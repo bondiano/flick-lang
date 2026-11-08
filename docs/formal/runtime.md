@@ -940,7 +940,7 @@ Found by the Lean development of the core (`formal/Formal/`).
 - Foreign calls enter `P` when they start, as JS; Go puts them there when they are interrupted.
 - Discontinuing a body throws the handler's signal into its frames, as Go panics with it, rather than `gen.return()`: every frame sees it as a failure, `Effect.ensuring` and scopes close by the same path, and the order of finalizers is Go's.
 - A group made while its owner closes: §3.6, as Go ([JS](#js-a-group-made-while-its-owner-closes-runs-nothing)). `group_in_closing` passes.
-- `Layer.merge` builds one side, then the other, into the one owner; Effect and Go build them side by side, each into a scope of its own that releases in parallel. A `shortcut:` in `rt/layer.ts`, until `Layer` moves.
+- A service a layer builds is a handler: its operations run with the evidence of the place of the `provide`, as the arms of `provide S impl` do (§3.2), and a failure of one is the handler's. On Effect and Go it is a record whose operations run where they are called: `codegen/service_place` prints `inner layer` there and `outer layer` here.
 
 ### Go: HTTP handlers
 

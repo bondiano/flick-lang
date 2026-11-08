@@ -3,10 +3,12 @@
 // scope closed when the last owner that asked for it closes. `provide layer {
 // body }` builds it into the owner of the body. A nested `provide` reads the
 // memo map of the one around it; sibling ones build anew.
-import { type Cause, type Exit, raise } from "./cause.ts";
+import { type Cause, type Exit, combine, empty, raise } from "./cause.ts";
+import { allOf } from "./concurrency.ts";
 import { mapped } from "./effects.ts";
 import { type Ctx, type Run, Suspend, Under, asExit, currentCtx, exitOf, extend, lookup, raiseOf, uninterruptible } from "./fiber.ts";
 import { Owner, addTo, closeOwn, finalize, inside, withOwner } from "./owner.ts";
+import { serving } from "./handle.ts";
 import { traceEvent, traceLayer, tracing } from "./trace.ts";
 
 /** Built services, a `Context`: implementations by tag, later ones replacing earlier ones. */
@@ -145,29 +147,65 @@ export const buildWith = (layer: Layer, memo: MemoMap, scope: Owner): Under =>
     mapped(layer.build(memo, scope), (services): Services => [...servicesOf(services), [MEMO, memo]]),
   );
 
-/** The evidence `ctx` with `services`. */
-export const provided = (ctx: Ctx, services: Services): Ctx => services.reduce((c: Ctx, [tag, impl]) => extend(c, tag, impl), ctx);
+/** Runs `body` with `services` in effect, as handlers at this place; a memo map among them is the current one. */
+export const withServices = (services: Services, body: () => unknown): Under =>
+  serving(
+    services.filter(([tag]) => tag === MEMO).reduce((c: Ctx, [tag, impl]) => extend(c, tag, impl), currentCtx()),
+    services.filter(([tag]) => tag !== MEMO),
+    body,
+  );
 
 /** A layer of services built without effects. */
 export const constant = (services: Services): Layer => new Layer(() => services);
 
 export const layerSucceed = (tag: object, impl: unknown): Layer => constant([[tag, impl]]);
 
-/** Both layers; services `b` builds replace those of `a`. */
-// shortcut: builds one after the other into one owner, not side by side into scopes of their own; upgrade when `Layer` moves to handlers
-export const layerMerge = (a: Layer, b: Layer): Layer =>
-  new Layer(function* (memo, into): Run {
-    const first = servicesOf(yield a.build(memo, into));
-    const second = servicesOf(yield b.build(memo, into));
-    return [...first, ...second];
+/** What `allOf` gave, known to be a list. */
+const listOf = (value: unknown): ReadonlyArray<unknown> => (Array.isArray(value) ? value : []);
+
+/** Closes the scopes side by side: they fail as their own finalizers do, joined. */
+function* closeAll(scopes: ReadonlyArray<Owner>, exit: Exit): Run {
+  const causes: Array<Cause> = scopes.map(() => empty);
+  yield allOf(
+    scopes.map((scope, i) =>
+      function* (): Run {
+        causes[i] = asExit(yield closeOwn(scope, exit)).cause ?? empty;
+        return undefined;
+      },
+    ),
+    Infinity,
+  );
+  const cause = causes.reduce(combine, empty);
+  return cause.reasons.length === 0 ? undefined : raise(cause);
+}
+
+/**
+ * Builds the layers side by side, each into a scope of its own, which release
+ * side by side when the merged layer's does; the first failure stops the other
+ * builds. The services of a later layer replace those of an earlier one.
+ */
+export const mergeAll = (layers: ReadonlyArray<Layer>): Layer =>
+  fromBuild(function* (memo, into): Run {
+    const parts = layers.map((layer) => [layer, new Owner(into.defects)] as const);
+    addTo(into, (exit: Exit) => closeAll(parts.map(([, scope]) => scope), exit), true);
+    const built = listOf(
+      yield allOf(
+        parts.map(([layer, scope]) => () => layer.build(memo, scope)),
+        Infinity,
+      ),
+    );
+    return built.flatMap(servicesOf);
   });
+
+/** Both layers; services `b` builds replace those of `a`. */
+export const layerMerge = (a: Layer, b: Layer): Layer => mergeAll([a, b]);
 
 export const layerOverride = layerMerge;
 
 function* provide(layer: Layer, body: (unit: undefined) => unknown): Run {
   return yield withOwner(function* (owner: Owner): Run {
     const services = servicesOf(yield buildWith(layer, currentMemo(), owner));
-    return new Under(provided(currentCtx(), services), () => body(undefined));
+    return withServices(services, () => body(undefined));
   }, "provide");
 }
 

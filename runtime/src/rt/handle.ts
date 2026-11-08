@@ -72,6 +72,7 @@ export const operation = (tag: object, name: string, arity: number, dicts: Reado
     if (impl === undefined) {
       throw new Error(`no handler of \`${String(Reflect.get(tag, "key"))}\` is in effect`);
     }
+    if (impl instanceof Served) return impl.call(name, dicts, args);
     return applyAll(dictsApplied(Reflect.get(Object(impl), name), dicts), args);
   };
   const collect = (args: ReadonlyArray<unknown>): unknown =>
@@ -95,6 +96,18 @@ function* tailRun(run: unknown, token: object): Run {
     throw armFailure(thrown, token);
   }
 }
+
+/** A `tail` arm's call: run with the evidence of its handler, a failure the handler's. */
+const tailCall = (prompt: Prompt, called: () => unknown): unknown => {
+  const { token, ctx } = prompt;
+  let out: unknown;
+  try {
+    out = inCtx(ctx, called);
+  } catch (thrown) {
+    throw armFailure(thrown, token);
+  }
+  return isRun(out) || out instanceof Instruction ? new Under(ctx, () => tailRun(out, token)) : out;
+};
 
 /** The frames of a body between an operation and its handler, out of the stack. */
 class Segment {
@@ -284,7 +297,7 @@ export const trySync = (body: () => unknown, handler: (error: unknown) => (() =>
 
 /** An arm of `installs` as the implementation of its operation. */
 const armOf = (prompt: Prompt, [, arm, kind, dicts, arity]: OpInstall): unknown => {
-  const { token, ctx } = prompt;
+  const { token } = prompt;
   const called = (given: ReadonlyArray<unknown>, args: ReadonlyArray<unknown>): unknown =>
     applyAll(dictsApplied(arm, given), args);
   if (kind === "control") {
@@ -295,15 +308,7 @@ const armOf = (prompt: Prompt, [, arm, kind, dicts, arity]: OpInstall): unknown 
       return raise(fail(new Signal(token, () => called(given, args), undefined, false)));
     });
   }
-  return collected(dicts, arity, (given, args) => {
-    let out: unknown;
-    try {
-      out = inCtx(ctx, () => called(given, args));
-    } catch (thrown) {
-      throw armFailure(thrown, token);
-    }
-    return isRun(out) || out instanceof Instruction ? new Under(ctx, () => tailRun(out, token)) : out;
-  });
+  return collected(dicts, arity, (given, args) => tailCall(prompt, () => called(given, args)));
 };
 
 /**
@@ -326,4 +331,34 @@ export const handle = (
     inner = extend(inner, tag, impl);
   }
   return new Under(inner, () => bodyRun(prompt, body, ret, errors), prompt);
+};
+
+/**
+ * A service a layer built, in effect as a handler: each of its operations is
+ * a `tail` arm, which runs with the evidence of the place of the `provide`, as
+ * the arms of `provide S impl` do (docs/formal/runtime.md §3.5).
+ */
+class Served {
+  private readonly prompt: Prompt;
+  readonly impl: unknown;
+  constructor(prompt: Prompt, impl: unknown) {
+    this.prompt = prompt;
+    this.impl = impl;
+  }
+  call(name: string, given: ReadonlyArray<unknown>, args: ReadonlyArray<unknown>): unknown {
+    return tailCall(this.prompt, () => applyAll(dictsApplied(Reflect.get(Object(this.impl), name), given), args));
+  }
+}
+
+/** The implementation of `tag` in the evidence, whether a layer or a record gave it. */
+export const implementation = (tag: object): unknown => {
+  const impl = lookup(tag);
+  return impl instanceof Served ? impl.impl : impl;
+};
+
+/** `body` under the handlers of `services` on top of `ctx`; their operations run with the evidence here. */
+export const serving = (ctx: Ctx, services: ReadonlyArray<readonly [tag: object, impl: unknown]>, body: () => unknown): Under => {
+  const prompt = new Prompt(currentFiber(), currentCtx());
+  const inner = services.reduce((c: Ctx, [tag, impl]) => extend(c, tag, new Served(prompt, impl)), ctx);
+  return new Under(inner, () => bodyRun(prompt, body, undefined, undefined), prompt);
 };

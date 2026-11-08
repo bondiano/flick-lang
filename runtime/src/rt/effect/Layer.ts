@@ -1,6 +1,6 @@
 // The bindings of `Layer` on the kernel, as Go's `flickrt` has Effect's.
 import { type Cause, die, dies, isFail, raise } from "../cause.ts";
-import { type Run, Suspend, Under, asExit, currentCtx, currentOwner, exitOf, lookup } from "../fiber.ts";
+import { type Run, Suspend, type Under, asExit, currentOwner, exitOf } from "../fiber.ts";
 import {
   type Build,
   Layer,
@@ -11,10 +11,12 @@ import {
   currentMemo,
   fromBuild,
   memoizable,
-  provided,
+  mergeAll,
   scoped,
   servicesOf,
+  withServices,
 } from "../layer.ts";
+import { implementation } from "../handle.ts";
 import { Failure } from "../outcome.ts";
 import { type Owner, withOwner } from "../owner.ts";
 
@@ -53,21 +55,12 @@ export const unwrap = (task: () => unknown): Layer =>
     return yield layer.build(memo, into);
   });
 
-/** Every layer's services, a later one's replacing an earlier one's. */
-export const flickMergeAll = (first: Layer, rest: ReadonlyArray<Layer>): Layer =>
-  [first, ...rest].reduce((merged, layer) => new Layer(function* (memo, into): Run {
-    const a = servicesOf(yield merged.build(memo, into));
-    const b = servicesOf(yield layer.build(memo, into));
-    return [...a, ...b];
-  }));
+export const flickMergeAll = (first: Layer, rest: ReadonlyArray<Layer>): Layer => mergeAll([first, ...rest]);
 
 const layerOf = (value: unknown): Layer => {
   if (value instanceof Layer) return value;
   throw new TypeError("not a layer");
 };
-
-/** Runs `build` with `services` in effect. */
-const withServices = (services: Services, build: () => unknown): Under => new Under(provided(currentCtx(), services), build);
 
 /** `Layer.provide_ that self`: `self` built with the services of `that`. */
 const provideTo =
@@ -160,7 +153,7 @@ export const orDie = (self: Layer): Layer =>
 /** `self` built with the service of `tag` its input has changed by `f`. */
 export const updateService = (tag: object, f: (impl: unknown) => unknown) => (self: Layer): Layer =>
   fromBuild((memo, into) => {
-    const impl = lookup(tag);
+    const impl = implementation(tag);
     if (impl === undefined) return raise(die(`Service not found: ${String(Reflect.get(tag, "key"))}`));
     return withServices([[tag, f(impl)]], () => self.build(memo, into));
   });
