@@ -110,7 +110,7 @@ up to date, record it with
 `node docs/scripts/parity.mjs --stamp docs/src/content/docs/ru/<page>.md`
 (a translated chapter of the specification is `docs/src/content/docs/spec/<page>.md`).
 
-The main entry points are Learn, Guides, API and Ecosystem. `/play/` runs a
+The main entry points are Start, Handbook and Reference. `/play/` runs a
 single Flick module in an isolated browser worker; `/transpile/` shows its
 real debug or release JavaScript without executing it. Both use the
 WebAssembly build of the same compiler core.

@@ -13,8 +13,9 @@ have what you came for.
    takes a few commands and ends with a project you can edit.
 3. **Decide whether it suits you.** [Why Flick](./why/) says what the language
    promises, where those promises stop, and who it does not suit yet.
-4. **Learn the language.** [Learn Flick](../learn/) introduces the ideas in
-   order, and [Syntax in five minutes](../learn/syntax/) is the quick version.
+4. **Learn the language.** The reference describes it in full: start with
+   [Kinds and types](../reference/types/) and
+   [Effects, errors and services](../reference/effects/).
 
 Moving a project from 0.1 to `main`? [Upgrading to 0.2](../handbook/upgrading/)
 lists what changed and how to update it. 0.2 is not released yet.

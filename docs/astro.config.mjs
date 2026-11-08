@@ -38,6 +38,20 @@ export default defineConfig({
     // Astro adds the base to where a redirect is served, not to where it leads
     "/start/upgrading/": `${base}/handbook/upgrading/`,
     "/ru/start/upgrading/": `${base}/ru/handbook/upgrading/`,
+    // pages that gave way to the start pages and the reference
+    ...Object.fromEntries(
+      [
+        ["learn/", "start/"],
+        ["learn/syntax/", "reference/grammar/"],
+        ["learn/flick-and-effect/", "reference/effect-surface/"],
+        ["guides/", "start/"],
+        ["ecosystem/", "start/getting-started/"],
+        ["api/", "reference/stdlib/"],
+      ].flatMap(([from, to]) => [
+        [`/${from}`, `${base}/${to}`],
+        [`/ru/${from}`, `${base}/ru/${to}`],
+      ]),
+    ),
   },
   vite: {
     environments: {

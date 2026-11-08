@@ -14,9 +14,9 @@ grows as more changes land.
 ## How to upgrade
 
 Build the compiler from a checkout of `main` (see
-[Ecosystem](../../ecosystem/)), point the project at the `std` of the same
-checkout (see [the next section](#std-comes-from-a-package)), then run in
-the project:
+[Getting started](../../start/getting-started/#from-source)); it takes the
+`std` of the same checkout (see [the next section](#std-comes-from-a-package)).
+Then run in the project:
 
 ```sh
 flick install

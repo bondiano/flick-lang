@@ -10,7 +10,7 @@
   <a href="https://bondiano.github.io/flick-lang/">Documentation</a> ·
   <a href="./docs/src/content/docs/start/why.md">Why Flick</a> ·
   <a href="./docs/src/content/docs/start/getting-started.md">Get started</a> ·
-  <a href="./docs/src/content/docs/learn/index.md">Learn</a> ·
+  <a href="./docs/src/content/docs/reference/types.md">Reference</a> ·
   <a href="./examples/">Examples</a> ·
   <a href="./editors/README.md">Editor setup</a>
 </p>
@@ -89,13 +89,8 @@ Go 1.23 or newer is needed only for the Go target (`--emit go`).
 
 ## Explore
 
-- [Learn Flick](./docs/src/content/docs/learn/index.md) — start with types,
-  functions and effects, including a path for TypeScript and Effect users.
-- [Guides](./docs/src/content/docs/guides/index.md) — work through real tasks.
-- [API & reference](./docs/src/content/docs/api/index.md) — syntax, standard
-  library and runtime contracts.
-- [Ecosystem](./docs/src/content/docs/ecosystem/index.md) — compiler, browser
-  playground, JavaScript interop and editor tooling.
+- [Reference](./docs/src/content/docs/reference/types.md) — the language, the
+  standard library, the runtime and the tools.
 - [Specification](./docs/src/content/docs/spec/index.md) — the normative
   description of the language; the formal semantics and its
   Lean proofs are in [`docs/formal/`](./docs/formal/) and

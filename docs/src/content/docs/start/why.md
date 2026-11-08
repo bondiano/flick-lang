@@ -160,9 +160,10 @@ one app, so treat these as a sanity check.
 - **Other platforms.** There is no mobile, desktop or WebAssembly target.
 - **Teams already productive with TypeScript and Effect.** On JavaScript, Flick
   runs on the same Effect, so adopting it is a choice of source language, not of
-  runtime. [Flick and Effect](../../learn/flick-and-effect/) compares the two.
+  runtime. [Effect coverage](../../reference/effect-surface/) lists what of
+  Effect Flick reaches.
 
 ## Next
 
 [Getting started](../getting-started/) installs the compiler and runs a first
-program. [Learn Flick](../../learn/) introduces the ideas in order.
+program. The [reference](../../reference/types/) describes the language in full.

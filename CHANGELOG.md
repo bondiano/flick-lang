@@ -6,6 +6,9 @@ break programs.
 
 ## Unreleased
 
+- **Documentation:** the Learn, Guides, API and Ecosystem pages are gone. Their
+  addresses lead to the start pages, Getting started and the reference; building
+  from source is a section of Getting started.
 - **A compiler built from source:** takes the `std` of its own checkout instead of
   the release tag its version names, so `flick new` and `flick run` work without
   `FLICK_STD_PATH`. A `std` that does not check with the compiler is the new
