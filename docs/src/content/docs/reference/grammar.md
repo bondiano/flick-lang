@@ -53,13 +53,12 @@ Contextual words are ordinary names everywhere except in one position:
   [sql.md](../sql/));
 - `cli` before a string and `{`: a block of the plugin of `std`, which reads
   its clauses (see [command-line applications](../cli-dsl/));
-- `codec` before a schema and `{`, and `server` before `fn` or a name: blocks
-  of the plugin of `std` (see [the codec DSL](../schema/#the-codec-dsl) and
-  [server functions](../server-fn/)). Every module has these blocks of `std`
-  without an import;
+- `codec` before a schema and `{`, `server` before `fn` or a name, and
+  `component` before the name of a top-level declaration: blocks of the plugin
+  of `std` (see [the codec DSL](../schema/#the-codec-dsl),
+  [server functions](../server-fn/) and [ui.md](../ui/#components)). Every
+  module has these blocks of `std` without an import;
 - `and` between the bindings of a `do` group, `x <- a and y <- b`;
-- `component` before the name of a top-level declaration (see
-  [ui.md](../ui/#components));
 - `effect` before the name of an effect declaration, `tail`, `abort` and
   `control` before an operation of a service or an effect, and `return`
   before the pattern of an arm of `try` (see
@@ -238,13 +237,12 @@ item        = name | Con | Con "(..)" | ".." | "plugin" name   // see plugins.md
 ModulePath  = Con { "." Con }
 
 decl        = signature | let | rec_group | type_decl | kind_decl | error_decl
-            | service | class | instance | foreign | component
+            | service | class | instance | foreign
             | head { head_arg } ("{" { token } "}" | { token })   // a plugin's, to the next decl
 signature   = name ":" type
 let         = "let" ["rec"] (name { atom_pattern } | pattern) [":" type] "=" block
             | "let" "assert" pattern [":" type] "=" block ["as" String]
 rec_group   = "rec" "{" { signature | let } "}"
-component   = "component" name atom_pattern "=" block
 type_decl   = ["opaque"] "type" Con { param } ["=" variants] [deriving]
             | ["opaque"] "type" "alias" Con { param } "=" type [deriving]
             | "refined" "type" Con { param } "=" type "where" expr [deriving]

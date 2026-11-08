@@ -264,7 +264,6 @@ impl Checker<'_> {
             K::RecordExpr => self.record(node, None),
             K::RecordUpdate => self.record_update(node, &children),
             K::FunExpr => self.lambda(node, None),
-            K::ComponentExpr => self.component(node),
             K::Block => self.block(node, None),
             K::MatchExpr => self.match_expr(node, None),
             K::TryExpr => self.try_expr(node, None),

@@ -6,6 +6,13 @@ break programs.
 
 ## Unreleased
 
+- **`component` is a block of `std`:** the plugin of `std` gives the code of
+  `component name (props : P) = body`, as the compiler did, so programs, their
+  diagnostics, their hover and their bundles stay as they were. The word starts a
+  component only before a name at the start of a declaration. A malformed one is
+  `std/U010`. The editor finds and renames a local of a block's code, and a
+  `CallSite` there names the definition the block gives. A long component no
+  longer gets the length and complexity lints of a function.
 - **Blocks of `std` need no import:** every module has the heads of the plugin of
   `std`, `cli`, `codec`, `server` and `sql`, as in 0.1. An import of one,
   `import Cli exposing (plugin cli)`, is `FLICK-R012`, which `flick check --fix`

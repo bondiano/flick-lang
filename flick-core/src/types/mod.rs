@@ -20,7 +20,6 @@ mod builtins;
 mod calls;
 mod class_members;
 mod classes;
-mod component;
 mod comprehension;
 mod convert;
 mod debug;
@@ -91,7 +90,6 @@ pub use builtins::{
 };
 pub use class_members::class_defaults;
 pub use classes::{Dict, Match, STRUCTURAL, match_type, which};
-pub use component::{instance_key as component_instance, parts as component_parts};
 pub use comprehension::{comprehension, for_parts};
 pub use convert::is_type;
 pub use display::{show_signature, show_type};

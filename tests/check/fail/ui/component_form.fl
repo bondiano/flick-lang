@@ -1,0 +1,9 @@
+module App.ComponentForm exposing (..)
+
+// a component without `=` after its props: the plugin says what it expects
+component broken (p : String)
+
+after : Float
+let after = 1
+
+//~ std/U010 @4:1-4:30 expected `=` after the props of the component

@@ -1,6 +1,6 @@
 ---
 title: "Грамматика Flick"
-source_hash: 38a373e437801b2e
+source_hash: f7a26467142ee1da
 ---
 
 Здесь описан синтаксис исходного кода, который принимают `flick check`
@@ -57,13 +57,12 @@ ui in when for yield do
   [SQL](../sql/));
 - `cli` перед строкой и `{`: блок плагина пакета `std`, который читает его
   предложения (см. [приложения командной строки](../cli-dsl/));
-- `codec` перед схемой и `{`, а также `server` перед `fn` или именем: блоки
-  плагина пакета `std` (см. [DSL кодеков](../schema/#dsl-кодеков) и
-  [серверные функции](../server-fn/)). Эти блоки `std` есть в каждом модуле
-  без импорта;
+- `codec` перед схемой и `{`, `server` перед `fn` или именем и `component`
+  перед именем объявления верхнего уровня: блоки плагина пакета `std` (см.
+  [DSL кодеков](../schema/#dsl-кодеков), [серверные функции](../server-fn/) и
+  [ui.md](../ui/#компоненты)). Эти блоки `std` есть в каждом модуле без
+  импорта;
 - `and` между связками группы `do`, `x <- a and y <- b`;
-- `component` перед именем объявления верхнего уровня (см.
-  [ui.md](../ui/#компоненты));
 - `effect` перед именем объявления эффекта, `tail`, `abort` и `control` перед
   операцией сервиса или эффекта и `return` перед образцом ветки `try` (см.
   [effects.md](../effects/#эффекты-и-handlers)).
@@ -258,13 +257,12 @@ item        = name | Con | Con "(..)" | ".." | "plugin" name   // см. plugins.
 ModulePath  = Con { "." Con }
 
 decl        = signature | let | rec_group | type_decl | kind_decl | error_decl
-            | service | class | instance | foreign | component
+            | service | class | instance | foreign
             | head { head_arg } ("{" { token } "}" | { token })   // плагина, до следующего decl
 signature   = name ":" type
 let         = "let" ["rec"] (name { atom_pattern } | pattern) [":" type] "=" block
             | "let" "assert" pattern [":" type] "=" block ["as" String]
 rec_group   = "rec" "{" { signature | let } "}"
-component   = "component" name atom_pattern "=" block
 type_decl   = ["opaque"] "type" Con { param } ["=" variants] [deriving]
             | ["opaque"] "type" "alias" Con { param } "=" type [deriving]
             | "refined" "type" Con { param } "=" type "where" expr [deriving]

@@ -206,7 +206,8 @@ another task for a busy `exhaust` handler.
 ### Components
 
 `component name (props : P) = body` declares a view of its props, of the
-type `Ui.View P`, which `Ui.render name props` places. The props are one
+type `Ui.View P`, which `Ui.render name props` places. It is a block of the
+plugin of `std`, which every module has without an import. The props are one
 pattern, usually a record with its type. The body is a block: its last
 expression renders the component, again whenever an atom it read changes or
 its props do. A body that is that expression alone is

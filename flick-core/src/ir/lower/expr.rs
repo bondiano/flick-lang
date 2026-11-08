@@ -104,7 +104,6 @@ impl Lower<'_> {
             }
             K::FunExpr => return self.lambda(node, &children),
             K::Block => return self.block(node),
-            K::ComponentExpr => return self.component(node, &children),
             // `Ui` names and implicit component applications were resolved by the checker.
             K::UiExpr => {
                 return match children.iter().find(|n| n.kind == K::Block) {

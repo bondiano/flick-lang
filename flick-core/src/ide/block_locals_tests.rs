@@ -33,3 +33,19 @@ fn a_parameter_of_a_server_fn_is_found_and_renamed_with_its_uses() {
         both
     );
 }
+
+#[test]
+fn the_render_of_a_component_sees_its_props_and_the_names_of_its_setup() {
+    let source =
+        "module App.C exposing (c)\n\ncomponent c (p : String) =\n  let n = p\n  ui { text n }\n";
+    let f = fixture_of(&[("src/App/C.fl", source)]);
+    let ide = f.ide();
+    let file = f.file("App.C");
+    let m = ide.analysis.by_file(file).expect("the module");
+    let offset = u32::try_from(source.rfind('n').expect("a use")).expect("small");
+    let names: Vec<String> = super::locals::in_scope(&m.tree, offset, source)
+        .into_iter()
+        .map(|(name, _)| name)
+        .collect();
+    assert_eq!(names, ["p", "n"]);
+}

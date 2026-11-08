@@ -539,7 +539,8 @@ pub trait Plugin {
         Vec::new()
     }
     /// What an editor shows at `offset` of `block`; `facts` are the types
-    /// of the `_` of its code, as `check` gets them, once it checked.
+    /// of the `_` of its code, as `check` gets them, once it checked. An
+    /// offset past the end of the block is its head, before the block.
     fn hover(&self, block: &Block, state: &[u8], offset: u32, facts: &[Fact]) -> Option<Hover> {
         let _ = (block, state, offset, facts);
         None

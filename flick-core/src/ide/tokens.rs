@@ -201,7 +201,6 @@ fn contextual_keywords(node: &Node, out: &mut Vec<(u32, u32, u32)>) {
         if matches!(
             t.kind,
             K::AndKw
-                | K::ComponentKw
                 | K::PluginKw
                 | K::EffectKw
                 | K::TailKw
