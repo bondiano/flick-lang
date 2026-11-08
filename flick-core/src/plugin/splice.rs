@@ -133,11 +133,26 @@ fn generated(
         };
         let width = u32::try_from(width).expect("a short placeholder");
         let placeholder = (at + offset, at + offset + width);
+        let local = parent_kind(&tree, kind, placeholder) == Some(K::Block);
+        if local && !matches!(user.kind, K::LetDecl | K::Signature) {
+            return Err("a declaration in a block is no `let` or signature".into());
+        }
         if !replace(&mut tree, kind, placeholder, &mut Some(user)) {
             return Err("a placeholder of a hole is missing".into());
         }
     }
     Ok(tree)
+}
+
+/// The kind of the node whose child is the node of `kind` at `range`.
+fn parent_kind(node: &Node, kind: K, range: (u32, u32)) -> Option<K> {
+    node.nodes().find_map(|n| {
+        if n.kind == kind && n.range() == range {
+            Some(node.kind)
+        } else {
+            parent_kind(n, kind, range)
+        }
+    })
 }
 
 /// Replaces the node of `kind` at `range` under `node` by `with`.

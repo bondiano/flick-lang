@@ -44,6 +44,31 @@ macro_rules! wit_arena_conversions {
                                 w::Expr::Annot(w::Annot { expr, ty })
                             }
                             $crate::Expr::Hole(s) => w::Expr::Hole(to_span(s)),
+                            $crate::Expr::Match { scrutinee, arms } => w::Expr::Match(w::MatchOn {
+                                scrutinee,
+                                arms: (arms.into_iter())
+                                    .map(|a| w::Arm {
+                                        pattern: a.pattern,
+                                        guard: a.guard,
+                                        body: a.body,
+                                    })
+                                    .collect(),
+                            }),
+                            $crate::Expr::If {
+                                condition,
+                                then,
+                                otherwise,
+                            } => w::Expr::If(w::Branches {
+                                condition,
+                                then,
+                                otherwise,
+                            }),
+                            $crate::Expr::Block { statements, result } => {
+                                w::Expr::Block(w::Statements {
+                                    items: statements,
+                                    result,
+                                })
+                            }
                         }),
                         $crate::Kind::Ty(t) => w::Kind::Ty(match t {
                             $crate::Ty::Name(s) => w::Ty::Name(s),
@@ -172,6 +197,25 @@ macro_rules! wit_arena_conversions {
                                 ty: a.ty,
                             },
                             w::Expr::Hole(s) => $crate::Expr::Hole(from_span(s)),
+                            w::Expr::Match(m) => $crate::Expr::Match {
+                                scrutinee: m.scrutinee,
+                                arms: (m.arms.into_iter())
+                                    .map(|a| $crate::Arm {
+                                        pattern: a.pattern,
+                                        guard: a.guard,
+                                        body: a.body,
+                                    })
+                                    .collect(),
+                            },
+                            w::Expr::If(b) => $crate::Expr::If {
+                                condition: b.condition,
+                                then: b.then,
+                                otherwise: b.otherwise,
+                            },
+                            w::Expr::Block(s) => $crate::Expr::Block {
+                                statements: s.items,
+                                result: s.result,
+                            },
                         }),
                         w::Kind::Ty(t) => $crate::Kind::Ty(match t {
                             w::Ty::Name(s) => $crate::Ty::Name(s),

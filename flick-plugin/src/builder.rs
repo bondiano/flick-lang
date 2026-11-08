@@ -111,6 +111,21 @@ impl Kind {
                 Expr::Get { record, .. } => vec![*record],
                 Expr::Items(items) | Expr::Tuple(items) | Expr::Concat(items) => items.clone(),
                 Expr::Annot { expr, ty } => vec![*expr, *ty],
+                Expr::Match { scrutinee, arms } => [*scrutinee]
+                    .into_iter()
+                    .chain(
+                        arms.iter()
+                            .flat_map(|a| [a.pattern].into_iter().chain(a.guard).chain([a.body])),
+                    )
+                    .collect(),
+                Expr::If {
+                    condition,
+                    then,
+                    otherwise,
+                } => vec![*condition, *then, *otherwise],
+                Expr::Block { statements, result } => {
+                    statements.iter().copied().chain([*result]).collect()
+                }
             },
             Kind::Ty(ty) => match ty {
                 Ty::Name(_) | Ty::Text(_) | Ty::Wildcard | Ty::Hole(_) | Ty::Signed(_) => {

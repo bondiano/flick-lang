@@ -161,6 +161,34 @@ pub enum Expr {
     Hole(Span),
     /// `(a ++ b ++ …)`: texts or lists joined, at least two.
     Concat(Vec<NodeId>),
+    // shortcut: `flick!` writes no `match`, `if` or block, which `Builder` builds;
+    // add the syntax when plugins write them by hand often
+    /// `match scrutinee with | p when g -> e …`, at least one arm.
+    Match {
+        scrutinee: NodeId,
+        arms: Vec<Arm>,
+    },
+    /// `if condition then then else otherwise`.
+    If {
+        condition: NodeId,
+        then: NodeId,
+        otherwise: NodeId,
+    },
+    /// Statements, then the value; only the body of a `fun` or a `let`. A
+    /// statement is a local `let`, a signature, a hole of one, or an
+    /// expression.
+    Block {
+        statements: Vec<NodeId>,
+        result: NodeId,
+    },
+}
+
+/// An arm of a `match`: its pattern, maybe a guard, and its value.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Arm {
+    pub pattern: NodeId,
+    pub guard: Option<NodeId>,
+    pub body: NodeId,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

@@ -395,3 +395,68 @@ fn a_native_plugin_that_panics_fails_the_block_not_the_compiler() {
         "panicked: no colors"
     );
 }
+
+#[test]
+fn a_match_an_if_and_a_block_render_as_the_parser_reads_them() {
+    let built = text(|b| {
+        let scrutinee = b.expr(Expr::Name("n".into()));
+        let (yes, no) = (b.expr(Expr::Boolean(true)), b.expr(Expr::Boolean(false)));
+        let condition = b.expr(Expr::Boolean(true));
+        let guard = b.expr(Expr::If {
+            condition,
+            then: yes,
+            otherwise: no,
+        });
+        let x = b.pat(Pat::Var("x".into()));
+        let found = b.expr(Expr::Name("x".into()));
+        let arms = vec![flick_plugin::Arm {
+            pattern: x,
+            guard: Some(guard),
+            body: found,
+        }];
+        let chosen = b.expr(Expr::Match { scrutinee, arms });
+        let one = b.expr(Expr::Number(1.0));
+        let kept = b.decl(Decl::Let {
+            name: "n".into(),
+            params: Vec::new(),
+            ty: None,
+            body: one,
+            rec: false,
+        });
+        let body = b.expr(Expr::Block {
+            statements: vec![kept],
+            result: chosen,
+        });
+        let param = b.pat(Pat::Wildcard);
+        b.expr(Expr::Lambda {
+            params: vec![param],
+            body,
+        })
+    });
+    assert_eq!(
+        built.as_deref(),
+        Ok(
+            "(fun _ -> \n  let n = 1\n  (match n with | x when (if true then true else false) -> x))"
+        )
+    );
+    // a block is the body of a `fun` or a `let`, and a `match` has arms
+    let loose = text(|b| {
+        let one = b.expr(Expr::Number(1.0));
+        b.expr(Expr::Block {
+            statements: Vec::new(),
+            result: one,
+        })
+    });
+    assert_eq!(
+        loose,
+        Err("a block is only the body of a `fun` or a `let`".into())
+    );
+    let armless = text(|b| {
+        let scrutinee = b.expr(Expr::Unit);
+        b.expr(Expr::Match {
+            scrutinee,
+            arms: Vec::new(),
+        })
+    });
+    assert_eq!(armless, Err("a `match` without arms".into()));
+}

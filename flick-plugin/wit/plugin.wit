@@ -53,6 +53,11 @@ interface types {
   record annot { expr: node-id, ty: node-id }
   record arrow { input: node-id, output: node-id }
   record con-pat { name: string, arguments: list<node-id> }
+  /// An arm of a `match`: its pattern, maybe a guard, and its value.
+  record arm { pattern: node-id, guard: option<node-id>, body: node-id }
+  record match-on { scrutinee: node-id, arms: list<arm> }
+  record branches { condition: node-id, then: node-id, otherwise: node-id }
+  record statements { items: list<node-id>, %result: node-id }
 
   variant expr {
     name(string),
@@ -70,6 +75,14 @@ interface types {
     hole(span),
     /// `(a ++ b ++ …)`: texts or lists joined, at least two.
     concat(list<node-id>),
+    /// `match scrutinee with | p when g -> e …`, at least one arm.
+    %match(match-on),
+    /// `if condition then then else otherwise`.
+    %if(branches),
+    /// Statements, then the value; only the body of a `fun` or a `let`. A
+    /// statement is a local `let`, a signature, a hole of one, or an
+    /// expression.
+    block(statements),
   }
 
   variant ty {
