@@ -141,7 +141,7 @@ fn shared_browser_and_sql_programs_compile_without_server_modules() {
         let fetch url = Http.Client.get url\n\
         main : Unit ->{} Unit\nlet main () = Platform.stdout_line \"ok\"\n";
     let sql = "module Main exposing (query)\n\
-        import Sql exposing (plugin sql)\n\
+        import Sql\n\
         sql table Users \"users\" { id : bigint primary key as BigInt }\n\
         query : Sql.Template Sql.Pg {} { id : BigInt }\n\
         let query = sql {\n  from user in Users\n  select { id = user.id }\n}\n";
@@ -156,7 +156,7 @@ fn shared_browser_and_sql_programs_compile_without_server_modules() {
 
 #[test]
 fn server_fns_and_cli_blocks_are_plugins_of_std_in_every_build() {
-    let server = "module Main exposing (ping)\nimport Server exposing (plugin server)\n\
+    let server = "module Main exposing (ping)\nimport Server\n\
         ping : Unit ->{Server.Server;} Unit\nserver fn ping () = ()\n";
     let (diagnostics, _, compilation) = compile(server);
     assert!(
@@ -165,7 +165,7 @@ fn server_fns_and_cli_blocks_are_plugins_of_std_in_every_build() {
     );
     assert!(compilation.modules[0].interface.exports_value("ping"));
     // `cli` is a plugin of std, which every build has
-    let cli = "module Main exposing (command)\nimport Cli exposing (plugin cli)\n\
+    let cli = "module Main exposing (command)\nimport Cli\n\
         let command = cli \"hello\" { handle fun _ -> Platform.stdout_line \"hello\" }\n";
     let (diagnostics, _, compilation) = compile(cli);
     assert!(

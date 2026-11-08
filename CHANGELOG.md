@@ -6,6 +6,13 @@ break programs.
 
 ## Unreleased
 
+- **Blocks of `std` need no import:** every module has the heads of the plugin of
+  `std`, `cli`, `codec`, `server` and `sql`, as in 0.1. An import of one,
+  `import Cli exposing (plugin cli)`, is `FLICK-R012`, which `flick check --fix`
+  removes; only a block without `{`, such as `cli Main`, still needs it. Another
+  plugin may not give these heads (`FLICK-P044`), and `FLICK-P037` is retired. A
+  block inside the code of another expands also where a file is checked on its
+  own, as a doc example is.
 - **A plugin's code:** a plugin may give `match` with guards, `if` and blocks of
   statements as the body of a `fun` or a `let`, and use a pattern of the user's in
   several places, as the props of a component its setup and its render bind. A

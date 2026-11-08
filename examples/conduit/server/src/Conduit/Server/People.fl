@@ -2,7 +2,6 @@
 /// no row.
 module Conduit.Server.People exposing (..)
 
-import Sql exposing (plugin sql)
 import Database exposing (Database)
 import Conduit.Server.Db as Db
 import Conduit.Server.Schema exposing (Follows, Users)

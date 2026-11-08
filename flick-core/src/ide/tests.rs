@@ -60,7 +60,7 @@ type Tagged (f : Type -> Type) a = Tagged a
 const MAIN: &str = "module App.Main exposing (run, keep, describe)
 
 import App.Domain exposing (User, Shape(..), greet, area)
-import Sql exposing (plugin sql)
+import Sql
 
 service Store =
   put : String ->{; StoreError} Unit

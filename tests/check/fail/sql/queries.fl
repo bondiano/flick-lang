@@ -1,7 +1,7 @@
 // What the SQL elaboration refuses, each with its span inside `sql { }`.
 module App.Queries exposing (..)
 
-import Sql exposing (Pg, plugin sql)
+import Sql exposing (Pg)
 
 type UserId = UserId BigInt
 

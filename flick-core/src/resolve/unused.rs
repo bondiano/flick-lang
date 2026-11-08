@@ -7,8 +7,10 @@ use super::syntax::{Import, Item, ItemKind};
 use super::uses::{Reference, Unused};
 use super::{Interface, Module};
 use crate::diagnostics::{Code, Diagnostic, Edit, Severity, codes};
+use crate::plugin::first_party;
 use crate::source::Span;
 use crate::syntax::kind::SyntaxKind as K;
+use crate::types::implicit_package_of;
 
 /// Warnings for local names bound and never used.
 pub(super) fn unused_locals(unused: Vec<Unused>) -> impl Iterator<Item = Diagnostic> {
@@ -73,21 +75,37 @@ impl Scope<'_> {
                 .iter()
                 .filter(|item| !used(item, interface, &names))
                 .collect();
+            // every module has the heads of std's plugin: an import of one is
+            // needed only for a block it lets the module write without `{`
+            let of_std = implicit_package_of(&import.module) == Some(first_party::PACKAGE);
+            let needless: Vec<&Item> = (import.plugins.iter())
+                .filter(|p| of_std && first_party::HEADS.iter().any(|(h, _)| *h == p.name))
+                .filter(|p| !module.syntax.bodiless.contains(&p.name))
+                .collect();
             // blocks of the plugins it exposes use it
-            let whole = unused.len() == import.exposing.len() && import.plugins.is_empty();
+            let whole =
+                unused.len() == import.exposing.len() && needless.len() == import.plugins.len();
             if !qualifiers.contains(import.qualifier()) && whole {
                 // importing a module brings its instances, which may be the point
-                if !interface
+                if interface
                     .instances
                     .iter()
                     .any(|i| i.module == import.module)
                 {
+                    // the import stays for them; a head of std still goes
+                    for item in needless {
+                        diagnostics.push(needless_head(module.text, import, item));
+                    }
+                } else {
                     diagnostics.push(unused_import(module, import));
                 }
                 continue;
             }
             for item in unused {
                 diagnostics.push(unused_item(module.text, import, item));
+            }
+            for item in needless {
+                diagnostics.push(needless_head(module.text, import, item));
             }
         }
     }
@@ -144,6 +162,22 @@ fn unused_import(module: &Module, import: &Import) -> Diagnostic {
     } else {
         d
     }
+}
+
+/// `R012` on `plugin head` for a head of std's plugin, which every module
+/// has; removing it is safe.
+fn needless_head(text: &str, import: &Import, item: &Item) -> Diagnostic {
+    let message = format!("`plugin {}` is not needed: every module has it", item.name);
+    warning(codes::R012, message, item.span).with_safe_fix(|| {
+        let (start, end) = item_removal(text, import, item.span);
+        (
+            format!("remove `plugin {}` from the import", item.name),
+            vec![Edit {
+                span: Span::new(item.span.file, start, end),
+                replacement: String::new(),
+            }],
+        )
+    })
 }
 
 fn unused_item(text: &str, import: &Import, item: &Item) -> Diagnostic {

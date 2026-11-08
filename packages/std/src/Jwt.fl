@@ -5,7 +5,7 @@ module Jwt exposing (Problem(..), JwtError(..), sign, verify, now, expires_in)
 
 import Bytes
 import Clock
-import Codec exposing (plugin codec)
+import Codec
 import Codec.Derive
 import Crypto
 import Json

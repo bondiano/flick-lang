@@ -53,6 +53,10 @@ Contextual words are ordinary names everywhere except in one position:
   [sql.md](../sql/));
 - `cli` before a string and `{`: a block of the plugin of `std`, which reads
   its clauses (see [command-line applications](../cli-dsl/));
+- `codec` before a schema and `{`, and `server` before `fn` or a name: blocks
+  of the plugin of `std` (see [the codec DSL](../schema/#the-codec-dsl) and
+  [server functions](../server-fn/)). Every module has these blocks of `std`
+  without an import;
 - `and` between the bindings of a `do` group, `x <- a and y <- b`;
 - `component` before the name of a top-level declaration (see
   [ui.md](../ui/#components));

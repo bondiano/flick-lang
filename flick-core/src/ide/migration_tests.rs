@@ -6,7 +6,7 @@ use crate::diagnostics::Diagnostic;
 
 const SCHEMA: &str = "module App.Schema exposing (..)
 
-import Sql exposing (Pg, plugin sql)
+import Sql exposing (Pg)
 
 /// The people.
 sql migration 1 \"people\" {

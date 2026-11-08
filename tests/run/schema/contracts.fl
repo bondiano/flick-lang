@@ -5,7 +5,7 @@
 // Standard Schema adapter stops with the scope it was made in.
 module App.Main exposing (main)
 
-import Codec exposing (plugin codec)
+import Codec
 
 type Tree = Leaf Float | Branch (List Tree)
   deriving Schema

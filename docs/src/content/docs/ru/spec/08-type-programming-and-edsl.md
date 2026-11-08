@@ -30,7 +30,7 @@ DSL Flick для SQL, UI и командной строки — `sql params { �
 `sql table Name "table" { … }` объявляет тип строки `Name` и его таблицу; компилятор никогда не подключается к БД. `sql [p] { … }` — чистый проверенный `Sql.Template Pg params row`. Имя после `sql` связывает параметры, типы которых выводятся из мест использования; `$name` захватывает значение программы как место для подстановки.
 
 ```flick
-# import Sql exposing (Pg, EncodeError, DbError, DecodeError, plugin sql)
+# import Sql exposing (Pg, EncodeError, DbError, DecodeError)
 # import Database exposing (Database)
 # import BigDecimal exposing (BigDecimal)
 # type UserId = UserId BigInt
@@ -153,7 +153,7 @@ component counter (start : Float) =
 Приложение командной строки — значение `Cli.Command r e`: чистое описание флагов, позиционных аргументов, подкоманд и обработчика, которому нужны сервисы `r` и который может завершиться ошибками `e`. Построение команды ничего не разбирает и не запускает.
 
 ```flick
-import Cli exposing (plugin cli)
+import Cli
 
 greet : Cli.Command none none
 let greet = cli "greet" {

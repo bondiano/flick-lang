@@ -2,7 +2,7 @@
 // parser's helpers, and trace context headers to and from spans.
 module App.Main exposing (main)
 
-import Codec exposing (plugin codec)
+import Codec
 
 type alias Note = { title : String; tag : List String }
   deriving Schema

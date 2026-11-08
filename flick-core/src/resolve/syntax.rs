@@ -2,6 +2,8 @@
 
 use std::sync::Arc;
 
+use crate::plugin::blocks_under;
+use crate::plugin::first_party::{BARE, DECLARATIONS, HEADS};
 use crate::source::{FileId, Span};
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
@@ -10,6 +12,9 @@ use crate::syntax::kind::SyntaxKind as K;
 pub struct ModuleSyntax {
     pub header: Option<Header>,
     pub imports: Vec<Import>,
+    /// The heads of std's plugin its imports expose that a block of it
+    /// writes as only an import lets it, without `{`: `cli Main`.
+    pub bodiless: Vec<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -111,7 +116,61 @@ pub fn module_syntax(tree: &Node, text: &str, file: FileId) -> ModuleSyntax {
             _ => {}
         }
     }
-    ModuleSyntax { header, imports }
+    let bodiless = bodiless(tree, text, &imports);
+    ModuleSyntax {
+        header,
+        imports,
+        bodiless,
+    }
+}
+
+/// The heads of std's plugin `imports` expose that a block under `tree`
+/// writes in a form the parser reads only after an import: an expression
+/// without `{`, other than [`BARE`] before a name, or a declaration that is
+/// none of [`DECLARATIONS`]. The body of a block is not parsed yet, so a head
+/// written there counts too, whatever its form: the import then stays.
+fn bodiless(tree: &Node, text: &str, imports: &[Import]) -> Vec<String> {
+    let implicit = |head: &str| HEADS.iter().any(|(h, _)| *h == head);
+    let imported = |head: &str| (imports.iter()).any(|i| i.plugins.iter().any(|p| p.name == head));
+    if !HEADS.iter().any(|(h, _)| imported(h)) {
+        return Vec::new();
+    }
+    let mut blocks = Vec::new();
+    blocks_under(tree, &mut blocks);
+    let mut out: Vec<String> = Vec::new();
+    for block in blocks {
+        let mut words = (block.child_tokens()).filter(|t| !t.kind.is_trivia());
+        let Some(head) = words.next().filter(|t| t.kind == K::Ident) else {
+            continue;
+        };
+        let at = head.start;
+        let head = head.text(text);
+        let next = words.next();
+        let free = match block.kind {
+            K::PluginExpr => {
+                block.nodes().any(|n| n.kind == K::Block)
+                    || BARE.contains(&head)
+                        && next.is_some_and(|t| matches!(t.kind, K::Ident | K::Con))
+            }
+            _ => next.is_some_and(|t| {
+                (DECLARATIONS.iter()).any(|(h, w)| *h == head && *w == t.text(text))
+            }),
+        };
+        // a block in its body is read only as it expands, so any word of a head counts
+        let inner = (block.tokens().into_iter())
+            .filter(|t| t.kind == K::Ident && t.start > at)
+            .map(|t| t.text(text))
+            .filter(|w| implicit(w) && imported(w));
+        for word in inner {
+            if !out.iter().any(|h| h == word) {
+                out.push(word.to_owned());
+            }
+        }
+        if !free && implicit(head) && imported(head) && !out.iter().any(|h| h == head) {
+            out.push(head.to_owned());
+        }
+    }
+    out
 }
 
 fn items(exposing: &Node, text: &str, file: FileId) -> Vec<Item> {

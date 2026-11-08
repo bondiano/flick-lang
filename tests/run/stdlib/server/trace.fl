@@ -6,7 +6,7 @@ module App.Main exposing (main)
 
 import Http.ServerRequest exposing (ServerRequest)
 import Http.ServerResponse exposing (ServerResponse)
-import Server exposing (plugin server)
+import Server
 
 start : Unit ->{Async;} Float
 foreign start from "./traces.mjs" "start"

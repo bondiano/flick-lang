@@ -5,7 +5,7 @@ module App.Main exposing (main)
 import Http.Etag exposing (Generator)
 import Http.ServerRequest exposing (ServerRequest)
 import Http.ServerResponse exposing (ServerResponse)
-import Codec exposing (plugin codec)
+import Codec
 
 type alias Note = { title : String; tag : List String }
   deriving Schema

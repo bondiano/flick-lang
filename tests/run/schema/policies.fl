@@ -3,7 +3,7 @@
 // tagged `Option`, a default for a missing key and extra keys.
 module App.Main exposing (main)
 
-import Codec exposing (plugin codec)
+import Codec
 
 type alias Row = {
   required : String;

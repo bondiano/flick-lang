@@ -1,7 +1,7 @@
 // `deriving Cli.Value` for a choice of constructors and for a refined type.
 module App.Choice exposing (paint)
 
-import Cli exposing (plugin cli)
+import Cli
 
 type Color = Red | GreenLight
   deriving Cli.Value, Show

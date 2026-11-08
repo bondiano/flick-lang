@@ -1,6 +1,6 @@
 ---
 title: "Серверные функции"
-source_hash: bdd42d3a26791693
+source_hash: 8c87c836cb06681a
 ---
 
 `server fn` — функция, которая выполняется на сервере и которую любой код,
@@ -12,7 +12,7 @@ source_hash: bdd42d3a26791693
 ```flick
 module App.Shop exposing (Order, OutOfStock, place)
 
-import Server exposing (plugin server)
+import Server
 # import App.Db
 
 type alias Order = { item : String; count : Float }
@@ -69,7 +69,7 @@ place : Order ->{; Rpc.ClientError, OutOfStock} String
 ```flick
 # import Http.ServerRequest exposing (ServerRequest)
 # import Http.ServerResponse exposing (ServerResponse)
-# import Server exposing (plugin server)
+# import Server
 # import App.Db
 # import App.Shop
 #
@@ -117,7 +117,7 @@ let route functions =
 ```flick
 # import Http.ServerRequest exposing (ServerRequest)
 # import Http.ServerResponse exposing (ServerResponse)
-# import Server exposing (plugin server)
+# import Server
 #
 service Session =
   user : Unit ->{} String

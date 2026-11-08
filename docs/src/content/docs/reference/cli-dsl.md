@@ -8,10 +8,10 @@ subcommands and a handler that needs services `r` and fails with errors `e`
 parses the arguments with Effect's CLI and only then runs the handler.
 
 The block `cli "name" { … }` is the plugin `cli` of the `std` package (see
-[plugins](../plugins/)): a file that writes one imports it.
+[plugins](../plugins/)), which every module has without an import.
 
 ```flick
-import Cli exposing (plugin cli)
+import Cli
 
 greet : Cli.Command none none
 let greet =
@@ -164,7 +164,6 @@ resource of a `scope` runs inside that scope and cannot leave it
 | an `arg` beside subcommands | `std/L006` |
 | other names on an `arg` | `std/L007` |
 | a clause that is not one of the five, or a block without its name | `std/L009` |
-| a block in a file that does not import `plugin cli` | `FLICK-P037`, fixed by `flick check --fix` |
 
 The codes `std/…` are the plugin's; `flick explain std/L001` shows what
 each means. A type without `Cli.Value` is `FLICK-C001`, a default of the wrong type

@@ -139,3 +139,52 @@ fn unused_warnings_keep_their_primary_diagnostics() {
         assert_eq!(&text[span.range()], name);
     }
 }
+
+#[cfg(feature = "diagnostic-fixes")]
+#[test]
+fn an_import_of_a_head_of_std_is_needless_unless_a_block_needs_it() {
+    let head = "module Probe exposing (tool)\n";
+    let body = "tool : Cli.Command none none\nlet tool = cli \"tool\" { handle fun {} -> Platform.stdout_line \"hi\" }\n";
+    // `Cli.Command` uses the import, and `Codec` brings instances
+    let text = format!("{head}import Cli exposing (plugin cli)\n{body}");
+    assert_eq!(
+        fixed(&text, "FLICK-R012"),
+        format!("{head}import Cli\n{body}")
+    );
+    let text = format!("{head}import Codec exposing (plugin codec)\n{body}");
+    assert_eq!(
+        fixed(&text, "FLICK-R012"),
+        format!("{head}import Codec\n{body}")
+    );
+    let typed = body.replace("Cli.Command", "Command");
+    let text = format!("{head}import Cli exposing (Command, plugin cli)\n{typed}");
+    assert_eq!(
+        fixed(&text, "FLICK-R012"),
+        format!("{head}import Cli exposing (Command)\n{typed}")
+    );
+    // a block without `{` is one only because of the import
+    let text = format!(
+        "{head}import Cli exposing (plugin cli)\n\ntool : Cli.Command none none\nlet tool = cli Probe\n"
+    );
+    let mut sources = SourceMap::default();
+    let file = sources.add("Probe.fl", text);
+    let warned: Vec<String> = (crate::check(&sources, file).iter())
+        .filter(|d| d.code.to_string() == "FLICK-R012")
+        .map(|d| d.message.clone())
+        .collect();
+    assert!(warned.is_empty(), "{warned:?}");
+}
+
+#[cfg(feature = "diagnostic-fixes")]
+#[test]
+fn a_head_of_std_inside_another_block_keeps_its_import() {
+    // the body of `cli` is read only as it expands: `codec` there may need the import
+    let text = "module Probe exposing (tool)\n\nimport Codec exposing (plugin codec)\n\ntool : Cli.Command none none\nlet tool = cli \"tool\" { handle fun {} -> codec x }\n";
+    let mut sources = SourceMap::default();
+    let file = sources.add("Probe.fl", text);
+    let warned: Vec<String> = (crate::check(&sources, file).iter())
+        .filter(|d| d.code.to_string() == "FLICK-R012")
+        .map(|d| d.message.clone())
+        .collect();
+    assert!(warned.is_empty(), "{warned:?}");
+}

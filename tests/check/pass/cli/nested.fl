@@ -1,7 +1,7 @@
 // A `cli` block inside another: a subcommand written in place.
 module App.Nested exposing (tool)
 
-import Cli exposing (plugin cli)
+import Cli
 
 tool : Cli.Command none none
 let tool = cli "tool" {

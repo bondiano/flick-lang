@@ -1,7 +1,7 @@
 // Lowered `[lint]` thresholds, and a function that reads atoms to build a `Ui`.
 module App.Shape exposing (..)
 
-import Sql exposing (plugin sql)
+import Sql
 
 long : Float -> Float
 let long n =

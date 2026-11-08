@@ -1,7 +1,7 @@
 // Names of a command are unique, and the CLI's own are reserved.
 module App.Names exposing (twice, reserved, positional)
 
-import Cli exposing (plugin cli)
+import Cli
 
 twice : Cli.Command none none
 let twice = cli "twice" {

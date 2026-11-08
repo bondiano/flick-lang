@@ -1,6 +1,6 @@
 ---
 title: "Схемы и кодеки"
-source_hash: 4d0f4b7c74868087
+source_hash: 18faacde948508df
 ---
 
 Схема описывает структуру значений типа и доступна во время выполнения.
@@ -112,7 +112,7 @@ let methods = Open.schema Schema.string
 `Codec`. Свидетель типа — `T.schema`.
 
 ```flick
-import Codec exposing (plugin codec)
+import Codec
 # refined type Email = String where Checks.non_empty
 #   deriving Schema
 # type alias Profile = { email : Email; nickname : Option String }
