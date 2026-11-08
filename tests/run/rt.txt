@@ -24,6 +24,7 @@ codegen/defaults
 codegen/defect
 codegen/derive_default
 codegen/do_notation
+codegen/effect_sets
 codegen/enums
 codegen/errors
 codegen/eval_order
@@ -46,6 +47,7 @@ codegen/ints
 codegen/let_assert
 codegen/lift
 codegen/literals
+codegen/local_functions
 codegen/numbers
 codegen/numeric_classes
 codegen/patterns
@@ -94,11 +96,15 @@ runtime/settling_calls
 runtime/shared_layer
 runtime/slice
 runtime/supervisor_defect
+sql/queries
 stdlib/effect/mutable_ref
 stdlib/effect/option
 stdlib/effect/queue
 stdlib/effect/shared_layer_merged
 stdlib/effect/string_locale
+stdlib/lists
+stdlib/markdown
+stdlib/seqs
 
 # Not yet, and why:
 # codegen/abi            its foreign fixture and `Schema` are on Effect
