@@ -32,7 +32,7 @@ const MODULES = [
 const listed = (name: string): Array<string> => {
   const list = new RegExp(`const ${name}: &\\[&str\\] = &\\[([^\\]]*)\\]`).exec(read("flick-core/src/build/effects.rs"));
   assert.ok(list, `\`${name}\` in build/effects.rs`);
-  return [...(list[1] ?? "").matchAll(/"([\w.]+)"/g)].map((m) => m[1] ?? "");
+  return [...(list[1] ?? "").matchAll(/"([\w./]+)"/g)].map((m) => m[1] ?? "");
 };
 
 /** The source of a built-in module: of the core package, else of std. */
@@ -45,7 +45,9 @@ const source = (module: string): string => {
 /** The kernel module `rt_specifier` makes of a runtime specifier, if it has one. */
 const kernelPath = (spec: string, inRt: ReadonlyArray<string>, inCore: ReadonlyArray<string>): string | undefined => {
   if (spec === "@flick-lang/runtime") return "../src/rt/index.ts";
-  const module = /^@flick-lang\/runtime\/effect\/(\w+)$/.exec(spec)?.[1];
+  const ui = /^@flick-lang\/runtime(\/ui(?:\/\w+)?)$/.exec(spec)?.[1];
+  if (ui !== undefined) return listed("UI_IN_RT").includes(ui) ? `../src/rt${ui}.ts` : undefined;
+  const module = /^@flick-lang\/runtime\/effect\/([\w/]+)$/.exec(spec)?.[1];
   if (module === undefined) return undefined;
   if (inRt.includes(module)) return `../src/rt/effect/${module}.ts`;
   return inCore.includes(module) ? `../src/core/${module}.ts` : undefined;
