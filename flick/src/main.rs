@@ -115,8 +115,13 @@ fn main() -> ExitCode {
             | Commands::Doctor
             // after its logging starts
             | Commands::Lsp(_)
-    ) {
-        builtins::prepare();
+    ) && let Err(diagnostic) = builtins::prepare()
+    {
+        let outcome = Outcome {
+            sources: SourceMap::default(),
+            diagnostics: vec![diagnostic],
+        };
+        return report(outcome, &args.global);
     }
     let members = match workspace::members(&args) {
         Ok(Some(members)) => members,

@@ -361,6 +361,7 @@ codes! {
     P040 = Project 40, "packages need different versions of an npm package";
     P041 = Project 41, "foreign module of a library cannot ship";
     P042 = Project 42, "the manifest disables this part of a plugin";
+    P043 = Project 43, "the `std` does not fit this compiler";
 }
 
 #[cfg(test)]

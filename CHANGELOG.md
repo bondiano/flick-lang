@@ -6,6 +6,11 @@ break programs.
 
 ## Unreleased
 
+- **A compiler built from source:** takes the `std` of its own checkout instead of
+  the release tag its version names, so `flick new` and `flick run` work without
+  `FLICK_STD_PATH`. A `std` that does not check with the compiler is the new
+  `FLICK-P043`, which names the module, instead of a crash. A release whose
+  `std-v<version>` tag is missing fails before it is built.
 - **Workspace plugins:** `[[workspace.plugins]]` in a workspace's root gives every
   member a plugin, as a dependency and its grants. The editor reports the root
   manifest's errors in a member, and a changed root manifest rebuilds the members.

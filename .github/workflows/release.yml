@@ -27,6 +27,12 @@ jobs:
           done
           # the runtime version `flick new` pins
           check flick/src/toolchain.rs "$(grep -m1 'pub const RUNTIME' flick/src/toolchain.rs | cut -d'"' -f2)"
+          # the `std` a compiler of this version fetches when a project names none
+          std="std-v${GITHUB_REF_NAME#v}"
+          if ! git ls-remote --exit-code --tags origin "refs/tags/$std" > /dev/null; then
+            echo "::error::tag $std is missing: a compiler of this version fetches it as its std"
+            exit 1
+          fi
 
   checks:
     uses: ./.github/workflows/ci.yml

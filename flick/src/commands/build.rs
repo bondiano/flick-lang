@@ -83,6 +83,9 @@ impl Command for BuildCommand {
     #[allow(clippy::too_many_lines)]
     fn run(&self) -> Outcome {
         let progress = self.progress();
+        if let Err(outcome) = self.prepare(&progress) {
+            return outcome;
+        }
         let mut sources = SourceMap::default();
         let host = FsHost::new();
         progress.stage("Resolving project");
