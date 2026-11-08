@@ -6,6 +6,13 @@ break programs.
 
 ## Unreleased
 
+- **A plugin's code:** a plugin may give `match` with guards, `if` and blocks of
+  statements as the body of a `fun` or a `let`, and use a pattern of the user's in
+  several places, as the props of a component its setup and its render bind. A
+  diagnostic under the plugin's code may be a warning or a note and carry fixes,
+  which `flick check --fix` applies when safe. Renaming a local the user's code of
+  a block binds, as a parameter of a `server fn`, renames its uses too. Rebuild a
+  plugin's component for the new interface.
 - **Documentation:** the Learn, Guides, API and Ecosystem pages are gone. Their
   addresses lead to the start pages, Getting started and the reference; building
   from source is a section of Getting started.
