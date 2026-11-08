@@ -8,6 +8,6 @@ title: "FLICK-U001"
 positive integers. A constant that is not one is refused when the program
 compiles; a value computed at run time is checked when the handler is made.
 
-```flick ignore
+```text
 on_click = Ui.Event.queue 8 (fun _ -> task { save () })
 ```

@@ -7,7 +7,7 @@ Arguments are evaluated before a function is applied. A function that takes an
 a runtime call written as its argument has already run by then. Pass the
 computation unstarted with `task { … }`.
 
-```flick ignore
+```text
 // was: with_users users_layer (load_request id)
 with_users users_layer (task { load_request id })
 ```

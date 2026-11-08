@@ -6,6 +6,6 @@ The application stopped, but closing its scopes failed: a finalizer failed
 or never finished. `flick dev` stops restarting it, since the next version
 could find resources the old one still holds; the cause is shown above.
 
-```flick ignore
+```text
 Resource.acquire_release open (fun file -> File.close file)
 ```

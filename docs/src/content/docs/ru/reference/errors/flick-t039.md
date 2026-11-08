@@ -1,13 +1,13 @@
 ---
 title: "FLICK-T039"
-source_hash: "0d1ce140a0b99c92"
+source_hash: "a03eccc9df7f47ed"
 ---
 
 Функция принимает больше параметров, чем `[lint] max-params` в `flick.toml`
 (по умолчанию 5). Вызов с таким количеством позиционных аргументов легко сделать
 в неправильном порядке. Используйте запись: её поля именованы при каждом вызове.
 
-```flick ignore
+```text
 type alias Box = { x : Float, y : Float, width : Float, height : Float, label : String, color : String }
 
 draw : Box -> Ui

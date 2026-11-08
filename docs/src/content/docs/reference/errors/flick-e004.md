@@ -7,7 +7,7 @@ layers that both build a service leave the choice ambiguous. Remove the service
 from one layer, or say which one wins with `Layer.override`, where the second
 layer replaces the first.
 
-```flick ignore
+```text
 // was: Layer.merge users_live users_test
 Layer.override users_live users_test
 ```
