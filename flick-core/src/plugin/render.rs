@@ -4,6 +4,7 @@
 //! on a line of their own. The arena comes from a plugin, or from a cache
 //! of one, so everything is checked first.
 
+mod control;
 mod decl;
 
 use flick_plugin::{Arena, Expr, Field, Hole, HoleKind, Kind, NodeId, Pat, Place, Span, Ty};
@@ -51,6 +52,7 @@ pub fn render(
         text: String::new(),
         origins: Vec::new(),
         holes: Vec::new(),
+        indent: 0,
     };
     let role = match place {
         Place::Expression => Role::Expr,
@@ -81,6 +83,8 @@ pub fn render(
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 enum Role {
     Expr,
+    /// The body of a `fun` or a `let`: an expression, or a block.
+    Body,
     Ty,
     Pat,
     Decl,
@@ -93,6 +97,8 @@ struct Printer<'a> {
     text: String,
     origins: Vec<((u32, u32), Span)>,
     holes: Vec<(u32, Hole)>,
+    /// The column of the lines of the block being printed.
+    indent: usize,
 }
 
 impl Printer<'_> {
@@ -111,7 +117,7 @@ impl Printer<'_> {
         self.within(node.origin, "the origin of a node")?;
         let start = self.offset();
         match (&node.kind, role) {
-            (Kind::Expr(expr), Role::Expr) => self.expr(expr, depth)?,
+            (Kind::Expr(expr), Role::Expr | Role::Body) => self.expr(expr, role, depth)?,
             (Kind::Ty(ty), Role::Ty) => self.ty(ty, depth)?,
             (Kind::Pat(pat), Role::Pat) => self.pat(pat, depth)?,
             (Kind::Decl(decl), Role::Decl) => self.decl(decl, depth)?,
@@ -124,7 +130,7 @@ impl Printer<'_> {
         Ok(())
     }
 
-    fn expr(&mut self, expr: &Expr, depth: u32) -> Result<(), String> {
+    fn expr(&mut self, expr: &Expr, role: Role, depth: u32) -> Result<(), String> {
         let d = depth + 1;
         match expr {
             Expr::Name(name) => self.name(name, Names::Value)?,
@@ -146,7 +152,7 @@ impl Printer<'_> {
                     self.node(p, Role::Pat, d)?;
                 }
                 self.push(" -> ");
-                self.node(*body, Role::Expr, d)?;
+                self.node(*body, Role::Body, d)?;
                 self.push(")");
             }
             Expr::Record(fields) => self.record(fields, " = ", Role::Expr, d)?,
@@ -184,6 +190,16 @@ impl Printer<'_> {
                 }
                 self.push(")");
             }
+            Expr::Match { scrutinee, arms } => self.match_on(*scrutinee, arms, d)?,
+            Expr::If {
+                condition,
+                then,
+                otherwise,
+            } => self.branches(*condition, *then, *otherwise, d)?,
+            Expr::Block { .. } if role != Role::Body => {
+                return Err("a block is only the body of a `fun` or a `let`".into());
+            }
+            Expr::Block { statements, result } => self.block(statements, *result, d)?,
         }
         Ok(())
     }

@@ -2,6 +2,8 @@
 //! the members of an `instance` one level in, every expression and type in
 //! them on one line as the rest of generated code is.
 
+use std::mem;
+
 use flick_plugin::{Case, Decl, Hole, HoleKind, Kind, NodeId, Span};
 
 use super::{Names, Printer, Role};
@@ -37,7 +39,7 @@ impl Printer<'_> {
                     self.node(*ty, Role::Ty, d)?;
                 }
                 self.push(" = ");
-                self.node(*body, Role::Expr, d)?;
+                self.node(*body, Role::Body, d)?;
             }
             Decl::Signature { name, ty } => {
                 self.value(name)?;
@@ -149,7 +151,9 @@ impl Printer<'_> {
                 ));
             }
             self.push("\n  ");
+            let outer = mem::replace(&mut self.indent, 2);
             self.node(member, Role::Decl, d)?;
+            self.indent = outer;
         }
         Ok(())
     }
