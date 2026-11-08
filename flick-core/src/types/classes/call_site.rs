@@ -23,7 +23,7 @@ impl Checker<'_> {
         }
         let here = self.env.module.clone();
         let line = self.text[..span.start as usize].matches('\n').count() + 1;
-        let definition = match self.top.definition_at(span.start) {
+        let definition = match self.top.definition_at(span.start, self.generated) {
             Some(name) => format!("{here}.{name}"),
             None => here.clone(),
         };

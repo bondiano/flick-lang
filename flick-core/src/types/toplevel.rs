@@ -42,24 +42,32 @@ struct Item<'a> {
 }
 
 impl TopLevel<'_> {
-    /// The name of the top-level definition whose declaration holds `offset`.
-    pub fn definition_at(&self, offset: u32) -> Option<&str> {
+    /// The name of the top-level definition whose declaration holds `offset`:
+    /// the user's code of a block is in the declaration the block gave, which
+    /// stands after the module's own text, from `generated` on.
+    pub fn definition_at(&self, offset: u32, generated: u32) -> Option<&str> {
         let holds = |i: &&Item| {
             let (start, end) = i.decl.range();
             start <= offset && offset < end
         };
-        self.items
-            .iter()
-            .find(holds)?
-            .names
-            .first()
-            .map(String::as_str)
+        let spliced = |i: &&Item| covers(i.decl, offset, generated);
+        let item = (self.items.iter().find(holds)).or_else(|| self.items.iter().find(spliced))?;
+        item.names.first().map(String::as_str)
     }
 
     /// Whether the module declares the value `name` at its top level.
     pub fn declares(&self, name: &str) -> bool {
         self.by_name.contains_key(name)
     }
+}
+
+/// Whether a node of the user's code under `node`, before `generated`,
+/// holds `offset`; a generated node may range from the user's code to its own.
+fn covers(node: &Node, offset: u32, generated: u32) -> bool {
+    node.nodes().any(|n| {
+        let (start, end) = n.range();
+        (start <= offset && offset < end && end <= generated) || covers(n, offset, generated)
+    })
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
