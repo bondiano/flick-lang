@@ -13,18 +13,18 @@ import Dom exposing (notify, source_value, tab_in_address)
 import Examples exposing (Example)
 import JsError exposing (JsError(..))
 import State exposing (
-  Compiled,
+  Diagnostic,
   Execution,
+  Generated,
   Model,
-  Profile(..),
   SyntaxToken,
   Tab(..),
-  empty_compiled,
+  emit_key,
   empty_execution,
-  errors,
   first_source,
   profile_name,
   requested_tab,
+  wants_code,
 )
 
 load_highlighting : Unit ->{Async; JsError} Unit
@@ -42,9 +42,15 @@ foreign load from "./compiler.ts" "load"
   arity 0
   catch JsError.from_js
 
-compile : String ->{Async; JsError} Compiled
-foreign compile from "./compiler.ts" "compile"
+check : String ->{Async; JsError} List Diagnostic
+foreign check from "./compiler.ts" "check"
   arity 1
+  catch JsError.from_js
+  cancel signal
+
+compile : String -> String ->{Async; JsError} Generated
+foreign compile from "./compiler.ts" "compile"
+  arity 2
   catch JsError.from_js
   cancel signal
 
@@ -63,8 +69,7 @@ let syntax_failure model message =
     m with
     highlighting = false;
     source_tokens = [];
-    debug_tokens = [];
-    release_tokens = [];
+    generated_tokens = [];
     syntax_error = message;
   })
 
@@ -84,16 +89,10 @@ let paint_generated model =
   let m = Atom.current model
   if m.highlighting then
     let result =
-      try
-        Ok (
-          highlight m.compiled.debug.code "javascript",
-          highlight m.compiled.release.code "javascript",
-        )
-      with
+      try Ok (highlight m.emitted.code "javascript") with
       | JsError failure -> Err failure.message
     match result with
-    | Ok (debug, release) ->
-      update model (fun m -> { m with debug_tokens = debug; release_tokens = release })
+    | Ok tokens -> update model (fun m -> { m with generated_tokens = tokens })
     | Err message -> syntax_failure model message
 
 adopt_source : Atom.Writable Model ->{Atom.Write;} Unit
@@ -119,40 +118,56 @@ let prepare_highlighting model =
     paint_source model
     paint_generated model
 
+/// Checks the source after an edit, which is quick, and emits it only when a
+/// tab shows what the compiler writes and that is not known yet.
 refresh : Atom.Writable Model ->{Async, Atom.Write;} Unit
 let refresh model =
   let m = Atom.current model
   if m.version == "" then
     ()
   else
-    update model (fun m -> {
-      m with
-      checking = true;
-      compiled = empty_compiled;
-      debug_tokens = [];
-      release_tokens = [];
-      compile_error = "";
-    })
+    update model (fun m -> { m with checking = true; compile_error = "" })
     let result =
-      try Ok (compile m.source) with
+      try Ok (check m.source) with
       | JsError failure -> Err failure.message
-    let current = Atom.current model
-    if current.source != m.source then
+    if (Atom.current model).source != m.source then
       ()
     else
       match result with
       | Err message -> update model (fun m -> { m with checking = false; compile_error = message })
-      | Ok compiled ->
-        update model (fun m ->
-          let current = if m.profile == Debug then compiled.debug else compiled.release
-          {
-            m with
-            checking = false;
-            compiled = compiled;
-            tab = if errors current > 0 && m.tab == Output then Problems else m.tab;
-          }
-        )
-        paint_generated model
+      | Ok diagnostics ->
+        let failing = List.any (fun d -> d.severity == "error") diagnostics
+        let shown = (Atom.current model).tab
+        let tab = if failing && shown == Output then Problems else shown
+        update model (fun m -> { m with checking = false; diagnostics = diagnostics; tab = tab })
+        let current = Atom.current model
+        if wants_code current && not failing && current.emitted_key != emit_key current then
+          emit model
+
+/// Emits the current source for the current profile.
+emit : Atom.Writable Model ->{Async, Atom.Write;} Unit
+let emit model =
+  let m = Atom.current model
+  update model (fun m -> { m with checking = true })
+  let result =
+    try Ok (compile m.source (profile_name m.profile)) with
+    | JsError failure -> Err failure.message
+  let current = Atom.current model
+  if current.source != m.source || current.profile != m.profile then
+    ()
+  else
+    match result with
+    | Err message -> update model (fun m -> { m with checking = false; compile_error = message })
+    | Ok emitted ->
+      update model (fun m -> {
+        m with
+        checking = false;
+        emitted = emitted;
+        emitted_key = emit_key m;
+        diagnostics = emitted.diagnostics;
+        generated_tokens = [];
+      })
+      paint_generated model
 
 load_compiler : Atom.Writable Model ->{Async, Atom.Write;} Unit
 let load_compiler model =

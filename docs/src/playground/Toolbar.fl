@@ -1,9 +1,9 @@
 module Toolbar exposing (choice, view)
 
 import Actions exposing (choose, run_program, update)
-import Dom exposing (attributes)
+import Dom exposing (attributes, notify)
 import Examples exposing (Example)
-import State exposing (Model, Profile(..), Tab(..), errors, generated, status, tr)
+import State exposing (Model, Profile(..), errors, status, tr)
 
 choice : String -> Bool -> Bool -> (Unit ->{Atom.Write;} Unit) -> Ui
 let choice label active disabled act =
@@ -64,10 +64,8 @@ let set_profile model m profile =
     (m.profile == profile)
     m.running
     (fun () ->
-      update model (fun m ->
-        let current = if profile == Debug then m.compiled.debug else m.compiled.release
-        { m with profile = profile; tab = if errors current > 0 then Problems else m.tab }
-      )
+      update model (fun m -> { m with profile = profile })
+      notify "fp-compile"
     )
 
 /// The chevron of the gallery's button.
@@ -116,11 +114,7 @@ let run_button model m =
       {
         disabled =
           not m.running
-            && (m.loading
-              || m.checking
-              || m.version == ""
-              || m.compile_error != ""
-              || errors (generated m) > 0);
+            && (m.loading || m.checking || m.version == "" || m.compile_error != "" || errors m > 0);
         on_click = Ui.Event.latest (fun _ -> task { run_program model });
       }
       [
@@ -141,7 +135,7 @@ let view model m = ui {
           class_name =
             if m.loading || m.checking then
               "fp-status fp-status-loading"
-            else if m.version == "" || m.compile_error != "" || errors (generated m) > 0 then
+            else if m.version == "" || m.compile_error != "" || errors m > 0 then
               "fp-status fp-bad"
             else
               "fp-status fp-status-ready";

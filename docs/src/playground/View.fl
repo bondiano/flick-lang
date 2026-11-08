@@ -11,8 +11,12 @@ import Toolbar exposing (choice)
 /// compiler writes for the current profile.
 result_pane : Atom.Writable Model -> Model -> Ui
 let result_pane model m =
+  // a tab of the compiler's output asks for an emit, which edits alone no longer make
   let tab name label =
-    choice label (m.tab == name) false (fun () -> update model (fun m -> { m with tab = name }))
+    choice label (m.tab == name) false (fun () ->
+      update model (fun m -> { m with tab = name })
+      if name == Js || name == Dts then notify "fp-compile"
+    )
   let body =
     match m.tab with
     | Output -> output_pane m

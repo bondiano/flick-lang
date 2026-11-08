@@ -1,6 +1,6 @@
 module Results exposing (current_problems, output_pane, diagnostic_label)
 
-import State exposing (Diagnostic, Locale, Model, generated, profile_name, tr)
+import State exposing (Diagnostic, Locale, Model, profile_name, tr)
 
 problem : Locale -> Diagnostic -> Ui
 let problem locale diagnostic = ui {
@@ -74,7 +74,7 @@ let current_problems m =
           "Повторите загрузку или компиляцию с помощью кнопки выше, чтобы проверить код."),
     ]
   else
-    Ui.render problems_pane { locale = m.locale; diagnostics = (generated m).diagnostics }
+    Ui.render problems_pane { locale = m.locale; diagnostics = m.diagnostics }
 
 execution_status : Model -> String
 let execution_status m =
@@ -191,7 +191,4 @@ let output_pane m =
 
 diagnostic_label : Model -> String
 let diagnostic_label m =
-  tr m.locale "Diagnostics" "Диагностика"
-    ++ " ("
-    ++ show (List.length (generated m).diagnostics)
-    ++ ")"
+  tr m.locale "Diagnostics" "Диагностика" ++ " (" ++ show (List.length m.diagnostics) ++ ")"

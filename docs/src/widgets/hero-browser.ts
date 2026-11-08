@@ -1,7 +1,7 @@
-import { compile } from "../playground/compiler.ts";
+import { check as checkSource } from "../playground/compiler.ts";
 
 // Compiler and map interop; what to check and what the answer means belong to Hero.fl.
-export const check = async (source: string, signal: AbortSignal) => (await compile(source, signal)).debug.diagnostics;
+export const check = (source: string, signal: AbortSignal) => checkSource(source, signal);
 
 export const showBreak = (broken: boolean): void => {
   const map = document.getElementById("flick-map");

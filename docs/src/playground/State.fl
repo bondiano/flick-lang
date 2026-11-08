@@ -6,11 +6,12 @@ module State exposing (
   SyntaxToken,
   Diagnostic,
   Generated,
-  Compiled,
   Line,
   Execution,
   Model,
-  empty_compiled,
+  empty_generated,
+  emit_key,
+  wants_code,
   empty_execution,
   first_source,
   tr,
@@ -39,7 +40,6 @@ type alias Configuration = { locale : String; examples : List Example }
 type alias SyntaxToken = { text : String; class_name : String }
 type alias Diagnostic = { code : String; severity : String; message : String; at : String }
 type alias Generated = { code : String; dts : String; diagnostics : List Diagnostic }
-type alias Compiled = { debug : Generated; release : Generated }
 type alias Line = { stream : String; text : String }
 type alias Execution = {
   lines : List Line;
@@ -55,7 +55,11 @@ type alias Model = {
   revision : Float;
   profile : Profile;
   tab : Tab;
-  compiled : Compiled;
+  /// What the last check of `source` says.
+  diagnostics : List Diagnostic;
+  /// What the compiler wrote for `emitted_key`: the profile and the source.
+  emitted : Generated;
+  emitted_key : String;
   execution : Execution;
   ran_source : String;
   ran_profile : Profile;
@@ -64,8 +68,7 @@ type alias Model = {
   checking : Bool;
   highlighting : Bool;
   source_tokens : List SyntaxToken;
-  debug_tokens : List SyntaxToken;
-  release_tokens : List SyntaxToken;
+  generated_tokens : List SyntaxToken;
   syntax_error : String;
   version : String;
   load_error : String;
@@ -73,11 +76,16 @@ type alias Model = {
   fault : String;
 }
 
-empty_compiled : Compiled
-let empty_compiled = {
-  debug = { code = ""; dts = ""; diagnostics = [] };
-  release = { code = ""; dts = ""; diagnostics = [] };
-}
+empty_generated : Generated
+let empty_generated = { code = ""; dts = ""; diagnostics = [] }
+
+/// What an emit of the current source and profile is filed under.
+emit_key : Model -> String
+let emit_key m = profile_name m.profile ++ "\n" ++ m.source
+
+/// Whether the tab shown needs what the compiler writes, not only its check.
+wants_code : Model -> Bool
+let wants_code m = m.tab == Js || m.tab == Dts
 
 empty_execution : Execution
 let empty_execution = { lines = []; status = ""; detail = ""; diagnostics = [] }
@@ -96,10 +104,10 @@ profile_name : Profile -> String
 let profile_name profile = if profile == Debug then "debug" else "release"
 
 generated : Model -> Generated
-let generated m = if m.profile == Debug then m.compiled.debug else m.compiled.release
+let generated m = m.emitted
 
-errors : Generated -> Int
-let errors result = List.length (List.filter (fun d -> d.severity == "error") result.diagnostics)
+errors : Model -> Int
+let errors m = List.length (List.filter (fun d -> d.severity == "error") m.diagnostics)
 
 status : Model -> String
 let status m =
@@ -111,8 +119,8 @@ let status m =
     tr m.locale "Compiler unavailable" "Компилятор недоступен"
   else if m.compile_error != "" then
     tr m.locale "Compilation failed" "Сбой компиляции"
-  else if errors (generated m) > 0 then
-    tr m.locale "Errors: " "Ошибок: " ++ show (errors (generated m))
+  else if errors m > 0 then
+    tr m.locale "Errors: " "Ошибок: " ++ show (errors m)
   else if m.running then
     tr m.locale "Running · 10 s limit" "Выполняется · лимит 10 с"
   else
@@ -136,7 +144,9 @@ let initial_model config = {
   revision = 0;
   profile = Debug;
   tab = Output;
-  compiled = empty_compiled;
+  diagnostics = [];
+  emitted = empty_generated;
+  emitted_key = "";
   execution = empty_execution;
   ran_source = "";
   ran_profile = Debug;
@@ -145,8 +155,7 @@ let initial_model config = {
   checking = false;
   highlighting = false;
   source_tokens = [];
-  debug_tokens = [];
-  release_tokens = [];
+  generated_tokens = [];
   syntax_error = "";
   version = "";
   load_error = "";

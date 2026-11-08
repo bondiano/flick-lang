@@ -15,7 +15,7 @@ class WorkerHarness {
   crash(): void { this.onerror?.({ error: new Error("compiler offline"), message: "compiler offline" }); }
 }
 
-const compiled = { debug: { code: "", dts: "", diagnostics: [] }, release: { code: "", dts: "", diagnostics: [] } };
+const checked: Array<never> = [];
 
 test("canceled work waiting behind a busy compiler is never executed", { timeout: 1000 }, async () => {
   const original = globalThis.Worker;
@@ -24,7 +24,7 @@ test("canceled work waiting behind a busy compiler is never executed", { timeout
   try {
     const bridge = await import(new URL("../src/playground/compiler.ts?backpressure", import.meta.url).href);
     const firstController = new AbortController();
-    const first = bridge.compile("first", firstController.signal);
+    const first = bridge.check("first", firstController.signal);
     const firstCanceled = assert.rejects(first, { name: "AbortError" });
     firstController.abort();
     await firstCanceled;
@@ -32,16 +32,16 @@ test("canceled work waiting behind a busy compiler is never executed", { timeout
     assert.ok(worker);
 
     const staleController = new AbortController();
-    const stale = bridge.compile("superseded", staleController.signal);
+    const stale = bridge.check("superseded", staleController.signal);
     const staleCanceled = assert.rejects(stale, { name: "AbortError" });
     staleController.abort();
     await staleCanceled;
-    const latest = bridge.compile("current", new AbortController().signal);
+    const latest = bridge.check("current", new AbortController().signal);
     assert.deepEqual(worker.messages.map(message => message.source), ["first"]);
 
-    worker.reply(worker.messages[0]!.id, compiled);
+    worker.reply(worker.messages[0]!.id, checked);
     assert.deepEqual(worker.messages.map(message => message.source), ["first", "current"]);
-    worker.reply(worker.messages[1]!.id, compiled);
+    worker.reply(worker.messages[1]!.id, checked);
     await latest;
   } finally {
     globalThis.Worker = original;
@@ -55,7 +55,7 @@ test("a crashed compiler rejects active and queued callers and permits explicit 
   try {
     const bridge = await import(new URL("../src/playground/compiler.ts?recovery", import.meta.url).href);
     const loading = bridge.load();
-    const checking = bridge.compile("queued", new AbortController().signal);
+    const checking = bridge.check("queued", new AbortController().signal);
     const failures = Promise.all([
       assert.rejects(loading, /compiler offline/),
       assert.rejects(checking, /compiler offline/),

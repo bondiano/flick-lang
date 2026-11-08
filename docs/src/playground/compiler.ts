@@ -1,5 +1,5 @@
 // Compiler/worker interoperability only. Widget state and presentation live in Flick.
-import type { Built, Compiled, Diagnostic, Operation, Reply, Request, Result } from "./compiler.worker.ts";
+import type { Built, Diagnostic, Generated, Operation, Reply, Request, Result } from "./compiler.worker.ts";
 import type { Message } from "./worker.ts";
 
 interface Line {
@@ -110,9 +110,13 @@ export const load = async (): Promise<string> => {
   }
 };
 
-/** Both real profiles, with each profile's generated code and diagnostics. */
-export const compile = (source: string, signal: AbortSignal): Promise<Compiled> =>
-  request<Compiled>({ action: "compile", source }, signal);
+/** The diagnostics of `source`: an analysis, which is quick, and no emit. */
+export const check = (source: string, signal: AbortSignal): Promise<Array<Diagnostic>> =>
+  request<Array<Diagnostic>>({ action: "check", source }, signal);
+
+/** What the compiler writes for `source` in `profile`: its JavaScript, `.d.ts` and diagnostics. */
+export const compile = (source: string, profile: string, signal: AbortSignal): Promise<Generated> =>
+  request<Generated>({ action: "compile", source, profile }, signal);
 
 /** Build off-thread, then execute in the existing isolated, terminable runner. */
 export const run = async (source: string, profile: string, signal: AbortSignal): Promise<Execution> => {
