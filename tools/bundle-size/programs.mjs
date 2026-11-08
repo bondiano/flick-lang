@@ -11,7 +11,11 @@ export const PROGRAMS = [
   // the registry keeps `Stream`, which `effect/reactivity` imports for stream atoms,
   // and since Effect 4.1 `Schema` (13 KB), whose `isSchemaError` hydration calls
   { name: "counter", source: "tests/run/ui/counter.fl", budget: 118, unused: ["effect/dist/Graph.js"] },
-  { name: "playground", source: "docs/src/playground/Playground.fl", budget: 126, unused: ["effect/dist/Graph.js"] },
+  {
+    name: "playground", source: "docs/src/playground/Playground.fl", budget: 127,
+    reason: "The sandboxed UI preview keeps a live output and failure channel after the program mounts.",
+    unused: ["effect/dist/Graph.js"],
+  },
   { name: "atoms", source: "tests/run/ui/atoms.fl", budget: 117, unused: ["effect/dist/Graph.js"] },
   // a browser client of a procedure keeps no Node server
   {
