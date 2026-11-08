@@ -1,10 +1,15 @@
 module Actions exposing (
   update,
   prepare_highlighting,
+  prepare_editor,
   refresh,
   load_compiler,
   edit,
+  edited,
   choose,
+  format,
+  explain,
+  focus_editor,
   run_program,
   report,
 )
@@ -54,6 +59,44 @@ foreign compile from "./compiler.ts" "compile"
   catch JsError.from_js
   cancel signal
 
+format_source : String ->{Async; JsError} String
+foreign format_source from "./compiler.ts" "formatSource"
+  arity 1
+  catch JsError.from_js
+
+/// What a diagnostic code means, as Markdown; empty for an unknown code.
+explain_code : String ->{Async; JsError} String
+foreign explain_code from "./compiler.ts" "explainCode"
+  arity 1
+  catch JsError.from_js
+
+load_editor : Unit ->{Async; JsError} Unit
+foreign load_editor from "./editor.ts" "loadEditor"
+  arity 0
+  catch JsError.from_js
+
+mount_editor : String -> String ->{; JsError} Unit
+foreign mount_editor from "./editor.ts" "mountEditor"
+  arity 2
+  catch JsError.from_js
+
+editor_text : Unit ->{} String
+foreign editor_text from "./editor.ts" "editorText"
+  arity 0
+
+set_editor_text : String ->{} Unit
+foreign set_editor_text from "./editor.ts" "setEditorText"
+  arity 1
+
+mark_diagnostics : String -> List Diagnostic ->{} Unit
+foreign mark_diagnostics from "./editor.ts" "markDiagnostics"
+  arity 2
+
+/// Focuses the editor; false when it is not open.
+focus_editor : Unit ->{} Bool
+foreign focus_editor from "./editor.ts" "focusEditor"
+  arity 0
+
 run_build : String -> String ->{Async; JsError} Execution
 foreign run_build from "./compiler.ts" "run"
   arity 2
@@ -68,21 +111,9 @@ let syntax_failure model message =
   update model (fun m -> {
     m with
     highlighting = false;
-    source_tokens = [];
     generated_tokens = [];
     syntax_error = message;
   })
-
-paint_source : Atom.Writable Model ->{Atom.Write;} Unit
-let paint_source model =
-  let m = Atom.current model
-  if m.highlighting then
-    let result =
-      try Ok (highlight m.source "flick") with
-      | JsError failure -> Err failure.message
-    match result with
-    | Ok tokens -> update model (fun m -> { m with source_tokens = tokens })
-    | Err message -> syntax_failure model message
 
 paint_generated : Atom.Writable Model ->{Atom.Write;} Unit
 let paint_generated model =
@@ -101,9 +132,7 @@ let adopt_source model =
   // A later example selection may not have committed its textarea yet.
   if m.revision == 0 && m.source == first_source m.examples then
     let source = source_value ()
-    if source != m.source then
-      update model (fun m -> { m with source = source })
-      paint_source model
+    if source != m.source then update model (fun m -> { m with source = source })
 
 prepare_highlighting : Atom.Writable Model ->{Async, Atom.Write;} Unit
 let prepare_highlighting model =
@@ -113,10 +142,29 @@ let prepare_highlighting model =
   match result with
   | Err message -> syntax_failure model message
   | Ok () ->
-    adopt_source model
     update model (fun m -> { m with highlighting = true; syntax_error = "" })
-    paint_source model
     paint_generated model
+
+/// Opens CodeMirror on the source; the native field stays when it cannot load.
+prepare_editor : Atom.Writable Model -> String ->{Async, Atom.Write;} Unit
+let prepare_editor model label =
+  let loaded =
+    try Ok (load_editor ()) with
+    | JsError failure -> Err failure.message
+  // what was typed into the field until now is the source the editor opens on
+  adopt_source model
+  let m = Atom.current model
+  let opened =
+    match loaded with
+    | Err message -> Err message
+    | Ok () ->
+      try Ok (mount_editor m.source label) with
+      | JsError failure -> Err failure.message
+  match opened with
+  | Err message -> update model (fun m -> { m with syntax_error = message })
+  | Ok () ->
+    update model (fun m -> { m with editor_open = true })
+    mark_diagnostics m.source m.diagnostics
 
 /// Checks the source after an edit, which is quick, and emits it only when a
 /// tab shows what the compiler writes and that is not known yet.
@@ -140,6 +188,7 @@ let refresh model =
         let shown = (Atom.current model).tab
         let tab = if failing && shown == Output then Problems else shown
         update model (fun m -> { m with checking = false; diagnostics = diagnostics; tab = tab })
+        mark_diagnostics m.source diagnostics
         let current = Atom.current model
         if wants_code current && not failing && current.emitted_key != emit_key current then
           emit model
@@ -167,6 +216,7 @@ let emit model =
         diagnostics = emitted.diagnostics;
         generated_tokens = [];
       })
+      mark_diagnostics m.source emitted.diagnostics
       paint_generated model
 
 load_compiler : Atom.Writable Model ->{Async, Atom.Write;} Unit
@@ -194,8 +244,17 @@ let load_compiler model =
 edit : Atom.Writable Model -> String ->{Atom.Write;} Unit
 let edit model source =
   update model (fun m -> { m with source = source })
-  paint_source model
   notify "fp-compile"
+
+/// Takes in what the reader typed into the editor.
+edited : Atom.Writable Model ->{Atom.Write;} Unit
+let edited model = edit model (editor_text ())
+
+/// Puts `source` in both the editor and the model.
+replace : Atom.Writable Model -> String ->{Atom.Write;} Unit
+let replace model source =
+  set_editor_text source
+  edit model source
 
 choose : Atom.Writable Model -> Example ->{Atom.Write;} Unit
 let choose model example =
@@ -205,7 +264,30 @@ let choose model example =
     execution = empty_execution;
     tab = Output;
   })
-  edit model example.source
+  replace model example.source
+
+/// Shows what the code of the diagnostic `key` means, or hides it when it is shown.
+explain : Atom.Writable Model -> String -> String ->{Async, Atom.Write;} Unit
+let explain model key code =
+  if (Atom.current model).explained == key then
+    update model (fun m -> { m with explained = "" })
+  else
+    let text =
+      try explain_code code with
+      | JsError failure -> failure.message
+    update model (fun m -> { m with explained = key; explanation = text })
+
+/// Formats the source as `flick fmt` does; a source that does not parse stays.
+format : Atom.Writable Model ->{Async, Atom.Write;} Unit
+let format model =
+  let m = Atom.current model
+  let result =
+    try Ok (format_source m.source) with
+    | JsError failure -> Err failure.message
+  match result with
+  | Ok text ->
+    if text != m.source && (Atom.current model).source == m.source then replace model text
+  | Err message -> update model (fun m -> { m with compile_error = message })
 
 // `latest` on the same button aborts and joins the worker before this Stop action.
 run_program : Atom.Writable Model ->{Async, Atom.Write;} Unit

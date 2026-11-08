@@ -38,7 +38,19 @@ type Tab = Output | Problems | Js | Dts
 
 type alias Configuration = { locale : String; examples : List Example }
 type alias SyntaxToken = { text : String; class_name : String }
-type alias Diagnostic = { code : String; severity : String; message : String; at : String }
+/// A change a fix makes; `start` and `end` are UTF-16 offsets of the module.
+type alias Edit = { start : Int; end : Int; insert : String }
+type alias Fix = { message : String; edits : List Edit }
+/// `start` and `end` are UTF-16 offsets of the module, or -1 for a place elsewhere.
+type alias Diagnostic = {
+  code : String;
+  severity : String;
+  message : String;
+  at : String;
+  start : Int;
+  end : Int;
+  fixes : List Fix;
+}
 type alias Generated = { code : String; dts : String; diagnostics : List Diagnostic }
 type alias Line = { stream : String; text : String }
 type alias Execution = {
@@ -67,9 +79,13 @@ type alias Model = {
   loading : Bool;
   checking : Bool;
   highlighting : Bool;
-  source_tokens : List SyntaxToken;
   generated_tokens : List SyntaxToken;
   syntax_error : String;
+  /// Whether CodeMirror holds the source in place of the native field.
+  editor_open : Bool;
+  /// The diagnostic whose explanation is open, by code, place and message, and the text.
+  explained : String;
+  explanation : String;
   version : String;
   load_error : String;
   compile_error : String;
@@ -154,9 +170,11 @@ let initial_model config = {
   loading = true;
   checking = false;
   highlighting = false;
-  source_tokens = [];
   generated_tokens = [];
   syntax_error = "";
+  editor_open = false;
+  explained = "";
+  explanation = "";
   version = "";
   load_error = "";
   compile_error = "";

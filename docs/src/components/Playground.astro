@@ -26,14 +26,12 @@ const embedded = JSON.stringify(gallery).replaceAll("<", "\\u003c");
 <script>
   import { run } from "@flick-lang/runtime/runner/browser";
   import { main } from "../playground/Playground.fl";
-  import { bindEditorScroll } from "../playground/highlight.ts";
   import { bindSplit } from "../playground/split.ts";
 
   void run(main);
   const root = document.getElementById("flick-playground");
   if (root !== null) {
-    const unbind = [bindEditorScroll(root), bindSplit(root)];
-    const dispose = () => unbind.forEach((f) => f());
+    const dispose = bindSplit(root);
     window.addEventListener("pagehide", dispose, { once: true });
     import.meta.hot?.dispose(dispose);
   }

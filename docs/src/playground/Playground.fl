@@ -1,8 +1,8 @@
 module Playground exposing (main, initial_view)
 
-import Actions exposing (load_compiler, prepare_highlighting, report)
+import Actions exposing (load_compiler, prepare_editor, prepare_highlighting, report)
 import Dom exposing (configuration)
-import State exposing (Configuration, initial_model)
+import State exposing (Configuration, initial_model, tr)
 import View exposing (view)
 
 initial_view : Configuration ->{} Ui
@@ -21,5 +21,12 @@ let main () =
     provide Atom.layer {
       ignore (parallel
         (task { Ui.Dom.mount root (report model) app })
-        (task { parallel (task { load_compiler model }) (task { prepare_highlighting model }) }))
+        (task {
+          let label = tr initial.locale "Flick source code" "Исходный код Flick"
+          ignore (parallel
+            (task { load_compiler model })
+            (task {
+              parallel (task { prepare_highlighting model }) (task { prepare_editor model label })
+            }))
+        }))
     }

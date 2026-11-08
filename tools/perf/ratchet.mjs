@@ -12,19 +12,20 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { PROGRAMS } from "../bundle-size/programs.mjs";
+import { CHUNKS, PROGRAMS } from "../bundle-size/programs.mjs";
 import { METRICS } from "./index.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const PERF = "tools/perf/budgets.json";
 const BUNDLE = "tools/bundle-size/programs.mjs";
 
+const size = (p) => ({ better: "lower", unit: "KB gzip", budget: p.budget, tolerance: 0, reason: p.reason });
+
 /** The budgets of both sources by name, each with which way is better, its unit and tolerance. */
-const budgets = (perf, programs) => ({
+const budgets = (perf, programs, chunks = []) => ({
   ...Object.fromEntries(Object.entries(perf).map(([metric, b]) => [metric, { better: "lower", unit: "", tolerance: 0, ...METRICS[metric], ...b }])),
-  ...Object.fromEntries(
-    programs.map((p) => [`bundle.${p.name}`, { better: "lower", unit: "KB gzip", budget: p.budget, tolerance: 0, reason: p.reason }]),
-  ),
+  ...Object.fromEntries(programs.map((p) => [`bundle.${p.name}`, size(p)])),
+  ...Object.fromEntries(chunks.map((c) => [`chunk.${c.name}`, size(c)])),
 });
 
 /** The worst measurement a budget lets pass, or null when it lets anything pass. */
@@ -75,12 +76,10 @@ const main = async () => {
   }
   const perf = at(ref, PERF);
   const programs = at(ref, BUNDLE);
-  const base = budgets(
-    perf === null ? {} : JSON.parse(perf),
-    // the module only defines the programs
-    programs === null ? [] : (await import(`data:text/javascript;base64,${Buffer.from(programs).toString("base64")}`)).PROGRAMS,
-  );
-  const head = budgets(JSON.parse(readFileSync(path.join(root, PERF), "utf8")), PROGRAMS);
+  // the module only defines the programs and the chunks
+  const bundle = programs === null ? {} : await import(`data:text/javascript;base64,${Buffer.from(programs).toString("base64")}`);
+  const base = budgets(perf === null ? {} : JSON.parse(perf), bundle.PROGRAMS ?? [], bundle.CHUNKS);
+  const head = budgets(JSON.parse(readFileSync(path.join(root, PERF), "utf8")), PROGRAMS, CHUNKS);
   const changes = compare(base, head);
   if (changes.length === 0) console.log(`no budget changed since ${ref}`);
   for (const { line } of changes) console.log(line);

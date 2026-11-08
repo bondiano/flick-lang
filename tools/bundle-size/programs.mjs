@@ -46,3 +46,12 @@ export const PROGRAMS = [
     ],
   },
 ];
+
+/** Chunks of the documentation site that load apart from its pages, by the name of their
+ * group in docs/astro.config.mjs, and their gzip budgets in KB; docs/scripts/chunks.mjs
+ * checks them in docs/dist. */
+export const CHUNKS = [
+  // the playground's editor: CodeMirror's state, view, commands, lint and autocompletion
+  // with @codemirror/language, which commands and autocompletion import; 105.8 KB plus 3%
+  { name: "codemirror", budget: 109 },
+];

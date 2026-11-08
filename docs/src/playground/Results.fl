@@ -1,28 +1,48 @@
 module Results exposing (current_problems, output_pane, diagnostic_label)
 
+import Actions exposing (explain)
+import Dom exposing (attributes)
 import State exposing (Diagnostic, Locale, Model, profile_name, tr)
 
-problem : Locale -> Diagnostic -> Ui
-let problem locale diagnostic = ui {
-  item [
-    span { class_name = "fp-diagnostic-code fp-" ++ diagnostic.severity } [text diagnostic.code],
-    span { class_name = "fp-diagnostic-at" } [
-      text
-        (
-          if diagnostic.severity == "error" then
-            tr locale "Error" "Ошибка"
-          else if diagnostic.severity == "warning" then
-            tr locale "Warning" "Предупреждение"
-          else
-            tr locale "Info" "Сообщение"
-        ),
-    ],
-    span { class_name = "fp-diagnostic-at" } [text diagnostic.at],
-    paragraph [text diagnostic.message],
-  ]
-}
+severity_label : Locale -> String -> String
+let severity_label locale severity =
+  if severity == "error" then
+    tr locale "Error" "Ошибка"
+  else if severity == "warning" then
+    tr locale "Warning" "Предупреждение"
+  else
+    tr locale "Info" "Сообщение"
 
-type alias Problems = { locale : Locale; diagnostics : List Diagnostic }
+problem : Atom.Writable Model -> Model -> Diagnostic -> Ui
+let problem model m diagnostic =
+  let code = diagnostic.code
+  // two diagnostics of one code each open their own
+  let key = code ++ " " ++ diagnostic.at ++ " " ++ diagnostic.message
+  let open = m.explained == key
+  ui {
+    item [
+      span { class_name = "fp-diagnostic-code fp-" ++ diagnostic.severity } [text code],
+      span { class_name = "fp-diagnostic-at" } [text (severity_label m.locale diagnostic.severity)],
+      span { class_name = "fp-diagnostic-at" } [text diagnostic.at],
+      attributes
+        [("aria-expanded", if open then "true" else "false")]
+        (Ui.with_host
+          { Ui.host with class_name = Some "fp-explain" }
+          (button
+            {
+              disabled = false;
+              on_click = Ui.Event.exhaust (fun _ -> task { explain model key code });
+            }
+            [
+              text
+                (if open then tr m.locale "Hide" "Скрыть" else tr m.locale "Explain" "Объяснить"),
+            ])),
+      paragraph [text diagnostic.message],
+      if open then pre { class_name = "fp-explanation" } [text m.explanation] else empty,
+    ]
+  }
+
+type alias Problems = { model : Atom.Writable Model; m : Model; diagnostics : List Diagnostic }
 
 // each pane keeps its own filter, which the model does not need to know
 component problems_pane (props : Problems) =
@@ -42,19 +62,19 @@ component problems_pane (props : Problems) =
           text
             (
               if only then
-                tr props.locale "Show all" "Показать все"
+                tr props.m.locale "Show all" "Показать все"
               else
-                tr props.locale "Errors only" "Только ошибки"
+                tr props.m.locale "Errors only" "Только ошибки"
             ),
         ]),
       match shown with
-      | [] -> paragraph [text (tr props.locale "No diagnostics." "Ошибок и предупреждений нет.")]
-      | items -> list (List.map (problem props.locale) items),
+      | [] -> paragraph [text (tr props.m.locale "No diagnostics." "Ошибок и предупреждений нет.")]
+      | items -> list (List.map (problem props.model props.m) items),
     ]
   }
 
-current_problems : Model -> Ui
-let current_problems m =
+current_problems : Atom.Writable Model -> Model -> Ui
+let current_problems model m =
   if m.loading then
     Ui.paragraph [
       Ui.text
@@ -74,7 +94,7 @@ let current_problems m =
           "Повторите загрузку или компиляцию с помощью кнопки выше, чтобы проверить код."),
     ]
   else
-    Ui.render problems_pane { locale = m.locale; diagnostics = m.diagnostics }
+    Ui.render problems_pane { model = model; m = m; diagnostics = m.diagnostics }
 
 execution_status : Model -> String
 let execution_status m =
@@ -97,8 +117,8 @@ let execution_status m =
   else
     tr m.locale "Program failed" "Программа завершилась с ошибкой"
 
-output_pane : Model -> Ui
-let output_pane m =
+output_pane : Atom.Writable Model -> Model -> Ui
+let output_pane model m =
   if m.running || m.execution.status == "" then
     ui {
       div { class_name = "fp-empty" } [
@@ -175,7 +195,7 @@ let output_pane m =
           pre { class_name = "fp-failure-detail" } [text m.execution.detail]
         else empty,
         if m.execution.status == "invalid" then
-          Ui.render problems_pane { locale = m.locale; diagnostics = m.execution.diagnostics }
+          Ui.render problems_pane { model = model; m = m; diagnostics = m.execution.diagnostics }
         else empty,
         if m.source != m.ran_source || m.profile != m.ran_profile then
           div { class_name = "fp-stale" } [

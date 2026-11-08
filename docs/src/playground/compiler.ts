@@ -1,5 +1,5 @@
 // Compiler/worker interoperability only. Widget state and presentation live in Flick.
-import type { Built, Diagnostic, Generated, Operation, Reply, Request, Result } from "./compiler.worker.ts";
+import type { Built, Completion, Diagnostic, Generated, Hover, Operation, Reply, Request, Result } from "./compiler.worker.ts";
 import type { Message } from "./worker.ts";
 
 interface Line {
@@ -117,6 +117,34 @@ export const check = (source: string, signal: AbortSignal): Promise<Array<Diagno
 /** What the compiler writes for `source` in `profile`: its JavaScript, `.d.ts` and diagnostics. */
 export const compile = (source: string, profile: string, signal: AbortSignal): Promise<Generated> =>
   request<Generated>({ action: "compile", source, profile }, signal);
+
+/**
+ * Markdown as plain text: a code block keeps its lines without its fences,
+ * and the lines of a paragraph, which the compiler wraps, join.
+ */
+export const plain = (markdown: string): string =>
+  markdown
+    .split(/^```[^\n]*\n?/m)
+    .map((part, i) => (i % 2 === 1 ? part : part.replace(/([^\n])\n(?![\n\s>#*-]|\d+\.)/g, "$1 ")))
+    .join("")
+    .trim();
+
+/** What hovering at the UTF-16 offset `at` of `source` shows, as plain text, or null. */
+export const hover = async (source: string, at: number, signal?: AbortSignal): Promise<Hover | null> => {
+  const shown = await request<Hover | null>({ action: "hover", source, at }, signal);
+  return shown === null ? null : { ...shown, text: plain(shown.text) };
+};
+
+/** What may stand at the UTF-16 offset `at` of `source`: the start of a name, or with `dotted` a `.` whose member is cut out of `source`. */
+export const complete = (source: string, at: number, dotted: boolean, signal?: AbortSignal): Promise<Array<Completion>> =>
+  request<Array<Completion>>({ action: "complete", source, at, dotted }, signal);
+
+/** `source` formatted, or the same text when it does not parse. */
+export const formatSource = async (source: string): Promise<string> =>
+  (await request<{ readonly text?: string }>({ action: "format", source })).text ?? source;
+
+/** What the diagnostic `code` means, as plain text; empty for a code the compiler does not have. */
+export const explainCode = async (code: string): Promise<string> => plain(await request<string>({ action: "explain", code }));
 
 /** Build off-thread, then execute in the existing isolated, terminable runner. */
 export const run = async (source: string, profile: string, signal: AbortSignal): Promise<Execution> => {

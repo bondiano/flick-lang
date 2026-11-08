@@ -78,3 +78,11 @@ test("a crashed compiler rejects active and queued callers and permits explicit 
     globalThis.Worker = original;
   }
 });
+
+test("Markdown of the compiler reads as plain text: a paragraph's lines join, code keeps its own", async () => {
+  const { plain } = await import(new URL("../src/playground/compiler.ts?plain", import.meta.url).href);
+  assert.equal(
+    plain("A type other\nthan expected.\n\n- one\n- two\n\n```flick\nlet a = 1\nlet b = 2\n```\n"),
+    "A type other than expected.\n\n- one\n- two\n\nlet a = 1\nlet b = 2",
+  );
+});
