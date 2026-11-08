@@ -12,7 +12,7 @@ use flick_plugin::Place;
 use super::expansion::{Expanded, Expansion};
 use super::render::render;
 use super::source::BlockSource;
-use super::{Failure, blocks_under, first_party, placed};
+use super::{Expander, Failure, ROUNDS, blocks_under, first_party, placed};
 use crate::diagnostics::{Diagnostic, codes};
 use crate::resolve::ModuleSyntax;
 use crate::source::{FileId, Span};
@@ -183,8 +183,8 @@ pub fn named<'n>(node: &'n Node, text: &str) -> Vec<Named<'n>> {
 
 /// The expansion of a built-in module `module`'s derives and blocks: the
 /// code std's plugin gives for each type that names a class it derives,
-/// after the type's declaration, and for each of its blocks the module
-/// imports, as `cli` and `server`; `None` without one.
+/// after the type's declaration, and for each of its blocks, as `cli` and
+/// `server`; `None` without one.
 pub fn builtin_expansion(
     text: &str,
     file: FileId,
@@ -288,8 +288,10 @@ pub fn builtin_expansion(
     (expansion, diagnostics)
 }
 
-/// The code of each block of std's plugin in `tree` whose head the module
-/// imports, as the loader expands it, into `blocks`.
+/// The code of each block of std's plugin in `tree`, as the loader expands
+/// it, into `blocks`: the blocks of the module, then those in the user's
+/// code of the ones the round before expanded, at most [`ROUNDS`] deep. One
+/// not closed, or nested deeper, is `P036`.
 fn std_blocks(
     shared: &Arc<str>,
     file: FileId,
@@ -303,37 +305,86 @@ fn std_blocks(
         return;
     };
     let (heads, aliases) = (&syntax.heads(), syntax.aliases());
-    let mut nodes = Vec::new();
-    blocks_under(tree, &mut nodes);
-    let own = |n: &&Node| {
+    let own = |n: &Node| {
         let head = super::head_token(n);
         head.is_some_and(|h| {
-            let head = h.text(shared);
-            heads.iter().any(|i| i == head) && first_party::HEADS.iter().any(|(h, _)| *h == head)
+            first_party::HEADS
+                .iter()
+                .any(|(head, _)| *head == h.text(shared))
         })
     };
-    let mut found: Vec<(Node, BlockSource)> = (nodes.into_iter())
-        .filter(own)
-        .filter_map(|n| {
-            let source = BlockSource::new(Arc::clone(shared), file, n, Arc::clone(heads))?;
-            Some((n.clone(), source.in_module(module, tree)))
-        })
-        .filter(|(_, s)| s.closed())
-        .collect();
-    if found.is_empty() {
-        return;
+    let unexpanded = |n: &Node, why: &str| {
+        let (start, end) = n.range();
+        Diagnostic::error(codes::P036, why, Span::new(file, start, end))
+    };
+    // the closed blocks of std's plugin among `nodes`, each read by `source`
+    let take = |nodes: Vec<&Node>,
+                source: &dyn Fn(&Node) -> Option<BlockSource>,
+                diagnostics: &mut Vec<Diagnostic>| {
+        let mut round = Vec::new();
+        for n in nodes.into_iter().filter(|n| own(n)) {
+            match source(n) {
+                Some(s) if s.closed() => round.push((n.clone(), s)),
+                Some(_) => diagnostics.push(unexpanded(n, "this block is not closed")),
+                None => {}
+            }
+        }
+        round
+    };
+    let mut nodes = Vec::new();
+    blocks_under(tree, &mut nodes);
+    let top = |n: &Node| {
+        let source = BlockSource::new(Arc::clone(shared), file, n, Arc::clone(heads))?;
+        Some(source.in_module(module, tree))
+    };
+    let mut round = take(nodes, &top, diagnostics);
+    for _ in 0..=ROUNDS {
+        if round.is_empty() {
+            return;
+        }
+        let expanded = std_round(plugin.as_ref(), module, round, &aliases, diagnostics);
+        let mut next = Vec::new();
+        for block in expanded {
+            let trees: Vec<Node> = (block.rendered.holes.iter())
+                .filter_map(|&(_, hole)| block.source.hole_tree(hole))
+                .collect();
+            let mut nested = Vec::new();
+            for tree in &trees {
+                if matches!(tree.kind, K::PluginExpr | K::PluginDecl) {
+                    nested.push(tree);
+                } else {
+                    blocks_under(tree, &mut nested);
+                }
+            }
+            next.extend(take(nested, &|n| block.source.nested(n), diagnostics));
+            blocks.push(block);
+        }
+        round = next;
     }
-    let read: Vec<Block> = found.iter().map(|(_, s)| s.block()).collect();
+    let deep = format!("this block is nested in more than {ROUNDS} blocks");
+    diagnostics.extend(round.iter().map(|(n, _)| unexpanded(n, &deep)));
+}
+
+/// The code std's plugin gives for each block of `round`, collected as one
+/// group; a block it gives none is `P036`.
+fn std_round(
+    plugin: &dyn Expander,
+    module: &str,
+    round: Vec<(Node, BlockSource)>,
+    aliases: &[(String, String)],
+    diagnostics: &mut Vec<Diagnostic>,
+) -> Vec<Expanded> {
+    let file = round[0].1.file();
+    let failed = |why: String, node: &Node| {
+        let (start, end) = node.range();
+        Diagnostic::error(codes::P036, why, Span::new(file, start, end))
+    };
+    let read: Vec<Block> = round.iter().map(|(_, s)| s.block()).collect();
     let state = match plugin.collect(&read, &mut BlockSource::default()) {
         Ok(state) => state,
         Err(why) => {
-            let (start, end) = found[0].0.range();
-            diagnostics.push(Diagnostic::error(
-                codes::P036,
-                why,
-                Span::new(file, start, end),
-            ));
-            return;
+            diagnostics.push(failed(why, &round[0].0));
+            return Vec::new();
         }
     };
     // what the plugin publishes of the module's own names, as the loader
@@ -341,13 +392,8 @@ fn std_blocks(
     let published = match plugin.publish(&state) {
         Ok(published) => published,
         Err(why) => {
-            let (start, end) = found[0].0.range();
-            diagnostics.push(Diagnostic::error(
-                codes::P036,
-                why,
-                Span::new(file, start, end),
-            ));
-            return;
+            diagnostics.push(failed(why, &round[0].0));
+            return Vec::new();
         }
     };
     let published: BTreeMap<String, Vec<u8>> = (published.into_iter())
@@ -355,7 +401,8 @@ fn std_blocks(
         .map(|p| (p.name, p.data))
         .collect();
     let published = Arc::new(published);
-    for ((node, mut source), block) in found.drain(..).zip(&read) {
+    let mut out = Vec::new();
+    for ((node, mut source), block) in round.into_iter().zip(&read) {
         let (start, end) = node.range();
         let whole = Span::new(file, start, end);
         source.see_published(Arc::clone(&published));
@@ -364,8 +411,8 @@ fn std_blocks(
         let Some(arena) = made_or(made, first_party::PACKAGE, &source, whole, diagnostics) else {
             continue;
         };
-        match render(&arena, block.whole().end, source.place(), &aliases) {
-            Ok(rendered) => blocks.push(Expanded {
+        match render(&arena, block.whole().end, source.place(), aliases) {
+            Ok(rendered) => out.push(Expanded {
                 node,
                 rendered,
                 source,
@@ -376,6 +423,7 @@ fn std_blocks(
             Err(why) => diagnostics.push(Diagnostic::error(codes::P036, why, whole)),
         }
     }
+    out
 }
 
 /// The code a plugin of `package` gave, or what it said, under its

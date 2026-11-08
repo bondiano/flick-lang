@@ -27,15 +27,12 @@ use crate::plugin::reach::{Gate, Reach};
 use crate::plugin::render::{Rendered, render};
 use crate::plugin::source::BlockSource;
 use crate::plugin::{
-    EditorBlock, Expander, Failure, blocks_under, first_party, head_token, placed,
+    EditorBlock, Expander, Failure, ROUNDS, blocks_under, first_party, head_token, placed,
 };
 use crate::source::Span;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
 use crate::types;
-
-/// How many blocks a block may be nested in, in the user's code of others.
-const ROUNDS: usize = 8;
 
 /// The plugin of each package a module imports, or why it does not load.
 type Plugins = HashMap<String, Result<Arc<dyn Expander>, String>>;
