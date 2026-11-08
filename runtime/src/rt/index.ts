@@ -42,6 +42,7 @@ export { layerMerge, layerOverride, layerRun, layerSucceed } from "./layer.ts";
 export { absent, flickAssert, flickEcho, flickTodo, refGet, refMake, refModify, refSame, refSet } from "./builtins.ts";
 export { exitFailure, exitValue, failureInspect, failurePrimary, failureRawCause, failureRethrow, rawCauseInspect } from "./outcome.ts";
 export { describeReport } from "./describe.ts";
+export { hash } from "./hash.ts";
 export { acquireRelease, bracket, reportedDefects } from "./owner.ts";
 export {
   genBool,

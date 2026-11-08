@@ -90,13 +90,15 @@ e2e-cases shard="": e2e-prepare
     FLICK_E2E_SHARD={{shard}} cargo nextest run --cargo-profile e2e --profile ci --run-ignored only -p flick --test e2e -E 'test(=run_cases)'
 
 # The language tests of tests/language on Node and as a Go executable, with
-# one seed: both must pass and write the same report
+# one seed: both must pass and write the same report; on Flick's own runtime
+# too, but for the tests tests/language/rt-gaps.txt lists
 language seed="42":
     cargo build -p flick --profile e2e
     cd tests/language && {{flick}} test --emit js --seed {{seed}} --reporter json > ../../target/language-js.txt || { cat ../../target/language-js.txt; exit 1; }
     cd tests/language && {{flick}} test --emit go --seed {{seed}} --reporter json > ../../target/language-go.txt || { cat ../../target/language-go.txt; exit 1; }
     diff -u target/language-js.txt target/language-go.txt
     cat target/language-go.txt
+    node tools/language-rt/index.mjs {{flick}} {{seed}} target/language-js.txt
 
 # Bundle the tracked programs (release) with rolldown and hold them to their gzip budgets
 bundle-size:

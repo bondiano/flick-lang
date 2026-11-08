@@ -337,6 +337,11 @@ pub struct TestArguments {
     /// default `build.emit` of the project.
     #[arg(long, value_enum)]
     pub emit: Option<TestEmitArgument>,
+
+    /// Run the tests on Flick's own runtime, as `build.effect = "rt"` does.
+    /// Only Node has it.
+    #[arg(long)]
+    pub rt: bool,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, ValueEnum)]

@@ -3,10 +3,13 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
+import { Hash } from "effect";
+
 import { fail, raise } from "../src/rt/cause.ts";
 import { clock } from "../src/rt/clock.ts";
 import { Duration, sleep } from "../src/rt/duration.ts";
 import { type Run, awaitFiber, currentCtx, fork } from "../src/rt/fiber.ts";
+import { hash } from "../src/rt/hash.ts";
 import { Layer } from "../src/rt/layer.ts";
 import { addFinalizer } from "../src/rt/owner.ts";
 import {
@@ -107,4 +110,9 @@ test("outcomes are reported apart", async () => {
   // the same seed draws the same cases
   const again = await run([["M", [testGroup("numbers", [testProperty("small", genInt(0, 100), (n) => (n < 50 ? PASS : failed("too big")))])]]]);
   assert.equal(again.json.tests[0]?.message, json.tests.find((t) => t.name === "M > numbers > small")?.message);
+});
+
+test("hash is Effect's, so that a seed draws the same Gen.function", () => {
+  const values = ["", 0, -0, 1.5, Number.NaN, 7n, true, "héllo😀", [1, "a"], { _tag: "X", _0: 1, _1: "b" }];
+  assert.deepEqual(values.map(hash), values.map((v) => Hash.hash(v)));
 });

@@ -67,3 +67,39 @@ let main () = Tracer.with_span \"App.save\" options Effect.void
     let _ = server.wait();
     assert!(got, "the DevTools got no span `App.save`");
 }
+
+/// Flick's own runtime has no `DevTools`: `run` says so and runs the app
+/// without them, by the flag or by `effect = "rt"`.
+#[test]
+#[ignore = "needs Node and the installed runtime"]
+fn run_on_flicks_own_runtime_leaves_devtools_out() {
+    let main = "module App.Main exposing (main)
+
+main : Unit ->{Async; AppError} Unit
+let main () =
+  Effect.sleep (Result.with_default Duration.zero (Duration.millis 1))
+  Platform.stdout_line \"on the kernel\"
+";
+    let config = format!("{APP}\n[build]\neffect = \"rt\"\n");
+    for (name, toml, args) in [
+        ("run_rt_flag", APP, &["run", "--rt", "--devtools"][..]),
+        ("run_rt_config", config.as_str(), &["run", "--devtools"][..]),
+    ] {
+        let dir = project(name, &[("flick.toml", toml), ("src/App/Main.fl", main)]);
+        let out = Command::new(env!("CARGO_BIN_EXE_flick"))
+            .args(args)
+            .current_dir(&dir)
+            .output()
+            .expect("flick runs");
+        assert_eq!(out.status.code(), Some(0), "{name}: {out:?}");
+        assert_eq!(
+            String::from_utf8_lossy(&out.stdout),
+            "on the kernel\n",
+            "{name}"
+        );
+        assert!(
+            String::from_utf8_lossy(&out.stderr).contains("DevTools need Effect"),
+            "{name}: {out:?}"
+        );
+    }
+}
