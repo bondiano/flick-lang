@@ -1,7 +1,7 @@
 ---
 title: Начало работы
 description: Установите инструменты, создайте приложение и запустите его.
-source_hash: 27e4d7c3e930fa92
+source_hash: e8b85c6bfbf9c762
 ---
 
 ## Установка
@@ -17,10 +17,24 @@ flick --version
 
 или через Homebrew: `brew install bondiano/tap/flick`. Можно также скачать
 архив `flick` для своей платформы со страницы
-[релизов](https://github.com/bondiano/flick-lang/releases) или собрать
-компилятор из исходников по разделу [Экосистема](../../ecosystem/).
+[релизов](https://github.com/bondiano/flick-lang/releases) или
+[собрать его из исходников](#из-исходников).
 
 В Windows распакуйте `.zip` и добавьте каталог с `flick.exe` в `PATH`.
+
+### Из исходников
+
+Версию Rust выбирает `rust-toolchain.toml` в checkout:
+
+```sh
+git clone https://github.com/bondiano/flick-lang
+cd flick-lang
+cargo build --release -p flick
+./target/release/flick --version
+```
+
+Такой компилятор берёт `std` своего checkout, поэтому оставьте checkout там,
+где собирали, или задайте в `FLICK_STD_PATH` его каталог `packages/std`.
 
 ## Первая программа
 
@@ -77,10 +91,11 @@ let main () =
 
 ## На веб-странице
 
-В Astro и Vite модули `.fl` можно импортировать через `@flick-lang/astro`.
-Это локальный пакет репозитория Flick; порядок подключения описан
-в разделе [Экосистема](../../ecosystem/).
-Плагин собирает импортированные модули командой `flick build`.
+В Astro и Vite модули `.fl` можно импортировать через `@flick-lang/astro`:
+плагин собирает каждый импортированный `.fl` командой `flick build`. Пакет
+лежит в репозитории Flick
+([исходники](https://github.com/bondiano/flick-lang/tree/main/tools/astro-flick))
+и в npm пока не опубликован.
 
 ```js
 // astro.config.mjs

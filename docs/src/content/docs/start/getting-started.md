@@ -15,10 +15,24 @@ flick --version
 
 or with Homebrew: `brew install bondiano/tap/flick`. You can also download a
 `flick` archive for your platform from the
-[releases](https://github.com/bondiano/flick-lang/releases), or build it from
-a source checkout as described in [Ecosystem](../../ecosystem/).
+[releases](https://github.com/bondiano/flick-lang/releases), or
+[build it from source](#from-source).
 
 On Windows, extract the `.zip` and add the folder with `flick.exe` to `PATH`.
+
+### From source
+
+The checkout's `rust-toolchain.toml` picks the Rust version:
+
+```sh
+git clone https://github.com/bondiano/flick-lang
+cd flick-lang
+cargo build --release -p flick
+./target/release/flick --version
+```
+
+A compiler built this way takes the `std` of its checkout, so keep the
+checkout where you built it, or set `FLICK_STD_PATH` to its `packages/std`.
 
 ## A first program
 
@@ -73,7 +87,9 @@ has every command.
 ## In a web page
 
 Astro and Vite import Flick modules directly with `@flick-lang/astro`: the
-plugin builds each imported `.fl` with `flick build`.
+plugin builds each imported `.fl` with `flick build`. The package lives in the
+Flick repository ([source](https://github.com/bondiano/flick-lang/tree/main/tools/astro-flick))
+and is not published to npm yet.
 
 ```js
 // astro.config.mjs

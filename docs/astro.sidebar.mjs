@@ -9,9 +9,6 @@ export const sidebar = [
       { slug: "start" },
       { slug: "start/getting-started" },
       { slug: "start/why" },
-      { slug: "learn" },
-      { slug: "learn/syntax" },
-      { slug: "learn/flick-and-effect" },
     ],
   },
   {

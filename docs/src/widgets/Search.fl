@@ -93,11 +93,13 @@ let view model m =
               route
                 (prefix ++ "/start/getting-started/")
                 (if m.ru then "Начало работы" else "Getting started"),
-              route (prefix ++ "/learn/flick-and-effect/") "Flick & Effect",
+              route (prefix ++ "/start/why/") (if m.ru then "Зачем Flick" else "Why Flick"),
               route
                 (prefix ++ "/reference/effects/")
                 (if m.ru then "Эффекты, ошибки и сервисы" else "Effects, errors and services"),
-              route (prefix ++ "/api/") (if m.ru then "Справочник API" else "API reference"),
+              route
+                (prefix ++ "/reference/types/")
+                (if m.ru then "Кинды и типы" else "Kinds and types"),
             ]
           else match m.hits with
             | [] ->
