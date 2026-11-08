@@ -1,6 +1,6 @@
 ---
 title: "Flick Specification"
-source_hash: 8f7e5f2e7d6a1ae5
+source_hash: fa485c41aa68276a
 ---
 
 This specification is the normative description of the Flick language as implemented by this compiler. Its chapters state the rules every program follows, with the reasoning a reader needs to apply them. The [reference](../reference/grammar/) pages describe the same language in more detail: the exact grammar, the diagnostics of the checker, the standard library and the code each target generates. Where a chapter and a reference page cover one topic, the chapter states the rule and links the page.

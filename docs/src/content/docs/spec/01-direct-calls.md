@@ -1,6 +1,6 @@
 ---
 title: "Direct effectful calls"
-source_hash: 83c8341531eef2d1
+source_hash: c3fab6aabc0b44ac
 ---
 
 An effectful function is called in an ordinary expression, and `let` binds its result. A sequence of operations is written with ordinary expressions and bindings.

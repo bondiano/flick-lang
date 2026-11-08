@@ -93,7 +93,7 @@ Effect помечает `effect/reactivity` как `@stability unstable` в 4.1.
 же помечены его привязки: `Reactivity.Atom` (атомы, сервис `Registry`,
 который хранит их значения, и его `layer`) и `Reactivity.AsyncResult`
 (значение атома, вычисленное задачей). Их API может измениться с любым
-выпуском Effect; стабильная поверхность — построенные на них модули UI.
+выпуск Effect; стабильный API предоставляют построенные на них модули UI.
 
 `effect/rpc` тоже нестабилен, как и `Rpc`: процедуры описываются кодеками,
 тип группы — запись её обработчиков, `listen` обслуживает группу по HTTP,
@@ -112,7 +112,7 @@ worker_threads Node; `with_middleware`
 `with_headers` добавляет заголовки к вызовам задачи; `uninterruptible`
 заставляет сервер довести обработчик до конца, даже если клиент ушёл;
 `call_local` и `call_stream_local` вызывают группу в памяти — для тестов;
-`connect` держит одно соединение, которое делят `call_on` и
+`connect` поддерживает одно соединение, совместно используемое `call_on` и
 `call_stream_on`.
 
 `effect/observability` тоже нестабилен, как и `Otlp` и `Prometheus`.
@@ -122,7 +122,7 @@ fetch-клиентом. `Otlp.settings url service` и `layer_with`, `traces_wit
 `logs_with`, `metrics_with` добавляют версию и атрибуты сервиса, заголовки
 запросов, gzip, protobuf (`Otlp.protobuf` попадает в бандл, только если его
 назвать), интервалы отправки, размер пачки и таймаут завершения.
-`Otlp.from_config` экспортирует то, что говорит конфигурация `OTEL_`
+`Otlp.from_config` экспортирует сигналы, указанные в конфигурации `OTEL_`
 текущего `ConfigProvider`; сигнал отправляется, только если его
 `OTEL_<SIGNAL>_EXPORTER` называет `otlp`.
 `Prometheus.format` выдаёт записанные метрики в текстовом формате Prometheus,

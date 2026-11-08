@@ -1,6 +1,6 @@
 ---
 title: "Schema and standard data types"
-source_hash: 27cc4aa99988c481
+source_hash: 7a0adbbe597ed73e
 ---
 
 ## The boundary between the language core and the library

@@ -20,7 +20,7 @@ const origin = Astro.site?.origin ?? "";
 const prefix = `${base}${ru ? "/ru" : ""}`;
 const text = (en: string, russian: string) => ru ? russian : en;
 const title = text("Flick — Functions that do what they say", "Flick — функции делают то, что говорят");
-const description = text("Flick is a language for whole apps, where every function does what it says. It compiles to JavaScript and Go. Try it in your browser.", "Flick — язык для приложений целиком, где каждая функция делает то, что говорит. Компилируется в JavaScript и Go. Попробуйте прямо в браузере.");
+const description = text("Flick is a language for whole apps, where every function does what it says. It compiles to JavaScript and Go. Try it in your browser.", "Flick — один язык для всего приложения. Компилятор проверяет соответствие функций их сигнатурам. Компилируется в JavaScript и Go. Попробуйте прямо в браузере.");
 const heroHtml = renderToString(uiRenderStatic(await Effect.runPromise(initial_view(ru))));
 
 const repository = "https://github.com/bondiano/flick-lang";
@@ -32,7 +32,7 @@ const signatureLine = (loadView ?? "").split("\n").findIndex((line) => line.star
 const legend = [
   { line: "needs", names: [["Users", "users"], ["Log", "log"]], body: text("The services it needs. A call to any other service does not compile.", "Сервисы, которые ей нужны. Вызов любого другого сервиса не скомпилируется.") },
   { line: "fails", names: [["NotFound", "fails"]], body: text("How it can fail. Handle it with `try`, or it stays in the caller's signature.", "Как она может упасть. Обработайте ошибку через `try`, иначе она останется в сигнатуре вызывающей функции.") },
-  { line: "returns", names: [["UserView", "returns"]], body: text("What it returns. The body gets there with plain calls: no `yield`, no `flatMap`.", "Что она возвращает. Тело приходит к этому обычными вызовами, без `yield` и `flatMap`.") },
+  { line: "returns", names: [["UserView", "returns"]], body: text("What it returns. The body gets there with plain calls: no `yield`, no `flatMap`.", "Что она возвращает. Результат вычисляется обычными вызовами функций, без `yield` и `flatMap`.") },
 ];
 const inlineCode = (value: string) => value.replace(/`([^`]+)`/g, "<code>$1</code>");
 
@@ -40,17 +40,17 @@ const signatures = [
   {
     name: "TypeScript",
     code: highlight("async function loadView(id: UserId): Promise<UserView> {\n  const user = await users.get(id);\n  log.info(`Loaded ${user.name}`);\n  return toView(user);\n}", "typescript", 1),
-    verdict: text("Says what it returns. What it needs and how it fails live in the body, the docs or your memory.", "Говорит, что возвращает. Что ей нужно и как она падает, остаётся в теле, в документации или в памяти."),
+    verdict: text("Says what it returns. What it needs and how it fails live in the body, the docs or your memory.", "Указывает тип результата. Зависимости и возможные ошибки приходится выяснять по реализации или документации либо помнить самому."),
   },
   {
     name: "TypeScript + Effect",
     code: highlight("const loadView = (id: UserId): Effect<UserView, NotFound, Users | Log> =>\n  Effect.gen(function* () {\n    const user = yield* Users.get(id);\n    yield* Log.info(`Loaded ${user.name}`);\n    return toView(user);\n  });", "typescript", 1),
-    verdict: text("Says all of it, in the TypeScript and with the ecosystem you already have. The body is written with `yield*`.", "Говорит всё, причём на TypeScript и с экосистемой, которая у вас уже есть. Тело пишется через `yield*`."),
+    verdict: text("Says all of it, in the TypeScript and with the ecosystem you already have. The body is written with `yield*`.", "Описывает результат, зависимости и ошибки средствами TypeScript, сохраняя доступ к его экосистеме. В реализации используется `yield*`."),
   },
   {
     name: "Flick",
     code: highlight("load_view : UserId ->{Users, Log; NotFound} UserView\nlet load_view id =\n  let user = Users.get id\n  Log.info (\"Loaded \" ++ user.name)\n  to_view user", "flick", 1),
-    verdict: text("Says all of it, and the body is plain calls. The price is a new language and a smaller ecosystem.", "Говорит всё, а тело состоит из обычных вызовов. Цена — новый язык и экосистема поменьше."),
+    verdict: text("Says all of it, and the body is plain calls. The price is a new language and a smaller ecosystem.", "Описывает результат, зависимости и ошибки, а реализация состоит из обычных вызовов. Но придётся освоить новый язык с меньшей экосистемой."),
   },
 ];
 
@@ -99,12 +99,12 @@ const status = [
         <HeroMap />
         <div class="hero-copy">
           <h1 id="hero-title">{text("Functions that", "Функции делают")}<br />{text("do what they say.", "то, что говорят.")}</h1>
-          <p class="hero-support">{text("A language for whole apps: browser, server and CLI. The signature says what a function needs and how it can fail, the compiler holds the body to it, and the code still reads like plain code.", "Язык для приложений целиком: браузер, сервер и CLI. Сигнатура говорит, что нужно функции и как она может упасть, компилятор держит тело в этих рамках, а код читается как обычный.")}</p>
+          <p class="hero-support">{text("A language for whole apps: browser, server and CLI. The signature says what a function needs and how it can fail, the compiler holds the body to it, and the code still reads like plain code.", "Один язык для всего приложения: браузера, сервера и командной строки. Сигнатура описывает зависимости функции и возможные ошибки, а компилятор проверяет, что реализация ей соответствует. При этом код состоит из обычных вызовов функций.")}</p>
           <div class="hero-actions">
             <a class="action action-primary" href={`${prefix}/start/getting-started/`}>{text("Get started", "Начать")} <Icon name="arrow" size={20} /></a>
             <a class="action" href={`${prefix}/play/`}>{text("Open playground", "Открыть песочницу")}</a>
           </div>
-          <p class="hero-limit"><a href={`${prefix}/start/why/#${ru ? "где-обещание-заканчивается" : "where-the-promise-stops"}`}>{text("Alpha: console, clock and randomness aren't in signatures yet", "Альфа: консоль, часы и случайные числа пока не видны в сигнатуре")} <Icon name="arrow" size={15} /></a></p>
+          <p class="hero-limit"><a href={`${prefix}/start/why/#${ru ? "ограничения" : "where-the-promise-stops"}`}>{text("Alpha: console, clock and randomness aren't in signatures yet", "Альфа: консоль, часы и случайные числа пока не видны в сигнатуре")} <Icon name="arrow" size={15} /></a></p>
         </div>
         <div id="flick-hero" data-flick-ssr set:html={heroHtml}></div>
       </section>
@@ -122,8 +122,8 @@ const status = [
               </div>)}
             </dl>
           </div>
-          <h3>{text("Lines end where they are served", "Линии заканчиваются там, где их обслужили")}</h3>
-          <p class="stop-text" set:html={inlineCode(text("A service line runs up through every caller until `provide` serves it. An error line runs until `try` handles it. `main` picks the real services in one place, and a test picks its own, without changing the code under test.", "Линия сервиса идёт вверх через всех вызывающих, пока её не обслужит `provide`. Линия ошибки идёт, пока её не обработает `try`. `main` выбирает настоящие сервисы в одном месте, а тест выбирает свои, не меняя проверяемый код."))} />
+          <h3>{text("Lines end where they are served", "Как предоставляются сервисы и обрабатываются ошибки")}</h3>
+          <p class="stop-text" set:html={inlineCode(text("A service line runs up through every caller until `provide` serves it. An error line runs until `try` handles it. `main` picks the real services in one place, and a test picks its own, without changing the code under test.", "Требование сервиса передаётся по цепочке вызовов, пока `provide` не предоставит его реализацию. Необработанная ошибка остаётся в сигнатурах вызывающих функций до обработки через `try`. В `main` подключаются реализации сервисов для приложения, а в тестах — тестовые, без изменения проверяемого кода."))} />
           <div class="edge-grid">
             <div class="edge">
               <ServedMap serves="provide live_users, live_log" handled={true} />
@@ -148,7 +148,7 @@ const status = [
         </section>
 
         <section class="stop" aria-labelledby="app-title">
-          <h2 id="app-title">{text("One app. One language. No unchecked seams.", "Одно приложение. Один язык. Без непроверенных стыков.")}</h2>
+          <h2 id="app-title">{text("One app. One language. No unchecked seams.", "Одно приложение. Один язык. Проверяемые контракты между частями.")}</h2>
           <p class="stop-lead" set:html={inlineCode(text("Conduit, the RealWorld demo app, is a Go server over PostgreSQL and a React client. Both depend on one package with the API contract, so a route that does not exist is a compile error on both sides.", "Conduit, демонстрационное приложение RealWorld, — это Go-сервер на PostgreSQL и клиент на React. Оба зависят от одного пакета с контрактом API, поэтому несуществующий маршрут — ошибка компиляции с обеих сторон."))} />
           <svg class="seam-map" viewBox="0 0 460 170" role="img" aria-label={text("One contract package, used by the Go server and the React client", "Один пакет с контрактом, его используют Go-сервер и клиент на React")}>
             <path d="M28 85H94Q110 85 121.3 73.7L154.7 40.3Q166 29 182 29H300" />
@@ -164,15 +164,15 @@ const status = [
           </svg>
           <div class="seams">
             <div class="sign-panel">
-              <p class="sign-caption">{text("A stale column, checked against your migrations", "Устаревшая колонка, сверка с миграциями")}</p>
+              <p class="sign-caption">{text("A stale column, checked against your migrations", "Проверка столбца по схеме из миграций")}</p>
               <p><span class="sign-fails">std/Q001</span> `Users` has no column `nmae`</p>
             </div>
             <div class="sign-panel">
-              <p class="sign-caption">{text("A path that disagrees with its parameters", "Путь, который расходится с параметрами")}</p>
+              <p class="sign-caption">{text("A path that disagrees with its parameters", "Несоответствие параметров шаблону пути")}</p>
               <p><span class="sign-fails">FLICK-C001</span> `PathParams "/items/:id/:rev" &#123; id : String &#125;` does not hold</p>
             </div>
           </div>
-          <p class="stop-text" set:html={inlineCode(text("`sql` blocks are checked against the migrations in your project, not against a live database. `ui` runs only on JavaScript, and when part of the standard library does not compile to Go yet, the build says so with `FLICK-P012`, never at run time.", "Блоки `sql` сверяются с миграциями проекта, а не с живой базой. `ui` работает только на JavaScript, а когда часть стандартной библиотеки ещё не компилируется в Go, об этом говорит сборка кодом `FLICK-P012`, а не работающая программа."))} />
+          <p class="stop-text" set:html={inlineCode(text("`sql` blocks are checked against the migrations in your project, not against a live database. `ui` runs only on JavaScript, and when part of the standard library does not compile to Go yet, the build says so with `FLICK-P012`, never at run time.", "Блоки `sql` сверяются с миграциями проекта, а не с живой базой. `ui` работает только на JavaScript, а если используемая часть стандартной библиотеки ещё не поддерживает Go, компилятор сообщает об этом кодом `FLICK-P012` при сборке, а не во время работы программы."))} />
           <p class="stop-text">{text("The server passes the official RealWorld API suite. The app runs the frontend suite in its full-stack mode: 75 tests pass, and the 65 that need a separate API or browser mocks do not apply. Both are run by hand for now, not in CI.", "Сервер проходит официальный набор RealWorld для API. Приложение запускает набор для фронтенда в режиме full-stack: 75 тестов проходят, а 65, которым нужен отдельный API или моки в браузере, в этом режиме не применяются. Оба набора пока запускаются вручную, а не в CI.")}</p>
           <a class="stop-link" href={`${repository}/tree/main/examples/conduit`}>{text("Read the Conduit example", "Посмотреть пример Conduit")} <Icon name="arrow" size={18} /></a>
         </section>
@@ -181,8 +181,8 @@ const status = [
           <h2 id="unread-title">{text("For code you didn't write", "Для кода, который писали не вы")}</h2>
           <div class="split">
             <div class="split-text">
-              <p class="stop-lead">{text("A teammate, a library or a model wrote it, and now you are reviewing it. The signature tells you what it needs and how it fails before you read the body.", "Его написал коллега, библиотека или модель, а теперь вы его проверяете. Сигнатура говорит, что нужно коду и как он падает, ещё до чтения тела.")}</p>
-          <p class="stop-text" set:html={inlineCode(text("Mistakes are compile errors with codes. `flick explain FLICK-E002` explains one, and `--diagnostics json` gives tools one event per line. The source stays about as long as the same app in Go and React: 30,174 tokens against 29,778 by GPT's tokenizer, for this one app. `node tools/tokens/index.mjs` repeats the count.", "Ошибки — это ошибки компиляции с кодами. `flick explain FLICK-E002` объясняет код, а `--diagnostics json` даёт инструментам по событию на строку. Исходник остаётся примерно такой же длины, как то же приложение на Go и React: 30 174 токена против 29 778 по токенизатору GPT для этого одного приложения. `node tools/tokens/index.mjs` повторяет подсчёт."))} />
+              <p class="stop-lead">{text("A teammate, a library or a model wrote it, and now you are reviewing it. The signature tells you what it needs and how it fails before you read the body.", "Код мог написать коллега или модель; он также мог быть взят из библиотеки. Сигнатура позволяет узнать зависимости функции и возможные ошибки до чтения её реализации.")}</p>
+          <p class="stop-text" set:html={inlineCode(text("Mistakes are compile errors with codes. `flick explain FLICK-E002` explains one, and `--diagnostics json` gives tools one event per line. The source stays about as long as the same app in Go and React: 30,174 tokens against 29,778 by GPT's tokenizer, for this one app. `node tools/tokens/index.mjs` repeats the count.", "Нарушения контракта выявляются при компиляции. `flick explain FLICK-E002` объясняет сообщение об ошибке, а `--diagnostics json` выводит диагностические события для инструментов, по одному на строку. Исходник остаётся примерно такой же длины, как то же приложение на Go и React: 30 174 токена против 29 778 по токенизатору GPT для этого одного приложения. `node tools/tokens/index.mjs` повторяет подсчёт."))} />
             </div>
             <div class="sign-panel sign-output">
               <p><span class="sign-fails">error[FLICK-E002]</span>: the signature of `load_view` does not allow service `Log`, which its body needs</p>
@@ -196,14 +196,14 @@ const status = [
           <h2 id="proved-title">{text("Proved, not promised", "Доказано, а не обещано")}</h2>
           <div class="split">
             <div class="split-text">
-              <p class="stop-lead">{text("The rules behind this page are checked by a machine, in Lean 4.", "Правила, стоящие за этой страницей, проверяет машина, на Lean 4.")}</p>
-              <p class="stop-text">{text("That covers the core calculus under stated hypotheses, not the whole compiler, and the known differences from the checker are written down. The build fails on a missing proof or a new axiom.", "Это касается базового исчисления при оговорённых гипотезах, а не всего компилятора, и известные отличия от проверки типов записаны. Сборка падает на недостающем доказательстве или новой аксиоме.")}</p>
+              <p class="stop-lead">{text("The rules behind this page are checked by a machine, in Lean 4.", "Описанные здесь свойства формальной модели доказаны в Lean 4.")}</p>
+              <p class="stop-text">{text("That covers the core calculus under stated hypotheses, not the whole compiler, and the known differences from the checker are written down. The build fails on a missing proof or a new axiom.", "Доказательства относятся к базовому исчислению при оговорённых гипотезах, а не ко всему компилятору; известные отличия от реализации проверки типов описаны отдельно. Сборка падает на недостающем доказательстве или новой аксиоме.")}</p>
             </div>
             <ul class="proved">
               <li><b>{text("Well-typed programs do not get stuck", "Типизированные программы не застревают")}</b><code>T1</code></li>
-              <li><b>{text("Pure code makes only pure steps", "Чистый код делает только чистые шаги")}</b><code>T2a</code></li>
-              <li><b>{text("Runtime code keeps to its row", "Эффектный код не выходит за свой ряд")}</b><code>T2b</code></li>
-              <li><b>{text("Live work reaches only live regions", "Живая работа обращается только к живым регионам")}</b><code>T4</code></li>
+              <li><b>{text("Pure code makes only pure steps", "Чистое вычисление состоит только из чистых шагов")}</b><code>T2a</code></li>
+              <li><b>{text("Runtime code keeps to its row", "Эффекты и ошибки вычисления ограничены его строкой эффектов")}</b><code>T2b</code></li>
+              <li><b>{text("Live work reaches only live regions", "Выполняемый код обращается только к ещё не закрытым регионам")}</b><code>T4</code></li>
             </ul>
           </div>
           <a class="stop-link" href={`${repository}/blob/main/formal/README.md`}>{text("What exactly is proved", "Что именно доказано")} <Icon name="arrow" size={18} /></a>
@@ -221,7 +221,7 @@ const status = [
         </section>
 
         <section class="stop stop-last" aria-labelledby="status-title">
-          <h2 id="status-title">{text("Where it stands", "Что сейчас")}</h2>
+          <h2 id="status-title">{text("Where it stands", "Текущее состояние")}</h2>
           <ul class="status-list">
             {status.map((line) => <li set:html={inlineCode(line)} />)}
           </ul>
@@ -234,7 +234,7 @@ const status = [
     </main>
     <footer class="home-footer">
       <Brand href={`${prefix}/`} label={text("Flick home", "Flick — главная")} />
-      <p>{text("A language for whole apps.", "Язык для приложений целиком.")}</p>
+      <p>{text("A language for whole apps.", "Один язык для всего приложения.")}</p>
       <a href={repository}><Icon name="github" /> GitHub</a>
     </footer>
     <script>

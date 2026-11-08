@@ -48,7 +48,7 @@ refined type Email = String where Checks.email
 | `type Tree a = …` | `Schema a -> Schema (Tree a)` |
 | `type alias PairOf f = { count : f Float }` | `(forall a. Schema a -> Schema (f a)) -> Schema (PairOf f)` |
 | фантомный параметр, который не используется в представлении типа | схема параметра всё равно нужна |
-| перечисление, `untagged type Method = Get = "GET" \| …` | `Schema Method`, на проводе — его литералы |
+| перечисление, `untagged type Method = Get = "GET" \| …` | `Schema Method`, в формате передачи — его литералы |
 
 ```flick
 # type Tree a = Leaf | Node (Tree a) a (Tree a)
@@ -89,7 +89,7 @@ methods : Schema (Open Method String)
 let methods = Open.schema Schema.string
 ```
 
-Комбинаторы, которыми пишет вывод, — значения `Schema`, ими может
+Комбинаторы, которые используются при автоматическом выводе схем, — значения `Schema`; ими может
 пользоваться и программа:
 
 | Комбинатор | Схема |
@@ -101,7 +101,7 @@ let methods = Open.schema Schema.string
 | `Schema.lazy "T" (fun _ -> s)` | ссылка с именем `T` в JSON Schema, создаётся при первом использовании |
 | `Schema.recursive "T" (fun self -> s)` | рекурсивный тип, `self` — ссылка на него |
 | `Schema.unsafe_unboxed s`, `Schema.unsafe_refined "T" known s T.parse` | `unboxed type` и уточнённый тип |
-| `Schema.enum Schema.string`, `Schema.unsafe_enum_tags Schema.string [("Get", Get), …]` | перечисление, на проводе — литералы или `{ "_tag" }` |
+| `Schema.enum Schema.string`, `Schema.unsafe_enum_tags Schema.string [("Get", Get), …]` | перечисление, в формате передачи — литералы или `{ "_tag" }` |
 
 Что части `unsafe_`-комбинатора — части его типа, никто не проверяет: вывод
 пишет их под сигнатурой схемы.
