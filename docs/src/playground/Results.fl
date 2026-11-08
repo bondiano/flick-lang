@@ -102,6 +102,8 @@ let execution_status m =
     tr m.locale "Exit code " "Код завершения " ++ m.execution.detail
   else if m.execution.status == "timeout" then
     tr m.locale "Stopped after 10 seconds" "Остановлено через 10 секунд"
+  else if m.execution.status == "preview" then
+    tr m.locale "Running in a sandboxed frame" "Работает в изолированном фрейме"
   else if m.execution.status == "stopped" then
     tr m.locale "Stopped" "Остановлено"
   else if m.execution.status == "no-main" then
@@ -116,6 +118,35 @@ let execution_status m =
       "Сборка не удалась. Исправьте ошибки и запустите снова."
   else
     tr m.locale "Program failed" "Программа завершилась с ошибкой"
+
+/// What the program wrote, or a note that it wrote nothing.
+printed : Model -> Ui
+let printed m = ui {
+  Ui.with_host
+    {
+      Ui.host with
+      tab_index = Some 0;
+      aria_label = Some (tr m.locale "Program output" "Вывод программы");
+    }
+    (pre
+      { class_name = "fp-output" }
+      (
+        match m.execution.lines with
+        | [] -> [
+          span { class_name = "fp-muted" } [
+            text
+              (
+                if m.execution.status == "exit" then
+                  tr m.locale "The program wrote no output." "Программа ничего не вывела."
+                else
+                  tr m.locale "No output captured." "Вывод не получен."
+              ),
+          ],
+        ]
+        | lines ->
+          List.map (fun line -> span { class_name = "fp-" ++ line.stream } [text line.text]) lines
+      ))
+}
 
 output_pane : Atom.Writable Model -> Model -> Ui
 let output_pane model m =
@@ -154,38 +185,14 @@ let output_pane model m =
   else
     ui {
       div { class_name = "fp-execution" } [
-        Ui.with_host
-          {
-            Ui.host with
-            tab_index = Some 0;
-            aria_label = Some (tr m.locale "Program output" "Вывод программы");
-          }
-          (pre
-            { class_name = "fp-output" }
-            (
-              match m.execution.lines with
-              | [] -> [
-                span { class_name = "fp-muted" } [
-                  text
-                    (
-                      if m.execution.status == "exit" then
-                        tr m.locale "The program wrote no output." "Программа ничего не вывела."
-                      else
-                        tr m.locale "No output captured." "Вывод не получен."
-                    ),
-                ],
-              ]
-              | lines ->
-                List.map
-                  (fun line -> span { class_name = "fp-" ++ line.stream } [text line.text])
-                  lines
-            )),
+        if m.execution.status == "preview" && m.execution.lines == [] then empty else printed m,
         Ui.with_host
           { Ui.host with role = Some "status" }
           (div
             {
               class_name =
-                if m.execution.status == "exit" && m.execution.detail == "0" then
+                if m.execution.detail == "0"
+                  && (m.execution.status == "exit" || m.execution.status == "preview") then
                   "fp-exit"
                 else
                   "fp-exit fp-bad";

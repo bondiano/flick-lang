@@ -1,6 +1,8 @@
 // Compiler/worker interoperability only. Widget state and presentation live in Flick.
 import type { Built, Completion, Diagnostic, Generated, Hover, Operation, Reply, Request, Result } from "./compiler.worker.ts";
-import type { Message } from "./worker.ts";
+import frameScript from "./frame.ts?worker&url";
+import { packages } from "./loader.ts";
+import type { Message, Program } from "./runtime.ts";
 
 interface Line {
   readonly stream: string;
@@ -146,8 +148,42 @@ export const formatSource = async (source: string): Promise<string> =>
 /** What the diagnostic `code` means, as plain text; empty for a code the compiler does not have. */
 export const explainCode = async (code: string): Promise<string> => plain(await request<string>({ action: "explain", code }));
 
-/** Build off-thread, then execute in the existing isolated, terminable runner. */
+/** Removes the preview a run left open. */
+export const closePreview = (): void => document.getElementById("fp-frame")?.replaceChildren();
+
+/** A message of the frame, whose program may be anyone's: only the shapes `runtime.ts` posts. */
+const fromFrame = (data: unknown): Message | undefined => {
+  if (typeof data !== "object" || data === null) return undefined;
+  const { stream, text, code } = data as Record<string, unknown>;
+  if ((stream === "stdout" || stream === "stderr" || stream === "crash") && typeof text === "string") return { stream, text };
+  if (stream === "exit" && typeof code === "number") return { stream, code };
+  return stream === "ready" ? { stream } : undefined;
+};
+
+/** A frame that allows scripts and nothing else, with a policy that lets it load only the runtime. */
+const openFrame = (): HTMLIFrameElement => {
+  const holder = document.getElementById("fp-frame");
+  if (holder === null) throw new Error("The playground has no place for a preview");
+  const script = new URL(frameScript, location.href);
+  const dark = document.documentElement.dataset.theme !== "light";
+  const policy = `default-src 'none'; script-src ${script.origin} blob:; style-src 'unsafe-inline'; img-src data: blob:`;
+  const frame = document.createElement("iframe");
+  frame.setAttribute("sandbox", "allow-scripts");
+  frame.title = holder.dataset.title ?? "";
+  frame.srcdoc = `<!doctype html><html lang="${document.documentElement.lang}"><meta charset="utf-8">`
+    + `<meta http-equiv="Content-Security-Policy" content="${policy}">`
+    + `<style>:root{color-scheme:${dark ? "dark" : "light"};font-family:system-ui,sans-serif}</style>`
+    + `<div id="app"></div><script type="module" src="${script.href}"></script></html>`;
+  holder.replaceChildren(frame);
+  return frame;
+};
+
+/**
+ * Build off-thread, then execute in the existing isolated, terminable runner: a
+ * worker, or for a program with an interface a frame that stays open once it starts.
+ */
 export const run = async (source: string, profile: string, signal: AbortSignal): Promise<Execution> => {
+  closePreview();
   if (signal.aborted) return { lines: [], status: "stopped", detail: "", diagnostics: [] };
   let result: Built;
   try {
@@ -160,29 +196,47 @@ export const run = async (source: string, profile: string, signal: AbortSignal):
   if (signal.aborted) return { lines: [], status: "stopped", detail: "", diagnostics: problems };
   if (result.files === null) return { lines: [], status: "invalid", detail: "", diagnostics: problems };
   if (result.entry === null) return { lines: [], status: "no-main", detail: "", diagnostics: problems };
+  const program: Program = { files: result.files, entry: result.entry };
+  const ui = packages(program.files, program.entry).some((spec) => spec.startsWith("@flick-lang/runtime/ui"));
   const lines: Array<Line> = [];
-  const worker = new Worker(new URL("./worker.ts", import.meta.url), { type: "module" });
   const { promise, resolve } = Promise.withResolvers<Execution>();
   let settled = false;
+  let close = (): void => { };
   const finish = (status: string, detail: string): void => {
     if (settled) return;
     settled = true;
     signal.removeEventListener("abort", abort);
-    worker.terminate();
+    if (status !== "preview") close();
     resolve({ lines, status, detail, diagnostics: problems });
   };
   const abort = (): void => finish("stopped", "");
   signal.addEventListener("abort", abort, { once: true });
-  worker.onmessage = (event: MessageEvent<Message>) => {
-    const message = event.data;
-    if (message.stream === "exit") finish("exit", String(message.code));
+  const receive = (message: Message, start: () => void): void => {
+    if (message.stream === "ready") start();
+    // a program with an interface that has mounted it and not failed is running
+    else if (message.stream === "exit") finish(ui && message.code === 0 ? "preview" : "exit", String(message.code));
     else if (message.stream === "crash") finish("failure", message.text);
     else lines.push({ stream: message.stream, text: message.text });
   };
-  worker.onerror = (event) => finish("failure", event.error instanceof Error ? detail(event.error) : event.message);
-  worker.onmessageerror = () => finish("failure", "The worker returned an unreadable message");
   try {
-    worker.postMessage({ files: result.files, entry: result.entry });
+    if (ui) {
+      const frame = openFrame();
+      // shortcut: what the program writes or throws after it starts stays in the frame's console; show it under the frame if readers miss it
+      const listen = (event: MessageEvent): void => {
+        const message = event.source === frame.contentWindow ? fromFrame(event.data) : undefined;
+        if (message !== undefined) receive(message, () => frame.contentWindow?.postMessage(program, "*"));
+      };
+      close = () => frame.remove();
+      addEventListener("message", listen);
+      void promise.then(() => removeEventListener("message", listen));
+    } else {
+      const worker = new Worker(new URL("./worker.ts", import.meta.url), { type: "module" });
+      close = () => worker.terminate();
+      worker.onmessage = (event: MessageEvent<Message>) => receive(event.data, () => { });
+      worker.onerror = (event) => finish("failure", event.error instanceof Error ? detail(event.error) : event.message);
+      worker.onmessageerror = () => finish("failure", "The worker returned an unreadable message");
+      worker.postMessage(program);
+    }
   } catch (error) {
     finish("failure", detail(error));
   }

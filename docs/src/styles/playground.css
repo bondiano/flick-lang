@@ -382,6 +382,11 @@ main:has(#flick-playground) .sl-container { max-width: none; }
 .fp .fp-bad, .fp-error, .fp-stderr { color: var(--sl-color-red-high, var(--sl-color-white)); }
 .fp-warning { color: var(--sl-color-orange-high, var(--sl-color-white)); }
 .fp-stale { padding: 0.75rem 1rem; border-top: 1px solid var(--fp-rule); color: var(--sl-color-gray-2); font-size: 0.8125rem; }
+/* The preview of a program with an interface fills the panel above its status. */
+.fp-frame { display: none; }
+.fp-frame-open { display: flex; flex: 1 1 auto; min-height: 0; }
+.fp-frame iframe { flex: 1 1 auto; width: 100%; border: 0; background: var(--sl-color-bg); }
+.fp-result > .fp-frame-open ~ .fp-execution { flex: 0 0 auto; min-height: 0; }
 
 .fp-problems-panel { padding: 1.25rem; }
 .fp-diagnostics { color: var(--sl-color-gray-2); }
@@ -429,6 +434,7 @@ main:has(#flick-playground) .sl-container { max-width: none; }
   .fp-generated-code, .fp-empty, .fp-execution, .fp-problems-panel { min-height: 20rem; }
   .fp-generated-code { max-height: 32rem; }
   .fp .fp-output { min-height: 16rem; }
+  .fp-frame-open { min-height: 20rem; }
 }
 
 @media (max-width: 36rem) {

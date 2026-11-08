@@ -33,6 +33,22 @@ let result_pane model m =
           tab Js "JavaScript",
           tab Dts ".d.ts",
         ]),
+      // `compiler.ts` opens a preview here; a tab other than the output hides it, and it keeps running
+      Ui.with_host
+        {
+          Ui.host with
+          id = Some "fp-frame";
+          data = [("title", tr m.locale "Preview of the program" "Предпросмотр программы")];
+        }
+        (div
+          {
+            class_name =
+              if m.tab == Output && m.execution.status == "preview" then
+                "fp-frame fp-frame-open"
+              else
+                "fp-frame";
+          }
+          []),
       body,
     ]
   }

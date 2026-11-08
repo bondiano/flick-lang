@@ -97,6 +97,11 @@ focus_editor : Unit ->{} Bool
 foreign focus_editor from "./editor.ts" "focusEditor"
   arity 0
 
+/// Removes the preview a run of a program with an interface left open.
+close_preview : Unit ->{} Unit
+foreign close_preview from "./compiler.ts" "closePreview"
+  arity 0
+
 run_build : String -> String ->{Async; JsError} Execution
 foreign run_build from "./compiler.ts" "run"
   arity 2
@@ -258,6 +263,7 @@ let replace model source =
 
 choose : Atom.Writable Model -> Example ->{Atom.Write;} Unit
 let choose model example =
+  close_preview ()
   update model (fun m -> {
     m with
     revision = m.revision + 1;
