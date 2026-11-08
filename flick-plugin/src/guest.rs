@@ -117,6 +117,18 @@ pub fn publish(plugin: &impl Plugin, state: &[u8]) -> Vec<types::Published> {
 }
 
 #[doc(hidden)]
+pub fn emit(
+    plugin: &impl Plugin,
+    artifacts: Vec<types::Artifact>,
+) -> Result<Vec<types::Artifact>, Vec<types::Diagnostic>> {
+    let artifacts = artifacts.into_iter().map(convert::from_artifact).collect();
+    plugin
+        .emit(artifacts)
+        .map(|written| written.into_iter().map(convert::to_artifact).collect())
+        .map_err(|found| found.into_iter().map(convert::to_diagnostic).collect())
+}
+
+#[doc(hidden)]
 pub fn load(
     plugin: &impl Plugin,
     path: &str,
@@ -243,6 +255,15 @@ macro_rules! export {
                 state: ::std::vec::Vec<u8>,
             ) -> ::std::vec::Vec<$crate::guest::bindings::flick::plugin::types::Published> {
                 $crate::guest::publish(&$plugin, &state)
+            }
+
+            fn emit(
+                artifacts: ::std::vec::Vec<$crate::guest::bindings::flick::plugin::types::Artifact>,
+            ) -> ::std::result::Result<
+                ::std::vec::Vec<$crate::guest::bindings::flick::plugin::types::Artifact>,
+                ::std::vec::Vec<$crate::guest::bindings::flick::plugin::types::Diagnostic>,
+            > {
+                $crate::guest::emit(&$plugin, artifacts)
             }
 
             fn load(

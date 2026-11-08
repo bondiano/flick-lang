@@ -111,6 +111,14 @@ macro_rules! wit_conversions {
                 }
             }
 
+            pub fn to_artifact(a: $crate::Artifact) -> w::Artifact {
+                w::Artifact { path: a.path, contents: a.contents }
+            }
+
+            pub fn from_artifact(a: w::Artifact) -> $crate::Artifact {
+                $crate::Artifact { path: a.path, contents: a.contents }
+            }
+
             pub fn to_diagnostic(d: $crate::Diagnostic) -> w::Diagnostic {
                 w::Diagnostic {
                     message: d.message,

@@ -35,6 +35,19 @@ pub use load::{
 };
 #[cfg(feature = "native-project")]
 pub use packages::project_name;
+
+/// The libraries of `project` whose plugins take part in `hook`, as
+/// `hooks = ["emit"]` says, each with its component, in the order of the
+/// dependencies; what is wrong with them is for `flick check` to say.
+#[cfg(feature = "native-project")]
+pub fn hooked_plugins(
+    host: &dyn Host,
+    sources: &mut SourceMap,
+    project: &Project,
+    hook: &str,
+) -> Vec<(String, Option<PathBuf>)> {
+    packages::Packages::load(host, sources, project, &mut Vec::new()).hooked(hook)
+}
 use std::io;
 
 #[cfg(test)]

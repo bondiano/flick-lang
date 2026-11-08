@@ -148,6 +148,9 @@ interface types {
 
   record arena { nodes: list<node>, root: node-id }
 
+  /// A file a build writes: its path in the output directory and its text.
+  record artifact { path: string, contents: string }
+
   /// How bad a diagnostic is: an error fails the build.
   enum severity { error, warning, note }
 
@@ -286,7 +289,7 @@ interface compiler {
 
 world plugin {
   import compiler;
-  use types.{block, arena, diagnostic, completion, hover, highlight, piece, derive-target, fact, published};
+  use types.{block, arena, diagnostic, completion, hover, highlight, piece, derive-target, fact, published, artifact};
 
   /// What the plugin learns from all its blocks of a group, before any expands.
   export collect: func(blocks: list<block>) -> list<u8>;
@@ -297,6 +300,11 @@ world plugin {
   /// contents `bytes`: declarations, at spans of the file. Only a plugin whose
   /// package says `load = ["ext"]` gets the files of that extension.
   export load: func(path: string, bytes: list<u8>) -> result<arena, list<diagnostic>>;
+  /// The files of `flick build` after it wrote them: their paths and texts,
+  /// each `.js` with its `.map` when the build writes maps, and the `.iface`
+  /// that sums up the types; what the build writes instead. Only a plugin
+  /// whose package says `hooks = ["emit"]` gets them.
+  export emit: func(artifacts: list<artifact>) -> result<list<artifact>, list<diagnostic>>;
   /// The code a block stands for, given what `collect` learned.
   export expand: func(block: block, state: list<u8>) -> result<arena, list<diagnostic>>;
   /// What an editor may insert at `offset` of the block; `member` says the

@@ -37,6 +37,8 @@ struct Package {
     plugin: Option<PathBuf>,
     /// The extensions of the files that plugin turns into modules.
     load: Vec<String>,
+    /// The stages of a build that plugin takes part in.
+    hooks: Vec<String>,
 }
 
 /// What the modules of a library of `[dependencies]` depend on besides the
@@ -121,6 +123,7 @@ impl Packages {
                     library: None,
                     plugin: None,
                     load: Vec::new(),
+                    hooks: Vec::new(),
                 }
             });
         packages.extend(installed.collect::<Vec<_>>());
@@ -151,6 +154,15 @@ impl Packages {
     pub fn loaders(&self) -> impl Iterator<Item = (&str, &str)> {
         (self.packages.iter())
             .flat_map(|p| p.load.iter().map(move |e| (e.as_str(), p.name.as_str())))
+    }
+
+    /// Each library whose plugin takes part in `hook`, with its component,
+    /// in the order of the dependencies.
+    pub fn hooked(&self, hook: &str) -> Vec<(String, Option<PathBuf>)> {
+        (self.packages.iter())
+            .filter(|p| p.hooks.iter().any(|h| h == hook))
+            .map(|p| (p.name.clone(), p.plugin.clone()))
+            .collect()
     }
 
     /// The component of the plugin the library `name` provides.
@@ -353,6 +365,7 @@ impl Libraries<'_> {
                 .and_then(|p| p.plugin.as_ref())
                 .map(|plugin| at.join(plugin)),
             load: (library.package.as_ref()).map_or_else(Vec::new, |p| p.load.clone()),
+            hooks: (library.package.as_ref()).map_or_else(Vec::new, |p| p.hooks.clone()),
         });
         Some((at, library.dependencies))
     }

@@ -85,6 +85,12 @@ impl BuildCommand {
         emitted: &mut Emission,
         progress: &Progress,
     ) {
+        // a run writes what it runs, which no plugin's `emit` changes
+        if !self.generation
+            && let Some(project) = project
+        {
+            super::hooks::emit(project, emitted);
+        }
         write_artifacts(output, emitted, progress);
         if self.generation
             || emitted

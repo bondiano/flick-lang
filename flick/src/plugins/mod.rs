@@ -94,6 +94,14 @@ impl Expander for Traced {
         self.inner.expand(block, state, source)
     }
 
+    fn emit(
+        &self,
+        artifacts: &[flick_plugin::Artifact],
+    ) -> Result<Vec<flick_plugin::Artifact>, Failure> {
+        self.trace(&format!("emit {}", self.inner.id()));
+        self.inner.emit(artifacts)
+    }
+
     fn load(&self, path: &str, bytes: &[u8]) -> Result<Arena, Failure> {
         self.trace(&format!("load {} {path}", self.inner.id()));
         self.inner.load(path, bytes)

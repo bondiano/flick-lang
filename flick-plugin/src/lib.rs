@@ -312,6 +312,13 @@ pub struct Arena {
     pub root: NodeId,
 }
 
+/// A file a build writes: its path in the output directory and its text.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Artifact {
+    pub path: String,
+    pub contents: String,
+}
+
 /// What an editor may insert at an offset of a block.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Completion {

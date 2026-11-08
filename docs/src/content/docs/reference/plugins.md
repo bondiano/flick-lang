@@ -345,6 +345,19 @@ spans under its own codes. The code names std and the Prelude by their full
 names; it cannot import another module of the project yet, the file must be
 UTF-8 text, and a `.fl` file of the same module beside it is `FLICK-R002`.
 
+## Rewriting what a build writes
+
+A plugin whose package says `hooks = ["emit"]` beside `plugin` gets the files
+`flick build` writes before it writes them: each path in the output
+directory and its text, the `.js` of each module with its `.map` when the
+build writes maps, and the `.iface` that sums up its types. Its `emit` gives
+the files the build writes instead; the plugins of several packages run one
+after another in the order of `[dependencies]`. A plugin that changes a `.js`
+it got with a `.map` gives that `.map` changed too, or the build keeps the
+files as they were and reports `FLICK-P046`; a `.js` without a map may
+change alone. Only `flick build` asks: `flick run` and `flick test` build
+without it, so a plugin that changes behavior tests it itself.
+
 ## Disabling a plugin
 
 A project may refuse part of a plugin it gets, the compiler's own included, in

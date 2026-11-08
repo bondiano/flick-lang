@@ -16,8 +16,8 @@ use std::panic::{self, AssertUnwindSafe};
 use std::sync::Arc;
 
 use flick_plugin::{
-    Arena, Block, Completion, DeriveTarget, Diagnostic, Fact, Highlight, Hover, Piece, Plugin,
-    Published,
+    Arena, Artifact, Block, Completion, DeriveTarget, Diagnostic, Fact, Highlight, Hover, Piece,
+    Plugin, Published,
 };
 
 use source::{BlockSource, Seen};
@@ -43,6 +43,11 @@ pub trait Expander: Send + Sync {
         state: &[u8],
         source: &mut BlockSource,
     ) -> Result<Arena, Failure>;
+    /// The files of `flick build` as the plugin writes them instead; why it
+    /// writes none.
+    fn emit(&self, artifacts: &[Artifact]) -> Result<Vec<Artifact>, Failure> {
+        Ok(artifacts.to_vec())
+    }
     /// The module the file at `path` stands for, its contents `bytes`, as
     /// declarations at spans of the file; why there is none.
     fn load(&self, path: &str, bytes: &[u8]) -> Result<Arena, Failure> {
@@ -209,6 +214,12 @@ impl<P: Plugin + Send + Sync> Expander for Native<P> {
         source: &mut BlockSource,
     ) -> Result<Arena, Failure> {
         guarded(|| self.plugin.expand(block, state, source))
+            .map_err(Failure::Broken)?
+            .map_err(Failure::Refused)
+    }
+
+    fn emit(&self, artifacts: &[Artifact]) -> Result<Vec<Artifact>, Failure> {
+        guarded(|| self.plugin.emit(artifacts.to_vec()))
             .map_err(Failure::Broken)?
             .map_err(Failure::Refused)
     }
