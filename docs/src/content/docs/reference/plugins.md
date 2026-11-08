@@ -322,6 +322,29 @@ of the files given, stands for, the user's code in place. Built with
 `crate-type = ["cdylib"]`, the `guest` feature of `flick-plugin` and
 `--target wasm32-wasip2`, as the script does, the crate is a component.
 
+## Files of other languages
+
+A plugin may also turn a file of another language into a module. Its package
+says which extensions, beside `plugin`:
+
+```toml
+[package]
+name = "protos"
+version = "0.1.0"
+plugin = "protos.wasm"
+load = ["proto"]
+```
+
+Then `import App.User` finds `App/User.proto` when there is no `App/User.fl`,
+and the plugin's `load(path, bytes)` gives the module's declarations, each at
+the span of the file it stands for: the project checks and imports them as
+its own, the module exposes all of them, and the editor goes from a use to
+that line of the file, and sends the server the file's edits once the
+server registers the extension. What the plugin finds wrong is at the file's
+spans under its own codes. The code names std and the Prelude by their full
+names; it cannot import another module of the project yet, the file must be
+UTF-8 text, and a `.fl` file of the same module beside it is `FLICK-R002`.
+
 ## Disabling a plugin
 
 A project may refuse part of a plugin it gets, the compiler's own included, in

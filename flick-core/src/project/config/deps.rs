@@ -31,6 +31,8 @@ pub(super) struct RawPackage {
     version: String,
     flick: Option<String>,
     plugin: Option<String>,
+    #[serde(default)]
+    load: Vec<String>,
 }
 
 /// `[js]` as written: its only table is `dependencies`.
@@ -153,6 +155,7 @@ pub(super) fn package(raw: Spanned<RawPackage>, at: Span) -> Result<Package, Dia
         version,
         flick,
         plugin,
+        load,
     } = raw.into_inner();
     let error = |message: String| Diagnostic::error(codes::P032, message, at);
     semver::Version::parse(&version).map_err(|e| {
@@ -175,11 +178,29 @@ pub(super) fn package(raw: Spanned<RawPackage>, at: Span) -> Result<Package, Dia
             "`plugin = \"{plugin}\"` must be a path inside the package, without `..`"
         )));
     }
+    if !load.is_empty() && plugin.is_none() {
+        return Err(error(
+            "`load` needs the `plugin` that loads the files".into(),
+        ));
+    }
+    // a module path has no dot of its own, and `.fl` is Flick's
+    if let Some(bad) = load.iter().find(|e| {
+        e.is_empty()
+            || e.as_str() == "fl"
+            || !e
+                .chars()
+                .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit())
+    }) {
+        return Err(error(format!(
+            "`load = [\"{bad}\"]`: an extension is lowercase letters and digits, without the dot, and not `fl`"
+        )));
+    }
     Ok(Package {
         name,
         version,
         flick,
         plugin,
+        load,
         span: at,
     })
 }

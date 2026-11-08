@@ -35,6 +35,8 @@ struct Package {
     library: Option<Library>,
     /// The component of the plugin a library provides.
     plugin: Option<PathBuf>,
+    /// The extensions of the files that plugin turns into modules.
+    load: Vec<String>,
 }
 
 /// What the modules of a library of `[dependencies]` depend on besides the
@@ -118,6 +120,7 @@ impl Packages {
                     source_dir,
                     library: None,
                     plugin: None,
+                    load: Vec::new(),
                 }
             });
         packages.extend(installed.collect::<Vec<_>>());
@@ -141,6 +144,13 @@ impl Packages {
                 p.library.as_ref()?,
             ))
         })
+    }
+
+    /// Each extension a library's plugin loads, with the library, in the
+    /// order of the dependencies.
+    pub fn loaders(&self) -> impl Iterator<Item = (&str, &str)> {
+        (self.packages.iter())
+            .flat_map(|p| p.load.iter().map(move |e| (e.as_str(), p.name.as_str())))
     }
 
     /// The component of the plugin the library `name` provides.
@@ -342,6 +352,7 @@ impl Libraries<'_> {
             plugin: (library.package.as_ref())
                 .and_then(|p| p.plugin.as_ref())
                 .map(|plugin| at.join(plugin)),
+            load: (library.package.as_ref()).map_or_else(Vec::new, |p| p.load.clone()),
         });
         Some((at, library.dependencies))
     }

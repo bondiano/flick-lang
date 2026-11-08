@@ -117,6 +117,18 @@ pub fn publish(plugin: &impl Plugin, state: &[u8]) -> Vec<types::Published> {
 }
 
 #[doc(hidden)]
+pub fn load(
+    plugin: &impl Plugin,
+    path: &str,
+    bytes: &[u8],
+) -> Result<types::Arena, Vec<types::Diagnostic>> {
+    plugin
+        .load(path, bytes)
+        .map(convert::to_arena)
+        .map_err(|found| found.into_iter().map(convert::to_diagnostic).collect())
+}
+
+#[doc(hidden)]
 pub fn expand(
     plugin: &impl Plugin,
     block: types::Block,
@@ -231,6 +243,16 @@ macro_rules! export {
                 state: ::std::vec::Vec<u8>,
             ) -> ::std::vec::Vec<$crate::guest::bindings::flick::plugin::types::Published> {
                 $crate::guest::publish(&$plugin, &state)
+            }
+
+            fn load(
+                path: ::std::string::String,
+                bytes: ::std::vec::Vec<u8>,
+            ) -> ::std::result::Result<
+                $crate::guest::bindings::flick::plugin::types::Arena,
+                ::std::vec::Vec<$crate::guest::bindings::flick::plugin::types::Diagnostic>,
+            > {
+                $crate::guest::load(&$plugin, &path, &bytes)
             }
 
             fn expand(

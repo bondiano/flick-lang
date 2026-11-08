@@ -191,6 +191,51 @@ impl Expansion {
         (Some(expansion), diagnostics)
     }
 
+    /// A file of another language, `text`, and the declarations `rendered`
+    /// its plugin gave for it, after it: the whole file is one block, whose
+    /// code has no holes.
+    pub fn whole(
+        text: &str,
+        file: FileId,
+        rendered: &Rendered,
+        plugin: &str,
+    ) -> Result<Self, String> {
+        let len = u32::try_from(text.len()).map_err(|_| "the file is too long")?;
+        let mut out = format!("{text}\n");
+        let at = u32::try_from(out.len()).map_err(|_| "the file is too long")?;
+        out.push_str(&rendered.text);
+        let end = u32::try_from(out.len()).map_err(|_| "the code is too long")?;
+        let decls = splice_decls(&out, file, at, rendered, &BlockSource::default())?;
+        let origins = (rendered.origins.iter())
+            .map(|&((s, e), o)| ((at + s, at + e), (o.start, o.end)))
+            .collect();
+        let tree = Node {
+            kind: K::SourceFile,
+            children: decls.into_iter().map(Element::Node).collect(),
+        };
+        let source_tree = Node {
+            kind: K::SourceFile,
+            children: Vec::new(),
+        };
+        Ok(Expansion {
+            text: out,
+            len,
+            tree,
+            source_tree,
+            file,
+            origins,
+            blocks: vec![Block {
+                range: (0, len),
+                code: (at, end),
+                plugin: plugin.to_owned(),
+                frame: (0, len),
+                place: Place::Declaration,
+                holes: Vec::new(),
+                signature: String::new(),
+            }],
+        })
+    }
+
     /// The top-level names the code of the module's blocks declares, each at
     /// what it stands for in the module: its block, or the user's name there
     /// the plugin gave as its origin.

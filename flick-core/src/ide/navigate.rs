@@ -62,13 +62,11 @@ impl Ide<'_> {
         match symbol {
             Symbol::Module(module) => {
                 let source = self.source(module)?;
-                let path = source
-                    .tree
-                    .nodes()
-                    .find(|n| n.kind == K::ModuleHeader)?
-                    .nodes()
-                    .find(|n| n.kind == K::ModulePath)?;
-                let (start, end) = path.range();
+                let path = (source.tree.nodes())
+                    .find(|n| n.kind == K::ModuleHeader)
+                    .and_then(|h| h.nodes().find(|n| n.kind == K::ModulePath));
+                // a file of another language has no header: its start
+                let (start, end) = path.map_or((0, 0), Node::range);
                 Some(at(source.target, start, end))
             }
             Symbol::Local { file, binder, .. } => Some(Location {

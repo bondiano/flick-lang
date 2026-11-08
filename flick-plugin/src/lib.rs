@@ -14,6 +14,7 @@ extern crate self as flick_plugin;
 mod builder;
 mod cursor;
 mod diagnostic;
+mod exports;
 #[cfg(feature = "guest")]
 pub mod guest;
 mod literal;
@@ -27,6 +28,7 @@ use serde::{Deserialize, Serialize};
 pub use builder::Builder;
 pub use cursor::Cursor;
 pub use diagnostic::{Diagnostic, Edit, Fix, Severity};
+pub use exports::Plugin;
 pub use flick_plugin_macros::flick;
 pub use literal::{literal_text, string_value};
 pub use reach::{ReachError, Request, Response};
@@ -496,92 +498,6 @@ pub trait Compiler {
     /// editor answers it; while a block expands, nothing.
     fn in_scope(&mut self, namespace: Namespace, fits: Option<&str>) -> Vec<Completion> {
         let _ = (namespace, fits);
-        Vec::new()
-    }
-}
-
-/// A plugin: what it learns from all its blocks of a group, and the code
-/// each block stands for. Both depend only on the blocks and on what the
-/// project grants them to read, so the compiler caches each result while
-/// what its call read stays the same.
-pub trait Plugin {
-    /// What the plugin learns from `blocks`, the state each expansion
-    /// gets; `compiler` reaches what the project grants, but parses no
-    /// hole.
-    fn collect(&self, blocks: &[Block], compiler: &mut dyn Compiler) -> Vec<u8>;
-    /// What the blocks of other groups and modules may ask of `state`, the
-    /// state of a group: each before any block expands.
-    fn publish(&self, state: &[u8]) -> Vec<Published> {
-        let _ = state;
-        Vec::new()
-    }
-    /// The code `block` stands for given what `collect` learned, or why
-    /// there is none; no diagnostic means the compiler already reported why.
-    fn expand(
-        &self,
-        block: &Block,
-        state: &[u8],
-        compiler: &mut dyn Compiler,
-    ) -> Result<Arena, Vec<Diagnostic>>;
-    /// What an editor may insert at `offset` of `block`; `member` says the
-    /// user typed `name.` right before `offset`, the `.` not in the block.
-    /// `compiler` answers `published` and `literal_of` as while it expands,
-    /// and parses no hole.
-    fn complete(
-        &self,
-        block: &Block,
-        state: &[u8],
-        offset: u32,
-        member: bool,
-        compiler: &mut dyn Compiler,
-    ) -> Vec<Completion> {
-        let _ = (block, state, offset, member, compiler);
-        Vec::new()
-    }
-    /// What an editor shows at `offset` of `block`; `facts` are the types
-    /// of the `_` of its code, as `check` gets them, once it checked. An
-    /// offset past the end of the block is its head, before the block.
-    fn hover(&self, block: &Block, state: &[u8], offset: u32, facts: &[Fact]) -> Option<Hover> {
-        let _ = (block, state, offset, facts);
-        None
-    }
-    /// How an editor colors the words of `block` that are the plugin's.
-    fn highlight(&self, block: &Block, state: &[u8]) -> Vec<Highlight> {
-        let _ = (block, state);
-        Vec::new()
-    }
-    /// The instance of `class` for `target`, and what goes with it, as
-    /// declarations; `args` is the `{ … }` after the class in `deriving`,
-    /// and `module` every type the module of `target` declares.
-    fn derive(
-        &self,
-        target: &DeriveTarget,
-        class: &str,
-        args: Option<&Block>,
-        module: &[DeriveTarget],
-        state: &[u8],
-        compiler: &mut dyn Compiler,
-    ) -> Result<Arena, Vec<Diagnostic>> {
-        let _ = (args, module, state, compiler);
-        let message = format!("`{class}` has no derive in this plugin");
-        Err(vec![Diagnostic::error(message, target.decl.whole())])
-    }
-    /// The layout of `block`, the user's code in it found through
-    /// `compiler`; none keeps the block as written.
-    fn format(
-        &self,
-        block: &Block,
-        state: &[u8],
-        compiler: &mut dyn Compiler,
-    ) -> Option<Vec<Piece>> {
-        let _ = (block, state, compiler);
-        None
-    }
-    /// What is wrong with `block` that only the types of its code show:
-    /// `facts` are the types of the `_` of its code, at the spans it gave
-    /// them. It only adds errors.
-    fn check(&self, block: &Block, state: &[u8], facts: &[Fact]) -> Vec<Diagnostic> {
-        let _ = (block, state, facts);
         Vec::new()
     }
 }

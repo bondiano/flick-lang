@@ -50,6 +50,9 @@ impl Loader<'_> {
                 }
                 // absent files are simply not candidates
                 let _ = self.load(&dir.join(module_path(name)));
+                for path in self.loaded_paths(&dir, name) {
+                    let _ = self.load(&path);
+                }
             }
         }
         let local = self.by_name.get(name).copied();

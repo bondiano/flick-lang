@@ -324,6 +324,19 @@ impl Expander for Wasm {
         }
     }
 
+    fn load(&self, path: &str, bytes: &[u8]) -> Result<flick_plugin::Arena, Failure> {
+        let (result, _) = self.run(BlockSource::default(), |plugin, store| {
+            plugin.call_load(store, path, bytes)
+        });
+        match result {
+            Ok(Ok(arena)) => Ok(convert::from_arena(arena)),
+            Ok(Err(found)) => Err(Failure::Refused(
+                found.into_iter().map(convert::from_diagnostic).collect(),
+            )),
+            Err(why) => Err(Failure::Broken(why)),
+        }
+    }
+
     fn complete(
         &self,
         block: &flick_plugin::Block,
