@@ -198,7 +198,8 @@ extensions into modules: `App/User.proto` is the module `App.User` (see
 [plugins.md](../plugins/#files-of-other-languages)). Two libraries that load
 one extension are `FLICK-P045`. `hooks = ["emit"]` lets its plugin rewrite the
 files `flick build` writes (see
-[plugins.md](../plugins/#rewriting-what-a-build-writes)).
+[plugins.md](../plugins/#rewriting-what-a-build-writes)), and `hooks = ["ir"]`
+the IR a build compiles (see [plugins.md](../plugins/#rewriting-the-ir)).
 
 `flick install` fetches each git or url library the manifests name, directly
 or through a library, into the package store (`FLICK_STORE`, else

@@ -94,6 +94,11 @@ impl Expander for Traced {
         self.inner.expand(block, state, source)
     }
 
+    fn transform(&self, program: &[u8]) -> Result<Vec<u8>, Failure> {
+        self.trace(&format!("transform {}", self.inner.id()));
+        self.inner.transform(program)
+    }
+
     fn emit(
         &self,
         artifacts: &[flick_plugin::Artifact],

@@ -19,4 +19,5 @@ crate-type = ["cdylib", "rlib"]
 guest = ["flick-plugin/guest"]
 
 [dependencies]
+flick-ir = { path = "../../../flick-ir", features = ["cbor"] }
 flick-plugin = { path = "../../../flick-plugin" }

@@ -31,6 +31,13 @@ pub trait Plugin {
         };
         Err(vec![Diagnostic::error("this plugin loads no files", whole)])
     }
+    /// The IR of the project's modules as a `Program` in CBOR, after the
+    /// checks of effects and before the build optimizes it; the program the
+    /// build compiles instead. Only a plugin whose package says `hooks =
+    /// ["ir"]` gets it.
+    fn transform(&self, program: Vec<u8>) -> Result<Vec<u8>, Vec<Diagnostic>> {
+        Ok(program)
+    }
     /// The files of `flick build`, each `.js` with its `.map` when the build
     /// writes maps; what it writes instead. Only a plugin whose package says
     /// `hooks = ["emit"]` gets them.

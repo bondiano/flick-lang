@@ -1,3 +1,4 @@
+use std::collections::BTreeSet;
 use std::path::Path;
 use std::path::PathBuf;
 use std::{env, fs};
@@ -82,15 +83,31 @@ fn every_passing_fixture_lowers() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../tests/check/pass");
     let mut paths = Vec::new();
     fixtures(&root, &mut paths);
+    let builtin = |m: &str| types::builtins().iter().any(|b| b.module == m);
     for path in paths {
         let text = fs::read_to_string(&path).expect("utf-8");
-        if let Err(d) = lower_text("Fixture", &text) {
+        match lower_text("Fixture", &text) {
+            // what a plugin's pass over the IR gives is held to the same check
+            Ok(module) => {
+                let mut files = BTreeSet::new();
+                module.clone().each_span_mut(&mut |s| {
+                    files.insert(s.file);
+                });
+                let program = flick_ir::Program {
+                    ir_version: flick_ir::VERSION.into(),
+                    compiler: String::new(),
+                    files: Vec::new(),
+                    modules: vec![module],
+                };
+                let problems = flick_ir::validate(&program, &builtin, &files);
+                assert!(problems.is_empty(), "{}: {problems:?}", path.display());
+            }
             // blocks compiled by later phases are reported, never miscompiled
-            assert!(
+            Err(d) => assert!(
                 d.iter().all(|d| d.code == codes::P012),
                 "{}: {d:?}",
                 path.display()
-            );
+            ),
         }
     }
 }

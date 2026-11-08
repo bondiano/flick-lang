@@ -714,6 +714,7 @@ dependencies = [
 name = "flick-test-pairs"
 version = "0.1.0"
 dependencies = [
+ "flick-ir",
  "flick-plugin",
 ]
 

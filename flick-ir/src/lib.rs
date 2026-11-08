@@ -14,6 +14,7 @@ mod op;
 mod program;
 mod span;
 mod stage;
+mod validate;
 
 pub use data::{Constructor, EnumLit, JsClass, Rep, TypeName};
 pub use dict::Dict;
@@ -29,3 +30,4 @@ pub use op::OpClass;
 pub use program::{Error, Program, VERSION};
 pub use span::{FileId, Span};
 pub use stage::{Lift, Stage};
+pub use validate::validate;

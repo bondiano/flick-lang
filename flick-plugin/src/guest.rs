@@ -117,6 +117,15 @@ pub fn publish(plugin: &impl Plugin, state: &[u8]) -> Vec<types::Published> {
 }
 
 #[doc(hidden)]
+pub fn transform(
+    plugin: &impl Plugin,
+    program: Vec<u8>,
+) -> Result<Vec<u8>, Vec<types::Diagnostic>> {
+    (plugin.transform(program))
+        .map_err(|found| found.into_iter().map(convert::to_diagnostic).collect())
+}
+
+#[doc(hidden)]
 pub fn emit(
     plugin: &impl Plugin,
     artifacts: Vec<types::Artifact>,
@@ -255,6 +264,15 @@ macro_rules! export {
                 state: ::std::vec::Vec<u8>,
             ) -> ::std::vec::Vec<$crate::guest::bindings::flick::plugin::types::Published> {
                 $crate::guest::publish(&$plugin, &state)
+            }
+
+            fn transform(
+                program: ::std::vec::Vec<u8>,
+            ) -> ::std::result::Result<
+                ::std::vec::Vec<u8>,
+                ::std::vec::Vec<$crate::guest::bindings::flick::plugin::types::Diagnostic>,
+            > {
+                $crate::guest::transform(&$plugin, program)
             }
 
             fn emit(

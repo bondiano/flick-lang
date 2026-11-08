@@ -43,6 +43,11 @@ pub trait Expander: Send + Sync {
         state: &[u8],
         source: &mut BlockSource,
     ) -> Result<Arena, Failure>;
+    /// The IR of the project's modules, a `Program` in CBOR, as the plugin
+    /// gives it instead; why it gives none.
+    fn transform(&self, program: &[u8]) -> Result<Vec<u8>, Failure> {
+        Ok(program.to_vec())
+    }
     /// The files of `flick build` as the plugin writes them instead; why it
     /// writes none.
     fn emit(&self, artifacts: &[Artifact]) -> Result<Vec<Artifact>, Failure> {
@@ -214,6 +219,12 @@ impl<P: Plugin + Send + Sync> Expander for Native<P> {
         source: &mut BlockSource,
     ) -> Result<Arena, Failure> {
         guarded(|| self.plugin.expand(block, state, source))
+            .map_err(Failure::Broken)?
+            .map_err(Failure::Refused)
+    }
+
+    fn transform(&self, program: &[u8]) -> Result<Vec<u8>, Failure> {
+        guarded(|| self.plugin.transform(program.to_vec()))
             .map_err(Failure::Broken)?
             .map_err(Failure::Refused)
     }
