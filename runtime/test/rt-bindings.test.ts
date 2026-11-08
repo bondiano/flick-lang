@@ -11,6 +11,7 @@ const read = (path: string): string => readFileSync(new URL(path, repo), "utf8")
 /** The modules of the kernel's first tier, but `Ui`, `Atom` and `Test`, which come later. */
 const MODULES = [
   "Cause",
+  "Clock",
   "Failure",
   "Fiber",
   "Instances",

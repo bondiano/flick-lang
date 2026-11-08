@@ -3,6 +3,7 @@
 // it chooses is a wait.
 import { type Option, none, some } from "../core/data.ts";
 import { type Cause, type Fail, fail, isFail, raise, unwinds } from "./cause.ts";
+import { clock } from "./clock.ts";
 import { sleep } from "./duration.ts";
 import { type Run, Under, asExit, caught, currentCtx, extend } from "./fiber.ts";
 import { DEFAULT_METADATA, METADATA, type Metadata, type Schedule, counter, outOf } from "./effect/Schedule.ts";
@@ -27,7 +28,7 @@ const stepper = (s: Schedule): ((input: unknown) => Run) => {
   const step = s.start();
   const count = counter();
   return function* (input): Run {
-    const now = Date.now();
+    const now = clock().millis();
     const [output, delay, done] = outOf(yield step(now, input));
     if (done) return new Stepped({ ...DEFAULT_METADATA, output }, true);
     const m: Metadata = { ...count(now, input), output, duration: delay };

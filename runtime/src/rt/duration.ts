@@ -1,6 +1,7 @@
 // Durations, in milliseconds, and the wait for one.
 import { type Result, err, ok } from "../core/data.ts";
 import { tag } from "../tags.ts";
+import { clock } from "./clock.ts";
 import { type Instruction, Suspend, schedule } from "./fiber.ts";
 
 /** `Duration`. */
@@ -27,7 +28,7 @@ export const durationMillis = (n: number) => checked("millis", n, 1);
 export const durationSeconds = (n: number) => checked("seconds", n, 1000);
 export const durationMinutes = (n: number) => checked("minutes", n, 60_000);
 
-/** A duration that is not positive yields; an infinite one never ends. */
+/** A wait on the clock of the fiber: a duration that is not positive yields; an infinite one never ends. */
 export const sleep = (d: Duration): Instruction =>
   new Suspend((resolve) => {
     if (d.millis <= 0) {
@@ -35,6 +36,5 @@ export const sleep = (d: Duration): Instruction =>
       return undefined;
     }
     if (d.millis === Infinity) return undefined;
-    const timer = setTimeout(() => resolve(undefined), d.millis);
-    return () => clearTimeout(timer);
+    return clock().timer(d.millis, () => resolve(undefined));
   });

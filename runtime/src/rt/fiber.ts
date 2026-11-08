@@ -327,9 +327,39 @@ const starve = (depth: number): void => {
   }
 };
 
+/** The tasks a wake by a test clock scheduled, theirs included, not yet run; `idle` runs when none is left. */
+export class Tracker {
+  pending = 0;
+  idle: (() => void) | undefined = undefined;
+}
+
+let tracker: Tracker | undefined;
+
+/** Runs `f`, counting in `t` what it schedules. */
+export const tracked = (t: Tracker, f: () => void): void => {
+  const saved = tracker;
+  tracker = t;
+  try {
+    f();
+  } finally {
+    tracker = saved;
+  }
+};
+
 /** Runs `task` on a later turn of the scheduler. */
 export const schedule = (task: () => void): void => {
-  tasks.push(task);
+  const t = tracker;
+  if (t === undefined) tasks.push(task);
+  else {
+    t.pending++;
+    tasks.push(() => {
+      try {
+        tracked(t, task);
+      } finally {
+        if (--t.pending === 0) t.idle?.();
+      }
+    });
+  }
   if (!running) {
     running = true;
     starve(0);
