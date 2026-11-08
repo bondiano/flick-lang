@@ -33,7 +33,7 @@ impl Checker<'_> {
             let span = self.span(node);
             let is_set = self.set_kind(item).is_some();
             if is_set && !node.has_token(K::DotDotDot) {
-                self.set_needs_dots(item);
+                self.set_needs_dots(item, None);
             }
             if is_set || node.has_token(K::DotDotDot) {
                 let Some(set) = self.set_of(node, item, None, free) else {

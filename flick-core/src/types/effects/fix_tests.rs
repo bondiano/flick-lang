@@ -137,9 +137,21 @@ fn fixed_t002(signature: &str, program: &str) -> String {
 #[test]
 fn a_set_without_dots_gets_them_and_an_element_loses_them() {
     let program = "let f x = Log.line x";
+    // with a set the row needs no `;`, unless errors follow it
     assert_eq!(
         fixed_t002("f : String ->{Env;} Unit", program),
-        "f : String ->{...Env;} Unit"
+        "f : String ->{...Env} Unit"
+    );
+    assert_eq!(
+        fixed_t002("f : String ->{Log, Env ; } Unit", program),
+        "f : String ->{Log, ...Env} Unit"
+    );
+    assert_eq!(
+        fixed_t002(
+            "f : String ->{Env; Boom} Unit",
+            "type error Boom = Boom\nlet f x = Log.line x"
+        ),
+        "f : String ->{...Env; Boom} Unit"
     );
     assert_eq!(
         fixed_t002("f : String ->{...Env, -Env} Unit", program),

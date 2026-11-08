@@ -8,6 +8,7 @@
 
 use super::{Free, is_type};
 use crate::diagnostics::codes;
+use crate::source::Span;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
 use crate::types::Checker;
@@ -130,6 +131,8 @@ impl Checker<'_> {
         };
         let mut entries: Vec<(String, Type)> = Vec::new();
         let mut named = Vec::new();
+        // with a set the row needs no `;`: the first fix that adds `...` takes it away
+        let mut needless_semi = self.needless_semi(node);
         for item in items {
             if single_row(item) {
                 self.error(
@@ -140,7 +143,7 @@ impl Checker<'_> {
                 continue;
             }
             if matches!(kind, Kind::ServiceRow | Kind::ErrorRow) && self.set_kind(item).is_some() {
-                self.set_needs_dots(item);
+                self.set_needs_dots(item, needless_semi.take());
                 spreads.push((item, item));
                 continue;
             }
@@ -205,6 +208,20 @@ impl Checker<'_> {
             omitted,
             named,
         }
+    }
+
+    /// Where `;` and an empty row of errors follow `node`, the services of an
+    /// arrow, up to the `}`.
+    fn needless_semi(&self, node: &Node) -> Option<Span> {
+        if node.kind != K::Row {
+            return None;
+        }
+        let span = self.span(node);
+        let after = &self.text[span.range().end..];
+        let rest = after.trim_start().strip_prefix(';')?;
+        let brace = after.len() - rest.trim_start().strip_prefix('}')?.len() - 1;
+        let end = span.end + u32::try_from(brace).ok()?;
+        Some(Span::new(span.file, span.end, end))
     }
 
     /// Adds an element of a row, which tells its elements apart by name, not by arguments.
