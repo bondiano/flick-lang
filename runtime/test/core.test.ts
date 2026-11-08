@@ -49,13 +49,18 @@ test("core has every binding of the built-in modules without effects", async () 
 test("core has every runtime helper compiled code calls", async () => {
   const core = await exportsOf("../src/core/index.ts");
   const dir = new URL("flick-core/src/codegen/js/", repo);
-  const code = readdirSync(dir)
-    .filter((f) => f.endsWith(".rs"))
-    .map((f) => readFileSync(new URL(f, dir), "utf8"))
-    .join("\n");
+  // `kernel.rs` emits only for Flick's own runtime, whose helpers are its own
+  const codegen = (kernel: boolean): string =>
+    readdirSync(dir)
+      .filter((f) => f.endsWith(".rs") && (f === "kernel.rs") === kernel)
+      .map((f) => readFileSync(new URL(f, dir), "utf8"))
+      .join("\n");
+  const code = codegen(false);
   const helpers = [...code.matchAll(/rt\("(\w+)"\)/g)].map((m) => m[1] ?? "");
   assert.ok(helpers.length > 10);
   for (const helper of helpers) assert.ok(core.has(helper), `\`$rt.${helper}\``);
+  const kernel = await exportsOf("../src/rt/index.ts");
+  for (const [, helper] of codegen(true).matchAll(/rt\("(\w+)"\)/g)) assert.ok(helper && kernel.has(helper), `kernel \`$rt.${helper}\``);
   const { Effect } = await import("../src/core/index.ts");
   for (const [, method] of code.matchAll(/effect\("(\w+)"\)/g)) assert.ok(method && method in Effect, `Effect.${method}`);
 });

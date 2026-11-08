@@ -13,10 +13,13 @@ let rec link owner prev i =
   else
     let next : Deferred.Deferred none Unit = Deferred.make ()
     let _f =
-      Fiber.spawn owner quiet (task {
-        Deferred.await_ prev
-        ignore (Deferred.succeed () next)
-      })
+      Fiber.spawn
+        owner
+        quiet
+        (task {
+          Deferred.await_ prev
+          ignore (Deferred.succeed () next)
+        })
     link owner next (i - 1)
 
 main : Unit ->{Async; AppError} Unit
