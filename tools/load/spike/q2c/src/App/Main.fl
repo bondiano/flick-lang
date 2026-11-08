@@ -8,8 +8,7 @@ main : Unit ->{Async; AppError} Unit
 let main () =
   let r =
     try
-      Stream.run_collect
-        (Stream.from_list [1, 2, 3] |> Stream.map_effect (fun x -> Emit.emit x))
+      Stream.run_collect (Stream.from_list [1, 2, 3] |> Stream.map_effect (fun x -> Emit.emit x))
     with
     | Emit.emit x -> resume (x + 1)
     | return xs -> xs

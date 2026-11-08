@@ -49,11 +49,14 @@ let timed label n run =
   // warm up, then the median of five
   let _ = run ()
   let _ = run ()
-  let ts = List.map_effect (fun _ ->
-    let t0 = now ()
-    let _ = run ()
-    (now () - t0) * 1000000 / Int.to_float n
-  ) [1, 2, 3, 4, 5]
+  let ts =
+    List.map_effect
+      (fun _ ->
+        let t0 = now ()
+        let _ = run ()
+        (now () - t0) * 1000000 / Int.to_float n
+      )
+      [1, 2, 3, 4, 5]
   let sorted = List.sort ts
   Platform.stdout_line (label ++ "\t" ++ show (Option.with_default 0 (List.get 2 sorted)))
 

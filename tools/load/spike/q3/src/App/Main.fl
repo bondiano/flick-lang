@@ -6,8 +6,12 @@ import HashMap
 import Stream exposing (Stream)
 import Fail
 
-type alias Row = { name : String; note : Option String; tags : List (Option Int); r : Result String Int }
-  deriving Schema
+type alias Row = {
+  name : String;
+  note : Option String;
+  tags : List (Option Int);
+  r : Result String Int;
+} deriving Schema
 
 type error Nope = Nope Int
   deriving Show, Eq
@@ -30,35 +34,66 @@ let main () =
 body : Unit ->{Async; SchemaError} Unit
 let body () =
   // a callback returning Option, a list of Option, through a type variable
-  let xs = Stream.run_collect (Stream.from_list [Some 1, None, Some 3] |> Stream.map_effect (fun o -> Option.map (fun x -> x + 1) o))
+  let xs =
+    Stream.run_collect
+      (Stream.from_list [Some 1, None, Some 3]
+        |> Stream.map_effect (fun o -> Option.map (fun x -> x + 1) o))
   say ("callback returning Option: " ++ show xs)
   say ("equal to a literal: " ++ show (xs == [Some 2, None, Some 4]))
   // Effect's own Option, made by Effect's code, read and compared by Flick's
   let m = HashMap.insert "a" 1 (HashMap.empty : HashMap.HashMap EqHash.Canonical String Int)
   let found = HashMap.get "a" m
-  say ("Effect's Some: " ++ show found ++ " equal: " ++ show (found == Some 1) ++ " none: " ++ show (HashMap.get "b" m == None))
+  say
+    ("Effect's Some: "
+      ++ show found
+      ++ " equal: "
+      ++ show (found == Some 1)
+      ++ " none: "
+      ++ show (HashMap.get "b" m == None))
   // a value only a schema looks inside: the signature says `a`
   let row = { name = "x"; note = Some "n"; tags = [Some 1, None]; r = Ok 2 }
   let encoded = Codec.encode row_codec row
   say ("schema encodes Flick's Option: " ++ Json.stringify encoded)
   let back = Codec.decode row_codec (Json.to_unknown encoded)
-  say ("schema decodes to what Flick matches: " ++ show back.note ++ " " ++ show back.tags ++ " " ++ show back.r ++ " equal: " ++ show (back == row))
+  say
+    ("schema decodes to what Flick matches: "
+      ++ show back.note
+      ++ " "
+      ++ show back.tags
+      ++ " "
+      ++ show back.r
+      ++ " equal: "
+      ++ show (back == row))
   // Exit and Failure by the signature
   let _ =
     Stream.run_drain
-      (Stream.from_list [1] |> Stream.on_exit (fun e -> say ("Exit given by Effect: " ++ show (Option.is_some (Exit.value e)))))
+      (Stream.from_list [1]
+        |> Stream.on_exit (fun e ->
+          say ("Exit given by Effect: " ++ show (Option.is_some (Exit.value e)))
+        ))
   let caught =
     Stream.run_collect
       (Stream.from_list [1]
-      |> Stream.map_effect (fun x -> if x == 0 then "never" else Fail.fail (Nope x))
-      |> Stream.tap_cause (fun f -> say ("Failure given by Effect, primary is some: " ++ show (Option.is_some (Failure.primary f))))
-      |> Stream.catch_cause (fun f -> Stream.from_list [show (Option.is_some (Failure.primary f))]))
+        |> Stream.map_effect (fun x -> if x == 0 then "never" else Fail.fail (Nope x))
+        |> Stream.tap_cause (fun f ->
+          say
+            ("Failure given by Effect, primary is some: "
+              ++ show (Option.is_some (Failure.primary f)))
+        )
+        |> Stream.catch_cause (fun f ->
+          Stream.from_list [show (Option.is_some (Failure.primary f))]
+        ))
   say ("after catch_cause: " ++ show caught)
   // Exit of the kernel's, in a value Effect carries
   let exits =
     Stream.run_collect
-      (Stream.from_list [1, 2] |> Stream.map_effect (fun x -> Effect.exit (task { if x == 1 then x else Fail.fail (Nope x) })))
-  say ("kernel Exits carried by a stream: " ++ show (List.map (fun e -> Option.is_some (Exit.value e)) exits))
+      (Stream.from_list [1, 2]
+        |> Stream.map_effect (fun x ->
+          Effect.exit (task { if x == 1 then x else Fail.fail (Nope x) })
+        ))
+  say
+    ("kernel Exits carried by a stream: "
+      ++ show (List.map (fun e -> Option.is_some (Exit.value e)) exits))
   // Effect's turn in a stage that runs at once
   say ("a long decode in a Sync stage: " ++ show (sync_decode 20000))
   say ("a long stream in a Sync stage: " ++ show (sync_stream 20000))
@@ -67,7 +102,9 @@ let body () =
 /// Enough of Effect's operations that its fiber gives its turn, without waiting for anything.
 sync_stream : Int ->{} Int
 let sync_stream n =
-  List.length (Stream.run_collect (Stream.from_list (List.range 0 n) |> Stream.map_effect (fun x -> x + 1) |> Stream.rechunk 1))
+  List.length
+    (Stream.run_collect
+      (Stream.from_list (List.range 0 n) |> Stream.map_effect (fun x -> x + 1) |> Stream.rechunk 1))
 
 sync_decode : Int ->{; SchemaError} Int
 let sync_decode n =

@@ -38,10 +38,14 @@ let main () =
   say ("immediate " ++ show (immediate 1))
   say ("sync " ++ show (syncly 2))
   scope s {
-    let other = Fiber.spawn s quiet (task {
-      Effect.sleep (ms 5)
-      say "another kernel fiber ran while the Effect slept"
-    })
+    let other =
+      Fiber.spawn
+        s
+        quiet
+        (task {
+          Effect.sleep (ms 5)
+          say "another kernel fiber ran while the Effect slept"
+        })
     say ("resumed with " ++ later 30 "value")
     Fiber.join other
   }
@@ -57,10 +61,14 @@ let main () =
     say ("defect is a failure: " ++ show (Option.is_some (Exit.failure exit)))
   }
   scope s {
-    let f = Fiber.spawn s quiet (task {
-      Scope.add_finalizer (task { say "kernel finalizer of the fiber" })
-      slow_finalizer 40
-    })
+    let f =
+      Fiber.spawn
+        s
+        quiet
+        (task {
+          Scope.add_finalizer (task { say "kernel finalizer of the fiber" })
+          slow_finalizer 40
+        })
     Effect.sleep (ms 10)
     say "interrupting"
     Fiber.interrupt f

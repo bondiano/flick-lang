@@ -39,11 +39,15 @@ let say line = Platform.stdout_line line
 /// Flick's layer with an acquire and a release on the kernel.
 greet_layer : Unit -> Layer {Scope s} none {Greet}
 let greet_layer () =
-  Layer.effect Greet (task {
-    say "flick layer: acquire Greet"
-    Scope.add_finalizer (task { say "flick layer: release Greet" })
-    { greet = fun name -> "hello " ++ name; }
-  })
+  Layer.effect
+    Greet
+    (task {
+      say "flick layer: acquire Greet"
+      Scope.add_finalizer (task { say "flick layer: release Greet" })
+      {
+        greet = fun name -> "hello " ++ name;
+      }
+    })
 
 ok : Http.ServerResponse.Options
 let ok = Http.ServerResponse.defaults
@@ -59,13 +63,17 @@ let both _ =
   Http.ServerResponse.text (hello ++ ", " ++ row) ok
 
 /// Reads the body with a row that says nothing of `Async`: a Sync stage on the kernel.
-closed : ServerRequest ->{RouteContext; Http.ServerError.HttpServerError, SchemaError, Http.Body.HttpBodyError} ServerResponse
+closed :
+  ServerRequest ->{RouteContext; Http.ServerError.HttpServerError, SchemaError, Http.Body.HttpBodyError}
+  ServerResponse
 let closed request =
   let got = Http.ServerRequest.schema_body_json item request
   Http.ServerResponse.schema_json item { n = got.n + 1 } ok
 
 /// The same, with `Async` in its row.
-said : ServerRequest ->{Async, RouteContext; Http.ServerError.HttpServerError, SchemaError, Http.Body.HttpBodyError} ServerResponse
+said :
+  ServerRequest ->{Async, RouteContext; Http.ServerError.HttpServerError, SchemaError, Http.Body.HttpBodyError}
+  ServerResponse
 let said request =
   let got = Http.ServerRequest.schema_body_json item request
   Http.ServerResponse.schema_json item { n = got.n + 1 } ok
@@ -90,7 +98,8 @@ let main () =
                 Http.Router.route (Some Http.Method.POST) "/closed" closed,
                 Http.Router.route (Some Http.Method.POST) "/said" said,
               ]
-            let server = Http.Server.serve { host = "127.0.0.1"; port = 0; gracefulShutdownTimeout = None } app
+            let server =
+              Http.Server.serve { host = "127.0.0.1"; port = 0; gracefulShutdownTimeout = None } app
             Scope.add_finalizer (task { say "kernel finalizer D, after serve" })
             let base = Http.Server.format_address (Http.Server.address server)
             say ("handler: " ++ http_get (base ++ "/greet/world"))
