@@ -24,7 +24,7 @@ foreign container from "@flick-lang/runtime/ui" "uiContainer"
 mount :
   Container ->
   (Failure none ->{r; none} Unit)^c ->
-  Ui^c ->{Atom.Registry, Atom.Write | r; none}
+  Ui^c ->{Async, Atom.Registry, Atom.Write | r; none}
   Never
 foreign effect mount from "@flick-lang/runtime/ui" "uiMount"
   retention call

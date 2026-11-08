@@ -56,7 +56,7 @@ let refusing n = ui {
 }
 
 // handlers write atoms, so a root needs `Atom.Write`
-run_without_write : Ui.Dom.Container ->{Atom.Registry;} Never
+run_without_write : Ui.Dom.Container ->{Async, Atom.Registry;} Never
 let run_without_write root = Ui.Dom.mount root supervisor (refusing 0)
 //                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FLICK-E002 does not allow service `Write`
 
