@@ -41,14 +41,14 @@ export const uninterruptible = (task: () => unknown): Run => masked(task);
 export const interruptible = (task: () => unknown): Run => atMask(0, task);
 
 /** `f restore`, one mask deeper; `restore` gives a task the depth around the call. */
-export const uninterruptibleMask = (f: (restore: (task: () => unknown) => () => unknown) => () => unknown): Run => {
+export const uninterruptibleMask = (f: (restore: (task: () => unknown) => () => unknown) => unknown): Run => {
   const depth = currentFiber().mask;
-  return masked(() => f((task) => () => atMask(depth, task))());
+  return masked(() => f((task) => () => atMask(depth, task)));
 };
 
-export const interruptibleMask = (f: (restore: (task: () => unknown) => () => unknown) => () => unknown): Run => {
+export const interruptibleMask = (f: (restore: (task: () => unknown) => () => unknown) => unknown): Run => {
   const depth = currentFiber().mask;
-  return atMask(0, () => f((task) => () => atMask(depth, task))());
+  return atMask(0, () => f((task) => () => atMask(depth, task)));
 };
 
 /** `finalizer` runs, masked, however `task` ended; the failures of both join. */
