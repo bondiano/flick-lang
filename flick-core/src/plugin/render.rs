@@ -68,8 +68,10 @@ pub fn render(
         return Err("an expression takes no type of the signature above its `let`".into());
     }
     holes.sort_by_key(|h| (h.span.start, h.span.end));
-    // a type may stand in several places, as in a signature and an annotation
-    holes.dedup_by(|b, a| a == b && a.kind == HoleKind::Ty);
+    // a type may stand in several places, as in a signature and an annotation,
+    // and a pattern too, as the props of a component its setup and its render
+    // bind; an expression or a declaration runs or declares once
+    holes.dedup_by(|b, a| a == b && matches!(a.kind, HoleKind::Ty | HoleKind::Pat));
     if holes.windows(2).any(|w| w[1].span.start < w[0].span.end) {
         return Err("two holes overlap or one is used twice".into());
     }
