@@ -270,8 +270,10 @@ export const layerToEffect = (layer: unknown): unknown => {
     Effect.flatMap(Effect.scope, (scope) =>
       callEffect(function* (): Run {
         const owner = new Owner();
-        EScope.addFinalizerExit(scope, (exit) =>
-          callEffect(() => close(owner, exit._tag === "Success" ? succeeded(undefined) : failed(causeIn(exit.cause)))),
+        EScope.addFinalizerExit(
+          scope,
+          (exit) =>
+            callEffect(() => close(owner, exit._tag === "Success" ? succeeded(undefined) : failed(causeIn(exit.cause)))) as Effect.Effect<unknown, never>,
         ).pipe(Effect.runSync);
         // the memo map of the `provide` around it: a layer shared with the kernel's side is one build
         const outer = lookup(MEMO_KEY);
