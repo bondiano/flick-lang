@@ -270,12 +270,17 @@ let choose model example =
 explain : Atom.Writable Model -> String -> String ->{Async, Atom.Write;} Unit
 let explain model key code =
   if (Atom.current model).explained == key then
-    update model (fun m -> { m with explained = "" })
+    update model (fun m -> { m with explained = ""; explain_revision = m.explain_revision + 1 })
   else
+    update model (fun m -> {
+      m with explained = key; explanation = ""; explain_revision = m.explain_revision + 1;
+    })
+    let request = Atom.current model
     let text =
       try explain_code code with
       | JsError failure -> failure.message
-    update model (fun m -> { m with explained = key; explanation = text })
+    if (Atom.current model).explain_revision == request.explain_revision then
+      update model (fun m -> { m with explanation = text })
 
 /// Formats the source as `flick fmt` does; a source that does not parse stays.
 format : Atom.Writable Model ->{Async, Atom.Write;} Unit

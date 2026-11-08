@@ -86,6 +86,7 @@ type alias Model = {
   /// The diagnostic whose explanation is open, by code, place and message, and the text.
   explained : String;
   explanation : String;
+  explain_revision : Float;
   version : String;
   load_error : String;
   compile_error : String;
@@ -175,6 +176,7 @@ let initial_model config = {
   editor_open = false;
   explained = "";
   explanation = "";
+  explain_revision = 0;
   version = "";
   load_error = "";
   compile_error = "";

@@ -49,8 +49,9 @@ const colors = ViewPlugin.fromClass(Colors, { decorations: (plugin) => plugin.de
 
 /** The type under the pointer, as the language server shows it. */
 const types = hoverTooltip(async (view, at) => {
-  const shown = await hover(view.state.doc.toString(), at).catch(() => null);
-  if (shown === null) return null;
+  const source = view.state.doc.toString();
+  const shown = await hover(source, at).catch(() => null);
+  if (shown === null || view.state.doc.toString() !== source) return null;
   return {
     pos: shown.from,
     end: shown.to,

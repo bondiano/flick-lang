@@ -105,7 +105,7 @@ test("a quick fix adds the forgotten case", async ({ page }) => {
   await page.locator(".fp-gallery-button").click();
   await page.locator(".fp-gallery").getByRole("button", { name: "A forgotten case" }).click();
   await expect(page.locator(".fp-status")).toContainText("Errors", { timeout: 30_000 });
-  await hoverWord(page, "match status", "status");
+  await page.locator(".cm-lintRange-error").first().hover();
   await page.locator(".cm-diagnosticAction").click();
   await expect(page.locator(".cm-content")).toContainText("| Paused ->");
   await expect(page.locator(".fp-status")).toContainText("Type-checked", { timeout: 30_000 });
