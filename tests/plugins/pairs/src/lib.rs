@@ -19,8 +19,8 @@ mod reach;
 use std::hint::black_box;
 
 use flick_plugin::{
-    Arena, Block, Builder, Compiler, DeriveTarget, Diagnostic, Fact, NodeId, Plugin, Published,
-    Span, Token, TokenKind, flick,
+    Arena, Block, Builder, Compiler, DeriveTarget, Diagnostic, Edit, Fact, NodeId, Plugin,
+    Published, Span, Token, TokenKind, flick,
 };
 
 pub struct Pairs;
@@ -133,8 +133,23 @@ impl Plugin for Pairs {
         Ok(b.finish(record))
     }
 
-    /// What `typed { e }` checks: the type of its `_`, as `X002`.
+    /// What `typed { e }` checks: the type of its `_`, as `X002`; and what
+    /// `linted { e }` warns of, `X003`, with a fix that writes `e` as `(e)`.
     fn check(&self, block: &Block, _: &[u8], facts: &[Fact]) -> Vec<Diagnostic> {
+        if block.head == "linted" {
+            return (facts.iter())
+                .map(|f| {
+                    let text = &block.text[f.span.start as usize..f.span.end as usize];
+                    let edit = Edit {
+                        span: f.span,
+                        replacement: format!("({text})"),
+                    };
+                    Diagnostic::warning("write it in parentheses", f.span)
+                        .with_code("X003")
+                        .with_fix("add the parentheses", vec![edit], true)
+                })
+                .collect();
+        }
         if block.head != "typed" {
             return Vec::new();
         }

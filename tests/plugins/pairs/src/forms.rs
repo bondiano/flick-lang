@@ -27,7 +27,7 @@ pub fn expand(
 ) -> Option<Result<Arena, Vec<Diagnostic>>> {
     let expression = matches!(
         block.head.as_str(),
-        "named" | "text_of" | "capture" | "typed"
+        "named" | "text_of" | "capture" | "typed" | "linted"
     );
     let declaration = matches!(
         block.head.as_str(),
@@ -53,7 +53,7 @@ pub fn expand(
             Ok(b.expr(Expr::Text(string_value(raw.unwrap_or("")))))
         }
         "capture" => capture(block, compiler, &mut b),
-        "typed" => typed(block, compiler, &mut b),
+        "typed" | "linted" => typed(block, compiler, &mut b),
         "define" => define(block, compiler, &mut b),
         "companion" => companion(block, compiler, &mut b),
         "table" => table(block, compiler, &mut b),

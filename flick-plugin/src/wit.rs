@@ -112,11 +112,47 @@ macro_rules! wit_conversions {
             }
 
             pub fn to_diagnostic(d: $crate::Diagnostic) -> w::Diagnostic {
-                w::Diagnostic { message: d.message, span: to_span(d.span), code: d.code }
+                w::Diagnostic {
+                    message: d.message,
+                    span: to_span(d.span),
+                    code: d.code,
+                    severity: match d.severity {
+                        $crate::Severity::Error => w::Severity::Error,
+                        $crate::Severity::Warning => w::Severity::Warning,
+                        $crate::Severity::Note => w::Severity::Note,
+                    },
+                    fixes: (d.fixes.into_iter())
+                        .map(|f| w::Fix {
+                            message: f.message,
+                            edits: (f.edits.into_iter())
+                                .map(|e| w::Edit { span: to_span(e.span), replacement: e.replacement })
+                                .collect(),
+                            safe: f.safe,
+                        })
+                        .collect(),
+                }
             }
 
             pub fn from_diagnostic(d: w::Diagnostic) -> $crate::Diagnostic {
-                $crate::Diagnostic { message: d.message, span: from_span(d.span), code: d.code }
+                $crate::Diagnostic {
+                    message: d.message,
+                    span: from_span(d.span),
+                    code: d.code,
+                    severity: match d.severity {
+                        w::Severity::Error => $crate::Severity::Error,
+                        w::Severity::Warning => $crate::Severity::Warning,
+                        w::Severity::Note => $crate::Severity::Note,
+                    },
+                    fixes: (d.fixes.into_iter())
+                        .map(|f| $crate::Fix {
+                            message: f.message,
+                            edits: (f.edits.into_iter())
+                                .map(|e| $crate::Edit { span: from_span(e.span), replacement: e.replacement })
+                                .collect(),
+                            safe: f.safe,
+                        })
+                        .collect(),
+                }
             }
 
             pub fn to_completion(c: $crate::Completion) -> w::Completion {

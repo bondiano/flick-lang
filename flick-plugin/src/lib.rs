@@ -13,6 +13,7 @@ extern crate self as flick_plugin;
 
 mod builder;
 mod cursor;
+mod diagnostic;
 #[cfg(feature = "guest")]
 pub mod guest;
 mod literal;
@@ -25,6 +26,7 @@ use serde::{Deserialize, Serialize};
 
 pub use builder::Builder;
 pub use cursor::Cursor;
+pub use diagnostic::{Diagnostic, Edit, Fix, Severity};
 pub use flick_plugin_macros::flick;
 pub use literal::{literal_text, string_value};
 pub use reach::{ReachError, Request, Response};
@@ -278,35 +280,6 @@ pub struct Node {
 pub struct Arena {
     pub nodes: Vec<Node>,
     pub root: NodeId,
-}
-
-/// An error in a block; `code` is the plugin's own, such as `L001`, which
-/// the compiler shows under the plugin's package: `std/L001`.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Diagnostic {
-    pub message: String,
-    pub span: Span,
-    pub code: Option<String>,
-}
-
-impl Diagnostic {
-    /// An error without a code of the plugin.
-    pub fn error(message: impl Into<String>, span: Span) -> Self {
-        Diagnostic {
-            message: message.into(),
-            span,
-            code: None,
-        }
-    }
-
-    /// This error under the plugin's code `code`, such as `L001`.
-    #[must_use]
-    pub fn with_code(self, code: &str) -> Self {
-        Diagnostic {
-            code: Some(code.to_owned()),
-            ..self
-        }
-    }
 }
 
 /// What an editor may insert at an offset of a block.

@@ -297,14 +297,42 @@ pub(crate) fn placed(
             frame.start + d.span.end,
         )
     };
-    match (d.code.as_deref()).and_then(|code| codes::plugin(package, code)) {
-        Some(code) => diagnostics::Diagnostic::error(code, d.message.clone(), span),
-        None => diagnostics::Diagnostic::error(
+    let Some(code) = (d.code.as_deref()).and_then(|code| codes::plugin(package, code)) else {
+        return diagnostics::Diagnostic::error(
             codes::P036,
             format!("plugin `{package}`: {}", d.message),
             span,
-        ),
+        );
+    };
+    let severity = match d.severity {
+        flick_plugin::Severity::Error => diagnostics::Severity::Error,
+        flick_plugin::Severity::Warning => diagnostics::Severity::Warning,
+        flick_plugin::Severity::Note => diagnostics::Severity::Note,
+    };
+    let mut placed =
+        diagnostics::Diagnostic::new(code, severity, d.message.clone()).with_span(span);
+    // a fix edits the block, so one of a declaration elsewhere has nowhere to go
+    for fix in d.fixes.iter().filter(|_| !foreign) {
+        let edits = || {
+            let edits = (fix.edits.iter())
+                .map(|e| diagnostics::Edit {
+                    span: Span::new(
+                        frame.file,
+                        frame.start + e.span.start,
+                        frame.start + e.span.end,
+                    ),
+                    replacement: e.replacement.clone(),
+                })
+                .collect();
+            (fix.message.clone(), edits)
+        };
+        placed = if fix.safe {
+            placed.with_safe_fix(edits)
+        } else {
+            placed.with_fix(edits)
+        };
     }
+    placed
 }
 
 /// The head of the block `node`, its first token: a name.
