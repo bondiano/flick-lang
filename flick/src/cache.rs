@@ -109,9 +109,18 @@ pub fn input_files(project: &Project, roots: &[PathBuf]) -> Vec<PathBuf> {
             files_under(&sibling_root(root, &name), &mut files);
         }
     }
+    // the files of other languages the plugins of the libraries load are modules too
+    let (mut libraries, mut loaded) = (Vec::new(), Vec::new());
+    library_files(
+        &project.root,
+        &project.config.dependencies,
+        &mut libraries,
+        &mut loaded,
+    );
     files.retain(|p| {
         p.extension()
-            .is_some_and(|e| e == "fl" || e == "go" || e == "mjs")
+            .and_then(|e| e.to_str())
+            .is_some_and(|e| matches!(e, "fl" | "go" | "mjs") || loaded.iter().any(|l| l == e))
     });
     files.extend(
         [
@@ -124,7 +133,7 @@ pub fn input_files(project: &Project, roots: &[PathBuf]) -> Vec<PathBuf> {
     );
     files.extend(project.workspace.clone());
     files.extend(dependency_files(&project.root));
-    library_files(&project.root, &project.config.dependencies, &mut files);
+    files.extend(libraries);
     // what plugins read: the files the project grants them, and snapshots
     files_under(&project.root.join(SNAPSHOTS), &mut files);
     let granted = project.config.plugins.values().flat_map(|g| &g.fs_read);
@@ -182,9 +191,17 @@ fn dependency_files(root: &Path) -> Vec<PathBuf> {
 }
 
 /// The configuration and modules of the libraries `dependencies` of the
-/// manifest in `dir` name by path, and of theirs; a fetched library never
+/// manifest in `dir` name by path, and of theirs, and into `loaded` the
+/// extensions of the files their plugins load; a fetched library never
 /// changes but with `flick.lock`.
-fn library_files(dir: &Path, dependencies: &[config::Dependency], out: &mut Vec<PathBuf>) {
+// shortcut: a fetched library's `load` is not read, so a file it loads changes
+// no build until `flick.lock` does; read fetched manifests when one loads files
+fn library_files(
+    dir: &Path,
+    dependencies: &[config::Dependency],
+    out: &mut Vec<PathBuf>,
+    loaded: &mut Vec<String>,
+) {
     for dependency in dependencies {
         let Some(path) = dependency.path() else {
             continue;
@@ -206,6 +223,7 @@ fn library_files(dir: &Path, dependencies: &[config::Dependency], out: &mut Vec<
         // a plugin's component expands blocks, so a new build of it is an input
         let component = library.package.as_ref().and_then(|p| p.plugin.as_ref());
         out.extend(component.map(|c| at.join(c)));
+        loaded.extend(library.package.iter().flat_map(|p| p.load.iter().cloned()));
         // the foreign files a build ships or compiles are inputs as its modules are
         let mut modules = Vec::new();
         files_under(&at.join(&library.source_dir), &mut modules);
@@ -213,7 +231,7 @@ fn library_files(dir: &Path, dependencies: &[config::Dependency], out: &mut Vec<
             p.extension()
                 .is_some_and(|e| e == "fl" || e == "go" || e == "mjs" || e == "cjs")
         }));
-        library_files(&at, &library.dependencies, out);
+        library_files(&at, &library.dependencies, out, loaded);
     }
 }
 
@@ -406,6 +424,23 @@ mod tests {
         let inputs = input_files(&project, &[]);
         assert!(
             inputs.iter().any(|p| p.ends_with("lib/pairs.wasm")),
+            "{inputs:?}"
+        );
+        // a file of the extension its plugin loads is a module of the project
+        fs::write(
+            root.join("lib/flick.toml"),
+            "schema-version = 1\n[package]\nname = \"pairs\"\nversion = \"1.0.0\"\nplugin = \"pairs.wasm\"\nload = [\"pairs\"]\n[project]\nkind = \"lib\"\n",
+        )
+        .expect("write");
+        fs::write(root.join("app/src/App/Words.pairs"), "hello = \"hi\"\n").expect("write");
+        fs::write(root.join("app/src/App/Notes.txt"), "not a module").expect("write");
+        let inputs = input_files(&project, &[]);
+        assert!(
+            inputs.iter().any(|p| p.ends_with("App/Words.pairs")),
+            "{inputs:?}"
+        );
+        assert!(
+            !inputs.iter().any(|p| p.ends_with("App/Notes.txt")),
             "{inputs:?}"
         );
         let _ = fs::remove_dir_all(&root);
