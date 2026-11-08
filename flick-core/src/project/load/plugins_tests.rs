@@ -479,11 +479,25 @@ fn a_plugin_reports_under_its_own_codes() {
     );
 }
 
+#[test]
+fn a_head_of_std_needs_no_import_and_no_other_plugin_gives_it() {
+    // `cli_ir` imports nothing
+    let block = "greet : Cli.Command none none\nlet greet = cli \"greet\" { handle fun {} -> Platform.stdout_line \"hi\" }\n\ntool : Cli.Command none none\nlet tool = cli \"tool\" { subcommand greet; subcommand version }";
+    assert!(cli_ir(block).contains("Cli.handled"));
+    let main = "module App.Main exposing (x)\n\nimport Pairs exposing (plugin sql)\n\nlet x = 1\n";
+    assert_eq!(
+        report(main),
+        [
+            "FLICK-P044 `plugin sql`: `sql` is a head of `std`'s plugin, which every module has, so the plugin of `pairs` cannot give it"
+        ]
+    );
+}
+
 /// The IR of `App.Main` with `greet` and `tool` as `body` writes them.
 fn cli_ir(body: &str) -> String {
     const HANDLER: &str = "fun { loud; times; name } -> Platform.stdout_line (String.join \"\\n\" (List.repeat times (if loud then String.to_upper name else name)))";
     let main = format!(
-        "module App.Main exposing (greet, tool)\n\nimport Cli exposing (plugin cli)\n\nversion : Cli.Command none none\nlet version = Cli.command \"version\" |> Cli.handle (fun {{}} -> Platform.stdout_line \"0.1.0\")\n\n{}\n",
+        "module App.Main exposing (greet, tool)\n\nversion : Cli.Command none none\nlet version = Cli.command \"version\" |> Cli.handle (fun {{}} -> Platform.stdout_line \"0.1.0\")\n\n{}\n",
         body.replace("HANDLER", HANDLER)
     );
     let mut sources = SourceMap::default();
