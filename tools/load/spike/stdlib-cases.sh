@@ -4,13 +4,16 @@
 root=$(cd "$(dirname "$0")/../../.." && pwd)
 mode=${1:-rt}; shift
 export FLICK_STD_PATH=$root/packages/std MODE=$mode ROOT=$root
+# macOS has `timeout` only as coreutils' `gtimeout`
+TIMEOUT=$(command -v timeout || command -v gtimeout) || { echo "no timeout or gtimeout" >&2; exit 1; }
+export TIMEOUT
 out=$root/target/spike-cases; mkdir -p "$out/$mode"
 one() {
   case=$1; rel=${case#"$ROOT"/tests/run/}; id=${rel%.fl}; id=${id//\//_}; dir=$ROOT/target/spike-cases/$MODE/$id
   rm -rf "$dir"; flag=; [ "$MODE" = rt ] && flag=--rt
   if ! "$ROOT/target/e2e/flick" build "$case" --out-dir "$dir" --profile debug $flag > "$dir.build" 2>&1; then
     printf '%s\tbuild-failed\t%s\n' "$rel" "$(grep -m1 -E '^error' "$dir.build" | cut -c1-140)"; return; fi
-  timeout 40 node "$dir/flick-main.js" > "$dir.out" 2> "$dir.err"; code=$?
+  "$TIMEOUT" 40 node "$dir/flick-main.js" > "$dir.out" 2> "$dir.err"; code=$?
   want=${case%.fl}.exit; wantcode=0; [ -f "$want" ] && wantcode=$(tr -d ' \n' < "$want")
   if cmp -s "$dir.out" "${case%.fl}.stdout" && [ "$code" = "$wantcode" ]; then printf '%s\tok\n' "$rel"
   elif [ "$code" = 124 ]; then printf '%s\ttimeout\t\n' "$rel"
