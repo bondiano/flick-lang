@@ -62,6 +62,8 @@
   --flick-line-coral-ink: #c8283f;
   --flick-line-violet: #5b3fd6;
   --flick-line-amber: #ffc20e;
+  /* amber as a thin line on the light page needs more weight than the amber of a button */
+  --flick-line-amber-rail: #c48a00;
   --flick-sign: #0e1116;
   --flick-sign-ink: #ffffff;
   --flick-sign-muted: #aab2bd;
@@ -107,6 +109,7 @@
   --flick-line-coral: #ff6b7f;
   --flick-line-coral-ink: #ff8496;
   --flick-line-violet: #b7a5ff;
+  --flick-line-amber-rail: #ffc20e;
   --flick-sign: #f0f2f4;
   --flick-sign-ink: #0e1116;
   --flick-sign-muted: #56606c;
@@ -184,15 +187,15 @@ code, pre, kbd { font-variant-ligatures: none; }
 /* The sidebar is the site's map: each section is a line and each page a station on it. */
 .site-main-frame { padding-top: var(--sl-nav-height); min-height: 100vh; }
 .site-docs-sidebar { position: fixed; top: var(--sl-nav-height); bottom: 0; left: 0; width: var(--sl-sidebar-width); overflow: auto; padding: 1.25rem 1rem 3rem 1.5rem; border-right: 1px solid var(--sl-color-hairline); background: var(--sl-color-bg); }
-.doc-nav-list { --line: var(--flick-line-violet); --line-x: 0.6rem; --indent: 1.6rem; list-style: none; margin: 0; padding: 0; }
+.doc-nav-list { --line-x: 0.6rem; --indent: 1.6rem; list-style: none; margin: 0; padding: 0; }
 .doc-nav-list > li { margin: 0; padding: 0; }
 .doc-nav-group { margin-bottom: 0.25rem; }
 .doc-nav-group > summary { position: relative; display: flex; align-items: center; gap: 0.5rem; min-height: 40px; padding-left: var(--indent); cursor: pointer; font-weight: 600; font-size: 1rem; color: var(--sl-color-white); list-style: none; }
 .doc-nav-group > summary::-webkit-details-marker { display: none; }
 .doc-nav-group > summary:hover { color: var(--sl-color-accent-high); }
 .doc-nav-count { margin-left: auto; font-size: 0.8rem; font-weight: 400; color: var(--sl-color-gray-3); font-variant-numeric: tabular-nums; }
-/* A section's token: large in the line's colour when open, small and grey when closed. */
-.doc-nav-token { position: absolute; left: var(--line-x); top: 50%; width: 18px; height: 18px; margin: -9px 0 0 -9px; border-radius: 50%; background: var(--sl-color-gray-4); transform: scale(0.5); transition: transform 180ms ease-out, background-color 180ms ease-out; }
+/* A section's token in its line's colour: large when open, small when closed. */
+.doc-nav-token { position: absolute; left: var(--line-x); top: 50%; width: 18px; height: 18px; margin: -9px 0 0 -9px; border-radius: 50%; background: var(--line); transform: scale(0.5); transition: transform 180ms ease-out, background-color 180ms ease-out; }
 .doc-nav-group[open] > summary .doc-nav-token { background: var(--line); transform: none; }
 .doc-nav-group > summary:hover .doc-nav-token { background: var(--line); }
 /* The line runs from the token, and ends past the last station on a T. */
@@ -211,7 +214,13 @@ code, pre, kbd { font-variant-ligatures: none; }
 .doc-nav-list a:hover { color: var(--sl-color-accent-high); }
 .doc-nav-nested a:hover::before { border-color: var(--sl-color-accent); }
 .doc-nav-list a[aria-current='page'] { color: var(--sl-color-white); font-weight: 600; }
-.doc-nav-nested a[aria-current='page']::before { width: 18px; height: 18px; margin: -9px 0 0 -9px; border-width: 4px; }
+.doc-nav-nested a[aria-current='page']::before { width: 18px; height: 18px; margin: -9px 0 0 -9px; border-width: 4px; border-color: var(--line); }
+
+/* Above a page's title, the line of its section: the same colour as in the sidebar. */
+.doc-section { display: flex; align-items: center; gap: 0.6rem; margin: 1rem 0 0; font-size: 0.95rem; font-weight: 600; color: var(--sl-color-gray-2); }
+.doc-section-token { position: relative; flex: none; width: 2.5rem; height: 4px; background: var(--line); }
+.doc-section-token::after { content: ''; position: absolute; right: -2px; top: 50%; width: 14px; height: 14px; margin-top: -7px; border-radius: 50%; background: var(--line); }
+.doc-section + h1#_top { margin-top: 0.5rem; }
 
 /* Reading comes first: quiet type, one measure, no decoration between the reader and the text. */
 .content-panel { padding-block: 1.5rem; }
