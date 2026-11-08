@@ -13,11 +13,14 @@
 //! - `companion Box { e }`: `let Box.label = e`, a companion of `Box`;
 //! - `signed name { e }` below `name : T`: `name : T`, `let name = e`, and
 //!   `let name_module = "App.Main"`, the module the block is in;
-//! - `typed { e }`: `(e : _)`, the `_` at `e`, whose type `check` reports.
+//! - `typed { e }`: `(e : _)`, the `_` at `e`, whose type `check` reports;
+//!   `linted { e }` the same, whose `check` warns with a fix;
+//! - `twice p { e }`: a function of `p` whose block keeps `e` and gives a
+//!   function of `p` again, a `match` and an `if` in it.
 
 use flick_plugin::{
-    Arena, Block, Builder, Case, Compiler, Decl, Diagnostic, Expr, Name, Place, Span, TokenKind,
-    Ty, flick, string_value,
+    Arena, Arm, Block, Builder, Case, Compiler, Decl, Diagnostic, Expr, Name, Pat, Place, Span,
+    TokenKind, Ty, flick, string_value,
 };
 
 /// The code of `block` when its head is one of these; `None` otherwise.
@@ -27,7 +30,7 @@ pub fn expand(
 ) -> Option<Result<Arena, Vec<Diagnostic>>> {
     let expression = matches!(
         block.head.as_str(),
-        "named" | "text_of" | "capture" | "typed" | "linted"
+        "named" | "text_of" | "capture" | "typed" | "linted" | "twice"
     );
     let declaration = matches!(
         block.head.as_str(),
@@ -53,6 +56,7 @@ pub fn expand(
             Ok(b.expr(Expr::Text(string_value(raw.unwrap_or("")))))
         }
         "capture" => capture(block, compiler, &mut b),
+        "twice" => twice(block, compiler, &mut b),
         "typed" | "linted" => typed(block, compiler, &mut b),
         "define" => define(block, compiler, &mut b),
         "companion" => companion(block, compiler, &mut b),
@@ -74,6 +78,66 @@ fn capture(
 ) -> Result<u32, Vec<Diagnostic>> {
     let held = block.body().expr(compiler).map_err(|d| vec![d])?;
     Ok(flick!(b, (fun x -> { held = #held; own = x; shown = show Pairs.version }) "shadow"))
+}
+
+/// `twice p { e }`: a function of `p` whose block keeps `e` and gives a
+/// function of `p` again, as the setup and the render of a component bind
+/// its props: `fun p -> let seen = e; fun p -> match seen with | x when (if
+/// true then true else false) -> x | _ -> 0.0`.
+fn twice(
+    block: &Block,
+    compiler: &mut dyn Compiler,
+    b: &mut Builder,
+) -> Result<u32, Vec<Diagnostic>> {
+    let props = block.cursor().pat(compiler).map_err(|d| vec![d])?;
+    let value = block.body().expr(compiler).map_err(|d| vec![d])?;
+    let outer = b.pat(Pat::Hole(props));
+    let body = b.expr(Expr::Hole(value));
+    let seen = b.decl(Decl::Let {
+        name: "seen".into(),
+        params: Vec::new(),
+        ty: None,
+        body,
+        rec: false,
+    });
+    let inner = b.pat(Pat::Hole(props));
+    let scrutinee = b.expr(Expr::Name("seen".into()));
+    let x = b.pat(Pat::Var("x".into()));
+    let (yes, no) = (b.expr(Expr::Boolean(true)), b.expr(Expr::Boolean(false)));
+    let condition = b.expr(Expr::Boolean(true));
+    let guard = b.expr(Expr::If {
+        condition,
+        then: yes,
+        otherwise: no,
+    });
+    let found = b.expr(Expr::Name("x".into()));
+    let other = b.pat(Pat::Wildcard);
+    let zero = b.expr(Expr::Number(0.0));
+    let arms = vec![
+        Arm {
+            pattern: x,
+            guard: Some(guard),
+            body: found,
+        },
+        Arm {
+            pattern: other,
+            guard: None,
+            body: zero,
+        },
+    ];
+    let chosen = b.expr(Expr::Match { scrutinee, arms });
+    let render = b.expr(Expr::Lambda {
+        params: vec![inner],
+        body: chosen,
+    });
+    let setup = b.expr(Expr::Block {
+        statements: vec![seen],
+        result: render,
+    });
+    Ok(b.expr(Expr::Lambda {
+        params: vec![outer],
+        body: setup,
+    }))
 }
 
 /// `let Owner.label = e`.

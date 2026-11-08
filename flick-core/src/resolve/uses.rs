@@ -36,13 +36,27 @@ pub(super) fn references(module: &Module) -> (Vec<Reference>, Vec<Unused>) {
         locals: Vec::new(),
         out: Vec::new(),
         unused: Vec::new(),
+        used: Vec::new(),
         top: 0,
     };
     for (i, decl) in module.tree.nodes().enumerate() {
         walker.top = i;
         walker.walk(decl);
     }
-    (walker.out, walker.unused)
+    // a pattern a block repeats binds its names once a copy: used if any copy is
+    let Walker {
+        out,
+        mut unused,
+        used,
+        ..
+    } = walker;
+    let mut seen = Vec::new();
+    unused.retain(|u| {
+        let first = !seen.contains(&u.span);
+        seen.push(u.span);
+        first && !used.contains(&u.span.start)
+    });
+    (out, unused)
 }
 
 struct Local<'a> {
@@ -62,6 +76,8 @@ struct Walker<'a> {
     locals: Vec<Local<'a>>,
     out: Vec<Reference>,
     unused: Vec<Unused>,
+    /// Where each binder that was used is written.
+    used: Vec<u32>,
     top: usize,
 }
 
@@ -163,6 +179,9 @@ impl Walker<'_> {
     /// Leaves the scope of the locals above `mark`, noting those never used.
     fn release(&mut self, mark: usize) {
         for local in self.locals.drain(mark..) {
+            if let (Some((token, _)), true) = (local.binder, local.used) {
+                self.used.push(token.start);
+            }
             if let (Some((token, punned)), false) = (local.binder, local.used)
                 && !local.name.starts_with('_')
             {

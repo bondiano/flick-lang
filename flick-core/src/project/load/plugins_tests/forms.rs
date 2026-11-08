@@ -263,3 +263,24 @@ fn what_a_plugins_check_finds_may_be_a_warning_with_a_fix() {
         ("1.0 + 2.0", "(1.0 + 2.0)")
     );
 }
+
+#[test]
+fn a_pattern_a_block_repeats_binds_in_each_place_and_is_used_if_one_copy_is() {
+    let main = "module App.Main exposing (..)\n\nimport Pairs exposing (plugin twice)\n\nf : (Float, Float) -> (Float, Float) -> Float\nlet f = twice (a, b) { a + 1.0 }\n";
+    let mut sources = SourceMap::default();
+    let project = library(&mut sources);
+    let main_only = [PathBuf::from("/p/src/App/Main.fl")];
+    let found = check(&host(main), &mut sources, Some(&project), &main_only);
+    let found: Vec<String> = found.iter().map(|d| show(&sources, d)).collect();
+    // `a` feeds the block, `b` nothing: one warning for it, not one a copy
+    assert_eq!(found, ["FLICK-R013 `b`: `b` is never used"], "{found:?}");
+    let (diagnostics, compiled) = compile(&host(main), &mut sources, Some(&project), &main_only);
+    assert!(
+        diagnostics
+            .iter()
+            .all(|d| d.code.to_string() == "FLICK-R013"),
+        "{diagnostics:?}"
+    );
+    let ir = ir::print(&compiled.modules[0].ir);
+    assert!(ir.contains("seen"), "{ir}");
+}
