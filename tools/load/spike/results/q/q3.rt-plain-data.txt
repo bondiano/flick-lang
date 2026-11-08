@@ -1,0 +1,5 @@
+callback returning Option: [Some 2, None, Some 4]
+equal to a literal: true
+Effect's Some: Some 1 equal: false none: false
+schema error
+exit 0

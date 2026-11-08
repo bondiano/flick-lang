@@ -1,0 +1,28 @@
+# FLICK_BRIDGE_COUNT=sites, ssr /render, 101 requests (first line: counts)
+[bridge] {"fromEffect":822,"fromEffectFast":101,"fromEffectRun":721,"callEffect":204,"callSync":101,"hostOp":303,"adopt":103}
+[bridge] 205	fromEffect process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+[bridge] 204	fromEffect dist/rt/_flick/Http/Router.js:39:113
+[bridge] 105	fromEffect AsyncResource.runInAsyncScope (node:async_hooks:214:14)
+[bridge] 103	callEffect dist/rt/_flick/Http/Server.js:18:83
+[bridge] 101	callEffect dist/rt/_flick/Http/Router.js:32:78
+[bridge] 101	fromEffect dist/rt/_flick/Atom.js:68:114
+[bridge] 101	fromEffect Module.render (dist/rt/_flick/Ui/Server.js:9:36)
+[bridge] 2	fromEffect node:internal/process/task_queues:149:7
+[bridge] 1	fromEffect dist/rt/_flick/Http/Router.js:39:56
+[bridge] 1	fromEffect Module.serve$2 (dist/rt/_flick/Http/Server.js:18:42)
+[bridge] 1	fromEffect ?
+
+# the same, 50 requests, four compiled frames per site
+[bridge] {"fromEffect":412,"fromEffectFast":50,"fromEffectRun":362,"callEffect":100,"callSync":50,"hostOp":150,"adopt":52}
+[bridge] 103	fromEffect process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+[bridge] 100	fromEffect dist/rt/_flick/Http/Router.js:39:113 <- _flick/Http/Server.js:18:100 <- started.next (<anonymous>) <- Server.emit (node:events:531:35)
+[bridge] 53	fromEffect AsyncResource.runInAsyncScope (node:async_hooks:214:14) <- process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+[bridge] 50	callEffect dist/rt/_flick/Http/Server.js:18:83 <- Server.emit (node:events:531:35) <- parserOnIncoming (node:_http_server:1186:12) <- HTTPParser.parserOnHeadersComplete (node:_http_common:125:17)
+[bridge] 50	callEffect dist/rt/_flick/Http/Router.js:32:78 <- _flick/Http/Router.js:39:113 <- _flick/Http/Server.js:18:100 <- started.next (<anonymous>)
+[bridge] 50	fromEffect dist/rt/_flick/Atom.js:68:114 <- Load/Server.js:41:107 <- Generator.next (<anonymous>) <- _flick/Http/Router.js:39:113
+[bridge] 50	fromEffect Module.render (dist/rt/_flick/Ui/Server.js:9:36) <- Load/Server.js:42:25 <- Generator.next (<anonymous>) <- _flick/Http/Router.js:39:113
+[bridge] 2	fromEffect node:internal/process/task_queues:149:7 <- AsyncResource.runInAsyncScope (node:async_hooks:214:14) <- AsyncResource.runMicrotask (node:internal/process/task_queues:146:8)
+[bridge] 1	fromEffect dist/rt/_flick/Http/Router.js:39:56 <- Load/Server.js:69:71 <- Generator.next (<anonymous>) <- node:internal/process/task_queues:149:7
+[bridge] 1	fromEffect Module.serve$2 (dist/rt/_flick/Http/Server.js:18:42) <- Load/Server.js:70:48 <- Generator.next (<anonymous>) <- node:internal/process/task_queues:149:7
+[bridge] 1	fromEffect 
+[bridge] 1	fromEffect AsyncResource.runInAsyncScope (node:async_hooks:214:14) <- AsyncResource.runInAsyncScope (node:async_hooks:214:14) <- AsyncResource.runInAsyncScope (node:async_hooks:214:14) <- Object.onceWrapper (node:events:633:28)

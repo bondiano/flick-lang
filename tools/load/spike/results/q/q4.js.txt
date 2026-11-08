@@ -1,0 +1,20 @@
+flick layer: acquire Greet
+effect layer: acquire Db, build 1
+flick code on the kernel uses Effect's layer: db answered direct
+effect layer read a Flick service: hello from effect's layer
+an Effect layer on a Flick layer: hello from effect's layer d2
+handler: 200 hello world, db answered world
+body, row with Async: 200 {"n":2}
+body, closed row: 200 {"n":2}
+closing the server's scope
+kernel finalizer D, after serve
+kernel finalizer C, before serve
+the server's scope closed
+kernel finalizer B, inside the provide
+effect layer: release Db starts
+flick layer: release Greet
+effect layer: release Db ends
+the provide closed
+kernel finalizer A, outside the provide
+done
+exit 0

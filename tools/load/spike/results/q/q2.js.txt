@@ -1,0 +1,12 @@
+provide reaches the callback: ["hello 1", "hello 2", "hello 3"]
+tail handler reaches the callback: [10, 20, 30]
+abort arm ran: two
+abort handler reaches the callback: [0]
+a typed failure goes through: [200]
+callback runs
+interrupting from outside
+callback finalizer starts
+callback finalizer ends
+Fiber.interrupt returned
+done
+exit 0

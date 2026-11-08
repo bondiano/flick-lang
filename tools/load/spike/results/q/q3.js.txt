@@ -1,0 +1,13 @@
+callback returning Option: [Some 2, None, Some 4]
+equal to a literal: true
+Effect's Some: Some 1 equal: true none: true
+schema encodes Flick's Option: {"name":"x","note":"n","r":{"ok":2},"tags":[1,null]}
+schema decodes to what Flick matches: Some "n" [Some 1, None] Ok 2 equal: true
+Exit given by Effect: true
+Failure given by Effect, primary is some: true
+after catch_cause: ["true"]
+kernel Exits carried by a stream: [true, false]
+a long decode in a Sync stage: 20000
+a long stream in a Sync stage: 20000
+done
+exit 0

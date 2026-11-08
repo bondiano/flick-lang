@@ -1,0 +1,13 @@
+# FLICK_BRIDGE_COUNT=sites, json /item, 100 requests
+[bridge] {"fromEffect":412,"fromEffectFast":100,"fromEffectRun":312,"callEffect":200,"callSync":0,"hostOp":100,"adopt":2}
+[bridge] 100	callEffect dist/rt/_flick/Http/Server.js:18:83
+[bridge] 100	fromEffect dist/rt/_flick/Http/Router.js:39:113
+[bridge] 100	callEffect dist/rt/_flick/Http/Router.js:32:78
+[bridge] 100	fromEffect Module.decode$2 (dist/rt/_flick/Codec.js:65:43)
+[bridge] 100	fromEffect Module.schema_json$3 (dist/rt/_flick/Http/ServerResponse.js:64:53)
+[bridge] 4	fromEffect AsyncResource.runInAsyncScope (node:async_hooks:214:14)
+[bridge] 3	fromEffect process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+[bridge] 2	fromEffect node:internal/process/task_queues:149:7
+[bridge] 1	fromEffect dist/rt/_flick/Http/Router.js:39:56
+[bridge] 1	fromEffect Module.serve$2 (dist/rt/_flick/Http/Server.js:18:42)
+[bridge] 1	fromEffect ?

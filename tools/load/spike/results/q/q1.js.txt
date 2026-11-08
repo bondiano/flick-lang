@@ -1,0 +1,17 @@
+immediate 1
+sync 2
+  effect: start value
+another kernel fiber ran while the Effect slept
+  effect: end value
+resumed with value
+try caught typed
+after try 0
+defect is a failure: true
+  effect: running, will never end
+interrupting
+  effect: interrupted, finalizer starts
+  effect: finalizer ends
+Fiber.interrupt returned
+kernel finalizer of the fiber
+done
+exit 0

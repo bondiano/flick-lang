@@ -1,0 +1,65 @@
+# node --cpu-prof, ssr /render: 300 warm-up and 1500 sequential requests per mode, self time by where the code is
+== rt: busy 1.68 s
+  node                       0.61 s  36.4%
+  effect                     0.35 s  20.7%
+  (native/gc/idle)           0.20 s  11.7%
+  (native)                   0.14 s   8.5%
+  kernel rt/*                0.12 s   7.3%
+  runtime (Effect side)      0.09 s   5.1%
+  react                      0.09 s   5.1%
+  bridge                     0.04 s   2.2%
+  other deps                 0.02 s   1.4%
+  program                    0.01 s   0.8%
+  compiled std               0.01 s   0.7%
+  top functions:
+     0.12 s  (native/gc/idle)     (garbage collector) :-1
+     0.10 s  node                 compileSourceTextModule utils:343
+     0.08 s  (native/gc/idle)     (program) :-1
+     0.06 s  (native)             writev :-1
+     0.05 s  kernel rt/*          drive fiber.js:192
+     0.03 s  effect               runLoop effect.js:462
+     0.02 s  node                 onconnection node:net:2235
+     0.02 s  (native)             close :-1
+     0.02 s  node                 Socket node:net:362
+     0.02 s  node                 compileForInternalLoader realm:384
+     0.01 s  effect               makePrimitiveProto effect.js:1023
+     0.01 s  node                 connectionListenerInternal node:_http_server:694
+     0.01 s  node                 emit node:events:465
+== js: busy 1.42 s
+  node                       0.52 s  36.7%
+  effect                     0.35 s  24.5%
+  (native/gc/idle)           0.15 s  10.3%
+  (native)                   0.13 s   9.3%
+  runtime (Effect side)      0.13 s   9.1%
+  react                      0.09 s   6.0%
+  other deps                 0.03 s   1.8%
+  program                    0.02 s   1.6%
+  compiled std               0.01 s   0.7%
+  top functions:
+     0.09 s  node                 compileSourceTextModule utils:343
+     0.08 s  (native/gc/idle)     (garbage collector) :-1
+     0.07 s  (native/gc/idle)     (program) :-1
+     0.06 s  (native)             writev :-1
+     0.03 s  effect               makePrimitiveProto effect.js:1023
+     0.02 s  effect               runLoop effect.js:462
+     0.02 s  node                 onconnection node:net:2235
+     0.02 s  effect               evaluate effect.js:406
+     0.01 s  runtime (Effect side) element nodes.js:18
+     0.01 s  node                 emit node:events:465
+     0.01 s  runtime (Effect side) pairs HttpRouter.js:17
+     0.01 s  effect               addSpanStackTrace tracer.js:2
+     0.01 s  node                 getPackageScopeConfig package_json_reader:206
+
+# rt: self time of the kernel by function
+   47.3 ms  fiber.js  drive
+   17.6 ms  layer.js  (anon)
+   10.9 ms  bridge.js  (anon)
+   10.7 ms  bridge.js  hostOwnerOf
+    6.3 ms  fiber.js  evaluate
+    6.0 ms  bridge.js  memoOf
+    5.3 ms  owner.js  closeSteps
+    5.1 ms  bridge.js  fromEffect
+    4.2 ms  fiber.js  inCtx
+    4.2 ms  owner.js  hooks
+    3.8 ms  handle.js  call
+    3.3 ms  owner.js  (anon)
