@@ -147,7 +147,7 @@ fn drops_empty_arrow_rows() {
     let src = "f : A ->{none; E} B\ng : A ->{none /* why */; E} B\nh : A ->{Log; none} B\ni : Eff none none A\nj : A ->{none; none} B\nk : A ->{; none} B\n";
     insta::assert_snapshot!(fmt(src), @r#"
     f : A ->{; E} B
-    g : A ->{/* why */ ; E} B
+    g : A ->{/* why */; E} B
     h : A ->{Log; none} B
     i : Eff none none A
     j : A ->{} B
@@ -165,9 +165,21 @@ fn drops_the_semicolon_a_set_does_not_need() {
     g : A ->{...Env, -Log} B
     h : A ->{...Env; Boom} B
     i : A ->{...Env; none} B
-    j : A ->{...Env/* why */ } B
+    j : A ->{...Env /* why */} B
     k : A ->{Log;} B
     type alias Errs = {...UserErrors;}
+    "#);
+}
+
+/// A block comment in a row is spaced as a word, braces stay tight.
+#[test]
+fn spaces_comments_in_rows_as_words() {
+    let src = "f : A ->{Log /* a */, Db; E} B\ng : A ->{Log; E /* b */} B\ntype alias S = {Log /* c */}\nh : A ->{/* d */ Log; E} B\n";
+    insta::assert_snapshot!(fmt(src), @r#"
+    f : A ->{Log /* a */, Db; E} B
+    g : A ->{Log; E /* b */} B
+    type alias S = {Log /* c */}
+    h : A ->{/* d */ Log; E} B
     "#);
 }
 

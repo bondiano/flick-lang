@@ -159,16 +159,34 @@ impl<'a> Printer<'a> {
         self.elements(n, &n.children)
     }
 
-    /// Children of `n`, spaced by [`space`].
+    /// Children of `n`, spaced by [`space`]; a block comment before a child
+    /// is spaced as a word, so `->{...S /* c */}` keeps its brace tight.
     pub fn elements(&mut self, n: &'a Node, children: &'a [Element]) -> Doc<'a> {
         let mut docs = Vec::with_capacity(children.len() * 2);
         let mut previous = None;
+        let word = (K::Ident, n.kind);
         for child in children {
             let Some((first, last)) = edges(n, child) else {
                 continue;
             };
-            if previous.is_some_and(|p| space(p, first)) {
-                docs.push(self.a.text(" "));
+            let start = match child {
+                Element::Node(c) => c.range().0,
+                Element::Token(t) => t.start,
+            };
+            let comments = self.comments.inline(start);
+            if comments.is_empty() {
+                if previous.is_some_and(|p| space(p, first)) {
+                    docs.push(self.a.text(" "));
+                }
+            } else {
+                if previous.is_some_and(|p| space(p, word)) {
+                    docs.push(self.a.text(" "));
+                }
+                let text = self.a.alloc_str(&comments.join(" "));
+                docs.push(self.a.text(text));
+                if space(word, first) {
+                    docs.push(self.a.text(" "));
+                }
             }
             docs.push(match child {
                 Element::Node(c) => self.node(c),
