@@ -213,6 +213,31 @@ mod wasm {
     }
 
     #[test]
+    fn a_wasm_plugin_rewrites_what_flick_build_writes() {
+        let root = app("plugins-emit", MAIN);
+        let emitting = LIB.replace(
+            "plugin = \"pairs.wasm\"\n",
+            "plugin = \"pairs.wasm\"\nhooks = [\"emit\"]\n",
+        );
+        fs::write(root.join("lib/flick.toml"), emitting).expect("write");
+        let built = flick(&root, &["build"]);
+        assert!(
+            built.status.success(),
+            "{}",
+            String::from_utf8_lossy(&built.stderr)
+        );
+        let main = fs::read_to_string(root.join("app/dist/App/Main.js")).expect("the module");
+        assert!(main.starts_with("// pairs\n"), "{main}");
+        let map = fs::read_to_string(root.join("app/dist/App/Main.js.map")).expect("its map");
+        assert!(map.contains("\"mappings\":\";"), "{map}");
+        assert!(
+            trace(&root).iter().any(|l| l == "emit pairs"),
+            "{:?}",
+            trace(&root)
+        );
+    }
+
+    #[test]
     fn a_plugin_runs_within_its_fuel_and_memory() {
         let main = "module App.Main exposing (main, a, b)\n\nimport Pairs exposing (plugin spin, plugin hog)\n\nlet a = spin {}\nlet b = hog {}\n\nmain : Unit ->{; AppError} Unit\nlet main () = ()\n";
         let root = app("plugins-limits", main);

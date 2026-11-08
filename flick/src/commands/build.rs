@@ -22,6 +22,7 @@ use crate::sources::FsHost;
 use crate::{cache, toolchain};
 
 mod cached;
+mod hooks;
 mod progress;
 mod shipped;
 

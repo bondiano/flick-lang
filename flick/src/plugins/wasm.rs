@@ -324,6 +324,25 @@ impl Expander for Wasm {
         }
     }
 
+    fn emit(
+        &self,
+        artifacts: &[flick_plugin::Artifact],
+    ) -> Result<Vec<flick_plugin::Artifact>, Failure> {
+        let given: Vec<_> = (artifacts.iter().cloned())
+            .map(convert::to_artifact)
+            .collect();
+        let (result, _) = self.run(BlockSource::default(), |plugin, store| {
+            plugin.call_emit(store, &given)
+        });
+        match result {
+            Ok(Ok(written)) => Ok(written.into_iter().map(convert::from_artifact).collect()),
+            Ok(Err(found)) => Err(Failure::Refused(
+                found.into_iter().map(convert::from_diagnostic).collect(),
+            )),
+            Err(why) => Err(Failure::Broken(why)),
+        }
+    }
+
     fn load(&self, path: &str, bytes: &[u8]) -> Result<flick_plugin::Arena, Failure> {
         let (result, _) = self.run(BlockSource::default(), |plugin, store| {
             plugin.call_load(store, path, bytes)

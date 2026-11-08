@@ -6,6 +6,10 @@ break programs.
 
 ## Unreleased
 
+- **A plugin's `emit`:** a library whose `[package]` says `hooks = ["emit"]` beside
+  its `plugin` rewrites the files `flick build` writes, its scripts, their maps
+  and interfaces, before they are written; a script changed without its map is
+  `FLICK-P046`. `flick run` and `flick test` build without it.
 - **Files of other languages:** a library whose `[package]` says `load = ["proto"]`
   beside its `plugin` turns each `.proto` file into a module: `import App.User`
   finds `App/User.proto`, the plugin's `load` gives its declarations at the

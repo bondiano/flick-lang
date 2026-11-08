@@ -17,10 +17,11 @@ mod published;
 mod reach;
 
 use std::hint::black_box;
+use std::path::Path;
 
 use flick_plugin::{
-    Arena, Block, Builder, Compiler, DeriveTarget, Diagnostic, Edit, Fact, NodeId, Plugin,
-    Published, Span, Token, TokenKind, flick,
+    Arena, Artifact, Block, Builder, Compiler, DeriveTarget, Diagnostic, Edit, Fact, NodeId,
+    Plugin, Published, Span, Token, TokenKind, flick,
 };
 
 pub struct Pairs;
@@ -39,6 +40,23 @@ fn parts(state: &[u8]) -> (&[u8], &[u8]) {
 flick_plugin::export!(Pairs);
 
 impl Plugin for Pairs {
+    /// Each `.js` with a line `// pairs` before it, its `.map` a line later.
+    fn emit(&self, artifacts: Vec<Artifact>) -> Result<Vec<Artifact>, Vec<Diagnostic>> {
+        Ok((artifacts.into_iter())
+            .map(|mut a| {
+                let extension = Path::new(&a.path).extension();
+                if extension.is_some_and(|e| e == "js") {
+                    a.contents = format!("// pairs\n{}", a.contents);
+                } else if extension.is_some_and(|e| e == "map") {
+                    a.contents = a
+                        .contents
+                        .replacen("\"mappings\":\"", "\"mappings\":\";", 1);
+                }
+                a
+            })
+            .collect())
+    }
+
     /// A `.pairs` file: a line `name = "text"` is `let name : String =
     /// "text"`, at that line; any other line that is not blank is `X004`.
     fn load(&self, _: &str, bytes: &[u8]) -> Result<Arena, Vec<Diagnostic>> {

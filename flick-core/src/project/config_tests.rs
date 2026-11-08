@@ -341,7 +341,14 @@ fn a_package_names_the_extensions_its_plugin_loads() {
         config.package.map(|p| p.load),
         Some(vec!["proto".into(), "pb2".into()])
     );
+    let config = package("plugin = \"protos.wasm\"\nhooks = [\"emit\", \"ir\"]").expect("valid");
+    assert_eq!(
+        config.package.map(|p| p.hooks),
+        Some(vec!["emit".into(), "ir".into()])
+    );
     for refused in [
+        "hooks = [\"emit\"]",
+        "plugin = \"protos.wasm\"\nhooks = [\"render\"]",
         "load = [\"proto\"]",
         "plugin = \"protos.wasm\"\nload = [\".proto\"]",
         "plugin = \"protos.wasm\"\nload = [\"fl\"]",

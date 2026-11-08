@@ -1,8 +1,8 @@
 //! The trait a plugin implements: the exports of its component.
 
 use crate::{
-    Arena, Block, Compiler, Completion, DeriveTarget, Diagnostic, Fact, Highlight, Hover, Piece,
-    Published, Span,
+    Arena, Artifact, Block, Compiler, Completion, DeriveTarget, Diagnostic, Fact, Highlight, Hover,
+    Piece, Published, Span,
 };
 
 /// A plugin: what it learns from all its blocks of a group, and the code
@@ -30,6 +30,12 @@ pub trait Plugin {
             end: u32::try_from(bytes.len()).unwrap_or(u32::MAX),
         };
         Err(vec![Diagnostic::error("this plugin loads no files", whole)])
+    }
+    /// The files of `flick build`, each `.js` with its `.map` when the build
+    /// writes maps; what it writes instead. Only a plugin whose package says
+    /// `hooks = ["emit"]` gets them.
+    fn emit(&self, artifacts: Vec<Artifact>) -> Result<Vec<Artifact>, Vec<Diagnostic>> {
+        Ok(artifacts)
     }
     /// The code `block` stands for given what `collect` learned, or why
     /// there is none; no diagnostic means the compiler already reported why.

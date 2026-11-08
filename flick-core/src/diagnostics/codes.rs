@@ -364,6 +364,7 @@ codes! {
     P043 = Project 43, "the `std` does not fit this compiler";
     P044 = Project 44, "another plugin gives a head of std's plugin";
     P045 = Project 45, "the plugins of two packages load one extension";
+    P046 = Project 46, "a plugin's emit changed code without its map";
 }
 
 #[cfg(test)]

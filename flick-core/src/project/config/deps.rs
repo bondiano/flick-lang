@@ -33,6 +33,8 @@ pub(super) struct RawPackage {
     plugin: Option<String>,
     #[serde(default)]
     load: Vec<String>,
+    #[serde(default)]
+    hooks: Vec<String>,
 }
 
 /// `[js]` as written: its only table is `dependencies`.
@@ -156,6 +158,7 @@ pub(super) fn package(raw: Spanned<RawPackage>, at: Span) -> Result<Package, Dia
         flick,
         plugin,
         load,
+        hooks,
     } = raw.into_inner();
     let error = |message: String| Diagnostic::error(codes::P032, message, at);
     semver::Version::parse(&version).map_err(|e| {
@@ -183,6 +186,16 @@ pub(super) fn package(raw: Spanned<RawPackage>, at: Span) -> Result<Package, Dia
             "`load` needs the `plugin` that loads the files".into(),
         ));
     }
+    if !hooks.is_empty() && plugin.is_none() {
+        return Err(error(
+            "`hooks` needs the `plugin` that takes part in them".into(),
+        ));
+    }
+    if let Some(bad) = hooks.iter().find(|h| !matches!(h.as_str(), "emit" | "ir")) {
+        return Err(error(format!(
+            "`hooks = [\"{bad}\"]`: a hook is `emit`, after the build writes its files, or `ir`, before it optimizes"
+        )));
+    }
     // a module path has no dot of its own, and `.fl` is Flick's
     if let Some(bad) = load.iter().find(|e| {
         e.is_empty()
@@ -201,6 +214,7 @@ pub(super) fn package(raw: Spanned<RawPackage>, at: Span) -> Result<Package, Dia
         flick,
         plugin,
         load,
+        hooks,
         span: at,
     })
 }

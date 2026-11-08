@@ -135,6 +135,9 @@ pub struct Package {
     /// `load = ["proto"]`: the extensions of the files its plugin turns into
     /// modules, without the dot.
     pub load: Vec<String>,
+    /// `hooks = ["emit", "ir"]`: the stages of a build its plugin takes part
+    /// in besides blocks.
+    pub hooks: Vec<String>,
     pub span: Span,
 }
 
