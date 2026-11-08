@@ -11,7 +11,7 @@ use crate::iface::{Decl, Namespace};
 use crate::source::FileId;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
-use crate::types::{Form, Ref, TypeDef, component_instance, show_signature, show_type};
+use crate::types::{Form, Ref, TypeDef, show_signature, show_type};
 
 pub(super) mod companions;
 mod kinds;
@@ -114,15 +114,7 @@ impl Ide<'_> {
         let kw = parent
             .child_tokens()
             .find(|t| t.start <= offset && offset <= t.end && t.kind != K::Ident)?;
-        // a component's instance is recorded at the start of its body
-        let at = match kw.kind {
-            K::ComponentKw => parent
-                .nodes()
-                .flat_map(Node::nodes)
-                .find(|n| n.kind == K::ComponentExpr)
-                .map_or((kw.start, kw.end), component_instance),
-            _ => (kw.start, kw.end),
-        };
+        let at = (kw.start, kw.end);
         let ty = m.typing.types.get(&at)?;
         let shown = show_signature(ty);
         let (head, note) = match kw.kind {
@@ -148,12 +140,6 @@ impl Ide<'_> {
             K::MatchKw => ("match … with", "The value of the arm that matches."),
             K::IfKw => ("if … then … else …", "The value of the branch taken."),
             K::FunKw => ("fun … -> …", "An anonymous function."),
-            K::ComponentKw => (
-                "component",
-                "A view of its props. The statements of its body set up each \
-                 instance once, in the instance's region `s`; its last \
-                 expression renders it, again when an atom it read changes.",
-            ),
             K::UiKw => (
                 "ui { … }",
                 "Describes a user interface; building it runs no handler.",
@@ -318,6 +304,9 @@ impl Ide<'_> {
     /// Markdown for the symbol at `offset`, and the range it covers.
     pub fn hover(&self, file: FileId, offset: u32) -> Option<(String, (u32, u32))> {
         if let Some(hover) = self.kind_hover(file, offset) {
+            return Some(hover);
+        }
+        if let Some(hover) = self.head_hover(file, offset) {
             return Some(hover);
         }
         if let Some((code, note, range)) = self.keyword(file, offset) {

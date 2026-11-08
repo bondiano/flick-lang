@@ -3,9 +3,11 @@
 //! Flick, which the other queries answer.
 
 use super::complete::item;
-use super::{Completion, CompletionKind, Ide};
-use crate::plugin::EditorBlock;
+use super::{Completion, CompletionKind, Ide, tree};
+use crate::plugin::{EditorBlock, head_token};
 use crate::source::FileId;
+use crate::syntax::kind::SyntaxKind as K;
+use crate::types::show_signature;
 
 impl Ide<'_> {
     /// The innermost plugin block of `file` at `offset`.
@@ -55,6 +57,54 @@ impl Ide<'_> {
             let range = (b.start + hover.span.start, b.start + hover.span.end);
             (hover.markdown, range)
         })
+    }
+}
+
+impl Ide<'_> {
+    /// On the head of a block: the type of the code it stands for, the
+    /// function it gives, as the instance of a component, else its value;
+    /// and what its plugin says of its head.
+    pub(super) fn head_hover(&self, file: FileId, offset: u32) -> Option<(String, (u32, u32))> {
+        let m = self.module(file)?;
+        let text = self.text(file);
+        let path = tree::path_to(&m.tree, offset);
+        let block = *path.iter().rev().find(|n| {
+            matches!(n.kind, K::PluginExpr | K::PluginDecl)
+                && head_token(n).is_some_and(|h| h.start <= offset && offset <= h.end)
+        })?;
+        let head = head_token(block)?;
+        let expansion = m.expansion.as_ref()?;
+        let code = expansion.standing_for(block.range());
+        let function = |&&(start, end): &&(u32, u32)| {
+            expansion
+                .text
+                .get(start as usize..end as usize)
+                .is_some_and(|c| c.starts_with("(fun"))
+        };
+        // a `fun` has its type at its keyword, after the `(` of generated code
+        let keyword = |&(start, _): &(u32, u32)| m.typing.types.get(&(start + 1, start + 4));
+        let typed = |&(start, end): &(u32, u32)| m.typing.types.get(&(start, end));
+        let ty = (code.iter().filter(function).find_map(keyword))
+            .or_else(|| code.iter().find_map(typed))?;
+        let mut markdown = format!(
+            "```flick\n{} : {}\n```",
+            head.text(text),
+            show_signature(ty)
+        );
+        // the plugin answers for its head at an offset past the block
+        let first =
+            (block.tokens().into_iter()).find(|t| !t.kind.is_trivia() && t.start > head.start);
+        if let Some(b) = first.and_then(|t| self.editor_block(file, t.start)) {
+            let past = u32::try_from(b.block.text.len()).ok()?.saturating_add(1);
+            let facts = Vec::new();
+            let said = (b.plugin)
+                .hover(&b.block, &b.state, past, &facts)
+                .unwrap_or_else(|why| failed(b.plugin.id(), "hover", &why));
+            if let Some(said) = said {
+                markdown = format!("{markdown}\n\n{}", said.markdown);
+            }
+        }
+        Some((markdown, (head.start, head.end)))
     }
 }
 

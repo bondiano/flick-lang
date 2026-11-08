@@ -247,6 +247,17 @@ impl Expansion {
     }
 
     /// The span of the module a span of the expansion stands for.
+    /// The generated code that stands for the whole block at `range`,
+    /// outermost first: what an editor shows on its head.
+    pub fn standing_for(&self, range: (u32, u32)) -> Vec<(u32, u32)> {
+        let mut out: Vec<(u32, u32)> = (self.origins.iter())
+            .filter(|(_, origin)| *origin == range)
+            .map(|(code, _)| *code)
+            .collect();
+        out.sort_by_key(|&(start, end)| (start, u32::MAX - end));
+        out
+    }
+
     pub fn place(&self, span: Span) -> Span {
         if span.file != self.file || span.end <= self.len {
             return span;

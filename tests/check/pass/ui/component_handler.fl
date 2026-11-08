@@ -1,0 +1,15 @@
+// A component that is its render alone may make a handler of a `fun` there,
+// as a `component` always could; a `Ui.view` written so is FLICK-U002.
+module App.ComponentHandler exposing (..)
+
+count : Atom.Writable Int
+let count = Atom.make 0
+
+component counter () = ui {
+  button
+    {
+      disabled = false;
+      on_click = Ui.Event.exhaust (fun _ -> task { Atom.update count (fun n -> n + 1) });
+    }
+    [text (show (Atom.value count))]
+}

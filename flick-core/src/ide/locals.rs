@@ -83,10 +83,16 @@ pub fn in_scope(root: &Node, offset: u32, text: &str) -> Vec<(String, (u32, u32)
                     out.extend(let_binders(clause, text));
                 }
             }
-            // the props; its body is a block like any other
-            K::ComponentExpr => {
-                for p in scope.nodes().filter(|n| is_pattern(n.kind)).filter(before) {
-                    binders(p, &mut out, text);
+            // the user's code of a plugin's block: its patterns and `let`s before
+            // shortcut: what the code of `component` and `server fn` sees; ask the
+            // checker's binders when a plugin's code scopes the user's otherwise
+            K::PluginExpr | K::PluginDecl | K::PluginRest | K::PluginArgs => {
+                for n in scope.nodes().filter(before) {
+                    if is_pattern(n.kind) {
+                        binders(n, &mut out, text);
+                    } else if n.kind == K::LetDecl {
+                        out.extend(let_binders(n, text));
+                    }
                 }
             }
             K::FunExpr | K::MatchArm => {
@@ -107,24 +113,4 @@ pub fn binder(root: &Node, offset: u32, name: &str, text: &str) -> Option<(u32, 
         .rev()
         .find(|(n, _)| n == name)
         .map(|(_, r)| r)
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::source::SourceMap;
-    use crate::syntax::parse;
-
-    #[test]
-    fn render_sees_the_props_and_the_names_of_setup() {
-        let text = "component c (p : P) =\n  let n = p\n  ui { text n }\n";
-        let mut sources = SourceMap::default();
-        let file = sources.add("C.fl", text.to_owned());
-        let tree = parse(text, file).tree;
-        let offset = u32::try_from(text.rfind('n').expect("a use")).expect("small");
-        let names: Vec<String> = super::in_scope(&tree, offset, text)
-            .into_iter()
-            .map(|(name, _)| name)
-            .collect();
-        assert_eq!(names, ["p", "n"]);
-    }
 }

@@ -10,17 +10,19 @@ use flick_plugin::{
 use flick_plugin_cli::Cli;
 use flick_plugin_derive::{codec, server_fn};
 use flick_plugin_sql::Sql;
+use flick_plugin_ui::component;
 
 use super::{Expander, Native};
 
 /// The heads of the plugins linked into the compiler and the module that
 /// exposes each. Every module has them without an import: `cli "x" { … }`
 /// is a block of std's plugin, and no other plugin may give the head.
-pub const HEADS: [(&str, &str); 4] = [
+pub const HEADS: [(&str, &str); 5] = [
     ("cli", "Cli"),
     ("server", "Server"),
     ("codec", "Codec"),
     ("sql", "Sql"),
+    ("component", "Ui"),
 ];
 
 /// The heads whose blocks need no body even where no import exposes them,
@@ -32,6 +34,10 @@ pub const BARE: [&str; 1] = ["server"];
 /// = …`, `sql table Users "users" { … }`, `sql migration 1 "m" { … }`.
 pub const DECLARATIONS: [(&str, &str); 3] =
     [("server", "fn"), ("sql", "table"), ("sql", "migration")];
+
+/// The heads that declare a name right after them, whatever word it is:
+/// `component counter (start : Float) = …`.
+pub const NAMED: [&str; 1] = ["component"];
 
 /// The package whose plugin is linked into the compiler. An implicit package
 /// without a plugin of its own needs no entry here.
@@ -46,9 +52,12 @@ pub fn plugin(package: &str) -> Option<Arc<dyn Expander>> {
 /// `codec`, `sql table`, and the derives of the witnesses of the Prelude.
 struct Std;
 
-/// Whether `block` is a `cli` block, the others being `server`'s.
+/// Whether `block` is a `cli` block.
 fn cli(block: &Block) -> bool {
-    !matches!(block.head.as_str(), "server" | "codec" | "sql")
+    !matches!(
+        block.head.as_str(),
+        "server" | "codec" | "sql" | "component"
+    )
 }
 
 impl Plugin for Std {
@@ -75,6 +84,7 @@ impl Plugin for Std {
             "server" => server_fn::expand(block, compiler),
             "codec" => codec::expand(block, compiler),
             "sql" => Sql.expand(block, state, compiler),
+            "component" => component::expand(block, compiler),
             _ => Cli.expand(block, state, compiler),
         }
     }
@@ -106,6 +116,7 @@ impl Plugin for Std {
         match block.head.as_str() {
             "codec" => codec::hover(block, offset, facts),
             "sql" => Sql.hover(block, state, offset, facts),
+            "component" => component::hover(block, offset),
             "server" => None,
             _ => Cli.hover(block, state, offset, facts),
         }
@@ -128,6 +139,7 @@ impl Plugin for Std {
         match block.head.as_str() {
             "codec" => codec::format(block, compiler),
             "sql" => Sql.format(block, state, compiler),
+            "component" => component::format(block, compiler),
             "server" => None,
             _ => Cli.format(block, state, compiler),
         }

@@ -392,18 +392,16 @@ fn unicode_comment_columns_preserve_record_layout() {
 }
 
 #[test]
-fn a_component_is_a_let_of_its_props_and_body() {
+fn a_component_is_a_declaration_of_std_s_plugin() {
     assert_eq!(
         sexp("component label (p : P) = text p.name\n"),
-        "(LetDecl component (VarPat label) (Block (ComponentExpr (AnnotPat ( (VarPat p) : \
-         (NameType P) )) = (Block (AppExpr (NameExpr text) (FieldExpr (NameExpr p) . name))))))"
+        "(PluginDecl component label ( (PluginArgs p : P) ) (PluginRest = text p . name))"
     );
     let src = "component counter (p : P) =\n  let n = 1\n  show n\nlet x = 1\n";
     assert_eq!(
         sexp(src),
-        "(LetDecl component (VarPat counter) (Block (ComponentExpr (AnnotPat ( (VarPat p) : \
-         (NameType P) )) = (Block (LetDecl let (VarPat n) = (Block (Literal 1))) \
-         (AppExpr (NameExpr show) (NameExpr n))))))\n(LetDecl let (VarPat x) = (Block (Literal 1)))"
+        "(PluginDecl component counter ( (PluginArgs p : P) ) (PluginRest = let n = 1 show n))\n\
+         (LetDecl let (VarPat x) = (Block (Literal 1)))"
     );
     // the word stays a name elsewhere
     assert_eq!(

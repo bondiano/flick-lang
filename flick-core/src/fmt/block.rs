@@ -6,7 +6,7 @@ use flick_pretty::{NextBreakFitsMode, docvec};
 
 use super::expr::Part;
 use super::printer::{Doc, INDENT, Printer, node_position, nodes, position, token};
-use crate::syntax::cst::{Element, Node, Token};
+use crate::syntax::cst::{Element, Node};
 use crate::syntax::kind::SyntaxKind as K;
 
 /// What follows `=`, `->` or `<-`: the block of a body, or one expression.
@@ -126,12 +126,9 @@ impl<'a> Printer<'a> {
         self.join_lines(&items)
     }
 
-    /// `let`, `server fn` and `component` declarations.
+    /// `let` and `server fn` declarations.
     pub fn let_(&mut self, n: &'a Node) -> Doc<'a> {
         let a = self.a;
-        if let Some(keyword) = token(n, K::ComponentKw) {
-            return self.component(n, keyword);
-        }
         let (Some(eq), Some(block)) = (position(n, K::Eq), node_position(n, K::Block)) else {
             return self.generic(n);
         };
@@ -147,28 +144,6 @@ impl<'a> Printer<'a> {
         } else {
             docvec![a, doc, " ", rest]
         }
-    }
-
-    /// `component name (props) = body`.
-    fn component(&mut self, n: &'a Node, keyword: Token) -> Doc<'a> {
-        let a = self.a;
-        let parts = nodes(n);
-        let (Some(name), Some(component)) =
-            (parts.first(), parts.get(1).and_then(|b| b.nodes().next()))
-        else {
-            return self.generic(n);
-        };
-        let (Some(eq), Some(block)) = (
-            position(component, K::Eq),
-            component.nodes().find(|c| c.kind == K::Block),
-        ) else {
-            return self.generic(n);
-        };
-        let keyword = self.tok(keyword);
-        let name = self.node(name);
-        let props = self.elements(component, &component.children[..=eq]);
-        let head = docvec![a, keyword, " ", name, " ", props];
-        self.body(head, Value::Block(block), block.range().1, &[])
     }
 
     /// `pattern <- value` in `do` and `for`.

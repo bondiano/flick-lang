@@ -23,19 +23,14 @@ const NESTS: [K; 7] = [
 ];
 
 impl Checker<'_> {
-    /// The lints of a function `decl`: a `let` with parameters or a
-    /// `component`; other declarations have none.
+    /// The lints of a function `decl`, a `let` with parameters; other
+    /// declarations have none.
+    // shortcut: a component is the code of std's plugin, whose ranges mix the
+    // user's code and the generated, so it has no T036–T038; lint it in the
+    // plugin once a plugin's `check` sees the module (PX5)
     pub(super) fn structure(&mut self, decl: &Node) {
         let parts = let_parts(decl, self.text);
-        let component = decl
-            .nodes()
-            .find(|n| n.kind == K::Block)
-            .and_then(|b| b.nodes().find(|n| n.kind == K::ComponentExpr));
-        let body = match component {
-            Some(c) => c.nodes().find(|n| n.kind == K::Block),
-            None if !parts.params.is_empty() => parts.body,
-            None => None,
-        };
+        let body = (!parts.params.is_empty()).then_some(parts.body).flatten();
         let (Some(body), Some(pattern)) = (body, parts.pattern) else {
             return;
         };
@@ -92,9 +87,7 @@ impl Checker<'_> {
             );
         }
         self.too_deep(body, 0, limits.nesting);
-        if component.is_none() {
-            self.reads_atoms(&name, at);
-        }
+        self.reads_atoms(&name, at);
     }
 
     /// T037 at each expression `depth` levels deep past `limit`, and not
@@ -167,8 +160,7 @@ impl Checker<'_> {
 
 /// A local function, linted as a function of its own.
 fn is_function(node: &Node) -> bool {
-    node.kind == K::LetDecl
-        && (node.nodes().any(|n| n.kind == K::Params) || node.has_token(K::ComponentKw))
+    node.kind == K::LetDecl && node.nodes().any(|n| n.kind == K::Params)
 }
 
 /// The branches of `node` apart from local functions: each `if`, each arm

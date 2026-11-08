@@ -190,7 +190,7 @@ foreign now from global \"Date.now\"
 }
 
 #[test]
-fn component_is_a_keyword_there_only() {
+fn component_is_a_head_there_only() {
     let text = "module App.Main exposing (badge)
 
 component badge (render : String) = ui { text render }
@@ -204,7 +204,7 @@ component badge (render : String) = ui { text render }
             .find(|t| t.0 == at)
             .map(|t| TOKEN_TYPES[t.2 as usize])
     };
-    assert_eq!(kind_at("component"), Some("keyword"));
+    assert_eq!(kind_at("component"), Some("macro"));
     assert_eq!(kind_at("render :"), Some("parameter"));
     assert_eq!(kind_at("render }"), Some("variable"));
 }

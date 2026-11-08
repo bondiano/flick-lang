@@ -103,15 +103,6 @@ impl Walker<'_> {
                 self.release(mark);
                 return;
             }
-            // the props, then the names of `setup` scope over `render`
-            K::ComponentExpr => {
-                self.bind_patterns(node);
-                for block in node.nodes().filter(|n| n.kind == K::Block) {
-                    self.statements(block);
-                }
-                self.release(mark);
-                return;
-            }
             K::ForExpr => {
                 // the names of the clauses scope over the clauses after them and the element
                 let mut parts = node.nodes();

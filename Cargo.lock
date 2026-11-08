@@ -618,6 +618,7 @@ dependencies = [
  "flick-plugin-cli",
  "flick-plugin-derive",
  "flick-plugin-sql",
+ "flick-plugin-ui",
  "flick-pretty",
  "flick-test-pairs",
  "insta",
@@ -692,6 +693,13 @@ dependencies = [
  "insta",
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "flick-plugin-ui"
+version = "0.1.0"
+dependencies = [
+ "flick-plugin",
 ]
 
 [[package]]

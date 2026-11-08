@@ -38,8 +38,6 @@ fn top_decl(p: &mut Parser) {
         K::InstanceKw => instance_decl(p),
         K::DerivingKw if p.nth(1) == K::InstanceKw => deriving_decl(p),
         K::ForeignKw => foreign_decl(p),
-        // `component name`: the word is a name everywhere else
-        K::Ident if p.at_word("component") && p.nth(1) == K::Ident => component_decl(p),
         // `effect Name`: the word is a name everywhere else
         K::Ident if p.at_word("effect") && p.nth(1) == K::Con => service_decl(p),
         K::Ident if super::plugin::at_declaration(p) => super::plugin::declaration(p),
@@ -149,30 +147,6 @@ pub(super) fn signature(p: &mut Parser) {
     p.bump();
     types::type_(p);
     p.complete(m, K::Signature);
-}
-
-/// `component name (props : P) = body`: a `LetDecl` whose body is one
-/// `ComponentExpr`. The body is a block: its statements are the setup of
-/// an instance, its last expression the render.
-fn component_decl(p: &mut Parser) {
-    let m = p.start();
-    p.bump_as(K::ComponentKw);
-    let name = p.start();
-    p.expect(K::Ident);
-    p.complete(name, K::VarPat);
-    let body = p.start();
-    let component = p.start();
-    if pattern::at_atom_start(p) {
-        pattern::atom_pattern(p);
-    } else {
-        p.error_expected("the props of the component, `(props : P)`");
-    }
-    if p.expect(K::Eq) {
-        p.body(K::Block, expr::stmt);
-    }
-    p.complete(component, K::ComponentExpr);
-    p.complete(body, K::Block);
-    p.complete(m, K::LetDecl);
 }
 
 /// `let [rec] name params [: T] = body`, `let pattern [: T] = body`, or

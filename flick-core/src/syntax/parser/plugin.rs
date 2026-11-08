@@ -10,7 +10,7 @@
 //! elsewhere.
 
 use super::{K, Parser, SyntaxKind};
-use crate::plugin::first_party::{BARE, DECLARATIONS, HEADS};
+use crate::plugin::first_party::{BARE, DECLARATIONS, HEADS, NAMED};
 
 /// Whether an exposed item `plugin head` starts here.
 pub(super) fn at_head(p: &Parser) -> bool {
@@ -91,12 +91,13 @@ fn arguments(p: &mut Parser) {
 }
 
 /// Whether a declaration of a plugin starts here: a head an import exposed
-/// at the start of a declaration, not its signature; or one of
-/// [`DECLARATIONS`] before its word.
+/// at the start of a declaration, not its signature; one of
+/// [`DECLARATIONS`] before its word; or one of [`NAMED`] before a name.
 pub(super) fn at_declaration(p: &Parser) -> bool {
     let head = p.text_of(p.raw());
     let own = (DECLARATIONS.iter())
-        .any(|(h, w)| *h == head && p.nth(1) == K::Ident && super::decl::word_at(p, 1, w));
+        .any(|(h, w)| *h == head && p.nth(1) == K::Ident && super::decl::word_at(p, 1, w))
+        || NAMED.contains(&head) && p.nth(1) == K::Ident;
     (p.plugin_heads.contains(&head) || own) && p.nth(1) != K::Colon
 }
 

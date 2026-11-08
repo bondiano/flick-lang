@@ -4,7 +4,7 @@ title: "Keywords"
 
 Every reserved word of Flick, what it introduces and where it is described in
 full. A keyword cannot be used as a name. The words that are keywords only in
-one position (`alias`, `unboxed`, `component`, the
+one position (`alias`, `unboxed`, the
 foreign modes, the SQL and CLI clause words) are listed in [grammar.md](../grammar/#keywords).
 
 ## Modules
@@ -92,9 +92,10 @@ as record labels: `{ echo = … }`.
 | - | - | - |
 | `ui` | a UI block | `ui { … }` |
 
-See [schema.md](../schema/) and [ui.md](../ui/). A command-line interface,
-`cli "deploy" { … }`, and a typed SQL query, `sql { from u in Users; select
-u }`, are blocks of the plugin of `std`, not keywords: see
+See [schema.md](../schema/) and [ui.md](../ui/). A component, `component
+counter () = …`, a command-line interface, `cli "deploy" { … }`, and a typed
+SQL query, `sql { from u in Users; select u }`, are blocks of the plugin of
+`std`, not keywords: see
 [cli-dsl.md](../cli-dsl/) and [sql.md](../sql/).
 
 ## In the editor
