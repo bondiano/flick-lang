@@ -1,51 +1,16 @@
-// The DOM backend mounts synchronously once so event targets are immediately usable.
+// `Ui.Dom.mount` on Effect: a root in a DOM container, with the atoms a server
+// wrote into the document.
 import { Effect } from "effect";
 import type * as AtomRegistry from "../effect/reactivity/AtomRegistry.ts";
 import * as Hydration from "../effect/reactivity/Hydration.ts";
-import { flushSync } from "react-dom";
-import { createRoot, hydrateRoot, type Root } from "react-dom/client";
 
 import type { Failure } from "../cause.ts";
 import { RegistryService, nativeRegistry } from "../effect/reactivity/Atom.ts";
-import { type Renderer, type Ui, uiMountWith } from "./react/index.ts";
+import { domRenderer } from "./dom.ts";
+import { type Ui, uiMountWith } from "./react/index.ts";
 
 export * from "./react/index.ts";
-
-export const uiContainer = (id: string): Element | null => globalThis.document?.getElementById(id) ?? null;
-
-/** A React DOM root in `container`, hydrating the markup a server rendered there. */
-const domRenderer =
-  (container: Element): Renderer =>
-  () => {
-      let root: Root | undefined;
-      return {
-        render: (node) => {
-          if (root !== undefined) root.render(node);
-          else {
-            // React resets uncontrolled textareas during hydration; preserve native pre-boot drafts.
-            const drafts = container.hasAttribute("data-flick-ssr")
-              ? Array.from(container.querySelectorAll("textarea"), (field) => ({
-                  field, value: field.value, start: field.selectionStart, end: field.selectionEnd, direction: field.selectionDirection,
-                }))
-              : undefined;
-            flushSync(() => {
-              if (drafts !== undefined) root = hydrateRoot(container, node);
-              else {
-                root = createRoot(container);
-                root.render(node);
-              }
-            });
-            if (drafts !== undefined) {
-              for (const draft of drafts) {
-                draft.field.value = draft.value;
-                draft.field.setSelectionRange(draft.start, draft.end, draft.direction);
-              }
-            }
-          }
-        },
-        unmount: () => root?.unmount(),
-      };
-  };
+export { uiContainer } from "./dom.ts";
 
 /**
  * The atoms the server wrote into the document for `container`, by

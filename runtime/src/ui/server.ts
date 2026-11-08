@@ -9,6 +9,7 @@ import { renderToReadableStream, renderToString } from "react-dom/server";
 
 import { handedOver } from "../atoms.ts";
 import { RegistryService, nativeRegistry } from "../effect/reactivity/Atom.ts";
+import { script } from "./markup.ts";
 import type { Ui } from "./react/nodes.ts";
 import { RegistryContext, StreamContext, uiRenderStatic } from "./react/render.ts";
 
@@ -43,14 +44,6 @@ const entries = (registry: AtomRegistry.AtomRegistry): Array<{ key: string; valu
   const all: Array<{ key: string; value: unknown }> = [];
   registry.getNodes().forEach((node, key) => all.push(...entryOf(String(key), node.atom, node.value())));
   return all;
-};
-
-/** A JSON script of `entries` for the root in `container`, with `attribute` naming it. */
-const script = (attribute: string, container: string, list: ReadonlyArray<{ key: string; value: unknown }>): string => {
-  // `<` escaped, so no value closes the script
-  const json = JSON.stringify(list).replaceAll("<", "\\u003c");
-  const name = container.replaceAll("&", "&amp;").replaceAll('"', "&quot;").replaceAll("<", "&lt;");
-  return `<script type="application/json" ${attribute}="${attribute === "id" ? "flick-state-" : ""}${name}">${json}</script>`;
 };
 
 /**

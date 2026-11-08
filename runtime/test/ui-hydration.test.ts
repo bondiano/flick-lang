@@ -37,11 +37,9 @@ test("hydration keeps text and focus entered before startup, then handles each e
   const root = container();
   root.setAttribute("data-flick-ssr", "");
   const count = Atom.make(0);
-  // a Flick handler names its services in its type; the root provides them
   const add = eventLatest(
-    () =>
-      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the root provides the registry
-      Effect.flatMap(Effect.service(RegistryService), (registry) => registry.update(count)((n) => n + 1)) as Effect.Effect<void>,
+    // a Flick handler names its services in its type; the root provides them
+    () => Effect.flatMap(Effect.service(RegistryService), (registry) => registry.update(count)((n) => n + 1)),
   );
   const tree = (n: number): Ui =>
     uiFragment([
