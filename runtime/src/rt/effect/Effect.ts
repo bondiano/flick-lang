@@ -108,3 +108,5 @@ export const flickAll =
     allOf(tasks, limitOf(c));
 
 export const flickSucceedExit = succeeded;
+
+export { repeat, repeatOrElse, retry, retryOrElse, schedule, scheduleFrom } from "../schedule.ts";

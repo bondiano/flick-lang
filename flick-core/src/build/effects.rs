@@ -54,7 +54,8 @@ pub fn specifier(spec: &str) -> Option<String> {
 /// The modules of `@flick-lang/runtime/effect/` that Flick's own runtime has,
 /// under `@flick-lang/runtime/rt/effect/`, for the exports it has.
 const IN_RT: &[&str] = &[
-    "Cause", "Deferred", "Effect", "Exit", "Fiber", "FiberSet", "Latch", "Layer", "Scope",
+    "Cause", "Deferred", "Effect", "Exit", "Fiber", "FiberSet", "Latch", "Layer", "Queue",
+    "Schedule", "Scope",
 ];
 
 /// What a foreign module `spec` is on Flick's own runtime; `None` when it has no

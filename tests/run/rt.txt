@@ -95,6 +95,7 @@ runtime/slice
 runtime/supervisor_defect
 stdlib/effect/mutable_ref
 stdlib/effect/option
+stdlib/effect/queue
 stdlib/effect/string_locale
 
 # Not yet, and why:
@@ -102,7 +103,7 @@ stdlib/effect/string_locale
 # codegen/effect_abi     its foreign fixture runs an Effect
 # codegen/release        `spin` loops for ever in a `->{}` stage, which runs at once and cannot be interrupted: docs/formal/runtime.md#the-runtime-of-effect--rt
 # runtime/cause_laws     its properties need `Arbitrary`, on Effect; `cause_lists`, `closing_causes` and the kernel's unit tests cover the algebra
-# runtime/interrupt_skips `Schedule` and `Stream`, on Effect
+# runtime/interrupt_skips its `Stream` probe, on Effect; the other probes pass
 # runtime/leases         `ScopedRef`, `Resource`, `ScopedCache`, on Effect
 # runtime/paths          `File`, not on this runtime yet
 # runtime/scoped_file    `File`, not on this runtime yet
