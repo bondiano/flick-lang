@@ -135,9 +135,26 @@ interface types {
 
   record arena { nodes: list<node>, root: node-id }
 
-  /// An error in a block; `code` is the plugin's own, such as `L001`, which
-  /// the compiler shows under the plugin's package: `std/L001`.
-  record diagnostic { message: string, span: span, code: option<string> }
+  /// How bad a diagnostic is: an error fails the build.
+  enum severity { error, warning, note }
+
+  /// The text that replaces a span of the block.
+  record edit { span: span, replacement: string }
+
+  /// A change an editor offers for a diagnostic; a `safe` one is what
+  /// `flick check --fix` applies.
+  record fix { message: string, edits: list<edit>, safe: bool }
+
+  /// What is wrong in a block; `code` is the plugin's own, such as `L001`,
+  /// which the compiler shows under the plugin's package: `std/L001`. Only
+  /// one with a code may be a warning or a note, and carry fixes.
+  record diagnostic {
+    message: string,
+    span: span,
+    code: option<string>,
+    severity: severity,
+    fixes: list<fix>,
+  }
 
   /// What an editor may insert at an offset of a block.
   record completion {
@@ -288,6 +305,6 @@ world plugin {
     state: list<u8>,
   ) -> result<arena, list<diagnostic>>;
   /// What is wrong with `block` that only the types of its code show, from
-  /// the types of the `_` of its code; it only adds errors.
+  /// the types of the `_` of its code; it only adds diagnostics.
   export check: func(block: block, state: list<u8>, facts: list<fact>) -> list<diagnostic>;
 }

@@ -401,13 +401,18 @@ answers.
 A span of the whole text of a block is the whole block, its head with it.
 A plugin's code is capital letters and three digits; the compiler puts the
 package before it, so a plugin cannot speak for another.
-`flick explain std/L001` shows `explain/L001.md` of the package. Warnings
-about generated code are not reported, and fixes that would edit it are
-dropped.
+`flick explain std/L001` shows `explain/L001.md` of the package. A
+diagnostic with a code may be a warning or a note,
+`Diagnostic::warning(message, span).with_code("L010")`, and carry fixes,
+`.with_fix("rename it", edits, safe)`, whose edits replace spans of the block;
+`flick check --fix` applies the safe ones. One without a code is an error, and
+`FLICK-P036`. Warnings about generated code are not reported, and fixes that
+would edit it are dropped.
 
 ## Not yet
 
-Warnings of plugins come later. A
+A plugin warns only from `check` or beside a refusal: `expand` gives code or
+errors, not code and warnings. A
 built-in module the file hides by an alias, as `import Other as List`, is
 hidden from generated code too. `collect` sees the modules the run loads, so `flick check one.fl` gives it
 fewer blocks than a whole build. A package whose modules have plugin blocks

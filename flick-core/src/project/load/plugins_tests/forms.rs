@@ -234,3 +234,32 @@ fn the_formatter_finds_the_plugins_of_the_projects_packages() {
     let mut alone = FormatPlugins::new(&host, &mut sources, None);
     assert!(alone.of(&main, FileId::default()).is_empty());
 }
+
+#[cfg(feature = "diagnostic-fixes")]
+#[test]
+fn what_a_plugins_check_finds_may_be_a_warning_with_a_fix() {
+    use crate::diagnostics::Severity;
+    let main = "module App.Main exposing (..)\n\nimport Pairs exposing (plugin linted)\n\nx : Float\nlet x = linted { 1.0 + 2.0 }\n";
+    let mut sources = SourceMap::default();
+    let project = library(&mut sources);
+    let main_only = [PathBuf::from("/p/src/App/Main.fl")];
+    let found = check(&host(main), &mut sources, Some(&project), &main_only);
+    let [d] = found.as_slice() else {
+        panic!("{found:?}")
+    };
+    assert_eq!(
+        (d.code.to_string(), d.severity),
+        ("pairs/X003".to_owned(), Severity::Warning)
+    );
+    let [fix] = d.fixes.as_slice() else {
+        panic!("{d:?}")
+    };
+    let [edit] = fix.edits.as_slice() else {
+        panic!("{fix:?}")
+    };
+    assert!(fix.safe);
+    assert_eq!(
+        (&main[edit.span.range()], edit.replacement.as_str()),
+        ("1.0 + 2.0", "(1.0 + 2.0)")
+    );
+}
