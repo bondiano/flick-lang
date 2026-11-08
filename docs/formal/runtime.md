@@ -558,7 +558,7 @@ The law (Unmask) of §3.2 has its own case, `interrupt_after_close`.
 
 `tests/run/known_gaps.txt` lists the cases a target does not pass yet, each with its reason. Their `.stdout` is what the contract asks for; the harness runs them and fails on one that passes, so a case joins its target as soon as the target holds the law.
 
-`tests/run/rt.txt` lists the cases that run on the runtime of `effect = "rt"`, which has no Effect under it, in both profiles and under the monitor (`just conformance-rt`). Where it and Go legitimately differ: [the runtime of `effect = "rt"`](#the-runtime-of-effect--rt).
+`tests/run/rt.txt` lists the cases that run on the runtime of `effect = "rt"`, which has no Effect under it, in both profiles and under the monitor (`just conformance-rt`); every other case runs there too, in debug, and one that passes is reported, so that it joins the list. Where it and Go legitimately differ: [the runtime of `effect = "rt"`](#the-runtime-of-effect--rt).
 
 A differential check: the cases of `tests/run/model.txt` also run on `flick-model`. Of this table it runs `abort_closes_scopes` and `discontinued_body`. It cannot run the others: it has no `parallel`, `Deferred`, `Effect.exit`, `Scope.add_finalizer_exit` or memo map of layers, and it runs children when a region closes, so nothing can wait for a child or a child be interrupted there. It rejects `scope_owners`, which acquires into an outer region from an inner one.
 

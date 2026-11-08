@@ -84,10 +84,10 @@ impl Ran {
 
 /// Builds and runs one case, as JS, TypeScript or Go, in a profile.
 fn run_case(case: &Path, rel: &Path, out_dir: &Path, emit: &str, profile: &str) -> Ran {
-    run_case_with(case, rel, out_dir, emit, profile, &[])
+    run_case_with(case, rel, out_dir, emit, profile, &[], None)
 }
 
-/// [`run_case`], with `flags` for the build.
+/// [`run_case`], with `flags` for the build, and a program stopped after `limit`.
 fn run_case_with(
     case: &Path,
     rel: &Path,
@@ -95,6 +95,7 @@ fn run_case_with(
     emit: &str,
     profile: &str,
     flags: &[&str],
+    limit: Option<Duration>,
 ) -> Ran {
     let _ = fs::remove_dir_all(out_dir);
     let started = Instant::now();
@@ -132,10 +133,7 @@ fn run_case_with(
         node
     };
     let started = Instant::now();
-    let output = command
-        .env("FLICK_TRACE", out_dir.join(trace::FILE))
-        .output()
-        .expect("the program runs: `node` (Node.js >= 24.18.0) is on PATH for JS");
+    let output = rt::output_within(command.env("FLICK_TRACE", out_dir.join(trace::FILE)), limit);
     let run_time = started.elapsed();
     let stderr = String::from_utf8_lossy(&output.stderr);
     let stderr_problem = match expected(case, "stderr.contains") {
