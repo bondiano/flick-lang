@@ -26,7 +26,11 @@ const output = {
   // Effect's cyclic modules must keep their execution order across chunks.
   strictExecutionOrder: true,
   codeSplitting: {
-    groups: [{ name: "vendor", test: /node_modules/, maxSize: 400_000 }],
+    groups: [
+      // the playground's editor loads after the page, in chunks of its own; the first group wins
+      { name: "codemirror", test: /node_modules[\\/](@codemirror|@lezer|style-mod|w3c-keyname|crelt)[\\/]/ },
+      { name: "vendor", test: /node_modules/, maxSize: 400_000 },
+    ],
   },
 };
 

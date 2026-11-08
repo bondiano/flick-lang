@@ -1,6 +1,6 @@
 module Toolbar exposing (choice, view)
 
-import Actions exposing (choose, run_program, update)
+import Actions exposing (choose, format, run_program, update)
 import Dom exposing (attributes, notify)
 import Examples exposing (Example)
 import State exposing (Model, Profile(..), errors, status, tr)
@@ -122,12 +122,22 @@ let run_button model m =
           (if m.running then tr m.locale "Stop" "Остановить" else tr m.locale "Run" "Запустить"),
       ])
 
+format_button : Atom.Writable Model -> Model -> Ui
+let format_button model m =
+  Ui.button
+    {
+      disabled = m.version == "" || m.running;
+      on_click = Ui.Event.exhaust (fun _ -> task { format model });
+    }
+    [Ui.text (tr m.locale "Format" "Форматировать")]
+
 /// The toolbar: what to edit and run first, then the state, then the build profile.
 view : Atom.Writable Model -> Model -> Ui
 let view model m = ui {
   div { class_name = "fp-toolbar" } [
     examples_view model m,
     run_button model m,
+    format_button model m,
     Ui.with_host
       { Ui.host with role = Some "status"; aria_live = Some Ui.Polite }
       (span

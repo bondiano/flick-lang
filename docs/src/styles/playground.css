@@ -279,37 +279,83 @@ main:has(#flick-playground) .sl-container { max-width: none; }
   isolation: isolate;
 }
 
-.fp-editor > textarea { position: relative; z-index: 1; min-width: 0; overflow: auto; word-break: normal; }
-.fp .fp-source-highlight {
+.fp-editor > textarea { min-width: 0; overflow: auto; word-break: normal; }
+
+/* CodeMirror takes the field's place once it loads, at the same metrics. */
+.fp-cm { position: relative; display: none; min-width: 0; min-height: 0; }
+/* the lines do not wrap: the editor scrolls inside its column rather than widen it */
+.fp-editor-open > .fp-cm { display: grid; grid-template: minmax(0, 1fr) / minmax(0, 1fr); }
+.fp-editor-open > textarea { display: none; }
+.fp-cm .cm-editor { min-width: 0; min-height: 0; background: var(--sl-color-bg); color: var(--sl-color-white); }
+/* the ring sits over the line numbers, which cover the editor's own outline */
+.fp-cm .cm-editor.cm-focused { outline: none; }
+.fp-cm:has(.cm-focused)::after {
   position: absolute;
+  z-index: 300;
   inset: 0;
-  display: none;
-  min-width: 0;
-  padding: 1.25rem;
-  overflow: hidden;
-  white-space: pre;
-  overflow-wrap: normal;
-  word-break: normal;
+  border: 2px solid var(--sl-color-accent-high);
+  content: "";
   pointer-events: none;
-  user-select: none;
 }
-
-/* The empty final line must occupy the same line box as the textarea caret. */
-.fp .fp-source-highlight::after { content: "\200b"; }
-.fp-editor-highlighted .fp-source-highlight { display: block; }
-.fp .fp-editor-highlighted > textarea {
-  background: transparent;
-  color: transparent;
-  -webkit-text-fill-color: transparent;
+.fp-cm .cm-scroller {
+  font-family: var(--__sl-font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 0.875rem;
+  font-variant-ligatures: none;
+  line-height: 1.6;
+  scrollbar-color: var(--sl-color-gray-4) var(--sl-color-bg);
+  scrollbar-width: thin;
 }
+.fp-cm .cm-content { padding-block: 1.25rem; caret-color: var(--sl-color-accent-high); tab-size: 2; }
+.fp-cm .cm-line { padding: 0 1.25rem 0 0.5rem; }
+.fp-cm .cm-cursor { border-left: 2px solid var(--sl-color-accent-high); }
+.fp-cm .cm-gutters { border: 0; background: var(--sl-color-bg); color: var(--sl-color-gray-4); }
+.fp-cm .cm-lineNumbers .cm-gutterElement { min-width: 2.75rem; padding: 0 0.5rem 0 0.75rem; font-variant-numeric: tabular-nums; }
 
-.fp .fp-editor-highlighted > textarea::selection {
-  background: var(--flick-selection);
+/* Hovers, completions and diagnostics: the panels of the page, square and ruled. */
+.fp-cm .cm-tooltip {
+  border: 1px solid var(--sl-color-gray-4);
+  background: var(--sl-color-bg);
   color: var(--sl-color-white);
-  -webkit-text-fill-color: var(--sl-color-white);
+  box-shadow: 0 6px 18px #0e111626;
 }
+.fp-cm .fp-hover, .fp-cm .cm-diagnostic {
+  max-width: min(60ch, 80vw);
+  margin: 0;
+  padding: 0.5rem 0.75rem;
+  font-family: var(--__sl-font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 0.8125rem;
+  font-variant-ligatures: none;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.fp-cm .cm-diagnostic { border-left: 0; }
+.fp-cm .cm-diagnostic + .cm-diagnostic { border-top: 1px solid var(--fp-rule); }
+.fp-cm .cm-diagnosticSource { margin-top: 0.375rem; color: var(--sl-color-gray-3); font-size: 0.75rem; opacity: 1; }
+.fp-cm .cm-diagnostic-error .cm-diagnosticSource { color: var(--flick-error); }
+.fp-cm .cm-diagnosticAction {
+  display: block;
+  min-height: 1.75rem;
+  margin: 0.5rem 0 0;
+  padding: 0.125rem 0.5rem;
+  border: 1px solid var(--sl-color-accent-high);
+  border-radius: 0;
+  background: transparent;
+  color: var(--sl-color-accent-high);
+  font: inherit;
+  cursor: pointer;
+}
+.fp-cm .cm-diagnosticAction:hover { background: var(--sl-color-accent-low); }
+.fp-cm .cm-tooltip-autocomplete > ul {
+  max-height: 16rem;
+  font-family: var(--__sl-font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 0.8125rem;
+}
+.fp-cm .cm-tooltip-autocomplete > ul > li { padding: 0.25rem 0.75rem 0.25rem 0.5rem; }
+.fp-cm .cm-tooltip-autocomplete > ul > li[aria-selected] { background: var(--sl-color-accent-low); color: var(--sl-color-accent-high); }
+.fp-cm .cm-completionDetail { margin-left: 1rem; color: var(--sl-color-gray-3); font-style: normal; }
+.fp-cm .cm-completionIcon { display: none; }
 
-.fp .fp-editor-highlighted > textarea::placeholder { -webkit-text-fill-color: var(--sl-color-gray-3); }
 .fp .fp-token-comment { color: var(--sl-color-gray-3); }
 .fp .fp-token-keyword { color: var(--sl-color-accent-high); }
 .fp .fp-token-string { color: var(--flick-success); }
@@ -344,6 +390,19 @@ main:has(#flick-playground) .sl-container { max-width: none; }
 .fp-diagnostics li + li { margin-top: 1.25rem; }
 .fp-diagnostic-code { font-weight: 600; }
 .fp-diagnostic-at { margin-left: 0.75rem; color: var(--sl-color-gray-3); }
+.fp .fp-explain { min-height: 1.75rem; margin-left: 0.75rem; padding: 0.125rem 0.5rem; border-color: var(--fp-rule); font-size: 0.8125rem; }
+.fp .fp-explanation {
+  max-width: 80ch;
+  max-height: 20rem;
+  margin-top: 0.75rem;
+  padding: 0.75rem 1rem;
+  overflow: auto;
+  border: 1px solid var(--fp-rule);
+  background: var(--fp-surface);
+  font-size: 0.8125rem;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
 /* a message quotes code in backticks, which Overpass draws as accents */
 .fp-diagnostics li p {
   margin-top: 0.375rem;
@@ -365,7 +424,8 @@ main:has(#flick-playground) .sl-container { max-width: none; }
   .fp-panes { grid-template-columns: minmax(0, 1fr); }
   .fp-split { display: none; }
   .fp-result { border-top: 1px solid var(--fp-rule); }
-  .fp textarea { min-height: 22rem; }
+  .fp textarea, .fp-cm .cm-editor { min-height: 22rem; }
+  .fp-cm .cm-editor { max-height: 70dvh; }
   .fp-generated-code, .fp-empty, .fp-execution, .fp-problems-panel { min-height: 20rem; }
   .fp-generated-code { max-height: 32rem; }
   .fp .fp-output { min-height: 16rem; }
@@ -382,18 +442,8 @@ main:has(#flick-playground) .sl-container { max-width: none; }
   .fp-status { order: 3; width: 100%; margin-left: 0; }
   .fp .fp-primary { min-width: 5rem; margin-left: auto; }
   .fp-pane-header { padding-inline: 0.75rem; }
-  .fp textarea, .fp .fp-source-highlight, .fp-generated-code, .fp .fp-output { padding: 1rem; }
+  .fp textarea, .fp-generated-code, .fp .fp-output { padding: 1rem; }
   .fp-pane-footer { font-size: 0.625rem; }
-}
-
-@media (forced-colors: active) {
-  .fp-editor-highlighted .fp-source-highlight { display: none; }
-  .fp .fp-editor-highlighted > textarea {
-    background: Canvas;
-    color: CanvasText;
-    -webkit-text-fill-color: CanvasText;
-    caret-color: CanvasText;
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {

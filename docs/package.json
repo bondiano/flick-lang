@@ -15,6 +15,11 @@
   },
   "dependencies": {
     "@astrojs/starlight": "0.42.8",
+    "@codemirror/autocomplete": "6.20.4",
+    "@codemirror/commands": "6.11.1",
+    "@codemirror/lint": "6.9.7",
+    "@codemirror/state": "6.7.6",
+    "@codemirror/view": "6.43.15",
     "@flick-lang/astro": "workspace:*",
     "@flick-lang/runtime": "workspace:*",
     "astro": "7.4.4",

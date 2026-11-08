@@ -79,6 +79,7 @@ e2e-js: docs-wasm e2e-prepare
     FLICK_BIN={{flick}} pnpm -r lint
     FLICK_BIN={{flick}} pnpm -r test
     FLICK_BIN={{flick}} pnpm -C docs build
+    node docs/scripts/chunks.mjs
     pnpm -C docs e2e
 
 # The e2e suites of the compiler but the cases of tests/run, under nextest
