@@ -1,26 +1,40 @@
 //! spike: the part of a foreign signature the bridge to Effect converts.
 
+use std::env;
+use std::fs::OpenOptions;
+use std::io::Write;
+
+use flick_ir::Shape;
+
 use crate::syntax::cst::Node;
 use crate::types::Checker;
-use crate::types::lang::Lang;
-use crate::types::ty::{Stage, Type};
+use crate::types::lang::{Lang, label};
+use crate::types::ty::{Stage, Type, stage_of};
 use crate::types::typing::ForeignInfo;
+
+/// Past this depth a type counts as data: deep enough for any signature of std.
+const MAX_DEPTH: usize = 8;
 
 /// spike: the row of the first runtime arrow: `async`, `open` with a variable, `closed` without `Async`, or `pure`.
 fn row_class(mut ty: &Type) -> &'static str {
     loop {
         match ty {
             Type::Fun {
-                effects: Some(e), ..
+                effects: Some(effects),
+                ..
             } => {
-                let label = crate::types::lang::label(Lang::Async);
-                let Type::Row(r) = &e.services else {
+                let Type::Row(row) = &effects.services else {
                     return "open";
                 };
-                if r.entries.iter().any(|(l, _)| Some(l.as_str()) == label) {
+                let async_label = label(Lang::Async);
+                if row
+                    .entries
+                    .iter()
+                    .any(|(name, _)| Some(name.as_str()) == async_label)
+                {
                     return "async";
                 }
-                return if r.tail.is_some() { "open" } else { "closed" };
+                return if row.tail.is_some() { "open" } else { "closed" };
             }
             Type::Fun { result, .. } => ty = result,
             Type::Captured { ty: inner, .. } | Type::Bounded { ty: inner, .. } => ty = inner,
@@ -30,108 +44,87 @@ fn row_class(mut ty: &Type) -> &'static str {
     }
 }
 
+/// `inner` in `wrap`, or data when there is nothing in it to convert.
+fn around(inner: Shape, wrap: fn(Box<Shape>) -> Shape) -> Shape {
+    if inner.is_data() {
+        inner
+    } else {
+        wrap(Box::new(inner))
+    }
+}
+
 impl Checker<'_> {
+    /// spike: with `FLICK_BRIDGE_DUMP=<file>`, a line per foreign binding of
+    /// what the bridge converts, for `tools/load/spike/count.py`.
     pub(super) fn bridge_dump(&self, decl: &Node, info: &ForeignInfo, body: &Type) {
-        if let Ok(path) = std::env::var("FLICK_BRIDGE_DUMP") {
-            use std::io::Write;
-            let binding = decl
-                .text(self.text)
-                .lines()
-                .find(|l| l.trim_start().starts_with("foreign"))
-                .unwrap_or("")
-                .trim()
-                .to_owned();
-            let line = format!(
-                "{}\t{}\t{:?}\t{:?}\t{:?}\t{}\n",
-                self.env.module,
-                binding,
-                info.mode,
-                info.adapter.shapes,
-                info.adapter.result_shape,
-                row_class(body),
-            );
-            if let Ok(mut f) = std::fs::OpenOptions::new()
-                .create(true)
-                .append(true)
-                .open(path)
-            {
-                let _ = f.write_all(line.as_bytes());
-            }
+        let Ok(path) = env::var("FLICK_BRIDGE_DUMP") else {
+            return;
+        };
+        let binding = decl
+            .text(self.text)
+            .lines()
+            .find(|line| line.trim_start().starts_with("foreign"))
+            .unwrap_or("")
+            .trim()
+            .to_owned();
+        let line = format!(
+            "{}\t{}\t{:?}\t{:?}\t{:?}\t{}\n",
+            self.env.module,
+            binding,
+            info.mode,
+            info.adapter.shapes,
+            info.adapter.result_shape,
+            row_class(body),
+        );
+        if let Ok(mut file) = OpenOptions::new().create(true).append(true).open(path) {
+            // a lost line only makes the count short: the check goes on
+            let _ = file.write_all(line.as_bytes());
         }
     }
 
     /// spike: the shapes of the first `arity` parameters; a type variable that an
     /// `Api` or a `Group` beside it also has is the record of handlers they need.
-    pub(super) fn param_shapes(&self, params: &[Type], arity: usize) -> Vec<flick_ir::Shape> {
-        let hidden = |p: &Type| {
-            let Type::Var(v) = self.whnf_captured(p).0 else {
+    pub(super) fn param_shapes(&self, params: &[Type], arity: usize) -> Vec<Shape> {
+        let hidden = |param: &Type| {
+            let Type::Var(var) = self.whnf_captured(param).0 else {
                 return false;
             };
-            params.iter().any(|q| {
-                let q = self.whnf_captured(q).0;
-                let (head, args) = q.spine();
+            params.iter().any(|other| {
+                let other = self.whnf_captured(other).0;
+                let (head, args) = other.spine();
                 matches!(head, Type::Con { name, .. } if name == "Api" || name == "Group")
-                    && args.iter().any(|a| matches!(a, Type::Var(w) if *w == v))
+                    && args
+                        .iter()
+                        .any(|arg| matches!(arg, Type::Var(w) if *w == var))
             })
         };
         params
             .iter()
             .take(arity)
-            .map(|p| {
-                if hidden(p) {
-                    flick_ir::Shape::Handlers
+            .map(|param| {
+                if hidden(param) {
+                    Shape::Handlers
                 } else {
-                    self.shape(p, 0)
+                    self.shape(param, 0)
                 }
             })
             .collect()
     }
 
     /// spike: the part of `ty` the bridge to Effect converts, from the signature.
-    pub(super) fn shape(&self, ty: &Type, depth: usize) -> flick_ir::Shape {
-        use flick_ir::Shape;
-        if depth > 8 {
+    pub(super) fn shape(&self, ty: &Type, depth: usize) -> Shape {
+        if depth > MAX_DEPTH {
             return Shape::Data;
         }
-        let t = self.whnf_captured(ty).0;
-        match &t {
+        let ty = self.whnf_captured(ty).0;
+        match &ty {
             Type::Forall { body, .. } => self.shape(body, depth + 1),
-            Type::Fun { .. } => {
-                let mut args = Vec::new();
-                let mut cur = t.clone();
-                loop {
-                    let Type::Fun {
-                        param,
-                        effects,
-                        result,
-                    } = self.whnf_captured(&cur).0
-                    else {
-                        break;
-                    };
-                    args.push(self.shape(&param, depth + 1));
-                    if crate::types::ty::stage_of(effects.as_deref()) != Stage::Pure {
-                        return Shape::Fun {
-                            args,
-                            result: Box::new(self.shape(&result, depth + 1)),
-                            runtime: true,
-                            sync: effects.as_deref().is_some_and(|e| e.sync),
-                        };
-                    }
-                    cur = *result;
-                }
-                let result = self.shape(&cur, depth + 1);
-                if result.is_data() && args.iter().all(Shape::is_data) {
-                    return Shape::Data;
-                }
-                Shape::Fun {
-                    args,
-                    result: Box::new(result),
-                    runtime: false,
-                    sync: false,
-                }
-            }
+            Type::Fun { .. } => self.fun_shape(ty.clone(), depth),
             Type::Tuple(items) => {
-                let shapes: Vec<Shape> = items.iter().map(|i| self.shape(i, depth + 1)).collect();
+                let shapes: Vec<Shape> = items
+                    .iter()
+                    .map(|item| self.shape(item, depth + 1))
+                    .collect();
                 if shapes.iter().all(Shape::is_data) {
                     Shape::Data
                 } else {
@@ -142,57 +135,73 @@ impl Checker<'_> {
                 let fields: Vec<(String, Shape)> = row
                     .entries
                     .iter()
-                    .map(|(n, ty)| (n.clone(), self.shape(ty, depth + 1)))
+                    .map(|(name, field)| (name.clone(), self.shape(field, depth + 1)))
                     .collect();
-                if fields.iter().all(|(_, s)| s.is_data()) {
+                if fields.iter().all(|(_, field)| field.is_data()) {
                     Shape::Data
                 } else {
                     Shape::Record(fields)
                 }
             }
-            _ => {
-                if let Some((_, _, a)) = self.eff_parts(&t) {
-                    return Shape::Eff(Box::new(self.shape(&a, depth + 1)));
-                }
-                let (head, targs) = t.spine();
-                if head.is_lang(Lang::Layer) {
-                    return Shape::Layer;
-                }
-                if head.is_lang(Lang::Exit) {
-                    return Shape::Exit;
-                }
-                if head.is_lang(Lang::Failure) {
-                    return Shape::Failure;
-                }
-                let inner = |item: &Type| -> Shape { self.shape(item, depth + 1) };
-                match targs[..] {
-                    [a] if head.is_lang(Lang::List) => {
-                        let s = inner(a);
-                        if s.is_data() {
-                            s
-                        } else {
-                            Shape::List(Box::new(s))
-                        }
-                    }
-                    [a] if head.is_lang(Lang::Option) => {
-                        let s = inner(a);
-                        if s.is_data() {
-                            s
-                        } else {
-                            Shape::Option(Box::new(s))
-                        }
-                    }
-                    [e, a] if head.is_lang(Lang::Result) => {
-                        let (e, a) = (inner(e), inner(a));
-                        if e.is_data() && a.is_data() {
-                            Shape::Data
-                        } else {
-                            Shape::Result(Box::new(e), Box::new(a))
-                        }
-                    }
-                    _ => Shape::Data,
+            _ => self.named_shape(&ty, depth),
+        }
+    }
+
+    /// The pure arrows of `ty` up to and including the first runtime one.
+    fn fun_shape(&self, ty: Type, depth: usize) -> Shape {
+        let mut args = Vec::new();
+        let mut rest = ty;
+        while let Type::Fun {
+            param,
+            effects,
+            result,
+        } = self.whnf_captured(&rest).0
+        {
+            args.push(self.shape(&param, depth + 1));
+            if stage_of(effects.as_deref()) != Stage::Pure {
+                return Shape::Fun {
+                    args,
+                    result: Box::new(self.shape(&result, depth + 1)),
+                    runtime: true,
+                    sync: effects.as_deref().is_some_and(|e| e.sync),
+                };
+            }
+            rest = *result;
+        }
+        let result = self.shape(&rest, depth + 1);
+        if result.is_data() && args.iter().all(Shape::is_data) {
+            return Shape::Data;
+        }
+        Shape::Fun {
+            args,
+            result: Box::new(result),
+            runtime: false,
+            sync: false,
+        }
+    }
+
+    /// An `Eff`, a type the language names, or data.
+    fn named_shape(&self, ty: &Type, depth: usize) -> Shape {
+        if let Some((_, _, value)) = self.eff_parts(ty) {
+            return Shape::Eff(Box::new(self.shape(&value, depth + 1)));
+        }
+        let (head, args) = ty.spine();
+        let inner = |item: &Type| self.shape(item, depth + 1);
+        match args[..] {
+            _ if head.is_lang(Lang::Layer) => Shape::Layer,
+            _ if head.is_lang(Lang::Exit) => Shape::Exit,
+            _ if head.is_lang(Lang::Failure) => Shape::Failure,
+            [item] if head.is_lang(Lang::List) => around(inner(item), Shape::List),
+            [item] if head.is_lang(Lang::Option) => around(inner(item), Shape::Option),
+            [error, success] if head.is_lang(Lang::Result) => {
+                let (error, success) = (inner(error), inner(success));
+                if error.is_data() && success.is_data() {
+                    Shape::Data
+                } else {
+                    Shape::Result(Box::new(error), Box::new(success))
                 }
             }
+            _ => Shape::Data,
         }
     }
 }

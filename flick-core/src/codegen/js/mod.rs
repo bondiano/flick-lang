@@ -18,6 +18,7 @@ macro_rules! mark {
 }
 
 mod binary;
+mod bridge;
 mod exports;
 mod expr;
 mod foreign;

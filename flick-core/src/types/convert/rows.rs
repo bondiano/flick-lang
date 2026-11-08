@@ -1,6 +1,8 @@
 //! Rows in types: the service and error rows of a runtime arrow, row types in
 //! braces, record fields and capture qualifiers.
 
+use std::env::var_os;
+
 use super::{Free, is_type, with_article};
 use crate::diagnostics::codes;
 use crate::iface::Namespace;
@@ -38,7 +40,7 @@ impl Checker<'_> {
         // spike: a build over the bridge may keep every closed row a runtime stage,
         // for an Effect binding suspends whatever its row says
         self.options.stages_by_class
-            && std::env::var_os("FLICK_NO_DIRECT").is_none()
+            && var_os("FLICK_NO_DIRECT").is_none()
             && self.closed_without_suspending(row)
     }
 
