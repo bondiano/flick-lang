@@ -1,5 +1,4 @@
 module State exposing (
-  Mode(..),
   Locale(..),
   Profile(..),
   Tab(..),
@@ -20,12 +19,10 @@ module State exposing (
   errors,
   status,
   initial_model,
+  requested_tab,
 )
 
 import Examples exposing (Example)
-
-type Mode = Play | Transpile
-  deriving Eq
 
 type Locale = En | Ru
   deriving Eq
@@ -33,13 +30,15 @@ type Locale = En | Ru
 type Profile = Debug | Release
   deriving Eq
 
-type Tab = Output | Problems
+/// What the result panel shows: the program's output, the diagnostics, or
+/// what the compiler writes, as JavaScript and as TypeScript declarations.
+type Tab = Output | Problems | Js | Dts
   deriving Eq
 
-type alias Configuration = { mode : String; locale : String; examples : List Example }
+type alias Configuration = { locale : String; examples : List Example }
 type alias SyntaxToken = { text : String; class_name : String }
 type alias Diagnostic = { code : String; severity : String; message : String; at : String }
-type alias Generated = { code : String; diagnostics : List Diagnostic }
+type alias Generated = { code : String; dts : String; diagnostics : List Diagnostic }
 type alias Compiled = { debug : Generated; release : Generated }
 type alias Line = { stream : String; text : String }
 type alias Execution = {
@@ -50,7 +49,6 @@ type alias Execution = {
 }
 
 type alias Model = {
-  mode : Mode;
   locale : Locale;
   examples : List Example;
   source : String;
@@ -77,8 +75,8 @@ type alias Model = {
 
 empty_compiled : Compiled
 let empty_compiled = {
-  debug = { code = ""; diagnostics = [] };
-  release = { code = ""; diagnostics = [] };
+  debug = { code = ""; dts = ""; diagnostics = [] };
+  release = { code = ""; dts = ""; diagnostics = [] };
 }
 
 empty_execution : Execution
@@ -120,9 +118,18 @@ let status m =
   else
     "Flick " ++ m.version ++ " · " ++ tr m.locale "Type-checked" "Типы проверены"
 
+/// The tab a link asks for with `?tab=`: `js`, `dts` or `problems`; any
+/// other value leaves the output.
+requested_tab : String -> Tab
+let requested_tab name =
+  match name with
+  | "js" -> Js
+  | "dts" -> Dts
+  | "problems" -> Problems
+  | _ -> Output
+
 initial_model : Configuration -> Model
 let initial_model config = {
-  mode = if config.mode == "transpile" then Transpile else Play;
   locale = if config.locale == "ru" then Ru else En;
   examples = config.examples;
   source = first_source config.examples;

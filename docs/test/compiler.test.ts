@@ -15,7 +15,7 @@ class WorkerHarness {
   crash(): void { this.onerror?.({ error: new Error("compiler offline"), message: "compiler offline" }); }
 }
 
-const compiled = { debug: { code: "", diagnostics: [] }, release: { code: "", diagnostics: [] } };
+const compiled = { debug: { code: "", dts: "", diagnostics: [] }, release: { code: "", dts: "", diagnostics: [] } };
 
 test("canceled work waiting behind a busy compiler is never executed", { timeout: 1000 }, async () => {
   const original = globalThis.Worker;

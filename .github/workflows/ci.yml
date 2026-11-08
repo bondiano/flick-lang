@@ -97,6 +97,12 @@ jobs:
         with:
           path: target/tools
           key: tools-${{ runner.os }}-wasm-bindgen-0.2.130
+      # the browser the docs' Playwright tests drive
+      - uses: actions/cache@v6
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-1.64.1
+      - run: pnpm install --frozen-lockfile && pnpm -C docs exec playwright install chromium
       - run: just e2e-js
       - run: just go-test
       - run: just language

@@ -1,4 +1,4 @@
-module Dom exposing (attributes, configuration, source_value, notify)
+module Dom exposing (attributes, configuration, source_value, notify, tab_in_address)
 
 import State exposing (Configuration)
 
@@ -13,6 +13,11 @@ foreign source_value from "./dom.ts" "sourceValue"
 notify : String ->{} Unit
 foreign notify from "./dom.ts" "notify"
   arity 1
+
+/// The `tab` of the page's query, or `""`.
+tab_in_address : Unit ->{} String
+foreign tab_in_address from "./dom.ts" "tabInAddress"
+  arity 0
 
 /// Host attributes `Ui.Host` does not type, such as `popover`.
 attributes : List (String, String) -> Ui^c -> Ui^c

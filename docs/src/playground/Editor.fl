@@ -1,11 +1,12 @@
-module Editor exposing (source_pane, generated_pane)
+module Editor exposing (declarations_pane, generated_pane, source_pane)
 
 import Actions exposing (edit)
 import State exposing (Model, Profile(..), SyntaxToken, errors, generated, tr)
 
-generated_pane : Model -> Ui
-let generated_pane m =
-  let result = generated m
+/// What the compiler writes for the current profile: `code`, painted with
+/// `tokens` when there are any, or why there is nothing to show.
+code_pane : Model -> String -> String -> List SyntaxToken -> Ui
+let code_pane m label code tokens =
   let hint =
     if m.loading then
       tr m.locale "Loading the WebAssembly compiler…" "Загрузка WebAssembly-компилятора…"
@@ -14,36 +15,41 @@ let generated_pane m =
     else if m.version == "" then
       tr
         m.locale
-        "Load the compiler to generate JavaScript."
-        "Загрузите компилятор, чтобы получить JavaScript."
+        "Load the compiler to see what it writes."
+        "Загрузите компилятор, чтобы увидеть результат."
     else if m.compile_error != "" then
       tr
         m.locale
         "Compilation failed. See the error above."
         "Не удалось скомпилировать код. Сообщение об ошибке — выше."
-    else if errors result > 0 then
+    else if errors (generated m) > 0 then
       tr
         m.locale
-        "Fix the diagnostics below to generate JavaScript."
-        "Чтобы получить JavaScript, исправьте ошибки, указанные ниже."
+        "Fix the diagnostics to see what the compiler writes."
+        "Исправьте ошибки, чтобы увидеть, что пишет компилятор."
     else
-      tr m.locale "This module emits no JavaScript." "Для этого модуля JavaScript не генерируется."
-  Ui.with_host
-    {
-      Ui.host with
-      tab_index = Some 0;
-      aria_label = Some (tr m.locale "Generated JavaScript" "Сгенерированный JavaScript");
-    }
-    (Ui.pre
-      { class_name = "fp-generated-code" }
-      (
-        if result.code == "" then
-          [Ui.text hint]
-        else if m.highlighting then
-          syntax_nodes (if m.profile == Debug then m.debug_tokens else m.release_tokens)
-        else
-          [Ui.text result.code]
-      ))
+      tr
+        m.locale
+        "The compiler writes nothing here for this module."
+        "Для этого модуля здесь ничего не пишется."
+  let shown = if m.highlighting && tokens != [] then syntax_nodes tokens else [Ui.text code]
+  ui {
+    Ui.with_host
+      { Ui.host with tab_index = Some 0; aria_label = Some label }
+      (pre { class_name = "fp-generated-code" } (if code == "" then [text hint] else shown))
+  }
+
+generated_pane : Model -> Ui
+let generated_pane m =
+  code_pane
+    m
+    (tr m.locale "Generated JavaScript" "Сгенерированный JavaScript")
+    (generated m).code
+    (if m.profile == Debug then m.debug_tokens else m.release_tokens)
+
+declarations_pane : Model -> Ui
+let declarations_pane m =
+  code_pane m (tr m.locale "TypeScript declarations" "Объявления TypeScript") (generated m).dts []
 
 syntax_nodes : List SyntaxToken -> List Ui
 let syntax_nodes tokens =

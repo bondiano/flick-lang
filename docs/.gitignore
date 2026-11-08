@@ -5,3 +5,6 @@ src/playground/wasm/
 # types of the .fl imports for editors, written by @flick-lang/astro
 *.d.fl.ts
 .flick/
+# what Playwright writes after `pnpm e2e`
+test-results/
+playwright-report/

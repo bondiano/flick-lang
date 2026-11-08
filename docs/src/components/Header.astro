@@ -16,7 +16,7 @@ const unlocalized = current.replace(/^\/ru(?=\/|$)/, "") || "/";
 const notFound = route?.entry.id === "404";
 const english = `${base}${notFound ? "/" : unlocalized}`;
 const russian = notFound ? `${base}/ru/` : `${base}/ru${unlocalized === "/" ? "/" : unlocalized}`;
-const playground = unlocalized.startsWith("/play/") || unlocalized.startsWith("/transpile/");
+const playground = unlocalized.startsWith("/play/");
 const links = [
   { label: ru ? "Документация" : "Docs", href: "/start/", current: unlocalized !== "/" && !playground && !notFound },
   { label: ru ? "Песочница" : "Playground", href: "/play/", current: playground },

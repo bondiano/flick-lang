@@ -544,7 +544,7 @@ focus and selection survive startup; adopt a pre-boot draft into the
 Flick state before checking or submitting it. Mount the root before
 starting background tasks that notify its event handlers.
 
-The documentation header and Play/Transpile use this path. Without the
+The documentation header and the playground use this path. Without the
 marker, ordinary client-only mounting is unchanged.
 
 ### Serializable atoms
