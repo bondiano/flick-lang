@@ -1,9 +1,9 @@
-module Toolbar exposing (choice, examples_view, view)
+module Toolbar exposing (choice, view)
 
 import Actions exposing (choose, run_program, update)
 import Dom exposing (attributes)
 import Examples exposing (Example)
-import State exposing (Model, Mode(..), Profile(..), Tab(..), errors, generated, status, tr)
+import State exposing (Model, Profile(..), Tab(..), errors, generated, status, tr)
 
 choice : String -> Bool -> Bool -> (Unit ->{Atom.Write;} Unit) -> Ui
 let choice label active disabled act =
@@ -70,6 +70,13 @@ let set_profile model m profile =
       )
     )
 
+/// The chevron of the gallery's button.
+chevron : Ui
+let chevron =
+  Ui.html
+    (Ui.trusted_html
+      "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' width='16' height='16' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' aria-hidden='true'><path d='m6 9 6 6 6-6'/></svg>")
+
 /// The gallery: a button with the current example's name opens a native
 /// popover of every example, by group.
 examples_view : Atom.Writable Model -> Model -> Ui
@@ -78,36 +85,55 @@ let examples_view model m =
     match List.find (fun e -> e.source == m.source) m.examples with
     | Some e -> tr m.locale e.name e.name_ru
     | None -> tr m.locale "Your code" "Ваш код"
+  let examples = tr m.locale "Examples" "Примеры"
   ui {
     div { class_name = "fp-examples" } [
-      span { class_name = "fp-control-label" } [text (tr m.locale "Examples" "Примеры")],
       attributes
         [("popoverTarget", gallery)]
-        (button { disabled = false; on_click = Ui.Event.latest (fun _ -> task { () }) } [
-          text (current ++ " ▾"),
-        ]),
+        (Ui.with_host
+          {
+            Ui.host with
+            class_name = Some "fp-gallery-button";
+            aria_label = Some (examples ++ ": " ++ current);
+          }
+          (button { disabled = false; on_click = Ui.Event.latest (fun _ -> task { () }) } [
+            text current,
+            chevron,
+          ])),
       attributes
         [("popover", "auto")]
         (Ui.with_host
-          { Ui.host with id = Some gallery; aria_label = Some (tr m.locale "Examples" "Примеры") }
+          { Ui.host with id = Some gallery; aria_label = Some examples }
           (div { class_name = "fp-gallery" } (List.map (group_view model m) (groups m.examples)))),
     ]
   }
 
+run_button : Atom.Writable Model -> Model -> Ui
+let run_button model m =
+  Ui.with_host
+    { Ui.host with class_name = Some (if m.running then "fp-primary fp-stop" else "fp-primary") }
+    (Ui.button
+      {
+        disabled =
+          not m.running
+            && (m.loading
+              || m.checking
+              || m.version == ""
+              || m.compile_error != ""
+              || errors (generated m) > 0);
+        on_click = Ui.Event.latest (fun _ -> task { run_program model });
+      }
+      [
+        Ui.text
+          (if m.running then tr m.locale "Stop" "Остановить" else tr m.locale "Run" "Запустить"),
+      ])
+
+/// The toolbar: what to edit and run first, then the state, then the build profile.
 view : Atom.Writable Model -> Model -> Ui
 let view model m = ui {
   div { class_name = "fp-toolbar" } [
-    Ui.with_host
-      {
-        Ui.host with
-        role = Some "group";
-        aria_label = Some (tr m.locale "Build profile" "Профиль сборки");
-      }
-      (div { class_name = "fp-profiles" } [
-        span { class_name = "fp-control-label" } [text (tr m.locale "Build" "Сборка")],
-        set_profile model m Debug,
-        set_profile model m Release,
-      ]),
+    examples_view model m,
+    run_button model m,
     Ui.with_host
       { Ui.host with role = Some "status"; aria_live = Some Ui.Polite }
       (span
@@ -121,29 +147,12 @@ let view model m = ui {
               "fp-status fp-status-ready";
         }
         [text (status m)]),
-    if m.mode == Play then
-      Ui.with_host
-        {
-          Ui.host with
-          class_name = Some (if m.running then "fp-primary fp-stop" else "fp-primary");
-        }
-        (button
-          {
-            disabled =
-              not m.running
-                && (m.loading
-                  || m.checking
-                  || m.version == ""
-                  || m.compile_error != ""
-                  || errors (generated m) > 0);
-            on_click = Ui.Event.latest (fun _ -> task { run_program model });
-          }
-          [
-            text
-              (
-                if m.running then tr m.locale "Stop" "Остановить" else tr m.locale "Run" "Запустить"
-              ),
-          ])
-    else empty,
+    Ui.with_host
+      {
+        Ui.host with
+        role = Some "group";
+        aria_label = Some (tr m.locale "Build profile" "Профиль сборки");
+      }
+      (div { class_name = "fp-profiles" } [set_profile model m Debug, set_profile model m Release]),
   ]
 }

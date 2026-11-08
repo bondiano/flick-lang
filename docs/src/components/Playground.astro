@@ -7,18 +7,17 @@ import { initial_view } from "../playground/Playground.fl";
 import { examples } from "./gallery.ts";
 
 interface Props {
-  mode: "play" | "transpile";
   locale: "en" | "ru";
 }
 
-const { mode, locale } = Astro.props;
+const { locale } = Astro.props;
 const gallery = examples();
-const markup = renderToString(uiRenderStatic(await Effect.runPromise(initial_view({ mode, locale, examples: gallery }))));
+const markup = renderToString(uiRenderStatic(await Effect.runPromise(initial_view({ locale, examples: gallery }))));
 // the browser reads the same examples back; `<` cannot end the script early
 const embedded = JSON.stringify(gallery).replaceAll("<", "\\u003c");
 ---
 
-<div id="flick-playground" class="not-content flick-playground-shell" data-mode={mode} data-locale={locale} data-flick-ssr data-pagefind-ignore set:html={markup}></div>
+<div id="flick-playground" class="not-content flick-playground-shell" data-locale={locale} data-flick-ssr data-pagefind-ignore set:html={markup}></div>
 <script is:inline type="application/json" id="flick-playground-examples" set:html={embedded}></script>
 <noscript>
   <p class="fp-boot">{locale === "ru" ? "Для компиляции и запуска в браузере нужен JavaScript." : "Browser compilation and execution require JavaScript."}</p>
@@ -28,11 +27,13 @@ const embedded = JSON.stringify(gallery).replaceAll("<", "\\u003c");
   import { run } from "@flick-lang/runtime/runner/browser";
   import { main } from "../playground/Playground.fl";
   import { bindEditorScroll } from "../playground/highlight.ts";
+  import { bindSplit } from "../playground/split.ts";
 
   void run(main);
   const root = document.getElementById("flick-playground");
   if (root !== null) {
-    const dispose = bindEditorScroll(root);
+    const unbind = [bindEditorScroll(root), bindSplit(root)];
+    const dispose = () => unbind.forEach((f) => f());
     window.addEventListener("pagehide", dispose, { once: true });
     import.meta.hot?.dispose(dispose);
   }

@@ -10,15 +10,18 @@ interface Example {
   readonly source: string;
 }
 
-/** Page-provided configuration; decoding and all mode/locale behavior belong to Flick. */
-export const configuration = (): { mode: string; locale: string; examples: ReadonlyArray<Example> } => {
+/** Page-provided configuration; decoding and all locale behavior belong to Flick. */
+export const configuration = (): { locale: string; examples: ReadonlyArray<Example> } => {
   const root = document.getElementById("flick-playground");
   if (root === null) throw new Error("The page has no flick-playground container");
   const embedded = document.getElementById("flick-playground-examples")?.textContent ?? "[]";
   // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the page writes this JSON from the gallery's index
   const examples = JSON.parse(embedded) as ReadonlyArray<Example>;
-  return { mode: root.dataset.mode ?? "", locale: root.dataset.locale ?? "", examples };
+  return { locale: root.dataset.locale ?? "", examples };
 };
+
+/** The tab a link names in its query, such as the old Transpile page's `?tab=js`. */
+export const tabInAddress = (): string => new URLSearchParams(location.search).get("tab") ?? "";
 
 /** Read native text entered before hydration; Flick adopts it into its model. */
 export const sourceValue = (): string => {

@@ -9,7 +9,7 @@ module Actions exposing (
   report,
 )
 
-import Dom exposing (notify, source_value)
+import Dom exposing (notify, source_value, tab_in_address)
 import Examples exposing (Example)
 import JsError exposing (JsError(..))
 import State exposing (
@@ -24,6 +24,7 @@ import State exposing (
   errors,
   first_source,
   profile_name,
+  requested_tab,
 )
 
 load_highlighting : Unit ->{Async; JsError} Unit
@@ -148,7 +149,7 @@ let refresh model =
             m with
             checking = false;
             compiled = compiled;
-            tab = if errors current > 0 then Problems else m.tab;
+            tab = if errors current > 0 && m.tab == Output then Problems else m.tab;
           }
         )
         paint_generated model
@@ -169,7 +170,9 @@ let load_compiler model =
   | Err message ->
     update model (fun m -> { m with loading = false; version = ""; load_error = message })
   | Ok version ->
-    update model (fun m -> { m with loading = false; checking = true; version = version })
+    // a link's `?tab=` takes effect here, after hydration, and its tabs need the compiler
+    let tab = requested_tab (tab_in_address ())
+    update model (fun m -> { m with loading = false; checking = true; version = version; tab = tab })
     adopt_source model
     notify "fp-compile"
 

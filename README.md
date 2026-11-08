@@ -96,8 +96,8 @@ Go 1.23 or newer is needed only for the Go target (`--emit go`).
   Lean proofs are in [`docs/formal/`](./docs/formal/) and
   [`formal/`](./formal/README.md).
 
-The documentation site includes **Play**, which runs Flick in an isolated
-browser worker, and **Transpile**, which shows the generated JavaScript.
+The documentation site includes a **playground**, which runs Flick in an
+isolated browser worker and shows the JavaScript the compiler writes.
 
 ## Examples
 

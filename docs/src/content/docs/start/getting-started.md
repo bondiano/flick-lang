@@ -108,9 +108,7 @@ export default defineConfig({ integrations: [flick()] });
 </script>
 ```
 
-The [Play](../../play/) surface of this site is such a program: a Flick
-module with a `ui` view, compiling your code with Flick's compiler built to
-WebAssembly.
-
-[Transpile](../../transpile/) shows the generated JavaScript beside the
-editable source, with separate debug and release output.
+The [playground](../../play/) of this site is such a program: a Flick module
+with a `ui` view, compiling your code with Flick's compiler built to
+WebAssembly. Its JavaScript tab shows what the compiler writes, for the debug
+or the release profile.

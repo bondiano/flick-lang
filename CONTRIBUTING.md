@@ -111,13 +111,14 @@ up to date, record it with
 (a translated chapter of the specification is `docs/src/content/docs/spec/<page>.md`).
 
 The main entry points are Start, Handbook and Reference. `/play/` runs a
-single Flick module in an isolated browser worker; `/transpile/` shows its
-real debug or release JavaScript without executing it. Both use the
-WebAssembly build of the same compiler core.
+single Flick module in an isolated browser worker and shows its real debug or
+release JavaScript and `.d.ts`, with the WebAssembly build of the compiler
+core. Its examples are files in `docs/src/playground/examples/`, run by
+`docs/test/examples.test.ts`.
 
 Interactive widgets are Flick programs: `docs/src/widgets/` owns search,
 theme controls, the live homepage example and code copying;
-`docs/src/playground/` shares Play/Transpile through a small entrypoint
+`docs/src/playground/` is the playground, with a small entrypoint
 (`Playground.fl`), model (`State.fl`), actions (`Actions.fl`), layout
 (`View.fl`), and components (`Toolbar.fl`, `Editor.fl`, `Results.fl`).
 `Dom.fl` contains browser ports. TypeScript is limited to mounting and

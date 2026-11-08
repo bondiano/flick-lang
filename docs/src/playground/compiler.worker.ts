@@ -18,14 +18,22 @@ interface Event {
 
 interface Emitted {
   readonly js: string | null;
+  readonly dts: string | null;
   readonly files: Record<string, string> | null;
   readonly entry: string | null;
   readonly diagnostics: Array<Event>;
 }
 
 export interface Compiled {
-  readonly debug: { readonly code: string; readonly diagnostics: Array<Diagnostic> };
-  readonly release: { readonly code: string; readonly diagnostics: Array<Diagnostic> };
+  readonly debug: Generated;
+  readonly release: Generated;
+}
+
+/** One profile's JavaScript and TypeScript declarations, with its diagnostics. */
+export interface Generated {
+  readonly code: string;
+  readonly dts: string;
+  readonly diagnostics: Array<Diagnostic>;
 }
 
 export interface Built {
@@ -60,9 +68,9 @@ const emitted = (source: string, profile: string): Emitted => {
   return JSON.parse(session.emit(profile)) as Emitted;
 };
 
-const generated = (source: string, profile: string) => {
+const generated = (source: string, profile: string): Generated => {
   const result = emitted(source, profile);
-  return { code: result.js ?? "", diagnostics: diagnostics(result.diagnostics) };
+  return { code: result.js ?? "", dts: result.dts ?? "", diagnostics: diagnostics(result.diagnostics) };
 };
 
 onmessage = async (event: MessageEvent<Request>) => {

@@ -38,6 +38,9 @@ export default defineConfig({
     // Astro adds the base to where a redirect is served, not to where it leads
     "/start/upgrading/": `${base}/handbook/upgrading/`,
     "/ru/start/upgrading/": `${base}/ru/handbook/upgrading/`,
+    // Transpile became the playground's JavaScript tab
+    "/transpile/": `${base}/play/?tab=js`,
+    "/ru/transpile/": `${base}/ru/play/?tab=js`,
     // pages that gave way to the start pages and the reference
     ...Object.fromEntries(
       [

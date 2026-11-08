@@ -212,6 +212,9 @@ importers:
       '@flick-lang/content-mapper':
         specifier: workspace:*
         version: link:../tools/content-mapper
+      '@playwright/test':
+        specifier: 1.64.1
+        version: 1.64.1
       '@types/jsdom':
         specifier: 30.0.0
         version: 30.0.0

@@ -2,39 +2,36 @@ module View exposing (view)
 
 import Actions exposing (load_compiler, refresh, update)
 import Dom exposing (notify)
-import Editor exposing (generated_pane, source_pane)
+import Editor exposing (declarations_pane, generated_pane, source_pane)
 import Results exposing (current_problems, diagnostic_label, output_pane)
-import State exposing (Model, Mode(..), Tab(..), profile_name, tr)
-import Toolbar exposing (choice, examples_view)
+import State exposing (Model, Tab(..), tr)
+import Toolbar exposing (choice)
 
+/// The result panel: what a run printed, the diagnostics, and what the
+/// compiler writes for the current profile.
 result_pane : Atom.Writable Model -> Model -> Ui
-let result_pane model m = ui {
-  div { class_name = "fp-result" } [
-    div
-      { class_name = "fp-pane-header" }
-      (
-        if m.mode == Transpile then
-          [
-            span { class_name = "fp-file" } [text "JavaScript"],
-            span { class_name = "fp-pane-note" } [text (profile_name m.profile)],
-          ]
-        else
-          [
-            choice (tr m.locale "Output" "Вывод") (m.tab == Output) false (fun () ->
-              update model (fun m -> { m with tab = Output })
-            ),
-            choice (diagnostic_label m) (m.tab == Problems) false (fun () ->
-              update model (fun m -> { m with tab = Problems })
-            ),
-          ]
-      ),
-    if m.mode == Transpile then
-      generated_pane m
-    else if m.tab == Problems then
-      div { class_name = "fp-problems-panel" } [current_problems m]
-    else output_pane m,
-  ]
-}
+let result_pane model m =
+  let tab name label =
+    choice label (m.tab == name) false (fun () -> update model (fun m -> { m with tab = name }))
+  let body =
+    match m.tab with
+    | Output -> output_pane m
+    | Problems -> ui { div { class_name = "fp-problems-panel" } [current_problems m] }
+    | Js -> generated_pane m
+    | Dts -> declarations_pane m
+  ui {
+    div { class_name = "fp-result" } [
+      Ui.with_host
+        { Ui.host with role = Some "group"; aria_label = Some (tr m.locale "Result" "Результат") }
+        (div { class_name = "fp-pane-header fp-tabs" } [
+          tab Output (tr m.locale "Output" "Вывод"),
+          tab Problems (diagnostic_label m),
+          tab Js "JavaScript",
+          tab Dts ".d.ts",
+        ]),
+      body,
+    ]
+  }
 
 notice : String -> String -> Ui
 let notice title detail = ui {
@@ -46,7 +43,7 @@ let notice title detail = ui {
 
 view : Atom.Writable Model -> Model -> Ui
 let view model m = ui {
-  div { class_name = if m.mode == Play then "fp fp-play" else "fp fp-transpile" } [
+  div { class_name = "fp" } [
     // a hidden button runs a compile under `latest`: a newer edit interrupts the one before
     Ui.with_host
       {
@@ -59,7 +56,6 @@ let view model m = ui {
       (button
         { disabled = false; on_click = Ui.Event.latest (fun _ -> task { refresh model }) }
         []),
-    examples_view model m,
     div { class_name = "fp-workspace" } [
       Toolbar.view model m,
       if m.load_error != "" then
@@ -122,14 +118,17 @@ let view model m = ui {
       else empty,
       div { class_name = "fp-panes" } [
         Ui.render source_pane { model = model; m = m },
+        // `split.ts` moves it with the pointer and the arrow keys
+        Ui.with_host
+          {
+            Ui.host with
+            role = Some "separator";
+            tab_index = Some 0;
+            aria_label = Some (tr m.locale "Resize the panels" "Изменить ширину панелей");
+          }
+          (div { class_name = "fp-split" } []),
         result_pane model m,
       ],
-      if m.mode == Transpile then
-        div { class_name = "fp-transpile-diagnostics" } [
-          div { class_name = "fp-diagnostics-heading" } [text (diagnostic_label m)],
-          current_problems m,
-        ]
-      else empty,
     ],
   ]
 }

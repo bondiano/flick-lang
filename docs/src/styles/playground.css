@@ -1,5 +1,20 @@
+/* The playground fills the screen under the header. Its page's title is for
+   screen readers, and the notes of the page follow below it. */
+main:has(#flick-playground) h1#_top {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+main:has(#flick-playground) .content-panel { padding: 0; }
+main:has(#flick-playground) .sl-container { max-width: none; }
+.sl-markdown-content:has(.flick-playground-shell) > p { margin-inline: var(--flick-gutter); }
+.sl-markdown-content:has(.flick-playground-shell) > p:last-child { margin-bottom: 2.5rem; }
+
 .flick-playground-shell {
-  margin-block: 1.75rem 2rem;
+  margin: 0 0 2rem;
   min-width: 0;
 }
 
@@ -21,7 +36,7 @@
   min-height: 2.125rem;
   padding: 0.375rem 0.75rem;
   border: 1px solid transparent;
-  border-radius: 6px;
+  border-radius: 0;
   background: transparent;
   color: var(--sl-color-gray-2);
   cursor: pointer;
@@ -54,12 +69,16 @@
   color: var(--sl-color-accent-high);
 }
 
-.fp-examples {
-  display: flex;
+.fp-examples { display: flex; align-items: center; }
+.fp .fp-gallery-button {
+  display: inline-flex;
   align-items: center;
-  gap: 0.75rem;
-  margin-bottom: 1rem;
+  gap: 0.5rem;
+  border-color: var(--fp-rule);
+  color: var(--sl-color-white);
+  font-weight: 600;
 }
+.fp-gallery-button svg { flex-shrink: 0; color: var(--sl-color-gray-3); }
 
 /* The gallery is a native popover: Escape and a click outside close it. */
 .fp-gallery {
@@ -91,9 +110,11 @@
 }
 
 .fp-workspace {
+  display: flex;
+  flex-direction: column;
+  height: calc(100dvh - var(--sl-nav-height));
   overflow: hidden;
-  border: 1px solid var(--fp-rule);
-  border-radius: 12px;
+  border-bottom: 1px solid var(--fp-rule);
   background: var(--sl-color-bg);
 }
 
@@ -129,29 +150,50 @@
 
 .fp-status-ready { color: var(--sl-color-green-high, var(--sl-color-gray-2)); }
 .fp-status-loading::before { background: var(--sl-color-gray-3); }
+/* Run is the one thing to press on this page, so it takes the amber of the site. */
 .fp .fp-primary {
   min-width: 6.25rem;
-  border-color: var(--sl-color-accent-high);
-  background: var(--sl-color-accent-high);
-  color: var(--sl-color-bg);
+  border-color: var(--flick-line-amber);
+  background: var(--flick-line-amber);
+  color: #0e1116;
   font-weight: 600;
 }
 
 .fp .fp-primary:hover:not(:disabled) {
-  border-color: var(--sl-color-accent-high);
-  background: color-mix(in srgb, var(--sl-color-accent-high) 88%, var(--sl-color-white));
-  color: var(--sl-color-bg);
+  border-color: #ffd34d;
+  background: #ffd34d;
+  color: #0e1116;
 }
 
 .fp .fp-stop {
+  border-color: var(--sl-color-white);
   background: var(--sl-color-bg);
-  color: var(--sl-color-accent-high);
+  color: var(--sl-color-white);
 }
 
-.fp-panes { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
-.fp-play .fp-panes { grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr); }
-.fp-source, .fp-result { display: flex; flex-direction: column; min-width: 0; }
-.fp-result { border-left: 1px solid var(--fp-rule); }
+/* `split.ts` sets the editor's share. The splitter is the 1px rule between the
+   panels, with room to grab on both sides of it. */
+.fp-panes {
+  --fp-split: 55%;
+  display: grid;
+  flex: 1 1 auto;
+  grid-template-columns: minmax(0, var(--fp-split)) 1px minmax(0, 1fr);
+  min-height: 0;
+}
+.fp-source, .fp-result { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+.fp-result > :last-child { flex: 1 1 auto; min-height: 0; overflow: auto; }
+.fp-split { position: relative; z-index: 2; background: var(--fp-rule); cursor: col-resize; touch-action: none; }
+.fp-split::before {
+  position: absolute;
+  inset: 0 -1.5px;
+  background: var(--sl-color-accent-high);
+  content: "";
+  opacity: 0;
+  transition: opacity 180ms ease-out;
+}
+.fp-split::after { position: absolute; inset: 0 -6px; content: ""; }
+.fp-split:hover::before, .fp-split:focus-visible::before { opacity: 1; }
+.fp-split:focus-visible { outline: none; }
 
 .fp-pane-header {
   display: flex;
@@ -177,9 +219,9 @@
 .fp textarea {
   display: block;
   width: 100%;
-  min-height: 30rem;
+  min-height: 0;
   flex: 1 1 auto;
-  resize: vertical;
+  resize: none;
   padding: 1.25rem;
   border: 0;
   border-radius: 0;
@@ -232,6 +274,7 @@
   position: relative;
   display: grid;
   min-width: 0;
+  min-height: 0;
   flex: 1 1 auto;
   isolation: isolate;
 }
@@ -275,8 +318,6 @@
 .fp .fp-token-fails { color: var(--flick-line-coral-ink); }
 
 .fp-generated-code {
-  min-height: 30rem;
-  max-height: 48rem;
   flex: 1 1 auto;
   padding: 1.25rem;
   overflow: auto;
@@ -285,38 +326,45 @@
 }
 
 .fp pre, .fp textarea { scrollbar-color: var(--sl-color-gray-4) var(--sl-color-bg); scrollbar-width: thin; }
-.fp-empty { min-height: 30rem; padding: 2rem 1.5rem; color: var(--sl-color-gray-3); }
+.fp-empty { padding: 2rem 1.5rem; color: var(--sl-color-gray-3); }
 .fp-empty p:first-child { margin-bottom: 0.625rem; color: var(--sl-color-gray-2); font-weight: 600; }
 .fp-empty p { max-width: 40ch; }
-.fp-execution { display: flex; min-height: 30rem; flex: 1 1 auto; flex-direction: column; }
-.fp .fp-output { min-height: 25rem; padding: 1.25rem; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; }
+.fp-execution { display: flex; flex: 1 1 auto; flex-direction: column; }
+.fp .fp-output { flex: 1 1 auto; padding: 1.25rem; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; }
 .fp-exit { margin-top: auto; padding: 0.75rem 1rem; border-top: 1px solid var(--fp-rule); color: var(--sl-color-green-high, var(--sl-color-gray-2)); }
 .fp-muted { color: var(--sl-color-gray-3); }
 .fp .fp-bad, .fp-error, .fp-stderr { color: var(--sl-color-red-high, var(--sl-color-white)); }
 .fp-warning { color: var(--sl-color-orange-high, var(--sl-color-white)); }
 .fp-stale { padding: 0.75rem 1rem; border-top: 1px solid var(--fp-rule); color: var(--sl-color-gray-2); font-size: 0.8125rem; }
 
-.fp-problems-panel { min-height: 30rem; padding: 1.25rem; }
+.fp-problems-panel { padding: 1.25rem; }
 .fp-diagnostics { color: var(--sl-color-gray-2); }
 .fp-filter { margin-bottom: 0.75rem; border-color: var(--fp-rule); }
 .fp-diagnostics ul { margin: 0; padding-left: 1.25rem; }
 .fp-diagnostics li + li { margin-top: 1.25rem; }
 .fp-diagnostic-code { font-weight: 600; }
 .fp-diagnostic-at { margin-left: 0.75rem; color: var(--sl-color-gray-3); }
-.fp-diagnostics li p { margin-top: 0.375rem; overflow-wrap: anywhere; }
-.fp-transpile-diagnostics { padding: 1rem 1.25rem 1.25rem; border-top: 1px solid var(--fp-rule); background: var(--fp-surface); }
-.fp-diagnostics-heading { margin-bottom: 0.75rem; font-weight: 600; }
+/* a message quotes code in backticks, which Overpass draws as accents */
+.fp-diagnostics li p {
+  margin-top: 0.375rem;
+  font-family: var(--__sl-font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 0.8125rem;
+  overflow-wrap: anywhere;
+}
 .fp-recovery, .fp-notice { padding: 1rem 1.25rem; border-bottom: 1px solid var(--fp-rule); background: var(--sl-color-bg); }
 .fp-recovery .fp-notice { padding: 0; border: 0; }
 .fp-notice > p { color: var(--sl-color-red-high, var(--sl-color-white)); font-weight: 600; }
 .fp .fp-failure-detail { max-height: 16rem; margin-top: 0.75rem; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; }
 .fp-recovery > button { margin-top: 0.875rem; border-color: var(--fp-rule); }
 .fp-execution > .fp-failure-detail { margin: 0; padding: 1rem; }
-.fp-boot { min-height: 12rem; padding: 1.5rem; border: 1px solid var(--sl-color-gray-5); border-radius: 12px; color: var(--sl-color-gray-3); }
+.fp-boot { min-height: 12rem; padding: 1.5rem; border: 1px solid var(--sl-color-gray-5); color: var(--sl-color-gray-3); }
 
+/* A phone or a narrow window stacks the panels and lets the page scroll. */
 @media (max-width: 56rem) {
-  .fp-panes, .fp-play .fp-panes { grid-template-columns: minmax(0, 1fr); }
-  .fp-result { border-top: 1px solid var(--fp-rule); border-left: 0; }
+  .fp-workspace { height: auto; }
+  .fp-panes { grid-template-columns: minmax(0, 1fr); }
+  .fp-split { display: none; }
+  .fp-result { border-top: 1px solid var(--fp-rule); }
   .fp textarea { min-height: 22rem; }
   .fp-generated-code, .fp-empty, .fp-execution, .fp-problems-panel { min-height: 20rem; }
   .fp-generated-code { max-height: 32rem; }
@@ -349,5 +397,5 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .fp button { transition: none; }
+  .fp button, .fp-split::before { transition: none; }
 }
