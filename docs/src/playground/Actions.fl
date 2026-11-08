@@ -273,7 +273,10 @@ let explain model key code =
     update model (fun m -> { m with explained = ""; explain_revision = m.explain_revision + 1 })
   else
     update model (fun m -> {
-      m with explained = key; explanation = ""; explain_revision = m.explain_revision + 1;
+      m with
+      explained = key;
+      explanation = "";
+      explain_revision = m.explain_revision + 1;
     })
     let request = Atom.current model
     let text =
