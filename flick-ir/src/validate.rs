@@ -189,10 +189,24 @@ impl Validator<'_> {
 fn bind(pat: &Pat, scope: &mut Vec<String>) {
     match pat {
         Pat::Bind(name) => scope.push(name.clone()),
-        Pat::Tuple(items) | Pat::Con(_, items) | Pat::Or(items) => {
+        Pat::Tuple(items) | Pat::Con(_, items) => {
             for p in items {
                 bind(p, scope);
             }
+        }
+        Pat::Or(alternatives) => {
+            let common = alternatives
+                .iter()
+                .fold(None, |common: Option<BTreeSet<String>>, p| {
+                    let mut names = Vec::new();
+                    bind(p, &mut names);
+                    let names: BTreeSet<_> = names.into_iter().collect();
+                    Some(match common {
+                        Some(common) => common.intersection(&names).cloned().collect(),
+                        None => names,
+                    })
+                });
+            scope.extend(common.into_iter().flatten());
         }
         Pat::List(items, rest) => {
             for p in items {
@@ -213,7 +227,7 @@ mod tests {
 
     use super::validate;
     use crate::{
-        Expr, ExprKind, FileId, Item, ItemKind, Lit, Module, Param, Pat, Program, Span, Stage,
+        Arm, Expr, ExprKind, FileId, Item, ItemKind, Lit, Module, Param, Pat, Program, Span, Stage,
     };
 
     fn at(kind: ExprKind) -> Expr {
@@ -275,6 +289,23 @@ mod tests {
         assert_eq!(
             validate(&program(unit), &external, &BTreeSet::new()).len(),
             2
+        );
+    }
+
+    #[test]
+    fn an_or_pattern_binds_only_names_in_every_alternative() {
+        let body = at(ExprKind::Match(
+            Box::new(at(ExprKind::Lit(Lit::Unit))),
+            vec![Arm {
+                pat: Pat::Or(vec![Pat::Bind("x".into()), Pat::Wild]),
+                guard: None,
+                body: at(ExprKind::Local("x".into())),
+            }],
+        ));
+        let files = BTreeSet::from([FileId::new(0)]);
+        assert_eq!(
+            validate(&program(body), &|_| false, &files),
+            ["`App.Main` uses the local `x`, which nothing binds there"]
         );
     }
 }
