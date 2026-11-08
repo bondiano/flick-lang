@@ -123,7 +123,7 @@ function* runFinalizer(finalizer: Finalizer, owner: Owner, exit: Exit): Run {
 function* closeSteps(owner: Owner, exit: Exit): Run {
   owner.open = false;
   owner.phase("C0");
-  let cause: Cause = exit.cause ?? empty;
+  let cause: Cause = empty;
   const ran = new Set<() => unknown>();
   function* hooks(): Run {
     for (const hook of owner.closing) {
@@ -173,11 +173,17 @@ function* closeSteps(owner: Owner, exit: Exit): Run {
   }
   owner.phase("C6");
   cause = combine(cause, released);
-  return cause.reasons.length === 0 ? exit : failed(cause);
+  return cause.reasons.length === 0 ? succeeded(undefined) : failed(cause);
 }
 
 /** The close of `owner` after its body ended with `exit`: how the region ends. */
-export const close = (owner: Owner, exit: Exit): Run => closeSteps(owner, exit);
+export function* close(owner: Owner, exit: Exit): Run {
+  const own = asExit(yield closeSteps(owner, exit));
+  return own.cause === undefined ? exit : failed(combine(exit.cause ?? empty, own.cause));
+}
+
+/** The close of `owner` after what it held ended with `exit`: how its hooks and finalizers ended. */
+export const closeOwn = (owner: Owner, exit: Exit): Run => closeSteps(owner, exit);
 
 /** Runs `task` with `owner` as the owner of what it acquires and spawns. */
 export const inside = (owner: Owner, task: () => unknown): Under => new Under(owned(currentCtx(), owner), task);

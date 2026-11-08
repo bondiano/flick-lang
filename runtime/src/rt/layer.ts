@@ -4,15 +4,16 @@
 // body }` builds it into the owner of the body. A nested `provide` reads the
 // memo map of the one around it; sibling ones build anew.
 import { type Cause, type Exit, raise } from "./cause.ts";
-import { type Ctx, type Run, Suspend, Under, asExit, currentCtx, exitOf, extend, lookup, owned, raiseOf } from "./fiber.ts";
-import { Owner, addTo, close, withOwner } from "./owner.ts";
+import { mapped } from "./effects.ts";
+import { type Ctx, type Run, Suspend, Under, asExit, currentCtx, exitOf, extend, lookup, raiseOf, uninterruptible } from "./fiber.ts";
+import { Owner, addTo, closeOwn, finalize, inside, withOwner } from "./owner.ts";
 import { traceEvent, traceLayer, tracing } from "./trace.ts";
 
-/** What a layer gives: implementations by tag, later ones replacing earlier ones. */
-type Services = ReadonlyArray<readonly [tag: object, impl: unknown]>;
+/** Built services, a `Context`: implementations by tag, later ones replacing earlier ones. */
+export type Services = ReadonlyArray<readonly [tag: object, impl: unknown]>;
 
-/** How a layer builds: through the memo map, into the owner. */
-type Build = (memo: MemoMap, into: Owner) => Run;
+/** How a layer builds: through the memo map, into the owner. What it gives, a value or a call, gives the services. */
+export type Build = (memo: MemoMap, into: Owner) => unknown;
 
 export class Layer {
   readonly build: Build;
@@ -21,7 +22,7 @@ export class Layer {
   }
 }
 
-const servicesOf = (value: unknown): Services => (Array.isArray(value) ? (value as Services) : []);
+export const servicesOf = (value: unknown): Services => (Array.isArray(value) ? (value as Services) : []);
 
 interface Entry {
   observers: number;
@@ -33,7 +34,7 @@ interface Entry {
 }
 
 /** What one build shares; a forked map reads the entries of its parent. */
-class MemoMap {
+export class MemoMap {
   readonly parent: MemoMap | undefined;
   readonly entries = new Map<Layer, Entry>();
   constructor(parent: MemoMap | undefined) {
@@ -45,8 +46,38 @@ class MemoMap {
   }
 }
 
-const MEMO = /*#__PURE__*/ Object.freeze({ key: "effect/Layer/CurrentMemoMap" });
+/** The key of the memo map of the build at hand. */
+export const MEMO: object = /*#__PURE__*/ Object.freeze({ key: "effect/Layer/CurrentMemoMap" });
 
+/** The memo map a build here uses: forked from the one of the build it runs in, or a new one. */
+export const currentMemo = (): MemoMap => {
+  const outer = lookup(MEMO);
+  return new MemoMap(outer instanceof MemoMap ? outer : undefined);
+};
+
+/** Closes `scope` after what it held ended with `exit`: it fails as its own finalizers do. */
+function* release(scope: Owner, exit: Exit): Run {
+  return raiseOf(asExit(yield uninterruptible(() => closeOwn(scope, exit))));
+}
+
+/** A scope closed when `parent` closes, with how it ended. */
+export const forkScope = (parent: Owner): Owner => {
+  const child = new Owner(parent.defects);
+  addTo(parent, (exit: Exit) => release(child, exit), true);
+  return child;
+};
+
+/** A layer that builds into a scope of its own, forked from the one it is built into and closed at once if the build fails. */
+export const fromBuild = (build: Build): Layer =>
+  new Layer(function* (memo, into): Run {
+    const inner = forkScope(into);
+    const built = asExit(yield exitOf(() => build(memo, inner)));
+    if (built.cause === undefined) return built.value;
+    // as `on_exit`: a finalizer's defect after the failure makes its failures defects
+    return raiseOf(finalize(built, asExit(yield uninterruptible(() => closeOwn(inner, built)))));
+  });
+
+/** Makes `into` hold `entry` until it closes: the last one to close releases it. */
 const held = (map: MemoMap, layer: Layer, entry: Entry, into: Owner): unknown => {
   entry.observers++;
   return addTo(
@@ -55,14 +86,14 @@ const held = (map: MemoMap, layer: Layer, entry: Entry, into: Owner): unknown =>
       entry.observers--;
       if (entry.observers > 0) return undefined;
       if (map.entries.get(layer) === entry) map.entries.delete(layer);
-      return raiseOf(asExit(yield close(entry.scope, exit)));
+      return yield release(entry.scope, exit);
     },
     true,
   );
 };
 
 /** The services of a memoized layer: of its entry, or built into a new one. */
-function* memoized(self: Layer, memo: MemoMap, into: Owner, build: Build): Run {
+function* getOrBuild(self: Layer, memo: MemoMap, into: Owner, build: Build): Run {
   const found = memo.find(self);
   if (found !== undefined) {
     const [entry, at] = found;
@@ -75,7 +106,9 @@ function* memoized(self: Layer, memo: MemoMap, into: Owner, build: Build): Run {
     if (entry.cause !== undefined) return raise(entry.cause);
     return entry.services;
   }
-  const entry: Entry = { observers: 0, scope: new Owner(), built: false, services: [], cause: undefined, waiting: [] };
+  // a closing scope cannot hold a shared entry
+  if (into.finalizing) return build(memo, into);
+  const entry: Entry = { observers: 0, scope: new Owner(into.defects), built: false, services: [], cause: undefined, waiting: [] };
   memo.entries.set(self, entry);
   yield held(memo, self, entry, into);
   if (tracing) {
@@ -93,31 +126,35 @@ function* memoized(self: Layer, memo: MemoMap, into: Owner, build: Build): Run {
   entry.built = true;
   entry.cause = built.cause;
   entry.services = built.cause === undefined ? servicesOf(built.value) : [];
-  for (const wake of entry.waiting) wake();
-  return raiseOf(built.cause === undefined ? built : built);
+  for (const wake of entry.waiting.splice(0)) wake();
+  return raiseOf(built);
 }
 
 /** A layer whose build the memo map shares. */
-const memoizable = (build: Build): Layer => {
-  const self: Layer = new Layer((memo, into) => memoized(self, memo, into, build));
+export const memoizable = (build: Build): Layer => {
+  const self: Layer = fromBuild((memo, into) => getOrBuild(self, memo, into, build));
   return self;
 };
 
-/** Runs `task` as a build: its owner `scope`, the map `memo` current. */
-const building = (memo: MemoMap, scope: Owner, task: () => unknown): Under =>
-  new Under(owned(extend(currentCtx(), MEMO, memo), scope), task);
+/** Runs `task` acquiring into `scope`. */
+export const scoped = (scope: Owner, task: () => unknown): Under => inside(scope, task);
 
-// oxlint-disable-next-line require-yield -- what it returns is what the layer gives
-function* constant(services: Services): Run {
-  return services;
-}
+/** Builds `layer` into `scope` through `memo`, which the build and what runs with its services read as the current map. */
+export const buildWith = (layer: Layer, memo: MemoMap, scope: Owner): Under =>
+  new Under(extend(currentCtx(), MEMO, memo), () =>
+    mapped(layer.build(memo, scope), (services): Services => [...servicesOf(services), [MEMO, memo]]),
+  );
 
-export const layerSucceed = (tag: object, impl: unknown): Layer => new Layer(() => constant([[tag, impl]]));
+/** The evidence `ctx` with `services`. */
+export const provided = (ctx: Ctx, services: Services): Ctx => services.reduce((c: Ctx, [tag, impl]) => extend(c, tag, impl), ctx);
 
-export const empty: Layer = /*#__PURE__*/ new Layer(() => constant([]));
+/** A layer of services built without effects. */
+export const constant = (services: Services): Layer => new Layer(() => services);
+
+export const layerSucceed = (tag: object, impl: unknown): Layer => constant([[tag, impl]]);
 
 /** Both layers; services `b` builds replace those of `a`. */
-// shortcut: builds one after the other into one owner, not side by side into scopes of their own; upgrade when the rest of `Layer` comes
+// shortcut: builds one after the other into one owner, not side by side into scopes of their own; upgrade when `Layer` moves to handlers
 export const layerMerge = (a: Layer, b: Layer): Layer =>
   new Layer(function* (memo, into): Run {
     const first = servicesOf(yield a.build(memo, into));
@@ -127,25 +164,10 @@ export const layerMerge = (a: Layer, b: Layer): Layer =>
 
 export const layerOverride = layerMerge;
 
-/** `Layer.effect tag task`: the implementation `task` computes when the layer builds. */
-export const effect =
-  (tag: object) =>
-  (task: () => unknown): Layer =>
-    memoizable(function* (memo, into): Run {
-      const impl: unknown = yield building(memo, into, task);
-      return [[tag, impl]];
-    });
-
-/** The evidence `ctx` with `services`, the map `memo` current. */
-const provided = (ctx: Ctx, services: Services, memo: MemoMap): Ctx =>
-  services.reduce((c: Ctx, [tag, impl]) => extend(c, tag, impl), extend(ctx, MEMO, memo));
-
 function* provide(layer: Layer, body: (unit: undefined) => unknown): Run {
   return yield withOwner(function* (owner: Owner): Run {
-    const outer = lookup(MEMO);
-    const memo = new MemoMap(outer instanceof MemoMap ? outer : undefined);
-    const services = servicesOf(yield building(memo, owner, () => layer.build(memo, owner)));
-    return new Under(provided(currentCtx(), services, memo), () => body(undefined));
+    const services = servicesOf(yield buildWith(layer, currentMemo(), owner));
+    return new Under(provided(currentCtx(), services), () => body(undefined));
   }, "provide");
 }
 

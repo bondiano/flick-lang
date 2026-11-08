@@ -8,6 +8,7 @@
 ../rt/deep_async
 ../rt/deep_control
 ../rt/late_effect
+../rt/layers
 ../rt/wake_chain
 bootstrap/debug
 bootstrap/hello
@@ -96,6 +97,7 @@ runtime/supervisor_defect
 stdlib/effect/mutable_ref
 stdlib/effect/option
 stdlib/effect/queue
+stdlib/effect/shared_layer_merged
 stdlib/effect/string_locale
 
 # Not yet, and why:

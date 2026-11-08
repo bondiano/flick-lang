@@ -1,0 +1,170 @@
+// The bindings of `Layer` on Flick's own runtime: what
+// tests/run/stdlib/effect/layer does with layers, but `Context`, which is on
+// Effect yet.
+module App.Main exposing (main)
+
+service Greeter =
+  greet : String ->{} String
+
+service Config =
+  prefix : Unit ->{} String
+
+type error BootError = BootError String
+
+config_layer : Layer none none {Config}
+let config_layer = Layer.succeed Config { prefix = fun () -> "hello" }
+
+greeter_live : Layer {Config} none {Greeter}
+let greeter_live =
+  Layer.effect
+    Greeter
+    (task {
+      let p = Config.prefix ()
+      { greet = fun name -> p ++ ", " ++ name }
+    })
+
+greet : String ->{Greeter;} Unit
+let greet name = Platform.stdout_line (Greeter.greet name)
+
+failing : Layer none {BootError} {Greeter}
+let failing = Layer.effect Greeter (task { from_result (Err (BootError "no greeter")) })
+
+fallback : Layer none none {Greeter}
+let fallback = Layer.succeed Greeter { greet = fun name -> "fallback " ++ name }
+
+recovered : Layer none none {Greeter}
+let recovered =
+  failing
+  |> Layer.tap_error (fun err ->
+    match err with
+    | BootError m -> Platform.stdout_line ("tap_error " ++ m)
+  )
+  |> Layer.catch (fun _ -> fallback)
+
+counting : Ref Float -> Layer none none {Config}
+let counting count =
+  Layer.effect
+    Config
+    (task {
+      Ref.update count (fun n -> n + 1)
+      { prefix = fun () -> "counted" }
+    })
+
+layers : Unit ->{; BootError} Unit
+let layers () =
+  provide (greeter_live |> Layer.provide_ config_layer) { greet "provide_" }
+  provide (greeter_live |> Layer.provide_merge config_layer) {
+    greet ("provide_merge " ++ Config.prefix ())
+  }
+  provide recovered { greet "catch" }
+  provide (Layer.catch_cause (fun _ -> fallback) failing) { greet "catch_cause" }
+  provide Layer.sync Greeter (fun () -> { greet = fun n -> "sync " ++ n }) { greet "x" }
+  provide Layer.suspend (fun () -> fallback) { greet "suspend" }
+  provide Layer.unwrap (task { fallback }) { greet "unwrap" }
+  provide Layer.merge_all fallback [Layer.succeed Greeter { greet = fun n -> "second " ++ n }] {
+    greet "merge_all"
+  }
+  provide Layer.merge
+    Layer.empty
+    (Layer.merge
+      config_layer
+      (Layer.effect_discard (task { Platform.stdout_line "effect_discard ran" }))) {
+    Platform.stdout_line (Config.prefix ())
+  }
+  let upper =
+    Layer.update_service
+      Config
+      (fun impl -> { prefix = fun () -> impl.prefix () ++ "!" })
+      greeter_live
+  provide (upper |> Layer.provide_ config_layer) { greet "update_service" }
+  let tapped = Layer.tap (fun _ -> Platform.stdout_line "tap") config_layer
+  provide tapped { () }
+  let mapped =
+    Layer.flat_map
+      (fun _ -> Layer.succeed Greeter { greet = fun n -> "flat_map " ++ n })
+      config_layer
+  provide mapped { greet "x" }
+  let exits =
+    parallel_exits [
+      task {
+        provide (Layer.or_die failing
+          |> Layer.tap_cause (fun _ -> Platform.stdout_line "tap_cause")) { greet "never" }
+      },
+    ]
+  let died = List.map (fun exit -> Option.is_some (Exit.failure exit)) exits
+  Platform.stdout_line ("or_die died " ++ show died)
+
+shared : Unit ->{} Unit
+let shared () =
+  let count = Ref.make 0
+  let once = counting count
+  provide Layer.merge once (Layer.provide_ once greeter_live) { () }
+  Platform.stdout_line ("shared builds " ++ show (Ref.get count))
+  let fresh = Layer.fresh (counting count)
+  provide Layer.merge fresh (Layer.provide_ fresh greeter_live) { () }
+  Platform.stdout_line ("fresh builds " ++ show (Ref.get count))
+  let memo = Layer.make_memo_map ()
+  let child = Layer.fork_memo_map memo
+  let _ = Layer.current_memo_map ()
+  scope {
+    let _ = Layer.build_with_memo_map memo once
+    let _ = Layer.build_with_memo_map memo once
+    let _ = Layer.build_with_memo_map child once
+    ()
+  }
+  Platform.stdout_line ("memo builds " ++ show (Ref.get count))
+  let built = Layer.from_build (fun m -> Layer.build_with_memo_map m config_layer)
+  provide built { Platform.stdout_line ("from_build " ++ Config.prefix ()) }
+  let memoized = Layer.from_build_memo (fun m -> Layer.build_with_memo_map m config_layer)
+  provide memoized { Platform.stdout_line ("from_build_memo " ++ Config.prefix ()) }
+
+finalizers : Unit ->{Async;} Unit
+let finalizers () =
+  scope {
+    Scope.add_finalizer (task { Platform.stdout_line "finalizer ran" })
+    Scope.add_finalizer_exit (fun exit ->
+      Platform.stdout_line ("exit failed " ++ show (Option.is_some exit))
+    )
+    let _ctx = Layer.build config_layer
+    Platform.stdout_line "built"
+  }
+  let launched =
+    timeout_option
+      5
+      (task { Layer.launch (Layer.effect_discard (task { Platform.stdout_line "launched" })) })
+  Platform.stdout_line ("launch interrupted " ++ show (Option.is_none launched))
+
+failed_build_cleanup : Unit ->{} Unit
+let failed_build_cleanup () =
+  let released = Ref.make 0
+  let zero = Ref.make 0
+  broken : Layer none {BootError} none
+  let broken =
+    Layer.from_build (fun _ ->
+      Scope.add_finalizer
+        (task {
+          Ref.update released (fun n -> n + 1)
+          ignore (Int.unsafe_div 1 (Ref.get zero))
+        })
+      from_result (Err (BootError "build failed"))
+    )
+  let outcome = Effect.exit (task { provide broken { () } })
+  Platform.stdout_line
+    ("failed build causes "
+      ++ show
+        (Option.map
+          (fun failure -> (
+            Cause.has_fails failure,
+            Cause.has_dies failure,
+            List.length (Cause.reasons failure),
+          ))
+          (Exit.failure outcome)))
+  Platform.stdout_line ("failed build cleanup count " ++ show (Ref.get released))
+
+main : Unit ->{Async; AppError} Unit
+let main () =
+  try layers () with
+  | BootError m -> Platform.stdout_line ("unexpected " ++ m)
+  shared ()
+  finalizers ()
+  failed_build_cleanup ()
