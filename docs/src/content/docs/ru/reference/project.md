@@ -1,6 +1,6 @@
 ---
 title: "Проект"
-source_hash: 059227187dc5b167
+source_hash: 72ca1107905b70fc
 ---
 
 Проект — каталог с `flick.toml` (см. [CLI компилятора](../cli/)).
