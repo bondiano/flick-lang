@@ -163,16 +163,18 @@ export const layerSucceed = (tag: object, impl: unknown): Layer => constant([[ta
 /** What `allOf` gave, known to be a list. */
 const listOf = (value: unknown): ReadonlyArray<unknown> => (Array.isArray(value) ? value : []);
 
-/** Closes the scopes side by side: they fail as their own finalizers do, joined. */
+/** Closes the scopes side by side, the last acquired starting first, as Effect and Go do: they fail as their own finalizers do, joined. */
 function* closeAll(scopes: ReadonlyArray<Owner>, exit: Exit): Run {
   const causes: Array<Cause> = scopes.map(() => empty);
   yield allOf(
-    scopes.map((scope, i) =>
-      function* (): Run {
-        causes[i] = asExit(yield closeOwn(scope, exit)).cause ?? empty;
-        return undefined;
-      },
-    ),
+    scopes
+      .map((scope, i) =>
+        function* (): Run {
+          causes[i] = asExit(yield closeOwn(scope, exit)).cause ?? empty;
+          return undefined;
+        },
+      )
+      .toReversed(),
     Infinity,
   );
   const cause = causes.reduce(combine, empty);

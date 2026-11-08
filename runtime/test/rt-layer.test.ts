@@ -12,7 +12,7 @@ import { root } from "./rt-support.ts";
 
 const tail = (name: string, arm: unknown): OpInstall => [name, arm, "tail", 0, 1];
 
-test("a merged layer builds its sides side by side and releases them so", { timeout: 5000 }, async () => {
+test("a merged layer builds its sides side by side and releases them so, the last acquired first", { timeout: 5000 }, async () => {
   // each side waits for the other: built or released one after the other, they would wait for ever
   const built = [Deferred.make(), Deferred.make()] as const;
   const released = [Deferred.make(), Deferred.make()] as const;
@@ -20,6 +20,7 @@ test("a merged layer builds its sides side by side and releases them so", { time
   const side = (i: 0 | 1, other: 0 | 1): Layer =>
     effect(service(`Side${i}`))(function* (): Run {
       yield addFinalizer(function* (): Run {
+        seen.push(`release ${i} starts`);
         Deferred.succeed(undefined)(released[i]);
         yield Deferred.await(released[other]);
         seen.push(`released ${i}`);
@@ -32,7 +33,9 @@ test("a merged layer builds its sides side by side and releases them so", { time
   const both = layerMerge(side(0, 1), side(1, 0));
   const exit = await root(() => layerRun(both, () => seen.push("body")));
   assert.equal(exit.cause, undefined);
-  assert.deepEqual(seen.toSorted(), ["body", "released 0", "released 1"]);
+  // as Effect and Go, the side acquired last starts its release first
+  assert.deepEqual(seen.slice(0, 3), ["body", "release 1 starts", "release 0 starts"]);
+  assert.deepEqual(seen.slice(3).toSorted(), ["released 0", "released 1"]);
 });
 
 test("an operation of a layer's service runs its own effects where the layer is provided", async () => {
