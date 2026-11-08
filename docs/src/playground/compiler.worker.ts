@@ -24,11 +24,6 @@ interface Emitted {
   readonly diagnostics: Array<Event>;
 }
 
-export interface Compiled {
-  readonly debug: Generated;
-  readonly release: Generated;
-}
-
 /** One profile's JavaScript and TypeScript declarations, with its diagnostics. */
 export interface Generated {
   readonly code: string;
@@ -44,16 +39,22 @@ export interface Built {
 
 export type Operation =
   | { readonly action: "load" }
-  | { readonly action: "compile"; readonly source: string }
+  | { readonly action: "check"; readonly source: string }
+  | { readonly action: "compile"; readonly source: string; readonly profile: string }
   | { readonly action: "build"; readonly source: string; readonly profile: string };
 
 export type Request = Operation & { readonly id: number };
-export type Result = string | Compiled | Built;
+export type Result = string | Array<Diagnostic> | Generated | Built;
 export type Reply = { readonly id: number; readonly result: Result } | { readonly error: string };
 
 let ready: Promise<string> | undefined;
-// one analysis of each edit serves both profiles and the run that follows it
+// one analysis of each edit serves its check, the emits of either profile and a run
 let session: Session | undefined;
+
+const analysed = (source: string): Array<Event> => {
+  session ??= new Session();
+  return JSON.parse(session.update(source)) as Array<Event>;
+};
 
 const diagnostics = (events: ReadonlyArray<Event>): Array<Diagnostic> => events.map((event) => ({
   code: event.code,
@@ -63,9 +64,8 @@ const diagnostics = (events: ReadonlyArray<Event>): Array<Diagnostic> => events.
 }));
 
 const emitted = (source: string, profile: string): Emitted => {
-  session ??= new Session();
-  session.update(source);
-  return JSON.parse(session.emit(profile)) as Emitted;
+  analysed(source);
+  return JSON.parse((session as Session).emit(profile)) as Emitted;
 };
 
 const generated = (source: string, profile: string): Generated => {
@@ -82,8 +82,11 @@ onmessage = async (event: MessageEvent<Request>) => {
       case "load":
         result = version;
         break;
+      case "check":
+        result = diagnostics(analysed(request.source));
+        break;
       case "compile":
-        result = { debug: generated(request.source, "debug"), release: generated(request.source, "release") };
+        result = generated(request.source, request.profile);
         break;
       case "build": {
         const built = emitted(request.source, request.profile);

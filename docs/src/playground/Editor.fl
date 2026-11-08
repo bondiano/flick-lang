@@ -1,7 +1,7 @@
 module Editor exposing (declarations_pane, generated_pane, source_pane)
 
 import Actions exposing (edit)
-import State exposing (Model, Profile(..), SyntaxToken, errors, generated, tr)
+import State exposing (Model, SyntaxToken, errors, generated, tr)
 
 /// What the compiler writes for the current profile: `code`, painted with
 /// `tokens` when there are any, or why there is nothing to show.
@@ -22,7 +22,7 @@ let code_pane m label code tokens =
         m.locale
         "Compilation failed. See the error above."
         "Не удалось скомпилировать код. Сообщение об ошибке — выше."
-    else if errors (generated m) > 0 then
+    else if errors m > 0 then
       tr
         m.locale
         "Fix the diagnostics to see what the compiler writes."
@@ -45,7 +45,7 @@ let generated_pane m =
     m
     (tr m.locale "Generated JavaScript" "Сгенерированный JavaScript")
     (generated m).code
-    (if m.profile == Debug then m.debug_tokens else m.release_tokens)
+    m.generated_tokens
 
 declarations_pane : Model -> Ui
 let declarations_pane m =
