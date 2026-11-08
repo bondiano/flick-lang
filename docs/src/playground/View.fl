@@ -94,7 +94,9 @@ let view model m = ui {
         aria_hidden = Some true;
         tab_index = Some (-1);
       }
-      (button { disabled = false; on_click = Ui.Event.exhaust (fun _ -> task { runtime_messages model }) } []),
+      (button
+        { disabled = false; on_click = Ui.Event.exhaust (fun _ -> task { runtime_messages model }) }
+        []),
     div { class_name = "fp-workspace" } [
       Toolbar.view model m,
       if m.load_error != "" then

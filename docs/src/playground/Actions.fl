@@ -352,7 +352,8 @@ let runtime_messages model =
           status = "failure";
           detail = first.text;
         };
-      })
+      }
+    )
     if crashes != [] then close_preview ()
 
 report : Atom.Writable Model -> Failure e ->{Atom.Write;} Unit
