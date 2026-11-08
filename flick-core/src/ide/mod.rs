@@ -122,7 +122,10 @@ impl Ide<'_> {
             let symbol = match r {
                 Ref::Local => {
                     let name = token.text(text).to_owned();
-                    let binder = locals::binder(&m.tree, range.0, &name, text)?;
+                    let binder = match m.typing.binders.get(&range) {
+                        Some(&binder) => binder,
+                        None => locals::binder(&m.tree, range.0, &name, text)?,
+                    };
                     Symbol::Local { file, binder, name }
                 }
                 Ref::Value { module, name } => match name.split_once('$') {
@@ -427,6 +430,8 @@ fn entity(module: &str, namespace: Namespace, name: &str) -> Symbol {
         name: name.to_owned(),
     })
 }
+#[cfg(test)]
+mod block_locals_tests;
 #[cfg(test)]
 mod companion_tests;
 #[cfg(test)]

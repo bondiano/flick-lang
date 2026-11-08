@@ -188,6 +188,7 @@ impl Checker<'_> {
                 let rec = (!explicit).then(|| self.new_rec(&name));
                 self.locals.push(Local {
                     name: name.clone(),
+                    at: Some(at),
                     generated: at >= self.generated,
                     ty: scheme.clone(),
                     rec,

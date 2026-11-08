@@ -40,6 +40,10 @@ pub struct Typing {
     pub declarations: Arc<Interface>,
     /// Every name in an expression or a constructor pattern.
     pub names: HashMap<Range, Ref>,
+    /// The binder of each name of the user's code that is a local, where an
+    /// editor cannot find it in the tree: in a block, generated code decides
+    /// which binder a name sees.
+    pub binders: HashMap<Range, Range>,
     /// The representation of each `unboxed` or `untagged` type of the module.
     pub abis: HashMap<String, Abi>,
     /// Applications `f a1 … ai` (from `f` to `ai`) and pipes `x |> f` whose

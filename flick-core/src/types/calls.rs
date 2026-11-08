@@ -20,6 +20,7 @@ impl Checker<'_> {
     pub fn push_local(&mut self, name: &str, at: u32, ty: Type) {
         self.locals.push(Local {
             name: name.to_owned(),
+            at: Some(at),
             generated: at >= self.generated,
             ty,
             rec: None,
@@ -68,6 +69,14 @@ impl Checker<'_> {
                 .rposition(|l| l.name == name && l.generated == (span.start >= self.generated))
         {
             self.record_name(span, Ref::Local);
+            if let Some(at) = self.locals[i].at
+                && span.start < self.generated
+            {
+                let end = at + u32::try_from(name.len()).expect("source fits in u32");
+                self.typing
+                    .binders
+                    .insert((span.start, span.end), (at, end));
+            }
             self.gadt.declared = self.declared_local(i);
             return self.use_local(i, span);
         }
