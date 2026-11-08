@@ -74,12 +74,14 @@ impl<'t> Comments<'t> {
     }
 
     /// The comments on their own lines before `before`, to be written on
-    /// lines of their own before the item that starts there.
+    /// lines of their own before the item that starts there. It stops at a
+    /// comment with code before it on its line: [`inline`](Self::inline)
+    /// writes that one, or finds it misplaced.
     pub fn leading(&mut self, before: u32) -> Vec<Comment<'t>> {
         let mut out = Vec::new();
-        while let Some(c) = self.peek().filter(|c| c.start < before) {
+        while let Some(c) = self.peek().filter(|c| c.start < before && c.own_line) {
             self.next += 1;
-            if c.start < self.cursor || !c.own_line {
+            if c.start < self.cursor {
                 self.misplaced = true;
             }
             out.push(c);
@@ -89,7 +91,9 @@ impl<'t> Comments<'t> {
 
     /// The comments ending the line of the last token written, before
     /// `before`: only whitespace, or the separator `sep` the layout writes
-    /// itself, may stand between that token and them.
+    /// itself, may stand between that token and them, and only whitespace or
+    /// a closer after them. A comment with code after it stays for
+    /// [`inline`](Self::inline).
     pub fn trailing(&mut self, before: u32, sep: Option<char>) -> Option<&'t str> {
         let mut from = self.cursor as usize;
         let first = self.next;
@@ -101,6 +105,15 @@ impl<'t> Comments<'t> {
             }
             self.next += 1;
             from = c.start as usize + c.text.len();
+        }
+        // a closer after them ends the item too, as in `{ a = 1; /* c */ }`
+        let rest = self.text[from..]
+            .split('\n')
+            .next()
+            .unwrap_or_default()
+            .trim();
+        if !(rest.is_empty() || rest.starts_with([')', ']', '}'])) {
+            self.next = first;
         }
         let taken = &self.list[first..self.next];
         match taken {
@@ -127,6 +140,32 @@ impl<'t> Comments<'t> {
                 out.push(c.text);
             }
         }
+        out
+    }
+
+    /// The block comments right after a token ending at `after`, when what
+    /// follows them is a token written with no space before it, as `)` or
+    /// `,`: they stick to the token, `x /* c */)`.
+    pub fn before_closer(&mut self, after: u32) -> Vec<&'t str> {
+        let mut from = after as usize;
+        let mut end = self.next;
+        while let Some(c) = self.list.get(end).filter(|c| {
+            !c.own_line
+                && c.text.starts_with("/*")
+                && self.text[from..c.start as usize].trim().is_empty()
+        }) {
+            from = c.start as usize + c.text.len();
+            end += 1;
+        }
+        let closer = self.text[from..]
+            .trim_start()
+            .starts_with([')', ']', '}', ',', ';', '.', '?', '^']);
+        if end == self.next || !closer {
+            return Vec::new();
+        }
+        let out = self.list[self.next..end].iter().map(|c| c.text).collect();
+        self.next = end;
+        self.cursor = u32::try_from(from).unwrap_or(u32::MAX);
         out
     }
 

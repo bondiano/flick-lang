@@ -193,6 +193,34 @@ fn keeps_comments_in_place() {
     "#);
 }
 
+/// A block comment with code after it on its line stays there, spaced as a
+/// word; before a closer or a separator it sticks to the token on its left.
+#[test]
+fn keeps_block_comments_inline() {
+    let src = "let a = f /* b */ x\nlet c = (x /* c */)\nlet d = (/* d */ x)\nlet e = x /* g */ + y\nlet h = [1 /* h */, 2]\nlet i = [1, 2 /* i */]\nlet j = (1 /* j */, 2)\nlet k = { a = 1 /* k */ }\nlet l = { a = 1 /* l */; b = 2 }\nlet n = if x /* n */ then y else z\nlet o = fun x /* o */ -> x\nlet u = (/* u */)\nlet t = x /* a */ // b\nlet after = [1, /* s */ 2]\nlet last = { a = 1; /* e */ }\nv : List /* v */ A\nw : { a : Int /* w */ }\n";
+    insta::assert_snapshot!(fmt(src), @r#"
+    let a = f /* b */ x
+    let c = (x /* c */)
+    let d = (/* d */ x)
+    let e = x /* g */ + y
+    let h = [1 /* h */, 2]
+    let i = [1, 2 /* i */]
+    let j = (1 /* j */, 2)
+    let k = { a = 1 /* k */ }
+    let l = { a = 1 /* l */; b = 2 }
+    let n = if x /* n */ then y else z
+    let o = fun x /* o */ -> x
+    let u = (/* u */)
+    let t = x /* a */ // b
+    let after = [1, /* s */ 2]
+    let last = {
+      a = 1; /* e */
+    }
+    v : List /* v */ A
+    w : { a : Int /* w */ }
+    "#);
+}
+
 /// `sql`, `cli`, `do` and `for` blocks put one clause or statement per line.
 #[test]
 fn lays_out_blocks_in_braces() {
