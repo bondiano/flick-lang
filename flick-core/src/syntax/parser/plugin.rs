@@ -1,11 +1,13 @@
-//! Blocks of plugins: `import Sql exposing (plugin sql)` makes `sql` start
-//! a block in the rest of the file. `sql p { … }`, `sql "x" (T) { … }` and
+//! Blocks of plugins: `import Pairs exposing (plugin pairs)` makes `pairs`
+//! start a block in the rest of the file. `sql p { … }`, `sql "x" (T) { … }` and
 //! `server App.Api.place` are expressions; at the start of a declaration,
 //! `sql table Name "t" { … }` and `server fn ping x = …` are declarations.
 //! The arguments, the body and the rest of a declaration are kept as tokens
 //! for the plugin of `Sql`'s package to read. A head only the same
 //! file imports counts, so `f { a = 1 }` stays a call with a record wherever
-//! no import says so.
+//! no import says so; the heads of std's plugin ([`HEADS`]) need no import
+//! where they start a block, before `{` or as a declaration, and stay names
+//! elsewhere.
 
 use super::{K, Parser, SyntaxKind};
 use crate::plugin::first_party::{BARE, DECLARATIONS, HEADS};

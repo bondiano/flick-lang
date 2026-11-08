@@ -362,6 +362,7 @@ codes! {
     P041 = Project 41, "foreign module of a library cannot ship";
     P042 = Project 42, "the manifest disables this part of a plugin";
     P043 = Project 43, "the `std` does not fit this compiler";
+    P044 = Project 44, "another plugin gives a head of std's plugin";
 }
 
 #[cfg(test)]

@@ -14,9 +14,8 @@ use flick_plugin_sql::Sql;
 use super::{Expander, Native};
 
 /// The heads of the plugins linked into the compiler and the module that
-/// exposes each. One is a block even where no import exposes it, so the
-/// compiler can say which import it needs: `cli "x" { … }` stays the block
-/// it was before `Cli` gave it.
+/// exposes each. Every module has them without an import: `cli "x" { … }`
+/// is a block of std's plugin, and no other plugin may give the head.
 pub const HEADS: [(&str, &str); 4] = [
     ("cli", "Cli"),
     ("server", "Server"),
@@ -30,8 +29,7 @@ pub const BARE: [&str; 1] = ["server"];
 
 /// The declarations of the compiler's own plugins even where no import
 /// exposes their heads, by the head and the word after it: `server fn f x
-/// = …`, `sql table Users "users" { … }`, `sql migration 1 "m" { … }`, so
-/// that the compiler says which import they need.
+/// = …`, `sql table Users "users" { … }`, `sql migration 1 "m" { … }`.
 pub const DECLARATIONS: [(&str, &str); 3] =
     [("server", "fn"), ("sql", "table"), ("sql", "migration")];
 

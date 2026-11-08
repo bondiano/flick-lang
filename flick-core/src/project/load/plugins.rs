@@ -19,7 +19,6 @@ mod results;
 use published::Publications;
 use results::Results;
 
-use super::unimported::unimported;
 use super::{Loaded, Loader, Root};
 use crate::diagnostics::{Diagnostic, codes};
 use crate::plugin::expansion::{Expanded, Expansion};
@@ -201,16 +200,23 @@ impl Loader<'_> {
         }
     }
 
-    /// The heads the imports of `m` expose, each with the package of its
-    /// plugin, loading each plugin once; why one does not load goes to
-    /// `diagnostics`.
+    /// The heads of `m`, each with the package of its plugin: those of the
+    /// plugins linked into the compiler, which need no import, and those its
+    /// imports expose, loading each plugin once; why one does not load goes
+    /// to `diagnostics`.
     fn heads(
         &self,
         m: &Loaded,
         plugins: &mut Plugins,
         diagnostics: &mut Vec<Diagnostic>,
     ) -> HashMap<String, String> {
-        let mut heads: HashMap<String, String> = HashMap::new();
+        let std = first_party::PACKAGE;
+        let mut heads: HashMap<String, String> = (first_party::HEADS.iter())
+            .map(|(head, _)| ((*head).to_owned(), std.to_owned()))
+            .collect();
+        plugins.entry(std.to_owned()).or_insert_with(|| {
+            first_party::plugin(std).ok_or_else(|| format!("`{std}` has no linked plugin"))
+        });
         for import in m.syntax.imports.iter().filter(|i| !i.plugins.is_empty()) {
             let module = &import.module;
             let refuse = |why: String| {
@@ -256,6 +262,18 @@ impl Loader<'_> {
                 )));
             }
             for item in &import.plugins {
+                if package != std && first_party::HEADS.iter().any(|(h, _)| *h == item.name) {
+                    diagnostics.push(Diagnostic::error(
+                        codes::P044,
+                        format!(
+                            "`{}` is a head of `{std}`'s plugin, which every module has, so \
+                             the plugin of `{package}` cannot give it",
+                            item.name
+                        ),
+                        item.span,
+                    ));
+                    continue;
+                }
                 if loaded || !heads.contains_key(&item.name) {
                     heads.insert(item.name.clone(), package.clone());
                 }
@@ -354,8 +372,7 @@ struct Sink<'a> {
 }
 
 impl Sink<'_> {
-    /// The block `node` of the module `i`, read as `source`; a head of the
-    /// compiler's own plugins the module does not import is `FLICK-P037`.
+    /// The block `node` of the module `i`, read as `source`.
     fn take(
         &mut self,
         loader: &Loader,
@@ -371,10 +388,6 @@ impl Sink<'_> {
         };
         let head = token.text(text);
         let Some(package) = self.heads.get(head) else {
-            if let Some((_, module)) = first_party::HEADS.iter().find(|(h, _)| *h == head) {
-                let span = (token.start, token.end);
-                diagnostics.push(unimported(m.file, &m.parse.tree, span, head, module));
-            }
             return;
         };
         if let Some(off) = loader.disabled(package, head, Span::new(m.file, token.start, token.end))

@@ -24,7 +24,6 @@ mod plugins_tests;
 mod precompiled;
 mod runner;
 mod target;
-mod unimported;
 mod unknown;
 
 pub use checking::ModuleCache;
