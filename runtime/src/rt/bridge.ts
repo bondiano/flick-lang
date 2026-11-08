@@ -133,10 +133,31 @@ function* awaiting(ef: EffectFiber, owner: Owner | undefined, scope: EScope.Clos
 
 const FAST = !process.env["FLICK_BRIDGE_NO_FAST"];
 
+
 /** spike: crossings by kind, written to stderr at exit when FLICK_BRIDGE_COUNT is set. */
 export const crossings = { fromEffect: 0, fromEffectFast: 0, fromEffectRun: 0, callEffect: 0, callSync: 0, hostOp: 0, adopt: 0 };
 if (process.env["FLICK_BRIDGE_COUNT"]) process.on("exit", () => process.stderr.write(`[bridge] ${JSON.stringify(crossings)}\n`));
 const COUNT = Boolean(process.env["FLICK_BRIDGE_COUNT"]);
+
+/** spike: with FLICK_BRIDGE_COUNT=sites, full runs and kernel calls by the compiled frame that made them. */
+const SITES = process.env["FLICK_BRIDGE_COUNT"] === "sites";
+const sites = new Map<string, number>();
+const site = (kind: string): void => {
+  const limit = Error.stackTraceLimit;
+  Error.stackTraceLimit = 40;
+  const stack = new Error().stack ?? "";
+  Error.stackTraceLimit = limit;
+  const frame = stack
+    .split("\n")
+    .slice(1)
+    .find((l) => !l.includes("/runtime/dist/") && !l.includes("/node_modules/"));
+  const at = `${kind} ${frame?.trim().replace(/^at /, "").replace(/file:\/\/\S*\/(dist\/[^/]+\/)/, "$1") ?? "?"}`;
+  sites.set(at, (sites.get(at) ?? 0) + 1);
+};
+if (SITES)
+  process.on("exit", () => {
+    for (const [at, n] of [...sites].sort((a, b) => b[1] - a[1])) process.stderr.write(`[bridge] ${n}\t${at}\n`);
+  });
 
 /** An Effect as a call of the kernel: runs at once, on this stack, as far as it goes. */
 export const fromEffect = (effect: unknown): unknown => {
@@ -150,6 +171,7 @@ export const fromEffect = (effect: unknown): unknown => {
     if (tag === "Failure") return raise(causeIn((effect as unknown as { readonly cause: ECause.Cause<unknown> }).cause));
   }
   if (COUNT) crossings.fromEffectRun++;
+  if (SITES) site("fromEffect");
   const ctx = currentCtx();
   const scope = EScope.makeUnsafe();
   const services = Context.add(Context.add(hostOf(ctx), KERNEL, ctx), EScope.Scope, scope);
@@ -176,8 +198,9 @@ const exitOut = (exit: Exit): Effect.Effect<unknown, unknown> => {
 const ROOT_CTX = /*#__PURE__*/ currentCtx();
 
 /** A kernel call as an Effect: a fiber of the kernel per run, with the evidence of the Effect fiber that runs it. */
-export const callEffect = (call: () => unknown): Effect.Effect<unknown, unknown> =>
-  Effect.withFiber((ef) => {
+export const callEffect = (call: () => unknown): Effect.Effect<unknown, unknown> => {
+  if (SITES) site("callEffect");
+  return Effect.withFiber((ef) => {
     if (COUNT) crossings.callEffect++;
     const context = ef.context as Context.Context<never>;
     const base = Context.getOrUndefined(context, KERNEL) ?? ROOT_CTX;
@@ -192,6 +215,7 @@ export const callEffect = (call: () => unknown): Effect.Effect<unknown, unknown>
       });
     });
   });
+};
 
 /** A Sync stage of Flick that Effect's side calls and that gives its value: the evidence is the services the side set. */
 export const callSync = (call: () => unknown): unknown => {
