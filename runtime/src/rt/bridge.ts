@@ -1,7 +1,7 @@
 // spike: the bridge between the kernel and Effect. Effect's Context travels on
 // the kernel's evidence (`Ctx.host`); the kernel's evidence travels in Effect's
 // Context under `KERNEL`. A crossing that ends at once takes no suspension.
-import { Cause as ECause, Context, Duration as EDuration, Effect, Exit as EExit, Layer as ELayer, Option as EOption, Result as EResult, Scope as EScope } from "effect";
+import { Cause as ECause, Context, Duration as EDuration, Effect, Exit as EExit, Layer as ELayer, Option as EOption, Result as EResult, Scheduler, Scope as EScope } from "effect";
 
 import { Failure as HostFailure } from "../cause.ts";
 import { failureCause, flickExit, nativeExit } from "../stdlib/outcome.ts";
@@ -133,6 +133,12 @@ function* awaiting(ef: EffectFiber, owner: Owner | undefined, scope: EScope.Clos
 
 const FAST = !process.env["FLICK_BRIDGE_NO_FAST"];
 
+/**
+ * spike: an Effect run from the kernel keeps its turn until it waits for something. Its fiber
+ * gives its turn after 2048 operations otherwise, and a Sync stage that called it cannot wait
+ * for that turn to come back. FLICK_BRIDGE_YIELD=1 lets it give its turn as before.
+ */
+const NO_YIELD = !process.env["FLICK_BRIDGE_YIELD"];
 
 /** spike: crossings by kind, written to stderr at exit when FLICK_BRIDGE_COUNT is set. */
 export const crossings = { fromEffect: 0, fromEffectFast: 0, fromEffectRun: 0, callEffect: 0, callSync: 0, hostOp: 0, adopt: 0 };
@@ -174,7 +180,8 @@ export const fromEffect = (effect: unknown): unknown => {
   if (SITES) site("fromEffect");
   const ctx = currentCtx();
   const scope = EScope.makeUnsafe();
-  const services = Context.add(Context.add(hostOf(ctx), KERNEL, ctx), EScope.Scope, scope);
+  let services = Context.add(Context.add(hostOf(ctx), KERNEL, ctx), EScope.Scope, scope);
+  if (NO_YIELD) services = Context.add(services, Scheduler.PreventSchedulerYield, true);
   const fiber = currentFiber();
   const ef = Effect.runForkWith(services)(effect as Effect.Effect<unknown, unknown, never>, { uninterruptible: fiber.mask > 0 }) as unknown as EffectFiber;
   const exit = ef._exit;
