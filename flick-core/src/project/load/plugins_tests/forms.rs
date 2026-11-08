@@ -284,3 +284,19 @@ fn a_pattern_a_block_repeats_binds_in_each_place_and_is_used_if_one_copy_is() {
     let ir = ir::print(&compiled.modules[0].ir);
     assert!(ir.contains("seen"), "{ir}");
 }
+
+#[test]
+fn a_call_site_in_a_blocks_code_names_the_definition_the_block_gives() {
+    use crate::diagnostics::Severity;
+    let main = "module App.Main exposing (..)\n\nimport Pairs exposing (plugin define)\n\nshown : Float\ndefine shown { Flick.Debug.echo_at 1.0 }\n";
+    let mut sources = SourceMap::default();
+    let project = library(&mut sources);
+    let main_only = [PathBuf::from("/p/src/App/Main.fl")];
+    let (diagnostics, compiled) = compile(&host(main), &mut sources, Some(&project), &main_only);
+    assert!(
+        diagnostics.iter().all(|d| d.severity != Severity::Error),
+        "{diagnostics:?}"
+    );
+    let ir = serde_json::to_string(&compiled.modules[0].ir).expect("IR as JSON");
+    assert!(ir.contains("\"definition\":\"App.Main.shown\""), "{ir}");
+}
