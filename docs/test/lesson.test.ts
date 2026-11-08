@@ -4,6 +4,7 @@ import { cpSync, mkdirSync, readFileSync, readdirSync, rmSync } from "node:fs";
 import path from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
+import { lessonCheck } from "../src/playground/lesson-check.ts";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repo = path.join(here, "../..");
@@ -12,9 +13,9 @@ const exercise = path.join(here, "../exercises/signatures/01");
 
 test("signature starter fails and solution compiles, exports, and prints 5", () => {
   const config = readFileSync(path.join(exercise, "check.toml"), "utf8");
-  assert.match(config, /^export = "length_of"$/m);
-  assert.match(config, /^return_type = "number"$/m);
-  assert.match(config, /^output = "5"$/m);
+  assert.match(config, new RegExp(`^export = "${lessonCheck.exportName}"$`, "m"));
+  assert.match(config, new RegExp(`^return_type = "${lessonCheck.returnType}"$`, "m"));
+  assert.match(config, new RegExp(`^output = "${lessonCheck.output}"$`, "m"));
   for (const name of ["starter", "solution"]) {
     const dir = path.join(repo, "target/tmp/docs-lesson", name);
     rmSync(dir, { recursive: true, force: true });
