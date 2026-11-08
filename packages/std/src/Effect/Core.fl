@@ -25,7 +25,7 @@ foreign effect sleep from "@flick-lang/runtime/effect/Effect" "sleep"
 /// Runs `task` again after each typed failure, as long as the schedule,
 /// which gets the error, recurs; then fails with the last error. A defect
 /// or an interruption is never retried.
-retry : Schedule.Schedule r2 e2 (Errors e) o -> (Eff r e a)^c ->{r + r2; e + e2} a
+retry : Schedule.Schedule r2 e2 (Errors e) o -> (Eff r e a)^c ->{Async | r + r2; e + e2} a
 foreign effect retry from "@flick-lang/runtime/effect/Effect" "retry"
   arity 1
   retention call
@@ -36,7 +36,7 @@ foreign effect retry from "@flick-lang/runtime/effect/Effect" "retry"
 retry_or_else :
   Schedule.Schedule r2 e2 (Errors e) o ->
   (Errors e -> o ->{r3; e3} a) ->
-  (Eff r e a)^c ->{r + r2 + r3; e2 + e3}
+  (Eff r e a)^c ->{Async | r + r2 + r3; e2 + e3}
   a
 foreign effect retry_or_else from "@flick-lang/runtime/effect/Effect" "retryOrElse"
   arity 2
@@ -46,7 +46,7 @@ foreign effect retry_or_else from "@flick-lang/runtime/effect/Effect" "retryOrEl
 /// Runs `task`, then again as long as the schedule, which gets each
 /// result, recurs; the schedule's last output. The first typed failure
 /// stops it.
-repeat : Schedule.Schedule r2 e2 a o -> (Eff r e a)^c ->{r + r2; e + e2} o
+repeat : Schedule.Schedule r2 e2 a o -> (Eff r e a)^c ->{Async | r + r2; e + e2} o
 foreign effect repeat from "@flick-lang/runtime/effect/Effect" "repeat"
   arity 1
   retention call
@@ -57,7 +57,7 @@ foreign effect repeat from "@flick-lang/runtime/effect/Effect" "repeat"
 repeat_or_else :
   Schedule.Schedule r2 e2 a o ->
   (Errors (e + e2) -> Option (Schedule.Metadata o a) ->{r3; e3} o) ->
-  (Eff r e a)^c ->{r + r2 + r3; e3}
+  (Eff r e a)^c ->{Async | r + r2 + r3; e3}
   o
 foreign effect repeat_or_else from "@flick-lang/runtime/effect/Effect" "repeatOrElse"
   arity 2
@@ -66,14 +66,14 @@ foreign effect repeat_or_else from "@flick-lang/runtime/effect/Effect" "repeatOr
 
 /// Runs `task` by the schedule, which gets no input, delaying before each
 /// run after the first; the schedule's last output.
-schedule : Schedule.Schedule r2 e2 i o -> (Eff r e a)^c ->{r + r2; e + e2} o
+schedule : Schedule.Schedule r2 e2 i o -> (Eff r e a)^c ->{Async | r + r2; e + e2} o
 foreign effect schedule from "@flick-lang/runtime/effect/Effect" "schedule"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:2f8fe183096c3d87"
 
 /// `repeat` with `initial` as the schedule's first input.
-schedule_from : a -> Schedule.Schedule r2 e2 a o -> (Eff r e a)^c ->{r + r2; e + e2} o
+schedule_from : a -> Schedule.Schedule r2 e2 a o -> (Eff r e a)^c ->{Async | r + r2; e + e2} o
 foreign effect schedule_from from "@flick-lang/runtime/effect/Effect" "scheduleFrom"
   arity 2
   retention call

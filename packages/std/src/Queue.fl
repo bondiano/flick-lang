@@ -88,12 +88,12 @@ foreign effect clear from "@flick-lang/runtime/effect/Queue" "clear"
 
 /// Takes every message there is, waiting for at least one; `None` once the
 /// queue has ended.
-take_all : Queue e a ->{; e} Option (NonEmpty.NonEmpty a)
+take_all : Queue e a ->{Async; e} Option (NonEmpty.NonEmpty a)
 foreign effect take_all from "@flick-lang/runtime/effect/Queue" "flickTakeAll"
   reviewed "effect@4.1.2 sha256:170d42fe7835aca7"
 
 /// Takes messages until the queue ends.
-collect : Queue e a ->{; e} List a
+collect : Queue e a ->{Async; e} List a
 foreign effect collect from "@flick-lang/runtime/effect/Queue" "collect"
   reviewed "effect@4.1.2 sha256:bb7ddca7be71be4a"
 
@@ -123,7 +123,7 @@ foreign effect poll from "@flick-lang/runtime/effect/Queue" "poll"
 
 /// The next message without taking it, waiting for one; `None` once the
 /// queue has ended.
-peek : Queue e a ->{; e} Option a
+peek : Queue e a ->{Async; e} Option a
 foreign effect peek from "@flick-lang/runtime/effect/Queue" "flickPeek"
   reviewed "effect@4.1.2 sha256:729ae505fa36662c"
 
@@ -134,7 +134,7 @@ foreign effect flush from "@flick-lang/runtime/effect/Queue" "flush"
   reviewed "effect@4.1.2 sha256:a02312bfbec68ab8"
 
 /// Waits until the queue has ended; fails if it was failed.
-await_ : Queue e a ->{; e} Unit
+await_ : Queue e a ->{Async; e} Unit
 foreign effect await_ from "@flick-lang/runtime/effect/Queue" "await"
   reviewed "effect@4.1.2 sha256:6d927f44cb6bdc97"
 
