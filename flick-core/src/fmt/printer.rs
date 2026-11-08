@@ -70,18 +70,23 @@ impl<'a> Printer<'a> {
     }
 
     /// A token of the source, with the block comments written just before
-    /// it on its line.
+    /// it on its line, and those after it that stand before a closer.
     pub fn tok(&mut self, t: Token) -> Doc<'a> {
         let inline = self.comments.inline(t.start);
         self.comments.cursor = t.end;
+        let after = self.comments.before_closer(t.end);
         let text = self.a.text(t.text(self.text));
-        if inline.is_empty() {
+        if inline.is_empty() && after.is_empty() {
             return text;
         }
-        let comments = inline
+        let a = self.a;
+        let opener = matches!(t.kind, K::LParen | K::LBracket | K::LBrace);
+        let before = inline.iter().flat_map(|c| [a.text(c), a.text(" ")]);
+        let after = after
             .iter()
-            .flat_map(|c| [self.a.text(c), self.a.text(" ")]);
-        self.a.concat(comments.chain([text]))
+            .enumerate()
+            .flat_map(|(i, c)| [a.text(if i == 0 && opener { "" } else { " " }), a.text(c)]);
+        a.concat(before.chain([text]).chain(after))
     }
 
     /// The comments on their own lines, each followed by a line break; a
