@@ -1,0 +1,13 @@
+---
+title: "FLICK-E004"
+---
+
+`Layer.merge` builds an environment with one implementation of each service; two
+layers that both build a service leave the choice ambiguous. Remove the service
+from one layer, or say which one wins with `Layer.override`, where the second
+layer replaces the first.
+
+```flick ignore
+// was: Layer.merge users_live users_test
+Layer.override users_live users_test
+```

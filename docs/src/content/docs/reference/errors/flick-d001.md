@@ -1,0 +1,16 @@
+---
+title: "FLICK-D001"
+---
+
+`deriving Schema` builds a witness from the type's definition, and every
+field needs one: a primitive, a type that derives `Schema` itself, `List`,
+`Option`, `Result`, `Redacted`, a tuple or a record of them, or a type
+parameter. A function, a `Ref`, a scoped resource or a runtime description
+has none; the message names the path of the field. `T.schema` needs a type
+that derives `Schema`.
+
+```flick ignore
+type alias Profile = { name : String; session_id : String }
+  deriving Schema
+// was: session : File s, a live resource with no wire form
+```

@@ -1,0 +1,35 @@
+---
+title: "FLICK-F002"
+---
+
+A parameter of a foreign function whose type may hold a scope's
+capabilities (a region, or a capture qualifier `^c`) needs a `retention`
+contract: `retention call` when the JS code keeps nothing past the call, or
+`retention owner` when it keeps it until the owner of the region closes.
+Without one, the compiler cannot tell how long the JS code holds the value.
+
+```flick ignore
+each : forall c a. (a ->{} Unit)^c -> (List a ->{} Unit)^c
+foreign each from "./each.js" "each"
+  retention call
+```
+
+With `retention owner` the JS code keeps the argument until the owner of a
+region `s` closes, so it may hold only what outlives `s`. A capture row `c`
+of a parameter that the result does not show then needs `Fiber.Outlives c s`;
+without it a finalizer or a child of an outer scope could keep a resource of
+an inner scope past its close. The work it keeps runs with the services of
+its caller, so a service row `r` of that work needs `Fiber.Provided r s`
+and `Detached r` too.
+
+A signature with one region gets these constraints without writing them, and
+its callers have to meet them. With two regions the compiler cannot tell which
+one owns the argument, so write them:
+
+```flick ignore
+add_finalizer_to :
+  (Fiber.Outlives c s, Fiber.Provided r s, Detached r) =>
+  Handle t -> (Eff r none Unit)^c ->{Scope s | r;} Unit
+foreign effect add_finalizer_to from "./scope.js" "addFinalizerTo"
+  retention owner
+```

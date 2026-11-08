@@ -1,0 +1,16 @@
+---
+title: "FLICK-U007"
+---
+
+A function that reads atoms (`Atom.Read`) and returns a `Ui` renders as
+part of whatever calls it: when one of its atoms changes, the whole caller
+renders again. A `component` renders on its own, so only it renders again.
+
+```flick ignore
+count : Atom.Writable Float
+let count = Atom.make 0
+
+component counter () = ui { text (show (Atom.value count)) }
+```
+
+Inside `ui { … }`, write `counter ()` where the function was called.

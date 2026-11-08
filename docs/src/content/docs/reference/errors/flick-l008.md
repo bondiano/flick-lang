@@ -1,0 +1,9 @@
+---
+title: "FLICK-L008"
+---
+
+Retired. The compiler checked `cli "name" { … }` blocks itself and refused
+them in a build without the `server-stdlib` Cargo feature. The blocks are now
+the plugin `cli` of `std`, which every build has.
+
+The code remains registered for historical diagnostics and is never reused.

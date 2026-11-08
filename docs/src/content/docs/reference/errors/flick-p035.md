@@ -1,0 +1,12 @@
+---
+title: "FLICK-P035"
+---
+
+An import exposes a plugin head, `plugin head`, whose plugin the compiler
+cannot load: the imported module is one of the project or a built-in one,
+which have no plugin, its package names no plugin, or the plugin does not
+load. The blocks of the head stay unchecked until it loads.
+
+```flick ignore
+import Pairs exposing (plugin pairs)
+```

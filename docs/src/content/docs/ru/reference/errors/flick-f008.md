@@ -1,0 +1,17 @@
+---
+title: "FLICK-F008"
+source_hash: "108246c9cae50434"
+---
+
+`flick ffi import` запускает Node-хелпер `@flick-lang/dts-importer`, который
+разрешает декларации пакета из проекта так же, как это делает TypeScript.
+Пакет должен быть установлен и содержать (или иметь) `.d.ts`; 
+`policy.toml` рядом с сгенерированным модулем должен перечислять экспорты пакета,
+известные импортёру; `--select` должен перечислять существующие экспорты.
+
+```toml
+# src/Ffi/LookupLib/policy.toml
+[exports.lookup]
+undefined = "none"
+catch = "JsError"
+```

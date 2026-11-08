@@ -1,0 +1,17 @@
+---
+title: "FLICK-T039"
+---
+
+A function takes more parameters than `[lint] max-params` in `flick.toml`
+(5 by default). A call with that many positional arguments is easy to get
+in the wrong order. Take a record: its fields are named at every call.
+
+```flick ignore
+type alias Box = { x : Float, y : Float, width : Float, height : Float, label : String, color : String }
+
+draw : Box -> Ui
+let draw box = Ui.text box.label
+```
+
+Raise the limit with `max-params = 7` under `[lint]`, or turn the warning
+off with `allow = ["FLICK-T039"]`.

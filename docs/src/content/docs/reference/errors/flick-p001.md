@@ -1,0 +1,12 @@
+---
+title: "FLICK-P001"
+---
+
+A source file passed to the command could not be read: it does not exist, is a
+directory, or is not readable by the current user.
+
+Check the path relative to the working directory:
+
+```sh
+flick check src/App/Main.fl
+```

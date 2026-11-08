@@ -25,6 +25,7 @@ export const sidebar = [
         translations: { ru: "Язык" },
         items: ["types", "gadts", "effects", "classes", "regions", "modules", "grammar", "keywords"].map(reference),
       },
+      { slug: "reference/errors" },
       {
         label: "Runtime",
         translations: { ru: "Среда выполнения" },

@@ -33,7 +33,7 @@ const pair = (rel) => {
 const frontmatter = (text) => /^---\n([\s\S]*?)\n---(?:\n|$)/.exec(text);
 
 /** The `source_hash` a page records, if any. */
-const recorded = (text) => /^source_hash:\s*(\S+)\s*$/m.exec(frontmatter(text)?.[1] ?? "")?.[1];
+const recorded = (text) => /^source_hash:\s*['"]?(\w+)['"]?\s*$/m.exec(frontmatter(text)?.[1] ?? "")?.[1];
 
 const relative = (file) => path.relative(process.cwd(), file).split(path.sep).join("/");
 

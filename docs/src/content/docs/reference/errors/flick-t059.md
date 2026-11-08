@@ -1,0 +1,37 @@
+---
+title: "FLICK-T059"
+---
+
+A signature writes something the compiler gives it anyway.
+
+A later stage of a function holds what its earlier parameters hold, so a
+qualifier that says just that can go:
+
+```flick ignore
+map : (a -> b)^c -> (List a -> List b)^c  // warns
+map : (a -> b)^c -> List a -> List b      // the same type
+```
+
+A foreign function with `retention owner` and one region in its signature gets
+`Fiber.Outlives`, `Fiber.Provided` and `Detached`, so it need not write them:
+
+```flick ignore
+add_finalizer : (Eff r none Unit)^c ->{Scope s | r;} Unit
+foreign effect add_finalizer from "./scope.js" "addFinalizer"
+  retention owner
+```
+
+An instance method has the type its class gives it, so a signature that repeats
+it can go. One whose type variables the method's body names stays, as they are
+in scope there:
+
+```flick ignore
+instance Functor Box =
+  map : (a -> b)^c -> Box a -> Box b  // warns
+  let map f (Box x) = Box (f x)
+```
+
+A qualifier that says less than the stage holds stays: `f : a -> (b -> b)^{}`
+says that the function it returns holds nothing of `a`.
+
+The fix is safe: `flick check --fix --only T059`.

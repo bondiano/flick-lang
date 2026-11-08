@@ -1,0 +1,11 @@
+---
+title: "FLICK-P004"
+---
+
+`flick fmt` could not write the formatted text back to a source file: it is
+read-only, its directory is not writable or the disk is full. The file keeps
+its previous contents.
+
+```sh
+chmod u+w src/App/Main.fl && flick fmt src/App/Main.fl
+```

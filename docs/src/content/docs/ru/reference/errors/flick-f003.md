@@ -1,0 +1,19 @@
+---
+title: "FLICK-F003"
+source_hash: "3c3ebbe77951068d"
+---
+
+`catch f` отображает исключение или отклонение JS в типизированную ошибку: `f` имеет тип
+`JsValue -> E`, где `E` является ошибкой из строки ошибок сигнатуры и не содержит
+возможностей области.
+
+```flick ignore
+type error FsError = FsError String
+
+from_js : JsValue -> FsError
+let from_js value = FsError "the file system failed"
+
+read_text : String ->{Async; FsError} String
+foreign read_text from "./fs.js" "readText"
+  catch from_js
+```

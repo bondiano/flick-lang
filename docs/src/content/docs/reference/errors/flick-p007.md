@@ -1,0 +1,12 @@
+---
+title: "FLICK-P007"
+---
+
+A project with `kind = "app"` must name its entry module: the module that
+exports `main : Unit ->{; AppError} Unit`. A library has no entry.
+
+```toml
+[project]
+kind = "app"
+entry = "App.Main"
+```

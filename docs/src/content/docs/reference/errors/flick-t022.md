@@ -1,0 +1,16 @@
+---
+title: "FLICK-T022"
+---
+
+`todo` stands for code not written yet. It has whatever type its place
+needs, so the rest of the module checks, and fails when it runs.
+`todo "what is missing"` says what it stands for in that failure.
+
+```flick ignore
+module App.Report exposing (render)
+
+render : List Float -> String
+let render rows = todo "render the rows as a table"
+```
+
+`flick pack` refuses a package with `todo` left in it.

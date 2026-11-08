@@ -1,0 +1,16 @@
+---
+title: "FLICK-T025"
+---
+
+`let assert` is for a pattern that can fail: it binds when the value
+matches and stops the program when it does not. A pattern that matches
+every value cannot fail, so the `assert` says nothing: write plain `let`.
+
+```flick ignore
+module App.Pairs exposing (sum)
+
+sum : (Float, Float) -> Float
+let sum pair =
+  let (a, b) = pair
+  a + b
+```

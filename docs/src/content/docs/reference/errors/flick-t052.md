@@ -1,0 +1,14 @@
+---
+title: "FLICK-T052"
+---
+
+`fun x -> f x` is a function that calls `f` with its parameter: `f` is
+that function already. The quick fix writes `f`. With more arguments,
+`fun x -> f a x` is `f a`. That fix is not applied by `flick check --fix`,
+because `f a` then runs once when the function is made. A class method,
+such as `pure`, is not reported: it finds its instance at the call.
+
+```flick ignore
+doubled : List Float -> List Float
+let doubled xs = List.map double xs
+```

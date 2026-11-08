@@ -1,0 +1,16 @@
+---
+title: "FLICK-T001"
+---
+
+A name used in a type or an expression is not defined in the module, not
+imported, and not built in. Qualified names need a module the file imports
+(`import App.Users`), a built-in module (`Ref`, `String`, …) or a service
+declared in scope (`Users.get`). Type variables of a `type` declaration must be
+its parameters.
+
+```flick ignore
+type alias Pair a b = (a, b)  // `b` is a parameter, so it may be used
+
+total : List Float -> Float
+let total items = List.sum items
+```

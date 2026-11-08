@@ -1,0 +1,21 @@
+---
+title: "FLICK-E016"
+---
+
+`provide S impl { body }` handles the service `S` in its body with the
+record `impl : S.Impl`, each operation by its field. Only a service, whose
+operations are all `tail`, is handled so: a field gives its operation a
+value. An effect is handled by the arms of a `try`.
+
+```flick ignore
+effect Throw =
+  abort throw : forall b. String ->{} b
+
+attempt : forall a r e. (Unit ->{Throw | r; e} a) ->{r; e} Result String a
+let attempt body =
+  // was: provide Throw { throw = fun m -> … } { Ok (body ()) }
+  try
+    Ok (body ())
+  with
+  | Throw.throw message -> Err message
+```

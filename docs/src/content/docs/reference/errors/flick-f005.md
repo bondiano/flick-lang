@@ -1,0 +1,20 @@
+---
+title: "FLICK-F005"
+---
+
+`flick ffi import` writes `foreign blocked name "reason"` for an export of
+a package it cannot bind safely: a type outside the supported subset, or a
+contract the `.d.ts` does not state (a promise's rejections, a callback's
+retention, a nullable result). The other exports of the package stay
+usable; this one needs a binding written and reviewed by hand, or a policy
+in `policy.toml` beside the generated module and a new `ffi import`.
+
+```flick ignore
+// Generated.fl: foreign blocked lookup "needs policy: …"
+lookup : String ->{Async; JsError} Option String
+foreign lookup from "lookup-lib" "lookup"
+  arity 1
+  catch JsError.from_js
+  nullable
+  reviewed "lookup-lib@1.0.0 sha256:…"
+```

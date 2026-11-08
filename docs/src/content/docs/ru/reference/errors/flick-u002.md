@@ -1,0 +1,14 @@
+---
+title: "FLICK-U002"
+source_hash: "dd10a5cf1685d5b2"
+---
+
+Обработчик, созданный из `fun` внутри render `Ui.view`, является новым замыканием при каждом рендере представления. Слушатель, который React хранит, остаётся тем же, но замыкание выделяется заново, и пропсы, содержащие его, никогда не сравниваются как равные. Объявите обработчик один раз как `Action` на верхнем уровне и передавайте различающиеся данные между элементами с помощью `Action.with`.
+
+```flick ignore
+remove : Action.Action (Item, Ui.ClickSnapshot)
+let remove = Action.exhaust (fun (item, _) -> task { Atom.update items (List.filter (fun i -> i != item)) })
+
+item_view : Ui.View Item
+let item_view = Ui.view (fun item -> ui { button { disabled = false; on_click = Action.with remove item } [text item.name] })
+```
