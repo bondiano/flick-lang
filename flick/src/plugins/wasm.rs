@@ -324,6 +324,19 @@ impl Expander for Wasm {
         }
     }
 
+    fn transform(&self, program: &[u8]) -> Result<Vec<u8>, Failure> {
+        let (result, _) = self.run(BlockSource::default(), |plugin, store| {
+            plugin.call_transform(store, program)
+        });
+        match result {
+            Ok(Ok(program)) => Ok(program),
+            Ok(Err(found)) => Err(Failure::Refused(
+                found.into_iter().map(convert::from_diagnostic).collect(),
+            )),
+            Err(why) => Err(Failure::Broken(why)),
+        }
+    }
+
     fn emit(
         &self,
         artifacts: &[flick_plugin::Artifact],

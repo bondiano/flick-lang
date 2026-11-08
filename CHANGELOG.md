@@ -6,6 +6,12 @@ break programs.
 
 ## Unreleased
 
+- **A plugin's pass over the IR:** a library whose `[package]` says `hooks = ["ir"]`
+  beside its `plugin` gets the IR of the project's modules as CBOR after the
+  checks of effects and gives what `flick build`, `run` and `test` compile
+  instead. The compiler checks it for form (`FLICK-P047` when it does not hold
+  together, from a new validator in `flick-ir`) and notes the rewrite with
+  `FLICK-P048`: what the program does is then outside Flick's checks.
 - **A plugin's `emit`:** a library whose `[package]` says `hooks = ["emit"]` beside
   its `plugin` rewrites the files `flick build` writes, its scripts, their maps
   and interfaces, before they are written; a script changed without its map is

@@ -103,11 +103,12 @@ fn prepare(options: &TestArguments, global: &GlobalArguments) -> Result<PathBuf,
         return fail(&sources, vec![diagnostic]);
     }
     progress.stage("Compiling Flick modules");
-    let (diagnostics, compilation) = package_cache::with_saved(|saved| {
+    let (mut diagnostics, mut compilation) = package_cache::with_saved(|saved| {
         let (diagnostics, compilation, fresh) =
             project::compile_with(&host, &mut sources, Some(&project), &roots, saved);
         ((diagnostics, compilation), fresh)
     });
+    super::build::hooks::ir(Some(&project), &mut compilation, &mut diagnostics);
     let errors = diagnostics.iter().any(|d| d.severity == Severity::Error);
     let progress = if diagnostics.is_empty() {
         progress

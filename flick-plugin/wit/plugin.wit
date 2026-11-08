@@ -300,6 +300,12 @@ world plugin {
   /// contents `bytes`: declarations, at spans of the file. Only a plugin whose
   /// package says `load = ["ext"]` gets the files of that extension.
   export load: func(path: string, bytes: list<u8>) -> result<arena, list<diagnostic>>;
+  /// The IR of the project's modules, a `Program` of the compiler's IR as
+  /// CBOR, without the built-in modules, after the checks of effects and
+  /// before the build optimizes it; the program the build compiles instead,
+  /// which it checks for form and nothing else. Only a plugin whose package
+  /// says `hooks = ["ir"]` gets it, in `flick build`, `run` and `test`.
+  export transform: func(program: list<u8>) -> result<list<u8>, list<diagnostic>>;
   /// The files of `flick build` after it wrote them: their paths and texts,
   /// each `.js` with its `.map` when the build writes maps, and the `.iface`
   /// that sums up the types; what the build writes instead. Only a plugin

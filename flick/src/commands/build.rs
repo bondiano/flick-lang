@@ -22,7 +22,7 @@ use crate::sources::FsHost;
 use crate::{cache, toolchain};
 
 mod cached;
-mod hooks;
+pub(super) mod hooks;
 mod progress;
 mod shipped;
 
@@ -157,6 +157,7 @@ impl Command for BuildCommand {
             };
         }
         compilation.modules.retain(|c| !c.test);
+        hooks::ir(project.as_ref(), &mut compilation, &mut diagnostics);
         let modules = &compilation.modules;
         let entries = match &project {
             Some(p) => self.entries(p),

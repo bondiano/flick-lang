@@ -40,6 +40,27 @@ fn parts(state: &[u8]) -> (&[u8], &[u8]) {
 flick_plugin::export!(Pairs);
 
 impl Plugin for Pairs {
+    /// The IR with each string `"hello"` as `"HELLO"`; a string `"break the
+    /// IR"` becomes a local nothing binds.
+    fn transform(&self, program: Vec<u8>) -> Result<Vec<u8>, Vec<Diagnostic>> {
+        let mut program = flick_ir::Program::from_cbor(&program)
+            .map_err(|e| vec![Diagnostic::error(e.to_string(), Span::default())])?;
+        for module in &mut program.modules {
+            for item in &mut module.items {
+                match &mut item.kind {
+                    flick_ir::ItemKind::Value { body, .. } => shout(body),
+                    flick_ir::ItemKind::Instance { methods, .. } => {
+                        for (_, body) in methods {
+                            shout(body);
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
+        Ok(program.to_cbor())
+    }
+
     /// Each `.js` with a line `// pairs` before it, its `.map` a line later.
     fn emit(&self, artifacts: Vec<Artifact>) -> Result<Vec<Artifact>, Vec<Diagnostic>> {
         Ok((artifacts.into_iter())
@@ -260,4 +281,17 @@ fn arguments(
 
 fn refuse(token: Token, message: &str) -> Diagnostic {
     Diagnostic::error(message, token.span)
+}
+
+/// `e` with each string `"hello"` in it as `"HELLO"`, and `"break the IR"`
+/// as a local nothing binds.
+fn shout(e: &mut flick_ir::Expr) {
+    if let flick_ir::ExprKind::Lit(flick_ir::Lit::String(s)) = &mut e.kind {
+        if s == "hello" {
+            *s = "HELLO".into();
+        } else if s == "break the IR" {
+            e.kind = flick_ir::ExprKind::Local("dangling".into());
+        }
+    }
+    e.each_child_mut(&mut |child| shout(child));
 }

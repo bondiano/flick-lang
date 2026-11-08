@@ -365,6 +365,8 @@ codes! {
     P044 = Project 44, "another plugin gives a head of std's plugin";
     P045 = Project 45, "the plugins of two packages load one extension";
     P046 = Project 46, "a plugin's emit changed code without its map";
+    P047 = Project 47, "the IR a plugin gave does not hold together";
+    P048 = Project 48, "a plugin rewrote the IR of the build";
 }
 
 #[cfg(test)]
