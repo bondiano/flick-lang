@@ -28,7 +28,12 @@ export const durationSeconds = (n: number) => checked("seconds", n, 1000);
 export const durationMinutes = (n: number) => checked("minutes", n, 60_000);
 
 /** spike: a duration may be Effect's: the one the bridge gives Flick, for Effect's code to read. */
-export const durationHooks: { millis: (d: unknown) => number } = { millis: (d) => (d as Duration).millis };
+export const durationHooks: { millis: (d: unknown) => number } = {
+  millis: (d) => {
+    if (d instanceof Duration) return d.millis;
+    throw new TypeError("not a duration of this runtime");
+  },
+};
 
 /** A duration that is not positive yields; an infinite one never ends. */
 export const sleep = (d: Duration): Instruction =>

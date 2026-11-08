@@ -26,7 +26,13 @@ export const HOST = /*#__PURE__*/ Object.freeze({ key: "flick/bridge/HostContext
 export const layerHooks: {
   adopt: (layer: unknown) => Layer;
   merge: (a: unknown, b: unknown) => unknown;
-} = { adopt: (layer) => layer as Layer, merge: (_, b) => b };
+} = {
+  adopt: (layer) => {
+    if (layer instanceof Layer) return layer;
+    throw new TypeError("not a layer of this runtime");
+  },
+  merge: (_, b) => b,
+};
 
 const servicesOf = (value: unknown): Services => (Array.isArray(value) ? (value as Services) : []);
 
