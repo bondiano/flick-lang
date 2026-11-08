@@ -162,7 +162,7 @@ const site = (kind: string): void => {
 };
 if (SITES)
   process.on("exit", () => {
-    for (const [at, n] of [...sites].sort((a, b) => b[1] - a[1])) process.stderr.write(`[bridge] ${n}\t${at}\n`);
+    for (const [at, n] of [...sites].toSorted((a, b) => b[1] - a[1])) process.stderr.write(`[bridge] ${n}\t${at}\n`);
   });
 
 /** An Effect as a call of the kernel: runs at once, on this stack, as far as it goes. */
