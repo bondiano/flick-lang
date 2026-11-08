@@ -82,7 +82,7 @@ Q2c — неустранимо: `callEffect` запускает на кажды�
 - json: `Codec.decode`, `ServerResponse.schema_json` — по одному полному запуску.
 - ssr: `provide Atom.layer` собирает реестр на каждый запрос (`adopt` и запуск `Layer.buildWithMemoMap`) — это задумано самим тестом («with a registry of its own»), промаха memo map нет. Ещё `Atom.set`, `Ui.Server.render` и около трёх закрытий scope Effect из owners ядра (`settled`, `hostOwnerOf`).
 
-### Куда уходит CPU на SSR (`results/ssr-profile.txt`, `profile.py`)
+### Куда уходит CPU на SSR (`results/ssr-profile.txt`, `profile.mjs cpu`)
 
 `node --cpu-prof`, 300 запросов на прогрев и 1500 последовательных в каждом режиме. Занятое время: `rt` 1.68 с, `js` 1.42 с, то есть +144 мкс на запрос; это совпадает с +145 мкс по нагрузке.
 
@@ -170,7 +170,7 @@ schema error
 - `runtime/src/rt/bridge.ts`: файбер Effect, запущенный из ядра, не отдаёт ход по бюджету операций (`Scheduler.PreventSchedulerYield`), пока ничего не ждёт; `FLICK_BRIDGE_YIELD=1` возвращает старое поведение. Чинит q3 в `rt`.
 - `codegen/js/foreign.rs`: функция уходит в Effect каррированной, как её зовёт Flick, а арность колбэка адаптирует `callback`, как без моста. Чинит `f(...) is not a function` в `cache`, `request`.
 - `runtime/src/rt/effect/Effect.ts`: `uninterruptible_mask` и `interruptible_mask` на ядре. Чинит `effect_errors`.
-- `FLICK_BRIDGE_COUNT=sites` — переходы по месту в скомпилированном коде; `profile.py` — профиль CPU по слоям.
+- `FLICK_BRIDGE_COUNT=sites` — переходы по месту в скомпилированном коде; `profile.mjs` — профиль CPU по слоям (`cpu`) и отношения микрозамера (`micro`).
 - Рантайм проходит `tsc` (раньше `pnpm install` падал на `bridge.ts`, а `dist` всё равно собирался); `stdlib-cases.sh` берёт `gtimeout` на macOS.
 
 Тест `rt-kernel.test.ts` «nothing the runtime's index reaches imports Effect» падает с первого коммита спайка: `rt/index.ts` экспортирует `bridge.ts`.
@@ -207,6 +207,8 @@ FLICK_NO_DIRECT=1 tools/load/spike/stdlib-cases.sh rt stdlib/http stdlib/server
 FLICK_BRIDGE_COUNT=sites node tools/load/ssr/dist/rt/flick-server.js          # и запросы
 FLICK_BRIDGE_DUMP=$PWD/tools/load/spike/dump.tsv flick --project packages/std check && python3 tools/load/spike/count.py
 python3 tools/load/spike/medians.py tools/load/spike/results/*.tsv
+node tools/load/spike/profile.mjs micro                                      # results/micro-2.txt
+node tools/load/spike/profile.mjs cpu rt js                                  # /tmp/prof/<mode>/*.cpuprofile от node --cpu-prof
 ```
 
 Нагрузка — `run-all.sh` (Linux: `taskset`, `/proc`), микрозамер — `micro.sh`.
