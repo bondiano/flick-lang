@@ -70,7 +70,9 @@ let read_later path =
 
 - **Host calls are not named yet.** `Console.log`, `Platform.env`,
   `DateTime.now` and `Random.next_int` are `->{}` functions. Such a signature
-  says only that the function runs in the runtime, not what it touches.
+  says only that the function runs in the runtime, not what it touches. In 0.2
+  the console, the clock, randomness, the environment and the arguments become
+  services: the signature names them, and a test swaps them.
 - **Defects stay outside the signature.** A pure function can still die with a
   defect or never finish. A runtime function can also be interrupted.
 - **`foreign` is taken on trust.** The compiler believes the signature of a
@@ -105,14 +107,15 @@ let load_two first_id second_id =
   parallel first second
 ```
 
-Local mutable variables and general loops are planned; they are not in the
-language yet.
+0.2 adds local mutable variables and loops: `let mut`, `loop` and `while`. A
+function that mutates its own variables stays pure from the outside.
 
 ## One language for the whole app
 
 The same modules build for two targets. JavaScript gives ES modules for the
 browser and Node: `ui` views render with React, and effects run on
-[Effect](https://effect.website/) for now. Go gives one executable that needs no
+[Effect](https://effect.website/). In 0.2 they run on a small runtime of
+Flick's own, and Effect becomes a package. Go gives one executable that needs no
 Node. `just language` compares the behaviour of both targets in CI.
 
 Pure code is written once and shared. In the
@@ -157,7 +160,8 @@ one app, so treat these as a sanity check.
 - **Pages that must ship little JavaScript.** A UI program carries the Effect
   runtime and React: the UI programs this repository tracks are held to budgets
   of 117–126 KB gzipped.
-- **Other platforms.** There is no mobile, desktop or WebAssembly target.
+- **Other platforms.** There is no mobile or desktop target. WebAssembly
+  comes in 0.2.
 - **Teams already productive with TypeScript and Effect.** On JavaScript, Flick
   runs on the same Effect, so adopting it is a choice of source language, not of
   runtime. [Effect coverage](../../reference/effect-surface/) lists what of

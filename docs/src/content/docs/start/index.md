@@ -18,4 +18,4 @@ have what you came for.
    [Effects, errors and services](../reference/effects/).
 
 Moving a project from 0.1 to `main`? [Upgrading to 0.2](../handbook/upgrading/)
-lists what changed and how to update it. 0.2 is not released yet.
+lists what changed and how to update it.
