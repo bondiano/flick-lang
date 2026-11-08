@@ -22,7 +22,7 @@ import State exposing (
   empty_compiled,
   empty_execution,
   errors,
-  initial_source,
+  first_source,
   profile_name,
 )
 
@@ -99,7 +99,7 @@ adopt_source : Atom.Writable Model ->{Atom.Write;} Unit
 let adopt_source model =
   let m = Atom.current model
   // A later example selection may not have committed its textarea yet.
-  if m.revision == 0 && m.source == initial_source then
+  if m.revision == 0 && m.source == first_source m.examples then
     let source = source_value ()
     if source != m.source then
       update model (fun m -> { m with source = source })

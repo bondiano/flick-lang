@@ -13,7 +13,7 @@ module State exposing (
   Model,
   empty_compiled,
   empty_execution,
-  initial_source,
+  first_source,
   tr,
   profile_name,
   generated,
@@ -22,7 +22,7 @@ module State exposing (
   initial_model,
 )
 
-import Examples exposing (examples)
+import Examples exposing (Example)
 
 type Mode = Play | Transpile
   deriving Eq
@@ -36,7 +36,7 @@ type Profile = Debug | Release
 type Tab = Output | Problems
   deriving Eq
 
-type alias Configuration = { mode : String; locale : String }
+type alias Configuration = { mode : String; locale : String; examples : List Example }
 type alias SyntaxToken = { text : String; class_name : String }
 type alias Diagnostic = { code : String; severity : String; message : String; at : String }
 type alias Generated = { code : String; diagnostics : List Diagnostic }
@@ -52,6 +52,7 @@ type alias Execution = {
 type alias Model = {
   mode : Mode;
   locale : Locale;
+  examples : List Example;
   source : String;
   revision : Float;
   profile : Profile;
@@ -83,10 +84,12 @@ let empty_compiled = {
 empty_execution : Execution
 let empty_execution = { lines = []; status = ""; detail = ""; diagnostics = [] }
 
-initial_source : String
-let initial_source =
-  let first = Option.with_default { name = ""; name_ru = ""; source = "" } (List.get 0 examples)
-  first.source
+/// The source the playground opens with: the first example's.
+first_source : List Example -> String
+let first_source examples =
+  match examples with
+  | [first, ..._] -> first.source
+  | [] -> ""
 
 tr : Locale -> String -> String -> String
 let tr locale english russian = if locale == Ru then russian else english
@@ -121,7 +124,8 @@ initial_model : Configuration -> Model
 let initial_model config = {
   mode = if config.mode == "transpile" then Transpile else Play;
   locale = if config.locale == "ru" then Ru else En;
-  source = initial_source;
+  examples = config.examples;
+  source = first_source config.examples;
   revision = 0;
   profile = Debug;
   tab = Output;

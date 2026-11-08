@@ -1,4 +1,4 @@
-module Dom exposing (configuration, source_value, notify)
+module Dom exposing (attributes, configuration, source_value, notify)
 
 import State exposing (Configuration)
 
@@ -13,3 +13,9 @@ foreign source_value from "./dom.ts" "sourceValue"
 notify : String ->{} Unit
 foreign notify from "./dom.ts" "notify"
   arity 1
+
+/// Host attributes `Ui.Host` does not type, such as `popover`.
+attributes : List (String, String) -> Ui^c -> Ui^c
+foreign pure attributes from "./dom.ts" "attributes"
+  arity 2
+  retention call

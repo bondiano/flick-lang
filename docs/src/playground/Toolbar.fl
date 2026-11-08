@@ -1,7 +1,8 @@
 module Toolbar exposing (choice, examples_view, view)
 
 import Actions exposing (choose, run_program, update)
-import Examples exposing (Example, examples)
+import Dom exposing (attributes)
+import Examples exposing (Example)
 import State exposing (Model, Mode(..), Profile(..), Tab(..), errors, generated, status, tr)
 
 choice : String -> Bool -> Bool -> (Unit ->{Atom.Write;} Unit) -> Ui
@@ -16,15 +17,45 @@ let choice label active disabled act =
       Ui.text label,
     ])
 
+/// The popover of the gallery; a choice in it closes it.
+gallery : String
+let gallery = "fp-gallery"
+
 pick : Atom.Writable Model -> Model -> Example -> Ui
 let pick model m example =
   Ui.keyed
-    example.name
-    (choice
-      (tr m.locale example.name example.name_ru)
-      (m.source == example.source)
-      m.running
-      (fun () -> choose model example))
+    example.id
+    (attributes
+      [("popoverTarget", gallery), ("popoverTargetAction", "hide")]
+      (choice
+        (tr m.locale example.name example.name_ru)
+        (m.source == example.source)
+        m.running
+        (fun () -> choose model example)))
+
+/// The examples by group, in the order of the gallery.
+groups : List Example -> List (List Example)
+let groups examples =
+  let names =
+    List.fold_left
+      (fun seen e -> if List.contains e.group seen then seen else seen ++ [e.group])
+      []
+      examples
+  [for name <- names yield [for e <- examples; if e.group == name yield e]]
+
+group_view : Atom.Writable Model -> Model -> List Example -> Ui
+let group_view model m examples =
+  match examples with
+  | [] -> Ui.fragment []
+  | [first, ..._] ->
+    Ui.keyed
+      first.group
+      (ui {
+        div { class_name = "fp-gallery-group" } [
+          paragraph [text (tr m.locale first.group first.group_ru)],
+          div { class_name = "fp-example-options" } (List.map (pick model m) examples),
+        ]
+      })
 
 set_profile : Atom.Writable Model -> Model -> Profile -> Ui
 let set_profile model m profile =
@@ -39,14 +70,29 @@ let set_profile model m profile =
       )
     )
 
+/// The gallery: a button with the current example's name opens a native
+/// popover of every example, by group.
 examples_view : Atom.Writable Model -> Model -> Ui
 let examples_view model m =
-  Ui.with_host
-    { Ui.host with role = Some "group"; aria_label = Some (tr m.locale "Examples" "Примеры") }
-    (Ui.div { class_name = "fp-examples" } [
-      Ui.span { class_name = "fp-control-label" } [Ui.text (tr m.locale "Examples" "Примеры")],
-      Ui.div { class_name = "fp-example-options" } (List.map (pick model m) examples),
-    ])
+  let current =
+    match List.find (fun e -> e.source == m.source) m.examples with
+    | Some e -> tr m.locale e.name e.name_ru
+    | None -> tr m.locale "Your code" "Ваш код"
+  ui {
+    div { class_name = "fp-examples" } [
+      span { class_name = "fp-control-label" } [text (tr m.locale "Examples" "Примеры")],
+      attributes
+        [("popoverTarget", gallery)]
+        (button { disabled = false; on_click = Ui.Event.latest (fun _ -> task { () }) } [
+          text (current ++ " ▾"),
+        ]),
+      attributes
+        [("popover", "auto")]
+        (Ui.with_host
+          { Ui.host with id = Some gallery; aria_label = Some (tr m.locale "Examples" "Примеры") }
+          (div { class_name = "fp-gallery" } (List.map (group_view model m) (groups m.examples)))),
+    ]
+  }
 
 view : Atom.Writable Model -> Model -> Ui
 let view model m = ui {

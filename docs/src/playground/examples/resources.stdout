@@ -1,0 +1,5 @@
+open file
+open socket
+close socket
+close file
+used file and socket

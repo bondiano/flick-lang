@@ -21,13 +21,20 @@ test("the playground hydrates the markup its page renders on the server", async 
   execFileSync(flick, ["build", path.join(here, "../src/playground/Playground.fl"), "--out-dir", out, "--color", "never"]);
   // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the compiled module exports what `Playground.fl` exposes
   const playground = (await import(pathToFileURL(path.join(out, "Playground.js")).href)) as {
-    initial_view: (config: { mode: string; locale: string }) => Effect.Effect<Ui>;
+    initial_view: (config: { mode: string; locale: string; examples: typeof examples }) => Effect.Effect<Ui>;
     main: (unit: undefined) => Effect.Effect<void, unknown>;
   };
+  const examples = [
+    { id: "hello", group: "Basics", group_ru: "Основы", name: "Hello", name_ru: "Привет", source: "module Main exposing (main)\n" },
+    { id: "other", group: "Types", group_ru: "Типы", name: "Other", name_ru: "Другое", source: "module Other exposing (x)\n" },
+  ];
   // as `Playground.astro` renders it
-  const markup = renderToString(uiRenderStatic(await Effect.runPromise(playground.initial_view({ mode: "play", locale: "en" }))));
+  const markup = renderToString(
+    uiRenderStatic(await Effect.runPromise(playground.initial_view({ mode: "play", locale: "en", examples }))),
+  );
   const dom = new JSDOM(
-    `<!doctype html><html><body><div id="flick-playground" data-mode="play" data-locale="en" data-flick-ssr>${markup}</div></body></html>`,
+    `<!doctype html><html><body><div id="flick-playground" data-mode="play" data-locale="en" data-flick-ssr>${markup}</div>` +
+      `<script type="application/json" id="flick-playground-examples">${JSON.stringify(examples)}</script></body></html>`,
   );
   Object.assign(globalThis, { window: dom.window, document: dom.window.document });
   const complaints: Array<string> = [];

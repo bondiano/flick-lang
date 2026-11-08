@@ -1,0 +1,18 @@
+// A file opened in a scope is closed when the scope ends, so it cannot leave it:
+// the function this returns would read a closed file.
+module Main exposing (main, reader)
+
+type File (s : Region)
+
+service Files =
+  open : forall s. String ->{Scope s;} File s
+  read : forall s. File s ->{} String
+
+reader : String ->{Files;} (Unit ->{Files;} String)
+let reader path = scope {
+  let file = Files.open path
+  fun () -> Files.read file
+}
+
+main : Unit ->{} Unit
+let main () = Platform.stdout_line "never runs"

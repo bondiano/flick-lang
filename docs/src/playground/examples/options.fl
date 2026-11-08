@@ -1,0 +1,16 @@
+// No null: a value that may be missing is an `Option`, a step that may fail a `Result`.
+module Main exposing (main)
+
+age : String -> Result String Int
+let age text =
+  match Int.parse text with
+  | Some n when n >= 0 -> Ok n
+  | Some _ -> Err "an age is not negative"
+  | None -> Err ("not a number: " ++ text)
+
+main : Unit ->{} Unit
+let main () =
+  Platform.stdout_line (show (age "36"))
+  Platform.stdout_line (show (age "-1"))
+  Platform.stdout_line (show (age "ada"))
+  Platform.stdout_line (show (List.head ([] : List Int)))

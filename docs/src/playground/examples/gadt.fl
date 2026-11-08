@@ -1,0 +1,25 @@
+// Each constructor says which type it builds, so `eval` returns exactly that type.
+module Main exposing (main)
+
+type Expr a =
+  | Num Int : Expr Int
+  | Yes Bool : Expr Bool
+  | Add (Expr Int) (Expr Int) : Expr Int
+  | Less (Expr Int) (Expr Int) : Expr Bool
+  | If (Expr Bool) (Expr a) (Expr a) : Expr a
+
+eval : forall a. Expr a -> a
+let rec eval e =
+  match e with
+  | Num n -> n
+  | Yes b -> b
+  | Add x y -> eval x + eval y
+  | Less x y -> eval x < eval y
+  | If c t f -> if eval c then eval t else eval f
+
+main : Unit ->{} Unit
+let main () =
+  let sum = Add (Num 1) (Num 2)
+  Platform.stdout_line (show (eval sum))
+  Platform.stdout_line (show (eval (Less sum (Num 5))))
+  Platform.stdout_line (show (eval (If (Less sum (Num 2)) (Num 10) (Num 20))))

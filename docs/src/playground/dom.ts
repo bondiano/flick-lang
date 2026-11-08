@@ -1,8 +1,23 @@
+export { attributes } from "../widgets/dom.ts";
+
+/** The examples of the gallery, as the page embeds them. */
+interface Example {
+  readonly id: string;
+  readonly group: string;
+  readonly group_ru: string;
+  readonly name: string;
+  readonly name_ru: string;
+  readonly source: string;
+}
+
 /** Page-provided configuration; decoding and all mode/locale behavior belong to Flick. */
-export const configuration = (): { mode: string; locale: string } => {
+export const configuration = (): { mode: string; locale: string; examples: ReadonlyArray<Example> } => {
   const root = document.getElementById("flick-playground");
   if (root === null) throw new Error("The page has no flick-playground container");
-  return { mode: root.dataset.mode ?? "", locale: root.dataset.locale ?? "" };
+  const embedded = document.getElementById("flick-playground-examples")?.textContent ?? "[]";
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the page writes this JSON from the gallery's index
+  const examples = JSON.parse(embedded) as ReadonlyArray<Example>;
+  return { mode: root.dataset.mode ?? "", locale: root.dataset.locale ?? "", examples };
 };
 
 /** Read native text entered before hydration; Flick adopts it into its model. */

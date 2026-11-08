@@ -1,0 +1,17 @@
+// Records have named fields, `with` makes a changed copy, `[for …]` builds a list.
+module Main exposing (main)
+
+type alias Book = { title : String; pages : Int; read : Bool }
+
+finish : Book -> Book
+let finish book = { book with read = true }
+
+main : Unit ->{} Unit
+let main () =
+  let shelf = [
+    { title = "Dune"; pages = 412; read = false },
+    { title = "Emma"; pages = 474; read = true },
+  ]
+  let left = [for b <- shelf; if not b.read yield b.pages]
+  Platform.stdout_line ("left to read: " ++ show (List.fold_left (fun a b -> a + b) 0 left))
+  Platform.stdout_line (show (List.map finish shelf))

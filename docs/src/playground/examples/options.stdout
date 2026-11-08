@@ -1,0 +1,4 @@
+Ok 36
+Err "an age is not negative"
+Err "not a number: ada"
+None

@@ -1,0 +1,13 @@
+// A `match` must cover every value: this one forgets `Paused`.
+module Main exposing (main)
+
+type Status = Running | Paused | Done
+
+label : Status -> String
+let label status =
+  match status with
+  | Running -> "running"
+  | Done -> "done"
+
+main : Unit ->{} Unit
+let main () = Platform.stdout_line (label Paused)
