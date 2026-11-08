@@ -3,13 +3,11 @@ title: Upgrading to 0.2
 description: What changed since Flick 0.1.0, and how to update a project.
 ---
 
-Flick 0.2 is in development on `main` and is not released yet. Before 1.0 a
-minor release may break programs, and 0.2 does: `std` is a package the
-project fetches, the `cli`, `codec` and `server fn` blocks and the derives of
-`Schema`, `Url`, `Form`, `HttpApi` and `Cli.Value` moved from the compiler
-into the plugin of `std`, and libraries are compiled from their sources.
-This page lists each change since 0.1.0 and how to update a project. It
-grows as more changes land.
+Before 1.0 a minor release may break programs, and 0.2 does: `std` is a
+package the project fetches, the `cli`, `codec` and `server fn` blocks and
+the derives of `Schema`, `Url`, `Form`, `HttpApi` and `Cli.Value` moved from
+the compiler into the plugin of `std`, and libraries are compiled from their
+sources. This page lists each change since 0.1.0 and how to update a project.
 
 ## How to upgrade
 
@@ -37,7 +35,11 @@ change needs.
 | [`deriving HttpApi` is stricter](#deriving-httpapi-is-stricter) | no | `std/D011`, `FLICK-C001` |
 | [SQL queries are stricter](#sql-queries-are-stricter) | no | `std/Q010`, `FLICK-T003` |
 | [What may suspend says `Async`](#what-may-suspend-says-async) | yes: `--only E002,F001,T003` | `FLICK-E002`, `FLICK-F001`, `FLICK-T003` |
-| Libraries are compiled from sources | no | `FLICK-R003` |
+| [Libraries are compiled from sources](#libraries-are-compiled-from-sources) | no | `FLICK-R003` |
+| [A `tail` arm may not suspend](#a-tail-arm-may-not-suspend) | no | `FLICK-E018` |
+| [`Scope.current` is not exposed](#scopecurrent-is-not-exposed) | no | `FLICK-T001` |
+| [Work a region keeps holds no `control` effect](#work-a-region-keeps-holds-no-control-effect) | no | `FLICK-E017` |
+| [The IR has no `Try`, `Provide`, `Scope` or `Operation`](#the-ir-has-no-try-provide-scope-or-operation) | no | — |
 | [Instances belong to one package](#instances-belong-to-one-package) | no | `FLICK-C006` |
 | [Plugins reach only what is granted](#plugins-reach-only-what-is-granted) | no | `FLICK-P038`, `FLICK-P039` |
 | [`LogLevel` is an enum](#loglevel-is-an-enum) | no | `FLICK-T001` |
@@ -215,6 +217,7 @@ nothing else. One case needs a hand: a function given rows of both kinds in
 a position no subtyping reaches, as `Channel.Channel none …` given a channel
 of a queue, takes a row variable instead: `Channel.Channel r e … ->{r; e} …`.
 
+## Libraries are compiled from sources
 
 In 0.1.0 an npm package gave its Flick modules as compiled interfaces:
 
@@ -372,9 +375,8 @@ Each old name is `FLICK-T001`; replace it by hand.
 A derive of an enum gets the literals of its constructors, and a plugin's
 `check` the base type of an enum; a derive knows which constructors are of
 a GADT (`refined`, `constrained` of a case), and a plugin asks while it
-expands whether a type is an enum (`literal-of`). The interface stays
-`0.1.0` until Flick 0.2 and changes without a new version: rebuild a
-component with the `flick-plugin` of the compiler it runs in.
+expands whether a type is an enum (`literal-of`). Rebuild a component with
+the `flick-plugin` of the compiler it runs in.
 
 ## `CallSite` replaces the `_at` writes
 
@@ -420,10 +422,3 @@ let keep_field x = { run = fun () -> ignore x }
 A checkout of `main` builds with Rust 1.95 (0.1.0 took 1.94); its
 `rust-toolchain.toml` names the version for rustup. The `server-stdlib`
 Cargo feature is gone: every build has the plugin of `std`.
-
-## Planned for 0.2
-
-These changes are planned and not done yet; each gets a section here when it
-lands:
-
-- later, changes to the core of effects.
