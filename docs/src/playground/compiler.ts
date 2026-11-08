@@ -1,8 +1,8 @@
 // Compiler/worker interoperability only. Widget state and presentation live in Flick.
 import type { Built, Completion, Diagnostic, Generated, Hover, Operation, Reply, Request, Result } from "./compiler.worker.ts";
-import frameScript from "./frame.ts?worker&url";
 import { packages } from "./loader.ts";
 import type { Message, Program } from "./runtime.ts";
+import { notify } from "./dom.ts";
 
 interface Line {
   readonly stream: string;
@@ -148,8 +148,21 @@ export const formatSource = async (source: string): Promise<string> =>
 /** What the diagnostic `code` means, as plain text; empty for a code the compiler does not have. */
 export const explainCode = async (code: string): Promise<string> => plain(await request<string>({ action: "explain", code }));
 
-/** Removes the preview a run left open. */
-export const closePreview = (): void => document.getElementById("fp-frame")?.replaceChildren();
+let disposePreview: (() => void) | undefined;
+let previewMessages: Array<Line> = [];
+let previewGeneration = 0;
+
+/** Removes the preview and its message listener. */
+export const closePreview = (): void => {
+  previewGeneration++;
+  disposePreview?.();
+  disposePreview = undefined;
+  previewMessages = [];
+  document.getElementById("fp-frame")?.replaceChildren();
+};
+
+/** Output sent after a UI program has mounted. */
+export const takePreviewMessages = (): Array<Line> => previewMessages.splice(0);
 
 /** A message of the frame, whose program may be anyone's: only the shapes `runtime.ts` posts. */
 const fromFrame = (data: unknown): Message | undefined => {
@@ -157,13 +170,15 @@ const fromFrame = (data: unknown): Message | undefined => {
   const { stream, text, code } = data as Record<string, unknown>;
   if ((stream === "stdout" || stream === "stderr" || stream === "crash") && typeof text === "string") return { stream, text };
   if (stream === "exit" && typeof code === "number") return { stream, code };
-  return stream === "ready" ? { stream } : undefined;
+  return stream === "ready" || stream === "mounted" ? { stream } : undefined;
 };
 
 /** A frame that allows scripts and nothing else, with a policy that lets it load only the runtime. */
-const openFrame = (): HTMLIFrameElement => {
+const openFrame = async (generation: number): Promise<HTMLIFrameElement> => {
   const holder = document.getElementById("fp-frame");
   if (holder === null) throw new Error("The playground has no place for a preview");
+  const { default: frameScript } = await import("./frame.ts?worker&url");
+  if (generation !== previewGeneration) throw new DOMException("The preview was replaced", "AbortError");
   const script = new URL(frameScript, location.href);
   const dark = document.documentElement.dataset.theme !== "light";
   const policy = `default-src 'none'; script-src ${script.origin} blob:; style-src 'unsafe-inline'; img-src data: blob:`;
@@ -184,6 +199,7 @@ const openFrame = (): HTMLIFrameElement => {
  */
 export const run = async (source: string, profile: string, signal: AbortSignal): Promise<Execution> => {
   closePreview();
+  const generation = previewGeneration;
   if (signal.aborted) return { lines: [], status: "stopped", detail: "", diagnostics: [] };
   let result: Built;
   try {
@@ -213,22 +229,38 @@ export const run = async (source: string, profile: string, signal: AbortSignal):
   signal.addEventListener("abort", abort, { once: true });
   const receive = (message: Message, start: () => void): void => {
     if (message.stream === "ready") start();
+    else if (message.stream === "mounted" && ui) finish("preview", "0");
     // a program with an interface that has mounted it and not failed is running
     else if (message.stream === "exit") finish(ui && message.code === 0 ? "preview" : "exit", String(message.code));
     else if (message.stream === "crash") finish("failure", message.text);
-    else lines.push({ stream: message.stream, text: message.text });
+    else if (message.stream === "stdout" || message.stream === "stderr") lines.push({ stream: message.stream, text: message.text });
   };
   try {
     if (ui) {
-      const frame = openFrame();
-      // shortcut: what the program writes or throws after it starts stays in the frame's console; show it under the frame if readers miss it
+      const frame = await openFrame(generation);
+      if (settled || signal.aborted) {
+        frame.remove();
+        return promise;
+      }
       const listen = (event: MessageEvent): void => {
         const message = event.source === frame.contentWindow ? fromFrame(event.data) : undefined;
-        if (message !== undefined) receive(message, () => frame.contentWindow?.postMessage(program, "*"));
+        if (message === undefined) return;
+        if (settled) {
+          if (message.stream === "stdout" || message.stream === "stderr" || message.stream === "crash") {
+            previewMessages.push({ stream: message.stream, text: message.text });
+            notify("fp-runtime");
+          }
+          return;
+        }
+        receive(message, () => frame.contentWindow?.postMessage(program, "*"));
       };
-      close = () => frame.remove();
+      close = () => {
+        removeEventListener("message", listen);
+        if (disposePreview === close) disposePreview = undefined;
+        frame.remove();
+      };
+      disposePreview = close;
       addEventListener("message", listen);
-      void promise.then(() => removeEventListener("message", listen));
     } else {
       const worker = new Worker(new URL("./worker.ts", import.meta.url), { type: "module" });
       close = () => worker.terminate();

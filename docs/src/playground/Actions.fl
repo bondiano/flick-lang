@@ -11,6 +11,7 @@ module Actions exposing (
   explain,
   focus_editor,
   run_program,
+  runtime_messages,
   report,
 )
 
@@ -100,6 +101,10 @@ foreign focus_editor from "./editor.ts" "focusEditor"
 /// Removes the preview a run of a program with an interface left open.
 close_preview : Unit ->{} Unit
 foreign close_preview from "./compiler.ts" "closePreview"
+  arity 0
+
+take_preview_messages : Unit ->{} List State.Line
+foreign take_preview_messages from "./compiler.ts" "takePreviewMessages"
   arity 0
 
 run_build : String -> String ->{Async; JsError} Execution
@@ -327,6 +332,28 @@ let run_program model =
       | TimeoutError -> { empty_execution with status = "timeout" }
       | JsError failure -> { empty_execution with status = "failure"; detail = failure.message }
     update model (fun m -> { m with running = false; execution = execution })
+    runtime_messages model
+
+/// Receives output and failures after a preview has mounted.
+runtime_messages : Atom.Writable Model ->{Atom.Write;} Unit
+let runtime_messages model =
+  if (Atom.current model).execution.status == "preview" then
+    let messages = take_preview_messages ()
+    let output = List.filter (fun line -> line.stream != "crash") messages
+    let crashes = List.filter (fun line -> line.stream == "crash") messages
+    update model (fun m ->
+      match crashes with
+      | [] -> { m with execution = { m.execution with lines = m.execution.lines ++ output } }
+      | [first, ..._] -> {
+        m with
+        execution = {
+          m.execution with
+          lines = m.execution.lines ++ output;
+          status = "failure";
+          detail = first.text;
+        };
+      })
+    if crashes != [] then close_preview ()
 
 report : Atom.Writable Model -> Failure e ->{Atom.Write;} Unit
 let report model failure =

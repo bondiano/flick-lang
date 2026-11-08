@@ -1,7 +1,7 @@
 // What a build runs on in the playground, in a worker or in the preview's frame:
 // `process` is an object whose streams post their text to the page, and
 // the runtime's packages are loaded on demand from its built files.
-import runtimePackage from "../../../runtime/package.json";
+import runtimePackage from "../../../runtime/package.json" with { type: "json" };
 import { type Files, type Namespace, link, packages } from "./loader.ts";
 
 export type Message =
@@ -9,7 +9,7 @@ export type Message =
   | { readonly stream: "exit"; readonly code: number }
   | { readonly stream: "crash"; readonly text: string }
   /** The frame has loaded and waits for the program. */
-  | { readonly stream: "ready" };
+  | { readonly stream: "ready" | "mounted" };
 
 export interface Program {
   readonly files: Files;
@@ -19,6 +19,7 @@ export interface Program {
 const modules = import.meta.glob<Namespace>([
   "../../../runtime/dist/index.js",
   "../../../runtime/dist/cli/index.js",
+  "../../../runtime/dist/ui/index.js",
   "../../../runtime/dist/ui/react/index.js",
   "../../../runtime/dist/effect/*.js",
   "../../../runtime/dist/effect/http/*.js",
