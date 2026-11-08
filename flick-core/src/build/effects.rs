@@ -54,9 +54,26 @@ pub fn specifier(spec: &str) -> Option<String> {
 /// The modules of `@flick-lang/runtime/effect/` that Flick's own runtime has,
 /// under `@flick-lang/runtime/rt/effect/`, for the exports it has.
 const IN_RT: &[&str] = &[
-    "Cause", "Clock", "Deferred", "Duration", "Effect", "Exit", "Fiber", "FiberSet", "Latch",
-    "Layer", "Queue", "Schedule", "Scope",
+    "Cause",
+    "Clock",
+    "Deferred",
+    "Duration",
+    "Effect",
+    "Exit",
+    "Fiber",
+    "FiberSet",
+    "Latch",
+    "Layer",
+    "Queue",
+    "Schedule",
+    "Scope",
+    "reactivity/AsyncResult",
+    "reactivity/Atom",
 ];
+
+/// The entry points of the UI layer, which Flick's own runtime has under
+/// `@flick-lang/runtime/rt/`.
+const UI_IN_RT: &[&str] = &["/ui", "/ui/react", "/ui/html", "/ui/server"];
 
 /// What a foreign module `spec` is on Flick's own runtime; `None` when it has no
 /// version there. A module of the program's own is itself.
@@ -64,6 +81,7 @@ pub fn rt_specifier(spec: &str) -> Option<String> {
     match spec.strip_prefix(RUNTIME) {
         None => Some(spec.to_owned()),
         Some("") => Some(format!("{RUNTIME}/rt")),
+        Some(rest) if UI_IN_RT.contains(&rest) => Some(format!("{RUNTIME}/rt{rest}")),
         Some(rest) => {
             let module = rest.strip_prefix("/effect/")?;
             if IN_RT.contains(&module) {
@@ -191,8 +209,16 @@ mod tests {
             rt_specifier("@flick-lang/runtime/effect/Option").as_deref(),
             Some("@flick-lang/runtime/core/Option")
         );
+        assert_eq!(
+            rt_specifier("@flick-lang/runtime/effect/reactivity/Atom").as_deref(),
+            Some("@flick-lang/runtime/rt/effect/reactivity/Atom")
+        );
         assert_eq!(rt_specifier("@flick-lang/runtime/effect/Stream"), None);
-        assert_eq!(rt_specifier("@flick-lang/runtime/ui/react"), None);
+        assert_eq!(
+            rt_specifier("@flick-lang/runtime/ui/react").as_deref(),
+            Some("@flick-lang/runtime/rt/ui/react")
+        );
+        assert_eq!(rt_specifier("@flick-lang/runtime/ui/other"), None);
         assert_eq!(rt_specifier("./clock.mjs").as_deref(), Some("./clock.mjs"));
     }
 

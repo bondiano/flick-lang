@@ -1,0 +1,3 @@
+before: all shown
+after: all followed
+supervisor: interrupt

@@ -103,7 +103,25 @@ stdlib/effect/shared_layer_merged
 stdlib/effect/string_locale
 stdlib/lists
 stdlib/markdown
+stdlib/reactivity/atom
 stdlib/seqs
+ui/async
+ui/atoms
+ui/awaiting
+ui/component
+ui/counter
+ui/directory
+ui/element
+ui/email
+ui/family
+ui/host_field
+ui/parity
+ui/registry
+ui/server
+ui/sync
+ui/sync_data
+ui/sync_for
+ui/wake_chain
 
 # Not yet, and why:
 # codegen/abi            its foreign fixture and `Schema` are on Effect
@@ -115,4 +133,11 @@ stdlib/seqs
 # runtime/leases         `ScopedRef`, `Resource`, `ScopedCache`, on Effect
 # runtime/paths          `File`, not on this runtime yet
 # runtime/scoped_file    `File`, not on this runtime yet
+# ui/form                its validation parses with `Schema`, on Effect
+# ui/hydrate             `Codec.json` of its serializable atoms is a `Schema`, on Effect
+# ui/navigate            the codec of its route is a `Schema`, on Effect
+# ui/query               `Atom.query_stream` reads a `Stream`, on Effect
+# ui/route               the codec of its route is a `Schema`, on Effect, and `Ui.Server.stream` a `Stream`
+# ui/serializable        `Codec.json` of its serializable atoms is a `Schema`, on Effect
+# ui/stream              `Codec.json` is a `Schema` and `Ui.Server.stream` a `Stream`, both on Effect
 # the rest of tests/run  what they reach is on Effect yet: a binding of a module this runtime does not have fails when it is called

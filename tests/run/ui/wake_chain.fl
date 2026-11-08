@@ -1,0 +1,76 @@
+// A write wakes what depends on it through the registry, not the stack: the
+// end of a chain of thousands of derived atoms, which a view shows, and
+// thousands of views of one state follow a click. A wake lost to a stack
+// overflow would leave the page as it was.
+module App.Main exposing (main)
+
+setup : Unit ->{} Unit
+foreign setup from "./dom.mjs" "setup"
+  arity 0
+
+click : String ->{} Unit
+foreign click from "./dom.mjs" "click"
+  arity 1
+
+settle : Unit ->{Async;} Unit
+foreign settle from "./dom.mjs" "settle"
+  arity 0
+
+text : Unit ->{} String
+foreign text from "./dom.mjs" "text"
+  arity 0
+
+count : Atom.Writable Int
+let count = Atom.make 0
+
+increment : Action.Action Ui.ClickSnapshot
+let increment = Action.exhaust (fun _ -> task { Atom.update count (fun n -> n + 1) })
+
+/// `n` derived atoms after `last`, each one more than the one before and
+/// read once it is made, so that no read goes deep.
+chain : Int -> Atom.Atom Int ->{Atom.Registry;} Atom.Atom Int
+let rec chain n last =
+  if n == 0 then
+    last
+  else
+    let next = Reactivity.Atom.keep_alive (Atom.derived (fun () -> Atom.get last + 1))
+    let _ = Reactivity.Atom.get next
+    chain (n - 1) next
+
+shown : Int -> String
+let shown n = if n == 0 then "o" else "x"
+
+/// `said` when the page shows `page`, else what it shows.
+expect : String -> String ->{} Unit
+let expect said page = Platform.stdout_line (if text () == page then said else text ())
+
+report : Failure e ->{} Unit
+let report failure =
+  Platform.stdout_line ("supervisor: " ++ RawCause.describe (Failure.inspect failure))
+
+main : Unit ->{Async; AppError} Unit
+let main () =
+  setup ()
+  match Ui.Dom.container "app" with
+  | None -> Platform.stdout_line "no container"
+  | Some root -> provide Atom.layer {
+    let last = chain 5000 (Atom.readonly count)
+    let end_view = Ui.view (fun () -> ui { text ("end " ++ show (Atom.get last)) })
+    let cell = Ui.view (fun () -> ui { text (shown (Atom.value count)) })
+    let cells = List.map (fun _ -> Ui.render cell ()) (List.range 0 2000)
+    scope s {
+      let app = ui {
+        fragment [
+          button { disabled = false; on_click = increment } [text "+1"],
+          Ui.render end_view (),
+          fragment cells,
+        ]
+      }
+      let _ui = Fiber.spawn s report (task { Ui.Dom.mount root report app })
+      settle ()
+      expect "before: all shown" ("+1end 5000" ++ String.repeat 2000 "o")
+      click "+1"
+      settle ()
+      expect "after: all followed" ("+1end 5001" ++ String.repeat 2000 "x")
+    }
+  }
