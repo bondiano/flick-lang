@@ -21,6 +21,7 @@ import {
   fiberSpawn,
   foreignAsync,
   ownedExits,
+  runIn,
   scopeCurrent,
   scopeRun,
   type OwnedExits,
@@ -30,6 +31,7 @@ import {
   withOwner,
   yieldNow,
 } from "../src/rt/kernel.ts";
+import { parallelExits } from "../src/rt/concurrency.ts";
 import { root, sleep } from "./rt-support.ts";
 
 const ignoreFailure = (): undefined => undefined;
@@ -312,4 +314,21 @@ test("an interruption of the body closes the owner, and is delivered again on le
   assert.deepEqual(exit.value, ["Interrupt"]);
   assert.deepEqual(seen, ["closed"]);
   assert.ok(currentCtx() !== undefined);
+});
+
+test("a stage that runs at once waits for branches that close scopes", async () => {
+  const { seen, say } = logger();
+  const exit = await root(() =>
+    runIn(
+      parallelExits([
+        () =>
+          scopeRun(function* (): Run {
+            yield addFinalizer(say("released"));
+            return 1;
+          }),
+      ]),
+    ),
+  );
+  assert.equal(exit.cause, undefined);
+  assert.deepEqual(seen, ["released"]);
 });

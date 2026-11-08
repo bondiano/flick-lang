@@ -36,6 +36,7 @@ import {
   owned,
   raiseOf,
   uninterruptible,
+  underSync,
 } from "./fiber.ts";
 import { traceEvent, traceId, tracing } from "./trace.ts";
 import { Failure } from "./outcome.ts";
@@ -154,8 +155,8 @@ function* closeSteps(owner: Owner, exit: Exit): Run {
   yield hooks();
   // a settling foreign call may add a hook, and a hook may start one: repeat until neither
   for (;;) {
-    // a stage that runs at once cannot wait for a promise, and has none to wait for
-    if (owner.pending.size > 0 || fiber.nested === 0) yield promised(settle(owner));
+    // a stage that runs at once, or a fiber it waits for, cannot wait for a promise, and has none to wait for
+    if (owner.pending.size > 0 || (fiber.nested === 0 && !underSync())) yield promised(settle(owner));
     if ([...owner.closing].every((hook) => ran.has(hook))) break;
     yield hooks();
   }

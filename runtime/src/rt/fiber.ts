@@ -336,6 +336,12 @@ export const schedule = (task: () => void): void => {
   }
 };
 
+/** How many Sync stages are on the JS stack, of any fiber. */
+let atOnce = 0;
+
+/** Whether a Sync stage is on the JS stack: a fiber it waits for cannot wait for a promise either. */
+export const underSync = (): boolean => atOnce > 0;
+
 /** Runs tasks until `done` holds; whether it does. A Sync stage waits for the fibers it needs this way. */
 const runTasksUntil = (done: () => boolean): boolean => {
   while (!done()) {
@@ -397,6 +403,7 @@ export const runIn = (run: unknown): unknown => {
   fiber.mode = NEXT;
   fiber.value = undefined;
   fiber.nested++;
+  atOnce++;
   try {
     while (fiber.drive(base)) {
       if (!runTasksUntil(() => !fiber.suspended)) {
@@ -409,6 +416,7 @@ export const runIn = (run: unknown): unknown => {
     }
   } finally {
     fiber.nested--;
+    atOnce--;
     context = saved;
     if (outside) current = undefined;
   }
