@@ -1,5 +1,5 @@
 // The compiler's JS glue and WASM are loaded only inside this persistent worker.
-import init, { build, compile as compileModule, compiler_version } from "./wasm/flick_wasm.js";
+import init, { Session, compiler_version } from "./wasm/flick_wasm.js";
 
 export interface Diagnostic {
   readonly code: string;
@@ -12,7 +12,15 @@ interface Event {
   readonly code: string;
   readonly severity: string;
   readonly message: string;
-  readonly range?: { readonly start: number };
+  /** `line:column` in the module, from the compiler; absent elsewhere. */
+  readonly at?: string;
+}
+
+interface Emitted {
+  readonly js: string | null;
+  readonly files: Record<string, string> | null;
+  readonly entry: string | null;
+  readonly diagnostics: Array<Event>;
 }
 
 export interface Compiled {
@@ -36,24 +44,25 @@ export type Result = string | Compiled | Built;
 export type Reply = { readonly id: number; readonly result: Result } | { readonly error: string };
 
 let ready: Promise<string> | undefined;
+// one analysis of each edit serves both profiles and the run that follows it
+let session: Session | undefined;
 
-/** `line:column` (from 1) of a UTF-8 offset of `source`. */
-const position = (source: string, offset: number): string => {
-  const before = new TextDecoder().decode(new TextEncoder().encode(source).slice(0, offset));
-  const lines = before.split("\n");
-  return `${lines.length}:${(lines.at(-1)?.length ?? 0) + 1}`;
-};
-
-const diagnostics = (source: string, events: ReadonlyArray<Event>): Array<Diagnostic> => events.map((event) => ({
+const diagnostics = (events: ReadonlyArray<Event>): Array<Diagnostic> => events.map((event) => ({
   code: event.code,
   severity: event.severity,
   message: event.message,
-  at: event.range === undefined ? "" : position(source, event.range.start),
+  at: event.at ?? "",
 }));
 
+const emitted = (source: string, profile: string): Emitted => {
+  session ??= new Session();
+  session.update(source);
+  return JSON.parse(session.emit(profile)) as Emitted;
+};
+
 const generated = (source: string, profile: string) => {
-  const result = JSON.parse(compileModule(source, profile)) as { js: string | null; diagnostics: Array<Event> };
-  return { code: result.js ?? "", diagnostics: diagnostics(source, result.diagnostics) };
+  const result = emitted(source, profile);
+  return { code: result.js ?? "", diagnostics: diagnostics(result.diagnostics) };
 };
 
 onmessage = async (event: MessageEvent<Request>) => {
@@ -69,12 +78,8 @@ onmessage = async (event: MessageEvent<Request>) => {
         result = { debug: generated(request.source, "debug"), release: generated(request.source, "release") };
         break;
       case "build": {
-        const built = JSON.parse(build(request.source, request.profile)) as {
-          files: Record<string, string> | null;
-          entry: string | null;
-          diagnostics: Array<Event>;
-        };
-        result = { files: built.files, entry: built.entry, diagnostics: diagnostics(request.source, built.diagnostics) };
+        const built = emitted(request.source, request.profile);
+        result = { files: built.files, entry: built.entry, diagnostics: diagnostics(built.diagnostics) };
         break;
       }
     }

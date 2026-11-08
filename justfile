@@ -215,10 +215,15 @@ wasm-plugins:
     cargo clippy -p flick --features wasm-plugins --all-targets -- -D warnings
     cargo test -p flick --features wasm-plugins --test plugins
 
-# Build the wasm module the in-browser demo loads and hold it to its size budget
+# Build the wasm module the in-browser demo loads and hold it to its size budget.
+# The budget, raw bytes, holds the editor queries of the playground (hover,
+# completion, fixes, `.d.ts`): 5 148 679 bytes, 1.68 MB gzipped, plus 3%. Built
+# for size instead it fits 4.5 MiB but analyses and emits 20-30% slower.
 wasm:
     cargo build -p flick-wasm --target wasm32-unknown-unknown --release
-    test $(wc -c < target/wasm32-unknown-unknown/release/flick_wasm.wasm) -le 4718592
+    @wasm=target/wasm32-unknown-unknown/release/flick_wasm.wasm; \
+    echo "flick_wasm.wasm: $(wc -c < $wasm) bytes, $(gzip -6c $wasm | wc -c) gzipped"; \
+    test $(wc -c < $wasm) -le 5303140
 
 # Build the playground's compiler: the wasm module and its JS bindings
 docs-wasm: wasm
