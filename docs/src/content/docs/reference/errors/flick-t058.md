@@ -11,7 +11,7 @@ it does not learn:
 - an equality from a pattern that is not a branch of a `match`, such as the
   pattern of a `let` or of a parameter. Match it in a `match` instead.
 
-```flick ignore
+```flick
 type Expr a =
   | IntLit Int : Expr Int
   | BoolLit Bool : Expr Bool

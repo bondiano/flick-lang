@@ -5,7 +5,7 @@ title: "FLICK-C008"
 The superclasses of a class must not lead back to it. Remove one link of the
 cycle.
 
-```flick ignore
+```flick
 class Eq a =
   eq : a -> a -> Bool
 

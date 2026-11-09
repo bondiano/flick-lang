@@ -6,7 +6,7 @@ A project built with `[build] effect = "none"` compiles to plain JavaScript
 without Effect, so nothing in it may run at runtime: no `task`, no `scope`
 and no runtime call. Keep the code pure, or build with `effect = "effect"`.
 
-```flick ignore
+```flick
 // flick.toml: [build] effect = "none"
 main : Unit -> Unit
 let main () = ()

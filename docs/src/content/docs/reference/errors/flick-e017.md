@@ -12,7 +12,7 @@ Work a region keeps needs the same: a finalizer, the release of a resource, a
 listener. It runs as its scope closes, when a handler may already have let the
 body go. No one would answer the operation, and the finalizer would stop there.
 
-```flick ignore
+```flick
 effect Emit a =
   control emit : a ->{} Unit
 

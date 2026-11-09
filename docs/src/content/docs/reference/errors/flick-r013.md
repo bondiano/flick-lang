@@ -6,7 +6,7 @@ A parameter, pattern variable or local `let` is bound and never used. Use
 it, or start its name with `_` to say it is unused on purpose; the
 warning's fix does that.
 
-```flick ignore
+```flick fail R013
 module App.Pairs exposing (first)
 
 first : (a, b) -> a

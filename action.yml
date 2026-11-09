@@ -1,0 +1,51 @@
+# Setup Flick
+#
+# Downloads a released `flick` binary for the runner, checks the sha256 the
+# release publishes, runs it once and puts it on PATH for the rest of the job.
+# The release it takes is a tag, or the latest one; the install directory is
+# reused across runs, so a cached one downloads nothing.
+#
+#   - uses: actions/checkout@v7
+#   - uses: bondiano/flick-lang@v0.1.0
+#     with:
+#       version: latest        # or v0.1.0, or 0.1.0
+#   - run: flick check
+#
+# It runs on Linux, macOS and Windows runners, for x86_64 and arm64, from the
+# archives the Release workflow publishes.
+
+name: Setup Flick
+description: Install the flick compiler from a release and add it to PATH
+author: bondiano
+
+branding:
+  icon: terminal
+  color: purple
+
+inputs:
+  version:
+    description: A release tag (`v0.1.0`), a version (`0.1.0`), or `latest`
+    required: false
+    default: latest
+  repository:
+    description: The repository whose releases carry the binaries
+    required: false
+    default: bondiano/flick-lang
+  install-dir:
+    description: Where the binary is unpacked; `<version>/<target>` under it is reused when present
+    required: false
+    default: ""
+  token:
+    description: A GitHub token for the release lookup, which avoids its rate limits
+    required: false
+    default: ${{ github.token }}
+
+outputs:
+  version:
+    description: The release tag the binary came from, such as `v0.1.0`
+  path:
+    description: The directory added to PATH
+
+runs:
+  using: node24
+  main: .github/actions/setup-flick/install.mjs

@@ -82,7 +82,7 @@ or set `FLICK_STD_PATH` to that directory.
 A type's witness is its companion `T.schema`, and `schema` is no keyword
 any more. In 0.1:
 
-```flick fail
+```flick fail T001
 type alias Profile = { email : String }
   deriving Schema
 
@@ -247,7 +247,7 @@ A `tail` arm runs on the stack of the caller, which may be Sync, so nothing it
 calls may suspend. A call in it that needs `Async`, an effect with a `control`
 operation or a row variable is now `FLICK-E018`:
 
-```flick fail
+```flick fail E018
 # effect Ask =
 #   ask : Unit ->{} Int
 #
@@ -397,7 +397,7 @@ hide a region its payload has. A curried stage keeps the variable, so
 holding `e`. A bare type that is no stage, such as a field, now rejects the
 closure:
 
-```flick fail
+```flick fail G001
 keep_field : forall e. Errors e -> { run : Unit -> Unit }
 let keep_field x = { run = fun () -> ignore x }
 ```

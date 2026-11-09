@@ -7,7 +7,7 @@ one concrete type. In `forall a. a -> a` the caller chooses `a`, so the body
 cannot add a number to its argument or call a `String` function on it. Use a
 less general signature or a more general implementation.
 
-```flick ignore
+```flick
 apply_twice : (forall a. a -> a) -> (Float, String)
 let apply_twice transform =
   (transform 42, transform "hello")

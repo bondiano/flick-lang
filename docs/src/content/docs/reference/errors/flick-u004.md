@@ -12,7 +12,7 @@ atom it read changes, so they only read atoms. A write (`Atom.set`,
 render, or the view is made with `Ui.suspended`, which gives each failure a
 view.
 
-```flick ignore
+```flick
 count : Atom.Writable Float
 let count = Atom.make 0
 

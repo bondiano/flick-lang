@@ -7,7 +7,7 @@ literal or a name is `Option.with_default default o`. The quick fix
 rewrites it. A `None` arm that computes or fails is left alone:
 `with_default` would compute its default before the `match`.
 
-```flick ignore
+```flick
 count : Option Float -> Float
 let count o = Option.with_default 0 o
 ```

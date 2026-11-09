@@ -69,15 +69,35 @@ fn explain_plugin(package: &str, code: &str, written: &str) -> Outcome {
     }
 }
 
+/// The trimmed stdout of `program args`, if it runs and succeeds.
+fn output_of(program: &str, args: &[&str]) -> Option<String> {
+    let out = Process::new(program).args(args).output().ok()?;
+    out.status
+        .success()
+        .then(|| String::from_utf8_lossy(&out.stdout).trim().to_owned())
+}
+
 /// The output of `program --version`, if it runs.
 fn version_of(program: &str) -> Option<String> {
-    let out = Process::new(program).arg("--version").output().ok()?;
-    out.status.success().then(|| {
-        String::from_utf8_lossy(&out.stdout)
-            .trim()
-            .trim_start_matches('v')
-            .to_owned()
-    })
+    output_of(program, &["--version"]).map(|v| v.trim_start_matches('v').to_owned())
+}
+
+/// The version `git --version` prints, such as `2.43.0`.
+fn git_version() -> Option<String> {
+    output_of("git", &["--version"]).map(|v| v.trim_start_matches("git version ").to_owned())
+}
+
+/// The version `go version` prints, such as `1.23.12`.
+fn go_version() -> Option<String> {
+    let printed = output_of("go", &["version"])?;
+    Some(
+        printed
+            .split_whitespace()
+            .find(|word| word.starts_with("go1"))
+            .map_or(printed.clone(), |word| {
+                word.trim_start_matches("go").to_owned()
+            }),
+    )
 }
 
 fn at_least(found: &str, wanted: &str) -> bool {
@@ -132,6 +152,32 @@ pub fn doctor(global: &GlobalArguments) -> Outcome {
             Some(false),
             "pnpm",
             format!("not found (the project pins {pinned})"),
+        ),
+    }
+    // a note, not a failure: a checkout with `FLICK_STD_PATH`, path
+    // dependencies and a warm package store fetches nothing
+    match git_version() {
+        Some(v) => line(
+            Some(true),
+            "git",
+            format!("{v} (fetches the implicit `std` and `git` dependencies)"),
+        ),
+        None => line(
+            None,
+            "git",
+            "not found: `flick install` fetches the implicit `std` from its release tag, and `check`, \
+             `build`, `run` and `test` do too when it is not in the package store; set \
+             `FLICK_STD_PATH` to a local `packages/std` to work without it"
+                .to_owned(),
+        ),
+    }
+    // the go target is optional: a missing toolchain is a note, as for adapters
+    match go_version() {
+        Some(v) => line(None, "Go", format!("{v} (the `go` target only)")),
+        None => line(
+            None,
+            "Go",
+            "not found (the `go` target only: `--emit go`)".to_owned(),
         ),
     }
     installed(root.as_deref(), &mut line);

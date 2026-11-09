@@ -10,10 +10,11 @@ test("hidden lines of a flick block are compiled, not shown", () => {
   assert.deepEqual(flickBlocks.code(code("flick", null, value)), code("flick", null, "show_id : UserId -> String\n#[not hidden]"));
 });
 
-test("the check words leave the meta, other words stay", () => {
+test("the check words leave the meta, with what follows them", () => {
   assert.equal(flickBlocks.code(code("flick", "fail", "x"))?.meta, null);
-  assert.equal(flickBlocks.code(code("flick", 'ignore title="x.fl"', "x"))?.meta, 'title="x.fl"');
-  assert.equal(flickBlocks.code(code("flick", 'title="x.fl" keep', "x"))?.meta, 'title="x.fl"');
+  assert.equal(flickBlocks.code(code("flick", "fail T010", "x"))?.meta, null);
+  assert.equal(flickBlocks.code(code("flick", "ignore needs a service row", "x"))?.meta, null);
+  assert.equal(flickBlocks.code(code("flick", 'title="x.fl" keep', "x"))?.meta, 'title="x.fl" keep');
   assert.equal(flickBlocks.code(code("flick", "keeper", "x"))?.meta, "keeper");
 });
 

@@ -1,6 +1,6 @@
 ---
 title: "FLICK-C001"
-source_hash: "f67a535577aa606d"
+source_hash: "547a1a7660a3033a"
 ---
 
 Ограничение класса требует экземпляра, но ни один не подходит: тип не имеет
@@ -8,7 +8,7 @@ source_hash: "f67a535577aa606d"
 сигнатура не ограничивает. Объявите экземпляр или добавьте ограничение в
 сигнатуру.
 
-```flick ignore
+```flick
 render : Show a => a -> String
 let render value =
   show value

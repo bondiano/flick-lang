@@ -6,7 +6,7 @@ Two string literals joined with `++` on one line are one literal. The
 quick fix joins them. Literals on lines of their own, which wrap a long
 text, are not reported.
 
-```flick ignore
+```flick
 greeting : String
 let greeting = "Hello, world"
 ```

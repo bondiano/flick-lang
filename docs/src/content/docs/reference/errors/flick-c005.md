@@ -8,7 +8,8 @@ The checker starts with those variables and repeatedly applies functional
 dependencies from the instance context and its instantiated superclasses.
 A rule applies only when all its determining variables are covered.
 
-```flick ignore
+```flick
+# type Set a = Set (List a)
 class Collection c a | c -> a =
   empty : c
 
@@ -20,7 +21,8 @@ instance Collection (Set a) a =
 
 Context-assisted coverage permits lifting a capability through a wrapper:
 
-```flick ignore
+```flick
+# type ReaderT r m a = ReaderT (r -> m a)
 class State m s | m -> s =
   get : m s
 

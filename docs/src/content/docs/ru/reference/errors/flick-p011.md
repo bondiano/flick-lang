@@ -1,11 +1,11 @@
 ---
 title: "FLICK-P011"
-source_hash: "a392a1aeb9dc37fa"
+source_hash: "caaf6b16766ac730"
 ---
 
 `entry` приложения должен указывать на модуль в корне исходного кода, который экспортирует `main`.
 
-```flick ignore
+```flick
 module App.Main exposing (main)
 
 main : Unit ->{; AppError} Unit

@@ -1,6 +1,6 @@
 ---
 title: "FLICK-T031"
-source_hash: "67c276bf2a0ea389"
+source_hash: "a33c96c7c1ef206b"
 ---
 
 Предупреждение: `Seq.to_list` последовательности, которая никогда не заканчивается, такой как
@@ -8,7 +8,7 @@ source_hash: "67c276bf2a0ea389"
 `Seq.filter` из них делает, никогда не возвращается. Сначала возьмите её часть с помощью
 `Seq.take` или `Seq.take_while`.
 
-```flick ignore
-first_squares : List Float
+```flick
+first_squares : List Int
 let first_squares = Seq.from 1 |> Seq.map (fun n -> n * n) |> Seq.take 5 |> Seq.to_list
 ```

@@ -7,7 +7,7 @@ mod artifacts;
 mod common;
 
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::{self, Output, Stdio};
 
 use common::{APP, flick_in, project};
@@ -261,7 +261,13 @@ fn a_wrong_pnpm_or_a_missing_lockfile_changes_nothing() {
     );
     let out = flick_in(&dir, &["add", "left-pad"]);
     assert_eq!(code(&out), Some(2), "{out:?}");
-    assert!(stderr(&out).contains("pins pnpm 1.0.0"), "{}", stderr(&out));
+    let err = stderr(&out);
+    assert!(err.contains("pins pnpm 1.0.0"), "{err}");
+    assert!(
+        err.contains("corepack prepare pnpm@1.0.0 --activate"),
+        "{err}"
+    );
+    assert!(err.contains("packageManager"), "{err}");
     assert_eq!(
         fs::read_to_string(dir.join("package.json")).expect("kept"),
         manifest
@@ -294,6 +300,177 @@ fn a_wrong_pnpm_or_a_missing_lockfile_changes_nothing() {
     );
     assert!(!dir.join("pnpm-lock.yaml").exists());
     assert!(!dir.join("node_modules/left-pad").exists());
+}
+
+/// Runs the built `flick` in `dir` with `PATH` as given, for a toolchain
+/// that lacks a program.
+fn flick_with_path(dir: &Path, path: &str, args: &[&str]) -> Output {
+    process::Command::new(env!("CARGO_BIN_EXE_flick"))
+        .args(args)
+        .current_dir(dir)
+        .env("PATH", path)
+        .env_remove("NO_COLOR")
+        .output()
+        .expect("flick runs")
+}
+
+/// A `pnpm` on `PATH` of its own: `--version` answers `version`, and every
+/// other invocation is recorded in the returned file, so a test can see
+/// whether the version gate let a command through without a real install.
+#[cfg(unix)]
+fn fake_pnpm(dir: &Path, version: &str) -> (PathBuf, PathBuf) {
+    use std::os::unix::fs::PermissionsExt;
+
+    let bin = dir.join("fake-bin");
+    fs::create_dir_all(&bin).expect("dir");
+    let marker = dir.join("pnpm-calls.txt");
+    let script = bin.join("pnpm");
+    fs::write(
+        &script,
+        format!(
+            "#!/bin/sh\nif [ \"$1\" = \"--version\" ]; then echo \"{version}\"; exit 0; fi\n\
+             echo \"$*\" >> \"{}\"\nexit 0\n",
+            marker.display()
+        ),
+    )
+    .expect("write");
+    fs::set_permissions(&script, fs::Permissions::from_mode(0o755)).expect("executable");
+    (bin, marker)
+}
+
+/// The `[dependencies]` entry that keeps `std` local, so a test fetches
+/// nothing and needs no `git`.
+fn local_std() -> String {
+    let std = Path::new(env!("CARGO_MANIFEST_DIR")).join("../packages/std");
+    format!(
+        "schema-version = 1\n\n[project]\nkind = \"app\"\nentry = \"App.Main\"\n\n[dependencies]\nstd = {{ path = \"{}\" }}\n",
+        std.display()
+    )
+}
+
+#[test]
+fn a_missing_pnpm_says_how_to_install_the_pinned_one_and_changes_nothing() {
+    let manifest = "{ \"name\": \"no-pnpm\", \"packageManager\": \"pnpm@1.0.0\" }\n";
+    let dir = project(
+        "cli_no_pnpm",
+        &[
+            ("flick.toml", &local_std()),
+            ("package.json", manifest),
+            ("src/App/Main.fl", MAIN),
+        ],
+    );
+    // no program is on this PATH: pnpm is missing, and so is git
+    let empty = Path::new(env!("CARGO_TARGET_TMPDIR")).join("cli_no_pnpm_path");
+    fs::create_dir_all(&empty).expect("dir");
+    let out = flick_with_path(&dir, empty.to_str().expect("utf-8"), &["add", "left-pad"]);
+    assert_eq!(code(&out), Some(2), "{out:?}");
+    let err = stderr(&out);
+    assert!(err.contains("`pnpm` is not on PATH"), "{err}");
+    assert!(
+        err.contains("corepack prepare pnpm@1.0.0 --activate"),
+        "{err}"
+    );
+    assert!(err.contains("npm install --global pnpm@1.0.0"), "{err}");
+    assert!(err.contains("nothing was changed"), "{err}");
+    assert_eq!(
+        fs::read_to_string(dir.join("package.json")).expect("kept"),
+        manifest
+    );
+    assert!(!dir.join("pnpm-lock.yaml").exists());
+    assert!(!dir.join("node_modules/left-pad").exists());
+}
+
+/// The pin is exact: a newer *patch* is still another version, and nothing
+/// runs.
+#[cfg(unix)]
+#[test]
+fn a_newer_patch_is_refused_by_the_exact_pin() {
+    let pin = "12.16.1";
+    let manifest = format!("{{ \"name\": \"patch\", \"packageManager\": \"pnpm@{pin}\" }}\n");
+    let dir = project(
+        "cli_pnpm_newer_patch",
+        &[("flick.toml", APP), ("package.json", &manifest)],
+    );
+    let (bin, marker) = fake_pnpm(&dir, "12.16.2");
+    let out = flick_with_path(&dir, bin.to_str().expect("utf-8"), &["add", "left-pad"]);
+    assert_eq!(code(&out), Some(2), "{out:?}");
+    let err = stderr(&out);
+    assert!(err.contains("FLICK-P016"), "{err}");
+    assert!(
+        err.contains(&format!(
+            "the project pins pnpm {pin} in `packageManager`, but `pnpm` is 12.16.2"
+        )),
+        "{err}"
+    );
+    assert!(
+        err.contains(&format!("corepack prepare pnpm@{pin} --activate")),
+        "{err}"
+    );
+    assert!(
+        err.contains(&format!("npm install --global pnpm@{pin}")),
+        "{err}"
+    );
+    assert!(err.contains("nothing was changed"), "{err}");
+    // pnpm itself never ran, and the project is as it was
+    assert!(!marker.exists(), "a wrong pnpm ran: {marker:?}");
+    assert_eq!(
+        fs::read_to_string(dir.join("package.json")).expect("kept"),
+        manifest
+    );
+    assert!(!dir.join("pnpm-lock.yaml").exists());
+    assert!(!dir.join("node_modules/left-pad").exists());
+}
+
+/// The pinned version passes the gate: the fake is not an installer, so the
+/// run may end elsewhere, but it must get as far as running pnpm.
+#[cfg(unix)]
+#[test]
+fn the_pinned_version_passes_the_gate_and_runs_pnpm() {
+    let pin = "12.16.1";
+    let manifest = format!("{{ \"name\": \"patched\", \"packageManager\": \"pnpm@{pin}\" }}\n");
+    let dir = project(
+        "cli_pnpm_pinned",
+        &[("flick.toml", APP), ("package.json", &manifest)],
+    );
+    let (bin, marker) = fake_pnpm(&dir, pin);
+    let out = flick_with_path(&dir, bin.to_str().expect("utf-8"), &["add", "left-pad"]);
+    let err = stderr(&out);
+    assert!(
+        !err.contains("FLICK-P016"),
+        "the exact pin was refused:\n{err}"
+    );
+    // the stub installs nothing and says it worked: the gate is what this
+    // project's run is about, and it ends where pnpm's exit status says
+    assert_eq!(code(&out), Some(0), "{out:?}");
+    let ran = fs::read_to_string(&marker).expect("pnpm ran, past the version gate");
+    assert!(ran.contains("left-pad"), "{ran}");
+}
+
+#[test]
+fn new_says_which_pnpm_install_needs() {
+    let dir = project("cli_new_pnpm", &[]);
+    fs::create_dir_all(&dir).expect("dir");
+    let out = flick_in(&dir, &["new", "demo", "--template", "lib"]);
+    assert_eq!(code(&out), Some(0), "{out:?}");
+    let text = String::from_utf8_lossy(&out.stdout);
+    assert!(text.contains("Next: flick install"), "{text}");
+    // the hint names the version the new project pins, which is what the
+    // install then needs: the pnpm on PATH is another version, or none at all
+    let manifest: serde_json::Value = serde_json::from_str(
+        &fs::read_to_string(dir.join("demo/package.json")).expect("package.json"),
+    )
+    .expect("json");
+    let pinned = manifest["packageManager"]
+        .as_str()
+        .expect("packageManager")
+        .strip_prefix("pnpm@")
+        .expect("a pnpm pin")
+        .to_owned();
+    assert!(!pinned.is_empty(), "{manifest}");
+    assert!(
+        text.contains(&format!("pnpm {pinned}")),
+        "the hint must name the pinned {pinned}:\n{text}"
+    );
 }
 
 #[test]
@@ -490,6 +667,8 @@ fn doctor_reports_without_failing_on_a_missing_content_mapper() {
         "compiler: flick",
         "Node.js:",
         "pnpm:",
+        "git:",
+        "Go:",
         "@flick-lang/runtime:",
         "effect:",
         "Content Mapper:",
@@ -501,6 +680,36 @@ fn doctor_reports_without_failing_on_a_missing_content_mapper() {
         .find(|l| l.contains("Content Mapper"))
         .expect("a line");
     assert!(!mapper.starts_with("FAIL"), "{mapper}");
+    for optional in ["git:", "Go:"] {
+        let line = text.lines().find(|l| l.contains(optional)).expect("a line");
+        assert!(!line.starts_with("FAIL"), "{line}");
+    }
+}
+
+#[test]
+fn doctor_notes_a_missing_git_rather_than_failing_on_it() {
+    let dir = project("cli_doctor_git", &[("flick.toml", APP)]);
+    let empty = Path::new(env!("CARGO_TARGET_TMPDIR")).join("cli_doctor_path");
+    fs::create_dir_all(&empty).expect("dir");
+    let out = flick_with_path(&dir, empty.to_str().expect("utf-8"), &["doctor"]);
+    let text = String::from_utf8_lossy(&out.stdout);
+    let git = text
+        .lines()
+        .find(|l| l.contains("git:"))
+        .expect("a git line");
+    assert!(git.starts_with("note"), "{git}");
+    assert!(
+        git.contains("FLICK_STD_PATH"),
+        "how to work without git:\n{git}"
+    );
+    let go = text.lines().find(|l| l.contains("Go:")).expect("a Go line");
+    assert!(go.starts_with("note"), "{go}");
+    // only the toolchain the build cannot do without fails, and git is not one
+    let failed: Vec<&str> = text.lines().filter(|l| l.starts_with("FAIL")).collect();
+    assert_eq!(failed.len(), 2, "{failed:?}");
+    assert!(failed.iter().any(|l| l.contains("Node.js")), "{failed:?}");
+    assert!(failed.iter().any(|l| l.contains("pnpm")), "{failed:?}");
+    assert_eq!(code(&out), Some(2), "{out:?}");
 }
 
 fn pnpm_version() -> String {

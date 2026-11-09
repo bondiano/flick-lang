@@ -9,7 +9,7 @@ is a region, a row or a capture set is passed on as a variable of the
 constructor. A type that names its representation (`unboxed type`,
 `untagged type`) has no such constructors.
 
-```flick ignore
+```flick
 type Expr a =
   | IntLit Int : Expr Int
   | Add (Expr Int) (Expr Int) : Expr Int

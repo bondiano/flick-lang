@@ -8,7 +8,10 @@ same, but the closure is allocated again and props holding it never compare
 equal. Declare the handler once as an `Action` at the top level and pass
 what differs between elements as data with `Action.with`.
 
-```flick ignore
+```flick
+# type alias Item = { name : String }
+# items : Atom.Writable (List Item)
+# let items = Atom.make []
 remove : Action.Action (Item, Ui.ClickSnapshot)
 let remove = Action.exhaust (fun (item, _) -> task { Atom.update items (List.filter (fun i -> i != item)) })
 

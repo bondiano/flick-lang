@@ -7,7 +7,7 @@ no arm matches. Arms with `when` guards cover nothing, since the guard may be
 false. A pattern in `let` or in a parameter must match every value: use `match`
 for a pattern that can fail.
 
-```flick ignore
+```flick
 describe : Option Float -> String
 let describe value =
   match value with

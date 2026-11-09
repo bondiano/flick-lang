@@ -242,7 +242,9 @@ impl Command for ScaffoldCommand {
             kind(self.template),
             shown(&self.dir)
         );
-        println!("Next: flick install");
+        println!(
+            "Next: flick install (it needs pnpm {PNPM}, the version this project pins; `flick doctor` checks the toolchain)"
+        );
         if self.template == Template::Plugin {
             println!("Then: flick run plugin, which builds the plugin's component");
         }

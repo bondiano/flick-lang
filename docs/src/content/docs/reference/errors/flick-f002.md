@@ -8,7 +8,7 @@ contract: `retention call` when the JS code keeps nothing past the call, or
 `retention owner` when it keeps it until the owner of the region closes.
 Without one, the compiler cannot tell how long the JS code holds the value.
 
-```flick ignore
+```flick
 each : forall c a. (a ->{} Unit)^c -> (List a ->{} Unit)^c
 foreign each from "./each.js" "each"
   retention call
@@ -27,6 +27,7 @@ its callers have to meet them. With two regions the compiler cannot tell which
 one owns the argument, so write them:
 
 ```flick ignore
+# import Fiber exposing (Handle)
 add_finalizer_to :
   (Fiber.Outlives c s, Fiber.Provided r s, Detached r) =>
   Handle t -> (Eff r none Unit)^c ->{Scope s | r;} Unit

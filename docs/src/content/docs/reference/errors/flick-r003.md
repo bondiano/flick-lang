@@ -7,6 +7,6 @@ No file and no installed package provides the imported module. A local module
 test root. A module from an npm package needs the package in `package.json` and
 installed: run `flick add <package>`, then `flick install`.
 
-```flick ignore
+```flick
 import App.Users exposing (load_user)   // src/App/Users.fl
 ```

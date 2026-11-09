@@ -1,11 +1,11 @@
 ---
 title: "FLICK-R012"
-source_hash: "5bbf18d74a54926b"
+source_hash: "2d3f0b9ecd97d9a7"
 ---
 
 Модуль импортируется, или имя импортируется с помощью `exposing`, но ничего в модуле его не использует. Исправление предупреждения удаляет импорт или имя.
 
-```flick ignore
+```flick fail R012
 module App.Report exposing (total)
 
 import List exposing (map, filter)

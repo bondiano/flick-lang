@@ -52,7 +52,7 @@ would not compile.
 The closure below would read a file after its scope has closed it. The compiler
 rejects it with `FLICK-G001`.
 
-```flick fail
+```flick fail G001
 # import File exposing (Path, FileSystem, OpenError, ReadError)
 #
 read_later : Path ->{Async, FileSystem; OpenError} (Unit ->{Async, FileSystem; ReadError} String)

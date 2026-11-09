@@ -7,7 +7,7 @@ field needs an instance of the class, and `Hash` and `Ord` are derived
 together with `Eq`, so all of them use the same fields. A field like a `Ref`
 has no `Hash`: write the instance by hand or wrap the field.
 
-```flick ignore
+```flick
 type Point = Point Float Float
   deriving Eq, Hash, Show
 ```

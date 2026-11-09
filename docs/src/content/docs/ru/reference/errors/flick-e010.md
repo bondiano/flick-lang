@@ -1,11 +1,11 @@
 ---
 title: "FLICK-E010"
-source_hash: "b530120189d10fae"
+source_hash: "2bc00c4a8da635a6"
 ---
 
 `server name` обозначает реализацию `name$server`, которую объявляет `server fn`, а `name` не является `server fn`: только `server fn` имеет реализацию для обслуживания. Форма самого `server fn` — это плагин для проверки, `std/E010`.
 
-```flick ignore
+```flick
 module App.Api exposing (greet, functions)
 
 import Server

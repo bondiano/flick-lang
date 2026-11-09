@@ -1,10 +1,10 @@
 ---
 title: "FLICK-T021"
-source_hash: "1e43478ba303780c"
+source_hash: "8addb2ec06a9af44"
 ---
 
 Предупреждение: аннотация `let` точно совпадает с типом, который уже имеет её значение, поэтому её можно удалить без каких-либо изменений. Быстрое исправление удаляет её; `flick check --fix` удаляет все такие аннотации. Отключите предупреждение с помощью `allow = ["FLICK-T021"]` под `[lint]` в `flick.toml`.
 
-```flick ignore
+```flick
 let kinds = [Tracer.internal, Tracer.server]
 ```

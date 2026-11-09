@@ -1,0 +1,22 @@
+# Explanations whose example is a fragment the checker cannot compile, and why.
+# `docs_examples_check` in flick-core/tests/corpus.rs enforces one line per
+# `flick ignore` example: its code, the fingerprint of the block's text, and
+# the reason it cannot be checked. Adding, changing or dropping an example
+# needs an edit here, reviewed with it. The list may only shrink.
+#
+# CODE  FINGERPRINT  REASON
+D008 4b17a922356da738 needs the Codec package and a schema witness that a single block cannot declare
+E011 62a0dfd3e2ad5685 needs the Server framework: Server.handler, Session and a Scope the block does not provide
+F002 e7d3330cdd1551c2 the std Fiber API's Handle and Detached, which the standalone checker does not load
+F005 947475cd77103d3f the binding is generated into a module and its reviewed fingerprint is checked against the package
+F007 664ea8462abc13d6 the binding is generated into a module and its reviewed fingerprint is checked against the package
+P026 c4aaab59da9e1bd0 the entry module and App.run belong to a project, not to a block
+P041 e0be42d6b99fd9cf a library's foreign module is a packaging fact: the file beside the module is missing
+R001 5733722b13348c25 a module's path is a project fact: a block has no path to disagree with
+R002 c50c38d2e11a2682 two modules with one name need two files of a project
+R004 df8cf42ea11ed171 what a module exports is read across a project's files, not inside one block
+R005 2be4604999987b43 what a module exports is read across a project's files, not inside one block
+R006 22c8079870c2c719 an import cycle needs several modules of a project
+S011 d3a7fb91bf7ea880 the catch needs FsError.from_js, which the standalone checker does not know
+T002 4aac33470eaed38f a signature is shown without its definition: the page is about the kind of types
+T059 907ceb22cd869605 signatures are shown without a definition, to compare what a signature says twice

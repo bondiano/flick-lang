@@ -9,7 +9,7 @@ parameter. A function, a `Ref`, a scoped resource or a runtime description
 has none; the message names the path of the field. `T.schema` needs a type
 that derives `Schema`.
 
-```flick ignore
+```flick
 type alias Profile = { name : String; session_id : String }
   deriving Schema
 // was: session : File s, a live resource with no wire form

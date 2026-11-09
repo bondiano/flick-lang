@@ -8,7 +8,7 @@ implicit conversions: `1 + 1n` mixes `Float` and `BigInt`, `"a" ++ 1` mixes
 pass for a smaller closed record type (no width subtyping); accept the extra
 fields with an open row `{ name : String | fields }` or project them away.
 
-```flick ignore
+```flick
 label : Float -> String
 let label n = "count: " ++ Float.to_string n
 ```

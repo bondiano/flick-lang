@@ -6,7 +6,7 @@ A function written inside another that uses none of the locals around it
 does not need to be there: as a top-level function it is made once, can
 have a signature and a test, and keeps the outer function short.
 
-```flick ignore
+```flick
 double : Float -> Float
 let double x = x * 2
 

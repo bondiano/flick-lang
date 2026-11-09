@@ -18,7 +18,7 @@ Make each once with a top-level `let`, and one per key with `Atom.family`:
 `Hash`, so it holds no function. Pass what differs between elements to an
 action as data with `Action.with`.
 
-```flick ignore
+```flick
 drafts : Atom.Family Float (Atom.Writable String)
 let drafts = Atom.family (fun _ -> Atom.make "")
 

@@ -7,7 +7,7 @@ declares, and `name` is no `server fn`: only a `server fn` has an
 implementation to serve. The shape of a `server fn` itself is the plugin's
 to check, `std/E010`.
 
-```flick ignore
+```flick
 module App.Api exposing (greet, functions)
 
 import Server

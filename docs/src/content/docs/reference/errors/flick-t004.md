@@ -8,7 +8,7 @@ too. Another local function may omit it, and an instance method takes the one of
 its class. The signature states every argument type, the result and the effect
 of each arrow; the body is checked against it.
 
-```flick ignore
+```flick
 greet : String -> String -> String
 let greet prefix name =
   prefix ++ ", " ++ name

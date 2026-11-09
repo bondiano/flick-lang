@@ -73,7 +73,15 @@ fn clone(url: &str, tag: &str, dir: &Path) -> Result<String, String> {
             .args(args)
             .env("GIT_TERMINAL_PROMPT", "0")
             .output()
-            .map_err(|e| format!("cannot run git: {e}"))?;
+            .map_err(|e| match e.kind() {
+                io::ErrorKind::NotFound => {
+                    "cannot run `git`: it is not on PATH; Flick fetches the \
+                     implicit `std` and `git` dependencies with it — install git, or set \
+                     `FLICK_STD_PATH` to a local `packages/std`"
+                        .to_owned()
+                }
+                _ => format!("cannot run git: {e}"),
+            })?;
         if out.status.success() {
             Ok(String::from_utf8_lossy(&out.stdout).trim().to_owned())
         } else {

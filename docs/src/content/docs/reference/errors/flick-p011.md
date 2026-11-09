@@ -5,7 +5,7 @@ title: "FLICK-P011"
 The `entry` of an application must name a module in the source root that
 exports `main`.
 
-```flick ignore
+```flick
 module App.Main exposing (main)
 
 main : Unit ->{; AppError} Unit

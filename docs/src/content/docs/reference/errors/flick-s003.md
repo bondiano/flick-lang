@@ -6,7 +6,7 @@ The source contains a character that starts no Flick token, such as `#`, `~`,
 `!` on its own or a non-ASCII letter outside a string or comment. Names are
 ASCII letters, digits and `_`.
 
-```flick ignore
+```flick
 // error: `user#name`
 let user_name = "Ada"
 ```

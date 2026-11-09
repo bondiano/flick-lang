@@ -10,6 +10,7 @@ permissions:
 jobs:
   version:
     runs-on: ubuntu-26.04
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
       - run: |
@@ -35,6 +36,7 @@ jobs:
             exit 1
           fi
 
+  # the timeouts of this reusable workflow's own jobs are set in ci.yml
   checks:
     uses: ./.github/workflows/ci.yml
 
@@ -42,6 +44,7 @@ jobs:
     needs: [version, checks]
     name: Build ${{ matrix.target }}
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
@@ -75,6 +78,7 @@ jobs:
   npm:
     needs: [build]
     runs-on: ubuntu-26.04
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
       # version comes from `packageManager` in package.json
@@ -94,24 +98,69 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
-  release:
-    needs: [checks, build, npm]
+  vsix:
+    needs: [version, checks]
     runs-on: ubuntu-26.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24.18.0
+          cache: pnpm
+      # the extension needs only its language client: the pinned esbuild and
+      # vsce that the scripts name are fetched by npx
+      - run: pnpm install --frozen-lockfile --filter ./editors/vscode
+      - name: Package the extension
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          FLICK_EXPECTED_VERSION="$version" node editors/vscode/scripts/package.mjs \
+            --out "target/vsix/flick-$version.vsix" 2>&1 | tee vsix.log
+          # a warning names a file VS Code would miss
+          if grep -qi warning vsix.log; then
+            echo "::error::packaging warned: the VSIX may miss a file"
+            exit 1
+          fi
+      - name: Check what the VSIX holds
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          unzip -q "target/vsix/flick-$version.vsix" -d vsix
+          # the bundle carries the language client, compiles, and is this
+          # release: the script exits 1 with `::error::`, which a `! grep`
+          # would not have done under `set -e`
+          node editors/vscode/scripts/check-vsix.mjs vsix --version "$version"
+      - name: Check that check
+        run: node --test editors/vscode/scripts/check-vsix.test.mjs
+      - uses: actions/upload-artifact@v7
+        with:
+          name: vsix
+          path: target/vsix/*.vsix
+          if-no-files-found: error
+
+  release:
+    needs: [checks, build, npm, vsix]
+    runs-on: ubuntu-26.04
+    timeout-minutes: 15
     permissions:
       contents: write
     steps:
       - uses: actions/download-artifact@v8
         with:
           merge-multiple: true
-      # install.sh and the Homebrew formula verify the archives against these
+      # install.sh and the Homebrew formula verify the archives against these;
+      # the VSIX, which matches the same glob, is attached with its digest
       - run: for archive in flick-*; do sha256sum "$archive" > "$archive.sha256"; done
-      - run: gh release create "$GITHUB_REF_NAME" flick-* --repo "$GITHUB_REPOSITORY" --generate-notes
+      # `--latest`: a package release, such as `std-v0.1.0`, is a release of
+      # this repository too, and `releases/latest` must name the compiler
+      - run: gh release create "$GITHUB_REF_NAME" flick-* --repo "$GITHUB_REPOSITORY" --generate-notes --latest
         env:
           GH_TOKEN: ${{ github.token }}
 
   homebrew:
     needs: [release]
     runs-on: ubuntu-26.04
+    timeout-minutes: 20
     steps:
       - uses: actions/download-artifact@v8
         with:
@@ -177,3 +226,66 @@ jobs:
           git add Formula/flick.rb
           git commit -m "flick $GITHUB_REF_NAME"
           git push
+
+  installer-tests:
+    needs: [version]
+    runs-on: ubuntu-26.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24.18.0
+      - run: node --test .github/actions/setup-flick/install.test.mjs
+
+  # the action of this release, as a workflow of another repository uses it
+  installer:
+    needs: [release]
+    name: Install ${{ matrix.version }} on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-22.04, version: latest }
+          - { os: ubuntu-26.04, version: pinned }
+          - { os: macos-15, version: latest }
+          - { os: windows-latest, version: latest }
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./
+        with:
+          version: ${{ matrix.version == 'latest' && 'latest' || github.ref_name }}
+      - name: It is on PATH, and it is this release
+        shell: bash
+        run: |
+          printed=$(flick --version)
+          echo "$printed"
+          if [ "$printed" != "flick ${GITHUB_REF_NAME#v}" ]; then
+            echo "::error::flick --version printed $printed"
+            exit 1
+          fi
+      # the checksum and the unpacking are checked by the installer's tests;
+      # this proves a failure of the release download fails the step
+      - name: A release that is not there
+        id: missing
+        continue-on-error: true
+        uses: ./
+        with:
+          version: v0.0.1
+      - name: That failure was reported
+        shell: bash
+        run: |
+          if [ "${{ steps.missing.outcome }}" != failure ]; then
+            echo "::error::a missing release did not fail the step"
+            exit 1
+          fi
+      - name: The install that worked is untouched
+        shell: bash
+        run: flick --version
+      - name: install.sh installs it too
+        if: runner.os == 'Linux' && matrix.version == 'latest'
+        run: |
+          FLICK_BIN_DIR="$RUNNER_TEMP/shell-bin" sh docs/public/install.sh
+          "$RUNNER_TEMP/shell-bin/flick" --version

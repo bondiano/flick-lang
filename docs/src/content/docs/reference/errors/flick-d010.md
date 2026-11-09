@@ -8,7 +8,7 @@ must derive `Schema` too, and each field must be typed from text: a
 one, which is `None` when its input is empty. A list, a nested record or a
 variant type has no input; the message names the field.
 
-```flick ignore
+```flick
 type alias Signup = { name : String; age : Option Float }
   deriving Schema, Form
 // was: tags : List String, a list has no single input

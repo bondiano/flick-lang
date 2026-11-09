@@ -1,6 +1,6 @@
 ---
 title: "Типизированные RPC"
-source_hash: 8778e0c0c7d58ff6
+source_hash: 78cbdc0bff8b32b0
 ---
 
 Опишите процедуру один раз и используйте это описание по обе стороны
@@ -160,7 +160,7 @@ runner = "Runner.Browser"
 entries = { app = { module = "App.Page", target = "client" }, worker = { module = "App.Worker", target = "client" } }
 ```
 
-```flick ignore
+```flick ignore the worker entry needs the runner and Rpc package of a project
 // App.Worker
 main : Unit ->{; AppError} Unit
 let main () = Rpc.serve_worker group handlers

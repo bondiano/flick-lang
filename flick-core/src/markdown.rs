@@ -13,8 +13,9 @@ use crate::source::{FileId, Span};
 /// What a block's info string asks of the checker: ```` ```flick ```` must
 /// check without errors, ```` ```flick keep ```` too but is never rewritten
 /// by fixes (it shows the long form a lint would shorten), ```` ```flick
-/// ignore ```` is only parsed, and ```` ```flick fail ```` must report at
-/// least one error.
+/// ignore ```` is only parsed and is a fragment `docs/error-examples.txt`
+/// explains, and ```` ```flick fail ```` must report errors, the codes it
+/// names (`fail T010`) or any error when it names none.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Mode {
     Check,
@@ -27,6 +28,13 @@ pub enum Mode {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Block {
     pub mode: Mode,
+    /// The codes a `fail` block must report, as the fence names them; empty
+    /// when it names none, then any error does.
+    pub codes: Vec<String>,
+    /// Why an `ignore` block outside the reference cannot be checked, as the
+    /// fence says it; the reference's reasons are reviewed in
+    /// `docs/error-examples.txt` instead.
+    pub reason: String,
     /// The 1-based line of the page where the block's code starts.
     pub line: usize,
     /// The code as it is compiled: its hidden lines without their prefix.
@@ -45,16 +53,31 @@ struct Line {
     hidden: usize,
 }
 
-/// The mode of a block whose info string is ```` ```flick ```` and `words`.
-fn mode(words: &str) -> Mode {
-    words
-        .split_whitespace()
-        .fold(Mode::Check, |mode, word| match word {
-            "keep" => Mode::Keep,
-            "ignore" => Mode::Ignore,
-            "fail" => Mode::Fail,
-            _ => mode,
-        })
+/// The mode of a block whose info string is ```` ```flick ```` and `words`,
+/// the codes a `fail` block expects, and the reason an `ignore` block gives.
+fn parse(words: &str) -> (Mode, Vec<String>, String) {
+    let mut mode = Mode::Check;
+    let mut codes = Vec::new();
+    let mut reason = Vec::new();
+    for word in words.split_whitespace() {
+        match (word, mode) {
+            ("fail", _) => mode = Mode::Fail,
+            ("keep", _) => mode = Mode::Keep,
+            ("ignore", _) => mode = Mode::Ignore,
+            _ if mode == Mode::Fail && is_code(word) => codes.push(word.to_owned()),
+            _ if mode == Mode::Ignore => reason.push(word),
+            _ => {}
+        }
+    }
+    (mode, codes, reason.join(" "))
+}
+
+/// Whether `word` is a diagnostic code as a fence names one: `T010` or
+/// `FLICK-T010`.
+fn is_code(word: &str) -> bool {
+    let short = word.strip_prefix("FLICK-").unwrap_or(word);
+    let bytes = short.as_bytes();
+    bytes.len() == 4 && bytes[0].is_ascii_uppercase() && bytes[1..].iter().all(u8::is_ascii_digit)
 }
 
 /// The bytes of the hidden prefix of a line of code.
@@ -81,10 +104,13 @@ pub fn blocks(page: &str) -> Vec<Block> {
         let fence = line.trim_start();
         match &mut open {
             None => {
-                let info = fence.strip_prefix("```flick");
-                if let Some(words) = info.filter(|w| w.is_empty() || w.starts_with(' ')) {
+                let after = fence.strip_prefix("```flick");
+                if let Some(words) = after.filter(|w| w.is_empty() || w.starts_with(' ')) {
+                    let (mode, codes, reason) = parse(words);
                     open = Some(Block {
-                        mode: mode(words),
+                        mode,
+                        codes,
+                        reason,
                         line: index + 2,
                         text: String::new(),
                         lines: Vec::new(),
@@ -214,6 +240,12 @@ mod tests {
         assert!(blocks("```flickr\nx\n```\n").is_empty());
         let keep = blocks("```flick keep title=\"a.fl\"\nx\n```\n");
         assert_eq!(keep[0].mode, Mode::Keep);
+        let fail = blocks("```flick fail T010 FLICK-S001 because it overlaps\nx\n```\n");
+        assert_eq!(fail[0].mode, Mode::Fail);
+        assert_eq!(fail[0].codes, ["T010", "FLICK-S001"]);
+        let ignore = blocks("```flick ignore needs a service\nx\n```\n");
+        assert_eq!(ignore[0].mode, Mode::Ignore);
+        assert_eq!(ignore[0].reason, "needs a service");
         let crlf = &blocks("```flick\r\n# a\r\nb\r\n```\r\n")[0];
         assert_eq!(crlf.text, "a\nb\n");
         assert_eq!(crlf.range(), 10..18);

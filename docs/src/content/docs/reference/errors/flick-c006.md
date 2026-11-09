@@ -6,11 +6,17 @@ Only the package of the class, or the package of the nominal type at the
 head of the instance's first type, may declare an instance. Another package
 wraps the type in a nominal type of its own; a transparent alias is not one.
 
-```flick ignore
+```flick
+# type ExternalId = ExternalId Float
+# hash_external : ExternalId -> Int
+# let hash_external id = 0
+# instance Eq LocalExternalId =
+#   eq : LocalExternalId -> LocalExternalId -> Bool
+#   let eq a b = a == b
 type LocalExternalId = LocalExternalId ExternalId
 
 instance Hash LocalExternalId =
-  hash : LocalExternalId -> Float
+  hash : LocalExternalId -> Int
   let hash id =
     match id with
     | LocalExternalId raw -> hash_external raw

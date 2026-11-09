@@ -24,7 +24,7 @@ type Expr a =
 the type of its two branches. Every use is held to these types, so adding a
 boolean to a number is `FLICK-T003` before anything runs:
 
-```flick fail
+```flick fail T003
 # type Expr a =
 #   | NatLit Int : Expr Int
 #   | BoolLit Bool : Expr Bool

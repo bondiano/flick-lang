@@ -7,7 +7,8 @@ A pattern binds its names inconsistently. Every alternative of an or-pattern
 types), so the arm body can use them whichever alternative matched. A name
 can be bound only once by one pattern or by the parameters of one function.
 
-```flick ignore
+```flick
+# type Shape = Square Float | Circle Float | Rect Float Float
 area : Shape -> Float
 let area shape =
   match shape with

@@ -7,7 +7,7 @@ The project sets `no-let-assert = true` in the `[lint]` table of
 with `match`; the fix moves the rest of the block into the arm of the
 pattern and adds an arm `-> todo` for what it misses.
 
-```flick ignore
+```flick
 module App.Config exposing (port)
 
 port : List Float -> Float

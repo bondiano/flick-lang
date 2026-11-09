@@ -10,7 +10,7 @@ a promise, a row with `Async`, and `catch` is for a mode that can throw.
 `foreign sync` and `foreign async` are words of before: without a mode word
 the signature tells how the host is called.
 
-```flick ignore
+```flick
 now_millis : Unit ->{} Float
 foreign now_millis from global "Date.now"
   arity 0

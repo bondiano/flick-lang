@@ -1,6 +1,6 @@
 ---
 title: "FLICK-T029"
-source_hash: "f7b9b66d6df32239"
+source_hash: "e6954944e57e1bde"
 ---
 
 Предупреждение: блок `do` над `Eff` строит вычисление через
@@ -9,7 +9,13 @@ source_hash: "f7b9b66d6df32239"
 строки своих вызовов. Быстрое исправление переписывает `x <- e` как `let x = await e`,
 выражение как `await e` и конечный `pure v` как `v`.
 
-```flick ignore
+```flick
+# service Users =
+#   get : Int ->{; NotFound} User
+#   touch : UserId ->{} Unit
+# type UserId = UserId String
+# type User = User { name : String }
+# type error NotFound = NotFound String
 load_both : Eff {Users} {NotFound} (User, User)
 let load_both =
   task {

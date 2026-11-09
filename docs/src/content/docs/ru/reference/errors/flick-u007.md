@@ -1,11 +1,11 @@
 ---
 title: "FLICK-U007"
-source_hash: "cdf2f0466b9d8d3d"
+source_hash: "47063ce4e38cbbdd"
 ---
 
 Функция, которая читает атомы (`Atom.Read`) и возвращает `Ui`, рендерится как часть того, кто её вызывает: когда один из её атомов изменяется, весь вызывающий компонент рендерится заново. `component` рендерится самостоятельно, поэтому рендерится заново только он.
 
-```flick ignore
+```flick
 count : Atom.Writable Float
 let count = Atom.make 0
 

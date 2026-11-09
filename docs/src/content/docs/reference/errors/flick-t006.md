@@ -7,7 +7,7 @@ definition, or with the definition elsewhere, is an error; services, classes and
 `foreign` declarations are the places where a signature stands alone or above a
 `foreign`.
 
-```flick ignore
+```flick
 now : Unit ->{} Float
 foreign now from global "Date.now"
 ```

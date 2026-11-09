@@ -6,7 +6,7 @@ title: "FLICK-T022"
 needs, so the rest of the module checks, and fails when it runs.
 `todo "what is missing"` says what it stands for in that failure.
 
-```flick ignore
+```flick fail T022
 module App.Report exposing (render)
 
 render : List Float -> String

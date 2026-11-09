@@ -8,7 +8,7 @@ imported, and not built in. Qualified names need a module the file imports
 declared in scope (`Users.get`). Type variables of a `type` declaration must be
 its parameters.
 
-```flick ignore
+```flick
 type alias Pair a b = (a, b)  // `b` is a parameter, so it may be used
 
 total : List Float -> Float

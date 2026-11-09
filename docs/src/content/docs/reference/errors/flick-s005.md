@@ -8,7 +8,7 @@ Unicode scalar value (no surrogates). `\0` cannot be followed by a digit. A
 multi-line string opens with `"""` followed by a line break. Raw strings
 `r"…"` and `r#"…"#` have no escapes.
 
-```flick ignore
+```flick
 let path = r"C:\temp"
 let smile = "\u{1F600}"
 ```

@@ -13,6 +13,7 @@ on:
 jobs:
   perf:
     runs-on: ubuntu-26.04
+    timeout-minutes: 70
     steps:
       - uses: actions/checkout@v7
         with:
@@ -33,9 +34,34 @@ jobs:
           node-version: 24.18.0
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: just perf
+      # the log keeps what the run measured and the budget it passed
+      - run: |
+          set -o pipefail
+          just perf 2>&1 | tee perf.log
+      # the numbers a nightly is judged by, on the run itself
+      - if: ${{ !cancelled() }}
+        name: The numbers, and the budget a failure passed
+        run: |
+          {
+            echo "## Performance"
+            echo
+            echo "Against \`tools/perf/budgets.json\`; \`perf.json\` and \`perf.log\` are artifacts."
+            echo
+            grep '^| ' perf.log || echo "no measurement table: the run failed before it measured"
+            if grep -q '^error: ' perf.log; then
+              echo
+              echo "### Failed"
+              echo
+              echo '```'
+              grep '^error: ' perf.log
+              echo '```'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v7
         if: ${{ !cancelled() }}
         with:
           name: perf
-          path: target/perf.json
+          path: |
+            target/perf.json
+            perf.log
+          if-no-files-found: warn

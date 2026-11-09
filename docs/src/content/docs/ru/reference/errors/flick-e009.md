@@ -1,11 +1,11 @@
 ---
 title: "FLICK-E009"
-source_hash: "b9217a5508ef512d"
+source_hash: "51ca3eff426fbd4f"
 ---
 
 Точка входа с `target = "client"` в `flick.toml` выполняется в браузере. Поэтому код, достижимый из её `main`, не может требовать `Server`: ни функция с `Server` в строке эффектов, ни значение, которое предоставляет его через `Server.node`. Сообщение показывает путь от `main` до такого кода. Вызывайте его из серверной точки входа, а из клиента обращайтесь к серверу через HTTP или RPC.
 
-```flick ignore
+```flick
 // flick.toml: entries = { web = { module = "App.Web", target = "client" } }
 module App.Web exposing (main)
 

@@ -6,9 +6,9 @@ A top-level definition has the name of something the module imports by name in
 `exposing (…)`. Uses of the name would silently mean the local one. Rename the
 definition or drop the name from the import's `exposing` list and qualify it.
 
-```flick ignore
-import App.Text as Text
+```flick fail R009
+import App.Text exposing (trim)
 
 trim : String -> String
-let trim s = Text.trim s
+let trim s = String.trim s
 ```

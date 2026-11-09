@@ -7,7 +7,10 @@ An `if`, `match`, `fun`, `do`, `task`, `for` or `try` nested deeper than
 nest. Move the inner part into a function of its own, or match on several
 values at once.
 
-```flick ignore
+```flick
+# type alias User = { name : String }
+# named : User -> String
+# let named u = u.name
 label : Option User -> String
 let label user = match user with
   | Some u -> named u

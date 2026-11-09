@@ -14,6 +14,7 @@ permissions:
 jobs:
   release:
     runs-on: ubuntu-26.04
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
       - name: Package and version of the tag
@@ -50,6 +51,9 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          # a package tag releases a package, not the compiler: it must not take
+          # the `latest` release, which the installer and the archives resolve
           gh release create "$GITHUB_REF_NAME" "${{ steps.pack.outputs.file }}" \
             --title "$GITHUB_REF_NAME" \
+            --latest=false \
             --notes "sha256 \`${{ steps.pack.outputs.sha256 }}\`"

@@ -1,11 +1,11 @@
 ---
 title: "FLICK-P044"
-source_hash: "35dd7cc334712158"
+source_hash: "2193945781982bb9"
 ---
 
 Импорт раскрывает заголовок плагина `std`, который есть в каждом модуле без импорта, из плагина другого пакета:
 
-```flick ignore
+```flick
 module App.Main exposing (..)
 
 import Queries exposing (plugin sql)

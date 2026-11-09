@@ -83,9 +83,14 @@ e2e-js: docs-wasm e2e-prepare
     node docs/scripts/chunks.mjs
     pnpm -C docs e2e
 
-# The e2e suites of the compiler but the cases of tests/run, under nextest
+# The e2e suites of the compiler but the cases of tests/run, under nextest.
+# Every ignored test of `flick` and `flick-core` runs here: the selection is
+# "all their test targets, minus the exceptions", so a new suite is covered
+# without touching this recipe. Each exception belongs to the recipe named
+# beside it, and `flick/tests/ignored_tests.rs` holds this recipe to that.
 e2e-tests: e2e-prepare
-    cargo nextest run --cargo-profile e2e --profile ci --run-ignored only -p flick -p flick-core --test e2e --test e2e_numbers --test go_main --test control_handlers --test rt_stages --test test_command --test dts_command --test build_command --test ffi_command --test cli_run --test cli_devtools --test cli_template --test cli_fullstack --test first_slice --test examples --test unicode_path --test source_packages --test workspace --test consteval_node -E 'not test(=run_cases)'
+    cargo nextest run --cargo-profile e2e --profile ci --run-ignored only -p flick -p flick-core \
+      -E 'not (test(=run_cases) | binary_id(flick::sql_postgres) | binary_id(flick::conduit) | test(~dump) | test(~write_fixes_of_built_in_signatures))'
 
 # The cases of tests/run: all of them, or the shard `k/n` of them
 e2e-cases shard="": e2e-prepare

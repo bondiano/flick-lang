@@ -1,12 +1,12 @@
 ---
 title: "FLICK-T014"
-source_hash: "ebd1d8516544c769"
+source_hash: "15500293a3f8b928"
 ---
 
 Метка появляется дважды в одном типе записи, литерале записи, обновлении или шаблоне.
 Метки записи уникальны; их порядок не имеет значения.
 
-```flick ignore
+```flick
 type alias Point = { x : Float; y : Float }
 
 origin : Point

@@ -7,7 +7,7 @@ top-level value is computed when its module loads, and a module does not
 fail while it loads: write `let assert` inside a function's block, or
 `match` over the value.
 
-```flick ignore
+```flick
 module App.Config exposing (port)
 
 port : List Float -> Float

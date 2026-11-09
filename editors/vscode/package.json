@@ -59,10 +59,15 @@
       }
     }
   },
-  "main": "./extension.js",
+  "main": "./dist/extension.js",
   "activationEvents": [
     "onLanguage:flick"
   ],
+  "scripts": {
+    "bundle": "node scripts/bundle.mjs",
+    "package": "node scripts/package.mjs",
+    "vscode:prepublish": "node scripts/bundle.mjs"
+  },
   "dependencies": {
     "vscode-languageclient": "11.0.0"
   }

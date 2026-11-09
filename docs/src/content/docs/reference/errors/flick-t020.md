@@ -9,7 +9,7 @@ the one field of each of its constructors, which JS must tell apart by
 type: `Float`, `String`, `Bool`, `BigInt`, or one list or tuple; no two
 constructors may share one.
 
-```flick ignore
+```flick
 unboxed type UserId = UserId String
 
 untagged type Key = ByNumber Float | ByName String
@@ -20,6 +20,6 @@ or all `Int`s and each different; its constructors have no fields and the
 type no parameters. A literal comes after `=`, and only in an `untagged
 type`.
 
-```flick ignore
+```flick
 untagged type Method = Get = "GET" | Post = "POST"
 ```

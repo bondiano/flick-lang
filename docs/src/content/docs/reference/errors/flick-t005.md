@@ -6,7 +6,7 @@ Flick writes types in the signature above a function, not in its `let` header:
 the header keeps only the names of the arguments. Move the types into the
 signature.
 
-```flick ignore
+```flick
 // not: let area (w : Float) (h : Float) : Float = w * h
 area : Float -> Float -> Float
 let area w h = w * h

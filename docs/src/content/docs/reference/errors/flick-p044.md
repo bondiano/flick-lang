@@ -5,7 +5,7 @@ title: "FLICK-P044"
 An import exposes a head of the plugin of `std`, which every module has
 without an import, from the plugin of another package:
 
-```flick ignore
+```flick
 module App.Main exposing (..)
 
 import Queries exposing (plugin sql)

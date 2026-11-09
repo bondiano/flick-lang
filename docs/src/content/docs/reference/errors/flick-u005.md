@@ -13,7 +13,7 @@ generalized, and a signature, annotation or higher-rank argument that gives
 it variables is rejected the same way. A function making an atom per call
 may stay polymorphic.
 
-```flick ignore
+```flick
 items : Atom.Writable (List Float)
 let items = Atom.make []
 

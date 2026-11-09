@@ -1,11 +1,12 @@
 ---
 title: "FLICK-S007"
-source_hash: "62377093460eac71"
+source_hash: "d22dfdaf4069fb0e"
 ---
 
 Парсер обнаружил токен в месте, где грамматика его не допускает. В сообщении указано, что ожидалось. После ошибки парсер пропускает до следующего оператора или объявления, поэтому последующие объявления всё ещё проверяются.
 
-```flick ignore
+```flick
+# add : Float -> Float -> Float
 // error: `let add left right = left +`
 let add left right =
   left + right

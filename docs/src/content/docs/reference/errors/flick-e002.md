@@ -7,7 +7,14 @@ body may need fewer, never more. The same holds for a value or a `task` checked
 against an expected type. Add what is missing to the signature, provide the
 service, or handle the error with `try … with`.
 
-```flick ignore
+```flick
+# service Users =
+#   get : UserId ->{; NotFound} User
+# service Log =
+#   info : String ->{} Unit
+# type UserId = UserId Int
+# type alias User = { name : String }
+# type error NotFound = NotFound String
 // was: load_name : UserId ->{Users; NotFound} String
 load_name : UserId ->{Users, Log; NotFound} String
 let load_name id =

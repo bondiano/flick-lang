@@ -6,7 +6,7 @@ A comparison with the literal on the left, `0 == n`, reads backwards. The
 quick fix puts the value compared first and turns `<` into `>` and so on,
 so the comparison means the same.
 
-```flick ignore
+```flick
 empty : Float -> Bool
 let empty n = n == 0
 ```

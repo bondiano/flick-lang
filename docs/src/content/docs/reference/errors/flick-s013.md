@@ -6,7 +6,7 @@ title: "FLICK-S013"
 the value out of `e` through `Monad.flat_map`. Elsewhere bind with `let`. A
 comparison with a negative number needs a space: `a < -1`, not `a<-1`.
 
-```flick ignore
+```flick
 pair_optional : Option a -> Option b -> Option (a, b)
 let pair_optional left right =
   do {

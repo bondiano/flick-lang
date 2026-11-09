@@ -1,13 +1,14 @@
 ---
 title: "FLICK-T044"
-source_hash: "98eb248ad242b20a"
+source_hash: "31e6b6d42f138d44"
 ---
 
 Значение, сравниваемое само с собой, даёт одинаковый результат каждый раз: `x == x`,  
 `x <= x` и `x >= x` являются `true`, остальные — `false`. Обычно это опечатка  
 для другого имени.
 
-```flick ignore
+```flick
+# type alias Point = { x : Float }
 same : Point -> Point -> Bool
 let same a b = a.x == b.x
 ```
