@@ -7,26 +7,31 @@ import Formal.ScopeRun
 
 namespace Flick
 
-variable {S : Sig}
+variable {S : Sig} {mode : TypingMode}
 
 /-- The error type of a raised value. -/
-theorem err_type {Ψ Θ v ε} (hv : Value v) (h : Typ S Ψ Θ [] v (.ex (.errors ε) .pure)) {K k ts T}
-    (hK : v.head = .ctor K) (hS : S.ctor K = some (k, ts, T)) :
-    ∃ U, ε (.nm T) ∧ U.hd = .adt T ∧ Typ S Ψ Θ [] v (.ex U .pure) ∧ Row.Sub (Row.err T U) ε := by
-  obtain ⟨K', k', ts', T', U, hK', hS', hε, hU, ht, hsub⟩ := canonical_errors hv h
+theorem err_type_mode {Ψ Θ v ε} (hv : Value v) (h : TypM S mode Ψ Θ [] v (.ex (.errors ε) .pure))
+    {K k ts T} (hK : v.head = .ctor K) (hS : S.ctor K = some (k, ts, T)) :
+    ∃ U, ε (.nm T) ∧ U.hd = .adt T ∧ TypM S mode Ψ Θ [] v (.ex U .pure) ∧ Row.Sub (Row.err T U) ε := by
+  obtain ⟨K', k', ts', T', U, hK', hS', hε, hU, ht, hsub⟩ := canonical_errors_mode hv h
   rw [hK] at hK'; cases hK'; rw [hS] at hS'; cases hS'
   exact ⟨U, hε, hU, ht, hsub⟩
+
+theorem err_type {Ψ Θ v ε} (hv : Value v) (h : Typ S Ψ Θ [] v (.ex (.errors ε) .pure)) {K k ts T}
+    (hK : v.head = .ctor K) (hS : S.ctor K = some (k, ts, T)) :
+    ∃ U, ε (.nm T) ∧ U.hd = .adt T ∧ Typ S Ψ Θ [] v (.ex U .pure) ∧ Row.Sub (Row.err T U) ε :=
+  err_type_mode hv h hK hS
 
 /-- After a failed `try` arm, the remaining arms still remove or let through the
 error of the value. -/
 theorem HCov.tail {Ψ Θ ε₀ p θ Δ v H H' ε'} (hp : HPat S ε₀ p θ Δ) (hv : Value v)
-    (hv' : Typ S Ψ Θ [] v (.ex (.errors ε₀) .pure)) (hc : HCov S v H ε')
+    (hv' : TypM S mode Ψ Θ [] v (.ex (.errors ε₀) .pure)) (hc : HCov S v H ε')
     (hH : ∀ n, H n → Catches S ε₀ p θ n ∨ H' n) (hm : matchP p v = none) : HCov S v H' ε' := by
   intro K k ts T hK hS
   rcases hc K k ts T hK hS with h | h
   · rcases hH _ h with (⟨rfl, _⟩ | ⟨rfl, hx⟩) | h'
     · cases hp <;> simp [matchP] at hm
-    · obtain ⟨U, _, hU, ht, _⟩ := err_type hv hv' hK hS
+    · obtain ⟨U, _, hU, ht, _⟩ := err_type_mode hv hv' hK hS
       have hs' : Shp S true (.adt T) v := by
         have hs := (ht.shape hv rfl).1
         cases hs with
@@ -43,15 +48,20 @@ theorem HCov.tail {Ψ Θ ε₀ p θ Δ v H H' ε'} (hp : HPat S ε₀ p θ Δ) (
   · exact .inr h
 
 /-- A raised value of a body with errors `ε₀`, at `Errors ε₀`. -/
-theorem raise_inv {Ψ Θ v t φ} (hv : Value v) (h : Typ S Ψ Θ [] (.raise v) (.ex t φ)) :
-    ∃ ε, Typ S Ψ Θ [] v (.ex (.errors ε) .pure) ∧ (Stage.rt Row.none ε).le φ := by
+theorem raise_inv_mode {Ψ Θ v t φ} (hv : Value v) (h : TypM S mode Ψ Θ [] (.raise v) (.ex t φ)) :
+    ∃ ε, TypM S mode Ψ Θ [] v (.ex (.errors ε) .pure) ∧ (Stage.rt Row.none ε).le φ := by
   cases h with
   | raise h₁ hφ => exact ⟨_, h₁.valueAny hv _, hφ⟩
   | raiseAdt h₁ hU hφ => exact ⟨_, .errVal hv (h₁.valueAny hv _) hU (Row.Sub.refl _), hφ⟩
   | errVal hv' | allI hv' => cases hv'
 
-theorem StoreTy.alloc {Ψ μ v t₀} (hμ : StoreTy S Ψ μ) (hv : Value v)
-    (h : Typ S Ψ Facts.age [] v (.ex t₀ .pure)) : StoreTy S (Ψ ++ [t₀]) (μ ++ [v]) := by
+theorem raise_inv {Ψ Θ v t φ} (hv : Value v) (h : Typ S Ψ Θ [] (.raise v) (.ex t φ)) :
+    ∃ ε, Typ S Ψ Θ [] v (.ex (.errors ε) .pure) ∧ (Stage.rt Row.none ε).le φ :=
+  raise_inv_mode hv h
+
+theorem StoreTyM.alloc {Ψ μ v t₀} (hμ : StoreTyM S mode Ψ μ) (hv : Value v)
+    (h : TypM S mode Ψ Facts.age [] v (.ex t₀ .pure)) :
+    StoreTyM S mode (Ψ ++ [t₀]) (μ ++ [v]) := by
   refine ⟨by simp [hμ.1], fun i w s hw hs => ?_⟩
   by_cases hi : i < μ.length
   · rw [List.getElem?_append_left hi] at hw
@@ -65,9 +75,9 @@ theorem StoreTy.alloc {Ψ μ v t₀} (hμ : StoreTy S Ψ μ) (hv : Value v)
     | zero => simp [hj] at hw hs; subst hw hs; exact ⟨hv, h.weakenStore _⟩
     | succ => simp [hj] at hw
 
-theorem StoreTy.set {Ψ μ l v t₀} (hμ : StoreTy S Ψ μ) (hl : Ψ[l]? = some t₀)
-    (hlt : l < μ.length) (hv : Value v) (h : Typ S Ψ Facts.age [] v (.ex t₀ .pure)) :
-    StoreTy S Ψ (μ.set l v) := by
+theorem StoreTyM.set {Ψ μ l v t₀} (hμ : StoreTyM S mode Ψ μ) (hl : Ψ[l]? = some t₀)
+    (hlt : l < μ.length) (hv : Value v) (h : TypM S mode Ψ Facts.age [] v (.ex t₀ .pure)) :
+    StoreTyM S mode Ψ (μ.set l v) := by
   refine ⟨by simp [hμ.1], fun i w s hw hs => ?_⟩
   by_cases hi : l = i
   · subst hi

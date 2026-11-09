@@ -47,16 +47,32 @@ hole (`PresHdl.lean`) and of the run-time steps of handlers at the redex
   that stage — `scope`'s rows bound its body, `Scope.run`'s desugaring (`scopeRun_body`,
   `ScopeRun.lean`) creates one — must then hold the qualifier's atoms too. In the
   capture instance the qualifier is erased at exactly those points, so nothing is asked;
-  in the live instance the lemma must carry `ofCaps C ⊆ ψ` of the function it runs. That
-  fact follows from the subtype of the argument type (`LeLive.arrow_use`), so the port is
-  possible, but each such site needs the inversion of the type former that carries the
-  qualifier (`.all`, a record, a dictionary). This is a port of substance, not of
-  notation.
+  in the live instance the lemma must carry `ofCaps C ⊆ ψ` of the function it runs. For
+  `Scope.run` that fact is *not* derivable: the constant's instance `ι` carries a
+  qualifier `ι.C` that the subtype of its argument constrains only inside the
+  parameter's own rows (`LeLive.arrow_use` gives `ofCaps C_f ⊆ ψ₀ ∪ ofCaps ι.C`, not
+  `⊆ ψ₀`), and `Const.ok` says nothing of `.scopeRun`.
+
+The two rule-level changes that close the port, both of them contract changes to the live
+instance rather than proof steps:
+
+1. A run-time form of a handler states that its own region is live: add
+   `(mode = .live → φ.svc (.atm (.r p)))` to `hwith`, `hctl`, `hres`, `hdone`, `unw`,
+   `hkarm` and `hkeep`. Then `hwith_catch` gets the atom from the derivation it inverts,
+   and every step that replaces one handler frame by another carries it along. The
+   premises are dischargeable where a handler is installed: `hdl_install` must type the
+   new `hwith` at the stage of the `inside` body, which holds `Row.scope (.rg n)`, and
+   the `inside` rule already accepts any body stage below that bound.
+2. A scope declares what its body uses: extend `Const.ok Θ .scopeRun ι .live` with
+   `Row.sub (Row.ofCaps ι.C) (Row.union (Row.scope ι.s) (Row.union ι.r (Row.obs ι.r ι.s)))`,
+   the row that bounds the desugared body. The checker chooses `ι` from the argument's
+   type, so this asks the same of a program that the `scope` rule asks of its body.
 
 What remains is preservation of the store steps and at a context (`PresRt.lean`,
-`Preservation.lean`), the invariant itself and `T4'_live`. Neither the examples nor the
-existing captures proofs establish it. Translation of live signature elision into the
-core judgment is a separate remaining obligation.
+`Preservation.lean`) under the first of these premises, the invariant itself and
+`T4'_live`. Neither the examples nor the existing captures proofs establish it.
+Translation of live signature elision into the core judgment is a separate remaining
+obligation.
 
 T4.2 matters beyond safety: the runtime contract (`Formal/RT/`) takes only T4.3 (as `G11`),
 so giving T4.2 up does not touch T5; what it costs is that a value may keep a closed
