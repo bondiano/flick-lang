@@ -11,7 +11,7 @@ type error B = B String
 say : String ->{} Unit
 let say line = Platform.stdout_line line
 
-nap : Float ->{Async;} Unit
+nap : Float ->{Async} Unit
 let nap millis =
   match Duration.millis millis with
   | Ok d -> Effect.sleep d

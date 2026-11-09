@@ -275,7 +275,7 @@ fn call(cx: &mut Cx, scope: &Scope, name: &Tok, args: &[E], span: Span, phase: P
         return Val::error();
     }
     match name.text.as_str() {
-        "exists" | "is_in" => membership(cx, scope, &name.text, args, phase),
+        "exists" | "is_in" => membership(cx, scope, name, args, phase),
         "is_null" | "is_not_null" => {
             let v = value(cx, scope, &args[0], phase);
             let test = if name.text == "is_null" {
@@ -339,9 +339,36 @@ fn call(cx: &mut Cx, scope: &Scope, name: &Tok, args: &[E], span: Span, phase: P
     }
 }
 
-/// `exists q` and `is_in e q` over an uncorrelated subquery.
-fn membership(cx: &mut Cx, scope: &Scope, name: &str, args: &[E], phase: Phase) -> Val {
+/// A template of the program as a subquery, `$(e)` of a
+/// `Sql.Template d {} r`: its placeholder, which the runtime replaces with
+/// the template's text and values, and the term of its row, whose type
+/// `check` reads at the capture.
+fn template(cx: &mut Cx, e: &E) -> Option<(Sql, W)> {
+    let e = match e {
+        E::Paren(inner, _) => inner,
+        other => other,
+    };
+    let E::Capture { inner, span } = e else {
+        return None;
+    };
+    let text = cx.block.text_of(*span).to_owned();
+    let k = cx.template(text, *span, *inner);
+    let row = W::Call("subquery", vec![W::Raw(format!("c{k}"))]);
+    let row = W::At(Box::new(W::Fact(Box::new(row), *span)), *span);
+    Some((Sql::slot(cx.captures[k].slot), W::Call("tested", vec![row])))
+}
+
+/// `exists q` and `is_in e q` over an uncorrelated subquery, written in
+/// the query or a template of the program.
+fn membership(cx: &mut Cx, scope: &Scope, word: &Tok, args: &[E], phase: Phase) -> Val {
+    let name = word.text.as_str();
     if name == "exists" {
+        if let Some((sql, row)) = template(cx, &args[0]) {
+            cx.checks.push(row);
+            let mut v = Val::plain(Sql::wrap("EXISTS (", sql, ")"), W::Boolean(true));
+            v.known = Known::Kind("bool".into(), "Bool".into());
+            return v;
+        }
         let Some(sub) = select::subquery(cx, &args[0]) else {
             return Val::error();
         };
@@ -350,6 +377,26 @@ fn membership(cx: &mut Cx, scope: &Scope, name: &str, args: &[E], phase: Phase) 
         return v;
     }
     let v = value(cx, scope, &args[0], phase);
+    if let Some((sql, row)) = template(cx, &args[1]) {
+        cx.checks.push(row);
+        // the value's type, at the word, for `check` to compare with the row's
+        let fact = W::Fact(Box::new(v.w.clone()), word.span);
+        cx.checks.push(W::Call("tested", vec![fact]));
+        let mut text = Sql::wrap("(", v.sql, " IN (");
+        text.append(sql);
+        text.push("))");
+        return Val {
+            sql: text,
+            w: W::Boolean(true),
+            // the template's column may be `NULL`
+            null: true,
+            agg: v.agg,
+            bare: v.bare,
+            form: None,
+            at: None,
+            known: Known::Kind("bool".into(), "Bool".into()),
+        };
+    }
     let Some(sub) = select::subquery(cx, &args[1]) else {
         return Val::error();
     };

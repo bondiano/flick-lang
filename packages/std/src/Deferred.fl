@@ -19,7 +19,7 @@ foreign effect await_ from "@flick-lang/effect-ts/effect/Deferred" "await"
 
 /// Runs `task` once and completes the deferred with its outcome; whether
 /// this call completed it.
-complete : (Eff r e a)^c -> Deferred e a ->{r;} Bool
+complete : (Eff r e a)^c -> Deferred e a ->{r} Bool
 foreign effect complete from "@flick-lang/effect-ts/effect/Deferred" "complete"
   arity 1
   retention call
@@ -101,7 +101,7 @@ foreign effect sync from "@flick-lang/effect-ts/effect/Deferred" "sync"
 
 /// Runs `task` and completes `deferred` with its outcome:
 /// `task |> Deferred.into deferred`.
-into : Deferred e a -> (Eff r e a)^c ->{r;} Bool
+into : Deferred e a -> (Eff r e a)^c ->{r} Bool
 foreign effect into from "@flick-lang/effect-ts/effect/Deferred" "into"
   arity 1
   retention call

@@ -36,7 +36,7 @@ impl Checker<'_> {
                 self.set_needs_dots(item, None);
             }
             if is_set || node.has_token(K::DotDotDot) {
-                let Some(set) = self.set_of(node, item, None, free) else {
+                let Some(set) = self.set_of(node, item, free) else {
                     continue;
                 };
                 if *kind == Kind::ErrorRow && !set.services.is_empty() {

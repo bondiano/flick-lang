@@ -322,7 +322,7 @@ foreign effect listen from "@flick-lang/effect-ts/effect/http-api/HttpApi" "http
 /// the pages and the RPC. It decodes and answers as `listen` does, a
 /// request no endpoint takes is 404, and the handlers run with the
 /// services here.
-route : String -> Api r gs -> (gs^c ->{r;} (Http.Router.Route q f)^c)^c
+route : String -> Api r gs -> (gs^c ->{r} (Http.Router.Route q f)^c)^c
 foreign effect route from "@flick-lang/effect-ts/effect/http-api/HttpApi" "httpApiRoute"
   arity 3
   retention call

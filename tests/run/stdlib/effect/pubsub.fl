@@ -5,7 +5,7 @@ module App.Main exposing (main)
 say : String ->{} Unit
 let say line = Platform.stdout_line line
 
-hubs : Unit ->{Async;} Unit
+hubs : Unit ->{Async} Unit
 let hubs () =
   let hub : PubSub.PubSub String = PubSub.bounded { capacity = 4; replay = None }
   let got = scope s {

@@ -16,7 +16,7 @@ ping : Deferred.Deferred none Unit ->{} Unit
 let ping d = ignore (Deferred.succeed () d)
 
 /// A child still running as its owner closes tries to start a sibling.
-spawn_in_closing : Unit ->{Async;} Unit
+spawn_in_closing : Unit ->{Async} Unit
 let spawn_in_closing () = scope owner {
   let started : Deferred.Deferred none Unit = Deferred.make ()
   sup : Failure none ->{} Unit
@@ -42,7 +42,7 @@ let spawn_in_closing () = scope owner {
 }
 
 /// So does a finalizer, in C5.
-spawn_in_finalizer : Unit ->{Async;} Unit
+spawn_in_finalizer : Unit ->{Async} Unit
 let spawn_in_finalizer () =
   let ex : Exit none Unit =
     Effect.exit
@@ -59,7 +59,7 @@ let spawn_in_finalizer () =
   say ("the scope failed with a defect: " ++ show (Exit.has_dies ex))
 
 /// Added before C5 by a running child: it joins the stack, on top.
-added_in_closing : Unit ->{Async;} Unit
+added_in_closing : Unit ->{Async} Unit
 let added_in_closing () = scope owner {
   let started : Deferred.Deferred none Unit = Deferred.make ()
   Scope.add_finalizer (task { say "added by the body, runs last" })

@@ -6,7 +6,7 @@ module App.Main exposing (main)
 quiet : Failure e ->{} Unit
 let quiet _ = ()
 
-link : Fiber.Owner s -> Deferred.Deferred none Unit -> Int ->{Async;} Deferred.Deferred none Unit
+link : Fiber.Owner s -> Deferred.Deferred none Unit -> Int ->{Async} Deferred.Deferred none Unit
 let rec link owner prev i =
   if i == 0 then
     prev

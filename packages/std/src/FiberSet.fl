@@ -13,7 +13,7 @@ type FiberSet (s : Region) (e : ErrorRow) a
 type alias RunOptions = { propagateInterruption : Bool; startImmediately : Bool }
 
 /// An empty set owned by the innermost `scope` (or the one of region `s`).
-make : Unit ->{Scope s;} FiberSet s e a
+make : Unit ->{Scope s} FiberSet s e a
 foreign effect make from "@flick-lang/effect-ts/effect/FiberSet" "flickMake"
   arity 0
   reviewed "effect@4.1.2 sha256:0ccf473d77d74576"
@@ -22,7 +22,7 @@ foreign effect make from "@flick-lang/effect-ts/effect/FiberSet" "flickMake"
 /// set's region.
 run :
   Fiber.Outlives c s =>
-  RunOptions -> (Eff {Scope s | r} e a)^c -> FiberSet s e a ->{r;} Fiber.Fiber e a
+  RunOptions -> (Eff {Scope s | r} e a)^c -> FiberSet s e a ->{r} Fiber.Fiber e a
 foreign effect run from "@flick-lang/effect-ts/effect/FiberSet" "flickRun"
   arity 1
   retention owner
@@ -37,7 +37,7 @@ foreign effect add from "@flick-lang/effect-ts/effect/FiberSet" "flickAdd"
   reviewed "effect@4.1.2 sha256:598395337876f1d4"
 
 /// Interrupts every child and empties the set.
-clear : FiberSet s e a ->{Async;} Unit
+clear : FiberSet s e a ->{Async} Unit
 foreign effect clear from "@flick-lang/effect-ts/effect/FiberSet" "clear"
   retention call
   reviewed "effect@4.1.2 sha256:84d569b250f4f0fa"
@@ -55,7 +55,7 @@ foreign effect join from "@flick-lang/effect-ts/effect/FiberSet" "join"
   reviewed "effect@4.1.2 sha256:2b481a2440fa00ef"
 
 /// Waits until no child is running.
-await_empty : FiberSet s e a ->{Async;} Unit
+await_empty : FiberSet s e a ->{Async} Unit
 foreign effect await_empty from "@flick-lang/effect-ts/effect/FiberSet" "awaitEmpty"
   retention call
   reviewed "effect@4.1.2 sha256:82b27c89ddbba48c"

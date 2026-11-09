@@ -21,7 +21,7 @@ type alias Open r = {Log | r}
 
 type alias Time = Log
 
-no_dots : Unit ->{Env;} Unit
+no_dots : Unit ->{Env} Unit
 let no_dots () = Log.info "a"
 
 no_dots_errors : Unit ->{; Errs} Unit

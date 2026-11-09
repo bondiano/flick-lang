@@ -257,7 +257,7 @@ handler :
   Fiber.Provided r s =>
   Serialization ->
   Group r hs ->
-  (hs^c ->{Scope s | r;} (ServerRequest ->{Async;} ServerResponse)^{s})^c
+  (hs^c ->{Scope s | r} (ServerRequest ->{Async} ServerResponse)^{s})^c
 foreign effect handler from "@flick-lang/effect-ts/effect/rpc/RpcNode" "rpcHandler"
   arity 3
   retention owner
@@ -269,7 +269,7 @@ handler_websocket :
   Fiber.Provided r s =>
   Serialization ->
   Group r hs ->
-  (hs^c ->{Scope s | r;} (ServerRequest ->{Async;} ServerResponse)^{s})^c
+  (hs^c ->{Scope s | r} (ServerRequest ->{Async} ServerResponse)^{s})^c
 foreign effect handler_websocket from "@flick-lang/effect-ts/effect/rpc/RpcNode" "rpcHandlerWebsocket"
   arity 3
   retention owner

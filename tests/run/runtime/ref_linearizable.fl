@@ -7,7 +7,7 @@ say : String ->{} Unit
 let say line = Platform.stdout_line line
 
 /// `count` tickets from `cell`, stepping aside after each.
-take : Ref Int -> Int -> List Int ->{Async;} List Int
+take : Ref Int -> Int -> List Int ->{Async} List Int
 let rec take cell count taken =
   if count == 0 then
     List.reverse taken
@@ -22,7 +22,7 @@ let rec ascending tickets =
   | [a, b, ...rest] -> a < b && ascending ([b] ++ rest)
   | _ -> true
 
-tickets : Unit ->{Async;} Unit
+tickets : Unit ->{Async} Unit
 let tickets () =
   let cell = Ref.make 0
   let all = parallel_all 8 (List.repeat 8 (task { take cell 25 [] }))
@@ -32,7 +32,7 @@ let tickets () =
   say ("next ticket: " ++ show (Ref.modify cell (fun n -> (n, n + 1))))
 
 /// Moves from one field to the other while a reader sums them.
-transfers : Unit ->{Async;} Unit
+transfers : Unit ->{Async} Unit
 let transfers () =
   let cell = Ref.make (100, 0)
   let move = task {
@@ -44,7 +44,7 @@ let transfers () =
   say ("no reader saw a transfer half done: " ++ show (List.all (fun ok -> ok) oks))
   say ("after the transfers: " ++ show (Ref.get cell))
 
-take_moves : Ref (Int, Int) -> Int ->{Async;} Unit
+take_moves : Ref (Int, Int) -> Int ->{Async} Unit
 let rec take_moves cell count =
   if count == 0 then
     ()
@@ -53,7 +53,7 @@ let rec take_moves cell count =
     Effect.yield_now ()
     take_moves cell (count - 1)
 
-reads_constant : Ref (Int, Int) -> Int ->{Async;} Bool
+reads_constant : Ref (Int, Int) -> Int ->{Async} Bool
 let rec reads_constant cell count =
   if count == 0 then
     true
@@ -62,7 +62,7 @@ let rec reads_constant cell count =
     Effect.yield_now ()
     a + b == 100 && reads_constant cell (count - 1)
 
-dying : Unit ->{Async;} Unit
+dying : Unit ->{Async} Unit
 let dying () =
   let cell = Ref.make 7
   let ex : Exit none Int = Effect.exit (task { Ref.modify cell (fun _ -> todo) })

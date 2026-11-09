@@ -1,6 +1,6 @@
 ---
 title: "Запросы SQL"
-source_hash: e0c754cbf25b9739
+source_hash: f4f7ebe8683dc3c7
 ---
 
 Flick проверяет запросы к PostgreSQL по объявлениям таблиц в исходном коде.
@@ -197,6 +197,51 @@ let balances_of id =
 истинно. Обе стороны сравнения должны иметь один тип Flick.
 Например, сравнение `UserId` с `Date` — ошибка типов, даже если в SQL
 оба типа представлены числами.
+
+## Повторное использование шаблонов
+
+`exists $(template)` и `is_in e $(template)` используют шаблон, построенный
+в другом месте, как некоррелированный подзапрос. Для имени подходит и
+`$template`. У шаблона не должно быть именованных параметров
+(`Sql.Template Pg {} row`); вместо этого захватывайте значения в функции.
+`is_in` требует ровно один результирующий столбец того же типа, что и `e`,
+возможно допускающий `NULL` (иначе `std/Q010`). `exists` принимает любую
+строку результата.
+
+```flick
+# import Sql exposing (Pg)
+# sql table Users "users" {
+#   id : bigint primary key generated always as BigInt
+#   name : text not null as String
+# }
+matching : String -> Sql.Template Pg {} { id : BigInt }
+let matching name = sql {
+  from u in Users
+  where u.name == $name
+  select u.id
+}
+
+page : String -> Sql.Template Pg { limit : Int } { id : BigInt }
+let page name = sql p {
+  from u in Users
+  where is_in u.id $(matching name)
+  order_by u.id
+  limit p.limit
+  select u.id
+}
+
+total : String -> Sql.Template Pg {} { count : BigInt }
+let total name = sql {
+  from u in Users
+  where is_in u.id $(matching name)
+  select { count = count_all }
+}
+```
+
+Композиция выполняется при построении внешнего шаблона, без ввода-вывода.
+Захваченные значения сохраняют свои кодеки, а заполнители перенумеровываются;
+значения никогда не становятся текстом SQL. Один шаблон можно использовать
+в нескольких запросах и снова вкладывать в другие шаблоны.
 
 ## Допустимость NULL
 

@@ -6,16 +6,16 @@ service Log =
   line : String ->{} Unit
 
 /// Waits: its row says it may suspend.
-wait : Unit ->{Async;} Unit
+wait : Unit ->{Async} Unit
 foreign effect wait from "./wait.mjs" "wait"
 
-twice : Unit ->{Async;} Unit
+twice : Unit ->{Async} Unit
 let twice () =
   wait ()
   wait ()
 
 /// Tasks that wait run side by side: `Async` is the root's, no owner's.
-both : Unit ->{Async;} (Unit, Unit)
+both : Unit ->{Async} (Unit, Unit)
 let both () = parallel (task { wait () }) (task { twice () })
 
 /// A function that does not suspend still reads services and fails.

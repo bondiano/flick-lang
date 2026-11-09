@@ -12,7 +12,7 @@ let transfer amount src dst =
 
 /// Retries until `flag` is set, telling `started` once it has to wait, so
 /// that the setter comes after a first attempt on any scheduling.
-await_flag : TxRef.TxRef Float -> Deferred.Deferred {} Unit ->{Async, Tx.Transaction;} (Float, Bool)
+await_flag : TxRef.TxRef Float -> Deferred.Deferred {} Unit ->{Async, Tx.Transaction} (Float, Bool)
 let await_flag flag started =
   let v = TxRef.get flag
   if v == 0 then

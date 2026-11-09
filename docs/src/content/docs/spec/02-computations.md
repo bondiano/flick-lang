@@ -1,6 +1,6 @@
 ---
 title: "Values of computations and their execution"
-source_hash: 20bee6b0e7cfcb83
+source_hash: 08cb9bc1e6ca5aff
 ---
 
 ## Two different kinds of functions
@@ -10,7 +10,7 @@ make_request : UserId -> Eff {Users} {NotFound} User
 get_user : UserId ->{Users; NotFound} User
 ```
 
-`make_request` purely builds a description. `get_user` performs the operation when called, in the source semantics. Both functions may have the same TS representation `(id) => Effect<User, E, R>`, so the typed IR and module interfaces keep this distinction. It cannot be recovered from the generated TS type alone. A Sync function (`->{Atom.Read;}`, [Sync stages](../01-direct-calls/#sync-stages)) is a third kind: it performs its reads when called, yet its representation is `(id) => User`, without an Effect.
+`make_request` purely builds a description. `get_user` performs the operation when called, in the source semantics. Both functions may have the same TS representation `(id) => Effect<User, E, R>`, so the typed IR and module interfaces keep this distinction. It cannot be recovered from the generated TS type alone. A Sync function (`->{Atom.Read}`, [Sync stages](../01-direct-calls/#sync-stages)) is a third kind: it performs its reads when called, yet its representation is `(id) => User`, without an Effect.
 
 ## Task and running a stored value
 
@@ -79,7 +79,7 @@ The checker tells a pure expression from a runtime computation independently of 
 | `a ->{; FsError} b` | The same: an omitted side of the arrow is an empty row |
 | `Eff none none a` | A stored runtime computation with two empty rows |
 
-In an arrow, either side may be omitted: `->{; E}` equals `->{none; E}`, and `->{R;}` equals `->{R; none}`. The separator `;` is mandatory, so `->{E}` is a syntax error rather than a guess about which row `E` belongs to. `->{}` is shorthand for a runtime arrow with two empty rows; it does not reduce to a pure `->`. `Eff Unit Unit a` is rejected by kinds. In the internal JS/TS representation, `Unit` corresponds to `undefined`, and empty `E` and `R` correspond to `never`. The public TS API may use `void` for an ignored result; on entering the language, an adapter normalizes such a result to `()`.
+In an arrow, either side may be omitted: `->{; E}` equals `->{none; E}`, and `->{R}` equals `->{R; none}`. Without `;`, the row always contains services: `->{R}` has no errors. A nonempty error row still needs the separator, as in `->{; E}`. A trailing `;` before omitted errors is accepted but removed by `flick fmt`. `->{}` is shorthand for a runtime arrow with two empty rows; it does not reduce to a pure `->`. `Eff Unit Unit a` is rejected by kinds. In the internal JS/TS representation, `Unit` corresponds to `undefined`, and empty `E` and `R` correspond to `never`. The public TS API may use `void` for an ignored result; on entering the language, an adapter normalizes such a result to `()`.
 
 In [TypeScript](https://www.typescriptlang.org/docs/handbook/2/functions.html), `void` and `undefined` are distinct. In [Effect](https://effect.website/docs/v4/getting-started/the-effect-type), the absence of expected errors and requirements is denoted by `never` in the corresponding parameters.
 

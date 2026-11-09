@@ -97,6 +97,41 @@ test("a value travels as a placeholder, rows decode by kind", async () => {
   assert.deepEqual(log, ["connect", "released"]);
 });
 
+test("a template used as a subquery is spliced, its placeholders and tables after those before it", async () => {
+  const accounts = sqlTable({
+    name: "a$1",
+    columns: [{ name: "owner", kind: "bigint", nullable: false, codec: undefined }],
+  });
+  const owners = sqlTemplate({
+    text: 'SELECT "a"."owner" AS "owner" FROM "a$1" AS "a" WHERE ("a"."owner" > $1)',
+    tables: [accounts],
+    params: [{ name: "$min", nullable: false, table: 0, column: "owner", value: 3n }],
+    columns: [{ name: "owner", nullable: false, table: 0, column: "owner" }],
+  });
+  const outer = sqlTemplate({
+    text: 'SELECT "u"."id" AS "id" FROM "users" AS "u" WHERE (("u"."name" = $1) AND ("u"."id" IN ($2))) LIMIT $3',
+    tables: [users],
+    params: [
+      { name: "name", nullable: false, table: 0, column: "name" },
+      { name: "$owners", nullable: false, sql_kind: "template", value: owners },
+      { name: "n", nullable: false, sql_kind: "number" },
+    ],
+    columns: [{ name: "id", nullable: false, table: 0, column: "id" }],
+  });
+  assert.equal(
+    outer.text,
+    'SELECT "u"."id" AS "id" FROM "users" AS "u" WHERE (("u"."name" = $1) AND ("u"."id" IN (SELECT "a"."owner" AS "owner" FROM "a$1" AS "a" WHERE ("a"."owner" > $2)))) LIMIT $3',
+  );
+  assert.deepEqual(
+    outer.params.map((p) => [p.name, p.table]),
+    [["name", 0], ["$min", 1], ["n", undefined]],
+  );
+  assert.deepEqual(outer.tables.map((t) => t.name), ["users", "a$1"]);
+  const { pool, calls } = fakePool(() => rows([["7"]], [20]));
+  await Effect.runPromise(databaseOf(pool).run_query(sqlBind(outer, { name: "Ada", n: 5 })));
+  assert.deepEqual(calls[0]?.values, ["Ada", "3", 5]);
+});
+
 test("a column of another type is a DecodeError", async () => {
   const { pool } = fakePool(() => rows([["seven", "x"]], [25, 25]));
   const exit = await Effect.runPromiseExit(databaseOf(pool).run_query(sqlBind(byName, { name: "x" })));

@@ -100,7 +100,7 @@ foreign effect run_into_pubsub from "@flick-lang/effect-ts/effect/Stream" "runIn
 
 /// Offers each element to the queue, then ends it, or fails it with the
 /// stream's failure.
-run_into_queue : Queue.Queue e a -> (Stream r e a)^c ->{r;} Unit
+run_into_queue : Queue.Queue e a -> (Stream r e a)^c ->{r} Unit
 foreign effect run_into_queue from "@flick-lang/effect-ts/effect/Stream" "runIntoQueue"
   arity 1
   retention call
@@ -112,7 +112,7 @@ foreign effect run_into_queue from "@flick-lang/effect-ts/effect/Stream" "runInt
 /// new subscriber.
 to_pubsub :
   { capacity : Option Int; strategy : Option Queue.Strategy; replay : Option Int } ->
-  (Stream r e a)^c ->{Scope s | r;}
+  (Stream r e a)^c ->{Scope s | r}
   PubSub.PubSub a
 foreign effect to_pubsub from "@flick-lang/effect-ts/effect/Stream" "flickToPubSub"
   arity 1
@@ -124,7 +124,7 @@ foreign effect to_pubsub from "@flick-lang/effect-ts/effect/Stream" "flickToPubS
 /// the stream does.
 to_queue :
   { capacity : Option Int; strategy : Option Queue.Strategy } ->
-  (Stream r e a)^c ->{Scope s | r;}
+  (Stream r e a)^c ->{Scope s | r}
   Queue.Queue e a
 foreign effect to_queue from "@flick-lang/effect-ts/effect/Stream" "flickToQueue"
   arity 1

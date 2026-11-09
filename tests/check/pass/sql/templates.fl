@@ -1,0 +1,34 @@
+// Templates of the program as subqueries of `is_in` and `exists`.
+module App.Templates exposing (..)
+
+import Sql exposing (Pg)
+
+sql table Users "users" {
+  id : bigint primary key generated always as BigInt
+  name : text not null as String
+  email : text as String
+}
+
+names : Sql.Template Pg {} { name : String }
+let names = sql { from u in Users; select u.name }
+
+pairs : Sql.Template Pg {} { id : BigInt; name : String }
+let pairs = sql { from u in Users; select u.id, u.name }
+
+emails : Sql.Template Pg {} { email : Option String }
+let emails = sql { from u in Users; select u.email }
+
+/// A column that may be `NULL` is compared as its values.
+known : Sql.Template Pg {} { id : BigInt }
+let known = sql { from u in Users; where is_in u.name $emails; select u.id }
+
+named : String -> Sql.Template Pg {} { id : BigInt }
+let named name = sql { from u in Users; where u.name == $name; select u.id }
+
+some : String -> Sql.Template Pg { n : Int } { id : BigInt }
+let some name = sql p {
+  from u in Users
+  where is_in u.id $(named name) && exists $pairs
+  limit p.n
+  select u.id
+}

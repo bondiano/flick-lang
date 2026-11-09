@@ -13,7 +13,7 @@ React 19 (`react-dom/client`) and runs each event as a task.
 type alias SaveButtonProps c = {
   label : String;
   disabled : Bool;
-  on_save : (Unit ->{Atom.Write;} Unit)^c;
+  on_save : (Unit ->{Atom.Write} Unit)^c;
 }
 
 save_button : SaveButtonProps c -> Ui^c
@@ -32,7 +32,7 @@ variable of a signature it is quantified over the whole signature, so
 `forall c.` can be left out ([types](../types/)).
 
 The two `^c` are what let `save_button` accept any callback. A function type
-without a qualifier holds no regions. So with `on_save : Unit ->{Atom.Write;} Unit`, a callback that uses a `File s` from an enclosing `scope`
+without a qualifier holds no regions. So with `on_save : Unit ->{Atom.Write} Unit`, a callback that uses a `File s` from an enclosing `scope`
 is rejected where it is passed (`FLICK-G001`), even when the `Ui` never
 leaves the scope. A callback that needs a service, such as saving through
 `Users`, provides it and handles its errors inside, writing the outcome to
@@ -318,7 +318,7 @@ can be stored where something outside the instance reads it
 unmounts. The atom functions borrow what they take, `(Atom.Writable a)^d`,
 so they read and write such an atom. A function that makes the state of an
 instance says so in its signature,
-`Float ->{Setup s;} (Atom.Writable Float)^{s}`, and is called from a
+`Float ->{Setup s} (Atom.Writable Float)^{s}`, and is called from a
 setup; an annotation names the capture too, `(Ui.Element Ui.Input)^c`. The
 word `component` stays a name everywhere else.
 
@@ -516,7 +516,7 @@ is a service of the `provide`, nothing can render with it after the
 # let count = Atom.make 0
 # component counter_view () = ui { text (Atom.value count |> show) }
 #
-request : Float ->{Async;} String
+request : Float ->{Async} String
 let request n =
   provide Atom.layer {
     Atom.set count n
@@ -581,7 +581,7 @@ encode is a defect naming its key, not a value silently left out.
 # let count = Atom.serializable (Codec.json Schema.number) (Atom.make 0)
 # component counter_view () = ui { text (Atom.value count |> show) }
 #
-page : Float ->{Async;} String
+page : Float ->{Async} String
 let page n =
   provide Atom.layer {
     Atom.set count n

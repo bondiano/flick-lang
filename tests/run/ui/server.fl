@@ -2,7 +2,7 @@
 // each with its own value of the same atom, and a field shows its state.
 module App.Main exposing (main)
 
-settle : Unit ->{Async;} Unit
+settle : Unit ->{Async} Unit
 foreign settle from "./dom.mjs" "settle"
   arity 0
 
@@ -21,7 +21,7 @@ let page =
     ]
   })
 
-request : Float ->{Async;} String
+request : Float ->{Async} String
 let request n = provide Atom.layer {
   Atom.set count n
   Atom.set name ("user " ++ show n)

@@ -156,8 +156,7 @@ impl Written {
     pub fn adding(self, services: &str) -> Option<(Span, String)> {
         let (at, shape) = self.0?;
         let text = match shape {
-            Shape::Empty => format!("{services};"),
-            Shape::NoServices | Shape::EmptyRow => services.to_owned(),
+            Shape::Empty | Shape::NoServices | Shape::EmptyRow => services.to_owned(),
             Shape::Items => format!("{services}, "),
             Shape::TailOnly => format!("{services} | "),
             Shape::None => format!("{{{services}}}"),

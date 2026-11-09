@@ -5,14 +5,14 @@ module App.Sync exposing (..)
 count : Atom.Writable Float
 let count = Atom.make 0
 
-doubled : Unit ->{Atom.Read;} Float
+doubled : Unit ->{Atom.Read} Float
 let doubled () = Atom.value count * 2
 
 twice : (Unit ->{r; e} Float) -> Unit ->{r; e} Float
 let twice f () = f () + f ()
 
 // a Sync function as a runtime argument, and the runtime result run at once
-quadrupled : Unit ->{Atom.Read;} Float
+quadrupled : Unit ->{Atom.Read} Float
 let quadrupled () = twice doubled ()
 
 counted : Unit ->{Atom.Read | r; e} Float
@@ -27,5 +27,5 @@ constant : Atom.Atom Float
 let constant = Atom.derived (fun () -> 1)
 
 // a runtime stage calls a Sync function
-logged : Unit ->{Atom.Read, Atom.Write;} Unit
+logged : Unit ->{Atom.Read, Atom.Write} Unit
 let logged () = Atom.set count (doubled ())

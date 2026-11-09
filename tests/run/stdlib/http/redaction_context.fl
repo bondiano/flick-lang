@@ -37,7 +37,7 @@ let server_url reason =
   | Http.ServerError.RouteNotFound details -> details.url
   | _ -> "unexpected server error"
 
-errors : Unit ->{Async;} Unit
+errors : Unit ->{Async} Unit
 let errors () =
   let raw = "http://example.com/?private_key=secret&sig=signed"
   let expected = "http://example.com/?private_key=REDACTED&sig=signed"

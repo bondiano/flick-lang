@@ -8,7 +8,7 @@ type error Oops = Oops String
 say : String ->{} Unit
 let say line = Platform.stdout_line line
 
-acquire : String ->{Scope s;} String
+acquire : String ->{Scope s} String
 let acquire name =
   Resource.acquire_release
     (task {

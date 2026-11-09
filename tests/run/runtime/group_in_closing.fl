@@ -11,7 +11,7 @@ let ping d = ignore (Deferred.succeed () d)
 
 /// A group with a child waiting to be stopped; says whether the child got to
 /// start: a child that is refused ends at once, so nothing here hangs on it.
-late_group : String ->{Scope s, Async;} Unit
+late_group : String ->{Scope s, Async} Unit
 let late_group name =
   let set : FiberSet.FiberSet s none Unit = FiberSet.make ()
   let started : Deferred.Deferred none Unit = Deferred.make ()
@@ -46,7 +46,7 @@ let until_stopped started = task {
 }
 
 /// A group's child makes another group as it stops: a hook added during C1.
-hook_in_c1 : Unit ->{Async;} Unit
+hook_in_c1 : Unit ->{Async} Unit
 let hook_in_c1 () = scope owner {
   Scope.add_finalizer (task { say "finalizer" })
   let set : FiberSet.FiberSet owner none Unit = FiberSet.make ()
@@ -59,11 +59,11 @@ let hook_in_c1 () = scope owner {
   Deferred.await_ started
 }
 
-making_a_group : Failure none ->{Scope s, Async;} Unit
+making_a_group : Failure none ->{Scope s, Async} Unit
 let making_a_group _ = late_group "group of a supervisor"
 
 /// A supervisor makes a group as its child ends: a hook added after C1.
-hook_after_c1 : Unit ->{Async;} Unit
+hook_after_c1 : Unit ->{Async} Unit
 let hook_after_c1 () = scope owner {
   Scope.add_finalizer (task { say "finalizer" })
   let started : Deferred.Deferred none Unit = Deferred.make ()

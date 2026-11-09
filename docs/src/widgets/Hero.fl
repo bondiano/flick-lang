@@ -64,7 +64,7 @@ lying_source : String
 let lying_source = program "load_view : UserId ->{Users; NotFound} UserView"
 
 /// Only the compiler's answer breaks the line on the map: nothing is shown ahead of it.
-press : Atom.Writable Model ->{Async, Atom.Write;} Unit
+press : Atom.Writable Model ->{Async, Atom.Write} Unit
 let press model =
   let m = Atom.current model
   let lying = not m.lying

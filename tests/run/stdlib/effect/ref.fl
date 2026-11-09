@@ -70,7 +70,7 @@ let synchronized () =
     "serialized: " ++ show (List.length (SynchronizedRef.get slow)),
   ]
 
-subscription : Unit ->{Async;} List String
+subscription : Unit ->{Async} List String
 let subscription () =
   let ref = SubscriptionRef.make "a"
   let a = SubscriptionRef.get_and_set "b" ref

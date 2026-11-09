@@ -5,7 +5,7 @@
 // way, and a mutation of its key runs it anew on the client.
 module App.Main exposing (main)
 
-later : Unit ->{Async;} String
+later : Unit ->{Async} String
 foreign later from "./stream.mjs" "later"
   arity 0
 
@@ -13,15 +13,15 @@ task_runs : Unit ->{} Float
 foreign task_runs from "./stream.mjs" "taskRuns"
   arity 0
 
-stream_shell : String ->{Async;} Unit
+stream_shell : String ->{Async} Unit
 foreign stream_shell from "./stream.mjs" "streamShell"
   arity 1
 
-stream_rest : Unit ->{Async;} Unit
+stream_rest : Unit ->{Async} Unit
 foreign stream_rest from "./stream.mjs" "streamRest"
   arity 0
 
-settle : Unit ->{Async;} Unit
+settle : Unit ->{Async} Unit
 foreign settle from "./stream.mjs" "settle"
   arity 0
 
@@ -47,7 +47,7 @@ stock : Atom.Atom (Atom.Async String none)
 let stock =
   Atom.serializable_task (Codec.json Schema.string) (Atom.query ["stock"] (task { later () }))
 
-restocked : Unit ->{Atom.Write;} Unit
+restocked : Unit ->{Atom.Write} Unit
 let restocked = Atom.mutation ["stock"] (fun () -> ())
 
 counter : Ui.View Unit

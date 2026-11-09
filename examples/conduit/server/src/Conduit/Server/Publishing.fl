@@ -45,7 +45,7 @@ now : Unit ->{} String
 let now () = DateTime.format_iso (DateTime.now ())
 
 /// The article as the reader sees it, with its tags.
-shown : Articles.Row ->{Async, Database;} Article
+shown : Articles.Row ->{Async, Database} Article
 let shown row = Present.article row (Articles.tags_of row.id)
 
 /// The article of `slug`, or 404.
@@ -172,5 +172,5 @@ let delete_comment request =
   | None -> from_result (Err missing)
 
 /// The tags in use.
-tags : Request Unit Unit Unit ->{Async, Database | r;} TagsBody
+tags : Request Unit Unit Unit ->{Async, Database | r} TagsBody
 let tags _ = { tags = Articles.all_tags () }

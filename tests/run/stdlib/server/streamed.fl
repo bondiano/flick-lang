@@ -6,11 +6,11 @@ module App.Main exposing (main)
 import Http.ServerRequest exposing (ServerRequest)
 import Http.ServerResponse exposing (ServerResponse)
 
-later : Unit ->{Async;} String
+later : Unit ->{Async} String
 foreign later from "./streamed.mjs" "later"
   arity 0
 
-visit : String ->{Async;} String
+visit : String ->{Async} String
 foreign visit from "./streamed.mjs" "visit"
   arity 1
 

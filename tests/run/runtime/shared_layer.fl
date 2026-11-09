@@ -29,7 +29,7 @@ let base_layer () =
     })
 
 /// The inner `provide` reads the outer one's map; release waits for the outer.
-nested : Unit ->{Async;} Unit
+nested : Unit ->{Async} Unit
 let nested () = scope {
   let base = base_layer ()
   provide base {
@@ -40,7 +40,7 @@ let nested () = scope {
 }
 
 /// Consumers in fibers, each with a nested `provide`, share the outer build.
-in_fibers : Unit ->{Async;} Unit
+in_fibers : Unit ->{Async} Unit
 let in_fibers () = scope {
   let base = base_layer ()
   provide base {
@@ -52,7 +52,7 @@ let in_fibers () = scope {
 }
 
 /// The children of a consumer end before the layer is released.
-with_children : Unit ->{Async;} Unit
+with_children : Unit ->{Async} Unit
 let with_children () = scope {
   let base = base_layer ()
   provide base {
@@ -78,7 +78,7 @@ let with_children () = scope {
   say "with_children: closed"
 }
 
-siblings : Unit ->{Async;} Unit
+siblings : Unit ->{Async} Unit
 let siblings () = scope {
   let base = base_layer ()
   provide base { say ("first " ++ Base.base ()) }

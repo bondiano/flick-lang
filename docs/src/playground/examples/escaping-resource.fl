@@ -5,10 +5,10 @@ module Main exposing (main, reader)
 type File (s : Region)
 
 service Files =
-  open : forall s. String ->{Scope s;} File s
+  open : forall s. String ->{Scope s} File s
   read : forall s. File s ->{} String
 
-reader : String ->{Files;} (Unit ->{Files;} String)
+reader : String ->{Files} (Unit ->{Files} String)
 let reader path = scope {
   let file = Files.open path
   fun () -> Files.read file

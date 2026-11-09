@@ -163,7 +163,7 @@ let three p =
     )
     (Arbitrary.zip3 atoms atoms atoms)
 
-nap : Float ->{Async;} Unit
+nap : Float ->{Async} Unit
 let nap millis =
   match Duration.millis millis with
   | Ok d -> Effect.sleep d
@@ -181,7 +181,7 @@ let late entered =
       from_result (Err (A 1))
     })
 
-guarded : Deferred.Deferred none Unit ->{Async;} String
+guarded : Deferred.Deferred none Unit ->{Async} String
 let guarded entered =
   try late entered with
   | A _ ->
@@ -192,7 +192,7 @@ quiet : Failure e ->{} Unit
 let quiet _ = ()
 
 /// The handler is skipped: the fiber ends with its interruption alone.
-skipped : Unit ->{Async;} Unit
+skipped : Unit ->{Async} Unit
 let skipped () =
   let entered : Deferred.Deferred none Unit = Deferred.make ()
   let exits = scope owner {

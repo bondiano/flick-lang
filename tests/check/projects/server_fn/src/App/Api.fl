@@ -7,5 +7,5 @@ import Server
 type alias Order = { item : String }
   deriving Schema
 
-place : Order ->{Server.Server;} String
+place : Order ->{Server.Server} String
 server fn place order = App.Db.save order.item

@@ -110,22 +110,22 @@ layer : Layer none none {Registry}
 let layer = layer_of Registry
 
 /// The value of `atom` in the registry.
-get : Atom a ->{Registry;} a
+get : Atom a ->{Registry} a
 let get atom = Registry.get atom
 
 /// Replaces the value of `atom`; the atoms that read it compute again.
-set : Writable a -> a ->{Registry;} Unit
+set : Writable a -> a ->{Registry} Unit
 let set atom value = Registry.set atom value
 
 /// Replaces the value of `atom` by `f` of it.
-update : Writable a -> (a -> a) ->{Registry;} Unit
+update : Writable a -> (a -> a) ->{Registry} Unit
 let update atom f = Registry.update atom f
 
 /// Replaces the value of `atom` by the second part of `f` of it and gives
 /// the first.
-modify : Writable a -> (a -> (b, a)) ->{Registry;} b
+modify : Writable a -> (a -> (b, a)) ->{Registry} b
 let modify atom f = Registry.modify atom f
 
 /// Computes `atom` again: a task atom runs its task anew.
-refresh : Atom a ->{Registry;} Unit
+refresh : Atom a ->{Registry} Unit
 let refresh atom = Registry.refresh atom

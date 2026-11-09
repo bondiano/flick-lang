@@ -9,7 +9,7 @@ type error Closed = Closed String
 ms : Float -> Duration.Duration
 let ms n = Result.with_default Duration.zero (Duration.millis n)
 
-fill : List Float -> TxQueue.TxQueue Float {Closed} ->{Async, Tx.Transaction;} List Float
+fill : List Float -> TxQueue.TxQueue Float {Closed} ->{Async, Tx.Transaction} List Float
 let fill xs q = TxQueue.offer_all xs q
 
 /// A failure of `Closed`, as a child's exit gives it.

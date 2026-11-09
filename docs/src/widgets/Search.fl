@@ -23,7 +23,7 @@ close_search : Unit ->{} Unit
 foreign close_search from "./browser.ts" "closeSearch"
   arity 0
 
-find : Atom.Writable Model -> String ->{Async, Atom.Write;} Unit
+find : Atom.Writable Model -> String ->{Async, Atom.Write} Unit
 let find model query =
   let m = Atom.current model
   if String.trim query == "" then

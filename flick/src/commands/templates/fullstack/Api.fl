@@ -11,7 +11,7 @@ service Session =
   user : Unit ->{} String
 
 /// Every todo: anyone may read them.
-list : Unit ->{Server.Server, Store;} List Todo
+list : Unit ->{Server.Server, Store} List Todo
 server fn list () = Store.all ()
 
 /// Adds a todo, for a signed-in caller only: a call without a session gets

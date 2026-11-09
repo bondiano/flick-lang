@@ -120,7 +120,7 @@ let through_control body =
     //~ FLICK-E018 @131:5-131:13 a `tail` arm may not suspend
     1
 
-pause : Unit ->{Async;} Unit
+pause : Unit ->{Async} Unit
 foreign pause from "./pause.mjs" "pause"
   arity 0
 
@@ -146,6 +146,6 @@ let kept () = collect (fun () -> scope { Scope.add_finalizer (task { Emit.emit 1
 //~ FLICK-E017 @145:42-145:61 `Detached {Emit Int}` does not hold: effect
 
 /// A row variable may hold a `control` effect here too.
-kept_row : Eff r none Unit ->{r;} Unit
+kept_row : Eff r none Unit ->{r} Unit
 let kept_row work = scope { Scope.add_finalizer work }
 //~ FLICK-E017 @150:29-150:48 cannot deduce `Detached r` from the constraints

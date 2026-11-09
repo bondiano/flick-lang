@@ -6,16 +6,16 @@ import Layer
 service Log =
   write : String -> String ->{} Unit
 
-info : String ->{Log;} Unit
+info : String ->{Log} Unit
 let info message = Log.write "info" message
 
-warn : String ->{Log;} Unit
+warn : String ->{Log} Unit
 let warn message = Log.write "warn" message
 
-error : String ->{Log;} Unit
+error : String ->{Log} Unit
 let error message = Log.write "error" message
 
-debug : String ->{Log;} Unit
+debug : String ->{Log} Unit
 let debug message = Log.write "debug" message
 
 write_console : String -> String ->{} Unit

@@ -1,7 +1,7 @@
 // a control effect declared after the function that uses it
 module App.Main exposing (main)
 
-twice : Unit ->{Later;} Int
+twice : Unit ->{Later} Int
 let twice () = Later.ask 1 + Later.ask 2
 
 effect Later =

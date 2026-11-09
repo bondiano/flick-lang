@@ -20,27 +20,27 @@ make_list : Unit -> Atom.Writable (List a)
 let make_list () = Atom.make []
 
 // a local atom has one type too: without a type, its uses decide it
-poke : Unit ->{Atom.Write;} Unit
+poke : Unit ->{Atom.Write} Unit
 let poke () =
   let fresh = Atom.fresh None
   Atom.set fresh (Some 1)
   Atom.set fresh (Some "one")
 
-poke_signed : Unit ->{Atom.Write;} Unit
+poke_signed : Unit ->{Atom.Write} Unit
 let poke_signed () =
   signed : Atom.Writable (Option a)
   let signed = Atom.fresh None
   Atom.set signed (Some 1)
 
-poke_annotated : Unit ->{Atom.Write;} Unit
+poke_annotated : Unit ->{Atom.Write} Unit
 let poke_annotated () =
   let annotated : forall a. Atom.Writable (Option a) = Atom.fresh None
   Atom.set annotated (Some 1)
 
-set_any : (forall a. Atom.Writable (Option a)) ->{Atom.Write;} Unit
+set_any : (forall a. Atom.Writable (Option a)) ->{Atom.Write} Unit
 let set_any atom = Atom.set atom (Some 1)
 
-poke_argument : Unit ->{Atom.Write;} Unit
+poke_argument : Unit ->{Atom.Write} Unit
 let poke_argument () = set_any (Atom.fresh None)
 
 //~ FLICK-T003 @27:19-27:29 expected `Option Int`, found `Option String`

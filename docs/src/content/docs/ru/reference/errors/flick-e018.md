@@ -1,6 +1,6 @@
 ---
 title: "FLICK-E018"
-source_hash: "97e1bebb62b87ecd"
+source_hash: "3ebfafb5a4f7afa8"
 ---
 
 Рука `tail` — это значение её операции и выполняется в стеке вызывающего, который может быть Sync: ничего, что она вызывает, не может приостанавливаться. Вызов эффекта с операцией `control`, `Async` или переменной ряда там является ошибкой, если только ряд операции не объявляет это или обработчик внутри руки не перехватывает это. В противном случае объявите, что требуется руке, или сделайте операцию `control`.
@@ -8,9 +8,9 @@ source_hash: "97e1bebb62b87ecd"
 ```flick
 effect Clock =
   // was: now : Unit ->{} Float
-  now : Unit ->{Async;} Float
+  now : Unit ->{Async} Float
 
-fetch_time : Unit ->{Async;} Float
+fetch_time : Unit ->{Async} Float
 foreign fetch_time from "./time.mjs" "fetchTime"
   arity 0
 

@@ -55,7 +55,7 @@ lifetime : Float
 let lifetime = 30 * 24 * 60 * 60
 
 /// A new token of the account.
-issue : Account ->{Async, Keys, Crypto.Crypto;} String
+issue : Account ->{Async, Keys, Crypto.Crypto} String
 let issue account =
   Effect.or_die
     (task {
@@ -78,7 +78,7 @@ let token_of header =
     None
 
 /// The id a valid token signs, if it is one.
-signed_id : String ->{Async, Keys, Crypto.Crypto;} Option BigInt
+signed_id : String ->{Async, Keys, Crypto.Crypto} Option BigInt
 let signed_id token =
   Effect.or_die
     (task {
@@ -117,12 +117,12 @@ let maybe request =
   | None -> session None
 
 /// The signed-in user of an endpoint `check` guards.
-signed_in : Unit ->{Session;} Signed
+signed_in : Unit ->{Session} Signed
 let signed_in () =
   match Session.current () with
   | Some signed -> signed
   | None -> Effect.die "an endpoint that needs a user ran without one"
 
 /// The id of the reader, if anyone.
-reader : Unit ->{Session;} Option BigInt
+reader : Unit ->{Session} Option BigInt
 let reader () = Option.map (fun me -> me.account.id) (Session.current ())

@@ -6,7 +6,7 @@ type error Gone = Gone String
 
 type error Late = Late Float
 
-gone : String ->{Fail {Gone};} Int
+gone : String ->{Fail {Gone}} Int
 let gone reason = Fail.fail (Gone reason)
 
 both : Float ->{Fail {Gone}; Late} Int

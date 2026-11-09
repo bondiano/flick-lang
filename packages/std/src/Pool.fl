@@ -22,7 +22,7 @@ make :
     size : Int;
     concurrency : Option Int;
     targetUtilization : Option Float;
-  } ->{Scope s | r;}
+  } ->{Scope s | r}
   Pool s e a
 foreign effect make from "@flick-lang/effect-ts/effect/Pool" "flickMake"
   reviewed "effect@4.1.2 sha256:875466331abc2dab"
@@ -38,7 +38,7 @@ make_with_ttl :
     targetUtilization : Option Float;
     timeToLive : Duration.Duration;
     timeToLiveStrategy : Option TimeToLiveStrategy;
-  } ->{Scope s | r;}
+  } ->{Scope s | r}
   Pool s e a
 foreign effect make_with_ttl from "@flick-lang/effect-ts/effect/Pool" "flickMakeWithTtl"
   reviewed "effect@4.1.2 sha256:02cbce8f61aa83d9"
@@ -59,7 +59,7 @@ foreign effect use from "@flick-lang/effect-ts/effect/Pool" "use"
 
 /// Releases `item`, the very value `get` gave, once its tasks are done;
 /// the pool acquires another when it needs one.
-invalidate : a -> Pool s e a ->{Async;} Unit
+invalidate : a -> Pool s e a ->{Async} Unit
 foreign effect invalidate from "@flick-lang/effect-ts/effect/Pool" "invalidate"
   arity 1
   retention call
@@ -68,7 +68,7 @@ foreign effect invalidate from "@flick-lang/effect-ts/effect/Pool" "invalidate"
 /// Keeps the borrowed `item` for this task alone until the innermost
 /// `scope` (or the one of region `t`) closes; with a `concurrency` of one
 /// it changes nothing.
-reserve : a -> Pool s e a ->{Scope t;} Unit
+reserve : a -> Pool s e a ->{Scope t} Unit
 foreign effect reserve from "@flick-lang/effect-ts/effect/Pool" "reserve"
   arity 1
   retention call

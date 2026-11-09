@@ -1,15 +1,15 @@
 // `DevTools.layer_with` sends its headers with the WebSocket's handshake.
 module App.Main exposing (main)
 
-start : Unit ->{Async;} Float
+start : Unit ->{Async} Float
 foreign start from "./handshake.mjs" "start"
   arity 0
 
-token : Unit ->{Async;} String
+token : Unit ->{Async} String
 foreign token from "./handshake.mjs" "token"
   arity 0
 
-stop : Unit ->{Async;} Unit
+stop : Unit ->{Async} Unit
 foreign stop from "./handshake.mjs" "stop"
   arity 0
 

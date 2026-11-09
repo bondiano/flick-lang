@@ -112,10 +112,10 @@ let built = task { merged "a" }
 in_eff : Eff Payments none Unit
 let in_eff = task { Log.info "b" }
 
-as_union : Unit ->{Payments + r;} Unit
+as_union : Unit ->{Payments + r} Unit
 let as_union () = Log.info "c"
 
-as_tail : Unit ->{Users | Payments;} Unit
+as_tail : Unit ->{Users | Payments} Unit
 let as_tail () = Log.info "d"
 
 type alias Services = {Log, Users}

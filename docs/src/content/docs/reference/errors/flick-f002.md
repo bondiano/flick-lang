@@ -30,7 +30,7 @@ one owns the argument, so write them:
 # import Fiber exposing (Handle)
 add_finalizer_to :
   (Fiber.Outlives c s, Fiber.Provided r s, Detached r) =>
-  Handle t -> (Eff r none Unit)^c ->{Scope s | r;} Unit
+  Handle t -> (Eff r none Unit)^c ->{Scope s | r} Unit
 foreign effect add_finalizer_to from "./scope.js" "addFinalizerTo"
   retention owner
 ```

@@ -25,7 +25,7 @@ let answer =
     (Atom.from_task (task { 41 + 1 }))
 
 /// The doubled count, from whatever registry is provided.
-read_doubled : Unit ->{Atom.Registry;} Float
+read_doubled : Unit ->{Atom.Registry} Float
 let read_doubled () = Atom.get doubled
 
 describe : AsyncResult.AsyncResult Float none -> String

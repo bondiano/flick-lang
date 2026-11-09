@@ -10,7 +10,7 @@ type error A = A Float
 say : String ->{} Unit
 let say line = Platform.stdout_line line
 
-nap : Float ->{Async;} Unit
+nap : Float ->{Async} Unit
 let nap millis =
   match Duration.millis millis with
   | Ok d -> Effect.sleep d
@@ -39,7 +39,7 @@ let view f =
   List.map label (Cause.reasons f)
 
 /// Runs `body` in a child that is interrupted once `late` tells it is masked.
-probe : String -> (Deferred.Deferred none Unit -> Eff {Async} none Unit) ->{Async;} Unit
+probe : String -> (Deferred.Deferred none Unit -> Eff {Async} none Unit) ->{Async} Unit
 let probe name body =
   let entered : Deferred.Deferred none Unit = Deferred.make ()
   let exits = scope owner {

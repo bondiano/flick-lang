@@ -71,7 +71,7 @@ foreign effect log_address from "@flick-lang/effect-ts/effect/http/HttpServer" "
 
 /// The client of the service, with each request's URL below the server's.
 test_client :
-  Server s ->{Http.Client.HttpClient;} Http.Client.Client none {Http.ClientError.HttpClientError}
+  Server s ->{Http.Client.HttpClient} Http.Client.Client none {Http.ClientError.HttpClientError}
 let test_client server =
   Http.Client.current ()
   |> Http.Client.map_request (Http.ClientRequest.prepend_url (format_address (address server)))

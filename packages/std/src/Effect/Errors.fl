@@ -75,14 +75,14 @@ foreign effect tap_defect from "@flick-lang/effect-ts/effect/Effect" "flickTapDe
   reviewed "effect@4.1.2 sha256:5ab4371925ca6cd3"
 
 /// `on_failure` of the cause or `on_success` of the value; never fails.
-match_cause : (Failure e -> b)^c -> (a -> b)^c -> (Eff r e a)^c ->{r;} b
+match_cause : (Failure e -> b)^c -> (a -> b)^c -> (Eff r e a)^c ->{r} b
 foreign effect match_cause from "@flick-lang/effect-ts/effect/Effect" "flickMatchCause"
   arity 2
   retention call
   reviewed "effect@4.1.2 sha256:62bccdc1ab43ca28"
 
 /// `match_cause`, reading an already ended task without a new step.
-match_cause_eager : (Failure e -> b)^c -> (a -> b)^c -> (Eff r e a)^c ->{r;} b
+match_cause_eager : (Failure e -> b)^c -> (a -> b)^c -> (Eff r e a)^c ->{r} b
 foreign effect match_cause_eager from "@flick-lang/effect-ts/effect/Effect" "flickMatchCauseEager"
   arity 2
   retention call
@@ -105,14 +105,14 @@ foreign effect match_cause_effect_eager from "@flick-lang/effect-ts/effect/Effec
   reviewed "effect@4.1.2 sha256:e8a1154a0a78c98d"
 
 /// Turns each typed failure of `task` into a defect.
-or_die : (Eff r e a)^c ->{r;} a
+or_die : (Eff r e a)^c ->{r} a
 foreign effect or_die from "@flick-lang/effect-ts/effect/Effect" "orDie"
   retention call
   reviewed "effect@4.1.2 sha256:02beae1b90df9983"
 
 /// Runs `task` and drops its typed failure, logging it at the level if
 /// one is given.
-ignore_ : Option LogLevel.LogLevel -> (Eff r e a)^c ->{r;} Unit
+ignore_ : Option LogLevel.LogLevel -> (Eff r e a)^c ->{r} Unit
 foreign effect ignore_ from "@flick-lang/effect-ts/effect/Effect" "flickIgnore"
   arity 1
   retention call
@@ -120,7 +120,7 @@ foreign effect ignore_ from "@flick-lang/effect-ts/effect/Effect" "flickIgnore"
 
 /// Runs `task` and drops any failure, defects included, logging it at the
 /// level if one is given.
-ignore_cause : Option LogLevel.LogLevel -> (Eff r e a)^c ->{r;} Unit
+ignore_cause : Option LogLevel.LogLevel -> (Eff r e a)^c ->{r} Unit
 foreign effect ignore_cause from "@flick-lang/effect-ts/effect/Effect" "flickIgnoreCause"
   arity 1
   retention call
@@ -134,7 +134,7 @@ foreign effect ensuring from "@flick-lang/effect-ts/effect/Effect" "ensuring"
   reviewed "effect@4.1.2 sha256:e9f9e82c594a5039"
 
 /// Runs `cleanup` of the cause when `task` fails, then fails as it did.
-on_error : (Failure e ->{r2;} b)^c -> (Eff r e a)^c ->{r + r2; e} a
+on_error : (Failure e ->{r2} b)^c -> (Eff r e a)^c ->{r + r2; e} a
 foreign effect on_error from "@flick-lang/effect-ts/effect/Effect" "flickOnError"
   arity 1
   retention call
@@ -204,7 +204,7 @@ foreign effect on_interrupt from "@flick-lang/effect-ts/effect/Effect" "flickOnI
 
 /// Registers `finalizer` with the owner of region `s`: it runs when that
 /// scope closes, with the cause of its failure if it failed.
-add_finalizer : (Option RawCause ->{r;} Unit)^c ->{Scope s | r;} Unit
+add_finalizer : (Option RawCause ->{r} Unit)^c ->{Scope s | r} Unit
 foreign effect add_finalizer from "@flick-lang/effect-ts/effect/Effect" "flickAddFinalizer"
   retention owner
   reviewed "effect@4.1.2 sha256:de9497fd0e3d4d55"

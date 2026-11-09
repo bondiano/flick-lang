@@ -47,7 +47,7 @@ let user =
   )
 
 /// The signed-in user, if one is and the API answered for them.
-signed_in : Unit ->{Atom.Read;} Option User
+signed_in : Unit ->{Atom.Read} Option User
 let signed_in () =
   match Atom.get (Atom.at user (Atom.value token)) with
   | Atom.Loaded found -> found

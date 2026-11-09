@@ -93,7 +93,7 @@ let load_balances user_id =
 type alias SaveButtonProps c = {
   label : String;
   disabled : Bool;
-  on_save : (Unit ->{Atom.Write;} Unit)^c;
+  on_save : (Unit ->{Atom.Write} Unit)^c;
 }
 
 save_button : SaveButtonProps c -> Ui^c

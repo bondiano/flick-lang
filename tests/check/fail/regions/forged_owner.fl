@@ -3,6 +3,6 @@
 // compiler's, for the outer owner of a `scope`.
 module App.ForgedOwner exposing (..)
 
-forged : forall o s. Fiber.Owner o ->{Scope o;} Fiber.Owner s
+forged : Fiber.Owner o ->{Scope o} Fiber.Owner s
 let forged _ = Scope.current ()
 //~ FLICK-T001 @7:16-7:29 `Scope` does not export `current`

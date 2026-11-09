@@ -28,12 +28,12 @@ foreign pure run from "@flick-lang/effect-ts/runner/cloudflare" "run"
 
 /// The variable or secret `name`; `None` when there is none, or the binding
 /// is not text.
-var : String ->{Env;} Option String
+var : String ->{Env} Option String
 let var name = Env.var name
 
 /// The binding `name` as it is, for a foreign function to use: a KV
 /// namespace, a queue, a service.
-binding : String ->{Env;} Option Unknown
+binding : String ->{Env} Option Unknown
 let binding name = Env.binding name
 
 /// Keeps the Worker alive until `task` ends, after the response is sent;

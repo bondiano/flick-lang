@@ -20,7 +20,7 @@ unexpected : Failure e ->{} Unit
 let unexpected failure = Platform.stdout_line "unexpected failure"
 
 /// How awaiting `d` ends.
-outcome : Deferred.Deferred {Boom} Float ->{Async;} String
+outcome : Deferred.Deferred {Boom} Float ->{Async} String
 let outcome d =
   try "ok " ++ show (Deferred.await_ d) with
   | Boom n -> "boom " ++ show n
@@ -32,14 +32,14 @@ let outcome_of t =
   | Boom n -> "boom " ++ show n
 
 /// A fresh deferred completed by `complete`, and how awaiting it ends.
-completed : (Deferred.Deferred {Boom} Float ->{} Bool) ->{Async;} String
+completed : (Deferred.Deferred {Boom} Float ->{} Bool) ->{Async} String
 let completed complete =
   let d : Deferred.Deferred {Boom} Float = Deferred.make ()
   let first = complete d
   let again = Deferred.succeed 0 d
   show (first, again) ++ " " ++ outcome d
 
-deferreds : Unit ->{Async;} Unit
+deferreds : Unit ->{Async} Unit
 let deferreds () =
   Platform.stdout_line ("succeed: " ++ completed (Deferred.succeed 1))
   Platform.stdout_line ("fail: " ++ completed (Deferred.fail (Boom 2)))
@@ -100,7 +100,7 @@ let deferreds () =
   }
   Platform.stdout_line waited
 
-latches : Unit ->{Async;} Unit
+latches : Unit ->{Async} Unit
 let latches () =
   let latch = Latch.make false
   let log = Ref.make []
@@ -131,7 +131,7 @@ let latches () =
   }
   Platform.stdout_line ("latch: " ++ show (Ref.get log))
 
-semaphores : Unit ->{Async;} Unit
+semaphores : Unit ->{Async} Unit
 let semaphores () =
   let sem = Semaphore.make 2
   let running = Ref.make 0
@@ -163,7 +163,7 @@ let semaphores () =
 capacity_of : PartitionedSemaphore.PartitionedSemaphore k -> Int
 let capacity_of sem = PartitionedSemaphore.capacity sem
 
-partitions : Unit ->{Async;} Unit
+partitions : Unit ->{Async} Unit
 let partitions () =
   let sem : PartitionedSemaphore.Partitioned String = PartitionedSemaphore.make { permits = 2 }
   let total = capacity_of sem

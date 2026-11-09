@@ -17,13 +17,13 @@ type alias Count = { total : String }
 
 type alias Parts = Stream none {MultipartError} Part
 
-bytes : HttpApi.Endpoint "bytes" (HttpApi.Request Unit Unit Unit (List Int) ->{r;} List Int)
+bytes : HttpApi.Endpoint "bytes" (HttpApi.Request Unit Unit Unit (List Int) ->{r} List Int)
 let bytes =
   HttpApi.endpoint HttpApi.Post "/bytes" (Record.label : Record.Label "bytes")
   |> HttpApi.with_bytes_payload
   |> HttpApi.with_bytes_success 200
 
-form : HttpApi.Endpoint "form" (HttpApi.Request Unit Unit Unit Note ->{r;} String)
+form : HttpApi.Endpoint "form" (HttpApi.Request Unit Unit Unit Note ->{r} String)
 let form =
   HttpApi.endpoint HttpApi.Post "/form" (Record.label : Record.Label "form")
   |> HttpApi.with_multipart_payload (Codec.json Note.schema)
@@ -36,12 +36,12 @@ let parts =
   |> HttpApi.with_text_success 200
 
 chunks :
-  HttpApi.Endpoint "chunks" (HttpApi.Request Unit Unit Unit Unit ->{r;} Stream none none (List Int))
+  HttpApi.Endpoint "chunks" (HttpApi.Request Unit Unit Unit Unit ->{r} Stream none none (List Int))
 let chunks =
   HttpApi.endpoint HttpApi.Get "/chunks" (Record.label : Record.Label "chunks")
   |> HttpApi.with_stream_success 200
 
-ticks : HttpApi.Endpoint "ticks" (HttpApi.Request Unit Unit Unit Unit ->{r;} Stream none none Tick)
+ticks : HttpApi.Endpoint "ticks" (HttpApi.Request Unit Unit Unit Unit ->{r} Stream none none Tick)
 let ticks =
   HttpApi.endpoint HttpApi.Get "/ticks" (Record.label : Record.Label "ticks")
   |> HttpApi.with_sse_success 200 (Codec.json Tick.schema)
@@ -49,7 +49,7 @@ let ticks =
 events :
   HttpApi.Endpoint
     "events"
-    (HttpApi.Request Unit Unit Unit Unit ->{r;} Stream none none HttpApi.SseEvent)
+    (HttpApi.Request Unit Unit Unit Unit ->{r} Stream none none HttpApi.SseEvent)
 let events =
   HttpApi.endpoint HttpApi.Get "/events" (Record.label : Record.Label "events")
   |> HttpApi.with_sse_events_success 200
@@ -60,7 +60,7 @@ let session = HttpApi.api_key "session" { key = "sid"; location = HttpApi.InCook
 login :
   HttpApi.Endpoint
     "login"
-    (HttpApi.Request Unit Unit Unit Unit ->{r;} ((String, Count), Option (Redacted String)))
+    (HttpApi.Request Unit Unit Unit Unit ->{r} ((String, Count), Option (Redacted String)))
 let login =
   HttpApi.endpoint HttpApi.Post "/login" (Record.label : Record.Label "login")
   |> HttpApi.with_text_success 200
@@ -68,13 +68,13 @@ let login =
   |> HttpApi.security_set_cookie session
 
 type alias Handlers r = {
-  bytes : HttpApi.Request Unit Unit Unit (List Int) ->{r;} List Int;
-  form : HttpApi.Request Unit Unit Unit Note ->{r;} String;
+  bytes : HttpApi.Request Unit Unit Unit (List Int) ->{r} List Int;
+  form : HttpApi.Request Unit Unit Unit Note ->{r} String;
   parts : HttpApi.Request Unit Unit Unit Parts ->{r; MultipartError} String;
-  chunks : HttpApi.Request Unit Unit Unit Unit ->{r;} Stream none none (List Int);
-  ticks : HttpApi.Request Unit Unit Unit Unit ->{r;} Stream none none Tick;
-  events : HttpApi.Request Unit Unit Unit Unit ->{r;} Stream none none HttpApi.SseEvent;
-  login : HttpApi.Request Unit Unit Unit Unit ->{r;} ((String, Count), Option (Redacted String));
+  chunks : HttpApi.Request Unit Unit Unit Unit ->{r} Stream none none (List Int);
+  ticks : HttpApi.Request Unit Unit Unit Unit ->{r} Stream none none Tick;
+  events : HttpApi.Request Unit Unit Unit Unit ->{r} Stream none none HttpApi.SseEvent;
+  login : HttpApi.Request Unit Unit Unit Unit ->{r} ((String, Count), Option (Redacted String));
 }
 
 api : HttpApi.Api r { bodies : Handlers r }

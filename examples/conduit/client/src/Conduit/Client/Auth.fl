@@ -44,7 +44,7 @@ let form_area name placeholder bind = ui {
 }
 
 /// Keeps the token of `user`, clears the form and goes home.
-keep : User ->{Atom.Write;} Unit
+keep : User ->{Atom.Write} Unit
 let keep user =
   Atom.set Session.token (Some user.token)
   Atom.set password ""
@@ -53,7 +53,7 @@ let keep user =
 
 /// The problems of a failed sign-in or sign-up.
 failed :
-  (Unit ->{Async; HttpApi.ClientError, Conflict, Unauthorized, Unprocessable} User) ->{Async, Atom.Write;}
+  (Unit ->{Async; HttpApi.ClientError, Conflict, Unauthorized, Unprocessable} User) ->{Async, Atom.Write}
   Unit
 let failed send =
   let outcome =

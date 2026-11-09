@@ -1,6 +1,6 @@
 ---
 title: "Серверные функции"
-source_hash: 8c87c836cb06681a
+source_hash: 9c243499541b3745
 ---
 
 `server fn` — функция, которая выполняется на сервере и которую любой код,
@@ -30,7 +30,7 @@ server fn place order =
 
 Сигнатура прямо над `server fn` описывает то, что выполняет сервер:
 параметры, нужные сервисы и ошибки. Выполняется только последняя стрелка:
-`String -> Float ->{Server.Server;} String` принимает два параметра. Вызывающий код видит другой тип:
+`String -> Float ->{Server.Server} String` принимает два параметра. Вызывающий код видит другой тип:
 
 ```flick
 # type alias Order = { item : String; count : Float }
@@ -73,7 +73,7 @@ place : Order ->{; Rpc.ClientError, OutOfStock} String
 # import App.Db
 # import App.Shop
 #
-serve : forall s. Unit ->{Scope s, Server.Server, App.Db.Db;} (ServerRequest ->{Async;} ServerResponse)^{s}
+serve : forall s. Unit ->{Scope s, Server.Server, App.Db.Db} (ServerRequest ->{Async} ServerResponse)^{s}
 let serve () = Server.handler [server App.Shop.place]
 ```
 
@@ -131,12 +131,12 @@ let check headers =
   | Some cookie -> { user = fun () -> cookie }
   | None -> from_result (Err Server.Unauthorized)
 
-# open_door : Unit ->{Server.Server;} String
+# open_door : Unit ->{Server.Server} String
 # server fn open_door () = "open"
 #
 # let example = task {
 #   scope s {
-# functions : (ServerRequest ->{Async;} ServerResponse)^{s}
+# functions : (ServerRequest ->{Async} ServerResponse)^{s}
 let functions =
   Server.handler (Server.authenticated Session check [server whoami] ++ [server open_door])
 # ()

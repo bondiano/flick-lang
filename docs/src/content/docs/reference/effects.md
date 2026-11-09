@@ -103,14 +103,15 @@ Every spelling below is the same closed row with no elements and no tail:
 | Written | Where |
 | - | - |
 | `none` | any row position: `->{none; E}`, `Eff none none a`, `Layer none none {Clock}` |
-| nothing | one side of an arrow: `->{; E}` has no services, `->{R;}` no errors |
-| `->{}`, `->{;}` | an arrow with both rows empty |
+| nothing | one side of an arrow: `->{; E}` has no services, `->{R}` no errors |
+| `->{}` | an arrow with both rows empty |
 | `{}` | a braced row: `Eff {} {} a` |
 
 In an arrow the side before `;` is always the service row and the side after
 it the error row, so `->{; AppError}` and `->{none; AppError}` are one type,
-and `->{AppError}` without `;` is a syntax error, never a guess about which
-row `AppError` belongs to. `flick fmt` writes an empty service row of an
+and without `;` the row is always services: `->{Log}` means `->{Log; none}`.
+To declare errors, keep `;`, as in `->{; AppError}`.
+`flick fmt` drops a trailing `;` before omitted errors and writes an empty service row of an
 arrow as nothing, `->{none; E}` becomes `->{; E}`, and an arrow with both rows
 empty as `->{}`. Elsewhere `none` stays, so `->{Log; none}` and
 `Eff none none a` are left as they are.
@@ -122,7 +123,7 @@ empty as `->{}`. Elsewhere `none` stays, so `->{Log; none}` and
 fail : String ->{; AppError} a
 # let fail message = App.fail message
 
-log_line : String ->{Log;} Unit
+log_line : String ->{Log} Unit
 # let log_line line = Log.info line
 ```
 
@@ -281,7 +282,7 @@ let clock_layer =
 ```
 
 A `type alias` of a service or of an error stands for it in a row:
-`type alias Time = Clock` makes `->{Time;}` the same row as `->{Clock;}`.
+`type alias Time = Clock` makes `->{Time}` the same row as `->{Clock}`.
 An alias of a whole row is a [set](#sets-of-services-and-errors). An alias of
 anything else in a row is an error (`FLICK-T002`). An alias
 names a type, not a namespace: as an alias of a data type does not open its
@@ -436,24 +437,24 @@ the services outlive the owner with `Fiber.Provided`; each call checks it:
 # report : Failure e ->{} Unit
 # let report _ = ()
 #
-start : forall s. Fiber.Provided {Greeter} s => Fiber.Owner s ->{Greeter;} Unit
+start : forall s. Fiber.Provided {Greeter} s => Fiber.Owner s ->{Greeter} Unit
 let start owner = ignore (Fiber.spawn owner report (task { Greeter.greet "child" }))
 ```
 
 ## What may suspend: `Async`
 
 A function that waits for time, input or output or another fiber says so
-with the effect `Async` in its row: `Effect.sleep : Duration ->{Async;} Unit`,
+with the effect `Async` in its row: `Effect.sleep : Duration ->{Async} Unit`,
 `Database.query`, `Http.Client.get`, `Fiber.join`, `Queue.take`. A row
 without it runs at once. `Async` has no operations: the scheduler of the
 runtime handles it at the root, so `main` may have it, and so may the tasks
 of `spawn` and `parallel`; `provide Async` is `FLICK-E016`.
 
 ```flick
-wait : Float ->{Async;} Unit
+wait : Float ->{Async} Unit
 foreign wait from "./timers.mjs" "wait"
 
-twice : Unit ->{Async;} Unit
+twice : Unit ->{Async} Unit
 let twice () =
   wait 1
   wait 2

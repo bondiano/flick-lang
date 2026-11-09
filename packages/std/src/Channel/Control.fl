@@ -63,13 +63,13 @@ foreign pure ensuring from "@flick-lang/effect-ts/effect/Channel" "ensuring"
   reviewed "effect@4.1.2 sha256:392968793dbade6c"
 
 /// Runs `f` with the failure when the channel fails.
-on_error : (Failure e ->{r2;} x) -> Channel r e i o d ie id -> Channel (r + r2) e i o d ie id
+on_error : (Failure e ->{r2} x) -> Channel r e i o d ie id -> Channel (r + r2) e i o d ie id
 foreign pure on_error from "@flick-lang/effect-ts/effect/Channel" "flickOnError"
   arity 1
   reviewed "effect@4.1.2 sha256:9013037f080633da"
 
 /// Runs `f` with how the channel ended.
-on_exit : (Exit e d ->{r2;} x) -> Channel r e i o d ie id -> Channel (r + r2) e i o d ie id
+on_exit : (Exit e d ->{r2} x) -> Channel r e i o d ie id -> Channel (r + r2) e i o d ie id
 foreign pure on_exit from "@flick-lang/effect-ts/effect/Channel" "flickOnExit"
   arity 1
   reviewed "effect@4.1.2 sha256:c0aefbd18d2a567b"

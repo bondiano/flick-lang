@@ -18,7 +18,7 @@ foreign pure void from "@flick-lang/effect-ts/effect/Effect" "void"
   reviewed "effect@4.1.2 sha256:f4001e59cfd15a7d"
 
 /// Suspends the fiber for the duration.
-sleep : Duration.Duration ->{Async;} Unit
+sleep : Duration.Duration ->{Async} Unit
 foreign effect sleep from "@flick-lang/effect-ts/effect/Effect" "sleep"
   reviewed "effect@4.1.2 sha256:2900e4923ff8d2f8"
 
@@ -92,26 +92,26 @@ foreign effect fail_cause_sync from "@flick-lang/effect-ts/effect/Effect" "flick
   reviewed "effect@4.1.2 sha256:aab9e6230fa8e4ed"
 
 /// Never ends; only an interruption stops it.
-never : Unit ->{Async;} a
+never : Unit ->{Async} a
 foreign effect never from "@flick-lang/effect-ts/effect/Effect" "flickNever"
   arity 0
   reviewed "effect@4.1.2 sha256:8db8203fce2282c5"
 
 /// Lets the other fibers run before this one goes on.
-yield_now : Unit ->{Async;} Unit
+yield_now : Unit ->{Async} Unit
 foreign effect yield_now from "@flick-lang/effect-ts/effect/Effect" "flickYieldNow"
   arity 0
   reviewed "effect@4.1.2 sha256:c167d26106a1fa95"
 
 /// `yield_now` with the priority of the scheduler's task, a Float as the
 /// scheduler takes it.
-yield_now_with : Float ->{Async;} Unit
+yield_now_with : Float ->{Async} Unit
 foreign effect yield_now_with from "@flick-lang/effect-ts/effect/Effect" "yieldNowWith"
   reviewed "effect@4.1.2 sha256:7e82b2a2a9eb9a63"
 
 /// How `task` ends, its typed failure, defect or interruption included;
 /// never fails itself.
-exit : (Eff r e a)^c ->{r;} Exit e a
+exit : (Eff r e a)^c ->{r} Exit e a
 foreign effect exit from "@flick-lang/effect-ts/effect/Effect" "flickExit"
   retention call
   reviewed "effect@4.1.2 sha256:f4b245f186c9f3a9"
@@ -158,7 +158,7 @@ foreign effect forever from "@flick-lang/effect-ts/effect/Effect" "forever"
   reviewed "effect@4.1.2 sha256:fe36215c57cef002"
 
 /// Runs `task` again after each typed failure until it succeeds.
-eventually : (Eff r e a)^c ->{r;} a
+eventually : (Eff r e a)^c ->{r} a
 foreign effect eventually from "@flick-lang/effect-ts/effect/Effect" "eventually"
   retention call
   reviewed "effect@4.1.2 sha256:0a54a91084aa5c5e"
@@ -190,7 +190,7 @@ foreign effect when_ from "@flick-lang/effect-ts/effect/Effect" "when"
 resource_auto :
   Fiber.Provided r2 s =>
   Schedule.Schedule r2 e2 i o ->
-  (forall t. Eff {Scope t | r} e a^{t})^c ->{Scope s | r + r2;}
+  (forall t. Eff {Scope t | r} e a^{t})^c ->{Scope s | r + r2}
   Resource.Resource s e a
 foreign effect resource_auto from "@flick-lang/effect-ts/effect/Effect" "flickResourceAuto"
   arity 1

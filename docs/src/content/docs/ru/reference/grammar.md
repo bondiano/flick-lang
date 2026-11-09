@@ -1,6 +1,6 @@
 ---
 title: "Грамматика Flick"
-source_hash: 370e99c489b49657
+source_hash: 441e81a19aa49455
 ---
 
 Здесь описан синтаксис исходного кода, который принимают `flick check`
@@ -380,7 +380,7 @@ rec {
 type        = "forall" name { name } "." type
             | union "=>" type                  // constraint(s): `Show a =>`, `(Show a, Eq a) =>`
             | union ["->" [effects] type]      // right associative
-effects     = "{" "}" | "{" [row] ";" [row] "}" // written `->{` with no space
+effects     = "{" [row] [";" [row]] "}"     // written `->{` with no space
 row         = union { "," union } ["|" union]  // `none`, `r`, `Users, Log | r`
 union       = app { "+" app }                  // row or capture union
 app         = capture { capture }
@@ -398,7 +398,7 @@ atom        = name | Con { "." Con } | "none" | "(" ")" | "(" type ")"
   [Значения вычислений и их выполнение](../../spec/02-computations/)).
   Если между `-> {` есть пробел, это стрелка к типу записи.
 - `none` — литерал пустой строки. Пропущенная сторона стрелки тоже пуста:
-  `->{; E}` — это `->{none; E}`, `->{R;}` — это `->{R; none}`
+  `->{; E}` — это `->{none; E}`, `->{R}` — это `->{R; none}`
   (см. [эффекты](../effects/#пустые-строки-none)). `{Users, Log}` —
   закрытая строка; хвост `| r` делает её открытой.
 - `T^c`, `T^{s}`, `T^(c + d)` задают верхнюю границу захватов значения.

@@ -370,7 +370,7 @@ type alias Split = {
 /// A stream that consumers in the scope of region `s` may each run: the
 /// source runs once, as a child of that scope, and every consumer sees its
 /// elements.
-broadcast : Split -> (Stream r e a)^c ->{Scope s | r;} (Stream none e a)^{s}
+broadcast : Split -> (Stream r e a)^c ->{Scope s | r} (Stream none e a)^{s}
 foreign effect broadcast from "@flick-lang/effect-ts/effect/Stream" "flickBroadcast"
   arity 1
   retention owner
@@ -378,7 +378,7 @@ foreign effect broadcast from "@flick-lang/effect-ts/effect/Stream" "flickBroadc
 
 /// `n` streams that each see every element of the source, which runs once
 /// as a child of the scope of region `s`.
-broadcast_n : Int -> Split -> (Stream r e a)^c ->{Scope s | r;} List ((Stream none e a)^{s})
+broadcast_n : Int -> Split -> (Stream r e a)^c ->{Scope s | r} List ((Stream none e a)^{s})
 foreign effect broadcast_n from "@flick-lang/effect-ts/effect/Stream" "flickBroadcastN"
   arity 2
   retention owner
@@ -386,7 +386,7 @@ foreign effect broadcast_n from "@flick-lang/effect-ts/effect/Stream" "flickBroa
 
 /// `broadcast` that starts the source with its first consumer and stops it
 /// `idleTimeToLive` (`None`: at once) after its last one ends.
-share : Split -> Option Duration.Duration -> (Stream r e a)^c ->{Scope s | r;} (Stream none e a)^{s}
+share : Split -> Option Duration.Duration -> (Stream r e a)^c ->{Scope s | r} (Stream none e a)^{s}
 foreign effect share from "@flick-lang/effect-ts/effect/Stream" "flickShare"
   arity 2
   retention owner
@@ -396,7 +396,7 @@ foreign effect share from "@flick-lang/effect-ts/effect/Stream" "flickShare"
 /// the scope of region `s`; the source runs once as a child of it.
 partition :
   Filter.Filter a p f ->
-  (Stream r e a)^c ->{Scope s | r;}
+  (Stream r e a)^c ->{Scope s | r}
   ((Stream none e p)^{s}, (Stream none e f)^{s})
 foreign effect partition from "@flick-lang/effect-ts/effect/Stream" "partition"
   arity 1
@@ -407,7 +407,7 @@ foreign effect partition from "@flick-lang/effect-ts/effect/Stream" "partition"
 partition_effect :
   Fiber.Provided r2 s =>
   Filter.FilterEffect r2 e2 a p f ->
-  (Stream r e a)^c ->{Scope s | r + r2;}
+  (Stream r e a)^c ->{Scope s | r + r2}
   ((Stream none (e + e2) p)^{s}, (Stream none (e + e2) f)^{s})
 foreign effect partition_effect from "@flick-lang/effect-ts/effect/Stream" "partitionEffect"
   arity 1
@@ -418,7 +418,7 @@ foreign effect partition_effect from "@flick-lang/effect-ts/effect/Stream" "part
 /// runs as a child of the scope of region `s`, which shuts them down when
 /// it closes.
 partition_queue :
-  Filter.Filter a p f -> (Stream r e a)^c ->{Scope s | r;} (Queue.Queue e p, Queue.Queue e f)
+  Filter.Filter a p f -> (Stream r e a)^c ->{Scope s | r} (Queue.Queue e p, Queue.Queue e f)
 foreign effect partition_queue from "@flick-lang/effect-ts/effect/Stream" "partitionQueue"
   arity 1
   retention owner

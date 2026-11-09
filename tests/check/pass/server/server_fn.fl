@@ -17,10 +17,10 @@ place : Order ->{Server.Server; OutOfStock} String
 server fn place order =
   if order.count > 3 then from_result (Err (OutOfStock order.item)) else order.item
 
-stock : Unit ->{Server.Server;} List String
+stock : Unit ->{Server.Server} List String
 server fn stock () = ["tea", "cake"]
 
-restock : String -> Int ->{Server.Server;} Int
+restock : String -> Int ->{Server.Server} Int
 server fn restock item count = count + String.length item
 
 refill : String -> Int ->{Async; Rpc.ClientError} Int
@@ -32,5 +32,5 @@ let call = place
 listing : Atom.Atom (Atom.Async (List String) {Rpc.ClientError})
 let listing = Atom.task (task { stock () })
 
-serve : Unit ->{Scope s, Server.Server;} (ServerRequest ->{Async;} ServerResponse)^{s}
+serve : Unit ->{Scope s, Server.Server} (ServerRequest ->{Async} ServerResponse)^{s}
 let serve () = Server.handler [server place, server stock, server restock]

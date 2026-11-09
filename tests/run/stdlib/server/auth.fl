@@ -25,7 +25,7 @@ server fn whoami () =
   ran ()
   Session.user ()
 
-open_door : Unit ->{Server.Server;} String
+open_door : Unit ->{Server.Server} String
 server fn open_door () = "open"
 
 session : String -> Session.Impl
@@ -40,7 +40,7 @@ let check headers =
   | _ -> from_result (Err Server.Unauthorized)
 
 /// A page that greets who asks.
-page : ServerRequest ->{Async, Server.Server;} ServerResponse
+page : ServerRequest ->{Async, Server.Server} ServerResponse
 let page _ =
   let greeting =
     try "hello " ++ whoami () with
@@ -77,7 +77,7 @@ let main () = provide (Layer.merge
   (Layer.merge Http.FetchClient.layer Http.Server.layer_services)) {
   try
     scope s {
-      functions : (ServerRequest ->{Async;} ServerResponse)^{s}
+      functions : (ServerRequest ->{Async} ServerResponse)^{s}
       let functions =
         Server.handler (Server.authenticated Session check [server whoami] ++ [server open_door])
       app :

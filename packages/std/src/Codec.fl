@@ -109,7 +109,7 @@ foreign pure standard from "@flick-lang/effect-ts" "codecStandard"
 
 /// A Standard Schema V1 with a Promise `validate`, run with the services
 /// and the scope of where it was made.
-standard_async : Codec rd re i a ->{rd;} StandardSchema i a
+standard_async : Codec rd re i a ->{rd} StandardSchema i a
 foreign effect standard_async from "@flick-lang/effect-ts" "codecStandardAsync"
 
 /// Exactly the string `value`.

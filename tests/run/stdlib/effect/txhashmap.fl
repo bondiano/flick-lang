@@ -9,7 +9,7 @@ type alias Scores = TxHashMap.TxHashMap EqHash.Canonical String Float
 sorted : List (String, Float) -> List (String, Float)
 let sorted xs = List.sort_by (fun (a, _) (b, _) -> compare a b) xs
 
-entries_of : TxHashMap.TxHashMap w String Float ->{Tx.Transaction;} List (String, Float)
+entries_of : TxHashMap.TxHashMap w String Float ->{Tx.Transaction} List (String, Float)
 let entries_of m = sorted (TxHashMap.entries m)
 
 main : Unit ->{; AppError} Unit

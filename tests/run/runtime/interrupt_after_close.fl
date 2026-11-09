@@ -30,7 +30,7 @@ let signal_when_stopped started stopped = task {
 
 /// Runs `body` with a finalizer that holds until the fiber was asked to stop.
 closes_under_request :
-  (Deferred.Deferred none Unit -> Deferred.Deferred none Unit -> Eff {Async} none Unit) ->{Async;}
+  (Deferred.Deferred none Unit -> Deferred.Deferred none Unit -> Eff {Async} none Unit) ->{Async}
   Unit
 let closes_under_request body = scope owner {
   let in_finalizer : Deferred.Deferred none Unit = Deferred.make ()

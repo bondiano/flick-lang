@@ -74,25 +74,25 @@ foreign effect is_shutdown from "@flick-lang/effect-ts/effect/PubSub" "isShutdow
   reviewed "effect@4.1.2 sha256:e5bad457b64bebd8"
 
 /// Waits until the hub is shut down.
-await_shutdown : PubSub a ->{Async;} Unit
+await_shutdown : PubSub a ->{Async} Unit
 foreign effect await_shutdown from "@flick-lang/effect-ts/effect/PubSub" "awaitShutdown"
   reviewed "effect@4.1.2 sha256:b4af5bedd7466ab2"
 
 /// Publishes `value` to every subscriber; whether it was published.
-publish : a -> PubSub a ->{Async;} Bool
+publish : a -> PubSub a ->{Async} Bool
 foreign effect publish from "@flick-lang/effect-ts/effect/PubSub" "publish"
   arity 1
   reviewed "effect@4.1.2 sha256:0f955147beac43fd"
 
 /// Publishes the messages in order; whether all were published.
-publish_all : List a -> PubSub a ->{Async;} Bool
+publish_all : List a -> PubSub a ->{Async} Bool
 foreign effect publish_all from "@flick-lang/effect-ts/effect/PubSub" "publishAll"
   arity 1
   reviewed "effect@4.1.2 sha256:ba920c3bff229b0f"
 
 /// Subscribes in the innermost `scope` (or the one of region `s`), which
 /// unsubscribes when it closes.
-subscribe : PubSub a ->{Scope s;} Subscription s a
+subscribe : PubSub a ->{Scope s} Subscription s a
 foreign effect subscribe from "@flick-lang/effect-ts/effect/PubSub" "subscribe"
   reviewed "effect@4.1.2 sha256:56c65ae30ac7d9eb"
 

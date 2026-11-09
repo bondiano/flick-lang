@@ -62,12 +62,12 @@ impl Checker<'_> {
         let (reason, sync_reason) = if strict {
             (
                 "a `[for …]` list is built from pure clauses: bind the result of a runtime call with `let` before it",
-                "a `[for …]` list makes Sync calls alone (`->{Atom.Read;}`): bind the result of a runtime call with `let` before it",
+                "a `[for …]` list makes Sync calls alone (`->{Atom.Read}`): bind the result of a runtime call with `let` before it",
             )
         } else {
             (
                 "the clauses of `for` run when the sequence is iterated, outside this function: bind the result of a runtime call with `let` before it",
-                "the clauses of `for` run when the sequence is iterated, where only Sync calls (`->{Atom.Read;}`) run: bind the result of a runtime call with `let` before it",
+                "the clauses of `for` run when the sequence is iterated, where only Sync calls (`->{Atom.Read}`) run: bind the result of a runtime call with `let` before it",
             )
         };
         // a stage that may read atoms lends its reader to the clauses

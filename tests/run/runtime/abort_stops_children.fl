@@ -14,7 +14,7 @@ let quiet _ = ()
 ping : Deferred.Deferred none Unit ->{} Unit
 let ping d = ignore (Deferred.succeed () d)
 
-with_child : Unit ->{Async;} String
+with_child : Unit ->{Async} String
 let with_child () =
   try
     scope owner {

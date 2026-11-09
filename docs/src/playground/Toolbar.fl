@@ -5,7 +5,7 @@ import Dom exposing (attributes, notify)
 import Examples exposing (Example)
 import State exposing (Model, Profile(..), errors, status, tr)
 
-choice : String -> Bool -> Bool -> (Unit ->{Atom.Write;} Unit) -> Ui
+choice : String -> Bool -> Bool -> (Unit ->{Atom.Write} Unit) -> Ui
 let choice label active disabled act =
   Ui.with_host
     {

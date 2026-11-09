@@ -271,7 +271,7 @@ type View p
 @lang view
 @maker
 /// The component of `render`.
-view : (p ->{Atom.Read;} Ui^c)^c -> (View p)^c
+view : (p ->{Atom.Read} Ui^c)^c -> (View p)^c
 foreign pure view from "@flick-lang/effect-ts/ui/react" "uiView"
   retention call
 
@@ -319,7 +319,7 @@ foreign pure handle from "@flick-lang/effect-ts/ui/react" "uiElementHandle"
   arity 1
 
 /// An element of the instance whose setup makes it.
-element : Unit ->{Setup s;} (Element t)^{s}
+element : Unit ->{Setup s} (Element t)^{s}
 let element () = Setup.own (handle ())
 
 /// `input props` whose node is `element`'s.
@@ -360,7 +360,7 @@ let measure element = Document.measure element
 
 /// The component whose instances run `setup` once, when they mount, and
 /// render with what it made, which has the instance's region `s`.
-stateful : (forall s. p ->{Setup s;} (p ->{Atom.Read;} Ui^{s | c})^{s | c})^c -> (View p)^c
+stateful : (forall s. p ->{Setup s} (p ->{Atom.Read} Ui^{s | c})^{s | c})^c -> (View p)^c
 foreign pure stateful from "@flick-lang/effect-ts/ui/react" "uiStateful"
   retention call
 
@@ -374,13 +374,13 @@ foreign pure mounted from "@flick-lang/effect-ts/ui/react" "uiMounted"
 /// task of the root: its unmount interrupts it and waits for it, and a
 /// defect goes to the root's supervisor. React's `useEffect` without
 /// dependencies, run once per instance.
-on_mount : (Eff {Async, Atom.Write, Document} none Unit)^c ->{Setup s;} Unit
+on_mount : (Eff {Async, Atom.Write, Document} none Unit)^c ->{Setup s} Unit
 let on_mount work = Setup.start (mounted work)
 
 /// `run` of what `read` reads as work of an instance, again whenever it
 /// changes.
 watched :
-  (Unit ->{Atom.Read;} a)^c ->
+  (Unit ->{Atom.Read} a)^c ->
   (a -> (Eff {Async, Atom.Write, Document} none Unit)^c)^c ->
   Lifecycle^c
 foreign pure watched from "@flick-lang/effect-ts/ui/react" "uiWatched"
@@ -392,8 +392,8 @@ foreign pure watched from "@flick-lang/effect-ts/ui/react" "uiWatched"
 /// interrupts the last one. The dependencies are the atoms read, not a
 /// list.
 watch :
-  (Unit ->{Atom.Read;} a)^c ->
-  (a -> (Eff {Async, Atom.Write, Document} none Unit)^c)^c ->{Setup s;}
+  (Unit ->{Atom.Read} a)^c ->
+  (a -> (Eff {Async, Atom.Write, Document} none Unit)^c)^c ->{Setup s}
   Unit
 let watch read run = Setup.start (watched read run)
 
@@ -530,9 +530,6 @@ foreign pure suspended from "@flick-lang/effect-ts/ui/react" "uiSuspended"
 /// A view of a task atom, its props: `fallback` while it loads, `failed`
 /// of its failure, `render` of its value. It is `suspended` reading one task.
 awaiting :
-  (Failure e -> Ui^c)^c ->
-  Ui^c ->
-  (a ->{Atom.Read;} Ui^c)^c ->
-  (View (Atom.Atom (Atom.Async a e)))^c
+  (Failure e -> Ui^c)^c -> Ui^c -> (a ->{Atom.Read} Ui^c)^c -> (View (Atom.Atom (Atom.Async a e)))^c
 let awaiting failed fallback render =
   suspended failed fallback (fun atom -> render (Atom.ready atom))

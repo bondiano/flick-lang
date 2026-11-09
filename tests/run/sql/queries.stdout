@@ -10,3 +10,5 @@ SELECT "u"."id" AS "id" FROM "users" AS "u" WHERE (("u"."name" = $1) AND ("u"."n
 (true, false)
 SELECT "u"."id" AS "id" FROM "users" AS "u" WHERE ((CAST($1 AS text) IS NULL) OR ("u"."name" = CAST($2 AS text)))
 2
+SELECT "u"."name" AS "name" FROM "users" AS "u" WHERE (("u"."name" <> $1) AND (("u"."id" IN (SELECT "a"."user_id" AS "user_id" FROM "accounts" AS "a" JOIN "users" AS "u" ON ("u"."id" = "a"."user_id") WHERE ("u"."name" = $2))) AND EXISTS (SELECT "a"."user_id" AS "user_id" FROM "accounts" AS "a" JOIN "users" AS "u" ON ("u"."id" = "a"."user_id") WHERE ("u"."name" = $3)))) LIMIT $4
+4

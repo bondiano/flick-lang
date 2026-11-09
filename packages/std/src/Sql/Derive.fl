@@ -64,6 +64,11 @@ let columns _ = phantom ()
 value : Sql.Column t n w -> t
 let value _ = phantom ()
 
+/// The row of a template used as a subquery: one without parameters, as
+/// its values are already in it.
+subquery : Sql.Template d {} r -> r
+let subquery _ = phantom ()
+
 /// The value of a parameter that may be `NULL`.
 inner : Option t -> t
 let inner _ = phantom ()

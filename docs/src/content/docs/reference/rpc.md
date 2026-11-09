@@ -35,7 +35,7 @@ let get_user =
     |> Rpc.with_success (Codec.json User.schema)
     |> Rpc.with_errors (Rpc.errors |> Rpc.error_case (Codec.json NotFound.schema))
 
-count_to : Rpc.Rpc "count_to" (Float ->{r;} Stream none none Float)
+count_to : Rpc.Rpc "count_to" (Float ->{r} Stream none none Float)
 let count_to =
   Rpc.make (Record.label : Record.Label "count_to")
     |> Rpc.with_payload (Codec.json Schema.number)
@@ -44,7 +44,7 @@ let count_to =
 type alias Handlers r =
   {
     get_user : Float ->{r; NotFound} User;
-    count_to : Float ->{r;} Stream none none Float;
+    count_to : Float ->{r} Stream none none Float;
   }
 
 users : Rpc.Group r (Handlers r)
@@ -184,15 +184,15 @@ routes and the router over it: one of them returned out of that scope is
 # import Http.Router exposing (RouteContext)
 # import Http.ServerRequest exposing (ServerRequest)
 # import Http.ServerResponse exposing (ServerResponse)
-# double : Rpc.Rpc "double" (Float ->{r;} Float)
+# double : Rpc.Rpc "double" (Float ->{r} Float)
 # let double =
 #   Rpc.make (Record.label : Record.Label "double")
 #   |> Rpc.with_payload (Codec.json Schema.number)
 #   |> Rpc.with_success (Codec.json Schema.number)
-# type alias Handlers r = { double : Float ->{r;} Float }
+# type alias Handlers r = { double : Float ->{r} Float }
 # users : Rpc.Group r (Handlers r)
 # let users = Rpc.group |> Rpc.add double
-# hello : ServerRequest ->{RouteContext;} ServerResponse
+# hello : ServerRequest ->{RouteContext} ServerResponse
 # let hello _ = Http.ServerResponse.text "hello" Http.ServerResponse.defaults
 #
 serve_both : Http.Server.ServeOptions -> Handlers none ->{Async, 
@@ -203,7 +203,7 @@ serve_both : Http.Server.ServeOptions -> Handlers none ->{Async,
   Unit
 let serve_both options handlers =
   scope s {
-    rpc : (ServerRequest ->{Async;} ServerResponse)^{s}
+    rpc : (ServerRequest ->{Async} ServerResponse)^{s}
     let rpc = Rpc.handler Rpc.ndjson users handlers
 #     app : (ServerRequest ->{Async; Http.ServerError.HttpServerError} ServerResponse)^{s}
     let app =

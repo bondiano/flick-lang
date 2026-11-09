@@ -55,7 +55,7 @@ impl Checker<'_> {
         if stages.contains(&Stage::Sync) && !self.options.stages_by_class {
             self.bad_meta(
                 decl,
-                "a foreign function returns an Effect, so its arrows cannot be Sync (`->{Atom.Read;}`): define the Sync function in Flick around a foreign",
+                "a foreign function returns an Effect, so its arrows cannot be Sync (`->{Atom.Read}`): define the Sync function in Flick around a foreign",
             );
         }
         let mode = self.foreign_mode(decl, &body);

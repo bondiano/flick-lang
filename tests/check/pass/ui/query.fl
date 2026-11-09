@@ -5,5 +5,5 @@ module App.Orders exposing (..)
 count : Atom.Atom (Atom.Async Float none)
 let count = Atom.serializable_task (Codec.json Schema.number) (Atom.query ["orders"] (task { 3 }))
 
-add : Float ->{Atom.Write;} Unit
+add : Float ->{Atom.Write} Unit
 let add = Atom.mutation ["orders"] (fun (_n : Float) -> ())

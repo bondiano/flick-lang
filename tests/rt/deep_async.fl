@@ -6,7 +6,7 @@ module App.Main exposing (main)
 depth : Int
 let depth = 1000000
 
-count_down : Ref Int -> Int ->{Async;} Unit
+count_down : Ref Int -> Int ->{Async} Unit
 let rec count_down cell n =
   if n == 0 then
     ()
@@ -15,7 +15,7 @@ let rec count_down cell n =
     count_down cell (n - 1)
 
 rec {
-  even : Ref Int -> Int ->{Async;} Int
+  even : Ref Int -> Int ->{Async} Int
   let even cell n =
     if n == 0 then
       Ref.get cell
@@ -23,7 +23,7 @@ rec {
       Ref.set cell (Ref.get cell + 1)
       odd cell (n - 1)
 
-  odd : Ref Int -> Int ->{Async;} Int
+  odd : Ref Int -> Int ->{Async} Int
   let odd cell n = if n == 0 then Ref.get cell else even cell (n - 1)
 }
 
@@ -35,7 +35,7 @@ let rec each f n =
     f n
     each f (n - 1)
 
-yielding : Ref Int -> Int ->{Async;} Unit
+yielding : Ref Int -> Int ->{Async} Unit
 let rec yielding cell n =
   if n == 0 then
     ()

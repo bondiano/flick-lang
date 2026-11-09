@@ -74,7 +74,7 @@ foreign effect mk_uint8_array from "@flick-lang/effect-ts/effect/Channel" "flick
 
 /// Offers every element to the queue, then ends it, or fails it with the
 /// channel's failure.
-run_into_queue : Queue.Queue e o -> (Channel r e i o d none Unit)^c ->{r;} Unit
+run_into_queue : Queue.Queue e o -> (Channel r e i o d none Unit)^c ->{r} Unit
 foreign effect run_into_queue from "@flick-lang/effect-ts/effect/Channel" "runIntoQueue"
   arity 1
   retention call
@@ -82,7 +82,7 @@ foreign effect run_into_queue from "@flick-lang/effect-ts/effect/Channel" "runIn
 
 /// `run_into_queue` of the elements of each chunk.
 run_into_queue_array :
-  Queue.Queue e o -> (Channel r e i (NonEmpty.NonEmpty o) d none Unit)^c ->{r;} Unit
+  Queue.Queue e o -> (Channel r e i (NonEmpty.NonEmpty o) d none Unit)^c ->{r} Unit
 foreign effect run_into_queue_array from "@flick-lang/effect-ts/effect/Channel" "runIntoQueueArray"
   arity 1
   retention call
@@ -91,7 +91,7 @@ foreign effect run_into_queue_array from "@flick-lang/effect-ts/effect/Channel" 
 /// Runs the channel in the background of the innermost `scope` (or the
 /// one of region `s`) into a queue with the options; the queue ends, or
 /// fails, as the channel does, and is shut down when the scope closes.
-to_queue : Buffer -> (Channel r e i o d none Unit)^c ->{Scope s | r;} Queue.Queue e o
+to_queue : Buffer -> (Channel r e i o d none Unit)^c ->{Scope s | r} Queue.Queue e o
 foreign effect to_queue from "@flick-lang/effect-ts/effect/Channel" "flickToQueue"
   arity 1
   retention owner
@@ -99,7 +99,7 @@ foreign effect to_queue from "@flick-lang/effect-ts/effect/Channel" "flickToQueu
 
 /// `to_queue` of the elements of each chunk.
 to_queue_array :
-  Buffer -> (Channel r e i (NonEmpty.NonEmpty o) d none Unit)^c ->{Scope s | r;} Queue.Queue e o
+  Buffer -> (Channel r e i (NonEmpty.NonEmpty o) d none Unit)^c ->{Scope s | r} Queue.Queue e o
 foreign effect to_queue_array from "@flick-lang/effect-ts/effect/Channel" "flickToQueueArray"
   arity 1
   retention owner
@@ -117,7 +117,7 @@ type alias HubOptions = {
 
 /// Runs the channel in the background of the innermost `scope` (or the
 /// one of region `s`), publishing its elements to a new hub.
-to_pubsub : HubOptions -> (Channel r e i o d none Unit)^c ->{Scope s | r;} PubSub.PubSub o
+to_pubsub : HubOptions -> (Channel r e i o d none Unit)^c ->{Scope s | r} PubSub.PubSub o
 foreign effect to_pubsub from "@flick-lang/effect-ts/effect/Channel" "flickToPubSub"
   arity 1
   retention owner
@@ -125,7 +125,7 @@ foreign effect to_pubsub from "@flick-lang/effect-ts/effect/Channel" "flickToPub
 
 /// `to_pubsub` of the elements of each chunk.
 to_pubsub_array :
-  HubOptions -> (Channel r e i (NonEmpty.NonEmpty o) d none Unit)^c ->{Scope s | r;} PubSub.PubSub o
+  HubOptions -> (Channel r e i (NonEmpty.NonEmpty o) d none Unit)^c ->{Scope s | r} PubSub.PubSub o
 foreign effect to_pubsub_array from "@flick-lang/effect-ts/effect/Channel" "flickToPubSubArray"
   arity 1
   retention owner

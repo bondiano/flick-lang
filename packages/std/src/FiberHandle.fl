@@ -21,7 +21,7 @@ type alias RunOptions = {
 }
 
 /// An empty handle owned by the innermost `scope` (or the one of region `s`).
-make : Unit ->{Scope s;} FiberHandle s e a
+make : Unit ->{Scope s} FiberHandle s e a
 foreign effect make from "@flick-lang/effect-ts/effect/FiberHandle" "flickMake"
   arity 0
   reviewed "effect@4.1.2 sha256:c6550d9883ffb295"
@@ -30,14 +30,14 @@ foreign effect make from "@flick-lang/effect-ts/effect/FiberHandle" "flickMake"
 /// the handle's region.
 run :
   Fiber.Outlives c s =>
-  RunOptions -> (Eff {Scope s | r} e a)^c -> FiberHandle s e a ->{r;} Fiber.Fiber e a
+  RunOptions -> (Eff {Scope s | r} e a)^c -> FiberHandle s e a ->{r} Fiber.Fiber e a
 foreign effect run from "@flick-lang/effect-ts/effect/FiberHandle" "flickRun"
   arity 1
   retention owner
   reviewed "effect@4.1.2 sha256:aca7b90ef702a788"
 
 /// Keeps a child spawned elsewhere as the one of the handle.
-set : SetOptions -> Fiber.Fiber e a -> FiberHandle s e a ->{Async;} Unit
+set : SetOptions -> Fiber.Fiber e a -> FiberHandle s e a ->{Async} Unit
 foreign effect set from "@flick-lang/effect-ts/effect/FiberHandle" "flickSet"
   arity 1
   retention call
@@ -50,7 +50,7 @@ foreign effect get from "@flick-lang/effect-ts/effect/FiberHandle" "flickGet"
   reviewed "effect@4.1.2 sha256:a7a0c777d9a6de40"
 
 /// Interrupts the child and empties the handle.
-clear : FiberHandle s e a ->{Async;} Unit
+clear : FiberHandle s e a ->{Async} Unit
 foreign effect clear from "@flick-lang/effect-ts/effect/FiberHandle" "clear"
   retention call
   reviewed "effect@4.1.2 sha256:7fe537025eeec2f4"
@@ -62,7 +62,7 @@ foreign effect join from "@flick-lang/effect-ts/effect/FiberHandle" "join"
   reviewed "effect@4.1.2 sha256:caaa432c5d4304c0"
 
 /// Waits until no child is running.
-await_empty : FiberHandle s e a ->{Async;} Unit
+await_empty : FiberHandle s e a ->{Async} Unit
 foreign effect await_empty from "@flick-lang/effect-ts/effect/FiberHandle" "awaitEmpty"
   retention call
   reviewed "effect@4.1.2 sha256:7328e8a70fedd0b0"

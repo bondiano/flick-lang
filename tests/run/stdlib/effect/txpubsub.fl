@@ -3,7 +3,7 @@
 // subscribed.
 module App.Main exposing (main)
 
-drain : TxPubSub.Subscription s Float ->{Tx.Transaction;} List Float
+drain : TxPubSub.Subscription s Float ->{Tx.Transaction} List Float
 let drain sub = NonEmpty.to_list (TxPubSub.take_all sub)
 
 main : Unit ->{Async; AppError} Unit

@@ -34,11 +34,11 @@ log : String ->{} Unit
 foreign log from "./form.mjs" "log"
   arity 1
 
-taken : String ->{Async;} Bool
+taken : String ->{Async} Bool
 foreign taken from "./form.mjs" "taken"
   arity 1
 
-settle : Unit ->{Async;} Unit
+settle : Unit ->{Async} Unit
 foreign settle from "./form.mjs" "settle"
   arity 0
 

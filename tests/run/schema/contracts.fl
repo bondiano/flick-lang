@@ -34,7 +34,7 @@ not_a_number : Unit -> Unknown
 foreign pure not_a_number from "./inputs.mjs" "notANumber"
   arity 0
 
-validate : Codec.StandardSchema Json Tree -> Unknown ->{Async;} String
+validate : Codec.StandardSchema Json Tree -> Unknown ->{Async} String
 foreign validate from "./inputs.mjs" "validate"
 
 profile_json : PureCodec Json Profile

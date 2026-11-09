@@ -7,7 +7,7 @@ module App.Main exposing (main)
 open_raw : String ->{} String
 foreign effect open_raw from "./resources.mjs" "open"
 
-sleep : Float ->{Async;} Unit
+sleep : Float ->{Async} Unit
 foreign sleep from "./timers.mjs" "sleep"
 
 type error Oops = Oops String
@@ -18,7 +18,7 @@ let failing_scope () = scope {
   from_result (Err (Oops "body failed"))
 }
 
-slow_scope : Unit ->{Async;} String
+slow_scope : Unit ->{Async} String
 let slow_scope () = scope {
   let file = open_raw "on timeout"
   sleep 1000
@@ -40,7 +40,7 @@ let failing_soon = task {
   from_result (Err (Oops "sibling failed"))
 }
 
-race_sibling : Unit ->{Async;} String
+race_sibling : Unit ->{Async} String
 let race_sibling () =
   try
     let (a, b) = parallel waiting failing_soon

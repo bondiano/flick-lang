@@ -2,7 +2,7 @@
 // `for…of` inside the computation, no generator; it stops when interrupted.
 module App.Main exposing (main)
 
-sleep : Float ->{Async;} Unit
+sleep : Float ->{Async} Unit
 foreign sleep from "../runtime/timers.mjs" "sleep"
 
 report : List (String, Float) ->{} Unit

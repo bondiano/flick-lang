@@ -56,9 +56,9 @@ fn effect_annot(p: &mut Parser) {
     p.bump();
     p.push(Ctx::Bracket);
     if p.raw().kind != K::RBrace {
-        // a set may hold errors, so `->{...A;}` would read as if it held none
-        let sets = row(p);
-        if !(sets && p.at(K::RBrace)) && p.expect(K::Semi) {
+        // without `;` the errors are none, as in `->{A, B}`
+        row(p);
+        if !p.at(K::RBrace) && p.expect(K::Semi) {
             row(p);
         }
     }
@@ -68,40 +68,39 @@ fn effect_annot(p: &mut Parser) {
 }
 
 /// One side of an effect annotation: `none`, `r`, `A, B | r`, `r1 + r2`, or
-/// nothing for an empty row, as in `->{; E}`. Whether it merges or omits a set.
-fn row(p: &mut Parser) -> bool {
+/// nothing for an empty row, as in `->{; E}`.
+fn row(p: &mut Parser) {
     let m = p.start();
-    let sets = !matches!(p.current(), K::Semi | K::RBrace) && row_items(p);
+    if !matches!(p.current(), K::Semi | K::RBrace) {
+        row_items(p);
+    }
     p.complete(m, K::Row);
-    sets
 }
 
-/// The items of a row; whether they merge or omit a set.
-fn row_items(p: &mut Parser) -> bool {
-    let mut sets = false;
+/// The items of a row.
+fn row_items(p: &mut Parser) {
     if matches!(p.current(), K::Semi | K::RBrace | K::Pipe) {
         p.error_expected("a row (write `none` for an empty row)");
     } else {
-        sets |= row_item(p);
+        row_item(p);
         while p.eat(K::Comma) {
-            sets |= row_item(p);
+            row_item(p);
         }
     }
     if p.at(K::Pipe) {
         tail(p);
     }
-    sets
 }
 
 /// An element, `...Set` that merges a set, or `-Element` and `-...Set` that
-/// take out of the row; whether it is one of the last two.
-fn row_item(p: &mut Parser) -> bool {
+/// take out of the row.
+fn row_item(p: &mut Parser) {
     let kind = match p.current() {
         K::DotDotDot => K::RowSpread,
         K::Minus => K::RowOmit,
         _ => {
             union(p);
-            return false;
+            return;
         }
     };
     let m = p.start();
@@ -111,7 +110,6 @@ fn row_item(p: &mut Parser) -> bool {
     }
     app(p);
     p.complete(m, kind);
-    true
 }
 
 fn tail(p: &mut Parser) {

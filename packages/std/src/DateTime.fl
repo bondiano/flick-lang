@@ -108,7 +108,7 @@ foreign effect now from "@flick-lang/effect-ts/effect/DateTime" "flickNow"
   reviewed "effect@4.1.2 sha256:048cf7652fb67b8d"
 
 /// The current instant in the current time zone.
-now_in_current_zone : Unit ->{CurrentTimeZone;} DateTime
+now_in_current_zone : Unit ->{CurrentTimeZone} DateTime
 let now_in_current_zone () = set_zone_current (now ())
 
 /// Whether the date-time is UTC.
@@ -148,7 +148,7 @@ foreign pure set_zone_named from "@flick-lang/effect-ts/effect/DateTime" "flickS
   reviewed "effect@4.1.2 sha256:6d4acf510368f1c9"
 
 /// The date-time in the current time zone, keeping the instant.
-set_zone_current : DateTime ->{CurrentTimeZone;} DateTime
+set_zone_current : DateTime ->{CurrentTimeZone} DateTime
 let set_zone_current t =
   let zone = CurrentTimeZone.current_zone ()
   match set_zone { adjustForTimeZone = None; disambiguation = None } zone t with

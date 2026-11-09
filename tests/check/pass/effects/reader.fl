@@ -14,7 +14,7 @@ let summed =
 listed : Atom.Atom (List Float)
 let listed = Atom.derived (fun () -> [for n <- [1] yield Atom.value count + n])
 
-local : Unit ->{Atom.Read;} List Float
+local : Unit ->{Atom.Read} List Float
 let local () =
   let xs = for n <- [1, 2] yield Atom.value count + n
   Seq.to_list xs

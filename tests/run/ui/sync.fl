@@ -6,7 +6,7 @@ module App.Main exposing (main)
 count : Atom.Writable Float
 let count = Atom.make 3
 
-doubled : Unit ->{Atom.Read;} Float
+doubled : Unit ->{Atom.Read} Float
 let doubled () = Atom.value count * 2
 
 twice : (Unit ->{r; e} Float) -> Unit ->{r; e} Float
@@ -25,7 +25,7 @@ let next = Atom.derived plus_one
 ident : Float ->{r; e} Float
 let ident n = n
 
-read_more : Float ->{Atom.Read;} Float
+read_more : Float ->{Atom.Read} Float
 let read_more n = Atom.value count + n
 
 more : Unit ->{Atom.Read | r; e} Float

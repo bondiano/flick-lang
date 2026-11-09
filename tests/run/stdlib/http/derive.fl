@@ -72,7 +72,7 @@ let maybe request =
 token : HttpApi.Security
 let token = HttpApi.api_key "Token" { key = "authorization"; location = HttpApi.InHeader }
 
-user : Unit ->{Session;} String
+user : Unit ->{Session} String
 let user () = Option.with_default "stranger" (Session.user ())
 
 /// The request of an endpoint with only `headers`.
@@ -88,21 +88,21 @@ let asking authorization = {
 answer :
   String ->
   Option String ->
-  HttpApi.Endpoint l (HttpApi.Request Unit Unit Credentials Unit ->{r; Unauthorized} String) ->{Async;}
+  HttpApi.Endpoint l (HttpApi.Request Unit Unit Credentials Unit ->{r; Unauthorized} String) ->{Async}
   String
 let answer base authorization endpoint =
   try HttpApi.call base endpoint (asking authorization) with
   | Unauthorized why -> "401 " ++ why
   | HttpApi.ClientError e -> "client error " ++ e.message
 
-profile : String -> String ->{Async;} String
+profile : String -> String ->{Async} String
 let profile base name =
   let request = { path = { name = name }; query = (); headers = (); payload = () }
   try (HttpApi.call base Public.endpoints.profile request).name with
   | NotFound who -> "404 " ++ who
   | HttpApi.ClientError e -> "client error " ++ e.message
 
-post : String ->{Async;} String
+post : String ->{Async} String
 let post base =
   let note = {
     path = ();
@@ -114,7 +114,7 @@ let post base =
   | Unauthorized why -> "401 " ++ why
   | HttpApi.ClientError e -> "client error " ++ e.message
 
-forget : String ->{Async;} String
+forget : String ->{Async} String
 let forget base =
   try
     HttpApi.call base Public.endpoints.forget { path = (); query = (); headers = (); payload = () }

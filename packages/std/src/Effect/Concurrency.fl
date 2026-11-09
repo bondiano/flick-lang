@@ -80,7 +80,7 @@ foreign effect cached_invalidate_with_ttl from "@flick-lang/effect-ts/effect/Eff
 /// each attempt.
 with_execution_plan :
   ExecutionPlan.ExecutionPlan p r2 e2 (Errors e) ->
-  (ExecutionPlan.Event e ->{r;} Unit)^c ->
+  (ExecutionPlan.Event e ->{r} Unit)^c ->
   (Eff (p + r) e a)^c ->{r + r2; e + e2}
   a
 foreign effect with_execution_plan from "@flick-lang/effect-ts/effect/Effect" "flickWithExecutionPlan"

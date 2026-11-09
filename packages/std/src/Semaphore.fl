@@ -40,7 +40,7 @@ foreign effect with_permits_if_available from "@flick-lang/effect-ts/effect/Sema
   reviewed "effect@4.1.2 sha256:8ce935520a994ce8"
 
 /// Takes `permits` permits, waiting until they are free; the number taken.
-take : Int -> Semaphore ->{Async;} Int
+take : Int -> Semaphore ->{Async} Int
 foreign effect take from "@flick-lang/effect-ts/effect/Semaphore" "take"
   arity 1
   reviewed "effect@4.1.2 sha256:0e705668842c0868"

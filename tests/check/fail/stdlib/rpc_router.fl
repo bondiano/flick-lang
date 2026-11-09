@@ -8,7 +8,7 @@ import Http.ServerResponse exposing (ServerResponse)
 // so it cannot outlive it.
 escaped : Rpc.Group none {} ->{} Route {Async} none
 let escaped group = scope s {
-  rpc : (ServerRequest ->{Async;} ServerResponse)^{s}
+  rpc : (ServerRequest ->{Async} ServerResponse)^{s}
   let rpc = Rpc.handler Rpc.ndjson group {}
   Http.Router.route (Some Http.Method.POST) "/rpc" (fun request -> rpc request)
 }

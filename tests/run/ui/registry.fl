@@ -6,7 +6,7 @@ module App.Main exposing (main)
 count : Atom.Writable Float
 let count = Atom.make 1
 
-read : Unit ->{Atom.Registry;} Float
+read : Unit ->{Atom.Registry} Float
 let read () = Atom.Registry.get (Atom.readonly count)
 
 main : Unit ->{; AppError} Unit

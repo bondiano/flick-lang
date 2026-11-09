@@ -56,7 +56,7 @@ let main () =
   | Ok workdays -> with_workdays workdays
   | Err (Cron.CronParseError message) -> Platform.stdout_line message
 
-with_workdays : Cron.Cron ->{Async;} Unit
+with_workdays : Cron.Cron ->{Async} Unit
 let with_workdays workdays =
   let monday = at "2024-03-11T09:00:00Z"
   Platform.stdout_line

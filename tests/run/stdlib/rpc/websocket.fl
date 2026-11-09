@@ -15,7 +15,7 @@ let double =
   |> Rpc.with_success (Codec.json Schema.number)
   |> Rpc.with_errors (Rpc.errors |> Rpc.error_case (Codec.json NotFound.schema))
 
-count_to : Rpc.Rpc "count_to" (Float ->{r;} Stream none none Float)
+count_to : Rpc.Rpc "count_to" (Float ->{r} Stream none none Float)
 let count_to =
   Rpc.make (Record.label : Record.Label "count_to")
   |> Rpc.with_payload (Codec.json Schema.number)
@@ -23,7 +23,7 @@ let count_to =
 
 type alias Handlers r = {
   double : Float ->{r; NotFound} Float;
-  count_to : Float ->{r;} Stream none none Float;
+  count_to : Float ->{r} Stream none none Float;
 }
 
 group : Rpc.Group r (Handlers r)

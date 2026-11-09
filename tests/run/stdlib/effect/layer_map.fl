@@ -18,7 +18,7 @@ let tenant builds key =
 options : LayerMap.Options String
 let options = { idleTimeToLive = None; preloadKeys = Some ["a"] }
 
-maps : Unit ->{Async;} Unit
+maps : Unit ->{Async} Unit
 let maps () =
   let builds = Ref.make 0
   scope s {
@@ -36,7 +36,7 @@ let maps () =
   }
   Platform.stdout_line ("map builds " ++ show (Ref.get builds))
 
-refs : Unit ->{Async;} Unit
+refs : Unit ->{Async} Unit
 let refs () =
   let builds = Ref.make 0
   scope s {
@@ -58,7 +58,7 @@ type error Boom = Boom String
 supervise : Failure none ->{} Unit
 let supervise _ = Platform.stdout_line "supervisor"
 
-reports : Unit ->{Async;} Unit
+reports : Unit ->{Async} Unit
 let reports () =
   let exits = parallel_exits [task { from_result (Err (Boom "reported")) }]
   let done : Deferred.Deferred none Unit = Deferred.make ()

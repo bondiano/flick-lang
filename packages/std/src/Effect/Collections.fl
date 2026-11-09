@@ -26,7 +26,7 @@ foreign effect all from "@flick-lang/effect-ts/effect/Effect" "flickAll"
 
 /// Runs `f` on every element: the results and the typed errors apart, in
 /// order; it fails only with a defect or an interruption.
-partition : Concurrency -> (a ->{r; e} b)^c -> List a ->{r;} (List b, List (Errors e))
+partition : Concurrency -> (a ->{r; e} b)^c -> List a ->{r} (List b, List (Errors e))
 foreign effect partition from "@flick-lang/effect-ts/effect/Effect" "flickPartition"
   arity 2
   retention call

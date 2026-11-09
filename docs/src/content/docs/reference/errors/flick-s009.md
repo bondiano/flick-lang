@@ -12,7 +12,7 @@ that is on the next line must be indented.
 # service Users =
 #   get : Int ->{} User
 # type alias User = { name : String }
-# load_name : Int ->{Users;} String
+# load_name : Int ->{Users} String
 let load_name id =
   let user = Users.get id
   user.name

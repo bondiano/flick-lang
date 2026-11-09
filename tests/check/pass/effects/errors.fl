@@ -81,7 +81,7 @@ let conflict id version = from_result (Err (Conflict id version))
 conflict_again : UserId -> Float ->{; Conflict} Unit
 let conflict_again id version = conflict id version
 
-load_quietly : UserId ->{Users;} Option User
+load_quietly : UserId ->{Users} Option User
 let load_quietly id = load_optional id
 
 // a variable takes the errors of the body: one error, when the body raises only it
@@ -105,7 +105,7 @@ let rethrown t = task {
 /// `Fail e` in a row is the error `e`, and `Fail.fail` raises it.
 type error Gone = Gone String
 
-gone : String ->{Fail {Gone};} Int
+gone : String ->{Fail {Gone}} Int
 let gone reason = Fail.fail (Gone reason)
 
 caught : String ->{} Int

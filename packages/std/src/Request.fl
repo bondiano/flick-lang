@@ -39,7 +39,7 @@ foreign effect complete from "@flick-lang/effect-ts/effect/Request" "flickComple
   reviewed "effect@4.1.2 sha256:7eb5c6503185791c"
 
 /// Completes `entry` with how `task` ends.
-complete_effect : Eff r e a -> Entry p e a ->{r;} Unit
+complete_effect : Eff r e a -> Entry p e a ->{r} Unit
 foreign effect complete_effect from "@flick-lang/effect-ts/effect/Request" "completeEffect"
   arity 1
   reviewed "effect@4.1.2 sha256:3676d79652301c9a"

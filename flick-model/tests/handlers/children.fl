@@ -7,12 +7,12 @@ service Named =
 effect Asker =
   ask : Unit ->{} String
 
-by_record : Unit ->{Async;} Unit
+by_record : Unit ->{Async} Unit
 let by_record () = provide Named ({ name = fun () -> "record" }) {
   scope s { ignore (Fiber.spawn s (fun _ -> ()) (task { Platform.stdout_line (Named.name ()) })) }
 }
 
-by_arm : Unit ->{Async;} Unit
+by_arm : Unit ->{Async} Unit
 let by_arm () =
   try
     scope s { ignore (Fiber.spawn s (fun _ -> ()) (task { Platform.stdout_line (Asker.ask ()) })) }

@@ -3,7 +3,7 @@ module App.ServerNode exposing (main)
 
 import Server exposing (Server)
 
-query : String ->{Server;} String
+query : String ->{Server} String
 let query key = "row " ++ key
 
 main : Unit ->{; AppError} Unit

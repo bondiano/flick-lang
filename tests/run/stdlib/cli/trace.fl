@@ -5,7 +5,7 @@ module App.Main exposing (main)
 
 import Cli
 
-start : Unit ->{Async;} Float
+start : Unit ->{Async} Float
 foreign start from "../observability/receiver.mjs" "start"
   arity 0
 
@@ -13,7 +13,7 @@ received : Unit ->{} String
 foreign received from "../observability/receiver.mjs" "received"
   arity 0
 
-stop : Unit ->{Async;} Unit
+stop : Unit ->{Async} Unit
 foreign stop from "../observability/receiver.mjs" "stop"
   arity 0
 

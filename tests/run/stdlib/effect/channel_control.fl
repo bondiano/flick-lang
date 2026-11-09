@@ -35,7 +35,7 @@ let why_of e =
 note : Ref (List String) -> String ->{} Unit
 let note log line = Ref.set log (Ref.get log ++ [line])
 
-slow : Unit ->{Async;} Float
+slow : Unit ->{Async} Float
 let slow () =
   Effect.sleep (ms 5)
   0

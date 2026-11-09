@@ -21,7 +21,7 @@ make :
     lookup : k ->{r; e} a;
     idleTimeToLive : Option (k -> Duration.Duration);
     capacity : Option Int;
-  } ->{Scope s | r;}
+  } ->{Scope s | r}
   RcMap s k e a
 foreign effect make from "@flick-lang/effect-ts/effect/RcMap" "flickMake"
   reviewed "effect@4.1.2 sha256:a1751cbe903120cf"
@@ -48,7 +48,7 @@ foreign effect keys from "@flick-lang/effect-ts/effect/RcMap" "flickKeys"
   reviewed "effect@4.1.2 sha256:415be2871c1c1181"
 
 /// Releases the resource of `key` once its holders are done.
-invalidate : k -> RcMap s k e a ->{Async;} Unit
+invalidate : k -> RcMap s k e a ->{Async} Unit
 foreign effect invalidate from "@flick-lang/effect-ts/effect/RcMap" "invalidate"
   arity 1
   retention call

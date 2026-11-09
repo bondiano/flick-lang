@@ -47,7 +47,7 @@ let describe t =
     }
     t
 
-zoned_in : DateTime.DateTime ->{CurrentTimeZone;} String
+zoned_in : DateTime.DateTime ->{CurrentTimeZone} String
 let zoned_in t =
   let here = DateTime.now_in_current_zone ()
   DateTime.format_iso_offset (DateTime.set_zone_current t)

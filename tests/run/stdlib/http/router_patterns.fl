@@ -5,7 +5,7 @@ import Http.ServerError exposing (HttpServerError)
 import Http.ServerRequest exposing (ServerRequest)
 import Http.ServerResponse exposing (ServerResponse)
 
-handler : ServerRequest ->{RouteContext;} ServerResponse
+handler : ServerRequest ->{RouteContext} ServerResponse
 let handler _ = Http.ServerResponse.text (show (Http.Router.params ())) Http.ServerResponse.defaults
 
 attempt : String -> String ->{} Unit

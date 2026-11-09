@@ -11,7 +11,7 @@ temp : Unit ->{} String
 let temp () =
   Option.with_default (Option.with_default "/tmp" (Platform.env "TMPDIR")) (Platform.env "TEMP")
 
-read : String ->{Async, File.FileSystem;} String
+read : String ->{Async, File.FileSystem} String
 let read path =
   try File.read_text path with
   | File.ReadError message -> message

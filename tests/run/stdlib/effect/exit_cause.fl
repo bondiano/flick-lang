@@ -237,7 +237,7 @@ handled :
   Eff
     {Async}
     {Cause.NoSuchElementError, Cause.IllegalArgumentError, Cause.UnknownError, TimeoutError}
-    String ->{Async;}
+    String ->{Async}
   String
 let handled t =
   try await t with
@@ -247,7 +247,7 @@ let handled t =
   | TimeoutError -> "timed out"
 
 /// Errors of `Cause` raised and handled as Flick errors.
-errors : Unit ->{Async;} Unit
+errors : Unit ->{Async} Unit
 let errors () =
   let raised = [
     task { from_result (Err (Cause.NoSuchElementError "empty")) },

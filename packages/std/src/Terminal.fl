@@ -23,11 +23,11 @@ service Terminal =
   display : String ->{; PlatformError.PlatformError} Unit
 
 /// The width of the terminal in characters; 0 when stdout is not one.
-columns : Unit ->{Terminal;} Int
+columns : Unit ->{Terminal} Int
 let columns () = Terminal.columns ()
 
 /// The height of the terminal in lines; 0 when stdout is not one.
-rows : Unit ->{Terminal;} Int
+rows : Unit ->{Terminal} Int
 let rows () = Terminal.rows ()
 
 /// The next line of input.

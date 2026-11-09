@@ -251,7 +251,7 @@ operation or a row variable is now `FLICK-E018`:
 # effect Ask =
 #   ask : Unit ->{} Int
 #
-# pause : Unit ->{Async;} Unit
+# pause : Unit ->{Async} Unit
 # foreign pause from "./pause.mjs" "pause"
 #   arity 0
 #
@@ -267,12 +267,12 @@ Declare what the arm needs in the row of the operation, as below, or make the
 operation `control`. A handler inside the arm may catch such an effect too.
 
 ```flick
-# pause : Unit ->{Async;} Unit
+# pause : Unit ->{Async} Unit
 # foreign pause from "./pause.mjs" "pause"
 #   arity 0
 #
 effect Ask =
-  ask : Unit ->{Async;} Int
+  ask : Unit ->{Async} Int
 
 waits : (Unit ->{Ask, Async; none} Int) ->{Async; none} Int
 let waits body =

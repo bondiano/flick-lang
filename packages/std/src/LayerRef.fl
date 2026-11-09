@@ -23,7 +23,7 @@ foreign pure get from "@flick-lang/effect-ts/effect/LayerRef" "flickGet"
   retention owner
 
 /// Drops the services: the next use builds them anew.
-invalidate : LayerRef s e ro ->{Async;} Unit
+invalidate : LayerRef s e ro ->{Async} Unit
 foreign effect invalidate from "@flick-lang/effect-ts/effect/LayerRef" "flickInvalidate"
   retention call
 

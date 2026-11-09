@@ -4,7 +4,7 @@
 438ba443bbdcdff5  01-direct-calls:8  type UserId = UserId String
 c792a8b0fdbb4111  01-direct-calls:57  type UserId = UserId String
 0e0762aff3749216  01-direct-calls:88  greet : String -> String -> String
-8373e69a41ab4ed2  01-direct-calls:106  count : Atom.Writable Float
+70dbe54f68949e1c  01-direct-calls:106  count : Atom.Writable Float
 c07f96b57a1a65fd  02-computations:17  type UserId = UserId String
 950aba5088199a59  02-computations:47  type UserId = UserId String
 0da8e6bb19c9ac86  02-computations:94  type UserId = UserId String
@@ -50,6 +50,6 @@ ecfe40849e18cf97  07-schema:69  refined type Email = String where Checks.email
 4fe0a456611fab95  07-schema:265  increment : Ref Float ->{} Float
 db39cdea80dbbc7c  07-schema:280  class Eq a => Hash a =
 390af6801f184082  08-type-programming-and-edsl:33  import Sql exposing (Pg, EncodeError, DbError, DecodeError)
-0d6f75c0a06b0061  08-type-programming-and-edsl:92  type alias SaveButtonProps c = {
+0e16d716784a77e2  08-type-programming-and-edsl:93  type alias SaveButtonProps c = {
 2c80c55aef7a08d4  08-type-programming-and-edsl:120  component counter (start : Float) =
 66cdf326a016e43e  08-type-programming-and-edsl:156  import Cli

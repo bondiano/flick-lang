@@ -7,7 +7,7 @@ let after millis text = task {
   text
 }
 
-main : Unit ->{Async;} Unit
+main : Unit ->{Async} Unit
 let main () =
   let (a, b) = parallel (after 20 "slow") (after 1 "fast")
   Platform.stdout_line (a ++ " " ++ b)

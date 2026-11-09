@@ -9,13 +9,13 @@ type error Oops = Oops String
 say : String ->{} Unit
 let say line = Platform.stdout_line line
 
-nap : Float ->{Async;} Unit
+nap : Float ->{Async} Unit
 let nap millis =
   match Duration.millis millis with
   | Ok d -> Effect.sleep d
   | Err _ -> ()
 
-acquire : String ->{Scope s;} String
+acquire : String ->{Scope s} String
 let acquire name =
   Resource.acquire_release
     (task {
@@ -30,7 +30,7 @@ let failing_scope () = scope {
   from_result (Err (Oops "body failed"))
 }
 
-slow_scope : Unit ->{Async;} String
+slow_scope : Unit ->{Async} String
 let slow_scope () = scope {
   let _ = acquire "on timeout"
   nap 1000
@@ -52,7 +52,7 @@ let failing_soon = task {
   from_result (Err (Oops "sibling failed"))
 }
 
-race_sibling : Unit ->{Async;} String
+race_sibling : Unit ->{Async} String
 let race_sibling () =
   try
     let _ = parallel waiting failing_soon

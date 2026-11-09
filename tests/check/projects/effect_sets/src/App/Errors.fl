@@ -8,5 +8,5 @@ type error Other = Other
 effect Suspends =
   control pause : Unit ->{} Unit
 
-wait : Unit ->{Suspends;} Unit
+wait : Unit ->{Suspends} Unit
 let wait () = Suspends.pause ()

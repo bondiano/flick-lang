@@ -20,7 +20,7 @@ service Generator =
   from_file_info : FileSystem.Info ->{} Etag
 
 /// The tag of the file, from its size and modification time.
-from_file_info : FileSystem.Info ->{Generator;} Etag
+from_file_info : FileSystem.Info ->{Generator} Etag
 let from_file_info info = Generator.from_file_info info
 
 layer_of : ServiceTag {Generator} -> Layer none none {Generator}

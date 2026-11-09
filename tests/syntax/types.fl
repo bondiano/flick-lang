@@ -11,6 +11,12 @@ unions : Eff (r1 + r2) (e1 + e2) a -> Layer none none {Clock}
 
 pure_runtime : Unit ->{} Unit
 
+services_only : Unit ->{Async, Log} Unit
+
+open_services : Unit ->{Log | r} Unit
+
+row_variable : Unit ->{r} Unit
+
 fields : forall fields. { name : String | fields } -> { name : String }
 
 captures : forall c d. (a -> b)^c -> ((f a)^d -> (f b)^(c + d))^c

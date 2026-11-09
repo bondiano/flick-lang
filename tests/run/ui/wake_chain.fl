@@ -12,7 +12,7 @@ click : String ->{} Unit
 foreign click from "./dom.mjs" "click"
   arity 1
 
-settle : Unit ->{Async;} Unit
+settle : Unit ->{Async} Unit
 foreign settle from "./dom.mjs" "settle"
   arity 0
 
@@ -28,7 +28,7 @@ let increment = Action.exhaust (fun _ -> task { Atom.update count (fun n -> n + 
 
 /// `n` derived atoms after `last`, each one more than the one before and
 /// read once it is made, so that no read goes deep.
-chain : Int -> Atom.Atom Int ->{Atom.Registry;} Atom.Atom Int
+chain : Int -> Atom.Atom Int ->{Atom.Registry} Atom.Atom Int
 let rec chain n last =
   if n == 0 then
     last

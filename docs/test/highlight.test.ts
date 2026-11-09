@@ -92,6 +92,30 @@ test("the two parts of an arrow's row have their own scopes, and names in them k
   }
 });
 
+test("a service-only arrow ends its scope without a semicolon", async () => {
+  const highlighter = await createHighlighterCore({
+    engine: createJavaScriptRegexEngine(),
+    themes: [],
+    langs: [{ ...grammar, name: "flick" }],
+  });
+  try {
+    const language = highlighter.getLanguage("flick");
+    const line = "load : Unit ->{Async, Log | r} Result";
+    const { tokens } = language.tokenizeLine(line, null);
+    const scopes = (word: string): readonly string[] => {
+      const at = line.indexOf(word);
+      return tokens.find((token) => token.startIndex <= at && at < token.endIndex)?.scopes ?? [];
+    };
+    for (const word of ["Async", "Log", "r}"]) {
+      assert.ok(scopes(word).includes("meta.effect-row.needs.flick"));
+      assert.ok(!scopes(word).includes("meta.effect-row.fails.flick"));
+    }
+    assert.ok(!scopes("Result").some((scope) => scope.startsWith("meta.effect-row")));
+  } finally {
+    highlighter.dispose();
+  }
+});
+
 test("a hole of a string is code, and a brace in it does not close the hole", async () => {
   const highlighter = await createHighlighterCore({
     engine: createJavaScriptRegexEngine(),

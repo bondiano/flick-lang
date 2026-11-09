@@ -46,7 +46,7 @@ let listening =
 unexpected : Failure e ->{} Unit
 let unexpected failure = Platform.stdout_line "unexpected failure"
 
-hello : ServerRequest ->{RouteContext;} ServerResponse
+hello : ServerRequest ->{RouteContext} ServerResponse
 let hello request =
   let name = Option.with_default "nobody" (Http.Router.param "name")
   Http.ServerResponse.text ("hello " ++ name ++ " " ++ show (Http.Router.params ())) ok
@@ -67,7 +67,7 @@ let create request =
   Log.info ("response " ++ show with_cookie)
   with_cookie
 
-whoami : ServerRequest ->{Log;} ServerResponse
+whoami : ServerRequest ->{Log} ServerResponse
 let whoami request =
   let cookies = Http.ServerRequest.cookies request
   Log.info ("cookies " ++ show cookies)
@@ -94,7 +94,7 @@ let seen request =
 
 /// `seen` behind `x_forwarded_headers`: the proxies are the loopback
 /// network for `/forwarded/loopback`, another network otherwise.
-forwarded : ServerRequest ->{RouteContext;} ServerResponse
+forwarded : ServerRequest ->{RouteContext} ServerResponse
 let forwarded request =
   let proxies =
     if Http.Router.param "by" == Some "loopback" then ["127.0.0.0/8"] else ["10.0.0.0/8"]
@@ -123,7 +123,7 @@ let upload_one request =
 
 /// Holds the request until the scope of the server closes; its finalizer
 /// runs before the server is closed.
-slow : Deferred.Deferred none Unit -> ServerRequest ->{Async;} ServerResponse
+slow : Deferred.Deferred none Unit -> ServerRequest ->{Async} ServerResponse
 let slow started _ = scope {
   Resource.acquire_release (task { line "slow" "acquired" }) (fun _ -> line "slow" "finalizer")
   let _ = Deferred.succeed () started

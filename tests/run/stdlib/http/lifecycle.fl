@@ -5,22 +5,22 @@ module App.Main exposing (main)
 start : String ->{} JsValue
 foreign start from "./raw.mjs" "start"
 
-wait : JsValue ->{Async;} String
+wait : JsValue ->{Async} String
 foreign wait from "./raw.mjs" "wait"
 
 ms : Float -> Duration.Duration
 let ms n = Result.with_default Duration.zero (Duration.millis n)
 
-slow : HttpApi.Endpoint "slow" (HttpApi.Request Unit Unit Unit Unit ->{r;} Unit)
+slow : HttpApi.Endpoint "slow" (HttpApi.Request Unit Unit Unit Unit ->{r} Unit)
 let slow = HttpApi.endpoint HttpApi.Get "/slow" (Record.label : Record.Label "slow")
 
-api : HttpApi.Api r { work : { slow : HttpApi.Request Unit Unit Unit Unit ->{r;} Unit } }
+api : HttpApi.Api r { work : { slow : HttpApi.Request Unit Unit Unit Unit ->{r} Unit } }
 let api =
   HttpApi.api "Work"
   |> HttpApi.add_group (HttpApi.group (Record.label : Record.Label "work") |> HttpApi.add slow)
 
 /// The slow handler; `started` tells the client side it is running.
-handle : Deferred.Deferred {} Unit -> HttpApi.Request Unit Unit Unit Unit ->{Async;} Unit
+handle : Deferred.Deferred {} Unit -> HttpApi.Request Unit Unit Unit Unit ->{Async} Unit
 let handle started _ = scope {
   Resource.acquire_release
     (task {

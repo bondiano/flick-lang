@@ -6,7 +6,7 @@ service Prefix =
   prefix : Unit ->{} String
 
 service Greeter =
-  greet : String ->{Prefix;} String
+  greet : String ->{Prefix} String
 
 outer : Prefix.Impl
 let outer = { prefix = fun () -> "outer" }
@@ -28,7 +28,7 @@ let by_layer () = provide Prefix outer {
 }
 
 /// `Layer.run` called by name, whose function takes the unit.
-by_name : Unit ->{Prefix;} String
+by_name : Unit ->{Prefix} String
 let by_name () =
   Layer.run (Layer.succeed Greeter impl) (fun unit ->
     ignore unit

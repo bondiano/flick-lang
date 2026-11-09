@@ -1,6 +1,6 @@
 ---
 title: "Direct effectful calls"
-source_hash: c3fab6aabc0b44ac
+source_hash: dc1a6d695f07054a
 ---
 
 An effectful function is called in an ordinary expression, and `let` binds its result. A sequence of operations is written with ordinary expressions and bindings.
@@ -97,19 +97,19 @@ A pure body or callback is allowed in an expected runtime position through a che
 
 ## Sync stages
 
-A runtime arrow whose effects are a closed row of effects with `tail` and `abort` operations, services and errors, is a *Sync* stage: it runs at once, without suspending. Suspension shows in the row: the built-in effect `Async`, of class `control`, which the runtime's scheduler handles at the root. A function that waits for time, input or output or another fiber has `Async` (`Effect.sleep : Duration ->{Async;} Unit`), and `->{}` is Sync. A `foreign` without a mode word whose row has `Async` is a promise, and without it a call that returns at once; a `foreign effect` is as written: without `Async` it runs at once, and its suspending is a defect. For now the JavaScript backend compiles to a plain JS function without `Effect.gen` only a row of `Atom.Read` (`Atom a ->{Atom.Read;} a`, the render of `Ui.view`, the computation of `Atom.derived`) with no errors; the rest of Sync stays an Effect; its calls of other Sync functions and of the operations of `Atom.Read` are plain calls, which read the services of the context the runtime set around the call (the reader of a render or a derived atom). The stage is decided where the arrow is written, so a row variable solved to `Atom.Read` later, as in `forall r. (a ->{r} b) -> …`, keeps the runtime stage its function was compiled with. A foreign function returns an Effect, so its arrows are never Sync.
+A runtime arrow whose effects are a closed row of effects with `tail` and `abort` operations, services and errors, is a *Sync* stage: it runs at once, without suspending. Suspension shows in the row: the built-in effect `Async`, of class `control`, which the runtime's scheduler handles at the root. A function that waits for time, input or output or another fiber has `Async` (`Effect.sleep : Duration ->{Async} Unit`), and `->{}` is Sync. A `foreign` without a mode word whose row has `Async` is a promise, and without it a call that returns at once; a `foreign effect` is as written: without `Async` it runs at once, and its suspending is a defect. For now the JavaScript backend compiles to a plain JS function without `Effect.gen` only a row of `Atom.Read` (`Atom a ->{Atom.Read} a`, the render of `Ui.view`, the computation of `Atom.derived`) with no errors; the rest of Sync stays an Effect; its calls of other Sync functions and of the operations of `Atom.Read` are plain calls, which read the services of the context the runtime set around the call (the reader of a render or a derived atom). The stage is decided where the arrow is written, so a row variable solved to `Atom.Read` later, as in `forall r. (a ->{r} b) -> …`, keeps the runtime stage its function was compiled with. A foreign function returns an Effect, so its arrows are never Sync.
 
 ```flick
 # count : Atom.Writable Float
 # let count = Atom.make 0
 #
-doubled : Unit ->{Atom.Read;} Float
+doubled : Unit ->{Atom.Read} Float
 let doubled () = Atom.value count * 2
 
 twice : (Unit ->{r; e} Float) -> Unit ->{r; e} Float
 let twice f () = f () + f ()
 
-quadrupled : Unit ->{Atom.Read;} Float
+quadrupled : Unit ->{Atom.Read} Float
 let quadrupled () = twice doubled ()
 ```
 

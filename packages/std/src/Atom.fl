@@ -52,7 +52,7 @@ foreign pure make from "@flick-lang/effect-ts" "atomState"
 /// A state of the component instance whose `setup` makes it, holding
 /// `value` first: each instance has its own, which cannot leave it and
 /// which the registry forgets when the instance unmounts.
-local : a ->{Setup s;} (Writable a)^{s}
+local : a ->{Setup s} (Writable a)^{s}
 let local value = Setup.own (fresh value)
 
 /// A state the registry keeps only while something holds it.
@@ -122,13 +122,13 @@ foreign pure route from "@flick-lang/effect-ts" "atomRoute"
 
 /// The URL the registry renders, which `route` reads on a server: a
 /// handler sets the request's URL before it renders the page.
-serving : String ->{Write;} Unit
+serving : String ->{Write} Unit
 foreign effect serving from "@flick-lang/effect-ts" "atomServing"
 
 @maker
 /// An atom computed by `compute` from the atoms it reads, again when one
 /// of them changes.
-derived : (Unit ->{Read;} a) -> Atom a
+derived : (Unit ->{Read} a) -> Atom a
 foreign pure derived from "@flick-lang/effect-ts" "atomDerived"
   arity 1
 
@@ -138,34 +138,34 @@ foreign pure readonly from "@flick-lang/effect-ts/effect/reactivity/Atom" "flick
   retention call
 
 /// The value of `atom`; the reader renders or computes again when it changes.
-get : (Atom a)^d ->{Read;} a
+get : (Atom a)^d ->{Read} a
 let get atom = Read.get atom
 
 /// The value of the state `atom`, read as `get` reads.
-value : (Writable a)^d ->{Read;} a
+value : (Writable a)^d ->{Read} a
 let value atom = Read.get (readonly atom)
 
 /// Replaces the value of `atom`; whoever read it renders or computes again.
 /// A debug log of the write names the place of the call.
-set : CallSite => (Writable a)^d -> a ->{Write;} Unit
+set : CallSite => (Writable a)^d -> a ->{Write} Unit
 let set atom new_value = Write.set CallSite.place atom new_value
 
 /// Replaces the value of `atom` by `f` of it.
-update : CallSite => (Writable a)^d -> (a -> a) ->{Write;} Unit
+update : CallSite => (Writable a)^d -> (a -> a) ->{Write} Unit
 let update atom f = Write.update CallSite.place atom f
 
 /// Replaces the value of `atom` by the second part of `f` of it and gives
 /// the first.
-modify : CallSite => (Writable a)^d -> (a -> (b, a)) ->{Write;} b
+modify : CallSite => (Writable a)^d -> (a -> (b, a)) ->{Write} b
 let modify atom f = Write.modify CallSite.place atom f
 
 /// The value of the state `atom` now, in a task: a task reads without
 /// depending on what it read.
-current : (Writable a)^d ->{Write;} a
+current : (Writable a)^d ->{Write} a
 let current atom = Write.current (readonly atom)
 
 /// Computes `atom` again: a task atom runs its task anew.
-refresh : (Atom a)^d ->{Write;} Unit
+refresh : (Atom a)^d ->{Write} Unit
 let refresh atom = Write.refresh atom
 
 /// The result of a task an atom runs: still loading, loaded, or failed.
@@ -280,6 +280,6 @@ foreign pure at from "@flick-lang/effect-ts" "atomAt"
 /// registry drops the old state's value once no view reads it. Forget the
 /// key of an item the program deletes, or its state stays as long as the
 /// registry does.
-forget : Family k a -> k ->{Write;} Unit
+forget : Family k a -> k ->{Write} Unit
 foreign effect forget from "@flick-lang/effect-ts" "atomForget"
   arity 2

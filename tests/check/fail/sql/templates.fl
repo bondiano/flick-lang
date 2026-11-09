@@ -1,0 +1,39 @@
+// A template of the program as a subquery: its row is one column of the
+// value's type, and it takes no parameters.
+module App.Templates exposing (..)
+
+import Sql exposing (Pg)
+
+sql table Users "users" {
+  id : bigint primary key generated always as BigInt
+  name : text not null as String
+  email : text as String
+}
+
+names : Sql.Template Pg {} { name : String }
+let names = sql { from u in Users; select u.name }
+
+pairs : Sql.Template Pg {} { id : BigInt; name : String }
+let pairs = sql { from u in Users; select u.id, u.name }
+
+by_name : Sql.Template Pg { name : String } { name : String }
+let by_name = sql p { from u in Users; where u.name == p.name; select u.name }
+
+wrong_type : Sql.Template Pg {} { id : BigInt }
+let wrong_type = sql { from u in Users; where is_in u.id $names; select u.id }
+//                                                       ^^^^^^ std/Q010 `is_in` compares `BigInt` with a template of `String`
+
+two : Sql.Template Pg {} { id : BigInt }
+let two = sql { from u in Users; where is_in u.id $pairs; select u.id }
+//                                                ^^^^^^ std/Q010 the template of `is_in` selects exactly one result, not 2
+
+open : Sql.Template Pg {} { id : BigInt }
+let open = sql { from u in Users; where is_in u.name $by_name; select u.id }
+//                                                   ^^^^^^^^ FLICK-T003 expected `Template Pg {} _`, found `Template Pg { name : String } { name : String }`
+
+removed : Sql.Template Pg {} {}
+let removed = sql { delete_from Users; where Users.id == 1n }
+
+no_result : Sql.Template Pg {} { id : BigInt }
+let no_result = sql { from u in Users; where is_in u.id $removed; select u.id }
+//                                                      ^^^^^^^^ std/Q010 the template of `is_in` selects exactly one result, not 0

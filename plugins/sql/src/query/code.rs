@@ -138,7 +138,7 @@ impl Emit<'_, '_, '_> {
             }
         }
         for (k, c) in self.cx.captures.iter().enumerate() {
-            if !c.form.as_ref().is_some_and(|f| f.via) {
+            if !c.template && !c.form.as_ref().is_some_and(|f| f.via) {
                 checks.push(W::Call(
                     "typed_by",
                     vec![W::Proxy(c.proxy), W::Raw(format!("c{k}"))],
@@ -370,7 +370,8 @@ impl Emit<'_, '_, '_> {
                     let cast = match self.cx.slots[*n] {
                         At::Capture(k) => {
                             let c = &self.cx.captures[k];
-                            (!c.form.as_ref().is_some_and(|f| f.via)).then_some((c.proxy, c.span))
+                            let plain = !c.template && !c.form.as_ref().is_some_and(|f| f.via);
+                            plain.then_some((c.proxy, c.span))
                         }
                         _ => None,
                     };
@@ -417,6 +418,20 @@ impl Emit<'_, '_, '_> {
     }
 
     fn slot_record(&mut self, at: At) -> NodeId {
+        if let At::Capture(k) = at
+            && self.cx.captures[k].template
+        {
+            // the runtime splices the template's text and values in its place
+            let name = self.cx.captures[k].text.clone();
+            let fields = vec![
+                field("name", self.text(&name)),
+                field("nullable", self.b.expr(Expr::Boolean(false))),
+                field("sql_kind", self.text("template")),
+                field("value", self.name(&format!("c{k}"))),
+            ];
+            let record = self.b.expr(Expr::Record(fields));
+            return self.apply("Sql.Derive.erase", vec![record]);
+        }
         let (name, nullable, form, proxy, value) = match at {
             At::Param(i) => {
                 let p = &self.cx.params[i];

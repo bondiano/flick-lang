@@ -28,7 +28,7 @@ let group = Rpc.group |> Rpc.add me
 handlers : Handlers none
 let handlers = { me = fun () -> "ada" }
 
-attempt : Rpc.CallOptions -> String ->{Async;} String
+attempt : Rpc.CallOptions -> String ->{Async} String
 let attempt options url =
   let without =
     try Rpc.call_with options url me () with

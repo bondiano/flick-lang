@@ -14,7 +14,7 @@ service Users =
 type alias SaveButtonProps c = {
   label : String;
   disabled : Bool;
-  on_save : (Unit ->{Atom.Write;} Unit)^c;
+  on_save : (Unit ->{Atom.Write} Unit)^c;
 }
 
 save_button : SaveButtonProps c -> Ui^c
@@ -39,7 +39,7 @@ let save_button_calls props =
 failure : Atom.Writable (Option String)
 let failure = Atom.make None
 
-save : Layer none none {Users} -> String -> Unit ->{Atom.Write;} Unit
+save : Layer none none {Users} -> String -> Unit ->{Atom.Write} Unit
 let save users name () = provide users {
   try Users.save name with
   | SaveError reason -> Atom.set failure (Some reason)

@@ -1,6 +1,6 @@
 ---
 title: "Type-level programming and eDSLs"
-source_hash: 2e453a294755c8f3
+source_hash: d773d206dd72a7fe
 ---
 
 Flick's SQL, UI and CLI DSLs — `sql params { … }`, `ui { … }` with `component` declarations, and `cli "name" { … }` — are libraries over one type core: rows, labels, finite kinds, HKT and multiparameter classes with functional dependencies. Their backends are PostgreSQL, React (in the browser and on the server) and Effect CLI.
@@ -90,7 +90,7 @@ A result that may be `NULL` — a nullable column, a column of a `left_join`ed t
 type alias SaveButtonProps c = {
   label : String;
   disabled : Bool;
-  on_save : (Unit ->{Atom.Write;} Unit)^c;
+  on_save : (Unit ->{Atom.Write} Unit)^c;
 }
 
 save_button : SaveButtonProps c -> Ui^c

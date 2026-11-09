@@ -1,6 +1,6 @@
 ---
 title: "Эффекты, ошибки и сервисы"
-source_hash: 65e25acc4c444c25
+source_hash: 68b4822cdfff4b7a
 ---
 
 Компилятор проверяет, где допустимы эффектные вызовы, какие сервисы им нужны
@@ -116,15 +116,17 @@ let log_all numbers =
 | Запись | Где используется |
 | - | - |
 | `none` | любая позиция строки: `->{none; E}`, `Eff none none a`, `Layer none none {Clock}` |
-| ничего | одна сторона стрелки: в `->{; E}` нет сервисов, в `->{R;}` нет ошибок |
-| `->{}`, `->{;}` | стрелка с двумя пустыми строками |
+| ничего | одна сторона стрелки: в `->{; E}` нет сервисов, в `->{R}` нет ошибок |
+| `->{}` | стрелка с двумя пустыми строками |
 | `{}` | строка в фигурных скобках: `Eff {} {} a` |
 
 В стрелке перед `;` всегда записывается строка сервисов, а после него —
 строка ошибок. Поэтому `->{; AppError}` и `->{none; AppError}` обозначают
-один тип, а `->{AppError}` без `;` — синтаксическая ошибка:
-компилятор не пытается угадать, к какой строке относится `AppError`.
-`flick fmt` опускает пустую строку сервисов в стрелке:
+один тип. Без `;` строка всегда содержит сервисы:
+`->{Log}` означает `->{Log; none}`. Для ошибок нужно оставить `;`,
+как в `->{; AppError}`.
+`flick fmt` удаляет завершающий `;` перед пропущенной строкой ошибок
+и опускает пустую строку сервисов в стрелке:
 `->{none; E}` становится `->{; E}`, а стрелка с двумя пустыми строками —
 `->{}`. В остальных позициях `none` сохраняется, поэтому `->{Log; none}`
 и `Eff none none a` остаются без изменений.
@@ -136,7 +138,7 @@ let log_all numbers =
 fail : String ->{; AppError} a
 # let fail message = App.fail message
 
-log_line : String ->{Log;} Unit
+log_line : String ->{Log} Unit
 # let log_line line = Log.info line
 ```
 
@@ -302,8 +304,8 @@ let clock_layer =
 ```
 
 `type alias` сервиса или ошибки означает в строке эффектов сам сервис или
-ошибку: после `type alias Time = Clock` строка `->{Time;}` та же, что
-`->{Clock;}`. Псевдоним целой строки — это [набор](#наборы-сервисов-и-ошибок).
+ошибку: после `type alias Time = Clock` строка `->{Time}` та же, что
+`->{Clock}`. Псевдоним целой строки — это [набор](#наборы-сервисов-и-ошибок).
 Псевдоним чего-то другого в строке — ошибка (`FLICK-T002`).
 Псевдоним — имя типа, а не пространство имён: как псевдоним типа данных не
 открывает его конструкторы, так псевдоним сервиса не открывает его операции
@@ -462,24 +464,24 @@ let leaked () = scope outer {
 # report : Failure e ->{} Unit
 # let report _ = ()
 #
-start : forall s. Fiber.Provided {Greeter} s => Fiber.Owner s ->{Greeter;} Unit
+start : forall s. Fiber.Provided {Greeter} s => Fiber.Owner s ->{Greeter} Unit
 let start owner = ignore (Fiber.spawn owner report (task { Greeter.greet "child" }))
 ```
 
 ## Что может приостановиться: `Async`
 
 Функция, которая ожидает срабатывания таймера, завершения ввода-вывода или
-другого файбера, говорит об этом эффектом `Async` в своей строке: `Effect.sleep : Duration ->{Async;} Unit`,
+другого файбера, говорит об этом эффектом `Async` в своей строке: `Effect.sleep : Duration ->{Async} Unit`,
 `Database.query`, `Http.Client.get`, `Fiber.join`, `Queue.take`. Вызов со
 строкой без `Async` выполняется без приостановки. У `Async` нет операций: его на корне обрабатывает
 планировщик среды выполнения, поэтому он может быть у `main` и у задач
 `spawn` и `parallel`; `provide Async` — `FLICK-E016`.
 
 ```flick
-wait : Float ->{Async;} Unit
+wait : Float ->{Async} Unit
 foreign wait from "./timers.mjs" "wait"
 
-twice : Unit ->{Async;} Unit
+twice : Unit ->{Async} Unit
 let twice () =
   wait 1
   wait 2

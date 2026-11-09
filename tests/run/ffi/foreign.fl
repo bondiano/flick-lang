@@ -24,7 +24,7 @@ let from_js value = FsError "the file system failed"
 counted : Float ->{} Float
 foreign effect counted from "./bindings.mjs" "counted"
 
-later : Float ->{Async;} Float
+later : Float ->{Async} Float
 foreign later from "./bindings.mjs" "later"
 
 fail_sync : String ->{; FsError} Unit
@@ -93,7 +93,7 @@ foreign pure same_callback from "./bindings.mjs" "sameCallback"
 twice : (Float ->{} Float) ->{} Float
 foreign effect twice from "./bindings.mjs" "twice"
 
-await_both : Js.PromiseCallback Float Float ->{Async;} Float
+await_both : Js.PromiseCallback Float Float ->{Async} Float
 foreign await_both from "./bindings.mjs" "awaitBoth"
 
 sync_outcome : Unit ->{} String
@@ -104,7 +104,7 @@ let sync_outcome () =
   with
   | FsError reason -> "sync: " ++ reason
 
-async_outcome : Unit ->{Async;} String
+async_outcome : Unit ->{Async} String
 let async_outcome () =
   try
     fail_async "boom"

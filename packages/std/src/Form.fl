@@ -66,11 +66,11 @@ foreign pure id from "@flick-lang/effect-ts" "formId"
 /// The record of the texts, or `None` when a field is not valid: then each
 /// field's error is its first issue, and the first invalid input has the
 /// focus.
-validate : Draft a ->{Atom.Write;} Option a
+validate : Draft a ->{Atom.Write} Option a
 foreign effect validate from "@flick-lang/effect-ts" "formValidate"
 
 /// Sets the error of `field`: the verdict of a check of its own.
-report : Draft a -> Field -> Option String ->{Atom.Write;} Unit
+report : Draft a -> Field -> Option String ->{Atom.Write} Unit
 let report form field message = Atom.set (problem form field) message
 
 /// The props of `input`'s view.

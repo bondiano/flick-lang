@@ -12,7 +12,7 @@ type alias Item = { label : String; size : Float }
 
 type error Boom = Boom
 
-call : String -> String -> String ->{Async;} String
+call : String -> String -> String ->{Async} String
 foreign call from "./wire.mjs" "call"
 
 say : String ->{} Unit

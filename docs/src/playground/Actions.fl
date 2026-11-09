@@ -149,10 +149,10 @@ foreign run_build from "./compiler.ts" "run"
   catch JsError.from_js
   cancel signal
 
-update : Atom.Writable Model -> (Model -> Model) ->{Atom.Write;} Unit
+update : Atom.Writable Model -> (Model -> Model) ->{Atom.Write} Unit
 let update model f = Atom.update model f
 
-syntax_failure : Atom.Writable Model -> String ->{Atom.Write;} Unit
+syntax_failure : Atom.Writable Model -> String ->{Atom.Write} Unit
 let syntax_failure model message =
   update model (fun m -> {
     m with
@@ -161,7 +161,7 @@ let syntax_failure model message =
     syntax_error = message;
   })
 
-paint_generated : Atom.Writable Model ->{Atom.Write;} Unit
+paint_generated : Atom.Writable Model ->{Atom.Write} Unit
 let paint_generated model =
   let m = Atom.current model
   if m.highlighting then
@@ -172,7 +172,7 @@ let paint_generated model =
     | Ok tokens -> update model (fun m -> { m with generated_tokens = tokens })
     | Err message -> syntax_failure model message
 
-adopt_source : Atom.Writable Model ->{Atom.Write;} Unit
+adopt_source : Atom.Writable Model ->{Atom.Write} Unit
 let adopt_source model =
   let m = Atom.current model
   // A later example selection may not have committed its textarea yet.
@@ -180,7 +180,7 @@ let adopt_source model =
     let source = source_value ()
     if source != m.source then update model (fun m -> { m with source = source })
 
-prepare_highlighting : Atom.Writable Model ->{Async, Atom.Write;} Unit
+prepare_highlighting : Atom.Writable Model ->{Async, Atom.Write} Unit
 let prepare_highlighting model =
   let result =
     try Ok (load_highlighting ()) with
@@ -192,7 +192,7 @@ let prepare_highlighting model =
     paint_generated model
 
 /// Opens CodeMirror on the source; the native field stays when it cannot load.
-prepare_editor : Atom.Writable Model -> String ->{Async, Atom.Write;} Unit
+prepare_editor : Atom.Writable Model -> String ->{Async, Atom.Write} Unit
 let prepare_editor model label =
   let loaded =
     try Ok (load_editor ()) with
@@ -214,7 +214,7 @@ let prepare_editor model label =
 
 /// Checks the source after an edit, which is quick, and emits it only when a
 /// tab shows what the compiler writes and that is not known yet.
-refresh : Atom.Writable Model ->{Async, Atom.Write;} Unit
+refresh : Atom.Writable Model ->{Async, Atom.Write} Unit
 let refresh model =
   let m = Atom.current model
   if m.version == "" then
@@ -240,7 +240,7 @@ let refresh model =
           emit model
 
 /// Emits the current source for the current profile.
-emit : Atom.Writable Model ->{Async, Atom.Write;} Unit
+emit : Atom.Writable Model ->{Async, Atom.Write} Unit
 let emit model =
   let m = Atom.current model
   update model (fun m -> { m with checking = true })
@@ -265,7 +265,7 @@ let emit model =
       mark_diagnostics m.source emitted.diagnostics
       paint_generated model
 
-load_compiler : Atom.Writable Model ->{Async, Atom.Write;} Unit
+load_compiler : Atom.Writable Model ->{Async, Atom.Write} Unit
 let load_compiler model =
   update model (fun m -> {
     m with
@@ -287,23 +287,23 @@ let load_compiler model =
     adopt_source model
     notify "fp-compile"
 
-edit : Atom.Writable Model -> String ->{Atom.Write;} Unit
+edit : Atom.Writable Model -> String ->{Atom.Write} Unit
 let edit model source =
   update model (fun m -> { m with source = source })
   save_draft source
   notify "fp-compile"
 
 /// Takes in what the reader typed into the editor.
-edited : Atom.Writable Model ->{Atom.Write;} Unit
+edited : Atom.Writable Model ->{Atom.Write} Unit
 let edited model = edit model (editor_text ())
 
 /// Puts `source` in both the editor and the model.
-replace : Atom.Writable Model -> String ->{Atom.Write;} Unit
+replace : Atom.Writable Model -> String ->{Atom.Write} Unit
 let replace model source =
   set_editor_text source
   edit model source
 
-restore_source : Atom.Writable Model ->{Async, Atom.Write;} Unit
+restore_source : Atom.Writable Model ->{Async, Atom.Write} Unit
 let restore_source model =
   let result =
     try Ok (restore_draft ()) with
@@ -321,7 +321,7 @@ let restore_source model =
         storage_notice = tr m.locale "This shared link is invalid." "Ссылка на код повреждена.";
       })
 
-share : Atom.Writable Model ->{Async, Atom.Write;} Unit
+share : Atom.Writable Model ->{Async, Atom.Write} Unit
 let share model =
   let m = Atom.current model
   let outcome =
@@ -341,10 +341,10 @@ let share model =
         "Не удалось создать ссылку в этом браузере."
   update model (fun m -> { m with storage_notice = message })
 
-download : Atom.Writable Model ->{Atom.Write;} Unit
+download : Atom.Writable Model ->{Atom.Write} Unit
 let download model = download_source (Atom.current model).source
 
-discard_draft : Atom.Writable Model ->{Atom.Write;} Unit
+discard_draft : Atom.Writable Model ->{Atom.Write} Unit
 let discard_draft model =
   clear_draft ()
   let source = first_source (Atom.current model).examples
@@ -357,7 +357,7 @@ let discard_draft model =
   })
   notify "fp-compile"
 
-check_lesson : Atom.Writable Model ->{Async, Atom.Write;} Unit
+check_lesson : Atom.Writable Model ->{Async, Atom.Write} Unit
 let check_lesson model =
   let m = Atom.current model
   update model (fun m -> { m with lesson_checking = true; lesson_result = "" })
@@ -391,20 +391,20 @@ let check_lesson model =
     lesson_done = m.lesson_done || result == "passed";
   })
 
-reveal_lesson_hint : Atom.Writable Model ->{Atom.Write;} Unit
+reveal_lesson_hint : Atom.Writable Model ->{Atom.Write} Unit
 let reveal_lesson_hint model = update model (fun m -> { m with lesson_hint = true })
 
-show_lesson_solution : Atom.Writable Model ->{Atom.Write;} Unit
+show_lesson_solution : Atom.Writable Model ->{Atom.Write} Unit
 let show_lesson_solution model =
   replace model (Atom.current model).lesson_solution
   update model (fun m -> { m with lesson_result = "" })
 
-reset_lesson : Atom.Writable Model ->{Atom.Write;} Unit
+reset_lesson : Atom.Writable Model ->{Atom.Write} Unit
 let reset_lesson model =
   replace model (first_source (Atom.current model).examples)
   update model (fun m -> { m with lesson_result = ""; lesson_hint = false })
 
-choose : Atom.Writable Model -> Example ->{Atom.Write;} Unit
+choose : Atom.Writable Model -> Example ->{Atom.Write} Unit
 let choose model example =
   close_preview ()
   update model (fun m -> {
@@ -416,7 +416,7 @@ let choose model example =
   replace model example.source
 
 /// Shows what the code of the diagnostic `key` means, or hides it when it is shown.
-explain : Atom.Writable Model -> String -> String ->{Async, Atom.Write;} Unit
+explain : Atom.Writable Model -> String -> String ->{Async, Atom.Write} Unit
 let explain model key code =
   if (Atom.current model).explained == key then
     update model (fun m -> { m with explained = ""; explain_revision = m.explain_revision + 1 })
@@ -435,7 +435,7 @@ let explain model key code =
       update model (fun m -> { m with explanation = text })
 
 /// Formats the source as `flick fmt` does; a source that does not parse stays.
-format : Atom.Writable Model ->{Async, Atom.Write;} Unit
+format : Atom.Writable Model ->{Async, Atom.Write} Unit
 let format model =
   let m = Atom.current model
   let result =
@@ -447,7 +447,7 @@ let format model =
   | Err message -> update model (fun m -> { m with compile_error = message })
 
 // `latest` on the same button aborts and joins the worker before this Stop action.
-run_program : Atom.Writable Model ->{Async, Atom.Write;} Unit
+run_program : Atom.Writable Model ->{Async, Atom.Write} Unit
 let run_program model =
   let m = Atom.current model
   if m.running then
@@ -473,7 +473,7 @@ let run_program model =
     runtime_messages model
 
 /// Receives output and failures after a preview has mounted.
-runtime_messages : Atom.Writable Model ->{Atom.Write;} Unit
+runtime_messages : Atom.Writable Model ->{Atom.Write} Unit
 let runtime_messages model =
   if (Atom.current model).execution.status == "preview" then
     let messages = take_preview_messages ()
@@ -494,7 +494,7 @@ let runtime_messages model =
     )
     if crashes != [] then close_preview ()
 
-report : Atom.Writable Model -> Failure e ->{Atom.Write;} Unit
+report : Atom.Writable Model -> Failure e ->{Atom.Write} Unit
 let report model failure =
   let message = RawCause.describe (Failure.inspect failure)
   update model (fun m -> { m with fault = message; running = false; loading = false })

@@ -94,7 +94,7 @@ foreign effect table from "@flick-lang/effect-ts/effect/Console" "flickTable"
 type alias GroupOptions = { label : Option String; collapsed : Bool }
 
 /// Indents what the console writes until the scope of region `s` closes.
-group : GroupOptions ->{Scope s;} Unit
+group : GroupOptions ->{Scope s} Unit
 foreign effect group from "@flick-lang/effect-ts/effect/Console" "flickGroup"
   reviewed "effect@4.1.2 sha256:7a1e604473cf5f21"
 
@@ -107,7 +107,7 @@ foreign effect with_group from "@flick-lang/effect-ts/effect/Console" "flickWith
 
 /// Starts the timer of the label; the scope of region `s` ends it, writing
 /// `label: <elapsed>`.
-time : String ->{Scope s;} Unit
+time : String ->{Scope s} Unit
 foreign effect time from "@flick-lang/effect-ts/effect/Console" "time"
   reviewed "effect@4.1.2 sha256:98ff0a1f2599c827"
 

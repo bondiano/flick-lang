@@ -29,7 +29,7 @@ server fn place order =
 
 The signature right above `server fn` is what the server runs: its
 parameters, the services it needs and its errors. Only the last arrow runs:
-`String -> Float ->{Server.Server;} String` takes two parameters. Callers see another type:
+`String -> Float ->{Server.Server} String` takes two parameters. Callers see another type:
 
 ```flick
 # type alias Order = { item : String; count : Float }
@@ -71,7 +71,7 @@ them on one route; a client entry that names `server place` reaches
 # import App.Db
 # import App.Shop
 #
-serve : forall s. Unit ->{Scope s, Server.Server, App.Db.Db;} (ServerRequest ->{Async;} ServerResponse)^{s}
+serve : forall s. Unit ->{Scope s, Server.Server, App.Db.Db} (ServerRequest ->{Async} ServerResponse)^{s}
 let serve () = Server.handler [server App.Shop.place]
 ```
 
@@ -130,12 +130,12 @@ let check headers =
   | Some cookie -> { user = fun () -> cookie }
   | None -> from_result (Err Server.Unauthorized)
 
-# open_door : Unit ->{Server.Server;} String
+# open_door : Unit ->{Server.Server} String
 # server fn open_door () = "open"
 #
 # let example = task {
 #   scope s {
-# functions : (ServerRequest ->{Async;} ServerResponse)^{s}
+# functions : (ServerRequest ->{Async} ServerResponse)^{s}
 let functions =
   Server.handler (Server.authenticated Session check [server whoami] ++ [server open_door])
 # ()

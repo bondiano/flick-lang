@@ -30,7 +30,7 @@ let signal_when_stopped started stopped = task {
 }
 
 /// A stack of two finalizers, the second holding until `go` opens.
-holding : Deferred.Deferred none Unit -> Deferred.Deferred none Unit ->{Async;} Unit
+holding : Deferred.Deferred none Unit -> Deferred.Deferred none Unit ->{Async} Unit
 let holding in_finalizer go =
   scope {
     Scope.add_finalizer (task { say "added first, runs last" })
@@ -47,7 +47,7 @@ let holding in_finalizer go =
   say "not reached: the request came in"
 
 /// The request comes from another fiber.
-requested : Unit ->{Async;} Unit
+requested : Unit ->{Async} Unit
 let requested () =
   scope owner {
     let in_finalizer : Deferred.Deferred none Unit = Deferred.make ()
@@ -64,7 +64,7 @@ let requested () =
 
 /// The request comes from the owner closing (C2), with a sibling started
 /// after the target: closing must ask both before it waits for either.
-closing : Unit ->{Async;} Unit
+closing : Unit ->{Async} Unit
 let closing () =
   scope owner {
     let in_finalizer : Deferred.Deferred none Unit = Deferred.make ()
@@ -80,7 +80,7 @@ let closing () =
   say "closing: closed"
 
 /// A finalizer that dies under a pending request does not stop the others.
-dying : Unit ->{Async;} Unit
+dying : Unit ->{Async} Unit
 let dying () =
   scope owner {
     let in_finalizer : Deferred.Deferred none Unit = Deferred.make ()

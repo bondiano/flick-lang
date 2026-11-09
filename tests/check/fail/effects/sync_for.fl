@@ -7,7 +7,7 @@ service Log =
   keep : Float ->{} Bool
 
 // a runtime call may suspend, so it does not run at a step of a sequence
-logged : Unit ->{Atom.Read, Log;} Seq Float
+logged : Unit ->{Atom.Read, Log} Seq Float
 let logged () = for {
   n <- [1, 2]
   if Log.keep n
@@ -18,17 +18,17 @@ pure_reads : Unit -> Seq Float
 let pure_reads () = for { n <- [1, 2] } yield n + Atom.value count
 
 // the stage that builds it needs `Atom.Read`
-unread : Unit ->{Log;} List Float
+unread : Unit ->{Log} List Float
 let unread () = [for n <- [1, 2] yield n + Atom.value count]
 
 // `await` and `scope` run on the Effect runtime too
-awaited : Unit ->{Atom.Read;} Seq Float
+awaited : Unit ->{Atom.Read} Seq Float
 let awaited () = for n <- [1] yield await task { n }
 
-scoped : Unit ->{Atom.Read;} Seq Float
+scoped : Unit ->{Atom.Read} Seq Float
 let scoped () = for n <- [1] yield scope { n }
 
-provided : Unit ->{Atom.Read;} Seq Float
+provided : Unit ->{Atom.Read} Seq Float
 let provided () = for n <- [1] yield provide Layer.empty { n }
 
 //~ FLICK-E001 @13:6-13:16 only Sync calls

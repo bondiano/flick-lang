@@ -18,7 +18,7 @@ choose : String ->{} Unit
 foreign choose from "./dom.mjs" "choose"
   arity 1
 
-settle : Unit ->{Async;} Unit
+settle : Unit ->{Async} Unit
 foreign settle from "./dom.mjs" "settle"
   arity 0
 
@@ -33,7 +33,7 @@ foreign markup from "./dom.mjs" "markup"
 open_raw : String ->{} String
 foreign effect open_raw from "../runtime/resources.mjs" "open"
 
-write_on_release : String ->{Async;} Unit
+write_on_release : String ->{Async} Unit
 foreign write_on_release from "./dom.mjs" "writeOnRelease"
 
 release : Unit ->{} Unit

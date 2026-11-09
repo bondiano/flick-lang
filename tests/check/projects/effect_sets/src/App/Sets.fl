@@ -18,8 +18,8 @@ let boom () = from_result (Err Boom)
 other : Unit ->{; Other} Int
 let other () = from_result (Err Other)
 
-wait : Unit ->{Suspends;} Unit
+wait : Unit ->{Suspends} Unit
 let wait () = App.Errors.wait ()
 
-log : String ->{Log;} Unit
+log : String ->{Log} Unit
 let log line = Log.info line

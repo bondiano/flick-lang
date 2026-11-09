@@ -5,7 +5,7 @@ type alias Count = Float
 
 type alias Name = String
 
-counting : Unit ->{Count;} Float
+counting : Unit ->{Count} Float
 let counting () = 1
 
 naming : Unit ->{; Name} Float

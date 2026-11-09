@@ -284,7 +284,7 @@ exported values with their projected types (see [Public TypeScript interfaces](.
 | `Option a`, `Result e a` | Effect `Option.Option<A>`, `Result.Result<A, E>` |
 | `a -> b` | `(arg: A) => B`, one arrow per stage |
 | `a ->{r; e} b`, `Eff r e a` | `(arg: A) => Effect.Effect<B, E, R>`, `Effect.Effect<A, E, R>`; an empty row is `never` |
-| an exported function whose last stage is Sync, `a ->{Atom.Read;} b` | `(arg: A) => Effect.Effect<B, never, Atom.Read>`: a Flick caller still gets the value at once; a TypeScript one gets an Effect that reads the fiber's services, so a direct call no longer fails |
+| an exported function whose last stage is Sync, `a ->{Atom.Read} b` | `(arg: A) => Effect.Effect<B, never, Atom.Read>`: a Flick caller still gets the value at once; a TypeScript one gets an Effect that reads the fiber's services, so a direct call no longer fails |
 | `Stream r e a` | Effect `Stream.Stream<A, E, R>`, the value itself |
 | a variant type, an error | a union of `{ readonly _tag: "<constructor id>"; readonly _0: … }` |
 | an enum; an opaque one | the union of its literals, `"GET" \| "POST"`; `string` or `number` branded with its qualified name |

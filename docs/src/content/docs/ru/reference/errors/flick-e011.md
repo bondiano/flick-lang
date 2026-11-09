@@ -1,6 +1,6 @@
 ---
 title: "FLICK-E011"
-source_hash: "3b76b3efc8e7890a"
+source_hash: "61c8092ada5f203f"
 ---
 
 `server fn`, который перечисляет `Server.Unauthorized` среди своих ошибок, защищён:
@@ -14,6 +14,6 @@ source_hash: "3b76b3efc8e7890a"
 whoami : Unit ->{Server.Server, Session; Server.Unauthorized} String
 server fn whoami () = Session.user ()
 
-routes : forall s. Unit ->{Scope s, Server.Server;} (ServerRequest ->{Async;} ServerResponse)^{s}
+routes : forall s. Unit ->{Scope s, Server.Server} (ServerRequest ->{Async} ServerResponse)^{s}
 let routes () = Server.handler (Server.authenticated Session check [server whoami])
 ```

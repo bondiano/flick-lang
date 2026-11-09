@@ -5,11 +5,11 @@ import Cli
 
 type File (s : Region)
 
-open_file : forall s. String ->{Scope s;} File s
+open_file : String ->{Scope s} File s
 foreign effect open_file from "./files.js" "open"
   retention call
 
-read_file : forall s. File s ->{} String
+read_file : File s ->{} String
 foreign read_file from "./files.js" "read"
   retention call
 

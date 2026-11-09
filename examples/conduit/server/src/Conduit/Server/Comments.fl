@@ -43,15 +43,15 @@ let rows reader article id = sql {
 }
 
 /// The comments of an article, oldest first.
-of_article : Option BigInt -> BigInt ->{Async, Database;} List Row
+of_article : Option BigInt -> BigInt ->{Async, Database} List Row
 let of_article reader article = Db.rows (rows reader (Some article) None)
 
 /// The comment `id` of the article, as `reader` sees it.
-find : Option BigInt -> BigInt -> BigInt ->{Async, Database;} Option Row
+find : Option BigInt -> BigInt -> BigInt ->{Async, Database} Option Row
 let find reader article id = Db.first (rows reader (Some article) (Some id))
 
 /// Stores a comment: its id.
-insert : BigInt -> BigInt -> String -> String ->{Async, Database;} BigInt
+insert : BigInt -> BigInt -> String -> String ->{Async, Database} BigInt
 let insert article author body now =
   Db.insert_id
     (sql {
@@ -67,7 +67,7 @@ let insert article author body now =
     })
 
 /// Deletes a comment.
-delete : BigInt ->{Async, Database;} Unit
+delete : BigInt ->{Async, Database} Unit
 let delete id =
   Db.run
     (sql {

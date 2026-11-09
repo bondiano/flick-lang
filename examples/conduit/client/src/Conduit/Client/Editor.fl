@@ -36,7 +36,7 @@ tags : Atom.Writable (List String)
 let tags = Atom.make []
 
 /// The fields of `article`, or empty ones for a new article.
-fill : Option Article ->{Atom.Write;} Unit
+fill : Option Article ->{Atom.Write} Unit
 let fill article =
   match article with
   | Some a ->
@@ -52,7 +52,7 @@ let fill article =
   Atom.set tag ""
 
 /// The article at `slug`, to edit.
-load : Option String -> String ->{Async, Atom.Write;} Unit
+load : Option String -> String ->{Async, Atom.Write} Unit
 let load jwt slug =
   match Paths.Slug.parse slug with
   | Ok path ->
@@ -86,7 +86,7 @@ let remove_tag =
 
 /// The fields of the editor, as an article's.
 written :
-  Unit ->{Atom.Write;} { title : Option String; description : Option String; body : Option String }
+  Unit ->{Atom.Write} { title : Option String; description : Option String; body : Option String }
 let written () = {
   title = Some (Atom.current title);
   description = Some (Atom.current description);
@@ -123,7 +123,7 @@ let send slug =
     (Session.call (Session.at jwt () draft) Api.Articles.endpoints.create_article).article
 
 /// The article written, shown once saved; else the problems the server named.
-publish : Option String ->{Async, Atom.Write;} Unit
+publish : Option String ->{Async, Atom.Write} Unit
 let publish slug =
   let outcome : Result Problems Article =
     try Ok (send slug) with

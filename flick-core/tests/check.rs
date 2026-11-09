@@ -8,6 +8,8 @@
 #[cfg(feature = "native-project")]
 use std::io;
 use std::path::{Path, PathBuf};
+#[cfg(all(feature = "native-project", feature = "diagnostic-fixes"))]
+use std::slice;
 use std::{fmt, fs};
 
 use flick_core::diagnostics::codes::Area;
@@ -349,6 +351,80 @@ fn diff_reports_missing_and_unexpected() {
 #[cfg(feature = "native-project")]
 struct FixtureHost {
     root: PathBuf,
+}
+
+#[cfg(all(feature = "native-project", feature = "diagnostic-fixes"))]
+#[test]
+fn unauthorized_fix_adds_the_error_separator_only_when_needed() {
+    struct EditedHost {
+        path: PathBuf,
+        text: String,
+    }
+    impl Host for EditedHost {
+        fn read(&self, path: &Path) -> io::Result<Vec<u8>> {
+            if path == self.path {
+                Ok(self.text.as_bytes().to_vec())
+            } else {
+                fs::read(path)
+            }
+        }
+        fn display(&self, path: &Path) -> String {
+            path.display().to_string()
+        }
+    }
+    let path = fs::canonicalize(
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("../tests/check/fail/server/auth.fl"),
+    )
+    .expect("auth fixture path");
+    let original = fs::read_to_string(&path).expect("auth fixture");
+    for (row, expected) in [
+        (
+            "Server.Server, Session",
+            "Server.Server, Session; Server.Unauthorized",
+        ),
+        (
+            "Server.Server, Session;",
+            "Server.Server, Session; Server.Unauthorized",
+        ),
+        (
+            "Server.Server, Session; AppError",
+            "Server.Server, Session; AppError, Server.Unauthorized",
+        ),
+    ] {
+        let mut host = EditedHost {
+            path: path.clone(),
+            text: original.replace(
+                "leaky : Unit ->{Server.Server, Session} String",
+                &format!("leaky : Unit ->{{{row}}} String"),
+            ),
+        };
+        let mut sources = SourceMap::default();
+        let diagnostics = project::check(&host, &mut sources, None, slice::from_ref(&path));
+        let diagnostic = diagnostics
+            .iter()
+            .find(|d| d.code == codes::E011 && d.message.contains("`leaky`"))
+            .expect("leaky needs Unauthorized");
+        let edits: Vec<_> = diagnostic.fixes.iter().flat_map(|f| &f.edits).collect();
+        assert_eq!(edits.len(), 1, "{diagnostics:?}");
+        host.text
+            .replace_range(edits[0].span.range(), &edits[0].replacement);
+        assert!(
+            host.text
+                .contains(&format!("leaky : Unit ->{{{expected}}} String"))
+        );
+        let diagnostics = project::check(
+            &host,
+            &mut SourceMap::default(),
+            None,
+            slice::from_ref(&path),
+        );
+        assert!(
+            !diagnostics
+                .iter()
+                .any(|d| d.code == codes::E011 && d.message.contains("`leaky`")),
+            "{diagnostics:?}"
+        );
+    }
 }
 
 #[cfg(feature = "native-project")]

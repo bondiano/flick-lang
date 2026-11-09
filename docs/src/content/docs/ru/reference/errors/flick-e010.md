@@ -1,6 +1,6 @@
 ---
 title: "FLICK-E010"
-source_hash: "2bc00c4a8da635a6"
+source_hash: "de9458db95b89ed6"
 ---
 
 `server name` обозначает реализацию `name$server`, которую объявляет `server fn`, а `name` не является `server fn`: только `server fn` имеет реализацию для обслуживания. Форма самого `server fn` — это плагин для проверки, `std/E010`.
@@ -10,7 +10,7 @@ module App.Api exposing (greet, functions)
 
 import Server
 
-greet : String ->{Server.Server;} String
+greet : String ->{Server.Server} String
 server fn greet name = "Hello, " ++ name
 
 let functions = [server greet]

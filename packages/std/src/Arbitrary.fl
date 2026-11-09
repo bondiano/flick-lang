@@ -127,7 +127,7 @@ foreign effect sample from "@flick-lang/effect-ts/effect/Arbitrary" "flickSample
   reviewed "effect@4.1.2 sha256:fe703ac99706d073"
 
 /// Runs the property on generated values and shrinks the first failure.
-check : CheckOptions -> (a ->{r; e} Bool)^c -> Arbitrary a ->{r;} CheckResult e a
+check : CheckOptions -> (a ->{r; e} Bool)^c -> Arbitrary a ->{r} CheckResult e a
 foreign effect check from "@flick-lang/effect-ts/effect/Arbitrary" "flickCheckEffect"
   retention call
   reviewed "effect@4.1.2 sha256:20e42afa9a0d1275"

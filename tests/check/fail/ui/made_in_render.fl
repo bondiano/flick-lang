@@ -34,7 +34,7 @@ let inner = Ui.view (fun () -> ui { text "inner" })
 views : Ui.View Unit
 let views = Ui.view (fun () -> ui { Ui.render (Ui.view (fun () -> ui { text "made" })) () })
 
-row : Float ->{Atom.Read;} Ui
+row : Float ->{Atom.Read} Ui
 let row n =
   let made = Atom.make ""
   ui { Ui.field { bind = made; placeholder = ""; on_input = None } }

@@ -10,7 +10,7 @@ import Http.ServerResponse exposing (ServerResponse)
 type alias Hello = { word : String }
   deriving Schema
 
-hello : HttpApi.Endpoint "hello" (HttpApi.Request Unit Unit Unit Unit ->{r;} Hello)
+hello : HttpApi.Endpoint "hello" (HttpApi.Request Unit Unit Unit Unit ->{r} Hello)
 let hello =
   HttpApi.endpoint HttpApi.Get "/api/hello" (Record.label : Record.Label "hello")
   |> HttpApi.with_success 200 (Codec.json Hello.schema)

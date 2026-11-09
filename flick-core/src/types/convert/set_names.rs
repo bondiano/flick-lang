@@ -13,7 +13,7 @@ use crate::types::kinds::Kind;
 use crate::types::ty::Type;
 
 impl Checker<'_> {
-    pub(super) fn not_a_set(&mut self, node: &Node, item: &Node, semi_at: Option<u32>, free: Free) {
+    pub(super) fn not_a_set(&mut self, node: &Node, item: &Node, free: Free) {
         // an alias whose kind is still unknown is in a cycle, which name resolution reports
         if let Some(TypeDef {
             form: Form::Alias { .. },
@@ -51,14 +51,10 @@ impl Checker<'_> {
             );
             return;
         };
-        let mut edits = vec![Edit {
+        let edits = vec![Edit {
             span: self.token_span(dots),
             replacement: String::new(),
         }];
-        edits.extend(semi_at.map(|at| Edit {
-            span: Span::new(span.file, at, at),
-            replacement: ";".to_owned(),
-        }));
         self.diagnostics.push(
             Diagnostic::error(
                 codes::T002,

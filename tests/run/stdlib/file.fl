@@ -2,12 +2,12 @@
 // `File.WriteError`: a handler matches them by constructor.
 module App.Main exposing (main)
 
-read : String ->{Async, File.FileSystem;} String
+read : String ->{Async, File.FileSystem} String
 let read path =
   try File.read_text path with
   | File.ReadError _ -> "read: no file"
 
-write : String ->{Async, File.FileSystem;} String
+write : String ->{Async, File.FileSystem} String
 let write path =
   try
     File.write_text path "x"

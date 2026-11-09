@@ -25,7 +25,7 @@ let until_stopped name started = task {
 }
 
 /// A group with one child waiting to be stopped, started when this returns.
-group : String ->{Scope s, Async;} FiberSet.FiberSet s none Unit
+group : String ->{Scope s, Async} FiberSet.FiberSet s none Unit
 let group name =
   let set : FiberSet.FiberSet s none Unit = FiberSet.make ()
   let started : Deferred.Deferred none Unit = Deferred.make ()
@@ -37,7 +37,7 @@ quiet : Failure e ->{} Unit
 let quiet _ = ()
 
 /// Groups stop in order of addition, then the children, then the finalizers.
-in_order : Unit ->{Async;} Unit
+in_order : Unit ->{Async} Unit
 let in_order () = scope owner {
   Scope.add_finalizer (task { say "finalizer added first" })
   let started : Deferred.Deferred none Unit = Deferred.make ()
@@ -50,7 +50,7 @@ let in_order () = scope owner {
 }
 
 /// Once its hook ran, a group admits no work: the body does not run.
-closed_group : Unit ->{Async;} Unit
+closed_group : Unit ->{Async} Unit
 let closed_group () = scope owner {
   let set = group "stopped first"
   let started : Deferred.Deferred none Unit = Deferred.make ()

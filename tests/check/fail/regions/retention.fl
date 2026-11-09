@@ -11,26 +11,26 @@ foreign effect make_conn from "./conn.js" "make"
 report : Failure e ->{} Unit
 let report _ = ()
 
-finalizer : Fiber.Owner s -> (Eff none none Unit)^c ->{Scope s;} Unit
+finalizer : Fiber.Owner s -> (Eff none none Unit)^c ->{Scope s} Unit
 let finalizer _ w = Scope.add_finalizer w
 
-finalizer_exit : Fiber.Owner s -> (Option RawCause ->{} Unit)^c ->{Scope s;} Unit
+finalizer_exit : Fiber.Owner s -> (Option RawCause ->{} Unit)^c ->{Scope s} Unit
 let finalizer_exit _ w = Scope.add_finalizer_exit w
 
-effect_finalizer : Fiber.Owner s -> (Option RawCause ->{} Unit)^c ->{Scope s;} Unit
+effect_finalizer : Fiber.Owner s -> (Option RawCause ->{} Unit)^c ->{Scope s} Unit
 let effect_finalizer _ w = Effect.add_finalizer w
 
-release : Fiber.Owner s -> (Raw ->{} Unit)^c ->{Scope s;} Unit
+release : Fiber.Owner s -> (Raw ->{} Unit)^c ->{Scope s} Unit
 let release _ r = ignore (Resource.acquire_release (task { make_conn "x" }) r)
 
 channel_queue :
-  Fiber.Owner s -> (Channel.Channel none none Unit Float Unit none Unit)^c ->{Scope s;} Unit
+  Fiber.Owner s -> (Channel.Channel none none Unit Float Unit none Unit)^c ->{Scope s} Unit
 let channel_queue _ ch = ignore (Channel.to_queue { capacity = None; strategy = None } ch)
 
 listener : Fiber.Owner s -> (a -> Eff none none Unit)^c ->{} Events.Listener s a
 let listener owner h = Events.listen owner (Events.queue 8) report h
 
-managed : Fiber.Owner s -> (Eff none none Float)^c ->{Scope s;} Unit
+managed : Fiber.Owner s -> (Eff none none Float)^c ->{Scope s} Unit
 let managed _ t = ignore (Resource.manual t)
 //~ FLICK-G003 @15:21-15:40
 //~ FLICK-G003 @18:26-18:50

@@ -10,7 +10,7 @@ use crate::syntax::kind::SyntaxKind as K;
 /// line break separates them as well), the `|` before the first variant
 /// dropped (`= | A | B` declares `A | B`), and an empty service row of an
 /// arrow written as nothing: `->{none; E}` is `->{; E}`, `->{none; none}` is
-/// `->{}`, `->{...S;}` is `->{...S}`. A declaration left as written then still
+/// `->{}`, `->{S;}` is `->{S}`. A declaration left as written then still
 /// compares equal to its formatted twin.
 pub(super) fn program(node: &Node, text: &str) -> Ast {
     normalize(lower(node, text))
@@ -37,14 +37,6 @@ fn normalize(ast: Ast) -> Ast {
     Ast::Node(kind, children)
 }
 
-/// Whether a row merges or omits a set, so that in an arrow it may leave out
-/// the `;` before an empty error slot.
-pub(super) fn holds_set(items: impl IntoIterator<Item = K>) -> bool {
-    items
-        .into_iter()
-        .any(|k| matches!(k, K::RowSpread | K::RowOmit))
-}
-
 fn is_token(ast: &Ast, kind: K) -> bool {
     matches!(ast, Ast::Token(k, _) if *k == kind)
 }
@@ -64,17 +56,9 @@ fn drop_empty_rows(children: &mut Vec<Ast>) {
     let rows: Vec<usize> = (0..children.len())
         .filter(|&i| matches!(children[i], Ast::Node(K::Row, _)))
         .collect();
-    let set = |row: &Ast| match row {
-        Ast::Node(_, items) => holds_set(items.iter().filter_map(|item| match item {
-            Ast::Node(kind, _) => Some(*kind),
-            Ast::Token(..) => None,
-        })),
-        Ast::Token(..) => false,
-    };
     if rows.len() == 2 && rows.iter().all(|&i| empty(&children[i])) {
         children.retain(|c| matches!(c, Ast::Token(k, _) if *k != K::Semi));
-    } else if let [services, errors] = rows[..]
-        && set(&children[services])
+    } else if let [_, errors] = rows[..]
         && matches!(&children[errors], Ast::Node(_, items) if items.is_empty())
     {
         children.remove(errors);

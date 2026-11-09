@@ -16,7 +16,7 @@ foreign effect from_acquire from "@flick-lang/effect-ts/effect/ScopedRef" "flick
   retention call
 
 /// A reference holding `f ()`, which needs no release.
-make : (Unit -> a)^c ->{Scope s;} ScopedRef s a
+make : (Unit -> a)^c ->{Scope s} ScopedRef s a
 foreign effect make from "@flick-lang/effect-ts/effect/ScopedRef" "flickMake"
   retention call
 

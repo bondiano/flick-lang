@@ -127,7 +127,7 @@ foreign pure port from "@flick-lang/effect-ts/effect/Config" "Port"
 /// it needs `Server.Server`: a client entry that reaches it is
 /// `FLICK-E009`, and neither the secret's name nor its value is in a
 /// browser's bundle.
-redacted : String ->{Server.Server;} Config (Redacted String)
+redacted : String ->{Server.Server} Config (Redacted String)
 foreign effect redacted from "@flick-lang/effect-ts/effect/Config" "flickRedacted"
   reviewed "effect@4.1.2 sha256:39cdab7425a475a8"
 

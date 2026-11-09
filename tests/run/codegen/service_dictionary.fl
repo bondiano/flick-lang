@@ -13,14 +13,14 @@ let render_impl = {
 }
 
 // the dictionary of `a` is the one `twice` is given
-twice : Show a => a ->{Render;} String
+twice : Show a => a ->{Render} String
 let twice x = Render.render x ++ Render.render [x]
 
 main : Unit ->{} Unit
 let main () = provide (Layer.succeed Render render_impl) {
   Platform.stdout_line (Render.render 42)
   Platform.stdout_line (Render.render "text")
-  half : Bool ->{Render;} String
+  half : Bool ->{Render} String
   let half = Render.pair 1
   Platform.stdout_line (half true)
   Platform.stdout_line (twice 1.5)

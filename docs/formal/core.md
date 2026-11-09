@@ -838,7 +838,7 @@ let g () =
 `Atom.make` and `Atom.fresh` are declared `foreign pure` but create state, and a local binding of one was generalized.
 
 ```flick
-poke : Unit ->{Atom.Read, Atom.Write;} String
+poke : Unit ->{Atom.Read, Atom.Write} String
 let poke () =
   let s = Atom.fresh None
   Atom.set s (Some 42)
@@ -860,7 +860,7 @@ let poke () =
 
 ### A callee of unknown type is a pure arrow
 
-- Divergence: `(fun h -> h ()) f` with `f : Unit ->{Log;} Unit` is `FLICK-T003` "expected `Unit -> _`".
+- Divergence: `(fun h -> h ()) f` with `f : Unit ->{Log} Unit` is `FLICK-T003` "expected `Unit -> _`".
 - In the model (App) admits any `φ`, but `λh. h ()` has no principal type: `(Unit →P τ) →P τ` and `(Unit →R⟨r;ε⟩ τ) →R⟨r;ε⟩ τ` are incomparable, and the core has no stage variables.
 - Resolution (spec): `reference/effects.md` states that a parameter of unknown type applied to an argument is treated as a pure function; an effectful callback gets its type from the expected type or from a signature.
 

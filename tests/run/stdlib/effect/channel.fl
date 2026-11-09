@@ -11,7 +11,7 @@ lists : Channel.Channel r e i (NonEmpty.NonEmpty a) d none Unit ->{r; e} List (L
 let lists channel = Channel.run_collect (Channel.map NonEmpty.to_list channel)
 
 /// Offers the numbers to the queue and ends it.
-feed : List Float -> Queue.Queue e Float ->{Async;} Bool
+feed : List Float -> Queue.Queue e Float ->{Async} Bool
 let feed numbers queue =
   let _ = Queue.offer_all numbers queue
   Queue.end queue

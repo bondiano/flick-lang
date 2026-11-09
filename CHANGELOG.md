@@ -10,6 +10,14 @@ break programs.
   names a conversion that loses nothing, to the type its place expects:
   `(into n : Float)`, `into n * 10n`. The core has `Into Int Float` and
   `Into Int BigInt`; a program declares it for its own types.
+- **SQL composition:** `exists $(template)` and `is_in value $(template)`
+  accept reusable `Sql.Template` values with no named parameters. Captures,
+  codecs and placeholders compose without running a query. `is_in` requires
+  one result column of the compared type. Conduit's article list and count
+  now share one filter, including the slug filter.
+- **Effect rows:** `->{Async, Database}` means `->{Async, Database; none}`.
+  The trailing `;` before omitted errors is optional in every runtime arrow,
+  not just rows with sets; `flick fmt` removes it. Errors still follow `;`.
 - **Holes in strings:** `"n = \{n + 1}"` is `"n = " ++ display (n + 1)`, through
   the new Prelude class `Display`: a `String` is itself, without the quotes of
   `show`, and `Int`, `Float` and `Bool` are spelled as `show` spells them. A
@@ -20,8 +28,9 @@ break programs.
 - **Plugins check calls:** a library whose `[package]` says
   `watch = ["Ui.Event.queue", "*.parse"]` beside its `plugin` gets, through the
   new `check-calls`, every place of a checked module that applies one of those
-  names, with the span of each argument, its type, the constant it folds to and,
-  for the `parse` of a refined type, how its check reads that constant. An entry
+  names, with each argument's span, type and constant value after constant
+  folding. For a refined type's `parse`, it also receives the refinement
+  metadata needed to validate that constant. An entry
   that is no `Module.name`, `Module.Sub.name` or `*.name`, and a `watch` without a `plugin`, are
   `FLICK-P032`. Two checks of the compiler's moved into the plugin of `std` and
   kept their codes, spans, messages and explanations: `FLICK-U001`, the capacity
@@ -89,9 +98,8 @@ break programs.
   into a row, also in an arrow (`->{...Orders, Async | r; Boom}`), and `-` takes
   an element or a set out (`{...Orders, -Log; -InvalidEmail}`). A set expands
   where it is named, so it fits wherever its row does; `Eff {...Orders} none a`
-  takes the errors of a set into its row of errors. An arrow row with a set needs
-  no `;` before empty errors, and `flick fmt` drops it: `->{...Env;}` becomes
-  `->{...Env}`.
+  takes the errors of a set into its row of errors. Like other arrow rows, a row
+  with a set needs no trailing `;`: `->{...Env}`.
 - **Aliases in declarations:** a declaration may use an alias written below it.
   `run : Unit ->{Time; Failure} Float` above `type alias Failure = Oops` was
   `FLICK-T002`.

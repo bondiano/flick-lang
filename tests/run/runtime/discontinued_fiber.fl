@@ -18,7 +18,7 @@ ping : Deferred.Deferred none Unit ->{} Unit
 let ping d = ignore (Deferred.succeed () d)
 
 /// A child of the abandoned scope stops before its finalizers run.
-with_child : Unit ->{Async;} Int
+with_child : Unit ->{Async} Int
 let with_child () =
   try
     scope owner {
@@ -58,7 +58,7 @@ let ensuring () =
   | Emit.emit x -> x
 
 /// A fiber stopped in an arm closes the scopes of the body it holds, once.
-stopped_in_arm : Unit ->{Async;} Unit
+stopped_in_arm : Unit ->{Async} Unit
 let stopped_in_arm () =
   scope owner {
     let in_arm : Deferred.Deferred none Unit = Deferred.make ()

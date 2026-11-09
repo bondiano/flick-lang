@@ -1,6 +1,6 @@
 ---
 title: "Flick Specification"
-source_hash: fa485c41aa68276a
+source_hash: 0372b044433a544a
 ---
 
 This specification is the normative description of the Flick language as implemented by this compiler. Its chapters state the rules every program follows, with the reasoning a reader needs to apply them. The [reference](../reference/grammar/) pages describe the same language in more detail: the exact grammar, the diagnostics of the checker, the standard library and the code each target generates. Where a chapter and a reference page cover one topic, the chapter states the rule and links the page.
@@ -24,7 +24,7 @@ This specification is the normative description of the Flick language as impleme
 
 - **Sequencing:** direct calls with `let`, `task`/`await`, `do` over `Monad` with pure continuations, `for` generators and comprehensions ([Direct effectful calls](./01-direct-calls/), [Higher-order functions](./04-higher-order/)).
 - **Computation type:** `Eff r e a`, the result last ([Values of computations](./02-computations/)).
-- **Arrows:** pure `a -> b`, runtime `a ->{r; e} b`, and the Sync stage `a ->{Atom.Read;} b`, which compiles to a plain JS function ([Sync stages](./01-direct-calls/#sync-stages)).
+- **Arrows:** pure `a -> b`, runtime `a ->{r; e} b`, and the Sync stage `a ->{Atom.Read} b`, which compiles to a plain JS function ([Sync stages](./01-direct-calls/#sync-stages)).
 - **Classes:** multi-parameter classes, superclasses and functional dependencies; no overlapping, orphan or local instances, ownership by package ([classes](../reference/classes/)).
 - **Generalization:** only provably pure constructions generalize; results of runtime calls are monomorphic ([types](./03-types-and-classes/)).
 - **Records and collections:** exact structural records with row polymorphism and no implicit width subtyping; `List` is a dense immutable array, `Chunk` a separate type for repeated concatenation ([stdlib](../reference/stdlib/)).

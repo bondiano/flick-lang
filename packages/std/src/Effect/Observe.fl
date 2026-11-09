@@ -66,7 +66,7 @@ foreign effect annotate_logs from "@flick-lang/effect-ts/effect/Effect" "annotat
 
 /// Annotates the log messages of the rest of the innermost `scope` (or the
 /// one of region `s`).
-annotate_logs_scoped : String -> String ->{Scope s;} Unit
+annotate_logs_scoped : String -> String ->{Scope s} Unit
 foreign effect annotate_logs_scoped from "@flick-lang/effect-ts/effect/Effect" "annotateLogsScoped"
   reviewed "effect@4.1.2 sha256:c03fada96be44ec1"
 
@@ -127,7 +127,7 @@ foreign effect make_span from "@flick-lang/effect-ts/effect/Effect" "flickMakeSp
 
 /// A new span that ends when the innermost `scope` (or the one of region
 /// `s`) closes.
-make_span_scoped : String -> Tracer.SpanOptions ->{Scope s;} Tracer.Span
+make_span_scoped : String -> Tracer.SpanOptions ->{Scope s} Tracer.Span
 foreign effect make_span_scoped from "@flick-lang/effect-ts/effect/Effect" "flickMakeSpanScoped"
   reviewed "effect@4.1.2 sha256:d80b1cfaabf5956d"
 

@@ -17,7 +17,7 @@ type alias Log = Ref (List String)
 note : Log -> String ->{} Unit
 let note log text = Ref.set log (Ref.get log ++ [text])
 
-nap : Float ->{Async;} Unit
+nap : Float ->{Async} Unit
 let nap millis =
   match Duration.millis millis with
   | Ok d -> Effect.sleep d
@@ -75,7 +75,7 @@ let tests = [
       "Fail.fail stops the computation, and either form of an arm catches it"
       (task {
         let steps = Ref.make 0
-        failing : Unit ->{Fail {NotFound};} Int
+        failing : Unit ->{Fail {NotFound}} Int
         let failing () =
           Ref.set steps 1
           let value = Fail.fail (NotFound "x")

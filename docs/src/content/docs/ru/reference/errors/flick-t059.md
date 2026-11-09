@@ -1,6 +1,6 @@
 ---
 title: "FLICK-T059"
-source_hash: "04ebad2efd924b89"
+source_hash: "4956e21b915fc1dd"
 ---
 
 Сигнатура записывает то, что компилятор и так ей предоставляет.
@@ -16,7 +16,7 @@ map : (a -> b)^c -> List a -> List b      // the same type
 `Fiber.Outlives`, `Fiber.Provided` и `Detached`, поэтому их писать не нужно:
 
 ```flick
-add_finalizer : (Eff r none Unit)^c ->{Scope s | r;} Unit
+add_finalizer : (Eff r none Unit)^c ->{Scope s | r} Unit
 foreign effect add_finalizer from "./scope.js" "addFinalizer"
   retention owner
 ```

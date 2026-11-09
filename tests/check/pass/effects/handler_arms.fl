@@ -97,9 +97,9 @@ let both_of first second = parallel first second
 /// A `tail` arm may suspend through what its operation declares, or what a
 /// handler inside the arm catches.
 effect Wait =
-  wait : Unit ->{Async;} Int
+  wait : Unit ->{Async} Int
 
-pause : Unit ->{Async;} Unit
+pause : Unit ->{Async} Unit
 foreign pause from "./pause.mjs" "pause"
   arity 0
 
@@ -116,5 +116,5 @@ let inside body =
   | Store.load () -> List.length (collect (fun () -> Emit.emit 1))
 
 /// A row variable a finalizer takes is `Detached` by its constraint too.
-closing : Detached r => Eff r none Unit ->{r;} Unit
+closing : Detached r => Eff r none Unit ->{r} Unit
 let closing work = scope { Scope.add_finalizer work }

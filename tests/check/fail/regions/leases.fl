@@ -7,11 +7,11 @@ type Raw
 make_conn : String ->{} Raw
 foreign effect make_conn from "./conn.js" "make"
 
-close_conn : forall c. Raw^c ->{} Unit
+close_conn : Raw^c ->{} Unit
 foreign effect close_conn from "./conn.js" "close"
   retention call
 
-conn : String ->{Scope s;} Raw^{s}
+conn : String ->{Scope s} Raw^{s}
 let conn name = Resource.acquire_release (task { make_conn name }) close_conn
 
 returned : Unit ->{} Unit

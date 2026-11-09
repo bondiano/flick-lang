@@ -37,11 +37,11 @@ service RouteContext =
 
 /// The parameters of the matched path: `[("id", "7")]` for `/users/7` of
 /// `/users/:id`.
-params : Unit ->{RouteContext;} List (String, String)
+params : Unit ->{RouteContext} List (String, String)
 let params () = RouteContext.params ()
 
 /// The parameter of the matched path.
-param : String ->{RouteContext;} Option String
+param : String ->{RouteContext} Option String
 let param name =
   match List.find (fun (key, _) -> key == name) (params ()) with
   | Some (_, value) -> Some value

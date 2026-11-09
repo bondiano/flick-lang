@@ -7,7 +7,7 @@ say : String ->{} Unit
 let say line = Platform.stdout_line line
 
 /// A resource named `name`, released with a log line by its owner.
-acquire : String ->{Scope s;} String
+acquire : String ->{Scope s} String
 let acquire name =
   Resource.acquire_release
     (task {
@@ -16,7 +16,7 @@ let acquire name =
     })
     (fun n -> say ("release " ++ n))
 
-main : Unit ->{Async;} Unit
+main : Unit ->{Async} Unit
 let main () =
   scope s {
     let ref = ScopedRef.from_acquire (task { acquire "ref 1" })

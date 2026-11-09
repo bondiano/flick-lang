@@ -1,7 +1,7 @@
 ---
 title: Переход на 0.2
 description: Что изменилось после Flick 0.1.0 и как обновить проект.
-source_hash: 84b22232a2282a1c
+source_hash: 502299ee0b3a7f46
 ---
 
 До 1.0 минорный релиз может ломать программы, и 0.2 ломает: `std` стал
@@ -258,7 +258,7 @@ Sync-стадии, поэтому вызовы внутри ветки не до
 # effect Ask =
 #   ask : Unit ->{} Int
 #
-# pause : Unit ->{Async;} Unit
+# pause : Unit ->{Async} Unit
 # foreign pause from "./pause.mjs" "pause"
 #   arity 0
 #
@@ -274,12 +274,12 @@ let waits body =
 `control`. Такой эффект может поймать и handler внутри ветки.
 
 ```flick
-# pause : Unit ->{Async;} Unit
+# pause : Unit ->{Async} Unit
 # foreign pause from "./pause.mjs" "pause"
 #   arity 0
 #
 effect Ask =
-  ask : Unit ->{Async;} Int
+  ask : Unit ->{Async} Int
 
 waits : (Unit ->{Ask, Async; none} Int) ->{Async; none} Int
 let waits body =

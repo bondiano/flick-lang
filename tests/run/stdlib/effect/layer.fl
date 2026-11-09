@@ -22,7 +22,7 @@ let greeter_live =
       { greet = fun name -> p ++ ", " ++ name }
     })
 
-greet : String ->{Greeter;} Unit
+greet : String ->{Greeter} Unit
 let greet name = Platform.stdout_line (Greeter.greet name)
 
 failing : Layer none {BootError} {Greeter}
@@ -159,7 +159,7 @@ let shared () =
   let memoized = Layer.from_build_memo (fun m -> Layer.build_with_memo_map m config_layer)
   provide memoized { Platform.stdout_line ("from_build_memo " ++ Config.prefix ()) }
 
-finalizers : Unit ->{Async;} Unit
+finalizers : Unit ->{Async} Unit
 let finalizers () =
   scope {
     Scope.add_finalizer (task { Platform.stdout_line "finalizer ran" })

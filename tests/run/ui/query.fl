@@ -10,7 +10,7 @@ setup : Unit ->{} Unit
 foreign setup from "./dom.mjs" "setup"
   arity 0
 
-settle : Unit ->{Async;} Unit
+settle : Unit ->{Async} Unit
 foreign settle from "./dom.mjs" "settle"
   arity 0
 
@@ -37,7 +37,7 @@ let both = Atom.query ["orders", "stock"] (task { run_of "both" })
 latest : Atom.Atom (Atom.Async Float none)
 let latest = Atom.query_stream ["stock"] (Stream.from_list [7, 8])
 
-shown : Atom.Atom (Atom.Async Float none) ->{Atom.Read;} String
+shown : Atom.Atom (Atom.Async Float none) ->{Atom.Read} String
 let shown atom =
   match Atom.get atom with
   | Atom.Loaded n -> show n
@@ -65,7 +65,7 @@ placed : Bool ->{Atom.Write; Refused} Unit
 let placed = Atom.mutation ["orders"] place
 
 /// A delivery changes both: a query of both keys runs once.
-delivered : Unit ->{Atom.Write;} Unit
+delivered : Unit ->{Atom.Write} Unit
 let delivered = Atom.mutation ["orders", "stock"] (fun () -> ())
 
 report : Failure e ->{} Unit

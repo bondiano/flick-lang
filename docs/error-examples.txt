@@ -6,8 +6,8 @@
 #
 # CODE  FINGERPRINT  REASON
 D008 4b17a922356da738 needs the Codec package and a schema witness that a single block cannot declare
-E011 62a0dfd3e2ad5685 needs the Server framework: Server.handler, Session and a Scope the block does not provide
-F002 e7d3330cdd1551c2 the std Fiber API's Handle and Detached, which the standalone checker does not load
+E011 74773a354b0ce473 needs the Server framework: Server.handler, Session and a Scope the block does not provide
+F002 a00a09867f9617c3 the std Fiber API's Handle and Detached, which the standalone checker does not load
 F005 947475cd77103d3f the binding is generated into a module and its reviewed fingerprint is checked against the package
 F007 664ea8462abc13d6 the binding is generated into a module and its reviewed fingerprint is checked against the package
 P026 c4aaab59da9e1bd0 the entry module and App.run belong to a project, not to a block

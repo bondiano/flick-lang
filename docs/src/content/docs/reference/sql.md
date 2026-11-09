@@ -182,6 +182,49 @@ only rows where the condition is true. A comparison's sides have the same
 Flick type: comparing a `UserId` with a `Date` is a type error even when
 both are numbers in SQL.
 
+## Reusing templates
+
+`exists $(template)` and `is_in e $(template)` use a template built elsewhere
+as an uncorrelated subquery. `$template` also works for a name. The template
+must have no named parameters (`Sql.Template Pg {} row`); capture values in a
+function instead. `is_in` requires exactly one result column with the same
+type as `e`, optionally nullable (`std/Q010` otherwise). `exists` accepts any
+result row.
+
+```flick
+# import Sql exposing (Pg)
+# sql table Users "users" {
+#   id : bigint primary key generated always as BigInt
+#   name : text not null as String
+# }
+matching : String -> Sql.Template Pg {} { id : BigInt }
+let matching name = sql {
+  from u in Users
+  where u.name == $name
+  select u.id
+}
+
+page : String -> Sql.Template Pg { limit : Int } { id : BigInt }
+let page name = sql p {
+  from u in Users
+  where is_in u.id $(matching name)
+  order_by u.id
+  limit p.limit
+  select u.id
+}
+
+total : String -> Sql.Template Pg {} { count : BigInt }
+let total name = sql {
+  from u in Users
+  where is_in u.id $(matching name)
+  select { count = count_all }
+}
+```
+
+Composition happens when the outer template is built, without I/O. Captured
+values keep their codecs and placeholders are renumbered; values never become
+SQL text. The same template can be reused in several queries or nested again.
+
 ## Nullability
 
 Every expression knows whether it may be `NULL`: a nullable column, a column

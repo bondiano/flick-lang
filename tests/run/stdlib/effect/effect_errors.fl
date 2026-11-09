@@ -141,7 +141,7 @@ let finalizers () =
   }
   Platform.stdout_line ("finalizers: " ++ show (Ref.get seen))
 
-interruption : Unit ->{Async;} Unit
+interruption : Unit ->{Async} Unit
 let interruption () =
   Platform.stdout_line ("interrupt: " ++ ended (task { Effect.interrupt () }))
   let steps = Ref.make []

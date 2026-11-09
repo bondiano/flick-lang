@@ -11,10 +11,10 @@ let impl = App.Time.fixed 3
 layer : Layer none none {App.Time.Clock}
 let layer = Layer.succeed App.Time.Clock impl
 
-now : Unit ->{App.Time.Clock;} Float
+now : Unit ->{App.Time.Clock} Float
 let now () = App.Time.Clock.now ()
 
-tick : Unit ->{App.Time.Clock;} App.Time.Tick
+tick : Unit ->{App.Time.Clock} App.Time.Tick
 let tick () = App.Time.Tick (now ())
 
 seconds : App.Time.Tick -> Float

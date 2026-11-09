@@ -1,7 +1,7 @@
 // A browser client of one procedure: it must keep no Node server.
 module App.Main exposing (main)
 
-greet : Rpc.Rpc "greet" (String ->{r;} String)
+greet : Rpc.Rpc "greet" (String ->{r} String)
 let greet =
   Rpc.make (Record.label : Record.Label "greet")
   |> Rpc.with_payload (Codec.json Schema.string)

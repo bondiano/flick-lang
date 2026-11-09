@@ -76,7 +76,7 @@ use comments::Comments;
 use foralls::drop_redundant_foralls;
 pub use plugins::PluginOf;
 use printer::{Printer, nodes};
-use program::{holds_set, program};
+use program::program;
 
 /// The line width the layout aims at.
 pub const WIDTH: usize = 100;
@@ -228,7 +228,7 @@ fn verbatim(declaration: &Node, text: &str) -> String {
 }
 
 /// Drops empty rows of an arrow: `->{none; E}` becomes `->{; E}`,
-/// `->{none; none}` becomes `->{}`, and `->{...S;}` becomes `->{...S}`; a row
+/// `->{none; none}` becomes `->{}`, and `->{S;}` becomes `->{S}`; a row
 /// holding a comment is kept.
 fn drop_empty_rows(node: &mut Node) {
     if node.kind == K::EffectAnnot {
@@ -238,8 +238,7 @@ fn drop_empty_rows(node: &mut Node) {
         if rows.len() == 2 && rows.iter().all(|r| empty(r)) {
             node.children
                 .retain(|c| matches!(c, Element::Token(t) if t.kind != K::Semi));
-        } else if let [services, errors] = rows[..]
-            && holds_set(services.nodes().map(|n| n.kind))
+        } else if let [_, errors] = rows[..]
             && blank(errors)
         {
             let mut rows = 0;

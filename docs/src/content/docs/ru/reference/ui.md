@@ -1,6 +1,6 @@
 ---
 title: "Пользовательские интерфейсы"
-source_hash: b144214a7516d9d0
+source_hash: 5ca68cf8980a40d2
 ---
 
 `Ui` описывает пользовательский интерфейс и обработчики его событий
@@ -17,7 +17,7 @@ source_hash: b144214a7516d9d0
 type alias SaveButtonProps c = {
   label : String;
   disabled : Bool;
-  on_save : (Unit ->{Atom.Write;} Unit)^c;
+  on_save : (Unit ->{Atom.Write} Unit)^c;
 }
 
 save_button : SaveButtonProps c -> Ui^c
@@ -37,7 +37,7 @@ let save_button props = ui {
 
 Два квалификатора `^c` связывают захваты `on_save` с захватами
 результирующего `Ui`. Без квалификатора тип функции не допускает регионов.
-Поэтому при `on_save : Unit ->{Atom.Write;} Unit` нельзя передать функцию обратного вызова, которая
+Поэтому при `on_save : Unit ->{Atom.Write} Unit` нельзя передать функцию обратного вызова, которая
 использует `File s` из окружающей `scope`: возникает `FLICK-G001`,
 даже если `Ui` никогда не покидает эту область. Функция обратного вызова,
 которой нужен сервис, например сохранение через `Users`, предоставляет его
@@ -338,7 +338,7 @@ component search () =
 (`FLICK-G001`), а реестр забывает атомы экземпляра при его unmount. Функции
 атомов заимствуют то, что принимают, `(Atom.Writable a)^d`, поэтому читают
 и пишут такой атом. Функция, которая создаёт состояние экземпляра,
-говорит об этом в сигнатуре, `Float ->{Setup s;} (Atom.Writable Float)^{s}`,
+говорит об этом в сигнатуре, `Float ->{Setup s} (Atom.Writable Float)^{s}`,
 и вызывается из setup; аннотация тоже называет захват,
 `(Ui.Element Ui.Input)^c`. Слово `component` остаётся именем во всех других
 местах.
@@ -550,7 +550,7 @@ let main () =
 # let count = Atom.make 0
 # component counter_view () = ui { text (Atom.value count |> show) }
 #
-request : Float ->{Async;} String
+request : Float ->{Async} String
 let request n =
   provide Atom.layer {
     Atom.set count n
@@ -617,7 +617,7 @@ let draft = Atom.serializable_family (Codec.json Schema.string) (fun _ -> Atom.m
 # let count = Atom.serializable (Codec.json Schema.number) (Atom.make 0)
 # component counter_view () = ui { text (Atom.value count |> show) }
 #
-page : Float ->{Async;} String
+page : Float ->{Async} String
 let page n =
   provide Atom.layer {
     Atom.set count n

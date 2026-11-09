@@ -150,13 +150,20 @@ fn rows_merge_and_omit_sets() {
          (NameType r))) ; (Row (RowSpread ... (NameType F)) , (RowOmit - (NameType G))) }) \
          (NameType H)))"
     );
-    // a row that merges or omits a set needs no `;`, a plain one still does
+    // no row needs `;` before omitted errors
     assert_eq!(
         sexp("f : A ->{...B} C"),
         "(Signature f : (ArrowType (NameType A) -> (EffectAnnot { (Row (RowSpread ... (NameType B))) \
          }) (NameType C)))"
     );
-    assert!(!errors("f : A ->{B} C").is_empty());
+    assert_eq!(
+        sexp("f : A ->{B} C"),
+        "(Signature f : (ArrowType (NameType A) -> (EffectAnnot { (Row (NameType B)) }) (NameType C)))"
+    );
+    for row in ["B, D", "r", "B | r", "none", "...B, -D"] {
+        assert!(errors(&format!("f : A ->{{{row}}} C")).is_empty());
+    }
+    assert!(!errors("f : A ->{B,} C").is_empty());
     assert_eq!(
         sexp("type alias O = {...A, B; C}"),
         "(TypeDecl type alias O = (RowType { (RowSpread ... (NameType A)) , (NameType B) ; (Row \

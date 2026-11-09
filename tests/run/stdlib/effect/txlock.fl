@@ -6,7 +6,7 @@ module App.Main exposing (main)
 ms : Float -> Duration.Duration
 let ms n = Result.with_default Duration.zero (Duration.millis n)
 
-counts : TxReentrantLock.TxReentrantLock ->{Tx.Transaction;} (Int, Int, Bool, Bool, Bool)
+counts : TxReentrantLock.TxReentrantLock ->{Tx.Transaction} (Int, Int, Bool, Bool, Bool)
 let counts lock = (
   TxReentrantLock.read_locks lock,
   TxReentrantLock.write_locks lock,

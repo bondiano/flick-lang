@@ -45,8 +45,76 @@ type rawPiece struct {
 	value Value
 }
 
-func SqlTable(table Value) Value       { return table }
-func SqlTemplate(template Value) Value { return template }
+func SqlTable(table Value) Value { return table }
+
+// sqlPlaceholder is a placeholder `$n`, or a quoted identifier, which may
+// hold `$` itself.
+var sqlPlaceholder = regexp.MustCompile(`"(?:[^"]|"")*"|\$(\d+)`)
+
+func renumberSql(text string, slot func(n int) string) string {
+	return sqlPlaceholder.ReplaceAllStringFunc(text, func(m string) string {
+		if m[0] == '"' {
+			return m
+		}
+		n, _ := strconv.Atoi(m[1:])
+		return slot(n)
+	})
+}
+
+// SqlTemplate is what a `sql { … }` block compiles to. A template of the
+// program used as a subquery (`sql_kind` "template") is spliced in its
+// place: its text with its placeholders after those before it, its tables
+// and values appended.
+func SqlTemplate(template Value) Value {
+	t := record(template)
+	spliced := false
+	for _, pv := range List(t.Get("params")) {
+		p := record(pv)
+		spliced = spliced || (p.index("sql_kind") >= 0 && p.Get("sql_kind") == "template")
+	}
+	if !spliced {
+		return template
+	}
+	tables := append([]Value{}, List(t.Get("tables"))...)
+	var params []Value
+	var texts []string
+	for _, pv := range List(t.Get("params")) {
+		p := record(pv)
+		if p.index("sql_kind") < 0 || p.Get("sql_kind") != "template" {
+			params = append(params, pv)
+			texts = append(texts, "$"+strconv.Itoa(len(params)))
+			continue
+		}
+		sub := record(p.Get("value"))
+		base, shift := len(params), len(tables)
+		tables = append(tables, List(sub.Get("tables"))...)
+		for _, qv := range List(sub.Get("params")) {
+			q := record(qv)
+			if q.index("table") >= 0 {
+				switch at := q.Get("table").(type) {
+				case int32:
+					qv = q.set("table", at+int32(shift))
+				case float64:
+					qv = q.set("table", at+float64(shift))
+				}
+			}
+			params = append(params, qv)
+		}
+		texts = append(texts, renumberSql(sub.Get("text").(string), func(n int) string {
+			return "$" + strconv.Itoa(base+n)
+		}))
+	}
+	text := renumberSql(t.Get("text").(string), func(n int) string {
+		if n-1 < len(texts) {
+			return texts[n-1]
+		}
+		return "$" + strconv.Itoa(n)
+	})
+	if params == nil {
+		params = []Value{}
+	}
+	return t.set("text", text).set("tables", tables).set("params", params)
+}
 
 // SqlColumn is `Sql.Derive.column name kind nullable codec`: a column as a
 // table holds it.

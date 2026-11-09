@@ -30,7 +30,7 @@ href : String ->{} String
 foreign href from "./navigate.mjs" "href"
   arity 1
 
-settle : Unit ->{Async;} Unit
+settle : Unit ->{Async} Unit
 foreign settle from "./navigate.mjs" "settle"
   arity 0
 

@@ -45,7 +45,7 @@ let fail_with entry exit =
   | Some failure -> Request.fail_cause failure entry
   | None -> ()
 
-run_all : RequestResolver Query {NotFound} String -> List Float ->{Async;} String
+run_all : RequestResolver Query {NotFound} String -> List Float ->{Async} String
 let run_all resolver ids =
   let results = parallel_results (List.map (fun id -> task { Request.run resolver (ask id) }) ids)
   show (List.map describe results)

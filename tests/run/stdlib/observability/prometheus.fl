@@ -2,7 +2,7 @@
 // server answers, and named with a prefix or renamed by `format_with`.
 module App.Main exposing (main)
 
-scrape : String ->{Async;} String
+scrape : String ->{Async} String
 foreign scrape from "./scrape.mjs" "scrape"
   arity 1
 

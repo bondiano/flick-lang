@@ -21,7 +21,7 @@ type alias RunOptions = {
 }
 
 /// An empty map owned by the innermost `scope` (or the one of region `s`).
-make : Unit ->{Scope s;} FiberMap s k e a
+make : Unit ->{Scope s} FiberMap s k e a
 foreign effect make from "@flick-lang/effect-ts/effect/FiberMap" "flickMake"
   arity 0
   reviewed "effect@4.1.2 sha256:3062dfe43eb79c37"
@@ -30,14 +30,14 @@ foreign effect make from "@flick-lang/effect-ts/effect/FiberMap" "flickMake"
 /// map's region.
 run :
   Fiber.Outlives c s =>
-  RunOptions -> k -> (Eff {Scope s | r} e a)^c -> FiberMap s k e a ->{r;} Fiber.Fiber e a
+  RunOptions -> k -> (Eff {Scope s | r} e a)^c -> FiberMap s k e a ->{r} Fiber.Fiber e a
 foreign effect run from "@flick-lang/effect-ts/effect/FiberMap" "flickRun"
   arity 1
   retention owner
   reviewed "effect@4.1.2 sha256:19752d4c68444c31"
 
 /// Keeps a child spawned elsewhere as the one of `key`.
-set : SetOptions -> k -> Fiber.Fiber e a -> FiberMap s k e a ->{Async;} Unit
+set : SetOptions -> k -> Fiber.Fiber e a -> FiberMap s k e a ->{Async} Unit
 foreign effect set from "@flick-lang/effect-ts/effect/FiberMap" "flickSet"
   arity 1
   retention call
@@ -58,14 +58,14 @@ foreign effect has from "@flick-lang/effect-ts/effect/FiberMap" "has"
   reviewed "effect@4.1.2 sha256:f1062c1c871ae65f"
 
 /// Interrupts the child of `key` and removes it.
-remove : k -> FiberMap s k e a ->{Async;} Unit
+remove : k -> FiberMap s k e a ->{Async} Unit
 foreign effect remove from "@flick-lang/effect-ts/effect/FiberMap" "remove"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:1f708524facb6472"
 
 /// Interrupts every child and empties the map.
-clear : FiberMap s k e a ->{Async;} Unit
+clear : FiberMap s k e a ->{Async} Unit
 foreign effect clear from "@flick-lang/effect-ts/effect/FiberMap" "clear"
   retention call
   reviewed "effect@4.1.2 sha256:8f198f7500242507"

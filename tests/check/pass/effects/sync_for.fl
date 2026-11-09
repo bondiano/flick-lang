@@ -5,7 +5,7 @@ module App.SyncFor exposing (..)
 count : Atom.Writable Float
 let count = Atom.make 0
 
-offsets : Unit ->{Atom.Read;} Float
+offsets : Unit ->{Atom.Read} Float
 let offsets () =
   Seq.fold
     (fun a b -> a + b)
@@ -15,5 +15,5 @@ let offsets () =
       if n > Atom.value count
     } yield n + Atom.value count)
 
-listed : Unit ->{Atom.Read, Atom.Write;} List Float
+listed : Unit ->{Atom.Read, Atom.Write} List Float
 let listed () = [for n <- [1, 2] yield n + Atom.value count]

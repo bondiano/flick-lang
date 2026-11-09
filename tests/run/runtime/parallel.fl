@@ -9,7 +9,7 @@ type error Oops = Oops String
 say : String ->{} Unit
 let say line = Platform.stdout_line line
 
-nap : Float ->{Async;} Unit
+nap : Float ->{Async} Unit
 let nap millis =
   match Duration.millis millis with
   | Ok d -> Effect.sleep d
@@ -47,7 +47,7 @@ quiet : Failure e ->{} Unit
 let quiet _ = ()
 
 /// The sibling of a failing branch ends before the failure is caught.
-fail_fast : Unit ->{Async;} String
+fail_fast : Unit ->{Async} String
 let fail_fast () =
   let started : Deferred.Deferred none Unit = Deferred.make ()
   try

@@ -36,14 +36,14 @@ foreign effect sliding from "@flick-lang/effect-ts/effect/TxQueue" "sliding"
 
 /// Adds the element, waiting while a bounded queue is full; false when
 /// a dropping queue dropped it or the queue is closed.
-offer : a -> TxQueue a e ->{Async, Tx.Transaction;} Bool
+offer : a -> TxQueue a e ->{Async, Tx.Transaction} Bool
 foreign effect offer from "@flick-lang/effect-ts/effect/TxQueue" "offer"
   arity 1
   reviewed "effect@4.1.2 sha256:b9d8655fe9948f8b"
 
 /// Adds the elements, waiting while a bounded queue is full; the ones a
 /// dropping or closed queue did not take.
-offer_all : List a -> TxQueue a e ->{Async, Tx.Transaction;} List a
+offer_all : List a -> TxQueue a e ->{Async, Tx.Transaction} List a
 foreign effect offer_all from "@flick-lang/effect-ts/effect/TxQueue" "offerAll"
   arity 1
   reviewed "effect@4.1.2 sha256:cb34470fdfaf6365"
@@ -54,7 +54,7 @@ foreign effect take from "@flick-lang/effect-ts/effect/TxQueue" "take"
   reviewed "effect@4.1.2 sha256:98a03d7d64e0d279"
 
 /// Removes the oldest element, if there is one.
-poll : TxQueue a e ->{Tx.Transaction;} Option a
+poll : TxQueue a e ->{Tx.Transaction} Option a
 foreign effect poll from "@flick-lang/effect-ts/effect/TxQueue" "poll"
   reviewed "effect@4.1.2 sha256:d90ea7655e719948"
 
@@ -81,40 +81,40 @@ foreign effect peek from "@flick-lang/effect-ts/effect/TxQueue" "peek"
   reviewed "effect@4.1.2 sha256:98e107efe3222e19"
 
 /// The number of elements.
-size : TxQueue a e ->{Tx.Transaction;} Int
+size : TxQueue a e ->{Tx.Transaction} Int
 foreign effect size from "@flick-lang/effect-ts/effect/TxQueue" "size"
   reviewed "effect@4.1.2 sha256:4f107de686c5ad9d"
 
 /// Whether it has no elements.
-is_empty : TxQueue a e ->{Tx.Transaction;} Bool
+is_empty : TxQueue a e ->{Tx.Transaction} Bool
 foreign effect is_empty from "@flick-lang/effect-ts/effect/TxQueue" "isEmpty"
   reviewed "effect@4.1.2 sha256:b190f20bea177c2f"
 
 /// Whether it has an element.
-is_non_empty : TxQueue a e ->{Tx.Transaction;} Bool
+is_non_empty : TxQueue a e ->{Tx.Transaction} Bool
 foreign effect is_non_empty from "@flick-lang/effect-ts/effect/TxQueue" "isNonEmpty"
   reviewed "effect@4.1.2 sha256:717c83bfcde17378"
 
 /// Whether it holds as many elements as its capacity.
-is_full : TxQueue a e ->{Tx.Transaction;} Bool
+is_full : TxQueue a e ->{Tx.Transaction} Bool
 foreign effect is_full from "@flick-lang/effect-ts/effect/TxQueue" "isFull"
   reviewed "effect@4.1.2 sha256:555f90c4fb10ad52"
 
 /// Closes it: takes drain the elements left, then interrupt the fiber;
 /// false when it was already closed.
-interrupt : TxQueue a e ->{Tx.Transaction;} Bool
+interrupt : TxQueue a e ->{Tx.Transaction} Bool
 foreign effect interrupt from "@flick-lang/effect-ts/effect/TxQueue" "interrupt"
   reviewed "effect@4.1.2 sha256:ebeb44f510cb2650"
 
 /// Closes it with the error, dropping its elements: takes fail with it;
 /// false when it was already closed.
-fail : Errors e -> TxQueue a e ->{Tx.Transaction;} Bool
+fail : Errors e -> TxQueue a e ->{Tx.Transaction} Bool
 foreign effect fail from "@flick-lang/effect-ts/effect/TxQueue" "fail"
   arity 1
   reviewed "effect@4.1.2 sha256:be9eddb116ae9a04"
 
 /// Closes it with the whole failure, as `fail` does with one error.
-fail_cause : Failure e -> TxQueue a e ->{Tx.Transaction;} Bool
+fail_cause : Failure e -> TxQueue a e ->{Tx.Transaction} Bool
 foreign effect fail_cause from "@flick-lang/effect-ts/effect/TxQueue" "flickFailCause"
   reviewed "effect@4.1.2 sha256:c8c5d4202b14fc45"
 
@@ -124,31 +124,31 @@ foreign effect clear from "@flick-lang/effect-ts/effect/TxQueue" "clear"
   reviewed "effect@4.1.2 sha256:93b6c84d6c60278b"
 
 /// Drops its elements and closes it, as `interrupt` does.
-shutdown : TxQueue a e ->{Tx.Transaction;} Bool
+shutdown : TxQueue a e ->{Tx.Transaction} Bool
 foreign effect shutdown from "@flick-lang/effect-ts/effect/TxQueue" "shutdown"
   reviewed "effect@4.1.2 sha256:0d423aa6b77c0e53"
 
 /// Whether it takes offers.
-is_open : TxQueue a e ->{Tx.Transaction;} Bool
+is_open : TxQueue a e ->{Tx.Transaction} Bool
 foreign effect is_open from "@flick-lang/effect-ts/effect/TxQueue" "isOpen"
   reviewed "effect@4.1.2 sha256:777f98980b37208c"
 
 /// Whether it is closed but still holds elements to take.
-is_closing : TxQueue a e ->{Tx.Transaction;} Bool
+is_closing : TxQueue a e ->{Tx.Transaction} Bool
 foreign effect is_closing from "@flick-lang/effect-ts/effect/TxQueue" "isClosing"
   reviewed "effect@4.1.2 sha256:403ae1e5d97d6993"
 
 /// Whether it is closed and empty.
-is_done : TxQueue a e ->{Tx.Transaction;} Bool
+is_done : TxQueue a e ->{Tx.Transaction} Bool
 foreign effect is_done from "@flick-lang/effect-ts/effect/TxQueue" "isDone"
   reviewed "effect@4.1.2 sha256:32c14ea43cdd6f73"
 
 /// Whether it is closed and empty, as `is_done`.
-is_shutdown : TxQueue a e ->{Tx.Transaction;} Bool
+is_shutdown : TxQueue a e ->{Tx.Transaction} Bool
 foreign effect is_shutdown from "@flick-lang/effect-ts/effect/TxQueue" "isShutdown"
   reviewed "effect@4.1.2 sha256:783e632450da1d88"
 
 /// Retries the transaction until the queue is done.
-await_completion : TxQueue a e ->{Tx.Transaction;} Unit
+await_completion : TxQueue a e ->{Tx.Transaction} Unit
 foreign effect await_completion from "@flick-lang/effect-ts/effect/TxQueue" "awaitCompletion"
   reviewed "effect@4.1.2 sha256:1b92f287244ad08c"

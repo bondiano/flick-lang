@@ -16,16 +16,16 @@ type alias UserPath = { id : String }
 type error NotFound = NotFound { id : String }
   deriving Schema
 
-post_raw : String -> String ->{Async;} String
+post_raw : String -> String ->{Async} String
 foreign post_raw from "./raw.mjs" "post"
 
-get_raw : String ->{Async;} String
+get_raw : String ->{Async} String
 foreign get_raw from "./raw.mjs" "get"
 
-head_raw : String ->{Async;} String
+head_raw : String ->{Async} String
 foreign head_raw from "./raw.mjs" "head"
 
-text_raw : String ->{Async;} String
+text_raw : String ->{Async} String
 foreign text_raw from "./raw.mjs" "text"
 
 user_path : PureCodec Json UserPath
@@ -39,7 +39,7 @@ let get_user =
   |> HttpApi.with_success 200 (Codec.json User.schema)
   |> HttpApi.with_errors (HttpApi.errors |> HttpApi.error_case 404 (Codec.json NotFound.schema))
 
-create_user : HttpApi.Endpoint "create_user" (HttpApi.Request Unit Unit Unit NewUser ->{r;} User)
+create_user : HttpApi.Endpoint "create_user" (HttpApi.Request Unit Unit Unit NewUser ->{r} User)
 let create_user =
   HttpApi.endpoint HttpApi.Post "/users" (Record.label : Record.Label "create_user")
   |> HttpApi.with_payload (Codec.json NewUser.schema)
@@ -47,12 +47,12 @@ let create_user =
   |> HttpApi.describe "Adds a user"
 
 type alias Handlers r = {
-  create_user : HttpApi.Request Unit Unit Unit NewUser ->{r;} User;
+  create_user : HttpApi.Request Unit Unit Unit NewUser ->{r} User;
   get_user : HttpApi.Request UserPath Unit Unit Unit ->{r; NotFound} User;
   me : HttpApi.Request Unit Unit Auth Unit ->{r; HttpApi.HttpError} String;
-  health : HttpApi.Request Unit Unit Unit Unit ->{r;} Unit;
-  echo : HttpApi.Request Unit Unit Unit String ->{r;} String;
-  login : HttpApi.Request Unit Unit Unit NewUser ->{r;} String;
+  health : HttpApi.Request Unit Unit Unit Unit ->{r} Unit;
+  echo : HttpApi.Request Unit Unit Unit String ->{r} String;
+  login : HttpApi.Request Unit Unit Unit NewUser ->{r} String;
 }
 
 users : HttpApi.Group "users" r (Handlers r)
@@ -99,31 +99,31 @@ let me =
   )
   |> HttpApi.deprecate
 
-echo_text : HttpApi.Endpoint "echo" (HttpApi.Request Unit Unit Unit String ->{r;} String)
+echo_text : HttpApi.Endpoint "echo" (HttpApi.Request Unit Unit Unit String ->{r} String)
 let echo_text =
   HttpApi.endpoint HttpApi.Post "/echo" (Record.label : Record.Label "echo")
   |> HttpApi.with_text_payload
   |> HttpApi.with_text_success 200
 
-login : HttpApi.Endpoint "login" (HttpApi.Request Unit Unit Unit NewUser ->{r;} String)
+login : HttpApi.Endpoint "login" (HttpApi.Request Unit Unit Unit NewUser ->{r} String)
 let login =
   HttpApi.endpoint HttpApi.Post "/login" (Record.label : Record.Label "login")
   |> HttpApi.with_form_payload (Codec.json NewUser.schema)
   |> HttpApi.with_text_success 200
 
-health : HttpApi.Endpoint "health" (HttpApi.Request Unit Unit Unit Unit ->{r;} Unit)
+health : HttpApi.Endpoint "health" (HttpApi.Request Unit Unit Unit Unit ->{r} Unit)
 let health =
   HttpApi.endpoint HttpApi.Head "/health" (Record.label : Record.Label "health") |> HttpApi.hide
 
 type alias Upload = { name : String; data : Unknown }
   deriving Schema
 
-upload : HttpApi.Endpoint "upload" (HttpApi.Request Unit Unit Unit Upload ->{r;} Unit)
+upload : HttpApi.Endpoint "upload" (HttpApi.Request Unit Unit Unit Upload ->{r} Unit)
 let upload =
   HttpApi.endpoint HttpApi.Post "/files" (Record.label : Record.Label "upload")
   |> HttpApi.with_payload (Codec.json Upload.schema)
 
-files : HttpApi.Api r { files : { upload : HttpApi.Request Unit Unit Unit Upload ->{r;} Unit } }
+files : HttpApi.Api r { files : { upload : HttpApi.Request Unit Unit Unit Upload ->{r} Unit } }
 let files =
   HttpApi.api "Files"
   |> HttpApi.add_group (HttpApi.group (Record.label : Record.Label "files") |> HttpApi.add upload)

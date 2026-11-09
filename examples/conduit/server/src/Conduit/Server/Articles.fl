@@ -44,14 +44,11 @@ type alias Fields = { title : String; description : String; body : String }
 everything : Filter
 let everything = { slug = None; tag = None; author = None; favorited = None; feed = None }
 
-/// A page of the articles `f` keeps, newest first, as `reader` sees them.
-rows : Option BigInt -> Filter -> Int -> Int -> Sql.Template Pg {} Row
-let rows reader f limit offset = sql {
+/// The ids of the articles `f` keeps: what `rows` lists and `total` counts.
+matching : Filter -> Sql.Template Pg {} { id : BigInt }
+let matching f = sql {
   from a in Articles
   join u in Users on u.id == a.author_id
-  left_join fav in Favorites on fav.article_id == a.id
-  left_join mine in Favorites on mine.article_id == a.id && mine.user_id == $reader
-  left_join fol in Follows on fol.followed_id == u.id && fol.follower_id == $reader
   where (is_null $(f.slug) || a.slug == $(f.slug))
     && (is_null $(f.author) || u.username == $(f.author))
     && (is_null $(f.tag)
@@ -80,6 +77,18 @@ let rows reader f limit offset = sql {
           where fo.follower_id == $(f.feed)
           select fo.followed_id
         }))
+  select a.id
+}
+
+/// A page of the articles `f` keeps, newest first, as `reader` sees them.
+rows : Option BigInt -> Filter -> Int -> Int -> Sql.Template Pg {} Row
+let rows reader f limit offset = sql {
+  from a in Articles
+  join u in Users on u.id == a.author_id
+  left_join fav in Favorites on fav.article_id == a.id
+  left_join mine in Favorites on mine.article_id == a.id && mine.user_id == $reader
+  left_join fol in Follows on fol.followed_id == u.id && fol.follower_id == $reader
+  where is_in a.id $(matching f)
   group_by a.id, a.slug, a.title, a.description, a.body, a.created_at, a.updated_at, a.author_id, u.username, u.bio, u.image
   order_by desc a.created_at, desc a.id
   limit $limit
@@ -106,50 +115,23 @@ let rows reader f limit offset = sql {
 total : Filter -> Sql.Template Pg {} { n : BigInt }
 let total f = sql {
   from a in Articles
-  join u in Users on u.id == a.author_id
-  where (is_null $(f.author) || u.username == $(f.author))
-    && (is_null $(f.tag)
-      || is_in
-        a.id
-        (sql {
-          from at in ArticleTags
-          join t in Tags on t.id == at.tag_id
-          where t.name == $(f.tag)
-          select at.article_id
-        }))
-    && (is_null $(f.favorited)
-      || is_in
-        a.id
-        (sql {
-          from fv in Favorites
-          join fu in Users on fu.id == fv.user_id
-          where fu.username == $(f.favorited)
-          select fv.article_id
-        }))
-    && (is_null $(f.feed)
-      || is_in
-        a.author_id
-        (sql {
-          from fo in Follows
-          where fo.follower_id == $(f.feed)
-          select fo.followed_id
-        }))
+  where is_in a.id $(matching f)
   select { n = count_all }
 }
 
 /// A page of the articles the filter keeps, newest first, and their number.
-page : Option BigInt -> Filter -> { limit : Int; offset : Int } ->{Async, Database;} (List Row, Int)
+page : Option BigInt -> Filter -> { limit : Int; offset : Int } ->{Async, Database} (List Row, Int)
 let page reader f at =
   let found = Db.rows (rows reader f at.limit at.offset)
   let n = Option.map (fun row -> row.n) (Db.first (total f)) |> Option.with_default 0n
   (found, Int.truncate (BigInt.to_number n))
 
 /// The article of `slug`, as `reader` sees it.
-find : Option BigInt -> String ->{Async, Database;} Option Row
+find : Option BigInt -> String ->{Async, Database} Option Row
 let find reader slug = Db.first (rows reader { everything with slug = Some slug } 1 0)
 
 /// The tags of an article, in the order its author gave them.
-tags_of : BigInt ->{Async, Database;} List String
+tags_of : BigInt ->{Async, Database} List String
 let tags_of id =
   List.map
     (fun row -> row.name)
@@ -163,7 +145,7 @@ let tags_of id =
       }))
 
 /// The tags in use, the most used first.
-all_tags : Unit ->{Async, Database;} List String
+all_tags : Unit ->{Async, Database} List String
 let all_tags () =
   List.map
     (fun row -> row.name)
@@ -177,7 +159,7 @@ let all_tags () =
       }))
 
 /// The id of the tag `name`, made if there is none.
-tag_id : String ->{Async, Database;} BigInt
+tag_id : String ->{Async, Database} BigInt
 let tag_id name =
   let existing =
     Db.first
@@ -197,7 +179,7 @@ let tag_id name =
       })
 
 /// Replaces the tags of the article, in their order.
-set_tags : BigInt -> List String ->{Async, Database;} Unit
+set_tags : BigInt -> List String ->{Async, Database} Unit
 let set_tags article names =
   Db.run
     (sql {
@@ -216,7 +198,7 @@ let set_tags article names =
     (List.map_indexed (fun i name -> (i, name)) names)
 
 /// Stores a new article: its id.
-insert : BigInt -> String -> Fields -> String ->{Async, Database;} BigInt
+insert : BigInt -> String -> Fields -> String ->{Async, Database} BigInt
 let insert author slug fields now =
   Db.insert_id
     (sql {
@@ -234,7 +216,7 @@ let insert author slug fields now =
     })
 
 /// Stores the new fields of an article and when they changed.
-save : BigInt -> Fields -> String ->{Async, Database;} Unit
+save : BigInt -> Fields -> String ->{Async, Database} Unit
 let save id fields now =
   Db.run
     (sql {
@@ -249,7 +231,7 @@ let save id fields now =
     })
 
 /// Deletes an article, its tags, favorites and comments.
-delete : BigInt ->{Async, Database;} Unit
+delete : BigInt ->{Async, Database} Unit
 let delete id =
   Db.run
     (sql {
@@ -258,7 +240,7 @@ let delete id =
     })
 
 /// The user favors the article; twice is once.
-favorite : BigInt -> BigInt ->{Async, Database;} Unit
+favorite : BigInt -> BigInt ->{Async, Database} Unit
 let favorite user article =
   Db.run_once
     (sql {
@@ -267,7 +249,7 @@ let favorite user article =
     })
 
 /// The user takes their favorite back.
-unfavorite : BigInt -> BigInt ->{Async, Database;} Unit
+unfavorite : BigInt -> BigInt ->{Async, Database} Unit
 let unfavorite user article =
   Db.run
     (sql {

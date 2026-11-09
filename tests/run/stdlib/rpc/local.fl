@@ -14,7 +14,7 @@ marked : Unit ->{} String
 foreign marked from "./marks.mjs" "marked"
   arity 0
 
-sleep : Float ->{Async;} Unit
+sleep : Float ->{Async} Unit
 foreign sleep from "./marks.mjs" "sleep"
   arity 1
 
@@ -22,7 +22,7 @@ start : String ->{} Unit
 foreign start from "./marks.mjs" "start"
   arity 1
 
-started : String ->{Async;} Unit
+started : String ->{Async} Unit
 foreign started from "./marks.mjs" "started"
   arity 1
 
@@ -36,23 +36,23 @@ let double =
   |> Rpc.with_success (Codec.json Schema.number)
   |> Rpc.with_errors (Rpc.errors |> Rpc.error_case (Codec.json NotFound.schema))
 
-count_to : Rpc.Rpc "count_to" (Float ->{r;} Stream none none Float)
+count_to : Rpc.Rpc "count_to" (Float ->{r} Stream none none Float)
 let count_to =
   Rpc.make (Record.label : Record.Label "count_to")
   |> Rpc.with_payload (Codec.json Schema.number)
   |> Rpc.with_stream (Codec.json Schema.number)
 
-slow : Rpc.Rpc "slow" (Unit ->{r;} Unit)
+slow : Rpc.Rpc "slow" (Unit ->{r} Unit)
 let slow = Rpc.make (Record.label : Record.Label "slow")
 
-steady : Rpc.Rpc "steady" (Unit ->{r;} Unit)
+steady : Rpc.Rpc "steady" (Unit ->{r} Unit)
 let steady = Rpc.make (Record.label : Record.Label "steady") |> Rpc.uninterruptible
 
 type alias Handlers r = {
   double : Float ->{r; NotFound} Float;
-  count_to : Float ->{r;} Stream none none Float;
-  slow : Unit ->{r;} Unit;
-  steady : Unit ->{r;} Unit;
+  count_to : Float ->{r} Stream none none Float;
+  slow : Unit ->{r} Unit;
+  steady : Unit ->{r} Unit;
 }
 
 group : Rpc.Group r (Handlers r)

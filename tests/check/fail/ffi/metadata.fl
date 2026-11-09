@@ -38,11 +38,11 @@ foreign pure first from "./first.js" "first"
 //~ FLICK-F001 @36:1-37:11 `nullable` makes the result an `Option a`
 
 /// A callback that may hold a scope, kept for who knows how long.
-every : forall c. Float -> (Unit ->{} Unit)^c ->{} Unit
+every : Float -> (Unit ->{} Unit)^c ->{} Unit
 foreign every from global "setInterval"
 //~ FLICK-F002 @42:1-42:40 may hold the capabilities of a scope
 
-keep : forall s. File s ->{} Unit
+keep : File s ->{} Unit
 foreign keep from "./keep.js" "keep"
 //~ FLICK-F002 @46:1-46:37 `File s` may hold the capabilities of a scope
 
@@ -50,11 +50,11 @@ foreign keep from "./keep.js" "keep"
 later : (Unit ->{} String) ->{} Unit
 foreign later from "./later.js" "later"
 
-open_file : forall s. String ->{Scope s;} File s
+open_file : String ->{Scope s} File s
 foreign effect open_file from "./files.js" "open"
   retention call
 
-read_file : forall s. File s ->{} String
+read_file : File s ->{} String
 foreign read_file from "./files.js" "read"
   retention call
 

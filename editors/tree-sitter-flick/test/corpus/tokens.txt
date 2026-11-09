@@ -275,6 +275,27 @@ server fn ping n = n
   (identifier))
 
 ==================
+Service-only arrow
+==================
+
+f : Unit ->{Async, Log | r} Unit
+
+---
+
+(source_file
+  (identifier)
+  (operator)
+  (constructor)
+  (operator)
+  (braces
+    (constructor)
+    (operator)
+    (constructor)
+    (operator)
+    (identifier))
+  (constructor))
+
+==================
 Interpolation
 ==================
 

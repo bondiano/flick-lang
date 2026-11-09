@@ -12,7 +12,7 @@ import Http.ServerRequest exposing (ServerRequest)
 import Http.ServerResponse exposing (ServerResponse)
 import Load.Page
 
-id : Unit ->{RouteContext;} String
+id : Unit ->{RouteContext} String
 let id () = Option.with_default "none" (Http.Router.param "id")
 
 html_options : Http.ServerResponse.Options
@@ -30,7 +30,7 @@ let streamed_ui n view =
   }
   Stream.provide_ Reactivity.Atom.layer (Stream.unwrap made)
 
-render : ServerRequest ->{Async, RouteContext;} ServerResponse
+render : ServerRequest ->{Async, RouteContext} ServerResponse
 let render _ =
   let n = id ()
   Http.ServerResponse.html
@@ -39,16 +39,16 @@ let render _ =
       Ui.Server.render (Ui.render Load.Page.rows ())
     })
 
-streamed : ServerRequest ->{RouteContext;} ServerResponse
+streamed : ServerRequest ->{RouteContext} ServerResponse
 let streamed _ =
   Http.ServerResponse.stream_text (streamed_ui (id ()) (Ui.render Load.Page.rows ())) html_options
 
-collected : ServerRequest ->{RouteContext;} ServerResponse
+collected : ServerRequest ->{RouteContext} ServerResponse
 let collected _ =
   Http.ServerResponse.html
     (String.join "" (Stream.run_collect (streamed_ui (id ()) (Ui.render Load.Page.rows ()))))
 
-suspended : ServerRequest ->{RouteContext;} ServerResponse
+suspended : ServerRequest ->{RouteContext} ServerResponse
 let suspended _ =
   Http.ServerResponse.stream_text
     (streamed_ui (id ()) Load.Page.suspended
@@ -59,7 +59,7 @@ let suspended _ =
         (Stream.make ["<script type=\"module\" src=\"/client.js\"></script></body></html>"]))
     html_options
 
-html : ServerRequest ->{RouteContext;} ServerResponse
+html : ServerRequest ->{RouteContext} ServerResponse
 let html _ =
   let n = id ()
   Http.ServerResponse.html

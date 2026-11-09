@@ -6,7 +6,7 @@ module App.Main exposing (main)
 open_raw : String ->{} String
 foreign effect open_raw from "./resources.mjs" "open"
 
-slow_write : String -> Float ->{Async;} Unit
+slow_write : String -> Float ->{Async} Unit
 foreign slow_write from "./resources.mjs" "slowWrite"
 
 type error Oops = Oops String

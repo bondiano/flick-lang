@@ -155,8 +155,8 @@ fn drops_empty_arrow_rows() {
     "#);
 }
 
-/// A set in an arrow needs no `;` before an empty error slot. A plain row
-/// needs it, and in an alias body it makes a row of services.
+/// An arrow needs no `;` before an empty error slot. In an alias body it
+/// still separates services from errors.
 #[test]
 fn drops_the_semicolon_a_set_does_not_need() {
     let src = "f : A ->{...Env;} B\ng : A ->{...Env, -Log ; } B\nh : A ->{...Env; Boom} B\ni : A ->{...Env; none} B\nj : A ->{...Env; /* why */} B\nk : A ->{Log;} B\ntype alias Errs = {...UserErrors;}\n";
@@ -166,7 +166,7 @@ fn drops_the_semicolon_a_set_does_not_need() {
     h : A ->{...Env; Boom} B
     i : A ->{...Env; none} B
     j : A ->{...Env /* why */} B
-    k : A ->{Log;} B
+    k : A ->{Log} B
     type alias Errs = {...UserErrors;}
     "#);
 }

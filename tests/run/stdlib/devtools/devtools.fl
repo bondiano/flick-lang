@@ -2,15 +2,15 @@
 // DevTools server listening on a local port.
 module App.Main exposing (main)
 
-start : Unit ->{Async;} Float
+start : Unit ->{Async} Float
 foreign start from "./server.mjs" "start"
   arity 0
 
-got : String ->{Async;} Bool
+got : String ->{Async} Bool
 foreign got from "./server.mjs" "got"
   arity 1
 
-stop : Unit ->{Async;} Unit
+stop : Unit ->{Async} Unit
 foreign stop from "./server.mjs" "stop"
   arity 0
 

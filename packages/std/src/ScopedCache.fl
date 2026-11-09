@@ -21,7 +21,7 @@ make :
     lookup : forall t. k ->{Scope t | r; e} a^{t};
     capacity : Int;
     timeToLive : Option Duration.Duration;
-  } ->{Scope s | r;}
+  } ->{Scope s | r}
   ScopedCache s k e a
 foreign effect make from "@flick-lang/effect-ts/effect/ScopedCache" "flickMake"
   reviewed "effect@4.1.2 sha256:463f2234265282d1"
@@ -33,7 +33,7 @@ make_with :
     lookup : forall t. k ->{Scope t | r; e} a^{t};
     capacity : Int;
     timeToLive : Option (Exit e a -> k -> Duration.Duration);
-  } ->{Scope s | r;}
+  } ->{Scope s | r}
   ScopedCache s k e a
 foreign effect make_with from "@flick-lang/effect-ts/effect/ScopedCache" "flickMakeWith"
   reviewed "effect@4.1.2 sha256:d09a00e4ddb73874"

@@ -12,7 +12,7 @@ let notes_file () =
   | Config.ConfigError message -> App.fail message
 
 /// The notes of the file; none when it does not exist yet.
-load : String ->{Async, File.FileSystem;} List String
+load : String ->{Async, File.FileSystem} List String
 let load path =
   try Notes.parse (File.read_text path) with
   | File.ReadError _ -> []

@@ -17,7 +17,7 @@ ping : Raw^c ->{} String
 foreign effect ping from "./conn.js" "ping"
   retention call
 
-conn : String ->{Scope s;} Raw^{s}
+conn : String ->{Scope s} Raw^{s}
 let conn name = Resource.acquire_release (task { make_conn name }) close_conn
 
 refs : Unit ->{} String
@@ -29,7 +29,7 @@ let refs () = scope {
   )
 }
 
-resources : Unit ->{Async;} String
+resources : Unit ->{Async} String
 let resources () = scope s {
   let res : Resource.Resource s none Raw = Resource.manual (task { conn "a" })
   Resource.refresh res

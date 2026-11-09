@@ -6,7 +6,7 @@ module App.Instance exposing (..)
 type File (s : Region)
 
 service Files =
-  open : forall s. String ->{Scope s;} File s
+  open : forall s. String ->{Scope s} File s
   read : forall s. File s ->{} String
 
 latest : Atom.Writable (Atom.Writable Float)
@@ -15,10 +15,10 @@ let latest = Atom.make (Atom.make 0)
 focused : Atom.Writable (Ui.Element Ui.Input)
 let focused = Atom.make (Ui.handle ())
 
-nothing : Unit ->{Files;} String
+nothing : Unit ->{Files} String
 let nothing () = ""
 
-reader : Atom.Writable (Unit ->{Files;} String)
+reader : Atom.Writable (Unit ->{Files} String)
 let reader = Atom.make nothing
 
 component counter () =
@@ -34,7 +34,7 @@ component counter () =
     }
   }
 
-keep : Unit ->{Files, Atom.Write;} Unit
+keep : Unit ->{Files, Atom.Write} Unit
 let keep () = scope s {
   let file = Files.open "notes"
   Atom.set reader (fun () -> Files.read file)

@@ -21,6 +21,6 @@ foreign effect snapshot from "@flick-lang/effect-ts" "snapshotDefault"
 snapshot_with : Int -> Int -> JsValue ->{; SnapshotError} Unknown
 foreign effect snapshot_with from "@flick-lang/effect-ts" "snapshot"
 
-promise_callback : (a ->{r; e} b)^c ->{r;} (PromiseCallback a b)^c
+promise_callback : (a ->{r; e} b)^c ->{r} (PromiseCallback a b)^c
 foreign effect promise_callback from "@flick-lang/effect-ts" "promiseCallback"
   retention owner

@@ -21,24 +21,24 @@ foreign effect await_ from "@flick-lang/effect-ts/effect/TxDeferred" "await"
   reviewed "effect@4.1.2 sha256:f0edc72d9760c34b"
 
 /// Its outcome, if it is completed.
-poll : TxDeferred a e ->{Tx.Transaction;} Option (Result (Errors e) a)
+poll : TxDeferred a e ->{Tx.Transaction} Option (Result (Errors e) a)
 foreign effect poll from "@flick-lang/effect-ts/effect/TxDeferred" "poll"
   reviewed "effect@4.1.2 sha256:bc55cbe6b4ccce98"
 
 /// Completes it with the outcome; false when it was already completed.
-done : Result (Errors e) a -> TxDeferred a e ->{Tx.Transaction;} Bool
+done : Result (Errors e) a -> TxDeferred a e ->{Tx.Transaction} Bool
 foreign effect done from "@flick-lang/effect-ts/effect/TxDeferred" "done"
   arity 1
   reviewed "effect@4.1.2 sha256:0923eff1e97152a2"
 
 /// Completes it with the value; false when it was already completed.
-succeed : a -> TxDeferred a e ->{Tx.Transaction;} Bool
+succeed : a -> TxDeferred a e ->{Tx.Transaction} Bool
 foreign effect succeed from "@flick-lang/effect-ts/effect/TxDeferred" "succeed"
   arity 1
   reviewed "effect@4.1.2 sha256:fceed9a9fb98e5c7"
 
 /// Completes it with the error; false when it was already completed.
-fail : Errors e -> TxDeferred a e ->{Tx.Transaction;} Bool
+fail : Errors e -> TxDeferred a e ->{Tx.Transaction} Bool
 foreign effect fail from "@flick-lang/effect-ts/effect/TxDeferred" "fail"
   arity 1
   reviewed "effect@4.1.2 sha256:91c64e09b1cd9a1d"

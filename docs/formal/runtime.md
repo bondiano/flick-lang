@@ -578,13 +578,13 @@ module App.Main exposing (main)
 
 type Res (s : Region)
 
-open_res : forall s. String ->{Scope s;} Res s
+open_res : forall s. String ->{Scope s} Res s
 foreign effect open_res from "./resources.mjs" "open"
 
 say : String ->{} Unit
 let say line = Platform.stdout_line line
 
-nap : Float ->{Async;} Unit
+nap : Float ->{Async} Unit
 let nap millis =
   match Duration.millis millis with
   | Ok d -> Effect.sleep d
@@ -670,7 +670,7 @@ let main () =
 main : Unit ->{; AppError} Unit
 let main () =
   scope outer {
-    sup : forall e. Failure e ->{Scope outer;} Unit
+    sup : forall e. Failure e ->{Scope outer} Unit
     let sup _ =
       let _r = open_res "sup"
       say "supervisor ran"

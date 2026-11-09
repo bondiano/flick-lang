@@ -120,27 +120,27 @@ let malformed_hash () =
   from_result (Err (CryptoError "not a password hash written by hash_password"))
 
 /// A random number from 0 up to 1.
-random : Unit ->{Crypto;} Float
+random : Unit ->{Crypto} Float
 let random () = Crypto.random ()
 
 /// A random `Bool`.
-random_boolean : Unit ->{Crypto;} Bool
+random_boolean : Unit ->{Crypto} Bool
 let random_boolean () = Crypto.random_boolean ()
 
 /// A random `Int`, over its whole 32-bit range.
-random_int : Unit ->{Crypto;} Int
+random_int : Unit ->{Crypto} Int
 let random_int () = Crypto.random_int ()
 
 /// A random number from `min` up to `max`.
-random_between : Float -> Float ->{Crypto;} Float
+random_between : Float -> Float ->{Crypto} Float
 let random_between min max = Crypto.random_between min max
 
 /// A random integer from `min` to `max`, both included.
-random_int_between : Int -> Int ->{Crypto;} Int
+random_int_between : Int -> Int ->{Crypto} Int
 let random_int_between min max = Crypto.random_int_between min max
 
 /// The list in a random order.
-random_shuffle : List a ->{Crypto;} List a
+random_shuffle : List a ->{Crypto} List a
 let random_shuffle xs = Crypto.random_shuffle xs
 
 /// A random version 4 UUID, in lower-case hex with dashes.

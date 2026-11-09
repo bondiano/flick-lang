@@ -7,12 +7,12 @@ import Http.ServerRequest exposing (ServerRequest)
 import Http.ServerResponse exposing (ServerResponse)
 import Server
 
-hello : HttpApi.Endpoint "hello" (HttpApi.Request Unit Unit Unit Unit ->{r;} String)
+hello : HttpApi.Endpoint "hello" (HttpApi.Request Unit Unit Unit Unit ->{r} String)
 let hello =
   HttpApi.endpoint HttpApi.Get "/api/hello" (Record.label : Record.Label "hello")
   |> HttpApi.with_success 200 (Codec.json Schema.string)
 
-api : HttpApi.Api r { greet : { hello : HttpApi.Request Unit Unit Unit Unit ->{r;} String } }
+api : HttpApi.Api r { greet : { hello : HttpApi.Request Unit Unit Unit Unit ->{r} String } }
 let api =
   HttpApi.api "Greet"
   |> HttpApi.add_group (HttpApi.group (Record.label : Record.Label "greet") |> HttpApi.add hello)
@@ -21,10 +21,10 @@ let api =
 service Greeting =
   word : Unit ->{} String
 
-twice : String ->{Server.Server;} String
+twice : String ->{Server.Server} String
 server fn twice word = word ++ word
 
-page : ServerRequest ->{Server.Server;} ServerResponse
+page : ServerRequest ->{Server.Server} ServerResponse
 let page _ = Http.ServerResponse.text "page" Http.ServerResponse.defaults
 
 main : Unit ->{Async; AppError} Unit
@@ -36,7 +36,7 @@ let main () =
   provide layers {
     try
       scope s {
-        functions : (ServerRequest ->{Async;} ServerResponse)^{s}
+        functions : (ServerRequest ->{Async} ServerResponse)^{s}
         let functions = Server.handler [server twice]
         app :
           (ServerRequest ->{Async, Server.Server; Http.ServerError.HttpServerError} ServerResponse)^{s}

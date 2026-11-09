@@ -39,7 +39,7 @@ fn the_fix_adds_the_service_after_the_brace() {
     let program = "let f x = Log.line x";
     assert_eq!(
         fixed("f : String ->{} Unit", program),
-        "f : String ->{Log;} Unit"
+        "f : String ->{Log} Unit"
     );
     let program = "let f x = Log.line x";
     assert_eq!(
@@ -160,11 +160,11 @@ fn a_set_without_dots_gets_them_and_an_element_loses_them() {
 }
 
 #[test]
-fn an_arrow_without_its_only_set_gets_its_semicolon() {
+fn an_arrow_without_its_only_set_needs_no_semicolon() {
     let program = "let f x = Log.line x";
     assert_eq!(
         fixed_t002("f : String ->{...Log} Unit", program),
-        "f : String ->{Log;} Unit"
+        "f : String ->{Log} Unit"
     );
     assert_eq!(
         fixed_t002(
@@ -251,7 +251,7 @@ fn the_words_of_before_go_and_a_promise_says_async() {
     assert_eq!(
         out,
         "module Probe exposing (..)\n\
-         wait : Unit ->{Async;} Unit\n\
+         wait : Unit ->{Async} Unit\n\
          foreign wait from \"./wait.mjs\" \"wait\"\n\
          tick : Unit ->{} Unit\n\
          foreign tick from \"./tick.mjs\" \"tick\"\n"
@@ -263,7 +263,7 @@ fn a_resource_without_an_owner_asks_the_row_for_its_scope() {
     let program = "let f x = ignore (Resource.acquire_release (task { x }) (fun _ -> ()))";
     assert_eq!(
         fixed("f : String ->{} Unit", program),
-        "f : String ->{Scope s;} Unit"
+        "f : String ->{Scope s} Unit"
     );
     assert_eq!(
         fixed("f : String ->{; NotFound} Unit", program),
@@ -273,7 +273,7 @@ fn a_resource_without_an_owner_asks_the_row_for_its_scope() {
     let program = "let f _ x = ignore (Resource.acquire_release (task { x }) (fun _ -> ()))";
     assert_eq!(
         fixed("f : s -> String ->{} Unit", program),
-        "f : s -> String ->{Scope s1;} Unit"
+        "f : s -> String ->{Scope s1} Unit"
     );
 }
 

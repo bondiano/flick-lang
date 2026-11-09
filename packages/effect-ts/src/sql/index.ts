@@ -62,7 +62,37 @@ const frozen = <A extends object>(a: A): A => Object.freeze(a);
 export const sqlTable = (table: { name: string; columns: ReadonlyArray<Column> }): Table =>
   frozen({ name: table.name, columns: frozen(table.columns.map((c) => frozen({ ...c }))) });
 
-export const sqlTemplate = (template: Template): Template => frozen(template);
+// a placeholder `$n`, or a quoted identifier, which may hold `$` itself
+const PLACEHOLDER = /"(?:[^"]|"")*"|\$(\d+)/g;
+
+const renumber = (text: string, slot: (n: number) => string): string =>
+  text.replace(PLACEHOLDER, (whole, n: string | undefined) => (n === undefined ? whole : slot(Number(n))));
+
+/**
+ * What a `sql { … }` block compiles to. A template of the program used as a
+ * subquery (`sql_kind` `"template"`) is spliced in its place: its text with
+ * its placeholders after those before it, its tables and values appended.
+ */
+export const sqlTemplate = (template: Template): Template => {
+  if (!template.params.some((p) => p.sql_kind === "template")) return frozen(template);
+  const tables: Array<Table> = [...template.tables];
+  const params: Array<Value> = [];
+  const texts: Array<string> = [];
+  for (const p of template.params) {
+    if (p.sql_kind !== "template") {
+      params.push(p);
+      texts.push(`$${params.length}`);
+      continue;
+    }
+    const sub = p.value as Template;
+    const [base, shift] = [params.length, tables.length];
+    tables.push(...sub.tables);
+    for (const q of sub.params) params.push(q.table === undefined ? q : frozen({ ...q, table: q.table + shift }));
+    texts.push(renumber(sub.text, (n) => `$${base + n}`));
+  }
+  const text = renumber(template.text, (n) => texts[n - 1] ?? `$${n}`);
+  return frozen({ ...template, text, tables: frozen(tables), params: frozen(params) });
+};
 
 /** `Sql.Derive.column name kind nullable codec`: a column as a table holds it. */
 export const sqlColumn = (name: string, kind: string, nullable: boolean, codec: unknown): unknown =>

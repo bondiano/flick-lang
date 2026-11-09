@@ -16,33 +16,33 @@ foreign effect make from "@flick-lang/effect-ts/effect/TxReentrantLock" "make"
 
 /// Takes the read lock once more, waiting while another fiber writes; the
 /// fiber's read count.
-acquire_read : TxReentrantLock ->{Async, Tx.Transaction;} Int
+acquire_read : TxReentrantLock ->{Async, Tx.Transaction} Int
 foreign effect acquire_read from "@flick-lang/effect-ts/effect/TxReentrantLock" "acquireRead"
   reviewed "effect@4.1.2 sha256:c6df9f0afe74b624"
 
 /// Takes the write lock once more, waiting while another fiber holds the
 /// lock; the fiber's write count.
-acquire_write : TxReentrantLock ->{Async, Tx.Transaction;} Int
+acquire_write : TxReentrantLock ->{Async, Tx.Transaction} Int
 foreign effect acquire_write from "@flick-lang/effect-ts/effect/TxReentrantLock" "acquireWrite"
   reviewed "effect@4.1.2 sha256:52a7f11c2bd83a3f"
 
 /// Gives back one read of the fiber; its read count left.
-release_read : TxReentrantLock ->{Tx.Transaction;} Int
+release_read : TxReentrantLock ->{Tx.Transaction} Int
 foreign effect release_read from "@flick-lang/effect-ts/effect/TxReentrantLock" "releaseRead"
   reviewed "effect@4.1.2 sha256:c64cede8ab76ef39"
 
 /// Gives back one write of the fiber; its write count left.
-release_write : TxReentrantLock ->{Tx.Transaction;} Int
+release_write : TxReentrantLock ->{Tx.Transaction} Int
 foreign effect release_write from "@flick-lang/effect-ts/effect/TxReentrantLock" "releaseWrite"
   reviewed "effect@4.1.2 sha256:a43d50d417e7e793"
 
 /// Holds the read lock until the scope of region `s` closes.
-read_lock : TxReentrantLock ->{Async, Scope s;} Int
+read_lock : TxReentrantLock ->{Async, Scope s} Int
 foreign effect read_lock from "@flick-lang/effect-ts/effect/TxReentrantLock" "readLock"
   reviewed "effect@4.1.2 sha256:354f2f76d383630a"
 
 /// Holds the write lock until the scope of region `s` closes.
-write_lock : TxReentrantLock ->{Async, Scope s;} Int
+write_lock : TxReentrantLock ->{Async, Scope s} Int
 foreign effect write_lock from "@flick-lang/effect-ts/effect/TxReentrantLock" "writeLock"
   reviewed "effect@4.1.2 sha256:cbc38353299ca90d"
 
@@ -68,26 +68,26 @@ foreign effect with_lock from "@flick-lang/effect-ts/effect/TxReentrantLock" "wi
   reviewed "effect@4.1.2 sha256:bd45c10dc77569d9"
 
 /// The number of reads held, by every fiber.
-read_locks : TxReentrantLock ->{Tx.Transaction;} Int
+read_locks : TxReentrantLock ->{Tx.Transaction} Int
 foreign effect read_locks from "@flick-lang/effect-ts/effect/TxReentrantLock" "readLocks"
   reviewed "effect@4.1.2 sha256:3266db62ff2d9b74"
 
 /// The number of writes held.
-write_locks : TxReentrantLock ->{Tx.Transaction;} Int
+write_locks : TxReentrantLock ->{Tx.Transaction} Int
 foreign effect write_locks from "@flick-lang/effect-ts/effect/TxReentrantLock" "writeLocks"
   reviewed "effect@4.1.2 sha256:178e956879b80425"
 
 /// Whether a fiber holds the lock, to read or to write.
-locked : TxReentrantLock ->{Tx.Transaction;} Bool
+locked : TxReentrantLock ->{Tx.Transaction} Bool
 foreign effect locked from "@flick-lang/effect-ts/effect/TxReentrantLock" "locked"
   reviewed "effect@4.1.2 sha256:21fbe39a5e39f7c5"
 
 /// Whether a fiber holds the read lock.
-read_locked : TxReentrantLock ->{Tx.Transaction;} Bool
+read_locked : TxReentrantLock ->{Tx.Transaction} Bool
 foreign effect read_locked from "@flick-lang/effect-ts/effect/TxReentrantLock" "readLocked"
   reviewed "effect@4.1.2 sha256:21075991c8ea4b09"
 
 /// Whether a fiber holds the write lock.
-write_locked : TxReentrantLock ->{Tx.Transaction;} Bool
+write_locked : TxReentrantLock ->{Tx.Transaction} Bool
 foreign effect write_locked from "@flick-lang/effect-ts/effect/TxReentrantLock" "writeLocked"
   reviewed "effect@4.1.2 sha256:acb9caf1b2933997"

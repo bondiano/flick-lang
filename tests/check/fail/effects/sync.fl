@@ -1,6 +1,6 @@
 module App.SyncForeign exposing (..)
 
-peek : Atom.Atom a ->{Atom.Read;} a
+peek : Atom.Atom a ->{Atom.Read} a
 foreign effect peek from "./peek.mjs" "peek"
   arity 1
 

@@ -4,7 +4,7 @@ module App.MethodStages exposing (..)
 
 type File (s : Region)
 
-open_file : String ->{Scope s;} File s
+open_file : String ->{Scope s} File s
 foreign effect open_file from "./x.js" "open"
   retention call
 

@@ -4,7 +4,7 @@
 // is sent.
 module App.Main exposing (main)
 
-start : Unit ->{Async;} Float
+start : Unit ->{Async} Float
 foreign start from "./receiver.mjs" "start"
   arity 0
 
@@ -12,7 +12,7 @@ received : Unit ->{} String
 foreign received from "./receiver.mjs" "received"
   arity 0
 
-stop : Unit ->{Async;} Unit
+stop : Unit ->{Async} Unit
 foreign stop from "./receiver.mjs" "stop"
   arity 0
 

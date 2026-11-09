@@ -11,7 +11,7 @@ complaints : Unit ->{} String
 foreign complaints from "./dom.mjs" "complaints"
   arity 0
 
-settle : Unit ->{Async;} Unit
+settle : Unit ->{Async} Unit
 foreign settle from "./dom.mjs" "settle"
   arity 0
 

@@ -5,7 +5,7 @@ type alias Path = String
 type File (s : Region)
 
 service Files =
-  open : forall s. Path ->{Scope s;} File s
+  open : forall s. Path ->{Scope s} File s
   read : forall s. File s ->{} String
 
 /// A channel of a subscription holds its region and cannot leave its scope.
@@ -16,7 +16,7 @@ let escaped hub =
   ()
 
 /// A callback kept in a channel may not hold a scoped resource.
-captured : Path ->{Files;} Unit
+captured : Path ->{Files} Unit
 let captured path = scope {
   let file = Files.open path
   let lines = Channel.map_effect (fun n -> Files.read file) (Channel.from_list [1])

@@ -172,15 +172,8 @@ impl Checker<'_> {
             named.push(label.clone());
             self.add_entry(&mut entries, label, ty, item);
         }
-        // without its only set, the row of an arrow needs its `;`
-        let arrow_end = self.span(node).range().end;
-        let semi_at = (node.kind == K::Row
-            && spreads.len() == 1
-            && omitted.is_empty()
-            && self.text[arrow_end..].trim_start().starts_with('}'))
-        .then(|| self.span(node).end);
         for (spread, item) in spreads {
-            let Some(set) = self.set_of(spread, item, semi_at, free) else {
+            let Some(set) = self.set_of(spread, item, free) else {
                 continue;
             };
             if *kind == Kind::ErrorRow && !set.services.is_empty() {
@@ -249,15 +242,9 @@ impl Checker<'_> {
     }
 
     /// What the set `item` of `...item`, written at `node`, holds; `None` after a diagnostic.
-    pub(super) fn set_of(
-        &mut self,
-        node: &Node,
-        item: &Node,
-        semi_at: Option<u32>,
-        free: Free,
-    ) -> Option<Set> {
+    pub(super) fn set_of(&mut self, node: &Node, item: &Node, free: Free) -> Option<Set> {
         let Some(kind) = self.set_kind(item) else {
-            self.not_a_set(node, item, semi_at, free);
+            self.not_a_set(node, item, free);
             return None;
         };
         let body = self.ty(item, &kind, free);

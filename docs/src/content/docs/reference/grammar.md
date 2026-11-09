@@ -356,7 +356,7 @@ rec {
 type        = "forall" name { name } "." type
             | union "=>" type                  // constraint(s): `Show a =>`, `(Show a, Eq a) =>`
             | union ["->" [effects] type]      // right associative
-effects     = "{" "}" | "{" [row] ";" [row] "}" // written `->{` with no space
+effects     = "{" [row] [";" [row]] "}"     // written `->{` with no space
 row         = union { "," union } ["|" union]  // `none`, `r`, `Users, Log | r`
 union       = app { "+" app }                  // row or capture union
 app         = capture { capture }
@@ -372,7 +372,7 @@ atom        = name | Con { "." Con } | "none" | "(" ")" | "(" type ")"
   never the same as `->` (see [Specification](../../spec/), [Values of computations and their execution](../../spec/02-computations/)). `-> {` with a space is an arrow to a record
   type.
 - `none` is the empty row literal. An arrow side left out is empty too:
-  `->{; E}` is `->{none; E}`, `->{R;}` is `->{R; none}` (see
+  `->{; E}` is `->{none; E}`, `->{R}` is `->{R; none}` (see
   [effects.md](../effects/#empty-rows-none)). `{Users, Log}` is a closed row, a
   trailing `| r` opens it.
 - `T^c`, `T^{s}`, `T^(c + d)` qualify a type with the captures it holds; `^`

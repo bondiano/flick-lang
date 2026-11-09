@@ -5,7 +5,7 @@ module App.Main exposing (main)
 say : String ->{} Unit
 let say line = Platform.stdout_line line
 
-open_res : String ->{Scope s;} String
+open_res : String ->{Scope s} String
 let open_res name =
   Resource.acquire_release
     (task {
@@ -15,9 +15,9 @@ let open_res name =
     (fun n -> say ("release " ++ n))
 
 /// Acquires into the caller's region from inside a scope of its own.
-keep : String ->{Scope s;} String
+keep : String ->{Scope s} String
 let keep name =
-  acquire : Unit ->{Scope s;} String
+  acquire : Unit ->{Scope s} String
   let acquire () = open_res name
   scope {
     let _ = open_res "local"
@@ -28,7 +28,7 @@ let keep name =
 
 main : Unit ->{; AppError} Unit
 let main () = scope outer {
-  acquire : Unit ->{Scope outer;} String
+  acquire : Unit ->{Scope outer} String
   let acquire () = open_res "outer"
   scope inner {
     let _ = open_res "inner"

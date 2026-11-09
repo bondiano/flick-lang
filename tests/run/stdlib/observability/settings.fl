@@ -3,7 +3,7 @@
 // protobuf, and gzip compresses a body of 1 KB or more.
 module App.Main exposing (main)
 
-start : Unit ->{Async;} Float
+start : Unit ->{Async} Float
 foreign start from "./receiver.mjs" "start"
   arity 0
 
@@ -15,7 +15,7 @@ meta : Unit ->{} String
 foreign meta from "./receiver.mjs" "meta"
   arity 0
 
-stop : Unit ->{Async;} Unit
+stop : Unit ->{Async} Unit
 foreign stop from "./receiver.mjs" "stop"
   arity 0
 

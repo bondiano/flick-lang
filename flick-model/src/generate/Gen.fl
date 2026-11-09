@@ -16,10 +16,10 @@ service Counter =
 // A capability of region `s`: acquired into it, released when it closes.
 type Handle (s : Region)
 
-open_scoped : forall s. String ->{Scope s;} Handle s
+open_scoped : String ->{Scope s} Handle s
 foreign effect open_scoped from "./res.mjs" "open"
 
-use : forall s. Handle s ->{} Unit
+use : Handle s ->{} Unit
 foreign effect use from "./res.mjs" "use"
   retention call
 
@@ -36,11 +36,11 @@ type Raw
 make_conn : String ->{} Raw
 foreign effect make_conn from "./res.mjs" "raw"
 
-close_conn : forall c. Raw^c ->{} Unit
+close_conn : Raw^c ->{} Unit
 foreign effect close_conn from "./res.mjs" "close"
   retention call
 
-use_conn : forall c. Raw^c ->{} Unit
+use_conn : Raw^c ->{} Unit
 foreign effect use_conn from "./res.mjs" "use"
   retention call
 

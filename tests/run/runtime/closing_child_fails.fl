@@ -14,7 +14,7 @@ ping : Deferred.Deferred none Unit ->{} Unit
 let ping d = ignore (Deferred.succeed () d)
 
 /// A group whose child opens `closing` as the owner starts to close.
-close_signal : Deferred.Deferred none Unit ->{Scope s, Async;} Unit
+close_signal : Deferred.Deferred none Unit ->{Scope s, Async} Unit
 let close_signal closing =
   let set : FiberSet.FiberSet s none Unit = FiberSet.make ()
   let started : Deferred.Deferred none Unit = Deferred.make ()
@@ -33,7 +33,7 @@ let close_signal closing =
   Deferred.await_ started
 
 /// The body's value comes back: a child's failure belongs to its supervisor.
-masked_failure : Unit ->{Async;} String
+masked_failure : Unit ->{Async} String
 let masked_failure () = scope owner {
   let closing : Deferred.Deferred none Unit = Deferred.make ()
   let entered : Deferred.Deferred none Unit = Deferred.make ()
@@ -61,7 +61,7 @@ let masked_failure () = scope owner {
 }
 
 /// The failure comes from the child's own finalizer, under the request of C2.
-finalizer_failure : Unit ->{Async;} String
+finalizer_failure : Unit ->{Async} String
 let finalizer_failure () = scope owner {
   let started : Deferred.Deferred none Unit = Deferred.make ()
   Scope.add_finalizer (task { say "owner finalizer, after the supervisor" })

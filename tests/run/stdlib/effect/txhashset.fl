@@ -4,7 +4,7 @@ module App.Main exposing (main)
 
 type alias Names = TxHashSet.TxHashSet EqHash.Canonical String
 
-elements : TxHashSet.TxHashSet w String ->{Tx.Transaction;} List String
+elements : TxHashSet.TxHashSet w String ->{Tx.Transaction} List String
 let elements s = List.sort (HashSet.to_list (TxHashSet.to_hash_set s))
 
 main : Unit ->{Async; AppError} Unit

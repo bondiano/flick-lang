@@ -67,7 +67,7 @@ let work dir =
   await later
   line "indirect" "true"
 
-main : Unit ->{Async;} Unit
+main : Unit ->{Async} Unit
 let main () =
   try
     provide FileSystem.node {

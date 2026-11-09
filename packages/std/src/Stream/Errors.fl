@@ -134,14 +134,14 @@ foreign pure retry from "@flick-lang/effect-ts/effect/Stream" "retry"
   reviewed "effect@4.1.2 sha256:a77aecde69ceeb29"
 
 /// Runs `finalizer` with how the stream ended, after it ended.
-on_exit : (Exit e Unit ->{r2;} x)^c -> (Stream r e a)^c -> (Stream (r + r2) e a)^c
+on_exit : (Exit e Unit ->{r2} x)^c -> (Stream r e a)^c -> (Stream (r + r2) e a)^c
 foreign pure on_exit from "@flick-lang/effect-ts/effect/Stream" "flickOnExit"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:b6519a57f636ecc3"
 
 /// Runs `cleanup` with the failure when the stream fails.
-on_error : (Failure e ->{r2;} x)^c -> (Stream r e a)^c -> (Stream (r + r2) e a)^c
+on_error : (Failure e ->{r2} x)^c -> (Stream r e a)^c -> (Stream (r + r2) e a)^c
 foreign pure on_error from "@flick-lang/effect-ts/effect/Stream" "flickOnError"
   arity 1
   retention call

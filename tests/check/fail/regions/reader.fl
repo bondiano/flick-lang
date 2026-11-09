@@ -9,7 +9,7 @@ let count = Atom.make 7
 leaked : Atom.Atom (Seq Float)
 let leaked = Atom.derived (fun () -> for n <- [1] yield Atom.value count + n)
 
-signed : Unit ->{Atom.Read;} Seq Float
+signed : Unit ->{Atom.Read} Seq Float
 let signed () = for n <- [1] yield Atom.value count + n
 
 held : Atom.Atom (Unit -> List Float)

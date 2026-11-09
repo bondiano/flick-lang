@@ -1,6 +1,6 @@
 ---
 title: "Генерация кода"
-source_hash: 287bb73d762a7e5f
+source_hash: 4a83bc87cf3b0211
 ---
 
 `flick build` компилирует каждый модуль в ES-модуль (см. [Генерация TypeScript и граница FFI](../../spec/06-typescript-and-ffi/), [Архитектура компилятора](../../contributing/implementation-decisions/#архитектура-компилятора)).
@@ -301,7 +301,7 @@ rec {
 | `Option a`, `Result e a` | `Option.Option<A>`, `Result.Result<A, E>` из Effect |
 | `a -> b` | `(arg: A) => B`, одна стрелка на стадию |
 | `a ->{r; e} b`, `Eff r e a` | `(arg: A) => Effect.Effect<B, E, R>`, `Effect.Effect<A, E, R>`; пустая строка — `never` |
-| экспортируемая функция с последней Sync-стадией, `a ->{Atom.Read;} b` | `(arg: A) => Effect.Effect<B, never, Atom.Read>`: вызывающий код на Flick по-прежнему сразу получает значение, а TypeScript — Effect, читающий сервисы файбера, так что прямой вызов больше не падает |
+| экспортируемая функция с последней Sync-стадией, `a ->{Atom.Read} b` | `(arg: A) => Effect.Effect<B, never, Atom.Read>`: вызывающий код на Flick по-прежнему сразу получает значение, а TypeScript — Effect, читающий сервисы файбера, так что прямой вызов больше не падает |
 | `Stream r e a` | `Stream.Stream<A, E, R>` Effect, само значение |
 | вариантный тип, ошибка | объединение `{ readonly _tag: "<constructor id>"; readonly _0: … }` |
 | перечисление; непрозрачное перечисление | объединение его литералов, `"GET" \| "POST"`; `string` или `number` с меткой его полного имени |

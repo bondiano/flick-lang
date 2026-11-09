@@ -93,7 +93,7 @@ let files dir =
   line ("watch remove", (show removed))
 
 /// Each element of a stream of the scope's subscription, inside the scope.
-subscribed : PubSub.PubSub Float ->{Async;} List Float
+subscribed : PubSub.PubSub Float ->{Async} List Float
 let subscribed hub = scope {
   let sub = PubSub.subscribe hub
   let _ = PubSub.publish_all [1, 2, 3] hub

@@ -348,7 +348,13 @@ impl Checker<'_> {
         let text = &self.text[sig.start as usize..sig.end as usize];
         let open = text.rfind("->{")?;
         let close = open + text[open..].find('}')?;
-        let semi = open + text[open..close].find(';')?;
+        let Some(semi) = text[open..close].find(';').map(|at| open + at) else {
+            let at = sig.start + u32::try_from(close).ok()?;
+            return Some(Edit {
+                span: Span::new(sig.file, at, at),
+                replacement: "; Server.Unauthorized".to_owned(),
+            });
+        };
         let listed = !text[semi + 1..close].trim().is_empty();
         let at = sig.start + u32::try_from(close).ok()?;
         let at = if listed {

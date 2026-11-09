@@ -106,6 +106,24 @@ let of_name name = sql {
   select { id = u.id }
 }
 
+/// The accounts of the users named `name`: a template other queries reuse.
+named : String -> Sql.Template Pg {} { user_id : UserId }
+let named name = sql {
+  from a in Accounts
+  join u in Users on u.id == a.user_id
+  where u.name == $name
+  select a.user_id
+}
+
+/// Templates as subqueries: their placeholders follow those before them.
+composed : String -> Sql.Template Pg { n : Int } { name : String }
+let composed other = sql p {
+  from u in Users
+  where u.name != $other && is_in u.id $(named "Ada") && exists $(named other)
+  limit p.n
+  select u.name
+}
+
 main : Unit ->{; AppError} Unit
 let main () =
   let q = Sql.bind by_name { name = "'; DROP TABLE users; --" }
@@ -122,3 +140,6 @@ let main () =
     (show (Option.is_some (Sql.identifier "users"), Option.is_some (Sql.identifier "users; drop")))
   Platform.stdout_line (Sql.template_text (of_name None))
   Platform.stdout_line (show (Sql.parameter_count (Sql.bind (of_name (Some "Ada")) {})))
+  let both = Sql.bind (composed "Bob") { n = 5 }
+  Platform.stdout_line (Sql.text both)
+  Platform.stdout_line (show (Sql.parameter_count both))

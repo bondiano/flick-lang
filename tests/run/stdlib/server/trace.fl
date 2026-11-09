@@ -8,11 +8,11 @@ import Http.ServerRequest exposing (ServerRequest)
 import Http.ServerResponse exposing (ServerResponse)
 import Server
 
-start : Unit ->{Async;} Float
+start : Unit ->{Async} Float
 foreign start from "./traces.mjs" "start"
   arity 0
 
-stop : Unit ->{Async;} Unit
+stop : Unit ->{Async} Unit
 foreign stop from "./traces.mjs" "stop"
   arity 0
 
@@ -41,10 +41,10 @@ let options = {
   disablePropagation = false;
 }
 
-stock : String ->{Server.Server;} Float
+stock : String ->{Server.Server} Float
 server fn stock item = Int.to_float (String.length item)
 
-price : String ->{Server.Server;} Float
+price : String ->{Server.Server} Float
 server fn price item = 2 * Int.to_float (String.length item)
 
 /// The price of jam, asked by a task the page's view reads.
@@ -52,7 +52,7 @@ priced : Atom.Atom (Atom.Async Float {Rpc.ClientError})
 let priced = Atom.task (task { price "jam" })
 
 /// The page: the stock of tea, asked of the server function, and the price.
-page : ServerRequest ->{Async, Server.Server;} ServerResponse
+page : ServerRequest ->{Async, Server.Server} ServerResponse
 let page _ =
   let count =
     try stock "tea" with
@@ -78,7 +78,7 @@ let main () =
     provide layers {
       try
         scope s {
-          functions : (ServerRequest ->{Async;} ServerResponse)^{s}
+          functions : (ServerRequest ->{Async} ServerResponse)^{s}
           let functions = Server.handler [server stock, server price]
           app :
             (ServerRequest ->{Async, Server.Server; Http.ServerError.HttpServerError} ServerResponse)^{s}

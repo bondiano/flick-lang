@@ -129,6 +129,8 @@ pub struct Capture {
     pub slot: usize,
     pub form: Option<Form>,
     pub proxy: usize,
+    /// A `Sql.Template` of the program, spliced into the text in its place.
+    pub template: bool,
 }
 
 /// A literal passed beside the text.
@@ -280,6 +282,23 @@ impl Cx<'_> {
             slot: self.slots.len(),
             form: None,
             proxy,
+            template: false,
+        });
+        self.slots.push(At::Capture(self.captures.len() - 1));
+        self.captures.len() - 1
+    }
+
+    /// A template of the program used as a subquery: its type says no kind
+    /// or cast, so it has no proxy.
+    pub fn template(&mut self, text: String, span: Span, inner: Span) -> usize {
+        self.captures.push(Capture {
+            text,
+            span,
+            inner,
+            slot: self.slots.len(),
+            form: None,
+            proxy: usize::MAX,
+            template: true,
         });
         self.slots.push(At::Capture(self.captures.len() - 1));
         self.captures.len() - 1
@@ -409,19 +428,52 @@ pub fn declared_types(block: &Block) -> Option<Vec<(String, String)>> {
 }
 
 /// What only the types of the code show: arithmetic on a type SQL cannot
-/// compute.
+/// compute, and a template in `is_in` whose row is not one column of the
+/// value's type.
 pub fn check(block: &Block, facts: &[Fact]) -> Vec<Diagnostic> {
     let toks = parse::tokens(block, block.body().rest());
     let Ok(parsed) = parse::query(None, &toks, block.whole()) else {
         return Vec::new();
     };
     let mut operands = Vec::new();
+    let mut members = Vec::new();
     for clause in &parsed.clauses {
         for e in &clause.items {
             arithmetic(e, &mut operands);
+            templates(e, &mut members);
         }
     }
     let mut out = Vec::new();
+    let fact = |span: Span| facts.iter().find(|f| f.span == span);
+    for (word, at) in members {
+        let (Some(value), Some(row)) = (fact(word), fact(at)) else {
+            continue;
+        };
+        let Some(fields) = &row.fields else {
+            continue;
+        };
+        let [only] = &fields[..] else {
+            let message = format!(
+                "the template of `is_in` selects exactly one result, not {}",
+                fields.len()
+            );
+            out.push(Diagnostic::error(message, at).with_code(MALFORMED));
+            continue;
+        };
+        let (Some(a), Some(b)) = (&value.ty.exact, &only.ty.exact) else {
+            continue;
+        };
+        // a column that may be `NULL` is an `Option` in the row
+        let same =
+            a == b || *b == format!("Prelude.Option {a}") || *b == format!("Prelude.Option ({a})");
+        if !same {
+            let message = format!(
+                "`is_in` compares `{}` with a template of `{}`",
+                value.ty.shown, only.ty.shown
+            );
+            out.push(Diagnostic::error(message, at).with_code(MALFORMED));
+        }
+    }
     for (span, op) in operands {
         let Some(fact) = facts.iter().find(|f| f.span == span) else {
             continue;
@@ -442,6 +494,38 @@ pub fn check(block: &Block, facts: &[Fact]) -> Vec<Diagnostic> {
         }
     }
     out
+}
+
+/// Each `is_in e $(t)`: the span of its word and of the template.
+fn templates(e: &E, out: &mut Vec<(Span, Span)>) {
+    match e {
+        E::Apply(name, args, _) => {
+            if let [_, sub] = &args[..]
+                && name.text == "is_in"
+            {
+                let sub = match sub {
+                    E::Paren(inner, _) => inner,
+                    other => other,
+                };
+                if let E::Capture { span, .. } = sub {
+                    out.push((name.span, *span));
+                }
+            }
+            for a in args {
+                templates(a, out);
+            }
+        }
+        E::Binary(_, l, r, _) => {
+            templates(l, out);
+            templates(r, out);
+        }
+        E::Not(inner, _) | E::Neg(inner, _) | E::Paren(inner, _) => templates(inner, out),
+        E::Record(fields, _) => fields.iter().for_each(|(_, v)| templates(v, out)),
+        E::Sub(q) => (q.clauses.iter())
+            .flat_map(|c| &c.items)
+            .for_each(|i| templates(i, out)),
+        E::Path(..) | E::Capture { .. } | E::Literal(_) => {}
+    }
 }
 
 /// The operands whose type arithmetic checks, with the operator.

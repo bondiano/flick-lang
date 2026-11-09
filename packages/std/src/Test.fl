@@ -65,12 +65,12 @@ clock_test : forall e. String -> (forall s. Eff {Async, Scope s, VirtualTime} e 
 foreign pure clock_test from "@flick-lang/effect-ts" "testClock"
 
 /// Moves the clock forward by `duration`, running what was waiting for it.
-adjust : Duration.Duration ->{Async, VirtualTime;} Unit
+adjust : Duration.Duration ->{Async, VirtualTime} Unit
 foreign effect adjust from "@flick-lang/effect-ts" "testAdjust"
 
 /// Sets the clock to `millis` since the epoch, running what was waiting
 /// until then.
-set_time : Float ->{Async, VirtualTime;} Unit
+set_time : Float ->{Async, VirtualTime} Unit
 foreign effect set_time from "@flick-lang/effect-ts" "testSetTime"
 
 /// Checks `check` on 100 values of `gen`, from the run's seed.

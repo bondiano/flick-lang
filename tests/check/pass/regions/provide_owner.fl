@@ -22,28 +22,28 @@ let inner_owner () = provide greeter {
 }
 
 // the service comes from the caller, which runs the whole function
-from_caller : Unit ->{Greeter;} Unit
+from_caller : Unit ->{Greeter} Unit
 let from_caller () = scope s {
   ignore (Fiber.spawn s report (task { ignore (Greeter.greet "child") }))
 }
 
 // the caller settles the obligation the signature names
-given : Fiber.Provided {Greeter} s => Fiber.Owner s ->{Greeter;} Unit
+given : Fiber.Provided {Greeter} s => Fiber.Owner s ->{Greeter} Unit
 let given owner = ignore (Fiber.spawn owner report (task { ignore (Greeter.greet "child") }))
 
 uses_given : Unit ->{} Unit
 let uses_given () = provide greeter { scope s { given s } }
 
 // a task passes the obligation on to where it runs
-in_task : Unit ->{Greeter;} Unit
+in_task : Unit ->{Greeter} Unit
 let in_task () = scope s {
   let start = task { ignore (Fiber.spawn s report (task { ignore (Greeter.greet "child") })) }
   await start
 }
 
-local_signature : Unit ->{Greeter;} Unit
+local_signature : Unit ->{Greeter} Unit
 let local_signature () = scope s {
-  start : Fiber.Provided {Greeter} s => Unit ->{Greeter;} Unit
+  start : Fiber.Provided {Greeter} s => Unit ->{Greeter} Unit
   let start () = ignore (Fiber.spawn s report (task { ignore (Greeter.greet "child") }))
   start ()
 }

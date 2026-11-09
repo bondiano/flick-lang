@@ -4,11 +4,11 @@
 // cancelled, so only C4 orders the lines, not how long that takes.
 module App.Main exposing (main)
 
-settle_later : String ->{Async;} Unit
+settle_later : String ->{Async} Unit
 foreign settle_later from "./calls.mjs" "settleLater"
   cancel signal
 
-under_way : String ->{Async;} Unit
+under_way : String ->{Async} Unit
 foreign under_way from "./calls.mjs" "underWay"
 
 say : String ->{} Unit
@@ -18,7 +18,7 @@ quiet : Failure e ->{} Unit
 let quiet _ = ()
 
 /// A child in a call, the owner closing around it.
-child_in_call : Unit ->{Async;} Unit
+child_in_call : Unit ->{Async} Unit
 let child_in_call () = scope owner {
   Scope.add_finalizer (task { say "finalizer, after the call" })
   let _child = Fiber.spawn owner quiet (task { settle_later "the child's call" })
@@ -27,7 +27,7 @@ let child_in_call () = scope owner {
 }
 
 /// The body is the fiber in the call, and the race it lost stops it.
-body_in_call : Unit ->{Async;} Unit
+body_in_call : Unit ->{Async} Unit
 let body_in_call () =
   let winner =
     race_first

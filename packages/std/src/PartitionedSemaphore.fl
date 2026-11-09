@@ -25,7 +25,7 @@ foreign pure capacity from "@flick-lang/effect-ts/effect/PartitionedSemaphore" "
   reviewed "effect@4.1.2 sha256:a91a340b46bf0b11"
 
 /// Takes `permits` permits for the partition `key`, waiting its turn.
-take : k -> Int -> PartitionedSemaphore k ->{Async;} Unit
+take : k -> Int -> PartitionedSemaphore k ->{Async} Unit
 foreign effect take from "@flick-lang/effect-ts/effect/PartitionedSemaphore" "take"
   arity 2
   reviewed "effect@4.1.2 sha256:a2d6d38910bbb44d"

@@ -19,7 +19,7 @@ click : String ->{} Unit
 foreign click from "./dom.mjs" "click"
   arity 1
 
-settle : Unit ->{Async;} Unit
+settle : Unit ->{Async} Unit
 foreign settle from "./dom.mjs" "settle"
   arity 0
 

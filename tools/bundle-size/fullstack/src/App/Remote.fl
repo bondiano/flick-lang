@@ -4,5 +4,5 @@ module App.Remote exposing (lookup)
 import App.Db
 import Server
 
-lookup : String ->{Server.Server;} String
+lookup : String ->{Server.Server} String
 server fn lookup key = App.Db.lookup key

@@ -54,7 +54,7 @@ let checked t =
   try show (await t) with
   | Odd n -> "Odd " ++ show n
 
-single : Unit ->{Async;} Unit
+single : Unit ->{Async} Unit
 let single () =
   let exit : Exit {Boom} Float = Effect.exit (task { from_result (Err (Boom 1)) })
   Platform.stdout_line ("exit: " ++ show (Exit.is_failure exit))
@@ -191,7 +191,7 @@ let collections () =
     ("filter_map_or_fail: "
       ++ checked (task { Effect.filter_map_or_fail parity (fun _ -> Odd 0) (task { 4 }) }))
 
-resources : Unit ->{Async;} Unit
+resources : Unit ->{Async} Unit
 let resources () =
   let log = Ref.make []
   let used =

@@ -32,7 +32,7 @@ limited : Schedule.Schedule r e i o -> Schedule.Schedule r e i o
 let limited schedule = Schedule.up_to { duration = None; times = Some 2 } schedule
 
 /// How many times `schedule` runs a task that counts its runs.
-count : Schedule.Schedule none none Float o ->{Async;} Float
+count : Schedule.Schedule none none Float o ->{Async} Float
 let count schedule =
   let calls = Ref.make 0
   let _ =
@@ -44,7 +44,7 @@ let count schedule =
       })
   Ref.get calls
 
-delays : Schedule.Schedule none none Float Duration.Duration ->{Async;} List String
+delays : Schedule.Schedule none none Float Duration.Duration ->{Async} List String
 let delays schedule =
   let seen = Ref.make []
   let traced =

@@ -354,7 +354,7 @@ otherwise, if a given Provided R ϱ with S ∈ R is in scope:      discharged
 otherwise:                                                       element {Provided {S} ϱ} in the row of X                (Provided)
 ```
 
-In the second case `S` comes from the row of `X`, hence from whoever runs `X`, and lives for the whole run of `X`, including after `ϱ` closes inside `X`. In the last case it cannot be decided: the element moves with the rest of the row to whoever runs `X` (`await`, application, `provide` of a layer) and is discharged there by the same rules. A signature does not write such an element; it writes a constraint: `start : forall s. Fiber.Provided {Greeter} s => Fiber.Owner s ->{Greeter;} Unit`. Inside `start` the constraint is given, and the call site receives it at instantiation and discharges it with its own provider.
+In the second case `S` comes from the row of `X`, hence from whoever runs `X`, and lives for the whole run of `X`, including after `ϱ` closes inside `X`. In the last case it cannot be decided: the element moves with the rest of the row to whoever runs `X` (`await`, application, `provide` of a layer) and is discharged there by the same rules. A signature does not write such an element; it writes a constraint: `start : forall s. Fiber.Provided {Greeter} s => Fiber.Owner s ->{Greeter} Unit`. Inside `start` the constraint is given, and the call site receives it at instantiation and discharges it with its own provider.
 
 A row has one `Provided {S}` element per service: two obligations for the same service under different owners in one stage unify the owners into one region, otherwise `FLICK-T003`. This is incompleteness, not a hole: the program is rejected.
 
@@ -533,7 +533,7 @@ Common definitions for the probes:
 ```flick
 type Handle (s : Region)
 
-open : forall s. String ->{Scope s;} Handle s
+open : forall s. String ->{Scope s} Handle s
 foreign effect open from "./res.mjs" "open"
 
 use : forall s. Handle s ->{} Unit
@@ -594,7 +594,7 @@ let main () =
 Divergence: `retention owner` without `Outlives c s`.
 
 ```flick
-defer_to : forall s c. Fiber.Owner s -> (Eff none none Unit)^c ->{Scope s;} Unit
+defer_to : forall s c. Fiber.Owner s -> (Eff none none Unit)^c ->{Scope s} Unit
 let defer_to _owner work = Scope.add_finalizer work
 
 main : Unit ->{} Unit
@@ -838,7 +838,7 @@ Divergence: a local function with `Scope s` in its row was considered to hold `s
 scoped_row : Unit ->{} Unit
 let scoped_row u =
   scope s1 {
-    v3 : Int ->{Scope s1;} Unit
+    v3 : Int ->{Scope s1} Unit
     let v3 n = ()
     let t : Eff {Scope s1} none Unit = task { v3 0 }
     await t

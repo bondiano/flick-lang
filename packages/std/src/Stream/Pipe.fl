@@ -110,7 +110,7 @@ foreign pure pipe_through_channel_or_fail from "@flick-lang/effect-ts/effect/Str
 with_execution_plan :
   ExecutionPlan.ExecutionPlan p r2 e2 (Errors e) ->
   Bool ->
-  (ExecutionPlan.Event e ->{r;} Unit)^c ->
+  (ExecutionPlan.Event e ->{r} Unit)^c ->
   ((Stream (p + r) e a)^c -> (Stream (r + r2) (e + e2) a)^c)^c
 foreign pure with_execution_plan from "@flick-lang/effect-ts/effect/Stream" "flickStreamWithExecutionPlan"
   arity 3

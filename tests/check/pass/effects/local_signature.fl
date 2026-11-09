@@ -11,7 +11,7 @@ service Counter =
 logger : Log.Impl
 let logger = { log = fun _ -> () }
 
-program : Unit ->{Counter;} Int
+program : Unit ->{Counter} Int
 let program () = provide (Layer.succeed Log logger) {
   let _ =
     try await (task { 0 }) with

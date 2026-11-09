@@ -13,19 +13,19 @@ type error Missing = Missing String
 
 server fn unsigned x = x
 
-pick : forall a. a ->{Server.Server;} a
+pick : forall a. a ->{Server.Server} a
 server fn pick x = x
 
-keep : Secret ->{Server.Server;} String
+keep : Secret ->{Server.Server} String
 server fn keep secret = if secret.check "" then "yes" else "no"
 
 find : Order ->{Server.Server; Missing} String
 server fn find order = order.item
 
-early : String ->{Server.Server;} String ->{Server.Server;} String
+early : String ->{Server.Server} String ->{Server.Server} String
 server fn early a b = a ++ b
 
-sealed : String -> Secret ->{Server.Server;} String
+sealed : String -> Secret ->{Server.Server} String
 server fn sealed a secret = if secret.check a then "yes" else "no"
 
 local : Order -> String

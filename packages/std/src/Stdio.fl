@@ -16,19 +16,19 @@ service Stdio =
   write_stderr : String ->{; PlatformError.PlatformError} Unit
 
 /// The arguments the program was started with.
-args : Unit ->{Stdio;} List String
+args : Unit ->{Stdio} List String
 let args () = Stdio.args ()
 
 /// Whether stdin is a terminal.
-stdin_is_terminal : Unit ->{Stdio;} Bool
+stdin_is_terminal : Unit ->{Stdio} Bool
 let stdin_is_terminal () = Stdio.stdin_is_terminal ()
 
 /// Whether stdout is a terminal.
-stdout_is_terminal : Unit ->{Stdio;} Bool
+stdout_is_terminal : Unit ->{Stdio} Bool
 let stdout_is_terminal () = Stdio.stdout_is_terminal ()
 
 /// Whether stderr is a terminal.
-stderr_is_terminal : Unit ->{Stdio;} Bool
+stderr_is_terminal : Unit ->{Stdio} Bool
 let stderr_is_terminal () = Stdio.stderr_is_terminal ()
 
 /// Writes the text to stdout as it is.

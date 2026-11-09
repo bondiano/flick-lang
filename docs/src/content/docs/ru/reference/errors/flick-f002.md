@@ -1,6 +1,6 @@
 ---
 title: "FLICK-F002"
-source_hash: "89253a8bc00c4259"
+source_hash: "eae33f8eba66a0b3"
 ---
 
 Параметр внешней функции, тип которой может содержать возможности области видимости (регион или квалификатор захвата `^c`), требует контракта `retention`: `retention call`, если JS-код не сохраняет значение после вызова, или `retention owner`, если он сохраняет его до закрытия владельцем региона. Без такого контракта компилятор не может определить, как долго JS-код удерживает значение.
@@ -19,7 +19,7 @@ foreign each from "./each.js" "each"
 # import Fiber exposing (Handle)
 add_finalizer_to :
   (Fiber.Outlives c s, Fiber.Provided r s, Detached r) =>
-  Handle t -> (Eff r none Unit)^c ->{Scope s | r;} Unit
+  Handle t -> (Eff r none Unit)^c ->{Scope s | r} Unit
 foreign effect add_finalizer_to from "./scope.js" "addFinalizerTo"
   retention owner
 ```

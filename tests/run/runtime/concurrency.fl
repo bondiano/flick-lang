@@ -2,7 +2,7 @@
 // Flick declares them over the runtime.
 module App.Main exposing (main)
 
-sleep : Float ->{Async;} Unit
+sleep : Float ->{Async} Unit
 foreign sleep from "./timers.mjs" "sleep"
 
 type error Oops = Oops String
