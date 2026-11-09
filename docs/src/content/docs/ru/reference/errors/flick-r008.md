@@ -1,12 +1,11 @@
 ---
 title: "FLICK-R008"
-source_hash: "d41ff3412f43d60d"
+source_hash: "b615e36741bb05fe"
 ---
 
 Модуль определяет имя дважды в одном пространстве имён: два значения, два типа или два конструктора с одинаковым именем. Сигнатура и её `let` считаются одним определением. Переименуйте или удалите одно из них.
 
-```flick
-# type Shape = Circle Float
-area : Shape -> Float
-let area shape = 0
+```flick fail R008
+type Light = Green | Red
+type Stop = Red | Amber
 ```
