@@ -86,7 +86,8 @@ def KidRow (S : Sig) (o : Nat) (φ : Stage) (E : List Frame) (R : Row) : Prop :=
     (φ.svc (.ob N (.r o)) ∨ .inside o ∈ E ∨ ∃ F ∈ E, ∃ q, F.isHandler ∧ F.bump = some q ∧ q ≤ o))
 
 /-- A handler handles an effect. -/
-theorem installs_op {Ψ' Θ x t φ} {F : Frame} {N : Name} (h : Typ S Ψ' Θ [] (F.plug x) (.ex t φ))
+theorem installs_op {mode : TypingMode} {Ψ' Θ x t φ} {F : Frame} {N : Name}
+    (h : TypM S mode Ψ' Θ [] (F.plug x) (.ex t φ))
     (hi : F.installs N) : ∃ o c a b, S.op N o = some (c, a, b) := by
   cases F <;> simp only [Frame.installs] at hi
   · subst hi
