@@ -39,7 +39,10 @@ export {
   durationZero,
 } from "./duration.ts";
 export { layerMerge, layerOverride, layerRun, layerSucceed } from "./layer.ts";
-export { absent, appFail, flickAssert, flickEcho, flickTodo, refGet, refMake, refModify, refSame, refSet } from "./builtins.ts";
+export {
+  absent, appFail, flickAssert, flickEcho, flickTodo, refGet, refMake, refModify, refSame, refSet,
+  recordLabel, recordGet, recordExtend, recordRemove, recordProject, recordMergeDisjoint, recordLabels,
+} from "./builtins.ts";
 export { exitFailure, exitValue, failureInspect, failurePrimary, failureRawCause, failureRethrow, rawCauseInspect } from "./outcome.ts";
 export { describeReport } from "./describe.ts";
 export { redactedMake, redactedReveal } from "./redacted.ts";

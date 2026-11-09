@@ -61,3 +61,19 @@ export const refModify = (cell: Cell, f: (a: unknown) => readonly [unknown, unkn
   cell.value = next;
   return result;
 };
+
+type Fields = Readonly<Record<string, unknown>>;
+type Erased = unknown;
+export const recordLabel: undefined = undefined;
+export const recordGet = (_has: Erased, label: string, record: Fields): unknown => record[label];
+export const recordExtend = (_lacks: Erased, _union: Erased, label: string, value: unknown, record: Fields): Fields => ({
+  ...record, [label]: value,
+});
+export const recordRemove = (_remove: Erased, label: string, record: Fields): Fields => {
+  const { [label]: _, ...rest } = record;
+  return rest;
+};
+export const recordProject = (labels: ReadonlyArray<string>, record: Fields): Fields =>
+  Object.fromEntries(labels.map((label) => [label, record[label]]));
+export const recordMergeDisjoint = (_union: Erased, a: Fields, b: Fields): Fields => ({ ...a, ...b });
+export const recordLabels = (_labels: Erased, record: Fields): Array<string> => Object.keys(record).toSorted();
