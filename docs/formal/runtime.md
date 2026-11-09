@@ -4,7 +4,7 @@ Extends `core.md` and `regions.md`: everything not redefined here holds as state
 
 References:
 
-- JS — `runtime/src/X.ts`;
+- Effect-backed JS — `packages/effect-ts/src/X.ts`; Flick-owned JS — `runtime/src/rt/X.ts`;
 - Go — `runtime-go/flickrt/X.go`;
 - Effect — `FX/…`, that is, `node_modules/.pnpm/effect@4.1.2/node_modules/effect/src/…`;
 - everything else — as in `core.md`.
@@ -548,7 +548,7 @@ Each law below names the cases that exercise it, under `tests/run/runtime/` unle
 | R8 | `cause_laws`, `cause_lists`, `closing_causes`; `cause_test.go` for (Seq=Par) | both | output |
 | C0 | `closed_owner` | both | trace (`refuse`, the phase), output |
 | C1 | `closing_hooks`; a hook added during C1 or C3: `group_in_closing` | both; `group_in_closing` passes on Go and is a [known gap on JS](#js-a-group-made-while-its-owner-closes-runs-nothing) | output: hooks are not traced, only the place of the phase |
-| C1, a failing hook; a hook added during C4 | not checked by a case: the hooks a Flick program adds (group stops, listener detaches) do not fail, and only a foreign callback can add one in C4. Unit tests: `runtime/test/scope.test.ts`, `owner_test.go` (a hook added during C4) | | not on a run of a program |
+| C1, a failing hook; a hook added during C4 | not checked by a case: the hooks a Flick program adds (group stops, listener detaches) do not fail, and only a foreign callback can add one in C4. Unit tests: `packages/effect-ts/test/scope.test.ts`, `owner_test.go` (a hook added during C4) | | not on a run of a program |
 | C2 | `closing_hooks`, `interrupt_in_finalizer` (closing asks every child before it waits for one), `closing_child_fails` | both | trace (`interrupt`, not projected), output |
 | C3 | `close_phases`, `closing_child_fails`, `supervisor_defect` | both | trace; the output of these cases can hold without the wait, so the monitor is what checks it |
 | C4 | `settling_calls`, `hung_io`, `scopes` | both | trace on JS, where every call is tracked (not projected), output. A call that starts another while settling is not checked |
@@ -637,7 +637,7 @@ let main () =
 
   The cause itself does not change: `Failure.rethrow`, `inspect` and rendering see the original list.
 
-  Fixed in both runtimes (`effect/Cause.ts` `flickReasons`, `mapHead`; `effect/Exit.ts`; Go `mapErrors`, `CauseReasons`). Fixture: `cause_lists.fl` (`Cause.map`, `Exit.map_error` over `Fail B, Fail A`); tests: `runtime/test/cause.test.ts`, `cause_test.go` `TestTheTypedViewOfACauseSeesItsHeadOnly`.
+  Fixed in both runtimes (`effect/Cause.ts` `flickReasons`, `mapHead`; `effect/Exit.ts`; Go `mapErrors`, `CauseReasons`). Fixture: `cause_lists.fl` (`Cause.map`, `Exit.map_error` over `Fail B, Fail A`); tests: `packages/effect-ts/test/cause.test.ts`, `cause_test.go` `TestTheTypedViewOfACauseSeesItsHeadOnly`.
 
 ### Go: a finalizer added during closing runs at once
 
@@ -807,12 +807,12 @@ let tests = [
 ### JS: `fiberSpawn` is interruptible midway
 
 - Divergence (found by reading the code): `fiberSpawn` was not masked (`owner.ts:145-172`). Interrupting the calling fiber at a step boundary after `forkDetach` (154) left the child outside `children` and without a watcher: it outlived its owner and its failure was lost. Interrupting after `children.add` (155) but before the watcher was forked left the child without a supervisor. Breaks I3 and through it R3 and R4. In Go the whole registration is under `o.mu`.
-- Resolution — JS: the body of `fiberSpawn` runs under `Effect.uninterruptible`. Fixed; test: `runtime/test/spawn.test.ts` "an interrupted spawner…": the caller is interrupted at the moment of `children.add`, and without the mask the supervisor is not called.
+- Resolution — JS: the body of `fiberSpawn` runs under `Effect.uninterruptible`. Fixed; test: `packages/effect-ts/test/spawn.test.ts` "an interrupted spawner…": the caller is interrupted at the moment of `children.add`, and without the mask the supervisor is not called.
 
 ### JS: leases register their release outside the mask
 
 - Divergence (found by reading the code): `ScopedRef.set` (`effect/ScopedRef.ts:44-47`) first replaced `ref.current`, then called `retire` on the previous holder; between them was a step boundary where an interruption left the previous holder unreleased. `Resource` (`effect/Resource.ts:25-61`) and `ScopedCache` (`effect/ScopedCache.ts:13-21`) had the same order; an interruption pending at the exit of `acquireHolder` threw away an already acquired holder. Breaks R1. Go has none of these modules.
-- Resolution — JS: registering the holder, replacing the value and `retire` run under one mask, like `acquireRelease` in Effect (G7b). The acquisition itself stays interruptible: the caller's mask is passed into `acquireHolder` through `restore`, as in Effect's `ScopedRef.set`. Fixed. The window between returning the holder and `retire` contains no user code, and the test cannot reach it; `runtime/test/leases.test.ts` pins "exactly once" when `set` is interrupted during acquisition.
+- Resolution — JS: registering the holder, replacing the value and `retire` run under one mask, like `acquireRelease` in Effect (G7b). The acquisition itself stays interruptible: the caller's mask is passed into `acquireHolder` through `restore`, as in Effect's `ScopedRef.set`. Fixed. The window between returning the holder and `retire` contains no user code, and the test cannot reach it; `packages/effect-ts/test/leases.test.ts` pins "exactly once" when `set` is interrupted during acquisition.
 
 ### A `provide` service outlives the release of its layer
 
@@ -849,7 +849,7 @@ let main () =
 ### A closing hook added after C1 does not run
 
 - Divergence (found by reading the code): `close` walked `owner.closing` once (`owner.ts:58-61`). A hook added during C3 — for example, a supervisor creating a `FiberSet` in the region of the closing owner — was skipped. The group was then stopped by its own Effect finalizer in C5, by its place in the stack, as in the [Go group divergence](#go-a-fiber-group-is-stopped-by-a-finalizer). Breaks R2 in a rare case.
-- Resolution — JS and Go: after C3, run the hooks added since closing began and wait for them; no new children can enter `K` after C0 (I2). Fixed; tests: `runtime/test/scope.test.ts` "a closing hook a supervisor adds…", `owner_test.go` `TestAHookAddedWhileClosingRuns`.
+- Resolution — JS and Go: after C3, run the hooks added since closing began and wait for them; no new children can enter `K` after C0 (I2). Fixed; tests: `packages/effect-ts/test/scope.test.ts` "a closing hook a supervisor adds…", `owner_test.go` `TestAHookAddedWhileClosingRuns`.
 
 ### The refresh fiber of `resource_auto`
 
@@ -911,7 +911,7 @@ Found by the Lean development `formal/Formal/RT/`.
 
 - Divergence (found by reading the code and the model): JS and Go ran the hooks added since closing began after C3, and then only waited for foreign Promises (C4: `settle`, `owner.ts:100-101`; Go `closeWithCause`). A hook added to `H(π)` during C4 did not run: a group created at that time was stopped by its own Effect finalizer in C5, as in the [Go group divergence](#go-a-fiber-group-is-stopped-by-a-finalizer). The Lean proof of R2 and R3 depends on this point: (C5) must start with `H(π) = ∅`.
 - Reachability: only a fiber whose current owner is `π` can add a hook to `π` during C4. By I4 these are the body, children, watchers, group children and branches started in `π`, and by C4 they have finished. What remains is a violation of I4 (G6) and a foreign call that adds a hook when it settles: the tests of the fix do exactly this.
-- Resolution — JS and Go: after C4, run the hooks added since, and wait for foreign calls again; repeat while hooks are being added, and only then start C5. This matches the premise `H(π) = ∅` of `Step.fins` in the model. In Go the check "no hooks" and `finalizing := true` happen under one `o.mu`, so a hook added later runs at once. Fixed; tests: `runtime/test/scope.test.ts` "a closing hook added while foreign calls settle…", `owner_test.go` `TestAHookAddedWhileCallsSettleRuns`, both fail without the fix.
+- Resolution — JS and Go: after C4, run the hooks added since, and wait for foreign calls again; repeat while hooks are being added, and only then start C5. This matches the premise `H(π) = ∅` of `Step.fins` in the model. In Go the check "no hooks" and `finalizing := true` happen under one `o.mu`, so a hook added later runs at once. Fixed; tests: `packages/effect-ts/test/scope.test.ts` "a closing hook added while foreign calls settle…", `owner_test.go` `TestAHookAddedWhileCallsSettleRuns`, both fail without the fix.
 
 ### The provide-liveness premise is stronger than typing gives
 

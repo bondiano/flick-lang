@@ -4,7 +4,7 @@
 // pin: `node tools/go-mime/gen.mjs`.
 import { readFileSync, writeFileSync } from "node:fs";
 
-const effect = new URL("../../runtime/node_modules/effect/", import.meta.url);
+const effect = new URL("../../packages/effect-ts/node_modules/effect/", import.meta.url);
 const { version } = JSON.parse(readFileSync(new URL("package.json", effect), "utf8"));
 // the module is internal, out of reach of the package's exports
 const { default: types } = await import(new URL("dist/http/internal/mimeTypes.js", effect).href);

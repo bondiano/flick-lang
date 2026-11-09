@@ -10,8 +10,8 @@
 import { chmodSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { Effect, Exit, FileSystem } from "../../runtime/node_modules/effect/dist/index.js";
-import { layer } from "../../runtime/node_modules/@effect/platform-node/dist/NodeFileSystem.js";
+import { Effect, Exit, FileSystem } from "../../packages/effect-ts/node_modules/effect/dist/index.js";
+import { layer } from "../../packages/effect-ts/node_modules/@effect/platform-node/dist/NodeFileSystem.js";
 
 const out = new URL("../../runtime-go/flickrt/testdata/glob.txt", import.meta.url);
 

@@ -110,21 +110,18 @@ on it; a difference between them is fixed in a runtime, not in the test.
 and checks that the source map and Go's `//line` directives still lead to
 its `.fl` files.
 
-## Runtime tests — `runtime/test/`
+## Runtime tests — `runtime/test/` and `packages/effect-ts/test/`
 
-The runtime is TypeScript 7 (`runtime/src/*.ts`), built to `runtime/dist/`
-with declarations; `just e2e` type-checks it with `tsc` (strict, with
-`noUncheckedIndexedAccess` and `exactOptionalPropertyTypes`, tests included),
-lints it with `oxlint --type-aware` (no `any`, no floating promises, and an
-unchecked type assertion only with its reason beside it) and runs the tests.
+Both packages use TypeScript 7 and build declarations. `just e2e` type-checks
+their sources and tests with `tsc` (strict, with `noUncheckedIndexedAccess` and
+`exactOptionalPropertyTypes`), lints them with `oxlint --type-aware`, and runs
+their tests. The runtime tests cover Flick's own RT kernel and its pure helpers;
+the adapter tests cover Effect integration, including recovery, cleanup,
+concurrency, the Effect `4.1.2` pin and its capability matrix, and codecs.
 
-`node --test` in `runtime/` runs the `.test.ts` files on Node's type
-stripping, after building `dist/`, and checks the adapter's
-contracts directly on Effect: the recovery table of `try … with`, inert cause
-reports, the two-phase close of owners, children and supervisors,
-concurrency, races and layers, the Effect `4.1.2` pin and its capability
-matrix, codecs against their compiled decoders. Entry runner tests start
-`runtime/fixtures/entry.ts` in a child process and send it signals.
+`node --test` runs each package's `.test.ts` files after its `dist/` build.
+Entry runner tests start `packages/effect-ts/fixtures/entry.ts` in a child
+process and send it signals.
 
 ## Syntax corpus and fuzzing — `flick-core/tests/{corpus,fuzz}.rs`
 

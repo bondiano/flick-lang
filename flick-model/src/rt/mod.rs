@@ -1,6 +1,6 @@
 //! `λRT` on traces (docs/formal/runtime.md). With `FLICK_TRACE` set, both
 //! runtimes write the steps of the owner contract as JSON lines
-//! (`runtime-go/flickrt/trace.go` lists the events, `runtime/src/trace.ts`
+//! (`runtime-go/flickrt/trace.go` lists the events, `packages/effect-ts/src/trace.ts`
 //! writes the same). [`monitor::check`] replays a trace and reports the
 //! first step `λRT` does not allow; [`project::project`] is what of a trace
 //! must agree between the JS and Go runs of one program: per owner, not
