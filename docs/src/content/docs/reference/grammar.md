@@ -85,8 +85,6 @@ tokens.
 
 ### String literals
 
-There is no interpolation.
-
 - `"…"` on one line, with escapes `\n \t \r \\ \" \0` and `\u{…}` with 1 to 6
   hex digits naming a Unicode scalar value (no surrogates, at most `10FFFF`).
   `\0` cannot be followed by a digit. Any other escape is `FLICK-S005`.
@@ -98,6 +96,17 @@ There is no interpolation.
   removes the common indentation of the non-blank lines (the closing line
   counts). Escapes are decoded after that, so `\u{20}` is content, not
   indentation.
+- A hole `\{e}` in a one-line string `"…"` puts `display e` there:
+  `"n = \{n + 1}"` is `"n = " ++ display (n + 1)`. `display` is the method of
+  the Prelude class `Display`: a `String` is itself, without the quotes `show`
+  adds, and `Int`, `Float` and `Bool` are spelled as `show` spells them. A
+  type without an instance is `FLICK-C001`. The expression of a hole ends on
+  the line of its string (`FLICK-S004` otherwise) and may hold braces and
+  strings with holes of their own. Raw strings have no holes, `\{` in a
+  multi-line string is `FLICK-S005`, and neither a string pattern nor the
+  message of `todo` has them (`FLICK-S007`, `FLICK-S005`). The
+  release optimizer joins the constant parts: `"\{2 + 3} of \{"x"}"` compiles
+  to `"5 of x"`.
 
 Line breaks inside any string value are `\n`, also in `\r\n` sources.
 Expressions made only of literals are evaluated at compile time with JS
@@ -110,6 +119,7 @@ let examples =
     "tab\t and \u{1F600}",
     r"C:\temp",
     r#"say "hi""#,
+    "sum: \{2 + 3}",
     """
     first line
       indented line

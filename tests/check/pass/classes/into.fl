@@ -1,0 +1,32 @@
+// `into` converts without loss to the type its place expects; the class
+// has no functional dependency, so the target comes from the context.
+module App.Into exposing (..)
+
+half : Int -> Float
+let half n = into n / 2.0
+
+big : Int -> BigInt
+let big n = into n
+
+annotated : Float
+let annotated = (into 2 : Float) + 0.5
+
+/// A program converts its own types the same way.
+unboxed type Celsius = Celsius Float
+
+unboxed type Fahrenheit = Fahrenheit Float
+
+instance Into Celsius Fahrenheit =
+  let into c =
+    match c with
+    | Celsius t -> Fahrenheit (t * 9.0 / 5.0 + 32.0)
+
+boiling : Fahrenheit
+let boiling = into (Celsius 100.0)
+
+/// A function generic over the conversion takes it as a constraint.
+widen_all : Into a b => List a -> List b
+let widen_all xs = List.map into xs
+
+floats : List Float
+let floats = widen_all [1, 2, 3]

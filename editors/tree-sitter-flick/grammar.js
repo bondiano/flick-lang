@@ -84,7 +84,15 @@ module.exports = grammar({
       /[0-9][0-9_]*(\.[0-9][0-9_]*)?([eE][+-]?[0-9_]+)?n?/,
     )),
 
-    string: _ => token(seq('"', repeat(choice(/[^"\\\n]/, /\\./)), '"')),
+    // a hole `\{…}` holds tokens, so the string is a node, not one token
+    string: $ => seq(
+      '"',
+      repeat(choice($._string_content, $._escape_sequence, $.interpolation)),
+      token.immediate('"'),
+    ),
+    _string_content: _ => token.immediate(prec(1, /[^"\\\n]+/)),
+    _escape_sequence: _ => token.immediate(/\\(u\{[0-9a-fA-F]*\}|[^{\n])/),
+    interpolation: $ => seq(token.immediate('\\{'), repeat($._token), '}'),
 
     doc_comment: _ => token(seq('///', optional(seq(/[^/\n]/, /[^\n]*/)))),
     line_comment: _ => token(seq('//', /[^\n]*/)),

@@ -1,0 +1,16 @@
+module Main exposing (main, label, greeting)
+
+label : Int -> String
+let label n = "n = \{n}, n + 1 = \{n + 1}!"
+
+greeting : String
+let greeting = "Hello, \{"Ada"}: \{42} \{1.5} \{true} \{-0.0}"
+
+main : Unit ->{} Unit
+let main () =
+  let name = "Flick"
+  Platform.stdout_line "Hello, \{name}!"
+  Platform.stdout_line (label 41)
+  Platform.stdout_line greeting
+  Platform.stdout_line "nested \{"[\{name}]"} \{{ a = 1 }.a} \{show "q"}"
+  Platform.stdout_line "\{1}\{2}"

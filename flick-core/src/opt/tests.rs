@@ -323,6 +323,22 @@ fn show_of_a_literal_folds_into_the_string() {
 }
 
 #[test]
+fn an_interpolation_of_constants_folds_into_one_string() {
+    let js = release(
+        "module App exposing (shown, label)\n\n\
+         shown : String\nlet shown = \"a \\{\"b\"} \\{2 + 3} \\{1.5} \\{true} \\{-0.0}!\"\n\n\
+         label : Int -> String\nlet label n = \"[\\{\"x\"}\\{1}] \\{n}\"\n",
+    );
+    assert!(
+        js.contains(r#"export const shown = "a b 5 1.5 true -0!";"#),
+        "{js}"
+    );
+    // the constants before a hole join into one part
+    assert!(js.contains(r#""[x1] " + "#), "{js}");
+    assert!(!js.contains("$display(\"x\")"), "{js}");
+}
+
+#[test]
 fn show_folds_as_the_runtime_spells_it() {
     let js = release(
         "module App exposing (shown, fraction)\n\n\

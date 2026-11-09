@@ -1,6 +1,6 @@
 ---
 title: "Стандартная библиотека"
-source_hash: ccca3e82ccc8e721
+source_hash: b815007010ee8d67
 ---
 
 Стандартная библиотека написана на Flick и использует адаптер среды выполнения
@@ -21,6 +21,8 @@ source_hash: ccca3e82ccc8e721
 | Имя | Назначение |
 | - | - |
 | `Eq`, `Ord`, `Hash`, `Show` | каноническое равенство, полный порядок, хеширование, представление для вывода |
+| `Display` | текст для читателя, то, что подставляет дырка `\{e}` строки: `String` без кавычек |
+| `Into` | `into`, преобразование без потерь в тип, которого ждёт место: `Int` в `Float` или `BigInt` |
 | `Functor`, `Foldable`, `Traversable`, `Applicative`, `Monad` | классы для конструкторов типов `f : Type -> Type`: `map`, `fold` и `fold_map`, `traverse`, `pure` и `map2`, `flat_map` |
 | `Semigroup`, `Monoid`, `Alternative` | `combine` и `empty` (`String`, `List a`, обёртки из `Monoids`), `nothing` и `or_else` |
 | `bind`, `bind_eff` | последовательное выполнение для любой монады и для `Eff` с объединением строк |

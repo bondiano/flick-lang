@@ -87,6 +87,48 @@ fn strings_escapes_raw_and_multiline() {
 }
 
 #[test]
+fn holes_of_strings() {
+    let (tokens, errors) = kinds(r#""a\{x}b\{ {c = "\{d}"}.c }e" "\{}""#);
+    assert!(errors.is_empty(), "{errors:?}");
+    let texts: Vec<_> = tokens.iter().map(|t| (t.0, t.1)).collect();
+    assert_eq!(
+        texts,
+        [
+            (K::StringStart, r#""a\{"#),
+            (K::Ident, "x"),
+            (K::StringMid, r"}b\{"),
+            (K::LBrace, "{"),
+            (K::Ident, "c"),
+            (K::Eq, "="),
+            (K::StringStart, r#""\{"#),
+            (K::Ident, "d"),
+            (K::StringEnd, r#"}""#),
+            (K::RBrace, "}"),
+            (K::Dot, "."),
+            (K::Ident, "c"),
+            (K::StringEnd, r#"}e""#),
+            (K::StringStart, r#""\{"#),
+            (K::StringEnd, r#"}""#),
+        ]
+    );
+    // a hole ends with its line; raw strings have none, multi-line ones report it
+    let (tokens, errors) = kinds("\"a\\{x\ny}");
+    assert!(errors.is_empty(), "{errors:?}");
+    assert_eq!(tokens.last().map(|t| t.0), Some(K::RBrace));
+    assert_eq!(kinds(r#"r"\{x}""#).0.len(), 1);
+    assert_eq!(kinds("\"\"\"\n\\{x}\n\"\"\"").1, ["FLICK-S005 \\{"]);
+    assert_eq!(kinds(r#""a\{x}b"#).1, ["FLICK-S004 }"]);
+    // a comment or a multi-line string that crosses the line ends the hole too
+    for src in ["\"a\\{x /* c\n */ }b\"", "\"a\\{x \"\"\"\nb\n\"\"\" }c\""] {
+        let (tokens, _) = kinds(src);
+        assert!(
+            tokens.iter().all(|t| t.0 != K::StringEnd),
+            "{src:?}: {tokens:?}"
+        );
+    }
+}
+
+#[test]
 fn comments_keywords_and_operators() {
     let (tokens, errors) = kinds("/* a /* b */ c */ /// doc\n// c\nlet x |> y ->{} ** -1");
     assert!(errors.is_empty());

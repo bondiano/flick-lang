@@ -153,6 +153,30 @@ instance Show String =
 instance Show Bool =
   let show x = show_prim x
 
+instance Display String =
+  let display x = x
+
+instance Display Int =
+  let display x = show_prim x
+
+instance Display Float =
+  let display x = show_prim x
+
+instance Display Bool =
+  let display x = show_prim x
+
+float_of_int : Int -> Float
+foreign pure float_of_int from global "Number"
+
+bigint_of_int : Int -> BigInt
+foreign pure bigint_of_int from global "BigInt"
+
+instance Into Int Float =
+  let into n = float_of_int n
+
+instance Into Int BigInt =
+  let into n = bigint_of_int n
+
 instance Show Unit =
   let show _x = "()"
 

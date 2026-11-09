@@ -34,11 +34,17 @@ fn lex_with(text: &str, file: FileId, generated: bool) -> (Vec<RawToken>, Vec<Di
         generated,
         tokens: Vec::new(),
         errors: Vec::new(),
+        holes: Vec::new(),
     };
     while lexer.pos < lexer.src.len() {
         let start = lexer.pos;
         let kind = lexer.token();
         debug_assert!(lexer.pos > start, "lexer makes progress");
+        // a hole ends with the line of its string, also inside a comment
+        // or a multi-line string that crosses it
+        if !lexer.holes.is_empty() && text[start..lexer.pos].contains('\n') {
+            lexer.holes.clear();
+        }
         lexer.tokens.push(RawToken {
             kind,
             start: offset(start),
@@ -56,6 +62,9 @@ struct Lexer<'a> {
     generated: bool,
     tokens: Vec<RawToken>,
     errors: Vec<Diagnostic>,
+    /// The `\{…}` of strings open around `pos`, innermost last: how many
+    /// `{` each has open, so its own `}` resumes the string.
+    holes: Vec<u32>,
 }
 
 fn offset(n: usize) -> u32 {
@@ -87,6 +96,14 @@ impl Lexer<'_> {
         use SyntaxKind as K;
         let start = self.pos;
         let b = self.peek(0);
+        if let Some(&open) = self.holes.last() {
+            match b {
+                b'}' if open == 0 => return self.string_rest(),
+                // a hole ends with the line of its string
+                b'\n' | b'\r' if b == b'\n' || self.peek(1) == b'\n' => self.holes.clear(),
+                _ => {}
+            }
+        }
         match b {
             b' ' | b'\t' => {
                 while matches!(self.peek(0), b' ' | b'\t') {
@@ -158,32 +175,42 @@ impl Lexer<'_> {
                     K::Ident
                 }
             }
-            _ => {
-                if let Some((len, kind)) = self.punct() {
-                    self.pos += len;
-                    return kind;
+            _ => self.symbol(start),
+        }
+    }
+
+    fn symbol(&mut self, start: usize) -> SyntaxKind {
+        use SyntaxKind as K;
+        if let Some((len, kind)) = self.punct() {
+            self.pos += len;
+            if let Some(open) = self.holes.last_mut() {
+                match kind {
+                    K::LBrace => *open += 1,
+                    K::RBrace => *open -= 1,
+                    _ => {}
                 }
-                // one token and one diagnostic for a whole run of stray characters
-                loop {
-                    self.pos += self.rest().chars().next().map_or(1, char::len_utf8);
-                    let next = self.peek(0);
-                    let known = next.is_ascii_alphanumeric()
-                        || matches!(next, b' ' | b'\t' | b'\n' | b'\r' | b'"' | b'_')
-                        || self.punct().is_some();
-                    if self.pos >= self.src.len() || known {
-                        break;
-                    }
-                }
-                let shown = &self.text[start..self.pos];
-                self.error(
-                    codes::S003,
-                    start,
-                    self.pos,
-                    format!("unexpected character{} `{shown}`", plural(shown)),
-                );
-                K::Unknown
+            }
+            return kind;
+        }
+        // one token and one diagnostic for a whole run of stray characters
+        loop {
+            self.pos += self.rest().chars().next().map_or(1, char::len_utf8);
+            let next = self.peek(0);
+            let known = next.is_ascii_alphanumeric()
+                || matches!(next, b' ' | b'\t' | b'\n' | b'\r' | b'"' | b'_')
+                || self.punct().is_some();
+            if self.pos >= self.src.len() || known {
+                break;
             }
         }
+        let shown = &self.text[start..self.pos];
+        self.error(
+            codes::S003,
+            start,
+            self.pos,
+            format!("unexpected character{} `{shown}`", plural(shown)),
+        );
+        K::Unknown
     }
 
     /// Whether the word at `start` names a value even if it spells a
@@ -341,6 +368,32 @@ impl Lexer<'_> {
         } else {
             self.pos += 1;
         }
+        match self.string_body(start, triple) {
+            Body::Closed => SyntaxKind::String,
+            Body::Hole => {
+                self.holes.push(0);
+                SyntaxKind::StringStart
+            }
+        }
+    }
+
+    /// The part of a string after the `}` of a hole: up to the next hole,
+    /// or to the end of the string.
+    fn string_rest(&mut self) -> SyntaxKind {
+        let start = self.pos;
+        self.pos += 1;
+        match self.string_body(start, false) {
+            Body::Hole => SyntaxKind::StringMid,
+            Body::Closed => {
+                self.holes.pop();
+                SyntaxKind::StringEnd
+            }
+        }
+    }
+
+    /// The text of a string from `pos` to its closing quote, past it, or to
+    /// a `\{` that opens a hole, past it; `start` is where the token began.
+    fn string_body(&mut self, start: usize, triple: bool) -> Body {
         loop {
             if self.pos >= self.src.len() || (!triple && matches!(self.peek(0), b'\n' | b'\r')) {
                 let len = if triple { 3 } else { 1 };
@@ -350,22 +403,33 @@ impl Lexer<'_> {
                     start + len,
                     "unterminated string: missing closing `\"`",
                 );
-                break;
+                return Body::Closed;
             }
             if triple && self.rest().starts_with("\"\"\"") {
                 self.pos += 3;
-                break;
+                return Body::Closed;
             }
             match self.peek(0) {
                 b'"' if !triple => {
                     self.pos += 1;
-                    break;
+                    return Body::Closed;
+                }
+                b'\\' if self.peek(1) == b'{' => {
+                    self.pos += 2;
+                    if !triple {
+                        return Body::Hole;
+                    }
+                    self.error(
+                        codes::S005,
+                        self.pos - 2,
+                        self.pos,
+                        "`\\{…}` interpolates only in a one-line string `\"…\"`",
+                    );
                 }
                 b'\\' => self.escape(),
                 _ => self.pos += self.rest().chars().next().map_or(1, char::len_utf8),
             }
         }
-        SyntaxKind::String
     }
 
     fn escape(&mut self) {
@@ -535,6 +599,14 @@ impl Lexer<'_> {
         }
         self.src[start..self.pos].iter().any(|&b| is_digit(b))
     }
+}
+
+/// Where the text of a string stopped.
+enum Body {
+    /// At its closing quote, or where a missing one was reported.
+    Closed,
+    /// After the `\{` of a hole.
+    Hole,
 }
 
 fn plural(s: &str) -> &'static str {

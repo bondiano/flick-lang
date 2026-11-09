@@ -11,6 +11,7 @@ mod enums;
 mod expr;
 mod generic;
 mod handle;
+mod interpolation;
 mod lambda;
 mod literals;
 mod numeric;

@@ -110,4 +110,18 @@ let tests = [
       Test.equal "\"\\ud83d\"" (show (String.slice 0 1 "\u{1F600}"))
     ),
   ],
+  Test.group "interpolation" [
+    Test.test "a string is itself" (fun () ->
+      Test.equal "say \"hi\" \\ now" "say \{concat "\"hi\"" " \\"} now"
+    ),
+    Test.test "numbers and booleans as show spells them" (fun () ->
+      Test.equal
+        "42 1.5 -0 1e+21 true"
+        "\{40 + 2} \{1.5} \{-0.0} \{1000000000.0 * 1000000000000.0} \{1 < 2}"
+    ),
+    Test.test "the halves of a pair join" (fun () ->
+      Test.equal earth "\{String.slice 0 2 earth}\{String.slice 2 4 earth}"
+    ),
+    Test.test "holes nest" (fun () -> Test.equal "[a[b]c]" "[\{concat "a" "[\{concat "b" ""}]"}c]"),
+  ],
 ]

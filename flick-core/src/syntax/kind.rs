@@ -15,6 +15,12 @@ pub enum SyntaxKind {
     Number,
     BigInt,
     String,
+    /// `"text\{` of a string with holes: up to its first hole.
+    StringStart,
+    /// `}text\{` between two holes.
+    StringMid,
+    /// `}text"` after the last hole.
+    StringEnd,
 
     // keywords
     ModuleKw,
@@ -172,6 +178,8 @@ pub enum SyntaxKind {
     // nodes: expressions
     Block,
     Literal,
+    /// `"text \{e} text"`: a string with holes, each a `display` of its expression.
+    InterpExpr,
     NameExpr,
     Path,
     FieldExpr,
@@ -367,6 +375,7 @@ pub fn describe(kind: SyntaxKind) -> &'static str {
         K::Con => "a capitalized name",
         K::Number | K::BigInt => "a number",
         K::String => "a string",
+        K::StringMid | K::StringEnd => "`}` to close `\\{`",
         K::LParen => "`(`",
         K::RParen => "`)`",
         K::LBracket => "`[`",

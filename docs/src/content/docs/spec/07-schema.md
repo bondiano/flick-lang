@@ -1,6 +1,6 @@
 ---
 title: "Schema and standard data types"
-source_hash: 7a0adbbe597ed73e
+source_hash: f3d895d62ea1106b
 ---
 
 ## The boundary between the language core and the library
@@ -307,7 +307,7 @@ There are three numeric types with one meaning on every backend. `Int` is a 32-b
 | Literals | An integer literal is of the numeric type its use requires, else `Int`, and must fit that type; a literal with a fraction or exponent is `Float`; the suffix `n` selects `BigInt` |
 | Checked forms | `Int.checked_add`, `checked_div`, … return `Result Int.ArithmeticError Int`; `Int.unsafe_div` and `unsafe_rem` are a defect on zero |
 | Bitwise operations | Named functions of `Int` on its 32 bits |
-| Cross-type coercions | None, implicit or by `==`; `Int.to_float`, `Int.from_float` and `Int.truncate` convert explicitly |
+| Cross-type coercions | None implicit, including through `==`; explicit `into` converts `Int` to `Float` or `BigInt` without loss; `Int.to_float`, `Int.from_float` and `Int.truncate` remain available |
 | JS representation | `Int` and `Float` are a JS `number`, `BigInt` a JS `bigint`; a foreign `Int` is trusted to be one |
 | JSON | `Int.json` accepts integers in range; the Float domain is wider than JSON: a finite codec rejects an unsupported value, a lossless codec uses an explicit tagged/string form |
 
