@@ -14,6 +14,9 @@ across the boundary, including codecs with runtime effects. Nested `Option`
 and `Result` values retain their meaning in generic library calls. A project
 that uses only RT bindings does not load the bridge.
 
+`Schema.number` validates runtime Floats, including non-finite values nested
+in lists, records or variants. Its JSON codec still rejects non-finite numbers.
+
 Opaque Stream values stay in the adapter. Native atoms, routes and renderers remain on RT. If a used UI binding needs
 the adapter (such as streamed server rendering), atoms, forms, routes and
 renderers use their matching Effect implementations together for the build.

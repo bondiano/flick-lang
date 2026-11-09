@@ -135,14 +135,18 @@ test("separate opaque native transforms retain their own JSON codecs", () => {
   assert.deepEqual(number.value, [7]);
 });
 
-test("native number generation stays finite while the runtime witness accepts infinity", async () => {
+test("native number generation retains Float values while JSON encoding stays finite", async () => {
   const host = schemaToEffect(schemaNumber);
   assert.ok(Schema.isSchema(host));
   assert.ok(isPure(host));
   assert.equal(Schema.decodeUnknownExit(host)(Infinity)._tag, "Success");
   const values = await Effect.runPromise(Arbitrary.sampleEffect(arbitrarySchema(host), { count: 1000, seed: 11 }));
   assert.equal(values.length, 1000);
-  assert.ok(values.every((value) => typeof value === "number" && Number.isFinite(value)));
+  assert.ok(values.every((value) => typeof value === "number"));
+  assert.ok(values.some((value) => !Number.isFinite(value)));
+  const codec = codecToEffect(schemaNumber);
+  assert.ok(Schema.isSchema(codec) && isPure(codec));
+  assert.equal(Schema.encodeUnknownExit(codec)(Infinity)._tag, "Failure");
 });
 
 test("distinct native witnesses keep their identities across schema and codec crossings", () => {

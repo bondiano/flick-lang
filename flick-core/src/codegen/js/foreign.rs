@@ -192,8 +192,15 @@ impl Gen<'_> {
             let callback = copies.and_then(|c| c.callbacks.get(i).cloned().flatten());
             let arg = match info.callbacks.get(i).copied().flatten() {
                 _ if info.optional.contains(&i) => {
-                    let arg = format!("{}({param})", self.rt("optionalArg"));
-                    self.copied(copy, arg)
+                    if bridged {
+                        let value = self.copied(copy, param.clone());
+                        let shape = info.shapes.get(i).unwrap_or(&Shape::Data);
+                        let host = self.crossed(Toward::Host, shape, value);
+                        format!("{}({host})", self.rt("optionalArg"))
+                    } else {
+                        let arg = format!("{}({param})", self.rt("optionalArg"));
+                        self.copied(copy, arg)
+                    }
                 }
                 n if bridged => {
                     let value = self.copied(copy, param.clone());

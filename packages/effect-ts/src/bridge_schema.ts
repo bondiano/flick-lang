@@ -31,9 +31,7 @@ const describedToEffect = (codec: Witness): AnySchema | undefined => {
   if (description === undefined) return undefined;
   switch (description.kind) {
     case "string": return hostString;
-    case "number": return withJson(hostNumber.check(Schema.makeFilter(() => true, {
-      arbitraryConstraint: { number: "finite" },
-    })), () => hostJsonCodec(hostNumber));
+    case "number": return hostNumber;
     case "int": return hostInt;
     case "bigint": return hostBigint;
     case "bool": return hostBool;

@@ -244,6 +244,37 @@ fn a_project_of_two_modules_built_again_and_after_an_edit_of_each() {
     }
 }
 
+#[test]
+#[ignore = "needs Node and pnpm install"]
+fn optional_effect_arguments_cross_the_bridge_only_when_present() {
+    let app = project(
+        "rt_stages/optional_effect",
+        &[
+            ("flick.toml", APP),
+            (
+                "package.json",
+                "{\"type\":\"module\",\"dependencies\":{\"@flick-lang/effect-ts\":\"*\"}}",
+            ),
+            (
+                "src/App/Main.fl",
+                "module App.Main exposing (main)\n\n\
+             pick : Option (Eff none none Float) ->{} Float\n\
+             foreign effect pick from \"./bindings.mjs\" \"pick\"\n  optional 0\n\n\
+             main : Unit ->{Async; AppError} Unit\n\
+             let main () =\n  Platform.stdout_line (show (pick (Some (task { 42 }))))\n  Platform.stdout_line (show (pick None))\n",
+            ),
+            (
+                "src/App/bindings.mjs",
+                "import { succeed } from '@flick-lang/effect-ts/effect/Effect';\nexport const pick = value => value === undefined ? succeed(7) : value;\n",
+            ),
+        ],
+    );
+    for args in [vec!["--rt"], vec!["--rt", "--profile", "release"]] {
+        build(&app, &args);
+        assert_eq!(run(&app), "42\n7\n");
+    }
+}
+
 /// Whether the build in `out` under `app` is one for the kernel, by what its main
 /// module imports, and whether its interface records a direct arrow.
 fn on_the_kernel(app: &Path, out: &str) -> (bool, bool) {

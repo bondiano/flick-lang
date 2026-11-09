@@ -66,6 +66,22 @@ fn effect_bridge_converts_the_public_chunks_underlying_core_type() {
 }
 
 #[test]
+fn effect_bridge_converts_optional_effect_values_before_unwrapping_them() {
+    let code = on_rt_with_bridge(
+        "module App exposing (choose)\n\
+         choose : Option (Eff none none Int) -> Eff none none Int\n\
+         foreign pure choose from \"./bindings.mjs\" \"choose\"\n  optional 0\n",
+        EffectBridge::Available,
+    );
+    let compact: String = code.split_whitespace().collect();
+    assert!(
+        compact.contains("optionalArg($bridge_optionToEffect("),
+        "{code}"
+    );
+    assert!(compact.contains("$bridge_callEffect("), "{code}");
+}
+
+#[test]
 fn on_flick_runtime_a_runtime_stage_is_a_generator_and_a_tail_call_is_returned() {
     let code = on_rt(
         "module App exposing (f, g)\n\

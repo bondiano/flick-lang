@@ -1,6 +1,7 @@
 // Pure codec values on Flick's own runtime. The JSON codec accepts only
 // finite numbers: parsing 1e400 yields Infinity.
 import { type Result, err, none, ok, some } from "../core/data.ts";
+import { structuralValue } from "./schema_value.ts";
 import { type Case, type SchemaNode, node } from "./schema_nodes.ts";
 export { schemaDescription } from "./schema_nodes.ts";
 import { tag } from "../tags.ts";
@@ -40,7 +41,7 @@ const at = (path: string, key: string | number): string =>
   typeof key === "number" ? `${path}[${key}]` : path ? `${path}.${key}` : key;
 
 export const witness = (kind: string, decode: Check, encode: Check,
-  value: Check = (input, path) => map(encode(input, path), () => input),
+  value?: Check,
   description?: SchemaNode): Witness => {
   const schema = {
     kind,
@@ -48,7 +49,7 @@ export const witness = (kind: string, decode: Check, encode: Check,
     encode: (input: unknown) => encode(input, ""),
     decodeAt: decode,
     encodeAt: encode,
-    value,
+    value: value ?? ((input: unknown, path: string) => structuralValue(description, input, path, schemaError) ?? map(encode(input, path), () => input)),
   };
   return description ? node(schema, description) : schema;
 };

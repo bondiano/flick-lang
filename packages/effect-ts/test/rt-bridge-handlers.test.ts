@@ -39,7 +39,7 @@ test("a native service exposed through Effect converts data on both sides of its
     echo: (input: unknown) => {
       assert.deepEqual(input, some("Ada"));
       assert.equal(Object.getPrototypeOf(input), Object.prototype);
-      return (function* (): Run { return { nested: [some("Ada")] }; })();
+      return (function* (): Run { return yield { nested: [some("Ada")] }; })();
     },
   };
   const request = Effect.flatMap(Effect.service(key), (value) => value.echo(Option.some("Ada")));
