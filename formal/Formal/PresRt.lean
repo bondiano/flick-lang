@@ -293,7 +293,7 @@ theorem rt_preservation {Ψ Θ Λ μ e t φ Λ' μ' e'} (h : Typ S Ψ Θ [] e (.
   | hkarmUnw hEi hk => exact same (hkarm_unw hEi hk h)
   | hresRaise hA ha _ => exact same (hres_signal hA ha raise_any h)
   | hresUnw hA ha => exact same (hres_signal hA ha unw_any h)
-  | hwithCatch => exact same (hwith_catch (fun h => nomatch h) h)
+  | hwithCatch => exact same (hwith_catch h)
   | hdl =>
     cases h with
     | hdl hal hn hrf hψ he hφ₀ hOb hc' hφ' hT =>

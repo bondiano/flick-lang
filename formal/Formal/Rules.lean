@@ -179,6 +179,7 @@ inductive TypM : List Ty → Facts → List Scheme → Tm → J → Prop
       TypM Ψ Θ Γ rf (.ex (.arrow t ψ t' C) (.rt r ε)) → (mode.use ψ C).le (.rt r ε) →
       TypM Ψ Θ Γ e (.ex t φ₀) → φ₀.le (.rt (Row.hP Θ p E r) ε) →
       S.Handles E al r → (Stage.rt r ε).le φ → mode.subtype t' T →
+      (mode = .live → φ.svc (.atm (.r p))) →
       TypM Ψ Θ Γ (.hwith p ℓ E al rf e) (.ex T φ)
   /-- While an arm runs, the body is parked where it performed the operation `o`: it is
   typed with the operation at the hole, the argument left out. A `tail` arm gives that
@@ -194,6 +195,7 @@ inductive TypM : List Ty → Facts → List Scheme → Tm → J → Prop
         (mode.use (.rt r ε) (if tl then Caps.none else (Ty.rg p).reach))) →
       (tl = false → ∃ C', Ψ[κ]? = some (.arrow b₀ (.rt r ε) t' C') ∧ C' (.r p)) →
       S.Handles E al r → (Stage.rt r ε).le φ → mode.subtype t' T →
+      (mode = .live → φ.svc (.atm (.r p))) →
       TypM Ψ Θ Γ (.hctl p ℓ κ tl E al rf a k) (.ex T φ)
   /-- While the resumed body runs, the arm is parked where it called `resume`, the
   argument left out. -/

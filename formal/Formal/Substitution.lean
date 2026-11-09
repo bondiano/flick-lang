@@ -151,16 +151,16 @@ theorem TypM.subst {Ψ Θ Γ e J} (h : TypM S mode Ψ Θ Γ e J) :
       (h x hx).imp id fun ⟨C', h₁, h₂⟩ => ⟨C', h₁.elim id False.elim, h₂⟩)
     exact .hdl h₁ (SubOkM.noIns hσ (by simpa using hal.frees) hn) (ih₂ hσ) hψ (ih₃ hσ) hφ₀ hOb ⟨hc.1, fun h => hc.2 fun hc' => h fun o c a b ho => by
       rw [hal.armOf_subst]; exact hc' o c a b ho⟩ hφ hT
-  | hwith hℓ hal _ hψ _ hφ₀ hc hφ hT ih₁ ih₂ ih₃ =>
+  | hwith hℓ hal _ hψ _ hφ₀ hc hφ hT hat ih₁ ih₂ ih₃ =>
     intro _ σ hσ
     exact .hwith hℓ (ih₁ hσ) (ih₂ hσ) hψ (ih₃ hσ) hφ₀ ⟨hc.1, fun h => hc.2 fun hc' => h fun o c a b ho => by
-      rw [hal.armOf_subst]; exact hc' o c a b ho⟩ hφ hT
-  | hctl hℓ hal _ hψ hop hc htl hE hk hp hφ₀ _ hl hcm hφ hT ih₁ ih₂ _ ih₄ =>
+      rw [hal.armOf_subst]; exact hc' o c a b ho⟩ hφ hT hat
+  | hctl hℓ hal _ hψ hop hc htl hE hk hp hφ₀ _ hl hcm hφ hT hat ih₁ ih₂ _ ih₄ =>
     intro _ σ hσ
     subst hk
     rw [Tm.subst, (plug_hole_closed hp).subst]
     exact .hctl hℓ (ih₁ hσ) (ih₂ hσ) hψ hop hc htl hE rfl hp hφ₀ (ih₄ hσ) hl ⟨hcm.1, fun h => hcm.2 fun hc' => h fun o c a b ho => by
-      rw [hal.armOf_subst]; exact hc' o c a b ho⟩ hφ hT
+      rw [hal.armOf_subst]; exact hc' o c a b ho⟩ hφ hT hat
   | hkeep hℓ hal _ hφ₀ hc hnt hle hφ hT ih₁ ih₂ =>
     intro _ σ hσ
     exact .hkeep hℓ (ih₁ hσ) (ih₂ hσ) hφ₀ ⟨hc.1, fun h => hc.2 fun hc' => h fun o c a b ho => by

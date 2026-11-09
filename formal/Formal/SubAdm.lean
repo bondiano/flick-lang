@@ -169,12 +169,14 @@ theorem TypM.sub {Ψ Θ Γ e J} (h : TypM S mode Ψ Θ Γ e J) : ∀ {J'}, JLeM 
   | hdl hal hn hrf hψ he hφ₀ hOb hc hφ hT =>
     intro _ hJ; obtain ⟨_, _, rfl, h₁, h₂⟩ := hJ.ex
     exact .hdl hal hn hrf hψ he hφ₀ hOb hc (Stage.le_trans hφ h₂) (hT.trans h₁)
-  | hwith hℓ hal hrf hψ he hφ₀ hc hφ hT =>
+  | hwith hℓ hal hrf hψ he hφ₀ hc hφ hT hat =>
     intro _ hJ; obtain ⟨_, _, rfl, h₁, h₂⟩ := hJ.ex
     exact .hwith hℓ hal hrf hψ he hφ₀ hc (Stage.le_trans hφ h₂) (hT.trans h₁)
-  | hctl hℓ hal hrf hψ hop hc htl hE hk hp hφ₀ ha hl hcm hφ hT =>
+      (fun hl => Stage.atom_le h₂ (hat hl))
+  | hctl hℓ hal hrf hψ hop hc htl hE hk hp hφ₀ ha hl hcm hφ hT hat =>
     intro _ hJ; obtain ⟨_, _, rfl, h₁, h₂⟩ := hJ.ex
     exact .hctl hℓ hal hrf hψ hop hc htl hE hk hp hφ₀ ha hl hcm (Stage.le_trans hφ h₂) (hT.trans h₁)
+      (fun hl => Stage.atom_le h₂ (hat hl))
   | hkeep hℓ hal he hφ₀ hc hnt hle hφ hT =>
     intro _ hJ; obtain ⟨_, _, rfl, h₁, h₂⟩ := hJ.ex
     exact .hkeep hℓ hal he hφ₀ hc hnt hle (Stage.le_trans hφ h₂) (hT.trans h₁)

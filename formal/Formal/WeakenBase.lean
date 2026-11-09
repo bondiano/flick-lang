@@ -49,7 +49,7 @@ theorem TypM.locs {Ψ Θ Γ e J} (h : TypM S mode Ψ Θ Γ e J) : ∀ l, e.Has (
     · exact ih₂ l h
   | scope _ _ _ _ _ _ ih => intro l h; simpa using ih l h
   | aref _ _ _ _ hlc _ _ _ _ ih => intro l h; exact h.elim (hlc l) (ih l)
-  | hctl _ _ _ _ _ _ _ _ hk _ _ _ _ _ _ _ ih₁ ih₂ ih₃ ih₄ =>
+  | hctl _ _ _ _ _ _ _ _ hk _ _ _ _ _ _ _ _ ih₁ ih₂ ih₃ ih₄ =>
     intro l h; subst hk
     simp only [Tm.Has] at h
     rcases h with h | h | h | h | h | h
@@ -146,7 +146,7 @@ theorem TypM.frees {Ψ Θ Γ e J} (h : TypM S mode Ψ Θ Γ e J) : ∀ i, e.Free
     intro i h; rcases h with h | h
     · have := ih₁ _ h; simp [Pat.spine_binds, Pat.binds] at this; omega
     · exact ih₂ i h
-  | hctl _ _ _ _ _ _ _ _ hk _ _ _ _ _ _ _ ih₁ ih₂ ih₃ ih₄ =>
+  | hctl _ _ _ _ _ _ _ _ hk _ _ _ _ _ _ _ _ ih₁ ih₂ ih₃ ih₄ =>
     intro i h; subst hk
     rcases h with h | h | h | h
     · exact ih₁ i h

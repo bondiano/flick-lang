@@ -14,7 +14,7 @@ theorem frame_typing_mode {Ψ Θ r t φ} (hr : ¬ Value r) (F : Frame) (hF : F.o
   cases F <;> simp only [Frame.plug] at h nv
   case hwith p ℓ E al rf =>
     cases h with
-    | hwith hℓ hal hrf hψ he hφ₀ hc hφ hT =>
+    | hwith hℓ hal hrf hψ he hφ₀ hc hφ hT hat =>
       refine .mk0 ⟨_, _, he, .installs rfl hφ₀ hφ, fun σ hσ X _ h' => ?_⟩
       have hp : σ (.r p) = .rg p := hσ.1 _ (.inr (.inl rfl))
       have h₁ := hal.sx (hσ.sub fun _ h => .inr (.inr (.inl h))) X
@@ -23,10 +23,11 @@ theorem frame_typing_mode {Ψ Θ r t φ} (hr : ¬ Value r) (F : Frame) (hF : F.o
         (Stage.le_rt_sub (by simpa [Stage.substT] using Stage.le_substT σ hφ₀)
           (Row.hP_substT hp (hσ.2.2.1 (.inl rfl)) (hσ.2.2.2 (.inl rfl))))
         ⟨hc.1, fun h => .inl (hc.2 h)⟩ (Stage.le_substT σ hφ) (hT.substT σ)
+        (fun hl => Stage.substT_svc_atm hp (hat hl))
     | errVal hv | allI hv => exact (nv hv).elim
   case hctlA p ℓ κ tl E al rf k =>
     cases h with
-    | hctl hℓ hal hrf hψ hop hc htl hE hk hp' hφ₀ ha hl hcm hφ hT =>
+    | hctl hℓ hal hrf hψ hop hc htl hE hk hp' hφ₀ ha hl hcm hφ hT hat =>
       refine .mk0 ⟨_, _, ha, FRelM.use_rgn (fun hm x hx => by
         cases hm
         cases tl with
@@ -44,6 +45,7 @@ theorem frame_typing_mode {Ψ Θ r t φ} (hr : ¬ Value r) (F : Frame) (hF : F.o
         hop hc htl hE rfl h₃ (Stage.le_rt_sub (by simpa [Stage.substT] using Stage.le_substT σ hφ₀)
           (Row.hP_substT hp (hσ.2.2.1 (.inl rfl)) (hσ.2.2.2 (.inl rfl)))) ?_
         (fun h => ?_) ⟨hcm.1, fun h => .inl (hcm.2 h)⟩ (Stage.le_substT σ hφ) (hT.substT σ)
+        (fun hl => Stage.substT_svc_atm hp (hat hl))
       · rw [TypingMode.use_substT_eq mode _ (Caps.substT_if_rg hp)] at h'
         cases tl <;> simpa [hb] using h'
       · obtain ⟨C', hl₁, hl₂⟩ := hl h

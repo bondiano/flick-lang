@@ -83,12 +83,12 @@ theorem TypM.weakenStore {Ψ Θ Γ e J} (h : TypM S mode Ψ Θ Γ e J) (X : List
   | hdl _ hn _ hψ _ hφ₀ hOb hc hφ hT ih₁ ih₂ ih₃ =>
     refine .hdl ?_ hn (ih₂ X) hψ (ih₃ X) hφ₀ hOb hc hφ hT
     rw [List.map_append]; exact ih₁ _
-  | hwith hℓ _ _ hψ _ hφ₀ hc hφ hT ih₁ ih₂ ih₃ =>
-    exact .hwith (getElem?_ext hℓ) (ih₁ X) (ih₂ X) hψ (ih₃ X) hφ₀ hc hφ hT
-  | hctl hℓ _ _ hψ hop hc htl hE hk _ hφ₀ _ hl hcm hφ hT ih₁ ih₂ ih₃ ih₄ =>
+  | hwith hℓ _ _ hψ _ hφ₀ hc hφ hT ha ih₁ ih₂ ih₃ =>
+    exact .hwith (getElem?_ext hℓ) (ih₁ X) (ih₂ X) hψ (ih₃ X) hφ₀ hc hφ hT ha
+  | hctl hℓ _ _ hψ hop hc htl hE hk _ hφ₀ _ hl hcm hφ hT ha ih₁ ih₂ ih₃ ih₄ =>
     exact .hctl (getElem?_ext hℓ) (ih₁ X) (ih₂ X) hψ hop hc htl hE hk (ih₃ X) hφ₀ (ih₄ X)
       (fun h => let ⟨C', h₁, h₂⟩ := hl h
-        ⟨C', by rw [List.getElem?_append_left (getElem?_lt h₁)]; exact h₁, h₂⟩) hcm hφ hT
+        ⟨C', by rw [List.getElem?_append_left (getElem?_lt h₁)]; exact h₁, h₂⟩) hcm hφ hT ha
   | hkeep hℓ _ _ hφ₀ hc hnt hle hφ hT ih₁ ih₂ =>
     exact .hkeep (getElem?_ext hℓ) (ih₁ X) (ih₂ X) hφ₀ hc hnt hle hφ hT
   | hkarm hℓ _ hop hE hk _ hφ₀ hc hnt _ hle hφ hT ih₁ ih₂ ih₃ =>
@@ -266,16 +266,16 @@ theorem TypM.rename {Ψ Θ Γ e J} (h : TypM S mode Ψ Θ Γ e J) :
     intro _ ξ hξ
     exact .hdl (ih₁ (hξ.up 1)) (hn.rename ξ) (ih₂ hξ) hψ (ih₃ hξ) hφ₀ hOb ⟨hc.1, fun h => hc.2 fun hc' => h fun o c a b ho => by
       rw [Tm.armOf_rename]; exact hc' o c a b ho⟩ hφ hT
-  | hwith hℓ _ _ hψ _ hφ₀ hc hφ hT ih₁ ih₂ ih₃ =>
+  | hwith hℓ _ _ hψ _ hφ₀ hc hφ hT ha ih₁ ih₂ ih₃ =>
     intro _ ξ hξ
     exact .hwith hℓ (ih₁ hξ) (ih₂ hξ) hψ (ih₃ hξ) hφ₀ ⟨hc.1, fun h => hc.2 fun hc' => h fun o c a b ho => by
-      rw [Tm.armOf_rename]; exact hc' o c a b ho⟩ hφ hT
-  | hctl hℓ _ _ hψ hop hc htl hE hk hp hφ₀ _ hl hcm hφ hT ih₁ ih₂ _ ih₄ =>
+      rw [Tm.armOf_rename]; exact hc' o c a b ho⟩ hφ hT ha
+  | hctl hℓ _ _ hψ hop hc htl hE hk hp hφ₀ _ hl hcm hφ hT ha ih₁ ih₂ _ ih₄ =>
     intro _ ξ hξ
     subst hk
     rw [Tm.rename, (plug_hole_closed hp).rename]
     exact .hctl hℓ (ih₁ hξ) (ih₂ hξ) hψ hop hc htl hE rfl hp hφ₀ (ih₄ hξ) hl ⟨hcm.1, fun h => hcm.2 fun hc' => h fun o c a b ho => by
-      rw [Tm.armOf_rename]; exact hc' o c a b ho⟩ hφ hT
+      rw [Tm.armOf_rename]; exact hc' o c a b ho⟩ hφ hT ha
   | hkeep hℓ _ _ hφ₀ hc hnt hle hφ hT ih₁ ih₂ =>
     intro _ ξ hξ
     exact .hkeep hℓ (ih₁ hξ) (ih₂ hξ) hφ₀ ⟨hc.1, fun h => hc.2 fun hc' => h fun o c a b ho => by

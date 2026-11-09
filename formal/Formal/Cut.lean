@@ -146,10 +146,10 @@ theorem TypM.cut {Ψ Θ₁ Γ e J} (h : TypM S mode Ψ Θ₁ Γ e J) : ∀ {Θ�
   | hactl hop _ _ ih₁ ih₂ => intro _ hΘ; exact .hactl hop (ih₁ hΘ) (ih₂ hΘ)
   | hdl _ hn _ hψ _ hφ₀ hOb hc hφ hT ih₁ ih₂ ih₃ =>
     intro _ hΘ; exact .hdl (ih₁ (hΘ.substT _)) hn (ih₂ hΘ) hψ (ih₃ hΘ) hφ₀ hOb hc hφ hT
-  | hwith hℓ _ _ hψ _ hφ₀ hc hφ hT ih₁ ih₂ ih₃ =>
-    intro _ hΘ; exact .hwith hℓ (ih₁ hΘ) (ih₂ hΘ) hψ (ih₃ hΘ) (Stage.le_rt_sub hφ₀ (Row.hP_mono hΘ)) hc hφ hT
-  | hctl hℓ _ _ hψ hop hc htl hE hk _ hφ₀ _ hl hcm hφ hT ih₁ ih₂ ih₃ ih₄ =>
-    intro _ hΘ; exact .hctl hℓ (ih₁ hΘ) (ih₂ hΘ) hψ hop hc htl hE hk (ih₃ hΘ) (Stage.le_rt_sub hφ₀ (Row.hP_mono hΘ)) (ih₄ hΘ) hl hcm hφ hT
+  | hwith hℓ _ _ hψ _ hφ₀ hc hφ hT ha ih₁ ih₂ ih₃ =>
+    intro _ hΘ; exact .hwith hℓ (ih₁ hΘ) (ih₂ hΘ) hψ (ih₃ hΘ) (Stage.le_rt_sub hφ₀ (Row.hP_mono hΘ)) hc hφ hT ha
+  | hctl hℓ _ _ hψ hop hc htl hE hk _ hφ₀ _ hl hcm hφ hT ha ih₁ ih₂ ih₃ ih₄ =>
+    intro _ hΘ; exact .hctl hℓ (ih₁ hΘ) (ih₂ hΘ) hψ hop hc htl hE hk (ih₃ hΘ) (Stage.le_rt_sub hφ₀ (Row.hP_mono hΘ)) (ih₄ hΘ) hl hcm hφ hT ha
   | hkeep hℓ _ _ hφ₀ hc hnt hle hφ hT ih₁ ih₂ =>
     intro _ hΘ; exact .hkeep hℓ (ih₁ hΘ) (ih₂ hΘ) (Stage.le_rt_sub hφ₀ (Row.hP_mono hΘ)) hc hnt hle hφ hT
   | hkarm hℓ _ hop hE hk _ hφ₀ hc hnt _ hle hφ hT ih₁ ih₂ ih₃ =>

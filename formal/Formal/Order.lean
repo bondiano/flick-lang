@@ -32,6 +32,10 @@ theorem Stage.le_svc : ∀ {φ ψ : Stage}, φ.le ψ → Row.Sub φ.svc ψ.svc
   | .rt _ _, .pure, h => h.elim
   | .rt _ _, .rt _ _, h => h.1
 
+/-- A region atom carried by a stage is carried by every larger stage. -/
+theorem Stage.atom_le {φ ψ : Stage} {p : Nat} (h : φ.le ψ) (ha : φ.svc (.atm (.r p))) :
+    ψ.svc (.atm (.r p)) := Stage.le_svc h _ ha
+
 theorem Stage.le_err : ∀ {φ ψ : Stage}, φ.le ψ → Row.Sub φ.err ψ.err
   | .pure, _, _ => fun _ h => h.elim
   | .rt _ _, .pure, h => h.elim

@@ -149,10 +149,10 @@ theorem pure_preservation_mode {Ψ Θ e t φ e'} (h : TypM S mode Ψ Θ [] e (.e
     | errVal hv'' | allI hv'' => exact (nv hv'').elim
   | hctlTail hE' hk' hv =>
     cases h with
-    | hctl hℓ hal hrf hψ hop hc htl hE hk hp hφ₀ ha _ hcm hφ hT =>
+    | hctl hℓ hal hrf hψ hop hc htl hE hk hp hφ₀ ha _ hcm hφ hT hat =>
       obtain ⟨rfl, -⟩ := plug_hole_inj hE' hE (hk'.symm.trans hk)
       refine .hwith hℓ hal hrf hψ (refill_app_mode hE perform_not_value hp (perform_fn hop) perform_up
-        fun T φ' hΘ _ hb _ => ?_) hφ₀ hcm hφ hT
+        fun T φ' hΘ _ hb _ => ?_) hφ₀ hcm hφ hT hat
       exact (((by simpa using ha : TypM S mode _ _ [] _ (.ex _ _)).valueAny hv φ').sub (J' := .ex T φ')
         ⟨hb hc, Stage.le_refl _⟩).cut hΘ.entails
     | errVal hv'' | allI hv'' => exact (nv hv'').elim
@@ -171,10 +171,10 @@ theorem pure_preservation_mode {Ψ Θ e t φ e'} (h : TypM S mode Ψ Θ [] e (.e
     | errVal hv'' | allI hv'' => exact (nv hv'').elim
   | hctlDisc hE' hk' hv =>
     cases h with
-    | hctl hℓ hal hrf hψ hop hc htl hE hk hp hφ₀ ha _ hcm hφ hT =>
+    | hctl hℓ hal hrf hψ hop hc htl hE hk hp hφ₀ ha _ hcm hφ hT hat =>
       obtain ⟨rfl, -⟩ := plug_hole_inj hE' hE (hk'.symm.trans hk)
       refine .hwith hℓ hal hrf hψ (refill_app_mode hE perform_not_value hp (perform_fn hop) perform_up
-        fun T φ' hΘ hψ₀ _ _ => ?_) hφ₀ hcm hφ hT
+        fun T φ' hΘ hψ₀ _ _ => ?_) hφ₀ hcm hφ hT hat
       exact .unw hℓ ((by simpa using ha : TypM S mode _ _ [] _ (.ex _ _)).cut hΘ.entails)
           (Stage.none_le (Stage.rt_ne_pure hψ₀))
     | errVal hv'' | allI hv'' => exact (nv hv'').elim

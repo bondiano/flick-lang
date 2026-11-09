@@ -28,18 +28,18 @@ theorem unw_any {Ψ Θ q ℓ a} : AnyTyM S mode Ψ Θ (.unw q ℓ a) := by
   | errVal hv | allI hv => cases hv
 
 /-- The handler catches its signal and runs what it holds. In the live discipline the
-region of the handler is live where the answer is used, and the frame supplies it. -/
-theorem hwith_catch {Ψ Θ p ℓ E al r a t φ} (hsvc : mode = .live → φ.svc (.atm (.r p)))
+region of the handler is live where the answer is used. -/
+theorem hwith_catch {Ψ Θ p ℓ E al r a t φ}
     (h : TypM S mode Ψ Θ [] (.hwith p ℓ E al r (.unw p ℓ a)) (.ex t φ)) :
     TypM S mode Ψ Θ [] a (.ex t φ) := by
   cases h with
-  | hwith hℓ _ _ _ he _ _ hφ hT =>
+  | hwith hℓ _ _ _ he _ _ hφ hT hat =>
     cases he with
     | unw hℓ' ha _ =>
       rw [hℓ] at hℓ'
       simp only [Option.some.injEq, Ty.arrow.injEq, Stage.rt.injEq] at hℓ'
       obtain ⟨-, ⟨rfl, rfl⟩, rfl, -⟩ := hℓ'
-      exact ha.sub ⟨hT, TypingMode.use_rg_le hφ hsvc⟩
+      exact ha.sub ⟨hT, TypingMode.use_rg_le hφ hat⟩
     | errVal hv | allI hv => cases hv
   | errVal hv | allI hv => cases hv
 
@@ -49,10 +49,10 @@ theorem hctl_signal {Ψ Θ p ℓ κ tl E al r x k t φ} {Ei : List Frame} (hEi :
     (h : TypM S mode Ψ Θ [] (.hctl p ℓ κ tl E al r x k) (.ex t φ)) :
     TypM S mode Ψ Θ [] (.hwith p ℓ E al r (plug Ei (.unw p ℓ x))) (.ex t φ) := by
   cases h with
-  | hctl hℓ hal hrf hψ hop _ _ hE hk' hp hφ₀ ha _ hcm hφ hT =>
+  | hctl hℓ hal hrf hψ hop _ _ hE hk' hp hφ₀ ha _ hcm hφ hT hat =>
     obtain ⟨rfl, -⟩ := plug_hole_inj hEi hE (hk.symm.trans hk')
     refine .hwith hℓ hal hrf hψ (refill_app_mode hE perform_not_value hp (perform_fn hop) perform_up
-      fun T φ' hΘ hψ₀ _ _ => ?_) hφ₀ hcm hφ hT
+      fun T φ' hΘ hψ₀ _ _ => ?_) hφ₀ hcm hφ hT hat
     exact .unw hℓ ((hx (ha.cut hΘ.entails)).sub
       (J' := .ex _ (mode.use (.rt _ _) (Ty.rg p).reach))
       ⟨TypingMode.subtype.refl, TypingMode.use_ctl_le mode tl _ _ _⟩)
@@ -151,7 +151,8 @@ theorem hdl_install {Ψ Θ E al rf e₀ T φ n t ψ C φ₀} {r ε : Row} {t' : 
   · have := Ty.yf_kill n (.arrow (.base .unit) (.rt r ε) t' Caps.none)
     simpa [Ty.substT, Stage.substT] using this
   · have hw : TypM S mode (Ψ ++ [c]) Θ [] (.hwith n Ψ.length E al rf e₀)
-        (.ex (t'.substT (kill n)) (.rt (r.substT (kill n)) (ε.substT (kill n)))) :=
+        (.ex (t'.substT (kill n))
+          (.rt (Row.union (Row.scope (.rg n)) (r.substT (kill n))) (ε.substT (kill n)))) :=
       .hwith (by simp [c]) (h₁.weakenStore _) (h₂.weakenStore _)
         (by
           rw [← TypingMode.use_substT mode ψ C (kill n)]
@@ -159,9 +160,13 @@ theorem hdl_install {Ψ Θ E al rf e₀ T φ n t ψ C φ₀} {r ε : Row} {t' : 
         (h₃.weakenStore _)
         (Stage.hP_of_out (by simpa [Stage.substT, Row.union_substT] using Stage.le_substT (kill n) hφ₀)
           (by simpa [Row.single_substT] using hOb.substT (kill n)))
-        ⟨hc.1, fun h => .inl (hc.2 h)⟩ (Stage.le_refl _) .refl
-    refine .inside (F := Facts.none) (fun _ _ h => h.elim) (hw.cut (Entails.union_left _ _))
-      ⟨fun _ h => .inr (.inl h), fun _ h => h⟩ (Ty.kill_fresh _ _) (Row.kill_fresh _ _)
+        ⟨hc.1, fun h => .inl (hc.2 h)⟩
+        (Stage.le_rt_sub (Stage.le_refl _) (fun _ h => Or.inr h)) .refl
+        (fun _ => Or.inl (by simp [Row.scope, Row.ofCaps]))
+    refine .inside (F := Facts.none) (r := r.substT (kill n)) (ε := ε.substT (kill n))
+      (fun _ _ h => h.elim) (hw.cut (Entails.union_left _ _))
+      ⟨fun _ h => h.elim (fun hs => .inl hs) fun hr => .inr (.inl hr), fun _ h => h⟩
+      (Ty.kill_fresh _ _) (Row.kill_fresh _ _)
       (by simpa [Stage.substT] using Stage.YF_kill hφ' hφ) ?_
     have := hT.substT (kill n); rwa [ht] at this
 

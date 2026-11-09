@@ -226,17 +226,21 @@ theorem TypM.substT {Ψ Θ Γ e J} (h : TypM S mode Ψ Θ Γ e J) :
     refine .hdl h₁ hn h₂ (by simpa only [TypingMode.use_substT] using Stage.le_substT σ hψ) h₃ ?_ ?_ ⟨hc.1, fun h => .inl (hc.2 h)⟩ (by simpa only [TypingMode.use_substT] using Stage.le_substT σ hφ) (hT.substT σ)
     · simpa [Stage.substT, Row.union_substT] using Stage.le_substT σ hφ₀
     · simpa [Row.single_substT] using hOb.substT σ
-  | hwith hℓ _ _ hψ _ hφ₀ hc hφ hT ih₁ ih₂ ih₃ =>
+  | hwith hℓ _ _ hψ _ hφ₀ hc hφ hT hat ih₁ ih₂ ih₃ =>
     intro σ hσ
     have hp : σ (.r _) = .rg _ := hσ.1 _ (.inr (.inl rfl))
     have h₁ := ih₁ σ (hσ.sub fun _ h => .inr (.inr (.inl h)))
     have h₂ := ih₂ σ (hσ.sub fun _ h => .inr (.inr (.inr (.inl h))))
     have h₃ := ih₃ σ (hσ.sub fun _ h => .inr (.inr (.inr (.inr h))))
     simp only [Flick.J.substT, Ty.substT, Stage.substT, hp] at h₁ h₂ h₃
-    refine .hwith (by simp [hℓ, Ty.substT, Stage.substT]) h₁ h₂ (by simpa only [TypingMode.use_substT] using Stage.le_substT σ hψ) h₃ ?_ ⟨hc.1, fun h => .inl (hc.2 h)⟩ (by simpa only [TypingMode.use_substT] using Stage.le_substT σ hφ) (hT.substT σ)
-    exact Stage.le_rt_sub (by simpa [Stage.substT] using Stage.le_substT σ hφ₀)
-      (Row.hP_substT hp (hσ.2.2.1 (.inl rfl)) (hσ.2.2.2 (.inl rfl)))
-  | hctl hℓ _ _ hψ hop hc htl hE hk _ hφ₀ _ hl hcm hφ hT ih₁ ih₂ ih₃ ih₄ =>
+    exact .hwith (by simp [hℓ, Ty.substT, Stage.substT]) h₁ h₂
+      (by simpa only [TypingMode.use_substT] using Stage.le_substT σ hψ) h₃
+      (Stage.le_rt_sub (by simpa [Stage.substT] using Stage.le_substT σ hφ₀)
+        (Row.hP_substT hp (hσ.2.2.1 (.inl rfl)) (hσ.2.2.2 (.inl rfl))))
+      ⟨hc.1, fun h => .inl (hc.2 h)⟩
+      (by simpa only [TypingMode.use_substT] using Stage.le_substT σ hφ) (hT.substT σ)
+      (fun hl => Stage.substT_svc_atm hp (hat hl))
+  | hctl hℓ _ _ hψ hop hc htl hE hk _ hφ₀ _ hl hcm hφ hT hat ih₁ ih₂ ih₃ ih₄ =>
     intro σ hσ
     subst hk
     obtain ⟨ha, hb⟩ := S.op_closed _ _ _ _ _ σ hop
@@ -249,6 +253,7 @@ theorem TypM.substT {Ψ Θ Γ e J} (h : TypM S mode Ψ Θ Γ e J) :
     simp only [Flick.J.substT, Ty.substT, Stage.substT, hp] at h₁ h₂ h₃ h₄
     refine .hctl (by simp [hℓ, Ty.substT, Stage.substT]) h₁ h₂ (by simpa only [TypingMode.use_substT] using Stage.le_substT σ hψ) hop hc htl hE rfl h₃ ?_ ?_ (fun h => ?_) ⟨hcm.1, fun h => .inl (hcm.2 h)⟩
       (by simpa only [TypingMode.use_substT] using Stage.le_substT σ hφ) (hT.substT σ)
+      (fun hl => Stage.substT_svc_atm hp (hat hl))
     · exact Stage.le_rt_sub (by simpa [Stage.substT] using Stage.le_substT σ hφ₀)
         (Row.hP_substT hp (hσ.2.2.1 (.inl rfl)) (hσ.2.2.2 (.inl rfl)))
     · split at h₄ <;> rename_i htl' <;> cases mode <;>
