@@ -3,7 +3,7 @@ package flickrt
 import "sync"
 
 // Leases on the values of library owners (`ScopedRef`, `Resource`,
-// `ScopedCache`), as runtime/src/effect/lease.ts: a value is used only
+// `ScopedCache`), as packages/effect-ts/src/effect/lease.ts: a value is used only
 // inside a lease, and a release the library starts (a replacement, a
 // refresh, an eviction) waits until no lease holds the value, so a value is
 // never released while it is in use.

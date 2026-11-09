@@ -6,7 +6,7 @@ import (
 )
 
 // ScopedCache is Effect's, each value kept with a lease count as
-// runtime/src/effect/ScopedCache.ts does: a value is used only under a
+// packages/effect-ts/src/effect/ScopedCache.ts does: a value is used only under a
 // lease, and dropping its entry releases it once the last lease ends. Each
 // entry has an owner of its own, which holds the value's holder.
 type scopedCache struct {

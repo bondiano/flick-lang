@@ -473,7 +473,7 @@ G1–G3 of `core.md` hold, and the following are added:
   - An acquisition `∀s. τ_a →R⟨{Scope s} + r; ε⟩ τ` returns capabilities of region `s`, and `s ∈ ⌈τ⌉` unless `τ` is a scalar. Only closing `s` releases them.
   - A function without `retention` counts as `call`. `FLICK-F002` requires the annotation only on parameters with variables of kinds `Region` and `CRow` (`ffi.rs` `foreign_info`). A parameter that is a variable of kind `Type` (`∀a. a →R Unit`) needs no annotation even though it can receive a capability: such a binding is covered only by this hypothesis.
   - Pure operations on a capability (`Rpc.port`, `Http.Server.address`) do not depend on whether the region is live.
-- **G5 (leases).** `ScopedRef`, `Resource`, `ScopedCache` hand out their value only in `use`, with lease region `t`, and release the previous value when no lease holds it (`runtime/src/effect/lease.ts`); acquisition goes into a region of its own, of higher rank. `RcRef`, `RcMap`, `Pool` lend the value to the calling scope (`a^{t}`) and do not revoke it before that scope closes (Effect 4.1.2).
+- **G5 (leases).** `ScopedRef`, `Resource`, `ScopedCache` hand out their value only in `use`, with lease region `t`, and release the previous value when no lease holds it (`packages/effect-ts/src/effect/lease.ts`); acquisition goes into a region of its own, of higher rank. `RcRef`, `RcMap`, `Pool` lend the value to the calling scope (`a^{t}`) and do not revoke it before that scope closes (Effect 4.1.2).
 - **G6 (lexical owner).** A step that needs `Scope ϱ` receives the owner of region `ϱ`, not the nearest `scope` at run time (`$rt.within`). A constant does not run its `Eff` argument under an owner other than the one named in that argument's row: an argument that a combinator runs names the combinator's region, of higher rank for sub-owners ([leases](#leases-instead-of-early-close)) and the owner's `Scope s` for children ([children acquire in the region of their owner](#children-acquire-in-the-region-of-their-owner)).
 
 ### 5.2 Lemmas
@@ -665,7 +665,7 @@ let early () =
 - Resolution, API with leases:
   - `use : ScopedRef s a -> (forall t. a^{t} ->{r; e} b)^c ->{r; e} b`, likewise `Resource.use`, `ScopedCache.use`, `use_option`, `use_success`; `get`, `get_option`, `get_success`, `ScopedCache.values` and `entries` are removed, and `ScopedCache.refresh` returns `Unit`;
   - acquisition is of higher rank in the region: `from_acquire : (forall t. Eff {Scope t | r} e a^{t})^c ->{Scope s | r; e} ScopedRef s a`, likewise `set`, `Resource.manual`, `Effect.resource_auto`, and `lookup` of `ScopedCache`; a task against such a type acquires into `t` (`lexical_owner`, `declared_scope`);
-  - runtime: `runtime/src/effect/lease.ts` keeps a lease count, and replacement, refresh or eviction release the previous value after the last lease ends; `ScopedRef` and `Resource` are Flick's own, not Effect's;
+  - runtime: `packages/effect-ts/src/effect/lease.ts` keeps a lease count, and replacement, refresh or eviction release the previous value after the last lease ends; `ScopedRef` and `Resource` are Flick's own, not Effect's;
   - the name of a top-level function passed at a higher-rank type holds nothing (`infer.rs` `names_top_level`): `Resource.use res ping` passes just like `fun c -> ping c`.
 
   A value of a type that names its region (`File t`) cannot be stored this way: `t` would escape the `forall`. Fixtures: `tests/check/fail/regions/leases.fl`, `tests/check/pass/regions/leases.fl`, e2e `tests/run/runtime/leases.fl`.

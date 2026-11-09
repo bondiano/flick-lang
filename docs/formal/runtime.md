@@ -630,7 +630,7 @@ let main () =
 - Divergence: the program is accepted, and Node prints `primary: B b`, then `flipped: undefined`. An exhaustive `match` over `Errors {B}` received `A 1` and returned `undefined` as a `String`; the core's T1 and R5 are broken.
   - `Cause.map bang f` with `bang : Errors {B} -> Errors {B}` calls `bang` on `A 1`, and so do `Exit.map_error` and `Exit.map_both`.
   - On Go, `Failure.rethrow` and `Cause.from_reasons` are unavailable (`FLICK-P012`). But `Cause.map`, `Exit.map_error`, `Exit.map_both` and `Cause.reasons` exist and visit every `Fail` (`exit.go` `CauseMap`, `ExitMapError`, `CauseReasons`). There, `parallel` produces the cause `Fail B, Fail A` at type `{B}` once it keeps late failures ([`parallel` in Go](#go-parallel-keeps-only-the-first-failure)).
-- Cause: the bindings mirror Effect's `Cause.map` and `Cause.reasons`, which do not distinguish the head from secondary `Fail`s (`runtime/src/effect/Cause.ts:33-47`, `runtime/src/effect/Exit.ts`, Go `exit.go`). I_ε is broken.
+- Cause: the bindings mirror Effect's `Cause.map` and `Cause.reasons`, which do not distinguish the head from secondary `Fail`s (`packages/effect-ts/src/effect/Cause.ts:33-47`, `packages/effect-ts/src/effect/Exit.ts`, Go `exit.go`). I_ε is broken.
 - Resolution — the bindings, as spec/05 requires:
   - the function of `Cause.map`, `Exit.map_error`, `Exit.map_both` applies only to the head; secondary `Fail`s stay as they are;
   - `Cause.reasons` returns secondary `Fail`s as `Die`s with the same error: for the typed view they are defects. `from_reasons` over such a list rebuilds a cause in which recovery is blocked — conservative and safe.
