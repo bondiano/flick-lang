@@ -1,7 +1,7 @@
 ---
 title: Начало работы
 description: Установите инструменты, создайте приложение и запустите его.
-source_hash: 5d96a4cffec07cbb
+source_hash: f83047cb6a6ecc9c
 ---
 
 ## Установка

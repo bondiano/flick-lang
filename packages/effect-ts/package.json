@@ -12,7 +12,13 @@
     "access": "public"
   },
   "type": "module",
-  "sideEffects": false,
+  "sideEffects": [
+    "./dist/bridge.js",
+    "./dist/bridge_kernel.js",
+    "./dist/bridge_data.js",
+    "./dist/bridge_layer.js",
+    "./dist/bridge_schema.js"
+  ],
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
