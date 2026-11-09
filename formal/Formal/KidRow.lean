@@ -125,11 +125,12 @@ theorem kid_outl {Θ : Facts} {φ₀ : Stage} {E : Name} {q b : Nat} {G : Frame}
 
 /-- The row of the work under a kept handler. -/
 theorem kid_kept {o b q : Nat} {Θ : Facts} {φ₀ φ : Stage} {E : Name} {G : Frame} {E₀ : List Frame}
-    {R' rout ε₀ : Row} (hΘ : Entails Θ Facts.age) (hG : G.bump = some q) (hi : G.isHandler)
+    {R' rout rk ε₀ : Row} (hΘ : Entails Θ Facts.age) (hG : G.bump = some q) (hi : G.isHandler)
     (hGi : G.installs E) (hA : AscE b (E₀ ++ [G])) (hq : q ≤ o)
-    (hrow : φ₀.le (.rt (Row.hP Θ q E rout) ε₀)) (up : ∀ y, rout y → φ.svc y)
+    (hrow : φ₀.le (.rt (Row.hP Θ q E rout) ε₀))
+    (hsub : ∀ y, (∀ a, y ≠ .atm a) → rout y → rk y) (up : ∀ y, rk y → φ.svc y)
     (hk : KidRow S o φ₀ E₀ R') :
-    (∀ y, R' y → Row.hP Facts.age q E (Row.kid S E R' rout) y) ∧ KidRow S o φ (E₀ ++ [G]) (Row.kid S E R' rout) := by
+    (∀ y, R' y → Row.hP Facts.age q E (Row.kid S E R' rk) y) ∧ KidRow S o φ (E₀ ++ [G]) (Row.kid S E R' rk) := by
   obtain ⟨h1, h2⟩ := hk
   have mem' : ∀ {F}, F ∈ E₀ → F ∈ E₀ ++ [G] := fun h => List.mem_append_left _ h
   have self : G ∈ E₀ ++ [G] := by simp
@@ -147,7 +148,7 @@ theorem kid_kept {o b q : Nat} {Θ : Facts} {φ₀ φ : Stage} {E : Name} {G : F
     | atm a | rv a | obv _ a => exact .inl hy
   · rcases hy with ⟨hN, hy⟩ | hy
     · rcases h1 N a hy with h' | ⟨p, rfl, hp⟩ | ⟨F, hF, x⟩
-      · exact .inl (up _ ((Stage.le_svc hrow _ h').2 hN))
+      · exact .inl (up _ (hsub _ (fun _ h => by cases h) ((Stage.le_svc hrow _ h').2 hN)))
       · exact .inr (.inl ⟨p, rfl, mem hp⟩)
       · exact .inr (.inr ⟨F, mem' hF, x⟩)
     · exact .inl (up _ hy)
@@ -160,7 +161,7 @@ theorem kid_kept {o b q : Nat} {Θ : Facts} {φ₀ φ : Stage} {E : Name} {G : F
       rcases a₁ with a₁ | ⟨hn, F, hF, hI⟩
       · rcases Stage.le_svc hrow _ a₁ with h' | h'
         · exact (hN h').elim
-        · exact .inl (up _ h')
+        · exact .inl (up _ (hsub _ (fun _ h => by cases h) h'))
       · exact .inr ⟨hn, F, mem' hF, hI⟩
     · exact ⟨.inl (up _ hy), own⟩
     · exact ⟨.inr ⟨hnt, G, self, hGi⟩, own⟩
@@ -200,5 +201,29 @@ theorem kid_dropped {o b q : Nat} {Θ : Facts} {φ₀ φ : Stage} {E : Name} {G 
       · exact .inl (up _ ((Stage.le_svc hrow _ h').2 hNE))
       · exact .inr (.inl (mem hp))
       · exact .inr (.inr ⟨F, mem' hF, x⟩)
+
+/-- The handler cell of a frame a child keeps. -/
+def Frame.cell : Frame → Option (Nat × Nat)
+  | .hwith q ℓ _ _ _ => some (q, ℓ)
+  | .hkeep q ℓ _ _ => some (q, ℓ)
+  | _ => none
+
+/-- An atom of the row of the arms of a handler of `E` no younger than `o`: what a child
+of `o` keeps of it. -/
+def KeptAtm (Ψ : List Ty) (o : Nat) (E : List Frame) (a : Atom) : Prop :=
+  ∃ F ∈ E, ∃ q ℓ r ε t, F.cell = some (q, ℓ) ∧ q ≤ o ∧
+    Ψ[ℓ]? = some (.arrow (.base .unit) (.rt r ε) t Caps.none) ∧ r (.atm a)
+
+theorem KeptAtm.mono {o : Nat} {E E' : List Frame} {a : Atom} (h : ∀ F, F ∈ E → F ∈ E')
+    (hk : KeptAtm Ψ o E a) : KeptAtm Ψ o E' a :=
+  let ⟨F, hF, rest⟩ := hk; ⟨F, h F hF, rest⟩
+
+/-- What work an owner keeps uses is the owner or older than it. -/
+theorem keep_old {Θ : Facts} {r : Row} {p : Nat} (hΘ : Entails Θ Facts.age)
+    (hk : TypingMode.live.keep Θ r (.rg p)) {a : Atom} (ha : r (.atm a)) :
+    a = .r p ∨ ∀ x, a = .r x → x < p := by
+  rcases hΘ _ _ hk a (.inl ha) with h | ⟨C', h₁, h₂⟩
+  · exact .inl h
+  · exact .inr fun x hx => h₁ x p (hx ▸ h₂) rfl
 
 end Flick
