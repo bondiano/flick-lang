@@ -11,7 +11,7 @@ let flaky calls = task {
   if n < 3 then from_result (Err (Flaky n)) else "done after " ++ show n
 }
 
-main : Unit ->{} Unit
+main : Unit ->{Async;} Unit
 let main () =
   let calls = Ref.make 0
   let result =

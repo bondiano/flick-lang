@@ -89,7 +89,7 @@ component shell () =
   }
 
 /// Mounts the client in `#app`.
-main : Unit ->{; AppError} Unit
+main : Unit ->{Async; AppError} Unit
 let main () =
   match Ui.Dom.container "app" with
   | None -> App.fail "the page has no #app"

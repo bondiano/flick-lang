@@ -11,7 +11,7 @@ break programs.
   new `check-calls`, every place of a checked module that applies one of those
   names, with the span of each argument, its type, the constant it folds to and,
   for the `parse` of a refined type, how its check reads that constant. An entry
-  that is no `Module.name` or `*.name`, and a `watch` without a `plugin`, are
+  that is no `Module.name`, `Module.Sub.name` or `*.name`, and a `watch` without a `plugin`, are
   `FLICK-P032`. Two checks of the compiler's moved into the plugin of `std` and
   kept their codes, spans, messages and explanations: `FLICK-U001`, the capacity
   or limit of an event policy, and `FLICK-D006`, a constant that fails the check

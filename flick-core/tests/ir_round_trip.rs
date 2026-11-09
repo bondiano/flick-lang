@@ -75,7 +75,7 @@ fn compiled(project: Option<&project::Project>, roots: &[PathBuf], what: &str) -
     let modules: Vec<ir::Module> = compiled.iter().map(|m| m.ir.clone()).collect();
     let optimized: Vec<ir::Module> = compiled
         .iter()
-        .map(|m| build::optimized(compiled, m))
+        .map(|m| build::optimized(compiled, m, false))
         .collect();
     let n = modules.len();
     let path = |f: FileId| sources.get(f).path.clone();

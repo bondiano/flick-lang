@@ -143,6 +143,7 @@ impl Loader<'_> {
             project: self.project,
             watching: &self.watchers.plugins,
             watched: &self.watchers.watched,
+            stages_by_class: self.stages_by_class,
             // a failed import leaves names unresolved, and the build fails anyway
             lower: self.lowered.is_some()
                 && !self
@@ -193,6 +194,7 @@ struct Checking<'a> {
     by_name: &'a BTreeMap<String, usize>,
     from_packages: &'a BTreeMap<String, Interface>,
     project: Option<&'a Project>,
+    stages_by_class: bool,
     lower: bool,
     lower_packages_only: bool,
     precompiled: &'a Precompiled,
@@ -314,8 +316,9 @@ impl Checking<'_> {
             thresholds: self
                 .project
                 .map_or_else(Default::default, |p| p.config.thresholds),
-            effects: build.is_none_or(|b| b.effect == Backend::Effect),
             watched: self.watched,
+            effects: build.is_none_or(|b| b.effect != Backend::None),
+            stages_by_class: self.stages_by_class,
         };
         let mut diagnostics = loaded.parse.diagnostics.clone();
         let resolved_cleanly = !resolved.iter().any(|d| d.severity == Severity::Error);
@@ -325,8 +328,13 @@ impl Checking<'_> {
         // not read those variables with their own unification store.
         let broken = !loaded.parse.diagnostics.is_empty();
         let mut untyped = interface.clone();
-        let (mut checked, typing) =
-            types::check_typed(&module, lookup, types::builtins(), options, &mut interface);
+        let (mut checked, typing) = types::check_typed(
+            &module,
+            lookup,
+            types::builtins_of(self.stages_by_class),
+            options,
+            &mut interface,
+        );
         // what the plugins find from the types of their code stops lowering too
         if let Some(expansion) = &loaded.expansion {
             checked.extend(expansion.check_blocks(&loaded.editing, &typing.wildcards));
@@ -384,6 +392,8 @@ impl Checking<'_> {
         let sites = plugin_calls::placed_sites(&typing.call_sites, expansion, loaded.file);
         (self.watching.iter())
             .flat_map(|w| {
+                // Each block of a collected group holds the same state,
+                // already collected from all its blocks, not just this one.
                 let state = (loaded.editing.iter())
                     .find(|e| e.plugin.id() == w.plugin.id())
                     .map(|e| Arc::clone(&e.state));

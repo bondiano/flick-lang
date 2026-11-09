@@ -42,6 +42,7 @@ fn check(text: &str, imported: &[Interface]) -> (Interface, Vec<Diagnostic>) {
             thresholds: types::Thresholds::default(),
             effects: true,
             watched: types::Watched::none(),
+            stages_by_class: false,
         },
         &mut interface,
     ));

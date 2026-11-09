@@ -258,7 +258,7 @@ foreign pure component from "@flick-lang/runtime/ui/react" "uiComponent"
 mount_with :
   Renderer ->
   (Failure none ->{r; none} Unit)^c ->
-  Ui^c ->{Atom.Registry, Atom.Write | r; none}
+  Ui^c ->{Async, Atom.Registry, Atom.Write | r; none}
   Never
 foreign effect mount_with from "@flick-lang/runtime/ui/react" "uiMountWith"
   retention call

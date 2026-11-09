@@ -155,7 +155,7 @@ foreign pure fresh from "@flick-lang/runtime/effect/Layer" "fresh"
 
 /// Builds `layer` and keeps its services until the call is interrupted:
 /// an application made of layers, such as a server.
-launch : Layer ri e ro ->{ri; e} Never
+launch : Layer ri e ro ->{Async | ri; e} Never
 foreign effect launch from "@flick-lang/runtime/effect/Layer" "launch"
   reviewed "effect@4.1.2 sha256:3ab16e9245162df2"
 

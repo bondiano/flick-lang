@@ -338,6 +338,7 @@ mod tests {
             thresholds: types::Thresholds::default(),
             effects: true,
             watched: types::Watched::none(),
+            stages_by_class: false,
         };
         diagnostics.extend(types::check(
             &module,

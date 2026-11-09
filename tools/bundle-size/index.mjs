@@ -6,7 +6,8 @@
 // uses, or a release bundle is larger than the debug one; a size more than
 // 10% under its budget prints a note that the budget can be lowered. It
 // also prints what labelling atoms costs: release with `labels = "all"`,
-// the default, against `"components"`. Host foreign modules (`.ts`/`.mjs`
+// the default, against `"components"`. A program with `rt` is built for
+// Flick's own runtime (`--rt`). Host foreign modules (`.ts`/`.mjs`
 // beside the source) are not Flick output and stay external.
 import { execFileSync } from "node:child_process";
 import { rmSync } from "node:fs";
@@ -113,9 +114,9 @@ export const measure = async (entry) => {
  * Compiles `source` into `out` with `flick build`, labelling `labels` when
  * given; a directory is a project, built with its `flick.toml`.
  */
-export const build = (flick, source, out, profile, labels) => {
+export const build = (flick, source, out, profile, labels, rt = false) => {
   rmSync(out, { recursive: true, force: true });
-  const options = labels === undefined ? [] : ["--labels", labels];
+  const options = [...(labels === undefined ? [] : ["--labels", labels]), ...(rt ? ["--rt"] : [])];
   const project = !source.endsWith(".fl");
   const file = project ? [] : [path.join(root, source)];
   execFileSync(flick, ["build", ...file, "--out-dir", out, "--profile", profile, ...options, "--quiet", "--color", "never"], {
@@ -137,11 +138,11 @@ const main = async () => {
     const sizes = {};
     for (const profile of ["debug", "release"]) {
       const out = path.join(base, profile, program.name);
-      build(flick, program.source, out, profile);
+      build(flick, program.source, out, profile, undefined, program.rt);
       sizes[profile] = await measure(path.join(out, runner(program)));
     }
     const components = path.join(base, "components", program.name);
-    build(flick, program.source, components, "release", "components");
+    build(flick, program.source, components, "release", "components", program.rt);
     sizes.components = await measure(path.join(components, runner(program)));
     rows.push({ ...program, ...sizes.release, debug: sizes.debug, components: sizes.components });
   }

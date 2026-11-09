@@ -23,7 +23,7 @@ impl Loader<'_> {
         if let Some(interface) = self.from_packages.get(name) {
             return Some(interface.clone());
         }
-        let interface = types::builtins().iter().find(|i| i.module == name)?.clone();
+        let interface = self.builtins().iter().find(|i| i.module == name)?.clone();
         self.from_packages
             .insert(name.to_owned(), interface.clone());
         Some(interface)
@@ -86,11 +86,12 @@ impl Loader<'_> {
             thresholds: types::Thresholds::default(),
             effects: true,
             watched: Watched::none(),
+            stages_by_class: self.stages_by_class,
         };
         diagnostics.extend(types::check(
             &checked,
             &lookup,
-            types::builtins(),
+            self.builtins(),
             options,
             &mut interface,
         ));

@@ -15,6 +15,9 @@ impl Gen<'_> {
 
     /// A JS function that turns a function into the one of the stage `lift` expects.
     fn lift(&mut self, lift: &Lift) -> String {
+        if self.kernel {
+            return self.kernel_lift(lift);
+        }
         match lift {
             Lift::Stage { from, to, result } => {
                 let inner = result.as_deref().map(|r| self.lift(r));

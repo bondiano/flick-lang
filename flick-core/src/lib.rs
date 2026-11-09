@@ -66,6 +66,7 @@ pub fn check(sources: &source::SourceMap, file: source::FileId) -> Vec<diagnosti
         thresholds: types::Thresholds::default(),
         effects: true,
         watched: &watched,
+        stages_by_class: false,
     };
     let mut diagnostics = parse.diagnostics;
     diagnostics.extend(derived);

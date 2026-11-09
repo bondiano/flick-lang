@@ -1,6 +1,6 @@
 ---
 title: "Покрытие Effect"
-source_hash: 315c6b5a10b15bc6
+source_hash: 1a0ecdbb5486054c
 ---
 
 Стандартная библиотека оборачивает закреплённую версию Effect
@@ -156,7 +156,7 @@ foreign pure spaced from "@flick-lang/runtime/effect/Schedule" "spaced"
 
 retry :
   forall c r e a r2 e2 o.
-  Schedule.Schedule r2 e2 (Errors e) o -> (Eff r e a)^c ->{r + r2; e + e2} a
+  Schedule.Schedule r2 e2 (Errors e) o -> (Eff r e a)^c ->{Async | r + r2; e + e2} a
 foreign effect retry from "@flick-lang/runtime/effect/Effect" "retry"
   arity 1
   retention call

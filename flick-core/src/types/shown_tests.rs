@@ -38,6 +38,7 @@ fn probe(text: &str) -> Interface {
         thresholds: types::Thresholds::default(),
         effects: true,
         watched: Watched::none(),
+        stages_by_class: false,
     };
     types::check(
         &module,

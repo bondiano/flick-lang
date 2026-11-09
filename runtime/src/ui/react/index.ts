@@ -11,8 +11,11 @@ import { DocumentService, document } from "./document.ts";
 import type { Ui } from "./nodes.ts";
 import { Bridge } from "./policies.ts";
 import { BridgeContext, RegistryContext, toReact } from "./render.ts";
+import type { RenderRoot, Renderer } from "./tree.ts";
 
 export * from "./nodes.ts";
+export type { Renderer } from "./tree.ts";
+export * from "./links.ts";
 export { DocumentService } from "./document.ts";
 export { type Events, uiRenderStatic } from "./render.ts";
 export * from "./views.ts";
@@ -30,14 +33,6 @@ export {
   type Handler,
   type Policy,
 } from "./policies.ts";
-
-interface RenderRoot {
-  render(node: ReactNode): void;
-  unmount(): void;
-}
-
-/** A backend opens its root when the effect runs, not when the description is built. */
-export type Renderer = () => RenderRoot;
 
 class RenderBoundary extends Component<
   { readonly broken: (cause: Cause.Cause<unknown>) => void; readonly children: ReactNode },

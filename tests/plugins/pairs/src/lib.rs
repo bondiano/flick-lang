@@ -245,6 +245,8 @@ impl Plugin for Pairs {
         let mut found = Vec::new();
         for call in calls {
             assert!(call.name != "boom", "no calls");
+            // A bare `tally` is a function value, not a zero-argument call;
+            // the checker records applications only.
             let Some(argument) = call.arguments.first() else {
                 continue;
             };

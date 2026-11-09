@@ -1,6 +1,7 @@
 //! `Test.suite`: a layer built once before the suite's first test and
 //! released after its last, its services shared by its tests, on both
-//! targets; a run that selects none of its tests never builds it.
+//! targets and on Flick's own runtime; a run that selects none of its tests
+//! never builds it.
 
 mod common;
 
@@ -51,8 +52,14 @@ fn project() -> PathBuf {
 #[ignore = "needs Node, pnpm install and Go"]
 fn a_suite_builds_its_layer_once_around_its_tests() {
     let dir = project();
-    for emit in ["js", "go"] {
-        let out = flick_in(&dir, &["test", "--emit", emit]);
+    // `rt`: on Flick's own runtime
+    for emit in ["js", "go", "rt"] {
+        let flags: &[&str] = if emit == "rt" {
+            &["--rt"]
+        } else {
+            &["--emit", emit]
+        };
+        let out = flick_in(&dir, &[&["test"], flags].concat());
         let stdout = String::from_utf8_lossy(&out.stdout);
         assert!(out.status.success(), "{emit}: {out:?}");
         assert_eq!(stdout.matches("acquire").count(), 1, "{emit}: {stdout}");
@@ -65,7 +72,7 @@ fn a_suite_builds_its_layer_once_around_its_tests() {
         assert!(at("acquire") < at("printed shared"), "{emit}: {stdout}");
         assert!(at("printed shared") < at("release"), "{emit}: {stdout}");
         assert!(stdout.contains("3 passed"), "{emit}: {stdout}");
-        let outside = flick_in(&dir, &["test", "--emit", emit, "--filter", "outside"]);
+        let outside = flick_in(&dir, &[&["test"], flags, &["--filter", "outside"]].concat());
         let stdout = String::from_utf8_lossy(&outside.stdout);
         assert!(outside.status.success(), "{emit}: {outside:?}");
         assert!(!stdout.contains("acquire"), "{emit}: {stdout}");

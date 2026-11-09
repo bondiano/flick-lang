@@ -186,7 +186,7 @@ let services () =
   let named = Channel.from_effect (task { Option.bind Tracer.span_name (Tracer.parent_span ()) })
   say ("with_span: " ++ show (Channel.run_collect (Channel.with_span "pipeline" options named)))
 
-running : Unit ->{; Boom} Unit
+running : Unit ->{Async; Boom} Unit
 let running () =
   say
     ("run_count, run_head, run_last: "

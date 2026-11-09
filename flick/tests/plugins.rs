@@ -231,6 +231,19 @@ mod wasm {
     }
 
     #[test]
+    fn a_reference_to_a_watched_function_is_no_call() {
+        let main = "module App.Main exposing (main, counter)\n\nimport Pairs exposing (tally)\n\ncounter : Float -> Float\nlet counter = tally\n\nmain : Unit ->{; AppError} Unit\nlet main () = ()\n";
+        let root = app("plugins-calls-reference", main);
+        let checked = flick(&root, &["check"]);
+        assert!(checked.status.success(), "{checked:?}");
+        assert!(
+            !trace(&root).iter().any(|l| l.starts_with("check-calls")),
+            "{:?}",
+            trace(&root)
+        );
+    }
+
+    #[test]
     fn a_plugin_that_fails_on_the_calls_is_reported_with_its_package() {
         let main = "module App.Main exposing (main, boomed)\n\nimport Pairs exposing (boom)\n\nboomed : Float\nlet boomed = boom 1.0\n\nmain : Unit ->{; AppError} Unit\nlet main () = Platform.stdout_line (show boomed)\n";
         let root = app("plugins-calls-fail", main);

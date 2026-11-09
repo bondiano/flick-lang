@@ -4,12 +4,14 @@
 /** Effect's `Reducer` shape, which `Reducer.fl` reads. */
 export interface Reducer<A> {
   readonly combine: (self: A, that: A) => A;
+  readonly initial: A;
   readonly initialValue: A;
   readonly combineAll: (xs: Iterable<A>) => A;
 }
 
 const reducer = <A>(combine: (self: A, that: A) => A, initialValue: A): Reducer<A> => ({
   combine,
+  initial: initialValue,
   initialValue,
   combineAll: (xs) => {
     let out = initialValue;

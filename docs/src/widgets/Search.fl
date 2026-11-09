@@ -120,7 +120,7 @@ let view model m =
 report : Failure e ->{} Unit
 let report failure = Platform.stderr_line (RawCause.describe (Failure.inspect failure))
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Async; AppError} Unit
 let main () =
   let ru = is_russian ()
   match Ui.Dom.container "flick-search-root" with

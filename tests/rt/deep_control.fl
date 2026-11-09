@@ -1,0 +1,15 @@
+// a million control operations in a tail loop under one handler
+module App.Main exposing (main)
+
+effect Tick =
+  control tick : Int ->{} Int
+
+loop : Int -> Int ->{Tick;} Int
+let rec loop acc i = if i == 0 then acc else loop (Tick.tick acc) (i - 1)
+
+main : Unit ->{Async; AppError} Unit
+let main () =
+  let r =
+    try loop 0 1000000 with
+    | Tick.tick x -> resume (x + 1)
+  Platform.stdout_line (show r)

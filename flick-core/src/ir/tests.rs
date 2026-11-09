@@ -57,6 +57,7 @@ pub(crate) fn check_text_with(
         thresholds: types::Thresholds::default(),
         effects: true,
         watched: Watched::none(),
+        stages_by_class: false,
     };
     let (more, typing) = types::check_typed(&module, &builtin, builtins, options, &mut interface);
     diagnostics.extend(parse.diagnostics);

@@ -27,6 +27,7 @@ mod group;
 mod handle;
 mod imports;
 mod items;
+mod kernel;
 mod labels;
 mod lift;
 mod literal;
@@ -73,7 +74,7 @@ pub fn js(module: &Module, options: &Options) -> Output {
     #[cfg(feature = "typescript")]
     let mut declarations = Vec::new();
     let interface = (options.interface)(&module.name);
-    if let Some(interface) = &interface {
+    if let Some(interface) = interface.as_ref().filter(|_| !options.rt) {
         g.sync_exports = sync_exports(interface, &module.name);
         // the wrapper of a Sync export is the runtime's
         g.runtime |= !g.sync_exports.is_empty();
@@ -166,8 +167,9 @@ pub fn relative(from: &str, to: &str) -> String {
 /// Removes the markers from `code`, recording where each one was.
 impl<'a> Gen<'a> {
     fn new(module: &'a Module, options: &'a Options<'a>) -> Self {
-        let groups = group::groups(&module.name, &module.items);
-        let grouped = group::grouped(&module.name, &module.items, &groups);
+        let calls = kernel::calls(options.rt);
+        let groups = group::groups(&module.name, &module.items, calls);
+        let grouped = group::grouped(&module.name, &module.items, &groups, calls);
         Gen {
             module: &module.name,
             options,
@@ -178,6 +180,7 @@ impl<'a> Gen<'a> {
             foreign: Vec::new(),
             runtime: false,
             effect: false,
+            kernel: options.rt,
             temps: 0,
             givens: Vec::new(),
             #[cfg(feature = "source-maps")]
@@ -306,6 +309,9 @@ struct Gen<'a> {
     foreign: Vec<(String, String, String)>,
     runtime: bool,
     effect: bool,
+    /// Compiling for Flick's own runtime: the runtime stage is a generator
+    /// the kernel drives, not an Effect (see [`kernel`]).
+    kernel: bool,
     temps: u32,
     /// Dictionaries in scope: as `Dict::Given` names them, and the parameter.
     givens: Vec<(String, String)>,
