@@ -38,9 +38,9 @@ test("effect-bump reports the change, writes the snapshot and moves the pins", (
   // the coverage linter's fixture: `flick-core/tests/effect_surface.rs` lints it red
   assert.equal(written, readFileSync(path.join(fixtures, "effect-1.1.0.snapshot.json"), "utf8"));
   const pins = {
-    "runtime/package.json": '"effect": "1.1.0"',
-    "runtime/src/capabilities.ts": 'EFFECT_VERSION = "1.1.0"',
-    "runtime/test/effect-version.test.ts": 'PINNED_EFFECT = "1.1.0"',
+    "packages/effect-ts/package.json": '"effect": "1.1.0"',
+    "packages/effect-ts/src/capabilities.ts": 'EFFECT_VERSION = "1.1.0"',
+    "packages/effect-ts/test/effect-version.test.ts": 'PINNED_EFFECT = "1.1.0"',
     "flick/src/toolchain.rs": 'EFFECT: &str = "1.1.0"',
   };
   for (const [file, pin] of Object.entries(pins)) {

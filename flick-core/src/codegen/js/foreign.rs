@@ -28,21 +28,6 @@ fn trusted_runtime_package(spec: &str) -> bool {
         })
 }
 
-#[cfg(test)]
-mod tests {
-    use super::trusted_runtime_package;
-
-    #[test]
-    fn only_runtime_and_adapter_package_paths_are_trusted() {
-        assert!(trusted_runtime_package("@flick-lang/runtime/rt"));
-        assert!(trusted_runtime_package(
-            "@flick-lang/effect-ts/effect/Effect"
-        ));
-        assert!(!trusted_runtime_package("@flick-lang/runtime-extra"));
-        assert!(!trusted_runtime_package("@flick-lang/effect-ts-extra"));
-    }
-}
-
 impl Gen<'_> {
     pub(super) fn foreign(&mut self, f: &Foreign) -> String {
         let alias = format!("$f_{}", f.name);
@@ -254,4 +239,19 @@ pub(super) fn plain_foreigns(items: &[Item]) -> HashMap<String, (usize, String)>
             _ => None,
         })
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::trusted_runtime_package;
+
+    #[test]
+    fn only_runtime_and_adapter_package_paths_are_trusted() {
+        assert!(trusted_runtime_package("@flick-lang/runtime/rt"));
+        assert!(trusted_runtime_package(
+            "@flick-lang/effect-ts/effect/Effect"
+        ));
+        assert!(!trusted_runtime_package("@flick-lang/runtime-extra"));
+        assert!(!trusted_runtime_package("@flick-lang/effect-ts-extra"));
+    }
 }

@@ -304,11 +304,7 @@ fn assert_go() {
     );
 }
 
-#[test]
-#[ignore = "needs Node and `pnpm install`; run `just e2e`"]
-fn run_cases() {
-    let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
-    let go_only = env::var_os("FLICK_E2E_GO_ONLY").is_some();
+fn installed_js_packages(repo: &Path, go_only: bool) {
     assert!(
         go_only || repo.join("node_modules/@flick-lang/runtime").exists(),
         "runtime is not installed: run `pnpm install --frozen-lockfile` in the repository root"
@@ -317,6 +313,14 @@ fn run_cases() {
         go_only || repo.join("node_modules/@flick-lang/effect-ts").exists(),
         "Effect adapter is not installed: run `pnpm install --frozen-lockfile` in the repository root"
     );
+}
+
+#[test]
+#[ignore = "needs Node and `pnpm install`; run `just e2e`"]
+fn run_cases() {
+    let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+    let go_only = env::var_os("FLICK_E2E_GO_ONLY").is_some();
+    installed_js_packages(&repo, go_only);
     let root = repo.join("tests/run");
     let (paths, part) = selected(&root);
     let gaps = gaps::load(&root);

@@ -22,7 +22,7 @@ the adapter relies on is checked by the runtime's tests and by
 would keep all of Effect in a browser bundle.
 
 ```text
-error: the Flick runtime requires effect 4.1.2, found 4.1.0
+error: the Flick Effect adapter requires effect 4.1.2, found 4.1.0
 ```
 
 ## Owners and scopes

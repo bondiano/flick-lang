@@ -1,6 +1,6 @@
 ---
 title: "Адаптер среды выполнения"
-source_hash: 04e2e3f9244dac7d
+source_hash: c8b6d4edd87e063d
 ---
 
 Скомпилированный код работает через `@flick-lang/effect-ts` (см. [Ошибки, сервисы, ресурсы и конкурентность](../../spec/05-errors-and-concurrency/), [Архитектура компилятора](../../contributing/implementation-decisions/#архитектура-компилятора)).
@@ -20,7 +20,7 @@ Flick без зависимости от Effect. Обычная сборка н�
 выполнение завершается с кодом `2`:
 
 ```text
-error: the Flick runtime requires effect 4.1.2, found 4.1.0
+error: the Flick Effect adapter requires effect 4.1.2, found 4.1.0
 ```
 
 Матрицу возможностей операций Effect, на которые опирается адаптер,

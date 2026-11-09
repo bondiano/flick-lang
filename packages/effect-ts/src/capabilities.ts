@@ -66,7 +66,7 @@ const has = (module: unknown, name: string): boolean =>
  * which would keep all of Effect in a browser bundle.
  */
 export const versionProblems = (version: string = effectPackage.version): Array<string> =>
-  version === EFFECT_VERSION ? [] : [`the Flick runtime requires effect ${EFFECT_VERSION}, found ${version}`];
+  version === EFFECT_VERSION ? [] : [`the Flick Effect adapter requires effect ${EFFECT_VERSION}, found ${version}`];
 
 /**
  * Problems that make the installed Effect unusable: another version, or an

@@ -67,7 +67,7 @@ cron = "cron expressions need a parser of their own"
 - a foreign binding of a `wrapped` symbol without `reviewed
   "effect@<pinned> …"`, or reviewed against another release;
 - a `language`, `excluded` or `pending` decision without a reason, a snapshot of another release than
-  `runtime/package.json` pins.
+  `packages/effect-ts/package.json` pins.
 
 `just effect-coverage` prints the counts by status and module; CI adds them
 to the run's summary.
@@ -76,8 +76,8 @@ to the run's summary.
 
 `just effect-bump <version>` downloads the release, writes its snapshot,
 prints what was added, removed and changed and what the runtime's
-capability matrix lacks, and moves the pins (`runtime/package.json`,
-`runtime/src/capabilities.ts`, the runtime's version test,
+capability matrix lacks, and moves the pins (`packages/effect-ts/package.json`,
+`packages/effect-ts/src/capabilities.ts`, the runtime's version test,
 `flick/src/toolchain.rs`). The linter stays red until the manifest and the
 reviewed bindings agree with the new snapshot.
 

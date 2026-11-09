@@ -93,13 +93,13 @@ test("a defect of a supervisor fails the run", async () => {
 
 test("another Effect release is refused with exit code 2", async () => {
   const r = await run("old-effect");
-  assert.deepEqual([r.code, r.stderr], [2, "error: the Flick runtime requires effect 4.1.2, found 4.1.0\n"]);
+  assert.deepEqual([r.code, r.stderr], [2, "error: the Flick Effect adapter requires effect 4.1.2, found 4.1.0\n"]);
 });
 
 test("the capability check names the version and missing operations", () => {
   assert.deepEqual(capabilities(), []);
   const problems = capabilities("4.1.0", { Effect: {} });
-  assert.equal(problems[0], "the Flick runtime requires effect 4.1.2, found 4.1.0");
+  assert.equal(problems[0], "the Flick Effect adapter requires effect 4.1.2, found 4.1.0");
   assert.ok(problems.includes("effect is missing Effect.gen"));
   assert.ok(problems.includes("effect is missing Scope.make"));
   assert.deepEqual(versionProblems(), []);
