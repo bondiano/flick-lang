@@ -109,7 +109,7 @@ the root that hydrates it agree:
 ```flick
 # import App.Pages
 #
-page_html : String ->{} List String
+page_html : String ->{Async;} List String
 let page_html url =
   provide Atom.layer {
     Atom.serving url

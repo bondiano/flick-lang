@@ -18,6 +18,11 @@ macro_rules! mark {
 }
 
 mod binary;
+#[cfg(not(target_arch = "wasm32"))]
+mod bridge;
+#[cfg(target_arch = "wasm32")]
+#[path = "bridge_stub.rs"]
+mod bridge;
 mod exports;
 mod expr;
 mod foreign;
@@ -31,7 +36,9 @@ mod kernel;
 mod labels;
 mod lift;
 mod literal;
+mod paths;
 mod pattern;
+pub use paths::relative;
 mod release;
 mod schema;
 mod services;
@@ -70,7 +77,8 @@ pub fn js(module: &Module, options: &Options) -> Output {
     );
     let mut g = Gen::new(module, options);
     #[cfg(feature = "typescript")]
-    let projection = Projection::new(&module.name, options.interface, options.package);
+    let projection =
+        Projection::for_runtime(&module.name, options.interface, options.package, options.rt);
     #[cfg(feature = "typescript")]
     let mut declarations = Vec::new();
     let interface = (options.interface)(&module.name);
@@ -141,29 +149,6 @@ pub fn js(module: &Module, options: &Options) -> Output {
     output
 }
 
-/// The import specifier of `to` from `from`, both relative to the output
-/// root; `npm:` marks a module of a package.
-pub fn relative(from: &str, to: &str) -> String {
-    if let Some(bare) = to.strip_prefix("npm:") {
-        return bare.to_owned();
-    }
-    let from_dir: Vec<&str> = from.split('/').collect();
-    let from_dir = &from_dir[..from_dir.len() - 1];
-    let to_parts: Vec<&str> = to.split('/').collect();
-    let common = from_dir
-        .iter()
-        .zip(&to_parts)
-        .take_while(|(a, b)| a == b)
-        .count();
-    let up = from_dir.len() - common;
-    let rest = to_parts[common..].join("/");
-    if up == 0 {
-        format!("./{rest}")
-    } else {
-        format!("{}{rest}", "../".repeat(up))
-    }
-}
-
 /// Removes the markers from `code`, recording where each one was.
 impl<'a> Gen<'a> {
     fn new(module: &'a Module, options: &'a Options<'a>) -> Self {
@@ -218,7 +203,7 @@ impl<'a> Gen<'a> {
                 })
                 .collect(),
             direct_foreigns: if options.release && !options.typescript() {
-                foreign::plain_foreigns(&module.items)
+                foreign::plain_foreigns(&module.items, &module.name, options)
             } else {
                 HashMap::new()
             },

@@ -64,7 +64,7 @@ map_effect_par :
   { concurrency : Option Int; unordered : Bool } ->
   (a ->{r2; e2} b)^c ->
   (Stream r e a)^c ->
-  (Stream (r + r2) (e + e2) b)^c
+  (Stream {Async | r + r2} (e + e2) b)^c
 foreign pure map_effect_par from "@flick-lang/effect-ts/effect/Stream" "flickMapEffectPar"
   arity 2
   retention call

@@ -298,3 +298,18 @@ fn a_set_of_services_and_errors_has_no_declaration() {
         assert!(!dts.contains(&format!("export interface {name}")), "{dts}");
     }
 }
+
+#[test]
+fn rt_service_keys_use_the_native_service_type() {
+    let (interface, lookup) = checked(
+        "module App.Shapes exposing (Greeter)\nservice Greeter =\n  hello : String ->{} String\n",
+    );
+    let package = |_: &str| None;
+    let projection = Projection::for_runtime("App.Shapes", &lookup, &package, true);
+    let (dts, refused) = declaration_file(&projection, &interface, &|m| m.to_owned());
+    assert!(refused.is_empty(), "{refused:?}");
+    assert!(dts.contains("$s_Greeter: $Service<Greeter,"), "{dts}");
+    assert!(dts.contains("ServiceValue as $Service"), "{dts}");
+    assert!(!dts.contains("$Context"), "{dts}");
+    assert!(!dts.contains("@flick-lang/effect-ts"), "{dts}");
+}

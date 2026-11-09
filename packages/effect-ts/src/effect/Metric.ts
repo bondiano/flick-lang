@@ -1,9 +1,10 @@
 // Effect's `Metric` for the bindings of the standard library, and the
 // adapters where a Flick value differs from what Effect takes: options
 // with `Option` fields, and states as Flick records.
-import { type Duration, Effect, Metric, Option } from "effect";
+import { Duration, Effect, Metric, Option } from "effect";
 
 import { tag } from "@flick-lang/runtime/tags";
+import { Duration as NativeDuration } from "@flick-lang/runtime/rt/duration";
 
 export * from "effect/Metric";
 
@@ -48,7 +49,12 @@ export const flickSummaryWithTimestamp = (name: string, o: SummaryOptions) =>
   Metric.summaryWithTimestamp(name, summaryOptions(o));
 
 export const flickTimer = (name: string, o: Common & { readonly boundaries: Option.Option<ReadonlyArray<number>> }) =>
-  Metric.timer(name, Option.match(o.boundaries, { onNone: () => common(o), onSome: (boundaries) => ({ ...common(o), boundaries }) }));
+  Metric.mapInput(
+    Metric.timer(name, Option.match(o.boundaries, { onNone: () => common(o), onSome: (boundaries) => ({ ...common(o), boundaries }) })),
+    (value: Duration.Duration | NativeDuration) => value instanceof NativeDuration
+      ? value.nanos === undefined ? Duration.millis(value.millis) : Duration.nanos(value.nanos)
+      : value,
+  );
 
 /** The type of a metric with its state. */
 type Kinded = Metric.Metric.Snapshot extends infer S ? (S extends Metric.Metric.Snapshot ? Pick<S, "type" | "state"> : never) : never;

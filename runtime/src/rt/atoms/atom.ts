@@ -58,7 +58,11 @@ export const label = <A extends object>(name: string, value: A): A => {
   if (Reflect.get(value, "label") !== undefined) return value;
   // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- an atom labelled is an atom
   if (isAtom(value)) return patched(value, { label: name }) as unknown as A;
-  return Object.freeze({ ...value, label: name });
+  const labelled = { ...value, label: name };
+  const prototype: unknown = Object.getPrototypeOf(value);
+  if (prototype === null || typeof prototype === "object" || typeof prototype === "function")
+    Object.setPrototypeOf(labelled, prototype);
+  return Object.freeze(labelled);
 };
 
 interface Entry<K, A> {

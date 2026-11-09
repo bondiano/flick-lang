@@ -18,6 +18,7 @@ import {
   SchemaTransformation,
 } from "effect";
 import type { Order } from "effect";
+import { type FlickHashSet as NativeHashSet, hashSetSize as nativeHashSetSize } from "@flick-lang/runtime/rt/collections";
 
 import { EQ, LT, type HashDict, type OrdDict, type Ordering } from "../data.ts";
 import { issueOf } from "../schema/codecs.ts";
@@ -75,9 +76,11 @@ export const flickMakeFilter = <T>(f: (value: T) => boolean, message: string): S
   Schema.makeFilter((value: T) => f(value), { message });
 
 /** A check of the size of a Flick `HashSet`, through Effect's check of a `{ size }`. */
+const isNativeSet = (value: unknown): value is NativeHashSet<unknown> =>
+  typeof value === "object" && value !== null && Reflect.has(value, "map") && !Reflect.has(value, "native");
 const sized = (check: SchemaAST.Filter<{ readonly size: number }>): SchemaAST.Filter<FlickHashSet<unknown>> =>
   new SchemaAST.Filter(
-    (set: FlickHashSet<unknown>, self, options) => check.run({ size: hashSetSize(set) }, self, options),
+    (set: FlickHashSet<unknown>, self, options) => check.run({ size: isNativeSet(set) ? nativeHashSetSize(set) : hashSetSize(set) }, self, options),
     check.annotations,
   );
 

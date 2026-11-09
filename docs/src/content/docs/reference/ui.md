@@ -640,7 +640,7 @@ arrive.
 user : Atom.Atom (Atom.Async String none)
 let user = Atom.serializable_task (Codec.json Schema.string) (Atom.task (task { fetch_name () }))
 
-chunks : Unit ->{} List String
+chunks : Unit ->{Async;} List String
 let chunks () = provide Atom.layer { Stream.run_collect (Ui.Server.stream "app" page) }
 ```
 

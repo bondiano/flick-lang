@@ -11,6 +11,7 @@ use std::io;
 use std::path::{Path, PathBuf};
 
 use flick_core::build::{self, Extras, Settings};
+use flick_core::codegen::EffectBridge;
 use flick_core::diagnostics::render::json_events;
 use flick_core::diagnostics::{Diagnostic, Severity, codes};
 use flick_core::fmt;
@@ -168,6 +169,7 @@ impl Session {
             out_dir: Path::new("/dist"),
             root: None,
             backend: Backend::Effect,
+            effect_bridge: EffectBridge::Absent,
             ui: None,
             runners: &[],
             core_modules: &[],

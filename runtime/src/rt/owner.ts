@@ -33,10 +33,10 @@ import {
   currentFiber,
   exitOf,
   fork,
+  startNow,
   owned,
   raiseOf,
   uninterruptible,
-  underSync,
 } from "./fiber.ts";
 import { traceEvent, traceId, tracing } from "./trace.ts";
 import { Failure } from "./outcome.ts";
@@ -155,8 +155,7 @@ function* closeSteps(owner: Owner, exit: Exit): Run {
   yield hooks();
   // a settling foreign call may add a hook, and a hook may start one: repeat until neither
   for (;;) {
-    // a stage that runs at once, or a fiber it waits for, cannot wait for a promise, and has none to wait for
-    if (owner.pending.size > 0 || (fiber.nested === 0 && !underSync())) yield promised(settle(owner));
+    if (owner.pending.size > 0) yield promised(settle(owner));
     if ([...owner.closing].every((hook) => ran.has(hook))) break;
     yield hooks();
   }
@@ -331,7 +330,7 @@ const spawned = /*#__PURE__*/ new WeakMap<Fiber, number>();
  * the supervisor acquire into `owner`. Nothing here yields, so nothing splits
  * registering the child from registering its watcher.
  */
-export const fiberSpawn = (owner: Owner, supervisor: (failure: Failure) => unknown, task: () => unknown): FlickFiber => {
+const spawnChild = (owner: Owner, supervisor: (failure: Failure) => unknown, task: () => unknown, now: boolean): FlickFiber => {
   const traced = tracing && owner.trace !== 0;
   if (!owner.open) {
     if (traced) traceEvent({ e: "refuse", o: owner.trace });
@@ -346,8 +345,16 @@ export const fiberSpawn = (owner: Owner, supervisor: (failure: Failure) => unkno
   owner.watchers.add(watcher);
   watcher.observe(() => owner.watchers.delete(watcher));
   if (traced) traceEvent({ e: "spawn", o: owner.trace, f: id });
+  if (now) startNow(child);
   return new FlickFiber(child);
 };
+
+export const fiberSpawn = (owner: Owner, supervisor: (failure: Failure) => unknown, task: () => unknown): FlickFiber =>
+  spawnChild(owner, supervisor, task, false);
+
+/** A child registered before it starts, run on this stack until its first wait. */
+export const fiberSpawnNow = (owner: Owner, supervisor: (failure: Failure) => unknown, task: () => unknown): FlickFiber =>
+  spawnChild(owner, supervisor, task, true);
 
 function* watch(owner: Owner, child: Fiber, supervisor: (failure: Failure) => unknown, id: number): Run {
   const exit = asExit(yield awaitFiber(child));

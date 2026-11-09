@@ -82,7 +82,11 @@ fn prepare(options: &TestArguments, global: &GlobalArguments) -> Result<PathBuf,
     let mut selected = wanted.clone();
     selected.sort();
     selected.dedup();
-    let rt = options.rt || project.config.build.effect == Backend::Rt;
+    let go_requested = match options.emit {
+        Some(target) => target == TestEmitArgument::Go,
+        None => project.config.build.emit == Emit::Go,
+    };
+    let rt = options.rt || (!go_requested && project.config.build.effect == Backend::Rt);
     let settings = format!(
         "test {:?} {:?} {:?} {rt}",
         selected,
@@ -93,7 +97,7 @@ fn prepare(options: &TestArguments, global: &GlobalArguments) -> Result<PathBuf,
         },
         release(options.profile, Some(&project.config.build)),
     );
-    let key = cache::key(&project, &roots, &settings);
+    let key = cache::key(&project, &roots, &settings, !go_requested && !rt);
     let out = project.root.join(OUT_DIR);
     progress.stage("Checking test cache");
     if let Some(runner) = cached_prepare(&project, &key, &out, &progress) {
@@ -134,11 +138,7 @@ fn prepare(options: &TestArguments, global: &GlobalArguments) -> Result<PathBuf,
         .filter(|m| wanted.is_empty() || wanted.contains(&m.path))
         .map(|m| (m.name.clone(), format!("./{}.js", m.name.replace('.', "/"))))
         .collect();
-    let go = match options.emit {
-        Some(target) => target == TestEmitArgument::Go,
-        None => project.config.build.emit == Emit::Go,
-    };
-    if go && rt {
+    if go_requested && rt {
         drop(progress);
         let message = "Flick's own runtime has only JavaScript output yet";
         return fail(
@@ -147,7 +147,7 @@ fn prepare(options: &TestArguments, global: &GlobalArguments) -> Result<PathBuf,
         );
     }
     // with no suite, the go target has no program: the node runner reports the empty run
-    let go = go && !suites.is_empty();
+    let go = go_requested && !suites.is_empty();
     if !go && let Some(problem) = toolchain::check_runtime(&project.root, rt) {
         drop(progress);
         return fail(&sources, vec![problem]);
@@ -181,7 +181,7 @@ fn prepare(options: &TestArguments, global: &GlobalArguments) -> Result<PathBuf,
     }
     if go {
         if diagnostics.is_empty()
-            && cache::key(&project, &roots, &settings) == key
+            && cache::key(&project, &roots, &settings, !go_requested && !rt) == key
             && cache::read_unchanged(&project, &roots, &host.cwd, &sources)
         {
             cache::store(&project.root, &key, &emitted.artifacts);
@@ -198,7 +198,7 @@ fn prepare(options: &TestArguments, global: &GlobalArguments) -> Result<PathBuf,
         return Err(());
     }
     if diagnostics.is_empty()
-        && cache::key(&project, &roots, &settings) == key
+        && cache::key(&project, &roots, &settings, !go_requested && !rt) == key
         && cache::read_unchanged(&project, &roots, &host.cwd, &sources)
     {
         emitted.artifacts.push(Artifact {

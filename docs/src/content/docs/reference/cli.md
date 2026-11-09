@@ -52,6 +52,9 @@ nothing, run no `main` and load no foreign module. An installed
 `@flick-lang/runtime`, `@flick-lang/effect-ts` or `effect` of another version than the compiler
 pins stops them with `FLICK-P015` (exit code 2). `schema export` loads the
 module that makes the codec, whose top level is pure, and nothing else.
+JSON Schema export uses the project's selected runtime. OpenAPI export uses the
+Effect adapter; set `effect = "effect"` and install `@flick-lang/effect-ts` for
+an `HttpApi.Api` export.
 
 `test` streams human results after each test's cleanup, with success/failure markers, completion counts and timings, then prints a summary. Node and Go share the format and honor `--color`; auto color checks stdout, `NO_COLOR` and `TERM=dumb`. `--reporter json` writes one final object in declaration order, without color or timings.
 

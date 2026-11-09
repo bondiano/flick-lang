@@ -4,13 +4,19 @@ import { tag } from "../tags.ts";
 import { schemaDescription, schemaError, type Codec, type ExportError, type SchemaError, type Witness } from "./schema.ts";
 
 const EXPORT_ERROR = /*#__PURE__*/ tag("Codec.ExportError.ExportError");
+/** Host schemas retain their AST for exact export when the Effect bridge is present. */
+export const schemaExportHooks: {
+  host: (name: string, codec: Codec) => Result<string, ExportError> | undefined;
+} = { host: () => undefined };
 const at = (path: string, key: string | number): string =>
   typeof key === "number" ? `${path}[${key}]` : path ? `${path}.${key}` : key;
 
 type JsonSchema = boolean | Readonly<Record<string, unknown>>;
 class Unsupported extends Error {
-  constructor(path: string, reason: string) {
+  readonly hosted: boolean;
+  constructor(path: string, reason: string, hosted = false) {
     super(`${path} -> JSON Schema: ${reason}`);
+    this.hosted = hosted;
   }
 }
 
@@ -23,7 +29,7 @@ const objectSchema = (fields: ReadonlyArray<readonly [string, JsonSchema]>): Jso
 
 const exportSchema = (schema: Witness, path: string, defs: Map<string, JsonSchema | null>): JsonSchema => {
   const description = schemaDescription(schema);
-  if (!description) throw new Unsupported(path, "a schema made outside Flick has no canonical JSON form");
+  if (!description) throw new Unsupported(path, "a schema made outside Flick has no canonical JSON form", true);
   switch (description.kind) {
     case "number": return { type: "number" };
     case "string": return { type: "string" };
@@ -33,7 +39,8 @@ const exportSchema = (schema: Witness, path: string, defs: Map<string, JsonSchem
     case "unit": return { type: "null" };
     case "never": return false;
     case "unknown": throw new Unsupported(path, "an Unknown value accepts anything, which strict export does not write");
-    case "list": return { type: "array", items: exportSchema(description.item, `${path}[]`, defs) };
+    case "list":
+    case "chunk": return { type: "array", items: exportSchema(description.item, `${path}[]`, defs) };
     case "option": return { anyOf: [exportSchema(description.item, path, defs), { type: "null" }] };
     case "result": return { oneOf: [
       objectSchema([["ok", exportSchema(description.value, at(path, "ok"), defs)]]),
@@ -80,6 +87,15 @@ const exportSchema = (schema: Witness, path: string, defs: Map<string, JsonSchem
       return { ...base, ...keywords };
     }
     case "transform": return exportSchema(description.from, path, defs);
+    case "duration-millis": return { type: "number", minimum: 0 };
+    case "entries": {
+      if (description.unsupported) throw new Unsupported(path, "a property check has no JSON Schema form");
+      return {
+        type: "object", additionalProperties: exportSchema(description.value, `${path}[]`, defs),
+        ...(description.min === undefined ? {} : { minProperties: description.min }),
+        ...(description.max === undefined ? {} : { maxProperties: description.max }),
+      };
+    }
     case "block": {
       const properties = Object.fromEntries(description.fields.map(([, field]) =>
         [field.wire, exportSchema(field.codec, at(path, field.wire), defs)]));
@@ -112,7 +128,10 @@ export const codecJsonSchema = (name: string, codec: Codec): Result<string, Expo
     };
     return ok(JSON.stringify(output, null, 2));
   } catch (error) {
-    if (error instanceof Unsupported) return err({ _tag: EXPORT_ERROR, _0: error.message });
+    if (error instanceof Unsupported) {
+      const hosted = error.hosted ? schemaExportHooks.host(name, codec) : undefined;
+      return hosted ?? err({ _tag: EXPORT_ERROR, _0: error.message });
+    }
     throw error;
   }
 };

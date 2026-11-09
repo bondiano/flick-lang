@@ -118,7 +118,7 @@ tool : Cli.Command none none
 let tool =
   Cli.command "tool" |> Cli.subcommand deploy "Deploys" |> Cli.subcommand secret "" |> Cli.group
 
-attempt : Cli.Command none none -> List String ->{} Unit
+attempt : Cli.Command none none -> List String ->{Async} Unit
 let attempt command args =
   Platform.stdout_line ("$ " ++ String.join " " args)
   try Cli.run command args with
@@ -141,7 +141,7 @@ let parsed text = Cli.parse text
 
 /// `attempt`, printing the temporary directory `dir` as `$TMP` and a
 /// Windows separator as `/`.
-attempt_in : String -> Cli.Command none none -> List String ->{} Unit
+attempt_in : String -> Cli.Command none none -> List String ->{Async} Unit
 let attempt_in dir command args =
   portable : String -> String
   let portable text = String.replace_all "\\" "/" (String.replace_all dir "$TMP" text)
@@ -186,7 +186,7 @@ let only_help = {
   formatter = Some custom;
 }
 
-with_settings : List String ->{} Unit
+with_settings : List String ->{Async} Unit
 let with_settings args =
   Platform.stdout_line ("$ " ++ String.join " " args)
   try Cli.run_with only_help deploy args with

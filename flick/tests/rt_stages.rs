@@ -10,7 +10,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use common::{APP, project};
+use common::{APP, flick_in, project};
 use flick_core::build::runner_path;
 
 const LIB_CONFIG: &str = "schema-version = 1
@@ -116,6 +116,70 @@ fn append(path: &Path, line: &str) {
     fs::write(path, format!("{text}{line}\n")).expect("write");
 }
 
+#[test]
+#[ignore = "needs Node and pnpm install"]
+fn a_new_project_builds_runs_and_tests_on_rt_without_effect() {
+    let root = project("rt_stages/new_default", &[]);
+    fs::create_dir_all(&root).expect("directory");
+    let created = flick_in(&root, &["new", "hello"]);
+    assert!(created.status.success(), "{created:?}");
+    let app = root.join("hello");
+    let manifest = fs::read_to_string(app.join("package.json")).expect("manifest");
+    assert!(manifest.contains("@flick-lang/runtime"), "{manifest}");
+    assert!(!manifest.contains("@flick-lang/effect-ts"), "{manifest}");
+    assert!(!manifest.contains("\"effect\""), "{manifest}");
+
+    build(&app, &[]);
+    let js = fs::read_to_string(app.join("dist/App/Main.js")).expect("compiled module");
+    assert!(js.contains("@flick-lang/runtime/rt"), "{js}");
+    assert!(!js.contains("@flick-lang/effect-ts"), "{js}");
+    assert_eq!(run(&app), "Hello, world!\n");
+
+    let tested = flick_in(&app, &["test", "--reporter", "json"]);
+    assert!(tested.status.success(), "{tested:?}");
+    let report: serde_json::Value = serde_json::from_slice(&tested.stdout).expect("test report");
+    assert!(
+        report["tests"]
+            .as_array()
+            .is_some_and(|tests| !tests.is_empty())
+    );
+
+    let go = flick_in(&app, &["test", "--emit", "go", "--reporter", "json"]);
+    assert!(
+        go.status.success(),
+        "the Go target still runs its own runtime: {go:?}"
+    );
+
+    let declarations = flick_in(&app, &["build", "--emit-dts", "--out-dir", "typed"]);
+    assert!(declarations.status.success(), "{declarations:?}");
+    assert!(app.join("typed/App/Main.d.ts").is_file());
+    let declaration = fs::read_to_string(app.join("typed/App/Main.d.ts")).expect("declaration");
+    assert!(
+        !declaration.contains("@flick-lang/effect-ts"),
+        "{declaration}"
+    );
+    let tsc = Command::new(Path::new(env!("CARGO_MANIFEST_DIR")).join("../node_modules/.bin/tsc"))
+        .args([
+            "--noEmit",
+            "--module",
+            "nodenext",
+            "--moduleResolution",
+            "nodenext",
+            "--target",
+            "es2022",
+            "typed/App/Main.d.ts",
+        ])
+        .current_dir(&app)
+        .output()
+        .expect("TypeScript checker runs");
+    assert!(tsc.status.success(), "RT declarations typecheck: {tsc:?}");
+    let typescript = flick_in(&app, &["build", "--emit", "ts", "--out-dir", "ts"]);
+    assert!(typescript.status.success(), "{typescript:?}");
+    assert!(app.join("ts/App/Main.ts").is_file());
+    let source = fs::read_to_string(app.join("ts/App/Main.ts")).expect("typescript");
+    assert!(!source.contains("@flick-lang/effect-ts"), "{source}");
+}
+
 /// An app in `name/app` over the library `name/ctl` by path; the app's directory.
 fn with_library(name: &str, build_section: &str, main: &str) -> PathBuf {
     let config = format!("{APP}{build_section}\n[dependencies]\nctl = {{ path = \"../ctl\" }}\n");
@@ -180,6 +244,37 @@ fn a_project_of_two_modules_built_again_and_after_an_edit_of_each() {
     }
 }
 
+#[test]
+#[ignore = "needs Node and pnpm install"]
+fn optional_effect_arguments_cross_the_bridge_only_when_present() {
+    let app = project(
+        "rt_stages/optional_effect",
+        &[
+            ("flick.toml", APP),
+            (
+                "package.json",
+                "{\"type\":\"module\",\"dependencies\":{\"@flick-lang/effect-ts\":\"*\"}}",
+            ),
+            (
+                "src/App/Main.fl",
+                "module App.Main exposing (main)\n\n\
+             pick : Option (Eff none none Float) ->{} Float\n\
+             foreign effect pick from \"./bindings.mjs\" \"pick\"\n  optional 0\n\n\
+             main : Unit ->{Async; AppError} Unit\n\
+             let main () =\n  Platform.stdout_line (show (pick (Some (task { 42 }))))\n  Platform.stdout_line (show (pick None))\n",
+            ),
+            (
+                "src/App/bindings.mjs",
+                "import { succeed } from '@flick-lang/effect-ts/effect/Effect';\nexport const pick = value => value === undefined ? succeed(7) : value;\n",
+            ),
+        ],
+    );
+    for args in [vec!["--rt"], vec!["--rt", "--profile", "release"]] {
+        build(&app, &args);
+        assert_eq!(run(&app), "42\n7\n");
+    }
+}
+
 /// Whether the build in `out` under `app` is one for the kernel, by what its main
 /// module imports, and whether its interface records a direct arrow.
 fn on_the_kernel(app: &Path, out: &str) -> (bool, bool) {
@@ -192,7 +287,11 @@ fn on_the_kernel(app: &Path, out: &str) -> (bool, bool) {
 
 #[test]
 fn the_two_modes_do_not_read_what_the_other_saved() {
-    let app = with_library("rt_stages/modes", "", PLAIN_MAIN);
+    let app = with_library(
+        "rt_stages/modes",
+        "\n[build]\neffect = \"effect\"\n",
+        PLAIN_MAIN,
+    );
     let default = ["--out-dir", "default"];
     let kernel = ["--out-dir", "kernel", "--rt"];
     build(&app, &default);

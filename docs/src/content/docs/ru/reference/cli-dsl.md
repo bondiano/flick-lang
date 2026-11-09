@@ -1,6 +1,6 @@
 ---
 title: "Приложения командной строки"
-source_hash: b7eb8076128ce429
+source_hash: fcefca0b61e758c1
 ---
 
 `Cli.Command r e` описывает флаги, позиционные аргументы, подкоманды
@@ -143,7 +143,7 @@ let greet =
 ```flick
 # import App.Greet exposing (greet)
 #
-main : Unit ->{; AppError} Unit
+main : Unit ->{Async; AppError} Unit
 let main () =
   try Cli.run greet (Platform.args ()) with
   | Cli.CliError message -> App.fail message

@@ -544,6 +544,12 @@ let tests =
 fn schema_arbitrary_draws_alike_on_go() {
     let report = |name: &str, args: &[&str]| {
         let dir = project(name);
+        let config = fs::read_to_string(dir.join("flick.toml")).expect("config");
+        fs::write(
+            dir.join("flick.toml"),
+            format!("{config}\n[build]\neffect = \"effect\"\n"),
+        )
+        .expect("Effect configuration");
         fs::write(dir.join("test/Test/Sample.fl"), DRAWS).expect("write");
         let out = flick_in(
             &dir,

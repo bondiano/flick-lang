@@ -14,10 +14,12 @@ use crate::types::lang::{self, Lang};
 use crate::types::{Form, Kind, ModuleRequirement, Type, TypeDef, passes_dictionary};
 
 /// The runtime package generated code imports.
-const RUNTIME: &str = "@flick-lang/effect-ts";
+const EFFECT_RUNTIME: &str = "@flick-lang/effect-ts";
+const FLICK_RUNTIME: &str = "@flick-lang/runtime/rt/types";
 
 /// The runtime module whose `Ui` a Flick `Ui` value is.
-const RUNTIME_UI: &str = "@flick-lang/effect-ts/ui/react";
+const EFFECT_RUNTIME_UI: &str = "@flick-lang/effect-ts/ui/react";
+const FLICK_RUNTIME_UI: &str = "@flick-lang/runtime/rt/types";
 
 /// Built-in types TypeScript has natively.
 const PRIMITIVES: &[(Lang, &str)] = &[
@@ -69,6 +71,8 @@ pub struct Projection<'a> {
     pub used: RefCell<BTreeSet<String>>,
     /// Whether the runtime `Ui` is referenced.
     ui: Cell<bool>,
+    /// The projection of values compiled for Flick's own runtime.
+    rt: bool,
 }
 
 /// Type parameters in scope: Flick name to TypeScript name; regions have
@@ -81,12 +85,22 @@ impl Projection<'_> {
         lookup: &'a dyn Fn(&str) -> Option<Interface>,
         package: &'a dyn Fn(&str) -> Option<String>,
     ) -> Projection<'a> {
+        Self::for_runtime(module, lookup, package, false)
+    }
+
+    pub fn for_runtime<'a>(
+        module: &'a str,
+        lookup: &'a dyn Fn(&str) -> Option<Interface>,
+        package: &'a dyn Fn(&str) -> Option<String>,
+        rt: bool,
+    ) -> Projection<'a> {
         Projection {
             module,
             lookup,
             package,
             used: RefCell::new(BTreeSet::new()),
             ui: Cell::new(false),
+            rt,
         }
     }
 
@@ -192,7 +206,7 @@ impl Projection<'_> {
                         let a = self.ty(result, vars)?;
                         let e_row = self.row(&e.errors, vars)?;
                         let r_row = self.row(&e.services, vars)?;
-                        effect(&a, &e_row, &r_row)
+                        effect(&a, &e_row, &r_row, self.rt)
                     }
                 };
                 Ok(format!("(arg: {param}) => {result}"))
@@ -288,58 +302,11 @@ impl Projection<'_> {
         if let Some(shown) = self.module_or_dictionary(module, name, &args, vars)? {
             return Ok(shown);
         }
-        let arg = |i: usize| self.ty(args[i], vars);
         let seq = lang::is(Lang::Seq, module, name).then_some(Lang::Seq);
-        if let Some(item) = native(module, name).or(seq) {
-            if let Some((_, ts)) = PRIMITIVES.iter().find(|&&(p, _)| p == item) {
-                return Ok((*ts).to_owned());
-            }
-            match (item, args.len()) {
-                (Lang::Stream, 3) => {
-                    let r = self.row(args[0], vars)?;
-                    let e = self.row(args[1], vars)?;
-                    return Ok(format!("$Stream.Stream<{}, {e}, {r}>", arg(2)?));
-                }
-                (Lang::List, 1) => return Ok(format!("ReadonlyArray<{}>", arg(0)?)),
-                (Lang::Ui, 0) => {
-                    self.ui.set(true);
-                    return Ok("$Ui".to_owned());
-                }
-                (Lang::Seq, 1) => return Ok(format!("Iterable<{}>", arg(0)?)),
-                (Lang::Option, 1) => return Ok(format!("$Option.Option<{}>", arg(0)?)),
-                (Lang::Result, 2) => {
-                    return Ok(format!("$Result.Result<{}, {}>", arg(1)?, arg(0)?));
-                }
-                (Lang::Eff, 3) => {
-                    let r = self.row(args[0], vars)?;
-                    let e = self.row(args[1], vars)?;
-                    return Ok(effect(&arg(2)?, &e, &r));
-                }
-                (Lang::Layer, 3) => {
-                    let ri = self.row(args[0], vars)?;
-                    let e = self.row(args[1], vars)?;
-                    let ro = self.row(args[2], vars)?;
-                    return Ok(format!("$Layer.Layer<{ro}, {e}, {ri}>"));
-                }
-                (Lang::Errors, 1) => return self.row(args[0], vars),
-                (Lang::Schema, 1) => return Ok(format!("$Schema.Codec<{0}, {0}>", arg(0)?)),
-                (Lang::PureCodec, 2) => {
-                    return Ok(format!("$Schema.Codec<{}, {}>", arg(1)?, arg(0)?));
-                }
-                (Lang::Codec, 4) => {
-                    let rd = self.row(args[0], vars)?;
-                    let re = self.row(args[1], vars)?;
-                    return Ok(format!(
-                        "$Schema.Codec<{}, {}, {rd}, {re}>",
-                        arg(3)?,
-                        arg(2)?
-                    ));
-                }
-                (Lang::ServiceTag | Lang::ServiceImpl | Lang::Scope, _) => {
-                    return Err(format!("`{name}` has no TypeScript form"));
-                }
-                _ => {}
-            }
+        if let Some(item) = native(module, name).or(seq)
+            && let Some(projected) = self.native_applied(item, &args, vars, name)?
+        {
+            return Ok(projected);
         }
         let def = self.definition(module, name)?;
         let params = params(&def.kind);
@@ -490,11 +457,27 @@ impl Projection<'_> {
     /// `import type` lines for what the projection referenced, with
     /// `path(module)` the import specifier of a module.
     pub fn imports(&self, path: &dyn Fn(&str) -> String) -> String {
-        let mut out = format!(
-            "import type {{ Effect as $Effect, Option as $Option, Result as $Result, Layer as $Layer, Schema as $Schema, Stream as $Stream, Context as $Context }} from \"{RUNTIME}\";\n"
-        );
+        let runtime = if self.rt {
+            FLICK_RUNTIME
+        } else {
+            EFFECT_RUNTIME
+        };
+        let runtime_ui = if self.rt {
+            FLICK_RUNTIME_UI
+        } else {
+            EFFECT_RUNTIME_UI
+        };
+        let mut out = if self.rt {
+            format!(
+                "import type {{ EffectValue as $Effect, OptionValue as $Option, ResultValue as $Result, LayerValue as $Layer, SchemaValue as $Schema, StreamValue as $Stream, ServiceValue as $Service }} from \"{runtime}\";\n"
+            )
+        } else {
+            format!(
+                "import type {{ Effect as $Effect, Option as $Option, Result as $Result, Layer as $Layer, Schema as $Schema, Stream as $Stream, Context as $Context }} from \"{runtime}\";\n"
+            )
+        };
         if self.ui.get() {
-            let _ = writeln!(out, "import type {{ Ui as $Ui }} from \"{RUNTIME_UI}\";");
+            let _ = writeln!(out, "import type {{ Ui as $Ui }} from \"{runtime_ui}\";");
         }
         for module in self.used.borrow().iter() {
             let _ = writeln!(
@@ -509,5 +492,6 @@ impl Projection<'_> {
 }
 
 include!("ts/helpers.rs");
+mod native;
 #[cfg(test)]
 mod tests;

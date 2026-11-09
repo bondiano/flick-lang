@@ -1,6 +1,6 @@
 ---
 title: "Пользовательские интерфейсы"
-source_hash: 5ca68cf8980a40d2
+source_hash: 8d143681f5785128
 ---
 
 `Ui` описывает пользовательский интерфейс и обработчики его событий
@@ -676,7 +676,7 @@ JSON-скриптами: атомы оболочки — перед ней, зн
 user : Atom.Atom (Atom.Async String none)
 let user = Atom.serializable_task (Codec.json Schema.string) (Atom.task (task { fetch_name () }))
 
-chunks : Unit ->{} List String
+chunks : Unit ->{Async;} List String
 let chunks () = provide Atom.layer { Stream.run_collect (Ui.Server.stream "app" page) }
 ```
 

@@ -53,8 +53,9 @@ fn type_args(args: &[String]) -> String {
 }
 
 /// `Effect<A, E, R>` with `never` for an empty row.
-fn effect(a: &str, e: &str, r: &str) -> String {
-    format!("$Effect.Effect<{a}, {e}, {r}>")
+fn effect(a: &str, e: &str, r: &str, rt: bool) -> String {
+    let effect = if rt { "$Effect" } else { "$Effect.Effect" };
+    format!("{effect}<{a}, {e}, {r}>")
 }
 
 fn key(label: &str) -> String {

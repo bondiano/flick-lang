@@ -1,6 +1,9 @@
-// Pure codec values on Flick's own runtime. The JSON codec accepts only JSON
-// data, including finite numbers; a parser may produce infinity from 1e400.
+// Pure codec values on Flick's own runtime. The JSON codec accepts only
+// finite numbers: parsing 1e400 yields Infinity.
 import { type Result, err, none, ok, some } from "../core/data.ts";
+import { structuralValue } from "./schema_value.ts";
+import { type Case, type SchemaNode, node } from "./schema_nodes.ts";
+export { schemaDescription } from "./schema_nodes.ts";
 import { tag } from "../tags.ts";
 
 const SCHEMA_ERROR = /*#__PURE__*/ tag("Prelude.SchemaError.SchemaError");
@@ -34,36 +37,11 @@ export interface Codec<A = unknown> {
 type Check = (value: unknown, path: string) => Result<unknown, SchemaError>;
 export type Witness = Codec & { readonly decodeAt: Check; readonly encodeAt: Check; readonly value: Check };
 
-type SchemaNode =
-  | { readonly kind: "number" | "string" | "bool" | "int" | "bigint" | "unit" | "never" | "unknown" }
-  | { readonly kind: "list" | "option"; readonly item: Witness }
-  | { readonly kind: "result"; readonly error: Witness; readonly value: Witness }
-  | { readonly kind: "tuple"; readonly items: ReadonlyArray<Witness> }
-  | { readonly kind: "record"; readonly fields: ReadonlyArray<readonly [string, Witness]> }
-  | { readonly kind: "adt"; readonly cases: ReadonlyArray<Case> }
-  | { readonly kind: "lazy"; readonly name: string; readonly get: () => Witness }
-  | { readonly kind: "opaque"; readonly reason: string }
-  | { readonly kind: "literals"; readonly values: ReadonlyArray<string | number> }
-  | { readonly kind: "enum-tags"; readonly pairs: ReadonlyArray<readonly [string, string | number]> }
-  | { readonly kind: "refined"; readonly name: string; readonly known: string | undefined; readonly base: Witness }
-  | { readonly kind: "transform"; readonly from: Witness }
-  | { readonly kind: "block"; readonly fields: ReadonlyArray<readonly [string, {
-    readonly wire: string; readonly codec: Witness; readonly optional: boolean;
-    readonly onMissing?: (unit: undefined) => unknown;
-  }]>; readonly ignoreExtra: boolean };
-
-const schemaNodes = /*#__PURE__*/ new WeakMap<Witness, SchemaNode>();
-export const schemaDescription = (schema: Witness): SchemaNode | undefined => schemaNodes.get(schema);
-const node = (schema: Witness, description: SchemaNode): Witness => {
-  schemaNodes.set(schema, description);
-  return schema;
-};
-
 const at = (path: string, key: string | number): string =>
   typeof key === "number" ? `${path}[${key}]` : path ? `${path}.${key}` : key;
 
 export const witness = (kind: string, decode: Check, encode: Check,
-  value: Check = (input, path) => map(encode(input, path), () => input),
+  value?: Check,
   description?: SchemaNode): Witness => {
   const schema = {
     kind,
@@ -71,7 +49,7 @@ export const witness = (kind: string, decode: Check, encode: Check,
     encode: (input: unknown) => encode(input, ""),
     decodeAt: decode,
     encodeAt: encode,
-    value,
+    value: value ?? ((input: unknown, path: string) => structuralValue(description, input, path, schemaError) ?? map(encode(input, path), () => input)),
   };
   return description ? node(schema, description) : schema;
 };
@@ -79,13 +57,15 @@ export const witness = (kind: string, decode: Check, encode: Check,
 const mismatch = (path: string, expected: string, input: unknown): Result<never, SchemaError> =>
   err(schemaError(path, `expected ${expected}, got ${describe(input)}`));
 
+
 const primitive = (kind: string, expected: string, valid: (v: unknown) => boolean): Witness => {
   const check: Check = (input, path) => valid(input) ? ok(input) : mismatch(path, expected, input);
   return witness(kind, check, check);
 };
 
 export const schemaNumber = node(witness("number",
-  (v, path) => typeof v === "number" && Number.isFinite(v) ? ok(v) : mismatch(path, "a finite number", v),
+  (v, path) => typeof v !== "number" ? mismatch(path, "a finite number", v)
+    : Number.isFinite(v) ? ok(v) : mismatch(path, "a finite number", v),
   (v, path) => typeof v === "number" && !Number.isFinite(v)
     ? err(schemaError(path, `${String(v)} has no JSON form`))
     : typeof v === "number" ? ok(v) : mismatch(path, "a number", v),
@@ -220,7 +200,6 @@ export const schemaRecordOf = (fields: ReadonlyArray<readonly [string, Witness]>
   return ok(out);
 }, undefined, { kind: "record", fields });
 
-interface Case { readonly tag: string; readonly fields: ReadonlyArray<Witness> }
 export const schemaCase = (constructor: unknown, fields: ReadonlyArray<Witness>): Case => {
   let current = constructor;
   // Compiler-generated constructor stages accept one positional field.
@@ -320,6 +299,7 @@ export const withWire = (codec: Witness, from: Witness): Witness => node(codec, 
 export const withBlock = (codec: Witness, fields: ReadonlyArray<readonly [string, {
   readonly wire: string; readonly codec: Witness; readonly optional: boolean;
   readonly onMissing?: (unit: undefined) => unknown;
+  readonly onMissingEffect?: (unit: undefined) => unknown;
 }]>, ignoreExtra: boolean): Witness => node(codec, { kind: "block", fields, ignoreExtra });
 export const codecTransformPure = (
   decode: (wire: unknown) => unknown,

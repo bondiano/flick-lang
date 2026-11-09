@@ -249,7 +249,7 @@ let traced_id =
       { prefix = fun () -> id }
     })
 
-traces : Unit ->{} Unit
+traces : Unit ->{Async} Unit
 let traces () =
   provide Layer.Trace.span "boot" span_options { Platform.stdout_line ("span " ++ current_span ()) }
   provide Layer.Trace.with_span "build" span_options traced {

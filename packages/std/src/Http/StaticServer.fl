@@ -34,18 +34,18 @@ let static_options root = {
 
 /// The handler of the files; fails if the directory cannot be read.
 make :
-  StaticOptions ->{; PlatformError.PlatformError}
-  (ServerRequest ->{; HttpServerError} ServerResponse)
+  StaticOptions ->{Async; PlatformError.PlatformError}
+  (ServerRequest ->{Async; HttpServerError} ServerResponse)
 foreign effect make from "@flick-lang/effect-ts/effect/http/HttpStaticServer" "flickMake"
   reviewed "effect@4.1.2 sha256:e59cebe7d680fe43"
 
 /// A route of `GET` below the prefix to the handler of the files.
 route :
   StaticOptions ->
-  String ->{; PlatformError.PlatformError}
-  Http.Router.Route r {HttpServerError | e}
+  String ->{Async; PlatformError.PlatformError}
+  Http.Router.Route {Async | r} {HttpServerError | e}
 let route options prefix =
-  handler : ServerRequest ->{; HttpServerError} ServerResponse
+  handler : ServerRequest ->{Async; HttpServerError} ServerResponse
   let handler = make options
   Http.Router.prefix_route
     prefix

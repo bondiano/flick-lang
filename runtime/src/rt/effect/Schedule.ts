@@ -305,5 +305,5 @@ export const DEFAULT_METADATA: Metadata = /*#__PURE__*/ Object.freeze({
 
 export const flickCurrentMetadata = (): unknown => lookup(METADATA) ?? DEFAULT_METADATA;
 
-// shortcut: a `Cron.Cron` is made by `Cron`, which is on Effect: port Go's `cron_step.go` when `Cron` comes to the kernel
+// Effect's Cron remains on the optional adapter; the compiler routes this placeholder there.
 export const cron: (c: unknown) => Schedule = /*#__PURE__*/ absent("Schedule", "cron");

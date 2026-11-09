@@ -1,7 +1,7 @@
 //! Handlers of `control` operations run on Go: `resume` is the rest of the
 //! body, an arm that never resumes discontinues it and closes its scopes, a
 //! handler hands a call of a handler around it on, and a second `resume`
-//! is a defect. On JavaScript they wait for a runtime of their own (P012).
+//! is a defect. Both Go and Flick's own JavaScript runtime preserve this contract.
 //! Ignored by default: part of `just e2e`, needs Go.
 
 mod common;
@@ -71,7 +71,7 @@ let main () =
 
 #[test]
 #[ignore = "needs Go"]
-fn control_handlers_run_on_go_and_wait_on_javascript() {
+fn control_handlers_run_on_go_and_javascript() {
     let dir = project("control_handlers", &[("src/App/Main.fl", MAIN)]);
     fs::write(
         dir.join("flick.toml"),
@@ -93,10 +93,15 @@ fn control_handlers_run_on_go_and_wait_on_javascript() {
         format!("{APP}\n[build]\nemit = \"js\"\n"),
     )
     .expect("write");
-    let build = flick_in(&dir, &["build"]);
-    let stderr = String::from_utf8_lossy(&build.stderr);
+    let run = flick_in(&dir, &["run"]);
+    assert_eq!(
+        String::from_utf8_lossy(&run.stdout),
+        "[1, 2, 3]\n[3, 2, 1]\nscope closed\n7\n[1, 3]\n",
+        "{run:?}"
+    );
+    assert_eq!(run.status.code(), Some(1), "{run:?}");
     assert!(
-        !build.status.success() && stderr.contains("FLICK-P012"),
-        "{stderr}"
+        String::from_utf8_lossy(&run.stderr).contains("`resume` ran twice"),
+        "{run:?}"
     );
 }

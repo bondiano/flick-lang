@@ -1,0 +1,18 @@
+module App.HttpAsync exposing (..)
+
+persisted :
+  Http.ServerRequest.ServerRequest ->{Scope s; Http.Multipart.MultipartError}
+  Http.Multipart.Persisted
+let persisted request = Http.Multipart.persisted request
+//~ FLICK-E002 @6:25-6:57 the signature of `persisted` does not allow service `Async`
+
+body :
+  Codec rd re Json a ->
+  Http.ServerRequest.ServerRequest ->{rd; Http.ServerError.HttpServerError, SchemaError}
+  a
+let body codec request = Http.ServerRequest.schema_body_json codec request
+//~ FLICK-E002 @13:26-13:75 the signature of `body` does not allow service `Async`
+
+streamed : Ui ->{Atom.Registry} List String
+let streamed content = Stream.run_collect (Ui.Server.stream "app" content)
+//~ FLICK-E002 @17:24-17:75 the signature of `streamed` does not allow service `Async`

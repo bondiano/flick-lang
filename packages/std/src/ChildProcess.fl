@@ -106,13 +106,13 @@ foreign effect kill_with from "@flick-lang/effect-ts/effect/ChildProcess" "flick
 
 /// The bytes the process writes to stdout; the stream cannot leave the
 /// process's scope.
-stdout : Process s -> (Stream none {PlatformError.PlatformError} (List Int))^{s}
+stdout : Process s -> (Stream {Async} {PlatformError.PlatformError} (List Int))^{s}
 foreign pure stdout from "@flick-lang/effect-ts/effect/ChildProcess" "flickStdout"
   retention call
   reviewed "effect@4.1.2 sha256:fbc5852c8234490f"
 
 /// The bytes the process writes to stderr.
-stderr : Process s -> (Stream none {PlatformError.PlatformError} (List Int))^{s}
+stderr : Process s -> (Stream {Async} {PlatformError.PlatformError} (List Int))^{s}
 foreign pure stderr from "@flick-lang/effect-ts/effect/ChildProcess" "flickStderr"
   retention call
   reviewed "effect@4.1.2 sha256:3fe00f74628a0caf"

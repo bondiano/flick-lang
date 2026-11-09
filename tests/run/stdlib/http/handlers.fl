@@ -304,13 +304,13 @@ let failures () =
 
 /// Handles the request as a server would, printing the response's status
 /// and headers as sent, after the pre-response handlers.
-observe : String -> List String -> Http.Middleware.Handler none none -> ServerRequest ->{} Unit
+observe : String -> List String -> Http.Middleware.Handler none none -> ServerRequest ->{Async} Unit
 let observe label names handler request =
   send : ServerRequest -> ServerResponse ->{} Unit
   let send _ response = line label (status_and response names)
   Http.Middleware.to_handled send handler request
 
-middlewares : Unit ->{; HttpServerError} Unit
+middlewares : Unit ->{Async; HttpServerError} Unit
 let middlewares () =
   let r = Http.ClientRequest.get "http://example.com/m"
   wrapped : Http.Middleware.Handler none none
@@ -402,7 +402,7 @@ let middlewares () =
   send : ServerRequest -> ServerResponse ->{} Unit
   let send _ response =
     Platform.stdout_line ("to_handled: " ++ (status_and response ["x-pre", "x-late"]))
-  handled : ServerRequest ->{} Unit
+  handled : ServerRequest ->{Async} Unit
   let handled =
     Http.Middleware.to_handled send (Http.Middleware.with_pre_response_handler pre appending)
   handled (Http.ServerRequest.from_client_request r)

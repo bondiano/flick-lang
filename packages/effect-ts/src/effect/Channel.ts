@@ -2,15 +2,53 @@
 // adapters where a Flick value differs from what Effect takes: options
 // records with `Option` fields, a `Failure` or `Exit` instead of a native
 // cause or exit, and bytes as lists of numbers.
-import { type Cause, Channel, Effect, type Exit, Option, type PubSub, type Queue } from "effect";
+import { Cause, Channel, type Chunk, Effect, Exit, Option, type PubSub, type Queue } from "effect";
 
 import { Failure, passOn, unwinds } from "../cause.ts";
 import type { Data } from "../data.ts";
 import { failureCause, flickExit } from "../stdlib/outcome.ts";
 import { tag } from "@flick-lang/runtime/tags";
 import { type FlickSpanOptions, nativeSpanOptions } from "./Tracer.ts";
+import { callEffect, causeFromEffect, inNativeRuntime } from "../bridge.ts";
+import { Queue as NativeQueue, end as nativeEnd, flickTake as nativeTake, flickTakeAll as nativeTakeAll, offer as nativeOffer, offerAll as nativeOfferAll } from "@flick-lang/runtime/rt/effect/Queue";
 
 export * from "effect/Channel";
+
+const isArray = <A>(chunk: Chunk.Chunk<A> | ReadonlyArray<A>): chunk is ReadonlyArray<A> => Array.isArray(chunk);
+
+/** The native Chunk is an array; Effect's Chunk has its own representation. */
+export const fromChunk = <A>(chunk: Chunk.Chunk<A> | ReadonlyArray<A>): Channel.Channel<A> =>
+  isArray(chunk) ? Channel.fromArray(chunk) : Channel.fromChunk(chunk);
+
+const nativePull = (queue: NativeQueue, arrays: boolean) =>
+  Effect.flatMap(callEffect(() => arrays ? nativeTakeAll(queue) : nativeTake(queue)), (taken) =>
+    Reflect.get(Object(taken), "_tag") === "Some"
+      ? Effect.succeed(Reflect.get(Object(taken), "value"))
+      : Cause.done());
+
+export const fromQueue = (queue: Queue.Dequeue<unknown, unknown> | NativeQueue) =>
+  queue instanceof NativeQueue ? Channel.fromPull(Effect.succeed(nativePull(queue, false))) : Channel.fromQueue(queue);
+
+export const fromQueueArray = (queue: Queue.Dequeue<unknown, unknown> | NativeQueue) =>
+  queue instanceof NativeQueue ? Channel.fromPull(Effect.succeed(nativePull(queue, true))) : Channel.fromQueueArray(queue);
+
+/** A channel can write into either side's Queue without changing its end signal. */
+const intoNativeQueue = (self: Any, queue: NativeQueue, arrays: boolean): Effect.Effect<void, never, unknown> =>
+  Effect.flatMap(
+    Effect.exit(Channel.runForEach(self, (value) => callEffect(() =>
+      arrays && Array.isArray(value) ? nativeOfferAll(value)(queue) : nativeOffer(value)(queue)))),
+    (exit) => Effect.sync(() => {
+      if (Exit.isSuccess(exit)) nativeEnd(queue);
+      else queue.failCause(causeFromEffect(exit.cause));
+    }),
+  );
+
+export const runIntoQueue = (queue: Queue.Queue<unknown, unknown> | NativeQueue) => (self: Any): Effect.Effect<void, never, unknown> =>
+  queue instanceof NativeQueue ? intoNativeQueue(self, queue, false) : Channel.runIntoQueue(self, queue);
+
+type ArrayChannel = Channel.Channel<readonly [unknown, ...unknown[]], unknown, unknown, unknown, unknown, unknown, unknown>;
+export const runIntoQueueArray = (queue: Queue.Queue<unknown, unknown> | NativeQueue) => (self: ArrayChannel): Effect.Effect<void, never, unknown> =>
+  queue instanceof NativeQueue ? intoNativeQueue(self, queue, true) : Channel.runIntoQueueArray(self, queue);
 
 type Any = Channel.Channel<unknown, unknown, unknown, unknown, unknown, unknown, unknown>;
 type NonEmpty<A> = readonly [A, ...Array<A>];
@@ -38,6 +76,8 @@ const queueOptions = (options: Buffer): QueueOptions =>
     onNone: () => ({ capacity: "unbounded" }),
     onSome: (capacity) => ({ capacity, strategy: strategyOf(options.strategy) }),
   });
+const nativeQueueOf = (options: Buffer): NativeQueue =>
+  new NativeQueue(Option.getOrElse(options.capacity, () => Infinity), strategyOf(options.strategy) ?? "suspend");
 
 const failureOf = (cause: Cause.Cause<unknown>): Failure => new Failure(cause);
 
@@ -59,17 +99,38 @@ export const flickFailCauseSync = <E>(f: () => Failure): Channel.Channel<never, 
 export const flickCallback = <A, E, R>(
   options: { readonly bufferSize: Option.Option<number>; readonly strategy: Option.Option<Data> },
   f: (queue: Queue.Queue<A, E | Cause.Done>) => Effect.Effect<unknown, E, R>,
-) => Channel.callback(f, { bufferSize: Option.getOrUndefined(options.bufferSize), strategy: strategyOf(options.strategy) });
+) => Channel.unwrap(Effect.flatMap(inNativeRuntime, (native): Effect.Effect<Any, unknown, unknown> => native
+  ? Effect.map(Effect.gen(function* () {
+      const queue = nativeQueueOf({ capacity: options.bufferSize, strategy: options.strategy });
+      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the callback comes from generated Flick code in this branch
+      const producer = f as unknown as (queue: NativeQueue) => Effect.Effect<unknown, E, R>;
+      yield* Effect.forkScoped(Effect.flatMap(Effect.exit(producer(queue)), (exit) => Effect.sync(() => {
+        if (Exit.isSuccess(exit)) nativeEnd(queue);
+        else queue.failCause(causeFromEffect(exit.cause));
+      })));
+      return fromQueue(queue);
+    }), (channel): Any => channel)
+  : Effect.succeed(Channel.callback(f, { bufferSize: Option.getOrUndefined(options.bufferSize), strategy: strategyOf(options.strategy) }))));
 
 /** `Channel.callback_array`. */
 export const flickCallbackArray = <A, E, R>(
   options: { readonly bufferSize: Option.Option<number>; readonly strategy: Option.Option<Data> },
   f: (queue: Queue.Queue<A, E | Cause.Done>) => Effect.Effect<unknown, E, R>,
-) =>
-  Channel.callbackArray(f, {
-    bufferSize: Option.getOrUndefined(options.bufferSize),
-    strategy: strategyOf(options.strategy),
-  });
+) => Channel.unwrap(Effect.flatMap(inNativeRuntime, (native): Effect.Effect<Any, unknown, unknown> => native
+  ? Effect.map(Effect.gen(function* () {
+      const queue = nativeQueueOf({ capacity: options.bufferSize, strategy: options.strategy });
+      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the callback comes from generated Flick code in this branch
+      const producer = f as unknown as (queue: NativeQueue) => Effect.Effect<unknown, E, R>;
+      yield* Effect.forkScoped(Effect.flatMap(Effect.exit(producer(queue)), (exit) => Effect.sync(() => {
+        if (Exit.isSuccess(exit)) nativeEnd(queue);
+        else queue.failCause(causeFromEffect(exit.cause));
+      })));
+      return fromQueueArray(queue);
+    }), (channel): Any => channel)
+  : Effect.succeed(Channel.callbackArray(f, {
+      bufferSize: Option.getOrUndefined(options.bufferSize),
+      strategy: strategyOf(options.strategy),
+    }))));
 
 /** `Channel.acquire_release`: the release gets only the value. */
 export const flickAcquireRelease =
@@ -161,13 +222,25 @@ export const flickMkUint8Array = <OX, OD, Env>(
 export const flickToQueue =
   (options: Buffer) =>
   <OE, OX, OD, Env>(self: Channel.Channel<OE, OX, OD, unknown, unknown, unknown, Env>) =>
-    Channel.toQueue(self, queueOptions(options));
+    Effect.flatMap(inNativeRuntime, (native) => native
+      ? Effect.map(Effect.gen(function* () {
+          const queue = nativeQueueOf(options);
+          yield* Effect.forkScoped(intoNativeQueue(self, queue, false));
+          return queue;
+        }), (queue): unknown => queue)
+      : Effect.map(Channel.toQueue(self, queueOptions(options)), (queue): unknown => queue));
 
 /** `Channel.to_queue_array`. */
 export const flickToQueueArray =
   (options: Buffer) =>
   <OE, OX, OD, Env>(self: Channel.Channel<NonEmpty<OE>, OX, OD, unknown, unknown, unknown, Env>) =>
-    Channel.toQueueArray(self, queueOptions(options));
+    Effect.flatMap(inNativeRuntime, (native) => native
+      ? Effect.map(Effect.gen(function* () {
+          const queue = nativeQueueOf(options);
+          yield* Effect.forkScoped(intoNativeQueue(self, queue, true));
+          return queue;
+        }), (queue): unknown => queue)
+      : Effect.map(Channel.toQueueArray(self, queueOptions(options)), (queue): unknown => queue));
 
 /** `Channel.HubOptions`. */
 interface HubOptions extends Buffer {

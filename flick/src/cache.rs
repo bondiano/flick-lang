@@ -37,7 +37,7 @@ pub fn files_under(dir: &Path, out: &mut Vec<PathBuf>) {
 
 /// The key of a build of `project` with `settings`, a description of the
 /// command-line settings that change its output.
-pub fn key(project: &Project, roots: &[PathBuf], settings: &str) -> String {
+pub fn key(project: &Project, roots: &[PathBuf], settings: &str, needs_effect: bool) -> String {
     let mut key = Key::default();
     key.add("settings", settings);
     let mut selected: Vec<PathBuf> = roots.iter().map(|p| project::normalize(p)).collect();
@@ -53,7 +53,11 @@ pub fn key(project: &Project, roots: &[PathBuf], settings: &str) -> String {
         "compiler-binary",
         toolchain::fingerprint().unwrap_or_default(),
     );
-    for package in ["@flick-lang/runtime", "@flick-lang/effect-ts", "effect"] {
+    let packages = ["@flick-lang/runtime"]
+        .into_iter()
+        .chain(needs_effect.then_some("@flick-lang/effect-ts"))
+        .chain(needs_effect.then_some("effect"));
+    for package in packages {
         let version = toolchain::resolved(&project.root, package).unwrap_or_default();
         key.add(format!("version {package}"), version);
     }

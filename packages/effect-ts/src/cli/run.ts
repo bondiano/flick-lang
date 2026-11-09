@@ -3,7 +3,7 @@
 // input becomes the Flick error `Cli.CliError` with Effect's text; the
 // handler runs only after the whole command line parsed.
 
-import { Console, Effect, Layer, Option, Result } from "effect";
+import { Console, Effect, Layer, Option } from "effect";
 import * as TestConsole from "effect/testing/TestConsole";
 import {
   CliConfig,
@@ -31,19 +31,21 @@ const CLI_ERROR = /*#__PURE__*/ tag("Cli.CliError.CliError");
 /** The value of a parameter's text, through its `Cli.Value` dictionary. */
 const parse =
   (param: Param) =>
-  (text: string): Effect.Effect<unknown, CliError.CliError> =>
-    Effect.flatMap(param.value.parse(text), (parsed) =>
-      Result.isSuccess(parsed)
-        ? Effect.succeed(parsed.success)
+  (text: string): Effect.Effect<unknown, CliError.CliError> => {
+    const parsed = param.value.parse(text);
+    return Effect.flatMap(Effect.isEffect(parsed) ? parsed : Effect.succeed(parsed), (result) =>
+      result._tag === "Success"
+        ? Effect.succeed(result.success)
         : Effect.fail(
             new CliError.InvalidValue({
               option: param.label,
               value: text,
-              expected: parsed.failure,
+              expected: result.failure,
               kind: param.flag ? "flag" : "argument",
             }),
           ),
     );
+  };
 
 /** What Effect reads for a parameter before `Cli.Value` parses its text. */
 const primitive = (source: Source): Primitive.Primitive<unknown> => {

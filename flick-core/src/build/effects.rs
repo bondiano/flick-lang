@@ -2,6 +2,7 @@
 //! `@flick-lang/runtime/core`, which has the runtime's data and pure helpers
 //! without Effect. A foreign module with no such version cannot be built.
 
+use crate::codegen::EffectBridge;
 use crate::diagnostics::{Diagnostic, Severity, codes};
 use crate::ir::{self, ItemKind};
 use crate::types::{NO_EFFECTS, OpClass};
@@ -157,6 +158,67 @@ pub fn rt_specifier(spec: &str) -> Option<String> {
     }
 }
 
+/// The exports implemented by the owned runtime. Other adapter exports cross
+/// into Effect through the optional bridge.
+const RT_EXPORTS: &str = include_str!("rt_exports.txt");
+
+pub fn on_kernel(spec: &str, export: &str) -> bool {
+    if !spec
+        .strip_prefix(RUNTIME)
+        .is_some_and(|rest| rest.is_empty() || rest.starts_with('/'))
+    {
+        return true;
+    }
+    RT_EXPORTS
+        .lines()
+        .any(|line| line.split_once(' ') == Some((spec, export)))
+}
+
+/// Throwing `core` placeholders also appear in the RT index. A build with an
+/// installed Effect adapter must route them to their real implementations.
+pub fn on_kernel_with_bridge(spec: &str, export: &str, bridge: bool) -> bool {
+    selected_on_kernel(
+        spec,
+        export,
+        if bridge {
+            EffectBridge::Available
+        } else {
+            EffectBridge::Absent
+        },
+    )
+}
+
+pub fn ui_family(spec: &str, export: &str) -> bool {
+    matches!(
+        spec,
+        "@flick-lang/runtime/rt/effect/reactivity/Atom"
+            | "@flick-lang/runtime/rt/ui"
+            | "@flick-lang/runtime/rt/ui/html"
+            | "@flick-lang/runtime/rt/ui/react"
+            | "@flick-lang/runtime/rt/ui/server"
+    ) || (spec == "@flick-lang/runtime/rt"
+        && (export == "label"
+            || ["atom", "form", "route"].iter().any(|prefix| {
+                export
+                    .strip_prefix(prefix)
+                    .is_some_and(|rest| rest.starts_with(char::is_uppercase))
+            })))
+}
+
+pub fn selected_on_kernel(spec: &str, export: &str, bridge: EffectBridge) -> bool {
+    const STUBS: &str = include_str!("rt_stubs.txt");
+    const BRIDGE_STUBS: &str = include_str!("rt_bridge_stubs.txt");
+    if bridge == EffectBridge::AvailableWithUi && ui_family(spec, export) {
+        return false;
+    }
+    let bridge = bridge.available();
+    let core_stub = spec == "@flick-lang/runtime/rt" && STUBS.lines().any(|name| name == export);
+    let module_stub = BRIDGE_STUBS
+        .lines()
+        .any(|line| line.split_once(' ') == Some((spec, export)));
+    !(bridge && (core_stub || module_stub)) && on_kernel(spec, export)
+}
+
 /// E008 when the program's `module` binds a foreign module that needs
 /// Effect, or makes a schema, which `core` has no codecs for.
 pub fn check(module: &ir::Module, diagnostics: &mut Vec<Diagnostic>) {
@@ -231,7 +293,7 @@ pub fn control_on_js(module: &ir::Module, diagnostics: &mut Vec<Diagnostic>) {
 
 #[cfg(test)]
 mod tests {
-    use super::{BUILTINS, effect_specifier, rt_specifier, specifier};
+    use super::{BUILTINS, effect_specifier, on_kernel, rt_specifier, specifier};
     use crate::types::builtin_sources;
 
     #[test]
@@ -302,6 +364,60 @@ mod tests {
         );
         assert_eq!(rt_specifier("@flick-lang/runtime/ui/other"), None);
         assert_eq!(rt_specifier("./clock.mjs").as_deref(), Some("./clock.mjs"));
+        assert!(on_kernel("@flick-lang/runtime-extra", "anyExport"));
+        assert!(on_kernel("@flick-lang/runtime/rt", "scopeRun"));
+        assert!(!on_kernel("@flick-lang/runtime/rt", "missingExport"));
+    }
+
+    #[test]
+    fn effect_bridge_routes_throwing_rt_stubs_to_the_effect_adapter() {
+        assert!(!super::on_kernel_with_bridge(
+            "@flick-lang/runtime/rt",
+            "formSpec",
+            true
+        ));
+        assert!(super::on_kernel_with_bridge(
+            "@flick-lang/runtime/rt",
+            "formSpec",
+            false
+        ));
+        assert!(!super::on_kernel_with_bridge(
+            "@flick-lang/runtime/rt/effect/Schedule",
+            "cron",
+            true
+        ));
+        assert!(super::on_kernel_with_bridge(
+            "@flick-lang/runtime/rt/effect/Schedule",
+            "cron",
+            false
+        ));
+        assert!(super::on_kernel_with_bridge(
+            "@flick-lang/runtime/rt",
+            "schemaField",
+            true
+        ));
+        assert!(super::on_kernel_with_bridge(
+            "@flick-lang/runtime/rt",
+            "dslFieldEffect",
+            true
+        ));
+        for export in ["redactedMake", "redactedReveal"] {
+            assert!(!super::on_kernel_with_bridge(
+                "@flick-lang/runtime/rt",
+                export,
+                true
+            ));
+            assert!(super::on_kernel_with_bridge(
+                "@flick-lang/runtime/rt",
+                export,
+                false
+            ));
+        }
+        assert!(!super::on_kernel_with_bridge(
+            "@flick-lang/runtime/rt/effect/Redacted",
+            "flickEquivalent",
+            true
+        ));
     }
 
     #[test]

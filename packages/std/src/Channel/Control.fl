@@ -87,13 +87,14 @@ foreign pure on_first from "@flick-lang/effect-ts/effect/Channel" "onFirst"
   reviewed "effect@4.1.2 sha256:c12e5cb7fd9f38fa"
 
 /// Runs the task when the channel ends without failing.
-on_end : Eff r2 e2 x -> Channel r e i o d ie id -> Channel (r + r2) (e + e2) i o d ie id
+on_end : Eff r2 e2 x -> Channel r e i o d ie id -> Channel {Async | r + r2} (e + e2) i o d ie id
 foreign pure on_end from "@flick-lang/effect-ts/effect/Channel" "onEnd"
   arity 1
   reviewed "effect@4.1.2 sha256:79cf3bb13c330306"
 
 /// Interrupts the channel when the task ends first, ending with its value.
-interrupt_when : Eff r2 e2 d -> Channel r e i o d ie id -> Channel (r + r2) (e + e2) i o d ie id
+interrupt_when :
+  Eff r2 e2 d -> Channel r e i o d ie id -> Channel {Async | r + r2} (e + e2) i o d ie id
 foreign pure interrupt_when from "@flick-lang/effect-ts/effect/Channel" "interruptWhen"
   arity 1
   reviewed "effect@4.1.2 sha256:c42a49474a524cb5"
@@ -148,7 +149,8 @@ foreign pure schedule from "@flick-lang/effect-ts/effect/Channel" "schedule"
   reviewed "effect@4.1.2 sha256:ef01d15ab59ed821"
 
 /// Builds the layer's services for the channel each time it runs.
-provide_ : Layer li le lo -> Channel (lo + r) e i o d ie id -> Channel (li + r) (e + le) i o d ie id
+provide_ :
+  Layer li le lo -> Channel (lo + r) e i o d ie id -> Channel {Async | li + r} (e + le) i o d ie id
 foreign pure provide_ from "@flick-lang/effect-ts/effect/Channel" "provide"
   arity 1
   reviewed "effect@4.1.2 sha256:2375bbe8c2f75863"

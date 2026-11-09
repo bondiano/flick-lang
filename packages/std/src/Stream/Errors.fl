@@ -127,7 +127,8 @@ foreign pure ignore_cause from "@flick-lang/effect-ts/effect/Stream" "ignoreCaus
 
 /// Runs the stream again from its start after an error, as long as the
 /// schedule, which gets the error, recurs.
-retry : Schedule.Schedule r2 e2 (Errors e) o -> (Stream r e a)^c -> (Stream (r + r2) (e + e2) a)^c
+retry :
+  Schedule.Schedule r2 e2 (Errors e) o -> (Stream r e a)^c -> (Stream {Async | r + r2} (e + e2) a)^c
 foreign pure retry from "@flick-lang/effect-ts/effect/Stream" "retry"
   arity 1
   retention call

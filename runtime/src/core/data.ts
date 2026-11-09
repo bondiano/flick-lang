@@ -59,6 +59,16 @@ export const runtimeHash = Symbol.for("@flick-lang/runtime/hash");
 /** A key `$0`, `$1` …: a dictionary a value of a GADT holds, which `==` and `hash` leave out. */
 const held = (k: string): boolean => k.charCodeAt(0) === 36;
 
+/** Effect's Option has its tag on the prototype; Flick's has it on the value. */
+const optionTag = (value: Readonly<Record<string, unknown>>): "None" | "Some" | undefined => {
+  const variant: unknown = Reflect.get(value, "_tag");
+  const keys = Object.keys(value);
+  const own = Object.hasOwn(value, "_tag") ? 1 : 0;
+  return variant === "None" && keys.length === own ||
+    variant === "Some" && keys.length === own + 1 && Object.hasOwn(value, "value")
+    ? variant : undefined;
+};
+
 /** `==`: structural equality with SameValueZero on numbers. */
 export const equals = (a: unknown, b: unknown): boolean => {
   // oxlint-disable-next-line no-self-compare -- SameValueZero: NaN equals NaN
@@ -66,11 +76,20 @@ export const equals = (a: unknown, b: unknown): boolean => {
   if (!isObject(a) || !isObject(b)) return false;
   const custom: unknown = Reflect.get(a, runtimeEquals);
   if (typeof custom === "function") return custom.call(a, b) === true;
+  const aTag = optionTag(a);
+  const bTag = optionTag(b);
+  if (aTag !== undefined && bTag !== undefined) return aTag === bTag && (aTag === "None" || equals(a["value"], b["value"]));
+  const hostEqual: unknown = Reflect.get(a, "~effect/Equal");
+  if (typeof hostEqual === "function" && typeof Reflect.get(b, "~effect/Equal") === "function") {
+    const result: unknown = hostEqual.call(a, b);
+    return result === true;
+  }
   if (Array.isArray(a) || Array.isArray(b)) {
     return Array.isArray(a) && Array.isArray(b) && listEquals(equals, a, b);
   }
-  // shortcut: plain objects and arrays only; a Map, Set or Date compares by identity until Flick has one without Effect
-  if (Object.getPrototypeOf(a) !== Object.getPrototypeOf(b)) return false;
+  // Class instances without a Flick equality hook compare by identity.
+  const proto: unknown = Object.getPrototypeOf(a);
+  if (proto !== Object.getPrototypeOf(b) || (proto !== Object.prototype && proto !== null)) return false;
   const keys = Object.keys(a);
   return (
     keys.length === Object.keys(b).length && keys.every((k) => held(k) || (Object.hasOwn(b, k) && equals(a[k], b[k])))
@@ -104,6 +123,13 @@ export const hash = (a: unknown): number => {
   const custom: unknown = Reflect.get(a, runtimeHash);
   if (typeof custom === "function") {
     const value: unknown = custom.call(a);
+    if (typeof value === "number") return value;
+  }
+  const option = Object.hasOwn(a, "_tag") ? undefined : optionTag(a);
+  if (option !== undefined) return hash(option === "Some" ? some(a["value"]) : none);
+  const hostHash: unknown = Reflect.get(a, "~effect/Hash");
+  if (typeof hostHash === "function") {
+    const value: unknown = hostHash.call(a);
     if (typeof value === "number") return value;
   }
   if (Array.isArray(a)) return listHash(hash, a);

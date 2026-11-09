@@ -95,8 +95,19 @@ export const testGroup = <Task, L>(name: string, tests: ReadonlyArray<Test<Task,
   Object.freeze({ kind: "group", name, tests });
 
 /** A BigInt as `<digits>n` and a function as `<function>`, not its source. */
-const replacePreview = (_: string, v: unknown): unknown =>
-  typeof v === "bigint" ? `${v}n` : typeof v === "function" ? "<function>" : v;
+const replacePreview = (_: string, v: unknown): unknown => {
+  if (typeof v === "bigint") return `${v}n`;
+  if (typeof v === "function") return "<function>";
+  if (v === null || typeof v !== "object" || "_id" in v) return v;
+  const data = v as { _tag?: unknown; value?: unknown; success?: unknown; failure?: unknown };
+  switch (data._tag) {
+    case "None": return { _id: "Option", _tag: "None" };
+    case "Some": return { _id: "Option", _tag: "Some", value: data.value };
+    case "Success": return { _id: "Result", _tag: "Success", value: data.success };
+    case "Failure": return { _id: "Result", _tag: "Failure", failure: data.failure };
+    default: return v;
+  }
+};
 
 /** A property's case: its JSON. */
 const preview = (value: unknown): string => {

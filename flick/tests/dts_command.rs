@@ -6,6 +6,8 @@
 mod common;
 #[path = "dts_command/hover.rs"]
 mod hover;
+#[path = "dts_command/native.rs"]
+mod native;
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -191,7 +193,7 @@ fn project(name: &str) -> PathBuf {
     fs::create_dir_all(dir.join("src/Lib")).expect("dir");
     fs::write(
         dir.join("flick.toml"),
-        "schema-version = 1\n\n[project]\nkind = \"lib\"\n",
+        "schema-version = 1\n\n[project]\nkind = \"lib\"\n\n[build]\neffect = \"effect\"\n",
     )
     .expect("write");
     fs::write(
@@ -447,7 +449,7 @@ fn streams_services_and_sync_exports_cross_into_effect_typescript() {
     fs::create_dir_all(dir.join("src/Lib")).expect("dir");
     fs::write(
         dir.join("flick.toml"),
-        "schema-version = 1\n\n[project]\nkind = \"lib\"\n",
+        "schema-version = 1\n\n[project]\nkind = \"lib\"\n\n[build]\neffect = \"effect\"\n",
     )
     .expect("write");
     fs::write(dir.join("package.json"), "{\"type\":\"module\"}\n").expect("write");

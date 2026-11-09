@@ -16,7 +16,7 @@ foreign pure js_number from global "Number"
 js_text : JsValue -> String
 foreign pure js_text from global "String"
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Async; AppError} Unit
 let main () =
   let values = [js_number 1, js_number 2]
   let read = Stream.from_readable_stream JsError.from_js (readable values)

@@ -6,5 +6,10 @@ export interface DateTime {
   readonly epochMilliseconds: number;
 }
 
-export const flickNow = (): DateTime => Object.freeze({ epochMilliseconds: clock().millis() });
+/** The Effect bridge keeps the native clock while returning its DateTime value. */
+export const dateTimeHooks: { makeUtc: (millis: number) => DateTime } = {
+  makeUtc: (epochMilliseconds) => Object.freeze({ epochMilliseconds }),
+};
+
+export const flickNow = (): DateTime => dateTimeHooks.makeUtc(clock().millis());
 export const toEpochMillis = (value: DateTime): number => value.epochMilliseconds;

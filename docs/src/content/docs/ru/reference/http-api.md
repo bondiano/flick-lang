@@ -1,6 +1,6 @@
 ---
 title: "Типизированные HTTP API"
-source_hash: db3e11dcdd9035aa
+source_hash: 336c59dc4e1af351
 ---
 
 `HttpApi` позволяет описать HTTP API значениями программы: эндпоинты
@@ -260,7 +260,7 @@ let server = HttpApi.listen options api { users = { get_user = find_user } }
 #
 # let example = task {
 let files = Http.StaticServer.route { Http.StaticServer.static_options "dist" with spa = true } ""
-# app : Http.Middleware.Handler none {Http.ServerError.HttpServerError}
+# app : Http.Middleware.Handler {Async} {Http.ServerError.HttpServerError}
 let app =
   Http.Middleware.cors
     { Http.Middleware.cors_options with allowedOrigins = ["http://localhost:5173"] }

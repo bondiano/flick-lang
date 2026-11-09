@@ -178,7 +178,7 @@ foreign pure suspend from "@flick-lang/effect-ts/effect/Channel" "suspend"
   reviewed "effect@4.1.2 sha256:31b5ac7e75b580bb"
 
 /// The channel the task builds when it runs.
-unwrap : Eff r1 e1 (Channel r e i o d ie id) -> Channel (r + r1) (e + e1) i o d ie id
+unwrap : Eff r1 e1 (Channel r e i o d ie id) -> Channel {Async | r + r1} (e + e1) i o d ie id
 foreign pure unwrap from "@flick-lang/effect-ts/effect/Channel" "unwrap"
   reviewed "effect@4.1.2 sha256:4a8553067c040687"
 
@@ -212,7 +212,7 @@ foreign pure callback_array from "@flick-lang/effect-ts/effect/Channel" "flickCa
   reviewed "effect@4.1.2 sha256:1193663f7d774b8b"
 
 /// Acquires a value and emits it; `release` runs when the channel ends.
-acquire_release : (a ->{} x) -> Eff r e a -> Channel r e i a Unit ie id
+acquire_release : (a ->{} x) -> Eff r e a -> Channel {Async | r} e i a Unit ie id
 foreign pure acquire_release from "@flick-lang/effect-ts/effect/Channel" "flickAcquireRelease"
   arity 1
   reviewed "effect@4.1.2 sha256:124c2f0c8fc66cb3"
@@ -232,7 +232,7 @@ foreign pure acquire_use_release from "@flick-lang/effect-ts/effect/Channel" "fl
 /// what the stream throws.
 from_readable_stream :
   { evaluate : Unit -> ReadableStream a; onError : JsValue -> Errors e; releaseLockOnEnd : Bool } ->
-  Channel none e i (NonEmpty.NonEmpty a) Unit ie id
+  Channel {Async} e i (NonEmpty.NonEmpty a) Unit ie id
 foreign pure from_readable_stream from "@flick-lang/effect-ts/effect/Channel" "fromReadableStream"
   reviewed "effect@4.1.2 sha256:4e65be7c520e690e"
 
@@ -240,7 +240,7 @@ foreign pure from_readable_stream from "@flick-lang/effect-ts/effect/Channel" "f
 /// `closeOnDone`.
 from_writable_stream :
   { evaluate : Unit -> WritableStream a; onError : JsValue -> Errors e; closeOnDone : Bool } ->
-  Channel none (e + ie) (NonEmpty.NonEmpty a) o Unit ie id
+  Channel {Async} (e + ie) (NonEmpty.NonEmpty a) o Unit ie id
 foreign pure from_writable_stream from "@flick-lang/effect-ts/effect/Channel" "fromWritableStream"
   reviewed "effect@4.1.2 sha256:869c7804ecd600e6"
 
@@ -253,20 +253,20 @@ from_transform_stream :
     closeOnDone : Bool;
     releaseLockOnEnd : Bool;
   } ->
-  Channel none (e + ie) (NonEmpty.NonEmpty a) (NonEmpty.NonEmpty b) Unit ie id
+  Channel {Async} (e + ie) (NonEmpty.NonEmpty a) (NonEmpty.NonEmpty b) Unit ie id
 foreign pure from_transform_stream from "@flick-lang/effect-ts/effect/Channel" "fromTransformStream"
   reviewed "effect@4.1.2 sha256:74bf5c837cbd1f20"
 
 /// Emits the values of a JS async iterable and ends with what its
 /// iterator returns.
-from_async_iterable : AsyncIterable a d -> (JsValue -> Errors e) -> Channel none e i a d ie id
+from_async_iterable : AsyncIterable a d -> (JsValue -> Errors e) -> Channel {Async} e i a d ie id
 foreign pure from_async_iterable from "@flick-lang/effect-ts/effect/Channel" "fromAsyncIterable"
   arity 2
   reviewed "effect@4.1.2 sha256:192927e13d1bf857"
 
 /// `from_async_iterable`, in chunks.
 from_async_iterable_array :
-  AsyncIterable a d -> (JsValue -> Errors e) -> Channel none e i (NonEmpty.NonEmpty a) d ie id
+  AsyncIterable a d -> (JsValue -> Errors e) -> Channel {Async} e i (NonEmpty.NonEmpty a) d ie id
 foreign pure from_async_iterable_array from "@flick-lang/effect-ts/effect/Channel" "fromAsyncIterableArray"
   arity 2
   reviewed "effect@4.1.2 sha256:c86d9d2a6e4000ff"

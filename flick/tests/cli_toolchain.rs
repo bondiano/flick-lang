@@ -9,6 +9,10 @@ use std::process::Output;
 use common::{APP, flick_in, project};
 
 const MAIN: &str = "module App.Main exposing (main)\n\nmain : Unit ->{; AppError} Unit\nlet main () = Platform.stdout_line \"hi\"\n";
+const EFFECT_APP: &str = concat!(
+    "schema-version = 1\n[project]\nkind = \"app\"\nentry = \"App.Main\"\n",
+    "[build]\neffect = \"effect\"\n"
+);
 
 fn code(out: &Output) -> Option<i32> {
     out.status.code()
@@ -44,7 +48,7 @@ fn an_incompatible_effect_blocks_build_and_run() {
     let dir = project(
         "cli_effect_version",
         &[
-            ("flick.toml", APP),
+            ("flick.toml", EFFECT_APP),
             ("src/App/Main.fl", MAIN),
             (
                 "node_modules/@flick-lang/runtime/package.json",
@@ -72,7 +76,7 @@ fn an_incompatible_effect_blocks_build_and_run() {
 fn the_installed_runtime_and_effect_are_in_the_cache_key() {
     let dir = project(
         "cli_cache_runtime",
-        &[("flick.toml", APP), ("src/App/Main.fl", MAIN)],
+        &[("flick.toml", EFFECT_APP), ("src/App/Main.fl", MAIN)],
     );
     let build = || assert_eq!(code(&flick_in(&dir, &["build"])), Some(0));
     build();
@@ -101,4 +105,32 @@ fn the_installed_runtime_and_effect_are_in_the_cache_key() {
     .expect("write");
     build();
     assert_eq!(cached(&dir), 4, "the Effect version is in the key");
+}
+
+#[test]
+fn rt_build_does_not_require_or_cache_effect() {
+    let dir = project(
+        "cli_cache_rt_only",
+        &[("flick.toml", APP), ("src/App/Main.fl", MAIN)],
+    );
+    let build = || {
+        let out = flick_in(&dir, &["build"]);
+        assert_eq!(code(&out), Some(0), "{out:?}");
+    };
+    build();
+    assert_eq!(cached(&dir), 1);
+    let adapter = dir.join("node_modules/@flick-lang/effect-ts");
+    fs::create_dir_all(adapter.join("node_modules/effect")).expect("dir");
+    fs::write(
+        adapter.join("package.json"),
+        "{ \"name\": \"@flick-lang/effect-ts\", \"version\": \"0.0.9\" }",
+    )
+    .expect("write");
+    fs::write(
+        adapter.join("node_modules/effect/package.json"),
+        "{ \"name\": \"effect\", \"version\": \"3.0.0\" }",
+    )
+    .expect("write");
+    build();
+    assert_eq!(cached(&dir), 1, "Effect does not affect an RT build");
 }

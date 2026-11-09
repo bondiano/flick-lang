@@ -272,10 +272,17 @@ fn argument(arg: &Type, kinds: &[(String, Kind)], bounded: bool) -> Atoms {
         {
             Some(BTreeSet::new())
         }
-        Type::Row(row) if row.entries.is_empty() => match &row.tail {
-            Some(tail) => argument(tail, kinds, bounded),
-            None => Some(BTreeSet::new()),
-        },
+        Type::Row(row)
+            if row
+                .entries
+                .iter()
+                .all(|(_, member)| matches!(member, Type::Con { .. } | Type::Symbol(_))) =>
+        {
+            match &row.tail {
+                Some(tail) => argument(tail, kinds, bounded),
+                None => Some(BTreeSet::new()),
+            }
+        }
         Type::Union(a, b) => union(&argument(a, kinds, bounded), &argument(b, kinds, bounded)),
         Type::Row(_) => None,
         other => reach(other, kinds, bounded),

@@ -17,18 +17,29 @@ export class Ctx {
   readonly impl: unknown;
   readonly next: Ctx | null;
   readonly owner: Owner | undefined;
-  constructor(tag: object | null, impl: unknown, next: Ctx | null, owner: Owner | undefined) {
+  /** Context supplied by the Effect adapter, when a crossing provides one. */
+  readonly host: unknown;
+  /** Effect Context derived from this evidence, cached for later crossings. */
+  bridged: unknown = undefined;
+  constructor(tag: object | null, impl: unknown, next: Ctx | null, owner: Owner | undefined, host: unknown = next?.host) {
     this.tag = tag;
     this.impl = impl;
     this.next = next;
     this.owner = owner;
+    this.host = host;
   }
 }
+
+/** Optional observer installed by the Effect adapter for child-fiber metrics. */
+export const fiberHooks: { started?: (ctx: Ctx, fiber: Fiber) => void } = {};
 
 const ROOT = /*#__PURE__*/ new Ctx(null, undefined, null, undefined);
 
 let context: Ctx = ROOT;
 let current: Fiber | undefined;
+
+/** Whether a native fiber is executing on this stack. */
+export const inNativeFiber = (): boolean => current !== undefined;
 
 /** The evidence in effect now. */
 export const currentCtx = (): Ctx => context;
@@ -55,6 +66,9 @@ export const extend = (ctx: Ctx, tag: object, impl: unknown): Ctx => new Ctx(tag
 
 /** The evidence `ctx` with `owner` as the owner. */
 export const owned = (ctx: Ctx, owner: Owner | undefined): Ctx => new Ctx(null, undefined, ctx, owner);
+
+/** The evidence `ctx` with a host Context from the Effect adapter. */
+export const hosted = (ctx: Ctx, host: unknown): Ctx => new Ctx(null, undefined, ctx, ctx.owner, host);
 
 /** Calls `f` with `ctx` as the evidence. */
 export const inCtx = <A>(ctx: Ctx, f: () => A): A => {
@@ -388,6 +402,7 @@ export const fork = (task: () => unknown, ctx: Ctx, mask = 0): Fiber => {
   fiber.mask = mask;
   fiber.top = new Frame(started(task), ctx, null, null, false);
   fiber.suspended = true;
+  fiberHooks.started?.(ctx, fiber);
   schedule(() => {
     if (fiber.suspended && !fiber.started && fiber.exit === undefined) {
       fiber.started = true;
@@ -395,6 +410,13 @@ export const fork = (task: () => unknown, ctx: Ctx, mask = 0): Fiber => {
     }
   });
   return fiber;
+};
+
+/** Starts a registered child on this stack, up to its first suspension. */
+export const startNow = (fiber: Fiber): void => {
+  if (fiber.started || fiber.exit !== undefined) return;
+  fiber.started = true;
+  fiber.wake(NEXT, undefined);
 };
 
 // oxlint-disable-next-line require-yield -- what it returns is a call, or a value
@@ -408,6 +430,7 @@ export const forkNow = (task: () => unknown, ctx: Ctx, mask = 0): Fiber => {
   fiber.mask = mask;
   fiber.top = new Frame(started(task), ctx, null, null, false);
   fiber.started = true;
+  fiberHooks.started?.(ctx, fiber);
   evaluate(fiber);
   return fiber;
 };

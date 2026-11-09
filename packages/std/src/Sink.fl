@@ -29,7 +29,7 @@ foreign pure to_channel from "@flick-lang/effect-ts/effect/Sink" "flickToChannel
 
 /// The sink of what `f` does with the stream of its input; it leaves
 /// nothing over.
-make : (Stream none none i ->{r; e} a) -> Sink r e i l a
+make : (Stream none none i ->{r; e} a) -> Sink {Async | r} e i l a
 foreign pure make from "@flick-lang/effect-ts/effect/Sink" "flickMake"
   reviewed "effect@4.1.2 sha256:c8e985f27b02c0df"
 
@@ -37,7 +37,7 @@ foreign pure make from "@flick-lang/effect-ts/effect/Sink" "flickMake"
 /// `closeOnDone`; `onError` makes the typed error of what it throws.
 from_writable_stream :
   { evaluate : Unit -> WritableStream a; onError : JsValue -> Errors e; closeOnDone : Bool } ->
-  Sink none e a l Unit
+  Sink {Async} e a l Unit
 foreign pure from_writable_stream from "@flick-lang/effect-ts/effect/Sink" "fromWritableStream"
   reviewed "effect@4.1.2 sha256:439f942e9fef8a7a"
 
@@ -354,7 +354,7 @@ foreign pure for_each_while_array from "@flick-lang/effect-ts/effect/Sink" "forE
   reviewed "effect@4.1.2 sha256:b05c92518759a8a0"
 
 /// The sink the task builds when it runs.
-unwrap : Eff r e1 (Sink r2 e2 i l a) -> Sink (r + r2) (e1 + e2) i l a
+unwrap : Eff r e1 (Sink r2 e2 i l a) -> Sink {Async | r + r2} (e1 + e2) i l a
 foreign pure unwrap from "@flick-lang/effect-ts/effect/Sink" "unwrap"
   reviewed "effect@4.1.2 sha256:5f66edc478550d3b"
 

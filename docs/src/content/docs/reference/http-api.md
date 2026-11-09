@@ -250,7 +250,7 @@ for a dev server on another origin.
 #
 # let example = task {
 let files = Http.StaticServer.route { Http.StaticServer.static_options "dist" with spa = true } ""
-# app : Http.Middleware.Handler none {Http.ServerError.HttpServerError}
+# app : Http.Middleware.Handler {Async} {Http.ServerError.HttpServerError}
 let app =
   Http.Middleware.cors
     { Http.Middleware.cors_options with allowedOrigins = ["http://localhost:5173"] }

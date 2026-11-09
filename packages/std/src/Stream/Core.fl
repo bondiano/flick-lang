@@ -155,21 +155,21 @@ foreign pure from_subscription from "@flick-lang/effect-ts/effect/Stream" "fromS
 
 /// The chunks of a JS `ReadableStream`; a read that fails becomes
 /// `on_error` of what it threw.
-from_readable_stream : (JsValue -> Errors e) -> JsValue -> Stream none e JsValue
+from_readable_stream : (JsValue -> Errors e) -> JsValue -> Stream {Async} e JsValue
 foreign pure from_readable_stream from "@flick-lang/effect-ts/effect/Stream" "flickFromReadableStream"
   arity 2
   reviewed "effect@4.1.2 sha256:55df33ec947c1649"
 
 /// The values of a JS async iterable; a failure becomes `on_error` of what
 /// it threw.
-from_async_iterable : (JsValue -> Errors e) -> JsValue -> Stream none e JsValue
+from_async_iterable : (JsValue -> Errors e) -> JsValue -> Stream {Async} e JsValue
 foreign pure from_async_iterable from "@flick-lang/effect-ts/effect/Stream" "flickFromAsyncIterable"
   arity 2
   reviewed "effect@4.1.2 sha256:422651542bc69232"
 
 /// The events of the type that a JS event target (`addEventListener`)
 /// dispatches while the stream runs.
-from_event_listener : String -> JsValue -> Stream none none JsValue
+from_event_listener : String -> JsValue -> Stream {Async} none JsValue
 foreign pure from_event_listener from "@flick-lang/effect-ts/effect/Stream" "flickFromEventListener"
   arity 2
   reviewed "effect@4.1.2 sha256:6f03b8d6c3daf370"

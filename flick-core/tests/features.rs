@@ -2,6 +2,7 @@ use std::io;
 use std::path::{Path, PathBuf};
 
 use flick_core::build::{self, Artifact, Extras, Settings};
+use flick_core::codegen::EffectBridge;
 use flick_core::diagnostics::{Diagnostic, Severity, codes};
 use flick_core::iface;
 use flick_core::project::config::Backend;
@@ -59,6 +60,7 @@ fn settings(release: bool) -> Settings<'static> {
         out_dir: Path::new("/dist"),
         root: None,
         backend: Backend::Effect,
+        effect_bridge: EffectBridge::Absent,
         ui: None,
         runners: &[],
         core_modules: &[],

@@ -11,7 +11,7 @@ test("zip runs the left task before the right and keeps both results", async () 
   assert.equal(exit.cause, undefined);
   assert.deepEqual(seen, ["left", "right"]);
   assert.deepEqual(exit.value, [1, 2]);
-  const combined = await root(() => zipWith(() => 3)((a, b) => Number(a) + Number(b))(() => 4));
+  const combined = await root(() => zipWith(() => 3, (a, b) => Number(a) + Number(b))(() => 4));
   assert.equal(combined.value, 7);
 });
 

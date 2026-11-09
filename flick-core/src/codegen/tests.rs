@@ -1,4 +1,4 @@
-use super::{Labels, Options, js};
+use super::{EffectBridge, Labels, Options, js};
 use crate::ir::tests::lower_text;
 use crate::types::{Constructor, Rep};
 
@@ -22,12 +22,17 @@ fn compile_with(text: &str, release: bool, labels: Labels) -> super::Output {
         direct: &|_, _, _| false,
         labels,
         rt: false,
+        effect_bridge: EffectBridge::Absent,
     };
     js(&ir, &options)
 }
 
 /// The code of `text` on Flick's own runtime, in debug.
 fn on_rt(text: &str) -> String {
+    on_rt_with_bridge(text, EffectBridge::Absent)
+}
+
+fn on_rt_with_bridge(text: &str, effect_bridge: EffectBridge) -> String {
     let ir = lower_text("App", text).expect("lowers");
     let path = |m: &str| format!("{}.js", m.replace('.', "/"));
     let package = |_: &str| None;
@@ -43,8 +48,37 @@ fn on_rt(text: &str) -> String {
         direct: &|_, _, _| false,
         labels: Labels::default(),
         rt: true,
+        effect_bridge,
     };
     js(&ir, &options).code
+}
+
+#[test]
+fn effect_bridge_converts_the_public_chunks_underlying_core_type() {
+    let code = on_rt_with_bridge(
+        "module App exposing (convert)\n\
+         convert : Chunk.Chunk Int ->{} Chunk.Chunk Int\n\
+         foreign effect convert from \"@flick-lang/effect-ts/effect/TxChunk\" \"convert\"\n",
+        EffectBridge::Available,
+    );
+    assert!(code.contains("chunkToEffect"), "{code}");
+    assert!(code.contains("chunkFromEffect"), "{code}");
+}
+
+#[test]
+fn effect_bridge_converts_optional_effect_values_before_unwrapping_them() {
+    let code = on_rt_with_bridge(
+        "module App exposing (choose)\n\
+         choose : Option (Eff none none Int) -> Eff none none Int\n\
+         foreign pure choose from \"./bindings.mjs\" \"choose\"\n  optional 0\n",
+        EffectBridge::Available,
+    );
+    let compact: String = code.split_whitespace().collect();
+    assert!(
+        compact.contains("optionalArg($bridge_optionToEffect("),
+        "{code}"
+    );
+    assert!(compact.contains("$bridge_callEffect("), "{code}");
 }
 
 #[test]
@@ -352,4 +386,25 @@ fn an_atom_write_names_its_place() {
     // each write's `CallSite` is the record of its own place
     assert!(code.contains("place: \"App.Counter:6\""), "{code}");
     assert!(code.contains("place: \"App.Counter:7\""), "{code}");
+}
+
+#[test]
+fn effect_bridge_does_not_treat_a_user_api_type_as_http_handlers() {
+    let code = on_rt_with_bridge(
+        "module App exposing (use)\n\ntype Api a = Api a\n\n\
+         use : Api a -> a -> a\n\
+foreign pure use from \"@flick-lang/effect-ts\" \"use\"\n  arity 2\n",
+        EffectBridge::Available,
+    );
+    assert!(!code.contains("handlersToEffect"), "{code}");
+}
+
+#[test]
+fn effect_bridge_adapts_the_handler_record_of_an_rpc_group() {
+    let code = on_rt_with_bridge(
+        "module App exposing (use)\n\nuse : Rpc.Group r hs -> hs -> Unit\n\
+foreign pure use from \"@flick-lang/effect-ts\" \"use\"\n  arity 2\n",
+        EffectBridge::Available,
+    );
+    assert!(code.contains("handlersToEffect"), "{code}");
 }

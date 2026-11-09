@@ -261,7 +261,7 @@ impl Default for Build {
             solver_steps: types::Limits::default().steps,
             solver_depth: types::Limits::default().depth,
             labels: Labels::default(),
-            effect: Backend::Effect,
+            effect: Backend::Rt,
             ui: None,
         }
     }

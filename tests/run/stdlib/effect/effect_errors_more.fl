@@ -78,7 +78,7 @@ let reports () =
   say ("first_success_of []: " ++ RawCause.describe (Failure.inspect (failure_of none_left)))
 
 /// The cause each message is logged with, as a logger made by `make` gets it.
-logged : Unit ->{} Unit
+logged : Unit ->{Async} Unit
 let logged () =
   let seen = Ref.make []
   let collect = {
@@ -165,7 +165,7 @@ let collections () =
   say ("for_each: " ++ show (Effect.for_each Effect.Sequential (fun n -> n + 1) xs))
   say ("replicate_effect: " ++ show (Effect.replicate_effect (Effect.Bounded 2) 3 (task { 7 })))
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Async; AppError} Unit
 let main () =
   pretty ()
   reports ()
