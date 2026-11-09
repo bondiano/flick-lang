@@ -88,7 +88,12 @@ export class Reading {
   }
   dispose(): void {
     this.disposed = true;
-    for (const f of this.finalizers.splice(0).toReversed()) f();
+    let failed: { readonly error: unknown } | undefined;
+    for (const f of this.finalizers.splice(0).toReversed()) {
+      try { f(); }
+      catch (error) { failed ??= { error }; }
+    }
+    if (failed !== undefined) throw failed.error;
   }
 }
 
@@ -303,12 +308,15 @@ export class Registry {
 
   dispose(): void {
     this.disposed = true;
+    let failed: { readonly error: unknown } | undefined;
     for (const node of this.nodes.values()) {
       node.state = REMOVED;
-      node.reading?.dispose();
+      try { node.reading?.dispose(); }
+      catch (error) { failed ??= { error }; }
     }
     this.nodes.clear();
     this.queries.clear();
+    if (failed !== undefined) throw failed.error;
   }
 
   setValue(node: Node, value: unknown): void {

@@ -106,3 +106,34 @@ test("a task atom's run is interrupted when it computes again or the registry is
   // it heard of the second run starting, and of no run's result: neither ended before it was interrupted
   assert.equal(results, 1);
 });
+
+test("a reading runs every finalizer even when an earlier one throws", () => {
+  const registry = new Registry(currentCtx());
+  const seen: Array<string> = [];
+  const atom = { ...readable((reading) => {
+    reading.addFinalizer(() => { seen.push("last"); });
+    reading.addFinalizer(() => { seen.push("first"); throw new Error("cleanup failed"); });
+    return 1;
+  }), keepAlive: true };
+  registry.get(atom);
+  assert.throws(() => registry.dispose(), /cleanup failed/);
+  assert.deepEqual(seen, ["first", "last"]);
+});
+
+test("registry disposal visits every reading after one finalizer throws", () => {
+  const registry = new Registry(currentCtx());
+  const seen: Array<string> = [];
+  const first = { ...readable((reading) => {
+    reading.addFinalizer(() => { seen.push("first"); throw new Error("first failed"); });
+    return 1;
+  }), keepAlive: true };
+  const second = { ...readable((reading) => {
+    reading.addFinalizer(() => { seen.push("second"); });
+    return 2;
+  }), keepAlive: true };
+  registry.get(first);
+  registry.get(second);
+  assert.throws(() => registry.dispose(), /first failed/);
+  assert.deepEqual(seen, ["first", "second"]);
+  assert.throws(() => registry.get(second), /disposed/);
+});
