@@ -3,6 +3,7 @@
 //! rendered as text after the module's own, parsed and spliced in place of
 //! the block, the user's code inside keeping its own place in the file.
 
+pub mod calls;
 pub mod derive;
 pub mod expansion;
 pub mod first_party;
@@ -16,14 +17,14 @@ use std::panic::{self, AssertUnwindSafe};
 use std::sync::Arc;
 
 use flick_plugin::{
-    Arena, Artifact, Block, Completion, DeriveTarget, Diagnostic, Fact, Highlight, Hover, Piece,
-    Plugin, Published,
+    Arena, Artifact, Block, CallSite, Completion, DeriveTarget, Diagnostic, Fact, Highlight, Hover,
+    Piece, Plugin, Published,
 };
 
 use source::{BlockSource, Seen};
 
 use crate::diagnostics::{self, codes};
-use crate::source::Span;
+use crate::source::{FileId, Span};
 use crate::syntax::cst::{Node, Token};
 use crate::syntax::kind::SyntaxKind as K;
 
@@ -128,6 +129,13 @@ pub trait Expander: Send + Sync {
         facts: &[Fact],
     ) -> Result<Vec<Diagnostic>, String> {
         let _ = (block, state, facts);
+        Ok(Vec::new())
+    }
+    /// What the plugin finds wrong with `calls`, the places of one module
+    /// that call the names its package watches, at spans of that module's
+    /// own file; why the plugin failed.
+    fn check_calls(&self, calls: &[CallSite], state: &[u8]) -> Result<Vec<Diagnostic>, String> {
+        let _ = (calls, state);
         Ok(Vec::new())
     }
 }
@@ -297,6 +305,10 @@ impl<P: Plugin + Send + Sync> Expander for Native<P> {
     ) -> Result<Vec<Diagnostic>, String> {
         guarded(|| self.plugin.check(block, state, facts))
     }
+
+    fn check_calls(&self, calls: &[CallSite], state: &[u8]) -> Result<Vec<Diagnostic>, String> {
+        guarded(|| self.plugin.check_calls(calls, state))
+    }
 }
 
 /// What `call` gives, or why it panicked: a native plugin runs in the
@@ -331,7 +343,7 @@ pub(crate) fn placed(
             frame.start + d.span.end,
         )
     };
-    let Some(code) = (d.code.as_deref()).and_then(|code| codes::plugin(package, code)) else {
+    let Some(code) = (d.code.as_deref()).and_then(|code| code_of(package, code)) else {
         return diagnostics::Diagnostic::error(
             codes::P036,
             format!("plugin `{package}`: {}", d.message),
@@ -367,6 +379,57 @@ pub(crate) fn placed(
         };
     }
     placed
+}
+
+/// What the plugin `package` found wrong at a span of the module's own
+/// text, as `check_calls` gives it: under the plugin's own code, or `P036`
+/// without one.
+pub(crate) fn placed_call(d: &Diagnostic, package: &str, file: FileId) -> diagnostics::Diagnostic {
+    let span = Span::new(file, d.span.start, d.span.end);
+    let Some(code) = (d.code.as_deref()).and_then(|code| code_of(package, code)) else {
+        return diagnostics::Diagnostic::error(
+            codes::P036,
+            format!("plugin `{package}`: {}", d.message),
+            span,
+        );
+    };
+    let severity = match d.severity {
+        flick_plugin::Severity::Error => diagnostics::Severity::Error,
+        flick_plugin::Severity::Warning => diagnostics::Severity::Warning,
+        flick_plugin::Severity::Note => diagnostics::Severity::Note,
+    };
+    let mut placed =
+        diagnostics::Diagnostic::new(code, severity, d.message.clone()).with_span(span);
+    for fix in &d.fixes {
+        let edits = || {
+            let edits = (fix.edits.iter())
+                .map(|e| diagnostics::Edit {
+                    span: Span::new(file, e.span.start, e.span.end),
+                    replacement: e.replacement.clone(),
+                })
+                .collect();
+            (fix.message.clone(), edits)
+        };
+        placed = if fix.safe {
+            placed.with_safe_fix(edits)
+        } else {
+            placed.with_fix(edits)
+        };
+    }
+    placed
+}
+
+/// The code `code` of the plugin of `package`: the compiler's own code of
+/// that spelling for the checks of std's plugin that were the compiler's
+/// ([`first_party::OWN_CODES`]), else the plugin's under its package.
+fn code_of(package: &str, code: &str) -> Option<codes::Code> {
+    if package == first_party::PACKAGE
+        && first_party::OWN_CODES.contains(&code)
+        && let Some(info) = codes::lookup(&format!("FLICK-{code}"))
+    {
+        return Some(info.code);
+    }
+    codes::plugin(package, code)
 }
 
 /// The head of the block `node`, its first token: a name.

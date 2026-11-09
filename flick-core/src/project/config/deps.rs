@@ -35,6 +35,8 @@ pub(super) struct RawPackage {
     load: Vec<String>,
     #[serde(default)]
     hooks: Vec<String>,
+    #[serde(default)]
+    watch: Vec<String>,
 }
 
 /// `[js]` as written: its only table is `dependencies`.
@@ -159,6 +161,7 @@ pub(super) fn package(raw: Spanned<RawPackage>, at: Span) -> Result<Package, Dia
         plugin,
         load,
         hooks,
+        watch,
     } = raw.into_inner();
     let error = |message: String| Diagnostic::error(codes::P032, message, at);
     semver::Version::parse(&version).map_err(|e| {
@@ -191,6 +194,16 @@ pub(super) fn package(raw: Spanned<RawPackage>, at: Span) -> Result<Package, Dia
             "`hooks` needs the `plugin` that takes part in them".into(),
         ));
     }
+    if !watch.is_empty() && plugin.is_none() {
+        return Err(error(
+            "`watch` needs the `plugin` that checks the calls".into(),
+        ));
+    }
+    if let Some(bad) = watch.iter().find(|w| !is_watched(w)) {
+        return Err(error(format!(
+            "`watch = [\"{bad}\"]`: a watched name is `Module.name`, `Module.Sub.name` or `*.name` for the name of any module"
+        )));
+    }
     if let Some(bad) = hooks.iter().find(|h| !matches!(h.as_str(), "emit" | "ir")) {
         return Err(error(format!(
             "`hooks = [\"{bad}\"]`: a hook is `emit`, after the build writes its files, or `ir`, before it optimizes"
@@ -215,8 +228,26 @@ pub(super) fn package(raw: Spanned<RawPackage>, at: Span) -> Result<Package, Dia
         plugin,
         load,
         hooks,
+        watch,
         span: at,
     })
+}
+
+/// Whether `watched` names a value of a module: `Ui.Event.queue`, or
+/// `*.parse` for the name of any module.
+fn is_watched(watched: &str) -> bool {
+    let Some((module, name)) = watched.rsplit_once('.') else {
+        return false;
+    };
+    let value = |n: &str| {
+        n.starts_with(|c: char| c.is_ascii_lowercase() || c == '_')
+            && n.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_')
+    };
+    let part = |p: &str| {
+        p.starts_with(|c: char| c.is_ascii_uppercase())
+            && p.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_')
+    };
+    value(name) && (module == "*" || module.split('.').all(part))
 }
 
 /// What a project grants the plugin of a package, as written.

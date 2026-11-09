@@ -407,6 +407,52 @@ pub struct Fact {
     pub fields: Option<Vec<FactField>>,
 }
 
+/// A value the compiler folded where a program writes it: the constant a
+/// watched call is given.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum Constant {
+    Number(f64),
+    Text(String),
+    Boolean(bool),
+}
+
+/// An argument of a watched call: where it is written, the type the checker
+/// found for it, the fields of a closed record, and the constant it folds
+/// to, if any.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Argument {
+    pub span: Span,
+    pub ty: FactType,
+    pub fields: Option<Vec<FactField>>,
+    pub constant: Option<Constant>,
+}
+
+/// How a refined type checks a value at `T$parse`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum Refinement {
+    /// The literals of an enum: a constant that is none of them never parses.
+    Literals(Vec<Constant>),
+    /// A check the compiler knows by name: `email`, `non_empty`, `positive`.
+    Known(String),
+    /// Whether the module's own predicate holds for the constant, as the
+    /// compiler folded it.
+    Holds(bool),
+}
+
+/// A place that calls a name the plugin's package watches: the module and
+/// the name as the compiler knows them, where the call is written, its
+/// arguments, and, for a `T$parse`, how `T` checks its value. Every span is
+/// a byte offset in the text of the module's own file, and the diagnostics
+/// of [`Plugin::check_calls`] are at spans of it too.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct CallSite {
+    pub module: String,
+    pub name: String,
+    pub span: Span,
+    pub arguments: Vec<Argument>,
+    pub refinement: Option<Refinement>,
+}
+
 /// What an editor shows over a span of a block, as Markdown.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Hover {

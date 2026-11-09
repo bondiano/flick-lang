@@ -1,92 +1,35 @@
-//! A refined type's `parse` of a constant, checked when the program
-//! compiles if the compiler knows the check.
+//! The predicate of a refined type, folded for a constant: what the plugin
+//! that checks `T.parse` of a constant gets as its verdict.
 
 use super::Checker;
-use super::env::{Abi, EnumLit, Form, Found};
 use super::lang::{self, Lang};
-use super::typing::Ref;
 use crate::consteval::{self, Const};
-use crate::diagnostics::codes;
 use crate::iface::Namespace;
 use crate::source::SourceMap;
 use crate::syntax;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
+use crate::types::env::Found;
 
 impl Checker<'_> {
-    /// `T.parse c` of a constant `c`: the check of `T`, applied when the
-    /// program compiles if the compiler knows it.
-    pub fn refined_constant(&mut self, head: &Node, arg: &Node) {
-        let Some(Ref::Value { module, name }) = self.typing.names.get(&head.range()).cloned()
-        else {
-            return;
-        };
-        let Some(ty) = name.strip_suffix("$parse") else {
-            return;
-        };
-        let Some(constant) = consteval::eval(arg, self.text) else {
-            return;
-        };
-        // an enum's literals travel in its interface, an opaque one's too
-        let literals = match self.env.type_def(&module, ty).map(|d| &d.form) {
-            Some(Form::Adt {
-                abi: Abi::Literal(literals),
-                ..
-            }) => Some(literals.clone()),
-            Some(Form::Nominal { literals }) if !literals.is_empty() => Some(literals.clone()),
-            _ => None,
-        };
-        if let Some(literals) = literals {
-            let known = match &constant {
-                Const::String(s) => literals.contains(&EnumLit::String(s.clone())),
-                Const::Number(n) => literals
-                    .iter()
-                    // exactly the integer, as the bits compare it
-                    .any(|l| matches!(l, EnumLit::Int(i) if f64::from(*i).to_bits() == n.to_bits())),
-                _ => return,
-            };
-            if !known {
-                let message = format!(
-                    "this constant is no literal of `{ty}`, so `{ty}.parse` of it always fails"
-                );
-                self.error(codes::D006, self.span(arg), message);
-            }
-            return;
-        }
-        if module != self.env.module {
-            return;
-        }
-        let Some(predicate) = self.predicates.get(ty).copied() else {
-            return;
-        };
-        let check = (predicate.nodes().next()).and_then(|body| {
-            let written: String = body.text(self.text).split_whitespace().collect();
-            self.known_check(&written)
-        });
-        if holds(predicate, self.text, &constant, check) == Some(false) {
-            self.error(
-                codes::D006,
-                self.span(arg),
-                format!(
-                    "this constant fails the check of `{ty}`, so `{ty}.parse` of it always fails"
-                ),
-            );
-        }
-    }
-}
-
-impl Checker<'_> {
-    /// The check of the compiler's that `written` names, qualified or not,
-    /// as the module sees it.
-    fn known_check(&self, written: &str) -> Option<Lang> {
+    /// The check of the compiler's that `predicate` is, as the plugins know
+    /// it: `email`, `non_empty` or `positive`.
+    pub(super) fn known_check(&self, predicate: &Node) -> Option<&'static str> {
+        let body = predicate.nodes().next()?;
+        let written: String = body.text(self.text).split_whitespace().collect();
         let known = |module: &str, name: &str| {
-            [Lang::CheckEmail, Lang::CheckNonEmpty, Lang::CheckPositive]
-                .into_iter()
-                .find(|l| lang::is(*l, module, name))
+            [
+                (Lang::CheckEmail, "email"),
+                (Lang::CheckNonEmpty, "non_empty"),
+                (Lang::CheckPositive, "positive"),
+            ]
+            .into_iter()
+            .find(|(l, _)| lang::is(*l, module, name))
+            .map(|(_, check)| check)
         };
         match written.rsplit_once('.') {
             Some((qualifier, name)) => known(self.env.qualified_module(qualifier)?.0, name),
-            None => match self.env.find(Namespace::Value, written) {
+            None => match self.env.find(Namespace::Value, &written) {
                 Found::Entity(e) => known(&e.module, &e.name),
                 Found::Unknown | Found::Missing => None,
             },
@@ -95,15 +38,9 @@ impl Checker<'_> {
 }
 
 /// Whether `constant` passes the predicate of a refined type, when the
-/// compiler can tell: a known check, or a `fun` of literals.
-fn holds(predicate: &Node, text: &str, constant: &Const, check: Option<Lang>) -> Option<bool> {
+/// compiler can fold it: a `fun` of literals.
+pub(super) fn holds(predicate: &Node, text: &str, constant: &Const) -> Option<bool> {
     let body = predicate.nodes().next()?;
-    match (check, constant) {
-        (Some(Lang::CheckEmail), Const::String(s)) => return Some(email(s)),
-        (Some(Lang::CheckNonEmpty), Const::String(s)) => return Some(!s.is_empty()),
-        (Some(Lang::CheckPositive), Const::Number(n)) => return Some(*n > 0.0),
-        _ => {}
-    }
     if body.kind != K::FunExpr {
         return None;
     }
@@ -144,18 +81,4 @@ fn js_number(n: f64) -> String {
     } else {
         format!("{n}")
     }
-}
-
-/// `Checks.email`, as the runtime checks it: one `@` with text on both
-/// sides, no spaces, and a dot inside the domain.
-fn email(s: &str) -> bool {
-    let Some((local, domain)) = s.split_once('@') else {
-        return false;
-    };
-    !local.is_empty()
-        && !s.chars().any(char::is_whitespace)
-        && !domain.contains('@')
-        && domain
-            .char_indices()
-            .any(|(i, c)| c == '.' && i > 0 && i + 1 < domain.len())
 }

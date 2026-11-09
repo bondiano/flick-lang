@@ -246,6 +246,18 @@ pub fn check(
     .collect()
 }
 
+#[doc(hidden)]
+pub fn check_calls(
+    plugin: &impl Plugin,
+    calls: Vec<types::CallSite>,
+    state: &[u8],
+) -> Vec<types::Diagnostic> {
+    let calls: Vec<_> = calls.into_iter().map(convert::from_call_site).collect();
+    (plugin.check_calls(&calls, state).into_iter())
+        .map(convert::to_diagnostic)
+        .collect()
+}
+
 /// Exports the plugin `$plugin`, a value of a type implementing [`Plugin`],
 /// as the component a crate of type `cdylib` builds for `wasm32-wasip2`.
 #[macro_export]
@@ -357,6 +369,13 @@ macro_rules! export {
                 facts: ::std::vec::Vec<$crate::guest::bindings::flick::plugin::types::Fact>,
             ) -> ::std::vec::Vec<$crate::guest::bindings::flick::plugin::types::Diagnostic> {
                 $crate::guest::check(&$plugin, block, &state, facts)
+            }
+
+            fn check_calls(
+                calls: ::std::vec::Vec<$crate::guest::bindings::flick::plugin::types::CallSite>,
+                state: ::std::vec::Vec<u8>,
+            ) -> ::std::vec::Vec<$crate::guest::bindings::flick::plugin::types::Diagnostic> {
+                $crate::guest::check_calls(&$plugin, calls, &state)
             }
         }
 

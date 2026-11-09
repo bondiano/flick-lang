@@ -20,16 +20,24 @@ const LIB: &str = "schema-version = 1
 name = \"pairs\"
 version = \"1.0.0\"
 plugin = \"pairs.wasm\"
+watch = [\"Pairs.tally\", \"*.boom\"]
 
 [project]
 kind = \"lib\"
 ";
 
-/// The module of the library a program imports the plugin's heads with.
-const PAIRS: &str = "module Pairs exposing (version)
+/// The module of the library a program imports the plugin's heads with;
+/// `tally` and `boom` are the names its package watches the calls of.
+const PAIRS: &str = "module Pairs exposing (version, tally, boom)
 
 version : Float
 let version = 1.0
+
+tally : Float -> Float
+let tally n = n
+
+boom : Float -> Float
+let boom n = n
 ";
 
 const MAIN: &str = "module App.Main exposing (main)
@@ -178,6 +186,59 @@ mod wasm {
             "{:?}",
             trace(&root)
         );
+    }
+
+    /// A module that calls `tally` twice, once with a count of `n`.
+    fn counting(n: &str) -> String {
+        format!(
+            "module App.Main exposing (main, counted)\n\nimport Pairs exposing (tally)\n\ncounted : Float\nlet counted = tally {n} + tally 2.0\n\nmain : Unit ->{{; AppError}} Unit\nlet main () = Platform.stdout_line (show counted)\n"
+        )
+    }
+
+    #[test]
+    fn a_wasm_plugin_checks_the_calls_its_package_watches() {
+        let root = app("plugins-calls", &counting("0.0"));
+        let checked = flick(&root, &["check"]);
+        let stderr = String::from_utf8_lossy(&checked.stderr);
+        assert!(!checked.status.success(), "{stderr}");
+        assert!(stderr.contains("pairs/X005"), "{stderr}");
+        assert!(stderr.contains("`tally` counts from one"), "{stderr}");
+        // the two calls of `tally` go in one call of the plugin; `version`
+        // is no watched name
+        assert!(
+            trace(&root).iter().any(|l| l == "check-calls pairs 2"),
+            "{:?}",
+            trace(&root)
+        );
+        // a count of one is what the plugin accepts
+        fs::write(root.join("app/src/App/Main.fl"), counting("1.0")).expect("write");
+        let checked = flick(&root, &["check"]);
+        assert!(checked.status.success(), "{checked:?}");
+    }
+
+    #[test]
+    fn a_package_without_watch_is_asked_about_no_calls() {
+        let root = app("plugins-unwatched", &counting("0.0"));
+        let lib = LIB.replace("watch = [\"Pairs.tally\", \"*.boom\"]\n", "");
+        fs::write(root.join("lib/flick.toml"), lib).expect("write");
+        let checked = flick(&root, &["check"]);
+        assert!(checked.status.success(), "{checked:?}");
+        assert!(
+            !trace(&root).iter().any(|l| l.starts_with("check-calls")),
+            "{:?}",
+            trace(&root)
+        );
+    }
+
+    #[test]
+    fn a_plugin_that_fails_on_the_calls_is_reported_with_its_package() {
+        let main = "module App.Main exposing (main, boomed)\n\nimport Pairs exposing (boom)\n\nboomed : Float\nlet boomed = boom 1.0\n\nmain : Unit ->{; AppError} Unit\nlet main () = Platform.stdout_line (show boomed)\n";
+        let root = app("plugins-calls-fail", main);
+        let checked = flick(&root, &["check"]);
+        let stderr = String::from_utf8_lossy(&checked.stderr);
+        assert!(!checked.status.success(), "{stderr}");
+        assert!(stderr.contains("FLICK-P036"), "{stderr}");
+        assert!(stderr.contains("plugin `pairs` failed"), "{stderr}");
     }
 
     #[test]

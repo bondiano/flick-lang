@@ -6,7 +6,7 @@ use crate::diagnostics::{Diagnostic, Severity, codes};
 use crate::iface::Namespace;
 use crate::resolve::{self, Interface};
 use crate::source::Span;
-use crate::types::{Form, show_type};
+use crate::types::{Form, Watched, show_type};
 use crate::{syntax, types};
 
 impl Loader<'_> {
@@ -85,6 +85,7 @@ impl Loader<'_> {
             no_let_assert: false,
             thresholds: types::Thresholds::default(),
             effects: true,
+            watched: Watched::none(),
         };
         diagnostics.extend(types::check(
             &checked,

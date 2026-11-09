@@ -108,6 +108,9 @@ pub struct Typing {
     pub wire_codecs: HashMap<Range, super::wire::WireCodec>,
     /// The type of each `_` of generated code, for its plugin's `check`.
     pub wildcards: Vec<(Range, flick_plugin::Fact)>,
+    /// Each place of the module that calls a name a plugin watches, for its
+    /// `check_calls`; the spans are of the text that was checked.
+    pub call_sites: Vec<flick_plugin::CallSite>,
     /// The uses of `wire_codec` an annotation has not given a codec yet.
     pub(super) pending_wire: Vec<(Range, Span)>,
     #[cfg(feature = "ide")]

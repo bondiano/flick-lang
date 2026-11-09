@@ -39,6 +39,8 @@ struct Package {
     load: Vec<String>,
     /// The stages of a build that plugin takes part in.
     hooks: Vec<String>,
+    /// The names whose places of call that plugin checks.
+    watch: Vec<String>,
 }
 
 /// What the modules of a library of `[dependencies]` depend on besides the
@@ -124,6 +126,7 @@ impl Packages {
                     plugin: None,
                     load: Vec::new(),
                     hooks: Vec::new(),
+                    watch: Vec::new(),
                 }
             });
         packages.extend(installed.collect::<Vec<_>>());
@@ -163,6 +166,14 @@ impl Packages {
             .filter(|p| p.hooks.iter().any(|h| h == hook))
             .map(|p| (p.name.clone(), p.plugin.clone()))
             .collect()
+    }
+
+    /// Each library whose plugin watches names, with those names, in the
+    /// order of the dependencies.
+    pub fn watchers(&self) -> impl Iterator<Item = (&str, &[String])> {
+        (self.packages.iter())
+            .filter(|p| !p.watch.is_empty())
+            .map(|p| (p.name.as_str(), p.watch.as_slice()))
     }
 
     /// The component of the plugin the library `name` provides.
@@ -366,6 +377,7 @@ impl Libraries<'_> {
                 .map(|plugin| at.join(plugin)),
             load: (library.package.as_ref()).map_or_else(Vec::new, |p| p.load.clone()),
             hooks: (library.package.as_ref()).map_or_else(Vec::new, |p| p.hooks.clone()),
+            watch: (library.package.as_ref()).map_or_else(Vec::new, |p| p.watch.clone()),
         });
         Some((at, library.dependencies))
     }

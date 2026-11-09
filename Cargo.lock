@@ -617,6 +617,7 @@ dependencies = [
  "flick-plugin",
  "flick-plugin-cli",
  "flick-plugin-derive",
+ "flick-plugin-refined",
  "flick-plugin-sql",
  "flick-plugin-ui",
  "flick-pretty",
@@ -682,6 +683,13 @@ version = "0.1.0"
 dependencies = [
  "proc-macro2",
  "quote",
+]
+
+[[package]]
+name = "flick-plugin-refined"
+version = "0.1.0"
+dependencies = [
+ "flick-plugin",
 ]
 
 [[package]]

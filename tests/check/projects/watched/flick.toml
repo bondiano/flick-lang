@@ -1,0 +1,6 @@
+# The calls the plugin of `std` watches are checked in a project too, where
+# a module is loaded and cached with its blocks.
+schema-version = 1
+
+[project]
+kind = "lib"

@@ -1,0 +1,23 @@
+// A policy bound written in the code of a `component` block: the call is
+// reported where it stands in the module's own text. A bound of one, and a
+// limit of two, are what the check accepts.
+module App.Policies exposing (..)
+
+count : Atom.Writable Int
+let count = Atom.make 0
+
+component counter () = ui {
+  button
+    {
+      disabled = false;
+      on_click = Ui.Event.queue 0 (fun _ -> task { Atom.update count (fun n -> n + 1) });
+    }
+    [text (show (Atom.value count))]
+}
+//~ FLICK-U001 @13:33-13:34 the capacity of `Ui.Event.queue` must be a positive integer
+
+ok : Ui.Handler Ui.ClickSnapshot
+let ok = Ui.Event.queue 1 (fun _ -> task { Atom.update count (fun n -> n + 1) })
+
+ok_many : Ui.Handler Ui.ClickSnapshot
+let ok_many = Ui.Event.concurrent 2 (fun _ -> task { Atom.update count (fun n -> n + 1) })

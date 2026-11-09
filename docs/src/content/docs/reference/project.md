@@ -193,6 +193,11 @@ version = "1.0.0"
 plugin = "pairs.wasm"
 ```
 
+`watch = ["Ui.Event.queue", "*.parse"]` beside `plugin` names the calls its
+plugin is asked about in every module checked (see
+[plugins.md](../plugins/#checks-of-calls)); an entry that is no
+`Module.name` or `*.name`, or a `watch` without a `plugin`, is `FLICK-P032`.
+
 `load = ["proto"]` beside `plugin` says its plugin turns the files of those
 extensions into modules: `App/User.proto` is the module `App.User` (see
 [plugins.md](../plugins/#files-of-other-languages)). Two libraries that load

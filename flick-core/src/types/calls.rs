@@ -7,6 +7,7 @@ use std::mem;
 use super::ty::Type;
 use super::typing::{Ref, range};
 use super::{Checker, Domain, Local, Operator};
+use crate::consteval;
 use crate::diagnostics::suggest::closest;
 use crate::diagnostics::{Diagnostic, Edit, Severity, codes};
 use crate::iface::Namespace;
@@ -185,6 +186,10 @@ impl Checker<'_> {
         #[cfg(feature = "diagnostic-fixes")]
         let mut unknown = Vec::new();
         let mut params = Vec::new();
+        // the places a plugin watches: read before any argument, so an
+        // application of a name none watches pays only the lookup
+        let watched = self.watched_name(head);
+        let mut given = Vec::new();
         for (i, arg) in args.iter().enumerate() {
             let span = Span::new(self.file, head.range().0, arg.range().1);
             match self.ui_callable(&ty, (span.start, span.end), self.span(head)) {
@@ -205,9 +210,11 @@ impl Checker<'_> {
                         defaults.extend(mine.unwrap_or_default());
                     }
                     self.explain_argument(since, head, i, &param);
+                    if watched.is_some() {
+                        let folded = consteval::eval(arg, self.text);
+                        given.push((self.span(arg), argument.clone(), folded));
+                    }
                     if i == 0 {
-                        self.refined_constant(head, arg);
-                        self.ui_capacity(head, arg);
                         self.ui_render_handlers(head, arg);
                     }
                     if eff {
@@ -251,6 +258,10 @@ impl Checker<'_> {
         if unknown.len() == args.len() && head.kind == K::NameExpr {
             self.stub_fix(since, head, args, &unknown);
         }
+        if let Some((module, name)) = watched {
+            let span = Span::new(self.file, head.range().0, head.range().1);
+            self.watched_call(&module, &name, span, given);
+        }
         if let [first, second] = &params[..]
             && self.is_builtin(head, Lang::LayerMerge)
         {
@@ -284,6 +295,17 @@ impl Checker<'_> {
                 },
             ])),
         );
+    }
+
+    /// The value `head` refers to when a plugin of the project watches it.
+    fn watched_name(&self, head: &Node) -> Option<(String, String)> {
+        if self.options.watched.is_empty() {
+            return None;
+        }
+        let Some(Ref::Value { module, name }) = self.typing.names.get(&head.range()) else {
+            return None;
+        };
+        (self.options.watched.holds(module, name)).then(|| (module.clone(), name.clone()))
     }
 
     /// `head` names the value `name` of the built-in module `module`.

@@ -5,7 +5,6 @@ use std::collections::HashMap;
 use super::ty::Type;
 use super::typing::Ref;
 use super::{Checker, Range, let_parts};
-use crate::consteval::{self, Const};
 use crate::diagnostics::codes;
 use crate::iface::Namespace;
 use crate::ir::Label;
@@ -37,37 +36,6 @@ impl Checker<'_> {
             }
         }
         target
-    }
-
-    /// `queue c` and `concurrent c` of `Ui.Event` or `Action` with a
-    /// constant `c`: the capacity or limit must be a positive integer.
-    pub fn ui_capacity(&mut self, head: &Node, arg: &Node) {
-        let Some(Ref::Value { module, name }) = self.typing.names.get(&head.range()) else {
-            return;
-        };
-        let limited = [
-            Lang::EventQueue,
-            Lang::ActionQueue,
-            Lang::EventConcurrent,
-            Lang::ActionConcurrent,
-        ];
-        let Some(policy) = limited.into_iter().find(|l| lang::is(*l, module, name)) else {
-            return;
-        };
-        let what = if matches!(policy, Lang::EventQueue | Lang::ActionQueue) {
-            "capacity"
-        } else {
-            "limit"
-        };
-        if let Some(Const::Number(n)) = consteval::eval(arg, self.text)
-            && !(n >= 1.0 && n.fract() == 0.0 && n.is_finite())
-        {
-            self.error(
-                codes::U001,
-                self.span(arg),
-                format!("the {what} of `{module}.{name}` must be a positive integer"),
-            );
-        }
     }
 
     /// `Ui.view render`: a handler made from a `fun` inside the render is

@@ -6,6 +6,16 @@ break programs.
 
 ## Unreleased
 
+- **Plugins check calls:** a library whose `[package]` says
+  `watch = ["Ui.Event.queue", "*.parse"]` beside its `plugin` gets, through the
+  new `check-calls`, every place of a checked module that applies one of those
+  names, with the span of each argument, its type, the constant it folds to and,
+  for the `parse` of a refined type, how its check reads that constant. An entry
+  that is no `Module.name` or `*.name`, and a `watch` without a `plugin`, are
+  `FLICK-P032`. Two checks of the compiler's moved into the plugin of `std` and
+  kept their codes, spans, messages and explanations: `FLICK-U001`, the capacity
+  or limit of an event policy, and `FLICK-D006`, a constant that fails the check
+  of its refined type. Rebuild a plugin's component for the new interface.
 - **A plugin's pass over the IR:** a library whose `[package]` says `hooks = ["ir"]`
   beside its `plugin` gets the IR of the project's modules as CBOR after the
   checks of effects and gives what `flick build`, `run` and `test` compile

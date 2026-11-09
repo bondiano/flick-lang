@@ -56,27 +56,48 @@ pub fn check(sources: &source::SourceMap, file: source::FileId) -> Vec<diagnosti
     let builtin = |name: &str| types::builtins().iter().find(|i| i.module == name).cloned();
     let (mut interface, resolved) = resolve::resolve(&module, &builtin);
     let local = |name: &str| name == module.name;
+    // std's plugin is linked into the compiler, so a lone file is watched
+    // for its names without a manifest
+    let watched = types::Watched::new(plugin::first_party::WATCH);
     let options = types::Options {
         local: &local,
         limits: types::Limits::default(),
         no_let_assert: false,
         thresholds: types::Thresholds::default(),
         effects: true,
+        watched: &watched,
     };
     let mut diagnostics = parse.diagnostics;
     diagnostics.extend(derived);
     diagnostics.extend(resolved);
-    let checked = types::check(
+    let (mut checked, typing) = types::check_typed(
         &module,
         &builtin,
         types::builtins(),
         options,
         &mut interface,
     );
+    checked.extend(watched_calls(&typing, expansion.as_ref(), file, &watched));
     diagnostics.extend(types::beside_syntax_errors(&parse.tree, checked));
     if let Some(expansion) = &expansion {
         expansion.restore(&mut diagnostics, None);
     }
     diagnostics.sort_by_key(|d| d.span.map(|s| (s.start, s.end)));
     diagnostics
+}
+
+/// What std's plugin finds wrong with the places of the file that call the
+/// names it watches; a lone file has no group of blocks, so no state.
+fn watched_calls(
+    typing: &types::Typing,
+    expansion: Option<&plugin::expansion::Expansion>,
+    file: source::FileId,
+    watched: &types::Watched,
+) -> Vec<diagnostics::Diagnostic> {
+    let package = plugin::first_party::PACKAGE;
+    let Some(std) = plugin::first_party::plugin(package) else {
+        return Vec::new();
+    };
+    let sites = plugin::calls::placed_sites(&typing.call_sites, expansion, file);
+    plugin::calls::check_calls(std.as_ref(), package, watched, &sites, &[], file)
 }

@@ -15,9 +15,11 @@ mod enums;
 mod groups;
 mod published;
 mod results;
+mod watching;
 
 use published::Publications;
 use results::Results;
+pub(super) use watching::{Watchers, Watching};
 
 use super::{Loaded, Loader, Root};
 use crate::diagnostics::{Diagnostic, codes};
@@ -153,6 +155,7 @@ impl Loader<'_> {
         for (i, block) in editing {
             self.modules[i].editing.push(block);
         }
+        self.watchers = Watchers::new(self.watching(&mut plugins, &mut diagnostics));
         self.place_expanded(expanded, &mut diagnostics);
         self.diagnostics.extend(diagnostics);
     }

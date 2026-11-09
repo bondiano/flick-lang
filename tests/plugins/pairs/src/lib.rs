@@ -7,6 +7,8 @@
 //! stands for `(1.0 : String)`, an error in generated code; `coded { X001 }`
 //! refuses with the code its body names. `spin {}` never
 //! ends and `hog {}` takes all memory: the limits of a plugin's calls.
+//! The calls the package watches are in `check_calls`: `tally` counts from
+//! one and `boom` fails the plugin.
 //! `deriving Pairs.Arbitrary` is in `derive`, the heads that reach
 //! outside their blocks are in `reach`, and those that tell other modules
 //! about a name in `published`.
@@ -20,8 +22,8 @@ use std::hint::black_box;
 use std::path::Path;
 
 use flick_plugin::{
-    Arena, Artifact, Block, Builder, Compiler, DeriveTarget, Diagnostic, Edit, Fact, NodeId,
-    Plugin, Published, Span, Token, TokenKind, flick,
+    Arena, Artifact, Block, Builder, CallSite, Compiler, Constant, DeriveTarget, Diagnostic, Edit,
+    Fact, NodeId, Plugin, Published, Span, Token, TokenKind, flick,
 };
 
 pub struct Pairs;
@@ -235,6 +237,23 @@ impl Plugin for Pairs {
                 Diagnostic::error(format!("`_` is `{}`", f.ty.shown), f.span).with_code("X002")
             })
             .collect()
+    }
+
+    /// What the calls the package watches must hold: `tally` counts from
+    /// one, as `X005` at its argument. A call of `boom` fails the plugin.
+    fn check_calls(&self, calls: &[CallSite], _: &[u8]) -> Vec<Diagnostic> {
+        let mut found = Vec::new();
+        for call in calls {
+            assert!(call.name != "boom", "no calls");
+            let Some(argument) = call.arguments.first() else {
+                continue;
+            };
+            if !matches!(argument.constant, Some(Constant::Number(n)) if n > 0.0) {
+                let refusal = Diagnostic::error("`tally` counts from one", argument.span);
+                found.push(refusal.with_code("X005"));
+            }
+        }
+        found
     }
 
     fn derive(

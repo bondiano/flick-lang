@@ -1,8 +1,8 @@
 //! The trait a plugin implements: the exports of its component.
 
 use crate::{
-    Arena, Artifact, Block, Compiler, Completion, DeriveTarget, Diagnostic, Fact, Highlight, Hover,
-    Piece, Published, Span,
+    Arena, Artifact, Block, CallSite, Compiler, Completion, DeriveTarget, Diagnostic, Fact,
+    Highlight, Hover, Piece, Published, Span,
 };
 
 /// A plugin: what it learns from all its blocks of a group, and the code
@@ -111,6 +111,15 @@ pub trait Plugin {
     /// them. It only adds errors.
     fn check(&self, block: &Block, state: &[u8], facts: &[Fact]) -> Vec<Diagnostic> {
         let _ = (block, state, facts);
+        Vec::new()
+    }
+    /// What is wrong with the places of one module that call the names the
+    /// plugin's package declares in `watch`: `calls` are those places with
+    /// the types the checker found there, at spans of the module's own
+    /// file, and `state` is what `collect` learned from that module's
+    /// blocks, empty where it has none. It only adds errors.
+    fn check_calls(&self, calls: &[CallSite], state: &[u8]) -> Vec<Diagnostic> {
+        let _ = (calls, state);
         Vec::new()
     }
 }
