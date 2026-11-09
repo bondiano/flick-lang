@@ -14,6 +14,7 @@ bootstrap/app_fail
 bootstrap/debug
 bootstrap/hello
 bootstrap/stderr
+codegen/abi
 codegen/applicative_do
 codegen/call_site
 codegen/category_classes
@@ -100,6 +101,8 @@ runtime/settling_calls
 runtime/shared_layer
 runtime/slice
 runtime/supervisor_defect
+schema/derive
+schema/json_wire
 sql/queries
 stdlib/collections
 stdlib/effect/clock
@@ -137,7 +140,6 @@ ui/sync_for
 ui/wake_chain
 
 # Not yet, and why:
-# codegen/abi            its foreign fixture and `Schema` are on Effect
 # codegen/effect_abi     its foreign fixture runs an Effect
 # codegen/release        `spin` loops for ever in a `->{}` stage, which runs at once and cannot be interrupted: docs/formal/runtime.md#the-runtime-of-effect--rt
 # runtime/cause_laws     its properties need `Arbitrary`, on Effect; `cause_lists`, `closing_causes` and the kernel's unit tests cover the algebra

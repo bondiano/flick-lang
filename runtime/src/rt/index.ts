@@ -46,6 +46,13 @@ export { redactedMake, redactedReveal } from "./redacted.ts";
 export { loop, trampolineDone, trampolineRun, trampolineSuspend } from "./loop.ts";
 export { snapshot, snapshotDefault } from "./snapshot.ts";
 export {
+  codecDecodeResult, codecEncodeResult, codecJsonSchema, jsonParse, jsonStringify,
+  schemaAdtOf, schemaBigint, schemaBool, schemaCase, schemaField, schemaInt, schemaItem,
+  schemaJsonCodec, schemaLazyOf, schemaList, schemaLiterals, schemaNever, schemaNumber, schemaOpaque,
+  schemaOption, schemaRecordOf, schemaRecursive, schemaRedacted, schemaRefinedOf, schemaResult,
+  schemaString, schemaTupleOf, schemaUnboxed, schemaUnit, schemaUnknown, schemaValidate, schemaEnumTags,
+} from "./schema.ts";
+export {
   eqHashCanonical,
   eqHashWith,
   hashMapEmpty,
