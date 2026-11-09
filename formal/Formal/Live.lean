@@ -51,45 +51,48 @@ hole (`PresHdl.lean`) and of the run-time steps of handlers at the redex
   `Scope.run` that fact is *not* derivable: the constant's instance `ι` carries a
   qualifier `ι.C` that the subtype of its argument constrains only inside the
   parameter's own rows (`LeLive.arrow_use` gives `ofCaps C_f ⊆ ψ₀ ∪ ofCaps ι.C`, not
-  `⊆ ψ₀`), and `Const.ok` says nothing of `.scopeRun`.
+  `⊆ ψ₀`), and `Const.ok` said nothing of `.scopeRun` before rule 2 below.
 
-Two rule-level changes close the port. Both are contract changes to the live instance
-rather than proof steps, and the first one is in the rules:
+Three rule-level changes close the port. They are contract changes to the live instance
+rather than proof steps; the capture instance is unchanged by each of them:
 
 1. A run-time form of a handler states that its own region is live. `hwith` and `hctl`
-   take `(mode = .live → φ.svc (.atm (.r p)))`. That is all: `hdone` already carries the
-   atom in `mode.use φ (Ty.rg p).reach`, and a step that builds an `hdone`, `hkeep` or
-   `unw` form reads it off the form it replaces. `hwith_catch` then needs no other
-   premise, and `hctlSignal`/`hctlDisc` pass the atom from the `hctl` they invert. The
+   take `(mode = .live → φ.svc (.atm (.r p)))`. `hdone` already carries the atom in
+   `mode.use φ (Ty.rg p).reach`, and a step that builds an `hdone`, `hkeep` or `unw` form
+   reads it off the form it replaces. `hwith_catch` then needs no other premise. The
    premise is dischargeable where a handler is installed: `hdl_install` types the new
    `hwith` at the stage of the `inside` body, which holds `Row.scope (.rg n)` and stays
    below that frame's bound. The cell it allocates keeps its old type: the atom lives in
-   the *stage* of the form, not in the row the cell's arrow names, so the cell type stays
-   free of the region and `Ty.YF` of the new cell is unchanged.
-2. A scope declares what its body uses: extend `Const.ok Θ .scopeRun ι .live` with
-   `Row.sub (Row.ofCaps ι.C) (Row.union (Row.scope ι.s) (Row.union ι.r (Row.obs ι.r ι.s)))`,
-   the row that bounds the desugared body. The checker chooses `ι` from the argument's
-   type, so this asks the same of a program that the `scope` rule asks of its body.
+   the *stage* of the form, not in the row the cell's arrow names.
+2. A scope declares what its body uses: `Const.ok Θ .scopeRun ι .live` is
+   `Row.Sub (Row.ofCaps ι.C) ι.r`. The row bounding the desugared body is
+   `Scope s ∪ r ∪ obs r s`; the qualifier of a function outside the binder cannot name
+   `s`, and `obs` holds no atom, so this is exactly what that bound asks of the qualifier
+   (`scopeRun_body`). `LiveRules.lean` checks that it rejects a qualifier the rows do not
+   cover.
+3. A resumed body is typed where its handler's region is live. `hres` types its body at
+   `mode.use (.rt r ε) (Ty.rg p).reach`, as the hole of its arm already is, and asks
+   `C' (.r p)` of the cell of `resume` (which `hctl` supplies). The `hresB` frame provides
+   that region's atom like `hctlA` and `hdone` (`Frame.rgn`). Without it `resume` puts an
+   `hwith p` under a stage without the atom of `p`, which rule 1 forbids.
 
-What remains is preservation of the store steps and at a context (`PresRt.lean`,
-`Preservation.lean`), the invariant itself and `T4'_live`. Porting `rt_preservation` to
-`TypM` is a mechanical transform except for sites that invert `mode.subtype` by `cases`,
-which does not reduce a mode-indexed def. Three of them go through by naming the fact in
-place of the case split (`TypingMode.subtype.eq_ref` and `eq_ref_left` at `refMake`,
-`refGet`, `refSet`, `eq_base_left` at `refSet`, and `inst_mode` for the pattern lemmas);
-what is left of the port is:
+With them, preservation of every step holds for both instances (`rt_preservation_mode`,
+`preservation`), and so does type soundness: `T1_live` is `T1` of `TypM S .live`. Its one
+extra premise is `RootBelow root`: typing by use does not bound what a value holds by its
+type, so that the roots name no run-time region cannot be read off `RootTyM`.
 
-* the `await` step, whose comparison of rows `r ⊆ r'`, `ε ⊆ ε'` reads out of the rows of
-  a `mode.subtype (.eff r ε t C) (.eff r' ε' t' C')` the way `Stage.rt_sub` wants it,
-* the `try` step, whose body is typed under an `all` whose subtype has no mode-generic
-  inversion yet, and `.instantiate` under a store,
-* the `open_` and `op` steps: `Const.ty` matches on the mode, so with `mode` a variable
-  its type does not reduce to an arrow and the case has to split on the mode first.
-
-Neither the examples nor the existing captures proofs establish the invariant.
-Translation of live signature elision into the core judgment is a separate remaining
-obligation.
-
+What remains is the invariant that replaces `Nest` and `T4'_live`. `Nest` bounds what each
+thread *names* (`Within`), which the live discipline gives up, so the invariant cannot be
+ported; it has to be built from stages: every region atom of the stage of a hole of a thread
+is live, and so is the region of every `inside` form of a thread. Rules 1 and 3 put the atom
+of a handler's region in the stage of its run-time forms for exactly this. The open part is
+work a child keeps: `withs` puts `hkeep q` frames around a child of an owner `p`, and the
+invariant needs `q` live while `p` is, which the live rules state only as
+`TypingMode.live.keep` (atoms of the row outlive the owner) over the facts of the context.
+That those facts hold of the order in which regions close is what `Nest` proves through
+`Within`; the live invariant must prove it without bounding names. Neither the examples nor
+the existing captures proofs establish the invariant. Translation of live signature elision
+into the core judgment is a separate remaining obligation.
 T4.2 matters beyond safety: the runtime contract (`Formal/RT/`) takes only T4.3 (as `G11`),
 so giving T4.2 up does not touch T5; what it costs is that a value may keep a closed
 capability reachable (memory, not use).

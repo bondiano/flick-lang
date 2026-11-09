@@ -207,4 +207,16 @@ example : ¬ TypingMode.live.keep Facts.none (fun x => x = .rv (.v 0)) (.rg 1) :
   · cases h
   · exact h.elim
 
+/-- `Scope.run` of a function whose qualifier names a region not in the rows around the scope
+is rejected in the live discipline; the capture discipline asks nothing of the constant. -/
+example : ¬ Const.ok Facts.none .scopeRun { (default : CArg) with C := fun a => a = .r 0 } .live :=
+  fun h => h (.atm (.r 0)) rfl
+
+example : Const.ok Facts.none .scopeRun
+    { (default : CArg) with C := fun a => a = .r 0, r := Row.ofCaps fun a => a = .r 0 } .live :=
+  fun _ h => h
+
+example : Const.ok Facts.none .scopeRun { (default : CArg) with C := fun a => a = .r 0 } .captures :=
+  trivial
+
 end Flick.LiveChecks
