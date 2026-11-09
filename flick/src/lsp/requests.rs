@@ -336,9 +336,11 @@ fn in_comment_or_string(text: &str, cursor: usize) -> bool {
         K::BlockComment => {
             t.start < cursor && (cursor < t.end || !text[..t.end as usize].ends_with("*/"))
         }
-        K::String => {
+        K::String | K::StringEnd => {
             t.start < cursor && (cursor < t.end || !closed(&text[t.start as usize..t.end as usize]))
         }
+        // the text before the `\{` of a hole
+        K::StringStart | K::StringMid => t.start < cursor && cursor <= t.end - 2,
         _ => false,
     })
 }
@@ -390,4 +392,21 @@ fn changes(sources: &SourceMap, edits: &[Edit]) -> serde_json::Map<String, Value
             .push(json!({ "range": range, "newText": edit.replacement }));
     }
     changes
+}
+
+#[cfg(test)]
+mod tests {
+    use super::in_comment_or_string;
+
+    #[test]
+    fn the_text_of_a_string_with_holes_is_not_code() {
+        let text = r#"let s = "ab \{name} cd \{x} ef""#;
+        let at = |s: &str| text.find(s).expect("in text");
+        assert!(in_comment_or_string(text, at("b ")));
+        assert!(in_comment_or_string(text, at(" cd") + 2));
+        assert!(in_comment_or_string(text, at(" ef") + 2));
+        assert!(!in_comment_or_string(text, at("name") + 2));
+        assert!(!in_comment_or_string(text, at("x}") + 1));
+        assert!(!in_comment_or_string(text, text.len()));
+    }
 }

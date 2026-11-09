@@ -47,6 +47,32 @@ fn errors(src: &str) -> Vec<String> {
 }
 
 #[test]
+fn strings_with_holes() {
+    assert_eq!(
+        sexp(r#"let s = f "a\{x + 1}b\{g "\{y}"}c" z"#),
+        "(LetDecl let (VarPat s) = (Block (AppExpr (NameExpr f) (InterpExpr \"a\\{ \
+         (BinExpr (NameExpr x) + (Literal 1)) }b\\{ (AppExpr (NameExpr g) (InterpExpr \"\\{ \
+         (NameExpr y) }\")) }c\") (NameExpr z))))"
+    );
+    assert_eq!(errors("let s = \"a\\{x\nlet t = 1"), ["FLICK-S004 \\{"]);
+    assert_eq!(errors("let s = \"a\\{}\""), ["FLICK-S007 }\""]);
+    // the hole left open is the one reported
+    assert_eq!(
+        errors("let s = \"a\\{x}b\\{y\nlet t = 1"),
+        ["FLICK-S004 \\{"]
+    );
+    assert_eq!(
+        parse_str("let s = \"a\\{x}b\\{y\nlet t = 1").diagnostics[0]
+            .span
+            .expect("span")
+            .start,
+        15
+    );
+    // a message with holes is refused, not taken for an argument
+    assert_eq!(errors(r#"let f n = todo "a\{n}""#), [r#"FLICK-S005 "a\{"#]);
+}
+
+#[test]
 fn operator_precedence_and_associativity() {
     assert_eq!(
         sexp("let x = a |> f || b && c == d ++ e + g * h ** i ** j"),

@@ -37,6 +37,17 @@ pub fn fold(e: &mut Expr) -> bool {
             {
                 constant(arg).and_then(|c| show(name, c)).map(Const::String)
             }
+            ExprKind::Method {
+                dict: Dict::Instance { module, name, args },
+                name: method,
+            } if *module == lang::item(Lang::Instances).module
+                && args.is_empty()
+                && *method == lang::item(Lang::DisplayMethod).name =>
+            {
+                constant(arg)
+                    .and_then(|c| display(name, c))
+                    .map(Const::String)
+            }
             _ => None,
         },
         ExprKind::If(c, t, f) => match constant(c) {
@@ -75,6 +86,17 @@ fn show(instance: &str, c: Const) -> Option<String> {
         ("Show String", Const::String(s)) => json_string(&s),
         _ => return None,
     })
+}
+
+/// `display` of a built-in instance as its runtime method spells it.
+fn display(instance: &str, c: Const) -> Option<String> {
+    match (instance, c) {
+        ("Display String", Const::String(s)) => Some(s),
+        ("Display Float", c) => show("Show Float", c),
+        ("Display Int", c) => show("Show Int", c),
+        ("Display Bool", c) => show("Show Bool", c),
+        _ => None,
+    }
 }
 
 /// JS `String(x)`, but `-0` for negative zero like the runtime `show`.

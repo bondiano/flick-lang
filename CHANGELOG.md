@@ -6,6 +6,13 @@ break programs.
 
 ## Unreleased
 
+- **Holes in strings:** `"n = \{n + 1}"` is `"n = " ++ display (n + 1)`, through
+  the new Prelude class `Display`: a `String` is itself, without the quotes of
+  `show`, and `Int`, `Float` and `Bool` are spelled as `show` spells them. A
+  hole ends on the line of its string and may nest strings with holes. Raw
+  strings have no holes, `\{` in a multi-line string is `FLICK-S005`, and the
+  release optimizer folds the constant parts into one string. `\{` was an
+  invalid escape before, so no program changes its meaning.
 - **Plugins check calls:** a library whose `[package]` says
   `watch = ["Ui.Event.queue", "*.parse"]` beside its `plugin` gets, through the
   new `check-calls`, every place of a checked module that applies one of those

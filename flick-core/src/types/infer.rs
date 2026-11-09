@@ -219,6 +219,7 @@ impl Checker<'_> {
                 token => literal_type(token.map(|t| t.kind)),
             },
             K::NameExpr => self.name(node),
+            K::InterpExpr => self.interpolation(node),
             K::ParenExpr => self.infer(children[0]),
             K::UnitExpr => Type::lang(Lang::Unit),
             K::TupleExpr => {

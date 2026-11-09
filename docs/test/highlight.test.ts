@@ -91,3 +91,36 @@ test("the two parts of an arrow's row have their own scopes, and names in them k
     highlighter.dispose();
   }
 });
+
+test("a hole of a string is code, and a brace in it does not close the hole", async () => {
+  const highlighter = await createHighlighterCore({
+    engine: createJavaScriptRegexEngine(),
+    themes: [],
+    langs: [{ ...grammar, name: "flick" }],
+  });
+  try {
+    const language = highlighter.getLanguage("flick");
+    const line = 'let s = "total \\{sum { a = 1 }.a} for \\{"x"} done"';
+    const { tokens } = language.tokenizeLine(line, null);
+    const scopes = (word: string): readonly string[] => {
+      const start = line.indexOf(word);
+      assert.ok(start >= 0, word);
+      return tokens.find((token) => token.startIndex <= start && start < token.endIndex)?.scopes ?? [];
+    };
+    assert.ok(scopes("total").includes("string.quoted.double.flick"));
+    assert.ok(!scopes("total").includes("meta.interpolation.flick"));
+    assert.ok(scopes("\\{sum").includes("punctuation.section.interpolation.begin.flick"));
+    assert.ok(scopes("sum").includes("meta.interpolation.flick"));
+    assert.ok(scopes(".a}").includes("meta.interpolation.flick"));
+    assert.ok(scopes(" for").includes("string.quoted.double.flick"));
+    assert.ok(!scopes(" for").includes("meta.interpolation.flick"));
+    assert.ok(scopes("done").includes("string.quoted.double.flick"));
+    assert.ok(!scopes("done").includes("meta.interpolation.flick"));
+    // a hole left open ends with its line, as the compiler reads it
+    const open = language.tokenizeLine('let s = "a \\{b', null);
+    const next = language.tokenizeLine("let t = 1", open.ruleStack);
+    assert.ok(next.tokens.every((token) => !token.scopes.includes("string.quoted.double.flick")));
+  } finally {
+    highlighter.dispose();
+  }
+});

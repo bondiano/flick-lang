@@ -69,6 +69,11 @@ def «show» («show» string : Nat) : Scheme :=
   ⟨1, [⟨«show», [.var 0]⟩],
     .arr .P (.var 0) (.con string) .cnil, .cnil⟩
 
+/-- `Prelude.display : forall a. Display a => a -> String` -/
+def display (display string : Nat) : Scheme :=
+  ⟨1, [⟨display, [.var 0]⟩],
+    .arr .P (.var 0) (.con string) .cnil, .cnil⟩
+
 /-- `Prelude.map : forall f c d a b. Functor f => (forall v. a^v -> b)^c -> ((f a)^d -> (f b)^(c + d))^{c}` -/
 def map (functor : Nat) : Scheme :=
   ⟨5, [⟨functor, [.var 0]⟩],

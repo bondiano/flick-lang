@@ -273,3 +273,25 @@ server fn ping n = n
   (identifier)
   (operator)
   (identifier))
+
+==================
+Interpolation
+==================
+
+let s = "a \{f { x = "\{y}" }} \n b"
+
+---
+
+(source_file
+  (keyword)
+  (identifier)
+  (operator)
+  (string
+    (interpolation
+      (identifier)
+      (braces
+        (identifier)
+        (operator)
+        (string
+          (interpolation
+            (identifier)))))))

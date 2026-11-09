@@ -1,0 +1,28 @@
+module App.Interpolation exposing (..)
+
+type Shape = Circle
+
+let shape = "shape: \{Circle}"
+
+let open_hole = "open \{1 + 2
+let after = 1
+
+let multi_line = """
+  multi \{1}
+  """
+
+let in_pattern s =
+  match s with
+  | "x\{1}" -> 1
+  | _ -> 2
+
+let empty = "empty \{}"
+
+let unfinished n = todo "later \{n}"
+
+//~ FLICK-C001 @5:21-5:29 no instance for `Display Shape`
+//~ FLICK-S004 @7:23-7:25 unterminated `\{`: missing `}` on the line of the string
+//~ FLICK-S005 @11:9-11:11 `\{…}` interpolates only in a one-line string
+//~ FLICK-S007 @16:5-16:9 expected a pattern
+//~ FLICK-S007 @19:22-19:24 expected an expression
+//~ FLICK-S005 @21:25-21:34 the message of `todo` is a string without

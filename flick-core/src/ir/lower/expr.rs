@@ -61,6 +61,7 @@ impl Lower<'_> {
                 return self.generic_literal(node, span);
             }
             K::Literal => ExprKind::Lit(self.literal(node)),
+            K::InterpExpr => return self.interpolation(node),
             K::UnitExpr => ExprKind::Lit(Lit::Unit),
             // the checker resolved `server name` to the implementation
             K::NameExpr => return self.name(node),

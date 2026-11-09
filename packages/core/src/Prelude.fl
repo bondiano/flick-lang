@@ -130,6 +130,12 @@ class Show a =
   @lang show_method
   show : a -> String
 
+/// Values as a reader sees them, what a hole `\{e}` of a string holds: a
+/// `String` is itself, without the quotes of `show`.
+class Display a =
+  @lang display_method
+  display : a -> String
+
 /// Containers whose elements a pure function maps. A container may apply
 /// the function later, so the result keeps the captures of both.
 class Functor (f : Type -> Type) =

@@ -46,9 +46,23 @@
           "name": "string.quoted.double.flick",
           "begin": "\"",
           "end": "\"|$",
-          "patterns": [{ "include": "#escapes" }]
+          "patterns": [{ "include": "#interpolation" }, { "include": "#escapes" }]
         }
       ]
+    },
+    "interpolation": {
+      "name": "meta.interpolation.flick",
+      "begin": "\\\\\\{",
+      "beginCaptures": { "0": { "name": "punctuation.section.interpolation.begin.flick" } },
+      "end": "\\}|$",
+      "endCaptures": { "0": { "name": "punctuation.section.interpolation.end.flick" } },
+      "contentName": "source.flick.embedded",
+      "patterns": [{ "include": "#interpolation-braces" }, { "include": "$self" }]
+    },
+    "interpolation-braces": {
+      "begin": "\\{",
+      "end": "\\}|$",
+      "patterns": [{ "include": "#interpolation-braces" }, { "include": "$self" }]
     },
     "escapes": {
       "patterns": [

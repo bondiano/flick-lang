@@ -3,6 +3,7 @@
 (block_comment) @comment
 
 [(string) (raw_string) (multiline_string)] @string
+(interpolation ["\\{" "}"] @punctuation.special)
 (number) @number
 (boolean) @boolean
 

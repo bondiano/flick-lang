@@ -153,6 +153,18 @@ instance Show String =
 instance Show Bool =
   let show x = show_prim x
 
+instance Display String =
+  let display x = x
+
+instance Display Int =
+  let display x = show_prim x
+
+instance Display Float =
+  let display x = show_prim x
+
+instance Display Bool =
+  let display x = show_prim x
+
 instance Show Unit =
   let show _x = "()"
 

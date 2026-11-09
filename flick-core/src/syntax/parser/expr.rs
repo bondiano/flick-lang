@@ -190,6 +190,7 @@ pub(super) fn at_arg_start(p: &Parser) -> bool {
         | K::Number
         | K::BigInt
         | K::String
+        | K::StringStart
         | K::TrueKw
         | K::FalseKw
         | K::LParen
@@ -267,7 +268,21 @@ pub(super) fn con_path(p: &mut Parser) {
 /// `todo` and the string that says what it stands for.
 fn todo(p: &mut Parser) -> K {
     p.bump();
-    p.eat(K::String);
+    if p.current() == K::StringStart {
+        // the message is known when the program is built
+        let start = p.raw();
+        let span = p.span(start.start, start.end);
+        p.error_at(
+            codes::S005,
+            span,
+            "the message of `todo` is a string without `\\{…}`".into(),
+        );
+        let m = p.start();
+        let kind = interpolation(p);
+        p.complete(m, kind);
+    } else {
+        p.eat(K::String);
+    }
     K::TodoExpr
 }
 
@@ -287,6 +302,7 @@ fn atom(p: &mut Parser) -> Option<Done> {
             p.bump();
             K::Literal
         }
+        K::StringStart => interpolation(p),
         K::TodoKw => todo(p),
         K::LParen => paren(p),
         K::LBracket => {
@@ -329,6 +345,38 @@ fn atom(p: &mut Parser) -> Option<Done> {
         }
     };
     Some(p.complete(m, kind))
+}
+
+/// `"text \{e} text"`: the parts of the string around expressions, each
+/// in a hole on the line of the string.
+fn interpolation(p: &mut Parser) -> K {
+    let mut opener = p.raw();
+    p.bump();
+    p.push(super::Ctx::Bracket);
+    loop {
+        expr(p);
+        match p.raw().kind {
+            K::StringMid => {
+                opener = p.raw();
+                p.bump();
+            }
+            K::StringEnd => {
+                p.bump();
+                break;
+            }
+            _ => {
+                let span = p.span(opener.end - 2, opener.end);
+                p.error_at(
+                    codes::S004,
+                    span,
+                    "unterminated `\\{`: missing `}` on the line of the string".into(),
+                );
+                break;
+            }
+        }
+    }
+    p.pop();
+    K::InterpExpr
 }
 
 fn head_without_braces(p: &mut Parser, head: fn(&mut Parser)) {

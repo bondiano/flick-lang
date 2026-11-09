@@ -33,7 +33,9 @@ parameters and has no `=`.
 `Prelude` declares `Eq`, `Ord` (`compare : a -> a -> Ordering`, with
 `type Ordering = LT | EQ | GT`), `Hash` and `Show`, with instances for the
 built-in types, `List`, `Option` and `Result`; `Ref` has `Eq` (the same
-cell) but no `Hash`.
+cell) but no `Hash`. `Display` (`display : a -> String`) is what a hole
+`\{e}` of a string inserts, with instances for `String`, `Int`, `Float` and
+`Bool`.
 
 ## Instances
 

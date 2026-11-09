@@ -19,6 +19,9 @@ let strings = [
     """,
 ]
 
+interpolated : Float -> String
+let interpolated x = "x = \{x}, \{"nested \{x + 1}"} and \{{ a = 1 }.a}"
+
 precedence : Float -> Bool
 let precedence x = -x ** 2 + 3 * x - 1 > 0 && not (x == 1) || x >= 10
 

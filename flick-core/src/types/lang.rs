@@ -141,6 +141,7 @@ lang_items! {
     Nothing = "nothing",
     Iter = "iter",
     ShowMethod = "show_method",
+    DisplayMethod = "display_method",
     Add = "add",
     Sub = "sub",
     Mul = "mul",
