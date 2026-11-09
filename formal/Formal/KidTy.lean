@@ -6,16 +6,52 @@ import Formal.KidRow
 
 namespace Flick
 
-variable {S : Sig} {Ψ : List Ty}
+variable {S : Sig} {mode : TypingMode} {Ψ : List Ty}
+
+theorem TypingMode.dom_nonatm {mode : TypingMode} {F : Frame} {y : Elem} (hy : ∀ a, y ≠ .atm a)
+    (h : mode.dom F y) : F.dom y := by
+  cases mode with
+  | captures => exact h
+  | live =>
+    rcases h with h | ⟨_, -, rfl⟩
+    · exact h
+    · exact (hy _ rfl).elim
+
+/-- A use stage adds only region atoms to the row it uses. -/
+theorem TypingMode.use_le_rows {mode : TypingMode} {r ε r' ε' : Row} {C C' : Caps}
+    (h : (mode.use (.rt r ε) C).le (mode.use (.rt r' ε') C')) :
+    ∀ y, (∀ a, y ≠ .atm a) → r y → r' y := by
+  intro y hy hr
+  cases mode with
+  | captures => exact h.1 y hr
+  | live =>
+    rcases h.1 y (.inl hr) with h' | h'
+    · exact h'
+    · cases y with
+      | atm a => exact (hy a rfl).elim
+      | _ => exact h'.elim
+
+theorem TypingMode.use_eq_rows {mode : TypingMode} {r ε R ε' : Row} {C : Caps}
+    (h : mode.use (.rt r ε) C = .rt R ε') : ∀ y, (∀ a, y ≠ .atm a) → R y → r y := by
+  intro y hy hR
+  cases mode with
+  | captures => simp only [TypingMode.use, Stage.rt.injEq] at h; obtain ⟨rfl, -⟩ := h; exact hR
+  | live =>
+    simp only [TypingMode.use, Stage.rt.injEq] at h; obtain ⟨rfl, -⟩ := h
+    rcases hR with h | h
+    · exact h
+    · cases y with
+      | atm a => exact (hy a rfl).elim
+      | _ => exact h.elim
 
 /-- The work of a child in the handlers of its context. -/
 theorem withs_typing {x r : Tm} {o : Nat}
-    (mk : ∀ {Θ' t' φ'}, Typ S Ψ Θ' [] r (.ex t' φ') → Entails Θ' Facts.age →
-      ∃ tx R εx, Typ S Ψ Facts.age [] x (.ex tx (.rt R εx)) ∧ KidRow S o φ' [] R)
-    (hnp : ∀ {Ψ' Θ' t'}, ¬ Typ S Ψ' Θ' [] r (.ex t' .pure)) (hv : ¬ Value r) :
+    (mk : ∀ {Θ' t' φ'}, TypM S mode Ψ Θ' [] r (.ex t' φ') → Entails Θ' Facts.age →
+      ∃ tx R εx, TypM S mode Ψ Facts.age [] x (.ex tx (.rt R εx)) ∧ KidRow S o φ' [] R)
+    (hnp : ∀ {Ψ' Θ' t'}, ¬ TypM S mode Ψ' Θ' [] r (.ex t' .pure)) (hv : ¬ Value r) :
     ∀ (E : List Frame) {b : Nat} {Θ : Facts} {t : Ty} {φ : Stage}, OkE E →
-      Typ S Ψ Θ [] (plug E r) (.ex t φ) → Entails Θ Facts.age → AscE b E →
-      ∃ t' R' ε', Typ S Ψ Facts.age [] (withs o E x) (.ex t' (.rt R' ε')) ∧ KidRow S o φ E R' := by
+      TypM S mode Ψ Θ [] (plug E r) (.ex t φ) → Entails Θ Facts.age → AscE b E →
+      ∃ t' R' ε', TypM S mode Ψ Facts.age [] (withs o E x) (.ex t' (.rt R' ε')) ∧ KidRow S o φ E R' := by
   refine list_rev_ind ?_ ?_
   · intro b Θ t φ _ h hΘ _
     exact mk h hΘ
@@ -28,9 +64,9 @@ theorem withs_typing {x r : Tm} {o : Nat}
     rw [withs_append]
     have mem : ∀ {p}, .inside p ∈ E₀ → .inside p ∈ E₀ ++ [G] := fun h => List.mem_append_left _ h
     have mem' : ∀ {F}, F ∈ E₀ → F ∈ E₀ ++ [G] := fun h => List.mem_append_left _ h
-    have nopure : ∀ {k Θ' t'}, ¬ Typ S (Ψ.map (Ty.up k)) Θ' [] (plug E₀ r) (.ex t' .pure) := by
+    have nopure : ∀ {k Θ' t'}, ¬ TypM S mode (Ψ.map (Ty.up k)) Θ' [] (plug E₀ r) (.ex t' .pure) := by
       intro k Θ' t' h'
-      obtain ⟨_, _, _, _, hr, rel, _⟩ := ctx_typing _ hE₀ hv h'
+      obtain ⟨_, _, _, _, hr, rel, _⟩ := ctx_typing_mode _ hE₀ hv h'
       exact hnp (rel.pure rfl ▸ hr)
     cases G with
     | hwith q ℓ E' al rf =>
@@ -94,36 +130,37 @@ theorem withs_typing {x r : Tm} {o : Nat}
             · exact .inr (.inr ⟨F, mem' hF', x⟩)
       | errVal hv' | allI hv' => exact (not_value_plug hnv _ hv').elim
     | _ =>
-      obtain ⟨k, Θ', t₁, φ₁, h₁, rel, hk, -⟩ := frame_typing hnv _ hG h
+      obtain ⟨k, Θ', t₁, φ₁, h₁, rel, hk, -⟩ := frame_typing_mode hnv _ hG h
       rcases hk with rfl | ⟨rfl, -, hΘ'⟩
       · exact (nopure h₁).elim
       · rw [hΘ' (fun h => h.elim)] at h₁
         simp only [List.map_up_zero] at h₁
         obtain ⟨t', R', ε', hw, h1, h2⟩ := ih hE₀ h₁ hΘ hA₀
-        have up : ∀ y, φ₁.svc y → φ.svc y := fun y h' =>
+        have up : ∀ y, φ₁.svc y → (∀ a, y ≠ .atm a) → φ.svc y := fun y h' hy =>
           (rel.svc _ h').resolve_right fun h₂ => by
-            cases y <;> simp [Frame.dom, Frame.installs] at h₂
+            have h₃ := TypingMode.dom_nonatm hy h₂
+            cases y <;> simp [Frame.dom, Frame.installs] at h₃
         refine ⟨t', R', ε', hw, fun N a hy => ?_, fun N hy => ?_⟩
         · rcases h1 N a hy with h' | ⟨p, rfl, hp⟩ | ⟨F, hF', x⟩
-          · exact .inl (up _ h')
+          · exact .inl (up _ h' fun _ h => by cases h)
           · exact .inr (.inl ⟨p, rfl, mem hp⟩)
           · exact .inr (.inr ⟨F, mem' hF', x⟩)
         · obtain ⟨a₁, a₂⟩ := h2 N hy
           refine ⟨?_, ?_⟩
           · rcases a₁ with a₁ | ⟨hn, F, hF', hI⟩
-            · exact .inl (up _ a₁)
+            · exact .inl (up _ a₁ fun _ h => by cases h)
             · exact .inr ⟨hn, F, mem' hF', hI⟩
           · rcases a₂ with h₂ | h₂ | ⟨F, hF', x⟩
-            · exact .inl (up _ h₂)
+            · exact .inl (up _ h₂ fun _ h => by cases h)
             · exact .inr (.inl (mem h₂))
             · exact .inr (.inr ⟨F, mem' hF', x⟩)
 
 /-- The work a finalizer or a child is given, awaited: its obligations are in the
 stage of the registration (regions.md §2.7). -/
 theorem fin_await {Θ : Facts} {c : Const} {p : Nat} {w : Tm} {T : Ty} {φ : Stage}
-    (h : Typ S Ψ Θ [] (.app (.app (.const c) (.own p)) w) (.ex T φ))
+    (h : TypM S mode Ψ Θ [] (.app (.app (.const c) (.own p)) w) (.ex T φ))
     (hc : c = .addFin ∨ c = .spawn) (hΘ : Entails Θ Facts.age) (hv : Value w) :
-    ∃ tx R εx, Typ S Ψ Facts.age [] (.await w) (.ex tx (.rt R εx)) ∧ KidRow S p φ [] R := by
+    ∃ tx R εx, TypM S mode Ψ Facts.age [] (.await w) (.ex tx (.rt R εx)) ∧ KidRow S p φ [] R := by
   cases h with
   | app hf hw hψ _ =>
     cases hf with
@@ -133,43 +170,52 @@ theorem fin_await {Θ : Facts} {c : Const} {p : Nat} {w : Tm} {T : Ty} {φ : Sta
       | const hok hT' =>
         rcases hc with rfl | rfl
         · obtain ⟨_, _, _, _, h, la₀, _, lt, -⟩ := hT'.arrow_left
-          cases h; cases la₀
-          obtain ⟨q, hq, hs⟩ := canonical_owner .own ho
+          cases h; cases TypingMode.subtype.eq_owner la₀
+          obtain ⟨q, hq, hs⟩ := canonical_owner_mode .own ho
           cases hq
           obtain ⟨_, _, _, _, h, la, lφ, _, -⟩ := (lt.trans hT₁).arrow_left
           cases h
-          obtain ⟨r', e', t', C', rfl, hr', -, -, -⟩ := la.eff_right
-          have up := fun y h => Stage.le_svc (Stage.le_trans lφ hψ) y h
-          refine ⟨_, _, _, .await ((hw.valueAny hv _).cut hΘ) (Stage.le_refl _) .refl,
-            fun N a ha => .inl (up _ (.inr (.inl (hr' _ ha)))), fun N ha => ⟨.inl (up _ (.inr (.inl (hr' _ ha)))),
-              .inl (up _ (.inr (.inr ⟨hr' _ ha, by rw [hs]; rfl⟩)))⟩⟩
+          obtain ⟨r', e', t', C', rfl, hle, -, -⟩ := TypingMode.subtype.eff_right_mode la
+          obtain ⟨R, ε, hR⟩ := TypingMode.use_rt (mode := mode) r' e' C'
+          have hr' := fun (y : Elem) (hy : ∀ a, y ≠ .atm a) (h : R y) =>
+            TypingMode.use_le_rows hle y hy (TypingMode.use_eq_rows hR y hy h)
+          have up := fun y h => Stage.le_svc (Stage.le_trans (TypingMode.le_use mode _ _)
+            (Stage.le_trans lφ hψ)) y h
+          have hk : TypM S mode Ψ Facts.age [] (.await w) (.ex t' (.rt R ε)) := by
+            rw [← hR]; exact .await ((hw.valueAny hv _).cut hΘ) (Stage.le_refl _) TypingMode.subtype.refl
+          refine ⟨_, R, ε, hk, fun N a ha => .inl (up _ (.inr (.inl (hr' _ (fun _ h => by cases h) ha)))),
+            fun N ha => ⟨.inl (up _ (.inr (.inl (hr' _ (fun _ h => by cases h) ha)))),
+              .inl (up _ (.inr (.inr ⟨hr' _ (fun _ h => by cases h) ha, by rw [hs]; rfl⟩)))⟩⟩
         · obtain ⟨_, _, _, _, h, la₀, _, lt, -⟩ := hT'.arrow_left
-          cases h; cases la₀
-          obtain ⟨q, hq, hs⟩ := canonical_owner .own ho
+          cases h; cases TypingMode.subtype.eq_owner la₀
+          obtain ⟨q, hq, hs⟩ := canonical_owner_mode .own ho
           cases hq
           obtain ⟨_, _, _, _, h, la, lφ, _, -⟩ := (lt.trans hT₁).arrow_left
           cases h
-          obtain ⟨r', e', t', C', rfl, hr', -, -, -⟩ := la.eff_right
-          have up := fun y h => Stage.le_svc (Stage.le_trans lφ hψ) y h
-          have inr : ∀ y, r' y → (∃ a, y = .atm a) ∨ _ := fun y h => (hr' y h).imp
-            (fun h' => by cases y <;> simp_all [Row.scope, Row.ofCaps]) id
-          refine ⟨_, _, _, .await ((hw.valueAny hv _).cut hΘ) (Stage.le_refl _) .refl,
-            fun N a ha => ?_, fun N ha => ?_⟩
-          · rcases inr _ ha with ⟨_, h'⟩ | h'
-            · cases h'
+          obtain ⟨r', e', t', C', rfl, hle, -, -⟩ := TypingMode.subtype.eff_right_mode la
+          obtain ⟨R, ε, hR⟩ := TypingMode.use_rt (mode := mode) r' e' C'
+          have hr' := fun (y : Elem) (hy : ∀ a, y ≠ .atm a) (h : R y) =>
+            TypingMode.use_le_rows hle y hy (TypingMode.use_eq_rows hR y hy h)
+          have up := fun y h => Stage.le_svc (Stage.le_trans (TypingMode.le_use mode _ _)
+            (Stage.le_trans lφ hψ)) y h
+          have hk : TypM S mode Ψ Facts.age [] (.await w) (.ex t' (.rt R ε)) := by
+            rw [← hR]; exact .await ((hw.valueAny hv _).cut hΘ) (Stage.le_refl _) TypingMode.subtype.refl
+          refine ⟨_, R, ε, hk, fun N a ha => ?_, fun N ha => ?_⟩
+          · rcases hr' _ (fun _ h => by cases h) ha with h' | h'
+            · simp [Row.scope, Row.ofCaps] at h'
             · exact .inl (up _ (.inl h'))
-          · rcases inr _ ha with ⟨_, h'⟩ | h'
-            · cases h'
+          · rcases hr' _ (fun _ h => by cases h) ha with h' | h'
+            · simp [Row.scope, Row.ofCaps] at h'
             · exact ⟨.inl (up _ (.inl h')), .inl (up _ (.inr ⟨h', by rw [hs]; rfl⟩))⟩
   | errVal hv' | allI hv' => exact (fin_not_value hc hv').elim
 
 /-- An operation at the hole of a context that no frame answers has its effect in the stage of
 the context: a handler without an arm for it leaves its effect in the row outside. -/
 theorem perform_out {Ef o : Name} {c : OpClass} {r : Tm}
-    (hask : ∀ {Ψ' Θ' t' φ'}, Typ S Ψ' Θ' [] r (.ex t' φ') → φ'.svc (.nm Ef)) (hv : ¬ Value r)
+    (hask : ∀ {Ψ' Θ' t' φ'}, TypM S mode Ψ' Θ' [] r (.ex t' φ') → φ'.svc (.nm Ef)) (hv : ¬ Value r)
     (hop : ∃ a b, S.op Ef o = some (c, a, b)) :
     ∀ (E : List Frame) {Ψ : List Ty} {Θ : Facts} {t : Ty} {φ : Stage}, OkE E →
-      (∀ F ∈ E, F.handles Ef o c = none) → Typ S Ψ Θ [] (plug E r) (.ex t φ) → φ.svc (.nm Ef) := by
+      (∀ F ∈ E, F.handles Ef o c = none) → TypM S mode Ψ Θ [] (plug E r) (.ex t φ) → φ.svc (.nm Ef) := by
   refine list_rev_ind ?_ ?_
   · intro Ψ Θ t φ _ _ h
     exact hask h
@@ -180,12 +226,13 @@ theorem perform_out {Ef o : Name} {c : OpClass} {r : Tm}
     have hnv := not_value_plugs hv E₀
     have hh₀ : ∀ F ∈ E₀, F.handles Ef o c = none := fun F hF => hh F (List.mem_append_left _ hF)
     have hhG : G.handles Ef o c = none := hh G (by simp)
-    obtain ⟨k, Θ', t₁, φ₁, h₁, rel, -⟩ := frame_typing hnv _ hG h
+    obtain ⟨k, Θ', t₁, φ₁, h₁, rel, -⟩ := frame_typing_mode hnv _ hG h
     have hn := ih hE₀ hh₀ h₁
     rcases rel.svc _ hn with h₂ | h₂
     · exact h₂
     · obtain ⟨a, b, hop⟩ := hop
-      cases G <;> simp only [TypingMode.captures_dom, Frame.dom, Frame.installs] at h₂
+      have h₂ := TypingMode.dom_nonatm (fun _ h => by cases h) h₂
+      cases G <;> simp only [Frame.dom, Frame.installs] at h₂
       · subst h₂
         cases h with
         | hwith _ _ _ _ _ _ hc hφ _ =>

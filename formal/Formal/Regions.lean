@@ -46,7 +46,7 @@ theorem reach_nest {root e₀ t φ₀ c} (hroot : RootTy S root) (h₀ : Typ S [
     (hp : e₀.Below 0) (ht : t.YF 0) (hφ : φ₀.substT (kill 0) = φ₀)
     (hs : CSteps root ⟨[], [], e₀⟩ c) :
     ∃ Ψ anc B home, CfgTy S Ψ c t φ₀ ∧ Nest Ψ c anc B home := by
-  obtain ⟨X, anc, B, home, hc, hn⟩ := steps_nest hroot hs ht hφ (CfgTy.init h₀ hp) (Nest.init (Ψ := []) h₀ hp)
+  obtain ⟨X, anc, B, home, hc, hn⟩ := steps_nest hroot hs ht hφ (CfgTyM.init h₀ hp) (Nest.init (Ψ := []) h₀ hp)
   exact ⟨_, anc, B, home, hc, hn⟩
 
 /-- A step that needs a region that is not live (regions.md §3.2): `open_H`, `op_H`,
