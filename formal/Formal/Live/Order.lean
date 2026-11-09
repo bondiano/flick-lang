@@ -283,6 +283,7 @@ theorem Const.ok_substT_mode {mode : TypingMode} {Θ c ι} (σ : Atom → Ty)
       · exact ⟨b, .inl hb, h'⟩
       · obtain ⟨b, hb, h'⟩ := (Ty.reach_substT σ _ a).mp ha
         exact ⟨b, .inr hb, h'⟩
+    case scopeRun => rw [← Row.ofCaps_substT]; exact h.substT σ
     all_goals exact h
 
 theorem Const.ok_mono_mode {mode : TypingMode} {Θ Θ' c ι} (h : Const.ok Θ c ι mode)

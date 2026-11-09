@@ -304,6 +304,7 @@ def Const.ok (Θ : Facts) : Const → CArg → (mode : TypingMode := .captures) 
   | .addFin, ι, .captures => Outl Θ ι.C ι.s
   | .spawn, ι, .captures => Outl Θ (fun a => ι.C a ∨ ι.t.reach a) ι.s
   | .addFin, ι, .live => Outl Θ ι.C ι.s ∧ TypingMode.live.keep Θ ι.r ι.s
+  | .scopeRun, ι, .live => Row.Sub (Row.ofCaps ι.C) ι.r
   | .spawn, ι, .live =>
     Outl Θ (fun a => ι.C a ∨ ι.t.reach a) ι.s ∧ TypingMode.live.keep Θ ι.r ι.s
   | .perform _ _ _, _, _ => False
