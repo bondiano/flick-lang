@@ -8,20 +8,20 @@ type Fields (rd : ServiceRow)
 
 /// No field.
 fields : Fields none
-foreign pure fields from "@flick-lang/runtime" "codecFieldsEmpty"
+foreign pure fields from "@flick-lang/effect-ts" "codecFieldsEmpty"
 
 /// The fields `rest`, then `label` decoded with `codec`.
 field : String -> FieldCodec rd a -> Fields rs -> Fields (rs + rd)
-foreign pure field from "@flick-lang/runtime" "codecField"
+foreign pure field from "@flick-lang/effect-ts" "codecField"
   arity 3
 
 /// The codec named `name`, where it reports a field, of the record `schema`
 /// describes, with `fields`.
 record : String -> Schema r -> Fields none -> PureCodec Json r
-foreign pure record from "@flick-lang/runtime" "codecRecord"
+foreign pure record from "@flick-lang/effect-ts" "codecRecord"
   arity 3
 
 /// [`record`] whose fields need the services `rd` to decode.
 record_effect : String -> Schema r -> Fields rd -> Codec rd none Json r
-foreign pure record_effect from "@flick-lang/runtime" "codecRecord"
+foreign pure record_effect from "@flick-lang/effect-ts" "codecRecord"
   arity 3

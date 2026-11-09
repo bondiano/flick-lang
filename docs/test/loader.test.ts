@@ -17,8 +17,8 @@ test("paths resolve like the output directory", () => {
 });
 
 test("package discovery follows reachable module imports", () => {
-  assert.deepEqual(packages({ "flick-main.js": 'import "@flick-lang/runtime";\nimport "./a.js";', "a.js": 'import "b";' }, "flick-main.js"), [
-    "@flick-lang/runtime",
+  assert.deepEqual(packages({ "flick-main.js": 'import "@flick-lang/effect-ts";\nimport "./a.js";', "a.js": 'import "b";' }, "flick-main.js"), [
+    "@flick-lang/effect-ts",
     "b",
   ]);
 });

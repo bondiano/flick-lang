@@ -44,12 +44,12 @@ const source = (module: string): string => {
 
 /** The kernel module `rt_specifier` makes of a runtime specifier, if it has one. */
 const kernelPath = (spec: string, inRt: ReadonlyArray<string>, inCore: ReadonlyArray<string>): string | undefined => {
-  if (spec === "@flick-lang/runtime") return "../src/rt/index.ts";
-  const ui = /^@flick-lang\/runtime(\/ui(?:\/\w+)?)$/.exec(spec)?.[1];
+  if (spec === "@flick-lang/effect-ts") return "../src/rt/index.ts";
+  const ui = /^@flick-lang\/effect-ts(\/ui(?:\/\w+)?)$/.exec(spec)?.[1];
   if (ui !== undefined) return listed("UI_IN_RT").includes(ui) ? `../src/rt${ui}.ts` : undefined;
-  const module = /^@flick-lang\/runtime\/effect\/([\w/]+)$/.exec(spec)?.[1];
+  const module = /^@flick-lang\/effect-ts\/effect\/([\w/]+)$/.exec(spec)?.[1];
   if (module === undefined) return undefined;
-  if (inRt.includes(module)) return `../src/effect/${module}.ts`;
+  if (inRt.includes(module)) return `../src/rt/effect/${module}.ts`;
   return inCore.includes(module) ? `../src/core/${module}.ts` : undefined;
 };
 
@@ -57,7 +57,7 @@ test("the kernel has every binding of its first tier of built-in modules", async
   const inRt = listed("IN_RT");
   const inCore = listed("IN_CORE");
   const bindings = MODULES.flatMap((module) =>
-    [...source(module).matchAll(/^foreign (?:\w+ )?\w+ from "(@flick-lang\/runtime[^"]*)" "(\w+)"/gm)].map(
+    [...source(module).matchAll(/^foreign (?:\w+ )?\w+ from "(@flick-lang\/effect-ts[^"]*)" "(\w+)"/gm)].map(
       ([, spec = "", name = ""]) => ({ module, spec, name }),
     ),
   );

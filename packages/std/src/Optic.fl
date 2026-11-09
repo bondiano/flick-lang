@@ -22,133 +22,133 @@ type Traversal s a
 
 /// The iso of `get` and its inverse `set`.
 make_iso : (s -> a) -> (a -> s) -> Iso s a
-foreign pure make_iso from "@flick-lang/runtime/effect/Optic" "makeIso"
+foreign pure make_iso from "@flick-lang/effect-ts/effect/Optic" "makeIso"
   reviewed "effect@4.1.2 sha256:2bafcd2558a96cec"
 
 /// The lens of `get` and `replace part whole`.
 make_lens : (s -> a) -> (a -> s -> s) -> Lens s a
-foreign pure make_lens from "@flick-lang/runtime/effect/Optic" "makeLens"
+foreign pure make_lens from "@flick-lang/effect-ts/effect/Optic" "makeLens"
   reviewed "effect@4.1.2 sha256:242bda49f9e37a19"
 
 /// The prism of `get`, which fails with a message, and `set`.
 make_prism : (s -> Result String a) -> (a -> s) -> Prism s a
-foreign pure make_prism from "@flick-lang/runtime/effect/Optic" "flickMakePrism"
+foreign pure make_prism from "@flick-lang/effect-ts/effect/Optic" "flickMakePrism"
   reviewed "effect@4.1.2 sha256:5f3e07378a6a4d71"
 
 /// The optional of `get` and `set part whole`, which fail with a message.
 make_optional : (s -> Result String a) -> (a -> s -> Result String s) -> Optional s a
-foreign pure make_optional from "@flick-lang/runtime/effect/Optic" "flickMakeOptional"
+foreign pure make_optional from "@flick-lang/effect-ts/effect/Optic" "flickMakeOptional"
   reviewed "effect@4.1.2 sha256:244ebc5a663d0d1a"
 
 /// The prism of the values `ok` accepts; the others fail with `message`.
 from_check : (a -> Bool) -> String -> Prism a a
-foreign pure from_check from "@flick-lang/runtime/effect/Optic" "flickFromCheck"
+foreign pure from_check from "@flick-lang/effect-ts/effect/Optic" "flickFromCheck"
   reviewed "effect@4.1.2 sha256:afd622217f087a6c"
 
 /// The iso of a value to itself.
 id : Unit -> Iso s s
-foreign pure id from "@flick-lang/runtime/effect/Optic" "id"
+foreign pure id from "@flick-lang/effect-ts/effect/Optic" "id"
   arity 0
   reviewed "effect@4.1.2 sha256:b813497d39f6956c"
 
 /// The value of a `Some`.
 some : Unit -> Prism (Option a) a
-foreign pure some from "@flick-lang/runtime/effect/Optic" "some"
+foreign pure some from "@flick-lang/effect-ts/effect/Optic" "some"
   arity 0
   reviewed "effect@4.1.2 sha256:c844c631ecde47ea"
 
 /// A `None`.
 none : Unit -> Prism (Option a) Unit
-foreign pure none from "@flick-lang/runtime/effect/Optic" "none"
+foreign pure none from "@flick-lang/effect-ts/effect/Optic" "none"
   arity 0
   reviewed "effect@4.1.2 sha256:85d40751f023fd3b"
 
 /// The value of an `Ok`.
 success : Unit -> Prism (Result e a) a
-foreign pure success from "@flick-lang/runtime/effect/Optic" "success"
+foreign pure success from "@flick-lang/effect-ts/effect/Optic" "success"
   arity 0
   reviewed "effect@4.1.2 sha256:376090323da30b51"
 
 /// The error of an `Err`.
 failure : Unit -> Prism (Result e a) e
-foreign pure failure from "@flick-lang/runtime/effect/Optic" "failure"
+foreign pure failure from "@flick-lang/effect-ts/effect/Optic" "failure"
   arity 0
   reviewed "effect@4.1.2 sha256:a7490db9974f91e9"
 
 /// The part a lens focuses on: `whole |> Optic.get lens`.
 get : Lens s a -> s -> a
-foreign pure get from "@flick-lang/runtime/effect/Optic" "get"
+foreign pure get from "@flick-lang/effect-ts/effect/Optic" "get"
   arity 1
   reviewed "effect@4.1.2 sha256:190a1ee1d1545ce4"
 
 /// The part, or why the structure does not have it.
 get_result : Optional s a -> s -> Result SchemaError a
-foreign pure get_result from "@flick-lang/runtime/effect/Optic" "flickGetResult"
+foreign pure get_result from "@flick-lang/effect-ts/effect/Optic" "flickGetResult"
   reviewed "effect@4.1.2 sha256:ad5463d7fc97ec03"
 
 /// The structure a prism builds from a part.
 set : Prism s a -> a -> s
-foreign pure set from "@flick-lang/runtime/effect/Optic" "set"
+foreign pure set from "@flick-lang/effect-ts/effect/Optic" "set"
   arity 1
   reviewed "effect@4.1.2 sha256:908cfedcb25adeb5"
 
 /// The structure with its part replaced; unchanged when it has none.
 replace : Optional s a -> a -> s -> s
-foreign pure replace from "@flick-lang/runtime/effect/Optic" "replace"
+foreign pure replace from "@flick-lang/effect-ts/effect/Optic" "replace"
   arity 2
   reviewed "effect@4.1.2 sha256:ad8927d0fabfe521"
 
 /// The structure with its part replaced, or why it has none.
 replace_result : Optional s a -> a -> s -> Result SchemaError s
-foreign pure replace_result from "@flick-lang/runtime/effect/Optic" "flickReplaceResult"
+foreign pure replace_result from "@flick-lang/effect-ts/effect/Optic" "flickReplaceResult"
   reviewed "effect@4.1.2 sha256:e95b52a64e4bfdfb"
 
 /// The structure with `f` of its part; unchanged when it has none.
 modify : Optional s a -> (a -> a) -> s -> s
-foreign pure modify from "@flick-lang/runtime/effect/Optic" "modify"
+foreign pure modify from "@flick-lang/effect-ts/effect/Optic" "modify"
   arity 2
   reviewed "effect@4.1.2 sha256:91f26846361cd291"
 
 /// Every part a traversal focuses on; none when the structure has none.
 get_all : Traversal s a -> s -> List a
-foreign pure get_all from "@flick-lang/runtime/effect/Optic" "getAll"
+foreign pure get_all from "@flick-lang/effect-ts/effect/Optic" "getAll"
   arity 1
   reviewed "effect@4.1.2 sha256:4ed3cb327d026a6d"
 
 /// The structure with `f` of every part.
 modify_all : Traversal s a -> (a -> a) -> s -> s
-foreign pure modify_all from "@flick-lang/runtime/effect/Optic" "modifyAll"
+foreign pure modify_all from "@flick-lang/effect-ts/effect/Optic" "modifyAll"
   arity 2
   reviewed "effect@4.1.2 sha256:020997e0c225fc2b"
 
 /// The optic of `self`, then `that`: `outer |> Optic.compose inner`.
 compose : Optional a b -> Optional s a -> Optional s b
-foreign pure compose from "@flick-lang/runtime/effect/Optic" "flickCompose"
+foreign pure compose from "@flick-lang/effect-ts/effect/Optic" "flickCompose"
 
 /// `compose` of two lenses, a lens.
 compose_lens : Lens a b -> Lens s a -> Lens s b
-foreign pure compose_lens from "@flick-lang/runtime/effect/Optic" "flickCompose"
+foreign pure compose_lens from "@flick-lang/effect-ts/effect/Optic" "flickCompose"
 
 /// `compose` of two prisms, a prism.
 compose_prism : Prism a b -> Prism s a -> Prism s b
-foreign pure compose_prism from "@flick-lang/runtime/effect/Optic" "flickCompose"
+foreign pure compose_prism from "@flick-lang/effect-ts/effect/Optic" "flickCompose"
 
 /// An optional of a list of parts, as a traversal of the parts.
 traversal : Optional s (List a) -> Traversal s a
-foreign pure traversal from "@flick-lang/runtime/effect/Optic" "flickAs"
+foreign pure traversal from "@flick-lang/effect-ts/effect/Optic" "flickAs"
 
 /// An iso as a lens.
 iso_lens : Iso s a -> Lens s a
-foreign pure iso_lens from "@flick-lang/runtime/effect/Optic" "flickAs"
+foreign pure iso_lens from "@flick-lang/effect-ts/effect/Optic" "flickAs"
 
 /// An iso as a prism.
 iso_prism : Iso s a -> Prism s a
-foreign pure iso_prism from "@flick-lang/runtime/effect/Optic" "flickAs"
+foreign pure iso_prism from "@flick-lang/effect-ts/effect/Optic" "flickAs"
 
 /// A lens as an optional.
 lens_optional : Lens s a -> Optional s a
-foreign pure lens_optional from "@flick-lang/runtime/effect/Optic" "flickAs"
+foreign pure lens_optional from "@flick-lang/effect-ts/effect/Optic" "flickAs"
 
 /// A prism as an optional.
 prism_optional : Prism s a -> Optional s a
-foreign pure prism_optional from "@flick-lang/runtime/effect/Optic" "flickAs"
+foreign pure prism_optional from "@flick-lang/effect-ts/effect/Optic" "flickAs"

@@ -11,55 +11,55 @@ import Http.UrlParams
 
 /// Headers as a JSON object of strings; names are read in lower case.
 headers : PureCodec Json Http.Headers.Headers
-foreign pure headers from "@flick-lang/runtime/effect/SchemaHttp" "flickHeaders"
+foreign pure headers from "@flick-lang/effect-ts/effect/SchemaHttp" "flickHeaders"
   reviewed "effect@4.1.2 sha256:2137dba63b8e8c3b"
 
 /// URL parameters as a JSON array of name and value pairs.
 url_params : PureCodec Json Http.UrlParams.UrlParams
-foreign pure url_params from "@flick-lang/runtime/effect/SchemaHttp" "flickUrlParams"
+foreign pure url_params from "@flick-lang/effect-ts/effect/SchemaHttp" "flickUrlParams"
   reviewed "effect@4.1.2 sha256:7575391af4f8542f"
 
 /// A cookie as its `Set-Cookie` header text, which shows its value.
 cookie : PureCodec Json Http.Cookies.Cookie
-foreign pure cookie from "@flick-lang/runtime/effect/SchemaHttp" "flickCookie"
+foreign pure cookie from "@flick-lang/effect-ts/effect/SchemaHttp" "flickCookie"
   reviewed "effect@4.1.2 sha256:166a772bf0c18e46"
 
 /// Cookies as a JSON array of their `Set-Cookie` header texts.
 cookies : PureCodec Json Http.Cookies.Cookies
-foreign pure cookies from "@flick-lang/runtime/effect/SchemaHttp" "flickCookies"
+foreign pure cookies from "@flick-lang/effect-ts/effect/SchemaHttp" "flickCookies"
   reviewed "effect@4.1.2 sha256:2150585ceeae9acc"
 
 /// A URL as its text; text that is no URL is an error.
 url : PureCodec Json Http.Url.Url
-foreign pure url from "@flick-lang/runtime/effect/SchemaHttp" "flickUrl"
+foreign pure url from "@flick-lang/effect-ts/effect/SchemaHttp" "flickUrl"
   reviewed "effect@4.1.2 sha256:def675f38e2f3123"
 
 /// URL parameters, as `url_params`, decoded by `codec` from an object of a
 /// string for a name given once and an array for a repeated one.
 from_url_params : PureCodec Json a -> PureCodec Json a
-foreign pure from_url_params from "@flick-lang/runtime/effect/SchemaHttp" "flickFromUrlParams"
+foreign pure from_url_params from "@flick-lang/effect-ts/effect/SchemaHttp" "flickFromUrlParams"
   reviewed "effect@4.1.2 sha256:b769c67f9a3eb42f"
 
 /// Cookies, as `cookies`, decoded by `codec` from an object of their values.
 from_cookies : PureCodec Json a -> PureCodec Json a
-foreign pure from_cookies from "@flick-lang/runtime/effect/SchemaHttp" "flickFromCookies"
+foreign pure from_cookies from "@flick-lang/effect-ts/effect/SchemaHttp" "flickFromCookies"
   reviewed "effect@4.1.2 sha256:f28a7270eb9dcc35"
 
 /// URL parameters, as `url_params`, whose first `field` holds JSON text
 /// decoded by `codec`; a missing field is an error.
 json_url_params_field : String -> PureCodec Json a -> PureCodec Json a
-foreign pure json_url_params_field from "@flick-lang/runtime/effect/SchemaHttp" "flickJsonUrlParamsField"
+foreign pure json_url_params_field from "@flick-lang/effect-ts/effect/SchemaHttp" "flickJsonUrlParamsField"
   arity 2
   reviewed "effect@4.1.2 sha256:ad3abdcd07564f10"
 
 /// A query string (`a=1&b[c]=2`) whose bracket paths form a tree of
 /// strings, objects and arrays decoded by `codec`.
 from_url_search_params : PureCodec Json a -> PureCodec Json a
-foreign pure from_url_search_params from "@flick-lang/runtime/effect/SchemaHttp" "flickFromUrlSearchParams"
+foreign pure from_url_search_params from "@flick-lang/effect-ts/effect/SchemaHttp" "flickFromUrlSearchParams"
   reviewed "effect@4.1.2 sha256:304cecc3e9f051cf"
 
 /// Form fields as a JSON array of name and value pairs, their bracket paths
 /// forming a tree decoded by `codec`, as `from_url_search_params`.
 from_form_data : PureCodec Json a -> PureCodec Json a
-foreign pure from_form_data from "@flick-lang/runtime/effect/SchemaHttp" "flickFromFormData"
+foreign pure from_form_data from "@flick-lang/effect-ts/effect/SchemaHttp" "flickFromFormData"
   reviewed "effect@4.1.2 sha256:85f6a966b6b9995b"

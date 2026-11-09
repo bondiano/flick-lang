@@ -1,6 +1,6 @@
 ---
 title: "Покрытие Effect"
-source_hash: 1a0ecdbb5486054c
+source_hash: e9ac6fbbaf50f5d7
 ---
 
 Стандартная библиотека оборачивает закреплённую версию Effect
@@ -138,7 +138,7 @@ span'ы программы по WebSocket в Effect DevTools, которые с�
 
 Обёртка обращается к экспорту через среду выполнения. Среда выполнения
 реэкспортирует каждый обёрнутый модуль Effect по пути
-`@flick-lang/runtime/effect/<Module>` (`runtime/src/effect/<Module>.ts`).
+`@flick-lang/effect-ts/effect/<Module>` (`packages/effect-ts/src/effect/<Module>.ts`).
 Поэтому скомпилированный код по-прежнему импортирует только пакет среды выполнения.
 
 Если значение нельзя передать как есть в виде значения Flick, в том же файле
@@ -151,13 +151,13 @@ span'ы программы по WebSocket в Effect DevTools, которые с�
 #
 /// Recurs forever, each step the duration after the previous one ended.
 spaced : Duration.Duration -> Schedule none none i Float
-foreign pure spaced from "@flick-lang/runtime/effect/Schedule" "spaced"
+foreign pure spaced from "@flick-lang/effect-ts/effect/Schedule" "spaced"
   reviewed "effect@4.1.2 sha256:498f22b480d2397e"
 
 retry :
   forall c r e a r2 e2 o.
   Schedule.Schedule r2 e2 (Errors e) o -> (Eff r e a)^c ->{Async | r + r2; e + e2} a
-foreign effect retry from "@flick-lang/runtime/effect/Effect" "retry"
+foreign effect retry from "@flick-lang/effect-ts/effect/Effect" "retry"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:508d9e1864f6c9d3"

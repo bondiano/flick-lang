@@ -9,7 +9,7 @@ import Http.ServerResponse
 
 /// The metrics recorded so far.
 format : Unit ->{} String
-foreign effect format from "@flick-lang/runtime/effect/observability/PrometheusMetrics" "prometheusFormat"
+foreign effect format from "@flick-lang/effect-ts/effect/observability/PrometheusMetrics" "prometheusFormat"
   arity 0
   reviewed "effect@4.1.2 sha256:f7c1d415fcfb2b6e"
 
@@ -18,7 +18,7 @@ type alias FormatOptions = { prefix : Option String; rename : Option (String -> 
 
 /// The metrics recorded so far, named as `options` say.
 format_with : FormatOptions -> Unit ->{} String
-foreign effect format_with from "@flick-lang/runtime/effect/observability/PrometheusMetrics" "prometheusFormatWith"
+foreign effect format_with from "@flick-lang/effect-ts/effect/observability/PrometheusMetrics" "prometheusFormatWith"
   arity 2
   reviewed "effect@4.1.2 sha256:f7c1d415fcfb2b6e"
 

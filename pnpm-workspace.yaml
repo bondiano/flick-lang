@@ -1,5 +1,6 @@
 packages:
   - runtime
+  - packages/effect-ts
   - tools/dts-importer
   - tools/content-mapper
   - tools/astro-flick

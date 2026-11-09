@@ -69,6 +69,7 @@ e2e-prepare:
     cargo build -p flick --profile e2e
     pnpm install --frozen-lockfile
     pnpm -C runtime build
+    pnpm -C packages/effect-ts build
     FLICK_BIN={{flick}} pnpm -C tools/dts-importer build
 
 # The JS packages, with the playground's compiler: typecheck, lint, tests, and
@@ -96,6 +97,7 @@ e2e-cases shard="": e2e-prepare
 language seed="42":
     cargo build -p flick --profile e2e
     pnpm -C runtime build
+    pnpm -C packages/effect-ts build
     cd tests/language && {{flick}} test --emit js --seed {{seed}} --reporter json > ../../target/language-js.txt || { cat ../../target/language-js.txt; exit 1; }
     cd tests/language && {{flick}} test --emit go --seed {{seed}} --reporter json > ../../target/language-go.txt || { cat ../../target/language-go.txt; exit 1; }
     diff -u target/language-js.txt target/language-go.txt

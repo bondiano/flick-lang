@@ -1,6 +1,6 @@
 # Sinks: channels that end with a value and leftovers.
 
-[@flick-lang/runtime/effect/Sink]
+[@flick-lang/effect-ts/effect/Sink]
 flickFromChannel SinkFromChannel
 flickToChannel SinkToChannel
 flickMake SinkMake

@@ -1,5 +1,5 @@
 //! The versions this compiler pins and how the installed tree compares:
-//! another `@flick-lang/runtime` or `effect` stops a build before it writes
+//! another runtime, Effect adapter or Effect version stops a build before it writes
 //! code against an ABI it does not know.
 
 use std::path::Path;
@@ -12,6 +12,7 @@ use flick_core::diagnostics::{Diagnostic, Severity, codes};
 
 pub const COMPILER: &str = env!("CARGO_PKG_VERSION");
 pub const RUNTIME: &str = "0.1.0";
+pub const EFFECT_TS: &str = "0.1.0";
 pub const EFFECT: &str = "4.1.2";
 pub const PNPM: &str = "12.16.1";
 pub const NODE: &str = "24.18.0";
@@ -44,17 +45,24 @@ pub fn installed(root: &Path, package: &str) -> Option<String> {
     Some(json.get("version")?.as_str()?.to_owned())
 }
 
-/// The version of `package` the runtime resolves: Effect from the runtime's
-/// own `node_modules` first, as Node does.
+/// The version of `package` that the Effect adapter resolves, then the project.
 pub fn resolved(root: &Path, package: &str) -> Option<String> {
-    let runtime_dir = root.join("node_modules/@flick-lang/runtime");
-    installed(&runtime_dir, package).or_else(|| installed(root, package))
+    let adapter_dir = root.join("node_modules/@flick-lang/effect-ts");
+    if package == "effect" {
+        installed(&adapter_dir, package).or_else(|| installed(root, package))
+    } else {
+        installed(root, package).or_else(|| installed(&adapter_dir, package))
+    }
 }
 
-/// `P015` for an installed runtime or Effect of another version; nothing
-/// when they are absent, which only running needs.
-pub fn check_runtime(root: &Path) -> Option<Diagnostic> {
-    for (package, wanted) in [("@flick-lang/runtime", RUNTIME), ("effect", EFFECT)] {
+/// `P015` for an installed runtime or adapter of another version; `rt` needs
+/// only the kernel package, while the Effect backend also pins its adapter.
+pub fn check_runtime(root: &Path, rt: bool) -> Option<Diagnostic> {
+    let packages = [("@flick-lang/runtime", RUNTIME)]
+        .into_iter()
+        .chain((!rt).then_some(("@flick-lang/effect-ts", EFFECT_TS)))
+        .chain((!rt).then_some(("effect", EFFECT)));
+    for (package, wanted) in packages {
         let Some(found) = resolved(root, package) else {
             continue;
         };

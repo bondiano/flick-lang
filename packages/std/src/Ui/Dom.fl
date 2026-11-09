@@ -9,7 +9,7 @@ type Container
 
 /// The element with this id in the document.
 container : String ->{} Option Container
-foreign container from "@flick-lang/runtime/ui" "uiContainer"
+foreign container from "@flick-lang/effect-ts/ui" "uiContainer"
   arity 1
   nullable
 
@@ -26,5 +26,5 @@ mount :
   (Failure none ->{r; none} Unit)^c ->
   Ui^c ->{Async, Atom.Registry, Atom.Write | r; none}
   Never
-foreign effect mount from "@flick-lang/runtime/ui" "uiMount"
+foreign effect mount from "@flick-lang/effect-ts/ui" "uiMount"
   retention call

@@ -14,20 +14,20 @@ type alias Options = { idleTimeToLive : Option Duration.Duration; preload : Bool
 
 /// A ref of the services `layer` builds.
 make : Layer ri e ro -> Options ->{Scope s | ri; e} LayerRef s e ro
-foreign effect make from "@flick-lang/runtime/effect/LayerRef" "flickMake"
+foreign effect make from "@flick-lang/effect-ts/effect/LayerRef" "flickMake"
   reviewed "effect@4.1.2 sha256:920ebbf52b1b72f1"
 
 /// The services as a layer: a `provide` of it shares those already built.
 get : LayerRef s e ro -> Layer none e ro
-foreign pure get from "@flick-lang/runtime/effect/LayerRef" "flickGet"
+foreign pure get from "@flick-lang/effect-ts/effect/LayerRef" "flickGet"
   retention owner
 
 /// Drops the services: the next use builds them anew.
 invalidate : LayerRef s e ro ->{Async;} Unit
-foreign effect invalidate from "@flick-lang/runtime/effect/LayerRef" "flickInvalidate"
+foreign effect invalidate from "@flick-lang/effect-ts/effect/LayerRef" "flickInvalidate"
   retention call
 
 /// Builds the services anew now, replacing those built before.
 refresh : LayerRef s e ro ->{Async; e} Unit
-foreign effect refresh from "@flick-lang/runtime/effect/LayerRef" "flickRefresh"
+foreign effect refresh from "@flick-lang/effect-ts/effect/LayerRef" "flickRefresh"
   retention call

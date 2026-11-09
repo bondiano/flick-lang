@@ -31,7 +31,8 @@ module never runs anything: modules only define values. A top-level value
 that is a call, a derived instance or an immediately run arrow is marked
 `/*#__PURE__*/`, so a bundler drops what the program does not use.
 
-Generated code imports `@flick-lang/runtime` only: `Effect` comes through it.
+Code on Effect imports `@flick-lang/effect-ts`; code built with `--rt` imports
+`@flick-lang/runtime/rt`. The Effect adapter provides `Effect`.
 A module that has no runtime stage imports no `Effect` at all.
 
 ## Values
@@ -322,7 +323,7 @@ stays `any` in `--emit ts`, and `--emit-dts` reports it. Code inside a module
 is annotated `any`: the source types live in the Flick checker and its
 `.iface`. The output runs as it is on Node (type stripping) and passes
 `tsc --noEmit` with `strict`, `allowImportingTsExtensions` and
-`module: nodenext`. `@flick-lang/runtime` ships `index.d.ts` for it.
+`module: nodenext`. `@flick-lang/effect-ts` ships `index.d.ts` for it.
 
 ## Release profile
 

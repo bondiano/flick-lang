@@ -10,7 +10,7 @@ use common::{APP, project};
 
 /// A `DevTools` server that prints its port, then the name of the first span
 /// it gets within a minute.
-const DEVTOOLS: &str = "import { devToolsListen } from \"@flick-lang/runtime/effect/devtools/DevToolsServer\";
+const DEVTOOLS: &str = "import { devToolsListen } from \"@flick-lang/effect-ts/effect/devtools/DevToolsServer\";
 const server = await devToolsListen();
 console.log(server.port);
 for (let i = 0; i < 3000 && server.spans.length === 0; i += 1) await new Promise((resolve) => setTimeout(resolve, 20));

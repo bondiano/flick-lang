@@ -1,8 +1,8 @@
 ---
 import "../styles/playground.css";
 import { readFileSync } from "node:fs";
-import { Effect } from "@flick-lang/runtime";
-import { uiRenderStatic } from "@flick-lang/runtime/ui/react";
+import { Effect } from "@flick-lang/effect-ts";
+import { uiRenderStatic } from "@flick-lang/effect-ts/ui/react";
 import { renderToString } from "react-dom/server";
 import { initial_view } from "../playground/Playground.fl";
 import { examples } from "./gallery.ts";
@@ -29,7 +29,7 @@ const embedded = JSON.stringify(gallery).replaceAll("<", "\\u003c");
 </noscript>
 
 <script>
-  import { run } from "@flick-lang/runtime/runner/browser";
+  import { run } from "@flick-lang/effect-ts/runner/browser";
   import { main } from "../playground/Playground.fl";
   import { bindSplit } from "../playground/split.ts";
 

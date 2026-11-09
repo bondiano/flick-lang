@@ -93,7 +93,7 @@ in an array, a throwing proxy or a value past the limits is a
 `SnapshotError` naming the path. A subtree shared by two places is copied
 once.
 
-Flick data crosses a binding outside `@flick-lang/runtime` as a copy: a
+Flick data crosses a binding outside `@flick-lang/effect-ts` and `@flick-lang/runtime` as a copy: a
 `List`, tuple, record or constructed value in an argument, the result, the
 value of a `Promise` or `Effect`, and what a callback is given or returns.
 JS may sort the array it got in place or change an object it returned

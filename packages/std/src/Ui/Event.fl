@@ -9,32 +9,32 @@ import Ui
 @lang event_exhaust
 /// Ignores events while the task of an earlier one runs.
 exhaust : (s -> (Eff {Async, Atom.Write, Ui.Document} none Unit)^c)^c -> (Ui.Handler s)^c
-foreign pure exhaust from "@flick-lang/runtime/ui/react" "eventExhaust"
+foreign pure exhaust from "@flick-lang/effect-ts/ui/react" "eventExhaust"
   retention call
 
 @lang event_latest
 /// Interrupts the running task, waits until it stopped, then runs the
 /// last event; one event waits at most.
 latest : (s -> (Eff {Async, Atom.Write, Ui.Document} none Unit)^c)^c -> (Ui.Handler s)^c
-foreign pure latest from "@flick-lang/runtime/ui/react" "eventLatest"
+foreign pure latest from "@flick-lang/effect-ts/ui/react" "eventLatest"
   retention call
 
 @lang event_queue
 /// Runs events one by one, `capacity` of them waiting at most; an event
 /// that finds the queue full is rejected and reported to the supervisor.
 queue : Int -> (s -> (Eff {Async, Atom.Write, Ui.Document} none Unit)^c)^c -> (Ui.Handler s)^c
-foreign pure queue from "@flick-lang/runtime/ui/react" "eventQueue"
+foreign pure queue from "@flick-lang/effect-ts/ui/react" "eventQueue"
   retention call
 
 @lang event_concurrent
 /// Runs at most `limit` tasks at once; an event beyond that is rejected and
 /// reported to the supervisor.
 concurrent : Int -> (s -> (Eff {Async, Atom.Write, Ui.Document} none Unit)^c)^c -> (Ui.Handler s)^c
-foreign pure concurrent from "@flick-lang/runtime/ui/react" "eventConcurrent"
+foreign pure concurrent from "@flick-lang/effect-ts/ui/react" "eventConcurrent"
   retention call
 
 /// Calls `decide` on the snapshot while the browser still waits, and
 /// prevents the default action when it says so.
 prevent_default : (s -> Bool)^c -> (Ui.Handler s)^c -> (Ui.Handler s)^c
-foreign pure prevent_default from "@flick-lang/runtime/ui/react" "eventPreventDefault"
+foreign pure prevent_default from "@flick-lang/effect-ts/ui/react" "eventPreventDefault"
   retention call

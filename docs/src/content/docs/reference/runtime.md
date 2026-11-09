@@ -2,10 +2,15 @@
 title: "Runtime adapter"
 ---
 
-`@flick-lang/runtime` is what compiled code runs on (see [Errors, services, resources and concurrency](../../spec/05-errors-and-concurrency/), [Compiler architecture](../../contributing/implementation-decisions/#compiler-architecture)). It is a thin
+`@flick-lang/effect-ts` is what compiled code runs on (see [Errors, services, resources and concurrency](../../spec/05-errors-and-concurrency/), [Compiler architecture](../../contributing/implementation-decisions/#compiler-architecture)). It is a thin
 adapter over Effect `4.1.2`: generated modules import only this package, and
 the adapter fixes the contracts below so that they hold whatever Effect does
 by default.
+
+For `flick build --rt`, `flick run --rt` and `flick test --rt`, generated code
+imports `@flick-lang/runtime/rt`. That package implements Flick's own runtime
+and has no dependency on Effect. The default Effect backend imports
+`@flick-lang/effect-ts`, which depends on the runtime's shared pure helpers.
 
 ## Effect release
 

@@ -41,7 +41,7 @@ export * from "./views.ts";
 export const uiSafeUrl = (url: string): Option<string> => (isSafeUrl(url) ? some(url) : none);
 
 // a route link prints its URL with the route's codec, whose `Schema` this runtime does not have yet
-export const uiRouteLink = /*#__PURE__*/ absent("@flick-lang/runtime/ui/react", "uiRouteLink");
+export const uiRouteLink = /*#__PURE__*/ absent("@flick-lang/effect-ts/ui/react", "uiRouteLink");
 
 const DETACHED = /*#__PURE__*/ tag("Ui.Detached.Detached");
 

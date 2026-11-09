@@ -130,8 +130,8 @@ handshake, on Node.
 ## Bindings
 
 A wrapper binds the export through the runtime, which re-exports each
-wrapped module of Effect as `@flick-lang/runtime/effect/<Module>`
-(`runtime/src/effect/<Module>.ts`), so compiled code still imports only
+wrapped module of Effect as `@flick-lang/effect-ts/effect/<Module>`
+(`packages/effect-ts/src/effect/<Module>.ts`), so compiled code still imports only
 the runtime package. An adapter for what a Flick value cannot pass as is
 (an options record with `Option` fields, an Effect error that becomes a
 Flick `type error`) sits in the same file, named `flick<Name>`.
@@ -141,13 +141,13 @@ Flick `type error`) sits in the same file, named `flick<Name>`.
 #
 /// Recurs forever, each step the duration after the previous one ended.
 spaced : Duration.Duration -> Schedule none none i Float
-foreign pure spaced from "@flick-lang/runtime/effect/Schedule" "spaced"
+foreign pure spaced from "@flick-lang/effect-ts/effect/Schedule" "spaced"
   reviewed "effect@4.1.2 sha256:498f22b480d2397e"
 
 retry :
   forall c r e a r2 e2 o.
   Schedule.Schedule r2 e2 (Errors e) o -> (Eff r e a)^c ->{Async | r + r2; e + e2} a
-foreign effect retry from "@flick-lang/runtime/effect/Effect" "retry"
+foreign effect retry from "@flick-lang/effect-ts/effect/Effect" "retry"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:508d9e1864f6c9d3"

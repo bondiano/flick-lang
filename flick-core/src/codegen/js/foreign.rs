@@ -11,11 +11,9 @@ use crate::ir::{Foreign, ForeignMode, Item, ItemKind};
 /// What crosses `f` as a copy: an import outside the runtime may change
 /// Flick data in place (`docs/formal/ts-holes.md#31-flick-data-is-copied-at-the-foreign-boundary`).
 fn copies(f: &Foreign) -> Option<&Copies> {
-    let trusted = f
-        .binding
-        .from
-        .as_deref()
-        .is_some_and(|m| m.starts_with("@flick-lang/runtime"));
+    let trusted = f.binding.from.as_deref().is_some_and(|m| {
+        m.starts_with("@flick-lang/runtime") || m.starts_with("@flick-lang/effect-ts")
+    });
     (!trusted && f.adapter.copies.any()).then_some(&f.adapter.copies)
 }
 
@@ -26,7 +24,7 @@ impl Gen<'_> {
             Some(module) => {
                 let spec = (self.options.foreign)(self.module, module);
                 // a module the kernel does not have: see `write_imports`
-                self.runtime |= self.kernel && spec.starts_with("@flick-lang/runtime/effect/");
+                self.runtime |= self.kernel && spec.starts_with("@flick-lang/effect-ts/effect/");
                 self.foreign
                     .push((spec, f.binding.name.clone(), alias.clone()));
                 alias

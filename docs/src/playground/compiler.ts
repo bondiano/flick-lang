@@ -213,7 +213,7 @@ export const run = async (source: string, profile: string, signal: AbortSignal):
   if (result.files === null) return { lines: [], status: "invalid", detail: "", diagnostics: problems };
   if (result.entry === null) return { lines: [], status: "no-main", detail: "", diagnostics: problems };
   const program: Program = { files: result.files, entry: result.entry };
-  const ui = packages(program.files, program.entry).some((spec) => spec.startsWith("@flick-lang/runtime/ui"));
+  const ui = packages(program.files, program.entry).some((spec) => spec.startsWith("@flick-lang/effect-ts/ui"));
   const lines: Array<Line> = [];
   const { promise, resolve } = Promise.withResolvers<Execution>();
   let settled = false;

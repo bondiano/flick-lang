@@ -12,23 +12,23 @@ type ScopedRef (s : Region) a
 /// `t` of its own, which ends when the resource is released: a value of a
 /// type that names its region, such as `File t`, cannot be kept here.
 from_acquire : (forall t. Eff {Scope t | r} e a^{t})^c ->{Scope s | r; e} ScopedRef s a
-foreign effect from_acquire from "@flick-lang/runtime/effect/ScopedRef" "flickFromAcquire"
+foreign effect from_acquire from "@flick-lang/effect-ts/effect/ScopedRef" "flickFromAcquire"
   retention call
 
 /// A reference holding `f ()`, which needs no release.
 make : (Unit -> a)^c ->{Scope s;} ScopedRef s a
-foreign effect make from "@flick-lang/runtime/effect/ScopedRef" "flickMake"
+foreign effect make from "@flick-lang/effect-ts/effect/ScopedRef" "flickMake"
   retention call
 
 /// Runs `f` with the current resource, which stays acquired until `f`
 /// ends; what `f` gives cannot hold the resource.
 use : ScopedRef s a -> (forall t. a^{t} ->{r; e} b)^c ->{r; e} b
-foreign effect use from "@flick-lang/runtime/effect/ScopedRef" "flickUse"
+foreign effect use from "@flick-lang/effect-ts/effect/ScopedRef" "flickUse"
   retention call
 
 /// Acquires a new resource with `acquire`; the previous one is released
 /// once no `use` holds it. If `acquire` fails, the previous one stays.
 set : (forall t. Eff {Scope t | r} e a^{t})^c -> ScopedRef s a ->{r; e} Unit
-foreign effect set from "@flick-lang/runtime/effect/ScopedRef" "flickSet"
+foreign effect set from "@flick-lang/effect-ts/effect/ScopedRef" "flickSet"
   arity 1
   retention call

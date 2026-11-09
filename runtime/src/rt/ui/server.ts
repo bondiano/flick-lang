@@ -24,4 +24,4 @@ export const uiServerState = (container: string): string => {
 };
 
 // a stream of markup is a `Stream`, which this runtime does not have yet
-export const uiServerStream = /*#__PURE__*/ absent("@flick-lang/runtime/ui/server", "uiServerStream");
+export const uiServerStream = /*#__PURE__*/ absent("@flick-lang/effect-ts/ui/server", "uiServerStream");

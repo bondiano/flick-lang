@@ -270,7 +270,7 @@ pub fn launch(
         } else if let Some(url) = &options.devtools {
             // the runtime's module that hands `runMain` the DevTools layer
             command
-                .args(["--import", "@flick-lang/runtime/runner/devtools"])
+                .args(["--import", "@flick-lang/effect-ts/runner/devtools"])
                 .env("FLICK_DEVTOOLS", url);
         }
         command.arg(generation.path().join(runner_file(name, false)));

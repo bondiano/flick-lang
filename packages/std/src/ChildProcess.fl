@@ -24,82 +24,82 @@ type alias KillOptions = { signal : Signal; force_after : Option Duration.Durati
 
 /// The program with its arguments, without a shell.
 make : String -> List String -> Command
-foreign pure make from "@flick-lang/runtime/effect/ChildProcess" "flickMake"
+foreign pure make from "@flick-lang/effect-ts/effect/ChildProcess" "flickMake"
   arity 2
   reviewed "effect@4.1.2 sha256:7a8da3f30d05e373"
 
 /// Runs the command in the directory.
 set_cwd : String -> Command -> Command
-foreign pure set_cwd from "@flick-lang/runtime/effect/ChildProcess" "setCwd"
+foreign pure set_cwd from "@flick-lang/effect-ts/effect/ChildProcess" "setCwd"
   arity 1
   reviewed "effect@4.1.2 sha256:6643453c15cdce07"
 
 /// Adds the variables to the environment the command inherits.
 set_env : List (String, String) -> Command -> Command
-foreign pure set_env from "@flick-lang/runtime/effect/ChildProcess" "flickSetEnv"
+foreign pure set_env from "@flick-lang/effect-ts/effect/ChildProcess" "flickSetEnv"
   arity 2
   reviewed "effect@4.1.2 sha256:686d62054774267e"
 
 /// Runs the command through the program and its arguments, as `sudo` or
 /// `env`.
 prefix : String -> List String -> Command -> Command
-foreign pure prefix from "@flick-lang/runtime/effect/ChildProcess" "flickPrefix"
+foreign pure prefix from "@flick-lang/effect-ts/effect/ChildProcess" "flickPrefix"
   arity 3
   reviewed "effect@4.1.2 sha256:15a214890d71dd15"
 
 /// `a |> pipe_to b`: the stdout of `a` is the stdin of `b`; the pipeline's
 /// output is that of `b`.
 pipe_to : Command -> Command -> Command
-foreign pure pipe_to from "@flick-lang/runtime/effect/ChildProcess" "pipeTo"
+foreign pure pipe_to from "@flick-lang/effect-ts/effect/ChildProcess" "pipeTo"
   arity 1
   reviewed "effect@4.1.2 sha256:fb3d583618428084"
 
 /// Writes the text to the command's stdin, then closes it.
 set_stdin : String -> Command -> Command
-foreign pure set_stdin from "@flick-lang/runtime/effect/ChildProcess" "flickSetStdin"
+foreign pure set_stdin from "@flick-lang/effect-ts/effect/ChildProcess" "flickSetStdin"
   arity 2
   reviewed "effect@4.1.2 sha256:85a7a94d87b0aa57"
 
 /// Lets the command write to the program's own stdout and stderr instead
 /// of pipes.
 inherit_output : Command -> Command
-foreign pure inherit_output from "@flick-lang/runtime/effect/ChildProcess" "flickInheritOutput"
+foreign pure inherit_output from "@flick-lang/effect-ts/effect/ChildProcess" "flickInheritOutput"
   reviewed "effect@4.1.2 sha256:08317a9ab947f5ff"
 
 /// Starts the command; the scope of region `s` stops it if it still runs.
 spawn : Command ->{Scope s; PlatformError.PlatformError} Process s
-foreign effect spawn from "@flick-lang/runtime/effect/ChildProcess" "flickSpawn"
+foreign effect spawn from "@flick-lang/effect-ts/effect/ChildProcess" "flickSpawn"
   reviewed "effect@4.1.2 sha256:40dccc7fabdf7b49"
 
 /// The process's ID.
 pid : Process s -> Int
-foreign pure pid from "@flick-lang/runtime/effect/ChildProcess" "flickPid"
+foreign pure pid from "@flick-lang/effect-ts/effect/ChildProcess" "flickPid"
   retention call
   reviewed "effect@4.1.2 sha256:f7d1cc90ab08e778"
 
 /// Waits for the process to end: its exit code. A process a signal ended
 /// fails.
 wait : Process s ->{Async; PlatformError.PlatformError} Int
-foreign effect wait from "@flick-lang/runtime/effect/ChildProcess" "flickWait"
+foreign effect wait from "@flick-lang/effect-ts/effect/ChildProcess" "flickWait"
   retention call
   reviewed "effect@4.1.2 sha256:6da3b9d4e047c7e2"
 
 /// Whether the process still runs.
 is_running : Process s ->{; PlatformError.PlatformError} Bool
-foreign effect is_running from "@flick-lang/runtime/effect/ChildProcess" "flickIsRunning"
+foreign effect is_running from "@flick-lang/effect-ts/effect/ChildProcess" "flickIsRunning"
   retention call
   reviewed "effect@4.1.2 sha256:2687b5e42628f930"
 
 /// Stops the process with `SIGTERM`, waits for it to end and gives the rest
 /// of its process group a second more.
 kill : Process s ->{Async; PlatformError.PlatformError} Unit
-foreign effect kill from "@flick-lang/runtime/effect/ChildProcess" "flickKill"
+foreign effect kill from "@flick-lang/effect-ts/effect/ChildProcess" "flickKill"
   retention call
   reviewed "effect@4.1.2 sha256:2687b5e42628f930"
 
 /// Stops the process with the signal, then `SIGKILL` after `force_after`.
 kill_with : KillOptions -> Process s ->{Async; PlatformError.PlatformError} Unit
-foreign effect kill_with from "@flick-lang/runtime/effect/ChildProcess" "flickKillWith"
+foreign effect kill_with from "@flick-lang/effect-ts/effect/ChildProcess" "flickKillWith"
   arity 2
   retention call
   reviewed "effect@4.1.2 sha256:0ab80168e973487b"
@@ -107,27 +107,27 @@ foreign effect kill_with from "@flick-lang/runtime/effect/ChildProcess" "flickKi
 /// The bytes the process writes to stdout; the stream cannot leave the
 /// process's scope.
 stdout : Process s -> (Stream none {PlatformError.PlatformError} (List Int))^{s}
-foreign pure stdout from "@flick-lang/runtime/effect/ChildProcess" "flickStdout"
+foreign pure stdout from "@flick-lang/effect-ts/effect/ChildProcess" "flickStdout"
   retention call
   reviewed "effect@4.1.2 sha256:fbc5852c8234490f"
 
 /// The bytes the process writes to stderr.
 stderr : Process s -> (Stream none {PlatformError.PlatformError} (List Int))^{s}
-foreign pure stderr from "@flick-lang/runtime/effect/ChildProcess" "flickStderr"
+foreign pure stderr from "@flick-lang/effect-ts/effect/ChildProcess" "flickStderr"
   retention call
   reviewed "effect@4.1.2 sha256:3fe00f74628a0caf"
 
 /// What the command writes to stdout, as text; it runs to its end.
 string : Command ->{Async; PlatformError.PlatformError} String
-foreign effect string from "@flick-lang/runtime/effect/ChildProcess" "flickString"
+foreign effect string from "@flick-lang/effect-ts/effect/ChildProcess" "flickString"
   reviewed "effect@4.1.2 sha256:40dccc7fabdf7b49"
 
 /// The lines the command writes to stdout.
 lines : Command ->{Async; PlatformError.PlatformError} List String
-foreign effect lines from "@flick-lang/runtime/effect/ChildProcess" "flickLines"
+foreign effect lines from "@flick-lang/effect-ts/effect/ChildProcess" "flickLines"
   reviewed "effect@4.1.2 sha256:40dccc7fabdf7b49"
 
 /// Runs the command to its end: its exit code.
 exit_code : Command ->{Async; PlatformError.PlatformError} Int
-foreign effect exit_code from "@flick-lang/runtime/effect/ChildProcess" "flickExitCode"
+foreign effect exit_code from "@flick-lang/effect-ts/effect/ChildProcess" "flickExitCode"
   reviewed "effect@4.1.2 sha256:40dccc7fabdf7b49"

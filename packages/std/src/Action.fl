@@ -16,14 +16,14 @@ type alias Action s = Ui.Handler s
 @maker
 /// Ignores events while the task of an earlier one runs.
 exhaust : (s -> (Eff {Async, Atom.Write, Ui.Document} none Unit)^c)^c -> (Action s)^c
-foreign pure exhaust from "@flick-lang/runtime/ui/react" "actionExhaust"
+foreign pure exhaust from "@flick-lang/effect-ts/ui/react" "actionExhaust"
   retention call
 
 @maker
 /// Interrupts the running task, waits until it stopped, then runs the last
 /// event; one event waits at most.
 latest : (s -> (Eff {Async, Atom.Write, Ui.Document} none Unit)^c)^c -> (Action s)^c
-foreign pure latest from "@flick-lang/runtime/ui/react" "actionLatest"
+foreign pure latest from "@flick-lang/effect-ts/ui/react" "actionLatest"
   retention call
 
 @lang action_queue
@@ -31,7 +31,7 @@ foreign pure latest from "@flick-lang/runtime/ui/react" "actionLatest"
 /// Runs events one by one, `capacity` of them waiting at most; an event
 /// that finds the queue full is rejected and reported to the supervisor.
 queue : Int -> (s -> (Eff {Async, Atom.Write, Ui.Document} none Unit)^c)^c -> (Action s)^c
-foreign pure queue from "@flick-lang/runtime/ui/react" "actionQueue"
+foreign pure queue from "@flick-lang/effect-ts/ui/react" "actionQueue"
   retention call
 
 @lang action_concurrent
@@ -39,7 +39,7 @@ foreign pure queue from "@flick-lang/runtime/ui/react" "actionQueue"
 /// Runs at most `limit` tasks at once; an event beyond that is rejected
 /// and reported to the supervisor.
 concurrent : Int -> (s -> (Eff {Async, Atom.Write, Ui.Document} none Unit)^c)^c -> (Action s)^c
-foreign pure concurrent from "@flick-lang/runtime/ui/react" "actionConcurrent"
+foreign pure concurrent from "@flick-lang/effect-ts/ui/react" "actionConcurrent"
   retention call
 
 /// `action` with `arg` paired with each snapshot: data, not a closure, so
@@ -48,5 +48,5 @@ foreign pure concurrent from "@flick-lang/runtime/ui/react" "actionConcurrent"
 /// when a keyed list reorders: the editor of one item does not wait for
 /// another's.
 with : (Action (a, s))^c -> a -> (Action s)^c
-foreign pure with from "@flick-lang/runtime/ui/react" "actionWith"
+foreign pure with from "@flick-lang/effect-ts/ui/react" "actionWith"
   retention call

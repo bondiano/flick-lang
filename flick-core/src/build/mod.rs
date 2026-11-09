@@ -60,7 +60,12 @@ pub fn schema_aot_file(name: &str) -> String {
 }
 
 /// The runtime modules `[build] ui` replaces.
-const UI_RENDERER: &[&str] = &["@flick-lang/runtime/ui", "@flick-lang/runtime/ui/react"];
+const UI_RENDERER: &[&str] = &[
+    "@flick-lang/effect-ts/ui",
+    "@flick-lang/effect-ts/ui/react",
+    "@flick-lang/runtime/ui",
+    "@flick-lang/runtime/ui/react",
+];
 
 /// A file of the output, by its path relative to the output directory.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -272,6 +277,9 @@ fn foreign_specifier(
     }
     if settings.backend == Backend::Rt && !relative {
         return effects::rt_specifier(spec).unwrap_or_else(|| spec.to_owned());
+    }
+    if settings.backend == Backend::Effect && !relative {
+        return effects::effect_specifier(spec);
     }
     match (relative, dir) {
         (true, Some(dir)) => {
@@ -736,7 +744,7 @@ fn runner(file: &str, entry: &str, start: &Start, schema_aot: Option<&str>) -> A
     let (import, run) = match start {
         Start::Call => (None, "main(undefined);"),
         Start::RunMain => (
-            Some(("runMain", "@flick-lang/runtime")),
+            Some(("runMain", "@flick-lang/effect-ts")),
             "await runMain(main);",
         ),
         Start::RunMainRt => (
@@ -751,7 +759,7 @@ fn runner(file: &str, entry: &str, start: &Start, schema_aot: Option<&str>) -> A
     });
     let contents = if let Some(aot) = schema_aot {
         format!(
-            "import {{ enableSchemaAot, installSchemaAot }} from \"@flick-lang/runtime\";\n{import}\nenableSchemaAot();\nconst {{ main }} = await import(\"{entry}\");\ninstallSchemaAot(await import(\"./{aot}\"));\n{run}\n"
+            "import {{ enableSchemaAot, installSchemaAot }} from \"@flick-lang/effect-ts\";\n{import}\nenableSchemaAot();\nconst {{ main }} = await import(\"{entry}\");\ninstallSchemaAot(await import(\"./{aot}\"));\n{run}\n"
         )
     } else {
         format!("{import}import {{ main }} from \"{entry}\";\n\n{run}\n")

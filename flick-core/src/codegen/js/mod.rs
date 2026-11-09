@@ -58,7 +58,7 @@ use crate::types::Dict;
 use exports::annotations;
 use exports::sync_exports;
 
-const RUNTIME: &str = "@flick-lang/runtime";
+const RUNTIME: &str = "@flick-lang/effect-ts";
 const MARK_START: char = '\u{E000}';
 const MARK_END: char = '\u{E001}';
 

@@ -5,45 +5,45 @@ module Random exposing (..)
 
 /// A number in [0, 1).
 next : Unit ->{} Float
-foreign effect next from "@flick-lang/runtime/effect/Random" "flickNext"
+foreign effect next from "@flick-lang/effect-ts/effect/Random" "flickNext"
   arity 0
   reviewed "effect@4.1.2 sha256:139b4a34859dc62b"
 
 /// `true` or `false`.
 next_boolean : Unit ->{} Bool
-foreign effect next_boolean from "@flick-lang/runtime/effect/Random" "flickNextBoolean"
+foreign effect next_boolean from "@flick-lang/effect-ts/effect/Random" "flickNextBoolean"
   arity 0
   reviewed "effect@4.1.2 sha256:a67565a1f6dd2738"
 
 /// An `Int`, over its whole 32-bit range.
 next_int : Unit ->{} Int
-foreign effect next_int from "@flick-lang/runtime/effect/Random" "flickNextInt"
+foreign effect next_int from "@flick-lang/effect-ts/effect/Random" "flickNextInt"
   arity 0
   reviewed "effect@4.1.2 sha256:1a7a2fb0fb70f2ba"
 
 /// A number in [min, max).
 next_between : Float -> Float ->{} Float
-foreign effect next_between from "@flick-lang/runtime/effect/Random" "nextBetween"
+foreign effect next_between from "@flick-lang/effect-ts/effect/Random" "nextBetween"
   reviewed "effect@4.1.2 sha256:aa6a35c1f1be26d2"
 
 /// An integer in [min, max], or [min, max) with `halfOpen`.
 next_int_between : { halfOpen : Option Bool } -> Int -> Int ->{} Int
-foreign effect next_int_between from "@flick-lang/runtime/effect/Random" "flickNextIntBetween"
+foreign effect next_int_between from "@flick-lang/effect-ts/effect/Random" "flickNextIntBetween"
   reviewed "effect@4.1.2 sha256:f366445a68ad45fc"
 
 /// The elements in a random order.
 shuffle : List a ->{} List a
-foreign effect shuffle from "@flick-lang/runtime/effect/Random" "shuffle"
+foreign effect shuffle from "@flick-lang/effect-ts/effect/Random" "shuffle"
   reviewed "effect@4.1.2 sha256:0a20473062dfbea9"
 
 /// One of the elements.
 choice : NonEmpty.NonEmpty a ->{} a
-foreign effect choice from "@flick-lang/runtime/effect/Random" "choice"
+foreign effect choice from "@flick-lang/effect-ts/effect/Random" "choice"
   reviewed "effect@4.1.2 sha256:902606ec0b585c36"
 
 /// Runs `task` with a generator seeded by `seed`: the same seed, the same draws.
 with_seed : Float -> (Eff r e a)^c ->{r; e} a
-foreign effect with_seed from "@flick-lang/runtime/effect/Random" "withSeed"
+foreign effect with_seed from "@flick-lang/effect-ts/effect/Random" "withSeed"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:2d13d347f06a3a37"

@@ -11,118 +11,118 @@ import Gen
 
 /// Numbers, `NaN` and the infinities included.
 number : Schema Float
-foreign pure number from "@flick-lang/runtime" "schemaNumber"
+foreign pure number from "@flick-lang/effect-ts" "schemaNumber"
   reviewed "effect@4.1.2 sha256:896cf94fa87a6316"
 
 /// Strings.
 string : Schema String
-foreign pure string from "@flick-lang/runtime" "schemaString"
+foreign pure string from "@flick-lang/effect-ts" "schemaString"
   reviewed "effect@4.1.2 sha256:9f6f00ea557ca8a0"
 
 /// Booleans.
 bool : Schema Bool
-foreign pure bool from "@flick-lang/runtime" "schemaBool"
+foreign pure bool from "@flick-lang/effect-ts" "schemaBool"
   reviewed "effect@4.1.2 sha256:9d843d230714ef54"
 
 /// BigInts.
 bigint : Schema BigInt
-foreign pure bigint from "@flick-lang/runtime" "schemaBigint"
+foreign pure bigint from "@flick-lang/effect-ts" "schemaBigint"
   reviewed "effect@4.1.2 sha256:758082cef0274082"
 
 /// `()`.
 unit : Schema Unit
-foreign pure unit from "@flick-lang/runtime" "schemaUnit"
+foreign pure unit from "@flick-lang/effect-ts" "schemaUnit"
   reviewed "effect@4.1.2 sha256:ddce6c1333e4efc5"
 
 /// No value.
 never : Schema Never
-foreign pure never from "@flick-lang/runtime" "schemaNever"
+foreign pure never from "@flick-lang/effect-ts" "schemaNever"
   reviewed "effect@4.1.2 sha256:c42dc25a140bc120"
 
 /// Lists of the item's values.
 list : Schema a -> Schema (List a)
-foreign pure list from "@flick-lang/runtime" "schemaList"
+foreign pure list from "@flick-lang/effect-ts" "schemaList"
   reviewed "effect@4.1.2 sha256:31e04eb2626179de"
 
 /// `Some` of the item's values, or `None`.
 option : Schema a -> Schema (Option a)
-foreign pure option from "@flick-lang/runtime" "schemaOption"
+foreign pure option from "@flick-lang/effect-ts" "schemaOption"
   reviewed "effect@4.1.2 sha256:3efe859326288138"
 
 /// `Err` of the error's values or `Ok` of the value's.
 result : Schema e -> Schema a -> Schema (Result e a)
-foreign pure result from "@flick-lang/runtime" "schemaResult"
+foreign pure result from "@flick-lang/effect-ts" "schemaResult"
   reviewed "effect@4.1.2 sha256:62953f28b638050a"
 
 /// Redacted values of the item; no JSON form without an explicit policy.
 redacted : Schema a -> Schema (Redacted a)
-foreign pure redacted from "@flick-lang/runtime" "schemaRedacted"
+foreign pure redacted from "@flick-lang/effect-ts" "schemaRedacted"
   reviewed "effect@4.1.2 sha256:dcdd94df46f88c71"
 
 /// A witness of a type with no wire form, as a scoped resource: checking a
 /// value passes, a JSON codec or export of it is refused with `reason`.
 opaque : String -> String -> Schema a
-foreign pure opaque from "@flick-lang/runtime" "schemaOpaque"
+foreign pure opaque from "@flick-lang/effect-ts" "schemaOpaque"
   reviewed "effect@4.1.2 sha256:0013d2728a6e900b"
 
 /// A schema with an explicit generator for `Schema.arbitrary`.
 with_generator : Gen.Gen a -> Schema a -> Schema a
-foreign pure with_generator from "@flick-lang/runtime" "schemaWithGenerator"
+foreign pure with_generator from "@flick-lang/effect-ts" "schemaWithGenerator"
 
 /// `input` as a value of the type, if it is one.
 validate : Schema a -> Unknown -> Result SchemaError a
-foreign pure validate from "@flick-lang/runtime" "schemaValidate"
+foreign pure validate from "@flick-lang/effect-ts" "schemaValidate"
 
 /// Values of the schema for property tests; a refinement needs
 /// `with_generator`.
 arbitrary : Schema a -> Gen.Gen a
-foreign pure arbitrary from "@flick-lang/runtime" "schemaArbitrary"
+foreign pure arbitrary from "@flick-lang/effect-ts" "schemaArbitrary"
 
 /// Any inert data, kept as it is; strict JSON Schema export refuses it.
 unknown : Schema Unknown
-foreign pure unknown from "@flick-lang/runtime" "schemaUnknown"
+foreign pure unknown from "@flick-lang/effect-ts" "schemaUnknown"
   reviewed "effect@4.1.2 sha256:4bcffb96fdb94636"
 
 /// Durations; their canonical JSON form is `Duration.json_millis`.
 duration : Schema Duration.Duration
-foreign pure duration from "@flick-lang/runtime/effect/Schema" "flickDuration"
+foreign pure duration from "@flick-lang/effect-ts/effect/Schema" "flickDuration"
   reviewed "effect@4.1.2 sha256:5eb928efac635541"
 
 /// Decimals; their canonical JSON form is `BigDecimal.json`.
 decimal : Schema BigDecimal.BigDecimal
-foreign pure decimal from "@flick-lang/runtime/effect/Schema" "flickBigDecimal"
+foreign pure decimal from "@flick-lang/effect-ts/effect/Schema" "flickBigDecimal"
   reviewed "effect@4.1.2 sha256:e63580a9cec685b8"
 
 /// Chunks of the item's values; their canonical JSON form is an array.
 chunk : Schema a -> Schema (Chunk.Chunk a)
-foreign pure chunk from "@flick-lang/runtime/effect/Schema" "flickChunk"
+foreign pure chunk from "@flick-lang/effect-ts/effect/Schema" "flickChunk"
   reviewed "effect@4.1.2 sha256:2826521488c26924"
 
 /// Integers of 32 bits.
 int : Schema Int
-foreign pure int from "@flick-lang/runtime" "schemaInt"
+foreign pure int from "@flick-lang/effect-ts" "schemaInt"
 
 /// A field of a record's schema: its label and the schema of its values.
 type Field
 
 field : String -> Schema a -> Field
-foreign pure field from "@flick-lang/runtime" "schemaField"
+foreign pure field from "@flick-lang/effect-ts" "schemaField"
 
 /// The schema of a record of `fields`, in label order. Nothing checks that
 /// they are the fields of `a`: `deriving Schema` writes it under a
 /// signature, `T$schema : Schema T`.
 unsafe_record : List Field -> Schema a
-foreign pure unsafe_record from "@flick-lang/runtime" "schemaRecordOf"
+foreign pure unsafe_record from "@flick-lang/effect-ts" "schemaRecordOf"
 
 /// An item of a tuple's schema.
 type Item
 
 item : Schema a -> Item
-foreign pure item from "@flick-lang/runtime" "schemaItem"
+foreign pure item from "@flick-lang/effect-ts" "schemaItem"
 
 /// The schema of a tuple of `items`, unchecked as `unsafe_record` is.
 unsafe_tuple : List Item -> Schema a
-foreign pure unsafe_tuple from "@flick-lang/runtime" "schemaTupleOf"
+foreign pure unsafe_tuple from "@flick-lang/effect-ts" "schemaTupleOf"
 
 /// A constructor of a variant type and the schemas of its fields.
 type Case
@@ -130,27 +130,27 @@ type Case
 /// The constructor `c`, a value, and its fields: `Schema.case Circle
 /// [Schema.item Schema.number]`. Nothing checks that they are its fields.
 unsafe_case : c -> List Item -> Case
-foreign pure unsafe_case from "@flick-lang/runtime" "schemaCase"
+foreign pure unsafe_case from "@flick-lang/effect-ts" "schemaCase"
 
 /// The schema of the variant type `name` of these constructors, unchecked
 /// as `unsafe_record` is.
 unsafe_adt : String -> List Case -> Schema a
-foreign pure unsafe_adt from "@flick-lang/runtime" "schemaAdtOf"
+foreign pure unsafe_adt from "@flick-lang/effect-ts" "schemaAdtOf"
 
 /// The schema of `name`, made on first use: a reference to a type whose
 /// schema is defined elsewhere in the module, named in JSON Schema.
 lazy : String -> (Unit -> Schema a) -> Schema a
-foreign pure lazy from "@flick-lang/runtime" "schemaLazyOf"
+foreign pure lazy from "@flick-lang/effect-ts" "schemaLazyOf"
 
 /// The schema of a recursive type `name`: `of` gets the schema itself, a
 /// reference named in JSON Schema.
 recursive : String -> (Schema a -> Schema a) -> Schema a
-foreign pure recursive from "@flick-lang/runtime" "schemaRecursive"
+foreign pure recursive from "@flick-lang/effect-ts" "schemaRecursive"
 
 /// The schema of an `unboxed type`, whose values are those of its field,
 /// unchecked as `unsafe_record` is.
 unsafe_unboxed : Schema b -> Schema a
-foreign pure unsafe_unboxed from "@flick-lang/runtime" "schemaUnboxed"
+foreign pure unsafe_unboxed from "@flick-lang/effect-ts" "schemaUnboxed"
 
 /// The schema of an enum, whose values are its literals of `base`: on the
 /// wire the literals too, which JSON Schema lists as `enum`.
@@ -160,16 +160,16 @@ let enum base = unsafe_literals base Enum.value Enum.all
 /// The schema of `values`, each its literal of `base` at run time, as
 /// `value` gives it; unchecked as `unsafe_record` is.
 unsafe_literals : Schema b -> (a -> b) -> List a -> Schema a
-foreign pure unsafe_literals from "@flick-lang/runtime" "schemaLiterals"
+foreign pure unsafe_literals from "@flick-lang/effect-ts" "schemaLiterals"
 
 /// The schema of an enum on the wire as a variant type, `{"_tag": "Get"}`:
 /// each constructor's name with its value, a literal of `base`. Unchecked
 /// as `unsafe_record` is.
 unsafe_enum_tags : Schema b -> List (String, a) -> Schema a
-foreign pure unsafe_enum_tags from "@flick-lang/runtime" "schemaEnumTags"
+foreign pure unsafe_enum_tags from "@flick-lang/effect-ts" "schemaEnumTags"
 
 /// The schema of the refined type `name` over `base`, which `parse` checks;
 /// `known` names a check exporters know, `"email"`. Unchecked as
 /// `unsafe_record` is: `parse` must be the type's own.
 unsafe_refined : String -> Option String -> Schema b -> (b -> Result SchemaError a) -> Schema a
-foreign pure unsafe_refined from "@flick-lang/runtime" "schemaRefinedOf"
+foreign pure unsafe_refined from "@flick-lang/effect-ts" "schemaRefinedOf"

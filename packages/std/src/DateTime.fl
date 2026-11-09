@@ -77,33 +77,33 @@ service CurrentTimeZone =
 
 /// Parses an ISO date-time; a string without an offset is read as UTC.
 make : String -> Result DateTimeError DateTime
-foreign pure make from "@flick-lang/runtime/effect/DateTime" "flickMake"
+foreign pure make from "@flick-lang/effect-ts/effect/DateTime" "flickMake"
   reviewed "effect@4.1.2 sha256:0f92e12e08d886ef"
 
 /// The UTC date-time of the given parts, the others from 1970-01-01.
 from_parts : PartialParts -> Result DateTimeError DateTime
-foreign pure from_parts from "@flick-lang/runtime/effect/DateTime" "flickFromParts"
+foreign pure from_parts from "@flick-lang/effect-ts/effect/DateTime" "flickFromParts"
   reviewed "effect@4.1.2 sha256:0f92e12e08d886ef"
 
 /// The UTC date-time `n` seconds after 1970-01-01.
 from_epoch_seconds : Float -> Result DateTimeError DateTime
-foreign pure from_epoch_seconds from "@flick-lang/runtime/effect/DateTime" "flickFromEpochSeconds"
+foreign pure from_epoch_seconds from "@flick-lang/effect-ts/effect/DateTime" "flickFromEpochSeconds"
   reviewed "effect@4.1.2 sha256:9efb17052ac67760"
 
 /// The date-time placed in the zone.
 make_zoned : ZoneOptions -> TimeZone -> DateTime -> Result DateTimeError DateTime
-foreign pure make_zoned from "@flick-lang/runtime/effect/DateTime" "flickMakeZoned"
+foreign pure make_zoned from "@flick-lang/effect-ts/effect/DateTime" "flickMakeZoned"
   reviewed "effect@4.1.2 sha256:02098c7c6d38ba3f"
 
 /// Parses `2024-03-10T09:00:00.000+01:00[Europe/Paris]` or an ISO string
 /// with an offset.
 make_zoned_from_string : String -> Result DateTimeError DateTime
-foreign pure make_zoned_from_string from "@flick-lang/runtime/effect/DateTime" "flickMakeZonedFromString"
+foreign pure make_zoned_from_string from "@flick-lang/effect-ts/effect/DateTime" "flickMakeZonedFromString"
   reviewed "effect@4.1.2 sha256:f2bc7607bedcf499"
 
 /// The current instant, in UTC, from the fiber's clock.
 now : Unit ->{} DateTime
-foreign effect now from "@flick-lang/runtime/effect/DateTime" "flickNow"
+foreign effect now from "@flick-lang/effect-ts/effect/DateTime" "flickNow"
   arity 0
   reviewed "effect@4.1.2 sha256:048cf7652fb67b8d"
 
@@ -113,38 +113,38 @@ let now_in_current_zone () = set_zone_current (now ())
 
 /// Whether the date-time is UTC.
 is_utc : DateTime -> Bool
-foreign pure is_utc from "@flick-lang/runtime/effect/DateTime" "isUtc"
+foreign pure is_utc from "@flick-lang/effect-ts/effect/DateTime" "isUtc"
   reviewed "effect@4.1.2 sha256:8a95dad64bba2f7f"
 
 /// Whether the date-time has a zone.
 is_zoned : DateTime -> Bool
-foreign pure is_zoned from "@flick-lang/runtime/effect/DateTime" "isZoned"
+foreign pure is_zoned from "@flick-lang/effect-ts/effect/DateTime" "isZoned"
   reviewed "effect@4.1.2 sha256:e3e60b7cff44c3a2"
 
 /// By kind: `onUtc` for a UTC date-time, `onZoned` for a zoned one.
 match_ : { onUtc : DateTime -> a; onZoned : DateTime -> a } -> DateTime -> a
-foreign pure match_ from "@flick-lang/runtime/effect/DateTime" "match"
+foreign pure match_ from "@flick-lang/effect-ts/effect/DateTime" "match"
   arity 1
   reviewed "effect@4.1.2 sha256:411148ed137d0c6c"
 
 /// The same instant in UTC.
 to_utc : DateTime -> DateTime
-foreign pure to_utc from "@flick-lang/runtime/effect/DateTime" "toUtc"
+foreign pure to_utc from "@flick-lang/effect-ts/effect/DateTime" "toUtc"
   reviewed "effect@4.1.2 sha256:345fb07a0571a40f"
 
 /// The date-time in the zone.
 set_zone : ZoneOptions -> TimeZone -> DateTime -> Result DateTimeError DateTime
-foreign pure set_zone from "@flick-lang/runtime/effect/DateTime" "flickSetZone"
+foreign pure set_zone from "@flick-lang/effect-ts/effect/DateTime" "flickSetZone"
   reviewed "effect@4.1.2 sha256:b89bb06b303864e7"
 
 /// The date-time at the offset, in milliseconds.
 set_zone_offset : ZoneOptions -> Float -> DateTime -> Result DateTimeError DateTime
-foreign pure set_zone_offset from "@flick-lang/runtime/effect/DateTime" "flickSetZoneOffset"
+foreign pure set_zone_offset from "@flick-lang/effect-ts/effect/DateTime" "flickSetZoneOffset"
   reviewed "effect@4.1.2 sha256:3fbaa0c1ee44dca8"
 
 /// The date-time in the zone of that IANA id.
 set_zone_named : ZoneOptions -> String -> DateTime -> Result DateTimeError DateTime
-foreign pure set_zone_named from "@flick-lang/runtime/effect/DateTime" "flickSetZoneNamed"
+foreign pure set_zone_named from "@flick-lang/effect-ts/effect/DateTime" "flickSetZoneNamed"
   reviewed "effect@4.1.2 sha256:6d4acf510368f1c9"
 
 /// The date-time in the current time zone, keeping the instant.
@@ -158,12 +158,12 @@ let set_zone_current t =
 
 /// The zone at a fixed offset from UTC, in milliseconds.
 zone_make_offset : Float -> TimeZone
-foreign pure zone_make_offset from "@flick-lang/runtime/effect/DateTime" "zoneMakeOffset"
+foreign pure zone_make_offset from "@flick-lang/effect-ts/effect/DateTime" "zoneMakeOffset"
   reviewed "effect@4.1.2 sha256:60aeb3e0972bf05f"
 
 /// The zone of an IANA id such as `Europe/Paris`.
 zone_make_named : String -> Result DateTimeError TimeZone
-foreign pure zone_make_named from "@flick-lang/runtime/effect/DateTime" "flickZoneMakeNamed"
+foreign pure zone_make_named from "@flick-lang/effect-ts/effect/DateTime" "flickZoneMakeNamed"
   reviewed "effect@4.1.2 sha256:d18521a306aca24a"
 
 /// `zone_make_named` as a runtime call failing with `DateTimeError`.
@@ -172,18 +172,18 @@ let zone_make_named_effect id = from_result (zone_make_named id)
 
 /// The zone of the machine the program runs on.
 zone_make_local : Unit ->{} TimeZone
-foreign zone_make_local from "@flick-lang/runtime/effect/DateTime" "zoneMakeLocal"
+foreign zone_make_local from "@flick-lang/effect-ts/effect/DateTime" "zoneMakeLocal"
   arity 0
   reviewed "effect@4.1.2 sha256:63133ecf5695a43a"
 
 /// An IANA id or an offset such as `+01:00`.
 zone_from_string : String -> Result DateTimeError TimeZone
-foreign pure zone_from_string from "@flick-lang/runtime/effect/DateTime" "flickZoneFromString"
+foreign pure zone_from_string from "@flick-lang/effect-ts/effect/DateTime" "flickZoneFromString"
   reviewed "effect@4.1.2 sha256:3aa8f4bee027c2b2"
 
 /// The IANA id, or the offset as `+01:00`.
 zone_to_string : TimeZone -> String
-foreign pure zone_to_string from "@flick-lang/runtime/effect/DateTime" "zoneToString"
+foreign pure zone_to_string from "@flick-lang/effect-ts/effect/DateTime" "zoneToString"
   reviewed "effect@4.1.2 sha256:6d063395d7a573a9"
 
 /// Provides the zone as the current time zone.
@@ -204,204 +204,204 @@ let layer_current_zone_local = Layer.succeed CurrentTimeZone { current_zone = zo
 
 /// The milliseconds since 1970-01-01 UTC.
 to_epoch_millis : DateTime -> Float
-foreign pure to_epoch_millis from "@flick-lang/runtime/effect/DateTime" "toEpochMillis"
+foreign pure to_epoch_millis from "@flick-lang/effect-ts/effect/DateTime" "toEpochMillis"
   reviewed "effect@4.1.2 sha256:e5ba4e1f4f6368a4"
 
 /// The whole seconds since 1970-01-01 UTC.
 to_epoch_seconds : DateTime -> Float
-foreign pure to_epoch_seconds from "@flick-lang/runtime/effect/DateTime" "toEpochSeconds"
+foreign pure to_epoch_seconds from "@flick-lang/effect-ts/effect/DateTime" "toEpochSeconds"
   reviewed "effect@4.1.2 sha256:9014f104b325355a"
 
 /// The epoch milliseconds mapped by `f`, keeping the zone.
 map_epoch_millis : (Float -> Float) -> DateTime -> DateTime
-foreign pure map_epoch_millis from "@flick-lang/runtime/effect/DateTime" "mapEpochMillis"
+foreign pure map_epoch_millis from "@flick-lang/effect-ts/effect/DateTime" "mapEpochMillis"
   arity 1
   reviewed "effect@4.1.2 sha256:6d92a84dbde1f3ba"
 
 /// The parts in the date-time's zone.
 to_parts : DateTime -> Parts
-foreign pure to_parts from "@flick-lang/runtime/effect/DateTime" "toParts"
+foreign pure to_parts from "@flick-lang/effect-ts/effect/DateTime" "toParts"
   reviewed "effect@4.1.2 sha256:5ffc365a727841e5"
 
 /// The parts in UTC.
 to_parts_utc : DateTime -> Parts
-foreign pure to_parts_utc from "@flick-lang/runtime/effect/DateTime" "toPartsUtc"
+foreign pure to_parts_utc from "@flick-lang/effect-ts/effect/DateTime" "toPartsUtc"
   reviewed "effect@4.1.2 sha256:5962faee2d62355f"
 
 /// The given parts replaced, in the date-time's zone.
 set_parts : PartialParts -> DateTime -> DateTime
-foreign pure set_parts from "@flick-lang/runtime/effect/DateTime" "flickSetParts"
+foreign pure set_parts from "@flick-lang/effect-ts/effect/DateTime" "flickSetParts"
   reviewed "effect@4.1.2 sha256:56213f3ef6291d7c"
 
 /// The given parts replaced, in UTC.
 set_parts_utc : PartialParts -> DateTime -> DateTime
-foreign pure set_parts_utc from "@flick-lang/runtime/effect/DateTime" "flickSetPartsUtc"
+foreign pure set_parts_utc from "@flick-lang/effect-ts/effect/DateTime" "flickSetPartsUtc"
   reviewed "effect@4.1.2 sha256:b7a790d751ffe83e"
 
 /// The UTC midnight of the date-time's UTC day.
 remove_time : DateTime -> DateTime
-foreign pure remove_time from "@flick-lang/runtime/effect/DateTime" "removeTime"
+foreign pure remove_time from "@flick-lang/effect-ts/effect/DateTime" "removeTime"
   reviewed "effect@4.1.2 sha256:8961ea0bd3046530"
 
 /// The offset of a zoned date-time, in milliseconds; `None` for UTC.
 zoned_offset : DateTime -> Option Float
-foreign pure zoned_offset from "@flick-lang/runtime/effect/DateTime" "flickZonedOffset"
+foreign pure zoned_offset from "@flick-lang/effect-ts/effect/DateTime" "flickZonedOffset"
   reviewed "effect@4.1.2 sha256:e9e947a43ebd3c03"
 
 /// The offset of a zoned date-time as `+01:00`; `None` for UTC.
 zoned_offset_iso : DateTime -> Option String
-foreign pure zoned_offset_iso from "@flick-lang/runtime/effect/DateTime" "flickZonedOffsetIso"
+foreign pure zoned_offset_iso from "@flick-lang/effect-ts/effect/DateTime" "flickZonedOffsetIso"
   reviewed "effect@4.1.2 sha256:85e4c097d4433710"
 
 /// `t |> add Day 3`: time units move the instant, calendar units the wall clock.
 add : TimeUnit -> Float -> DateTime -> DateTime
-foreign pure add from "@flick-lang/runtime/effect/DateTime" "flickAdd"
+foreign pure add from "@flick-lang/effect-ts/effect/DateTime" "flickAdd"
   reviewed "effect@4.1.2 sha256:f67cee9e0ee26661"
 
 /// `t |> subtract Month 1`, as `add` does.
 subtract : TimeUnit -> Float -> DateTime -> DateTime
-foreign pure subtract from "@flick-lang/runtime/effect/DateTime" "flickSubtract"
+foreign pure subtract from "@flick-lang/effect-ts/effect/DateTime" "flickSubtract"
   reviewed "effect@4.1.2 sha256:e36504dec048e62d"
 
 /// The date-time the duration later.
 add_duration : Duration.Duration -> DateTime -> DateTime
-foreign pure add_duration from "@flick-lang/runtime/effect/DateTime" "addDuration"
+foreign pure add_duration from "@flick-lang/effect-ts/effect/DateTime" "addDuration"
   arity 1
   reviewed "effect@4.1.2 sha256:d28ab543e929a00b"
 
 /// The date-time the duration earlier.
 subtract_duration : Duration.Duration -> DateTime -> DateTime
-foreign pure subtract_duration from "@flick-lang/runtime/effect/DateTime" "subtractDuration"
+foreign pure subtract_duration from "@flick-lang/effect-ts/effect/DateTime" "subtractDuration"
   arity 1
   reviewed "effect@4.1.2 sha256:edeb62291f853099"
 
 /// The start of the unit the date-time is in; weeks start on
 /// `weekStartsOn` (0 for Sunday, the default).
 start_of : { weekStartsOn : Option Int } -> TimeUnit -> DateTime -> DateTime
-foreign pure start_of from "@flick-lang/runtime/effect/DateTime" "flickStartOf"
+foreign pure start_of from "@flick-lang/effect-ts/effect/DateTime" "flickStartOf"
   reviewed "effect@4.1.2 sha256:fff7007ef6df8081"
 
 /// The last millisecond of the unit the date-time is in.
 end_of : { weekStartsOn : Option Int } -> TimeUnit -> DateTime -> DateTime
-foreign pure end_of from "@flick-lang/runtime/effect/DateTime" "flickEndOf"
+foreign pure end_of from "@flick-lang/effect-ts/effect/DateTime" "flickEndOf"
   reviewed "effect@4.1.2 sha256:41295efe9bf681ba"
 
 /// The nearer of the start of the unit and the start of the next one.
 nearest : { weekStartsOn : Option Int } -> TimeUnit -> DateTime -> DateTime
-foreign pure nearest from "@flick-lang/runtime/effect/DateTime" "flickNearest"
+foreign pure nearest from "@flick-lang/effect-ts/effect/DateTime" "flickNearest"
   reviewed "effect@4.1.2 sha256:b5a6cb1d9fc31a9d"
 
 /// The time between the two, whichever comes first.
 distance : DateTime -> DateTime -> Duration.Duration
-foreign pure distance from "@flick-lang/runtime/effect/DateTime" "flickDistance"
+foreign pure distance from "@flick-lang/effect-ts/effect/DateTime" "flickDistance"
   reviewed "effect@4.1.2 sha256:cae97b81d816cb9b"
 
 /// The order of instants, earliest first; zones do not matter.
 compare_date_time : DateTime -> DateTime -> Ordering
-foreign pure compare_date_time from "@flick-lang/runtime/effect/DateTime" "flickCompare"
+foreign pure compare_date_time from "@flick-lang/effect-ts/effect/DateTime" "flickCompare"
   reviewed "effect@4.1.2 sha256:d8a89e685fa8b4fb"
 
 /// The earlier of the two.
 min : DateTime -> DateTime -> DateTime
-foreign pure min from "@flick-lang/runtime/effect/DateTime" "min"
+foreign pure min from "@flick-lang/effect-ts/effect/DateTime" "min"
   arity 1
   reviewed "effect@4.1.2 sha256:80547f10e9bac15b"
 
 /// The later of the two.
 max : DateTime -> DateTime -> DateTime
-foreign pure max from "@flick-lang/runtime/effect/DateTime" "max"
+foreign pure max from "@flick-lang/effect-ts/effect/DateTime" "max"
   arity 1
   reviewed "effect@4.1.2 sha256:17c2c8bd0bbba0cc"
 
 /// The date-time, moved into the bounds.
 clamp : { minimum : DateTime; maximum : DateTime } -> DateTime -> DateTime
-foreign pure clamp from "@flick-lang/runtime/effect/DateTime" "clamp"
+foreign pure clamp from "@flick-lang/effect-ts/effect/DateTime" "clamp"
   arity 1
   reviewed "effect@4.1.2 sha256:2ce43fc9ec0cd489"
 
 /// Whether the date-time lies within the bounds, both included.
 between : { minimum : DateTime; maximum : DateTime } -> DateTime -> Bool
-foreign pure between from "@flick-lang/runtime/effect/DateTime" "between"
+foreign pure between from "@flick-lang/effect-ts/effect/DateTime" "between"
   arity 1
   reviewed "effect@4.1.2 sha256:f5f0ba8e91f2bbba"
 
 /// `t |> is_less_than u`: `t` is earlier.
 is_less_than : DateTime -> DateTime -> Bool
-foreign pure is_less_than from "@flick-lang/runtime/effect/DateTime" "isLessThan"
+foreign pure is_less_than from "@flick-lang/effect-ts/effect/DateTime" "isLessThan"
   arity 1
   reviewed "effect@4.1.2 sha256:eea1d134adf36ba8"
 
 /// `t |> is_less_than_or_equal_to u`: `t` is not later.
 is_less_than_or_equal_to : DateTime -> DateTime -> Bool
-foreign pure is_less_than_or_equal_to from "@flick-lang/runtime/effect/DateTime" "isLessThanOrEqualTo"
+foreign pure is_less_than_or_equal_to from "@flick-lang/effect-ts/effect/DateTime" "isLessThanOrEqualTo"
   arity 1
   reviewed "effect@4.1.2 sha256:1dc5a4e35db55c71"
 
 /// `t |> is_greater_than u`: `t` is later.
 is_greater_than : DateTime -> DateTime -> Bool
-foreign pure is_greater_than from "@flick-lang/runtime/effect/DateTime" "isGreaterThan"
+foreign pure is_greater_than from "@flick-lang/effect-ts/effect/DateTime" "isGreaterThan"
   arity 1
   reviewed "effect@4.1.2 sha256:4327aa333ca75200"
 
 /// `t |> is_greater_than_or_equal_to u`: `t` is not earlier.
 is_greater_than_or_equal_to : DateTime -> DateTime -> Bool
-foreign pure is_greater_than_or_equal_to from "@flick-lang/runtime/effect/DateTime" "isGreaterThanOrEqualTo"
+foreign pure is_greater_than_or_equal_to from "@flick-lang/effect-ts/effect/DateTime" "isGreaterThanOrEqualTo"
   arity 1
   reviewed "effect@4.1.2 sha256:aca9dddbf6cb8d8e"
 
 /// Whether the date-time is after the clock's now.
 is_future : DateTime ->{} Bool
-foreign effect is_future from "@flick-lang/runtime/effect/DateTime" "isFuture"
+foreign effect is_future from "@flick-lang/effect-ts/effect/DateTime" "isFuture"
   reviewed "effect@4.1.2 sha256:a8dcf8cc7f5bb143"
 
 /// Whether the date-time is before the clock's now.
 is_past : DateTime ->{} Bool
-foreign effect is_past from "@flick-lang/runtime/effect/DateTime" "isPast"
+foreign effect is_past from "@flick-lang/effect-ts/effect/DateTime" "isPast"
   reviewed "effect@4.1.2 sha256:9780737ca92f1e90"
 
 /// Formats in the date-time's zone (UTC for a UTC one).
 format : FormatOptions -> DateTime -> Result DateTimeError String
-foreign pure format from "@flick-lang/runtime/effect/DateTime" "flickFormat"
+foreign pure format from "@flick-lang/effect-ts/effect/DateTime" "flickFormat"
   reviewed "effect@4.1.2 sha256:f0c127e081a324b9"
 
 /// Formats in the zone of the machine the program runs on.
 format_local : FormatOptions -> DateTime -> Result DateTimeError String
-foreign pure format_local from "@flick-lang/runtime/effect/DateTime" "flickFormatLocal"
+foreign pure format_local from "@flick-lang/effect-ts/effect/DateTime" "flickFormatLocal"
   reviewed "effect@4.1.2 sha256:133b7dd6017c3a6d"
 
 /// Formats in UTC.
 format_utc : FormatOptions -> DateTime -> Result DateTimeError String
-foreign pure format_utc from "@flick-lang/runtime/effect/DateTime" "flickFormatUtc"
+foreign pure format_utc from "@flick-lang/effect-ts/effect/DateTime" "flickFormatUtc"
   reviewed "effect@4.1.2 sha256:5856af1808f786c6"
 
 /// Formats with an `Intl.DateTimeFormat` made of the options.
 format_intl : FormatOptions -> DateTime -> Result DateTimeError String
-foreign pure format_intl from "@flick-lang/runtime/effect/DateTime" "flickFormatIntl"
+foreign pure format_intl from "@flick-lang/effect-ts/effect/DateTime" "flickFormatIntl"
   reviewed "effect@4.1.2 sha256:e186b67ad4dd5555"
 
 /// ISO 8601 in UTC: `2024-03-10T08:00:00.000Z`.
 format_iso : DateTime -> String
-foreign pure format_iso from "@flick-lang/runtime/effect/DateTime" "formatIso"
+foreign pure format_iso from "@flick-lang/effect-ts/effect/DateTime" "formatIso"
   reviewed "effect@4.1.2 sha256:addfe5ed384325a3"
 
 /// The ISO date in the date-time's zone: `2024-03-10`.
 format_iso_date : DateTime -> String
-foreign pure format_iso_date from "@flick-lang/runtime/effect/DateTime" "formatIsoDate"
+foreign pure format_iso_date from "@flick-lang/effect-ts/effect/DateTime" "formatIsoDate"
   reviewed "effect@4.1.2 sha256:94d54051ac33ba67"
 
 /// The ISO date in UTC.
 format_iso_date_utc : DateTime -> String
-foreign pure format_iso_date_utc from "@flick-lang/runtime/effect/DateTime" "formatIsoDateUtc"
+foreign pure format_iso_date_utc from "@flick-lang/effect-ts/effect/DateTime" "formatIsoDateUtc"
   reviewed "effect@4.1.2 sha256:2ac69ead62390dc5"
 
 /// ISO 8601 with the zone's offset: `2024-03-10T09:00:00.000+01:00`.
 format_iso_offset : DateTime -> String
-foreign pure format_iso_offset from "@flick-lang/runtime/effect/DateTime" "formatIsoOffset"
+foreign pure format_iso_offset from "@flick-lang/effect-ts/effect/DateTime" "formatIsoOffset"
   reviewed "effect@4.1.2 sha256:d818ae01bcb560ff"
 
 /// ISO 8601 with the offset and a named zone's id in brackets; `None` for UTC.
 format_iso_zoned : DateTime -> Option String
-foreign pure format_iso_zoned from "@flick-lang/runtime/effect/DateTime" "flickFormatIsoZoned"
+foreign pure format_iso_zoned from "@flick-lang/effect-ts/effect/DateTime" "flickFormatIsoZoned"
   reviewed "effect@4.1.2 sha256:14f754be4e6145cc"
 
 instance Eq DateTime =
@@ -412,30 +412,30 @@ instance Ord DateTime =
 
 /// A date-time as JSON ISO 8601 text, decoded to UTC; encodes only UTC ones.
 json_utc : PureCodec Json DateTime
-foreign pure json_utc from "@flick-lang/runtime/effect/DateTime" "flickJsonUtc"
+foreign pure json_utc from "@flick-lang/effect-ts/effect/DateTime" "flickJsonUtc"
   reviewed "effect@4.1.2 sha256:67f62f4e02ae87f9"
 
 /// A UTC date-time as a whole JSON number of milliseconds since the epoch.
 json_utc_millis : PureCodec Json DateTime
-foreign pure json_utc_millis from "@flick-lang/runtime/effect/DateTime" "flickJsonUtcMillis"
+foreign pure json_utc_millis from "@flick-lang/effect-ts/effect/DateTime" "flickJsonUtcMillis"
   reviewed "effect@4.1.2 sha256:051d69ddbcb03e32"
 
 /// A zoned date-time as JSON text: `"2024-01-01T09:00:00.000+01:00[Europe/Paris]"`.
 json_zoned : PureCodec Json DateTime
-foreign pure json_zoned from "@flick-lang/runtime/effect/DateTime" "flickJsonZoned"
+foreign pure json_zoned from "@flick-lang/effect-ts/effect/DateTime" "flickJsonZoned"
   reviewed "effect@4.1.2 sha256:316407fb71ddaf0c"
 
 /// A zone as JSON text: an IANA name or an offset such as `"+02:00"`.
 json_zone : PureCodec Json TimeZone
-foreign pure json_zone from "@flick-lang/runtime/effect/DateTime" "flickJsonZone"
+foreign pure json_zone from "@flick-lang/effect-ts/effect/DateTime" "flickJsonZone"
   reviewed "effect@4.1.2 sha256:37916e1b4cac8244"
 
 /// A named zone as JSON text; an offset or unknown name is a `SchemaError`.
 json_zone_named : PureCodec Json TimeZone
-foreign pure json_zone_named from "@flick-lang/runtime/effect/DateTime" "flickJsonZoneNamed"
+foreign pure json_zone_named from "@flick-lang/effect-ts/effect/DateTime" "flickJsonZoneNamed"
   reviewed "effect@4.1.2 sha256:0b47a93cf88d7295"
 
 /// A fixed-offset zone as a JSON number of milliseconds east of UTC.
 json_zone_offset : PureCodec Json TimeZone
-foreign pure json_zone_offset from "@flick-lang/runtime/effect/DateTime" "flickJsonZoneOffset"
+foreign pure json_zone_offset from "@flick-lang/effect-ts/effect/DateTime" "flickJsonZoneOffset"
   reviewed "effect@4.1.2 sha256:e80b9a59e619e0e8"

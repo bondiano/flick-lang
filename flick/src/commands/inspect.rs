@@ -265,9 +265,9 @@ pub fn schema_export(options: &SchemaExportArguments, explicit: Option<&str>) ->
     }
     let export = match options.target {
         SchemaTarget::JsonSchema => format!(
-            "import {{ codecJsonSchema }} from \"@flick-lang/runtime\";\nconst r = codecJsonSchema({value:?}, exported);"
+            "import {{ codecJsonSchema }} from \"@flick-lang/effect-ts\";\nconst r = codecJsonSchema({value:?}, exported);"
         ),
-        SchemaTarget::OpenApi => "import { httpApiOpenApi } from \"@flick-lang/runtime/effect/http-api/HttpApi\";\nconst r = httpApiOpenApi(exported);".to_owned(),
+        SchemaTarget::OpenApi => "import { httpApiOpenApi } from \"@flick-lang/effect-ts/effect/http-api/HttpApi\";\nconst r = httpApiOpenApi(exported);".to_owned(),
     };
     let script = format!(
         "{export}\nimport {{ {value} as exported }} from \"./{}.js\";\nif (r._tag === \"Success\") process.stdout.write(r.success); else {{ process.stderr.write(JSON.stringify(r.failure._0)); process.exitCode = 1; }}\n",

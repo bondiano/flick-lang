@@ -5,9 +5,9 @@ import path from "node:path";
 import { test } from "node:test";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
-import * as Effect from "@flick-lang/runtime/effect/Effect";
-import * as Fiber from "@flick-lang/runtime/effect/Fiber";
-import { type Ui, uiRenderStatic } from "@flick-lang/runtime/ui/react";
+import * as Effect from "@flick-lang/effect-ts/effect/Effect";
+import * as Fiber from "@flick-lang/effect-ts/effect/Fiber";
+import { type Ui, uiRenderStatic } from "@flick-lang/effect-ts/ui/react";
 import { JSDOM } from "jsdom";
 import { renderToString } from "react-dom/server";
 

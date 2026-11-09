@@ -360,7 +360,7 @@ fn schema_aot_writes_compiled_decoders_the_runner_installs() {
     );
     assert!(out.status.success(), "{out:?}");
     let aot = fs::read_to_string(dir.join("out/schemas.aot.js")).expect("compiled decoders");
-    assert!(aot.contains("from \"@flick-lang/runtime\""), "{aot}");
+    assert!(aot.contains("from \"@flick-lang/effect-ts\""), "{aot}");
     let run = Command::new("node")
         .arg(Path::new("out").join(runner_path(false)))
         .current_dir(&dir)

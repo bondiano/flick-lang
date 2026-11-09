@@ -47,6 +47,6 @@ export const keepAlive = <A>(atom: Atom<A>): Atom<A> => patched(atom, { keepAliv
 export const flickIdleTtl = <A>(ttl: Duration, atom: Atom<A>): Atom<A> => patched(atom, { idleTtl: ttl.millis });
 
 // a serializable atom codes its value with a `Schema`, which this runtime does not have yet
-const MODULE = "@flick-lang/runtime/effect/reactivity/Atom";
+const MODULE = "@flick-lang/effect-ts/effect/reactivity/Atom";
 export const flickSerializable = /*#__PURE__*/ absent(MODULE, "flickSerializable");
 export const flickSerializableFamily = /*#__PURE__*/ absent(MODULE, "flickSerializableFamily");

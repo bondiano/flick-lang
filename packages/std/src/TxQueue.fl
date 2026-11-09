@@ -13,142 +13,142 @@ type TxQueue a (e : ErrorRow)
 /// A new queue of at most `capacity` elements; an offer to a full one
 /// waits.
 bounded : Int ->{} TxQueue a e
-foreign effect bounded from "@flick-lang/runtime/effect/TxQueue" "bounded"
+foreign effect bounded from "@flick-lang/effect-ts/effect/TxQueue" "bounded"
   reviewed "effect@4.1.2 sha256:c064fa0cd99fd61c"
 
 /// A new queue without a bound.
 unbounded : Unit ->{} TxQueue a e
-foreign effect unbounded from "@flick-lang/runtime/effect/TxQueue" "unbounded"
+foreign effect unbounded from "@flick-lang/effect-ts/effect/TxQueue" "unbounded"
   arity 0
   reviewed "effect@4.1.2 sha256:be295e43c9f80c9a"
 
 /// A new queue of at most `capacity` elements; an offer to a full one
 /// drops the new element.
 dropping : Int ->{} TxQueue a e
-foreign effect dropping from "@flick-lang/runtime/effect/TxQueue" "dropping"
+foreign effect dropping from "@flick-lang/effect-ts/effect/TxQueue" "dropping"
   reviewed "effect@4.1.2 sha256:15171b76e7f8b0c8"
 
 /// A new queue of at most `capacity` elements; an offer to a full one
 /// drops the oldest element.
 sliding : Int ->{} TxQueue a e
-foreign effect sliding from "@flick-lang/runtime/effect/TxQueue" "sliding"
+foreign effect sliding from "@flick-lang/effect-ts/effect/TxQueue" "sliding"
   reviewed "effect@4.1.2 sha256:cb3e0a001ce280e2"
 
 /// Adds the element, waiting while a bounded queue is full; false when
 /// a dropping queue dropped it or the queue is closed.
 offer : a -> TxQueue a e ->{Async, Tx.Transaction;} Bool
-foreign effect offer from "@flick-lang/runtime/effect/TxQueue" "offer"
+foreign effect offer from "@flick-lang/effect-ts/effect/TxQueue" "offer"
   arity 1
   reviewed "effect@4.1.2 sha256:b9d8655fe9948f8b"
 
 /// Adds the elements, waiting while a bounded queue is full; the ones a
 /// dropping or closed queue did not take.
 offer_all : List a -> TxQueue a e ->{Async, Tx.Transaction;} List a
-foreign effect offer_all from "@flick-lang/runtime/effect/TxQueue" "offerAll"
+foreign effect offer_all from "@flick-lang/effect-ts/effect/TxQueue" "offerAll"
   arity 1
   reviewed "effect@4.1.2 sha256:cb34470fdfaf6365"
 
 /// Removes the oldest element, waiting for one.
 take : TxQueue a e ->{Async, Tx.Transaction; e} a
-foreign effect take from "@flick-lang/runtime/effect/TxQueue" "take"
+foreign effect take from "@flick-lang/effect-ts/effect/TxQueue" "take"
   reviewed "effect@4.1.2 sha256:98a03d7d64e0d279"
 
 /// Removes the oldest element, if there is one.
 poll : TxQueue a e ->{Tx.Transaction;} Option a
-foreign effect poll from "@flick-lang/runtime/effect/TxQueue" "poll"
+foreign effect poll from "@flick-lang/effect-ts/effect/TxQueue" "poll"
   reviewed "effect@4.1.2 sha256:d90ea7655e719948"
 
 /// Removes every element, waiting for at least one.
 take_all : TxQueue a e ->{Tx.Transaction; e} NonEmpty.NonEmpty a
-foreign effect take_all from "@flick-lang/runtime/effect/TxQueue" "takeAll"
+foreign effect take_all from "@flick-lang/effect-ts/effect/TxQueue" "takeAll"
   reviewed "effect@4.1.2 sha256:4308b512040656d0"
 
 /// Removes `n` elements, waiting for them.
 take_n : Int -> TxQueue a e ->{Async, Tx.Transaction; e} List a
-foreign effect take_n from "@flick-lang/runtime/effect/TxQueue" "takeN"
+foreign effect take_n from "@flick-lang/effect-ts/effect/TxQueue" "takeN"
   arity 1
   reviewed "effect@4.1.2 sha256:d3ca973702ca1dfd"
 
 /// Removes at least `min` and at most `max` elements, waiting for `min`.
 take_between : Int -> Int -> TxQueue a e ->{Async, Tx.Transaction; e} List a
-foreign effect take_between from "@flick-lang/runtime/effect/TxQueue" "takeBetween"
+foreign effect take_between from "@flick-lang/effect-ts/effect/TxQueue" "takeBetween"
   arity 2
   reviewed "effect@4.1.2 sha256:d937babda2d00f7d"
 
 /// The oldest element, kept in the queue, waiting for one.
 peek : TxQueue a e ->{Tx.Transaction; e} a
-foreign effect peek from "@flick-lang/runtime/effect/TxQueue" "peek"
+foreign effect peek from "@flick-lang/effect-ts/effect/TxQueue" "peek"
   reviewed "effect@4.1.2 sha256:98e107efe3222e19"
 
 /// The number of elements.
 size : TxQueue a e ->{Tx.Transaction;} Int
-foreign effect size from "@flick-lang/runtime/effect/TxQueue" "size"
+foreign effect size from "@flick-lang/effect-ts/effect/TxQueue" "size"
   reviewed "effect@4.1.2 sha256:4f107de686c5ad9d"
 
 /// Whether it has no elements.
 is_empty : TxQueue a e ->{Tx.Transaction;} Bool
-foreign effect is_empty from "@flick-lang/runtime/effect/TxQueue" "isEmpty"
+foreign effect is_empty from "@flick-lang/effect-ts/effect/TxQueue" "isEmpty"
   reviewed "effect@4.1.2 sha256:b190f20bea177c2f"
 
 /// Whether it has an element.
 is_non_empty : TxQueue a e ->{Tx.Transaction;} Bool
-foreign effect is_non_empty from "@flick-lang/runtime/effect/TxQueue" "isNonEmpty"
+foreign effect is_non_empty from "@flick-lang/effect-ts/effect/TxQueue" "isNonEmpty"
   reviewed "effect@4.1.2 sha256:717c83bfcde17378"
 
 /// Whether it holds as many elements as its capacity.
 is_full : TxQueue a e ->{Tx.Transaction;} Bool
-foreign effect is_full from "@flick-lang/runtime/effect/TxQueue" "isFull"
+foreign effect is_full from "@flick-lang/effect-ts/effect/TxQueue" "isFull"
   reviewed "effect@4.1.2 sha256:555f90c4fb10ad52"
 
 /// Closes it: takes drain the elements left, then interrupt the fiber;
 /// false when it was already closed.
 interrupt : TxQueue a e ->{Tx.Transaction;} Bool
-foreign effect interrupt from "@flick-lang/runtime/effect/TxQueue" "interrupt"
+foreign effect interrupt from "@flick-lang/effect-ts/effect/TxQueue" "interrupt"
   reviewed "effect@4.1.2 sha256:ebeb44f510cb2650"
 
 /// Closes it with the error, dropping its elements: takes fail with it;
 /// false when it was already closed.
 fail : Errors e -> TxQueue a e ->{Tx.Transaction;} Bool
-foreign effect fail from "@flick-lang/runtime/effect/TxQueue" "fail"
+foreign effect fail from "@flick-lang/effect-ts/effect/TxQueue" "fail"
   arity 1
   reviewed "effect@4.1.2 sha256:be9eddb116ae9a04"
 
 /// Closes it with the whole failure, as `fail` does with one error.
 fail_cause : Failure e -> TxQueue a e ->{Tx.Transaction;} Bool
-foreign effect fail_cause from "@flick-lang/runtime/effect/TxQueue" "flickFailCause"
+foreign effect fail_cause from "@flick-lang/effect-ts/effect/TxQueue" "flickFailCause"
   reviewed "effect@4.1.2 sha256:c8c5d4202b14fc45"
 
 /// Removes every element; fails with the queue's error when it failed.
 clear : TxQueue a e ->{Tx.Transaction; e} List a
-foreign effect clear from "@flick-lang/runtime/effect/TxQueue" "clear"
+foreign effect clear from "@flick-lang/effect-ts/effect/TxQueue" "clear"
   reviewed "effect@4.1.2 sha256:93b6c84d6c60278b"
 
 /// Drops its elements and closes it, as `interrupt` does.
 shutdown : TxQueue a e ->{Tx.Transaction;} Bool
-foreign effect shutdown from "@flick-lang/runtime/effect/TxQueue" "shutdown"
+foreign effect shutdown from "@flick-lang/effect-ts/effect/TxQueue" "shutdown"
   reviewed "effect@4.1.2 sha256:0d423aa6b77c0e53"
 
 /// Whether it takes offers.
 is_open : TxQueue a e ->{Tx.Transaction;} Bool
-foreign effect is_open from "@flick-lang/runtime/effect/TxQueue" "isOpen"
+foreign effect is_open from "@flick-lang/effect-ts/effect/TxQueue" "isOpen"
   reviewed "effect@4.1.2 sha256:777f98980b37208c"
 
 /// Whether it is closed but still holds elements to take.
 is_closing : TxQueue a e ->{Tx.Transaction;} Bool
-foreign effect is_closing from "@flick-lang/runtime/effect/TxQueue" "isClosing"
+foreign effect is_closing from "@flick-lang/effect-ts/effect/TxQueue" "isClosing"
   reviewed "effect@4.1.2 sha256:403ae1e5d97d6993"
 
 /// Whether it is closed and empty.
 is_done : TxQueue a e ->{Tx.Transaction;} Bool
-foreign effect is_done from "@flick-lang/runtime/effect/TxQueue" "isDone"
+foreign effect is_done from "@flick-lang/effect-ts/effect/TxQueue" "isDone"
   reviewed "effect@4.1.2 sha256:32c14ea43cdd6f73"
 
 /// Whether it is closed and empty, as `is_done`.
 is_shutdown : TxQueue a e ->{Tx.Transaction;} Bool
-foreign effect is_shutdown from "@flick-lang/runtime/effect/TxQueue" "isShutdown"
+foreign effect is_shutdown from "@flick-lang/effect-ts/effect/TxQueue" "isShutdown"
   reviewed "effect@4.1.2 sha256:783e632450da1d88"
 
 /// Retries the transaction until the queue is done.
 await_completion : TxQueue a e ->{Tx.Transaction;} Unit
-foreign effect await_completion from "@flick-lang/runtime/effect/TxQueue" "awaitCompletion"
+foreign effect await_completion from "@flick-lang/effect-ts/effect/TxQueue" "awaitCompletion"
   reviewed "effect@4.1.2 sha256:1b92f287244ad08c"

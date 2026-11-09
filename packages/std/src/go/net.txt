@@ -1,6 +1,6 @@
 # Effect's network addresses and DNS records (Net): their JSON codecs,
 # parsers and canonical texts.
-[@flick-lang/runtime/effect/Net]
+[@flick-lang/effect-ts/effect/Net]
 flickFormatIp NetFormatIp
 flickFormatInterface NetFormatInterface
 flickFormatNetwork NetFormatInterface

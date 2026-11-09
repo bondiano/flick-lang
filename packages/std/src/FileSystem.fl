@@ -222,54 +222,54 @@ let write_file_string options path text = FileSystem.write_file_string options p
 
 /// What `stat` tells of the open file.
 file_stat : File s ->{Async; PlatformError.PlatformError} Info
-foreign effect file_stat from "@flick-lang/runtime/effect/FileSystem" "flickFileStat"
+foreign effect file_stat from "@flick-lang/effect-ts/effect/FileSystem" "flickFileStat"
   retention call
   reviewed "effect@4.1.2 sha256:e5908aede5e43a55"
 
 /// Moves the position of the file; the new position.
 seek : BigInt -> SeekMode -> File s ->{Async; PlatformError.PlatformError} BigInt
-foreign effect seek from "@flick-lang/runtime/effect/FileSystem" "flickSeek"
+foreign effect seek from "@flick-lang/effect-ts/effect/FileSystem" "flickSeek"
   arity 3
   retention call
   reviewed "effect@4.1.2 sha256:e5908aede5e43a55"
 
 /// Flushes what was written to the storage device.
 sync : File s ->{Async; PlatformError.PlatformError} Unit
-foreign effect sync from "@flick-lang/runtime/effect/FileSystem" "flickSync"
+foreign effect sync from "@flick-lang/effect-ts/effect/FileSystem" "flickSync"
   retention call
   reviewed "effect@4.1.2 sha256:e5908aede5e43a55"
 
 /// Reads at most `size` bytes from the position, or from the current one;
 /// `None` at the end of the file.
 read_alloc : Int -> Option BigInt -> File s ->{Async; PlatformError.PlatformError} Option (List Int)
-foreign effect read_alloc from "@flick-lang/runtime/effect/FileSystem" "flickReadAlloc"
+foreign effect read_alloc from "@flick-lang/effect-ts/effect/FileSystem" "flickReadAlloc"
   arity 3
   retention call
   reviewed "effect@4.1.2 sha256:e5908aede5e43a55"
 
 /// Cuts or extends the open file to the length, by default 0.
 file_truncate : Option Float -> File s ->{Async; PlatformError.PlatformError} Unit
-foreign effect file_truncate from "@flick-lang/runtime/effect/FileSystem" "flickFileTruncate"
+foreign effect file_truncate from "@flick-lang/effect-ts/effect/FileSystem" "flickFileTruncate"
   arity 2
   retention call
   reviewed "effect@4.1.2 sha256:e5908aede5e43a55"
 
 /// Writes some of the bytes at the position; how many it wrote.
 write : List Int -> File s ->{Async; PlatformError.PlatformError} Int
-foreign effect write from "@flick-lang/runtime/effect/FileSystem" "flickWrite"
+foreign effect write from "@flick-lang/effect-ts/effect/FileSystem" "flickWrite"
   arity 2
   retention call
   reviewed "effect@4.1.2 sha256:e5908aede5e43a55"
 
 /// Writes all the bytes at the position.
 write_all : List Int -> File s ->{Async; PlatformError.PlatformError} Unit
-foreign effect write_all from "@flick-lang/runtime/effect/FileSystem" "flickWriteAll"
+foreign effect write_all from "@flick-lang/effect-ts/effect/FileSystem" "flickWriteAll"
   arity 2
   retention call
   reviewed "effect@4.1.2 sha256:e5908aede5e43a55"
 
 node_of : ServiceTag {FileSystem} -> Layer none none {FileSystem}
-foreign pure node_of from "@flick-lang/runtime/effect/FileSystem" "flickNode"
+foreign pure node_of from "@flick-lang/effect-ts/effect/FileSystem" "flickNode"
   reviewed "effect@4.1.2 sha256:c7982553317a7697"
 
 /// The file system of Node.js.

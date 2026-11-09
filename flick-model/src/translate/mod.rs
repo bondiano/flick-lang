@@ -193,9 +193,9 @@ fn foreign(path: Path, f: &ir::Foreign) -> Term {
     let arity = f.dicts + f.stages.len();
     let module = f.binding.from.as_deref().unwrap_or("global");
     let core = match (module, f.binding.name.as_str()) {
-        ("@flick-lang/runtime", "refMake") => Some(Const::RefMake),
-        ("@flick-lang/runtime", "refGet") => Some(Const::RefGet),
-        ("@flick-lang/runtime", "refSet") => Some(Const::RefSet),
+        ("@flick-lang/effect-ts", "refMake") => Some(Const::RefMake),
+        ("@flick-lang/effect-ts", "refGet") => Some(Const::RefGet),
+        ("@flick-lang/effect-ts", "refSet") => Some(Const::RefSet),
         (m, e) => region_op(m, e).map(|op| Const::Region(path, op)),
     };
     match core {
@@ -225,9 +225,9 @@ fn region_op(module: &str, export: &str) -> Option<RegionOp> {
         ("./res.mjs", "use") => RegionOp::Use,
         ("./res.mjs", "raw") => RegionOp::Make,
         ("./res.mjs", "close") => RegionOp::Release,
-        ("@flick-lang/runtime", "fiberSpawn") => RegionOp::Spawn,
-        ("@flick-lang/runtime", "acquireRelease") => RegionOp::AcquireRelease,
-        ("@flick-lang/runtime/effect/Scope", "flickAddFinalizer") => RegionOp::AddFinalizer,
+        ("@flick-lang/effect-ts", "fiberSpawn") => RegionOp::Spawn,
+        ("@flick-lang/effect-ts", "acquireRelease") => RegionOp::AcquireRelease,
+        ("@flick-lang/effect-ts/effect/Scope", "flickAddFinalizer") => RegionOp::AddFinalizer,
         _ => return None,
     })
 }

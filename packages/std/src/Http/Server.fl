@@ -39,14 +39,14 @@ serve :
   ServeOptions ->
   (ServerRequest ->{r; e} ServerResponse)^c ->{Async, Scope s | r; ServeError}
   Server s
-foreign effect serve from "@flick-lang/runtime/effect/http/HttpServer" "flickServe"
+foreign effect serve from "@flick-lang/effect-ts/effect/http/HttpServer" "flickServe"
   arity 2
   retention owner
   reviewed "effect@4.1.2 sha256:2830adcb190e6acd"
 
 /// Where the server listens.
 address : Server s -> Address
-foreign pure address from "@flick-lang/runtime/effect/http/HttpServer" "flickAddress"
+foreign pure address from "@flick-lang/effect-ts/effect/http/HttpServer" "flickAddress"
   retention call
   reviewed "effect@4.1.2 sha256:2ee695843d7fe6dc"
 
@@ -65,7 +65,7 @@ let address_formatted_with f server = f (format_address (address server))
 
 /// Logs `Listening on <url>` at the info level of Effect's logger.
 log_address : Server s ->{} Unit
-foreign effect log_address from "@flick-lang/runtime/effect/http/HttpServer" "flickLogAddress"
+foreign effect log_address from "@flick-lang/effect-ts/effect/http/HttpServer" "flickLogAddress"
   retention call
   reviewed "effect@4.1.2 sha256:13cc22882eaf503e"
 
