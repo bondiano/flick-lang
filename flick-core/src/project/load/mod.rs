@@ -123,6 +123,9 @@ struct Loader<'a> {
     ide: Option<Vec<Analyzed>>,
     /// With `Some`, the outputs of earlier runs to reuse.
     cache: Option<&'a mut ModuleCache>,
+    /// The plugins that watch names of the modules, each with the names its
+    /// package declares; filled while the blocks expand.
+    watchers: plugins::Watchers,
 }
 
 /// A module's IR and what the reference model reads of it.
@@ -326,6 +329,7 @@ fn run_in(
         #[cfg(feature = "ide")]
         ide: (mode == Mode::Analyze).then(Vec::new),
         cache,
+        watchers: plugins::Watchers::default(),
     };
     let mut roots: Vec<(Root, PathBuf)> = roots
         .iter()

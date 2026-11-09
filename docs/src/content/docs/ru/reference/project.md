@@ -1,6 +1,6 @@
 ---
 title: "Проект"
-source_hash: 6496b891f19821b8
+source_hash: f6a59992c928cae5
 ---
 
 Проект — каталог с `flick.toml` (см. [CLI компилятора](../cli/)).
@@ -196,6 +196,12 @@ name = "pairs"
 version = "1.0.0"
 plugin = "pairs.wasm"
 ```
+
+`watch = ["Ui.Event.queue", "*.parse"]` рядом с `plugin` называет вызовы, о
+которых её плагин спрашивают в каждом проверяемом модуле (см.
+[plugins.md](../plugins/#проверки-вызовов)); запись, которая не
+`Module.name`, не `Module.Sub.name` и не `*.name`, как и `watch` без `plugin`, —
+`FLICK-P032`.
 
 `load = ["proto"]` рядом с `plugin` говорит, что её плагин превращает файлы с
 этими расширениями в модули: `App/User.proto` — модуль `App.User` (см.

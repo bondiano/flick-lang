@@ -15,6 +15,7 @@ use super::{Loaded, Loader, Root};
 use crate::clock::timed;
 use crate::diagnostics::{Diagnostic, Severity};
 use crate::ir;
+use crate::plugin::calls as plugin_calls;
 #[cfg(feature = "ide")]
 use crate::plugin::expansion::Expansion;
 use crate::project::Project;
@@ -25,6 +26,11 @@ use crate::source::Span;
 use crate::source::{FileId, SourceMap};
 use crate::syntax::Parse;
 use crate::types;
+
+mod graph;
+
+pub(super) use graph::levels;
+use graph::{package_of, parallel};
 
 /// The output of checking each module in earlier runs, reused while the
 /// module's text, the interfaces of its imports and the configuration stay
@@ -74,6 +80,9 @@ struct Key {
     /// their docs, which checking does not read, and whether it is a module
     /// of the project.
     imports: Vec<(Option<Arc<Interface>>, bool)>,
+    /// What tells the watching plugins apart: a module without blocks is
+    /// checked again when one of them changes.
+    watching: Vec<String>,
 }
 
 impl Loader<'_> {
@@ -132,6 +141,8 @@ impl Loader<'_> {
             by_name: &self.by_name,
             from_packages: &self.from_packages,
             project: self.project,
+            watching: &self.watchers.plugins,
+            watched: &self.watchers.watched,
             stages_by_class: self.stages_by_class,
             // a failed import leaves names unresolved, and the build fails anyway
             lower: self.lowered.is_some()
@@ -188,6 +199,10 @@ struct Checking<'a> {
     lower_packages_only: bool,
     precompiled: &'a Precompiled,
     cache: Option<&'a ModuleCache>,
+    /// The plugins that watch names of every module.
+    watching: &'a [super::plugins::Watching],
+    /// Every name they watch, which the checker collects.
+    watched: &'a types::Watched,
 }
 
 impl Checking<'_> {
@@ -226,6 +241,9 @@ impl Checking<'_> {
                     };
                     (interface, self.by_name.contains_key(&i.module))
                 })
+                .collect(),
+            watching: (self.watching.iter())
+                .map(|w| w.plugin.id().to_owned())
                 .collect(),
         };
         match cache.entries.get(&loaded.path) {
@@ -298,6 +316,7 @@ impl Checking<'_> {
             thresholds: self
                 .project
                 .map_or_else(Default::default, |p| p.config.thresholds),
+            watched: self.watched,
             effects: build.is_none_or(|b| b.effect != Backend::None),
             stages_by_class: self.stages_by_class,
         };
@@ -320,6 +339,7 @@ impl Checking<'_> {
         if let Some(expansion) = &loaded.expansion {
             checked.extend(expansion.check_blocks(&loaded.editing, &typing.wildcards));
         }
+        checked.extend(self.watched_calls(loaded, &typing));
         let checked = types::beside_syntax_errors(tree, checked);
         let clean =
             !broken && resolved_cleanly && !checked.iter().any(|d| d.severity == Severity::Error);
@@ -360,6 +380,37 @@ impl Checking<'_> {
     }
 }
 
+impl Checking<'_> {
+    /// What the watching plugins find wrong with the places of `loaded` that
+    /// call the names each watches, at spans of the module's own text; a
+    /// plugin gets what it collected from this module's blocks, if any.
+    fn watched_calls(&self, loaded: &Loaded, typing: &types::Typing) -> Vec<Diagnostic> {
+        if typing.call_sites.is_empty() {
+            return Vec::new();
+        }
+        let expansion = loaded.expansion.as_deref();
+        let sites = plugin_calls::placed_sites(&typing.call_sites, expansion, loaded.file);
+        (self.watching.iter())
+            .flat_map(|w| {
+                // Each block of a collected group holds the same state,
+                // already collected from all its blocks, not just this one.
+                let state = (loaded.editing.iter())
+                    .find(|e| e.plugin.id() == w.plugin.id())
+                    .map(|e| Arc::clone(&e.state));
+                let state = state.as_deref().unwrap_or(&[]);
+                plugin_calls::check_calls(
+                    w.plugin.as_ref(),
+                    &w.package,
+                    &w.watched,
+                    &sites,
+                    state,
+                    loaded.file,
+                )
+            })
+            .collect()
+    }
+}
+
 /// What checking one module produces.
 #[derive(Clone)]
 struct Output {
@@ -395,92 +446,6 @@ fn redeclare(interface: &mut Interface, imported: &Interface) {
         if let Some(found) = imported.exports.iter().find(|e| e.entity == export.entity) {
             export.at = found.at;
         }
-    }
-}
-
-/// The modules by level of the import graph, each after every module it
-/// imports; `None` when imports form a cycle.
-pub(super) fn levels(edges: &[Vec<usize>]) -> Option<Vec<Vec<usize>>> {
-    let mut waiting: Vec<usize> = edges.iter().map(Vec::len).collect();
-    let mut importers: Vec<Vec<usize>> = vec![Vec::new(); edges.len()];
-    for (i, targets) in edges.iter().enumerate() {
-        for &j in targets {
-            importers[j].push(i);
-        }
-    }
-    let mut level: Vec<usize> = (0..edges.len()).filter(|&i| waiting[i] == 0).collect();
-    let mut levels = Vec::new();
-    let mut placed = 0;
-    while !level.is_empty() {
-        placed += level.len();
-        let mut next = Vec::new();
-        for &i in &level {
-            for &k in &importers[i] {
-                waiting[k] -= 1;
-                if waiting[k] == 0 {
-                    next.push(k);
-                }
-            }
-        }
-        next.sort_unstable();
-        levels.push(level);
-        level = next;
-    }
-    (placed == edges.len()).then_some(levels)
-}
-
-/// `f` of each item, in order, spread over the available cores.
-#[cfg(not(target_arch = "wasm32"))]
-fn parallel<T: Send>(items: &[usize], f: impl Fn(usize) -> T + Sync) -> Vec<T> {
-    use std::panic;
-    use std::sync::atomic::{AtomicUsize, Ordering};
-    use std::thread;
-    // the checker recurses deeply, like on the main thread
-    const STACK: usize = 8 << 20;
-    let workers = thread::available_parallelism()
-        .map_or(1, usize::from)
-        .min(items.len());
-    if workers <= 1 {
-        return items.iter().map(|&i| f(i)).collect();
-    }
-    let next = AtomicUsize::new(0);
-    let mut results: Vec<(usize, T)> = thread::scope(|scope| {
-        let handles: Vec<_> = (0..workers)
-            .map(|_| {
-                thread::Builder::new()
-                    .stack_size(STACK)
-                    .spawn_scoped(scope, || {
-                        let mut done = Vec::new();
-                        loop {
-                            let k = next.fetch_add(1, Ordering::Relaxed);
-                            let Some(&i) = items.get(k) else {
-                                return done;
-                            };
-                            done.push((k, f(i)));
-                        }
-                    })
-                    .expect("spawn a checker thread")
-            })
-            .collect();
-        handles
-            .into_iter()
-            .flat_map(|h| h.join().unwrap_or_else(|e| panic::resume_unwind(e)))
-            .collect()
-    });
-    results.sort_unstable_by_key(|(k, _)| *k);
-    results.into_iter().map(|(_, t)| t).collect()
-}
-
-#[cfg(target_arch = "wasm32")]
-fn parallel<T>(items: &[usize], f: impl Fn(usize) -> T) -> Vec<T> {
-    items.iter().map(|&i| f(i)).collect()
-}
-
-/// The library a module of `root` belongs to; `None` for the project's own.
-fn package_of(root: &Root) -> Option<&str> {
-    match root {
-        Root::Package(name) => Some(name),
-        _ => None,
     }
 }
 

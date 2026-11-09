@@ -198,6 +198,48 @@ fn check(&self, block: &Block, _: &[u8], facts: &[Fact]) -> Vec<Diagnostic> {
 }
 ```
 
+## Checks of calls
+
+A package may watch calls of names, not only its own blocks. `watch` of its
+`[package]`, beside `plugin`, names them, each `Module.name`,
+`Module.Sub.name` or `*.name` for the name in any module:
+
+```toml
+[package]
+name = "ui"
+version = "1.0.0"
+plugin = "ui.wasm"
+watch = ["Ui.Event.queue", "*.parse"]
+```
+
+`check-calls` then gets every place of a checked module that applies one of
+them, with what the checker found there: the module and name applied, the
+span of the application, and for each argument where it is written, its
+type as `check` sees it and the constant it folds to, if any. A call of the
+`parse` of a refined type also carries how its check reads that constant:
+the literals of an enum, a check the compiler knows by name, or the
+compiler's verdict on the module's own predicate. Every span is of the
+module's own file, inside a block as well as outside one, so a diagnostic
+comes back at the code the user wrote.
+
+```rust
+fn check_calls(&self, calls: &[CallSite], state: &[u8]) -> Vec<Diagnostic> {
+    (calls.iter())
+        .filter(|c| !matches!(c.arguments.first().and_then(|a| a.constant.as_ref()),
+            Some(Constant::Number(n)) if *n > 0.0))
+        .map(|c| Diagnostic::error("it counts from one", c.span).with_code("L002"))
+        .collect()
+}
+```
+
+The plugin is asked once per module, with the calls of the names its
+package watches and the state its `collect` made; a module with no such
+call does not reach it, and a package without `watch` is asked nothing.
+`check-calls` only adds errors: the call itself the compiler has checked
+already. The checks of `std` work so, and keep the compiler's own codes: a
+policy bound that is not a positive integer is `FLICK-U001`, and a constant
+that fails the check of its refined type is `FLICK-D006`.
+
 ## Derives
 
 A class marked `@derive` is derived by a plugin: that of the class's
@@ -454,6 +496,7 @@ answers.
 | an error in the user's code inside a block | the usual one, at that code |
 | an error in the code a plugin gave | the usual one, on the code it stands for, with a note naming the plugin |
 | what a plugin's `check` finds | `<package>/X001` at the span it names; `FLICK-P036` when `check` fails |
+| what a plugin's `check-calls` finds | `<package>/X001` at the span it names; `FLICK-P036` when it fails, at the first call it was asked about |
 | a plugin reaches a file, a variable or a host the project does not grant | `FLICK-P038` on the block |
 | an offline run has no snapshot of the answer a plugin asks for | `FLICK-P039` on the block |
 

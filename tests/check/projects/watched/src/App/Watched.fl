@@ -1,0 +1,21 @@
+// The checks of `std` that watch calls: a constant of a refined type and
+// the capacity of an event policy.
+module App.Watched exposing (..)
+
+import Checks exposing (non_empty)
+
+refined type Name = String where non_empty
+
+bad_name : Result SchemaError Name
+let bad_name = Name.parse ""
+//                        ^^ FLICK-D006 fails the check of `Name`
+
+good_name : Result SchemaError Name
+let good_name = Name.parse "Ada"
+
+saved : Atom.Writable String
+let saved = Atom.make ""
+
+overflow : Ui.Handler Ui.ClickSnapshot
+let overflow = Ui.Event.queue 0 (fun _ -> task { Atom.set saved "x" })
+//                            ^ FLICK-U001 the capacity of `Ui.Event.queue` must be a positive integer

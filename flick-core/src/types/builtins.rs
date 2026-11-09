@@ -16,9 +16,9 @@ use std::{fs, io};
 
 use tracing::debug;
 
-use super::Typing;
 use super::builtin_sources::CORE;
 use super::env::Builtins;
+use super::{Typing, Watched};
 use crate::clock::timed;
 use crate::diagnostics::{Code, Diagnostic, codes};
 use crate::iface::Interface;
@@ -337,6 +337,7 @@ fn check_reporting(
             no_let_assert: false,
             thresholds: super::Thresholds::default(),
             effects: true,
+            watched: Watched::none(),
             stages_by_class,
         };
         let (checked, typing, _) =

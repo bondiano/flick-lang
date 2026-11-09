@@ -73,6 +73,7 @@ mod ty;
 mod typing;
 mod ui;
 mod unify;
+mod watched;
 pub mod wire;
 
 use crate::numeric::NumLang;
@@ -111,6 +112,7 @@ pub use typing::{
     Constructor, ForeignInfo, GenericInfo, Identity, InstanceInfo, Lift, Owner, Range, Ref, Typing,
     default_method, passes_dictionary,
 };
+pub use watched::Watched;
 
 use convert::TyVar;
 use env::{Builtins, Env};
@@ -178,6 +180,9 @@ pub struct Options<'a> {
     pub thresholds: Thresholds,
     /// Whether runtime code may run: `false` under `effect = "none"`.
     pub effects: bool,
+    /// The names whose places of call the plugins of the project watch:
+    /// each one checked gives a [`Typing::call_sites`].
+    pub watched: &'a Watched,
     /// Whether a stage comes from the classes of the operations of its row, as
     /// on Flick's own runtime: see [`Effects::direct`]. Every module of a build
     /// and the built-in modules it reads are checked alike.
@@ -304,6 +309,7 @@ fn run_in(
         regions: regions::State::default(),
         typing: Typing::default(),
         predicates: HashMap::new(),
+        calls: Vec::new(),
         field_path: Vec::new(),
         holes: Vec::new(),
         hole_ok: false,
@@ -316,6 +322,7 @@ fn run_in(
     };
     checker.module(module.tree);
     checker.report_holes();
+    checker.record_call_sites();
     checker.unannotated_codecs();
     checker.fill(interface);
     checker.typing.declarations = Arc::new(checker.declarations());
@@ -482,6 +489,9 @@ struct Checker<'a> {
     typing: Typing,
     /// The predicate of each refined type of the module, by type name.
     predicates: HashMap<String, &'a Node>,
+    /// The applications of a watched name, whose types settle once the
+    /// module is solved.
+    calls: Vec<facts::PendingCall>,
     /// The fields of the record literals around the value being checked,
     /// outermost first: where a nested record's field is missing.
     field_path: Vec<String>,
