@@ -146,6 +146,14 @@
     "definitions": {
       "patterns": [
         {
+          "match": "(?<![.\\w])(let)\\s+(mut)\\s+([a-z_][A-Za-z0-9_]*)",
+          "captures": {
+            "1": { "name": "keyword.other.flick" },
+            "2": { "name": "keyword.other.flick" },
+            "3": { "name": "variable.other.flick" }
+          }
+        },
+        {
           "match": "(?<![.\\w])(let)\\s+(?:(rec|assert)\\s+)?([a-z_][A-Za-z0-9_]*)",
           "captures": {
             "1": { "name": "keyword.other.flick" },
@@ -206,7 +214,7 @@
         { "name": "keyword.operator.word.flick", "match": "(?<![.\\w])not\\b" },
         {
           "name": "keyword.other.flick",
-          "match": "(?<![.\\w])(?:module|exposing|import|as|let|rec|assert|fun|task|scope|provide|ignore|todo|echo|type|opaque|refined|where|kind|error|service|class|instance|deriving|foreign|from|forall|none|ui)\\b"
+          "match": "(?<![.\\w])(?:module|exposing|import|as|let|mut|rec|assert|fun|task|scope|provide|ignore|todo|echo|type|opaque|refined|where|kind|error|service|class|instance|deriving|foreign|from|forall|none|ui)\\b"
         }
       ]
     },

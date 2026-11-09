@@ -176,6 +176,10 @@
         },
         {
           "type": "STRING",
+          "value": "mut"
+        },
+        {
+          "type": "STRING",
           "value": "rec"
         },
         {

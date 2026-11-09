@@ -316,3 +316,24 @@ let s = "a \{f { x = "\{y}" }} \n b"
         (string
           (interpolation
             (identifier)))))))
+
+==================
+Variables
+==================
+
+let mut n = 1
+n = n + 1
+
+---
+
+(source_file
+  (keyword)
+  (keyword)
+  (identifier)
+  (operator)
+  (number)
+  (identifier)
+  (operator)
+  (identifier)
+  (operator)
+  (number))
