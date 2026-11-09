@@ -1,5 +1,5 @@
 // Recursive data and callback conversions at foreign service boundaries.
-import { Context, Exit as EExit, Option as EOption, Result as EResult } from "effect";
+import { Context, Effect, Exit as EExit, Option as EOption, Result as EResult } from "effect";
 import { type Exit, succeeded, failed } from "@flick-lang/runtime/rt/cause";
 import { currentCtx } from "@flick-lang/runtime/rt/fiber";
 import { bridgeHooks } from "@flick-lang/runtime/rt/handle";
@@ -16,10 +16,7 @@ const contextOf = (u: unknown): Context.Context<never> | undefined => Context.is
 export const handlersToEffect = (handlers: unknown): unknown => {
   if (typeof handlers === "function") {
     return (x: unknown) =>
-      callEffect(() => {
-        const out: unknown = Reflect.apply(handlers, undefined, [x]);
-        return out;
-      });
+      Effect.map(callEffect(() => Reflect.apply(handlers, undefined, [dataFromEffect(x)])), dataToEffect);
   }
   if (typeof handlers !== "object" || handlers === null) return handlers;
   return Object.fromEntries(Object.entries(handlers).map(([k, v]) => [k, handlersToEffect(v)]));

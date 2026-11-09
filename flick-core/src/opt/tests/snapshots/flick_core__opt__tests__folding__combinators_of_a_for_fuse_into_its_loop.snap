@@ -1,5 +1,5 @@
 ---
-source: flick-core/src/opt/tests.rs
+source: flick-core/src/opt/tests/folding.rs
 expression: js
 ---
 import * as $rt from "@flick-lang/effect-ts";

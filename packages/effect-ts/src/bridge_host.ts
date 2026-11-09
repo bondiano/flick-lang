@@ -1,5 +1,5 @@
 // Effect contexts and scopes corresponding to native evidence and owners.
-import { Context, Exit as EExit, Scope as EScope } from "effect";
+import { Context, Effect, Exit as EExit, Scope as EScope } from "effect";
 import { type Ctx, Instruction, currentCtx, currentFiber, hosted, inCtx, isRun, inNativeFiber } from "@flick-lang/runtime/rt/fiber";
 import { type Exit } from "@flick-lang/runtime/rt/cause";
 import { HOST } from "@flick-lang/runtime/rt/layer";
@@ -7,6 +7,7 @@ import { type Owner, addTo } from "@flick-lang/runtime/rt/owner";
 import { CurrentOwner, Owner as HostOwner, close as closeHost } from "./owner.ts";
 import { syncContext } from "./sync.ts";
 import { updatedContext } from "./bridge_context.ts";
+import { dataFromEffect, dataToEffect } from "./bridge_data.ts";
 import { fromEffect, callEffect, causeToEffect } from "./bridge_runtime.ts";
 
 export const KERNEL = /*#__PURE__*/ Context.Service<Ctx>("flick/bridge/KernelCtx");
@@ -24,9 +25,9 @@ const opOut = (f: unknown): unknown =>
     : (...args: ReadonlyArray<unknown>): unknown => {
         const context = syncContext();
         const base = Context.getOrUndefined(context, KERNEL) ?? ROOT_CTX;
-        const out: unknown = inCtx(hosted(base, context), (): unknown => Reflect.apply(f, undefined, args));
+        const out: unknown = inCtx(hosted(base, context), (): unknown => Reflect.apply(f, undefined, args.map(dataFromEffect)));
         if (typeof out === "function") return opOut(out);
-        return isRun(out) || out instanceof Instruction ? callEffect(() => out) : out;
+        return isRun(out) || out instanceof Instruction ? Effect.map(callEffect(() => out), dataToEffect) : dataToEffect(out);
       };
 
 const implOut = (impl: unknown): unknown =>

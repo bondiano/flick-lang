@@ -4,10 +4,10 @@ import { test } from "node:test";
 import { Arbitrary, Effect, Exit, Schema } from "effect";
 
 import { err, none, ok } from "@flick-lang/runtime/core/data";
-import { codecTransformPure, witness, schemaLiterals, schemaInt, schemaAdtOf, schemaCase, schemaError, schemaLazyOf, schemaOption, schemaRecordOf, schemaRefinedOf, schemaString, type Witness } from "@flick-lang/runtime/rt/schema";
+import { schemaNumber, codecTransformPure, witness, schemaLiterals, schemaInt, schemaAdtOf, schemaCase, schemaError, schemaLazyOf, schemaOption, schemaRecordOf, schemaRefinedOf, schemaString, type Witness } from "@flick-lang/runtime/rt/schema";
 import { codecJsonSchema } from "@flick-lang/runtime/rt/schema_export";
 
-import { codecToEffect, schemaFromEffect, schemaToEffect } from "../src/bridge.ts";
+import { codecFromEffect, codecToEffect, schemaFromEffect, schemaToEffect } from "../src/bridge.ts";
 import { schema as arbitrarySchema } from "../src/effect/Arbitrary.ts";
 import { schemaRecord, schemaString as hostString } from "../src/schema/schemas.ts";
 import { isPure } from "../src/schema/index.ts";
@@ -118,4 +118,45 @@ test("an untyped native transform remains opaque when HTTP error codecs are disc
   const host = codecToEffect(native);
   assert.ok(Schema.isSchema(host));
   assert.equal(Schema.is(host)({ _tag: "flick/opaque-probe" }), true);
+});
+
+test("separate opaque native transforms retain their own JSON codecs", () => {
+  const first = codecTransformPure((text) => ({ value: text }), (value) =>
+    typeof value === "object" && value !== null ? Reflect.get(value, "value") : undefined, schemaString);
+  const second = codecTransformPure((number) => [number], (value) => Array.isArray(value) ? value[0] : undefined, schemaInt);
+  const firstHost = codecToEffect(first);
+  const secondHost = codecToEffect(second);
+  assert.ok(Schema.isSchema(firstHost) && Schema.isSchema(secondHost));
+  assert.ok(isPure(firstHost) && isPure(secondHost));
+  const text = Schema.decodeUnknownExit(firstHost)("book");
+  const number = Schema.decodeUnknownExit(secondHost)(7);
+  assert.ok(Exit.isSuccess(text) && Exit.isSuccess(number));
+  assert.deepEqual(text.value, { value: "book" });
+  assert.deepEqual(number.value, [7]);
+});
+
+test("native number generation stays finite while the runtime witness accepts infinity", async () => {
+  const host = schemaToEffect(schemaNumber);
+  assert.ok(Schema.isSchema(host));
+  assert.ok(isPure(host));
+  assert.equal(Schema.decodeUnknownExit(host)(Infinity)._tag, "Success");
+  const values = await Effect.runPromise(Arbitrary.sampleEffect(arbitrarySchema(host), { count: 1000, seed: 11 }));
+  assert.equal(values.length, 1000);
+  assert.ok(values.every((value) => typeof value === "number" && Number.isFinite(value)));
+});
+
+test("distinct native witnesses keep their identities across schema and codec crossings", () => {
+  const first = schemaLazyOf("First", () => schemaString);
+  const second = schemaLazyOf("Second", () => schemaString);
+  const firstSchema = schemaToEffect(first);
+  const firstCodec = codecToEffect(first);
+  const secondSchema = schemaToEffect(second);
+  const secondCodec = codecToEffect(second);
+  assert.notEqual(firstSchema, secondSchema);
+  assert.notEqual(firstCodec, secondCodec);
+  assert.equal(schemaFromEffect(firstSchema), first);
+  assert.equal(schemaFromEffect(secondSchema), second);
+  assert.equal(codecFromEffect(firstCodec), first);
+  assert.equal(codecFromEffect(secondCodec), second);
+  assert.equal(codecToEffect(first), firstCodec);
 });

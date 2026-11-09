@@ -382,3 +382,13 @@ foreign pure use from \"@flick-lang/effect-ts\" \"use\"\n  arity 2\n",
     );
     assert!(!code.contains("handlersToEffect"), "{code}");
 }
+
+#[test]
+fn effect_bridge_adapts_the_handler_record_of_an_rpc_group() {
+    let code = on_rt_with_bridge(
+        "module App exposing (use)\n\nuse : Rpc.Group r hs -> hs -> Unit\n\
+foreign pure use from \"@flick-lang/effect-ts\" \"use\"\n  arity 2\n",
+        EffectBridge::Available,
+    );
+    assert!(code.contains("handlersToEffect"), "{code}");
+}

@@ -33,7 +33,7 @@ import { causeHooks } from "@flick-lang/runtime/rt/effect/Cause";
 import { dateTimeHooks } from "@flick-lang/runtime/rt/effect/DateTime";
 import { inheritContext, rememberContext } from "./bridge_context.ts";
 
-import { installDataBridge } from "./bridge_data.ts";
+import { dataFromEffect, dataToEffect, installDataBridge } from "./bridge_data.ts";
 import { installLayerBridge } from "./bridge_layer.ts";
 import { installSchemaBridge } from "./bridge_schema.ts";
 import { bridgeKernel } from "./bridge_runtime.ts";
@@ -177,7 +177,7 @@ export const inNativeRuntime: Effect.Effect<boolean> = Effect.withFiber((fiber) 
 const causeIn = (cause: ECause.Cause<unknown>): Cause =>
   fromReasons(
     cause.reasons.map((r) => Object.assign(
-      ECause.isFailReason(r) ? failReason(r.error) : ECause.isDieReason(r) ? dieReason(r.defect) : interruptReason(r.fiberId),
+      ECause.isFailReason(r) ? failReason(dataFromEffect(r.error)) : ECause.isDieReason(r) ? dieReason(r.defect) : interruptReason(r.fiberId),
       { trace: Context.getOrUndefined(ECause.reasonAnnotations(r), ECause.StackTrace), annotations: ECause.reasonAnnotations(r) },
     )),
   );
@@ -187,7 +187,7 @@ export const causeFromEffect = causeIn;
 export const causeToEffect = (cause: Cause): ECause.Cause<unknown> =>
   ECause.fromReasons(
     cause.reasons.flatMap((r) => {
-      const reason = r._tag === "Fail" ? ECause.makeFailReason(r.error) : r._tag === "Die" ? ECause.makeDieReason(r.defect) : ECause.makeInterruptReason(r.fiberId);
+      const reason = r._tag === "Fail" ? ECause.makeFailReason(dataToEffect(r.error)) : r._tag === "Die" ? ECause.makeDieReason(r.defect) : ECause.makeInterruptReason(r.fiberId);
       let annotations = contextOf(Reflect.get(r, "annotations")) ?? Context.empty();
       const trace: unknown = Reflect.get(r, "trace");
       if (typeof trace === "object" && trace !== null && typeof Reflect.get(trace, "stack") === "function") {

@@ -31,7 +31,9 @@ const describedToEffect = (codec: Witness): AnySchema | undefined => {
   if (description === undefined) return undefined;
   switch (description.kind) {
     case "string": return hostString;
-    case "number": return hostNumber;
+    case "number": return withJson(hostNumber.check(Schema.makeFilter(() => true, {
+      arbitraryConstraint: { number: "finite" },
+    })), () => hostJsonCodec(hostNumber));
     case "int": return hostInt;
     case "bigint": return hostBigint;
     case "bool": return hostBool;
@@ -134,12 +136,13 @@ export const schemaToEffect = (value: unknown): unknown => {
   if (original !== undefined) return original;
   const structural = describedToEffect(codec);
   if (structural !== undefined) {
-    structuralSchemas.set(codec, structural);
-    nativeSchemas.set(structural, codec);
-    return structural;
+    const distinct = withJson(structural.annotate({}), () => hostJsonCodec(structural));
+    structuralSchemas.set(codec, distinct);
+    nativeSchemas.set(distinct, codec);
+    return distinct;
   }
   const runtime = schemaDescription(codec)?.kind === "transform"
-    ? Schema.Unknown
+    ? Schema.Unknown.annotate({ "flick/transform": "pure" })
     : Schema.declare((input: unknown): input is unknown => codec.value(dataFromEffect(input), "")._tag === "Success", { expected: codec.kind });
   const fallback = Schema.Unknown.pipe(Schema.decodeTo(runtime, {
     decode: SchemaGetter.transformEffect((input: unknown) => {
@@ -163,7 +166,8 @@ export const codecToEffect = (value: unknown): unknown => {
   if (original !== undefined) return original;
   const schema = schemaToEffect(value);
   if (!Schema.isSchema(schema)) return schema;
-  const codec = hostJsonCodec(schema);
+  const codec = hostJsonCodec(schema).annotate({});
+  effectCodecs.set(value, codec);
   nativeSchemas.set(codec, value);
   return codec;
 };
