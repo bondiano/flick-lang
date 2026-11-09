@@ -72,8 +72,7 @@ impl Gen<'_> {
     pub(super) fn expr(&mut self, e: &Expr) -> String {
         match &e.kind {
             ExprKind::Lit(lit) => literal::literal(lit),
-            ExprKind::Local(name) => names::ident(name),
-            ExprKind::Var(name) => names::ident(name),
+            ExprKind::Local(name) | ExprKind::Var(name) => names::ident(name),
             ExprKind::Global { module, name } => self.global(module, &names::ident(name)),
             ExprKind::Method { dict, name } => match self.direct_method(dict, name) {
                 Some(direct) => direct,

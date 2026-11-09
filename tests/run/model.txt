@@ -33,5 +33,6 @@ codegen/numbers
 codegen/do_notation
 codegen/applicative_do
 codegen/classes
+codegen/let_mut
 runtime/abort_closes_scopes
 runtime/discontinued_body

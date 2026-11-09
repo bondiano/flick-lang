@@ -257,7 +257,9 @@ fn apply(e: &mut Expr, names: &HashMap<String, String>) {
             for s in stmts {
                 match s {
                     Stmt::Let(p, _) => apply_pat(p, names),
-                    Stmt::Var(name, _) | Stmt::Assign(name, _) | Stmt::Fun { name, .. } => new(name),
+                    Stmt::Var(name, _) | Stmt::Assign(name, _) | Stmt::Fun { name, .. } => {
+                        new(name);
+                    }
                     Stmt::Expr(_) => {}
                 }
             }

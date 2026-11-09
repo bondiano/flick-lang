@@ -127,11 +127,6 @@ impl Lower<'_> {
             }
             K::FunExpr => return self.lambda(node, &children),
             K::Block => return self.block(node),
-            K::AssignStmt => {
-                let assign = self.assign(node);
-                let unit = Expr::new(ExprKind::Lit(Lit::Unit), span);
-                ExprKind::Block(vec![assign], Box::new(unit))
-            }
             // `Ui` names and implicit component applications were resolved by the checker.
             K::UiExpr => {
                 return match children.iter().find(|n| n.kind == K::Block) {
@@ -476,8 +471,10 @@ impl Lower<'_> {
         let token = target.and_then(|t| t.child_tokens().find(|t| t.kind == K::Ident));
         let unique = token
             .and_then(|t| self.local(t.text(self.text), t.start))
-            .map(str::to_owned)
-            .unwrap_or_else(|| panic!("the checker resolved the target of an assignment"));
+            .map_or_else(
+                || panic!("the checker resolved the target of an assignment"),
+                str::to_owned,
+            );
         let value = match children.next() {
             Some(value) => self.expr(value),
             None => Expr::new(ExprKind::Lit(Lit::Unit), self.span(node)),

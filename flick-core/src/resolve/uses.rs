@@ -220,8 +220,8 @@ impl Walker<'_> {
     fn assigned(&mut self, token: Token) {
         let name = token.text(self.text);
         let generated = token.start >= self.generated;
-        let local = (self.locals.iter_mut().rev())
-            .find(|l| l.name == name && l.generated == generated);
+        let local =
+            (self.locals.iter_mut().rev()).find(|l| l.name == name && l.generated == generated);
         if let Some(Local {
             mutable: Some((_, assigned)),
             ..

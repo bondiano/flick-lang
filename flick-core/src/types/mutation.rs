@@ -147,7 +147,9 @@ impl Checker<'_> {
             self.error(
                 codes::T013,
                 self.span(decl),
-                format!("`{name}` is a `let mut` variable, which has one type: it cannot be polymorphic"),
+                format!(
+                    "`{name}` is a `let mut` variable, which has one type: it cannot be polymorphic"
+                ),
             );
         }
         self.push_local(name, at, ty);
@@ -201,7 +203,8 @@ impl Checker<'_> {
     /// `FLICK-T061` for an assignment of the local `index` inside a body of
     /// `try` or a loop that started after it was declared.
     fn settled_assignment(&mut self, index: usize, name: &str, span: Span) {
-        let Some(&(_, what)) = (self.mutation.settled.iter().rev()).find(|(below, _)| index < *below)
+        let Some(&(_, what)) =
+            (self.mutation.settled.iter().rev()).find(|(below, _)| index < *below)
         else {
             return;
         };

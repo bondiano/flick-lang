@@ -22,7 +22,7 @@ pub fn con(c: &Constructor) -> Rc<Con> {
     })
 }
 
-fn stuck(what: &str) -> Term {
+pub(super) fn stuck(what: &str) -> Term {
     Term::Stuck(format!("{what} has no λFlick form").into())
 }
 
@@ -45,7 +45,7 @@ impl Tr {
         match &e.kind {
             ExprKind::Lit(l) => lit(l).map_or_else(|| stuck("a `BigInt` literal"), Term::Lit),
             ExprKind::Local(x) => Term::Var(x.as_str().into()),
-            ExprKind::Var(_) => stuck("a `let mut` variable"),
+            ExprKind::Var(x) => self.version(x),
             ExprKind::Global { module, name } => Term::Global(Path::new(module, name)),
             ExprKind::Method { dict: d, name } => Term::Field(rc(dict(d)), name.as_str().into()),
             ExprKind::Con(c) => Term::konst_con(con(c)),
@@ -94,10 +94,7 @@ impl Tr {
                 }
                 body
             }
-            ExprKind::Block(stmts, tail) => {
-                let tail = self.expr(tail);
-                stmts.iter().rev().fold(tail, |rest, s| self.stmt(s, rest))
-            }
+            ExprKind::Block(stmts, tail) => self.block(stmts, tail, None),
             ExprKind::If(c, a, b) => cond(self.expr(c), self.expr(a), self.expr(b)),
             ExprKind::Match(e, arms) => Term::Match(rc(self.expr(e)), self.arms(arms)),
             ExprKind::Handle(h) if h.is_try() => {
@@ -180,13 +177,13 @@ impl Tr {
         )
     }
 
-    fn stmt(&mut self, s: &Stmt, rest: Term) -> Term {
+    pub(super) fn stmt(&mut self, s: &Stmt, rest: Term) -> Term {
         let rc = |t: Term| Rc::new(t);
         match s {
             Stmt::Let(ir::Pat::Bind(x), e) => {
                 Term::Let(x.as_str().into(), None, rc(self.expr(e)), rc(rest))
             }
-            Stmt::Var(..) | Stmt::Assign(..) => stuck("a `let mut` variable"),
+            Stmt::Var(..) | Stmt::Assign(..) => stuck("a variable outside a block"),
             Stmt::Let(ir::Pat::Wild, e) | Stmt::Expr(e) => {
                 Term::Let("_".into(), None, rc(self.expr(e)), rc(rest))
             }
@@ -318,16 +315,22 @@ fn binary(op: BinOp, a: Term, b: Term) -> Term {
 impl Tr {
     /// `Scope.run arg`, which is `scope s { body }`: the core's form of it.
     fn scope(&mut self, arg: &ir::Expr) -> Term {
+        self.scope_with(arg, &|tr, body| tr.expr(body))
+    }
+
+    /// [`Self::scope`] with the body as `body` translates it.
+    pub(super) fn scope_with(&mut self, arg: &ir::Expr, body: Body) -> Term {
+        let translate = body;
         if let ExprKind::Lambda { params, body } = &arg.kind
             && let [ir::Param { pat, .. }] = &params[..]
         {
             match pat {
                 ir::Pat::Bind(s) => {
-                    return Term::Scope(Name::from(s.as_str()), Rc::new(self.expr(body)));
+                    return Term::Scope(Name::from(s.as_str()), Rc::new(translate(self, body)));
                 }
                 ir::Pat::Wild => {
                     let s = self.fresh("s");
-                    return Term::Scope(s, Rc::new(self.expr(body)));
+                    return Term::Scope(s, Rc::new(translate(self, body)));
                 }
                 _ => {}
             }
@@ -340,6 +343,12 @@ impl Tr {
     /// `Layer.run layer arg`, which is `provide layer { body }`: the core's
     /// form of it.
     fn provide(&mut self, func: &ir::Expr, arg: &ir::Expr) -> Term {
+        self.provide_with(func, arg, &|tr, body| tr.expr(body))
+    }
+
+    /// [`Self::provide`] with the body as `body` translates it.
+    pub(super) fn provide_with(&mut self, func: &ir::Expr, arg: &ir::Expr, body: Body) -> Term {
+        let translate = body;
         let layer = self.expr(layer_run(func).expect("a call of `Layer.run`"));
         let body = match &arg.kind {
             // what `provide` lowers to, which binds nothing
@@ -352,7 +361,7 @@ impl Tr {
                     }]
                 ) =>
             {
-                self.expr(body)
+                translate(self, body)
             }
             _ => Term::app(self.expr(arg), Term::unit()),
         };
@@ -360,12 +369,15 @@ impl Tr {
     }
 }
 
-fn is_global(func: &ir::Expr, m: &str, n: &str) -> bool {
+/// How the body of a `scope` or a `provide` is translated.
+pub(super) type Body<'b> = &'b dyn Fn(&mut Tr, &ir::Expr) -> Term;
+
+pub(super) fn is_global(func: &ir::Expr, m: &str, n: &str) -> bool {
     matches!(&func.kind, ExprKind::Global { module, name } if module == m && name == n)
 }
 
 /// The layer of `Layer.run layer`.
-fn layer_run(func: &ir::Expr) -> Option<&ir::Expr> {
+pub(super) fn layer_run(func: &ir::Expr) -> Option<&ir::Expr> {
     let ExprKind::App { func, arg, .. } = &func.kind else {
         return None;
     };
