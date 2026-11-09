@@ -166,3 +166,12 @@ test("a throwing child finalizer still unlinks the child from its parent", () =>
   assert.equal(parentNode.children.has(childNode), false);
   assert.equal(parentNode.removable, true);
 });
+
+test("a throwing query invalidation still refreshes every registered query once", () => {
+  const registry = new Registry(currentCtx());
+  const seen: Array<string> = [];
+  registry.register(["a", "b"], () => { seen.push("first"); throw new Error("refresh failed"); });
+  registry.register(["b"], () => { seen.push("second"); });
+  assert.throws(() => registry.invalidate(["a", "b", "a"]), /refresh failed/);
+  assert.deepEqual(seen, ["first", "second"]);
+});

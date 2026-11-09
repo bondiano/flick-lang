@@ -306,9 +306,16 @@ export class Registry {
   /** Runs anew, once each, the queries of `keys`. */
   invalidate(keys: ReadonlyArray<string>): void {
     const runs = new Set(keys.flatMap((key) => [...(this.queries.get(key) ?? [])]));
-    batch(() => {
-      for (const run of runs) run();
-    });
+    let failed: { readonly error: unknown } | undefined;
+    try {
+      batch(() => {
+        for (const run of runs) {
+          try { run(); }
+          catch (error) { failed ??= { error }; }
+        }
+      });
+    } catch (error) { failed ??= { error }; }
+    if (failed !== undefined) throw failed.error;
   }
 
   dispose(): void {
