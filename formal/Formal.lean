@@ -79,6 +79,7 @@ import Formal.Regions
 import Formal.T43
 import Formal.T43Main
 import Formal.Effects
+import Formal.LetMut
 import Formal.Generalization
 import Formal.RecordHandler
 import Formal.Examples
