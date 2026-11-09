@@ -12,7 +12,7 @@ export default defineConfig({
     launchOptions: process.env.CHROMIUM === undefined ? {} : { executablePath: process.env.CHROMIUM },
   },
   webServer: {
-    command: `pnpm exec astro preview --host 127.0.0.1 --port ${port}`,
+    command: `pnpm exec astro preview --ignore-lock --host 127.0.0.1 --port ${port}`,
     url: `http://127.0.0.1:${port}/flick-lang/`,
     reuseExistingServer: process.env.CI === undefined,
   },
