@@ -6,6 +6,10 @@ break programs.
 
 ## Unreleased
 
+- **Explicit conversions:** the Prelude class `Into a b` with `into : a -> b`
+  names a conversion that loses nothing, to the type its place expects:
+  `(into n : Float)`, `into n * 10n`. The core has `Into Int Float` and
+  `Into Int BigInt`; a program declares it for its own types.
 - **Holes in strings:** `"n = \{n + 1}"` is `"n = " ++ display (n + 1)`, through
   the new Prelude class `Display`: a `String` is itself, without the quotes of
   `show`, and `Int`, `Float` and `Bool` are spelled as `show` spells them. A

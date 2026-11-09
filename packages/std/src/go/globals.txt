@@ -27,3 +27,7 @@ to_string BigIntString
 [global Numeric]
 bigint_of BigIntOfInt
 float_of_bigint FloatOfBigInt
+
+[global Instances]
+float_of_int IntToFloat
+bigint_of_int BigIntOfInt

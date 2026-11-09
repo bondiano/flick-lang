@@ -106,4 +106,15 @@ let tests = [
     Test.test "shift right keeps the sign" (fun () -> Test.equal (-4) (Int.shift_right (-8) 1)),
     Test.test "unsigned shift" (fun () -> Test.equal 2147483644 (Int.shift_right_unsigned (-8) 1)),
   ],
+  Test.group "into" [
+    Test.test "a Float holds every Int" (fun () ->
+      Test.equal [2147483647.0, -2147483648.0] [into (add 2147483646 1), into (sub (-2147483647) 1)]
+    ),
+    Test.test "a BigInt holds every Int" (fun () ->
+      Test.equal [2147483647n, -2147483648n] [into (add 2147483646 1), into (sub (-2147483647) 1)]
+    ),
+    Test.test "the place picks the type" (fun () ->
+      Test.equal "1.5 70n" "\{into (add 1 2) / 2.0} \{show (into (add 3 4) * 10n)}"
+    ),
+  ],
 ]

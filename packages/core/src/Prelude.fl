@@ -136,6 +136,11 @@ class Display a =
   @lang display_method
   display : a -> String
 
+/// Conversions that lose nothing, named where they happen: `into n` with
+/// `n : Int` is a `Float` or a `BigInt`, whichever its place expects.
+class Into a b =
+  into : a -> b
+
 /// Containers whose elements a pure function maps. A container may apply
 /// the function later, so the result keeps the captures of both.
 class Functor (f : Type -> Type) =

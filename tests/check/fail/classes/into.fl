@@ -1,0 +1,16 @@
+// `Into` has only conversions that lose nothing, and its target comes from
+// the place of `into`: without one no instance can be chosen.
+module App.Into exposing (..)
+
+lossy : Float -> Int
+let lossy x = into x
+
+unknown : Int -> String
+let unknown n = into n
+
+let unknown_target = show (into 1)
+
+//~ FLICK-C001 @6:15-6:19 no instance for `Into Float Int`
+//~ FLICK-C001 @9:17-9:21 no instance for `Into Int String`
+//~ FLICK-C002 @11:22-11:26 cannot choose an instance for `Show _`
+//~ FLICK-C002 @11:28-11:32 cannot choose an instance for `Into Int _`

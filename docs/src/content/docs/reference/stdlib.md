@@ -19,6 +19,7 @@ Signatures the specification gives are declared word for word;
 | - | - |
 | `Eq`, `Ord`, `Hash`, `Show` | canonical equality, the total order, hashing, display |
 | `Display` | text for a reader, what a hole `\{e}` of a string inserts: a `String` without quotes |
+| `Into` | `into`, a conversion that loses nothing to the type its place expects: `Int` to `Float` or `BigInt` |
 | `Functor`, `Foldable`, `Traversable`, `Applicative`, `Monad` | classes over `f : Type -> Type`: `map`, `fold` and `fold_map`, `traverse`, `pure` and `map2`, `flat_map` |
 | `Semigroup`, `Monoid`, `Alternative` | `combine` and `empty` (`String`, `List a`, the wrappers of `Monoids`), `nothing` and `or_else` |
 | `bind`, `bind_eff` | sequencing for any monad, and for `Eff` with the rows joined |
