@@ -502,3 +502,17 @@ fn doctor_reports_without_failing_on_a_missing_content_mapper() {
         .expect("a line");
     assert!(!mapper.starts_with("FAIL"), "{mapper}");
 }
+
+fn pnpm_version() -> String {
+    process::Command::new("pnpm")
+        .env("npm_config_manage_package_manager_versions", "false")
+        .env("PNPM_CONFIG_PM_ON_FAIL", "ignore")
+        .env("COREPACK_ENABLE_PROJECT_SPEC", "0")
+        .env("COREPACK_ENABLE_AUTO_PIN", "0")
+        .env("COREPACK_ENABLE_NETWORK", "0")
+        .env("COREPACK_DEFAULT_TO_LATEST", "0")
+        .arg("--version")
+        .output()
+        .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_owned())
+        .unwrap_or_default()
+}
