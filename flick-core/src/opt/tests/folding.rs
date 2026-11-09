@@ -166,12 +166,12 @@ fn a_numeric_function_of_another_module_is_copied_too() {
 /// time.
 #[test]
 fn folded_floats_are_written_as_js_writes_them() {
-    let corpus = include_str!("../../../runtime-go/flickrt/testdata/numbers.txt");
+    let corpus = include_str!("../../../../runtime-go/flickrt/testdata/numbers.txt");
     let mut cases = 0;
     for line in corpus.lines().filter(|l| !l.starts_with('#')) {
         let (bits, want) = line.split_once(' ').expect("bits and text");
         let x = f64::from_bits(u64::from_str_radix(bits, 16).expect("hex bits"));
-        assert_eq!(super::fold::js_number(x), want, "{bits}");
+        assert_eq!(crate::opt::fold::js_number(x), want, "{bits}");
         cases += 1;
     }
     assert!(cases > 300, "{cases} cases");

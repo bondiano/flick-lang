@@ -1,4 +1,4 @@
-use super::*;
+use super::{Lang, PRIMITIVES, Projection, Type, Vars, effect};
 
 impl Projection<'_> {
     /// A built-in type with a TypeScript form on the selected runtime.
