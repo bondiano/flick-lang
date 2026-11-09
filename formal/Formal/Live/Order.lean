@@ -114,6 +114,52 @@ theorem TypingMode.use_svc_nm {mode : TypingMode} {φ : Stage} {C : Caps} {N : N
       rcases h with h | h
       · exact h
       · exact h.elim
+
+/-- A stage above a run-time stage that holds the atom of a region is above the use of
+that region: in the live discipline the frame of a handler supplies the atom its own
+region needs, and in the capture discipline there is no such requirement. -/
+theorem TypingMode.use_rg_le {mode : TypingMode} {r ε : Row} {φ : Stage} {p : Nat}
+    (h : (Stage.rt r ε).le φ) (hp : mode = .live → φ.svc (.atm (.r p))) :
+    (mode.use (.rt r ε) (Ty.rg p).reach).le φ := by
+  obtain ⟨r', ε', rfl, hr, he⟩ := Stage.rt_le h
+  cases mode with
+  | captures => exact ⟨hr, he⟩
+  | live =>
+    simp only [TypingMode.use]
+    refine ⟨fun n hn => ?_, he⟩
+    cases n with
+    | nm N =>
+      rcases hn with hn | hn
+      · exact hr _ hn
+      · simp [Row.ofCaps] at hn
+    | atm a =>
+      rcases hn with hn | hn
+      · exact hr _ hn
+      · rw [show a = .r p by simpa [Row.ofCaps, Ty.reach] using hn]; exact hp rfl
+    | ob N a =>
+      rcases hn with hn | hn
+      · exact hr _ hn
+      · simp [Row.ofCaps] at hn
+    | rv a =>
+      rcases hn with hn | hn
+      · exact hr _ hn
+      · simp [Row.ofCaps] at hn
+    | obv v a =>
+      rcases hn with hn | hn
+      · exact hr _ hn
+      · simp [Row.ofCaps] at hn
+
+/-- A control arm may call `resume`, which uses the region of the handler; a `tail` arm
+does not. -/
+theorem TypingMode.use_ctl_le (mode : TypingMode) (tl : Bool) (r ε : Row) (p : Nat) :
+    (mode.use (.rt r ε) (if tl then Caps.none else (Ty.rg p).reach)).le
+      (mode.use (.rt r ε) (Ty.rg p).reach) := by
+  cases tl with
+  | true =>
+    simp only [if_true, TypingMode.use_none]
+    exact TypingMode.le_use mode (Stage.rt r ε) (Ty.rg p).reach
+  | false => exact Stage.le_refl _
+
 theorem LeLive.reach {a b : Ty} (h : LeLive a b) : Caps.Sub a.reach b.reach := by
   cases h with
   | refl => exact Caps.Sub.refl _
