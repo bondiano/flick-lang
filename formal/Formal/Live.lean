@@ -53,26 +53,33 @@ hole (`PresHdl.lean`) and of the run-time steps of handlers at the redex
   parameter's own rows (`LeLive.arrow_use` gives `ofCaps C_f ⊆ ψ₀ ∪ ofCaps ι.C`, not
   `⊆ ψ₀`), and `Const.ok` says nothing of `.scopeRun`.
 
-The two rule-level changes that close the port, both of them contract changes to the live
-instance rather than proof steps:
+Two rule-level changes close the port. Both are contract changes to the live instance
+rather than proof steps, and the first one is in the rules:
 
-1. A run-time form of a handler states that its own region is live: add
-   `(mode = .live → φ.svc (.atm (.r p)))` to `hwith`, `hctl`, `hres`, `hdone`, `unw`,
-   `hkarm` and `hkeep`. Then `hwith_catch` gets the atom from the derivation it inverts,
-   and every step that replaces one handler frame by another carries it along. The
-   premises are dischargeable where a handler is installed: `hdl_install` must type the
-   new `hwith` at the stage of the `inside` body, which holds `Row.scope (.rg n)`, and
-   the `inside` rule already accepts any body stage below that bound.
+1. A run-time form of a handler states that its own region is live. `hwith` and `hctl`
+   take `(mode = .live → φ.svc (.atm (.r p)))`. That is all: `hdone` already carries the
+   atom in `mode.use φ (Ty.rg p).reach`, and a step that builds an `hdone`, `hkeep` or
+   `unw` form reads it off the form it replaces. `hwith_catch` then needs no other
+   premise, and `hctlSignal`/`hctlDisc` pass the atom from the `hctl` they invert. The
+   premise is dischargeable where a handler is installed: `hdl_install` types the new
+   `hwith` at the stage of the `inside` body, which holds `Row.scope (.rg n)` and stays
+   below that frame's bound. The cell it allocates keeps its old type: the atom lives in
+   the *stage* of the form, not in the row the cell's arrow names, so the cell type stays
+   free of the region and `Ty.YF` of the new cell is unchanged.
 2. A scope declares what its body uses: extend `Const.ok Θ .scopeRun ι .live` with
    `Row.sub (Row.ofCaps ι.C) (Row.union (Row.scope ι.s) (Row.union ι.r (Row.obs ι.r ι.s)))`,
    the row that bounds the desugared body. The checker chooses `ι` from the argument's
    type, so this asks the same of a program that the `scope` rule asks of its body.
 
 What remains is preservation of the store steps and at a context (`PresRt.lean`,
-`Preservation.lean`) under the first of these premises, the invariant itself and
-`T4'_live`. Neither the examples nor the existing captures proofs establish it.
-Translation of live signature elision into the core judgment is a separate remaining
-obligation.
+`Preservation.lean`), the invariant itself and `T4'_live`. Porting `rt_preservation` to
+`TypM` is a mechanical transform everywhere except four sites that invert
+`mode.subtype` by `cases`, which does not reduce a mode-indexed def: the `refMake`,
+`refGet` and `refSet` steps of `RHead` and the `eff_left` inversion, each of which needs a
+mode-generic `eq_*`/`arrow_left`-style lemma in the shape of
+`TypingMode.subtype.arrow_left`. Neither the examples nor the existing captures proofs
+establish the invariant. Translation of live signature elision into the core judgment is
+a separate remaining obligation.
 
 T4.2 matters beyond safety: the runtime contract (`Formal/RT/`) takes only T4.3 (as `G11`),
 so giving T4.2 up does not touch T5; what it costs is that a value may keep a closed
