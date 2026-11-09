@@ -103,9 +103,12 @@ runtime/slice
 runtime/supervisor_defect
 schema/derive
 schema/json_wire
+schema/route_nested
 sql/queries
+stdlib/cli/value
 stdlib/collections
 stdlib/effect/clock
+stdlib/effect/exit_cause
 stdlib/effect/hash_map
 stdlib/effect/hash_set
 stdlib/effect/mutable_ref
@@ -113,6 +116,7 @@ stdlib/effect/option
 stdlib/effect/queue
 stdlib/effect/shared_layer_merged
 stdlib/effect/string_locale
+stdlib/effect/tracer
 stdlib/effect/void
 stdlib/file
 stdlib/hash_order

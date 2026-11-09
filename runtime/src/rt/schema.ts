@@ -33,12 +33,13 @@ export interface Codec<A = unknown> {
 }
 
 type Check = (value: unknown, path: string) => Result<unknown, SchemaError>;
-type Witness = Codec & { readonly decodeAt: Check; readonly encodeAt: Check; readonly value: Check };
+export type Witness = Codec & { readonly decodeAt: Check; readonly encodeAt: Check; readonly value: Check };
 
 const at = (path: string, key: string | number): string =>
   typeof key === "number" ? `${path}[${key}]` : path ? `${path}.${key}` : key;
 
-const witness = (kind: string, decode: Check, encode: Check, value: Check = encode): Witness => ({
+const witness = (kind: string, decode: Check, encode: Check,
+  value: Check = (input, path) => map(encode(input, path), () => input)): Witness => ({
   kind,
   decode: (input) => decode(input, ""),
   encode: (input) => encode(input, ""),
@@ -277,6 +278,12 @@ export const schemaRefinedOf = (name: string, _known: unknown, base: Witness,
     return valid._tag === "Failure" ? valid : base.encodeAt(v, path);
   }, check);
 };
+export const refinedParse = (name: string, check: (value: unknown) => boolean) =>
+  (value: unknown): Result<unknown, SchemaError> =>
+    check(value) ? ok(value) : err(schemaError("", `not a valid ${name}`));
+export const checkEmail = (value: string): boolean => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+export const checkNonEmpty = (value: string): boolean => value.length > 0;
+export const checkPositive = (value: number): boolean => value > 0;
 export const schemaJsonCodec = (schema: Witness): Codec => schema;
 export const schemaValidate = (schema: Witness, value: unknown): Result<unknown, SchemaError> => schema.value(value, "");
 

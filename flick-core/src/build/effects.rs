@@ -72,6 +72,7 @@ const IN_RT: &[&str] = &[
     "Schedule",
     "Schema",
     "Scope",
+    "Tracer",
     "reactivity/AsyncResult",
     "reactivity/Atom",
 ];
