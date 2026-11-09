@@ -4,10 +4,10 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import * as Deferred from "../src/effect/Deferred.ts";
-import { effect } from "../src/effect/Layer.ts";
-import { type Layer, layerMerge, layerRun, layerSucceed } from "../src/layer.ts";
-import { type OpInstall, type Run, addFinalizer, handle, operation, runIn, service } from "../src/kernel.ts";
+import * as Deferred from "../src/rt/effect/Deferred.ts";
+import { effect } from "../src/rt/effect/Layer.ts";
+import { type Layer, layerMerge, layerRun, layerSucceed } from "../src/rt/layer.ts";
+import { type OpInstall, type Run, addFinalizer, handle, operation, runIn, service } from "../src/rt/kernel.ts";
 import { root } from "./rt-support.ts";
 
 const tail = (name: string, arm: unknown): OpInstall => [name, arm, "tail", 0, 1];

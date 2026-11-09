@@ -1,10 +1,38 @@
-// The bindings of `Scope` on the kernel: finalizers added to the owner of a call.
-import { none, some } from "../core/data.ts";
-import type { Exit } from "../cause.ts";
-import { RawCause } from "../outcome.ts";
-import { addFinalizer, addFinalizerExit } from "../owner.ts";
+// Effect's `Scope` for the bindings of the standard library: finalizers
+// added to the scope of the owner a call runs in.
+import { Effect, Exit, Option, Scope } from "effect";
 
-export const flickAddFinalizer = (finalizer: () => unknown): unknown => addFinalizer(finalizer);
+import { RawCause } from "../cause.ts";
+import { traceFinalizer } from "../owner.ts";
 
-export const flickAddFinalizerExit = (finalizer: (cause: unknown) => unknown): unknown =>
-  addFinalizerExit((exit: Exit) => finalizer(exit.cause === undefined ? none : some(new RawCause(exit.cause))));
+export * from "effect/Scope";
+
+/** `Scope.add_finalizer`: into the scope of the call. */
+export const flickAddFinalizer = <R>(finalizer: Effect.Effect<void, never, R>): Effect.Effect<void, never, R | Scope.Scope> =>
+  Effect.flatMap(Effect.context<R>(), (context) =>
+    Effect.flatMap(Effect.scope, (scope) =>
+      Effect.flatMap(traceFinalizer(scope), (ran) =>
+        Scope.addFinalizer(scope, Effect.andThen(ran, Effect.provideContext(finalizer, context))),
+      ),
+    ),
+  );
+
+/** `Scope.add_finalizer_exit`: `finalizer` sees the cause of a failure. */
+export const flickAddFinalizerExit = <R>(
+  finalizer: (cause: Option.Option<RawCause>) => Effect.Effect<void, never, R>,
+): Effect.Effect<void, never, R | Scope.Scope> =>
+  Effect.flatMap(Effect.context<R>(), (context) =>
+    Effect.flatMap(Effect.scope, (scope) =>
+      Effect.flatMap(traceFinalizer(scope), (ran) =>
+        Scope.addFinalizerExit(scope, (exit) =>
+          Effect.andThen(
+            ran,
+            Effect.provideContext(
+              finalizer(Exit.isSuccess(exit) ? Option.none() : Option.some(new RawCause(exit.cause))),
+              context,
+            ),
+          ),
+        ),
+      ),
+    ),
+  );

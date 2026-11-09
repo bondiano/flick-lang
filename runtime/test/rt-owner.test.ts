@@ -30,8 +30,8 @@ import {
   within,
   withOwner,
   yieldNow,
-} from "../src/kernel.ts";
-import { parallelExits } from "../src/concurrency.ts";
+} from "../src/rt/kernel.ts";
+import { parallelExits } from "../src/rt/concurrency.ts";
 import { root, sleep } from "./rt-support.ts";
 
 const ignoreFailure = (): undefined => undefined;

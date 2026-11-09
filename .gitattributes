@@ -1,6 +1,6 @@
-packages/effect-ts/Effect/snapshot.json linguist-generated=true
+stdlib/Effect/snapshot.json linguist-generated=true
 tools/dts-importer/test/fixtures/*.snapshot.json linguist-generated=true
-packages/effect-ts/test/fixtures/openapi-3.1.schema.json linguist-vendored=true
+runtime/test/fixtures/openapi-3.1.schema.json linguist-vendored=true
 tests/run/portable.txt merge=union
 # corpora tools/go-unicode/graphemes.mjs and tools/go-collate/gen.mjs write from Node
 runtime-go/flickrt/testdata/graphemes.txt linguist-generated=true

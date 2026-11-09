@@ -5,9 +5,9 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { type Atom, Registry, readable, state, taskAtom } from "../src/atoms/registry.ts";
-import { currentCtx } from "../src/kernel.ts";
-import * as Deferred from "../src/effect/Deferred.ts";
+import { type Atom, Registry, readable, state, taskAtom } from "../src/rt/atoms/registry.ts";
+import { currentCtx } from "../src/rt/kernel.ts";
+import * as Deferred from "../src/rt/effect/Deferred.ts";
 
 const LONG = 20_000;
 

@@ -1,195 +1,114 @@
-// The bindings of `Layer` on the kernel, as Go's `flickrt` has Effect's.
-import { type Cause, die, dies, isFail, raise } from "../cause.ts";
-import { type Run, Suspend, type Under, asExit, currentOwner, exitOf } from "../fiber.ts";
-import {
-  type Build,
-  Layer,
-  MemoMap,
-  type Services,
-  buildWith,
-  constant,
-  currentMemo,
-  fromBuild,
-  memoizable,
-  mergeAll,
-  scoped,
-  servicesOf,
-  withServices,
-} from "../layer.ts";
-import { implementation } from "../handle.ts";
-import { Failure } from "../outcome.ts";
-import { type Owner, withOwner } from "../owner.ts";
+// Effect's `Layer` for the bindings of the standard library, and the
+// adapters where a Flick value differs from what Effect takes.
+import { type Cause, Context, Effect, Exit, Layer, type LogLevel, Option, Scope, Tracer } from "effect";
 
-export const empty: Layer = /*#__PURE__*/ constant([]);
+import { Failure, RawCause, passOn, unwinds } from "../cause.ts";
 
-export const succeedContext = (services: Services): Layer => constant(services);
+export * from "effect/Layer";
 
-export const sync =
-  (tag: object) =>
-  (make: (unit: undefined) => unknown): Layer =>
-    memoizable(() => [[tag, make(undefined)]]);
+/** `Layer.merge_all`: the first layer and the rest. */
+export const flickMergeAll = <A, E, R>(
+  first: Layer.Layer<A, E, R>,
+  rest: ReadonlyArray<Layer.Layer<A, E, R>>,
+): Layer.Layer<A, E, R> => Layer.mergeAll(first, ...rest);
 
-export const syncContext = (make: (unit: undefined) => unknown): Layer => memoizable(() => make(undefined));
-
-/** `Layer.effect tag task`: the implementation `task` computes when the layer builds. */
-export const effect =
-  (tag: object) =>
-  (task: () => unknown): Layer =>
-    memoizable(function* (_memo, into): Run {
-      return [[tag, yield scoped(into, task)]];
-    });
-
-export const effectContext = (task: () => unknown): Layer => memoizable((_memo, into) => scoped(into, task));
-
-export const effectDiscard = (task: () => unknown): Layer =>
-  memoizable(function* (_memo, into): Run {
-    yield scoped(into, task);
-    return [];
-  });
-
-export const suspend = (make: (unit: undefined) => Layer): Layer => memoizable((memo, into) => make(undefined).build(memo, into));
-
-export const unwrap = (task: () => unknown): Layer =>
-  fromBuild(function* (memo, into): Run {
-    const layer = layerOf(yield scoped(into, task));
-    return yield layer.build(memo, into);
-  });
-
-export const flickMergeAll = (first: Layer, rest: ReadonlyArray<Layer>): Layer => mergeAll([first, ...rest]);
-
-const layerOf = (value: unknown): Layer => {
-  if (value instanceof Layer) return value;
-  throw new TypeError("not a layer");
-};
-
-/** `Layer.provide_ that self`: `self` built with the services of `that`. */
-const provideTo =
-  (that: Layer) =>
-  (self: Layer): Layer =>
-    fromBuild(function* (memo, into): Run {
-      const inputs = servicesOf(yield that.build(memo, into));
-      return yield withServices(inputs, () => self.build(memo, into));
-    });
-export { provideTo as provide };
-
-export const provideMerge =
-  (that: Layer) =>
-  (self: Layer): Layer =>
-    fromBuild(function* (memo, into): Run {
-      const inputs = servicesOf(yield that.build(memo, into));
-      return [...inputs, ...servicesOf(yield withServices(inputs, () => self.build(memo, into)))];
-    });
-
-export const flatMap =
-  (f: (services: Services) => Layer) =>
-  (self: Layer): Layer =>
-    fromBuild(function* (memo, into): Run {
-      const services = servicesOf(yield self.build(memo, into));
-      return yield f(services).build(memo, into);
-    });
-
-export const tap =
-  (f: (services: Services) => unknown) =>
-  (self: Layer): Layer =>
-    fromBuild(function* (memo, into): Run {
-      const services = servicesOf(yield self.build(memo, into));
-      yield scoped(into, () => f(services));
-      return services;
-    });
-
-/** A layer that runs `handle` on the cause `self` fails with: the layer it gives is built in its place; none, and it fails as it did. */
-const onFailure = (self: Layer, handle: (into: Owner, cause: Cause) => unknown): Layer =>
-  fromBuild(function* (memo, into): Run {
-    const built = asExit(yield exitOf(() => self.build(memo, into)));
-    if (built.cause === undefined) return built.value;
-    const next: unknown = yield handle(into, built.cause);
-    if (next === undefined) return raise(built.cause);
-    return yield layerOf(next).build(memo, into);
-  });
-
-/** The error of the first typed failure of `cause`, if it has one. */
-const firstError = (cause: Cause): readonly [unknown] | undefined => {
-  const reason = cause.reasons.find(isFail);
-  return reason === undefined ? undefined : [reason.error];
-};
-
-export const tapError =
-  (f: (error: unknown) => unknown) =>
-  (self: Layer): Layer =>
-    onFailure(self, function* (into, cause): Run {
-      const error = firstError(cause);
-      if (error !== undefined) yield scoped(into, () => f(error[0]));
-      return undefined;
-    });
-
+/** `Layer.tap_cause`: `f` sees a `Failure`. */
 export const flickTapCause =
-  (f: (failure: Failure) => unknown) =>
-  (self: Layer): Layer =>
-    onFailure(self, function* (into, cause): Run {
-      yield scoped(into, () => f(new Failure(cause)));
-      return undefined;
-    });
+  <E, X, E2, R2>(f: (failure: Failure) => Effect.Effect<X, E2, R2>) =>
+  <A, R>(self: Layer.Layer<A, E, R>): Layer.Layer<A, E | E2, R | Exclude<R2, Scope.Scope>> =>
+    Layer.tapCause(self, (cause: Cause.Cause<E>) => f(new Failure(cause)));
 
-const catchIt =
-  (f: (error: unknown) => Layer) =>
-  (self: Layer): Layer =>
-    onFailure(self, (_into, cause) => {
-      const error = firstError(cause);
-      return error === undefined ? undefined : f(error[0]);
-    });
-export { catchIt as catch };
-
+/** `Layer.catch_cause`: `f` sees a `Failure`. */
 export const flickCatchCause =
-  (f: (failure: Failure) => Layer) =>
-  (self: Layer): Layer =>
-    onFailure(self, (_into, cause) => f(new Failure(cause)));
+  <E, A2, E2, R2>(f: (failure: Failure) => Layer.Layer<A2, E2, R2>) =>
+  <A, R>(self: Layer.Layer<A, E, R>): Layer.Layer<A & A2, E2, R | R2> =>
+    Layer.catchCause(self, (cause: Cause.Cause<E>) =>
+      unwinds(cause)
+        ? // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- it never builds: it unwinds to a handler of effects
+          (Layer.effectDiscard(passOn(cause)) as unknown as Layer.Layer<A2, E2, R2>)
+        : f(new Failure(cause)),
+    );
 
-export const orDie = (self: Layer): Layer =>
-  new Layer(function* (memo, into): Run {
-    const built = asExit(yield exitOf(() => self.build(memo, into)));
-    return built.cause === undefined ? built.value : raise(dies(built.cause));
-  });
+/** `Layer.build_with_memo_map`: into the scope of the call. */
+export const flickBuildWithMemoMap =
+  (memoMap: Layer.MemoMap) =>
+  <A, E, R>(self: Layer.Layer<A, E, R>): Effect.Effect<Context.Context<A>, E, R | Scope.Scope> =>
+    Effect.flatMap(Effect.scope, (scope) => Layer.buildWithMemoMap(self, memoMap, scope));
 
-/** `self` built with the service of `tag` its input has changed by `f`. */
-export const updateService = (tag: object, f: (impl: unknown) => unknown) => (self: Layer): Layer =>
-  fromBuild((memo, into) => {
-    const impl = implementation(tag);
-    if (impl === undefined) return raise(die(`Service not found: ${String(Reflect.get(tag, "key"))}`));
-    return withServices([[tag, f(impl)]], () => self.build(memo, into));
-  });
+/** `Layer.make_memo_map`. */
+export const flickMakeMemoMap = (): Effect.Effect<Layer.MemoMap> => Layer.makeMemoMap;
 
-export const fresh = (self: Layer): Layer => new Layer((_memo, into) => self.build(new MemoMap(undefined), into));
+/** `Layer.current_memo_map`: forked from the context, or a new one. */
+export const flickCurrentMemoMap = (): Effect.Effect<Layer.MemoMap> =>
+  Effect.map(Effect.context(), (context) => Layer.CurrentMemoMap.forkOrCreate(context));
 
-/** Builds the layer and holds its services until interrupted. */
-export const launch = (self: Layer): Run =>
-  withOwner(function* (owner: Owner): Run {
-    yield buildWith(self, currentMemo(), owner);
-    return yield new Suspend(() => undefined);
-  });
+type Build<A, E, R> = (memoMap: Layer.MemoMap) => Effect.Effect<Context.Context<A>, E, R>;
 
-/** The owner of the call: the innermost `scope`'s. */
-const here = (): Owner => {
-  const owner = currentOwner();
-  if (owner === undefined) throw new Error("a layer is built outside any scope");
-  return owner;
+const scoped =
+  <A, E, R>(build: Build<A, E, R>) =>
+  (memoMap: Layer.MemoMap, scope: Scope.Scope): Effect.Effect<Context.Context<A>, E, Exclude<R, Scope.Scope>> =>
+    Scope.provide(build(memoMap), scope);
+
+/** `Layer.from_build`: `build` runs with the scope of the build as its `Scope`. */
+export const flickFromBuild = <A, E, R>(build: Build<A, E, R>): Layer.Layer<A, E, Exclude<R, Scope.Scope>> =>
+  Layer.fromBuild(scoped(build));
+
+/** `Layer.from_build_memo`. */
+export const flickFromBuildMemo = <A, E, R>(build: Build<A, E, R>): Layer.Layer<A, E, Exclude<R, Scope.Scope>> =>
+  Layer.fromBuildMemo(scoped(build));
+
+/** `Tracer.SpanOptions` as Flick holds it. */
+export interface FlickTraceOptions {
+  readonly attributes: ReadonlyArray<readonly [string, string]>;
+  readonly links: ReadonlyArray<{
+    readonly span: Tracer.AnySpan;
+    readonly attributes: ReadonlyArray<readonly [string, string]>;
+  }>;
+  readonly parent: Option.Option<Tracer.AnySpan>;
+  readonly root: boolean;
+  readonly kind_: Tracer.SpanKind;
+  readonly sampled: Option.Option<boolean>;
+  readonly level: Option.Option<LogLevel.LogLevel>;
+  readonly captureStackTrace: boolean;
+  readonly disablePropagation: boolean;
+}
+
+/** `Layer.Trace.SpanOptions`; `onEnd` arrives curried, inside an `Option`. */
+export interface FlickSpanOptions {
+  readonly span: FlickTraceOptions;
+  readonly onEnd: Option.Option<(span: Tracer.Span) => (cause: Option.Option<RawCause>) => Effect.Effect<void>>;
+}
+
+/** Effect's span options of Flick's `Tracer.SpanOptions`. */
+export const traceOptions = (s: FlickTraceOptions): Tracer.SpanOptions => ({
+  attributes: Object.fromEntries(s.attributes),
+  links: s.links.map((link) => ({ span: link.span, attributes: Object.fromEntries(link.attributes) })),
+  parent: Option.getOrUndefined(s.parent),
+  root: s.root,
+  kind: s.kind_,
+  sampled: Option.getOrUndefined(s.sampled),
+  level: Option.getOrUndefined(s.level),
+  captureStackTrace: s.captureStackTrace,
+  annotations: Context.make(Tracer.DisablePropagation, s.disablePropagation),
+});
+
+const spanOptions = (options: FlickSpanOptions): Layer.SpanOptions => {
+  const onEnd = Option.getOrUndefined(options.onEnd);
+  return {
+    ...traceOptions(options.span),
+    onEnd:
+      onEnd === undefined
+        ? undefined
+        : (span, exit) => onEnd(span)(Exit.isSuccess(exit) ? Option.none() : Option.some(new RawCause(exit.cause))),
+  };
 };
 
-export const build = (self: Layer): Under => buildWith(self, currentMemo(), here());
+/** `Layer.Trace.span`. */
+export const flickSpan = (name: string, options: FlickSpanOptions): Layer.Layer<Tracer.ParentSpan> =>
+  Layer.span(name, spanOptions(options));
 
-export const flickBuildWithMemoMap =
-  (memo: MemoMap) =>
-  (self: Layer): Under =>
-    buildWith(self, memo, here());
-
-export const flickMakeMemoMap = (): MemoMap => new MemoMap(undefined);
-export const forkMemoMap = (parent: MemoMap): MemoMap => new MemoMap(parent);
-export const flickCurrentMemoMap = (): MemoMap => currentMemo();
-
-/** The build of `make`, a function of the memo map to a task that acquires into the layer's scope. */
-const fromTask =
-  (make: (memo: MemoMap) => unknown): Build =>
-  (memo, into) =>
-    scoped(into, () => make(memo));
-
-export const flickFromBuild = (make: (memo: MemoMap) => unknown): Layer => fromBuild(fromTask(make));
-export const flickFromBuildMemo = (make: (memo: MemoMap) => unknown): Layer => memoizable(fromTask(make));
+/** `Layer.Trace.with_span`. */
+export const flickWithSpan =
+  (name: string, options: FlickSpanOptions) =>
+  <A, E, R>(self: Layer.Layer<A, E, R>): Layer.Layer<A, E, Exclude<R, Tracer.ParentSpan>> =>
+    Layer.withSpan(self, name, spanOptions(options));

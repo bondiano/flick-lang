@@ -25,7 +25,7 @@ import {
   tryWith,
   trySync,
   yieldNow,
-} from "../src/kernel.ts";
+} from "../src/rt/kernel.ts";
 import { root, sleep } from "./rt-support.ts";
 
 const Ask = service("Test.Ask");

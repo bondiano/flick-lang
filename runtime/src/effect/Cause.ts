@@ -1,153 +1,119 @@
-// The bindings of `Cause` on the kernel, over Flick's opaque `Failure e`.
-import { err, fromNullable, none, ok, type Option, type Result, some } from "../core/data.ts";
-import { describeDefect } from "../describe.ts";
-import {
-  type Cause,
-  type Die,
-  type Fail,
-  type Interrupt,
-  type Reason,
-  combine,
-  die,
-  dieReason,
-  empty,
-  fail,
-  failReason,
-  fromReasons,
-  hasDies,
-  hasFails,
-  hasInterrupts,
-  hasInterruptsOnly,
-  interrupt,
-  interruptReason,
-  isDie,
-  isFail,
-  isInterrupt,
-} from "../cause.ts";
-import { pretty } from "../entry.ts";
-import { Failure } from "../outcome.ts";
+// Effect's `Cause` for the bindings of the standard library, and the
+// adapters over Flick's opaque `Failure e`, which holds a native cause.
+import { Cause, Context, Option, Result } from "effect";
+import type { StackFrame } from "effect/References";
 
-const optional = <A>(option: Option<A>): A | undefined => (option._tag === "Some" ? option.value : undefined);
+import { Failure, describeDefect } from "../cause.ts";
+import type { Tagged } from "../data.ts";
+import { failureCause } from "../stdlib/outcome.ts";
+import { tag } from "../tags.ts";
 
-export const flickEmpty: Failure = /*#__PURE__*/ new Failure(empty);
-export const flickFail = (error: unknown): Failure => new Failure(fail(error));
-export const flickDie = (defect: string): Failure => new Failure(die(defect));
-export const flickInterrupt = (fiberId: Option<number>): Failure => new Failure(interrupt(optional(fiberId)));
-export const flickFromReasons = (reasons: ReadonlyArray<Reason>): Failure => new Failure(fromReasons(reasons));
+export * from "effect/Cause";
 
+/** A Flick `Failure` of a native cause. */
+export const toFailure = (cause: Cause.Cause<unknown>): Failure => new Failure(cause);
+
+/** The native cause of a Flick `Failure`. */
+export const causeOf = <E>(failure: Failure): Cause.Cause<E> => failureCause<E>(failure);
+
+/** `Cause.NoSuchElementError`. */
+export type NoSuchElement = Tagged<string, string>;
+
+const NO_SUCH_ELEMENT = /*#__PURE__*/ tag("Cause.NoSuchElementError.NoSuchElementError");
+
+/** Effect's `NoSuchElementError` as the Flick error of the same name; other errors as they are. */
+export const noSuchElement = <E>(error: E | Cause.NoSuchElementError): E | NoSuchElement =>
+  Cause.isNoSuchElementError(error) ? { _tag: NO_SUCH_ELEMENT, _0: error.message } : error;
+
+export const flickEmpty: Failure = /*#__PURE__*/ toFailure(Cause.empty);
+export const flickFail = (error: unknown): Failure => toFailure(Cause.fail(error));
+export const flickDie = (defect: string): Failure => toFailure(Cause.die(defect));
+export const flickInterrupt = (fiberId: Option.Option<number>): Failure =>
+  toFailure(Cause.interrupt(Option.getOrUndefined(fiberId)));
+export const flickFromReasons = (reasons: ReadonlyArray<Cause.Reason<unknown>>): Failure =>
+  toFailure(Cause.fromReasons(reasons));
 /**
  * The reasons of a failure as `Failure e` types them: only its first typed
- * failure has an error of `e`; a later one is a defect here.
+ * failure has an error of `e`; a later one, which a narrowing `try` left
+ * behind, is a defect here (docs/formal/runtime.md §2.4).
  */
-export const flickReasons = (failure: Failure): ReadonlyArray<Reason> => {
+export const flickReasons = (failure: Failure): ReadonlyArray<Cause.Reason<unknown>> => {
   let head = true;
-  return failure.cause.reasons.map((reason) => {
-    if (!isFail(reason)) return reason;
+  return causeOf(failure).reasons.map((reason) => {
+    if (!Cause.isFailReason(reason)) return reason;
     if (head) {
       head = false;
       return reason;
     }
-    return dieReason(reason.error);
+    return Cause.makeDieReason(reason.error);
   });
 };
 
 /** The cause with its first typed error mapped by `f`: the later ones have no type to map from. */
-export const mapHead = (cause: Cause, f: (error: unknown) => unknown): Cause => {
+export const mapHead = (cause: Cause.Cause<unknown>, f: (error: unknown) => unknown): Cause.Cause<unknown> => {
   let head = true;
-  return fromReasons(
+  return Cause.fromReasons(
     cause.reasons.map((reason) => {
-      if (!head || !isFail(reason)) return reason;
+      if (!head || !Cause.isFailReason(reason)) return reason;
       head = false;
-      return failReason(f(reason.error));
+      return Cause.makeFailReason(f(reason.error));
     }),
   );
 };
+export const flickMakeInterruptReason = (fiberId: Option.Option<number>): Cause.Interrupt =>
+  Cause.makeInterruptReason(Option.getOrUndefined(fiberId));
 
-export const makeFailReason = failReason;
-export const makeDieReason = dieReason;
-export const flickMakeInterruptReason = (fiberId: Option<number>): Interrupt => interruptReason(optional(fiberId));
-export const isFailReason = isFail;
-export const isDieReason = isDie;
-export const isInterruptReason = isInterrupt;
-
-export const flickHasInterruptsOnly = (failure: Failure): boolean => hasInterruptsOnly(failure.cause);
-export const flickHasFails = (failure: Failure): boolean => hasFails(failure.cause);
-export const flickHasDies = (failure: Failure): boolean => hasDies(failure.cause);
-export const flickHasInterrupts = (failure: Failure): boolean => hasInterrupts(failure.cause);
+export const flickHasInterruptsOnly = (failure: Failure): boolean => Cause.hasInterruptsOnly(causeOf(failure));
+export const flickHasFails = (failure: Failure): boolean => Cause.hasFails(causeOf(failure));
+export const flickHasDies = (failure: Failure): boolean => Cause.hasDies(causeOf(failure));
+export const flickHasInterrupts = (failure: Failure): boolean => Cause.hasInterrupts(causeOf(failure));
 
 export const flickMap =
   (f: (error: unknown) => unknown) =>
   (failure: Failure): Failure =>
-    new Failure(mapHead(failure.cause, f));
+    toFailure(mapHead(causeOf(failure), f));
 export const flickCombine =
   (that: Failure) =>
   (failure: Failure): Failure =>
-    new Failure(combine(failure.cause, that.cause));
+    toFailure(Cause.combine(causeOf(failure), causeOf(that)));
 
-export const flickFindFail = (failure: Failure): Result<Fail, Failure> => {
-  const reason = failure.cause.reasons.find(isFail);
-  return reason === undefined ? err(failure) : ok(reason);
-};
-export const flickFindError = (failure: Failure): Result<unknown, Failure> => {
-  const reason = failure.cause.reasons.find(isFail);
-  return reason === undefined ? err(failure) : ok(reason.error);
-};
-export const flickFindErrorOption = (failure: Failure): Option<unknown> => {
-  const reason = failure.cause.reasons.find(isFail);
-  return reason === undefined ? none : some(reason.error);
-};
-export const flickFindDie = (failure: Failure): Result<Die, Failure> => {
-  const reason = failure.cause.reasons.find(isDie);
-  return reason === undefined ? err(failure) : ok(reason);
-};
-export const flickFindDefect = (failure: Failure): Result<string, Failure> => {
-  const reason = failure.cause.reasons.find(isDie);
-  return reason === undefined ? err(failure) : ok(describeDefect(reason.defect));
-};
-export const flickFindInterrupt = (failure: Failure): Result<Interrupt, Failure> => {
-  const reason = failure.cause.reasons.find(isInterrupt);
-  return reason === undefined ? err(failure) : ok(reason);
-};
-const interruptors = (cause: Cause): Array<number> => {
-  const ids = new Set<number>();
-  for (const r of cause.reasons) if (isInterrupt(r) && r.fiberId !== undefined) ids.add(r.fiberId);
-  return [...ids];
-};
-export const flickInterruptors = (failure: Failure): Array<number> => interruptors(failure.cause);
-export const flickFilterInterruptors = (failure: Failure): Result<Array<number>, Failure> =>
-  hasInterrupts(failure.cause) ? ok(interruptors(failure.cause)) : err(failure);
+/** A native `Result` whose failure is a cause, with the cause as a Flick `Failure`. */
+const failing = <A>(result: Result.Result<A, Cause.Cause<unknown>>): Result.Result<A, Failure> =>
+  Result.mapError(result, toFailure);
 
-export const flickPretty = (failure: Failure): string => pretty(failure.cause);
+export const flickFindFail = (failure: Failure): Result.Result<Cause.Fail<unknown>, Failure> =>
+  failing(Cause.findFail(causeOf(failure)));
+export const flickFindError = (failure: Failure): Result.Result<unknown, Failure> => failing(Cause.findError(causeOf(failure)));
+export const flickFindErrorOption = (failure: Failure): Option.Option<unknown> => Cause.findErrorOption(causeOf(failure));
+export const flickFindDie = (failure: Failure): Result.Result<Cause.Die, Failure> => failing(Cause.findDie(causeOf(failure)));
+export const flickFindDefect = (failure: Failure): Result.Result<string, Failure> =>
+  Result.map(failing(Cause.findDefect(causeOf(failure))), describeDefect);
+export const flickFindInterrupt = (failure: Failure): Result.Result<Cause.Interrupt, Failure> =>
+  failing(Cause.findInterrupt(causeOf(failure)));
+export const flickInterruptors = (failure: Failure): Array<number> => [...Cause.interruptors(causeOf(failure))];
+export const flickFilterInterruptors = (failure: Failure): Result.Result<Array<number>, Failure> =>
+  Result.map(failing(Cause.filterInterruptors(causeOf(failure))), (ids) => [...ids]);
+
+export const flickPretty = (failure: Failure): string => Cause.pretty(causeOf(failure));
 export const flickPrettyErrors = (failure: Failure): Array<string> =>
-  failure.cause.reasons.flatMap((r) => (isFail(r) ? [String(r.error)] : isDie(r) ? [describeDefect(r.defect)] : []));
+  Cause.prettyErrors(causeOf(failure)).map((error) => `${error.name}: ${error.message}`);
 
-/** A frame of a span, which a reason may carry: nothing on this runtime makes one, but `annotate` keeps one given. */
-interface StackFrame {
-  readonly name: string;
-  readonly stack: () => string | undefined;
-  readonly parent: StackFrame | undefined;
-}
+/** The stack frame a context of annotations holds under `key`. */
+const frame = <I>(context: Context.Context<never>, key: Context.Key<I, StackFrame>): Option.Option<StackFrame> =>
+  Context.getOption(context, key);
 
-const isFrame = (value: unknown): value is StackFrame => typeof value === "object" && value !== null && typeof Reflect.get(value, "name") === "string";
-
-const traceOf = (reason: Reason): StackFrame | undefined => {
-  const trace: unknown = Reflect.get(reason, "trace");
-  return isFrame(trace) ? trace : undefined;
-};
-
-const frameOption = (frame: StackFrame | undefined): Option<StackFrame> => (frame === undefined ? none : some(frame));
-
-/** The frame of the failure: the annotations of its reasons merged, the last one winning. */
-export const flickStackTrace = (failure: Failure): Option<StackFrame> =>
-  frameOption(failure.cause.reasons.reduce<StackFrame | undefined>((frame, r) => traceOf(r) ?? frame, undefined));
-// shortcut: always `None`, as an interruption here carries the fiber's id only, as on Go; record its frame if a program reads it
-export const flickInterruptorStackTrace = (_failure: Failure): Option<StackFrame> => none;
-export const flickReasonStackTrace = (reason: Reason): Option<StackFrame> => frameOption(traceOf(reason));
+export const flickStackTrace = (failure: Failure): Option.Option<StackFrame> =>
+  frame(Cause.annotations(causeOf(failure)), Cause.StackTrace);
+export const flickInterruptorStackTrace = (failure: Failure): Option.Option<StackFrame> =>
+  frame(Cause.annotations(causeOf(failure)), Cause.InterruptorStackTrace);
+export const flickReasonStackTrace = (reason: Cause.Reason<unknown>): Option.Option<StackFrame> =>
+  frame(Cause.reasonAnnotations(reason), Cause.StackTrace);
 export const flickAnnotate =
   (overwrite: boolean) =>
-  (frame: StackFrame) =>
+  (stack: StackFrame) =>
   (failure: Failure): Failure =>
-    new Failure(fromReasons(failure.cause.reasons.map((r) => (overwrite || traceOf(r) === undefined ? { ...r, trace: frame } : r))));
-export const flickFrameName = (frame: StackFrame): string => frame.name;
-export const flickFrameStack = (frame: StackFrame): Option<string> => fromNullable(frame.stack());
-export const flickFrameParent = (frame: StackFrame): Option<StackFrame> => frameOption(frame.parent);
+    toFailure(Cause.annotate(causeOf(failure), Context.make(Cause.StackTrace, stack), { overwrite }));
+
+export const flickFrameName = (stack: StackFrame): string => stack.name;
+export const flickFrameStack = (stack: StackFrame): Option.Option<string> => Option.fromNullishOr(stack.stack());
+export const flickFrameParent = (stack: StackFrame): Option.Option<StackFrame> => Option.fromNullishOr(stack.parent);

@@ -5,13 +5,13 @@ import { test } from "node:test";
 
 import { Hash } from "effect";
 
-import { fail, raise } from "../src/cause.ts";
-import { clock } from "../src/clock.ts";
-import { Duration, sleep } from "../src/duration.ts";
-import { type Run, awaitFiber, currentCtx, fork } from "../src/fiber.ts";
-import { hash } from "../src/hash.ts";
-import { Layer } from "../src/layer.ts";
-import { addFinalizer } from "../src/owner.ts";
+import { fail, raise } from "../src/rt/cause.ts";
+import { clock } from "../src/rt/clock.ts";
+import { Duration, sleep } from "../src/rt/duration.ts";
+import { type Run, awaitFiber, currentCtx, fork } from "../src/rt/fiber.ts";
+import { hash } from "../src/rt/hash.ts";
+import { Layer } from "../src/rt/layer.ts";
+import { addFinalizer } from "../src/rt/owner.ts";
 import {
   genInt,
   runTests,
@@ -22,7 +22,7 @@ import {
   testProperty,
   testPure,
   testSuite,
-} from "../src/testing.ts";
+} from "../src/rt/testing.ts";
 import type { TestResult } from "../src/core/suites.ts";
 import { tag } from "../src/tags.ts";
 

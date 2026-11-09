@@ -1,60 +1,67 @@
-// The bindings of `Exit` on the kernel: Flick's opaque `Exit e a` is the kernel's.
-import { err, none, ok, type Option, type Result, some } from "../core/data.ts";
-import { type Exit, concat, die, empty, fail, failed, hasDies, hasFails, hasInterrupts, interrupt, isDie, isFail, succeeded } from "../cause.ts";
-import { describeDefect } from "../describe.ts";
-import { Failure } from "../outcome.ts";
-import { mapHead } from "./Cause.ts";
+// Effect's `Exit` for the bindings of the standard library, and the
+// adapters over Flick's opaque `Exit e a`, which holds a native exit.
+import { Exit, Option, Result } from "effect";
 
-export const flickSucceed = succeeded;
-export const flickFail = (error: unknown): Exit => failed(fail(error));
-export const flickFailCause = (failure: Failure): Exit => failed(failure.cause);
-export const flickDie = (defect: string): Exit => failed(die(defect));
-export const flickInterrupt = (fiberId: Option<number>): Exit =>
-  failed(interrupt(fiberId._tag === "Some" ? fiberId.value : undefined));
-export const flickVoid: Exit = /*#__PURE__*/ succeeded(undefined);
+import { type Failure, type FlickExit, describeDefect } from "../cause.ts";
+import { failureCause, flickExit, nativeExit } from "../stdlib/outcome.ts";
+import { mapHead, toFailure } from "./Cause.ts";
 
-export const flickIsSuccess = (exit: Exit): boolean => exit.cause === undefined;
-export const flickIsFailure = (exit: Exit): boolean => exit.cause !== undefined;
-export const flickHasFails = (exit: Exit): boolean => exit.cause !== undefined && hasFails(exit.cause);
-export const flickHasDies = (exit: Exit): boolean => exit.cause !== undefined && hasDies(exit.cause);
-export const flickHasInterrupts = (exit: Exit): boolean => exit.cause !== undefined && hasInterrupts(exit.cause);
+export * from "effect/Exit";
 
-export const flickFilterSuccess = (exit: Exit): Result<Exit, Exit> => (exit.cause === undefined ? ok(exit) : err(exit));
-export const flickFilterValue = (exit: Exit): Result<unknown, Exit> => (exit.cause === undefined ? ok(exit.value) : err(exit));
-export const flickFilterFailure = (exit: Exit): Result<Exit, Exit> => (exit.cause === undefined ? err(exit) : ok(exit));
-export const flickFilterCause = (exit: Exit): Result<Failure, Exit> =>
-  exit.cause === undefined ? err(exit) : ok(new Failure(exit.cause));
-export const flickFindError = (exit: Exit): Result<unknown, Exit> => {
-  const reason = exit.cause?.reasons.find(isFail);
-  return reason === undefined ? err(exit) : ok(reason.error);
-};
-export const flickFindErrorOption = (exit: Exit): Option<unknown> => {
-  const reason = exit.cause?.reasons.find(isFail);
-  return reason === undefined ? none : some(reason.error);
-};
-export const flickFindDefect = (exit: Exit): Result<string, Exit> => {
-  const reason = exit.cause?.reasons.find(isDie);
-  return reason === undefined ? err(exit) : ok(describeDefect(reason.defect));
-};
+const native = <A>(exit: FlickExit<A>): Exit.Exit<A, unknown> => nativeExit<A, unknown>(exit);
+
+export const flickSucceed = <A>(value: A): FlickExit<A> => flickExit(Exit.succeed(value));
+export const flickFail = (error: unknown): FlickExit<never> => flickExit(Exit.fail(error));
+export const flickFailCause = (failure: Failure): FlickExit<never> => flickExit(Exit.failCause(failureCause(failure)));
+export const flickDie = (defect: string): FlickExit<never> => flickExit(Exit.die(defect));
+export const flickInterrupt = (fiberId: Option.Option<number>): FlickExit<never> =>
+  flickExit(Exit.interrupt(Option.getOrUndefined(fiberId)));
+export const flickVoid: FlickExit<void> = /*#__PURE__*/ flickExit(Exit.void);
+
+export const flickIsSuccess = <A>(exit: FlickExit<A>): boolean => Exit.isSuccess(native(exit));
+export const flickIsFailure = <A>(exit: FlickExit<A>): boolean => Exit.isFailure(native(exit));
+export const flickHasFails = <A>(exit: FlickExit<A>): boolean => Exit.hasFails(native(exit));
+export const flickHasDies = <A>(exit: FlickExit<A>): boolean => Exit.hasDies(native(exit));
+export const flickHasInterrupts = <A>(exit: FlickExit<A>): boolean => Exit.hasInterrupts(native(exit));
+
+/** The other side of a filter stays a Flick exit. */
+const keep = <A, B>(result: Result.Result<A, Exit.Exit<B, unknown>>): Result.Result<A, FlickExit<B>> =>
+  Result.mapError(result, flickExit);
+
+export const flickFilterSuccess = <A>(exit: FlickExit<A>): Result.Result<FlickExit<A>, FlickExit<A>> =>
+  Result.map(keep(Exit.filterSuccess(native(exit))), flickExit);
+export const flickFilterValue = <A>(exit: FlickExit<A>): Result.Result<A, FlickExit<never>> =>
+  keep(Exit.filterValue(native(exit)));
+export const flickFilterFailure = <A>(exit: FlickExit<A>): Result.Result<FlickExit<never>, FlickExit<A>> =>
+  Result.map(keep(Exit.filterFailure(native(exit))), flickExit);
+export const flickFilterCause = <A>(exit: FlickExit<A>): Result.Result<Failure, FlickExit<A>> =>
+  Result.map(keep(Exit.filterCause(native(exit))), toFailure);
+export const flickFindError = <A>(exit: FlickExit<A>): Result.Result<unknown, FlickExit<A>> =>
+  keep(Exit.findError(native(exit)));
+export const flickFindErrorOption = <A>(exit: FlickExit<A>): Option.Option<unknown> => Exit.findErrorOption(native(exit));
+export const flickFindDefect = <A>(exit: FlickExit<A>): Result.Result<string, FlickExit<A>> =>
+  Result.map(keep(Exit.findDefect(native(exit))), describeDefect);
 
 export const flickMatch =
-  (onSuccess: (value: unknown) => unknown, onFailure: (failure: Failure) => unknown) =>
-  (exit: Exit): unknown =>
-    exit.cause === undefined ? onSuccess(exit.value) : onFailure(new Failure(exit.cause));
+  <A, B>(onSuccess: (value: A) => B, onFailure: (failure: Failure) => B) =>
+  (exit: FlickExit<A>): B =>
+    Exit.match(native(exit), { onSuccess, onFailure: (cause) => onFailure(toFailure(cause)) });
 export const flickMap =
-  (f: (value: unknown) => unknown) =>
-  (exit: Exit): Exit =>
-    exit.cause === undefined ? succeeded(f(exit.value)) : exit;
+  <A, B>(f: (value: A) => B) =>
+  (exit: FlickExit<A>): FlickExit<B> =>
+    flickExit(Exit.map(native(exit), f));
+/** The exit with the first typed error of its failure mapped, as `Cause.map` does. */
+const mapFailure = <A>(exit: Exit.Exit<A, unknown>, f: (error: unknown) => unknown): Exit.Exit<A, unknown> =>
+  Exit.isFailure(exit) ? Exit.failCause(mapHead(exit.cause, f)) : exit;
+
 export const flickMapError =
   (f: (error: unknown) => unknown) =>
-  (exit: Exit): Exit =>
-    exit.cause === undefined ? exit : failed(mapHead(exit.cause, f));
+  <A>(exit: FlickExit<A>): FlickExit<A> =>
+    flickExit(mapFailure(native(exit), f));
 export const flickMapBoth =
-  (onFailure: (error: unknown) => unknown, onSuccess: (value: unknown) => unknown) =>
-  (exit: Exit): Exit =>
-    exit.cause === undefined ? succeeded(onSuccess(exit.value)) : failed(mapHead(exit.cause, onFailure));
-export const flickAsVoid = (exit: Exit): Exit => (exit.cause === undefined ? flickVoid : exit);
-export const flickAsVoidAll = (exits: ReadonlyArray<Exit>): Exit => {
-  const cause = exits.reduce((c, e) => (e.cause === undefined ? c : concat(c, e.cause)), empty);
-  return cause.reasons.length === 0 ? flickVoid : failed(cause);
-};
+  <A, B>(onFailure: (error: unknown) => unknown, onSuccess: (value: A) => B) =>
+  (exit: FlickExit<A>): FlickExit<B> =>
+    flickExit(Exit.map(mapFailure(native(exit), onFailure), onSuccess));
+export const flickAsVoid = <A>(exit: FlickExit<A>): FlickExit<void> => flickExit(Exit.asVoid(native(exit)));
+export const flickAsVoidAll = <A>(exits: ReadonlyArray<FlickExit<A>>): FlickExit<void> =>
+  flickExit(Exit.asVoidAll(exits.map(native)));

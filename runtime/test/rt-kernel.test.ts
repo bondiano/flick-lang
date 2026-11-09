@@ -31,7 +31,7 @@ import {
   die,
   exitOf,
   caught,
-} from "../src/kernel.ts";
+} from "../src/rt/kernel.ts";
 import { root, sleep } from "./rt-support.ts";
 
 test("a chain of calls deeper than the JS stack runs on heap frames", async () => {
@@ -324,6 +324,6 @@ test("nothing the runtime's index reaches imports Effect", () => {
       visit(new URL(spec, url));
     }
   };
-  visit(new URL("../src/index.ts", import.meta.url));
+  visit(new URL("../src/rt/index.ts", import.meta.url));
   assert.ok(seen.size > 10);
 });

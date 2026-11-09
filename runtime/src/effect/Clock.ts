@@ -1,12 +1,13 @@
-// The bindings of `Clock` on the kernel: the clock of the fiber, read anew by each call.
-import { type Clock, clock } from "../clock.ts";
+// Effect's `Clock` for the bindings of the standard library: its reads as
+// functions that return the effect, so each call reads the clock anew.
+import { Clock, type Effect } from "effect";
 
-export const clockWith = (f: (clock: Clock) => unknown): unknown => f(clock());
+export * from "effect/Clock";
 
-export const flickMillisOf = (c: Clock): number => c.millis();
-export const flickNanosOf = (c: Clock): bigint => c.nanos();
-export const flickMonotonicNanosOf = (c: Clock): bigint => c.monotonic();
+export const flickMillisOf = (clock: Clock.Clock): Effect.Effect<number> => clock.currentTimeMillis;
+export const flickNanosOf = (clock: Clock.Clock): Effect.Effect<bigint> => clock.currentTimeNanos;
+export const flickMonotonicNanosOf = (clock: Clock.Clock): Effect.Effect<bigint> => clock.monotonicTimeNanos;
 
-export const flickCurrentTimeMillis = (): number => clock().millis();
-export const flickCurrentTimeNanos = (): bigint => clock().nanos();
-export const flickMonotonicTimeNanos = (): bigint => clock().monotonic();
+export const flickCurrentTimeMillis = (): Effect.Effect<number> => Clock.currentTimeMillis;
+export const flickCurrentTimeNanos = (): Effect.Effect<bigint> => Clock.currentTimeNanos;
+export const flickMonotonicTimeNanos = (): Effect.Effect<bigint> => Clock.monotonicTimeNanos;

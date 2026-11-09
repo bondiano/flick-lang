@@ -4,13 +4,13 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { fail } from "../src/cause.ts";
-import { CLOCK, TestClock, clock } from "../src/clock.ts";
-import { timeout } from "../src/concurrency.ts";
-import { Duration, sleep } from "../src/duration.ts";
-import { spaced } from "../src/effect/Schedule.ts";
-import { type Run, Under, asExit, awaitFiber, currentCtx, extend, fork, raise } from "../src/kernel.ts";
-import { retry } from "../src/schedule.ts";
+import { fail } from "../src/rt/cause.ts";
+import { CLOCK, TestClock, clock } from "../src/rt/clock.ts";
+import { timeout } from "../src/rt/concurrency.ts";
+import { Duration, sleep } from "../src/rt/duration.ts";
+import { spaced } from "../src/rt/effect/Schedule.ts";
+import { type Run, Under, asExit, awaitFiber, currentCtx, extend, fork, raise } from "../src/rt/kernel.ts";
+import { retry } from "../src/rt/schedule.ts";
 import { root } from "./rt-support.ts";
 
 const HOUR = 3_600_000;

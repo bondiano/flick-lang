@@ -39,16 +39,14 @@ const listed = (name: string): Array<string> => {
 const source = (module: string): string => {
   const file = `${module.replaceAll(".", "/")}.fl`;
   const core = new URL(`packages/core/src/${file}`, repo);
-  if (existsSync(core)) return readFileSync(core, "utf8");
-  const std = new URL(`packages/std/src/${file}`, repo);
-  return existsSync(std) ? readFileSync(std, "utf8") : read(`packages/effect-ts/src/${file}`);
+  return existsSync(core) ? readFileSync(core, "utf8") : read(`packages/std/src/${file}`);
 };
 
 /** The kernel module `rt_specifier` makes of a runtime specifier, if it has one. */
 const kernelPath = (spec: string, inRt: ReadonlyArray<string>, inCore: ReadonlyArray<string>): string | undefined => {
-  if (spec === "@flick-lang/runtime") return "../src/index.ts";
+  if (spec === "@flick-lang/runtime") return "../src/rt/index.ts";
   const ui = /^@flick-lang\/runtime(\/ui(?:\/\w+)?)$/.exec(spec)?.[1];
-  if (ui !== undefined) return listed("UI_IN_RT").includes(ui) ? `../src${ui}.ts` : undefined;
+  if (ui !== undefined) return listed("UI_IN_RT").includes(ui) ? `../src/rt${ui}.ts` : undefined;
   const module = /^@flick-lang\/runtime\/effect\/([\w/]+)$/.exec(spec)?.[1];
   if (module === undefined) return undefined;
   if (inRt.includes(module)) return `../src/effect/${module}.ts`;

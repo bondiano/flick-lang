@@ -5,8 +5,8 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import { type Option, none, some } from "../src/core/data.ts";
-import { type Exit, die, fail, raise } from "../src/cause.ts";
-import { Duration } from "../src/duration.ts";
+import { type Exit, die, fail, raise } from "../src/rt/cause.ts";
+import { Duration } from "../src/rt/duration.ts";
 import {
   type Metadata,
   type Schedule,
@@ -28,8 +28,8 @@ import {
   spaced,
   tap,
   while as whileIt,
-} from "../src/effect/Schedule.ts";
-import { repeat, repeatOrElse, retry, retryOrElse, schedule, scheduleFrom } from "../src/schedule.ts";
+} from "../src/rt/effect/Schedule.ts";
+import { repeat, repeatOrElse, retry, retryOrElse, schedule, scheduleFrom } from "../src/rt/schedule.ts";
 import { root } from "./rt-support.ts";
 
 const ms = (n: number): Duration => new Duration(n);
