@@ -118,140 +118,140 @@ type alias PanelSlots c = {
 
 /// Text through the text channel: markup in it stays text.
 text : String -> Ui
-foreign pure text from "@flick-lang/runtime/ui/react" "uiText"
+foreign pure text from "@flick-lang/effect-ts/ui/react" "uiText"
 
 /// No node at all.
 empty : Ui
 let empty = fragment []
 
 fragment : List (Ui^c) -> Ui^c
-foreign pure fragment from "@flick-lang/runtime/ui/react" "uiFragment"
+foreign pure fragment from "@flick-lang/effect-ts/ui/react" "uiFragment"
   retention call
 
 /// The node, or nothing.
 optional : Option (Ui^c) -> Ui^c
-foreign pure optional from "@flick-lang/runtime/ui/react" "uiOptional"
+foreign pure optional from "@flick-lang/effect-ts/ui/react" "uiOptional"
   retention call
 
 /// The React key of a node in a dynamic list: metadata, not a prop.
 keyed : String -> Ui^c -> Ui^c
-foreign pure keyed from "@flick-lang/runtime/ui/react" "uiKeyed"
+foreign pure keyed from "@flick-lang/effect-ts/ui/react" "uiKeyed"
   retention call
 
 div : ElementProps -> List (Ui^c) -> Ui^c
-foreign pure div from "@flick-lang/runtime/ui/react" "uiDiv"
+foreign pure div from "@flick-lang/effect-ts/ui/react" "uiDiv"
   retention call
 
 span : ElementProps -> List (Ui^c) -> Ui^c
-foreign pure span from "@flick-lang/runtime/ui/react" "uiSpan"
+foreign pure span from "@flick-lang/effect-ts/ui/react" "uiSpan"
   retention call
 
 paragraph : List (Ui^c) -> Ui^c
-foreign pure paragraph from "@flick-lang/runtime/ui/react" "uiParagraph"
+foreign pure paragraph from "@flick-lang/effect-ts/ui/react" "uiParagraph"
   retention call
 
 heading : List (Ui^c) -> Ui^c
-foreign pure heading from "@flick-lang/runtime/ui/react" "uiHeading"
+foreign pure heading from "@flick-lang/effect-ts/ui/react" "uiHeading"
   retention call
 
 list : List (Ui^c) -> Ui^c
-foreign pure list from "@flick-lang/runtime/ui/react" "uiList"
+foreign pure list from "@flick-lang/effect-ts/ui/react" "uiList"
   retention call
 
 item : List (Ui^c) -> Ui^c
-foreign pure item from "@flick-lang/runtime/ui/react" "uiItem"
+foreign pure item from "@flick-lang/effect-ts/ui/react" "uiItem"
   retention call
 
 button : ButtonProps c -> List (Ui^c) -> Ui^c
-foreign pure button from "@flick-lang/runtime/ui/react" "uiButton"
+foreign pure button from "@flick-lang/effect-ts/ui/react" "uiButton"
   retention call
 
 /// A text input; it has no children.
 input : InputProps c -> Ui^c
-foreign pure input from "@flick-lang/runtime/ui/react" "uiInput"
+foreign pure input from "@flick-lang/effect-ts/ui/react" "uiInput"
   retention call
 
 /// A text area of several lines; like `input`, `value` is the initial text.
 textarea : InputProps c -> Ui^c
-foreign pure textarea from "@flick-lang/runtime/ui/react" "uiTextarea"
+foreign pure textarea from "@flick-lang/effect-ts/ui/react" "uiTextarea"
   retention call
 
 /// Preformatted text: spaces and line breaks are kept.
 pre : ElementProps -> List (Ui^c) -> Ui^c
-foreign pure pre from "@flick-lang/runtime/ui/react" "uiPre"
+foreign pure pre from "@flick-lang/effect-ts/ui/react" "uiPre"
   retention call
 
 link : LinkProps -> List (Ui^c) -> Ui^c
-foreign pure link from "@flick-lang/runtime/ui/react" "uiLink"
+foreign pure link from "@flick-lang/effect-ts/ui/react" "uiLink"
   retention call
 
 /// A link inside the app: a plain left click writes `to` to `route`, which
 /// pushes its URL without a reload; other clicks, and markup without a
 /// client, follow its `href`, `Route.print url to`.
 route_link : RouteLinkProps a -> List (Ui^c) -> Ui^c
-foreign pure route_link from "@flick-lang/runtime/ui/react" "uiRouteLink"
+foreign pure route_link from "@flick-lang/effect-ts/ui/react" "uiRouteLink"
   retention call
 
 nav : ElementProps -> List (Ui^c) -> Ui^c
-foreign pure nav from "@flick-lang/runtime/ui/react" "uiNav"
+foreign pure nav from "@flick-lang/effect-ts/ui/react" "uiNav"
   retention call
 
 footer : ElementProps -> List (Ui^c) -> Ui^c
-foreign pure footer from "@flick-lang/runtime/ui/react" "uiFooter"
+foreign pure footer from "@flick-lang/effect-ts/ui/react" "uiFooter"
   retention call
 
 fieldset : ElementProps -> List (Ui^c) -> Ui^c
-foreign pure fieldset from "@flick-lang/runtime/ui/react" "uiFieldset"
+foreign pure fieldset from "@flick-lang/effect-ts/ui/react" "uiFieldset"
   retention call
 
 /// The `i` element of an icon font, which its classes name.
 icon : ElementProps -> Ui
-foreign pure icon from "@flick-lang/runtime/ui/react" "uiIcon"
+foreign pure icon from "@flick-lang/effect-ts/ui/react" "uiIcon"
 
 /// A thematic break, `hr`.
 hr : Ui
-foreign pure hr from "@flick-lang/runtime/ui/react" "uiHr"
+foreign pure hr from "@flick-lang/effect-ts/ui/react" "uiHr"
 
 image : ImageProps -> Ui
-foreign pure image from "@flick-lang/runtime/ui/react" "uiImage"
+foreign pure image from "@flick-lang/effect-ts/ui/react" "uiImage"
 
 form : FormProps c -> List (Ui^c) -> Ui^c
-foreign pure form from "@flick-lang/runtime/ui/react" "uiForm"
+foreign pure form from "@flick-lang/effect-ts/ui/react" "uiForm"
   retention call
 
 /// The button that submits the `form` around it.
 submit : SubmitProps -> List (Ui^c) -> Ui^c
-foreign pure submit from "@flick-lang/runtime/ui/react" "uiSubmit"
+foreign pure submit from "@flick-lang/effect-ts/ui/react" "uiSubmit"
   retention call
 
 /// Trusted HTML, inside a `div`.
 html : SanitizedHtml -> Ui
-foreign pure html from "@flick-lang/runtime/ui/react" "uiHtml"
+foreign pure html from "@flick-lang/effect-ts/ui/react" "uiHtml"
 
 /// A listbox of `items`; choosing one runs `on_change` with it.
 select : SelectProps a c -> Ui^c
-foreign pure select from "@flick-lang/runtime/ui/react" "uiSelect"
+foreign pure select from "@flick-lang/effect-ts/ui/react" "uiSelect"
   retention call
 
 /// Header, body and an optional footer, each in its place.
 panel : PanelSlots c -> Ui^c
-foreign pure panel from "@flick-lang/runtime/ui/react" "uiPanel"
+foreign pure panel from "@flick-lang/effect-ts/ui/react" "uiPanel"
   retention call
 
 tab : String -> Ui^c -> Tab^c
-foreign pure tab from "@flick-lang/runtime/ui/react" "uiTab"
+foreign pure tab from "@flick-lang/effect-ts/ui/react" "uiTab"
   retention call
 
 /// At least one tab; `selected` counts from 0.
 tabs : TabsProps -> NonEmpty.NonEmpty (Tab^c) -> Ui^c
-foreign pure tabs from "@flick-lang/runtime/ui/react" "uiTabs"
+foreign pure tabs from "@flick-lang/effect-ts/ui/react" "uiTabs"
   retention call
 
 /// A foreign component with its props, which React gets as they are.
 /// Inside `ui { … }`, `value props` inserts this operation automatically
 /// when `value` has type `Component p`; the component itself stays opaque.
 component : Component p -> p -> Ui
-foreign pure component from "@flick-lang/runtime/ui/react" "uiComponent"
+foreign pure component from "@flick-lang/effect-ts/ui/react" "uiComponent"
 
 /// `Ui.Dom.mount` with a renderer factory, called when this call starts,
 /// instead of a DOM container. The elements here are still DOM ones.
@@ -260,7 +260,7 @@ mount_with :
   (Failure none ->{r; none} Unit)^c ->
   Ui^c ->{Async, Atom.Registry, Atom.Write | r; none}
   Never
-foreign effect mount_with from "@flick-lang/runtime/ui/react" "uiMountWith"
+foreign effect mount_with from "@flick-lang/effect-ts/ui/react" "uiMountWith"
   retention call
 
 @lang ui_view
@@ -272,7 +272,7 @@ type View p
 @maker
 /// The component of `render`.
 view : (p ->{Atom.Read;} Ui^c)^c -> (View p)^c
-foreign pure view from "@flick-lang/runtime/ui/react" "uiView"
+foreign pure view from "@flick-lang/effect-ts/ui/react" "uiView"
   retention call
 
 /// A DOM element of a component instance, of the tag `t`: its setup makes
@@ -315,7 +315,7 @@ service Document =
 
 /// A fresh element, not bound to a node yet.
 handle : Unit -> Element t
-foreign pure handle from "@flick-lang/runtime/ui/react" "uiElementHandle"
+foreign pure handle from "@flick-lang/effect-ts/ui/react" "uiElementHandle"
   arity 1
 
 /// An element of the instance whose setup makes it.
@@ -324,22 +324,22 @@ let element () = Setup.own (handle ())
 
 /// `input props` whose node is `element`'s.
 input_at : (Element Input)^d -> InputProps c -> Ui^(c + d)
-foreign pure input_at from "@flick-lang/runtime/ui/react" "uiInputAt"
+foreign pure input_at from "@flick-lang/effect-ts/ui/react" "uiInputAt"
   retention call
 
 /// `textarea props` whose node is `element`'s.
 textarea_at : (Element Textarea)^d -> InputProps c -> Ui^(c + d)
-foreign pure textarea_at from "@flick-lang/runtime/ui/react" "uiTextareaAt"
+foreign pure textarea_at from "@flick-lang/effect-ts/ui/react" "uiTextareaAt"
   retention call
 
 /// `button props children` whose node is `element`'s.
 button_at : (Element Button)^d -> ButtonProps c -> List (Ui^c) -> Ui^(c + d)
-foreign pure button_at from "@flick-lang/runtime/ui/react" "uiButtonAt"
+foreign pure button_at from "@flick-lang/effect-ts/ui/react" "uiButtonAt"
   retention call
 
 /// `div props children` whose node is `element`'s.
 div_at : (Element Div)^d -> ElementProps -> List (Ui^c) -> Ui^(c + d)
-foreign pure div_at from "@flick-lang/runtime/ui/react" "uiDivAt"
+foreign pure div_at from "@flick-lang/effect-ts/ui/react" "uiDivAt"
   retention call
 
 /// Moves the keyboard focus to `element`'s node.
@@ -361,13 +361,13 @@ let measure element = Document.measure element
 /// The component whose instances run `setup` once, when they mount, and
 /// render with what it made, which has the instance's region `s`.
 stateful : (forall s. p ->{Setup s;} (p ->{Atom.Read;} Ui^{s | c})^{s | c})^c -> (View p)^c
-foreign pure stateful from "@flick-lang/runtime/ui/react" "uiStateful"
+foreign pure stateful from "@flick-lang/effect-ts/ui/react" "uiStateful"
   retention call
 
 /// `task` as work of an instance: it starts after the instance mounts,
 /// and its unmount interrupts it.
 mounted : (Eff {Async, Atom.Write, Document} none Unit)^c -> Lifecycle^c
-foreign pure mounted from "@flick-lang/runtime/ui/react" "uiMounted"
+foreign pure mounted from "@flick-lang/effect-ts/ui/react" "uiMounted"
   retention call
 
 /// Runs `task` in a component's `setup` once the instance mounts, as a
@@ -383,7 +383,7 @@ watched :
   (Unit ->{Atom.Read;} a)^c ->
   (a -> (Eff {Async, Atom.Write, Document} none Unit)^c)^c ->
   Lifecycle^c
-foreign pure watched from "@flick-lang/runtime/ui/react" "uiWatched"
+foreign pure watched from "@flick-lang/effect-ts/ui/react" "uiWatched"
   retention call
 
 /// Runs `run` of the value `read` computes in a component's `setup` once
@@ -400,12 +400,12 @@ let watch read run = Setup.start (watched read run)
 @maker
 /// The component named `name` in React's developer tools.
 named : String -> (View p)^c -> (View p)^c
-foreign pure named from "@flick-lang/runtime/ui/react" "uiNamed"
+foreign pure named from "@flick-lang/effect-ts/ui/react" "uiNamed"
   retention call
 
 /// The component with the props `props`.
 render : (View p)^c -> p^c -> Ui^c
-foreign pure render from "@flick-lang/runtime/ui/react" "uiRender"
+foreign pure render from "@flick-lang/effect-ts/ui/react" "uiRender"
   retention call
 
 /// The props of a field bound to a state.
@@ -423,12 +423,12 @@ type alias FieldProps c = {
 /// where the user left them; a write to the state from elsewhere, a reset,
 /// shows in the field. `on_input` then runs as a task.
 field : FieldProps c -> Ui^c
-foreign pure field from "@flick-lang/runtime/ui/react" "uiField"
+foreign pure field from "@flick-lang/effect-ts/ui/react" "uiField"
   retention call
 
 /// A text area bound to a state as `field` is.
 field_area : FieldProps c -> Ui^c
-foreign pure field_area from "@flick-lang/runtime/ui/react" "uiFieldArea"
+foreign pure field_area from "@flick-lang/effect-ts/ui/react" "uiFieldArea"
   retention call
 
 /// How a live region announces its changes.
@@ -507,7 +507,7 @@ let host = {
 /// `field` or `field_area` they go on its input or text area. Another node
 /// that is not an element is a defect.
 with_host : Host -> Ui^c -> Ui^c
-foreign pure with_host from "@flick-lang/runtime/ui/react" "uiWithHost"
+foreign pure with_host from "@flick-lang/effect-ts/ui/react" "uiWithHost"
   retention call
 
 /// The level of a heading, `h1` to `h6`.
@@ -516,7 +516,7 @@ type Level = H1 | H2 | H3 | H4 | H5 | H6
 
 /// A heading of the level.
 heading_at : Level -> List (Ui^c) -> Ui^c
-foreign pure heading_at from "@flick-lang/runtime/ui/react" "uiHeadingAt"
+foreign pure heading_at from "@flick-lang/effect-ts/ui/react" "uiHeadingAt"
   retention call
 
 @maker
@@ -524,7 +524,7 @@ foreign pure heading_at from "@flick-lang/runtime/ui/react" "uiHeadingAt"
 /// it shows `fallback`, and when one failed it shows `failed` of the
 /// failure, so each error of `x` has a place to go.
 suspended : (Failure x -> Ui^c)^c -> Ui^c -> (p ->{Atom.Read; x} Ui^c)^c -> (View p)^c
-foreign pure suspended from "@flick-lang/runtime/ui/react" "uiSuspended"
+foreign pure suspended from "@flick-lang/effect-ts/ui/react" "uiSuspended"
   retention call
 
 /// A view of a task atom, its props: `fallback` while it loads, `failed`

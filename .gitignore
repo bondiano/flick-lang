@@ -2,6 +2,7 @@
 node_modules/
 !/tests/check/projects/*/node_modules/
 /runtime/dist/
+/packages/effect-ts/dist/
 /tools/dts-importer/dist/
 /tools/load/*/dist/
 /tools/load/*/.flick/

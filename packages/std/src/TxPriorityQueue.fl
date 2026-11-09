@@ -10,93 +10,93 @@ type TxPriorityQueue a
 
 /// A new empty queue.
 empty : Ord a => Unit ->{} TxPriorityQueue a
-foreign effect empty from "@flick-lang/runtime/effect/TxPriorityQueue" "flickEmpty"
+foreign effect empty from "@flick-lang/effect-ts/effect/TxPriorityQueue" "flickEmpty"
   arity 0
   reviewed "effect@4.1.2 sha256:35599b1cfa875064"
 
 /// A new queue of the elements of the list.
 from_iterable : Ord a => List a ->{} TxPriorityQueue a
-foreign effect from_iterable from "@flick-lang/runtime/effect/TxPriorityQueue" "flickFromIterable"
+foreign effect from_iterable from "@flick-lang/effect-ts/effect/TxPriorityQueue" "flickFromIterable"
   reviewed "effect@4.1.2 sha256:e291c2b06043a8a9"
 
 /// A new queue of the elements, as `from_iterable`.
 make : Ord a => List a ->{} TxPriorityQueue a
-foreign effect make from "@flick-lang/runtime/effect/TxPriorityQueue" "flickMake"
+foreign effect make from "@flick-lang/effect-ts/effect/TxPriorityQueue" "flickMake"
   reviewed "effect@4.1.2 sha256:8ef1b1f2f253a7e1"
 
 /// The number of elements.
 size : TxPriorityQueue a ->{Tx.Transaction;} Int
-foreign effect size from "@flick-lang/runtime/effect/TxPriorityQueue" "size"
+foreign effect size from "@flick-lang/effect-ts/effect/TxPriorityQueue" "size"
   reviewed "effect@4.1.2 sha256:9234fe546b322b3a"
 
 /// Whether it has no elements.
 is_empty : TxPriorityQueue a ->{Tx.Transaction;} Bool
-foreign effect is_empty from "@flick-lang/runtime/effect/TxPriorityQueue" "isEmpty"
+foreign effect is_empty from "@flick-lang/effect-ts/effect/TxPriorityQueue" "isEmpty"
   reviewed "effect@4.1.2 sha256:4b513c9574de2188"
 
 /// Whether it has an element.
 is_non_empty : TxPriorityQueue a ->{Tx.Transaction;} Bool
-foreign effect is_non_empty from "@flick-lang/runtime/effect/TxPriorityQueue" "isNonEmpty"
+foreign effect is_non_empty from "@flick-lang/effect-ts/effect/TxPriorityQueue" "isNonEmpty"
   reviewed "effect@4.1.2 sha256:475b56d1f07c9681"
 
 /// The least element, kept in the queue, waiting for one.
 peek : TxPriorityQueue a ->{Tx.Transaction;} a
-foreign effect peek from "@flick-lang/runtime/effect/TxPriorityQueue" "peek"
+foreign effect peek from "@flick-lang/effect-ts/effect/TxPriorityQueue" "peek"
   reviewed "effect@4.1.2 sha256:985eff68699a41f3"
 
 /// The least element, kept in the queue, if there is one.
 peek_option : TxPriorityQueue a ->{Tx.Transaction;} Option a
-foreign effect peek_option from "@flick-lang/runtime/effect/TxPriorityQueue" "peekOption"
+foreign effect peek_option from "@flick-lang/effect-ts/effect/TxPriorityQueue" "peekOption"
   reviewed "effect@4.1.2 sha256:774e3ba6e6fee773"
 
 /// Adds the element.
 offer : a -> TxPriorityQueue a ->{Tx.Transaction;} Unit
-foreign effect offer from "@flick-lang/runtime/effect/TxPriorityQueue" "offer"
+foreign effect offer from "@flick-lang/effect-ts/effect/TxPriorityQueue" "offer"
   arity 1
   reviewed "effect@4.1.2 sha256:e7d66e51c8ee6848"
 
 /// Adds the elements.
 offer_all : List a -> TxPriorityQueue a ->{Tx.Transaction;} Unit
-foreign effect offer_all from "@flick-lang/runtime/effect/TxPriorityQueue" "offerAll"
+foreign effect offer_all from "@flick-lang/effect-ts/effect/TxPriorityQueue" "offerAll"
   arity 1
   reviewed "effect@4.1.2 sha256:74be140ae520bd4a"
 
 /// Removes the least element, waiting for one.
 take : TxPriorityQueue a ->{Async, Tx.Transaction;} a
-foreign effect take from "@flick-lang/runtime/effect/TxPriorityQueue" "take"
+foreign effect take from "@flick-lang/effect-ts/effect/TxPriorityQueue" "take"
   reviewed "effect@4.1.2 sha256:7f082437c530d85a"
 
 /// Removes every element, least first.
 take_all : TxPriorityQueue a ->{Async, Tx.Transaction;} List a
-foreign effect take_all from "@flick-lang/runtime/effect/TxPriorityQueue" "takeAll"
+foreign effect take_all from "@flick-lang/effect-ts/effect/TxPriorityQueue" "takeAll"
   reviewed "effect@4.1.2 sha256:504363044f11f4aa"
 
 /// Removes the least element, if there is one.
 take_option : TxPriorityQueue a ->{Async, Tx.Transaction;} Option a
-foreign effect take_option from "@flick-lang/runtime/effect/TxPriorityQueue" "takeOption"
+foreign effect take_option from "@flick-lang/effect-ts/effect/TxPriorityQueue" "takeOption"
   reviewed "effect@4.1.2 sha256:435c4930b49ef6ae"
 
 /// Removes at most `n` elements, least first.
 take_up_to : Int -> TxPriorityQueue a ->{Tx.Transaction;} List a
-foreign effect take_up_to from "@flick-lang/runtime/effect/TxPriorityQueue" "takeUpTo"
+foreign effect take_up_to from "@flick-lang/effect-ts/effect/TxPriorityQueue" "takeUpTo"
   arity 1
   reviewed "effect@4.1.2 sha256:022d31005067b046"
 
 /// Removes the elements the predicate accepts.
 remove_if : (a -> Bool)^c -> TxPriorityQueue a ->{Tx.Transaction;} Unit
-foreign effect remove_if from "@flick-lang/runtime/effect/TxPriorityQueue" "removeIf"
+foreign effect remove_if from "@flick-lang/effect-ts/effect/TxPriorityQueue" "removeIf"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:d1190553201205ed"
 
 /// Keeps only the elements the predicate accepts.
 retain_if : (a -> Bool)^c -> TxPriorityQueue a ->{Tx.Transaction;} Unit
-foreign effect retain_if from "@flick-lang/runtime/effect/TxPriorityQueue" "retainIf"
+foreign effect retain_if from "@flick-lang/effect-ts/effect/TxPriorityQueue" "retainIf"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:a8de5abb9e02524f"
 
 /// The elements, least first, kept in the queue.
 to_array : TxPriorityQueue a ->{Tx.Transaction;} List a
-foreign effect to_array from "@flick-lang/runtime/effect/TxPriorityQueue" "toArray"
+foreign effect to_array from "@flick-lang/effect-ts/effect/TxPriorityQueue" "toArray"
   reviewed "effect@4.1.2 sha256:fa51c722a9f6901c"

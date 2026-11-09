@@ -15,8 +15,17 @@ fn copies(f: &Foreign) -> Option<&Copies> {
         .binding
         .from
         .as_deref()
-        .is_some_and(|m| m.starts_with("@flick-lang/runtime"));
+        .is_some_and(trusted_runtime_package);
     (!trusted && f.adapter.copies.any()).then_some(&f.adapter.copies)
+}
+
+fn trusted_runtime_package(spec: &str) -> bool {
+    ["@flick-lang/runtime", "@flick-lang/effect-ts"]
+        .iter()
+        .any(|package| {
+            spec.strip_prefix(package)
+                .is_some_and(|rest| rest.is_empty() || rest.starts_with('/'))
+        })
 }
 
 impl Gen<'_> {
@@ -26,7 +35,7 @@ impl Gen<'_> {
             Some(module) => {
                 let spec = (self.options.foreign)(self.module, module);
                 // a module the kernel does not have: see `write_imports`
-                self.runtime |= self.kernel && spec.starts_with("@flick-lang/runtime/effect/");
+                self.runtime |= self.kernel && spec.starts_with("@flick-lang/effect-ts/effect/");
                 self.foreign
                     .push((spec, f.binding.name.clone(), alias.clone()));
                 alias
@@ -230,4 +239,19 @@ pub(super) fn plain_foreigns(items: &[Item]) -> HashMap<String, (usize, String)>
             _ => None,
         })
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::trusted_runtime_package;
+
+    #[test]
+    fn only_runtime_and_adapter_package_paths_are_trusted() {
+        assert!(trusted_runtime_package("@flick-lang/runtime/rt"));
+        assert!(trusted_runtime_package(
+            "@flick-lang/effect-ts/effect/Effect"
+        ));
+        assert!(!trusted_runtime_package("@flick-lang/runtime-extra"));
+        assert!(!trusted_runtime_package("@flick-lang/effect-ts-extra"));
+    }
 }

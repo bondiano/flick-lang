@@ -15,10 +15,10 @@ type error PatchError = PatchError String
 
 /// The operations that turn `old` into `new`: `JsonPatch.get old new`.
 get : Json -> Json -> JsonPatch
-foreign pure get from "@flick-lang/runtime/effect/JsonPatch" "flickGet"
+foreign pure get from "@flick-lang/effect-ts/effect/JsonPatch" "flickGet"
   reviewed "effect@4.1.2 sha256:ddd08e9b587c85f7"
 
 /// The value after the operations: `old |> JsonPatch.apply patch`.
 apply : JsonPatch -> Json -> Result PatchError Json
-foreign pure apply from "@flick-lang/runtime/effect/JsonPatch" "flickApply"
+foreign pure apply from "@flick-lang/effect-ts/effect/JsonPatch" "flickApply"
   reviewed "effect@4.1.2 sha256:7f3d050630dffd85"

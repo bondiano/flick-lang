@@ -1,6 +1,6 @@
 ---
 title: "Генерация кода"
-source_hash: 3a959f60e2e4be6c
+source_hash: 287bb73d762a7e5f
 ---
 
 `flick build` компилирует каждый модуль в ES-модуль (см. [Генерация TypeScript и граница FFI](../../spec/06-typescript-and-ffi/), [Архитектура компилятора](../../contributing/implementation-decisions/#архитектура-компилятора)).
@@ -38,8 +38,8 @@ source_hash: 3a959f60e2e4be6c
 вызовом, выведенным экземпляром или сразу вызываемой стрелкой, помечено
 `/*#__PURE__*/`, поэтому бандлер отбрасывает то, что программа не использует.
 
-Сгенерированный код импортирует только `@flick-lang/runtime` и получает
-`Effect` через него. Модуль без эффектных стадий вообще не импортирует `Effect`.
+Код для Effect импортирует `@flick-lang/effect-ts`; код с `--rt` импортирует
+`@flick-lang/runtime/rt`. Адаптер Effect предоставляет `Effect`. Модуль без эффектных стадий вообще не импортирует `Effect`.
 
 ## Значения
 
@@ -346,7 +346,7 @@ rec {
 проверки типов Flick и записаны в `.iface`. Сгенерированный код выполняется
 на Node как есть (с удалением типов) и проходит `tsc --noEmit` с `strict`,
 `allowImportingTsExtensions` и `module: nodenext`. Для этого
-`@flick-lang/runtime` поставляет `index.d.ts`.
+`@flick-lang/effect-ts` поставляет `index.d.ts`.
 
 ## Профиль выпуска
 

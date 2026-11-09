@@ -14,19 +14,19 @@ type RcRef (s : Region) (e : ErrorRow) a
 /// for `idleTimeToLive` after its last holder (`None`: no time).
 make :
   { acquire : Eff r e a; idleTimeToLive : Option Duration.Duration } ->{Scope s | r;} RcRef s e a
-foreign effect make from "@flick-lang/runtime/effect/RcRef" "flickMake"
+foreign effect make from "@flick-lang/effect-ts/effect/RcRef" "flickMake"
   reviewed "effect@4.1.2 sha256:e19931a575c79b4b"
 
 /// The resource, acquiring it if no one holds it; the innermost `scope`
 /// (or the one of region `t`) holds it until it closes.
 get : RcRef s e a ->{Scope t; e} a^{t}
-foreign effect get from "@flick-lang/runtime/effect/RcRef" "get"
+foreign effect get from "@flick-lang/effect-ts/effect/RcRef" "get"
   retention call
   reviewed "effect@4.1.2 sha256:bd017d10758c36d1"
 
 /// Releases the resource once its holders are done; the next `get`
 /// acquires it again.
 invalidate : RcRef s e a ->{Async;} Unit
-foreign effect invalidate from "@flick-lang/runtime/effect/RcRef" "invalidate"
+foreign effect invalidate from "@flick-lang/effect-ts/effect/RcRef" "invalidate"
   retention call
   reviewed "effect@4.1.2 sha256:1c1dccd0aab9e2c0"

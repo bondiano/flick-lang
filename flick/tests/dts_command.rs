@@ -91,7 +91,7 @@ twice : Functor f => f Float -> f Float
 let twice values = map (fun n -> n * 2) values
 ";
 
-const CONSUMER: &str = r#"import type { Effect, Option, Result, Schema } from "@flick-lang/runtime";
+const CONSUMER: &str = r#"import type { Effect, Option, Result, Schema } from "@flick-lang/effect-ts";
 import { area, identity_of, origin, maybe, find, later, point_json, Circle } from "./dist/Lib/Shapes.js";
 import type { Shape, Point, NotFound, Tree } from "./dist/Lib/Shapes.js";
 import { find as findPromise } from "./dist/Lib/Shapes.promise.js";
@@ -466,8 +466,8 @@ fn streams_services_and_sync_exports_cross_into_effect_typescript() {
     // a TypeScript caller uses Effect's own API on Flick's values
     fs::write(
         dir.join("consumer.ts"),
-        "import { Effect } from '@flick-lang/runtime';\n\
-         import * as Stream from '@flick-lang/runtime/effect/Stream';\n\
+        "import { Effect } from '@flick-lang/effect-ts';\n\
+         import * as Stream from '@flick-lang/effect-ts/effect/Stream';\n\
          import { $s_Greeter, doubled, greet, numbers } from './dist/Lib/Bridge.js';\n\
          const collected: Effect.Effect<ReadonlyArray<number>> = Stream.runCollect(numbers);\n\
          const greeted: Effect.Effect<string> = Effect.provideService(greet('ada'), $s_Greeter, {\n\

@@ -150,6 +150,7 @@ site (including its static Pagefind search index):
 
 ```sh
 pnpm -C runtime build
+pnpm -C packages/effect-ts build
 just docs
 pnpm -C docs preview
 ```
@@ -169,6 +170,6 @@ upgrading Pagefind; it does not affect program-worker isolation.
 
 A tag `vX.Y.Z` runs `.github/workflows/release.yml`: it checks that every
 package carries that version, runs CI, builds the `flick` archives for
-macOS, Linux and Windows, publishes `@flick-lang/runtime` and
+macOS, Linux and Windows, publishes `@flick-lang/runtime`, `@flick-lang/effect-ts` and
 `@flick-lang/astro` to npm and creates the GitHub release. Record the
 changes in [`CHANGELOG.md`](./CHANGELOG.md) first.

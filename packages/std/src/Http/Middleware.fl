@@ -47,19 +47,19 @@ type alias CompressionOptions = {
 
 /// Logs each request with its method, URL and status, and its failure.
 logger : Handler r e -> Handler r e
-foreign pure logger from "@flick-lang/runtime/effect/http/HttpMiddleware" "flickLogger"
+foreign pure logger from "@flick-lang/effect-ts/effect/http/HttpMiddleware" "flickLogger"
   arity 1
   reviewed "effect@4.1.2 sha256:273dbfddf64ab5b1"
 
 /// The handler with no log of its requests by `logger`.
 with_logger_disabled : Handler r e -> Handler r e
-foreign pure with_logger_disabled from "@flick-lang/runtime/effect/http/HttpMiddleware" "flickWithLoggerDisabled"
+foreign pure with_logger_disabled from "@flick-lang/effect-ts/effect/http/HttpMiddleware" "flickWithLoggerDisabled"
   arity 1
   reviewed "effect@4.1.2 sha256:a23f5ffa75fe52b4"
 
 /// Runs each request in a server span, continuing the trace of its headers.
 tracer : Handler r e -> Handler r e
-foreign pure tracer from "@flick-lang/runtime/effect/http/HttpMiddleware" "flickTracer"
+foreign pure tracer from "@flick-lang/effect-ts/effect/http/HttpMiddleware" "flickTracer"
   arity 1
   reviewed "effect@4.1.2 sha256:35d3acdbc2d9d015"
 
@@ -68,59 +68,59 @@ foreign pure tracer from "@flick-lang/runtime/effect/http/HttpMiddleware" "flick
 /// as CIDRs (`"10.0.0.0/8"`): the nearest address that is not a proxy is
 /// the client. An invalid CIDR is a defect.
 x_forwarded_headers : List String -> Handler r e -> Handler r e
-foreign pure x_forwarded_headers from "@flick-lang/runtime/effect/http/HttpMiddleware" "flickXForwardedHeaders"
+foreign pure x_forwarded_headers from "@flick-lang/effect-ts/effect/http/HttpMiddleware" "flickXForwardedHeaders"
   arity 2
   reviewed "effect@4.1.2 sha256:72dbfe4c67f56c94"
 
 /// Parses the query of each request once for the router's decoders.
 search_params_parser : Handler r e -> Handler r e
-foreign pure search_params_parser from "@flick-lang/runtime/effect/http/HttpMiddleware" "flickSearchParamsParser"
+foreign pure search_params_parser from "@flick-lang/effect-ts/effect/http/HttpMiddleware" "flickSearchParamsParser"
   arity 1
   reviewed "effect@4.1.2 sha256:548fee1527db2edc"
 
 /// Answers CORS preflight requests and adds the CORS headers to responses.
 cors : CorsOptions -> Handler r e -> Handler r e
-foreign pure cors from "@flick-lang/runtime/effect/http/HttpMiddleware" "flickCors"
+foreign pure cors from "@flick-lang/effect-ts/effect/http/HttpMiddleware" "flickCors"
   arity 2
   reviewed "effect@4.1.2 sha256:5a9cb34140380122"
 
 /// Compresses response bodies by the `Accept-Encoding` of the request.
 compression : CompressionOptions -> Handler r e -> Handler r e
-foreign pure compression from "@flick-lang/runtime/effect/http/HttpMiddleware" "flickCompression"
+foreign pure compression from "@flick-lang/effect-ts/effect/http/HttpMiddleware" "flickCompression"
   arity 2
   reviewed "effect@4.1.2 sha256:af22e04d244b96ff"
 
 /// `compression` through the web `CompressionStream`: gzip and deflate,
 /// whatever the levels say.
 compression_web : CompressionOptions -> Handler r e -> Handler r e
-foreign pure compression_web from "@flick-lang/runtime/effect/http/HttpMiddleware" "flickCompressionWeb"
+foreign pure compression_web from "@flick-lang/effect-ts/effect/http/HttpMiddleware" "flickCompressionWeb"
   arity 2
   reviewed "effect@4.1.2 sha256:d1f41e90c6b44cde"
 
 /// Decompresses request bodies by their `Content-Encoding`, refusing one
 /// that grows past the size.
 decompression : Option ByteSize.ByteSize -> Handler r e -> Handler r e
-foreign pure decompression from "@flick-lang/runtime/effect/http/HttpMiddleware" "flickDecompression"
+foreign pure decompression from "@flick-lang/effect-ts/effect/http/HttpMiddleware" "flickDecompression"
   arity 2
   reviewed "effect@4.1.2 sha256:efe18001f13cf523"
 
 /// Runs `task` with no server span for the requests `f` accepts.
 with_tracer_disabled_when : (ServerRequest -> Bool) -> (Eff r e a)^c ->{r; e} a
-foreign effect with_tracer_disabled_when from "@flick-lang/runtime/effect/http/HttpMiddleware" "flickWithTracerDisabledWhen"
+foreign effect with_tracer_disabled_when from "@flick-lang/effect-ts/effect/http/HttpMiddleware" "flickWithTracerDisabledWhen"
   arity 2
   retention call
   reviewed "effect@4.1.2 sha256:ed330b667501bce9"
 
 /// Runs `task` with no server span for requests of the URLs.
 with_tracer_disabled_for_urls : List String -> (Eff r e a)^c ->{r; e} a
-foreign effect with_tracer_disabled_for_urls from "@flick-lang/runtime/effect/http/HttpMiddleware" "flickWithTracerDisabledForUrls"
+foreign effect with_tracer_disabled_for_urls from "@flick-lang/effect-ts/effect/http/HttpMiddleware" "flickWithTracerDisabledForUrls"
   arity 2
   retention call
   reviewed "effect@4.1.2 sha256:a1edbac479e1c390"
 
 /// Runs `task` naming the server span of a request by `f`.
 with_span_name_generator : (ServerRequest -> String) -> (Eff r e a)^c ->{r; e} a
-foreign effect with_span_name_generator from "@flick-lang/runtime/effect/http/HttpMiddleware" "flickWithSpanNameGenerator"
+foreign effect with_span_name_generator from "@flick-lang/effect-ts/effect/http/HttpMiddleware" "flickWithSpanNameGenerator"
   arity 2
   retention call
   reviewed "effect@4.1.2 sha256:bcf088d4ce6475f2"
@@ -128,7 +128,7 @@ foreign effect with_span_name_generator from "@flick-lang/runtime/effect/http/Ht
 /// Runs `task` recording in server spans only the headers `f name phase`
 /// accepts; the phase is `"request"` or `"response"`.
 with_tracer_header_filter : (String -> String -> Bool) -> (Eff r e a)^c ->{r; e} a
-foreign effect with_tracer_header_filter from "@flick-lang/runtime/effect/http/HttpMiddleware" "flickWithTracerHeaderFilter"
+foreign effect with_tracer_header_filter from "@flick-lang/effect-ts/effect/http/HttpMiddleware" "flickWithTracerHeaderFilter"
   arity 2
   retention call
   reviewed "effect@4.1.2 sha256:80416986cda2fed8"
@@ -139,7 +139,7 @@ append_pre_response_handler :
   (ServerRequest -> ServerResponse ->{; Http.ServerError.HttpServerError} ServerResponse) ->
   ServerRequest ->{}
   Unit
-foreign effect append_pre_response_handler from "@flick-lang/runtime/effect/http/HttpMiddleware" "flickAppendPreResponseHandler"
+foreign effect append_pre_response_handler from "@flick-lang/effect-ts/effect/http/HttpMiddleware" "flickAppendPreResponseHandler"
   arity 2
   reviewed "effect@4.1.2 sha256:8d42b837128a6182"
 
@@ -148,7 +148,7 @@ with_pre_response_handler :
   (ServerRequest -> ServerResponse ->{; Http.ServerError.HttpServerError} ServerResponse) ->
   Handler r e ->
   Handler r e
-foreign pure with_pre_response_handler from "@flick-lang/runtime/effect/http/HttpMiddleware" "flickWithPreResponseHandler"
+foreign pure with_pre_response_handler from "@flick-lang/effect-ts/effect/http/HttpMiddleware" "flickWithPreResponseHandler"
   arity 2
   reviewed "effect@4.1.2 sha256:f11574d6347dcaa0"
 
@@ -158,6 +158,6 @@ to_handled :
   (ServerRequest -> ServerResponse ->{r2; e2} Unit) ->
   Handler r e ->
   (ServerRequest ->{r + r2;} Unit)
-foreign pure to_handled from "@flick-lang/runtime/effect/http/HttpMiddleware" "flickToHandled"
+foreign pure to_handled from "@flick-lang/effect-ts/effect/http/HttpMiddleware" "flickToHandled"
   arity 2
   reviewed "effect@4.1.2 sha256:410e9b7d36d30ce7"

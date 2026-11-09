@@ -2,8 +2,8 @@
 import Brand from "./Brand.astro";
 import Icon from "./Icon.astro";
 import DocNavigation from "./DocNavigation.astro";
-import { Effect } from "@flick-lang/runtime";
-import { uiRenderStatic } from "@flick-lang/runtime/ui/react";
+import { Effect } from "@flick-lang/effect-ts";
+import { uiRenderStatic } from "@flick-lang/effect-ts/ui/react";
 import { renderToString } from "react-dom/server";
 import { shell } from "../widgets/Controls.fl";
 
@@ -56,7 +56,7 @@ const controlsHtml = renderToString(uiRenderStatic(await Effect.runPromise(shell
 </div>
 
 <script>
-  import { run } from "@flick-lang/runtime/runner/browser";
+  import { run } from "@flick-lang/effect-ts/runner/browser";
   import { main as controls } from "../widgets/Controls.fl";
   import { main as search } from "../widgets/Search.fl";
   import { mount } from "../widgets/Copy.fl";

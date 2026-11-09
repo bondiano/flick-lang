@@ -15,12 +15,12 @@ max_value : Int
 let max_value = 2147483647
 
 to_string : Int -> String
-foreign pure to_string from "@flick-lang/runtime" "stringFromNumber"
+foreign pure to_string from "@flick-lang/effect-ts" "stringFromNumber"
 
 /// The `Int` the decimal digits spell, with an optional sign; `None` for
 /// other text and for numbers out of range.
 parse : String -> Option Int
-foreign pure parse from "@flick-lang/runtime" "intParse"
+foreign pure parse from "@flick-lang/effect-ts" "intParse"
 
 /// The same number as a `Float`; every `Int` is exact.
 to_float : Int -> Float
@@ -28,16 +28,16 @@ foreign pure to_float from global "Number"
 
 /// `n` when it is a whole number in the range of `Int`.
 from_float : Float -> Option Int
-foreign pure from_float from "@flick-lang/runtime" "intFromFloat"
+foreign pure from_float from "@flick-lang/effect-ts" "intFromFloat"
 
 /// `n` with its fraction dropped, wrapped around into `Int`; NaN and the
 /// infinities are 0.
 truncate : Float -> Int
-foreign pure truncate from "@flick-lang/runtime" "intTruncate"
+foreign pure truncate from "@flick-lang/effect-ts" "intTruncate"
 
 /// `abs min_value` wraps around to `min_value`.
 abs : Int -> Int
-foreign pure abs from "@flick-lang/runtime" "intAbs"
+foreign pure abs from "@flick-lang/effect-ts" "intAbs"
 
 min : Int -> Int -> Int
 let min a b = if a <= b then a else b
@@ -46,52 +46,52 @@ max : Int -> Int -> Int
 let max a b = if a >= b then a else b
 
 checked_add : Int -> Int -> Result ArithmeticError Int
-foreign pure checked_add from "@flick-lang/runtime" "intCheckedAdd"
+foreign pure checked_add from "@flick-lang/effect-ts" "intCheckedAdd"
 
 checked_sub : Int -> Int -> Result ArithmeticError Int
-foreign pure checked_sub from "@flick-lang/runtime" "intCheckedSub"
+foreign pure checked_sub from "@flick-lang/effect-ts" "intCheckedSub"
 
 checked_mul : Int -> Int -> Result ArithmeticError Int
-foreign pure checked_mul from "@flick-lang/runtime" "intCheckedMul"
+foreign pure checked_mul from "@flick-lang/effect-ts" "intCheckedMul"
 
 /// Division dropping the fraction; division by zero and
 /// `min_value / -1` are errors.
 checked_div : Int -> Int -> Result ArithmeticError Int
-foreign pure checked_div from "@flick-lang/runtime" "intCheckedDiv"
+foreign pure checked_div from "@flick-lang/effect-ts" "intCheckedDiv"
 
 checked_rem : Int -> Int -> Result ArithmeticError Int
-foreign pure checked_rem from "@flick-lang/runtime" "intCheckedRem"
+foreign pure checked_rem from "@flick-lang/effect-ts" "intCheckedRem"
 
 /// `a / b`, a defect when `b` is 0.
 unsafe_div : Int -> Int -> Int
-foreign pure unsafe_div from "@flick-lang/runtime" "intUnsafeDiv"
+foreign pure unsafe_div from "@flick-lang/effect-ts" "intUnsafeDiv"
 
 /// `a % b`, a defect when `b` is 0.
 unsafe_rem : Int -> Int -> Int
-foreign pure unsafe_rem from "@flick-lang/runtime" "intUnsafeRem"
+foreign pure unsafe_rem from "@flick-lang/effect-ts" "intUnsafeRem"
 
 bit_and : Int -> Int -> Int
-foreign pure bit_and from "@flick-lang/runtime" "bitAnd"
+foreign pure bit_and from "@flick-lang/effect-ts" "bitAnd"
 
 bit_or : Int -> Int -> Int
-foreign pure bit_or from "@flick-lang/runtime" "bitOr"
+foreign pure bit_or from "@flick-lang/effect-ts" "bitOr"
 
 bit_xor : Int -> Int -> Int
-foreign pure bit_xor from "@flick-lang/runtime" "bitXor"
+foreign pure bit_xor from "@flick-lang/effect-ts" "bitXor"
 
 bit_not : Int -> Int
-foreign pure bit_not from "@flick-lang/runtime" "bitNot"
+foreign pure bit_not from "@flick-lang/effect-ts" "bitNot"
 
 shift_left : Int -> Int -> Int
-foreign pure shift_left from "@flick-lang/runtime" "shiftLeft"
+foreign pure shift_left from "@flick-lang/effect-ts" "shiftLeft"
 
 shift_right : Int -> Int -> Int
-foreign pure shift_right from "@flick-lang/runtime" "shiftRight"
+foreign pure shift_right from "@flick-lang/effect-ts" "shiftRight"
 
 /// The shift that fills with zeros, its 32 bits read back as an `Int`.
 shift_right_unsigned : Int -> Int -> Int
-foreign pure shift_right_unsigned from "@flick-lang/runtime" "shiftRightUnsignedInt"
+foreign pure shift_right_unsigned from "@flick-lang/effect-ts" "shiftRightUnsignedInt"
 
 /// A JSON number that is an `Int`.
 json : PureCodec Json Int
-foreign pure json from "@flick-lang/runtime" "codecInt"
+foreign pure json from "@flick-lang/effect-ts" "codecInt"

@@ -2,6 +2,7 @@
 // `process` is an object whose streams post their text to the page, and
 // the runtime's packages are loaded on demand from its built files.
 import runtimePackage from "../../../runtime/package.json" with { type: "json" };
+import effectPackage from "../../../packages/effect-ts/package.json" with { type: "json" };
 import { type Files, type Namespace, link, packages } from "./loader.ts";
 
 export type Message =
@@ -17,30 +18,31 @@ export interface Program {
 }
 
 const modules = import.meta.glob<Namespace>([
-  "../../../runtime/dist/index.js",
-  "../../../runtime/dist/cli/index.js",
-  "../../../runtime/dist/ui/index.js",
-  "../../../runtime/dist/ui/react/index.js",
-  "../../../runtime/dist/effect/*.js",
-  "../../../runtime/dist/effect/http/*.js",
+  "../../../packages/effect-ts/dist/index.js",
+  "../../../packages/effect-ts/dist/cli/index.js",
+  "../../../packages/effect-ts/dist/ui/index.js",
+  "../../../packages/effect-ts/dist/ui/react/index.js",
+  "../../../packages/effect-ts/dist/effect/*.js",
+  "../../../packages/effect-ts/dist/effect/http/*.js",
   // These adapters (including Response through Multipart) load Node services.
-  "!../../../runtime/dist/effect/http/{HttpServer,HttpPlatform,HttpMiddleware,HttpStaticServer,HttpServerResponse,Multipart}.js",
-  "../../../runtime/dist/effect/reactivity/*.js",
-  "../../../runtime/dist/effect/observability/*.js",
-  "../../../runtime/dist/effect/devtools/DevTools.js",
-  "../../../runtime/dist/effect/rpc/Rpc.js",
+  "!../../../packages/effect-ts/dist/effect/http/{HttpServer,HttpPlatform,HttpMiddleware,HttpStaticServer,HttpServerResponse,Multipart}.js",
+  "../../../packages/effect-ts/dist/effect/reactivity/*.js",
+  "../../../packages/effect-ts/dist/effect/observability/*.js",
+  "../../../packages/effect-ts/dist/effect/devtools/DevTools.js",
+  "../../../packages/effect-ts/dist/effect/rpc/Rpc.js",
 ]);
 
 /** The built file a specifier of the runtime package resolves to. */
 const fileOf = (spec: string): string | undefined => {
-  const prefix = "@flick-lang/runtime";
+  const effect = spec === "@flick-lang/effect-ts" || spec.startsWith("@flick-lang/effect-ts/");
+  const prefix = effect ? "@flick-lang/effect-ts" : "@flick-lang/runtime";
   if (spec !== prefix && !spec.startsWith(`${prefix}/`)) return undefined;
   const sub = spec === prefix ? "." : `.${spec.slice(prefix.length)}`;
-  const exports = runtimePackage.exports as Record<string, { default: string }>;
+  const exports = (effect ? effectPackage.exports : runtimePackage.exports) as Record<string, { default: string }>;
   const direct = exports[sub]?.default;
   const pattern = Object.entries(exports).find(([k]) => k.endsWith("*") && sub.startsWith(k.slice(0, -1)));
   const target = direct ?? pattern?.[1].default.replace("*", sub.slice(pattern[0].length - 1));
-  return target === undefined ? undefined : `../../../runtime/${target.slice(2)}`;
+  return target === undefined ? undefined : `../../../${effect ? "packages/effect-ts" : "runtime"}/${target.slice(2)}`;
 };
 
 /** Runs the program, posting what it writes, then `exit` with its code or `crash`. */

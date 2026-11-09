@@ -1,5 +1,5 @@
 // A DevTools server on a free local port for the devtools run test.
-import { devToolsListen } from "@flick-lang/runtime/effect/devtools/DevToolsServer";
+import { devToolsListen } from "@flick-lang/effect-ts/effect/devtools/DevToolsServer";
 
 let server;
 

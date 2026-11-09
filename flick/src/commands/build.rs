@@ -130,7 +130,7 @@ impl Command for BuildCommand {
         if let Some(problem) = project
             .as_ref()
             .filter(|_| !go)
-            .and_then(|p| toolchain::check_runtime(&p.root))
+            .and_then(|p| toolchain::check_runtime(&p.root, plan.extras.rt))
         {
             return Outcome {
                 sources,
@@ -436,7 +436,7 @@ pub(super) fn write_artifacts(output: &BuildPlan, emitted: &mut Emission, progre
 /// Loads the app's modules on Node and writes the compiled decoders of the
 /// codecs they make, which the runner installs.
 fn compile_schemas(out_dir: &Path, module: &Path, file: &str) -> Result<(), String> {
-    let script = "import { writeSchemaAot } from \"@flick-lang/runtime\";\nawait writeSchemaAot(process.argv[1], process.argv[2]);\n";
+    let script = "import { writeSchemaAot } from \"@flick-lang/effect-ts\";\nawait writeSchemaAot(process.argv[1], process.argv[2]);\n";
     let output = process::Command::new("node")
         .args(["--input-type=module", "-e", script])
         .arg(module)

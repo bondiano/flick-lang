@@ -4,28 +4,28 @@
 module Instances
 
 eq_prim : a -> a -> Bool
-foreign pure eq_prim from "@flick-lang/runtime" "equals"
+foreign pure eq_prim from "@flick-lang/effect-ts" "equals"
 
 compare_prim : a -> a -> Ordering
-foreign pure compare_prim from "@flick-lang/runtime" "compare"
+foreign pure compare_prim from "@flick-lang/effect-ts" "compare"
 
 hash_prim : a -> Int
-foreign pure hash_prim from "@flick-lang/runtime" "hash"
+foreign pure hash_prim from "@flick-lang/effect-ts" "hash"
 
 show_prim : a -> String
-foreign pure show_prim from "@flick-lang/runtime" "show"
+foreign pure show_prim from "@flick-lang/effect-ts" "show"
 
 eq_list : (a -> a -> Bool) -> List a -> List a -> Bool
-foreign pure eq_list from "@flick-lang/runtime" "listEquals"
+foreign pure eq_list from "@flick-lang/effect-ts" "listEquals"
 
 compare_list : (a -> a -> Ordering) -> List a -> List a -> Ordering
-foreign pure compare_list from "@flick-lang/runtime" "listCompare"
+foreign pure compare_list from "@flick-lang/effect-ts" "listCompare"
 
 hash_list : (a -> Int) -> List a -> Int
-foreign pure hash_list from "@flick-lang/runtime" "listHash"
+foreign pure hash_list from "@flick-lang/effect-ts" "listHash"
 
 show_list : (a -> String) -> List a -> String
-foreign pure show_list from "@flick-lang/runtime" "listShow"
+foreign pure show_list from "@flick-lang/effect-ts" "listShow"
 
 instance Eq Int =
   let eq x y = eq_prim x y
@@ -202,88 +202,88 @@ let rank o =
   | GT -> 2
 
 map_list : (forall v. a^v -> b)^c -> (List a)^d -> (List b)^(c + d)
-foreign pure map_list from "@flick-lang/runtime" "listMap"
+foreign pure map_list from "@flick-lang/effect-ts" "listMap"
   arity 2
   retention call
 
 fold_list : (b -> a -> b)^c -> b^c -> List a -> b
-foreign pure fold_list from "@flick-lang/runtime" "listFold"
+foreign pure fold_list from "@flick-lang/effect-ts" "listFold"
   arity 3
   retention call
 
 traverse_list : (a ->{r; e} b)^c -> List a ->{r; e} List b
-foreign effect traverse_list from "@flick-lang/runtime" "listMapEffect"
+foreign effect traverse_list from "@flick-lang/effect-ts" "listMapEffect"
   retention call
 
 flat_map_list : (forall v. a^v -> (List b)^(c + v))^c -> (List a)^d -> (List b)^(c + d)
-foreign pure flat_map_list from "@flick-lang/runtime" "listFlatMap"
+foreign pure flat_map_list from "@flick-lang/effect-ts" "listFlatMap"
   arity 2
   retention call
 
 pure_eff : a^c -> (Eff r e a)^c
-foreign pure pure_eff from "@flick-lang/runtime" "succeed"
+foreign pure pure_eff from "@flick-lang/effect-ts" "succeed"
   retention call
 
 flat_map_eff : (forall v. a^v -> (Eff r e b)^(c + v))^c -> (Eff r e a)^d -> (Eff r e b)^(c + d)
-foreign pure flat_map_eff from "@flick-lang/runtime" "flatMapEff"
+foreign pure flat_map_eff from "@flick-lang/effect-ts" "flatMapEff"
   arity 2
   retention call
 
 map_eff : (forall v. a^v -> b)^c -> (Eff r e a)^d -> (Eff r e b)^(c + d)
-foreign pure map_eff from "@flick-lang/runtime" "mapEff"
+foreign pure map_eff from "@flick-lang/effect-ts" "mapEff"
   arity 2
   retention call
 
 map2_option : (forall u v. a^u -> b^v -> x)^c -> (Option a)^d -> (Option b)^d -> (Option x)^(c + d)
-foreign pure map2_option from "@flick-lang/runtime" "optionMap2"
+foreign pure map2_option from "@flick-lang/effect-ts" "optionMap2"
   arity 3
   retention call
 
 map2_result :
   (forall u v. a^u -> b^v -> x)^c -> (Result e a)^d -> (Result e b)^d -> (Result e x)^(c + d)
-foreign pure map2_result from "@flick-lang/runtime" "resultMap2"
+foreign pure map2_result from "@flick-lang/effect-ts" "resultMap2"
   arity 3
   retention call
 
 map2_list : (forall u v. a^u -> b^v -> x)^c -> (List a)^d -> (List b)^d -> (List x)^(c + d)
-foreign pure map2_list from "@flick-lang/runtime" "listMap2"
+foreign pure map2_list from "@flick-lang/effect-ts" "listMap2"
   arity 3
   retention call
 
 map2_eff : (forall u v. a^u -> b^v -> x)^c -> (Eff r e a)^d -> (Eff r e b)^d -> (Eff r e x)^(c + d)
-foreign pure map2_eff from "@flick-lang/runtime" "map2Eff"
+foreign pure map2_eff from "@flick-lang/effect-ts" "map2Eff"
   arity 3
   retention call
 
 seq_of_list : List a -> Seq a
-foreign pure seq_of_list from "@flick-lang/runtime" "seqOfList"
+foreign pure seq_of_list from "@flick-lang/effect-ts" "seqOfList"
 
 seq_of_list_held : (List a)^d -> (Seq a)^d
-foreign pure seq_of_list_held from "@flick-lang/runtime" "seqOfList"
+foreign pure seq_of_list_held from "@flick-lang/effect-ts" "seqOfList"
   retention call
 
 map_seq : (forall v. a^v -> b)^c -> (Seq a)^d -> (Seq b)^(c + d)
-foreign pure map_seq from "@flick-lang/runtime" "seqMap"
+foreign pure map_seq from "@flick-lang/effect-ts" "seqMap"
   arity 2
   retention call
 
 flat_map_seq : (forall v. a^v -> (Seq b)^(c + v))^c -> (Seq a)^d -> (Seq b)^(c + d)
-foreign pure flat_map_seq from "@flick-lang/runtime" "seqFlatMap"
+foreign pure flat_map_seq from "@flick-lang/effect-ts" "seqFlatMap"
   arity 2
   retention call
 
 fold_seq : (b -> a -> b)^c -> b^c -> Seq a -> b
-foreign pure fold_seq from "@flick-lang/runtime" "seqFold"
+foreign pure fold_seq from "@flick-lang/effect-ts" "seqFold"
   arity 3
   retention call
 
 map2_seq : (forall u v. a^u -> b^v -> x)^c -> (Seq a)^d -> (Seq b)^d -> (Seq x)^(c + d)
-foreign pure map2_seq from "@flick-lang/runtime" "seqMap2"
+foreign pure map2_seq from "@flick-lang/effect-ts" "seqMap2"
   arity 3
   retention call
 
 append_seq : (Seq a)^d -> (Seq a)^d -> (Seq a)^d
-foreign pure append_seq from "@flick-lang/runtime" "seqAppend"
+foreign pure append_seq from "@flick-lang/effect-ts" "seqAppend"
   arity 2
   retention call
 

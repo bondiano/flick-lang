@@ -4,6 +4,8 @@ use std::fmt::Write;
 
 use super::{Gen, RUNTIME, names, relative};
 
+const KERNEL_RUNTIME: &str = "@flick-lang/runtime";
+
 impl Gen<'_> {
     pub(super) fn write_imports(&self, code: &mut String, here: &str) {
         let runtime = (self.options.foreign)(self.module, RUNTIME);
@@ -41,7 +43,7 @@ impl Gen<'_> {
                 );
                 continue;
             }
-            if self.kernel && source.starts_with(RUNTIME) {
+            if self.kernel && source.starts_with(KERNEL_RUNTIME) {
                 let at = namespaces
                     .iter()
                     .position(|s| s == source)

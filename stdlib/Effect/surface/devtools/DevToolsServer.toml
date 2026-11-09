@@ -1,3 +1,3 @@
 [excluded]
 Client = "TS-only: type-level machinery of the DevTools protocol; Flick's `DevTools` layer carries no exported data types"
-run = "a server is the DevTools' own side; the runtime keeps one for tests and tools (`@flick-lang/runtime/effect/devtools/DevToolsServer`), not a library surface"
+run = "a server is the DevTools' own side; the runtime keeps one for tests and tools (`@flick-lang/effect-ts/effect/devtools/DevToolsServer`), not a library surface"

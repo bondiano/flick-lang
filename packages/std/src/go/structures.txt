@@ -1,6 +1,6 @@
 # Data structures: Chunk, Trie, HashRing, ByteSize, Crypto, checks.
 
-[@flick-lang/runtime/effect/HashRing]
+[@flick-lang/effect-ts/effect/HashRing]
 flickMake HashRingMake
 flickAdd *HashRingAdd
 flickAddMany *HashRingAddMany
@@ -9,7 +9,7 @@ flickHas *HashRingHas
 flickGet HashRingGet
 flickGetShards HashRingGetShards
 
-[@flick-lang/runtime/effect/Crypto]
+[@flick-lang/effect-ts/effect/Crypto]
 flickRandomBytes CryptoRandomBytes
 flickDigest CryptoDigest
 flickPbkdf2 CryptoPbkdf2
@@ -27,7 +27,7 @@ flickUtf8Decode CryptoUtf8Decode
 flickBase64UrlEncode CryptoBase64UrlEncode
 flickBase64UrlDecode CryptoBase64UrlDecode
 
-[@flick-lang/runtime/effect/Trie]
+[@flick-lang/effect-ts/effect/Trie]
 flickEmpty TrieEmpty
 fromIterable TrieFromList
 insert TrieInsert
@@ -54,7 +54,7 @@ compact TrieCompact
 
 # the rest of ByteSize; `zero`, `flickBytes`, `flickFormat` and the codecs
 # are in effect.txt
-[@flick-lang/runtime/effect/ByteSize]
+[@flick-lang/effect-ts/effect/ByteSize]
 flickKilobytes ByteSizeKilobytes
 flickMegabytes ByteSizeMegabytes
 flickGigabytes ByteSizeGigabytes
@@ -95,13 +95,13 @@ ReducerSum BigIntReducerSum
 CombinerMax BigIntCombinerMax
 CombinerMin BigIntCombinerMin
 
-[@flick-lang/runtime]
+[@flick-lang/effect-ts]
 chunkAppend ChunkAppend
 chunkConcat ChunkConcat
 chunkGet ChunkGet
 chunkMap *ChunkMap
 
-[@flick-lang/runtime/effect/Chunk]
+[@flick-lang/effect-ts/effect/Chunk]
 flickNonEmpty ChunkNonEmpty
 isEmpty ChunkIsEmpty
 of ChunkOf
@@ -162,7 +162,7 @@ zipWith *ChunkZipWith
 
 # the checks of `Check`; apply, int, finite, between, min/max length and
 # pattern are in schema.txt
-[@flick-lang/runtime/effect/Schema]
+[@flick-lang/effect-ts/effect/Schema]
 makeFilterGroup CheckAll
 flickMakeFilter CheckPredicate
 isBetweenLength CheckLengthBetween

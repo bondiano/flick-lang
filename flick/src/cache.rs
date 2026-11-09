@@ -53,7 +53,7 @@ pub fn key(project: &Project, roots: &[PathBuf], settings: &str) -> String {
         "compiler-binary",
         toolchain::fingerprint().unwrap_or_default(),
     );
-    for package in ["@flick-lang/runtime", "effect"] {
+    for package in ["@flick-lang/runtime", "@flick-lang/effect-ts", "effect"] {
         let version = toolchain::resolved(&project.root, package).unwrap_or_default();
         key.add(format!("version {package}"), version);
     }

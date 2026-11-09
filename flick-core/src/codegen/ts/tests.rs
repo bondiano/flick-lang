@@ -187,7 +187,7 @@ fn ui_is_the_runtime_ui_imported_only_where_used() {
     assert!(
         projection
             .imports(&path)
-            .contains("import type { Ui as $Ui } from \"@flick-lang/runtime/ui/react\";")
+            .contains("import type { Ui as $Ui } from \"@flick-lang/effect-ts/ui/react\";")
     );
 }
 

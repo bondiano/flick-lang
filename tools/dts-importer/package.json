@@ -10,7 +10,8 @@
   },
   "dependencies": {
     "@flick-lang/runtime": "workspace:*",
-    "typescript": "5.9.3"
+    "typescript": "5.9.3",
+    "@flick-lang/effect-ts": "workspace:*"
   },
   "devDependencies": {
     "date-fns": "4.4.0",

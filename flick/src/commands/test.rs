@@ -148,7 +148,7 @@ fn prepare(options: &TestArguments, global: &GlobalArguments) -> Result<PathBuf,
     }
     // with no suite, the go target has no program: the node runner reports the empty run
     let go = go && !suites.is_empty();
-    if !go && let Some(problem) = toolchain::check_runtime(&project.root) {
+    if !go && let Some(problem) = toolchain::check_runtime(&project.root, rt) {
         drop(progress);
         return fail(&sources, vec![problem]);
     }
@@ -265,7 +265,7 @@ fn runner_source(suites: &[(String, String)], rt: bool) -> String {
     let runtime = if rt {
         "@flick-lang/runtime/rt"
     } else {
-        "@flick-lang/runtime"
+        "@flick-lang/effect-ts"
     };
     let mut out = format!("import {{ runTests }} from \"{runtime}\";\n");
     for (i, (_, path)) in suites.iter().enumerate() {

@@ -10,7 +10,7 @@ import (
 // The runtime trace of docs/formal/runtime.md: with FLICK_TRACE set
 // to a file, each step of the owner contract λRT names is written there as
 // one JSON object per line, in the order the steps happened. The JS
-// runtime writes the same events (runtime/src/trace.ts); flick-model's
+// runtime writes the same events (packages/effect-ts/src/trace.ts); flick-model's
 // monitor checks a trace against λRT, and the e2e harness compares the
 // projections of both. A disabled trace costs one check of `tracing`.
 //

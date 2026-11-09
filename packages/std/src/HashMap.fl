@@ -9,52 +9,52 @@ type HashMap w k v
 
 /// The empty map of the witness.
 with : EqHash.EqHash w k -> HashMap w k v
-foreign pure with from "@flick-lang/runtime" "hashMapWith"
+foreign pure with from "@flick-lang/effect-ts" "hashMapWith"
 
 /// The empty map of the canonical instances.
 empty : Hash k => HashMap EqHash.Canonical k v
-foreign pure empty from "@flick-lang/runtime" "hashMapEmpty"
+foreign pure empty from "@flick-lang/effect-ts" "hashMapEmpty"
   reviewed "effect@4.1.2 sha256:9bb2ff55a3d827d7"
 
 /// The map with `key` bound to `value`.
 insert : k -> v -> HashMap w k v -> HashMap w k v
-foreign pure insert from "@flick-lang/runtime" "hashMapInsert"
+foreign pure insert from "@flick-lang/effect-ts" "hashMapInsert"
   reviewed "effect@4.1.2 sha256:20655faeb73ee0f7"
 
 /// The map without `key`.
 remove : k -> HashMap w k v -> HashMap w k v
-foreign pure remove from "@flick-lang/runtime" "hashMapRemove"
+foreign pure remove from "@flick-lang/effect-ts" "hashMapRemove"
   reviewed "effect@4.1.2 sha256:91193fd8c3452f5a"
 
 /// The value of `key`, if the map has it.
 get : k -> HashMap w k v -> Option v
-foreign pure get from "@flick-lang/runtime" "hashMapGet"
+foreign pure get from "@flick-lang/effect-ts" "hashMapGet"
   reviewed "effect@4.1.2 sha256:1241cb4f18054464"
 
 /// The number of entries.
 size : HashMap w k v -> Int
-foreign pure size from "@flick-lang/runtime" "hashMapSize"
+foreign pure size from "@flick-lang/effect-ts" "hashMapSize"
   reviewed "effect@4.1.2 sha256:e2ce37ab87e87b45"
 
 /// The entries, in no particular order.
 to_list : HashMap w k v -> List (k, v)
-foreign pure to_list from "@flick-lang/runtime" "hashMapToList"
+foreign pure to_list from "@flick-lang/effect-ts" "hashMapToList"
   reviewed "effect@4.1.2 sha256:a8e3e38c208ef388"
 
 /// The entries of both maps, the second's value for a key both have; their
 /// witness must be the same.
 union : HashMap w k v -> HashMap w k v -> HashMap w k v
-foreign pure union from "@flick-lang/runtime" "hashMapUnion"
+foreign pure union from "@flick-lang/effect-ts" "hashMapUnion"
   reviewed "effect@4.1.2 sha256:4576e714f9c1599f"
 
 /// The same entries under another witness of the keys.
 rehash : EqHash.EqHash x k -> HashMap w k v -> HashMap x k v
-foreign pure rehash from "@flick-lang/runtime" "hashMapRehash"
+foreign pure rehash from "@flick-lang/effect-ts" "hashMapRehash"
 
 /// The map of the entries under the witness; a later entry for a key
 /// replaces an earlier one.
 from_list : EqHash.EqHash w k -> List (k, v) -> HashMap w k v
-foreign pure from_list from "@flick-lang/runtime/effect/HashMap" "flickFromList"
+foreign pure from_list from "@flick-lang/effect-ts/effect/HashMap" "flickFromList"
   reviewed "effect@4.1.2 sha256:23d7203eb4ffb168"
 
 /// The map of the pairs of a sequence, such as a `for` that yields them,
@@ -68,131 +68,131 @@ let to_seq map = Seq.of_list (to_list map)
 
 /// Whether the map has no entries.
 is_empty : HashMap w k v -> Bool
-foreign pure is_empty from "@flick-lang/runtime/effect/HashMap" "flickIsEmpty"
+foreign pure is_empty from "@flick-lang/effect-ts/effect/HashMap" "flickIsEmpty"
   reviewed "effect@4.1.2 sha256:db237b5b633559d0"
 
 /// Whether the map has `key`.
 has : k -> HashMap w k v -> Bool
-foreign pure has from "@flick-lang/runtime/effect/HashMap" "flickHas"
+foreign pure has from "@flick-lang/effect-ts/effect/HashMap" "flickHas"
   reviewed "effect@4.1.2 sha256:2edd70088712dc63"
 
 /// `get` with the key's hash already computed by the map's witness; another
 /// hash finds nothing.
 get_hash : k -> Int -> HashMap w k v -> Option v
-foreign pure get_hash from "@flick-lang/runtime/effect/HashMap" "flickGetHash"
+foreign pure get_hash from "@flick-lang/effect-ts/effect/HashMap" "flickGetHash"
   reviewed "effect@4.1.2 sha256:25a7ed42cae51acd"
 
 /// `has` with the key's hash already computed by the map's witness.
 has_hash : k -> Int -> HashMap w k v -> Bool
-foreign pure has_hash from "@flick-lang/runtime/effect/HashMap" "flickHasHash"
+foreign pure has_hash from "@flick-lang/effect-ts/effect/HashMap" "flickHasHash"
   reviewed "effect@4.1.2 sha256:b48ec23d49255978"
 
 /// Whether some entry satisfies `f value key`.
 has_by : (v -> k -> Bool)^c -> HashMap w k v -> Bool
-foreign pure has_by from "@flick-lang/runtime/effect/HashMap" "flickHasBy"
+foreign pure has_by from "@flick-lang/effect-ts/effect/HashMap" "flickHasBy"
   arity 2
   retention call
   reviewed "effect@4.1.2 sha256:b033b3f1f6a357d0"
 
 /// The keys, in no particular order.
 keys : HashMap w k v -> List k
-foreign pure keys from "@flick-lang/runtime/effect/HashMap" "flickKeys"
+foreign pure keys from "@flick-lang/effect-ts/effect/HashMap" "flickKeys"
   reviewed "effect@4.1.2 sha256:10764c24051e82af"
 
 /// The values, in no particular order.
 values : HashMap w k v -> List v
-foreign pure values from "@flick-lang/runtime/effect/HashMap" "flickValues"
+foreign pure values from "@flick-lang/effect-ts/effect/HashMap" "flickValues"
   reviewed "effect@4.1.2 sha256:a38ad371c81244a7"
 
 /// The map with the entry of `key` decided by `f`: it gets the current value,
 /// if any, and `None` removes the key.
 modify_at : k -> (Option v -> Option v)^c -> (HashMap w k v -> HashMap w k v)^c
-foreign pure modify_at from "@flick-lang/runtime/effect/HashMap" "flickModifyAt"
+foreign pure modify_at from "@flick-lang/effect-ts/effect/HashMap" "flickModifyAt"
   arity 3
   retention call
   reviewed "effect@4.1.2 sha256:3929f93f5f8676d1"
 
 /// `modify_at` with the key's hash already computed by the map's witness.
 modify_hash : k -> Int -> (Option v -> Option v)^c -> (HashMap w k v -> HashMap w k v)^c
-foreign pure modify_hash from "@flick-lang/runtime/effect/HashMap" "flickModifyHash"
+foreign pure modify_hash from "@flick-lang/effect-ts/effect/HashMap" "flickModifyHash"
   arity 4
   retention call
   reviewed "effect@4.1.2 sha256:c9e2e6707e113108"
 
 /// The map with the value of `key` replaced by `f value`, if it has the key.
 modify : k -> (v -> v)^c -> (HashMap w k v -> HashMap w k v)^c
-foreign pure modify from "@flick-lang/runtime/effect/HashMap" "flickModify"
+foreign pure modify from "@flick-lang/effect-ts/effect/HashMap" "flickModify"
   arity 3
   retention call
   reviewed "effect@4.1.2 sha256:9c481f97b5a8b4f3"
 
 /// The map without any of the keys.
 remove_many : List k -> HashMap w k v -> HashMap w k v
-foreign pure remove_many from "@flick-lang/runtime/effect/HashMap" "flickRemoveMany"
+foreign pure remove_many from "@flick-lang/effect-ts/effect/HashMap" "flickRemoveMany"
   reviewed "effect@4.1.2 sha256:6b3dbdd95250bc30"
 
 /// The map with each entry inserted in order.
 insert_many : List (k, v) -> HashMap w k v -> HashMap w k v
-foreign pure insert_many from "@flick-lang/runtime/effect/HashMap" "flickSetMany"
+foreign pure insert_many from "@flick-lang/effect-ts/effect/HashMap" "flickSetMany"
   reviewed "effect@4.1.2 sha256:36d7d1b98d742872"
 
 /// Each value mapped by `f value key`.
 map : (v -> k -> b)^c -> HashMap w k v -> HashMap w k b
-foreign pure map from "@flick-lang/runtime/effect/HashMap" "flickMap"
+foreign pure map from "@flick-lang/effect-ts/effect/HashMap" "flickMap"
   arity 2
   retention call
   reviewed "effect@4.1.2 sha256:11fd79f781246f3f"
 
 /// The union of the maps `f value key` gives for each entry.
 flat_map : (v -> k -> HashMap w k b)^c -> HashMap w k v -> HashMap w k b
-foreign pure flat_map from "@flick-lang/runtime/effect/HashMap" "flickFlatMap"
+foreign pure flat_map from "@flick-lang/effect-ts/effect/HashMap" "flickFlatMap"
   arity 2
   retention call
   reviewed "effect@4.1.2 sha256:e8c2f9a507f5008d"
 
 /// Folds the entries in no particular order: `f acc value key`.
 reduce : z -> (z -> v -> k -> z)^c -> (HashMap w k v -> z)^c
-foreign pure reduce from "@flick-lang/runtime/effect/HashMap" "flickReduce"
+foreign pure reduce from "@flick-lang/effect-ts/effect/HashMap" "flickReduce"
   arity 3
   retention call
   reviewed "effect@4.1.2 sha256:b02d09a6ed2b5624"
 
 /// The entries for which `f value key` holds.
 filter : (v -> k -> Bool)^c -> HashMap w k v -> HashMap w k v
-foreign pure filter from "@flick-lang/runtime/effect/HashMap" "flickFilter"
+foreign pure filter from "@flick-lang/effect-ts/effect/HashMap" "flickFilter"
   arity 2
   retention call
   reviewed "effect@4.1.2 sha256:4fc5ec207b98ba6b"
 
 /// The entries whose value is `Some`, unwrapped.
 compact : HashMap w k (Option v) -> HashMap w k v
-foreign pure compact from "@flick-lang/runtime/effect/HashMap" "flickCompact"
+foreign pure compact from "@flick-lang/effect-ts/effect/HashMap" "flickCompact"
   reviewed "effect@4.1.2 sha256:ef072299ad732c26"
 
 /// The entries `f value key` keeps with `Ok`, mapped to its value.
 filter_map : (v -> k -> Result x b)^c -> HashMap w k v -> HashMap w k b
-foreign pure filter_map from "@flick-lang/runtime/effect/HashMap" "flickFilterMap"
+foreign pure filter_map from "@flick-lang/effect-ts/effect/HashMap" "flickFilterMap"
   arity 2
   retention call
   reviewed "effect@4.1.2 sha256:fc1dcf974915e056"
 
 /// Some entry for which `f value key` holds, if any.
 find_first : (v -> k -> Bool)^c -> HashMap w k v -> Option (k, v)
-foreign pure find_first from "@flick-lang/runtime/effect/HashMap" "flickFindFirst"
+foreign pure find_first from "@flick-lang/effect-ts/effect/HashMap" "flickFindFirst"
   arity 2
   retention call
   reviewed "effect@4.1.2 sha256:6ac8055ee88dd5f9"
 
 /// Whether `f value key` holds for some entry.
 some : (v -> k -> Bool)^c -> HashMap w k v -> Bool
-foreign pure some from "@flick-lang/runtime/effect/HashMap" "flickSome"
+foreign pure some from "@flick-lang/effect-ts/effect/HashMap" "flickSome"
   arity 2
   retention call
   reviewed "effect@4.1.2 sha256:e6700f35e9537c7a"
 
 /// Whether `f value key` holds for every entry.
 every : (v -> k -> Bool)^c -> HashMap w k v -> Bool
-foreign pure every from "@flick-lang/runtime/effect/HashMap" "flickEvery"
+foreign pure every from "@flick-lang/effect-ts/effect/HashMap" "flickEvery"
   arity 2
   retention call
   reviewed "effect@4.1.2 sha256:41932a7027a04fd5"
@@ -205,5 +205,5 @@ let for_each f m = List.each_effect (fun (key, value) -> f value key) (to_list m
 /// canonical instances; of a repeated key the last pair wins.
 json :
   Hash k => PureCodec Json k -> PureCodec Json v -> PureCodec Json (HashMap EqHash.Canonical k v)
-foreign pure json from "@flick-lang/runtime/effect/Schema" "flickHashMapJson"
+foreign pure json from "@flick-lang/effect-ts/effect/Schema" "flickHashMapJson"
   reviewed "effect@4.1.2 sha256:1a2e1d73f8a704a7"

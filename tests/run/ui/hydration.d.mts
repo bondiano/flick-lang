@@ -1,1 +1,1 @@
-export declare const dehydrated: () => import("@flick-lang/runtime/effect/Effect").Effect<string, never, unknown>;
+export declare const dehydrated: () => import("@flick-lang/effect-ts/effect/Effect").Effect<string, never, unknown>;

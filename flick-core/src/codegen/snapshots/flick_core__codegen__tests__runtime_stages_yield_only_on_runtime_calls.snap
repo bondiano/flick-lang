@@ -2,8 +2,8 @@
 source: flick-core/src/codegen/tests.rs
 expression: js
 ---
-import { Effect } from "@flick-lang/runtime";
-import * as $rt from "@flick-lang/runtime";
+import { Effect } from "@flick-lang/effect-ts";
+import * as $rt from "@flick-lang/effect-ts";
 import * as $m_String from "../String.js";
 
 export const NotFound = (_0) => ({ _tag: "NotFound#82397ace53fc", _0 });

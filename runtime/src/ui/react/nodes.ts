@@ -2,8 +2,8 @@
 // handler and touches no DOM; the bridge turns them into React elements.
 import type { ComponentType } from "react";
 
-import type { Option } from "../../core/data.ts";
-import { constructorName } from "../../tags.ts";
+import type { Option } from "@flick-lang/runtime/core/data";
+import { constructorName } from "@flick-lang/runtime/tags";
 import { type Handler, eventPreventDefault } from "./handlers.ts";
 
 /** What an event prop of an element gives its handler. */

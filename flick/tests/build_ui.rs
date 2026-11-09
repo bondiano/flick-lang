@@ -24,5 +24,5 @@ fn build_ui_names_the_renderer_in_place_of_react() {
     assert!(out.status.success(), "{out:?}");
     let ui = fs::read_to_string(dir.join("dist/_flick/Ui.js")).expect("Ui.js");
     assert!(ui.contains("from \"../../renderer.mjs\""), "{ui}");
-    assert!(!ui.contains("@flick-lang/runtime/ui"), "{ui}");
+    assert!(!ui.contains("@flick-lang/effect-ts/ui"), "{ui}");
 }

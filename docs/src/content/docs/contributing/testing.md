@@ -75,7 +75,7 @@ Every case runs three times: compiled to JS, compiled with `--emit ts`, whose
 profile, which must behave as the debug build. Within each pass the cases
 run in parallel, `FLICK_E2E_JOBS` at a time (default: the number of CPUs;
 `FLICK_E2E_JOBS=1` runs them one by one). Afterwards `tsc --noEmit` (strict) checks all of
-the TypeScript output. Output goes to `target/tmp/e2e/` and imports `@flick-lang/runtime` from the
+the TypeScript output. Output goes to `target/tmp/e2e/` and imports `@flick-lang/effect-ts` from the
 workspace. A foreign module next to a case (`./tags.mjs`) is imported from
 there. `just e2e` also builds every `tests/check/pass/**` fixture and runs
 `node --check` on the output, and `e2e_numbers.rs` compares random `Float`
@@ -110,21 +110,18 @@ on it; a difference between them is fixed in a runtime, not in the test.
 and checks that the source map and Go's `//line` directives still lead to
 its `.fl` files.
 
-## Runtime tests — `runtime/test/`
+## Runtime tests — `runtime/test/` and `packages/effect-ts/test/`
 
-The runtime is TypeScript 7 (`runtime/src/*.ts`), built to `runtime/dist/`
-with declarations; `just e2e` type-checks it with `tsc` (strict, with
-`noUncheckedIndexedAccess` and `exactOptionalPropertyTypes`, tests included),
-lints it with `oxlint --type-aware` (no `any`, no floating promises, and an
-unchecked type assertion only with its reason beside it) and runs the tests.
+Both packages use TypeScript 7 and build declarations. `just e2e` type-checks
+their sources and tests with `tsc` (strict, with `noUncheckedIndexedAccess` and
+`exactOptionalPropertyTypes`), lints them with `oxlint --type-aware`, and runs
+their tests. The runtime tests cover Flick's own RT kernel and its pure helpers;
+the adapter tests cover Effect integration, including recovery, cleanup,
+concurrency, the Effect `4.1.2` pin and its capability matrix, and codecs.
 
-`node --test` in `runtime/` runs the `.test.ts` files on Node's type
-stripping, after building `dist/`, and checks the adapter's
-contracts directly on Effect: the recovery table of `try … with`, inert cause
-reports, the two-phase close of owners, children and supervisors,
-concurrency, races and layers, the Effect `4.1.2` pin and its capability
-matrix, codecs against their compiled decoders. Entry runner tests start
-`runtime/fixtures/entry.ts` in a child process and send it signals.
+`node --test` runs each package's `.test.ts` files after its `dist/` build.
+Entry runner tests start `packages/effect-ts/fixtures/entry.ts` in a child
+process and send it signals.
 
 ## Syntax corpus and fuzzing — `flick-core/tests/{corpus,fuzz}.rs`
 
@@ -170,15 +167,15 @@ Where to look for the tests of a behavior, and where a new one goes:
 | - | - |
 | kinds, instance resolution and coherence | `tests/check/{pass,fail}/types/kinds.fl`, `tests/check/fail/classes/` |
 | cold tasks, direct calls binding results, stage and evaluation order | `tests/run/codegen/{task_twice,stage_order,eval_order}.fl`, `tests/check/{pass,fail}/effects/`, `flick/tests/first_slice.rs` over `examples/first-slice/` |
-| error rows and `Cause`, services and layers | `tests/run/stdlib/effect/`, `tests/run/codegen/{errors,defect,services}.fl`, `runtime/test/{cause,layer}.test.ts` |
-| scopes, owners, `parallel` and races | `tests/run/runtime/`, `runtime/test/{scope,concurrency,race}.test.ts` |
+| error rows and `Cause`, services and layers | `tests/run/stdlib/effect/`, `tests/run/codegen/{errors,defect,services}.fl`, `packages/effect-ts/test/{cause,layer}.test.ts` |
+| scopes, owners, `parallel` and races | `tests/run/runtime/`, `packages/effect-ts/test/{scope,concurrency,race}.test.ts` |
 | regions and captures | `tests/check/{pass,fail}/regions/`, `tests/check/projects/regions/` |
 | `Float` semantics in debug, release and constant folding | `flick/tests/e2e_numbers.rs`, `tests/run/codegen/numbers.fl`, `flick-core/tests/consteval_node.rs` |
 | optimizer passes | `flick-core/src/opt/tests.rs`, `tests/run/codegen/release.fl` |
-| `deriving Schema`, codec policies, strict export, OpenAPI | `tests/{check,run}/**/schema/`, `runtime/test/{schema,httpapi}.test.ts`, `flick/tests/schema_export.rs` |
-| FFI callbacks, `.d.ts` import and reviewed bindings | `tests/run/ffi/`, `runtime/test/callbacks.test.ts`, `flick-core/src/ffi/tests.rs`, `flick/tests/ffi_command.rs`, `tools/dts-importer/test/` |
-| SQL | `tests/check/{pass,fail}/sql/`, `tests/run/sql/`, `runtime/test/sql.test.ts`, `flick/tests/sql_postgres.rs` over `tests/postgres/` |
-| UI | `tests/check/{pass,fail}/ui/`, `tests/run/ui/`, `runtime/test/ui-*.test.ts` |
+| `deriving Schema`, codec policies, strict export, OpenAPI | `tests/{check,run}/**/schema/`, `packages/effect-ts/test/{schema,httpapi}.test.ts`, `flick/tests/schema_export.rs` |
+| FFI callbacks, `.d.ts` import and reviewed bindings | `tests/run/ffi/`, `packages/effect-ts/test/callbacks.test.ts`, `flick-core/src/ffi/tests.rs`, `flick/tests/ffi_command.rs`, `tools/dts-importer/test/` |
+| SQL | `tests/check/{pass,fail}/sql/`, `tests/run/sql/`, `packages/effect-ts/test/sql.test.ts`, `flick/tests/sql_postgres.rs` over `tests/postgres/` |
+| UI | `tests/check/{pass,fail}/ui/`, `tests/run/ui/`, `packages/effect-ts/test/ui-*.test.ts` |
 | the `cli` block | `tests/check/{pass,fail}/cli/`, `tests/run/stdlib/cli/`, `flick-core/src/project/load/plugins_tests.rs` (the calls it stands for), `flick/tests/lsp_editor/cli.rs` |
 | hover, the language server and the TypeScript projection | `flick-core/src/ide/tests.rs`, `flick/tests/{lsp_command.rs,lsp_editor/}`, `flick-core/tests/projection.rs`, `flick-core/src/codegen/ts/tests.rs` |
 | the CLI: no code run by `check`/`build`, run generations, `dev`, cache, pnpm, exit codes, NDJSON | `flick/tests/{cli_project,cli_run,check_command}.rs` |

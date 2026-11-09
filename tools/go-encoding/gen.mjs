@@ -5,8 +5,8 @@
 // these, line by line: the input as JSON, a tab, then the result.
 // Run from the repository root: `node tools/go-encoding/gen.mjs`.
 import { writeFileSync } from "node:fs";
-import { Result } from "../../runtime/node_modules/effect/dist/index.js";
-import { Ini, Toml, Yaml } from "../../runtime/node_modules/effect/dist/encoding/index.js";
+import { Result } from "../../packages/effect-ts/node_modules/effect/dist/index.js";
+import { Ini, Toml, Yaml } from "../../packages/effect-ts/node_modules/effect/dist/encoding/index.js";
 
 const ini = [
   "",

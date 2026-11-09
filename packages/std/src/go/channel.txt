@@ -1,7 +1,7 @@
 # Channels: pulls from an upstream pull, their schemas, and the hubs they
 # read and feed.
 
-[@flick-lang/runtime/effect/Channel]
+[@flick-lang/effect-ts/effect/Channel]
 fromArray ChannelFromArray
 flickFromListChunked ChannelFromListChunked
 succeed ChannelSucceed
@@ -112,12 +112,12 @@ flickToPubSubArray *ChannelToPubSubArray
 flickRunIntoPubSub *ChannelRunIntoPubSub
 flickRunIntoPubSubArray *ChannelRunIntoPubSubArray
 
-[@flick-lang/runtime/effect/ChannelSchema]
+[@flick-lang/effect-ts/effect/ChannelSchema]
 flickDecode ChannelSchemaDecode
 flickEncode ChannelSchemaEncode
 flickDuplex ChannelSchemaDuplex
 
-[@flick-lang/runtime/effect/PubSub]
+[@flick-lang/effect-ts/effect/PubSub]
 flickBounded PubSubBounded
 flickDropping PubSubDropping
 flickSliding PubSubSliding

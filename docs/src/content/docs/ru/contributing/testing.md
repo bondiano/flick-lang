@@ -1,6 +1,6 @@
 ---
 title: "Тестирование"
-source_hash: c28b3b87047978d7
+source_hash: 260221ea1fd0a8ef
 ---
 
 Установите инструмент проверки зависимостей, используемый локально и в CI:
@@ -84,7 +84,7 @@ let x : Float = "hi"
 каждого прохода примеры идут параллельно, по `FLICK_E2E_JOBS` за раз (по умолчанию —
 по числу процессоров; `FLICK_E2E_JOBS=1` запускает их по одному). Затем `tsc --noEmit`
 в строгом режиме проверяет весь сгенерированный TypeScript. Результаты
-записываются в `target/tmp/e2e/` и импортируют `@flick-lang/runtime` из рабочей
+записываются в `target/tmp/e2e/` и импортируют `@flick-lang/effect-ts` из рабочей
 области. Внешний модуль рядом с примером (`./tags.mjs`) импортируется
 оттуда же. `just e2e` также собирает каждый пример `tests/check/pass/**`
 и запускает `node --check` для результата, а `e2e_numbers.rs` сравнивает
@@ -120,23 +120,19 @@ let x : Float = "hi"
 проверяет, что карта исходников и директивы `//line` Go по-прежнему ведут
 к его файлам `.fl`.
 
-## Тесты среды выполнения — `runtime/test/`
+## Тесты среды выполнения — `runtime/test/` и `packages/effect-ts/test/`
 
-Среда выполнения написана на TypeScript 7 (`runtime/src/*.ts`) и собирается
-в `runtime/dist/` вместе с декларациями. `just e2e` проверяет её типы и типы
-тестов через `tsc` в строгом режиме с `noUncheckedIndexedAccess` и
-`exactOptionalPropertyTypes`, затем запускает `oxlint --type-aware` и тесты.
-Проверка линтером запрещает `any`, необработанные промисы и непроверенные
-утверждения о типах без пояснения рядом.
+Оба пакета используют TypeScript 7 и собирают декларации. `just e2e` проверяет
+исходники и тесты через `tsc` в строгом режиме с `noUncheckedIndexedAccess` и
+`exactOptionalPropertyTypes`, запускает `oxlint --type-aware` и тесты. Тесты
+runtime покрывают собственное ядро RT и чистые функции Flick; тесты адаптера
+проверяют интеграцию с Effect: восстановление после ошибок, очистку ресурсов,
+конкурентное выполнение, закреплённую версию Effect `4.1.2`, матрицу
+возможностей и кодеки.
 
-`node --test` в `runtime/` выполняет файлы `.test.ts` после сборки `dist/`;
-аннотации типов удаляет сам Node. Тесты проверяют контракты адаптера напрямую
-на Effect: правила восстановления `try … with`, инертные отчёты о причинах,
-двухфазное закрытие владельцев, дочерние задачи и супервизоры, конкурентное
-выполнение, гонки и слои, закреплённую версию Effect `4.1.2` и её матрицу
-возможностей, а также соответствие кодеков скомпилированным декодерам.
-Тесты модуля запуска создают дочерний процесс `runtime/fixtures/entry.ts`
-и посылают ему сигналы.
+`node --test` выполняет файлы `.test.ts` каждого пакета после сборки его
+`dist/`. Тесты модуля запуска создают дочерний процесс
+`packages/effect-ts/fixtures/entry.ts` и посылают ему сигналы.
 
 ## Синтаксический корпус и фаззинг — `flick-core/tests/{corpus,fuzz}.rs`
 
@@ -185,15 +181,15 @@ let x : Float = "hi"
 | - | - |
 | кинды, выбор экземпляров и их согласованность | `tests/check/{pass,fail}/types/kinds.fl`, `tests/check/fail/classes/` |
 | холодные задачи, прямые вызовы, связывающие результат, порядок стадий и вычисления | `tests/run/codegen/{task_twice,stage_order,eval_order}.fl`, `tests/check/{pass,fail}/effects/`, `flick/tests/first_slice.rs` над `examples/first-slice/` |
-| строки ошибок и `Cause`, сервисы и слои | `tests/run/stdlib/effect/`, `tests/run/codegen/{errors,defect,services}.fl`, `runtime/test/{cause,layer}.test.ts` |
-| области, владельцы, `parallel` и гонки | `tests/run/runtime/`, `runtime/test/{scope,concurrency,race}.test.ts` |
+| строки ошибок и `Cause`, сервисы и слои | `tests/run/stdlib/effect/`, `tests/run/codegen/{errors,defect,services}.fl`, `packages/effect-ts/test/{cause,layer}.test.ts` |
+| области, владельцы, `parallel` и гонки | `tests/run/runtime/`, `packages/effect-ts/test/{scope,concurrency,race}.test.ts` |
 | регионы и захваты | `tests/check/{pass,fail}/regions/`, `tests/check/projects/regions/` |
 | семантика `Float` в debug, release и при свёртке констант | `flick/tests/e2e_numbers.rs`, `tests/run/codegen/numbers.fl`, `flick-core/tests/consteval_node.rs` |
 | проходы оптимизатора | `flick-core/src/opt/tests.rs`, `tests/run/codegen/release.fl` |
-| `deriving Schema`, политики кодеков, строгий экспорт, OpenAPI | `tests/{check,run}/**/schema/`, `runtime/test/{schema,httpapi}.test.ts`, `flick/tests/schema_export.rs` |
-| обратные вызовы FFI, импорт `.d.ts` и проверенные привязки | `tests/run/ffi/`, `runtime/test/callbacks.test.ts`, `flick-core/src/ffi/tests.rs`, `flick/tests/ffi_command.rs`, `tools/dts-importer/test/` |
-| SQL | `tests/check/{pass,fail}/sql/`, `tests/run/sql/`, `runtime/test/sql.test.ts`, `flick/tests/sql_postgres.rs` над `tests/postgres/` |
-| UI | `tests/check/{pass,fail}/ui/`, `tests/run/ui/`, `runtime/test/ui-*.test.ts` |
+| `deriving Schema`, политики кодеков, строгий экспорт, OpenAPI | `tests/{check,run}/**/schema/`, `packages/effect-ts/test/{schema,httpapi}.test.ts`, `flick/tests/schema_export.rs` |
+| обратные вызовы FFI, импорт `.d.ts` и проверенные привязки | `tests/run/ffi/`, `packages/effect-ts/test/callbacks.test.ts`, `flick-core/src/ffi/tests.rs`, `flick/tests/ffi_command.rs`, `tools/dts-importer/test/` |
+| SQL | `tests/check/{pass,fail}/sql/`, `tests/run/sql/`, `packages/effect-ts/test/sql.test.ts`, `flick/tests/sql_postgres.rs` над `tests/postgres/` |
+| UI | `tests/check/{pass,fail}/ui/`, `tests/run/ui/`, `packages/effect-ts/test/ui-*.test.ts` |
 | блок `cli` | `tests/check/{pass,fail}/cli/`, `tests/run/stdlib/cli/`, `flick-core/src/project/load/plugins_tests.rs` (вызовы, которые он означает), `flick/tests/lsp_editor/cli.rs` |
 | подсказки, языковой сервер и проекция TypeScript | `flick-core/src/ide/tests.rs`, `flick/tests/{lsp_command.rs,lsp_editor/}`, `flick-core/tests/projection.rs`, `flick-core/src/codegen/ts/tests.rs` |
 | CLI: `check`/`build` не запускают код, поколения запуска, `dev`, кеш, pnpm, коды выхода, NDJSON | `flick/tests/{cli_project,cli_run,check_command}.rs` |

@@ -15,12 +15,12 @@ type PromiseCallback a b
 /// prototype or a throwing proxy is a `SnapshotError` naming the path; a
 /// subtree shared by two places is copied once.
 snapshot : JsValue ->{; SnapshotError} Unknown
-foreign effect snapshot from "@flick-lang/runtime" "snapshotDefault"
+foreign effect snapshot from "@flick-lang/effect-ts" "snapshotDefault"
 
 /// `snapshot` with the depth and value limits given.
 snapshot_with : Int -> Int -> JsValue ->{; SnapshotError} Unknown
-foreign effect snapshot_with from "@flick-lang/runtime" "snapshot"
+foreign effect snapshot_with from "@flick-lang/effect-ts" "snapshot"
 
 promise_callback : (a ->{r; e} b)^c ->{r;} (PromiseCallback a b)^c
-foreign effect promise_callback from "@flick-lang/runtime" "promiseCallback"
+foreign effect promise_callback from "@flick-lang/effect-ts" "promiseCallback"
   retention owner

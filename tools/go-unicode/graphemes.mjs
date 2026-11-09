@@ -11,7 +11,7 @@
 // widths of a corpus as Intl.Segmenter and Effect give them.
 // Run from the repository root: `node tools/go-unicode/graphemes.mjs`.
 import { writeFileSync } from "node:fs";
-import { displayWidth } from "../../runtime/node_modules/effect/dist/cli/CliOutput.js";
+import { displayWidth } from "../../packages/effect-ts/node_modules/effect/dist/cli/CliOutput.js";
 
 const out = "runtime-go/flickrt/grapheme_tables.go";
 const corpusOut = "runtime-go/flickrt/testdata/graphemes.txt";

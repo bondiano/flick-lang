@@ -10,8 +10,8 @@ type SanitizedHtml
 
 /// The URL if its scheme is safe.
 safe_url : String -> Option SafeUrl
-foreign pure safe_url from "@flick-lang/runtime/ui/react" "uiSafeUrl"
+foreign pure safe_url from "@flick-lang/effect-ts/ui/react" "uiSafeUrl"
 
 /// HTML the program vouches for: it is inserted as it is.
 trusted_html : String -> SanitizedHtml
-foreign pure trusted_html from "@flick-lang/runtime/ui/react" "uiTrustedHtml"
+foreign pure trusted_html from "@flick-lang/effect-ts/ui/react" "uiTrustedHtml"

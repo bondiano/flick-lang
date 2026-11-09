@@ -1,20 +1,20 @@
 # Transactions: TxRef and the structures over it (tx*.go).
 
-[@flick-lang/runtime/effect/Effect]
+[@flick-lang/effect-ts/effect/Effect]
 tx *TxAtomically
 
-[@flick-lang/runtime/effect/Tx]
+[@flick-lang/effect-ts/effect/Tx]
 flickRetry *TxRetry
 flickCurrent *TxCurrent
 
-[@flick-lang/runtime/effect/TxRef]
+[@flick-lang/effect-ts/effect/TxRef]
 make TxRefMake
 get *TxRefGet
 set *TxRefSet
 update *TxRefUpdate
 modify *TxRefModify
 
-[@flick-lang/runtime/effect/TxChunk]
+[@flick-lang/effect-ts/effect/TxChunk]
 make TxChunkMake
 empty TxChunkEmpty
 fromIterable TxChunkFromIterable
@@ -36,7 +36,7 @@ appendAll *TxChunkAppendAll
 prependAll *TxChunkPrependAll
 concat *TxChunkConcat
 
-[@flick-lang/runtime/effect/TxDeferred]
+[@flick-lang/effect-ts/effect/TxDeferred]
 make TxDeferredMake
 await *TxDeferredAwait
 poll *TxDeferredPoll
@@ -44,7 +44,7 @@ done *TxDeferredDone
 succeed *TxDeferredSucceed
 fail *TxDeferredFail
 
-[@flick-lang/runtime/effect/TxHashMap]
+[@flick-lang/effect-ts/effect/TxHashMap]
 flickEmpty TxHashMapEmpty
 flickMake *TxHashMapMake
 flickFromIterable *TxHashMapMake
@@ -81,7 +81,7 @@ flickEvery *TxHashMapEvery
 flickFindFirst *TxHashMapFindFirst
 flickForEach *TxHashMapForEach
 
-[@flick-lang/runtime/effect/TxHashSet]
+[@flick-lang/effect-ts/effect/TxHashSet]
 flickEmpty TxHashSetEmpty
 flickMake *TxHashSetMake
 flickFromIterable *TxHashSetMake
@@ -104,7 +104,7 @@ flickFilter *TxHashSetFilter
 flickReduce *TxHashSetReduce
 flickToHashSet *TxHashSetToHashSet
 
-[@flick-lang/runtime/effect/TxPriorityQueue]
+[@flick-lang/effect-ts/effect/TxPriorityQueue]
 flickEmpty *TxPriorityQueueEmpty
 flickFromIterable *TxPriorityQueueFromIterable
 flickMake *TxPriorityQueueFromIterable
@@ -123,7 +123,7 @@ removeIf *TxPriorityQueueRemoveIf
 retainIf *TxPriorityQueueRetainIf
 toArray *TxPriorityQueueToArray
 
-[@flick-lang/runtime/effect/TxReentrantLock]
+[@flick-lang/effect-ts/effect/TxReentrantLock]
 make TxReentrantLockMake
 acquireRead *TxReentrantLockAcquireRead
 acquireWrite *TxReentrantLockAcquireWrite
@@ -140,7 +140,7 @@ locked *TxReentrantLockLocked
 readLocked *TxReentrantLockReadLocked
 writeLocked *TxReentrantLockWriteLocked
 
-[@flick-lang/runtime/effect/TxSemaphore]
+[@flick-lang/effect-ts/effect/TxSemaphore]
 make TxSemaphoreMake
 available *TxSemaphoreAvailable
 capacity TxSemaphoreCapacity
@@ -154,7 +154,7 @@ withPermit *TxSemaphoreWithPermit
 withPermits *TxSemaphoreWithPermits
 withPermitScoped *TxSemaphoreWithPermitScoped
 
-[@flick-lang/runtime/effect/TxQueue]
+[@flick-lang/effect-ts/effect/TxQueue]
 bounded TxQueueBounded
 unbounded TxQueueUnbounded
 dropping TxQueueDropping
@@ -182,7 +182,7 @@ isDone *TxQueueIsDone
 isShutdown *TxQueueIsDone
 awaitCompletion *TxQueueAwaitCompletion
 
-[@flick-lang/runtime/effect/TxPubSub]
+[@flick-lang/effect-ts/effect/TxPubSub]
 bounded TxPubSubBounded
 dropping TxPubSubDropping
 sliding TxPubSubSliding
@@ -199,7 +199,7 @@ subscribe *TxPubSubSubscribe
 shutdown *TxPubSubShutdown
 awaitShutdown *TxPubSubAwaitShutdown
 
-[@flick-lang/runtime/effect/TxSubscriptionRef]
+[@flick-lang/effect-ts/effect/TxSubscriptionRef]
 make TxSubscriptionRefMake
 get *TxSubscriptionRefGet
 modify *TxSubscriptionRefModify

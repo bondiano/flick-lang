@@ -8,23 +8,23 @@ type SynchronizedRef a
 
 /// A fresh reference holding `value`.
 make : a ->{} SynchronizedRef a
-foreign effect make from "@flick-lang/runtime/effect/SynchronizedRef" "make"
+foreign effect make from "@flick-lang/effect-ts/effect/SynchronizedRef" "make"
   reviewed "effect@4.1.2 sha256:dc76276bffd8e5bf"
 
 /// The current value.
 get : SynchronizedRef a ->{Async;} a
-foreign effect get from "@flick-lang/runtime/effect/SynchronizedRef" "get"
+foreign effect get from "@flick-lang/effect-ts/effect/SynchronizedRef" "get"
   reviewed "effect@4.1.2 sha256:27eb75f3de24fcf3"
 
 /// Sets the value, giving the previous one.
 get_and_set : a -> SynchronizedRef a ->{Async;} a
-foreign effect get_and_set from "@flick-lang/runtime/effect/SynchronizedRef" "getAndSet"
+foreign effect get_and_set from "@flick-lang/effect-ts/effect/SynchronizedRef" "getAndSet"
   arity 1
   reviewed "effect@4.1.2 sha256:27083c2ae9b1e470"
 
 /// Applies `f`, giving the previous value.
 get_and_update : (a -> a)^c -> SynchronizedRef a ->{Async;} a
-foreign effect get_and_update from "@flick-lang/runtime/effect/SynchronizedRef" "getAndUpdate"
+foreign effect get_and_update from "@flick-lang/effect-ts/effect/SynchronizedRef" "getAndUpdate"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:ce09fd2140fba7d7"
@@ -32,28 +32,28 @@ foreign effect get_and_update from "@flick-lang/runtime/effect/SynchronizedRef" 
 /// Runs `f` on the value and keeps its result, giving the previous value;
 /// other updates wait for it.
 get_and_update_effect : (a ->{r; e} a)^c -> SynchronizedRef a ->{r; e} a
-foreign effect get_and_update_effect from "@flick-lang/runtime/effect/SynchronizedRef" "getAndUpdateEffect"
+foreign effect get_and_update_effect from "@flick-lang/effect-ts/effect/SynchronizedRef" "getAndUpdateEffect"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:e2645bd925658d55"
 
 /// Applies `f` where it gives `Some`, giving the previous value.
 get_and_update_some : (a -> Option a)^c -> SynchronizedRef a ->{Async;} a
-foreign effect get_and_update_some from "@flick-lang/runtime/effect/SynchronizedRef" "getAndUpdateSome"
+foreign effect get_and_update_some from "@flick-lang/effect-ts/effect/SynchronizedRef" "getAndUpdateSome"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:b3a34d6055e99516"
 
 /// `get_and_update_effect` where `f` may keep the value with `None`.
 get_and_update_some_effect : (a ->{r; e} Option a)^c -> SynchronizedRef a ->{r; e} a
-foreign effect get_and_update_some_effect from "@flick-lang/runtime/effect/SynchronizedRef" "getAndUpdateSomeEffect"
+foreign effect get_and_update_some_effect from "@flick-lang/effect-ts/effect/SynchronizedRef" "getAndUpdateSomeEffect"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:1772ec6a2c222310"
 
 /// `f` gives the result and the new value, in one step.
 modify : (a -> (b, a))^c -> SynchronizedRef a ->{Async;} b
-foreign effect modify from "@flick-lang/runtime/effect/SynchronizedRef" "modify"
+foreign effect modify from "@flick-lang/effect-ts/effect/SynchronizedRef" "modify"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:a139ca5d091056e9"
@@ -61,89 +61,89 @@ foreign effect modify from "@flick-lang/runtime/effect/SynchronizedRef" "modify"
 /// Runs `f`, which gives the result and the new value; other updates wait
 /// for it.
 modify_effect : (a ->{r; e} (b, a))^c -> SynchronizedRef a ->{r; e} b
-foreign effect modify_effect from "@flick-lang/runtime/effect/SynchronizedRef" "modifyEffect"
+foreign effect modify_effect from "@flick-lang/effect-ts/effect/SynchronizedRef" "modifyEffect"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:360c17f1d63931b5"
 
 /// `modify` where `f` may keep the value with `None`.
 modify_some : (a -> (b, Option a))^c -> SynchronizedRef a ->{Async;} b
-foreign effect modify_some from "@flick-lang/runtime/effect/SynchronizedRef" "modifySome"
+foreign effect modify_some from "@flick-lang/effect-ts/effect/SynchronizedRef" "modifySome"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:21dcc2894a2cc5d1"
 
 /// `modify_effect` where `f` may keep the value with `None`.
 modify_some_effect : (a ->{r; e} (b, Option a))^c -> SynchronizedRef a ->{r; e} b
-foreign effect modify_some_effect from "@flick-lang/runtime/effect/SynchronizedRef" "modifySomeEffect"
+foreign effect modify_some_effect from "@flick-lang/effect-ts/effect/SynchronizedRef" "modifySomeEffect"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:9e1c1a25035a725a"
 
 /// Sets the value.
 set : a -> SynchronizedRef a ->{Async;} Unit
-foreign effect set from "@flick-lang/runtime/effect/SynchronizedRef" "set"
+foreign effect set from "@flick-lang/effect-ts/effect/SynchronizedRef" "set"
   arity 1
   reviewed "effect@4.1.2 sha256:282e659b085ed420"
 
 /// Sets the value, giving it.
 set_and_get : a -> SynchronizedRef a ->{Async;} a
-foreign effect set_and_get from "@flick-lang/runtime/effect/SynchronizedRef" "setAndGet"
+foreign effect set_and_get from "@flick-lang/effect-ts/effect/SynchronizedRef" "setAndGet"
   arity 1
   reviewed "effect@4.1.2 sha256:861529729c76ceb0"
 
 /// Applies `f` to the value.
 update : (a -> a)^c -> SynchronizedRef a ->{Async;} Unit
-foreign effect update from "@flick-lang/runtime/effect/SynchronizedRef" "update"
+foreign effect update from "@flick-lang/effect-ts/effect/SynchronizedRef" "update"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:c3b1a72c1ed05257"
 
 /// Runs `f` on the value and keeps its result; other updates wait for it.
 update_effect : (a ->{r; e} a)^c -> SynchronizedRef a ->{r; e} Unit
-foreign effect update_effect from "@flick-lang/runtime/effect/SynchronizedRef" "updateEffect"
+foreign effect update_effect from "@flick-lang/effect-ts/effect/SynchronizedRef" "updateEffect"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:bd1a6b0c0f857f30"
 
 /// Applies `f`, giving the new value.
 update_and_get : (a -> a)^c -> SynchronizedRef a ->{Async;} a
-foreign effect update_and_get from "@flick-lang/runtime/effect/SynchronizedRef" "updateAndGet"
+foreign effect update_and_get from "@flick-lang/effect-ts/effect/SynchronizedRef" "updateAndGet"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:2555caa6d63b7efa"
 
 /// `update_effect`, giving the new value.
 update_and_get_effect : (a ->{r; e} a)^c -> SynchronizedRef a ->{r; e} a
-foreign effect update_and_get_effect from "@flick-lang/runtime/effect/SynchronizedRef" "updateAndGetEffect"
+foreign effect update_and_get_effect from "@flick-lang/effect-ts/effect/SynchronizedRef" "updateAndGetEffect"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:1cc8f146631060ff"
 
 /// Applies `f` where it gives `Some`.
 update_some : (a -> Option a)^c -> SynchronizedRef a ->{Async;} Unit
-foreign effect update_some from "@flick-lang/runtime/effect/SynchronizedRef" "updateSome"
+foreign effect update_some from "@flick-lang/effect-ts/effect/SynchronizedRef" "updateSome"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:7c2a3302466aa0a2"
 
 /// `update_effect` where `f` may keep the value with `None`.
 update_some_effect : (a ->{r; e} Option a)^c -> SynchronizedRef a ->{r; e} Unit
-foreign effect update_some_effect from "@flick-lang/runtime/effect/SynchronizedRef" "updateSomeEffect"
+foreign effect update_some_effect from "@flick-lang/effect-ts/effect/SynchronizedRef" "updateSomeEffect"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:ecbae8b06920bdb9"
 
 /// Applies `f` where it gives `Some`, giving the value after.
 update_some_and_get : (a -> Option a)^c -> SynchronizedRef a ->{} a
-foreign effect update_some_and_get from "@flick-lang/runtime/effect/SynchronizedRef" "updateSomeAndGet"
+foreign effect update_some_and_get from "@flick-lang/effect-ts/effect/SynchronizedRef" "updateSomeAndGet"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:d3b291762bab8982"
 
 /// `update_some_effect`, giving the value after.
 update_some_and_get_effect : (a ->{r; e} Option a)^c -> SynchronizedRef a ->{r; e} a
-foreign effect update_some_and_get_effect from "@flick-lang/runtime/effect/SynchronizedRef" "updateSomeAndGetEffect"
+foreign effect update_some_and_get_effect from "@flick-lang/effect-ts/effect/SynchronizedRef" "updateSomeAndGetEffect"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:654a0d8bde375294"

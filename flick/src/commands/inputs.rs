@@ -104,7 +104,7 @@ pub fn describe(
         toolchain::fingerprint().unwrap_or_default(),
     );
     if let Some(project) = project {
-        for package in ["@flick-lang/runtime", "effect"] {
+        for package in ["@flick-lang/runtime", "@flick-lang/effect-ts", "effect"] {
             key.add(
                 format!("version {package}"),
                 toolchain::resolved(&project.root, package).unwrap_or_default(),

@@ -1,4 +1,4 @@
-import { Effect } from "@flick-lang/runtime";
+import { Effect } from "@flick-lang/effect-ts";
 
 export let factoryCalls = 0;
 export let promisesMade = 0;

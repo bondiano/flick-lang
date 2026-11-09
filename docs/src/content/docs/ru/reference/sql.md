@@ -1,6 +1,6 @@
 ---
 title: "Запросы SQL"
-source_hash: b84cad9fa67a6880
+source_hash: e0c754cbf25b9739
 ---
 
 Flick проверяет запросы к PostgreSQL по объявлениям таблиц в исходном коде.
@@ -260,7 +260,7 @@ let load id = Database.query (Sql.bind balances { user_id = id })
 даёт 10 соединений без таймаутов; чтобы изменить их, задайте поля записи:
 `{ Database.config url with max_connections = 4; statement_timeout_ms =
 Some 5000 }`. Пакет `pg` — необязательная peer-зависимость
-`@flick-lang/runtime`; его загружает только этот слой. На Go-target пул —
+`@flick-lang/effect-ts`; его загружает только этот слой. На Go-target пул —
 из pgx: Go-модуль программы, которая обращается к `Database`, требует pgx
 v5.7.6, его скачивает первый `go build` в кэш модулей Go со сверкой по
 зафиксированному `go.sum`; дальше сеть не нужна. Остальные программы

@@ -1,5 +1,5 @@
 # Commands as data, run by the port of Effect's CLI.
-[@flick-lang/runtime/cli]
+[@flick-lang/effect-ts/cli]
 multiSwitch CliMultiSwitch
 multiRequired CliMultiRequired
 multiDefault CliMultiDefault

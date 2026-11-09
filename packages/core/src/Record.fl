@@ -40,28 +40,28 @@ class Labels r
 
 @lang record_label
 label : Label l
-foreign pure label from "@flick-lang/runtime" "recordLabel"
+foreign pure label from "@flick-lang/effect-ts" "recordLabel"
 
 get : HasField l r a => Label l -> r -> a
-foreign pure get from "@flick-lang/runtime" "recordGet"
+foreign pure get from "@flick-lang/effect-ts" "recordGet"
 
 extend : (Lacks l r, UnionDisjoint r (Field l a) out) => Label l -> a -> r -> out
-foreign pure extend from "@flick-lang/runtime" "recordExtend"
+foreign pure extend from "@flick-lang/effect-ts" "recordExtend"
 
 remove : Remove l r out => Label l -> r -> out
-foreign pure remove from "@flick-lang/runtime" "recordRemove"
+foreign pure remove from "@flick-lang/effect-ts" "recordRemove"
 
 /// The record with only the fields of `out`.
 project : Project r out => r -> out
-foreign pure project from "@flick-lang/runtime" "recordProject"
+foreign pure project from "@flick-lang/effect-ts" "recordProject"
   reviewed "effect@4.1.2 sha256:0c8a737842e9bc05"
 
 merge_disjoint : UnionDisjoint a b out => a -> b -> out
-foreign pure merge_disjoint from "@flick-lang/runtime" "recordMergeDisjoint"
+foreign pure merge_disjoint from "@flick-lang/effect-ts" "recordMergeDisjoint"
 
 /// The labels of the record, in canonical order.
 labels : Labels r => r -> List String
-foreign pure labels from "@flick-lang/runtime" "recordLabels"
+foreign pure labels from "@flick-lang/effect-ts" "recordLabels"
   reviewed "effect@4.1.2 sha256:59a472c41aac0334"
 
 /// A dictionary from string keys to values of one type, as Effect's
@@ -76,145 +76,145 @@ instance Show a => Show (ReadonlyRecord a) =
 
 /// The dictionary without keys.
 empty : Unit -> ReadonlyRecord a
-foreign pure empty from "@flick-lang/runtime/effect/Record" "empty"
+foreign pure empty from "@flick-lang/effect-ts/effect/Record" "empty"
   arity 0
   reviewed "effect@4.1.2 sha256:ebce6623720a0f97"
 
 /// Whether the dictionary has no key.
 is_empty : ReadonlyRecord a -> Bool
-foreign pure is_empty from "@flick-lang/runtime/effect/Record" "isEmptyReadonlyRecord"
+foreign pure is_empty from "@flick-lang/effect-ts/effect/Record" "isEmptyReadonlyRecord"
   reviewed "effect@4.1.2 sha256:09ec0c7e68b2435d"
 
 /// The dictionary of the pairs; a later key wins.
 from_entries : List (String, a) -> ReadonlyRecord a
-foreign pure from_entries from "@flick-lang/runtime/effect/Record" "fromEntries"
+foreign pure from_entries from "@flick-lang/effect-ts/effect/Record" "fromEntries"
   reviewed "effect@4.1.2 sha256:b6ba3da813c127ee"
 
 /// The dictionary of the key and value `f` gives each element; a later key wins.
 from_iterable_with : (a -> (String, b))^c -> List a -> ReadonlyRecord b
-foreign pure from_iterable_with from "@flick-lang/runtime/effect/Record" "fromIterableWith"
+foreign pure from_iterable_with from "@flick-lang/effect-ts/effect/Record" "fromIterableWith"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:719ab8c0675463a9"
 
 /// The elements under the key `f` gives each; a later key wins.
 from_iterable_by : (a -> String)^c -> List a -> ReadonlyRecord a
-foreign pure from_iterable_by from "@flick-lang/runtime/effect/Record" "fromIterableBy"
+foreign pure from_iterable_by from "@flick-lang/effect-ts/effect/Record" "fromIterableBy"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:41c0015d159b7ebc"
 
 /// The dictionary with `value` under each key.
 from_keys : List String -> a -> ReadonlyRecord a
-foreign pure from_keys from "@flick-lang/runtime/effect/Struct" "Record"
+foreign pure from_keys from "@flick-lang/effect-ts/effect/Struct" "Record"
   reviewed "effect@4.1.2 sha256:7d29b11beef137d7"
 
 /// The dictionary with the one key.
 singleton : String -> a -> ReadonlyRecord a
-foreign pure singleton from "@flick-lang/runtime/effect/Record" "singleton"
+foreign pure singleton from "@flick-lang/effect-ts/effect/Record" "singleton"
   reviewed "effect@4.1.2 sha256:47cac3fc2a1c139e"
 
 /// `f` of each key and value, in key order.
 collect : (String -> a -> b)^c -> ReadonlyRecord a -> List b
-foreign pure collect from "@flick-lang/runtime/effect/Record" "collect"
+foreign pure collect from "@flick-lang/effect-ts/effect/Record" "collect"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:a79badd974887206"
 
 /// The key and value pairs, in key order.
 to_entries : ReadonlyRecord a -> List (String, a)
-foreign pure to_entries from "@flick-lang/runtime/effect/Record" "toEntries"
+foreign pure to_entries from "@flick-lang/effect-ts/effect/Record" "toEntries"
   reviewed "effect@4.1.2 sha256:cb4a8883efc8012b"
 
 /// The keys, in order.
 keys : ReadonlyRecord a -> List String
-foreign pure keys from "@flick-lang/runtime/effect/Record" "keys"
+foreign pure keys from "@flick-lang/effect-ts/effect/Record" "keys"
   reviewed "effect@4.1.2 sha256:c8e94b3075648fc0"
 
 /// The values, in key order.
 values : ReadonlyRecord a -> List a
-foreign pure values from "@flick-lang/runtime/effect/Record" "values"
+foreign pure values from "@flick-lang/effect-ts/effect/Record" "values"
   reviewed "effect@4.1.2 sha256:a1a0ac144ab23772"
 
 /// How many keys the dictionary has.
 size : ReadonlyRecord a -> Int
-foreign pure size from "@flick-lang/runtime/effect/Record" "size"
+foreign pure size from "@flick-lang/effect-ts/effect/Record" "size"
   reviewed "effect@4.1.2 sha256:26ab4b926e6db68b"
 
 /// Whether the key is in the dictionary.
 has : String -> ReadonlyRecord a -> Bool
-foreign pure has from "@flick-lang/runtime/effect/Record" "has"
+foreign pure has from "@flick-lang/effect-ts/effect/Record" "has"
   arity 1
   reviewed "effect@4.1.2 sha256:45fa17996e387f2e"
 
 /// The value under the key.
 get_key : String -> ReadonlyRecord a -> Option a
-foreign pure get_key from "@flick-lang/runtime/effect/Record" "get"
+foreign pure get_key from "@flick-lang/effect-ts/effect/Record" "get"
   arity 1
   reviewed "effect@4.1.2 sha256:ee7f276ae38e1254"
 
 /// The value under the key replaced by `f` of it; `None` without the key.
 modify : String -> (a -> a)^c -> ReadonlyRecord a -> Option (ReadonlyRecord a)
-foreign pure modify from "@flick-lang/runtime/effect/Record" "modify"
+foreign pure modify from "@flick-lang/effect-ts/effect/Record" "modify"
   arity 2
   retention call
   reviewed "effect@4.1.2 sha256:9e1fd7e09fe10ca6"
 
 /// The value under the key replaced; `None` without the key.
 replace : String -> a -> ReadonlyRecord a -> Option (ReadonlyRecord a)
-foreign pure replace from "@flick-lang/runtime/effect/Record" "replace"
+foreign pure replace from "@flick-lang/effect-ts/effect/Record" "replace"
   arity 2
   reviewed "effect@4.1.2 sha256:dd1ae384f755dc6a"
 
 /// The dictionary with `value` under the key, added or replaced.
 set : String -> a -> ReadonlyRecord a -> ReadonlyRecord a
-foreign pure set from "@flick-lang/runtime/effect/Record" "set"
+foreign pure set from "@flick-lang/effect-ts/effect/Record" "set"
   arity 2
   reviewed "effect@4.1.2 sha256:5708e71ab154f714"
 
 /// The dictionary without the key.
 remove_key : String -> ReadonlyRecord a -> ReadonlyRecord a
-foreign pure remove_key from "@flick-lang/runtime/effect/Record" "remove"
+foreign pure remove_key from "@flick-lang/effect-ts/effect/Record" "remove"
   arity 1
   reviewed "effect@4.1.2 sha256:4681f3e03fb7655b"
 
 /// The value under the key and the dictionary without it; `None` without the key.
 pop : String -> ReadonlyRecord a -> Option (a, ReadonlyRecord a)
-foreign pure pop from "@flick-lang/runtime/effect/Record" "pop"
+foreign pure pop from "@flick-lang/effect-ts/effect/Record" "pop"
   arity 1
   reviewed "effect@4.1.2 sha256:b95ac903ac7f2924"
 
 /// Each value replaced by `f` of it and its key.
 map : (a -> String -> b)^c -> ReadonlyRecord a -> ReadonlyRecord b
-foreign pure map from "@flick-lang/runtime/effect/Record" "map"
+foreign pure map from "@flick-lang/effect-ts/effect/Record" "map"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:6c876862a16a1465"
 
 /// Each key replaced by `f` of it and its value; a later key wins.
 map_keys : (String -> a -> String)^c -> ReadonlyRecord a -> ReadonlyRecord a
-foreign pure map_keys from "@flick-lang/runtime/effect/Record" "mapKeys"
+foreign pure map_keys from "@flick-lang/effect-ts/effect/Record" "mapKeys"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:74bc9be1e78f5c07"
 
 /// Each entry replaced by the key and value `f` gives of its value and key.
 map_entries : (a -> String -> (String, b))^c -> ReadonlyRecord a -> ReadonlyRecord b
-foreign pure map_entries from "@flick-lang/runtime/effect/Record" "mapEntries"
+foreign pure map_entries from "@flick-lang/effect-ts/effect/Record" "mapEntries"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:dc1e6b7bc7a55c63"
 
 /// The entries whose value and key satisfy `p`.
 filter : (a -> String -> Bool)^c -> ReadonlyRecord a -> ReadonlyRecord a
-foreign pure filter from "@flick-lang/runtime/effect/Record" "filter"
+foreign pure filter from "@flick-lang/effect-ts/effect/Record" "filter"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:743af5c938465c30"
 
 /// The `Ok` values of `f` over each value and key.
 filter_map : (a -> String -> Result e b)^c -> ReadonlyRecord a -> ReadonlyRecord b
-foreign pure filter_map from "@flick-lang/runtime/effect/Record" "filterMap"
+foreign pure filter_map from "@flick-lang/effect-ts/effect/Record" "filterMap"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:d1e7a89c087d0753"
@@ -222,55 +222,55 @@ foreign pure filter_map from "@flick-lang/runtime/effect/Record" "filterMap"
 /// The `Ok` values and the `Err` errors of `f` over each value and key.
 partition :
   (a -> String -> Result f p)^c -> ReadonlyRecord a -> (ReadonlyRecord p, ReadonlyRecord f)
-foreign pure partition from "@flick-lang/runtime/effect/Record" "partition"
+foreign pure partition from "@flick-lang/effect-ts/effect/Record" "partition"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:e8e24b93183935e8"
 
 /// The values of the `Some` entries.
 get_somes : ReadonlyRecord (Option a) -> ReadonlyRecord a
-foreign pure get_somes from "@flick-lang/runtime/effect/Record" "getSomes"
+foreign pure get_somes from "@flick-lang/effect-ts/effect/Record" "getSomes"
   reviewed "effect@4.1.2 sha256:7f8d49ffc9a3b0ac"
 
 /// The errors of the `Err` entries.
 get_failures : ReadonlyRecord (Result e a) -> ReadonlyRecord e
-foreign pure get_failures from "@flick-lang/runtime/effect/Record" "getFailures"
+foreign pure get_failures from "@flick-lang/effect-ts/effect/Record" "getFailures"
   reviewed "effect@4.1.2 sha256:dc8fc3e111495327"
 
 /// The values of the `Ok` entries.
 get_successes : ReadonlyRecord (Result e a) -> ReadonlyRecord a
-foreign pure get_successes from "@flick-lang/runtime/effect/Record" "getSuccesses"
+foreign pure get_successes from "@flick-lang/effect-ts/effect/Record" "getSuccesses"
   reviewed "effect@4.1.2 sha256:9541688fb1ba3bbb"
 
 /// The `Ok` values and the `Err` errors.
 separate : ReadonlyRecord (Result e a) -> (ReadonlyRecord a, ReadonlyRecord e)
-foreign pure separate from "@flick-lang/runtime/effect/Record" "separate"
+foreign pure separate from "@flick-lang/effect-ts/effect/Record" "separate"
   reviewed "effect@4.1.2 sha256:f7cc9b22a0dd7cf2"
 
 /// Folds the values in key order, `f` seeing each value and key.
 reduce : b -> (b -> a -> String -> b)^c -> (ReadonlyRecord a -> b)^c
-foreign pure reduce from "@flick-lang/runtime/effect/Record" "reduce"
+foreign pure reduce from "@flick-lang/effect-ts/effect/Record" "reduce"
   arity 2
   retention call
   reviewed "effect@4.1.2 sha256:28c146a2f26c1bb4"
 
 /// Whether every value and key satisfy `p`.
 every : (a -> String -> Bool)^c -> ReadonlyRecord a -> Bool
-foreign pure every from "@flick-lang/runtime/effect/Record" "every"
+foreign pure every from "@flick-lang/effect-ts/effect/Record" "every"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:a59d1da567b262ff"
 
 /// Whether some value and key satisfy `p`.
 some : (a -> String -> Bool)^c -> ReadonlyRecord a -> Bool
-foreign pure some from "@flick-lang/runtime/effect/Record" "some"
+foreign pure some from "@flick-lang/effect-ts/effect/Record" "some"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:2c419dcd222b33b7"
 
 /// The first key and value, in key order, that satisfy `p`.
 find_first : (a -> String -> Bool)^c -> ReadonlyRecord a -> Option (String, a)
-foreign pure find_first from "@flick-lang/runtime/effect/Record" "findFirst"
+foreign pure find_first from "@flick-lang/effect-ts/effect/Record" "findFirst"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:ba87d0f6208bbc7e"
@@ -278,7 +278,7 @@ foreign pure find_first from "@flick-lang/runtime/effect/Record" "findFirst"
 /// `self |> union that combine`: the keys of both, `combine` of the two
 /// values under a shared key.
 union : ReadonlyRecord a -> (a -> a -> a)^c -> (ReadonlyRecord a -> ReadonlyRecord a)^c
-foreign pure union from "@flick-lang/runtime/effect/Record" "union"
+foreign pure union from "@flick-lang/effect-ts/effect/Record" "union"
   arity 2
   retention call
   reviewed "effect@4.1.2 sha256:cd57676a46225568"
@@ -286,21 +286,21 @@ foreign pure union from "@flick-lang/runtime/effect/Record" "union"
 /// `self |> intersection that combine`: the shared keys, with `combine` of
 /// the two values.
 intersection : ReadonlyRecord b -> (a -> b -> d)^c -> (ReadonlyRecord a -> ReadonlyRecord d)^c
-foreign pure intersection from "@flick-lang/runtime/effect/Record" "intersection"
+foreign pure intersection from "@flick-lang/effect-ts/effect/Record" "intersection"
   arity 2
   retention call
   reviewed "effect@4.1.2 sha256:1859f7c944910710"
 
 /// `self |> difference that`: the entries whose key only one of the two has.
 difference : ReadonlyRecord a -> ReadonlyRecord a -> ReadonlyRecord a
-foreign pure difference from "@flick-lang/runtime/effect/Record" "difference"
+foreign pure difference from "@flick-lang/effect-ts/effect/Record" "difference"
   arity 1
   reviewed "effect@4.1.2 sha256:baeb87dcd291fcf5"
 
 /// `self |> is_subrecord_by same that`: every entry of `self` is in `that`,
 /// its value `same` as the one there.
 is_subrecord_by : (a -> a -> Bool)^c -> ReadonlyRecord a -> ReadonlyRecord a -> Bool
-foreign pure is_subrecord_by from "@flick-lang/runtime/effect/Record" "isSubrecordBy"
+foreign pure is_subrecord_by from "@flick-lang/effect-ts/effect/Record" "isSubrecordBy"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:a272e6e6496f929b"
@@ -311,7 +311,7 @@ let is_subrecord that self = is_subrecord_by eq that self
 
 /// Whether both have the same keys, with values `same` under each.
 make_equivalence : (a -> a -> Bool)^c -> ReadonlyRecord a -> ReadonlyRecord a -> Bool
-foreign pure make_equivalence from "@flick-lang/runtime/effect/Record" "flickMakeEquivalence"
+foreign pure make_equivalence from "@flick-lang/effect-ts/effect/Record" "flickMakeEquivalence"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:19051946cb775edd"

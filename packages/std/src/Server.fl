@@ -45,7 +45,7 @@ authenticated :
   (Http.Headers.Headers ->{r; Unauthorized} ServiceImpl a) ->
   List (Guarded (a + r)) ->
   List (Function r)
-foreign pure authenticated from "@flick-lang/runtime/effect/server/Functions" "serverAuthenticated"
+foreign pure authenticated from "@flick-lang/effect-ts/effect/server/Functions" "serverAuthenticated"
   arity 3
 
 /// Where `handler` is mounted and the calls of every `server fn` go:
@@ -57,5 +57,5 @@ let path = "/_flick/fn"
 /// NDJSON, for a route at `path`. It holds region `s`: when the scope
 /// owning it closes, the calls it serves finish and run their finalizers.
 handler : List (Function r) ->{Scope s | r;} (ServerRequest ->{Async;} ServerResponse)^{s}
-foreign effect handler from "@flick-lang/runtime/effect/server/FunctionsNode" "serverHandler"
+foreign effect handler from "@flick-lang/effect-ts/effect/server/FunctionsNode" "serverHandler"
   retention owner

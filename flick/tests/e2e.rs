@@ -304,21 +304,29 @@ fn assert_go() {
     );
 }
 
+fn installed_js_packages(repo: &Path, go_only: bool) {
+    assert!(
+        go_only || repo.join("node_modules/@flick-lang/runtime").exists(),
+        "runtime is not installed: run `pnpm install --frozen-lockfile` in the repository root"
+    );
+    assert!(
+        go_only || repo.join("node_modules/@flick-lang/effect-ts").exists(),
+        "Effect adapter is not installed: run `pnpm install --frozen-lockfile` in the repository root"
+    );
+}
+
 #[test]
 #[ignore = "needs Node and `pnpm install`; run `just e2e`"]
 fn run_cases() {
     let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
     let go_only = env::var_os("FLICK_E2E_GO_ONLY").is_some();
-    assert!(
-        go_only || repo.join("node_modules/@flick-lang/runtime").exists(),
-        "runtime is not installed: run `pnpm install --frozen-lockfile` in the repository root"
-    );
+    installed_js_packages(&repo, go_only);
     let root = repo.join("tests/run");
     let (paths, part) = selected(&root);
     let gaps = gaps::load(&root);
     let is_gap = |target: &str, case: &Path| gaps::listed(&gaps, target, &root, case);
 
-    // Under target/, so `@flick-lang/runtime` resolves from the repository root
+    // Under target/, so the runtime and Effect adapter resolve from the repository root
     // node_modules exactly as it would in a project.
     let out_root = Path::new(env!("CARGO_TARGET_TMPDIR")).join("e2e");
     let mut report = Vec::new();
