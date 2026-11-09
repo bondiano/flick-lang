@@ -61,6 +61,10 @@ theorem Typ.sx {Ψ Θ e J} (h : Typ S Ψ Θ [] e J) {σ : Atom → Ty} (hσ : Fi
     Typ S (Ψ.map (Ty.substT σ) ++ X) (Θ.substT σ) [] e (J.substT σ) := by
   simpa using (h.substT σ hσ).weakenStore X
 
+namespace TypM
+export Typ (sx)
+end TypM
+
 theorem cell_sx {Ψ : List Ty} {σ : Atom → Ty} {ℓ : Nat} {T : Ty} (h : Ψ[ℓ]? = some T) (X : List Ty) :
     (Ψ.map (Ty.substT σ) ++ X)[ℓ]? = some (T.substT σ) := by
   rw [List.getElem?_append_left (by simpa using getElem?_lt h), List.getElem?_map, h]; rfl
@@ -69,6 +73,10 @@ theorem Typ.sx1 {Ψ Θ a e J} (h : Typ S Ψ Θ [.mono a] e J) {σ : Atom → Ty}
     (X : List Ty) :
     Typ S (Ψ.map (Ty.substT σ) ++ X) (Θ.substT σ) [.mono (a.substT σ)] e (J.substT σ) := by
   simpa using (h.substT σ hσ).weakenStore X
+
+namespace TypM
+export Typ (sx1)
+end TypM
 
 /-- One frame of L3: the hole is `k` type variables deep, and pure if `k ≠ 0`;
 at depth `0` it has the facts of the frame. -/

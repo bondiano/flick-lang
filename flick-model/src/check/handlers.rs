@@ -10,7 +10,7 @@ use super::expr::mono;
 use super::{Check, Checker, error};
 use crate::subst::matches;
 use crate::syntax::{Arm, Name, Pat, Term};
-use crate::types::{Row, Stage, Type};
+use crate::types::{Caps, Row, Stage, Type};
 
 impl Checker<'_> {
     /// (Match): every arm at one type; the arms without `when` cover `τ`.
@@ -117,7 +117,9 @@ impl Checker<'_> {
             Some(Type::Eff(r, e, _)) => (r.clone(), e.clone()),
             _ => (self.fresh_row(), self.fresh_row()),
         };
-        self.stage_within(&inner, &Stage::Runtime(r.clone(), e.clone()))?;
+        let wanted_stage = Stage::Runtime(r.clone(), e.clone());
+        let live = qualifier.clone().unwrap_or_default();
+        self.stage_within(&inner, &self.live_stage(&wanted_stage, &live))?;
         let task = Term::Task(Rc::new(body.clone()));
         Ok(self.close_over(&task, Type::Eff(r, e, Rc::new(t)), qualifier))
     }
@@ -125,6 +127,11 @@ impl Checker<'_> {
     /// (Await): `φ ⊔ R⟨r; ε⟩`, one layer of `Eff` off.
     pub(super) fn await_(&mut self, e: &Term) -> Check<Type> {
         let t = self.infer(e)?;
+        let held = if self.live {
+            self.qualifier(&t)
+        } else {
+            Caps::default()
+        };
         let (r, x, a) = match self.resolve(&t) {
             Type::Eff(r, x, a) => (r, x, (*a).clone()),
             other => {
@@ -133,6 +140,7 @@ impl Checker<'_> {
                 (r, x, a)
             }
         };
+        let r = self.add_live(&r, &held);
         self.perform(&Stage::Runtime(r, x))?;
         Ok(a)
     }

@@ -40,6 +40,10 @@ theorem Typ.armOf_subst {σ : Nat → Tm} {o : Name} :
   | .unw _ _ _, _, _, _, _, _, _, _, h | .kont _ _, _, _, _, _, _, _, _, h | .hole _, _, _, _, _, _, _, _, h => by
     cases h
 
+namespace TypM
+export Typ (armOf_subst)
+end TypM
+
 theorem Typ.subst {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
     ∀ {Γ' σ}, SubOk S Ψ Θ Γ Γ' σ → Typ S Ψ Θ Γ' (e.subst σ) J := by
   induction h with
@@ -175,6 +179,10 @@ theorem Typ.subst {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
   | unw hℓ _ hφ ih => intro _ _ hσ; exact .unw hℓ (ih hσ) hφ
   | kont hl hC hT => intro _ _ _; exact .kont hl hC hT
 
+namespace TypM
+export Typ (subst)
+end TypM
+
 /-- `e[x := v]` for `x` with a scheme: `v` is a value typed with the scheme's
 variables fresh and its facts assumed. -/
 theorem SubOk.one {Ψ Θ v} {s : Scheme} (hv : Value v)
@@ -244,5 +252,9 @@ theorem Inst.ok {Ψ Θ Γ δ Δ} (h : Inst S Ψ Θ Γ δ Δ) :
 theorem Typ.inst {Ψ Θ Γ e J δ Δ} (h : Typ S Ψ Θ (Δ.map .mono ++ Γ) e J) (hδ : Inst S Ψ Θ Γ δ Δ) :
     Typ S Ψ Θ Γ (e.subst (inst δ)) J :=
   h.subst hδ.ok
+
+namespace TypM
+export Typ (inst)
+end TypM
 
 end Flick

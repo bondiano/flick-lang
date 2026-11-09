@@ -159,6 +159,10 @@ theorem Typ.spine_res {Ψ Θ Γ v J} (h : Typ S Ψ Θ Γ v J) :
   | allI => intro _ _ _ _ _ _ _ _ _ hJ _ hA; cases hJ; exact (hA trivial).elim
   | _ => intro hv _ _ _ _ _ _ hK; cases hv <;> simp [Tm.head] at hK
 
+namespace TypM
+export Typ (spine_res)
+end TypM
+
 /-- The head of a constructor pattern, and the final type of its spine. -/
 theorem PatTy.spine {fl p t Δ} (hp : PatTy S fl p t Δ) (hf : fl = false) :
     ∃ K k ts T us, S.ctor K = some (k, ts, T) ∧ us.length = k ∧

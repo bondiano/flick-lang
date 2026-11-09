@@ -36,6 +36,14 @@ in the `lean` job (`leanprover/lean-action` with `build-args: --wfail`).
   regions), `T4_3` (no handler of a region that ended is used) and `T1_regions` (`T1` with
   `op_H`, without the blocked outcome of a step that needs a region that is not live, which
   `T4` rules out).
+- **T4′, stated** (`Formal/Live.lean`): `SafeUse`, T4.1 and T4.3 without T4.2, the safety a
+  discipline where a region is needed alive only where it is used promises; `T4'_captures`
+  proves it of the capture rules from `T4` and `T4_3`. `TypM` (`Rules.lean`) now gives
+  both `Typ` (captures, unchanged) and `TypLive`, with use-stage subtyping `LeLive`,
+  region use in `Const.ty`, and bounds on the live rows of child work and finalizers.
+  `LiveRules.lean` checks holding without use, scope discharge, qualifier-preserving
+  subtyping and owner bounds. Type soundness and T4′ for `TypLive`, and the translation
+  of signature elision, are not yet proved.
 - **T5, the runtime contract** (`Formal/RT/`, `RT/T5.lean`): for any core and any
   interleaving, every reachable configuration of λRT satisfies R1–R4, R6 and R7, and R5 and
   R8 hold of the cause algebra, under the hypotheses on the libraries (`Hyp`) and `G11`.

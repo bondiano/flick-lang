@@ -105,6 +105,7 @@ impl Checker<'_> {
                 );
             }
         };
+        let s = self.live_scheme(&s);
         Ok(self.instantiate(&s))
     }
 }

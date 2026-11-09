@@ -7,7 +7,7 @@ import Formal.Closed
 
 namespace Flick
 
-variable {S : Sig}
+variable {S : Sig} {mode : TypingMode}
 
 theorem PatTy.binds {fl p t Δ} (h : PatTy S fl p t Δ) : Δ.length = p.binds := by
   induction h <;> simp_all [Pat.binds]
@@ -40,7 +40,7 @@ theorem getElem?_ext {α} {l l' : List α} {i : Nat} {a : α} (h : l[i]? = some 
   rw [List.getElem?_append_left (getElem?_lt h)]; exact h
 
 /-- A typed term names only cells of its store typing. -/
-theorem Typ.locs {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) : ∀ l, e.Has (.loc l) → l < Ψ.length := by
+theorem TypM.locs {Ψ Θ Γ e J} (h : TypM S mode Ψ Θ Γ e J) : ∀ l, e.Has (.loc l) → l < Ψ.length := by
   induction h with
   | loc hl => intro l h; cases h; exact getElem?_lt hl
   | letGen _ _ ih₁ ih₂ =>
@@ -84,6 +84,9 @@ theorem Typ.locs {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) : ∀ l, e.Has (.loc l)
     · exact ih₁ l h
   | _ => intro l h; (try simp only [Tm.Has] at h) <;> grind
 
+theorem Typ.locs {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) : ∀ l, e.Has (.loc l) → l < Ψ.length :=
+  TypM.locs h
+
 theorem HPat.binds {ε₀ p θ Δ} (h : HPat S ε₀ p θ Δ) : Δ.length = p.binds := by
   cases h with
   | wild => rfl
@@ -92,7 +95,7 @@ theorem HPat.binds {ε₀ p θ Δ} (h : HPat S ε₀ p θ Δ) : Δ.length = p.bi
 
 
 /-- A typed term names only variables of its context. -/
-theorem Typ.frees {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) : ∀ i, e.Free i → i < Γ.length := by
+theorem TypM.frees {Ψ Θ Γ e J} (h : TypM S mode Ψ Θ Γ e J) : ∀ i, e.Free i → i < Γ.length := by
   induction h with
   | var => intro i h; cases h; exact getElem?_lt ‹_›
   | allVar hi => intro i h; cases h; exact getElem?_lt hi
@@ -162,5 +165,8 @@ theorem Typ.frees {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) : ∀ i, e.Free i → 
     · exact absurd (ih₂ i (plug_free_of_hole h)) (Nat.not_lt_zero _)
     · exact ih₁ i h
   | _ => intro i h; (try simp only [Tm.Free] at h) <;> grind
+
+theorem Typ.frees {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) : ∀ i, e.Free i → i < Γ.length :=
+  TypM.frees h
 
 end Flick

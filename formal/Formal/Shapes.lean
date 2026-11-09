@@ -94,6 +94,10 @@ theorem Typ.constApp_kind {Ψ Θ Γ c w T φ} (h : Typ S Ψ Θ Γ (.app (.const 
     | errVal _ _ _ _ => simp [Ty.hd] at hU
     | allI => simp [Ty.hd] at hU
 
+namespace TypM
+export Typ (constApp_kind)
+end TypM
+
 theorem Le.opaque {a b : Ty} (h : Le a b) (ha : a.Opaque) : b.Opaque := by
   cases h with
   | refl => exact ha
@@ -226,5 +230,9 @@ theorem Typ.shape {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) : Value e → ∀ {T �
       | const _ hT' => exact Const.res_kind hc hT' hT
       | perform => simp [Const.arity] at hc
   | _ => intro hv _ _ hJ; cases hJ <;> cases hv
+
+namespace TypM
+export Typ (shape)
+end TypM
 
 end Flick

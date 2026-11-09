@@ -5,8 +5,11 @@
 //! is the least row, `none`: the least solution of §2.1.
 
 use std::mem;
+use std::rc::Rc;
+use std::slice;
 
-use super::{Check, Checker, error};
+use super::regions::{arg_caps, live_arg};
+use super::{Check, Checker, error, live_service};
 use crate::types::{Caps, Row, Stage, Type, Var};
 
 impl Checker<'_> {
@@ -17,6 +20,18 @@ impl Checker<'_> {
         let mut extra = Row::none();
         for (name, args) in &a.elems {
             match b.elems.get(name) {
+                // `{Live C} ⊆ {Live C'}` is `C ⊆ C'`, which may grow `C'`
+                Some(theirs) if *name == live_service() => {
+                    let allowed = arg_caps(&theirs[0]);
+                    self.hold(slice::from_ref(&args[0]), &[], &allowed, "Live");
+                }
+                // against a closed row, `Live C` needs `C` to hold no region
+                // or variable once known: what is unknown now may be none
+                None if *name == live_service()
+                    && !b.vars.iter().any(|v| matches!(v, Var::Meta(_))) =>
+                {
+                    self.hold(slice::from_ref(&args[0]), &[], &Caps::default(), "Live");
+                }
                 Some(theirs) if theirs.len() == args.len() => {
                     for (x, y) in args.iter().zip(theirs.iter()) {
                         self.unify(x, y)?;
@@ -96,6 +111,10 @@ impl Checker<'_> {
         let mut out = a.clone();
         for (name, args) in &b.elems {
             match a.elems.get(name) {
+                Some(mine) if *name == live_service() => {
+                    let both = arg_caps(&mine[0]).union(&arg_caps(&args[0]));
+                    out.elems.insert(name.clone(), Rc::from([live_arg(both)]));
+                }
                 Some(mine) if mine.len() == args.len() => {
                     for (x, y) in mine.iter().zip(args.iter()) {
                         self.unify(x, y)?;
@@ -162,13 +181,22 @@ impl Checker<'_> {
     }
 
     fn subsume_bare(&mut self, actual: &Type, expected: &Type) -> Check<()> {
+        // under `regions/live.rs` a qualifier on a function or a task is
+        // the `Live` its use needs
+        let (qa, qe) = if self.live {
+            (self.qualifier(actual), self.qualifier(expected))
+        } else {
+            (Caps::default(), Caps::default())
+        };
         match (self.resolve(actual), self.resolve(expected)) {
             (Type::Fun(p, s, r), Type::Fun(p2, s2, r2)) => {
                 self.subsume(&p2, &p)?;
+                let (s, s2) = (self.live_stage(&s, &qa), self.live_stage(&s2, &qe));
                 self.stage_within(&s, &s2)?;
                 self.subsume(&r, &r2)
             }
             (Type::Eff(r, e, t), Type::Eff(r2, e2, t2)) => {
+                let (r, r2) = (self.add_live(&r, &qa), self.add_live(&r2, &qe));
                 self.within(&r, &r2)?;
                 self.within(&e, &e2)?;
                 self.subsume(&t, &t2)

@@ -9,61 +9,51 @@ Raising the result type along `≤` and the stage along `⊑` keeps a derivation
 
 namespace Flick
 
-variable {S : Sig}
+variable {S : Sig} {mode : TypingMode}
 
 /-- Subsumption between judgment forms. -/
-def JLe : J → J → Prop
-  | .ex t φ, .ex t' φ' => Le t t' ∧ φ.le φ'
-  | .alts t r φ, .alts t' r' φ' => t = t' ∧ Le r r' ∧ φ.le φ'
-  | .halts ε H r φ, .halts ε' H' r' φ' => ε = ε' ∧ H = H' ∧ Le r r' ∧ φ.le φ'
+def JLeM (mode : TypingMode) : J → J → Prop
+  | .ex t φ, .ex t' φ' => mode.subtype t t' ∧ φ.le φ'
+  | .alts t r φ, .alts t' r' φ' => t = t' ∧ mode.subtype r r' ∧ φ.le φ'
+  | .halts ε H r φ, .halts ε' H' r' φ' => ε = ε' ∧ H = H' ∧ mode.subtype r r' ∧ φ.le φ'
   | .dfs fs, .dfs fs' => fs = fs'
   | .harms E t φ s, .harms E' t' φ' s' => E = E' ∧ t = t' ∧ φ = φ' ∧ s = s'
   | _, _ => False
 
-theorem JLe.ex {t φ J'} (h : JLe (.ex t φ) J') :
-    ∃ t' φ', J' = .ex t' φ' ∧ Le t t' ∧ φ.le φ' := by
-  cases J' <;> simp only [JLe] at h
+theorem JLeM.ex {t φ J'} (h : JLeM mode (.ex t φ) J') :
+    ∃ t' φ', J' = .ex t' φ' ∧ mode.subtype t t' ∧ φ.le φ' := by
+  cases J' <;> simp only [JLeM] at h
   exact ⟨_, _, rfl, h⟩
 
-theorem JLe.alts {t r φ J'} (h : JLe (.alts t r φ) J') :
-    ∃ r' φ', J' = .alts t r' φ' ∧ Le r r' ∧ φ.le φ' := by
-  cases J' <;> simp only [JLe] at h
+theorem JLeM.alts {t r φ J'} (h : JLeM mode (.alts t r φ) J') :
+    ∃ r' φ', J' = .alts t r' φ' ∧ mode.subtype r r' ∧ φ.le φ' := by
+  cases J' <;> simp only [JLeM] at h
   obtain ⟨rfl, h⟩ := h
   exact ⟨_, _, rfl, h⟩
 
-theorem JLe.halts {ε H r φ J'} (h : JLe (.halts ε H r φ) J') :
-    ∃ r' φ', J' = .halts ε H r' φ' ∧ Le r r' ∧ φ.le φ' := by
-  cases J' <;> simp only [JLe] at h
+theorem JLeM.halts {ε H r φ J'} (h : JLeM mode (.halts ε H r φ) J') :
+    ∃ r' φ', J' = .halts ε H r' φ' ∧ mode.subtype r r' ∧ φ.le φ' := by
+  cases J' <;> simp only [JLeM] at h
   obtain ⟨rfl, rfl, h⟩ := h
   exact ⟨_, _, rfl, h⟩
 
-theorem JLe.dfs {fs J'} (h : JLe (.dfs fs) J') : J' = .dfs fs := by
-  cases J' <;> simp only [JLe] at h
+theorem JLeM.dfs {fs J'} (h : JLeM mode (.dfs fs) J') : J' = .dfs fs := by
+  cases J' <;> simp only [JLeM] at h
   rw [h]
 
-theorem JLe.st {t φ φ'} (h : φ.le φ') : JLe (.ex t φ) (.ex t φ') := ⟨.refl, h⟩
+theorem JLeM.st {t φ φ'} (h : φ.le φ') : JLeM mode (.ex t φ) (.ex t φ') := ⟨.refl, h⟩
 
 theorem Ty.field_rcons {R : Ty} {l t} (h : R.field l = some t) :
     ∃ l' t' R', R = .rcons l' t' R' := by
   cases R <;> simp [Ty.field] at h
   exact ⟨_, _, _, rfl⟩
 
-theorem Le.substT {a b : Ty} (σ : Atom → Ty) (h : Le a b) : Le (a.substT σ) (b.substT σ) := by
-  have sub : ∀ {x y : Ty}, Caps.Sub x.reach y.reach →
-      Caps.Sub (x.substT σ).reach (y.substT σ).reach := fun hc a ha => by
-    obtain ⟨b, hb, h'⟩ := (Ty.reach_substT σ _ a).mp ha
-    exact (Ty.reach_substT σ _ a).mpr ⟨b, hc b hb, h'⟩
-  induction h with
-  | refl => exact .refl
-  | arrow _ hφ _ hc ih₁ ih₂ => exact .arrow ih₁ (Stage.le_substT σ hφ) ih₂ (sub hc)
-  | eff hr he _ hc ih => exact .eff (hr.substT σ) (he.substT σ) ih (sub hc)
-
-theorem Typ.sub {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) : ∀ {J'}, JLe J J' → Typ S Ψ Θ Γ e J' := by
+theorem TypM.sub {Ψ Θ Γ e J} (h : TypM S mode Ψ Θ Γ e J) : ∀ {J'}, JLeM mode J J' → TypM S mode Ψ Θ Γ e J' := by
   induction h with
   | var hi hts hH hT =>
     intro _ hJ; obtain ⟨_, _, rfl, h₁, _⟩ := hJ.ex; exact .var hi hts hH (hT.trans (·.trans h₁))
-  | allVar hi hk hc => intro _ hJ; obtain ⟨_, _, rfl, h₁, _⟩ := hJ.ex; cases h₁; exact .allVar hi hk hc
-  | allI hv he => intro _ hJ; obtain ⟨_, _, rfl, h₁, _⟩ := hJ.ex; cases h₁; exact .allI hv he
+  | allVar hi hk hc => intro _ hJ; obtain ⟨_, _, rfl, h₁, _⟩ := hJ.ex; cases mode <;> cases h₁ <;> exact .allVar hi hk hc
+  | allI hv he => intro _ hJ; obtain ⟨_, _, rfl, h₁, _⟩ := hJ.ex; cases mode <;> cases h₁ <;> exact .allI hv he
   | lam hb hn hc hT =>
     intro _ hJ; obtain ⟨_, _, rfl, h₁, _⟩ := hJ.ex; exact .lam hb hn hc (hT.trans h₁)
   | app _ _ hψ hT ih₁ ih₂ =>
@@ -80,24 +70,24 @@ theorem Typ.sub {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) : ∀ {J'}, JLe J J' →
     exact .letrec hf hn hc (ih₂ ⟨h₁, h₂⟩)
   | fix hf hn hc hT =>
     intro _ hJ; obtain ⟨_, _, rfl, h₁, _⟩ := hJ.ex; exact .fix hf hn hc (hT.trans h₁)
-  | lit => intro _ hJ; obtain ⟨_, _, rfl, h₁, _⟩ := hJ.ex; cases h₁; exact .lit
-  | loc hl => intro _ hJ; obtain ⟨_, _, rfl, h₁, _⟩ := hJ.ex; cases h₁; exact .loc hl
+  | lit => intro _ hJ; obtain ⟨_, _, rfl, h₁, _⟩ := hJ.ex; cases mode <;> cases h₁ <;> exact .lit
+  | loc hl => intro _ hJ; obtain ⟨_, _, rfl, h₁, _⟩ := hJ.ex; cases mode <;> cases h₁ <;> exact .loc hl
   | const hc hT =>
     intro _ hJ; obtain ⟨_, _, rfl, h₁, _⟩ := hJ.ex; exact .const hc (hT.trans h₁)
   | ctor hK hk hH hT =>
     intro _ hJ; obtain ⟨_, _, rfl, h₁, _⟩ := hJ.ex; exact .ctor hK hk hH (hT.trans h₁)
-  | rnil => intro _ hJ; obtain ⟨_, _, rfl, h₁, _⟩ := hJ.ex; cases h₁; exact .rnil
+  | rnil => intro _ hJ; obtain ⟨_, _, rfl, h₁, _⟩ := hJ.ex; cases mode <;> cases h₁ <;> exact .rnil
   | rcons hR hl _ _ ih₁ ih₂ =>
-    intro _ hJ; obtain ⟨_, _, rfl, h₁, h₂⟩ := hJ.ex; cases h₁
-    exact .rcons hR hl (ih₁ (.st h₂)) (ih₂ (.st h₂))
+    intro _ hJ; obtain ⟨_, _, rfl, h₁, h₂⟩ := hJ.ex; cases mode <;> cases h₁ <;>
+      exact .rcons hR hl (ih₁ (.st h₂)) (ih₂ (.st h₂))
   | proj _ hf hT ih =>
     intro _ hJ; obtain ⟨_, _, rfl, h₁, h₂⟩ := hJ.ex
     exact .proj (ih (.st h₂)) hf (hT.trans h₁)
   | update _ hf _ ih₁ ih₂ =>
     intro _ hJ; obtain ⟨_, _, rfl, h₁, h₂⟩ := hJ.ex
     obtain ⟨_, _, _, rfl⟩ := Ty.field_rcons hf
-    cases h₁
-    exact .update (ih₁ (.st h₂)) hf (ih₂ (.st h₂))
+    cases mode <;> cases h₁ <;>
+      exact .update (ih₁ (.st h₂)) hf (ih₂ (.st h₂))
   | match_ _ _ hc ih₁ ih₂ =>
     intro _ hJ; obtain ⟨_, _, rfl, h₁, h₂⟩ := hJ.ex
     exact .match_ (ih₁ (.st h₂)) (ih₂ ⟨rfl, h₁, h₂⟩) hc
@@ -127,8 +117,8 @@ theorem Typ.sub {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) : ∀ {J'}, JLe J J' →
     intro _ hJ; obtain ⟨_, _, rfl, _, h₂⟩ := hJ.ex
     exact .raiseAdt (ih (.st h₂)) hU (Stage.le_trans hφ h₂)
   | errVal hv _ hU hE ih =>
-    intro _ hJ; obtain ⟨_, _, rfl, h₁, h₂⟩ := hJ.ex; cases h₁
-    exact .errVal hv (ih (.st h₂)) hU hE
+    intro _ hJ; obtain ⟨_, _, rfl, h₁, h₂⟩ := hJ.ex; cases mode <;> cases h₁ <;>
+      exact .errVal hv (ih (.st h₂)) hU hE
   | tryR _ _ hφ hs ih₁ ih₂ =>
     intro _ hJ; obtain ⟨_, _, rfl, h₁, h₂⟩ := hJ.ex
     exact .tryR (ih₁ ⟨h₁, Stage.le_refl _⟩) (ih₂ ⟨rfl, rfl, h₁, h₂⟩) (Stage.le_trans hφ h₂) hs
@@ -151,10 +141,10 @@ theorem Typ.sub {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) : ∀ {J'}, JLe J J' →
   | inside hF hb hφ' ht hε hφ hT =>
     intro _ hJ; obtain ⟨_, _, rfl, h₁, h₂⟩ := hJ.ex
     exact .inside hF hb hφ' ht hε (Stage.le_trans hφ h₂) (hT.trans h₁)
-  | cap => intro _ hJ; obtain ⟨_, _, rfl, h₁, _⟩ := hJ.ex; cases h₁; exact .cap
-  | own => intro _ hJ; obtain ⟨_, _, rfl, h₁, _⟩ := hJ.ex; cases h₁; exact .own
+  | cap => intro _ hJ; obtain ⟨_, _, rfl, h₁, _⟩ := hJ.ex; cases mode <;> cases h₁ <;> exact .cap
+  | own => intro _ hJ; obtain ⟨_, _, rfl, h₁, _⟩ := hJ.ex; cases mode <;> cases h₁ <;> exact .own
   | drec hc hk hr hn hh =>
-    intro _ hJ; obtain ⟨_, _, rfl, h₁, _⟩ := hJ.ex; cases h₁; exact .drec hc hk hr hn hh
+    intro _ hJ; obtain ⟨_, _, rfl, h₁, _⟩ := hJ.ex; cases mode <;> cases h₁ <;> exact .drec hc hk hr hn hh
   | dnil => intro _ hJ; rw [hJ.dfs]; exact .dnil
   | dcons he hr => intro _ hJ; rw [hJ.dfs]; exact .dcons he hr
   | dproj _ hc hk hl hts hH hT ih =>
@@ -165,16 +155,16 @@ theorem Typ.sub {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) : ∀ {J'}, JLe J J' →
   | perform hop hT =>
     intro _ hJ; obtain ⟨_, _, rfl, h₁, _⟩ := hJ.ex; exact .perform hop (hT.trans h₁)
   | hanil =>
-    intro J' hJ; cases J' <;> simp only [JLe] at hJ
+    intro J' hJ; cases J' <;> simp only [JLeM] at hJ
     obtain ⟨rfl, rfl, rfl, rfl⟩ := hJ; exact .hanil
   | hatail hop hb hr =>
-    intro J' hJ; cases J' <;> simp only [JLe] at hJ
+    intro J' hJ; cases J' <;> simp only [JLeM] at hJ
     obtain ⟨rfl, rfl, rfl, rfl⟩ := hJ; exact .hatail hop hb hr
   | haabort hop hb hr =>
-    intro J' hJ; cases J' <;> simp only [JLe] at hJ
+    intro J' hJ; cases J' <;> simp only [JLeM] at hJ
     obtain ⟨rfl, rfl, rfl, rfl⟩ := hJ; exact .haabort hop hb hr
   | hactl hop hb hr =>
-    intro J' hJ; cases J' <;> simp only [JLe] at hJ
+    intro J' hJ; cases J' <;> simp only [JLeM] at hJ
     obtain ⟨rfl, rfl, rfl, rfl⟩ := hJ; exact .hactl hop hb hr
   | hdl hal hn hrf hψ he hφ₀ hOb hc hφ hT =>
     intro _ hJ; obtain ⟨_, _, rfl, h₁, h₂⟩ := hJ.ex
@@ -194,8 +184,26 @@ theorem Typ.sub {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) : ∀ {J'}, JLe J J' →
   | hres hℓ hb hA ha hp hl hφ hT =>
     intro _ hJ; obtain ⟨_, _, rfl, h₁, h₂⟩ := hJ.ex
     exact .hres hℓ hb hA ha hp hl (Stage.le_trans hφ h₂) (hT.trans h₁)
-  | hdone _ ih => intro _ hJ; obtain ⟨_, _, rfl, h₁, h₂⟩ := hJ.ex; exact .hdone (ih ⟨h₁, h₂⟩)
+  | hdone _ ih => intro _ hJ; obtain ⟨_, _, rfl, h₁, h₂⟩ := hJ.ex; exact .hdone (ih ⟨h₁, mode.use_mono h₂ (Caps.Sub.refl _)⟩)
   | unw hℓ ha hφ => intro _ hJ; obtain ⟨_, _, rfl, _, h₂⟩ := hJ.ex; exact .unw hℓ ha (Stage.le_trans hφ h₂)
   | kont hl hC hT => intro _ hJ; obtain ⟨_, _, rfl, h₁, _⟩ := hJ.ex; exact .kont hl hC (hT.trans h₁)
+
+abbrev JLe := JLeM .captures
+
+theorem JLe.ex {t φ J'} (h : JLe (.ex t φ) J') :
+    ∃ t' φ', J' = .ex t' φ' ∧ Le t t' ∧ φ.le φ' := JLeM.ex h
+
+theorem JLe.alts {t r φ J'} (h : JLe (.alts t r φ) J') :
+    ∃ r' φ', J' = .alts t r' φ' ∧ Le r r' ∧ φ.le φ' := JLeM.alts h
+
+theorem JLe.halts {ε H r φ J'} (h : JLe (.halts ε H r φ) J') :
+    ∃ r' φ', J' = .halts ε H r' φ' ∧ Le r r' ∧ φ.le φ' := JLeM.halts h
+
+theorem JLe.dfs {fs J'} (h : JLe (.dfs fs) J') : J' = .dfs fs := JLeM.dfs h
+
+theorem JLe.st {t φ φ'} (h : φ.le φ') : JLe (.ex t φ) (.ex t φ') := JLeM.st h
+
+theorem Typ.sub {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) : ∀ {J'}, JLe J J' → Typ S Ψ Θ Γ e J' :=
+  TypM.sub h
 
 end Flick

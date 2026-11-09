@@ -121,4 +121,8 @@ theorem Typ.arm_inv {Ψ Θ E t φ s o c a₀ b₀} (hop : S.op E o = some (c, a�
   | .hdone _ _, _, _, h, _ | .unw _ _ _, _, _, h, _ | .kont _ _, _, _, h, _ | .hole _, _, _, h, _ => by
     cases h
 
+namespace TypM
+export Typ (arm_inv)
+end TypM
+
 end Flick

@@ -11,7 +11,7 @@ substitution lemma drops them again with the facts the use of the variable check
 
 namespace Flick
 
-variable {S : Sig}
+variable {S : Sig} {mode : TypingMode}
 
 /-- `Θ₁` gives no more than `Θ₂`. -/
 def Entails (Θ₁ Θ₂ : Facts) : Prop := ∀ C s, Outl Θ₁ C s → Outl Θ₂ C s
@@ -91,7 +91,7 @@ theorem Row.hP_mono {Θ₁ Θ₂ : Facts} {q : Nat} {E : Name} {r : Row} (hΘ : 
   | ob N a => exact ⟨fun h => hΘ _ _ (hx.1 h), hx.2⟩
   | _ => exact hx
 
-theorem Typ.cut {Ψ Θ₁ Γ e J} (h : Typ S Ψ Θ₁ Γ e J) : ∀ {Θ₂}, Entails Θ₁ Θ₂ → Typ S Ψ Θ₂ Γ e J := by
+theorem TypM.cut {Ψ Θ₁ Γ e J} (h : TypM S mode Ψ Θ₁ Γ e J) : ∀ {Θ₂}, Entails Θ₁ Θ₂ → TypM S mode Ψ Θ₂ Γ e J := by
   induction h with
   | var hi hts hH hT => intro _ hΘ; exact .var hi hts (hH.mono hΘ) hT
   | allVar hi hk hc => intro _ _; exact .allVar hi hk hc
@@ -104,7 +104,7 @@ theorem Typ.cut {Ψ Θ₁ Γ e J} (h : Typ S Ψ Θ₁ Γ e J) : ∀ {Θ₂}, Ent
   | fix _ hn hc hT ih => intro _ hΘ; exact .fix (ih hΘ) hn hc hT
   | lit => intro _ _; exact .lit
   | loc hl => intro _ _; exact .loc hl
-  | const hc hT => intro _ hΘ; exact .const (Const.ok_mono hc hΘ) hT
+  | const hc hT => intro _ hΘ; exact .const (Const.ok_mono_mode hc hΘ) hT
   | ctor hK hk hH hT => intro _ _; exact .ctor hK hk hH hT
   | rnil => intro _ _; exact .rnil
   | rcons hR hl _ _ ih₁ ih₂ => intro _ hΘ; exact .rcons hR hl (ih₁ hΘ) (ih₂ hΘ)
@@ -158,5 +158,9 @@ theorem Typ.cut {Ψ Θ₁ Γ e J} (h : Typ S Ψ Θ₁ Γ e J) : ∀ {Θ₂}, Ent
   | hdone _ ih => intro _ hΘ; exact .hdone (ih hΘ)
   | unw hℓ _ hφ ih => intro _ hΘ; exact .unw hℓ (ih hΘ) hφ
   | kont hl hC hT => intro _ _; exact .kont hl hC hT
+
+theorem Typ.cut {Ψ Θ₁ Γ e J} (h : Typ S Ψ Θ₁ Γ e J) :
+    ∀ {Θ₂}, Entails Θ₁ Θ₂ → Typ S Ψ Θ₂ Γ e J :=
+  TypM.cut h
 
 end Flick

@@ -34,7 +34,8 @@ theorem scopeRun_body {Ψ Θ f t T φ φ₀} {r ε : Row} {C : Caps} (hv : Value
     · exact (h.noIns hv).rename _ h'
     · cases h'
   · exact (Typ.app (hr.sub ⟨.refl, Stage.pure_le _⟩)
-      (.var (ts := []) rfl rfl (fun _ _ h => False.elim h) .refl) (Stage.le_refl _) .refl).cut
+      (.var (σ := .mono (.owner (.tvar 0))) (ts := []) rfl rfl
+        (fun _ _ h => False.elim h) .refl) (Stage.le_refl _) .refl).cut
       (Entails.union_left _ _)
   · rw [← hobs]; exact Stage.le_refl _
 

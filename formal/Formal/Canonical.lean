@@ -128,10 +128,18 @@ theorem Typ.pureTy {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
     exact ⟨_, hT, .kont hl hC .refl, by simp [Tm.head], by simp⟩
   | _ => intro hv _ _ hJ; cases hJ <;> cases hv
 
+namespace TypM
+export Typ (pureTy)
+end TypM
+
 /-- L1, last clause: a value has its type with any stage. -/
 theorem Typ.valueAny {Ψ Θ Γ v T φ} (h : Typ S Ψ Θ Γ v (.ex T φ)) (hv : Value v) (ψ : Stage) :
     Typ S Ψ Θ Γ v (.ex T ψ) := by
   obtain ⟨_, l, t, -⟩ := h.pureTy hv rfl
   exact t.sub ⟨l, Stage.pure_le _⟩
+
+namespace TypM
+export Typ (valueAny)
+end TypM
 
 end Flick

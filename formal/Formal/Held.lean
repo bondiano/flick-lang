@@ -316,6 +316,10 @@ theorem Typ.holds {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
     · cases h
   | _ => intro hv _ _ hJ; cases hJ <;> cases hv
 
+namespace TypM
+export Typ (holds)
+end TypM
+
 /-- A value has no `inside` form. -/
 theorem Typ.noIns {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) : Value e → e.NoIns := by
   induction h with
@@ -350,5 +354,9 @@ theorem Typ.noIns {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) : Value e → e.NoIns 
       · exact ih₁ hv₁ h
       · exact ih₂ hv₂ h
   | _ => intro hv; cases hv
+
+namespace TypM
+export Typ (noIns)
+end TypM
 
 end Flick

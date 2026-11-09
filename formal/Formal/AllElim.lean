@@ -116,4 +116,8 @@ theorem Typ.elim {Ψ Θ Γ e A T} (hV : e.Stands ∨ ¬ A.isAll) (hn : e.NoIns)
     have hs := hV.resolve_right fun h => h trivial
     exact ih (.inl hs) (Typ.instAll hs hn h hus)
 
+namespace TypM
+export Typ (elim)
+end TypM
+
 end Flick

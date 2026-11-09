@@ -50,6 +50,10 @@ theorem Typ.dfs_field {Ψ Θ Γ l} : ∀ {r : Tm} {fs : List (Label × Scheme)} 
         rw [this] at hl; simp only [he, if_false]; exact ih hr hl
   | _ => intro _ _ h; cases h
 
+namespace TypM
+export Typ (dfs_field)
+end TypM
+
 theorem Tm.has_of_field {l : Label} {x : Site} : ∀ {r w : Tm}, r.field l = some w → w.Has x → r.Has x := by
   intro r
   induction r with

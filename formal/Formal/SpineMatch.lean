@@ -82,6 +82,10 @@ theorem Typ.spine_match {Ψ Θ Γ v J} (h : Typ S Ψ Θ Γ v J) :
   | allI => intro _ _ _ _ _ _ _ _ hJ _ hA; cases hJ; exact (hA trivial).elim
   | _ => intro hv _ _ _ _ _ hK; cases hv <;> simp [Tm.head] at hK
 
+namespace TypM
+export Typ (spine_match)
+end TypM
+
 theorem Stage.up_substT (φ : Stage) (k : Nat) (us : List Ty) (h : us.length = k) :
     (φ.substT (shiftV k)).substT (instT us) = φ := by
   rw [Stage.substT_comp]; conv => rhs; rw [← φ.substT_ident]

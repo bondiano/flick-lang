@@ -8,6 +8,8 @@ import Formal.Subst
 import Formal.Reach
 import Formal.Typing
 import Formal.EvalCtx
+import Formal.RuleRows
+import Formal.Live.Mode
 import Formal.Rules
 import Formal.Semantics
 import Formal.Order
@@ -157,4 +159,5 @@ import Formal.Elab.CallSite
 import Formal.Elab.Witness.Main
 import Formal.Elab.Witness.T6b
 import Formal.FailAbort
+import Formal.Live
 import Formal.Axioms

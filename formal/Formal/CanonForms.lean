@@ -77,6 +77,10 @@ theorem Typ.vkind {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) : Value e → ∀ {T �
       simp [VKind, Tm.head, (Typ.app hf ha hψ hT).constApp_kind hc hA]
   | _ => intro hv _ _ hJ _; cases hJ <;> cases hv
 
+namespace TypM
+export Typ (vkind)
+end TypM
+
 /-- L1 for functions. -/
 theorem canonical_arrow {Ψ Θ Γ v a ψ t C φ} (hv : Value v)
     (h : Typ S Ψ Θ Γ v (.ex (.arrow a ψ t C) φ)) :
