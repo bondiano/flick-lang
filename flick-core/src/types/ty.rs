@@ -62,6 +62,13 @@ pub enum Type {
         constraints: Vec<Type>,
         body: Box<Type>,
     },
+    /// `exists K : Sig. T`: a value and a hidden module witness packaged
+    /// together. Abstract `K.Member` references in `body` use `$exists:K`.
+    Exists {
+        binder: String,
+        contract: Box<Type>,
+        body: Box<Type>,
+    },
     /// A unification variable.
     #[serde(skip)]
     Meta(u32),
@@ -425,6 +432,15 @@ impl Type {
                 constraints: constraints.iter().map(&mut *f).collect(),
                 body: Box::new(f(body)),
             },
+            Type::Exists {
+                binder,
+                contract,
+                body,
+            } => Type::Exists {
+                binder: binder.clone(),
+                contract: Box::new(f(contract)),
+                body: Box::new(f(body)),
+            },
             Type::Con { .. }
             | Type::Var(_)
             | Type::Symbol(_)
@@ -473,6 +489,10 @@ impl Type {
                 constraints.iter().for_each(&mut *f);
                 f(body);
             }
+            Type::Exists { contract, body, .. } => {
+                f(contract);
+                f(body);
+            }
             Type::Con { .. }
             | Type::Var(_)
             | Type::Symbol(_)
@@ -496,10 +516,21 @@ impl Type {
             return self.clone();
         }
         match self {
-            Type::Var(name) => subst
-                .iter()
-                .find(|(n, _)| n == name)
-                .map_or_else(|| self.clone(), |(_, t)| t.clone()),
+            Type::Var(name) => {
+                if let Some((_, ty)) = subst.iter().find(|(n, _)| n == name) {
+                    return ty.clone();
+                }
+                if let Some(class) = name.strip_suffix("$Dict")
+                    && let Some((_, identity)) = subst.iter().find(|(n, _)| n == class)
+                {
+                    return match identity {
+                        Type::Con { module, name } => Type::con(module, &format!("{name}$Dict")),
+                        Type::Var(name) => Type::Var(format!("{name}$Dict")),
+                        _ => self.clone(),
+                    };
+                }
+                self.clone()
+            }
             Type::Forall {
                 vars,
                 constraints,

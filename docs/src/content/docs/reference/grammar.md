@@ -239,7 +239,7 @@ let between x =
 ## Declarations
 
 ```text
-file        = [module_header] { import } { decl }
+file        = [module_header] { import } { decl | module_application }
 module_header = "module" ModulePath ["exposing" exposing]
 import      = "import" ModulePath ["as" Con] ["exposing" exposing]
 exposing    = "(" item { "," item } [","] ")"
@@ -247,8 +247,11 @@ item        = name | Con | Con "(..)" | ".." | "plugin" name   // see plugins.md
 ModulePath  = Con { "." Con }
 
 decl        = signature | let | rec_group | type_decl | kind_decl | error_decl
-            | service | class | instance | foreign
+            | service | class | instance | foreign | module_contract | inline_module
             | head { head_arg } ("{" { token } "}" | { token })   // a plugin's, to the next decl
+inline_module = "module" Con ["exposing" exposing] "=" indented { import | decl }
+module_contract = "type" "module" Con "=" indented { module_member }
+module_application = "module" Con "=" ModulePath "(" ModulePath { "," ModulePath } ")"
 signature   = name ":" type
 let         = "let" ["rec"] (name { atom_pattern } | pattern) [":" type] "=" block
             | "let" "assert" pattern [":" type] "=" block ["as" String]
@@ -277,6 +280,9 @@ foreign     = "foreign" [mode] name "from" ("global" String | String String) [me
 mode        = "pure" | "effect"
 metadata    = indented lines: meta_name { atom }
 ```
+
+`module_application` is a file-level declaration. Writing it inside an
+`inline_module` reports `FLICK-R019`; a `module_contract` is allowed there.
 
 The right-hand side of `type` is always a list of variants, so
 `type Wrapper = Wrap Float` is an ADT with one constructor; a transparent

@@ -162,6 +162,11 @@ fn dict(d: &Dict) -> Term {
             Term::apps(Term::Global(instance(module, name)), args)
         }
         Dict::Given(name) => Term::Var(given(name)),
+        Dict::Value { module, name } => Term::Global(Path::new(module, name)),
+        Dict::Opened { binder, field } => Term::Field(
+            Rc::new(Term::Var(binder.as_str().into())),
+            field.as_str().into(),
+        ),
         // the pattern of the constructor whose value holds it binds it
         Dict::Field(local) => Term::Var(local.as_str().into()),
         Dict::Super { dict: inner, class } => {

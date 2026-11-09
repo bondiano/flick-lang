@@ -1,7 +1,7 @@
 /// Traversals of graphs as walkers, read with `indices`, `values` and
 /// `entries`. A start node that is missing or an invalid radius is a
 /// `GraphError`.
-module Graph.Walk exposing (..)
+private module Graph.Walk exposing (..)
 
 import Graph.Types exposing (..)
 

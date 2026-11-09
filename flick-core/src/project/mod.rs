@@ -25,6 +25,7 @@ use std::path::{Component, Path, PathBuf};
 use std::sync::Arc;
 
 pub use config::Config;
+pub(crate) use load::check_inline_file;
 #[cfg(all(test, feature = "build-artifacts"))]
 pub(crate) use load::js_only;
 #[cfg(feature = "ide")]

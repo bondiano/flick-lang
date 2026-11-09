@@ -220,6 +220,8 @@ impl Checker<'_> {
             },
             K::NameExpr => self.name(node),
             K::InterpExpr => self.interpolation(node),
+            K::PackExpr => self.pack_module(node),
+            K::UnpackExpr => self.unpack_module(node),
             K::ParenExpr => self.infer(children[0]),
             K::UnitExpr => Type::lang(Lang::Unit),
             K::TupleExpr => {

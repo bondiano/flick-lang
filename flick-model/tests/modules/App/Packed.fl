@@ -1,0 +1,7 @@
+module App.Packed exposing (result)
+
+import App.Contracts exposing (Box)
+import App.Argument as Arg
+
+result : exists K : Box. K.Key
+let result = unpack (pack Arg as Box) as K in K.value

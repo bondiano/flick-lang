@@ -50,6 +50,11 @@ impl Projection<'_> {
         let Some(def) = &export.definition else {
             return Ok(None);
         };
+        if matches!(def.form, Form::ModuleContract { .. })
+            || self.module == "Prelude" && name == "Module"
+        {
+            return Ok(None);
+        }
         // a set of services and errors is expanded in every signature that names it
         if matches!(def.form, Form::Alias { .. }) && alias_of_row(&def.kind) {
             return Ok(None);

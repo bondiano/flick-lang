@@ -99,7 +99,7 @@ fn used_names() -> BTreeSet<String> {
                     Ref::ServiceTag(service) => {
                         used.insert(service.clone());
                     }
-                    Ref::Local => {}
+                    Ref::Local | Ref::PackedField { .. } => {}
                 }
             }
             for (module, name) in module.typing.type_names.values() {

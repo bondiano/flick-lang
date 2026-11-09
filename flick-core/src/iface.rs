@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 use crate::types::{EnumLit, Instance, Type, TypeDef};
 
 /// Bumped on every change of the schema.
-pub const IFACE_VERSION: u32 = 8;
+pub const IFACE_VERSION: u32 = 11;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -49,6 +49,8 @@ pub enum Decl {
     Refined,
     /// `type T` without a definition
     Abstract,
+    /// `type module Sig = ...`; its body is a structural module contract.
+    ModuleType,
     Error,
     Kind,
     /// `A` of `kind K = A | B`
@@ -102,6 +104,8 @@ pub struct Hidden {
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Interface {
     pub module: String,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub private: bool,
     pub exports: Vec<Export>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub hidden: Vec<Hidden>,
@@ -135,6 +139,12 @@ pub struct Interface {
     /// no build wrote.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub targets: Vec<Target>,
+}
+
+// serde's predicate receives a reference to the serialized field.
+#[allow(clippy::trivially_copy_pass_by_ref)]
+fn is_false(value: &bool) -> bool {
+    !*value
 }
 
 /// A target compiled code of a module exists for.
@@ -350,6 +360,17 @@ mod tests {
         diagnostics.retain(|d| !d.unnecessary());
         assert!(diagnostics.is_empty(), "{diagnostics:?}");
         interface
+    }
+
+    #[test]
+    fn private_visibility_round_trips_and_changes_fingerprint() {
+        let public = interface_of("module App.Shapes exposing (answer)\nlet answer = 42\n");
+        let private =
+            interface_of("private module App.Shapes exposing (answer)\nlet answer = 42\n");
+        assert!(!public.private);
+        assert!(private.private);
+        assert_ne!(fingerprint(&public), fingerprint(&private));
+        assert_eq!(read(write(&private).as_bytes(), "App.Shapes"), Ok(private));
     }
 
     #[test]

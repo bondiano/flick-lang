@@ -137,6 +137,11 @@ pub enum SyntaxKind {
     // nodes: declarations
     SourceFile,
     ModuleHeader,
+    /// A private inline child whose declarations share its parent's source file.
+    InlineModuleDecl,
+    /// A named static application: `module Names = Set.Make(Key)`.
+    ModuleApplyDecl,
+    FunctorParam,
     Exposing,
     ExposeItem,
     ModulePath,
@@ -146,6 +151,14 @@ pub enum SyntaxKind {
     Params,
     RecGroup,
     TypeDecl,
+    /// `type module Name = ...`: a structural module contract.
+    ModuleTypeDecl,
+    /// An abstract or manifest type required by a module contract.
+    ModuleTypeMember,
+    /// `class C = M.C` or `service S = M.S` in a module contract.
+    ModuleNominalMember,
+    /// `instance C T from dictionary` in a module contract.
+    ModuleInstanceReq,
     TypeParam,
     Variant,
     /// `: T index…` after the fields of a constructor of a GADT: the type
@@ -190,6 +203,8 @@ pub enum SyntaxKind {
     AppExpr,
     BinExpr,
     PrefixExpr,
+    PackExpr,
+    UnpackExpr,
     /// `todo` or `todo "what is missing"`.
     TodoExpr,
     ParenExpr,
@@ -258,6 +273,7 @@ pub enum SyntaxKind {
     RowSpread,
     RowOmit,
     ForallType,
+    ExistsType,
     ConstrainedType,
     TupleType,
     UnitType,

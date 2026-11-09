@@ -63,7 +63,7 @@ pub fn args_of(c: &Type, item: Lang) -> Option<Vec<&Type>> {
 /// Whether `d` is built from an assumption, so holds only where that is.
 fn assumes(d: &Dict) -> bool {
     match d {
-        Dict::Given(_) | Dict::Field(_) => true,
+        Dict::Given(_) | Dict::Field(_) | Dict::Value { .. } | Dict::Opened { .. } => true,
         Dict::Super { dict, .. } => assumes(dict),
         Dict::Instance { args: dicts, .. } | Dict::Structural { fields: dicts, .. } => {
             dicts.iter().any(assumes)
@@ -78,6 +78,8 @@ pub struct Wanted {
     pub constraint: Type,
     pub span: Span,
     pub givens: Vec<Type>,
+    /// Local module dictionaries visible when this use was written.
+    pub local: Vec<(Type, Dict)>,
     /// Position among the constraints required so far, which orders the
     /// dictionaries of one use.
     pub order: u32,
@@ -90,6 +92,8 @@ pub struct State {
     /// Constraints assumed at this point: of the signature being checked,
     /// of an instance, of an enclosing higher-rank `forall`.
     pub givens: Vec<Type>,
+    /// Named dictionaries supplied by static module parameters.
+    pub local: Vec<(Type, Dict)>,
     pub evidence: Vec<(Span, Dict)>,
     /// Solver steps spent on the current definition.
     pub steps: u32,
@@ -164,6 +168,7 @@ impl Checker<'_> {
             constraint,
             span,
             givens,
+            local: self.classes.local.clone(),
             order: self.classes.required,
         });
     }

@@ -44,6 +44,13 @@ pub fn check(sources: &source::SourceMap, file: source::FileId) -> Vec<diagnosti
     // the witnesses its `deriving` names, which std's plugin writes
     let (expansion, derived) =
         plugin::derive::builtin_expansion(text, file, &parse.tree, name, &syntax);
+    if parse
+        .tree
+        .nodes()
+        .any(|n| n.kind == syntax::kind::SyntaxKind::InlineModuleDecl)
+    {
+        return project::check_inline_file(sources, file, parse, syntax, expansion, derived);
+    }
     let module = resolve::Module {
         name,
         file,
@@ -53,7 +60,12 @@ pub fn check(sources: &source::SourceMap, file: source::FileId) -> Vec<diagnosti
         generated: expansion.as_ref().map_or(resolve::NO_GENERATED, |e| e.len),
     };
     // a lone file imports only built-in modules
-    let builtin = |name: &str| types::builtins().iter().find(|i| i.module == name).cloned();
+    let builtin = |name: &str| {
+        types::builtins()
+            .iter()
+            .find(|i| i.module == name && !i.private)
+            .cloned()
+    };
     let (mut interface, resolved) = resolve::resolve(&module, &builtin);
     let local = |name: &str| name == module.name;
     // std's plugin is linked into the compiler, so a lone file is watched
@@ -71,6 +83,21 @@ pub fn check(sources: &source::SourceMap, file: source::FileId) -> Vec<diagnosti
     let mut diagnostics = parse.diagnostics;
     diagnostics.extend(derived);
     diagnostics.extend(resolved);
+    for import in &syntax.imports {
+        if types::builtins()
+            .iter()
+            .any(|i| i.module == import.module && i.private)
+        {
+            diagnostics.push(diagnostics::Diagnostic::error(
+                diagnostics::codes::R017,
+                format!(
+                    "module `{}` is private to its package; import its public facade instead",
+                    import.module
+                ),
+                import.span,
+            ));
+        }
+    }
     let (mut checked, typing) = types::check_typed(
         &module,
         &builtin,

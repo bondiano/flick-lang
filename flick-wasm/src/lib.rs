@@ -364,3 +364,32 @@ impl Host for Demo<'_> {
         path.strip_prefix("/").unwrap_or(path).display().to_string()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::Session;
+    use serde_json::Value;
+
+    #[test]
+    fn playground_compiles_and_queries_an_inline_module() {
+        let source = "module Main exposing (main)\nmodule Child exposing (answer) =\n  let answer = 42\nmain : Unit ->{} Unit\nlet main () = Platform.stdout_line (show Child.answer)\n";
+        let mut session = Session::new();
+        let diagnostics: Value = serde_json::from_str(&session.update(source)).expect("JSON");
+        assert_eq!(diagnostics, serde_json::json!([]));
+        let built: Value = serde_json::from_str(&session.emit("debug")).expect("JSON");
+        assert!(
+            built["js"]
+                .as_str()
+                .is_some_and(|js| js.contains("Child$answer")),
+            "{built}"
+        );
+        let at = u32::try_from(source.find("Child.answer").expect("use") + 6).expect("offset");
+        let hover: Value = serde_json::from_str(&session.hover(at)).expect("JSON");
+        assert!(
+            hover["text"]
+                .as_str()
+                .is_some_and(|text| text.contains("Int")),
+            "{hover}"
+        );
+    }
+}

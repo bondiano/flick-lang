@@ -1,0 +1,3 @@
+module App.Parent exposing (Chosen)
+
+module Chosen = App.Make(App.Argument)

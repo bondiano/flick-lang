@@ -117,10 +117,19 @@ impl Checker<'_> {
         }
         let (a, e) = (short(actual), short(expected));
         if a == e {
-            return (
+            let (a, e) = (
                 self.show_exact(&plain(actual)),
                 self.show_exact(&plain(expected)),
             );
+            if a == e {
+                // Distinct nominal types from different modules, including
+                // virtual functor results, can share the same short name.
+                return (
+                    self.show_qualified(&plain(actual)),
+                    self.show_qualified(&plain(expected)),
+                );
+            }
+            return (a, e);
         }
         (a, e)
     }
@@ -146,7 +155,13 @@ impl Checker<'_> {
                     _ => self.show(t),
                 };
                 let (sa, sb) = (show(a), show(b));
-                if sa == actual && sb == expected || sa == expected && sb == actual {
+                if sa == sb && self.show_qualified(a) != self.show_qualified(b) {
+                    format!(
+                        "`{}` and `{}` are distinct nominal types; use one module result or convert the values explicitly",
+                        self.show_qualified(a),
+                        self.show_qualified(b)
+                    )
+                } else if sa == actual && sb == expected || sa == expected && sb == actual {
                     String::new()
                 } else {
                     format!("`{sa}` is not `{sb}`")

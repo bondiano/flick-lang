@@ -1,6 +1,6 @@
 ---
 title: "Грамматика Flick"
-source_hash: 441e81a19aa49455
+source_hash: 4dbd059a6a212f86
 ---
 
 Здесь описан синтаксис исходного кода, который принимают `flick check`
@@ -260,7 +260,7 @@ let between x =
 ## Объявления
 
 ```text
-file        = [module_header] { import } { decl }
+file        = [module_header] { import } { decl | module_application }
 module_header = "module" ModulePath ["exposing" exposing]
 import      = "import" ModulePath ["as" Con] ["exposing" exposing]
 exposing    = "(" item { "," item } [","] ")"
@@ -268,8 +268,11 @@ item        = name | Con | Con "(..)" | ".." | "plugin" name   // см. plugins.
 ModulePath  = Con { "." Con }
 
 decl        = signature | let | rec_group | type_decl | kind_decl | error_decl
-            | service | class | instance | foreign
+            | service | class | instance | foreign | module_contract | inline_module
             | head { head_arg } ("{" { token } "}" | { token })   // плагина, до следующего decl
+inline_module = "module" Con ["exposing" exposing] "=" indented { import | decl }
+module_contract = "type" "module" Con "=" indented { module_member }
+module_application = "module" Con "=" ModulePath "(" ModulePath { "," ModulePath } ")"
 signature   = name ":" type
 let         = "let" ["rec"] (name { atom_pattern } | pattern) [":" type] "=" block
             | "let" "assert" pattern [":" type] "=" block ["as" String]
@@ -298,6 +301,9 @@ foreign     = "foreign" [mode] name "from" ("global" String | String String) [me
 mode        = "pure" | "effect"
 metadata    = indented lines: meta_name { atom }
 ```
+
+`module_application` объявляется только на уровне файла. Внутри
+`inline_module` он вызывает `FLICK-R019`; `module_contract` там разрешён.
 
 Правая часть `type` — всегда список вариантов.
 Например, `type Wrapper = Wrap Float` — ADT с одним конструктором.

@@ -71,13 +71,15 @@ pub fn dict_uses(d: &Dict, out: &mut Vec<Key>) {
                 dict_uses(a, out);
             }
         }
+        Dict::Value { module, name } => out.push((module.clone(), name.clone())),
         Dict::Super { dict, .. } => dict_uses(dict, out),
         Dict::Structural { fields, .. } => {
             for f in fields {
                 dict_uses(f, out);
             }
         }
-        Dict::Given(_)
+        Dict::Opened { .. }
+        | Dict::Given(_)
         | Dict::Field(_)
         | Dict::Primitive { .. }
         | Dict::Site { .. }

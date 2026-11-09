@@ -1,5 +1,5 @@
 /// The core of `List`: folds, searches and access by index.
-module List.Core exposing (..)
+private module List.Core exposing (..)
 
 /// `map` with each element's index.
 map_indexed : (Int -> a -> b)^c -> List a -> List b

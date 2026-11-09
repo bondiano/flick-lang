@@ -489,6 +489,10 @@ impl Gen<'_> {
                     || panic!("dictionary `{shown}` is in scope"),
                     |(_, p)| p.clone(),
                 ),
+            Dict::Value { module, name } => self.global(module, &names::ident(name)),
+            Dict::Opened { binder, field } => {
+                format!("{}.{field}", names::ident(binder))
+            }
             // bound by the pattern of the constructor whose value holds it
             Dict::Field(local) => names::ident(local),
             Dict::Super { dict, class } => format!("{}.${class}", self.dict(dict)),

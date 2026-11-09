@@ -5,6 +5,70 @@ title: "Modules and names"
 One `.fl` file is one module. The module header names it and lists
 what it exports; imports bring other modules' exports into scope.
 
+## Inline modules
+
+An inline module groups declarations in the same source file. Its body may
+declare values, types, classes, instances, services, effects, contracts and
+other inline modules. Indent the body under `=`:
+
+```flick
+module App.Article exposing (answer)
+
+type Key = Key Int
+let seed = 41
+
+module Comments exposing (value) =
+  value : Key
+  let value = Key (seed + 1)
+
+answer : Key
+let answer = Comments.value
+```
+
+`Comments` sees the parent's earlier declarations, including private `Key`
+and `seed`. The parent uses only members in the child's `exposing` list,
+qualified as `Comments.value`; without `exposing`, the child exports no
+members to the parent. Child declarations have their own namespace, so a
+type or class in `Comments` is distinct from one with the same name in the
+parent. A child may import modules within its body; those imports stay in
+the child.
+
+An inline child is private to its source file. `App.Article.Comments` is not
+an import path, even for another file in the same package. Keep the child
+out of the parent's `exposing` list. The compiler emits the file as one
+runtime module, preserving initialization order across the boundary. An
+attempt to import the inline path reports `FLICK-R018` at the import and
+points to its declaration.
+
+Classes and services declared in a child keep their own nominal identities.
+A `type module` contract may be declared inside the child. To pack the whole
+child as `Module Sig`, a contract outside it can require those identities
+explicitly with `class Describe = Child.Describe` and
+`service Greeter = Child.Greeter`; `pack Child as Sig` then checks its exported
+members. See [module contracts](#module-contracts-and-named-functors) for the
+rules on abstract requirements and dictionaries.
+
+| Situation | Diagnostic |
+| - | - |
+| two inline children have the same name, or a child occupies a file module's path | `FLICK-R002` at the conflicting declaration |
+| the parent refers to a member absent from the child's `exposing` list | `FLICK-R004` at the qualified name |
+| another file imports the child or a deeper path through it | `FLICK-R018` at the import, with the inline declaration as a related location |
+| a named static functor application is declared inside the child | `FLICK-R019` at the application name; declare the result in a file module |
+
+Prefix the header with `private` to make a file module available only to
+source and test files of its package:
+
+```flick
+private module App.Internal exposing (helper)
+# helper : Int -> Int
+# let helper x = x
+```
+
+An importer in another package gets `FLICK-R017` at its import path. A public
+module of the same package can re-export names from a private module; clients
+import that facade. A private module remains private when a dependency is
+compiled from source or loaded from the package cache.
+
 ```flick
 module App.Users exposing (User, load_user)
 
@@ -109,8 +173,113 @@ type alias Forest a = List (Tree a)
 ```
 
 Functions that call themselves or each other are declared with `let rec` or
-in one `rec { … }` group (see [Recursion](../types/#recursion)). Modules are
-not values: there are no first-class modules or functors.
+in one `rec { … }` group (see [Recursion](../types/#recursion)).
+
+## Module contracts and named functors
+
+`type module` declares a structural contract for a module. A required
+`type Key` is abstract to users of the contract; `type Key = String` requires
+that equality. A concrete module may export additional members.
+
+```text
+type module Source =
+  type Key
+  value : Key
+
+module App.Make(S : App.Contracts.Source) exposing (answer)
+// App/Make.fl uses S.Key and S.value
+
+module App.Parent exposing (Chosen)
+module Chosen = App.Make(App.Argument)
+// App.Parent.Chosen can be imported from another file
+```
+
+A functor takes a named module known during compilation. Each `module Chosen
+= App.Make(App.Argument)` declaration creates a distinct result module and
+distinct identities for its abstract result types. Importing that result in
+multiple files preserves its identity. The parent must export `Chosen` for
+other modules to import `App.Parent.Chosen`. The functor body sees only the
+members and equalities listed in its argument contract.
+
+For example, `CaseInsensitiveSet.Set` and `ExactSet.Set` are distinct even
+when both policies use `String` keys. Two files importing the same
+`CaseInsensitiveSet` result can exchange sets. Passing one of its sets to an
+`ExactSet` operation reports `FLICK-T003` with both full type paths; convert
+explicitly through exported operations such as `to_list` and `from_list` when
+the change of policy is intentional.
+
+Contracts may require classes and services. Their identities are nominal:
+the same method or operation shape does not make two declarations identical.
+Use `class Eq = Prelude.Eq` or `service Clock = Time.Clock` to require an
+existing identity. An abstract class or service requirement is available to
+a static functor, but `pack` requires the manifest form.
+
+```text
+type module Policy =
+  type Key = String
+  class Eq = Prelude.Eq
+  equality : Eq.Dict Key
+  instance Eq Key from equality
+
+let equality = Eq.dictionary { eq = fun _ _ -> false }
+let hashing = Hash.dictionary {
+  Eq = equality
+  hash = fun _ -> 0
+}
+```
+
+`instance Eq Key from equality` uses that named dictionary within a functor
+body or an `unpack` body. An explicit given dictionary takes precedence;
+otherwise the local dictionary takes precedence over a global instance.
+The requirement does not declare a global instance. If two functor arguments
+provide the same constraint, `FLICK-T066` reports the ambiguity. A
+dictionary for a class with a superclass must include its named superclass
+field, as `Hash.dictionary` does above.
+
+A static functor can also require a class whose identity is supplied by its
+argument. The contract can name its dictionary type and method. In the
+functor, `K.equal` resolves through the dictionary named by `instance`:
+
+```text
+type module EqualityPolicy =
+  class Equality a =
+    equal : a -> a -> Bool
+  equality : Equality.Dict String
+  instance Equality String from equality
+
+module App.Make(K : App.Contracts.EqualityPolicy) exposing (answer)
+answer : Bool
+let answer = K.equal "A" "A"
+```
+
+## Packed modules and existential results
+
+`pack Argument as Source` has type `Module Source`. Use `unpack packed as K
+in ...` to open it in a lexical scope. Every opening creates a fresh witness
+for abstract types, so a value of `K.Key` cannot silently lose its witness.
+When such a value leaves `unpack`, the result is existential; an exported
+binding must state its type explicitly:
+
+```text
+result : exists K : Box. K.Key
+let result = unpack (pack Argument as Box) as K in K.value
+
+answer : Int
+let answer = unpack result as K, item in (fun _ -> 42) item
+```
+
+`unpack result as K, item in ...` opens both the module witness and its
+carried value. Separate openings produce unrelated abstract witnesses.
+`Module Sig` has no carried value, so its opening uses `as K in`.
+Functor application is static: its argument must be a named module, not a
+`Module Sig` value. TypeScript sees an exported existential value as
+`unknown`, since it cannot express the fresh witness.
+
+Contract diagnostics distinguish a missing member (`FLICK-T060`), a
+mismatched member type or manifest equality (`FLICK-T061`), a wrong nominal
+class or service identity (`FLICK-T062`), an abstract nominal requirement in
+`pack` (`FLICK-T063`), an escaping or unannotated existential witness
+(`FLICK-T064`), and an invalid dictionary requirement (`FLICK-T065`).
 
 ## Initialization and entry modules
 

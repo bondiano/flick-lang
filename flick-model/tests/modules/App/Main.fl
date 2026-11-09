@@ -1,0 +1,7 @@
+module App.Main exposing (main)
+
+import App.Parent.Chosen as Chosen
+import App.Use as Use
+
+main : Unit ->{} Unit
+let main () = Platform.stdout_line (if Chosen.answer == false && Use.answer == 42 then "ok" else "bad")

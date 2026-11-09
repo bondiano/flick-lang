@@ -3,7 +3,7 @@
 
 use super::Checker;
 use super::gadt::scheme::dicts;
-use super::ty::Type;
+use super::ty::{Row, Type};
 use super::typing::{Constructor, Ref, range};
 use crate::diagnostics::codes;
 use crate::diagnostics::suggest::closest;
@@ -12,6 +12,31 @@ use crate::source::Span;
 use crate::types::lang::{self, Lang};
 
 impl Checker<'_> {
+    fn opened_value(&mut self, qualifier: &str, name: &str, span: Span) -> Option<Type> {
+        let opened = self
+            .opened_modules
+            .iter()
+            .rev()
+            .find(|opened| opened.alias == qualifier)
+            .cloned()?;
+        let Some((_, scheme)) = opened.values.iter().find(|(member, _)| member == name) else {
+            self.error(
+                codes::T001,
+                span,
+                format!("opened module `{qualifier}` has no value `{name}`"),
+            );
+            return Some(Type::Error);
+        };
+        self.record_name(
+            span,
+            Ref::PackedField {
+                binder: opened.alias,
+                field: name.to_owned(),
+            },
+        );
+        Some(self.instantiate(scheme, span))
+    }
+
     /// Records what a top-level name refers to; `ty` is its type at the use.
     pub(super) fn record_entity(&mut self, entity: &Entity, ty: &Type, span: Span) {
         let parent = self.env.parent(entity);
@@ -55,6 +80,23 @@ impl Checker<'_> {
         name: &str,
         span: Span,
     ) -> Type {
+        if name == "dictionary"
+            && namespace == Namespace::Value
+            && let Some(dictionary) = self.dictionary_constructor(qualifier, span)
+        {
+            return dictionary;
+        }
+        if let Some(ty) = self.opened_value(qualifier, name, span) {
+            return ty;
+        }
+        if self.env.private_builtin(qualifier) {
+            self.error(
+                codes::R017,
+                span,
+                format!("module `{qualifier}` is private to its package; import its public facade instead"),
+            );
+            return Type::Error;
+        }
         // generated code names a companion by its type, a module of the
         // type's name notwithstanding: `Path.schema` of a type `Path`
         if span.start >= self.generated
@@ -136,6 +178,86 @@ impl Checker<'_> {
             return ty;
         }
         self.service_member(qualifier, name, span)
+    }
+
+    /// `C.dictionary` turns an explicitly supplied record of methods and
+    /// superclass dictionaries into the dictionary value of class `C`.
+    fn dictionary_constructor(&mut self, qualifier: &str, span: Span) -> Option<Type> {
+        let super::env::Found::Entity(entity) = self.env.find_type(qualifier) else {
+            return None;
+        };
+        let def = self.env.type_def(&entity.module, &entity.name)?.clone();
+        let super::env::Form::Class {
+            params,
+            supers,
+            methods,
+            ..
+        } = def.form
+        else {
+            return None;
+        };
+        let mut kind = def.kind;
+        let mut args = Vec::new();
+        for _ in &params {
+            let super::Kind::Arrow(param, result) = kind else {
+                return None;
+            };
+            args.push(self.store.fresh_of(&param));
+            kind = *result;
+        }
+        let subst: Vec<(String, Type)> = params.into_iter().zip(args.iter().cloned()).collect();
+        let mut fields = Vec::new();
+        let mut runtime_slots = Vec::new();
+        for (index, superclass) in supers.iter().enumerate() {
+            let slot = super::classes::super_slot(&supers, index);
+            let head = superclass.substitute(&subst);
+            fields.push((
+                slot.clone(),
+                super::module_contract::dictionary_type(&head)?,
+            ));
+            runtime_slots.push((slot.clone(), format!("${slot}")));
+        }
+        for method in methods {
+            let method_entity = Entity {
+                module: entity.module.clone(),
+                namespace: Namespace::Value,
+                name: method.clone(),
+            };
+            let scheme = self.env.value(&method_entity)?.clone();
+            let method_type = match scheme {
+                Type::Forall {
+                    vars,
+                    constraints,
+                    body,
+                } => {
+                    let vars: Vec<_> = vars
+                        .into_iter()
+                        .filter(|v| !subst.iter().any(|(name, _)| *name == v.name))
+                        .collect();
+                    let constraints: Vec<_> = constraints.into_iter().skip(1).collect();
+                    if vars.is_empty() && constraints.is_empty() {
+                        *body
+                    } else {
+                        Type::Forall {
+                            vars,
+                            constraints,
+                            body,
+                        }
+                    }
+                }
+                ty => ty,
+            };
+            fields.push((method, method_type.substitute(&subst)));
+        }
+        self.typing
+            .dictionary_constructors
+            .insert(range(span), runtime_slots);
+        let class = Type::apps(Type::con(&entity.module, &entity.name), args);
+        Some(Type::Fun {
+            param: Box::new(Type::Record(Row::closed(fields))),
+            effects: None,
+            result: Box::new(super::module_contract::dictionary_type(&class)?),
+        })
     }
 
     /// `T.member`, the companion `T$member` of the type `T` in scope.

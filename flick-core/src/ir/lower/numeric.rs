@@ -34,7 +34,7 @@ impl Lower<'_> {
                 module: function.module.clone(),
                 name: function.name.clone(),
             };
-            let dicts = self.typing.dicts.get(&key).cloned().unwrap_or_default();
+            let dicts = self.dictionaries(key);
             return Some(apply(
                 with_dicts(Expr::new(global, span), dicts),
                 args,

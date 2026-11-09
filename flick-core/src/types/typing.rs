@@ -40,6 +40,8 @@ pub struct Typing {
     pub declarations: Arc<Interface>,
     /// Every name in an expression or a constructor pattern.
     pub names: HashMap<Range, Ref>,
+    /// The public runtime values captured by each `pack M as Sig`.
+    pub packs: HashMap<Range, Vec<(String, String, String)>>,
     /// The binder of each name of the user's code that is a local, where an
     /// editor cannot find it in the tree: in a block, generated code decides
     /// which binder a name sees.
@@ -89,6 +91,12 @@ pub struct Typing {
     pub identity_eq: HashMap<Range, Identity>,
     /// Dictionaries a use receives, in the order of its constraints.
     pub dicts: HashMap<Range, Vec<Dict>>,
+    /// `C.dictionary { ... }`: written superclass fields and their runtime slots.
+    pub dictionary_constructors: HashMap<Range, Vec<(String, String)>>,
+    /// `unpack` bodies whose result carries an abstract type witness.
+    pub existential_unpacks: HashSet<Range>,
+    /// `unpack` expressions opening an existential pair with a value binder.
+    pub existential_opens: HashSet<Range>,
     /// The constraints a definition, a method or a higher-rank argument
     /// assumes, as dictionaries name them (`Dict::Given`), in order.
     pub givens: HashMap<Range, Vec<String>>,
@@ -175,6 +183,11 @@ pub struct Coercion {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Ref {
     Local,
+    /// A public value field of the lexically opened `Module Sig` local.
+    PackedField {
+        binder: String,
+        field: String,
+    },
     /// A top-level `let` or `foreign` of `module`.
     Value {
         module: String,

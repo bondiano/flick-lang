@@ -123,6 +123,8 @@ fn prefix(p: &mut Parser) -> Option<Done> {
         return Some(p.complete(m, K::PrefixExpr));
     }
     match p.current() {
+        K::Ident if p.at_word("pack") && keyword_ahead(p, K::AsKw) => Some(pack_expr(p)),
+        K::Ident if p.at_word("unpack") && keyword_ahead(p, K::AsKw) => Some(unpack_expr(p)),
         K::FunKw => Some(fun_expr(p)),
         K::MatchKw => Some(match_expr(p)),
         K::TryKw => Some(try_expr(p)),
@@ -133,6 +135,43 @@ fn prefix(p: &mut Parser) -> Option<Done> {
         )),
         _ => app(p),
     }
+}
+
+fn keyword_ahead(p: &Parser, kind: K) -> bool {
+    for i in p.pos + 1..p.toks.len() {
+        if p.sep_at(i).is_some() {
+            return false;
+        }
+        if p.toks[i].kind == kind {
+            return true;
+        }
+    }
+    false
+}
+
+fn pack_expr(p: &mut Parser) -> Done {
+    let m = p.start();
+    p.bump();
+    decl::module_path(p);
+    if p.expect(K::AsKw) {
+        types::type_(p);
+    }
+    p.complete(m, K::PackExpr)
+}
+
+fn unpack_expr(p: &mut Parser) -> Done {
+    let m = p.start();
+    p.bump();
+    expr(p);
+    if p.expect(K::AsKw) && p.expect(K::Con) {
+        if p.eat(K::Comma) {
+            p.expect(K::Ident);
+        }
+        if p.expect(K::InKw) {
+            p.body(K::Block, stmt);
+        }
+    }
+    p.complete(m, K::UnpackExpr)
 }
 
 /// Whether the next token can start the operand of a prefix operator.
@@ -421,7 +460,7 @@ fn record(p: &mut Parser) -> K {
         return K::RecordExpr;
     }
     p.push_aligned_here();
-    let kind = if p.at(K::Ident) && p.nth(1) == K::Eq {
+    let kind = if matches!(p.current(), K::Ident | K::Con) && p.nth(1) == K::Eq {
         p.items(record_field, true, |_| false);
         K::RecordExpr
     } else {
@@ -440,7 +479,12 @@ fn record(p: &mut Parser) -> K {
 
 fn record_field(p: &mut Parser) {
     let m = p.start();
-    if p.expect(K::Ident) && p.expect(K::Eq) {
+    if matches!(p.current(), K::Ident | K::Con) {
+        p.bump();
+    } else {
+        p.error_expected("a record field name");
+    }
+    if p.expect(K::Eq) {
         p.body(K::Block, stmt);
     }
     p.complete(m, K::RecordField);

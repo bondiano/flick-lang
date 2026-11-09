@@ -2,7 +2,7 @@
 /// options of its algorithms and their results. Records keep Effect's field
 /// names; string literal unions of Effect are unboxed strings with a value
 /// per literal.
-module Graph.Types exposing (..)
+private module Graph.Types exposing (..)
 
 /// An immutable graph with node data `n`, edge data `e`, and kind `k`:
 /// `Directed` or `Undirected`.

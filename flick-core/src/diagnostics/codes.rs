@@ -178,6 +178,9 @@ codes! {
     R014 = Resolve 14, "unused private definition";
     R015 = Resolve 15, "local shadows another local";
     R016 = Resolve 16, "lang item outside the built-in modules";
+    R017 = Resolve 17, "private module belongs to another package";
+    R018 = Resolve 18, "inline module is private to its source file";
+    R019 = Resolve 19, "static module application inside an inline module";
     T001 = Types 1, "unknown name";
     T002 = Types 2, "kind mismatch";
     T003 = Types 3, "type mismatch";
@@ -237,6 +240,13 @@ codes! {
     T057 = Types 57, "a refining match needs known types";
     T058 = Types 58, "a refinement Flick does not make";
     T059 = Types 59, "a part of a signature it gets anyway";
+    T060 = Types 60, "module lacks a required contract member";
+    T061 = Types 61, "module member does not satisfy its contract";
+    T062 = Types 62, "module member has a different nominal identity";
+    T063 = Types 63, "abstract class or service cannot be packed";
+    T064 = Types 64, "an unpacked module's abstract type escapes";
+    T065 = Types 65, "module contract dictionary source has the wrong type";
+    T066 = Types 66, "ambiguous local module dictionaries";
     E001 = Effects 1, "runtime call in a pure position";
     E002 = Effects 2, "services or errors not allowed by the bound";
     E003 = Effects 3, "argument runs before the function that takes an Eff";

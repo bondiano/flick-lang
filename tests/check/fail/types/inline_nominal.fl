@@ -1,0 +1,14 @@
+module App.Main exposing (answer)
+
+type Tag = Tag Int
+
+module Child exposing (Tag(..), accept) =
+  type Tag = Tag Int
+  accept : Tag -> Int
+  let accept value =
+    match value with
+    | Tag n -> n
+
+answer : Int
+let answer = Child.accept (Tag 1)
+//~ FLICK-T003 @13:28-13:33 distinct nominal types

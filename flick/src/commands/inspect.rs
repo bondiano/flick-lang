@@ -195,7 +195,12 @@ pub fn doc(options: &OutDirArguments, explicit: Option<&str>) -> Outcome {
     };
     let out = checked.host.cwd.join(&options.out_dir);
     let mut index = String::from("# API\n\n");
-    for module in checked.compilation.modules.iter().filter(|m| !m.test) {
+    for module in checked
+        .compilation
+        .modules
+        .iter()
+        .filter(|m| !m.test && !m.interface.private)
+    {
         // the expanded text has the documentation of generated declarations
         let text =
             (module.expansion.as_ref()).map_or(&checked.sources.get(module.file).text, |e| &e.text);

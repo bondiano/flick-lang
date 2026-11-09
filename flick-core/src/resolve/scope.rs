@@ -363,6 +363,13 @@ impl<'a> Scope<'a> {
                 }
             }
             Found::Unknown => {}
+            Found::Missing
+                if self
+                    .module
+                    .syntax
+                    .applications
+                    .iter()
+                    .any(|application| application.name == item.name) => {}
             Found::Missing => diagnostics.push(error(format!(
                 "cannot export `{}`: it is neither defined in this module nor imported",
                 item.name

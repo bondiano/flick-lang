@@ -1,0 +1,9 @@
+module App.Main exposing (answer)
+
+module Child exposing (visible) =
+  let visible = 1
+  let _hidden = 2
+
+answer : Int
+let answer = Child._hidden
+//~ FLICK-R004 @8:14-8:27 does not export

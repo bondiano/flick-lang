@@ -442,7 +442,12 @@ fn as_given(e: &mut Expr, given: &[(String, String)]) {
                 }
             }
             Dict::Super { dict: inner, .. } => dict(inner, given),
-            Dict::Given(_) | Dict::Primitive { .. } | Dict::Site { .. } | Dict::Error => {}
+            Dict::Given(_)
+            | Dict::Value { .. }
+            | Dict::Opened { .. }
+            | Dict::Primitive { .. }
+            | Dict::Site { .. }
+            | Dict::Error => {}
         }
     }
     match &mut e.kind {

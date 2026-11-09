@@ -6,7 +6,7 @@ use std::fmt::Write;
 use super::Checker;
 use super::lang::Lang;
 use super::shown::short_form;
-use super::ty::{Binder, Row, Type};
+use super::ty::{Binder, Effects, Row, Type};
 use super::unify::Store;
 use crate::numeric::default_num;
 
@@ -134,9 +134,16 @@ impl Printer<'_> {
             }
         };
         match t {
+            Type::Con { module, name } if let Some(binder) = module.strip_prefix("$exists:") => {
+                let _ = write!(out, "{binder}.{name}");
+            }
+            Type::Con { module, name } if name.ends_with("$Dict") => {
+                self.print_dictionary_name(module, name, out);
+            }
             Type::Con { module, name } if self.qualified && !module.is_empty() => {
                 let _ = write!(out, "{module}.{name}");
             }
+            Type::Var(name) if name.ends_with("$Dict") => self.print_dictionary_name("", name, out),
             Type::Con { name, .. } | Type::Var(name) => out.push_str(name),
             Type::Symbol(label) => {
                 let _ = write!(out, "{label:?}");
@@ -149,37 +156,12 @@ impl Printer<'_> {
             }
             Type::Meta(_) => out.push('_'),
             Type::Error => out.push('?'),
-            Type::App { .. } => {
-                let (head, args) = t.spine();
-                parens(prec >= Prec::Arg, out, &mut |out| {
-                    self.print(head, Prec::App, out);
-                    for arg in &args {
-                        out.push(' ');
-                        self.print(arg, Prec::Arg, out);
-                    }
-                });
-            }
+            Type::App { .. } => self.print_app(t, prec, out),
             Type::Fun {
                 param,
                 effects,
                 result,
-            } => parens(prec >= Prec::App, out, &mut |out| {
-                self.print(param, Prec::App, out);
-                match effects {
-                    None => out.push_str(" -> "),
-                    Some(e) if is_empty(&e.services) && is_empty(&e.errors) => {
-                        out.push_str(" ->{} ");
-                    }
-                    Some(e) => {
-                        out.push_str(" ->{");
-                        self.print_row_items(&e.services, out);
-                        out.push_str("; ");
-                        self.print_row_items(&e.errors, out);
-                        out.push_str("} ");
-                    }
-                }
-                self.print_result(result, out);
-            }),
+            } => self.print_fun(param, effects.as_deref(), result, prec, out),
             Type::Tuple(items) => {
                 out.push('(');
                 for (i, item) in items.iter().enumerate() {
@@ -220,6 +202,71 @@ impl Printer<'_> {
             } => parens(prec > Prec::Top, out, &mut |out| {
                 self.print_forall(vars, constraints, body, out);
             }),
+            Type::Exists {
+                binder,
+                contract,
+                body,
+            } => parens(prec > Prec::Top, out, &mut |out| {
+                let _ = write!(out, "exists {binder} : ");
+                self.print(contract, Prec::Top, out);
+                out.push_str(". ");
+                self.print(body, Prec::Top, out);
+            }),
+        }
+    }
+
+    fn print_fun(
+        &self,
+        param: &Type,
+        effects: Option<&Effects>,
+        result: &Type,
+        prec: Prec,
+        out: &mut String,
+    ) {
+        let needs_parens = prec >= Prec::App;
+        if needs_parens {
+            out.push('(');
+        }
+        self.print(param, Prec::App, out);
+        match effects {
+            None => out.push_str(" -> "),
+            Some(e) if is_empty(&e.services) && is_empty(&e.errors) => out.push_str(" ->{} "),
+            Some(e) => {
+                out.push_str(" ->{");
+                self.print_row_items(&e.services, out);
+                out.push_str("; ");
+                self.print_row_items(&e.errors, out);
+                out.push_str("} ");
+            }
+        }
+        self.print_result(result, out);
+        if needs_parens {
+            out.push(')');
+        }
+    }
+
+    fn print_app(&self, t: &Type, prec: Prec, out: &mut String) {
+        let (head, args) = t.spine();
+        let needs_parens = prec >= Prec::Arg;
+        if needs_parens {
+            out.push('(');
+        }
+        self.print(head, Prec::App, out);
+        for arg in &args {
+            out.push(' ');
+            self.print(arg, Prec::Arg, out);
+        }
+        if needs_parens {
+            out.push(')');
+        }
+    }
+
+    fn print_dictionary_name(&self, module: &str, name: &str, out: &mut String) {
+        if self.qualified && !module.is_empty() {
+            let _ = write!(out, "{module}.");
+        }
+        if let Some(class) = name.strip_suffix("$Dict") {
+            let _ = write!(out, "{class}.Dict");
         }
     }
 

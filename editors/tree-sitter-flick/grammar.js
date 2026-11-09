@@ -34,6 +34,7 @@ module.exports = grammar({
       $._component,
       $._plugin,
       $._server_fn,
+      $._private_module,
       $.parens,
       $.brackets,
       $.braces,
@@ -66,6 +67,7 @@ module.exports = grammar({
     // `plugin head` in an import's `exposing`, and `server fn`
     _plugin: $ => seq(alias('plugin', $.keyword), $.identifier),
     _server_fn: $ => seq(alias('server', $.keyword), alias('fn', $.keyword)),
+    _private_module: $ => seq(alias('private', $.keyword), alias('module', $.keyword)),
     boolean: _ => choice('true', 'false'),
     // `@lang int`: the attribute's name; its arguments are plain identifiers
     attribute: _ => token(seq('@', /[a-z_][A-Za-z0-9_]*/)),

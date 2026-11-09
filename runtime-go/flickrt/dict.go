@@ -25,6 +25,17 @@ func NewDict() *Dict {
 	return &Dict{entries: map[string]Value{}, lazy: map[string]*lazyEntry{}}
 }
 
+// DictOf constructs a dictionary from alternating field names and values.
+// The compiler has already checked that these are the methods and
+// superclass slots of the class.
+func DictOf(entries ...Value) *Dict {
+	d := NewDict()
+	for i := 0; i < len(entries); i += 2 {
+		d.Set(entries[i].(string), entries[i+1])
+	}
+	return d
+}
+
 // Site is the dictionary of `CallSite` the compiler made for a use.
 func Site(place, definition string) Value {
 	return NewDict().Set("place", place).Set("definition", definition)

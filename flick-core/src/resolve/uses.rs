@@ -103,6 +103,29 @@ impl Walker<'_> {
                 self.release(mark);
                 return;
             }
+            K::UnpackExpr => {
+                let mut children = node.nodes();
+                if let Some(source) = children.next() {
+                    self.walk(source);
+                }
+                let mut tokens = node.child_tokens();
+                let payload = tokens
+                    .find(|t| t.kind == K::Comma)
+                    .and_then(|_| tokens.find(|t| t.kind == K::Ident));
+                if let Some(payload) = payload {
+                    self.locals.push(Local {
+                        name: payload.text(self.text),
+                        generated: payload.start >= self.generated,
+                        binder: Some((payload, false)),
+                        used: false,
+                    });
+                }
+                for child in children {
+                    self.walk(child);
+                }
+                self.release(mark);
+                return;
+            }
             K::ForExpr => {
                 // the names of the clauses scope over the clauses after them and the element
                 let mut parts = node.nodes();

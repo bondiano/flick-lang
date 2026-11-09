@@ -142,6 +142,8 @@ pub enum ExprKind {
     List(Vec<Expr>),
     /// Fields in the order written, which is the order of evaluation.
     Record(Vec<(String, Expr)>),
+    /// A class dictionary assembled from explicit methods and superclasses.
+    Dictionary(Vec<(String, Expr)>),
     Update(Box<Expr>, Vec<(String, Expr)>),
     Field(Box<Expr>, String),
     Binary(BinOp, Box<Expr>, Box<Expr>),
@@ -239,7 +241,7 @@ impl Expr {
                     f(item);
                 }
             }
-            ExprKind::Record(fields) => {
+            ExprKind::Record(fields) | ExprKind::Dictionary(fields) => {
                 for (_, v) in fields {
                     f(v);
                 }
@@ -366,7 +368,7 @@ impl Expr {
                     f(item);
                 }
             }
-            ExprKind::Record(fields) => {
+            ExprKind::Record(fields) | ExprKind::Dictionary(fields) => {
                 for (_, v) in fields {
                     f(v);
                 }

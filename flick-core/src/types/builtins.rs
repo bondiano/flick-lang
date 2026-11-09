@@ -341,7 +341,7 @@ fn check_reporting(
             stages_by_class,
         };
         let (checked, typing, _) =
-            super::run_in(&module, &imported, &known, options, &mut interface);
+            super::run_in(&module, &imported, &known, options, &mut interface, &[]);
         diagnostics.extend(checked);
         if let Some(expansion) = &expansion {
             expansion.restore(&mut diagnostics, None);

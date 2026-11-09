@@ -39,6 +39,7 @@ pub struct Expanded {
     pub whole: (u32, u32),
 }
 
+#[derive(Clone)]
 pub struct Expansion {
     pub text: String,
     /// The length of the module's own text: offsets past it are generated.
@@ -54,6 +55,7 @@ pub struct Expansion {
     blocks: Vec<Block>,
 }
 
+#[derive(Clone)]
 struct Block {
     range: (u32, u32),
     code: (u32, u32),

@@ -391,13 +391,19 @@ fn dict_uses(d: &Dict, module: &str, out: &mut BTreeSet<String>) {
                 dict_uses(a, module, out);
             }
         }
+        Dict::Value { module: m, name } => {
+            if m == module {
+                out.insert(names::ident(name));
+            }
+        }
         Dict::Super { dict, .. } => dict_uses(dict, module, out),
         Dict::Structural { fields, .. } => {
             for f in fields {
                 dict_uses(f, module, out);
             }
         }
-        Dict::Given(_)
+        Dict::Opened { .. }
+        | Dict::Given(_)
         | Dict::Field(_)
         | Dict::Primitive { .. }
         | Dict::Site { .. }

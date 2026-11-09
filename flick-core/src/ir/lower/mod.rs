@@ -34,8 +34,8 @@ use crate::syntax::cst::{Node, foreign_words};
 use crate::syntax::kind::SyntaxKind as K;
 use crate::syntax::literal;
 use crate::types::{
-    Abi, Constructor, Range, Rep, Type, Typing, class_defaults, default_method, is_type, let_parts,
-    written_dicts,
+    Abi, Constructor, Dict, Range, Rep, Type, Typing, class_defaults, default_method, is_type,
+    let_parts, written_dicts,
 };
 
 /// Lowers `module`, which checked without errors, with what its check recorded.
@@ -168,6 +168,36 @@ impl Lower<'_> {
         (self.scope.iter().rev())
             .find(|(n, g, _)| n == name && *g == generated)
             .map(|(_, _, u)| u.as_str())
+    }
+
+    fn dictionaries(&self, key: Range) -> Vec<Dict> {
+        fn bind(lower: &Lower<'_>, key: Range, dict: &mut Dict) {
+            match dict {
+                Dict::Opened { binder, .. } => {
+                    let unique = lower
+                        .local(binder, key.0)
+                        .unwrap_or_else(|| panic!("`{binder}` is an opened module in scope"));
+                    *binder = unique.to_owned();
+                }
+                Dict::Instance { args, .. } => {
+                    for arg in args {
+                        bind(lower, key, arg);
+                    }
+                }
+                Dict::Super { dict, .. } => bind(lower, key, dict),
+                Dict::Structural { fields, .. } => {
+                    for field in fields {
+                        bind(lower, key, field);
+                    }
+                }
+                _ => {}
+            }
+        }
+        let mut dictionaries = self.typing.dicts.get(&key).cloned().unwrap_or_default();
+        for dictionary in &mut dictionaries {
+            bind(self, key, dictionary);
+        }
+        dictionaries
     }
 
     fn givens(&self, node: &Node) -> Vec<String> {

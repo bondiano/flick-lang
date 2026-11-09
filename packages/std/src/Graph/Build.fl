@@ -1,6 +1,6 @@
 /// Making and changing graphs. Every change returns a new graph and leaves
 /// the one given as it was: Effect's mutations run on a copy.
-module Graph.Build exposing (..)
+private module Graph.Build exposing (..)
 
 import Graph.Types exposing (..)
 

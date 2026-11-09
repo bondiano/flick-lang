@@ -108,6 +108,7 @@ impl Checker<'_> {
                 Form::Adt { .. } => Decl::Adt,
                 Form::Error => Decl::Error,
                 Form::Alias { .. } => Decl::Alias,
+                Form::ModuleContract { .. } => Decl::ModuleType,
                 Form::Service { .. } => Decl::Service,
                 Form::Class { .. } => Decl::Class,
                 Form::Kind => Decl::Kind,

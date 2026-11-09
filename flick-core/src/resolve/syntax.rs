@@ -5,13 +5,18 @@ use std::sync::Arc;
 use crate::plugin::blocks_under;
 use crate::plugin::first_party::{BARE, DECLARATIONS, HEADS};
 use crate::source::{FileId, Span};
-use crate::syntax::cst::Node;
+use crate::syntax::cst::{Element, Node};
 use crate::syntax::kind::SyntaxKind as K;
 
 #[derive(Debug, Clone)]
 pub struct ModuleSyntax {
     pub header: Option<Header>,
     pub imports: Vec<Import>,
+    /// Imports written inside inline module bodies, used for dependency
+    /// loading and cache invalidation, not the enclosing module's scope.
+    pub inline_imports: Vec<Import>,
+    /// Named static functor applications declared by this file.
+    pub applications: Vec<ModuleApplication>,
     /// The heads of std's plugin its imports expose that a block of it
     /// writes as only an import lets it, without `{`: `cli Main`.
     pub bodiless: Vec<String>,
@@ -20,10 +25,30 @@ pub struct ModuleSyntax {
 #[derive(Debug, Clone)]
 pub struct Header {
     pub name: String,
+    pub private: bool,
     /// Span of the module path.
     pub span: Span,
     /// `None` without `exposing`: the module exports nothing.
     pub exposing: Option<Vec<Item>>,
+    /// Static module parameters of a functor source file.
+    pub parameters: Vec<FunctorParam>,
+}
+
+#[derive(Debug, Clone)]
+pub struct FunctorParam {
+    pub name: String,
+    pub contract: String,
+    pub span: Span,
+}
+
+#[derive(Debug, Clone)]
+pub struct ModuleApplication {
+    pub name: String,
+    pub functor: String,
+    pub functor_span: Span,
+    pub arguments: Vec<String>,
+    pub argument_spans: Vec<Span>,
+    pub span: Span,
 }
 
 #[derive(Debug, Clone)]
@@ -88,6 +113,7 @@ pub enum ItemKind {
 pub fn module_syntax(tree: &Node, text: &str, file: FileId) -> ModuleSyntax {
     let mut header = None;
     let mut imports = Vec::new();
+    let mut applications = Vec::new();
     for node in tree.nodes() {
         let Some(path) = node.nodes().find(|n| n.kind == K::ModulePath) else {
             continue;
@@ -99,8 +125,24 @@ pub fn module_syntax(tree: &Node, text: &str, file: FileId) -> ModuleSyntax {
             K::ModuleHeader if header.is_none() => {
                 header = Some(Header {
                     name,
+                    private: node
+                        .child_tokens()
+                        .any(|t| t.kind == K::Ident && t.text(text) == "private"),
                     span,
                     exposing: exposing.map(|e| items(e, text, file)),
+                    parameters: node
+                        .nodes()
+                        .filter(|n| n.kind == K::FunctorParam)
+                        .filter_map(|param| {
+                            let name = param.child_tokens().find(|t| t.kind == K::Con)?;
+                            let contract = param.nodes().next()?;
+                            Some(FunctorParam {
+                                name: name.text(text).to_owned(),
+                                contract: contract.text(text).split_whitespace().collect(),
+                                span: Span::new(file, name.start, name.end),
+                            })
+                        })
+                        .collect(),
                 });
             }
             K::ImportDecl => imports.push(Import {
@@ -113,14 +155,64 @@ pub fn module_syntax(tree: &Node, text: &str, file: FileId) -> ModuleSyntax {
                 exposing: exposing.map(|e| items(e, text, file)).unwrap_or_default(),
                 plugins: exposing.map(|e| plugins(e, text, file)).unwrap_or_default(),
             }),
+            K::ModuleApplyDecl => {
+                let arguments: Vec<_> = node
+                    .nodes()
+                    .filter(|n| n.kind == K::ModulePath)
+                    .skip(1)
+                    .collect();
+                if let Some(local) = node.child_tokens().find(|t| t.kind == K::Con) {
+                    applications.push(ModuleApplication {
+                        name: local.text(text).to_owned(),
+                        functor: name,
+                        functor_span: span,
+                        arguments: arguments
+                            .iter()
+                            .map(|n| n.text(text).split_whitespace().collect())
+                            .collect(),
+                        argument_spans: arguments
+                            .iter()
+                            .map(|n| {
+                                let (start, end) = n.range();
+                                Span::new(file, start, end)
+                            })
+                            .collect(),
+                        span: Span::new(file, local.start, local.end),
+                    });
+                }
+            }
             _ => {}
         }
     }
     let bodiless = bodiless(tree, text, &imports);
+    let mut inline_imports = Vec::new();
+    for node in tree.nodes().filter(|n| n.kind == K::InlineModuleDecl) {
+        collect_inline_imports(node, text, file, &mut inline_imports);
+    }
     ModuleSyntax {
         header,
         imports,
+        inline_imports,
+        applications,
         bodiless,
+    }
+}
+
+fn collect_inline_imports(node: &Node, text: &str, file: FileId, out: &mut Vec<Import>) {
+    for child in node
+        .nodes()
+        .filter(|n| n.kind == K::Members)
+        .flat_map(Node::nodes)
+    {
+        if child.kind == K::ImportDecl {
+            let tree = Node {
+                kind: K::SourceFile,
+                children: vec![Element::Node(child.clone())],
+            };
+            out.extend(module_syntax(&tree, text, file).imports);
+        } else if child.kind == K::InlineModuleDecl {
+            collect_inline_imports(child, text, file, out);
+        }
     }
 }
 

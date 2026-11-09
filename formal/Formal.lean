@@ -1,4 +1,5 @@
 import Formal.TyBase
+import Formal.Modules
 import Formal.Syntax
 import Formal.TyComp
 import Formal.TyOps

@@ -273,10 +273,12 @@ pub(super) fn analyze_builtin(path: &Path, index: usize) -> Snapshot {
     Snapshot {
         analysis: Analysis {
             modules: vec![Analyzed {
+                inline: false,
                 name: name.to_owned(),
                 path: path.to_path_buf(),
                 file,
                 test: false,
+                package: None,
                 tree: parsed.tree,
                 typing: typing.into(),
                 interface,

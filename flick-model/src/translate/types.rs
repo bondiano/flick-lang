@@ -97,10 +97,15 @@ pub fn constraint(c: &fc::Type) -> Type {
 
 pub fn ty(t: &fc::Type) -> Type {
     match t {
-        fc::Type::Con { module, name } => match name.strip_suffix(".Impl") {
-            Some(service) => Type::Impl(Row::one(Path::new(module, service))),
-            None => Type::con(module, name),
-        },
+        fc::Type::Con { module, name } => {
+            if let Some(class) = name.strip_suffix("$Dict") {
+                Type::Dict(Path::new(module, class), Rc::from([]))
+            } else if let Some(service) = name.strip_suffix(".Impl") {
+                Type::Impl(Row::one(Path::new(module, service)))
+            } else {
+                Type::con(module, name)
+            }
+        }
         fc::Type::Var(v) => Type::Var(Var::Named(v.as_str().into())),
         fc::Type::App { .. } => app(t),
         fc::Type::Fun {
@@ -133,6 +138,11 @@ pub fn ty(t: &fc::Type) -> Type {
 
 fn app(t: &fc::Type) -> Type {
     let (head, args) = t.spine();
+    if let fc::Type::Con { module, name } = head
+        && let Some(class) = name.strip_suffix("$Dict")
+    {
+        return Type::Dict(Path::new(module, class), args.into_iter().map(ty).collect());
+    }
     if let fc::Type::Con { module, name } = head
         && module == PRELUDE
     {

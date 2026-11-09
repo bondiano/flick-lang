@@ -11,7 +11,7 @@ mod unused;
 mod uses;
 
 pub(crate) use defs::{alias_names, shortest_cycle};
-pub use syntax::{Header, Import, Item, ItemKind, ModuleSyntax, module_syntax};
+pub use syntax::{Header, Import, Item, ItemKind, ModuleApplication, ModuleSyntax, module_syntax};
 #[cfg(feature = "ide")]
 pub(crate) use unused::item_removal;
 
@@ -40,6 +40,33 @@ pub fn declarations(tree: &Node, text: &str, file: FileId) -> Vec<Declared> {
             signature: d.signature,
         })
         .collect()
+}
+
+/// Top-level names used by a synthetic inline-module body. The enclosing
+/// file uses these to account for references to its preceding declarations.
+pub(crate) fn referenced_names(module: &Module) -> Vec<(Namespace, String)> {
+    uses::references(module)
+        .0
+        .into_iter()
+        .filter(|reference| reference.qualifier.is_none())
+        .map(|reference| (reference.namespace, reference.name))
+        .collect()
+}
+
+/// Import-use warnings for a whole source file, including declarations of
+/// inline namespaces. Checking the namespaces separately must still count an
+/// import once for the file that wrote it.
+pub(crate) fn import_warnings(
+    module: &Module,
+    imported: &dyn Fn(&str) -> Option<Interface>,
+) -> Vec<Diagnostic> {
+    let defs = defs::defined(defs::collect(module.tree, module.text, module.file));
+    let mut ignored = Vec::new();
+    let scope = scope::Scope::new(module, &defs, imported, &mut ignored);
+    let (references, _) = uses::references(module);
+    let mut diagnostics = Vec::new();
+    scope.unused_imports(&references, &mut diagnostics);
+    diagnostics
 }
 
 pub use crate::iface::{Decl, Entity, Export, Hidden, Interface, Namespace};
@@ -91,6 +118,7 @@ pub fn resolve(
     diagnostics.extend(defs::alias_cycles(module.tree, module.text, module.file));
     let scope = scope::Scope::new(module, &defs, imported, &mut diagnostics);
     let mut interface = scope.exports(&mut diagnostics);
+    interface.private = module.syntax.header.as_ref().is_some_and(|h| h.private);
     let mut docs = doc::comments(module.text);
     interface.docs = (interface.exports.iter())
         .filter(|e| e.entity.module == interface.module)

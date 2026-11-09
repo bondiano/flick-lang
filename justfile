@@ -236,10 +236,10 @@ wasm-plugins:
 
 # Build the wasm module the in-browser demo loads and hold it to its size budget.
 # The budget, raw bytes, holds the editor queries of the playground (hover,
-# completion, fixes, `.d.ts`): 5 148 679 bytes, 1.68 MB gzipped, plus 3%. Built
-# for size instead it fits 4.5 MiB but analyses and emits 20-30% slower.
+# completion, fixes, `.d.ts`): 5 148 679 bytes, 1.68 MB gzipped, plus 3%.
+# Optimize the browser compiler for size; keep the raw-byte budget unchanged.
 wasm:
-    cargo build -p flick-wasm --target wasm32-unknown-unknown --release
+    CARGO_PROFILE_RELEASE_OPT_LEVEL=s cargo build -p flick-wasm --target wasm32-unknown-unknown --release
     @wasm=target/wasm32-unknown-unknown/release/flick_wasm.wasm; \
     echo "flick_wasm.wasm: $(wc -c < $wasm) bytes, $(gzip -6c $wasm | wc -c) gzipped"; \
     test $(wc -c < $wasm) -le 5303140

@@ -105,7 +105,7 @@ impl Tr {
             ExprKind::Tuple(xs) if xs.is_empty() => Term::unit(),
             ExprKind::Tuple(xs) => Term::Tuple(xs.iter().map(|x| self.expr(x)).collect()),
             ExprKind::List(xs) => Term::List(xs.iter().map(|x| self.expr(x)).collect()),
-            ExprKind::Record(fs) => Term::Record(
+            ExprKind::Record(fs) | ExprKind::Dictionary(fs) => Term::Record(
                 fs.iter()
                     .map(|(l, x)| (Name::from(l.as_str()), self.expr(x)))
                     .collect(),

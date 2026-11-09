@@ -124,12 +124,16 @@ impl Loader<'_> {
         };
         let header = Header {
             name: name.to_owned(),
+            private: false,
             span: at,
             exposing: Some(vec![all]),
+            parameters: Vec::new(),
         };
         let syntax = ModuleSyntax {
             header: Some(header),
             imports: Vec::new(),
+            inline_imports: Vec::new(),
+            applications: Vec::new(),
             bodiless: Vec::new(),
         };
         (Arc::new(syntax::parse("", file)), Arc::new(syntax))

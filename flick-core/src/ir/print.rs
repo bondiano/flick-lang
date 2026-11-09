@@ -83,6 +83,8 @@ pub fn dict(d: &Dict) -> String {
             format!("<{name}>({})", args.join(", "))
         }
         Dict::Given(g) => format!("?{g}"),
+        Dict::Value { module, name } => format!("@{module}.{name}"),
+        Dict::Opened { binder, field } => format!("@{binder}.{field}"),
         Dict::Field(local) => format!("@{local}"),
         Dict::Super { dict: d, class } => format!("{}.{class}", dict(d)),
         Dict::Structural { class, fields } => {
@@ -176,6 +178,7 @@ pub fn expr(e: &Expr) -> String {
         ExprKind::Tuple(items) => format!("({})", exprs(items)),
         ExprKind::List(items) => format!("[{}]", exprs(items)),
         ExprKind::Record(f) => format!("{{{}}}", fields(f)),
+        ExprKind::Dictionary(f) => format!("dictionary {{{}}}", fields(f)),
         ExprKind::Update(r, f) => format!("{{{} with {}}}", expr(r), fields(f)),
         ExprKind::Field(r, l) => format!("{}.{l}", expr(r)),
         ExprKind::Binary(op, l, r) => format!("({} {} {})", expr(l), op.symbol(), expr(r)),

@@ -89,7 +89,7 @@ fn interfaces(root: &Path) -> Result<Vec<Interface>, Outcome> {
         .compilation
         .modules
         .iter()
-        .filter(|m| !m.test)
+        .filter(|m| !m.test && !m.interface.private)
         .map(|m| m.interface.clone())
         .collect())
 }

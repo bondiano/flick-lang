@@ -5,7 +5,7 @@
 use std::mem;
 
 use super::Checker;
-use super::env::{Form, Found};
+use super::env::{Form, Found, ModuleRequirement};
 use super::kinds::Kind;
 use super::ty::{Binder, Row, Type};
 use crate::diagnostics::codes;
@@ -25,6 +25,14 @@ mod sets;
 pub use kinds::is_type;
 use kinds::with_article;
 use rows::{place_braces, written_none};
+
+fn as_value_kind(kind: Kind) -> Kind {
+    match kind {
+        Kind::Arrow(param, result) => Kind::Arrow(param, Box::new(as_value_kind(*result))),
+        Kind::Constraint => Kind::Type,
+        other => other,
+    }
+}
 
 /// What a type variable that is not in scope means.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -223,6 +231,71 @@ impl Checker<'_> {
                 };
             }
             K::ForallType => return self.forall(node, &children, expected, free),
+            K::ExistsType => {
+                let [contract_node, body_node] = &children[..] else {
+                    return Type::Error;
+                };
+                let Some(binder) = node.child_tokens().find(|t| t.kind == K::Con) else {
+                    return Type::Error;
+                };
+                let binder = binder.text(self.text).to_owned();
+                let contract = self.ty(contract_node, &Kind::Module, free);
+                let Type::Con { module, name } = &contract else {
+                    return Type::Error;
+                };
+                let Some(def) = self.env.type_def(module, name).cloned() else {
+                    return Type::Error;
+                };
+                let Form::ModuleContract { requirements } = def.form else {
+                    return Type::Error;
+                };
+                let mut subst = Vec::new();
+                let mut types = Vec::new();
+                for requirement in &requirements {
+                    match requirement {
+                        ModuleRequirement::Type {
+                            name,
+                            params,
+                            manifest,
+                        } => {
+                            let ty = manifest.as_ref().map_or_else(
+                                || Type::con(&format!("$exists:{binder}"), name),
+                                |ty| ty.substitute(&subst),
+                            );
+                            let kind =
+                                Kind::arrows(params.iter().map(|p| p.kind.clone()), Kind::Type);
+                            subst.push((name.clone(), ty.clone()));
+                            types.push((name.clone(), ty, kind));
+                        }
+                        ModuleRequirement::Nominal {
+                            name,
+                            identity: Some(identity),
+                            ..
+                        } => {
+                            let ty = Type::con(&identity.module, &identity.name);
+                            let kind = self
+                                .env
+                                .type_def(&identity.module, &identity.name)
+                                .map_or(Kind::Type, |def| def.kind.clone());
+                            subst.push((name.clone(), ty.clone()));
+                            types.push((name.clone(), ty, kind));
+                        }
+                        _ => {}
+                    }
+                }
+                self.opened_modules.push(super::module_contract::Opened {
+                    alias: binder.clone(),
+                    types,
+                    values: Vec::new(),
+                });
+                let body = self.ty(body_node, &Kind::Type, free);
+                self.opened_modules.pop();
+                return Type::Exists {
+                    binder,
+                    contract: Box::new(contract),
+                    body: Box::new(body),
+                };
+            }
             K::ConstrainedType => {
                 let constraints = self.constraints(children[0], free);
                 let body = children
@@ -343,6 +416,8 @@ impl Checker<'_> {
             let kind = self.kinds.fresh();
             (self.ty(head_node, &kind, free), kind)
         };
+        let first_class_module =
+            matches!(&head, Type::Con { module, name } if module == "Prelude" && name == "Module");
         if let Type::Con { module, name } = &head
             && let Some(Form::Alias { params, .. }) =
                 self.env.type_def(module, name).map(|d| &d.form)
@@ -381,155 +456,40 @@ impl Checker<'_> {
             ty = Type::app(ty, self.ty(arg, &param, free));
             kind = result;
         }
+        if first_class_module {
+            let (_, applied) = ty.spine();
+            if let [signature] = &applied[..]
+                && let Type::Con { module, name } = self.whnf(signature)
+                && let Some(super::env::TypeDef {
+                    form: Form::ModuleContract { requirements },
+                    ..
+                }) = self.env.type_def(&module, &name)
+            {
+                let abstract_names: Vec<String> = requirements
+                    .iter()
+                    .filter_map(|requirement| match requirement {
+                        super::ModuleRequirement::Nominal {
+                            name,
+                            identity: None,
+                            ..
+                        } => Some(name.clone()),
+                        _ => None,
+                    })
+                    .collect();
+                for name in abstract_names {
+                    self.error(
+                        codes::T063,
+                        self.span(node),
+                        format!(
+                            "`Module {}` cannot carry abstract class or service `{name}`; use a manifest identity in the contract",
+                            self.text_of(args[0])
+                        ),
+                    );
+                }
+            }
+        }
         (ty, kind)
     }
-
-    /// A type variable, `none`, or a type constructor by its (qualified) name.
-    fn type_name(&mut self, node: &Node, free: Free) -> Option<(Type, Kind)> {
-        let tokens: Vec<_> = node.child_tokens().filter(|t| t.kind != K::Dot).collect();
-        let first = tokens.first()?;
-        match first.kind {
-            K::NoneKw => return Some((Type::empty_row(), self.kinds.fresh())),
-            K::String => {
-                let label = literal::string_value(first.text(self.text));
-                return Some((Type::Symbol(label), Kind::Symbol));
-            }
-            K::Ident => {
-                let name = first.text(self.text);
-                if let Some(v) = self.tyvars.iter().rev().find(|v| v.name == name) {
-                    return Some((v.ty.clone(), v.kind.clone()));
-                }
-                let kind = self.kinds.fresh();
-                let ty = match free {
-                    Free::Quantify => Type::Var(name.to_owned()),
-                    Free::Fresh => self.fresh(),
-                    Free::Reject => {
-                        self.error(
-                            codes::T001,
-                            self.span(node),
-                            format!("unknown type variable `{name}`: declare it as a parameter"),
-                        );
-                        return None;
-                    }
-                };
-                self.tyvars.push(TyVar {
-                    name: name.to_owned(),
-                    ty: ty.clone(),
-                    kind: kind.clone(),
-                });
-                return Some((ty, kind));
-            }
-            _ => {}
-        }
-        let parts: Vec<&str> = tokens.iter().map(|t| t.text(self.text)).collect();
-        let (name, qualifier) = parts.split_last()?;
-        let qualifier = qualifier.join(".");
-        let (module, def) = self.find_type(node, &qualifier, name)?;
-        let named = (module.clone(), (*name).to_owned());
-        self.typing
-            .type_names
-            .insert((node.range().0, node.range().1), named);
-        let ty = if let Some((_, service)) = self.service_module(&qualifier, name) {
-            Type::con(&module, &format!("{service}.{name}"))
-        } else {
-            Type::con(&module, name)
-        };
-        match def.form {
-            Form::Kind => {
-                self.error(
-                    codes::T002,
-                    self.span(node),
-                    format!("`{name}` is a kind, not a type"),
-                );
-                None
-            }
-            _ => Some((ty, def.kind)),
-        }
-    }
-
-    /// The definition of a type-level name; `None` after a diagnostic or
-    /// for a name from a module that could not be checked.
-    pub fn find_type(
-        &mut self,
-        node: &Node,
-        qualifier: &str,
-        name: &str,
-    ) -> Option<(String, super::env::TypeDef)> {
-        let module = if qualifier.is_empty() {
-            match self.env.find(Namespace::Type, name) {
-                Found::Entity(e) => e.module,
-                Found::Unknown => return None,
-                Found::Missing => {
-                    self.error_guess(
-                        codes::T001,
-                        self.name_span(node),
-                        format!("unknown type `{name}`"),
-                        |this| closest(name, this.env.names(Namespace::Type)).map(str::to_owned),
-                    );
-                    return None;
-                }
-            }
-        } else if let Some((module, service)) = self.service_module(qualifier, name) {
-            let def = self
-                .env
-                .type_def(&module, &format!("{service}.{name}"))?
-                .clone();
-            return Some((module, def));
-        } else {
-            let Some((_, interface)) = self.env.qualified_module(qualifier) else {
-                self.error_guess(
-                    codes::T001,
-                    self.name_span(node),
-                    format!("unknown module `{qualifier}`"),
-                    |this| {
-                        closest(qualifier, this.env.qualifier_names())
-                            .map(|g| format!("{g}.{name}"))
-                    },
-                );
-                return None;
-            };
-            let interface = interface?;
-            let Some(export) = interface.find(Namespace::Type, name) else {
-                self.error_guess(
-                    codes::T001,
-                    self.name_span(node),
-                    format!("`{qualifier}` does not export type `{name}`"),
-                    |this| {
-                        let (_, Some(interface)) = this.env.qualified_module(qualifier)? else {
-                            return None;
-                        };
-                        let types = interface
-                            .exports
-                            .iter()
-                            .filter(|e| e.entity.namespace == Namespace::Type);
-                        closest(name, types.map(|e| e.entity.name.as_str()))
-                            .map(|g| format!("{qualifier}.{g}"))
-                    },
-                );
-                return None;
-            };
-            export.entity.module.clone()
-        };
-        let def = self.env.type_def(&module, name)?.clone();
-        Some((module, def))
-    }
-
-    /// The module and the name of the service `S` in `S.Impl` or `M.S.Impl`:
-    /// a service in scope wins over a module of its name, as it does for
-    /// `S.operation`.
-    fn service_module(&self, qualifier: &str, name: &str) -> Option<(String, String)> {
-        if name != "Impl" {
-            return None;
-        }
-        let Found::Entity(entity) = self.env.find_type(qualifier) else {
-            return None;
-        };
-        matches!(
-            self.env
-                .type_def(&entity.module, &entity.name)
-                .map(|d| &d.form),
-            Some(Form::Service { .. })
-        )
-        .then_some((entity.module, entity.name))
-    }
 }
+
+include!("convert_names.rs");

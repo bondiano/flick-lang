@@ -1,6 +1,6 @@
 /// Looking into graphs: nodes and edges by index or predicate, neighbors,
 /// degrees, and renderings as GraphViz and Mermaid text.
-module Graph.Query exposing (..)
+private module Graph.Query exposing (..)
 
 import Graph.Types exposing (..)
 

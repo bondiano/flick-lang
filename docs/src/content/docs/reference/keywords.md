@@ -12,6 +12,7 @@ foreign modes, the SQL and CLI clause words) are listed in [grammar.md](../gramm
 | Keyword | Meaning | Example |
 | - | - | - |
 | `module` | names the module of the file | `module App.Main exposing (run)` |
+| `private` | limits a file module to its own package when placed before `module`; a name elsewhere | `private module App.Internal exposing (helper)` |
 | `exposing` | the names a module exports, or an import brings in unqualified | `import App.Domain exposing (User, greet)` |
 | `import` | uses another module | `import Effect.Log as Log` |
 | `as` | a local name for an imported module; the Flick type of a `sql table` column | `import Effect.Log as Log` |

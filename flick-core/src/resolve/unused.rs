@@ -9,6 +9,7 @@ use super::{Interface, Module};
 use crate::diagnostics::{Code, Diagnostic, Edit, Severity, codes};
 use crate::plugin::first_party;
 use crate::source::Span;
+use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
 use crate::types::implicit_package_of;
 
@@ -39,6 +40,17 @@ pub(super) fn unused_locals(unused: Vec<Unused>) -> impl Iterator<Item = Diagnos
     })
 }
 
+fn packed_paths(node: &Node, text: &str, out: &mut Vec<String>) {
+    if node.kind == K::PackExpr
+        && let Some(path) = node.nodes().find(|n| n.kind == K::ModulePath)
+    {
+        out.push(path.text(text).split_whitespace().collect());
+    }
+    for child in node.nodes() {
+        packed_paths(child, text, out);
+    }
+}
+
 impl Scope<'_> {
     /// Warnings for imports, and names they expose, that no reference and no
     /// export of the module uses.
@@ -59,10 +71,13 @@ impl Scope<'_> {
                 .map(|i| i.name.as_str()),
         );
         // `M.S.op` uses the import `M` too: count each prefix of a qualifier
+        let mut packed = Vec::new();
+        packed_paths(module.tree, module.text, &mut packed);
         let qualifiers: BTreeSet<&str> = references
             .iter()
             .filter_map(|r| r.qualifier.as_deref())
             .flat_map(|q| q.match_indices('.').map(|(i, _)| &q[..i]).chain([q]))
+            .chain(packed.iter().map(String::as_str))
             .collect();
         // `T.member`, a companion, uses the type `T`
         names.extend(qualifiers.iter().filter(|q| !q.contains('.')));

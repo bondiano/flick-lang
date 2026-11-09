@@ -56,6 +56,10 @@ type Codec (rd : ServiceRow) (re : ServiceRow) i a
 @lang errors
 type Errors (e : ErrorRow)
 
+/// A packed module satisfying the structural contract `sig`.
+/// `pack` and `unpack` are the only ways to construct and open one.
+type Module (sig : Module)
+
 @lang ui
 /// A user interface: see the module `Ui`.
 type Ui

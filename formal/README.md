@@ -9,6 +9,15 @@ dictionaries in [`docs/formal/elaboration.md`](../docs/formal/elaboration.md)
 (`Formal/Elab/`, see [Elaboration and T6](#elaboration-and-t6)). Lean 4.29.1
 (`lean-toolchain`), no Mathlib.
 
+The module layer (`type module`, named functors, `Module Sig`, and existential
+module witnesses) is checked before this core. [`Formal/Modules.lean`](Formal/Modules.lean)
+models named result identities, manifest class/service requirements, and scoped
+existential elimination; its rules and limits are in the [module boundary
+model](../docs/formal/modules.md). The core theorems still do not establish
+source-level module soundness or correctness of the Rust lowering. The reference
+model checks dictionary records and executes the lowered module examples;
+source typing remains a compiler obligation.
+
 ## Building
 
 ```sh
@@ -25,6 +34,12 @@ in the `lean` job (`leanprover/lean-action` with `build-args: --wfail`).
 
 ## What is proved
 
+- **The module boundary** (`Formal/Modules.lean`): separate named application
+  sites have separate nominal result types, repeated imports preserve identity,
+  manifest class/service requirements match exactly, abstract identities cannot
+  cross `Module Sig`, and packed witness introduction follows the scoped
+  elimination equations. These are model properties, not a compiler soundness
+  theorem; see the [module boundary model](../docs/formal/modules.md).
 - **The core** (`Formal/`, the top-level modules), with rows of services and errors that
   take variables, generalized and instantiated as variables of the other kinds, and arms on
   the constructors of a GADT typed under every unifier of what the constructor builds with

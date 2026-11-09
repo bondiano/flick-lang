@@ -1,7 +1,7 @@
 /// Graph algorithms: cycles, connectivity, matching, flows, spanning
 /// forests and shortest paths. Invalid input (a missing node, a negative or
 /// `NaN` weight where none may be) is a `GraphError`, never a defect.
-module Graph.Algorithms exposing (..)
+private module Graph.Algorithms exposing (..)
 
 import Graph.Types exposing (..)
 

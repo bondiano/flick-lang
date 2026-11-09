@@ -1,6 +1,9 @@
 use super::*;
+use crate::diagnostics::codes;
 use crate::source::SourceMap;
 use crate::syntax::cst::Element;
+use crate::types::{Limits, Options, Thresholds, Watched};
+use crate::{doc, iface, ir, resolve, types};
 
 /// Compact shape of the tree: node kinds and token texts, no trivia; nodes
 /// with one child are shown as `Kind:child` to keep expectations short.
@@ -216,6 +219,8 @@ fn type_lists_variants_and_alias_names_a_type() {
     );
 }
 
+include!("tests_modules.rs");
+include!("tests_module_values.rs");
 #[test]
 fn a_gadt_constructor_names_what_it_builds() {
     assert_eq!(

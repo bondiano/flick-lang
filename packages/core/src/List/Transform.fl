@@ -1,6 +1,8 @@
 /// Lists combined, accumulated and taken apart: the part of `List` over
 /// Effect's `Array` that computes new elements.
-module List.Transform exposing (..)
+private module List.Transform exposing (..)
+
+import List.Core
 
 /// `xs |> cartesian ys`: every pair of an element of `xs` and one of `ys`.
 cartesian : List b -> List a -> List (a, b)

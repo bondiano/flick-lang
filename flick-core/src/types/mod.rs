@@ -47,6 +47,11 @@ pub mod lang;
 mod lint_tests;
 mod lints;
 mod makers;
+mod module_contract;
+pub(crate) use module_contract::{
+    Mismatch as ModuleMismatch, check as check_module_contract,
+    local_dictionaries as module_local_dictionaries, project as project_module_contract,
+};
 mod origin;
 mod patterns;
 mod qualified;
@@ -97,7 +102,10 @@ pub use convert::is_type;
 pub use display::{show_signature, show_type};
 pub use do_notation::{bind_key, guard_key};
 pub use effects::NO_EFFECTS;
-pub use env::{Abi, EnumLit, Form, Fundep, Instance, JsClass, Rep, TypeDef};
+pub use env::{
+    Abi, EnumLit, Form, Fundep, Instance, JsClass, ModuleNominalKind, ModuleRequirement, Rep,
+    TypeDef,
+};
 pub use ffi::keeps_for_owner;
 pub use gadt::branch::dict_local;
 pub use gadt::scheme::{built, is_indexed, written_dicts};
@@ -124,7 +132,7 @@ use std::sync::Arc;
 use unify::Store;
 
 use crate::diagnostics::{Code, Diagnostic, Severity, codes};
-use crate::iface::Interface;
+use crate::iface::{Interface, Namespace};
 use crate::numeric::Num;
 use crate::plugin::derive::{Derived, derived_classes};
 use crate::resolve::Module;
@@ -229,6 +237,21 @@ pub fn check_typed(
     (diagnostics, typing)
 }
 
+/// Checks a named functor result with the dictionaries supplied by its
+/// static module arguments in scope for every definition of the result.
+pub(crate) fn check_typed_with_module_dictionaries(
+    module: &Module,
+    imported: &dyn Fn(&str) -> Option<Interface>,
+    builtins: &[Interface],
+    options: Options,
+    interface: &mut Interface,
+    dictionaries: &[(Type, Dict)],
+) -> (Vec<Diagnostic>, Typing) {
+    let (diagnostics, typing, _) =
+        run_with_dictionaries(module, imported, builtins, options, interface, dictionaries);
+    (diagnostics, typing)
+}
+
 /// Checks a built-in module for editor queries against the built-in modules
 /// before it, allowing the compiler's `@lang` marks in its source.
 pub fn check_builtin_typed(
@@ -239,7 +262,7 @@ pub fn check_builtin_typed(
     interface: &mut Interface,
 ) -> (Vec<Diagnostic>, Typing) {
     let known = Builtins::new(dependencies);
-    let (diagnostics, typing, _) = run_in(module, imported, &known, options, interface);
+    let (diagnostics, typing, _) = run_in(module, imported, &known, options, interface, &[]);
     (diagnostics, typing)
 }
 
@@ -250,6 +273,17 @@ fn run(
     options: Options,
     interface: &mut Interface,
 ) -> (Vec<Diagnostic>, Typing, Vec<(Span, Dict)>) {
+    run_with_dictionaries(module, imported, builtins, options, interface, &[])
+}
+
+fn run_with_dictionaries(
+    module: &Module,
+    imported: &dyn Fn(&str) -> Option<Interface>,
+    builtins: &[Interface],
+    options: Options,
+    interface: &mut Interface,
+    dictionaries: &[(Type, Dict)],
+) -> (Vec<Diagnostic>, Typing, Vec<(Span, Dict)>) {
     let owned;
     let builtins = if let Some(by_class) = builtins::are_builtins(builtins) {
         builtin_env(by_class)
@@ -258,7 +292,7 @@ fn run(
         &owned
     };
     let (mut diagnostics, typing, evidence) =
-        run_in(module, imported, builtins, options, interface);
+        run_in(module, imported, builtins, options, interface, dictionaries);
     // only the built-in modules, which `run_in` checks directly, mark lang items
     let marks = lang::attributes(module.tree);
     for attribute in marks
@@ -282,6 +316,7 @@ fn run_in(
     builtins: &Builtins,
     options: Options,
     interface: &mut Interface,
+    dictionaries: &[(Type, Dict)],
 ) -> (Vec<Diagnostic>, Typing, Vec<(Span, Dict)>) {
     let env = Env::new(module.name, module.syntax, imported, builtins);
     let mut checker = Checker {
@@ -296,6 +331,8 @@ fn run_in(
         locals: Vec::new(),
         ui: 0,
         tyvars: Vec::new(),
+        contract_types: Vec::new(),
+        opened_modules: Vec::new(),
         runtime: false,
         stage: effects::Stage::default(),
         sites: Vec::new(),
@@ -322,7 +359,24 @@ fn run_in(
         sugar: Vec::new(),
         gadt: gadt::branch::State::default(),
     };
+    checker.classes.local.extend_from_slice(dictionaries);
     checker.module(module.tree);
+    for export in &interface.exports {
+        if export.entity.module == module.name
+            && export.entity.namespace == Namespace::Value
+            && !checker.top.has_signature(&export.entity.name)
+            && checker
+                .env
+                .value(&export.entity)
+                .is_some_and(|ty| ty.contains(&mut |part| matches!(part, Type::Exists { .. })))
+        {
+            checker.error(
+                codes::T064,
+                export.at.map_or_else(|| Span::new(module.file, 0, 0), |[start, end]| Span::new(module.file, start, end)),
+                format!("public value `{}` contains an abstract module witness; write an explicit `exists K : Sig. T` signature immediately above its definition", export.entity.name),
+            );
+        }
+    }
     checker.report_holes();
     checker.record_call_sites();
     checker.unannotated_codecs();
@@ -465,6 +519,10 @@ struct Checker<'a> {
     /// names `Ui` exports need no `Ui.`.
     ui: usize,
     tyvars: Vec<TyVar>,
+    /// Capitalized type members visible only while checking a `type module` body.
+    contract_types: Vec<(String, Type, kinds::Kind)>,
+    /// Lexically opened `Module Sig` values, innermost first on lookup.
+    opened_modules: Vec<module_contract::Opened>,
     /// Whether the expression being inferred runs a runtime call at this
     /// stage; lambdas and `task` bodies are deferred and do not count.
     runtime: bool,
@@ -509,65 +567,4 @@ struct Checker<'a> {
     control_effects: HashSet<String>,
 }
 
-impl Checker<'_> {
-    fn span(&self, node: &Node) -> Span {
-        let (start, end) = node.range();
-        Span::new(self.file, start, end)
-    }
-
-    fn token_span(&self, token: Token) -> Span {
-        Span::new(self.file, token.start, token.end)
-    }
-
-    /// The span of a node's own (possibly qualified) name tokens, without
-    /// the arguments a pattern or type application carries as child nodes.
-    fn name_span(&self, node: &Node) -> Span {
-        let mut names = node
-            .child_tokens()
-            .filter(|t| matches!(t.kind, K::Con | K::Ident | K::Dot));
-        let Some(first) = names.next() else {
-            return self.span(node);
-        };
-        let end = names.last().map_or(first.end, |t| t.end);
-        Span::new(self.file, first.start, end)
-    }
-
-    /// Source text of a node with its line breaks and runs of spaces collapsed.
-    fn text_of(&self, node: &Node) -> String {
-        let (start, end) = node.range();
-        self.text[start as usize..end as usize]
-            .split_whitespace()
-            .collect::<Vec<_>>()
-            .join(" ")
-    }
-
-    fn error(&mut self, code: Code, span: Span, message: impl Into<String>) {
-        self.diagnostics
-            .push(Diagnostic::error(code, message, span));
-    }
-
-    /// An error that offers `guess` as the replacement of `span`'s text.
-    fn error_guess(
-        &mut self,
-        code: Code,
-        span: Span,
-        message: impl Into<String>,
-        guess: impl FnOnce(&Self) -> Option<String>,
-    ) {
-        let diagnostic = Diagnostic::error(code, message, span).did_you_mean(span, || guess(self));
-        self.diagnostics.push(diagnostic);
-    }
-
-    fn warning(&mut self, code: Code, span: Span, message: impl Into<String>) {
-        self.diagnostics
-            .push(Diagnostic::new(code, Severity::Warning, message).with_span(span));
-    }
-
-    fn duplicate_label(&mut self, label: &str, span: Span) {
-        self.error(
-            codes::T014,
-            span,
-            format!("field `{label}` is given more than once; labels of a record are unique"),
-        );
-    }
-}
+include!("checker_helpers.rs");

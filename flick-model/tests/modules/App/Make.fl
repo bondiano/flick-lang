@@ -1,0 +1,4 @@
+module App.Make(K : App.Contracts.Policy) exposing (answer)
+
+answer : Bool
+let answer = eq "A" "A"

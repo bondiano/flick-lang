@@ -7,14 +7,17 @@ needs, so an importer never re-reads, re-parses or re-checks the module's
 source (see [Compiler architecture](../../contributing/implementation-decisions/#compiler-architecture)). It is versioned JSON. `.d.ts` is only a projection for
 TypeScript; `.iface` is the source of truth for Flick importers.
 
-The current schema is `iface-version` 8. Every change of the schema bumps it,
-and a compiler rejects any version but its own with `FLICK-P010`.
+The current schema is `iface-version` 11. It includes module visibility,
+`type module` contracts, the `exists` type form and implicit conversion
+instances. Every schema change bumps the version; a compiler rejects any other
+version with `FLICK-P010`. The simplified example below shows the envelope;
+use the current compiler to write an interface for a new package.
 
-## Version 3
+## Example
 
 ```json
 {
-  "iface-version": 8,
+  "iface-version": 11,
   "compiler": "0.1.0",
   "module": "App.Shapes",
   "exports": [
@@ -38,6 +41,7 @@ number by hand cannot recover missing capture information.
 | `iface-version` | schema version; must equal the compiler's |
 | `compiler` | version of the compiler that wrote the file; must equal the reader's |
 | `module` | full name of the described module |
+| `private` | `true` for a module importable only within its package; omitted otherwise |
 | `exports` | the module's interface, in the order of its `exposing` list |
 | `hidden` | constructors of exported types that are not exported, so an import of one gets a precise `FLICK-R005`; omitted when empty |
 | `docs` | the `///` comment of each export the module declares, by name, which its `.d.ts` carries as JSDoc; omitted when empty |

@@ -71,7 +71,12 @@ fn declaration(decl: &Node, text: &str, file: FileId, defs: &mut Vec<Def>) {
                 }
             }
         }
-        K::TypeDecl | K::KindDecl | K::ErrorDecl | K::ServiceDecl | K::ClassDecl => {
+        K::TypeDecl
+        | K::ModuleTypeDecl
+        | K::KindDecl
+        | K::ErrorDecl
+        | K::ServiceDecl
+        | K::ClassDecl => {
             let Some(name) = first(K::Con) else { return };
             let parent = name.text(text);
             let variants: Vec<Token> = decl
@@ -85,6 +90,7 @@ fn declaration(decl: &Node, text: &str, file: FileId, defs: &mut Vec<Def>) {
                 K::TypeDecl if !variants.is_empty() => Decl::Adt,
                 K::TypeDecl if decl.has_token(K::Eq) => Decl::Alias,
                 K::TypeDecl => Decl::Abstract,
+                K::ModuleTypeDecl => Decl::ModuleType,
                 K::KindDecl => Decl::Kind,
                 K::ErrorDecl => Decl::Error,
                 K::ServiceDecl => Decl::Service,

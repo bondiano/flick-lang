@@ -144,6 +144,11 @@ impl<'a> Gen<'a> {
                 list(a, "[]flickrt.Value{", items, "}").into()
             }
             ExprKind::Record(fields) => self.record(None, fields),
+            ExprKind::Dictionary(fields) => {
+                let all: Vec<&Expr> = fields.iter().map(|(_, value)| value).collect();
+                let values = self.ordered(&all);
+                call(self.a, "flickrt.DictOf", self.entries(fields, values)).into()
+            }
             ExprKind::Update(base, fields) => self.record(Some(base), fields),
             ExprKind::Field(record, label) => {
                 let r = self.expr(record);

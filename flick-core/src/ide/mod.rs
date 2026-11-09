@@ -128,6 +128,7 @@ impl Ide<'_> {
                     };
                     Symbol::Local { file, binder, name }
                 }
+                Ref::PackedField { .. } => return None,
                 Ref::Value { module, name } => match name.split_once('$') {
                     Some((ty, _)) => entity(module, Namespace::Type, ty),
                     None => entity(module, Namespace::Value, name),

@@ -42,6 +42,11 @@ struct Item<'a> {
 }
 
 impl TopLevel<'_> {
+    pub(super) fn has_signature(&self, name: &str) -> bool {
+        self.by_name
+            .get(name)
+            .is_some_and(|&index| self.items[index].sig.is_some())
+    }
     /// The name of the top-level definition whose declaration holds `offset`:
     /// the user's code of a block is in the declaration the block gave, which
     /// stands after the module's own text, from `generated` on.

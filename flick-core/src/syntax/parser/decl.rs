@@ -28,11 +28,14 @@ pub(super) fn declaration(p: &mut Parser) -> Done {
 
 fn top_decl(p: &mut Parser) {
     match p.current() {
+        K::Ident if p.at_word("private") && p.nth(1) == K::ModuleKw => module_header(p),
+        K::ModuleKw if p.nth(1) == K::Con && p.nth(2) == K::Eq => module_apply_decl(p),
         K::ModuleKw => module_header(p),
         K::ImportKw => import(p),
         K::RecKw => rec_group(p),
         K::KindKw => kind_decl(p),
         K::TypeKw if p.nth(1) == K::ErrorKw => error_decl(p),
+        K::TypeKw if p.nth(1) == K::ModuleKw => module_type_decl(p),
         K::ServiceKw => service_decl(p),
         K::ClassKw => class_decl(p),
         K::InstanceKw => instance_decl(p),
@@ -76,71 +79,7 @@ fn member(p: &mut Parser) {
     }
 }
 
-fn module_path(p: &mut Parser) {
-    let m = p.start();
-    if p.expect(K::Con) {
-        while expr::path_continues(p) && p.toks[p.pos + 1].kind == K::Con {
-            p.bump();
-            p.bump();
-        }
-    }
-    p.complete(m, K::ModulePath);
-}
-
-fn module_header(p: &mut Parser) {
-    let m = p.start();
-    p.bump();
-    module_path(p);
-    if p.at(K::ExposingKw) {
-        exposing(p);
-    }
-    p.complete(m, K::ModuleHeader);
-}
-
-fn import(p: &mut Parser) {
-    let m = p.start();
-    p.bump();
-    module_path(p);
-    if p.eat(K::AsKw) {
-        p.expect(K::Con);
-    }
-    if p.at(K::ExposingKw) {
-        exposing(p);
-    }
-    p.complete(m, K::ImportDecl);
-}
-
-fn exposing(p: &mut Parser) {
-    let m = p.start();
-    p.bump();
-    if p.at(K::LParen) {
-        p.delimited(K::RParen, expose_item);
-    } else {
-        p.error_expected("`(` with the exposed names");
-    }
-    p.complete(m, K::Exposing);
-}
-
-/// `name`, `Type`, `Type(..)`, `..` or `plugin head`.
-fn expose_item(p: &mut Parser) {
-    let m = p.start();
-    match p.current() {
-        K::Ident if super::plugin::at_head(p) => super::plugin::head(p),
-        K::Ident | K::DotDot => p.bump(),
-        K::Con => {
-            p.bump();
-            if p.at(K::LParen) && p.adjacent() {
-                let opener = p.raw();
-                p.bump();
-                p.expect(K::DotDot);
-                p.expect_closer(K::RParen, opener);
-            }
-        }
-        _ => p.error_expected("an exposed name"),
-    }
-    p.complete(m, K::ExposeItem);
-}
-
+include!("decl_modules.rs");
 pub(super) fn signature(p: &mut Parser) {
     let m = p.start();
     p.bump();
@@ -282,6 +221,60 @@ fn type_decl(p: &mut Parser) {
         }
     }
     p.complete(m, K::TypeDecl);
+}
+
+/// `type module Name =` followed by required declarations. `type T = U`
+/// in this body is a manifest type equality, unlike an ordinary ADT.
+fn module_type_decl(p: &mut Parser) {
+    let m = p.start();
+    p.bump();
+    p.bump();
+    if p.expect(K::Con) && p.expect(K::Eq) {
+        p.body(K::Members, module_type_member);
+    }
+    p.complete(m, K::ModuleTypeDecl);
+}
+
+fn module_type_member(p: &mut Parser) {
+    match p.current() {
+        K::TypeKw => {
+            let m = p.start();
+            p.bump();
+            if p.expect(K::Con) {
+                type_params(p);
+                if p.eat(K::Eq) {
+                    types::type_(p);
+                }
+            }
+            p.complete(m, K::ModuleTypeMember);
+        }
+        K::InstanceKw => {
+            let m = p.start();
+            p.bump();
+            types::union(p);
+            if p.expect(K::FromKw) {
+                p.expect(K::Ident);
+            }
+            p.complete(m, K::ModuleInstanceReq);
+        }
+        K::Ident if p.nth(1) == K::Colon => signature(p),
+        K::ClassKw | K::ServiceKw
+            if p.nth(1) == K::Con && p.nth(2) == K::Eq && p.nth(3) == K::Con =>
+        {
+            let m = p.start();
+            p.bump();
+            p.bump();
+            p.bump();
+            module_path(p);
+            p.complete(m, K::ModuleNominalMember);
+        }
+        K::ClassKw => class_decl(p),
+        K::ServiceKw => service_decl(p),
+        _ => {
+            p.error_expected("a module requirement: `type`, a value signature, `class`, `service`, or `instance ... from name`");
+            p.recover();
+        }
+    }
 }
 
 fn variants(p: &mut Parser, refinable: bool) {

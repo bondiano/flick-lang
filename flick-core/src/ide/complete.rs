@@ -178,7 +178,13 @@ impl Ide<'_> {
                 return ops;
             }
             let service = iter::once(&m.interface)
-                .chain(self.analysis.modules.iter().map(|x| &x.interface))
+                .chain(
+                    self.analysis
+                        .modules
+                        .iter()
+                        .filter(|x| !x.inline || x.file == m.file)
+                        .map(|x| &x.interface),
+                )
                 .find_map(|i| i.find(Namespace::Type, &qualifier)?.definition.clone());
             if let Some(def) = service
                 && let Form::Service { operations, .. } = def.form

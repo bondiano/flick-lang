@@ -39,6 +39,10 @@
         },
         {
           "type": "SYMBOL",
+          "name": "_private_module"
+        },
+        {
+          "type": "SYMBOL",
           "name": "parens"
         },
         {
@@ -452,6 +456,29 @@
           "content": {
             "type": "STRING",
             "value": "fn"
+          },
+          "named": true,
+          "value": "keyword"
+        }
+      ]
+    },
+    "_private_module": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "ALIAS",
+          "content": {
+            "type": "STRING",
+            "value": "private"
+          },
+          "named": true,
+          "value": "keyword"
+        },
+        {
+          "type": "ALIAS",
+          "content": {
+            "type": "STRING",
+            "value": "module"
           },
           "named": true,
           "value": "keyword"

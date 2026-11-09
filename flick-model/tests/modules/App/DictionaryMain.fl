@@ -1,0 +1,6 @@
+module App.DictionaryMain exposing (main)
+
+import App.Parent.Chosen as Chosen
+
+main : Unit ->{} Unit
+let main () = Platform.stdout_line (if Chosen.answer == false then "ok" else "bad")

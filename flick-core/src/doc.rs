@@ -10,7 +10,7 @@ use std::ptr;
 use crate::iface::{Decl, Export, Interface, Namespace};
 use crate::syntax::cst::{Element, Node};
 use crate::syntax::kind::SyntaxKind as K;
-use crate::types::{Form, show_signature, show_type};
+use crate::types::{Form, ModuleNominalKind, ModuleRequirement, show_signature, show_type};
 
 /// The `///` comment right above each top-level declaration, and above
 /// each constructor on a line of its own (`| Circle Float`), by name. A
@@ -109,6 +109,11 @@ fn declared(line: &str) -> Option<String> {
         return None;
     }
     let words: Vec<&str> = line.split_whitespace().collect();
+    if words.starts_with(&["type", "module"]) {
+        return words
+            .get(2)
+            .map(|name| name.trim_end_matches('=').to_owned());
+    }
     let skip = [
         "type", "alias", "error", "opaque", "refined", "unboxed", "untagged", "service", "class",
         "kind", "sql", "table",
@@ -191,9 +196,96 @@ pub fn page(interface: &Interface, text: &str) -> String {
     out
 }
 
+fn module_contract(name: &str, requirements: &[ModuleRequirement], out: &mut String) {
+    let mut lines = Vec::new();
+    for requirement in requirements {
+        lines.push(match requirement {
+            ModuleRequirement::Type {
+                name,
+                params,
+                manifest,
+            } => {
+                let params = params
+                    .iter()
+                    .map(|p| p.name.as_str())
+                    .collect::<Vec<_>>()
+                    .join(" ");
+                let head = if params.is_empty() {
+                    name.clone()
+                } else {
+                    format!("{name} {params}")
+                };
+                manifest.as_ref().map_or_else(
+                    || format!("  type {head}"),
+                    |ty| format!("  type {head} = {}", show_type(ty)),
+                )
+            }
+            ModuleRequirement::Value { name, ty } => {
+                format!("  {name} : {}", show_signature(ty))
+            }
+            ModuleRequirement::Nominal {
+                name,
+                category,
+                identity,
+                definition,
+                methods,
+            } => {
+                let keyword = match category {
+                    ModuleNominalKind::Class => "class",
+                    ModuleNominalKind::Service => "service",
+                };
+                if let Some(e) = identity {
+                    format!("  {keyword} {name} = {}.{}", e.module, e.name)
+                } else if let Some(def) = definition {
+                    let (params, members) = match &def.form {
+                        Form::Class { params, .. } => (
+                            params.as_slice(),
+                            methods
+                                .iter()
+                                .map(|(n, ty)| format!("    {n} : {}", show_signature(ty)))
+                                .collect::<Vec<_>>(),
+                        ),
+                        Form::Service {
+                            params, operations, ..
+                        } => (
+                            params.as_slice(),
+                            operations
+                                .iter()
+                                .map(|op| format!("    {} : {}", op.name, show_signature(&op.ty)))
+                                .collect::<Vec<_>>(),
+                        ),
+                        _ => (&[][..], Vec::new()),
+                    };
+                    let suffix = if params.is_empty() {
+                        String::new()
+                    } else {
+                        format!(" {}", params.join(" "))
+                    };
+                    if members.is_empty() {
+                        format!("  {keyword} {name}{suffix}")
+                    } else {
+                        format!("  {keyword} {name}{suffix} =\n{}", members.join("\n"))
+                    }
+                } else {
+                    format!("  {keyword} {name}")
+                }
+            }
+            ModuleRequirement::Dictionary { head, from } => {
+                format!("  instance {} from {from}", show_type(head))
+            }
+        });
+    }
+    let _ = writeln!(
+        out,
+        "\n```flick\ntype module {name} =\n{}\n```",
+        lines.join("\n")
+    );
+}
+
 fn definition(interface: &Interface, e: &Export, form: &Form, out: &mut String) {
     let name = &e.entity.name;
     match form {
+        Form::ModuleContract { requirements } => module_contract(name, requirements, out),
         Form::Alias { params, body, .. } => {
             let params: String = params.iter().fold(String::new(), |mut acc, p| {
                 let _ = write!(acc, " {p}");
@@ -291,5 +383,7 @@ mod tests {
         assert!(!docs.contains_key("x"));
         let docs = comments("/// Made.\nlet rec made = 1\n");
         assert_eq!(docs.get("made").map(String::as_str), Some("Made."));
+        let docs = comments("/// Contract.\ntype module HashKey =\n  type Key\n");
+        assert_eq!(docs.get("HashKey").map(String::as_str), Some("Contract."));
     }
 }

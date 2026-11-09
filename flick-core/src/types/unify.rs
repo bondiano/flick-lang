@@ -685,6 +685,32 @@ impl Checker<'_> {
                 x.iter().zip(y).try_for_each(|(x, y)| self.unify(x, y))
             }
             (Type::Record(r1), Type::Record(r2)) => self.unify_rows(r1, r2),
+            (
+                Type::Exists {
+                    binder: x,
+                    contract: c1,
+                    body: b1,
+                },
+                Type::Exists {
+                    binder: y,
+                    contract: c2,
+                    body: b2,
+                },
+            ) => {
+                fn alpha(ty: &Type, binder: &str) -> Type {
+                    if let Type::Con { module, name } = ty
+                        && module == &format!("$exists:{binder}")
+                    {
+                        return Type::con("$exists:#", name);
+                    }
+                    if matches!(ty, Type::Exists { binder: inner, .. } if inner == binder) {
+                        return ty.clone();
+                    }
+                    ty.map_children(&mut |child| alpha(child, binder))
+                }
+                self.unify(c1, c2)?;
+                self.unify(&alpha(b1, x), &alpha(b2, y))
+            }
             (Type::Row(_) | Type::Union(..), _) | (_, Type::Row(_) | Type::Union(..)) => {
                 self.unify_row_types(&a, &b)
             }

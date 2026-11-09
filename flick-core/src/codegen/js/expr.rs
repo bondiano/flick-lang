@@ -129,7 +129,7 @@ impl Gen<'_> {
                 let items: Vec<&Expr> = items.iter().collect();
                 format!("[{}]", self.ordered(&items).join(", "))
             }
-            ExprKind::Record(fields) => self.record(None, fields),
+            ExprKind::Record(fields) | ExprKind::Dictionary(fields) => self.record(None, fields),
             ExprKind::Update(record, fields) => self.record(Some(record), fields),
             ExprKind::Field(record, label) => {
                 let r = self.expr(record);

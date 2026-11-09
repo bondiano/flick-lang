@@ -45,15 +45,18 @@ impl Checker<'_> {
             for mut w in pending {
                 // under the equalities of the GADT branches it is from
                 let outcome = self.under(&w.givens, |this| {
+                    let previous = mem::replace(&mut this.classes.local, w.local.clone());
                     let givens = this.closure(&w.givens);
                     let c = this.canon(&w.constraint);
                     progress |= c != w.constraint;
                     w.constraint = c;
                     let site = this.call_site(&w.constraint, &givens, w.span);
-                    site.map_or_else(
+                    let outcome = site.map_or_else(
                         || this.entail(&w.constraint, &givens, &mut Vec::new()),
                         Outcome::Solved,
-                    )
+                    );
+                    this.classes.local = previous;
+                    outcome
                 });
                 match outcome {
                     Outcome::Solved(dict) => {
@@ -196,6 +199,15 @@ impl Checker<'_> {
             let shown = self.show(&g);
             visit(self, g, Dict::Given(shown), &mut path, &mut out);
         }
+        for (constraint, dict) in self.classes.local.iter().rev() {
+            visit(
+                self,
+                self.canon(constraint),
+                dict.clone(),
+                &mut path,
+                &mut out,
+            );
+        }
         out
     }
 
@@ -231,10 +243,10 @@ impl Checker<'_> {
         let ground =
             !c.contains(&mut |t| matches!(t, Type::Meta(_) | Type::Skolem(_) | Type::Var(_)));
         let key = ground.then(|| c.clone());
-        if let Some(dict) = key.as_ref().and_then(|k| self.classes.cache.get(k)) {
+        if let Some((_, dict)) = givens.iter().find(|(g, _)| g == c) {
             return Outcome::Solved(dict.clone());
         }
-        if let Some((_, dict)) = givens.iter().find(|(g, _)| g == c) {
+        if let Some(dict) = key.as_ref().and_then(|k| self.classes.cache.get(k)) {
             return Outcome::Solved(dict.clone());
         }
         if self.improve_by_givens(&module, &name, &args, givens) {

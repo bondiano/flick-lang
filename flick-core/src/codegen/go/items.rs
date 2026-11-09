@@ -370,6 +370,16 @@ impl<'a> Gen<'a> {
                     .map_or_else(|| panic!("dictionary `{shown}` is in scope"), |&(_, p)| p);
                 self.code(given)
             }
+            Dict::Value { module, name } => {
+                self.reads(module);
+                self.global_value(module, name, Vec::new())
+            }
+            Dict::Opened { binder, field } => call(
+                a,
+                "flickrt.Field",
+                [self.code(&names::local(binder)).doc, self.string(field)],
+            )
+            .into(),
             // bound by the pattern of the constructor whose value holds it
             Dict::Field(local) => self.code(&names::local(local)),
             Dict::Super { dict, class } => {

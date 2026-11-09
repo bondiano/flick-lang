@@ -13,6 +13,10 @@ pub enum Dict {
     },
     /// A constraint of the enclosing signature or instance.
     Given(String),
+    /// A named dictionary exported by a static module argument.
+    Value { module: String, name: String },
+    /// A dictionary field of a lexically opened `Module Sig` value.
+    Opened { binder: String, field: String },
     /// A dictionary a matched value holds, bound to this local by the
     /// pattern of its constructor.
     Field(String),

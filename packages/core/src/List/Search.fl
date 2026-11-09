@@ -1,7 +1,7 @@
 /// Lists searched, compared as sets and grouped: the part of `List` over
 /// Effect's `Array` that relates elements to each other. The variants
 /// without `_with` use `Eq`.
-module List.Search exposing (..)
+private module List.Search exposing (..)
 
 /// The last element that satisfies `p`.
 find_last : (a -> Bool)^c -> List a -> Option a

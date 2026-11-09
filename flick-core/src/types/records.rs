@@ -101,7 +101,10 @@ impl Checker<'_> {
         #[cfg(feature = "ide")]
         let mut labels = Vec::new();
         for field in node.nodes().filter(|n| n.kind == K::RecordField) {
-            let Some(label) = field.child_tokens().find(|t| t.kind == K::Ident) else {
+            let Some(label) = field
+                .child_tokens()
+                .find(|t| matches!(t.kind, K::Ident | K::Con))
+            else {
                 continue;
             };
             #[cfg(feature = "ide")]
@@ -148,7 +151,10 @@ impl Checker<'_> {
         let record = self.infer(children[0]);
         let mut seen: Vec<String> = Vec::new();
         for field in node.nodes().filter(|n| n.kind == K::RecordField) {
-            let Some(label) = field.child_tokens().find(|t| t.kind == K::Ident) else {
+            let Some(label) = field
+                .child_tokens()
+                .find(|t| matches!(t.kind, K::Ident | K::Con))
+            else {
                 continue;
             };
             let name = label.text(self.text).to_owned();

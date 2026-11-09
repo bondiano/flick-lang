@@ -17,6 +17,9 @@ pub(super) fn kind_description(kind: &Kind) -> &'static str {
         Kind::Type => {
             "The kind of ordinary value types, such as `String` and `List String`. A type constructor can take type arguments: `List` has kind `Type -> Type`."
         }
+        Kind::Module => {
+            "The kind of a structural `type module` contract. A named static module can satisfy it, and `Module Sig` can carry a matching module as a value."
+        }
         Kind::ServiceRow => {
             "A row of service identities, used for the requirements of computations such as `Eff r e a` and for the inputs and outputs of layers. `none` is the empty row."
         }

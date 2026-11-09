@@ -11,6 +11,8 @@ use serde::{Deserialize, Serialize};
 #[serde(rename_all = "kebab-case")]
 pub enum Kind {
     Type,
+    /// A `type module` contract, used by static functors and `Module Sig`.
+    Module,
     ServiceRow,
     ErrorRow,
     CaptureRow,
@@ -53,6 +55,7 @@ impl Kind {
     pub fn builtin(name: &str) -> Option<Kind> {
         Some(match name {
             "Type" => Kind::Type,
+            "Module" => Kind::Module,
             "ServiceRow" => Kind::ServiceRow,
             "ErrorRow" => Kind::ErrorRow,
             "CaptureRow" => Kind::CaptureRow,
@@ -69,6 +72,7 @@ impl fmt::Display for Kind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Kind::Type => f.write_str("Type"),
+            Kind::Module => f.write_str("Module"),
             Kind::ServiceRow => f.write_str("ServiceRow"),
             Kind::ErrorRow => f.write_str("ErrorRow"),
             Kind::CaptureRow => f.write_str("CaptureRow"),

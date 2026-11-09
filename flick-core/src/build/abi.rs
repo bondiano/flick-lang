@@ -254,7 +254,9 @@ impl Totality<'_> {
                 partial(e)
             }
             ExprKind::Tuple(items) | ExprKind::List(items) => items.iter().any(partial),
-            ExprKind::Record(fields) => fields.iter().any(|(_, v)| partial(v)),
+            ExprKind::Record(fields) | ExprKind::Dictionary(fields) => {
+                fields.iter().any(|(_, v)| partial(v))
+            }
             ExprKind::Update(r, fields) => partial(r) || fields.iter().any(|(_, v)| partial(v)),
             ExprKind::If(c, t, f) => partial(c) || partial(t) || partial(f),
             ExprKind::Match(s, arms) => {

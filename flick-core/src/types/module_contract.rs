@@ -1,0 +1,378 @@
+//! Structural matching of a named module against `type module` requirements.
+
+use super::env::{Form, ModuleNominalKind, ModuleRequirement, TypeDef};
+use super::ty::Type;
+use crate::api_diff;
+use crate::diagnostics::codes;
+use crate::iface::{Decl, Interface, Namespace};
+use crate::syntax::cst::Node;
+use crate::syntax::kind::SyntaxKind as K;
+
+#[derive(Debug, Clone)]
+pub(super) struct Opened {
+    pub alias: String,
+    pub types: Vec<(String, Type, super::Kind)>,
+    pub values: Vec<(String, Type)>,
+}
+
+type OpenedRequirements = (
+    Vec<(String, Type)>,
+    Vec<(String, Type, super::Kind)>,
+    Vec<(String, Type)>,
+);
+
+fn open_existential_type(ty: &Type, binder: &str, witness: &str) -> Type {
+    if let Type::Con { module, name } = ty
+        && module == &format!("$exists:{binder}")
+    {
+        return Type::con(witness, name);
+    }
+    if matches!(ty, Type::Exists { binder: inner, .. } if inner == binder) {
+        return ty.clone();
+    }
+    ty.map_children(&mut |child| open_existential_type(child, binder, witness))
+}
+
+fn close_existential_type(ty: &Type, witness: &str, binder: &str) -> Type {
+    if let Type::Con { module, name } = ty
+        && module == witness
+    {
+        return Type::con(&format!("$exists:{binder}"), name);
+    }
+    ty.map_children(&mut |child| close_existential_type(child, witness, binder))
+}
+
+include!("module_contract/checker.rs");
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum Mismatch {
+    Missing(String),
+    Kind(String),
+    TypeEquality(String),
+    ValueType(String),
+    NominalIdentity(String),
+    Shape(String),
+}
+
+fn contract_subst(
+    requirements: &[ModuleRequirement],
+    actual: &Interface,
+    errors: &mut Vec<Mismatch>,
+) -> Vec<(String, Type)> {
+    let mut subst = Vec::new();
+    for requirement in requirements {
+        match requirement {
+            ModuleRequirement::Type { name, params, .. } => {
+                let Some(export) = actual.find(Namespace::Type, name) else {
+                    errors.push(Mismatch::Missing(name.clone()));
+                    continue;
+                };
+                let Some(def) = &export.definition else {
+                    errors.push(Mismatch::Kind(name.clone()));
+                    continue;
+                };
+                let expected =
+                    super::Kind::arrows(params.iter().map(|p| p.kind.clone()), super::Kind::Type);
+                if def.kind != expected {
+                    errors.push(Mismatch::Kind(name.clone()));
+                }
+                let representation = match &def.form {
+                    Form::Alias { params, body, .. } if params.is_empty() => body.clone(),
+                    _ => Type::con(&export.entity.module, &export.entity.name),
+                };
+                subst.push((name.clone(), representation));
+            }
+            ModuleRequirement::Nominal { name, .. } => {
+                if let Some(export) = actual.find(Namespace::Type, name) {
+                    subst.push((
+                        name.clone(),
+                        Type::con(&export.entity.module, &export.entity.name),
+                    ));
+                } else {
+                    errors.push(Mismatch::Missing(name.clone()));
+                }
+            }
+            ModuleRequirement::Value { .. } | ModuleRequirement::Dictionary { .. } => {}
+        }
+    }
+    subst
+}
+
+pub(crate) fn check(contract: &TypeDef, actual: &Interface) -> Vec<Mismatch> {
+    let Form::ModuleContract { requirements } = &contract.form else {
+        return vec![Mismatch::Kind("module contract".into())];
+    };
+    let mut errors = Vec::new();
+    let subst = contract_subst(requirements, actual, &mut errors);
+    let normalizer = super::Store::default();
+    let same = |expected: &Type, found: &Type| {
+        api_diff::canonical_type(&normalizer.zonk(&expected.substitute(&subst)))
+            == api_diff::canonical_type(&normalizer.zonk(&expand_actual(found, actual, 32)))
+    };
+    for requirement in requirements {
+        match requirement {
+            ModuleRequirement::Type {
+                name,
+                manifest: Some(expected),
+                ..
+            } => {
+                if let Some(export) = actual.find(Namespace::Type, name)
+                    && let Some(def) = &export.definition
+                {
+                    let found = match &def.form {
+                        Form::Alias { params, body, .. } if params.is_empty() => body.clone(),
+                        _ => Type::con(&export.entity.module, &export.entity.name),
+                    };
+                    if !same(expected, &found) {
+                        errors.push(Mismatch::TypeEquality(name.clone()));
+                    }
+                }
+            }
+            ModuleRequirement::Value { name, ty } => match actual.find(Namespace::Value, name) {
+                None => errors.push(Mismatch::Missing(name.clone())),
+                Some(export) if !export.scheme.as_ref().is_some_and(|found| same(ty, found)) => {
+                    errors.push(Mismatch::ValueType(name.clone()));
+                }
+                Some(_) => {}
+            },
+            ModuleRequirement::Nominal {
+                name,
+                category,
+                identity,
+                definition,
+                methods,
+            } => {
+                let Some(export) = actual.find(Namespace::Type, name) else {
+                    continue;
+                };
+                let right_category = matches!(
+                    (category, export.decl),
+                    (ModuleNominalKind::Class, Decl::Class)
+                        | (ModuleNominalKind::Service, Decl::Service)
+                );
+                if !right_category {
+                    errors.push(Mismatch::Shape(name.clone()));
+                } else if let Some(identity) = identity {
+                    if &export.entity != identity {
+                        errors.push(Mismatch::NominalIdentity(name.clone()));
+                    }
+                } else if let (Some(expected), Some(found)) = (definition, &export.definition) {
+                    if expected.kind != found.kind
+                        || !shape_matches(expected, found, methods, actual, name, &same)
+                    {
+                        errors.push(Mismatch::Shape(name.clone()));
+                    }
+                } else {
+                    errors.push(Mismatch::Shape(name.clone()));
+                }
+            }
+            ModuleRequirement::Dictionary { from, .. } => {
+                if actual.find(Namespace::Value, from).is_none() {
+                    errors.push(Mismatch::Missing(from.clone()));
+                }
+            }
+            ModuleRequirement::Type { manifest: None, .. } => {}
+        }
+    }
+    errors
+}
+
+/// The value type that can supply a constraint's dictionary.
+pub(super) fn dictionary_type(head: &Type) -> Option<Type> {
+    let (class, args) = head.spine();
+    let dictionary = match class {
+        Type::Con { module, name } => Type::con(module, &format!("{name}$Dict")),
+        Type::Var(name) => Type::Var(format!("{name}$Dict")),
+        _ => return None,
+    };
+    Some(Type::apps(dictionary, args.into_iter().cloned()))
+}
+
+/// The part of an argument visible through a functor parameter. Abstract
+/// type requirements keep the argument's identity but hide its definition.
+/// The exact constraint and exported value supplied by each `instance ...
+/// from ...` requirement of a static module argument. These are local to the
+/// named result and never become instances in the argument's interface.
+pub(crate) fn local_dictionaries(
+    contract: &TypeDef,
+    actual: &Interface,
+) -> Vec<(Type, super::Dict)> {
+    let Form::ModuleContract { requirements } = &contract.form else {
+        return Vec::new();
+    };
+    let subst: Vec<(String, Type)> = requirements
+        .iter()
+        .filter_map(|requirement| match requirement {
+            ModuleRequirement::Type { name, manifest, .. } => {
+                let export = actual.find(Namespace::Type, name)?;
+                let identity = Type::con(&export.entity.module, &export.entity.name);
+                let ty = if manifest.is_some() {
+                    expand_actual(&identity, actual, 32)
+                } else {
+                    identity
+                };
+                Some((name.clone(), ty))
+            }
+            ModuleRequirement::Nominal { name, .. } => {
+                let export = actual.find(Namespace::Type, name)?;
+                Some((
+                    name.clone(),
+                    Type::con(&export.entity.module, &export.entity.name),
+                ))
+            }
+            _ => None,
+        })
+        .collect();
+    requirements
+        .iter()
+        .filter_map(|requirement| {
+            let ModuleRequirement::Dictionary { head, from } = requirement else {
+                return None;
+            };
+            let export = actual.find(Namespace::Value, from)?;
+            Some((
+                head.substitute(&subst),
+                super::Dict::Value {
+                    module: export.entity.module.clone(),
+                    name: export.entity.name.clone(),
+                },
+            ))
+        })
+        .collect()
+}
+
+pub(crate) fn project(contract: &TypeDef, actual: &Interface) -> Interface {
+    let Form::ModuleContract { requirements } = &contract.form else {
+        return Interface::default();
+    };
+    let mut projected = Interface {
+        module: actual.module.clone(),
+        private: actual.private,
+        ..Interface::default()
+    };
+    let subst: Vec<(String, Type)> = requirements
+        .iter()
+        .filter_map(|requirement| match requirement {
+            ModuleRequirement::Type { name, .. } | ModuleRequirement::Nominal { name, .. } => {
+                let export = actual.find(Namespace::Type, name)?;
+                Some((
+                    name.clone(),
+                    Type::con(&export.entity.module, &export.entity.name),
+                ))
+            }
+            _ => None,
+        })
+        .collect();
+    for requirement in requirements {
+        match requirement {
+            ModuleRequirement::Type { name, manifest, .. } => {
+                if let Some(export) = actual.find(Namespace::Type, name) {
+                    let mut export = export.clone();
+                    if manifest.is_none()
+                        && let Some(def) = &mut export.definition
+                    {
+                        def.form = Form::NOMINAL;
+                    }
+                    projected.exports.push(export);
+                }
+            }
+            ModuleRequirement::Value { name, ty } => {
+                if let Some(export) = actual.find(Namespace::Value, name) {
+                    let mut export = export.clone();
+                    export.scheme = Some(ty.substitute(&subst));
+                    projected.exports.push(export);
+                }
+            }
+            ModuleRequirement::Nominal { name, .. } => {
+                if let Some(export) = actual.find(Namespace::Type, name) {
+                    projected.exports.push(export.clone());
+                    projected.exports.extend(
+                        actual
+                            .exports
+                            .iter()
+                            .filter(|member| {
+                                member.parent.as_deref() == Some(name)
+                                    && member.entity.namespace == Namespace::Value
+                            })
+                            .cloned(),
+                    );
+                }
+            }
+            ModuleRequirement::Dictionary { .. } => {}
+        }
+    }
+    projected
+}
+
+fn shape_matches(
+    expected: &TypeDef,
+    found: &TypeDef,
+    methods: &[(String, Type)],
+    actual: &Interface,
+    class_name: &str,
+    same: &impl Fn(&Type, &Type) -> bool,
+) -> bool {
+    match (&expected.form, &found.form) {
+        (
+            Form::Class {
+                supers: required_supers,
+                fundeps: required_fundeps,
+                ..
+            },
+            Form::Class {
+                supers, fundeps, ..
+            },
+        ) => {
+            required_fundeps == fundeps
+                && required_supers
+                    .iter()
+                    .all(|required| supers.iter().any(|provided| same(required, provided)))
+                && methods.iter().all(|(name, ty)| {
+                    actual.exports.iter().any(|e| {
+                        e.parent.as_deref() == Some(class_name)
+                            && e.entity.name == *name
+                            && e.scheme.as_ref().is_some_and(|found| same(ty, found))
+                    })
+                })
+        }
+        (
+            Form::Service {
+                operations: required,
+                ..
+            },
+            Form::Service { operations, .. },
+        ) => required.iter().all(|op| {
+            operations
+                .iter()
+                .any(|provided| op.name == provided.name && same(&op.ty, &provided.ty))
+        }),
+        _ => false,
+    }
+}
+
+fn expand_actual(ty: &Type, actual: &Interface, fuel: usize) -> Type {
+    if fuel == 0 {
+        return ty.clone();
+    }
+    let (head, args) = ty.spine();
+    if let Type::Con { module, name } = head
+        && let Some(export) = actual.find(Namespace::Type, name)
+        && export.entity.module == *module
+        && let Some(TypeDef {
+            form: Form::Alias { params, body, .. },
+            ..
+        }) = &export.definition
+        && params.len() == args.len()
+    {
+        let replacements: Vec<_> = params
+            .iter()
+            .cloned()
+            .zip(args.into_iter().cloned())
+            .collect();
+        return expand_actual(&body.substitute(&replacements), actual, fuel - 1);
+    }
+    ty.map_children(&mut |child| expand_actual(child, actual, fuel - 1))
+}
+
+#[cfg(test)]
+mod tests;

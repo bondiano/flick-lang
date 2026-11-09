@@ -9,13 +9,14 @@ use std::mem;
 use super::Checker;
 use super::class_members::method_names;
 use super::convert::{Free, TyVar, is_type};
-use super::env::{Abi, Form, Fundep, TypeDef};
+use super::env::{Abi, Form, Fundep, ModuleNominalKind, ModuleRequirement, TypeDef};
 use super::gadt::scheme::{Variant, quantify};
 use super::kinds::Kind;
 use super::services::{OpClass, Operation};
 use super::ty::{Binder, Type};
-use crate::diagnostics::codes;
-use crate::iface::Namespace;
+use crate::api_diff;
+use crate::diagnostics::{Diagnostic, codes};
+use crate::iface::{Entity, Namespace};
 use crate::resolve;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
@@ -48,6 +49,56 @@ impl Checker<'_> {
         self.break_alias_cycles(&pending);
         for (p, body) in pending.iter().zip(bodies) {
             self.finish(p, body);
+        }
+        // Aliases are converted before contract bodies so a contract may use
+        // an alias declared later. Validate `Module Sig` again once the local
+        // contract's members are known.
+        for p in pending.iter().filter(|p| p.node.kind == K::TypeDecl) {
+            let Some(TypeDef {
+                form: Form::Alias { body, .. },
+                ..
+            }) = self.env.type_def(&self.env.module, &p.name)
+            else {
+                continue;
+            };
+            let body = body.clone();
+            let mut contracts = Vec::new();
+            body.visit(&mut |ty| {
+                let (head, args) = ty.spine();
+                if matches!(head, Type::Con { module, name } if module == "Prelude" && name == "Module")
+                    && let [Type::Con { module, name }] = &args[..]
+                    && module == &self.env.module
+                {
+                    contracts.push(name.clone());
+                }
+            });
+            for contract in contracts {
+                let abstract_names: Vec<String> = self
+                    .env
+                    .type_def(&self.env.module, &contract)
+                    .and_then(|def| match &def.form {
+                        Form::ModuleContract { requirements } => Some(requirements),
+                        _ => None,
+                    })
+                    .into_iter()
+                    .flatten()
+                    .filter_map(|r| match r {
+                        ModuleRequirement::Nominal {
+                            name,
+                            identity: None,
+                            ..
+                        } => Some(name.clone()),
+                        _ => None,
+                    })
+                    .collect();
+                for name in abstract_names {
+                    self.error(
+                        codes::T063,
+                        self.span(p.node),
+                        format!("`Module {contract}` cannot carry abstract class or service `{name}`; use a manifest identity in the contract"),
+                    );
+                }
+            }
         }
         for p in pending.iter().filter(|p| p.node.kind == K::ErrorDecl) {
             if let Some(variant) = p.node.nodes().find(|n| n.kind == K::Variant) {
@@ -191,6 +242,7 @@ impl Checker<'_> {
     fn skeleton<'n>(&mut self, decl: &'n Node) -> Option<Pending<'n>> {
         let result = match decl.kind {
             K::TypeDecl | K::ErrorDecl => Kind::Type,
+            K::ModuleTypeDecl => Kind::Module,
             K::ServiceDecl => Kind::Service,
             K::ClassDecl => Kind::Constraint,
             _ => return None,
@@ -242,6 +294,12 @@ impl Checker<'_> {
                 self.kinds.fresh(),
             ),
             K::TypeDecl => (Form::NOMINAL, result),
+            K::ModuleTypeDecl => (
+                Form::ModuleContract {
+                    requirements: Vec::new(),
+                },
+                result,
+            ),
             K::ErrorDecl => (Form::Error, result),
             K::ServiceDecl => (
                 Form::Service {
@@ -290,6 +348,7 @@ impl Checker<'_> {
     fn body<'n>(&mut self, p: &Pending<'n>, refined: &mut Vec<(&'n Node, Type)>) -> Body {
         let decl = p.node;
         match decl.kind {
+            K::ModuleTypeDecl => Body::ModuleContract(self.module_contract(decl)),
             K::TypeDecl => {
                 let variants: Vec<&Node> = decl.nodes().filter(|n| n.kind == K::Variant).collect();
                 if !variants.is_empty() {
@@ -394,6 +453,9 @@ impl Checker<'_> {
         let quantify = |body: Type| quantify(&params, body);
         match body {
             Body::None => {}
+            Body::ModuleContract(requirements) => {
+                def.form = Form::ModuleContract { requirements };
+            }
             Body::Variants(variants) => {
                 let error = p.node.kind == K::ErrorDecl;
                 self.constructor_schemes(&p.name, error, &params, variants);
@@ -441,16 +503,13 @@ impl Checker<'_> {
             }
         }
     }
-
-    pub fn con_token(&self, node: &Node) -> Option<String> {
-        node.child_tokens()
-            .find(|t| t.kind == K::Con)
-            .map(|t| t.text(self.text).to_owned())
-    }
 }
+
+include!("decls_contracts.rs");
 
 enum Body {
     None,
+    ModuleContract(Vec<ModuleRequirement>),
     Variants(Vec<Variant>),
     Members(Vec<(String, Type, OpClass)>),
     /// Superclasses, functional dependencies, methods and default

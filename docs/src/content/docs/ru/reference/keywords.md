@@ -1,6 +1,6 @@
 ---
 title: Ключевые слова
-source_hash: 71682fce19909e2e
+source_hash: ff115dcc843b7b6c
 ---
 
 Здесь перечислены зарезервированные слова Flick: что они обозначают
@@ -15,6 +15,7 @@ source_hash: 71682fce19909e2e
 | Ключевое слово | Назначение | Пример |
 | - | - | - |
 | `module` | Задаёт имя модуля для файла | `module App.Main exposing (run)` |
+| `private` | Ограничивает модуль файла его пакетом перед `module`; в других местах остаётся именем | `private module App.Internal exposing (helper)` |
 | `exposing` | Перечисляет экспортируемые имена или имена, импортируемые без префикса модуля | `import App.Domain exposing (User, greet)` |
 | `import` | Подключает другой модуль | `import Effect.Log as Log` |
 | `as` | Задаёт локальное имя импортированного модуля; в `sql table` указывает тип столбца во Flick | `import Effect.Log as Log` |

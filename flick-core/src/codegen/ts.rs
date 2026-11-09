@@ -11,7 +11,7 @@ use std::fmt::Write;
 use super::names;
 use crate::iface::{Interface, Namespace};
 use crate::types::lang::{self, Lang};
-use crate::types::{Form, Kind, Type, TypeDef, passes_dictionary};
+use crate::types::{Form, Kind, ModuleRequirement, Type, TypeDef, passes_dictionary};
 
 /// The runtime package generated code imports.
 const RUNTIME: &str = "@flick-lang/effect-ts";
@@ -225,6 +225,10 @@ impl Projection<'_> {
                 let inner = self.value_in(t, vars)?;
                 Ok(format!("({inner})"))
             }
+            // TypeScript has no existential opener that preserves a fresh
+            // abstract module identity. `unknown` keeps the exported value
+            // present without claiming that its witness may be inspected.
+            Type::Exists { .. } => Ok("unknown".to_owned()),
             Type::Row(_) | Type::Union(..) => self.row(t, vars),
             Type::Symbol(s) => Ok(names::string(s)),
             Type::Meta(_) | Type::Skolem(_) | Type::Error => {
@@ -281,6 +285,9 @@ impl Projection<'_> {
                 "`{shown}` is applied to a type: a higher-kinded type has no TypeScript form; export a concrete façade"
             ));
         };
+        if let Some(shown) = self.module_or_dictionary(module, name, &args, vars)? {
+            return Ok(shown);
+        }
         let arg = |i: usize| self.ty(args[i], vars);
         let seq = lang::is(Lang::Seq, module, name).then_some(Lang::Seq);
         if let Some(item) = native(module, name).or(seq) {
@@ -371,6 +378,96 @@ impl Projection<'_> {
         ))
     }
 
+    fn module_or_dictionary(
+        &self,
+        module: &str,
+        name: &str,
+        args: &[&Type],
+        vars: &Vars,
+    ) -> Result<Option<String>, String> {
+        if module == "Prelude" && name == "Module" {
+            return match args {
+                [signature] => self.module_value(signature).map(Some),
+                _ => Err("`Module` needs one module contract".to_owned()),
+            };
+        }
+        if let Some(class) = name.strip_suffix("$Dict") {
+            let def = self.definition(module, class)?;
+            if matches!(def.form, Form::Class { .. }) {
+                let shown: Result<Vec<_>, _> = args.iter().map(|arg| self.ty(arg, vars)).collect();
+                return Ok(Some(format!(
+                    "{}{}",
+                    self.qualified(module, class),
+                    type_args(&shown?)
+                )));
+            }
+        }
+        Ok(None)
+    }
+
+    fn module_value(&self, signature: &Type) -> Result<String, String> {
+        let Type::Con { module, name } = signature else {
+            return Err("a module contract alias has no TypeScript projection".to_owned());
+        };
+        let def = self.definition(module, name)?;
+        let Form::ModuleContract { requirements } = def.form else {
+            return Err("`Module` argument is not a module contract".to_owned());
+        };
+        let mut subst = Vec::new();
+        for requirement in &requirements {
+            match requirement {
+                ModuleRequirement::Type {
+                    name,
+                    manifest: Some(ty),
+                    ..
+                } => {
+                    subst.push((name.clone(), ty.substitute(&subst)));
+                }
+                ModuleRequirement::Type {
+                    name,
+                    manifest: None,
+                    ..
+                } => {
+                    return Err(format!(
+                        "abstract type `{name}` in a module value has no faithful TypeScript projection"
+                    ));
+                }
+                ModuleRequirement::Nominal {
+                    name,
+                    identity: Some(identity),
+                    ..
+                } => {
+                    subst.push((name.clone(), Type::con(&identity.module, &identity.name)));
+                }
+                ModuleRequirement::Nominal {
+                    name,
+                    identity: None,
+                    ..
+                } => {
+                    return Err(format!(
+                        "abstract class or service `{name}` has no TypeScript projection"
+                    ));
+                }
+                _ => {}
+            }
+        }
+        let mut fields = Vec::new();
+        for requirement in &requirements {
+            if let ModuleRequirement::Value { name, ty } = requirement {
+                fields.push(format!(
+                    "readonly {}: {}",
+                    key(name),
+                    self.value(&ty.substitute(&subst))?
+                ));
+            }
+        }
+        Ok(if fields.is_empty() {
+            "{}".to_owned()
+        } else {
+            format!("{{ {} }}", fields.join("; "))
+        })
+    }
+
     /// `T` of this module, `$t_A$B.T` of another.
     fn qualified(&self, module: &str, name: &str) -> String {
         if module == self.module {
@@ -411,77 +508,6 @@ impl Projection<'_> {
     }
 }
 
-fn uncaptured<'a>(mut t: &'a Type, vars: &Vars) -> Result<&'a Type, String> {
-    while let Type::Captured { ty, captures, .. } | Type::Bounded { ty, captures } = t {
-        if !empty_captures(captures, vars) {
-            return Err(
-                "a value holding a scope's capabilities has no bare TypeScript export".to_owned(),
-            );
-        }
-        t = ty;
-    }
-    Ok(t)
-}
-
-fn empty_captures(t: &Type, vars: &Vars) -> bool {
-    match t {
-        Type::Row(row) => {
-            row.entries.iter().all(|(_, t)| empty_captures(t, vars))
-                && row.tail.as_deref().is_none_or(|t| empty_captures(t, vars))
-        }
-        Type::Union(a, b) => empty_captures(a, vars) && empty_captures(b, vars),
-        // TypeScript type parameters contain only scope-free data.
-        Type::Var(name) => matches!(vars.get(name), Some(Some(_))),
-        _ => false,
-    }
-}
-
-/// The kinds of the parameters of a type constructor of kind `k`.
-fn params(k: &Kind) -> Vec<Kind> {
-    let mut out = Vec::new();
-    let mut k = k;
-    while let Kind::Arrow(p, r) = k {
-        out.push((**p).clone());
-        k = r;
-    }
-    out
-}
-
-/// The TypeScript name of a type variable: `a` is `A`, `elem` is `Elem`.
-fn generic(name: &str) -> String {
-    let mut chars = name.chars();
-    let first = chars.next().map_or('T', |c| c.to_ascii_uppercase());
-    let rest: String = chars
-        .filter(|c| c.is_ascii_alphanumeric() || *c == '_')
-        .collect();
-    format!("{first}{rest}")
-}
-
-fn type_args(args: &[String]) -> String {
-    if args.is_empty() {
-        String::new()
-    } else {
-        format!("<{}>", args.join(", "))
-    }
-}
-
-/// `Effect<A, E, R>` with `never` for an empty row.
-fn effect(a: &str, e: &str, r: &str) -> String {
-    format!("$Effect.Effect<{a}, {e}, {r}>")
-}
-
-fn key(label: &str) -> String {
-    if names::is_property(label) {
-        label.to_owned()
-    } else {
-        names::string(label)
-    }
-}
-
-mod declare;
-mod dts;
-pub mod stages;
-
-pub use dts::{Facade, declaration_file, facade_files, jsdoc};
+include!("ts/helpers.rs");
 #[cfg(test)]
 mod tests;

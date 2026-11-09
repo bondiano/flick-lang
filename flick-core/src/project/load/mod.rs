@@ -29,6 +29,7 @@ mod target;
 mod unknown;
 
 pub use checking::ModuleCache;
+pub(crate) use checking::check_inline_file;
 pub use entry::{MainKind, main_kind};
 pub use format_plugins::FormatPlugins;
 #[cfg(feature = "ide")]
@@ -63,6 +64,17 @@ enum Root {
     Other(Option<PathBuf>),
 }
 
+impl Root {
+    fn same_package(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::Source | Self::Test, Self::Source | Self::Test) => true,
+            (Self::Package(a), Self::Package(b)) => a == b,
+            (Self::Other(a), Self::Other(b)) => a == b,
+            _ => false,
+        }
+    }
+}
+
 struct Loaded {
     path: PathBuf,
     file: FileId,
@@ -77,6 +89,14 @@ struct Loaded {
     editing: Vec<EditorBlock>,
     /// The package whose plugin gives its code, for a file of another language.
     loader: Option<String>,
+    /// A named application compiled as a separate generated module.
+    virtual_of: Option<Virtual>,
+}
+
+#[derive(Clone)]
+struct Virtual {
+    at: Span,
+    parameters: Vec<(String, String, String)>,
 }
 
 /// How far a run goes past checking.
@@ -142,7 +162,13 @@ fn compiled(m: &Loaded, (ir, declarations): Lowered, interface: Interface) -> Co
             Root::Package(name) => Some(name.clone()),
             _ => None,
         },
-        imports: m.syntax.imports.iter().map(|i| i.module.clone()).collect(),
+        imports: m
+            .syntax
+            .imports
+            .iter()
+            .chain(&m.syntax.inline_imports)
+            .map(|i| i.module.clone())
+            .collect(),
         ir,
         declarations,
         interface,

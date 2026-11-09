@@ -73,7 +73,7 @@ impl Ide<'_> {
             };
             let kind = match r {
                 Ref::Value { .. } if is_function(m.typing.types.get(range)) => FUNCTION,
-                Ref::Local | Ref::Value { .. } => VARIABLE,
+                Ref::Local | Ref::Value { .. } | Ref::PackedField { .. } => VARIABLE,
                 Ref::Method { .. } | Ref::Operation { .. } => METHOD,
                 Ref::Constructor(_) => CONSTRUCTOR,
                 Ref::ServiceTag(_) => TYPE,

@@ -27,6 +27,47 @@ fn cases(list: &str) -> Vec<String> {
 }
 
 #[test]
+fn module_dictionaries_are_checked_and_run_in_the_model() {
+    let file = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/modules/App/DictionaryMain.fl");
+    let modules = run::compile(&file).expect("module fixture compiles");
+    let program = run::program(&modules);
+    let errors = run::check(&modules, &program);
+    assert!(
+        errors.is_empty(),
+        "model rejects the module fixture: {errors:?}"
+    );
+    let main = run::main_of(&modules).expect("main");
+    let ran = run::run_main(&program, &main, FUEL);
+    assert_eq!(ran.stdout, "ok\n", "{:?}", ran.outcome);
+}
+
+#[test]
+fn existential_module_witnesses_run_in_the_model() {
+    let file = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/modules/App/Main.fl");
+    let modules = run::compile(&file).expect("module fixture compiles");
+    let program = run::program(&modules);
+    // The core model has records and nominal types, but no existential
+    // introduction/elimination rules. The source checker establishes the
+    // witness type; this checks its elaborated runtime representation.
+    let main = run::main_of(&modules).expect("main");
+    let ran = run::run_main(&program, &main, FUEL);
+    assert_eq!(ran.stdout, "ok\n", "{:?}", ran.outcome);
+}
+
+#[test]
+fn inline_module_contract_pack_runs_in_the_model() {
+    let file = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../tests/run/bootstrap/inline_pack_nominals.fl");
+    let modules = run::compile(&file).expect("inline module fixture compiles");
+    let program = run::program(&modules);
+    // The core model checks the elaborated runtime record. It does not yet
+    // type-check source-level `Module Sig` packing or opening.
+    let main = run::main_of(&modules).expect("main");
+    let ran = run::run_main(&program, &main, FUEL);
+    assert_eq!(ran.stdout, "hello Ada\n", "{:?}", ran.outcome);
+}
+
+#[test]
 #[ignore = "runs every case of tests/run/model.txt; run `just model`"]
 fn model_prints_what_the_builds_print() {
     let portable = cases("portable.txt");

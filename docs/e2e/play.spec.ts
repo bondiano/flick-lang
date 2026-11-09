@@ -32,6 +32,17 @@ test("Run prints what the program writes", async ({ page }) => {
   await expect(page.locator(".fp-output")).toContainText("Hello from Flick", { timeout: 60_000 });
 });
 
+test("an inline module compiles and runs in the browser", async ({ page }) => {
+  await page.goto("/flick-lang/play/");
+  await ready(page);
+  await page.locator(".cm-content").click();
+  await page.keyboard.press("ControlOrMeta+A");
+  await page.keyboard.insertText("module Main exposing (main)\n\nmodule Child exposing (answer) =\n  let answer = 42\n\nmain : Unit ->{} Unit\nlet main () = Platform.stdout_line (show Child.answer)\n");
+  await expect(page.locator(".fp-status")).toContainText("Type-checked", { timeout: 30_000 });
+  await page.getByRole("button", { name: "Run", exact: true }).click();
+  await expect(page.locator(".fp-output")).toContainText("42", { timeout: 60_000 });
+});
+
 test("a shared program opens without running and a draft survives reload", async ({ page, context }) => {
   await page.goto("/flick-lang/play/");
   await ready(page);

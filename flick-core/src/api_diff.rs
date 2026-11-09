@@ -7,6 +7,7 @@
 
 use std::collections::BTreeMap;
 use std::fmt;
+use std::iter::once;
 
 use crate::iface::{Export, Interface, Namespace};
 use crate::types::{Binder, Form, Instance, Row, Type, TypeDef, show_type};
@@ -245,10 +246,22 @@ fn bind<'a>(
         .collect()
 }
 
+/// A scheme with its quantified variables named by binder order.
+pub(crate) fn canonical_type(ty: &Type) -> Type {
+    rename(ty, &[], &mut 0)
+}
+
 /// `ty` with its free variables renamed by `names` and those its `forall`s
 /// bind given fresh names.
 fn rename(ty: &Type, names: &[(String, String)], next: &mut usize) -> Type {
     match ty {
+        Type::Con { module, name } if let Some(binder) = module.strip_prefix("$exists:") => {
+            let binder = names
+                .iter()
+                .find(|(old, _)| old == binder)
+                .map_or(binder, |(_, fresh)| fresh);
+            Type::con(&format!("$exists:{binder}"), name)
+        }
         Type::Var(name) => (names.iter().find(|(n, _)| n == name))
             .map_or_else(|| ty.clone(), |(_, fresh)| Type::Var(fresh.clone())),
         Type::Forall {
@@ -270,6 +283,21 @@ fn rename(ty: &Type, names: &[(String, String)], next: &mut usize) -> Type {
                     .iter()
                     .map(|c| rename(c, &inner, next))
                     .collect(),
+                body: Box::new(rename(body, &inner, next)),
+            }
+        }
+        Type::Exists {
+            binder,
+            contract,
+            body,
+        } => {
+            let fresh = bind([binder], next).pop().expect("one binder").1;
+            let inner: Vec<(String, String)> = once((binder.clone(), fresh.clone()))
+                .chain(names.iter().cloned())
+                .collect();
+            Type::Exists {
+                binder: fresh,
+                contract: Box::new(rename(contract, names, next)),
                 body: Box::new(rename(body, &inner, next)),
             }
         }

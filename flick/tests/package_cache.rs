@@ -141,6 +141,33 @@ fn a_saved_library_is_not_checked_again() {
 }
 
 #[test]
+fn cached_private_module_stays_private_to_a_dependent() {
+    let (root, _) = fetched("package-cache-private");
+    let shift = root.join(format!("store/{HASH}/lib/src/Geo/Shift.fl"));
+    fs::write(
+        &shift,
+        SHIFT.replacen("module Geo.Shift", "private module Geo.Shift", 1),
+    )
+    .expect("private dependency module");
+    assert_eq!(flick(&root, "cache", &["check"]), Some(0));
+
+    let main = root.join("app/src/App/Main.fl");
+    fs::write(
+        &main,
+        MAIN.replace(
+            "import Geo exposing (origin, shifted)",
+            "import Geo exposing (origin, shifted)\nimport Geo.Shift exposing (by)",
+        ),
+    )
+    .expect("import private dependency module");
+    for cache in ["cache", "fresh"] {
+        let (status, stderr) = flick_output(&root, cache, &["check"]);
+        assert_eq!(status, Some(1), "{stderr}");
+        assert!(stderr.contains("FLICK-R017"), "{stderr}");
+    }
+}
+
+#[test]
 fn a_build_from_saved_modules_is_the_build_from_sources() {
     let (root, _) = fetched("package-cache-same");
     let main = root.join("app/src/App/Main.fl");

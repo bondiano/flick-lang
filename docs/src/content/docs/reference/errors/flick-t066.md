@@ -1,0 +1,9 @@
+---
+title: "FLICK-T066"
+---
+
+# Ambiguous local module dictionaries
+
+Two static arguments of one named functor application supply dictionaries for the same class constraint. The compiler cannot choose one without making the result depend on argument order.
+
+Keep one `instance C T from value` requirement for that constraint in the functor's scope. If both policies are needed, pass their dictionary values explicitly to the operations that use them, or place the policies in separate named applications.
