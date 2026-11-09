@@ -108,6 +108,27 @@ theorem TypingMode.subtype.eq_base {mode : TypingMode} {a : Ty} {b : Base}
     (h : mode.subtype a (.base b)) : a = .base b :=
   TypingMode.subtype.eq_of (fun _ _ _ _ h => by cases h) (fun _ _ _ _ h => by cases h) h
 
+/-- A type below one that is neither an arrow nor a computation is that type. -/
+theorem TypingMode.subtype.eq_of_left {mode : TypingMode} {a b : Ty}
+    (ha : ∀ x φ y C, a ≠ .arrow x φ y C) (he : ∀ r ε y C, a ≠ .eff r ε y C)
+    (h : mode.subtype a b) : a = b := by
+  cases mode with
+  | captures =>
+    cases h with
+    | refl => rfl
+    | arrow => exact absurd rfl (ha _ _ _ _)
+    | eff => exact absurd rfl (he _ _ _ _)
+  | live =>
+    cases h with
+    | refl => rfl
+    | arrow => exact absurd rfl (ha _ _ _ _)
+    | eff => exact absurd rfl (he _ _ _ _)
+
+theorem TypingMode.subtype.eq_base_left {mode : TypingMode} {a : Ty} {b : Base}
+    (h : mode.subtype (.base b) a) : a = .base b :=
+  ((TypingMode.subtype.eq_of_left (a := .base b) (fun _ _ _ _ h => by cases h)
+    (fun _ _ _ _ h => by cases h) h)).symm
+
 theorem TypingMode.subtype.typ_ref {mode : TypingMode} {Ψ Θ Γ e x t φ}
     (h : mode.subtype x (.ref t)) (he : TypM S mode Ψ Θ Γ e (.ex x φ)) :
     TypM S mode Ψ Θ Γ e (.ex (.ref t) φ) := by
