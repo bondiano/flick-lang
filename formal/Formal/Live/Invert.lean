@@ -129,6 +129,21 @@ theorem TypingMode.subtype.eq_base_left {mode : TypingMode} {a : Ty} {b : Base}
   ((TypingMode.subtype.eq_of_left (a := .base b) (fun _ _ _ _ h => by cases h)
     (fun _ _ _ _ h => by cases h) h)).symm
 
+theorem TypingMode.subtype.eq_ref_left {mode : TypingMode} {a t : Ty}
+    (h : mode.subtype (.ref t) a) : a = .ref t :=
+  ((TypingMode.subtype.eq_of_left (a := .ref t) (fun _ _ _ _ h => by cases h)
+    (fun _ _ _ _ h => by cases h) h)).symm
+
+theorem TypingMode.subtype.eq_hnd_left {mode : TypingMode} {a s : Ty}
+    (h : mode.subtype (.hnd s) a) : a = .hnd s :=
+  ((TypingMode.subtype.eq_of_left (a := .hnd s) (fun _ _ _ _ h => by cases h)
+    (fun _ _ _ _ h => by cases h) h)).symm
+
+theorem TypingMode.subtype.eq_owner_left {mode : TypingMode} {a s : Ty}
+    (h : mode.subtype (.owner s) a) : a = .owner s :=
+  ((TypingMode.subtype.eq_of_left (a := .owner s) (fun _ _ _ _ h => by cases h)
+    (fun _ _ _ _ h => by cases h) h)).symm
+
 theorem TypingMode.subtype.typ_ref {mode : TypingMode} {Ψ Θ Γ e x t φ}
     (h : mode.subtype x (.ref t)) (he : TypM S mode Ψ Θ Γ e (.ex x φ)) :
     TypM S mode Ψ Θ Γ e (.ex (.ref t) φ) := by

@@ -34,17 +34,29 @@ have canonical forms, L3 types a frame and a context, progress shows every close
 to be a value or one of the outcomes `NV` with its effect among the services of its
 stage, and preservation holds of a pure step (`PresPure.lean`), of refilling a handler's
 hole (`PresHdl.lean`) and of the run-time steps of handlers at the redex
-(`PresHdlRt.lean`). Two findings from that port: a value may be retyped at any stage, so
-the frame of a finished handler loses nothing when it gives its value back
-(`hdoneVal`), and the step that closes a handler's region (`hwithCatch`) keeps its
-answer at a stage that holds that region's atom, which only the frame supplies — in the
-live discipline the step therefore carries the atom as a premise. That premise is what
-the invariant replacing `Nest.reach` must supply: every region atom of a running stage
-is live, including the stages of child work and handler frames. What remains is
-preservation of the store steps and at a context (`PresRt.lean`, `Preservation.lean`),
-the invariant itself and `T4'_live`. Neither the examples nor the existing captures
-proofs establish it. Translation of live signature elision into the core judgment is a
-separate remaining obligation.
+(`PresHdlRt.lean`). Findings from that port:
+
+* A value may be retyped at any stage, so the frame of a finished handler loses nothing
+  when it gives its value back (`hdoneVal`).
+* The step that closes a handler's region (`hwithCatch`) keeps its answer at a stage
+  that holds that region's atom, which only the frame supplies. In the live discipline
+  the step therefore carries the atom as a premise (`TypingMode.use_rg_le`), and that
+  premise is what the invariant replacing `Nest.reach` must supply: every region atom of
+  a running stage is live, including the stages of child work and handler frames.
+* A use site needs the qualifier of what it uses in its stage, and a context that fixes
+  that stage — `scope`'s rows bound its body, `Scope.run`'s desugaring (`scopeRun_body`,
+  `ScopeRun.lean`) creates one — must then hold the qualifier's atoms too. In the
+  capture instance the qualifier is erased at exactly those points, so nothing is asked;
+  in the live instance the lemma must carry `ofCaps C ⊆ ψ` of the function it runs. That
+  fact follows from the subtype of the argument type (`LeLive.arrow_use`), so the port is
+  possible, but each such site needs the inversion of the type former that carries the
+  qualifier (`.all`, a record, a dictionary). This is a port of substance, not of
+  notation.
+
+What remains is preservation of the store steps and at a context (`PresRt.lean`,
+`Preservation.lean`), the invariant itself and `T4'_live`. Neither the examples nor the
+existing captures proofs establish it. Translation of live signature elision into the
+core judgment is a separate remaining obligation.
 
 T4.2 matters beyond safety: the runtime contract (`Formal/RT/`) takes only T4.3 (as `G11`),
 so giving T4.2 up does not touch T5; what it costs is that a value may keep a closed

@@ -53,9 +53,13 @@ in the `lean` job (`leanprover/lean-action` with `build-args: --wfail`).
   region atoms to a use stage, so a frame still takes over the named effects of its hole.
   The one step that closes a handler's region, `hwithCatch`, needs that region's atom in
   the stage of the live discipline: the frame supplies it, so the live statement of the
-  step carries it as a premise. Preservation of the store steps and at a context
-  (`PresRt.lean`, `Preservation.lean`), T4′ for `TypLive`, and the translation of
-  signature elision are not yet proved.
+  step carries it as a premise. A context that fixes the stage of its body — `scope`, and
+  the desugaring of `Scope.run` — must also hold the qualifier of what the body uses,
+  which the capture instance erases and the live instance does not; that fact follows
+  from the subtype of the argument (`LeLive.arrow_use`), through the inversion of the
+  type former that carries the qualifier. Preservation of the store steps and at a
+  context (`PresRt.lean`, `Preservation.lean`), T4′ for `TypLive`, and the translation
+  of signature elision are not yet proved.
 - **T5, the runtime contract** (`Formal/RT/`, `RT/T5.lean`): for any core and any
   interleaving, every reachable configuration of λRT satisfies R1–R4, R6 and R7, and R5 and
   R8 hold of the cause algebra, under the hypotheses on the libraries (`Hyp`) and `G11`.
