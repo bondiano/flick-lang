@@ -7,14 +7,14 @@ needs, so an importer never re-reads, re-parses or re-checks the module's
 source (see [Compiler architecture](../../contributing/implementation-decisions/#compiler-architecture)). It is versioned JSON. `.d.ts` is only a projection for
 TypeScript; `.iface` is the source of truth for Flick importers.
 
-Release 0.1.0 ships `iface-version` 3. Every change of the schema bumps it,
+The current schema is `iface-version` 8. Every change of the schema bumps it,
 and a compiler rejects any version but its own with `FLICK-P010`.
 
 ## Version 3
 
 ```json
 {
-  "iface-version": 3,
+  "iface-version": 8,
   "compiler": "0.1.0",
   "module": "App.Shapes",
   "exports": [
@@ -169,6 +169,10 @@ outside its module: importers cannot see its representation.
 `context` are over `vars`, with transparent aliases expanded. An importer
 checks its own instances against these for overlap and functional
 dependencies, and resolves constraints with them.
+
+`implicit: true` marks an `@implicit` conversion instance. The field defaults
+to `false` and is omitted when false. Importers use it when choosing a unique
+one-step conversion between ground nominal types.
 
 ### ABI
 

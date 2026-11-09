@@ -39,19 +39,33 @@ pub struct Parse {
 }
 
 pub fn parse(text: &str, file: FileId) -> Parse {
-    parse_with_heads(text, file, &[])
+    parse_with_heads_mode(text, file, &[], false)
 }
 
 /// [`parse`] of a part of a file whose imports expose the plugin heads
 /// `heads`, as a declaration the formatter laid out.
 pub fn parse_with_heads<'t>(text: &'t str, file: FileId, heads: Heads<'t>) -> Parse {
+    parse_with_heads_mode(text, file, heads, true)
+}
+
+fn parse_with_heads_mode<'t>(
+    text: &'t str,
+    file: FileId,
+    heads: Heads<'t>,
+    allow_trailing_attribute: bool,
+) -> Parse {
     let (raw, mut diagnostics) = lex(text, file);
     let mut p = Parser::new(text, file, &raw);
     p.plugin_heads.extend(heads);
     decl::source_file(&mut p);
     diagnostics.append(&mut p.errors);
     let tree = build(&raw, p.events);
-    diagnostics.extend(super::validate::check(&tree, text, file));
+    diagnostics.extend(super::validate::check(
+        &tree,
+        text,
+        file,
+        allow_trailing_attribute,
+    ));
     diagnostics.sort_by_key(|d| d.span.map(|s| (s.start, s.end)));
     Parse { tree, diagnostics }
 }

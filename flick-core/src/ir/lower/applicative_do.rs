@@ -80,7 +80,7 @@ impl Lower<'_> {
             acc = apply(apply(apply(map2, function, at), acc, at), value, at);
         }
         if applicative {
-            return acc;
+            return self.apply_coercion(group.range(), acc);
         }
         let key = group_key(group);
         let at = Span::new(self.file, key.0, key.1);

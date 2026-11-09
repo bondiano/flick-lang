@@ -286,7 +286,7 @@ impl Checker<'_> {
 
     /// The class signature of `method` with `args` for the class parameters,
     /// without the class constraint itself.
-    fn method_type(
+    pub(super) fn method_type(
         &self,
         class_module: &str,
         method: &str,

@@ -9,10 +9,16 @@ use crate::diagnostics::{Diagnostic, codes};
 use crate::source::{FileId, Span};
 use crate::types::lang::Lang;
 
-pub fn check(tree: &Node, src: &str, file: FileId) -> Vec<Diagnostic> {
+pub fn check(
+    tree: &Node,
+    src: &str,
+    file: FileId,
+    allow_trailing_attribute: bool,
+) -> Vec<Diagnostic> {
     let mut v = Validator {
         src,
         file,
+        allow_trailing_attribute,
         errors: Vec::new(),
     };
     v.walk(tree);
@@ -22,6 +28,7 @@ pub fn check(tree: &Node, src: &str, file: FileId) -> Vec<Diagnostic> {
 struct Validator<'a> {
     src: &'a str,
     file: FileId,
+    allow_trailing_attribute: bool,
     errors: Vec<Diagnostic>,
 }
 
@@ -47,28 +54,48 @@ impl Validator<'_> {
                     self.group(&[pattern]);
                 }
             }
-            K::Attribute => self.attribute(node),
             _ => {}
         }
-        for child in node.nodes() {
+        for (index, child) in node.nodes().enumerate() {
+            if child.kind == K::Attribute {
+                let next = node
+                    .nodes()
+                    .skip(index + 1)
+                    .find(|n| n.kind != K::Attribute)
+                    .map(|n| n.kind);
+                self.attribute(child, next);
+            }
             self.walk(child);
         }
     }
 
     /// `@lang item`, with an item the compiler knows, `@derive` before a
     /// class, maybe naming the package whose plugin derives it, or `@maker`
-    /// before a value that makes an atom, an action or a view.
-    fn attribute(&mut self, node: &Node) {
+    /// before a value that makes an atom, an action or a view; `@implicit`
+    /// marks a conversion instance.
+    fn attribute(&mut self, node: &Node, next: Option<K>) {
         let words: Vec<Token> = idents(node).collect();
         let message = match &words[..] {
             [name] | [name, _] if name.text(self.src) == "derive" => return,
             [name] if name.text(self.src) == "maker" => return,
             [name, ..] if name.text(self.src) == "maker" => "`@maker` takes no argument".to_owned(),
+            [name] if name.text(self.src) == "implicit" => {
+                // a lone attribute is a fragment the formatter checks on its own
+                if matches!(next, Some(K::InstanceDecl))
+                    || (next.is_none() && self.allow_trailing_attribute)
+                {
+                    return;
+                }
+                "`@implicit` belongs before an instance declaration".to_owned()
+            }
+            [name, ..] if name.text(self.src) == "implicit" => {
+                "`@implicit` takes no argument".to_owned()
+            }
             [name, ..] if name.text(self.src) == "derive" => {
                 "`@derive` names at most the package of its plugin: `@derive std`".to_owned()
             }
             [name, ..] if name.text(self.src) != "lang" => format!(
-                "unknown attribute `@{}`: the attributes are `@lang`, `@derive` and `@maker`",
+                "unknown attribute `@{}`: the attributes are `@lang`, `@derive`, `@maker` and `@implicit`",
                 name.text(self.src)
             ),
             [_, item] if Lang::from_name(item.text(self.src)).is_some() => return,

@@ -5,6 +5,7 @@
 //! superclasses and derived fields are checked after.
 
 use std::collections::HashSet;
+use std::mem;
 
 use super::solve::Outcome;
 use super::{Dict, NUMERIC_CLASSES, RECORD_CLASSES, split, vars, which};
@@ -93,11 +94,24 @@ impl<'n> Checker<'_> {
         refined: &[(&Node, Type)],
     ) -> Vec<Declared<'n>> {
         let mut out = Vec::new();
+        let mut implicit = false;
         for &decl in decls {
+            if decl.kind == K::Attribute {
+                implicit |= decl
+                    .child_tokens()
+                    .find(|t| t.kind == K::Ident)
+                    .is_some_and(|t| t.text(self.text) == "implicit");
+                continue;
+            }
+            let implicit = mem::take(&mut implicit);
             match decl.kind {
                 K::InstanceDecl => {
-                    if let Some(instance) = self.instance_head(decl) {
+                    if let Some(mut instance) = self.instance_head(decl) {
+                        instance.implicit = implicit;
                         let span = self.span(decl);
+                        if implicit && !self.admit_implicit(&instance, span) {
+                            continue;
+                        }
                         let written = self.written_enum(&instance, span)
                             || self.written_call_site(&instance, span);
                         if !written && self.admit(&instance, span) {
@@ -170,6 +184,7 @@ impl<'n> Checker<'_> {
             .own_instances()
             .any(|i| i.module == self.env.module && i.name == shown);
         Some(Instance {
+            implicit: false,
             module: self.env.module.clone(),
             name: if taken {
                 self.show_qualified(&head)
@@ -180,6 +195,59 @@ impl<'n> Checker<'_> {
             context: context.iter().map(|c| self.canon(c)).collect(),
             head,
         })
+    }
+
+    /// The sole method of a class that can convert its first type to its second.
+    pub(in crate::types) fn conversion_method(&self, module: &str, name: &str) -> Option<String> {
+        let info = self.class_info(module, name)?;
+        let [first, second] = &info.params[..] else {
+            return None;
+        };
+        let [method] = &info.methods[..] else {
+            return None;
+        };
+        let args = [Type::Var(first.clone()), Type::Var(second.clone())];
+        let ty = self.method_type(module, method, &info.params, &args)?;
+        let Type::Fun {
+            param,
+            effects: None,
+            result,
+        } = self.conversion_type(&ty)
+        else {
+            return None;
+        };
+        (param.as_ref() == &args[0] && result.as_ref() == &args[1]).then(|| method.clone())
+    }
+
+    fn admit_implicit(&mut self, instance: &Instance, span: Span) -> bool {
+        let valid = split(&instance.head).is_some_and(|((module, name), args)| {
+            args.len() == 2
+                && self.conversion_method(module, name).is_some()
+                && instance.context.is_empty()
+                && instance.vars.is_empty()
+                && !instance.head.contains(&mut |t| {
+                    matches!(
+                        t,
+                        Type::Var(_) | Type::Meta(_) | Type::Skolem(_) | Type::Error
+                    )
+                })
+                && args[0] != args[1]
+        });
+        if !valid {
+            self.error(
+                codes::C014,
+                span,
+                "`@implicit` needs two different ground types, no context, and a two-parameter class with exactly one pure method `a -> b`".to_owned(),
+            );
+        }
+        valid
+    }
+
+    /// Aliases expanded and qualifiers dropped only where they hold nothing,
+    /// so a value that may capture never matches.
+    pub(in crate::types) fn conversion_type(&self, ty: &Type) -> Type {
+        self.bound_head(&self.zonk(ty))
+            .map_children(&mut |t| self.conversion_type(t))
     }
 
     /// Checks the coherence rules and makes the instance known; `false`

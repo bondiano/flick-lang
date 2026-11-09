@@ -76,6 +76,26 @@ const USES: &str = "texts : List String\n\
      let texts = [show (Circle 1), pretty (Circle 2), show [Circle 3]]\n";
 
 #[test]
+fn implicit_instances_survive_interfaces() {
+    let conversions = (
+        "App.Units",
+        "module App.Units exposing (Meters(..), Feet(..))\n\
+         type Meters = Meters Float\n\
+         type Feet = Feet Float\n\
+         @implicit\n\
+         instance Into Meters Feet =\n  let into (Meters n) = Feet (n * 3.0)\n",
+    );
+    let main = (
+        "App.Main",
+        "module App.Main exposing (..)\n\
+         import App.Units exposing (..)\n\
+         feet : Feet\nlet feet = Meters 2.0\n",
+    );
+    let (diagnostics, _) = check_all(&[conversions, main]);
+    assert!(diagnostics.is_empty(), "{diagnostics:?}");
+}
+
+#[test]
 fn instances_do_not_depend_on_the_order_or_form_of_imports() {
     let mains = [
         "module App.Main exposing (texts)\n\

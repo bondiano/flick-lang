@@ -4,6 +4,7 @@ use super::Checker;
 use super::ty::Type;
 use super::unify::Mismatch;
 mod async_place;
+mod coercions;
 
 use crate::diagnostics::{Code, Diagnostic, Edit, codes};
 use crate::source::Span;
@@ -37,6 +38,8 @@ impl Checker<'_> {
     /// Unifies the type an expression has with the one its position expects;
     /// reports a mismatch at `span`. `false` after a diagnostic.
     pub fn expect(&mut self, actual: &Type, expected: &Type, span: Span) -> bool {
+        let ground = self.coercion_types(actual, expected);
+        let marks = (self.regions.holds.len(), self.subrows.len());
         match self.subsume(actual, expected, span) {
             Ok(()) => {
                 if let Some(lift) = self.lift(actual, expected) {
@@ -45,6 +48,15 @@ impl Checker<'_> {
                 true
             }
             Err(mismatch) => {
+                if let Some((actual, expected)) = ground
+                    && self.insert_coercion(&actual, &expected, span)
+                {
+                    // ground nominal types bind no metas; what the failed
+                    // comparison queued is about a value no longer placed here
+                    self.regions.holds.truncate(marks.0);
+                    self.subrows.truncate(marks.1);
+                    return true;
+                }
                 self.mismatch(&mismatch, actual, expected, span);
                 false
             }

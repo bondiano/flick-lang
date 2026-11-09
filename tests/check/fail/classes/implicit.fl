@@ -1,0 +1,77 @@
+module App.Implicit exposing (..)
+
+type A = A
+type B = B
+type C = C
+type D = D
+type E = E
+
+instance Into D E =
+  let into _ = E
+
+plain : E
+let plain = D
+
+@implicit
+instance Into A B =
+  let into _ = B
+
+@implicit
+instance Into B C =
+  let into _ = C
+
+chain : C
+let chain = A
+
+class Convert a b =
+  convert : a -> b
+
+@derive implicit
+instance Convert D E =
+  let convert _ = E
+
+derived_attribute : E
+let derived_attribute = D
+
+@implicit
+instance Convert A B =
+  let convert _ = B
+
+ambiguous : B
+let ambiguous = A
+
+@implicit
+instance Eq D => Into D C =
+  let into _ = C
+
+@implicit
+instance Into (List a) C =
+  let into _ = C
+
+class Single a =
+  single : a -> a
+
+@implicit
+instance Single D =
+  let single x = x
+
+class Runtime a b =
+  runtime : a ->{} b
+
+@implicit
+instance Runtime D C =
+  let runtime _ = C
+
+@implicit
+instance Into C C =
+  let into x = x
+
+//~ FLICK-T003 @13:13-13:14 expected `E`, found `D`
+//~ FLICK-T003 @24:13-24:14 expected `C`, found `A`
+//~ FLICK-T003 @34:25-34:26 expected `E`, found `D`
+//~ FLICK-T003 @41:17-41:18 expected `B`, found `A`
+//~ FLICK-C014 @44:1-45:17 `@implicit` needs two different ground types, no context
+//~ FLICK-C014 @48:1-49:17 `@implicit` needs two different ground types, no context
+//~ FLICK-C014 @55:1-56:19 two-parameter class with exactly one pure method `a -> b`
+//~ FLICK-C014 @62:1-63:20 two-parameter class with exactly one pure method `a -> b`
+//~ FLICK-C014 @66:1-67:17 `@implicit` needs two different ground types

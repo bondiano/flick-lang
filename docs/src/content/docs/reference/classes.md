@@ -40,6 +40,44 @@ cell) but no `Hash`. `Display` (`display : a -> String`) is what a hole
 the type `into` gives is the one its place expects; without one it is
 `FLICK-C002`. A program declares `Into` for its own types like any class.
 
+## Implicit conversions
+
+`@implicit` before an instance opts it into automatic conversion: where a
+value of ground nominal type `A` meets a place expecting ground nominal type
+`B`, exactly one visible implicit instance must convert `A` to `B`.
+
+```flick
+unboxed type Meters = Meters Float
+type Feet = Feet Float
+
+@implicit
+instance Into Meters Feet =
+  let into (Meters n) = Feet (n * 3.0)
+
+feet : Feet
+let feet = Meters 2.0
+
+read : Feet -> Float
+let read (Feet n) = n
+
+let length = read (Meters 3.0)
+```
+
+The class must have exactly two parameters and one method of type `a -> b`,
+without effects or additional constraints. The instance must have no context
+or type variables, and its two types must differ (`FLICK-C014`).
+`@implicit` takes no argument and belongs only before an instance (`FLICK-S014`).
+The class need not be `Into`.
+
+Conversion takes one step, never a chain. It does not infer an unknown type,
+convert functions, records, tuples, rows or captured/bounded types, or change
+ordinary successful type checking. Nominal applications must themselves have
+ground nominal arguments. Two matching instances, even of different classes,
+leave the type mismatch unresolved. Arguments, annotated bindings, return
+positions, branches and list elements can receive a conversion when their
+expected type is known. Explicit method calls such as `into x` still work.
+The core's numeric `Into` instances are **not** implicit.
+
 ## Instances
 
 ```flick
@@ -107,6 +145,7 @@ Instances are canonical. The checker rejects an instance when:
 | neither the class nor the nominal type at the head of its first type belongs to this package | `FLICK-C006` |
 | a context variable is not in the head, or a context constraint is not smaller than the head or repeats a variable more often | `FLICK-C007` |
 | it is for a row primitive, for `Eq`, `Ord`, `Hash`, `Show` of a record or tuple, or for the closed `Numeric` or `Iterable` | `FLICK-C012` |
+| it has `@implicit`, but its class or instance head does not meet the conversion rules | `FLICK-C014` |
 
 Coverage starts with the variables in a dependency's determining head
 arguments. The checker repeatedly adds variables determined by the instance

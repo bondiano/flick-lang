@@ -1,0 +1,28 @@
+module App.Implicit exposing (..)
+
+unboxed type Meters = Meters Float
+type Feet = Feet Float
+
+@implicit
+instance Into Meters Feet =
+  let into (Meters n) = Feet (n * 3.0)
+
+take : Feet -> Feet
+let take x = x
+
+let argument = take (Meters 2.0)
+
+annotated : Feet
+let annotated = Meters 3.0
+
+result : Meters -> Feet
+let result x = x
+
+branch : Bool -> Feet
+let branch b = if b then Feet 1.0 else Meters 2.0
+
+elements : List Feet
+let elements = [Feet 1.0, Meters 2.0]
+
+explicit : Feet
+let explicit = into (Meters 4.0)

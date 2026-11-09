@@ -64,7 +64,23 @@ Checker:
 - an extra constraint in a method signature is `FLICK-C010`, a missing method is `FLICK-C011`;
 - `deriving`: `classes/derive.rs` `derive`. The head `C (T ᾱ)` is not canonicalized, the context is `C α` for every parameter of kind `Type`, the field dictionaries come from `derived_fields`.
 
-### 1.2 Sugar
+### 1.2 Opt-in conversions before elaboration
+
+An `@implicit` instance has no context or type variables, two different ground
+head types, and a class with two parameters and exactly one pure method
+`a -> b`. At a mismatch between ground nominal types, the checker inserts
+that method applied to the value only when exactly one visible implicit
+instance matches the ordered pair. It neither infers types nor chains
+conversions; ambiguity remains a mismatch.
+
+This is a deterministic rewrite before the elaboration modeled here: its
+result is an ordinary explicit method application with a known instance
+dictionary. T6, including coherence, therefore applies unchanged to that
+result. The model and Lean contract are unchanged: no new entailment rule,
+target term, evaluation rule or Prelude scheme is introduced. This does not
+constitute a proof of the Rust checker's rewrite.
+
+### 1.3 Sugar
 
 ```text
 e ::= … | do { s̄ } | for { c̄ } yield e | [for { c̄ } yield e] | for { c̄ } do e | e?

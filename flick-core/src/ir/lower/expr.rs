@@ -15,10 +15,12 @@ impl Lower<'_> {
     /// An expression with the lift and the dictionaries its position gives it.
     pub(super) fn expr(&mut self, node: &Node) -> Expr {
         let key = node.range();
-        let lift = self
-            .consumed
-            .insert((key, false))
+        let first = self.consumed.insert((key, false));
+        let lift = first
             .then(|| self.typing.lifts.get(&key).cloned())
+            .flatten();
+        let coercion = first
+            .then(|| self.typing.coercions.get(&key).cloned())
             .flatten();
         let dicts = self
             .consumed
@@ -33,10 +35,30 @@ impl Lower<'_> {
         if let Some(lift) = lift {
             expr = Expr::new(ExprKind::Lift(Box::new(expr), lift), span);
         }
+        if let Some(coercion) = coercion {
+            expr = Self::coercion_expr(expr, coercion.dict, coercion.method, span);
+        }
         if let Some(dicts) = dicts {
             expr = Expr::new(ExprKind::Abstract(dicts, Box::new(expr)), span);
         }
         expr
+    }
+
+    /// Applies a conversion recorded at a range that lowers to generated IR.
+    pub(super) fn apply_coercion(&mut self, key: Range, expr: Expr) -> Expr {
+        if !self.consumed.insert((key, false)) {
+            return expr;
+        }
+        let Some(coercion) = self.typing.coercions.get(&key).cloned() else {
+            return expr;
+        };
+        let span = expr.span;
+        Self::coercion_expr(expr, coercion.dict, coercion.method, span)
+    }
+
+    fn coercion_expr(expr: Expr, dict: Dict, name: String, span: Span) -> Expr {
+        let method = Expr::new(ExprKind::Method { dict, name }, span);
+        apply(method, [Box::new(expr)], span)
     }
 
     fn boxed(&mut self, node: &Node) -> Box<Expr> {

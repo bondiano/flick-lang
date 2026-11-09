@@ -32,6 +32,7 @@ impl<'n> Checker<'_> {
             [target, Type::lang(base)],
         );
         let instance = Instance {
+            implicit: false,
             module,
             name: self.show_exact(&head),
             vars: Vec::new(),

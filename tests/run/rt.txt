@@ -45,6 +45,7 @@ codegen/handler_arms
 codegen/handlers
 codegen/higher_rank
 codegen/instance_names
+codegen/implicit
 codegen/interpolation
 codegen/ints
 codegen/let_assert

@@ -97,6 +97,7 @@ impl<'n> Checker<'_> {
                 .map(|p| Type::app(con.clone(), Type::Var(p.name.clone())))
                 .collect();
             let instance = Instance {
+                implicit: false,
                 module: module.clone(),
                 name: self.show_exact(&head),
                 vars: params.clone(),

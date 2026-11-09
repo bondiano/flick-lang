@@ -66,6 +66,8 @@ pub struct Typing {
     pub stages: HashMap<Range, Vec<Stage>>,
     /// Functions accepted where one of another stage is expected.
     pub lifts: HashMap<Range, Lift>,
+    /// Unique ground conversions at value boundaries.
+    pub coercions: HashMap<Range, Coercion>,
     /// The numeric type of arithmetic and integer literals.
     pub numeric: HashMap<Range, Num>,
     /// Operators on a type variable, by `Numeric` or by `Ord`.
@@ -160,6 +162,13 @@ pub struct Typing {
     /// and `scope` expressions, innermost last.
     pub(super) pending_owners: Vec<(Range, Type, OpenScopes)>,
     pending_dicts: Vec<(Range, u32, Dict)>,
+}
+
+/// A class method selected without inference or dictionary search.
+#[derive(Debug, Clone)]
+pub struct Coercion {
+    pub method: String,
+    pub dict: Dict,
 }
 
 /// What a name refers to. Locals are known to the lowering by scope.

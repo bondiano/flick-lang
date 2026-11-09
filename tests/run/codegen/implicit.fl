@@ -1,0 +1,38 @@
+module Main exposing (main)
+
+unboxed type Meters = Meters Float
+type Feet = Feet Float
+
+@implicit
+instance Into Meters Feet =
+  let into (Meters n) = Feet (n * 3.0)
+
+class Convert a b =
+  to_feet : a -> b
+
+@implicit
+instance Convert (Option String) Feet =
+  let to_feet _ = Feet 42.0
+
+value : Feet -> Float
+let value (Feet n) = n
+
+convert : Meters -> Feet
+let convert x = x
+
+main : Unit ->{} Unit
+let main () =
+  let distance : Feet = Meters 2.0
+  Platform.stdout_line (show (value distance))
+  Platform.stdout_line (show (value (Meters 3.0)))
+  Platform.stdout_line (show (value (convert (Meters 4.0))))
+  let branch : Feet = if true then Meters 5.0 else Feet 0.0
+  Platform.stdout_line (show (value branch))
+  let distances : List Feet = [Feet 1.0, Meters 6.0]
+  Platform.stdout_line (show (List.map value distances))
+  Platform.stdout_line (show (value (into (Meters 7.0))))
+  let from_applicative : Feet = do {
+    x <- Some "a" and y <- Some "b"
+    pure (x ++ y)
+  }
+  Platform.stdout_line (show (value from_applicative))

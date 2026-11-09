@@ -132,6 +132,9 @@ pub struct Fundep {
 /// `vars`; transparent aliases in them are expanded.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Instance {
+    /// Whether a ground mismatch may insert this conversion.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub implicit: bool,
     /// The module that declares it.
     pub module: String,
     /// The head as written, for diagnostics and dictionary names: `Show (List a)`.

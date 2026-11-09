@@ -6,6 +6,10 @@ break programs.
 
 ## Unreleased
 
+- **Opt-in implicit conversions:** `@implicit` marks a ground, context-free
+  instance of a class with one pure `a -> b` method. A unique visible
+  conversion is inserted at a ground nominal type mismatch, without chains
+  or inference. Built-in numeric conversions remain explicit.
 - **Explicit conversions:** the Prelude class `Into a b` with `into : a -> b`
   names a conversion that loses nothing, to the type its place expects:
   `(into n : Float)`, `into n * 10n`. The core has `Into Int Float` and
