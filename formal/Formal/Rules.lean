@@ -256,10 +256,12 @@ of this order (regions.md §3.4). -/
 def Facts.age : Facts := fun C s => ∀ q p, C (.r q) → s.reach (.r p) → q < p
 
 /-- `⊢ μ : Ψ` of core.md §3.6. -/
-def StoreTy (Ψ : List Ty) (μ : List Tm) : Prop :=
+def StoreTyM (mode : TypingMode) (Ψ : List Ty) (μ : List Tm) : Prop :=
   μ.length = Ψ.length ∧
     ∀ (i : Nat) v t, μ[i]? = some v → Ψ[i]? = some t →
-      Value v ∧ Typ S Ψ Facts.age [] v (.ex t .pure)
+      Value v ∧ TypM S mode Ψ Facts.age [] v (.ex t .pure)
+
+abbrev StoreTy := StoreTyM S .captures
 
 /-- The root environment `Σ₀` of core.md §2.6 and the bodies of the globals of λFlick⁺. -/
 structure Roots where
@@ -268,11 +270,13 @@ structure Roots where
 
 /-- `Σ₀` has closed values of `S.Impl`. The body of a global is closed source code,
 typed at the scheme of the global; each declared global has a body. -/
-structure RootTy (root : Roots) : Prop where
-  svc : ∀ N v, root.svc N = some v → Value v ∧ Typ S [] Facts.none [] v (.ex (S.impl N) .pure)
+structure RootTyM (mode : TypingMode) (root : Roots) : Prop where
+  svc : ∀ N v, root.svc N = some v → Value v ∧ TypM S mode [] Facts.none [] v (.ex (S.impl N) .pure)
   glob : ∀ g v, root.glob g = some v → (∀ x, ¬ v.Has x) ∧
-    ∃ s, S.glob g = some s ∧ Typ S [] s.cs [] v (.ex s.t .pure)
+    ∃ s, S.glob g = some s ∧ TypM S mode [] s.cs [] v (.ex s.t .pure)
   globs : ∀ g s, S.glob g = some s → (root.glob g).isSome
+
+abbrev RootTy := RootTyM S .captures
 
 /-- An ordinary constructor at `T us`. -/
 theorem Typ.ctor_plain {Ψ Θ Γ K k ts T₀ us T φ} (hK : S.ctor K = some (k, ts, T₀))

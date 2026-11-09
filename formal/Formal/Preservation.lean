@@ -239,7 +239,7 @@ theorem glob_preservation {root Ψ Θ g T φ v} (hroot : RootTy S root)
 /-- A root writes no region: its type names none. -/
 theorem root_no_rgn {root : Roots} (hroot : RootTy S root) {N v} (h : root.svc N = some v) (p : Nat) :
     ¬ v.Has (.rgn p) := fun hp =>
-  S.impl_reach N _ (((hroot.svc N v h).2.holds (hroot.svc N v h).1 rfl).1 _ (.inr (.inl ⟨p, hp, rfl⟩)))
+  S.impl_reach N _ ((Typ.holds (hroot.svc N v h).2 (hroot.svc N v h).1 rfl).1 _ (.inr (.inl ⟨p, hp, rfl⟩)))
 
 /-- A root's function for an operation has the type of the operation. -/
 theorem root_field {root Ψ Θ Ef o w f c v t φ} (hroot : RootTy S root) (hr₀ : root.svc Ef = some w)

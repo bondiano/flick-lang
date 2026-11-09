@@ -6,7 +6,7 @@ import Formal.Shapes
 
 namespace Flick
 
-variable {S : Sig}
+variable {S : Sig} {mode : TypingMode}
 
 def Tm.args : Tm → Nat
   | .app f _ => f.args + 1
@@ -26,7 +26,7 @@ def VKind (e : Tm) (k : Nat) : Prop :=
   | .drec .. => k = 13
   | _ => True
 
-theorem Typ.vkind {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) : Value e → ∀ {T φ}, J = .ex T φ →
+theorem TypM.vkind {Ψ Θ Γ e J} (h : TypM S mode Ψ Θ Γ e J) : Value e → ∀ {T φ}, J = .ex T φ →
     ¬ T.isAll → VKind e T.kind := by
   induction h with
   | allI => intro _ _ _ hJ h; cases hJ; exact (h trivial).elim
@@ -42,7 +42,7 @@ theorem Typ.vkind {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) : Value e → ∀ {T �
   | drec => intro _ _ _ hJ _; cases hJ; rfl
   | const _ hT =>
     intro _ _ _ hJ _; cases hJ
-    simp only [VKind, Tm.head]; rw [← hT.kind, Const.ty_kind]
+    simp only [VKind, Tm.head]; rw [← hT.kind, Const.ty_kind _ _ mode]
   | perform _ hT =>
     intro _ _ _ hJ _; cases hJ
     simp only [VKind, Tm.head]; rw [← hT.kind]; rfl
@@ -63,7 +63,7 @@ theorem Typ.vkind {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) : Value e → ∀ {T �
     all_goals simp
   | app hf ha hψ hT _ _ =>
     intro hv _ _ hJ hA; cases hJ
-    have hs := (Typ.app hf ha hψ hT).shape hv rfl
+    have hs := (TypM.app hf ha hψ hT).shape hv rfl
     cases hv with
     | ctorApp _ hK _ =>
       rcases hs.2 _ hK hA with ⟨U, us, hU, hs'⟩ | ⟨_, _, _, h', -⟩
@@ -74,16 +74,15 @@ theorem Typ.vkind {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) : Value e → ∀ {T �
         simp only [VKind, Tm.head, hK]; rw [← hU.kind]; omega
       · rw [h']; simp [VKind, Tm.head, hK, Ty.kind]
     | constApp hc _ =>
-      simp [VKind, Tm.head, (Typ.app hf ha hψ hT).constApp_kind hc hA]
+      simp [VKind, Tm.head, (TypM.app hf ha hψ hT).constApp_kind hc hA]
   | _ => intro hv _ _ hJ _; cases hJ <;> cases hv
 
-namespace TypM
-export Typ (vkind)
-end TypM
+theorem Typ.vkind {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) : Value e → ∀ {T φ}, J = .ex T φ →
+    ¬ T.isAll → VKind e T.kind := TypM.vkind h
 
 /-- L1 for functions. -/
-theorem canonical_arrow {Ψ Θ Γ v a ψ t C φ} (hv : Value v)
-    (h : Typ S Ψ Θ Γ v (.ex (.arrow a ψ t C) φ)) :
+theorem canonical_arrow_mode {Ψ Θ Γ v a ψ t C φ} (hv : Value v)
+    (h : TypM S mode Ψ Θ Γ v (.ex (.arrow a ψ t C) φ)) :
     (∃ b, v = .lam b) ∨ (∃ f, v = .fix f) ∨ (∃ K, v.head = .ctor K) ∨ (∃ c, v = .const c) ∨
       (∃ c w, v = .app (.const c) w ∧ c.arity = 2 ∧ Value w) ∨ ∃ p ℓ, v = .kont p ℓ := by
   have hk := h.vkind hv rfl (by simp [Ty.isAll])
@@ -100,7 +99,7 @@ theorem canonical_arrow {Ψ Θ Γ v a ψ t C φ} (hv : Value v)
   | _ => simp [VKind, Tm.head, Ty.kind] at hk
 
 /-- L1 for references. -/
-theorem canonical_ref {Ψ Θ Γ v t φ} (hv : Value v) (h : Typ S Ψ Θ Γ v (.ex (.ref t) φ)) :
+theorem canonical_ref_mode {Ψ Θ Γ v t φ} (hv : Value v) (h : TypM S mode Ψ Θ Γ v (.ex (.ref t) φ)) :
     ∃ l, v = .loc l ∧ Ψ[l]? = some t := by
   have hk := h.vkind hv rfl (by simp [Ty.isAll])
   cases hv with
@@ -111,23 +110,23 @@ theorem canonical_ref {Ψ Θ Γ v t φ} (hv : Value v) (h : Typ S Ψ Θ Γ v (.e
   | _ => simp [VKind, Tm.head, Ty.kind] at hk
 
 /-- L1 for computations. -/
-theorem canonical_eff {Ψ Θ Γ v r ε t C φ} (hv : Value v)
-    (h : Typ S Ψ Θ Γ v (.ex (.eff r ε t C) φ)) :
-    ∃ e t₀ ψ, v = .task e ∧ Typ S Ψ Θ Γ e (.ex t₀ ψ) ∧ ψ.le (.rt r ε) ∧ Le t₀ t := by
+theorem canonical_eff_mode {Ψ Θ Γ v r ε t C φ} (hv : Value v)
+    (h : TypM S mode Ψ Θ Γ v (.ex (.eff r ε t C) φ)) :
+    ∃ e t₀ ψ, v = .task e ∧ TypM S mode Ψ Θ Γ e (.ex t₀ ψ) ∧ ψ.le (mode.use (.rt r ε) C) ∧ mode.subtype t₀ t := by
   have hk := h.vkind hv rfl (by simp [Ty.isAll])
   cases hv with
   | task =>
     cases h with
     | task he hψ _ _ hT =>
-      obtain ⟨_, _, _, _, h, hr, he', ht, -⟩ := hT.eff_left
+      obtain ⟨_, _, _, _, h, huse, ht, -⟩ := hT.eff_left_mode
       cases h
-      exact ⟨_, _, _, rfl, he, Stage.le_trans hψ ⟨hr, he'⟩, ht⟩
+      exact ⟨_, _, _, rfl, he, Stage.le_trans hψ huse, ht⟩
   | ctorApp _ hf _ => simp [VKind, Tm.head, hf, Ty.kind] at hk
   | constApp =>
     simp [VKind, Tm.head, Ty.kind] at hk
   | _ => simp [VKind, Tm.head, Ty.kind] at hk
 
-theorem canonical_unit {Ψ Θ Γ v φ} (hv : Value v) (h : Typ S Ψ Θ Γ v (.ex (.base .unit) φ)) :
+theorem canonical_unit_mode {Ψ Θ Γ v φ} (hv : Value v) (h : TypM S mode Ψ Θ Γ v (.ex (.base .unit) φ)) :
     v = .lit .unit := by
   have hs := (h.shape hv rfl).1
   generalize hT : Ty.base Base.unit = T at hs
@@ -137,7 +136,7 @@ theorem canonical_unit {Ψ Θ Γ v φ} (hv : Value v) (h : Typ S Ψ Θ Γ v (.ex
   | adt _ _ h => subst hT; simp [Ty.hd] at h
   | _ => cases hT
 
-theorem canonical_int {Ψ Θ Γ v φ} (hv : Value v) (h : Typ S Ψ Θ Γ v (.ex (.base .int) φ)) :
+theorem canonical_int_mode {Ψ Θ Γ v φ} (hv : Value v) (h : TypM S mode Ψ Θ Γ v (.ex (.base .int) φ)) :
     ∃ n, v = .lit (.int n) := by
   have hs := (h.shape hv rfl).1
   generalize hT : Ty.base Base.int = T at hs
@@ -148,7 +147,7 @@ theorem canonical_int {Ψ Θ Γ v φ} (hv : Value v) (h : Typ S Ψ Θ Γ v (.ex 
   | _ => cases hT
 
 /-- L1 for owners. -/
-theorem canonical_owner {Ψ Θ Γ v s φ} (hv : Value v) (h : Typ S Ψ Θ Γ v (.ex (.owner s) φ)) :
+theorem canonical_owner_mode {Ψ Θ Γ v s φ} (hv : Value v) (h : TypM S mode Ψ Θ Γ v (.ex (.owner s) φ)) :
     ∃ p, v = .own p ∧ s = .rg p := by
   have hk := h.vkind hv rfl (by simp [Ty.isAll])
   cases hv with
@@ -159,7 +158,7 @@ theorem canonical_owner {Ψ Θ Γ v s φ} (hv : Value v) (h : Typ S Ψ Θ Γ v (
   | _ => simp [VKind, Tm.head, Ty.kind] at hk
 
 /-- L1 for capabilities. -/
-theorem canonical_hnd {Ψ Θ Γ v s φ} (hv : Value v) (h : Typ S Ψ Θ Γ v (.ex (.hnd s) φ)) :
+theorem canonical_hnd_mode {Ψ Θ Γ v s φ} (hv : Value v) (h : TypM S mode Ψ Θ Γ v (.ex (.hnd s) φ)) :
     ∃ p, v = .cap p ∧ s = .rg p := by
   have hk := h.vkind hv rfl (by simp [Ty.isAll])
   cases hv with
@@ -192,9 +191,9 @@ theorem Shp.field {fl R v l t} (h : Shp S fl R v) (hf : fl = true) (hR : R.field
 
 /-- L1 for errors: a value of `Errors ε` is a constructor of an error in `ε`, at a
 type whose `⌈·⌉` is within the atoms of `ε`. -/
-theorem canonical_errors {Ψ Θ Γ v ε φ} (hv : Value v) (h : Typ S Ψ Θ Γ v (.ex (.errors ε) φ)) :
+theorem canonical_errors_mode {Ψ Θ Γ v ε φ} (hv : Value v) (h : TypM S mode Ψ Θ Γ v (.ex (.errors ε) φ)) :
     ∃ K k ts T U, v.head = .ctor K ∧ S.ctor K = some (k, ts, T) ∧ ε (.nm T) ∧ U.hd = .adt T ∧
-      Typ S Ψ Θ Γ v (.ex U .pure) ∧ Row.Sub (Row.err T U) ε := by
+      TypM S mode Ψ Θ Γ v (.ex U .pure) ∧ Row.Sub (Row.err T U) ε := by
   have hk := h.vkind hv rfl (by simp [Ty.isAll])
   have hs := (h.shape hv rfl).2
   obtain ⟨K, hK⟩ : ∃ K, v.head = .ctor K := by
@@ -222,5 +221,33 @@ theorem canonical_errors {Ψ Θ Γ v ε φ} (hv : Value v) (h : Typ S Ψ Θ Γ v
         exact ⟨K, k, ts, _, U, hK, hS, hE, hUE, hty.valueAny hv _, hsub⟩
       | cons => simp [Ty.arrows, Ty.hd] at hU₁
     | lit | rnil | rcons => simp [Ty.hd] at hUE
+
+theorem canonical_arrow {Ψ Θ Γ v a ψ t C φ} (hv : Value v)
+    (h : Typ S Ψ Θ Γ v (.ex (.arrow a ψ t C) φ)) :
+    (∃ b, v = .lam b) ∨ (∃ f, v = .fix f) ∨ (∃ K, v.head = .ctor K) ∨ (∃ c, v = .const c) ∨
+      (∃ c w, v = .app (.const c) w ∧ c.arity = 2 ∧ Value w) ∨ ∃ p ℓ, v = .kont p ℓ := canonical_arrow_mode (mode := .captures) hv h
+
+theorem canonical_ref {Ψ Θ Γ v t φ} (hv : Value v) (h : Typ S Ψ Θ Γ v (.ex (.ref t) φ)) :
+    ∃ l, v = .loc l ∧ Ψ[l]? = some t := canonical_ref_mode (mode := .captures) hv h
+
+theorem canonical_eff {Ψ Θ Γ v r ε t C φ} (hv : Value v)
+    (h : Typ S Ψ Θ Γ v (.ex (.eff r ε t C) φ)) :
+    ∃ e t₀ ψ, v = .task e ∧ Typ S Ψ Θ Γ e (.ex t₀ ψ) ∧ ψ.le (.rt r ε) ∧ Le t₀ t := canonical_eff_mode (mode := .captures) hv h
+
+theorem canonical_unit {Ψ Θ Γ v φ} (hv : Value v) (h : Typ S Ψ Θ Γ v (.ex (.base .unit) φ)) :
+    v = .lit .unit := canonical_unit_mode (mode := .captures) hv h
+
+theorem canonical_int {Ψ Θ Γ v φ} (hv : Value v) (h : Typ S Ψ Θ Γ v (.ex (.base .int) φ)) :
+    ∃ n, v = .lit (.int n) := canonical_int_mode (mode := .captures) hv h
+
+theorem canonical_owner {Ψ Θ Γ v s φ} (hv : Value v) (h : Typ S Ψ Θ Γ v (.ex (.owner s) φ)) :
+    ∃ p, v = .own p ∧ s = .rg p := canonical_owner_mode (mode := .captures) hv h
+
+theorem canonical_hnd {Ψ Θ Γ v s φ} (hv : Value v) (h : Typ S Ψ Θ Γ v (.ex (.hnd s) φ)) :
+    ∃ p, v = .cap p ∧ s = .rg p := canonical_hnd_mode (mode := .captures) hv h
+
+theorem canonical_errors {Ψ Θ Γ v ε φ} (hv : Value v) (h : Typ S Ψ Θ Γ v (.ex (.errors ε) φ)) :
+    ∃ K k ts T U, v.head = .ctor K ∧ S.ctor K = some (k, ts, T) ∧ ε (.nm T) ∧ U.hd = .adt T ∧
+      Typ S Ψ Θ Γ v (.ex U .pure) ∧ Row.Sub (Row.err T U) ε := canonical_errors_mode (mode := .captures) hv h
 
 end Flick

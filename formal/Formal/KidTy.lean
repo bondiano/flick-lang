@@ -185,7 +185,7 @@ theorem perform_out {Ef o : Name} {c : OpClass} {r : Tm}
     rcases rel.svc _ hn with h₂ | h₂
     · exact h₂
     · obtain ⟨a, b, hop⟩ := hop
-      cases G <;> simp only [Frame.dom, Frame.installs] at h₂
+      cases G <;> simp only [TypingMode.captures_dom, Frame.dom, Frame.installs] at h₂
       · subst h₂
         cases h with
         | hwith _ _ _ _ _ _ hc hφ _ =>

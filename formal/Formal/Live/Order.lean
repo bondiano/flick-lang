@@ -29,6 +29,26 @@ theorem TypingMode.held_mono {mode : TypingMode} {A B C : Caps}
       funext x
       cases x <;> simp [Row.union, Row.ofCaps, Caps.none]
 
+@[simp] theorem TypingMode.use_pure (mode : TypingMode) (C : Caps) :
+    mode.use .pure C = .pure := by cases mode <;> rfl
+
+@[simp] theorem TypingMode.use_err (mode : TypingMode) (φ : Stage) (C : Caps) :
+    (mode.use φ C).err = φ.err := by cases mode <;> cases φ <;> rfl
+
+/-- A use stage adds only the atoms of what it uses, and only in the live discipline. -/
+theorem TypingMode.use_svc (mode : TypingMode) (φ : Stage) (C : Caps) {n : Elem}
+    (h : (mode.use φ C).svc n) : φ.svc n ∨ mode = .live ∧ ∃ a, C a ∧ n = .atm a := by
+  cases mode with
+  | captures => exact .inl h
+  | live =>
+    cases φ with
+    | pure => exact .inl h
+    | rt r ε =>
+      rcases h with h | h
+      · exact .inl h
+      · cases n <;> simp [Row.ofCaps] at h
+        exact .inr ⟨rfl, _, h, rfl⟩
+
 theorem TypingMode.le_use (mode : TypingMode) (φ : Stage) (C : Caps) :
     φ.le (mode.use φ C) := by
   cases mode with
@@ -59,6 +79,27 @@ theorem TypingMode.use_substT (mode : TypingMode) (φ : Stage) (C : Caps) (σ : 
     (mode.use φ C).substT σ = mode.use (φ.substT σ) (C.substT σ) := by
   cases mode <;> cases φ <;>
     simp [TypingMode.use, Stage.substT, Row.union_substT, Row.ofCaps_substT]
+
+theorem Caps.substT_rg {p : Nat} {σ : Atom → Ty} (hp : σ (.r p) = .rg p) :
+    ((Ty.rg p).reach).substT σ = (Ty.rg p).reach := by
+  funext a
+  apply propext
+  constructor
+  · rintro ⟨b, rfl, h⟩; rw [hp] at h; exact h
+  · intro h; exact ⟨.r p, rfl, by rw [hp]; exact h⟩
+
+theorem Caps.substT_if_rg {tl : Bool} {p : Nat} {σ : Atom → Ty} (hp : σ (.r p) = .rg p) :
+    ((if tl = true then Caps.none else (Ty.rg p).reach) : Caps).substT σ
+      = if tl = true then Caps.none else (Ty.rg p).reach := by
+  cases tl <;> simp [Caps.substT_rg hp, Caps.none_substT]
+
+theorem TypingMode.use_substT_eq (mode : TypingMode) (φ : Stage) {C : Caps} {σ : Atom → Ty}
+    (hC : C.substT σ = C) : (mode.use φ C).substT σ = mode.use (φ.substT σ) C := by
+  rw [TypingMode.use_substT, hC]
+theorem TypingMode.use_substT_rg (mode : TypingMode) (φ : Stage) {p : Nat} {σ : Atom → Ty}
+    (hp : σ (.r p) = .rg p) :
+    (mode.use φ (Ty.rg p).reach).substT σ = mode.use (φ.substT σ) (Ty.rg p).reach :=
+  TypingMode.use_substT_eq mode φ (Caps.substT_rg hp)
 
 theorem LeLive.reach {a b : Ty} (h : LeLive a b) : Caps.Sub a.reach b.reach := by
   cases h with
