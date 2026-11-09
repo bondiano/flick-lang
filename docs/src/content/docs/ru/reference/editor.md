@@ -1,6 +1,6 @@
 ---
 title: "Редакторы"
-source_hash: adef67c1ffdf7f7a
+source_hash: 4daf5e4e13cff8d8
 ---
 
 ## Языковой сервер
@@ -176,12 +176,13 @@ TypeScript 7.1 проверяет `.ts` и `.tsx`, импортирующие м
 TypeScript, его проекцией, построенной по несохранённому тексту редактора.
 
 Пакет приватный для репозитория и в npm пока не опубликован, поэтому
-возьмите его из checkout и подключите к проекту ссылкой. Затем укажите его
-в `tsconfig.json`:
+возьмите его из checkout и подключите к проекту ссылкой:
 
 ```sh
 pnpm add --save-dev @flick-lang/content-mapper@file:/path/to/flick-lang/tools/content-mapper
 ```
+
+Затем укажите его в `tsconfig.json`:
 
 ```json
 {

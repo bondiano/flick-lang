@@ -169,12 +169,13 @@ against the module's types through a Content Mapper: `@flick-lang/content-mapper
 its projection, made from the editor's unsaved text.
 
 The package is private to the repository and is not published to npm yet, so
-take it from a checkout of the repository and link it into the project. Then
-name it in `tsconfig.json`:
+take it from a checkout of the repository and link it into the project:
 
 ```sh
 pnpm add --save-dev @flick-lang/content-mapper@file:/path/to/flick-lang/tools/content-mapper
 ```
+
+Then name it in `tsconfig.json`:
 
 ```json
 {

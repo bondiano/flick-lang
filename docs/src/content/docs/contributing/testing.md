@@ -29,7 +29,7 @@ Snapshot tests use [`insta`](https://insta.rs); review changes with
 
 Annotation forms:
 
-```flick ignore annotation syntax shown without a program
+```flick ignore the markers are the subject: their codes and positions are illustrative, not what the snippet reports
 let x : Float = "hi"
 //               ^^^^ FLICK-T012 expected `Float`
 //~ FLICK-E003 @4:1-6:9 effect row is not closed

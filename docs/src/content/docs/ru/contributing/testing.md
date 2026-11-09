@@ -1,6 +1,6 @@
 ---
 title: "Тестирование"
-source_hash: 534a6f88e89f6c2a
+source_hash: 5e4e90b58370669e
 ---
 
 Установите инструмент проверки зависимостей, используемый локально и в CI:
@@ -32,7 +32,7 @@ cargo install cargo-machete --version 0.9.2 --locked
 
 Формы аннотаций:
 
-```flick ignore annotation syntax shown without a program
+```flick ignore the markers are the subject: their codes and positions are illustrative, not what the snippet reports
 let x : Float = "hi"
 //               ^^^^ FLICK-T012 expected `Float`
 //~ FLICK-E003 @4:1-6:9 effect row is not closed
