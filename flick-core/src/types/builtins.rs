@@ -379,4 +379,5 @@ pub(super) fn builtin_env(stages_by_class: bool) -> &'static Builtins {
 }
 
 #[cfg(test)]
+#[path = "builtins_tests.rs"]
 mod builtins_tests;

@@ -4,6 +4,15 @@
 import assert from "node:assert/strict";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { test } from "node:test";
+import { bigintDivide, bigintRemainder } from "../src/core/text.ts";
+
+test("checked BigInt division keeps a zero divisor as an arithmetic error", () => {
+  assert.deepEqual(bigintDivide(7n, 2n), { _tag: "Success", success: 3n });
+  assert.deepEqual(bigintRemainder(-7n, 2n), { _tag: "Success", success: -1n });
+  const result = bigintDivide(5n, 0n);
+  assert.equal(result._tag, "Failure");
+  if (result._tag === "Failure") assert.equal(result.failure._0, "division by zero");
+});
 
 const repo = new URL("../../", import.meta.url);
 const read = (path: string): string => readFileSync(new URL(path, repo), "utf8");

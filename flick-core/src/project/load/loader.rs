@@ -1,4 +1,7 @@
-use super::*;
+use super::{
+    Diagnostic, Edit, Loaded, Loader, Path, PathBuf, Root, Span, codes, expected_name, io,
+    module_path,
+};
 
 impl Loader<'_> {
     pub(super) fn load(&mut self, path: &Path) -> io::Result<Option<usize>> {

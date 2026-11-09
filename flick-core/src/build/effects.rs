@@ -65,6 +65,7 @@ const IN_RT: &[&str] = &[
     "Latch",
     "Layer",
     "Queue",
+    "Redacted",
     "Schedule",
     "Scope",
     "reactivity/AsyncResult",
