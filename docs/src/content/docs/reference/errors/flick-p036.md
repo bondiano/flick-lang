@@ -8,7 +8,7 @@ memory), or the code it gave does not fit where the block stands. Errors
 of the user's code inside the block are reported as such; this one is
 about the plugin or how the block is written for it.
 
-```flick ignore
+```flick
 import Pairs exposing (plugin pairs)
 
 let point = pairs { x = 1.0; y }

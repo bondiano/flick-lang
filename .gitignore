@@ -12,3 +12,4 @@ node_modules/
 /tools/bundle-size/fullstack/.flick/
 /editors/zed/target/
 /docs/research/
+/editors/vscode/dist/

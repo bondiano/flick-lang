@@ -409,7 +409,7 @@ place that started it, so each of them must come from a provider that
 outlives that owner: a `provide` around the owner's `scope`, or the caller
 of a function whose body opens that `scope`. Otherwise it is `FLICK-G003`:
 
-```flick fail
+```flick fail G003
 # service Greeter =
 #   greet : String ->{} String
 # report : Failure e ->{} Unit
@@ -525,7 +525,7 @@ closes its scopes too; calling `resume` a second time is a defect.
 `resume` holds the handler's region, so it stays in the arms: kept in a
 cell made outside, it is `FLICK-G002`:
 
-```flick fail
+```flick fail G002
 # effect Emit a =
 #   control emit : a ->{} Unit
 # zero : Unit ->{} Int

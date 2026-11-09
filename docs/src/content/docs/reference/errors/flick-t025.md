@@ -6,7 +6,7 @@ title: "FLICK-T025"
 matches and stops the program when it does not. A pattern that matches
 every value cannot fail, so the `assert` says nothing: write plain `let`.
 
-```flick ignore
+```flick
 module App.Pairs exposing (sum)
 
 sum : (Float, Float) -> Float

@@ -6,7 +6,7 @@ title: "FLICK-T047"
 to take its first. `List.find p xs` stops at the first match. The quick
 fix rewrites it, written either way or through `|>`.
 
-```flick ignore
+```flick
 first_adult : List Float -> Option Float
 let first_adult ages = List.find (fun a -> a >= 18) ages
 ```

@@ -1,6 +1,6 @@
 ---
 title: "FLICK-E016"
-source_hash: "c00dee161661f15f"
+source_hash: "92a942605ddb576b"
 ---
 
 `provide S impl { body }` обрабатывает сервис `S` в своем теле с помощью
@@ -8,7 +8,7 @@ source_hash: "c00dee161661f15f"
 только сервис, у которого все операции `tail`: поле задает операции
 ее значение. Эффект обрабатывается ветвями `try`.
 
-```flick ignore
+```flick
 effect Throw =
   abort throw : forall b. String ->{} b
 

@@ -8,7 +8,7 @@ each use means. Give it a name of its own. Rebinding a value from itself,
 `let total = total + tax`, is not reported, and neither are the
 parameters of a `fun` or the variables of a `match` arm.
 
-```flick ignore
+```flick
 area : Float -> Float -> Float
 let area width height =
   let w = width * 2

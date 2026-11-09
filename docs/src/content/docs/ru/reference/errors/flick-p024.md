@@ -1,6 +1,6 @@
 ---
 title: "FLICK-P024"
-source_hash: "94d1d411cac27e3b"
+source_hash: "a9c4e9f659802908"
 ---
 
 `flick pack` отклоняет пакет, модули которого всё ещё содержат `todo` или `echo`:
@@ -8,7 +8,7 @@ source_hash: "94d1d411cac27e3b"
 пакета. Каждое из них отображается как ошибка; исправьте или удалите её, затем упакуйте
 снова.
 
-```flick ignore
+```flick
 render : List Float -> String
 let render rows = todo "render the rows as a table"
 ```

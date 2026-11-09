@@ -8,7 +8,13 @@ A warning: a `do` block over `Eff` builds a computation through
 rows of its calls. The quick fix rewrites `x <- e` as `let x = await e`, a
 statement as `await e`, and a final `pure v` as `v`.
 
-```flick ignore
+```flick
+# service Users =
+#   get : Int ->{; NotFound} User
+#   touch : UserId ->{} Unit
+# type UserId = UserId String
+# type User = User { name : String }
+# type error NotFound = NotFound String
 load_both : Eff {Users} {NotFound} (User, User)
 let load_both =
   task {

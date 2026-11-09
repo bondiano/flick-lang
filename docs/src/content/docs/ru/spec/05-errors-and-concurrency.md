@@ -282,7 +282,7 @@ let read_config path =
 
 Каждый `scope s { ... }` создаёт свежий регион `s` и его владельца в среде выполнения. В `scope { ... }` имя региона выводится и остаётся скрытым. Дескриптор ресурса области имеет тип вроде `File s`. Компилятор передаёт владельца лексически: один обычный поиск в Context не подходит, потому что во вложенной области он мог бы выбрать другой scope.
 
-```flick fail
+```flick fail E002 G001
 # import File exposing (File, Path, FileSystem, OpenError, ReadError)
 #
 bad_deferred :
@@ -316,7 +316,7 @@ let deferred_read path =
 
 Та же проверка действует для обычной функции обратного вызова:
 
-```flick fail
+```flick fail E002 G001
 # import File exposing (File, Path, FileSystem, OpenError, ReadError)
 #
 bad_callback :

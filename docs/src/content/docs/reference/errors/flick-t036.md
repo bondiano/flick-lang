@@ -6,7 +6,14 @@ A function whose body is longer than `[lint] max-function-lines` in
 `flick.toml` (60 by default) does too much to read at once. Split it into
 functions that each do one part, and name each part.
 
-```flick ignore
+```flick
+# type Order = Order
+# header : Order -> String
+# let header _ = ""
+# lines : Order -> String
+# let lines _ = ""
+# total : Order -> String
+# let total _ = ""
 summary : Order -> String
 let summary order = header order ++ "\n" ++ lines order ++ "\n" ++ total order
 ```

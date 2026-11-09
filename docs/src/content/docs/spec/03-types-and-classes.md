@@ -1,6 +1,6 @@
 ---
 title: "Types and classes"
-source_hash: 8dafd1b5097e4e12
+source_hash: 33f31e56ad78d7d2
 ---
 
 ## Computations and kinds
@@ -257,7 +257,7 @@ The set of instances a module sees is determined by its dependency graph, not by
 
 Generalization means that the type of a binding can be instantiated anew at each use. For `identity : forall a. a -> a`, two calls can independently choose `Float` and `String`. A single mutable cell must keep one content type. An explicit `forall` signature cannot make unsafe sharing of state acceptable.
 
-```flick fail
+```flick fail T003
 invalid : Unit ->{} String
 let invalid () =
   let cell = Ref.make None

@@ -1,7 +1,7 @@
 ---
 title: Начало работы
 description: Установите инструменты, создайте приложение и запустите его.
-source_hash: 86ae5017a741fd76
+source_hash: fd37ff4bf6978c0f
 ---
 
 ## Установка
@@ -21,6 +21,33 @@ flick --version
 [собрать его из исходников](#из-исходников).
 
 В Windows распакуйте `.zip` и добавьте каталог с `flick.exe` в `PATH`.
+
+`flick` также требует `git` в `PATH` и — при первой установке или проверке
+проекта — доступа к github.com: пакет `std`, который проект видит без
+объявления, и любую зависимость из `git` компилятор забирает этой командой
+по тегу `std-v<версия>` своего релиза. Checkout репозитория или
+`FLICK_STD_PATH` с локальным `packages/std` убирают эту загрузку, а
+зависимостям по пути сеть не нужна.
+
+Проект закрепляет pnpm в `package.json`, и `flick install` ничего не меняет,
+если `pnpm --version` — другая версия. Включите закреплённую:
+`corepack prepare pnpm@12.16.1 --activate` (эту версию записывает
+`flick new`; если в `package.json` другая, возьмите её) или установите её
+через `npm install --global pnpm@12.16.1`. `flick doctor` показывает
+найденные версии рядом с теми, что нужны проекту.
+
+### Непрерывная интеграция
+
+Репозиторий — ещё и GitHub Action: он скачивает архив релиза, сверяет его
+`.sha256` и добавляет `flick` в `PATH` до конца шага.
+
+```yaml
+- uses: actions/checkout@v7
+- uses: bondiano/flick-lang@main # закрепите тег релиза, в котором есть action
+  with:
+    version: latest # или v0.1.0
+- run: flick --version
+```
 
 ### Из исходников
 
@@ -94,9 +121,9 @@ let main () =
 
 В Astro и Vite модули `.fl` можно импортировать через `@flick-lang/astro`:
 плагин собирает каждый импортированный `.fl` командой `flick build`. Пакет
-лежит в репозитории Flick
-([исходники](https://github.com/bondiano/flick-lang/tree/main/tools/astro-flick))
-и в npm пока не опубликован.
+опубликован в npm и версионируется вместе с компилятором, а исходники лежат
+в репозитории Flick
+([исходники](https://github.com/bondiano/flick-lang/tree/main/tools/astro-flick)).
 
 ```js
 // astro.config.mjs

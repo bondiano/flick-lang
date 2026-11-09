@@ -8,9 +8,10 @@ capture qualifier: `T^{s}`. A bare type holds no region it does not show, so
 a closure that uses a scoped file cannot pass for `Unit -> String`. Widen the
 qualifier of the expected type, or use the resource where it lives.
 
-```flick ignore
+```flick
+# import File exposing (File, OpenError, ReadError, FileSystem)
 // was: read_later : forall s. File s -> Eff none {ReadError} String
-read_later : forall s. File s -> (Eff none {ReadError} String)^{s}
+read_later : forall s. File s -> (Eff {FileSystem, Async} {ReadError} String)^{s}
 let read_later file =
   task { File.read_all file }
 ```

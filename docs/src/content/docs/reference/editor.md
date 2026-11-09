@@ -105,6 +105,19 @@ In Zed, set `lsp.flick.binary.env` to
 Normal events omit document bodies and raw RPC payloads, but a panic message
 can contain a source excerpt: check logs before sharing them.
 
+## VS Code
+
+The VS Code extension is a `.vsix` attached to each compiler release; it is
+not published to a marketplace. Install the one of the release you use:
+
+```sh
+code --install-extension flick-<version>.vsix
+```
+
+It starts `flick lsp --stdio`, taking `flick` from `PATH`; the `flick.path`
+setting names another binary. The extension carries the language client it
+needs, so nothing is installed beside it.
+
 ## Zed
 
 The extension first uses `lsp.flick.binary.path`, if set, then `flick` on
@@ -153,8 +166,15 @@ TypeScript 7.1 checks a `.ts` or `.tsx` file that imports a Flick module
 against the module's types through a Content Mapper: `@flick-lang/content-mapper`
 (`tools/content-mapper`) starts `flick content-mapper` (`FLICK_BIN`, else
 `flick` on the PATH), which answers each `.fl` file TypeScript reaches with
-its projection, made from the editor's unsaved text. Name it in
-`tsconfig.json`:
+its projection, made from the editor's unsaved text.
+
+The package is private to the repository and is not published to npm yet, so
+take it from a checkout of the repository and link it into the project. Then
+name it in `tsconfig.json`:
+
+```sh
+pnpm add --save-dev @flick-lang/content-mapper@file:/path/to/flick-lang/tools/content-mapper
+```
 
 ```json
 {

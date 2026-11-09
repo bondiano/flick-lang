@@ -1,6 +1,6 @@
 ---
 title: "FLICK-T055"
-source_hash: "c2d2c2e182aa1be3"
+source_hash: "b8d1277e40f3854f"
 ---
 
 Звено `_` в `match` для варианта типа этого модуля покрывает
@@ -9,7 +9,7 @@ source_hash: "c2d2c2e182aa1be3"
 такое происходит. Напишите звено для каждого конструктора или отключите предупреждение
 для этого кода с помощью `[lint] allow`.
 
-```flick ignore
+```flick
 type Shape = Circle Float | Square Float | Dot
 
 area : Shape -> Float

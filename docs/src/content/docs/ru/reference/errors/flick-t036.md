@@ -1,11 +1,18 @@
 ---
 title: "FLICK-T036"
-source_hash: "9477cc3df34adb5d"
+source_hash: "1c23cf209de1b8d5"
 ---
 
 Функция, тело которой длиннее `[lint] max-function-lines` в `flick.toml` (по умолчанию 60), слишком большая для восприятия за один раз. Разбейте её на функции, каждая из которых выполняет одну часть, и дайте каждой части имя.
 
-```flick ignore
+```flick
+# type Order = Order
+# header : Order -> String
+# let header _ = ""
+# lines : Order -> String
+# let lines _ = ""
+# total : Order -> String
+# let total _ = ""
 summary : Order -> String
 let summary order = header order ++ "\n" ++ lines order ++ "\n" ++ total order
 ```

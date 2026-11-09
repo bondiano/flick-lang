@@ -1,7 +1,7 @@
 ---
 title: Переход на 0.2
 description: Что изменилось после Flick 0.1.0 и как обновить проект.
-source_hash: b8656233d21f12cf
+source_hash: 84b22232a2282a1c
 ---
 
 До 1.0 минорный релиз может ломать программы, и 0.2 ломает: `std` стал
@@ -83,7 +83,7 @@ std = { path = "../flick-lang/packages/std" }
 Свидетельство схемы типа доступно как `T.schema`, а `schema` больше не ключевое
 слово. В 0.1:
 
-```flick fail
+```flick fail T001
 type alias Profile = { email : String }
   deriving Schema
 
@@ -254,7 +254,7 @@ Sync-стадии, поэтому вызовы внутри ветки не до
 ней, которому нужен `Async`, эффект с операцией `control` или переменная
 строки, теперь даёт `FLICK-E018`:
 
-```flick fail
+```flick fail E018
 # effect Ask =
 #   ask : Unit ->{} Int
 #
@@ -407,7 +407,7 @@ HTTP сохраняются в `.flick/plugin-snapshots/`, и проект их 
 каррирования, например в типе поля, тип без аннотации захватов теперь не
 допускает такое замыкание:
 
-```flick fail
+```flick fail G001
 keep_field : forall e. Errors e -> { run : Unit -> Unit }
 let keep_field x = { run = fun () -> ignore x }
 ```

@@ -8,7 +8,7 @@ added to the type later: the compiler cannot point at this `match` when
 one is. Write an arm for each constructor, or leave the warning off for
 this code with `[lint] allow`.
 
-```flick ignore
+```flick
 type Shape = Circle Float | Square Float | Dot
 
 area : Shape -> Float

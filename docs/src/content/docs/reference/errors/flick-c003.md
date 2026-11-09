@@ -7,7 +7,7 @@ their heads unify. Instances are canonical: there is no priority between a
 general and a specific one, and the context does not choose. Keep one, or
 give the special case a nominal wrapper.
 
-```flick ignore
+```flick fail C003 C006
 instance Show a => Show (List a) =
   show : List a -> String
   let show items = "[…]"

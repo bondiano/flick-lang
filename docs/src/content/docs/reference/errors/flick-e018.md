@@ -9,7 +9,7 @@ unless the row of the operation declares it or a handler inside the arm
 catches it. Otherwise declare what the arm needs, or make the operation
 `control`.
 
-```flick ignore
+```flick
 effect Clock =
   // was: now : Unit ->{} Float
   now : Unit ->{Async;} Float

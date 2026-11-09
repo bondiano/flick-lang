@@ -1,11 +1,11 @@
 ---
 title: "FLICK-F002"
-source_hash: "db363533cf4f55a7"
+source_hash: "89253a8bc00c4259"
 ---
 
 Параметр внешней функции, тип которой может содержать возможности области видимости (регион или квалификатор захвата `^c`), требует контракта `retention`: `retention call`, если JS-код не сохраняет значение после вызова, или `retention owner`, если он сохраняет его до закрытия владельцем региона. Без такого контракта компилятор не может определить, как долго JS-код удерживает значение.
 
-```flick ignore
+```flick
 each : forall c a. (a ->{} Unit)^c -> (List a ->{} Unit)^c
 foreign each from "./each.js" "each"
   retention call
@@ -16,6 +16,7 @@ foreign each from "./each.js" "each"
 Сигнатура с одним регионом получает эти ограничения без явного их указания, и её вызывающие должны их соблюдать. При двух регионах компилятор не может определить, какой из них владеет аргументом, поэтому укажите их явно:
 
 ```flick ignore
+# import Fiber exposing (Handle)
 add_finalizer_to :
   (Fiber.Outlives c s, Fiber.Provided r s, Detached r) =>
   Handle t -> (Eff r none Unit)^c ->{Scope s | r;} Unit

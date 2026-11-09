@@ -7,7 +7,7 @@ A name refers to more than one entity: two imports expose it by name, two
 one qualifier. A re-export of the same entity is not ambiguous. Qualify the
 name or import it by name from one module.
 
-```flick ignore
+```flick
 import App.Users as Users exposing (..)
 import App.Orders as Orders exposing (..)
 

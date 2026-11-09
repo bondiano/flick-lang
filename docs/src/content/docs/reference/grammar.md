@@ -479,7 +479,7 @@ duplicate names, while the types of `Cli` check the options (see [CLI eDSL:
 flags, arguments and subcommands](../../spec/08-type-programming-and-edsl/#cli-edsl-flags-arguments-and-subcommands)). A `///` comment right above a `flag`, `arg` or
 `subcommand` clause is its help text.
 
-```flick ignore
+```flick ignore several statements shown without the declarations around them
 load_twice : UserId ->{Users; NotFound} (User, User)
 let load_twice id =
   let request = task { Users.get id }

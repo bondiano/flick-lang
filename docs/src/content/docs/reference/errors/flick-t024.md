@@ -6,7 +6,7 @@ A `_` in a signature or annotation leaves that part of the type to the
 checker. The warning shows the type it inferred, and its fix writes it in
 place of the `_`.
 
-```flick ignore
+```flick fail T024
 module App.Pairs exposing (swap)
 
 swap : (Float, String) -> _

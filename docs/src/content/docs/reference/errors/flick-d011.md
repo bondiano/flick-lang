@@ -9,7 +9,7 @@ its module that is a `PureCodec Json` of it (`credentials` for
 or `deriving Schema`, whose JSON codec decodes it. A value of that name with
 another type is no codec of it.
 
-```flick ignore
+```flick
 type alias Credentials = { authorization : Option String }
   deriving Schema
 // was: a record without `deriving Schema` and no `credentials`

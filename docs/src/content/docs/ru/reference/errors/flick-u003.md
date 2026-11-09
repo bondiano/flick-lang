@@ -1,6 +1,6 @@
 ---
 title: "FLICK-U003"
-source_hash: "132668705e69738e"
+source_hash: "801b4ee8e6b12de6"
 ---
 
 Сериализуемый атом известен реестру по своему ключу, и
@@ -12,7 +12,7 @@ source_hash: "132668705e69738e"
 с помощью собственного верхнеуровневого `let` без параметров, применённого к его кодеку и
 состоянию там; `Atom.serializable_family` даёт один атом на ключ.
 
-```flick ignore
+```flick
 count : Atom.Writable Float
 let count = Atom.serializable (Codec.json Schema.number) (Atom.make 0)
 

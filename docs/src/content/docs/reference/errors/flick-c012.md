@@ -10,7 +10,7 @@ The classes `Numeric` and `Iterable` are closed: their instances are the
 built-in ones, since the compiler emits their operations and `for` loops
 directly.
 
-```flick ignore
+```flick
 type User = User { name : String }
 
 instance Show User =

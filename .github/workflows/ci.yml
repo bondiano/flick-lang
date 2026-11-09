@@ -14,6 +14,7 @@ concurrency:
 jobs:
   lint:
     runs-on: ubuntu-26.04
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
       # a pull request loosens no budget without a reason (`just ratchet`)
@@ -36,8 +37,22 @@ jobs:
           CARGO_TARGET_DIR=target/zed cargo test --manifest-path editors/zed/Cargo.toml --locked
       - run: just lint
 
+  # the root setup Action, as a user meets it: its installer resolves the
+  # compiler release, so it is tested where every pull request sees it, not
+  # only where a release is cut. It needs no Rust toolchain of its own
+  actions:
+    runs-on: ubuntu-26.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24.18.0
+      - run: node --test .github/actions/setup-flick/install.test.mjs
+
   test:
     runs-on: ubuntu-26.04
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v7
       - run: rustup show active-toolchain || rustup toolchain install
@@ -59,6 +74,7 @@ jobs:
 
   features:
     runs-on: ubuntu-26.04
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
       - run: rustup show active-toolchain || rustup toolchain install
@@ -72,6 +88,7 @@ jobs:
   # tests on both targets and the bundle budgets
   e2e-js:
     runs-on: ubuntu-26.04
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v7
       - run: rustup show active-toolchain || rustup toolchain install
@@ -111,6 +128,7 @@ jobs:
   # the e2e suites of the compiler but the cases of tests/run
   e2e-tests:
     runs-on: ubuntu-26.04
+    timeout-minutes: 75
     steps:
       - uses: actions/checkout@v7
       - run: rustup show active-toolchain || rustup toolchain install
@@ -142,6 +160,7 @@ jobs:
   # comparisons between the targets and profiles of a case stay in one job
   e2e-cases:
     runs-on: ubuntu-26.04
+    timeout-minutes: 75
     strategy:
       fail-fast: false
       matrix:
@@ -176,6 +195,7 @@ jobs:
   # plugins built as WebAssembly components, run by wasmtime
   plugins:
     runs-on: ubuntu-26.04
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
       - run: rustup show active-toolchain || rustup toolchain install
@@ -187,6 +207,7 @@ jobs:
 
   postgres:
     runs-on: ubuntu-26.04
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
       - run: rustup show active-toolchain || rustup toolchain install
@@ -214,6 +235,7 @@ jobs:
   # pins (rust-toolchain.toml and package.json)
   nix:
     runs-on: ubuntu-26.04
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v7
       - uses: cachix/install-nix-action@v31
@@ -247,6 +269,7 @@ jobs:
   # and the model properties on generated programs; it needs neither Node nor Go
   model:
     runs-on: ubuntu-26.04
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v7
       - run: rustup show active-toolchain || rustup toolchain install
@@ -260,6 +283,7 @@ jobs:
   # pinned in formal/lean-toolchain; --wfail turns a `sorry` (a warning) into a failure
   lean:
     runs-on: ubuntu-26.04
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v7
       - uses: leanprover/lean-action@v1
@@ -282,6 +306,7 @@ jobs:
       matrix:
         os: [ubuntu-26.04-arm, macos-15, windows-latest]
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
     steps:
       # the expected outputs keep their LF line ends on windows
       - run: git config --global core.autocrlf false

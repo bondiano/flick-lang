@@ -6,7 +6,13 @@ An expression statement in the middle of a block must have type `Unit`; a result
 of another type is not dropped silently. Bind it with `let`, or discard it
 explicitly with `ignore`.
 
-```flick ignore
+```flick
+# service Users =
+#   get : UserId ->{; NotFound} User
+#   touch : UserId ->{} Unit
+# type UserId = UserId String
+# type User = User { name : String }
+# type error NotFound = NotFound String
 refresh : UserId ->{Users; NotFound} Unit
 let refresh id =
   ignore (Users.get id)

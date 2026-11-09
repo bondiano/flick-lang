@@ -1,11 +1,11 @@
 ---
 title: "FLICK-T035"
-source_hash: "e12a5af5c41ff731"
+source_hash: "4964192988b1c918"
 ---
 
 Предупреждение: вложенные вызовы `flat_map` (или `Option.bind`, `Result.bind`), функции которых являются `fun x -> …`, и `match`, передающие `None` или `Err e` дальше, связывают значения одно за другим. Блок `do` выражает то же самое в порядке:
 
-```flick ignore
+```flick fail T035
 total : Option Float -> Option Float -> Option Float
 let total a b =
   Option.bind (fun x -> Option.bind (fun y -> Some (x + y)) b) a
@@ -13,7 +13,7 @@ let total a b =
 
 равносильно
 
-```flick ignore
+```flick
 total : Option Float -> Option Float -> Option Float
 let total a b = do { x <- a; y <- b; Some (x + y) }
 ```

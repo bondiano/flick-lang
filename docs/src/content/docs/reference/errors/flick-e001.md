@@ -7,7 +7,10 @@ has a pure arrow `->`, in a callback expected to be pure, or while a module is
 initialized. An empty row does not make a call pure: `->{}` is still a runtime
 arrow. Make the arrow a runtime one, or defer the call with `task { … }`.
 
-```flick ignore
+```flick
+# type UserId = UserId String
+# type User = User { name : String }
+# type error NotFound = NotFound String
 service Users =
   get : UserId ->{; NotFound} User
 

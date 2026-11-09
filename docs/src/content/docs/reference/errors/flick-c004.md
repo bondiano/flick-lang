@@ -6,7 +6,9 @@ With a functional dependency `c -> a`, the types at `c` determine those at
 `a`: two instances whose determining types unify must agree on the rest.
 Wrap one of the types to keep both relations.
 
-```flick ignore
+```flick
+# type User = User String
+# type UserSet = UserSet (List User)
 class Collection c a | c -> a =
   empty : c
 

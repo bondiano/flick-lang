@@ -1,6 +1,6 @@
 ---
 title: "Грамматика Flick"
-source_hash: f7a26467142ee1da
+source_hash: e53bce82df958a68
 ---
 
 Здесь описан синтаксис исходного кода, который принимают `flick check`
@@ -512,7 +512,7 @@ clause      = ("from" | "join" | "left_join") name "in" expr
 Комментарий `///` непосредственно над предложением `flag`, `arg`
 или `subcommand` задаёт текст справки для него.
 
-```flick ignore
+```flick ignore several statements shown without the declarations around them
 load_twice : UserId ->{Users; NotFound} (User, User)
 let load_twice id =
   let request = task { Users.get id }

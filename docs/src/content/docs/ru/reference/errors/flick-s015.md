@@ -1,6 +1,6 @@
 ---
 title: "FLICK-S015"
-source_hash: "d6c5577401f2a4b0"
+source_hash: "dfecfd343118314c"
 ---
 
 Конструктор называет тип, который он строит, после `:` (`| IntLit Int : Expr Int`)
@@ -8,7 +8,7 @@ source_hash: "d6c5577401f2a4b0"
 Конструктор `type error` и член `kind` строят собственный тип,
 а конструктор `untagged type` является его литералом.
 
-```flick ignore
+```flick
 type Expr a =
   | IntLit Int : Expr Int
   | BoolLit Bool : Expr Bool

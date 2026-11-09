@@ -8,7 +8,7 @@ region, an open record or a service implementation has no faithful
 TypeScript form. Export a concrete function instead (a façade), or leave the
 value out of the module's exports.
 
-```flick ignore
+```flick
 // was: map_twice : Functor f => (a -> a) -> f a -> f a
 map_twice_list : (a -> a) -> List a -> List a
 let map_twice_list f xs = List.map f (List.map f xs)

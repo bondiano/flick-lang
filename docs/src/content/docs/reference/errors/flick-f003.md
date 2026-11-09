@@ -6,7 +6,7 @@ title: "FLICK-F003"
 `JsValue -> E`, where `E` is an error of the signature's error row and holds
 no capability of a scope.
 
-```flick ignore
+```flick
 type error FsError = FsError String
 
 from_js : JsValue -> FsError

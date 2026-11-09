@@ -11,7 +11,7 @@ key, and two in one binding would share it. Define each serializable atom
 with its own top-level `let` without parameters, applied to its codec and
 state there; `Atom.serializable_family` gives one atom per key.
 
-```flick ignore
+```flick
 count : Atom.Writable Float
 let count = Atom.serializable (Codec.json Schema.number) (Atom.make 0)
 

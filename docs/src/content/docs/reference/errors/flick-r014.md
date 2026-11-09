@@ -6,7 +6,7 @@ A top-level definition the module does not export is never used by the
 exported ones, directly or through other private definitions. Delete it,
 or export it.
 
-```flick ignore
+```flick fail R014
 module App.Prices exposing (net)
 
 net : Float -> Float

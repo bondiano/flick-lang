@@ -7,7 +7,7 @@ A recursive function calls itself at another type than the one being defined
 quantifies all its variables with an explicit `forall`: then it checks the body
 against the signature instead of inferring it.
 
-```flick ignore
+```flick
 type Nested a = Flat a | Nest (Nested (List a))
 
 depth : forall a. Nested a -> Float

@@ -1,11 +1,11 @@
 ---
 title: "FLICK-T024"
-source_hash: "b0490114c53425e8"
+source_hash: "a1b10a2570ab8fe6"
 ---
 
 `_` в сигнатуре или аннотации оставляет эту часть типа для проверки. Предупреждение показывает тип, который был выведен, а исправление записывает его вместо `_`.
 
-```flick ignore
+```flick fail T024
 module App.Pairs exposing (swap)
 
 swap : (Float, String) -> _

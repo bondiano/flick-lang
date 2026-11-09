@@ -1,15 +1,21 @@
 ---
 title: "FLICK-C006"
-source_hash: "83d3db785ab8a69f"
+source_hash: "164a7836d82c6ea7"
 ---
 
 Только пакет класса или пакет номинального типа в начале первого типа экземпляра может объявлять экземпляр. Другой пакет оборачивает тип в собственный номинальный тип; прозрачный алиас таковым не является.
 
-```flick ignore
+```flick
+# type ExternalId = ExternalId Float
+# hash_external : ExternalId -> Int
+# let hash_external id = 0
+# instance Eq LocalExternalId =
+#   eq : LocalExternalId -> LocalExternalId -> Bool
+#   let eq a b = a == b
 type LocalExternalId = LocalExternalId ExternalId
 
 instance Hash LocalExternalId =
-  hash : LocalExternalId -> Float
+  hash : LocalExternalId -> Int
   let hash id =
     match id with
     | LocalExternalId raw -> hash_external raw

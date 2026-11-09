@@ -9,5 +9,11 @@ and do not mix; an error row holds only types declared with `error`; a type
 constructor takes as many arguments as its kind allows.
 
 ```flick ignore
+# service Users =
+#   get : UserId ->{; NotFound} User
+#   touch : UserId ->{} Unit
+# type UserId = UserId String
+# type User = User { name : String }
+# type error NotFound = NotFound String
 load : UserId -> Eff {Users} {NotFound} User   // not `Eff Unit Unit User`
 ```

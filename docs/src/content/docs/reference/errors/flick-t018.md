@@ -6,7 +6,7 @@ A constructor pattern gives a different number of arguments than the
 constructor takes. `Circle Point Float` takes two; a record field is one
 argument.
 
-```flick ignore
+```flick
 type Shape = Circle Float Float | Empty
 
 radius : Shape -> Float

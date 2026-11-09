@@ -6,12 +6,13 @@
 //! without diagnostics. The repository's `.fl` sources must already be
 //! formatted. The blocks of the site's pages must also check on their own.
 
+use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 use std::{env, fs, panic};
 
-use flick_core::diagnostics::Severity;
+use flick_core::diagnostics::{Diagnostic, Severity, codes};
 use flick_core::fmt;
-use flick_core::markdown::{Mode, blocks};
+use flick_core::markdown::{Block, Mode, blocks};
 use flick_core::source::SourceMap;
 use flick_core::syntax::parse;
 
@@ -29,7 +30,8 @@ fn fingerprint(text: &str) -> String {
     format!("{hash:016x}")
 }
 
-fn parse_errors(name: &str, text: &str) -> Vec<String> {
+/// The syntax diagnostics of `text` as `(code, rendered)`.
+fn parse_diagnostics(name: &str, text: &str) -> Vec<(String, String)> {
     let mut sources = SourceMap::default();
     let file = sources.add(name, text);
     let parsed = parse(text, file);
@@ -40,8 +42,18 @@ fn parse_errors(name: &str, text: &str) -> Vec<String> {
         .map(|d| {
             let span = d.span.expect("syntax diagnostics have spans");
             let (line, col) = sources.get(file).line_col(span.start);
-            format!("{name}:{}:{}: {} {}", line + 1, col + 1, d.code, d.message)
+            (
+                d.code.to_string(),
+                format!("{name}:{}:{}: {} {}", line + 1, col + 1, d.code, d.message),
+            )
         })
+        .collect()
+}
+
+fn parse_errors(name: &str, text: &str) -> Vec<String> {
+    parse_diagnostics(name, text)
+        .into_iter()
+        .map(|(_, rendered)| rendered)
         .collect()
 }
 
@@ -192,12 +204,26 @@ fn corpus() -> Vec<(String, String)> {
 fn docs_examples_parse() {
     let mut docs = Vec::new();
     md_files(&root().join("docs"), &mut docs);
+    // the Russian explanations are sources of the generated reference pages,
+    // checked there with the code their fence fails with
+    docs.retain(|path| !path.to_string_lossy().contains("/error-translations/"));
     let mut errors = Vec::new();
     for path in docs {
         let markdown = fs::read_to_string(&path).expect("readable markdown");
         for block in blocks(&markdown) {
             let name = format!("{}:{}", path.display(), block.line);
-            errors.extend(parse_errors(&name, &block.text));
+            let mut found = parse_diagnostics(&name, &block.text);
+            // a block that must fail may fail to parse, but only with the
+            // diagnostics its fence names
+            if block.mode == Mode::Fail {
+                let named: Vec<String> = block
+                    .codes
+                    .iter()
+                    .map(|code| short(code).to_owned())
+                    .collect();
+                found.retain(|(code, _)| !named.iter().any(|named| named == short(code)));
+            }
+            errors.extend(found.into_iter().map(|(_, rendered)| rendered));
         }
     }
     assert!(
@@ -208,7 +234,11 @@ fn docs_examples_parse() {
 }
 
 /// Every block of the site's pages checks on its own, imports taken on trust:
-/// hidden lines declare the names a fragment uses.
+/// hidden lines declare the names a fragment uses. A `fail` block must report
+/// the codes its fence names and no other error, a checked block no error, and
+/// an `ignore` block of the reference is a fragment the checker cannot compile,
+/// listed with its reason in `docs/error-examples.txt`; that list may only
+/// shrink, and changing an exempted example needs a new reviewed line.
 #[test]
 fn docs_examples_check() {
     let mut pages = Vec::new();
@@ -216,8 +246,10 @@ fn docs_examples_check() {
     // an example's README whose blocks stand on their own
     pages.push(root().join("examples/typed-interpreter/README.md"));
     pages.sort();
+    let exemptions = exemptions();
+    let mut seen = BTreeSet::new();
     let mut failures = Vec::new();
-    let mut checked = 0;
+    let mut counts = Counts::default();
     for path in pages {
         let markdown = fs::read_to_string(&path).expect("readable markdown");
         let page = path
@@ -226,38 +258,321 @@ fn docs_examples_check() {
             .display()
             .to_string();
         for block in blocks(&markdown) {
-            let (line, mode) = (block.line, block.mode);
-            if mode == Mode::Ignore {
-                continue;
-            }
-            checked += 1;
-            let mut sources = SourceMap::default();
-            let file = sources.add(format!("{page}:{line}"), block.text);
-            let errors: Vec<_> = flick_core::check(&sources, file)
-                .into_iter()
-                .filter(|d| d.severity == Severity::Error)
-                .collect();
-            if mode == Mode::Fail && errors.is_empty() {
-                failures.push(format!(
-                    "{page}:{line}: a `fail` block checks without errors"
-                ));
-            }
-            if matches!(mode, Mode::Check | Mode::Keep) {
-                failures.extend(errors.iter().map(|d| {
-                    let at = d
-                        .span
-                        .map_or(0, |s| sources.get(file).line_col(s.start).0 as usize);
-                    format!("{page}:{}: {} {}", line + at, d.code, d.message)
-                }));
+            if block.mode == Mode::Ignore {
+                ignored(
+                    &page,
+                    &block,
+                    &exemptions,
+                    &mut seen,
+                    &mut counts,
+                    &mut failures,
+                );
+            } else {
+                checked(&page, &block, &mut counts, &mut failures);
             }
         }
     }
-    assert!(checked > 300, "only {checked} docs examples were checked");
+    // every exemption covers an ignored example of the English page and of
+    // its translation, and no example is left unexplained
+    assert!(
+        counts.exempt >= exemptions.len(),
+        "{} ignored examples for {} exemptions",
+        counts.exempt,
+        exemptions.len()
+    );
+    for exemption in &exemptions {
+        if !seen.contains(&(exemption.code.clone(), exemption.fingerprint.clone())) {
+            failures.push(format!(
+                "docs/error-examples.txt lists {} {} ({}), but no ignored example has that text",
+                exemption.code, exemption.fingerprint, exemption.reason
+            ));
+        }
+    }
+    assert!(
+        counts.checked > 300,
+        "only {} docs examples were checked",
+        counts.checked
+    );
     assert!(
         failures.is_empty(),
-        "docs examples do not check (declare free names on hidden `# ` lines):\n{}",
+        "docs examples do not check as their fences say:\n{}",
         failures.join("\n")
     );
+    // the counts of what each kind of example does may only grow where
+    // examples are repaired
+    assert!(
+        counts.failed >= 3 && counts.valid >= 80,
+        "only {} examples report the code of their page and {} check as valid programs",
+        counts.failed,
+        counts.valid
+    );
+}
+
+/// What the examples of the site's pages turned out to be.
+#[derive(Default)]
+struct Counts {
+    checked: usize,
+    failed: usize,
+    valid: usize,
+    exempt: usize,
+}
+
+/// An `ignore` block: a reviewed exemption of the reference, or elsewhere an
+/// inline reason of the fence itself.
+fn ignored(
+    page: &str,
+    block: &Block,
+    exemptions: &[Exemption],
+    seen: &mut BTreeSet<(String, String)>,
+    counts: &mut Counts,
+    failures: &mut Vec<String>,
+) {
+    let line = block.line;
+    counts.exempt += 1;
+    let Some(code) = page_code(page) else {
+        if block.reason.trim().len() < MIN_REASON {
+            failures.push(format!(
+                "{page}:{line}: an `ignore` block must say why it cannot be checked:\
+                 \n```flick ignore the reason\n```"
+            ));
+        }
+        return;
+    };
+    if !block.reason.is_empty() {
+        failures.push(format!(
+            "{page}:{line}: the reason of a reference example is reviewed in docs/error-examples.txt, not in the fence"
+        ));
+    }
+    let print = fingerprint(&block.text);
+    if exemptions
+        .iter()
+        .any(|e| e.code == code && e.fingerprint == print)
+    {
+        seen.insert((code, print));
+    } else {
+        failures.push(format!(
+            "{page}:{line}: this example is neither checked nor exempted; \
+             if it cannot be compiled, add a reviewed line to docs/error-examples.txt:\n\
+             {code} {print} <why the checker cannot compile it>"
+        ));
+    }
+}
+
+/// A `fail` or checked block, as its fence says.
+fn checked(page: &str, block: &Block, counts: &mut Counts, failures: &mut Vec<String>) {
+    let line = block.line;
+    counts.checked += 1;
+    let mut sources = SourceMap::default();
+    let file = sources.add(format!("{page}:{line}"), block.text.as_str());
+    let diagnostics = flick_core::check(&sources, file);
+    let found: Vec<String> = diagnostics
+        .iter()
+        .map(|d| {
+            let code = d.code.to_string();
+            short(&code).to_owned()
+        })
+        .collect();
+    let errors: Vec<_> = diagnostics
+        .iter()
+        .filter(|d| d.severity == Severity::Error)
+        .collect();
+    if block.mode == Mode::Fail {
+        counts.failed += 1;
+        failed_as_fenced(page, block, &found, &errors, failures);
+    } else {
+        if errors.is_empty() {
+            counts.valid += 1;
+        }
+        failures.extend(errors.iter().map(|d| {
+            let at = d
+                .span
+                .map_or(0, |s| sources.get(file).line_col(s.start).0 as usize);
+            format!("{page}:{}: {} {}", line + at, d.code, d.message)
+        }));
+    }
+}
+
+/// The failures of a `fail` block: it must name the codes it reports, and
+/// report the codes it names.
+fn failed_as_fenced(
+    page: &str,
+    block: &Block,
+    found: &[String],
+    errors: &[&Diagnostic],
+    failures: &mut Vec<String>,
+) {
+    let line = block.line;
+    if block.codes.is_empty() {
+        failures.push(format!(
+            "{page}:{line}: a `fail` block must name the code it expects:\n\
+             ```flick fail {}```",
+            page_code(page).unwrap_or_else(|| "T010".to_owned())
+        ));
+        return;
+    }
+    for code in &block.codes {
+        let code = short(code);
+        if !found.iter().any(|found| found == code) {
+            failures.push(format!(
+                "{page}:{line}: expected {code}, got {}",
+                if found.is_empty() {
+                    "no diagnostic".to_owned()
+                } else {
+                    found.join(", ")
+                }
+            ));
+        }
+    }
+    let unexpected: Vec<String> = errors
+        .iter()
+        .map(|d| {
+            let code = d.code.to_string();
+            short(&code).to_owned()
+        })
+        .filter(|code| !block.codes.iter().any(|wanted| short(wanted) == code))
+        .collect();
+    if !unexpected.is_empty() {
+        failures.push(format!(
+            "{page}:{line}: besides the codes it names, the block reports {}",
+            unexpected.join(", ")
+        ));
+    }
+}
+
+/// An example the checker cannot compile, with the reason it may not.
+struct Exemption {
+    code: String,
+    fingerprint: String,
+    reason: String,
+}
+
+/// The reviewed exemptions of `docs/error-examples.txt`: one line per
+/// `flick ignore` example, `CODE FINGERPRINT a reason of at least 20 characters`.
+fn exemptions() -> Vec<Exemption> {
+    let path = root().join("docs/error-examples.txt");
+    let text = fs::read_to_string(&path)
+        .unwrap_or_else(|err| panic!("{} is readable: {err}", path.display()));
+    let mut exemptions = Vec::new();
+    for (index, line) in text.lines().enumerate() {
+        let line = line.trim();
+        if line.is_empty() || line.starts_with('#') {
+            continue;
+        }
+        let mut words = line.splitn(3, char::is_whitespace);
+        let (Some(code), Some(print), Some(reason)) = (words.next(), words.next(), words.next())
+        else {
+            panic!(
+                "{}:{}: expected `CODE FINGERPRINT reason`",
+                path.display(),
+                index + 1
+            );
+        };
+        assert!(
+            codes::lookup(&format!("FLICK-{code}")).is_some(),
+            "{}:{}: `{code}` is not a diagnostic code",
+            path.display(),
+            index + 1
+        );
+        assert!(
+            reason.trim().len() >= MIN_REASON,
+            "{}:{}: the reason says too little",
+            path.display(),
+            index + 1
+        );
+        assert!(
+            !exemptions
+                .iter()
+                .any(|e: &Exemption| e.code == code && e.fingerprint == print),
+            "{}:{}: listed twice",
+            path.display(),
+            index + 1
+        );
+        exemptions.push(Exemption {
+            code: code.to_owned(),
+            fingerprint: print.to_owned(),
+            reason: reason.to_owned(),
+        });
+    }
+    exemptions
+}
+
+/// The fewest characters an `ignore` reason can have to say anything.
+const MIN_REASON: usize = 20;
+
+/// `TRIAGE_CODE=T010 cargo test --test corpus dump -- --ignored --nocapture`
+/// prints what each example of an explanation reports today (the `~dump`
+/// filter of `just e2e-tests` keeps it out of the e2e set).
+#[test]
+#[ignore = "debug helper"]
+fn dump_explanations() {
+    let only = env::var("TRIAGE_CODE").ok();
+    let mut files = Vec::new();
+    md_files(
+        &root().join("flick-core/src/diagnostics/explain"),
+        &mut files,
+    );
+    files.sort();
+    if let Some(only) = &only {
+        files.retain(|path| path.file_stem().is_some_and(|name| name == only.as_str()));
+    }
+    for path in files {
+        let code = path
+            .file_stem()
+            .expect("a code name")
+            .to_string_lossy()
+            .into_owned();
+        let markdown = fs::read_to_string(&path).expect("readable explanation");
+        for block in blocks(&markdown) {
+            let mut sources = SourceMap::default();
+            let file = sources.add(code.clone(), block.text.as_str());
+            let diagnostics = flick_core::check(&sources, file);
+            let found: Vec<String> = diagnostics
+                .iter()
+                .map(|d| {
+                    let code = d.code.to_string();
+                    let short = short(&code).to_owned();
+                    match d.severity {
+                        Severity::Error => short,
+                        _ => format!("{short}?"),
+                    }
+                })
+                .collect();
+            if only.is_some() {
+                println!(
+                    "{code}:{line} {mode:?}",
+                    line = block.line,
+                    mode = block.mode
+                );
+                for d in &diagnostics {
+                    println!("    {:?} {}", d.severity, d.message);
+                }
+            } else {
+                println!(
+                    "{code}|{line}|{mode:?}|{found}|{print}",
+                    line = block.line,
+                    mode = block.mode,
+                    print = fingerprint(&block.text),
+                    found = if found.is_empty() {
+                        "clean".to_owned()
+                    } else {
+                        found.join(",")
+                    },
+                );
+            }
+        }
+    }
+}
+
+/// `code` without its `FLICK-` prefix, as a fence names it.
+fn short(code: &str) -> &str {
+    code.strip_prefix("FLICK-").unwrap_or(code)
+}
+
+/// The code of a generated reference page, `reference/errors/flick-t010.md`.
+fn page_code(page: &str) -> Option<String> {
+    let name = page.rsplit('/').next()?.strip_suffix(".md")?;
+    let short = name.strip_prefix("flick-")?;
+    (short.len() == 4).then(|| short.to_ascii_uppercase())
 }
 
 /// Syntax fixtures exercise the grammar only; their names need not resolve.

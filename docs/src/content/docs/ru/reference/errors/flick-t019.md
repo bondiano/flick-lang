@@ -1,12 +1,12 @@
 ---
 title: "FLICK-T019"
-source_hash: "486ddc1d9a6e0644"
+source_hash: "61c31212478d739a"
 ---
 
 Последним выражением блока является его значение, поэтому блок не может заканчиваться на `let`
 или сигнатуру. Добавьте выражение, к которому сводится блок.
 
-```flick ignore
+```flick
 double : Float -> Float
 let double n =
   let twice = n * 2

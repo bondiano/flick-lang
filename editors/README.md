@@ -13,11 +13,29 @@ definitions) is meant to come from the language server's semantic tokens.
 
 Requires VS Code 1.91.0 or later, matching `vscode-languageclient`.
 
+The Release workflow builds `flick-<version>.vsix`, versioned with the
+compiler, and attaches it to the release. Install that file:
+
 ```sh
-ln -s "$PWD/editors/vscode" ~/.vscode/extensions/flick
+code --install-extension flick-<version>.vsix
 ```
 
-Restart VS Code. To package: `npx @vscode/vsce package` inside `editors/vscode`.
+The VSIX holds `dist/extension.js`, the extension with its language client
+bundled, so it needs no `node_modules` and no npm package.
+
+To work on the extension, link the directory instead and install the client
+from the workspace:
+
+```sh
+ln -s "$PWD/editors/vscode" ~/.vscode/extensions/flick
+pnpm install --frozen-lockfile
+```
+
+Restart VS Code. To package by hand:
+`node editors/vscode/scripts/package.mjs` (esbuild and `vsce` are pinned and
+fetched by npx); `--out FILE` names the archive. It writes
+`target/vsix/flick-<version>.vsix` and checks that the archive carries the
+bundled client, the grammar and the version of `editors/vscode/package.json`.
 
 ## Zed
 

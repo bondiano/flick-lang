@@ -1,6 +1,6 @@
 ---
 title: "Errors, services, resources and concurrency"
-source_hash: 315c82fdaafe5dfa
+source_hash: 42fc822e9d961d9b
 ---
 
 ## Expected errors
@@ -275,7 +275,7 @@ For safe scoped APIs the checker verifies direct and indirect escape: the result
 
 Every `scope s { ... }` creates a fresh region `s` and a runtime owner. In `scope { ... }` the name is inferred and stays hidden. A scoped handle has a type such as `File s`. The owner is passed by the compiler lexically; it is not implemented by a single ordinary Context lookup, which in a nested region could pick a different scope.
 
-```flick fail
+```flick fail E002 G001
 # import File exposing (File, Path, FileSystem, OpenError, ReadError)
 #
 bad_deferred :
@@ -309,7 +309,7 @@ Now every `await` gets its own region and resource. The returned string may outl
 
 The same check applies to an ordinary callback:
 
-```flick fail
+```flick fail E002 G001
 # import File exposing (File, Path, FileSystem, OpenError, ReadError)
 #
 bad_callback :

@@ -5,7 +5,8 @@ title: "FLICK-C011"
 An instance defines exactly the methods of its class: each method once,
 and nothing else.
 
-```flick ignore
+```flick
+# type Shape = Circle Float
 instance Show Shape =
   show : Shape -> String
   let show shape = "shape"
@@ -15,7 +16,7 @@ In a class body, a `let` is the default of one of the class's methods, and
 a default signature, the repeat of a method's signature, comes with its
 `let`:
 
-```flick ignore
+```flick
 class Describe a =
   describe : a -> String
   describe : Show a => a -> String

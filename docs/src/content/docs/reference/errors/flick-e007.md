@@ -6,7 +6,13 @@ title: "FLICK-E007"
 `type error`, or a variable or `_` that matches any error of the body. Other
 values are matched with `match` on the result.
 
-```flick ignore
+```flick
+# service Users =
+#   get : UserId ->{; NotFound} User
+#   touch : UserId ->{} Unit
+# type UserId = UserId String
+# type User = User { name : String }
+# type error NotFound = NotFound String
 safe : UserId ->{Users; none} Option User
 let safe id =
   try

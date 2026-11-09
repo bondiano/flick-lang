@@ -13,7 +13,7 @@ type of the matched value is: in the `IntLit` branch of a match on an
   branch learned. A type that is still unknown outside, such as the result
   of an unannotated `let`, needs an annotation.
 
-```flick ignore
+```flick
 type Expr a =
   | IntLit Int : Expr Int
   | BoolLit Bool : Expr Bool

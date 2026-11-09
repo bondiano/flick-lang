@@ -6,7 +6,7 @@ title: "FLICK-D006"
 knows the check: a `Checks` function or a `fun` over the constant built from
 literals. A constant that fails it cannot become a `T`.
 
-```flick ignore
+```flick
 refined type Port = Float where fun n -> n > 0 && n < 65536
 
 default_port : Result SchemaError Port

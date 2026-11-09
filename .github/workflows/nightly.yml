@@ -5,6 +5,11 @@ on:
     - cron: "17 2 * * *"
   workflow_dispatch:
 
+# a newer nightly replaces the older one, as a pull request replaces its run
+concurrency:
+  group: nightly-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   # the full set: CI with the go target on every platform
   ci:
@@ -12,6 +17,7 @@ jobs:
 
   fuzz:
     runs-on: ubuntu-26.04
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v7
       - run: rustup show active-toolchain || rustup toolchain install
@@ -19,8 +25,70 @@ jobs:
       - uses: taiki-e/install-action@v2
         with:
           tool: just@1.59.0
-      - run: just fuzz 1000000
+      # the log keeps the count, the seed and the input a failure names, which
+      # the artifact below carries off the run
+      - run: |
+          set -o pipefail
+          just fuzz 1000000 2>&1 | tee fuzz.log
+      - if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: fuzz
+          path: fuzz.log
+          if-no-files-found: error
+      - if: ${{ failure() }}
+        run: |
+          {
+            echo "## Fuzz"
+            echo
+            echo '```'
+            tail -40 fuzz.log
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
 
   # the performance baseline
   perf:
     uses: ./.github/workflows/perf.yml
+
+  # What the run found, in one place: the summary says which of the three jobs
+  # failed, so the nightly is readable without opening each one, and a failed
+  # job fails this one too, so the run itself is red. It writes to the run's
+  # own summary and artifacts only: no issue, no webhook, no other write.
+  report:
+    needs: [ci, fuzz, perf]
+    if: ${{ always() && !cancelled() }}
+    runs-on: ubuntu-26.04
+    timeout-minutes: 5
+    steps:
+      - name: The three jobs, and what a failure left behind
+        env:
+          CI: ${{ needs.ci.result }}
+          FUZZ: ${{ needs.fuzz.result }}
+          PERF: ${{ needs.perf.result }}
+          RUN: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          {
+            echo "## Nightly"
+            echo
+            echo "| job | what it holds | result |"
+            echo "|---|---|---|"
+            echo "| \`ci\` | the full set, the go target on every platform | $CI |"
+            echo "| \`fuzz\` | 1 000 000 parser and formatter inputs | $FUZZ |"
+            echo "| \`perf\` | the budgets of \`tools/perf/budgets.json\` | $PERF |"
+            echo
+            echo "Run: $RUN"
+            echo
+            echo "Artifacts: \`fuzz\` (\`fuzz.log\`: the count, the seed and the input), \`perf\` (\`perf.json\`, \`perf.log\`)"
+            echo
+            if [ "$CI" != success ] || [ "$FUZZ" != success ] || [ "$PERF" != success ]; then
+              echo "### Failed"
+              echo
+              echo "Open the job above at $RUN. The suites are the ones a pull request runs,"
+              echo "so a red nightly usually starts from the last merge to \`main\`; \`perf\`"
+              echo "names the metric and the budget it passed, and \`fuzz\` the seed and input."
+              echo
+              echo "A running nightly is cancelled by the next one; this job does not run"
+              echo "for a cancelled run."
+              exit 1
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"

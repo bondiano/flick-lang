@@ -29,7 +29,7 @@ Snapshot tests use [`insta`](https://insta.rs); review changes with
 
 Annotation forms:
 
-```flick fail
+```flick ignore annotation syntax shown without a program
 let x : Float = "hi"
 //               ^^^^ FLICK-T012 expected `Float`
 //~ FLICK-E003 @4:1-6:9 effect row is not closed
@@ -132,8 +132,15 @@ matrix, codecs against their compiled decoders. Entry runner tests start
   and each block of the site's pages must check on its own
   (`docs_examples_check`), its imports taken on trust: hidden lines, `#`
   alone or starting with `# `, declare what it uses and are left off the
-  page. A `flick ignore` block is only parsed; a `flick fail` block must
-  report an error.
+  page. A `flick fail CODE` block must report that code and no other error;
+  a plain block must check without an error, and a `flick ignore reason`
+  block, outside the reference, is only parsed and says why in at least 20
+  characters. In the reference the reason is not in the fence: the generated
+  page of a code names the code its example fails with (`flick fail T010`),
+  and `docs/error-examples.txt` lists every `flick ignore` example with its
+  fingerprint and a reviewed reason, so the corpus test fails when an example
+  becomes checked, changes text, or a new one is ignored without a line
+  there.
   The blocks of the Russian specification (`ru/spec`), the original text, are
   pinned by fingerprint in `tests/syntax/spec_examples.txt`: a new or edited
   example fails the test until its parse is reviewed and the printed line is

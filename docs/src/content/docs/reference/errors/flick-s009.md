@@ -8,7 +8,11 @@ statement) or deeper (a continuation). A column between two enclosing blocks
 belongs to neither; a tab makes columns ambiguous. A body after `=` or `->`
 that is on the next line must be indented.
 
-```flick ignore
+```flick
+# service Users =
+#   get : Int ->{} User
+# type alias User = { name : String }
+# load_name : Int ->{Users;} String
 let load_name id =
   let user = Users.get id
   user.name

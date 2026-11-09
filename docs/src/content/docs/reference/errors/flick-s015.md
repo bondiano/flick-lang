@@ -7,7 +7,7 @@ only in a `type` declaration, and only when it has no literal value. The
 constructor of a `type error` and a member of a `kind` build their own type,
 and the constructor of an `untagged type` is its literal.
 
-```flick ignore
+```flick
 type Expr a =
   | IntLit Int : Expr Int
   | BoolLit Bool : Expr Bool

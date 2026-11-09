@@ -5,7 +5,7 @@ title: "FLICK-R012"
 A module is imported, or a name is imported by `exposing`, and nothing in
 the module uses it. The warning's fix removes the import or the name.
 
-```flick ignore
+```flick fail R012
 module App.Report exposing (total)
 
 import List exposing (map, filter)

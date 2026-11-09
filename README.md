@@ -69,9 +69,22 @@ flick install
 flick run -- Ada
 ```
 
+The compiler fetches the implicit `std` package from the `std-v<version>` tag
+of its release with `git`, so it needs `git` on `PATH` and github.com
+reachable the first time a project installs or checks; a checkout of this
+repository, or `FLICK_STD_PATH` naming a local `packages/std`, removes that
+fetch. `flick install` writes nothing unless `pnpm --version` is the version
+`package.json` pins, which `flick new` writes; the message says how to
+activate it, and `flick doctor` prints the versions it finds.
+
+In GitHub Actions, the repository is the action: `uses:
+bondiano/flick-lang@main` downloads a release archive, checks its `.sha256`
+and puts `flick` on `PATH`, with `version: latest` or a tag such as `v0.1.0`.
+
 [Getting started](./docs/src/content/docs/start/getting-started.md) walks
 through the generated project. Editor support is in
-[`editors/`](./editors/README.md).
+[`editors/`](./editors/README.md): install `flick-<version>.vsix` from the
+release, or link `editors/vscode` while working on the extension.
 
 ## Build from source
 

@@ -8,7 +8,7 @@ nothing its `main` reaches may need `Server`: not a function whose row has
 the path from `main` to what needs it. Call that code from a server entry
 and reach it from the client over HTTP or RPC.
 
-```flick ignore
+```flick
 // flick.toml: entries = { web = { module = "App.Web", target = "client" } }
 module App.Web exposing (main)
 

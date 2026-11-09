@@ -1,6 +1,6 @@
 ---
 title: "FLICK-C012"
-source_hash: "f0a0c5f378b38774"
+source_hash: "1c5283ba89151926"
 ---
 
 Некоторые ограничения решаются компилятором: примитивы строк `Record`
@@ -11,7 +11,7 @@ source_hash: "f0a0c5f378b38774"
 встроенные, так как компилятор генерирует их операции, а `for` циклы
 напрямую.
 
-```flick ignore
+```flick
 type User = User { name : String }
 
 instance Show User =

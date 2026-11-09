@@ -10,7 +10,7 @@ too: its dictionaries would make the value a function, run again at each
 use. Make a factory function, or describe the computation with `task` and
 run it where each type is known.
 
-```flick ignore
+```flick
 make_empty : forall a. Unit ->{} Ref (Option a)
 let make_empty () =
   Ref.make None

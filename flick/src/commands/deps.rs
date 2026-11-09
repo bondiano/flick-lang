@@ -54,7 +54,8 @@ fn pnpm_process(root: &Path) -> Process {
     process
 }
 
-/// `P016` unless `pnpm --version` is `wanted`.
+/// `P016` unless `pnpm --version` is `wanted`, with how to get it: the
+/// project's own `packageManager` pin wins, and only that version writes.
 fn check_pnpm(root: &Path, wanted: &str) -> Option<Outcome> {
     let found = pnpm_process(root)
         .arg("--version")
@@ -62,18 +63,23 @@ fn check_pnpm(root: &Path, wanted: &str) -> Option<Outcome> {
         .ok()
         .filter(|o| o.status.success())
         .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_owned());
-    let instruction = format!("install it with `corepack prepare pnpm@{wanted} --activate`");
+    let instruction = format!(
+        "run `corepack prepare pnpm@{wanted} --activate`, or `npm install --global pnpm@{wanted}`"
+    );
+    let next = "nothing was changed (`flick doctor` lists the toolchain versions)";
     match found {
         Some(v) if v == wanted => None,
         Some(v) => Some(failure(
             codes::P016,
             format!(
-                "the project pins pnpm {wanted}, but `pnpm` is {v}: {instruction}; nothing was changed"
+                "the project pins pnpm {wanted} in `packageManager`, but `pnpm` is {v}: {instruction}; {next}"
             ),
         )),
         None => Some(failure(
             codes::P016,
-            format!("pnpm {wanted} is not available: {instruction}; nothing was changed"),
+            format!(
+                "`pnpm` is not on PATH and the project pins pnpm {wanted} in `packageManager`: {instruction}; {next}"
+            ),
         )),
     }
 }

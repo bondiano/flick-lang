@@ -6,7 +6,11 @@ An opening `(`, `[` or `{` has no matching closing delimiter. The related span
 points at the opener. Closing delimiters may be dedented, but must come before
 the next declaration.
 
-```flick ignore
+```flick
+# first : Float
+# let first = 1.0
+# second : Float
+# let second = 2.0
 let pair =
   (first,
    second)

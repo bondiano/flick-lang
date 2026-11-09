@@ -1,13 +1,19 @@
 ---
 title: "FLICK-E007"
-source_hash: "3647c91d5b856f25"
+source_hash: "000a683417dbd98e"
 ---
 
 `try … with` обрабатывает ожидаемые ошибки: каждый вариант соответствует типу, объявленному с помощью
 `type error`, или переменной либо `_`, которая соответствует любой ошибке тела. Другие
 значения сопоставляются с `match` в результате.
 
-```flick ignore
+```flick
+# service Users =
+#   get : UserId ->{; NotFound} User
+#   touch : UserId ->{} Unit
+# type UserId = UserId String
+# type User = User { name : String }
+# type error NotFound = NotFound String
 safe : UserId ->{Users; none} Option User
 let safe id =
   try

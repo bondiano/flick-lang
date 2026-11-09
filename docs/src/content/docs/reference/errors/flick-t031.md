@@ -7,7 +7,7 @@ A warning: `Seq.to_list` of a sequence that never ends, such as
 `Seq.filter` makes of them, never returns. Take a part of it first with
 `Seq.take` or `Seq.take_while`.
 
-```flick ignore
-first_squares : List Float
+```flick
+first_squares : List Int
 let first_squares = Seq.from 1 |> Seq.map (fun n -> n * n) |> Seq.take 5 |> Seq.to_list
 ```

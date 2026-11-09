@@ -155,7 +155,7 @@ runner = "Runner.Browser"
 entries = { app = { module = "App.Page", target = "client" }, worker = { module = "App.Worker", target = "client" } }
 ```
 
-```flick ignore
+```flick ignore the worker entry needs the runner and Rpc package of a project
 // App.Worker
 main : Unit ->{; AppError} Unit
 let main () = Rpc.serve_worker group handlers

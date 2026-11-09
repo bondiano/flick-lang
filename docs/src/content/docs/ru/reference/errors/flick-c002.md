@@ -1,11 +1,13 @@
 ---
 title: "FLICK-C002"
-source_hash: "cdbe140d8cdb83d6"
+source_hash: "9205dfc28c5a5d0d"
 ---
 
 Ограничение класса ссылается на тип, который вывод типов не может определить, поэтому экземпляр не может быть выбран; кандидаты перечислены. Аннотируйте значение, чтобы его тип был известен.
 
-```flick ignore
-let empty_names : List String = []
-let text = show empty_names
+```flick fail C002
+describe : Unit -> String
+let describe () =
+  let text = show []
+  text
 ```

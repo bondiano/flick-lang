@@ -20,6 +20,32 @@ or with Homebrew: `brew install bondiano/tap/flick`. You can also download a
 
 On Windows, extract the `.zip` and add the folder with `flick.exe` to `PATH`.
 
+`flick` also needs `git` on `PATH` and, the first time a project installs or
+checks, network access to github.com: it fetches the implicit `std` package
+from the `std-v<version>` tag of its release, and any `git` dependency, with
+`git`. A checkout of the repository, or `FLICK_STD_PATH` naming a local
+`packages/std`, removes that fetch; path dependencies need no network.
+
+A project pins pnpm in `package.json`, and `flick install` changes nothing
+when `pnpm --version` is another version. Activate the pinned one with
+`corepack prepare pnpm@12.16.1 --activate` (`flick new` writes that version;
+use the one in your `package.json` when it differs), or install it with
+`npm install --global pnpm@12.16.1`. `flick doctor` prints the versions it
+finds beside the ones the project needs.
+
+### Continuous integration
+
+The repository is also a GitHub Action: it downloads a release archive, checks
+its `.sha256` and puts `flick` on `PATH` for the rest of the job.
+
+```yaml
+- uses: actions/checkout@v7
+- uses: bondiano/flick-lang@main # pin the tag of a release that has the action
+  with:
+    version: latest # or v0.1.0
+- run: flick --version
+```
+
 ### From source
 
 The checkout's `rust-toolchain.toml` picks the Rust version:
@@ -87,9 +113,9 @@ has every command.
 ## In a web page
 
 Astro and Vite import Flick modules directly with `@flick-lang/astro`: the
-plugin builds each imported `.fl` with `flick build`. The package lives in the
-Flick repository ([source](https://github.com/bondiano/flick-lang/tree/main/tools/astro-flick))
-and is not published to npm yet.
+plugin builds each imported `.fl` with `flick build`. The package is published
+on npm, versioned with the compiler, and its sources are in the Flick
+repository ([source](https://github.com/bondiano/flick-lang/tree/main/tools/astro-flick)).
 
 ```js
 // astro.config.mjs

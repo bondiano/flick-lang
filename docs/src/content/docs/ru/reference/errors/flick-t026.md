@@ -1,11 +1,11 @@
 ---
 title: "FLICK-T026"
-source_hash: "2b4181877fc97e6b"
+source_hash: "e64659fec6c7b076"
 ---
 
 `let assert` останавливает программу, если его шаблон не совпадает. Значение верхнего уровня вычисляется при загрузке модуля, и модуль не может завершиться с ошибкой во время загрузки: поместите `let assert` внутри блока функции или `match` поверх значения.
 
-```flick ignore
+```flick
 module App.Config exposing (port)
 
 port : List Float -> Float

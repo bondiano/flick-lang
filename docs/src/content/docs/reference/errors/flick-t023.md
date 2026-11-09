@@ -7,7 +7,7 @@ unchanged; `x |> echo` does the same in a pipeline. It is for debugging and
 does not show up in the function's effects, so the warning keeps it from
 being forgotten.
 
-```flick ignore
+```flick fail T023
 module App.Totals exposing (total)
 
 total : List Float -> Float

@@ -17,8 +17,24 @@ const hash = (text) => createHash("sha256").update(text).digest("hex").slice(0, 
 const page = (title, body, sourceHash) => `---\ntitle: ${JSON.stringify(title)}\n${sourceHash ? `source_hash: ${JSON.stringify(sourceHash)}\n` : ""}---\n\n${body.trim()}\n`;
 const fences = (text) => text.match(/```[\s\S]*?```/g) ?? [];
 const inline = (text) => new Set((text.replace(/```[\s\S]*?```/g, "").match(/`[^`\n]+`/g) ?? []));
-// Diagnostic examples are fragments of a failing program, not standalone doctests.
-const forDocs = (text) => text.replace(/^```flick\s*$/gm, "```flick ignore");
+// The example of a page is checked as the fence says: `flick` must check,
+// `flick fail` must report the page's own code, `flick keep` must check
+// unfixed, and `flick ignore` is a fragment the checker cannot compile,
+// its reason reviewed in `docs/error-examples.txt`.
+const forDocs = (text, code) =>
+  text.replace(/^```flick(?: (.*))?$/gm, (_line, rest = "") => {
+    const words = rest.trim();
+    if (words === "") return "```flick";
+    if (words === "fail") return `\`\`\`flick fail ${code.slice("FLICK-".length)}`;
+    if (/^fail [A-Z]\d{3}( [A-Z]\d{3})*$/.test(words)) {
+      const named = words.slice("fail ".length).split(" ");
+      if (!named.includes(code.slice("FLICK-".length))) throw new Error(`${code}: a \`fail\` fence names the codes of the page: ${words}`);
+      return `\`\`\`flick ${words}`;
+    }
+    if (words === "keep" || words.startsWith("keep ")) return `\`\`\`flick ${words}`;
+    if (words === "ignore") return "```flick ignore";
+    throw new Error(`${code}: a \`flick\` fence must be \`flick\`, \`flick fail\`, \`flick keep\` or \`flick ignore\`, not \`${words}\``);
+  });
 
 export function expectedPages() {
   const sourceFiles = readdirSync(explanations).filter((name) => /^[A-Z]\d{3}\.md$/.test(name)).sort();
@@ -28,6 +44,7 @@ export function expectedPages() {
   if (JSON.stringify(translated) !== JSON.stringify(registered)) throw new Error("Russian explanations and diagnostic registry differ");
   const pages = new Map();
   const add = (rel, text) => pages.set(path.join(content, rel), text);
+  const counted = { fail: 0, valid: 0, ignore: 0, none: 0 };
   for (const { short, code } of entries) {
     const source = readFileSync(path.join(explanations, `${short}.md`), "utf8");
     const translated = readFileSync(path.join(translations, `${short}.md`), "utf8");
@@ -35,8 +52,18 @@ export function expectedPages() {
         [...inline(source)].some((token) => !inline(translated).has(token))) {
       throw new Error(`${code}: Russian explanation changed a code example or identifier`);
     }
-    const en = page(code, forDocs(source));
-    const ru = page(code, forDocs(translated), hash(en));
+    const examples = fences(source)
+      .map((fence) => fence.slice(0, fence.indexOf("\n")))
+      .filter((line) => line.startsWith("```flick"))
+      .map((line) => line.slice("```flick".length).trim());
+    if (!examples.length) counted.none += 1;
+    for (const words of examples) {
+      if (words === "fail" || words.startsWith("fail ")) counted.fail += 1;
+      else if (words === "ignore" || words.startsWith("ignore ")) counted.ignore += 1;
+      else counted.valid += 1;
+    }
+    const en = page(code, forDocs(source, code));
+    const ru = page(code, forDocs(translated, code), hash(en));
     add(`reference/errors/${code.toLowerCase()}.md`, en);
     add(`ru/reference/errors/${code.toLowerCase()}.md`, ru);
   }
@@ -44,9 +71,13 @@ export function expectedPages() {
     const rows = entries.filter((entry) => entry.area === area);
     return rows.length ? `## ${ru ? areaRu[i] : area}\n\n${rows.map(({ code }) => `- [${code}](./${code.toLowerCase()}/)`).join("\n")}` : "";
   }).filter(Boolean).join("\n\n");
-  const enIndex = page("Compiler errors", "Every compiler code has an explanation and an example. Plugin codes belong to their packages and are explained with `flick explain <package>/<code>`.\n\n" + index(false));
+  const total = entries.length;
+  const shown = total - counted.none;
+  const tally = `${shown} of the ${total} codes have an example: ${counted.fail} report the code of their page, ${counted.valid} are programs that check, and ${counted.ignore} are fragments the compiler cannot check, each with its reason in the repository (\`docs/error-examples.txt\`). The other ${counted.none} show a configuration or a shape instead.`;
+  const tallyRu = `${shown} из ${total} кодов имеют пример: ${counted.fail} сообщают код своей страницы, ${counted.valid} — программы, которые проверяются, ${counted.ignore} — фрагменты, которые компилятор проверить не может, каждый с причиной в репозитории (\`docs/error-examples.txt\`). Остальные ${counted.none} показывают настройку или форму.`;
+  const enIndex = page("Compiler errors", "Every compiler code has an explanation and an example. Plugin codes belong to their packages and are explained with `flick explain <package>/<code>`.\n\n" + tally + "\n\n" + index(false));
   add("reference/errors/index.md", enIndex);
-  add("ru/reference/errors/index.md", page("Ошибки компилятора", "Для каждого кода ошибки компилятора есть объяснение и пример. Коды плагинов принадлежат своим пакетам; их можно объяснить командой `flick explain <пакет>/<код>`.\n\n" + index(true), hash(enIndex)));
+  add("ru/reference/errors/index.md", page("Ошибки компилятора", "Для каждого кода ошибки компилятора есть объяснение и пример. Коды плагинов принадлежат своим пакетам; их можно объяснить командой `flick explain <пакет>/<код>`.\n\n" + tallyRu + "\n\n" + index(true), hash(enIndex)));
   return pages;
 }
 

@@ -7,7 +7,7 @@ record `impl : S.Impl`, each operation by its field. Only a service, whose
 operations are all `tail`, is handled so: a field gives its operation a
 value. An effect is handled by the arms of a `try`.
 
-```flick ignore
+```flick
 effect Throw =
   abort throw : forall b. String ->{} b
 

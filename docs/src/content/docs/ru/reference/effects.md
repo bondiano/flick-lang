@@ -1,6 +1,6 @@
 ---
 title: "Эффекты, ошибки и сервисы"
-source_hash: 773ab3f3d7b6f8cf
+source_hash: 65e25acc4c444c25
 ---
 
 Компилятор проверяет, где допустимы эффектные вызовы, какие сервисы им нужны
@@ -434,7 +434,7 @@ let application id =
 `provide` вокруг области владельца или от вызывающего функции, в теле
 которой открыта эта область. Иначе — `FLICK-G003`:
 
-```flick fail
+```flick fail G003
 # service Greeter =
 #   greet : String ->{} String
 # report : Failure e ->{} Unit
@@ -552,7 +552,7 @@ let attempt body =
 держит регион handler и поэтому остаётся в ветках: сохранённый в ячейке,
 созданной снаружи, он даёт `FLICK-G002`:
 
-```flick fail
+```flick fail G002
 # effect Emit a =
 #   control emit : a ->{} Unit
 # zero : Unit ->{} Int

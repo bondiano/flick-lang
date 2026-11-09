@@ -6,6 +6,6 @@ A transparent alias expands to its definition, so an alias that refers to
 itself, directly or through other aliases, never ends. Recursion needs a
 nominal type: an ADT or an `opaque type`.
 
-```flick ignore
+```flick
 type Tree a = Node a (List (Tree a))
 ```

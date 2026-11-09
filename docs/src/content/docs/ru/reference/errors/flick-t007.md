@@ -1,6 +1,6 @@
 ---
 title: "FLICK-T007"
-source_hash: "7a634e34c76919d5"
+source_hash: "918ec0b2156710e0"
 ---
 
 Переменная типа, ограниченная `forall`, используется вне этого `forall` (сколемическое
@@ -8,7 +8,7 @@ source_hash: "7a634e34c76919d5"
 не может сохранять свой аргумент в ячейку, созданную вне его, или возвращать что-то,
 чей тип ссылается на этот `a`.
 
-```flick ignore
+```flick
 log_all : (forall a. a ->{} Unit) ->{} Unit
 let log_all log =
   log 1

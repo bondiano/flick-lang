@@ -7,7 +7,11 @@ already is, so it can be removed without changing anything. The quick fix
 deletes it; `flick check --fix` deletes all of them. Turn the warning off with
 `allow = ["FLICK-T028"]` under `[lint]` in `flick.toml`.
 
-```flick ignore
+```flick
+# verbose : Bool
+# let verbose = false
+# import Console
+# warn : String ->{} Unit
 let warn msg =
   if verbose then
     Console.log msg

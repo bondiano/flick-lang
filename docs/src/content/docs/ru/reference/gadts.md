@@ -1,6 +1,6 @@
 ---
 title: "GADT"
-source_hash: 023d281fcacf0565
+source_hash: 88b39fe9c9ad02a1
 ---
 
 В обобщённом алгебраическом типе данных каждый конструктор сам говорит, какой
@@ -25,7 +25,7 @@ type Expr a =
 ветвей. Компилятор сверяет с этими типами каждое использование, поэтому сложение
 булева значения с числом даёт `FLICK-T003` ещё до запуска:
 
-```flick fail
+```flick fail T003
 # type Expr a =
 #   | NatLit Int : Expr Int
 #   | BoolLit Bool : Expr Bool

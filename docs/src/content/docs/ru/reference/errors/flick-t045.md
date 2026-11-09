@@ -1,11 +1,11 @@
 ---
 title: "FLICK-T045"
-source_hash: "2f94dfa7ddeaddf2"
+source_hash: "b888db1dd3639450"
 ---
 
 Условие этого `if` известно до запуска программы, поэтому одна из веток никогда не выполняется. Часто это остается после отладки. Быстрое исправление, не применяемое `flick check --fix`, сохраняет ветку, которая выполняется.
 
-```flick ignore
+```flick
 greeting : String
 let greeting = "hello"
 ```

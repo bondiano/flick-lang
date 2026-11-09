@@ -38,7 +38,7 @@ installs from the store) and `--help`; `flick help <command>` prints a command's
 | `doc --out-dir <dir>` | Markdown pages of the public API: types, kinds, constraints, effects, captures |
 | `explain <code>` | the explanation of a diagnostic code, a plugin's too, as `std/L001` |
 | `expand [paths]` | the code each [plugin](../plugins/) block of the project or of the files stands for |
-| `doctor` | the compiler, Node.js, pnpm, the TypeScript Content Mapper, the installed runtime and Effect, the optional adapters |
+| `doctor` | the compiler, Node.js, pnpm, git, the TypeScript Content Mapper, the installed runtime and Effect, the optional adapters, and Go when it is installed; everything but the compiler, Node.js and pnpm is a note, not a failure |
 | `inspect <M> --emit ast\|typed-ir\|js\|ts\|iface\|mapping` | one representation of a module |
 | `lsp --stdio` | the [language server](../editor/#language-server); stdio is its only transport |
 | `content-mapper [--declarations <paths>…]` | serves TypeScript's [Content Mapper](../editor/#content-mapper) requests for `.fl` files on stdio, started by `@flick-lang/content-mapper`; `--declarations` instead writes the projection of each `.fl` file under the paths beside it as `Name.d.fl.ts` and exits |
@@ -102,8 +102,9 @@ and `add` with `--git`, `--url` or `--path` and `remove` change
 packages the dependency commands delegate to pnpm. Every command that changes
 `package.json`, its lockfile or the tree first checks that `pnpm --version`
 is the version `packageManager` pins (`FLICK-P016`, exit code 2, nothing
-changed). `install --locked` without `pnpm-lock.yaml`, or with one out of
-date, is `FLICK-P017` with exit code 2.
+changed); the message names the pinned version and how to activate it, and
+`flick doctor` prints both versions. `install --locked` without
+`pnpm-lock.yaml`, or with one out of date, is `FLICK-P017` with exit code 2.
 
 `pack` builds the project in the release profile and refuses a `todo` or
 `echo` left in it (`FLICK-P024`). A library with `[package]` packs its sources:
