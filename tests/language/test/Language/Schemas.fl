@@ -129,9 +129,7 @@ let tests = [
     ),
   ],
   Test.group "refined" [
-    Test.test "accepts a valid value" (fun () ->
-      Test.equal "ok 8080" (decoded Port.schema "8080")
-    ),
+    Test.test "accepts a valid value" (fun () -> Test.equal "ok 8080" (decoded Port.schema "8080")),
     Test.test "rejects an invalid value" (fun () ->
       Test.equal "(root): not a valid Port" (decoded Port.schema "70000")
     ),

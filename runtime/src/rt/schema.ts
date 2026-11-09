@@ -4,7 +4,6 @@ import { type Result, err, none, ok, some } from "../core/data.ts";
 import { tag } from "../tags.ts";
 
 const SCHEMA_ERROR = /*#__PURE__*/ tag("Prelude.SchemaError.SchemaError");
-const EXPORT_ERROR = /*#__PURE__*/ tag("Codec.ExportError.ExportError");
 
 export interface SchemaIssue {
   readonly path: string;
@@ -35,18 +34,47 @@ export interface Codec<A = unknown> {
 type Check = (value: unknown, path: string) => Result<unknown, SchemaError>;
 export type Witness = Codec & { readonly decodeAt: Check; readonly encodeAt: Check; readonly value: Check };
 
+type SchemaNode =
+  | { readonly kind: "number" | "string" | "bool" | "int" | "bigint" | "unit" | "never" | "unknown" }
+  | { readonly kind: "list" | "option"; readonly item: Witness }
+  | { readonly kind: "result"; readonly error: Witness; readonly value: Witness }
+  | { readonly kind: "tuple"; readonly items: ReadonlyArray<Witness> }
+  | { readonly kind: "record"; readonly fields: ReadonlyArray<readonly [string, Witness]> }
+  | { readonly kind: "adt"; readonly cases: ReadonlyArray<Case> }
+  | { readonly kind: "lazy"; readonly name: string; readonly get: () => Witness }
+  | { readonly kind: "opaque"; readonly reason: string }
+  | { readonly kind: "literals"; readonly values: ReadonlyArray<string | number> }
+  | { readonly kind: "enum-tags"; readonly pairs: ReadonlyArray<readonly [string, string | number]> }
+  | { readonly kind: "refined"; readonly name: string; readonly known: string | undefined; readonly base: Witness }
+  | { readonly kind: "transform"; readonly from: Witness }
+  | { readonly kind: "block"; readonly fields: ReadonlyArray<readonly [string, {
+    readonly wire: string; readonly codec: Witness; readonly optional: boolean;
+    readonly onMissing?: (unit: undefined) => unknown;
+  }]>; readonly ignoreExtra: boolean };
+
+const schemaNodes = /*#__PURE__*/ new WeakMap<Witness, SchemaNode>();
+export const schemaDescription = (schema: Witness): SchemaNode | undefined => schemaNodes.get(schema);
+const node = (schema: Witness, description: SchemaNode): Witness => {
+  schemaNodes.set(schema, description);
+  return schema;
+};
+
 const at = (path: string, key: string | number): string =>
   typeof key === "number" ? `${path}[${key}]` : path ? `${path}.${key}` : key;
 
-const witness = (kind: string, decode: Check, encode: Check,
-  value: Check = (input, path) => map(encode(input, path), () => input)): Witness => ({
-  kind,
-  decode: (input) => decode(input, ""),
-  encode: (input) => encode(input, ""),
-  decodeAt: decode,
-  encodeAt: encode,
-  value,
-});
+export const witness = (kind: string, decode: Check, encode: Check,
+  value: Check = (input, path) => map(encode(input, path), () => input),
+  description?: SchemaNode): Witness => {
+  const schema = {
+    kind,
+    decode: (input: unknown) => decode(input, ""),
+    encode: (input: unknown) => encode(input, ""),
+    decodeAt: decode,
+    encodeAt: encode,
+    value,
+  };
+  return description ? node(schema, description) : schema;
+};
 
 const mismatch = (path: string, expected: string, input: unknown): Result<never, SchemaError> =>
   err(schemaError(path, `expected ${expected}, got ${describe(input)}`));
@@ -56,31 +84,31 @@ const primitive = (kind: string, expected: string, valid: (v: unknown) => boolea
   return witness(kind, check, check);
 };
 
-export const schemaNumber = witness("number",
+export const schemaNumber = node(witness("number",
   (v, path) => typeof v === "number" && Number.isFinite(v) ? ok(v) : mismatch(path, "a finite number", v),
   (v, path) => typeof v === "number" && !Number.isFinite(v)
     ? err(schemaError(path, `${String(v)} has no JSON form`))
     : typeof v === "number" ? ok(v) : mismatch(path, "a number", v),
-  (v, path) => typeof v === "number" ? ok(v) : mismatch(path, "a number", v));
-export const schemaString = primitive("string", "a string", (v) => typeof v === "string");
-export const schemaBool = primitive("bool", "a boolean", (v) => typeof v === "boolean");
+  (v, path) => typeof v === "number" ? ok(v) : mismatch(path, "a number", v)), { kind: "number" });
+export const schemaString = node(primitive("string", "a string", (v) => typeof v === "string"), { kind: "string" });
+export const schemaBool = node(primitive("bool", "a boolean", (v) => typeof v === "boolean"), { kind: "bool" });
 const checkInt: Check = (v, path) => {
     if (typeof v !== "number") return mismatch(path, "an Int", v);
     return Number.isInteger(v) && v >= -2147483648 && v <= 2147483647
       ? ok(v) : err(schemaError(path, "expected an Int, an integer from -2147483648 to 2147483647"));
 };
-export const schemaInt: Witness = witness("int", checkInt, checkInt);
-export const schemaBigint: Witness = witness("bigint", (v, path) => {
+export const schemaInt: Witness = node(witness("int", checkInt, checkInt), { kind: "int" });
+export const schemaBigint: Witness = node(witness("bigint", (v, path) => {
   if (typeof v !== "string" || !/^-?\d+$/.test(v))
     return err(schemaError(path, typeof v === "string" ? "expected a string of digits" : `expected a string of digits, got ${describe(v)}`));
   return ok(BigInt(v));
 }, (v, path) => typeof v === "bigint" ? ok(String(v)) : mismatch(path, "a BigInt", v),
-(v, path) => typeof v === "bigint" ? ok(v) : mismatch(path, "a BigInt", v));
-export const schemaUnit = witness("unit", (v, path) => v === null ? ok(undefined) : mismatch(path, "null", v),
+(v, path) => typeof v === "bigint" ? ok(v) : mismatch(path, "a BigInt", v)), { kind: "bigint" });
+export const schemaUnit = node(witness("unit", (v, path) => v === null ? ok(undefined) : mismatch(path, "null", v),
   (v, path) => v === undefined ? ok(null) : mismatch(path, "()", v),
-  (v, path) => v === undefined ? ok(v) : mismatch(path, "()", v));
-export const schemaNever = primitive("never", "nothing (Never)", () => false);
-export const schemaUnknown = witness("unknown", (v) => ok(v), (v) => ok(v));
+  (v, path) => v === undefined ? ok(v) : mismatch(path, "()", v)), { kind: "unit" });
+export const schemaNever = node(primitive("never", "nothing (Never)", () => false), { kind: "never" });
+export const schemaUnknown = node(witness("unknown", (v) => ok(v), (v) => ok(v)), { kind: "unknown" });
 
 export const schemaList = (item: Witness): Witness => witness("list", (input, path) => {
   if (!Array.isArray(input)) return mismatch(path, "an array", input);
@@ -100,7 +128,7 @@ export const schemaList = (item: Witness): Witness => witness("list", (input, pa
     out.push(result.success);
   }
   return ok(out);
-});
+}, undefined, { kind: "list", item });
 
 export const schemaOption = (item: Witness): Witness => witness("option", (v, path) => {
   if (v === null) return ok(none);
@@ -112,7 +140,7 @@ export const schemaOption = (item: Witness): Witness => witness("option", (v, pa
     const option = v as { _tag?: string; value?: unknown };
     return option._tag === "None" ? ok(null) : option._tag === "Some"
       ? item.encodeAt(option.value, path) : mismatch(path, "an Option", v);
-  });
+  }, undefined, { kind: "option", item });
 
 export const schemaResult = (error: Witness, value: Witness): Witness => witness("result", (v, path) => {
   if (!isRecord(v))
@@ -143,7 +171,7 @@ export const schemaResult = (error: Witness, value: Witness): Witness => witness
   return v["_tag"] === "Success" ? map(value.encodeAt(v["success"], at(path, "ok")), (success) => ({ ok: success }))
     : v["_tag"] === "Failure" ? map(error.encodeAt(v["failure"], at(path, "err")), (failure) => ({ err: failure }))
       : mismatch(path, "a Result", v);
-});
+}, undefined, { kind: "result", error, value });
 
 export const schemaField = (label: string, schema: Witness): readonly [string, Witness] => [label, schema];
 export const schemaItem = (schema: Witness): Witness => schema;
@@ -167,7 +195,7 @@ export const schemaTupleOf = (items: ReadonlyArray<Witness>): Witness => witness
     out.push(r.success);
   }
   return ok(out);
-});
+}, undefined, { kind: "tuple", items });
 export const schemaRecordOf = (fields: ReadonlyArray<readonly [string, Witness]>): Witness => witness("record", (v, path) => {
   if (!isRecord(v)) return mismatch(path, "an object", v);
   const out: Record<string, unknown> = {};
@@ -190,7 +218,7 @@ export const schemaRecordOf = (fields: ReadonlyArray<readonly [string, Witness]>
     out[name] = r.success;
   }
   return ok(out);
-});
+}, undefined, { kind: "record", fields });
 
 interface Case { readonly tag: string; readonly fields: ReadonlyArray<Witness> }
 export const schemaCase = (constructor: unknown, fields: ReadonlyArray<Witness>): Case => {
@@ -230,11 +258,12 @@ export const schemaAdtOf = (name: string, cases: ReadonlyArray<Case>): Witness =
     out[key] = r.success;
   }
   return ok(out);
-});
+}, undefined, { kind: "adt", cases });
 export const schemaLazyOf = (name: string, get: (unit: undefined) => Witness): Witness => {
   let target: Witness | undefined;
   const resolve = (): Witness => target ??= get(undefined);
-  return witness(name, (v, path) => resolve().decodeAt(v, path), (v, path) => resolve().encodeAt(v, path));
+  return witness(name, (v, path) => resolve().decodeAt(v, path), (v, path) => resolve().encodeAt(v, path),
+    undefined, { kind: "lazy", name, get: resolve });
 };
 export const schemaRecursive = (name: string, of: (self: Witness) => Witness): Witness => {
   const self = schemaLazyOf(name, () => {
@@ -245,13 +274,14 @@ export const schemaRecursive = (name: string, of: (self: Witness) => Witness): W
 };
 export const schemaUnboxed = (schema: Witness): Witness => schema;
 export const schemaOpaque = (name: string, reason: string): Witness => witness(name,
-  (_v, path) => err(schemaError(path, reason)), (_v, path) => err(schemaError(path, reason)), (v) => ok(v));
+  (_v, path) => err(schemaError(path, reason)), (_v, path) => err(schemaError(path, reason)), (v) => ok(v),
+  { kind: "opaque", reason });
 export const schemaRedacted = (_item: Witness): Witness => schemaOpaque("redacted", "a Redacted value has no JSON form without an explicit policy");
 
 export const schemaLiterals = (_base: Witness, _value: unknown, values: ReadonlyArray<string | number>): Witness => {
   const check: Check = (v, path) => (typeof v === "string" || typeof v === "number") && values.includes(v)
     ? ok(v) : err(schemaError(path, `expected one of ${values.map((x) => JSON.stringify(x)).join(", ")}`));
-  return witness("literals", check, check);
+  return witness("literals", check, check, undefined, { kind: "literals", values });
 };
 export const schemaEnumTags = (_base: Witness, pairs: ReadonlyArray<readonly [string, string | number]>): Witness =>
   witness("enum-tags", (v, path) => {
@@ -261,7 +291,7 @@ export const schemaEnumTags = (_base: Witness, pairs: ReadonlyArray<readonly [st
   }, (v, path) => {
     const match = pairs.find(([, value]) => value === v);
     return match ? ok({ _tag: match[0] }) : mismatch(path, "an enum value", v);
-  });
+  }, undefined, { kind: "enum-tags", pairs });
 export const schemaRefinedOf = (name: string, _known: unknown, base: Witness,
   parse: (v: unknown) => Result<unknown, SchemaError>): Witness => {
   const check: Check = (v, path) => {
@@ -276,7 +306,8 @@ export const schemaRefinedOf = (name: string, _known: unknown, base: Witness,
   }, (v, path) => {
     const valid = check(v, path);
     return valid._tag === "Failure" ? valid : base.encodeAt(v, path);
-  }, check);
+  }, check, { kind: "refined", name, known: isRecord(_known) && _known["_tag"] === "Some"
+    && typeof _known["value"] === "string" ? _known["value"] : undefined, base });
 };
 export const refinedParse = (name: string, check: (value: unknown) => boolean) =>
   (value: unknown): Result<unknown, SchemaError> =>
@@ -285,6 +316,19 @@ export const checkEmail = (value: string): boolean => /^[^\s@]+@[^\s@]+\.[^\s@]+
 export const checkNonEmpty = (value: string): boolean => value.length > 0;
 export const checkPositive = (value: number): boolean => value > 0;
 export const schemaJsonCodec = (schema: Witness): Codec => schema;
+export const withWire = (codec: Witness, from: Witness): Witness => node(codec, { kind: "transform", from });
+export const withBlock = (codec: Witness, fields: ReadonlyArray<readonly [string, {
+  readonly wire: string; readonly codec: Witness; readonly optional: boolean;
+  readonly onMissing?: (unit: undefined) => unknown;
+}]>, ignoreExtra: boolean): Witness => node(codec, { kind: "block", fields, ignoreExtra });
+export const codecTransformPure = (
+  decode: (wire: unknown) => unknown,
+  encode: (value: unknown) => unknown,
+  from: Witness,
+): Witness => witness("transform",
+  (input, path) => map(from.decodeAt(input, path), decode),
+  (value, path) => from.encodeAt(encode(value), path),
+  undefined, { kind: "transform", from });
 export const schemaValidate = (schema: Witness, value: unknown): Result<unknown, SchemaError> => schema.value(value, "");
 
 const isRecord = (v: unknown): v is Record<string, unknown> =>
@@ -343,16 +387,3 @@ export const codecDecodeResult = <A>(codec: Codec<A>, input: unknown): Result<A,
   return problem ? err(schemaError(problem.path, problem.message)) : codec.decode(input);
 };
 export const codecEncodeResult = <A>(codec: Codec<A>, value: A): Result<unknown, SchemaError> => codec.encode(value);
-
-export const codecJsonSchema = (name: string, codec: Codec): Result<string, ExportError> =>
-  err({ _tag: EXPORT_ERROR, _0: `${name} -> JSON Schema: ${codec.kind === "json" ? "JSON value has no JSON form" : "unsupported codec"}` });
-
-export const jsonParse = (text: string): Result<unknown, SchemaError> => {
-  try {
-    return ok(JSON.parse(text) as unknown);
-  } catch (error) {
-    return err(schemaError("", `not JSON: ${error instanceof Error ? error.message : String(error)}`));
-  }
-};
-
-export const jsonStringify = (value: unknown): string | undefined => JSON.stringify(value);

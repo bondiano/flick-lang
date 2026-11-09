@@ -46,13 +46,14 @@ export { redactedMake, redactedReveal } from "./redacted.ts";
 export { loop, trampolineDone, trampolineRun, trampolineSuspend } from "./loop.ts";
 export { snapshot, snapshotDefault } from "./snapshot.ts";
 export {
-  checkEmail, checkNonEmpty, checkPositive, codecDecodeResult, codecEncodeResult, codecJsonSchema, jsonParse, jsonStringify,
+  checkEmail, checkNonEmpty, checkPositive, codecDecodeResult, codecEncodeResult, codecTransformPure,
   schemaAdtOf, schemaBigint, schemaBool, schemaCase, schemaField, schemaInt, schemaItem,
   schemaJsonCodec, schemaLazyOf, schemaList, schemaLiterals, schemaNever, schemaNumber, schemaOpaque,
   schemaOption, schemaRecordOf, schemaRecursive, schemaRedacted, schemaRefinedOf, schemaResult,
   schemaString, schemaTupleOf, schemaUnboxed, schemaUnit, schemaUnknown, schemaValidate, schemaEnumTags,
   refinedParse,
 } from "./schema.ts";
+export { codecJsonSchema, jsonParse, jsonStringify } from "./schema_export.ts";
 export {
   eqHashCanonical,
   eqHashWith,
@@ -78,6 +79,12 @@ export {
 } from "./collections.ts";
 export { fileOpen, fileReadHandle, fileRead, fileWrite } from "./file.ts";
 export { routeCodec, routeNestedOf, routeParse, routePath, routePrint, routeQuery, routeSegment, routeWordsOf } from "./route.ts";
+export {
+  codecBlock, codecBool, codecField, codecFieldsEmpty, codecIgnoreExtra, codecInt, codecNumberFinite, codecNumberLossless,
+  codecOptionNull, codecOptionNullish, codecRecord, codecStandard, codecStandardAsync, codecString, codecTaggedOption,
+  codecRedactedReveal, codecRedactedMasked,
+  dslField, dslOnMissing, dslOptionalField,
+} from "./codec.ts";
 export {
   atomAt,
   atomClientOnly,

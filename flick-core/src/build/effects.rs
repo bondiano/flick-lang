@@ -54,6 +54,8 @@ pub fn specifier(spec: &str) -> Option<String> {
 /// The modules of `@flick-lang/runtime/effect/` that Flick's own runtime has,
 /// under `@flick-lang/runtime/rt/effect/`, for the exports it has.
 const IN_RT: &[&str] = &[
+    "Arbitrary",
+    "Array",
     "Cause",
     "Clock",
     "DateTime",
@@ -68,6 +70,7 @@ const IN_RT: &[&str] = &[
     "Latch",
     "Layer",
     "Queue",
+    "Record",
     "Redacted",
     "Schedule",
     "Schema",
