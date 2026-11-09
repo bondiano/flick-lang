@@ -6,6 +6,8 @@
 mod common;
 #[path = "dts_command/hover.rs"]
 mod hover;
+#[path = "dts_command/native.rs"]
+mod native;
 
 use std::fs;
 use std::path::{Path, PathBuf};

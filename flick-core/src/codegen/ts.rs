@@ -469,7 +469,7 @@ impl Projection<'_> {
         };
         let mut out = if self.rt {
             format!(
-                "import type {{ EffectValue as $Effect, OptionValue as $Option, ResultValue as $Result, LayerValue as $Layer, SchemaValue as $Schema, StreamValue as $Stream }} from \"{runtime}\";\n"
+                "import type {{ EffectValue as $Effect, OptionValue as $Option, ResultValue as $Result, LayerValue as $Layer, SchemaValue as $Schema, StreamValue as $Stream, ServiceValue as $Service }} from \"{runtime}\";\n"
             )
         } else {
             format!(

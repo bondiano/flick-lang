@@ -4,6 +4,7 @@
 
 #[cfg(any(feature = "build-artifacts", feature = "typescript"))]
 mod abi;
+#[cfg(not(target_arch = "wasm32"))]
 mod bridge_select;
 pub mod effects;
 #[cfg(feature = "build-artifacts")]
@@ -218,7 +219,10 @@ pub fn emit(
         direct: &direct,
         labels: settings.extras.labels,
         rt: settings.backend == Backend::Rt,
+        #[cfg(not(target_arch = "wasm32"))]
         effect_bridge: bridge_select::select(compilation, settings.effect_bridge),
+        #[cfg(target_arch = "wasm32")]
+        effect_bridge: settings.effect_bridge,
     };
     let mut out = Vec::new();
     #[cfg(feature = "build-artifacts")]

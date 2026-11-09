@@ -65,11 +65,14 @@ pub fn declaration_file(
             })
             .collect();
         match ops {
-            Ok(ops) => values.push(format!(
-                "export declare const {}: $Context.Service<{name}, {{ {} }}>;",
-                names::service(name),
-                ops.join("; ")
-            )),
+            Ok(ops) => {
+                let service = if projection.rt { "$Service" } else { "$Context.Service" };
+                values.push(format!(
+                    "export declare const {}: {service}<{name}, {{ {} }}>;",
+                    names::service(name),
+                    ops.join("; ")
+                ));
+            }
             Err(reason) => refused.push((names::service(name), reason)),
         }
     }

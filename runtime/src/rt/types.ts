@@ -26,3 +26,9 @@ export interface StreamValue<A, E, R> {
   readonly [stream]: readonly [A, E, R];
 }
 export type Ui = RuntimeUi;
+
+/** An interned native service key with its service and implementation types. */
+export interface ServiceValue<Self, Impl> {
+  readonly key: string;
+  readonly [services]?: readonly [Self, Impl];
+}
