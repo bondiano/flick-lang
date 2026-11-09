@@ -73,8 +73,9 @@ export function expectedPages() {
   }).filter(Boolean).join("\n\n");
   const total = entries.length;
   const shown = total - counted.none;
-  const tally = `${shown} of the ${total} codes have an example: ${counted.fail} report the code of their page, ${counted.valid} are programs that check, and ${counted.ignore} are fragments the compiler cannot check, each with its reason in the repository (\`docs/error-examples.txt\`). The other ${counted.none} show a configuration or a shape instead.`;
-  const tallyRu = `${shown} из ${total} кодов имеют пример: ${counted.fail} сообщают код своей страницы, ${counted.valid} — программы, которые проверяются, ${counted.ignore} — фрагменты, которые компилятор проверить не может, каждый с причиной в репозитории (\`docs/error-examples.txt\`). Остальные ${counted.none} показывают настройку или форму.`;
+  const blocks = counted.fail + counted.valid + counted.ignore;
+  const tally = `${shown} of the ${total} codes have an example, ${blocks} blocks in all: ${counted.fail} report the code of their page, ${counted.valid} are programs that check, and ${counted.ignore} are fragments the compiler cannot check, each with its reason in the repository (\`docs/error-examples.txt\`). The other ${counted.none} show a configuration or a shape instead.`;
+  const tallyRu = `${shown} из ${total} кодов имеют пример, всего ${blocks} блоков: ${counted.fail} сообщают код своей страницы, ${counted.valid} — программы, которые проверяются, ${counted.ignore} — фрагменты, которые компилятор проверить не может, каждый с причиной в репозитории (\`docs/error-examples.txt\`). Остальные ${counted.none} показывают настройку или форму.`;
   const enIndex = page("Compiler errors", "Every compiler code has an explanation and an example. Plugin codes belong to their packages and are explained with `flick explain <package>/<code>`.\n\n" + tally + "\n\n" + index(false));
   add("reference/errors/index.md", enIndex);
   add("ru/reference/errors/index.md", page("Ошибки компилятора", "Для каждого кода ошибки компилятора есть объяснение и пример. Коды плагинов принадлежат своим пакетам; их можно объяснить командой `flick explain <пакет>/<код>`.\n\n" + tallyRu + "\n\n" + index(true), hash(enIndex)));
