@@ -165,7 +165,7 @@ example : ¬ (TypingMode.live.use emptyStage region).le emptyStage := by
 example : ¬ Const.ok Facts.none .addFin
     { (default : CArg) with s := .rg 1, r := Row.ofCaps region } .live := by
   intro h
-  rcases h.2 (.r 0) (Or.inl rfl) with h | ⟨_, h, _⟩
+  rcases h.2.1 (.r 0) (Or.inl rfl) with h | ⟨_, h, _⟩
   · cases h
   · exact h.elim
 
@@ -173,19 +173,37 @@ example : ¬ Const.ok Facts.none .addFin
 example : ¬ Const.ok Facts.none .spawn
     { (default : CArg) with s := .rg 1, r := Row.ofCaps region } .live := by
   intro h
-  rcases h.2 (.r 0) (Or.inl rfl) with h | ⟨_, h, _⟩
+  rcases h.2.1 (.r 0) (Or.inl rfl) with h | ⟨_, h, _⟩
   · cases h
   · exact h.elim
 
 /-- Work using its own region is allowed. -/
 example : Const.ok Facts.none .spawn
     { (default : CArg) with s := .rg 0, r := Row.ofCaps region } .live := by
-  refine ⟨?_, ?_⟩
+  refine ⟨?_, ?_, ?_⟩
   · intro a h
     exact h.elim (fun h => h.elim) (fun h => h.elim)
   · intro a h
     exact .inl (h.elim id False.elim)
+  · intro y hy
+    cases y <;> first | exact (hy : False).elim | simp [Row.ofCaps] at hy
 
+/-- A child's qualifier is part of what it uses: a task that uses its owner's region but does
+not show it in its row is rejected, though its owner outlives it. -/
+example : ¬ Const.ok Facts.none .spawn { (default : CArg) with s := .rg 0, C := region } .live :=
+  fun h => h.2.2 (.atm (.r 0)) rfl
+
+example : Const.ok Facts.none .spawn
+    { (default : CArg) with s := .rg 0, C := region, r := Row.ofCaps region } .live := by
+  refine ⟨?_, ?_, fun _ h => h⟩
+  · intro a h
+    exact .inl (h.elim id fun h => h.elim)
+  · intro a h
+    exact .inl (h.elim id False.elim)
+
+/-- The same holds of a finalizer. -/
+example : ¬ Const.ok Facts.none .addFin { (default : CArg) with s := .rg 0, C := region } .live :=
+  fun h => h.2.2 (.atm (.r 0)) rfl
 /-- A control arm may use its own resume, without leaking the handler's region into its outer row. -/
 example (S : Sig) (hop : S.op "E" "op" = some (.control, .base .unit, .base .unit)) :
     TypLive S [] Facts.none []

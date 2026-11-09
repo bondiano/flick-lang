@@ -273,9 +273,10 @@ theorem Const.ok_substT_mode {mode : TypingMode} {Θ c ι} (σ : Atom → Ty)
   | captures => exact Const.ok_substT σ h
   | live =>
     cases c <;> simp only [Const.ok, CArg.substT] at h ⊢
-    case addFin => exact ⟨h.1.substT σ, TypingMode.keep_substT σ h.2⟩
+    case addFin =>
+      exact ⟨h.1.substT σ, TypingMode.keep_substT σ h.2.1, by rw [← Row.ofCaps_substT]; exact h.2.2.substT σ⟩
     case spawn =>
-      refine ⟨?_, TypingMode.keep_substT σ h.2⟩
+      refine ⟨?_, TypingMode.keep_substT σ h.2.1, by rw [← Row.ofCaps_substT]; exact h.2.2.substT σ⟩
       have hs := h.1.substT σ
       intro a ha
       apply hs a
@@ -292,7 +293,7 @@ theorem Const.ok_mono_mode {mode : TypingMode} {Θ Θ' c ι} (h : Const.ok Θ c 
   | captures => exact Const.ok_mono h hΘ
   | live =>
     cases c <;> simp only [Const.ok] at h ⊢
-    case addFin | spawn => exact ⟨hΘ _ _ h.1, hΘ _ _ h.2⟩
+    case addFin | spawn => exact ⟨hΘ _ _ h.1, hΘ _ _ h.2.1, h.2.2⟩
     all_goals exact h
 
 theorem TypingMode.subtype.refl {mode : TypingMode} {t : Ty} : mode.subtype t t := by
