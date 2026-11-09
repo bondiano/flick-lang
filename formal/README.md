@@ -45,11 +45,17 @@ in the `lean` job (`leanprover/lean-action` with `build-args: --wfail`).
   subtyping and owner bounds. The lemmas soundness rests on are proved for both instances:
   values are pure and have canonical forms (`Canonical.lean`, `Shapes.lean`,
   `CanonForms.lean`, `DictCanon.lean`, `Patterns.lean`), L3 holds for a frame and a
-  context (`FrameTy.lean`, `Context.lean`, `Lemma3.lean`), and progress
+  context (`FrameTy.lean`, `Context.lean`, `Lemma3.lean`), progress
   (`Progress.lean`, `ProgressMain.lean`) shows every closed term of either discipline to
-  be a value or one of the outcomes `NV`; typing by use adds only region atoms to a use
-  stage, so a frame still takes over the named effects of its hole. Preservation and T4′
-  for `TypLive`, and the translation of signature elision, are not yet proved.
+  be a value or one of the outcomes `NV`, and preservation holds of a pure step
+  (`PresPure.lean`), of refilling the hole of a handler (`PresHdl.lean`) and of the
+  run-time steps of handlers at the redex (`PresHdlRt.lean`). Typing by use adds only
+  region atoms to a use stage, so a frame still takes over the named effects of its hole.
+  The one step that closes a handler's region, `hwithCatch`, needs that region's atom in
+  the stage of the live discipline: the frame supplies it, so the live statement of the
+  step carries it as a premise. Preservation of the store steps and at a context
+  (`PresRt.lean`, `Preservation.lean`), T4′ for `TypLive`, and the translation of
+  signature elision are not yet proved.
 - **T5, the runtime contract** (`Formal/RT/`, `RT/T5.lean`): for any core and any
   interleaving, every reachable configuration of λRT satisfies R1–R4, R6 and R7, and R5 and
   R8 hold of the cause algebra, under the hypotheses on the libraries (`Hyp`) and `G11`.

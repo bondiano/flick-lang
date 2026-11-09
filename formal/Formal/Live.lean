@@ -30,13 +30,21 @@ Control arms and their runtime frames add the handler's own region locally, so `
 can use it without leaking that region into the handler's outer row.
 
 The lemmas type soundness rests on now hold for both instances: values are pure and
-have canonical forms, L3 types a frame and a context, and progress shows every closed term
+have canonical forms, L3 types a frame and a context, progress shows every closed term
 to be a value or one of the outcomes `NV` with its effect among the services of its
-stage. What remains is preservation for `TypLive` and the invariant replacing
-`Nest.reach`: every region atom of a running stage is live, including the stages of child
-work and handler frames. Preservation of that invariant is where `T4'_live` must be
-proved. Neither the examples nor the existing captures proofs establish it. Translation of
-live signature elision into the core judgment is a separate remaining obligation.
+stage, and preservation holds of a pure step (`PresPure.lean`), of refilling a handler's
+hole (`PresHdl.lean`) and of the run-time steps of handlers at the redex
+(`PresHdlRt.lean`). Two findings from that port: a value may be retyped at any stage, so
+the frame of a finished handler loses nothing when it gives its value back
+(`hdoneVal`), and the step that closes a handler's region (`hwithCatch`) keeps its
+answer at a stage that holds that region's atom, which only the frame supplies — in the
+live discipline the step therefore carries the atom as a premise. That premise is what
+the invariant replacing `Nest.reach` must supply: every region atom of a running stage
+is live, including the stages of child work and handler frames. What remains is
+preservation of the store steps and at a context (`PresRt.lean`, `Preservation.lean`),
+the invariant itself and `T4'_live`. Neither the examples nor the existing captures
+proofs establish it. Translation of live signature elision into the core judgment is a
+separate remaining obligation.
 
 T4.2 matters beyond safety: the runtime contract (`Formal/RT/`) takes only T4.3 (as `G11`),
 so giving T4.2 up does not touch T5; what it costs is that a value may keep a closed
