@@ -11,10 +11,36 @@ use crate::ir::{Foreign, ForeignMode, Item, ItemKind};
 /// What crosses `f` as a copy: an import outside the runtime may change
 /// Flick data in place (`docs/formal/ts-holes.md#31-flick-data-is-copied-at-the-foreign-boundary`).
 fn copies(f: &Foreign) -> Option<&Copies> {
-    let trusted = f.binding.from.as_deref().is_some_and(|m| {
-        m.starts_with("@flick-lang/runtime") || m.starts_with("@flick-lang/effect-ts")
-    });
+    let trusted = f
+        .binding
+        .from
+        .as_deref()
+        .is_some_and(trusted_runtime_package);
     (!trusted && f.adapter.copies.any()).then_some(&f.adapter.copies)
+}
+
+fn trusted_runtime_package(spec: &str) -> bool {
+    ["@flick-lang/runtime", "@flick-lang/effect-ts"]
+        .iter()
+        .any(|package| {
+            spec.strip_prefix(package)
+                .is_some_and(|rest| rest.is_empty() || rest.starts_with('/'))
+        })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::trusted_runtime_package;
+
+    #[test]
+    fn only_runtime_and_adapter_package_paths_are_trusted() {
+        assert!(trusted_runtime_package("@flick-lang/runtime/rt"));
+        assert!(trusted_runtime_package(
+            "@flick-lang/effect-ts/effect/Effect"
+        ));
+        assert!(!trusted_runtime_package("@flick-lang/runtime-extra"));
+        assert!(!trusted_runtime_package("@flick-lang/effect-ts-extra"));
+    }
 }
 
 impl Gen<'_> {
