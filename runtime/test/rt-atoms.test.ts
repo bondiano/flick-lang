@@ -137,3 +137,32 @@ test("registry disposal visits every reading after one finalizer throws", () => 
   assert.deepEqual(seen, ["first", "second"]);
   assert.throws(() => registry.get(second), /disposed/);
 });
+
+test("a throwing subscriber does not skip the other subscribers", () => {
+  const registry = new Registry(currentCtx());
+  const atom = state(0);
+  const seen: Array<string> = [];
+  registry.subscribe(atom, () => { seen.push("first"); throw new Error("listener failed"); });
+  registry.subscribe(atom, () => { seen.push("second"); });
+  assert.throws(() => registry.set(atom, 1), /listener failed/);
+  assert.deepEqual(seen, ["first", "second"]);
+  assert.equal(registry.get(atom), 1);
+});
+
+test("a throwing child finalizer still unlinks the child from its parent", () => {
+  const registry = new Registry(currentCtx());
+  const parent = state(1);
+  const child = readable((reading) => {
+    const value = reading.get(parent);
+    reading.addFinalizer(() => { throw new Error("cleanup failed"); });
+    return value + 1;
+  });
+  registry.get(child);
+  const parentNode = registry.node(parent);
+  const childNode = registry.node(child);
+  assert.equal(parentNode.children.has(childNode), true);
+  const internal = registry as unknown as { remove(node: typeof childNode): void };
+  assert.throws(() => internal.remove(childNode), /cleanup failed/);
+  assert.equal(parentNode.children.has(childNode), false);
+  assert.equal(parentNode.removable, true);
+});

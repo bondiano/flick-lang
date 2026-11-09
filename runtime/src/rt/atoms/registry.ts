@@ -171,14 +171,19 @@ export const batch = <A>(f: () => A): A => {
 
 const flush = (): void => {
   depth++;
+  let failed: { readonly error: unknown } | undefined;
   try {
     for (let node = first(announced); node !== undefined; node = first(announced)) {
       announced.delete(node);
-      for (const listener of Array.from(node.listeners)) listener();
+      for (const listener of Array.from(node.listeners)) {
+        try { listener(); }
+        catch (error) { failed ??= { error }; }
+      }
     }
   } finally {
     depth--;
   }
+  if (failed !== undefined) throw failed.error;
 };
 
 const first = <A>(set: ReadonlySet<A>): A | undefined => set.values().next().value;
@@ -414,12 +419,15 @@ export class Registry {
   private remove(node: Node): void {
     this.nodes.delete(node.atom);
     node.state = REMOVED;
-    node.reading?.dispose();
+    let failed: { readonly error: unknown } | undefined;
+    try { node.reading?.dispose(); }
+    catch (error) { failed = { error }; }
     node.reading = undefined;
     for (const parent of Array.from(node.parents)) {
       unlink(node, parent);
       this.dropLater(parent);
     }
+    if (failed !== undefined) throw failed.error;
   }
 }
 
