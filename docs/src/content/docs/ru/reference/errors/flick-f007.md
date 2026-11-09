@@ -1,0 +1,15 @@
+---
+title: "FLICK-F007"
+source_hash: "d5539345caa81c89"
+---
+
+Привязка с `reviewed "<pkg>@<ver> sha256:…"` гарантирует одну форму объявления. После обновления зависимости объявление может измениться: пересмотрите привязку и запишите новый отпечаток, который сгенерированный модуль показывает над экспортом. Привязка также должна указывать, чего форма не может содержать: `catch` для возвращаемого Promise, `nullable` для результата `undefined` или `null`, `retention` для обратного вызова.
+
+```flick ignore
+lookup : String ->{Async; JsError} Option String
+foreign lookup from "lookup-lib" "lookup"
+  arity 1
+  catch JsError.from_js
+  nullable
+  reviewed "lookup-lib@1.1.0 sha256:…"
+```

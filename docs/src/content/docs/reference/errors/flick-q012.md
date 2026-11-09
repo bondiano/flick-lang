@@ -1,0 +1,10 @@
+---
+title: "FLICK-Q012"
+---
+
+Retired. The compiler checked `sql { … }` queries itself and reported this
+code for a value whose type has no SQL form; the queries are now the plugin
+`sql` of `std`, whose code asks for an instance of `Sql.Param` of the
+value's type, so such a value is `FLICK-C001`.
+
+The code remains registered for historical diagnostics and is never reused.

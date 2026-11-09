@@ -14,8 +14,8 @@ export const PROGRAMS = [
   // the same counter on Flick's own runtime: React and the kernel, no Effect at all
   { name: "counter-rt", source: "tests/run/ui/counter.fl", rt: true, budget: 80, effectFree: true },
   {
-    name: "playground", source: "docs/src/playground/Playground.fl", budget: 127,
-    reason: "The sandboxed UI preview keeps a live output and failure channel after the program mounts.",
+    name: "playground", source: "docs/src/playground/Playground.fl", budget: 129,
+    reason: "The sandboxed preview, saved drafts and shared links, and the first lesson add browser interactions to the playground.",
     unused: ["effect/dist/Graph.js"],
   },
   { name: "atoms", source: "tests/run/ui/atoms.fl", budget: 117, unused: ["effect/dist/Graph.js"] },

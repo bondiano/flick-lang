@@ -11,13 +11,21 @@ interface Example {
 }
 
 /** Page-provided configuration; decoding and all locale behavior belong to Flick. */
-export const configuration = (): { locale: string; examples: ReadonlyArray<Example> } => {
+export const configuration = (): { locale: string; examples: ReadonlyArray<Example>; lesson: boolean; solution: string; done: boolean } => {
   const root = document.getElementById("flick-playground");
   if (root === null) throw new Error("The page has no flick-playground container");
   const embedded = document.getElementById("flick-playground-examples")?.textContent ?? "[]";
   // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the page writes this JSON from the gallery's index
   const examples = JSON.parse(embedded) as ReadonlyArray<Example>;
-  return { locale: root.dataset.locale ?? "", examples };
+  let done = false;
+  try { done = localStorage.getItem("flick.lesson.signatures.01.done") === "1"; } catch { /* local progress is optional */ }
+  return {
+    locale: root.dataset.locale ?? "",
+    examples,
+    lesson: root.dataset.lesson === "true",
+    solution: document.getElementById("flick-lesson-solution")?.textContent ?? "",
+    done,
+  };
 };
 
 /** The tab a link names in its query, such as the old Transpile page's `?tab=js`. */

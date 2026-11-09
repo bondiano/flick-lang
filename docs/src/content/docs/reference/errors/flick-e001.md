@@ -1,0 +1,18 @@
+---
+title: "FLICK-E001"
+---
+
+A runtime call runs where only pure code may run: in a function whose signature
+has a pure arrow `->`, in a callback expected to be pure, or while a module is
+initialized. An empty row does not make a call pure: `->{}` is still a runtime
+arrow. Make the arrow a runtime one, or defer the call with `task { … }`.
+
+```flick ignore
+service Users =
+  get : UserId ->{; NotFound} User
+
+// was: load_user : UserId -> User
+load_user : UserId ->{Users; NotFound} User
+let load_user id =
+  Users.get id
+```

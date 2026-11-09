@@ -1,0 +1,12 @@
+---
+title: "FLICK-T012"
+---
+
+A value would be evaluated while it is being defined. Only functions can be
+recursive in this version: `let rec` and `rec { … }` define functions, and
+top-level values must not depend on each other in a cycle.
+
+```flick ignore
+let rec countdown n =
+  if n <= 0 then [] else [n] ++ countdown (n - 1)
+```

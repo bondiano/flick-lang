@@ -11,3 +11,4 @@ node_modules/
 /tools/bundle-size/none/.flick/
 /tools/bundle-size/fullstack/.flick/
 /editors/zed/target/
+/docs/research/

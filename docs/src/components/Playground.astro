@@ -1,5 +1,6 @@
 ---
 import "../styles/playground.css";
+import { readFileSync } from "node:fs";
 import { Effect } from "@flick-lang/runtime";
 import { uiRenderStatic } from "@flick-lang/runtime/ui/react";
 import { renderToString } from "react-dom/server";
@@ -8,17 +9,21 @@ import { examples } from "./gallery.ts";
 
 interface Props {
   locale: "en" | "ru";
+  lesson?: boolean;
 }
 
-const { locale } = Astro.props;
-const gallery = examples();
-const markup = renderToString(uiRenderStatic(await Effect.runPromise(initial_view({ locale, examples: gallery }))));
+const { locale, lesson = false } = Astro.props;
+const starter = lesson ? readFileSync("exercises/signatures/01/starter.fl", "utf8") : "";
+const solution = lesson ? readFileSync("exercises/signatures/01/solution.fl", "utf8") : "";
+const gallery = lesson ? [{ id: "lesson", group: "Lesson", group_ru: "Урок", name: "Starter", name_ru: "Начало", source: starter }] : examples();
+const markup = renderToString(uiRenderStatic(await Effect.runPromise(initial_view({ locale, examples: gallery, lesson, solution, done: false }))));
 // the browser reads the same examples back; `<` cannot end the script early
 const embedded = JSON.stringify(gallery).replaceAll("<", "\\u003c");
 ---
 
-<div id="flick-playground" class="not-content flick-playground-shell" data-locale={locale} data-flick-ssr data-pagefind-ignore set:html={markup}></div>
+<div id="flick-playground" class="not-content flick-playground-shell" data-locale={locale} data-lesson={String(lesson)} data-flick-ssr data-pagefind-ignore set:html={markup}></div>
 <script is:inline type="application/json" id="flick-playground-examples" set:html={embedded}></script>
+{lesson && <script is:inline type="text/plain" id="flick-lesson-solution" set:html={solution.replaceAll("<", "&lt;")}></script>}
 <noscript>
   <p class="fp-boot">{locale === "ru" ? "Для компиляции и запуска в браузере нужен JavaScript." : "Browser compilation and execution require JavaScript."}</p>
 </noscript>

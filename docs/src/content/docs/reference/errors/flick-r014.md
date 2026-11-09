@@ -1,0 +1,20 @@
+---
+title: "FLICK-R014"
+---
+
+A top-level definition the module does not export is never used by the
+exported ones, directly or through other private definitions. Delete it,
+or export it.
+
+```flick ignore
+module App.Prices exposing (net)
+
+net : Float -> Float
+let net price = price * 0.8
+
+gross : Float -> Float
+let gross price = price * 1.2
+```
+
+`gross` is never used. Private definitions that only use each other are
+reported together.

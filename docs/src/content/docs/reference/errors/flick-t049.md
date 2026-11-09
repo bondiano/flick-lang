@@ -1,0 +1,12 @@
+---
+title: "FLICK-T049"
+---
+
+`List.length xs == 0` counts the whole list to learn whether it has an
+element. `List.is_empty xs` says it, and `not (List.is_empty xs)` the
+opposite. The quick fix rewrites `== 0`, `!= 0`, `> 0`, `>= 1` and `< 1`.
+
+```flick ignore
+nothing : List Float -> Bool
+let nothing xs = List.is_empty xs
+```

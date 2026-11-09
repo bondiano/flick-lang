@@ -1,0 +1,15 @@
+---
+title: "FLICK-P026"
+---
+
+The runner of an application starts `main` with `()` and either calls it as
+a plain function or runs it as an effect. So `main` is `Unit -> Unit`, or
+`Unit ->{; AppError} Unit`: every service it uses is provided inside it, and
+the only failure it lets out is `AppError`, which the runner reports.
+
+```flick ignore
+module App.Main exposing (main)
+
+main : Unit ->{; AppError} Unit
+let main () = provide Users.live { App.run () }
+```

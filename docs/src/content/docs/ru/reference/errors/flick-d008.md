@@ -1,0 +1,13 @@
+---
+title: "FLICK-D008"
+source_hash: "8fa8bafc84ca8486"
+---
+
+`flick schema export` записывает только строгую JSON Schema 2020-12: без `{}` или
+`any`. Кодек, узел которого не имеет такой формы (эффектное преобразование,
+проверка, неизвестная экспортерам, скрытое значение без политики), отклоняется с указанием пути этого узла.
+
+```flick ignore
+user_json : PureCodec Json User
+let user_json = Codec.json User.schema
+```

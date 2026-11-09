@@ -1,0 +1,22 @@
+---
+title: "FLICK-E016"
+source_hash: "c00dee161661f15f"
+---
+
+`provide S impl { body }` обрабатывает сервис `S` в своем теле с помощью
+записи `impl : S.Impl`, каждую операцию — через соответствующее поле. Обрабатывается
+только сервис, у которого все операции `tail`: поле задает операции
+ее значение. Эффект обрабатывается ветвями `try`.
+
+```flick ignore
+effect Throw =
+  abort throw : forall b. String ->{} b
+
+attempt : forall a r e. (Unit ->{Throw | r; e} a) ->{r; e} Result String a
+let attempt body =
+  // was: provide Throw { throw = fun m -> … } { Ok (body ()) }
+  try
+    Ok (body ())
+  with
+  | Throw.throw message -> Err message
+```

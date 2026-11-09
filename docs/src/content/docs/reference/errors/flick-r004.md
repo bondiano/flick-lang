@@ -1,0 +1,11 @@
+---
+title: "FLICK-R004"
+---
+
+The module does not export the name, either in an `exposing` list of an import
+or in a qualified name `M.name`. A module exports only what its own `exposing`
+list names. Export the name from the module, or use one that is exported.
+
+```flick ignore
+module App.Users exposing (User, load_user)
+```

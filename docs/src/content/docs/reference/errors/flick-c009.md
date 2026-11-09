@@ -1,0 +1,14 @@
+---
+title: "FLICK-C009"
+---
+
+Instance resolution has a budget per definition: 100 000 steps and 256
+nested constraints by default. Exceeding it is an error, never a success; the
+message shows the chain of constraints. Simplify the types, or raise the
+limits in `flick.toml`.
+
+```toml
+[build]
+solver-steps = 200000
+solver-depth = 512
+```

@@ -27,6 +27,10 @@ export const editorText = (): string => view?.state.doc.toString() ?? "";
 
 export const setEditorText = (text: string): void => {
   if (view !== undefined) editor?.replace(view, text);
+  else {
+    const field = document.querySelector<HTMLTextAreaElement>("#flick-playground textarea");
+    if (field !== null) field.value = text;
+  }
 };
 
 export const markDiagnostics = (source: string, diagnostics: ReadonlyArray<Diagnostic>): void => {

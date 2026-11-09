@@ -1,0 +1,13 @@
+---
+title: "FLICK-T014"
+---
+
+A label appears twice in one record type, record literal, update or pattern.
+Labels of a record are unique; their order does not matter.
+
+```flick ignore
+type alias Point = { x : Float; y : Float }
+
+origin : Point
+let origin = { x = 0; y = 0 }
+```

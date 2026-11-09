@@ -1,0 +1,12 @@
+---
+title: "FLICK-T016"
+---
+
+Unifying two types would need a type that contains itself, such as `a = List a`.
+This usually means a function is applied to itself or an argument is wrapped
+once too often.
+
+```flick ignore
+wrap : a -> List a
+let wrap value = [value]
+```

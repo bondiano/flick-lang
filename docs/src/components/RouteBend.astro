@@ -1,0 +1,14 @@
+---
+// A bend of the page's rail into another column, drawn like the hero's lines: 45 degrees with the
+// same rounded corner. Units are design pixels of the 1440 wide hero, as everywhere on the page.
+interface Props { from: number; to: number }
+const { from, to } = Astro.props;
+const COLUMN = 120;
+const dx = Math.abs(to - from) * COLUMN;
+// the two corners take 11.3 across and 27.3 down each; the rest is the diagonal
+const h = dx + 32;
+const right = to > from;
+const x = (value: number) => right ? value : dx - value;
+const d = `M${x(0)} 0Q${x(0)} 16 ${x(11.3)} 27.3L${x(dx - 11.3)} ${h - 27.3}Q${x(dx)} ${h - 16} ${x(dx)} ${h}`;
+---
+{dx > 0 && <svg class:list={["route-bend", right ? "route-bend-right" : "route-bend-left"]} style={`--dx: ${dx}`} viewBox={`0 0 ${dx} ${h}`} aria-hidden="true" focusable="false"><path d={d} /></svg>}

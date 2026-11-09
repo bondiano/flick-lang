@@ -1,0 +1,3 @@
+export = "length_of"
+return_type = "number"
+output = "5"

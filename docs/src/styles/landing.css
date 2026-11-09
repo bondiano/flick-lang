@@ -105,25 +105,37 @@
   .hero-status { position: absolute; left: calc(var(--u) * 900); top: calc(var(--u) * 700); width: calc(var(--u) * 480); font-size: max(0.88rem, calc(var(--u) * 15.5)); }
 }
 
-/* Below the hero, the page is one line and each section a station on it. */
+/* Below the hero, the page is one line and each section a station on it. Each section lays its own
+   piece of the line, so the line ends where the last section does. */
 .route { --rail: 0.5rem; --g: max(1rem, var(--flick-gutter)); --rail-x: calc(9 * min(100vw - 2 * var(--g), 26rem) / 358); position: relative; max-width: 1760px; margin-inline: auto; padding: 0.5rem var(--g) 0; }
-.route::before { content: ''; position: absolute; top: 0; bottom: 0; left: calc(var(--g) + var(--rail-x) - 0.25rem); width: var(--rail); background: var(--flick-line-violet); }
-.terminus { position: relative; }
-.terminus::before { content: ''; position: absolute; z-index: 1; left: calc(var(--rail-x) - 2.5rem - 0.8rem); top: calc(26px - 0.25rem); width: 1.6rem; height: var(--rail); background: var(--flick-line-violet); }
-/* Below the terminus the rail is painted out: the actions may wrap to any height. */
-.terminus::after { content: ''; position: absolute; left: calc(var(--rail-x) - 2.5rem - 0.8rem); top: 26px; width: 1.6rem; height: 24rem; background: var(--sl-color-bg); }
-.stop { position: relative; display: grid; gap: 1.25rem; padding: 1.5rem 0 4rem 2.5rem; max-width: 72rem; min-width: 0; }
+.route::before { content: ''; position: absolute; top: 0; height: 0.5rem; left: calc(var(--g) + var(--rail-x) - var(--rail) / 2); width: var(--rail); background: var(--flick-line-violet); }
+.stop { --pad-top: 1.5rem; --pad-left: 2.5rem; --rail-top: 0px; position: relative; display: grid; gap: 1.25rem; padding: var(--pad-top) 0 4rem var(--pad-left); max-width: 72rem; min-width: 0; }
+.stop::before { content: ''; position: absolute; top: var(--rail-top); bottom: 0; left: calc(var(--rail-x) - var(--rail) / 2); width: var(--rail); background: var(--flick-line-violet); }
 .stop > * { min-width: 0; }
+.route-bend { display: none; }
+.route-bend path { fill: none; stroke: var(--flick-line-violet); stroke-width: var(--rail); stroke-linejoin: round; vector-effect: non-scaling-stroke; }
 .stop h2 { position: relative; margin: 0; font-size: clamp(2rem, 4.2vw, 3rem); font-weight: 800; line-height: 1.08; }
-.stop h2::before { content: ''; position: absolute; left: calc(var(--rail-x) - 2.5rem); translate: -50%; top: 0.1em; width: 1.5rem; height: 1.5rem; border: 5px solid var(--sl-color-white); border-radius: 50%; background: var(--flick-panel); }
+.stop h2::before { content: ''; position: absolute; left: calc(var(--rail-x) - var(--pad-left)); translate: -50%; top: 0.1em; width: 1.5rem; height: 1.5rem; border: 5px solid var(--sl-color-white); border-radius: 50%; background: var(--flick-panel); }
 .stop h3 { margin: 0.75rem 0 0; font-size: 1.4rem; font-weight: 800; line-height: 1.2; }
 .stop-lead { max-width: 40rem; font-size: 1.25rem; line-height: 1.45; color: var(--sl-color-white); }
 .stop-text { max-width: 36rem; font-size: 1.0625rem; line-height: 1.6; }
 .stop code { padding: 0.08em 0.28em; background: var(--sl-color-bg-inline-code); color: var(--sl-color-white); white-space: nowrap; }
 .stop-link { display: inline-flex; align-items: center; gap: 0.5rem; justify-self: start; min-height: 44px; font-weight: 600; font-size: 1.05rem; color: var(--sl-color-text-accent); text-decoration: none; }
 .stop-link:hover { text-decoration: underline; }
-.stop-last { padding-bottom: 3rem; }
-.stop-last .hero-actions { margin-top: 0.75rem; }
+
+/* The last section: the line is laid up to today's station, and the track beyond it is planned,
+   dashed, with stations not built yet. */
+.stop-next { padding-bottom: 4rem; }
+.stop-next::before { display: none; }
+.next-built { position: relative; display: grid; gap: 1.25rem; }
+.next-built::before { content: ''; position: absolute; top: calc(var(--rail-top) - var(--pad-top)); bottom: calc(-1.25rem - 0.72rem); left: calc(var(--rail-x) - var(--pad-left) - var(--rail) / 2); width: var(--rail); background: var(--flick-line-violet); }
+.next-stops { display: grid; gap: 1.25rem; max-width: 38rem; margin: 0; padding: 0; list-style: none; }
+.next-stops li { position: relative; display: grid; gap: 0.3rem; }
+.next-stops li:not(:last-child)::before { content: ''; position: absolute; top: 0.72rem; bottom: calc(-1.25rem - 0.72rem); left: calc(var(--rail-x) - var(--pad-left) - var(--rail) / 2); width: var(--rail); background: repeating-linear-gradient(to bottom, var(--flick-line-violet) 0 0.5rem, transparent 0.5rem 0.9rem); }
+.next-stops li::after { content: ''; position: absolute; top: 0.72rem; left: calc(var(--rail-x) - var(--pad-left)); translate: -50% -50%; width: 1.15rem; height: 1.15rem; border: 4px solid var(--flick-line-violet); border-radius: 50%; background: var(--sl-color-bg); }
+.next-stops h3 { margin: 0; font-size: 1.2rem; }
+.next-stops p { font-size: 1.0625rem; line-height: 1.5; }
+.stop-next .hero-actions { margin-top: 1.25rem; }
 
 /* Code on the page: one line in focus, the rest quiet. */
 .code-panel { min-width: 0; border: 1px solid var(--sl-color-hairline); background: var(--flick-editor-bg); }
@@ -175,9 +187,6 @@
 .sign-panel { display: grid; gap: 0.4rem; padding: 0.95rem 1.15rem 0.8rem; background: var(--flick-sign); color: var(--flick-sign-ink); font-family: var(--sl-font-mono); font-size: 0.92rem; font-variant-ligatures: none; line-height: 1.45; overflow-wrap: anywhere; }
 .sign-caption { font-family: var(--sl-font); font-size: 0.95rem; font-weight: 600; color: var(--flick-sign-muted); }
 
-.status-list { display: grid; gap: 0.75rem; max-width: 36rem; margin: 0; padding: 0; list-style: none; }
-.status-list li { font-size: 1.0625rem; line-height: 1.5; }
-
 .home-footer { position: relative; background: var(--sl-color-bg); display: flex; flex-wrap: wrap; align-items: center; gap: 1rem 2rem; padding: 1.5rem max(1rem, var(--flick-gutter)) 2rem calc(max(1rem, var(--flick-gutter)) + 2.5rem); border-top: 1px solid var(--sl-color-hairline); }
 .home-footer .flick-brand { width: 110px; }
 .home-footer p { margin: 0 auto 0 0; color: var(--sl-color-gray-2); }
@@ -196,9 +205,7 @@
 }
 @media (min-width: 64rem) {
   .read-grid { grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); align-items: start; gap: 2.5rem; }
-  .stop { padding: 2rem 0 5rem 3.5rem; }
-  .stop h2::before { left: calc(var(--rail-x) - 3.5rem); }
-  .terminus::before, .terminus::after { left: calc(var(--rail-x) - 3.5rem - 0.8rem); }
+  .stop { --pad-top: 2rem; --pad-left: 3.5rem; padding-bottom: 5rem; }
   .split { grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 2.5rem; align-items: start; }
   .compare article { grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr); column-gap: 2rem; align-items: start; }
   .compare h3 { grid-column: 1 / -1; }
@@ -206,13 +213,21 @@
 }
 /* Tablets: no violet line reaches the rail here, so it starts at its first station. */
 @media (min-width: 48rem) and (max-width: 74.99rem) {
-  .route::before { top: 3.4rem; }
+  .route::before { display: none; }
+  .route > .stop:first-child::before { top: 2.9rem; }
 }
-/* The rail stands where the violet line leaves the diagram, in the hero's own units. */
+/* The rail stands where the violet line leaves the diagram, in the hero's own units. A section
+   may stand a column or two aside; the line bends into it like the hero's lines do, and the
+   section starts below the bend. */
 @media (min-width: 75rem) {
   .route { container-type: inline-size; padding-inline: 0; --rail-x: calc(var(--u) * 9); }
-  .route::before { left: calc(var(--u) * 81 - 0.25rem); }
-  .stop { margin-inline: calc(var(--u) * 72); }
+  .route::before { left: calc(var(--u) * 81 - var(--rail) / 2); }
+  .stop { --pad-top: calc(var(--u) * var(--bend, 0) + 2rem); --rail-top: calc(var(--u) * var(--bend, 0)); margin-left: calc(var(--u) * (72 + 120 * var(--shift, 0))); margin-right: calc(var(--u) * 72); max-width: min(72rem, calc(var(--u) * (1296 - 120 * var(--shift, 0)))); }
+  .route-bend { display: block; position: absolute; top: 0; width: calc(var(--u) * var(--dx)); height: auto; overflow: visible; }
+  .route-bend-right { left: calc(var(--rail-x) - var(--u) * var(--dx)); }
+  .route-bend-left { left: var(--rail-x); }
+  /* the bend is the way to the next section, so the gap before it is the bend itself */
+  .stop:has(+ .stop > .route-bend) { padding-bottom: 1.5rem; }
 }
 @media (prefers-reduced-motion: reduce) {
   .line-log { transition: none; }

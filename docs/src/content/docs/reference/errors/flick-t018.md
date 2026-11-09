@@ -1,0 +1,17 @@
+---
+title: "FLICK-T018"
+---
+
+A constructor pattern gives a different number of arguments than the
+constructor takes. `Circle Point Float` takes two; a record field is one
+argument.
+
+```flick ignore
+type Shape = Circle Float Float | Empty
+
+radius : Shape -> Float
+let radius shape =
+  match shape with
+  | Circle _ r -> r
+  | Empty -> 0
+```

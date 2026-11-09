@@ -1,0 +1,13 @@
+---
+title: "FLICK-P013"
+---
+
+`flick build` could not create the output directory or write a file in it.
+The message names the path and the reason the system gave, such as a
+missing permission or a file where a directory is expected.
+
+Fix the path or the permissions, or choose another directory:
+
+```sh
+flick build --out-dir build
+```

@@ -1,0 +1,12 @@
+---
+title: "FLICK-P016"
+---
+
+Dependency commands run the pnpm version `package.json` pins in
+`packageManager`, checked before anything is written. Another version, or no
+pnpm at all, stops the command with exit code 2.
+
+```sh
+corepack enable
+corepack prepare pnpm@12.16.1 --activate
+```

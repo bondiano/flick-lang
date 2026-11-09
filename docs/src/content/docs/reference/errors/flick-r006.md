@@ -1,0 +1,12 @@
+---
+title: "FLICK-R006"
+---
+
+Modules import each other in a cycle; the message lists the chain. Flick has no
+cyclic imports between modules. Move the shared definitions into a module both
+can import, or merge the modules.
+
+```flick ignore
+// src/App/Types.fl holds what App.Users and App.Orders both need
+module App.Types exposing (UserId, OrderId)
+```

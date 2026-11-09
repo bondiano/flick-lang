@@ -1,0 +1,16 @@
+---
+title: "FLICK-T056"
+source_hash: "1e8b68fedf1cb547"
+---
+
+Конструктор, написанный с помощью `: R`, строит `R`, и `R` должен быть собственным типом, применённым ко всем параметрам типа. Аргументом может быть любой тип вида `Type`, член `kind` или `Symbol`; аргумент для параметра, который является регионом, строкой или набором захвата, передаётся как переменная конструктора. Тип, который называет своё представление (`unboxed type`, `untagged type`), не имеет таких конструкторов.
+
+```flick ignore
+type Expr a =
+  | IntLit Int : Expr Int
+  | Add (Expr Int) (Expr Int) : Expr Int
+  | If (Expr Bool) (Expr a) (Expr a) : Expr a
+  | BoolLit Bool : Expr Bool
+```
+
+Сообщаются `| IntLit Int : Option Int` и `| IntLit Int : Expr`.

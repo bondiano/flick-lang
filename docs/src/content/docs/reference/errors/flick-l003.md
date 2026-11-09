@@ -1,0 +1,9 @@
+---
+title: "FLICK-L003"
+---
+
+Retired. The compiler checked `cli "name" { … }` blocks itself and
+reported this code; the blocks are now the plugin `cli` of `std`, which
+reports the same rule as `std/L003`: see `flick explain std/L003`.
+
+The code remains registered for historical diagnostics and is never reused.

@@ -1,0 +1,11 @@
+---
+title: "FLICK-P019"
+---
+
+`flick init` never overwrites a file: every file it would create that
+already exists is listed before anything is written. Move them away or start
+in an empty directory with `flick new`.
+
+```sh
+flick new my-app --template app
+```

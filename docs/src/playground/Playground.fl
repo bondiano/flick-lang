@@ -1,6 +1,12 @@
 module Playground exposing (main, initial_view)
 
-import Actions exposing (load_compiler, prepare_editor, prepare_highlighting, report)
+import Actions exposing (
+  load_compiler,
+  prepare_editor,
+  prepare_highlighting,
+  report,
+  restore_source,
+)
 import Dom exposing (configuration)
 import State exposing (Configuration, initial_model, tr)
 import View exposing (view)
@@ -23,6 +29,7 @@ let main () =
         (task { Ui.Dom.mount root (report model) app })
         (task {
           let label = tr initial.locale "Flick source code" "Исходный код Flick"
+          restore_source model
           ignore (parallel
             (task { load_compiler model })
             (task {

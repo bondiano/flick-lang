@@ -1,0 +1,11 @@
+---
+title: "FLICK-P009"
+---
+
+A module could not be found and a dependency in `package.json` is not
+installed in `node_modules`, so the module may come from it. Install the
+dependencies first.
+
+```sh
+flick install
+```

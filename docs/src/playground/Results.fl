@@ -2,7 +2,7 @@ module Results exposing (current_problems, output_pane, diagnostic_label)
 
 import Actions exposing (explain)
 import Dom exposing (attributes)
-import State exposing (Diagnostic, Locale, Model, profile_name, tr)
+import State exposing (Diagnostic, Locale(..), Model, profile_name, tr)
 
 severity_label : Locale -> String -> String
 let severity_label locale severity =
@@ -39,6 +39,19 @@ let problem model m diagnostic =
             ])),
       paragraph [text diagnostic.message],
       if open then pre { class_name = "fp-explanation" } [text m.explanation] else empty,
+      if String.starts_with "FLICK-" code then
+        match
+          Ui.safe_url
+            ("/flick-lang/"
+              ++ (if m.locale == Ru then "ru/" else "")
+              ++ "reference/errors/"
+              ++ String.to_lower code
+              ++ "/")
+        with
+        | Some url ->
+          Ui.link { href = url } [text (tr m.locale "Full explanation" "Полное объяснение")]
+        | None -> empty
+      else empty,
     ]
   }
 

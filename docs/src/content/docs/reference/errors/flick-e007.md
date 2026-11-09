@@ -1,0 +1,16 @@
+---
+title: "FLICK-E007"
+---
+
+`try … with` handles expected errors: every arm matches a type declared with
+`type error`, or a variable or `_` that matches any error of the body. Other
+values are matched with `match` on the result.
+
+```flick ignore
+safe : UserId ->{Users; none} Option User
+let safe id =
+  try
+    Some (Users.get id)
+  with
+  | NotFound _ -> None
+```

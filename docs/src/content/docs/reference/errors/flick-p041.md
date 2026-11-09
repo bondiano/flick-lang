@@ -1,0 +1,13 @@
+---
+title: "FLICK-P041"
+---
+
+A library's foreign module is written into the build's output beside the module
+that binds it, with the other `.mjs` and `.cjs` of the library, and one of them
+cannot be: the file a `foreign` names is missing, a link leads outside the
+library, or two libraries ship different files at one path. Put the file beside
+the module, and name shared files by a directory of the library's own.
+
+```flick ignore
+foreign pad from "./pad.mjs" "pad"
+```
