@@ -7,7 +7,10 @@ export * from "../../core/Array.ts";
 
 type List<A> = ReadonlyArray<A>;
 type Eqv<A> = (a: A, b: A) => boolean;
+interface Reducer<A> { readonly initial: A; readonly combine: (a: A, b: A) => A }
 const count = (n: number): number => n > 0 ? Math.floor(n) : 0;
+export const getReadonlyReducerConcat = <A>(): Reducer<ReadonlyArray<A>> =>
+  ({ initial: [], combine: (a, b) => [...a, ...b] });
 
 export const append = <A>(value: A) => (self: List<A>): Array<A> => [...self, value];
 export const makeBy = <A>(n: number, f: (i: number) => A): Array<A> =>

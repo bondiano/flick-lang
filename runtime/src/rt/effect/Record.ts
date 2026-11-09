@@ -5,6 +5,8 @@ import { none, some as someOption, type Option, type Result } from "../../core/d
 
 type Dict<A> = Readonly<Record<string, A>>;
 type Pair<A> = readonly [string, A];
+interface Combiner<A> { readonly combine: (a: A, b: A) => A }
+interface Reducer<A> extends Combiner<A> { readonly initial: A }
 const entries = <A>(record: Dict<A>): Array<[string, A]> => Object.entries(record);
 const hasKey = <A>(record: Dict<A>, key: string): boolean => Object.hasOwn(record, key);
 const fromPairs = <A>(pairs: Iterable<Pair<A>>): Record<string, A> => Object.fromEntries(pairs);
@@ -100,3 +102,9 @@ export const isSubrecordBy = <A>(same: (self: A, that: A) => boolean) =>
 export const flickMakeEquivalence = <A>(same: (a: A, b: A) => boolean) =>
   (self: Dict<A>) => (that: Dict<A>): boolean =>
     size(self) === size(that) && isSubrecordBy(same)(that)(self);
+export const makeReducerUnion = <A>(combiner: Combiner<A>): Reducer<Dict<A>> => ({
+  initial: {}, combine: (a, b) => union(b, combiner.combine)(a),
+});
+export const makeReducerIntersection = <A>(combiner: Combiner<A>): Reducer<Dict<A>> => ({
+  initial: {}, combine: (a, b) => intersection(b, combiner.combine)(a),
+});

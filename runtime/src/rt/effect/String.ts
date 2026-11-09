@@ -2,6 +2,7 @@
 import { none, some, type Option } from "../../core/data.ts";
 
 export * from "../../core/String.ts";
+export const ReducerConcat = { initial: "", combine: (a: string, b: string): string => a + b };
 export const search = (expression: RegExp) => (text: string): Option<number> => {
   const index = text.search(expression);
   return index < 0 ? none : some(index);

@@ -56,8 +56,12 @@ pub fn specifier(spec: &str) -> Option<String> {
 const IN_RT: &[&str] = &[
     "Arbitrary",
     "Array",
+    "BigInt",
+    "ByteSize",
     "Cause",
     "Clock",
+    "Combiner",
+    "Crypto",
     "DateTime",
     "Deferred",
     "Duration",
@@ -67,13 +71,18 @@ const IN_RT: &[&str] = &[
     "FiberSet",
     "Filter",
     "Function",
+    "Hash",
     "HashMap",
+    "HashRing",
     "HashSet",
     "Latch",
     "Layer",
     "Queue",
     "Random",
+    "Number",
+    "Option",
     "Record",
+    "Reducer",
     "Predicate",
     "RegExp",
     "Redacted",
@@ -82,7 +91,9 @@ const IN_RT: &[&str] = &[
     "Scope",
     "String",
     "Struct",
+    "Tuple",
     "Tracer",
+    "Trie",
     "reactivity/AsyncResult",
     "reactivity/Atom",
 ];
@@ -231,7 +242,7 @@ mod tests {
         );
         assert_eq!(
             rt_specifier("@flick-lang/runtime/effect/Option").as_deref(),
-            Some("@flick-lang/runtime/core/Option")
+            Some("@flick-lang/runtime/rt/effect/Option")
         );
         assert_eq!(
             rt_specifier("@flick-lang/runtime/effect/reactivity/Atom").as_deref(),
