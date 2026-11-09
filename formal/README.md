@@ -36,7 +36,7 @@ in the `lean` job (`leanprover/lean-action` with `build-args: --wfail`).
   regions), `T4_3` (no handler of a region that ended is used) and `T1_regions` (`T1` with
   `op_H`, without the blocked outcome of a step that needs a region that is not live, which
   `T4` rules out).
-- **T4′, stated** (`Formal/Live.lean`): `SafeUse`, T4.1 and T4.3 without T4.2, the safety a
+- **T4′** (`Formal/Live.lean`, `Formal/Live/`): `SafeUse`, T4.1 and T4.3 without T4.2, the safety a
   discipline where a region is needed alive only where it is used promises; `T4'_captures`
   proves it of the capture rules from `T4` and `T4_3`. `TypM` (`Rules.lean`) now gives
   both `Typ` (captures, unchanged) and `TypLive`, with use-stage subtyping `LeLive`,
@@ -57,9 +57,13 @@ in the `lean` job (`leanprover/lean-action` with `build-args: --wfail`).
   the desugaring of `Scope.run` — must also hold the qualifier of what the body uses,
   which the capture instance erases and the live instance does not; that fact follows
   from the subtype of the argument (`LeLive.arrow_use`), through the inversion of the
-  type former that carries the qualifier. Preservation of the store steps and at a
-  context (`PresRt.lean`, `Preservation.lean`), T4′ for `TypLive`, and the translation
-  of signature elision are not yet proved.
+  type former that carries the qualifier. Preservation holds of every step for both
+  instances (`PresRt.lean`, `Preservation.lean`), and `T1_live` is `T1` of `TypLive`.
+  `T4'_live` (`Live/T4Live.lean`) proves T4′ of `TypLive`, from an invariant of run-time
+  forms (`LNest`, the half of `Nest` that does not bound names) and of the stages of child
+  work (`LCfgTy`); both it and `T1_live` take `RootBelow root` as a premise. Four live
+  rule changes, listed in `Live.lean`, close these proofs. The translation of signature
+  elision is not yet proved.
 - **T5, the runtime contract** (`Formal/RT/`, `RT/T5.lean`): for any core and any
   interleaving, every reachable configuration of λRT satisfies R1–R4, R6 and R7, and R5 and
   R8 hold of the cause algebra, under the hypotheses on the libraries (`Hyp`) and `G11`.
@@ -90,8 +94,8 @@ in the `lean` job (`leanprover/lean-action` with `build-args: --wfail`).
 `witness_T6b_example`, `witness_T6b_closed` and `witness_T6b_open` lists only Lean's standard `propext`,
 `Classical.choice` and `Quot.sound`; the hypotheses of T5 (`Hyp`, `G11`), of T6(a)
 (`Target`; for the core, `Real`) and of T6(b) (`Coherent`, `Sim`) are their parameters.
-`Formal/Axioms.lean` pins what `#print axioms` prints for `T1`, `T6a`, `T6b`, `T6a_core`
-and `T6b_core` with `#guard_msgs`, so `lake build` fails on a `sorry` or a new axiom.
+`Formal/Axioms.lean` pins what `#print axioms` prints for `T1`, `T1_live`, `T4'_live`, `T6a`,
+`T6b`, `T6a_core` and `T6b_core` with `#guard_msgs`, so `lake build` fails on a `sorry` or a new axiom.
 
 T4.3 is the premise G11 of T5 in the form [the answering provide must be live](../docs/formal/runtime.md#the-provide-liveness-premise-is-stronger-than-typing-gives) gives it: an operation answered by a handler of the region `q` happens only while `q` is live.
 Its Lean statement (`T43Main.lean`), the counterpart of `G11` in `Formal/RT/Hyp.lean`:

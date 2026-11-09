@@ -3,6 +3,7 @@ import Formal.Elab.T6a
 import Formal.Elab.Coherence
 import Formal.Elab.CoreT6a
 import Formal.Elab.CoreRun
+import Formal.Live.T4Live
 
 /-!
 # The axioms of the main theorems
@@ -19,6 +20,10 @@ prints, and `#guard_msgs` turns the difference into an error.
 /-- info: 'Flick.T1_live' depends on axioms: [propext, Classical.choice, Quot.sound] -/
 #guard_msgs in
 #print axioms Flick.T1_live
+
+/-- info: 'Flick.T4'_live' depends on axioms: [propext, Classical.choice, Quot.sound] -/
+#guard_msgs in
+#print axioms Flick.T4'_live
 
 /-- info: 'Flick.Elab.T6a' depends on axioms: [propext, Quot.sound] -/
 #guard_msgs in

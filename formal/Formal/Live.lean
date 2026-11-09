@@ -53,7 +53,7 @@ hole (`PresHdl.lean`) and of the run-time steps of handlers at the redex
   parameter's own rows (`LeLive.arrow_use` gives `ofCaps C_f ⊆ ψ₀ ∪ ofCaps ι.C`, not
   `⊆ ψ₀`), and `Const.ok` said nothing of `.scopeRun` before rule 2 below.
 
-Three rule-level changes close the port. They are contract changes to the live instance
+Four rule-level changes close the proofs. They are contract changes to the live instance
 rather than proof steps; the capture instance is unchanged by each of them:
 
 1. A run-time form of a handler states that its own region is live. `hwith` and `hctl`
@@ -75,25 +75,34 @@ rather than proof steps; the capture instance is unchanged by each of them:
    `C' (.r p)` of the cell of `resume` (which `hctl` supplies). The `hresB` frame provides
    that region's atom like `hctlA` and `hdone` (`Frame.rgn`). Without it `resume` puts an
    `hwith p` under a stage without the atom of `p`, which rule 1 forbids.
-
+4. Work an owner keeps declares what it uses: `Const.ok` of a live `.addFin` or `.spawn`
+   is `Row.Sub (Row.ofCaps ι.C) ι.r`, as rule 2 asks of `Scope.run`. The row of a child
+   then holds the qualifier of what it runs, and the owner bound of its row
+   (`TypingMode.live.keep`) reaches those atoms too: a child of `p` runs at a stage of `p`,
+   of regions older than `p` its registration uses, and of the arms of handlers it keeps
+   (`withs_typing_atm`, `fin_await_atm`, `kid_stage`). `LiveRules.lean` rejects an
+   undeclared qualifier and accepts a declared one.
 With them, preservation of every step holds for both instances (`rt_preservation_mode`,
 `preservation`), and so does type soundness: `T1_live` is `T1` of `TypM S .live`. Its one
 extra premise is `RootBelow root`: typing by use does not bound what a value holds by its
 type, so that the roots name no run-time region cannot be read off `RootTyM`.
 
-What remains is the invariant that replaces `Nest` and `T4'_live`. `Nest` bounds what each
-thread *names* (`Within`), which the live discipline gives up, so the invariant cannot be
-ported; it has to be built from stages: every region atom of the stage of a hole of a thread
-is live, and so is the region of every `inside` form of a thread. Rules 1 and 3 put the atom
-of a handler's region in the stage of its run-time forms for exactly this. The open part is
-work a child keeps: `withs` puts `hkeep q` frames around a child of an owner `p`, and the
-invariant needs `q` live while `p` is, which the live rules state only as
-`TypingMode.live.keep` (atoms of the row outlive the owner) over the facts of the context.
-That those facts hold of the order in which regions close is what `Nest` proves through
-`Within`; the live invariant must prove it without bounding names. Neither the examples nor
-the existing captures proofs establish the invariant. Translation of live signature elision
-into the core judgment is a separate remaining obligation.
-T4.2 matters beyond safety: the runtime contract (`Formal/RT/`) takes only T4.3 (as `G11`),
+`T4'_live` (`Live/T4Live.lean`) is T4′ of `TypLive`. `Nest` bounds what each thread *names*
+(`Within`), which the live discipline gives up, so its invariant is split in two:
+
+* `LNest` (`Live/LNest*.lean`) is the half of `Nest` about run-time forms: the ancestors
+  of the regions, where the `inside` forms and the handlers of each thread are, and for
+  each handler a cell whose arms' row names only ancestors of its region (`LCell`). A
+  step keeps it given two facts of typing: the owner given work is a region of the hole,
+  and the arms of a new handler name regions of its place or its own.
+* `LCfgTy` (`Live/LCfg.lean`) is the typed configuration with the stages of the children
+  and finalizers of each region `p` holding only ancestors of `p` (`LRgs`).
+
+Every region atom of the stage of a hole is one of the thread's stage or of a frame
+(`hole_atm`), and so a region of the hole, which `LNest` makes live; a step that needs a
+region has its atom in the stage of its redex (`open_atm`, `op_atm`, `fin_atm`). That gives
+T4.1, and T4.3 follows from the regions of the handler frames. Translation of live signature
+elision into the core judgment is a separate remaining obligation.T4.2 matters beyond safety: the runtime contract (`Formal/RT/`) takes only T4.3 (as `G11`),
 so giving T4.2 up does not touch T5; what it costs is that a value may keep a closed
 capability reachable (memory, not use).
 -/
