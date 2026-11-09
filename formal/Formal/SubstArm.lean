@@ -11,7 +11,7 @@ go to `todo`, which has every type and changes nothing the arm uses.
 
 namespace Flick
 
-variable {S : Sig}
+variable {S : Sig} {mode : TypingMode}
 
 theorem liftS_has_of {n : Nat} {σ : Nat → Tm} {i : Nat} {s : Site} (h : (σ i).Has s) :
     (liftS n σ (i + n)).Has s := by
@@ -155,22 +155,25 @@ theorem held_substS {Ψ : List Ty} {Γ : List Scheme} {e : Tm} {s : Scheme} {σ 
 
 open Classical in
 /-- `σ` on the variables `P` picks and `todo` on the others is a fit replacement. -/
-theorem SubOk.restrict {Ψ Θ Γ Γ' σ} (h : SubOk S Ψ Θ Γ Γ' σ) (P : Nat → Prop) :
-    SubOk S Ψ Θ Γ Γ' fun i => if P i then σ i else .todo := by
+theorem SubOkM.restrict {Ψ Θ Γ Γ' σ} (h : SubOkM S mode Ψ Θ Γ Γ' σ) (P : Nat → Prop) :
+    SubOkM S mode Ψ Θ Γ Γ' fun i => if P i then σ i else .todo := by
   intro i s hi
   by_cases hP : P i
   · simpa [hP] using h i s hi
   · simp only [hP, if_false]
     refine ⟨.todo, fun h => False.elim h, ?_, .inr (.inr (.inl rfl))⟩
+    cases mode with
+    | live => trivial
+    | captures =>
     rintro a (⟨j, _, hj, _⟩ | ⟨p, hp, _⟩ | ⟨l, _, hl, _⟩)
     · exact False.elim hj
     · exact False.elim hp
     · exact False.elim hl
 
 /-- A fit replacement whose terms fit `θ` is one under `θ`. -/
-theorem SubOk.substT {Ψ Θ Γ Γ' σ} (h : SubOk S Ψ Θ Γ Γ' σ) (θ : Atom → Ty)
+theorem SubOkM.substT {Ψ Θ Γ Γ' σ} (h : SubOkM S mode Ψ Θ Γ Γ' σ) (θ : Atom → Ty)
     (hθ : ∀ i, Fits θ (σ i)) :
-    SubOk S (Ψ.map (Ty.substT θ)) (Θ.substT θ) (Γ.map (Scheme.substT θ))
+    SubOkM S mode (Ψ.map (Ty.substT θ)) (Θ.substT θ) (Γ.map (Scheme.substT θ))
       (Γ'.map (Scheme.substT θ)) σ := by
   intro i s hi
   simp only [List.getElem?_map, Option.map_eq_some_iff] at hi
@@ -185,15 +188,18 @@ theorem SubOk.substT {Ψ Θ Γ Γ' σ} (h : SubOk S Ψ Θ Γ Γ' σ) (θ : Atom 
   have e₃ : (Θ.at s₀).substT (liftT s₀.k θ) = (Θ.substT θ).at (s₀.substT θ) := by
     simp only [Facts.at, Facts.union_substT, Facts.up_comm]; rfl
   rw [e₃] at this
-  exact ⟨this, hnI, held_substS (hθ i) hc, hV.substT _⟩
+  refine ⟨this, hnI, ?_, hV.substT _⟩
+  cases mode with
+  | captures => exact held_substS (hθ i) hc
+  | live => trivial
 
-theorem SubOk.frees {Ψ Θ Γ Γ' σ} (h : SubOk S Ψ Θ Γ Γ' σ) {e : Tm}
+theorem SubOkM.frees {Ψ Θ Γ Γ' σ} (h : SubOkM S mode Ψ Θ Γ Γ' σ) {e : Tm}
     (hf : ∀ i, e.Free i → i < Γ.length) : ∀ j, (e.subst σ).Free j → j < Γ'.length := by
   intro j hj
   obtain ⟨i, hi, hj'⟩ := Tm.free_subst e σ j hj
   simpa using (h i _ (List.getElem?_eq_getElem (hf i hi))).1.frees j hj'
 
-theorem SubOk.locs {Ψ Θ Γ Γ' σ} (h : SubOk S Ψ Θ Γ Γ' σ) {e : Tm}
+theorem SubOkM.locs {Ψ Θ Γ Γ' σ} (h : SubOkM S mode Ψ Θ Γ Γ' σ) {e : Tm}
     (hf : ∀ i, e.Free i → i < Γ.length) (hl : ∀ l, e.Has (.loc l) → l < Ψ.length) :
     ∀ l, (e.subst σ).Has (.loc l) → l < Ψ.length := by
   intro l h'
@@ -203,21 +209,21 @@ theorem SubOk.locs {Ψ Θ Γ Γ' σ} (h : SubOk S Ψ Θ Γ Γ' σ) {e : Tm}
 
 open Classical in
 /-- An arm on a constructor of a GADT after a substitution of terms. -/
-theorem Typ.aref_subst {Ψ : List Ty} {Θ : Facts} {Γ Γ' : List Scheme} {σ : Nat → Tm}
+theorem TypM.aref_subst {Ψ : List Ty} {Θ : Facts} {Γ Γ' : List Scheme} {σ : Nat → Tm}
     {K : Name} {k : Nat} {ts : List Ty} {T₀ : Name} {qs : List Pat} {b r : Tm} {t t' : Ty}
     {φ : Stage} {Δ : (Atom → Ty) → List Ty} (hK : S.ctor K = some (k, ts, T₀))
-    (hU : t.hd = .adt T₀) (hσ : SubOk S Ψ Θ Γ Γ' σ) (hn : b.NoIns)
+    (hU : t.hd = .adt T₀) (hσ : SubOkM S mode Ψ Θ Γ Γ' σ) (hn : b.NoIns)
     (hfr : ∀ i, b.Free i → i < (Pat.spine K qs).binds + Γ.length)
     (hlc : ∀ l, b.Has (.loc l) → l < Ψ.length)
     (hpA : ∀ θ, Fits θ b → (Ty.tcon T₀ (S.res K)).substT θ = (t.up k).substT θ →
       PatsTy S qs (ts.map (Ty.substT θ)) (Δ θ))
     (ihA : ∀ θ, Fits θ b → (Ty.tcon T₀ (S.res K)).substT θ = (t.up k).substT θ →
-      ∀ {Γ'' σ''}, SubOk S ((Ψ.map (Ty.up k)).map (Ty.substT θ)) ((Θ.substT (shiftV k)).substT θ)
+      ∀ {Γ'' σ''}, SubOkM S mode ((Ψ.map (Ty.up k)).map (Ty.substT θ)) ((Θ.substT (shiftV k)).substT θ)
         ((Δ θ).map .mono ++ (Γ.map (Scheme.up k)).map (Scheme.substT θ)) Γ'' σ'' →
-      Typ S ((Ψ.map (Ty.up k)).map (Ty.substT θ)) ((Θ.substT (shiftV k)).substT θ) Γ''
+      TypM S mode ((Ψ.map (Ty.up k)).map (Ty.substT θ)) ((Θ.substT (shiftV k)).substT θ) Γ''
         (b.subst σ'') (.ex ((t'.up k).substT θ) ((φ.substT (shiftV k)).substT θ)))
-    (hr : Typ S Ψ Θ Γ' (r.subst σ) (.alts t t' φ)) :
-    Typ S Ψ Θ Γ' ((Tm.acons (Pat.spine K qs) b r).subst σ) (.alts t t' φ) := by
+    (hr : TypM S mode Ψ Θ Γ' (r.subst σ) (.alts t t' φ)) :
+    TypM S mode Ψ Θ Γ' ((Tm.acons (Pat.spine K qs) b r).subst σ) (.alts t t' φ) := by
   have hl := hσ.lift (List.replicate (Pat.spine K qs).binds (Scheme.mono .rnil))
     (n := (Pat.spine K qs).binds) (by simp)
   have hfr' : ∀ i, b.Free i → i < (List.replicate (Pat.spine K qs).binds
@@ -243,5 +249,22 @@ theorem Typ.aref_subst {Ψ : List Ty} {Θ : Facts} {Γ Γ' : List Scheme} {σ : 
       b.subst (liftS (Pat.spine K qs).binds σ) :=
     Tm.subst_congr b (liftS_congr fun i hi => by rw [if_pos hi])
   rw [← e]; exact ihA θ hθb hu h₂
+
+theorem Typ.aref_subst {Ψ : List Ty} {Θ : Facts} {Γ Γ' : List Scheme} {σ : Nat → Tm}
+    {K : Name} {k : Nat} {ts : List Ty} {T₀ : Name} {qs : List Pat} {b r : Tm} {t t' : Ty}
+    {φ : Stage} {Δ : (Atom → Ty) → List Ty} (hK : S.ctor K = some (k, ts, T₀))
+    (hU : t.hd = .adt T₀) (hσ : SubOk S Ψ Θ Γ Γ' σ) (hn : b.NoIns)
+    (hfr : ∀ i, b.Free i → i < (Pat.spine K qs).binds + Γ.length)
+    (hlc : ∀ l, b.Has (.loc l) → l < Ψ.length)
+    (hpA : ∀ θ, Fits θ b → (Ty.tcon T₀ (S.res K)).substT θ = (t.up k).substT θ →
+      PatsTy S qs (ts.map (Ty.substT θ)) (Δ θ))
+    (ihA : ∀ θ, Fits θ b → (Ty.tcon T₀ (S.res K)).substT θ = (t.up k).substT θ →
+      ∀ {Γ'' σ''}, SubOk S ((Ψ.map (Ty.up k)).map (Ty.substT θ)) ((Θ.substT (shiftV k)).substT θ)
+        ((Δ θ).map .mono ++ (Γ.map (Scheme.up k)).map (Scheme.substT θ)) Γ'' σ'' →
+      Typ S ((Ψ.map (Ty.up k)).map (Ty.substT θ)) ((Θ.substT (shiftV k)).substT θ) Γ''
+        (b.subst σ'') (.ex ((t'.up k).substT θ) ((φ.substT (shiftV k)).substT θ)))
+    (hr : Typ S Ψ Θ Γ' (r.subst σ) (.alts t t' φ)) :
+    Typ S Ψ Θ Γ' ((Tm.acons (Pat.spine K qs) b r).subst σ) (.alts t t' φ) :=
+  TypM.aref_subst hK hU hσ hn hfr hlc hpA ihA hr
 
 end Flick

@@ -14,7 +14,7 @@ constant because each constant shows its first argument in the rest of its type;
 
 namespace Flick
 
-variable {S : Sig}
+variable {S : Sig} {mode : TypingMode}
 
 theorem Sig.impl_reach (S : Sig) (N : Name) (a : Atom) : ¬ (S.impl N).reach a := by
   intro h
@@ -154,15 +154,79 @@ theorem held_shift {Ψ Γ e} (k : Nat) {a : Atom} (h : held Ψ Γ e a) :
 theorem Le.not_all {x y : Ty} (h : Le x y) (hx : ¬ x.isAll) : ¬ y.isAll := by
   cases h <;> first | exact hx | simp [Ty.isAll]
 
+theorem LeLive.res {a b : Ty} (h : LeLive a b) : LeLive a.res b.res := by
+  induction h with
+  | refl => exact .refl
+  | arrow _ _ _ _ _ ih => exact ih
+  | eff hφ ht hc => exact .eff hφ ht hc
+
+theorem LeLive.not_all {x y : Ty} (h : LeLive x y) (hx : ¬ x.isAll) : ¬ y.isAll := by
+  cases h <;> first | exact hx | simp [Ty.isAll]
+
+theorem LeLiveI.snoc {a k t} {us : List Ty} (h : LeLiveI a (.all k t)) (hus : us.length = k) :
+    LeLiveI a (t.substT (instT us)) := by
+  generalize ht : Ty.all k t = T at h
+  induction h with
+  | le h => subst ht; cases h; exact .inst hus .refl
+  | inst hus' _ ih => exact .inst hus' (ih ht)
+
+theorem TypingMode.subtype.res {mode : TypingMode} {a b : Ty} (h : mode.subtype a b) :
+    mode.subtype a.res b.res := by
+  cases mode with
+  | captures => exact Le.res h
+  | live => exact LeLive.res h
+
+theorem TypingMode.subtype.not_all {mode : TypingMode} {x y : Ty} (h : mode.subtype x y)
+    (hx : ¬ x.isAll) : ¬ y.isAll := by
+  cases mode with
+  | captures => exact Le.not_all h hx
+  | live => exact LeLive.not_all h hx
+
+/-- Only a binder is below a binder. -/
+theorem TypingMode.subtype.eq_all {mode : TypingMode} {x : Ty} {k t}
+    (h : mode.subtype x (.all k t)) : x = .all k t := by
+  cases mode <;> cases h <;> rfl
+
+/-- Subtyping keeps the shape of an arrow and relates its results. -/
+theorem TypingMode.subtype.arrow_res {mode : TypingMode} {a φ t C T : _}
+    (h : mode.subtype (.arrow a φ t C) T) :
+    ∃ a' φ' t' C', T = .arrow a' φ' t' C' ∧ mode.subtype t t' := by
+  cases mode with
+  | captures =>
+    obtain ⟨_, _, _, _, he, _, _, ht, -⟩ := Le.arrow_left h; exact ⟨_, _, _, _, he, ht⟩
+  | live =>
+    obtain ⟨_, _, _, _, he, _, _, ht, -⟩ := LeLive.arrow_left h; exact ⟨_, _, _, _, he, ht⟩
+
+theorem TypingMode.instSubtype.refl {mode : TypingMode} {t : Ty} : mode.instSubtype t t := by
+  cases mode with
+  | captures => exact LeI.refl
+  | live => exact LeLiveI.refl
+
+theorem TypingMode.instSubtype.snoc {mode : TypingMode} {a k t} {us : List Ty}
+    (h : mode.instSubtype a (.all k t)) (hus : us.length = k) :
+    mode.instSubtype a (t.substT (instT us)) := by
+  cases mode with
+  | captures => exact LeI.snoc h hus
+  | live => exact LeLiveI.snoc h hus
+
+theorem Const.ty_isArrow_mode (c : Const) (ι : CArg) (S : Sig) (mode : TypingMode) :
+    ∃ a φ t C, c.ty S ι mode = .arrow a φ t C := by
+  cases c
+  case perform E o _ =>
+    simp only [Const.ty]
+    split <;> exact ⟨_, _, _, _, rfl⟩
+  case op => cases mode <;> exact ⟨_, _, _, _, rfl⟩
+  all_goals exact ⟨_, _, _, _, rfl⟩
+
 /-- The result of a constructor spine is not a binder, unless the value itself is one. -/
-theorem Typ.spine_notAll {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
+theorem TypM.spine_notAll {Ψ Θ Γ e J} (h : TypM S mode Ψ Θ Γ e J) :
     Value e → ∀ {K T φ}, e.head = .ctor K → J = .ex T φ → T.isAll ∨ ¬ T.res.isAll := by
   induction h with
   | allI => intro _ _ _ _ _ hJ; cases hJ; exact .inl trivial
   | errVal => intro _ _ _ _ _ hJ; cases hJ; exact .inr (by simp [Ty.res, Ty.isAll])
   | ctor hK hk hH hT =>
     intro _ _ _ _ _ hJ; cases hJ
-    refine .inr (Le.not_all hT.res ?_)
+    refine .inr (TypingMode.subtype.not_all hT.res ?_)
     rw [Sig.ctorTyR, Ty.arrows_res _ _ (Ty.tcon_not_arrow _ _)]
     exact Ty.not_all_of_hd (Ty.tcon_hd _ _)
   | app hf _ _ hT ih₁ _ =>
@@ -171,9 +235,13 @@ theorem Typ.spine_notAll {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
     | ctorApp hvf hK' _ =>
       rcases ih₁ hvf hK' rfl with h' | h'
       · exact h'.elim
-      · exact .inr (Le.not_all hT.res h')
+      · exact .inr (TypingMode.subtype.not_all hT.res h')
     | constApp => simp [Tm.head] at hK
   | _ => intro hv _ _ _ hK hJ; cases hJ <;> cases hv <;> simp [Tm.head] at hK
+
+theorem Typ.spine_notAll {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
+    Value e → ∀ {K T φ}, e.head = .ctor K → J = .ex T φ → T.isAll ∨ ¬ T.res.isAll :=
+  TypM.spine_notAll h
 
 theorem held_app {Ψ Γ f e} :
     Caps.Sub (held Ψ Γ (.app f e)) fun a => held Ψ Γ f a ∨ held Ψ Γ e a := by
@@ -316,12 +384,8 @@ theorem Typ.holds {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
     · cases h
   | _ => intro hv _ _ hJ; cases hJ <;> cases hv
 
-namespace TypM
-export Typ (holds)
-end TypM
-
 /-- A value has no `inside` form. -/
-theorem Typ.noIns {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) : Value e → e.NoIns := by
+theorem TypM.noIns {Ψ Θ Γ e J} (h : TypM S mode Ψ Θ Γ e J) : Value e → e.NoIns := by
   induction h with
   | lam _ hn => intro _; exact hn
   | fix _ hn => intro _; exact hn
@@ -355,8 +419,6 @@ theorem Typ.noIns {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) : Value e → e.NoIns 
       · exact ih₂ hv₂ h
   | _ => intro hv; cases hv
 
-namespace TypM
-export Typ (noIns)
-end TypM
+theorem Typ.noIns {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) : Value e → e.NoIns := TypM.noIns h
 
 end Flick
