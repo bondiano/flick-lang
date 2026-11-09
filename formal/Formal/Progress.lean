@@ -6,16 +6,16 @@ import Formal.StepFrame
 
 namespace Flick
 
-variable {S : Sig}
+variable {S : Sig} {mode : TypingMode}
 
 theorem acons_progress {v p b r} (hv : Value v) : ∃ e', PHead (.match_ v (.acons p b r)) e' := by
   cases hm : matchP p v with
   | none => exact ⟨_, .matchNo hv hm⟩
   | some δ => exact ⟨_, .matchYes hv hm⟩
 
-theorem match_progress {Ψ Θ v A t t' φ} (hv : Value v) (he : Typ S Ψ Θ [] v (.ex t φ))
-    (hA : Typ S Ψ Θ [] A (.alts t t' φ)) (hc : Covers S t A.unguarded v) :
-    ∃ e', PHead (.match_ v A) e' := by
+theorem match_progress_mode {Ψ Θ v A t t' φ} (hv : Value v)
+    (he : TypM S mode Ψ Θ [] v (.ex t φ)) (hA : TypM S mode Ψ Θ [] A (.alts t t' φ))
+    (hc : Covers S t A.unguarded v) : ∃ e', PHead (.match_ v A) e' := by
   cases hA with
   | anil =>
     exfalso
@@ -32,8 +32,8 @@ theorem match_progress {Ψ Θ v A t t' φ} (hv : Value v) (he : Typ S Ψ Θ [] v
     | some δ => exact ⟨_, .guardYes hv hm⟩
   | aref => exact acons_progress hv
 
-theorem handle_progress {Ψ Θ Λ μ v A ε₀ H t φ} (hv : Value v)
-    (hA : Typ S Ψ Θ [] A (.halts ε₀ H t φ)) : ∃ Λ' μ' e', RHead Λ μ (.handle v A) Λ' μ' e' := by
+theorem handle_progress_mode {Ψ Θ Λ μ v A ε₀ H t φ} (hv : Value v)
+    (hA : TypM S mode Ψ Θ [] A (.halts ε₀ H t φ)) : ∃ Λ' μ' e', RHead Λ μ (.handle v A) Λ' μ' e' := by
   cases A with
   | anil => exact ⟨_, _, _, .handleNil hv⟩
   | acons p b r =>
@@ -50,52 +50,57 @@ theorem nt {F : Frame} (h : F.isTry → False) : ¬ F.isTry := h
 theorem ni {F : Frame} (h : F.isInside → False) : ¬ F.isInside := h
 
 /-- Progress of an application of two values. -/
-theorem app_progress {Ψ Θ Λ μ root f e a ψ t C φ} (hμ : μ.length = Ψ.length) (hvf : Value f)
-    (hve : Value e) (hf : Typ S Ψ Θ [] f (.ex (.arrow a ψ t C) φ)) (he : Typ S Ψ Θ [] e (.ex a φ))
-    (hψ : ψ.le φ) : Value (.app f e) ∨ NV S root Λ μ (.app f e) φ.svc := by
-  have step : ∀ {l o}, Step root l Λ μ (.app f e) o → Value (.app f e) ∨ NV S root Λ μ (.app f e) φ.svc :=
-    fun h => .inr (.step ⟨_, _, h⟩)
+theorem app_progress_mode {Ψ Θ Λ μ root f e a ψ t C φ} (hμ : μ.length = Ψ.length)
+    (hvf : Value f) (hve : Value e) (hf : TypM S mode Ψ Θ [] f (.ex (.arrow a ψ t C) φ))
+    (he : TypM S mode Ψ Θ [] e (.ex a φ)) (hψ : (mode.use ψ C).le φ) :
+    Value (.app f e) ∨ NV S root Λ μ (.app f e) φ.svc := by
+  have step : ∀ {l o}, Step root l Λ μ (.app f e) o →
+      Value (.app f e) ∨ NV S root Λ μ (.app f e) φ.svc := fun h => .inr (.step ⟨_, _, h⟩)
   have blocked : Blocks Λ (.app f e) → Value (.app f e) ∨ NV S root Λ μ (.app f e) φ.svc :=
     fun h => .inr (.blocked ⟨[], _, OkE.nil, rfl, h⟩)
-  rcases canonical_arrow hvf hf with ⟨b, rfl⟩ | ⟨g, rfl⟩ | ⟨K, hK⟩ | ⟨c, rfl⟩ |
+  rcases canonical_arrow_mode hvf hf with ⟨b, rfl⟩ | ⟨g, rfl⟩ | ⟨K, hK⟩ | ⟨c, rfl⟩ |
       ⟨c, w, rfl, hc, hw⟩ | ⟨p, ℓ, rfl⟩
   · exact step (Step.ofP (.beta hve))
   · exact step (Step.ofP (.fix hve))
   · exact .inl (.ctorApp hvf hK hve)
-  · cases hf with
-    | @perform Ef o c _ _ _ _ _ _ _ _ hop hT' =>
-      obtain ⟨_, _, _, _, h, _, hψ', _, -⟩ := hT'.arrow_left
-      cases h
-      by_cases hra : RootAnswers root Ef o c
-      · obtain ⟨rfl, _, _, hr, hf⟩ := hra
-        exact step (Step.performRoot (E := []) OkE.nil (fun _ h => by cases h) hr hf hve)
-      · exact .inr (.perform ⟨[], _, _, _, _, _, _, OkE.nil, hve, rfl, hop, fun _ h => (by cases h),
-          hra, Stage.le_svc (Stage.le_trans hψ' hψ) _ rfl⟩)
-    | const hok hT' =>
-      cases c with
-      | scopeRun => exact step (Step.ofR (.scopeRun hve))
-      | perform E o _ => simp_all [Const.ok]
-      | refMake => exact step (Step.ofR (.refMake hve))
-      | refGet =>
-        obtain ⟨_, _, _, _, h, la, _, _, -⟩ := hT'.arrow_left
-        cases h; cases la
-        obtain ⟨l, rfl, hl⟩ := canonical_ref hve he
+  · cases c with
+    | perform E o cl =>
+      cases hf with
+      | perform hop hT' =>
+        obtain ⟨-, hψ', -⟩ := TypingMode.arrow_inv hT'
+        by_cases hra : RootAnswers root E o cl
+        · obtain ⟨rfl, _, _, hr, hf⟩ := hra
+          exact step (Step.performRoot (E := []) OkE.nil (fun _ h => by cases h) hr hf hve)
+        · have hrow : Stage.le (Stage.rt (Row.single E) Row.none) φ := by
+            simpa only [TypingMode.use_none] using Stage.le_trans hψ' hψ
+          exact .inr (.perform ⟨[], _, _, _, _, _, _, OkE.nil, hve, rfl, hop, fun _ h => (by cases h),
+            hra, Stage.le_svc hrow _ rfl⟩)
+      | const hok _ => simp_all [Const.ok]
+    | scopeRun => exact step (Step.ofR (.scopeRun hve))
+    | refMake => exact step (Step.ofR (.refMake hve))
+    | refGet =>
+      cases hf with
+      | const _ hT' =>
+        obtain ⟨hdom, -⟩ := TypingMode.arrow_inv hT'
+        obtain ⟨l, rfl, hl⟩ := canonical_ref_mode hve (TypingMode.subtype.typ_ref hdom he)
         exact step (Step.ofR (.refGet (List.getElem?_eq_getElem (hμ ▸ getElem?_lt hl))))
-      | refSet => exact .inl (.constApp rfl hve)
-      | addFin => exact .inl (.constApp rfl hve)
-      | spawn => exact .inl (.constApp rfl hve)
-      | intEq => exact .inl (.constApp rfl hve)
-      | open_ =>
-        obtain ⟨_, _, _, _, h, la, _, _, -⟩ := hT'.arrow_left
-        cases h; cases la
-        obtain ⟨p, rfl, -⟩ := canonical_owner hve he
+    | refSet => exact .inl (.constApp rfl hve)
+    | addFin => exact .inl (.constApp rfl hve)
+    | spawn => exact .inl (.constApp rfl hve)
+    | intEq => exact .inl (.constApp rfl hve)
+    | open_ =>
+      cases hf with
+      | const _ hT' =>
+        obtain ⟨hdom, -⟩ := TypingMode.arrow_inv hT'
+        obtain ⟨p, rfl, -⟩ := canonical_owner_mode hve (TypingMode.subtype.typ_owner hdom he)
         rcases live_or_dead Λ p with ⟨g, hg, hl⟩ | hd
         · exact step (Step.ofR (.open_ hg hl))
         · exact blocked (.inr ⟨p, hd, .inl rfl⟩)
-      | op =>
-        obtain ⟨_, _, _, _, h, la, _, _, -⟩ := hT'.arrow_left
-        cases h; cases la
-        obtain ⟨p, rfl, -⟩ := canonical_hnd hve he
+    | op =>
+      cases hf with
+      | const _ hT' =>
+        obtain ⟨p, rfl, -⟩ :=
+          canonical_hnd_mode hve (TypingMode.subtype.typ_hnd (TypingMode.op_dom hT') he)
         rcases live_or_dead Λ p with ⟨g, hg, hl⟩ | hd
         · exact step (Step.ofR (.op hg hl))
         · exact blocked (.inr ⟨p, hd, .inr (.inl rfl)⟩)
@@ -105,18 +110,16 @@ theorem app_progress {Ψ Θ Λ μ root f e a ψ t C φ} (hμ : μ.length = Ψ.le
       | app hc' hw' _ _ =>
         cases hc' with
         | const _ hT' =>
-          obtain ⟨_, _, _, _, h, la, _, _, -⟩ := hT'.arrow_left
-          cases h; cases la
-          obtain ⟨l, rfl, hl⟩ := canonical_ref hw hw'
+          obtain ⟨hdom, -⟩ := TypingMode.arrow_inv hT'
+          obtain ⟨l, rfl, hl⟩ := canonical_ref_mode hw (TypingMode.subtype.typ_ref hdom hw')
           exact step (Step.ofR (.refSet hve (hμ ▸ getElem?_lt hl)))
     | addFin =>
       cases hf with
       | app hc' hw' _ _ =>
         cases hc' with
         | const _ hT' =>
-          obtain ⟨_, _, _, _, h, la, _, _, -⟩ := hT'.arrow_left
-          cases h; cases la
-          obtain ⟨p, rfl, -⟩ := canonical_owner hw hw'
+          obtain ⟨hdom, -⟩ := TypingMode.arrow_inv hT'
+          obtain ⟨p, rfl, -⟩ := canonical_owner_mode hw (TypingMode.subtype.typ_owner hdom hw')
           rcases live_or_dead Λ p with ⟨g, hg, hl⟩ | hd
           · exact step (Step.addFin (E := []) OkE.nil hg hl hve)
           · exact blocked (.inr ⟨p, hd, .inr (.inr (.inl ⟨_, rfl⟩))⟩)
@@ -125,9 +128,8 @@ theorem app_progress {Ψ Θ Λ μ root f e a ψ t C φ} (hμ : μ.length = Ψ.le
       | app hc' hw' _ _ =>
         cases hc' with
         | const _ hT' =>
-          obtain ⟨_, _, _, _, h, la, _, _, -⟩ := hT'.arrow_left
-          cases h; cases la
-          obtain ⟨p, rfl, -⟩ := canonical_owner hw hw'
+          obtain ⟨hdom, -⟩ := TypingMode.arrow_inv hT'
+          obtain ⟨p, rfl, -⟩ := canonical_owner_mode hw (TypingMode.subtype.typ_owner hdom hw')
           rcases live_or_dead Λ p with ⟨g, hg, hl⟩ | hd
           · exact step (Step.spawn (E := []) OkE.nil hg hl hve)
           · exact blocked (.inr ⟨p, hd, .inr (.inr (.inr (.inl ⟨_, rfl⟩)))⟩)
@@ -136,14 +138,25 @@ theorem app_progress {Ψ Θ Λ μ root f e a ψ t C φ} (hμ : μ.length = Ψ.le
       | app hc' hw' _ hT =>
         cases hc' with
         | const _ hT' =>
-          obtain ⟨_, _, _, _, h, la, _, lt, -⟩ := hT'.arrow_left
-          cases h; cases la
-          obtain ⟨_, _, _, _, h', la', _, _, -⟩ := (lt.trans hT).arrow_left
-          cases h'; cases la'
-          obtain ⟨m, rfl⟩ := canonical_int hw hw'
-          obtain ⟨n, rfl⟩ := canonical_int hve he
+          obtain ⟨hdom, -, lt⟩ := TypingMode.arrow_inv hT'
+          obtain ⟨hdom', -⟩ := TypingMode.arrow_inv (TypingMode.subtype.trans lt hT)
+          obtain ⟨m, rfl⟩ := canonical_int_mode hw (TypingMode.subtype.typ_base hdom hw')
+          obtain ⟨n, rfl⟩ := canonical_int_mode hve (TypingMode.subtype.typ_base hdom' he)
           exact step (Step.ofP .intEq)
     | _ => simp [Const.arity] at hc
   · exact step (Step.resumeDie (E := []) OkE.nil hve (by rintro ⟨A, E', _, _, _, _, _, h, _⟩; simp at h))
+
+theorem match_progress {Ψ Θ v A t t' φ} (hv : Value v) (he : Typ S Ψ Θ [] v (.ex t φ))
+    (hA : Typ S Ψ Θ [] A (.alts t t' φ)) (hc : Covers S t A.unguarded v) :
+    ∃ e', PHead (.match_ v A) e' := match_progress_mode hv he hA hc
+
+theorem handle_progress {Ψ Θ Λ μ v A ε₀ H t φ} (hv : Value v)
+    (hA : Typ S Ψ Θ [] A (.halts ε₀ H t φ)) : ∃ Λ' μ' e', RHead Λ μ (.handle v A) Λ' μ' e' :=
+  handle_progress_mode hv hA
+
+theorem app_progress {Ψ Θ Λ μ root f e a ψ t C φ} (hμ : μ.length = Ψ.length) (hvf : Value f)
+    (hve : Value e) (hf : Typ S Ψ Θ [] f (.ex (.arrow a ψ t C) φ)) (he : Typ S Ψ Θ [] e (.ex a φ))
+    (hψ : ψ.le φ) : Value (.app f e) ∨ NV S root Λ μ (.app f e) φ.svc :=
+  app_progress_mode hμ hvf hve hf he hψ
 
 end Flick

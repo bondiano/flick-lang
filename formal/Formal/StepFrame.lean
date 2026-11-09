@@ -170,7 +170,7 @@ theorem Blocked.frame {Λ e} (h : Blocked Λ e) {F : Frame} (hF : F.ok) : Blocke
 
 /-- An operation the frame around handles steps; one it does not stays stuck. -/
 theorem PerformStuck.frame {root Λ μ e D D'} (h : PerformStuck S root e D) {F : Frame} (hF : F.ok)
-    (hD : ∀ n, D n → F.dom n ∨ D' n)
+    (hD : ∀ N : Name, D (.nm N) → F.dom (.nm N) ∨ D' (.nm N))
     (hpart : ∀ N o c, (∃ a b, S.op N o = some (c, a, b)) → F.installs N → F.handles N o c = none →
       D (.nm N) → D' (.nm N)) :
     (∃ l o, Step root l Λ μ (F.plug e) o) ∨ PerformStuck S root (F.plug e) D' ∨ Blocked Λ (F.plug e) := by
@@ -211,7 +211,7 @@ theorem PerformStuck.frame {root Λ μ e D D'} (h : PerformStuck S root e D) {F 
 
 /-- Lift the non-value outcomes over a frame that is neither `try` nor `inside`. -/
 theorem NV.frame {root Λ μ e D D'} (h : NV S root Λ μ e D) {F : Frame} (hF : F.ok)
-    (hnt : ¬ F.isTry) (hni : ¬ F.isInside) (hD : ∀ n, D n → F.dom n ∨ D' n)
+    (hnt : ¬ F.isTry) (hni : ¬ F.isInside) (hD : ∀ N : Name, D (.nm N) → F.dom (.nm N) ∨ D' (.nm N))
     (hk : F.Parks := by trivial)
     (hpart : ∀ N o c, (∃ a b, S.op N o = some (c, a, b)) → F.installs N →
       F.handles N o c = none → D (.nm N) → D' (.nm N) := by

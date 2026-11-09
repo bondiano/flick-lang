@@ -74,6 +74,16 @@ theorem TypingMode.dom_of (mode : TypingMode) {F : Frame} {n : Elem} (h : F.dom 
   | captures => exact h
   | live => exact .inl h
 
+/-- At a name, what a frame provides is the same in both disciplines: typing by use
+adds only region atoms. -/
+theorem TypingMode.dom_nm {mode : TypingMode} {F : Frame} {N : Name} (h : mode.dom F (.nm N)) :
+    F.dom (.nm N) := by
+  cases mode with
+  | captures => exact h
+  | live =>
+    rcases h with h | ⟨p, -, h'⟩
+    · exact h
+    · cases h'
 /-- What the frames of `E` provide in a discipline. -/
 def domEM (mode : TypingMode) : List Frame → Row
   | [] => Row.none

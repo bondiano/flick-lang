@@ -101,6 +101,19 @@ theorem TypingMode.use_substT_rg (mode : TypingMode) (φ : Stage) {p : Nat} {σ 
     (mode.use φ (Ty.rg p).reach).substT σ = mode.use (φ.substT σ) (Ty.rg p).reach :=
   TypingMode.use_substT_eq mode φ (Caps.substT_rg hp)
 
+/-- A named effect of a use stage is one of the stage used: typing by use adds only
+region atoms to a row. -/
+theorem TypingMode.use_svc_nm {mode : TypingMode} {φ : Stage} {C : Caps} {N : Name}
+    (h : (mode.use φ C).svc (.nm N)) : φ.svc (.nm N) := by
+  cases mode with
+  | captures => exact h
+  | live =>
+    cases φ with
+    | pure => exact h
+    | rt r ε =>
+      rcases h with h | h
+      · exact h
+      · exact h.elim
 theorem LeLive.reach {a b : Ty} (h : LeLive a b) : Caps.Sub a.reach b.reach := by
   cases h with
   | refl => exact Caps.Sub.refl _
