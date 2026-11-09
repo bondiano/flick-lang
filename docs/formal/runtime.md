@@ -322,11 +322,12 @@ In Effect a synchronous winner can win before the second branch starts; Go start
 
 ### 3.5 Layers and `provide`
 
-`provide L { e }` is a lexical owner (`reference/runtime.md` "Layers"). `Layer` is a library, not a form of the core: it lowers to `Layer.run L (fun () -> e)` (`core.md` §1.4), and this section is what that library does. A known layer of `Layer.succeed` and `Layer.merge` means a chain of handlers, the first binding of an effect the innermost (`chain`, `layer_typ`, `layer_answers` in `formal/Formal/RecordHandler.lean`); what a chain does not say, the build, its scope and the memo map, is below.
+`provide L { e }` is a lexical owner (`reference/runtime.md` "Layers"). `Layer` is a library, not a form of the core: it lowers to `Layer.run L (fun () -> e)` (`core.md` §1.4), and this section is what that library does. For a known layer of `Layer.succeed` and `Layer.merge`, the first binding of an effect is selected. `chain`, `layer_typ` and `layer_answers` in `formal/Formal/RecordHandler.lean` prove selection and typing through an abstract handler chain; they do not prove which evidence the selected record's functions see. Those functions run with the caller's evidence, as the model test `layer_service_uses_the_callers_provider` and `codegen/service_place` check. The build, its scope and the memo map are below.
 
 ```text
 (Provide)  provide L e in f  →  owner πₚ by (Scope);  m := fork(M_f) or a new map;
-           θ := build(m, πₚ, L);  with θ e inside πₚ;  closing πₚ — by §3.3
+           θ := build(m, πₚ, L);  with θ e inside πₚ;  calls to θ use the caller's evidence;
+           closing πₚ — by §3.3
 
 build(m, π, L) for a memoizable L (Layer.effect, sync, suspend, from_build_memo):
            L ∉ m:  m[L] := ⟨building, σ, n = 0⟩ with a new scope σ;  build L in σ;  m[L] := ⟨θ_L, σ, n⟩
@@ -941,7 +942,7 @@ Found by the Lean development of the core (`formal/Formal/`).
 - Discontinuing a body throws the handler's signal into its frames, as Go panics with it, rather than `gen.return()`: every frame sees it as a failure, `Effect.ensuring` and scopes close by the same path, and the order of finalizers is Go's.
 - A group made while its owner closes: §3.6, as Go ([JS](#js-a-group-made-while-its-owner-closes-runs-nothing)). `group_in_closing` passes.
 - Time: a sleep, `timeout` and a schedule wait on the clock in the evidence, the host's or the virtual one of `Test.clock_test`. Moving a virtual clock wakes the sleepers due in order and waits, before the next, until what each wake scheduled has run, as Effect's `TestClock` does by its scheduler; Go waits until the fibers under the clock are parked.
-- A service a layer builds is a handler: its operations run with the evidence of the place of the `provide`, as the arms of `provide S impl` do (§3.2), and a failure of one is the handler's. On Effect and Go it is a record whose operations run where they are called: `codegen/service_place` prints `inner layer` there and `outer layer` here.
+- A service a layer builds is a record whose operations run with the caller's evidence, as on Effect and Go. An explicit `provide S impl` remains a handler (§3.2), whose arms run with the handler's evidence. `codegen/service_place` prints `inner layer` on every target.
 
 ### Go: HTTP handlers
 

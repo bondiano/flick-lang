@@ -56,12 +56,15 @@ pub fn specifier(spec: &str) -> Option<String> {
 const IN_RT: &[&str] = &[
     "Cause",
     "Clock",
+    "DateTime",
     "Deferred",
     "Duration",
     "Effect",
     "Exit",
     "Fiber",
     "FiberSet",
+    "HashMap",
+    "HashSet",
     "Latch",
     "Layer",
     "Queue",
@@ -205,6 +208,14 @@ mod tests {
         assert_eq!(
             rt_specifier("@flick-lang/runtime/effect/Fiber").as_deref(),
             Some("@flick-lang/runtime/rt/effect/Fiber")
+        );
+        assert_eq!(
+            rt_specifier("@flick-lang/runtime/effect/DateTime").as_deref(),
+            Some("@flick-lang/runtime/rt/effect/DateTime")
+        );
+        assert_eq!(
+            rt_specifier("@flick-lang/runtime/effect/HashMap").as_deref(),
+            Some("@flick-lang/runtime/rt/effect/HashMap")
         );
         assert_eq!(
             rt_specifier("@flick-lang/runtime/effect/Option").as_deref(),

@@ -8,7 +8,6 @@ import { allOf } from "./concurrency.ts";
 import { mapped } from "./effects.ts";
 import { type Ctx, type Run, Suspend, Under, asExit, currentCtx, exitOf, extend, lookup, raiseOf, uninterruptible } from "./fiber.ts";
 import { Owner, addTo, closeOwn, finalize, inside, withOwner } from "./owner.ts";
-import { serving } from "./handle.ts";
 import { traceEvent, traceLayer, tracing } from "./trace.ts";
 
 /** Built services, a `Context`: implementations by tag, later ones replacing earlier ones. */
@@ -147,13 +146,9 @@ export const buildWith = (layer: Layer, memo: MemoMap, scope: Owner): Under =>
     mapped(layer.build(memo, scope), (services): Services => [...servicesOf(services), [MEMO, memo]]),
   );
 
-/** Runs `body` with `services` in effect, as handlers at this place; a memo map among them is the current one. */
+/** Runs `body` with a layer's services as values in the caller's evidence. */
 export const withServices = (services: Services, body: () => unknown): Under =>
-  serving(
-    services.filter(([tag]) => tag === MEMO).reduce((c: Ctx, [tag, impl]) => extend(c, tag, impl), currentCtx()),
-    services.filter(([tag]) => tag !== MEMO),
-    body,
-  );
+  new Under(services.reduce((c: Ctx, [tag, impl]) => extend(c, tag, impl), currentCtx()), body);
 
 /** A layer of services built without effects. */
 export const constant = (services: Services): Layer => new Layer(() => services);

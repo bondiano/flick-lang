@@ -39,10 +39,36 @@ export {
   durationZero,
 } from "./duration.ts";
 export { layerMerge, layerOverride, layerRun, layerSucceed } from "./layer.ts";
-export { absent, flickAssert, flickEcho, flickTodo, refGet, refMake, refModify, refSame, refSet } from "./builtins.ts";
+export { absent, appFail, flickAssert, flickEcho, flickTodo, refGet, refMake, refModify, refSame, refSet } from "./builtins.ts";
 export { exitFailure, exitValue, failureInspect, failurePrimary, failureRawCause, failureRethrow, rawCauseInspect } from "./outcome.ts";
 export { describeReport } from "./describe.ts";
 export { redactedMake, redactedReveal } from "./redacted.ts";
+export { loop, trampolineDone, trampolineRun, trampolineSuspend } from "./loop.ts";
+export { snapshot, snapshotDefault } from "./snapshot.ts";
+export {
+  eqHashCanonical,
+  eqHashWith,
+  hashMapEmpty,
+  hashMapGet,
+  hashMapInsert,
+  hashMapRehash,
+  hashMapRemove,
+  hashMapSize,
+  hashMapToList,
+  hashMapUnion,
+  hashMapWith,
+  hashSetEmpty,
+  hashSetFromList,
+  hashSetInsert,
+  hashSetMember,
+  hashSetRehash,
+  hashSetRemove,
+  hashSetSize,
+  hashSetToList,
+  hashSetUnion,
+  hashSetWith,
+} from "./collections.ts";
+export { fileOpen, fileReadHandle, fileRead, fileWrite } from "./file.ts";
 export {
   atomAt,
   atomClientOnly,

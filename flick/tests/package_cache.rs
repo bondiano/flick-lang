@@ -7,6 +7,7 @@ mod common;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::time::Duration;
 
 use common::project;
 
@@ -174,6 +175,19 @@ fn a_changed_library_project_or_compiler_checks_again() {
     // another binary of the compiler
     let copy = root.join("flick-copy");
     fs::copy(env!("CARGO_BIN_EXE_flick"), &copy).expect("copy");
+    // APFS can preserve the source timestamp when copying, while the cache
+    // fingerprint distinguishes binaries by size and modification time.
+    let original = fs::metadata(env!("CARGO_BIN_EXE_flick"))
+        .expect("binary metadata")
+        .modified()
+        .expect("binary modified time");
+    let earlier = original
+        .checked_sub(Duration::from_secs(1))
+        .expect("binary timestamp after epoch");
+    fs::File::open(&copy)
+        .expect("copied binary")
+        .set_times(fs::FileTimes::new().set_modified(earlier))
+        .expect("change copied binary timestamp");
     assert_eq!(flick_with(&copy, &root, "cache", &["check"]), Some(1));
     // the project's configuration
     let config = root.join("app/flick.toml");

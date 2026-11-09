@@ -1,6 +1,6 @@
 /* oxlint-disable require-yield, unicorn/consistent-function-scoping, typescript/no-unsafe-type-assertion -- generators that return a call are what the compiler emits */
 // Layers on the kernel of `effect = "rt"`: a merged layer builds and releases
-// its sides side by side, and the services of a layer are handlers.
+// its sides side by side, and calls its services in the caller's evidence.
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
@@ -38,7 +38,7 @@ test("a merged layer builds its sides side by side and releases them so, the las
   assert.deepEqual(seen.slice(3).toSorted(), ["released 0", "released 1"]);
 });
 
-test("an operation of a layer's service runs its own effects where the layer is provided", async () => {
+test("an operation of a layer's service runs its own effects where it is called", async () => {
   const Prefix = service("Prefix");
   const Greeter = service("Greeter");
   const prefixed = (prefix: string) => (body: () => unknown) => handle([[Prefix, [tail("prefix", () => prefix)]]], body, undefined, undefined);
@@ -48,5 +48,5 @@ test("an operation of a layer's service runs its own effects where the layer is 
   const exit = await root(() =>
     prefixed("outer")(() => layerRun(layerSucceed(Greeter, impl), () => prefixed("inner")(() => greet("layer")))),
   );
-  assert.equal(exit.value, "outer layer");
+  assert.equal(exit.value, "inner layer");
 });

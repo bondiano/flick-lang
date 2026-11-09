@@ -3,10 +3,3 @@
 # Each needs a module the kernel does not have yet.
 Language.Json                                                   # Schema, Codec and Json
 Language.Schemas                                                # Schema and Codec
-Language.Collections > hash order > string keys                 # HashMap
-Language.Collections > hash order > integer keys                # HashMap
-Language.Collections > hash order > float keys                  # HashMap
-Language.Collections > hash order > record keys                 # HashMap
-Language.Collections > hash order > replacing keeps the place   # HashMap
-Language.Equality > hash keys > -0 and 0 are one key            # HashSet
-Language.Equality > hash keys > NaN finds itself                # HashSet

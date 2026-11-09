@@ -10,6 +10,7 @@
 ../rt/late_effect
 ../rt/layers
 ../rt/wake_chain
+bootstrap/app_fail
 bootstrap/debug
 bootstrap/hello
 bootstrap/stderr
@@ -59,6 +60,7 @@ codegen/repeated_superclass
 codegen/scope_run
 codegen/service_child
 codegen/service_dictionary
+codegen/service_place
 codegen/services
 codegen/stage_order
 codegen/strings_utf16
@@ -66,6 +68,7 @@ codegen/tags
 codegen/task_twice
 ffi/copy
 ffi/defect
+ffi/snapshot
 runtime/abort_closes_scopes
 runtime/abort_stops_children
 runtime/cause_lists
@@ -85,24 +88,34 @@ runtime/interrupt_after_close
 runtime/interrupt_in_finalizer
 runtime/owners
 runtime/parallel
+runtime/paths
 runtime/ref_linearizable
 runtime/releases
 runtime/scope_close
 runtime/scope_owners
 runtime/scope_releases
+runtime/scoped_file
 runtime/scopes
 runtime/settling_calls
 runtime/shared_layer
 runtime/slice
 runtime/supervisor_defect
 sql/queries
+stdlib/collections
+stdlib/effect/clock
+stdlib/effect/hash_map
+stdlib/effect/hash_set
 stdlib/effect/mutable_ref
 stdlib/effect/option
 stdlib/effect/queue
 stdlib/effect/shared_layer_merged
 stdlib/effect/string_locale
+stdlib/effect/void
+stdlib/file
+stdlib/hash_order
 stdlib/lists
 stdlib/markdown
+stdlib/monoids
 stdlib/reactivity/atom
 stdlib/seqs
 ui/async
@@ -127,12 +140,9 @@ ui/wake_chain
 # codegen/abi            its foreign fixture and `Schema` are on Effect
 # codegen/effect_abi     its foreign fixture runs an Effect
 # codegen/release        `spin` loops for ever in a `->{}` stage, which runs at once and cannot be interrupted: docs/formal/runtime.md#the-runtime-of-effect--rt
-# codegen/service_place a layer's service is a handler here, so its effects resolve at the `provide`: `outer layer`, until the default runtime does the same
 # runtime/cause_laws     its properties need `Arbitrary`, on Effect; `cause_lists`, `closing_causes` and the kernel's unit tests cover the algebra
 # runtime/interrupt_skips its `Stream` probe, on Effect; the other probes pass
 # runtime/leases         `ScopedRef`, `Resource`, `ScopedCache`, on Effect
-# runtime/paths          `File`, not on this runtime yet
-# runtime/scoped_file    `File`, not on this runtime yet
 # ui/form                its validation parses with `Schema`, on Effect
 # ui/hydrate             `Codec.json` of its serializable atoms is a `Schema`, on Effect
 # ui/navigate            the codec of its route is a `Schema`, on Effect

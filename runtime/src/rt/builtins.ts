@@ -1,5 +1,8 @@
 // Bindings of the built-in modules that need neither Effect nor a fiber.
 import { writeStderr } from "./host.ts";
+import { none } from "../core/data.ts";
+import { tag } from "../tags.ts";
+import { fail, raise } from "./cause.ts";
 
 /** What a binding of a module this runtime does not have yet is, until it is called. */
 export const absent =
@@ -12,6 +15,12 @@ export const absent =
 export const flickTodo = (message: string): never => {
   throw new Error(message);
 };
+
+const APP_ERROR = /*#__PURE__*/ tag("Prelude.AppError.AppError");
+
+/** The typed application error that the entry runner prints. */
+export const appFail = (message: string): never =>
+  raise(fail({ _tag: APP_ERROR, _0: { message, details: none } }));
 
 const shown = (value: unknown): string => {
   try {

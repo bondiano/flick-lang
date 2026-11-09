@@ -24,6 +24,26 @@ export { sleep };
 const nothing = (): undefined => undefined;
 export { nothing as void };
 
+/** Run two task values in order and keep both results. */
+export const zip =
+  (that: () => unknown) =>
+  (self: () => unknown): Run =>
+    (function* (): Run {
+      const first = yield self();
+      const second = yield that();
+      return [first, second];
+    })();
+
+export const zipWith =
+  (that: () => unknown) =>
+  (combine: (first: unknown, second: unknown) => unknown) =>
+  (self: () => unknown): Run =>
+    (function* (): Run {
+      const first = yield self();
+      const second = yield that();
+      return combine(first, second);
+    })();
+
 export const die = (message: string): never => raise(dieCause(message));
 export const flickNever = (): Suspend => new Suspend(() => undefined);
 export const flickYieldNow = (): unknown => yieldNow();

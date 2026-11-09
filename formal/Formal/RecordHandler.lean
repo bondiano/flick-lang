@@ -7,10 +7,11 @@ import Formal.Preservation
 operation under it runs the field of the record (`T6c_tail`), under a frame kept by a child too
 (`T6c_tail_kept`); its value goes back to the operation.
 
-A layer of `Layer.succeed` and `Layer.merge` leaves the core: it means the chain of such
-handlers, the first binding of an effect the innermost (`chain`). `layer_typ` is (Provide) for
-it, with the row of its outputs removed, and `layer_answers` is what `θ(S)` said: an operation
-runs the field of the first binding of its effect.
+The handler chain below models selection and typing for the bindings of
+`Layer.succeed` and `Layer.merge`: the first binding of an effect is selected
+(`chain`, `layer_typ`, `layer_answers`). It does not model the evidence used by
+the selected record's functions. Runtime layer services run with the caller's
+evidence; explicit `provide E w` handlers run with their handler's evidence.
 -/
 
 namespace Flick
@@ -282,8 +283,9 @@ theorem hframes_split {E o w} : ∀ {bs : List Binding} {ps : List (Nat × Nat)}
         · rfl
         · exact hn G hG
 
-/-- What `θ(S)` said of a layer: an operation under a running chain runs the field of the first
-binding of its effect. -/
+/-- Selection for known layer bindings: an operation in the abstract handler
+chain runs the field of the first binding of its effect. This does not establish
+which evidence is visible inside that field. -/
 theorem layer_answers {root Λ μ E o v w f} {bs : List Binding} {ps : List (Nat × Nat)}
     (hl : ps.length = bs.length) (hall : ∀ b ∈ bs, b.Ok S) (ha : answer bs E o = some w)
     (hf : w.field o = some f) (hv : Value v) :
