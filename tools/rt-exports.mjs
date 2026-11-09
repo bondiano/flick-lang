@@ -25,18 +25,8 @@ const bridgeOverrides = [
 ];
 // An installed tracer/exporter belongs to Effect's Context. Keep every span
 // operation on that side so creation, annotation and completion see it.
-const bridgeModules = new Set([
-  "rt/effect/Tracer",
-  "rt/effect/reactivity/Atom",
-  "rt/ui",
-  "rt/ui/html",
-  "rt/ui/react",
-  "rt/ui/server",
-]);
-// Atoms, forms, routes and renderers share opaque values and one registry.
-// Select the complete adapter family rather than mixing its atoms with RT's.
-const bridgeExport = (module, name) => bridgeModules.has(module) ||
-  (module === "rt/index" && (/^(atom|form|route)[A-Z]/.test(name) || name === "label"));
+const bridgeModules = new Set(["rt/effect/Tracer"]);
+const bridgeExport = (module) => bridgeModules.has(module);
 
 async function files(dir) {
   const out = [];

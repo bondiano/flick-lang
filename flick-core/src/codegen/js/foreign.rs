@@ -9,9 +9,7 @@ use flick_ir::Shape;
 use super::bridge::Toward;
 use super::{Gen, names};
 #[cfg(not(target_arch = "wasm32"))]
-use crate::build::effects::{effect_specifier, on_kernel_with_bridge};
-#[cfg(not(target_arch = "wasm32"))]
-use crate::codegen::EffectBridge;
+use crate::build::effects::{effect_specifier, selected_on_kernel};
 use crate::codegen::Options;
 use crate::ir::Copies;
 use crate::ir::{Foreign, ForeignMode, Item, ItemKind};
@@ -62,11 +60,7 @@ impl Gen<'_> {
             let mut spec = spec;
             let mut bridged = false;
             if self.kernel
-                && !on_kernel_with_bridge(
-                    &spec,
-                    &f.binding.name,
-                    self.options.effect_bridge == EffectBridge::Available,
-                )
+                && !selected_on_kernel(&spec, &f.binding.name, self.options.effect_bridge)
             {
                 spec = effect_specifier(module);
                 bridged = true;
@@ -76,7 +70,7 @@ impl Gen<'_> {
                     || spec == "@flick-lang/effect-ts"
                     || spec.starts_with("@flick-lang/effect-ts/"));
             bridged |= self.kernel
-                && self.options.effect_bridge == EffectBridge::Available
+                && self.options.effect_bridge.available()
                 && !spec.starts_with("@flick-lang/runtime")
                 && (f.adapter.shapes.iter().any(contains_eff)
                     || contains_eff(&f.adapter.result_shape));
@@ -316,11 +310,7 @@ pub(super) fn plain_foreigns(
                     let spec = (options.foreign)(module, source);
                     if spec == "@flick-lang/effect-ts"
                         || spec.starts_with("@flick-lang/effect-ts/")
-                        || !on_kernel_with_bridge(
-                            &spec,
-                            &f.binding.name,
-                            options.effect_bridge == EffectBridge::Available,
-                        )
+                        || !selected_on_kernel(&spec, &f.binding.name, options.effect_bridge)
                     {
                         return None;
                     }

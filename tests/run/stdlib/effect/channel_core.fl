@@ -30,7 +30,7 @@ let slow =
       Channel.end "late"
     })
 
-outcome : Channel.Channel r {Boom} Unit Float Unit none Unit ->{r;} String
+outcome : Channel.Channel r {Boom} Unit Float Unit none Unit ->{r} String
 let outcome channel =
   try show (Channel.run_collect channel) with
   | Boom why -> "failed " ++ why

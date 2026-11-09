@@ -60,20 +60,13 @@ export const runtimeHash = Symbol.for("@flick-lang/runtime/hash");
 const held = (k: string): boolean => k.charCodeAt(0) === 36;
 
 /** Effect's Option has its tag on the prototype; Flick's has it on the value. */
-const hostOptionTag = (value: Readonly<Record<string, unknown>>): "None" | "Some" | undefined => {
-  if (Object.hasOwn(value, "_tag")) return undefined;
-  const optionTag: unknown = Reflect.get(value, "_tag");
+const optionTag = (value: Readonly<Record<string, unknown>>): "None" | "Some" | undefined => {
+  const variant: unknown = Reflect.get(value, "_tag");
   const keys = Object.keys(value);
-  return optionTag === "None" && keys.length === 0 || optionTag === "Some" && keys.length === 1 && keys[0] === "value"
-    ? optionTag : undefined;
-};
-
-const nativeOptionTag = (value: Readonly<Record<string, unknown>>): "None" | "Some" | undefined => {
-  if (!Object.hasOwn(value, "_tag")) return undefined;
-  const optionTag = value["_tag"];
-  const keys = Object.keys(value);
-  return optionTag === "None" && keys.length === 1 || optionTag === "Some" && keys.length === 2 && Object.hasOwn(value, "value")
-    ? optionTag : undefined;
+  const own = Object.hasOwn(value, "_tag") ? 1 : 0;
+  return variant === "None" && keys.length === own ||
+    variant === "Some" && keys.length === own + 1 && Object.hasOwn(value, "value")
+    ? variant : undefined;
 };
 
 /** `==`: structural equality with SameValueZero on numbers. */
@@ -83,8 +76,8 @@ export const equals = (a: unknown, b: unknown): boolean => {
   if (!isObject(a) || !isObject(b)) return false;
   const custom: unknown = Reflect.get(a, runtimeEquals);
   if (typeof custom === "function") return custom.call(a, b) === true;
-  const aTag = hostOptionTag(a) ?? nativeOptionTag(a);
-  const bTag = hostOptionTag(b) ?? nativeOptionTag(b);
+  const aTag = optionTag(a);
+  const bTag = optionTag(b);
   if (aTag !== undefined && bTag !== undefined) return aTag === bTag && (aTag === "None" || equals(a["value"], b["value"]));
   const hostEqual: unknown = Reflect.get(a, "~effect/Equal");
   if (typeof hostEqual === "function" && typeof Reflect.get(b, "~effect/Equal") === "function") {
@@ -132,7 +125,7 @@ export const hash = (a: unknown): number => {
     const value: unknown = custom.call(a);
     if (typeof value === "number") return value;
   }
-  const option = hostOptionTag(a);
+  const option = Object.hasOwn(a, "_tag") ? undefined : optionTag(a);
   if (option !== undefined) return hash(option === "Some" ? some(a["value"]) : none);
   const hostHash: unknown = Reflect.get(a, "~effect/Hash");
   if (typeof hostHash === "function") {

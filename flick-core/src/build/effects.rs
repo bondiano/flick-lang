@@ -2,6 +2,7 @@
 //! `@flick-lang/runtime/core`, which has the runtime's data and pure helpers
 //! without Effect. A foreign module with no such version cannot be built.
 
+use crate::codegen::EffectBridge;
 use crate::diagnostics::{Diagnostic, Severity, codes};
 use crate::ir::{self, ItemKind};
 use crate::types::{NO_EFFECTS, OpClass};
@@ -176,8 +177,41 @@ pub fn on_kernel(spec: &str, export: &str) -> bool {
 /// Throwing `core` placeholders also appear in the RT index. A build with an
 /// installed Effect adapter must route them to their real implementations.
 pub fn on_kernel_with_bridge(spec: &str, export: &str, bridge: bool) -> bool {
+    selected_on_kernel(
+        spec,
+        export,
+        if bridge {
+            EffectBridge::Available
+        } else {
+            EffectBridge::Absent
+        },
+    )
+}
+
+pub fn ui_family(spec: &str, export: &str) -> bool {
+    matches!(
+        spec,
+        "@flick-lang/runtime/rt/effect/reactivity/Atom"
+            | "@flick-lang/runtime/rt/ui"
+            | "@flick-lang/runtime/rt/ui/html"
+            | "@flick-lang/runtime/rt/ui/react"
+            | "@flick-lang/runtime/rt/ui/server"
+    ) || (spec == "@flick-lang/runtime/rt"
+        && (export == "label"
+            || ["atom", "form", "route"].iter().any(|prefix| {
+                export
+                    .strip_prefix(prefix)
+                    .is_some_and(|rest| rest.starts_with(char::is_uppercase))
+            })))
+}
+
+pub fn selected_on_kernel(spec: &str, export: &str, bridge: EffectBridge) -> bool {
     const STUBS: &str = include_str!("rt_stubs.txt");
     const BRIDGE_STUBS: &str = include_str!("rt_bridge_stubs.txt");
+    if bridge == EffectBridge::AvailableWithUi && ui_family(spec, export) {
+        return false;
+    }
+    let bridge = bridge.available();
     let core_stub = spec == "@flick-lang/runtime/rt" && STUBS.lines().any(|name| name == export);
     let module_stub = BRIDGE_STUBS
         .lines()

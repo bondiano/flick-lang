@@ -143,10 +143,13 @@ form_of : Http.Multipart.Persisted -> Int
 let form_of persisted = List.length (Http.Multipart.fields persisted)
 
 note : Codec none none Json Note
-let note = Codec.general (ignore_extra_fields (codec Note.schema {
-    title = field "title" String.json;
-    tag = field "tag" (Codec.list String.json);
-  }))
+let note =
+  Codec.general
+    (ignore_extra_fields
+      (codec Note.schema {
+        title = field "title" String.json;
+        tag = field "tag" (Codec.list String.json);
+      }))
 
 point : Codec none none Json Point
 let point = Codec.general (Codec.json Point.schema)

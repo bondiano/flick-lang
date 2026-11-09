@@ -89,6 +89,7 @@ const hostOperation = (value: unknown): unknown =>
     ? (...args: ReadonlyArray<unknown>): unknown => hostOperation(Reflect.apply(value, undefined, args.map((arg) => serviceData(arg, "host"))))
     : value;
 
+export const installDataBridge = (): void => {
 bridgeHooks.operation = (tag) => {
   const host = contextOf(currentCtx().host);
   const service: unknown = host?.mapUnsafe.get(String(Reflect.get(tag, "key")));
@@ -98,3 +99,4 @@ bridgeHooks.operation = (tag) => {
   });
 };
 bridgeHooks.ran = (value) => mapped(fromEffect(value), (result) => dataFromEffect(result));
+};

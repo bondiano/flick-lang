@@ -46,14 +46,14 @@ let app () =
   }
   Http.Router.router Http.Router.config [HttpApi.route "/api/*" api handlers]
 
-profile : Handler -> String ->{Async;} String
+profile : Handler -> String ->{Async} String
 let profile server name =
   let request = { path = { name = name }; query = (); headers = (); payload = () }
   try (HttpApi.Inject.call server "/api" Notes.endpoints.profile request).name with
   | NotFound who -> "404 " ++ who
   | HttpApi.ClientError e -> "client error " ++ show e.status
 
-post : Handler -> String -> String ->{Async;} String
+post : Handler -> String -> String ->{Async} String
 let post server base text =
   let request = { path = (); query = (); headers = (); payload = { text = text } }
   try (HttpApi.Inject.call server base Notes.endpoints.post request).text with

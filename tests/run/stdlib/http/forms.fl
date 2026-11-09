@@ -26,10 +26,14 @@ let forms () =
     let form = Http.Multipart.persisted (Http.ServerRequest.from_client_request post)
     Platform.stdout_line ("fields: " ++ (show (Http.Multipart.fields form)))
     Platform.stdout_line ("files: " ++ (show (List.length (Http.Multipart.files form))))
-    let note : Note = Http.Multipart.schema_persisted (json_of (codec Note.schema {
-        title = field "title" String.json;
-        tag = field "tag" (Codec.list String.json);
-      })) form
+    let note : Note =
+      Http.Multipart.schema_persisted
+        (json_of
+          (codec Note.schema {
+            title = field "title" String.json;
+            tag = field "tag" (Codec.list String.json);
+          }))
+        form
     Platform.stdout_line ("schema_persisted: " ++ (show note))
     Platform.stdout_line ("schema_json: " ++ (show (Http.Multipart.schema_json point "meta" form)))
   }

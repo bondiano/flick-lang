@@ -6,7 +6,7 @@ say : String ->{} Unit
 let say line = Platform.stdout_line line
 
 /// Feeds 1 to 5 in chunks of two to the sink; its end.
-run : Sink.Sink r none Float Float a ->{r;} Sink.End a Float
+run : Sink.Sink r none Float Float a ->{r} Sink.End a Float
 let run sink =
   Channel.run_drain
     (Channel.from_list_chunked 2 [1, 2, 3, 4, 5] |> Channel.pipe_to (Sink.to_channel sink))

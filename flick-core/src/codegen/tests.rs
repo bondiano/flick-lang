@@ -371,3 +371,14 @@ fn an_atom_write_names_its_place() {
     assert!(code.contains("place: \"App.Counter:6\""), "{code}");
     assert!(code.contains("place: \"App.Counter:7\""), "{code}");
 }
+
+#[test]
+fn effect_bridge_does_not_treat_a_user_api_type_as_http_handlers() {
+    let code = on_rt_with_bridge(
+        "module App exposing (use)\n\ntype Api a = Api a\n\n\
+         use : Api a -> a -> a\n\
+foreign pure use from \"@flick-lang/effect-ts\" \"use\"\n  arity 2\n",
+        EffectBridge::Available,
+    );
+    assert!(!code.contains("handlersToEffect"), "{code}");
+}

@@ -33,6 +33,9 @@ import { causeHooks } from "@flick-lang/runtime/rt/effect/Cause";
 import { dateTimeHooks } from "@flick-lang/runtime/rt/effect/DateTime";
 import { inheritContext, rememberContext } from "./bridge_context.ts";
 
+import { installDataBridge } from "./bridge_data.ts";
+import { installLayerBridge } from "./bridge_layer.ts";
+import { installSchemaBridge } from "./bridge_schema.ts";
 import { bridgeKernel } from "./bridge_runtime.ts";
 import { KERNEL, hostOf, settled } from "./bridge_host.ts";
 
@@ -357,8 +360,18 @@ durationHooks.native = (d) => {
 dateTimeHooks.makeUtc = (millis) => EDateTime.makeUnsafe(millis);
 
 
+export { Raise, asExit, exitOf, raiseOf };
+
+let initialized = false;
+export const initializeBridge = (): void => {
+  if (initialized) return;
+  initialized = true;
 bridgeKernel.fromEffect = fromEffect;
 bridgeKernel.callEffect = callEffect;
 bridgeKernel.causeFromEffect = causeFromEffect;
 bridgeKernel.causeToEffect = causeToEffect;
-export { Raise, asExit, exitOf, raiseOf };
+  installDataBridge();
+  installLayerBridge();
+  installSchemaBridge();
+};
+initializeBridge();

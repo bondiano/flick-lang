@@ -29,7 +29,7 @@ impl Checker<'_> {
             params.iter().any(|other| {
                 let other = self.whnf_captured(other).0;
                 let (head, args) = other.spine();
-                matches!(head, Type::Con { name, .. } if name == "Api" || name == "Group")
+                matches!(head, Type::Con { module, name } if module == "HttpApi" && (name == "Api" || name == "Group"))
                     && args
                         .iter()
                         .any(|arg| matches!(arg, Type::Var(w) if *w == var))

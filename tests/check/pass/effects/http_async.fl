@@ -11,5 +11,5 @@ body :
   a
 let body codec request = Http.ServerRequest.schema_body_json codec request
 
-streamed : Ui ->{Async, Atom.Registry;} List String
+streamed : Ui ->{Async, Atom.Registry} List String
 let streamed content = Stream.run_collect (Ui.Server.stream "app" content)

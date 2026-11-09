@@ -14,9 +14,10 @@ across the boundary, including codecs with runtime effects. Nested `Option`
 and `Result` values retain their meaning in generic library calls. A project
 that uses only RT bindings does not load the bridge.
 
-Opaque Stream values stay in the adapter. When the bridge is installed, atoms,
-forms, routes and renderers use their matching Effect implementations together,
-as do tracing bindings and their configured exporters.
+Opaque Stream values stay in the adapter. Native atoms, routes and renderers remain on RT. If a used UI binding needs
+the adapter (such as streamed server rendering), atoms, forms, routes and
+renderers use their matching Effect implementations together for the build.
+Tracing bindings share Effect implementations with their configured exporters.
 
 Reading request bodies, persisting multipart forms, serving static files and
 consuming a server-rendered stream require `Async` in the caller's effect row.

@@ -22,7 +22,7 @@ broken : Channel.Channel none {Boom} i Float Unit ie id
 let broken = Channel.concat (Channel.fail (Boom "broken")) (Channel.from_list [1])
 
 /// What running the channel gives, or the error it fails with.
-outcome : Channel.Channel r {Boom} Unit Float Unit none Unit ->{r;} String
+outcome : Channel.Channel r {Boom} Unit Float Unit none Unit ->{r} String
 let outcome channel =
   try show (Channel.run_collect channel) with
   | Boom why -> "failed " ++ why

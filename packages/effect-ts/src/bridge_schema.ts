@@ -23,14 +23,6 @@ const effectSchemas = /*#__PURE__*/ new WeakMap<Witness, unknown>();
 const effectCodecs = /*#__PURE__*/ new WeakMap<Witness, unknown>();
 const structuralSchemas = /*#__PURE__*/ new WeakMap<Witness, AnySchema>();
 const nativeSchemas = /*#__PURE__*/ new WeakMap<object, Witness>();
-schemaExportHooks.host = (name, codec) => {
-  if (!isNativeCodec(codec)) return undefined;
-  const sourceCodec = codecToEffect(codec);
-  if (!Schema.isSchema(sourceCodec)) return undefined;
-  const exported = hostCodecJsonSchema(name, sourceCodec);
-  return EResult.isSuccess(exported) ? ok(exported.success) : err(exported.failure);
-};
-
 /** Structural native witnesses keep their wire shape at an Effect API. */
 const describedToEffect = (codec: Witness): AnySchema | undefined => {
   const original = effectSchemas.get(codec);
@@ -146,7 +138,9 @@ export const schemaToEffect = (value: unknown): unknown => {
     nativeSchemas.set(structural, codec);
     return structural;
   }
-  const runtime = Schema.declare((input: unknown): input is unknown => codec.value(dataFromEffect(input), "")._tag === "Success", { expected: codec.kind });
+  const runtime = schemaDescription(codec)?.kind === "transform"
+    ? Schema.Unknown
+    : Schema.declare((input: unknown): input is unknown => codec.value(dataFromEffect(input), "")._tag === "Success", { expected: codec.kind });
   const fallback = Schema.Unknown.pipe(Schema.decodeTo(runtime, {
     decode: SchemaGetter.transformEffect((input: unknown) => {
       const result = codec.decode(input);
@@ -247,3 +241,14 @@ const witnessFromEffect = (value: unknown, codec: boolean): unknown => {
 export const schemaFromEffect = (value: unknown): unknown => witnessFromEffect(value, false);
 export const codecFromEffect = (value: unknown): unknown => witnessFromEffect(value, true);
 
+
+export const installSchemaBridge = (): void => {
+schemaExportHooks.host = (name, codec) => {
+  if (!isNativeCodec(codec)) return undefined;
+  const sourceCodec = codecToEffect(codec);
+  if (!Schema.isSchema(sourceCodec)) return undefined;
+  const exported = hostCodecJsonSchema(name, sourceCodec);
+  return EResult.isSuccess(exported) ? ok(exported.success) : err(exported.failure);
+};
+
+};

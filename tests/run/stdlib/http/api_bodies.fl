@@ -29,7 +29,10 @@ let form =
   |> HttpApi.with_multipart_payload (Codec.json Note.schema)
   |> HttpApi.with_text_success 200
 
-parts : HttpApi.Endpoint "parts" (HttpApi.Request Unit Unit Unit Parts ->{Async | r; MultipartError} String)
+parts :
+  HttpApi.Endpoint
+    "parts"
+    (HttpApi.Request Unit Unit Unit Parts ->{Async | r; MultipartError} String)
 let parts =
   HttpApi.endpoint HttpApi.Post "/parts" (Record.label : Record.Label "parts")
   |> HttpApi.with_multipart_stream_payload

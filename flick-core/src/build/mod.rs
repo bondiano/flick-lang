@@ -4,6 +4,7 @@
 
 #[cfg(any(feature = "build-artifacts", feature = "typescript"))]
 mod abi;
+mod bridge_select;
 pub mod effects;
 #[cfg(feature = "build-artifacts")]
 pub mod go;
@@ -217,7 +218,7 @@ pub fn emit(
         direct: &direct,
         labels: settings.extras.labels,
         rt: settings.backend == Backend::Rt,
-        effect_bridge: settings.effect_bridge,
+        effect_bridge: bridge_select::select(compilation, settings.effect_bridge),
     };
     let mut out = Vec::new();
     #[cfg(feature = "build-artifacts")]

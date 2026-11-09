@@ -4,7 +4,7 @@ import { test } from "node:test";
 import { Arbitrary, Effect, Exit, Schema } from "effect";
 
 import { err, none, ok } from "@flick-lang/runtime/core/data";
-import { witness, schemaLiterals, schemaInt, schemaAdtOf, schemaCase, schemaError, schemaLazyOf, schemaOption, schemaRecordOf, schemaRefinedOf, schemaString, type Witness } from "@flick-lang/runtime/rt/schema";
+import { codecTransformPure, witness, schemaLiterals, schemaInt, schemaAdtOf, schemaCase, schemaError, schemaLazyOf, schemaOption, schemaRecordOf, schemaRefinedOf, schemaString, type Witness } from "@flick-lang/runtime/rt/schema";
 import { codecJsonSchema } from "@flick-lang/runtime/rt/schema_export";
 
 import { codecToEffect, schemaFromEffect, schemaToEffect } from "../src/bridge.ts";
@@ -110,4 +110,12 @@ test("an undescribed native schema validates runtime values and retains its sepa
   const encoded = Schema.encodeUnknownExit(codec)(4);
   assert.ok(Exit.isSuccess(encoded));
   assert.equal(encoded.value, "4");
+});
+
+test("an untyped native transform remains opaque when HTTP error codecs are discriminated", () => {
+  const native = codecTransformPure((text) => ({ _tag: "Conflict#1", _0: text }), (value) =>
+    typeof value === "object" && value !== null ? Reflect.get(value, "_0") : undefined, schemaString);
+  const host = codecToEffect(native);
+  assert.ok(Schema.isSchema(host));
+  assert.equal(Schema.is(host)({ _tag: "flick/opaque-probe" }), true);
 });

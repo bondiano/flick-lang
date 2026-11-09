@@ -10,6 +10,12 @@
 ../rt/late_effect
 ../rt/layers
 ../rt/wake_chain
+bootstrap/inline_declarations
+bootstrap/inline_module
+bootstrap/inline_nested
+bootstrap/inline_pack
+bootstrap/inline_pack_nominals
+bootstrap/packed_module
 bootstrap/app_fail
 bootstrap/debug
 bootstrap/hello

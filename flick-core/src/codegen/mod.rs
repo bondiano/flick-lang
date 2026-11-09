@@ -23,6 +23,14 @@ pub enum EffectBridge {
     #[default]
     Absent,
     Available,
+    /// Opaque UI values and registries belong to the Effect adapter.
+    AvailableWithUi,
+}
+
+impl EffectBridge {
+    pub const fn available(self) -> bool {
+        !matches!(self, Self::Absent)
+    }
 }
 
 use crate::iface::Interface;

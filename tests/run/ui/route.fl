@@ -74,7 +74,7 @@ let report failure =
   Platform.stdout_line ("supervisor: " ++ RawCause.describe (Failure.inspect failure))
 
 /// The page the server streams for `url`.
-served : String ->{Async;} String
+served : String ->{Async} String
 let served url =
   let chunks = provide Atom.layer {
     Atom.serving url

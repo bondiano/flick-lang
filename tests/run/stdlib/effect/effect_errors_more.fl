@@ -78,7 +78,7 @@ let reports () =
   say ("first_success_of []: " ++ RawCause.describe (Failure.inspect (failure_of none_left)))
 
 /// The cause each message is logged with, as a logger made by `make` gets it.
-logged : Unit ->{Async;} Unit
+logged : Unit ->{Async} Unit
 let logged () =
   let seen = Ref.make []
   let collect = {

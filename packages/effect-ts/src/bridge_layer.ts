@@ -69,6 +69,7 @@ export const layerToEffect = (layer: unknown): unknown => {
   );
 };
 
+export const installLayerBridge = (): void => {
 layerHooks.adopt = adopt;
 layerHooks.services = (value) => Context.isContext(value) ? [[HOST, value]] : undefined;
 layerHooks.context = servicesOut;
@@ -78,3 +79,4 @@ layerHooks.merge = (a, b) => {
   return first === undefined || second === undefined ? (first ?? b) : Context.merge(first, second);
 };
 
+};
