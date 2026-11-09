@@ -52,6 +52,9 @@ export const EQ = /*#__PURE__*/ ordering("EQ");
 export const GT = /*#__PURE__*/ ordering("GT");
 
 const isObject = (a: unknown): a is Readonly<Record<string, unknown>> => typeof a === "object" && a !== null;
+/** A native runtime value whose equality is defined by its semantic value. */
+export const runtimeEquals = Symbol.for("@flick-lang/runtime/equals");
+export const runtimeHash = Symbol.for("@flick-lang/runtime/hash");
 
 /** A key `$0`, `$1` …: a dictionary a value of a GADT holds, which `==` and `hash` leave out. */
 const held = (k: string): boolean => k.charCodeAt(0) === 36;
@@ -61,6 +64,8 @@ export const equals = (a: unknown, b: unknown): boolean => {
   // oxlint-disable-next-line no-self-compare -- SameValueZero: NaN equals NaN
   if (a === b || (a !== a && b !== b)) return true;
   if (!isObject(a) || !isObject(b)) return false;
+  const custom: unknown = Reflect.get(a, runtimeEquals);
+  if (typeof custom === "function") return custom.call(a, b) === true;
   if (Array.isArray(a) || Array.isArray(b)) {
     return Array.isArray(a) && Array.isArray(b) && listEquals(equals, a, b);
   }
@@ -96,6 +101,11 @@ const hashString = (s: string): number => {
 export const hash = (a: unknown): number => {
   if (typeof a === "number") return hashString(Object.is(a, -0) ? "0" : String(a));
   if (!isObject(a)) return hashString(`${typeof a}:${String(a)}`);
+  const custom: unknown = Reflect.get(a, runtimeHash);
+  if (typeof custom === "function") {
+    const value: unknown = custom.call(a);
+    if (typeof value === "number") return value;
+  }
   if (Array.isArray(a)) return listHash(hash, a);
   return Object.keys(a)
     .toSorted()

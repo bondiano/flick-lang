@@ -3,6 +3,14 @@
 export * from "../core/index.ts";
 export { runMain } from "./entry.ts";
 export {
+  chunkEmpty, chunkFromList, chunkToList, chunkAppend, chunkConcat, chunkSize, chunkGet, chunkMap,
+} from "./chunk.ts";
+export {
+  decimalFromString, decimalFromBigInt, decimalFromInteger, decimalFromNumber,
+  decimalToString, decimalNormalString, decimalScale, decimalAdd, decimalSubtract,
+  decimalMultiply, decimalCompare, decimalDivideToScale,
+} from "./decimal.ts";
+export {
   bindEff,
   flatMapEff,
   foreignEffect,
@@ -30,10 +38,13 @@ export { fiberJoin, fiberSpawn, foreignAsync, foreignSync, scopeCurrent, scopeRu
 export { parallel, parallelAll, parallelExits, parallelResults, raceFirst, raceSuccess, timeout, timeoutOption } from "./concurrency.ts";
 export {
   durationAdd,
+  durationCompare,
+  durationFormat,
   durationInfinity,
   durationIsFinite,
   durationMillis,
   durationMinutes,
+  durationNanos,
   durationSeconds,
   durationToMillis,
   durationZero,
