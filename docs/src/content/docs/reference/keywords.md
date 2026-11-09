@@ -23,6 +23,7 @@ See [modules.md](../modules/).
 | Keyword | Meaning | Example |
 | - | - | - |
 | `let` | binds a value or a function, at the top level or in a block | `let total = a + b` |
+| `mut` | `let mut` declares a variable of a function, which `name = value` assigns | `let mut total = 0` |
 | `rec` | `let rec` lets a function call itself; `rec { … }` groups mutually recursive functions | `let rec go n = …` |
 | `assert` | `let assert` binds a pattern that may not match, and fails when it does not | `let assert [x, ..._] = xs as "no items"` |
 | `type` | declares an ADT, `type alias` a transparent alias | `type Shape = Circle Float \| Empty` |

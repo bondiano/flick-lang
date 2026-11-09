@@ -6,6 +6,19 @@ break programs.
 
 ## Unreleased
 
+- **Local variables:** `let mut name = value` declares a variable of a function
+  and `name = value` assigns it; a pure function may assign its variables.
+  A variable has one type, fixed where it is declared, which a `scope` cannot
+  give its region (`FLICK-G002`/`G001`). A function, `task`, lazy `for`, `do`
+  block or arm of a handler of operations inside the function cannot use one
+  (`FLICK-G005`), the body of `try … with` and loops do not assign one from
+  outside yet (`FLICK-T061`), an assignment to another name is `FLICK-T060`,
+  `mut` elsewhere `FLICK-S016`, and a `mut` never assigned the warning
+  `FLICK-R017`. `mut` is a keyword now: a program that names something `mut`
+  renames it. The IR is 0.5.0: `Stmt::Var`, `Stmt::Assign` and `ExprKind::Var`;
+  a plugin's pass over the IR reads and writes them. JavaScript and Go assign
+  in place, and the model and the new Lean theorem T7 read a variable by
+  passing its values along.
 - **Opt-in implicit conversions:** `@implicit` marks a ground, context-free
   instance of a class with one pure `a -> b` method. A unique visible
   conversion is inserted at a ground nominal type mismatch, without chains

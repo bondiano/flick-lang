@@ -175,6 +175,7 @@ the enclosing bound. Primitive fields such as `Float` gain no captures.
 | a value an acquisition gives | `Resource.acquire_release` gives `a^{s}`, a value of region `s` (`FLICK-G002`); a function it is passed to takes `Conn^c` for some `c` |
 | a nominal or opaque wrapper | a visible region or hidden field capture cannot be erased |
 | a cell or binding from outside the scope | its type may not come to mention the region; mutable storage and its qualified element types are invariant (`FLICK-T003`), even when a value bound could otherwise widen |
+| a `let mut` variable from outside the scope | its type is fixed where it is declared: a value assigned inside the scope cannot hold the region (`FLICK-G002`, or `FLICK-G001` for a closure) |
 | an error | its payload holds no region, even when a handler inside the scope catches it (`FLICK-E005`); `type error E (s : Region) = E (File s)` is rejected where it is declared |
 | a foreign function | its signature is its retention contract: what it keeps is in its result's qualifier; with `retention owner` and one region in the signature, it gets `Fiber.Outlives` for a capture row it keeps and `Fiber.Provided` and `Detached` for the services of kept work; with two regions the signature writes them (`FLICK-F002`) |
 
