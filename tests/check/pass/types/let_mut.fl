@@ -36,7 +36,7 @@ let function_value n =
   if n > 0 then step = fun x -> x * 2
   step n
 
-in_scope : Unit ->{Files;} String
+in_scope : Unit ->{Files} String
 let in_scope () =
   let mut seen = "none"
   scope {
@@ -45,7 +45,7 @@ let in_scope () =
   }
   seen
 
-scoped_mut : Unit ->{Files;} String
+scoped_mut : Unit ->{Files} String
 let scoped_mut () = scope {
   let mut file = Files.open "a.txt"
   file = Files.open "b.txt"

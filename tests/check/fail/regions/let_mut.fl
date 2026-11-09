@@ -12,7 +12,7 @@ path_of : File s -> String
 let path_of file = match file with
   | File path -> path
 
-outer_file : String ->{Files;} Unit
+outer_file : String ->{Files} Unit
 let outer_file path =
   let mut last = None
   scope {
@@ -20,7 +20,7 @@ let outer_file path =
     last = Some file
   }
 
-outer_callback : String ->{Files;} String
+outer_callback : String ->{Files} String
 let outer_callback path =
   let mut reader = fun () -> ""
   scope {
@@ -29,7 +29,7 @@ let outer_callback path =
   }
   reader ()
 
-written_callback : String ->{Files;} String
+written_callback : String ->{Files} String
 let written_callback path =
   reader : Unit -> String
   let mut reader = fun () -> ""
