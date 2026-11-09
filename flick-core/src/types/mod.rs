@@ -47,6 +47,7 @@ pub mod lang;
 mod lint_tests;
 mod lints;
 mod makers;
+mod mutation;
 mod origin;
 mod patterns;
 mod qualified;
@@ -294,6 +295,7 @@ fn run_in(
         kinds: KindStore::default(),
         diagnostics: Vec::new(),
         locals: Vec::new(),
+        mutation: mutation::Frames::default(),
         ui: 0,
         tyvars: Vec::new(),
         runtime: false,
@@ -378,6 +380,7 @@ struct Local {
     /// A local function without a signature: it has one type, from its body
     /// and its first uses.
     unsigned: bool,
+    binding: mutation::Binding,
 }
 
 /// A recursive function whose signature has no explicit `forall`: its
@@ -461,6 +464,9 @@ struct Checker<'a> {
     kinds: KindStore,
     diagnostics: Vec<Diagnostic>,
     locals: Vec<Local>,
+    /// The functions and bodies around the expression that limit what a
+    /// `let mut` variable from outside them may do.
+    mutation: mutation::Frames,
     /// How many `ui { … }` blocks enclose the expression: inside one, the
     /// names `Ui` exports need no `Ui.`.
     ui: usize,

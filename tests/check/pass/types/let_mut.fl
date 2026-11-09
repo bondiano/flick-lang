@@ -1,0 +1,88 @@
+// `let mut` and assignment where they are allowed: a function stays pure,
+// an assignment is `Unit` and keeps the variable's type, a scope and an arm
+// of `try` may assign, and a loop or a `try` body may read.
+module App.LetMut exposing (..)
+
+type File (s : Region)
+
+type error Missing = Missing String
+
+service Files =
+  open : forall s. String ->{Scope s; none} File s
+  name : forall s. File s ->{} String
+
+pure_count : Int -> Int
+let pure_count n =
+  let mut total = n
+  total = total + 1
+  if total > 10 then total = 10
+  total
+
+signed : Int -> String
+let signed n =
+  label : String
+  let mut label = "zero"
+  if n > 0 then
+    label = "positive"
+  else if n < 0 then
+    label = "negative"
+  label
+
+assigned_unit : Unit -> Unit
+let assigned_unit () =
+  let mut x = 1
+  x = x + 1
+
+function_value : Int -> Int
+let function_value n =
+  let mut step = fun x -> x + 1
+  if n > 0 then step = fun x -> x * 2
+  step n
+
+in_scope : Unit ->{Files;} String
+let in_scope () =
+  let mut seen = "none"
+  scope {
+    let file = Files.open "a.txt"
+    seen = Files.name file
+  }
+  seen
+
+scoped_mut : Unit ->{Files;} String
+let scoped_mut () = scope {
+  let mut file = Files.open "a.txt"
+  file = Files.open "b.txt"
+  Files.name file
+}
+
+loop_reads : List Int ->{} Unit
+let loop_reads xs =
+  let mut limit = 3
+  limit = limit + 1
+  for x <- xs do
+    if x > limit then Platform.stdout_line "\{x}"
+
+try_reads : String ->{} Int
+let try_reads key =
+  let mut fallback = 1
+  fallback = fallback * 2
+  try
+    let mut inner = fallback
+    inner = inner + from_result (Err (Missing key))
+    inner
+  with
+  | Missing _ -> fallback
+
+arm_assigns : String ->{} String
+let arm_assigns key =
+  let mut status = "ok"
+  try from_result (Err (Missing key)) with
+  | Missing k -> status = k
+  status
+
+inside_lambda : List Int -> List Int
+let inside_lambda xs = List.map (fun x ->
+  let mut y = x
+  y = y * 2
+  y
+) xs

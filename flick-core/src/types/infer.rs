@@ -219,6 +219,7 @@ impl Checker<'_> {
                 token => literal_type(token.map(|t| t.kind)),
             },
             K::NameExpr => self.name(node),
+            K::AssignStmt => self.assign(node),
             K::InterpExpr => self.interpolation(node),
             K::ParenExpr => self.infer(children[0]),
             K::UnitExpr => Type::lang(Lang::Unit),
@@ -412,6 +413,7 @@ impl Checker<'_> {
         let mark = self.locals.len();
         let givens = self.classes.givens.len();
         let uses = self.uses_mark();
+        self.enter_apart(super::mutation::Apart::Function);
         self.begin_reader();
         let mut rest = expected.cloned();
         let mut stages = Vec::new();
@@ -496,6 +498,7 @@ impl Checker<'_> {
         if inferred && let Some(stage) = stages.last_mut() {
             stage.1 = Self::stage_effects(&inner);
         }
+        self.leave_apart();
         let closures: Vec<_> = closures
             .into_iter()
             .map(|(locals, expected)| (self.held_since(uses, locals), expected))

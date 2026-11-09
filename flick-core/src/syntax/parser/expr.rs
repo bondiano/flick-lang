@@ -3,15 +3,28 @@
 use super::{Done, K, Parser, decl, pattern, plugin, types};
 use crate::diagnostics::codes;
 
-/// A statement of a block: `let`, a local signature or an expression.
+/// A statement of a block: `let`, a local signature, an assignment or an
+/// expression.
 pub(super) fn stmt(p: &mut Parser) {
     match p.current() {
         K::LetKw => decl::let_decl(p),
         K::Ident if p.nth(1) == K::Colon => decl::signature(p),
+        K::Ident if p.nth(1) == K::Eq => assign_stmt(p),
         _ => {
             expr(p);
         }
     }
+}
+
+/// `name = value`: the name is a `NameExpr`, as any use of it.
+fn assign_stmt(p: &mut Parser) {
+    let m = p.start();
+    let name = p.start();
+    p.bump();
+    p.complete(name, K::NameExpr);
+    p.bump();
+    p.body(K::Block, stmt);
+    p.complete(m, K::AssignStmt);
 }
 
 pub(super) fn expr(p: &mut Parser) -> Option<Done> {

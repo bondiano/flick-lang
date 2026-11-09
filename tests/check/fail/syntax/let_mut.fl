@@ -1,0 +1,30 @@
+// `mut` makes a local variable of one name: not a function, a pattern, an
+// asserted binding, a definition of the module, or a binding of `do` or
+// `for`.
+module App.LetMutSyntax exposing (..)
+
+let mut counter = 0
+
+function : Int -> Int
+let function n =
+  let mut twice x = x * 2
+  let mut (a, b) = (n, n)
+  let assert mut [c] = [n]
+  twice a + b + c
+
+in_do : Option Int -> Option Int
+let in_do o = do {
+  x <- o
+  let mut y = x
+  pure y
+}
+
+in_for : List Int -> List Int
+let in_for xs = [for x <- xs; let mut y = x yield y]
+
+//~ FLICK-S016 @6:5-6:8 a definition of the module cannot be `mut`
+//~ FLICK-S016 @10:7-10:10 a function cannot be `mut`
+//~ FLICK-S016 @11:7-11:10 only a name can be `mut`
+//~ FLICK-S016 @12:14-12:17 `let assert` cannot be `mut`
+//~ FLICK-S016 @18:7-18:10 a binding of `do` cannot be `mut`
+//~ FLICK-S016 @23:35-23:38 a binding of `for` cannot be `mut`

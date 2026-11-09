@@ -164,7 +164,12 @@ pub(super) fn let_decl(p: &mut Parser) {
         );
         p.bump();
     }
+    // `validate` says where `mut` may stand; `let assert mut` is read to say so
+    let mutable = p.eat(K::MutKw);
     let assert = p.eat(K::AssertKw);
+    if assert && !mutable {
+        p.eat(K::MutKw);
+    }
     let_rest(p, m, assert);
 }
 

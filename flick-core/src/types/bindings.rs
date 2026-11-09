@@ -180,6 +180,15 @@ impl Checker<'_> {
         };
         let binder = decl.nodes().find(|n| n.kind == K::VarPat);
         let at = binder.unwrap_or(decl).range().0;
+        // `validate` reports the other places of `mut`, which bind as plain `let`
+        if decl.has_token(K::MutKw) && parts.params.is_empty() && !parts.rec {
+            self.local_mut(decl, sig, &parts, &name, at);
+            if let (Some(binder), Some(local)) = (binder, self.locals.last()) {
+                let ty = local.ty.clone();
+                self.note_type(self.span(binder), &ty);
+            }
+            return;
+        }
         let signature = sig
             .and_then(|s| s.nodes().find(|n| is_type(n.kind)))
             .map(|t| self.signature(t));
@@ -193,6 +202,7 @@ impl Checker<'_> {
                     ty: scheme.clone(),
                     rec,
                     unsigned: false,
+                    binding: super::mutation::Binding::Other,
                 });
                 rec
             });
@@ -207,6 +217,12 @@ impl Checker<'_> {
             self.polymorphic_signature(&name, &scheme, runtime, decl, &parts);
             let ty = self.inferred_captures(scheme, captures, self.span(decl));
             self.push_local(&name, at, ty);
+            if let Some(local) = self.locals.last_mut()
+                && !parts.is_function()
+                && !parts.rec
+            {
+                local.binding = super::mutation::Binding::Let;
+            }
         } else {
             if parts.rec {
                 let ty = self.fresh();
@@ -219,6 +235,9 @@ impl Checker<'_> {
             self.push_local(&name, at, ty);
             if let Some(local) = self.locals.last_mut() {
                 local.unsigned = parts.is_function();
+                if !parts.is_function() && !parts.rec {
+                    local.binding = super::mutation::Binding::Let;
+                }
             }
         }
         if let (Some(binder), Some(local)) = (binder, self.locals.last()) {

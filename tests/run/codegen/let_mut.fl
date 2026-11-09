@@ -1,0 +1,140 @@
+// A `let mut` variable of a function: an assignment changes what later reads
+// see, in a branch, an arm or a `scope`, and the function stays pure. A value
+// read before an assignment keeps what it read.
+module App.Main exposing (main)
+
+type error Missing = Missing String
+
+effect Ask =
+  ask : Unit ->{} Int
+
+classify : Int -> String
+let classify n =
+  let mut label = "small"
+  if n > 10 then label = "big"
+  if n > 100 then
+    label = "huge"
+  label
+
+sorted : Int -> Int -> (Int, Int)
+let sorted a b =
+  let mut low = a
+  let mut high = b
+  if low > high then
+    let kept = low
+    low = high
+    high = kept
+  (low, high)
+
+describe : List Int -> String
+let describe xs =
+  let mut text = "none"
+  match xs with
+  | [] -> ()
+  | [x] -> text = "one \{x}"
+  | _ -> text = "many"
+  text
+
+/// What a read saw stays: the optimizer may not move it past the assignment.
+before_after : Int -> (Int, Int)
+let before_after n =
+  let mut count = n
+  let before = count
+  count = count + 1
+  count = count * 10
+  (before, count)
+
+/// A constant is not known once it is assigned again.
+constant : Unit -> Int
+let constant () =
+  let mut k = 1
+  k = 2
+  k * 10
+
+/// A tuple held by a `let mut` is replaced whole.
+pair : Unit -> Int
+let pair () =
+  let mut p = (1, 2)
+  p = (3, 4)
+  let (a, b) = p
+  a * 10 + b
+
+/// The value of an `if` that assigns in a branch.
+chosen : Bool -> (Int, Int)
+let chosen flag =
+  let mut side = 0
+  let value = if flag then
+    side = 1
+    10
+  else
+    20
+  (value, side)
+
+/// A shadowing `let` is a new name; the `let mut` under it is unchanged.
+shadowed : Unit -> (Int, Int)
+let shadowed () =
+  let mut x = 1
+  x = 2
+  let y = x
+  let x = 100
+  (x, y)
+
+/// Inside a `scope`, an assignment to a variable from outside it.
+scoped : Unit ->{} String
+let scoped () =
+  let mut log = "start"
+  scope {
+    log = log ++ ", inside"
+  }
+  log ++ ", after"
+
+/// An arm of `try` may assign; only its body may not.
+recovered : String ->{} String
+let recovered key =
+  let mut status = "found"
+  let value =
+    try from_result (Err (Missing key)) with
+    | Missing k ->
+      status = "missing \{k}"
+      0
+  "\{status} \{value}"
+
+/// A `let mut` in a handled body lives across the operation.
+handled : Unit ->{} Int
+let handled () =
+  try
+    let mut a = 1
+    a = a + Ask.ask ()
+    a = a * 2
+    a
+  with
+  | Ask.ask () -> 20
+
+/// Between runtime calls of a runtime function.
+counted : Unit ->{; AppError} Unit
+let counted () =
+  let mut n = 1
+  Platform.stdout_line "n = \{n}"
+  n = n * 7
+  Platform.stdout_line "n = \{n}"
+
+main : Unit ->{; AppError} Unit
+let main () =
+  Platform.stdout_line (classify 5)
+  Platform.stdout_line (classify 50)
+  Platform.stdout_line (classify 500)
+  Platform.stdout_line (show (sorted 3 1))
+  Platform.stdout_line (show (sorted 1 3))
+  Platform.stdout_line (describe [])
+  Platform.stdout_line (describe [7])
+  Platform.stdout_line (describe [1, 2])
+  Platform.stdout_line (show (before_after 4))
+  Platform.stdout_line (show (constant ()))
+  Platform.stdout_line (show (pair ()))
+  Platform.stdout_line (show (chosen true))
+  Platform.stdout_line (show (chosen false))
+  Platform.stdout_line (show (shadowed ()))
+  Platform.stdout_line (scoped ())
+  Platform.stdout_line (recovered "id")
+  Platform.stdout_line (show (handled ()))
+  counted ()

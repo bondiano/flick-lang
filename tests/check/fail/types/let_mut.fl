@@ -1,0 +1,111 @@
+// Assignments the checker rejects: to a name that is not `let mut`, of
+// another type, to or from a `let mut` of an enclosing function, and inside
+// the body of `try … with` or a loop.
+module App.LetMutFail exposing (..)
+
+type error Missing = Missing String
+
+effect Ask =
+  ask : Unit ->{} Int
+
+not_mut : Int -> Int
+let not_mut n =
+  let x = n
+  x = x + 1
+//^ FLICK-T060 `x` is not `let mut`
+  x
+
+parameter : Int -> Int
+let parameter n =
+  n = 2
+//^ FLICK-T060 `n` is not `let mut`
+  n
+
+global : Int
+let global = 1
+
+to_global : Unit -> Int
+let to_global () =
+  global = 2
+//^^^^^^ FLICK-T060 only a `let mut` variable
+  global
+
+undeclared : Unit -> Int
+let undeclared () =
+  fresh = 2
+//^^^^^ FLICK-T060 cannot find `fresh`
+  0
+
+other_type : Int -> Int
+let other_type n =
+  let mut x = n
+  x = "two"
+//    ^^^^^ FLICK-T003
+  x
+
+in_lambda : List Int -> List Int
+let in_lambda xs =
+  let mut total = 0
+  total = total + 1
+  List.map (fun x -> x + total) xs
+//                       ^^^^^ FLICK-G005 `total`, a `let mut` variable
+
+assign_in_lambda : List Int -> Int
+let assign_in_lambda xs =
+  let mut total = 0
+  let add = fun x ->
+    total = total + x
+//  ^^^^^ FLICK-G005 `total`, a `let mut` variable
+//          ^^^^^ FLICK-G005 `total`, a `let mut` variable
+  ignore (List.map add xs)
+  total
+
+in_local_function : Int -> Int
+let in_local_function n =
+  let mut base = n
+  base = base * 2
+  bump : Int -> Int
+  let bump x = x + base
+//                 ^^^^ FLICK-G005 `base`
+  bump 1
+
+in_task : Unit ->{} Int
+let in_task () =
+  let mut count = 1
+  count = count + 1
+  let later = task { count }
+//                   ^^^^^ FLICK-G005 `count`
+  await later
+
+in_sequence : List Int -> Seq Int
+let in_sequence xs =
+  let mut offset = 1
+  offset = 2
+  for x <- xs yield x + offset
+//                      ^^^^^^ FLICK-G005 `offset`
+
+in_handler_arm : Unit ->{} Int
+let in_handler_arm () =
+  let mut answer = 1
+  answer = answer + 1
+  try Ask.ask () with
+  | Ask.ask () -> answer
+//                ^^^^^^ FLICK-G005 `answer`
+
+in_try_body : String ->{} Int
+let in_try_body key =
+  let mut status = 0
+  try
+    status = 1
+//  ^^^^^^ FLICK-T061 the body of `try … with`
+    from_result (Err (Missing key))
+  with
+  | Missing _ -> status
+
+in_loop : List Int ->{} Int
+let in_loop xs =
+  let mut total = 0
+  for x <- xs do
+    total = total + x
+//  ^^^^^ FLICK-T061 a loop
+  total

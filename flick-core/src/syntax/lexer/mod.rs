@@ -246,7 +246,8 @@ impl Lexer<'_> {
         matches!(
             before[..],
             [.., "foreign"] | [.., "foreign", "pure" | "sync" | "async" | "effect"]
-        ) || (matches!(before[..], ["let"] | ["let", "rec"]) && !matches!(word, "rec" | "assert"))
+        ) || (matches!(before[..], ["let"] | ["let", "rec"] | ["let", "mut"])
+            && !matches!(word, "rec" | "assert" | "mut"))
     }
 
     /// Length and kind of the operator or delimiter at `pos`, if any.

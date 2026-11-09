@@ -162,6 +162,7 @@ codes! {
     S013 = Syntax 13, "`<-` outside a `do` block";
     S014 = Syntax 14, "unknown attribute";
     S015 = Syntax 15, "a constructor result where none can be written";
+    S016 = Syntax 16, "`mut` where only a local variable of one name can be";
     R001 = Resolve 1, "module name does not match the file path";
     R002 = Resolve 2, "two files declare the same module";
     R003 = Resolve 3, "unknown module";
@@ -178,6 +179,7 @@ codes! {
     R014 = Resolve 14, "unused private definition";
     R015 = Resolve 15, "local shadows another local";
     R016 = Resolve 16, "lang item outside the built-in modules";
+    R017 = Resolve 17, "`let mut` variable never assigned";
     T001 = Types 1, "unknown name";
     T002 = Types 2, "kind mismatch";
     T003 = Types 3, "type mismatch";
@@ -237,6 +239,8 @@ codes! {
     T057 = Types 57, "a refining match needs known types";
     T058 = Types 58, "a refinement Flick does not make";
     T059 = Types 59, "a part of a signature it gets anyway";
+    T060 = Types 60, "assignment to a name that is not a `let mut` variable";
+    T061 = Types 61, "assignment inside the body of `try` or a loop";
     E001 = Effects 1, "runtime call in a pure position";
     E002 = Effects 2, "services or errors not allowed by the bound";
     E003 = Effects 3, "argument runs before the function that takes an Eff";
@@ -273,6 +277,7 @@ codes! {
     G002 = Regions 2, "scoped value leaves its scope";
     G003 = Regions 3, "child may outlive what it holds";
     G004 = Regions 4, "resource acquired outside a scope";
+    G005 = Regions 5, "`let mut` variable used in a function it is not a variable of";
     F001 = Ffi 1, "invalid foreign metadata";
     F002 = Ffi 2, "foreign parameter may hold a scope without a retention contract";
     F003 = Ffi 3, "catch mapping does not make an error of the signature";

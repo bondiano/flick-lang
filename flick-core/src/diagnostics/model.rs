@@ -65,7 +65,7 @@ impl Diagnostic {
     /// A warning about code nothing uses: an import, a variable, a private
     /// definition. Editors grey such code out.
     pub fn unnecessary(&self) -> bool {
-        [codes::R012, codes::R013, codes::R014, codes::T059].contains(&self.code)
+        [codes::R012, codes::R013, codes::R014, codes::R017, codes::T059].contains(&self.code)
     }
 
     #[must_use]

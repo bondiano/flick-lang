@@ -1,0 +1,44 @@
+// A `let mut` from outside a `scope` cannot take what the scope owns: its
+// type is fixed where it is declared, so an assignment inside the scope can
+// neither give it the region nor make a closure it holds capture more.
+module App.LetMutRegions exposing (..)
+
+type File (s : Region) = File String
+
+service Files =
+  open : forall s. String ->{Scope s; none} File s
+
+path_of : File s -> String
+let path_of file = match file with
+  | File path -> path
+
+outer_file : String ->{Files;} Unit
+let outer_file path =
+  let mut last = None
+  scope {
+    let file = Files.open path
+    last = Some file
+  }
+
+outer_callback : String ->{Files;} String
+let outer_callback path =
+  let mut reader = fun () -> ""
+  scope {
+    let file = Files.open path
+    reader = fun () -> path_of file
+  }
+  reader ()
+
+written_callback : String ->{Files;} String
+let written_callback path =
+  reader : Unit -> String
+  let mut reader = fun () -> ""
+  scope {
+    let file = Files.open path
+    reader = fun () -> path_of file
+  }
+  reader ()
+
+//~ FLICK-G002 @20:12-20:21
+//~ FLICK-G001 @28:14-28:36
+//~ FLICK-G001 @38:14-38:36

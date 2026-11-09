@@ -28,6 +28,7 @@ pub enum SyntaxKind {
     ImportKw,
     AsKw,
     LetKw,
+    MutKw,
     RecKw,
     AssertKw,
     FunKw,
@@ -211,6 +212,8 @@ pub enum SyntaxKind {
     DoExpr,
     /// `pattern <- expr` in a `do` block.
     BindStmt,
+    /// `name = expr`: an assignment to a `let mut` variable.
+    AssignStmt,
     /// `p <- a and q <- b`: bindings that run independently (`map2`).
     BindGroup,
     /// `if condition` without `then` in a `do` block: a guard through `Alternative`.
@@ -324,6 +327,7 @@ pub fn keyword(text: &str) -> Option<SyntaxKind> {
         "import" => K::ImportKw,
         "as" => K::AsKw,
         "let" => K::LetKw,
+        "mut" => K::MutKw,
         "rec" => K::RecKw,
         "assert" => K::AssertKw,
         "fun" => K::FunKw,
