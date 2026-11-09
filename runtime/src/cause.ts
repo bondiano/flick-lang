@@ -1,251 +1,139 @@
-// Outcomes as Flick sees them: `try … with` recovers the first typed
-// failure of a cause, and `Exit`, `Failure` and `RawCause` keep the native
-// cause opaque. A `CauseReport` is inert data: building it never runs code
-// of a payload (getters, `toString`, `toJSON`, Proxy traps).
-import type { types as NodeTypes } from "node:util";
+// Why a computation failed: a flat list of reasons, joined by `combine` (each
+// reason once) or `concat` (repeats kept). A failing computation throws a
+// `Raise` holding its cause; a typed failure and the abort of a handler are the
+// same thing thrown, the second a `Fail` whose error is a `Signal`.
+import { equals } from "./core/data.ts";
 
-import { Cause, Effect, Exit, type Option, Result } from "effect";
+export interface Fail {
+  readonly _tag: "Fail";
+  readonly error: unknown;
+}
+export interface Die {
+  readonly _tag: "Die";
+  readonly defect: unknown;
+}
+export interface Interrupt {
+  readonly _tag: "Interrupt";
+  readonly fiberId: number | undefined;
+}
+export type Reason = Fail | Die | Interrupt;
 
-import { none, some } from "./data.ts";
-import { nodeUtil } from "./host.ts";
-import { constructorName } from "./tags.ts";
+export interface Cause {
+  readonly reasons: ReadonlyArray<Reason>;
+}
 
-// a Proxy is told apart only on Node.js; elsewhere a payload is read by its descriptors anyway
-const types: Pick<typeof NodeTypes, "isProxy" | "isNativeError"> = /*#__PURE__*/ nodeUtil()?.types ?? {
-  isProxy: (_value: unknown): _value is never => false,
-  isNativeError: (value: unknown): value is Error => value instanceof Error,
+export const empty: Cause = /*#__PURE__*/ Object.freeze({ reasons: Object.freeze([]) });
+
+export const fromReasons = (reasons: ReadonlyArray<Reason>): Cause => ({ reasons });
+export const failReason = (error: unknown): Fail => ({ _tag: "Fail", error });
+export const dieReason = (defect: unknown): Die => ({ _tag: "Die", defect });
+export const interruptReason = (fiberId: number | undefined): Interrupt => ({ _tag: "Interrupt", fiberId });
+
+export const fail = (error: unknown): Cause => ({ reasons: [failReason(error)] });
+export const die = (defect: unknown): Cause => ({ reasons: [dieReason(defect)] });
+export const interrupt = (fiberId: number | undefined): Cause => ({ reasons: [interruptReason(fiberId)] });
+
+/** Reasons are one when a typed error or a defect's value is equal; a thrown `Error` only equals itself. */
+export const sameReason = (a: Reason, b: Reason): boolean => {
+  if (a._tag === "Fail") return b._tag === "Fail" && equals(a.error, b.error);
+  if (a._tag === "Interrupt") return b._tag === "Interrupt" && a.fiberId === b.fiberId;
+  if (b._tag !== "Die") return false;
+  return a.defect instanceof Error || b.defect instanceof Error ? a.defect === b.defect : equals(a.defect, b.defect);
 };
 
-const failsToDies = <E>(cause: Cause.Cause<E>): Cause.Cause<never> =>
-  Cause.fromReasons(cause.reasons.map((r) => (Cause.isFailReason(r) ? Cause.makeDieReason(r.error) : r)).filter(
-    (r): r is Cause.Die | Cause.Interrupt => !Cause.isFailReason(r),
-  ));
+/** `c ⊕ c'`: both, each reason once; an empty one gives the other as it is. */
+export const combine = (a: Cause, b: Cause): Cause => {
+  if (a.reasons.length === 0) return b;
+  if (b.reasons.length === 0) return a;
+  const out: Array<Reason> = [];
+  for (const r of [...a.reasons, ...b.reasons]) {
+    if (!out.some((k) => sameReason(k, r))) out.push(r);
+  }
+  return { reasons: out };
+};
+
+/** `c ⧺ c'`: both, repeats kept. */
+export const concat = (a: Cause, b: Cause): Cause => {
+  if (a.reasons.length === 0) return b;
+  if (b.reasons.length === 0) return a;
+  return { reasons: [...a.reasons, ...b.reasons] };
+};
+
+export const isFail = (r: Reason): r is Fail => r._tag === "Fail";
+export const isDie = (r: Reason): r is Die => r._tag === "Die";
+export const isInterrupt = (r: Reason): r is Interrupt => r._tag === "Interrupt";
+
+export const hasFails = (c: Cause): boolean => c.reasons.some(isFail);
+export const hasDies = (c: Cause): boolean => c.reasons.some(isDie);
+export const hasInterrupts = (c: Cause): boolean => c.reasons.some(isInterrupt);
+export const hasInterruptsOnly = (c: Cause): boolean => c.reasons.length > 0 && c.reasons.every(isInterrupt);
+
+/** `dies c`: every typed failure a defect of the same value. */
+export const dies = (c: Cause): Cause => ({ reasons: c.reasons.map((r) => (isFail(r) ? dieReason(r.error) : r)) });
+
+/** `elect c`: `dies c` when `c` has a defect and a typed failure, `c` otherwise. */
+export const elect = (c: Cause): Cause => (hasDies(c) && hasFails(c) ? dies(c) : c);
+
+/** What a failing computation throws. Not an `Error`: it captures no stack. */
+export class Raise {
+  readonly cause: Cause;
+  constructor(cause: Cause) {
+    this.cause = cause;
+  }
+}
+
+/** Fails with `cause`. */
+export const raise = (cause: Cause): never => {
+  // oxlint-disable-next-line typescript/only-throw-error -- the one thing a failure throws: no stack to capture
+  throw new Raise(cause);
+};
+
+/** The cause of what a computation threw; anything but a `Raise` is a defect. */
+export const causeOf = (thrown: unknown): Cause => (thrown instanceof Raise ? thrown.cause : die(thrown));
 
 /**
- * Where a handler of effects unwinds to (`handlers.ts`): the `abort` arm to
- * run there, or the typed failure of a `tail` arm, which is the handler's,
- * not its body's. No `try` and no `Exit` takes it for an error.
+ * Where a handler of effects unwinds to, as the error of a `Fail`: the `abort`
+ * arm to run there, the failure of a `tail` arm, which is the handler's and not
+ * its body's, or the discontinuing of its body. No `try` and no `Exit` takes it
+ * for an error.
  */
-export class HandlerSignal {
+export class Signal {
   readonly token: object;
-  readonly arm: Effect.Effect<unknown, unknown, unknown> | undefined;
-  readonly error: unknown;
-  constructor(token: object, arm: Effect.Effect<unknown, unknown, unknown> | undefined, error?: unknown) {
+  readonly arm: (() => unknown) | undefined;
+  readonly cause: Cause | undefined;
+  readonly discontinue: boolean;
+  constructor(token: object, arm: (() => unknown) | undefined, cause: Cause | undefined, discontinue: boolean) {
     this.token = token;
     this.arm = arm;
-    this.error = error;
-    Object.freeze(this);
+    this.cause = cause;
+    this.discontinue = discontinue;
   }
 }
 
-/** Whether a typed failure is a handler unwinding, not an error. */
-export const isHandlerSignal = (error: unknown): error is HandlerSignal => error instanceof HandlerSignal;
+/** Whether `c` unwinds to a handler of effects. */
+export const unwinds = (c: Cause): boolean => c.reasons.some((r) => isFail(r) && r.error instanceof Signal);
 
-/** Whether `cause` unwinds to a handler of effects. */
-export const unwinds = (cause: Cause.Cause<unknown>): boolean =>
-  cause.reasons.some((r) => Cause.isFailReason(r) && isHandlerSignal(r.error));
-
-/**
- * `cause` again, unchanged, where only a handler of effects takes it: it
- * is no error of the code it passes, so it has the type of none.
- */
-export const passOn = (cause: Cause.Cause<unknown>): Effect.Effect<never> =>
-  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- what it fails with is a handler's, of no error type of the code
-  Effect.failCause(cause as Cause.Cause<never>);
-
-/**
- * The typed error recovery may handle: the first failure of a cause without
- * defects. A defect blocks recovery, and so does unwinding to a handler;
- * interruption alone has no error.
- */
-const recoverable = <E>(cause: Cause.Cause<E>): Cause.Fail<E> | undefined =>
-  Cause.hasDies(cause) || unwinds(cause) ? undefined : cause.reasons.find(Cause.isFailReason);
-
-type Selected<B> = { readonly die: Cause.Cause<never> } | { readonly handled: B };
-
-/**
- * `try body with arms`. `handler` returns the handling effect for a typed
- * error an arm matches, `undefined` otherwise. A cause that also holds a
- * defect is not recovered and its failures become defects; without a
- * matching arm the original cause propagates.
- */
-export const tryWith = <A, E, R, A2, E2, R2>(
-  body: Effect.Effect<A, E, R>,
-  handler: (error: E) => Effect.Effect<A2, E2, R2> | undefined,
-): Effect.Effect<A | A2, E | E2, R | R2> =>
-  Effect.catchCauseFilter(
-    body,
-    (cause): Result.Result<Selected<Effect.Effect<A2, E2, R2>>, Cause.Cause<E>> => {
-      if (Cause.hasDies(cause)) {
-        return Cause.hasFails(cause) ? Result.succeed({ die: failsToDies(cause) }) : Result.fail(cause);
-      }
-      const reason = recoverable(cause);
-      const handled = reason === undefined ? undefined : handler(reason.error);
-      return handled === undefined ? Result.fail(cause) : Result.succeed({ handled });
-    },
-    (selected) => ("die" in selected ? Effect.failCause(selected.die) : selected.handled),
-  );
-
-const causes = /*#__PURE__*/ new WeakMap<object, Cause.Cause<unknown>>();
-
-const causeOf = (value: object): Cause.Cause<unknown> => {
-  const cause = causes.get(value);
-  if (cause === undefined) throw new TypeError("not a Failure or RawCause of this runtime");
-  return cause;
+/** The signal of the handler `token` in `c`. */
+export const signalOf = (c: Cause, token: object): Signal | undefined => {
+  for (const r of c.reasons) {
+    if (isFail(r) && r.error instanceof Signal && r.error.token === token) return r.error;
+  }
+  return undefined;
 };
 
-/** `Failure e`: how a computation failed, as an opaque native cause. */
-export class Failure {
-  /** Whether it is the interruption of a closing owner. */
-  readonly shutdown: boolean;
-  constructor(cause: Cause.Cause<unknown>, shutdown = false) {
-    causes.set(this, cause);
-    this.shutdown = shutdown;
-    Object.freeze(this);
+/** The first typed failure of a cause without defects, which recovery selects. */
+export const recoverable = (c: Cause): Fail | undefined =>
+  hasDies(c) || unwinds(c) ? undefined : c.reasons.find(isFail);
+
+/** How a computation ended: `cause` is undefined on success. */
+export class Exit {
+  readonly value: unknown;
+  readonly cause: Cause | undefined;
+  constructor(value: unknown, cause: Cause | undefined) {
+    this.value = value;
+    this.cause = cause;
   }
 }
 
-/** `RawCause`: the whole native cause, for diagnostics only. */
-// oxlint-disable-next-line typescript/no-extraneous-class -- the class gives raw causes an identity of their own
-export class RawCause {
-  constructor(cause: Cause.Cause<unknown>) {
-    causes.set(this, cause);
-    Object.freeze(this);
-  }
-}
-
-/** `Exit e a`: success with its value, or a `Failure`. */
-export class FlickExit<A> {
-  readonly #exit: Exit.Exit<A, unknown>;
-  constructor(exit: Exit.Exit<A, unknown>) {
-    this.#exit = exit;
-    Object.freeze(this);
-  }
-  static value<A>(exit: FlickExit<A>): Option.Option<A> {
-    return Exit.isSuccess(exit.#exit) ? some(exit.#exit.value) : none;
-  }
-  static failure<A>(exit: FlickExit<A>): Option.Option<Failure> {
-    return Exit.isFailure(exit.#exit) ? some(new Failure(exit.#exit.cause)) : none;
-  }
-}
-
-/** The exit of `effect`, which itself never fails but where it unwinds to a handler. */
-export const exitOf = <A, E, R>(effect: Effect.Effect<A, E, R>): Effect.Effect<FlickExit<A>, never, R> =>
-  Effect.flatMap(Effect.exit(effect), (exit) =>
-    Exit.isFailure(exit) && unwinds(exit.cause)
-      ? passOn(exit.cause)
-      : Effect.succeed(new FlickExit(exit)),
-  );
-export const exitValue = <A>(exit: FlickExit<A>): Option.Option<A> => FlickExit.value(exit);
-export const exitFailure = <A>(exit: FlickExit<A>): Option.Option<Failure> => FlickExit.failure(exit);
-
-/** `Failure.primary`: the typed error recovery would select. */
-export const failurePrimary = (failure: Failure): Option.Option<unknown> => {
-  const reason = recoverable(causeOf(failure));
-  return reason === undefined ? none : some(reason.error);
-};
-
-export const failureRawCause = (failure: Failure): RawCause => new RawCause(causeOf(failure));
-
-/** The native cause of a `Failure`, for the runtime only. */
-export const failureCause = (failure: Failure): Cause.Cause<unknown> => causeOf(failure);
-
-/** `Failure.rethrow`: fails with the original cause, unchanged. */
-export const failureRethrow = (failure: Failure): Effect.Effect<never, unknown> => Effect.failCause(causeOf(failure));
-
-/** The native cause behind a `Failure` or `RawCause`, for the adapter itself. */
-export const nativeCause = (value: Failure | RawCause): Cause.Cause<unknown> | undefined => causes.get(value);
-
-const LIMIT = 200;
-
-const text = (s: string): string => (s.length > LIMIT ? `${s.slice(0, LIMIT)}…` : s);
-
-/** A data property of `value` read without running code of it. */
-const own = (value: object, key: string): string | undefined => {
-  const descriptor = Object.getOwnPropertyDescriptor(value, key);
-  return descriptor && "value" in descriptor && typeof descriptor.value === "string" ? text(descriptor.value) : undefined;
-};
-
-/** What can be said of a payload without running any code of it. */
-interface Described {
-  readonly value?: string;
-  readonly error?: true;
-  readonly message?: string;
-  readonly tag?: string | undefined;
-}
-
-const describe = (payload: unknown): Described => {
-  switch (typeof payload) {
-    case "string":
-      return { value: text(payload) };
-    case "number":
-    case "boolean":
-    case "bigint":
-    case "undefined":
-      return { value: String(payload) };
-    case "symbol":
-      return { value: "<symbol>" };
-    case "function":
-      return { value: "<function>" };
-    default:
-      if (typeof payload !== "object" || payload === null) return { value: "null" };
-      if (types.isProxy(payload)) return { value: "<proxy>" };
-      if (types.isNativeError(payload)) {
-        return { error: true, message: own(payload, "message") ?? "<error>" };
-      }
-      return { tag: own(payload, "_tag"), value: "<object>" };
-  }
-};
-
-/** A defect as inert text: the message of an error, a primitive, or the constructor of a tagged value. */
-export const describeDefect = (defect: unknown): string => {
-  const d = describe(defect);
-  if (d.error) return d.message ?? "<error>";
-  return d.tag === undefined ? (d.value ?? "") : constructorName(d.tag);
-};
-
-/** One reason of a `CauseReport`. */
-export type ReasonReport =
-  | (Described & { readonly kind: "fail" | "die" })
-  | { readonly kind: "interrupt"; readonly fiber: number | null };
-
-/** `CauseReport`: what a cause holds, as inert data. */
-export interface CauseReport {
-  readonly reasons: ReadonlyArray<ReasonReport>;
-}
-
-/** `fields` as an object without a prototype: nothing of it runs code when read. */
-const inert = <T extends object>(fields: T): Readonly<T> => {
-  const out: T = { ...fields };
-  Object.setPrototypeOf(out, null);
-  return Object.freeze(out);
-};
-
-/** A `CauseReport` of a native cause: kinds, safe tags and texts. */
-const report = (cause: Cause.Cause<unknown>): CauseReport =>
-  inert({
-    reasons: Object.freeze(
-      cause.reasons.map((r): ReasonReport => {
-        if (Cause.isFailReason(r)) return inert({ kind: "fail" as const, ...describe(r.error) });
-        if (Cause.isDieReason(r)) return inert({ kind: "die" as const, ...describe(r.defect) });
-        return inert({ kind: "interrupt" as const, fiber: r.fiberId ?? null });
-      }),
-    ),
-  });
-
-export const failureInspect = (failure: Failure): Effect.Effect<CauseReport> => Effect.sync(() => report(causeOf(failure)));
-export const rawCauseInspect = (raw: RawCause): Effect.Effect<CauseReport> => Effect.sync(() => report(causeOf(raw)));
-
-/** One line of a `CauseReport`: the reasons, with what can be said of each. */
-export const describeReport = (r: CauseReport): string =>
-  r.reasons
-    .map((reason) => {
-      if (reason.kind === "interrupt") return "interrupt";
-      const shown = reason.tag === undefined ? reason.value : constructorName(reason.tag);
-      const what = reason.error ? `error ${reason.message ?? ""}` : (shown ?? "");
-      return `${reason.kind} ${what}`;
-    })
-    .join("; ");
-
-/** `describeReport` of a native cause, for test results and reporters. */
-export const describeCause = (cause: Cause.Cause<unknown>): string => describeReport(report(cause));
+export const succeeded = (value: unknown): Exit => new Exit(value, undefined);
+export const failed = (cause: Cause): Exit => new Exit(undefined, cause);

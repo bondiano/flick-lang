@@ -536,9 +536,9 @@ Each law below names the cases that exercise it, under `tests/run/runtime/` unle
 | Law | Cases | Targets | Checked by |
 | - | - | - | - |
 | R1 | `scope_close`, `scope_releases`, `abort_closes_scopes`, `interrupt_in_finalizer`, `closed_owner` | both | trace, output |
-| R1, a discontinued body | `discontinued_body`, `discontinued_fiber` | Go; JS waits for `control` arms (`FLICK-P012`) | trace, output |
+| R1, a discontinued body | `discontinued_body`, `discontinued_fiber` | Go and `effect = "rt"`; JS on Effect waits for `control` arms (`FLICK-P012`) | trace, output |
 | R2 | `close_phases`, `scope_owners`, `closing_hooks`, `settling_calls`, `closing_child_fails`, `interrupt_in_finalizer`, `abort_stops_children` | both | trace, output. Group children are not traced: output only |
-| R2, a discontinued body | `discontinued_body`, `discontinued_fiber` | Go; JS waits | trace, output |
+| R2, a discontinued body | `discontinued_body`, `discontinued_fiber` | Go and `effect = "rt"`; JS on Effect waits | trace, output |
 | R3 | `parallel`, `close_phases`, `closing_hooks`, `abort_stops_children`; `discontinued_fiber` on Go | both | trace for children and watchers; output for group children and combinator branches, which are not traced |
 | R4 | `close_phases`, `closing_child_fails`, `supervisor_defect` (exit code), `cause_lists` (`parallel`) | both | trace for the call of the supervisor; output for the root seeing its failure and for `parallel` |
 | R5 | `cause_laws`, `cause_lists` | both | output (properties) |
@@ -557,6 +557,8 @@ Each law below names the cases that exercise it, under `tests/run/runtime/` unle
 The law (Unmask) of §3.2 has its own case, `interrupt_after_close`.
 
 `tests/run/known_gaps.txt` lists the cases a target does not pass yet, each with its reason. Their `.stdout` is what the contract asks for; the harness runs them and fails on one that passes, so a case joins its target as soon as the target holds the law.
+
+`tests/run/rt.txt` lists the cases that run on the runtime of `effect = "rt"`, which has no Effect under it, in both profiles and under the monitor (`just conformance-rt`); every other case runs there too, in debug, and one that passes is reported, so that it joins the list. Where it and Go legitimately differ: [the runtime of `effect = "rt"`](#the-runtime-of-effect--rt).
 
 A differential check: the cases of `tests/run/model.txt` also run on `flick-model`. Of this table it runs `abort_closes_scopes` and `discontinued_body`. It cannot run the others: it has no `parallel`, `Deferred`, `Effect.exit`, `Scope.add_finalizer_exit` or memo map of layers, and it runs children when a region closes, so nothing can wait for a child or a child be interrupted there. It rejects `scope_owners`, which acquires into an outer region from an inner one.
 
@@ -928,6 +930,18 @@ Found by the Lean development of the core (`formal/Formal/`).
 
 - Divergence: a supervisor or a stopping group child makes a `FiberSet` in the region of the closing owner and runs a task in it. On Go the group is open until its hook runs (§3.6): the task runs and has stopped before the finalizers. On Node `inOwner` refuses any child of a closing owner (`stdlib/fibers.ts`): the fiber is interrupted and the task does not run. R2 and R3 hold on both, and so a hook added during C1 or C3 cannot be observed on Node from a program.
 - Resolution: recorded; §3.6 is the rule. Case: `tests/run/runtime/group_in_closing.fl`, listed in `tests/run/known_gaps.txt` for JS.
+
+### The runtime of `effect = "rt"`
+
+`runtime/src/rt/` is the same contract without Effect, on generators and a driver of its own. Where the runtimes differ it takes a side:
+
+- Interruption points: as JS, a boundary between two steps of the driver: a call, a suspension, a jump of a looping generator. A plain function is one step, so a stage that runs at once cannot be interrupted, and on this runtime that is every closed row of `tail` and `abort` effects, `->{}` included: `spin : Float ->{} Float` looping for ever blocks the thread, and `codegen/release`, which stops it with `timeout_option`, does not finish. Go interrupts it at `Check`. Recorded: a function that loops for ever and must stop has a row that says so, `Async`.
+- A wait that ends moves its fiber on at once, on the stack that ended it, and a fiber forked by `spawn` starts on a later turn of a queue on microtasks; branches of a combinator start at once on the stack. As Effect, so that the order of output agrees with JS on Effect. Go's order comes from goroutines and turns (`startup.go`).
+- Foreign calls enter `P` when they start, as JS; Go puts them there when they are interrupted.
+- Discontinuing a body throws the handler's signal into its frames, as Go panics with it, rather than `gen.return()`: every frame sees it as a failure, `Effect.ensuring` and scopes close by the same path, and the order of finalizers is Go's.
+- A group made while its owner closes: §3.6, as Go ([JS](#js-a-group-made-while-its-owner-closes-runs-nothing)). `group_in_closing` passes.
+- Time: a sleep, `timeout` and a schedule wait on the clock in the evidence, the host's or the virtual one of `Test.clock_test`. Moving a virtual clock wakes the sleepers due in order and waits, before the next, until what each wake scheduled has run, as Effect's `TestClock` does by its scheduler; Go waits until the fibers under the clock are parked.
+- A service a layer builds is a handler: its operations run with the evidence of the place of the `provide`, as the arms of `provide S impl` do (§3.2), and a failure of one is the handler's. On Effect and Go it is a record whose operations run where they are called: `codegen/service_place` prints `inner layer` there and `outer layer` here.
 
 ### Go: HTTP handlers
 

@@ -6,7 +6,7 @@ use std::mem;
 
 use super::expr::{arrow_body, unmarked};
 use super::{Gen, Tail, indent, names, view};
-use crate::codegen::tail::{Calls, Target, self_call, tail_callees};
+use crate::codegen::tail::{Calls, Target, jumpable, self_call, tail_callees};
 use crate::ir::{BinOp, Expr, ExprKind, Lit, Param, Pat, Stage};
 
 impl Gen<'_> {
@@ -80,8 +80,9 @@ impl Gen<'_> {
         }
         let vars: Vec<String> = (0..heads.len()).map(|i| format!("$l{i}")).collect();
         let grouped = target.as_ref().and_then(|t| self.group_call(t, &heads));
+        let calls = self.calls();
         let tail = target
-            .filter(|_| grouped.is_none() && params.iter().all(|p| p.stage == Stage::Pure))
+            .filter(|_| grouped.is_none() && jumpable(params, calls))
             .map(|target| Tail {
                 members: vec![(target, params.len())],
                 current: 0,
@@ -90,7 +91,7 @@ impl Gen<'_> {
                 state: None,
                 offsets: Vec::new(),
             })
-            .filter(|t| has_tail_call(body, t));
+            .filter(|t| has_tail_call(body, t, calls));
         let stmts = if let Some(call) = grouped {
             vec![format!("return {call};")]
         } else if let Some(mut tail) = tail {
@@ -105,6 +106,11 @@ impl Gen<'_> {
             });
             stmts
         };
+        if self.kernel && last_runtime {
+            let text = self.stage_function(&heads, &stmts, uncurried);
+            (self.buf, self.generator, self.sync, self.tail) = saved;
+            return text;
+        }
         let mut text = if last_runtime {
             self.generator_of(&stmts)
         } else {
@@ -124,7 +130,7 @@ impl Gen<'_> {
             text = format!("{} {text}", self.arrow(&heads.join(", ")));
         }
         for (i, head) in heads.iter().enumerate().rev().filter(|_| !uncurried) {
-            if i + 1 < params.len() && params[i].stage == Stage::Runtime {
+            if i + 1 < params.len() && params[i].stage == Stage::Runtime && !self.kernel {
                 text = format!("{}({text})", self.effect("succeed"));
             }
             text = format!("{} {text}", self.arrow(head));
@@ -207,7 +213,10 @@ impl Gen<'_> {
             }
             // the right operand is in tail position: a jump there needs a statement
             ExprKind::Binary(op @ (BinOp::And | BinOp::Or), lhs, rhs)
-                if self.tail.as_ref().is_some_and(|t| has_tail_call(rhs, t)) =>
+                if self
+                    .tail
+                    .as_ref()
+                    .is_some_and(|t| has_tail_call(rhs, t, self.calls())) =>
             {
                 let l = self.expr(lhs);
                 let (test, value) = if *op == BinOp::And {
@@ -220,61 +229,73 @@ impl Gen<'_> {
                 self.tail_expr(rhs);
             }
             _ => {
+                let calls = self.calls();
                 if let Some((j, args)) = self
                     .tail
                     .as_ref()
-                    .and_then(|t| self_call(e, &t.members, Calls::Pure))
+                    .and_then(|t| self_call(e, &t.members, calls))
                 {
-                    let (vars, binds, state, offsets) = self
-                        .tail
-                        .as_ref()
-                        .map(|t| {
-                            let state = t.state.clone().filter(|_| j != t.current);
-                            (t.vars.clone(), t.binds.clone(), state, t.offsets.clone())
-                        })
-                        .unwrap_or_default();
-                    let offset = |i: usize| offsets.get(i).cloned().flatten();
-                    // the rest of a walked list passed on at its own position moves its offset
-                    let moves: Vec<(usize, String)> = (0..args.len())
-                        .filter(|&i| offset(i).is_some())
-                        .filter_map(|i| match &args[i].kind {
-                            ExprKind::Local(r) => match self.rests.get(r) {
-                                Some((pos, start)) if *pos == i => Some((i, start.clone())),
-                                _ => None,
-                            },
-                            _ => None,
-                        })
-                        .collect();
-                    // a parameter passed on unchanged keeps its variable
-                    let changed: Vec<usize> = (0..args.len())
-                        .filter(|&i| !moves.iter().any(|(m, _)| *m == i))
-                        .filter(|&i| !matches!(&args[i].kind, ExprKind::Local(n) if binds.get(i).is_some_and(|b| b.as_ref() == Some(n))))
-                        .collect();
-                    let args: Vec<&Expr> = changed.iter().map(|&i| args[i]).collect();
-                    // the arguments read the parameters, never the loop variables
-                    let js = self.ordered(&args);
-                    for (&i, value) in changed.iter().zip(js) {
-                        self.buf.push(format!("{} = {value};", vars[i]));
-                        if let Some(o) = offset(i) {
-                            self.buf.push(format!("{o} = 0;"));
-                        }
-                    }
-                    for (i, start) in moves {
-                        if let Some(o) = offset(i) {
-                            self.buf.push(format!("{o} = {start};"));
-                        }
-                    }
-                    if let Some(state) = state {
-                        self.buf.push(format!("{state} = {j};"));
-                    }
-                    self.buf.push("continue;".to_owned());
+                    self.jump(j, &args);
                     return;
                 }
                 let v = self.expr(e);
+                let v = self.tail_call(v);
                 let mark = mark!(self, e.span);
                 self.buf.push(format!("return {mark}{v};"));
             }
         }
+    }
+
+    /// A tail call of the member `j` of the current tail: sets the loop
+    /// variables to `args` and jumps.
+    fn jump(&mut self, j: usize, args: &[&Expr]) {
+        let (vars, binds, state, offsets) = self
+            .tail
+            .as_ref()
+            .map(|t| {
+                let state = t.state.clone().filter(|_| j != t.current);
+                (t.vars.clone(), t.binds.clone(), state, t.offsets.clone())
+            })
+            .unwrap_or_default();
+        let offset = |i: usize| offsets.get(i).cloned().flatten();
+        // the rest of a walked list passed on at its own position moves its offset
+        let moves: Vec<(usize, String)> = (0..args.len())
+            .filter(|&i| offset(i).is_some())
+            .filter_map(|i| match &args[i].kind {
+                ExprKind::Local(r) => match self.rests.get(r) {
+                    Some((pos, start)) if *pos == i => Some((i, start.clone())),
+                    _ => None,
+                },
+                _ => None,
+            })
+            .collect();
+        // a parameter passed on unchanged keeps its variable
+        let changed: Vec<usize> = (0..args.len())
+            .filter(|&i| !moves.iter().any(|(m, _)| *m == i))
+            .filter(|&i| !matches!(&args[i].kind, ExprKind::Local(n) if binds.get(i).is_some_and(|b| b.as_ref() == Some(n))))
+            .collect();
+        let args: Vec<&Expr> = changed.iter().map(|&i| args[i]).collect();
+        // the arguments read the parameters, never the loop variables
+        let js = self.ordered(&args);
+        for (&i, value) in changed.iter().zip(js) {
+            self.buf.push(format!("{} = {value};", vars[i]));
+            if let Some(o) = offset(i) {
+                self.buf.push(format!("{o} = 0;"));
+            }
+        }
+        for (i, start) in moves {
+            if let Some(o) = offset(i) {
+                self.buf.push(format!("{o} = {start};"));
+            }
+        }
+        if let Some(state) = state {
+            self.buf.push(format!("{state} = {j};"));
+        }
+        // a step of the driver: the loop can be stopped and gives others a turn
+        if self.kernel && self.generator {
+            self.buf.push("yield;".to_owned());
+        }
+        self.buf.push("continue;".to_owned());
     }
 
     /// The body of a runtime stage, `task` or handler: an `Effect.gen`.
@@ -283,6 +304,9 @@ impl Gen<'_> {
         self.generator = true;
         let (stmts, ()) = self.block(|g| g.tail_expr(body));
         (self.generator, self.tail) = saved;
+        if self.kernel {
+            return self.stage_function(&[], &stmts, true);
+        }
         self.generator_of(&stmts)
     }
 
@@ -306,7 +330,7 @@ impl Gen<'_> {
 
 /// `x` of `return (yield* x);` when `x` yields nothing itself, with the
 /// markers before it.
-fn lone_yield(stmt: &str) -> Option<String> {
+pub(super) fn lone_yield(stmt: &str) -> Option<String> {
     let value = stmt.strip_prefix("return ")?.strip_suffix(';')?;
     let code = unmarked(value);
     let marks = &value[..value.len() - code.len()];
@@ -316,7 +340,7 @@ fn lone_yield(stmt: &str) -> Option<String> {
 
 /// Whether the parentheses of `js` balance and it has no `yield` outside a
 /// nested `function*`, skipping string literals.
-fn balanced_without_yield(js: &str) -> bool {
+pub(super) fn balanced_without_yield(js: &str) -> bool {
     let bytes = js.as_bytes();
     // braces open, `true` for the body of a nested generator
     let mut braces: Vec<bool> = Vec::new();
@@ -335,7 +359,7 @@ fn balanced_without_yield(js: &str) -> bool {
                 Some(p) => parens = p,
                 None => return false,
             },
-            b'{' => braces.push(js[..i].trim_end().ends_with("function* ()")),
+            b'{' => braces.push(after_generator_head(&js[..i])),
             b'}' => {
                 braces.pop();
             }
@@ -345,6 +369,13 @@ fn balanced_without_yield(js: &str) -> bool {
         i += 1;
     }
     parens == 0
+}
+
+/// Whether `js` ends with the head of a generator, `function* (…)`.
+fn after_generator_head(js: &str) -> bool {
+    let head = js.trim_end();
+    head.rfind("function* (")
+        .is_some_and(|at| head[at..].find(')') == Some(head.len() - at - 1))
 }
 
 /// The offset variable of each walked position.
@@ -368,6 +399,6 @@ pub(super) fn binds(params: &[Param]) -> Vec<Option<String>> {
 }
 
 /// Whether a tail position of `body` jumps to a member of `tail`.
-fn has_tail_call(body: &Expr, tail: &Tail) -> bool {
-    !tail_callees(body, &tail.members, Calls::Pure).is_empty()
+fn has_tail_call(body: &Expr, tail: &Tail, calls: Calls) -> bool {
+    !tail_callees(body, &tail.members, calls).is_empty()
 }

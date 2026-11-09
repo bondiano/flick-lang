@@ -1,47 +1,117 @@
-// Services and their operations.
-import { Context, Effect } from "effect";
+// Tasks as values: a task is a function of nothing that runs when called, and
+// these are the functions over them that compiled code and the built-in modules
+// name. What a task or a runtime function gives is a value or a call, which the
+// driver tells apart, so each of these takes either.
+import type { Seq } from "./core/seq.ts";
+import { fromNullable } from "./core/data.ts";
+import { seq } from "./core/seq.ts";
+import { fail, raise } from "./cause.ts";
+import { type Ctx, Instruction, type Run, currentCtx, inCtx, isRun } from "./fiber.ts";
+import { args, env, writeStderr, writeStdout } from "./host.ts";
 
-/** The implementation of a service: its operations, curried. */
-export type ServiceImpl = Readonly<Record<string, unknown>>;
+function* then(call: unknown, f: (value: unknown) => unknown): Run {
+  return f(yield call);
+}
 
-/** The key of `service S` declared in module `M`: `M.S`; `S` is the type of its implementation. */
-export const service = <S extends object = ServiceImpl>(key: string): Context.Service<S, S> => Context.Service<S>(key);
+/** `f` of what `call` gives: at once when it is a value. */
+export const mapped = (call: unknown, f: (value: unknown) => unknown): unknown =>
+  isRun(call) || call instanceof Instruction ? then(call, f) : f(call);
 
-/** `f a` for a curried function of the program. */
-const apply = (f: unknown, a: unknown): unknown => {
-  if (typeof f !== "function") throw new TypeError("the function takes fewer arguments");
-  const result: unknown = Reflect.apply(f, undefined, [a]);
-  return result;
-};
+/** A foreign `effect` with `catch`: a throw of its factory becomes the mapped error. */
+export function* foreignEffect(make: () => unknown, mapping: (error: unknown) => unknown): Run {
+  let made: unknown;
+  try {
+    made = make();
+  } catch (error) {
+    return raise(fail(mapping(error)));
+  }
+  return yield made;
+}
 
-/** The effect of a curried runtime function applied to `args`. */
-export const applyRuntime = (fn: unknown, args: ReadonlyArray<unknown>): Effect.Effect<unknown, unknown, unknown> => {
-  const result = args.reduce(apply, fn);
-  return Effect.isEffect(result) ? result : Effect.die(new TypeError("a runtime function returned no effect"));
-};
+export const succeed =
+  (value: unknown) =>
+  (): unknown =>
+    value;
 
-/** The operation `name` of `impl`, given the dictionaries of its constraints. */
-export const implementation = <S extends object>(impl: S, name: keyof S, dicts: ReadonlyArray<unknown>): unknown => {
-  const f: unknown = impl[name];
-  if (dicts.length === 0) return f;
-  if (typeof f !== "function") throw new TypeError("the operation takes no dictionaries");
-  const given: unknown = Reflect.apply(f, undefined, dicts);
-  return given;
-};
+export const fromResult = (result: { readonly _tag: string; readonly success?: unknown; readonly failure?: unknown }): unknown =>
+  result._tag === "Success" ? result.success : raise(fail(result.failure));
 
-/**
- * `S.op`: a function of the operation's arguments up to its first runtime
- * stage that looks the service up when that stage runs.
- */
-export const operation = <S extends object>(
-  tag: Context.Service<S, S>,
-  name: keyof S,
-  arity: number,
-  dicts: ReadonlyArray<unknown> = [],
-): unknown => {
-  const call = (args: ReadonlyArray<unknown>): Effect.Effect<unknown, unknown, unknown> =>
-    Effect.flatMap(Effect.service(tag), (impl) => applyRuntime(implementation(impl, name, dicts), args));
-  const collect = (args: ReadonlyArray<unknown>): unknown =>
-    args.length === arity ? call(args) : (a: unknown) => collect([...args, a]);
-  return arity === 0 ? call([]) : collect([]);
-};
+export const bindEff =
+  (task: () => unknown, f: (value: unknown) => () => unknown) =>
+  (): Run =>
+    (function* (): Run {
+      return f(yield task())();
+    })();
+
+export const flatMapEff =
+  (f: (value: unknown) => () => unknown, task: () => unknown) =>
+  (): Run =>
+    (function* (): Run {
+      return f(yield task())();
+    })();
+
+export const mapEff =
+  (f: (value: unknown) => unknown, task: () => unknown) =>
+  (): unknown =>
+    mapped(task(), f);
+
+export const map2Eff =
+  (f: (a: unknown, b: unknown) => unknown, x: () => unknown, y: () => unknown) =>
+  (): Run =>
+    (function* (): Run {
+      const a: unknown = yield x();
+      const b: unknown = yield y();
+      return f(a, b);
+    })();
+
+export function* listMapEffect(f: (a: unknown) => unknown, xs: ReadonlyArray<unknown>): Run {
+  const out: Array<unknown> = [];
+  for (const x of xs) out.push(yield f(x));
+  return out;
+}
+
+export function* listEachEffect(f: (a: unknown) => unknown, xs: ReadonlyArray<unknown>): Run {
+  for (const x of xs) yield f(x);
+  return undefined;
+}
+
+export function* listFoldEffect(f: (acc: unknown, a: unknown) => unknown, init: unknown, xs: ReadonlyArray<unknown>): Run {
+  let acc = init;
+  for (const x of xs) acc = yield f(acc, x);
+  return acc;
+}
+
+export function* seqEachEffect(f: (a: unknown) => unknown, xs: Iterable<unknown>): Run {
+  for (const x of xs) yield f(x);
+  return undefined;
+}
+
+export function* seqFoldEffect(f: (acc: unknown, a: unknown) => unknown, init: unknown, xs: Iterable<unknown>): Run {
+  let acc = init;
+  for (const x of xs) acc = yield f(acc, x);
+  return acc;
+}
+
+/** The evidence of the stage at hand, for a sequence whose steps read it later. */
+export const syncContext = (): Ctx => currentCtx();
+
+/** The sequence of a `for` whose body makes Sync calls: each step runs with `ctx`. */
+export const seqIn = <A>(ctx: Ctx, gen: () => Iterator<A>): Seq<A> =>
+  seq(function* () {
+    const steps = gen();
+    try {
+      for (;;) {
+        const step = inCtx(ctx, () => steps.next());
+        if (step.done === true) return;
+        yield step.value;
+      }
+    } finally {
+      inCtx(ctx, () => steps.return?.());
+    }
+  });
+
+export const stdoutLine = (text: string): void => writeStdout(`${text}\n`);
+export const stderrLine = (text: string): void => writeStderr(`${text}\n`);
+export const stdoutWrite = (text: string): void => writeStdout(text);
+export const platformArgs = (): Array<string> => args();
+export const platformEnv = (name: string): unknown => fromNullable(env(name));

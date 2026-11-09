@@ -23,18 +23,27 @@ const PREFIX: &str = "builtins-";
 /// them. A failure to read or save only means they are checked again; an
 /// implicit package that does not check with this compiler is `FLICK-P043`.
 pub fn prepare() -> Result<(), Diagnostic> {
-    let Some((dir, binary, name)) = location() else {
-        return types::try_builtins().map(drop).map_err(|p| unfit(&p));
+    prepare_in(false)
+}
+
+/// [`prepare`], for checks with `stages_by_class` or without, each with a file
+/// of its own.
+pub fn prepare_in(stages_by_class: bool) -> Result<(), Diagnostic> {
+    let Some((dir, binary, name)) = location(stages_by_class) else {
+        return types::try_builtins(stages_by_class)
+            .map(drop)
+            .map_err(|p| unfit(&p));
     };
     let path = dir.join(&name);
     if let Some(interfaces) = fs::read(&path)
         .ok()
         .and_then(|bytes| serde_json::from_slice::<Vec<Interface>>(&bytes).ok())
     {
-        types::install_builtins(interfaces);
+        types::install_builtins(stages_by_class, interfaces);
         return Ok(());
     }
-    let Ok(json) = serde_json::to_vec(types::try_builtins().map_err(|p| unfit(&p))?) else {
+    let Ok(json) = serde_json::to_vec(types::try_builtins(stages_by_class).map_err(|p| unfit(&p))?)
+    else {
         return Ok(());
     };
     if fs::create_dir_all(&dir).is_err() {
@@ -72,10 +81,11 @@ fn unfit(problem: &str) -> Diagnostic {
 /// name for its implicit packages: the interfaces depend on the checker as
 /// much as on the sources, so the name follows the executable, not only the
 /// version, and the hash of the sources of those packages, which a project picks.
-fn location() -> Option<(PathBuf, String, String)> {
+fn location(stages_by_class: bool) -> Option<(PathBuf, String, String)> {
     let dir = store::cache_dir()?;
     let binary = format!("{PREFIX}{}-", toolchain::fingerprint()?);
-    let name = format!("{binary}{}.json", &implicit_hash()[..16]);
+    let mode = if stages_by_class { "-by-class" } else { "" };
+    let name = format!("{binary}{}{mode}.json", &implicit_hash()[..16]);
     Some((dir, binary, name))
 }
 

@@ -1,29 +1,49 @@
-// Effect's `Fiber` for the bindings of the standard library, and the
-// adapters over Flick's `Fiber e a`: a child spawned into an owner.
-import { Effect, Fiber, Option } from "effect";
-
-import type { FlickExit } from "../cause.ts";
+// The bindings of `Fiber` on the kernel, over a child spawned into an owner.
+import { type Exit } from "../cause.ts";
+import { type Fiber, type Run, asExit, awaitFiber, currentFiber, raiseOf } from "../fiber.ts";
+import type { Option } from "../core/data.ts";
 import type { FlickFiber } from "../owner.ts";
-import { flickExit } from "../stdlib/outcome.ts";
 
-export * from "effect/Fiber";
+export function* flickAwait(fiber: FlickFiber): Run {
+  return yield awaitFiber(fiber.fiber);
+}
 
-const natives = <A, E>(fibers: ReadonlyArray<FlickFiber<A, E>>): Array<Fiber.Fiber<A, E>> => fibers.map((f) => f.fiber);
+export function* flickAwaitAll(fibers: ReadonlyArray<FlickFiber>): Run {
+  const exits: Array<Exit> = [];
+  for (const f of fibers) exits.push(asExit(yield awaitFiber(f.fiber)));
+  return exits;
+}
 
-export const flickAwait = <A, E>(fiber: FlickFiber<A, E>): Effect.Effect<FlickExit<A>> =>
-  Effect.map(Fiber.await(fiber.fiber), flickExit);
-export const flickAwaitAll = <A, E>(fibers: ReadonlyArray<FlickFiber<A, E>>): Effect.Effect<Array<FlickExit<A>>> =>
-  Effect.map(Fiber.awaitAll(natives(fibers)), (exits) => exits.map(flickExit));
-export const flickJoinAll = <A, E>(fibers: ReadonlyArray<FlickFiber<A, E>>): Effect.Effect<ReadonlyArray<A>, E> =>
-  Fiber.joinAll(natives(fibers));
-export const flickInterrupt = <A, E>(fiber: FlickFiber<A, E>): Effect.Effect<void> => Fiber.interrupt(fiber.fiber);
+export function* flickJoinAll(fibers: ReadonlyArray<FlickFiber>): Run {
+  const out: Array<unknown> = [];
+  for (const f of fibers) out.push(raiseOf(asExit(yield awaitFiber(f.fiber))));
+  return out;
+}
+
+/** Asks each to stop, as `by`, and waits for them all. */
+function* stopping(fibers: ReadonlyArray<Fiber>, by: number): Run {
+  for (const f of fibers) f.interrupt(by);
+  for (const f of fibers) yield awaitFiber(f);
+  return undefined;
+}
+
+export const flickInterrupt = (fiber: FlickFiber): Run => stopping([fiber.fiber], currentFiber().id);
+
 export const flickInterruptAs =
-  (fiberId: Option.Option<number>) =>
-  <A, E>(fiber: FlickFiber<A, E>): Effect.Effect<void> =>
-    Fiber.interruptAs(fiber.fiber, Option.getOrUndefined(fiberId));
-export const flickInterruptAll = <A, E>(fibers: ReadonlyArray<FlickFiber<A, E>>): Effect.Effect<void> =>
-  Fiber.interruptAll(natives(fibers));
+  (fiberId: Option<number>) =>
+  (fiber: FlickFiber): Run =>
+    stopping([fiber.fiber], fiberId._tag === "Some" ? fiberId.value : currentFiber().id);
+
+export const flickInterruptAll = (fibers: ReadonlyArray<FlickFiber>): Run =>
+  stopping(
+    fibers.map((f) => f.fiber),
+    currentFiber().id,
+  );
+
 export const flickInterruptAllAs =
   (fiberId: number) =>
-  <A, E>(fibers: ReadonlyArray<FlickFiber<A, E>>): Effect.Effect<void> =>
-    Fiber.interruptAllAs(natives(fibers), fiberId);
+  (fibers: ReadonlyArray<FlickFiber>): Run =>
+    stopping(
+      fibers.map((f) => f.fiber),
+      fiberId,
+    );

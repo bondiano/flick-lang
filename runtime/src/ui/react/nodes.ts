@@ -1,13 +1,10 @@
 // `Ui r e` values: inert descriptions of elements. Building one runs no
 // handler and touches no DOM; the bridge turns them into React elements.
-import { Effect, Option } from "effect";
-import type * as Atom from "../../effect/reactivity/Atom.ts";
 import type { ComponentType } from "react";
 
-import { WriteService } from "../../effect/reactivity/Atom.ts";
-import { routePrint, type UrlCodec } from "../../route.ts";
+import type { Option } from "../../core/data.ts";
 import { constructorName } from "../../tags.ts";
-import { type Handler, eventLatest, eventPreventDefault } from "./policies.ts";
+import { type Handler, eventPreventDefault } from "./handlers.ts";
 
 /** What an event prop of an element gives its handler. */
 export interface Binding {
@@ -76,7 +73,7 @@ export const uiElementHandle = (_unit: undefined): ElementHandle => {
 const at = (handle: ElementHandle, node: Ui): Ui => (node.kind === "element" ? Object.freeze({ ...node, handle }) : node);
 
 /** A component's `Ui` for the props it was given, reading atoms through `read`. */
-export type Static = (read: (atom: Atom.Atom<unknown>) => unknown) => Ui;
+export type Static = (read: (atom: object) => unknown) => Ui;
 
 /** `Tab r e`. */
 export interface Tab {
@@ -93,7 +90,7 @@ export const element = (
 
 const bool = (value: unknown): boolean => value === true;
 
-const clickSnapshot = (event: DomEvent): unknown =>
+export const clickSnapshot = (event: DomEvent): unknown =>
   Object.freeze({
     button: event.button ?? 0,
     alt: bool(event.altKey),
@@ -109,7 +106,7 @@ export const inputSnapshot = (event: DomEvent): unknown => {
 
 export const uiText = (value: string): Ui => Object.freeze({ kind: "text", value });
 export const uiFragment = (children: ReadonlyArray<Ui>): Ui => Object.freeze({ kind: "fragment", children });
-export const uiOptional = (node: Option.Option<Ui>): Ui => (Option.isSome(node) ? node.value : uiFragment([]));
+export const uiOptional = (node: Option<Ui>): Ui => (node._tag === "Some" ? node.value : uiFragment([]));
 export const uiComponent = (component: ComponentType<object>, props: object, toUi?: Static): Ui =>
   Object.freeze(toUi === undefined ? { kind: "component", component, props } : { kind: "component", component, props, static: toUi });
 export const uiKeyed = (key: string, node: Ui): Ui => Object.freeze({ kind: "keyed", key, node });
@@ -195,41 +192,26 @@ export const uiForm = (props: { readonly on_submit: Handler }, children: Readonl
 export const uiSubmit = (props: { readonly disabled: boolean }, children: ReadonlyArray<Ui>): Ui =>
   element("button", { type: "submit", disabled: props.disabled }, {}, children);
 
-interface RouteLinkProps {
-  readonly route: Atom.Writable<unknown>;
-  readonly url: UrlCodec;
-  readonly to: Readonly<Record<string, unknown>>;
-}
-
 /** A left click without a modifier key: what a browser follows in the same tab. */
-const plainClick = (snapshot: unknown): boolean =>
+export const plainClick = (snapshot: unknown): boolean =>
   typeof snapshot === "object" &&
   snapshot !== null &&
   Reflect.get(snapshot, "button") === 0 &&
   !["alt", "ctrl", "shift", "meta"].some((key) => Reflect.get(snapshot, key) === true);
 
 /**
- * A link inside the app: a plain click writes `to` to the route state, which
- * pushes its URL without a reload; another click, and markup without a
- * client, follow the real `href`.
+ * A link inside the app to `href`: a plain click runs `navigate`, which
+ * writes the route state, and pushes no reload; another click, and markup
+ * without a client, follow the real `href`.
  */
-export const uiRouteLink = (props: RouteLinkProps, children: ReadonlyArray<Ui>): Ui => {
-  const navigate = Effect.flatMap(Effect.service(WriteService), (write) => write.set("Ui.route_link")(props.route)(props.to));
-  // a handler's task runs with the root's `Atom.Write`, as one of Flick's does
-  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the root provides the service
-  const run = navigate as Effect.Effect<void>;
-  const handler = eventPreventDefault(
-    plainClick,
-    eventLatest((snapshot) => (plainClick(snapshot) ? run : Effect.void)),
-  );
-  return element("a", { href: routePrint(props.url, props.to) }, { onClick: { handler, snapshot: clickSnapshot } }, children);
-};
+export const routeLink = (href: string, navigate: Handler, children: ReadonlyArray<Ui>): Ui =>
+  element("a", { href }, { onClick: { handler: eventPreventDefault(plainClick, navigate), snapshot: clickSnapshot } }, children);
 
 export const uiHtml = (html: string): Ui => Object.freeze({ kind: "element", tag: "div", attrs: {}, events: {}, children: [], html });
 
 interface SelectProps {
   readonly items: ReadonlyArray<unknown>;
-  readonly selected: Option.Option<unknown>;
+  readonly selected: Option<unknown>;
   readonly key: (item: unknown) => string;
   readonly render_item: (item: unknown) => Ui;
   readonly on_change: Handler;
@@ -237,10 +219,10 @@ interface SelectProps {
 
 /** A listbox: choosing an item runs `on_change` with it. */
 export const uiSelect = (props: SelectProps): Ui => {
-  const chosen = Option.map(props.selected, props.key);
+  const chosen = props.selected._tag === "Some" ? props.key(props.selected.value) : undefined;
   const options = props.items.map((item) => {
     const key = props.key(item);
-    const selected = Option.isSome(chosen) && chosen.value === key;
+    const selected = chosen === key;
     const option = element(
       "li",
       { role: "option", "aria-selected": selected },
@@ -255,14 +237,14 @@ export const uiSelect = (props: SelectProps): Ui => {
 interface PanelSlots {
   readonly header: Ui;
   readonly body: Ui;
-  readonly footer: Option.Option<Ui>;
+  readonly footer: Option<Ui>;
 }
 
 export const uiPanel = (slots: PanelSlots): Ui =>
   element("section", {}, {}, [
     element("header", {}, {}, [slots.header]),
     element("main", {}, {}, [slots.body]),
-    uiOptional(Option.map(slots.footer, (footer) => element("footer", {}, {}, [footer]))),
+    slots.footer._tag === "Some" ? element("footer", {}, {}, [slots.footer.value]) : uiFragment([]),
   ]);
 
 export const uiTab = (label: string, node: Ui): Tab => Object.freeze({ label, node });
@@ -280,34 +262,34 @@ export const uiTabs = (props: { readonly selected: number }, tabs: ReadonlyArray
 
 const SAFE_SCHEMES = /*#__PURE__*/ new Set(["http", "https", "mailto"]);
 
-/** `Ui.safe_url`: a relative URL, or one with a safe scheme. */
-export const uiSafeUrl = (url: string): Option.Option<string> => {
+/** Whether `url` is relative, or of a safe scheme: `Ui.safe_url`. */
+export const isSafeUrl = (url: string): boolean => {
   // browsers drop tabs and line breaks inside a URL: `java\tscript:` is a scheme
   // oxlint-disable-next-line no-control-regex -- the control characters are what is refused
-  if (/[\u0000- \u007f]/.test(url)) return Option.none();
+  if (/[\u0000- \u007f]/.test(url)) return false;
   const scheme = /^([a-zA-Z][a-zA-Z0-9+.-]*):/.exec(url)?.[1];
-  return scheme === undefined || SAFE_SCHEMES.has(scheme.toLowerCase()) ? Option.some(url) : Option.none();
+  return scheme === undefined || SAFE_SCHEMES.has(scheme.toLowerCase());
 };
 
 export const uiTrustedHtml = (html: string): string => html;
 
 interface Host {
-  readonly id: Option.Option<string>;
-  readonly class_name: Option.Option<string>;
-  readonly role: Option.Option<string>;
-  readonly aria_label: Option.Option<string>;
-  readonly aria_describedby: Option.Option<string>;
-  readonly aria_hidden: Option.Option<boolean>;
-  readonly aria_invalid: Option.Option<boolean>;
-  readonly aria_pressed: Option.Option<boolean>;
-  readonly aria_live: Option.Option<{ readonly _tag: string }>;
-  readonly tab_index: Option.Option<number>;
+  readonly id: Option<string>;
+  readonly class_name: Option<string>;
+  readonly role: Option<string>;
+  readonly aria_label: Option<string>;
+  readonly aria_describedby: Option<string>;
+  readonly aria_hidden: Option<boolean>;
+  readonly aria_invalid: Option<boolean>;
+  readonly aria_pressed: Option<boolean>;
+  readonly aria_live: Option<{ readonly _tag: string }>;
+  readonly tab_index: Option<number>;
   readonly data: ReadonlyArray<readonly [string, string]>;
-  readonly auto_capitalize: Option.Option<boolean>;
-  readonly auto_correct: Option.Option<boolean>;
-  readonly wrap: Option.Option<boolean>;
-  readonly name: Option.Option<string>;
-  readonly input_type: Option.Option<{ readonly _tag: string }>;
+  readonly auto_capitalize: Option<boolean>;
+  readonly auto_correct: Option<boolean>;
+  readonly wrap: Option<boolean>;
+  readonly name: Option<string>;
+  readonly input_type: Option<{ readonly _tag: string }>;
 }
 
 /** The `type` of an input of each `Ui.InputType`. */
@@ -318,8 +300,8 @@ const onOff = (on: boolean): string => (on ? "on" : "off");
 /** `attrs` with the host attributes `host` sets. */
 const hostAttrs = (host: Host, base: Attrs): Attrs => {
   const attrs: Record<string, string | boolean | number> = { ...base };
-  const put = <A>(name: string, value: Option.Option<A>, write: (a: A) => string | number): void => {
-    if (Option.isSome(value)) attrs[name] = write(value.value);
+  const put = <A>(name: string, value: Option<A>, write: (a: A) => string | number): void => {
+    if (value._tag === "Some") attrs[name] = write(value.value);
   };
   put("id", host.id, String);
   put("className", host.class_name, String);

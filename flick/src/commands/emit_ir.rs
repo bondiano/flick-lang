@@ -29,7 +29,7 @@ pub(super) fn write(
         .iter()
         .map(|m| {
             if output.release {
-                build::optimized(modules, m)
+                build::optimized(modules, m, output.extras.rt)
             } else {
                 m.ir.clone()
             }

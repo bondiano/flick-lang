@@ -52,7 +52,7 @@ impl Checker<'_> {
         };
         let params = self.params_of(&body);
         let stages = self.arrow_stages(scheme);
-        if stages.contains(&Stage::Sync) {
+        if stages.contains(&Stage::Sync) && !self.options.stages_by_class {
             self.bad_meta(
                 decl,
                 "a foreign function returns an Effect, so its arrows cannot be Sync (`->{Atom.Read;}`): define the Sync function in Flick around a foreign",

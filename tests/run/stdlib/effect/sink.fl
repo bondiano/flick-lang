@@ -212,7 +212,7 @@ let failures () =
     | Boom why -> why
   say ("map_error: " ++ message)
 
-targets : Unit ->{; Boom} Unit
+targets : Unit ->{Async; Boom} Unit
 let targets () =
   let q : Queue.Queue none Float = Queue.unbounded ()
   let _ = run (Sink.from_queue q)
@@ -235,7 +235,7 @@ let targets () =
     Sink.to_channel Sink.sum
   say (ended "from_channel" (run (Sink.from_channel summing)))
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Async; AppError} Unit
 let main () =
   try
     folds ()

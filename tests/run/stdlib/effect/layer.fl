@@ -159,7 +159,7 @@ let shared () =
   let memoized = Layer.from_build_memo (fun m -> Layer.build_with_memo_map m config_layer)
   provide memoized { Platform.stdout_line ("from_build_memo " ++ Config.prefix ()) }
 
-finalizers : Unit ->{} Unit
+finalizers : Unit ->{Async;} Unit
 let finalizers () =
   scope {
     Scope.add_finalizer (task { Platform.stdout_line "finalizer ran" })
@@ -264,7 +264,7 @@ let traces () =
     Platform.stdout_line ("with_parent_span " ++ Config.prefix ())
   }
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Async; AppError} Unit
 let main () =
   contexts ()
   try layers () with

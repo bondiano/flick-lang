@@ -1,0 +1,34 @@
+// A wait that ends moves its fiber on at once, on the stack that ended it, but a
+// long chain of them must not grow that stack: here each fiber wakes the next,
+// and a chain lost to a stack overflow would leave `main` waiting for ever.
+module App.Main exposing (main)
+
+quiet : Failure e ->{} Unit
+let quiet _ = ()
+
+link : Fiber.Owner s -> Deferred.Deferred none Unit -> Int ->{Async;} Deferred.Deferred none Unit
+let rec link owner prev i =
+  if i == 0 then
+    prev
+  else
+    let next : Deferred.Deferred none Unit = Deferred.make ()
+    let _f =
+      Fiber.spawn
+        owner
+        quiet
+        (task {
+          Deferred.await_ prev
+          ignore (Deferred.succeed () next)
+        })
+    link owner next (i - 1)
+
+main : Unit ->{Async; AppError} Unit
+let main () =
+  scope owner {
+    let first : Deferred.Deferred none Unit = Deferred.make ()
+    let last = link owner first 200000
+    Effect.yield_now ()
+    ignore (Deferred.succeed () first)
+    Deferred.await_ last
+  }
+  Platform.stdout_line "chain done"

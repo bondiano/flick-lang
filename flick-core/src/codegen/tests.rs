@@ -21,8 +21,56 @@ fn compile_with(text: &str, release: bool, labels: Labels) -> super::Output {
         workers: &|_, _| None,
         direct: &|_, _, _| false,
         labels,
+        rt: false,
     };
     js(&ir, &options)
+}
+
+/// The code of `text` on Flick's own runtime, in debug.
+fn on_rt(text: &str) -> String {
+    let ir = lower_text("App", text).expect("lowers");
+    let path = |m: &str| format!("{}.js", m.replace('.', "/"));
+    let package = |_: &str| None;
+    let foreign = |_: &str, spec: &str| spec.to_owned();
+    let options = Options {
+        path: &path,
+        package: &package,
+        foreign: &foreign,
+        typescript: false,
+        interface: &|_| None,
+        release: false,
+        workers: &|_, _| None,
+        direct: &|_, _, _| false,
+        labels: Labels::default(),
+        rt: true,
+    };
+    js(&ir, &options).code
+}
+
+#[test]
+fn on_flick_runtime_a_runtime_stage_is_a_generator_and_a_tail_call_is_returned() {
+    let code = on_rt(
+        "module App exposing (f, g)\n\
+         g : Int ->{Async;} Int\n\
+         let g n = n\n\
+         f : Int ->{Async;} Int\n\
+         let f n =\n  let a = g n\n  g a\n",
+    );
+    assert!(code.contains("function* (n)"), "{code}");
+    assert!(code.contains("const a = yield g(n);"), "{code}");
+    assert!(code.contains("return g(a);"), "{code}");
+    assert!(!code.contains("Effect."), "{code}");
+}
+
+#[test]
+fn on_flick_runtime_a_jump_of_a_generator_is_a_step_of_the_driver() {
+    let code = on_rt(
+        "module App exposing (spin)\n\
+         spin : Int ->{Async;} Int\n\
+         let rec spin n = if n == 0 then 0 else spin (n - 1)\n",
+    );
+    assert!(code.contains("yield;\n"), "{code}");
+    assert!(code.contains("continue;"), "{code}");
 }
 
 #[test]

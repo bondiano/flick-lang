@@ -219,7 +219,7 @@ impl Checker<'_> {
 
     /// Records the application or pipe at `range` as a call of `effects`.
     fn record_call(&mut self, effects: &Effects, range: super::typing::Range) {
-        if effects.sync {
+        if effects.stage() == super::ty::Stage::Sync {
             self.typing.sync.insert(range);
         } else {
             self.typing.runtime.insert(range);

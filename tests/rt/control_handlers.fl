@@ -1,0 +1,63 @@
+// The program of `flick/tests/control_handlers.rs`, on Flick's own runtime: the
+// output Go gives, a second `resume` a defect.
+module App.Main exposing (main)
+
+effect Emit a =
+  control emit : a ->{} Unit
+
+effect Choose =
+  control choose : Unit ->{} Bool
+
+say : String ->{} Unit
+let say line = Platform.stdout_line line
+
+collect : (Unit ->{Emit a | r; e} Unit) ->{r; e} List a
+let collect body =
+  try body () with
+  | Emit.emit x -> [x] ++ resume ()
+  | return () -> []
+
+reversed : (Unit ->{Emit a | r; e} Unit) ->{r; e} List a
+let reversed body =
+  try body () with
+  | Emit.emit x ->
+    let rest = resume ()
+    rest ++ [x]
+  | return () -> []
+
+first : (Unit ->{Emit Int; none} Unit) ->{} Int
+let first body =
+  try body () with
+  | Emit.emit x -> x
+  | return () -> 0
+
+three : Unit ->{Emit Int; none} Unit
+let three () =
+  Emit.emit 1
+  Emit.emit 2
+  Emit.emit 3
+
+main : Unit ->{} Unit
+let main () =
+  say (show (collect three))
+  say (show (reversed three))
+  let x =
+    first (fun () -> scope {
+      Scope.add_finalizer (task { say "scope closed" })
+      Emit.emit 7
+      say "not reached"
+    })
+  say (show x)
+  let chosen =
+    collect (fun () ->
+      try
+        Emit.emit (if Choose.choose () then 1 else 2)
+        Emit.emit 3
+      with
+      | Choose.choose () -> resume true
+    )
+  say (show chosen)
+  let twice =
+    try (if Choose.choose () then 1 else 2) with
+    | Choose.choose () -> resume true + resume false
+  say (show twice)

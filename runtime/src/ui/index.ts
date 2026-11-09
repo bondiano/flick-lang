@@ -1,106 +1,17 @@
-// The DOM backend mounts synchronously once so event targets are immediately usable.
-import { Effect } from "effect";
-import type * as AtomRegistry from "../effect/reactivity/AtomRegistry.ts";
-import * as Hydration from "../effect/reactivity/Hydration.ts";
-import { flushSync } from "react-dom";
-import { createRoot, hydrateRoot, type Root } from "react-dom/client";
+// `@flick-lang/runtime/ui` on Flick's own runtime: a root in a DOM container.
+import type { Ui } from "../ui/react/nodes.ts";
+import { domRenderer } from "../ui/dom.ts";
+import { registryHere } from "../atoms/services.ts";
+import type { Run } from "../fiber.ts";
+import type { Failure } from "../outcome.ts";
+import { uiRunWith } from "./react.ts";
 
-import type { Failure } from "../cause.ts";
-import { RegistryService, nativeRegistry } from "../effect/reactivity/Atom.ts";
-import { type Renderer, type Ui, uiMountWith } from "./react/index.ts";
-
-export * from "./react/index.ts";
-
-export const uiContainer = (id: string): Element | null => globalThis.document?.getElementById(id) ?? null;
-
-/** A React DOM root in `container`, hydrating the markup a server rendered there. */
-const domRenderer =
-  (container: Element): Renderer =>
-  () => {
-      let root: Root | undefined;
-      return {
-        render: (node) => {
-          if (root !== undefined) root.render(node);
-          else {
-            // React resets uncontrolled textareas during hydration; preserve native pre-boot drafts.
-            const drafts = container.hasAttribute("data-flick-ssr")
-              ? Array.from(container.querySelectorAll("textarea"), (field) => ({
-                  field, value: field.value, start: field.selectionStart, end: field.selectionEnd, direction: field.selectionDirection,
-                }))
-              : undefined;
-            flushSync(() => {
-              if (drafts !== undefined) root = hydrateRoot(container, node);
-              else {
-                root = createRoot(container);
-                root.render(node);
-              }
-            });
-            if (drafts !== undefined) {
-              for (const draft of drafts) {
-                draft.field.value = draft.value;
-                draft.field.setSelectionRange(draft.start, draft.end, draft.direction);
-              }
-            }
-          }
-        },
-        unmount: () => root?.unmount(),
-      };
-  };
-
-/**
- * The atoms the server wrote into the document for `container`, by
- * `Ui.Server.state` or in the scripts of `Ui.Server.stream`, into
- * `registry`. Each script is removed, so a later root does not write its
- * atoms over values changed since.
- */
-const hydrateState = (container: Element, registry: AtomRegistry.AtomRegistry): void => {
-  const document = container.ownerDocument;
-  const streamed = Array.from(document.querySelectorAll("script[data-flick-state]")).filter(
-    (script) => script.getAttribute("data-flick-state") === container.id,
-  );
-  for (const script of [document.getElementById(`flick-state-${container.id}`), ...streamed]) {
-    if (script === null) continue;
-    script.remove();
-    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- `Ui.Server.state` and `Ui.Server.stream` wrote these entries
-    Hydration.hydrate(registry, JSON.parse(script.textContent ?? "[]") as Array<Hydration.DehydratedAtom>);
-  }
-};
-
-/**
- * Hydrates the atoms of each script a streamed page adds to `container`
- * after the root mounted, until the root unmounts: a script comes before
- * the markup it holds the atoms of, and a mutation observer runs before
- * React hydrates that markup.
- */
-const hydrateStreamed = (container: Element, registry: AtomRegistry.AtomRegistry): (() => void) => {
-  const Observer = container.ownerDocument.defaultView?.MutationObserver;
-  if (Observer === undefined || !container.hasAttribute("data-flick-ssr")) return () => undefined;
-  const observer = new Observer(() => hydrateState(container, registry));
-  // the stream's later chunks follow the container, which it rendered itself
-  observer.observe(container.parentNode ?? container.ownerDocument, { childList: true });
-  return () => observer.disconnect();
-};
+export * from "./react.ts";
+export { uiContainer } from "../ui/dom.ts";
 
 /**
  * `Ui.Dom.mount`: renders `ui` into `container` with the registry of the
- * provided `Reactivity.Atom.Registry`, hydrating markup a server rendered
- * and, before the first render, the atoms of `Ui.Server.state`.
+ * provided `Reactivity.Atom.Registry`, hydrating markup a server rendered.
  */
-export const uiMount = <R>(
-  container: Element,
-  supervisor: (failure: Failure) => Effect.Effect<unknown, unknown, R>,
-  ui: Ui,
-): Effect.Effect<never, unknown, unknown> =>
-  Effect.flatMap(Effect.service(RegistryService), (record) => {
-    const registry = nativeRegistry(record);
-    const mount = uiMountWith(domRenderer(container), supervisor, ui);
-    if (registry === undefined) return mount;
-    return Effect.acquireUseRelease(
-      Effect.sync(() => {
-        hydrateState(container, registry);
-        return hydrateStreamed(container, registry);
-      }),
-      () => mount,
-      (stop) => Effect.sync(stop),
-    );
-  });
+export const uiMount = (container: Element, supervisor: (failure: Failure) => unknown, ui: Ui): Run =>
+  uiRunWith(domRenderer(container), supervisor, ui, registryHere());
