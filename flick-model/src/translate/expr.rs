@@ -45,6 +45,7 @@ impl Tr {
         match &e.kind {
             ExprKind::Lit(l) => lit(l).map_or_else(|| stuck("a `BigInt` literal"), Term::Lit),
             ExprKind::Local(x) => Term::Var(x.as_str().into()),
+            ExprKind::Var(_) => stuck("a `let mut` variable"),
             ExprKind::Global { module, name } => Term::Global(Path::new(module, name)),
             ExprKind::Method { dict: d, name } => Term::Field(rc(dict(d)), name.as_str().into()),
             ExprKind::Con(c) => Term::konst_con(con(c)),
@@ -185,6 +186,7 @@ impl Tr {
             Stmt::Let(ir::Pat::Bind(x), e) => {
                 Term::Let(x.as_str().into(), None, rc(self.expr(e)), rc(rest))
             }
+            Stmt::Var(..) | Stmt::Assign(..) => stuck("a `let mut` variable"),
             Stmt::Let(ir::Pat::Wild, e) | Stmt::Expr(e) => {
                 Term::Let("_".into(), None, rc(self.expr(e)), rc(rest))
             }

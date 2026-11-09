@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 use crate::{FileId, Module};
 
 /// The version of the IR this crate reads and writes.
-pub const VERSION: &str = "0.4.0";
+pub const VERSION: &str = "0.5.0";
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Program {

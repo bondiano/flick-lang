@@ -75,6 +75,10 @@ pub enum ExprKind {
     Lit(Lit),
     /// A local by its unique name in the enclosing top-level definition.
     Local(String),
+    /// What the `Stmt::Var` of this name holds where this is evaluated: the
+    /// value of its last `Stmt::Assign`. Unlike a `Local`, two reads may
+    /// differ, so no pass copies or moves one.
+    Var(String),
     /// A top-level value of a module.
     Global {
         module: String,
@@ -215,7 +219,11 @@ impl Expr {
             ExprKind::Block(stmts, result) => {
                 for stmt in stmts {
                     match stmt {
-                        Stmt::Let(_, v) | Stmt::Expr(v) | Stmt::Fun { value: v, .. } => f(v),
+                        Stmt::Let(_, v)
+                        | Stmt::Var(_, v)
+                        | Stmt::Assign(_, v)
+                        | Stmt::Expr(v)
+                        | Stmt::Fun { value: v, .. } => f(v),
                     }
                 }
                 f(result);
@@ -256,6 +264,7 @@ impl Expr {
             }
             ExprKind::Handle(h) => h.each_child(f),
             ExprKind::Lit(_)
+            | ExprKind::Var(_)
             | ExprKind::Local(_)
             | ExprKind::Global { .. }
             | ExprKind::Method { .. }
@@ -342,7 +351,11 @@ impl Expr {
             ExprKind::Block(stmts, result) => {
                 for stmt in stmts {
                     match stmt {
-                        Stmt::Let(_, v) | Stmt::Expr(v) | Stmt::Fun { value: v, .. } => f(v),
+                        Stmt::Let(_, v)
+                        | Stmt::Var(_, v)
+                        | Stmt::Assign(_, v)
+                        | Stmt::Expr(v)
+                        | Stmt::Fun { value: v, .. } => f(v),
                     }
                 }
                 f(result);
@@ -383,6 +396,7 @@ impl Expr {
             }
             ExprKind::Handle(h) => h.each_child_mut(f),
             ExprKind::Lit(_)
+            | ExprKind::Var(_)
             | ExprKind::Local(_)
             | ExprKind::Global { .. }
             | ExprKind::Method { .. }
@@ -407,6 +421,13 @@ pub struct Param {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Stmt {
     Let(Pat, Expr),
+    /// `let mut name = value`: a variable of the enclosing function, read
+    /// as a `Local` and changed by an `Assign` after it. No function inside
+    /// the function uses it, but the body of `Scope.run` or a layer's run,
+    /// which runs once, in place.
+    Var(String, Expr),
+    /// `name = value` of a `Var` in scope.
+    Assign(String, Expr),
     /// A local function; `rec` when it may call itself.
     Fun {
         name: String,

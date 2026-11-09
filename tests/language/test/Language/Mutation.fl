@@ -9,8 +9,7 @@ clamp : Int -> Int -> Int -> Int
 let clamp low high n =
   let mut value = n
   if value < low then value = low
-  if value > high then
-    value = high
+  if value > high then value = high
   value
 
 swapped : (Int, Int) -> (Int, Int)
@@ -44,20 +43,31 @@ let read_then_write n =
 valued_branch : Bool -> (String, Int)
 let valued_branch flag =
   let mut changes = 0
-  let label = if flag then
-    changes = changes + 1
-    "yes"
-  else
-    "no"
+  let label =
+    if flag then
+      changes = changes + 1
+      "yes"
+    else
+      "no"
   (label, changes)
 
 in_scope : Unit ->{} String
 let in_scope () =
   let mut steps = "a"
-  scope {
-    steps = steps ++ "b"
-  }
+  scope { steps = steps ++ "b" }
   steps ++ "c"
+
+operands_in_order : Unit ->{} (Int, Int, Int)
+let operands_in_order () =
+  let mut x = 1
+  (
+    x,
+    scope {
+      x = x + 1
+      x * 10
+    },
+    x,
+  )
 
 in_arm : String ->{} String
 let in_arm key =
@@ -82,8 +92,15 @@ let tests = [
   Test.test "an `if` with a value assigns too" (fun () ->
     Test.equal [("yes", 1), ("no", 0)] [valued_branch true, valued_branch false]
   ),
-  Test.test "an assignment inside a scope" (fun () -> Test.equal "abc" (in_scope ())),
-  Test.test "an assignment in an arm of try" (fun () -> Test.equal "id -1" (in_arm "id")),
+  Test.effect_test
+    "an assignment inside a scope"
+    (task { Test.expect (Test.equal "abc" (in_scope ())) }),
+  Test.effect_test
+    "an assignment in an arm of try"
+    (task { Test.expect (Test.equal "id -1" (in_arm "id")) }),
+  Test.effect_test
+    "operands read and assign left to right"
+    (task { Test.expect (Test.equal (1, 20, 2) (operands_in_order ())) }),
   Test.test "a local of a test body" (fun () ->
     let mut total = 1
     total = total + 41

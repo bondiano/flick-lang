@@ -22,10 +22,7 @@ signed : Int -> String
 let signed n =
   label : String
   let mut label = "zero"
-  if n > 0 then
-    label = "positive"
-  else if n < 0 then
-    label = "negative"
+  if n > 0 then label = "positive" else if n < 0 then label = "negative"
   label
 
 assigned_unit : Unit -> Unit
@@ -59,8 +56,7 @@ loop_reads : List Int ->{} Unit
 let loop_reads xs =
   let mut limit = 3
   limit = limit + 1
-  for x <- xs do
-    if x > limit then Platform.stdout_line "\{x}"
+  for x <- xs do if x > limit then Platform.stdout_line "\{x}"
 
 try_reads : String ->{} Int
 let try_reads key =
@@ -81,8 +77,11 @@ let arm_assigns key =
   status
 
 inside_lambda : List Int -> List Int
-let inside_lambda xs = List.map (fun x ->
-  let mut y = x
-  y = y * 2
-  y
-) xs
+let inside_lambda xs =
+  List.map
+    (fun x ->
+      let mut y = x
+      y = y * 2
+      y
+    )
+    xs

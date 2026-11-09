@@ -131,6 +131,7 @@ pub fn expr(e: &Expr) -> String {
     match &e.kind {
         ExprKind::Lit(l) => lit(l),
         ExprKind::Local(n) => n.clone(),
+        ExprKind::Var(n) => format!("!{n}"),
         ExprKind::Global { module, name } => format!("{module}.{name}"),
         ExprKind::Method { dict: d, name } => format!("{}.{name}", dict(d)),
         ExprKind::Con(c) => c.name.clone(),
@@ -219,6 +220,8 @@ pub fn expr(e: &Expr) -> String {
 fn stmt(s: &Stmt) -> String {
     match s {
         Stmt::Let(p, e) => format!("let {} = {}", pat(p), expr(e)),
+        Stmt::Var(n, e) => format!("let mut {n} = {}", expr(e)),
+        Stmt::Assign(n, e) => format!("{n} := {}", expr(e)),
         Stmt::Fun {
             name,
             rec,

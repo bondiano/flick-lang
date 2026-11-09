@@ -12,8 +12,7 @@ classify : Int -> String
 let classify n =
   let mut label = "small"
   if n > 10 then label = "big"
-  if n > 100 then
-    label = "huge"
+  if n > 100 then label = "huge"
   label
 
 sorted : Int -> Int -> (Int, Int)
@@ -44,6 +43,17 @@ let before_after n =
   count = count * 10
   (before, count)
 
+/// A function made from a read keeps the value it read, inlined or not.
+made : Int -> Int
+let made n =
+  let mut x = n
+  let f = keep x
+  x = x + 100
+  f ()
+
+keep : Int -> (Unit -> Int)
+let keep a = fun () -> a
+
 /// A constant is not known once it is assigned again.
 constant : Unit -> Int
 let constant () =
@@ -63,30 +73,34 @@ let pair () =
 chosen : Bool -> (Int, Int)
 let chosen flag =
   let mut side = 0
-  let value = if flag then
-    side = 1
-    10
-  else
-    20
+  let value =
+    if flag then
+      side = 1
+      10
+    else
+      20
   (value, side)
-
-/// A shadowing `let` is a new name; the `let mut` under it is unchanged.
-shadowed : Unit -> (Int, Int)
-let shadowed () =
-  let mut x = 1
-  x = 2
-  let y = x
-  let x = 100
-  (x, y)
 
 /// Inside a `scope`, an assignment to a variable from outside it.
 scoped : Unit ->{} String
 let scoped () =
   let mut log = "start"
-  scope {
-    log = log ++ ", inside"
-  }
+  scope { log = log ++ ", inside" }
   log ++ ", after"
+
+/// The operands of a tuple run left to right: the read before an operand
+/// that assigns sees the old value, the read after it the new one.
+ordered : Unit ->{} (Int, Int, Int)
+let ordered () =
+  let mut x = 1
+  (
+    x,
+    scope {
+      x = x + 1
+      x * 10
+    },
+    x,
+  )
 
 /// An arm of `try` may assign; only its body may not.
 recovered : String ->{} String
@@ -129,12 +143,13 @@ let main () =
   Platform.stdout_line (describe [7])
   Platform.stdout_line (describe [1, 2])
   Platform.stdout_line (show (before_after 4))
+  Platform.stdout_line (show (made 1))
   Platform.stdout_line (show (constant ()))
   Platform.stdout_line (show (pair ()))
   Platform.stdout_line (show (chosen true))
   Platform.stdout_line (show (chosen false))
-  Platform.stdout_line (show (shadowed ()))
   Platform.stdout_line (scoped ())
+  Platform.stdout_line (show (ordered ()))
   Platform.stdout_line (recovered "id")
   Platform.stdout_line (show (handled ()))
   counted ()

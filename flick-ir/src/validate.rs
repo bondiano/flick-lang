@@ -21,6 +21,7 @@ pub fn validate(
         files,
         module: "",
         scope: Vec::new(),
+        vars: Vec::new(),
         problems: Vec::new(),
     };
     let mut seen = BTreeSet::new();
@@ -61,6 +62,9 @@ struct Validator<'p> {
     module: &'p str,
     /// The locals in scope, innermost last.
     scope: Vec<String>,
+    /// The names `Var` binds, of every block entered; a name is a variable
+    /// where its innermost binder in `scope` is one.
+    vars: Vec<String>,
     problems: Vec<String>,
 }
 
@@ -92,11 +96,24 @@ impl Validator<'_> {
         }
     }
 
+    /// A read or an assignment of `name`, whose binders in scope are `Var`s.
+    fn variable(&mut self, name: &str, what: &str) {
+        let binders = self.scope.iter().filter(|s| *s == name).count();
+        let vars = self.vars.iter().filter(|s| *s == name).count();
+        if binders == 0 || binders != vars {
+            let module = self.module;
+            self.problems.push(format!(
+                "`{module}` {what} `{name}`, which is not a variable in scope there"
+            ));
+        }
+    }
+
     fn expr(&mut self, e: &Expr) {
         self.span(e.span);
-        let mark = self.scope.len();
+        let (mark, vars) = (self.scope.len(), self.vars.len());
         match &e.kind {
             ExprKind::Local(name) => self.used(name),
+            ExprKind::Var(name) => self.variable(name, "reads"),
             ExprKind::Global { module, .. } => {
                 if !self.modules.contains(module.as_str()) && !(self.external)(module) {
                     let here = self.module;
@@ -142,6 +159,15 @@ impl Validator<'_> {
                             self.expr(value);
                             bind(pat, &mut self.scope);
                         }
+                        Stmt::Var(name, value) => {
+                            self.expr(value);
+                            self.scope.push(name.clone());
+                            self.vars.push(name.clone());
+                        }
+                        Stmt::Assign(name, value) => {
+                            self.expr(value);
+                            self.variable(name, "assigns");
+                        }
                         Stmt::Fun {
                             name, dicts, value, ..
                         } => {
@@ -157,6 +183,7 @@ impl Validator<'_> {
             _ => e.each_child(&mut |child| self.expr(child)),
         }
         self.scope.truncate(mark);
+        self.vars.truncate(vars);
     }
 
     fn arm(&mut self, pat: &Pat, guard: Option<&Expr>, body: &Expr) {
@@ -228,6 +255,7 @@ mod tests {
     use super::validate;
     use crate::{
         Arm, Expr, ExprKind, FileId, Item, ItemKind, Lit, Module, Param, Pat, Program, Span, Stage,
+        Stmt,
     };
 
     fn at(kind: ExprKind) -> Expr {
@@ -289,6 +317,46 @@ mod tests {
         assert_eq!(
             validate(&program(unit), &external, &BTreeSet::new()).len(),
             2
+        );
+    }
+
+    #[test]
+    fn a_variable_is_read_and_assigned_where_a_var_binds_it() {
+        let files = BTreeSet::from([FileId::new(0)]);
+        let one = || at(ExprKind::Lit(Lit::Int(1)));
+        let block = |stmts, result| at(ExprKind::Block(stmts, Box::new(result)));
+        let counted = block(
+            vec![
+                Stmt::Var("n".into(), one()),
+                Stmt::Assign("n".into(), one()),
+            ],
+            at(ExprKind::Var("n".into())),
+        );
+        assert_eq!(
+            validate(&program(counted), &|_| false, &files),
+            Vec::<String>::new()
+        );
+        let immutable = block(
+            vec![
+                Stmt::Let(Pat::Bind("n".into()), one()),
+                Stmt::Assign("n".into(), one()),
+            ],
+            at(ExprKind::Var("n".into())),
+        );
+        assert_eq!(
+            validate(&program(immutable), &|_| false, &files),
+            [
+                "`App.Main` assigns `n`, which is not a variable in scope there",
+                "`App.Main` reads `n`, which is not a variable in scope there",
+            ]
+        );
+        let outside = block(
+            vec![Stmt::Expr(block(vec![Stmt::Var("n".into(), one())], one()))],
+            at(ExprKind::Var("n".into())),
+        );
+        assert_eq!(
+            validate(&program(outside), &|_| false, &files),
+            ["`App.Main` reads `n`, which is not a variable in scope there"]
         );
     }
 

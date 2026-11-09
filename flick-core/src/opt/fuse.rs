@@ -275,7 +275,9 @@ fn total(body: &Expr) -> bool {
         ExprKind::If(c, t, f) => droppable(c) && total(t) && total(f),
         ExprKind::Block(stmts, tail) => {
             stmts.iter().all(|s| match s {
-                Stmt::Let(_, v) | Stmt::Expr(v) => droppable(v),
+                Stmt::Let(_, v) | Stmt::Var(_, v) | Stmt::Assign(_, v) | Stmt::Expr(v) => {
+                    droppable(v)
+                }
                 Stmt::Fun { .. } => false,
             }) && total(tail)
         }

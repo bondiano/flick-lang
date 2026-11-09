@@ -34,7 +34,7 @@ impl Gen<'_> {
             if self.buf.len() > mark {
                 let mut spills = Vec::new();
                 for prev in &mut out {
-                    if !atomic(prev) {
+                    if !atomic(prev) || self.vars.contains(prev.as_str()) {
                         let t = self.temp();
                         spills.push(self.constant(&t, prev));
                         *prev = t;
@@ -49,7 +49,7 @@ impl Gen<'_> {
 
     /// `js` as a constant unless it is atomic.
     pub(super) fn spill(&mut self, js: String) -> String {
-        if atomic(&js) {
+        if atomic(&js) && !self.vars.contains(&js) {
             return js;
         }
         let t = self.temp();
@@ -73,6 +73,7 @@ impl Gen<'_> {
         match &e.kind {
             ExprKind::Lit(lit) => literal::literal(lit),
             ExprKind::Local(name) => names::ident(name),
+            ExprKind::Var(name) => names::ident(name),
             ExprKind::Global { module, name } => self.global(module, &names::ident(name)),
             ExprKind::Method { dict, name } => match self.direct_method(dict, name) {
                 Some(direct) => direct,
@@ -428,7 +429,11 @@ impl Gen<'_> {
     pub(super) fn stmt(&mut self, stmt: &Stmt) {
         #[cfg(feature = "source-maps")]
         let span = match stmt {
-            Stmt::Let(_, e) | Stmt::Expr(e) | Stmt::Fun { value: e, .. } => e.span,
+            Stmt::Let(_, e)
+            | Stmt::Var(_, e)
+            | Stmt::Assign(_, e)
+            | Stmt::Expr(e)
+            | Stmt::Fun { value: e, .. } => e.span,
         };
         #[cfg(feature = "source-maps")]
         let first = self.buf.len();
@@ -450,6 +455,16 @@ impl Gen<'_> {
                 let v = self.expr(value);
                 let v = self.spill(v);
                 self.destructure(pat, &v);
+            }
+            Stmt::Var(name, value) => {
+                let v = self.expr(value);
+                let name = names::ident(name);
+                self.buf.push(self.variable(&name, &v));
+                self.vars.insert(name);
+            }
+            Stmt::Assign(name, value) => {
+                let v = self.expr(value);
+                self.buf.push(format!("{} = {v};", names::ident(name)));
             }
             Stmt::Fun {
                 name,

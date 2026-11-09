@@ -172,7 +172,7 @@ fn later_uses(stmts: &[Stmt], i: usize, result: &Expr, name: &str) -> (usize, us
     let mut strict = strict_uses(result, name);
     for s in &stmts[i + 1..] {
         match s {
-            Stmt::Let(_, v) | Stmt::Expr(v) => {
+            Stmt::Let(_, v) | Stmt::Var(_, v) | Stmt::Assign(_, v) | Stmt::Expr(v) => {
                 all += uses(v, name);
                 strict += strict_uses(v, name);
             }
@@ -203,7 +203,11 @@ fn propagate(stmts: &mut Vec<Stmt>, result: &mut Expr) -> bool {
         };
         for s in &mut stmts[i..] {
             match s {
-                Stmt::Let(_, v) | Stmt::Expr(v) | Stmt::Fun { value: v, .. } => {
+                Stmt::Let(_, v)
+                | Stmt::Var(_, v)
+                | Stmt::Assign(_, v)
+                | Stmt::Expr(v)
+                | Stmt::Fun { value: v, .. } => {
                     substitute(v, &name, &value);
                 }
             }
@@ -230,6 +234,8 @@ fn dead(stmts: &mut Vec<Stmt>, result: &Expr) -> bool {
                 p.irrefutable() && unused(&bound) && droppable(v)
             }
             Stmt::Fun { name, .. } => unused(&[name.as_str()]),
+            // a variable's reads are not counted as uses of a local
+            Stmt::Var(..) | Stmt::Assign(..) => false,
         };
         if drop {
             stmts.remove(i);

@@ -42,7 +42,7 @@ pub use release::{direct_methods, exported_worker};
 
 #[cfg(feature = "typescript")]
 use std::cell::RefCell;
-use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::mem;
 
 use super::exports::reexports;
@@ -195,6 +195,7 @@ impl<'a> Gen<'a> {
             groups,
             grouped,
             views: HashMap::new(),
+            vars: HashSet::new(),
             rests: HashMap::new(),
             #[cfg(feature = "typescript")]
             annotations: HashMap::new(),
@@ -338,6 +339,9 @@ struct Gen<'a> {
     /// The walked lists in scope, by their JS name: the offset variable and
     /// the loop position (see [`view`]).
     views: HashMap<String, (String, usize)>,
+    /// The JS names of `let mut` variables: a read of one is a name that an
+    /// assignment after it changes, so it is never left to read later.
+    vars: HashSet<String>,
     /// The `...rest` of a walked list, by its local: the loop position and
     /// the offset it starts at.
     rests: HashMap<String, (usize, String)>,
@@ -390,6 +394,16 @@ impl Gen<'_> {
             ""
         };
         format!("const {name}{ty} = {value};")
+    }
+
+    /// `let name = value;` of a `let mut` variable.
+    fn variable(&self, name: &str, value: &str) -> String {
+        let ty = if self.options.typescript() {
+            ": any"
+        } else {
+            ""
+        };
+        format!("let {name}{ty} = {value};")
     }
 
     /// An exported `const`: in TypeScript with its projected type.

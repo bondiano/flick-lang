@@ -49,6 +49,7 @@ codegen/implicit
 codegen/interpolation
 codegen/ints
 codegen/let_assert
+codegen/let_mut
 codegen/lift
 codegen/literals
 codegen/local_functions

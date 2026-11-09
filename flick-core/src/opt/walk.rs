@@ -48,7 +48,9 @@ pub fn strict_uses(e: &Expr, name: &str) -> usize {
             let in_stmts: usize = stmts
                 .iter()
                 .map(|s| match s {
-                    Stmt::Let(_, v) | Stmt::Expr(v) => strict_uses(v, name),
+                    Stmt::Let(_, v) | Stmt::Var(_, v) | Stmt::Assign(_, v) | Stmt::Expr(v) => {
+                        strict_uses(v, name)
+                    }
                     Stmt::Fun { .. } => 0,
                 })
                 .sum();
@@ -210,8 +212,8 @@ fn binders(e: &Expr, names: &mut HashMap<String, String>, suffix: &str) {
             for s in stmts {
                 match s {
                     Stmt::Let(p, _) => pat_binders(p, names, suffix),
-                    Stmt::Fun { name, .. } => fresh(names, name, suffix),
-                    Stmt::Expr(_) => {}
+                    Stmt::Var(name, _) | Stmt::Fun { name, .. } => fresh(names, name, suffix),
+                    Stmt::Assign(..) | Stmt::Expr(_) => {}
                 }
             }
         }
@@ -238,7 +240,7 @@ fn apply(e: &mut Expr, names: &HashMap<String, String>) {
         }
     };
     match &mut e.kind {
-        ExprKind::Local(n) | ExprKind::Within(n, _) => new(n),
+        ExprKind::Local(n) | ExprKind::Var(n) | ExprKind::Within(n, _) => new(n),
         // a dictionary a matched value holds is a local of the pattern too
         ExprKind::Dicts(_, dicts) => {
             for d in dicts {
@@ -255,7 +257,7 @@ fn apply(e: &mut Expr, names: &HashMap<String, String>) {
             for s in stmts {
                 match s {
                     Stmt::Let(p, _) => apply_pat(p, names),
-                    Stmt::Fun { name, .. } => new(name),
+                    Stmt::Var(name, _) | Stmt::Assign(name, _) | Stmt::Fun { name, .. } => new(name),
                     Stmt::Expr(_) => {}
                 }
             }

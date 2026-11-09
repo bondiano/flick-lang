@@ -55,12 +55,25 @@ fn lift(how: &Lift) -> String {
 impl<'a> Gen<'a> {
     /// Compiles expressions that are evaluated in order: an operand whose
     /// code needs statements makes the operands before it variables first.
+    /// Go orders the calls of an expression but not the reads of variables
+    /// between them: an operand is a variable of its own, evaluated first,
+    /// when it may run code and a later one reads a `let mut` variable, or
+    /// it reads one and a later one may run code.
     pub(super) fn ordered(&mut self, exprs: &[&Expr]) -> Vec<Code<'a>> {
         let a = self.a;
         let mut out: Vec<Code<'a>> = Vec::new();
-        for e in exprs {
+        let reads: Vec<bool> = exprs.iter().map(|e| reads_variable(e)).collect();
+        for (i, e) in exprs.iter().enumerate() {
             let mark = self.buf.len();
-            let go = self.expr(e);
+            let mut go = self.expr(e);
+            let later = (i + 1..exprs.len())
+                .any(|j| (!plain(e) && reads[j]) || (reads[i] && !plain(exprs[j])));
+            if later && !go.atomic {
+                let t = self.temp();
+                let ty = self.native(e).map_or("flickrt.Value", Native::go);
+                self.emit(docvec![a, "var ", t, " ", ty, " = ", go]);
+                go = self.code(t);
+            }
             if self.buf.len() > mark {
                 let mut spills = Vec::new();
                 for (prev, before) in out.iter_mut().zip(exprs) {
@@ -109,6 +122,8 @@ impl<'a> Gen<'a> {
         match &e.kind {
             ExprKind::Lit(lit) => self.code(&literal(lit)),
             ExprKind::Local(name) => self.code(&names::local(name)),
+            // not atomic: an operand after it that assigns it is ordered after the read
+            ExprKind::Var(name) => Code::from(a.text(a.alloc_str(&names::local(name)))),
             ExprKind::Global { module, name } => self.global_value(module, name, Vec::new()),
             ExprKind::Method { dict, name } => {
                 let dict = self.dict(dict);
@@ -269,7 +284,11 @@ impl<'a> Gen<'a> {
 
     pub(super) fn stmt(&mut self, stmt: &Stmt) {
         let a = self.a;
-        let (Stmt::Let(_, e) | Stmt::Expr(e) | Stmt::Fun { value: e, .. }) = stmt;
+        let (Stmt::Let(_, e)
+        | Stmt::Var(_, e)
+        | Stmt::Assign(_, e)
+        | Stmt::Expr(e)
+        | Stmt::Fun { value: e, .. }) = stmt;
         self.line(e.span);
         match stmt {
             Stmt::Let(Pat::Bind(name), value) => {
@@ -282,6 +301,15 @@ impl<'a> Gen<'a> {
             Stmt::Let(Pat::Wild, value) => {
                 let v = self.expr(value);
                 self.emit(docvec![a, "_ = ", v]);
+            }
+            Stmt::Var(name, value) => {
+                let v = self.expr(value);
+                self.bind(name, v);
+            }
+            Stmt::Assign(name, value) => {
+                let v = self.expr(value);
+                let l = a.alloc_str(&names::local(name));
+                self.emit(docvec![a, l, " = ", v]);
             }
             Stmt::Let(pat, value) => {
                 let v = self.expr(value);
@@ -332,6 +360,27 @@ impl<'a> Gen<'a> {
                 // a result read by nothing: Go refuses a variable nobody reads
                 self.emit(docvec![a, "_ = ", v]);
             }
+        }
+    }
+}
+
+/// A literal or a name: evaluating it runs no code.
+fn plain(e: &Expr) -> bool {
+    matches!(
+        e.kind,
+        ExprKind::Lit(_) | ExprKind::Local(_) | ExprKind::Var(_) | ExprKind::Con(_)
+    )
+}
+
+/// Whether `e` reads a `let mut` variable where it is evaluated.
+fn reads_variable(e: &Expr) -> bool {
+    match &e.kind {
+        ExprKind::Var(_) => true,
+        ExprKind::Lambda { .. } | ExprKind::Task(_) => false,
+        _ => {
+            let mut found = false;
+            e.each_child(&mut |c| found |= reads_variable(c));
+            found
         }
     }
 }

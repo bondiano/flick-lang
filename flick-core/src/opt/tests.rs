@@ -487,3 +487,39 @@ fn folded_floats_are_written_as_js_writes_them() {
     }
     assert!(cases > 300, "{cases} cases");
 }
+
+#[test]
+fn a_read_of_a_variable_stays_before_the_assignment_after_it() {
+    let js = release(
+        "module App exposing (counted)\n\n\
+         counted : Int -> (Int, Int)\n\
+         let counted n =\n  let mut x = n\n  let before = x\n  x = x + 1\n  (before, x)\n",
+    );
+    let read = js.find("const before = x;").expect(&js);
+    let write = js.find("x = x + 1 | 0;").expect(&js);
+    assert!(read < write, "{js}");
+    assert!(js.contains("return [before, x];"), "{js}");
+}
+
+#[test]
+fn an_inlined_function_takes_the_value_a_variable_has_at_the_call() {
+    let js = release(
+        "module App exposing (made)\n\n\
+         keep : Int -> (Unit -> Int)\nlet keep a = fun () -> a\n\n\
+         made : Int -> Int\n\
+         let made n =\n  let mut x = n\n  let f = keep x\n  x = x + 100\n  f ()\n",
+    );
+    // the argument is bound where it is read: the closure holds that, not `x`
+    assert!(!js.contains("() => x"), "{js}");
+    assert!(js.contains("let x = n;"), "{js}");
+}
+
+#[test]
+fn a_variable_assigned_again_is_no_known_constant() {
+    let js = release(
+        "module App exposing (constant)\n\n\
+         constant : Unit -> Int\nlet constant () =\n  let mut k = 1\n  k = 2\n  k * 10\n",
+    );
+    assert!(!js.contains("return 10;"), "{js}");
+    assert!(js.contains("k = 2;"), "{js}");
+}
