@@ -65,6 +65,9 @@ export const sqlTable = (table: { name: string; columns: ReadonlyArray<Column> }
 // a placeholder `$n`, or a quoted identifier, which may hold `$` itself
 const PLACEHOLDER = /"(?:[^"]|"")*"|\$(\d+)/g;
 
+const isTemplate = (value: unknown): value is Template =>
+  typeof value === "object" && value !== null && "text" in value && "tables" in value && "params" in value;
+
 const renumber = (text: string, slot: (n: number) => string): string =>
   text.replace(PLACEHOLDER, (whole, n: string | undefined) => (n === undefined ? whole : slot(Number(n))));
 
@@ -84,7 +87,8 @@ export const sqlTemplate = (template: Template): Template => {
       texts.push(`$${params.length}`);
       continue;
     }
-    const sub = p.value as Template;
+    const sub = p.value;
+    if (!isTemplate(sub)) throw new TypeError(`sql template parameter ${p.name} holds no template`);
     const [base, shift] = [params.length, tables.length];
     tables.push(...sub.tables);
     for (const q of sub.params) params.push(q.table === undefined ? q : frozen({ ...q, table: q.table + shift }));
