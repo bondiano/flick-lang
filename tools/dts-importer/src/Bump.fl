@@ -151,7 +151,8 @@ let run version package_dir root =
       | Err _ -> App.fail (file ++ " is not a snapshot")
       | Ok snap -> snap
   let capabilities =
-    matrix (FileSystem.read_file_string (Path.join [root, "packages/effect-ts/src/capabilities.ts"]))
+    matrix
+      (FileSystem.read_file_string (Path.join [root, "packages/effect-ts/src/capabilities.ts"]))
   Platform.stdout_write (report old next capabilities)
   FileSystem.write_file_string plain file (Surface.render next)
   List.each_effect
