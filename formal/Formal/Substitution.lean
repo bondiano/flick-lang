@@ -171,11 +171,11 @@ theorem TypM.subst {Ψ Θ Γ e J} (h : TypM S mode Ψ Θ Γ e J) :
     rw [Tm.subst, (plug_hole_closed hp).subst]
     exact .hkarm hℓ (ih₁ hσ) hop hE rfl hp hφ₀ ⟨hc.1, fun h => hc.2 fun hc' => h fun o c a b ho => by
       rw [hal.armOf_subst]; exact hc' o c a b ho⟩ hnt (ih₃ hσ) hle hφ hT
-  | hres hℓ _ hA ha hp hl hφ hT ih₁ _ =>
+  | hres hℓ _ hA ha hp hl hcp hφ hT ih₁ _ =>
     intro _ σ hσ
     subst ha
     rw [Tm.subst, (plug_hole_closed hp).subst]
-    exact .hres hℓ (ih₁ hσ) hA rfl hp hl hφ hT
+    exact .hres hℓ (ih₁ hσ) hA rfl hp hl hcp hφ hT
   | hdone _ ih => intro _ _ hσ; exact .hdone (ih hσ)
   | unw hℓ _ hφ ih => intro _ _ hσ; exact .unw hℓ (ih hσ) hφ
   | kont hl hC hT => intro _ _ _; exact .kont hl hC hT

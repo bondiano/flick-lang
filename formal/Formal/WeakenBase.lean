@@ -72,7 +72,7 @@ theorem TypM.locs {Ψ Θ Γ e J} (h : TypM S mode Ψ Θ Γ e J) : ∀ l, e.Has (
     · rcases plug_has_iff.mp h with h | h
       · exact ih₂ l (plug_has_iff.mpr (.inl h))
       · simp [Tm.Has] at h
-  | hres _ _ _ ha _ _ _ _ ih₁ ih₂ =>
+  | hres _ _ _ ha _ _ _ _ _ ih₁ ih₂ =>
     intro l h; subst ha
     simp only [Tm.Has] at h
     rcases h with h | h | h | h
@@ -159,7 +159,7 @@ theorem TypM.frees {Ψ Θ Γ e J} (h : TypM S mode Ψ Θ Γ e J) : ∀ i, e.Free
     · exact ih₁ i h
     · exact ih₃ i h
     · exact absurd (ih₂ i (plug_free_of_hole h)) (Nat.not_lt_zero _)
-  | hres _ _ _ ha _ _ _ _ ih₁ ih₂ =>
+  | hres _ _ _ ha _ _ _ _ _ ih₁ ih₂ =>
     intro i h; subst ha
     rcases h with h | h
     · exact absurd (ih₂ i (plug_free_of_hole h)) (Nat.not_lt_zero _)

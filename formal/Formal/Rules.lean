@@ -200,11 +200,11 @@ inductive TypM : List Ty → Facts → List Scheme → Tm → J → Prop
   /-- While the resumed body runs, the arm is parked where it called `resume`, the
   argument left out. -/
   | hres {A : List Frame} : Ψ[ℓ]? = some (.arrow (.base .unit) (.rt r ε) t' Caps.none) →
-      TypM Ψ Θ Γ b (.ex t' (.rt r ε)) →
+      TypM Ψ Θ Γ b (.ex t' (mode.use (.rt r ε) (Ty.rg p).reach)) →
       OkE A → a = plug A (.hole p) → TypM Ψ Θ [] (plug A (.app (.kont p κ) .todo))
         (.ex t' (mode.use (.rt r ε) (Ty.rg p).reach)) →
-      Ψ[κ]? = some (.arrow b₀ (.rt r ε) t' C') → (Stage.rt r ε).le φ → mode.subtype t' T →
-      TypM Ψ Θ Γ (.hres p ℓ a b) (.ex T φ)
+      Ψ[κ]? = some (.arrow b₀ (.rt r ε) t' C') → C' (.r p) → (Stage.rt r ε).le φ →
+      mode.subtype t' T → TypM Ψ Θ Γ (.hres p ℓ a b) (.ex T φ)
   | hdone : TypM Ψ Θ Γ a (.ex t (mode.use φ (Ty.rg p).reach)) →
       TypM Ψ Θ Γ (.hdone p a) (.ex t φ)
   /-- Unwinding to the handler of the cell `ℓ`, which then runs `a` with the type of its

@@ -96,9 +96,9 @@ theorem hres_signal {Ψ Θ p ℓ a x t φ} {A : List Frame} (hA : OkE A) (ha : a
     (h : TypM S mode Ψ Θ [] (.hres p ℓ a x) (.ex t φ)) :
     TypM S mode Ψ Θ [] (.hdone p (plug A x)) (.ex t φ) := by
   cases h with
-  | hres _ hb hA' ha' hp hl hφ hT =>
+  | hres _ hb hA' ha' hp hl hcp hφ hT =>
     obtain ⟨rfl, -⟩ := plug_hole_inj hA hA' (ha.symm.trans ha')
-    have h₁ := refill_app_mode hA' kont_not_value hp (kont_fn hl) (fun _ _ h l => h.trans l)
+    have h₁ := refill_app_mode hA' kont_not_value hp (kont_fn_rg hl hcp) (fun _ _ h l => h.trans l)
       fun T φ' hΘ hψ₀ _ _ => hx ((hb.cut hΘ.entails).sub (J' := .ex _ φ')
         ⟨TypingMode.subtype.refl, hψ₀⟩)
     exact .hdone (h₁.sub ⟨hT, TypingMode.use_mono mode hφ (Caps.Sub.refl _)⟩)

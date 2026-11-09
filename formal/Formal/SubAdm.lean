@@ -183,9 +183,9 @@ theorem TypM.sub {Ψ Θ Γ e J} (h : TypM S mode Ψ Θ Γ e J) : ∀ {J'}, JLeM 
   | hkarm hℓ hal hop hE hk hp hφ₀ hc hnt ha hle hφ hT =>
     intro _ hJ; obtain ⟨_, _, rfl, h₁, h₂⟩ := hJ.ex
     exact .hkarm hℓ hal hop hE hk hp hφ₀ hc hnt ha hle (Stage.le_trans hφ h₂) (hT.trans h₁)
-  | hres hℓ hb hA ha hp hl hφ hT =>
+  | hres hℓ hb hA ha hp hl hcp hφ hT =>
     intro _ hJ; obtain ⟨_, _, rfl, h₁, h₂⟩ := hJ.ex
-    exact .hres hℓ hb hA ha hp hl (Stage.le_trans hφ h₂) (hT.trans h₁)
+    exact .hres hℓ hb hA ha hp hl hcp (Stage.le_trans hφ h₂) (hT.trans h₁)
   | hdone _ ih => intro _ hJ; obtain ⟨_, _, rfl, h₁, h₂⟩ := hJ.ex; exact .hdone (ih ⟨h₁, mode.use_mono h₂ (Caps.Sub.refl _)⟩)
   | unw hℓ ha hφ => intro _ hJ; obtain ⟨_, _, rfl, _, h₂⟩ := hJ.ex; exact .unw hℓ ha (Stage.le_trans hφ h₂)
   | kont hl hC hT => intro _ hJ; obtain ⟨_, _, rfl, h₁, _⟩ := hJ.ex; exact .kont hl hC (hT.trans h₁)

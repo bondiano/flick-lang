@@ -56,6 +56,7 @@ discipline its hole may need that region live. -/
 def Frame.rgn : Frame → Option Nat
   | .hctlA p _ _ _ _ _ _ _ => some p
   | .hdone p => some p
+  | .hresB p _ _ => some p
   | _ => none
 
 /-- What a frame provides its hole in each discipline. The capture discipline keeps

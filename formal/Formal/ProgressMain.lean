@@ -242,12 +242,13 @@ theorem progress_mode {Λ μ root} (hroot : RootTyM S mode root) :
     obtain ⟨_, _, rfl, hr, _⟩ := Stage.rt_le hφ
     exact .inr (hn.frame (F := .hctlA _ _ _ _ _ _ _ _) trivial (nt id) (ni id) (fun N h => .inr (hr (.nm N) (TypingMode.use_svc_nm h)))
       ⟨_, hE, hk⟩)
-  | hres _ _ hA ha _ _ hφ _ ih _ =>
+  | hres _ _ hA ha _ _ _ hφ _ ih _ =>
     intro hμ hΓ _ _ hJ; cases hJ
     rcases ih hμ hΓ rfl with hv | hn
     · exact step (Step.ofP (.hresVal hA ha hv))
     obtain ⟨_, _, rfl, hr, _⟩ := Stage.rt_le hφ
-    exact .inr (hn.frame (F := .hresB _ _ _) trivial (nt id) (ni id) (fun N h => .inr (hr (.nm N) h)) ⟨_, hA, ha⟩)
+    exact .inr (hn.frame (F := .hresB _ _ _) trivial (nt id) (ni id)
+      (fun N h => .inr (hr (.nm N) (TypingMode.use_svc_nm h))) ⟨_, hA, ha⟩)
   | hkeep _ _ _ hφ₀ hc hnt hle hφ _ _ ih =>
     intro hμ hΓ _ _ hJ; cases hJ
     rcases ih hμ hΓ rfl with hv | hn

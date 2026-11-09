@@ -287,7 +287,7 @@ theorem TypM.substT {Ψ Θ Γ e J} (h : TypM S mode Ψ Θ Γ e J) :
         (Row.hP_substT hp (hσ.2.2.1 (.inl rfl)) (hσ.2.2.2 (.inl rfl))))
       ⟨hc.1, fun h => .inl (hc.2 h)⟩ (fun h => .inl (hnt h)) h₄
       (by simpa [Stage.substT] using Stage.le_substT σ hle) (by simpa only [TypingMode.use_substT] using Stage.le_substT σ hφ) (hT.substT σ)
-  | hres hℓ _ hA ha _ hl hφ hT ih₁ ih₂ =>
+  | hres hℓ _ hA ha _ hl hcp hφ hT ih₁ ih₂ =>
     intro σ hσ
     subst ha
     have hp : σ (.r _) = .rg _ := hσ.1 _ (.inr (.inl rfl))
@@ -300,7 +300,8 @@ theorem TypM.substT {Ψ Θ Γ e J} (h : TypM S mode Ψ Θ Γ e J) :
         · exact h.elim)
     simp only [Flick.J.substT, TypingMode.use_substT] at h₁ h₂
     simp only [Stage.substT, Ty.reach_caps, Ty.substT, hp] at h₁ h₂
-    exact .hres (by simp [hℓ, Ty.substT, Stage.substT]) h₁ hA rfl h₂ (by rw [List.getElem?_map, hl]; rfl) (by simpa only [TypingMode.use_substT] using Stage.le_substT σ hφ) (hT.substT σ)
+    exact .hres (by simp [hℓ, Ty.substT, Stage.substT]) h₁ hA rfl h₂ (by rw [List.getElem?_map, hl]; rfl)
+      (by exact ⟨.r _, hcp, by rw [hp]; rfl⟩) (by simpa only [TypingMode.use_substT] using Stage.le_substT σ hφ) (hT.substT σ)
   | hdone _ ih =>
     intro σ hσ
     have hp : σ (.r _) = .rg _ := hσ.1 _ (.inr (.inl rfl))

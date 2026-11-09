@@ -180,7 +180,7 @@ theorem pure_preservation_mode {Ψ Θ e t φ e'} (h : TypM S mode Ψ Θ [] e (.e
     | errVal hv'' | allI hv'' => exact (nv hv'').elim
   | hresVal hA' ha' hv =>
     cases h with
-    | hres _ hb hA ha hp hl hφ hT =>
+    | hres _ hb hA ha hp hl hcp hφ hT =>
       obtain ⟨rfl, -⟩ := plug_hole_inj hA' hA (ha'.symm.trans ha)
       have h₁ := refill_app_mode hA kont_not_value hp (kont_fn hl) (fun _ _ h l => h.trans l)
         fun T φ' hΘ _ hb' _ =>

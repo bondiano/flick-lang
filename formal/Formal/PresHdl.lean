@@ -116,6 +116,27 @@ theorem kont_fn {mode : TypingMode} {Ψ : List Ty} {p ℓ b₀ r ε t' C'}
       simp only [h0, Ty.substT_ident, Stage.substT_ident] at hdom hψ ht
       exact ⟨hdom, Stage.le_trans (TypingMode.le_use mode _ _) hψ, ht⟩
 
+/-- `resume` of a region `p` that its cell names: the hole uses that region too. -/
+theorem kont_fn_rg {mode : TypingMode} {Ψ : List Ty} {p ℓ b₀ r ε t' C'}
+    (hl : Ψ[ℓ]? = some (.arrow b₀ (.rt r ε) t' C')) (hcp : C' (.r p)) :
+    HoleFnM S mode Ψ (.kont p ℓ) b₀ (mode.use (.rt r ε) (Ty.rg p).reach)
+      (fun t => mode.subtype t' t) := by
+  intro K Θ' a ψ t C φ' h
+  have h₁ := kont_fn (S := S) (p := p) hl h
+  refine ⟨h₁.1, fun hK => ?_⟩
+  obtain ⟨hdom, -, ht⟩ := h₁.2 hK
+  subst hK
+  cases h with
+  | kont hl' _ hT =>
+    obtain ⟨-, hψ, -⟩ := TypingMode.arrow_inv hT
+    rw [List.getElem?_map, hl] at hl'
+    simp only [Option.map_some, Option.some.injEq, Ty.up_def, Ty.substT, Ty.arrow.injEq] at hl'
+    obtain ⟨rfl, rfl, rfl, rfl⟩ := hl'
+    have h0 : shiftV 0 = Ty.ident := by funext a; cases a <;> rfl
+    simp only [h0, Caps.substT_ident, Stage.substT_ident] at hψ
+    exact ⟨hdom, Stage.le_trans (TypingMode.use_mono mode (Stage.le_refl _)
+      fun x hx => by cases hx; exact hcp) hψ, ht⟩
+
 /-- `lam todo` has every function type: the type of a cell before its use. -/
 theorem lam_todo {mode : TypingMode} {Ψ Θ a ψ t C φ} :
     TypM S mode Ψ Θ [] (.lam .todo) (.ex (.arrow a ψ t C) φ) := by

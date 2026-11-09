@@ -85,10 +85,13 @@ theorem frame_typing_mode {Ψ Θ r t φ} (hr : ¬ Value r) (F : Frame) (hF : F.o
     | errVal hv | allI hv => exact (nv hv).elim
   case hresB p ℓ a =>
     cases h with
-    | hres hℓ hb hA ha hp' hl hφ hT =>
-      refine .mk0 ⟨_, _, hb, .of_le hφ, fun σ hσ X _ h' => ?_⟩
+    | hres hℓ hb hA ha hp' hl hcp hφ hT =>
+      refine .mk0 ⟨_, _, hb, FRelM.use_rgn (fun hm x hx => by
+        cases hm; exact .inr ⟨p, rfl, congrArg Elem.atm hx⟩)
+        (TypingMode.use_mono mode hφ (Caps.Sub.refl _)), fun σ hσ X _ h' => ?_⟩
       subst ha
       have hp : σ (.r p) = .rg p := hσ.1 _ (.inr (.inl rfl))
+      rw [TypingMode.use_substT_rg mode _ hp] at h'
       have h₂ := hp'.sx (hσ.sub fun s h => by
         rcases plug_has_iff.mp h with h | h
         · exact .inr (.inr (.inl (plug_has_iff.mpr (.inl h))))
@@ -98,7 +101,7 @@ theorem frame_typing_mode {Ψ Θ r t φ} (hr : ¬ Value r) (F : Frame) (hF : F.o
       simp only [Flick.J.substT, TypingMode.use_substT_rg mode _ hp] at h₂
       exact .hres (by simpa [Ty.substT, Stage.substT] using cell_sx (σ := σ) hℓ X) h' hA rfl h₂
         (by rw [List.getElem?_append_left (by simpa using getElem?_lt hl), List.getElem?_map, hl]; rfl)
-        (Stage.le_substT σ hφ) (hT.substT σ)
+        (by exact ⟨.r _, hcp, by rw [hp]; rfl⟩) (Stage.le_substT σ hφ) (hT.substT σ)
     | errVal hv | allI hv => exact (nv hv).elim
   case hdone p =>
     cases h with

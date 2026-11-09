@@ -93,8 +93,8 @@ theorem TypM.weakenStore {Ψ Θ Γ e J} (h : TypM S mode Ψ Θ Γ e J) (X : List
     exact .hkeep (getElem?_ext hℓ) (ih₁ X) (ih₂ X) hφ₀ hc hnt hle hφ hT
   | hkarm hℓ _ hop hE hk _ hφ₀ hc hnt _ hle hφ hT ih₁ ih₂ ih₃ =>
     exact .hkarm (getElem?_ext hℓ) (ih₁ X) hop hE hk (ih₂ X) hφ₀ hc hnt (ih₃ X) hle hφ hT
-  | hres hℓ _ hA ha _ hl hφ hT ih₁ ih₂ =>
-    exact .hres (getElem?_ext hℓ) (ih₁ X) hA ha (ih₂ X) (by rw [List.getElem?_append_left (getElem?_lt hl)]; exact hl) hφ hT
+  | hres hℓ _ hA ha _ hl hcp hφ hT ih₁ ih₂ =>
+    exact .hres (getElem?_ext hℓ) (ih₁ X) hA ha (ih₂ X) (by rw [List.getElem?_append_left (getElem?_lt hl)]; exact hl) hcp hφ hT
   | hdone _ ih => exact .hdone (ih X)
   | unw hℓ _ hφ ih => exact .unw (getElem?_ext hℓ) (ih X) hφ
   | kont hl hC hT => exact .kont (by rw [List.getElem?_append_left (getElem?_lt hl)]; exact hl) hC hT
@@ -286,11 +286,11 @@ theorem TypM.rename {Ψ Θ Γ e J} (h : TypM S mode Ψ Θ Γ e J) :
     rw [Tm.rename, (plug_hole_closed hp).rename]
     exact .hkarm hℓ (ih₁ hξ) hop hE rfl hp hφ₀ ⟨hc.1, fun h => hc.2 fun hc' => h fun o c a b ho => by
       rw [Tm.armOf_rename]; exact hc' o c a b ho⟩ hnt (ih₃ hξ) hle hφ hT
-  | hres hℓ _ hA ha hp hl hφ hT ih₁ _ =>
+  | hres hℓ _ hA ha hp hl hcp hφ hT ih₁ _ =>
     intro _ ξ hξ
     subst ha
     rw [Tm.rename, (plug_hole_closed hp).rename]
-    exact .hres hℓ (ih₁ hξ) hA rfl hp hl hφ hT
+    exact .hres hℓ (ih₁ hξ) hA rfl hp hl hcp hφ hT
   | hdone _ ih => intro _ _ hξ; exact .hdone (ih hξ)
   | unw hℓ _ hφ ih => intro _ _ hξ; exact .unw hℓ (ih hξ) hφ
   | kont hl hC hT => intro _ _ _; exact .kont hl hC hT
