@@ -186,6 +186,46 @@ fn inner_provide_wins() {
     assert_eq!(value(run_task(e)), Lit::String("inner".into()));
 }
 
+/// A layer's operation runs in the caller's environment, including a service
+/// provided inside the layer's own `provide`.
+#[test]
+fn layer_service_uses_the_callers_provider() {
+    let prefix = Path::new("T", "Prefix");
+    let greeter = Path::new("T", "Greeter");
+    let prefix_layer = |text: &str| {
+        let implementation = Term::Record(Rc::from([(
+            "prefix".into(),
+            Term::lam("_", Term::string(text)),
+        )]));
+        konst(Const::LayerSucceed(prefix.clone()), vec![implementation])
+    };
+    let prefix_call = Term::app(
+        Term::Field(
+            Rc::new(konst(Const::Ask(prefix.clone()), vec![Term::unit()])),
+            "prefix".into(),
+        ),
+        Term::unit(),
+    );
+    let greeter_layer = konst(
+        Const::LayerSucceed(greeter.clone()),
+        vec![Term::Record(Rc::from([(
+            "greet".into(),
+            Term::lam("_", prefix_call),
+        )]))],
+    );
+    let greet = Term::app(
+        Term::Field(
+            Rc::new(konst(Const::Ask(greeter), vec![Term::unit()])),
+            "greet".into(),
+        ),
+        Term::unit(),
+    );
+    let inner = Term::Provide(Rc::new(prefix_layer("inner")), Rc::new(greet));
+    let middle = Term::Provide(Rc::new(greeter_layer), Rc::new(inner));
+    let outer = Term::Provide(Rc::new(prefix_layer("outer")), Rc::new(middle));
+    assert_eq!(value(run_task(outer)), Lit::String("inner".into()));
+}
+
 /// `todo` is a defect, not a value.
 #[test]
 fn todo_dies() {

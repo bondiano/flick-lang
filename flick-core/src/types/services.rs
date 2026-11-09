@@ -123,20 +123,21 @@ pub fn returns_any(ty: &Type) -> bool {
         && !constraints.iter().any(names)
 }
 
-/// `ty` with the service `label` needed at every runtime arrow of its stages.
-fn require(ty: Type, label: &str, service: &Type) -> Type {
+/// `ty` with the service `label` needed at every runtime arrow of its stages;
+/// an arrow stays direct if `never_suspends` holds of the service.
+fn require(ty: Type, label: &str, service: &Type, never_suspends: bool) -> Type {
     match ty {
         Type::Captured {
             ty,
             captures,
             value,
         } => Type::Captured {
-            ty: Box::new(require(*ty, label, service)),
+            ty: Box::new(require(*ty, label, service, never_suspends)),
             captures,
             value,
         },
         Type::Bounded { ty, captures } => Type::Bounded {
-            ty: Box::new(require(*ty, label, service)),
+            ty: Box::new(require(*ty, label, service, never_suspends)),
             captures,
         },
         Type::Forall {
@@ -146,7 +147,7 @@ fn require(ty: Type, label: &str, service: &Type) -> Type {
         } => Type::Forall {
             vars,
             constraints,
-            body: Box::new(require(*body, label, service)),
+            body: Box::new(require(*body, label, service, never_suspends)),
         },
         Type::Fun {
             param,
@@ -161,9 +162,10 @@ fn require(ty: Type, label: &str, service: &Type) -> Type {
                     ..Row::default()
                 });
                 e.sync = super::ty::sync_rows(&e.services, &e.errors);
+                e.direct = e.direct && never_suspends;
                 e
             }),
-            result: Box::new(require(*result, label, service)),
+            result: Box::new(require(*result, label, service, never_suspends)),
         },
         other => other,
     }
@@ -200,7 +202,8 @@ impl Checker<'_> {
             subst.iter().take(params).map(|(_, t)| t.clone()),
         );
         let ty = self.instantiate(&body.substitute(&subst), span);
-        require(ty, &format!("{module}.{name}"), &service)
+        let never_suspends = self.never_suspends(module, name);
+        require(ty, &format!("{module}.{name}"), &service, never_suspends)
     }
 
     /// A service named as a value, `S` or `M.S`, as `Layer.succeed` takes it.

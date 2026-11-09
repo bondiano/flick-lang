@@ -132,6 +132,7 @@ impl Loader<'_> {
             by_name: &self.by_name,
             from_packages: &self.from_packages,
             project: self.project,
+            stages_by_class: self.stages_by_class,
             // a failed import leaves names unresolved, and the build fails anyway
             lower: self.lowered.is_some()
                 && !self
@@ -182,6 +183,7 @@ struct Checking<'a> {
     by_name: &'a BTreeMap<String, usize>,
     from_packages: &'a BTreeMap<String, Interface>,
     project: Option<&'a Project>,
+    stages_by_class: bool,
     lower: bool,
     lower_packages_only: bool,
     precompiled: &'a Precompiled,
@@ -296,7 +298,8 @@ impl Checking<'_> {
             thresholds: self
                 .project
                 .map_or_else(Default::default, |p| p.config.thresholds),
-            effects: build.is_none_or(|b| b.effect == Backend::Effect),
+            effects: build.is_none_or(|b| b.effect != Backend::None),
+            stages_by_class: self.stages_by_class,
         };
         let mut diagnostics = loaded.parse.diagnostics.clone();
         let resolved_cleanly = !resolved.iter().any(|d| d.severity == Severity::Error);
@@ -306,8 +309,13 @@ impl Checking<'_> {
         // not read those variables with their own unification store.
         let broken = !loaded.parse.diagnostics.is_empty();
         let mut untyped = interface.clone();
-        let (mut checked, typing) =
-            types::check_typed(&module, lookup, types::builtins(), options, &mut interface);
+        let (mut checked, typing) = types::check_typed(
+            &module,
+            lookup,
+            types::builtins_of(self.stages_by_class),
+            options,
+            &mut interface,
+        );
         // what the plugins find from the types of their code stops lowering too
         if let Some(expansion) = &loaded.expansion {
             checked.extend(expansion.check_blocks(&loaded.editing, &typing.wildcards));

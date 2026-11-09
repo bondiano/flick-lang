@@ -12,5 +12,8 @@ type alias A = { next : Option B }
 type alias B = (Float, C)
 type alias C = List A
 
+// a constructor may name a cyclic alias: it is nominal by then
+type Chain = Link C
+
 // an opaque type is nominal: it may refer to itself
 opaque type alias Stream = Option (Float, Stream)

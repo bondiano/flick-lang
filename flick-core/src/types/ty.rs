@@ -80,7 +80,7 @@ pub struct Binder {
 }
 
 /// `{services; errors}` of a runtime arrow.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Effects {
     pub services: Type,
     pub errors: Type,
@@ -89,9 +89,32 @@ pub struct Effects {
     /// `Atom.Read` keeps the runtime stage its function was compiled with.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub sync: bool,
+    /// Whether the arrow is written, under `Options::stages_by_class`, with a
+    /// closed row without `Async` or an effect with a `control` operation: a
+    /// plain function on Flick's own runtime, where nothing else suspends. No
+    /// part of the type: `sync` still says what unifies, and the runtime adapts
+    /// a call of either stage to a function of the other.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub direct: bool,
     /// Where the row is written, for a fix that adds to it.
     #[serde(skip)]
     pub written: Written,
+}
+
+impl PartialEq for Effects {
+    fn eq(&self, other: &Effects) -> bool {
+        self.services == other.services && self.errors == other.errors && self.sync == other.sync
+    }
+}
+
+impl Eq for Effects {}
+
+impl Hash for Effects {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.services.hash(state);
+        self.errors.hash(state);
+        self.sync.hash(state);
+    }
 }
 
 /// Where an effect row is written: right after its `{`, and what is
@@ -157,12 +180,13 @@ impl Effects {
             services,
             errors,
             sync,
+            direct: false,
             written: Written::default(),
         }
     }
 
     pub fn stage(&self) -> Stage {
-        if self.sync {
+        if self.sync || self.direct {
             Stage::Sync
         } else {
             Stage::Runtime
@@ -370,6 +394,7 @@ impl Type {
                         services: f(&e.services),
                         errors: f(&e.errors),
                         sync: e.sync,
+                        direct: e.direct,
                         written: e.written,
                     })
                 }),
@@ -505,7 +530,33 @@ impl Type {
 
 #[cfg(test)]
 mod tests {
-    use super::{Lang, Type};
+    use std::hash::{DefaultHasher, Hash, Hasher};
+
+    use super::{Effects, Lang, Stage, Type};
+
+    #[test]
+    fn direct_changes_the_stage_and_not_the_type() {
+        let plain = Effects::new(Type::empty_row(), Type::empty_row());
+        let direct = Effects {
+            direct: true,
+            ..plain.clone()
+        };
+        let hash = |e: &Effects| {
+            let mut hasher = DefaultHasher::new();
+            e.hash(&mut hasher);
+            hasher.finish()
+        };
+        assert_eq!(plain, direct);
+        assert_eq!(hash(&plain), hash(&direct));
+        assert_eq!(plain.stage(), Stage::Runtime);
+        assert_eq!(direct.stage(), Stage::Sync);
+        // an interface of the default mode does not change
+        let json = |e: &Effects| serde_json::to_string(e).expect("serializes");
+        assert!(!json(&plain).contains("direct"));
+        assert!(json(&direct).contains("\"direct\":true"));
+        let read: Effects = serde_json::from_str(&json(&direct)).expect("reads");
+        assert!(read.direct);
+    }
 
     #[test]
     fn substitution_preserves_capture_qualification_kind() {

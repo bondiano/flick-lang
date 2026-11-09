@@ -1,0 +1,28 @@
+hello, provide_
+hello, provide_merge hello
+tap_error no greeter
+fallback catch
+fallback catch_cause
+sync x
+fallback suspend
+fallback unwrap
+second merge_all
+effect_discard ran
+hello
+hello!, update_service
+tap
+flat_map x
+tap_cause
+or_die died [true]
+shared builds 1
+fresh builds 3
+memo builds 4
+from_build hello
+from_build_memo hello
+built
+exit failed false
+finalizer ran
+launched
+launch interrupted true
+failed build causes Some (false, true, 2)
+failed build cleanup count 1

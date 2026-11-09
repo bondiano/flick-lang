@@ -123,11 +123,17 @@ impl Settings<'_> {
 
 /// The opt-in outputs of a build.
 #[derive(Debug, Clone, Copy, Default)]
+#[allow(
+    clippy::struct_excessive_bools,
+    reason = "each flag asks for one thing of a build"
+)]
 pub struct Extras {
     /// Write `A/B.d.ts`, the public TypeScript interface of each module.
     pub dts: bool,
     /// Write `A/B.promise.js`: Promise façades of runtime functions.
     pub promise_facade: bool,
+    /// Build for Flick's own runtime, whatever the project's `build.effect`.
+    pub rt: bool,
     /// The runner of an app compiles pure codecs ahead of use.
     pub schema_aot: bool,
     /// What a release build labels for debugging tools.
@@ -179,10 +185,16 @@ pub fn emit(
             foreign_specifier(settings, &path, module, spec)
         }
     };
+    let by_class = settings.backend == Backend::Rt;
     let any_interface = |m: &str| {
-        interface_of(m).or_else(|| types::builtins().iter().find(|i| i.module == m).cloned())
+        interface_of(m).or_else(|| {
+            types::builtins_of(by_class)
+                .iter()
+                .find(|i| i.module == m)
+                .cloned()
+        })
     };
-    let (workers, direct) = exports(settings.release, modules, &any_interface);
+    let (workers, direct) = exports(settings.release, modules, &any_interface, by_class);
     let workers = |m: &str, name: &str| workers.get(&(m.to_owned(), name.to_owned())).copied();
     let direct = |m: &str, i: &str, method: &str| {
         direct.contains(&(m.to_owned(), i.to_owned(), method.to_owned()))
@@ -197,6 +209,7 @@ pub fn emit(
         workers: &workers,
         direct: &direct,
         labels: settings.extras.labels,
+        rt: settings.backend == Backend::Rt,
     };
     let mut out = Vec::new();
     #[cfg(feature = "build-artifacts")]
@@ -247,8 +260,18 @@ fn foreign_specifier(
         _ => (spec, (settings.source_dir)(module)),
     };
     let relative = spec.starts_with("./") || spec.starts_with("../");
+    // a foreign module may have a version for Flick's own runtime beside it
+    let beside = spec
+        .strip_suffix(".mjs")
+        .map(|stem| format!("{stem}.rt.mjs"))
+        .filter(|_| settings.backend == Backend::Rt && relative)
+        .filter(|rt| dir.as_ref().is_some_and(|d| d.join(rt).is_file()));
+    let spec = beside.as_deref().unwrap_or(spec);
     if settings.backend == Backend::None && !relative {
         return effects::specifier(spec).unwrap_or_else(|| spec.to_owned());
+    }
+    if settings.backend == Backend::Rt && !relative {
+        return effects::rt_specifier(spec).unwrap_or_else(|| spec.to_owned());
     }
     match (relative, dir) {
         (true, Some(dir)) => {
@@ -362,6 +385,7 @@ fn entry_runners(
                     Some(module) => Start::Run(codegen::relative(&file, &path(module))),
                     None => match kind.and_then(Result::ok) {
                         Some(MainKind::Pure) => Start::Call,
+                        _ if settings.backend == Backend::Rt => Start::RunMainRt,
                         _ => Start::RunMain,
                     },
                 };
@@ -491,13 +515,16 @@ fn exports(
     release: bool,
     modules: &[Compiled],
     any_interface: &dyn Fn(&str) -> Option<Interface>,
+    by_class: bool,
 ) -> Exports {
     let mut out = Exports::default();
     if !release {
         return out;
     }
     let own = modules.iter().map(|c| (&c.name, &c.ir.items));
-    let builtin = builtin_modules().iter().map(|m| (&m.name, &m.items));
+    let builtin = builtin_modules_of(by_class)
+        .iter()
+        .map(|m| (&m.name, &m.items));
     for (module, items) in own.chain(builtin) {
         let Some(interface) = any_interface(module) else {
             continue;
@@ -527,16 +554,14 @@ fn builtins(
     #[cfg(feature = "typescript")]
     let dts = ctx.settings.extras.dts;
     let mut pending = imports;
+    let lowered = builtin_modules_of(ctx.settings.backend == Backend::Rt);
     #[cfg(feature = "typescript")]
     if dts {
-        pending = builtin_modules()
-            .iter()
-            .map(|module| module.name.clone())
-            .collect();
+        pending = lowered.iter().map(|module| module.name.clone()).collect();
     }
     let mut written = HashSet::new();
     while let Some(name) = pending.pop() {
-        let Some(module) = builtin_modules().iter().find(|m| m.name == name) else {
+        let Some(module) = lowered.iter().find(|m| m.name == name) else {
             continue;
         };
         if !written.insert(name) {
@@ -566,12 +591,21 @@ fn builtins(
 
 /// The function `name` of `module`, a module of the build or a built-in one,
 /// with its dictionary parameters and body for the optimizer to copy.
-fn generic_of(modules: &[Compiled], module: &str, name: &str) -> Option<(Vec<String>, ir::Expr)> {
+fn generic_of(
+    modules: &[Compiled],
+    module: &str,
+    name: &str,
+    by_class: bool,
+) -> Option<(Vec<String>, ir::Expr)> {
     if let Some(m) = modules.iter().find(|m| m.name == module) {
         return opt::names_only(&m.ir, name, &|n| m.interface.exports_value(n));
     }
-    let ir = builtin_modules().iter().find(|m| m.name == module)?;
-    let interface = types::builtins().iter().find(|i| i.module == module)?;
+    let ir = builtin_modules_of(by_class)
+        .iter()
+        .find(|m| m.name == module)?;
+    let interface = types::builtins_of(by_class)
+        .iter()
+        .find(|i| i.module == module)?;
     opt::names_only(ir, name, &|n| interface.exports_value(n))
 }
 
@@ -600,11 +634,19 @@ fn compiled_module(
     diagnostics: &mut Vec<Diagnostic>,
 ) -> Vec<String> {
     // the interface and its summaries come from the reference lowering
-    let optimized = ctx.settings.release.then(|| optimized(ctx.modules, module));
+    let by_class = ctx.settings.backend == Backend::Rt;
+    let optimized = ctx
+        .settings
+        .release
+        .then(|| optimized(ctx.modules, module, by_class));
     if ctx.settings.backend == Backend::None {
         effects::check(&module.ir, diagnostics);
     }
-    effects::control_on_js(&module.ir, diagnostics);
+    // Flick's own runtime has `control` arms, and takes what it lacks when it is
+    // called: a module binds more than a program uses
+    if ctx.settings.backend != Backend::Rt {
+        effects::control_on_js(&module.ir, diagnostics);
+    }
     let output = codegen::js(optimized.as_ref().unwrap_or(&module.ir), ctx.options);
     let file = (ctx.path)(&module.name);
     #[cfg(feature = "source-maps")]
@@ -697,6 +739,10 @@ fn runner(file: &str, entry: &str, start: &Start, schema_aot: Option<&str>) -> A
             Some(("runMain", "@flick-lang/runtime")),
             "await runMain(main);",
         ),
+        Start::RunMainRt => (
+            Some(("runMain", "@flick-lang/runtime/rt")),
+            "await runMain(main);",
+        ),
         // what `run` returns is what the host takes from the module, such as Cloudflare's `fetch`
         Start::Run(module) => (Some(("run", module.as_str())), "export default run(main);"),
     };
@@ -723,6 +769,8 @@ enum Start {
     Call,
     /// An effect, run by the runtime's Node runner.
     RunMain,
+    /// [`Start::RunMain`] on Flick's own runtime.
+    RunMainRt,
     /// By `run` of a runner module, at this path from the runner.
     Run(String),
 }
@@ -832,34 +880,46 @@ fn specifier(from: &Path, target: &Path) -> String {
 }
 
 /// The IR of `module` of the build `modules` as a release build optimizes
-/// it, for every target alike.
-pub fn optimized(modules: &[Compiled], module: &Compiled) -> ir::Module {
+/// it, for every target alike; `by_class` is the mode the build is checked in.
+pub fn optimized(modules: &[Compiled], module: &Compiled, by_class: bool) -> ir::Module {
     let mut ir = module.ir.clone();
     let exported = |name: &str| module.interface.exports_value(name);
-    let generics = |m: &str, name: &str| generic_of(modules, m, name);
+    let generics = |m: &str, name: &str| generic_of(modules, m, name, by_class);
     opt::optimize(&mut ir, &exported, &generics);
     ir
 }
 
 /// The built-in modules, lowered.
 pub fn builtin_modules() -> &'static [ir::Module] {
-    &lowered_builtins().0
+    builtin_modules_of(false)
+}
+
+/// The built-in modules, lowered from a check with `stages_by_class`.
+pub fn builtin_modules_of(stages_by_class: bool) -> &'static [ir::Module] {
+    &lowered_builtins(stages_by_class).0
 }
 
 /// What the reference model reads of each built-in module, in the order of
 /// [`builtin_modules`].
 pub fn builtin_declarations() -> &'static [Arc<Interface>] {
-    &lowered_builtins().1
+    &lowered_builtins(false).1
 }
 
-fn lowered_builtins() -> &'static (Vec<ir::Module>, Vec<Arc<Interface>>) {
-    static BUILTINS: OnceLock<(Vec<ir::Module>, Vec<Arc<Interface>>)> = OnceLock::new();
-    BUILTINS.get_or_init(|| {
+/// The built-in modules lowered, with what the reference model reads of each.
+type Lowered = (Vec<ir::Module>, Vec<Arc<Interface>>);
+
+fn lowered_builtins(stages_by_class: bool) -> &'static Lowered {
+    static BUILTINS: [OnceLock<Lowered>; 2] = [OnceLock::new(), OnceLock::new()];
+    BUILTINS[usize::from(stages_by_class)].get_or_init(|| {
         let (mut lowered, mut declarations) = (Vec::new(), Vec::new());
-        types::check_each(types::builtin_sources(), |module, typing| {
-            lowered.push(ir::lower(module, typing).expect("built-in modules compile"));
-            declarations.push(typing.declarations.clone());
-        });
+        types::check_each(
+            types::builtin_sources(),
+            stages_by_class,
+            |module, typing| {
+                lowered.push(ir::lower(module, typing).expect("built-in modules compile"));
+                declarations.push(typing.declarations.clone());
+            },
+        );
         (lowered, declarations)
     })
 }

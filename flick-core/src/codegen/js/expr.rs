@@ -154,6 +154,9 @@ impl Gen<'_> {
             ExprKind::Await(inner) => {
                 let owner = self.owner.take();
                 let v = self.expr(inner);
+                if self.kernel {
+                    return self.await_task(owner, v);
+                }
                 self.run(owner, &v)
             }
             ExprKind::Task(body) => self.gen_block(body),
@@ -176,7 +179,7 @@ impl Gen<'_> {
         if let Some((worker, args)) = self.worker_call(e) {
             let owner = self.owner.take();
             let js = self.ordered(&args);
-            let js = self.before_sync(stage, js);
+            let js = self.before_sync(stage, owner.is_some(), js);
             let call = format!("{}{worker}({})", mark!(self, e.span), js.join(", "));
             return self.call(stage, owner, call);
         }
@@ -189,8 +192,8 @@ impl Gen<'_> {
             let js = self.ordered(&[func, arg]);
             (js[0].clone(), js[1].clone())
         };
-        let [f, a] =
-            <[String; 2]>::try_from(self.before_sync(stage, vec![f, a])).expect("two operands");
+        let [f, a] = <[String; 2]>::try_from(self.before_sync(stage, owner.is_some(), vec![f, a]))
+            .expect("two operands");
         // `(x) => (y)` ends with `)` too, yet needs parentheses to be called
         let call_like = tidy::is_call(&f);
         let f = if atomic(&f) || call_like {
@@ -205,8 +208,14 @@ impl Gen<'_> {
     /// The operands of a Sync call in a generator as constants when one
     /// yields: `$rt.sync` wraps the call in an arrow, where `yield*` is
     /// not allowed.
-    fn before_sync(&mut self, stage: Stage, js: Vec<String>) -> Vec<String> {
-        if stage != Stage::Sync || !self.generator || !js.iter().any(|j| j.contains("yield")) {
+    fn before_sync(&mut self, stage: Stage, within: bool, js: Vec<String>) -> Vec<String> {
+        // on the kernel only `within` wraps a call in an arrow
+        let wrapped = if self.kernel {
+            within
+        } else {
+            stage == Stage::Sync
+        };
+        if !wrapped || !self.generator || !js.iter().any(|j| j.contains("yield")) {
             return js;
         }
         js.into_iter().map(|j| self.spill(j)).collect()
@@ -215,6 +224,13 @@ impl Gen<'_> {
     /// The JS call `call` of `stage` made at the current stage: a Sync one
     /// in a generator runs with the fiber's services.
     fn call(&mut self, stage: Stage, owner: Option<String>, call: String) -> String {
+        if self.kernel {
+            return if stage == Stage::Pure {
+                call
+            } else {
+                self.run(owner, &call)
+            };
+        }
         match stage {
             Stage::Sync if self.generator => format!("(yield* {}(() => {call}))", self.rt("sync")),
             Stage::Pure | Stage::Sync => call,
@@ -319,6 +335,9 @@ impl Gen<'_> {
     /// Runs the effect `js`: in a generator with `yield*`, in a Sync stage
     /// at once with the services of the context.
     pub(super) fn run(&mut self, owner: Option<String>, js: &str) -> String {
+        if self.kernel {
+            return self.kernel_run(owner, js);
+        }
         let js = match owner {
             Some(owner) => format!("{}({owner}, {js})", self.rt("within")),
             None => js.to_owned(),
@@ -365,6 +384,9 @@ impl Gen<'_> {
     fn try_expr(&mut self, body: &Expr, arms: &[Arm]) -> String {
         if !self.generator && !self.sync {
             return self.expr(body);
+        }
+        if self.kernel && !self.generator {
+            return self.try_at_once(body, arms);
         }
         let body = self.gen_block(body);
         let error = self.temp();

@@ -9,7 +9,6 @@ use crate::project::config::Emit;
 use crate::source::{FileId, Span};
 use crate::syntax::cst::{Element, Node};
 use crate::syntax::kind::SyntaxKind as K;
-use crate::types;
 
 /// The built-in modules of the js target only: the browser UI, its forms
 /// and its reactivity, the RPC and telemetry clients, JS interop and the
@@ -86,7 +85,7 @@ impl Loader<'_> {
                 if self.by_name.contains_key(name) {
                     continue;
                 }
-                let builtin = types::builtins().iter().any(|i| i.module == name);
+                let builtin = self.builtins().iter().any(|i| i.module == name);
                 if builtin && js_only(name) {
                     found.push(js_only_error(name, import.span));
                 }

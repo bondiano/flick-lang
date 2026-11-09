@@ -58,6 +58,11 @@ pub struct RunArguments {
     #[arg(long, value_name = "URL", num_args = 0..=1, default_missing_value = "ws://localhost:34437")]
     pub devtools: Option<String>,
 
+    /// Run on Flick's own runtime, as `build.effect = "rt"` does. Only Node
+    /// has it, and without `DevTools`: `--devtools` is left out.
+    #[arg(long)]
+    pub rt: bool,
+
     /// Arguments of the application, or the script's `"$@"`, after `--`.
     #[arg(last = true)]
     pub args: Vec<String>,

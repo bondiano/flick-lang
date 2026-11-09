@@ -4,6 +4,15 @@
 import assert from "node:assert/strict";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { test } from "node:test";
+import { bigintDivide, bigintRemainder } from "../src/core/text.ts";
+
+test("checked BigInt division keeps a zero divisor as an arithmetic error", () => {
+  assert.deepEqual(bigintDivide(7n, 2n), { _tag: "Success", success: 3n });
+  assert.deepEqual(bigintRemainder(-7n, 2n), { _tag: "Success", success: -1n });
+  const result = bigintDivide(5n, 0n);
+  assert.equal(result._tag, "Failure");
+  if (result._tag === "Failure") assert.equal(result.failure._0, "division by zero");
+});
 
 const repo = new URL("../../", import.meta.url);
 const read = (path: string): string => readFileSync(new URL(path, repo), "utf8");
@@ -49,13 +58,18 @@ test("core has every binding of the built-in modules without effects", async () 
 test("core has every runtime helper compiled code calls", async () => {
   const core = await exportsOf("../src/core/index.ts");
   const dir = new URL("flick-core/src/codegen/js/", repo);
-  const code = readdirSync(dir)
-    .filter((f) => f.endsWith(".rs"))
-    .map((f) => readFileSync(new URL(f, dir), "utf8"))
-    .join("\n");
+  // `kernel.rs` emits only for Flick's own runtime, whose helpers are its own
+  const codegen = (kernel: boolean): string =>
+    readdirSync(dir)
+      .filter((f) => f.endsWith(".rs") && (f === "kernel.rs") === kernel)
+      .map((f) => readFileSync(new URL(f, dir), "utf8"))
+      .join("\n");
+  const code = codegen(false);
   const helpers = [...code.matchAll(/rt\("(\w+)"\)/g)].map((m) => m[1] ?? "");
   assert.ok(helpers.length > 10);
   for (const helper of helpers) assert.ok(core.has(helper), `\`$rt.${helper}\``);
+  const kernel = await exportsOf("../src/rt/index.ts");
+  for (const [, helper] of codegen(true).matchAll(/rt\("(\w+)"\)/g)) assert.ok(helper && kernel.has(helper), `kernel \`$rt.${helper}\``);
   const { Effect } = await import("../src/core/index.ts");
   for (const [, method] of code.matchAll(/effect\("(\w+)"\)/g)) assert.ok(method && method in Effect, `Effect.${method}`);
 });

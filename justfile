@@ -84,20 +84,23 @@ e2e-js: docs-wasm e2e-prepare
 
 # The e2e suites of the compiler but the cases of tests/run, under nextest
 e2e-tests: e2e-prepare
-    cargo nextest run --cargo-profile e2e --profile ci --run-ignored only -p flick -p flick-core --test e2e --test e2e_numbers --test go_main --test control_handlers --test test_command --test dts_command --test build_command --test ffi_command --test cli_run --test cli_devtools --test cli_template --test cli_fullstack --test first_slice --test examples --test unicode_path --test source_packages --test workspace --test consteval_node -E 'not test(=run_cases)'
+    cargo nextest run --cargo-profile e2e --profile ci --run-ignored only -p flick -p flick-core --test e2e --test e2e_numbers --test go_main --test control_handlers --test rt_stages --test test_command --test dts_command --test build_command --test ffi_command --test cli_run --test cli_devtools --test cli_template --test cli_fullstack --test first_slice --test examples --test unicode_path --test source_packages --test workspace --test consteval_node -E 'not test(=run_cases)'
 
 # The cases of tests/run: all of them, or the shard `k/n` of them
 e2e-cases shard="": e2e-prepare
     FLICK_E2E_SHARD={{shard}} cargo nextest run --cargo-profile e2e --profile ci --run-ignored only -p flick --test e2e -E 'test(=run_cases)'
 
 # The language tests of tests/language on Node and as a Go executable, with
-# one seed: both must pass and write the same report
+# one seed: both must pass and write the same report; on Flick's own runtime
+# too, but for the tests tests/language/rt-gaps.txt lists
 language seed="42":
     cargo build -p flick --profile e2e
+    pnpm -C runtime build
     cd tests/language && {{flick}} test --emit js --seed {{seed}} --reporter json > ../../target/language-js.txt || { cat ../../target/language-js.txt; exit 1; }
     cd tests/language && {{flick}} test --emit go --seed {{seed}} --reporter json > ../../target/language-go.txt || { cat ../../target/language-go.txt; exit 1; }
     diff -u target/language-js.txt target/language-go.txt
     cat target/language-go.txt
+    node tools/language-rt/index.mjs {{flick}} {{seed}} target/language-js.txt
 
 # Bundle the tracked programs (release) with rolldown and hold them to their gzip budgets
 bundle-size:
@@ -182,6 +185,10 @@ stress runs="20" +prefixes="runtime/":
 conformance: e2e-prepare
     FLICK_E2E_ONLY=tests/run/runtime/,effect/shared_layer_merged cargo test --profile e2e -p flick --test e2e -- --ignored run_cases
     FLICK_MODEL_ONLY=runtime/ cargo test --profile e2e -p flick-model --test run -- --include-ignored model_prints
+
+# The cases of tests/run/rt.txt on Flick's own runtime, in both profiles
+conformance-rt: e2e-prepare
+    cargo test --profile e2e -p flick --test e2e -- --ignored rt_cases
 
 # Run SQL queries against PostgreSQL in Docker
 e2e-postgres: e2e-prepare

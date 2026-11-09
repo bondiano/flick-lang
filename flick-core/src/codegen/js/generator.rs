@@ -59,7 +59,7 @@ impl Gen<'_> {
             let function = format!("function* () {{\n{}}}", indent(&stmts));
             if !sync {
                 format!("{}({function})", self.rt("seq"))
-            } else if self.generator {
+            } else if self.generator && !self.kernel {
                 let context = format!("(yield* {})", self.rt("fiberContext"));
                 format!("{}({context}, {function})", self.rt("seqIn"))
             } else {

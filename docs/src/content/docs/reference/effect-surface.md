@@ -146,7 +146,7 @@ foreign pure spaced from "@flick-lang/runtime/effect/Schedule" "spaced"
 
 retry :
   forall c r e a r2 e2 o.
-  Schedule.Schedule r2 e2 (Errors e) o -> (Eff r e a)^c ->{r + r2; e + e2} a
+  Schedule.Schedule r2 e2 (Errors e) o -> (Eff r e a)^c ->{Async | r + r2; e + e2} a
 foreign effect retry from "@flick-lang/runtime/effect/Effect" "retry"
   arity 1
   retention call

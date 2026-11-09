@@ -279,6 +279,8 @@ pub enum Backend {
     Effect,
     /// No runtime calls; the output imports no Effect.
     None,
+    /// Flick's own runtime, without Effect.
+    Rt,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

@@ -14,7 +14,7 @@ impl Gen<'_> {
     ) -> String {
         let tag = self.service_ref(service);
         let op = match stages.iter().find(|&&s| s != Stage::Pure) {
-            Some(Stage::Sync) => self.rt("syncOperation"),
+            Some(Stage::Sync) if !self.kernel => self.rt("syncOperation"),
             _ => self.rt("operation"),
         };
         let arity = operation_arity(stages);

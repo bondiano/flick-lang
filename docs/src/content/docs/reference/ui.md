@@ -456,7 +456,7 @@ still interrupts and joins them.
 ```flick
 mount :
   forall c r.
-  Ui.Dom.Container -> (Failure none ->{r; none} Unit)^c -> Ui^c ->{Atom.Registry, Atom.Write | r; none} Never
+  Ui.Dom.Container -> (Failure none ->{r; none} Unit)^c -> Ui^c ->{Async, Atom.Registry, Atom.Write | r; none} Never
 # let mount = Ui.Dom.mount
 ```
 
@@ -474,7 +474,7 @@ provides:
 # report : Failure none ->{} Unit
 # let report _ = ()
 #
-main : Unit ->{; AppError} Unit
+main : Unit ->{Async; AppError} Unit
 let main () =
   match Ui.Dom.container "app" with
   | None -> App.fail "missing root"

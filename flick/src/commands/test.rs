@@ -1,9 +1,10 @@
 //! `flick test`: builds the project with its test root into `.flick/test/`,
 //! writes a runner that imports the `tests` of each test module, and runs it
 //! on Node; a project that emits go, or `--emit go`, gets one executable,
-//! `flick-test`, that runs them. With `--watch`, a change of a source file stops the run (closing
-//! the runner's stdin: every running test closes its scope) and starts the
-//! next one after it.
+//! `flick-test`, that runs them, and `--rt` runs them on Flick's own runtime.
+//! With `--watch`, a change of a source file stops the run (closing the
+//! runner's stdin: every running test closes its scope) and starts the next
+//! one after it.
 
 use std::fmt::Write;
 use std::io::IsTerminal;
@@ -13,8 +14,8 @@ use std::time::{Duration, SystemTime};
 use std::{env, fs, io, thread};
 
 use flick_core::build::{Artifact, go};
-use flick_core::diagnostics::{Diagnostic, Severity};
-use flick_core::project::config::Emit;
+use flick_core::diagnostics::{Diagnostic, Severity, codes};
+use flick_core::project::config::{Backend, Emit};
 use flick_core::project::{self, Project};
 use flick_core::source::SourceMap;
 
@@ -81,8 +82,9 @@ fn prepare(options: &TestArguments, global: &GlobalArguments) -> Result<PathBuf,
     let mut selected = wanted.clone();
     selected.sort();
     selected.dedup();
+    let rt = options.rt || project.config.build.effect == Backend::Rt;
     let settings = format!(
-        "test {:?} {:?} {:?}",
+        "test {:?} {:?} {:?} {rt}",
         selected,
         match options.emit {
             Some(TestEmitArgument::Go) => "go",
@@ -98,14 +100,14 @@ fn prepare(options: &TestArguments, global: &GlobalArguments) -> Result<PathBuf,
         return Ok(runner);
     }
     progress.stage("Preparing compiler");
-    if let Err(diagnostic) = builtins::prepare() {
+    if let Err(diagnostic) = builtins::prepare_in(rt) {
         drop(progress);
         return fail(&sources, vec![diagnostic]);
     }
     progress.stage("Compiling Flick modules");
     let (mut diagnostics, mut compilation) = package_cache::with_saved(|saved| {
         let (diagnostics, compilation, fresh) =
-            project::compile_with(&host, &mut sources, Some(&project), &roots, saved);
+            project::compile_with(&host, &mut sources, Some(&project), &roots, saved, rt);
         ((diagnostics, compilation), fresh)
     });
     super::build::hooks::ir(Some(&project), &mut compilation, &mut diagnostics);
@@ -136,6 +138,14 @@ fn prepare(options: &TestArguments, global: &GlobalArguments) -> Result<PathBuf,
         Some(target) => target == TestEmitArgument::Go,
         None => project.config.build.emit == Emit::Go,
     };
+    if go && rt {
+        drop(progress);
+        let message = "Flick's own runtime has only JavaScript output yet";
+        return fail(
+            &sources,
+            vec![Diagnostic::new(codes::F004, Severity::Error, message)],
+        );
+    }
     // with no suite, the go target has no program: the node runner reports the empty run
     let go = go && !suites.is_empty();
     if !go && let Some(problem) = toolchain::check_runtime(&project.root) {
@@ -152,7 +162,10 @@ fn prepare(options: &TestArguments, global: &GlobalArguments) -> Result<PathBuf,
         } else {
             Vec::new()
         },
-        extras: Extras::default(),
+        extras: Extras {
+            rt,
+            ..Extras::default()
+        },
         release: release(options.profile, Some(&project.config.build)),
     };
     progress.stage(if go {
@@ -179,7 +192,7 @@ fn prepare(options: &TestArguments, global: &GlobalArguments) -> Result<PathBuf,
     }
     progress.stage("Writing test runner");
     let runner = out.join("test.js");
-    if let Err(err) = write(&runner, &runner_source(&suites)) {
+    if let Err(err) = write(&runner, &runner_source(&suites, rt)) {
         drop(progress);
         eprintln!("error: cannot write `{}`: {err}", runner.display());
         return Err(());
@@ -190,7 +203,7 @@ fn prepare(options: &TestArguments, global: &GlobalArguments) -> Result<PathBuf,
     {
         emitted.artifacts.push(Artifact {
             path: "test.js".to_owned(),
-            contents: runner_source(&suites),
+            contents: runner_source(&suites, rt),
         });
         cache::store(&project.root, &key, &emitted.artifacts);
     }
@@ -246,9 +259,15 @@ fn cached_prepare(
     }
 }
 
-/// The runner: imports each suite's `tests` and runs them all.
-fn runner_source(suites: &[(String, String)]) -> String {
-    let mut out = String::from("import { runTests } from \"@flick-lang/runtime\";\n");
+/// The runner: imports each suite's `tests` and runs them all, on Flick's own
+/// runtime with `rt`.
+fn runner_source(suites: &[(String, String)], rt: bool) -> String {
+    let runtime = if rt {
+        "@flick-lang/runtime/rt"
+    } else {
+        "@flick-lang/runtime"
+    };
+    let mut out = format!("import {{ runTests }} from \"{runtime}\";\n");
     for (i, (_, path)) in suites.iter().enumerate() {
         let _ = writeln!(out, "import * as $s{i} from {path:?};");
     }
