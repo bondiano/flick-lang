@@ -47,6 +47,7 @@ change needs.
 | [`CallSite` replaces the `_at` writes](#callsite-replaces-the-_at-writes) | no | `FLICK-T001` |
 | [A closure over an error value says so](#a-closure-over-an-error-value-says-so) | no | `FLICK-G001` |
 | [Rust 1.95 builds the compiler](#rust-195-builds-the-compiler) | no | — |
+| [`mut` is a keyword](#mut-is-a-keyword) | no | `FLICK-S007` |
 
 `flick check --fix page.md` rewrites the `flick` code blocks of a Markdown
 page, each checked on its own.
@@ -304,10 +305,19 @@ passes on a row variable names `Detached r` in its signature, and `flick check
 
 ## The IR has no `Try`, `Provide`, `Scope` or `Operation`
 
-A reader of `flick build --emit-ir` meets a new version, `0.4.0`. A `try` with
+A reader of `flick build --emit-ir` meets a new version, `0.5.0`. A `try` with
 arms only for errors is a `Handle`, `provide layer { body }` is a call of
 `Layer.run`, `scope s { body }` is a call of `Scope.run`, and an operation is
-`Perform { effect, op }`. Source code does not change.
+`Perform { effect, op }`. A `let mut` variable is a `Stmt::Var`, its assignment
+a `Stmt::Assign` and a read of it an `ExprKind::Var`. Source code does not change.
+
+## `mut` is a keyword
+
+`let mut name = value` declares a variable of a function, which `name = value`
+assigns (see [Variables](../../reference/types/#variables)). The word `mut`
+is a keyword now: a parameter, a value or a record field named `mut` is
+`FLICK-S007`, or `FLICK-S016` for `let mut = …`; rename it. After a dot,
+`r.mut` is still a name.
 
 ## Instances belong to one package
 
