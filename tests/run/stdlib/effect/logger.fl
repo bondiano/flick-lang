@@ -13,7 +13,7 @@ replace : Logger.LayerOptions
 let replace = { mergeWithExisting = false }
 
 /// Logs through `Log` with the loggers of `loggers`.
-logged : Layer none none none -> (Unit ->{Log.Log} Unit) ->{} Unit
+logged : Layer none none none -> (Unit ->{Log.Log} Unit) ->{Async} Unit
 let logged loggers body = provide (Layer.merge loggers Logger.effect_log) { body () }
 
 contains : String -> String -> Bool

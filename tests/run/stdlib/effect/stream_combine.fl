@@ -17,7 +17,7 @@ pairs : Show a => (String, List a) ->{} Unit
 let pairs (label, xs) = Platform.stdout_line (label ++ ": " ++ show xs)
 
 /// The elements, sorted: concurrent streams interleave in any order.
-sorted : Stream.Stream none none Float ->{} List Float
+sorted : Stream.Stream r none Float ->{r;} List Float
 let sorted s = List.sort (Stream.run_collect s)
 
 nums : Stream.Stream none none Float

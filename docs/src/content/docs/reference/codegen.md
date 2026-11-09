@@ -31,8 +31,8 @@ module never runs anything: modules only define values. A top-level value
 that is a call, a derived instance or an immediately run arrow is marked
 `/*#__PURE__*/`, so a bundler drops what the program does not use.
 
-Code on Effect imports `@flick-lang/effect-ts`; code built with `--rt` imports
-`@flick-lang/runtime/rt`. The Effect adapter provides `Effect`.
+Code built by default or with `--rt` imports `@flick-lang/runtime/rt`.
+An explicit `effect = "effect"` build imports `@flick-lang/effect-ts`; the adapter provides `Effect`.
 A module that has no runtime stage imports no `Effect` at all.
 
 ## Values

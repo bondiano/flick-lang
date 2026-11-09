@@ -1,6 +1,6 @@
 ---
 title: "Маршруты"
-source_hash: 31175be74842616e
+source_hash: 0e9427fc83717b75
 ---
 
 URL страницы — значение типа, который вы пишете. `deriving Url` даёт типу
@@ -111,7 +111,7 @@ URL нового значения добавляется в историю, а �
 ```flick
 # import App.Pages
 #
-page_html : String ->{} List String
+page_html : String ->{Async;} List String
 let page_html url =
   provide Atom.layer {
     Atom.serving url

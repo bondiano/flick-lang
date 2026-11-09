@@ -95,8 +95,16 @@ let main () =
 
 /// A workspace of the contract package and a dependent `app` that emits
 /// `emit`, the package linked into its `node_modules` as pnpm links one.
-fn workspace(name: &str, app_main: &str, emit: &str) -> PathBuf {
-    let config = format!("{APP}\n[build]\nemit = \"{emit}\"\n");
+fn workspace(name: &str, app_main: &str, emit: &str, effect: bool) -> PathBuf {
+    let config = format!(
+        "{APP}\n[build]\nemit = \"{emit}\"\n{}",
+        if effect { "effect = \"effect\"\n" } else { "" }
+    );
+    let package = if effect {
+        "{ \"name\": \"@acme/app\", \"dependencies\": { \"@acme/contract\": \"workspace:*\", \"@flick-lang/effect-ts\": \"workspace:*\" } }\n"
+    } else {
+        "{ \"name\": \"@acme/app\", \"dependencies\": { \"@acme/contract\": \"workspace:*\" } }\n"
+    };
     let dir = project(
         name,
         &[
@@ -107,10 +115,7 @@ fn workspace(name: &str, app_main: &str, emit: &str) -> PathBuf {
             ),
             ("contract/src/Shared/Types.fl", TYPES),
             ("contract/src/Shared/Api.fl", API),
-            (
-                "app/package.json",
-                "{ \"name\": \"@acme/app\", \"dependencies\": { \"@acme/contract\": \"workspace:*\" } }\n",
-            ),
+            ("app/package.json", package),
             ("app/flick.toml", &config),
             ("app/src/App/Main.fl", app_main),
         ],
@@ -134,7 +139,7 @@ fn link(target: &Path, at: &Path) {
 #[test]
 #[ignore = "needs Go"]
 fn a_go_server_and_a_js_client_share_a_source_package() {
-    let server = workspace("source_package_server", SERVER, "go").join("app");
+    let server = workspace("source_package_server", SERVER, "go", false).join("app");
     let build = flick_in(&server, &["build"]);
     assert!(build.status.success(), "{build:?}");
     let mut child = Command::new(server.join("dist").join(executable("main")))
@@ -152,7 +157,7 @@ fn a_go_server_and_a_js_client_share_a_source_package() {
         }
     });
     let port = rx.recv_timeout(Duration::from_mins(1)).expect("the port");
-    let client = workspace("source_package_client", CLIENT, "js").join("app");
+    let client = workspace("source_package_client", CLIENT, "js", true).join("app");
     let run = Command::new(env!("CARGO_BIN_EXE_flick"))
         .arg("run")
         .current_dir(&client)
@@ -173,7 +178,7 @@ fn a_go_server_and_a_js_client_share_a_source_package() {
 fn a_source_package_module_is_checked_for_the_target_of_its_dependent() {
     let ui = "module Shared.View exposing (hello)\n\nimport Ui\n\nhello : Ui\nlet hello = Ui.text \"hi\"\n";
     let main = "module App.Main exposing (main)\n\nimport Shared.View exposing (hello)\n\nmain : Unit -> Unit\nlet main () = ()\n";
-    let dir = workspace("source_package_go_only", main, "go");
+    let dir = workspace("source_package_go_only", main, "go", false);
     fs::write(dir.join("contract/src/Shared/View.fl"), ui).expect("write");
     fs::write(
         dir.join("app/src/App/Main.fl"),
@@ -192,7 +197,7 @@ fn a_source_package_module_is_checked_for_the_target_of_its_dependent() {
 fn a_dependent_does_not_answer_for_the_warnings_of_a_source_package() {
     let unused = "module Shared.Types exposing (Box)\n\nimport Shared.Api exposing (api)\n\ntype alias Box = { label : String }\n";
     let main = "module App.Main exposing (main)\n\nimport Shared.Types exposing (Box)\n\nmain : Unit -> Unit\nlet main () =\n  let _box : Box = { label = \"a\" }\n  ()\n";
-    let dir = workspace("source_package_warnings", main, "js");
+    let dir = workspace("source_package_warnings", main, "js", false);
     fs::write(dir.join("contract/src/Shared/Types.fl"), unused).expect("write");
     fs::write(
         dir.join("contract/src/Shared/Api.fl"),

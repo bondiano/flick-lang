@@ -22,7 +22,7 @@ broken : Channel.Channel none {Boom} i Float Unit ie id
 let broken = Channel.concat (Channel.fail (Boom "broken")) (Channel.from_list [1])
 
 /// What running the channel gives, or the error it fails with.
-outcome : Channel.Channel none {Boom} Unit Float Unit none Unit ->{} String
+outcome : Channel.Channel r {Boom} Unit Float Unit none Unit ->{r;} String
 let outcome channel =
   try show (Channel.run_collect channel) with
   | Boom why -> "failed " ++ why
@@ -56,7 +56,7 @@ let options = {
   disablePropagation = false;
 }
 
-failures : Unit ->{; Boom} Unit
+failures : Unit ->{Async; Boom} Unit
 let failures () =
   say ("fail: " ++ outcome broken)
   say ("fail_sync: " ++ outcome (Channel.fail_sync (fun () -> Boom "later")))
@@ -165,7 +165,7 @@ let merging () =
         Ref.get side,
       ))
 
-services : Unit ->{; Boom} Unit
+services : Unit ->{Async; Boom} Unit
 let services () =
   let greeted = Channel.map_effect (fun n -> Greeter.greet n) (Channel.from_list ["ada"])
   say

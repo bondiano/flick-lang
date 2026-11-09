@@ -21,7 +21,7 @@ use std::sync::{Arc, OnceLock};
 use crate::codegen::sourcemap;
 #[cfg(feature = "typescript")]
 use crate::codegen::ts::{Facade, Projection, declaration_file, facade_files};
-use crate::codegen::{self, Labels, Options};
+use crate::codegen::{self, EffectBridge, Labels, Options};
 use crate::diagnostics::{Diagnostic, Severity, codes};
 #[cfg(feature = "build-artifacts")]
 use crate::iface;
@@ -98,6 +98,8 @@ pub struct Settings<'a> {
     /// What runs effects: without Effect, compiled code imports the
     /// runtime's `core`.
     pub backend: Backend,
+    /// Whether the project has the optional Effect adapter for RT fallbacks.
+    pub effect_bridge: EffectBridge,
     /// The module that renders and mounts views in place of React's; a
     /// relative one is relative to the project's root.
     pub ui: Option<&'a str>,
@@ -215,6 +217,7 @@ pub fn emit(
         direct: &direct,
         labels: settings.extras.labels,
         rt: settings.backend == Backend::Rt,
+        effect_bridge: settings.effect_bridge,
     };
     let mut out = Vec::new();
     #[cfg(feature = "build-artifacts")]
@@ -586,8 +589,13 @@ fn builtins(
         });
         #[cfg(feature = "typescript")]
         if dts
-            && let Some((text, _)) =
-                declarations(&module.name, ctx.any_interface, ctx.package, ctx.path)
+            && let Some((text, _)) = declarations(
+                &module.name,
+                ctx.any_interface,
+                ctx.package,
+                ctx.path,
+                ctx.settings.backend == Backend::Rt,
+            )
         {
             out.push(Artifact {
                 path: dts_path(&(ctx.path)(&module.name)),
@@ -702,8 +710,13 @@ fn compiled_module(
         .expect("every compiled module has a published interface");
     #[cfg(feature = "typescript")]
     if ctx.settings.extras.dts
-        && let Some((text, refused)) =
-            declarations(&module.name, ctx.any_interface, ctx.package, ctx.path)
+        && let Some((text, refused)) = declarations(
+            &module.name,
+            ctx.any_interface,
+            ctx.package,
+            ctx.path,
+            ctx.settings.backend == Backend::Rt,
+        )
     {
         out.push(Artifact {
             path: dts_path(&file),
@@ -793,8 +806,9 @@ fn declarations(
     interfaces: &dyn Fn(&str) -> Option<Interface>,
     package: &dyn Fn(&str) -> Option<String>,
     path: &dyn Fn(&str) -> String,
+    rt: bool,
 ) -> Option<(String, Vec<(String, String)>)> {
-    let projection = Projection::new(name, interfaces, package);
+    let projection = Projection::for_runtime(name, interfaces, package, rt);
     let interface = interfaces(name)?;
     let here = path(name);
     let import = |m: &str| codegen::relative(&here, &path(m));

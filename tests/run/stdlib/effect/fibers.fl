@@ -170,7 +170,7 @@ let scheduling () =
     ("with_prevent_scheduler_yield: "
       ++ show (Scheduler.with_prevent_scheduler_yield true (task { 1 + 1 })))
 
-plans : Unit ->{; Boom} Unit
+plans : Unit ->{Async; Boom} Unit
 let plans () =
   let english = Layer.succeed Greeter { greet = fun n -> "hello " ++ n }
   let failing = Layer.succeed Greeter { greet = fun n -> "" }

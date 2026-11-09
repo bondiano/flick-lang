@@ -21,6 +21,18 @@ export class Duration {
   [runtimeHash](): number { return hash(this.millis); }
 }
 
+/** Accepts a host duration when the optional Effect bridge is installed. */
+export const durationHooks: { millis: (duration: unknown) => number; native: (duration: unknown) => Duration } = {
+  millis: (duration) => {
+    if (duration instanceof Duration) return duration.millis;
+    throw new TypeError("not a duration of this runtime");
+  },
+  native: (duration) => {
+    if (duration instanceof Duration) return duration;
+    throw new TypeError("not a duration of this runtime");
+  },
+};
+
 const DURATION = /*#__PURE__*/ tag("Duration.DurationError.DurationError");
 
 const error = (message: string) => err({ _tag: DURATION, _0: message });
@@ -61,7 +73,8 @@ export const durationCompare = (a: Duration, b: Duration): Ordering => {
   }
   return a.millis < b.millis ? LT : a.millis > b.millis ? GT : EQ;
 };
-export const durationFormat = (duration: Duration): string => {
+export const durationFormat = (input: unknown): string => {
+  const duration = durationHooks.native(input);
   if (duration.millis === Infinity) return "Infinity";
   let remaining = exactNanos(duration);
   if (remaining === 0n) return "0ms";
@@ -80,10 +93,11 @@ export const durationFormat = (duration: Duration): string => {
 /** A wait on the clock of the fiber: a duration that is not positive yields; an infinite one never ends. */
 export const sleep = (d: Duration): Instruction =>
   new Suspend((resolve) => {
-    if (d.millis <= 0) {
+    const millis = durationHooks.millis(d);
+    if (millis <= 0) {
       schedule(() => resolve(undefined));
       return undefined;
     }
-    if (d.millis === Infinity) return undefined;
-    return clock().timer(d.millis, () => resolve(undefined));
+    if (millis === Infinity) return undefined;
+    return clock().timer(millis, () => resolve(undefined));
   });

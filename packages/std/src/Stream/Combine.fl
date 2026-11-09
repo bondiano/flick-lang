@@ -42,7 +42,7 @@ flat_map_par :
   } ->
   (a -> Stream r2 e2 b)^c ->
   (Stream r e a)^c ->
-  (Stream (r + r2) (e + e2) b)^c
+  (Stream {Async | r + r2} (e + e2) b)^c
 foreign pure flat_map_par from "@flick-lang/effect-ts/effect/Stream" "flickFlatMapPar"
   arity 2
   retention call

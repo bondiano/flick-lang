@@ -18,6 +18,11 @@ macro_rules! mark {
 }
 
 mod binary;
+#[cfg(not(target_arch = "wasm32"))]
+mod bridge;
+#[cfg(target_arch = "wasm32")]
+#[path = "bridge_stub.rs"]
+mod bridge;
 mod exports;
 mod expr;
 mod foreign;
@@ -70,7 +75,8 @@ pub fn js(module: &Module, options: &Options) -> Output {
     );
     let mut g = Gen::new(module, options);
     #[cfg(feature = "typescript")]
-    let projection = Projection::new(&module.name, options.interface, options.package);
+    let projection =
+        Projection::for_runtime(&module.name, options.interface, options.package, options.rt);
     #[cfg(feature = "typescript")]
     let mut declarations = Vec::new();
     let interface = (options.interface)(&module.name);
@@ -218,7 +224,7 @@ impl<'a> Gen<'a> {
                 })
                 .collect(),
             direct_foreigns: if options.release && !options.typescript() {
-                foreign::plain_foreigns(&module.items)
+                foreign::plain_foreigns(&module.items, &module.name, options)
             } else {
                 HashMap::new()
             },

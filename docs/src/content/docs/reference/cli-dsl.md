@@ -128,7 +128,7 @@ of help and version as well.
 ```flick
 # import App.Greet exposing (greet)
 #
-main : Unit ->{; AppError} Unit
+main : Unit ->{Async; AppError} Unit
 let main () =
   try Cli.run greet (Platform.args ()) with
   | Cli.CliError message -> App.fail message

@@ -22,6 +22,7 @@ use crate::progress::{Mode, Progress};
 use crate::sources::FsHost;
 use crate::{builtins, cache, toolchain};
 
+mod backend;
 mod cached;
 pub(super) mod hooks;
 mod js_artifacts;
@@ -113,8 +114,8 @@ impl Command for BuildCommand {
         let plan = self.plan(&host, project.as_ref(), Vec::new());
         let go = plan.go;
         if plan.extras.rt {
-            if plan.typescript || go || plan.extras.dts || plan.extras.promise_facade {
-                let message = "Flick's own runtime has only JavaScript output yet";
+            if go || plan.extras.promise_facade {
+                let message = "Flick's own runtime does not support Go output or Promise façades";
                 return Outcome {
                     sources,
                     diagnostics: vec![Diagnostic::new(codes::F004, Severity::Error, message)],
@@ -299,7 +300,8 @@ impl BuildCommand {
                 dts: self.options.emit_dts || config.is_some_and(|b| b.emit_dts),
                 promise_facade: self.options.promise_facade
                     || config.is_some_and(|b| b.promise_facade),
-                rt: self.options.rt || config.is_some_and(|b| b.effect == Backend::Rt),
+                rt: self.options.rt
+                    || (emit != Emit::Go && config.is_some_and(|b| b.effect == Backend::Rt)),
                 schema_aot: self.options.schema_aot || config.is_some_and(|b| b.schema_aot),
                 labels: match self.options.labels {
                     Some(LabelsArgument::All) => Labels::All,
@@ -329,7 +331,7 @@ impl BuildCommand {
             output.extras,
             output.release
         );
-        cache::key(project, roots, &settings)
+        cache::key(project, roots, &settings, !output.go && !output.extras.rt)
     }
 }
 
@@ -507,6 +509,7 @@ pub fn artifacts(
     } else {
         project.map_or(Backend::Effect, |p| p.config.build.effect)
     };
+
     let settings = Settings {
         source_dir: &source_dir,
         out_dir,
@@ -518,6 +521,7 @@ pub fn artifacts(
         release: output.release,
         root: project.map(|p| p.root.as_path()),
         backend,
+        effect_bridge: backend::effect_bridge(host, project, compilation),
         ui: project.and_then(|p| p.config.build.ui.as_deref()),
         runners: &runners,
         core_modules: &[],

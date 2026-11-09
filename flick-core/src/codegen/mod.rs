@@ -17,6 +17,14 @@ pub mod ts;
 pub use js::{direct_methods, exported_worker, js, relative};
 pub use names::{ident, instance as instance_export, qualified_id, tag};
 
+/// Whether an RT build may use the separately installed Effect adapter.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum EffectBridge {
+    #[default]
+    Absent,
+    Available,
+}
+
 use crate::iface::Interface;
 #[cfg(feature = "source-maps")]
 use crate::source::Span;
@@ -51,6 +59,8 @@ pub struct Options<'a> {
     pub labels: Labels,
     /// Compile for Flick's own runtime instead of Effect (see `js::kernel`).
     pub rt: bool,
+    /// Whether RT code may import the optional Effect adapter.
+    pub effect_bridge: EffectBridge,
 }
 
 impl Options<'_> {

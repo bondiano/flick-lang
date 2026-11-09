@@ -24,7 +24,7 @@ let halves = Filter.make (fun n -> if even n then Ok (n / 2) else Err n)
 halves_effect : Filter.FilterEffect none none Float Float Float
 let halves_effect = Filter.make_effect (fun n -> if even n then Ok (n / 2) else Err n)
 
-elements : Unit ->{; Boom} Unit
+elements : Unit ->{Async; Boom} Unit
 let elements () =
   say ("map: " ++ show (Channel.run_collect (Channel.map (fun n -> n * 10) nums)))
   say ("map_effect: " ++ show (Channel.run_collect (Channel.map_effect (fun n -> n + 1) nums)))
@@ -77,7 +77,7 @@ let elements () =
     (Channel.forever (Channel.from_list [1, 2]))
   say ("forever: " ++ show (Ref.get looped))
 
-filters : Unit ->{; Boom} Unit
+filters : Unit ->{Async; Boom} Unit
 let filters () =
   say ("filter: " ++ show (Channel.run_collect (Channel.filter even nums)))
   say ("filter_map: " ++ show (Channel.run_collect (Channel.filter_map halves nums)))
@@ -121,7 +121,7 @@ let text () =
     nums |> Channel.pipe_to_or_fail (Channel.map_input (fun n -> n + 100) (Channel.identity ()))
   say ("pipe_to_or_fail: " ++ show (Channel.run_collect strict))
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Async; AppError} Unit
 let main () =
   try
     elements ()

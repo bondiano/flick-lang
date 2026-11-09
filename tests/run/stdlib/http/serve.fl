@@ -33,7 +33,7 @@ let get_item _ =
   Http.ServerResponse.schema_json item { label = "item " ++ id; size = 1 } ok
 
 create :
-  ServerRequest ->{; Http.ServerError.HttpServerError, SchemaError, Http.Body.HttpBodyError}
+  ServerRequest ->{Async; Http.ServerError.HttpServerError, SchemaError, Http.Body.HttpBodyError}
   ServerResponse
 let create request =
   let created = Http.ServerRequest.schema_body_json item request
@@ -48,7 +48,7 @@ let boom _ = from_result (Err Boom)
 /// The handler of the server's routes.
 app :
   Unit ->{}
-  (ServerRequest ->{; Http.ServerError.HttpServerError, SchemaError, Http.Body.HttpBodyError, Boom}
+  (ServerRequest ->{Async; Http.ServerError.HttpServerError, SchemaError, Http.Body.HttpBodyError, Boom}
     ServerResponse)
 let app () =
   Http.Router.router Http.Router.config [

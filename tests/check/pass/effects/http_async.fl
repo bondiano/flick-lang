@@ -1,0 +1,15 @@
+module App.HttpAsync exposing (..)
+
+persisted :
+  Http.ServerRequest.ServerRequest ->{Async, Scope s; Http.Multipart.MultipartError}
+  Http.Multipart.Persisted
+let persisted request = Http.Multipart.persisted request
+
+body :
+  Codec rd re Json a ->
+  Http.ServerRequest.ServerRequest ->{Async | rd; Http.ServerError.HttpServerError, SchemaError}
+  a
+let body codec request = Http.ServerRequest.schema_body_json codec request
+
+streamed : Ui ->{Async, Atom.Registry;} List String
+let streamed content = Stream.run_collect (Ui.Server.stream "app" content)

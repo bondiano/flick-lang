@@ -66,11 +66,22 @@ foreign pure stream from "@flick-lang/effect-ts/effect/http/HttpServerResponse" 
   arity 2
   reviewed "effect@4.1.2 sha256:261a610a1e39cd04"
 
-/// A body of the stream's chunks of text in UTF-8, sent as they come, as
-/// `Ui.Server.stream` makes them; `text/plain` unless the options set a
-/// content type.
+/// A body of the stream's chunks of text in UTF-8, sent as they come;
+/// `text/plain` unless the options set a content type.
 stream_text : Stream none e String -> Options -> ServerResponse
 foreign pure stream_text from "@flick-lang/effect-ts/effect/http/HttpServerResponse" "flickStreamText"
+  arity 2
+  reviewed "effect@4.1.2 sha256:261a610a1e39cd04"
+
+/// A byte stream that may suspend but holds no service dependency or region.
+stream_async : Stream {Async} e (List Int) -> Options -> ServerResponse
+foreign pure stream_async from "@flick-lang/effect-ts/effect/http/HttpServerResponse" "flickStream"
+  arity 2
+  reviewed "effect@4.1.2 sha256:261a610a1e39cd04"
+
+/// A text stream that may suspend, as `Ui.Server.stream` does.
+stream_text_async : Stream {Async} e String -> Options -> ServerResponse
+foreign pure stream_text_async from "@flick-lang/effect-ts/effect/http/HttpServerResponse" "flickStreamText"
   arity 2
   reviewed "effect@4.1.2 sha256:261a610a1e39cd04"
 

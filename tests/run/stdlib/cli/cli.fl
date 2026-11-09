@@ -42,13 +42,13 @@ let tool = cli "tool" {
 }
 
 /// Runs the command line, printing the error a bad one gives.
-attempt : Cli.Command none none -> List String ->{} Unit
+attempt : Cli.Command none none -> List String ->{Async;} Unit
 let attempt command args =
   Platform.stdout_line ("$ " ++ String.join " " args)
   try Cli.run command args with
   | Cli.CliError message -> Platform.stdout_line ("CliError: " ++ message)
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Async; AppError} Unit
 let main () =
   attempt greet ["Ada"]
   attempt greet ["--loud", "-n", "2", "--color", "green-light", "Bob"]

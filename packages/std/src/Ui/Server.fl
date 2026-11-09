@@ -33,7 +33,7 @@ foreign effect state from "@flick-lang/effect-ts/ui/server" "uiServerState"
 /// markup that shows it, so `Ui.Dom.mount` on the container hydrates that
 /// markup from the server's values. Run it inside the `provide` of the
 /// request's registry.
-stream : String -> Ui -> Stream {Atom.Registry} none String
+stream : String -> Ui -> Stream {Async, Atom.Registry} none String
 foreign pure stream from "@flick-lang/effect-ts/ui/server" "uiServerStream"
   arity 2
 

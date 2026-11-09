@@ -16,7 +16,7 @@ let json_of c = Codec.general (ignore_extra_fields c)
 point : Codec none none Json Point
 let point = Codec.general (Codec.json Point.schema)
 
-forms : Unit ->{; Http.Multipart.MultipartError, SchemaError} Unit
+forms : Unit ->{Async; Http.Multipart.MultipartError, SchemaError} Unit
 let forms () =
   let post =
     Http.ClientRequest.body_form_data
@@ -26,14 +26,10 @@ let forms () =
     let form = Http.Multipart.persisted (Http.ServerRequest.from_client_request post)
     Platform.stdout_line ("fields: " ++ (show (Http.Multipart.fields form)))
     Platform.stdout_line ("files: " ++ (show (List.length (Http.Multipart.files form))))
-    let note : Note =
-      Http.Multipart.schema_persisted
-        (json_of
-          (codec Note.schema {
-            title = field "title" String.json;
-            tag = field "tag" (Codec.list String.json);
-          }))
-        form
+    let note : Note = Http.Multipart.schema_persisted (json_of (codec Note.schema {
+        title = field "title" String.json;
+        tag = field "tag" (Codec.list String.json);
+      })) form
     Platform.stdout_line ("schema_persisted: " ++ (show note))
     Platform.stdout_line ("schema_json: " ++ (show (Http.Multipart.schema_json point "meta" form)))
   }
@@ -100,7 +96,7 @@ let traces () =
               ("x-b3-sampled", "1"),
             ])))))
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Async; AppError} Unit
 let main () =
   try forms () with
   | Http.Multipart.MultipartError reason ->

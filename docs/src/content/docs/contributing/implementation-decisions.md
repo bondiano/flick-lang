@@ -26,14 +26,14 @@ diagnostics; TypeScript never decides a Flick type.
 | Typed IR | `flick-core/src/ir` | the checked module with application stages, dictionaries, lifts and source ranges made explicit; `ir/lower` elaborates `do`, comprehensions and `sql` |
 | Constant evaluation | `flick-core/src/consteval` | expressions of literals folded with JS semantics bit for bit |
 | Optimizer | `flick-core/src/opt` | release passes over the typed IR (specialization, inlining, fusion, scalar replacement, folding) that keep every observable contract of the debug lowering; both backends run them (see [Release profile](../../reference/codegen/#release-profile)) |
-| JS backend | `flick-core/src/codegen/js`, `runtime/`, `packages/effect-ts/` | ESM with source maps. With `effect = "rt"` or `--rt`, runtime stages use Flick's own runtime without Effect; the default backend runs them through `@flick-lang/effect-ts` |
+| JS backend | `flick-core/src/codegen/js`, `runtime/`, `packages/effect-ts/` | ESM with source maps. By default, runtime stages use Flick's own RT without Effect; `effect = "effect"` selects `@flick-lang/effect-ts`, and `--rt` overrides that choice for one command |
 | Go backend | `flick-core/src/codegen/go`, `flick-core/src/build/go.rs`, `runtime-go/flickrt` | `[build] emit = "go"`: a Go module per entry over the runtime package `flickrt`, compiled by `go build` (see [Go target](../../reference/codegen/#go-target)) |
 | TypeScript emitter | `flick-core/src/codegen/ts` | the types of `--emit ts`, the `.d.ts` of `--emit-dts` and the Promise façades of `--promise-facade`; a type without a TypeScript form is refused, never written as `any` |
 | Interfaces | `flick-core/src/iface.rs`, `flick-core/src/build` | the versioned JSON `.iface` of each module, with the data and dictionary ABI and fingerprints from a build (see [Interfaces](../../reference/iface/)) |
 | FFI importer | `flick-core/src/ffi`, `tools/dts-importer` | `flick ffi import` and `ffi check` over the surface the Node helper reads from `.d.ts` with TypeScript |
 | Editor | `flick-core/src/ide`, `flick-core/src/projection.rs`, `flick/src/lsp`, `flick/src/mapper.rs` | hover, definition, references, completion, rename and code actions over one analysis; `flick lsp --stdio` serves them and `flick content-mapper` the TypeScript projection with its span maps (see [Editors](../../reference/editor/)) |
 
-The JS backend targets exactly Effect 4.1.2, which `flick/src/toolchain.rs`
+The Effect adapter targets exactly Effect 4.1.2, which `flick/src/toolchain.rs`
 pins with the runtime, pnpm and Node versions; an installed `effect` or
 `@flick-lang/effect-ts` of another version stops a build (`FLICK-P015`).
 `flick-wasm` runs the same core for the in-browser demo, and `flick-model` is
@@ -52,7 +52,7 @@ the reference model of the formal core (`docs/formal/`).
 | pnpm | A pinned version through `packageManager` in the project template (`pnpm@12.16.1`); `flick doctor` compares the installed pnpm with it. Dependency commands disable manager bootstrapping and automatic pinning before checking or running pnpm, so a refused frozen install does not rewrite the lockfile's manager metadata |
 | Effect | Exactly 4.1.2, commit `506eef143bcc1750ce58920aac1e45da7265d103` (see [A complex Cause](../../spec/05-errors-and-concurrency/#a-complex-cause-what-the-error-row-promises), [Compiler architecture](#compiler-architecture) and [Effect release](../../reference/runtime/#effect-release)) |
 | Effect API coverage | Every export of `effect`, `effect/cli`, `effect/http` and `effect/http-api` is classified in a manifest; a linter in `cargo test` fails on an unclassified, stale or changed-signature export (see [Effect coverage](../../reference/effect-surface/)) |
-| Backends | Flick's execution rules are the contract: the JS target has an Effect adapter and Flick's own `rt` runtime, while `runtime-go` implements the Go target. `[build] emit = "go"` selects Go output; `[build] effect = "rt"` or `--rt` selects the own JS runtime. The typed IR keeps numeric literals as values, and `foreign` bindings retain the JS calling convention |
+| Backends | Flick's execution rules are the contract: the JS target defaults to Flick's own `rt` runtime and has an optional Effect adapter; `runtime-go` implements the Go target. `[build] emit = "go"` selects Go output; `[build] effect = "effect"` selects the JS adapter. The typed IR keeps numeric literals as values, and `foreign` bindings retain the JS calling convention |
 | Effect Node platform | The HTTP server and `Terminal`/`FileSystem`/`Path` for the CLI come from `@effect/platform-node`, pinned to 4.1.2 alongside Effect as a dependency of `@flick-lang/effect-ts` |
 | PostgreSQL driver | `pg` (node-postgres), an optional peer dependency of `@flick-lang/effect-ts`, bound through `foreign` in the standard library module `Database` (`Database.pg`) |
 | React | React 19 and `react-dom/client` are optional peers of both packages: the shared UI nodes and DOM bridge live in `@flick-lang/runtime`, while the Effect adapter provides its own mounting policy |

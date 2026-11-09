@@ -86,15 +86,13 @@ let queues () =
     (one, Option.map NonEmpty.to_list rest)
   }
   say ("from_subscription: " ++ show got)
-  let fed = Channel.callback { bufferSize = None; strategy = None } (fun queue -> feed [1, 2] queue)
+  let fed = Channel.callback { bufferSize = None; strategy = None } (feed [1, 2])
   say ("callback: " ++ show (Channel.run_collect fed))
   let fed_chunks =
-    Channel.callback_array { bufferSize = Some 8; strategy = Some Queue.Sliding } (fun queue ->
-      feed [3, 4] queue
-    )
+    Channel.callback_array { bufferSize = Some 8; strategy = Some Queue.Sliding } (feed [3, 4])
   say ("callback_array: " ++ show (lists fed_chunks))
 
-resources : Unit ->{; Boom} Unit
+resources : Unit ->{Async; Boom} Unit
 let resources () =
   let log = Ref.make []
   let acquired =

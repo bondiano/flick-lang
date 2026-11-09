@@ -6,7 +6,7 @@
 import { Context, type Duration, Effect, Layer, LogLevel, Option, type Schema, Scope, type Tracer } from "effect";
 import type * as AsyncResult from "effect/reactivity/AsyncResult";
 import * as Atom from "effect/reactivity/Atom";
-import * as AtomRegistry from "effect/reactivity/AtomRegistry";
+import * as AtomRegistry from "./AtomRegistry.ts";
 
 import { service } from "../../effects.ts";
 

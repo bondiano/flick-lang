@@ -15,7 +15,7 @@ type alias Tick = { n : Float }
 type alias Count = { total : String }
   deriving Schema
 
-type alias Parts = Stream none {MultipartError} Part
+type alias Parts = Stream {Async} {MultipartError} Part
 
 bytes : HttpApi.Endpoint "bytes" (HttpApi.Request Unit Unit Unit (List Int) ->{r} List Int)
 let bytes =
@@ -29,7 +29,7 @@ let form =
   |> HttpApi.with_multipart_payload (Codec.json Note.schema)
   |> HttpApi.with_text_success 200
 
-parts : HttpApi.Endpoint "parts" (HttpApi.Request Unit Unit Unit Parts ->{r; MultipartError} String)
+parts : HttpApi.Endpoint "parts" (HttpApi.Request Unit Unit Unit Parts ->{Async | r; MultipartError} String)
 let parts =
   HttpApi.endpoint HttpApi.Post "/parts" (Record.label : Record.Label "parts")
   |> HttpApi.with_multipart_stream_payload
@@ -77,7 +77,7 @@ type alias Handlers r = {
   login : HttpApi.Request Unit Unit Unit Unit ->{r} ((String, Count), Option (Redacted String));
 }
 
-api : HttpApi.Api r { bodies : Handlers r }
+api : HttpApi.Api {Async | r} { bodies : Handlers {Async | r} }
 let api =
   HttpApi.api "Bodies"
   |> HttpApi.add_group
@@ -90,7 +90,7 @@ let api =
       |> HttpApi.add events
       |> HttpApi.add login)
 
-describe : Part ->{; MultipartError} String
+describe : Part ->{Async; MultipartError} String
 let describe part =
   match part with
   | Field f -> f.key ++ "=" ++ f.value
@@ -121,7 +121,7 @@ let upload =
       {MultipartError}
       (List Part))
 
-handlers : { bodies : Handlers none }
+handlers : { bodies : Handlers {Async} }
 let handlers = {
   bodies = {
     bytes = fun request -> List.reverse request.payload;

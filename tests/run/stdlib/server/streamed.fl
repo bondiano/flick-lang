@@ -25,7 +25,7 @@ let greeting =
 
 page : ServerRequest ->{} ServerResponse
 let page _ =
-  Http.ServerResponse.stream_text
+  Http.ServerResponse.stream_text_async
     (Stream.provide_ Reactivity.Atom.layer (Ui.Server.stream "app" (Ui.render greeting ())))
     { Http.ServerResponse.defaults with contentType = Some "text/html" }
 

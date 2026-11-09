@@ -34,14 +34,13 @@ fn new_creates_a_project_and_init_refuses_before_writing() {
     for pin in [
         "\"pnpm@",
         "\"@flick-lang/runtime\": \"0.1.0\"",
-        "\"@flick-lang/effect-ts\": \"0.1.0\"",
         "\"compiler\": \"0.1.0\"",
     ] {
         assert!(manifest.contains(pin), "{pin} in {manifest}");
     }
     assert!(
-        !manifest.contains("\"effect\":"),
-        "Effect is an adapter dependency"
+        !manifest.contains("\"@flick-lang/effect-ts\"") && !manifest.contains("\"effect\":"),
+        "a library's default runtime needs no Effect adapter"
     );
     assert_eq!(code(&flick_in(dir.join("demo"), &["check"])), Some(0));
     assert_eq!(code(&flick_in(&dir, &["new", "demo"])), Some(2));

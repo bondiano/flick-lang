@@ -90,7 +90,7 @@ type alias MergeOptions = { concurrency : Option Int; bufferSize : Option Int; s
 merge_all :
   MergeOptions ->
   Channel r e i (Channel r2 e2 i o d2 ie id) d ie id ->
-  Channel (r + r2) (e + e2) i o d ie id
+  Channel {Async | r + r2} (e + e2) i o d ie id
 foreign pure merge_all from "@flick-lang/effect-ts/effect/Channel" "flickMergeAll"
   arity 1
   reviewed "effect@4.1.2 sha256:c7dbb12e3896fc2c"
@@ -224,7 +224,7 @@ foreign pure scan_effect from "@flick-lang/effect-ts/effect/Channel" "scanEffect
 
 /// Runs the channel ahead of its reader, keeping what it emits in a queue
 /// with the options.
-buffer : Buffer -> Channel r e i o d ie id -> Channel r e i o d ie id
+buffer : Buffer -> Channel r e i o d ie id -> Channel {Async | r} e i o d ie id
 foreign pure buffer from "@flick-lang/effect-ts/effect/Channel" "flickBuffer"
   arity 1
   reviewed "effect@4.1.2 sha256:de2471a25208abf9"
@@ -233,7 +233,7 @@ foreign pure buffer from "@flick-lang/effect-ts/effect/Channel" "flickBuffer"
 buffer_array :
   Buffer ->
   Channel r e i (NonEmpty.NonEmpty o) d ie id ->
-  Channel r e i (NonEmpty.NonEmpty o) d ie id
+  Channel {Async | r} e i (NonEmpty.NonEmpty o) d ie id
 foreign pure buffer_array from "@flick-lang/effect-ts/effect/Channel" "flickBufferArray"
   arity 1
   reviewed "effect@4.1.2 sha256:2f1eb69947695fbc"

@@ -1,7 +1,10 @@
 // Seeded generators and property checks over the own runtime's Schema tree.
 import { none, some, type Option } from "../../core/data.ts";
+import type { Gen } from "../../core/testing.ts";
 import { tag } from "../../tags.ts";
+import { Duration } from "../duration.ts";
 import { type Run } from "../fiber.ts";
+import { schemaGenerator } from "../schema_gen.ts";
 import { schemaDescription, type Witness } from "../schema.ts";
 
 type Random = () => number;
@@ -31,6 +34,8 @@ const word = (random: Random, size: number): string => {
 
 const fromSchema = (schema: Witness, random: Random, size: number, depth = 0): Draw<unknown> => {
   if (depth > 12) return undefined;
+  const explicit = schemaGenerator(schema);
+  if (explicit !== undefined) return drawn(explicit(random));
   const node = schemaDescription(schema);
   if (node === undefined) return undefined;
   const next = (child: Witness): Draw<unknown> => fromSchema(child, random, Math.max(0, size - 1), depth + 1);
@@ -42,6 +47,7 @@ const fromSchema = (schema: Witness, random: Random, size: number, depth = 0): D
     case "bool": return drawn(random() < 0.5);
     case "unit": return drawn(undefined);
     case "unknown": return drawn(null);
+    case "duration-millis": return drawn(new Duration(choice(random, Math.max(1, size * 1000 + 1))));
     case "never":
     case "opaque": return undefined;
     case "literals": return node.values.length ? drawn(node.values[choice(random, node.values.length)]) : undefined;
@@ -51,7 +57,8 @@ const fromSchema = (schema: Witness, random: Random, size: number, depth = 0): D
       const item = next(node.item);
       return item === undefined ? undefined : drawn(some(item.value));
     }
-    case "list": {
+    case "list":
+    case "chunk": {
       const values: unknown[] = [];
       const length = choice(random, Math.max(1, Math.min(size, 5) + 1));
       for (let i = 0; i < length; i++) {
@@ -113,9 +120,32 @@ const fromSchema = (schema: Witness, random: Random, size: number, depth = 0): D
       const decoded = schema.decode(wire.success);
       return decoded._tag === "Success" ? drawn(decoded.success) : undefined;
     }
+    case "entries": {
+      for (let attempt = 0; attempt < 20; attempt++) {
+        const object: Record<string, unknown> = {};
+        const length = choice(random, Math.max(1, size + 1));
+        for (let i = 0; i < length; i++) {
+          const value = next(node.value);
+          if (value === undefined) return undefined;
+          const wire = node.value.encode(value.value);
+          if (wire._tag === "Failure") return undefined;
+          object[`k${i}`] = wire.success;
+        }
+        const decoded = schema.decode(object);
+        if (decoded._tag === "Success") return drawn(decoded.success);
+      }
+      return undefined;
+    }
     case "block": return undefined;
   }
   return undefined;
+};
+
+/** `Schema.arbitrary`: a pure generator with the same ABI as `Gen.Gen`. */
+export const schemaArbitrary = (value: Witness): Gen<unknown> => (random) => {
+  const draw = fromSchema(value, random, 4);
+  if (draw === undefined) throw new RangeError("Schema.arbitrary: this schema needs an explicit generator (Schema.with_generator)");
+  return draw.value;
 };
 
 // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the Flick type of the Schema determines A

@@ -2,12 +2,31 @@
 // adapters where a Flick value differs from what Effect takes: an `End`
 // keeps its leftovers in an `Option`, and failures are `Failure` and
 // `Exit` values.
-import { Channel, Effect, Option, Sink, type Stream } from "effect";
+import { Channel, Effect, Option, Sink, Stream, type Cause, type Queue } from "effect";
 
 import { Failure, passOn, unwinds } from "../cause.ts";
 import { failureCause, flickExit } from "../stdlib/outcome.ts";
+import { callEffect, durationFromEffect, inNativeRuntime } from "../bridge.ts";
+import { Queue as NativeQueue, end as nativeEnd, offer as nativeOffer } from "@flick-lang/runtime/rt/effect/Queue";
 
 export * from "effect/Sink";
+
+/** A native queue receives each sink input and its end. */
+export const fromQueue = (queue: Queue.Queue<unknown, Cause.Done> | NativeQueue): Sink.Sink<void, unknown, never, unknown, unknown> =>
+  queue instanceof NativeQueue
+    ? Sink.make<unknown>()((stream) => Effect.flatMap(
+        Stream.runForEach(stream, (value) => callEffect(() => nativeOffer(value)(queue))),
+        () => Effect.sync(() => { nativeEnd(queue); }),
+      ))
+    : Sink.fromQueue(queue);
+
+/** Timings leave Effect as native durations only for the native runner. */
+export const withDuration = <A, In, L, E, R>(self: Sink.Sink<A, In, L, E, R>) =>
+  Sink.mapEffect(Sink.withDuration(self), ([value, duration]) =>
+    Effect.map(inNativeRuntime, (native) => [value, native ? durationFromEffect(duration) : duration] as const));
+
+export const timed = Sink.mapEffect(Sink.timed, (duration) =>
+  Effect.map(inNativeRuntime, (native) => native ? durationFromEffect(duration) : duration));
 
 type NonEmpty<A> = readonly [A, ...Array<A>];
 type AnySink = Sink.Sink<unknown, unknown, unknown, unknown, unknown>;

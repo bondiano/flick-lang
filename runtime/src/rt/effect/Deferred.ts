@@ -81,6 +81,11 @@ export const complete =
       if (self.task !== undefined) return false;
       return settle(self, asExit(yield exitOf(task)));
     })();
+/** Runs the task once and stores its outcome in this deferred. */
+export const into =
+  (self: Deferred) =>
+  (task: () => unknown): Run =>
+    complete(task)(self);
 /** Sets it to `task`, which each waiter runs. */
 export const completeWith =
   (task: () => unknown) =>

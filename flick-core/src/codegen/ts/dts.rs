@@ -87,15 +87,25 @@ pub fn declaration_file(
     let value = |export: &Export| {
         let scheme = export.scheme.as_ref();
         scheme.is_some_and(|scheme| {
-            Projection::new(&export.entity.module, projection.lookup, projection.package)
-                .value(scheme)
-                .is_ok()
+            Projection::for_runtime(
+                &export.entity.module,
+                projection.lookup,
+                projection.package,
+                projection.rt,
+            )
+            .value(scheme)
+            .is_ok()
         })
     };
     let ty = |export: &Export| {
         (projection.lookup)(&export.entity.module).is_some_and(|interface| {
-            Projection::new(&export.entity.module, projection.lookup, projection.package)
-                .declares(&interface, export)
+            Projection::for_runtime(
+                &export.entity.module,
+                projection.lookup,
+                projection.package,
+                projection.rt,
+            )
+            .declares(&interface, export)
         })
     };
     let (barrel, _) = reexports(projection.module, interface, path, &value, &ty);

@@ -100,7 +100,7 @@ export const close = <A, E>(owner: Owner, exit: Exit.Exit<A, E>): Effect.Effect<
     yield* hooks;
     // a settling foreign call may add a hook, and a hook may start one: repeat until neither (`docs/formal/runtime.md#a-hook-added-during-c4-does-not-run`)
     for (;;) {
-      yield* Effect.promise(() => settle(owner));
+      if (owner.pending.size > 0) yield* Effect.promise(() => settle(owner));
       if ([...owner.closing].every((hook) => ran.has(hook))) break;
       yield* hooks;
     }

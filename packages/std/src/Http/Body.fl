@@ -88,6 +88,12 @@ foreign pure stream from "@flick-lang/effect-ts/effect/http/HttpBody" "flickStre
   arity 3
   reviewed "effect@4.1.2 sha256:52e3ba8e5568e864"
 
+/// A stream that may suspend but holds no service dependency or region.
+stream_async : Stream {Async} e (List Int) -> Option String -> Option Float -> Body
+foreign pure stream_async from "@flick-lang/effect-ts/effect/http/HttpBody" "flickStream"
+  arity 3
+  reviewed "effect@4.1.2 sha256:52e3ba8e5568e864"
+
 /// Which part of a file `file` streams: at most `bytesToRead` bytes from
 /// `offset`, in chunks of `chunkSize`; and the content type.
 type alias FileOptions = {

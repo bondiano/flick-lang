@@ -18,7 +18,7 @@ const flick = process.env.FLICK_BIN ?? path.join(process.env.CARGO_TARGET_DIR ??
 test("the playground hydrates the markup its page renders on the server", async () => {
   const out = path.join(repo, "target/tmp/playground-hydration");
   rmSync(out, { recursive: true, force: true });
-  execFileSync(flick, ["build", path.join(here, "../src/playground/Playground.fl"), "--out-dir", out, "--color", "never"]);
+  execFileSync(flick, ["build", path.join(here, "../src/playground/Playground.fl"), "--project", path.join(here, "../src/playground"), "--out-dir", out, "--color", "never"]);
   // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the compiled module exports what `Playground.fl` exposes
   const playground = (await import(pathToFileURL(path.join(out, "Playground.js")).href)) as {
     initial_view: (config: { locale: string; examples: typeof examples }) => Effect.Effect<Ui>;

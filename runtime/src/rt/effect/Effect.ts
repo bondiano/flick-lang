@@ -1,7 +1,8 @@
 // The bindings of `Effect` on the kernel: what the runtime contract's cases run.
-import type { Data } from "../../core/data.ts";
+import { none, some, type Data } from "../../core/data.ts";
+import { clock } from "../clock.ts";
 import { allOf } from "../concurrency.ts";
-import { sleep } from "../duration.ts";
+import { Duration, sleep } from "../duration.ts";
 import { type Exit, die as dieCause, hasInterrupts, interrupt, isInterrupt, raise, succeeded, unwinds } from "../cause.ts";
 import {
   type Run,
@@ -15,8 +16,8 @@ import {
   uninterruptible as masked,
   yieldNow,
 } from "../fiber.ts";
-import { Failure } from "../outcome.ts";
-import { finalize } from "../owner.ts";
+import { Failure, RawCause } from "../outcome.ts";
+import { addFinalizerExit, finalize } from "../owner.ts";
 
 export { sleep };
 
@@ -35,8 +36,7 @@ export const zip =
     })();
 
 export const zipWith =
-  (that: () => unknown) =>
-  (combine: (first: unknown, second: unknown) => unknown) =>
+  (that: () => unknown, combine: (first: unknown, second: unknown) => unknown) =>
   (self: () => unknown): Run =>
     (function* (): Run {
       const first = yield self();
@@ -44,11 +44,23 @@ export const zipWith =
       return combine(first, second);
     })();
 
+/** The elapsed monotonic time and the result, including under a test clock. */
+export function* timed(task: () => unknown): Run {
+  const started = clock().monotonic();
+  const value = yield task();
+  const nanos = clock().monotonic() - started;
+  return [new Duration(Number(nanos) / 1_000_000, nanos), value];
+}
+
 export const die = (message: string): never => raise(dieCause(message));
 export const flickNever = (): Suspend => new Suspend(() => undefined);
 export const flickYieldNow = (): unknown => yieldNow();
 export const flickFiberId = (): number => currentFiber().id;
 export const flickInterrupt = (): never => raise(interrupt(currentFiber().id));
+
+/** Register a scope finalizer with the native owner. */
+export const flickAddFinalizer = (finalizer: (cause: unknown) => unknown): unknown =>
+  addFinalizerExit((exit: Exit) => finalizer(exit.cause === undefined ? none : some(new RawCause(exit.cause))));
 
 /** How `task` ended, as a value, unless it unwinds to a handler of effects. */
 export function* flickExit(task: () => unknown): Run {
@@ -61,14 +73,14 @@ export const uninterruptible = (task: () => unknown): Run => masked(task);
 export const interruptible = (task: () => unknown): Run => atMask(0, task);
 
 /** `f restore`, one mask deeper; `restore` gives a task the depth around the call. */
-export const uninterruptibleMask = (f: (restore: (task: () => unknown) => () => unknown) => () => unknown): Run => {
+export const uninterruptibleMask = (f: (restore: (task: () => unknown) => () => unknown) => unknown): Run => {
   const depth = currentFiber().mask;
-  return masked(() => f((task) => () => atMask(depth, task))());
+  return masked(() => f((task) => () => atMask(depth, task)));
 };
 
-export const interruptibleMask = (f: (restore: (task: () => unknown) => () => unknown) => () => unknown): Run => {
+export const interruptibleMask = (f: (restore: (task: () => unknown) => () => unknown) => unknown): Run => {
   const depth = currentFiber().mask;
-  return atMask(0, () => f((task) => () => atMask(depth, task))());
+  return atMask(0, () => f((task) => () => atMask(depth, task)));
 };
 
 /** `finalizer` runs, masked, however `task` ended; the failures of both join. */

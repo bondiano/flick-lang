@@ -64,7 +64,7 @@ let main () = provide (Layer.merge
       scope s {
         let files =
           Http.StaticServer.route { Http.StaticServer.static_options dir with spa = true } ""
-        app : (ServerRequest ->{; Http.ServerError.HttpServerError} ServerResponse)^{s}
+        app : (ServerRequest ->{Async; Http.ServerError.HttpServerError} ServerResponse)^{s}
         let app =
           Http.Middleware.cors
             { Http.Middleware.cors_options with allowedOrigins = [origin] }

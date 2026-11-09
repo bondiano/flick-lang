@@ -10,6 +10,7 @@ use std::process::Command as Process;
 use flick_core::build::Extras;
 use flick_core::diagnostics::{Code, Diagnostic, Severity, codes};
 use flick_core::iface::Interface;
+use flick_core::project::config::Backend;
 use flick_core::project::{self, Analysis, Analyzed, Compilation, Host, Project, cache};
 use flick_core::projection::Projected;
 use flick_core::source::SourceMap;
@@ -225,6 +226,22 @@ pub fn doc(options: &OutDirArguments, explicit: Option<&str>) -> Outcome {
     Outcome::default()
 }
 
+fn schema_exporter(target: SchemaTarget, value: &str, backend: Backend) -> String {
+    match target {
+        SchemaTarget::JsonSchema => {
+            let runtime = if backend == Backend::Rt {
+                "@flick-lang/runtime/rt"
+            } else {
+                "@flick-lang/effect-ts"
+            };
+            format!(
+                "import {{ codecJsonSchema }} from \"{runtime}\";\nconst r = codecJsonSchema({value:?}, exported);"
+            )
+        }
+        SchemaTarget::OpenApi => "import { httpApiOpenApi } from \"@flick-lang/effect-ts/effect/http-api/HttpApi\";\nconst r = httpApiOpenApi(exported);".to_owned(),
+    }
+}
+
 pub fn schema_export(options: &SchemaExportArguments, explicit: Option<&str>) -> Outcome {
     let checked = match compile(explicit) {
         Ok(c) => c,
@@ -268,12 +285,11 @@ pub fn schema_export(options: &SchemaExportArguments, explicit: Option<&str>) ->
             diagnostics: emission.diagnostics,
         };
     }
-    let export = match options.target {
-        SchemaTarget::JsonSchema => format!(
-            "import {{ codecJsonSchema }} from \"@flick-lang/effect-ts\";\nconst r = codecJsonSchema({value:?}, exported);"
-        ),
-        SchemaTarget::OpenApi => "import { httpApiOpenApi } from \"@flick-lang/effect-ts/effect/http-api/HttpApi\";\nconst r = httpApiOpenApi(exported);".to_owned(),
-    };
+    let backend = checked
+        .project
+        .as_ref()
+        .map_or(Backend::Effect, |p| p.config.build.effect);
+    let export = schema_exporter(options.target, value, backend);
     let script = format!(
         "{export}\nimport {{ {value} as exported }} from \"./{}.js\";\nif (r._tag === \"Success\") process.stdout.write(r.success); else {{ process.stderr.write(JSON.stringify(r.failure._0)); process.exitCode = 1; }}\n",
         module.replace('.', "/")

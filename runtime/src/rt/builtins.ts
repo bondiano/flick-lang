@@ -5,11 +5,13 @@ import { tag } from "../tags.ts";
 import { fail, raise } from "./cause.ts";
 
 /** What a binding of a module this runtime does not have yet is, until it is called. */
-export const absent =
-  (module: string, name: string) =>
-  (): never => {
+export const absent = (module: string, name: string): (() => never) => {
+  const missing = (): never => {
     throw new Error(`\`${module}\` \`${name}\` is not on Flick's own runtime yet`);
   };
+  Object.defineProperty(missing, Symbol.for("flick/absent"), { value: true });
+  return missing;
+};
 
 /** `todo`: code not written yet fails when it runs. */
 export const flickTodo = (message: string): never => {

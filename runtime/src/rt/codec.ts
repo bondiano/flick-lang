@@ -1,6 +1,7 @@
 // Pure codecs and the field policies of a Flick `codec` block.
-import { err, none, ok, some } from "../core/data.ts";
-import { currentOwner } from "./fiber.ts";
+import { type Result, err, none, ok, some } from "../core/data.ts";
+import { fail, raise } from "./cause.ts";
+import { type Run, currentOwner } from "./fiber.ts";
 import { type Redacted, redactedMake, redactedReveal } from "./redacted.ts";
 import {
   type Codec,
@@ -8,12 +9,15 @@ import {
   type Witness,
   codecDecodeResult,
   schemaBool,
+  schemaBigint,
   schemaError,
   schemaInt,
   schemaNumber,
   schemaOption,
   schemaLiterals,
+  schemaList,
   schemaString,
+  schemaUnknown,
   codecTransformPure,
   withWire,
   withBlock,
@@ -22,6 +26,7 @@ import {
 
 export const codecString = schemaString;
 export const codecBool = schemaBool;
+export const codecBigint = schemaBigint;
 export const codecInt = schemaInt;
 export const codecNumberFinite = schemaNumber;
 export const codecNumberLossless: Witness = /*#__PURE__*/ witness("number-lossless",
@@ -41,6 +46,80 @@ export const codecNumberLossless: Witness = /*#__PURE__*/ witness("number-lossle
     return ok(value);
   });
 export const codecOptionNull = schemaOption;
+export const codecList = schemaList;
+const rooted = (result: CodecResult, path: string): CodecResult => result._tag === "Success" ? result :
+  err({ ...result.failure, _0: result.failure._0.map((issue) => ({ ...issue, path: issue.path || path || "(root)" })) });
+export const codecTransformResult = (
+  decode: (wire: unknown) => CodecResult,
+  encode: (value: unknown) => unknown,
+  from: Witness,
+): Witness => withWire(witness("transform-result", (input, path) => {
+  const base = from.decodeAt(input, path);
+  return base._tag === "Failure" ? base : rooted(decode(base.success), path);
+}, (value, path) => from.encodeAt(encode(value), path)), from);
+
+export const codecCheckWhole = (predicate: (value: unknown) => boolean, message: string, from: Witness): Witness =>
+  withWire(witness("check", (input, path) => {
+    const base = from.decodeAt(input, path);
+    if (base._tag === "Failure") return base;
+    return predicate(base.success) ? base : err(schemaError(path, message));
+  }, (value, path) => predicate(value) ? from.encodeAt(value, path) : err(schemaError(path, message))), from);
+
+type CodecResult = Result<unknown, SchemaError>;
+interface RuntimeCodec {
+  readonly decode: (input: unknown, path: string) => unknown;
+  readonly encode: (value: unknown, path: string) => unknown;
+}
+const runtimeCodecs = /*#__PURE__*/ new WeakMap<Witness, RuntimeCodec>();
+/** A codec implemented by a bridged runtime may suspend during either direction. */
+export const registerRuntimeCodec = (codec: Witness, implementation: RuntimeCodec): Witness => {
+  runtimeCodecs.set(codec, implementation);
+  return codec;
+};
+const codecResult = (value: unknown): CodecResult => {
+  if (!isRecord(value) || (value["_tag"] !== "Success" && value["_tag"] !== "Failure")) {
+    throw new TypeError("a codec returned a value that is not a Result");
+  }
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- a typed codec owns the payload of this checked Result
+  return value as CodecResult;
+};
+const decodeAt = (codec: Witness, input: unknown, path: string): unknown =>
+  runtimeCodecs.get(codec)?.decode(input, path) ?? codec.decodeAt(input, path);
+const encodeAt = (codec: Witness, value: unknown, path: string): unknown =>
+  runtimeCodecs.get(codec)?.encode(value, path) ?? codec.encodeAt(value, path);
+
+export const codecTransformEffect = (
+  decode: (wire: unknown) => unknown,
+  encode: (value: unknown) => unknown,
+  from: Witness,
+): Witness => {
+  const codec = withWire(witness("transform-effect",
+    (_input, path) => err(schemaError(path, "a codec with runtime decoding is no PureCodec")),
+    (value, path) => from.encodeAt(encode(value), path)), from);
+  runtimeCodecs.set(codec, {
+    decode: (input, path) => (function* (): Run {
+      const base = codecResult(yield decodeAt(from, input, path));
+      return base._tag === "Failure" ? base : ok(yield decode(base.success));
+    })(),
+    encode: (value, path) => encodeAt(from, encode(value), path),
+  });
+  return codec;
+};
+
+/** A codec may wait and fail with `SchemaError`; pure witnesses finish at once. */
+export function* codecDecode(codec: Witness, input: unknown): Run {
+  const inert = codecDecodeResult(schemaUnknown, input);
+  if (inert._tag === "Failure") raise(fail(inert.failure));
+  const decoded = codecResult(yield decodeAt(codec, input, ""));
+  if (decoded._tag === "Success") return decoded.success;
+  return raise(fail(decoded.failure));
+}
+
+export function* codecEncode(codec: Witness, value: unknown): Run {
+  const encoded = codecResult(yield encodeAt(codec, value, ""));
+  if (encoded._tag === "Success") return encoded.success;
+  return raise(fail(encoded.failure));
+}
 const isRedacted = (value: unknown): value is Redacted<unknown> =>
   typeof value === "object" && value !== null && typeof Reflect.get(value, "toJSON") === "function";
 export const codecRedactedReveal = (item: Witness): Witness =>
@@ -85,13 +164,17 @@ interface FieldSpec {
   readonly codec: Witness;
   readonly optional: boolean;
   readonly onMissing?: (unit: undefined) => unknown;
+  readonly onMissingEffect?: (unit: undefined) => unknown;
 }
 type BlockFields = ReadonlyArray<readonly [string, FieldSpec]>;
 
 export const dslField = (wire: string, codec: Witness): FieldSpec => Object.freeze({ wire, codec, optional: false });
 export const dslOptionalField = (wire: string, codec: Witness): FieldSpec => Object.freeze({ wire, codec, optional: true });
+export const dslFieldEffect = dslField;
 export const dslOnMissing = (factory: (unit: undefined) => unknown, field: FieldSpec): FieldSpec =>
   Object.freeze({ ...field, onMissing: factory });
+export const dslOnMissingEffect = (factory: (unit: undefined) => unknown, field: FieldSpec): FieldSpec =>
+  Object.freeze({ ...field, onMissingEffect: factory });
 
 export const codecFieldsEmpty: BlockFields = /*#__PURE__*/ Object.freeze([]);
 export const codecField = (label: string, field: FieldSpec, rest: BlockFields): BlockFields =>
@@ -150,8 +233,57 @@ const makeBlock = (name: string, fields: BlockFields, ignoreExtra: boolean): Wit
     return ok(out);
   });
   blocks.set(codec, { name, fields, ignoreExtra });
+  if (fields.some(([, field]) => field.onMissingEffect !== undefined || runtimeCodecs.has(field.codec))) {
+    runtimeCodecs.set(codec, {
+      decode: (input, path) => decodeBlock(input, path, fields, wires, ignoreExtra),
+      encode: (value, path) => encodeBlock(value, path, fields),
+    });
+  }
   return withBlock(codec, fields, ignoreExtra);
 };
+
+function* decodeBlock(input: unknown, path: string, fields: BlockFields, wires: ReadonlySet<string>, ignoreExtra: boolean): Run {
+  if (!isRecord(input)) return err(schemaError(path, `expected an object, got ${describe(input)}`));
+  if (!ignoreExtra) {
+    for (const wire of Object.keys(input))
+      if (!wires.has(wire)) return err(schemaError(at(path, wire), "an unknown key"));
+  }
+  const out: Record<string, unknown> = {};
+  for (const [label, field] of fields) {
+    const where = at(path, field.wire);
+    if (!Object.hasOwn(input, field.wire)) {
+      if (field.optional) { out[label] = none; continue; }
+      if (field.onMissingEffect !== undefined) {
+        out[label] = yield field.onMissingEffect(undefined);
+        continue;
+      }
+      if (field.onMissing !== undefined) { out[label] = field.onMissing(undefined); continue; }
+      if (field.codec.kind !== "option-nullish") return err(schemaError(where, "a missing key"));
+    }
+    const decoded = codecResult(yield decodeAt(field.codec, input[field.wire], where));
+    if (decoded._tag === "Failure") return decoded;
+    out[label] = field.optional ? some(decoded.success) : decoded.success;
+  }
+  return ok(out);
+}
+
+function* encodeBlock(value: unknown, path: string, fields: BlockFields): Run {
+  if (!isRecord(value)) return err(schemaError(path, `expected an object, got ${describe(value)}`));
+  const out: Record<string, unknown> = {};
+  for (const [label, field] of fields) {
+    const input = value[label];
+    let actual = input;
+    if (field.optional) {
+      if (!isRecord(input) || input["_tag"] === "None") continue;
+      if (input["_tag"] !== "Some") return err(schemaError(at(path, label), "expected an Option"));
+      actual = input["value"];
+    }
+    const encoded = codecResult(yield encodeAt(field.codec, actual, at(path, field.wire)));
+    if (encoded._tag === "Failure") return encoded;
+    out[field.wire] = encoded.success;
+  }
+  return ok(out);
+}
 
 export const codecBlock = (name: string, fields: BlockFields): Witness => makeBlock(name, fields, false);
 export const codecRecord = (name: string, _schema: Witness, fields: BlockFields): Witness => makeBlock(name, fields, false);

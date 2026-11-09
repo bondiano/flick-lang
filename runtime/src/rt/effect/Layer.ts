@@ -1,6 +1,6 @@
 // The bindings of `Layer` on the kernel, as Go's `flickrt` has Effect's.
 import { type Cause, die, dies, isFail, raise } from "../cause.ts";
-import { type Run, Suspend, type Under, asExit, currentOwner, exitOf } from "../fiber.ts";
+import { type Run, Suspend, asExit, currentOwner, exitOf } from "../fiber.ts";
 import {
   type Build,
   Layer,
@@ -10,6 +10,7 @@ import {
   constant,
   currentMemo,
   fromBuild,
+  layerHooks,
   memoizable,
   mergeAll,
   scoped,
@@ -81,19 +82,19 @@ export const provideMerge =
     });
 
 export const flatMap =
-  (f: (services: Services) => Layer) =>
+  (f: (services: unknown) => Layer) =>
   (self: Layer): Layer =>
     fromBuild(function* (memo, into): Run {
       const services = servicesOf(yield self.build(memo, into));
-      return yield f(services).build(memo, into);
+      return yield f(layerHooks.context(services)).build(memo, into);
     });
 
 export const tap =
-  (f: (services: Services) => unknown) =>
+  (f: (services: unknown) => unknown) =>
   (self: Layer): Layer =>
     fromBuild(function* (memo, into): Run {
       const services = servicesOf(yield self.build(memo, into));
-      yield scoped(into, () => f(services));
+      yield scoped(into, () => f(layerHooks.context(services)));
       return services;
     });
 
@@ -174,12 +175,15 @@ const here = (): Owner => {
   return owner;
 };
 
-export const build = (self: Layer): Under => buildWith(self, currentMemo(), here());
+export const build = (self: Layer): Run => (function* (): Run {
+  return layerHooks.context(servicesOf(yield buildWith(self, currentMemo(), here())));
+})();
 
 export const flickBuildWithMemoMap =
   (memo: MemoMap) =>
-  (self: Layer): Under =>
-    buildWith(self, memo, here());
+  (self: Layer): Run => (function* (): Run {
+    return layerHooks.context(servicesOf(yield buildWith(self, memo, here())));
+  })();
 
 export const flickMakeMemoMap = (): MemoMap => new MemoMap(undefined);
 export const forkMemoMap = (parent: MemoMap): MemoMap => new MemoMap(parent);

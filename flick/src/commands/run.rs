@@ -236,7 +236,8 @@ pub fn build_into_generation(
         generation: true,
         built: RefCell::default(),
     };
-    generation.rt = options.rt || project.config.build.effect == Backend::Rt;
+    generation.rt = options.rt
+        || (project.config.build.emit != Emit::Go && project.config.build.effect == Backend::Rt);
     let outcome = build.run();
     report::render(global, &outcome.sources, &outcome.diagnostics);
     let code = report::code(&outcome.diagnostics);

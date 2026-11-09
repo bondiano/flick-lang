@@ -1,5 +1,5 @@
 use crate::build::builtin_modules;
-use crate::codegen::{Labels, Options, js};
+use crate::codegen::{EffectBridge, Labels, Options, js};
 use crate::ir::Expr;
 use crate::ir::tests::check_text;
 use crate::types::builtins;
@@ -36,6 +36,7 @@ fn release_with(text: &str, workers: &dyn Fn(&str, &str) -> Option<usize>) -> St
         direct: &|_, _, _| false,
         labels: Labels::default(),
         rt: false,
+        effect_bridge: EffectBridge::Absent,
     };
     js(&ir, &options).code
 }
@@ -251,6 +252,7 @@ fn known_instances_and_plain_foreigns_are_called_directly() {
         direct: &direct,
         labels: Labels::default(),
         rt: false,
+        effect_bridge: EffectBridge::Absent,
     };
     let js = js(&ir, &options).code;
     assert!(js.contains("$m_Instances.$i_Show_Float$show(n)"), "{js}");
@@ -309,6 +311,18 @@ fn a_plain_foreign_named_as_a_value_is_defined_in_its_module() {
         js.contains("export const join = ($a0) => ($a1) => join$2($a0, $a1);"),
         "{js}"
     );
+}
+
+#[test]
+fn effect_backend_keeps_direct_pure_foreigns_with_schema_values() {
+    let js = release(
+        "module App exposing (keep, pick)\n\n\
+         keep : Schema String -> Schema String\n\
+foreign pure keep from \"./x.mjs\" \"keep\"\n\n\
+         pick : Schema String -> Schema String\n\
+let pick = keep\n",
+    );
+    assert!(js.contains("export const keep = $f_keep;"), "{js}");
 }
 
 #[test]

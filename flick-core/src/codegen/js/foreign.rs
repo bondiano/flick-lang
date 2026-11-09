@@ -4,7 +4,15 @@
 
 use std::collections::HashMap;
 
+use flick_ir::Shape;
+
+use super::bridge::Toward;
 use super::{Gen, names};
+#[cfg(not(target_arch = "wasm32"))]
+use crate::build::effects::{effect_specifier, on_kernel_with_bridge};
+#[cfg(not(target_arch = "wasm32"))]
+use crate::codegen::EffectBridge;
+use crate::codegen::Options;
 use crate::ir::Copies;
 use crate::ir::{Foreign, ForeignMode, Item, ItemKind};
 
@@ -28,20 +36,61 @@ fn trusted_runtime_package(spec: &str) -> bool {
         })
 }
 
+#[cfg(not(target_arch = "wasm32"))]
+fn contains_eff(shape: &Shape) -> bool {
+    match shape {
+        Shape::Eff(_) => true,
+        Shape::Fun { args, result, .. } => args.iter().any(contains_eff) || contains_eff(result),
+        Shape::List(item) | Shape::Option(item) => contains_eff(item),
+        Shape::Result(error, value) => contains_eff(error) || contains_eff(value),
+        Shape::Tuple(items) => items.iter().any(contains_eff),
+        Shape::Record(fields) => fields.iter().any(|(_, field)| contains_eff(field)),
+        _ => false,
+    }
+}
+
 impl Gen<'_> {
-    pub(super) fn foreign(&mut self, f: &Foreign) -> String {
-        let alias = format!("$f_{}", f.name);
-        let target = match &f.binding.from {
-            Some(module) => {
-                let spec = (self.options.foreign)(self.module, module);
-                // a module the kernel does not have: see `write_imports`
-                self.runtime |= self.kernel && spec.starts_with("@flick-lang/effect-ts/effect/");
-                self.foreign
-                    .push((spec, f.binding.name.clone(), alias.clone()));
-                alias
-            }
-            None => format!("globalThis.{}", f.binding.name),
+    /// The import used by this binding and whether its value crosses to Effect.
+    fn foreign_target(&mut self, f: &Foreign) -> (String, bool) {
+        let Some(module) = &f.binding.from else {
+            return (format!("globalThis.{}", f.binding.name), false);
         };
+        let alias = format!("$f_{}", f.name);
+        let spec = (self.options.foreign)(self.module, module);
+        #[cfg(not(target_arch = "wasm32"))]
+        let (spec, bridged) = {
+            let mut spec = spec;
+            let mut bridged = false;
+            if self.kernel
+                && !on_kernel_with_bridge(
+                    &spec,
+                    &f.binding.name,
+                    self.options.effect_bridge == EffectBridge::Available,
+                )
+            {
+                spec = effect_specifier(module);
+                bridged = true;
+            }
+            bridged |= self.kernel
+                && ((f.mode == ForeignMode::Effect && !spec.starts_with("@flick-lang/runtime"))
+                    || spec == "@flick-lang/effect-ts"
+                    || spec.starts_with("@flick-lang/effect-ts/"));
+            bridged |= self.kernel
+                && self.options.effect_bridge == EffectBridge::Available
+                && !spec.starts_with("@flick-lang/runtime")
+                && (f.adapter.shapes.iter().any(contains_eff)
+                    || contains_eff(&f.adapter.result_shape));
+            (spec, bridged)
+        };
+        #[cfg(target_arch = "wasm32")]
+        let bridged = false;
+        self.foreign
+            .push((spec, f.binding.name.clone(), alias.clone()));
+        (alias, bridged)
+    }
+
+    pub(super) fn foreign(&mut self, f: &Foreign) -> String {
+        let (target, bridged) = self.foreign_target(f);
         let info = &f.adapter;
         let dicts: Vec<String> = (0..f.dicts).map(|i| format!("$d{i}")).collect();
         let params: Vec<String> = (0..f.taken()).map(|i| format!("$a{i}")).collect();
@@ -54,30 +103,41 @@ impl Gen<'_> {
         let copy_result = copies(f).is_some_and(|c| c.result);
         if f.arity == 0 && params.is_empty() && f.dicts == 0 && f.mode == ForeignMode::Pure {
             let value = self.copied(copy_result, target);
+            let value = if bridged {
+                self.crossed(Toward::Flick, &info.result_shape, value)
+            } else {
+                value
+            };
             return self.export(&names::ident(&f.name), &value);
         }
         let id = names::ident(&f.name);
-        let plain = self.direct_foreigns.contains_key(&f.name);
+        let plain = self.direct_foreigns.contains_key(&f.name) && !bridged;
         // a constant, not `export { … as … }`: the module names it too
         if plain && params.len() == 1 {
             return self.export(&id, &target);
         }
-        let call = self.foreign_call(f, &target, &dicts, &params);
+        let call = self.foreign_call(f, &target, &dicts, &params, bridged);
         let result = |g: &mut Self, v: &str| g.foreign_result(f, copy_result, v);
         let catch = f.catch.as_ref().map(|c| self.expr(c));
-        let mut body = match (f.mode, runtime) {
-            (ForeignMode::Pure, _) | (_, false) => result(self, &call),
-            (ForeignMode::Sync | ForeignMode::Effect, true) if self.kernel => {
+        let bridged_body = if bridged {
+            self.bridged_body(f, runtime, &call, copy_result, catch.as_deref())
+        } else {
+            None
+        };
+        let mut body = match (bridged_body, f.mode, runtime) {
+            (Some(body), _, _) => body,
+            (None, ForeignMode::Pure, _) | (None, _, false) => result(self, &call),
+            (None, ForeignMode::Sync | ForeignMode::Effect, true) if self.kernel => {
                 self.kernel_foreign(f, copy_result, &call, catch)
             }
-            (ForeignMode::Sync, true) => {
+            (None, ForeignMode::Sync, true) => {
                 let value = result(self, &call);
                 match catch {
                     Some(c) => format!("{}(() => {value}, {c})", self.rt("foreignSync")),
                     None => format!("{}(() => {value})", self.effect("sync")),
                 }
             }
-            (ForeignMode::Async, true) => {
+            (None, ForeignMode::Async, true) => {
                 let value = result(self, "$v");
                 let start = format!(
                     "{} Promise.resolve({call}).then(($v) => {value})",
@@ -86,7 +146,7 @@ impl Gen<'_> {
                 let catch = catch.map_or(String::new(), |c| format!(", {c}"));
                 format!("{}({start}{catch})", self.rt("foreignAsync"))
             }
-            (ForeignMode::Effect, true) => {
+            (None, ForeignMode::Effect, true) => {
                 let effect = match catch {
                     Some(c) => format!("{}(() => {call}, {c})", self.rt("foreignEffect")),
                     None => format!("{}(() => {call})", self.effect("suspend")),
@@ -128,6 +188,7 @@ impl Gen<'_> {
         target: &str,
         dicts: &[String],
         params: &[String],
+        bridged: bool,
     ) -> String {
         let info = &f.adapter;
         let copies = copies(f);
@@ -136,12 +197,22 @@ impl Gen<'_> {
             let copy = copies.is_some_and(|c| c.args.get(i) == Some(&true));
             let callback = copies.and_then(|c| c.callbacks.get(i).cloned().flatten());
             let arg = match info.callbacks.get(i).copied().flatten() {
-                _ if info.receiver && i == 0 => self.copied(copy, param.clone()),
-                Some(n) => self.callback(param, n, callback.as_ref()),
-                None if info.optional.contains(&i) => {
+                _ if info.optional.contains(&i) => {
                     let arg = format!("{}({param})", self.rt("optionalArg"));
                     self.copied(copy, arg)
                 }
+                n if bridged => {
+                    let value = self.copied(copy, param.clone());
+                    let shape = info.shapes.get(i).unwrap_or(&Shape::Data);
+                    let host = self.crossed(Toward::Host, shape, value);
+                    match n {
+                        Some(n) => self.callback(&format!("({host})"), n, callback.as_ref()),
+                        None if info.variadic && i + 1 == f.arity => format!("...{host}"),
+                        None => host,
+                    }
+                }
+                _ if info.receiver && i == 0 => self.copied(copy, param.clone()),
+                Some(n) => self.callback(param, n, callback.as_ref()),
                 None if info.variadic && i + 1 == f.arity => {
                     format!("...{}", self.copied(copy, param.clone()))
                 }
@@ -210,7 +281,7 @@ impl Gen<'_> {
 
 /// Whether the JS function itself can stand for `f` in release: a pure
 /// import called with its arguments as they are and returning its result.
-pub(super) fn plain(f: &Foreign) -> bool {
+pub(super) fn plain(f: &Foreign, kernel: bool) -> bool {
     let info = &f.adapter;
     f.mode == ForeignMode::Pure
         && f.binding.from.is_some()
@@ -223,17 +294,39 @@ pub(super) fn plain(f: &Foreign) -> bool {
         && !(info.receiver || info.cancel || info.variadic)
         && info.optional.is_empty()
         && info.callbacks.iter().all(|c| matches!(c, None | Some(1)))
+        && (!kernel || (info.shapes.iter().all(Shape::is_data) && info.result_shape.is_data()))
         && !(info.result.nullable || info.result.unit)
         && copies(f).is_none()
 }
 
 /// The plain foreigns of a module (see [`plain`]), by name, with their arity
 /// and import alias: a full application calls the import.
-pub(super) fn plain_foreigns(items: &[Item]) -> HashMap<String, (usize, String)> {
+pub(super) fn plain_foreigns(
+    items: &[Item],
+    module: &str,
+    options: &Options<'_>,
+) -> HashMap<String, (usize, String)> {
     items
         .iter()
         .filter_map(|item| match &item.kind {
-            ItemKind::Foreign(f) if plain(f) => {
+            ItemKind::Foreign(f) if plain(f, options.rt) => {
+                #[cfg(not(target_arch = "wasm32"))]
+                if options.rt {
+                    let source = f.binding.from.as_deref()?;
+                    let spec = (options.foreign)(module, source);
+                    if spec == "@flick-lang/effect-ts"
+                        || spec.starts_with("@flick-lang/effect-ts/")
+                        || !on_kernel_with_bridge(
+                            &spec,
+                            &f.binding.name,
+                            options.effect_bridge == EffectBridge::Available,
+                        )
+                    {
+                        return None;
+                    }
+                }
+                #[cfg(target_arch = "wasm32")]
+                let _ = module;
                 Some((f.name.clone(), (f.stages.len(), format!("$f_{}", f.name))))
             }
             _ => None,

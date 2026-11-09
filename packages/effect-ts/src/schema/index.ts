@@ -116,7 +116,7 @@ const needsRuntime = (ast: SchemaAST.AST): boolean => {
 type PureCodec = Schema.Codec<unknown>;
 
 /** Whether `codec` is pure: no runtime transformation or default anywhere in it. */
-const isPure = (codec: AnySchema): codec is AnySchema & PureCodec => !needsRuntime(codec.ast);
+export const isPure = (codec: AnySchema): codec is AnySchema & PureCodec => !needsRuntime(codec.ast);
 
 const fromExit = <A>(exit: Exit.Exit<A, Schema.SchemaError>, encoding: boolean): Exit.Exit<A, SchemaError> =>
   Exit.mapError(exit, toSchemaError(encoding));

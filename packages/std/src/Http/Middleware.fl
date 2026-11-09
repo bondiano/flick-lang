@@ -157,7 +157,7 @@ foreign pure with_pre_response_handler from "@flick-lang/effect-ts/effect/http/H
 to_handled :
   (ServerRequest -> ServerResponse ->{r2; e2} Unit) ->
   Handler r e ->
-  (ServerRequest ->{r + r2} Unit)
+  (ServerRequest ->{Async | r + r2} Unit)
 foreign pure to_handled from "@flick-lang/effect-ts/effect/http/HttpMiddleware" "flickToHandled"
   arity 2
   reviewed "effect@4.1.2 sha256:410e9b7d36d30ce7"

@@ -322,7 +322,7 @@ foreign effect listen from "@flick-lang/effect-ts/effect/http-api/HttpApi" "http
 /// the pages and the RPC. It decodes and answers as `listen` does, a
 /// request no endpoint takes is 404, and the handlers run with the
 /// services here.
-route : String -> Api r gs -> (gs^c ->{r} (Http.Router.Route q f)^c)^c
+route : String -> Api r gs -> (gs^c ->{r} (Http.Router.Route {Async | q} f)^c)^c
 foreign effect route from "@flick-lang/effect-ts/effect/http-api/HttpApi" "httpApiRoute"
   arity 3
   retention call
@@ -378,7 +378,7 @@ with_multipart_stream_payload :
   Endpoint l (Request p q h b ->{r; e} s) ->
   Endpoint
     l
-    (Request p q h (Stream none {Http.Multipart.MultipartError} Http.Multipart.Part) ->{r; Http.Multipart.MultipartError | e}
+    (Request p q h (Stream {Async} {Http.Multipart.MultipartError} Http.Multipart.Part) ->{Async | r; Http.Multipart.MultipartError | e}
       s)
 foreign pure with_multipart_stream_payload from "@flick-lang/effect-ts/effect/http-api/HttpApi" "httpApiWithMultipartStreamPayload"
   reviewed "effect@4.1.2 sha256:007eacb6e7e077d7"

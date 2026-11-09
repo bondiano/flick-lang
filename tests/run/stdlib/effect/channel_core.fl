@@ -30,7 +30,7 @@ let slow =
       Channel.end "late"
     })
 
-outcome : Channel.Channel none {Boom} Unit Float Unit none Unit ->{} String
+outcome : Channel.Channel r {Boom} Unit Float Unit none Unit ->{r;} String
 let outcome channel =
   try show (Channel.run_collect channel) with
   | Boom why -> "failed " ++ why
@@ -45,7 +45,7 @@ let seen log n =
   n
 
 /// A channel of the number, acquired and released.
-resource : Ref (List String) -> Float -> Channel.Channel none none i Float Unit ie id
+resource : Ref (List String) -> Float -> Channel.Channel {Async} none i Float Unit ie id
 let resource log n =
   Channel.acquire_release
     (fun x -> note log ("release " ++ show x))
@@ -54,7 +54,7 @@ let resource log n =
       n
     })
 
-sources : Unit ->{; Boom} Unit
+sources : Unit ->{Async; Boom} Unit
 let sources () =
   say ("from_list: " ++ show (Channel.run_collect nums))
   say ("from_list_chunked: " ++ show (lists (Channel.from_list_chunked 2 [1, 2, 3, 4, 5])))
@@ -73,7 +73,7 @@ let sources () =
   let acquired = Channel.acquire_release (fun n -> note log ("release " ++ show n)) (task { 5 })
   say ("acquire_release: " ++ show (Channel.run_collect acquired) ++ " " ++ show (Ref.get log))
 
-transforms : Unit ->{; Boom} Unit
+transforms : Unit ->{Async; Boom} Unit
 let transforms () =
   say ("map: " ++ show (Channel.run_collect (Channel.map (fun n -> n * 10) nums)))
   let log = Ref.make []
@@ -103,7 +103,7 @@ let transforms () =
   say
     ("pipe_to_or_fail ok: " ++ show (Channel.run_collect (nums |> Channel.pipe_to_or_fail offset)))
 
-failures : Unit ->{; Boom} Unit
+failures : Unit ->{Async; Boom} Unit
 let failures () =
   let caught = Ref.make None
   let kept =

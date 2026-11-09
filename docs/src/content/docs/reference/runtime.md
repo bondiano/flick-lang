@@ -1,16 +1,32 @@
 ---
-title: "Runtime adapter"
+title: "Runtime and Effect adapter"
 ---
 
-`@flick-lang/effect-ts` is what compiled code runs on (see [Errors, services, resources and concurrency](../../spec/05-errors-and-concurrency/), [Compiler architecture](../../contributing/implementation-decisions/#compiler-architecture)). It is a thin
-adapter over Effect `4.1.2`: generated modules import only this package, and
-the adapter fixes the contracts below so that they hold whatever Effect does
-by default.
+By default, compiled code imports `@flick-lang/runtime/rt`, Flick's own runtime
+without an Effect dependency. The `--rt` flag also selects it for one build,
+run or test of a project configured for Effect.
 
-For `flick build --rt`, `flick run --rt` and `flick test --rt`, generated code
-imports `@flick-lang/runtime/rt`. That package implements Flick's own runtime
-and has no dependency on Effect. The default Effect backend imports
-`@flick-lang/effect-ts`, which depends on the runtime's shared pure helpers.
+An RT project that uses a library binding still implemented by Effect imports
+`@flick-lang/effect-ts/bridge` for that binding. Add `@flick-lang/effect-ts`
+when using such modules. The bridge converts callbacks, effects, services,
+scopes, Fibers, Schedules, Durations, collections, schema witnesses and codecs
+across the boundary, including codecs with runtime effects. Nested `Option`
+and `Result` values retain their meaning in generic library calls. A project
+that uses only RT bindings does not load the bridge.
+
+Opaque Stream values stay in the adapter. When the bridge is installed, atoms,
+forms, routes and renderers use their matching Effect implementations together,
+as do tracing bindings and their configured exporters.
+
+Reading request bodies, persisting multipart forms, serving static files and
+consuming a server-rendered stream require `Async` in the caller's effect row.
+For an HTTP body whose stream requires only `Async`, use `Http.Body.stream_async`
+or `Http.ServerResponse.stream_async` / `stream_text_async`.
+
+Projects with `effect = "effect"` use `@flick-lang/effect-ts` (see [Errors,
+services, resources and concurrency](../../spec/05-errors-and-concurrency/),
+[Compiler architecture](../../contributing/implementation-decisions/#compiler-architecture)).
+This adapter targets Effect `4.1.2` and preserves the contracts below.
 
 ## Effect release
 

@@ -29,7 +29,7 @@ let form =
       (Some form_type)
       (Http.ClientRequest.post "http://fake/f"))
 
-describe : Part ->{; MultipartError} String
+describe : Part ->{Async; MultipartError} String
 let describe part =
   match part with
   | Field f -> f.key ++ "=" ++ f.value
@@ -70,7 +70,7 @@ let files () = provide FileSystem.node {
   }
 }
 
-forms : Unit ->{; MultipartError} Unit
+forms : Unit ->{Async; MultipartError} Unit
 let forms () =
   Platform.stdout_line
     ("parts: "

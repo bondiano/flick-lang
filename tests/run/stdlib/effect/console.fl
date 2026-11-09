@@ -14,7 +14,7 @@ let levels = [
   LogLevel.Trace,
 ]
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Async; AppError} Unit
 let main () =
   Console.log "log"
   Console.info "info"

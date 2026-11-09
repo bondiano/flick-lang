@@ -1,6 +1,6 @@
 ---
 title: "Проект"
-source_hash: e869ee0235bd0e86
+source_hash: 04fcf8255a0ef18f
 ---
 
 Проект — каталог с `flick.toml` (см. [CLI компилятора](../cli/)).
@@ -58,7 +58,7 @@ max-params = 5
 | `build.solver-steps` | число шагов разрешения экземпляров классов для одного определения | `100000` |
 | `build.solver-depth` | глубина вложенности ограничений классов | `256` |
 | `build.labels` | что release-сборка помечает `Module.name` для инструментов отладки: `"all"` (атомы, представления, actions), `"components"` (представления и actions) или `"none"`; debug помечает всё; `flick build --labels` переопределяет | `"all"` |
-| `build.effect` | на чём выполняются эффекты: `"effect"`, `"rt"` на собственной среде Flick или `"none"` для простого JavaScript, который импортирует только `@flick-lang/runtime/core`: тогда `main` — `Unit -> Unit`, вызов времени выполнения — `FLICK-E001`, а `task`, уточнённый тип, схема или встроенный модуль вне `Prelude`, `List`, `Option`, `Result`, `String`, `Float` и `Bool` — `FLICK-E008`. Библиотека на Effect дополнительно пишет в `_core/` своего вывода модули, которым Effect не нужен; библиотека, от которой зависит проект, компилируется с `effect` проекта | `"effect"` |
+| `build.effect` | на чём выполняются эффекты: `"rt"` на собственной среде Flick, `"effect"` через адаптер Effect или `"none"` для простого JavaScript, который импортирует только `@flick-lang/runtime/core`: тогда `main` — `Unit -> Unit`, вызов времени выполнения — `FLICK-E001`, а `task`, уточнённый тип, схема или встроенный модуль вне `Prelude`, `List`, `Option`, `Result`, `String`, `Float` и `Bool` — `FLICK-E008`. Библиотека на Effect дополнительно пишет в `_core/` своего вывода модули, которым Effect не нужен; библиотека, от которой зависит проект, компилируется с `effect` проекта | `"rt"` |
 | `build.ui` | модуль, который рисует и монтирует представления вместо React: экспортирует все имена, которые `Ui` и `Action` берут из `@flick-lang/effect-ts/ui` и `@flick-lang/effect-ts/ui/react`; относительный путь — от корня проекта | React |
 | `sql.dialect` | диалект SQL для `sql table` и `sql { … }` (см. [запросы SQL](../sql/)): `"postgresql"`; `"mysql"`, `"sqlite"`, `"clickhouse"` и `"oracle"` распознаются, но пока не поддерживаются | `"postgresql"` |
 | `lint.allow` | коды предупреждений, о которых не сообщается, например `"FLICK-T021"`; ошибки отключить нельзя | `[]` |
@@ -69,7 +69,7 @@ max-params = 5
 | `lint.max-params` | сколько параметров может быть у функции, дальше — `FLICK-T039` | `5` |
 | `plugins.<пакет>` | к чему плагин зависимости может обращаться для блоков проекта: `fs-read` (пути от корня проекта), `net` (`host` или `host:port`) и `env` (имена); не в корне workspace (см. [Доступ вовне](../plugins/#доступ-вовне)) | ничего |
 
-`flick build --rt`, `flick run --rt` и `flick test --rt` выбирают собственную среду выполнения для одного вызова. Проект с `"rt"` требует `@flick-lang/runtime` и работает без установки Effect.
+`flick new` создаёт проект на RT с зависимостью от `@flick-lang/runtime` и без Effect. Параметр `--rt` у `flick build`, `flick run` и `flick test` также выбирает RT для одного вызова в старом проекте на Effect. Если проекту нужен адаптер Effect, явно задайте `effect = "effect"` и добавьте зависимость `@flick-lang/effect-ts`.
 
 Ошибки конфигурации приводят к завершению с кодом `2`:
 

@@ -18,6 +18,10 @@
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     },
+    "./bridge": {
+      "types": "./dist/bridge.d.ts",
+      "default": "./dist/bridge.js"
+    },
     "./runner/*": {
       "types": "./dist/runner/*.d.ts",
       "default": "./dist/runner/*.js"

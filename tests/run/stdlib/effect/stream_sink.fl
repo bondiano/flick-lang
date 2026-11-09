@@ -18,7 +18,7 @@ let failing = Stream.concat (Stream.fail (Boom 3)) (Stream.make [1, 2])
 pairs : Sink.Sink none none Float Float (List Float)
 let pairs = Sink.take 2
 
-summed : Sink.Sink none none Float Float Float
+summed : Sink.Sink {Async} none Float Float Float
 let summed = Sink.make (fun input -> Stream.run_sum input)
 
 tens : Channel.Channel none e (NonEmpty.NonEmpty Float) (NonEmpty.NonEmpty Float) Unit e Unit
@@ -32,7 +32,7 @@ let greeting =
       if text == "" then from_result (Err (Boom 0)) else text
     })
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Async; AppError} Unit
 let main () =
   line "run" [Stream.run summed nums]
   line "run take" (Stream.run pairs nums)

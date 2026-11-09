@@ -26,7 +26,7 @@ let reason failure =
 
 /// Text of a byte stream, as lines.
 text_lines :
-  (Stream none {PlatformError.PlatformError} (List Int))^c ->{; PlatformError.PlatformError}
+  (Stream {Async} {PlatformError.PlatformError} (List Int))^c ->{Async; PlatformError.PlatformError}
   List String
 let text_lines bytes = Stream.run_collect (Stream.split_lines (Stream.decode_text bytes))
 
