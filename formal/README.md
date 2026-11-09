@@ -42,8 +42,14 @@ in the `lean` job (`leanprover/lean-action` with `build-args: --wfail`).
   both `Typ` (captures, unchanged) and `TypLive`, with use-stage subtyping `LeLive`,
   region use in `Const.ty`, and bounds on the live rows of child work and finalizers.
   `LiveRules.lean` checks holding without use, scope discharge, qualifier-preserving
-  subtyping and owner bounds. Type soundness and T4′ for `TypLive`, and the translation
-  of signature elision, are not yet proved.
+  subtyping and owner bounds. The lemmas soundness rests on are proved for both instances:
+  values are pure and have canonical forms (`Canonical.lean`, `Shapes.lean`,
+  `CanonForms.lean`, `DictCanon.lean`, `Patterns.lean`), L3 holds for a frame and a
+  context (`FrameTy.lean`, `Context.lean`, `Lemma3.lean`), and progress
+  (`Progress.lean`, `ProgressMain.lean`) shows every closed term of either discipline to
+  be a value or one of the outcomes `NV`; typing by use adds only region atoms to a use
+  stage, so a frame still takes over the named effects of its hole. Preservation and T4′
+  for `TypLive`, and the translation of signature elision, are not yet proved.
 - **T5, the runtime contract** (`Formal/RT/`, `RT/T5.lean`): for any core and any
   interleaving, every reachable configuration of λRT satisfies R1–R4, R6 and R7, and R5 and
   R8 hold of the cause algebra, under the hypotheses on the libraries (`Hyp`) and `G11`.

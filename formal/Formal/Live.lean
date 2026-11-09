@@ -29,10 +29,13 @@ including a source scope that returns a closure holding its capability without u
 Control arms and their runtime frames add the handler's own region locally, so `resume`
 can use it without leaking that region into the handler's outer row.
 
-What remains is type soundness for `TypLive` and the invariant replacing `Nest.reach`:
-every region atom of a running stage is live, including the stages of child work and
-handler frames. Preservation of that invariant is where `T4'_live` must be proved.
-Neither the examples nor the existing captures proofs establish it. Translation of
+The lemmas type soundness rests on now hold for both instances: values are pure and
+have canonical forms, L3 types a frame and a context, and progress shows every closed term
+to be a value or one of the outcomes `NV` with its effect among the services of its
+stage. What remains is preservation for `TypLive` and the invariant replacing
+`Nest.reach`: every region atom of a running stage is live, including the stages of child
+work and handler frames. Preservation of that invariant is where `T4'_live` must be
+proved. Neither the examples nor the existing captures proofs establish it. Translation of
 live signature elision into the core judgment is a separate remaining obligation.
 
 T4.2 matters beyond safety: the runtime contract (`Formal/RT/`) takes only T4.3 (as `G11`),
