@@ -260,8 +260,12 @@ export class Registry {
     if (atom.refresh !== undefined) return atom.refresh(this);
     const node = this.node(atom);
     if (node.state !== VALID) return;
-    this.stale(node);
-    batch(() => this.propagate([node]));
+    let failed: { readonly error: unknown } | undefined;
+    try { this.stale(node); }
+    catch (error) { failed = { error }; }
+    try { batch(() => this.propagate([node])); }
+    catch (error) { failed ??= { error }; }
+    if (failed !== undefined) throw failed.error;
   }
 
   /** Calls `f` with the value of `atom` whenever it changes, at once too with `immediate`. */
@@ -273,8 +277,18 @@ export class Registry {
     const was = node.observed;
     node.listeners.add(listener);
     if (!was) observedBy(node, 1);
-    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- as above
-    if (immediate) f(value as A);
+    if (immediate) {
+      try {
+        // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the node of `atom` holds a value of its type
+        f(value as A);
+      }
+      catch (error) {
+        node.listeners.delete(listener);
+        if (!node.observed) observedBy(node, -1);
+        this.dropLater(node);
+        throw error;
+      }
+    }
     return () => {
       if (node.listeners.delete(listener) && !node.observed) observedBy(node, -1);
       this.dropLater(node);
@@ -337,10 +351,18 @@ export class Registry {
     const initialized = node.state !== UNINITIALIZED;
     node.value = value;
     node.state = VALID;
-    batch(() => {
-      if (node.listeners.size > 0) announced.add(node);
-      if (initialized) this.propagate(this.staleChildren(node));
-    });
+    let failed: { readonly error: unknown } | undefined;
+    try {
+      batch(() => {
+        if (node.listeners.size > 0) announced.add(node);
+        if (initialized) {
+          const stale = this.staleChildren(node, (error) => { failed ??= { error }; });
+          try { this.propagate(stale); }
+          catch (error) { failed ??= { error }; }
+        }
+      });
+    } catch (error) { failed ??= { error }; }
+    if (failed !== undefined) throw failed.error;
   }
 
   /** Computes `node`, whose dependents, if any, are stale already; its subscribers hear of a new value. */
@@ -378,11 +400,12 @@ export class Registry {
   }
 
   /** The dependents of `node` that held its value, now stale. */
-  private staleChildren(node: Node): Array<Node> {
+  private staleChildren(node: Node, onError: (error: unknown) => void): Array<Node> {
     const stale: Array<Node> = [];
     for (const child of Array.from(node.children)) {
       if (child.state !== VALID) continue;
-      this.stale(child);
+      try { this.stale(child); }
+      catch (error) { onError(error); }
       stale.push(child);
     }
     return stale;
@@ -408,7 +431,7 @@ export class Registry {
         }
         if (Object.is(before, node.value)) continue;
       }
-      for (const child of this.staleChildren(node)) queue.push(child);
+      for (const child of this.staleChildren(node, (error) => { failure ??= { error }; })) queue.push(child);
     }
     if (failure !== undefined) throw failure.error;
   }

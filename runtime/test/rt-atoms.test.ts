@@ -175,3 +175,47 @@ test("a throwing query invalidation still refreshes every registered query once"
   assert.throws(() => registry.invalidate(["a", "b", "a"]), /refresh failed/);
   assert.deepEqual(seen, ["first", "second"]);
 });
+
+test("a throwing finalizer does not prevent sibling atoms from updating", () => {
+  const registry = new Registry(currentCtx());
+  const source = state(0);
+  const cleaned: Array<string> = [];
+  const first = readable((reading) => {
+    const value = reading.get(source);
+    reading.addFinalizer(() => { cleaned.push("first"); if (value === 0) throw new Error("cleanup failed"); });
+    return value;
+  });
+  const second = readable((reading) => {
+    const value = reading.get(source);
+    reading.addFinalizer(() => { cleaned.push("second"); });
+    return value;
+  });
+  const seen: Array<string> = [];
+  registry.subscribe(first, (value) => seen.push(`first ${value}`));
+  registry.subscribe(second, (value) => seen.push(`second ${value}`));
+  assert.throws(() => registry.set(source, 1), /cleanup failed/);
+  assert.deepEqual(cleaned, ["first", "second"]);
+  assert.deepEqual(seen, ["first 1", "second 1"]);
+});
+
+test("refresh still recomputes an atom after its old finalizer throws", () => {
+  const registry = new Registry(currentCtx());
+  let reads = 0;
+  const atom = readable((reading) => {
+    reading.addFinalizer(() => { if (reads === 1) throw new Error("cleanup failed"); });
+    return ++reads;
+  });
+  const seen: Array<number> = [];
+  registry.subscribe(atom, (value) => seen.push(value));
+  assert.throws(() => registry.refresh(atom), /cleanup failed/);
+  assert.deepEqual(seen, [2]);
+});
+
+test("a failed immediate subscription leaves no active listener", () => {
+  const registry = new Registry(currentCtx());
+  const atom = state(0);
+  assert.throws(() => registry.subscribe(atom, () => { throw new Error("listener failed"); }, true), /listener failed/);
+  assert.equal(registry.node(atom).listeners.size, 0);
+  assert.equal(registry.node(atom).observed, false);
+  registry.set(atom, 1);
+});
