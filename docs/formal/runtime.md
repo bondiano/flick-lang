@@ -4,7 +4,7 @@ Extends `core.md` and `regions.md`: everything not redefined here holds as state
 
 References:
 
-- JS — `runtime/src/X.ts`;
+- Effect-backed JS — `packages/effect-ts/src/X.ts`; Flick-owned JS — `runtime/src/rt/X.ts`;
 - Go — `runtime-go/flickrt/X.go`;
 - Effect — `FX/…`, that is, `node_modules/.pnpm/effect@4.1.2/node_modules/effect/src/…`;
 - everything else — as in `core.md`.
@@ -322,11 +322,12 @@ In Effect a synchronous winner can win before the second branch starts; Go start
 
 ### 3.5 Layers and `provide`
 
-`provide L { e }` is a lexical owner (`reference/runtime.md` "Layers"). `Layer` is a library, not a form of the core: it lowers to `Layer.run L (fun () -> e)` (`core.md` §1.4), and this section is what that library does. A known layer of `Layer.succeed` and `Layer.merge` means a chain of handlers, the first binding of an effect the innermost (`chain`, `layer_typ`, `layer_answers` in `formal/Formal/RecordHandler.lean`); what a chain does not say, the build, its scope and the memo map, is below.
+`provide L { e }` is a lexical owner (`reference/runtime.md` "Layers"). `Layer` is a library, not a form of the core: it lowers to `Layer.run L (fun () -> e)` (`core.md` §1.4), and this section is what that library does. For a known layer of `Layer.succeed` and `Layer.merge`, the first binding of an effect is selected. `chain`, `layer_typ` and `layer_answers` in `formal/Formal/RecordHandler.lean` prove selection and typing through an abstract handler chain; they do not prove which evidence the selected record's functions see. Those functions run with the caller's evidence, as the model test `layer_service_uses_the_callers_provider` and `codegen/service_place` check. The build, its scope and the memo map are below.
 
 ```text
 (Provide)  provide L e in f  →  owner πₚ by (Scope);  m := fork(M_f) or a new map;
-           θ := build(m, πₚ, L);  with θ e inside πₚ;  closing πₚ — by §3.3
+           θ := build(m, πₚ, L);  with θ e inside πₚ;  calls to θ use the caller's evidence;
+           closing πₚ — by §3.3
 
 build(m, π, L) for a memoizable L (Layer.effect, sync, suspend, from_build_memo):
            L ∉ m:  m[L] := ⟨building, σ, n = 0⟩ with a new scope σ;  build L in σ;  m[L] := ⟨θ_L, σ, n⟩
@@ -536,9 +537,9 @@ Each law below names the cases that exercise it, under `tests/run/runtime/` unle
 | Law | Cases | Targets | Checked by |
 | - | - | - | - |
 | R1 | `scope_close`, `scope_releases`, `abort_closes_scopes`, `interrupt_in_finalizer`, `closed_owner` | both | trace, output |
-| R1, a discontinued body | `discontinued_body`, `discontinued_fiber` | Go; JS waits for `control` arms (`FLICK-P012`) | trace, output |
+| R1, a discontinued body | `discontinued_body`, `discontinued_fiber` | Go and `effect = "rt"`; JS on Effect waits for `control` arms (`FLICK-P012`) | trace, output |
 | R2 | `close_phases`, `scope_owners`, `closing_hooks`, `settling_calls`, `closing_child_fails`, `interrupt_in_finalizer`, `abort_stops_children` | both | trace, output. Group children are not traced: output only |
-| R2, a discontinued body | `discontinued_body`, `discontinued_fiber` | Go; JS waits | trace, output |
+| R2, a discontinued body | `discontinued_body`, `discontinued_fiber` | Go and `effect = "rt"`; JS on Effect waits | trace, output |
 | R3 | `parallel`, `close_phases`, `closing_hooks`, `abort_stops_children`; `discontinued_fiber` on Go | both | trace for children and watchers; output for group children and combinator branches, which are not traced |
 | R4 | `close_phases`, `closing_child_fails`, `supervisor_defect` (exit code), `cause_lists` (`parallel`) | both | trace for the call of the supervisor; output for the root seeing its failure and for `parallel` |
 | R5 | `cause_laws`, `cause_lists` | both | output (properties) |
@@ -547,7 +548,7 @@ Each law below names the cases that exercise it, under `tests/run/runtime/` unle
 | R8 | `cause_laws`, `cause_lists`, `closing_causes`; `cause_test.go` for (Seq=Par) | both | output |
 | C0 | `closed_owner` | both | trace (`refuse`, the phase), output |
 | C1 | `closing_hooks`; a hook added during C1 or C3: `group_in_closing` | both; `group_in_closing` passes on Go and is a [known gap on JS](#js-a-group-made-while-its-owner-closes-runs-nothing) | output: hooks are not traced, only the place of the phase |
-| C1, a failing hook; a hook added during C4 | not checked by a case: the hooks a Flick program adds (group stops, listener detaches) do not fail, and only a foreign callback can add one in C4. Unit tests: `runtime/test/scope.test.ts`, `owner_test.go` (a hook added during C4) | | not on a run of a program |
+| C1, a failing hook; a hook added during C4 | not checked by a case: the hooks a Flick program adds (group stops, listener detaches) do not fail, and only a foreign callback can add one in C4. Unit tests: `packages/effect-ts/test/scope.test.ts`, `owner_test.go` (a hook added during C4) | | not on a run of a program |
 | C2 | `closing_hooks`, `interrupt_in_finalizer` (closing asks every child before it waits for one), `closing_child_fails` | both | trace (`interrupt`, not projected), output |
 | C3 | `close_phases`, `closing_child_fails`, `supervisor_defect` | both | trace; the output of these cases can hold without the wait, so the monitor is what checks it |
 | C4 | `settling_calls`, `hung_io`, `scopes` | both | trace on JS, where every call is tracked (not projected), output. A call that starts another while settling is not checked |
@@ -557,6 +558,8 @@ Each law below names the cases that exercise it, under `tests/run/runtime/` unle
 The law (Unmask) of §3.2 has its own case, `interrupt_after_close`.
 
 `tests/run/known_gaps.txt` lists the cases a target does not pass yet, each with its reason. Their `.stdout` is what the contract asks for; the harness runs them and fails on one that passes, so a case joins its target as soon as the target holds the law.
+
+`tests/run/rt.txt` lists the cases that run on the runtime of `effect = "rt"`, which has no Effect under it, in both profiles and under the monitor (`just conformance-rt`); every other case runs there too, in debug, and one that passes is reported, so that it joins the list. Where it and Go legitimately differ: [the runtime of `effect = "rt"`](#the-runtime-of-effect--rt).
 
 A differential check: the cases of `tests/run/model.txt` also run on `flick-model`. Of this table it runs `abort_closes_scopes` and `discontinued_body`. It cannot run the others: it has no `parallel`, `Deferred`, `Effect.exit`, `Scope.add_finalizer_exit` or memo map of layers, and it runs children when a region closes, so nothing can wait for a child or a child be interrupted there. It rejects `scope_owners`, which acquires into an outer region from an inner one.
 
@@ -627,14 +630,14 @@ let main () =
 - Divergence: the program is accepted, and Node prints `primary: B b`, then `flipped: undefined`. An exhaustive `match` over `Errors {B}` received `A 1` and returned `undefined` as a `String`; the core's T1 and R5 are broken.
   - `Cause.map bang f` with `bang : Errors {B} -> Errors {B}` calls `bang` on `A 1`, and so do `Exit.map_error` and `Exit.map_both`.
   - On Go, `Failure.rethrow` and `Cause.from_reasons` are unavailable (`FLICK-P012`). But `Cause.map`, `Exit.map_error`, `Exit.map_both` and `Cause.reasons` exist and visit every `Fail` (`exit.go` `CauseMap`, `ExitMapError`, `CauseReasons`). There, `parallel` produces the cause `Fail B, Fail A` at type `{B}` once it keeps late failures ([`parallel` in Go](#go-parallel-keeps-only-the-first-failure)).
-- Cause: the bindings mirror Effect's `Cause.map` and `Cause.reasons`, which do not distinguish the head from secondary `Fail`s (`runtime/src/effect/Cause.ts:33-47`, `runtime/src/effect/Exit.ts`, Go `exit.go`). I_ε is broken.
+- Cause: the bindings mirror Effect's `Cause.map` and `Cause.reasons`, which do not distinguish the head from secondary `Fail`s (`packages/effect-ts/src/effect/Cause.ts:33-47`, `packages/effect-ts/src/effect/Exit.ts`, Go `exit.go`). I_ε is broken.
 - Resolution — the bindings, as spec/05 requires:
   - the function of `Cause.map`, `Exit.map_error`, `Exit.map_both` applies only to the head; secondary `Fail`s stay as they are;
   - `Cause.reasons` returns secondary `Fail`s as `Die`s with the same error: for the typed view they are defects. `from_reasons` over such a list rebuilds a cause in which recovery is blocked — conservative and safe.
 
   The cause itself does not change: `Failure.rethrow`, `inspect` and rendering see the original list.
 
-  Fixed in both runtimes (`effect/Cause.ts` `flickReasons`, `mapHead`; `effect/Exit.ts`; Go `mapErrors`, `CauseReasons`). Fixture: `cause_lists.fl` (`Cause.map`, `Exit.map_error` over `Fail B, Fail A`); tests: `runtime/test/cause.test.ts`, `cause_test.go` `TestTheTypedViewOfACauseSeesItsHeadOnly`.
+  Fixed in both runtimes (`effect/Cause.ts` `flickReasons`, `mapHead`; `effect/Exit.ts`; Go `mapErrors`, `CauseReasons`). Fixture: `cause_lists.fl` (`Cause.map`, `Exit.map_error` over `Fail B, Fail A`); tests: `packages/effect-ts/test/cause.test.ts`, `cause_test.go` `TestTheTypedViewOfACauseSeesItsHeadOnly`.
 
 ### Go: a finalizer added during closing runs at once
 
@@ -804,12 +807,12 @@ let tests = [
 ### JS: `fiberSpawn` is interruptible midway
 
 - Divergence (found by reading the code): `fiberSpawn` was not masked (`owner.ts:145-172`). Interrupting the calling fiber at a step boundary after `forkDetach` (154) left the child outside `children` and without a watcher: it outlived its owner and its failure was lost. Interrupting after `children.add` (155) but before the watcher was forked left the child without a supervisor. Breaks I3 and through it R3 and R4. In Go the whole registration is under `o.mu`.
-- Resolution — JS: the body of `fiberSpawn` runs under `Effect.uninterruptible`. Fixed; test: `runtime/test/spawn.test.ts` "an interrupted spawner…": the caller is interrupted at the moment of `children.add`, and without the mask the supervisor is not called.
+- Resolution — JS: the body of `fiberSpawn` runs under `Effect.uninterruptible`. Fixed; test: `packages/effect-ts/test/spawn.test.ts` "an interrupted spawner…": the caller is interrupted at the moment of `children.add`, and without the mask the supervisor is not called.
 
 ### JS: leases register their release outside the mask
 
 - Divergence (found by reading the code): `ScopedRef.set` (`effect/ScopedRef.ts:44-47`) first replaced `ref.current`, then called `retire` on the previous holder; between them was a step boundary where an interruption left the previous holder unreleased. `Resource` (`effect/Resource.ts:25-61`) and `ScopedCache` (`effect/ScopedCache.ts:13-21`) had the same order; an interruption pending at the exit of `acquireHolder` threw away an already acquired holder. Breaks R1. Go has none of these modules.
-- Resolution — JS: registering the holder, replacing the value and `retire` run under one mask, like `acquireRelease` in Effect (G7b). The acquisition itself stays interruptible: the caller's mask is passed into `acquireHolder` through `restore`, as in Effect's `ScopedRef.set`. Fixed. The window between returning the holder and `retire` contains no user code, and the test cannot reach it; `runtime/test/leases.test.ts` pins "exactly once" when `set` is interrupted during acquisition.
+- Resolution — JS: registering the holder, replacing the value and `retire` run under one mask, like `acquireRelease` in Effect (G7b). The acquisition itself stays interruptible: the caller's mask is passed into `acquireHolder` through `restore`, as in Effect's `ScopedRef.set`. Fixed. The window between returning the holder and `retire` contains no user code, and the test cannot reach it; `packages/effect-ts/test/leases.test.ts` pins "exactly once" when `set` is interrupted during acquisition.
 
 ### A `provide` service outlives the release of its layer
 
@@ -846,7 +849,7 @@ let main () =
 ### A closing hook added after C1 does not run
 
 - Divergence (found by reading the code): `close` walked `owner.closing` once (`owner.ts:58-61`). A hook added during C3 — for example, a supervisor creating a `FiberSet` in the region of the closing owner — was skipped. The group was then stopped by its own Effect finalizer in C5, by its place in the stack, as in the [Go group divergence](#go-a-fiber-group-is-stopped-by-a-finalizer). Breaks R2 in a rare case.
-- Resolution — JS and Go: after C3, run the hooks added since closing began and wait for them; no new children can enter `K` after C0 (I2). Fixed; tests: `runtime/test/scope.test.ts` "a closing hook a supervisor adds…", `owner_test.go` `TestAHookAddedWhileClosingRuns`.
+- Resolution — JS and Go: after C3, run the hooks added since closing began and wait for them; no new children can enter `K` after C0 (I2). Fixed; tests: `packages/effect-ts/test/scope.test.ts` "a closing hook a supervisor adds…", `owner_test.go` `TestAHookAddedWhileClosingRuns`.
 
 ### The refresh fiber of `resource_auto`
 
@@ -908,7 +911,7 @@ Found by the Lean development `formal/Formal/RT/`.
 
 - Divergence (found by reading the code and the model): JS and Go ran the hooks added since closing began after C3, and then only waited for foreign Promises (C4: `settle`, `owner.ts:100-101`; Go `closeWithCause`). A hook added to `H(π)` during C4 did not run: a group created at that time was stopped by its own Effect finalizer in C5, as in the [Go group divergence](#go-a-fiber-group-is-stopped-by-a-finalizer). The Lean proof of R2 and R3 depends on this point: (C5) must start with `H(π) = ∅`.
 - Reachability: only a fiber whose current owner is `π` can add a hook to `π` during C4. By I4 these are the body, children, watchers, group children and branches started in `π`, and by C4 they have finished. What remains is a violation of I4 (G6) and a foreign call that adds a hook when it settles: the tests of the fix do exactly this.
-- Resolution — JS and Go: after C4, run the hooks added since, and wait for foreign calls again; repeat while hooks are being added, and only then start C5. This matches the premise `H(π) = ∅` of `Step.fins` in the model. In Go the check "no hooks" and `finalizing := true` happen under one `o.mu`, so a hook added later runs at once. Fixed; tests: `runtime/test/scope.test.ts` "a closing hook added while foreign calls settle…", `owner_test.go` `TestAHookAddedWhileCallsSettleRuns`, both fail without the fix.
+- Resolution — JS and Go: after C4, run the hooks added since, and wait for foreign calls again; repeat while hooks are being added, and only then start C5. This matches the premise `H(π) = ∅` of `Step.fins` in the model. In Go the check "no hooks" and `finalizing := true` happen under one `o.mu`, so a hook added later runs at once. Fixed; tests: `packages/effect-ts/test/scope.test.ts` "a closing hook added while foreign calls settle…", `owner_test.go` `TestAHookAddedWhileCallsSettleRuns`, both fail without the fix.
 
 ### The provide-liveness premise is stronger than typing gives
 
@@ -928,6 +931,18 @@ Found by the Lean development of the core (`formal/Formal/`).
 
 - Divergence: a supervisor or a stopping group child makes a `FiberSet` in the region of the closing owner and runs a task in it. On Go the group is open until its hook runs (§3.6): the task runs and has stopped before the finalizers. On Node `inOwner` refuses any child of a closing owner (`stdlib/fibers.ts`): the fiber is interrupted and the task does not run. R2 and R3 hold on both, and so a hook added during C1 or C3 cannot be observed on Node from a program.
 - Resolution: recorded; §3.6 is the rule. Case: `tests/run/runtime/group_in_closing.fl`, listed in `tests/run/known_gaps.txt` for JS.
+
+### The runtime of `effect = "rt"`
+
+`runtime/src/rt/` is the same contract without Effect, on generators and a driver of its own. Where the runtimes differ it takes a side:
+
+- Interruption points: as JS, a boundary between two steps of the driver: a call, a suspension, a jump of a looping generator. A plain function is one step, so a stage that runs at once cannot be interrupted, and on this runtime that is every closed row of `tail` and `abort` effects, `->{}` included: `spin : Float ->{} Float` looping for ever blocks the thread, and `codegen/release`, which stops it with `timeout_option`, does not finish. Go interrupts it at `Check`. Recorded: a function that loops for ever and must stop has a row that says so, `Async`.
+- A wait that ends moves its fiber on at once, on the stack that ended it, and a fiber forked by `spawn` starts on a later turn of a queue on microtasks; branches of a combinator start at once on the stack. As Effect, so that the order of output agrees with JS on Effect. Go's order comes from goroutines and turns (`startup.go`).
+- Foreign calls enter `P` when they start, as JS; Go puts them there when they are interrupted.
+- Discontinuing a body throws the handler's signal into its frames, as Go panics with it, rather than `gen.return()`: every frame sees it as a failure, `Effect.ensuring` and scopes close by the same path, and the order of finalizers is Go's.
+- A group made while its owner closes: §3.6, as Go ([JS](#js-a-group-made-while-its-owner-closes-runs-nothing)). `group_in_closing` passes.
+- Time: a sleep, `timeout` and a schedule wait on the clock in the evidence, the host's or the virtual one of `Test.clock_test`. Moving a virtual clock wakes the sleepers due in order and waits, before the next, until what each wake scheduled has run, as Effect's `TestClock` does by its scheduler; Go waits until the fibers under the clock are parked.
+- A service a layer builds is a record whose operations run with the caller's evidence, as on Effect and Go. An explicit `provide S impl` remains a handler (§3.2), whose arms run with the handler's evidence. `codegen/service_place` prints `inner layer` on every target.
 
 ### Go: HTTP handlers
 

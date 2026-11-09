@@ -1,4 +1,4 @@
-import { Effect, acquireRelease } from "@flick-lang/runtime";
+import { Effect, acquireRelease } from "@flick-lang/effect-ts";
 
 const say = (text) => Effect.sync(() => void process.stdout.write(`${text}\n`));
 

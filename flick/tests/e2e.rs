@@ -25,6 +25,7 @@
 //! to what the JS debug run projects it to (`trace`).
 
 mod gaps;
+mod rt;
 mod times;
 mod trace;
 
@@ -83,6 +84,19 @@ impl Ran {
 
 /// Builds and runs one case, as JS, TypeScript or Go, in a profile.
 fn run_case(case: &Path, rel: &Path, out_dir: &Path, emit: &str, profile: &str) -> Ran {
+    run_case_with(case, rel, out_dir, emit, profile, &[], None)
+}
+
+/// [`run_case`], with `flags` for the build, and a program stopped after `limit`.
+fn run_case_with(
+    case: &Path,
+    rel: &Path,
+    out_dir: &Path,
+    emit: &str,
+    profile: &str,
+    flags: &[&str],
+    limit: Option<Duration>,
+) -> Ran {
     let _ = fs::remove_dir_all(out_dir);
     let started = Instant::now();
     let build = Command::new(env!("CARGO_BIN_EXE_flick"))
@@ -94,6 +108,7 @@ fn run_case(case: &Path, rel: &Path, out_dir: &Path, emit: &str, profile: &str) 
         .arg(emit)
         .arg("--profile")
         .arg(profile)
+        .args(flags)
         .output()
         .expect("flick runs");
     let build_time = started.elapsed();
@@ -118,10 +133,7 @@ fn run_case(case: &Path, rel: &Path, out_dir: &Path, emit: &str, profile: &str) 
         node
     };
     let started = Instant::now();
-    let output = command
-        .env("FLICK_TRACE", out_dir.join(trace::FILE))
-        .output()
-        .expect("the program runs: `node` (Node.js >= 24.18.0) is on PATH for JS");
+    let output = rt::output_within(command.env("FLICK_TRACE", out_dir.join(trace::FILE)), limit);
     let run_time = started.elapsed();
     let stderr = String::from_utf8_lossy(&output.stderr);
     let stderr_problem = match expected(case, "stderr.contains") {
@@ -170,8 +182,13 @@ fn run_case(case: &Path, rel: &Path, out_dir: &Path, emit: &str, profile: &str) 
 
 /// The cases of `tests/run/portable.txt`, by path without `.fl`.
 fn portable(root: &Path) -> Vec<String> {
+    listed_cases(root, "portable.txt")
+}
+
+/// The cases a list under `root` names, by path without `.fl`.
+fn listed_cases(root: &Path, list: &str) -> Vec<String> {
     let text =
-        fs::read_to_string(root.join("portable.txt")).expect("readable tests/run/portable.txt");
+        fs::read_to_string(root.join(list)).unwrap_or_else(|_| panic!("readable tests/run/{list}"));
     let cases: Vec<String> = text
         .lines()
         .map(|l| l.split('#').next().unwrap_or("").trim())
@@ -181,7 +198,7 @@ fn portable(root: &Path) -> Vec<String> {
     for case in &cases {
         assert!(
             root.join(format!("{case}.fl")).exists(),
-            "tests/run/portable.txt lists `{case}`, which is no case"
+            "tests/run/{list} lists `{case}`, which is no case"
         );
     }
     cases
@@ -287,21 +304,29 @@ fn assert_go() {
     );
 }
 
+fn installed_js_packages(repo: &Path, go_only: bool) {
+    assert!(
+        go_only || repo.join("node_modules/@flick-lang/runtime").exists(),
+        "runtime is not installed: run `pnpm install --frozen-lockfile` in the repository root"
+    );
+    assert!(
+        go_only || repo.join("node_modules/@flick-lang/effect-ts").exists(),
+        "Effect adapter is not installed: run `pnpm install --frozen-lockfile` in the repository root"
+    );
+}
+
 #[test]
 #[ignore = "needs Node and `pnpm install`; run `just e2e`"]
 fn run_cases() {
     let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
     let go_only = env::var_os("FLICK_E2E_GO_ONLY").is_some();
-    assert!(
-        go_only || repo.join("node_modules/@flick-lang/runtime").exists(),
-        "runtime is not installed: run `pnpm install --frozen-lockfile` in the repository root"
-    );
+    installed_js_packages(&repo, go_only);
     let root = repo.join("tests/run");
     let (paths, part) = selected(&root);
     let gaps = gaps::load(&root);
     let is_gap = |target: &str, case: &Path| gaps::listed(&gaps, target, &root, case);
 
-    // Under target/, so `@flick-lang/runtime` resolves from the repository root
+    // Under target/, so the runtime and Effect adapter resolve from the repository root
     // node_modules exactly as it would in a project.
     let out_root = Path::new(env!("CARGO_TARGET_TMPDIR")).join("e2e");
     let mut report = Vec::new();

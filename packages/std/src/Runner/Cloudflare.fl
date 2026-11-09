@@ -24,7 +24,7 @@ type alias Main = Fetch ->{Async, Env; AppError} ServerResponse
 
 /// The Worker's handler of `main`.
 run : Main -> Unknown
-foreign pure run from "@flick-lang/runtime/runner/cloudflare" "run"
+foreign pure run from "@flick-lang/effect-ts/runner/cloudflare" "run"
 
 /// The variable or secret `name`; `None` when there is none, or the binding
 /// is not text.
@@ -40,4 +40,4 @@ let binding name = Env.binding name
 /// its failure is reported on the console. It outlives the request, so it
 /// holds nothing of the request's scopes.
 wait_until : Context -> Eff none none Unit ->{} Unit
-foreign effect wait_until from "@flick-lang/runtime/runner/cloudflare" "waitUntil"
+foreign effect wait_until from "@flick-lang/effect-ts/runner/cloudflare" "waitUntil"

@@ -314,7 +314,7 @@ The finding: Flick data crossed the foreign boundary by reference.
   - Copied are the arguments (and `this`), the result (for `async` and `effect`, the success value), and the arguments and result of a callback.
   - The type decides what to copy: a position with a `List`, a tuple, a record, an ADT or a type variable (`types/ffi.rs` `holds_data`, the plan in `ForeignInfo.copies`).
   - Primitives, `JsValue`, opaque types and functions are passed as they are. A callback without data keeps its identity.
-  - The copy is made by the runtime's `copyData` (`runtime/src/core/data.ts`; on Effect, `runtime/src/data.ts`, with Effect's `Option` and `Result`). It copies arrays and plain objects all the way down and passes other objects as they are.
+  - The copy is made by the runtime's `copyData` (`runtime/src/core/data.ts`; on Effect, `packages/effect-ts/src/data.ts`, with Effect's `Option` and `Result`). It copies arrays and plain objects all the way down and passes other objects as they are.
   - The trusted boundary (the runtime) does not copy. For it this is hypothesis G1.
 - Test: `tests/run/ffi/copy.fl` prints `argument [3, 1, 2], result [1, 2, 3]`, `held result [1, 2]`, `record ann ["a"]`, `callback result [1, 2], JS saw 3`.
 

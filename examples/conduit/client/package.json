@@ -10,9 +10,9 @@
   },
   "dependencies": {
     "@flick-lang/runtime": "workspace:*",
-    "effect": "4.1.2",
     "react": "19.3.1",
-    "react-dom": "19.3.1"
+    "react-dom": "19.3.1",
+    "@flick-lang/effect-ts": "workspace:*"
   },
   "devDependencies": {
     "@flick-lang/astro": "workspace:*",

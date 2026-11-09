@@ -5,7 +5,7 @@
 // vendored RealWorld theme stays untouched in vendor/.
 import './theme.css';
 
-import { hotCarry, hotDispose, run } from "@flick-lang/runtime/runner/browser";
+import { hotCarry, hotDispose, run } from "@flick-lang/effect-ts/runner/browser";
 
 import { main } from "./Conduit/Client/Main.fl";
 

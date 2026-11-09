@@ -18,116 +18,116 @@ type ServerRequest
 
 /// The method.
 method : ServerRequest -> Http.Method.Method
-foreign pure method from "@flick-lang/runtime/effect/http/HttpServerRequest" "flickMethod"
+foreign pure method from "@flick-lang/effect-ts/effect/http/HttpServerRequest" "flickMethod"
   reviewed "effect@4.1.2 sha256:ae2238ba32848885"
 
 /// The URL as the request line gives it, a path with its query: `/a?x=1`.
 url : ServerRequest -> String
-foreign pure url from "@flick-lang/runtime/effect/http/HttpServerRequest" "flickUrl"
+foreign pure url from "@flick-lang/effect-ts/effect/http/HttpServerRequest" "flickUrl"
   reviewed "effect@4.1.2 sha256:ae2238ba32848885"
 
 /// The URL before a router took a prefix from it.
 original_url : ServerRequest -> String
-foreign pure original_url from "@flick-lang/runtime/effect/http/HttpServerRequest" "flickOriginalUrl"
+foreign pure original_url from "@flick-lang/effect-ts/effect/http/HttpServerRequest" "flickOriginalUrl"
   reviewed "effect@4.1.2 sha256:ae2238ba32848885"
 
 /// The headers.
 headers : ServerRequest -> Http.Headers.Headers
-foreign pure headers from "@flick-lang/runtime/effect/http/HttpServerRequest" "flickHeaders"
+foreign pure headers from "@flick-lang/effect-ts/effect/http/HttpServerRequest" "flickHeaders"
   reviewed "effect@4.1.2 sha256:ae2238ba32848885"
 
 /// The address of the client, if the platform knows it.
 remote_address : ServerRequest -> Option String
-foreign pure remote_address from "@flick-lang/runtime/effect/http/HttpServerRequest" "flickRemoteAddress"
+foreign pure remote_address from "@flick-lang/effect-ts/effect/http/HttpServerRequest" "flickRemoteAddress"
   reviewed "effect@4.1.2 sha256:ae2238ba32848885"
 
 /// The cookies of the `Cookie` header.
 cookies : ServerRequest ->{} List (String, Redacted String)
-foreign cookies from "@flick-lang/runtime/effect/http/HttpServerRequest" "flickCookies"
+foreign cookies from "@flick-lang/effect-ts/effect/http/HttpServerRequest" "flickCookies"
   reviewed "effect@4.1.2 sha256:ae2238ba32848885"
 
 /// The parameters of the URL's query.
 search_params : ServerRequest -> Http.UrlParams.UrlParams
-foreign pure search_params from "@flick-lang/runtime/effect/http/HttpServerRequest" "flickSearchParams"
+foreign pure search_params from "@flick-lang/effect-ts/effect/http/HttpServerRequest" "flickSearchParams"
   reviewed "effect@4.1.2 sha256:082d413ecf6a2bc9"
 
 /// Each key of the URL's query with all its values.
 search_params_from_url : Http.Url.Url -> List (String, List String)
-foreign pure search_params_from_url from "@flick-lang/runtime/effect/http/HttpServerRequest" "flickSearchParamsFromUrl"
+foreign pure search_params_from_url from "@flick-lang/effect-ts/effect/http/HttpServerRequest" "flickSearchParamsFromUrl"
   reviewed "effect@4.1.2 sha256:79bf66712c3fcb76"
 
 /// The body as text.
 text : ServerRequest ->{Async; HttpServerError} String
-foreign effect text from "@flick-lang/runtime/effect/http/HttpServerRequest" "flickText"
+foreign effect text from "@flick-lang/effect-ts/effect/http/HttpServerRequest" "flickText"
   reviewed "effect@4.1.2 sha256:ae2238ba32848885"
 
 /// The body as JSON.
 json : ServerRequest ->{Async; HttpServerError} Json
-foreign effect json from "@flick-lang/runtime/effect/http/HttpServerRequest" "flickJson"
+foreign effect json from "@flick-lang/effect-ts/effect/http/HttpServerRequest" "flickJson"
   reviewed "effect@4.1.2 sha256:ae2238ba32848885"
 
 /// The body as URL parameters (`application/x-www-form-urlencoded`).
 url_params_body : ServerRequest ->{Async; HttpServerError} Http.UrlParams.UrlParams
-foreign effect url_params_body from "@flick-lang/runtime/effect/http/HttpServerRequest" "flickUrlParamsBody"
+foreign effect url_params_body from "@flick-lang/effect-ts/effect/http/HttpServerRequest" "flickUrlParamsBody"
   reviewed "effect@4.1.2 sha256:ae2238ba32848885"
 
 /// The bytes of the body.
 bytes : ServerRequest ->{Async; HttpServerError} List Int
-foreign effect bytes from "@flick-lang/runtime/effect/http/HttpServerRequest" "flickBytes"
+foreign effect bytes from "@flick-lang/effect-ts/effect/http/HttpServerRequest" "flickBytes"
   reviewed "effect@4.1.2 sha256:ae2238ba32848885"
 
 /// Runs `task` with the largest body a request may have.
 with_max_body_size : ByteSize.ByteSize -> (Eff r e a)^c ->{r; e} a
-foreign effect with_max_body_size from "@flick-lang/runtime/effect/http/HttpServerRequest" "flickWithMaxBodySize"
+foreign effect with_max_body_size from "@flick-lang/effect-ts/effect/http/HttpServerRequest" "flickWithMaxBodySize"
   arity 2
   retention call
   reviewed "effect@4.1.2 sha256:4d3ea3389a8732a7"
 
 /// The request a client would send: method, URL, headers and body.
 to_client_request : ServerRequest -> Http.ClientRequest.ClientRequest
-foreign pure to_client_request from "@flick-lang/runtime/effect/http/HttpServerRequest" "toClientRequest"
+foreign pure to_client_request from "@flick-lang/effect-ts/effect/http/HttpServerRequest" "toClientRequest"
   arity 1
   reviewed "effect@4.1.2 sha256:2a98ea443bfad380"
 
 /// The request a server would get from the client request: a test input.
 from_client_request : Http.ClientRequest.ClientRequest -> ServerRequest
-foreign pure from_client_request from "@flick-lang/runtime/effect/http/HttpServerRequest" "fromClientRequest"
+foreign pure from_client_request from "@flick-lang/effect-ts/effect/http/HttpServerRequest" "fromClientRequest"
   arity 1
   reviewed "effect@4.1.2 sha256:7ca1400e95ad2a58"
 
 /// The full URL of the request, from its `Host` header.
 to_url : ServerRequest -> Option Http.Url.Url
-foreign pure to_url from "@flick-lang/runtime/effect/http/HttpServerRequest" "toURL"
+foreign pure to_url from "@flick-lang/effect-ts/effect/http/HttpServerRequest" "toURL"
   arity 1
   reviewed "effect@4.1.2 sha256:1c247cfe905e1765"
 
 /// Decodes the cookies, an object of names and values.
 schema_cookies : Codec rd re Json a -> ServerRequest ->{rd; SchemaError} a
-foreign effect schema_cookies from "@flick-lang/runtime/effect/http/HttpServerRequest" "flickSchemaCookies"
+foreign effect schema_cookies from "@flick-lang/effect-ts/effect/http/HttpServerRequest" "flickSchemaCookies"
   arity 2
   reviewed "effect@4.1.2 sha256:0f82dce26a36f662"
 
 /// Decodes the headers.
 schema_headers : Codec rd re Json a -> ServerRequest ->{rd; SchemaError} a
-foreign effect schema_headers from "@flick-lang/runtime/effect/http/HttpServerRequest" "flickSchemaHeaders"
+foreign effect schema_headers from "@flick-lang/effect-ts/effect/http/HttpServerRequest" "flickSchemaHeaders"
   arity 2
   reviewed "effect@4.1.2 sha256:d181dbbc5534e8a9"
 
 /// Decodes the query parameters.
 schema_search_params : Codec rd re Json a -> ServerRequest ->{rd; SchemaError} a
-foreign effect schema_search_params from "@flick-lang/runtime/effect/http/HttpServerRequest" "flickSchemaSearchParams"
+foreign effect schema_search_params from "@flick-lang/effect-ts/effect/http/HttpServerRequest" "flickSchemaSearchParams"
   arity 2
   reviewed "effect@4.1.2 sha256:75bb818582cdba6e"
 
 /// Decodes the JSON body.
 schema_body_json : Codec rd re Json a -> ServerRequest ->{rd; HttpServerError, SchemaError} a
-foreign effect schema_body_json from "@flick-lang/runtime/effect/http/HttpServerRequest" "flickSchemaBodyJson"
+foreign effect schema_body_json from "@flick-lang/effect-ts/effect/http/HttpServerRequest" "flickSchemaBodyJson"
   arity 2
   reviewed "effect@4.1.2 sha256:7a0b6e05a79d2abb"
 
 /// Decodes the URL parameters of the body.
 schema_body_url_params : Codec rd re Json a -> ServerRequest ->{rd; HttpServerError, SchemaError} a
-foreign effect schema_body_url_params from "@flick-lang/runtime/effect/http/HttpServerRequest" "flickSchemaBodyUrlParams"
+foreign effect schema_body_url_params from "@flick-lang/effect-ts/effect/http/HttpServerRequest" "flickSchemaBodyUrlParams"
   arity 2
   reviewed "effect@4.1.2 sha256:181408c3b4093545"
 

@@ -1,17 +1,17 @@
 // Writes runtime-go/flickrt/testdata/cli_parity.txt: what Effect's CLI
 // prints and fails with for a corpus of command lines, run through Flick's
-// own adapter (runtime/src/cli) on the command that cliParityCommand
+// own adapter (packages/effect-ts/src/cli) on the command that cliParityCommand
 // (cli_parity_test.go) mirrors. Run from the repository root after moving
 // the Effect pin: `node tools/go-cli/parity.mjs`.
 import { writeFileSync } from "node:fs";
 
 process.env.NO_COLOR = "1";
-const src = new URL("../../runtime/src/cli/", import.meta.url);
+const src = new URL("../../packages/effect-ts/src/cli/", import.meta.url);
 const { cliRunVersion, cliHelpDoc } = await import(new URL("run.ts", src).href);
 const { cliDefaultFormatter } = await import(new URL("output.ts", src).href);
 const S = await import(new URL("spec.ts", src).href);
-const { Console, Effect, Exit, Option, Result } = await import("../../runtime/node_modules/effect/dist/index.js");
-const TestConsole = await import("../../runtime/node_modules/effect/dist/testing/TestConsole.js");
+const { Console, Effect, Exit, Option, Result } = await import("../../packages/effect-ts/node_modules/effect/dist/index.js");
+const TestConsole = await import("../../packages/effect-ts/node_modules/effect/dist/testing/TestConsole.js");
 
 const text = { parse: (t) => Effect.succeed(Result.succeed(t)) };
 const int = { parse: (t) => Effect.succeed(/^-?\d+$/.test(t) ? Result.succeed(t) : Result.fail(`not an Int: ${t}`)) };

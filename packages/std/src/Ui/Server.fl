@@ -11,7 +11,7 @@ import Stream.Core exposing (Stream)
 /// rendered at once do not see each other's atoms, and nothing reads that
 /// registry once its `provide` ends. Handlers do not run here.
 render : Ui^c ->{Async, Atom.Registry; none} String
-foreign effect render from "@flick-lang/runtime/ui/server" "uiServerRender"
+foreign effect render from "@flick-lang/effect-ts/ui/server" "uiServerRender"
   retention call
 
 /// The serializable atoms of the registry as a JSON
@@ -21,7 +21,7 @@ foreign effect render from "@flick-lang/runtime/ui/server" "uiServerRender"
 /// so the client starts from the server's values. An atom whose value its
 /// codec does not encode is a defect naming its key.
 state : String ->{Atom.Registry; none} String
-foreign effect state from "@flick-lang/runtime/ui/server" "uiServerState"
+foreign effect state from "@flick-lang/effect-ts/ui/server" "uiServerState"
   arity 1
 
 /// The container `<div id="container" data-flick-ssr>` with the markup of
@@ -34,7 +34,7 @@ foreign effect state from "@flick-lang/runtime/ui/server" "uiServerState"
 /// markup from the server's values. Run it inside the `provide` of the
 /// request's registry.
 stream : String -> Ui -> Stream {Atom.Registry} none String
-foreign pure stream from "@flick-lang/runtime/ui/server" "uiServerStream"
+foreign pure stream from "@flick-lang/effect-ts/ui/server" "uiServerStream"
   arity 2
 
 /// The HTML of `ui`, without React: a template for mail or any markup no
@@ -44,4 +44,4 @@ foreign pure stream from "@flick-lang/runtime/ui/server" "uiServerStream"
 /// are left out, and a foreign component, which only React renders, is a
 /// defect.
 to_html : Ui -> String
-foreign pure to_html from "@flick-lang/runtime/ui/html" "uiToHtml"
+foreign pure to_html from "@flick-lang/effect-ts/ui/html" "uiToHtml"

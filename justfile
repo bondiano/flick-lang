@@ -69,6 +69,7 @@ e2e-prepare:
     cargo build -p flick --profile e2e
     pnpm install --frozen-lockfile
     pnpm -C runtime build
+    pnpm -C packages/effect-ts build
     FLICK_BIN={{flick}} pnpm -C tools/dts-importer build
 
 # The JS packages, with the playground's compiler: typecheck, lint, tests, and
@@ -96,13 +97,17 @@ e2e-cases shard="": e2e-prepare
     FLICK_E2E_SHARD={{shard}} cargo nextest run --cargo-profile e2e --profile ci --run-ignored only -p flick --test e2e -E 'test(=run_cases)'
 
 # The language tests of tests/language on Node and as a Go executable, with
-# one seed: both must pass and write the same report
+# one seed: both must pass and write the same report; on Flick's own runtime
+# too, but for the tests tests/language/rt-gaps.txt lists
 language seed="42":
     cargo build -p flick --profile e2e
+    pnpm -C runtime build
+    pnpm -C packages/effect-ts build
     cd tests/language && {{flick}} test --emit js --seed {{seed}} --reporter json > ../../target/language-js.txt || { cat ../../target/language-js.txt; exit 1; }
     cd tests/language && {{flick}} test --emit go --seed {{seed}} --reporter json > ../../target/language-go.txt || { cat ../../target/language-go.txt; exit 1; }
     diff -u target/language-js.txt target/language-go.txt
     cat target/language-go.txt
+    node tools/language-rt/index.mjs {{flick}} {{seed}} target/language-js.txt
 
 # Bundle the tracked programs (release) with rolldown and hold them to their gzip budgets
 bundle-size:
@@ -187,6 +192,10 @@ stress runs="20" +prefixes="runtime/":
 conformance: e2e-prepare
     FLICK_E2E_ONLY=tests/run/runtime/,effect/shared_layer_merged cargo test --profile e2e -p flick --test e2e -- --ignored run_cases
     FLICK_MODEL_ONLY=runtime/ cargo test --profile e2e -p flick-model --test run -- --include-ignored model_prints
+
+# The cases of tests/run/rt.txt on Flick's own runtime, in both profiles
+conformance-rt: e2e-prepare
+    cargo test --profile e2e -p flick --test e2e -- --ignored rt_cases
 
 # Run SQL queries against PostgreSQL in Docker
 e2e-postgres: e2e-prepare

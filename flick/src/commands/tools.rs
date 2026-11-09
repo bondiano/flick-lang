@@ -12,7 +12,7 @@ use crate::args::{ExplainArguments, GlobalArguments};
 use crate::command::Outcome;
 use crate::sources::FsHost;
 use crate::stdlib;
-use crate::toolchain::{self, COMPILER, EFFECT, NODE, PNPM, RUNTIME};
+use crate::toolchain::{self, COMPILER, EFFECT, EFFECT_TS, NODE, PNPM, RUNTIME};
 
 pub fn explain(options: &ExplainArguments) -> Outcome {
     if let Some((package, code)) = options.code.trim().split_once('/') {
@@ -209,10 +209,12 @@ pub fn doctor(global: &GlobalArguments) -> Outcome {
 fn installed(root: Option<&Path>, line: &mut impl FnMut(Option<bool>, &str, String)) {
     match root {
         Some(root) => {
-            for (package, wanted) in [("@flick-lang/runtime", RUNTIME), ("effect", EFFECT)] {
-                let base = root.join("node_modules/@flick-lang/runtime");
-                let found = toolchain::installed(root, package)
-                    .or_else(|| toolchain::installed(&base, package));
+            for (package, wanted) in [
+                ("@flick-lang/runtime", RUNTIME),
+                ("@flick-lang/effect-ts", EFFECT_TS),
+                ("effect", EFFECT),
+            ] {
+                let found = toolchain::resolved(root, package);
                 match found {
                     Some(v) => line(Some(v == wanted), package, format!("{v} (needs {wanted})")),
                     None => line(
@@ -227,7 +229,7 @@ fn installed(root: Option<&Path>, line: &mut impl FnMut(Option<bool>, &str, Stri
                 ("react", "React adapter of `Ui.Dom.mount`"),
             ] {
                 let found = toolchain::installed(root, package).or_else(|| {
-                    toolchain::installed(&root.join("node_modules/@flick-lang/runtime"), package)
+                    toolchain::installed(&root.join("node_modules/@flick-lang/effect-ts"), package)
                 });
                 line(
                     None,

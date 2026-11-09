@@ -3,20 +3,20 @@
 module Platform exposing (stdout_line, stderr_line, stdout_write, args, env)
 
 stdout_line : String ->{} Unit
-foreign stdout_line from "@flick-lang/runtime" "stdoutLine"
+foreign stdout_line from "@flick-lang/effect-ts" "stdoutLine"
 
 stderr_line : String ->{} Unit
-foreign stderr_line from "@flick-lang/runtime" "stderrLine"
+foreign stderr_line from "@flick-lang/effect-ts" "stderrLine"
 
 /// Writes `text` to stdout without a line break.
 stdout_write : String ->{} Unit
-foreign stdout_write from "@flick-lang/runtime" "stdoutWrite"
+foreign stdout_write from "@flick-lang/effect-ts" "stdoutWrite"
 
 /// The arguments after `--` of `flick run`, or after the script name.
 args : Unit ->{} List String
-foreign args from "@flick-lang/runtime" "platformArgs"
+foreign args from "@flick-lang/effect-ts" "platformArgs"
   arity 0
 
 /// The environment variable `name`, if set.
 env : String ->{} Option String
-foreign env from "@flick-lang/runtime" "platformEnv"
+foreign env from "@flick-lang/effect-ts" "platformEnv"

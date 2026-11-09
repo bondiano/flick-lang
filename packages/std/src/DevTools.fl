@@ -7,7 +7,7 @@ module DevTools exposing (..)
 /// Spans sent to the DevTools at `url`; Effect's default is
 /// `ws://localhost:34437`.
 layer : String -> Layer none none none
-foreign pure layer from "@flick-lang/runtime/effect/devtools/DevTools" "devToolsLayer"
+foreign pure layer from "@flick-lang/effect-ts/effect/devtools/DevTools" "devToolsLayer"
   reviewed "effect@4.1.2 sha256:8efdbda563d781dc"
 
 /// Where the DevTools listen, and the headers of the WebSocket's handshake:
@@ -17,5 +17,5 @@ type alias Options = { url : String; headers : List (String, String) }
 /// `layer` with handshake headers, which only Node's WebSocket sends.
 /// Node only.
 layer_with : Options -> Layer none none none
-foreign pure layer_with from "@flick-lang/runtime/effect/devtools/DevToolsNode" "devToolsLayerWith"
+foreign pure layer_with from "@flick-lang/effect-ts/effect/devtools/DevToolsNode" "devToolsLayerWith"
   reviewed "effect@4.1.2 sha256:4d3f3adcabe3da54"

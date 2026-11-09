@@ -3,7 +3,7 @@ use std::fmt::Write;
 use crate::iface::Interface;
 use crate::source::SourceMap;
 use crate::types::display::show_type_qualified;
-use crate::types::{self, show_signature, show_type};
+use crate::types::{self, Watched, show_signature, show_type};
 use crate::{resolve, syntax};
 
 use super::{row_atoms, short_form};
@@ -37,6 +37,8 @@ fn probe(text: &str) -> Interface {
         no_let_assert: false,
         thresholds: types::Thresholds::default(),
         effects: true,
+        watched: Watched::none(),
+        stages_by_class: false,
     };
     types::check(
         &module,

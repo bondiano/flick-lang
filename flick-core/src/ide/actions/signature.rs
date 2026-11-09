@@ -5,7 +5,7 @@ use super::{Action, edit, indent_at, line_start};
 use crate::source::FileId;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
-use crate::types::{Kind, Type, show_signature, without_value_captures};
+use crate::types::{Kind, Type, Watched, show_signature, without_value_captures};
 use crate::{diagnostics::Severity, resolve, syntax, types};
 
 impl Ide<'_> {
@@ -167,6 +167,8 @@ impl Ide<'_> {
             no_let_assert: false,
             thresholds: types::Thresholds::default(),
             effects: true,
+            watched: Watched::none(),
+            stages_by_class: false,
         };
         !types::check(
             &module,

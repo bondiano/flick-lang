@@ -15,115 +15,115 @@ type alias Bounds = { capacity : Int; replay : Option Int }
 
 /// A hub whose `publish` waits while it is full.
 bounded : Bounds ->{} PubSub a
-foreign effect bounded from "@flick-lang/runtime/effect/PubSub" "flickBounded"
+foreign effect bounded from "@flick-lang/effect-ts/effect/PubSub" "flickBounded"
   reviewed "effect@4.1.2 sha256:2270e96f7b11a4bb"
 
 /// A hub that drops new messages while it is full.
 dropping : Bounds ->{} PubSub a
-foreign effect dropping from "@flick-lang/runtime/effect/PubSub" "flickDropping"
+foreign effect dropping from "@flick-lang/effect-ts/effect/PubSub" "flickDropping"
   reviewed "effect@4.1.2 sha256:aa8e20629713752c"
 
 /// A hub that drops the oldest message to make room.
 sliding : Bounds ->{} PubSub a
-foreign effect sliding from "@flick-lang/runtime/effect/PubSub" "flickSliding"
+foreign effect sliding from "@flick-lang/effect-ts/effect/PubSub" "flickSliding"
   reviewed "effect@4.1.2 sha256:fd034db1143e8b9b"
 
 /// A hub without a bound, replaying the last `replay` messages to a new
 /// subscriber.
 unbounded : { replay : Option Int } ->{} PubSub a
-foreign effect unbounded from "@flick-lang/runtime/effect/PubSub" "flickUnbounded"
+foreign effect unbounded from "@flick-lang/effect-ts/effect/PubSub" "flickUnbounded"
   reviewed "effect@4.1.2 sha256:398cb9c12c4ab36a"
 
 /// The capacity of the hub.
 capacity : PubSub a -> Int
-foreign pure capacity from "@flick-lang/runtime/effect/PubSub" "capacity"
+foreign pure capacity from "@flick-lang/effect-ts/effect/PubSub" "capacity"
   reviewed "effect@4.1.2 sha256:6136c6828646c64a"
 
 /// The number of messages not yet taken by every subscriber.
 size : PubSub a ->{} Int
-foreign effect size from "@flick-lang/runtime/effect/PubSub" "size"
+foreign effect size from "@flick-lang/effect-ts/effect/PubSub" "size"
   reviewed "effect@4.1.2 sha256:529827bbc5a2cc78"
 
 /// Whether the hub is at its capacity.
 is_full : PubSub a ->{} Bool
-foreign effect is_full from "@flick-lang/runtime/effect/PubSub" "isFull"
+foreign effect is_full from "@flick-lang/effect-ts/effect/PubSub" "isFull"
   reviewed "effect@4.1.2 sha256:bedcbe60d2d021fa"
 
 /// Whether the hub holds no messages.
 is_empty : PubSub a ->{} Bool
-foreign effect is_empty from "@flick-lang/runtime/effect/PubSub" "isEmpty"
+foreign effect is_empty from "@flick-lang/effect-ts/effect/PubSub" "isEmpty"
   reviewed "effect@4.1.2 sha256:1602fa160978ac0f"
 
 /// Shuts the hub down: publishing stops and waiting subscribers are
 /// interrupted.
 shutdown : PubSub a ->{} Unit
-foreign effect shutdown from "@flick-lang/runtime/effect/PubSub" "shutdown"
+foreign effect shutdown from "@flick-lang/effect-ts/effect/PubSub" "shutdown"
   reviewed "effect@4.1.2 sha256:43965823d0da96bb"
 
 /// Ends the hub with the final message `value`: later publishes are
 /// refused, and every subscriber, also a later one, gets `value` after what
 /// is buffered. Whether this call ended the hub.
 end : a -> PubSub a ->{} Bool
-foreign effect end from "@flick-lang/runtime/effect/PubSub" "end"
+foreign effect end from "@flick-lang/effect-ts/effect/PubSub" "end"
   arity 1
   reviewed "effect@4.1.2 sha256:029fa2873cd94249"
 
 /// Whether the hub was shut down.
 is_shutdown : PubSub a ->{} Bool
-foreign effect is_shutdown from "@flick-lang/runtime/effect/PubSub" "isShutdown"
+foreign effect is_shutdown from "@flick-lang/effect-ts/effect/PubSub" "isShutdown"
   reviewed "effect@4.1.2 sha256:e5bad457b64bebd8"
 
 /// Waits until the hub is shut down.
 await_shutdown : PubSub a ->{Async;} Unit
-foreign effect await_shutdown from "@flick-lang/runtime/effect/PubSub" "awaitShutdown"
+foreign effect await_shutdown from "@flick-lang/effect-ts/effect/PubSub" "awaitShutdown"
   reviewed "effect@4.1.2 sha256:b4af5bedd7466ab2"
 
 /// Publishes `value` to every subscriber; whether it was published.
 publish : a -> PubSub a ->{Async;} Bool
-foreign effect publish from "@flick-lang/runtime/effect/PubSub" "publish"
+foreign effect publish from "@flick-lang/effect-ts/effect/PubSub" "publish"
   arity 1
   reviewed "effect@4.1.2 sha256:0f955147beac43fd"
 
 /// Publishes the messages in order; whether all were published.
 publish_all : List a -> PubSub a ->{Async;} Bool
-foreign effect publish_all from "@flick-lang/runtime/effect/PubSub" "publishAll"
+foreign effect publish_all from "@flick-lang/effect-ts/effect/PubSub" "publishAll"
   arity 1
   reviewed "effect@4.1.2 sha256:ba920c3bff229b0f"
 
 /// Subscribes in the innermost `scope` (or the one of region `s`), which
 /// unsubscribes when it closes.
 subscribe : PubSub a ->{Scope s;} Subscription s a
-foreign effect subscribe from "@flick-lang/runtime/effect/PubSub" "subscribe"
+foreign effect subscribe from "@flick-lang/effect-ts/effect/PubSub" "subscribe"
   reviewed "effect@4.1.2 sha256:56c65ae30ac7d9eb"
 
 /// The next message, waiting for one.
 take : Subscription s a ->{} a
-foreign effect take from "@flick-lang/runtime/effect/PubSub" "take"
+foreign effect take from "@flick-lang/effect-ts/effect/PubSub" "take"
   retention call
   reviewed "effect@4.1.2 sha256:36e5e47294d9fdd7"
 
 /// Every message there is, waiting for at least one.
 take_all : Subscription s a ->{} NonEmpty.NonEmpty a
-foreign effect take_all from "@flick-lang/runtime/effect/PubSub" "takeAll"
+foreign effect take_all from "@flick-lang/effect-ts/effect/PubSub" "takeAll"
   retention call
   reviewed "effect@4.1.2 sha256:c7dc5dc478fced97"
 
 /// At most `max` of the messages there are, without waiting.
 take_up_to : Int -> Subscription s a ->{} List a
-foreign effect take_up_to from "@flick-lang/runtime/effect/PubSub" "takeUpTo"
+foreign effect take_up_to from "@flick-lang/effect-ts/effect/PubSub" "takeUpTo"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:f29fc6302c5293f5"
 
 /// At least `min` and at most `max` messages, waiting for `min`.
 take_between : Int -> Int -> Subscription s a ->{} List a
-foreign effect take_between from "@flick-lang/runtime/effect/PubSub" "takeBetween"
+foreign effect take_between from "@flick-lang/effect-ts/effect/PubSub" "takeBetween"
   arity 2
   retention call
   reviewed "effect@4.1.2 sha256:42d1896fef0497f1"
 
 /// The number of messages waiting for the subscriber.
 remaining : Subscription s a ->{} Int
-foreign effect remaining from "@flick-lang/runtime/effect/PubSub" "remaining"
+foreign effect remaining from "@flick-lang/effect-ts/effect/PubSub" "remaining"
   retention call
   reviewed "effect@4.1.2 sha256:ce959e5af55fbdb8"

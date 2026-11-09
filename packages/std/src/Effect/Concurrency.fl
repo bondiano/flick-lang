@@ -7,71 +7,71 @@ import ExecutionPlan
 
 /// Interrupts the current fiber.
 interrupt : Unit ->{} a
-foreign effect interrupt from "@flick-lang/runtime/effect/Effect" "flickInterrupt"
+foreign effect interrupt from "@flick-lang/effect-ts/effect/Effect" "flickInterrupt"
   arity 0
   reviewed "effect@4.1.2 sha256:12bc7cd9a744efae"
 
 /// Runs `task` so that it may be interrupted, inside an uninterruptible
 /// region too.
 interruptible : (Eff r e a)^c ->{r; e} a
-foreign effect interruptible from "@flick-lang/runtime/effect/Effect" "interruptible"
+foreign effect interruptible from "@flick-lang/effect-ts/effect/Effect" "interruptible"
   retention call
   reviewed "effect@4.1.2 sha256:4d916d6b131c524b"
 
 /// Runs `task` to its end even if the fiber is interrupted meanwhile.
 uninterruptible : (Eff r e a)^c ->{r; e} a
-foreign effect uninterruptible from "@flick-lang/runtime/effect/Effect" "uninterruptible"
+foreign effect uninterruptible from "@flick-lang/effect-ts/effect/Effect" "uninterruptible"
   retention call
   reviewed "effect@4.1.2 sha256:cd976ea71c1d1669"
 
 /// Runs `f` uninterruptibly; `restore` makes a task inside it as
 /// interruptible as outside.
 uninterruptible_mask : ((Eff r2 e2 b -> Eff r2 e2 b) ->{r; e} a)^c ->{r; e} a
-foreign effect uninterruptible_mask from "@flick-lang/runtime/effect/Effect" "uninterruptibleMask"
+foreign effect uninterruptible_mask from "@flick-lang/effect-ts/effect/Effect" "uninterruptibleMask"
   retention call
   reviewed "effect@4.1.2 sha256:8bf58de1eb291c3a"
 
 /// Runs `f` interruptibly; `restore` makes a task inside it as
 /// interruptible as outside.
 interruptible_mask : ((Eff r2 e2 b -> Eff r2 e2 b) ->{r; e} a)^c ->{r; e} a
-foreign effect interruptible_mask from "@flick-lang/runtime/effect/Effect" "interruptibleMask"
+foreign effect interruptible_mask from "@flick-lang/effect-ts/effect/Effect" "interruptibleMask"
   retention call
   reviewed "effect@4.1.2 sha256:2225cf2e13c3c101"
 
 /// The result of the first task to succeed; the others are interrupted
 /// and awaited.
 race_all : Detached r => List ((Eff r e a)^c) ->{r; e} a
-foreign effect race_all from "@flick-lang/runtime/effect/Effect" "raceAll"
+foreign effect race_all from "@flick-lang/effect-ts/effect/Effect" "raceAll"
   retention call
   reviewed "effect@4.1.2 sha256:a81830e3f46e7acb"
 
 /// The first task to end, however it ends; the others are interrupted and
 /// awaited.
 race_all_first : Detached r => List ((Eff r e a)^c) ->{r; e} a
-foreign effect race_all_first from "@flick-lang/runtime/effect/Effect" "raceAllFirst"
+foreign effect race_all_first from "@flick-lang/effect-ts/effect/Effect" "raceAllFirst"
   retention call
   reviewed "effect@4.1.2 sha256:b744957ac315cbf1"
 
 /// The id of the current fiber.
 fiber_id : Unit ->{} Float
-foreign effect fiber_id from "@flick-lang/runtime/effect/Effect" "flickFiberId"
+foreign effect fiber_id from "@flick-lang/effect-ts/effect/Effect" "flickFiberId"
   arity 0
   reviewed "effect@4.1.2 sha256:091e7863734906b4"
 
 /// A task that runs `task` the first time and gives its outcome each time.
 cached : Eff r e a ->{} Eff r e a
-foreign effect cached from "@flick-lang/runtime/effect/Effect" "cached"
+foreign effect cached from "@flick-lang/effect-ts/effect/Effect" "cached"
   reviewed "effect@4.1.2 sha256:476680538954f2da"
 
 /// `cached`, running `task` again once the duration has passed.
 cached_with_ttl : Duration.Duration -> Eff r e a ->{} Eff r e a
-foreign effect cached_with_ttl from "@flick-lang/runtime/effect/Effect" "cachedWithTTL"
+foreign effect cached_with_ttl from "@flick-lang/effect-ts/effect/Effect" "cachedWithTTL"
   arity 1
   reviewed "effect@4.1.2 sha256:ca55470023f2b707"
 
 /// `cached_with_ttl`, and a task that forgets the cached outcome.
 cached_invalidate_with_ttl : Duration.Duration -> Eff r e a ->{} (Eff r e a, Eff none none Unit)
-foreign effect cached_invalidate_with_ttl from "@flick-lang/runtime/effect/Effect" "cachedInvalidateWithTTL"
+foreign effect cached_invalidate_with_ttl from "@flick-lang/effect-ts/effect/Effect" "cachedInvalidateWithTTL"
   arity 1
   reviewed "effect@4.1.2 sha256:2b9505b63da00d2b"
 
@@ -83,7 +83,7 @@ with_execution_plan :
   (ExecutionPlan.Event e ->{r;} Unit)^c ->
   (Eff (p + r) e a)^c ->{r + r2; e + e2}
   a
-foreign effect with_execution_plan from "@flick-lang/runtime/effect/Effect" "flickWithExecutionPlan"
+foreign effect with_execution_plan from "@flick-lang/effect-ts/effect/Effect" "flickWithExecutionPlan"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:d0c36dfb3130ffdf"

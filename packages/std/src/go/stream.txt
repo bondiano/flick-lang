@@ -1,6 +1,6 @@
 # Streams.
 
-[@flick-lang/runtime/effect/Stream]
+[@flick-lang/effect-ts/effect/Stream]
 fromIterable StreamFromSeq
 fromArray StreamFromList
 fromArrayEffect StreamFromListEffect
@@ -214,8 +214,8 @@ flickThrottleEffect StreamThrottleEffect
 flickBuffer StreamBuffer
 flickBufferArray StreamBufferArray
 
-[@flick-lang/runtime/effect/SubscriptionRef]
+[@flick-lang/effect-ts/effect/SubscriptionRef]
 changes SubscriptionRefChanges
 
-[@flick-lang/runtime/effect/TxSubscriptionRef]
+[@flick-lang/effect-ts/effect/TxSubscriptionRef]
 changesStream TxSubscriptionRefChangesStream

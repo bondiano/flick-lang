@@ -119,5 +119,11 @@ export const bigintParse = (s: string): Option<bigint> => {
 
 export const bigintAbs = (n: bigint): bigint => (n < 0n ? -n : n);
 
+/** Checked BigInt operations use the same arithmetic error as checked Int. */
+export const bigintDivide = (a: bigint, b: bigint): Result<bigint, ArithmeticError> =>
+  b === 0n ? arithmetic("division by zero") : ok(a / b);
+export const bigintRemainder = (a: bigint, b: bigint): Result<bigint, ArithmeticError> =>
+  b === 0n ? arithmetic("division by zero") : ok(a % b);
+
 export const numberStrictEqual = (a: number, b: number): boolean => a === b;
 export const numberSameValue = (a: number, b: number): boolean => Object.is(a, b);

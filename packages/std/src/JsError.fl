@@ -12,4 +12,4 @@ from_js : JsValue -> JsError
 let from_js value = JsError { message = describe value }
 
 describe : JsValue -> String
-foreign pure describe from "@flick-lang/runtime" "jsErrorMessage"
+foreign pure describe from "@flick-lang/effect-ts" "jsErrorMessage"

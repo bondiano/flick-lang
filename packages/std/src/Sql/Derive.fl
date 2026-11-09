@@ -26,7 +26,7 @@ plain : String -> String -> Bool -> Same t t -> Column
 let plain name sql_kind nullable _ = column name sql_kind nullable ()
 
 column : String -> String -> Bool -> a -> Column
-foreign pure column from "@flick-lang/runtime/sql" "sqlColumn"
+foreign pure column from "@flick-lang/effect-ts/sql" "sqlColumn"
   arity 4
 
 /// A value of a template as the runtime reads it, a table or a placeholder
@@ -34,7 +34,7 @@ foreign pure column from "@flick-lang/runtime/sql" "sqlColumn"
 type Erased
 
 erase : a -> Erased
-foreign pure erase from "@flick-lang/runtime" "identity"
+foreign pure erase from "@flick-lang/effect-ts" "identity"
 
 /// The template of a `sql { … }` block: `data`, the text and the values as
 /// the runtime reads them. `typing` is the query's types as a function
@@ -54,7 +54,7 @@ let tie _ x = x
 /// A value of any type, for the function of a query's types, which never
 /// runs.
 phantom : Unit -> a
-foreign pure phantom from "@flick-lang/runtime" "identity"
+foreign pure phantom from "@flick-lang/effect-ts" "identity"
 
 /// The columns of a table.
 columns : Sql.Table n cols -> cols

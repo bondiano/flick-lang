@@ -1,4 +1,4 @@
-import { Effect } from "@flick-lang/runtime";
+import { Effect } from "@flick-lang/effect-ts";
 
 export const isEffect = (value) => Effect.isEffect(value);
 

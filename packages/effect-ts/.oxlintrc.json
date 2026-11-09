@@ -1,0 +1,103 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": [
+    "typescript",
+    "unicorn",
+    "oxc",
+    "import",
+    "node"
+  ],
+  "categories": {
+    "correctness": "error",
+    "suspicious": "error",
+    "perf": "error"
+  },
+  "rules": {
+    "typescript/no-explicit-any": "error",
+    "typescript/no-non-null-assertion": "error",
+    "typescript/consistent-type-imports": "error",
+    "typescript/no-floating-promises": "error",
+    "typescript/no-misused-promises": "error",
+    "typescript/await-thenable": "error",
+    "typescript/no-unsafe-assignment": "error",
+    "typescript/no-unsafe-call": "error",
+    "typescript/no-unsafe-member-access": "error",
+    "typescript/no-unsafe-return": "error",
+    "typescript/no-unsafe-argument": "error",
+    "typescript/no-unnecessary-type-assertion": "error",
+    "typescript/restrict-template-expressions": "error",
+    "typescript/switch-exhaustiveness-check": [
+      "error",
+      {
+        "considerDefaultExhaustiveForUnions": true
+      }
+    ],
+    "typescript/prefer-promise-reject-errors": "error",
+    "typescript/only-throw-error": "error",
+    "eqeqeq": "error",
+    "no-var": "error",
+    "prefer-const": "error",
+    "import/no-cycle": "error",
+    "no-underscore-dangle": "off",
+    "typescript/no-unsafe-type-assertion": "error"
+  },
+  "ignorePatterns": [
+    "dist",
+    "test/fixtures/*.aot.js"
+  ],
+  "overrides": [
+    {
+      "files": [
+        "test/**"
+      ],
+      "rules": {
+        "typescript/no-floating-promises": [
+          "error",
+          {
+            "allowForKnownSafeCalls": [
+              {
+                "from": "package",
+                "name": [
+                  "test",
+                  "it",
+                  "describe"
+                ],
+                "package": "node:test"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": [
+        "src/**"
+      ],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": [
+                  "effect/reactivity",
+                  "effect/reactivity/*"
+                ],
+                "message": "reach effect/reactivity through src/effect/reactivity or src/atoms.ts, so swapping the registry stays in one layer"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": [
+        "src/atoms.ts",
+        "src/effect/reactivity/**"
+      ],
+      "rules": {
+        "no-restricted-imports": "off"
+      }
+    }
+  ]
+}

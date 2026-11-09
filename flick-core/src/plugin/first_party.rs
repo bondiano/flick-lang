@@ -4,13 +4,13 @@
 use std::sync::Arc;
 
 use flick_plugin::{
-    Arena, Block, Compiler, Completion, DeriveTarget, Diagnostic, Fact, Highlight, Hover, Piece,
-    Plugin, Published,
+    Arena, Block, CallSite, Compiler, Completion, DeriveTarget, Diagnostic, Fact, Highlight, Hover,
+    Piece, Plugin, Published,
 };
 use flick_plugin_cli::Cli;
 use flick_plugin_derive::{codec, server_fn};
 use flick_plugin_sql::Sql;
-use flick_plugin_ui::component;
+use flick_plugin_ui::{calls, component};
 
 use super::{Expander, Native};
 
@@ -38,6 +38,23 @@ pub const DECLARATIONS: [(&str, &str); 3] =
 /// The heads that declare a name right after them, whatever word it is:
 /// `component counter (start : Float) = …`.
 pub const NAMED: [&str; 1] = ["component"];
+
+/// The names whose places of call the plugin of std checks, as the `watch`
+/// of a package declares them. Every module is watched for them without a
+/// manifest, as every module has std's heads.
+pub const WATCH: [&str; 5] = [
+    "Ui.Event.queue",
+    "Ui.Event.concurrent",
+    "Action.queue",
+    "Action.concurrent",
+    "*.parse",
+];
+
+/// The codes std's plugin gives that are the compiler's own, not shown
+/// under its package: the checks that moved into it keep the code, the
+/// reference page and the `flick explain` text they had. Its other codes,
+/// such as `Q010`, stay `std/Q010`.
+pub const OWN_CODES: [&str; 2] = ["U001", "D006"];
 
 /// The package whose plugin is linked into the compiler. An implicit package
 /// without a plugin of its own needs no entry here.
@@ -95,6 +112,14 @@ impl Plugin for Std {
             "sql" => Sql.check(block, state, facts),
             _ => Vec::new(),
         }
+    }
+
+    // each takes the names of [`WATCH`] it owns: the event policies, and
+    // the `parse` of a refined type
+    fn check_calls(&self, calls: &[CallSite], _state: &[u8]) -> Vec<Diagnostic> {
+        let mut found = calls::check(calls);
+        found.extend(flick_plugin_refined::check(calls));
+        found
     }
 
     fn complete(

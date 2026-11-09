@@ -139,7 +139,7 @@ test("the old Transpile page opens the JavaScript tab", async ({ page }) => {
   await expect(page).toHaveURL(/\/play\/\?tab=js$/);
   await ready(page);
   await expect(page.locator(".fp-tabs .fp-on")).toHaveText("JavaScript");
-  await expect(page.locator(".fp-generated-code")).toContainText("@flick-lang/runtime");
+  await expect(page.locator(".fp-generated-code")).toContainText("@flick-lang/effect-ts");
 });
 
 test("an example from the gallery fails with its code", async ({ page }) => {

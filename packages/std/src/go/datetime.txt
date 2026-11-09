@@ -1,6 +1,6 @@
 # Effect's DateTime: instants in UTC or a zone, their parts, arithmetic,
 # comparisons and formatting, and their JSON codecs.
-[@flick-lang/runtime/effect/DateTime]
+[@flick-lang/effect-ts/effect/DateTime]
 flickMake DateTimeMake
 flickFromParts DateTimeFromParts
 flickFromEpochSeconds DateTimeFromEpochSeconds

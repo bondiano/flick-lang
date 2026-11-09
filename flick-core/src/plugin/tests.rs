@@ -374,6 +374,45 @@ impl flick_plugin::Plugin for Panicking {
     fn highlight(&self, _: &flick_plugin::Block, _: &[u8]) -> Vec<flick_plugin::Highlight> {
         panic!("no colors")
     }
+
+    fn check_calls(&self, _: &[flick_plugin::CallSite], _: &[u8]) -> Vec<flick_plugin::Diagnostic> {
+        panic!("no calls")
+    }
+}
+
+#[test]
+fn a_plugin_sees_the_calls_of_the_names_it_watches_and_no_others() {
+    use super::Native;
+    use super::calls::check_calls;
+    use crate::diagnostics::codes;
+    use crate::source::FileId;
+    use crate::types::Watched;
+    let site = flick_plugin::CallSite {
+        module: "Ui.Event".into(),
+        name: "queue".into(),
+        span: span(10, 15),
+        arguments: Vec::new(),
+        refinement: None,
+    };
+    let plugin = Native::new("panicking", Panicking);
+    let file = FileId::default();
+    // a name its package does not watch: the plugin is not called at all
+    let elsewhere = Watched::new(["Action.queue"]);
+    let sites = [site.clone()];
+    assert!(check_calls(&plugin, "panicking", &elsewhere, &sites, &[], file).is_empty());
+    // one it watches: the plugin fails, and that is the diagnostic
+    let watched = Watched::new(["Ui.Event.queue"]);
+    let found = check_calls(&plugin, "panicking", &watched, &sites, &[], file);
+    let [failure] = &found[..] else {
+        panic!("{found:?}")
+    };
+    assert_eq!(failure.code, codes::P036);
+    assert_eq!(failure.span.map(|s| (s.start, s.end)), Some((10, 15)));
+    assert!(
+        failure.message.contains("panicked: no calls"),
+        "{}",
+        failure.message
+    );
 }
 
 #[test]

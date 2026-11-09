@@ -1,6 +1,6 @@
 ---
 title: "Покрытие Effect"
-source_hash: 315c6b5a10b15bc6
+source_hash: 91113113c1c957dd
 ---
 
 Стандартная библиотека оборачивает закреплённую версию Effect
@@ -72,7 +72,7 @@ cron = "cron expressions need a parser of their own"
 - у внешней привязки символа `wrapped` нет отметки `reviewed
   "effect@<pinned> …"` либо привязка проверена по другой версии;
 - у решения `language`, `excluded` или `pending` не указана причина;
-- версия снимка отличается от закреплённой в `runtime/package.json`.
+- версия снимка отличается от закреплённой в `packages/effect-ts/package.json`.
 
 `just effect-coverage` выводит число экспортов по статусам и модулям.
 CI добавляет эти данные в сводку запуска.
@@ -82,7 +82,7 @@ CI добавляет эти данные в сводку запуска.
 `just effect-bump <version>` загружает указанную версию и записывает её снимок.
 Команда выводит добавленные, удалённые и изменённые элементы, а также возможности,
 которых недостаёт в матрице возможностей среды выполнения. Она также обновляет
-закреплённые версии в `runtime/package.json`, `runtime/src/capabilities.ts`,
+закреплённые версии в `packages/effect-ts/package.json`, `packages/effect-ts/src/capabilities.ts`,
 тесте версии среды выполнения и `flick/src/toolchain.rs`.
 Линтер продолжает завершаться с ошибкой, пока манифест и проверенные привязки
 не будут согласованы с новым снимком.
@@ -138,7 +138,7 @@ span'ы программы по WebSocket в Effect DevTools, которые с�
 
 Обёртка обращается к экспорту через среду выполнения. Среда выполнения
 реэкспортирует каждый обёрнутый модуль Effect по пути
-`@flick-lang/runtime/effect/<Module>` (`runtime/src/effect/<Module>.ts`).
+`@flick-lang/effect-ts/effect/<Module>` (`packages/effect-ts/src/effect/<Module>.ts`).
 Поэтому скомпилированный код по-прежнему импортирует только пакет среды выполнения.
 
 Если значение нельзя передать как есть в виде значения Flick, в том же файле
@@ -151,13 +151,13 @@ span'ы программы по WebSocket в Effect DevTools, которые с�
 #
 /// Recurs forever, each step the duration after the previous one ended.
 spaced : Duration.Duration -> Schedule none none i Float
-foreign pure spaced from "@flick-lang/runtime/effect/Schedule" "spaced"
+foreign pure spaced from "@flick-lang/effect-ts/effect/Schedule" "spaced"
   reviewed "effect@4.1.2 sha256:498f22b480d2397e"
 
 retry :
   forall c r e a r2 e2 o.
-  Schedule.Schedule r2 e2 (Errors e) o -> (Eff r e a)^c ->{r + r2; e + e2} a
-foreign effect retry from "@flick-lang/runtime/effect/Effect" "retry"
+  Schedule.Schedule r2 e2 (Errors e) o -> (Eff r e a)^c ->{Async | r + r2; e + e2} a
+foreign effect retry from "@flick-lang/effect-ts/effect/Effect" "retry"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:508d9e1864f6c9d3"

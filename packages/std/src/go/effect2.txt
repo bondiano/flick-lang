@@ -1,6 +1,6 @@
 # The rest of Effect's `Effect` and `Cause`, and the failures of the core.
 
-[@flick-lang/runtime/effect/Effect]
+[@flick-lang/effect-ts/effect/Effect]
 # Effect.Core
 flickFailCauseSync *EffectFailCauseSync
 yieldNowWith *EffectYieldNowWith
@@ -55,7 +55,7 @@ flickOnExitPrimitive *EffectOnExitPrimitive
 flickAddFinalizer *AddFinalizerExit
 flickWithErrorReporting *EffectWithErrorReporting
 
-[@flick-lang/runtime/effect/Cause]
+[@flick-lang/effect-ts/effect/Cause]
 flickFromReasons CauseFromReasons
 makeFailReason CauseMakeFailReason
 makeDieReason CauseMakeDieReason
@@ -79,7 +79,7 @@ flickFrameName CauseFrameName
 flickFrameStack CauseFrameStack
 flickFrameParent CauseFrameParent
 
-[@flick-lang/runtime]
+[@flick-lang/effect-ts]
 failureRawCause FailureRawCause
 failureInspect *FailureInspect
 failureRethrow *FailureRethrow

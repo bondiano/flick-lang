@@ -230,7 +230,7 @@ pub fn deps(command: &Command, global: &GlobalArguments) -> Outcome {
         Err(err) => return failure(codes::P016, format!("cannot run pnpm: {err}")),
     }
     let diagnostics = if pnpm::writes(command) {
-        toolchain::check_runtime(root).into_iter().collect()
+        toolchain::check_runtime(root, false).into_iter().collect()
     } else {
         Vec::new()
     };

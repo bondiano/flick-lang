@@ -7,7 +7,6 @@ use crate::diagnostics::suggest::closest;
 use crate::diagnostics::{Diagnostic, codes};
 use crate::project::module_path;
 use crate::source::Span;
-use crate::types;
 
 impl Loader<'_> {
     pub(super) fn unknown_module(&self, name: &str, span: Span) -> Diagnostic {
@@ -36,7 +35,7 @@ impl Loader<'_> {
                     .keys()
                     .chain(self.from_packages.keys())
                     .map(String::as_str);
-                let builtin = types::builtins().iter().map(|i| i.module.as_str());
+                let builtin = self.builtins().iter().map(|i| i.module.as_str());
                 closest(name, known.chain(builtin)).map(str::to_owned)
             })
             .with_fix(|| {

@@ -3,7 +3,7 @@
 // Without arguments it is the `.d.ts` reader `flick ffi import` runs, with
 // `{"root": "<project dir>", "package": "<name>"}` on stdin; `--help` lists
 // the other commands.
-import { runMain } from "@flick-lang/runtime";
+import { runMain } from "@flick-lang/effect-ts";
 
 const { main, import_main } = await import("./dist/Main.js").catch((error) => {
   process.stderr.write(`@flick-lang/dts-importer is not built: run \`pnpm -C tools/dts-importer build\` (${error.message})\n`);

@@ -127,7 +127,7 @@ export default defineConfig({ integrations: [flick()] });
 ```astro
 <div id="app"></div>
 <script>
-  import { runMain } from "@flick-lang/runtime";
+  import { runMain } from "@flick-lang/effect-ts";
   import { main } from "../app/Main.fl";
 
   runMain(main);

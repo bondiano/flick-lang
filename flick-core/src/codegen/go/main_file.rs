@@ -15,18 +15,18 @@ use crate::ir::{ItemKind, Module};
 /// modules of the package.
 pub const OPTIONAL: &[(&str, &str, &[&str])] = &[
     // the PostgreSQL driver, on pgx
-    ("flickpg", "@flick-lang/runtime/sql", &["pgLayer"]),
+    ("flickpg", "@flick-lang/effect-ts/sql", &["pgLayer"]),
     // brotli and zstd of the compression middleware; the web one has neither
     (
         "flickcompress",
-        "@flick-lang/runtime/effect/http/HttpMiddleware",
+        "@flick-lang/effect-ts/effect/http/HttpMiddleware",
         &["flickCompression"],
     ),
 ];
 
 /// The bindings that look a named time zone up: a program that reaches one
 /// embeds Go's zone database and V8's names of zones; others carry neither.
-const ZONE_MODULE: &str = "@flick-lang/runtime/effect/DateTime";
+const ZONE_MODULE: &str = "@flick-lang/effect-ts/effect/DateTime";
 const ZONE_EXPORTS: &[&str] = &[
     "flickZoneMakeNamed",
     "flickZoneFromString",

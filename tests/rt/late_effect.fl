@@ -1,0 +1,15 @@
+// a control effect declared after the function that uses it
+module App.Main exposing (main)
+
+twice : Unit ->{Later;} Int
+let twice () = Later.ask 1 + Later.ask 2
+
+effect Later =
+  control ask : Int ->{} Int
+
+main : Unit ->{Async; AppError} Unit
+let main () =
+  let r =
+    try twice () with
+    | Later.ask x -> resume (x * 10)
+  Platform.stdout_line (show r)

@@ -1,6 +1,6 @@
 ---
 title: "Пользовательские интерфейсы"
-source_hash: 409d1f9aec39a8b8
+source_hash: b144214a7516d9d0
 ---
 
 `Ui` описывает пользовательский интерфейс и обработчики его событий
@@ -484,7 +484,7 @@ let increment = Action.exhaust (fun _ -> task { Atom.update count (fun n -> n + 
 ```flick
 mount :
   forall c r.
-  Ui.Dom.Container -> (Failure none ->{r; none} Unit)^c -> Ui^c ->{Atom.Registry, Atom.Write | r; none} Never
+  Ui.Dom.Container -> (Failure none ->{r; none} Unit)^c -> Ui^c ->{Async, Atom.Registry, Atom.Write | r; none} Never
 # let mount = Ui.Dom.mount
 ```
 
@@ -502,7 +502,7 @@ mount :
 # report : Failure none ->{} Unit
 # let report _ = ()
 #
-main : Unit ->{; AppError} Unit
+main : Unit ->{Async; AppError} Unit
 let main () =
   match Ui.Dom.container "app" with
   | None -> App.fail "missing root"
@@ -558,11 +558,11 @@ let request n =
   }
 ```
 
-`Ui.Server` берётся из `@flick-lang/runtime/ui/server`, поэтому клиентские
+`Ui.Server` берётся из `@flick-lang/effect-ts/ui/server`, поэтому клиентские
 программы не загружают `react-dom/server`. Вместо него JavaScript-хост может
 экспортировать из Flick функцию начального представления и выполнить её
 холодный эффект на сервере. Передайте полученный `Ui` в `uiRenderStatic`
-из `@flick-lang/runtime/ui/react`, затем сериализуйте React-узел через
+из `@flick-lang/effect-ts/ui/react`, затем сериализуйте React-узел через
 `renderToString` из `react-dom/server`. Представления и поля читают атомы
 как на сервере: каждый вызов — из собственного реестра. На сервере
 обработчики не запускаются. Отдельная HTML-реализация виджета не нужна.
@@ -688,7 +688,7 @@ let chunks () = provide Atom.layer { Stream.run_collect (Ui.Server.stream "app" 
 опускаются, а представления читают атомы так же, как на сервере, из реестра
 только этого вызова. Поэтому один и тот же `ui` всегда даёт один и тот же
 HTML. Внешний компонент, который умеет отображать только React, — дефект.
-Функция находится в `@flick-lang/runtime/ui/html`, который не импортирует
+Функция находится в `@flick-lang/effect-ts/ui/html`, который не импортирует
 ни React, ни `react-dom/server`.
 
 ```flick
@@ -701,8 +701,8 @@ let receipt order =
 
 ## Другие рендереры React
 
-`@flick-lang/runtime/ui` — адаптер React DOM.
-`@flick-lang/runtime/ui/react` содержит только преобразование узлов React,
+`@flick-lang/effect-ts/ui` — адаптер React DOM.
+`@flick-lang/effect-ts/ui/react` содержит только преобразование узлов React,
 представления и управление жизненным циклом задач. Импорт этого подпути
 не загружает `react-dom` и не читает `document` или `window`.
 
@@ -773,15 +773,15 @@ HTML-конструкторы остаются привязанными к DOM: 
   задачи принадлежат корню, а не DOM.
 
 Реализация находится в
-[коде запуска для React](https://github.com/bondiano/flick-lang/blob/main/runtime/src/ui/react/index.ts),
-[DOM-адаптере](https://github.com/bondiano/flick-lang/blob/main/runtime/src/ui/index.ts)
+[коде запуска для React](https://github.com/bondiano/flick-lang/blob/main/packages/effect-ts/src/ui/react/index.ts),
+[DOM-адаптере](https://github.com/bondiano/flick-lang/blob/main/packages/effect-ts/src/ui/index.ts)
 и встроенных модулях
 [`Ui`](https://github.com/bondiano/flick-lang/blob/main/packages/std/src/Ui.fl)
 и [`Ui.Dom`](https://github.com/bondiano/flick-lang/blob/main/packages/std/src/Ui/Dom.fl).
 Для этих возможностей есть регрессионные тесты:
 
-- [`runtime/test/ui-roots.test.ts`](https://github.com/bondiano/flick-lang/blob/main/runtime/test/ui-roots.test.ts)
-  и [`ui-policies.test.ts`](https://github.com/bondiano/flick-lang/blob/main/runtime/test/ui-policies.test.ts):
+- [`packages/effect-ts/test/ui-roots.test.ts`](https://github.com/bondiano/flick-lang/blob/main/packages/effect-ts/test/ui-roots.test.ts)
+  и [`ui-policies.test.ts`](https://github.com/bondiano/flick-lang/blob/main/packages/effect-ts/test/ui-policies.test.ts):
   представления, ключи, стабильные слушатели, StrictMode, работа
   супервизора, размонтирование с ожиданием задач и импорт подпути
   для React без DOM.

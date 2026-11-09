@@ -8,52 +8,52 @@ import Graph.Types exposing (..)
 /// Depth-first from `start` (default: nothing), along `direction` (default
 /// outgoing), at most `radius` steps.
 dfs : SearchConfig -> Graph n e k -> Result GraphError (NodeWalker n)
-foreign pure dfs from "@flick-lang/runtime/effect/Graph" "flickDfs"
+foreign pure dfs from "@flick-lang/effect-ts/effect/Graph" "flickDfs"
   reviewed "effect@4.1.2 sha256:b9ca82abbc9e02a7"
 
 /// Breadth-first, as `dfs` is depth-first.
 bfs : SearchConfig -> Graph n e k -> Result GraphError (NodeWalker n)
-foreign pure bfs from "@flick-lang/runtime/effect/Graph" "flickBfs"
+foreign pure bfs from "@flick-lang/effect-ts/effect/Graph" "flickBfs"
   reviewed "effect@4.1.2 sha256:82b74e2641ec8cd3"
 
 /// Depth-first, each node after the nodes it leads to.
 dfs_post_order : SearchConfig -> Graph n e k -> Result GraphError (NodeWalker n)
-foreign pure dfs_post_order from "@flick-lang/runtime/effect/Graph" "flickDfsPostOrder"
+foreign pure dfs_post_order from "@flick-lang/effect-ts/effect/Graph" "flickDfsPostOrder"
   reviewed "effect@4.1.2 sha256:4e0d3888799beaa1"
 
 /// Each node before the nodes it leads to, from `initials` (default: the
 /// nodes without incoming edges); a cycle, or an initial node with incoming
 /// edges, is an error.
 topo : TopoConfig -> Graph n e Directed -> Result GraphError (NodeWalker n)
-foreign pure topo from "@flick-lang/runtime/effect/Graph" "flickTopo"
+foreign pure topo from "@flick-lang/effect-ts/effect/Graph" "flickTopo"
   reviewed "effect@4.1.2 sha256:f98e4271cb53a5d8"
 
 /// Every node, in index order.
 nodes : Graph n e k -> NodeWalker n
-foreign pure nodes from "@flick-lang/runtime/effect/Graph" "nodes"
+foreign pure nodes from "@flick-lang/effect-ts/effect/Graph" "nodes"
   reviewed "effect@4.1.2 sha256:5b7aa18f6ad5bd6c"
 
 /// Every edge, in index order.
 edges : Graph n e k -> EdgeWalker e
-foreign pure edges from "@flick-lang/runtime/effect/Graph" "edges"
+foreign pure edges from "@flick-lang/effect-ts/effect/Graph" "edges"
   reviewed "effect@4.1.2 sha256:b4886bcba543b7b4"
 
 /// The nodes without edges in the direction (default outgoing).
 externals : ExternalsConfig -> Graph n e k -> NodeWalker n
-foreign pure externals from "@flick-lang/runtime/effect/Graph" "flickExternals"
+foreign pure externals from "@flick-lang/effect-ts/effect/Graph" "flickExternals"
   reviewed "effect@4.1.2 sha256:d719ff55263572fc"
 
 /// The indices a walker visits, in order.
 indices : Walker t a -> List t
-foreign pure indices from "@flick-lang/runtime/effect/Graph" "flickIndices"
+foreign pure indices from "@flick-lang/effect-ts/effect/Graph" "flickIndices"
   reviewed "effect@4.1.2 sha256:c746fbd13ca4b96f"
 
 /// The data a walker visits, in order.
 values : Walker t a -> List a
-foreign pure values from "@flick-lang/runtime/effect/Graph" "flickValues"
+foreign pure values from "@flick-lang/effect-ts/effect/Graph" "flickValues"
   reviewed "effect@4.1.2 sha256:f3f499b9e9ac29cc"
 
 /// The index and data of each visit, in order.
 entries : Walker t a -> List (t, a)
-foreign pure entries from "@flick-lang/runtime/effect/Graph" "flickEntries"
+foreign pure entries from "@flick-lang/effect-ts/effect/Graph" "flickEntries"
   reviewed "effect@4.1.2 sha256:65ad6c755e7dbcc0"

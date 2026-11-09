@@ -2,7 +2,7 @@
 source: flick-core/src/opt/tests.rs
 expression: js
 ---
-import * as $rt from "@flick-lang/runtime";
+import * as $rt from "@flick-lang/effect-ts";
 import * as $m_Seq from "./Seq.js";
 
 export const chain = (xs) => {

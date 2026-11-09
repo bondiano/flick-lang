@@ -9,7 +9,7 @@ import Stream.Core exposing (Stream)
 
 /// The stream `f` gives for the error, after the elements so far.
 catch : (Errors e -> Stream r2 e2 a)^c -> (Stream r e a)^c -> (Stream (r + r2) e2 a)^c
-foreign pure catch from "@flick-lang/runtime/effect/Stream" "catch"
+foreign pure catch from "@flick-lang/effect-ts/effect/Stream" "catch"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:c971320ab32bda89"
@@ -19,7 +19,7 @@ catch_if :
   (Errors e -> Bool)^c ->
   (Errors e -> Stream r2 e2 a)^c ->
   ((Stream r e a)^c -> (Stream (r + r2) (e + e2) a)^c)^c
-foreign pure catch_if from "@flick-lang/runtime/effect/Stream" "catchIf"
+foreign pure catch_if from "@flick-lang/effect-ts/effect/Stream" "catchIf"
   arity 2
   retention call
   reviewed "effect@4.1.2 sha256:cbca48c714796699"
@@ -30,7 +30,7 @@ catch_filter :
   Filter.Filter (Errors e) b (Errors e3) ->
   (b -> Stream r2 e2 a)^c ->
   ((Stream r e a)^c -> (Stream (r + r2) (e2 + e3) a)^c)^c
-foreign pure catch_filter from "@flick-lang/runtime/effect/Stream" "catchFilter"
+foreign pure catch_filter from "@flick-lang/effect-ts/effect/Stream" "catchFilter"
   arity 2
   retention call
   reviewed "effect@4.1.2 sha256:7d066188f2aec607"
@@ -38,7 +38,7 @@ foreign pure catch_filter from "@flick-lang/runtime/effect/Stream" "catchFilter"
 /// The stream `f` gives for any failure: an error, a defect or an
 /// interruption.
 catch_cause : (Failure e -> Stream r2 e2 a)^c -> (Stream r e a)^c -> (Stream (r + r2) e2 a)^c
-foreign pure catch_cause from "@flick-lang/runtime/effect/Stream" "flickCatchCause"
+foreign pure catch_cause from "@flick-lang/effect-ts/effect/Stream" "flickCatchCause"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:1d255ce0708f0ce2"
@@ -48,7 +48,7 @@ catch_cause_if :
   (Failure e -> Bool)^c ->
   (Failure e -> Stream r2 e2 a)^c ->
   ((Stream r e a)^c -> (Stream (r + r2) (e + e2) a)^c)^c
-foreign pure catch_cause_if from "@flick-lang/runtime/effect/Stream" "flickCatchCauseIf"
+foreign pure catch_cause_if from "@flick-lang/effect-ts/effect/Stream" "flickCatchCauseIf"
   arity 2
   retention call
   reviewed "effect@4.1.2 sha256:eb3da882583cb575"
@@ -59,7 +59,7 @@ catch_cause_filter :
   Filter.Filter (Failure e) b (Failure e3) ->
   (b -> Failure e -> Stream r2 e2 a)^c ->
   ((Stream r e a)^c -> (Stream (r + r2) (e2 + e3) a)^c)^c
-foreign pure catch_cause_filter from "@flick-lang/runtime/effect/Stream" "flickCatchCauseFilter"
+foreign pure catch_cause_filter from "@flick-lang/effect-ts/effect/Stream" "flickCatchCauseFilter"
   arity 2
   retention call
   reviewed "effect@4.1.2 sha256:38d89b776c8aa3ef"
@@ -67,117 +67,117 @@ foreign pure catch_cause_filter from "@flick-lang/runtime/effect/Stream" "flickC
 /// The stream `f` gives for a defect, as a `Failure` that holds only it.
 catch_defect :
   (Failure none -> Stream r2 e2 a)^c -> (Stream r e a)^c -> (Stream (r + r2) (e + e2) a)^c
-foreign pure catch_defect from "@flick-lang/runtime/effect/Stream" "flickCatchDefect"
+foreign pure catch_defect from "@flick-lang/effect-ts/effect/Stream" "flickCatchDefect"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:04683ba5580801c3"
 
 /// Runs `f` on the error, which then fails the stream.
 tap_error : (Errors e ->{r2; e2} x)^c -> (Stream r e a)^c -> (Stream (r + r2) (e + e2) a)^c
-foreign pure tap_error from "@flick-lang/runtime/effect/Stream" "tapError"
+foreign pure tap_error from "@flick-lang/effect-ts/effect/Stream" "tapError"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:7462e80e3cfe1f74"
 
 /// Runs `f` on any failure, which then fails the stream.
 tap_cause : (Failure e ->{r2; e2} x)^c -> (Stream r e a)^c -> (Stream (r + r2) (e + e2) a)^c
-foreign pure tap_cause from "@flick-lang/runtime/effect/Stream" "flickTapCause"
+foreign pure tap_cause from "@flick-lang/effect-ts/effect/Stream" "flickTapCause"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:9a0a9a6d1eebd728"
 
 /// Runs `f` on a defect, which then ends the stream.
 tap_defect : (Failure none ->{r2; e2} x)^c -> (Stream r e a)^c -> (Stream (r + r2) (e + e2) a)^c
-foreign pure tap_defect from "@flick-lang/runtime/effect/Stream" "flickTapDefect"
+foreign pure tap_defect from "@flick-lang/effect-ts/effect/Stream" "flickTapDefect"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:f781d2e748aa9e2d"
 
 /// `fallback` when the stream ends without an element.
 or_else_if_empty : (Stream r2 e2 a)^c -> (Stream r e a)^c -> (Stream (r + r2) (e + e2) a)^c
-foreign pure or_else_if_empty from "@flick-lang/runtime/effect/Stream" "flickOrElseIfEmpty"
+foreign pure or_else_if_empty from "@flick-lang/effect-ts/effect/Stream" "flickOrElseIfEmpty"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:166a316c4aa26932"
 
 /// The last element `f` gives for the error.
 or_else_succeed : (Errors e -> a)^c -> (Stream r e a)^c -> (Stream r none a)^c
-foreign pure or_else_succeed from "@flick-lang/runtime/effect/Stream" "orElseSucceed"
+foreign pure or_else_succeed from "@flick-lang/effect-ts/effect/Stream" "orElseSucceed"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:e669a6612870de99"
 
 /// An error becomes a defect.
 or_die : (Stream r e a)^c -> (Stream r none a)^c
-foreign pure or_die from "@flick-lang/runtime/effect/Stream" "orDie"
+foreign pure or_die from "@flick-lang/effect-ts/effect/Stream" "orDie"
   retention call
   reviewed "effect@4.1.2 sha256:7986b5f7f6035e7a"
 
 /// Ends the stream quietly on an error.
 ignore_ : (Stream r e a)^c -> (Stream r none a)^c
-foreign pure ignore_ from "@flick-lang/runtime/effect/Stream" "ignore"
+foreign pure ignore_ from "@flick-lang/effect-ts/effect/Stream" "ignore"
   retention call
   reviewed "effect@4.1.2 sha256:20a3255f08e63fcc"
 
 /// Ends the stream quietly on an error or a defect.
 ignore_cause : (Stream r e a)^c -> (Stream r none a)^c
-foreign pure ignore_cause from "@flick-lang/runtime/effect/Stream" "ignoreCause"
+foreign pure ignore_cause from "@flick-lang/effect-ts/effect/Stream" "ignoreCause"
   retention call
   reviewed "effect@4.1.2 sha256:a00b5d5e1cb73f61"
 
 /// Runs the stream again from its start after an error, as long as the
 /// schedule, which gets the error, recurs.
 retry : Schedule.Schedule r2 e2 (Errors e) o -> (Stream r e a)^c -> (Stream (r + r2) (e + e2) a)^c
-foreign pure retry from "@flick-lang/runtime/effect/Stream" "retry"
+foreign pure retry from "@flick-lang/effect-ts/effect/Stream" "retry"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:a77aecde69ceeb29"
 
 /// Runs `finalizer` with how the stream ended, after it ended.
 on_exit : (Exit e Unit ->{r2;} x)^c -> (Stream r e a)^c -> (Stream (r + r2) e a)^c
-foreign pure on_exit from "@flick-lang/runtime/effect/Stream" "flickOnExit"
+foreign pure on_exit from "@flick-lang/effect-ts/effect/Stream" "flickOnExit"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:b6519a57f636ecc3"
 
 /// Runs `cleanup` with the failure when the stream fails.
 on_error : (Failure e ->{r2;} x)^c -> (Stream r e a)^c -> (Stream (r + r2) e a)^c
-foreign pure on_error from "@flick-lang/runtime/effect/Stream" "flickOnError"
+foreign pure on_error from "@flick-lang/effect-ts/effect/Stream" "flickOnError"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:8ba312441a39b8f0"
 
 /// Runs `task` when the stream starts.
 on_start : Eff r2 e2 x -> (Stream r e a)^c -> (Stream (r + r2) (e + e2) a)^c
-foreign pure on_start from "@flick-lang/runtime/effect/Stream" "onStart"
+foreign pure on_start from "@flick-lang/effect-ts/effect/Stream" "onStart"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:2aa07fa3333f2c5e"
 
 /// Runs `f` on the first element.
 on_first : (a ->{r2; e2} x)^c -> (Stream r e a)^c -> (Stream (r + r2) (e + e2) a)^c
-foreign pure on_first from "@flick-lang/runtime/effect/Stream" "onFirst"
+foreign pure on_first from "@flick-lang/effect-ts/effect/Stream" "onFirst"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:4b9cfbe1e3beeddb"
 
 /// Runs `task` when the stream ends without a failure.
 on_end : Eff r2 e2 x -> (Stream r e a)^c -> (Stream (r + r2) (e + e2) a)^c
-foreign pure on_end from "@flick-lang/runtime/effect/Stream" "onEnd"
+foreign pure on_end from "@flick-lang/effect-ts/effect/Stream" "onEnd"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:8e3ff80ee796dd71"
 
 /// Runs `finalizer` however the stream ends.
 ensuring : Eff r2 none x -> (Stream r e a)^c -> (Stream (r + r2) e a)^c
-foreign pure ensuring from "@flick-lang/runtime/effect/Stream" "ensuring"
+foreign pure ensuring from "@flick-lang/effect-ts/effect/Stream" "ensuring"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:893a59389bd54426"
 
 /// The stream with the services the layer builds, built each time it runs.
 provide_ : Layer ri el ro -> (Stream (ro + r) e a)^c -> (Stream (ri + r) (el + e) a)^c
-foreign pure provide_ from "@flick-lang/runtime/effect/Stream" "provide"
+foreign pure provide_ from "@flick-lang/effect-ts/effect/Stream" "provide"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:0913a9f897607a56"
@@ -185,14 +185,14 @@ foreign pure provide_ from "@flick-lang/runtime/effect/Stream" "provide"
 /// The stream with the service `f` makes of the current one.
 update_service :
   ServiceTag s -> (ServiceImpl s -> ServiceImpl s)^c -> (Stream r e a)^c -> (Stream (s + r) e a)^c
-foreign pure update_service from "@flick-lang/runtime/effect/Stream" "updateService"
+foreign pure update_service from "@flick-lang/effect-ts/effect/Stream" "updateService"
   arity 2
   retention call
   reviewed "effect@4.1.2 sha256:01d8535c629060a3"
 
 /// The stream in a new span with the name, which ends with it.
 with_span : String -> (Stream r e a)^c -> (Stream r e a)^c
-foreign pure with_span from "@flick-lang/runtime/effect/Stream" "withSpan"
+foreign pure with_span from "@flick-lang/effect-ts/effect/Stream" "withSpan"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:b1c7181cea7c9bbb"

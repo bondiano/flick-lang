@@ -4,21 +4,21 @@ module JsonPointer exposing (..)
 
 /// A key as a pointer token: `~` as `~0`, `/` as `~1`.
 escape_token : String -> String
-foreign pure escape_token from "@flick-lang/runtime/effect/JsonPointer" "escapeToken"
+foreign pure escape_token from "@flick-lang/effect-ts/effect/JsonPointer" "escapeToken"
   reviewed "effect@4.1.2 sha256:ed8141d3518f4b75"
 
 /// The key of a pointer token.
 unescape_token : String -> String
-foreign pure unescape_token from "@flick-lang/runtime/effect/JsonPointer" "unescapeToken"
+foreign pure unescape_token from "@flick-lang/effect-ts/effect/JsonPointer" "unescapeToken"
   reviewed "effect@4.1.2 sha256:a065ade494c3bf3f"
 
 /// The keys of a URI fragment pointer (`#/a/b`); `None` when it is not one.
 parse_uri_fragment : String -> Option (List String)
-foreign pure parse_uri_fragment from "@flick-lang/runtime/effect/JsonPointer" "parseUriFragment"
+foreign pure parse_uri_fragment from "@flick-lang/effect-ts/effect/JsonPointer" "parseUriFragment"
   nullable
   reviewed "effect@4.1.2 sha256:4f4e124fe05d0ad7"
 
 /// The URI fragment pointer of the keys.
 format_uri_fragment : List String -> String
-foreign pure format_uri_fragment from "@flick-lang/runtime/effect/JsonPointer" "formatUriFragment"
+foreign pure format_uri_fragment from "@flick-lang/effect-ts/effect/JsonPointer" "formatUriFragment"
   reviewed "effect@4.1.2 sha256:848c01ba2381c6b5"

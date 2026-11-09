@@ -1,6 +1,6 @@
 ---
 title: "TypeScript generation and the FFI boundary"
-source_hash: f4427b6ac5365b2b
+source_hash: a0ce28e543ded32d
 ---
 
 The examples of generated code below are the output of the debug profile, the reference lowering; [Code generation](../../reference/codegen/) describes it in full.
@@ -258,7 +258,7 @@ On the Go target (`[build] emit = "go"`) a binding to a module of the program, `
 | Methods | `this`, arity, evaluation order and listener identity are preserved |
 | Callbacks | Four families: pure, Effect, Promise, scoped event |
 
-The FFI supports fixed uncurried calls, `this`, optional arguments and a variadic tail taken from a `List`. Flick's currying is preserved. The constructor id includes the package, module, type and constructor and is recorded in `.iface` next to the tag; `_tag` carries the constructor name and the hash of this id, so identity is not reduced to a single name. Immutable data is copied at the boundary: every binding outside `@flick-lang/runtime` gets and gives lists, tuples, records and constructed values as copies, its callbacks included. Primitives, `JsValue`, opaque types and functions pass as they are.
+The FFI supports fixed uncurried calls, `this`, optional arguments and a variadic tail taken from a `List`. Flick's currying is preserved. The constructor id includes the package, module, type and constructor and is recorded in `.iface` next to the tag; `_tag` carries the constructor name and the hash of this id, so identity is not reduced to a single name. Immutable data is copied at the boundary: every binding outside `@flick-lang/effect-ts` and `@flick-lang/runtime` gets and gives lists, tuples, records and constructed values as copies, its callbacks included. Primitives, `JsValue`, opaque types and functions pass as they are.
 
 The representation of a variant type is declared explicitly, because it is an ABI, not an optimizer decision:
 

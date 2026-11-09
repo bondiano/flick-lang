@@ -23,73 +23,73 @@ type Context
 /// A writable atom holding `value`, whatever its type: a function or a task
 /// is the value itself.
 state : a -> Writable a
-foreign pure state from "@flick-lang/runtime/effect/reactivity/Atom" "flickState"
+foreign pure state from "@flick-lang/effect-ts/effect/reactivity/Atom" "flickState"
   reviewed "effect@4.1.2 sha256:bc281fccfb5af41b"
 
 /// A derived atom: `read` computes its value from the atoms it reads
 /// through the context, and runs again when one of them changes.
 readable : (Context -> a) -> Atom a
-foreign pure readable from "@flick-lang/runtime/effect/reactivity/Atom" "readable"
+foreign pure readable from "@flick-lang/effect-ts/effect/reactivity/Atom" "readable"
   arity 1
   reviewed "effect@4.1.2 sha256:a6c2a0d7197620cd"
 
 /// The value of `atom` inside a read function, which then depends on it.
 read : Context -> Atom a -> a
-foreign pure read from "@flick-lang/runtime/effect/reactivity/Atom" "flickRead"
+foreign pure read from "@flick-lang/effect-ts/effect/reactivity/Atom" "flickRead"
   reviewed "effect@4.1.2 sha256:1a93a277076bb044"
 
 /// A writable atom read as an atom.
 readonly : Writable a -> Atom a
-foreign pure readonly from "@flick-lang/runtime/effect/reactivity/Atom" "flickReadonly"
+foreign pure readonly from "@flick-lang/effect-ts/effect/reactivity/Atom" "flickReadonly"
   reviewed "effect@4.1.2 sha256:1f579e00e5d57973"
 
 /// The atom of a task's result, run by the registry that first reads it.
 from_task : Eff none e a -> Atom (Reactivity.AsyncResult.AsyncResult a e)
-foreign pure from_task from "@flick-lang/runtime/effect/reactivity/Atom" "flickFromTask"
+foreign pure from_task from "@flick-lang/effect-ts/effect/reactivity/Atom" "flickFromTask"
   reviewed "effect@4.1.2 sha256:bc281fccfb5af41b"
 
 /// The values of `atom` through `f`.
 map : (a -> b) -> Atom a -> Atom b
-foreign pure map from "@flick-lang/runtime/effect/reactivity/Atom" "flickMap"
+foreign pure map from "@flick-lang/effect-ts/effect/reactivity/Atom" "flickMap"
   reviewed "effect@4.1.2 sha256:66489a3049c532a3"
 
 /// One atom per key, made by `f` the first time and the same after: keys
 /// compare as Effect's `Equal` does, strings and numbers by value.
 family : (k -> Atom a) -> k -> Atom a
-foreign pure family from "@flick-lang/runtime/effect/reactivity/Atom" "family"
+foreign pure family from "@flick-lang/effect-ts/effect/reactivity/Atom" "family"
   arity 1
   reviewed "effect@4.1.2 sha256:00393d08b77f0bbb"
 
 /// The atom named `name` in debugging tools.
 with_label : String -> Atom a -> Atom a
-foreign pure with_label from "@flick-lang/runtime/effect/reactivity/Atom" "flickWithLabel"
+foreign pure with_label from "@flick-lang/effect-ts/effect/reactivity/Atom" "flickWithLabel"
   reviewed "effect@4.1.2 sha256:dcf199329ec11958"
 
 /// A writable atom named `name` in debugging tools.
 label_state : String -> Writable a -> Writable a
-foreign pure label_state from "@flick-lang/runtime/effect/reactivity/Atom" "flickWithLabel"
+foreign pure label_state from "@flick-lang/effect-ts/effect/reactivity/Atom" "flickWithLabel"
   reviewed "effect@4.1.2 sha256:dcf199329ec11958"
 
 /// The state under `key`, coded by `codec` for hydration: a registry
 /// keeps one value per key, so two atoms with one key share it. Prefer
 /// `Atom.serializable`, whose key the compiler gives.
 serializable : String -> PureCodec Json a -> Writable a -> Writable a
-foreign pure serializable from "@flick-lang/runtime/effect/reactivity/Atom" "flickSerializable"
+foreign pure serializable from "@flick-lang/effect-ts/effect/reactivity/Atom" "flickSerializable"
 
 /// One serializable state per key, made by `f` the first time, under
 /// `prefix/key`.
 serializable_family : String -> PureCodec Json a -> (String -> Writable a) -> String -> Writable a
-foreign pure serializable_family from "@flick-lang/runtime/effect/reactivity/Atom" "flickSerializableFamily"
+foreign pure serializable_family from "@flick-lang/effect-ts/effect/reactivity/Atom" "flickSerializableFamily"
   arity 3
 
 /// The atom with its value kept while the registry lives, read or not.
 keep_alive : Atom a -> Atom a
-foreign pure keep_alive from "@flick-lang/runtime/effect/reactivity/Atom" "keepAlive"
+foreign pure keep_alive from "@flick-lang/effect-ts/effect/reactivity/Atom" "keepAlive"
   reviewed "effect@4.1.2 sha256:3b9956a5f7e73649"
 
 /// The atom with its value kept for `ttl` after nobody reads it.
 idle_ttl : Duration.Duration -> Atom a -> Atom a
-foreign pure idle_ttl from "@flick-lang/runtime/effect/reactivity/Atom" "flickIdleTtl"
+foreign pure idle_ttl from "@flick-lang/effect-ts/effect/reactivity/Atom" "flickIdleTtl"
   reviewed "effect@4.1.2 sha256:ff359ba0593bfaa2"
 
 @lang atom_registry
@@ -102,7 +102,7 @@ service Registry =
   refresh : forall a. Atom a ->{} Unit
 
 layer_of : ServiceTag {Registry} -> Layer none none {Registry}
-foreign pure layer_of from "@flick-lang/runtime/effect/reactivity/Atom" "flickLayer"
+foreign pure layer_of from "@flick-lang/effect-ts/effect/reactivity/Atom" "flickLayer"
   reviewed "effect@4.1.2 sha256:aed6a9830749e2d0"
 
 /// A fresh registry.

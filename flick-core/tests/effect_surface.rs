@@ -163,12 +163,12 @@ fn binding(target: &str) -> Binding {
 
 #[cfg(feature = "ide")]
 fn pinned() -> String {
-    let text =
-        fs::read_to_string(repo().join("runtime/package.json")).expect("runtime/package.json");
+    let text = fs::read_to_string(repo().join("packages/effect-ts/package.json"))
+        .expect("packages/effect-ts/package.json");
     let json: serde_json::Value = serde_json::from_str(&text).expect("valid package.json");
     json["dependencies"]["effect"]
         .as_str()
-        .expect("the runtime pins effect")
+        .expect("the adapter pins effect")
         .to_owned()
 }
 

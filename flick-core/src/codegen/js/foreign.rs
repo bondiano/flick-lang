@@ -15,8 +15,17 @@ fn copies(f: &Foreign) -> Option<&Copies> {
         .binding
         .from
         .as_deref()
-        .is_some_and(|m| m.starts_with("@flick-lang/runtime"));
+        .is_some_and(trusted_runtime_package);
     (!trusted && f.adapter.copies.any()).then_some(&f.adapter.copies)
+}
+
+fn trusted_runtime_package(spec: &str) -> bool {
+    ["@flick-lang/runtime", "@flick-lang/effect-ts"]
+        .iter()
+        .any(|package| {
+            spec.strip_prefix(package)
+                .is_some_and(|rest| rest.is_empty() || rest.starts_with('/'))
+        })
 }
 
 impl Gen<'_> {
@@ -25,6 +34,8 @@ impl Gen<'_> {
         let target = match &f.binding.from {
             Some(module) => {
                 let spec = (self.options.foreign)(self.module, module);
+                // a module the kernel does not have: see `write_imports`
+                self.runtime |= self.kernel && spec.starts_with("@flick-lang/effect-ts/effect/");
                 self.foreign
                     .push((spec, f.binding.name.clone(), alias.clone()));
                 alias
@@ -52,22 +63,13 @@ impl Gen<'_> {
             return self.export(&id, &target);
         }
         let call = self.foreign_call(f, &target, &dicts, &params);
-        let result = |g: &mut Self, v: &str| {
-            let v = g.copied(copy_result, v.to_owned());
-            let v = if info.result.nullable {
-                format!("{}({v})", g.rt("fromNullable"))
-            } else {
-                v
-            };
-            if info.result.unit {
-                format!("(void {v})")
-            } else {
-                v
-            }
-        };
+        let result = |g: &mut Self, v: &str| g.foreign_result(f, copy_result, v);
         let catch = f.catch.as_ref().map(|c| self.expr(c));
         let mut body = match (f.mode, runtime) {
             (ForeignMode::Pure, _) | (_, false) => result(self, &call),
+            (ForeignMode::Sync | ForeignMode::Effect, true) if self.kernel => {
+                self.kernel_foreign(f, copy_result, &call, catch)
+            }
             (ForeignMode::Sync, true) => {
                 let value = result(self, &call);
                 match catch {
@@ -161,6 +163,23 @@ impl Gen<'_> {
 }
 
 impl Gen<'_> {
+    /// What a foreign call's value `v` is to the program: a copy when asked,
+    /// its `null` a `None`, nothing for `Unit`.
+    pub(super) fn foreign_result(&mut self, f: &Foreign, copy: bool, v: &str) -> String {
+        let info = &f.adapter;
+        let v = self.copied(copy, v.to_owned());
+        let v = if info.result.nullable {
+            format!("{}({v})", self.rt("fromNullable"))
+        } else {
+            v
+        };
+        if info.result.unit {
+            format!("(void {v})")
+        } else {
+            v
+        }
+    }
+
     /// `value`, as a copy when `copy`.
     fn copied(&mut self, copy: bool, value: String) -> String {
         if copy {
@@ -220,4 +239,19 @@ pub(super) fn plain_foreigns(items: &[Item]) -> HashMap<String, (usize, String)>
             _ => None,
         })
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::trusted_runtime_package;
+
+    #[test]
+    fn only_runtime_and_adapter_package_paths_are_trusted() {
+        assert!(trusted_runtime_package("@flick-lang/runtime/rt"));
+        assert!(trusted_runtime_package(
+            "@flick-lang/effect-ts/effect/Effect"
+        ));
+        assert!(!trusted_runtime_package("@flick-lang/runtime-extra"));
+        assert!(!trusted_runtime_package("@flick-lang/effect-ts-extra"));
+    }
 }

@@ -1,5 +1,5 @@
 # Schedules: when to repeat or retry, and with what output.
-[@flick-lang/runtime/effect/Schedule]
+[@flick-lang/effect-ts/effect/Schedule]
 forever ScheduleForever
 once ScheduleOnce
 identity ScheduleIdentity
@@ -26,7 +26,7 @@ modifyDelay ScheduleModifyDelay
 flickCurrentMetadata *ScheduleCurrentMetadata
 cron ScheduleCron
 
-[@flick-lang/runtime/effect/Effect]
+[@flick-lang/effect-ts/effect/Effect]
 repeat *EffectRepeat
 repeatOrElse *EffectRepeatOrElse
 retry *EffectRetry

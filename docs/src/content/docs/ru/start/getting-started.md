@@ -1,7 +1,7 @@
 ---
 title: Начало работы
 description: Установите инструменты, создайте приложение и запустите его.
-source_hash: fd37ff4bf6978c0f
+source_hash: c3f53e07fdc6a9a5
 ---
 
 ## Установка
@@ -135,7 +135,7 @@ export default defineConfig({ integrations: [flick()] });
 ```astro
 <div id="app"></div>
 <script>
-  import { runMain } from "@flick-lang/runtime";
+  import { runMain } from "@flick-lang/effect-ts";
   import { main } from "../app/Main.fl";
 
   runMain(main);

@@ -9,8 +9,8 @@ import HeroMap from "./HeroMap.astro";
 import ServedMap from "./ServedMap.astro";
 import RouteBend from "./RouteBend.astro";
 import { highlight, shown } from "./highlight.ts";
-import { Effect } from "@flick-lang/runtime";
-import { uiRenderStatic } from "@flick-lang/runtime/ui/react";
+import { Effect } from "@flick-lang/effect-ts";
+import { uiRenderStatic } from "@flick-lang/effect-ts/ui/react";
 import { renderToString } from "react-dom/server";
 import { initial_view } from "../widgets/Hero.fl";
 
@@ -260,7 +260,7 @@ const place = (stop: Stop) => `--shift: ${columns[stop]}; --bend: ${bendHeight(s
       <a href={repository}><Icon name="github" /> GitHub</a>
     </footer>
     <script>
-      import { run } from "@flick-lang/runtime/runner/browser";
+      import { run } from "@flick-lang/effect-ts/runner/browser";
       import { main } from "../widgets/Hero.fl";
       void run(main);
     </script>

@@ -55,29 +55,29 @@ let limits = {
 /// Reads the form of the request; its files are removed when the scope of
 /// region `s` closes.
 persisted : Http.ServerRequest.ServerRequest ->{Scope s; MultipartError} Persisted
-foreign effect persisted from "@flick-lang/runtime/effect/http/Multipart" "flickPersisted"
+foreign effect persisted from "@flick-lang/effect-ts/effect/http/Multipart" "flickPersisted"
   reviewed "effect@4.1.2 sha256:7c2d97a9b575ef4e"
 
 /// Each text field with all its values.
 fields : Persisted -> List (String, List String)
-foreign pure fields from "@flick-lang/runtime/effect/http/Multipart" "flickFields"
+foreign pure fields from "@flick-lang/effect-ts/effect/http/Multipart" "flickFields"
   reviewed "effect@4.1.2 sha256:7c2d97a9b575ef4e"
 
 /// Each file field with all its files.
 files : Persisted -> List (String, List PersistedFile)
-foreign pure files from "@flick-lang/runtime/effect/http/Multipart" "flickFiles"
+foreign pure files from "@flick-lang/effect-ts/effect/http/Multipart" "flickFiles"
   reviewed "effect@4.1.2 sha256:4d1c89a92aadd42d"
 
 /// Decodes the form: an object of a string, strings or files (records of
 /// `PersistedFile`'s fields) for each key.
 schema_persisted : Codec rd re Json a -> Persisted ->{rd; SchemaError} a
-foreign effect schema_persisted from "@flick-lang/runtime/effect/http/Multipart" "flickSchemaPersisted"
+foreign effect schema_persisted from "@flick-lang/effect-ts/effect/http/Multipart" "flickSchemaPersisted"
   arity 2
   reviewed "effect@4.1.2 sha256:947b6de4b7f057ec"
 
 /// Decodes the JSON text of the field of the form.
 schema_json : Codec rd re Json a -> String -> Persisted ->{rd; SchemaError} a
-foreign effect schema_json from "@flick-lang/runtime/effect/http/Multipart" "flickSchemaJson"
+foreign effect schema_json from "@flick-lang/effect-ts/effect/http/Multipart" "flickSchemaJson"
   arity 3
   reviewed "effect@4.1.2 sha256:f56a1dd7a3f2a1c7"
 
@@ -86,7 +86,7 @@ schema_body_multipart :
   Codec rd re Json a ->
   Http.ServerRequest.ServerRequest ->{Scope s | rd; MultipartError, SchemaError}
   a
-foreign effect schema_body_multipart from "@flick-lang/runtime/effect/http/Multipart" "flickSchemaBodyMultipart"
+foreign effect schema_body_multipart from "@flick-lang/effect-ts/effect/http/Multipart" "flickSchemaBodyMultipart"
   arity 2
   reviewed "effect@4.1.2 sha256:19037ac1c9df1f52"
 
@@ -96,7 +96,7 @@ schema_body_form :
   Codec rd re Json a ->
   Http.ServerRequest.ServerRequest ->{Scope s | rd; Http.ServerError.HttpServerError, MultipartError, SchemaError}
   a
-foreign effect schema_body_form from "@flick-lang/runtime/effect/http/Multipart" "flickSchemaBodyForm"
+foreign effect schema_body_form from "@flick-lang/effect-ts/effect/http/Multipart" "flickSchemaBodyForm"
   arity 2
   reviewed "effect@4.1.2 sha256:bffe6740849fd0ac"
 
@@ -106,13 +106,13 @@ schema_body_form_json :
   String ->
   Http.ServerRequest.ServerRequest ->{Scope s | rd; MultipartError, SchemaError}
   a
-foreign effect schema_body_form_json from "@flick-lang/runtime/effect/http/Multipart" "flickSchemaBodyFormJson"
+foreign effect schema_body_form_json from "@flick-lang/effect-ts/effect/http/Multipart" "flickSchemaBodyFormJson"
   arity 3
   reviewed "effect@4.1.2 sha256:689e48d5b357ade0"
 
 /// Runs `task` with the limits for the forms it reads.
 with_limits : Limits -> (Eff r e a)^c ->{r; e} a
-foreign effect with_limits from "@flick-lang/runtime/effect/http/Multipart" "flickWithLimits"
+foreign effect with_limits from "@flick-lang/effect-ts/effect/http/Multipart" "flickWithLimits"
   arity 2
   retention call
   reviewed "effect@4.1.2 sha256:7d736d5d9b8ba138"
@@ -132,12 +132,12 @@ type alias PartInfo = {
 /// Whether the parser reads the part as a file: it has a file name, or a
 /// media type that is not text.
 default_is_file : PartInfo -> Bool
-foreign pure default_is_file from "@flick-lang/runtime/effect/http/Multipart" "flickDefaultIsFile"
+foreign pure default_is_file from "@flick-lang/effect-ts/effect/http/Multipart" "flickDefaultIsFile"
   reviewed "effect@4.1.2 sha256:ebe920f8a497dacd"
 
 /// The text of a field's bytes, in the charset of its media type.
 decode_field : PartInfo -> List Int -> String
-foreign pure decode_field from "@flick-lang/runtime/effect/http/Multipart" "flickDecodeField"
+foreign pure decode_field from "@flick-lang/effect-ts/effect/http/Multipart" "flickDecodeField"
   arity 2
   reviewed "effect@4.1.2 sha256:49be3c553d049561"
 
@@ -154,7 +154,7 @@ type Part =
 
 /// The parts of the request's form, in order.
 parts : Http.ServerRequest.ServerRequest -> Stream none {MultipartError} Part
-foreign pure parts from "@flick-lang/runtime/effect/http/Multipart" "flickParts"
+foreign pure parts from "@flick-lang/effect-ts/effect/http/Multipart" "flickParts"
   reviewed "effect@4.1.2 sha256:e5f1e8023bf26c37"
 
 /// Parses chunks of bytes of a form into its parts; `headers` are those of
@@ -170,11 +170,11 @@ make_channel :
     Unit
     e
     Unit
-foreign pure make_channel from "@flick-lang/runtime/effect/http/Multipart" "flickMakeChannel"
+foreign pure make_channel from "@flick-lang/effect-ts/effect/http/Multipart" "flickMakeChannel"
   reviewed "effect@4.1.2 sha256:c4fb7aade4e9dd3f"
 
 /// The whole form of the parts, as `persisted` reads it: files are written
 /// to temporary files that the scope of region `s` removes.
 to_persisted : Stream none {MultipartError} Part ->{Scope s; MultipartError} Persisted
-foreign effect to_persisted from "@flick-lang/runtime/effect/http/Multipart" "flickToPersisted"
+foreign effect to_persisted from "@flick-lang/effect-ts/effect/http/Multipart" "flickToPersisted"
   reviewed "effect@4.1.2 sha256:22e22f2f7418accd"

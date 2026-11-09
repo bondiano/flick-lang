@@ -22,7 +22,7 @@ import { after, before, test } from "node:test";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 
-import { asset, install, matches, recorded, redacts, repository, tag } from "./install.mjs";
+import { asset, install, latest, matches, recorded, redacts, repository, tag } from "./install.mjs";
 
 const execFile = promisify(execFileCallback);
 
@@ -101,6 +101,24 @@ const routes = {
   },
   "/api-empty/owner/repo/releases?per_page=30": {
     body: Buffer.from(JSON.stringify([{ tag_name: "std-v0.1.0", draft: false }])),
+    type: "application/json",
+  },
+  "/api-paged/owner/repo/releases?per_page=30": {
+    body: Buffer.from(JSON.stringify(Array.from({ length: 30 }, (_, i) => ({ tag_name: `std-v0.1.${i}` })))),
+    type: "application/json",
+  },
+  "/api-paged/owner/repo/releases?per_page=30&page=2": {
+    body: Buffer.from(JSON.stringify([
+      { tag_name: "v0.1.9" },
+      { tag_name: "v0.2.0" },
+    ])),
+    type: "application/json",
+  },
+  "/api-unsorted/owner/repo/releases?per_page=30": {
+    body: Buffer.from(JSON.stringify([
+      { tag_name: "v0.1.9" },
+      { tag_name: "v0.2.0" },
+    ])),
     type: "application/json",
   },
   // the API refuses, as it does over its rate limit; the download names the tag
@@ -255,6 +273,21 @@ test("a rate-limited API still names the tag, from where the download leads", as
   const found = await install({ env, log: quiet });
   assert.equal(found.version, "v0.1.0");
   assert.ok(existsSync(path.join(dir, "tool-cache", "v0.1.0", TARGET, "flick")));
+});
+
+test("latest finds compiler releases past a full page and chooses the highest version", async () => {
+  const lookup = (api) => latest({ fetch, api, base, repo: "owner/repo", file: FILE, token: "" });
+  assert.equal(await lookup(`${base}/api-paged`), "v0.2.0");
+  assert.equal(await lookup(`${base}/api-unsorted`), "v0.2.0");
+  assert.equal(await lookup(`${base}/api-empty`), "v0.1.0", "the download supplies the fallback tag");
+});
+
+test("missing GITHUB_PATH warns even when GITHUB_OUTPUT is set", async () => {
+  const { env } = environment({ INPUT_VERSION: "v0.1.0", GITHUB_PATH: undefined });
+  const lines = [];
+  await install({ env, log: (line) => lines.push(line) });
+  assert.ok(lines.some((line) => line.includes("::warning::GITHUB_PATH is unset")));
+  assert.match(readFileSync(env.GITHUB_OUTPUT, "utf8"), /^version=v0\.1\.0$/m);
 });
 
 test("a wrong sha256 installs nothing", async () => {

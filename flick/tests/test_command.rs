@@ -110,8 +110,22 @@ fn status<'a>(json: &'a Value, name: &str) -> (&'a str, &'a str) {
 #[test]
 #[ignore = "needs Node and pnpm install"]
 fn outcomes_are_reported_apart() {
-    let dir = project("outcomes");
-    let out = flick_in(&dir, &["test", "--reporter", "json", "--seed", "7"]);
+    outcomes(&project("outcomes"));
+}
+
+#[test]
+#[ignore = "needs Node and pnpm install"]
+fn outcomes_are_reported_apart_on_flicks_own_runtime() {
+    let dir = project("outcomes_rt");
+    let toml = dir.join("flick.toml");
+    let config = fs::read_to_string(&toml).expect("read");
+    fs::write(&toml, format!("{config}\n[build]\neffect = \"rt\"\n")).expect("write");
+    outcomes(&dir);
+}
+
+/// Runs `SUITE` in `dir`: each outcome has its kind, and a seed draws alike.
+fn outcomes(dir: &Path) {
+    let out = flick_in(dir, &["test", "--reporter", "json", "--seed", "7"]);
     assert_eq!(out.status.code(), Some(1), "{out:?}");
     let json = results(&out);
     assert_eq!(json["seed"], 7);
@@ -134,7 +148,7 @@ fn outcomes_are_reported_apart() {
     assert!(String::from_utf8_lossy(&out.stderr).contains("released"));
     // the same seed draws the same values
     let again = results(&flick_in(
-        &dir,
+        dir,
         &["test", "--reporter", "json", "--seed", "7"],
     ));
     let message = |j: &Value| {
@@ -475,6 +489,12 @@ fn clock_tests_pass(name: &str, args: &[&str]) {
 #[ignore = "needs Node and pnpm install"]
 fn clock_tests_run_on_virtual_time() {
     clock_tests_pass("clocks", &[]);
+}
+
+#[test]
+#[ignore = "needs Node and pnpm install"]
+fn clock_tests_run_on_virtual_time_on_flicks_own_runtime() {
+    clock_tests_pass("clocks_rt", &["--rt"]);
 }
 
 #[test]

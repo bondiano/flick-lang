@@ -1,6 +1,6 @@
 # Queues, ended by Done, as Effect 4's.
 
-[@flick-lang/runtime/effect/Queue]
+[@flick-lang/effect-ts/effect/Queue]
 flickMake QueueMake
 bounded QueueBounded
 sliding QueueSliding

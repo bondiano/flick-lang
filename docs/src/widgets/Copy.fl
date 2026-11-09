@@ -50,7 +50,7 @@ let view input model m =
 report : Failure e ->{} Unit
 let report failure = Platform.stderr_line (RawCause.describe (Failure.inspect failure))
 
-mount : Input ->{; AppError} Unit
+mount : Input ->{Async; AppError} Unit
 let mount input =
   match Ui.Dom.container input.id with
   | None -> App.fail "Missing code copy container"

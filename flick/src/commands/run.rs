@@ -15,7 +15,7 @@ use std::{fs, io, process};
 
 use flick_core::build::{go, runner_file};
 use flick_core::diagnostics::{Diagnostic, Severity, codes};
-use flick_core::project::config::{Emit, MAIN_ENTRY};
+use flick_core::project::config::{Backend, Emit, MAIN_ENTRY};
 use flick_core::project::{self, Project, cache};
 use flick_core::source::SourceMap;
 #[cfg(unix)]
@@ -38,6 +38,8 @@ pub fn generations(root: &Path) -> PathBuf {
 /// A directory atomically reserved by this CLI until all cleanup ends.
 pub struct Generation {
     path: PathBuf,
+    /// Built for Flick's own runtime, which has no `DevTools`.
+    rt: bool,
 }
 
 impl Generation {
@@ -49,7 +51,7 @@ impl Generation {
             // The owner is in the name, so clean cannot race lock-file creation.
             let path = dir.join(format!("{owner}-{number}"));
             match fs::create_dir(&path) {
-                Ok(()) => return Ok(Self { path }),
+                Ok(()) => return Ok(Self { path, rt: false }),
                 Err(err) if err.kind() == ErrorKind::AlreadyExists => {}
                 Err(err) => return Err(err),
             }
@@ -197,7 +199,7 @@ pub fn build_into_generation(
     options: &RunArguments,
     global: &GlobalArguments,
 ) -> Result<Generation, u8> {
-    let generation = match Generation::reserve(&project.root) {
+    let mut generation = match Generation::reserve(&project.root) {
         Ok(generation) => generation,
         Err(err) => {
             let d = Diagnostic::new(
@@ -224,6 +226,7 @@ pub fn build_into_generation(
             schema_aot: false,
             profile: options.profile,
             labels: None,
+            rt: options.rt,
             watch: false,
             inputs: false,
         },
@@ -233,6 +236,7 @@ pub fn build_into_generation(
         generation: true,
         built: RefCell::default(),
     };
+    generation.rt = options.rt || project.config.build.effect == Backend::Rt;
     let outcome = build.run();
     report::render(global, &outcome.sources, &outcome.diagnostics);
     let code = report::code(&outcome.diagnostics);
@@ -258,10 +262,15 @@ pub fn launch(
     } else {
         let mut command = Process::new("node");
         command.arg("--enable-source-maps");
-        if let Some(url) = &options.devtools {
+        if generation.rt && options.devtools.is_some() {
+            report::log(
+                global,
+                "DevTools need Effect: Flick's own runtime runs without them",
+            );
+        } else if let Some(url) = &options.devtools {
             // the runtime's module that hands `runMain` the DevTools layer
             command
-                .args(["--import", "@flick-lang/runtime/runner/devtools"])
+                .args(["--import", "@flick-lang/effect-ts/runner/devtools"])
                 .env("FLICK_DEVTOOLS", url);
         }
         command.arg(generation.path().join(runner_file(name, false)));

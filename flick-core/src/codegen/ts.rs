@@ -14,10 +14,10 @@ use crate::types::lang::{self, Lang};
 use crate::types::{Form, Kind, Type, TypeDef, passes_dictionary};
 
 /// The runtime package generated code imports.
-const RUNTIME: &str = "@flick-lang/runtime";
+const RUNTIME: &str = "@flick-lang/effect-ts";
 
 /// The runtime module whose `Ui` a Flick `Ui` value is.
-const RUNTIME_UI: &str = "@flick-lang/runtime/ui/react";
+const RUNTIME_UI: &str = "@flick-lang/effect-ts/ui/react";
 
 /// Built-in types TypeScript has natively.
 const PRIMITIVES: &[(Lang, &str)] = &[

@@ -456,7 +456,7 @@ still interrupts and joins them.
 ```flick
 mount :
   forall c r.
-  Ui.Dom.Container -> (Failure none ->{r; none} Unit)^c -> Ui^c ->{Atom.Registry, Atom.Write | r; none} Never
+  Ui.Dom.Container -> (Failure none ->{r; none} Unit)^c -> Ui^c ->{Async, Atom.Registry, Atom.Write | r; none} Never
 # let mount = Ui.Dom.mount
 ```
 
@@ -474,7 +474,7 @@ provides:
 # report : Failure none ->{} Unit
 # let report _ = ()
 #
-main : Unit ->{; AppError} Unit
+main : Unit ->{Async; AppError} Unit
 let main () =
   match Ui.Dom.container "app" with
   | None -> App.fail "missing root"
@@ -495,7 +495,7 @@ the handler tasks are interrupted and joined, supervisors included, and
 only then `mount` ends — so the scope releases its resources after the
 tasks have stopped. `Ui.Dom.container id` finds the element to render into.
 
-The adapter is `@flick-lang/runtime/ui`; `react` and `react-dom` 19 are
+The adapter is `@flick-lang/effect-ts/ui`; `react` and `react-dom` 19 are
 peer dependencies of the runtime, installed by the application.
 
 DOM roots live in the separate `Ui.Dom` module. `Ui` itself imports only
@@ -524,11 +524,11 @@ let request n =
   }
 ```
 
-`Ui.Server` comes from `@flick-lang/runtime/ui/server`, so client programs
+`Ui.Server` comes from `@flick-lang/effect-ts/ui/server`, so client programs
 do not load `react-dom/server`. A JavaScript host can instead
 expose an initial-view function from Flick and evaluate its cold effect on
 the server. Pass the resulting `Ui` to `uiRenderStatic` from
-`@flick-lang/runtime/ui/react`, then serialize that React node with
+`@flick-lang/effect-ts/ui/react`, then serialize that React node with
 `renderToString` from `react-dom/server`. Its views and fields read atoms
 as a server does, each call from a registry of its own. Event bindings
 remain inert on the server; the application does not need a second HTML
@@ -652,7 +652,7 @@ values are escaped as `text` keeps markup in text, handlers are left out,
 and views read atoms as a server does, from a registry of that call alone,
 so the same `ui` always gives the same HTML. A foreign component, which
 only React renders, is a defect. It comes from
-`@flick-lang/runtime/ui/html`, which imports neither React nor
+`@flick-lang/effect-ts/ui/html`, which imports neither React nor
 `react-dom/server`.
 
 ```flick
@@ -665,8 +665,8 @@ let receipt order =
 
 ## Other React renderers
 
-`@flick-lang/runtime/ui` is the React DOM adapter.
-`@flick-lang/runtime/ui/react` contains the React-only node conversion,
+`@flick-lang/effect-ts/ui` is the React DOM adapter.
+`@flick-lang/effect-ts/ui/react` contains the React-only node conversion,
 views and task lifecycle; importing it does not load `react-dom` or
 read `document` or `window`.
 
@@ -731,15 +731,15 @@ Flick's React 19 batching does not promise Elmish's animation-frame schedule.
   to the DOM surface.
 
 The implementation is in the
-[React-only runner](https://github.com/bondiano/flick-lang/blob/main/runtime/src/ui/react/index.ts),
-[DOM adapter](https://github.com/bondiano/flick-lang/blob/main/runtime/src/ui/index.ts)
+[React-only runner](https://github.com/bondiano/flick-lang/blob/main/packages/effect-ts/src/ui/react/index.ts),
+[DOM adapter](https://github.com/bondiano/flick-lang/blob/main/packages/effect-ts/src/ui/index.ts)
 and built-in modules
 [`Ui`](https://github.com/bondiano/flick-lang/blob/main/packages/std/src/Ui.fl)
 and [`Ui.Dom`](https://github.com/bondiano/flick-lang/blob/main/packages/std/src/Ui/Dom.fl).
 Regression coverage is kept with the behavior:
 
-- [`runtime/test/ui-roots.test.ts`](https://github.com/bondiano/flick-lang/blob/main/runtime/test/ui-roots.test.ts)
-  and [`ui-policies.test.ts`](https://github.com/bondiano/flick-lang/blob/main/runtime/test/ui-policies.test.ts):
+- [`packages/effect-ts/test/ui-roots.test.ts`](https://github.com/bondiano/flick-lang/blob/main/packages/effect-ts/test/ui-roots.test.ts)
+  and [`ui-policies.test.ts`](https://github.com/bondiano/flick-lang/blob/main/packages/effect-ts/test/ui-policies.test.ts):
   views, keys, stable listeners, StrictMode, supervision, unmount/join and
   importing the React-only entry point without a DOM.
 - View check fixtures

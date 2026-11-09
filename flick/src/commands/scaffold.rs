@@ -1,5 +1,5 @@
 //! `flick new` and `flick init`: the files of a project pinning the
-//! compiler, the runtime, Effect and pnpm. `init` never overwrites: every
+//! compiler, the runtime, Effect adapter and pnpm. `init` never overwrites: every
 //! file that exists is reported before anything is written. Neither
 //! installs anything; that is `flick install`.
 
@@ -12,7 +12,7 @@ use flick_core::source::SourceMap;
 use super::build::write;
 use crate::args::Template;
 use crate::command::{Command, Outcome};
-use crate::toolchain::{COMPILER, EFFECT, PNPM, REACT, RUNTIME, VITE};
+use crate::toolchain::{COMPILER, EFFECT_TS, PNPM, REACT, RUNTIME, VITE};
 
 /// The entries of the `fullstack` template: a server, and a page that Vite
 /// serves in development.
@@ -96,7 +96,7 @@ fn files(name: &str, template: Template) -> Vec<(&'static str, String)> {
         "private": app,
         "type": "module",
         "packageManager": format!("pnpm@{PNPM}"),
-        "dependencies": { "@flick-lang/runtime": RUNTIME, "effect": EFFECT },
+        "dependencies": { "@flick-lang/runtime": RUNTIME, "@flick-lang/effect-ts": EFFECT_TS },
         "flick": { "compiler": COMPILER },
     });
     if template == Template::Fullstack {

@@ -5,14 +5,14 @@
 // node with constraints no value meets, at its path), as the JS runtime
 // builds them. TestArbitraryLinksAsEffect compares the go
 // runtime's lines with these.
-// Run from the repository root after `pnpm -C runtime build`:
+// Run from the repository root after `pnpm -C packages/effect-ts build`:
 // `node tools/go-arbitrary/gen.mjs`.
 import { writeFileSync } from "node:fs";
 
-import * as rt from "../../runtime/dist/index.js";
-import * as S from "../../runtime/dist/effect/Schema.js";
-import * as D from "../../runtime/dist/effect/DateTime.js";
-import { Arbitrary, Chunk, DateTime, Duration, Effect, Exit } from "../../runtime/node_modules/effect/dist/index.js";
+import * as rt from "../../packages/effect-ts/dist/index.js";
+import * as S from "../../packages/effect-ts/dist/effect/Schema.js";
+import * as D from "../../packages/effect-ts/dist/effect/DateTime.js";
+import { Arbitrary, Chunk, DateTime, Duration, Effect, Exit } from "../../packages/effect-ts/node_modules/effect/dist/index.js";
 
 const out = "runtime-go/flickrt/testdata/arbitrary_links.txt";
 

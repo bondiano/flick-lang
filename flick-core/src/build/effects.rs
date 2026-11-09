@@ -11,6 +11,25 @@ use crate::types::{NO_EFFECTS, OpClass};
 pub const CORE_DIR: &str = "_core/";
 
 const RUNTIME: &str = "@flick-lang/runtime";
+const EFFECT_TS: &str = "@flick-lang/effect-ts";
+
+/// The former Effect adapter specifier, accepted in foreign declarations
+/// written before the packages split. Generated imports use the new package.
+pub fn effect_specifier(spec: &str) -> String {
+    match spec.strip_prefix(RUNTIME) {
+        Some(rest)
+            if rest.is_empty()
+                || rest.starts_with("/effect/")
+                || rest.starts_with("/ui")
+                || rest.starts_with("/runner/")
+                || rest.starts_with("/sql")
+                || rest.starts_with("/cli") =>
+        {
+            format!("{EFFECT_TS}{rest}")
+        }
+        _ => spec.to_owned(),
+    }
+}
 
 /// The built-in modules whose foreign bindings `core` has, every one.
 const BUILTINS: &[&str] = &[
@@ -41,13 +60,100 @@ const IN_CORE: &[&str] = &[
 /// What a foreign module `spec` is without effects; `None` when it has no
 /// version without Effect. A module of the program's own is itself.
 pub fn specifier(spec: &str) -> Option<String> {
-    match spec.strip_prefix(RUNTIME) {
+    match spec
+        .strip_prefix(EFFECT_TS)
+        .or_else(|| spec.strip_prefix(RUNTIME))
+    {
         None => Some(spec.to_owned()),
         Some("") => Some(format!("{RUNTIME}/core")),
         Some(rest) => rest
             .strip_prefix("/effect/")
             .filter(|m| IN_CORE.contains(m))
             .map(|m| format!("{RUNTIME}/core/{m}")),
+    }
+}
+
+/// The modules of `@flick-lang/runtime/effect/` that Flick's own runtime has,
+/// under `@flick-lang/runtime/rt/effect/`, for the exports it has.
+const IN_RT: &[&str] = &[
+    "Arbitrary",
+    "Array",
+    "BigInt",
+    "BigDecimal",
+    "ByteSize",
+    "Cause",
+    "Clock",
+    "Chunk",
+    "Combiner",
+    "Crypto",
+    "DateTime",
+    "Deferred",
+    "Differ",
+    "Duration",
+    "Effect",
+    "Exit",
+    "Fiber",
+    "FiberSet",
+    "Filter",
+    "Function",
+    "Hash",
+    "HashMap",
+    "HashRing",
+    "HashSet",
+    "Formatter",
+    "Inspectable",
+    "JsonPatch",
+    "JsonPointer",
+    "JsonSchema",
+    "Latch",
+    "Layer",
+    "Queue",
+    "Random",
+    "Number",
+    "Option",
+    "Optic",
+    "Record",
+    "Reducer",
+    "Predicate",
+    "RegExp",
+    "Redacted",
+    "Schedule",
+    "Schema",
+    "Scope",
+    "String",
+    "Struct",
+    "Tuple",
+    "Tracer",
+    "Trie",
+    "Version",
+    "reactivity/AsyncResult",
+    "reactivity/Atom",
+];
+
+/// The entry points of the UI layer, which Flick's own runtime has under
+/// `@flick-lang/runtime/rt/`.
+const UI_IN_RT: &[&str] = &["/ui", "/ui/react", "/ui/html", "/ui/server"];
+
+/// What a foreign module `spec` is on Flick's own runtime; `None` when it has no
+/// version there. A module of the program's own is itself.
+pub fn rt_specifier(spec: &str) -> Option<String> {
+    match spec
+        .strip_prefix(EFFECT_TS)
+        .or_else(|| spec.strip_prefix(RUNTIME))
+    {
+        None => Some(spec.to_owned()),
+        Some("") => Some(format!("{RUNTIME}/rt")),
+        Some(rest) if UI_IN_RT.contains(&rest) => Some(format!("{RUNTIME}/rt{rest}")),
+        Some(rest) => {
+            let module = rest.strip_prefix("/effect/")?;
+            if IN_RT.contains(&module) {
+                Some(format!("{RUNTIME}/rt/effect/{module}"))
+            } else if IN_CORE.contains(&module) {
+                Some(format!("{RUNTIME}/core/{module}"))
+            } else {
+                None
+            }
+        }
     }
 }
 
@@ -125,7 +231,7 @@ pub fn control_on_js(module: &ir::Module, diagnostics: &mut Vec<Diagnostic>) {
 
 #[cfg(test)]
 mod tests {
-    use super::{BUILTINS, specifier};
+    use super::{BUILTINS, effect_specifier, rt_specifier, specifier};
     use crate::types::builtin_sources;
 
     #[test]
@@ -149,6 +255,53 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[test]
+    fn runtime_modules_map_to_flick_runtime_core_or_stay_absent() {
+        assert_eq!(
+            effect_specifier("@flick-lang/runtime/effect/Stream"),
+            "@flick-lang/effect-ts/effect/Stream"
+        );
+        assert_eq!(
+            effect_specifier("@flick-lang/runtime/rt"),
+            "@flick-lang/runtime/rt"
+        );
+        assert_eq!(
+            rt_specifier("@flick-lang/effect-ts/effect/Fiber").as_deref(),
+            Some("@flick-lang/runtime/rt/effect/Fiber")
+        );
+        assert_eq!(
+            rt_specifier("@flick-lang/runtime").as_deref(),
+            Some("@flick-lang/runtime/rt")
+        );
+        assert_eq!(
+            rt_specifier("@flick-lang/runtime/effect/Fiber").as_deref(),
+            Some("@flick-lang/runtime/rt/effect/Fiber")
+        );
+        assert_eq!(
+            rt_specifier("@flick-lang/runtime/effect/DateTime").as_deref(),
+            Some("@flick-lang/runtime/rt/effect/DateTime")
+        );
+        assert_eq!(
+            rt_specifier("@flick-lang/runtime/effect/HashMap").as_deref(),
+            Some("@flick-lang/runtime/rt/effect/HashMap")
+        );
+        assert_eq!(
+            rt_specifier("@flick-lang/runtime/effect/Option").as_deref(),
+            Some("@flick-lang/runtime/rt/effect/Option")
+        );
+        assert_eq!(
+            rt_specifier("@flick-lang/runtime/effect/reactivity/Atom").as_deref(),
+            Some("@flick-lang/runtime/rt/effect/reactivity/Atom")
+        );
+        assert_eq!(rt_specifier("@flick-lang/runtime/effect/Stream"), None);
+        assert_eq!(
+            rt_specifier("@flick-lang/runtime/ui/react").as_deref(),
+            Some("@flick-lang/runtime/rt/ui/react")
+        );
+        assert_eq!(rt_specifier("@flick-lang/runtime/ui/other"), None);
+        assert_eq!(rt_specifier("./clock.mjs").as_deref(), Some("./clock.mjs"));
     }
 
     #[test]

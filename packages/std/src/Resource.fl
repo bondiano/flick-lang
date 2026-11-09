@@ -10,14 +10,14 @@ type Resource (s : Region) (e : ErrorRow) a
 /// which runs it when that scope closes; `release` has no typed errors.
 /// The value holds region `s`, so it cannot leave that scope.
 acquire_release : (Eff r e a)^c -> (a ->{r;} Unit)^c ->{Scope s | r; e} a^{s}
-foreign effect acquire_release from "@flick-lang/runtime" "acquireRelease"
+foreign effect acquire_release from "@flick-lang/effect-ts" "acquireRelease"
   retention owner
   reviewed "effect@4.1.2 sha256:8c69fda7dc943ca4"
 
 /// Runs `acquire`, `use` and then `release`, even when `use` fails;
 /// `release` may fail with a typed error of its own.
 bracket : (Eff r e a)^c -> (a ->{r; e} b)^c -> (a ->{r; e} Unit)^c ->{r; e} b
-foreign effect bracket from "@flick-lang/runtime" "bracket"
+foreign effect bracket from "@flick-lang/effect-ts" "bracket"
   retention call
   reviewed "effect@4.1.2 sha256:447feb1119a6d518"
 
@@ -25,17 +25,17 @@ foreign effect bracket from "@flick-lang/runtime" "bracket"
 /// acquired now by `acquire`, which runs with the services of this call and
 /// acquires into a region `t` of its own; `refresh` acquires it again.
 manual : (forall t. Eff {Scope t | r} e a^{t})^c ->{Scope s | r;} Resource s e a
-foreign effect manual from "@flick-lang/runtime/effect/Resource" "flickManual"
+foreign effect manual from "@flick-lang/effect-ts/effect/Resource" "flickManual"
   retention owner
 
 /// Runs `f` with the current value, which stays acquired until `f` ends;
 /// fails as the acquisition did if it never succeeded.
 use : Resource s e a -> (forall t. a^{t} ->{r; e2} b)^c ->{r; e + e2} b
-foreign effect use from "@flick-lang/runtime/effect/Resource" "flickUse"
+foreign effect use from "@flick-lang/effect-ts/effect/Resource" "flickUse"
   retention call
 
 /// Acquires the value again; the previous one is released once no `use`
 /// holds it. If the acquisition fails, the previous value stays.
 refresh : Resource s e a ->{Async; e} Unit
-foreign effect refresh from "@flick-lang/runtime/effect/Resource" "flickRefresh"
+foreign effect refresh from "@flick-lang/effect-ts/effect/Resource" "flickRefresh"
   retention call

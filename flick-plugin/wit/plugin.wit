@@ -192,6 +192,38 @@ interface types {
   /// its fields when it is a closed record.
   record fact { span: span, ty: fact-type, fields: option<list<fact-field>> }
 
+  /// A value the compiler folded where a program writes it: the constant a
+  /// watched call is given.
+  variant constant { number(f64), text(string), boolean(bool) }
+
+  /// An argument of a watched call: where it is written, the type the
+  /// checker found for it, the fields of a closed record, and the constant
+  /// it folds to, if any.
+  record argument {
+    span: span,
+    ty: fact-type,
+    fields: option<list<fact-field>>,
+    constant: option<constant>,
+  }
+
+  /// How a refined type checks a value at `T$parse`: the literals of an
+  /// enum, the name of a check the compiler knows (`email`, `non-empty`,
+  /// `positive`), or the host's verdict on the module's own predicate.
+  variant refinement { literals(list<constant>), known(string), holds(bool) }
+
+  /// A place that calls a name the plugin's package watches: the module and
+  /// the name as the compiler knows them, where the call is written, its
+  /// arguments, and, for a `T$parse`, how `T` checks its value. Every span
+  /// is a byte offset in the text of the module's own file, and the
+  /// diagnostics of `check-calls` are at spans of it too.
+  record call-site {
+    module: string,
+    name: string,
+    span: span,
+    arguments: list<argument>,
+    refinement: option<refinement>,
+  }
+
   enum highlight-kind { keyword, parameter }
 
   /// How an editor colors a span of a block that is not the user's code.
@@ -289,7 +321,7 @@ interface compiler {
 
 world plugin {
   import compiler;
-  use types.{block, arena, diagnostic, completion, hover, highlight, piece, derive-target, fact, published, artifact};
+  use types.{block, arena, diagnostic, completion, hover, highlight, piece, derive-target, fact, call-site, published, artifact};
 
   /// What the plugin learns from all its blocks of a group, before any expands.
   export collect: func(blocks: list<block>) -> list<u8>;
@@ -339,4 +371,9 @@ world plugin {
   /// What is wrong with `block` that only the types of its code show, from
   /// the types of the `_` of its code; it only adds diagnostics.
   export check: func(block: block, state: list<u8>, facts: list<fact>) -> list<diagnostic>;
+  /// What is wrong with the places of one module that call the names the
+  /// plugin's package declares in `watch`, given the types the checker
+  /// found there; `state` is what `collect` learned from that module's
+  /// blocks, empty where it has none. It only adds diagnostics.
+  export check-calls: func(calls: list<call-site>, state: list<u8>) -> list<diagnostic>;
 }

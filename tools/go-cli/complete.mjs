@@ -4,7 +4,7 @@
 // repository root after moving the Effect pin: `node tools/go-cli/complete.mjs`.
 import { writeFileSync } from "node:fs";
 
-const internal = new URL("../../runtime/node_modules/effect/dist/cli/internal/completions/", import.meta.url);
+const internal = new URL("../../packages/effect-ts/node_modules/effect/dist/cli/internal/completions/", import.meta.url);
 // the generators are internal, out of reach of the package's exports
 const load = (name) => import(new URL(`${name}.js`, internal).href);
 const [bash, zsh, powershell] = await Promise.all([load("bash"), load("zsh"), load("powershell")]);

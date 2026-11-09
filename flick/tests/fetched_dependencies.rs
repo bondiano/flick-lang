@@ -257,6 +257,7 @@ fn install_fetches_a_tarball_of_the_named_hash() {
     let tgz = src.join("geo.tgz");
     let packed = Command::new("tar")
         .args(["czf", "geo.tgz", "package"])
+        .env("COPYFILE_DISABLE", "1")
         .current_dir(&src)
         .status()
         .expect("tar runs");

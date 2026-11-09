@@ -1,22 +1,22 @@
 # Resources, caches and requests.
 
-[@flick-lang/runtime/effect/Resource]
+[@flick-lang/effect-ts/effect/Resource]
 flickManual *ResourceManual
 flickUse *ResourceUse
 flickRefresh *ResourceRefresh
 
-[@flick-lang/runtime/effect/ScopedRef]
+[@flick-lang/effect-ts/effect/ScopedRef]
 flickFromAcquire *ScopedRefFromAcquire
 flickMake *ScopedRefMake
 flickUse *ScopedRefUse
 flickSet *ScopedRefSet
 
-[@flick-lang/runtime/effect/RcRef]
+[@flick-lang/effect-ts/effect/RcRef]
 flickMake *RcRefMake
 get *RcRefGet
 invalidate *RcRefInvalidate
 
-[@flick-lang/runtime/effect/RcMap]
+[@flick-lang/effect-ts/effect/RcMap]
 flickMake *RcMapMake
 flickGet *RcMapGet
 getOption *RcMapGetOption
@@ -25,7 +25,7 @@ invalidate *RcMapInvalidate
 has *RcMapHas
 touch *RcMapTouch
 
-[@flick-lang/runtime/effect/Pool]
+[@flick-lang/effect-ts/effect/Pool]
 flickMake *PoolMake
 flickMakeWithTtl *PoolMakeWithTtl
 get *PoolGet
@@ -33,7 +33,7 @@ use *PoolUse
 invalidate *PoolInvalidate
 reserve *PoolReserve
 
-[@flick-lang/runtime/effect/Cache]
+[@flick-lang/effect-ts/effect/Cache]
 flickMake *CacheMake
 flickMakeWith *CacheMakeWith
 get *CacheGet
@@ -50,7 +50,7 @@ flickKeys *CacheKeys
 flickValues *CacheValues
 flickEntries *CacheEntries
 
-[@flick-lang/runtime/effect/ScopedCache]
+[@flick-lang/effect-ts/effect/ScopedCache]
 flickMake *ScopedCacheMake
 flickMakeWith *ScopedCacheMakeWith
 flickUse *ScopedCacheUse
@@ -65,7 +65,7 @@ invalidateAll *ScopedCacheInvalidateAll
 size *ScopedCacheSize
 keys *ScopedCacheKeys
 
-[@flick-lang/runtime/effect/Request]
+[@flick-lang/effect-ts/effect/Request]
 flickOf RequestOf
 flickPayload RequestPayload
 flickRequest RequestRequest
@@ -76,7 +76,7 @@ succeed *RequestSucceed
 fail *RequestFail
 flickFailCause *RequestFailCause
 
-[@flick-lang/runtime/effect/RequestResolver]
+[@flick-lang/effect-ts/effect/RequestResolver]
 flickMake RequestResolverMake
 flickMakeWith RequestResolverMakeWith
 flickMakeGrouped RequestResolverMakeGrouped

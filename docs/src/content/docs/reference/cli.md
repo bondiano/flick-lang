@@ -49,7 +49,7 @@ dependencies first.
 
 `check`, `build` and the build steps of `run`, `dev` and `test` install
 nothing, run no `main` and load no foreign module. An installed
-`@flick-lang/runtime` or `effect` of another version than the compiler
+`@flick-lang/runtime`, `@flick-lang/effect-ts` or `effect` of another version than the compiler
 pins stops them with `FLICK-P015` (exit code 2). `schema export` loads the
 module that makes the codec, whose top level is pure, and nothing else.
 

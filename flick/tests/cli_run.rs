@@ -13,8 +13,7 @@ use std::{fs, thread};
 
 use common::{APP, project};
 
-const FOREVER: &str =
-    "import { Effect } from \"@flick-lang/runtime\";\nexport const forever = () => Effect.never;\n";
+const FOREVER: &str = "import { Effect } from \"@flick-lang/effect-ts\";\nexport const forever = () => Effect.never;\n";
 
 /// An app that prints `started <v>`, waits for a signal and prints
 /// `cleanup <v>` when its scope closes, failing there when `broken`.

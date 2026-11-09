@@ -167,32 +167,55 @@ const follow = async (fetch, address, { headers, base }) => {
  * trusted. Without the API (a rate limit), the download of `latest` still
  * names the tag it leads to.
  */
-const latest = async ({ fetch, api, base, repo, file, token }) => {
+export const latest = async ({ fetch, api, base, repo, file, token }) => {
   if (api !== "") {
-    const { response } = await follow(fetch, `${api.replace(/\/+$/, "")}/${repo}/releases?per_page=30`, {
-      base: api,
-      headers: {
-        accept: "application/vnd.github+json",
-        "user-agent": "flick-action",
-        ...(token ? { authorization: `Bearer ${token}` } : {}),
-      },
-    });
-    if (response.ok) {
-      const releases = await response.json();
-      const compiler = releases
-        .filter((release) => release.draft !== true && release.prerelease !== true)
-        .map((release) => release.tag_name ?? "")
-        .filter((name) => /^v\d+\.\d+\.\d+$/.test(name));
-      if (compiler.length === 0) {
-        throw new Error(`\`${repo}\` publishes no compiler release (\`v<major>.<minor>.<patch>\`)`);
+    let newest;
+    for (let page = 1; page <= 1000; page += 1) {
+      const url = `${api.replace(/\/+$/, "")}/${repo}/releases?per_page=30${page === 1 ? "" : `&page=${page}`}`;
+      const { response } = await follow(fetch, url, {
+        base: api,
+        headers: {
+          accept: "application/vnd.github+json",
+          "user-agent": "flick-action",
+          ...(token ? { authorization: `Bearer ${token}` } : {}),
+        },
+      });
+      if (!response.ok) {
+        if (response.status !== 403 && response.status !== 429) {
+          throw failure("listing the releases", response);
+        }
+        return latestFromDownload({ fetch, base, repo, file });
       }
-      return tag(compiler[0]);
+      const releases = await response.json();
+      if (!Array.isArray(releases)) throw new Error("the release list is not an array");
+      for (const release of releases) {
+        const name = release.tag_name ?? "";
+        if (release.draft === true || release.prerelease === true || !/^v\d+\.\d+\.\d+$/.test(name)) continue;
+        const parts = name.slice(1).split(".").map(BigInt);
+        if (
+          newest === undefined ||
+          parts.some(
+            (n, i) =>
+              parts.slice(0, i).every((before, j) => before === newest.parts[j]) &&
+              n > newest.parts[i],
+          )
+        ) {
+          newest = { name, parts };
+        }
+      }
+      if (releases.length < 30) {
+        return newest === undefined
+          ? latestFromDownload({ fetch, base, repo, file })
+          : tag(newest.name);
+      }
     }
-    // a rate limit is not a reason to fail: the download names the tag too
-    if (response.status !== 403 && response.status !== 429) {
-      throw failure("listing the releases", response);
-    }
+    throw new Error("listing the releases exceeded 1000 pages");
   }
+  // Without the API, the download names the tag too.
+  return latestFromDownload({ fetch, base, repo, file });
+};
+
+const latestFromDownload = async ({ fetch, base, repo, file }) => {
   const { response, address } = await follow(fetch, latestUrl(base, repo, file), { base });
   if (!response.ok) throw failure("looking up the latest release", response);
   const seen = /\/releases\/download\/([^/]+)\//.exec(address);
@@ -334,7 +357,7 @@ export const install = async ({ env = process.env, fetch = globalThis.fetch, log
   append(env.GITHUB_PATH, directory);
   append(env.GITHUB_OUTPUT, `version=${tagName}`);
   append(env.GITHUB_OUTPUT, `path=${directory}`);
-  if (env.GITHUB_OUTPUT === undefined || env.GITHUB_OUTPUT === "") {
+  if (env.GITHUB_PATH === undefined || env.GITHUB_PATH === "") {
     log(`::warning::GITHUB_PATH is unset: add ${directory} to PATH yourself`);
   }
   return { version: tagName, directory, printed };

@@ -3,12 +3,15 @@ use std::collections::{BTreeMap, HashMap};
 use std::fmt::Write as _;
 use std::io::{self, ErrorKind};
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::{Arc, Mutex};
 
-use flick_plugin::{Arena, Block, DeriveTarget, Diagnostic as PluginDiagnostic, Fact, Published};
+use flick_plugin::{
+    Arena, Block, CallSite, DeriveTarget, Diagnostic as PluginDiagnostic, Fact, Published,
+};
 use flick_test_pairs::Pairs;
 
+mod calls;
 mod derive;
 mod forms;
 mod loaded;
@@ -33,9 +36,22 @@ struct Counting {
     inner: Native<Pairs>,
     collects: AtomicUsize,
     expands: AtomicUsize,
+    call_states: Mutex<Vec<Vec<u8>>>,
 }
 
 impl Expander for Counting {
+    fn check_calls(
+        &self,
+        calls: &[CallSite],
+        state: &[u8],
+    ) -> Result<Vec<PluginDiagnostic>, String> {
+        self.call_states
+            .lock()
+            .expect("call states")
+            .push(state.to_vec());
+        self.inner.check_calls(calls, state)
+    }
+
     fn id(&self) -> &str {
         self.inner.id()
     }
@@ -186,6 +202,7 @@ fn host(main: &str) -> Memory {
             inner: Native::new("pairs", Pairs),
             collects: AtomicUsize::new(0),
             expands: AtomicUsize::new(0),
+            call_states: Mutex::default(),
         }),
         store: Some(RefCell::default()),
         outside: None,

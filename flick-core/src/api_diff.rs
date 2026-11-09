@@ -346,6 +346,8 @@ mod tests {
             no_let_assert: false,
             thresholds: types::Thresholds::default(),
             effects: true,
+            watched: types::Watched::none(),
+            stages_by_class: false,
         };
         let _ = types::check(
             &module,

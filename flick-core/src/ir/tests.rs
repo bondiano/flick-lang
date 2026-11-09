@@ -10,6 +10,7 @@ use crate::iface::Interface;
 use crate::plugin::derive::builtin_expansion;
 use crate::resolve::{self, Module};
 use crate::source::SourceMap;
+use crate::types::Watched;
 use crate::{syntax, types};
 
 /// Checks one self-contained module and lowers it.
@@ -55,6 +56,8 @@ pub(crate) fn check_text_with(
         no_let_assert: false,
         thresholds: types::Thresholds::default(),
         effects: true,
+        watched: Watched::none(),
+        stages_by_class: false,
     };
     let (more, typing) = types::check_typed(&module, &builtin, builtins, options, &mut interface);
     diagnostics.extend(parse.diagnostics);

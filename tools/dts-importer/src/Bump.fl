@@ -1,6 +1,6 @@
 /// Moves the repository to another Effect release: takes the snapshot of its
 /// surface, reports what was added, removed or changed against the current
-/// one and what the runtime's capability matrix lacks, writes the snapshot
+/// one and what the adapter's capability matrix lacks, writes the snapshot
 /// and the pins. The coverage linter stays red until the manifest is reviewed.
 module Bump exposing (report, matrix, run)
 
@@ -10,9 +10,9 @@ import Ts
 /// The files that pin the Effect release, and how each spells it.
 pins : List (String, String)
 let pins = [
-  ("runtime/package.json", "(\"effect\": \")[^\"]+(\")"),
-  ("runtime/src/capabilities.ts", "(EFFECT_VERSION = \")[^\"]+(\")"),
-  ("runtime/test/effect-version.test.ts", "(PINNED_EFFECT = \")[^\"]+(\")"),
+  ("packages/effect-ts/package.json", "(\"effect\": \")[^\"]+(\")"),
+  ("packages/effect-ts/src/capabilities.ts", "(EFFECT_VERSION = \")[^\"]+(\")"),
+  ("packages/effect-ts/test/effect-version.test.ts", "(PINNED_EFFECT = \")[^\"]+(\")"),
   ("flick/src/toolchain.rs", "(pub const EFFECT: &str = \")[^\"]+(\")"),
 ]
 
@@ -151,7 +151,8 @@ let run version package_dir root =
       | Err _ -> App.fail (file ++ " is not a snapshot")
       | Ok snap -> snap
   let capabilities =
-    matrix (FileSystem.read_file_string (Path.join [root, "runtime/src/capabilities.ts"]))
+    matrix
+      (FileSystem.read_file_string (Path.join [root, "packages/effect-ts/src/capabilities.ts"]))
   Platform.stdout_write (report old next capabilities)
   FileSystem.write_file_string plain file (Surface.render next)
   List.each_effect

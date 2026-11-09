@@ -5,7 +5,7 @@
   "version": "0.1.0",
   "dependencies": {
     "@flick-lang/runtime": "workspace:*",
-    "effect": "4.1.2"
+    "@flick-lang/effect-ts": "workspace:*"
   },
   "flick": {
     "compiler": "0.1.0"

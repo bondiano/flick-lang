@@ -23,11 +23,12 @@ jobs:
           for manifest in flick/Cargo.toml editors/zed/Cargo.toml editors/zed/extension.toml; do
             check "$manifest" "$(grep -m1 '^version = ' "$manifest" | cut -d'"' -f2)"
           done
-          for manifest in runtime/package.json tools/astro-flick/package.json editors/vscode/package.json editors/tree-sitter-flick/tree-sitter.json; do
+          for manifest in runtime/package.json packages/effect-ts/package.json tools/astro-flick/package.json editors/vscode/package.json editors/tree-sitter-flick/tree-sitter.json; do
             check "$manifest" "$(jq -r '.version // .metadata.version' "$manifest")"
           done
           # the runtime version `flick new` pins
           check flick/src/toolchain.rs "$(grep -m1 'pub const RUNTIME' flick/src/toolchain.rs | cut -d'"' -f2)"
+          check flick/src/toolchain.rs "$(grep -m1 'pub const EFFECT_TS' flick/src/toolchain.rs | cut -d'"' -f2)"
           # the `std` a compiler of this version fetches when a project names none
           std="std-v${GITHUB_REF_NAME#v}"
           if ! git ls-remote --exit-code --tags origin "refs/tags/$std" > /dev/null; then
@@ -89,8 +90,10 @@ jobs:
           registry-url: https://registry.npmjs.org
       - run: pnpm install --frozen-lockfile
       - run: pnpm -C runtime build
+      - run: pnpm -C packages/effect-ts build
       - run: |
           pnpm -C runtime publish --no-git-checks
+          pnpm -C packages/effect-ts publish --no-git-checks
           pnpm -C tools/astro-flick publish --no-git-checks
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

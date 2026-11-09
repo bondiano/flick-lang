@@ -360,6 +360,31 @@ fn a_package_names_the_extensions_its_plugin_loads() {
 }
 
 #[test]
+fn a_package_names_the_calls_its_plugin_watches() {
+    let package = |rest: &str| {
+        parse_text(&format!(
+            "schema-version = 1\n[package]\nname = \"protos\"\nversion = \"1.0.0\"\n{rest}\n[project]\nkind = \"lib\"\n"
+        ))
+    };
+    let config = package("plugin = \"protos.wasm\"\nwatch = [\"Ui.Event.queue\", \"*.parse\"]")
+        .expect("valid");
+    assert_eq!(
+        config.package.map(|p| p.watch),
+        Some(vec!["Ui.Event.queue".into(), "*.parse".into()])
+    );
+    for refused in [
+        "watch = [\"Ui.Event.queue\"]",
+        "plugin = \"protos.wasm\"\nwatch = [\"queue\"]",
+        "plugin = \"protos.wasm\"\nwatch = [\"Ui.Event.Queue\"]",
+        "plugin = \"protos.wasm\"\nwatch = [\"ui.event.queue\"]",
+        "plugin = \"protos.wasm\"\nwatch = [\"*.*\"]",
+        "plugin = \"protos.wasm\"\nwatch = [\"\"]",
+    ] {
+        let err = package(refused).expect_err(refused);
+        assert_eq!(err.code, codes::P032, "{refused}: {}", err.message);
+    }
+}
+#[test]
 fn a_project_grants_a_plugin_files_hosts_and_variables() {
     let with = |grants: &str| {
         parse_text(&format!(

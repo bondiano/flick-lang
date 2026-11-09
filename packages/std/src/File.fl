@@ -36,19 +36,19 @@ let read_text path = FileSystem.read_file path
 write_text : Path -> String ->{Async, FileSystem; WriteError} Unit
 let write_text path text = FileSystem.write_file path text
 
-node_open : Path ->{Scope s; OpenError} File s
-foreign effect node_open from "@flick-lang/runtime" "fileOpen"
+node_open : Path ->{Async, Scope s; OpenError} File s
+foreign effect node_open from "@flick-lang/effect-ts" "fileOpen"
   retention call
 
 node_read_handle : File s ->{Async; ReadError} String
-foreign effect node_read_handle from "@flick-lang/runtime" "fileReadHandle"
+foreign effect node_read_handle from "@flick-lang/effect-ts" "fileReadHandle"
   retention call
 
 node_read_file : Path ->{Async; ReadError} String
-foreign effect node_read_file from "@flick-lang/runtime" "fileRead"
+foreign effect node_read_file from "@flick-lang/effect-ts" "fileRead"
 
 node_write_file : Path -> String ->{Async; WriteError} Unit
-foreign effect node_write_file from "@flick-lang/runtime" "fileWrite"
+foreign effect node_write_file from "@flick-lang/effect-ts" "fileWrite"
 
 /// The file system of Node.js.
 node : Layer none none {FileSystem}

@@ -1,0 +1,184 @@
+# Cases on Flick's own runtime (`flick build --rt`): `just conformance-rt` runs
+# them in both profiles, checks each trace with the monitor, and compares the
+# projection of a case of tests/run/runtime with Go's. A case joins as soon as it
+# passes. The paths are under tests/run; `../rt/` holds cases only this runtime
+# runs, as the corpus runs every case on Effect too.
+
+../rt/control_handlers
+../rt/deep_async
+../rt/deep_control
+../rt/late_effect
+../rt/layers
+../rt/wake_chain
+bootstrap/app_fail
+bootstrap/debug
+bootstrap/hello
+bootstrap/stderr
+codegen/abi
+codegen/applicative_do
+codegen/call_site
+codegen/category_classes
+codegen/classes
+codegen/closures
+codegen/deep_recursion
+codegen/default_signatures
+codegen/defaults
+codegen/defect
+codegen/derive_default
+codegen/do_notation
+codegen/effect_sets
+codegen/enums
+codegen/errors
+codegen/eval_order
+codegen/exports
+codegen/fail
+codegen/for_comprehension
+codegen/for_loop
+codegen/functor
+codegen/fusion
+codegen/gadt
+codegen/gadt_derive
+codegen/gadt_dicts
+codegen/generic
+codegen/given_shadow
+codegen/handler_arms
+codegen/handlers
+codegen/higher_rank
+codegen/instance_names
+codegen/ints
+codegen/let_assert
+codegen/lift
+codegen/literals
+codegen/local_functions
+codegen/numbers
+codegen/numeric_classes
+codegen/patterns
+codegen/pure_main
+codegen/question
+codegen/ranges
+codegen/recursion
+codegen/repeated_superclass
+codegen/scope_run
+codegen/service_child
+codegen/service_dictionary
+codegen/service_place
+codegen/services
+codegen/stage_order
+codegen/strings_utf16
+codegen/tags
+codegen/task_twice
+ffi/copy
+ffi/defect
+ffi/snapshot
+runtime/abort_closes_scopes
+runtime/abort_stops_children
+runtime/cause_lists
+runtime/close_phases
+runtime/closed_owner
+runtime/closing_causes
+runtime/closing_child_fails
+runtime/closing_hooks
+runtime/concurrency
+runtime/discontinued_body
+runtime/discontinued_fiber
+runtime/exits
+runtime/group_in_closing
+runtime/handoff
+runtime/hung_io
+runtime/interrupt_after_close
+runtime/interrupt_in_finalizer
+runtime/owners
+runtime/parallel
+runtime/paths
+runtime/ref_linearizable
+runtime/releases
+runtime/scope_close
+runtime/scope_owners
+runtime/scope_releases
+runtime/scoped_file
+runtime/scopes
+runtime/settling_calls
+runtime/shared_layer
+runtime/slice
+runtime/supervisor_defect
+schema/combinators
+schema/contracts
+schema/derive
+schema/enums
+schema/json_wire
+schema/policies
+schema/route
+schema/route_nested
+sql/queries
+stdlib/cli/value
+stdlib/collections
+stdlib/decimals
+stdlib/effect/array
+stdlib/effect/bytesize
+stdlib/effect/chunk
+stdlib/effect/clock
+stdlib/effect/clock_random
+stdlib/effect/combine
+stdlib/effect/crypto
+stdlib/effect/duration
+stdlib/effect/exit_cause
+stdlib/effect/function
+stdlib/effect/hash_map
+stdlib/effect/hash_ring
+stdlib/effect/hash_set
+stdlib/effect/hmac
+stdlib/effect/json_schema
+stdlib/effect/mutable_ref
+stdlib/effect/number
+stdlib/effect/option
+stdlib/effect/order
+stdlib/effect/password
+stdlib/effect/queue
+stdlib/effect/record
+stdlib/effect/schedule
+stdlib/effect/shared_layer_merged
+stdlib/effect/string
+stdlib/effect/string_locale
+stdlib/effect/tracer
+stdlib/effect/trie
+stdlib/effect/values
+stdlib/effect/void
+stdlib/file
+stdlib/hash_order
+stdlib/lists
+stdlib/markdown
+stdlib/monoids
+stdlib/reactivity/atom
+stdlib/seqs
+ui/async
+ui/atoms
+ui/awaiting
+ui/component
+ui/counter
+ui/directory
+ui/element
+ui/email
+ui/family
+ui/host_field
+ui/parity
+ui/registry
+ui/server
+ui/sync
+ui/sync_data
+ui/sync_for
+ui/wake_chain
+
+# Not yet, and why:
+# codegen/effect_abi     its foreign fixture runs an Effect
+# codegen/release        `spin` loops for ever in a `->{}` stage, which runs at once and cannot be interrupted: docs/formal/runtime.md#the-runtime-of-effect--rt
+# runtime/cause_laws     its properties need `Arbitrary`, on Effect; `cause_lists`, `closing_causes` and the kernel's unit tests cover the algebra
+# runtime/interrupt_skips its `Stream` probe, on Effect; the other probes pass
+# runtime/leases         `ScopedRef`, `Resource`, `ScopedCache`, on Effect
+# ui/form                its validation parses with `Schema`, on Effect
+# ui/hydrate             `Codec.json` of its serializable atoms is a `Schema`, on Effect
+# ui/navigate            the codec of its route is a `Schema`, on Effect
+# ui/query               `Atom.query_stream` reads a `Stream`, on Effect
+# ui/route               the codec of its route is a `Schema`, on Effect, and `Ui.Server.stream` a `Stream`
+# ui/serializable        `Codec.json` of its serializable atoms is a `Schema`, on Effect
+# ui/stream              `Codec.json` is a `Schema` and `Ui.Server.stream` a `Stream`, both on Effect
+# the rest of tests/run  what they reach is on Effect yet: a binding of a module this runtime does not have fails when it is called

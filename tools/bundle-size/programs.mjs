@@ -11,6 +11,8 @@ export const PROGRAMS = [
   // the registry keeps `Stream`, which `effect/reactivity` imports for stream atoms,
   // and since Effect 4.1 `Schema` (13 KB), whose `isSchemaError` hydration calls
   { name: "counter", source: "tests/run/ui/counter.fl", budget: 118, unused: ["effect/dist/Graph.js"] },
+  // the same counter on Flick's own runtime: React and the kernel, no Effect at all
+  { name: "counter-rt", source: "tests/run/ui/counter.fl", rt: true, budget: 80, effectFree: true },
   {
     name: "playground", source: "docs/src/playground/Playground.fl", budget: 129,
     reason: "The sandboxed preview, saved drafts and shared links, and the first lesson add browser interactions to the playground.",

@@ -120,7 +120,7 @@ let at method path label parts = parts (HttpApi.endpoint method (path_text path)
 
 /// The path a label stands for.
 path_text : Record.Label path -> String
-foreign pure path_text from "@flick-lang/runtime" "identity"
+foreign pure path_text from "@flick-lang/effect-ts" "identity"
 
 /// The success `s2`, sent with 200.
 ok :

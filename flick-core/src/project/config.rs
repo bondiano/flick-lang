@@ -138,6 +138,10 @@ pub struct Package {
     /// `hooks = ["emit", "ir"]`: the stages of a build its plugin takes part
     /// in besides blocks.
     pub hooks: Vec<String>,
+    /// `watch = ["Ui.Event.queue", "*.parse"]`: the names whose places of
+    /// call its plugin checks, each `Module.name` or `*.name` for the name
+    /// of any module.
+    pub watch: Vec<String>,
     pub span: Span,
 }
 
@@ -279,6 +283,8 @@ pub enum Backend {
     Effect,
     /// No runtime calls; the output imports no Effect.
     None,
+    /// Flick's own runtime, without Effect.
+    Rt,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

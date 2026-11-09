@@ -17,7 +17,8 @@ use std::sync::Arc;
 use flick_core::plugin::source::BlockSource;
 use flick_core::plugin::{Expander, Failure};
 use flick_plugin::{
-    Arena, Block, Completion, DeriveTarget, Diagnostic, Fact, Highlight, Hover, Piece, Published,
+    Arena, Block, CallSite, Completion, DeriveTarget, Diagnostic, Fact, Highlight, Hover, Piece,
+    Published,
 };
 
 pub use cache::{cached, save};
@@ -173,5 +174,10 @@ impl Expander for Traced {
     ) -> Result<Vec<Diagnostic>, String> {
         self.trace(&format!("check {} {}", self.inner.id(), block.head));
         self.inner.check(block, state, facts)
+    }
+
+    fn check_calls(&self, calls: &[CallSite], state: &[u8]) -> Result<Vec<Diagnostic>, String> {
+        self.trace(&format!("check-calls {} {}", self.inner.id(), calls.len()));
+        self.inner.check_calls(calls, state)
     }
 }

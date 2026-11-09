@@ -1,6 +1,6 @@
 # The rest of the runtime's bindings.
 
-[@flick-lang/runtime]
+[@flick-lang/effect-ts]
 recordLabel RecordLabel
 recordGet RecordGet
 recordExtend RecordExtend
@@ -17,5 +17,5 @@ codecInt CodecInt
 schemaArbitrary SchemaArbitrary
 schemaWithGenerator SchemaWithGenerator
 
-[@flick-lang/runtime/effect/http/HttpClientResponse]
+[@flick-lang/effect-ts/effect/http/HttpClientResponse]
 flickFormData *ClientResponseFormData

@@ -34,11 +34,15 @@ fn new_creates_a_project_and_init_refuses_before_writing() {
     for pin in [
         "\"pnpm@",
         "\"@flick-lang/runtime\": \"0.1.0\"",
-        "\"effect\": \"4.1.2\"",
+        "\"@flick-lang/effect-ts\": \"0.1.0\"",
         "\"compiler\": \"0.1.0\"",
     ] {
         assert!(manifest.contains(pin), "{pin} in {manifest}");
     }
+    assert!(
+        !manifest.contains("\"effect\":"),
+        "Effect is an adapter dependency"
+    );
     assert_eq!(code(&flick_in(dir.join("demo"), &["check"])), Some(0));
     assert_eq!(code(&flick_in(&dir, &["new", "demo"])), Some(2));
 
@@ -246,25 +250,6 @@ fn clean_keeps_user_files_and_running_generations() {
         dir.join(".flick/cache").exists(),
         "the cache stays without --cache"
     );
-}
-
-#[test]
-fn an_incompatible_runtime_blocks_the_build() {
-    let dir = project(
-        "cli_runtime",
-        &[
-            ("flick.toml", APP),
-            ("src/App/Main.fl", MAIN),
-            (
-                "node_modules/@flick-lang/runtime/package.json",
-                "{ \"name\": \"@flick-lang/runtime\", \"version\": \"0.0.9\" }",
-            ),
-        ],
-    );
-    let out = flick_in(&dir, &["build"]);
-    assert_eq!(code(&out), Some(2), "{out:?}");
-    assert!(stderr(&out).contains("FLICK-P015"));
-    assert!(!dir.join("dist").exists());
 }
 
 #[test]
@@ -567,75 +552,6 @@ fn the_pinned_pnpm_installs_offline_and_keeps_a_frozen_lockfile() {
 }
 
 #[test]
-fn an_incompatible_effect_blocks_build_and_run() {
-    let dir = project(
-        "cli_effect_version",
-        &[
-            ("flick.toml", APP),
-            ("src/App/Main.fl", MAIN),
-            (
-                "node_modules/@flick-lang/runtime/package.json",
-                "{ \"name\": \"@flick-lang/runtime\", \"version\": \"0.1.0\" }",
-            ),
-            (
-                "node_modules/@flick-lang/runtime/node_modules/effect/package.json",
-                "{ \"name\": \"effect\", \"version\": \"3.0.0\" }",
-            ),
-        ],
-    );
-    for command in ["build", "run"] {
-        let out = flick_in(&dir, &[command]);
-        assert_eq!(code(&out), Some(2), "{command}: {out:?}");
-        assert!(stderr(&out).contains("FLICK-P015"), "{command}: {out:?}");
-    }
-    assert!(!dir.join("dist").exists());
-    assert!(
-        fs::read_dir(dir.join(".flick/run")).map_or(0, Iterator::count) == 0,
-        "no generation was written"
-    );
-}
-
-#[test]
-fn the_installed_runtime_and_effect_are_in_the_cache_key() {
-    let dir = project(
-        "cli_cache_runtime",
-        &[("flick.toml", APP), ("src/App/Main.fl", MAIN)],
-    );
-    let build = || assert_eq!(code(&flick_in(&dir, &["build"])), Some(0));
-    build();
-    let runtime = dir.join("node_modules/@flick-lang/runtime");
-    fs::create_dir_all(runtime.join("node_modules/effect")).expect("dir");
-    fs::write(
-        runtime.join("package.json"),
-        "{ \"name\": \"@flick-lang/runtime\", \"version\": \"0.1.0\" }",
-    )
-    .expect("write");
-    build();
-    assert_eq!(cached(&dir), 2, "the runtime version is in the key");
-    fs::write(
-        runtime.join("node_modules/effect/package.json"),
-        "{ \"name\": \"effect\", \"version\": \"4.1.2\" }",
-    )
-    .expect("write");
-    build();
-    assert_eq!(cached(&dir), 3, "the Effect version is in the key");
-}
-
-fn pnpm_version() -> String {
-    process::Command::new("pnpm")
-        .env("npm_config_manage_package_manager_versions", "false")
-        .env("PNPM_CONFIG_PM_ON_FAIL", "ignore")
-        .env("COREPACK_ENABLE_PROJECT_SPEC", "0")
-        .env("COREPACK_ENABLE_AUTO_PIN", "0")
-        .env("COREPACK_ENABLE_NETWORK", "0")
-        .env("COREPACK_DEFAULT_TO_LATEST", "0")
-        .arg("--version")
-        .output()
-        .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_owned())
-        .unwrap_or_default()
-}
-
-#[test]
 fn check_and_build_run_no_code_of_the_program() {
     let witness = Path::new(env!("CARGO_TARGET_TMPDIR")).join("cli_effects_witness");
     let _ = fs::remove_file(&witness);
@@ -794,4 +710,18 @@ fn doctor_notes_a_missing_git_rather_than_failing_on_it() {
     assert!(failed.iter().any(|l| l.contains("Node.js")), "{failed:?}");
     assert!(failed.iter().any(|l| l.contains("pnpm")), "{failed:?}");
     assert_eq!(code(&out), Some(2), "{out:?}");
+}
+
+fn pnpm_version() -> String {
+    process::Command::new("pnpm")
+        .env("npm_config_manage_package_manager_versions", "false")
+        .env("PNPM_CONFIG_PM_ON_FAIL", "ignore")
+        .env("COREPACK_ENABLE_PROJECT_SPEC", "0")
+        .env("COREPACK_ENABLE_AUTO_PIN", "0")
+        .env("COREPACK_ENABLE_NETWORK", "0")
+        .env("COREPACK_DEFAULT_TO_LATEST", "0")
+        .arg("--version")
+        .output()
+        .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_owned())
+        .unwrap_or_default()
 }
