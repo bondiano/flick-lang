@@ -73,13 +73,22 @@ rather than proof steps, and the first one is in the rules:
 
 What remains is preservation of the store steps and at a context (`PresRt.lean`,
 `Preservation.lean`), the invariant itself and `T4'_live`. Porting `rt_preservation` to
-`TypM` is a mechanical transform everywhere except four sites that invert
-`mode.subtype` by `cases`, which does not reduce a mode-indexed def: the `refMake`,
-`refGet` and `refSet` steps of `RHead` and the `eff_left` inversion, each of which needs a
-mode-generic `eq_*`/`arrow_left`-style lemma in the shape of
-`TypingMode.subtype.arrow_left`. Neither the examples nor the existing captures proofs
-establish the invariant. Translation of live signature elision into the core judgment is
-a separate remaining obligation.
+`TypM` is a mechanical transform except for sites that invert `mode.subtype` by `cases`,
+which does not reduce a mode-indexed def. Three of them go through by naming the fact in
+place of the case split (`TypingMode.subtype.eq_ref` and `eq_ref_left` at `refMake`,
+`refGet`, `refSet`, `eq_base_left` at `refSet`, and `inst_mode` for the pattern lemmas);
+what is left of the port is:
+
+* the `await` step, whose comparison of rows `r ⊆ r'`, `ε ⊆ ε'` reads out of the rows of
+  a `mode.subtype (.eff r ε t C) (.eff r' ε' t' C')` the way `Stage.rt_sub` wants it,
+* the `try` step, whose body is typed under an `all` whose subtype has no mode-generic
+  inversion yet, and `.instantiate` under a store,
+* the `open_` and `op` steps: `Const.ty` matches on the mode, so with `mode` a variable
+  its type does not reduce to an arrow and the case has to split on the mode first.
+
+Neither the examples nor the existing captures proofs establish the invariant.
+Translation of live signature elision into the core judgment is a separate remaining
+obligation.
 
 T4.2 matters beyond safety: the runtime contract (`Formal/RT/`) takes only T4.3 (as `G11`),
 so giving T4.2 up does not touch T5; what it costs is that a value may keep a closed
