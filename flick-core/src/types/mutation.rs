@@ -1,11 +1,11 @@
 //! `let mut` variables and `name = value`. A variable belongs to the
 //! function that declares it: a function, `task`, lazy `for` or arm of a
 //! handler of operations inside it neither reads nor assigns it, so the
-//! function stays pure from the outside (`docs/formal/elaboration.md`, local
-//! mutable variables). Its type is fixed where it is declared, and an
-//! assignment keeps it exactly, as the content of a `Ref`: what a `scope`
-//! owns cannot reach a variable from outside the scope. Inside the body of
-//! `try … with` and in a loop, a variable from outside is not assigned yet.
+//! function stays pure from the outside (`docs/formal/elaboration.md` §3.5).
+//! Its type is fixed where it is declared, and an assigned value is checked
+//! against it, as what `Ref.set` writes: what a `scope` owns cannot reach a
+//! variable from outside the scope. Inside the body of `try … with` and in a
+//! loop, a variable from outside is not assigned yet.
 
 use super::ty::Type;
 use super::typing::Ref;

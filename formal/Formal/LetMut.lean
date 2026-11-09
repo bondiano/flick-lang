@@ -3,7 +3,7 @@ import Formal.Effects
 import Formal.Regions
 
 /-!
-# `let mut` variables (elaboration.md §3.4)
+# `let mut` variables (elaboration.md §3.5)
 
 A block of a function with variables, `Blk`, over the terms of the core: `let`,
 `let mut`, an assignment `x = e`, a `scope` and a two-armed `match` whose values the
@@ -14,7 +14,7 @@ assignment gives it a value of exactly that type, at any stage — it is not a s
 the stage — and inside a `scope` the variables from outside have their types
 shifted past the scope's region, as the rest of the context does.
 
-`tr` is the reading of `docs/formal/elaboration.md#local-mutable-variables`: an
+`tr` is the reading of `docs/formal/elaboration.md` §3.5: an
 assignment is a `let` of a new name, which the rest of the block reads for the
 variable; a `scope` and the arms of a `match` give a record of their value and of
 what the variables hold where they end, `{a = v, b = {a = x₁, b = {…}}}`, which the

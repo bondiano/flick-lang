@@ -1,5 +1,5 @@
 //! `let mut` variables by passing their values along
-//! (`docs/formal/elaboration.md#local-mutable-variables`): a variable is a
+//! (`docs/formal/elaboration.md` §3.5): a variable is a
 //! name per assignment, the one in scope where it is read. A statement whose
 //! value assigns variables from outside it gives a tuple of its value and of
 //! what those variables hold after it, which the rest of the block takes

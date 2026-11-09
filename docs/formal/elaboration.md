@@ -1,6 +1,6 @@
 # λFlick: elaboration
 
-This document describes the elaboration of the surface language into the core of `core.md`. Classes and instances become dictionary passing. `do`, `for`, `?` and direct calls become core forms. Divergences from the spec, the checker and the code generator, and how each is resolved, are in §5.
+This document describes the elaboration of the surface language into the core of `core.md`. Classes and instances become dictionary passing. `do`, `for`, `?`, direct calls and `let mut` variables become core forms. Divergences from the spec, the checker and the code generator, and how each is resolved, are in §5.
 
 References are as in `core.md`. Checker paths are relative to `flick-core/src/types/`, IR lowering paths to `flick-core/src/ir/`, code generator paths to `flick-core/src/codegen/`. The probes of §5 were built with `flick build` and run on Node (`--emit js`) and as a Go executable (`--emit go`).
 
@@ -15,6 +15,7 @@ Elaborated here:
 - `for … yield`, `[for …]`, `for … do`;
 - postfix `?`;
 - direct calls;
+- `let mut` variables and assignment;
 - `CallSite`, the place of a use, which the checker gives.
 
 | Not covered | Where | How the model accounts for it |
@@ -376,6 +377,32 @@ Calling an effectful function without `await` (spec/01) rewrites nothing in the 
 - the `≤-Fun` lift: a `Lift` node from `typing.lifts`;
 - `task e`, `await e`: `ExprKind::Task`, `Await`;
 - a block statement: `let _ : Unit = s in rest` (`core.md` §1.4).
+
+### 3.5 Local mutable variables
+
+`let mut x = e` declares a variable of the function whose block holds it; `x = e` assigns it, a statement of type `Unit`. The checker (`mutation.rs`) gives the variable one monotype where it is declared, never generalized, and checks an assigned value against it, as the content of a `Ref` (`Ref.set`). An assignment is not a runtime step: a block of a pure function may assign. A function, `task`, lazy `for`, `do` continuation or arm of a handler of operations inside the function uses no variable of it (`FLICK-G005`), and the body of `try … with`, `for … do` and `[for …]` assign none declared outside them (`FLICK-T061`). Inside a `scope`, the variables from outside keep the types of the context outside, which do not name the scope's region; a value that names it is `FLICK-G002`, a closure that holds it `FLICK-G001`, as for a `Ref` created outside (`regions.md` §4).
+
+The elaboration passes the values along. A variable is a name per assignment, the one in scope where it is read; a construct that ends in several places gives the state of the variables it assigns with its value, and the rest of the block takes it apart:
+
+```text
+⟦let mut x = e; s̄⟧             = let x₀ = e in ⟦s̄⟧[x ↦ x₀]
+⟦x = e; s̄⟧                     = let xᵢ₊₁ = e in ⟦s̄⟧[x ↦ xᵢ₊₁]
+⟦let y = C; s̄⟧                 = match C⁺ with (y, x̄') → ⟦s̄⟧[x̄ ↦ x̄']     x̄: the variables C assigns
+(if c then a else b)⁺          = if c then a⁺ else b⁺
+(match e with p̄ → ā)⁺          = match e with p̄ → ā⁺
+(try e with p̄ → ā)⁺            = try (let v = e in (v, x̄)) with p̄ → ā⁺
+(scope { a })⁺                 = scope { a⁺ }
+(provide l { a })⁺             = provide l { a⁺ }
+{ s̄; e }⁺                      = ⟦s̄; (e, x̄)⟧
+```
+
+Any other expression that assigns evaluates its parts in order, each bound by a `let` first. With the rules of the checker, this reading and the compiled code, which assigns in place, agree. Only the function that declares a variable reads it, once per read, in order. The bodies of `scope` and `provide` run once, in place. No catching construct inside the variable's scope sees a variable assigned in the code it abandons: that would take an assignment in the body of `try`, which `FLICK-T061` rejects, or in a handled body abandoned by `abort`, which is the body of a `try` too. `resume` runs the parked body at most once (§3.7 of `core.md`), so a variable that lives across an operation has one value at a time.
+
+T7 (`formal/Formal/LetMut.lean`) is this elaboration over a fragment of blocks: `let`, `let mut`, an assignment, a `scope` and a two-armed `match` whose values the rest of the block takes, the arms giving a record `{a = v, b = {a = x₁, b = …}}` of their value and the variables. `MutOk` is the typing of the checker: a variable of a monotype, an assignment of exactly that type at any stage, the variables shifted past the region inside a `scope`. T7 states that the translation has the block's type at its stage. T1, T2a and T4 then apply to it (`T7_pure`, `T7_regions`): a block typed pure makes only pure steps, and no value assigned in a `scope` is reached after the scope ends. A lambda inside the block is a term of the core there. The rule `FLICK-G005` is not a premise of typing, since the reading types without it; it makes the reading agree with the compiled code.
+
+IR: `Stmt::Var`, `Stmt::Assign` and `ExprKind::Var`, a read (`ir/lower/expr.rs`). Unlike a `Local`, two reads may differ, so no optimization copies or moves one (`opt/walk.rs` `droppable`, `opt/mod.rs` `atom`). JavaScript declares a variable with `let`. Go orders the calls of an expression but not the reads between them, so an operand that a later one may change or observe is bound first (`go/expr.rs` `ordered`). The model (`flick-model/src/translate/mutation.rs`) runs this elaboration, `tests/run/codegen/let_mut.fl` among its cases.
+
+Loops (`loop`, `while`, `break`, an assignment in `for … do`) and an assignment in the body of `try` need the state of a variable where control leaves a body. They are not covered here.
 
 ## 4. Coherence and T6
 

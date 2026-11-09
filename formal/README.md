@@ -36,6 +36,16 @@ in the `lean` job (`leanprover/lean-action` with `build-args: --wfail`).
   regions), `T4_3` (no handler of a region that ended is used) and `T1_regions` (`T1` with
   `op_H`, without the blocked outcome of a step that needs a region that is not live, which
   `T4` rules out).
+- **T7, `let mut` variables** (`Formal/LetMut.lean`, `docs/formal/elaboration.md` §3.5): a
+  block of a function with `let`, `let mut`, assignments, `scope` and two-armed `match`,
+  typed as the checker types it (`MutOk`: a variable of one monotype, an assignment of
+  exactly it at any stage, the variables shifted past the region inside a `scope`),
+  translates, by passing the variables' values along, to a core term of the block's type at
+  its stage. `T7_pure` and `T7_regions` are `T2a` and `T4` of the translation: a pure block
+  makes only pure steps, and what a `scope` assigns to a variable from outside never reaches
+  its region after it ends. That the compiled code, which assigns in place, runs as the
+  translation does rests on `FLICK-G005` and `FLICK-T061` and is checked by the model and both
+  runtimes, not proved.
 - **T5, the runtime contract** (`Formal/RT/`, `RT/T5.lean`): for any core and any
   interleaving, every reachable configuration of λRT satisfies R1–R4, R6 and R7, and R5 and
   R8 hold of the cause algebra, under the hypotheses on the libraries (`Hyp`) and `G11`.
@@ -63,11 +73,12 @@ in the `lean` job (`leanprover/lean-action` with `build-args: --wfail`).
 
 `#print axioms` of `T1`, `T2a`, `T2b`, `lemma_3_1`, `T3`, `lemma_4`, `lemma_6`, `T4`,
 `T4_3`, `T1_regions`, `T5`, `T6a`, `T6a_core`, `T6a_close`, `T6b`, `T6b_core`,
-`witness_T6b_example`, `witness_T6b_closed` and `witness_T6b_open` lists only Lean's standard `propext`,
+`witness_T6b_example`, `witness_T6b_closed`, `witness_T6b_open`, `T7`, `T7_pure` and
+`T7_regions` lists only Lean's standard `propext`,
 `Classical.choice` and `Quot.sound`; the hypotheses of T5 (`Hyp`, `G11`), of T6(a)
 (`Target`; for the core, `Real`) and of T6(b) (`Coherent`, `Sim`) are their parameters.
-`Formal/Axioms.lean` pins what `#print axioms` prints for `T1`, `T6a`, `T6b`, `T6a_core`
-and `T6b_core` with `#guard_msgs`, so `lake build` fails on a `sorry` or a new axiom.
+`Formal/Axioms.lean` pins what `#print axioms` prints for `T1`, `T6a`, `T6b`, `T6a_core`,
+`T6b_core` and `T7` with `#guard_msgs`, so `lake build` fails on a `sorry` or a new axiom.
 
 T4.3 is the premise G11 of T5 in the form [the answering provide must be live](../docs/formal/runtime.md#the-provide-liveness-premise-is-stronger-than-typing-gives) gives it: an operation answered by a handler of the region `q` happens only while `q` is live.
 Its Lean statement (`T43Main.lean`), the counterpart of `G11` in `Formal/RT/Hyp.lean`:
