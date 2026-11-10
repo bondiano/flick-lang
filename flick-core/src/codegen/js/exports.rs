@@ -6,7 +6,6 @@ use std::collections::HashMap;
 
 use crate::codegen::exports::sync_stages;
 use crate::codegen::names;
-#[cfg(feature = "typescript")]
 use crate::codegen::ts::Projection;
 use crate::iface::{Interface, Namespace};
 
@@ -25,7 +24,6 @@ pub(super) fn sync_exports(interface: &Interface, module: &str) -> HashMap<Strin
         .collect()
 }
 
-#[cfg(feature = "typescript")]
 /// The TypeScript type of each exported value and constructor that has
 /// one; the others stay `any`.
 pub(super) fn annotations(

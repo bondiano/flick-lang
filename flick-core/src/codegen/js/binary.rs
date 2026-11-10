@@ -52,9 +52,9 @@ impl Gen<'_> {
         let mut js = self.ordered(&[lhs, rhs]);
         let r = operand(js.pop().unwrap_or_default(), rhs, true);
         let l = operand(js.pop().unwrap_or_default(), lhs, false);
-        #[cfg(feature = "source-maps")]
+        #[cfg(feature = "native-project")]
         let l = format!("{}{l}", self.mark(span));
-        #[cfg(not(feature = "source-maps"))]
+        #[cfg(not(feature = "native-project"))]
         let _ = span;
         let (l, r) = (&l, &r);
         match op {

@@ -3,8 +3,6 @@
 //! with an `import`, so a package's dependencies can be read from its sources.
 //! Which names a module qualifies is checked beside the built-in modules.
 
-#![cfg(feature = "typescript")]
-
 use std::io;
 use std::path::{Path, PathBuf};
 

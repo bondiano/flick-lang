@@ -137,9 +137,6 @@ impl Checker<'_> {
     /// with `let` unless it is a whole statement. Not offered when the call
     /// uses a variable the block binds.
     pub(super) fn bind_before(&mut self, node: &Node) {
-        if !cfg!(feature = "diagnostic-fixes") {
-            return;
-        }
         let (start, end) = node.range();
         let line = self.text[..start as usize].rfind('\n').map_or(0, |i| i + 1);
         let indent = self.text[line..start as usize].to_owned();

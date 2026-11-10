@@ -21,7 +21,6 @@ impl Checker<'_> {
         detail: impl FnOnce(&Self) -> String,
     ) {
         let d = Diagnostic::error(code, head, span).with_incomplete(incomplete);
-        #[cfg(feature = "diagnostic-fixes")]
         let d = {
             let detail = detail(self);
             if detail.is_empty() {
@@ -30,8 +29,6 @@ impl Checker<'_> {
                 d.with_fix(|| (detail, Vec::new()))
             }
         };
-        #[cfg(not(feature = "diagnostic-fixes"))]
-        let _ = detail;
         self.diagnostics.push(d);
     }
 

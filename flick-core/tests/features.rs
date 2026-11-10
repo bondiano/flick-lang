@@ -89,13 +89,16 @@ fn optional_outputs_have_real_artifacts_only_when_enabled() {
         assert!(file("Main.js").is_some());
         assert_eq!(
             file("package.json").is_some(),
-            cfg!(feature = "build-artifacts")
+            cfg!(feature = "native-project")
         );
         assert_eq!(
             file("Main.iface").is_some(),
-            cfg!(feature = "build-artifacts")
+            cfg!(feature = "native-project")
         );
-        assert_eq!(file("Main.js.map").is_some(), cfg!(feature = "source-maps"));
+        assert_eq!(
+            file("Main.js.map").is_some(),
+            cfg!(feature = "native-project")
+        );
         if let Some(artifact) = file("Main.iface") {
             let interface =
                 iface::read(artifact.contents.as_bytes(), "Main").expect("published interface");
@@ -115,24 +118,6 @@ fn optional_outputs_have_real_artifacts_only_when_enabled() {
             assert_eq!(map["version"], 3);
             assert_eq!(map["sources"], serde_json::json!(["file:///Main.fl"]));
         }
-    }
-}
-
-#[cfg(not(feature = "typescript"))]
-#[test]
-fn unavailable_typed_outputs_report_errors_instead_of_returning_javascript() {
-    for selection in [0, 1, 2] {
-        let mut settings = settings(false);
-        match selection {
-            0 => settings.typescript = true,
-            1 => settings.extras.dts = true,
-            _ => settings.extras.promise_facade = true,
-        }
-        let (artifacts, diagnostics) = emit(MAIN, &settings);
-        assert!(artifacts.is_empty());
-        assert_eq!(diagnostics.len(), 1);
-        assert_eq!(diagnostics[0].code, codes::F004);
-        assert_eq!(diagnostics[0].severity, Severity::Error);
     }
 }
 
@@ -185,7 +170,6 @@ fn server_fns_and_cli_blocks_are_plugins_of_std_in_every_build() {
     assert!(!missing, "{diagnostics:?}");
 }
 
-#[cfg(feature = "typescript")]
 #[test]
 fn typed_declarations_and_facades_do_not_require_native_artifact_publication() {
     let source = "module Main exposing (answer)\nanswer : Unit ->{} Int\nlet answer () = 42\n";
@@ -201,7 +185,7 @@ fn typed_declarations_and_facades_do_not_require_native_artifact_publication() {
         assert!(contains("Main.d.ts"));
         assert!(contains("Main.promise.js"));
         assert!(contains("Main.promise.d.ts"));
-        assert_eq!(contains("Main.iface"), cfg!(feature = "build-artifacts"));
+        assert_eq!(contains("Main.iface"), cfg!(feature = "native-project"));
     }
 }
 

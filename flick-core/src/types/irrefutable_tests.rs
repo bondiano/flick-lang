@@ -10,7 +10,6 @@ fn check(text: &str) -> Vec<Diagnostic> {
 }
 
 /// `text` after the fix titled `title` of its `FLICK-T009`.
-#[cfg(feature = "diagnostic-fixes")]
 fn fixed(text: &str, title: &str) -> String {
     let diagnostics = check(text);
     let fix = diagnostics
@@ -39,18 +38,13 @@ fn assert_fix(body: &str, title: &str, want: &str) {
             .any(|d| d.code == codes::T009 && d.severity == Severity::Error),
         "{diagnostics:?}"
     );
-    #[cfg(feature = "diagnostic-fixes")]
-    {
-        let out = fixed(&text, title);
-        assert_eq!(out, format!("{HEAD}{want}"));
-        let errors: Vec<_> = check(&out)
-            .into_iter()
-            .filter(|d| d.severity == Severity::Error)
-            .collect();
-        assert!(errors.is_empty(), "{errors:?}");
-    }
-    #[cfg(not(feature = "diagnostic-fixes"))]
-    let _ = (title, want);
+    let out = fixed(&text, title);
+    assert_eq!(out, format!("{HEAD}{want}"));
+    let errors: Vec<_> = check(&out)
+        .into_iter()
+        .filter(|d| d.severity == Severity::Error)
+        .collect();
+    assert!(errors.is_empty(), "{errors:?}");
 }
 
 #[test]
@@ -109,20 +103,16 @@ fn an_assert_that_cannot_fail_becomes_a_let() {
         .find(|d| d.code.to_string() == "FLICK-T025")
         .expect("T025");
     assert_eq!(d.severity, Severity::Warning);
-    #[cfg(feature = "diagnostic-fixes")]
-    {
-        let mut out = text.clone();
-        for edit in d.fixes[0].edits.iter().rev() {
-            out.replace_range(
-                edit.span.start as usize..edit.span.end as usize,
-                &edit.replacement,
-            );
-        }
-        assert_eq!(out, text.replace("let assert (a, b)", "let (a, b)"));
+    let mut out = text.clone();
+    for edit in d.fixes[0].edits.iter().rev() {
+        out.replace_range(
+            edit.span.start as usize..edit.span.end as usize,
+            &edit.replacement,
+        );
     }
+    assert_eq!(out, text.replace("let assert (a, b)", "let (a, b)"));
 }
 
-#[cfg(feature = "diagnostic-fixes")]
 #[test]
 fn no_match_fix_without_a_rest_of_the_block() {
     let text = format!("{HEAD}f : Option Float -> Float\nlet f (Some n) = n\n");

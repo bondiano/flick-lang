@@ -210,6 +210,6 @@ fn constraint_items(node: &Node) -> Vec<&Node> {
     }
 }
 
-#[cfg(all(test, feature = "diagnostic-fixes"))]
+#[cfg(test)]
 #[path = "signature_lints_tests.rs"]
 mod tests;

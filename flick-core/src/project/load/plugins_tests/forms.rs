@@ -235,7 +235,6 @@ fn the_formatter_finds_the_plugins_of_the_projects_packages() {
     assert!(alone.of(&main, FileId::default()).is_empty());
 }
 
-#[cfg(feature = "diagnostic-fixes")]
 #[test]
 fn what_a_plugins_check_finds_may_be_a_warning_with_a_fix() {
     use crate::diagnostics::Severity;
