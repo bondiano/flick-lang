@@ -25,7 +25,7 @@ use std::path::{Component, Path, PathBuf};
 use std::sync::Arc;
 
 pub use config::Config;
-pub(crate) use load::check_inline_file;
+pub(crate) use load::check_file;
 #[cfg(all(test, feature = "native-project"))]
 pub(crate) use load::js_only;
 #[cfg(feature = "ide")]

@@ -29,7 +29,7 @@ mod target;
 mod unknown;
 
 pub use checking::ModuleCache;
-pub(crate) use checking::check_inline_file;
+pub(crate) use checking::check_file;
 pub use entry::{MainKind, main_kind};
 pub use format_plugins::FormatPlugins;
 #[cfg(feature = "ide")]
