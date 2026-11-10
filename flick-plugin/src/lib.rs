@@ -439,6 +439,18 @@ pub enum Refinement {
     Holds(bool),
 }
 
+/// The enclosing top-level binding of a watched reference. These are
+/// read-only syntax and scheme facts, not a verdict about the reference.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Binding {
+    pub module: String,
+    pub name: Option<String>,
+    pub span: Span,
+    pub constrained: bool,
+    pub in_function: bool,
+    pub applied: u32,
+}
+
 /// A place that calls a name the plugin's package watches: the module and
 /// the name as the compiler knows them, where the call is written, its
 /// arguments, and, for a `T$parse`, how `T` checks its value. Every span is
@@ -451,6 +463,7 @@ pub struct CallSite {
     pub span: Span,
     pub arguments: Vec<Argument>,
     pub refinement: Option<Refinement>,
+    pub binding: Option<Binding>,
 }
 
 /// What an editor shows over a span of a block, as Markdown.

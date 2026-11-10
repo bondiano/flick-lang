@@ -222,6 +222,12 @@ compiler's verdict on the module's own predicate. Every span is of the
 module's own file, inside a block as well as outside one, so a diagnostic
 comes back at the code the user wrote.
 
+A serializable atom reference also carries read-only `binding` facts: its
+module and top-level name, the binding span, whether its scheme takes a
+dictionary, whether the reference is inside a function, and its applied
+argument count. This includes partial references. The UI plugin uses these
+facts for `FLICK-U003`; it does not change type inference.
+
 ```rust
 fn check_calls(&self, calls: &[CallSite], state: &[u8]) -> Vec<Diagnostic> {
     (calls.iter())

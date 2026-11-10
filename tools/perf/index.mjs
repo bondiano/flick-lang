@@ -31,7 +31,7 @@ export const METRICS = {
 };
 
 /** The peak in MiB that tools/load and tools/lsp-bench print. */
-export const peakRss = (out) => Number(/^RSS, MiB: .*\bpeak ([\d.]+)/m.exec(out)[1]);
+export const peakRss = (out) => Number(/^RSS, MiB: .*\bpeak ([\d.]+)/m.exec(out)?.[1]);
 
 const RUNS = 5;
 const HOVERS = 50;
@@ -62,7 +62,7 @@ const median = (xs) => [...xs].sort((a, b) => a - b)[Math.floor(xs.length / 2)];
  * Checking the corpus: `flick check` of each area of tests/check/pass, then each
  * project of tests/check/projects, whose expected diagnostics are part of it.
  */
-const checkCorpus = (flick) => {
+export const checkCorpus = (flick) => {
   const dirs = (dir) =>
     readdirSync(path.join(root, dir), { withFileTypes: true })
       .filter((entry) => entry.isDirectory())
@@ -114,17 +114,19 @@ const answers = async (url) => {
 };
 
 /** Requests per second at 16 clients, the median of tools/load's runs, of the server `command` starts. */
-const throughput = async (command, { port, path: route, expect, env = {} }) => {
+const throughput = async (command, { port, path: route, expect, env = {}, client = "fetch" }) => {
   const server = spawn(command[0], command.slice(1), { cwd: root, env: { ...process.env, ...env, PORT: String(port) }, stdio: "ignore" });
   try {
     await answers(`http://127.0.0.1:${port}${route.replace("{id}", "warm")}`);
+    // Go JSON selects direct GETs because fetch limits its throughput even
+    // with workers. SSR keeps its historical client for comparable results.
     const workers = String(Math.max(1, Math.min(8, availableParallelism() >> 1)));
     const out = execFileSync(
       "node",
       [
         "tools/load/index.mjs",
         ...["--url", `http://127.0.0.1:${port}${route}`, "--expect", expect, "--levels", "16"],
-        ...["--warmup", "5", "--run", "5", "--runs", "3", "--soak", "1", "--idle", "0", "--workers", workers, "--pid", String(server.pid)],
+        ...["--warmup", "5", "--run", "5", "--runs", "3", "--soak", "1", "--idle", "0", "--client", client, "--workers", workers, "--pid", String(server.pid)],
       ],
       { cwd: root, encoding: "utf8" },
     );
@@ -141,68 +143,84 @@ const main = async () => {
     execFileSync(flick, ["build", ...args, "--quiet", "--color", "never"], { cwd: path.join(root, dir), stdio: "inherit", env });
   const values = {};
 
-  values["check.corpus"] = Math.round(checkCorpus(flick));
-  console.log(`check corpus: median ${values["check.corpus"]} ms of ${RUNS}`);
-
-  const { hover, afterEdit, rss } = hovers(flick);
-  values["lsp.hover.p95"] = hover;
-  values["lsp.hover_after_edit.p95"] = afterEdit;
-  values["lsp.rss.peak"] = rss;
-
-  // the binary's budget is that of the Go in runtime-go/go.mod, which CI sets up: a newer
-  // Go builds a bigger one, so a local run builds with that version, which Go fetches once
-  const version = /^go (\S+)$/m.exec(readFileSync(path.join(root, "runtime-go/go.mod"), "utf8"))[1];
-  const goroot = execFileSync("go", ["env", "GOROOT"], {
-    env: { ...process.env, GOTOOLCHAIN: `go${version}` },
-    encoding: "utf8",
-  }).trim();
-  const withGo = { ...process.env, PATH: `${path.join(goroot, "bin")}${path.delimiter}${process.env.PATH}` };
-  build("tools/load/json", ["--emit", "go", "--out-dir", "dist/go"], withGo);
-  const go = "tools/load/json/dist/go/flick-server";
-  values["load.json.go.binary"] = statSync(path.join(root, go)).size;
-  const json = await throughput([go], { port: 3930, path: "/item/{id}", expect: '"item {id}"' });
-  values["load.json.go.rps"] = json.rps;
-  values["load.json.go.rss.peak"] = json.rss;
-
-  build("tools/load/ssr", []);
-  execFileSync("node", ["tools/load/bundle.mjs", "tools/load/ssr/dist/flick-client.js", "tools/load/ssr/dist/client.js"], {
-    cwd: root,
-    stdio: "inherit",
-  });
-  const ssr = await throughput(["node", "tools/load/ssr/dist/flick-server.js"], {
-    port: 3931,
-    path: "/render/{id}",
-    expect: "request {id}",
-    env: { NODE_ENV: "production", CLIENT_JS: "tools/load/ssr/dist/client.js" },
-  });
-  values["load.ssr.rps"] = ssr.rps;
-  values["load.ssr.rss.peak"] = ssr.rss;
-
-  const budgets = JSON.parse(readFileSync(path.join(root, "tools/perf/budgets.json"), "utf8"));
-  const rows = Object.entries(METRICS).map(([metric, { unit }]) => ({ metric, value: values[metric], unit }));
-  mkdirSync(path.join(root, "target"), { recursive: true });
-  writeFileSync(path.join(root, "target/perf.json"), `${JSON.stringify(rows, null, 2)}\n`);
-
   const errors = [];
+  try {
+    values["check.corpus"] = Math.round(checkCorpus(flick));
+    console.log(`check corpus: median ${values["check.corpus"]} ms of ${RUNS}`);
+
+    const { hover, afterEdit, rss } = hovers(flick);
+    values["lsp.hover.p95"] = hover;
+    values["lsp.hover_after_edit.p95"] = afterEdit;
+    values["lsp.rss.peak"] = rss;
+
+    // the binary's budget is that of the Go in runtime-go/go.mod, which CI sets up: a newer
+    // Go builds a bigger one, so a local run builds with that version, which Go fetches once
+    const version = /^go (\S+)$/m.exec(readFileSync(path.join(root, "runtime-go/go.mod"), "utf8"))[1];
+    const goroot = execFileSync("go", ["env", "GOROOT"], {
+      env: { ...process.env, GOTOOLCHAIN: `go${version}` },
+      encoding: "utf8",
+    }).trim();
+    const withGo = { ...process.env, PATH: `${path.join(goroot, "bin")}${path.delimiter}${process.env.PATH}` };
+    build("tools/load/json", ["--emit", "go", "--out-dir", "dist/go"], withGo);
+    const go = "tools/load/json/dist/go/flick-server";
+    values["load.json.go.binary"] = statSync(path.join(root, go)).size;
+    const json = await throughput([go], { port: 3930, path: "/item/{id}", expect: '"item {id}"', client: "http" });
+    values["load.json.go.rps"] = json.rps;
+    values["load.json.go.rss.peak"] = json.rss;
+
+    build("tools/load/ssr", []);
+    execFileSync("node", ["tools/load/bundle.mjs", "tools/load/ssr/dist/flick-client.js", "tools/load/ssr/dist/client.js"], {
+      cwd: root,
+      stdio: "inherit",
+    });
+    const ssr = await throughput(["node", "tools/load/ssr/dist/flick-server.js"], {
+      port: 3931,
+      path: "/render/{id}",
+      expect: "request {id}",
+      env: { NODE_ENV: "production", CLIENT_JS: "tools/load/ssr/dist/client.js" },
+    });
+    values["load.ssr.rps"] = ssr.rps;
+    values["load.ssr.rss.peak"] = ssr.rss;
+
+  } catch (error) {
+    errors.push(error.message);
+  } finally {
+    const budgets = JSON.parse(readFileSync(path.join(root, "tools/perf/budgets.json"), "utf8"));
+    const result = report(values, budgets, errors);
+    mkdirSync(path.join(root, "target"), { recursive: true });
+    writeFileSync(path.join(root, "target/perf.json"), `${JSON.stringify(result.rows, null, 2)}\n`);
+    writeFileSync(path.join(root, "target/perf-errors.json"), `${JSON.stringify(result.errors, null, 2)}\n`);
+    console.log(`\n${result.table}`);
+    if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, `## Performance\n\n${result.table}\n`);
+    for (const n of result.notes) console.log(`note: ${n}`);
+    for (const e of result.errors) console.error(`error: ${e}`);
+    if (result.errors.length > 0) process.exitCode = 1;
+  }
+};
+
+/** Reports completed metrics even when a later stage failed. Missing metrics fail the run. */
+export const report = (values, budgets, failures = []) => {
+  const rows = [];
+  const errors = [...failures];
   const notes = [];
   const table = ["| metric | value | unit | budget |", "|---|---:|---|---:|"];
-  for (const { metric, value, unit } of rows) {
+  for (const [metric, { unit }] of Object.entries(METRICS)) {
+    const value = values[metric];
     const budget = budgets[metric];
-    if (budget === undefined) {
-      errors.push(`${metric} has no entry in tools/perf/budgets.json`);
+    if (budget === undefined) errors.push(`${metric} has no entry in tools/perf/budgets.json`);
+    if (!Number.isFinite(value)) {
+      errors.push(`${metric} was not measured`);
+      table.push(`| ${metric} | — | ${unit} | ${budget?.budget ?? "—"} (not measured) |`);
       continue;
     }
-    const failed = failure(metric, value, budget);
+    rows.push({ metric, value, unit });
+    const failed = budget && failure(metric, value, budget);
     if (failed) errors.push(failed);
-    const note = slack(metric, value, budget);
+    const note = budget && slack(metric, value, budget);
     if (note) notes.push(note);
-    table.push(`| ${metric} | ${value} | ${unit} | ${budget.budget ?? "—"}${failed ? " (failed)" : ""} |`);
+    table.push(`| ${metric} | ${value} | ${unit} | ${budget?.budget ?? "—"}${failed ? " (failed)" : ""} |`);
   }
-  console.log(`\n${table.join("\n")}`);
-  if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, `## Performance\n\n${table.join("\n")}\n`);
-  for (const n of notes) console.log(`note: ${n}`);
-  for (const e of errors) console.error(`error: ${e}`);
-  if (errors.length > 0) process.exitCode = 1;
+  return { rows, errors, notes, table: table.join("\n") };
 };
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) await main();

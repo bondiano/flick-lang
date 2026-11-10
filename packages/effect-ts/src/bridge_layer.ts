@@ -1,8 +1,8 @@
 // Layers share memoization and finalizer ownership across both interpreters.
 import { Context, Effect, Exit as EExit, Layer as ELayer, Scope as EScope } from "effect";
 import { type Exit, succeeded, failed } from "@flick-lang/runtime/rt/cause";
-import { type Run, lookup } from "@flick-lang/runtime/rt/fiber";
-import { HOST, Layer, MEMO as MEMO_KEY, MemoMap, layerHooks, memoizable } from "@flick-lang/runtime/rt/layer";
+import { type Run } from "@flick-lang/runtime/rt/fiber";
+import { HOST, Layer, type MemoMap, currentMemo, layerHooks, memoizable } from "@flick-lang/runtime/rt/layer";
 import { Owner, addTo, close, inside } from "@flick-lang/runtime/rt/owner";
 import { fromEffect, callEffect, causeFromEffect, causeToEffect } from "./bridge_runtime.ts";
 import { servicesOut } from "./bridge_host.ts";
@@ -58,9 +58,9 @@ export const layerToEffect = (layer: unknown): unknown => {
             // a close of an owner fails only with defects and interruptions
             Effect.orDie(callEffect(() => close(owner, exit._tag === "Success" ? succeeded(undefined) : failed(causeFromEffect(exit.cause))))),
           ).pipe(Effect.runSync);
-          // the memo map of the `provide` around it: a layer shared with the kernel's side is one build
-          const outer = lookup(MEMO_KEY);
-          const memo = outer instanceof MemoMap ? outer : new MemoMap(undefined);
+          // Reuse dependencies already built by the enclosing native provide,
+          // while sibling Effect scopes acquire their own request resources.
+          const memo = currentMemo();
           return yield inside(owner, () => layer.build(memo, owner));
         }),
         servicesOut,

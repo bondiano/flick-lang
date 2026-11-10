@@ -23,7 +23,7 @@ jobs:
           BASE: ${{ github.base_ref }}
         run: |
           git fetch --depth=1 origin "$BASE"
-          node --test tools/perf/ratchet.test.mjs
+          node --test tools/perf/*.test.mjs tools/load/*.test.mjs
           node tools/perf/ratchet.mjs FETCH_HEAD
       # installs the toolchain, components and targets from rust-toolchain.toml
       - run: rustup show active-toolchain || rustup toolchain install

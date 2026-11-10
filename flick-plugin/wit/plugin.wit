@@ -211,6 +211,16 @@ interface types {
   /// `positive`), or the host's verdict on the module's own predicate.
   variant refinement { literals(list<constant>), known(string), holds(bool) }
 
+  /// Read-only facts about the top-level binding enclosing a reference.
+  record binding {
+    module: string,
+    name: option<string>,
+    span: span,
+    constrained: bool,
+    in-function: bool,
+    applied: u32,
+  }
+
   /// A place that calls a name the plugin's package watches: the module and
   /// the name as the compiler knows them, where the call is written, its
   /// arguments, and, for a `T$parse`, how `T` checks its value. Every span
@@ -222,6 +232,7 @@ interface types {
     span: span,
     arguments: list<argument>,
     refinement: option<refinement>,
+    binding: option<binding>,
   }
 
   enum highlight-kind { keyword, parameter }

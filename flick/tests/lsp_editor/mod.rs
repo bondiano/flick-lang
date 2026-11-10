@@ -373,3 +373,33 @@ fn hover_distinguishes_errors_services_types_and_constructors() {
     }
     lsp.close();
 }
+
+#[test]
+fn serializable_key_diagnostics_follow_edits() {
+    let valid = "module App.Main exposing (count)\ncount : Atom.Writable String\nlet count = Atom.serializable (Codec.json Schema.string) (Atom.make \"\")\n";
+    let invalid = valid
+        .replace("count : Atom.Writable", "count : Unit -> Atom.Writable")
+        .replace("let count =", "let count _ =");
+    let dir = project(
+        "lsp_serializable_keys",
+        &[("flick.toml", LIB), ("src/App/Main.fl", valid)],
+    );
+    let file = dir.join("src/App/Main.fl");
+    let document = uri(&file);
+    let mut lsp = Lsp::start(&dir);
+    lsp.notify("textDocument/didOpen", &json!({ "textDocument": { "uri": document, "languageId": "flick", "version": 1, "text": valid } }));
+    assert!(lsp.diagnostics(&document).is_empty());
+    lsp.notify("textDocument/didChange", &json!({ "textDocument": { "uri": document, "version": 2 }, "contentChanges": [{ "text": invalid }] }));
+    let found = lsp.diagnostics(&document);
+    assert_eq!(found.len(), 1, "{found:?}");
+    assert_eq!(found[0]["code"], "FLICK-U003");
+    let start = invalid.find("Atom.serializable").expect("reference");
+    assert_eq!(found[0]["range"]["start"], position(&invalid, start));
+    assert_eq!(
+        found[0]["range"]["end"],
+        position(&invalid, start + "Atom.serializable".len())
+    );
+    lsp.notify("textDocument/didChange", &json!({ "textDocument": { "uri": document, "version": 3 }, "contentChanges": [{ "text": valid }] }));
+    assert!(lsp.diagnostics(&document).is_empty());
+    lsp.close();
+}

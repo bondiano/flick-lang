@@ -92,6 +92,7 @@ mod tests {
                 constant: Some(constant),
             }],
             refinement,
+            binding: None,
         }
     }
 

@@ -189,6 +189,18 @@ pub fn on_kernel_with_bridge(spec: &str, export: &str, bridge: bool) -> bool {
 }
 
 pub fn ui_family(spec: &str, export: &str) -> bool {
+    // Both renderers re-export these exact inert constructors from
+    // runtime/ui/react/nodes. They hold no registry or runtime task, so
+    // crossing the adapter here only walks the same tree repeatedly.
+    if matches!(
+        spec,
+        "@flick-lang/runtime/rt/ui" | "@flick-lang/runtime/rt/ui/react"
+    ) && include_str!("shared_ui_exports.txt")
+        .lines()
+        .any(|name| name == export)
+    {
+        return false;
+    }
     matches!(
         spec,
         "@flick-lang/runtime/rt/effect/reactivity/Atom"
@@ -417,6 +429,34 @@ mod tests {
             "@flick-lang/runtime/rt/effect/Redacted",
             "flickEquivalent",
             true
+        ));
+    }
+
+    #[test]
+    fn shared_inert_ui_nodes_stay_on_kernel_with_adapter_views() {
+        use crate::codegen::EffectBridge;
+        for export in [
+            "uiText",
+            "uiParagraph",
+            "uiHeading",
+            "uiDiv",
+            "uiFragment",
+            "uiKeyed",
+            "uiComponent",
+        ] {
+            assert!(
+                super::selected_on_kernel(
+                    "@flick-lang/runtime/rt/ui",
+                    export,
+                    EffectBridge::AvailableWithUi
+                ),
+                "{export}"
+            );
+        }
+        assert!(!super::selected_on_kernel(
+            "@flick-lang/runtime/rt/ui",
+            "uiView",
+            EffectBridge::AvailableWithUi
         ));
     }
 

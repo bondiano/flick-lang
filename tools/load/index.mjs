@@ -7,14 +7,18 @@
 // the highest one for `--soak` seconds. With `--pid` it samples the
 // server's resident memory (Linux, /proc) before the soak, at its peak and
 // after `--idle` seconds of rest. With `--workers N` the clients are split
-// over N threads, so one client process is not what limits the rate.
+// over N threads to spread load generation over several cores.
+// `--client http` uses direct HTTP/1 GETs with keep-alive and no redirects;
+// the default `fetch` client remains available for comparisons.
 //
 //   node tools/load/index.mjs --url 'http://127.0.0.1:3000/render/{id}' \
 //     --expect 'request {id}' [--pid N] [--levels 1,16,64] [--run 10] \
-//     [--runs 3] [--warmup 10] [--soak 60] [--idle 30] [--timeout 5] [--workers 1]
+//     [--runs 3] [--warmup 10] [--soak 60] [--idle 30] [--timeout 5] [--workers 1] [--client fetch|http]
 import { readFileSync } from "node:fs";
 import { parseArgs } from "node:util";
 import { isMainThread, parentPort, Worker, workerData } from "node:worker_threads";
+
+import { HttpClient } from "./client.mjs";
 
 const { values: options } = parseArgs({
   options: {
@@ -29,6 +33,7 @@ const { values: options } = parseArgs({
     idle: { type: "string", default: "30" },
     timeout: { type: "string", default: "5" },
     workers: { type: "string", default: "1" },
+    client: { type: "string", default: "fetch" },
   },
   args: isMainThread ? process.argv.slice(2) : workerData,
   allowPositionals: !isMainThread,
@@ -37,6 +42,11 @@ if (!options.url?.includes("{id}")) {
   console.error("usage: index.mjs --url <url with {id}> [--expect <text with {id}>] [--pid N] ...");
   process.exit(2);
 }
+if (!["fetch", "http"].includes(options.client)) {
+  console.error("--client must be fetch or http");
+  process.exit(2);
+}
+const httpClient = options.client === "http" ? new HttpClient() : undefined;
 const levels = options.levels.split(",").map(Number);
 const expected = options.expect.split("|");
 const seconds = (name) => Number(options[name]) * 1000;
@@ -49,8 +59,10 @@ const one = async () => {
   const id = `r${isMainThread ? "" : `${workerData.at(-1)}-`}${++next}`;
   const started = performance.now();
   try {
-    const response = await fetch(options.url.replaceAll("{id}", id), { signal: AbortSignal.timeout(seconds("timeout")) });
-    const body = await response.text();
+    const url = options.url.replaceAll("{id}", id);
+    const signal = AbortSignal.timeout(seconds("timeout"));
+    const response = httpClient ? await httpClient.get(url, { signal }) : await fetch(url, { signal });
+    const body = httpClient ? response.body : await response.text();
     if (response.status !== 200) return { error: "status" };
     if (!expected.every((text) => body.includes(text.replaceAll("{id}", id)))) return { error: "body" };
     return { ms: performance.now() - started };
@@ -117,6 +129,7 @@ const row = (label, c, r) =>
 
 if (isMainThread) {
   console.log(`url ${options.url}`);
+  console.log(`client ${options.client}`);
   await load(16, seconds("warmup"));
   console.log("| path | c | req/s | p50, ms | p95, ms | p99, ms |\n|---|---:|---:|---:|---:|---:|");
   for (const c of levels) {
@@ -138,5 +151,6 @@ if (isMainThread) {
   console.log(`RSS, MiB: before soak ${before.toFixed(1)}, peak ${peak.toFixed(1)}, after ${options.idle} s idle ${rss().toFixed(1)}`);
   console.log(`answers ${totals.ok}; errors: ${JSON.stringify({ ...totals, ok: undefined })}`);
   process.exitCode = totals.status + totals.body + totals.transport + totals.timeout === 0 ? 0 : 1;
+  httpClient?.close();
   for (const t of threads) t.terminate();
 }

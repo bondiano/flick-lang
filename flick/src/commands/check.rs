@@ -4,13 +4,14 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use flick_core::diagnostics::{Diagnostic, Edit, Severity, codes};
+use flick_core::project::config::Backend;
 use flick_core::project::{self, Project};
 use flick_core::source::{FileId, SourceMap};
 
 use crate::args::CheckArguments;
 use crate::command::{Command, Outcome};
-use crate::package_cache;
 use crate::sources::{self, FsHost};
+use crate::{builtins, package_cache};
 
 mod pages;
 
@@ -35,6 +36,12 @@ impl Command for CheckCommand {
         } else {
             self.check_files(&paths)
         };
+        if !pages.is_empty()
+            && let Err(diagnostic) = builtins::prepare()
+        {
+            outcome.diagnostics.push(diagnostic);
+            return outcome;
+        }
         for page in &pages {
             let fix = self.options.fix.then_some(self.options.only.as_slice());
             let diagnostics = pages::check(&mut outcome.sources, page, fix);
@@ -85,6 +92,20 @@ impl CheckCommand {
                 );
             }
         };
+        // Projects select class-derived stages on RT. Persist that set of
+        // builtin interfaces, rather than checking std anew in every process.
+        let rt = project
+            .as_ref()
+            .is_some_and(|p| p.config.build.effect == Backend::Rt);
+        if let Err(diagnostic) = builtins::prepare_in(rt) {
+            return (
+                Outcome {
+                    sources,
+                    diagnostics: vec![diagnostic],
+                },
+                roots,
+            );
+        }
         let diagnostics = package_cache::with_saved(|saved| {
             project::check_with(host, &mut sources, project.as_ref(), &roots, saved)
         });

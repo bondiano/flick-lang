@@ -65,11 +65,9 @@ impl Checker<'_> {
 }
 
 impl Checker<'_> {
-    /// `Atom.serializable`, `serializable_family`, `serializable_task` and `serializable_result` take their key
-    /// from the top-level binding they define, so each is applied there
-    /// once, outside any function: anywhere else one key would name many
-    /// atoms.
-    pub fn atom_keys(&mut self, decls: &[&Node]) {
+    /// Read-only binding and application facts for serializable atom
+    /// references. The watching UI plugin decides whether their keys are safe.
+    pub fn record_atom_bindings(&mut self, decls: &[&Node]) {
         for decl in members(decls) {
             let mut keyed = Keyed::default();
             keyed.walk(decl, false, &self.typing.names);
@@ -86,31 +84,32 @@ impl Checker<'_> {
                 let entity = self.env.entity(Namespace::Value, b);
                 matches!(self.env.value(&entity), Some(Type::Forall { constraints, .. }) if !constraints.is_empty())
             });
-            let mut defined = false;
             for (range, name, in_function) in keyed.found {
-                let message = match &binding {
-                    None => format!(
-                        "`Atom.{name}` takes its key from the top-level binding it defines: define the atom with a top-level `let` without parameters"
-                    ),
-                    Some(b) if constrained => format!(
-                        "`Atom.{name}` in `{b}`, whose type takes a dictionary, would make an atom at each use of `{b}`: drop the constraint from its signature"
-                    ),
-                    Some(_) if in_function => format!(
-                        "`Atom.{name}` inside a function would give its key to every atom the function makes: define the atom with a top-level `let`"
-                    ),
-                    Some(_) if keyed.applied.get(&range) != Some(&key_arity(&name)) => format!(
-                        "`Atom.{name}` is applied to its codec and state where it is defined, since the binding's name is its key"
-                    ),
-                    Some(b) if defined => format!(
-                        "a second serializable atom in `{b}` would share its key `{}.{b}`: define each with its own top-level `let`",
-                        self.env.module
-                    ),
-                    Some(_) => {
-                        defined = true;
-                        continue;
-                    }
+                let Some(Ref::Value { module, .. }) = self.typing.names.get(&range) else {
+                    continue;
                 };
-                self.error(codes::U003, Span::new(self.file, range.0, range.1), message);
+                self.typing.call_sites.push(flick_plugin::CallSite {
+                    module: module.clone(),
+                    name,
+                    span: flick_plugin::Span {
+                        start: range.0,
+                        end: range.1,
+                    },
+                    arguments: Vec::new(),
+                    refinement: None,
+                    binding: Some(flick_plugin::Binding {
+                        module: self.env.module.clone(),
+                        name: binding.clone(),
+                        span: flick_plugin::Span {
+                            start: decl.range().0,
+                            end: decl.range().1,
+                        },
+                        constrained,
+                        in_function,
+                        applied: u32::try_from(keyed.applied.get(&range).copied().unwrap_or(0))
+                            .unwrap_or(u32::MAX),
+                    }),
+                });
             }
         }
     }
@@ -376,13 +375,6 @@ pub(super) fn members<'n>(decls: &[&'n Node]) -> impl Iterator<Item = &'n Node> 
             .collect(),
         _ => vec![*d],
     })
-}
-
-/// The arguments of a serializable maker: its codecs and its state.
-fn key_arity(name: &str) -> usize {
-    let result = lang::module_of(Lang::SerializableResult).is_some()
-        && name == lang::item(Lang::SerializableResult).name;
-    if result { 3 } else { 2 }
 }
 
 /// The serializable atoms under a declaration: where each is named, and

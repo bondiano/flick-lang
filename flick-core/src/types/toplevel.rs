@@ -124,7 +124,7 @@ impl<'a> Checker<'a> {
             }
             self.settle_operators();
         }
-        self.atom_keys(&decls);
+        self.record_atom_bindings(&decls);
         self.class_defaults(&decls);
         self.solve_classes(true);
         self.check_instances(&declared);

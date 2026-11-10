@@ -108,7 +108,7 @@ impl Checker<'_> {
     /// the solved module has them.
     pub(super) fn record_call_sites(&mut self) {
         let calls = mem::take(&mut self.calls);
-        self.typing.call_sites = (calls.iter())
+        let sites = (calls.iter())
             .map(|call| {
                 let arguments = (call.args.iter())
                     .map(|(at, ty, constant)| {
@@ -127,9 +127,11 @@ impl Checker<'_> {
                     span: span_of(call.span),
                     arguments,
                     refinement: self.refinement(call),
+                    binding: None,
                 }
             })
-            .collect();
+            .collect::<Vec<_>>();
+        self.typing.call_sites.extend(sites);
     }
 
     /// How the refined type of a companion `T$parse` checks the constant the

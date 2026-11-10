@@ -282,6 +282,7 @@ macro_rules! wit_conversions {
                     span: to_span(c.span),
                     arguments: c.arguments.iter().map(to_argument).collect(),
                     refinement: c.refinement.as_ref().map(to_refinement),
+                    binding: c.binding.as_ref().map(|b| w::Binding { module: b.module.clone(), name: b.name.clone(), span: to_span(b.span), constrained: b.constrained, in_function: b.in_function, applied: b.applied }),
                 }
             }
 
@@ -292,6 +293,7 @@ macro_rules! wit_conversions {
                     span: from_span(c.span),
                     arguments: c.arguments.into_iter().map(from_argument).collect(),
                     refinement: c.refinement.map(from_refinement),
+                    binding: c.binding.map(|b| $crate::Binding { module: b.module, name: b.name, span: from_span(b.span), constrained: b.constrained, in_function: b.in_function, applied: b.applied }),
                 }
             }
 

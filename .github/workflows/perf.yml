@@ -63,5 +63,6 @@ jobs:
           name: perf
           path: |
             target/perf.json
+            target/perf-errors.json
             perf.log
           if-no-files-found: warn

@@ -22,7 +22,7 @@ let html_options = {
 }
 
 /// The streamed markup of `view` for request `n`, with a registry of its own.
-streamed_ui : String -> Ui -> Stream.Stream none none String
+streamed_ui : String -> Ui -> Stream.Stream {Async} none String
 let streamed_ui n view =
   let made = task {
     Reactivity.Atom.set Load.Page.request n
@@ -41,16 +41,18 @@ let render _ =
 
 streamed : ServerRequest ->{RouteContext} ServerResponse
 let streamed _ =
-  Http.ServerResponse.stream_text (streamed_ui (id ()) (Ui.render Load.Page.rows ())) html_options
+  Http.ServerResponse.stream_text_async
+    (streamed_ui (id ()) (Ui.render Load.Page.rows ()))
+    html_options
 
-collected : ServerRequest ->{RouteContext} ServerResponse
+collected : ServerRequest ->{Async, RouteContext} ServerResponse
 let collected _ =
   Http.ServerResponse.html
     (String.join "" (Stream.run_collect (streamed_ui (id ()) (Ui.render Load.Page.rows ()))))
 
 suspended : ServerRequest ->{RouteContext} ServerResponse
 let suspended _ =
-  Http.ServerResponse.stream_text
+  Http.ServerResponse.stream_text_async
     (streamed_ui (id ()) Load.Page.suspended
       |> Stream.prepend [
         "<!doctype html><html><head><title>load</title><link rel=\"icon\" href=\"data:,\"></head><body>",

@@ -104,6 +104,7 @@ fn main() -> ExitCode {
             | Commands::Init(_)
             | Commands::Clean(_)
             | Commands::Build(_)
+            | Commands::Check(_)
             | Commands::Test(_)
             | Commands::Install(_)
             | Commands::Add(_)

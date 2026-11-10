@@ -492,6 +492,15 @@ importers:
         specifier: 1.2.16
         version: 1.2.16
 
+  tools/load/ssr:
+    dependencies:
+      '@flick-lang/effect-ts':
+        specifier: workspace:*
+        version: link:../../../packages/effect-ts
+      '@flick-lang/runtime':
+        specifier: workspace:*
+        version: link:../../../runtime
+
   tools/tokens:
     dependencies:
       gpt-tokenizer:

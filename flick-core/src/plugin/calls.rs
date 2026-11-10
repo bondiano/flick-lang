@@ -30,6 +30,9 @@ pub fn placed_sites(
     };
     for site in &mut sites {
         site.span = place(site.span);
+        if let Some(binding) = &mut site.binding {
+            binding.span = place(binding.span);
+        }
         for argument in &mut site.arguments {
             argument.span = place(argument.span);
         }
