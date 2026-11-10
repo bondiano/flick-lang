@@ -915,6 +915,68 @@ let group () =
 - Stricter than Lean, not a hole: in `formal/Formal/Live/Mode.lean`, `Stage.use (.rt r ε) C` is `.rt (Row.union r (Row.ofCaps C)) ε`, and `Row.scope s = Row.ofCaps s.reach` (`Syntax.lean`), so `Live C` and `Scope s` are the same row atoms. Resolution, model and checker: where `Live C` is checked within a row, the regions of that row's `Scope ϱ` count as live. Work an owner keeps needs the regions of its `Live` to outlive the owner; its `Scope` is the owner's own ([children acquire in the region of their owner](#children-acquire-in-the-region-of-their-owner)), which adds nothing to that. Only one direction: `Live ϱ` gives no `Scope ϱ`, so an acquisition into `ϱ` still needs `Scope ϱ` (`FLICK-G004`). Model: `check/regions/live.rs` `scope_live`, `check/rows.rs` `within`; flick-core: `types/regions/live_rows.rs`. Tests: `flick-model/tests/live_scope.rs`; `tests/check/pass/regions/scope_helper.fl`, `tests/check/fail/regions/acquire.fl`.
 - Extended to `Setup s` of a component, like any service indexed by a region: a row with `Setup s` keeps `s` live, and a handler of it is installed only where `s` is live, so a `provide` of `Setup s` outside the instance of `s` is rejected. The runtime gives `Setup s` only while it sets up the instance of region `s` (`setUp` in `runtime/src/rt/ui/views.ts` and `runtime/src/ui/react/views.ts`). Checker: `regions/live_rows.rs` `live_install`; model: `check/regions/live.rs` `indexed_live`; Lean: `hdl_err_live` (`formal/Formal/Live/Install.lean`): (Handle) removes only the name of the effect from the body's row, so every region its index reaches stays in the stage where the handler is installed. Tests: `tests/check/pass/ui/component_setup.fl`, `tests/check/pass/regions/setup_region.fl`, `tests/check/fail/regions/install.fl`.
 
+### The step of scope names its region in signatures
+
+Divergence: the reference machine took the step of `scope` as `inside π e[s := own π]` and left `s` in the signatures of `e`, bound again by (Inside).
+
+```text
+scope s {
+  let h = open "x"
+  let _ = Fiber.spawn s report (task {
+    v : ((Unit ->{} Unit)^{s}) ->{} Unit
+    let v f = f ()
+    v (fun _ -> use h) })
+  0 }
+```
+
+- Symptom: `FLICK-G001` "this value holds {π0}, which `` does not allow" at the step of `Fiber.spawn` in `progress_and_preservation_hold`, and `FLICK-G002` when the argument of `v` holds nothing. The task became a child `K(π)`, and `⊢ Λ` types a child outside the `inside` that bound `s`; a finalizer and the value of a cell leave the same way.
+- Incompleteness of the reference machine, not of the document: §3.2 has `e[s := π][s := own π]`, and under it the child's signature names `π`.
+- Resolution, model: the step puts `π` in place of `s` in the signatures of the body, but for a signature that binds `s` itself and for a nested `scope s` (`flick-model/src/subst.rs` `subst_in_region`). Test: `a_child_keeps_the_region_its_signatures_name` (`flick-model/tests/props.rs`).
+
+### Fix keeps the qualifier of a local signature
+
+Divergence: (Fix) of the reference checker took the signature of `fix f. λx. e` bare, although (Let-Sig) had inferred its outer qualifier ([local signatures infer only the outer qualifier](#local-signatures-infer-only-the-outer-qualifier)).
+
+The program the model properties found, as the generator wrote it and its choices shrank it:
+
+```text
+scope s1 {
+  let h2 = open "x"
+  v3 : Unit ->{} Unit
+  let v3 x7 =
+    ({ a = use h2
+       b = scope s4 {
+         let h5 = open "x"
+         let cell6 = Ref.make 0
+         0 } }).a
+  let cell10 : Ref (Int -> Int) = Ref.make ((fun x9 -> 0) : Int -> Int)
+  let v11 : (Eff none none Unit)^{s1} = task { v3 () }
+  0 }
+```
+
+- Symptom: `FLICK-G001` "this value holds {π0}, which `` does not allow" in `progress_and_preservation_hold`, one step after `let v3` (the step that makes it `fix v3. λx7. …use (cap π0 n)…`, see [stepping a signed let](core.md#stepping-a-signed-let-loses-its-signature)): the λ needs `Live {π0}`, and a bare `Unit →R⟨none;none⟩ Unit` allows none.
+- Incompleteness of the reference checker: the program is accepted with `v3 : (Unit →R Unit)^{s1}`, and the state is typed by the same rule once (Fix) infers the qualifier as (Let-Sig) did.
+- Resolution, model: (Fix) checks the λ against the local signature with its own qualifier inferred, and gives `fix` that type (`flick-model/src/check/expr.rs` `fix`). Test: `a_function_keeps_the_qualifier_of_its_local_signature` (`flick-model/tests/props.rs`).
+
+### The work of a region is typed inside it
+
+Divergence: `⊢ Λ` of the reference checker typed a child or a finalizer of `π` outside every region, so a `scope` written in it was nested in nothing.
+
+```text
+scope s1 {
+  let _ = Fiber.spawn s1 report (task {
+    (scope s4 {
+      let _ = Fiber.spawn s4 report (task {
+        let _ = Fiber.spawn s1 report (task { () })
+        () })
+      { a = (); b = 0 } }).a })
+  0 }
+```
+
+- Symptom: `FLICK-G003` "`π0` may end before region `s4`" in `progress_and_preservation_hold`, at the step that makes the outer task a child of `π0`: the child of `s4` holds the owner of `s1`, which needs `s1 ≥ s4`. The program has it by the first rule of §2.4, `s4` being written inside `scope s1`; in `K(π0)` the task stands apart from that `scope`.
+- Incompleteness of the reference checker: a child runs in the region of its owner ([children acquire in the region of their owner](#children-acquire-in-the-region-of-their-owner)), so a `scope` it opens is inside `π0` and the regions `π0` was made in, as the machine runs it.
+- Resolution, model: `⊢ Λ` types the work of `π` as nested in `π` and in every region `π` was made in (`flick-model/src/check/runtime.rs` `lambda`, `check/regions/scope.rs` `nested_in`). Test: `a_scope_in_a_child_is_inside_the_region_of_its_owner` (`flick-model/tests/props.rs`).
+
 ### Rules of typing by use found while porting
 
 - An instance method without a signature is checked against the class signature, elided before the instance arguments are substituted (`tests/check/pass/regions/instance_elided.fl`); a signature an instance method writes does not add the `Live` its own arrows would need (`tests/check/fail/regions/instance_signature.fl`).
