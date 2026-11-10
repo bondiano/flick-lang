@@ -1,5 +1,5 @@
-// A file opened in a scope is closed when the scope ends, so it cannot leave it:
-// the function this returns would read a closed file.
+// A file opened in a scope is closed when the scope ends, so a function that
+// reads it cannot leave the scope: it would read a closed file.
 module Main exposing (main, reader)
 
 type File (s : Region)

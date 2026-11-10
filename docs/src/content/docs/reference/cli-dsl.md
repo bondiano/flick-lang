@@ -148,9 +148,8 @@ logs and metrics over OTLP to `OTEL_EXPORTER_OTLP_ENDPOINT`
 into exit code 1. The flags of a command with subcommands come before the
 subcommand's name and are seen only by that command's handler.
 
-A command keeps the captures of its handler: one whose handler holds a
-resource of a `scope` runs inside that scope and cannot leave it
-(`FLICK-G001`).
+A command needs what its handler uses: one whose handler uses a resource
+of a `scope` runs inside that scope and cannot leave it (`FLICK-G001`).
 
 ## Rules
 

@@ -32,16 +32,16 @@ variable of a signature it is quantified over the whole signature, so
 `forall c.` can be left out ([types](../types/)).
 
 The two `^c` are what let `save_button` accept any callback. A function type
-without a qualifier holds no regions. So with `on_save : Unit ->{Atom.Write} Unit`, a callback that uses a `File s` from an enclosing `scope`
-is rejected where it is passed (`FLICK-G001`), even when the `Ui` never
+without a qualifier keeps no region live. So with `on_save : Unit ->{Atom.Write} Unit`, a callback that uses a `File s` from an enclosing `scope`
+is rejected where it is passed (`FLICK-G002`), even when the `Ui` never
 leaves the scope. A callback that needs a service, such as saving through
 `Users`, provides it and handles its errors inside, writing the outcome to
-an atom. With `^c` on the field the callback may hold anything, and
-`^c` on the result keeps those captures in the `Ui`, so a `Ui` that holds a
-region still cannot leave its scope. A qualifier on the result alone does not
-help, since the field would still allow no captures. A top-level signature is
+an atom. With `^c` on the field the callback may use what `c` keeps
+live, and `^c` on the result says that using the `Ui` needs it too, so a `Ui`
+whose callbacks use a region cannot leave its scope. A qualifier on the result
+alone does not help, since the field would still keep nothing live. A top-level signature is
 checked as written, so these qualifiers are never inferred. A component whose
-callbacks never hold scoped resources can drop both of them.
+callbacks never use scoped resources can drop both of them.
 
 `ui { … }` is a block in which the names `Ui` exports need no `Ui.`: a local
 binding still wins, then a name of `Ui`, then the module's own names.
@@ -440,7 +440,7 @@ calls the pure `decide` on the snapshot before the callback returns and
 prevents the default action when it says so; otherwise the default action
 happens.
 
-Handlers keep their captures: a button whose handler holds a file of a
+Handlers keep what they need: a button whose handler uses a file of a
 scope cannot leave that scope (`FLICK-G001`). Building a `Ui` is pure, so
 `Ref.get` there is a runtime call where none is allowed (`FLICK-E001`); a
 view reads atoms instead.

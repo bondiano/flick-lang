@@ -6,6 +6,16 @@ break programs.
 
 ## Unreleased
 
+- **Regions by use:** the checker asks where a value uses a region, not what
+  it holds, everywhere: a value may keep a handle past its `scope` while
+  nothing uses it there, and a use there is `FLICK-G002`. The `captures`
+  discipline, the `[build] regions` key and the `flick live` code-block tag
+  are gone; `.iface` version 12. `Setup s` keeps an instance's region live,
+  a handler of a region-indexed service needs its region live where it is
+  installed, and lifecycle work outlives its instance (`Lifecycle s`). The
+  reference model and the Lean development have one typing judgment, by use,
+  with T4′ as their region safety theorem.
+
 - **Opt-in implicit conversions:** `@implicit` marks a ground, context-free
   instance of a class with one pure `a -> b` method. A unique visible
   conversion is inserted at a ground nominal type mismatch, without chains
