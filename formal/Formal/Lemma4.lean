@@ -12,7 +12,7 @@ semantics by substitution this is reachability.
 
 namespace Flick
 
-variable {S : Sig}
+variable {S : Sig} {mode : TypingMode}
 
 /-- `π ∈ reach_μ(e)`. -/
 inductive Reaches (μ : List Tm) : Tm → Nat → Prop
@@ -43,14 +43,14 @@ theorem lemma_4_cell {Ψ : List Ty} {μ : List Tm} {l : Nat} {v : Tm} {t : Ty} {
 /-- **L6 (old cells).** In every configuration reached by a program, the type of each
 cell names only regions that already exist, and later configurations keep the type
 of every cell: a region created after a cell is not in its type. -/
-theorem lemma_6 {root e₀ t φ₀ c} (hroot : RootTy S root) (h₀ : Typ S [] Facts.none [] e₀ (.ex t φ₀))
+theorem lemma_6 {root e₀ t φ₀ c} (hroot : RootTyM S mode root) (h₀ : TypM S mode [] Facts.none [] e₀ (.ex t φ₀))
     (hp : e₀.Below 0) (ht : t.YF 0) (hφ : φ₀.substT (kill 0) = φ₀)
     (hs : CSteps root ⟨[], [], e₀⟩ c) :
-    ∃ Ψ, CfgTy S Ψ c t φ₀ ∧ (∀ u ∈ Ψ, ∀ p, c.rgs.length ≤ p → u.substT (kill p) = u) ∧
-      ∀ {c'}, CSteps root c c' → ∃ X, CfgTy S (Ψ ++ X) c' t φ₀ := by
-  obtain ⟨Ψ, hc⟩ := steps_typed hroot hs ht hφ (CfgTyM.init h₀ hp)
+    ∃ Ψ, CfgTyM S mode Ψ c t φ₀ ∧ (∀ u ∈ Ψ, ∀ p, c.rgs.length ≤ p → u.substT (kill p) = u) ∧
+      ∀ {c'}, CSteps root c c' → ∃ X, CfgTyM S mode (Ψ ++ X) c' t φ₀ := by
+  obtain ⟨Ψ, hc⟩ := steps_typed_mode hroot hs ht hφ (CfgTyM.init h₀ hp)
   simp only [List.nil_append] at hc
   exact ⟨Ψ, hc, fun u hu _ hle => (hc.2.2.2.2.1 u hu).mono hle,
-    fun hs' => steps_typed hroot hs' ht hφ hc⟩
+    fun hs' => steps_typed_mode hroot hs' ht hφ hc⟩
 
 end Flick
