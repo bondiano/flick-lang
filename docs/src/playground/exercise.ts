@@ -1,4 +1,5 @@
 /** Shared rules over compiler results. Browser and CI supply their own compiler ports. */
+import { escape } from "@flick-lang/runtime/rt/effect/RegExp";
 export interface ExerciseCheck {
   readonly export: string;
   readonly argument_types: ReadonlyArray<string>;
@@ -10,7 +11,6 @@ export interface ExerciseOperations {
   compile(): Promise<{ readonly dts: string }>;
   run(): Promise<{ readonly status: string; readonly code: number; readonly lines: ReadonlyArray<{ readonly stream: string; readonly text: string }> }>;
 }
-const escape = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 export const evaluateExercise = async (rules: ExerciseCheck, operations: ExerciseOperations): Promise<string> => {
   if ((await operations.check()).some((problem) => problem.severity === "error")) return "fix-errors";
