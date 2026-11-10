@@ -53,6 +53,7 @@ include!("checking_tests_replay.rs");
 #[cfg(feature = "ide")]
 include!("checking_tests_visibility.rs");
 include!("checking_tests_contracts.rs");
+include!("checking_tests_higher_order.rs");
 #[cfg(feature = "ide")]
 #[test]
 fn private_builtin_cannot_be_imported_or_named_without_an_import() {
