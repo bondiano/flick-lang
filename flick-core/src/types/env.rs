@@ -198,13 +198,40 @@ pub enum Found {
     Missing,
 }
 
+/// The definitions of types by module, then by name: a lookup borrows both,
+/// and the checker asks for one at every head of a type it reduces.
+#[derive(Debug, Default)]
+pub(super) struct TypeDefs(HashMap<String, HashMap<String, TypeDef>>);
+
+impl TypeDefs {
+    fn get(&self, module: &str, name: &str) -> Option<&TypeDef> {
+        self.0.get(module)?.get(name)
+    }
+
+    fn define(&mut self, module: &str, name: String, def: TypeDef) {
+        match self.0.get_mut(module) {
+            Some(types) => types.insert(name, def),
+            None => self
+                .0
+                .entry(module.to_owned())
+                .or_default()
+                .insert(name, def),
+        };
+    }
+
+    /// The types `module` defines, in no order.
+    fn of(&self, module: &str) -> impl Iterator<Item = (&String, &TypeDef)> {
+        self.0.get(module).into_iter().flatten()
+    }
+}
+
 /// A module's environment: its own and imported knowledge over the shared
 /// [`Builtins`], which every lookup falls back to.
 #[derive(Debug)]
 pub struct Env<'b> {
     pub module: String,
     builtins: &'b Builtins,
-    types: HashMap<(String, String), TypeDef>,
+    types: TypeDefs,
     values: HashMap<Entity, Type>,
     /// Type of a constructor's parent, by constructor entity.
     parents: HashMap<Entity, String>,
