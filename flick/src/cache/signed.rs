@@ -33,8 +33,9 @@ impl Deref for Signed {
     }
 }
 
-fn path(root: &Path) -> PathBuf {
-    root.join(cache::DIR).join("cache").join("inputs.json")
+/// Beside the cache, whose directory holds one entry per cached build.
+pub fn path(root: &Path) -> PathBuf {
+    root.join(cache::DIR).join("cache-inputs.json")
 }
 
 /// Records the inputs of the build cached under `key`; without the record a

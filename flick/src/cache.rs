@@ -21,7 +21,7 @@ use crate::toolchain;
 
 mod signed;
 
-pub use signed::{Signed, missed};
+pub use signed::{Signed, missed, path as inputs_path};
 
 /// Files under `dir`, recursively, in a stable order.
 pub fn files_under(dir: &Path, out: &mut Vec<PathBuf>) {
