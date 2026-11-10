@@ -85,10 +85,7 @@ impl Checker<'_> {
                 Some(t) => Ok(Type::Ref(Rc::new(t.clone()))),
                 None => error("Loc", format!("no cell ℓ{l} in μ")),
             },
-            // (Fix): `fix f. λx. e` is `let rec f : σ = λx. e in f`
-            Term::Fix(f, sig, lam) => {
-                self.let_rec(f, sig.as_deref(), lam, &Term::Var(f.clone()), expected)
-            }
+            Term::Fix(f, sig, lam) => self.fix(f, sig.as_deref(), lam, expected),
             Term::Env(theta) => self.env(theta),
             // (Bind)
             Term::Bind(s, e) => {
@@ -156,8 +153,8 @@ impl Checker<'_> {
         }
     }
 
-    /// `⊢ Λ`: the children and finalizers of each live region are typed,
-    /// and reach only regions that outlive it (§2.4, T4).
+    /// `⊢ Λ`: the children and finalizers of each live region are typed as
+    /// what runs in it, and reach only regions that outlive it (§2.4, T4).
     fn lambda(&mut self, lambda: &Lambda, mem: &[Term]) -> Check<()> {
         for (pi, r) in lambda.regions.iter().enumerate().filter(|(_, r)| r.live) {
             let fins = r.finalizers.iter().filter_map(|f| match f {
@@ -166,9 +163,11 @@ impl Checker<'_> {
             });
             let kids = r.children.iter().flat_map(|(f, t, _)| [f, t]);
             let outer = lambda.outlived_by(pi);
+            // made one in another, so in the order they were made
+            let enclosing: Vec<_> = outer.iter().map(|p| region_name(*p)).collect();
             for t in fins.chain(kids) {
                 let stage = mem::replace(&mut self.stage, Stage::Pure);
-                self.infer(t)?;
+                self.nested_in(enclosing.clone(), |c| c.infer(t))?;
                 self.stage = stage;
                 if let Some(q) = reach(t, mem).difference(&outer).next() {
                     return error(

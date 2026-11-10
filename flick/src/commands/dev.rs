@@ -9,12 +9,15 @@
 //! client's, and Vite for its pages: the bundler builds the client's
 //! modules itself and replaces them in the page as they change.
 
+use std::cell::RefCell;
 use std::process::ExitCode;
+use std::rc::Rc;
 use std::sync::atomic::Ordering;
 use std::thread;
 use std::time::Duration;
 
 use flick_core::diagnostics::{Diagnostic, Severity, codes};
+use flick_core::project::ModuleCache;
 use flick_core::source::SourceMap;
 use signal_hook::consts::SIGTERM;
 
@@ -84,6 +87,8 @@ pub fn dev(options: &RunArguments, global: &GlobalArguments) -> ExitCode {
     let paths = watched_roots(&project);
     let mut live: Option<Live> = None;
     let mut seen = None;
+    // what the builds of this session compiled: a change compiles what it reaches
+    let modules: Rc<RefCell<ModuleCache>> = Rc::default();
     loop {
         let now = watch_snapshot(&paths);
         if seen.as_ref() != Some(&now) {
@@ -92,7 +97,7 @@ pub fn dev(options: &RunArguments, global: &GlobalArguments) -> ExitCode {
                 timings::discard();
             }
             seen = Some(now);
-            let built = build_into_generation(&project, options, global);
+            let built = build_into_generation(&project, options, global, Some(modules.clone()));
             // each build reports itself, before the version it built starts
             timings::report(global);
             if let Ok(generation) = built {

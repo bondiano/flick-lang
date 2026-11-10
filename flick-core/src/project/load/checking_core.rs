@@ -33,6 +33,7 @@ impl Checking<'_> {
             text: self.text_of(loaded).to_owned(),
             config: self.project.map(|p| p.config.clone()),
             lower: self.lower,
+            cached_ir: self.cached_ir,
             imports: loaded
                 .syntax
                 .imports
@@ -265,9 +266,7 @@ impl Checking<'_> {
             inline_ide: Vec::new(),
             exported: if clean { interface.clone() } else { untyped },
             interface,
-            // editors, the runs with a cache, read its diagnostics only, and
-            // keeping the IR would copy all of it on every keystroke
-            ir: ir.filter(|_| self.cache.is_none()),
+            ir: ir.filter(|_| self.cache.is_none() || self.cached_ir == CachedIr::Kept),
             declarations,
         }
     }

@@ -187,6 +187,83 @@ fn a_function_keeps_its_signature() {
     assert!(checked.is_ok(), "{checked:?}\n{}", generate::source(&p));
 }
 
+/// A signature in a child names the region of its `scope`: a task given to
+/// `Fiber.spawn s` holds `v : ((Unit ->{} Unit)^{s}) ->{} Unit`, and once it
+/// is a child of the region it is typed outside the `scope` that bound `s`.
+/// With an argument that holds the region, and with one that holds nothing.
+/// Cases the model properties found.
+#[test]
+#[allow(
+    clippy::unreadable_literal,
+    reason = "the choices as proptest printed them"
+)]
+fn a_child_keeps_the_region_its_signatures_name() {
+    let held: &[u32] = &[
+        3, 0, 0, 0, 0, 0, 0, 0, 1, 3733153966, 1140624250, 0, 0, 41785623, 1, 0, 265291797,
+    ];
+    let nothing: &[u32] = &[
+        0, 0, 0, 2, 1, 1, 2971067122, 1, 1911584171, 0, 3036185343, 3743594924, 3928023536,
+        2226115803, 0, 0, 1533559200, 1,
+    ];
+    for c in [held, nothing] {
+        let p = generate::program(c);
+        let source = generate::source(&p);
+        assert!(source.contains("Fiber.spawn s"), "{source}");
+        assert!(model(&p).is_ok(), "{source}");
+        let checked = GEN.with(|(d, globals)| progress_and_preservation(globals, d, &p));
+        assert!(checked.is_ok(), "{checked:?}\n{source}");
+    }
+}
+
+/// A function with a local signature keeps the qualifier (Let-Sig) inferred
+/// for it when its `let` steps: `v : Unit ->{} Unit` uses a handle of the
+/// `scope` around it, and the `fix` its λ became is called in a task. A
+/// case the model properties found.
+#[test]
+#[allow(
+    clippy::unreadable_literal,
+    reason = "the choices as proptest printed them"
+)]
+fn a_function_keeps_the_qualifier_of_its_local_signature() {
+    let c = [
+        0, 0, 0, 2, 1, 1, 3798531823, 396777437, 2, 0, 0, 0, 1, 2291891977, 0, 1, 2111737910, 0,
+        190755199, 82792337, 0, 0, 0, 0, 2882392651, 0, 0, 0, 0, 1, 0, 0, 0, 1084595813, 2, 0, 3,
+        0, 315595452, 1,
+    ];
+    let p = generate::program(&c);
+    let source = generate::source(&p);
+    assert!(
+        source.contains("(use h2)") && source.contains("(v3 ())"),
+        "{source}"
+    );
+    assert!(model(&p).is_ok(), "{source}");
+    let checked = GEN.with(|(d, globals)| progress_and_preservation(globals, d, &p));
+    assert!(checked.is_ok(), "{checked:?}\n{source}");
+}
+
+/// A child runs in the region of its owner: a `scope` it opens is inside
+/// that region, so a child of the inner `scope` may hold the outer one,
+/// `Fiber.spawn s1` in a child of `s4` in a child of `s1`. A case the model
+/// properties found.
+#[test]
+#[allow(
+    clippy::unreadable_literal,
+    reason = "the choices as proptest printed them"
+)]
+fn a_scope_in_a_child_is_inside_the_region_of_its_owner() {
+    let c = [
+        0, 0, 0, 0, 0, 1, 2103265675, 3241815428, 0, 0, 1685817865, 0, 2523900354, 3031439068, 0,
+        1, 318732972,
+    ];
+    let p = generate::program(&c);
+    let source = generate::source(&p);
+    assert_eq!(source.matches("Fiber.spawn s1").count(), 2, "{source}");
+    assert!(source.contains("Fiber.spawn s4"), "{source}");
+    assert!(model(&p).is_ok(), "{source}");
+    let checked = GEN.with(|(d, globals)| progress_and_preservation(globals, d, &p));
+    assert!(checked.is_ok(), "{checked:?}\n{source}");
+}
+
 proptest! {
     // a failure becomes a case of `tests/check`, not a file of seeds
     // (the programs with a hole of TypeScript are not run, below)

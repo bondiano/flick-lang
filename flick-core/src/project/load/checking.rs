@@ -76,6 +76,7 @@ pub(crate) fn check_inline_file(
         project: None,
         stages_by_class: false,
         lower: false,
+        cached_ir: CachedIr::Dropped,
         lower_packages_only: false,
         precompiled: &precompiled,
         cache: None,
@@ -148,6 +149,8 @@ struct Key {
     /// The effective configuration, including programmatically supplied values.
     config: Option<Config>,
     lower: bool,
+    /// An editor's entry, without the IR, is none a build reads.
+    cached_ir: CachedIr,
     /// Each import's interface, without where its names are declared and
     /// their docs, which checking does not read, and whether it is a module
     /// of the project.
@@ -226,6 +229,15 @@ impl Loader<'_> {
                     .diagnostics
                     .iter()
                     .any(|d| d.severity == Severity::Error),
+            // an editor's run reads no IR; a check and a build do
+            #[cfg(feature = "ide")]
+            cached_ir: if self.ide.is_some() {
+                CachedIr::Dropped
+            } else {
+                CachedIr::Kept
+            },
+            #[cfg(not(feature = "ide"))]
+            cached_ir: CachedIr::Kept,
             lower_packages_only: self.lower_packages_only,
             precompiled: &self.precompiled,
             cache: self.cache.as_deref(),
@@ -256,6 +268,15 @@ impl Loader<'_> {
     }
 }
 
+/// What a cached output does with a module's IR: an editor reads its
+/// diagnostics only, and keeping the IR would copy all of it on every
+/// keystroke; a check or a build that runs again reads it.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum CachedIr {
+    Kept,
+    Dropped,
+}
+
 /// What the modules checked so far show their importers.
 struct Known {
     interfaces: Vec<Option<Interface>>,
@@ -273,6 +294,7 @@ struct Checking<'a> {
     project: Option<&'a Project>,
     stages_by_class: bool,
     lower: bool,
+    cached_ir: CachedIr,
     lower_packages_only: bool,
     precompiled: &'a Precompiled,
     cache: Option<&'a ModuleCache>,

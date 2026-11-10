@@ -1,5 +1,6 @@
 use std::cell::RefCell;
 use std::path::{Path, PathBuf};
+use std::rc::Rc;
 use std::time::Duration;
 use std::{fs, io, process};
 
@@ -7,7 +8,7 @@ use flick_core::build::{self, Artifact, Extras, Settings};
 use flick_core::codegen::Labels;
 use flick_core::diagnostics::{Diagnostic, Severity, codes};
 use flick_core::project::config::{Backend, Build, Emit, Kind, MAIN_ENTRY, Profile};
-use flick_core::project::{self, Compilation, Compiled, Project, js};
+use flick_core::project::{self, Compilation, Compiled, ModuleCache, Project, js};
 use flick_core::source::{FileId, SourceMap};
 
 use self::js_artifacts::js_artifacts;
@@ -41,11 +42,15 @@ pub struct BuildCommand {
     pub generation: bool,
     /// What the last run wrote, for its summary.
     pub built: RefCell<Option<Built>>,
+    /// What the builds before this one compiled, for a command that builds
+    /// again and again: `--watch` and `dev`. One build keeps nothing.
+    pub modules: Option<Rc<RefCell<ModuleCache>>>,
 }
 
 impl BuildCommand {
     pub fn new(options: BuildArguments, project: Option<String>, display: Option<Mode>) -> Self {
         Self {
+            modules: options.watch.then(Rc::default),
             options,
             project,
             display,
@@ -166,6 +171,7 @@ impl Command for BuildCommand {
             };
         }
         progress.stage("Compiling Flick modules");
+        let mut kept = self.modules.as_ref().map(|modules| modules.borrow_mut());
         let (mut diagnostics, mut compilation) = package_cache::with_saved(|saved| {
             let (diagnostics, compilation, fresh) = project::compile_with(
                 &host,
@@ -174,6 +180,7 @@ impl Command for BuildCommand {
                 &roots,
                 saved,
                 plan.extras.rt,
+                kept.as_deref_mut(),
             );
             ((diagnostics, compilation), fresh)
         });

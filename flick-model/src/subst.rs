@@ -5,8 +5,11 @@
 use std::borrow::Cow;
 use std::collections::BTreeSet;
 use std::rc::Rc;
+use std::slice;
 
+use crate::check::in_regions;
 use crate::syntax::{Arm, Head, Lit, Name, Pat, Term};
+use crate::types::Scheme;
 
 pub type Subst = [(Name, Term)];
 
@@ -21,10 +24,33 @@ fn without<'a>(s: &'a Subst, x: &str) -> Cow<'a, Subst> {
 
 /// `e[δ]`.
 pub fn subst(e: &Term, s: &Subst) -> Term {
-    if s.is_empty() {
+    walk(e, s, None)
+}
+
+/// `e[s := π][δ]`, the step of `scope` (`docs/formal/regions.md` §3.2): the
+/// signatures of `e` name the region `π` where they named `s`, so what
+/// leaves the body for `Λ` or `μ`, a child, a finalizer or the value of a
+/// cell, is typed without the `scope` that bound `s`.
+pub fn subst_in_region(e: &Term, s: &Subst, name: &Name, region: &Name) -> Term {
+    walk(e, s, Some(&(name.clone(), region.clone())))
+}
+
+/// A region a `scope` opened, by the name its body gives it.
+type Opened<'a> = Option<&'a (Name, Name)>;
+
+/// `σ` with the region opened in place of its name.
+fn signed(sig: Option<&Rc<Scheme>>, opened: Opened) -> Option<Rc<Scheme>> {
+    match (sig, opened) {
+        (Some(sig), Some(renamed)) => Some(Rc::new(in_regions(sig, slice::from_ref(renamed)))),
+        _ => sig.cloned(),
+    }
+}
+
+fn walk(e: &Term, s: &Subst, opened: Opened) -> Term {
+    if s.is_empty() && opened.is_none() {
         return e.clone();
     }
-    let go = |t: &Rc<Term>| Rc::new(subst(t, s));
+    let go = |t: &Rc<Term>| Rc::new(walk(t, s, opened));
     match e {
         Term::Var(x) => s
             .iter()
@@ -44,54 +70,63 @@ pub fn subst(e: &Term, s: &Subst) -> Term {
         | Term::Cont(_)
         | Term::Signal(_)
         | Term::Cap(..) => e.clone(),
-        Term::Lam(x, b) => Term::Lam(x.clone(), Rc::new(subst(b, &without(s, x)))),
+        Term::Lam(x, b) => Term::Lam(x.clone(), Rc::new(walk(b, &without(s, x), opened))),
         Term::App(f, a) => Term::App(go(f), go(a)),
         Term::Let(x, sig, e1, e2) => Term::Let(
             x.clone(),
-            sig.clone(),
+            signed(sig.as_ref(), opened),
             go(e1),
-            Rc::new(subst(e2, &without(s, x))),
+            Rc::new(walk(e2, &without(s, x), opened)),
         ),
         Term::LetRec(f, sig, e1, e2) => {
             let inner = without(s, f);
             Term::LetRec(
                 f.clone(),
-                sig.clone(),
-                Rc::new(subst(e1, &inner)),
-                Rc::new(subst(e2, &inner)),
+                signed(sig.as_ref(), opened),
+                Rc::new(walk(e1, &inner, opened)),
+                Rc::new(walk(e2, &inner, opened)),
             )
         }
-        Term::Match(e, arms) => Term::Match(go(e), arms_subst(arms, s)),
-        Term::Tuple(xs) => Term::Tuple(xs.iter().map(|x| subst(x, s)).collect()),
+        Term::Match(e, arms) => Term::Match(go(e), arms_subst(arms, s, opened)),
+        Term::Tuple(xs) => Term::Tuple(xs.iter().map(|x| walk(x, s, opened)).collect()),
         Term::Structural(c, xs) => {
-            Term::Structural(c.clone(), xs.iter().map(|x| subst(x, s)).collect())
+            Term::Structural(c.clone(), xs.iter().map(|x| walk(x, s, opened)).collect())
         }
-        Term::List(xs) => Term::List(xs.iter().map(|x| subst(x, s)).collect()),
-        Term::Record(fs) => {
-            Term::Record(fs.iter().map(|(l, x)| (l.clone(), subst(x, s))).collect())
-        }
+        Term::List(xs) => Term::List(xs.iter().map(|x| walk(x, s, opened)).collect()),
+        Term::Record(fs) => Term::Record(
+            fs.iter()
+                .map(|(l, x)| (l.clone(), walk(x, s, opened)))
+                .collect(),
+        ),
         Term::Field(e, l) => Term::Field(go(e), l.clone()),
         Term::Update(e, l, v) => Term::Update(go(e), l.clone(), go(v)),
         Term::Task(e) => Term::Task(go(e)),
         Term::Await(e) => Term::Await(go(e)),
-        Term::Try(e, arms) => Term::Try(go(e), arms_subst(arms, s)),
+        Term::Try(e, arms) => Term::Try(go(e), arms_subst(arms, s, opened)),
         Term::Provide(l, e) => Term::Provide(go(l), go(e)),
-        Term::Scope(r, e) => Term::Scope(r.clone(), Rc::new(subst(e, &without(s, r)))),
+        // a `scope` of the same name binds another region in its body
+        Term::Scope(r, e) => {
+            let opened = opened.filter(|(name, _)| name != r);
+            Term::Scope(r.clone(), Rc::new(walk(e, &without(s, r), opened)))
+        }
         Term::Fix(f, sig, lam) => {
-            Term::Fix(f.clone(), sig.clone(), Rc::new(subst(lam, &without(s, f))))
+            let sig = signed(sig.as_ref(), opened);
+            Term::Fix(f.clone(), sig, Rc::new(walk(lam, &without(s, f), opened)))
         }
         Term::Bind(svc, e) => Term::Bind(svc.clone(), go(e)),
         Term::Join(a, b) => Term::Join(go(a), go(b)),
         Term::With(env, e) => Term::With(env.clone(), go(e)),
-        Term::Handle(v, arms) => Term::Handle(go(v), arms_subst(arms, s)),
+        Term::Handle(v, arms) => Term::Handle(go(v), arms_subst(arms, s, opened)),
         Term::Raise(v) => Term::Raise(go(v)),
-        // the region's name binds in types only
+        // the name of a region that runs: its body names the region itself
         Term::Inside(p, r, e) => Term::Inside(*p, r.clone(), go(e)),
-        Term::Handler(h) => Term::Handler(Rc::new(h.map(|t| subst(t, s), |a| arms_subst(a, s)))),
+        Term::Handler(h) => Term::Handler(Rc::new(
+            h.map(|t| walk(t, s, opened), |a| arms_subst(a, s, opened)),
+        )),
     }
 }
 
-fn arms_subst(arms: &Rc<[Arm]>, s: &Subst) -> Rc<[Arm]> {
+fn arms_subst(arms: &Rc<[Arm]>, s: &Subst, opened: Opened) -> Rc<[Arm]> {
     arms.iter()
         .map(|arm| {
             let mut bound = Vec::new();
@@ -102,8 +137,8 @@ fn arms_subst(arms: &Rc<[Arm]>, s: &Subst) -> Rc<[Arm]> {
             }
             Arm {
                 pat: arm.pat.clone(),
-                guard: arm.guard.as_ref().map(|g| subst(g, &inner)),
-                body: subst(&arm.body, &inner),
+                guard: arm.guard.as_ref().map(|g| walk(g, &inner, opened)),
+                body: walk(&arm.body, &inner, opened),
             }
         })
         .collect()

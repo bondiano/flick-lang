@@ -256,8 +256,9 @@ pub enum Term {
     /// when the binding acquires into one; without, an object of G4, as
     /// the one `Resource.acquire_release` holds, or a fiber.
     Cap(Path, Option<usize>, usize),
-    /// `inside π e`: the body of a `scope` run in region `π`; its types
-    /// name the region `Name`, as the `scope` did.
+    /// `inside π e`: the body of a `scope` run in region `π`. `Name` is what
+    /// the `scope` called the region; the step that opened it put `π` in
+    /// its place in the signatures of `e`.
     Inside(usize, Name, Rc<Term>),
     /// `try … with` with arms for operations, or `provide S impl`.
     Handler(Rc<Handler>),

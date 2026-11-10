@@ -983,7 +983,7 @@ let v1 g x = (g x)
 
 - Divergence: the step of §3.3 gives `(λg. λx. g x) (try … with _ → as4)` with `as4 : Unit →R⟨none;none⟩ (Unit, Int)`. In the program the `try` was checked against `a →R⟨r;e⟩ b` from `σ`, but in the state `λg` has no signature. The reference checker infers the argument without an expected type: `λx2` takes `P` (see [a callee of unknown type](#a-callee-of-unknown-type-is-a-pure-arrow)), and the branch with `as4` fails `(⊑)` at step 32 of `progress_and_preservation_hold`.
 - This is incompleteness of the reference checker, not of the document: under the rules of §2, `λg` is typed with a runtime-arrow parameter, and Preservation holds. The reference checker infers, and `λg. λx. g x` has no principal type.
-- Resolution (model): in the reference checker the step `let x : σ = λy. e₁ in e₂` gives `e₂[x := fix x. λy. e₁]`: `x ∉ fv(λy. e₁)`, the value is the same, and (Fix) of §3.6 checks it against `σ`, like the source program (`flick-model/src/eval/mod.rs`). Test: `a_function_keeps_its_signature` (`flick-model/tests/props.rs`).
+- Resolution (model): in the reference checker the step `let x : σ = λy. e₁ in e₂` gives `e₂[x := fix x. λy. e₁]`: `x ∉ fv(λy. e₁)`, the value is the same, and (Fix) of §3.6 checks it against `σ`, like the source program (`flick-model/src/eval/mod.rs`). Test: `a_function_keeps_its_signature` (`flick-model/tests/props.rs`). With regions, `σ` there is the local signature with its own qualifier inferred ([Fix keeps the qualifier of a local signature](regions.md#fix-keeps-the-qualifier-of-a-local-signature)).
 
 ### A handler that waited for its body to unwind was typable and stuck
 
