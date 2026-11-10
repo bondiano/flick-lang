@@ -176,7 +176,6 @@ fn checked_module_contract_is_preserved_in_its_interface() {
         effects: true,
         watched,
         stages_by_class: false,
-        regions: types::RegionMode::Captures,
     };
     let diagnostics = types::check(
         &module,
@@ -285,7 +284,6 @@ fn manifest_class_name_can_be_used_by_later_dictionary_requirement() {
         effects: true,
         watched,
         stages_by_class: false,
-        regions: types::RegionMode::Captures,
     };
     let checked = types::check(
         &module,

@@ -58,7 +58,6 @@ pub(crate) fn check_text_with(
         effects: true,
         watched: Watched::none(),
         stages_by_class: false,
-        regions: types::RegionMode::Captures,
     };
     let (more, typing) = types::check_typed(&module, &builtin, builtins, options, &mut interface);
     diagnostics.extend(parse.diagnostics);

@@ -95,8 +95,7 @@ impl Checker<'_> {
             },
         };
         let ty = self.default_kinds(&ty);
-        let ty = self.signature_stages(&ty);
-        self.redundant_stages(node, &ty);
+        let ty = self.live_scheme(&ty);
         #[cfg(feature = "ide")]
         self.typing.signature_types.insert(node.range(), ty.clone());
         (ty, explicit)

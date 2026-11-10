@@ -1,7 +1,6 @@
-// captures: accepts
 // A child kept by an owner may use the regions that outlive the owner:
 // the outer one from inside the inner `scope`, and its own.
-module App.LiveChildren exposing (..)
+module App.Children exposing (..)
 
 type alias Path = String
 

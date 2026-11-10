@@ -34,7 +34,7 @@ let escaped body =
   try body () with
   | Emit.emit _ ->
     Ref.set cell resume
-    //~ FLICK-G002 @36:18-36:24 this value holds region `resume`: `resume` stays
+    //~ FLICK-G002 @36:5-36:24 this uses region `resume`
     0
 
 /// One `return` arm, matching every value, without a guard.

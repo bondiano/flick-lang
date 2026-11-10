@@ -8,10 +8,8 @@
 
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
-use std::slice;
 
 use super::{Check, Checker, error};
-use crate::subst::free_vars;
 
 mod live;
 mod provided;
@@ -20,7 +18,7 @@ mod solve;
 use crate::syntax::{Con, Name, Path, Term};
 use crate::types::{Caps, Fields, Kind, Row, Scheme, Stage, Type, Var};
 pub(crate) use live::live_service;
-pub(in crate::check) use live::{arg_caps, live_arg, regions_of};
+pub(in crate::check) use live::{arg_caps, drop_empty_live, live_arg, regions_of};
 
 /// `⋃ ⌈held⌉ ⊆ ⋃ ⌈within⌉ ∪ allowed`.
 #[derive(Clone, Debug)]
@@ -285,44 +283,6 @@ impl Checker<'_> {
         Caps::var(Var::Meta(self.meta()))
     }
 
-    /// The premise of (Lam) and (Task): what `e` uses of `Γ` is within
-    /// `⌈ty^C⌉`. Returns the type with its qualifier: `C` if given, else a
-    /// fresh capture row when `e` uses a local.
-    pub(super) fn close_over(&mut self, e: &Term, ty: Type, given: Option<Caps>) -> Type {
-        if self.live {
-            return ty;
-        }
-        let held: Vec<Type> = free_vars(e)
-            .iter()
-            .filter_map(|x| self.locals.iter().rev().find(|(n, _)| n == x))
-            .map(|(_, s)| {
-                if s.vars.is_empty() {
-                    s.body.clone()
-                } else {
-                    Type::Forall(Rc::new(s.clone()))
-                }
-            })
-            .collect();
-        let c = match given {
-            Some(c) => c,
-            None if held.is_empty() => return ty,
-            None => self.fresh_caps(),
-        };
-        if !held.is_empty() {
-            let rule = if matches!(e, Term::Task(_)) {
-                "Task"
-            } else {
-                "Lam"
-            };
-            self.hold(&held, slice::from_ref(&ty), &c, rule);
-        }
-        if c.is_empty() {
-            ty
-        } else {
-            Type::Captured(Rc::new(ty), c)
-        }
-    }
-
     /// The qualifier of `t`, `∅` when bare.
     pub(super) fn qualifier(&self, t: &Type) -> Caps {
         match self.follow(t) {
@@ -369,31 +329,24 @@ impl Checker<'_> {
         out
     }
 
-    /// The premises of (Lam) and (Task) against `expected`, for each of its
-    /// qualifiers: the body's stage `inner` within `stage` with its `Live`,
-    /// and what `e` uses of `Γ` within it. Returns `ty` with the outermost.
+    /// The premise of (Lam) and (Task) against `expected`, for each of its
+    /// qualifiers: the body's stage `inner` within `stage` with its `Live`.
+    /// What the body holds is no bound: a qualifier is what its use needs.
     pub(super) fn close_within(
         &mut self,
-        e: &Term,
         ty: &Type,
         inner: &Stage,
         stage: &Stage,
         expected: Option<&Type>,
     ) -> Check<Type> {
-        let layers = expected.map_or_else(Vec::new, |t| self.qualifiers(t));
-        let mut each = layers.clone();
+        let mut each = expected.map_or_else(Vec::new, |t| self.qualifiers(t));
         if each.is_empty() {
             each.push(Caps::default());
         }
         for q in &each {
             self.stage_within(inner, &self.live_stage(stage, q))?;
         }
-        let given = expected.map(|_| each[0].clone());
-        let closed = self.close_over(e, ty.clone(), given);
-        for q in layers.into_iter().skip(1) {
-            self.close_over(e, ty.clone(), Some(q));
-        }
-        Ok(closed)
+        Ok(ty.clone())
     }
 
     /// (Proj): a part of a value of `(T ῡ)^C` taken apart has `C` too.
@@ -450,30 +403,6 @@ impl Checker<'_> {
             let r = super::substitute(r, map);
             let facts = self.regions.facts.clone();
             self.regions.needs.push((c, r, facts));
-        }
-    }
-
-    /// `a → b → c` of a signature as `a → (b → c)^{⌈a⌉}` (§1.4): a stage
-    /// holds the parameters before it, unless its qualifier is written.
-    pub(super) fn implicit(&self, t: &Type, held: &Caps) -> Type {
-        match t {
-            Type::Fun(p, s, r) => {
-                let p = self.implicit(p, &Caps::default());
-                let held = held.union(&self.reach(&p));
-                let mut r = self.implicit(r, &held);
-                if matches!(r, Type::Fun(..)) && !held.is_empty() {
-                    r = Type::Captured(Rc::new(r), held);
-                }
-                Type::Fun(Rc::new(p), s.clone(), Rc::new(r))
-            }
-            Type::Captured(x, c) => Type::Captured(Rc::new(self.implicit(x, c)), c.clone()),
-            Type::Bounded(x, c) => Type::Bounded(Rc::new(self.implicit(x, c)), c.clone()),
-            Type::Forall(s) => Type::Forall(Rc::new(Scheme {
-                vars: s.vars.clone(),
-                body: self.implicit(&s.body, &Caps::default()),
-                outlives: s.outlives.clone(),
-            })),
-            other => other.clone(),
         }
     }
 }

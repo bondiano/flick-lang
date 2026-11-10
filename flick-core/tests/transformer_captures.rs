@@ -43,7 +43,6 @@ fn check(text: &str, imported: &[Interface]) -> (Interface, Vec<Diagnostic>) {
             effects: true,
             watched: types::Watched::none(),
             stages_by_class: false,
-            regions: types::RegionMode::Captures,
         },
         &mut interface,
     ));

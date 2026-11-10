@@ -184,6 +184,8 @@ impl Checker<'_> {
     ) -> Type {
         #[cfg(feature = "diagnostic-fixes")]
         let since = self.diagnostics.len();
+        // a local `forall v. τ^v -> σ` keeps its argument out of its result
+        let parametric = self.local_parametric(head);
         let mut ty = self.infer(head);
         #[cfg(feature = "diagnostic-fixes")]
         let mut unknown = Vec::new();
@@ -232,7 +234,7 @@ impl Checker<'_> {
                     }
                     params.push(*param);
                     let result = self.instantiate(&result, span);
-                    ty = self.application_result(result, &ty, &argument);
+                    ty = self.application_result(result, &ty, &argument, parametric && i == 0);
                 }
                 Type::Error => {
                     let inferred = self.infer(arg);
@@ -405,7 +407,7 @@ impl Checker<'_> {
                 }
                 let span = Span::new(self.file, lhs.range().0, rhs.range().1);
                 let result = self.instantiate(&result, span);
-                self.application_result(result, &function, &arg)
+                self.application_result(result, &function, &arg, false)
             }
             Type::Error => Type::Error,
             meta @ Type::Meta(_) => {

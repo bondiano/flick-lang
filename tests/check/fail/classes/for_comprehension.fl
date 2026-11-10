@@ -24,8 +24,8 @@ let logged xs = for {
 from_option : Option Float -> List Float
 let from_option o = [for x <- o yield x]
 
-// A lazy sequence holds what it uses: one over a scoped file cannot leave
-// the scope.
+// A lazy sequence over a scoped file may leave the scope: what its clauses
+// run of the file is pure, and a pure operation uses no region.
 escaped : Path ->{FileSystem; OpenError} Seq Float
 let escaped path = scope {
   let file = FileSystem.open_scoped path
@@ -45,5 +45,4 @@ let looped xs = for x <- xs do x + 1
 
 //~ FLICK-E001 @20:11-20:36 this is a runtime call, but the clauses of `for` run when the sequence
 //~ FLICK-C001 @25:28-25:30 no instance for `Iterable Option`; instances of `Iterable`: `Iterable
-//~ FLICK-G001 @32:3-32:42 this sequence uses `file`, which holds region `s`, but the expected ty
 //~ FLICK-T003 @44:32-44:37 expected `Unit`, found `Float`

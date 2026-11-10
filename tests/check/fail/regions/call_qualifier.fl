@@ -1,8 +1,7 @@
-// captures: FLICK-G001
 // A qualifier does not hide `Live`: a function qualified by a region is a
 // function whose use needs the region live, so it is no function without
 // a qualifier, whose use needs nothing live.
-module App.LiveQualifier exposing (..)
+module App.Qualifier exposing (..)
 
 type alias Path = String
 
@@ -26,4 +25,4 @@ let dropped path = scope {
   let read = fun () -> FileSystem.read_all file
   run read
 }
-//~ FLICK-G002 @27:7-27:11
+//~ FLICK-G002 @26:7-26:11

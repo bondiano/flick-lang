@@ -87,7 +87,6 @@ impl Loader<'_> {
             effects: true,
             watched: Watched::none(),
             stages_by_class: self.stages_by_class,
-            regions: types::RegionMode::Captures,
         };
         diagnostics.extend(types::check(
             &checked,

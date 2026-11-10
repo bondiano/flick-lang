@@ -1,9 +1,0 @@
-schema-version = 1
-
-[project]
-kind = "lib"
-source-dir = "src"
-
-[build]
-regions = "alive"
-#~ FLICK-P005 @8:11-8:18 invalid `flick.toml`: unknown variant `alive`, expected `captures` or `live`

@@ -245,9 +245,6 @@ pub struct Build {
     pub effect: Backend,
     /// The module that renders and mounts views, instead of React.
     pub ui: Option<String>,
-    /// How regions are checked: by the captures of closures and tasks, or,
-    /// experimentally, by what their rows need live.
-    pub regions: types::RegionMode,
 }
 
 impl Default for Build {
@@ -266,7 +263,6 @@ impl Default for Build {
             labels: Labels::default(),
             effect: Backend::Rt,
             ui: None,
-            regions: types::RegionMode::Captures,
         }
     }
 }

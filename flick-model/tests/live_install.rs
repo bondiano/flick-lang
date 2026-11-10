@@ -38,7 +38,7 @@ fn handled_touch() -> Term {
 #[test]
 fn a_handler_installed_while_its_region_is_live_runs() {
     let p = thunk_program(open_in("s", handled_touch()));
-    assert!(verdict(&p, true).is_ok(), "{:?}", verdict(&p, true));
+    assert!(verdict(&p).is_ok(), "{:?}", verdict(&p));
     assert!(matches!(run(&p), Outcome::Value(_)), "{:?}", run(&p));
 }
 
@@ -53,7 +53,7 @@ fn a_handler_installed_after_its_region_closes_is_rejected() {
         Rc::new(leaked),
         Rc::new(Term::app(v("k"), Term::unit())),
     ));
-    assert!(verdict(&p, true).is_err(), "accepted a use after close");
+    assert!(verdict(&p).is_err(), "accepted a use after close");
     // what the rule keeps out: the machine reaches the use of a closed region
     assert!(matches!(run(&p), Outcome::Stuck(_)), "{:?}", run(&p));
 }

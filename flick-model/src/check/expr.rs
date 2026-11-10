@@ -117,7 +117,7 @@ impl Checker<'_> {
                 self.locals.pop();
                 let inner = mem::replace(&mut self.stage, outer);
                 checked?;
-                self.close_within(e, &expected, &inner, s, Some(&full))
+                self.close_within(&expected, &inner, s, Some(&full))
                     .map(drop)
             }
             (Term::Scope(s, body), _) => self.scope(s, body, Some(&full)).map(drop),
@@ -247,8 +247,7 @@ impl Checker<'_> {
         let r = self.infer(body);
         self.locals.pop();
         let inner = mem::replace(&mut self.stage, outer);
-        let lam = Term::Lam(x.clone(), Rc::new(body.clone()));
-        Ok(self.close_over(&lam, Type::fun(p, inner, r?), None))
+        Ok(Type::fun(p, inner, r?))
     }
 
     /// (App): `φ₁ ⊔ φ₂ ⊔ φ`. A callee of unknown type is a pure arrow (`docs/formal/core.md#a-callee-of-unknown-type-is-a-pure-arrow`).
@@ -322,7 +321,7 @@ impl Checker<'_> {
                 ..s.clone()
             };
             self.check_qualified_forall(e1, &bare, qualifier)?;
-            self.with_stage_qualifiers(&s)
+            s
         } else {
             self.level += 1;
             let outer = mem::replace(&mut self.stage, Stage::Pure);
@@ -369,23 +368,6 @@ impl Checker<'_> {
         }
     }
 
-    /// A local signature as its uses see it: with the qualifiers (Let-Sig)
-    /// gives its later stages when it checks the body (§1.4, `skolemize`),
-    /// so a partial application holds the parameters it took. Under
-    /// `regions/live.rs` `live_scheme` already did the same with `Live`.
-    fn with_stage_qualifiers(&self, s: &Scheme) -> Scheme {
-        if self.live {
-            return s.clone();
-        }
-        let body = match &s.body {
-            Type::Captured(t, c) => {
-                Type::Captured(Rc::new(self.implicit(t, &Caps::default())), c.clone())
-            }
-            t => self.implicit(t, &Caps::default()),
-        };
-        Scheme { body, ..s.clone() }
-    }
-
     /// (Let-Rec): without a signature the recursive calls are monomorphic.
     pub(super) fn let_rec(
         &mut self,
@@ -401,7 +383,7 @@ impl Checker<'_> {
             let checked = self.check_forall(lam, s);
             self.locals.pop();
             checked?;
-            self.with_stage_qualifiers(s)
+            s.clone()
         } else {
             self.level += 1;
             let t = self.fresh();

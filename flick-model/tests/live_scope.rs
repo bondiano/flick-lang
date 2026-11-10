@@ -12,7 +12,7 @@ use flick_model::generate::Program;
 use flick_model::syntax::{Path, Term};
 use flick_model::types::{Kind, Row, Scheme, Stage, Type, Var};
 
-use live_support::{core_live, g, open_in, probe, thunk_program, v, verdict};
+use live_support::{core, g, open_in, probe, thunk_program, v, verdict};
 
 fn unit() -> Type {
     Type::con("Prelude", "Unit")
@@ -53,11 +53,10 @@ fn acquiring_helper() -> Program {
 #[test]
 fn a_helper_with_scope_keeps_its_region_live() {
     let p = acquiring_helper();
-    let (captures, live, outcome) = probe("scope helper", &p);
-    assert!(captures.is_ok(), "{captures:?}");
+    let (live, outcome) = probe("scope helper", &p);
     assert!(live.is_ok(), "{live:?}");
     assert!(matches!(outcome, Outcome::Value(_)), "{outcome:?}");
-    let errors = core_live(&p);
+    let errors = core(&p);
     assert!(errors.is_empty(), "{errors:?}");
 }
 
@@ -81,10 +80,9 @@ fn live_alone_does_not_acquire() {
         Rc::new(body),
         Rc::new(call),
     ));
-    assert!(verdict(&p, false).is_err());
-    let live = verdict(&p, true);
-    assert!(live.is_err(), "live acquires with `Live s` alone");
-    let errors = core_live(&p);
+    let live = verdict(&p);
+    assert!(live.is_err(), "`Live s` alone acquires");
+    let errors = core(&p);
     assert!(
         errors.iter().any(|e| e.starts_with("FLICK-G004")),
         "{errors:?}"

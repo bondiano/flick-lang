@@ -50,9 +50,9 @@ would not compile.
   acquired when it ends, and nothing usable can outlive it.
 
 The closure below would read a file after its scope has closed it. The compiler
-rejects it with `FLICK-G001`.
+rejects it with `FLICK-G002`.
 
-```flick fail G001
+```flick fail G002
 # import File exposing (Path, FileSystem, OpenError, ReadError)
 #
 read_later : Path ->{Async, FileSystem; OpenError} (Unit ->{Async, FileSystem; ReadError} String)

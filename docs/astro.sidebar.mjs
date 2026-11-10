@@ -15,7 +15,7 @@ export const sidebar = [
   {
     label: "Handbook",
     translations: { ru: "Руководство" },
-    items: [{ slug: "handbook/upgrading" }, { slug: "handbook/live-regions" }],
+    items: [{ slug: "handbook/upgrading" }],
   },
   {
     label: "Reference",

@@ -1,8 +1,7 @@
-// captures: FLICK-G002
 // A stream over a file may leave the file's `scope`, but running it there
 // needs the file's region live: its qualifier `^{s}` is what using it
-// needs (`../pass/stream_of_param.fl`).
-module App.LiveStreamLate exposing (..)
+// needs (`../../pass/regions/stream_of_param.fl`).
+module App.StreamLate exposing (..)
 
 type File (s : Region)
 
@@ -19,5 +18,5 @@ late : String ->{Files; ReadError} List String
 let late path =
   let stream = scope { lines (Files.open_scoped path) }
   Stream.run_collect stream
-//~ FLICK-G002 @20:24-20:54 region `s` ends with its `scope`, so the value cannot leave it
-//~ FLICK-G002 @21:22-21:28 this value holds region `s`
+//~ FLICK-G002 @19:24-19:54 region `s` ends with its `scope`, so the value cannot leave it
+//~ FLICK-G002 @20:22-20:28 this value holds region `s`

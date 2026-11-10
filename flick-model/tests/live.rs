@@ -1,20 +1,17 @@
-//! The spike of `src/check/regions/live.rs`: the leaks of the generator,
-//! the generated programs and their changes, and the cases of
-//! `tests/run/model.txt` under the discipline where a region is live where
-//! a row has `Live` of it. A change the discipline accepts must run without
-//! a use after close or another stuck state: the machine is the judge, not
-//! the other checker. `cargo test -p flick-model --test live -- --nocapture`
+//! Regions by use (`src/check/regions/live.rs`): the leaks of the
+//! generator, the generated programs and their changes, and the values of
+//! the built-in modules, where a region is live where a row has `Live` of
+//! it. A change the model accepts must run without a use after close or
+//! another stuck state: the machine is the judge. `cargo test -p flick-model --test live -- --nocapture`
 //! prints what it counted.
 
 mod live_support;
 
 use std::collections::{BTreeSet, HashSet};
 use std::env;
-use std::fs;
-use std::path::Path;
 use std::rc::Rc;
 
-use flick_model::check::check_program_with;
+use flick_model::check::check_program;
 use flick_model::decls::Decls;
 use flick_model::eval::Outcome;
 use flick_model::generate;
@@ -22,7 +19,7 @@ use flick_model::run;
 use flick_model::syntax::Name;
 use flick_model::types::{Caps, Fields, Kind, Scheme, Type, Var};
 
-use live_support::{core, run, verdict};
+use live_support::{run, verdict};
 
 /// xorshift: choices without a dependency.
 struct Seeds(u64);
@@ -49,7 +46,7 @@ fn live_rejects_every_leak() {
             continue;
         };
         let source = generate::source(&p);
-        let live = verdict(&p, true);
+        let live = verdict(&p);
         println!("path {path}: {live:?}");
         assert!(live.is_err(), "path {path}: live accepts\n{source}");
         assert!(
@@ -61,28 +58,8 @@ fn live_rejects_every_leak() {
     assert_eq!(seen, 11);
 }
 
-#[derive(Default, Debug)]
-struct Count {
-    both: u32,
-    only_captures: u32,
-    only_live: u32,
-    neither: u32,
-}
-
-impl Count {
-    fn add(&mut self, captures: bool, live: bool) {
-        match (captures, live) {
-            (true, true) => self.both += 1,
-            (true, false) => self.only_captures += 1,
-            (false, true) => self.only_live += 1,
-            (false, false) => self.neither += 1,
-        }
-    }
-}
-
-/// Generated programs and changes of them: how the two disciplines judge
-/// them, and every one the live discipline accepts runs without getting
-/// stuck.
+/// Generated programs and changes of them: every generated program
+/// checks, and every one the model accepts runs without getting stuck.
 #[test]
 fn live_accepts_only_what_runs() {
     let rounds: u32 = env::var("LIVE_ROUNDS")
@@ -90,9 +67,8 @@ fn live_accepts_only_what_runs() {
         .and_then(|n| n.parse().ok())
         .unwrap_or(3000);
     let mut seeds = Seeds(0x9e37_79b9_7f4a_7c15);
-    let (mut programs, mut changes) = (Count::default(), Count::default());
-    let mut gaps: Vec<String> = Vec::new();
-    let mut gained: Vec<String> = Vec::new();
+    let (mut programs, mut changes) = (0, 0);
+    let mut rejected: Vec<String> = Vec::new();
     let mut violations: Vec<String> = Vec::new();
     let mut ran = 0;
     for _ in 0..rounds {
@@ -100,21 +76,15 @@ fn live_accepts_only_what_runs() {
         let p = generate::program(&c);
         let m = seeds.choices(8);
         let q = generate::mutate(&p, &m);
-        for (prog, count, changed) in [(&p, &mut programs, false), (&q, &mut changes, true)] {
-            let (captures, live) = (verdict(prog, false), verdict(prog, true));
-            count.add(captures.is_ok(), live.is_ok());
-            if captures.is_ok()
-                && !changed
-                && gaps.len() < 6
-                && let Err(e) = &live
-            {
-                gaps.push(format!("{e}\n{}", generate::source(prog)));
-            }
-            if live.is_ok()
-                && gained.len() < 6
-                && let Err(e) = &captures
-            {
-                gained.push(format!("captures: {e}\n{}", generate::source(prog)));
+        for (prog, changed) in [(&p, false), (&q, true)] {
+            let live = verdict(prog);
+            match (&live, changed) {
+                (Ok(()), false) => programs += 1,
+                (Ok(()), true) => changes += 1,
+                (Err(e), false) if rejected.len() < 6 => {
+                    rejected.push(format!("{e}\n{}", generate::source(prog)));
+                }
+                (Err(_), _) => {}
             }
             if live.is_ok() && generate::runs(prog) {
                 ran += 1;
@@ -124,28 +94,26 @@ fn live_accepts_only_what_runs() {
             }
         }
     }
-    println!("programs: {programs:?}\nchanges: {changes:?}\nrun under live: {ran}");
-    for g in &gaps {
-        println!("--- generated, captures accept, live rejects:\n{g}");
-    }
-    for g in &gained {
-        println!("--- live accepts, captures reject:\n{g}");
-    }
+    println!("accepted: {programs} programs, {changes} changes of {rounds}; run {ran}");
     assert!(
         violations.is_empty(),
         "{} accepted programs get stuck:\n{}",
         violations.len(),
         violations.join("\n---\n")
     );
-    assert_eq!(programs.both, rounds, "generated programs must typecheck");
+    assert_eq!(
+        programs,
+        rounds,
+        "generated programs must typecheck:\n{}",
+        rejected.join("\n---\n")
+    );
 }
 
 /// Generated programs where a value only holds a capability past its
-/// `scope` (`generate::holding`): the live discipline accepts each and it
-/// runs without a use after close; the discipline of captures and
-/// flick-core reject it. The same program with `use h` is rejected by all
-/// three, and run, reaches a use after close: the freedom is exactly what
-/// the machine allows.
+/// `scope` (`generate::holding`): the model accepts each and it runs
+/// without a use after close. The same program with `use h` is rejected,
+/// and run, reaches a use after close: the freedom is exactly what the
+/// machine allows. `live_core.rs` checks flick-core on the same programs.
 #[test]
 fn holding_without_use_on_generated_programs() {
     let rounds: u32 = env::var("LIVE_ROUNDS")
@@ -154,13 +122,13 @@ fn holding_without_use_on_generated_programs() {
         .unwrap_or(3000);
     let mut seeds = Seeds(0x2545_f491_4f6c_dd1d);
     let mut failures: Vec<String> = Vec::new();
-    let (mut core_checked, mut core_g002, mut ran) = (0, 0, 0);
-    for round in 0..rounds {
+    let mut ran = 0;
+    for _ in 0..rounds {
         let c = seeds.choices(256);
         for used in [false, true] {
             let p = generate::holding(&c, used);
             let source = generate::source(&p);
-            let (captures, live) = (verdict(&p, false), verdict(&p, true));
+            let live = verdict(&p);
             // the machine has no natives for the foreign values of the
             // holes of TypeScript: those are judged, not run
             let runs = generate::runs(&p);
@@ -173,72 +141,21 @@ fn holding_without_use_on_generated_programs() {
             let stuck_after_close =
                 matches!(&outcome, Outcome::Stuck(w) if w.starts_with("use after"));
             let ok = if used {
-                live.is_err() && captures.is_err() && (!runs || stuck_after_close)
+                live.is_err() && (!runs || stuck_after_close)
             } else {
-                live.is_ok()
-                    && matches!(&captures, Err(e) if e.contains("FLICK-G002"))
-                    && (!runs || !matches!(outcome, Outcome::Stuck(_)))
+                live.is_ok() && (!runs || !matches!(outcome, Outcome::Stuck(_)))
             };
-            // flick-core is slower: every tenth program
-            if round % 10 == 0 {
-                core_checked += 1;
-                let errors = core(&p);
-                core_g002 += usize::from(errors.iter().any(|e| e.starts_with("FLICK-G002")));
-                if errors.is_empty() {
-                    failures.push(format!("flick-core accepts (used {used}):\n{source}"));
-                }
-            }
             if !ok && failures.len() < 8 {
                 failures.push(format!(
-                    "used {used}: captures {captures:?}; live {live:?}; run {outcome:?}\n{source}"
+                    "used {used}: model {live:?}; run {outcome:?}\n{source}"
                 ));
             }
         }
     }
-    println!(
-        "holding: {rounds} shapes, held and used; run {ran}; flick-core checked {core_checked}, G002 {core_g002}"
-    );
+    println!("holding: {rounds} shapes, held and used; run {ran}");
     assert!(failures.is_empty(), "{}", failures.join("\n---\n"));
     // a quarter of the programs at least reach the machine
     assert!(ran * 2 > rounds as usize, "too few programs run: {ran}");
-}
-
-/// The cases of `tests/run/model.txt`: which the live discipline rejects.
-#[test]
-fn live_on_the_corpus() {
-    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../tests/run");
-    let list = fs::read_to_string(root.join("model.txt")).expect("model.txt");
-    let (mut total, mut rejected) = (0, Vec::new());
-    for case in list
-        .lines()
-        .map(|l| l.split('#').next().unwrap_or("").trim())
-        .filter(|l| !l.is_empty())
-    {
-        let Ok(modules) = run::compile(&root.join(format!("{case}.fl"))) else {
-            continue;
-        };
-        let program = run::program(&modules);
-        if !run::check(&modules, &program).is_empty() {
-            continue;
-        }
-        total += 1;
-        let errors = run::check_with(&modules, &program, true);
-        if !errors.is_empty() {
-            rejected.push(format!("{case}: {}", errors.join("; ")));
-        }
-    }
-    println!(
-        "corpus: {total} checked, {} rejected under live",
-        rejected.len()
-    );
-    for r in &rejected {
-        println!("{r}");
-    }
-    assert!(total > 0, "the corpus must not be empty");
-    assert!(
-        rejected.is_empty(),
-        "live rejects corpus cases: {rejected:?}"
-    );
 }
 
 fn strip(t: &Type, regions: &BTreeSet<Name>) -> Type {
@@ -286,36 +203,22 @@ fn strip_scheme(s: &Scheme, outer: &BTreeSet<Name>) -> Scheme {
     }
 }
 
-fn qualified(t: &Type) -> bool {
-    match t {
-        Type::Captured(..) | Type::Bounded(..) => true,
-        Type::App(a, b) | Type::Fun(a, _, b) => qualified(a) || qualified(b),
-        Type::Eff(_, _, a) | Type::Ref(a) => qualified(a),
-        Type::Tuple(ts) => ts.iter().any(qualified),
-        Type::Record(f) => f.fields.values().any(qualified),
-        Type::Forall(s) => qualified(&s.body),
-        _ => false,
-    }
-}
-
-/// The values of the built-in modules (std and core): checked under the
-/// discipline of captures, under the live one, and under the live one with
-/// every qualifier that names no region taken out of every scheme.
+/// The values of the built-in modules (std and core) the model rejects:
+/// natives it has no translation or type for, and the values below, which
+/// it cannot type yet. Taking out every qualifier that names no region
+/// rejects nothing more: elision makes no use of them.
 #[test]
 fn live_on_std() {
     let program = run::program(&[]);
     let decls = run::decls(&[]);
     let modules: HashSet<Name> = program.globals.keys().map(|p| p.module.clone()).collect();
-    let errs = |d: &Decls, live: bool| -> BTreeSet<String> {
-        check_program_with(&program, d, &modules, live)
+    let errs = |d: &Decls| -> BTreeSet<String> {
+        check_program(&program, d, &modules)
             .into_iter()
             .map(|(p, _)| p.to_string())
             .collect()
     };
-    let checked = program.globals.len();
-    let captures = errs(&decls, false);
-    let live = errs(&decls, true);
-    let before = decls.values.values().filter(|s| qualified(&s.body)).count();
+    let rejected = errs(&decls);
     let mut stripped = run::decls(&[]);
     let none = BTreeSet::new();
     for s in stripped
@@ -331,47 +234,51 @@ fn live_on_std() {
             *s = strip_scheme(s, &none);
         }
     }
-    let after = stripped
-        .values
-        .values()
-        .filter(|s| qualified(&s.body))
-        .count();
-    let live_bare = errs(&stripped, true);
-    let captures_bare = errs(&stripped, false);
+    let bare = errs(&stripped);
+    let native =
+        |e: &str| e.starts_with("(Translation)") || e.ends_with("has no type in the model");
+    let typed: BTreeSet<String> = check_program(&program, &decls, &modules)
+        .into_iter()
+        .filter(|(_, e)| !native(&e.to_string()))
+        .map(|(p, e)| {
+            println!("rejects {p}: {e}");
+            p.to_string()
+        })
+        .collect();
     println!(
-        "std: {checked} values; schemes with a qualifier {before} -> {after} once those without a region are out"
+        "std: {} values; rejected {}, {} of them typed; without qualifiers {}",
+        program.globals.len(),
+        rejected.len(),
+        typed.len(),
+        bare.len()
     );
-    println!(
-        "rejected: captures {}, live {}, live without qualifiers {}, captures without qualifiers {}",
-        captures.len(),
-        live.len(),
-        live_bare.len(),
-        captures_bare.len()
-    );
-    for p in captures.difference(&live) {
-        println!("live newly accepts {p}");
-    }
-    for p in captures.difference(&live_bare) {
-        println!("live without qualifiers newly accepts {p}");
-    }
-    let fails = |d: &Decls, live: bool| check_program_with(&program, d, &modules, live);
-    let mut shown = 0;
-    for (p, e) in fails(&stripped, true) {
-        if !captures.contains(&p.to_string()) && shown < 25 {
-            println!("live without qualifiers rejects {p}: {e}");
-            shown += 1;
-        }
-    }
-    let mut shown = 0;
-    for (p, e) in fails(&decls, true) {
-        if !captures.contains(&p.to_string()) && shown < 15 {
-            println!("live rejects {p}: {e}");
-            shown += 1;
-        }
-    }
-    assert!(live.is_subset(&captures), "live introduces std rejections");
+    let known: BTreeSet<String> = UNTYPED.iter().map(|p| (*p).to_owned()).collect();
+    assert_eq!(typed, known, "the std values the model cannot type changed");
     assert!(
-        live_bare.is_subset(&captures),
+        bare.is_subset(&rejected),
         "elision introduces std rejections"
     );
 }
+
+/// The values of std and core the model cannot type (`live_on_std`).
+const UNTYPED: &[&str] = &[
+    "Atom.local",
+    "Atom.serializable_result",
+    "Http.Client.current",
+    "Http.Client.execute",
+    "Http.Client.layer",
+    "Http.Server.layer_test_client",
+    "Http.Server.test_client",
+    "Http.StaticServer.route",
+    "HttpApi.Derive.problem_case",
+    "HttpApi.http_error",
+    "Jwt.expiry_json",
+    "Jwt.header_json",
+    "Jwt.sign",
+    "Record.instance Show (ReadonlyRecord a)",
+    "Resource.acquire_release",
+    "Scope.add_finalizer",
+    "Ui.element",
+    "Ui.on_mount",
+    "Ui.watch",
+];

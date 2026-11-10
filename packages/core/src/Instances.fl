@@ -225,7 +225,7 @@ let rank o =
   | EQ -> 1
   | GT -> 2
 
-map_list : (forall v. a^v -> b)^c -> (List a)^d -> (List b)^(c + d)
+map_list : (forall v. a^v -> b)^c -> (List a)^d -> (List b)^c
 foreign pure map_list from "@flick-lang/effect-ts" "listMap"
   arity 2
   retention call

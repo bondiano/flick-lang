@@ -71,7 +71,6 @@ fn pack_lowers_to_a_record_of_public_values() {
         effects: true,
         watched,
         stages_by_class: false,
-        regions: types::RegionMode::Captures,
     };
     let (checked, typing) = types::check_typed(
         &module,
@@ -203,7 +202,6 @@ fn static_module_contract_preserves_abstract_class_and_service_shapes() {
         effects: true,
         watched,
         stages_by_class: false,
-        regions: types::RegionMode::Captures,
     };
     let diagnostics = types::check(
         &module,

@@ -42,5 +42,5 @@ let stashed () = scope {
   ()
 }
 //~ FLICK-T007 @20:42-20:43
-//~ FLICK-G002 @28:41-28:63
+//~ FLICK-G002 @28:51-28:63 this uses `t`
 //~ FLICK-T007 @39:23-39:29

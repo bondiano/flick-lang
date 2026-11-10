@@ -1,8 +1,7 @@
-// captures: FLICK-G001
 // Under the live discipline a value may hold a region past its `scope`
 // while nothing uses the region there: what leaves holds `file`, but no
 // row of it needs `s` live. The default discipline rejects each of them.
-module App.LiveHolding exposing (..)
+module App.Holding exposing (..)
 
 type alias Path = String
 

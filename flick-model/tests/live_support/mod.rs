@@ -1,5 +1,5 @@
-//! Shared helpers of the live-discipline tests: checking a generated
-//! program under either discipline, running it, and building probes.
+//! Shared helpers of the tests of regions by use: checking a generated
+//! program, running it, and building probes.
 
 #![allow(dead_code)]
 
@@ -26,13 +26,9 @@ thread_local! {
 
 const FUEL: u64 = 20_000;
 
-pub fn verdict(p: &Program, live: bool) -> Result<(), String> {
+pub fn verdict(p: &Program) -> Result<(), String> {
     GEN.with(|(d, _)| {
-        let mut c = if live {
-            Checker::live(d)
-        } else {
-            Checker::new(d)
-        };
+        let mut c = Checker::new(d);
         c.check_top(&p.term, &p.scheme).map_err(|e| e.to_string())
     })
 }
@@ -96,10 +92,10 @@ pub fn core(p: &Program) -> Vec<String> {
         .collect()
 }
 
-pub fn probe(name: &str, p: &Program) -> (Result<(), String>, Result<(), String>, Outcome) {
-    let (captures, live) = (verdict(p, false), verdict(p, true));
+pub fn probe(name: &str, p: &Program) -> (Result<(), String>, Outcome) {
+    let live = verdict(p);
     let outcome = run(p);
-    println!("probe {name}: captures {captures:?}; live {live:?}; run {outcome:?}");
+    println!("probe {name}: model {live:?}; run {outcome:?}");
     println!(
         "probe {name}: flick-core {:?}\n{}",
         core(p),
@@ -108,18 +104,5 @@ pub fn probe(name: &str, p: &Program) -> (Result<(), String>, Result<(), String>
             .next()
             .unwrap_or("")
     );
-    (captures, live, outcome)
-}
-
-/// flick-core's errors on the program printed as Flick, under
-/// `[build] regions = "live"`.
-pub fn core_live(p: &Program) -> Vec<String> {
-    use flick_core::types::RegionMode;
-    let mut sources = SourceMap::default();
-    let file = sources.add("Gen.fl", generate::source(p));
-    flick_core::check_regions(&sources, file, RegionMode::Live)
-        .into_iter()
-        .filter(|d| d.severity == Severity::Error)
-        .map(|d| format!("{}: {}", d.code, d.message))
-        .collect()
+    (live, outcome)
 }

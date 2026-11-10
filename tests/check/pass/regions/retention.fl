@@ -1,8 +1,7 @@
-// captures: accepts
 // With `retention owner`, what a later stage of a pure foreign function
 // holds of its parameters is what its result shows under either discipline,
 // so it needs no `Fiber.Outlives`.
-module App.LiveRetention exposing (..)
+module App.Retention exposing (..)
 
 shown : (Unit -> a)^c -> Unit -> a
 foreign pure shown from "./scope.js" "shown"

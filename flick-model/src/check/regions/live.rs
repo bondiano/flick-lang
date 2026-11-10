@@ -1,9 +1,8 @@
-//! A spike of another discipline of regions, beside the one of
-//! `docs/formal/regions.md`: a region is live where the row of a stage has
-//! `{Live C}` with the region in `C`, the way `Local s` of E8 is. A closure
-//! or a task carries no capture qualifier: what it uses of a region shows
-//! in its row, and (Scope) already keeps a region out of the rows a
-//! `scope` leaves. Only `Checker::live` checks this way.
+//! Regions by use (`docs/formal/regions.md`): a region is live where the
+//! row of a stage has `{Live C}` with the region in `C`, the way `Local s`
+//! of E8 is. A closure or a task carries no capture qualifier: what it uses
+//! of a region shows in its row, and (Scope) already keeps a region out of
+//! the rows a `scope` leaves.
 //!
 //! - A runtime arrow of a signature needs `Live` of what its parameters,
 //!   and the parameters of the stages before it, reach (`elide`).
@@ -49,6 +48,17 @@ pub(in crate::check) fn live_arg(c: Caps) -> Type {
 }
 
 /// `C` of the argument of `{Live C}`.
+/// `r` without `Live` of nothing: once its qualifier is known, it needs
+/// nothing.
+pub(in crate::check) fn drop_empty_live(r: &mut Row) {
+    if r.elems
+        .get(&live_service())
+        .is_some_and(|a| arg_caps(&a[0]).is_empty())
+    {
+        r.elems.remove(&live_service());
+    }
+}
+
 pub(in crate::check) fn arg_caps(t: &Type) -> Caps {
     match t {
         Type::Captured(_, c) => c.clone(),
@@ -59,7 +69,7 @@ pub(in crate::check) fn arg_caps(t: &Type) -> Caps {
 impl Checker<'_> {
     /// `ρ + {Live C}`.
     pub(in crate::check) fn add_live(&self, r: &Row, c: &Caps) -> Row {
-        if !self.live || c.is_empty() {
+        if c.is_empty() {
             return r.clone();
         }
         let mut out = r.clone();
@@ -77,16 +87,13 @@ impl Checker<'_> {
     /// stays pure.
     pub(in crate::check) fn live_stage(&self, s: &Stage, c: &Caps) -> Stage {
         match s {
-            Stage::Runtime(r, e) if self.live => Stage::Runtime(self.add_live(r, c), e.clone()),
+            Stage::Runtime(r, e) => Stage::Runtime(self.add_live(r, c), e.clone()),
             other => other.clone(),
         }
     }
 
     /// `σ` with the `Live` its runtime arrows need: the elision rule.
     pub(in crate::check) fn live_scheme(&self, s: &Scheme) -> Scheme {
-        if !self.live {
-            return s.clone();
-        }
         Scheme {
             vars: s.vars.clone(),
             body: self.elide(

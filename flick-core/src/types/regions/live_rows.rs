@@ -55,9 +55,6 @@ impl Checker<'_> {
         entries: impl IntoIterator<Item = &'t Type>,
         span: Span,
     ) {
-        if !self.live() {
-            return;
-        }
         let mut atoms = Norm::default();
         for entry in entries {
             merge(&mut atoms, self.indexed_live(entry));

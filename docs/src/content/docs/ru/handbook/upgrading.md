@@ -1,7 +1,7 @@
 ---
 title: Переход на 0.2
 description: Что изменилось после Flick 0.1.0 и как обновить проект.
-source_hash: 502299ee0b3a7f46
+source_hash: ffd38d357a04078a
 ---
 
 До 1.0 минорный релиз может ломать программы, и 0.2 ломает: `std` стал
@@ -407,7 +407,7 @@ HTTP сохраняются в `.flick/plugin-snapshots/`, и проект их 
 каррирования, например в типе поля, тип без аннотации захватов теперь не
 допускает такое замыкание:
 
-```flick fail G001
+```flick ignore accepted since regions are checked by use
 keep_field : forall e. Errors e -> { run : Unit -> Unit }
 let keep_field x = { run = fun () -> ignore x }
 ```

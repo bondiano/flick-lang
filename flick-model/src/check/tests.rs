@@ -316,8 +316,9 @@ fn task_and_await() {
     rejected_by(infer(&task(await_(int(1)))), "≡");
 }
 
-/// (Task) with a generic value (`regions.md` §2.1, `docs/formal/regions.md#a-bounded-variable-reaches-what-the-variable-reaches`): `a^{≤c}` is
-/// within `c`, a bare `a` is a capture the bare `Eff` does not allow.
+/// (Task) with a generic value (`regions.md` §2.1, `docs/formal/regions.md#a-bounded-variable-reaches-what-the-variable-reaches`): a task
+/// that only holds a value uses nothing of it, so both `a^{≤c}` and a bare
+/// `a` may go into a bare `Eff`.
 #[test]
 fn task_holds_a_type_variable() {
     let c = Var::Named("c".into());
@@ -334,10 +335,7 @@ fn task_holds_a_type_variable() {
         outlives: Vec::new(),
     };
     assert!(check(&lam, &bounded).is_ok());
-    rejected_by(
-        check(&lam, &poly(Type::fun(a(), Stage::Pure, eff(ty("Unit"))))),
-        "Task",
-    );
+    assert!(check(&lam, &poly(Type::fun(a(), Stage::Pure, eff(ty("Unit"))))).is_ok());
 }
 
 /// `∀e. Errors e → (Unit → Unit)^{e}`: a qualifier takes what the row

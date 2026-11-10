@@ -1,7 +1,6 @@
-// captures: FLICK-G003
 // Work an owner keeps runs until the owner closes: each region its row
 // needs live must outlive the owner (`FLICK-G003`).
-module App.LiveKeep exposing (..)
+module App.Keep exposing (..)
 
 type alias Path = String
 
@@ -29,5 +28,5 @@ let younger_child path = scope outer {
 // a finalizer runs when its owner closes, after what it was given may end
 finalizer : Fiber.Owner s -> (Eff none none Unit)^c ->{Scope s} Unit
 let finalizer _ work = Scope.add_finalizer work
-//~ FLICK-G003 @25:13-25:24
-//~ FLICK-G003 @31:24-31:43
+//~ FLICK-G003 @24:13-24:24
+//~ FLICK-G003 @30:24-30:43

@@ -1,6 +1,5 @@
-//! The live discipline of regions, `[build] regions = "live"`, beside the
-//! discipline of captures the rest of this module checks: a closure or a
-//! task gets no qualifier for the locals it holds. What it uses of a region
+//! Regions are checked by use: a closure or a task gets no qualifier for
+//! the locals it holds. What it uses of a region
 //! shows in its rows as `Live C`, an element of a service row no program
 //! can write, so a `scope` keeps out every value that would use its region
 //! after it ends, and lets out one that only holds it. The reference model
@@ -20,17 +19,6 @@ use crate::types::effects::Stage;
 use crate::types::kinds::Kind;
 use crate::types::lang::Lang;
 use crate::types::ty::{Effects, Norm, Row, Type};
-
-/// How the checker decides what a value may take out of a `scope`.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, serde::Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum RegionMode {
-    /// A closure or a task is qualified by what it holds (`docs/formal/regions.md`).
-    #[default]
-    Captures,
-    /// A region is live where a row needs it: experimental.
-    Live,
-}
 
 /// The label of `Live C` in a service row; no written row has a space in a label.
 pub const LIVE: &str = "Fiber.Live ";
@@ -91,18 +79,6 @@ pub(super) fn add_live(services: &Type, atoms: Norm) -> Type {
     }
 }
 
-/// Whether `captures` is what `stages` gives a later stage of a signature
-/// checked under captures, which starts from the empty row.
-fn implied(captures: &Type) -> bool {
-    match captures {
-        Type::Union(left, _) => {
-            matches!(&**left, Type::Row(r) if r.entries.is_empty() && r.tail.is_none())
-                || implied(left)
-        }
-        _ => false,
-    }
-}
-
 pub(super) fn merge(into: &mut Norm, atoms: Norm) {
     into.entries.extend(atoms.entries);
     into.entries.sort_by(|a, b| a.0.cmp(&b.0));
@@ -115,13 +91,9 @@ pub(super) fn merge(into: &mut Norm, atoms: Norm) {
 }
 
 impl Checker<'_> {
-    pub(in crate::types) fn live(&self) -> bool {
-        self.options.regions == RegionMode::Live
-    }
-
     /// Whether a value of `t` needs the region `skolem` live.
     pub(in crate::types) fn needs_live(&self, t: &Type, skolem: u32) -> bool {
-        self.live() && self.zonk(t).contains(&mut |r| row_needs(r, skolem))
+        self.zonk(t).contains(&mut |r| row_needs(r, skolem))
     }
 
     /// What of the capture row `captures` a stage needs alive: its regions
@@ -156,9 +128,6 @@ impl Checker<'_> {
     /// What `function` or a task needs live to be used: what its qualifier
     /// holds, but the region of `resume` in arms that run at this stage.
     fn qualifier_live(&self, t: &Type) -> Option<Norm> {
-        if !self.live() {
-            return None;
-        }
         self.atoms_live(&self.whnf_captured(t).1?)
     }
 
@@ -172,9 +141,6 @@ impl Checker<'_> {
     /// `(τ^C₁)^C₂` the innermost, the capacity its storage keeps, so the
     /// cell `Ref.set` takes gets no region its own capacity lacks.
     fn expected_live(&self, expected: &Type) -> Option<Norm> {
-        if !self.live() {
-            return None;
-        }
         let mut t = self.qualified_head(expected);
         let mut innermost = None;
         for _ in 0..64 {
@@ -229,21 +195,12 @@ impl Checker<'_> {
         }
     }
 
-    /// A signature as its body and its uses see it: under captures a later
-    /// stage holds what the parameters before it hold (`implicit_captures`);
-    /// under this discipline its arrow needs them live instead.
-    pub(in crate::types) fn signature_stages(&self, t: &Type) -> Type {
-        self.live_scheme(&self.implicit_captures(t))
-    }
-
-    /// The type of a value of another module at a use: its interface leaves
-    /// out `Live`, which elision gives again.
+    /// A signature as its body and its uses see it: each runtime arrow needs
+    /// live what the parameters before it reach. An interface leaves `Live`
+    /// out, which elision gives again; a type elided already is elided anew,
+    /// not twice.
     pub(in crate::types) fn live_scheme(&self, t: &Type) -> Type {
-        if self.live() {
-            self.elide(t, &Norm::default(), &mut Vec::new())
-        } else {
-            t.clone()
-        }
+        self.elide(&strip_live(t), &Norm::default(), &mut Vec::new())
     }
 
     /// `t` with `Live` of `held` and of what the parameters of each stage
@@ -266,8 +223,6 @@ impl Checker<'_> {
                     body: Box::new(body),
                 }
             }
-            // what a stage holds of the parameters before it is `Live` here
-            Type::Captured { ty, captures, .. } if implied(captures) => self.elide(ty, held, kinds),
             Type::Captured {
                 ty,
                 captures,
@@ -339,9 +294,6 @@ impl Checker<'_> {
         (a, ca): (Type, Option<&Type>),
         (e, ce): (Type, Option<&Type>),
     ) -> (Type, Type) {
-        if !self.live() {
-            return (a, e);
-        }
         let side = |t: Type, c: Option<&Type>| {
             let Some(atoms) = c.map(|c| self.live_atoms(c, &[])) else {
                 return t;

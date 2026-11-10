@@ -1,8 +1,7 @@
-// captures: FLICK-G001 FLICK-G002
 // What uses a region after its `scope` ends is `FLICK-G002`: the row of
 // the function or the task needs the region live, and the bound it is
 // checked against, past the `scope`, does not keep it live.
-module App.LiveAfterClose exposing (..)
+module App.AfterClose exposing (..)
 
 type alias Path = String
 
@@ -57,8 +56,8 @@ let outer_cell path =
     let file = FileSystem.open_scoped path
     Ref.set cell (task { FileSystem.read_all file })
   }
-//~ FLICK-G002 @22:13-22:37
-//~ FLICK-G002 @28:10-28:34
-//~ FLICK-G002 @38:20-38:44
-//~ FLICK-G002 @45:5-48:9
-//~ FLICK-G002 @58:26-58:50
+//~ FLICK-G002 @21:13-21:37
+//~ FLICK-G002 @27:10-27:34
+//~ FLICK-G002 @37:20-37:44
+//~ FLICK-G002 @44:5-47:9
+//~ FLICK-G002 @57:26-57:50

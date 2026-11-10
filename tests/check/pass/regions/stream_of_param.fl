@@ -1,9 +1,8 @@
-// captures: accepts
 // A stream over a parameter: its callback uses `file`, so running the
 // stream needs `s` live, which its qualifier says: `^{s}` is what using
 // the stream needs, as it is what a closure's use needs. Running it inside
 // the `scope` of the file keeps `s` live (`used_lines`).
-module App.LiveStreamOfParam exposing (..)
+module App.StreamOfParam exposing (..)
 
 type File (s : Region)
 
