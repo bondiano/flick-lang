@@ -47,6 +47,16 @@ These instructions apply throughout the repository. Follow more specific
   browser/compiler interoperability and mounting.
 - Do not commit, push, publish or merge unless requested.
 
+## Commit messages
+
+- Use Conventional Commits for every commit: `<type>[optional scope][!]: <summary>`.
+  Examples: `fix(perf): restore load measurements`, `docs(agents): require conventional commits`.
+- Choose the type that describes the change (`feat`, `fix`, `docs`, `refactor`,
+  `perf`, `test`, `build`, `ci`, `chore` or `revert`); add a scope when useful.
+- Write a concise English summary in the imperative, without a trailing period.
+- Check the exact message before committing or pushing. Existing commits with
+  nonconforming messages are not a precedent.
+
 ## Finish and hand off
 
 Run the checks for every affected area, not just the edited files. Report
