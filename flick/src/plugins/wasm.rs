@@ -3,19 +3,17 @@
 //! pure, so their results can be cached, and a plugin can neither hang the
 //! compiler nor take its memory. Imports other than the compiler's trap.
 //! A component is compiled on its first call: a build whose blocks all come
-//! from the cache never compiles it. A process keeps the plugin of a
-//! component for as long as its file stays as it is, so a language server
-//! compiles it once and not for every analysis; and wasmtime keeps the
-//! compiled code in the user's cache directory, so the next process reads it.
+//! from the cache never compiles it. A process keeps the plugins it loaded
+//! last, by the bytes of their components, so a language server compiles
+//! one once and not for every analysis; and wasmtime keeps the compiled
+//! code in the user's cache directory, so the next process reads it.
 
-use std::collections::HashMap;
 use std::fs;
 use std::io;
 use std::mem;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::str;
 use std::sync::{Arc, Mutex, OnceLock, PoisonError};
-use std::time::SystemTime;
 
 use flick_core::plugin::source::BlockSource;
 use flick_core::plugin::{Expander, Failure};
@@ -39,30 +37,25 @@ flick_plugin::reach_conversions!(flick::plugin::types);
 const FUEL: u64 = 1_000_000_000;
 const MEMORY: usize = 64 << 20;
 
-/// The plugins this process loaded, by package and path, each with the
-/// time and size its file had: one of a file that changed is replaced.
-type Loaded = HashMap<(String, PathBuf), (Option<SystemTime>, u64, Arc<Wasm>)>;
+/// How many plugins a process keeps with what they compiled: the ones of
+/// the projects open in a language server, not every one it ever loaded.
+const KEPT: usize = 8;
 
 /// The plugin of `package` in the component at `path`: the one loaded
-/// before, with what it compiled, while the file is as it was.
+/// before, with what it compiled, when the bytes of the file are the same.
+/// The file is read and hashed each time, as a rebuilt component may keep
+/// its size and its time; compiling it is what a load costs.
 pub fn load(package: &str, path: &Path) -> Result<Arc<dyn Expander>, String> {
-    static LOADED: OnceLock<Mutex<Loaded>> = OnceLock::new();
-    let stamp = fs::metadata(path)
-        .ok()
-        .map(|m| (m.modified().ok(), m.len()));
-    let key = (package.to_owned(), path.to_path_buf());
-    let mut loaded =
-        (LOADED.get_or_init(Mutex::default).lock()).unwrap_or_else(PoisonError::into_inner);
-    if let Some((modified, len)) = stamp
-        && let Some((was_modified, was_len, plugin)) = loaded.get(&key)
-        && (*was_modified, *was_len) == (modified, len)
-    {
-        return Ok(plugin.clone());
-    }
-    let plugin = Arc::new(read(package, path)?);
-    if let Some((modified, len)) = stamp {
-        loaded.insert(key, (modified, len, plugin.clone()));
-    }
+    // the latest first
+    static LOADED: Mutex<Vec<Arc<Wasm>>> = Mutex::new(Vec::new());
+    let read = read(package, path)?;
+    let mut loaded = LOADED.lock().unwrap_or_else(PoisonError::into_inner);
+    let plugin = match loaded.iter().position(|kept| kept.id == read.id) {
+        Some(at) => loaded.remove(at),
+        None => Arc::new(read),
+    };
+    loaded.insert(0, plugin.clone());
+    loaded.truncate(KEPT);
     Ok(plugin)
 }
 
