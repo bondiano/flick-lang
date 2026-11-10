@@ -10,7 +10,7 @@
 
 mod lower;
 mod print;
-#[cfg(any(not(target_arch = "wasm32"), feature = "build-artifacts"))]
+#[cfg(any(not(target_arch = "wasm32"), feature = "native-project"))]
 pub(crate) mod reach;
 
 pub use flick_ir::{

@@ -313,40 +313,36 @@ impl Checker<'_> {
             span,
         )
         .with_incomplete(incomplete);
-        if cfg!(feature = "diagnostic-fixes") {
-            let suggestion = self.signature_of(ty);
-            let shown = self.show(&suggestion);
-            // the edit is offered only for a type inferred without errors
-            let line = self.text[..span.start as usize]
-                .rfind('\n')
-                .map_or(0, |i| i + 1);
-            let indent = &self.text[line..span.start as usize];
-            let inferred = errors == self.diagnostics.len()
-                && self.operators_fit()
-                && !suggestion.contains(&mut |t| matches!(t, Type::Error | Type::Meta(_)));
-            let at = (inferred && indent.chars().all(|c| c == ' ' || c == '\t')).then(|| {
-                (
-                    u32::try_from(line).expect("offsets fit in u32"),
-                    indent.to_owned(),
-                )
+        let suggestion = self.signature_of(ty);
+        let shown = self.show(&suggestion);
+        // the edit is offered only for a type inferred without errors
+        let line = self.text[..span.start as usize]
+            .rfind('\n')
+            .map_or(0, |i| i + 1);
+        let indent = &self.text[line..span.start as usize];
+        let inferred = errors == self.diagnostics.len()
+            && self.operators_fit()
+            && !suggestion.contains(&mut |t| matches!(t, Type::Error | Type::Meta(_)));
+        let at = (inferred && indent.chars().all(|c| c == ' ' || c == '\t')).then(|| {
+            (
+                u32::try_from(line).expect("offsets fit in u32"),
+                indent.to_owned(),
+            )
+        });
+        // a number literal's type is known once the declaration settles
+        if self.has_open_number(ty) {
+            self.signatures.push(PendingSignature {
+                index: self.diagnostics.len(),
+                name: name.to_owned(),
+                ty: ty.clone(),
+                span,
+                at,
             });
-            // a number literal's type is known once the declaration settles
-            if self.has_open_number(ty) {
-                self.signatures.push(PendingSignature {
-                    index: self.diagnostics.len(),
-                    name: name.to_owned(),
-                    ty: ty.clone(),
-                    span,
-                    at,
-                });
-                self.diagnostics
-                    .push(signature_diagnostic(diagnostic, name, &shown, span, None));
-            } else {
-                self.diagnostics
-                    .push(signature_diagnostic(diagnostic, name, &shown, span, at));
-            }
+            self.diagnostics
+                .push(signature_diagnostic(diagnostic, name, &shown, span, None));
         } else {
-            self.diagnostics.push(diagnostic);
+            self.diagnostics
+                .push(signature_diagnostic(diagnostic, name, &shown, span, at));
         }
     }
 

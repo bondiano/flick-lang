@@ -141,7 +141,7 @@ impl Loader<'_> {
     }
 
     /// The plugin of `package`, loaded once.
-    pub(super) fn load_plugin(
+    pub(in crate::project::load) fn load_plugin(
         &self,
         plugins: &mut Plugins,
         package: &str,

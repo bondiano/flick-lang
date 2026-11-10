@@ -51,20 +51,15 @@ capabilities with `--no-default-features --features <names>`.
 
 | Cargo feature | Capability |
 | - | - |
-| `ide` | Editor queries, projections and retained editor metadata; enables `typescript` and `diagnostic-fixes`. |
-| `build-artifacts` | Published `.iface`, `package.json` and publication fingerprints. |
-| `source-maps` | Source markers, mapping data, `.map` files and `sourceMappingURL`. |
-| `typescript` | TypeScript output, `.d.ts` and Promise façades; JavaScript exports and Sync wrappers remain available without it. |
-| `diagnostic-fixes` | Lazy construction and JSON serialization of fixes/edits; primary diagnostics and validation remain available without it. |
-| `native-project` | Project discovery, TOML/FFI-policy parsing, installed packages, disk-cache contracts and pnpm adapters; activates `toml`. |
-| `terminal-diagnostics` | Human-readable diagnostic rendering; activates `annotate-snippets`. |
-| `builtin-docs` | Documentation comments in embedded builtin sources. Without it, build-time lexing removes those comments, not user-program documentation or string contents. |
+| `ide` | Editor queries, projections and retained editor metadata. |
+| `native-project` | Project discovery, TOML/FFI-policy parsing, installed packages, disk-cache contracts and pnpm adapters; published `.iface`, `package.json` and publication fingerprints; source maps; documentation comments in the built-in sources. Activates `toml`, `semver` and `sha2`. |
+| `embedded-std` | `std` inside the binary, for a host without packages. |
 
 Shared in-memory project/configuration types, `Host`-backed source loading,
-type checking, JSON primary diagnostics and both debug/release profiles remain
-available without defaults. Unsupported TypeScript output requests report an
-error instead of silently producing JavaScript. Without `diagnostic-fixes`,
-JSON diagnostic events omit `fixes`.
+type checking, diagnostics with their fixes in both renderings, TypeScript
+output and both debug/release profiles are available without defaults.
+Without `native-project`, build-time lexing removes documentation comments
+from the built-in sources, not user-program documentation or string contents.
 
 `flick-wasm` disables the core's default features.
 Use `just wasm` or `just docs-wasm` for this smaller browser compiler.

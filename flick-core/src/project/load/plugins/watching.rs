@@ -49,17 +49,10 @@ impl Loader<'_> {
         let mut out: Vec<_> = linked(plugins, diagnostics).into_iter().collect();
         for (package, names) in self.watchers() {
             let watched = types::Watched::new(names.iter().map(String::as_str));
-            let plugin =
-                plugins.entry(package.clone()).or_insert_with(|| {
-                    match first_party::plugin(&package) {
-                        Some(plugin) => Ok(plugin),
-                        None => self.host.plugin(&package, self.component(&package)),
-                    }
-                });
-            match plugin {
+            match self.load_plugin(plugins, &package) {
                 Ok(plugin) => out.push(Watching {
                     package,
-                    plugin: Arc::clone(plugin),
+                    plugin,
                     watched,
                 }),
                 // the names it watches go unchecked, which is no less than a

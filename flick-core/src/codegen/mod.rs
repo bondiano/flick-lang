@@ -4,14 +4,13 @@
 //! `docs/src/content/docs/reference/codegen.md`.
 
 pub(crate) mod exports;
-#[cfg(feature = "build-artifacts")]
+#[cfg(feature = "native-project")]
 pub mod go;
 mod js;
 mod names;
-#[cfg(feature = "source-maps")]
+#[cfg(feature = "native-project")]
 pub mod sourcemap;
 pub mod tail;
-#[cfg(feature = "typescript")]
 pub mod ts;
 
 pub use js::{direct_methods, exported_worker, js, relative};
@@ -34,7 +33,7 @@ impl EffectBridge {
 }
 
 use crate::iface::Interface;
-#[cfg(feature = "source-maps")]
+#[cfg(feature = "native-project")]
 use crate::source::Span;
 
 /// Where modules are and who owns them, as the build lays them out.
@@ -73,7 +72,7 @@ pub struct Options<'a> {
 
 impl Options<'_> {
     pub(crate) fn typescript(&self) -> bool {
-        cfg!(feature = "typescript") && self.typescript
+        self.typescript
     }
 }
 
@@ -95,7 +94,7 @@ pub enum Labels {
 #[derive(Debug)]
 pub struct Output {
     pub code: String,
-    #[cfg(feature = "source-maps")]
+    #[cfg(feature = "native-project")]
     /// Each generated position, 0-based line and UTF-16 column, with the
     /// source node it comes from and, at the name of a top-level value, its
     /// Flick name.

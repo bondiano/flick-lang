@@ -406,7 +406,6 @@ impl<'a> Checker<'a> {
     }
 
     /// Where the top-level declaration being checked ends.
-    #[cfg(feature = "diagnostic-fixes")]
     pub fn current_end(&self) -> Option<u32> {
         self.top.current.map(|i| self.top.items[i].decl.range().1)
     }

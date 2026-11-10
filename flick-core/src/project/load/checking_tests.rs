@@ -238,3 +238,20 @@ fn changing_programmatic_config_invalidates_cached_checking() {
         &changed.modules[0].typing
     ));
 }
+
+#[test]
+fn standalone_check_of_inline_modules_rejects_a_private_builtin_import() {
+    use crate::diagnostics::codes;
+    use crate::source::SourceMap;
+
+    let mut sources = SourceMap::default();
+    let text = "module Probe exposing (page)\nimport List.Core\n\
+                module Inner exposing (one) =\n  one : Int\n  let one = 1\n\
+                page : Int\nlet page = Inner.one\n";
+    let file = sources.add("Probe.fl", text);
+    let diagnostics = crate::check(&sources, file);
+    assert!(
+        diagnostics.iter().any(|d| d.code == codes::R017),
+        "{diagnostics:?}"
+    );
+}

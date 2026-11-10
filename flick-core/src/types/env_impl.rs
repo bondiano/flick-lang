@@ -29,7 +29,7 @@ impl<'b> Env<'b> {
         let mut env = Env {
             module: module.to_owned(),
             builtins,
-            types: HashMap::new(),
+            types: TypeDefs::default(),
             values: HashMap::new(),
             parents: HashMap::new(),
             scope: HashMap::new(),
@@ -165,10 +165,7 @@ impl<'b> Env<'b> {
 
     /// The types, services and classes the module declares.
     pub fn own_types(&self) -> impl Iterator<Item = (&str, &TypeDef)> {
-        self.types
-            .iter()
-            .filter(|((m, _), _)| *m == self.module)
-            .map(|((_, n), d)| (n.as_str(), d))
+        self.types.of(&self.module).map(|(n, d)| (n.as_str(), d))
     }
 
     /// The instances beyond the built-in ones, which an interface carries.
@@ -191,34 +188,32 @@ impl<'b> Env<'b> {
     }
 
     pub fn type_def(&self, module: &str, name: &str) -> Option<&TypeDef> {
-        let key = (module.to_owned(), name.to_owned());
         self.types
-            .get(&key)
-            .or_else(|| self.builtins.types.get(&key))
+            .get(module, name)
+            .or_else(|| self.builtins.types.get(module, name))
     }
 
     pub fn define_type(&mut self, name: &str, def: TypeDef) {
-        self.types
-            .insert((self.module.clone(), name.to_owned()), def);
+        self.types.define(&self.module, name.to_owned(), def);
     }
 
     #[cfg(feature = "ide")]
     /// The transparent type aliases the module declares, exported or not.
     pub fn local_aliases(&self) -> impl Iterator<Item = (&str, &[String], &Type)> {
         self.types
-            .iter()
-            .filter_map(|((module, name), def)| match &def.form {
+            .of(&self.module)
+            .filter_map(|(name, def)| match &def.form {
                 Form::Alias {
                     params,
                     body,
                     opaque: false,
-                } if *module == self.module => Some((name.as_str(), params.as_slice(), body)),
+                } => Some((name.as_str(), params.as_slice(), body)),
                 _ => None,
             })
     }
 
     pub fn type_def_mut(&mut self, name: &str) -> Option<&mut TypeDef> {
-        self.types.get_mut(&(self.module.clone(), name.to_owned()))
+        self.types.0.get_mut(&self.module)?.get_mut(name)
     }
 
     /// Makes a local definition visible by its plain name.

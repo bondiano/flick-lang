@@ -426,14 +426,14 @@ impl Gen<'_> {
     }
 
     pub(super) fn stmt(&mut self, stmt: &Stmt) {
-        #[cfg(feature = "source-maps")]
+        #[cfg(feature = "native-project")]
         let span = match stmt {
             Stmt::Let(_, e) | Stmt::Expr(e) | Stmt::Fun { value: e, .. } => e.span,
         };
-        #[cfg(feature = "source-maps")]
+        #[cfg(feature = "native-project")]
         let first = self.buf.len();
         self.stmt_kind(stmt);
-        #[cfg(feature = "source-maps")]
+        #[cfg(feature = "native-project")]
         if first < self.buf.len() {
             let mark = self.mark(span);
             self.buf[first].insert_str(0, &mark);

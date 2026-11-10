@@ -1,7 +1,6 @@
 use crate::source::SourceMap;
 
 /// `text` after the first fix of the first diagnostic with `code`.
-#[cfg(feature = "diagnostic-fixes")]
 fn fixed(text: &str, code: &str) -> String {
     let mut sources = SourceMap::default();
     let file = sources.add("Probe.fl", text.to_owned());
@@ -22,7 +21,6 @@ fn fixed(text: &str, code: &str) -> String {
 
 const HEAD: &str = "module Probe exposing (f)\n";
 
-#[cfg(feature = "diagnostic-fixes")]
 #[test]
 fn removing_an_import_item_keeps_the_list_well_formed() {
     let body = "f : Float -> Float\nlet f x = abs x\n";
@@ -57,7 +55,6 @@ fn removing_an_import_item_keeps_the_list_well_formed() {
     );
 }
 
-#[cfg(feature = "diagnostic-fixes")]
 #[test]
 fn removing_an_unused_import_or_value_deletes_its_lines() {
     let text = format!("{HEAD}import String\nf : Float -> Float\nlet f x = x\n");
@@ -74,7 +71,6 @@ fn removing_an_unused_import_or_value_deletes_its_lines() {
     );
 }
 
-#[cfg(feature = "diagnostic-fixes")]
 #[test]
 fn unused_value_can_be_exposed_without_removing_it() {
     for (head, want) in [
@@ -105,7 +101,6 @@ fn unused_value_can_be_exposed_without_removing_it() {
     }
 }
 
-#[cfg(feature = "diagnostic-fixes")]
 #[test]
 fn an_unused_variable_is_renamed_with_an_underscore() {
     let text = format!("{HEAD}f : (Float, Float) -> Float\nlet f (x, y) = x\n");
@@ -140,7 +135,6 @@ fn unused_warnings_keep_their_primary_diagnostics() {
     }
 }
 
-#[cfg(feature = "diagnostic-fixes")]
 #[test]
 fn an_import_of_a_head_of_std_is_needless_unless_a_block_needs_it() {
     let head = "module Probe exposing (tool)\n";
@@ -175,7 +169,6 @@ fn an_import_of_a_head_of_std_is_needless_unless_a_block_needs_it() {
     assert!(warned.is_empty(), "{warned:?}");
 }
 
-#[cfg(feature = "diagnostic-fixes")]
 #[test]
 fn a_head_of_std_inside_another_block_keeps_its_import() {
     // the body of `cli` is read only as it expands: `codec` there may need the import

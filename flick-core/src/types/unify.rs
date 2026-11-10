@@ -7,7 +7,9 @@
 //! its scope.
 
 use crate::numeric::NumLang;
+use std::borrow::Cow;
 use std::collections::HashSet;
+use std::ptr;
 
 use super::Checker;
 use super::env::Form;
@@ -440,6 +442,23 @@ impl Checker<'_> {
         self.whnf_captured(t).0
     }
 
+    /// [`Self::whnf`] without the copy of a type that does not reduce.
+    pub fn borrowed_whnf<'a>(&'a self, t: &'a Type) -> Cow<'a, Type> {
+        let mut t = self.borrowed_head(t);
+        for _ in 0..64 {
+            t = match t {
+                Cow::Borrowed(Type::Captured { ty, .. } | Type::Bounded { ty, .. }) => {
+                    self.borrowed_head(ty)
+                }
+                Cow::Owned(Type::Captured { ty, .. } | Type::Bounded { ty, .. }) => {
+                    Cow::Owned(self.qualified_head(&ty))
+                }
+                other => return other,
+            };
+        }
+        t
+    }
+
     /// [`Self::whnf`], and the capture row of the qualifiers taken off.
     pub fn whnf_captured(&self, t: &Type) -> (Type, Option<Type>) {
         let mut t = self.qualified_head(t);
@@ -465,16 +484,26 @@ impl Checker<'_> {
     /// Head reduction without erasing the distinction between hidden
     /// captures and a refinement of a complete generic type.
     pub fn qualified_head(&self, t: &Type) -> Type {
-        let mut t = self.store.resolve(t);
+        self.borrowed_head(t).into_owned()
+    }
+
+    /// [`Self::qualified_head`] without the copy of a type that does not
+    /// reduce, which is most of what the capture summaries ask about.
+    pub fn borrowed_head<'a>(&'a self, t: &'a Type) -> Cow<'a, Type> {
+        let mut t = Cow::Borrowed(self.store.head(t));
         for _ in 0..64 {
-            if let Some(reduced) = self.project(&t) {
-                t = self.store.resolve(&reduced);
-                continue;
+            // only an application or a constructor has a head to reduce
+            if !matches!(*t, Type::App { .. } | Type::Con { .. }) {
+                break;
             }
             let (head, args) = t.spine();
-            let resolved = self.store.resolve(head);
-            if resolved != *head {
-                t = Type::apps(resolved, args.into_iter().cloned());
+            if let Some(reduced) = self.project(head, &args) {
+                t = Cow::Owned(self.store.resolve(&reduced));
+                continue;
+            }
+            let resolved = self.store.head(head);
+            if !ptr::eq(resolved, head) && resolved != head {
+                t = Cow::Owned(Type::apps(resolved.clone(), args.into_iter().cloned()));
                 continue;
             }
             let Type::Con { module, name } = head else {
@@ -493,10 +522,10 @@ impl Checker<'_> {
                 .cloned()
                 .zip(args.iter().map(|a| (*a).clone()))
                 .collect();
-            t = self.store.resolve(&Type::apps(
+            t = Cow::Owned(self.store.resolve(&Type::apps(
                 body.substitute(&subst),
                 args[params.len()..].iter().map(|a| (*a).clone()),
-            ));
+            )));
         }
         t
     }
@@ -504,9 +533,8 @@ impl Checker<'_> {
     /// The fixed projections of a row into a type, once the row is known
     /// well enough: `Errors none` is `Never`, `Errors {E}` is `E`, and
     /// `ServiceImpl {S}` is `S.Impl`; `Record.Field "x" T` is `{ x : T }`.
-    fn project(&self, t: &Type) -> Option<Type> {
-        let (head, args) = t.spine();
-        if let ([label, field], Type::Con { module, name }) = (&args[..], head)
+    fn project(&self, head: &Type, args: &[&Type]) -> Option<Type> {
+        if let ([label, field], Type::Con { module, name }) = (args, head)
             && lang::is(Lang::Field, module, name)
             && let Type::Symbol(label) = self.store.resolve(label)
         {

@@ -32,7 +32,6 @@ pub fn json_events<'a>(
                 message: &r.message,
             })
             .collect(),
-        #[cfg(feature = "diagnostic-fixes")]
         fixes: d
             .fixes
             .iter()
@@ -72,7 +71,6 @@ pub struct Event<'a> {
     path: Option<&'a str>,
     range: Option<Range>,
     related: Vec<Located<'a>>,
-    #[cfg(feature = "diagnostic-fixes")]
     fixes: Vec<JsonFix<'a>>,
 }
 
@@ -99,14 +97,12 @@ struct Located<'a> {
     message: &'a str,
 }
 
-#[cfg(feature = "diagnostic-fixes")]
 #[derive(Serialize)]
 struct JsonFix<'a> {
     message: &'a str,
     edits: Vec<JsonEdit<'a>>,
 }
 
-#[cfg(feature = "diagnostic-fixes")]
 #[derive(Serialize)]
 struct JsonEdit<'a> {
     path: &'a str,

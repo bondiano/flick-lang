@@ -135,7 +135,7 @@ fn top_level_atoms_views_and_actions_are_labelled_by_their_names() {
     assert_eq!(labels(true, Labels::All), ["count", "reset", "counter"]);
     assert_eq!(labels(true, Labels::Components), ["reset", "counter"]);
     assert!(labels(true, Labels::None).is_empty());
-    #[cfg(feature = "source-maps")]
+    #[cfg(feature = "native-project")]
     {
         let named: Vec<_> = compile_with(text, false, Labels::default())
             .mappings

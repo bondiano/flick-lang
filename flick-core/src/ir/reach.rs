@@ -3,7 +3,7 @@
 //! built-in module may hold bindings a program never uses.
 
 use std::collections::HashMap;
-#[cfg(feature = "build-artifacts")]
+#[cfg(feature = "native-project")]
 use std::collections::HashSet;
 
 use crate::ir::{Expr, ExprKind, Item, ItemKind, Module};
@@ -118,7 +118,7 @@ pub fn index(modules: &[&Module]) -> HashMap<Key, (usize, usize)> {
 
 /// The items reachable from `roots`, by module and item index, and the
 /// modules reached that the program does not have.
-#[cfg(feature = "build-artifacts")]
+#[cfg(feature = "native-project")]
 pub fn reachable(
     modules: &[&Module],
     index: &HashMap<Key, (usize, usize)>,

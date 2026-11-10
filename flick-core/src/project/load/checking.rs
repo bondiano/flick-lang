@@ -30,9 +30,9 @@ use crate::syntax::cst::{Element, Node};
 use crate::syntax::{Parse, kind::SyntaxKind as K};
 use crate::types;
 
-/// The single-file checking API uses the same inline-module path as a project
-/// run, while resolving only built-in imports.
-pub(crate) fn check_inline_file(
+/// A file checked on its own takes the path of a module of a project run,
+/// while resolving only built-in imports.
+pub(crate) fn check_file(
     sources: &SourceMap,
     file: FileId,
     parse: Parse,
@@ -91,6 +91,20 @@ pub(crate) fn check_inline_file(
     };
     let mut diagnostics = checking.check(&modules[0], &builtin).diagnostics;
     diagnostics.append(&mut derived);
+    // a lone file has no package, so no private module of one is its own
+    for import in &modules[0].syntax.imports {
+        let private = |i: &Interface| i.module == import.module && i.private;
+        if types::builtins().iter().any(private) {
+            diagnostics.push(Diagnostic::error(
+                codes::R017,
+                format!(
+                    "module `{}` is private to its package; import its public facade instead",
+                    import.module
+                ),
+                import.span,
+            ));
+        }
+    }
     diagnostics.sort_by_key(|d| d.span.map(|s| (s.start, s.end)));
     diagnostics
 }

@@ -2,7 +2,7 @@
 
 use std::collections::{HashMap, HashSet};
 
-use super::{Instance, TypeDef};
+use super::{Instance, TypeDefs};
 use crate::iface::{Entity, Interface, Namespace};
 use crate::types::lang;
 use crate::types::services::impl_def;
@@ -12,7 +12,7 @@ use crate::types::ty::Type;
 /// by the environments of all modules instead of rebuilt for each.
 #[derive(Debug, Default)]
 pub struct Builtins {
-    pub(super) types: HashMap<(String, String), TypeDef>,
+    pub(super) types: TypeDefs,
     pub(super) values: HashMap<Entity, Type>,
     pub(super) parents: HashMap<Entity, String>,
     /// The exports of the prelude, by plain name.
@@ -67,7 +67,7 @@ impl Builtins {
 
 /// Records the definitions, schemes and constructor parents an interface exports.
 pub(super) fn learn_exports(
-    types: &mut HashMap<(String, String), TypeDef>,
+    types: &mut TypeDefs,
     values: &mut HashMap<Entity, Type>,
     parents: &mut HashMap<Entity, String>,
     interface: &Interface,
@@ -77,9 +77,9 @@ pub(super) fn learn_exports(
         if let Some(def) = &export.definition {
             if let Some(implementation) = impl_def(def) {
                 let name = format!("{}.Impl", entity.name);
-                types.insert((entity.module.clone(), name), implementation);
+                types.define(&entity.module, name, implementation);
             }
-            types.insert((entity.module.clone(), entity.name.clone()), def.clone());
+            types.define(&entity.module, entity.name.clone(), def.clone());
         }
         if let Some(scheme) = &export.scheme {
             values.insert(entity.clone(), scheme.clone());

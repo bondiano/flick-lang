@@ -1,4 +1,6 @@
-use std::fs;
+use std::fs::{self, File};
+use std::path::Path;
+use std::time::{Duration, SystemTime};
 
 use super::{APP, MAIN, flick_in, project};
 
@@ -73,4 +75,40 @@ fn timings_name_the_phases_and_the_input_that_missed_the_cache() {
         "the last cached build differs in `input src/App/Main.fl`"
     );
     assert_eq!(timings["modules"][0]["module"], "App.Main");
+}
+
+#[test]
+fn a_project_keeps_the_builds_stored_last() {
+    let dir = project(
+        "build_cache_bound",
+        &[("flick.toml", APP), ("src/App/Main.fl", MAIN)],
+    );
+    assert!(flick_in(&dir, &["build"]).status.success());
+    let cache = dir.join(".flick/cache");
+    let long_ago = SystemTime::now() - Duration::from_hours(1);
+    for n in 0..20 {
+        let stale = cache.join(format!("stale{n}.json"));
+        fs::write(&stale, "[]").expect("a stale build");
+        File::options()
+            .write(true)
+            .open(&stale)
+            .and_then(|file| file.set_modified(long_ago))
+            .expect("a time of writing");
+    }
+    let source = dir.join("src/App/Main.fl");
+    fs::write(&source, MAIN.replace("hi", "ho")).expect("an edit");
+    assert!(flick_in(&dir, &["build"]).status.success());
+    let kept = fs::read_dir(&cache).expect("the cache").count();
+    assert_eq!(kept, 16, "the two builds and the newest of the stale ones");
+
+    // the build stored last is still the one an unchanged build takes
+    let module = dir.join("dist/App/Main.js");
+    let written = |path: &Path| {
+        fs::metadata(path)
+            .and_then(|m| m.modified())
+            .expect("mtime")
+    };
+    let before = written(&module);
+    assert!(flick_in(&dir, &["build"]).status.success());
+    assert_eq!(written(&module), before);
 }

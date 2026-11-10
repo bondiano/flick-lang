@@ -87,8 +87,8 @@ impl Checker<'_> {
     }
 
     fn hidden_fields(&self, t: &Type, seen: &mut Vec<(String, String)>) -> bool {
-        let t = self.qualified_head(t);
-        match &t {
+        let t = self.borrowed_head(t);
+        match &*t {
             Type::Captured { ty, .. } | Type::Bounded { ty, .. } => self.hidden_fields(ty, seen),
             Type::Fun { .. } => true,
             Type::Tuple(items) => items.iter().any(|t| self.hidden_fields(t, seen)),
@@ -354,7 +354,10 @@ impl Checker<'_> {
         if self.scalar(t) {
             return true;
         }
-        if matches!(self.whnf(t), Type::Var(_) | Type::Meta(_) | Type::Skolem(_)) {
+        if matches!(
+            *self.borrowed_whnf(t),
+            Type::Var(_) | Type::Meta(_) | Type::Skolem(_)
+        ) {
             return false;
         }
         let captures = self.captures_of(t);
@@ -461,8 +464,8 @@ impl Checker<'_> {
     /// Whether `t` is a primitive value, which holds no captures; an integer
     /// literal's type is one before it is settled.
     pub(in crate::types) fn scalar(&self, t: &Type) -> bool {
-        match self.whnf(t) {
-            Type::Meta(m) => self.store.is_numeric(m),
+        match &*self.borrowed_whnf(t) {
+            Type::Meta(m) => self.store.is_numeric(*m),
             t => SCALARS.into_iter().any(|item| t.is_lang(item)),
         }
     }

@@ -88,7 +88,7 @@ fn lang_attribute_hover_includes_action_documentation() {
         let at = u32::try_from(source.find(needle).expect("item")).expect("small");
         let (markdown, _) = ide.hover(file, at).expect("lang item");
         assert!(markdown.contains(expected), "{markdown}");
-        #[cfg(feature = "builtin-docs")]
+        #[cfg(feature = "native-project")]
         assert!(
             markdown.contains(if needle == "action\n" {
                 "snapshot"
