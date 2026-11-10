@@ -187,6 +187,34 @@ fn a_function_keeps_its_signature() {
     assert!(checked.is_ok(), "{checked:?}\n{}", generate::source(&p));
 }
 
+/// A signature in a child names the region of its `scope`: a task given to
+/// `Fiber.spawn s` holds `v : ((Unit ->{} Unit)^{s}) ->{} Unit`, and once it
+/// is a child of the region it is typed outside the `scope` that bound `s`.
+/// With an argument that holds the region, and with one that holds nothing.
+/// Cases the model properties found.
+#[test]
+#[allow(
+    clippy::unreadable_literal,
+    reason = "the choices as proptest printed them"
+)]
+fn a_child_keeps_the_region_its_signatures_name() {
+    let held: &[u32] = &[
+        3, 0, 0, 0, 0, 0, 0, 0, 1, 3733153966, 1140624250, 0, 0, 41785623, 1, 0, 265291797,
+    ];
+    let nothing: &[u32] = &[
+        0, 0, 0, 2, 1, 1, 2971067122, 1, 1911584171, 0, 3036185343, 3743594924, 3928023536,
+        2226115803, 0, 0, 1533559200, 1,
+    ];
+    for c in [held, nothing] {
+        let p = generate::program(c);
+        let source = generate::source(&p);
+        assert!(source.contains("Fiber.spawn s"), "{source}");
+        assert!(model(&p).is_ok(), "{source}");
+        let checked = GEN.with(|(d, globals)| progress_and_preservation(globals, d, &p));
+        assert!(checked.is_ok(), "{checked:?}\n{source}");
+    }
+}
+
 proptest! {
     // a failure becomes a case of `tests/check`, not a file of seeds
     // (the programs with a hole of TypeScript are not run, below)

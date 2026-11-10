@@ -2,12 +2,12 @@
 //! the stage of the body, and the regions that must not leave it; the
 //! owner a step acquires into (§1.4), and the errors (Err-Raise) checks.
 
-use std::collections::{BTreeSet, HashMap};
+use std::collections::BTreeSet;
 use std::rc::Rc;
 
 use super::super::expr::mono;
-use super::super::generalize::substitute_caps;
-use super::super::{Check, Checker, Inst, error, substitute};
+use super::super::generalize::in_regions;
+use super::super::{Check, Checker, error};
 use super::{owner, scope_service};
 use crate::syntax::{Name, Term};
 use crate::types::{Caps, Row, Scheme, Stage, Type, Var};
@@ -113,28 +113,7 @@ impl Checker<'_> {
     /// A signature written in the body of `scope`s: the regions it names
     /// are theirs.
     pub(in crate::check) fn in_scopes(&self, s: &Scheme) -> Scheme {
-        let map: HashMap<Name, Inst> = self
-            .regions
-            .renamed
-            .iter()
-            .filter(|(n, r)| n != r && !s.vars.iter().any(|(v, _)| v == n))
-            .map(|(n, r)| (n.clone(), Inst::Type(Type::Var(Var::Named(r.clone())))))
-            .collect();
-        if map.is_empty() {
-            return s.clone();
-        }
-        Scheme {
-            vars: s.vars.clone(),
-            body: substitute(&s.body, &map),
-            outlives: s
-                .outlives
-                .iter()
-                .map(|(c, r)| {
-                    let c = substitute_caps(c, &map);
-                    (c, substitute(r, &map))
-                })
-                .collect(),
-        }
+        in_regions(s, &self.regions.renamed)
     }
 
     /// Whether a value at `level` may take what `t` names: no region of a
