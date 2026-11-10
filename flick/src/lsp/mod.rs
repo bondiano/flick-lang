@@ -150,7 +150,7 @@ impl Server {
         if builtin_index(&path).is_some() {
             match method {
                 "textDocument/didOpen" => self.refresh(&path),
-                "textDocument/didClose" => self.clear(&Context::of(&self.docs, &path), &path),
+                "textDocument/didClose" => self.clear(&Context::of(&self.docs, &path)),
                 _ => {}
             }
             return;
@@ -186,7 +186,7 @@ impl Server {
                     .keys()
                     .any(|p| Context::of(&self.docs, p) == context)
                 {
-                    self.clear(&context, &path);
+                    self.clear(&context);
                     return;
                 }
             }
@@ -196,9 +196,9 @@ impl Server {
         self.refresh(&path);
     }
 
-    fn clear(&mut self, context: &Context, path: &Path) {
-        self.snapshots
-            .retain(|of, s| of != context && s.file(path).is_none());
+    fn clear(&mut self, context: &Context) {
+        // what read `path` went when the notification arrived
+        self.snapshots.remove(context);
         if self.latest.as_ref() == Some(context) {
             self.latest = None;
         }
