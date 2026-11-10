@@ -76,6 +76,7 @@ codegen/stage_order
 codegen/strings_utf16
 codegen/tags
 codegen/task_twice
+ffi/catch_order
 ffi/copy
 ffi/defect
 ffi/events

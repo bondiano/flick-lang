@@ -352,63 +352,33 @@ fn defined(item: &Item) -> Vec<String> {
 }
 
 fn item_uses(item: &Item, module: &str, out: &mut BTreeSet<String>) {
-    match &item.kind {
-        ItemKind::Value { body, .. } | ItemKind::Destructure { body, .. } => {
-            expr_uses(body, module, out);
+    // the mapping of `catch` is read when a call throws, after the module
+    // has started, so it does not order the foreign function after it
+    if !matches!(item.kind, ItemKind::Foreign(_)) {
+        item.each_body(&mut |e| expr_uses(e, module, out));
+    }
+    if let ItemKind::Instance { info, .. } = &item.kind {
+        let derived = info.derived.iter().flat_map(|(fields, _)| fields);
+        let extra = info.defaults.iter().flat_map(|(_, _, extra)| extra);
+        for d in (info.supers.iter().map(|(_, d)| d))
+            .chain(derived)
+            .chain(extra)
+        {
+            dict_uses(d, module, out);
         }
-        ItemKind::Instance { info, methods } => {
-            for (_, d) in &info.supers {
-                dict_uses(d, module, out);
-            }
-            if let Some((fields, _)) = &info.derived {
-                for d in fields {
-                    dict_uses(d, module, out);
-                }
-            }
-            for d in info.defaults.iter().flat_map(|(_, _, extra)| extra) {
-                dict_uses(d, module, out);
-            }
-            for (_, m) in methods {
-                expr_uses(m, module, out);
-            }
-        }
-        ItemKind::Refined { check, .. } => expr_uses(check, module, out),
-        ItemKind::Foreign(_) | ItemKind::Constructor(_) | ItemKind::Service { .. } => {}
     }
 }
 
 fn dict_uses(d: &Dict, module: &str, out: &mut BTreeSet<String>) {
-    match d {
-        Dict::Instance {
-            module: m,
-            name,
-            args,
-        } => {
-            if m == module {
-                out.insert(names::instance(name));
-            }
-            for a in args {
-                dict_uses(a, module, out);
-            }
+    d.each_global(&mut |instance, m, name| {
+        if m == module {
+            out.insert(if instance {
+                names::instance(name)
+            } else {
+                names::ident(name)
+            });
         }
-        Dict::Value { module: m, name } => {
-            if m == module {
-                out.insert(names::ident(name));
-            }
-        }
-        Dict::Super { dict, .. } => dict_uses(dict, module, out),
-        Dict::Structural { fields, .. } => {
-            for f in fields {
-                dict_uses(f, module, out);
-            }
-        }
-        Dict::Opened { .. }
-        | Dict::Given(_)
-        | Dict::Field(_)
-        | Dict::Primitive { .. }
-        | Dict::Site { .. }
-        | Dict::Error => {}
-    }
+    });
 }
 
 fn expr_uses(e: &Expr, module: &str, out: &mut BTreeSet<String>) {
