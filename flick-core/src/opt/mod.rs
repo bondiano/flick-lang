@@ -324,7 +324,7 @@ fn unused_items(module: &mut Module, exported: &dyn Fn(&str) -> bool) {
     loop {
         let mut used = BTreeSet::new();
         for item in &module.items {
-            item_globals(item, &module.name, &mut used);
+            item.each_body(&mut |e| globals(e, &module.name, &mut used));
         }
         let before = module.items.len();
         module.items.retain(|item| match &item.kind {
@@ -339,21 +339,6 @@ fn unused_items(module: &mut Module, exported: &dyn Fn(&str) -> bool) {
         if module.items.len() == before {
             return;
         }
-    }
-}
-
-fn item_globals(item: &Item, module: &str, out: &mut BTreeSet<String>) {
-    let mut walk = |e: &Expr| globals(e, module, out);
-    match &item.kind {
-        ItemKind::Value { body, .. } | ItemKind::Destructure { body, .. } => walk(body),
-        ItemKind::Refined { check, .. } => walk(check),
-        ItemKind::Instance { methods, .. } => methods.iter().for_each(|(_, m)| walk(m)),
-        ItemKind::Foreign(f) => {
-            if let Some(c) = &f.catch {
-                walk(c);
-            }
-        }
-        ItemKind::Constructor(_) | ItemKind::Service { .. } => {}
     }
 }
 
