@@ -313,15 +313,7 @@ impl Checker<'_> {
     ) -> Check<Type> {
         let s = if let Some(s) = sig {
             let s = self.local_signature(&self.live_scheme(s));
-            let (bare, qualifier) = match &s.body {
-                Type::Captured(t, c) => ((**t).clone(), c.clone()),
-                t => (t.clone(), Caps::default()),
-            };
-            let bare = Scheme {
-                body: bare,
-                ..s.clone()
-            };
-            self.check_qualified_forall(e1, &bare, qualifier)?;
+            self.check_signed(e1, &s)?;
             s
         } else {
             self.level += 1;
@@ -351,6 +343,43 @@ impl Checker<'_> {
         };
         self.locals.pop();
         t
+    }
+
+    /// (Let-Sig) against a local signature `(∀ᾱ. τ)^C`, its own qualifier
+    /// the one [`Checker::local_signature`] gave it.
+    fn check_signed(&mut self, e: &Term, s: &Scheme) -> Check<()> {
+        let (bare, qualifier) = match &s.body {
+            Type::Captured(t, c) => ((**t).clone(), c.clone()),
+            t => (t.clone(), Caps::default()),
+        };
+        let bare = Scheme {
+            body: bare,
+            ..s.clone()
+        };
+        self.check_qualified_forall(e, &bare, qualifier)
+    }
+
+    /// (Fix): `fix f. λx. e` is `let rec f : σ = λx. e in f`, with `σ` the
+    /// local signature of the `let` whose step made it: its own qualifier
+    /// is inferred as (Let-Sig) inferred it, so a state types the λ as the
+    /// source did (`docs/formal/core.md#stepping-a-signed-let-loses-its-signature`).
+    pub(super) fn fix(
+        &mut self,
+        f: &Name,
+        sig: Option<&Scheme>,
+        lam: &Term,
+        expected: Option<&Type>,
+    ) -> Check<Type> {
+        let at = Term::Var(f.clone());
+        let Some(sig) = sig else {
+            return self.let_rec(f, None, lam, &at, expected);
+        };
+        let s = self.local_signature(&self.live_scheme(sig));
+        self.locals.push((f.clone(), s.clone()));
+        let checked = self.check_signed(lam, &s);
+        self.locals.pop();
+        checked?;
+        self.body(f, s, &at, expected)
     }
 
     /// A local signature of a function: its own qualifier is inferred, a

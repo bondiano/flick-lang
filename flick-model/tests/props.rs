@@ -215,6 +215,32 @@ fn a_child_keeps_the_region_its_signatures_name() {
     }
 }
 
+/// A function with a local signature keeps the qualifier (Let-Sig) inferred
+/// for it when its `let` steps: `v : Unit ->{} Unit` uses a handle of the
+/// `scope` around it, and the `fix` its λ became is called in a task. A
+/// case the model properties found.
+#[test]
+#[allow(
+    clippy::unreadable_literal,
+    reason = "the choices as proptest printed them"
+)]
+fn a_function_keeps_the_qualifier_of_its_local_signature() {
+    let c = [
+        0, 0, 0, 2, 1, 1, 3798531823, 396777437, 2, 0, 0, 0, 1, 2291891977, 0, 1, 2111737910, 0,
+        190755199, 82792337, 0, 0, 0, 0, 2882392651, 0, 0, 0, 0, 1, 0, 0, 0, 1084595813, 2, 0, 3,
+        0, 315595452, 1,
+    ];
+    let p = generate::program(&c);
+    let source = generate::source(&p);
+    assert!(
+        source.contains("(use h2)") && source.contains("(v3 ())"),
+        "{source}"
+    );
+    assert!(model(&p).is_ok(), "{source}");
+    let checked = GEN.with(|(d, globals)| progress_and_preservation(globals, d, &p));
+    assert!(checked.is_ok(), "{checked:?}\n{source}");
+}
+
 proptest! {
     // a failure becomes a case of `tests/check`, not a file of seeds
     // (the programs with a hole of TypeScript are not run, below)

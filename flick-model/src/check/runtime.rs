@@ -85,10 +85,7 @@ impl Checker<'_> {
                 Some(t) => Ok(Type::Ref(Rc::new(t.clone()))),
                 None => error("Loc", format!("no cell ℓ{l} in μ")),
             },
-            // (Fix): `fix f. λx. e` is `let rec f : σ = λx. e in f`
-            Term::Fix(f, sig, lam) => {
-                self.let_rec(f, sig.as_deref(), lam, &Term::Var(f.clone()), expected)
-            }
+            Term::Fix(f, sig, lam) => self.fix(f, sig.as_deref(), lam, expected),
             Term::Env(theta) => self.env(theta),
             // (Bind)
             Term::Bind(s, e) => {
