@@ -22,7 +22,7 @@ use super::run::{Generation, build_into_generation, dev_entries, find_project, l
 use super::test::{watch_snapshot, watched_roots};
 use crate::args::{GlobalArguments, RunArguments};
 use crate::child::{self, Running};
-use crate::report;
+use crate::{report, timings};
 
 /// A running generation: a process per entry it started.
 struct Live {
@@ -87,8 +87,15 @@ pub fn dev(options: &RunArguments, global: &GlobalArguments) -> ExitCode {
     loop {
         let now = watch_snapshot(&paths);
         if seen.as_ref() != Some(&now) {
+            // the version running until now is no phase of the next build
+            if seen.is_some() {
+                timings::discard();
+            }
             seen = Some(now);
-            if let Ok(generation) = build_into_generation(&project, options, global) {
+            let built = build_into_generation(&project, options, global);
+            // each build reports itself, before the version it built starts
+            timings::report(global);
+            if let Ok(generation) = built {
                 if let Some(old) = live.take() {
                     report::log(global, "dev: stopping the running version");
                     let code = old.stop(SIGTERM as usize);

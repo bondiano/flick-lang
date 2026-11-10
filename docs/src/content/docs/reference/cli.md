@@ -148,9 +148,10 @@ It suppresses service output, not warnings or errors, and leaves useful stdout
 `--timings` reports on stderr, after the diagnostics, how long the command's
 phases took, the work measured inside them (such as checking the built-in
 modules), the ten modules that took longest to check and, when the build
-cache missed, the inputs that differ from the build cached last. A watching
-`check` or `build` reports after each run; `test --watch` and `dev` report
-when they end. With `--diagnostics json` the report is one event of type
+cache missed, the inputs that differ from the build cached last. What a
+command spends in a process it starts, the app or the tests, is the phase
+`Running a child process`. A watching command reports each run: `check` and
+`build` after it, `test --watch` and `dev` after its build. With `--diagnostics json` the report is one event of type
 `timings` with `stages` and `phases` (each a `label` and `micros`), `modules`
 (each a `module` and `micros`, the slowest first) and `cache-misses`. The
 measurements are no input of the build cache.

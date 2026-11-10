@@ -1,6 +1,7 @@
 //! A build's key with the digest of each input behind it, and the digests
 //! of the build cached last: what names the input that made the cache miss.
 
+use std::collections::HashSet;
 use std::fs;
 use std::ops::Deref;
 use std::path::{Path, PathBuf};
@@ -61,6 +62,7 @@ pub fn missed(root: &Path, key: &Signed) -> String {
 /// The labels whose digest is in only one of `saved` and `current`.
 fn differing(saved: &[(String, String)], current: &[(String, String)], root: &str) -> String {
     let only = |these: &'_ [(String, String)], those: &'_ [(String, String)]| {
+        let those: HashSet<&(String, String)> = those.iter().collect();
         let labels: Vec<String> = (these.iter())
             .filter(|part| !those.contains(part))
             .map(|(label, _)| format!("`{}`", label.replace(root, "")))

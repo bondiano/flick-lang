@@ -254,6 +254,15 @@ fn compiled(text: &str) -> (SourceMap, Compilation) {
     (sources, compilation)
 }
 
+fn optimizing(compilation: &Compilation, _: &SourceMap) -> Duration {
+    let modules = &compilation.modules;
+    let start = Instant::now();
+    for module in modules {
+        build::optimized(modules, module, false);
+    }
+    start.elapsed()
+}
+
 fn emitting_js(compilation: &Compilation, sources: &SourceMap) -> Duration {
     let start = Instant::now();
     let (artifacts, diagnostics) = build::emit(compilation, sources, &settings(&[]));
@@ -334,6 +343,11 @@ fn function_of_2000_lines_checks_and_lowers_in_linear_time() {
         ratio < 9.0,
         "4x the size takes {ratio:.1}x the time ({small:?} -> {full:?})"
     );
+}
+
+#[test]
+fn function_of_2000_lines_optimizes_in_linear_time() {
+    assert_stage_linear("optimizer", optimizing);
 }
 
 #[test]
