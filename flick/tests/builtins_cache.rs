@@ -59,7 +59,9 @@ fn project_checks_save_the_interfaces_of_the_selected_backend() {
             .map(|e| e.expect("entry").file_name().to_string_lossy().into_owned())
             .filter(|name| {
                 name.starts_with("builtins-")
-                    && Path::new(name).extension().is_some_and(|ext| ext == "json")
+                    && Path::new(name)
+                        .extension()
+                        .is_some_and(|ext| ext == "jsonl")
             })
             .collect();
         assert_eq!(files.len(), 1, "{files:?}");
