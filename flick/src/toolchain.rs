@@ -1,8 +1,6 @@
-//! The versions this compiler pins and how the installed tree compares:
-//! another runtime, Effect adapter or Effect version stops a build before it writes
-//! code against an ABI it does not know.
+//! The compiler owns the runtime ABI; the adapter owns its npm requirements.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::time::UNIX_EPOCH;
 use std::{env, fs, io, process};
 
@@ -12,8 +10,18 @@ use flick_core::diagnostics::{Diagnostic, Severity, codes};
 
 pub const COMPILER: &str = env!("CARGO_PKG_VERSION");
 pub const RUNTIME: &str = "0.1.0";
-pub const EFFECT_TS: &str = "0.1.0";
-pub const EFFECT: &str = "4.1.2";
+pub const ADAPTER: &str = "@flick-lang/effect-ts";
+const ADAPTER_MANIFEST: &str = include_str!("../../packages/effect-ts/package.json");
+
+/// Default for newly scaffolded projects, supplied by the adapter package.
+pub fn adapter_version() -> String {
+    let manifest: serde_json::Value =
+        serde_json::from_str(ADAPTER_MANIFEST).expect("adapter manifest");
+    manifest["version"]
+        .as_str()
+        .expect("adapter version")
+        .to_owned()
+}
 pub const PNPM: &str = "12.16.1";
 pub const NODE: &str = "24.18.0";
 /// The TypeScript release `flick content-mapper` is verified against: the
@@ -45,35 +53,130 @@ pub fn installed(root: &Path, package: &str) -> Option<String> {
     Some(json.get("version")?.as_str()?.to_owned())
 }
 
-/// The version of `package` that the Effect adapter resolves, then the project.
-pub fn resolved(root: &Path, package: &str) -> Option<String> {
-    let adapter_dir = root.join("node_modules/@flick-lang/effect-ts");
-    if package == "effect" {
-        installed(&adapter_dir, package).or_else(|| installed(root, package))
-    } else {
-        installed(root, package).or_else(|| installed(&adapter_dir, package))
-    }
+/// Node resolves dependencies from the real package directory, including pnpm's store.
+pub fn dependency_manifest(root: &Path, package: &str) -> PathBuf {
+    let adapter = root.join("node_modules").join(ADAPTER);
+    let real = fs::canonicalize(&adapter).unwrap_or(adapter);
+    real.ancestors()
+        .map(|dir| dir.join("node_modules").join(package).join("package.json"))
+        .find(|path| path.exists())
+        .unwrap_or_else(|| root.join("node_modules").join(package).join("package.json"))
 }
 
-/// `P015` for an installed runtime or adapter of another version; `rt` needs
-/// only the kernel package, while the Effect backend also pins its adapter.
+/// The adapter and kernel resolve from the project; adapter dependencies from its real path.
+pub fn resolved(root: &Path, package: &str) -> Option<String> {
+    if package == ADAPTER || package == "@flick-lang/runtime" {
+        return installed(root, package);
+    }
+    let text = fs::read_to_string(dependency_manifest(root, package)).ok()?;
+    let json: serde_json::Value = serde_json::from_str(&text).ok()?;
+    json.get("version")?.as_str().map(str::to_owned)
+}
+
+/// Exact production dependency pins of an installed adapter, without compiler-owned versions.
+/// No installed adapter is normal for compile-only projects.
+pub fn adapter_requirements(root: &Path) -> Result<Vec<(String, String)>, String> {
+    let path = root.join("node_modules").join(ADAPTER).join("package.json");
+    let text = match fs::read_to_string(&path) {
+        Ok(text) => text,
+        Err(error)
+            if error.kind() == io::ErrorKind::NotFound
+                && path
+                    .parent()
+                    .is_none_or(|dir| fs::symlink_metadata(dir).is_err()) =>
+        {
+            return Ok(Vec::new());
+        }
+        Err(error) => return Err(format!("cannot read `{}`: {error}", path.display())),
+    };
+    let json: serde_json::Value = serde_json::from_str(&text)
+        .map_err(|error| format!("invalid `{}`: {error}", path.display()))?;
+    if json.get("version").and_then(|v| v.as_str()).is_none() {
+        return Err(format!("`{ADAPTER}` has no package version"));
+    }
+    let deps = json
+        .get("dependencies")
+        .and_then(|v| v.as_object())
+        .ok_or_else(|| format!("`{ADAPTER}` has no dependency contract"))?;
+    if !deps.contains_key("effect") {
+        return Err(format!("`{ADAPTER}` has no `effect` requirement"));
+    }
+    deps.iter()
+        .map(|(name, value)| {
+            if name == "@flick-lang/runtime" && value.as_str() == Some("workspace:*") {
+                let runtime: serde_json::Value =
+                    serde_json::from_str(include_str!("../../runtime/package.json"))
+                        .expect("runtime manifest");
+                return Ok((
+                    name.clone(),
+                    runtime["version"]
+                        .as_str()
+                        .expect("runtime version")
+                        .to_owned(),
+                ));
+            }
+            let version = value
+                .as_str()
+                .filter(|v| {
+                    let parts: Vec<_> = v.split('.').collect();
+                    parts.len() == 3
+                        && parts
+                            .iter()
+                            .all(|p| !p.is_empty() && p.chars().all(|c| c.is_ascii_digit()))
+                })
+                .ok_or_else(|| {
+                    format!("`{ADAPTER}` must pin `{name}` to an exact release version")
+                })?;
+            Ok((name.clone(), version.to_owned()))
+        })
+        .collect()
+}
+
+/// Inputs include manifest contents, so changing requirements at the same version invalidates caches.
+pub fn contract_inputs(root: &Path) -> Vec<PathBuf> {
+    let mut paths = vec![root.join("node_modules").join(ADAPTER).join("package.json")];
+    if let Ok(requirements) = adapter_requirements(root) {
+        paths.extend(
+            requirements
+                .iter()
+                .map(|(name, _)| dependency_manifest(root, name)),
+        );
+    }
+    paths
+}
+
+/// `P015` for a runtime ABI mismatch or an unsatisfied installed adapter contract.
 pub fn check_runtime(root: &Path, rt: bool) -> Option<Diagnostic> {
-    let packages = [("@flick-lang/runtime", RUNTIME)]
-        .into_iter()
-        .chain((!rt).then_some(("@flick-lang/effect-ts", EFFECT_TS)))
-        .chain((!rt).then_some(("effect", EFFECT)));
-    for (package, wanted) in packages {
-        let Some(found) = resolved(root, package) else {
-            continue;
-        };
-        if found != wanted {
-            return Some(Diagnostic::new(
-                codes::P015,
-                Severity::Error,
-                format!(
-                    "the installed `{package}` is {found}, but flick {COMPILER} needs {wanted}: install `{package}@{wanted}`"
-                ),
-            ));
+    let error = |message| Diagnostic::new(codes::P015, Severity::Error, message);
+    if let Some(found) = installed(root, "@flick-lang/runtime")
+        && found != RUNTIME
+    {
+        return Some(error(format!(
+            "the installed `@flick-lang/runtime` is {found}, but flick {COMPILER} needs {RUNTIME}: install `@flick-lang/runtime@{RUNTIME}`"
+        )));
+    }
+    if rt {
+        return None;
+    }
+    let requirements = match adapter_requirements(root) {
+        Ok(requirements) => requirements,
+        Err(message) => return Some(error(message)),
+    };
+    for (package, wanted) in requirements {
+        if package == "@flick-lang/runtime" && wanted != RUNTIME {
+            return Some(error(format!(
+                "`{ADAPTER}` needs runtime {wanted}, but flick {COMPILER} supports runtime {RUNTIME}"
+            )));
+        }
+        let found = fs::read_to_string(dependency_manifest(root, &package))
+            .ok()
+            .and_then(|text| serde_json::from_str::<serde_json::Value>(&text).ok())
+            .and_then(|json| json.get("version")?.as_str().map(str::to_owned));
+        if found.as_deref() != Some(&wanted) {
+            return Some(error(format!(
+                "`{ADAPTER}` needs `{package}@{wanted}`, but resolves {}: run `flick install`",
+                found.as_deref().unwrap_or("no installed package")
+            )));
         }
     }
     None

@@ -12,7 +12,7 @@ use crate::args::{ExplainArguments, GlobalArguments};
 use crate::command::Outcome;
 use crate::sources::FsHost;
 use crate::stdlib;
-use crate::toolchain::{self, COMPILER, EFFECT, EFFECT_TS, NODE, PNPM, RUNTIME};
+use crate::toolchain::{self, COMPILER, NODE, PNPM, RUNTIME};
 
 pub fn explain(options: &ExplainArguments) -> Outcome {
     if let Some((package, code)) = options.code.trim().split_once('/') {
@@ -209,17 +209,27 @@ pub fn doctor(global: &GlobalArguments) -> Outcome {
 fn installed(root: Option<&Path>, line: &mut impl FnMut(Option<bool>, &str, String)) {
     match root {
         Some(root) => {
-            for (package, wanted) in [
-                ("@flick-lang/runtime", RUNTIME),
-                ("@flick-lang/effect-ts", EFFECT_TS),
-                ("effect", EFFECT),
-            ] {
-                let found = toolchain::resolved(root, package);
+            if let Some(problem) = toolchain::check_runtime(root, false) {
+                line(Some(false), "package contract", problem.message);
+            }
+            let mut requirements = vec![("@flick-lang/runtime".to_owned(), RUNTIME.to_owned())];
+            match toolchain::adapter_requirements(root) {
+                Ok(deps) => requirements.extend(deps),
+                Err(message) => line(Some(false), toolchain::ADAPTER, message),
+            }
+            line(
+                None,
+                toolchain::ADAPTER,
+                toolchain::installed(root, toolchain::ADAPTER)
+                    .unwrap_or_else(|| "not installed".to_owned()),
+            );
+            for (package, wanted) in requirements {
+                let found = toolchain::resolved(root, &package);
                 match found {
-                    Some(v) => line(Some(v == wanted), package, format!("{v} (needs {wanted})")),
+                    Some(v) => line(Some(v == wanted), &package, format!("{v} (needs {wanted})")),
                     None => line(
                         None,
-                        package,
+                        &package,
                         format!("not installed; `flick install` (needs {wanted})"),
                     ),
                 }
