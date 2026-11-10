@@ -33,3 +33,9 @@ test("a Unit result uses the emitted undefined type", async () => {
     compile: async () => ({ dts: "export declare const length_of: (arg: string) => undefined;" }),
   }), "passed");
 });
+
+test("reserved JavaScript export names use the compiler's dollar suffix", async () => {
+  assert.equal(await evaluateExercise({ ...contract, export: "eval" }, {
+    ...operations, compile: async () => ({ dts: "export declare const eval$: (arg: string) => number;" }),
+  }), "passed");
+});

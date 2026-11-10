@@ -1,8 +1,9 @@
 import assert from "node:assert/strict";
-import { mkdirSync } from "node:fs";
+import { mkdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { test } from "node:test";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { parseExerciseMetadata } from "../exercises/load.ts";
 import { rolldown } from "rolldown";
 
 const repo = fileURLToPath(new URL("../../", import.meta.url));
@@ -15,4 +16,11 @@ test("exercise files survive bundling into a prerender server chunk", async () =
   const { loadExercise } = await import(pathToFileURL(file).href);
   assert.equal(loadExercise("signatures/02").check.output, "6");
   assert.throws(() => loadExercise("../other"), /Invalid exercise ID/);
+});
+
+test("empty expected stdout is a valid contract", () => {
+  const source = readFileSync(new URL("../exercises/signatures/01/check.toml", import.meta.url), "utf8");
+  assert.equal(parseExerciseMetadata(source.replace('output = "5"', 'output = ""'), "test").check.output, "");
+  assert.throws(() => parseExerciseMetadata(source.replace('output = "5"', ''), "test"), /output/);
+  assert.throws(() => parseExerciseMetadata(source.replace('output = "5"', 'output = 5'), "test"), /output/);
 });

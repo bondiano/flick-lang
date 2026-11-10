@@ -17,7 +17,8 @@ export const evaluateExercise = async (rules: ExerciseCheck, operations: Exercis
   const generated = await operations.compile();
   const args = rules.argument_types.map((type) => `\\(\\s*[$\\w]+:\\s*${escape(type)}\\s*\\)\\s*=>\\s*`).join("");
   const result = rules.return_type === "void" ? "undefined" : rules.return_type;
-  const signature = new RegExp(`^export declare const ${escape(rules.export)}:\\s*${args}${escape(result)}\\s*;`, "m");
+  // Flick identifiers cannot contain $, which the emitter appends to reserved JS names.
+  const signature = new RegExp(`^export declare const ${escape(rules.export)}\\$?:\\s*${args}${escape(result)}\\s*;`, "m");
   if (!signature.test(generated.dts)) return "type";
   const execution = await operations.run();
   return execution.status === "exit" && execution.code === 0 && execution.lines.filter((line) => line.stream === "stdout").map((line) => line.text).join("").trim() === rules.output ? "passed" : "output";

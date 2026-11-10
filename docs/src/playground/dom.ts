@@ -12,10 +12,10 @@ interface Example {
   readonly source: string;
 }
 
-export const lessonData = (): Exercise | undefined => {
+export const lessonData = (): Omit<Exercise, "starter"> | undefined => {
   const text = document.getElementById("flick-lesson")?.textContent;
   // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the build validates and embeds this data
-  return text ? JSON.parse(text) as Exercise : undefined;
+  return text ? JSON.parse(text) as Omit<Exercise, "starter"> : undefined;
 };
 export const lessonKey = (kind: string): string => `flick.lesson.${(document.getElementById("flick-playground")?.dataset.lesson ?? "").replaceAll("/", ".")}.${kind}`;
 export const completeLesson = (): void => {
@@ -23,7 +23,7 @@ export const completeLesson = (): void => {
 };
 
 /** Page-provided configuration; decoding and all locale behavior belong to Flick. */
-export const configuration = (): { locale: string; examples: ReadonlyArray<Example>; lesson: boolean; solution: string; done: boolean; lesson_title: string; lesson_task: string; lesson_hint_text: string } => {
+export const configuration = (): { locale: string; examples: ReadonlyArray<Example>; lesson: boolean; solution: string; done: boolean; lesson_title: string; lesson_title_ru: string; lesson_task: string; lesson_task_ru: string; lesson_hint_text: string } => {
   const root = document.getElementById("flick-playground");
   if (root === null) throw new Error("The page has no flick-playground container");
   const embedded = document.getElementById("flick-playground-examples")?.textContent ?? "[]";
@@ -32,15 +32,17 @@ export const configuration = (): { locale: string; examples: ReadonlyArray<Examp
   let done = false;
   try { done = localStorage.getItem(lessonKey("done")) === "1"; } catch { /* local progress is optional */ }
   const exercise = lessonData();
-  const ru = root.dataset.locale === "ru";
   return {
     locale: root.dataset.locale ?? "",
     examples,
     lesson: exercise !== undefined,
     solution: exercise?.solution ?? "",
-    lesson_title: exercise?.[ru ? "title_ru" : "title"] ?? "",
-    lesson_task: exercise?.[ru ? "task_ru" : "task"] ?? "",
-    lesson_hint_text: exercise?.[ru ? "hint_ru" : "hint"] ?? "",
+    lesson_title: exercise?.title ?? "",
+    lesson_title_ru: exercise?.title_ru ?? "",
+    lesson_task: exercise?.task ?? "",
+    lesson_task_ru: exercise?.task_ru ?? "",
+    lesson_hint_text: exercise?.hint ?? "",
+    lesson_hint_text_ru: exercise?.hint_ru ?? "",
     done,
   };
 };

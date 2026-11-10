@@ -41,8 +41,11 @@ type alias Configuration = {
   examples : List Example;
   lesson : Bool;
   lesson_title : String;
+  lesson_title_ru : String;
   lesson_task : String;
+  lesson_task_ru : String;
   lesson_hint_text : String;
+  lesson_hint_text_ru : String;
   solution : String;
   done : Bool;
 }
@@ -103,8 +106,11 @@ type alias Model = {
   storage_notice : String;
   lesson : Bool;
   lesson_title : String;
+  lesson_title_ru : String;
   lesson_task : String;
+  lesson_task_ru : String;
   lesson_hint_text : String;
+  lesson_hint_text_ru : String;
   lesson_solution : String;
   lesson_hint : Bool;
   lesson_result : String;
@@ -203,8 +209,11 @@ let initial_model config = {
   storage_notice = "";
   lesson = config.lesson;
   lesson_title = config.lesson_title;
+  lesson_title_ru = config.lesson_title_ru;
   lesson_task = config.lesson_task;
+  lesson_task_ru = config.lesson_task_ru;
   lesson_hint_text = config.lesson_hint_text;
+  lesson_hint_text_ru = config.lesson_hint_text_ru;
   lesson_solution = config.solution;
   lesson_hint = false;
   lesson_result = "";
