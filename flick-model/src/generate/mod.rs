@@ -122,6 +122,11 @@ pub fn by_design(errors: &[String]) -> bool {
             .all(|e| e.starts_with("FLICK-T004") || e.starts_with("FLICK-C002"))
 }
 
+/// The module of `Gen.fl`, whose declarations the programs use.
+pub fn fixture_module() -> &'static str {
+    MODULE
+}
+
 /// The program `choices` build.
 pub fn program(choices: &[u32]) -> Program {
     Gen::new(choices).program()

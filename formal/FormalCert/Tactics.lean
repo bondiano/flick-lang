@@ -50,6 +50,18 @@ macro "inst_eq" : tactic => `(tactic| (
     | row_set
     | ((repeat' apply And.intro) <;> first | caps_set | row_set)))
 
+/-- `s.Closed s.k` of a concrete scheme: two substitutions that agree on its variables agree
+on it, rows and capture rows compared point by point. -/
+macro "closed_tac" : tactic => `(tactic| (
+  intro σ σ' hσ
+  refine ⟨?_, by simp⟩
+  simp [Ty.substT, Ty.spine, Stage.substT, hσ]
+  all_goals first
+    | (funext x
+       rcases x with _ | a | ⟨_, a⟩ | a | ⟨v, a⟩ <;> simp [Row.substT, Caps.substT, hσ])
+    | ((repeat' apply And.intro) <;> funext x <;>
+       rcases x with _ | a | ⟨_, a⟩ | a | ⟨v, a⟩ <;> simp [Row.substT, Caps.substT, hσ])))
+
 /-- `LeLive t t'` of concrete types: the same type, or an arrow or a computation whose stage
 and reach widen. -/
 syntax "le_live" : tactic

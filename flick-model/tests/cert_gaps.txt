@@ -1,0 +1,17 @@
+# The forms the certificates do not write yet, over the fixed run of 500 programs of
+# `certificates_of_generated_programs` (`tests/certs.rs`): `<count> <reason>`. The list may only
+# shrink: a new gap fails the test, and a closed one is taken off.
+1 a field of no record
+1 a term the check did not type
+1 no core form for `?15`
+1 no core form for `?4`
+11 a meta
+13 the form LetRec
+23 a value bound, which the core does not have
+27 the form Scope
+4 the global Value(Path { module: "List.Core", name: "get" }), not in the signature
+44 the form Try
+45 a call of the form Apply
+45 the form Provide
+8 a call of the form Field
+98 the form Match

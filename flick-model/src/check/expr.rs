@@ -94,12 +94,13 @@ impl Checker<'_> {
             Term::Try(body, arms) => self.try_(body, arms, None),
             Term::Provide(l, body) => self.provide(l, body, None),
             Term::Handler(h) => self.handler(h, None),
-            Term::Apply(Head::Con(c), args) if args.len() == c.arity => self.construct(c, args),
+            Term::Apply(Head::Con(c), args) if args.len() == c.arity => self.construct(c, args, e),
             Term::Apply(head, args) => {
                 let t = match head {
                     Head::Con(c) => self.constructor(&c.ty.module, &c.name)?,
                     Head::Const(c) => self.constant(c)?,
                 };
+                self.note_instance(e);
                 self.call(|c| args.iter().try_fold(t, |t, a| c.apply(&t, a)))
             }
             Term::Scope(s, body) => self.scope(s, body, None),
@@ -154,7 +155,7 @@ impl Checker<'_> {
                 xs.iter().try_for_each(|x| self.check(x, t))
             }
             (Term::Apply(Head::Con(c), args), _) if args.len() == c.arity => {
-                let t = self.construct(c, args)?;
+                let t = self.construct(c, args, e)?;
                 self.subsume(&t, &full)
             }
             (Term::Let(x, sig, e1, e2), _) => {
@@ -265,8 +266,15 @@ impl Checker<'_> {
         }
     }
 
+    /// The instance just taken, on the node of `e`.
+    pub(super) fn note_instance(&mut self, e: &Term) {
+        if let Some(i) = self.instanced.take() {
+            self.note(e, |n| n.instance = Some(i));
+        }
+    }
+
     /// An instance of `s`, which the trace keeps with the scheme.
-    fn instance_of(&mut self, s: Scheme) -> Type {
+    pub(super) fn instance_of(&mut self, s: Scheme) -> Type {
         let (t, insts) = self.instantiate_with(&s);
         if self.trace.is_some() {
             self.instanced = Some((s, insts));
@@ -278,7 +286,7 @@ impl Checker<'_> {
         match self.decls.constructors.get(&Path::new(module, name)) {
             Some(s) => {
                 let s = s.clone();
-                Ok(self.instantiate(&s))
+                Ok(self.instance_of(s))
             }
             None => error("Var", format!("no constructor `{module}.{name}`")),
         }
@@ -313,7 +321,7 @@ impl Checker<'_> {
             && given.len() + args.len() == c.arity
         {
             let all: Vec<Term> = given.iter().chain(args).cloned().collect();
-            return self.construct(c, &all);
+            return self.construct(c, &all, head);
         }
         // the spine is one call
         self.call(|c| {

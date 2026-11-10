@@ -45,6 +45,15 @@ model:
 formal-schemes:
     FLICK_FORMAL_SCHEMES=1 cargo test -p flick-model --lib translate::lean
 
+# Regenerate formal/FormalCert/GenSig.lean and the golden certificates from the model
+formal-certs:
+    FLICK_FORMAL_CERTS=1 cargo test -p flick-model --test certs the_certificates_are_fresh
+
+# Certify a run of generated programs and check the certificates with Lean
+model-certs:
+    cargo test -p flick-model --test certs -- --ignored
+    cd formal && lake env lean ../target/certs/Batch.lean
+
 # Check each capability independently, without workspace feature unification
 feature-check:
     cargo clippy -p flick-core --all-targets --no-default-features -- -D warnings

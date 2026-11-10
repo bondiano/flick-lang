@@ -2,21 +2,45 @@
 //! terms the generator makes, with the types of the trace.
 
 use crate::check::Inst;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 use std::iter;
+use std::rc::Rc;
 
 use crate::check::trace::{Node, Trace, key};
-use crate::syntax::{Lit, Name, Term};
+use crate::syntax::{Const, Head, Lit, Name, Term};
 use crate::translate::lean::elide::{Env, caps, row, stage, ty};
-use crate::types::{Caps, Fields, Row, Stage, Type};
+use crate::types::{Caps, Fields, Row, Scheme, Stage, Type};
 
 use super::Unsupported;
+use super::sig::{Key, Sig, bare, kept, prim_key};
+use crate::check::substitute;
 
 /// The term `e` in the core, its variables by de Bruijn index (`ctx`
 /// innermost first).
-pub(super) fn tm(e: &Term, ctx: &[Name]) -> Result<String, Unsupported> {
+pub(super) fn tm(e: &Term, ctx: &[Name], sig: &Sig) -> Result<String, Unsupported> {
+    let tm = |e: &Term, ctx: &[Name]| tm(e, ctx, sig);
     Ok(match e {
         Term::Var(x) => format!("(.var {})", index(ctx, x)?),
+        Term::Global(p) => format!("(.glob {})", global(sig, &Key::Value(p.clone()))?.0),
+        Term::Apply(Head::Const(Const::Prim(p)), xs) if xs.is_empty() => {
+            format!("(.glob {})", global(sig, &prim_key(*p))?.0)
+        }
+        Term::Apply(Head::Con(c), xs) => {
+            let k = c.ty.module.to_string() + "." + &c.name;
+            xs.iter().try_fold(format!("(.ctor {k:?})"), |f, x| {
+                Ok::<_, Unsupported>(format!("(.app {f} {})", tm(x, ctx)?))
+            })?
+        }
+        Term::Tuple(xs) => {
+            let mut xs = xs.iter();
+            let first = tm(xs.next().ok_or("an empty tuple")?, ctx)?;
+            xs.try_fold(first, |a, b| {
+                Ok::<_, Unsupported>(format!(
+                    "(.app (.app (.ctor \"Tuple\") {a}) {})",
+                    tm(b, ctx)?
+                ))
+            })?
+        }
         Term::Lit(l) => format!("(.lit {})", lit(l)?),
         Term::Lam(x, b) => format!("(.lam {})", tm(b, &push(ctx, x))?),
         Term::App(f, a) => format!("(.app {} {})", tm(f, ctx)?, tm(a, ctx)?),
@@ -96,6 +120,21 @@ fn lit(l: &Lit) -> Result<String, Unsupported> {
     })
 }
 
+/// The arrows of a constructor's scheme without the qualifiers of its
+/// fields and value, which the core's data has not.
+fn plain(t: &Type) -> Type {
+    match bare(t) {
+        Type::Fun(p, s, r) => Type::Fun(Rc::new(bare(p).clone()), s.clone(), Rc::new(plain(r))),
+        t => t.clone(),
+    }
+}
+
+/// The index and scheme of a global of the signature.
+fn global<'s>(sig: &'s Sig, key: &Key) -> Result<(usize, &'s Scheme), Unsupported> {
+    sig.glob(key)
+        .ok_or_else(|| format!("the global {key:?}, not in the signature"))
+}
+
 /// What kind of term the certificates do not write yet.
 fn form(e: &Term) -> Unsupported {
     let s = format!("{e:?}");
@@ -118,6 +157,7 @@ fn arrow(t: &Type) -> Option<(&Type, &Stage, &Type, Caps)> {
 /// A proof of a typing, at the depth `col` of its line.
 pub(super) struct Cx<'t> {
     trace: &'t Trace,
+    sig: &'t Sig,
     /// The term variables, innermost first.
     terms: Vec<Name>,
     /// The type variables, innermost first.
@@ -125,9 +165,10 @@ pub(super) struct Cx<'t> {
 }
 
 impl<'t> Cx<'t> {
-    pub(super) fn new(trace: &'t Trace) -> Self {
+    pub(super) fn new(trace: &'t Trace, sig: &'t Sig) -> Self {
         Cx {
             trace,
+            sig,
             terms: Vec::new(),
             env: Env::default(),
         }
@@ -180,6 +221,8 @@ impl<'t> Cx<'t> {
         match e {
             Term::Lit(l) => lit(l).map(|_| ".lit".into()),
             Term::Var(x) => self.var(e, x),
+            Term::Global(_) | Term::Apply(Head::Const(Const::Prim(_)), _) => self.glob(e),
+
             Term::Lam(x, body) => {
                 let (_, _, r, _) = arrow(t).ok_or_else(|| format!("a λ at `{t}`"))?;
                 let args = self.arrow_args(t)?;
@@ -188,7 +231,7 @@ impl<'t> Cx<'t> {
                     "(.lam {args}{pad}{b}{pad}(by simp [Tm.NoIns, Tm.Has]) (by le_live))"
                 ))
             }
-            Term::App(..) => self.app(e, col),
+            Term::App(..) | Term::Apply(Head::Con(_), _) | Term::Tuple(_) => self.app(e, col),
             Term::Task(body) => {
                 let args = self.eff_args(t)?;
                 let (_, _, a, _) = eff(t).ok_or("a task at no `Eff`")?;
@@ -266,6 +309,108 @@ impl<'t> Cx<'t> {
         ))
     }
 
+    /// The instance a variable, global or constructor took, its types.
+    fn instance(&self, e: &Term) -> Result<(&'t Scheme, Vec<String>), Unsupported> {
+        let (scheme, insts) = self
+            .node(e)?
+            .instance
+            .as_ref()
+            .ok_or("a term without its instance")?;
+        if !scheme.outlives.is_empty() {
+            return Err("a scheme with facts".into());
+        }
+        let ts = insts
+            .iter()
+            .map(|i| self.inst(i))
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok((scheme, ts))
+    }
+
+    /// (Glob) of a global or an operator at the instance the check took.
+    fn glob(&mut self, e: &Term) -> Result<String, Unsupported> {
+        let key = match e {
+            Term::Global(p) => Key::Value(p.clone()),
+            Term::Apply(Head::Const(Const::Prim(p)), _) => prim_key(*p),
+            other => return Err(form(other)),
+        };
+        let (g, _) = global(self.sig, &key)?;
+        let (_, ts) = self.instance(e)?;
+        let instance = self.ty(&self.inferred(e)?)?;
+        Ok(format!(
+            "(Cert.typ_glob (ts := [{}]) (T' := {instance}) ((hS.glob {g} rfl).trans rfl) rfl (Cert.holds_none _) (by inst_eq) (by le_live))",
+            ts.join(", ")
+        ))
+    }
+
+    /// (Con) of the ordinary constructor `k` at the instance `us`.
+    fn ctor(&self, k: &str, us: &[String]) -> Result<String, Unsupported> {
+        if !self.sig.ctors.contains_key(k) {
+            return Err(format!("the constructor `{k}`, not in the signature"));
+        }
+        Ok(format!(
+            "(Typ.ctor_plain S (K := {k:?}) (us := [{}]) ((hS.ctor _ rfl).trans rfl) ((hS.res _ rfl).trans rfl) rfl LeLive.refl)",
+            us.join(", ")
+        ))
+    }
+
+    /// The head of a call, its proof and type: a constructor and a tuple
+    /// take their fields as arguments, before those of the call.
+    fn head<'e>(
+        &mut self,
+        head: &'e Term,
+        args: &mut Vec<&'e Term>,
+        col: usize,
+    ) -> Result<(String, Type), Unsupported> {
+        match head {
+            Term::Var(_) | Term::Global(_) | Term::Apply(Head::Const(Const::Prim(_)), _) => {
+                let at = self.inferred(head)?;
+                Ok((self.typing(head, &at, col)?, at))
+            }
+            Term::Apply(Head::Con(c), given) => {
+                args.splice(0..0, given.iter());
+                let (scheme, insts) = self
+                    .node(head)?
+                    .instance
+                    .as_ref()
+                    .ok_or("a constructor without its instance")?;
+                let map: HashMap<Name, Inst> = scheme
+                    .vars
+                    .iter()
+                    .map(|(v, _)| v.clone())
+                    .zip(insts.iter().cloned())
+                    .collect();
+                let at = substitute(&plain(&scheme.body), &map);
+                let us = kept(scheme)
+                    .into_iter()
+                    .zip(insts)
+                    .filter(|(k, _)| *k)
+                    .map(|(_, i)| self.inst(i))
+                    .collect::<Result<Vec<_>, _>>()?;
+                let k = format!("{}.{}", c.ty.module, c.name);
+                Ok((self.ctor(&k, &us)?, at))
+            }
+            Term::Tuple(xs) => {
+                let [x, y] = &xs[..] else {
+                    return Err("a tuple of more than two".into());
+                };
+                args.splice(0..0, [x, y]);
+                let (tx, ty_) = (self.inferred(x)?, self.inferred(y)?);
+                let at = Type::fun(
+                    tx.clone(),
+                    Stage::Pure,
+                    Type::fun(
+                        ty_.clone(),
+                        Stage::Pure,
+                        Type::Tuple(Rc::from([tx.clone(), ty_.clone()])),
+                    ),
+                );
+                let us = [self.ty(&tx)?, self.ty(&ty_)?];
+                Ok((self.ctor("Tuple", &us)?, at))
+            }
+            other => Err(format!("a call of {}", form(other))),
+        }
+    }
+
     /// (Rec): the fields by label, each at its type.
     fn record(&mut self, fs: &[(Name, Term)], t: &Type, col: usize) -> Result<String, Unsupported> {
         let pad = format!("\n{}", " ".repeat(col + 2));
@@ -332,12 +477,8 @@ impl<'t> Cx<'t> {
             head = f;
         }
         args.reverse();
-        if !matches!(head, Term::Var(_)) {
-            return Err(format!("a call of {}", form(head)));
-        }
         let pad = format!("\n{}", " ".repeat(col + 2));
-        let mut at = self.inferred(head)?;
-        let mut proof = self.typing(head, &at, col + 2)?;
+        let (mut proof, mut at) = self.head(head, &mut args, col + 2)?;
         for a in args {
             let (p, _, r, _) = arrow(&at).ok_or_else(|| format!("a call of `{at}`"))?;
             let (p, r) = (p.clone(), r.clone());

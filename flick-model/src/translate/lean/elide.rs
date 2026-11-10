@@ -93,7 +93,7 @@ pub(crate) fn row(r: &Row, env: &Env) -> Result<String, String> {
     for v in &r.vars {
         parts.push(format!("x = .rv (.v {})", env.index_of(v)?));
     }
-    Ok(disjunction(&parts, "(fun _ => False)"))
+    Ok(disjunction(&parts, "Row.none"))
 }
 
 pub(crate) fn stage(s: &Stage, env: &Env) -> Result<String, String> {

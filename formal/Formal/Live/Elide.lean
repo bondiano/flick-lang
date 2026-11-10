@@ -147,6 +147,6 @@ macro "elide_eq" : tactic => `(tactic| (
     | constructor
     | (funext x
        rcases x with n | a | ⟨n, a⟩ | a | ⟨v, a⟩ <;> (try cases a) <;> (try cases v) <;>
-         simp [Row.union, Row.ofCaps, Ty.reach, Caps.none, Caps.under, Atom.up] <;> omega))))
+         simp [Row.union, Row.ofCaps, Row.none, Ty.reach, Caps.none, Caps.under, Atom.up] <;> omega))))
 
 end Flick

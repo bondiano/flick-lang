@@ -159,8 +159,8 @@ theorem identity :
 
 /-- `Prelude.from_result : forall e a. Result (Errors e) a ->{none; e} a` -/
 theorem from_result :
-    Ty.elide Caps.none (.arrow (.tapp (.tapp (.adt "Prelude.Result") (.errors (fun x => x = .rv (.v 0)))) (.tvar 1)) (.rt (fun _ => False) (fun x => x = .rv (.v 0))) (.tvar 1) Caps.none) Caps.none =
-      (.arrow (.tapp (.tapp (.adt "Prelude.Result") (.errors (fun x => x = .rv (.v 0)))) (.tvar 1)) (.rt (fun _ => False) (fun x => x = .rv (.v 0))) (.tvar 1) Caps.none) := by
+    Ty.elide Caps.none (.arrow (.tapp (.tapp (.adt "Prelude.Result") (.errors (fun x => x = .rv (.v 0)))) (.tvar 1)) (.rt Row.none (fun x => x = .rv (.v 0))) (.tvar 1) Caps.none) Caps.none =
+      (.arrow (.tapp (.tapp (.adt "Prelude.Result") (.errors (fun x => x = .rv (.v 0)))) (.tvar 1)) (.rt Row.none (fun x => x = .rv (.v 0))) (.tvar 1) Caps.none) := by
   elide_eq
 
 /-- `Prelude.parallel : forall r e a c b. Detached r => (Eff r e a)^c -> (Eff r e b)^c ->{r; e} (a, b)` -/
@@ -177,14 +177,14 @@ theorem parallel_all :
 
 /-- `Prelude.parallel_results : forall r e a c. Detached r => List (Eff r e a)^c ->{r; none} List (Result (Errors e) a)` -/
 theorem parallel_results :
-    Ty.elide (fun x => x = .v 3) (.arrow (.tapp (.adt "Prelude.List") (.eff (fun x => x = .rv (.v 0)) (fun x => x = .rv (.v 1)) (.tvar 2) (fun x => x = .v 3))) (.rt (fun x => x = .rv (.v 0)) (fun _ => False)) (.tapp (.adt "Prelude.List") (.tapp (.tapp (.adt "Prelude.Result") (.errors (fun x => x = .rv (.v 1)))) (.tvar 2))) Caps.none) Caps.none =
-      (.arrow (.tapp (.adt "Prelude.List") (.eff (fun x => x = .rv (.v 0)) (fun x => x = .rv (.v 1)) (.tvar 2) (fun x => x = .v 3))) (.rt (fun x => x = .atm (.v 3) ∨ x = .rv (.v 0)) (fun _ => False)) (.tapp (.adt "Prelude.List") (.tapp (.tapp (.adt "Prelude.Result") (.errors (fun x => x = .rv (.v 1)))) (.tvar 2))) Caps.none) := by
+    Ty.elide (fun x => x = .v 3) (.arrow (.tapp (.adt "Prelude.List") (.eff (fun x => x = .rv (.v 0)) (fun x => x = .rv (.v 1)) (.tvar 2) (fun x => x = .v 3))) (.rt (fun x => x = .rv (.v 0)) Row.none) (.tapp (.adt "Prelude.List") (.tapp (.tapp (.adt "Prelude.Result") (.errors (fun x => x = .rv (.v 1)))) (.tvar 2))) Caps.none) Caps.none =
+      (.arrow (.tapp (.adt "Prelude.List") (.eff (fun x => x = .rv (.v 0)) (fun x => x = .rv (.v 1)) (.tvar 2) (fun x => x = .v 3))) (.rt (fun x => x = .atm (.v 3) ∨ x = .rv (.v 0)) Row.none) (.tapp (.adt "Prelude.List") (.tapp (.tapp (.adt "Prelude.Result") (.errors (fun x => x = .rv (.v 1)))) (.tvar 2))) Caps.none) := by
   elide_eq
 
 /-- `Prelude.parallel_exits : forall r e a c. Detached r => List (Eff r e a)^c ->{r; none} List (Exit e a)` -/
 theorem parallel_exits :
-    Ty.elide (fun x => x = .v 3) (.arrow (.tapp (.adt "Prelude.List") (.eff (fun x => x = .rv (.v 0)) (fun x => x = .rv (.v 1)) (.tvar 2) (fun x => x = .v 3))) (.rt (fun x => x = .rv (.v 0)) (fun _ => False)) (.tapp (.adt "Prelude.List") (.tapp (.tapp (.adt "Prelude.Exit") (.tvar 1)) (.tvar 2))) Caps.none) Caps.none =
-      (.arrow (.tapp (.adt "Prelude.List") (.eff (fun x => x = .rv (.v 0)) (fun x => x = .rv (.v 1)) (.tvar 2) (fun x => x = .v 3))) (.rt (fun x => x = .atm (.v 3) ∨ x = .rv (.v 0)) (fun _ => False)) (.tapp (.adt "Prelude.List") (.tapp (.tapp (.adt "Prelude.Exit") (.tvar 1)) (.tvar 2))) Caps.none) := by
+    Ty.elide (fun x => x = .v 3) (.arrow (.tapp (.adt "Prelude.List") (.eff (fun x => x = .rv (.v 0)) (fun x => x = .rv (.v 1)) (.tvar 2) (fun x => x = .v 3))) (.rt (fun x => x = .rv (.v 0)) Row.none) (.tapp (.adt "Prelude.List") (.tapp (.tapp (.adt "Prelude.Exit") (.tvar 1)) (.tvar 2))) Caps.none) Caps.none =
+      (.arrow (.tapp (.adt "Prelude.List") (.eff (fun x => x = .rv (.v 0)) (fun x => x = .rv (.v 1)) (.tvar 2) (fun x => x = .v 3))) (.rt (fun x => x = .atm (.v 3) ∨ x = .rv (.v 0)) Row.none) (.tapp (.adt "Prelude.List") (.tapp (.tapp (.adt "Prelude.Exit") (.tvar 1)) (.tvar 2))) Caps.none) := by
   elide_eq
 
 /-- `Prelude.race_success : forall r e a c. Detached r => (Eff r e a)^c -> (Eff r e a)^c ->{r; e} a` -/
@@ -225,20 +225,20 @@ theorem bind_eff :
 
 /-- `Prelude.field : forall a. String -> PureCodec Json a -> FieldCodec none a` -/
 theorem field :
-    Ty.elide Caps.none (.arrow (.base .string) .pure (.arrow (.tapp (.tapp (.adt "Prelude.PureCodec") (.adt "Prelude.Json")) (.tvar 0)) .pure (.tapp (.tapp (.adt "Prelude.FieldCodec") (.errors (fun _ => False))) (.tvar 0)) Caps.none) Caps.none) Caps.none =
-      (.arrow (.base .string) .pure (.arrow (.tapp (.tapp (.adt "Prelude.PureCodec") (.adt "Prelude.Json")) (.tvar 0)) .pure (.tapp (.tapp (.adt "Prelude.FieldCodec") (.errors (fun _ => False))) (.tvar 0)) Caps.none) Caps.none) := by
+    Ty.elide Caps.none (.arrow (.base .string) .pure (.arrow (.tapp (.tapp (.adt "Prelude.PureCodec") (.adt "Prelude.Json")) (.tvar 0)) .pure (.tapp (.tapp (.adt "Prelude.FieldCodec") (.errors Row.none)) (.tvar 0)) Caps.none) Caps.none) Caps.none =
+      (.arrow (.base .string) .pure (.arrow (.tapp (.tapp (.adt "Prelude.PureCodec") (.adt "Prelude.Json")) (.tvar 0)) .pure (.tapp (.tapp (.adt "Prelude.FieldCodec") (.errors Row.none)) (.tvar 0)) Caps.none) Caps.none) := by
   elide_eq
 
 /-- `Prelude.optional_field : forall a. String -> PureCodec Json a -> FieldCodec none (Option a)` -/
 theorem optional_field :
-    Ty.elide Caps.none (.arrow (.base .string) .pure (.arrow (.tapp (.tapp (.adt "Prelude.PureCodec") (.adt "Prelude.Json")) (.tvar 0)) .pure (.tapp (.tapp (.adt "Prelude.FieldCodec") (.errors (fun _ => False))) (.tapp (.adt "Prelude.Option") (.tvar 0))) Caps.none) Caps.none) Caps.none =
-      (.arrow (.base .string) .pure (.arrow (.tapp (.tapp (.adt "Prelude.PureCodec") (.adt "Prelude.Json")) (.tvar 0)) .pure (.tapp (.tapp (.adt "Prelude.FieldCodec") (.errors (fun _ => False))) (.tapp (.adt "Prelude.Option") (.tvar 0))) Caps.none) Caps.none) := by
+    Ty.elide Caps.none (.arrow (.base .string) .pure (.arrow (.tapp (.tapp (.adt "Prelude.PureCodec") (.adt "Prelude.Json")) (.tvar 0)) .pure (.tapp (.tapp (.adt "Prelude.FieldCodec") (.errors Row.none)) (.tapp (.adt "Prelude.Option") (.tvar 0))) Caps.none) Caps.none) Caps.none =
+      (.arrow (.base .string) .pure (.arrow (.tapp (.tapp (.adt "Prelude.PureCodec") (.adt "Prelude.Json")) (.tvar 0)) .pure (.tapp (.tapp (.adt "Prelude.FieldCodec") (.errors Row.none)) (.tapp (.adt "Prelude.Option") (.tvar 0))) Caps.none) Caps.none) := by
   elide_eq
 
 /-- `Prelude.field_effect : forall rd a. String -> Codec rd none Json a -> FieldCodec rd a` -/
 theorem field_effect :
-    Ty.elide Caps.none (.arrow (.base .string) .pure (.arrow (.tapp (.tapp (.tapp (.tapp (.adt "Prelude.Codec") (.tvar 0)) (.errors (fun _ => False))) (.adt "Prelude.Json")) (.tvar 1)) .pure (.tapp (.tapp (.adt "Prelude.FieldCodec") (.tvar 0)) (.tvar 1)) Caps.none) Caps.none) Caps.none =
-      (.arrow (.base .string) .pure (.arrow (.tapp (.tapp (.tapp (.tapp (.adt "Prelude.Codec") (.tvar 0)) (.errors (fun _ => False))) (.adt "Prelude.Json")) (.tvar 1)) .pure (.tapp (.tapp (.adt "Prelude.FieldCodec") (.tvar 0)) (.tvar 1)) Caps.none) Caps.none) := by
+    Ty.elide Caps.none (.arrow (.base .string) .pure (.arrow (.tapp (.tapp (.tapp (.tapp (.adt "Prelude.Codec") (.tvar 0)) (.errors Row.none)) (.adt "Prelude.Json")) (.tvar 1)) .pure (.tapp (.tapp (.adt "Prelude.FieldCodec") (.tvar 0)) (.tvar 1)) Caps.none) Caps.none) Caps.none =
+      (.arrow (.base .string) .pure (.arrow (.tapp (.tapp (.tapp (.tapp (.adt "Prelude.Codec") (.tvar 0)) (.errors Row.none)) (.adt "Prelude.Json")) (.tvar 1)) .pure (.tapp (.tapp (.adt "Prelude.FieldCodec") (.tvar 0)) (.tvar 1)) Caps.none) Caps.none) := by
   elide_eq
 
 /-- `Prelude.option_as_null : forall a. PureCodec Json a -> PureCodec Json (Option a)` -/

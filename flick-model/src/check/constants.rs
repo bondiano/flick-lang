@@ -89,7 +89,7 @@ impl Checker<'_> {
                 )
             }
             Const::Prim(p @ (Prim::Lt | Prim::Le | Prim::Gt | Prim::Ge)) => {
-                let t = self.instantiate(&prim(*p));
+                let t = self.instance_of(prim(*p));
                 if let Type::Fun(operand, ..) = &t {
                     self.ordered.push((**operand).clone());
                 }
@@ -106,8 +106,13 @@ impl Checker<'_> {
             }
         };
         let s = self.live_scheme(&s);
-        Ok(self.instantiate(&s))
+        Ok(self.instance_of(s))
     }
+}
+
+/// The scheme of an operator, a global of a certificate (`crate::cert`).
+pub(crate) fn prim_scheme(p: Prim) -> Scheme {
+    prim(p)
 }
 
 /// `τ^c`, `c` the capacity of a cell.

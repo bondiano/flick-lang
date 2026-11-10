@@ -390,8 +390,9 @@ impl Checker<'_> {
 
     /// (Con): the fields of `K ē`; captures a field hides go into the
     /// qualifier of the data, which a type without hidden storage needs not.
-    pub(super) fn construct(&mut self, c: &Con, args: &[Term]) -> Check<Type> {
+    pub(super) fn construct(&mut self, c: &Con, args: &[Term], at: &Term) -> Check<Type> {
         let mut t = self.constructor(&c.ty.module, &c.name)?;
+        self.note_instance(at);
         let mut fields = Vec::new();
         for a in args {
             let Type::Fun(p, _, r) = self.resolve(&t) else {
