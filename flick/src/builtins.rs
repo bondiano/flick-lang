@@ -8,9 +8,11 @@ use std::sync::OnceLock;
 use std::time::Instant;
 use std::{fs, process};
 
+use flick_core::build::{self, BuiltinStore};
 use flick_core::diagnostics::{Diagnostic, Severity, codes};
 use flick_core::iface::Interface;
 use flick_core::types;
+use flick_ir::{Module, Program};
 
 use crate::fetch;
 use crate::stdlib;
@@ -81,6 +83,48 @@ fn read_or_check(stages_by_class: bool) -> Result<(), Diagnostic> {
         let _ = fs::remove_file(&pending);
     }
     Ok(())
+}
+
+/// Keeps the lowered built-in modules beside their interfaces, as a program
+/// in the IR's CBOR: only the first build of a compiler with a `std` checks
+/// and lowers them, and a command that builds nothing reads none of it.
+pub fn keep_modules() {
+    build::keep_builtin_modules(BuiltinStore {
+        load: saved_modules,
+        save: save_modules,
+    });
+}
+
+fn modules_path(stages_by_class: bool) -> Option<PathBuf> {
+    let (dir, _, name) = location(stages_by_class)?;
+    Some(dir.join(name).with_extension("ir.cbor"))
+}
+
+fn saved_modules(stages_by_class: bool) -> Option<Vec<Module>> {
+    let started = Instant::now();
+    let bytes = fs::read(modules_path(stages_by_class)?).ok()?;
+    // a file of another version of the IR is lowered again and replaced
+    let program = Program::from_cbor(&bytes).ok()?;
+    timings::phase("built-in modules read from their cache", started.elapsed());
+    Some(program.modules)
+}
+
+/// A failure to save only means the next build lowers them again.
+fn save_modules(stages_by_class: bool, modules: &[Module]) {
+    let Some(path) = modules_path(stages_by_class) else {
+        return;
+    };
+    // every built-in module is the one file of its own source map
+    let program = Program::new(toolchain::COMPILER, modules.to_vec(), &|_| String::new());
+    let pending = path.with_extension(format!("cbor.{}.tmp", process::id()));
+    if path
+        .parent()
+        .is_some_and(|dir| fs::create_dir_all(dir).is_ok())
+        && fs::write(&pending, program.to_cbor()).is_ok()
+        && fs::rename(&pending, &path).is_err()
+    {
+        let _ = fs::remove_file(&pending);
+    }
 }
 
 /// What `problem`, the first error of an implicit module, means for the run.

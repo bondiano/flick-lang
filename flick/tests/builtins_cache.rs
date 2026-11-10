@@ -208,3 +208,111 @@ fn a_compiler_built_from_source_uses_its_std_outside_the_checkout() {
     let _ = fs::remove_dir_all(&root);
     assert!(checked.status.success(), "{checked:?}");
 }
+
+/// The lowered built-in modules are kept beside their interfaces: the first
+/// build of a compiler lowers them, a later one reads them, and a file that
+/// is no program of this IR is lowered again and replaced.
+#[test]
+fn a_build_lowers_the_built_in_modules_once() {
+    let app = project(
+        "builtins_cache_modules",
+        &[
+            (
+                "flick.toml",
+                "schema-version = 1\n\n[project]\nkind = \"lib\"\n",
+            ),
+            (
+                "src/App/Main.fl",
+                "module App.Main exposing (x)\nx : Int\nlet x = 1\n",
+            ),
+        ],
+    );
+    let cache = app.join("cache");
+    let std = Path::new(env!("CARGO_MANIFEST_DIR")).join("../packages/std");
+    // each build misses the build cache, so each emits the built-in modules
+    let build = || {
+        let _ = fs::remove_dir_all(app.join(".flick"));
+        let out = Command::new(env!("CARGO_BIN_EXE_flick"))
+            .args(["build", "--timings", "--quiet"])
+            .current_dir(&app)
+            .env("FLICK_STD_PATH", &std)
+            .env("XDG_CACHE_HOME", &cache)
+            .output()
+            .expect("flick runs");
+        assert!(out.status.success(), "{out:?}");
+        let stderr = String::from_utf8(out.stderr).expect("utf-8 stderr");
+        (
+            stderr.contains("built-in modules lowered"),
+            stderr.contains("built-in modules read from their cache"),
+        )
+    };
+    assert_eq!(build(), (true, false), "the first build lowers them");
+    assert_eq!(build(), (false, true), "the second reads them");
+    let kept: Vec<_> = fs::read_dir(cache.join("flick"))
+        .expect("cache")
+        .map(|e| e.expect("entry").path())
+        .filter(|path| path.to_string_lossy().ends_with(".ir.cbor"))
+        .collect();
+    assert!(!kept.is_empty(), "the lowered modules are a file");
+    for path in &kept {
+        fs::write(path, b"no program").expect("write");
+    }
+    assert_eq!(
+        build(),
+        (true, false),
+        "what does not read is lowered again"
+    );
+    assert_eq!(build(), (false, true), "and replaced");
+}
+
+/// A changed `std` is lowered again, as it is checked again: what a build
+/// emits of a built-in module follows the sources the build is given.
+#[test]
+fn a_changed_std_is_lowered_again() {
+    let root = Path::new(env!("CARGO_TARGET_TMPDIR")).join("builtins_cache_lowered");
+    let _ = fs::remove_dir_all(&root);
+    let std = root.join("std");
+    copy(
+        &Path::new(env!("CARGO_MANIFEST_DIR")).join("../packages/std"),
+        &std,
+    );
+    let cache = root.join("cache");
+    let manifest = "schema-version = 1\n\n[project]\nkind = \"lib\"\n";
+    let main = |call: &str| format!("module App.Main exposing (x)\n\nx : String\nlet x = {call}\n");
+    let app = project(
+        "builtins_cache_lowered/app",
+        &[
+            ("flick.toml", manifest),
+            ("src/App/Main.fl", &main("Markdown.escape \"<\"")),
+        ],
+    );
+    // each build misses the build cache, so each emits the built-in modules
+    let build = || {
+        let _ = fs::remove_dir_all(app.join(".flick"));
+        let out = Command::new(env!("CARGO_BIN_EXE_flick"))
+            .args(["build", "--timings", "--quiet"])
+            .current_dir(&app)
+            .env("FLICK_STD_PATH", &std)
+            .env("XDG_CACHE_HOME", &cache)
+            .output()
+            .expect("flick runs");
+        assert!(out.status.success(), "{out:?}");
+        let stderr = String::from_utf8(out.stderr).expect("utf-8 stderr");
+        stderr.contains("built-in modules lowered")
+    };
+    assert!(build(), "the first build lowers them");
+    assert!(!build(), "the second reads them");
+    let emitted = app.join("dist/_flick/Markdown.js");
+    let before = fs::read_to_string(&emitted).expect("the built-in module");
+    assert!(!before.contains("shout"), "{before}");
+
+    let markdown = std.join("src/Markdown.fl");
+    let text = fs::read_to_string(&markdown).expect("Markdown.fl");
+    let text = text.replacen("exposing (", "exposing (shout, ", 1)
+        + "\nshout : String -> String\nlet shout s = s ++ \"!\"\n";
+    fs::write(&markdown, text).expect("write");
+    fs::write(app.join("src/App/Main.fl"), main("Markdown.shout \"hi\"")).expect("write");
+    assert!(build(), "another std is lowered, not read from the cache");
+    let after = fs::read_to_string(&emitted).expect("the built-in module");
+    assert!(after.contains("shout"), "{after}");
+}
