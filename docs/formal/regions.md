@@ -919,7 +919,7 @@ let group () =
 
 Divergence: the reference machine took the step of `scope` as `inside π e[s := own π]` and left `s` in the signatures of `e`, bound again by (Inside).
 
-```flick
+```text
 scope s {
   let h = open "x"
   let _ = Fiber.spawn s report (task {
@@ -939,7 +939,7 @@ Divergence: (Fix) of the reference checker took the signature of `fix f. λx. e`
 
 The program the model properties found, as the generator wrote it and its choices shrank it:
 
-```flick
+```text
 scope s1 {
   let h2 = open "x"
   v3 : Unit ->{} Unit
@@ -962,7 +962,7 @@ scope s1 {
 
 Divergence: `⊢ Λ` of the reference checker typed a child or a finalizer of `π` outside every region, so a `scope` written in it was nested in nothing.
 
-```flick
+```text
 scope s1 {
   let _ = Fiber.spawn s1 report (task {
     (scope s4 {
