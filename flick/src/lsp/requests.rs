@@ -88,15 +88,15 @@ impl Server {
 
     pub(super) fn snapshot_for(&mut self, path: &Path) -> &Snapshot {
         let context = Context::of(&self.docs, path);
-        let fresh = self
-            .snapshot
-            .as_ref()
-            .is_some_and(|s| s.context == context && s.file(path).is_some());
+        let kept = self.snapshots.get(&context);
+        let fresh = kept.is_some_and(|s| s.file(path).is_some());
         tracing::debug!(cached = fresh, "selecting analysis snapshot");
         if !fresh {
-            self.snapshot = Some(analyze(&self.docs, path, &mut self.caches));
+            let snapshot = analyze(&self.docs, path, &mut self.caches);
+            self.snapshots.insert(context.clone(), snapshot);
         }
-        self.snapshot.as_ref().expect("analyzed")
+        self.latest = Some(context.clone());
+        &self.snapshots[&context]
     }
 
     fn at_position(&mut self, method: &str, params: &Value) -> Reply {

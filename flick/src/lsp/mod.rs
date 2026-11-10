@@ -33,7 +33,12 @@ pub use snapshot::{Caches, Context, Snapshot, analyze};
 
 pub struct Server {
     docs: HashMap<PathBuf, String>,
-    snapshot: Option<Snapshot>,
+    /// The analysis of each context since the last change of a document it
+    /// reads: a request of one context does not cost the next request of
+    /// another its analysis.
+    snapshots: HashMap<Context, Snapshot>,
+    /// The context analyzed last, which `workspace/symbol` starts from.
+    latest: Option<Context>,
     caches: Caches,
     /// Each context clears only the diagnostics it previously published.
     published: HashMap<Context, HashSet<PathBuf>>,
@@ -59,7 +64,8 @@ pub fn serve() -> ExitCode {
     );
     let mut server = Server {
         docs: HashMap::new(),
-        snapshot: None,
+        snapshots: HashMap::new(),
+        latest: None,
         caches: Caches::new(),
         published: HashMap::new(),
         out: Box::new(io::stdout()),
@@ -149,6 +155,8 @@ impl Server {
             }
             return;
         }
+        // whatever read this document reads it anew
+        self.snapshots.retain(|_, s| s.file(&path).is_none());
         match method {
             "textDocument/didOpen" => {
                 let text = params["textDocument"]["text"]
@@ -189,12 +197,10 @@ impl Server {
     }
 
     fn clear(&mut self, context: &Context, path: &Path) {
-        if self
-            .snapshot
-            .as_ref()
-            .is_some_and(|s| s.context == *context || s.file(path).is_some())
-        {
-            self.snapshot = None;
+        self.snapshots
+            .retain(|of, s| of != context && s.file(path).is_none());
+        if self.latest.as_ref() == Some(context) {
+            self.latest = None;
         }
         // a project keeps its cache for the next document opened in it; a
         // standalone file's goes with its last document, or every file ever
@@ -288,7 +294,8 @@ impl Server {
             messages.push(publish(file, &list));
         }
         let context = snapshot.context.clone();
-        self.snapshot = Some(snapshot);
+        self.latest = Some(context.clone());
+        self.snapshots.insert(context.clone(), snapshot);
         for m in messages {
             self.send(&m);
         }
