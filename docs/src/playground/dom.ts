@@ -1,16 +1,7 @@
 import type { Exercise } from "../../exercises/load.ts";
+import type { Configuration } from "./State.fl";
 
 export { attributes } from "../widgets/dom.ts";
-
-/** The examples of the gallery, as the page embeds them. */
-interface Example {
-  readonly id: string;
-  readonly group: string;
-  readonly group_ru: string;
-  readonly name: string;
-  readonly name_ru: string;
-  readonly source: string;
-}
 
 export const lessonData = (): Omit<Exercise, "starter"> | undefined => {
   const text = document.getElementById("flick-lesson")?.textContent;
@@ -23,12 +14,12 @@ export const completeLesson = (): void => {
 };
 
 /** Page-provided configuration; decoding and all locale behavior belong to Flick. */
-export const configuration = (): { locale: string; examples: ReadonlyArray<Example>; lesson: boolean; solution: string; done: boolean; lesson_title: string; lesson_title_ru: string; lesson_task: string; lesson_task_ru: string; lesson_hint_text: string } => {
+export const configuration = (): Configuration => {
   const root = document.getElementById("flick-playground");
   if (root === null) throw new Error("The page has no flick-playground container");
   const embedded = document.getElementById("flick-playground-examples")?.textContent ?? "[]";
   // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the page writes this JSON from the gallery's index
-  const examples = JSON.parse(embedded) as ReadonlyArray<Example>;
+  const examples = JSON.parse(embedded) as Configuration["examples"];
   let done = false;
   try { done = localStorage.getItem(lessonKey("done")) === "1"; } catch { /* local progress is optional */ }
   const exercise = lessonData();
