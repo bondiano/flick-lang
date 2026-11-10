@@ -1,6 +1,7 @@
 //! The rules that bind (`docs/formal/core.md` §2.3, §2.5): (Let-Gen),
-//! (Let-Mono), (Let-Sig) and (Let-Rec), a local signature with its outer
-//! qualifier inferred (`regions.md` §2.6).
+//! (Let-Mono), (Let-Sig), (Let-Rec) and the (Fix) a step gives, a local
+//! signature of (Let-Sig) and (Fix) with its outer qualifier inferred
+//! (`regions.md` §2.6).
 
 use std::mem;
 use std::rc::Rc;
@@ -101,7 +102,12 @@ impl Checker<'_> {
         expected: Option<&Type>,
     ) -> Check<Type> {
         let s = if let Some(s) = sig {
-            self.signed(lam, s, Some(f))?
+            let s = &self.in_scopes(&self.live_scheme(s));
+            self.locals.push((f.clone(), s.clone()));
+            let checked = self.check_forall(lam, s);
+            self.locals.pop();
+            checked?;
+            s.clone()
         } else {
             self.level += 1;
             let t = self.fresh();
@@ -115,5 +121,24 @@ impl Checker<'_> {
         let bound = s.clone();
         self.note(lam, |n| n.scheme = Some(bound));
         self.body(f, s, e2, expected)
+    }
+
+    /// (Fix): `fix f. λx. e` is `let rec f : σ = λx. e in f`, with `σ` the
+    /// local signature of the `let` whose step made it: its own qualifier
+    /// is inferred as (Let-Sig) inferred it, so a state types the λ as the
+    /// source did (`docs/formal/core.md#stepping-a-signed-let-loses-its-signature`).
+    pub(super) fn fix(
+        &mut self,
+        f: &Name,
+        sig: Option<&Scheme>,
+        lam: &Term,
+        expected: Option<&Type>,
+    ) -> Check<Type> {
+        let at = Term::Var(f.clone());
+        let Some(sig) = sig else {
+            return self.let_rec(f, None, lam, &at, expected);
+        };
+        let s = self.signed(lam, sig, Some(f))?;
+        self.body(f, s, &at, expected)
     }
 }

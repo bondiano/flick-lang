@@ -45,7 +45,7 @@ A `type module` contract may be declared inside the child. To pack the whole
 child as `Module Sig`, a contract outside it can require those identities
 explicitly with `class Describe = Child.Describe` and
 `service Greeter = Child.Greeter`; `pack Child as Sig` then checks its exported
-members. See [module contracts](#module-contracts-and-named-functors) for the
+members. See [module contracts](#module-contracts-and-parameterized-modules) for the
 rules on abstract requirements and dictionaries.
 
 | Situation | Diagnostic |
@@ -53,7 +53,7 @@ rules on abstract requirements and dictionaries.
 | two inline children have the same name, or a child occupies a file module's path | `FLICK-R002` at the conflicting declaration |
 | the parent refers to a member absent from the child's `exposing` list | `FLICK-R004` at the qualified name |
 | another file imports the child or a deeper path through it | `FLICK-R018` at the import, with the inline declaration as a related location |
-| a named static functor application is declared inside the child | `FLICK-R019` at the application name; declare the result in a file module |
+| a named application of a parameterized module is declared inside the child | `FLICK-R019` at the application name; declare the result in a file module |
 
 Prefix the header with `private` to make a file module available only to
 source and test files of its package:
@@ -175,7 +175,9 @@ type alias Forest a = List (Tree a)
 Functions that call themselves or each other are declared with `let rec` or
 in one `rec { … }` group (see [Recursion](../types/#recursion)).
 
-## Module contracts and named functors
+<div id="module-contracts-and-named-functors"></div>
+
+## Module contracts and parameterized modules
 
 `type module` declares a structural contract for a module. A required
 `type Key` is abstract to users of the contract; `type Key = String` requires
@@ -194,11 +196,11 @@ module Chosen = App.Make(App.Argument)
 // App.Parent.Chosen can be imported from another file
 ```
 
-A functor takes a named module known during compilation. Each `module Chosen
+A parameterized module takes a named module known during compilation. Each `module Chosen
 = App.Make(App.Argument)` declaration creates a distinct result module and
 distinct identities for its abstract result types. Importing that result in
 multiple files preserves its identity. The parent must export `Chosen` for
-other modules to import `App.Parent.Chosen`. The functor body sees only the
+other modules to import `App.Parent.Chosen`. The parameterized module body sees only the
 members and equalities listed in its argument contract.
 
 For example, `CaseInsensitiveSet.Set` and `ExactSet.Set` are distinct even
@@ -212,7 +214,7 @@ Contracts may require classes and services. Their identities are nominal:
 the same method or operation shape does not make two declarations identical.
 Use `class Eq = Prelude.Eq` or `service Clock = Time.Clock` to require an
 existing identity. An abstract class or service requirement is available to
-a static functor, but `pack` requires the manifest form.
+a parameterized module, but `pack` requires the manifest form.
 
 ```text
 type module Policy =
@@ -228,17 +230,17 @@ let hashing = Hash.dictionary {
 }
 ```
 
-`instance Eq Key from equality` uses that named dictionary within a functor
+`instance Eq Key from equality` uses that named dictionary within a parameterized module
 body or an `unpack` body. An explicit given dictionary takes precedence;
 otherwise the local dictionary takes precedence over a global instance.
-The requirement does not declare a global instance. If two functor arguments
+The requirement does not declare a global instance. If two parameterized module arguments
 provide the same constraint, `FLICK-T066` reports the ambiguity. A
 dictionary for a class with a superclass must include its named superclass
 field, as `Hash.dictionary` does above.
 
-A static functor can also require a class whose identity is supplied by its
+A parameterized module can also require a class whose identity is supplied by its
 argument. The contract can name its dictionary type and method. In the
-functor, `K.equal` resolves through the dictionary named by `instance`:
+parameterized module, `K.equal` resolves through the dictionary named by `instance`:
 
 ```text
 type module EqualityPolicy =
@@ -271,7 +273,7 @@ let answer = unpack result as K, item in (fun _ -> 42) item
 `unpack result as K, item in ...` opens both the module witness and its
 carried value. Separate openings produce unrelated abstract witnesses.
 `Module Sig` has no carried value, so its opening uses `as K in`.
-Functor application is static: its argument must be a named module, not a
+Parameterized module application is static: its argument must be a named module, not a
 `Module Sig` value. TypeScript sees an exported existential value as
 `unknown`, since it cannot express the fresh witness.
 

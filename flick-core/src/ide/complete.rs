@@ -69,7 +69,7 @@ const IMPORTED: u8 = 2;
 const PRELUDE_NAMES: u8 = 3;
 
 impl Ide<'_> {
-    fn completion_interface(&self, module: &str, from: &Analyzed) -> Option<Interface> {
+    fn completion_interface(&self, module: &str, from: &Analyzed) -> Option<&Interface> {
         let interface = self.interface(module)?;
         if interface.private
             && self
@@ -147,12 +147,12 @@ impl Ide<'_> {
             let name = tree::name_of(import, K::Con, text)
                 .unwrap_or_else(|| module.rsplit('.').next().unwrap_or(&module));
             add(IMPORTED, item(name, CompletionKind::Module, None));
-            for e in exposed(import, &interface, text) {
+            for e in exposed(import, interface, text) {
                 add(IMPORTED, completion(e));
             }
         }
         if let Some(prelude) = self.interface(lang::prelude()) {
-            for c in exports(&prelude) {
+            for c in exports(prelude) {
                 add(PRELUDE_NAMES, c);
             }
         }
@@ -177,7 +177,7 @@ impl Ide<'_> {
             if let Some(interface) =
                 self.completion_interface(&self.unalias(m, qualifier.clone()), m)
             {
-                return exports(&interface);
+                return exports(interface);
             }
             // `Api.Public.` or `Public.`: the companions of a type
             let (owner, interface) = match qualifier.rsplit_once('.') {
@@ -185,9 +185,9 @@ impl Ide<'_> {
                     owner,
                     self.completion_interface(&self.unalias(m, module.to_owned()), m),
                 ),
-                None => (qualifier.as_str(), Some(m.interface.clone())),
+                None => (qualifier.as_str(), Some(&m.interface)),
             };
-            let companions = interface.map(|i| companions(&i, owner)).unwrap_or_default();
+            let companions = interface.map(|i| companions(i, owner)).unwrap_or_default();
             if !companions.is_empty() {
                 return companions;
             }

@@ -17,7 +17,7 @@ fn module_header(p: &mut Parser) {
     p.bump();
     module_path(p);
     if p.at(K::LParen) {
-        p.delimited(K::RParen, functor_param);
+        p.delimited(K::RParen, module_param);
     }
     if p.at(K::ExposingKw) {
         exposing(p);
@@ -30,12 +30,12 @@ fn module_header(p: &mut Parser) {
     }
 }
 
-fn functor_param(p: &mut Parser) {
+fn module_param(p: &mut Parser) {
     let m = p.start();
     if p.expect(K::Con) && p.expect(K::Colon) {
         types::type_(p);
     }
-    p.complete(m, K::FunctorParam);
+    p.complete(m, K::ModuleParam);
 }
 
 fn module_apply_decl(p: &mut Parser) {

@@ -231,6 +231,26 @@ fn row_atoms(r: &Row, out: &mut Caps) {
     out.atoms.extend(r.vars.iter().cloned());
 }
 
+/// `σ[s̄ := ϱ̄]`: `s` with each region of `renamed` in place of its name, but
+/// for a name the signature binds itself.
+pub(crate) fn in_regions(s: &Scheme, renamed: &[(Name, Name)]) -> Scheme {
+    let map: HashMap<Name, Inst> = renamed
+        .iter()
+        .filter(|(n, r)| n != r && !s.vars.iter().any(|(v, _)| v == n))
+        .map(|(n, r)| (n.clone(), Inst::Type(Type::Var(Var::Named(r.clone())))))
+        .collect();
+    if map.is_empty() {
+        return s.clone();
+    }
+    Scheme {
+        vars: s.vars.clone(),
+        body: substitute(&s.body, &map),
+        outlives: (s.outlives.iter())
+            .map(|(c, r)| (substitute_caps(c, &map), substitute(r, &map)))
+            .collect(),
+    }
+}
+
 /// `τ[ᾱ := τ̄]`.
 pub(crate) fn substitute(t: &Type, map: &HashMap<Name, Inst>) -> Type {
     if map.is_empty() {

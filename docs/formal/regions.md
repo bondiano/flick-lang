@@ -927,17 +927,67 @@ let group () =
 
 Fixtures: the cases of `accepted.rs`; `flick-model/tests/live.rs` `live_on_std` lists the std values the model still cannot type.
 
-### The work of a region is typed with the names of its scopes
+### The step of scope names its region in signatures
 
-- Symptom: `progress_and_preservation_hold` failed: a task spawned in `scope s1 { … }` whose local signature writes `(Unit ->{} Unit)^{s1}` did not type once it was a child in `Λ`: "this value holds {π0}, which `` does not allow".
-- Cause: the model's `⊢ Λ` (`check/runtime.rs` `lambda`) typed the children and finalizers of a region outside the `inside π s` that names `s` the region `π`, so the signature's `s1` was no region. A model incompleteness, on `main` too; the checker has no `Λ`.
-- Resolution, model: a region keeps the name its `scope` binds (`eval/regions.rs` `Region::name`), and its work is typed with the names of it and the regions around it. Fixture: `flick-model/tests/props.rs` `work_of_a_region_names_its_scope`.
+Divergence: the reference machine took the step of `scope` as `inside π e[s := own π]` and left `s` in the signatures of `e`, bound again by (Inside).
 
-### A signature keeps its inferred qualifier when its let steps
+```text
+scope s {
+  let h = open "x"
+  let _ = Fiber.spawn s report (task {
+    v : ((Unit ->{} Unit)^{s}) ->{} Unit
+    let v f = f ()
+    v (fun _ -> use h) })
+  0 }
+```
 
-- Symptom: `progress_and_preservation_hold` failed: `v4 : Unit ->{} Unit` uses a region of its `scope`, and once its `let` stepped to `fix v4. λx. …` (`core.md` §3.6) in a child, the child did not type.
-- Cause: the model's (Let-Sig) infers the outer qualifier of a local signature ([local signatures infer only the outer qualifier](#local-signatures-infer-only-the-outer-qualifier)), its (Let-Rec), which also types `fix`, read the signature bare. A model incompleteness, not of the checker.
-- Resolution, model: both check against the signature with its outer qualifier inferred (`check/bindings.rs` `signed`). Fixture: `flick-model/tests/props.rs` `a_stepped_signature_keeps_its_qualifier`.
+- Symptom: `FLICK-G001` "this value holds {π0}, which `` does not allow" at the step of `Fiber.spawn` in `progress_and_preservation_hold`, and `FLICK-G002` when the argument of `v` holds nothing. The task became a child `K(π)`, and `⊢ Λ` types a child outside the `inside` that bound `s`; a finalizer and the value of a cell leave the same way.
+- Incompleteness of the reference machine, not of the document: §3.2 has `e[s := π][s := own π]`, and under it the child's signature names `π`.
+- Resolution, model: the step puts `π` in place of `s` in the signatures of the body, but for a signature that binds `s` itself and for a nested `scope s` (`flick-model/src/subst.rs` `subst_in_region`). Tests: `a_child_keeps_the_region_its_signatures_name`, `work_of_a_region_names_its_scope` (`flick-model/tests/props.rs`).
+
+### Fix keeps the qualifier of a local signature
+
+Divergence: (Fix) of the reference checker took the signature of `fix f. λx. e` bare, although (Let-Sig) had inferred its outer qualifier ([local signatures infer only the outer qualifier](#local-signatures-infer-only-the-outer-qualifier)).
+
+The program the model properties found, as the generator wrote it and its choices shrank it:
+
+```text
+scope s1 {
+  let h2 = open "x"
+  v3 : Unit ->{} Unit
+  let v3 x7 =
+    ({ a = use h2
+       b = scope s4 {
+         let h5 = open "x"
+         let cell6 = Ref.make 0
+         0 } }).a
+  let cell10 : Ref (Int -> Int) = Ref.make ((fun x9 -> 0) : Int -> Int)
+  let v11 : (Eff none none Unit)^{s1} = task { v3 () }
+  0 }
+```
+
+- Symptom: `FLICK-G001` "this value holds {π0}, which `` does not allow" in `progress_and_preservation_hold`, one step after `let v3` (the step that makes it `fix v3. λx7. …use (cap π0 n)…`, see [stepping a signed let](core.md#stepping-a-signed-let-loses-its-signature)): the λ needs `Live {π0}`, and a bare `Unit →R⟨none;none⟩ Unit` allows none.
+- Incompleteness of the reference checker: the program is accepted with `v3 : (Unit →R Unit)^{s1}`, and the state is typed by the same rule once (Fix) infers the qualifier as (Let-Sig) did.
+- Resolution, model: (Fix) checks the λ against the local signature with its own qualifier inferred, and gives `fix` that type (`flick-model/src/check/bindings.rs` `fix`). Tests: `a_function_keeps_the_qualifier_of_its_local_signature`, `a_stepped_signature_keeps_its_qualifier` (`flick-model/tests/props.rs`).
+
+### The work of a region is typed inside it
+
+Divergence: `⊢ Λ` of the reference checker typed a child or a finalizer of `π` outside every region, so a `scope` written in it was nested in nothing.
+
+```text
+scope s1 {
+  let _ = Fiber.spawn s1 report (task {
+    (scope s4 {
+      let _ = Fiber.spawn s4 report (task {
+        let _ = Fiber.spawn s1 report (task { () })
+        () })
+      { a = (); b = 0 } }).a })
+  0 }
+```
+
+- Symptom: `FLICK-G003` "`π0` may end before region `s4`" in `progress_and_preservation_hold`, at the step that makes the outer task a child of `π0`: the child of `s4` holds the owner of `s1`, which needs `s1 ≥ s4`. The program has it by the first rule of §2.4, `s4` being written inside `scope s1`; in `K(π0)` the task stands apart from that `scope`.
+- Incompleteness of the reference checker: a child runs in the region of its owner ([children acquire in the region of their owner](#children-acquire-in-the-region-of-their-owner)), so a `scope` it opens is inside `π0` and the regions `π0` was made in, as the machine runs it.
+- Resolution, model: `⊢ Λ` types the work of `π` as nested in `π` and in every region `π` was made in (`flick-model/src/check/runtime.rs` `lambda`, `check/regions/scope.rs` `nested_in`). Test: `a_scope_in_a_child_is_inside_the_region_of_its_owner` (`flick-model/tests/props.rs`).
 
 ### Rules of typing by use found while porting
 

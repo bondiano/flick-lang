@@ -77,8 +77,7 @@ to the run's summary.
 `just effect-bump <version>` downloads the release, writes its snapshot,
 prints what was added, removed and changed and what the runtime's
 capability matrix lacks, and moves the pins (`packages/effect-ts/package.json`,
-`packages/effect-ts/src/capabilities.ts`, the runtime's version test,
-`flick/src/toolchain.rs`). The linter stays red until the manifest and the
+`packages/effect-ts/src/capabilities.ts`, the runtime's version test). The linter stays red until the manifest and the
 reviewed bindings agree with the new snapshot.
 
 ## Unstable modules

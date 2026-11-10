@@ -13,7 +13,7 @@ use flick_core::source::SourceMap;
 use super::build::write;
 use crate::args::Template;
 use crate::command::{Command, Outcome};
-use crate::toolchain::{COMPILER, EFFECT_TS, PNPM, REACT, RUNTIME, VITE};
+use crate::toolchain::{COMPILER, PNPM, REACT, RUNTIME, VITE, adapter_version};
 
 /// The entries of the `fullstack` template: a server, and a page that Vite
 /// serves in development.
@@ -105,7 +105,7 @@ fn files(name: &str, template: Template) -> Vec<(&'static str, String)> {
         "flick": { "compiler": COMPILER },
     });
     if needs_effect {
-        package["dependencies"]["@flick-lang/effect-ts"] = EFFECT_TS.into();
+        package["dependencies"]["@flick-lang/effect-ts"] = adapter_version().into();
     }
     if template == Template::Fullstack {
         let dependencies = &mut package["dependencies"];

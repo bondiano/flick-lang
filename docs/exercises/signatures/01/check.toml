@@ -1,3 +1,10 @@
 export = "length_of"
+argument_types = ["string"]
 return_type = "number"
 output = "5"
+title = "1. Make the signature honest"
+title_ru = "1. Исправьте сигнатуру"
+task = "The body returns the length of a String. Change the declared result type, then check your answer."
+task_ru = "Тело возвращает длину строки. Исправьте объявленный тип результата и проверьте ответ."
+hint = "String.length returns Int. The last type in the arrow is the result type."
+hint_ru = "String.length возвращает Int. Последний тип после стрелки — тип результата."

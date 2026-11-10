@@ -33,9 +33,11 @@ diagnostics; TypeScript never decides a Flick type.
 | FFI importer | `flick-core/src/ffi`, `tools/dts-importer` | `flick ffi import` and `ffi check` over the surface the Node helper reads from `.d.ts` with TypeScript |
 | Editor | `flick-core/src/ide`, `flick-core/src/projection.rs`, `flick/src/lsp`, `flick/src/mapper.rs` | hover, definition, references, completion, rename and code actions over one analysis; `flick lsp --stdio` serves them and `flick content-mapper` the TypeScript projection with its span maps (see [Editors](../../reference/editor/)) |
 
-The Effect adapter targets exactly Effect 4.1.2, which `flick/src/toolchain.rs`
-pins with the runtime, pnpm and Node versions; an installed `effect` or
-`@flick-lang/effect-ts` of another version stops a build (`FLICK-P015`).
+The Effect adapter owns its version and exact dependency pins in
+`packages/effect-ts/package.json`. The CLI checks an installed adapter against
+its own requirements (`FLICK-P015`), resolving dependencies from its real
+directory, including pnpm links. `flick/src/toolchain.rs` retains the runtime
+ABI, pnpm and Node versions. RT-only builds do not inspect the adapter.
 `flick-wasm` runs the same core for the in-browser demo, and `flick-model` is
 the reference model of the formal core (`docs/formal/`).
 

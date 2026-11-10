@@ -2,12 +2,19 @@
 title: "FLICK-P015"
 ---
 
-The installed `@flick-lang/runtime`, `@flick-lang/effect-ts` or `effect` is not the version this
-compiler was built for, so their ABI may differ. `check`, `build`, `run` and
-`test` refuse to go on rather than produce code that misbehaves. Install the
-versions the project template pins.
+The compiler requires an ABI-compatible `@flick-lang/runtime`. An installed
+`@flick-lang/effect-ts` owns its exact dependency requirements in `package.json`;
+its version is selected by the project. This error reports an incompatible
+kernel ABI, an unreadable adapter manifest, or unsatisfied adapter dependencies.
+
+Restore the dependencies selected by the project and its lockfile:
 
 ```sh
-flick add @flick-lang/runtime@0.1.0 @flick-lang/effect-ts@0.1.0 effect@4.1.2
 flick install
 ```
+
+For an adapter dependency mismatch, satisfy the installed adapter's requirements.
+For a kernel ABI mismatch, select a compatible runtime or compiler. If the
+adapter manifest is damaged, reinstall the selected adapter from the lockfile.
+`build`, `run` and `test` check compatibility before emitting executable code;
+installation also checks the resulting package tree.

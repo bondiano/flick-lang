@@ -24,7 +24,7 @@ fn formats_module_contract_without_changing_manifest_equality() {
 }
 
 #[test]
-fn formats_functor_headers_and_named_applications() {
+fn formats_parameterized_module_headers_and_named_applications() {
     let src = "module HashSet.Make(K:HashKey) exposing (Set,empty)\nmodule Names=HashSet.Make(CaseInsensitive)\n";
     assert_eq!(
         fmt(src),

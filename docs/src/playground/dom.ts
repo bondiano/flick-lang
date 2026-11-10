@@ -1,29 +1,35 @@
+import { lessonConfiguration } from "./lesson-config.ts";
+import type { Exercise } from "../../exercises/load.ts";
+import type { Configuration } from "./State.fl";
+
 export { attributes } from "../widgets/dom.ts";
 
-/** The examples of the gallery, as the page embeds them. */
-interface Example {
-  readonly id: string;
-  readonly group: string;
-  readonly group_ru: string;
-  readonly name: string;
-  readonly name_ru: string;
-  readonly source: string;
-}
+export const lessonData = (): Omit<Exercise, "starter"> | undefined => {
+  const text = document.getElementById("flick-lesson")?.textContent;
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the build validates and embeds this data
+  return text ? JSON.parse(text) as Omit<Exercise, "starter"> : undefined;
+};
+export const lessonKey = (kind: string): string => `flick.lesson.${(document.getElementById("flick-playground")?.dataset.lesson ?? "").replaceAll("/", ".")}.${kind}`;
+export const completeLesson = (): void => {
+  try { localStorage.setItem(lessonKey("done"), "1"); } catch { /* local progress is optional */ }
+};
 
 /** Page-provided configuration; decoding and all locale behavior belong to Flick. */
-export const configuration = (): { locale: string; examples: ReadonlyArray<Example>; lesson: boolean; solution: string; done: boolean } => {
+export const configuration = (): Configuration => {
   const root = document.getElementById("flick-playground");
   if (root === null) throw new Error("The page has no flick-playground container");
   const embedded = document.getElementById("flick-playground-examples")?.textContent ?? "[]";
   // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the page writes this JSON from the gallery's index
-  const examples = JSON.parse(embedded) as ReadonlyArray<Example>;
+  const examples = JSON.parse(embedded) as Configuration["examples"];
   let done = false;
-  try { done = localStorage.getItem("flick.lesson.signatures.01.done") === "1"; } catch { /* local progress is optional */ }
+  try { done = localStorage.getItem(lessonKey("done")) === "1"; } catch { /* local progress is optional */ }
+  const exercise = lessonData();
   return {
     locale: root.dataset.locale ?? "",
     examples,
-    lesson: root.dataset.lesson === "true",
-    solution: document.getElementById("flick-lesson-solution")?.textContent ?? "",
+    lesson: exercise !== undefined,
+    solution: exercise?.solution ?? "",
+    ...lessonConfiguration(exercise),
     done,
   };
 };
