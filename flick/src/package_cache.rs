@@ -5,13 +5,12 @@
 
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::process;
 
 use flick_core::project::{CachedModule, Fresh, PackageCache, store};
 use sha2::{Digest, Sha256};
 
 use crate::cache::files_under;
-use crate::{builtins, fetch, toolchain};
+use crate::{builtins, fetch, saved, toolchain};
 
 const PREFIX: &str = "packages-";
 
@@ -61,28 +60,16 @@ impl Saved {
 
     /// Saves `fresh`. Any failure only means the packages are checked again.
     fn save(&self, fresh: Vec<Fresh>) {
-        if fresh.is_empty() || fs::create_dir_all(&self.dir).is_err() {
+        if fresh.is_empty() {
             return;
         }
         // other binaries' files are stale once this one saves
-        if let Ok(entries) = fs::read_dir(&self.dir) {
-            for entry in entries.flatten() {
-                let file = entry.file_name();
-                let file = file.to_string_lossy();
-                if file.starts_with(PREFIX) && !file.starts_with(&self.binary) {
-                    let _ = fs::remove_file(entry.path());
-                }
-            }
-        }
+        saved::evict_others(&self.dir, PREFIX, &self.binary);
         for Fresh { key, modules } in fresh {
             let Ok(json) = serde_json::to_vec(&modules) else {
                 continue;
             };
-            let path = self.path(&key);
-            let pending = path.with_extension(format!("{}.tmp", process::id()));
-            if fs::write(&pending, json).is_ok() && fs::rename(&pending, &path).is_err() {
-                let _ = fs::remove_file(&pending);
-            }
+            let _ = saved::write(&self.path(&key), &json);
         }
     }
 
