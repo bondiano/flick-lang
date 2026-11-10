@@ -7,6 +7,7 @@ use std::rc::Rc;
 
 use flick_core::numeric::{Arith, Num};
 
+use super::classes;
 use super::regions::visible;
 use super::term::{Cx, extend, plain};
 use super::{Gen, int, mono, nothing, option, some, unit};
@@ -108,9 +109,10 @@ impl Gen<'_> {
             if map.contains_key(v) {
                 continue;
             }
-            let inst = match k {
-                Kind::Services => Inst::Row(self.some_of(&services)),
-                Kind::Errors => Inst::Row(self.some_of(&errors)),
+            let inst = match (k, classes::constrained(&params, v)) {
+                (Kind::Services, _) => Inst::Row(self.some_of(&services)),
+                (Kind::Errors, _) => Inst::Row(self.some_of(&errors)),
+                (_, Some(class)) => Inst::Type(self.instance_type(class)),
                 _ => Inst::Type(self.data(1)),
             };
             map.insert(v.clone(), inst);
@@ -125,6 +127,14 @@ impl Gen<'_> {
                 return self.leaf(cx, t);
             }
             let p = substitute(&p, &map);
+            // a dictionary parameter takes the instance's dictionary
+            if let Type::Dict(c, ts) = &p {
+                match classes::dictionary(&c.name, &ts[0]) {
+                    Some(d) => args.push(d),
+                    None => return self.leaf(cx, t),
+                }
+                continue;
+            }
             args.push(self.term(cx, &p, budget, s, false));
         }
         Term::apps(Term::Var(f), args)
@@ -132,7 +142,7 @@ impl Gen<'_> {
 }
 
 /// How many polymorphic templates there are.
-const TEMPLATES: usize = 9;
+const TEMPLATES: usize = 11;
 
 /// A polymorphic value of known scheme: its scheme, its λ, whether it is
 /// recursive and whether it is bound with its signature (Let-Sig) or
@@ -233,6 +243,9 @@ fn template(i: usize, name: &str) -> (Scheme, Term, bool, bool) {
         ),
         // a function that relies on a pure parameter (`ts-holes.md` §2.6)
         8 => pure_parameter(),
+        // a function with a class constraint (`classes.rs`)
+        9 => classes::template(false),
+        10 => classes::template(true),
         // (Let-Gen): `None` generalized
         _ => (
             scheme(ty_vars(&["a"]), option(a)),

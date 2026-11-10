@@ -112,7 +112,12 @@ impl Checker<'_> {
             Some(Type::Eff(_, _, a)) => Some((**a).clone()),
             _ => None,
         };
-        let (t, inner) = self.own_stage(body, result.as_ref())?;
+        let declared = match &wanted {
+            Some(Type::Eff(r, e, _)) => Some(Stage::Runtime(r.clone(), e.clone())),
+            _ => None,
+        };
+        let (t, inner) =
+            self.declaring(declared.as_ref(), |c| c.own_stage(body, result.as_ref()))?;
         let (r, e) = match &wanted {
             Some(Type::Eff(r, e, _)) => (r.clone(), e.clone()),
             _ => (self.fresh_row(), self.fresh_row()),
@@ -158,6 +163,7 @@ impl Checker<'_> {
             Stage::Runtime(r, e) => (r.clone(), e.clone()),
         };
         let rest = self.error_arms(arms, &raised, &t)?;
+        self.note(body, |n| n.own = Some((inner.clone(), rest.clone())));
         if inner == Stage::Pure {
             return Ok(t);
         }

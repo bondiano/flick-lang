@@ -8,6 +8,7 @@ use flick_core::iface;
 use flick_core::project::config::Backend;
 use flick_core::project::{self, Compilation, Host};
 use flick_core::source::{FileId, SourceMap};
+use flick_core::types::{Kind, Type};
 
 struct Module<'a>(&'a str);
 
@@ -186,4 +187,35 @@ fn typed_declarations_and_facades_do_not_require_native_artifact_publication() {
         assert!(contains("Main.promise.d.ts"));
         assert_eq!(contains("Main.iface"), cfg!(feature = "native-project"));
     }
+}
+
+#[test]
+fn an_inferred_row_argument_takes_the_kind_of_its_parameter() {
+    let source = "module Main exposing (functions)\n\nimport Server\n\n\
+                  greet : String ->{Server.Server} String\n\
+                  server fn greet name = \"Hello, \" ++ name\n\n\
+                  let functions = [server greet]\n";
+    let (diagnostics, _, compilation) = compile(source);
+    let errors: Vec<_> = diagnostics
+        .iter()
+        .filter(|d| d.severity == Severity::Error)
+        .collect();
+    assert!(errors.is_empty(), "{errors:?}");
+    let main = compilation
+        .modules
+        .iter()
+        .find(|m| m.name == "Main")
+        .expect("Main compiles");
+    let functions = main
+        .interface
+        .exports
+        .iter()
+        .find(|e| e.entity.name == "functions")
+        .and_then(|e| e.scheme.clone());
+    // `Server.Function (r : ServiceRow)`: the open tail of `{Server.Server | a}`
+    let Some(Type::Forall { vars, .. }) = functions else {
+        panic!("`functions` is polymorphic: {functions:?}");
+    };
+    let kinds: Vec<Kind> = vars.into_iter().map(|b| b.kind).collect();
+    assert_eq!(kinds, [Kind::ServiceRow]);
 }

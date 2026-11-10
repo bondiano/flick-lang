@@ -168,7 +168,7 @@ theorem Elab.anyStage {Γ Δ e τ φ e'} (h : Elab P Γ Δ e τ φ e') (hφ : φ
   | const hc hk he => exact .const hc hk he
   | app _ _ hψ ih₁ ih₂ =>
     subst hφ
-    exact .app (ih₁ rfl ψ) (ih₂ rfl ψ) (.inl (by rcases hψ with h | ⟨h, -⟩ <;> exact h))
+    exact .app (ih₁ rfl ψ) (ih₂ rfl ψ) (.inl (by rcases hψ with h | ⟨h, -⟩ <;> first | exact h | exact h.elim))
   | lam h _ => exact .lam h
   | allLam h => exact .allLam h
   | allVar hx hc hk => exact .allVar hx hc hk

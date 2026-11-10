@@ -5,7 +5,7 @@ import Formal.Elab.DoNotation
 
 `GenOk` is the checker's typing of the clauses of `for … yield` and `[for …]`
 (`comprehension.rs`): they run at `P` (Sync calls are not modeled), each source `s : f d a` with
-`Iterable f` gives `Seq (d ∪ a) a` through `iter`. `LoopOk` types `for … do` at the stage of the
+`Iterable f` gives `Seq d a` through `iter`. `LoopOk` types `for … do` at the stage of the
 loop. `?` (`question.rs`) is `from_result` at `R` on a `Result`, and a `match` on an `Option`
 whose rest returns an `Option`. The statement `s; rest` of a block is `let _ : Unit = s in rest`.
 Each desugared form elaborates, and T6(a) covers it.
@@ -37,13 +37,13 @@ inductive LoopOk (φ : Stage) : List Scheme → List Cn → List Clause → Exp 
   | let_ {Γ Δ x cs e a x'} : Elab P Γ Δ x a φ x' → LoopOk φ (Scheme.mono a :: Γ) Δ cs e →
       LoopOk φ Γ Δ (.let_ x :: cs) e
 
-/-- `d.iter s : Seq (d ∪ a) a` -/
+/-- `d.iter s : Seq d a` -/
 theorem elab_iter {Γ Δ s f d a φ dk s'} (hd : Ent P Δ [⟨S.iterable, [f]⟩] [dk])
     (hs : Elab P Γ Δ s (appQ f d a) φ s') :
-    ∃ e', Elab P Γ Δ (.app (.meth S.iter) s) (appQ (.con S.seq) (.cun d a) a) φ e' := by
+    ∃ e', Elab P Γ Δ (.app (.meth S.iter) s) (appQ (.con S.seq) d a) φ e' := by
   have hi := elab_meth (Γ := Γ) (φ := φ) S.hIter rfl (ts := [f, d, a]) rfl
     (by simpa [Cn.subst, Ty.subst, inst] using hd)
-    (τ := arrP (appQ f d a) (appQ (.con S.seq) (.cun d a) a)) rfl
+    (τ := arrP (appQ f d a) (appQ (.con S.seq) d a)) rfl
   exact ⟨_, .app hi hs (.inl rfl)⟩
 
 theorem gen_elab {Γ Δ cs e t} (h : GenOk S Γ Δ cs e t) :
@@ -56,7 +56,7 @@ theorem gen_elab {Γ Δ cs e t} (h : GenOk S Γ Δ cs e t) :
     obtain ⟨q, _, hk⟩ := ih
     obtain ⟨_, hi⟩ := elab_iter S hd hs
     have hf := elab_const (Γ := Γ) (Δ := Δ) (φ := .P) S.hSeqFlatMap
-      (ts := [a, t, .cnil, .cun d a, q]) rfl (τ := bindTy (.con S.seq) .cnil (.cun d a) a t q) rfl
+      (ts := [a, t, .cnil, d, q]) rfl (τ := bindTy (.con S.seq) .cnil d a t q) rfl
     exact ⟨_, _, .app (.app hf (.lam hk) (.inl rfl)) hi (.inl rfl)⟩
   | @guard Γ Δ c cs e t c' hc _ ih =>
     obtain ⟨q, _, hk⟩ := ih
@@ -84,13 +84,20 @@ theorem loop_elab {φ Γ Δ cs e} (h : LoopOk S φ Γ Δ cs e) :
   | @gen Γ Δ s cs e f d a dk s' hd hs _ ih =>
     obtain ⟨_, hk⟩ := ih
     obtain ⟨_, hi⟩ := elab_iter S hd hs
-    have hf : Elab P Γ Δ (.const (S.each φ)) (arrP (.arr φ a (.con S.unit) .cnil)
-        (.arr φ (appQ (.con S.seq) (.cun d a) a) (.con S.unit) .cnil)) φ (.const (S.each φ)) := by
-      cases φ with
-      | P => exact elab_const (S.hEach .P) (ts := [.cnil, .cun d a, a]) rfl rfl
-      | R r e => exact elab_const (S.hEach (.R r e)) (ts := [a, r, e, .cnil, .cun d a]) rfl rfl
     -- the body uses nothing the loop must keep live: its qualifier is empty
-    exact ⟨_, .app (.app hf (.lam hk) (.inl rfl)) hi (Stage.keeps_cnil φ)⟩
+    cases φ with
+    | P =>
+      have hf := elab_const (Γ := Γ) (Δ := Δ) (φ := .P) (S.hEach .P) (ts := [.cnil, d, a]) rfl
+        (τ := arrP (.arr .P a (.con S.unit) .cnil)
+          (.arr .P (appQ (.con S.seq) d a) (.con S.unit) .cnil)) rfl
+      exact ⟨_, .app (.app hf (.lam hk) (.inl rfl)) hi (Stage.keeps_cnil .P)⟩
+    | R r e =>
+      -- `Seq.each_loop` at `c := ∅`: its later stage `R⟨Live ∅ + r; e⟩` applies at `R⟨r; e⟩`
+      have hf := elab_const (Γ := Γ) (Δ := Δ) (φ := .R r e) (S.hEach (.R r e))
+        (ts := [a, r, e, .cnil, d]) rfl
+        (τ := arrP (.arr (.R r e) a (.con S.unit) .cnil)
+          (.arr (.R (.run (.cun .cnil .cnil) r) e) (appQ (.con S.seq) d a) (.con S.unit) .cnil)) rfl
+      exact ⟨_, .app (.app hf (.lam hk) (.inl rfl)) hi (Stage.applies_live_cnil r e)⟩
   | guard hc _ ih =>
     obtain ⟨_, hk⟩ := ih
     exact ⟨_, .ite hc hk (elab_const S.hUnitV (ts := []) rfl rfl)⟩

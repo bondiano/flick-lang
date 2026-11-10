@@ -79,6 +79,7 @@ inductive Base
   | unit
   | bool
   | int
+  | string
   deriving DecidableEq, Repr
 
 /-- Literals `n` of core.md §1.3; `()`, `True`, `False` are literals too. -/
@@ -86,12 +87,14 @@ inductive Lit
   | unit
   | bool (b : Bool)
   | int (n : Int)
+  | str (s : String)
   deriving DecidableEq, Repr
 
 def Lit.base : Lit → Base
   | .unit => .unit
   | .bool _ => .bool
   | .int _ => .int
+  | .str _ => .string
 
 /-- Types `τ` of core.md §1.2 and regions.md §1.2.
 A record type is a spine `rcons ℓ τ (… rnil)`; field order is fixed. A nominal

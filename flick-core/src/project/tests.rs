@@ -243,6 +243,33 @@ fn without_a_project_imports_resolve_from_the_module_root() {
     );
 }
 
+/// `Gen` as std names a module: one of the project by that name keeps its
+/// instances, for an importer and in what it exports.
+const GEN: &str = "module Gen exposing (..)\n\nclass Describe a =\n  describe : a -> String\n\n\
+                   instance Describe Int =\n  let describe _ = \"int\"\n";
+
+#[test]
+fn a_module_named_as_one_of_std_keeps_its_instances_for_an_importer() {
+    let main =
+        "module Main exposing (x)\n\nimport Gen exposing (..)\n\nx : String\nlet x = describe 1\n";
+    let host = memory(&[("src/Gen.fl", GEN), ("src/Main.fl", main)]);
+    assert_eq!(run_library(&host, &["src/Main.fl"]), Vec::<String>::new());
+}
+
+#[test]
+fn a_module_named_as_one_of_std_exports_its_instances() {
+    let host = memory(&[("lib/Gen.fl", GEN)]);
+    let roots = [PathBuf::from("/p/lib/Gen.fl")];
+    let (diagnostics, compilation) = compile(&host, &mut SourceMap::default(), None, &roots);
+    assert!(
+        diagnostics.iter().all(|d| d.severity != Severity::Error),
+        "{diagnostics:?}"
+    );
+    let gen_module = &compilation.modules[0];
+    assert_eq!(gen_module.interface.instances.len(), 1);
+    assert_eq!(gen_module.declarations.instances.len(), 1);
+}
+
 #[test]
 fn standalone_compilation_checks_the_real_import_graph() {
     let mut host = memory(&[

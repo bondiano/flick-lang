@@ -59,10 +59,6 @@ impl Builtins {
         self.interfaces
             .insert(interface.module.clone(), interface.clone());
     }
-
-    pub fn contains(&self, module: &str) -> bool {
-        self.interfaces.contains_key(module)
-    }
 }
 
 /// Records the definitions, schemes and constructor parents an interface exports.

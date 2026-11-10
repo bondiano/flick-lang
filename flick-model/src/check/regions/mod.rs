@@ -57,6 +57,16 @@ pub(super) struct Regions {
     nest: Vec<Name>,
     /// `Provided R ϱ` of the signatures around (§2.7).
     givens: Vec<(Row, Type)>,
+    /// The calls being checked, innermost last: the unknown `Scope`
+    /// regions of steps of their task arguments, each with the `scope`
+    /// innermost there.
+    calls: Vec<Vec<(Type, Name)>>,
+    /// While an argument of type `Eff` is checked: its call, and how many
+    /// `scope`s are open there.
+    task_argument: Option<(usize, usize)>,
+    /// The region of `Scope` the stage of the λ or task being checked
+    /// names, once known, with how many `scope`s are open there.
+    declared: Option<(Type, usize)>,
 }
 
 /// The element `Scope ϱ` of a row of services.
@@ -99,9 +109,24 @@ impl Checker<'_> {
             Type::Var(v) => {
                 out.atoms.insert(v.clone());
             }
-            Type::App(a, b) => {
-                go(a, out);
-                go(b, out);
+            Type::App(..) => {
+                let mut args = Vec::new();
+                let mut head = t;
+                while let Type::App(h, a) = head {
+                    args.push(&**a);
+                    head = h;
+                }
+                let params = match head {
+                    Type::Con(p) => self.decls.params.get(p),
+                    _ => None,
+                };
+                go(head, out);
+                // an argument of kind SRow reaches nothing (§2.1)
+                for (i, a) in args.iter().rev().enumerate() {
+                    if params.and_then(|k| k.get(i)) != Some(&Kind::Services) {
+                        go(a, out);
+                    }
+                }
             }
             Type::Fun(a, s, b) => {
                 go(a, out);
@@ -365,8 +390,14 @@ impl Checker<'_> {
 
     /// (Con): the fields of `K ē`; captures a field hides go into the
     /// qualifier of the data, which a type without hidden storage needs not.
-    pub(super) fn construct(&mut self, c: &Con, args: &[Term]) -> Check<Type> {
+    pub(super) fn construct<'e>(
+        &mut self,
+        c: &Con,
+        args: impl IntoIterator<Item = &'e Term>,
+        at: &Term,
+    ) -> Check<Type> {
         let mut t = self.constructor(&c.ty.module, &c.name)?;
+        self.note_instance(at);
         let mut fields = Vec::new();
         for a in args {
             let Type::Fun(p, _, r) = self.resolve(&t) else {

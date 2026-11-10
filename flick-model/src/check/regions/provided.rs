@@ -52,13 +52,11 @@ impl Checker<'_> {
             Var::Meta(_) => None,
         });
         for s in services.chain(tails).collect::<Vec<_>>() {
-            match r.elems.get(&key(&s)).cloned() {
-                // one element a service: two owners are one region
-                Some(old) => self.unify(&old[0], owner)?,
-                None => {
-                    r.elems.insert(key(&s), Rc::from([owner.clone()]));
-                }
-            }
+            let owner = match r.elems.get(&key(&s)).cloned() {
+                Some(old) => self.both_owners(&old[0], owner)?,
+                None => owner.clone(),
+            };
+            r.elems.insert(key(&s), Rc::from([owner]));
         }
         Ok(r)
     }
@@ -108,6 +106,22 @@ impl Checker<'_> {
     }
 
     /// Whether `inner` is `outer` or nested in it (§2.4).
+    /// One element a service: work two owners keep needs its provider
+    /// to outlive both, so the outer when one `scope` encloses the other;
+    /// else the two are one region.
+    pub(in crate::check) fn both_owners(&mut self, a: &Type, b: &Type) -> Check<Type> {
+        if let (Type::Var(Var::Named(x)), Type::Var(Var::Named(y))) = (self.zonk(a), self.zonk(b)) {
+            if self.encloses(&x, &y) {
+                return Ok(a.clone());
+            }
+            if self.encloses(&y, &x) {
+                return Ok(b.clone());
+            }
+        }
+        self.unify(a, b)?;
+        Ok(a.clone())
+    }
+
     fn encloses(&self, outer: &Name, inner: &Name) -> bool {
         let mut at = Some(inner.clone());
         while let Some(s) = at {

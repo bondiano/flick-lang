@@ -80,7 +80,8 @@ theorem const_typ {c s b} (hc : constSch c = some s) (hb : constBody c = some b)
   · exact ⟨fun _ h => by simp [seqEmpty, snil, Flick.Tm.Has] at h, typ_seqEmpty⟩
   · exact ⟨fun _ h => by simp [seqToList, caseSeq, Flick.Tm.Has] at h, typ_seqToList⟩
   · exact ⟨fun _ h => by simp [seqEach, caseSeq, Flick.Tm.Has] at h, typ_seqEach⟩
-  · exact ⟨fun _ h => by simp [seqEach, caseSeq, Flick.Tm.Has] at h, typ_seqEach⟩
+  · exact ⟨fun _ h => by simp [seqEach, caseSeq, Flick.Tm.Has] at h,
+      typ_seqEach_at (trStage_use_live (.var 1) (.var 2) (.var 3))⟩
   · exact ⟨fun _ h => h, typ_con0 (us := []) rfl⟩
 
 theorem typ_eqRec {Ψ Θ} : Typ Sg Ψ Θ [.mono (trD N ⟨cEq, [tyInt]⟩)] eqRec

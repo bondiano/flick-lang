@@ -22,7 +22,7 @@ arguments it holds reach (`elaboration.md`, Prelude schemes).
 The schemes of the Prelude names are generated from the checker (`PreludeSchemes`, `just
 formal-schemes`). `bindTy` and `map2Ty` are their forms the proofs use; the witness
 holds them to the generated ones by `rfl` (`Witness/Prog.lean`). `pair`, `unc n`
-and `each_φ` have no Prelude name and stay written here (`docs/formal/elaboration.md#the-loop-rule-l-was-missing`, README simplification 9).
+and `each_P` have no Prelude name and stay written here (`docs/formal/elaboration.md#the-loop-rule-l-was-missing`, README simplification 9).
 -/
 
 namespace Flick.Elab
@@ -46,15 +46,15 @@ qualifier `q` of its value (`docs/formal/elaboration.md#value-qualifiers-in-prel
 abbrev appQ (m q a : Ty) : Ty := .app (.app m q) a
 
 /-- The type of `flat_map` for the container `m`:
-`(a →P^c m e b) →P (m d a →P m ((c ∪ e) ∪ (d ∪ a)) b)`. -/
+`(a →P^c m e b) →P (m d a →P m ((c ∪ e) ∪ d) b)`. -/
 def bindTy (m c d a b e : Ty) : Ty :=
   arrP (.arr .P a (appQ m e b) c)
-    (arrP (appQ m d a) (appQ m (.cun (.cun c e) (.cun d a)) b))
+    (arrP (appQ m d a) (appQ m (.cun (.cun c e) d) b))
 
-/-- The type of `map2` for the container `f`, with `R = c ∪ ((d ∪ a) ∪ (d' ∪ b))`:
+/-- The type of `map2` for the container `f`, with `R = c ∪ (d ∪ d')`:
 `(a →P^c b →P x) →P (f d a →P f d' b →P f R x)`. -/
 def map2Ty (f c d a b x d' : Ty) : Ty :=
-  let R : Ty := .cun c (.cun (.cun d a) (.cun d' b))
+  let R : Ty := .cun c (.cun d d')
   arrP (.arr .P a (arrP b x) c)
     (arrP (appQ f d a) (arrP (appQ f d' b) (appQ f R x)))
 
@@ -65,15 +65,14 @@ def uncSch (tup n : Nat) : Scheme :=
 
 /-- `each_φ`, the loop of `for … do` at the stage `φ` (`docs/formal/elaboration.md#the-loop-rule-l-was-missing`):
 `each_P : ∀c d a. (a →P^c Unit) →P (Seq d a →P^c Unit)`, and for every `R r e` the one
-`each_R : ∀a r e c d. (a →R⟨r;e⟩^c Unit) →P (Seq d a →R⟨r;e⟩^c Unit)`, used at the rows of the
-loop. Neither is a Prelude name: the checker's loop (`for_loop`) checks the body at the current
-stage and asks nothing of the source, while `Seq.each_effect`, read through elision, needs the
-qualifier `d` of the sequence live (`docs/formal/elaboration.md#the-loop-rule-l-was-missing`). -/
+`Seq.each_loop : ∀a r e c d. (a →R⟨r;e⟩^c Unit) →P (Seq d a →R⟨Live c + r; e⟩ Unit)`, used at
+the rows of the loop. `each_P` has no Prelude name; `Seq.each_loop` is `Seq.each_effect` read as
+the checker's `for_loop` reads a loop, its body live and nothing of the source, generated with
+the other schemes (`PreludeSchemes`). -/
 def eachSch (unit seq : Nat) : Stage → Scheme
   | .P => ⟨3, [], arrP (.arr .P (.var 2) (.con unit) (.var 0))
       (.arr .P (appQ (.con seq) (.var 1) (.var 2)) (.con unit) (.var 0)), .cnil⟩
-  | .R _ _ => ⟨5, [], arrP (.arr (.R (.var 1) (.var 2)) (.var 0) (.con unit) (.var 3))
-      (.arr (.R (.var 1) (.var 2)) (appQ (.con seq) (.var 4) (.var 0)) (.con unit) (.var 3)), .cnil⟩
+  | .R _ _ => PreludeSchemes.Seq.each_loop unit seq
 
 /-- The Prelude classes and methods, the constants of Γ₀ and the types the sugar uses. -/
 structure Sugar (P : Prog) where
@@ -112,7 +111,7 @@ structure Sugar (P : Prog) where
   hPure : P.methods pure = some (applicative, PreludeSchemes.pure applicative)
   /-- `nothing : ∀f a r. Alternative f ⇒ f r a` (`∀a. f a`) -/
   hNothing : P.methods nothing = some (alternative, PreludeSchemes.nothing alternative)
-  /-- `iter : ∀f d a. Iterable f ⇒ f d a →P Seq (d ∪ a) a` (`∀d a. (f a)^d → (Seq a)^d`) -/
+  /-- `iter : ∀f d a. Iterable f ⇒ f d a →P Seq d a` (`∀d a. (f a)^d → (Seq a)^d`) -/
   hIter : P.methods iter = some (iterable, PreludeSchemes.iter iterable seq)
   /-- `pair : ∀a b. a →P b →P (a, b)`, a constant of the model: no Prelude name (`docs/formal/elaboration.md#the-loop-rule-l-was-missing`,
   README simplification 9) -/

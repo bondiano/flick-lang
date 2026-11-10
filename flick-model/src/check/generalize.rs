@@ -12,7 +12,7 @@ use crate::syntax::Name;
 use crate::types::{Caps, Fields, Kind, Row, Scheme, Stage, Type, Var};
 
 /// What a variable of a scheme becomes.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub(crate) enum Inst {
     Type(Type),
     Row(Row),
@@ -63,9 +63,10 @@ impl Checker<'_> {
     }
 
     /// The body of `s` with its variables rigid and the stages of its
-    /// signature holding their parameters: what (Let-Sig) checks. Its
-    /// facts `Θ` are given from here on.
-    pub(super) fn skolemize(&mut self, s: &Scheme) -> Type {
+    /// signature holding their parameters: what (Let-Sig) checks, with the
+    /// names of the rigid variables. Its facts `Θ` are given from here on.
+    pub(super) fn skolemize(&mut self, s: &Scheme) -> (Type, Vec<Name>) {
+        let mut rigid = Vec::new();
         let insts: Vec<Inst> = s
             .vars
             .iter()
@@ -75,6 +76,7 @@ impl Checker<'_> {
                 if *k == Kind::Region {
                     self.regions.kinds.insert(Var::Named(name.as_str().into()));
                 }
+                rigid.push(Name::from(name.as_str()));
                 rigid_inst(&name, k)
             })
             .collect();
@@ -90,7 +92,7 @@ impl Checker<'_> {
         );
         let body = substitute(&body, &map);
         self.give_provided(&body);
-        body
+        (body, rigid)
     }
 
     /// `Gen(Γ, τ)`: the type metas of `t` deeper than the current level.
@@ -98,14 +100,23 @@ impl Checker<'_> {
     pub(super) fn generalize(&mut self, t: &Type) -> Scheme {
         let mut ms = BTreeSet::new();
         self.metas(t, &mut ms);
+        let zonked = self.zonk(t);
         let mut vars = Vec::new();
         for m in ms {
             let slot = &self.slots[m as usize];
-            if slot.level > self.level && slot.solved.is_none() && self.is_type_meta(m, t) {
-                let name: Name = format!("g{m}").into();
-                self.slots[m as usize].solved =
-                    Some(Solved::Type(Type::Var(Var::Named(name.clone()))));
+            if slot.level <= self.level || slot.solved.is_some() {
+                continue;
+            }
+            let name: Name = format!("g{m}").into();
+            let named = Var::Named(name.clone());
+            if self.is_type_meta(m, t) {
+                self.slots[m as usize].solved = Some(Solved::Type(Type::Var(named)));
                 vars.push((name, Kind::Type));
+            } else if in_errors(&Var::Meta(m), &zonked) {
+                // a row a type takes, as `Errors e`; a row only of a stage
+                // is closed instead (`core.md` §2.5, item 5)
+                self.slots[m as usize].solved = Some(Solved::Row(Row::var(named)));
+                vars.push((name, Kind::Errors));
             }
         }
         Scheme {
@@ -134,6 +145,22 @@ impl Checker<'_> {
             Type::Forall(s) => self.mentions(v, &s.body),
             _ => false,
         }
+    }
+}
+
+/// Whether the row variable `v` is in a row a type of `t` takes, `Errors ρ`.
+fn in_errors(v: &Var, t: &Type) -> bool {
+    let any = |ts: &[Type]| ts.iter().any(|t| in_errors(v, t));
+    match t {
+        Type::Errors(r) => r.vars.contains(v) || r.elems.values().any(|a| any(a)),
+        Type::App(h, a) | Type::Fun(h, _, a) => in_errors(v, h) || in_errors(v, a),
+        Type::Eff(_, _, t) | Type::Ref(t) | Type::Captured(t, _) | Type::Bounded(t, _) => {
+            in_errors(v, t)
+        }
+        Type::Record(f) => f.fields.values().any(|t| in_errors(v, t)),
+        Type::Tuple(ts) | Type::Dict(_, ts) => any(ts),
+        Type::Forall(s) => in_errors(v, &s.body),
+        _ => false,
     }
 }
 

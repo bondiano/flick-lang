@@ -34,8 +34,8 @@ def doSkel : Tm := .app (.app (.meth (.hole 0) 3) (.lam (.app (.meth (.hole 1) 1
 def effMonad : Cn := ⟨cMonad, [.con 5]⟩
 def effApp : Cn := ⟨cApp, [.con 5]⟩
 
-/-- The row of the block, `(∅ ∪ ∅) ∪ (∅ ∪ Unit)`, and its type `Eff row Unit`. -/
-def doRow : Ty := .cun (.cun .cnil .cnil) (.cun .cnil (.con 1))
+/-- The row of the block, `(∅ ∪ ∅) ∪ ∅`, and its type `Eff row Unit`. -/
+def doRow : Ty := .cun (.cun .cnil .cnil) .cnil
 def doTy : TTy := .mono (appQ (.con 5) doRow (.con 1))
 
 /-- The filled block is typed by the laws of any target, from the typings of its dictionaries. -/

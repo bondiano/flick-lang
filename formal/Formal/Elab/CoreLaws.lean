@@ -87,11 +87,19 @@ theorem trTT_inst_tr (t : TTy) (ts : List Ty) :
     (trTT N t).substT (instT (ts.map (trT N))) = trTT N (t.subst (inst ts)) := by
   rw [trTT_subst]; exact Flick.Ty.substT_congr fun a => (trσ_inst N ts a).symm
 
+/-- An atom of `⌈⟦q⟧⌉` for a qualifier `q` the stage `R r e` keeps live is in the row `⟦r⟧`
+(`trT_keeps`). -/
+theorem trT_kept {r e q : Ty} (hk : (Stage.R r e).Keeps q) {a : Atom}
+    (ha : (trT N q).reach a) : (trT N r).asRow (.atm a) := by
+  obtain ⟨n, rfl, hn⟩ := (trT_reach N q a).1 ha
+  exact trT_keeps N (hk n hn)
+
 /-- A call of an arrow at `ψ` with the qualifier `q` runs at the stage `φ` that keeps `q`
-live: the atoms of `⌈⟦q⟧⌉` are in the row of `⟦φ⟧` (`trT_keeps`). -/
-theorem trStage_use_le {ψ φ : Stage} {q : Ty} (h : ψ = .P ∨ ψ = φ ∧ φ.Keeps q) :
+live: the atoms of `⌈⟦q⟧⌉` are in the row of `⟦φ⟧`, and so are those of `Live C` in the row
+of `ψ`, which `φ` keeps live too. -/
+theorem trStage_use_le {ψ φ : Stage} {q : Ty} (h : ψ.Applies φ q) :
     (Stage.use (trStage N ψ) (trT N q).reach).le (trStage N φ) := by
-  rcases h with rfl | ⟨rfl, hk⟩
+  rcases h with rfl | ⟨hk, rfl | ⟨C, r, e, rfl, rfl, hC⟩⟩
   · trivial
   · cases ψ with
     | P => trivial
@@ -100,10 +108,53 @@ theorem trStage_use_le {ψ φ : Stage} {q : Ty} (h : ψ = .P ∨ ψ = φ ∧ φ.
       rcases hx with hx | hx
       · exact hx
       · cases x with
-        | atm a =>
-          obtain ⟨n, rfl, hn⟩ := (trT_reach N q a).1 hx
-          exact trT_keeps N (hk n hn)
+        | atm a => exact trT_kept hk hx
         | _ => exact hx.elim
+  · refine ⟨fun x hx => ?_, fun _ h => h⟩
+    cases x with
+    | atm a =>
+      rcases hx with ((hx | hx) | hx) | hx
+      · exact trT_kept hC hx
+      · exact hx.elim
+      · exact hx
+      · exact trT_kept hk hx
+    | nm n =>
+      rcases hx with (hx | hx) | hx
+      · exact hx.elim
+      · exact hx
+      · exact hx.elim
+    | rv v =>
+      rcases hx with (hx | hx) | hx
+      · exact hx.elim
+      · exact hx
+      · exact hx.elim
+    | ob n a => rcases hx with hx | hx <;> exact hx.elim
+    | obv v a => rcases hx with hx | hx <;> exact hx.elim
+
+/-- A row `⟦t⟧` holds no obligation. -/
+theorem trT_asRow_ob (t : Flick.Ty) (n : Flick.Name) (a : Atom) : ¬ t.asRow (.ob n a) := by
+  cases t <;> simp [Flick.Ty.asRow, Row.plain, Row.ofCaps]
+
+theorem trT_asRow_obv (t : Flick.Ty) (v a : Atom) : ¬ t.asRow (.obv v a) := by
+  cases t <;> simp [Flick.Ty.asRow, Row.plain, Row.ofCaps]
+
+/-- What a call of an arrow at `R r e` with the qualifier `c` needs live, `R⟨Live c + r; e⟩`
+holds by its row: elision moves the qualifier of a later stage into its row. -/
+theorem trStage_use_live (r e c : Ty) :
+    (Stage.use (trStage N (.R r e)) (trT N c).reach).le
+      (Stage.use (trStage N (.R (.run (.cun c .cnil) r) e)) Caps.none) := by
+  refine ⟨fun x hx => ?_, fun _ h => h⟩
+  rcases hx with hx | hx
+  · refine .inl ?_
+    cases x with
+    | ob n a => exact (trT_asRow_ob _ n a hx).elim
+    | obv v a => exact (trT_asRow_obv _ v a hx).elim
+    | atm a => exact .inr hx
+    | nm n => exact .inr hx
+    | rv a => exact .inr hx
+  · cases x with
+    | atm a => exact .inl (.inl (.inl hx))
+    | _ => exact hx.elim
 
 theorem has_var {Γ Δ x s ts φ} (hx : Γ[x]? = some s) (hk : ts.length = s.k) :
     Has S N Γ Δ (.var x) (s.ty.subst (inst ts)) φ := fun _ _ _ _ _ hc =>
@@ -143,7 +194,7 @@ theorem has_const (hR : Real P S N) {Γ Δ c s ts φ} (hc : P.consts c = some s)
     (fun _ _ h => (h : False).elim) (by rw [Flick.Scheme.inst, trTT_inst_tr]; exact .refl)⟩
 
 theorem has_app {Γ Δ f x a b q ψ φ} (hf : Has S N Γ Δ f (.mono (.arr ψ a b q)) φ)
-    (hx : Has S N Γ Δ x (.mono a) φ) (hψ : ψ = .P ∨ ψ = φ ∧ φ.Keeps q) :
+    (hx : Has S N Γ Δ x (.mono a) φ) (hψ : ψ.Applies φ q) :
     Has S N Γ Δ (.app f x) (.mono b) φ := by
   intro Ψ Θ Γc γ δ hc
   obtain ⟨f', hf', tf⟩ := hf Ψ Θ Γc γ δ hc

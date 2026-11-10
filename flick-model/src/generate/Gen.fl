@@ -1,7 +1,7 @@
 // The declarations every program of the generator of the model properties uses
 // (flick-model/src/generate): two errors and two services, and what the
 // programs of regions (docs/formal/regions.md) acquire and hold.
-module Gen exposing (..)
+module Fixture exposing (..)
 
 type error Oops = Oops Int
 
@@ -71,3 +71,32 @@ foreign pure shape_of from "./shapes.mjs" "shape"
 
 shape_name : Shape ->{} String
 foreign effect shape_name from "./shapes.mjs" "name"
+
+// Classes the programs call methods of: a superclass, an instance on an
+// error, and one with a context.
+class Describe a =
+  describe : a -> String
+
+class Describe a => Rank a =
+  rank : a -> Int
+
+instance Describe Int =
+  let describe _ = "int"
+
+instance Describe Bool =
+  let describe b = if b then "yes" else "no"
+
+instance Describe Oops =
+  let describe _ = "oops"
+
+instance Describe a => Describe (Option a) =
+  let describe o =
+    match o with
+    | Some x -> describe x
+    | None -> "none"
+
+instance Rank Int =
+  let rank n = n
+
+instance Rank Bool =
+  let rank b = if b then 1 else 0

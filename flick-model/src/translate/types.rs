@@ -15,7 +15,7 @@ use crate::types::{Caps, Fields, Kind, Row, Scheme, Stage, Type, Var};
 
 const PRELUDE: &str = "Prelude";
 
-fn kind(k: &fc::Kind) -> Option<Kind> {
+pub(crate) fn kind(k: &fc::Kind) -> Option<Kind> {
     Some(match k {
         fc::Kind::ServiceRow => Kind::Services,
         fc::Kind::ErrorRow => Kind::Errors,
@@ -132,6 +132,9 @@ pub fn ty(t: &fc::Type) -> Type {
             captures,
         } => Type::Bounded(Rc::new(ty(inner)), caps(captures)),
         fc::Type::Forall { .. } => Type::Forall(Rc::new(scheme(t))),
+        // a row written as the argument of a type: `Atom.Async a none`, as
+        // instantiating a row variable there gives it (`generalize::substitute`)
+        fc::Type::Row(_) | fc::Type::Union(..) => Type::Errors(row(t)),
         other => Type::Con(Path::new("?", &format!("{other:?}"))),
     }
 }

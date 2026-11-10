@@ -41,12 +41,6 @@ fn rounds() -> u32 {
         .unwrap_or(300)
 }
 
-/// A local function needs a signature in flick-core, not in the rules
-/// (`core.md` §2.5, 6).
-fn by_design(errors: &[String]) -> bool {
-    !errors.is_empty() && errors.iter().all(|e| e.starts_with("FLICK-T004"))
-}
-
 /// Every leak of the generator reaches a use after close, so flick-core
 /// rejects each, as the model does.
 #[test]
@@ -123,7 +117,7 @@ fn live_core_agrees_on_generated() {
         for prog in [&original, &changed] {
             programs += 1;
             let (model, errors) = (verdict(prog), core(prog));
-            let core_ok = errors.is_empty() || by_design(&errors);
+            let core_ok = errors.is_empty() || generate::by_design(&errors);
             if core_ok {
                 accepted += 1;
             } else {
