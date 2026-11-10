@@ -34,7 +34,7 @@ fn spine(p: &Pat) -> Option<(String, &[Pat])> {
 }
 
 /// `p` in the core, with the names it binds left to right.
-fn pat(p: &Pat) -> Result<(String, Vec<Name>), Unsupported> {
+pub(super) fn pat(p: &Pat) -> Result<(String, Vec<Name>), Unsupported> {
     let names = |ps: &[Pat]| -> Vec<Name> {
         ps.iter()
             .filter_map(|p| match p {
@@ -69,14 +69,19 @@ fn bind(names: &[Name], ctx: &[Name]) -> Vec<Name> {
     names.iter().chain(ctx).cloned().collect()
 }
 
-/// `match s { arms }` in the core: an arm's body sees what its pattern
-/// binds, leftmost innermost.
+/// `match s { arms }` in the core.
 pub(super) fn match_tm(
     s: &Term,
     arms: &[Arm],
     ctx: &[Name],
     sig: &Sig,
 ) -> Result<String, Unsupported> {
+    Ok(format!("(.match_ {} {})", tm(s, ctx, sig)?, arms_tm(arms, ctx, sig)?))
+}
+
+/// The arms of a `match` or a `try` in the core: an arm's body sees what
+/// its pattern binds, leftmost innermost.
+pub(super) fn arms_tm(arms: &[Arm], ctx: &[Name], sig: &Sig) -> Result<String, Unsupported> {
     let mut alts = ".anil".to_owned();
     for arm in arms.iter().rev() {
         let (p, names) = pat(&arm.pat)?;
@@ -87,7 +92,7 @@ pub(super) fn match_tm(
             Some(g) => format!("(.aguard {p} {} {b} {alts})", tm(g, &inner, sig)?),
         };
     }
-    Ok(format!("(.match_ {} {alts})", tm(s, ctx, sig)?))
+    Ok(alts)
 }
 
 /// The type arguments of a type of data, if it is `T ū` or a pair.
@@ -145,7 +150,7 @@ impl Cx<'_> {
     }
 
     /// `check` with the names of a pattern bound, leftmost innermost.
-    fn under_all<T>(&mut self, names: &[Name], check: impl FnOnce(&mut Self) -> T) -> T {
+    pub(super) fn under_all<T>(&mut self, names: &[Name], check: impl FnOnce(&mut Self) -> T) -> T {
         let outer = self.terms.clone();
         self.terms = bind(names, &outer);
         let out = check(self);
@@ -186,20 +191,22 @@ impl Cx<'_> {
                     field(q)?
                 )
             }
-            p => {
-                let (k, ps) = spine(p).ok_or("a list or or-pattern")?;
-                let (adt, us) = self.args(&k, st)?;
-                let c = &self.sig.ctors[&k];
-                let head = format!(
-                    "(PatTy.head_plain S (K := {k:?}) (ts := [{}]) (T := {adt:?}) (us := [{}]) ((hS.ctor _ rfl).trans rfl) ((hS.res _ rfl).trans rfl) rfl)",
-                    c.fields.join(", "),
-                    us.join(", ")
-                );
-                let app = ps.iter().try_fold(head, |f, q| {
-                    Ok::<_, Unsupported>(format!("(.app {f} {})", field(q)?))
-                })?;
-                format!("(.adt {app} (Ty.tcon_hd _ _))")
-            }
+            p => format!("(.adt {} rfl)", self.spine_ty(p, st)?),
+        })
+    }
+
+    /// `⊢ K q₁ … qₙ : st ⇒ Δ` of a saturated spine, before (Pat-Adt).
+    pub(super) fn spine_ty(&self, p: &Pat, st: &Type) -> Result<String, Unsupported> {
+        let (k, ps) = spine(p).ok_or("a list or or-pattern")?;
+        let (adt, us) = self.args(&k, st)?;
+        let c = &self.sig.ctors[&k];
+        let head = format!(
+            "(PatTy.head_plain S (K := {k:?}) (ts := [{}]) (T := {adt:?}) (us := [{}]) ((hS.ctor _ rfl).trans rfl) ((hS.res _ rfl).trans rfl) rfl)",
+            c.fields.join(", "),
+            us.join(", ")
+        );
+        ps.iter().try_fold(head, |f, q| {
+            Ok::<_, Unsupported>(format!("(.app {f} {})", field(q)?))
         })
     }
 

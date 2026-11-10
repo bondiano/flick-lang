@@ -163,6 +163,7 @@ impl Checker<'_> {
             Stage::Runtime(r, e) => (r.clone(), e.clone()),
         };
         let rest = self.error_arms(arms, &raised, &t)?;
+        self.note(body, |n| n.own = Some((inner.clone(), rest.clone())));
         if inner == Stage::Pure {
             return Ok(t);
         }

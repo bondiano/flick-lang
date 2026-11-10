@@ -29,7 +29,7 @@ pub(crate) struct Env {
     pub(crate) vars: Vec<String>,
     pub(crate) inst: Vec<(String, String)>,
     /// A meta the check left open is the least instance of its kind: a type
-    /// `Unit`, a row or capture row empty. A certificate's typing holds at
+    /// `Unit`, a row, capture row or record's rest empty. A certificate's typing holds at
     /// any instance of them, and Lean checks it at this one.
     pub(crate) ground: bool,
 }
@@ -179,7 +179,7 @@ fn qualified(t: &Type, q: Option<&Caps>, env: &Env) -> Result<String, String> {
             }
         }
         Type::Ref(x) => format!("(.ref {})", ty(x, env)?),
-        Type::Record(f) if f.tail.is_none() => {
+        Type::Record(f) if f.tail.is_none() || env.ground && matches!(f.tail, Some(Var::Meta(_))) => {
             let mut out = ".rnil".to_owned();
             for (l, t) in f.fields.iter().rev() {
                 out = format!("(.rcons \"{l}\" {} {out})", ty(t, env)?);

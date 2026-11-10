@@ -9,10 +9,11 @@ use std::rc::Rc;
 use crate::check::trace::{Node, Trace, key};
 use crate::syntax::{Const, Head, Lit, Name, Term};
 use crate::translate::lean::elide::{Env, caps, row, stage, ty};
-use crate::types::{Caps, Fields, Row, Scheme, Stage, Type};
+use crate::types::{Caps, Fields, Row, Scheme, Stage, Type, Var};
 
 use super::Unsupported;
-use super::pat::match_tm;
+use super::pat::{arms_tm, match_tm};
+use super::raise::is_raise;
 use super::sig::{Key, Sig, bare, kept, prim_key};
 use crate::check::substitute;
 
@@ -43,9 +44,18 @@ pub(super) fn tm(e: &Term, ctx: &[Name], sig: &Sig) -> Result<String, Unsupporte
             })?
         }
         Term::Lit(l) => format!("(.lit {})", lit(l)?),
+        Term::App(f, a) if is_raise(f) => format!("(.raise {})", tm(a, ctx)?),
+        Term::Try(b, arms) => format!("(.try_ {} {})", tm(b, ctx)?, arms_tm(arms, ctx, sig)?),
         Term::Lam(x, b) => format!("(.lam {})", tm(b, &push(ctx, x))?),
         Term::App(f, a) => format!("(.app {} {})", tm(f, ctx)?, tm(a, ctx)?),
         Term::Let(x, _, e1, e2) => format!("(.let_ {} {})", tm(e1, ctx)?, tm(e2, &push(ctx, x))?),
+        Term::LetRec(f, _, lam, e2) => {
+            let Term::Lam(x, body) = &**lam else {
+                return Err("a `let rec` of no λ".into());
+            };
+            let inner = push(&push(ctx, f), x);
+            format!("(.let_ (.fix {}) {})", tm(body, &inner)?, tm(e2, &push(ctx, f))?)
+        }
         Term::Task(b) => format!("(.task {})", tm(b, ctx)?),
         Term::Await(x) => format!("(.await {})", tm(x, ctx)?),
         // a record of the core is a spine in the order of its labels, as
@@ -82,7 +92,8 @@ pub(super) fn field<'a>(t: &'a Type, l: &str) -> Result<&'a Type, Unsupported> {
 /// The fields of a record type.
 fn fields(t: &Type) -> Option<&Fields> {
     match t {
-        Type::Record(f) if f.tail.is_none() => Some(f),
+        // a rest the check left open is empty (`Env::ground`)
+        Type::Record(f) if matches!(f.tail, None | Some(Var::Meta(_))) => Some(f),
         Type::Captured(x, _) | Type::Bounded(x, _) => fields(x),
         _ => None,
     }
@@ -105,7 +116,7 @@ fn push(ctx: &[Name], x: &Name) -> Vec<Name> {
     iter::once(x.clone()).chain(ctx.iter().cloned()).collect()
 }
 
-fn index(ctx: &[Name], x: &str) -> Result<usize, Unsupported> {
+pub(super) fn index(ctx: &[Name], x: &str) -> Result<usize, Unsupported> {
     ctx.iter()
         .position(|y| &**y == x)
         .ok_or_else(|| format!("`{x}` is not bound"))
@@ -147,7 +158,7 @@ fn form(e: &Term) -> Unsupported {
 }
 
 /// The arrow of `t`: its parameter, stage, result and qualifier.
-fn arrow(t: &Type) -> Option<(&Type, &Stage, &Type, Caps)> {
+pub(super) fn arrow(t: &Type) -> Option<(&Type, &Stage, &Type, Caps)> {
     match t {
         Type::Fun(p, s, r) => Some((p, s, r, Caps::default())),
         Type::Captured(f, c) => match &**f {
@@ -166,7 +177,10 @@ pub(super) struct Cx<'t> {
     /// The term variables, innermost first.
     pub(super) terms: Vec<Name>,
     /// The type variables, innermost first.
-    env: Env,
+    pub(super) env: Env,
+    /// Where in `terms`, from the outermost, a `fix` binds itself, with the
+    /// rigid variables of its signature.
+    pub(super) fixed: Vec<(usize, Vec<Name>)>,
 }
 
 impl<'t> Cx<'t> {
@@ -179,10 +193,11 @@ impl<'t> Cx<'t> {
                 ground: true,
                 ..Env::default()
             },
+            fixed: Vec::new(),
         }
     }
 
-    fn node(&self, e: &Term) -> Result<&'t Node, Unsupported> {
+    pub(super) fn node(&self, e: &Term) -> Result<&'t Node, Unsupported> {
         self.trace
             .get(&key(e))
             .ok_or_else(|| "a term the check did not type".to_owned())
@@ -192,10 +207,16 @@ impl<'t> Cx<'t> {
         ty(t, &self.env)
     }
 
-    fn arrow_args(&self, t: &Type) -> Result<String, Unsupported> {
+    pub(super) fn arrow_args(&self, t: &Type) -> Result<String, Unsupported> {
+        self.arrow_named(t, "t")
+    }
+
+    /// The implicit arguments of a rule at the arrow `t`, its result named
+    /// `result`.
+    pub(super) fn arrow_named(&self, t: &Type, result: &str) -> Result<String, Unsupported> {
         let (p, s, r, c) = arrow(t).ok_or_else(|| format!("`{t}` is no arrow"))?;
         Ok(format!(
-            "(a := {}) (ψ := {}) (t := {}) (C := {})",
+            "(a := {}) (ψ := {}) ({result} := {}) (C := {})",
             self.ty(p)?,
             stage(s, &self.env)?,
             self.ty(r)?,
@@ -214,7 +235,7 @@ impl<'t> Cx<'t> {
         ))
     }
 
-    fn inst(&self, i: &Inst) -> Result<String, Unsupported> {
+    pub(super) fn inst(&self, i: &Inst) -> Result<String, Unsupported> {
         Ok(match i {
             Inst::Type(t) => self.ty(t)?,
             Inst::Row(r) => format!("(.row {})", row(r, &self.env)?),
@@ -239,6 +260,8 @@ impl<'t> Cx<'t> {
                     "(.lam {args}{pad}{b}{pad}(by simp [Tm.NoIns, Tm.Has]) (by le_live))"
                 ))
             }
+            Term::App(f, a) if is_raise(f) => self.raise(a, t, col),
+            Term::Try(body, arms) => self.try_(body, arms, t, col),
             Term::App(..) | Term::Apply(Head::Con(_), _) | Term::Tuple(_) => self.app(e, col),
             Term::Task(body) => {
                 let args = self.eff_args(t)?;
@@ -275,7 +298,8 @@ impl<'t> Cx<'t> {
                     "(.update (R := {rt}) (t := {ftp}){pad}{pr}{pad}rfl{pad}{pv})"
                 ))
             }
-            Term::Let(x, _, e1, e2) => self.let_(x, e1, e2, t, col),
+            Term::Let(x, _, e1, e2) => self.let_(x, e1, e2, t, false, col),
+            Term::LetRec(f, _, lam, e2) => self.let_(f, lam, e2, t, true, col),
             Term::Match(s, arms) => self.match_(s, arms, t, col),
             other => Err(form(other)),
         }
@@ -289,33 +313,11 @@ impl<'t> Cx<'t> {
     }
 
     /// `check` with `x` bound, innermost.
-    fn under<T>(&mut self, x: &Name, check: impl FnOnce(&mut Self) -> T) -> T {
+    pub(super) fn under<T>(&mut self, x: &Name, check: impl FnOnce(&mut Self) -> T) -> T {
         self.terms.insert(0, x.clone());
         let out = check(self);
         self.terms.remove(0);
         out
-    }
-
-    /// (Var) at the instance the check took.
-    fn var(&mut self, e: &Term, x: &str) -> Result<String, Unsupported> {
-        index(&self.terms, x)?;
-        let node = self.node(e)?;
-        let (scheme, insts) = node
-            .instance
-            .as_ref()
-            .ok_or_else(|| format!("`{x}` without its instance"))?;
-        if !scheme.outlives.is_empty() {
-            return Err("a scheme with facts".into());
-        }
-        let ts = insts
-            .iter()
-            .map(|i| self.inst(i))
-            .collect::<Result<Vec<_>, _>>()?;
-        let instance = self.ty(&self.inferred(e)?)?;
-        Ok(format!(
-            "(Cert.typ_var (ts := [{}]) (T' := {instance}) rfl rfl (Cert.holds_none _) (by inst_eq) (by le_live))",
-            ts.join(", ")
-        ))
     }
 
     /// The instance a variable, global or constructor took, its types.
@@ -437,48 +439,6 @@ impl<'t> Cx<'t> {
             rest.fields.insert(l.clone(), ft.clone());
         }
         Ok(proof)
-    }
-
-    /// (Let-Mono) or, for a scheme with variables, (Let-Gen).
-    fn let_(
-        &mut self,
-        x: &Name,
-        e1: &Term,
-        e2: &Term,
-        t: &Type,
-        col: usize,
-    ) -> Result<String, Unsupported> {
-        let pad = format!("\n{}", " ".repeat(col + 2));
-        let node = self.node(e1)?;
-        let scheme = node.scheme.clone().ok_or("a `let` without its scheme")?;
-        if !scheme.outlives.is_empty() {
-            return Err("a scheme with facts".into());
-        }
-        let k = scheme.vars.len();
-        let outer = self.env.clone();
-        let under = |names: Vec<String>| -> Vec<String> {
-            names.into_iter().chain(outer.vars.iter().cloned()).collect()
-        };
-        self.env.vars = under(scheme.vars.iter().map(|(v, _)| v.to_string()).collect());
-        let a = self.ty(&scheme.body);
-        // a signed right side is typed at its rigid variables, the binders
-        // of (Let-Gen)
-        let rhs_ty = match (&node.rigid, &node.expected) {
-            (Some(rigid), Some(t)) => {
-                self.env.vars = under(rigid.iter().map(ToString::to_string).collect());
-                t
-            }
-            _ => &scheme.body,
-        };
-        let rhs = self.typing(e1, rhs_ty, col + 2);
-        self.env = outer;
-        let (a, rhs) = (a?, rhs?);
-        let rest = self.under(x, |c| c.typing(e2, t, col + 2))?;
-        Ok(if k == 0 {
-            format!("(.let_ (a := {a}){pad}{rhs}{pad}{rest})")
-        } else {
-            format!("(.letGen (k := {k}) (Φ := Facts.none) (a := {a}){pad}{rhs}{pad}{rest})")
-        })
     }
 
     /// `f a₁ … aₙ`: each call at the arrow the instance of `f` gives.

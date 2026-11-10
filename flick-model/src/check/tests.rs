@@ -3,6 +3,7 @@
 use std::fmt::Debug;
 use std::rc::Rc;
 
+use super::trace::key;
 use super::{Checker, TypeError};
 use crate::decls::Decls;
 use crate::syntax::{Arm, Con, Const, Lit, Pat, Path, Prim, Term};
@@ -240,6 +241,20 @@ fn let_sig_rule() {
         ))),
         "Let-Sig",
     );
+}
+
+/// A field of a constructor applied by (App) is typed where it stands: the
+/// trace a certificate reads has its node.
+#[test]
+fn the_fields_of_a_constructor_are_traced() {
+    let e = b_err();
+    let Term::App(_, field) = &e else {
+        unreachable!("a call")
+    };
+    let trace = Checker::new(&decls())
+        .check_top_traced(&e, &mono(Type::con(T, "B")))
+        .expect("`B \"x\"` is a `B`");
+    assert!(trace.contains_key(&key(field)), "the field has no node");
 }
 
 #[test]

@@ -19,10 +19,15 @@ macro "cert_simp" : tactic => `(tactic| (simp_all [Row.union, Row.ofCaps, Row.pl
   Row.none, Row.substT, Caps.substT, Caps.none, Ty.reach, instT, Atom.up, Atom.ty, Ty.asRow,
   Row.err] <;> omega))
 
+/-- `h : x ∈ A` of a finite set `A`, split into one goal for each element `A` names. -/
+macro "split_mem " h:ident : tactic => `(tactic| (
+  (try simp only [Row.union, Row.ofCaps, Row.single, Row.none, Caps.none, Ty.reach] at $h:ident)
+  repeat' (obtain $h:ident | $h:ident := $h:ident)))
+
 /-- `C = C'` or `C ⊆ C'` of finite sets of atoms. -/
 macro "caps_set" : tactic => `(tactic| first
   | (funext x; rcases x with n | p <;> cert_simp)
-  | (simp only [Caps.Sub]; intro x hx; rcases x with n | p <;> cert_simp))
+  | (simp only [Caps.Sub]; intro x hx; rcases x with n | p <;> split_mem hx <;> cert_simp))
 
 /-- `r = r'` or `r ⊆ r'` of finite rows. -/
 macro "row_set" : tactic => `(tactic| first
@@ -30,7 +35,8 @@ macro "row_set" : tactic => `(tactic| first
      rcases x with _ | a | ⟨_, a⟩ | a | ⟨v, a⟩ <;> (try cases a) <;> (try cases v) <;> cert_simp)
   | (simp only [Row.Sub]
      intro x hx
-     rcases x with _ | a | ⟨_, a⟩ | a | ⟨v, a⟩ <;> (try cases a) <;> (try cases v) <;> cert_simp))
+     rcases x with _ | a | ⟨_, a⟩ | a | ⟨v, a⟩ <;> (try cases a) <;> (try cases v) <;> split_mem hx <;>
+       cert_simp))
 
 /-- `φ ≤ φ'` of concrete stages, `Stage.use` unfolded. -/
 macro "stage_le" : tactic => `(tactic| first

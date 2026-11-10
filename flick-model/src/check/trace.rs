@@ -8,7 +8,7 @@ use std::ptr;
 use super::Checker;
 use super::generalize::Inst;
 use crate::syntax::{Name, Term};
-use crate::types::{Scheme, Type};
+use crate::types::{Row, Scheme, Stage, Type};
 
 #[derive(Clone, Debug, Default)]
 pub struct Node {
@@ -23,6 +23,9 @@ pub struct Node {
     /// The rigid variables a signed right side is checked at, those of its
     /// scheme in order.
     pub(crate) rigid: Option<Vec<Name>>,
+    /// The stage of the body of a `try` on its own, and the errors of it
+    /// that pass the arms.
+    pub(crate) own: Option<(Stage, Row)>,
 }
 
 /// The nodes of a check, by [`key`].
@@ -64,6 +67,10 @@ impl Checker<'_> {
                         .map(|(s, is)| (scheme(s), is.iter().map(inst).collect())),
                     scheme: n.scheme.as_ref().map(scheme),
                     rigid: n.rigid.clone(),
+                    own: n
+                        .own
+                        .as_ref()
+                        .map(|(s, r)| (self.zonk_stage(s), self.zonk_row(r))),
                 };
                 (*k, node)
             })

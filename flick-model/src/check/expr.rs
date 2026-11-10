@@ -94,7 +94,9 @@ impl Checker<'_> {
             Term::Try(body, arms) => self.try_(body, arms, None),
             Term::Provide(l, body) => self.provide(l, body, None),
             Term::Handler(h) => self.handler(h, None),
-            Term::Apply(Head::Con(c), args) if args.len() == c.arity => self.construct(c, args, e),
+            Term::Apply(Head::Con(c), args) if args.len() == c.arity => {
+                self.construct(c, args.iter(), e)
+            }
             Term::Apply(head, args) => {
                 let t = match head {
                     Head::Con(c) => self.constructor(&c.ty.module, &c.name)?,
@@ -155,7 +157,7 @@ impl Checker<'_> {
                 xs.iter().try_for_each(|x| self.check(x, t))
             }
             (Term::Apply(Head::Con(c), args), _) if args.len() == c.arity => {
-                let t = self.construct(c, args, e)?;
+                let t = self.construct(c, args.iter(), e)?;
                 self.subsume(&t, &full)
             }
             (Term::Let(x, sig, e1, e2), _) => {
@@ -321,8 +323,8 @@ impl Checker<'_> {
         if let Term::Apply(Head::Con(c), given) = head
             && given.len() + args.len() == c.arity
         {
-            let all: Vec<Term> = given.iter().chain(args).cloned().collect();
-            return self.construct(c, &all, head);
+            // the fields themselves, not copies: the trace is by address
+            return self.construct(c, given.iter().chain(args), head);
         }
         // the spine is one call
         self.call(|c| {

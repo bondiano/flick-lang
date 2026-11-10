@@ -8,7 +8,9 @@
 //! `formal/FormalCert/Tactics.lean` close the side conditions. A form the
 //! certificates do not write yet is `Unsupported`, with its reason.
 
+mod bind;
 mod pat;
+mod raise;
 pub mod sig;
 mod term;
 
