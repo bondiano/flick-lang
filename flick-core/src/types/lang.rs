@@ -243,6 +243,10 @@ impl Table {
             items: vec![None; Lang::ALL.len()],
         };
         for &(module, text) in sources {
+            // most modules declare none: only one that may is parsed
+            if !text.contains("@lang") {
+                continue;
+            }
             let mut map = SourceMap::default();
             let file = map.add(format!("<builtin>/{module}.fl"), text);
             let parse = syntax::parse(text, file);
