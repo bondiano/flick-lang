@@ -48,7 +48,7 @@ The search directories depend on the importing module, in `flick-core/src/projec
 - Standalone modules use the sibling root established by their declared module path.
 - Builtin interfaces are the fallback when no loaded/package module supplies the import.
 
-The loader also rejects imports of lexical inline namespaces and enforces package-private module visibility with `FLICK-R017`. Named functor applications can create virtual modules; their parameters and contract interfaces participate in checking and incremental keys in `flick-core/src/project/load/imports.rs` and `flick-core/src/project/load/checking_core.rs`.
+The loader also rejects imports of lexical inline namespaces and enforces package-private module visibility with `FLICK-R017`. Named applications of parameterized modules can create virtual modules; their parameters and contract interfaces participate in checking and incremental keys in `flick-core/src/project/load/imports.rs` and `flick-core/src/project/load/checking_core.rs`.
 
 ## Two dependency channels
 

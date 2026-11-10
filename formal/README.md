@@ -9,7 +9,7 @@ dictionaries in [`docs/formal/elaboration.md`](../docs/formal/elaboration.md)
 (`Formal/Elab/`, see [Elaboration and T6](#elaboration-and-t6)). Lean 4.29.1
 (`lean-toolchain`), no Mathlib.
 
-The module layer (`type module`, named functors, `Module Sig`, and existential
+The module layer (`type module`, parameterized modules, `Module Sig`, and existential
 module witnesses) is checked before this core. [`Formal/Modules.lean`](Formal/Modules.lean)
 models named result identities, manifest class/service requirements, and scoped
 existential elimination; its rules and limits are in the [module boundary

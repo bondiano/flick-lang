@@ -99,7 +99,7 @@ impl Checking<'_> {
             .map_or(&self.sources.get(loaded.file).text, |e| &e.text)
     }
 
-    fn is_functor_template(loaded: &Loaded) -> bool {
+    fn is_module_template(loaded: &Loaded) -> bool {
         loaded
             .syntax
             .header
@@ -107,7 +107,7 @@ impl Checking<'_> {
             .is_some_and(|header| !header.parameters.is_empty())
     }
 
-    fn functor_template(loaded: &Loaded) -> Output {
+    fn module_template(loaded: &Loaded) -> Output {
         let interface = Interface {
             module: loaded.name.clone(),
             ..Interface::default()
@@ -188,7 +188,7 @@ impl Checking<'_> {
                         {
                             contract_errors.push(Diagnostic::error(
                                 codes::T066,
-                                format!("more than one static module argument supplies a dictionary for `{}`; keep one `instance ... from ...` requirement in this functor scope", types::show_type(&head)),
+                                format!("more than one static module argument supplies a dictionary for `{}`; keep one `instance ... from ...` requirement in the scope of this parameterized module", types::show_type(&head)),
                                 virtual_of.at,
                             ));
                         } else {
@@ -206,8 +206,8 @@ impl Checking<'_> {
     }
 
     fn check(&self, loaded: &Loaded, lookup: &dyn Fn(&str) -> Option<Interface>) -> Output {
-        if Self::is_functor_template(loaded) {
-            return Self::functor_template(loaded);
+        if Self::is_module_template(loaded) {
+            return Self::module_template(loaded);
         }
         let tree = loaded
             .expansion
@@ -344,7 +344,7 @@ impl Checking<'_> {
     ) -> Output {
         let text = self.text_of(loaded);
         let Some(units) = inline_units(loaded, tree, index, inline, text) else {
-            return Self::functor_template(loaded);
+            return Self::module_template(loaded);
         };
         let prefix_output = self.check(&units.prefix, lookup);
         let child = &units.child;

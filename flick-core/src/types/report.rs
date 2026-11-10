@@ -123,7 +123,7 @@ impl Checker<'_> {
             );
             if a == e {
                 // Distinct nominal types from different modules, including
-                // virtual functor results, can share the same short name.
+                // virtual parameterized module results, can share the same short name.
                 return (
                     self.show_qualified(&plain(actual)),
                     self.show_qualified(&plain(expected)),

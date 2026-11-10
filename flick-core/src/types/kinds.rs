@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 #[serde(rename_all = "kebab-case")]
 pub enum Kind {
     Type,
-    /// A `type module` contract, used by static functors and `Module Sig`.
+    /// A `type module` contract, used by parameterized modules and `Module Sig`.
     Module,
     ServiceRow,
     ErrorRow,
