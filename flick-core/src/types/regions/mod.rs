@@ -186,8 +186,8 @@ impl Checker<'_> {
     }
 
     fn collect_bounded_captures(&self, t: &Type, out: &mut Norm, bounded: bool) {
-        let t = self.qualified_head(t);
-        match &t {
+        let t = self.borrowed_head(t);
+        match &*t {
             Type::Bounded { ty, captures } => {
                 if self.holds_nothing(ty) {
                     return;
@@ -208,8 +208,8 @@ impl Checker<'_> {
                 reason = "a known tail must not fall to an atom"
             )]
             Type::Meta(m) if self.store.is_capture_row(*m) => {
-                if !out.tails.contains(&t) {
-                    out.tails.push(t.clone());
+                if !out.tails.contains(&*t) {
+                    out.tails.push(t.into_owned());
                 }
             }
             // an integer literal's type is a number, which captures nothing
