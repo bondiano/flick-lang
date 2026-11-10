@@ -323,6 +323,14 @@ jobs:
       - name: Go runtime
         working-directory: runtime-go
         run: go vet ./... && go test ./...
+      # Windows is the slowest of the three: a push to main holds it to the
+      # cases of tests/run/runtime, and the nightly run and a release, which
+      # call this workflow with another event or ref, run every portable case
+      # there. `FLICK_E2E_ONLY` is a part of the native path of a case
+      - name: Only the runtime cases on Windows for a push to main
+        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && runner.os == 'Windows' }}
+        shell: bash
+        run: echo 'FLICK_E2E_ONLY=runtime\' >> "$GITHUB_ENV"
       - name: Portable cases, the go executable and a non-ASCII project path
         env:
           FLICK_E2E_GO_ONLY: "1"
