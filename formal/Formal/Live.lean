@@ -101,8 +101,18 @@ type, so that the roots name no run-time region cannot be read off `RootTyM`.
 Every region atom of the stage of a hole is one of the thread's stage or of a frame
 (`hole_atm`), and so a region of the hole, which `LNest` makes live; a step that needs a
 region has its atom in the stage of its redex (`open_atm`, `op_atm`, `fin_atm`). That gives
-T4.1, and T4.3 follows from the regions of the handler frames. Translation of live signature
-elision into the core judgment is a separate remaining obligation.T4.2 matters beyond safety: the runtime contract (`Formal/RT/`) takes only T4.3 (as `G11`),
+T4.1, and T4.3 follows from the regions of the handler frames.
+
+Signature elision (`Live/Elide.lean`): `Ty.elide` is the model's reading of a signature
+with `Live` of what earlier parameters reach. The live type of a constant that the core
+types is kept by it (`Const.ty_kept`), so its elided reading is a live supertype
+(`Const.ty_le_elide`) and the core types the constant there by (Sub)
+(`TypM.const_elided`), given instance types that elision leaves alone (`CArg.Fixed`).
+This covers the constants, not user signatures, and the link to the model's `elide` is
+by reading, not a proof; the core counts every atom of a reach, the model only regions
+and capture rows.
+
+T4.2 matters beyond safety: the runtime contract (`Formal/RT/`) takes only T4.3 (as `G11`),
 so giving T4.2 up does not touch T5; what it costs is that a value may keep a closed
 capability reachable (memory, not use).
 -/

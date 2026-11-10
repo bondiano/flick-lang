@@ -163,4 +163,5 @@ import Formal.Elab.Witness.T6b
 import Formal.FailAbort
 import Formal.Live
 import Formal.Live.T4Live
+import Formal.Live.Elide
 import Formal.Axioms

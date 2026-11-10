@@ -62,8 +62,11 @@ in the `lean` job (`leanprover/lean-action` with `build-args: --wfail`).
   `T4'_live` (`Live/T4Live.lean`) proves T4′ of `TypLive`, from an invariant of run-time
   forms (`LNest`, the half of `Nest` that does not bound names) and of the stages of child
   work (`LCfgTy`); both it and `T1_live` take `RootBelow root` as a premise. Four live
-  rule changes, listed in `Live.lean`, close these proofs. The translation of signature
-  elision is not yet proved.
+  rule changes, listed in `Live.lean`, close these proofs. `Live/Elide.lean` gives signature
+  elision (`Ty.elide`) and proves that the elided reading of each constant is a live
+  supertype of its live type (`Const.ty_le_elide`, `TypM.const_elided`), for instance
+  types that elision leaves alone; user signatures and the link to the model's `elide`
+  are not proved.
 - **T5, the runtime contract** (`Formal/RT/`, `RT/T5.lean`): for any core and any
   interleaving, every reachable configuration of λRT satisfies R1–R4, R6 and R7, and R5 and
   R8 hold of the cause algebra, under the hypotheses on the libraries (`Hyp`) and `G11`.
