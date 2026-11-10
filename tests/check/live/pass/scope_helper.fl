@@ -1,0 +1,27 @@
+// captures: accepts
+// `Scope s` keeps `s` live, as `Live` of `s` would: a helper whose row has
+// `Scope s` and no parameter of `s` may use what it acquires into `s`, as
+// a file it opens or a group of fibers it makes and runs
+// (`formal/Formal/Live/Mode.lean`, `TypingMode.use`).
+module App.LiveScopeHelper exposing (..)
+
+type File (s : Region)
+
+service Files =
+  open_scoped : forall s. String ->{Scope s} File s
+  read_all : forall s. File s ->{} String
+
+first_line : String ->{Scope s, Files} String
+let first_line path = Files.read_all (Files.open_scoped path)
+
+group : Unit ->{Scope s, Async} FiberSet.FiberSet s none Unit
+let group () =
+  let set : FiberSet.FiberSet s none Unit = FiberSet.make ()
+  let _ = FiberSet.run { propagateInterruption = false; startImmediately = true } (task { () }) set
+  set
+
+main : Unit ->{Async, Files} String
+let main () = scope {
+  let _ = group ()
+  first_line "x"
+}

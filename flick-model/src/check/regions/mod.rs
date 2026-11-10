@@ -13,11 +13,14 @@ use std::slice;
 use super::{Check, Checker, error};
 use crate::subst::free_vars;
 
+mod live;
 mod provided;
 mod scope;
 mod solve;
 use crate::syntax::{Con, Name, Path, Term};
-use crate::types::{Caps, Fields, Kind, Row, Scheme, Type, Var};
+use crate::types::{Caps, Fields, Kind, Row, Scheme, Stage, Type, Var};
+pub(crate) use live::live_service;
+pub(in crate::check) use live::{arg_caps, live_arg, regions_of};
 
 /// `⋃ ⌈held⌉ ⊆ ⋃ ⌈within⌉ ∪ allowed`.
 #[derive(Clone, Debug)]
@@ -96,11 +99,22 @@ impl Checker<'_> {
             Type::Var(v) => {
                 out.atoms.insert(v.clone());
             }
-            Type::App(a, b) | Type::Fun(a, _, b) => {
+            Type::App(a, b) => {
                 go(a, out);
                 go(b, out);
             }
-            Type::Eff(_, _, a) | Type::Ref(a) => go(a, out),
+            Type::Fun(a, s, b) => {
+                go(a, out);
+                go(b, out);
+                if let Stage::Runtime(r, _) = s {
+                    *out = out.union(&row_live(r));
+                }
+            }
+            Type::Eff(r, _, a) => {
+                go(a, out);
+                *out = out.union(&row_live(r));
+            }
+            Type::Ref(a) => go(a, out),
             Type::Record(f) => f.fields.values().for_each(|t| go(t, out)),
             Type::Tuple(ts) => ts.iter().for_each(|t| go(t, out)),
             // the variables a `∀` binds are no captures: each use instantiates them
@@ -275,6 +289,9 @@ impl Checker<'_> {
     /// `⌈ty^C⌉`. Returns the type with its qualifier: `C` if given, else a
     /// fresh capture row when `e` uses a local.
     pub(super) fn close_over(&mut self, e: &Term, ty: Type, given: Option<Caps>) -> Type {
+        if self.live {
+            return ty;
+        }
         let held: Vec<Type> = free_vars(e)
             .iter()
             .filter_map(|x| self.locals.iter().rev().find(|(n, _)| n == x))
@@ -312,6 +329,71 @@ impl Checker<'_> {
             Type::Captured(_, c) | Type::Bounded(_, c) => self.zonk_caps(&c),
             _ => Caps::default(),
         }
+    }
+
+    /// Every qualifier of `t`, outermost first: a value of `(τ^{≤C})^{≤D}`,
+    /// as `Ref.set` takes into a cell of `τ^{≤C}`, is within each.
+    pub(super) fn qualifiers(&self, t: &Type) -> Vec<Caps> {
+        let mut out = Vec::new();
+        let mut t = self.follow(t);
+        while let Type::Captured(inner, c) | Type::Bounded(inner, c) = &t {
+            out.push(self.zonk_caps(c));
+            t = self.follow(inner);
+        }
+        out
+    }
+
+    /// `t` once for each of its qualifiers, about the bare type: what is
+    /// within `(τ^{≤C})^{≤D}` is within `τ^{≤C}` and within `τ^{≤D}`, not
+    /// within what the two reach together.
+    pub(super) fn layers(&self, t: &Type) -> Vec<Type> {
+        let mut out = Vec::new();
+        let bare = Rc::new(self.resolve(t));
+        let mut cur = self.follow(t);
+        loop {
+            cur = match &cur {
+                Type::Captured(inner, c) => {
+                    out.push(Type::Captured(bare.clone(), c.clone()));
+                    self.follow(inner)
+                }
+                Type::Bounded(inner, c) => {
+                    out.push(Type::Bounded(bare.clone(), c.clone()));
+                    self.follow(inner)
+                }
+                _ => break,
+            };
+        }
+        if out.len() < 2 {
+            return vec![self.follow(t)];
+        }
+        out
+    }
+
+    /// The premises of (Lam) and (Task) against `expected`, for each of its
+    /// qualifiers: the body's stage `inner` within `stage` with its `Live`,
+    /// and what `e` uses of `Γ` within it. Returns `ty` with the outermost.
+    pub(super) fn close_within(
+        &mut self,
+        e: &Term,
+        ty: &Type,
+        inner: &Stage,
+        stage: &Stage,
+        expected: Option<&Type>,
+    ) -> Check<Type> {
+        let layers = expected.map_or_else(Vec::new, |t| self.qualifiers(t));
+        let mut each = layers.clone();
+        if each.is_empty() {
+            each.push(Caps::default());
+        }
+        for q in &each {
+            self.stage_within(inner, &self.live_stage(stage, q))?;
+        }
+        let given = expected.map(|_| each[0].clone());
+        let closed = self.close_over(e, ty.clone(), given);
+        for q in layers.into_iter().skip(1) {
+            self.close_over(e, ty.clone(), Some(q));
+        }
+        Ok(closed)
     }
 
     /// (Proj): a part of a value of `(T ῡ)^C` taken apart has `C` too.
@@ -394,6 +476,14 @@ impl Checker<'_> {
             other => other.clone(),
         }
     }
+}
+
+/// What `{Live C}` of `r` needs alive: `C`, or nothing.
+fn row_live(r: &Row) -> Caps {
+    r.elems
+        .get(&live_service())
+        .map(|a| arg_caps(&a[0]))
+        .unwrap_or_default()
 }
 
 /// The variables `α` of a scheme under a value bound `α^D`.

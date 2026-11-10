@@ -93,7 +93,9 @@ impl Checker<'_> {
                     self.top_value(name, span)
                 } else {
                     let scheme = self.env.value(&entity).cloned();
-                    scheme.map_or(Type::Error, |s| self.instantiate(&s, span))
+                    scheme.map_or(Type::Error, |s| {
+                        self.instantiate(&self.live_scheme(&s), span)
+                    })
                 };
                 self.record_entity(&entity, &ty, span);
                 ty
@@ -226,7 +228,7 @@ impl Checker<'_> {
                         self.grow();
                     }
                     if let Some(e) = effects {
-                        self.call_effects(&e, span);
+                        self.call_effects(&self.live_call(&ty, &e), span);
                     }
                     params.push(*param);
                     let result = self.instantiate(&result, span);
@@ -398,6 +400,7 @@ impl Checker<'_> {
                 if let Some(e) = effects {
                     let (start, _) = lhs.range();
                     let (_, end) = rhs.range();
+                    let e = self.live_call(&function, &e);
                     self.call_effects(&e, Span::new(self.file, start, end));
                 }
                 let span = Span::new(self.file, lhs.range().0, rhs.range().1);
@@ -460,6 +463,7 @@ impl Checker<'_> {
                 }
                 let span = self.span(node);
                 if self.runtime_allowed(span) {
+                    let services = self.live_await(&ty, services);
                     self.perform(&services, &errors, span);
                 }
                 result

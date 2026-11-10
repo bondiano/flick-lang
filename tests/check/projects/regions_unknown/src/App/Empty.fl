@@ -1,0 +1,4 @@
+module App.Empty exposing (..)
+
+empty : Unit
+let empty = ()

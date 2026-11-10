@@ -9,21 +9,23 @@ form, not only a lambda: it is a `scope` whose body gives that function the owne
 
 namespace Flick
 
-variable {S : Sig}
+variable {S : Sig} {mode : TypingMode}
 
 theorem Row.obs_ty (a : Atom) (r : Row) : Row.obs r a.ty = Row.disch a r := by
   funext x; apply propext
   cases x <;> simp [Row.obs, Row.disch, Atom.ty_reach, and_comm]
 
-/-- The step of `Scope.run f` keeps the type, for a closed value `f`. -/
+/-- The step of `Scope.run f` keeps the type, for a closed value `f`. In the live discipline
+the qualifier of `f` is live in the rows around the scope (`Const.ok` of `.scopeRun`). -/
 theorem scopeRun_body {Ψ Θ f t T φ φ₀} {r ε : Row} {C : Caps} (hv : Value f)
-    (h : Typ S Ψ Θ [] f (.ex (.all 1 (.arrow (.owner (.tvar 0))
+    (h : TypM S mode Ψ Θ [] f (.ex (.all 1 (.arrow (.owner (.tvar 0))
       (.rt (Row.union (Row.scope (.tvar 0)) (Row.union (r.substT (shiftV 1))
         (Row.obs (r.substT (shiftV 1)) (.tvar 0)))) (ε.substT (shiftV 1)))
       (t.up 1) (C.substT (shiftV 1)))) φ₀))
-    (hφ : (Stage.rt r ε).le φ) (hT : Le t T) :
-    Typ S Ψ Θ [] (.scope (.app (f.rename (· + 1)) (.var 0))) (.ex T φ) := by
-  have hr := (Typ.allInv hv h).rename (Γ' := [.mono (.owner (.tvar 0))]) (ξ := (· + 1))
+    (hφ : (Stage.rt r ε).le φ) (hT : mode.subtype t T)
+    (hC : mode = .live → Row.Sub (Row.ofCaps C) r) :
+    TypM S mode Ψ Θ [] (.scope (.app (f.rename (· + 1)) (.var 0))) (.ex T φ) := by
+  have hr := (TypM.allInv hv h).rename (Γ' := [.mono (.owner (.tvar 0))]) (ξ := (· + 1))
     fun _ _ hj => by simp at hj
   have hobs := Row.obs_ty (.v 0) (r.substT (shiftV 1))
   simp only [Atom.ty] at hobs
@@ -33,9 +35,16 @@ theorem scopeRun_body {Ψ Θ f t T φ φ₀} {r ε : Row} {C : Caps} (hv : Value
   · rintro (h' | h')
     · exact (h.noIns hv).rename _ h'
     · cases h'
-  · exact (Typ.app (hr.sub ⟨.refl, Stage.pure_le _⟩)
-      (.var (ts := []) rfl rfl (fun _ _ h => False.elim h) .refl) (Stage.le_refl _) .refl).cut
+  · refine (TypM.app (hr.sub ⟨TypingMode.subtype.refl, Stage.pure_le _⟩)
+      (.var (σ := .mono (.owner (.tvar 0))) (ts := []) rfl rfl
+        (fun _ _ h => False.elim h) TypingMode.instSubtype.refl) ?_ TypingMode.subtype.refl).cut
       (Entails.union_left _ _)
+    cases mode with
+    | captures => exact Stage.le_refl _
+    | live =>
+      have hs := (hC rfl).substT (shiftV 1)
+      rw [Row.ofCaps_substT] at hs
+      exact ⟨fun x hx => hx.elim id fun h' => .inr (.inl (hs x h')), fun _ h' => h'⟩
   · rw [← hobs]; exact Stage.le_refl _
 
 /-- `Scope.run (λ. b)` and `scope b` run the same way: each creates the region at the end of

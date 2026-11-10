@@ -39,6 +39,7 @@ impl Checker<'_> {
         }
         self.merge_same_names(&mut left_norm)?;
         self.merge_same_names(&mut right_norm)?;
+        self.unify_live(&mut left_norm, &mut right_norm);
         let (left, right) = (left_norm, right_norm);
         let (mut only_left, mut only_right) = (Vec::new(), Vec::new());
         let (mut i, mut j) = (0, 0);
@@ -175,6 +176,11 @@ impl Checker<'_> {
         while i < norm.entries.len() {
             if norm.entries[i].0 == norm.entries[i - 1].0 {
                 let (kept, same) = (norm.entries[i - 1].1.clone(), norm.entries.remove(i).1);
+                // what each `Live` needs alive, `regions/live.rs`, is needed together
+                if norm.entries[i - 1].0 == super::regions::LIVE {
+                    norm.entries[i - 1].1 = Type::Union(Box::new(kept), Box::new(same));
+                    continue;
+                }
                 self.unify(&kept, &same)?;
             } else {
                 i += 1;

@@ -894,6 +894,36 @@ Divergence: (Lam) and (Task) did not see runtime forms in the body.
 - Symptom: the premise of (Lam) counted only the free variables of the body. The term `λx. (λy. ()) (cap π n)` has none and gets type `(Unit → Unit)^∅`, although the body holds a capability of region `π`, and L4 fails for it. Programs contain no such terms, but a step creates them: substituting a value for a free variable leaves `cap π n` inside a `λ`.
 - Imprecise §3.4. Resolution, document: for runtime forms, the premises of (Lam) and (Task) count the regions of `cap π n`, `own π` and `⌈Ψ(ℓ)⌉` of the body's locations on a par with `⌈Γ(y)⌉` of the free variables; for programs the rule is unchanged. Substituting a value preserves the premise by the syntactic part of L4: a value holds no more than its type shows. Lean: `held`, `Typ.lam`, `Typ.holds`. Found while proving T4 in Lean (`formal/Formal/Regions.lean`).
 
+### A cell's content and the cell both bound what is stored
+
+Divergence: the model checked a value stored by `Ref.set` only against the outer of two qualifiers.
+
+```flick
+leak : Unit ->{} Unit
+let leak () =
+  let cell = Ref.make (task { () })
+  let _ = scope s { let h = open "x"; Ref.set cell (task { use h }) }
+  await (Ref.get cell)
+```
+
+- Symptom: the model's checkers, captures and live, accepted the program, and its machine stopped with "use after close". `Ref.set` takes `α^c` with `α` the cell's content `τ^{c₀}`, so the task was checked against `(τ^{c₀})^c`. (Lam), (Task) and (≤-Cap) took only `c`, which is free and grew to `s`; `c₀`, the capacity the cell was made with, was never asked. flick-core rejects the program in both modes.
+- Model hole, not a hole of the document or of Lean, where `Ref.set` takes exactly the cell's type. Resolution, model: a value checked against nested qualifiers is within each (`qualifiers`, `layers`, `close_within` in `check/regions/mod.rs`), so `c₀` grows to `s` and `s` would leave its `scope` (`FLICK-G002`). Found while porting the live discipline to flick-core. Test: `flick-model/tests/live_core.rs` `live_core_rejects_a_task_in_an_outer_cell`.
+
+### Scope keeps its region live
+
+Divergence: the live discipline (`[build] regions = "live"`) of the model and of flick-core kept `Live C` as a row element of its own, apart from `Scope s`.
+
+```flick
+group : Unit ->{Scope s, Async;} FiberSet.FiberSet s none Unit
+let group () =
+  let set : FiberSet.FiberSet s none Unit = FiberSet.make ()
+  let _ = FiberSet.run { propagateInterruption = false; startImmediately = true } (task { () }) set
+  set
+```
+
+- Symptom: under the live discipline both checkers rejected the helper (`FLICK-G002` "this uses `s`, which the signature of `group` does not keep live"). Its body uses region `s`, its row has `Scope s` and no `Live s`, and no program can write `Live s`. The same held for `tests/run/runtime/{closing_child_fails,closing_hooks,group_in_closing}.fl`, which the captures discipline accepts and which run.
+- Stricter than Lean, not a hole: in `formal/Formal/Live/Mode.lean`, `TypingMode.use .live (.rt r ε) C` is `.rt (Row.union r (Row.ofCaps C)) ε`, and `Row.scope s = Row.ofCaps s.reach` (`Syntax.lean`), so `Live C` and `Scope s` are the same row atoms. Resolution, model and checker: where `Live C` is checked within a row, the regions of that row's `Scope ϱ` count as live. Work an owner keeps needs the regions of its `Live` to outlive the owner; its `Scope` is the owner's own ([children acquire in the region of their owner](#children-acquire-in-the-region-of-their-owner)), which adds nothing to that. Only one direction: `Live ϱ` gives no `Scope ϱ`, so an acquisition into `ϱ` still needs `Scope ϱ` (`FLICK-G004`). Model: `check/regions/live.rs` `scope_live`, `check/rows.rs` `within`; flick-core: `types/regions/live_rows.rs`. Tests: `flick-model/tests/live_scope.rs`; `tests/check/live/pass/scope_helper.fl`, `tests/check/live/fail/acquire.fl`.
+- Not extended to `Setup s` of a component, so `tests/check/pass/ui/component_setup.fl` is still rejected under the live discipline. The runtime gives `Setup s` only while it sets up the instance of region `s` (`setUp` in `runtime/src/rt/ui/views.ts` and `runtime/src/ui/react/views.ts`), but `Setup` is a service that no rule keeps a program from providing, so the checker cannot tell that `s` is open where a row has `Setup s`. Test: `tests/check/live/fail/setup_live.fl`.
 Outside regions, found along the way:
 
 ### flick build stops at an unknown module

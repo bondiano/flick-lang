@@ -11,7 +11,7 @@ use flick_core::project::{self, Compiled, Host};
 use flick_core::source::SourceMap;
 use flick_core::{build, ir};
 
-use crate::check::check_program;
+use crate::check::check_program_with;
 use crate::decls::Decls;
 use crate::eval::{Machine, Outcome, Program};
 use crate::syntax::{Name, Path, Term};
@@ -66,11 +66,16 @@ pub fn decls(modules: &[Compiled]) -> Decls {
 
 /// The type errors of the top-level values of `modules`.
 pub fn check(modules: &[Compiled], program: &Program) -> Vec<String> {
+    check_with(modules, program, false)
+}
+
+/// [`check`] under the discipline of `check/regions/live.rs` if `live`.
+pub fn check_with(modules: &[Compiled], program: &Program, live: bool) -> Vec<String> {
     let checked: HashSet<Name> = modules
         .iter()
         .map(|m| Name::from(m.name.as_str()))
         .collect();
-    check_program(program, &decls(modules), &checked)
+    check_program_with(program, &decls(modules), &checked, live)
         .into_iter()
         .map(|(p, e)| format!("{p}: {e}"))
         .collect()

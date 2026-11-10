@@ -62,6 +62,7 @@ impl Checker<'_> {
         let Some(region) = self.subrows[i].provides.clone() else {
             return actual;
         };
+        self.discharge_live(&mut actual, &region);
         let Some(scope) = actual.get(regions::scope()).cloned() else {
             return actual;
         };
@@ -95,7 +96,10 @@ impl Checker<'_> {
             Type::Meta(m) => Some(*m),
             _ => None,
         });
-        for (label, ty) in &actual.entries {
+        if self.grow_live(&actual, &declared, open) {
+            return true;
+        }
+        for (label, ty) in actual.entries.iter().filter(|(l, _)| l != regions::LIVE) {
             match declared.get(label) {
                 Some(bound) => {
                     let bound = bound.clone();
@@ -203,7 +207,8 @@ impl Checker<'_> {
             }
             let mut lacking = Vec::new();
             let mut labels = Vec::new();
-            for (label, ty) in &actual.entries {
+            self.report_live(&actual, &declared, c.site, c.span);
+            for (label, ty) in actual.entries.iter().filter(|(l, _)| l != regions::LIVE) {
                 match declared.get(label) {
                     Some(bound) => {
                         if let Err(m) = self.unify(ty, bound) {

@@ -123,7 +123,7 @@ theorem resume_arg {Θ p ℓ κ Ef al rf u k t φ} {A : List Frame} (hA : OkE A)
 theorem hres_val {Θ p ℓ a w t φ} (hc : HCell Ψ p ℓ) (h : Typ S Ψ Θ [] (.hres p ℓ a w) (.ex t φ)) :
     ∃ T φ', Typ S Ψ Θ [] w (.ex T φ') ∧ ∀ x, T.reach (.r x) → x < p := by
   cases h with
-  | hres hℓ hb _ _ _ _ _ _ => exact ⟨_, _, hb, fun x hx => (hc.res hℓ).1.reach hx⟩
+  | hres hℓ hb _ _ _ _ _ _ _ => exact ⟨_, _, hb, fun x hx => (hc.res hℓ).1.reach hx⟩
   | errVal hv | allI hv => cases hv
 
 /-- What a resumed body raises names no region younger than its handler. -/
@@ -131,7 +131,7 @@ theorem hres_raise {Θ p ℓ a w t φ} (hc : HCell Ψ p ℓ) (hw : Value w)
     (h : Typ S Ψ Θ [] (.hres p ℓ a (.raise w)) (.ex t φ)) :
     ∃ T φ', Typ S Ψ Θ [] w (.ex T φ') ∧ ∀ x, T.reach (.r x) → x < p := by
   cases h with
-  | hres hℓ hb _ _ _ _ _ _ =>
+  | hres hℓ hb _ _ _ _ _ _ _ =>
     obtain ⟨ε', hw', hε⟩ := raise_inv hw hb
     obtain ⟨_, _, he, -, hs⟩ := Stage.rt_le hε
     cases he
@@ -140,7 +140,7 @@ theorem hres_raise {Θ p ℓ a w t φ} (hc : HCell Ψ p ℓ) (hw : Value w)
 
 theorem hres_not_pure {Θ p ℓ a b t} (h : Typ S Ψ Θ [] (.hres p ℓ a b) (.ex t .pure)) : False := by
   cases h with
-  | hres _ _ _ _ _ _ hφ _ => exact hφ
+  | hres _ _ _ _ _ _ _ hφ _ => exact hφ
   | errVal hv | allI hv => cases hv
 
 end Flick

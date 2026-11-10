@@ -51,6 +51,37 @@ in the `lean` job (`leanprover/lean-action` with `build-args: --wfail`).
   regions), `T4_3` (no handler of a region that ended is used) and `T1_regions` (`T1` with
   `op_H`, without the blocked outcome of a step that needs a region that is not live, which
   `T4` rules out).
+- **T4′** (`Formal/Live.lean`, `Formal/Live/`): `SafeUse`, T4.1 and T4.3 without T4.2, the safety a
+  discipline where a region is needed alive only where it is used promises; `T4'_captures`
+  proves it of the capture rules from `T4` and `T4_3`. `TypM` (`Rules.lean`) now gives
+  both `Typ` (captures, unchanged) and `TypLive`, with use-stage subtyping `LeLive`,
+  region use in `Const.ty`, and bounds on the live rows of child work and finalizers.
+  `LiveRules.lean` checks holding without use, scope discharge, qualifier-preserving
+  subtyping and owner bounds. The lemmas soundness rests on are proved for both instances:
+  values are pure and have canonical forms (`Canonical.lean`, `Shapes.lean`,
+  `CanonForms.lean`, `DictCanon.lean`, `Patterns.lean`), L3 holds for a frame and a
+  context (`FrameTy.lean`, `Context.lean`, `Lemma3.lean`), progress
+  (`Progress.lean`, `ProgressMain.lean`) shows every closed term of either discipline to
+  be a value or one of the outcomes `NV`, and preservation holds of a pure step
+  (`PresPure.lean`), of refilling the hole of a handler (`PresHdl.lean`) and of the
+  run-time steps of handlers at the redex (`PresHdlRt.lean`). Typing by use adds only
+  region atoms to a use stage, so a frame still takes over the named effects of its hole.
+  The one step that closes a handler's region, `hwithCatch`, needs that region's atom in
+  the stage of the live discipline: the frame supplies it, so the live statement of the
+  step carries it as a premise. A context that fixes the stage of its body — `scope`, and
+  the desugaring of `Scope.run` — must also hold the qualifier of what the body uses,
+  which the capture instance erases and the live instance does not; that fact follows
+  from the subtype of the argument (`LeLive.arrow_use`), through the inversion of the
+  type former that carries the qualifier. Preservation holds of every step for both
+  instances (`PresRt.lean`, `Preservation.lean`), and `T1_live` is `T1` of `TypLive`.
+  `T4'_live` (`Live/T4Live.lean`) proves T4′ of `TypLive`, from an invariant of run-time
+  forms (`LNest`, the half of `Nest` that does not bound names) and of the stages of child
+  work (`LCfgTy`); both it and `T1_live` take `RootBelow root` as a premise. Four live
+  rule changes, listed in `Live.lean`, close these proofs. `Live/Elide.lean` gives signature
+  elision (`Ty.elide`) and proves that the elided reading of each constant is a live
+  supertype of its live type (`Const.ty_le_elide`, `TypM.const_elided`), for instance
+  types that elision leaves alone; user signatures and the link to the model's `elide`
+  are not proved.
 - **T5, the runtime contract** (`Formal/RT/`, `RT/T5.lean`): for any core and any
   interleaving, every reachable configuration of λRT satisfies R1–R4, R6 and R7, and R5 and
   R8 hold of the cause algebra, under the hypotheses on the libraries (`Hyp`) and `G11`.
@@ -81,8 +112,8 @@ in the `lean` job (`leanprover/lean-action` with `build-args: --wfail`).
 `witness_T6b_example`, `witness_T6b_closed` and `witness_T6b_open` lists only Lean's standard `propext`,
 `Classical.choice` and `Quot.sound`; the hypotheses of T5 (`Hyp`, `G11`), of T6(a)
 (`Target`; for the core, `Real`) and of T6(b) (`Coherent`, `Sim`) are their parameters.
-`Formal/Axioms.lean` pins what `#print axioms` prints for `T1`, `T6a`, `T6b`, `T6a_core`
-and `T6b_core` with `#guard_msgs`, so `lake build` fails on a `sorry` or a new axiom.
+`Formal/Axioms.lean` pins what `#print axioms` prints for `T1`, `T1_live`, `T4'_live`, `T6a`,
+`T6b`, `T6a_core` and `T6b_core` with `#guard_msgs`, so `lake build` fails on a `sorry` or a new axiom.
 
 T4.3 is the premise G11 of T5 in the form [the answering provide must be live](../docs/formal/runtime.md#the-provide-liveness-premise-is-stronger-than-typing-gives) gives it: an operation answered by a handler of the region `q` happens only while `q` is live.
 Its Lean statement (`T43Main.lean`), the counterpart of `G11` in `Formal/RT/Hyp.lean`:

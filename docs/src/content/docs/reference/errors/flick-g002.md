@@ -21,3 +21,8 @@ let deferred_read path =
     }
   }
 ```
+
+Under the experimental live discipline (`[build] regions = "live"`) a value may
+hold a region of the scope as long as it does not use it, and this code also
+reports a use of a region that the expected type does not keep live: see
+[Live regions](../../handbook/live-regions/).

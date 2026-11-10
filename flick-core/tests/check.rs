@@ -13,13 +13,17 @@ use std::slice;
 use std::{fmt, fs};
 
 use flick_core::diagnostics::codes::Area;
-use flick_core::diagnostics::{Diagnostic, codes};
+use flick_core::diagnostics::{Diagnostic, Severity, codes};
 #[cfg(feature = "native-project")]
 use flick_core::project::{self, Host};
 use flick_core::source;
 use flick_core::source::{FileId, SourceFile, SourceMap};
 #[cfg(feature = "native-project")]
 use flick_core::syntax::{self, cst::Node, kind::SyntaxKind};
+use flick_core::types::RegionMode;
+
+#[path = "check/live.rs"]
+mod live;
 
 /// 1-based `line:col-line:col`, columns in characters, end exclusive.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -204,6 +208,11 @@ fn fixtures(dir: &Path, out: &mut Vec<PathBuf>) {
 }
 
 fn check_fixture(path: &Path, should_fail: bool) -> Vec<String> {
+    check_fixture_in(path, should_fail, RegionMode::Captures)
+}
+
+/// [`check_fixture`] under the discipline of regions `regions`.
+fn check_fixture_in(path: &Path, should_fail: bool, regions: RegionMode) -> Vec<String> {
     let mut sources = SourceMap::default();
     let (file, utf8) = sources.add_bytes(
         path.display().to_string(),
@@ -211,7 +220,10 @@ fn check_fixture(path: &Path, should_fail: bool) -> Vec<String> {
     );
     let mut actual: Vec<_> = utf8.into_iter().collect();
     if actual.is_empty() {
-        actual = lone(&mut sources, path, file);
+        actual = match regions {
+            RegionMode::Captures => lone(&mut sources, path, file),
+            RegionMode::Live => flick_core::check_regions(&sources, file, regions),
+        };
     }
     let expected = match parse_annotations(&sources.get(file).text) {
         Ok(expected) => expected,

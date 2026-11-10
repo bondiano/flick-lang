@@ -1,0 +1,29 @@
+// captures: FLICK-G001
+// A qualifier does not hide `Live`: a function qualified by a region is a
+// function whose use needs the region live, so it is no function without
+// a qualifier, whose use needs nothing live.
+module App.LiveQualifier exposing (..)
+
+type alias Path = String
+
+type File (s : Region)
+
+type error OpenError = OpenError Path
+
+type error ReadError = ReadError Path
+
+service FileSystem =
+  open_scoped : forall s. Path ->{Scope s; OpenError} File s
+  read_all : forall s. File s ->{; ReadError} String
+
+run : (Unit ->{FileSystem; ReadError} String) ->{FileSystem; ReadError} String
+let run work = work ()
+
+dropped : Path ->{FileSystem; OpenError, ReadError} String
+let dropped path = scope {
+  let file = FileSystem.open_scoped path
+  read : (Unit ->{FileSystem; ReadError} String)^{s}
+  let read = fun () -> FileSystem.read_all file
+  run read
+}
+//~ FLICK-G002 @27:7-27:11

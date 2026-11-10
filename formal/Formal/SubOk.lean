@@ -14,17 +14,20 @@ which keeps the premises of (Lam) and (Task).
 
 namespace Flick
 
-variable {S : Sig}
+variable {S : Sig} {mode : TypingMode}
 
 /-- The facts of the context at the level of a scheme. -/
 def Facts.at (Θ : Facts) (s : Scheme) : Facts := Facts.union (Θ.substT (shiftV s.k)) s.cs
 
 /-- A substitution `σ : Γ → Γ'`: each variable goes to a pure term of its scheme,
 without `inside`, holding no more than its scheme shows, a value or a variable. -/
-def SubOk (S : Sig) (Ψ : List Ty) (Θ : Facts) (Γ Γ' : List Scheme) (σ : Nat → Tm) : Prop :=
+def SubOkM (S : Sig) (mode : TypingMode) (Ψ : List Ty) (Θ : Facts) (Γ Γ' : List Scheme)
+    (σ : Nat → Tm) : Prop :=
   ∀ (i : Nat) s, Γ[i]? = some s →
-    Typ S (Ψ.map (Ty.up s.k)) (Θ.at s) (Γ'.map (Scheme.up s.k)) (σ i) (.ex s.t .pure) ∧
-      (σ i).NoIns ∧ Caps.Sub (held Ψ Γ' (σ i)) s.reach ∧ (σ i).StandsAt Γ' s
+    TypM S mode (Ψ.map (Ty.up s.k)) (Θ.at s) (Γ'.map (Scheme.up s.k)) (σ i) (.ex s.t .pure) ∧
+      (σ i).NoIns ∧ mode.held (held Ψ Γ' (σ i)) s.reach ∧ (σ i).StandsAt Γ' s
+
+abbrev SubOk (S : Sig) := SubOkM S .captures
 
 @[simp] theorem idTs_length (k : Nat) : (idTs k).length = k := by simp [idTs]
 
@@ -57,22 +60,22 @@ theorem Scheme.up_holds_self (s : Scheme) (Θ : Facts) :
   exact fun x hx => .inr ⟨C₀, .inr h₀, hx⟩
 
 /-- A variable at the level of its own scheme. -/
-theorem Typ.var_self {Ψ : List Ty} {Θ : Facts} {Γ : List Scheme} {i : Nat} {s : Scheme}
+theorem TypM.var_self {Ψ : List Ty} {Θ : Facts} {Γ : List Scheme} {i : Nat} {s : Scheme}
     {φ : Stage} (hi : Γ[i]? = some s) :
-    Typ S Ψ (Θ.at s) (Γ.map (Scheme.up s.k)) (.var i) (.ex s.t φ) :=
+    TypM S mode Ψ (Θ.at s) (Γ.map (Scheme.up s.k)) (.var i) (.ex s.t φ) :=
   .var (σ := s.up s.k) (ts := idTs s.k) (by simp [hi]) (by simp [Scheme.up, Scheme.substT])
-    (s.up_holds_self Θ) (by rw [Scheme.up_inst_self]; exact .refl)
+    (s.up_holds_self Θ) (by rw [Scheme.up_inst_self]; exact TypingMode.instSubtype.refl)
 
 /-- A term at the level of a scheme, at an instance whose facts hold. -/
-theorem Typ.instantiate {Ψ : List Ty} {Θ : Facts} {Γ : List Scheme} {e : Tm} {s : Scheme}
+theorem TypM.instantiate {Ψ : List Ty} {Θ : Facts} {Γ : List Scheme} {e : Tm} {s : Scheme}
     {ts : List Ty} (hts : ts.length = s.k) (hH : s.Holds Θ ts) (hn : e.NoIns)
-    (h : Typ S (Ψ.map (Ty.up s.k)) (Θ.at s) (Γ.map (Scheme.up s.k)) e (.ex s.t .pure)) :
-    Typ S Ψ Θ Γ e (.ex (s.inst ts) .pure) := by
-  have := h.substT (instT ts) (Fits.noIns hn fun _ => rfl)
+    (h : TypM S mode (Ψ.map (Ty.up s.k)) (Θ.at s) (Γ.map (Scheme.up s.k)) e (.ex s.t .pure)) :
+    TypM S mode Ψ Θ Γ e (.ex (s.inst ts) .pure) := by
+  have := TypM.substT h (instT ts) (Fits.noIns hn fun _ => rfl)
   simp only [List.map_map, Function.comp_def, Ty.up_substT _ _ _ hts,
     Scheme.up_substT _ _ _ hts, List.map_id', Flick.J.substT, Facts.at, Facts.union_substT,
     Facts.up_substT _ _ _ hts] at this
-  refine this.cut fun C r hC x hx => ?_
+  refine TypM.cut this fun C r hC x hx => ?_
   rcases hC x hx with h' | ⟨C', h₁ | ⟨C₀, r₀, h₀, rfl, hr⟩, h₂⟩
   · exact .inl h'
   · exact .inr ⟨C', h₁, h₂⟩
@@ -106,21 +109,31 @@ theorem held_down {Ψ Γ e} {s : Scheme}
     exact (Ty.reach_up _ _ _).mpr ⟨a, ha, rfl⟩
 
 /-- A value at the level of its scheme is a fit replacement. -/
+theorem SubOkM.value {Ψ : List Ty} {Θ : Facts} {Γ' : List Scheme} {v : Tm} {s : Scheme} (hv : Value v)
+    (h : TypM S mode (Ψ.map (Ty.up s.k)) (Θ.at s) (Γ'.map (Scheme.up s.k)) v (.ex s.t .pure)) :
+    v.NoIns ∧ mode.held (held Ψ Γ' v) s.reach ∧ v.StandsAt Γ' s := by
+  refine ⟨TypM.noIns h hv, ?_, .inl hv⟩
+  cases mode with
+  | captures => exact held_down (Typ.holds h hv rfl).1
+  | live => trivial
+
 theorem SubOk.value {Ψ : List Ty} {Θ : Facts} {Γ' : List Scheme} {v : Tm} {s : Scheme} (hv : Value v)
     (h : Typ S (Ψ.map (Ty.up s.k)) (Θ.at s) (Γ'.map (Scheme.up s.k)) v (.ex s.t .pure)) :
-    v.NoIns ∧ Caps.Sub (held Ψ Γ' v) s.reach ∧ v.StandsAt Γ' s :=
-  ⟨h.noIns hv, held_down (h.holds hv rfl).1, .inl hv⟩
+    v.NoIns ∧ Caps.Sub (held Ψ Γ' v) s.reach ∧ v.StandsAt Γ' s := SubOkM.value hv h
 
-theorem SubOk.lift {Ψ Θ Γ Γ' σ} (h : SubOk S Ψ Θ Γ Γ' σ) (Δ : List Scheme) {n} (hn : Δ.length = n) :
-    SubOk S Ψ Θ (Δ ++ Γ) (Δ ++ Γ') (liftS n σ) := by
+theorem SubOkM.lift {Ψ Θ Γ Γ' σ} (h : SubOkM S mode Ψ Θ Γ Γ' σ) (Δ : List Scheme) {n} (hn : Δ.length = n) :
+    SubOkM S mode Ψ Θ (Δ ++ Γ) (Δ ++ Γ') (liftS n σ) := by
   intro i s hi
   subst hn
   unfold liftS
   split
   · rw [List.getElem?_append_left (by omega)] at hi
-    refine ⟨Typ.var_self (by rw [List.getElem?_append_left (by omega)]; exact hi), ?_, ?_⟩
+    refine ⟨TypM.var_self (by rw [List.getElem?_append_left (by omega)]; exact hi), ?_, ?_⟩
     · intro h; cases h
     refine ⟨?_, .inr (.inl ⟨_, rfl, by rw [List.getElem?_append_left (by omega)]; exact hi⟩)⟩
+    cases mode with
+    | live => trivial
+    | captures =>
     rintro a (⟨j, s', hj, hs, ha⟩ | ⟨p, hp, _⟩ | ⟨l, _, hl, _⟩)
     · cases hj; rw [List.getElem?_append_left (by omega), hi] at hs; cases hs; exact ha
     · cases hp
@@ -130,20 +143,21 @@ theorem SubOk.lift {Ψ Θ Γ Γ' σ} (h : SubOk S Ψ Θ Γ Γ' σ) (Δ : List Sc
     have hr : RenOk Γ' (Δ ++ Γ') (· + Δ.length) := fun j s hj => by
       show (Δ ++ Γ')[j + Δ.length]? = some s
       rw [List.getElem?_append_right (by omega)]; simpa using hj
-    refine ⟨ht.rename fun j s hj => ?_, hnI.rename _, (held_rename hr fun j hj => ?_).trans hc,
+    refine ⟨TypM.rename ht fun j s hj => ?_, hnI.rename _,
+      TypingMode.held_mono (held_rename hr fun j hj => ?_) hc,
       hV.rename hr⟩
     · rw [List.map_append, List.getElem?_append_right (by simp only [List.length_map]; omega)]
       simpa using hj
-    · have := ht.frees j hj; simpa using this
+    · have := TypM.frees ht j hj; simpa using this
 
-theorem SubOk.up {Ψ Θ Γ Γ' σ} (h : SubOk S Ψ Θ Γ Γ' σ) (k : Nat) (Φ : Facts) :
-    SubOk S (Ψ.map (Ty.up k)) (Facts.union (Θ.substT (shiftV k)) Φ) (Γ.map (Scheme.up k))
+theorem SubOkM.up {Ψ Θ Γ Γ' σ} (h : SubOkM S mode Ψ Θ Γ Γ' σ) (k : Nat) (Φ : Facts) :
+    SubOkM S mode (Ψ.map (Ty.up k)) (Facts.union (Θ.substT (shiftV k)) Φ) (Γ.map (Scheme.up k))
       (Γ'.map (Scheme.up k)) σ := by
   intro i s hi
   simp only [List.getElem?_map, Option.map_eq_some_iff] at hi
   obtain ⟨s₀, hs₀, rfl⟩ := hi
   obtain ⟨ht, hnI, hc, hV⟩ := h _ _ hs₀
-  have := ht.substT (liftT s₀.k (shiftV k)) (Fits.noIns hnI fun _ => by simp [liftT, Ty.up_def, Ty.substT, shiftV])
+  have := TypM.substT ht (liftT s₀.k (shiftV k)) (Fits.noIns hnI fun _ => by simp [liftT, Ty.up_def, Ty.substT, shiftV])
   simp only [Flick.J.substT] at this
   have e₁ : (Ψ.map (Ty.up s₀.k)).map (Ty.substT (liftT s₀.k (shiftV k))) =
       (Ψ.map (Ty.up k)).map (Ty.up s₀.k) := by
@@ -155,7 +169,11 @@ theorem SubOk.up {Ψ Θ Γ Γ' σ} (h : SubOk S Ψ Θ Γ Γ' σ) (k : Nat) (Φ :
       Facts.union ((Θ.substT (shiftV k)).substT (shiftV s₀.k)) (s₀.up k).cs := by
     simp only [Facts.at, Facts.union_substT, Facts.up_comm]; rfl
   rw [e₁, e₂, e₃] at this
-  refine ⟨this.cut ?_, hnI, held_up k hc, hV.substT _⟩
+  refine ⟨TypM.cut this ?_, hnI, ?_, hV.substT _⟩
+  rotate_left
+  · cases mode with
+    | captures => exact held_up k hc
+    | live => trivial
   have hk : (s₀.up k).k = s₀.k := rfl
   simp only [Facts.at, hk]
   intro C r hC x hx
@@ -190,18 +208,49 @@ theorem noIns_subst {Γ : List Scheme} {e : Tm} {σ : Nat → Tm} (hΓ : ∀ i, 
   · exact hn h
   · exact hσ i _ (List.getElem?_eq_getElem (hΓ i hi)) h
 
-theorem SubOk.mono {Ψ Θ Θ' Γ Γ'} {σ : Nat → Tm} (h : SubOk S Ψ Θ Γ Γ' σ) (hΘ : Entails Θ Θ') :
-    SubOk S Ψ Θ' Γ Γ' σ := fun i s hi =>
+theorem SubOkM.mono {Ψ Θ Θ' Γ Γ'} {σ : Nat → Tm} (h : SubOkM S mode Ψ Θ Γ Γ' σ)
+    (hΘ : Entails Θ Θ') : SubOkM S mode Ψ Θ' Γ Γ' σ := fun i s hi =>
   let ⟨ht, hn, hc⟩ := h i s hi
-  ⟨ht.cut (hΘ.lift s.k s.cs), hn, hc⟩
+  ⟨TypM.cut ht (hΘ.lift s.k s.cs), hn, hc⟩
 
-theorem SubOk.held {Ψ : List Ty} {Θ : Facts} {Γ Γ' : List Scheme} {e : Tm} {T : Caps} {σ : Nat → Tm} (hσ : SubOk S Ψ Θ Γ Γ' σ)
-    (hΓ : ∀ i, e.Free i → i < Γ.length) (h : Caps.Sub (held Ψ Γ e) T) :
-    Caps.Sub (held Ψ Γ' (e.subst σ)) T :=
-  (held_subst hΓ fun i s hs => (hσ i s hs).2.2.1).trans h
+theorem SubOkM.held {Ψ : List Ty} {Θ : Facts} {Γ Γ' : List Scheme} {e : Tm} {T : Caps}
+    {σ : Nat → Tm} (hσ : SubOkM S mode Ψ Θ Γ Γ' σ)
+    (hΓ : ∀ i, e.Free i → i < Γ.length) (h : mode.held (held Ψ Γ e) T) :
+    mode.held (held Ψ Γ' (e.subst σ)) T := by
+  cases mode with
+  | captures => exact (held_subst hΓ fun i s hs => (hσ i s hs).2.2.1).trans h
+  | live => trivial
 
-theorem SubOk.noIns {Ψ : List Ty} {Θ : Facts} {Γ Γ' : List Scheme} {e : Tm} {σ : Nat → Tm} (hσ : SubOk S Ψ Θ Γ Γ' σ)
+theorem SubOkM.noIns {Ψ : List Ty} {Θ : Facts} {Γ Γ' : List Scheme} {e : Tm} {σ : Nat → Tm}
+    (hσ : SubOkM S mode Ψ Θ Γ Γ' σ)
     (hΓ : ∀ i, e.Free i → i < Γ.length) (h : e.NoIns) : (e.subst σ).NoIns :=
   noIns_subst hΓ h fun i s hs => (hσ i s hs).2.1
+
+theorem Typ.var_self {Ψ : List Ty} {Θ : Facts} {Γ : List Scheme} {i : Nat} {s : Scheme}
+    {φ : Stage} (hi : Γ[i]? = some s) :
+    Typ S Ψ (Θ.at s) (Γ.map (Scheme.up s.k)) (.var i) (.ex s.t φ) := TypM.var_self hi
+
+theorem Typ.instantiate {Ψ : List Ty} {Θ : Facts} {Γ : List Scheme} {e : Tm} {s : Scheme}
+    {ts : List Ty} (hts : ts.length = s.k) (hH : s.Holds Θ ts) (hn : e.NoIns)
+    (h : Typ S (Ψ.map (Ty.up s.k)) (Θ.at s) (Γ.map (Scheme.up s.k)) e (.ex s.t .pure)) :
+    Typ S Ψ Θ Γ e (.ex (s.inst ts) .pure) := TypM.instantiate hts hH hn h
+
+theorem SubOk.lift {Ψ Θ Γ Γ' σ} (h : SubOk S Ψ Θ Γ Γ' σ) (Δ : List Scheme) {n} (hn : Δ.length = n) :
+    SubOk S Ψ Θ (Δ ++ Γ) (Δ ++ Γ') (liftS n σ) := SubOkM.lift h Δ hn
+
+theorem SubOk.up {Ψ Θ Γ Γ' σ} (h : SubOk S Ψ Θ Γ Γ' σ) (k : Nat) (Φ : Facts) :
+    SubOk S (Ψ.map (Ty.up k)) (Facts.union (Θ.substT (shiftV k)) Φ) (Γ.map (Scheme.up k))
+      (Γ'.map (Scheme.up k)) σ := SubOkM.up h k Φ
+
+theorem SubOk.mono {Ψ Θ Θ' Γ Γ'} {σ : Nat → Tm} (h : SubOk S Ψ Θ Γ Γ' σ) (hΘ : Entails Θ Θ') :
+    SubOk S Ψ Θ' Γ Γ' σ := SubOkM.mono h hΘ
+
+theorem SubOk.held {Ψ : List Ty} {Θ : Facts} {Γ Γ' : List Scheme} {e : Tm} {T : Caps} {σ : Nat → Tm}
+    (hσ : SubOk S Ψ Θ Γ Γ' σ) (hΓ : ∀ i, e.Free i → i < Γ.length) (h : Caps.Sub (held Ψ Γ e) T) :
+    Caps.Sub (held Ψ Γ' (e.subst σ)) T := SubOkM.held hσ hΓ h
+
+theorem SubOk.noIns {Ψ : List Ty} {Θ : Facts} {Γ Γ' : List Scheme} {e : Tm} {σ : Nat → Tm}
+    (hσ : SubOk S Ψ Θ Γ Γ' σ) (hΓ : ∀ i, e.Free i → i < Γ.length) (h : e.NoIns) :
+    (e.subst σ).NoIns := SubOkM.noIns hσ hΓ h
 
 end Flick

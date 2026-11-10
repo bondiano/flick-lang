@@ -439,7 +439,9 @@ impl<'a> Checker<'a> {
         let entity = self.env.entity(Namespace::Value, name);
         let Some(&i) = self.top.by_name.get(name) else {
             let scheme = self.env.value(&entity).cloned();
-            return scheme.map_or(Type::Error, |s| self.instantiate(&s, span));
+            return scheme.map_or(Type::Error, |s| {
+                self.instantiate(&self.live_scheme(&s), span)
+            });
         };
         if let Some(current) = self.top.current {
             self.top.edges.push((current, i, span));

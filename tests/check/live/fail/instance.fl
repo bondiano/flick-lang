@@ -1,0 +1,19 @@
+// captures: FLICK-G001
+// An instance method is checked against the type its class gives it, which
+// callers see: a signature it writes does not add the `Live` its own
+// arrows would need, so its body may not defer a use the class hides.
+module App.LiveInstance exposing (..)
+
+type error ReadError = ReadError String
+
+service Files =
+  read : String ->{; ReadError} String
+
+class Runner (f : Type -> Type) =
+  later : (Unit ->{Files; ReadError} String)^c -> f String
+
+instance Runner (Eff {Files} {ReadError}) =
+  later : (Unit ->{Files; ReadError} String)^c -> Eff {Files} {ReadError} String
+  let later work = task { work () }
+//~ FLICK-T059 @16:3-16:81
+//~ FLICK-G002 @17:27-17:34

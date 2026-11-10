@@ -14,7 +14,7 @@
 use std::rc::Rc;
 
 use super::super::{Check, Checker, error};
-use super::scope_service;
+use super::{live_service, scope_service};
 use crate::syntax::{Name, Path};
 use crate::types::{PROVIDED, Row, Stage, Type, Var, provided};
 
@@ -35,10 +35,17 @@ impl Checker<'_> {
         let [Type::Tag(wanted), owner] = &args[..] else {
             return error("Provided", "a malformed `Fiber.Provided`");
         };
+        let wanted = &self.zonk_row(wanted);
+        self.keep_live(wanted, owner);
         let services = wanted
             .elems
             .keys()
-            .filter(|s| **s != scope_service() && **s != provided() && &*s.module != PROVIDED)
+            .filter(|s| {
+                **s != scope_service()
+                    && **s != live_service()
+                    && **s != provided()
+                    && &*s.module != PROVIDED
+            })
             .map(ToString::to_string);
         let tails = wanted.vars.iter().filter_map(|v| match v {
             Var::Named(n) => Some(format!("~{n}")),

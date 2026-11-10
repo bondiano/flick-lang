@@ -12,6 +12,8 @@ test("hidden lines of a flick block are compiled, not shown", () => {
 
 test("the check words leave the meta, with what follows them", () => {
   assert.equal(flickBlocks.code(code("flick", "fail", "x"))?.meta, null);
+  assert.equal(flickBlocks.code(code("flick", "live fail", "x"))?.meta, null);
+  assert.equal(flickBlocks.code(code("flick", "live", "x"))?.meta, null);
   assert.equal(flickBlocks.code(code("flick", "fail T010", "x"))?.meta, null);
   assert.equal(flickBlocks.code(code("flick", "ignore needs a service row", "x"))?.meta, null);
   assert.equal(flickBlocks.code(code("flick", 'title="x.fl" keep', "x"))?.meta, 'title="x.fl" keep');

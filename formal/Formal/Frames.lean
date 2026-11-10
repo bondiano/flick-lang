@@ -50,6 +50,53 @@ theorem domE_nm (E : List Frame) (N : Name) : domE E (.nm N) ↔ ∃ F ∈ E, F.
   | nil => simp [domE, Row.none]
   | cons F E ih => simp only [domE, Row.union, Frame.dom, ih, List.mem_cons]; grind
 
+/-- The region of a runtime form of a handler. Such a frame is created inside the
+`inside` form of its region (`Step.resume`, `PHead.hresVal`), so in the live
+discipline its hole may need that region live. -/
+def Frame.rgn : Frame → Option Nat
+  | .hctlA p _ _ _ _ _ _ _ => some p
+  | .hdone p => some p
+  | .hresB p _ _ => some p
+  | _ => none
+
+/-- What a frame provides its hole in each discipline. The capture discipline keeps
+`Frame.dom`; typing by use also lets a runtime form of a handler stand for its own
+region, which the `inside` form around it keeps live. -/
+def TypingMode.dom : TypingMode → Frame → Row
+  | .captures, F => F.dom
+  | .live, F => fun n => F.dom n ∨ ∃ p, F.rgn = some p ∧ n = .atm (.r p)
+
+@[simp] theorem TypingMode.captures_dom (F : Frame) :
+    TypingMode.dom .captures F = F.dom := rfl
+
+theorem TypingMode.dom_of (mode : TypingMode) {F : Frame} {n : Elem} (h : F.dom n) :
+    mode.dom F n := by
+  cases mode with
+  | captures => exact h
+  | live => exact .inl h
+
+/-- At a name, what a frame provides is the same in both disciplines: typing by use
+adds only region atoms. -/
+theorem TypingMode.dom_nm {mode : TypingMode} {F : Frame} {N : Name} (h : mode.dom F (.nm N)) :
+    F.dom (.nm N) := by
+  cases mode with
+  | captures => exact h
+  | live =>
+    rcases h with h | ⟨p, -, h'⟩
+    · exact h
+    · cases h'
+/-- What the frames of `E` provide in a discipline. -/
+def domEM (mode : TypingMode) : List Frame → Row
+  | [] => Row.none
+  | F :: E => Row.union (mode.dom F) (domEM mode E)
+
+theorem domEM_cons (mode : TypingMode) (F : Frame) (E : List Frame) (n : Elem) :
+    domEM mode (F :: E) n ↔ mode.dom F n ∨ domEM mode E n := Iff.rfl
+
+theorem domEM_captures (E : List Frame) (n : Elem) : domEM .captures E n ↔ domE E n := by
+  induction E with
+  | nil => exact Iff.rfl
+  | cons F E ih => exact or_congr Iff.rfl ih
 theorem not_value_plug {r : Tm} (hr : ¬ Value r) (F : Frame) : ¬ Value (F.plug r) := by
   intro hv
   cases F <;> simp only [Frame.plug] at hv

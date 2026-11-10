@@ -1,0 +1,64 @@
+// captures: FLICK-G001 FLICK-G002
+// What uses a region after its `scope` ends is `FLICK-G002`: the row of
+// the function or the task needs the region live, and the bound it is
+// checked against, past the `scope`, does not keep it live.
+module App.LiveAfterClose exposing (..)
+
+type alias Path = String
+
+type File (s : Region)
+
+type error OpenError = OpenError Path
+
+type error ReadError = ReadError Path
+
+service FileSystem =
+  open_scoped : forall s. Path ->{Scope s; OpenError} File s
+  read_all : forall s. File s ->{; ReadError} String
+
+callback : Path ->{FileSystem; OpenError} (Unit ->{FileSystem; ReadError} String)
+let callback path = scope {
+  let file = FileSystem.open_scoped path
+  fun () -> FileSystem.read_all file
+}
+
+deferred : Path ->{FileSystem; OpenError} Eff {FileSystem} {ReadError} String
+let deferred path = scope {
+  let file = FileSystem.open_scoped path
+  task { FileSystem.read_all file }
+}
+
+// a helper generic in what it runs later
+later : (Unit ->{FileSystem; ReadError} String) -> Eff {FileSystem} {ReadError} String
+let later work = task { work () }
+
+through_helper : Path ->{FileSystem; OpenError} Eff {FileSystem} {ReadError} String
+let through_helper path = scope {
+  let file = FileSystem.open_scoped path
+  later (fun () -> FileSystem.read_all file)
+}
+
+// a local signature is a bound too
+local_signature : Path ->{FileSystem; OpenError} Unit
+let local_signature path =
+  let _read = scope {
+    let file = FileSystem.open_scoped path
+    read : Unit ->{FileSystem; ReadError} String
+    let read () = FileSystem.read_all file
+    read
+  }
+  ()
+
+// a task stored in a cell made outside the `scope`
+outer_cell : Path ->{FileSystem; OpenError} Unit
+let outer_cell path =
+  let cell = Ref.make (task { "" })
+  scope {
+    let file = FileSystem.open_scoped path
+    Ref.set cell (task { FileSystem.read_all file })
+  }
+//~ FLICK-G002 @22:13-22:37
+//~ FLICK-G002 @28:10-28:34
+//~ FLICK-G002 @38:20-38:44
+//~ FLICK-G002 @45:5-48:9
+//~ FLICK-G002 @58:26-58:50

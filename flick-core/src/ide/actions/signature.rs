@@ -169,6 +169,7 @@ impl Ide<'_> {
             effects: true,
             watched: Watched::none(),
             stages_by_class: false,
+            regions: types::RegionMode::Captures,
         };
         !types::check(
             &module,

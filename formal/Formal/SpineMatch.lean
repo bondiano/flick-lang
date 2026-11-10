@@ -11,7 +11,7 @@ patterns of the fields at it give the bindings of the match.
 
 namespace Flick
 
-variable {S : Sig}
+variable {S : Sig} {mode : TypingMode}
 
 /-- A constructor spine at the instance `us` of the variables of its constructor `K`. -/
 inductive SpTy (S : Sig) (K : Name) (us : List Ty) : Pat → Ty → List Ty → Prop
@@ -43,17 +43,17 @@ theorem matchP_spine_head {K qs v δ} (hm : matchP (Pat.spine K qs) v = some δ)
 
 /-- A value built by a constructor `K` at an instance `us` of its variables: the final
 type of the value is `T rs` at `us`, and patterns of the fields at `us` match. -/
-theorem Typ.spine_match {Ψ Θ Γ v J} (h : Typ S Ψ Θ Γ v J) :
+theorem TypM.spine_match {Ψ Θ Γ v J} (h : TypM S mode Ψ Θ Γ v J) :
     Value v → ∀ {K k ts T X}, v.head = .ctor K → S.ctor K = some (k, ts, T) →
       J = .ex X .pure → X.kind ≠ 7 → ¬ X.isAll →
       ∃ us, us.length = k ∧ X.res = Ty.tcon T ((S.res K).map (Ty.substT (instT us))) ∧
-        ∀ {p Z Δ δ}, SpTy S K us p Z Δ → matchP p v = some δ → Le Z X ∧ Inst S Ψ Θ Γ δ Δ := by
+        ∀ {p Z Δ δ}, SpTy S K us p Z Δ → matchP p v = some δ → mode.subtype Z X ∧ InstM S mode Ψ Θ Γ δ Δ := by
   induction h with
   | ctor hK hk _ hT =>
     intro _ _ _ _ _ _ hK' hS hJ _ _
     cases hJ; simp only [Tm.head] at hK'; cases hK'
     rw [hK] at hS; cases hS
-    refine ⟨_, hk, hT.res_tcon (Sig.ctorTyR_res _ _ _ _), fun hp hm => ?_⟩
+    refine ⟨_, hk, TypingMode.subtype.res_tcon hT (Sig.ctorTyR_res _ _ _ _), fun hp hm => ?_⟩
     cases hp with
     | head hK'' =>
       rw [hK] at hK''; cases hK''
@@ -68,19 +68,27 @@ theorem Typ.spine_match {Ψ Θ Γ v J} (h : Typ S Ψ Θ Γ v J) :
       simp only [Tm.head] at hK
       obtain ⟨us, hl, hr, hus⟩ := ih₁ hvf hK hS rfl (by simp [Ty.kind]) (by simp [Ty.isAll])
       simp only [Ty.res] at hr
-      refine ⟨us, hl, hT.res_tcon hr, fun hp hm => ?_⟩
+      refine ⟨us, hl, TypingMode.subtype.res_tcon hT hr, fun hp hm => ?_⟩
       cases hp with
       | head => simp [matchP] at hm
       | app hp' hq =>
         obtain ⟨δ₁, δ₂, h1, h2, rfl⟩ := matchP_app.mp hm
         obtain ⟨hl', i₁⟩ := hus hp' h1
-        obtain ⟨_, _, _, _, h, la, _, lt, -⟩ := hl'.arrow_left
+        obtain ⟨_, _, _, _, h, la, _, lt, -⟩ := TypingMode.subtype.arrow_left hl'
         cases h
-        exact ⟨lt.trans hT, i₁.append (hq.inst hve (he.sub ⟨la, Stage.le_refl _⟩) h2)⟩
+        exact ⟨lt.trans hT, i₁.append (hq.inst_mode hve
+          (he.sub (J' := .ex _ .pure) ⟨la, Stage.le_refl _⟩) h2)⟩
     | constApp => simp [Tm.head] at hK
   | errVal => intro _ _ _ _ _ _ _ _ hJ hk; cases hJ; simp [Ty.kind] at hk
   | allI => intro _ _ _ _ _ _ _ _ hJ _ hA; cases hJ; exact (hA trivial).elim
   | _ => intro hv _ _ _ _ _ hK; cases hv <;> simp [Tm.head] at hK
+
+theorem Typ.spine_match {Ψ Θ Γ v J} (h : Typ S Ψ Θ Γ v J) :
+    Value v → ∀ {K k ts T X}, v.head = .ctor K → S.ctor K = some (k, ts, T) →
+      J = .ex X .pure → X.kind ≠ 7 → ¬ X.isAll →
+      ∃ us, us.length = k ∧ X.res = Ty.tcon T ((S.res K).map (Ty.substT (instT us))) ∧
+        ∀ {p Z Δ δ}, SpTy S K us p Z Δ → matchP p v = some δ → Le Z X ∧ Inst S Ψ Θ Γ δ Δ :=
+  TypM.spine_match (mode := .captures) h
 
 theorem Stage.up_substT (φ : Stage) (k : Nat) (us : List Ty) (h : us.length = k) :
     (φ.substT (shiftV k)).substT (instT us) = φ := by
@@ -97,17 +105,17 @@ theorem Ty.res_of_hd {t : Ty} {T : Name} (h : t.hd = .adt T) : t.res = t := by
 
 /-- The step into an arm on a constructor of a GADT: the instance of the value's own
 constructor unifies the arm's problem and types its patterns and its body. -/
-theorem aref_match {Ψ Θ v t t' φ K k ts T₀ qs b δ} {Δ : (Atom → Ty) → List Ty}
-    (hv : Value v) (h₁ : Typ S Ψ Θ [] v (.ex t φ)) (hK : S.ctor K = some (k, ts, T₀))
+theorem aref_match_mode {Ψ Θ v t t' φ K k ts T₀ qs b δ} {Δ : (Atom → Ty) → List Ty}
+    (hv : Value v) (h₁ : TypM S mode Ψ Θ [] v (.ex t φ)) (hK : S.ctor K = some (k, ts, T₀))
     (hU : t.hd = .adt T₀) (hn : b.NoIns)
     (hpA : ∀ θ, Fits θ b → (Ty.tcon T₀ (S.res K)).substT θ = (t.up k).substT θ →
       PatsTy S qs (ts.map (Ty.substT θ)) (Δ θ))
     (hbA : ∀ θ, Fits θ b → (Ty.tcon T₀ (S.res K)).substT θ = (t.up k).substT θ →
-      Typ S ((Ψ.map (Ty.up k)).map (Ty.substT θ)) ((Θ.substT (shiftV k)).substT θ)
+      TypM S mode ((Ψ.map (Ty.up k)).map (Ty.substT θ)) ((Θ.substT (shiftV k)).substT θ)
         ((Δ θ).map .mono ++ (([] : List Scheme).map (Scheme.up k)).map (Scheme.substT θ)) b
         (.ex ((t'.up k).substT θ) ((φ.substT (shiftV k)).substT θ)))
     (hm : matchP (Pat.spine K qs) v = some δ) :
-    Typ S Ψ Θ [] (b.subst (inst δ)) (.ex t' φ) := by
+    TypM S mode Ψ Θ [] (b.subst (inst δ)) (.ex t' φ) := by
   have hU7 : t.kind ≠ 7 := by rw [Ty.kind_of_hd hU]; decide
   obtain ⟨us, hk, hr, hus⟩ :=
     (h₁.valueAny hv .pure).spine_match hv (matchP_spine_head hm) hK rfl hU7 (Ty.not_all_of_hd hU)
@@ -122,5 +130,19 @@ theorem aref_match {Ψ Θ v t t' φ K k ts T₀ qs b δ} {Δ : (Atom → Ty) →
   simp only [List.map_nil, List.map_map, Function.comp_def, Ty.up_substT _ _ _ hk, List.map_id',
     Facts.up_substT _ _ _ hk, Stage.up_substT _ _ _ hk] at hb
   exact hb.inst (by simpa using hδ)
+
+/-- The step into an arm on a constructor of a GADT, for the capture discipline. -/
+theorem aref_match {Ψ Θ v t t' φ K k ts T₀ qs b δ} {Δ : (Atom → Ty) → List Ty}
+    (hv : Value v) (h₁ : Typ S Ψ Θ [] v (.ex t φ)) (hK : S.ctor K = some (k, ts, T₀))
+    (hU : t.hd = .adt T₀) (hn : b.NoIns)
+    (hpA : ∀ θ, Fits θ b → (Ty.tcon T₀ (S.res K)).substT θ = (t.up k).substT θ →
+      PatsTy S qs (ts.map (Ty.substT θ)) (Δ θ))
+    (hbA : ∀ θ, Fits θ b → (Ty.tcon T₀ (S.res K)).substT θ = (t.up k).substT θ →
+      Typ S ((Ψ.map (Ty.up k)).map (Ty.substT θ)) ((Θ.substT (shiftV k)).substT θ)
+        ((Δ θ).map .mono ++ (([] : List Scheme).map (Scheme.up k)).map (Scheme.substT θ)) b
+        (.ex ((t'.up k).substT θ) ((φ.substT (shiftV k)).substT θ)))
+    (hm : matchP (Pat.spine K qs) v = some δ) :
+    Typ S Ψ Θ [] (b.subst (inst δ)) (.ex t' φ) :=
+  aref_match_mode (mode := .captures) hv h₁ hK hU hn hpA hbA hm
 
 end Flick

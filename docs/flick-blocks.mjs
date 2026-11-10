@@ -1,6 +1,7 @@
 // A ```flick block may declare what it uses on hidden lines, `#` alone or
 // starting with `# `, and say how `flick-core/tests/corpus.rs` checks it
-// (`flick fail T010`, `flick ignore <reason>`) or that `flick check --fix`
+// (`flick fail T010`, `flick ignore <reason>`, `flick live` for the live
+// discipline of regions) or that `flick check --fix`
 // leaves it as written (`flick keep`). The checker reads both; the page shows
 // neither, nor the words that follow them.
 
@@ -17,7 +18,7 @@ const shown = (value) =>
 /** The meta of a block without the words only the checker reads. */
 const meta = (words) => {
   const rest = (words ?? "").trim();
-  return /^(ignore|fail|keep)(\s|$)/.test(rest) ? null : rest || null;
+  return /^(live\s*)?((ignore|fail|keep)(\s|$)|$)/.test(rest) ? null : rest || null;
 };
 
 /** A Sätteri mdast plugin: ```flick blocks as the reader sees them. */

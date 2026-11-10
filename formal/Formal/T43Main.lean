@@ -73,7 +73,7 @@ theorem T1_regions {root e₀ t φ₀ c} (hroot : RootTy S root)
     rintro e hd ⟨E, r, hE, he, hb⟩
     exact hb.elim (fun hw => ⟨E, r, hE, he, hw⟩) fun hb' => (hd E r hE he hb').elim
   refine ⟨h₁.imp_right (Or.imp_right (Or.imp_right (waits _ hm))), fun p g hg hl k hk' => ?_⟩
-  obtain ⟨Ψ, hc, hkc⟩ := steps_cov hroot hs ht hφ (fun N h => .inl (hcov N h)) (CfgTy.init h₀ hp)
+  obtain ⟨Ψ, hc, hkc⟩ := steps_cov hroot hs ht hφ (fun N h => .inl (hcov N h)) (CfgTyM.init h₀ hp)
     (fun _ _ h => by simp at h)
   obtain ⟨t', φ', hkt, hkn⟩ := hkc p g hg k (List.mem_append_left _ hk')
   rcases progress (Λ := c.rgs) (root := root) hroot hkt hc.1.1 rfl rfl with hv | hn

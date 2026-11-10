@@ -41,7 +41,7 @@ use crate::syntax::{Name, Path, Term};
 use crate::types::{Caps, Fields, Row, Scheme, Stage, Type};
 
 pub(crate) use generalize::{Inst, substitute};
-pub(crate) use regions::scope_service;
+pub(crate) use regions::{live_service, scope_service};
 pub use runtime::check_config;
 
 /// A rule whose premise fails, and why.
@@ -113,6 +113,9 @@ pub struct Checker<'d> {
     /// Whether `≡` may equate a rigid variable: the result of a constructor
     /// of a GADT against the type of the matched value.
     refining: bool,
+    /// The discipline of `regions/live.rs`: a region is live where a row
+    /// has `Live` of it, and a closure carries no capture qualifier.
+    live: bool,
 }
 
 impl<'d> Checker<'d> {
@@ -132,6 +135,15 @@ impl<'d> Checker<'d> {
             regions: regions::Regions::default(),
             equalities: Vec::new(),
             refining: false,
+            live: false,
+        }
+    }
+
+    /// A checker of the discipline of `regions/live.rs`.
+    pub fn live(decls: &'d Decls) -> Self {
+        Checker {
+            live: true,
+            ..Checker::new(decls)
         }
     }
 
@@ -181,6 +193,16 @@ pub fn check_program<S: BuildHasher>(
     decls: &Decls,
     modules: &HashSet<Name, S>,
 ) -> Vec<(Path, TypeError)> {
+    check_program_with(program, decls, modules, false)
+}
+
+/// [`check_program`] under the discipline of `regions/live.rs` if `live`.
+pub fn check_program_with<S: BuildHasher>(
+    program: &Program,
+    decls: &Decls,
+    modules: &HashSet<Name, S>,
+    live: bool,
+) -> Vec<(Path, TypeError)> {
     let mut globals: Vec<(&Path, &Term)> = program
         .globals
         .iter()
@@ -190,7 +212,11 @@ pub fn check_program<S: BuildHasher>(
     let mut out = Vec::new();
     for (path, term) in globals {
         let scheme = decls.values.get(path).or_else(|| decls.instances.get(path));
-        let mut checker = Checker::new(decls);
+        let mut checker = if live {
+            Checker::live(decls)
+        } else {
+            Checker::new(decls)
+        };
         let result = match scheme {
             Some(s) => checker.check_top(term, s),
             None => checker.infer_top(term).map(|_| ()),

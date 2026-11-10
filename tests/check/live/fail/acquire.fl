@@ -1,0 +1,13 @@
+// captures: FLICK-G004
+// `Live s` gives no owner to acquire into: a parameter of region `s` keeps
+// `s` live in the signature's row, which still lacks `Scope s`.
+module App.LiveAcquire exposing (..)
+
+type File (s : Region)
+
+service Files =
+  open_scoped : forall s. String ->{Scope s} File s
+
+reopened : File s ->{Files} File s
+let reopened _ = Files.open_scoped "again"
+//~ FLICK-G004 @12:18-12:43 which needs `Scope`

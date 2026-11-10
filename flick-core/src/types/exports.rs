@@ -2,6 +2,7 @@
 
 use super::Checker;
 use super::env::{Abi, Form, TypeDef};
+use super::regions;
 use super::services::Operation;
 use super::ty::Type;
 use crate::iface::{Decl, Entity, Export, Interface, Namespace};
@@ -194,6 +195,12 @@ impl Checker<'_> {
     /// need no alias of a module they do not import.
     fn exported(&self, t: &Type) -> Type {
         let t = self.zonk(t);
+        // a use elides `Live` again from the signature (`regions/live.rs`)
+        let t = if self.live() && regions::has_live(&t) {
+            regions::strip_live(&t)
+        } else {
+            t
+        };
         let (head, args) = t.spine();
         if let Type::Con { module, name } = head
             && let Some(Form::Alias {

@@ -8,6 +8,7 @@
 
 mod bind;
 mod handle;
+mod holds;
 mod holes;
 mod leaks;
 mod mutate;
@@ -18,6 +19,7 @@ mod term;
 
 use std::rc::Rc;
 
+pub use holds::holding;
 pub use leaks::leak_used;
 pub use mutate::mutate;
 pub use print::source;

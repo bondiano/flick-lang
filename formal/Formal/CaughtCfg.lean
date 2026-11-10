@@ -113,7 +113,7 @@ theorem unw_pass {F : Frame} {H : Nat → Prop} {p ℓ : Nat} {a : Tm} (hcF : F.
   | _ => exact hp
 
 /-- A step of a thread keeps every signal under its handler. -/
-theorem Step.caught {root l Λ μ e Λ' μ' e'} (hroot : RootTy S root)
+theorem Step.caught {root l Λ μ e Λ' μ' e'} {mode : TypingMode} (hroot : RootTyM S mode root)
     {n : Nat} (hst : Step root l Λ μ e (.cfg Λ' μ' e')) (hc : CfgCaught hs cell n Λ e) (ha : CfgAsc Λ μ e)
     (hb : CfgBelow Λ μ e) (hn : n ≤ Λ.length) :
     ∃ hs' cell', (∀ p, p < Λ.length → hs' p = hs p ∧ cell' p = cell p) ∧ CfgCaught hs' cell' n Λ' e' := by

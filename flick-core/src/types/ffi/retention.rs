@@ -108,6 +108,13 @@ impl Checker<'_> {
         outlived: &[String],
         body: &Type,
     ) -> Vec<&'b Binder> {
+        // a later stage holds what the result shows under either discipline,
+        // though the live one leaves it out of a signature
+        let body = &if self.live() {
+            self.held_stages(body)
+        } else {
+            body.clone()
+        };
         (vars.iter())
             .filter(|v| {
                 let name = slice::from_ref(&v.name);

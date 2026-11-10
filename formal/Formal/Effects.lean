@@ -63,7 +63,7 @@ theorem T2a {root Ψ Λ μ e t Λ' μ' e'} (hroot : RootTy S root) (hμ : StoreT
   | step h₁ _ _ ih =>
     obtain ⟨hl, rfl, rfl⟩ := step_pure h h₁
     obtain ⟨X, hμ', h', hX⟩ := preservation hroot h hμ hb.main hb.mem hΨ h₁
-    obtain ⟨hb', _⟩ := h₁.below hroot hb
+    obtain ⟨hb', _⟩ := h₁.below hroot.below hb
     obtain ⟨hs', rfl, rfl, hr⟩ := ih hμ' hb' (fun u hu => by
       rcases List.mem_append.mp hu with hu | hu
       · exact hΨ u hu
@@ -114,7 +114,7 @@ theorem T2b {root Ψ Λ μ e t r ε Λ' μ' e'} (hroot : RootTy S root) (hμ : S
   | refl => exact ⟨.refl, fun v he hv => ⟨Ψ, by subst he; exact raise_errors hv h⟩⟩
   | step h₁ _ _ ih =>
     obtain ⟨X, hμ', h', hX⟩ := preservation hroot h hμ hb.main hb.mem hΨ h₁
-    obtain ⟨hb', hl⟩ := h₁.below hroot hb
+    obtain ⟨hb', hl⟩ := h₁.below hroot.below hb
     obtain ⟨hs', hr⟩ := ih hμ' hb' (fun u hu => by
       rcases List.mem_append.mp hu with hu | hu
       · exact (hΨ u hu).mono hl

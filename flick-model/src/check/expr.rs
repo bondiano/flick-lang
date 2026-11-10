@@ -117,10 +117,8 @@ impl Checker<'_> {
                 self.locals.pop();
                 let inner = mem::replace(&mut self.stage, outer);
                 checked?;
-                self.stage_within(&inner, s)?;
-                let qualifier = self.qualifier(&full);
-                self.close_over(e, expected.clone(), Some(qualifier));
-                Ok(())
+                self.close_within(e, &expected, &inner, s, Some(&full))
+                    .map(drop)
             }
             (Term::Scope(s, body), _) => self.scope(s, body, Some(&full)).map(drop),
             (Term::Apply(Head::Con(c), args), _) if args.len() == c.arity => {
@@ -223,7 +221,7 @@ impl Checker<'_> {
             .or_else(|| self.decls.instances.get(p));
         match s {
             Some(s) => {
-                let s = s.clone();
+                let s = self.live_scheme(s);
                 Ok(self.instantiate(&s))
             }
             None => error("Var", format!("no type for `{p}`")),
@@ -280,6 +278,7 @@ impl Checker<'_> {
         match self.resolve(f) {
             Type::Fun(p, s, r) => {
                 self.check(a, &p)?;
+                let s = self.live_stage(&s, &self.qualifier(f));
                 self.perform(&s)?;
                 Ok((*r).clone())
             }
@@ -313,7 +312,7 @@ impl Checker<'_> {
         expected: Option<&Type>,
     ) -> Check<Type> {
         let s = if let Some(s) = sig {
-            let s = self.local_signature(s);
+            let s = self.local_signature(&self.live_scheme(s));
             let (bare, qualifier) = match &s.body {
                 Type::Captured(t, c) => ((**t).clone(), c.clone()),
                 t => (t.clone(), Caps::default()),
@@ -323,7 +322,7 @@ impl Checker<'_> {
                 ..s.clone()
             };
             self.check_qualified_forall(e1, &bare, qualifier)?;
-            s
+            self.with_stage_qualifiers(&s)
         } else {
             self.level += 1;
             let outer = mem::replace(&mut self.stage, Stage::Pure);
@@ -370,6 +369,23 @@ impl Checker<'_> {
         }
     }
 
+    /// A local signature as its uses see it: with the qualifiers (Let-Sig)
+    /// gives its later stages when it checks the body (§1.4, `skolemize`),
+    /// so a partial application holds the parameters it took. Under
+    /// `regions/live.rs` `live_scheme` already did the same with `Live`.
+    fn with_stage_qualifiers(&self, s: &Scheme) -> Scheme {
+        if self.live {
+            return s.clone();
+        }
+        let body = match &s.body {
+            Type::Captured(t, c) => {
+                Type::Captured(Rc::new(self.implicit(t, &Caps::default())), c.clone())
+            }
+            t => self.implicit(t, &Caps::default()),
+        };
+        Scheme { body, ..s.clone() }
+    }
+
     /// (Let-Rec): without a signature the recursive calls are monomorphic.
     pub(super) fn let_rec(
         &mut self,
@@ -380,12 +396,12 @@ impl Checker<'_> {
         expected: Option<&Type>,
     ) -> Check<Type> {
         let s = if let Some(s) = sig {
-            let s = &self.in_scopes(s);
+            let s = &self.in_scopes(&self.live_scheme(s));
             self.locals.push((f.clone(), s.clone()));
             let checked = self.check_forall(lam, s);
             self.locals.pop();
             checked?;
-            s.clone()
+            self.with_stage_qualifiers(s)
         } else {
             self.level += 1;
             let t = self.fresh();

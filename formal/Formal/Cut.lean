@@ -11,7 +11,7 @@ substitution lemma drops them again with the facts the use of the variable check
 
 namespace Flick
 
-variable {S : Sig}
+variable {S : Sig} {mode : TypingMode}
 
 /-- `Θ₁` gives no more than `Θ₂`. -/
 def Entails (Θ₁ Θ₂ : Facts) : Prop := ∀ C s, Outl Θ₁ C s → Outl Θ₂ C s
@@ -91,7 +91,7 @@ theorem Row.hP_mono {Θ₁ Θ₂ : Facts} {q : Nat} {E : Name} {r : Row} (hΘ : 
   | ob N a => exact ⟨fun h => hΘ _ _ (hx.1 h), hx.2⟩
   | _ => exact hx
 
-theorem Typ.cut {Ψ Θ₁ Γ e J} (h : Typ S Ψ Θ₁ Γ e J) : ∀ {Θ₂}, Entails Θ₁ Θ₂ → Typ S Ψ Θ₂ Γ e J := by
+theorem TypM.cut {Ψ Θ₁ Γ e J} (h : TypM S mode Ψ Θ₁ Γ e J) : ∀ {Θ₂}, Entails Θ₁ Θ₂ → TypM S mode Ψ Θ₂ Γ e J := by
   induction h with
   | var hi hts hH hT => intro _ hΘ; exact .var hi hts (hH.mono hΘ) hT
   | allVar hi hk hc => intro _ _; exact .allVar hi hk hc
@@ -104,7 +104,7 @@ theorem Typ.cut {Ψ Θ₁ Γ e J} (h : Typ S Ψ Θ₁ Γ e J) : ∀ {Θ₂}, Ent
   | fix _ hn hc hT ih => intro _ hΘ; exact .fix (ih hΘ) hn hc hT
   | lit => intro _ _; exact .lit
   | loc hl => intro _ _; exact .loc hl
-  | const hc hT => intro _ hΘ; exact .const (Const.ok_mono hc hΘ) hT
+  | const hc hT => intro _ hΘ; exact .const (Const.ok_mono_mode hc hΘ) hT
   | ctor hK hk hH hT => intro _ _; exact .ctor hK hk hH hT
   | rnil => intro _ _; exact .rnil
   | rcons hR hl _ _ ih₁ ih₂ => intro _ hΘ; exact .rcons hR hl (ih₁ hΘ) (ih₂ hΘ)
@@ -146,17 +146,21 @@ theorem Typ.cut {Ψ Θ₁ Γ e J} (h : Typ S Ψ Θ₁ Γ e J) : ∀ {Θ₂}, Ent
   | hactl hop _ _ ih₁ ih₂ => intro _ hΘ; exact .hactl hop (ih₁ hΘ) (ih₂ hΘ)
   | hdl _ hn _ hψ _ hφ₀ hOb hc hφ hT ih₁ ih₂ ih₃ =>
     intro _ hΘ; exact .hdl (ih₁ (hΘ.substT _)) hn (ih₂ hΘ) hψ (ih₃ hΘ) hφ₀ hOb hc hφ hT
-  | hwith hℓ _ _ hψ _ hφ₀ hc hφ hT ih₁ ih₂ ih₃ =>
-    intro _ hΘ; exact .hwith hℓ (ih₁ hΘ) (ih₂ hΘ) hψ (ih₃ hΘ) (Stage.le_rt_sub hφ₀ (Row.hP_mono hΘ)) hc hφ hT
-  | hctl hℓ _ _ hψ hop hc htl hE hk _ hφ₀ _ hl hcm hφ hT ih₁ ih₂ ih₃ ih₄ =>
-    intro _ hΘ; exact .hctl hℓ (ih₁ hΘ) (ih₂ hΘ) hψ hop hc htl hE hk (ih₃ hΘ) (Stage.le_rt_sub hφ₀ (Row.hP_mono hΘ)) (ih₄ hΘ) hl hcm hφ hT
+  | hwith hℓ _ _ hψ _ hφ₀ hc hφ hT ha ih₁ ih₂ ih₃ =>
+    intro _ hΘ; exact .hwith hℓ (ih₁ hΘ) (ih₂ hΘ) hψ (ih₃ hΘ) (Stage.le_rt_sub hφ₀ (Row.hP_mono hΘ)) hc hφ hT ha
+  | hctl hℓ _ _ hψ hop hc htl hE hk _ hφ₀ _ hl hcm hφ hT ha ih₁ ih₂ ih₃ ih₄ =>
+    intro _ hΘ; exact .hctl hℓ (ih₁ hΘ) (ih₂ hΘ) hψ hop hc htl hE hk (ih₃ hΘ) (Stage.le_rt_sub hφ₀ (Row.hP_mono hΘ)) (ih₄ hΘ) hl hcm hφ hT ha
   | hkeep hℓ _ _ hφ₀ hc hnt hle hφ hT ih₁ ih₂ =>
     intro _ hΘ; exact .hkeep hℓ (ih₁ hΘ) (ih₂ hΘ) (Stage.le_rt_sub hφ₀ (Row.hP_mono hΘ)) hc hnt hle hφ hT
   | hkarm hℓ _ hop hE hk _ hφ₀ hc hnt _ hle hφ hT ih₁ ih₂ ih₃ =>
     intro _ hΘ; exact .hkarm hℓ (ih₁ hΘ) hop hE hk (ih₂ hΘ) (Stage.le_rt_sub hφ₀ (Row.hP_mono hΘ)) hc hnt (ih₃ hΘ) hle hφ hT
-  | hres hℓ _ hA ha _ hl hφ hT ih₁ ih₂ => intro _ hΘ; exact .hres hℓ (ih₁ hΘ) hA ha (ih₂ hΘ) hl hφ hT
+  | hres hℓ _ hA ha _ hl hcp hφ hT ih₁ ih₂ => intro _ hΘ; exact .hres hℓ (ih₁ hΘ) hA ha (ih₂ hΘ) hl hcp hφ hT
   | hdone _ ih => intro _ hΘ; exact .hdone (ih hΘ)
   | unw hℓ _ hφ ih => intro _ hΘ; exact .unw hℓ (ih hΘ) hφ
   | kont hl hC hT => intro _ _; exact .kont hl hC hT
+
+theorem Typ.cut {Ψ Θ₁ Γ e J} (h : Typ S Ψ Θ₁ Γ e J) :
+    ∀ {Θ₂}, Entails Θ₁ Θ₂ → Typ S Ψ Θ₂ Γ e J :=
+  TypM.cut h
 
 end Flick

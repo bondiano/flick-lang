@@ -156,7 +156,7 @@ theorem cstep_cov {root : Roots} {Ψ : List Ty} {c c' : Cfg} {t : Ty} {φ : Stag
     have hkb := (hb.rgs _ _ hg).1 _ hkm
     have hkA := ha.rgs _ _ hg _ (List.mem_append_left _ hkm)
     obtain ⟨X, hμ', hk', hX⟩ := preservation hroot hkt hμ hkb hb.mem hΨ hs'
-    obtain ⟨hb', hl'⟩ := hs'.below hroot ⟨hkb, hb.mem, hb.rgs⟩
+    obtain ⟨hb', hl'⟩ := hs'.below hroot.below ⟨hkb, hb.mem, hb.rgs⟩
     obtain ⟨ha', hka⟩ := hs'.asc hroot ⟨hkA, ha.rgs, ha.mem⟩ hkb
     obtain ⟨m, hm, hkm'⟩ := hcg.rgs _ _ hg _ (List.mem_append_left _ hkm)
     obtain ⟨hgs', hgc', hgg, hkc⟩ := hs'.caught hroot (n := m)

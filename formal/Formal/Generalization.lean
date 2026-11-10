@@ -41,7 +41,7 @@ theorem T3 {root e₀ t φ₀ c} (hroot : RootTy S root) (h₀ : Typ S [] Facts.
       ∀ E r, OkE E → ¬ Value r → c.main = plug E r →
         ∃ K Θ' t' φ', Typ S (Ψ.map (Ty.up K)) Θ' [] r (.ex t' φ') ∧
           (K ≠ 0 → φ' = .pure ∧ ∀ u ∈ Ψ.map (Ty.up K), u.Avoids K) := by
-  obtain ⟨Ψ, hc⟩ := steps_typed hroot hs ht hφ (CfgTy.init h₀ hp)
+  obtain ⟨Ψ, hc⟩ := steps_typed hroot hs ht hφ (CfgTyM.init h₀ hp)
   simp only [List.nil_append] at hc
   refine ⟨Ψ, hc, fun hs' => steps_typed hroot hs' ht hφ hc, ?_⟩
   intro E r hE hr he

@@ -1,0 +1,45 @@
+// captures: FLICK-G001
+// Under the live discipline a value may hold a region past its `scope`
+// while nothing uses the region there: what leaves holds `file`, but no
+// row of it needs `s` live. The default discipline rejects each of them.
+module App.LiveHolding exposing (..)
+
+type alias Path = String
+
+type File (s : Region)
+
+type error OpenError = OpenError Path
+
+type error ReadError = ReadError Path
+
+service FileSystem =
+  open_scoped : forall s. Path ->{Scope s; OpenError} File s
+  read_all : forall s. File s ->{; ReadError} String
+
+held_closure : Path ->{FileSystem; OpenError} (Unit ->{} Unit)
+let held_closure path = scope {
+  let file = FileSystem.open_scoped path
+  fun () -> ignore file
+}
+
+held_task : Path ->{FileSystem; OpenError} Eff {} none Unit
+let held_task path = scope {
+  let file = FileSystem.open_scoped path
+  task { ignore file }
+}
+
+held_in_record : Path ->{FileSystem; OpenError} { size : Int; keep : Unit ->{} Unit }
+let held_in_record path = scope {
+  let file = FileSystem.open_scoped path
+  { size = 1; keep = fun () -> ignore (file, file) }
+}
+
+// what uses the region does so inside its `scope`
+used_inside : Path ->{FileSystem; OpenError, ReadError} String
+let used_inside path = scope {
+  let file = FileSystem.open_scoped path
+  let read = fun () -> FileSystem.read_all file
+  let later = task { FileSystem.read_all file }
+  ignore later
+  read ()
+}

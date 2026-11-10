@@ -1,5 +1,6 @@
 //! `flick check` of Markdown pages: each ```` ```flick ```` block is checked
-//! on its own, as the site's corpus test does, and reported in the page;
+//! on its own, under the discipline of regions it names, as the site's corpus
+//! test does, and reported in the page;
 //! `--fix` writes the safe fixes of its compiled text back into the page.
 
 use std::fs;
@@ -20,8 +21,10 @@ pub fn is_page(path: &str) -> bool {
 
 /// The diagnostics of the blocks of the page at `path`, which is added to
 /// `sources`; with `fix`, the page is first rewritten with their safe fixes
-/// of the codes `fix` lets through, except in `keep` blocks. An `ignore` block is not checked; a `fail` block
-/// is not either, as its errors are the example and a fix could remove them.
+/// of the codes `fix` lets through, except in `keep` and `live` blocks. An
+/// `ignore` block is not checked; a `fail` block is not either, as its errors
+/// are the example and a fix could remove them. Each block checks under the
+/// discipline it names.
 pub fn check(sources: &mut SourceMap, path: &str, fix: Option<&[String]>) -> Vec<Diagnostic> {
     let error = |code, message: String| vec![Diagnostic::new(code, Severity::Error, message)];
     let read = match fs::read_to_string(path) {
@@ -62,7 +65,7 @@ fn check_blocks(page: &str) -> Vec<(Block, Vec<Diagnostic>)> {
         .map(|block| {
             let mut sources = SourceMap::default();
             let file = sources.add("", block.text.as_str());
-            let diagnostics = flick_core::check(&sources, file);
+            let diagnostics = flick_core::check_regions(&sources, file, block.regions());
             (block, diagnostics)
         })
         .collect()
@@ -72,7 +75,7 @@ fn check_blocks(page: &str) -> Vec<(Block, Vec<Diagnostic>)> {
 fn fixed(page: &str, checked: &[(Block, Vec<Diagnostic>)], only: &[String]) -> String {
     let mut out = page.to_owned();
     // the last block first, so the ranges of those before it hold
-    let fixable = checked.iter().filter(|(b, _)| b.mode == Mode::Check);
+    let fixable = checked.iter().filter(|(b, _)| b.fixable());
     for (block, diagnostics) in fixable.rev() {
         let fixes = diagnostics
             .iter()
