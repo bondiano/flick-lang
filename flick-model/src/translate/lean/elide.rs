@@ -25,9 +25,9 @@ const STORED: [&str; 1] = ["Seq"];
 /// The binders in scope, innermost first, with the capture rows rule 2 has
 /// instantiated: `v ↦ a`.
 #[derive(Clone, Default)]
-struct Env {
-    vars: Vec<String>,
-    inst: Vec<(String, String)>,
+pub(crate) struct Env {
+    pub(crate) vars: Vec<String>,
+    pub(crate) inst: Vec<(String, String)>,
 }
 
 impl Env {
@@ -62,7 +62,7 @@ fn disjunction(parts: &[String], empty: &str) -> String {
     }
 }
 
-fn caps(c: &Caps, env: &Env) -> Result<String, String> {
+pub(crate) fn caps(c: &Caps, env: &Env) -> Result<String, String> {
     let atoms = c
         .atoms
         .iter()
@@ -72,7 +72,7 @@ fn caps(c: &Caps, env: &Env) -> Result<String, String> {
     Ok(disjunction(&atoms, "Caps.none"))
 }
 
-fn row(r: &Row, env: &Env) -> Result<String, String> {
+pub(crate) fn row(r: &Row, env: &Env) -> Result<String, String> {
     let mut parts = Vec::new();
     for (name, args) in &r.elems {
         if *name == live_service() || *name == scope_service() {
@@ -96,7 +96,7 @@ fn row(r: &Row, env: &Env) -> Result<String, String> {
     Ok(disjunction(&parts, "(fun _ => False)"))
 }
 
-fn stage(s: &Stage, env: &Env) -> Result<String, String> {
+pub(crate) fn stage(s: &Stage, env: &Env) -> Result<String, String> {
     Ok(match s {
         Stage::Pure => ".pure".into(),
         Stage::Runtime(r, e) => format!("(.rt {} {})", row(r, env)?, row(e, env)?),
@@ -108,6 +108,7 @@ fn con(p: &Path) -> String {
         ("Prelude", "Int") => "(.base .int)".into(),
         ("Prelude", "Bool") => "(.base .bool)".into(),
         ("Prelude", "Unit") => "(.base .unit)".into(),
+        ("Prelude", "String") => "(.base .string)".into(),
         _ => format!("(.adt \"{p}\")"),
     }
 }
@@ -134,7 +135,7 @@ fn data(t: &Type, c: Option<&Caps>, env: &Env) -> Result<String, String> {
     Ok(out)
 }
 
-fn ty(t: &Type, env: &Env) -> Result<String, String> {
+pub(crate) fn ty(t: &Type, env: &Env) -> Result<String, String> {
     qualified(t, None, env)
 }
 

@@ -43,6 +43,22 @@ pub(super) fn runtime(r: Row, e: Row) -> Stage {
 impl Checker<'_> {
     /// `Γ ⊢ e : τ ! φ`, `φ` joined into `self.stage`.
     pub(super) fn infer(&mut self, e: &Term) -> Check<Type> {
+        let t = self.infer_node(e)?;
+        if self.trace.is_some() {
+            let instance = self
+                .instanced
+                .take()
+                .filter(|_| matches!(e, Term::Var(_) | Term::Global(_)));
+            let inferred = t.clone();
+            self.note(e, |n| {
+                n.inferred = Some(inferred);
+                n.instance = n.instance.take().or(instance);
+            });
+        }
+        Ok(t)
+    }
+
+    fn infer_node(&mut self, e: &Term) -> Check<Type> {
         match e {
             Term::Var(x) => self.var(x),
             Term::Global(p) => self.global(p),
@@ -107,6 +123,10 @@ impl Checker<'_> {
     /// `Γ ⊢ e : τ'` with `τ ≤ τ'` (Sub): the expected type is pushed into
     /// λs, `let` bodies and arms, where it fixes stages and parameters.
     pub(super) fn check(&mut self, e: &Term, expected: &Type) -> Check<()> {
+        if self.trace.is_some() {
+            let expected = expected.clone();
+            self.note(e, |n| n.expected = Some(expected));
+        }
         let full = self.follow(expected);
         let expected = self.resolve(&full);
         match (e, &expected) {
@@ -223,7 +243,7 @@ impl Checker<'_> {
         match self.locals.iter().rev().find(|(n, _)| &**n == x) {
             Some((_, s)) => {
                 let s = s.clone();
-                Ok(self.instantiate(&s))
+                Ok(self.instance_of(s))
             }
             None => error("Var", format!("`{x}` is not bound")),
         }
@@ -239,10 +259,19 @@ impl Checker<'_> {
         match s {
             Some(s) => {
                 let s = self.live_scheme(s);
-                Ok(self.instantiate(&s))
+                Ok(self.instance_of(s))
             }
             None => error("Var", format!("no type for `{p}`")),
         }
+    }
+
+    /// An instance of `s`, which the trace keeps with the scheme.
+    fn instance_of(&mut self, s: Scheme) -> Type {
+        let (t, insts) = self.instantiate_with(&s);
+        if self.trace.is_some() {
+            self.instanced = Some((s, insts));
+        }
+        t
     }
 
     pub(super) fn constructor(&mut self, module: &str, name: &str) -> Check<Type> {

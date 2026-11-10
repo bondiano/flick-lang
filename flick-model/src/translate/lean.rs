@@ -30,7 +30,7 @@
 //! A scheme the model cannot write is a line of the skipped list, with its
 //! reason (`docs/formal/elaboration.md#the-scheme-generator-translated-only-the-sugar-names`).
 
-mod elide;
+pub(crate) mod elide;
 mod tr;
 
 use std::fmt::{self, Write};

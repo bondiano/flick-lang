@@ -25,6 +25,7 @@ mod pattern;
 mod regions;
 mod rows;
 mod runtime;
+pub mod trace;
 mod unify;
 mod zonk;
 
@@ -118,6 +119,10 @@ pub struct Checker<'d> {
     /// The module of the definition being checked: its opaque aliases
     /// are their representations.
     module: Name,
+    /// What each subterm was typed at, when a certificate is wanted.
+    trace: Option<trace::Trace>,
+    /// The scheme and instance of the variable or global just typed.
+    instanced: Option<(Scheme, Vec<Inst>)>,
 }
 
 /// `σ` as the model reads a signature: with the `Live` elision adds
@@ -145,6 +150,8 @@ impl<'d> Checker<'d> {
             equalities: Vec::new(),
             refining: false,
             module: Name::from(""),
+            trace: None,
+            instanced: None,
         }
     }
 
@@ -162,6 +169,14 @@ impl<'d> Checker<'d> {
             );
         }
         Ok(())
+    }
+
+    /// [`Self::check_top`], and what it typed each subterm at.
+    pub fn check_top_traced(&mut self, e: &Term, scheme: &Scheme) -> Check<trace::Trace> {
+        self.trace = Some(trace::Trace::default());
+        self.check_top(e, scheme)?;
+        let trace = self.trace.take().unwrap_or_default();
+        Ok(self.zonk_trace(&trace))
     }
 
     /// `· ⊢ e : τ ! φ`, with the rows of `τ` and `φ` settled.

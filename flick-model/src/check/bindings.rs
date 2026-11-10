@@ -39,6 +39,8 @@ impl Checker<'_> {
                 mono(t1)
             }
         };
+        let bound = s.clone();
+        self.note(e1, |n| n.scheme = Some(bound));
         self.body(x, s, e2, expected)
     }
 
@@ -110,6 +112,8 @@ impl Checker<'_> {
             self.unify(&t, &inferred?)?;
             self.generalize(&t)
         };
+        let bound = s.clone();
+        self.note(lam, |n| n.scheme = Some(bound));
         self.body(f, s, e2, expected)
     }
 }

@@ -12,7 +12,7 @@ use crate::syntax::Name;
 use crate::types::{Caps, Fields, Kind, Row, Scheme, Stage, Type, Var};
 
 /// What a variable of a scheme becomes.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub(crate) enum Inst {
     Type(Type),
     Row(Row),
