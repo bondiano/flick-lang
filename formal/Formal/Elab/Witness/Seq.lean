@@ -108,16 +108,23 @@ theorem typ_seqToList {D A C0 φ} :
       (typ_con0 (us := [A]) rfl))
     (fun s h => by simp [caseSeq, Flick.Tm.Has] at h)
 
-theorem typ_seqEach {A D C C0 ψ φ} :
+/-- The loop at the later stage `ψ'` with the qualifier `C'`, where what `f x` needs live, its
+stage `ψ` with `C`, holds. -/
+theorem typ_seqEach_at {A D C C' C0 ψ ψ' φ} (h : (Stage.use ψ C).le (Stage.use ψ' C')) :
     Typ Sg Ψ Θ [] seqEach (.ex (.arrow (.arrow A ψ (tc "Unit" []) C) .pure
-      (.arrow (seqT D A) ψ (tc "Unit" []) C) C0) φ) := by
-  -- `f x` and the call of `each_φ f xs` both need `C` live, as the stage of the body has it
+      (.arrow (seqT D A) ψ' (tc "Unit" []) C') C0) φ) := by
   exact typ_lam (typ_fix (typ_caseSeq (typ_var_mono rfl)
-      (.let_ (.app (typ_var_mono rfl) (typ_var_mono rfl) (Stage.le_refl _) .refl)
+      (.let_ (.app (typ_var_mono rfl) (typ_var_mono rfl) h .refl)
         (.app (typ_var_mono rfl) (typ_var_mono rfl) (Stage.le_refl _) .refl))
       (typ_con0 (us := []) rfl))
     (fun s h => by simp [caseSeq, Flick.Tm.Has] at h))
     (fun s h => by simp [caseSeq, Flick.Tm.Has] at h)
+
+/-- `f x` and the call of `each_φ f xs` both need `C` live, as the stage of the body has it. -/
+theorem typ_seqEach {A D C C0 ψ φ} :
+    Typ Sg Ψ Θ [] seqEach (.ex (.arrow (.arrow A ψ (tc "Unit" []) C) .pure
+      (.arrow (seqT D A) ψ (tc "Unit" []) C) C0) φ) :=
+  typ_seqEach_at (Stage.le_refl _)
 
 theorem typ_seqFlatMap {A B C C2 C0 D E R φ} :
     Typ Sg Ψ Θ [] seqFlatMap (.ex (.arrow (.arrow A .pure (seqT E B) C) .pure
