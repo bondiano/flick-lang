@@ -137,8 +137,7 @@ theorem LInv.steps {root c c'} (hroot : RootTyM S .live root)
 
 /-- **T4′ of the live discipline.** A program typed by use reaches no configuration where a
 thread is at a step that needs a region that is not live, or where an operation is answered by
-a handler of a region that ended. As for `T1_live`, that the roots name no run-time region is
-a premise. -/
+a handler of a region that ended. -/
 theorem T4'_live {root : Roots} (hroot : RootTyM S .live root) :
     SafeUse root (fun e t φ => TypM S .live [] Facts.none [] e (.ex t φ)) := by
   intro e₀ t φ₀ c h₀ hp ht hφ hs

@@ -14,16 +14,16 @@ always answered, by a kept handler or by the root.
 
 namespace Flick
 
-variable {S : Sig}
+variable {S : Sig} {mode : TypingMode}
 
 /-- A stage of effects the root answers, or with an operation that is not `tail`. -/
 def Stage.Cov (S : Sig) (root : Roots) (φ : Stage) : Prop :=
   ∀ N, φ.svc (.nm N) → (root.svc N).isSome ∨ S.HasNonTail N
 
 /-- The children and finalizers of the regions have typings of such stages. -/
-def KidCov (S : Sig) (root : Roots) (Ψ : List Ty) (Λ : List Rgn) : Prop :=
+def KidCov (S : Sig) (mode : TypingMode) (root : Roots) (Ψ : List Ty) (Λ : List Rgn) : Prop :=
   ∀ (r : Nat) (g : Rgn), Λ[r]? = some g → ∀ k ∈ g.kids ++ g.fins,
-    ∃ t φ, Typ S Ψ Facts.age [] k (.ex t φ) ∧ φ.Cov S root
+    ∃ t φ, TypM S mode Ψ Facts.age [] k (.ex t φ) ∧ φ.Cov S root
 
 theorem Stage.Cov.kill {root : Roots} {φ : Stage} (h : φ.Cov S root) (n : Nat) : (φ.substT (kill n)).Cov S root := by
   intro N hN
@@ -31,20 +31,20 @@ theorem Stage.Cov.kill {root : Roots} {φ : Stage} (h : φ.Cov S root) (n : Nat)
   | pure => exact hN.elim
   | rt r e => exact h N (Row.kill_sub r n _ hN)
 
-theorem KidCov.weaken {root Ψ Λ} (h : KidCov S root Ψ Λ) (X : List Ty) : KidCov S root (Ψ ++ X) Λ :=
+theorem KidCov.weaken {root Ψ Λ} (h : KidCov S mode root Ψ Λ) (X : List Ty) : KidCov S mode root (Ψ ++ X) Λ :=
   fun r g hg k hk => let ⟨t, φ, ht, hn⟩ := h r g hg k hk; ⟨t, φ, ht.weakenStore X, hn⟩
 
-theorem KidCov.keep {root Ψ Λ Λ'} (hk : KidCov S root Ψ Λ)
+theorem KidCov.keep {root Ψ Λ Λ'} (hk : KidCov S mode root Ψ Λ)
     (h : ∀ (r : Nat) (g : Rgn), Λ'[r]? = some g → ∀ k ∈ g.kids ++ g.fins,
       (∃ g₀, Λ[r]? = some g₀ ∧ k ∈ g₀.kids ++ g₀.fins) ∨
-      ∃ t φ, Typ S Ψ Facts.age [] k (.ex t φ) ∧ φ.Cov S root) : KidCov S root Ψ Λ' := by
+      ∃ t φ, TypM S mode Ψ Facts.age [] k (.ex t φ) ∧ φ.Cov S root) : KidCov S mode root Ψ Λ' := by
   intro r g hg k hk'
   rcases h r g hg k hk' with ⟨g₀, h₀, hk₀⟩ | h'
   · exact hk r g₀ h₀ k hk₀
   · exact h'
 
-theorem KidCov.setKid {root Ψ Λ p j k} (h : KidCov S root Ψ Λ)
-    (hk : ∃ t φ, Typ S Ψ Facts.age [] k (.ex t φ) ∧ φ.Cov S root) : KidCov S root Ψ (setKid Λ p j k) := by
+theorem KidCov.setKid {root Ψ Λ p j k} (h : KidCov S mode root Ψ Λ)
+    (hk : ∃ t φ, TypM S mode Ψ Facts.age [] k (.ex t φ) ∧ φ.Cov S root) : KidCov S mode root Ψ (setKid Λ p j k) := by
   intro q g hq k' hk'
   obtain ⟨g₀, hg₀, h₁, h₂⟩ := setKid_get hq
   by_cases hqp : q = p
@@ -62,12 +62,12 @@ theorem KidCov.setKid {root Ψ Λ p j k} (h : KidCov S root Ψ Λ)
 /-- A step of a thread keeps the children and finalizers within what the root answers. -/
 theorem KidCov.step {root : Roots} {Λ : List Rgn} {μ : List Tm} {e : Tm} {l : Lbl} {Λ' : List Rgn}
     {μ' : List Tm} {e' : Tm} {Ψ : List Ty} {t : Ty} {φ : Stage}
-    (he : Typ S Ψ Facts.age [] e (.ex t φ)) (hφ : φ.Cov S root) (hA : e.Asc 0)
-    (hk : KidCov S root Ψ Λ) (hs : Step root l Λ μ e (.cfg Λ' μ' e')) : KidCov S root Ψ Λ' := by
+    (he : TypM S mode Ψ Facts.age [] e (.ex t φ)) (hφ : φ.Cov S root) (hA : e.Asc 0)
+    (hk : KidCov S mode root Ψ Λ) (hs : Step root l Λ μ e (.cfg Λ' μ' e')) : KidCov S mode root Ψ Λ' := by
   have setold : ∀ {p g g'}, Λ[p]? = some g →
       (∀ k ∈ g'.kids ++ g'.fins, k ∈ g.kids ++ g.fins ∨
-        ∃ t φ, Typ S Ψ Facts.age [] k (.ex t φ) ∧ φ.Cov S root) →
-      KidCov S root Ψ (setRgn Λ p g') := by
+        ∃ t φ, TypM S mode Ψ Facts.age [] k (.ex t φ) ∧ φ.Cov S root) →
+      KidCov S mode root Ψ (setRgn Λ p g') := by
     intro p g g' hg hnew
     refine hk.keep fun r g'' hr k hk' => ?_
     rcases setRgn_get hg hr with ⟨rfl, rfl⟩ | ⟨_, hr⟩
@@ -77,7 +77,7 @@ theorem KidCov.step {root : Roots} {Λ : List Rgn} {μ : List Tm} {e : Tm} {l : 
     · exact .inl ⟨g'', hr, hk'⟩
   have newkid : ∀ {E c p w}, OkE E → e = plug E (.app (.app (.const c) (.own p)) w) →
       (c = .addFin ∨ c = .spawn) → Value w →
-      ∃ t φ, Typ S Ψ Facts.age [] (withs p E (.await w)) (.ex t φ) ∧ φ.Cov S root := by
+      ∃ t φ, TypM S mode Ψ Facts.age [] (withs p E (.await w)) (.ex t φ) ∧ φ.Cov S root := by
     intro E c p w hE he' hc hv
     subst he'
     have hnv := fin_not_value (w₁ := .own p) (w₂ := w) hc
@@ -107,8 +107,19 @@ theorem KidCov.step {root : Roots} {Λ : List Rgn} {μ : List Tm} {e : Tm} {l : 
       · exact .inl (List.mem_append_left _ hk')
       · exact .inl (List.mem_append_right _ hk')
       · simp at hk'; subst hk'
-        exact .inr ⟨_, .rt Row.none Row.none, .app (.const (ι := { (default : CArg) with s := .rg _ })
-          trivial .refl) .cap (Stage.le_refl _) .refl, fun N h => h.elim⟩
+        -- `op (cap p)` at the stage of its owner: the live `op` needs its region there
+        rename_i p _ _
+        have hcov : ∀ q, (Stage.rt (Row.scope (.rg q)) Row.none).Cov S root := fun _ N h => by
+          simp [Stage.svc, Row.scope, Row.ofCaps] at h
+        cases mode with
+        | captures =>
+          exact .inr ⟨_, .rt (Row.scope (.rg p)) Row.none,
+            .app (.const (ι := { (default : CArg) with s := .rg p }) trivial .refl) .cap
+              (by exact ⟨fun _ h => h.elim, fun _ h => h⟩) .refl, hcov _⟩
+        | live =>
+          exact .inr ⟨_, .rt (Row.scope (.rg p)) Row.none,
+            .app (.const (ι := { (default : CArg) with s := .rg p }) trivial .refl) .cap
+              (by rw [TypingMode.use_none]; exact Stage.le_refl _) .refl, hcov _⟩
     | finRun hg _ _ _ hfs =>
       refine setold hg fun k hk' => .inl ?_
       simp only [List.mem_append, hfs] at hk' ⊢
@@ -142,12 +153,12 @@ theorem KidCov.step {root : Roots} {Λ : List Rgn} {μ : List Tm} {e : Tm} {l : 
 /-- A configuration step keeps a typed configuration and its children within what the root
 answers; a child steps at the typing that says so. -/
 theorem cstep_cov {root : Roots} {Ψ : List Ty} {c c' : Cfg} {t : Ty} {φ : Stage} {l : Lbl}
-    (hroot : RootTy S root) (ht : t.YF 0) (hφ : φ.substT (kill 0) = φ) (hcov : φ.Cov S root)
-    (hc : CfgTy S Ψ c t φ) (hk : KidCov S root Ψ c.rgs) (hs : CStep root l c c') :
-    ∃ X, CfgTy S (Ψ ++ X) c' t φ ∧ KidCov S root (Ψ ++ X) c'.rgs := by
+    (hroot : RootTyM S mode root) (ht : t.YF 0) (hφ : φ.substT (kill 0) = φ) (hcov : φ.Cov S root)
+    (hc : CfgTyM S mode Ψ c t φ) (hk : KidCov S mode root Ψ c.rgs) (hs : CStep root l c c') :
+    ∃ X, CfgTyM S mode (Ψ ++ X) c' t φ ∧ KidCov S mode root (Ψ ++ X) c'.rgs := by
   cases hs with
   | main hs' =>
-    obtain ⟨X, hc', -⟩ := cstep_typed hroot ht hφ hc (.main hs')
+    obtain ⟨X, hc', -⟩ := cstep_typed_mode hroot ht hφ hc (.main hs')
     exact ⟨X, hc', (KidCov.step hc.2.1 hcov hc.2.2.2.2.2.1.main hk hs').weaken X⟩
   | @kid Λ p g j k l μ Λ' μ' k' e hg hl hj hs' =>
     obtain ⟨hμ, h, hΛ, hb, hΨ, ha, hgs, hgc, hcg⟩ := hc
@@ -171,9 +182,9 @@ theorem cstep_cov {root : Roots} {Ψ : List Ty} {c c' : Cfg} {t : Ty} {φ : Stag
         hkc.setKid (Nat.le_trans hm hl') hkc.main (hcg.main.ghostB hb.main hgg)⟩, ?_⟩
     exact ((KidCov.step hkt hkn hkA hk hs').weaken X).setKid ⟨_, _, hk', Stage.Cov.kill hkn _⟩
 
-theorem steps_cov {root : Roots} {c c' : Cfg} (hroot : RootTy S root) (hs : CSteps root c c') :
-    ∀ {Ψ t φ}, t.YF 0 → φ.substT (kill 0) = φ → φ.Cov S root → CfgTy S Ψ c t φ →
-      KidCov S root Ψ c.rgs → ∃ X, CfgTy S (Ψ ++ X) c' t φ ∧ KidCov S root (Ψ ++ X) c'.rgs := by
+theorem steps_cov {root : Roots} {c c' : Cfg} (hroot : RootTyM S mode root) (hs : CSteps root c c') :
+    ∀ {Ψ t φ}, t.YF 0 → φ.substT (kill 0) = φ → φ.Cov S root → CfgTyM S mode Ψ c t φ →
+      KidCov S mode root Ψ c.rgs → ∃ X, CfgTyM S mode (Ψ ++ X) c' t φ ∧ KidCov S mode root (Ψ ++ X) c'.rgs := by
   induction hs with
   | refl => intro Ψ _ _ _ _ _ hc hk; exact ⟨[], by simpa using hc, by simpa using hk⟩
   | step h₁ _ ih =>

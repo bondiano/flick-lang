@@ -164,6 +164,7 @@ import Formal.Elab.Witness.T6b
 import Formal.FailAbort
 import Formal.Live
 import Formal.Live.T4Live
+import Formal.Live.T1Regions
 import Formal.Live.Elide
 import Formal.Live.Install
 import Formal.Axioms
