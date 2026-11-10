@@ -75,6 +75,8 @@ if (Number(repeat) > 0) {
     return performance.now() - started;
   };
   const samples = { hover: [], "hover after edit": [], "completion after a dot": [], "hover after an interface edit": [] };
+  // a request answers only after the notifications before it are handled
+  const settled = () => request("workspace/symbol", { query: "" });
   const change = (version, next) =>
     send({ method: "textDocument/didChange", params: { textDocument: { uri, version }, contentChanges: [{ text: next }] } });
   // a declaration being typed: the module does not parse to its end
@@ -106,16 +108,19 @@ if (Number(repeat) > 0) {
         return request("textDocument/completion", { textDocument: { uri }, position: afterDot });
       }),
     );
+    // the server analyzes an edit before it answers: a sample starts once
+    // the edit that restores the text is behind
     change(versions + 4 * i + 1, text);
+    await settled();
     if (exporting === null) continue;
-    const [l, c] = positions[0].split(":").map(Number);
     samples["hover after an interface edit"].push(
       await sample(() => {
         change(versions + 4 * i + 2, exporting);
-        return hover([l, c]);
+        return hover([line, character]);
       }),
     );
     change(versions + 4 * i + 3, text);
+    await settled();
   }
   for (const [label, ms] of Object.entries(samples)) {
     if (ms.length === 0) continue;
