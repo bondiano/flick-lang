@@ -19,8 +19,8 @@ let group () =
   let _ = FiberSet.run { propagateInterruption = false; startImmediately = true } (task { () }) set
   set
 
-main : Unit ->{Async, Files} String
-let main () = scope {
+read_both : Unit ->{Async, Files} String
+let read_both () = scope {
   let _ = group ()
   first_line "x"
 }
