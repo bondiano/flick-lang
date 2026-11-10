@@ -947,7 +947,9 @@ pub fn builtin_modules_of(stages_by_class: bool) -> &'static [ir::Module] {
 /// Where a host keeps the lowered built-in modules between its processes:
 /// lowering them takes longer than building a small project. What `load`
 /// gives must be what `save` got from this compiler for the same sources of
-/// the built-in modules and the same mode of `stages_by_class`.
+/// the built-in modules and the same mode of `stages_by_class`. Asked for
+/// when a build first reads a mode, which only the emitters decide: a host
+/// that installed them up front would read both modes for every build.
 pub struct BuiltinStore {
     pub load: fn(bool) -> Option<Vec<ir::Module>>,
     pub save: fn(bool, &[ir::Module]),
