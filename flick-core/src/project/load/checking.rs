@@ -227,20 +227,19 @@ impl Loader<'_> {
                     .diagnostics
                     .iter()
                     .any(|d| d.severity == Severity::Error),
-            cached_ir: self.cached_ir(),
+            // an editor's run reads no IR; a check and a build do
+            #[cfg(feature = "ide")]
+            cached_ir: if self.ide.is_some() {
+                CachedIr::Dropped
+            } else {
+                CachedIr::Kept
+            },
+            #[cfg(not(feature = "ide"))]
+            cached_ir: CachedIr::Kept,
             lower_packages_only: self.lower_packages_only,
             precompiled: &self.precompiled,
             cache: self.cache.as_deref(),
         }
-    }
-
-    /// An editor's run reads no IR; a check and a build do.
-    fn cached_ir(&self) -> CachedIr {
-        #[cfg(feature = "ide")]
-        if self.ide.is_some() {
-            return CachedIr::Dropped;
-        }
-        CachedIr::Kept
     }
 
     fn apply(&mut self, i: usize, (output, key): (Output, Option<Key>), known: &mut Known) {
