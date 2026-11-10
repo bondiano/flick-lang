@@ -76,7 +76,11 @@ pub(super) fn match_tm(
     ctx: &[Name],
     sig: &Sig,
 ) -> Result<String, Unsupported> {
-    Ok(format!("(.match_ {} {})", tm(s, ctx, sig)?, arms_tm(arms, ctx, sig)?))
+    Ok(format!(
+        "(.match_ {} {})",
+        tm(s, ctx, sig)?,
+        arms_tm(arms, ctx, sig)?
+    ))
 }
 
 /// The arms of a `match` or a `try` in the core: an arm's body sees what

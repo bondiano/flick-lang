@@ -32,6 +32,11 @@ in the `lean` job (`leanprover/lean-action` with `build-args: --wfail`).
 `just formal-schemes` rewrites it, and a golden test of `cargo test -p flick-model`
 (`flick-model/src/translate/lean.rs`) fails when it is stale.
 
+The second library, `FormalCert`, holds certificates: theorems that the programs of the
+model's generator type in this core, with the rules and tactics they need
+([certificates](../docs/formal/certificates.md)). `just formal-certs` regenerates its
+signature and golden certificates.
+
 ## What is proved
 
 - **The module boundary** (`Formal/Modules.lean`): separate named application

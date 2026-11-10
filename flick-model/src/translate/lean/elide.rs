@@ -179,7 +179,9 @@ fn qualified(t: &Type, q: Option<&Caps>, env: &Env) -> Result<String, String> {
             }
         }
         Type::Ref(x) => format!("(.ref {})", ty(x, env)?),
-        Type::Record(f) if f.tail.is_none() || env.ground && matches!(f.tail, Some(Var::Meta(_))) => {
+        Type::Record(f)
+            if f.tail.is_none() || env.ground && matches!(f.tail, Some(Var::Meta(_))) =>
+        {
             let mut out = ".rnil".to_owned();
             for (l, t) in f.fields.iter().rev() {
                 out = format!("(.rcons \"{l}\" {} {out})", ty(t, env)?);

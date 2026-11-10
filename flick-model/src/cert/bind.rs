@@ -28,7 +28,10 @@ impl Cx<'_> {
         let k = scheme.vars.len();
         let outer = self.env.clone();
         let under = |names: Vec<String>| -> Vec<String> {
-            names.into_iter().chain(outer.vars.iter().cloned()).collect()
+            names
+                .into_iter()
+                .chain(outer.vars.iter().cloned())
+                .collect()
         };
         self.env.vars = under(scheme.vars.iter().map(|(v, _)| v.to_string()).collect());
         let a = self.ty(&scheme.body);
@@ -90,9 +93,10 @@ impl Cx<'_> {
         let ts = match self.fixed.iter().find(|(p, _)| *p == at) {
             Some((_, rigid)) => {
                 let own = insts.len() == rigid.len()
-                    && insts.iter().zip(rigid).all(
-                        |(i, v)| matches!(i, Inst::Type(Type::Var(Var::Named(n))) if n == v),
-                    );
+                    && insts
+                        .iter()
+                        .zip(rigid)
+                        .all(|(i, v)| matches!(i, Inst::Type(Type::Var(Var::Named(n))) if n == v));
                 if !own {
                     return Err("polymorphic recursion".into());
                 }

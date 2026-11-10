@@ -54,7 +54,11 @@ pub(super) fn tm(e: &Term, ctx: &[Name], sig: &Sig) -> Result<String, Unsupporte
                 return Err("a `let rec` of no λ".into());
             };
             let inner = push(&push(ctx, f), x);
-            format!("(.let_ (.fix {}) {})", tm(body, &inner)?, tm(e2, &push(ctx, f))?)
+            format!(
+                "(.let_ (.fix {}) {})",
+                tm(body, &inner)?,
+                tm(e2, &push(ctx, f))?
+            )
         }
         Term::Task(b) => format!("(.task {})", tm(b, ctx)?),
         Term::Await(x) => format!("(.await {})", tm(x, ctx)?),
