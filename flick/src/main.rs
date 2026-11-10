@@ -74,6 +74,7 @@ fn dependency_command(cmd: Commands, offline: bool) -> pnpm::Command {
 
 fn main() -> ExitCode {
     let args = CommandArguments::parse();
+    builtins::keep_modules();
     let global = args.global.clone();
     // the language server sets its own subscriber for its log
     if global.timings && !matches!(args.cmd, Commands::Lsp(_)) {
