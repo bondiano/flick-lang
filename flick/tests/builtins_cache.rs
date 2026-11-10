@@ -59,7 +59,9 @@ fn project_checks_save_the_interfaces_of_the_selected_backend() {
             .map(|e| e.expect("entry").file_name().to_string_lossy().into_owned())
             .filter(|name| {
                 name.starts_with("builtins-")
-                    && Path::new(name).extension().is_some_and(|ext| ext == "json")
+                    && Path::new(name)
+                        .extension()
+                        .is_some_and(|ext| ext == "jsonl")
             })
             .collect();
         assert_eq!(files.len(), 1, "{files:?}");
@@ -315,4 +317,46 @@ fn a_changed_std_is_lowered_again() {
     assert!(build(), "another std is lowered, not read from the cache");
     let after = fs::read_to_string(&emitted).expect("the built-in module");
     assert!(after.contains("shout"), "{after}");
+}
+
+/// Saved interfaces cut short at the end of a line still read line by
+/// line: the file is taken only with every built-in module in it.
+#[test]
+fn a_cache_cut_short_is_checked_again() {
+    let app = project(
+        "builtins_cache_cut",
+        &[
+            (
+                "flick.toml",
+                "schema-version = 1\n\n[project]\nkind = \"lib\"\n",
+            ),
+            (
+                "src/App/Main.fl",
+                "module App.Main exposing (x)\n\nx : String\nlet x = Markdown.escape \"<\"\n",
+            ),
+        ],
+    );
+    let cache = app.join("cache");
+    let std = Path::new(env!("CARGO_MANIFEST_DIR")).join("../packages/std");
+    let out = check(&app, &std, &cache);
+    assert!(out.status.success(), "{out:?}");
+    let saved = fs::read_dir(cache.join("flick"))
+        .expect("cache")
+        .map(|e| e.expect("entry").path())
+        .find(|path| path.extension().is_some_and(|ext| ext == "jsonl"))
+        .expect("the saved interfaces");
+    let whole = fs::read(&saved).expect("read");
+    for cut in [
+        0,
+        whole
+            .iter()
+            .position(|byte| *byte == b'\n')
+            .expect("a line")
+            + 1,
+    ] {
+        fs::write(&saved, &whole[..cut]).expect("write");
+        let out = check(&app, &std, &cache);
+        assert!(out.status.success(), "{out:?}");
+        assert_eq!(fs::read(&saved).expect("read"), whole, "saved anew");
+    }
 }
