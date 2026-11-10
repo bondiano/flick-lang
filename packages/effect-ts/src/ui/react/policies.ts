@@ -1,11 +1,12 @@
 // Event handlers and their policies. An event is snapshotted and its
 // default action decided synchronously, inside the DOM callback; its task
 // then runs as a fiber of the root's bridge under the handler's policy.
-import { Cause, type Context, Effect, Exit, Fiber, type Tracer } from "effect";
+import { Cause, Context, Effect, Exit, Fiber, type Tracer } from "effect";
 
 import { Failure } from "../../cause.ts";
 import type { Binding, DomEvent } from "@flick-lang/runtime/ui/react/nodes";
 import type { Handler, Listener } from "@flick-lang/runtime/ui/react/handlers";
+import { ActionObserver } from "../action-observer.ts";
 
 export * from "@flick-lang/runtime/ui/react/handlers";
 
@@ -28,14 +29,6 @@ interface Slot {
 
 const now = (): bigint => BigInt(Date.now()) * 1_000_000n;
 
-/** The attributes of the span of a task: its policy and the event that started it. */
-const spanAttributes = ({ policy }: Handler, event: string): Record<string, unknown> => ({
-  "flick.action.policy": policy.kind,
-  ...(policy.kind === "queue" ? { "flick.action.capacity": policy.capacity } : {}),
-  ...(policy.kind === "concurrent" ? { "flick.action.limit": policy.limit } : {}),
-  "flick.event": event,
-});
-
 /**
  * The runtime side of a mounted root: which events it still takes, the
  * tasks it runs and the supervisor that hears of their failures.
@@ -50,6 +43,7 @@ export class Bridge<R> {
   private readonly supervisor: (failure: Failure) => Effect.Effect<unknown, unknown, R>;
   private readonly settled: () => void;
   private readonly broken: (cause: Cause.Cause<unknown>) => void;
+  private readonly observer: ActionObserver | undefined;
 
   /**
    * `settled` runs after each task ends while the root is open: the root
@@ -65,6 +59,7 @@ export class Bridge<R> {
     this.supervisor = supervisor;
     this.settled = settled;
     this.broken = broken;
+    this.observer = Context.get(context, ActionObserver);
   }
 
   /**
@@ -171,20 +166,13 @@ export class Bridge<R> {
     if (waiting !== undefined) this.start(slot, waiting.handler, waiting.snapshot, waiting.event);
   }
 
-  /** Runs the task of an event in a span named by the action's label. */
+  /** Runs an event; spans are opt-in for this root. */
   private start(slot: Slot, handler: Handler, snapshot: unknown, event: string): void {
-    const traced = Effect.useSpan(handler.label ?? "Ui.event", { attributes: spanAttributes(handler, event) }, (span) => {
-      slot.spans.add(span);
-      return Effect.withFiber((fiber) => {
-        span.attribute("flick.fiber", fiber.id);
-        // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- on Effect, the task of an event is an Effect
-        return handler.run(snapshot) as Effect.Effect<unknown, unknown>;
-      }).pipe(
-        Effect.withParentSpan(span),
-        Effect.onInterrupt(() => Effect.sync(() => span.event("interrupted", now()))),
-        Effect.ensuring(Effect.sync(() => slot.spans.delete(span))),
-      );
-    });
+    const task = (): Effect.Effect<unknown, unknown> => {
+      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- on Effect, the task of an event is an Effect
+      return handler.run(snapshot) as Effect.Effect<unknown, unknown>;
+    };
+    const traced = this.observer?.(handler, event, slot.spans, task) ?? Effect.suspend(task);
     this.fork(
       traced,
       (fiber) => slot.running.add(fiber),

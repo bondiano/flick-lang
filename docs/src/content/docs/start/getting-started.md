@@ -110,6 +110,10 @@ JavaScript to `dist/`, `flick test` runs the tests of the test root and
 `flick dev` rebuilds and restarts on every change. The [CLI reference](../../reference/cli/)
 has every command.
 
+Next, [design a program with effects](../../handbook/designing-with-effects/):
+separate user lookup logic from external calls and provide different services
+in the application and its tests.
+
 ## In a web page
 
 Astro and Vite import Flick modules directly with `@flick-lang/astro`: the

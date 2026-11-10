@@ -80,6 +80,26 @@ pub fn selected_on_kernel(spec: &str, export: &str, bridge: EffectBridge) -> boo
     !(bridge.available() && (stub || module_stub)) && on_kernel(spec, export)
 }
 
+/// A native export that is a placeholder, rather than an implementation.
+/// Bridge policy also names working native exports, so it cannot answer this.
+#[cfg(not(target_arch = "wasm32"))]
+pub(super) fn unavailable_on_kernel(spec: &str, export: &str) -> bool {
+    (spec == bindings::NATIVE_ENTRY && bindings::STUBS.lines().any(|name| name == export))
+        || bindings::UNAVAILABLE
+            .lines()
+            .any(|line| line.split_once(' ') == Some((spec, export)))
+}
+
+/// Whether a routed binding needs the adapter rather than a native implementation.
+#[cfg(not(target_arch = "wasm32"))]
+pub(crate) fn requires_adapter(spec: &str, export: &str, effect: bool) -> bool {
+    if belongs_to(spec, bindings::OWNED_PREFIX) {
+        !on_kernel(spec, export) || unavailable_on_kernel(spec, export)
+    } else {
+        belongs_to(spec, bindings::ADAPTER_PREFIX) || effect
+    }
+}
+
 /// E008 when the program's `module` binds a foreign module that needs
 /// Effect, or makes a schema, which `core` has no codecs for.
 pub fn check(module: &ir::Module, diagnostics: &mut Vec<Diagnostic>) {

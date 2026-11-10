@@ -370,7 +370,7 @@ const GREET_MAIN: &str = "module App.Main exposing (main)
 import Lib.Greet
 
 main : Unit ->{} Unit
-let main () = Console.log (Lib.Greet.hi \"there\")
+let main () = Platform.stdout_line (Lib.Greet.hi \"there\")
 ";
 
 /// The library `lib` of a foreign module on both targets, and an app of it

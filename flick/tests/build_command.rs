@@ -1,5 +1,7 @@
 #[path = "build_command/cache.rs"]
 mod cache;
+#[path = "build_command/capabilities.rs"]
+mod capabilities;
 mod common;
 #[path = "build_command/ir.rs"]
 mod ir;

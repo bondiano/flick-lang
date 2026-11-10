@@ -9,6 +9,7 @@ import { label } from "../src/atoms.ts";
 import { WriteService, atomLayer, make, nativeRegistry } from "../src/effect/reactivity/Atom.ts";
 import { sync, syncOperation } from "../src/index.ts";
 import { type Handler, type Ui, actionExhaust, actionLatest, actionWith, uiButton, uiRunWith, uiText } from "../src/ui/react/index.ts";
+import { withActionSpans } from "../src/ui/tracing.ts";
 
 interface Recorded {
   readonly name: string;
@@ -38,7 +39,20 @@ const recording = () => {
 const button = (handler: Handler) => uiButton({ disabled: false, on_click: handler }, [uiText("go")]);
 
 const mountTraced = (root: Element, ui: Ui, tracer: Tracer.Tracer) =>
-  Effect.runFork(Effect.withTracer(uiRunWith(domRenderer(root), logging([]), ui, undefined), tracer));
+  Effect.runFork(Effect.withTracer(withActionSpans(true)(uiRunWith(domRenderer(root), logging([]), ui, undefined)), tracer));
+
+test("roots create no action spans by default, even with a tracer installed", async () => {
+  const { spans, tracer } = recording();
+  let runs = 0;
+  const root = container();
+  const go = actionExhaust(() => Effect.sync(() => runs++));
+  const fiber = Effect.runFork(Effect.withTracer(uiRunWith(domRenderer(root), logging([]), button(go), undefined), tracer));
+  click(root);
+  await tick();
+  assert.equal(runs, 1);
+  assert.deepEqual(spans, []);
+  await stop(fiber);
+});
 
 test("a run of an action is a span named by its label, with its policy and event", async () => {
   const { spans, tracer } = recording();
@@ -109,6 +123,7 @@ const writes = async (level: "Debug" | "Info"): Promise<Array<string>> => {
     const registry = nativeRegistry(yield* Effect.service(WriteService));
     return yield* uiRunWith(domRenderer(root), logging([]), button(go), registry);
   }).pipe(
+    withActionSpans(true),
     Effect.provide(atomLayer),
     Effect.provideService(References.MinimumLogLevel, level),
     Effect.provideService(Logger.CurrentLoggers, new Set([logger])),

@@ -10,12 +10,13 @@
 //   node tools/lsp-bench/index.mjs [--repeat N] <flick binary> <file.fl> <line:character>...
 //
 // Lines and characters are zero-based, as in LSP.
-import { existsSync, readFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { parseArgs } from "node:util";
 
 import { connect } from "./client.mjs";
+import { sampleRss } from "../perf/rss.mjs";
 
 const {
   values: { repeat },
@@ -28,6 +29,7 @@ if (!binary || !file || positions.length === 0) {
 const uri = pathToFileURL(resolve(file)).href;
 const text = readFileSync(file, "utf8");
 const { server, send, request, diagnostics: published } = connect(binary);
+const memory = sampleRss(server.pid);
 const diagnostics = () => published(uri);
 const timed = async (label, work) => {
   const started = performance.now();
@@ -131,7 +133,5 @@ if (Number(repeat) > 0) {
     console.log(`${`${label}, ${ms.length} samples`.padEnd(32)} p50 ${at(50).padStart(6)} ms  p95 ${at(95).padStart(6)} ms`);
   }
 }
-// Linux only: it reads /proc
-const peak = /VmHWM:\s+(\d+)/.exec(existsSync(`/proc/${server.pid}/status`) ? readFileSync(`/proc/${server.pid}/status`, "utf8") : "");
-if (peak) console.log(`RSS, MiB: peak ${(Number(peak[1]) / 1024).toFixed(1)}`);
+console.log(`RSS, MiB: peak ${memory.stop().toFixed(1)}`);
 server.kill();

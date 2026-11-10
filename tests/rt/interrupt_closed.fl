@@ -1,0 +1,23 @@
+// Scheduler preemption does not require an Async operation in a function's row.
+module App.Main exposing (main)
+
+effect Probe =
+  tail ping : Unit ->{} Unit
+
+empty_loop : Int ->{} Int
+let rec empty_loop n = empty_loop (n + 1)
+
+tail_loop : Int ->{Probe} Int
+let rec tail_loop n = tail_loop (n + 1)
+
+main : Unit ->{Async; AppError} Unit
+let main () =
+  let finalizers = Ref.make 0
+  let done = task { Ref.update finalizers (fun n -> n + 1) }
+  let first = timeout_option 10 (task { Effect.ensuring done (task { empty_loop 0 }) })
+  let second =
+    try timeout_option 10 (task { Effect.ensuring done (task { tail_loop 0 }) }) with
+    | Probe.ping () -> ()
+  Platform.stdout_line (show first)
+  Platform.stdout_line (show second)
+  Platform.stdout_line (show (Ref.get finalizers))

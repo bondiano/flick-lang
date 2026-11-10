@@ -3,7 +3,7 @@
 // as many distinct standalone copies of it, each opened, edited and closed
 // once. Memory that keeps growing in the second phase is state a closed
 // document leaves behind: the last line is how much it grew over that
-// phase. Linux only: it reads /proc.
+// phase. Linux reads /proc; macOS samples RSS with ps.
 //
 //   node tools/lsp-bench/soak.mjs <flick binary> <file.fl> [cycles]
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -12,6 +12,7 @@ import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 
 import { connect } from "./client.mjs";
+import { readRss } from "../perf/rss.mjs";
 
 const [binary, file, cycles = "400"] = process.argv.slice(2);
 if (!binary || !file) {
@@ -23,7 +24,7 @@ const text = readFileSync(file, "utf8");
 // outside any project, so each copy is a standalone context of its own
 const dir = mkdtempSync(join(tmpdir(), "flick-lsp-soak-"));
 const { server, send, request } = connect(binary);
-const rss = () => Number(/VmRSS:\s+(\d+)/.exec(readFileSync(`/proc/${server.pid}/status`, "utf8"))[1]) / 1024;
+const rss = () => readRss(server.pid).current;
 const report = (label) => console.log(`${label.padEnd(28)} ${rss().toFixed(1).padStart(8)} MiB`);
 
 // a request answers only after the notifications before it are handled

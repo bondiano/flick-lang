@@ -656,6 +656,9 @@
     ]
   ],
   "owned_prefix": "@flick-lang/runtime",
+  "ui_requirements": [
+    "@flick-lang/effect-ts/ui/tracing withActionSpans"
+  ],
   "adapter_prefix": "@flick-lang/effect-ts",
   "ui_renderer": [
     "@flick-lang/effect-ts/ui",

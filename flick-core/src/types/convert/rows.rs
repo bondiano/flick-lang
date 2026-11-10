@@ -21,26 +21,16 @@ impl Checker<'_> {
         let (services, errors) = self.slots(services, errors, free);
         Effects {
             written: self.row_written(node),
-            direct: self.direct_row(&services),
+            direct: self.direct_row(&services, &errors),
             ..Effects::new(services, errors)
         }
     }
 
-    /// Whether an arrow of the services `row`, as written, is a plain function
-    /// on Flick's own runtime; a variable, a meta or an effect not found says no.
-    pub(in crate::types) fn direct_row(&self, row: &Type) -> bool {
-        self.options.stages_by_class && self.closed_without_suspending(row)
-    }
-
-    fn closed_without_suspending(&self, row: &Type) -> bool {
-        let Type::Row(r) = row else { return false };
-        (r.entries.iter()).all(|(_, entry)| match entry.spine().0 {
-            Type::Con { module, name } => self.never_suspends(module, name),
-            _ => false,
-        }) && r
-            .tail
-            .as_deref()
-            .is_none_or(|t| self.closed_without_suspending(t))
+    /// Only intrinsically synchronous UI rows are atomic. A closed runtime
+    /// row can still recurse forever: scheduler preemption is independent of
+    /// whether its operations can suspend.
+    pub(in crate::types) fn direct_row(&self, services: &Type, errors: &Type) -> bool {
+        self.options.stages_by_class && ty::sync_rows(services, errors)
     }
 
     /// Whether the service or effect `module.name` is known, is not `Async` and

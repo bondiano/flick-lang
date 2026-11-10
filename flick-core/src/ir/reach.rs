@@ -1,8 +1,10 @@
 //! What a program uses: the top-level items reachable from its `main`,
-//! across modules. Only those are compiled, so a built-in module may hold
-//! what the target cannot run as long as the program does not reach it.
+//! across modules. Backends and build validation share this graph, so a
+//! built-in module may hold bindings a program never uses.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
+#[cfg(feature = "native-project")]
+use std::collections::HashSet;
 
 use crate::ir::{Expr, ExprKind, Item, ItemKind, Module};
 use crate::types::{Dict, companion_name, default_method};
@@ -48,7 +50,7 @@ pub fn uses(item: &Item, out: &mut Vec<Key>) {
     }
 }
 
-fn dict_uses(d: &Dict, out: &mut Vec<Key>) {
+pub fn dict_uses(d: &Dict, out: &mut Vec<Key>) {
     d.each_global(&mut |_, module, name| out.push((module.to_owned(), name.to_owned())));
 }
 
@@ -81,6 +83,7 @@ pub fn index(modules: &[&Module]) -> HashMap<Key, (usize, usize)> {
 
 /// The items reachable from `roots`, by module and item index, and the
 /// modules reached that the program does not have.
+#[cfg(feature = "native-project")]
 pub fn reachable(
     modules: &[&Module],
     index: &HashMap<Key, (usize, usize)>,

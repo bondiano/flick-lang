@@ -8,6 +8,7 @@ const repo = dirname(dirname(fileURLToPath(import.meta.url)));
 const root = join(repo, "runtime/dist");
 const manifest = join(repo, "runtime/rt_exports.txt");
 const stubManifest = join(repo, "runtime/rt_stubs.txt");
+const unavailableManifest = join(repo, "runtime/rt_unavailable.txt");
 const bridgeStubManifest = join(repo, "packages/effect-ts/rt_bridge_stubs.txt");
 // The adapter owns overrides and modules that must share its runtime context.
 const policy = JSON.parse(await readFile(join(repo, "packages/effect-ts/compiler-bindings.json"), "utf8"));
@@ -33,6 +34,7 @@ const selected = (await files(root)).filter((path) =>
 );
 const lines = [];
 const bridgeStubs = [];
+const unavailable = [];
 for (const path of selected) {
   const exports = await import(pathToFileURL(path).href);
   const name = relative(root, path).replace(/\.js$/, "");
@@ -40,6 +42,8 @@ for (const path of selected) {
   for (const exportName of Object.keys(exports)) {
     const line = `${spec} ${exportName}`;
     lines.push(line);
+    if (typeof exports[exportName] === "function" && exports[exportName][Symbol.for("flick/absent")] === true)
+      unavailable.push(line);
     if (bridgeExport(name, exportName) ||
         (typeof exports[exportName] === "function" && exports[exportName][Symbol.for("flick/absent")] === true))
       bridgeStubs.push(line);
@@ -57,9 +61,11 @@ const rt = await import(pathToFileURL(join(root, "rt/index.js")).href);
 const stubs = await import(pathToFileURL(join(root, "core/stubs.js")).href);
 const stubNames = Object.keys(stubs).filter((name) => rt[name] === stubs[name]).sort();
 const stubContents = `${stubNames.join("\n")}\n`;
+const unavailableContents = `${unavailable.sort().join("\n")}\n`;
 if (process.argv.includes("--check")) {
   if (contents !== await readFile(manifest, "utf8") ||
       stubContents !== await readFile(stubManifest, "utf8") ||
+      unavailableContents !== await readFile(unavailableManifest, "utf8") ||
       bridgeStubContents !== await readFile(bridgeStubManifest, "utf8")) {
     console.error("RT exports changed; run pnpm -C runtime build && node tools/rt-exports.mjs");
     process.exitCode = 1;
@@ -67,6 +73,7 @@ if (process.argv.includes("--check")) {
 } else {
   await writeFile(manifest, contents);
   await writeFile(stubManifest, stubContents);
+  await writeFile(unavailableManifest, unavailableContents);
   await writeFile(bridgeStubManifest, bridgeStubContents);
   console.log(`${selected.length} modules, ${lines.length} exports, ${stubNames.length} RT stubs, ${uniqueBridgeStubs.length} bridge stubs`);
 }

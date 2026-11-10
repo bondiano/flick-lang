@@ -180,7 +180,18 @@ values on each scrape; it does not push to a Prometheus server.
 
 ## UI actions and atom writes
 
-Each task an action or an event handler of a mounted root runs is a span,
+Action spans on the Effect adapter are disabled by default. Wrap the task that
+mounts a root in `Ui.Tracing.with_action_spans true`; the root captures the
+setting when mounted. `false` opts a root out inside an enabled parent.
+`flick run --devtools` enables them explicitly. The tracing implementation lives
+in a separate module, so an application that never enables it can drop that code.
+
+```flick
+observe_actions : (Eff r e a)^c ->{r; e} a
+let observe_actions mount = Ui.Tracing.with_action_spans true mount
+```
+
+When enabled, each task an action or event handler of a mounted root runs is a span,
 named by the action's label (`App.Counter.increment`; `Ui.event` for a
 handler with none). Its attributes are `flick.action.policy`,
 `flick.action.capacity` or `flick.action.limit` where the policy has one,

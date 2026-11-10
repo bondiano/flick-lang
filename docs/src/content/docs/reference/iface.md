@@ -7,7 +7,7 @@ needs, so an importer never re-reads, re-parses or re-checks the module's
 source (see [Compiler architecture](../../contributing/implementation-decisions/#compiler-architecture)). It is versioned JSON. `.d.ts` is only a projection for
 TypeScript; `.iface` is the source of truth for Flick importers.
 
-The current schema is `iface-version` 11. It includes module visibility,
+The current schema is `iface-version` 13. It includes module visibility,
 `type module` contracts, the `exists` type form and implicit conversion
 instances. Every schema change bumps the version; a compiler rejects any other
 version with `FLICK-P010`. The simplified example below shows the envelope;
@@ -17,7 +17,7 @@ use the current compiler to write an interface for a new package.
 
 ```json
 {
-  "iface-version": 12,
+  "iface-version": 13,
   "compiler": "0.1.0",
   "module": "App.Shapes",
   "exports": [

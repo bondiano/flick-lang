@@ -71,8 +71,8 @@ type ServiceTag (r : ServiceRow)
 @lang async
 /// Suspension: waiting for time, input or output, or another fiber. The
 /// runtime's scheduler handles it at the root. A function whose row has it
-/// may suspend; one whose closed row has only effects of `tail` and `abort`
-/// operations runs at once.
+/// may wait for external work. Ordinary runtime calls and recursive loops
+/// remain interruptible even without it; only intrinsic Sync stages are atomic.
 effect Async
 
 @lang fail

@@ -10,12 +10,13 @@ export const sidebar = [
       { slug: "start" },
       { slug: "start/getting-started" },
       { slug: "start/why" },
+      { slug: "principles" },
     ],
   },
   {
     label: "Handbook",
     translations: { ru: "Руководство" },
-    items: [{ slug: "handbook/upgrading" }],
+    items: [{ slug: "handbook/designing-with-effects" }, { slug: "handbook/upgrading" }],
   },
   {
     label: "Reference",
