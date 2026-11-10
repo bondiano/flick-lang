@@ -1,6 +1,7 @@
 import Formal.Elab.CloseTy
 import Formal.Elab.Run
 import Formal.Elab.SugarBase
+import Formal.Elab.Keeps
 
 /-!
 # Elaboration: closing the premises by types and dictionaries (`docs/formal/elaboration.md#typing-the-whole-term-does-not-type-its-dictionaries-in-the-empty-context`)
@@ -148,7 +149,8 @@ theorem T6a_close (hP : P.ConstsClosed) (hC : P.CtorsClosed) {Γ D e τ φ e'}
     intro _ _ θ _ hD hρ hg
     exact X.caseKDead (σ := θ) (ihe hD hρ hg) hK hT hlen hC' (ihr hD hρ hg)
   | app _ _ hψ ih₁ ih₂ =>
-    intro _ _ θ _ hD hρ hg; exact X.app (ih₁ hD hρ hg) (ih₂ hD hρ hg) (Stage.subst_or θ hψ)
+    intro _ _ θ _ hD hρ hg
+    exact X.app (ih₁ hD hρ hg) (ih₂ hD hρ hg) (Stage.subst_keeps_or θ hψ)
   | @allVar Γ D x σ ψ hx hc hk =>
     intro _ _ θ _ _ _ _
     simp only [Ty.subst, liftTy_eq]
@@ -192,21 +194,18 @@ theorem T6a_close (hP : P.ConstsClosed) (hC : P.CtorsClosed) {Γ D e τ φ e'}
     have hs := ihs hD hρ hg
     simp only [List.map_cons, Scheme.subst, lift_zero, List.map_nil, Ty.subst] at hs
     exact X.caseOpt (ihe hD hρ hg) (ihn hD hρ hg) hs
-  | @lam Γ D b a t q φ ψ b' hb hh ih =>
+  | lam _ ih =>
     intro Δl Δ θ ρ hD hρ hg
     have hb' := ih hD hρ hg
     simp only [List.map_cons, Scheme.subst, lift_zero, List.map_nil, Ty.subst] at hb'
-    refine X.lam hb' fun n hn => ?_
-    obtain ⟨m, hm, ho⟩ := heldS_subst (heldT_of (e := .lam b) (e' := .lam (b'.dsubst ρ Δl.length))
-      (fun _ hx => hb.free (Tm.free_dsubst (e := b') hx)) hn)
-    exact Ty.occurs_subst (hh m hm) ho
+    exact X.lam hb'
   | let_ _ _ ih₁ ih₂ =>
     intro _ _ _ _ hD hρ hg
     have h₂ := ih₂ hD hρ hg
     simp only [List.map_cons, Scheme.subst, lift_zero, List.map_nil, Ty.subst] at h₂
     refine X.let_ (k := 0) ?_ (fun h => absurd rfl h) (.inr rfl) h₂
     simpa [TSch.subst_up_zero, Cn.subst_up_zero] using ih₁ hD hρ hg
-  | @letSig Γ D σ e b t φ₁ φ e' b' he hp hφ hq _ ih₁ ih₂ =>
+  | @letSig Γ D σ e b t φ₁ φ e' b' he hp hφ _ ih₁ ih₂ =>
     intro Δl Δ θ ρ hD hρ hg; subst hD
     have hD' : σ.ctx ++ (Δl ++ Δ).map (·.subst (up σ.k)) =
         (σ.ctx ++ Δl.map (·.subst (up σ.k))) ++ Δ.map (·.subst (up σ.k)) := by simp
@@ -224,11 +223,6 @@ theorem T6a_close (hP : P.ConstsClosed) (hC : P.CtorsClosed) {Γ D e τ φ e'}
     rw [List.map_append] at h₁
     have hd := X.lamD (q := σ.q.subst (lift σ.k θ)) h₁
       (fun h => by rw [hp (.inl fun e => h (by simp [e]))]; rfl)
-      fun hc n hn => by
-        obtain ⟨m, hm, ho⟩ := heldS_subst (heldT_of (e := e)
-          (fun _ hx => he.free (Tm.free_dsubst hx)) hn)
-        exact (hq (fun e => hc (by simp [e])) m hm).imp (Ty.occurs_subst · ho)
-          (Ty.occurs_subst · ho)
     have hΔl : (Δl.map (·.subst (up σ.k))).map (·.subst (lift σ.k θ)) =
         (Δl.map (·.subst θ)).map (·.subst (up σ.k)) := by
       simp [List.map_map, Function.comp_def, Cn.up_lift]

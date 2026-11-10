@@ -1,36 +1,29 @@
 import Formal.Typing
 
 /-!
-# Typing modes: capture discipline and typing by use
+# Typing by use: the stage of a use and subtyping
 
-`TypM` (`Rules.lean`) is parameterized by a mode. The capture mode keeps the
-original relations; the live mode needs a region where a value is used.
+A value is typed by use (`Rules.lean`): a region is needed live where a value is used, at
+the stage `Stage.use φ C` of a call of an arrow qualified `C`, not where it is held.
 -/
 
 namespace Flick
 
 /-- `Live C` uses the same row atoms as `Scope s`; no new row element is needed.
 A pure computation does not use a region, even when its value holds one. -/
-def TypingMode.use : TypingMode → Stage → Caps → Stage
-  | .captures, φ, _ => φ
-  | .live, .pure, _ => .pure
-  | .live, .rt r ε, C => .rt (Row.union r (Row.ofCaps C)) ε
+def Stage.use : Stage → Caps → Stage
+  | .pure, _ => .pure
+  | .rt r ε, C => .rt (Row.union r (Row.ofCaps C)) ε
 
-/-- Captures account for everything held by a value. Live accounts for use in its
-stage instead, so merely holding a value imposes no liveness obligation. -/
-def TypingMode.held : TypingMode → Caps → Caps → Prop
-  | .captures, C, D => Caps.Sub C D
-  | .live, _, _ => True
-
-/-- Subtyping for live compares the stages at which qualified values are used.
-The captures relation alone may hide a qualifier in an argument or a result type. -/
+/-- Subtyping compares the stages at which qualified values are used, so it cannot hide a
+qualifier in an argument or a result type. -/
 inductive LeLive : Ty → Ty → Prop
   | refl : LeLive t t
   | arrow : LeLive a' a →
-      (TypingMode.live.use φ C).le (TypingMode.live.use φ' C') → LeLive t t' →
+      (Stage.use φ C).le (Stage.use φ' C') → LeLive t t' →
       Caps.Sub (Ty.arrow a φ t C).reach (Ty.arrow a' φ' t' C').reach →
       LeLive (.arrow a φ t C) (.arrow a' φ' t' C')
-  | eff : (TypingMode.live.use (.rt r e) C).le (TypingMode.live.use (.rt r' e') C') →
+  | eff : (Stage.use (.rt r e) C).le (Stage.use (.rt r' e') C') →
       LeLive t t' →
       Caps.Sub (Ty.eff r e t C).reach (Ty.eff r' e' t' C').reach →
       LeLive (.eff r e t C) (.eff r' e' t' C')
@@ -42,18 +35,10 @@ inductive LeLiveI : Ty → Ty → Prop
 
 theorem LeLiveI.refl : LeLiveI t t := .le .refl
 
-def TypingMode.subtype : TypingMode → Ty → Ty → Prop
-  | .captures => Le
-  | .live => LeLive
-
-def TypingMode.instSubtype : TypingMode → Ty → Ty → Prop
-  | .captures => LeI
-  | .live => LeLiveI
-
 /-- Subtyping cannot erase the stage needed to call a qualified function. -/
 theorem LeLive.arrow_use {a ψ t C a' ψ' t' C'}
     (h : LeLive (.arrow a ψ t C) (.arrow a' ψ' t' C')) :
-    (TypingMode.live.use ψ C).le (TypingMode.live.use ψ' C') := by
+    (Stage.use ψ C).le (Stage.use ψ' C') := by
   cases h with
   | refl =>
     cases ψ with
@@ -64,7 +49,7 @@ theorem LeLive.arrow_use {a ψ t C a' ψ' t' C'}
 /-- The same obligation is kept when a qualified task is widened. -/
 theorem LeLive.eff_use {r ε t C r' ε' t' C'}
     (h : LeLive (.eff r ε t C) (.eff r' ε' t' C')) :
-    (TypingMode.live.use (.rt r ε) C).le (TypingMode.live.use (.rt r' ε') C') := by
+    (Stage.use (.rt r ε) C).le (Stage.use (.rt r' ε') C') := by
   cases h with
   | refl => exact ⟨fun _ h => h, fun _ h => h⟩
   | eff hψ _ _ => exact hψ

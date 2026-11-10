@@ -16,9 +16,9 @@ variable {S : Sig} {Ψ : List Ty} {anc : Nat → Nat → Prop}
 
 theorem LNest.step {root : Roots} {Λ : List Rgn} {μ : List Tm} {m : Tm}
     {i : Option (Nat × Nat)} {e : Tm} {l : Lbl} {Λ' : List Rgn} {μ' : List Tm} {e' : Tm} {X : List Ty}
-    {home : Nat → Option (Nat × Nat)} (hroot : RootTyM S .live root)
+    {home : Nat → Option (Nat × Nat)} (hroot : RootTy S root)
     (hn : LNest Ψ ⟨Λ, μ, m⟩ anc home) (hi : (⟨Λ, μ, m⟩ : Cfg).at i = some e)
-    (hμ : StoreTyM S .live Ψ μ) (hμ' : StoreTyM S .live (Ψ ++ X) μ') {hs₀ : Nat → Nat → Prop}
+    (hμ : StoreTy S Ψ μ) (hμ' : StoreTy S (Ψ ++ X) μ') {hs₀ : Nat → Nat → Prop}
     {cell : Nat → Nat} {H : Nat → Prop} (hca : e.Caught hs₀ cell H)
     (hown : ∀ E c p t, OkE E → e = plug E (.app (.app (.const c) (.own p)) t) →
       (c = .addFin ∨ c = .spawn) → holeE (baseOf anc i) E p)

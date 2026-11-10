@@ -11,7 +11,7 @@ variable {S : Sig}
 theorem Tm.unguarded_rename (ξ : Nat → Nat) (A : Tm) : (A.rename ξ).unguarded = A.unguarded := by
   induction A <;> simp_all [Tm.rename, Tm.unguarded]
 
-theorem TypM.unguarded_subst {mode : TypingMode} {Ψ Θ Γ A J} (h : TypM S mode Ψ Θ Γ A J) (σ : Nat → Tm) :
+theorem Typ.unguarded_subst {Ψ Θ Γ A J} (h : Typ S Ψ Θ Γ A J) (σ : Nat → Tm) :
     ∀ {t t' φ}, J = .alts t t' φ → (A.subst σ).unguarded = A.unguarded := by
   induction h with
   | anil => intros; rfl
@@ -19,10 +19,6 @@ theorem TypM.unguarded_subst {mode : TypingMode} {Ψ Θ Γ A J} (h : TypM S mode
   | aguard _ _ _ _ _ _ ih => intro _ _ _ hJ; simp [Tm.subst, Tm.unguarded, ih hJ]
   | aref _ _ _ _ _ _ _ _ _ ih => intro _ _ _ hJ; simp [Tm.subst, Tm.unguarded, ih hJ]
   | _ => intro _ _ _ hJ; cases hJ
-
-theorem Typ.unguarded_subst {Ψ Θ Γ A J} (h : Typ S Ψ Θ Γ A J) (σ : Nat → Tm) :
-    ∀ {t t' φ}, J = .alts t t' φ → (A.subst σ).unguarded = A.unguarded :=
-  TypM.unguarded_subst h σ
 
 theorem Tm.head_rename {ξ : Nat → Nat} {K} {f : Tm} (h : f.head = .ctor K) :
     (f.rename ξ).head = .ctor K := by

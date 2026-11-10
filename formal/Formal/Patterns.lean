@@ -7,11 +7,11 @@ import Formal.Semantics
 
 namespace Flick
 
-variable {S : Sig} {mode : TypingMode}
+variable {S : Sig}
 
-theorem field_typ_mode {Ψ Θ Γ l φ} :
-    ∀ {v w R t}, TypM S mode Ψ Θ Γ v (.ex R φ) → v.field l = some w → R.field l = some t →
-      TypM S mode Ψ Θ Γ w (.ex t φ) := by
+theorem field_typ {Ψ Θ Γ l φ} :
+    ∀ {v w R t}, Typ S Ψ Θ Γ v (.ex R φ) → v.field l = some w → R.field l = some t →
+      Typ S Ψ Θ Γ w (.ex t φ) := by
   intro v
   induction v with
   | rcons l' e r _ ih =>
@@ -33,7 +33,7 @@ theorem field_typ_mode {Ψ Θ Γ l φ} :
   | _ => intro _ _ _ _ hw; simp [Tm.field] at hw
 
 /-- A field of a record value is a value. A dictionary record is not a record. -/
-theorem Value.field_mode {Ψ Θ Γ l φ} : ∀ {v w R t}, Value v → TypM S mode Ψ Θ Γ v (.ex R φ) →
+theorem Value.field {Ψ Θ Γ l φ} : ∀ {v w R t}, Value v → Typ S Ψ Θ Γ v (.ex R φ) →
     v.field l = some w → R.field l = some t → Value w := by
   intro v
   induction v with
@@ -57,9 +57,9 @@ theorem Value.field_mode {Ψ Θ Γ l φ} : ∀ {v w R t}, Value v → TypM S mod
     | errVal => simp [Ty.field] at hR
   | _ => intro _ _ _ _ _ hw; simp [Tm.field] at hw
 
-theorem setField_typ_mode {Ψ Θ Γ l w t φ} (hw : TypM S mode Ψ Θ Γ w (.ex t φ)) :
-    ∀ {v v' R}, TypM S mode Ψ Θ Γ v (.ex R φ) → v.setField l w = some v' → R.field l = some t →
-      TypM S mode Ψ Θ Γ v' (.ex R φ) := by
+theorem setField_typ {Ψ Θ Γ l w t φ} (hw : Typ S Ψ Θ Γ w (.ex t φ)) :
+    ∀ {v v' R}, Typ S Ψ Θ Γ v (.ex R φ) → v.setField l w = some v' → R.field l = some t →
+      Typ S Ψ Θ Γ v' (.ex R φ) := by
   intro v
   induction v with
   | rcons l' e r _ ih =>
@@ -88,14 +88,6 @@ theorem Ty.tcon_inj {T : Name} {us us' : List Ty} (hl : us.length = us'.length)
     (h : Ty.tcon T us = Ty.tcon T us') : us = us' :=
   (Ty.foldl_tapp_inj hl h).2
 
-/-- Subtyping does not change a final result that is not a computation. -/
-theorem Le.res_eq {a b : Ty} (h : Le a b) (hb : ∀ r e t C, b.res ≠ .eff r e t C) :
-    a.res = b.res := by
-  induction h with
-  | refl => rfl
-  | arrow _ _ _ _ _ ih => exact ih hb
-  | eff => exact (hb _ _ _ _ rfl).elim
-
 theorem Ty.tcon_res (T : Name) (us : List Ty) : (Ty.tcon T us).res = Ty.tcon T us := by
   have h := Ty.tcon_not_arrow T us
   generalize Ty.tcon T us = t at h
@@ -107,39 +99,19 @@ theorem Ty.tcon_not_eff (T : Name) (us : List Ty) : ∀ r e t C, Ty.tcon T us �
   intro r e t C h
   have := Ty.tcon_kind T us; rw [h] at this; cases this
 
-theorem Le.res_tcon {a b : Ty} {T : Name} {us : List Ty} (h : Le a b) (ha : a.res = Ty.tcon T us) :
-    b.res = Ty.tcon T us := by
+theorem LeLive.res_tcon {a b : Ty} {T : Name} {us : List Ty}
+    (h : LeLive a b) (ha : a.res = Ty.tcon T us) : b.res = Ty.tcon T us := by
   induction h with
   | refl => exact ha
   | arrow _ _ _ _ _ ih => exact ih ha
   | eff => exact absurd ha.symm (Ty.tcon_not_eff _ _ _ _ _ _)
 
-theorem Le.res_tcon' {a b : Ty} {T : Name} {us : List Ty} (h : Le a b) (hb : b.res = Ty.tcon T us) :
-    a.res = Ty.tcon T us := by
+theorem LeLive.res_tcon' {a b : Ty} {T : Name} {us : List Ty}
+    (h : LeLive a b) (hb : b.res = Ty.tcon T us) : a.res = Ty.tcon T us := by
   induction h with
   | refl => exact hb
   | arrow _ _ _ _ _ ih => exact ih hb
   | eff => exact absurd hb.symm (Ty.tcon_not_eff _ _ _ _ _ _)
-
-theorem TypingMode.subtype.res_tcon {mode : TypingMode} {a b : Ty} {T : Name} {us : List Ty}
-    (h : mode.subtype a b) (ha : a.res = Ty.tcon T us) : b.res = Ty.tcon T us := by
-  cases mode with
-  | captures => exact Le.res_tcon h ha
-  | live =>
-    induction h with
-    | refl => exact ha
-    | arrow _ _ _ _ _ ih => exact ih ha
-    | eff => exact absurd ha.symm (Ty.tcon_not_eff _ _ _ _ _ _)
-
-theorem TypingMode.subtype.res_tcon' {mode : TypingMode} {a b : Ty} {T : Name} {us : List Ty}
-    (h : mode.subtype a b) (hb : b.res = Ty.tcon T us) : a.res = Ty.tcon T us := by
-  cases mode with
-  | captures => exact Le.res_tcon' h hb
-  | live =>
-    induction h with
-    | refl => exact hb
-    | arrow _ _ _ _ _ ih => exact ih hb
-    | eff => exact absurd hb.symm (Ty.tcon_not_eff _ _ _ _ _ _)
 theorem Ty.tcon_eq_adt {T T' : Name} {us : List Ty} (h : Ty.tcon T us = .adt T') :
     us = [] ∧ T = T' := by
   cases us with
@@ -154,7 +126,7 @@ theorem Ty.tcon_eq_adt {T T' : Name} {us : List Ty} (h : Ty.tcon T us = .adt T')
     simp only [Ty.tcon, List.foldl] at h; rw [hg] at h; cases h
 
 /-- The final type of a typed constructor spine is its type at an instance. -/
-theorem TypM.spine_res {Ψ Θ Γ v J} (h : TypM S mode Ψ Θ Γ v J) :
+theorem Typ.spine_res {Ψ Θ Γ v J} (h : Typ S Ψ Θ Γ v J) :
     Value v → ∀ {K k ts T X φ}, v.head = .ctor K → S.ctor K = some (k, ts, T) →
       J = .ex X φ → X.kind ≠ 7 → ¬ X.isAll →
         ∃ us, us.length = k ∧ X.res = Ty.tcon T ((S.res K).map (Ty.substT (instT us))) := by
@@ -178,11 +150,6 @@ theorem TypM.spine_res {Ψ Θ Γ v J} (h : TypM S mode Ψ Θ Γ v J) :
   | allI => intro _ _ _ _ _ _ _ _ _ hJ _ hA; cases hJ; exact (hA trivial).elim
   | _ => intro hv _ _ _ _ _ _ hK; cases hv <;> simp [Tm.head] at hK
 
-theorem Typ.spine_res {Ψ Θ Γ v J} (h : Typ S Ψ Θ Γ v J) :
-    Value v → ∀ {K k ts T X φ}, v.head = .ctor K → S.ctor K = some (k, ts, T) →
-      J = .ex X φ → X.kind ≠ 7 → ¬ X.isAll →
-        ∃ us, us.length = k ∧ X.res = Ty.tcon T ((S.res K).map (Ty.substT (instT us))) := TypM.spine_res h
-
 /-- The head of a constructor pattern, and the final type of its spine. -/
 theorem PatTy.spine {fl p t Δ} (hp : PatTy S fl p t Δ) (hf : fl = false) :
     ∃ K k ts T us, S.ctor K = some (k, ts, T) ∧ us.length = k ∧
@@ -204,22 +171,22 @@ theorem PatTy.spine {fl p t Δ} (hp : PatTy S fl p t Δ) (hf : fl = false) :
 
 /-- Typing of `match(p, v)`. For a constructor spine (flag `false`) the type of
 the pattern is below the type of the value, at the same instance. -/
-theorem PatTy.typ_match_mode {Ψ Θ Γ fl p t Δ} (hp : PatTy S fl p t Δ) :
-    ∀ {v δ t'}, Value v → TypM S mode Ψ Θ Γ v (.ex t' .pure) → matchP p v = some δ →
+theorem PatTy.typ_match {Ψ Θ Γ fl p t Δ} (hp : PatTy S fl p t Δ) :
+    ∀ {v δ t'}, Value v → Typ S Ψ Θ Γ v (.ex t' .pure) → matchP p v = some δ →
       (fl = true → t' = t) → (fl = false → t'.kind ≠ 7 ∧ t'.res = t.res) →
-      mode.subtype t t' ∧ InstM S mode Ψ Θ Γ δ Δ := by
+      LeLive t t' ∧ Inst S Ψ Θ Γ δ Δ := by
   induction hp with
   | wild =>
     intro _ _ _ _ _ hm ht _; simp [matchP] at hm; subst hm; obtain rfl := ht rfl
-    exact ⟨TypingMode.subtype.refl, .nil⟩
+    exact ⟨LeLive.refl, .nil⟩
   | var =>
     intro _ _ _ hvv hv hm ht _; simp [matchP] at hm; subst hm
-    obtain rfl := ht rfl; exact ⟨TypingMode.subtype.refl, .cons hvv hv .nil⟩
+    obtain rfl := ht rfl; exact ⟨LeLive.refl, .cons hvv hv .nil⟩
   | lit =>
     intro v _ _ _ _ hm ht _
     obtain rfl := ht rfl
     cases v <;> simp [matchP] at hm
-    exact ⟨TypingMode.subtype.refl, hm.2 ▸ .nil⟩
+    exact ⟨LeLive.refl, hm.2 ▸ .nil⟩
   | head hK hj hk =>
     intro v _ _ _ hv hm _ hk'
     cases v <;> simp [matchP] at hm
@@ -243,7 +210,7 @@ theorem PatTy.typ_match_mode {Ψ Θ Γ fl p t Δ} (hp : PatTy S fl p t Δ) :
       obtain ⟨δ₁, δ₂, h1, h2, rfl⟩ := matchP_app.mp hm
       cases hv with
       | app hf he hψ hT =>
-        obtain rfl := Stage.eq_pure (Stage.le_trans (mode.le_use _ _) hψ)
+        obtain rfl := Stage.eq_pure (Stage.le_trans (Stage.le_use _ _) hψ)
         have hvf : Value f ∧ Value e := by
           cases hvv with
           | ctorApp hf' _ he' => exact ⟨hf', he'⟩
@@ -271,14 +238,14 @@ theorem PatTy.typ_match_mode {Ψ Θ Γ fl p t Δ} (hp : PatTy S fl p t Δ) :
   | rany =>
     intro v _ _ _ _ hm ht _
     obtain rfl := ht rfl
-    cases v <;> simp [matchP] at hm <;> exact ⟨TypingMode.subtype.refl, hm ▸ .nil⟩
+    cases v <;> simp [matchP] at hm <;> exact ⟨LeLive.refl, hm ▸ .nil⟩
   | rfield hR _ _ ih₁ ih₂ =>
     intro v δ _ hvv hv hm ht _
     obtain rfl := ht rfl
     obtain ⟨x, δ₁, δ₂, hx, h1, h2, rfl⟩ := matchP_rfield.mp hm
-    obtain ⟨_, i₁⟩ := ih₁ (hvv.field_mode hv hx hR) (field_typ_mode hv hx hR) h1 (fun _ => rfl) (fun h => by cases h)
+    obtain ⟨_, i₁⟩ := ih₁ (hvv.field hv hx hR) (field_typ hv hx hR) h1 (fun _ => rfl) (fun h => by cases h)
     obtain ⟨_, i₂⟩ := ih₂ hvv hv h2 (fun _ => rfl) (fun h => by cases h)
-    exact ⟨TypingMode.subtype.refl, i₁.append i₂⟩
+    exact ⟨LeLive.refl, i₁.append i₂⟩
   | or _ _ ih₁ ih₂ =>
     intro v δ _ hvv hv hm ht hk
     rcases matchP_or.mp hm with h | ⟨_, h⟩
@@ -286,19 +253,19 @@ theorem PatTy.typ_match_mode {Ψ Θ Γ fl p t Δ} (hp : PatTy S fl p t Δ) :
     · exact ih₂ hvv hv h ht hk
 
 /-- Matching at the type of a value. -/
-theorem PatTy.inst_mode {Ψ Θ Γ p t Δ v δ} (hp : PatTy S true p t Δ) (hvv : Value v)
-    (hv : TypM S mode Ψ Θ Γ v (.ex t .pure)) (hm : matchP p v = some δ) : InstM S mode Ψ Θ Γ δ Δ :=
-  (hp.typ_match_mode hvv hv hm (fun _ => rfl) (fun h => by cases h)).2
+theorem PatTy.inst {Ψ Θ Γ p t Δ v δ} (hp : PatTy S true p t Δ) (hvv : Value v)
+    (hv : Typ S Ψ Θ Γ v (.ex t .pure)) (hm : matchP p v = some δ) : Inst S Ψ Θ Γ δ Δ :=
+  (hp.typ_match hvv hv hm (fun _ => rfl) (fun h => by cases h)).2
 
 /-- Matching a raised value against a `try` arm. -/
-theorem HPat.inst_mode {Ψ Θ Γ ε₀ p θ Δ v δ} (hp : HPat S ε₀ p θ Δ) (hvv : Value v)
-    (hv : TypM S mode Ψ Θ Γ v (.ex (.errors ε₀) .pure)) (hm : matchP p v = some δ) :
-    InstM S mode Ψ Θ Γ δ Δ ∧ TypM S mode Ψ Θ Γ v (.ex θ .pure) := by
+theorem HPat.inst {Ψ Θ Γ ε₀ p θ Δ v δ} (hp : HPat S ε₀ p θ Δ) (hvv : Value v)
+    (hv : Typ S Ψ Θ Γ v (.ex (.errors ε₀) .pure)) (hm : matchP p v = some δ) :
+    Inst S Ψ Θ Γ δ Δ ∧ Typ S Ψ Θ Γ v (.ex θ .pure) := by
   cases hp with
   | wild => simp [matchP] at hm; subst hm; exact ⟨.nil, hv⟩
   | var => simp [matchP] at hm; subst hm; exact ⟨.cons hvv hv .nil, hv⟩
   | ctor hp =>
-    obtain ⟨K, k, ts, T, U, hK, hS, _, hU, hv', _⟩ := canonical_errors_mode hvv hv
+    obtain ⟨K, k, ts, T, U, hK, hS, _, hU, hv', _⟩ := canonical_errors hvv hv
     obtain ⟨K', k', ts', T', us, hS', hk', hr, hm'⟩ := hp.spine rfl
     rw [hm' v δ hm] at hK; cases hK
     rw [hS] at hS'; cases hS'
@@ -307,33 +274,8 @@ theorem HPat.inst_mode {Ψ Θ Γ ε₀ p θ Δ v δ} (hp : HPat S ε₀ p θ Δ)
     -- an error's constructor builds the error type itself
     obtain ⟨hnil, rfl⟩ := Ty.tcon_eq_adt hr.symm
     have hrs : S.res K = [] := List.map_eq_nil_iff.mp hnil
-    obtain ⟨hl, i⟩ := hp.typ_match_mode hvv hv' hm (fun h => by cases h)
+    obtain ⟨hl, i⟩ := hp.typ_match hvv hv' hm (fun h => by cases h)
       (fun _ => ⟨hU7, by rw [hr', hrs]; rfl⟩)
-    cases mode <;> cases hl <;> exact ⟨i, hv'⟩
-
-theorem field_typ {Ψ Θ Γ l φ} {v w R t} (h : Typ S Ψ Θ Γ v (.ex R φ))
-    (hw : v.field l = some w) (hR : R.field l = some t) :
-    Typ S Ψ Θ Γ w (.ex t φ) := field_typ_mode h hw hR
-
-theorem Value.field {Ψ Θ Γ l φ} {v w R t} (hv : Value v)
-    (h : Typ S Ψ Θ Γ v (.ex R φ)) (hw : v.field l = some w) (hR : R.field l = some t) :
-    Value w := Value.field_mode hv h hw hR
-
-theorem setField_typ {Ψ Θ Γ l w t φ} (hw : Typ S Ψ Θ Γ w (.ex t φ))
-    {v v' R} (h : Typ S Ψ Θ Γ v (.ex R φ)) (hv : v.setField l w = some v')
-    (hR : R.field l = some t) : Typ S Ψ Θ Γ v' (.ex R φ) := setField_typ_mode hw h hv hR
-
-theorem PatTy.typ_match {Ψ Θ Γ fl p t Δ} (hp : PatTy S fl p t Δ)
-    {v δ t'} (hv : Value v) (h : Typ S Ψ Θ Γ v (.ex t' .pure)) (hm : matchP p v = some δ)
-    (ht : fl = true → t' = t) (hk : fl = false → t'.kind ≠ 7 ∧ t'.res = t.res) :
-    Le t t' ∧ Inst S Ψ Θ Γ δ Δ := PatTy.typ_match_mode hp hv h hm ht hk
-
-theorem PatTy.inst {Ψ Θ Γ p t Δ v δ} (hp : PatTy S true p t Δ) (hvv : Value v)
-    (hv : Typ S Ψ Θ Γ v (.ex t .pure)) (hm : matchP p v = some δ) : Inst S Ψ Θ Γ δ Δ :=
-  PatTy.inst_mode hp hvv hv hm
-
-theorem HPat.inst {Ψ Θ Γ ε₀ p θ Δ v δ} (hp : HPat S ε₀ p θ Δ) (hvv : Value v)
-    (hv : Typ S Ψ Θ Γ v (.ex (.errors ε₀) .pure)) (hm : matchP p v = some δ) :
-    Inst S Ψ Θ Γ δ Δ ∧ Typ S Ψ Θ Γ v (.ex θ .pure) := HPat.inst_mode hp hvv hv hm
+    cases hl <;> exact ⟨i, hv'⟩
 
 end Flick

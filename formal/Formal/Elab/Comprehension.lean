@@ -56,8 +56,8 @@ theorem gen_elab {Γ Δ cs e t} (h : GenOk S Γ Δ cs e t) :
     obtain ⟨q, _, hk⟩ := ih
     obtain ⟨_, hi⟩ := elab_iter S hd hs
     have hf := elab_const (Γ := Γ) (Δ := Δ) (φ := .P) S.hSeqFlatMap
-      (ts := [a, t, ctxRow Γ, .cun d a, q]) rfl (τ := bindTy (.con S.seq) (ctxRow Γ) (.cun d a) a t q) rfl
-    exact ⟨_, _, .app (.app hf (.lam hk (lam_cov (cov_ctxRow Γ))) (.inl rfl)) hi (.inl rfl)⟩
+      (ts := [a, t, .cnil, .cun d a, q]) rfl (τ := bindTy (.con S.seq) .cnil (.cun d a) a t q) rfl
+    exact ⟨_, _, .app (.app hf (.lam hk) (.inl rfl)) hi (.inl rfl)⟩
   | @guard Γ Δ c cs e t c' hc _ ih =>
     obtain ⟨q, _, hk⟩ := ih
     exact ⟨_, _, .ite hc hk (elab_const S.hEmpty (ts := [t, q]) rfl rfl)⟩
@@ -84,12 +84,13 @@ theorem loop_elab {φ Γ Δ cs e} (h : LoopOk S φ Γ Δ cs e) :
   | @gen Γ Δ s cs e f d a dk s' hd hs _ ih =>
     obtain ⟨_, hk⟩ := ih
     obtain ⟨_, hi⟩ := elab_iter S hd hs
-    have hf : Elab P Γ Δ (.const (S.each φ)) (arrP (.arr φ a (.con S.unit) (ctxRow Γ))
-        (.arr φ (appQ (.con S.seq) (.cun d a) a) (.con S.unit) (ctxRow Γ))) φ (.const (S.each φ)) := by
+    have hf : Elab P Γ Δ (.const (S.each φ)) (arrP (.arr φ a (.con S.unit) .cnil)
+        (.arr φ (appQ (.con S.seq) (.cun d a) a) (.con S.unit) .cnil)) φ (.const (S.each φ)) := by
       cases φ with
-      | P => exact elab_const (S.hEach .P) (ts := [ctxRow Γ, .cun d a, a]) rfl rfl
-      | R r e => exact elab_const (S.hEach (.R r e)) (ts := [a, r, e, ctxRow Γ, .cun d a]) rfl rfl
-    exact ⟨_, .app (.app hf (.lam hk (lam_cov (cov_ctxRow Γ))) (.inl rfl)) hi (.inr rfl)⟩
+      | P => exact elab_const (S.hEach .P) (ts := [.cnil, .cun d a, a]) rfl rfl
+      | R r e => exact elab_const (S.hEach (.R r e)) (ts := [a, r, e, .cnil, .cun d a]) rfl rfl
+    -- the body uses nothing the loop must keep live: its qualifier is empty
+    exact ⟨_, .app (.app hf (.lam hk) (.inl rfl)) hi (Stage.keeps_cnil φ)⟩
   | guard hc _ ih =>
     obtain ⟨_, hk⟩ := ih
     exact ⟨_, .ite hc hk (elab_const S.hUnitV (ts := []) rfl rfl)⟩
@@ -102,7 +103,7 @@ theorem tryResult_elab {Γ Δ e ε a e'}
     ∃ e'', Elab P Γ Δ (S.tryResult e) a (.R .cnil ε) e'' :=
   ⟨_, .app (elab_const S.hFromResult (ts := [ε, a]) rfl
     (τ := .arr (.R .cnil ε) (.app (.app (.con S.result) (.app (.con S.errors) ε)) a) a .cnil) rfl)
-    he (.inr rfl)⟩
+    he (Stage.keeps_cnil _)⟩
 
 /-- **`let y = e? in b` on an `Option` elaborates** when the rest returns an `Option`. -/
 theorem tryOption_elab {Γ Δ e b a r φ e' b'} (he : Elab P Γ Δ e (optTy a) φ e')
@@ -118,8 +119,7 @@ theorem seqUnit_elab {Γ Δ s rest τ φ s' r'} (hs : Elab P Γ Δ s (.con S.uni
     (hr : Elab P Γ Δ rest τ φ r') : ∃ e', Elab P Γ Δ (S.seqUnit s rest) τ φ e' := by
   have hs' : Elab P (Γ.map (·.subst (up 0))) ([] ++ Δ.map (·.subst (up 0))) s (.con S.unit) φ s' := by
     simpa [Scheme.subst_up_zero, Cn.subst_up_zero] using hs
-  exact ⟨_, .letSig (σ := ⟨0, [], .con S.unit, .cnil⟩) hs' (by simp) (.inr rfl)
-    (fun h => absurd rfl h) (hr.shift _)⟩
+  exact ⟨_, .letSig (σ := ⟨0, [], .con S.unit, .cnil⟩) hs' (by simp) (.inr rfl) (hr.shift _)⟩
 
 /-- **T6(a) for `for`, `?` and blocks**: each elaboration above is typed in the target. -/
 theorem T6a_sugar (X : Target P) {Γ Δ e τ φ} (h : ∃ e', Elab P Γ Δ e τ φ e') :

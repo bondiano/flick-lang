@@ -7,31 +7,26 @@ import Formal.ScopeRun
 
 namespace Flick
 
-variable {S : Sig} {mode : TypingMode}
+variable {S : Sig}
 
 /-- The error type of a raised value. -/
-theorem err_type_mode {Ψ Θ v ε} (hv : Value v) (h : TypM S mode Ψ Θ [] v (.ex (.errors ε) .pure))
+theorem err_type {Ψ Θ v ε} (hv : Value v) (h : Typ S Ψ Θ [] v (.ex (.errors ε) .pure))
     {K k ts T} (hK : v.head = .ctor K) (hS : S.ctor K = some (k, ts, T)) :
-    ∃ U, ε (.nm T) ∧ U.hd = .adt T ∧ TypM S mode Ψ Θ [] v (.ex U .pure) ∧ Row.Sub (Row.err T U) ε := by
-  obtain ⟨K', k', ts', T', U, hK', hS', hε, hU, ht, hsub⟩ := canonical_errors_mode hv h
+    ∃ U, ε (.nm T) ∧ U.hd = .adt T ∧ Typ S Ψ Θ [] v (.ex U .pure) ∧ Row.Sub (Row.err T U) ε := by
+  obtain ⟨K', k', ts', T', U, hK', hS', hε, hU, ht, hsub⟩ := canonical_errors hv h
   rw [hK] at hK'; cases hK'; rw [hS] at hS'; cases hS'
   exact ⟨U, hε, hU, ht, hsub⟩
-
-theorem err_type {Ψ Θ v ε} (hv : Value v) (h : Typ S Ψ Θ [] v (.ex (.errors ε) .pure)) {K k ts T}
-    (hK : v.head = .ctor K) (hS : S.ctor K = some (k, ts, T)) :
-    ∃ U, ε (.nm T) ∧ U.hd = .adt T ∧ Typ S Ψ Θ [] v (.ex U .pure) ∧ Row.Sub (Row.err T U) ε :=
-  err_type_mode hv h hK hS
 
 /-- After a failed `try` arm, the remaining arms still remove or let through the
 error of the value. -/
 theorem HCov.tail {Ψ Θ ε₀ p θ Δ v H H' ε'} (hp : HPat S ε₀ p θ Δ) (hv : Value v)
-    (hv' : TypM S mode Ψ Θ [] v (.ex (.errors ε₀) .pure)) (hc : HCov S v H ε')
+    (hv' : Typ S Ψ Θ [] v (.ex (.errors ε₀) .pure)) (hc : HCov S v H ε')
     (hH : ∀ n, H n → Catches S ε₀ p θ n ∨ H' n) (hm : matchP p v = none) : HCov S v H' ε' := by
   intro K k ts T hK hS
   rcases hc K k ts T hK hS with h | h
   · rcases hH _ h with (⟨rfl, _⟩ | ⟨rfl, hx⟩) | h'
     · cases hp <;> simp [matchP] at hm
-    · obtain ⟨U, _, hU, ht, _⟩ := err_type_mode hv hv' hK hS
+    · obtain ⟨U, _, hU, ht, _⟩ := err_type hv hv' hK hS
       have hs' : Shp S true (.adt T) v := by
         have hs := (ht.shape hv rfl).1
         cases hs with
@@ -48,20 +43,16 @@ theorem HCov.tail {Ψ Θ ε₀ p θ Δ v H H' ε'} (hp : HPat S ε₀ p θ Δ) (
   · exact .inr h
 
 /-- A raised value of a body with errors `ε₀`, at `Errors ε₀`. -/
-theorem raise_inv_mode {Ψ Θ v t φ} (hv : Value v) (h : TypM S mode Ψ Θ [] (.raise v) (.ex t φ)) :
-    ∃ ε, TypM S mode Ψ Θ [] v (.ex (.errors ε) .pure) ∧ (Stage.rt Row.none ε).le φ := by
+theorem raise_inv {Ψ Θ v t φ} (hv : Value v) (h : Typ S Ψ Θ [] (.raise v) (.ex t φ)) :
+    ∃ ε, Typ S Ψ Θ [] v (.ex (.errors ε) .pure) ∧ (Stage.rt Row.none ε).le φ := by
   cases h with
   | raise h₁ hφ => exact ⟨_, h₁.valueAny hv _, hφ⟩
   | raiseAdt h₁ hU hφ => exact ⟨_, .errVal hv (h₁.valueAny hv _) hU (Row.Sub.refl _), hφ⟩
   | errVal hv' | allI hv' => cases hv'
 
-theorem raise_inv {Ψ Θ v t φ} (hv : Value v) (h : Typ S Ψ Θ [] (.raise v) (.ex t φ)) :
-    ∃ ε, Typ S Ψ Θ [] v (.ex (.errors ε) .pure) ∧ (Stage.rt Row.none ε).le φ :=
-  raise_inv_mode hv h
-
-theorem StoreTyM.alloc {Ψ μ v t₀} (hμ : StoreTyM S mode Ψ μ) (hv : Value v)
-    (h : TypM S mode Ψ Facts.age [] v (.ex t₀ .pure)) :
-    StoreTyM S mode (Ψ ++ [t₀]) (μ ++ [v]) := by
+theorem StoreTy.alloc {Ψ μ v t₀} (hμ : StoreTy S Ψ μ) (hv : Value v)
+    (h : Typ S Ψ Facts.age [] v (.ex t₀ .pure)) :
+    StoreTy S (Ψ ++ [t₀]) (μ ++ [v]) := by
   refine ⟨by simp [hμ.1], fun i w s hw hs => ?_⟩
   by_cases hi : i < μ.length
   · rw [List.getElem?_append_left hi] at hw
@@ -75,9 +66,9 @@ theorem StoreTyM.alloc {Ψ μ v t₀} (hμ : StoreTyM S mode Ψ μ) (hv : Value 
     | zero => simp [hj] at hw hs; subst hw hs; exact ⟨hv, h.weakenStore _⟩
     | succ => simp [hj] at hw
 
-theorem StoreTyM.set {Ψ μ l v t₀} (hμ : StoreTyM S mode Ψ μ) (hl : Ψ[l]? = some t₀)
-    (hlt : l < μ.length) (hv : Value v) (h : TypM S mode Ψ Facts.age [] v (.ex t₀ .pure)) :
-    StoreTyM S mode Ψ (μ.set l v) := by
+theorem StoreTy.set {Ψ μ l v t₀} (hμ : StoreTy S Ψ μ) (hl : Ψ[l]? = some t₀)
+    (hlt : l < μ.length) (hv : Value v) (h : Typ S Ψ Facts.age [] v (.ex t₀ .pure)) :
+    StoreTy S Ψ (μ.set l v) := by
   refine ⟨by simp [hμ.1], fun i w s hw hs => ?_⟩
   by_cases hi : l = i
   · subst hi
@@ -100,14 +91,14 @@ theorem Stage.rt_union_right {i r e ε : Row} :
 theorem Ty.YF.ref {n : Nat} {t : Ty} (h : (Ty.ref t).YF n) : t.YF n := by
   simp only [Ty.YF, Ty.substT, Ty.ref.injEq] at h; exact h
 
-theorem rt_preservation_mode {Ψ Θ Λ μ e t φ Λ' μ' e'} (h : TypM S mode Ψ Θ [] e (.ex t φ))
-    (hμ : StoreTyM S mode Ψ μ) (hc : RtCtx Ψ Θ Λ.length) (hbl : e.Below Λ.length)
+theorem rt_preservation {Ψ Θ Λ μ e t φ Λ' μ' e'} (h : Typ S Ψ Θ [] e (.ex t φ))
+    (hμ : StoreTy S Ψ μ) (hc : RtCtx Ψ Θ Λ.length) (hbl : e.Below Λ.length)
     (hμb : ∀ (l : Nat) (v : Tm), μ[l]? = some v → v.Below Λ.length) (ht : t.YF Λ.length)
     (hφ : φ.substT (kill Λ.length) = φ) (hh : RHead Λ μ e Λ' μ' e') :
-    ∃ X, StoreTyM S mode (Ψ ++ X) μ' ∧ TypM S mode (Ψ ++ X) Θ [] e' (.ex t φ) ∧ ∀ u ∈ X, u.YF Λ.length := by
+    ∃ X, StoreTy S (Ψ ++ X) μ' ∧ Typ S (Ψ ++ X) Θ [] e' (.ex t φ) ∧ ∀ u ∈ X, u.YF Λ.length := by
   have nv := hh.not_value
-  have same : ∀ {e'}, TypM S mode Ψ Θ [] e' (.ex t φ) →
-      ∃ X, StoreTyM S mode (Ψ ++ X) μ ∧ TypM S mode (Ψ ++ X) Θ [] e' (.ex t φ) ∧ ∀ u ∈ X, u.YF Λ.length :=
+  have same : ∀ {e'}, Typ S Ψ Θ [] e' (.ex t φ) →
+      ∃ X, StoreTy S (Ψ ++ X) μ ∧ Typ S (Ψ ++ X) Θ [] e' (.ex t φ) ∧ ∀ u ∈ X, u.YF Λ.length :=
     fun h' => ⟨[], by simpa using hμ, by simpa using h', by simp⟩
   cases hh with
   | refMake hv =>
@@ -117,8 +108,8 @@ theorem rt_preservation_mode {Ψ Θ Λ μ e t φ Λ' μ' e'} (h : TypM S mode Ψ
       | const _ hT' =>
         obtain ⟨_, _, _, _, h, la, _, lt, -⟩ := hT'.arrow_left
         cases h
-        cases TypingMode.subtype.eq_ref_left lt
-        cases TypingMode.subtype.eq_ref_left hT
+        cases LeLive.eq_ref_left lt
+        cases LeLive.eq_ref_left hT
         exact ⟨_, hμ.alloc hv (((ha.valueAny hv .pure).sub (J' := .ex _ .pure) ⟨la, Stage.le_refl _⟩).cut
             hc.outΘ),
           .loc (by simp [hμ.1]), by simpa using ht.ref⟩
@@ -129,7 +120,7 @@ theorem rt_preservation_mode {Ψ Θ Λ μ e t φ Λ' μ' e'} (h : TypM S mode Ψ
       cases hf with
       | const _ hT' =>
         obtain ⟨_, _, _, _, h, la, _, lt, -⟩ := hT'.arrow_left
-        cases h; cases TypingMode.subtype.eq_ref la
+        cases h; cases LeLive.eq_ref la
         cases ha with
         | loc hl' =>
           have hv := (hμ.2 _ _ _ hl hl').2
@@ -149,11 +140,11 @@ theorem rt_preservation_mode {Ψ Θ Λ μ e t φ Λ' μ' e'} (h : TypM S mode Ψ
         cases hc with
         | const _ hT' =>
           obtain ⟨_, _, _, _, h, la, _, lt, -⟩ := hT'.arrow_left
-          cases h; cases TypingMode.subtype.eq_ref la
+          cases h; cases LeLive.eq_ref la
           obtain ⟨_, _, _, _, h, la', _, lt', -⟩ := (lt.trans hT₁).arrow_left
           cases h
-          cases TypingMode.subtype.eq_base_left lt'
-          cases TypingMode.subtype.eq_base_left hT
+          cases LeLive.eq_base_left lt'
+          cases LeLive.eq_base_left hT
           cases hloc with
           | loc hl =>
             have hst := hμ.set hl hlt hv (((ha.valueAny hv .pure).sub (J' := .ex _ .pure)
@@ -164,29 +155,29 @@ theorem rt_preservation_mode {Ψ Θ Λ μ e t φ Λ' μ' e'} (h : TypM S mode Ψ
     cases h with
     | await he hφ hT =>
       cases he with
-      | task he' hψ _ _ hT' =>
-        obtain ⟨_, _, _, _, h, hle, lt, -⟩ := TypingMode.subtype.eff_left_mode hT'
+      | task he' hψ _ hT' =>
+        obtain ⟨_, _, _, _, h, hle, lt, -⟩ := LeLive.eff_left hT'
         cases h
         exact same (he'.sub ⟨lt.trans hT, Stage.le_trans (Stage.le_trans hψ hle) hφ⟩)
     | errVal hv'' | allI hv'' => exact (nv hv'').elim
   | tryRaise hv =>
     cases h with
     | tryR hb hA hφ hs =>
-      obtain ⟨ε, hv', hε⟩ := raise_inv_mode hv hb
-      obtain ⟨K, k, ts, T, U, hK, hS, hT, hU, ht, hsub⟩ := canonical_errors_mode hv hv'
+      obtain ⟨ε, hv', hε⟩ := raise_inv hv hb
+      obtain ⟨K, k, ts, T, U, hK, hS, hT, hU, ht, hsub⟩ := canonical_errors hv hv'
       obtain ⟨_, _, rfl, _, hε'⟩ := Stage.rt_le hφ
       refine same (.handle hv (.errVal hv ht hU (hsub.trans hε.2)) hA
         (fun K' k' ts' T' hK' hS' => ?_) (fun x hx => ?_) ⟨fun _ h => h.elim, hε'⟩)
       · rw [hK] at hK'; cases hK'; rw [hS] at hS'; cases hS'; exact hs _ (hε.2 _ hT)
       · exact .inr (hs _ hx)
     | tryP hb =>
-      obtain ⟨_, _, hε⟩ := raise_inv_mode hv hb; exact hε.elim
+      obtain ⟨_, _, hε⟩ := raise_inv hv hb; exact hε.elim
     | errVal hv'' | allI hv'' => exact (nv hv'').elim
   | handleYes hv hm =>
     cases h with
     | handle _ hv' hA _ _ _ =>
       cases hA with
-      | hcons hp hb _ _ => exact same (hb.inst (hp.inst_mode hv hv' hm).1)
+      | hcons hp hb _ _ => exact same (hb.inst (hp.inst hv hv' hm).1)
     | errVal hv'' | allI hv'' => exact (nv hv'').elim
   | handleNo hv hm =>
     cases h with
@@ -208,8 +199,8 @@ theorem rt_preservation_mode {Ψ Θ Λ μ e t φ Λ' μ' e'} (h : TypM S mode Ψ
     | handle _ hv' hA hc ha hφ =>
       cases hA with
       | hguard hp hg hb hr hH =>
-        have hδ := (hp.inst_mode hv hv' hm).1
-        exact same (guard_typ_mode (hg.inst hδ) (hb.inst hδ)
+        have hδ := (hp.inst hv hv' hm).1
+        exact same (guard_typ (hg.inst hδ) (hb.inst hδ)
           (.handle hv hv' hr (fun K k ts T hK hS => (hc K k ts T hK hS).imp_left (hH _))
             (fun x hx => (ha x hx).imp_right (Or.imp_left (hH x))) hφ))
     | errVal hv'' | allI hv'' => exact (nv hv'').elim
@@ -226,7 +217,7 @@ theorem rt_preservation_mode {Ψ Θ Λ μ e t φ Λ' μ' e'} (h : TypM S mode Ψ
     | handle _ hv' hA hc ha hφ =>
       cases hA with
       | hnil hH =>
-        obtain ⟨K, k, ts, T, U, hK, hS, _, hU, ht, hsub⟩ := canonical_errors_mode hv hv'
+        obtain ⟨K, k, ts, T, U, hK, hS, _, hU, ht, hsub⟩ := canonical_errors hv hv'
         rcases hc K k ts T hK hS with h | h
         · exact (hH _ h).elim
         · refine same (.raise (.errVal hv (ht.valueAny hv _) hU fun x hx => ?_) hφ)
@@ -244,10 +235,10 @@ theorem rt_preservation_mode {Ψ Θ Λ μ e t φ Λ' μ' e'} (h : TypM S mode Ψ
       cases hf with
       | const hok hT' =>
         obtain ⟨_, _, _, _, h, la, lψ, lt, -⟩ := hT'.arrow_left
-        cases h; cases TypingMode.subtype.eq_all la
+        cases h; cases LeLive.eq_all la
         exact same (scopeRun_body hv ha
-          (Stage.le_trans (TypingMode.le_use mode _ _) (Stage.le_trans lψ hψ)) (lt.trans hT)
-          fun hm => by subst hm; exact hok)
+          (Stage.le_trans (Stage.le_use _ _) (Stage.le_trans lψ hψ)) (lt.trans hT)
+          hok)
     | errVal hv' | allI hv' => exact (nv hv').elim
   | scope =>
     cases h with
@@ -264,8 +255,8 @@ theorem rt_preservation_mode {Ψ Θ Λ μ e t φ Λ' μ' e'} (h : TypM S mode Ψ
       cases hf with
       | const _ hT' =>
         obtain ⟨_, _, _, _, h, la, _, lt, -⟩ := hT'.arrow_left
-        cases h; cases TypingMode.subtype.eq_owner la
-        obtain ⟨_, he, hs⟩ := canonical_owner_mode .own ha
+        cases h; cases LeLive.eq_owner la
+        obtain ⟨_, he, hs⟩ := canonical_owner .own ha
         cases he; rw [hs] at lt
         exact same ((Typ.cap).sub ⟨lt.trans hT, Stage.pure_le _⟩)
     | errVal hv' | allI hv' => exact (nv hv').elim
@@ -274,12 +265,12 @@ theorem rt_preservation_mode {Ψ Θ Λ μ e t φ Λ' μ' e'} (h : TypM S mode Ψ
     | app hf _ _ hT =>
       cases hf with
       | const _ hT' =>
-        obtain ⟨_, hop⟩ := Const.ty_op_arrow S _ mode
+        obtain ⟨_, hop⟩ := Const.ty_op_arrow S _
         rw [hop] at hT'
         obtain ⟨_, _, _, _, h, _, _, lt, -⟩ := hT'.arrow_left
         cases h
-        cases TypingMode.subtype.eq_base_left lt
-        cases TypingMode.subtype.eq_base_left hT
+        cases LeLive.eq_base_left lt
+        cases LeLive.eq_base_left hT
         exact same .lit
     | errVal hv' | allI hv' => exact (nv hv').elim
   | finRun => exact same h
@@ -290,7 +281,7 @@ theorem rt_preservation_mode {Ψ Θ Λ μ e t φ Λ' μ' e'} (h : TypM S mode Ψ
       have hbody := hbody.cut hcut
       rcases hw with hw | ⟨v, hv, rfl⟩ | ⟨_, _, _, rfl⟩
       · exact same ((hbody.valueAny hw _).sub ⟨hT, Stage.le_refl _⟩)
-      · obtain ⟨ε, hv', hε⟩ := raise_inv_mode hv hbody
+      · obtain ⟨ε, hv', hε⟩ := raise_inv hv hbody
         obtain ⟨_, _, rfl, _, he⟩ := Stage.rt_le hφ
         exact same (.raise (hv'.valueAny hv _) ⟨fun _ h => h.elim,
           fun n hn => he n ((Stage.le_err (Stage.le_trans hε hφ')) n hn)⟩)
@@ -312,12 +303,5 @@ theorem rt_preservation_mode {Ψ Θ Λ μ e t φ Λ' μ' e'} (h : TypM S mode Ψ
       exact ⟨[c], hμ.alloc .lam hcl, by rw [hμ.1]; exact hb, by simpa using hcy⟩
     | errVal hv'' | allI hv'' => exact (nv hv'').elim
 
-
-theorem rt_preservation {Ψ Θ Λ μ e t φ Λ' μ' e'} (h : Typ S Ψ Θ [] e (.ex t φ))
-    (hμ : StoreTy S Ψ μ) (hc : RtCtx Ψ Θ Λ.length) (hbl : e.Below Λ.length)
-    (hμb : ∀ (l : Nat) (v : Tm), μ[l]? = some v → v.Below Λ.length) (ht : t.YF Λ.length)
-    (hφ : φ.substT (kill Λ.length) = φ) (hh : RHead Λ μ e Λ' μ' e') :
-    ∃ X, StoreTy S (Ψ ++ X) μ' ∧ Typ S (Ψ ++ X) Θ [] e' (.ex t φ) ∧ ∀ u ∈ X, u.YF Λ.length :=
-  rt_preservation_mode h hμ hc hbl hμb ht hφ hh
 
 end Flick

@@ -11,7 +11,7 @@ that a variable stands for in the substitution lemma is a value or another varia
 
 namespace Flick
 
-variable {S : Sig} {mode : TypingMode}
+variable {S : Sig}
 
 /-- What a variable can stand for: a value, a variable, or `todo` for what a dead arm
 does not use. -/
@@ -48,35 +48,35 @@ theorem Tm.StandsAt.rename {Γ Γ' s} {e : Tm} {ξ : Nat → Nat} (h : e.StandsA
   · exact .inr (.inr (.inr h))
 
 /-- A value of a binder's type is typed by (∀I): no other rule gives a value that type. -/
-theorem TypM.allInv {Ψ Θ Γ e k t φ} (hv : Value e) (h : TypM S mode Ψ Θ Γ e (.ex (.all k t) φ)) :
-    TypM S mode (Ψ.map (Ty.up k)) (Θ.substT (shiftV k)) (Γ.map (Scheme.up k)) e (.ex t .pure) := by
-  have noArrow : ∀ {a φ t C T}, mode.subtype (.arrow a φ t C) T → ¬ T.isAll := fun h' => by
+theorem Typ.allInv {Ψ Θ Γ e k t φ} (hv : Value e) (h : Typ S Ψ Θ Γ e (.ex (.all k t) φ)) :
+    Typ S (Ψ.map (Ty.up k)) (Θ.substT (shiftV k)) (Γ.map (Scheme.up k)) e (.ex t .pure) := by
+  have noArrow : ∀ {a φ t C T}, LeLive (.arrow a φ t C) T → ¬ T.isAll := fun h' => by
     obtain ⟨_, _, _, _, rfl, -⟩ := h'.arrow_res; simp [Ty.isAll]
-  have noEff : ∀ {r ε t C T}, mode.subtype (.eff r ε t C) T → ¬ T.isAll := fun h' => by
-    cases mode <;> cases h' <;> simp [Ty.isAll]
+  have noEff : ∀ {r ε t C T}, LeLive (.eff r ε t C) T → ¬ T.isAll := fun h' => by
+    cases h' <;> simp [Ty.isAll]
   cases h with
   | allI _ h => exact h
-  | lam _ _ _ hT | fix _ _ _ hT | perform _ hT | kont _ _ hT => exact (noArrow hT trivial).elim
-  | task _ _ _ _ hT => exact (noEff hT trivial).elim
+  | lam _ _ hT | fix _ _ hT | perform _ hT | kont _ _ hT => exact (noArrow hT trivial).elim
+  | task _ _ _ hT => exact (noEff hT trivial).elim
   | const _ hT =>
-    obtain ⟨_, _, _, _, hx⟩ := Const.ty_isArrow_mode _ _ S mode
+    obtain ⟨_, _, _, _, hx⟩ := Const.ty_isArrow _ _ S
     rw [hx] at hT; exact (noArrow hT trivial).elim
   | ctor _ _ _ hT =>
     have := hT.res
     rw [Sig.ctorTyR, Ty.arrows_res _ _ (Ty.tcon_not_arrow _ _)] at this
     exact (this.not_all (Ty.not_all_of_hd (Ty.tcon_hd _ _)) trivial).elim
   | app hf _ _ hT =>
-    have hT0 : mode.subtype _ _ := hT
+    have hT0 : LeLive _ _ := hT
     cases hv with
     | ctorApp hvf hK _ =>
-      rcases TypM.spine_notAll hf hvf hK rfl with h | h
+      rcases Typ.spine_notAll hf hvf hK rfl with h | h
       · exact h.elim
       · obtain rfl := hT0.eq_all; exact (h trivial).elim
     | constApp hc _ =>
       cases hf with
       | const _ hT' =>
         have key : ∀ (c : Const) ι, c.arity = 2 →
-            ∃ x y, c.ty S ι mode = .arrow x .pure y Caps.none ∧ ¬ y.isAll := by
+            ∃ x y, c.ty S ι = .arrow x .pure y Caps.none ∧ ¬ y.isAll := by
           intro c _ hc
           cases c <;> simp [Const.arity] at hc <;> exact ⟨_, _, rfl, by simp [Ty.isAll]⟩
         obtain ⟨_, _, hxy, hy⟩ := key _ _ hc
@@ -98,48 +98,28 @@ theorem Facts.up_substT (Θ : Facts) (k : Nat) (ts : List Ty) (h : ts.length = k
   | r p => simp [shiftV, Ty.substT, instT, Ty.ident]
 
 /-- One instance of a binder. -/
-theorem TypM.instAll {Ψ Θ Γ e k t φ} {us : List Ty} (hV : e.Stands) (hn : e.NoIns)
-    (h : TypM S mode Ψ Θ Γ e (.ex (.all k t) φ)) (hus : us.length = k) :
-    TypM S mode Ψ Θ Γ e (.ex (t.substT (instT us)) .pure) := by
+theorem Typ.instAll {Ψ Θ Γ e k t φ} {us : List Ty} (hV : e.Stands) (hn : e.NoIns)
+    (h : Typ S Ψ Θ Γ e (.ex (.all k t) φ)) (hus : us.length = k) :
+    Typ S Ψ Θ Γ e (.ex (t.substT (instT us)) .pure) := by
   rcases hV with hv | ⟨j, rfl⟩ | rfl
-  · have := (TypM.allInv hv h).substT (instT us) (Fits.noIns hn fun _ => rfl)
+  · have := (Typ.allInv hv h).substT (instT us) (Fits.noIns hn fun _ => rfl)
     simp only [List.map_map, Function.comp_def, Ty.up_substT _ _ _ hus,
       Scheme.up_substT _ _ _ hus, List.map_id', Flick.J.substT, Facts.up_substT _ _ _ hus] at this
     exact this
   · cases h with
     | var hi hts hH hT => exact .var hi hts hH (hT.snoc hus)
-    | allVar hi _ hc => exact .var hi hus (fun _ _ h => (hc _ _ h).elim) TypingMode.instSubtype.refl
+    | allVar hi _ hc => exact .var hi hus (fun _ _ h => (hc _ _ h).elim) LeLiveI.refl
     | allI hv => cases hv
   · exact .todo
 
 /-- (Var) at an instance, for the term that stands for the variable. -/
-theorem TypM.elim {Ψ Θ Γ e A T} (hV : e.Stands ∨ ¬ A.isAll) (hn : e.NoIns)
-    (h : TypM S mode Ψ Θ Γ e (.ex A .pure)) (hT : mode.instSubtype A T) :
-    TypM S mode Ψ Θ Γ e (.ex T .pure) := by
-  cases mode with
-  | captures =>
-    induction hT with
-    | le hl => exact h.sub ⟨hl, Stage.le_refl _⟩
-    | inst hus _ ih =>
-      have hs := hV.resolve_right fun h => h trivial
-      exact ih (.inl hs) (TypM.instAll hs hn h hus)
-  | live =>
-    induction hT with
-    | le hl => exact h.sub ⟨hl, Stage.le_refl _⟩
-    | inst hus _ ih =>
-      have hs := hV.resolve_right fun h => h trivial
-      exact ih (.inl hs) (TypM.instAll hs hn h hus)
-
-theorem Typ.allInv {Ψ Θ Γ e k t φ} (hv : Value e) (h : Typ S Ψ Θ Γ e (.ex (.all k t) φ)) :
-    Typ S (Ψ.map (Ty.up k)) (Θ.substT (shiftV k)) (Γ.map (Scheme.up k)) e (.ex t .pure) :=
-  TypM.allInv hv h
-
-theorem Typ.instAll {Ψ Θ Γ e k t φ} {us : List Ty} (hV : e.Stands) (hn : e.NoIns)
-    (h : Typ S Ψ Θ Γ e (.ex (.all k t) φ)) (hus : us.length = k) :
-    Typ S Ψ Θ Γ e (.ex (t.substT (instT us)) .pure) := TypM.instAll hV hn h hus
-
 theorem Typ.elim {Ψ Θ Γ e A T} (hV : e.Stands ∨ ¬ A.isAll) (hn : e.NoIns)
-    (h : Typ S Ψ Θ Γ e (.ex A .pure)) (hT : LeI A T) : Typ S Ψ Θ Γ e (.ex T .pure) :=
-  TypM.elim hV hn h hT
+    (h : Typ S Ψ Θ Γ e (.ex A .pure)) (hT : LeLiveI A T) :
+    Typ S Ψ Θ Γ e (.ex T .pure) := by
+  induction hT with
+  | le hl => exact h.sub ⟨hl, Stage.le_refl _⟩
+  | inst hus _ ih =>
+    have hs := hV.resolve_right fun h => h trivial
+    exact ih (.inl hs) (Typ.instAll hs hn h hus)
 
 end Flick

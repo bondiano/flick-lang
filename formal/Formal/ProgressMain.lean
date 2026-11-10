@@ -11,7 +11,7 @@ stage.
 
 namespace Flick
 
-variable {S : Sig} {mode : TypingMode}
+variable {S : Sig}
 
 /-- A region whose body has finished closes, runs a finalizer, waits for a child,
 or is not live. -/
@@ -37,8 +37,8 @@ theorem hctl_progress {p ℓ κ E al r w k} {Ei : List Frame} {tl : Bool} (hE : 
   · exact ⟨_, .hctlDisc hE hk hv⟩
   · exact ⟨_, .hctlTail hE hk hv⟩
 
-theorem progress_mode {Λ μ root} (hroot : RootTyM S mode root) :
-    ∀ {Ψ Θ Γ e J}, TypM S mode Ψ Θ Γ e J → μ.length = Ψ.length → Γ = [] →
+theorem progress {Λ μ root} (hroot : RootTy S root) :
+    ∀ {Ψ Θ Γ e J}, Typ S Ψ Θ Γ e J → μ.length = Ψ.length → Γ = [] →
       ∀ {t φ}, J = .ex t φ →
       Value e ∨ NV S root Λ μ e φ.svc := by
   intro Ψ Θ Γ e J h
@@ -81,7 +81,7 @@ theorem progress_mode {Λ μ root} (hroot : RootTyM S mode root) :
     intro hμ hΓ _ _ hJ; cases hJ
     rcases ih₁ hμ hΓ rfl with hvf | hn
     · rcases ih₂ hμ hΓ rfl with hve | hn
-      · subst hΓ; exact app_progress_mode hμ hvf hve hf he hψ
+      · subst hΓ; exact app_progress hμ hvf hve hf he hψ
       · exact .inr (hn.frame' (F := .appR _) hvf (nt id) (ni id))
     · exact .inr (hn.frame' (F := .appL _) trivial (nt id) (ni id))
   | letGen _ _ ih₁ _ =>
@@ -112,7 +112,7 @@ theorem progress_mode {Λ μ root} (hroot : RootTyM S mode root) :
     intro hμ hΓ _ _ hJ; cases hJ
     rcases ih hμ hΓ rfl with hv | hn
     · subst hΓ
-      obtain ⟨r, _, _, _, rfl, hU, hc, _, hr, -⟩ := canonical_dict_mode hv he
+      obtain ⟨r, _, _, _, rfl, hU, hc, _, hr, -⟩ := canonical_dict hv he
       obtain rfl := Ty.spine_inj hU
       rw [hc₀] at hc; cases hc
       obtain ⟨w, hw, -⟩ := hr.dfs_field (by rw [List.lookup_map_snd, hl]; rfl)
@@ -132,14 +132,14 @@ theorem progress_mode {Λ μ root} (hroot : RootTyM S mode root) :
     intro hμ hΓ _ _ hJ; cases hJ
     rcases ih hμ hΓ rfl with hv | hn
     · subst hΓ
-      obtain ⟨_, hh⟩ := match_progress_mode hv he hA hc
+      obtain ⟨_, hh⟩ := match_progress hv he hA hc
       exact step (Step.ofP hh)
     · exact .inr (hn.frame' (F := .match_ _) trivial (nt id) (ni id))
   | await he _ _ ih =>
     intro hμ hΓ _ _ hJ; cases hJ
     rcases ih hμ hΓ rfl with hv | hn
     · subst hΓ
-      obtain ⟨_, _, _, rfl, -⟩ := canonical_eff_mode hv he
+      obtain ⟨_, _, _, rfl, -⟩ := canonical_eff hv he
       exact step (Step.ofR .await)
     · exact .inr (hn.frame' (F := .await) trivial (nt id) (ni id))
   | raise _ _ ih =>
@@ -192,7 +192,7 @@ theorem progress_mode {Λ μ root} (hroot : RootTyM S mode root) :
       exact step (Step.unw (E := []) (F := .try_ _) OkE.nil trivial (ni id) id id)
   | handle hv _ hA _ _ _ =>
     intro hμ hΓ _ _ hJ; cases hJ; subst hΓ
-    obtain ⟨_, _, _, hh⟩ := handle_progress_mode (Λ := Λ) (μ := μ) hv hA
+    obtain ⟨_, _, _, hh⟩ := handle_progress (Λ := Λ) (μ := μ) hv hA
     exact step (Step.ofR hh)
   | inside _ _ hφ' _ _ hφ _ ih =>
     intro hμ hΓ _ _ hJ; cases hJ
@@ -226,10 +226,10 @@ theorem progress_mode {Λ μ root} (hroot : RootTyM S mode root) :
     obtain ⟨_, _, rfl, hr, _⟩ := Stage.rt_le hφ
     refine .inr (hn.frame (F := .hwith _ _ _ _ _) trivial (nt id) (ni id) (fun N h => ?_)
       (hpart := fun N o c ⟨a, b, hop⟩ hN hh _ => ?_))
-    · rcases (FRelM.installs (mode := mode) (F := .hwith _ _ _ _ _) rfl hφ₀ hφ).svc (.nm N) h
+    · rcases (FRel.installs (F := .hwith _ _ _ _ _) rfl hφ₀ hφ).svc (.nm N) h
         with h' | h'
       · exact .inr h'
-      · exact .inl (TypingMode.dom_nm h')
+      · exact .inl (Frame.provides_nm h')
     · cases hN
       exact hr _ (hc.2 fun hcomp => by
         have h₁ := hcomp o c a b hop
@@ -240,7 +240,7 @@ theorem progress_mode {Λ μ root} (hroot : RootTyM S mode root) :
     · obtain ⟨_, hh⟩ := hctl_progress hE hk hv
       exact step (Step.ofP hh)
     obtain ⟨_, _, rfl, hr, _⟩ := Stage.rt_le hφ
-    exact .inr (hn.frame (F := .hctlA _ _ _ _ _ _ _ _) trivial (nt id) (ni id) (fun N h => .inr (hr (.nm N) (TypingMode.use_svc_nm h)))
+    exact .inr (hn.frame (F := .hctlA _ _ _ _ _ _ _ _) trivial (nt id) (ni id) (fun N h => .inr (hr (.nm N) (Stage.use_svc_nm h)))
       ⟨_, hE, hk⟩)
   | hres _ _ hA ha _ _ _ hφ _ ih _ =>
     intro hμ hΓ _ _ hJ; cases hJ
@@ -248,7 +248,7 @@ theorem progress_mode {Λ μ root} (hroot : RootTyM S mode root) :
     · exact step (Step.ofP (.hresVal hA ha hv))
     obtain ⟨_, _, rfl, hr, _⟩ := Stage.rt_le hφ
     exact .inr (hn.frame (F := .hresB _ _ _) trivial (nt id) (ni id)
-      (fun N h => .inr (hr (.nm N) (TypingMode.use_svc_nm h))) ⟨_, hA, ha⟩)
+      (fun N h => .inr (hr (.nm N) (Stage.use_svc_nm h))) ⟨_, hA, ha⟩)
   | hkeep _ _ _ hφ₀ hc hnt hle hφ _ _ ih =>
     intro hμ hΓ _ _ hJ; cases hJ
     rcases ih hμ hΓ rfl with hv | hn
@@ -256,10 +256,10 @@ theorem progress_mode {Λ μ root} (hroot : RootTyM S mode root) :
     obtain ⟨_, _, rfl, hr, _⟩ := Stage.rt_le hφ
     refine .inr (hn.frame (F := .hkeep _ _ _ _) trivial (nt id) (ni id)
       (fun N h => by
-        rcases (FRelM.installs (mode := mode) (F := .hkeep _ _ _ _) rfl hφ₀ hφ).svc (.nm N) h
+        rcases (FRel.installs (F := .hkeep _ _ _ _) rfl hφ₀ hφ).svc (.nm N) h
           with h' | h'
         · exact .inr h'
-        · exact .inl (TypingMode.dom_nm h'))
+        · exact .inl (Frame.provides_nm h'))
       (hpart := fun N o c ⟨a, b, hop⟩ hN hh _ => ?_))
     cases hN
     refine hr _ ?_
@@ -281,11 +281,6 @@ theorem progress_mode {Λ μ root} (hroot : RootTyM S mode root) :
     rcases ih hμ hΓ rfl with hv | hn
     · exact step (Step.ofP (.hdoneVal hv))
     · exact .inr (hn.frame (F := .hdone _) trivial (nt id) (ni id)
-        (fun N h => .inr (TypingMode.use_svc_nm h)))
-
-theorem progress {Λ μ root} (hroot : RootTy S root) :
-    ∀ {Ψ Θ Γ e J}, Typ S Ψ Θ Γ e J → μ.length = Ψ.length → Γ = [] → ∀ {t φ}, J = .ex t φ →
-      Value e ∨ NV S root Λ μ e φ.svc :=
-  progress_mode (mode := .captures) hroot
+        (fun N h => .inr (Stage.use_svc_nm h)))
 
 end Flick

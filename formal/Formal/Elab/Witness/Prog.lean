@@ -20,8 +20,8 @@ The type constructors are `unit = 1`, `Bool = 2`, `Option = 3`, `Int = 4`, `Eff 
 `OptQ = 6`, `ListQ = 7`, `List = 8`, `Seq = 9`, the pair `Tup = 10`, `Result = 11`,
 `Errors = 12`, `Rec = 13`.
 
-The schemes of `methSch` and `constSch` are written by hand (`bindTy`, `map2Ty`, `eachSch`);
-the fields of `S` equate them with the ones generated from the checker (`PreludeSchemes`) by
+The schemes of `methSch` and `constSch` are written by hand (`bindTy`, `map2Ty`; `eachSch`,
+`pair` and `unc n` have no Prelude name); the fields of `S` equate the first with the ones generated from the checker (`PreludeSchemes`) by
 `rfl`, so a hand scheme that drifts from `Prelude.fl` breaks the build.
 -/
 
@@ -43,8 +43,8 @@ def tyRec : Ty := .con 13
 def methSch : Nat → Option (Nat × Scheme)
   | 0 => some (cEq, ⟨1, [⟨cEq, [.var 0]⟩], arrP (.var 0) (arrP (.var 0) boolTy), .cnil⟩)
   | 1 => some (cApp, ⟨3, [⟨cApp, [.var 0]⟩], arrP (.var 2) (appQ (.var 0) (.var 1) (.var 2)), .cnil⟩)
-  | 2 => some (cApp, ⟨8, [⟨cApp, [.var 0]⟩],
-      map2Ty (.var 0) (.var 1) (.var 2) (.var 3) (.var 4) (.var 5) (.var 6) (.var 7), .cnil⟩)
+  | 2 => some (cApp, ⟨7, [⟨cApp, [.var 0]⟩],
+      map2Ty (.var 0) (.var 1) (.var 2) (.var 3) (.var 4) (.var 5) (.var 6), .cnil⟩)
   | 3 => some (cMonad, ⟨6, [⟨cMonad, [.var 0]⟩],
       bindTy (.var 0) (.var 1) (.var 2) (.var 3) (.var 4) (.var 5), .cnil⟩)
   | 4 => some (cAlt, ⟨3, [⟨cAlt, [.var 0]⟩], appQ (.var 0) (.var 2) (.var 1), .cnil⟩)

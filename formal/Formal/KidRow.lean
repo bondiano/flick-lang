@@ -86,8 +86,8 @@ def KidRow (S : Sig) (o : Nat) (φ : Stage) (E : List Frame) (R : Row) : Prop :=
     (φ.svc (.ob N (.r o)) ∨ .inside o ∈ E ∨ ∃ F ∈ E, ∃ q, F.isHandler ∧ F.bump = some q ∧ q ≤ o))
 
 /-- A handler handles an effect. -/
-theorem installs_op {mode : TypingMode} {Ψ' Θ x t φ} {F : Frame} {N : Name}
-    (h : TypM S mode Ψ' Θ [] (F.plug x) (.ex t φ))
+theorem installs_op {Ψ' Θ x t φ} {F : Frame} {N : Name}
+    (h : Typ S Ψ' Θ [] (F.plug x) (.ex t φ))
     (hi : F.installs N) : ∃ o c a b, S.op N o = some (c, a, b) := by
   cases F <;> simp only [Frame.installs] at hi
   · subst hi
@@ -220,7 +220,7 @@ theorem KeptAtm.mono {o : Nat} {E E' : List Frame} {a : Atom} (h : ∀ F, F ∈ 
 
 /-- What work an owner keeps uses is the owner or older than it. -/
 theorem keep_old {Θ : Facts} {r : Row} {p : Nat} (hΘ : Entails Θ Facts.age)
-    (hk : TypingMode.live.keep Θ r (.rg p)) {a : Atom} (ha : r (.atm a)) :
+    (hk : Row.Outlives Θ r (.rg p)) {a : Atom} (ha : r (.atm a)) :
     a = .r p ∨ ∀ x, a = .r x → x < p := by
   rcases hΘ _ _ hk a (.inl ha) with h | ⟨C', h₁, h₂⟩
   · exact .inl h

@@ -49,22 +49,6 @@ theorem Outl.substT {Θ C s} (σ : Atom → Ty) (h : Outl Θ C s) :
 theorem Outl.mono {Θ Θ' C s} (h : Outl Θ C s) (hΘ : ∀ C s, Θ C s → Θ' C s) : Outl Θ' C s :=
   fun k hk => (h k hk).imp id fun ⟨C', h₁, h₂⟩ => ⟨C', hΘ _ _ h₁, h₂⟩
 
-theorem Const.ok_substT {Θ c ι} (σ : Atom → Ty) (h : Const.ok Θ c ι) :
-    Const.ok (Θ.substT σ) c (ι.substT σ) := by
-  cases c <;> simp only [Const.ok, CArg.substT] at h ⊢
-  case addFin => exact h.substT σ
-  case spawn =>
-    have := h.substT σ
-    refine fun k hk => this k ?_
-    rcases hk with ⟨b, hb, h'⟩ | hk
-    · exact ⟨b, .inl hb, h'⟩
-    · obtain ⟨b, hb, h'⟩ := (Ty.reach_substT σ _ k).mp hk
-      exact ⟨b, .inr hb, h'⟩
-
-theorem Const.ok_mono {Θ Θ' c ι} (h : Const.ok Θ c ι)
-    (hΘ : ∀ C s, Outl Θ C s → Outl Θ' C s) : Const.ok Θ' c ι := by
-  cases c <;> simp only [Const.ok] at h ⊢ <;> first | exact h | exact hΘ _ _ h
-
 def Scheme.substT (σ : Atom → Ty) (s : Scheme) : Scheme :=
   ⟨s.k, s.cs.substT (liftT s.k σ), s.t.substT (liftT s.k σ)⟩
 

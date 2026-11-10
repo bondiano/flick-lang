@@ -64,12 +64,13 @@ theorem typ_scons {x xs Q A φ} (hx : Typ Sg Ψ Θ Γ x (.ex A φ)) (hxs : Typ S
 
 theorem typ_snil {Q A φ} : Typ Sg Ψ Θ Γ snil (.ex (seqT Q A) φ) := typ_con0 (us := [Q, A]) rfl
 
-/-- `fix f` typed in a context whose types all lie within the arrow. -/
+/-- `fix f`: its body runs at the stage of its arrow with the qualifier live, where it calls
+itself. -/
 theorem typ_fix {a ψ r f φ} {C : Caps}
-    (hf : Typ Sg Ψ Θ (.mono a :: .mono (.arrow a ψ r C) :: Γ) f (.ex r ψ)) (hn : ∀ s, ¬ f.Has s)
-    (hh : ∀ s ∈ Γ, ∀ x, Flick.Scheme.reach s x → (Flick.Ty.arrow a ψ r C).reach x) :
+    (hf : Typ Sg Ψ Θ (.mono a :: .mono (.arrow a ψ r C) :: Γ) f
+      (.ex r (Stage.use ψ C))) (hn : ∀ s, ¬ f.Has s) :
     Typ Sg Ψ Θ Γ (.fix f) (.ex (.arrow a ψ r C) φ) :=
-  .fix hf (hn .ins) (held_sub (fun s h => hn s h) hh) .refl
+  .fix hf (hn .ins) .refl
 
 /-- `iter xs`: `ConsQ x xs ↦ SCons x (iter xs)`, `NilQ ↦ SNil`. -/
 def iterL : Flick.Tm := .fix (caseLQ (.var 0) (scons (.var 0) (.app (.var 3) (.var 1))) snil)
@@ -92,12 +93,11 @@ theorem typ_iterL {D Q A C0 φ} :
   typ_fix (typ_caseLQ (typ_var_mono rfl)
       (typ_scons (typ_var_mono rfl) (.app (ψ := .pure) (typ_var_mono rfl) (typ_var_mono rfl) trivial .refl))
       typ_snil)
-    (fun s h => by simp [caseLQ, scons, snil, Flick.Tm.Has] at h) (by simp)
+    (fun s h => by simp [caseLQ, scons, snil, Flick.Tm.Has] at h)
 
 theorem typ_seqSingleton {Q A C0 φ} :
     Typ Sg Ψ Θ [] seqSingleton (.ex (.arrow A .pure (seqT Q A) C0) φ) :=
   typ_lam (typ_scons (typ_var_mono rfl) typ_snil) (fun s h => by simp [scons, snil, Flick.Tm.Has] at h)
-    (by simp)
 
 theorem typ_seqEmpty {Q A φ} : Typ Sg Ψ Θ [] seqEmpty (.ex (seqT Q A) φ) := typ_snil
 
@@ -106,39 +106,31 @@ theorem typ_seqToList {D A C0 φ} :
   typ_fix (typ_caseSeq (typ_var_mono rfl)
       (typ_con2 (us := [A]) rfl (typ_var_mono rfl) (.app (ψ := .pure) (typ_var_mono rfl) (typ_var_mono rfl) trivial .refl))
       (typ_con0 (us := [A]) rfl))
-    (fun s h => by simp [caseSeq, Flick.Tm.Has] at h) (by simp)
+    (fun s h => by simp [caseSeq, Flick.Tm.Has] at h)
 
 theorem typ_seqEach {A D C C0 ψ φ} :
     Typ Sg Ψ Θ [] seqEach (.ex (.arrow (.arrow A ψ (tc "Unit" []) C) .pure
       (.arrow (seqT D A) ψ (tc "Unit" []) C) C0) φ) := by
-  refine typ_lam (typ_fix (typ_caseSeq (typ_var_mono rfl)
+  -- `f x` and the call of `each_φ f xs` both need `C` live, as the stage of the body has it
+  exact typ_lam (typ_fix (typ_caseSeq (typ_var_mono rfl)
       (.let_ (.app (typ_var_mono rfl) (typ_var_mono rfl) (Stage.le_refl _) .refl)
         (.app (typ_var_mono rfl) (typ_var_mono rfl) (Stage.le_refl _) .refl))
       (typ_con0 (us := []) rfl))
-    (fun s h => by simp [caseSeq, Flick.Tm.Has] at h) ?_)
-    (fun s h => by simp [caseSeq, Flick.Tm.Has] at h) (by simp)
-  intro s hs x h
-  simp only [List.mem_cons, List.not_mem_nil, or_false] at hs; subst hs
-  simp only [Flick.Scheme.reach_mono, Flick.Ty.reach, tc, Flick.Ty.tcon, List.foldl, seqT,
-    Caps.none] at h ⊢
-  grind
+    (fun s h => by simp [caseSeq, Flick.Tm.Has] at h))
+    (fun s h => by simp [caseSeq, Flick.Tm.Has] at h)
 
-theorem typ_seqFlatMap {A B C C2 C0 D E R φ}
-    (hk : ∀ x, (Flick.Ty.arrow A .pure (seqT E B) C).reach x →
-      (Flick.Ty.arrow (seqT D A) .pure (seqT R B) C2).reach x) :
+theorem typ_seqFlatMap {A B C C2 C0 D E R φ} :
     Typ Sg Ψ Θ [] seqFlatMap (.ex (.arrow (.arrow A .pure (seqT E B) C) .pure
       (.arrow (seqT D A) .pure (seqT R B) C2) C0) φ) :=
   typ_lam (typ_fix (typ_caseSeq (typ_var_mono rfl)
       (.let_ (.app (ψ := .pure) (typ_var_mono rfl) (typ_var_mono rfl) trivial .refl)
-        (.app (typ_fix (C := fun _ => True) (typ_caseSeq (typ_var_mono rfl)
+        (.app (typ_fix (ψ := .pure) (C := Caps.none) (typ_caseSeq (typ_var_mono rfl)
             (typ_scons (typ_var_mono rfl) (.app (ψ := .pure) (typ_var_mono rfl) (typ_var_mono rfl) trivial .refl))
             (typ_var_mono rfl))
-          (fun s h => by simp [seqApp, caseSeq, scons, Flick.Tm.Has] at h)
-          (fun _ _ _ _ => .inr (.inr trivial)))
+          (fun s h => by simp [seqApp, caseSeq, scons, Flick.Tm.Has] at h))
           (.app (ψ := .pure) (typ_var_mono rfl) (typ_var_mono rfl) trivial .refl) trivial .refl))
       typ_snil)
+    (fun s h => by simp [seqApp, caseSeq, scons, snil, Flick.Tm.Has] at h))
     (fun s h => by simp [seqApp, caseSeq, scons, snil, Flick.Tm.Has] at h)
-    (mem1 fun x h => hk x ((Flick.Scheme.reach_mono _ _).1 h)))
-    (fun s h => by simp [seqApp, caseSeq, scons, snil, Flick.Tm.Has] at h) (by simp)
 
 end Flick.Elab.Witness

@@ -125,13 +125,22 @@ theorem T2b {root Ψ Λ μ e t r ε Λ' μ' e'} (hroot : RootTy S root) (hμ : S
     obtain ⟨_, _, _, _, U, _, _, _, hU, ht, hsub⟩ := canonical_errors hv hv'
     exact ⟨Ψ', .errVal hv ht hU (hsub.trans (Row.kill_sub _ _))⟩
 
-/-- T2(b) for `await v` with `v : Eff r ε τ`. -/
+/-- T2(b) for `await v` with `v : Eff r ε τ`: awaiting runs at the stage that uses the
+task's qualifier `C`, whose effects are still those of `r` (`Stage.use_svc_nm`). -/
 theorem T2b_await {root Ψ Λ μ v r ε t C Λ' μ' e'} (hroot : RootTy S root) (hμ : StoreTy S Ψ μ)
     (hb : CfgBelow Λ μ (.await v)) (hΨ : ∀ u ∈ Ψ, u.YF Λ.length)
     (h : Typ S Ψ Facts.age [] v (.ex (.eff r ε t C) .pure))
     (hs : Steps root (fun _ => True) Λ μ (.await v) Λ' μ' e') :
     Steps root (fun l => ∀ N, l = .root N → r (.nm N)) Λ μ (.await v) Λ' μ' e' ∧
-      ∀ w, e' = .raise w → Value w → ∃ Ψ', Typ S Ψ' Facts.age [] w (.ex (.errors ε) .pure) :=
-  T2b hroot hμ hb hΨ (.await (h.sub ⟨.refl, Stage.pure_le _⟩) (Stage.le_refl _) .refl) hs
+      ∀ w, e' = .raise w → Value w → ∃ Ψ', Typ S Ψ' Facts.age [] w (.ex (.errors ε) .pure) := by
+  obtain ⟨r', ε', hu⟩ := Stage.use_rt r ε C
+  have hε : ε' = ε := by simpa [hu, Stage.err] using Stage.use_err (.rt r ε) C
+  rw [hε] at hu
+  have ha : Typ S Ψ Facts.age [] (.await v) (.ex t (.rt r' ε)) :=
+    .await (h.sub ⟨.refl, Stage.pure_le _⟩) (hu ▸ Stage.le_refl _) .refl
+  obtain ⟨hs', hr⟩ := T2b hroot hμ hb hΨ ha hs
+  refine ⟨hs'.mono fun _ hq N hl => ?_, hr⟩
+  have := hq N hl
+  exact Stage.use_svc_nm (φ := .rt r ε) (C := C) (by rw [hu]; exact this)
 
 end Flick

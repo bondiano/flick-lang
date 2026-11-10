@@ -140,7 +140,7 @@ theorem recArms_typ {E : Name} {w : Tm} {Ψ Θ Γ t s} {r ε : Row}
     exact .app (C := Caps.none) (ψ := .rt Row.none Row.none)
       (.proj (hw x) (S.op_field _ _ _ _ hop hne) .refl)
       (.var (ts := []) rfl rfl (fun _ _ h => h.elim) (by rw [Scheme.inst_mono]; exact .refl))
-      ⟨fun _ h => h.elim, fun _ h => h.elim⟩ .refl
+      (by rw [Stage.use_none]; exact ⟨fun _ h => h.elim, fun _ h => h.elim⟩) .refl
 
 theorem recArms_noIns {w : Tm} (hw : w.NoIns) : ∀ {os : List Name}, (recArms w os).NoIns
   | [] => fun h => h
@@ -153,12 +153,8 @@ theorem recArms_noIns {w : Tm} (hw : w.NoIns) : ∀ {os : List Name}, (recArms w
 
 /-- The function `λx. x` of a handler that gives the value of its body back. -/
 theorem id_typ {Ψ Θ Γ t φ} : Typ S Ψ Θ Γ (.lam (.var 0)) (.ex (.arrow t .pure t (t.reach)) φ) := by
-  refine .lam (.var (ts := []) rfl rfl (fun _ _ h => h.elim) (by rw [Scheme.inst_mono]; exact .refl))
-    (fun h => by simp [Tm.Has] at h) ?_ .refl
-  rintro a (⟨i, s, hi, _⟩ | ⟨p, hp, _⟩ | ⟨l, _, hl, _⟩)
-  · simp [Tm.Free] at hi
-  · simp [Tm.Has] at hp
-  · simp [Tm.Has] at hl
+  exact .lam (.var (ts := []) rfl rfl (fun _ _ h => h.elim) (by rw [Scheme.inst_mono]; exact .refl))
+    (fun h => by simp [Tm.Has] at h) .refl
 
 /-- A layer of known bindings is (Provide): its outputs leave the row of the body, unless an
 obligation is about them. -/

@@ -20,9 +20,9 @@ caller supplies is a variable of the scheme, and one the result shows names what
 arguments it holds reach (`elaboration.md`, Prelude schemes).
 
 The schemes of the Prelude names are generated from the checker (`PreludeSchemes`, `just
-formal-schemes`). `bindTy`, `map2Ty` and `eachSch` are their forms the proofs use; the witness
-holds them to the generated ones by `rfl` (`Witness/Prog.lean`, `eachSch_R`). `pair`, `unc n`
-and `each_P` have no Prelude name and stay written here (`docs/formal/elaboration.md#the-loop-rule-l-was-missing`, README simplification 9).
+formal-schemes`). `bindTy` and `map2Ty` are their forms the proofs use; the witness
+holds them to the generated ones by `rfl` (`Witness/Prog.lean`). `pair`, `unc n`
+and `each_φ` have no Prelude name and stay written here (`docs/formal/elaboration.md#the-loop-rule-l-was-missing`, README simplification 9).
 -/
 
 namespace Flick.Elab
@@ -46,17 +46,17 @@ qualifier `q` of its value (`docs/formal/elaboration.md#value-qualifiers-in-prel
 abbrev appQ (m q a : Ty) : Ty := .app (.app m q) a
 
 /-- The type of `flat_map` for the container `m`:
-`(a →P^c m e b) →P (m d a →P^(c ∪ e) m ((c ∪ e) ∪ (d ∪ a)) b)`. -/
+`(a →P^c m e b) →P (m d a →P m ((c ∪ e) ∪ (d ∪ a)) b)`. -/
 def bindTy (m c d a b e : Ty) : Ty :=
   arrP (.arr .P a (appQ m e b) c)
-    (.arr .P (appQ m d a) (appQ m (.cun (.cun c e) (.cun d a)) b) (.cun c e))
+    (arrP (appQ m d a) (appQ m (.cun (.cun c e) (.cun d a)) b))
 
-/-- The type of `map2` for the container `f`, with `R = (c ∪ g) ∪ ((d ∪ a) ∪ (d' ∪ b))`:
-`(a →P^c b →P^g x) →P (f d a →P^(c ∪ g) f d' b →P^R f R x)`. -/
-def map2Ty (f c d a b x g d' : Ty) : Ty :=
-  let R : Ty := .cun (.cun c g) (.cun (.cun d a) (.cun d' b))
-  arrP (.arr .P a (.arr .P b x g) c)
-    (.arr .P (appQ f d a) (.arr .P (appQ f d' b) (appQ f R x) R) (.cun c g))
+/-- The type of `map2` for the container `f`, with `R = c ∪ ((d ∪ a) ∪ (d' ∪ b))`:
+`(a →P^c b →P x) →P (f d a →P f d' b →P f R x)`. -/
+def map2Ty (f c d a b x d' : Ty) : Ty :=
+  let R : Ty := .cun c (.cun (.cun d a) (.cun d' b))
+  arrP (.arr .P a (arrP b x) c)
+    (arrP (appQ f d a) (arrP (appQ f d' b) (appQ f R x)))
 
 /-- `∀a₁ … aₙ r c. (a₁ →^c … → aₙ →^c r) →P (T_n →^c r)`, for `n ≥ 1`. -/
 def uncSch (tup n : Nat) : Scheme :=
@@ -64,17 +64,16 @@ def uncSch (tup n : Nat) : Scheme :=
     (.arr .P (nest tup (.var 0) (vars n).tail) (.var n) (.var (n + 1))), .cnil⟩
 
 /-- `each_φ`, the loop of `for … do` at the stage `φ` (`docs/formal/elaboration.md#the-loop-rule-l-was-missing`):
-`each_P : ∀c d a. (a →P^c Unit) →P (Seq d a →P^c Unit)`, which has no Prelude name, and for every
-`R r e` the one `each_R : ∀a r e c d. (a →R⟨r;e⟩^c Unit) →P (Seq d a →R⟨r;e⟩^c Unit)`, which is
-`Seq.each_effect` (`eachSch_R`) and is used at the rows of the loop. -/
+`each_P : ∀c d a. (a →P^c Unit) →P (Seq d a →P^c Unit)`, and for every `R r e` the one
+`each_R : ∀a r e c d. (a →R⟨r;e⟩^c Unit) →P (Seq d a →R⟨r;e⟩^c Unit)`, used at the rows of the
+loop. Neither is a Prelude name: the checker's loop (`for_loop`) checks the body at the current
+stage and asks nothing of the source, while `Seq.each_effect`, read through elision, needs the
+qualifier `d` of the sequence live (`docs/formal/elaboration.md#the-loop-rule-l-was-missing`). -/
 def eachSch (unit seq : Nat) : Stage → Scheme
   | .P => ⟨3, [], arrP (.arr .P (.var 2) (.con unit) (.var 0))
       (.arr .P (appQ (.con seq) (.var 1) (.var 2)) (.con unit) (.var 0)), .cnil⟩
   | .R _ _ => ⟨5, [], arrP (.arr (.R (.var 1) (.var 2)) (.var 0) (.con unit) (.var 3))
       (.arr (.R (.var 1) (.var 2)) (appQ (.con seq) (.var 4) (.var 0)) (.con unit) (.var 3)), .cnil⟩
-
-theorem eachSch_R (unit seq : Nat) (r e : Ty) :
-    eachSch unit seq (.R r e) = PreludeSchemes.Seq.each_effect unit seq := rfl
 
 /-- The Prelude classes and methods, the constants of Γ₀ and the types the sugar uses. -/
 structure Sugar (P : Prog) where
@@ -104,11 +103,10 @@ structure Sugar (P : Prog) where
   unitV : Nat
   fromResult : Nat
   /-- `flat_map : ∀m c d a b e. Monad m ⇒ bindTy m c d a b e` (`Prelude.fl`:
-  `∀c d a b. (∀v. a^v → (m b)^(c + v))^c → ((m a)^d → (m b)^(c + d))^c`) -/
+  `∀c d a b. (∀v. a^v → (m b)^(c + v))^c → (m a)^d → (m b)^(c + d)`) -/
   hFlatMap : P.methods flatMap = some (monad, PreludeSchemes.flat_map monad)
-  /-- `map2 : ∀f c d a b x g d'. Applicative f ⇒ map2Ty f c d a b x g d'` (`Prelude.fl`:
-  `∀c d a b x. (∀u v. a^u → (b^v → x)^(c + u))^c →
-  ((f a)^d → ((f b)^d → (f x)^(c + d))^(c + d))^c`) -/
+  /-- `map2 : ∀f c d a b x d'. Applicative f ⇒ map2Ty f c d a b x d'` (`Prelude.fl`:
+  `∀c d a b x. (∀u v. a^u → b^v → x)^c → (f a)^d → (f b)^d → (f x)^(c + d)`) -/
   hMap2 : P.methods map2 = some (applicative, PreludeSchemes.map2 applicative)
   /-- `pure : ∀f c a. Applicative f ⇒ a →P f c a` (`∀c a. a^c → (f a)^c`) -/
   hPure : P.methods pure = some (applicative, PreludeSchemes.pure applicative)
