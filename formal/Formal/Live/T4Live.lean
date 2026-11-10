@@ -85,7 +85,7 @@ theorem LNest.new_cell {c home i E Ef al rf e₀ n ℓ t' Ψ'} {ψ : Stage} (hn 
   · exact .inl (hn.frame_reg hi hE F hF (Frame.rgn_reg h₁))
 
 theorem LInv.main {root Ψ Λ μ e Λ' μ' e' t φ l anc home} (hroot : RootTyM S .live root)
-    (hrb : RootBelow root) (ht : t.YF 0) (hφ : φ.substT (kill 0) = φ)
+    (ht : t.YF 0) (hφ : φ.substT (kill 0) = φ)
     (hc : LCfgTy S Ψ ⟨Λ, μ, e⟩ t φ anc) (hn : LNest Ψ ⟨Λ, μ, e⟩ anc home)
     (hs : Step root l Λ μ e (.cfg Λ' μ' e')) :
     ∃ X anc' home', LCfgTy S (Ψ ++ X) ⟨Λ', μ', e'⟩ t φ anc' ∧
@@ -93,7 +93,7 @@ theorem LInv.main {root Ψ Λ μ e Λ' μ' e' t φ l anc home} (hroot : RootTyM 
   have hi : (⟨Λ, μ, e⟩ : Cfg).at none = some e := rfl
   have hψ : ∀ x, φ.svc (.atm (.r x)) → baseOf anc none x :=
     fun x hx => (Stage.no_atm_zero hφ x hx).elim
-  obtain ⟨X, hc', -⟩ := hc.main hroot hrb ht hφ hn.self
+  obtain ⟨X, hc', -⟩ := hc.main hroot ht hφ hn.self
     (fun E r hE he _ => ⟨_, hn.place (r := r) (by rw [← he]; exact hi) hE hψ⟩) hs
   obtain ⟨hμ, h, -, -, -, -, _hs, _cell, hcg⟩ := hc.1
   obtain ⟨anc', home', hn', hag⟩ := hn.step (X := X) hroot hi hμ hc'.1.1 hcg.main
@@ -102,13 +102,13 @@ theorem LInv.main {root Ψ Λ μ e Λ' μ' e' t φ l anc home} (hroot : RootTyM 
   exact ⟨X, anc', home', ⟨hc'.1, hc'.2.reanc hs.fresh hag⟩, hn'⟩
 
 theorem LInv.kid {root Ψ Λ μ e p g j k Λ' μ' k' t φ l anc home} (hroot : RootTyM S .live root)
-    (hrb : RootBelow root) (hc : LCfgTy S Ψ ⟨Λ, μ, e⟩ t φ anc) (hn : LNest Ψ ⟨Λ, μ, e⟩ anc home)
+    (hc : LCfgTy S Ψ ⟨Λ, μ, e⟩ t φ anc) (hn : LNest Ψ ⟨Λ, μ, e⟩ anc home)
     (hg : Λ[p]? = some g) (hl : g.live = true) (hj : g.kids[j]? = some k)
     (hs : Step root l Λ μ k (.cfg Λ' μ' k')) :
     ∃ X anc' home', LCfgTy S (Ψ ++ X) ⟨setKid Λ' p j k', μ', e⟩ t φ anc' ∧
       LNest (Ψ ++ X) ⟨setKid Λ' p j k', μ', e⟩ anc' home' := by
   have hi : (⟨Λ, μ, e⟩ : Cfg).at (some (p, j)) = some k := Cfg.at_some.mpr ⟨g, hg, hl, hj⟩
-  obtain ⟨X, hc', -, t₁, ψ₁, hk₁, hψ₁⟩ := hc.kid hroot hrb hn.self hg hj
+  obtain ⟨X, hc', -, t₁, ψ₁, hk₁, hψ₁⟩ := hc.kid hroot hn.self hg hj
     (fun _ _ _ hψ E r hE he _ =>
       ⟨_, hn.place (i := some (p, j)) (r := r) (by rw [← he]; exact hi) hE hψ⟩) hs
   obtain ⟨t₀, ψ₀, hk, hψ₀⟩ := (hc.2 p g hg).1 k (List.mem_of_getElem? hj)
@@ -119,7 +119,7 @@ theorem LInv.kid {root Ψ Λ μ e p g j k Λ' μ' k' t φ l anc home} (hroot : R
     (fun E _ _ _ _ hE he he' => hn.new_cell (i := some (p, j)) (he ▸ hi) hE (he' ▸ hk₁) hψ₁) hs
   exact ⟨X, anc', home', ⟨hc'.1, hc'.2.reanc (CStep.kid (e := e) hg hl hj hs).fresh hag⟩, hn'⟩
 
-theorem LInv.steps {root c c'} (hroot : RootTyM S .live root) (hrb : RootBelow root)
+theorem LInv.steps {root c c'} (hroot : RootTyM S .live root)
     (hs : CSteps root c c') :
     ∀ {Ψ t φ anc home}, t.YF 0 → φ.substT (kill 0) = φ → LCfgTy S Ψ c t φ anc →
       LNest Ψ c anc home → ∃ Ψ' anc' home', LCfgTy S Ψ' c' t φ anc' ∧ LNest Ψ' c' anc' home' := by
@@ -129,20 +129,20 @@ theorem LInv.steps {root c c'} (hroot : RootTyM S .live root) (hrb : RootBelow r
     intro Ψ t φ anc home ht hφ hc hn
     cases h₁ with
     | main hs =>
-      obtain ⟨_, _, _, hc₁, hn₁⟩ := LInv.main hroot hrb ht hφ hc hn hs
+      obtain ⟨_, _, _, hc₁, hn₁⟩ := LInv.main hroot ht hφ hc hn hs
       exact ih ht hφ hc₁ hn₁
     | kid hg hl hj hs =>
-      obtain ⟨_, _, _, hc₁, hn₁⟩ := LInv.kid hroot hrb hc hn hg hl hj hs
+      obtain ⟨_, _, _, hc₁, hn₁⟩ := LInv.kid hroot hc hn hg hl hj hs
       exact ih ht hφ hc₁ hn₁
 
 /-- **T4′ of the live discipline.** A program typed by use reaches no configuration where a
 thread is at a step that needs a region that is not live, or where an operation is answered by
 a handler of a region that ended. As for `T1_live`, that the roots name no run-time region is
 a premise. -/
-theorem T4'_live {root : Roots} (hroot : RootTyM S .live root) (hrb : RootBelow root) :
+theorem T4'_live {root : Roots} (hroot : RootTyM S .live root) :
     SafeUse root (fun e t φ => TypM S .live [] Facts.none [] e (.ex t φ)) := by
   intro e₀ t φ₀ c h₀ hp ht hφ hs
-  obtain ⟨Ψ, anc, home, hc, hn⟩ := LInv.steps hroot hrb hs ht hφ
+  obtain ⟨Ψ, anc, home, hc, hn⟩ := LInv.steps hroot hs ht hφ
     (LCfgTy.init h₀ hp (fun q x => x = q)) (LNest.init hp)
   refine ⟨fun E r hE he => ?_, fun p g hg hl k hk E r hE he => ?_,
     fun i e E Ef o k v q hi hE he hq => ?_⟩

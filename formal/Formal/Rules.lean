@@ -277,6 +277,8 @@ structure RootTyM (mode : TypingMode) (root : Roots) : Prop where
   glob : ∀ g v, root.glob g = some v → (∀ x, ¬ v.Has x) ∧
     ∃ s, S.glob g = some s ∧ TypM S mode [] s.cs [] v (.ex s.t .pure)
   globs : ∀ g s, S.glob g = some s → (root.glob g).isSome
+  /-- A root is source code: it names no run-time region. -/
+  svcBelow : ∀ N v, root.svc N = some v → ∀ p, ¬ v.Has (.rgn p)
 
 abbrev RootTy := RootTyM S .captures
 

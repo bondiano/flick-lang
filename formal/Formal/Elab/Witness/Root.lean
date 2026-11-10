@@ -151,6 +151,7 @@ theorem constSch_body {c s} (h : constSch c = some s) : ∃ b, constBody c = som
 
 theorem rootTy : RootTy Sg root where
   svc _ _ h := by cases h
+  svcBelow _ _ h := by cases h
   glob g v h := by
     simp only [root, bodyF] at h
     simp only [Sg, globF]

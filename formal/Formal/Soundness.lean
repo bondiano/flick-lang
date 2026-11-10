@@ -17,7 +17,7 @@ variable {S : Sig} {mode : TypingMode}
 /-- A configuration step keeps a typed configuration at the same type and stage,
 with a store typing that extends the first one. The type and the stage of the
 program name no run-time region. -/
-theorem cstep_typed_mode {root Ψ c c' t φ l} (hroot : RootTyM S mode root) (hrb : RootBelow root)
+theorem cstep_typed_mode {root Ψ c c' t φ l} (hroot : RootTyM S mode root)
     (ht : t.YF 0)
     (hφ : φ.substT (kill 0) = φ) (hc : CfgTyM S mode Ψ c t φ) (hs : CStep root l c c') :
     ∃ X, CfgTyM S mode (Ψ ++ X) c' t φ ∧ ∀ u ∈ X, u.YF c.rgs.length := by
@@ -25,7 +25,7 @@ theorem cstep_typed_mode {root Ψ c c' t φ l} (hroot : RootTyM S mode root) (hr
   cases hs with
   | main hs =>
     obtain ⟨X, hμ', h', hX⟩ := preservation hroot h hμ hb.main hb.mem hΨ hs
-    obtain ⟨hb', hl⟩ := hs.below hrb hb
+    obtain ⟨hb', hl⟩ := hs.below hroot.below hb
     obtain ⟨ha', hka⟩ := hs.asc hroot ha hb.main
     obtain ⟨hs', cell', -, hcc'⟩ := hs.caught hroot hcg ha hb (Nat.zero_le _)
     rw [ht.mono (Nat.zero_le _), Stage.YF_mono hφ (Nat.zero_le _)] at h'
@@ -40,12 +40,12 @@ theorem cstep_typed_mode {root Ψ c c' t φ l} (hroot : RootTyM S mode root) (hr
     have hkb := (hb.rgs _ _ hg).1 _ hkm
     have hkA := ha.rgs _ _ hg _ (List.mem_append_left _ hkm)
     obtain ⟨X, hμ', hk', hX⟩ := preservation hroot hk hμ hkb hb.mem hΨ hs
-    obtain ⟨hb', hl⟩ := hs.below hrb ⟨hkb, hb.mem, hb.rgs⟩
+    obtain ⟨hb', hl⟩ := hs.below hroot.below ⟨hkb, hb.mem, hb.rgs⟩
     obtain ⟨ha', hka⟩ := hs.asc hroot ⟨hkA, ha.rgs, ha.mem⟩ hkb
     obtain ⟨m, hm, hkm'⟩ := hcg.rgs _ _ hg _ (List.mem_append_left _ hkm)
     obtain ⟨hs', cell', hg', hkc⟩ := hs.caught hroot (n := m)
       ⟨hkm', hcg.rgs⟩ ⟨hkA, ha.rgs, ha.mem⟩ ⟨hkb, hb.mem, hb.rgs⟩ hm
-    have hll := (hs.below hrb ⟨hkb, hb.mem, hb.rgs⟩).2
+    have hll := (hs.below hroot.below ⟨hkb, hb.mem, hb.rgs⟩).2
     refine ⟨X, ⟨hμ', h.weakenStore X, ((step_rgs hΛ hk hkb hΨ hkA hs).weaken X).setKid ⟨_, _, hk'⟩,
       CfgBelow.kid ⟨hb.main.mono hl, hb'.mem, hb'.rgs⟩ hb'.main, fun u hu => ?_,
       (hka _ ha.main).setKid ha', hs', cell', hkc.setKid (Nat.le_trans hm hll) hkc.main (hcg.main.ghostB hb.main hg')⟩, hX⟩
@@ -54,7 +54,7 @@ theorem cstep_typed_mode {root Ψ c c' t φ l} (hroot : RootTyM S mode root) (hr
     · exact (hΨ u hu).mono hl
     · exact (hX u hu).mono hl
 
-theorem steps_typed_mode {root c c'} (hroot : RootTyM S mode root) (hrb : RootBelow root)
+theorem steps_typed_mode {root c c'} (hroot : RootTyM S mode root)
     (hs : CSteps root c c') :
     ∀ {Ψ t φ}, t.YF 0 → φ.substT (kill 0) = φ → CfgTyM S mode Ψ c t φ →
       ∃ X, CfgTyM S mode (Ψ ++ X) c' t φ := by
@@ -62,7 +62,7 @@ theorem steps_typed_mode {root c c'} (hroot : RootTyM S mode root) (hrb : RootBe
   | refl => intro Ψ _ _ _ _ h; exact ⟨[], by simpa using h⟩
   | step h₁ _ ih =>
     intro _ _ _ ht hφ h
-    obtain ⟨X₁, h', -⟩ := cstep_typed_mode hroot hrb ht hφ h h₁
+    obtain ⟨X₁, h', -⟩ := cstep_typed_mode hroot ht hφ h h₁
     obtain ⟨X₂, h''⟩ := ih ht hφ h'
     exact ⟨X₁ ++ X₂, by simpa using h''⟩
 
@@ -104,7 +104,7 @@ performs an operation no handler and no root answers, or is blocked. An
 operation nothing answers is not an outcome of the main thread, for `Σ₀` has a function
 for each operation of an effect of the stage, and it does not unwind past its top: every
 signal is under the frame of its handler (`CfgCaught`). -/
-theorem T1_mode {root e₀ t φ₀ c} (hroot : RootTyM S mode root) (hrb : RootBelow root)
+theorem T1_mode {root e₀ t φ₀ c} (hroot : RootTyM S mode root)
     (hcov : ∀ N, φ₀.svc (.nm N) → (root.svc N).isSome) (h₀ : TypM S mode [] Facts.none [] e₀ (.ex t φ₀))
     (hp : e₀.Below 0) (ht : t.YF 0) (hφ : φ₀.substT (kill 0) = φ₀)
     (hs : CSteps root ⟨[], [], e₀⟩ c) :
@@ -114,7 +114,7 @@ theorem T1_mode {root e₀ t φ₀ c} (hroot : RootTyM S mode root) (hrb : RootB
     ∀ (p : Nat) (g : Rgn), c.rgs[p]? = some g → g.live = true → ∀ k ∈ g.kids,
       Final k ∨ (∃ l o, Step root l c.rgs c.mem k o) ∨ (∃ D, PerformStuck S root k D) ∨
         Blocked c.rgs k := by
-  obtain ⟨Ψ, hμ, h, hΛ, -, -, -, _, _, hcg⟩ := steps_typed_mode hroot hrb hs ht hφ (CfgTyM.init h₀ hp)
+  obtain ⟨Ψ, hμ, h, hΛ, -, -, -, _, _, hcg⟩ := steps_typed_mode hroot hs ht hφ (CfgTyM.init h₀ hp)
   simp only [List.nil_append] at hμ h hΛ
   refine ⟨?_, fun p g hg _ k hk => ?_⟩
   · rcases progress_mode (Λ := c.rgs) (root := root) hroot h hμ.1 rfl rfl with hv | hn
@@ -143,12 +143,12 @@ theorem T1_mode {root e₀ t φ₀ c} (hroot : RootTyM S mode root) (hrb : RootB
 theorem cstep_typed {root Ψ c c' t φ l} (hroot : RootTy S root) (ht : t.YF 0)
     (hφ : φ.substT (kill 0) = φ) (hc : CfgTy S Ψ c t φ) (hs : CStep root l c c') :
     ∃ X, CfgTy S (Ψ ++ X) c' t φ ∧ ∀ u ∈ X, u.YF c.rgs.length :=
-  cstep_typed_mode hroot hroot.below ht hφ hc hs
+  cstep_typed_mode hroot ht hφ hc hs
 
 theorem steps_typed {root c c'} (hroot : RootTy S root) (hs : CSteps root c c') :
     ∀ {Ψ t φ}, t.YF 0 → φ.substT (kill 0) = φ → CfgTy S Ψ c t φ →
       ∃ X, CfgTy S (Ψ ++ X) c' t φ :=
-  steps_typed_mode hroot hroot.below hs
+  steps_typed_mode hroot hs
 
 /-- **T1** of the capture discipline. -/
 theorem T1 {root e₀ t φ₀ c} (hroot : RootTy S root)
@@ -161,12 +161,10 @@ theorem T1 {root e₀ t φ₀ c} (hroot : RootTy S root)
     ∀ (p : Nat) (g : Rgn), c.rgs[p]? = some g → g.live = true → ∀ k ∈ g.kids,
       Final k ∨ (∃ l o, Step root l c.rgs c.mem k o) ∨ (∃ D, PerformStuck S root k D) ∨
         Blocked c.rgs k :=
-  T1_mode hroot hroot.below hcov h₀ hp ht hφ hs
+  T1_mode hroot hcov h₀ hp ht hφ hs
 
-/-- **T1** of the live discipline. Typing by use does not bound what a root holds by its
-type, so that its roots name no run-time region is a premise (`RootBelow`) rather than a
-consequence of `RootTyM`. -/
-theorem T1_live {root e₀ t φ₀ c} (hroot : RootTyM S .live root) (hrb : RootBelow root)
+/-- **T1** of the live discipline. -/
+theorem T1_live {root e₀ t φ₀ c} (hroot : RootTyM S .live root)
     (hcov : ∀ N, φ₀.svc (.nm N) → (root.svc N).isSome) (h₀ : TypM S .live [] Facts.none [] e₀ (.ex t φ₀))
     (hp : e₀.Below 0) (ht : t.YF 0) (hφ : φ₀.substT (kill 0) = φ₀)
     (hs : CSteps root ⟨[], [], e₀⟩ c) :
@@ -176,5 +174,5 @@ theorem T1_live {root e₀ t φ₀ c} (hroot : RootTyM S .live root) (hrb : Root
     ∀ (p : Nat) (g : Rgn), c.rgs[p]? = some g → g.live = true → ∀ k ∈ g.kids,
       Final k ∨ (∃ l o, Step root l c.rgs c.mem k o) ∨ (∃ D, PerformStuck S root k D) ∨
         Blocked c.rgs k :=
-  T1_mode hroot hrb hcov h₀ hp ht hφ hs
+  T1_mode hroot hcov h₀ hp ht hφ hs
 end Flick

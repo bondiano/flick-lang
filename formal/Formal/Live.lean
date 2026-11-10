@@ -83,9 +83,9 @@ rather than proof steps; the capture instance is unchanged by each of them:
    (`withs_typing_atm`, `fin_await_atm`, `kid_stage`). `LiveRules.lean` rejects an
    undeclared qualifier and accepts a declared one.
 With them, preservation of every step holds for both instances (`rt_preservation_mode`,
-`preservation`), and so does type soundness: `T1_live` is `T1` of `TypM S .live`. Its one
-extra premise is `RootBelow root`: typing by use does not bound what a value holds by its
-type, so that the roots name no run-time region cannot be read off `RootTyM`.
+`preservation`), and so does type soundness: `T1_live` is `T1` of `TypM S .live`. That
+the roots name no run-time region is part of `RootTyM` (`svcBelow`): typing by use does not
+bound what a value holds by its type, so it cannot be read off a root's typing.
 
 `T4'_live` (`Live/T4Live.lean`) is T4′ of `TypLive`. `Nest` bounds what each thread *names*
 (`Within`), which the live discipline gives up, so its invariant is split in two:
