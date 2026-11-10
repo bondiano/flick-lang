@@ -26,3 +26,10 @@ test("multiple arguments use Flick's curried declaration", async () => {
     compile: async () => ({ dts: "export declare const length_of: (arg: string) => (arg: number) => string;" }),
   }), "passed");
 });
+
+test("a Unit result uses the emitted undefined type", async () => {
+  assert.equal(await evaluateExercise({ ...contract, return_type: "void" }, {
+    ...operations,
+    compile: async () => ({ dts: "export declare const length_of: (arg: string) => undefined;" }),
+  }), "passed");
+});

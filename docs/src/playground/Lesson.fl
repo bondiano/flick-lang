@@ -39,9 +39,7 @@ let view model m = ui {
         { disabled = false; on_click = Ui.Event.exhaust (fun _ -> task { reset_lesson model }) }
         [text (tr m.locale "Reset" "Сбросить")],
     ],
-    if m.lesson_hint then
-      paragraph [text m.lesson_hint_text]
-    else empty,
+    if m.lesson_hint then paragraph [text m.lesson_hint_text] else empty,
     if m.lesson_result != "" then
       Ui.with_host
         { Ui.host with role = Some "status"; aria_live = Some Ui.Polite }

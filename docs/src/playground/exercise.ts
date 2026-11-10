@@ -16,7 +16,8 @@ export const evaluateExercise = async (rules: ExerciseCheck, operations: Exercis
   if ((await operations.check()).some((problem) => problem.severity === "error")) return "fix-errors";
   const generated = await operations.compile();
   const args = rules.argument_types.map((type) => `\\(\\s*[$\\w]+:\\s*${escape(type)}\\s*\\)\\s*=>\\s*`).join("");
-  const signature = new RegExp(`^export declare const ${escape(rules.export)}:\\s*${args}${escape(rules.return_type)}\\s*;`, "m");
+  const result = rules.return_type === "void" ? "undefined" : rules.return_type;
+  const signature = new RegExp(`^export declare const ${escape(rules.export)}:\\s*${args}${escape(result)}\\s*;`, "m");
   if (!signature.test(generated.dts)) return "type";
   const execution = await operations.run();
   return execution.status === "exit" && execution.code === 0 && execution.lines.filter((line) => line.stream === "stdout").map((line) => line.text).join("").trim() === rules.output ? "passed" : "output";
