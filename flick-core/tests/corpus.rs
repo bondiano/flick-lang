@@ -208,7 +208,8 @@ fn docs_examples_parse() {
 }
 
 /// Every block of the site's pages checks on its own, imports taken on trust:
-/// hidden lines declare the names a fragment uses.
+/// hidden lines declare the names a fragment uses, and a `live` block checks
+/// under the live discipline of regions.
 #[test]
 fn docs_examples_check() {
     let mut pages = Vec::new();
@@ -231,9 +232,10 @@ fn docs_examples_check() {
                 continue;
             }
             checked += 1;
+            let regions = block.regions();
             let mut sources = SourceMap::default();
             let file = sources.add(format!("{page}:{line}"), block.text);
-            let errors: Vec<_> = flick_core::check(&sources, file)
+            let errors: Vec<_> = flick_core::check_regions(&sources, file, regions)
                 .into_iter()
                 .filter(|d| d.severity == Severity::Error)
                 .collect();

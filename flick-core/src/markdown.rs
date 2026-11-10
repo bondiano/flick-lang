@@ -9,12 +9,16 @@ use std::ops::Range;
 
 use crate::diagnostics::Edit;
 use crate::source::{FileId, Span};
+use crate::types::RegionMode;
 
 /// What a block's info string asks of the checker: ```` ```flick ```` must
 /// check without errors, ```` ```flick keep ```` too but is never rewritten
 /// by fixes (it shows the long form a lint would shorten), ```` ```flick
 /// ignore ```` is only parsed, and ```` ```flick fail ```` must report at
-/// least one error.
+/// least one error. The word `live` adds the discipline a block checks
+/// under, which a build otherwise opts into (`[build] regions`): a ```` ```flick
+/// live ```` block must check without errors under it, and ```` ```flick live
+/// fail ```` must report one there.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Mode {
     Check,
@@ -27,6 +31,8 @@ pub enum Mode {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Block {
     pub mode: Mode,
+    /// Whether the info string asks the live discipline of regions.
+    pub live: bool,
     /// The 1-based line of the page where the block's code starts.
     pub line: usize,
     /// The code as it is compiled: its hidden lines without their prefix.
@@ -57,6 +63,11 @@ fn mode(words: &str) -> Mode {
         })
 }
 
+/// Whether the words ask the live discipline: ```` ```flick live ````.
+fn live(words: &str) -> bool {
+    words.split_whitespace().any(|word| word == "live")
+}
+
 /// The bytes of the hidden prefix of a line of code.
 fn hidden(line: &str) -> usize {
     // shortcut: a raw string line starting with `# ` would be hidden too; no example has one, mark such a block `ignore`
@@ -85,6 +96,7 @@ pub fn blocks(page: &str) -> Vec<Block> {
                 if let Some(words) = info.filter(|w| w.is_empty() || w.starts_with(' ')) {
                     open = Some(Block {
                         mode: mode(words),
+                        live: live(words),
                         line: index + 2,
                         text: String::new(),
                         lines: Vec::new(),
@@ -113,6 +125,23 @@ pub fn blocks(page: &str) -> Vec<Block> {
 }
 
 impl Block {
+    /// The discipline the block is checked under: a `live` block asks the
+    /// live discipline, the one a build opts into with `[build] regions`.
+    pub fn regions(&self) -> RegionMode {
+        if self.live {
+            RegionMode::Live
+        } else {
+            RegionMode::Captures
+        }
+    }
+
+    /// Whether `flick check --fix` may rewrite the block. The fixes of a
+    /// block are those of its own discipline; a `live` block is left as
+    /// written, as only the corpus test checks it.
+    pub fn fixable(&self) -> bool {
+        self.mode == Mode::Check && !self.live
+    }
+
     /// The bytes of the page that hold the block's code.
     pub fn range(&self) -> Range<usize> {
         let fence = self.lines.last().expect("a closed block has its fence");
@@ -217,6 +246,29 @@ mod tests {
         let crlf = &blocks("```flick\r\n# a\r\nb\r\n```\r\n")[0];
         assert_eq!(crlf.text, "a\nb\n");
         assert_eq!(crlf.range(), 10..18);
+    }
+
+    /// A block says which discipline of regions it checks under: the word
+    /// `live`, which leaves the mode to `fail`, `keep` or `ignore`.
+    #[test]
+    fn a_block_may_ask_the_live_discipline() {
+        assert_eq!(blocks(PAGE)[0].regions(), RegionMode::Captures);
+        for (words, mode) in [
+            ("live", Mode::Check),
+            ("live fail", Mode::Fail),
+            ("live keep", Mode::Keep),
+            ("live ignore", Mode::Ignore),
+        ] {
+            let block = &blocks(&format!("```flick {words}\nx\n```\n"))[0];
+            assert!(block.live, "{words}");
+            assert_eq!(block.mode, mode, "{words}");
+            assert_eq!(block.regions(), RegionMode::Live, "{words}");
+            assert!(!block.fixable(), "{words}");
+        }
+        let plain = &blocks("```flick keep\nx\n```\n")[0];
+        assert_eq!(plain.regions(), RegionMode::Captures);
+        assert!(!plain.fixable());
+        assert!(blocks("```flick\nx\n```\n")[0].fixable());
     }
 
     #[test]

@@ -5,7 +5,9 @@ title: "Regions and captures"
 A `scope` releases what it acquired when its body ends, and the checker
 proves that nothing usable outlives it (see [Resources](../../spec/05-errors-and-concurrency/#resources), [Static regions and captures](../../spec/05-errors-and-concurrency/#static-regions-and-captures)). Regions are checked after types and effects; there is no early
 close and no linearity: a resource may be used any number of times while its
-scope is open.
+scope is open. This page describes the default discipline, which bounds what a
+value holds. An experimental mode bounds instead what a value uses, and where
+the region must be live: see [Live regions](../handbook/live-regions/).
 
 ## Scopes and owners
 

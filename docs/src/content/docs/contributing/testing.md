@@ -133,7 +133,10 @@ matrix, codecs against their compiled decoders. Entry runner tests start
   (`docs_examples_check`), its imports taken on trust: hidden lines, `#`
   alone or starting with `# `, declare what it uses and are left off the
   page. A `flick ignore` block is only parsed; a `flick fail` block must
-  report an error.
+  report an error; a block with the word `live` checks under the live
+  discipline of regions, which a build opts into with `[build] regions`
+  (`flick live`, `flick live fail`), and `flick check --fix` leaves it as
+  written.
   The blocks of the Russian specification (`ru/spec`), the original text, are
   pinned by fingerprint in `tests/syntax/spec_examples.txt`: a new or edited
   example fails the test until its parse is reviewed and the printed line is
