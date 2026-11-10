@@ -217,6 +217,13 @@ fn installed(root: Option<&Path>, line: &mut impl FnMut(Option<bool>, &str, Stri
                 Ok(deps) => requirements.extend(deps),
                 Err(message) => line(Some(false), toolchain::ADAPTER, message),
             }
+            if toolchain::installed(root, toolchain::ADAPTER).is_none() {
+                line(
+                    None,
+                    "effect",
+                    "not installed; requirements come from the adapter package".to_owned(),
+                );
+            }
             line(
                 None,
                 toolchain::ADAPTER,
