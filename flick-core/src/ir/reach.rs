@@ -50,7 +50,7 @@ pub fn uses(item: &Item, out: &mut Vec<Key>) {
     }
 }
 
-fn dict_uses(d: &Dict, out: &mut Vec<Key>) {
+pub fn dict_uses(d: &Dict, out: &mut Vec<Key>) {
     d.each_global(&mut |_, module, name| out.push((module.to_owned(), name.to_owned())));
 }
 
