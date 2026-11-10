@@ -45,22 +45,32 @@ pub fn fingerprint() -> Option<String> {
     ))
 }
 
-/// The version of an installed package, from `root/node_modules`.
-pub fn installed(root: &Path, package: &str) -> Option<String> {
-    let path = root.join("node_modules").join(package).join("package.json");
+fn version_at(path: &Path) -> Option<String> {
     let text = fs::read_to_string(path).ok()?;
     let json: serde_json::Value = serde_json::from_str(&text).ok()?;
-    Some(json.get("version")?.as_str()?.to_owned())
+    json.get("version")?.as_str().map(str::to_owned)
 }
 
-/// Node resolves dependencies from the real package directory, including pnpm's store.
-pub fn dependency_manifest(root: &Path, package: &str) -> PathBuf {
+/// The version of an installed package, from `root/node_modules`.
+pub fn installed(root: &Path, package: &str) -> Option<String> {
+    version_at(&root.join("node_modules").join(package).join("package.json"))
+}
+
+/// Node walks the real directory's ancestors, skipping `node_modules` itself.
+fn dependency_candidates(root: &Path, package: &str) -> Vec<PathBuf> {
     let adapter = root.join("node_modules").join(ADAPTER);
     let real = fs::canonicalize(&adapter).unwrap_or(adapter);
     real.ancestors()
+        .filter(|dir| dir.file_name().is_none_or(|name| name != "node_modules"))
         .map(|dir| dir.join("node_modules").join(package).join("package.json"))
+        .collect()
+}
+
+/// A failed real-path resolution stays unresolved, including external links.
+pub fn dependency_manifest(root: &Path, package: &str) -> Option<PathBuf> {
+    dependency_candidates(root, package)
+        .into_iter()
         .find(|path| path.exists())
-        .unwrap_or_else(|| root.join("node_modules").join(package).join("package.json"))
 }
 
 /// The adapter and kernel resolve from the project; adapter dependencies from its real path.
@@ -68,9 +78,9 @@ pub fn resolved(root: &Path, package: &str) -> Option<String> {
     if package == ADAPTER || package == "@flick-lang/runtime" {
         return installed(root, package);
     }
-    let text = fs::read_to_string(dependency_manifest(root, package)).ok()?;
-    let json: serde_json::Value = serde_json::from_str(&text).ok()?;
-    json.get("version")?.as_str().map(str::to_owned)
+    dependency_manifest(root, package)
+        .as_deref()
+        .and_then(version_at)
 }
 
 /// Exact production dependency pins of an installed adapter, without compiler-owned versions.
@@ -139,7 +149,7 @@ pub fn contract_inputs(root: &Path) -> Vec<PathBuf> {
         paths.extend(
             requirements
                 .iter()
-                .map(|(name, _)| dependency_manifest(root, name)),
+                .flat_map(|(name, _)| dependency_candidates(root, name)),
         );
     }
     paths
@@ -168,10 +178,9 @@ pub fn check_runtime(root: &Path, rt: bool) -> Option<Diagnostic> {
                 "`{ADAPTER}` needs runtime {wanted}, but flick {COMPILER} supports runtime {RUNTIME}"
             )));
         }
-        let found = fs::read_to_string(dependency_manifest(root, &package))
-            .ok()
-            .and_then(|text| serde_json::from_str::<serde_json::Value>(&text).ok())
-            .and_then(|json| json.get("version")?.as_str().map(str::to_owned));
+        let found = dependency_manifest(root, &package)
+            .as_deref()
+            .and_then(version_at);
         if found.as_deref() != Some(&wanted) {
             return Some(error(format!(
                 "`{ADAPTER}` needs `{package}@{wanted}`, but resolves {}: run `flick install`",

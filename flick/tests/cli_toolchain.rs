@@ -356,3 +356,55 @@ fn doctor_reports_effect_without_an_adapter_owned_requirement() {
     assert!(text.contains("note effect: 4.2.0"), "{text}");
     assert!(!text.contains("FAIL effect"), "{text}");
 }
+
+#[cfg(unix)]
+#[test]
+fn externally_linked_adapter_cannot_borrow_project_dependencies() {
+    use std::os::unix::fs::symlink;
+    use std::process;
+    let dir = project(
+        "cli_external_adapter",
+        &[
+            ("flick.toml", EFFECT_APP),
+            ("src/App/Main.fl", MAIN),
+            ("node_modules/effect/package.json", r#"{"version":"4.2.0"}"#),
+        ],
+    );
+    let external = env::temp_dir().join(format!("flick-external-adapter-{}", process::id()));
+    fs::create_dir(&external).expect("fresh external adapter");
+    fs::write(
+        external.join("package.json"),
+        r#"{"version":"0.2.0","dependencies":{"effect":"4.2.0"}}"#,
+    )
+    .expect("manifest");
+    fs::create_dir_all(dir.join("node_modules/@flick-lang")).expect("dir");
+    symlink(&external, dir.join("node_modules/@flick-lang/effect-ts")).expect("link");
+    let out = flick_in(&dir, &["build"]);
+    fs::remove_dir_all(external).expect("cleanup");
+    assert_eq!(code(&out), Some(2), "{out:?}");
+    assert!(stderr(&out).contains("FLICK-P015"));
+    assert!(!dir.join("dist").exists());
+}
+
+#[test]
+fn adapter_does_not_search_nested_node_modules_directories() {
+    let dir = project(
+        "cli_nested_node_modules",
+        &[
+            ("flick.toml", EFFECT_APP),
+            ("src/App/Main.fl", MAIN),
+            (
+                "node_modules/@flick-lang/effect-ts/package.json",
+                r#"{"version":"0.2.0","dependencies":{"effect":"4.2.0"}}"#,
+            ),
+            (
+                "node_modules/node_modules/effect/package.json",
+                r#"{"version":"4.2.0"}"#,
+            ),
+        ],
+    );
+    let out = flick_in(&dir, &["build"]);
+    assert_eq!(code(&out), Some(2), "{out:?}");
+    assert!(stderr(&out).contains("FLICK-P015"));
+    assert!(!dir.join("dist").exists());
+}
