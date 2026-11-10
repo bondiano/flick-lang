@@ -29,6 +29,7 @@ mod progress;
 mod report;
 mod sources;
 mod stdlib;
+mod timings;
 mod toolchain;
 mod workspace;
 
@@ -38,6 +39,7 @@ fn watch(command: &impl Command, global: &GlobalArguments) -> ExitCode {
     loop {
         let before = commands::watch_snapshot(&paths);
         run_command(command, global);
+        timings::report(global);
         while commands::watch_snapshot(&paths) == before {
             thread::sleep(Duration::from_millis(200));
         }
@@ -72,6 +74,18 @@ fn dependency_command(cmd: Commands, offline: bool) -> pnpm::Command {
 
 fn main() -> ExitCode {
     let args = CommandArguments::parse();
+    let global = args.global.clone();
+    // the language server sets its own subscriber for its log
+    if global.timings && !matches!(args.cmd, Commands::Lsp(_)) {
+        timings::install();
+    }
+    let code = run(args);
+    timings::report(&global);
+    code
+}
+
+/// Runs the command of `args` on its project, or on each member of its workspace.
+fn run(args: CommandArguments) -> ExitCode {
     plugins::set_offline(args.global.offline || env::var_os("CI").is_some());
     // what installs or edits the dependencies, or checks no module, needs no `std`
     let needs_std = !matches!(

@@ -19,6 +19,10 @@ use crate::builtins;
 use crate::commands::inputs::{declared_name, sibling_root};
 use crate::toolchain;
 
+mod signed;
+
+pub use signed::{Signed, missed, path as inputs_path};
+
 /// Files under `dir`, recursively, in a stable order.
 pub fn files_under(dir: &Path, out: &mut Vec<PathBuf>) {
     let Ok(entries) = fs::read_dir(dir) else {
@@ -37,7 +41,7 @@ pub fn files_under(dir: &Path, out: &mut Vec<PathBuf>) {
 
 /// The key of a build of `project` with `settings`, a description of the
 /// command-line settings that change its output.
-pub fn key(project: &Project, roots: &[PathBuf], settings: &str, needs_effect: bool) -> String {
+pub fn key(project: &Project, roots: &[PathBuf], settings: &str, needs_effect: bool) -> Signed {
     let mut key = Key::default();
     key.add("settings", settings);
     let mut selected: Vec<PathBuf> = roots.iter().map(|p| project::normalize(p)).collect();
@@ -72,7 +76,7 @@ pub fn key(project: &Project, roots: &[PathBuf], settings: &str, needs_effect: b
             fs::read(path).unwrap_or_default(),
         );
     }
-    key.finish()
+    key.into()
 }
 
 /// Whether each input the compiler read still has the bytes it compiled.
@@ -259,7 +263,7 @@ pub fn load(root: &Path, key: &str) -> Option<Vec<Artifact>> {
 
 /// Caches `artifacts` under `key`; a cache that cannot be written is only
 /// slower.
-pub fn store(root: &Path, key: &str, artifacts: &[Artifact]) {
+pub fn store(root: &Path, key: &Signed, artifacts: &[Artifact]) {
     let pairs: Vec<(&str, &str)> = artifacts
         .iter()
         .map(|a| (a.path.as_str(), a.contents.as_str()))
@@ -270,6 +274,7 @@ pub fn store(root: &Path, key: &str, artifacts: &[Artifact]) {
         && let Ok(json) = serde_json::to_string(&pairs)
     {
         let _ = fs::write(path, json);
+        signed::save(root, key);
     }
 }
 

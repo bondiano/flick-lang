@@ -22,6 +22,10 @@ use std::collections::{HashMap, HashSet};
 use std::path::{Component, Path, PathBuf};
 use std::sync::{Arc, OnceLock};
 
+use tracing::debug;
+
+use crate::clock::{micros, timed};
+
 #[cfg(feature = "source-maps")]
 use crate::codegen::sourcemap;
 #[cfg(feature = "typescript")]
@@ -937,13 +941,21 @@ fn lowered_builtins(stages_by_class: bool) -> &'static Lowered {
     static BUILTINS: [OnceLock<Lowered>; 2] = [OnceLock::new(), OnceLock::new()];
     BUILTINS[usize::from(stages_by_class)].get_or_init(|| {
         let (mut lowered, mut declarations) = (Vec::new(), Vec::new());
-        types::check_each(
-            types::builtin_sources(),
-            stages_by_class,
-            |module, typing| {
-                lowered.push(ir::lower(module, typing).expect("built-in modules compile"));
-                declarations.push(typing.declarations.clone());
-            },
+        let ((), elapsed) = timed(|| {
+            types::check_each(
+                types::builtin_sources(),
+                stages_by_class,
+                |module, typing| {
+                    lowered.push(ir::lower(module, typing).expect("built-in modules compile"));
+                    declarations.push(typing.declarations.clone());
+                },
+            );
+        });
+        debug!(
+            modules = lowered.len(),
+            ?elapsed,
+            micros = micros(elapsed),
+            "built-in modules lowered"
         );
         (lowered, declarations)
     })

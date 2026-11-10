@@ -314,7 +314,7 @@ impl BuildCommand {
         }
     }
 
-    fn key(&self, project: &Project, roots: &[PathBuf], output: &BuildPlan) -> String {
+    fn key(&self, project: &Project, roots: &[PathBuf], output: &BuildPlan) -> cache::Signed {
         // generations sit at one depth, so their artifacts are the same
         let out_dir = if self.generation {
             project.root.join(".flick/run/*")

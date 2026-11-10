@@ -86,7 +86,7 @@ impl Checking<'_> {
     /// [`Checking::check`], logging how long it took.
     fn timed(&self, loaded: &Loaded, lookup: &dyn Fn(&str) -> Option<Interface>) -> Output {
         let (output, elapsed) = timed(|| self.check(loaded, lookup));
-        debug!(module = %loaded.name, ?elapsed, "module checked");
+        debug!(module = %loaded.name, ?elapsed, micros = micros(elapsed), "module checked");
         output
     }
 

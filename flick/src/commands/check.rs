@@ -11,7 +11,7 @@ use flick_core::source::{FileId, SourceMap};
 use crate::args::CheckArguments;
 use crate::command::{Command, Outcome};
 use crate::sources::{self, FsHost};
-use crate::{builtins, package_cache};
+use crate::{builtins, package_cache, timings};
 
 mod pages;
 
@@ -79,6 +79,7 @@ impl CheckCommand {
     /// The diagnostics of the files selected by `paths`, and those files.
     fn check(&self, host: &FsHost, paths: &[String]) -> (Outcome, Vec<PathBuf>) {
         let mut sources = SourceMap::default();
+        timings::stage("Resolving project");
         let (project, roots) = match select(host, &mut sources, self.project.as_deref(), paths) {
             Ok(selected) => selected,
             Err(diagnostic) => {
@@ -97,6 +98,7 @@ impl CheckCommand {
         let rt = project
             .as_ref()
             .is_some_and(|p| p.config.build.effect == Backend::Rt);
+        timings::stage("Preparing compiler");
         if let Err(diagnostic) = builtins::prepare_in(rt) {
             return (
                 Outcome {
@@ -106,6 +108,7 @@ impl CheckCommand {
                 roots,
             );
         }
+        timings::stage("Checking Flick modules");
         let diagnostics = package_cache::with_saved(|saved| {
             project::check_with(host, &mut sources, project.as_ref(), &roots, saved)
         });
