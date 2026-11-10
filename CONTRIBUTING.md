@@ -18,8 +18,8 @@ Install the [pinned Rust toolchain](./rust-toolchain.toml), Node.js
 for the Go target (`--emit go`, `just go-test`), and Lean 4 (the version in
 [`formal/lean-toolchain`](./formal/lean-toolchain)) only for the proofs in
 [`formal/`](./formal/README.md). Development also uses
-[`just`](https://just.systems/), `cargo-machete` and, for `just e2e`,
-[`cargo-nextest`](https://nexte.st/) (the Nix dev shell has them all):
+[`just`](https://just.systems/), `cargo-machete` and, for `just test` and
+`just e2e`, [`cargo-nextest`](https://nexte.st/) (the Nix dev shell has them all):
 
 ```sh
 cargo install cargo-machete --version 0.9.2 --locked

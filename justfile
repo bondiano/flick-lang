@@ -31,9 +31,12 @@ docs-fix:
 # Run the test suites; the reference model has its own recipe, `model`
 test: unit feature-test
 
-# The tests of the workspace crates but the reference model
+# The tests of the workspace crates but the reference model, under nextest,
+# which runs the test binaries side by side, and their doctests, which it
+# does not run. The parser fuzzing is `just fuzz`
 unit:
-    cargo test --workspace --exclude flick-model
+    cargo nextest run --workspace --exclude flick-model -E 'not binary_id(flick-core::fuzz)'
+    cargo test --doc --workspace --exclude flick-model
 
 # The reference model of λFlick: its unit tests, the cases of
 # tests/run/model.txt checked and run against their `.stdout`, and the

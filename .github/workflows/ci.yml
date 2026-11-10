@@ -63,7 +63,7 @@ jobs:
           cache-dependency-path: runtime-go/go.sum
       - uses: taiki-e/install-action@v2
         with:
-          tool: just@1.59.0
+          tool: just@1.59.0,cargo-nextest@0.9.148
       # some tests run pnpm; its version comes from `packageManager`
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v7

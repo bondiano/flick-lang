@@ -12,7 +12,7 @@ cargo install cargo-machete --version 0.9.2 --locked
 | Команда | Что запускается |
 | - | - |
 | `just lint` | fmt, clippy (`-D warnings`, в том числе для `wasm32`), `cargo machete` (неиспользуемые зависимости Rust) |
-| `just check` | `just lint`, `cargo test --workspace` |
+| `just check` | `just lint`, `cargo nextest run --workspace`, `cargo test --doc --workspace` |
 | `just e2e` | `pnpm install --frozen-lockfile`, тесты среды выполнения, `tests/run/**` на Node, `flick test` на примерах проектов, `just language` |
 | `just language` | языковые тесты `tests/language` на Node и исполняемым файлом Go: оба запуска должны пройти с одинаковым отчётом |
 | `just bundle-size` | release-сборки `tools/bundle-size/pure.fl`, `tests/run/ui/counter.fl`, `tests/run/ui/atoms.fl` и плейграунда, собранные для браузера через rolldown; падает, если размер в gzip превышает бюджет из `tools/bundle-size/programs.mjs` |
@@ -169,8 +169,8 @@ runtime покрывают собственное ядро RT и чистые ф
 - `fuzz.rs` изменяет корпус и проверяет, что парсер не паникует, не зависает,
   сохраняет весь исходный текст и не выводит диапазоны за его границы,
   а проверка типов не паникует на успешно разобранных входных данных.
-  `FLICK_FUZZ_ITERATIONS` задаёт число входов: 20 000 в `just check`,
-  1 000 000 в ночной задаче CI (`just fuzz`).
+  `FLICK_FUZZ_ITERATIONS` задаёт число входов: 20 000 по умолчанию, столько
+  CI проверяет в пул-реквестах, 1 000 000 в ночной задаче CI (`just fuzz`).
 - `DUMP=out.txt [DUMP_FILE=x.fl] cargo test -p flick-core --test corpus dump -- --ignored`
   записывает деревья примеров спецификации или одного файла для просмотра.
 

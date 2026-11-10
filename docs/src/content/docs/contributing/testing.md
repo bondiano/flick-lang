@@ -11,7 +11,7 @@ cargo install cargo-machete --version 0.9.2 --locked
 | Command | What runs |
 | - | - |
 | `just lint` | fmt, clippy (`-D warnings`, also for `wasm32`), `cargo machete` (unused Rust dependencies) |
-| `just check` | `just lint`, `cargo test --workspace` |
+| `just check` | `just lint`, `cargo nextest run --workspace`, `cargo test --doc --workspace` |
 | `just e2e` | `pnpm install --frozen-lockfile`, runtime tests, `tests/run/**` on Node, `flick test` on sample projects, `just language` |
 | `just language` | the language tests of `tests/language` on Node and as a Go executable, which must pass with the same report |
 | `just bundle-size` | release builds of `tools/bundle-size/pure.fl`, `tests/run/ui/counter.fl`, `tests/run/ui/atoms.fl` and the playground, bundled for the browser with rolldown; fails when a gzip size exceeds its budget in `tools/bundle-size/programs.mjs` |
@@ -155,8 +155,8 @@ process and send it signals.
 - `fuzz.rs` mutates the corpus and asserts that the parser does not panic or
   hang, stays lossless and keeps spans in bounds, and that the checker does
   not panic on inputs that parse. `FLICK_FUZZ_ITERATIONS`
-  sets the number of inputs: 20 000 in `just check`, 1 000 000 in the nightly
-  CI job (`just fuzz`).
+  sets the number of inputs: 20 000 by default, which CI runs on pull
+  requests, 1 000 000 in the nightly CI job (`just fuzz`).
 - `DUMP=out.txt [DUMP_FILE=x.fl] cargo test -p flick-core --test corpus dump -- --ignored`
   writes the trees of the spec examples (or of one file) for inspection.
 
