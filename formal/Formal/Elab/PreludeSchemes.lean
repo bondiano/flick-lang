@@ -97,7 +97,7 @@ def fold_map (foldable monoid : Nat) : Scheme :=
 /-- `Prelude.traverse : forall f c a b r e. Traversable f => (a ->{r; e} b)^c -> f a ->{r; e} f b` -/
 def traverse (traversable : Nat) : Scheme :=
   ⟨8, [⟨traversable, [.var 0]⟩],
-    .arr .P (.arr (.R (.var 4) (.var 5)) (.var 2) (.var 3) (.var 1)) (.arr (.R (.var 4) (.var 5)) (.app (.app (.var 0) (.var 6)) (.var 2)) (.app (.app (.var 0) (.var 7)) (.var 3)) .cnil) .cnil, .cnil⟩
+    .arr .P (.arr (.R (.var 4) (.var 5)) (.var 2) (.var 3) (.var 1)) (.arr (.R (.run (.cun (.cun (.var 1) (.var 6)) .cnil) (.var 4)) (.var 5)) (.app (.app (.var 0) (.var 6)) (.var 2)) (.app (.app (.var 0) (.var 7)) (.var 3)) .cnil) .cnil, .cnil⟩
 
 /-- `Prelude.pure : forall f c a. Applicative f => a^c -> (f a)^c` -/
 def pure (applicative : Nat) : Scheme :=
@@ -167,42 +167,42 @@ def from_result (result errors : Nat) : Scheme :=
 /-- `Prelude.parallel : forall r e a c b. Detached r => (Eff r e a)^c -> (Eff r e b)^c ->{r; e} (a, b)` -/
 def parallel (detached eff tup : Nat) : Scheme :=
   ⟨6, [⟨detached, [.var 0]⟩],
-    .arr .P (.app (.app (.con eff) (.var 3)) (.var 2)) (.arr (.R (.var 0) (.var 1)) (.app (.app (.con eff) (.var 5)) (.var 4)) (.app (.app (.con tup) (.var 2)) (.var 4)) .cnil) .cnil, .cnil⟩
+    .arr .P (.app (.app (.con eff) (.var 3)) (.var 2)) (.arr (.R (.run (.cun (.cun (.var 3) (.var 5)) .cnil) (.var 0)) (.var 1)) (.app (.app (.con eff) (.var 5)) (.var 4)) (.app (.app (.con tup) (.var 2)) (.var 4)) .cnil) .cnil, .cnil⟩
 
 /-- `Prelude.parallel_all : forall r e a c. Detached r => Int -> List (Eff r e a)^c ->{r; e} List a` -/
 def parallel_all (detached int list eff : Nat) : Scheme :=
   ⟨4, [⟨detached, [.var 0]⟩],
-    .arr .P (.con int) (.arr (.R (.var 0) (.var 1)) (.app (.con list) (.app (.app (.con eff) (.var 3)) (.var 2))) (.app (.con list) (.var 2)) .cnil) .cnil, .cnil⟩
+    .arr .P (.con int) (.arr (.R (.run (.cun (.var 3) .cnil) (.var 0)) (.var 1)) (.app (.con list) (.app (.app (.con eff) (.var 3)) (.var 2))) (.app (.con list) (.var 2)) .cnil) .cnil, .cnil⟩
 
 /-- `Prelude.parallel_results : forall r e a c. Detached r => List (Eff r e a)^c ->{r; none} List (Result (Errors e) a)` -/
 def parallel_results (detached list eff result errors : Nat) : Scheme :=
   ⟨4, [⟨detached, [.var 0]⟩],
-    .arr (.R (.var 0) .cnil) (.app (.con list) (.app (.app (.con eff) (.var 3)) (.var 2))) (.app (.con list) (.app (.app (.con result) (.app (.con errors) (.var 1))) (.var 2))) .cnil, .cnil⟩
+    .arr (.R (.run (.cun (.var 3) .cnil) (.var 0)) .cnil) (.app (.con list) (.app (.app (.con eff) (.var 3)) (.var 2))) (.app (.con list) (.app (.app (.con result) (.app (.con errors) (.var 1))) (.var 2))) .cnil, .cnil⟩
 
 /-- `Prelude.parallel_exits : forall r e a c. Detached r => List (Eff r e a)^c ->{r; none} List (Exit e a)` -/
 def parallel_exits (detached list eff exit : Nat) : Scheme :=
   ⟨4, [⟨detached, [.var 0]⟩],
-    .arr (.R (.var 0) .cnil) (.app (.con list) (.app (.app (.con eff) (.var 3)) (.var 2))) (.app (.con list) (.app (.app (.con exit) (.var 1)) (.var 2))) .cnil, .cnil⟩
+    .arr (.R (.run (.cun (.var 3) .cnil) (.var 0)) .cnil) (.app (.con list) (.app (.app (.con eff) (.var 3)) (.var 2))) (.app (.con list) (.app (.app (.con exit) (.var 1)) (.var 2))) .cnil, .cnil⟩
 
 /-- `Prelude.race_success : forall r e a c. Detached r => (Eff r e a)^c -> (Eff r e a)^c ->{r; e} a` -/
 def race_success (detached eff : Nat) : Scheme :=
   ⟨5, [⟨detached, [.var 0]⟩],
-    .arr .P (.app (.app (.con eff) (.var 3)) (.var 2)) (.arr (.R (.var 0) (.var 1)) (.app (.app (.con eff) (.var 4)) (.var 2)) (.var 2) .cnil) .cnil, .cnil⟩
+    .arr .P (.app (.app (.con eff) (.var 3)) (.var 2)) (.arr (.R (.run (.cun (.cun (.var 3) (.var 4)) .cnil) (.var 0)) (.var 1)) (.app (.app (.con eff) (.var 4)) (.var 2)) (.var 2) .cnil) .cnil, .cnil⟩
 
 /-- `Prelude.race_first : forall r e a c. Detached r => (Eff r e a)^c -> (Eff r e a)^c ->{r; e} a` -/
 def race_first (detached eff : Nat) : Scheme :=
   ⟨5, [⟨detached, [.var 0]⟩],
-    .arr .P (.app (.app (.con eff) (.var 3)) (.var 2)) (.arr (.R (.var 0) (.var 1)) (.app (.app (.con eff) (.var 4)) (.var 2)) (.var 2) .cnil) .cnil, .cnil⟩
+    .arr .P (.app (.app (.con eff) (.var 3)) (.var 2)) (.arr (.R (.run (.cun (.cun (.var 3) (.var 4)) .cnil) (.var 0)) (.var 1)) (.app (.app (.con eff) (.var 4)) (.var 2)) (.var 2) .cnil) .cnil, .cnil⟩
 
 /-- `Prelude.timeout : forall r e a c. Detached r => Float -> (Eff r e a)^c ->{r; TimeoutError | e} a` -/
 def timeout (detached float timeouterror eff : Nat) : Scheme :=
   ⟨4, [⟨detached, [.var 0]⟩],
-    .arr .P (.con float) (.arr (.R (.var 0) (.run (.rnm timeouterror (.con timeouterror)) (.var 1))) (.app (.app (.con eff) (.var 3)) (.var 2)) (.var 2) .cnil) .cnil, .cnil⟩
+    .arr .P (.con float) (.arr (.R (.run (.cun (.var 3) .cnil) (.var 0)) (.run (.rnm timeouterror (.con timeouterror)) (.var 1))) (.app (.app (.con eff) (.var 3)) (.var 2)) (.var 2) .cnil) .cnil, .cnil⟩
 
 /-- `Prelude.timeout_option : forall r e a c. Detached r => Float -> (Eff r e a)^c ->{r; e} Option a` -/
 def timeout_option (detached float eff option : Nat) : Scheme :=
   ⟨4, [⟨detached, [.var 0]⟩],
-    .arr .P (.con float) (.arr (.R (.var 0) (.var 1)) (.app (.app (.con eff) (.var 3)) (.var 2)) (.app (.con option) (.var 2)) .cnil) .cnil, .cnil⟩
+    .arr .P (.con float) (.arr (.R (.run (.cun (.var 3) .cnil) (.var 0)) (.var 1)) (.app (.app (.con eff) (.var 3)) (.var 2)) (.app (.con option) (.var 2)) .cnil) .cnil, .cnil⟩
 
 /-- `Prelude.bind : forall m a c b d. Monad m => (m a)^c -> (a -> (m b)^d)^d -> (m b)^(c + d)` -/
 def bind (monad : Nat) : Scheme :=
@@ -407,12 +407,12 @@ def Seq.first (seq option : Nat) : Scheme :=
 /-- `Seq.each_effect : forall a r e c d. (a ->{r; e} Unit)^c -> (Seq a)^d ->{r; e} Unit` -/
 def Seq.each_effect (unit seq : Nat) : Scheme :=
   ⟨5, [],
-    .arr .P (.arr (.R (.var 1) (.var 2)) (.var 0) (.con unit) (.var 3)) (.arr (.R (.var 1) (.var 2)) (.app (.app (.con seq) (.var 4)) (.var 0)) (.con unit) .cnil) .cnil, .cnil⟩
+    .arr .P (.arr (.R (.var 1) (.var 2)) (.var 0) (.con unit) (.var 3)) (.arr (.R (.run (.cun (.cun (.var 3) (.var 4)) .cnil) (.var 1)) (.var 2)) (.app (.app (.con seq) (.var 4)) (.var 0)) (.con unit) .cnil) .cnil, .cnil⟩
 
 /-- `Seq.fold_effect : forall b a r e c d. (b -> a ->{r; e} b)^c -> b -> ((Seq a)^d ->{r; e} b)^c` -/
 def Seq.fold_effect (seq : Nat) : Scheme :=
   ⟨6, [],
-    .arr .P (.arr .P (.var 0) (.arr (.R (.var 2) (.var 3)) (.var 1) (.var 0) .cnil) (.var 4)) (.arr .P (.var 0) (.arr (.R (.var 2) (.var 3)) (.app (.app (.con seq) (.var 5)) (.var 1)) (.var 0) (.var 4)) .cnil) .cnil, .cnil⟩
+    .arr .P (.arr .P (.var 0) (.arr (.R (.var 2) (.var 3)) (.var 1) (.var 0) .cnil) (.var 4)) (.arr .P (.var 0) (.arr (.R (.run (.cun (.cun (.var 4) (.var 5)) .cnil) (.var 2)) (.var 3)) (.app (.app (.con seq) (.var 5)) (.var 1)) (.var 0) (.var 4)) .cnil) .cnil, .cnil⟩
 
 /-- `Seq.empty : forall a. Seq a` -/
 def Seq.empty (seq : Nat) : Scheme :=
@@ -712,7 +712,7 @@ def List.map (list : Nat) : Scheme :=
 /-- `List.map_effect : forall a r e b c. (a ->{r; e} b)^c -> List a ->{r; e} List b` -/
 def List.map_effect (list : Nat) : Scheme :=
   ⟨5, [],
-    .arr .P (.arr (.R (.var 1) (.var 2)) (.var 0) (.var 3) (.var 4)) (.arr (.R (.var 1) (.var 2)) (.app (.con list) (.var 0)) (.app (.con list) (.var 3)) .cnil) .cnil, .cnil⟩
+    .arr .P (.arr (.R (.var 1) (.var 2)) (.var 0) (.var 3) (.var 4)) (.arr (.R (.run (.cun (.var 4) .cnil) (.var 1)) (.var 2)) (.app (.con list) (.var 0)) (.app (.con list) (.var 3)) .cnil) .cnil, .cnil⟩
 
 /-- `List.map_indexed : forall a b c. (Int -> a -> b)^c -> List a -> List b` -/
 def List.map_indexed (int list : Nat) : Scheme :=
@@ -722,7 +722,7 @@ def List.map_indexed (int list : Nat) : Scheme :=
 /-- `List.each_effect : forall a r e c. (a ->{r; e} Unit)^c -> List a ->{r; e} Unit` -/
 def List.each_effect (unit list : Nat) : Scheme :=
   ⟨4, [],
-    .arr .P (.arr (.R (.var 1) (.var 2)) (.var 0) (.con unit) (.var 3)) (.arr (.R (.var 1) (.var 2)) (.app (.con list) (.var 0)) (.con unit) .cnil) .cnil, .cnil⟩
+    .arr .P (.arr (.R (.var 1) (.var 2)) (.var 0) (.con unit) (.var 3)) (.arr (.R (.run (.cun (.var 3) .cnil) (.var 1)) (.var 2)) (.app (.con list) (.var 0)) (.con unit) .cnil) .cnil, .cnil⟩
 
 /-- `List.fold_left : forall b a c. (b -> a -> b)^c -> b -> (List a -> b)^c` -/
 def List.fold_left (list : Nat) : Scheme :=
@@ -737,7 +737,7 @@ def List.fold_right (list : Nat) : Scheme :=
 /-- `List.fold_effect : forall b a r e c. (b -> a ->{r; e} b)^c -> b -> (List a ->{r; e} b)^c` -/
 def List.fold_effect (list : Nat) : Scheme :=
   ⟨5, [],
-    .arr .P (.arr .P (.var 0) (.arr (.R (.var 2) (.var 3)) (.var 1) (.var 0) .cnil) (.var 4)) (.arr .P (.var 0) (.arr (.R (.var 2) (.var 3)) (.app (.con list) (.var 1)) (.var 0) (.var 4)) .cnil) .cnil, .cnil⟩
+    .arr .P (.arr .P (.var 0) (.arr (.R (.var 2) (.var 3)) (.var 1) (.var 0) .cnil) (.var 4)) (.arr .P (.var 0) (.arr (.R (.run (.cun (.var 4) .cnil) (.var 2)) (.var 3)) (.app (.con list) (.var 1)) (.var 0) (.var 4)) .cnil) .cnil, .cnil⟩
 
 /-- `List.filter : forall a c. (a -> Bool)^c -> List a -> List a` -/
 def List.filter (bool list : Nat) : Scheme :=

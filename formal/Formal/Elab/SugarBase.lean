@@ -78,9 +78,9 @@ theorem elab_tuple {Γ Δ φ m dk} (hd : Ent P Δ [⟨S.applicative, [m]⟩] [dk
   | _, _, _, _, _, _, .nil, h => ⟨_, _, h⟩
   | _, _, acc, t, d, _, .cons (a := e) (b := a) ⟨d', _, he⟩ hs, h => by
     let ta : Ty := .app (.app (.con S.tup) t) a
-    have hm := elab_meth (Γ := Γ) (φ := φ) S.hMap2 rfl (ts := [m, .cnil, d, t, a, ta, .cnil, d'])
+    have hm := elab_meth (Γ := Γ) (φ := φ) S.hMap2 rfl (ts := [m, .cnil, d, t, a, ta, d'])
       rfl (by simpa [Cn.subst, Ty.subst, inst] using hd)
-      (τ := map2Ty m .cnil d t a ta .cnil d') rfl
+      (τ := map2Ty m .cnil d t a ta d') rfl
     have hp := elab_const (Γ := Γ) (Δ := Δ) (φ := φ) S.hPair (ts := [t, a])
       (τ := arrP t (arrP a ta)) rfl rfl
     have := elab_tuple hd hs (.app (.app (.app hm hp (.inl rfl)) h (.inl rfl)) he (.inl rfl))

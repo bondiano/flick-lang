@@ -153,8 +153,8 @@ theorem typ_effBind_tr (c d a b e : Ty) {Ψ Θ φ} :
     simp [Flick.Ty.reach, trT_reach] at h ⊢ <;> grind
 
 /-- **`map2` of `Monad Eff`** is typed at its scheme in `Sugar` (`map2Ty`). -/
-theorem typ_effMap2_tr (c d a b x g d' : Ty) {Ψ Θ φ} :
-    Typ S Ψ Θ [] (effMap2 mk) (.ex (trT N (map2Ty (.con eC) c d a b x g d')) φ) := by
+theorem typ_effMap2_tr (c d a b x d' : Ty) {Ψ Θ φ} :
+    Typ S Ψ Θ [] (effMap2 mk) (.ex (trT N (map2Ty (.con eC) c d a b x d')) φ) := by
   simp only [map2Ty, arrP, appQ, trT, if_neg h2, if_neg h4, hE]
   refine typ_effMap2 hmk hmkr hone ?_ ?_ <;> intro y h <;> rcases y with n | p <;>
     simp [Flick.Ty.reach, trT_reach] at h ⊢ <;> grind

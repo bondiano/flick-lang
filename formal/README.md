@@ -687,7 +687,7 @@ Simplifications:
    row is a type: a variable, `cnil`, the row `{t}` of one service or error type `t` with
    constructor `c` (`rnm c t`) or a union `ρ₁ + ρ₂` (`run`), so `timeout` is at
    `R r ({TimeoutError} + e)`; a row may be the argument of a type (`FieldCodec (rd + r) a`,
-   `Exit e a`), which the model writes as data. `pair`, `unc n` and `each_P` have no Prelude name and are
+   `Exit e a`), which the model writes as data. `pair`, `unc n`, `each_P` and `each_R` have no Prelude name and are
    written in `Sugar.lean`. `from_result : ∀e a. Result (Errors e) a →R⟨∅; e⟩ a` is the
    generated scheme, and `e?` takes it at the row of errors of `e` (`tryResult_elab`, at the
    stage `R⟨∅; ε⟩`): its `raise` of `Errors e` adds the atom `e` to the row, which the stage
@@ -706,8 +706,9 @@ Simplifications:
    `λ(p₁, …, pₙ). e` is `unc n (λp₁ … pₙ. e)` with a constant `unc n` per arity; the checker
    uses flat tuples with the same curried patterns. The clauses of `for … yield` run at `P`
    (Sync calls are not modelled) and the loop of `for … do` at its stage, with the constant
-   `Seq.each_P` at `P` and the one `Seq.each_effect : ∀c d a r e. …` at every `R r e`, used at
-   the rows of the loop ([for-do loops elaborate to Seq.each per stage](../docs/formal/elaboration.md#the-loop-rule-l-was-missing)). Each source of `for` goes through `iter` ([for sources elaborate through iter](../docs/formal/elaboration.md#g-elaborated-the-for-source-without-iter)). Only the
+   `Seq.each_P` at `P` and the one `each_R : ∀c d a r e. …` at every `R r e`, used at the rows
+   of the loop; neither is a Prelude name, as `Seq.each_effect` read through elision needs the
+   sequence's qualifier live, which the checker's loop does not ([for-do loops elaborate to Seq.each per stage](../docs/formal/elaboration.md#the-loop-rule-l-was-missing)). Each source of `for` goes through `iter` ([for sources elaborate through iter](../docs/formal/elaboration.md#g-elaborated-the-for-source-without-iter)). Only the
    last step of `?` on an `Option` is modelled, `let y = e? in b` ⇝ `match`; the A-normal
    form before it is not.
 10. The core instance. `⟦R r e⟧ = rt ⟦r⟧ (⟦e⟧ ∪ ⌈⟦e⟧⌉ ∪ ε)` with `ε` every name (`allNames`): a row

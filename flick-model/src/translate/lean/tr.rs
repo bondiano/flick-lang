@@ -1,10 +1,11 @@
 //! Rules 1–4 of the translation of Prelude schemes
-//! (`docs/formal/elaboration.md#value-qualifiers-in-prelude-schemes`) on one checker type: `Tr::ty`, then `Tr::resolve`.
+//! (`docs/formal/elaboration.md#value-qualifiers-in-prelude-schemes`) on one checker type: `Tr::ty`, then `Tr::resolve`,
+//! with the elision of rule 6 on the way.
 
 use std::collections::{BTreeMap, BTreeSet};
-use std::iter;
+use std::{iter, mem};
 
-use flick_core::types::{self as fc, show_type};
+use flick_core::types::{self as fc, Kind, show_type};
 
 use super::Skip;
 
@@ -66,6 +67,10 @@ pub(super) struct Tr {
     pub fresh: Vec<String>,
     /// the type constructors, in the order they appear
     pub cons: Vec<String>,
+    /// the variables of kind `CaptureRow` or `Region`: what elision keeps live
+    pub live_kinds: BTreeSet<String>,
+    /// what the parameters of the stages before reach, for the next runtime arrow (rule 6)
+    held: Vec<String>,
 }
 
 /// What a qualified argument reaches besides its qualifier.
@@ -90,6 +95,8 @@ impl Tr {
     }
 
     pub fn ty(&mut self, t: &fc::Type, neg: bool) -> Result<Ty, Skip> {
+        // only the result of a stage, a qualified type and a `∀` pass on what is held
+        let held = mem::take(&mut self.held);
         Ok(match t {
             fc::Type::Var(a) => Ty::Var(a.clone()),
             fc::Type::Con { name, .. } => self.con(name.to_lowercase()),
@@ -98,7 +105,7 @@ impl Tr {
                 param,
                 effects,
                 result,
-            } => self.arrow(param, effects.as_deref(), result, None, neg)?,
+            } => self.arrow(param, effects.as_deref(), result, None, neg, held)?,
             // `(a, b, c)` is `tup (tup a b) c`, as `nest` of `Sugar`
             fc::Type::Tuple(ts) if ts.len() > 1 => {
                 let tup = self.con("tup".into());
@@ -132,16 +139,22 @@ impl Tr {
                         param,
                         effects,
                         result,
-                    } => self.arrow(param, effects.as_deref(), result, Some(captures), neg)?,
+                    } => {
+                        self.arrow(param, effects.as_deref(), result, Some(captures), neg, held)?
+                    }
                     fc::Type::App { .. } => self.data(inner, Some(captures), neg)?,
                     // a type variable: its bound is not modelled; other data
                     // has no storage
-                    _ => self.ty(inner, neg)?,
+                    _ => {
+                        self.held = held;
+                        self.ty(inner, neg)?
+                    }
                 };
                 all(names, t)
             }
             fc::Type::Forall { .. } => {
                 let (names, body) = self.open(t)?;
+                self.held = held;
                 all(names, self.ty(body, neg)?)
             }
             other => return Err(Skip::Other(format!("no type {}", show_type(other)))),
@@ -164,6 +177,9 @@ impl Tr {
         }
         let mut names = Vec::new();
         for v in vars {
+            if matches!(v.kind, Kind::CaptureRow | Kind::Region) {
+                self.live_kinds.insert(v.name.clone());
+            }
             match bound(body, &v.name) {
                 Some(a) => {
                     self.inst.insert(v.name.clone(), a);
@@ -174,6 +190,10 @@ impl Tr {
         Ok((names, body))
     }
 
+    /// An arrow, its row with `Live` of what `held` and its parameter reach
+    /// (rule 6, the checker's `elide`): `Live C` is the capture row `C` in
+    /// the row, ending in `.cnil` so that one variable is not read as a row
+    /// variable (`Ty.Keeps` of `Elab/Source.lean`).
     fn arrow(
         &mut self,
         param: &fc::Type,
@@ -181,23 +201,68 @@ impl Tr {
         result: &fc::Type,
         q: Option<&fc::Type>,
         neg: bool,
+        mut held: Vec<String>,
     ) -> Result<Ty, Skip> {
         let rows = effects
-            .map(|e| {
-                Ok((
-                    Box::new(self.row(&e.services)?),
-                    Box::new(self.row(&e.errors)?),
-                ))
-            })
+            .map(|e| Ok((self.row(&e.services)?, Box::new(self.row(&e.errors)?))))
             .transpose()?;
         let start = self.fresh.len();
         let a = self.ty(param, !neg)?;
+        let mut reached = Vec::new();
+        self.reached(&a, &[], &mut reached);
+        for v in reached {
+            if !held.contains(&v) {
+                held.push(v);
+            }
+        }
+        let rows = rows.map(|(r, e)| {
+            let live = (!held.is_empty()).then(|| {
+                let c = cun(held.iter().cloned().map(Ty::Var).collect());
+                Ty::Un(Box::new(c), Box::new(Ty::Nil))
+            });
+            let r = match live {
+                Some(live) => Ty::RUn(Box::new(live), Box::new(r)),
+                None => r,
+            };
+            (Box::new(r), e)
+        });
+        self.held = held;
         let b = self.ty(result, neg)?;
         let q = match q {
             Some(q) => self.qual(q, neg, Site::Fun(start))?,
             None => Ty::Nil,
         };
         Ok(Ty::Arr(rows, Box::new(a), Box::new(b), Box::new(q)))
+    }
+
+    /// The variables of kind `CaptureRow` or `Region` a value of `t` reaches,
+    /// but those `bound` binds: `Ty.Shown`, without the rows of arrows.
+    fn reached(&self, t: &Ty, bound: &[String], out: &mut Vec<String>) {
+        let push = |v: &String, out: &mut Vec<String>| {
+            let live = self.live_kinds.contains(v) || self.fresh.contains(v);
+            if live && !bound.contains(v) && !out.contains(v) {
+                out.push(v.clone());
+            }
+        };
+        match t {
+            Ty::Var(v) => push(v, out),
+            Ty::Pos(vs) => vs.iter().for_each(|v| push(v, out)),
+            Ty::App(a, b) | Ty::Un(a, b) | Ty::RUn(a, b) => {
+                self.reached(a, bound, out);
+                self.reached(b, bound, out);
+            }
+            Ty::Arr(_, a, b, q) => {
+                self.reached(a, bound, out);
+                self.reached(b, bound, out);
+                self.reached(q, bound, out);
+            }
+            Ty::Nm(_, t) => self.reached(t, bound, out),
+            Ty::All(names, t) => {
+                let inner: Vec<String> = bound.iter().chain(names).cloned().collect();
+                self.reached(t, &inner, out);
+            }
+            Ty::Con(_) | Ty::Nil => {}
+        }
     }
 
     /// `T ā` with the qualifier `q` of its value.

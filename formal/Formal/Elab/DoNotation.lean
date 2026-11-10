@@ -114,9 +114,9 @@ theorem do_elab {Γ Δ ss r m b φ} (h : DoOk S Γ Δ ss r m b φ) :
     have hu := elab_unc S (Γ := Γ) (Δ := Δ) (φ := φ) a₁ as (.arr .P aₙ x q) q
     obtain ⟨d, _, ht⟩ := elab_tuple S hd' hs h₁
     have hm := elab_meth (Γ := Γ) (φ := φ) S.hMap2 rfl
-      (ts := [m, q, d, nest S.tup a₁ as, aₙ, x, q, dₙ]) rfl
+      (ts := [m, q, d, nest S.tup a₁ as, aₙ, x, dₙ]) rfl
       (by simpa [Cn.subst, Ty.subst, inst] using hd')
-      (τ := map2Ty m q d (nest S.tup a₁ as) aₙ x q dₙ) rfl
+      (τ := map2Ty m q d (nest S.tup a₁ as) aₙ x dₙ) rfl
     simp only [Sugar.desugarDo, hp]
     simp only [List.length_append, List.length_cons, List.length_nil] at hK
     rw [hl]
