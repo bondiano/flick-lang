@@ -148,11 +148,11 @@ impl<'b> Env<'b> {
             .map(|((_, n), d)| (n.as_str(), d))
     }
 
-    /// The instances beyond the built-in ones, which an interface carries.
+    /// The instances beyond the built-in ones, which an interface carries:
+    /// `learn` keeps a built-in one out by its key, so a module of the
+    /// project named as one of std (`Gen`) keeps its own.
     pub fn own_instances(&self) -> impl Iterator<Item = &Instance> {
-        self.instances
-            .iter()
-            .filter(|i| !self.builtins.contains(&i.module))
+        self.instances.iter()
     }
 
     pub fn add_instance(&mut self, instance: Instance) {

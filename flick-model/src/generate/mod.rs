@@ -139,8 +139,8 @@ pub fn runnable(e: Term) -> Term {
     })
 }
 
-/// The module of `Gen.fl`: not `Gen`, a module of std, whose instances a
-/// module of the same name would not export.
+/// The module of `Gen.fl`: not `Gen`, which would shadow the module of std
+/// for the programs.
 const MODULE: &str = "Fixture";
 
 /// The services of `Gen.fl`.
