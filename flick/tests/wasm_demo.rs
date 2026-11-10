@@ -150,6 +150,31 @@ fn hover_and_completion_answer_at_utf16_offsets() {
 }
 
 #[test]
+fn attribute_hover_updates_at_utf16_offsets() {
+    let source = "module Main exposing (..)\nlet text = \"ёж 🦔\"\n@lang action_concurrent\nlet concurrent = ()\n";
+    let mut session = session(source);
+    for (text, word, expected) in [
+        (source.to_owned(), "action_concurrent", "Action.concurrent"),
+        (
+            source.replace("@lang action_concurrent", "@maker"),
+            "@maker",
+            "atom, action or view",
+        ),
+    ] {
+        session.update(&text);
+        let start = text.find(word).expect("attribute");
+        let at = u32::try_from(text[..start].encode_utf16().count()).expect("small");
+        let hover = json(&session.hover(at));
+        assert!(
+            hover["text"].as_str().is_some_and(|s| s.contains(expected)),
+            "{hover}"
+        );
+        assert_eq!(hover["from"], at);
+        assert_eq!(hover["to"], at + u32::try_from(word.len()).expect("small"));
+    }
+}
+
+#[test]
 fn format_and_explain_need_no_session() {
     let formatted = json(&flick_wasm::format(
         "module Main exposing (x)\nx : Int\nlet x =   1\n",

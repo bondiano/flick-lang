@@ -13,6 +13,9 @@ use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
 use crate::types::{Form, Ref, TypeDef, show_signature, show_type};
 
+mod attributes;
+#[cfg(test)]
+mod attributes_tests;
 pub(super) mod companions;
 mod kinds;
 mod types;
@@ -303,6 +306,9 @@ impl Ide<'_> {
 
     /// Markdown for the symbol at `offset`, and the range it covers.
     pub fn hover(&self, file: FileId, offset: u32) -> Option<(String, (u32, u32))> {
+        if let Some(hover) = self.attribute_hover(file, offset) {
+            return Some(hover);
+        }
         if let Some(hover) = self.kind_hover(file, offset) {
             return Some(hover);
         }
