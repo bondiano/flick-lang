@@ -114,7 +114,9 @@
               cargo-machete
               cargo-nextest
               jq
-            ];
+            ]
+            # a sampling profiler for the compiler: `perf record -e cpu-clock:u`
+            ++ lib.optionals stdenv.hostPlatform.isLinux [ perf ];
 
             env.RUST_SRC_PATH = "${rustToolchain}/lib/rustlib/src/rust/library";
 

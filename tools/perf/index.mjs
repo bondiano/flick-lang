@@ -22,10 +22,13 @@ export const METRICS = {
   "check.corpus": { unit: "ms", better: "lower" },
   "lsp.hover.p95": { unit: "ms", better: "lower" },
   "lsp.hover_after_edit.p95": { unit: "ms", better: "lower" },
+  "lsp.completion_after_dot.p95": { unit: "ms", better: "lower" },
+  "lsp.hover_after_interface_edit.p95": { unit: "ms", better: "lower" },
   "load.json.go.rps": { unit: "req/s", better: "higher" },
   "load.json.go.binary": { unit: "bytes", better: "lower" },
   "load.ssr.rps": { unit: "req/s", better: "higher" },
   "lsp.rss.peak": { unit: "MiB", better: "lower" },
+  "lsp.soak.rss.growth": { unit: "MiB", better: "lower" },
   "load.json.go.rss.peak": { unit: "MiB", better: "lower" },
   "load.ssr.rss.peak": { unit: "MiB", better: "lower" },
 };
@@ -96,7 +99,20 @@ const hovers = (flick) => {
   );
   process.stdout.write(out);
   const p95 = (label) => Number(new RegExp(`^${label}, \\d+ samples +p50 +[\\d.]+ ms +p95 +([\\d.]+) ms`, "m").exec(out)[1]);
-  return { hover: p95("hover"), afterEdit: p95("hover after edit"), rss: peakRss(out) };
+  return {
+    hover: p95("hover"),
+    afterEdit: p95("hover after edit"),
+    afterDot: p95("completion after a dot"),
+    afterInterfaceEdit: p95("hover after an interface edit"),
+    rss: peakRss(out),
+  };
+};
+
+/** How much the server's memory grew over the documents `lsp-bench/soak` opened and closed once each. */
+const soak = (flick) => {
+  const out = execFileSync("node", ["tools/lsp-bench/soak.mjs", flick, "examples/mtl/src/Mtl/StateT.fl"], { cwd: root, encoding: "utf8" });
+  process.stdout.write(out);
+  return Number(/^RSS, MiB: growth ([\d.]+)/m.exec(out)?.[1]);
 };
 
 const answers = async (url) => {
@@ -148,10 +164,13 @@ const main = async () => {
     values["check.corpus"] = Math.round(checkCorpus(flick));
     console.log(`check corpus: median ${values["check.corpus"]} ms of ${RUNS}`);
 
-    const { hover, afterEdit, rss } = hovers(flick);
+    const { hover, afterEdit, afterDot, afterInterfaceEdit, rss } = hovers(flick);
     values["lsp.hover.p95"] = hover;
     values["lsp.hover_after_edit.p95"] = afterEdit;
+    values["lsp.completion_after_dot.p95"] = afterDot;
+    values["lsp.hover_after_interface_edit.p95"] = afterInterfaceEdit;
     values["lsp.rss.peak"] = rss;
+    values["lsp.soak.rss.growth"] = soak(flick);
 
     // the binary's budget is that of the Go in runtime-go/go.mod, which CI sets up: a newer
     // Go builds a bigger one, so a local run builds with that version, which Go fetches once

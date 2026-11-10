@@ -2,9 +2,10 @@
 //!
 //! `just e2e-tests` runs `--run-ignored only` over every test target of
 //! `flick` and `flick-core` and excludes only what another recipe owns: the
-//! cases of `tests/run` (`just e2e-cases`, sharded), the `PostgreSQL` suite
-//! (`just e2e-postgres`), the Conduit API suite (`just conduit-api`) and the
-//! helpers that need an environment variable or write the tree. The plugin
+//! cases of `tests/run`, on Flick's own runtime too (`just e2e-cases`,
+//! sharded), the `PostgreSQL` suite (`just e2e-postgres`), the Conduit API
+//! suite (`just conduit-api`) and the helpers that need an environment
+//! variable or write the tree. The plugin
 //! tests are `#[cfg(feature = "wasm-plugins")]`, so `just wasm-plugins` is
 //! the recipe that builds and runs them; the reference model is `just model`
 //! (`--include-ignored`), and `flick-pretty`'s timing probe is manual.
@@ -90,6 +91,7 @@ const MANUAL: &[(&str, &str, &str)] = &[
 /// The recipe that runs each kind, and what its body must contain to do so.
 const ANCHORS: &[(&str, &str)] = &[
     ("e2e-cases", "test(=run_cases)"),
+    ("e2e-cases", "test(=rt::rt_cases)"),
     ("e2e-postgres", "--test sql_postgres"),
     ("conduit-api", "--test conduit"),
     ("wasm-plugins", "--test plugins"),
@@ -105,7 +107,8 @@ fn runner(test: &Ignored) -> Runner {
         test.target.as_str(),
         test.name.as_str(),
     ) {
-        ("flick", "e2e", "run_cases") => Runner::E2eCases,
+        // `tests/rt/` is a module of the `e2e` target, named here by its directory
+        ("flick", "e2e", "run_cases") | ("flick", "rt", "rt_cases") => Runner::E2eCases,
         ("flick", "sql_postgres", _) => Runner::Postgres,
         ("flick", "conduit", _) => Runner::Conduit,
         ("flick", "plugins", _) => Runner::Plugins,

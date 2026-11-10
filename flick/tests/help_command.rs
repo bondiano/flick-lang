@@ -15,7 +15,7 @@ fn help_describes_global_and_build_options() {
             None => (stdout(&["help"]), stdout(&["--help"])),
         };
         assert_eq!(help, flag);
-        for option in ["--quiet", "--silent", "--verbose"] {
+        for option in ["--quiet", "--silent", "--verbose", "--timings"] {
             assert!(help.contains(option), "{help}");
         }
         if command == Some("build") {

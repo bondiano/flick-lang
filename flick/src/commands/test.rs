@@ -18,6 +18,7 @@ use flick_core::diagnostics::{Diagnostic, Severity, codes};
 use flick_core::project::config::{Backend, Emit};
 use flick_core::project::{self, Project};
 use flick_core::source::SourceMap;
+use tracing::debug;
 
 use super::build::{BuildPlan, Emission, artifacts, release, write, write_artifacts};
 use super::check::select;
@@ -25,7 +26,7 @@ use crate::args::{Color, GlobalArguments, Reporter, TestArguments, TestEmitArgum
 use crate::package_cache;
 use crate::progress::{Mode, Progress};
 use crate::sources::FsHost;
-use crate::{builtins, cache, child, report, toolchain};
+use crate::{builtins, cache, child, report, timings, toolchain};
 use flick_core::build::Extras;
 
 /// Where the test build goes, inside the project.
@@ -213,11 +214,14 @@ fn prepare(options: &TestArguments, global: &GlobalArguments) -> Result<PathBuf,
 
 fn cached_prepare(
     project: &Project,
-    key: &str,
+    key: &cache::Signed,
     out: &Path,
     progress: &Progress,
 ) -> Option<PathBuf> {
-    let artifacts = cache::load(&project.root, key)?;
+    let Some(artifacts) = cache::load(&project.root, key) else {
+        debug!(miss = %cache::missed(&project.root, key));
+        return None;
+    };
     let go = artifacts.iter().any(|a| a.path == "go/test/go.mod");
     let runner = out.join(if go {
         go::executable(go::TEST)
@@ -418,7 +422,10 @@ fn watch(options: &TestArguments, global: &GlobalArguments) -> ExitCode {
     let paths = watched(global);
     loop {
         let before = watch_snapshot(&paths);
-        let mut child = prepare(options, global)
+        let prepared = prepare(options, global);
+        // each run reports its build, before its tests start
+        timings::report(global);
+        let mut child = prepared
             .ok()
             .and_then(|runner| start(&runner, options, global, true).ok());
         while watch_snapshot(&paths) == before {
@@ -427,6 +434,7 @@ fn watch(options: &TestArguments, global: &GlobalArguments) -> ExitCode {
         if let Some(child) = &mut child {
             stop(child);
         }
+        timings::discard();
         println!("\n— a file changed: running the tests again —\n");
     }
 }

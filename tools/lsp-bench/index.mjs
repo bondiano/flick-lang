@@ -2,8 +2,10 @@
 // a hover, and a hover right after an edit in the middle of the file,
 // which moves every declaration below it.
 //
-// With `--repeat N` it then takes N more samples of each hover and of a
-// hover after an edit, and prints their p50 and p95.
+// With `--repeat N` it then takes N more samples of each hover, of a hover
+// after an edit, of a completion after a dot typed at the end of the file
+// and of a hover after an edit that changes what the module exports, which
+// checks its dependents again, and prints their p50 and p95.
 //
 //   node tools/lsp-bench/index.mjs [--repeat N] <flick binary> <file.fl> <line:character>...
 //
@@ -72,7 +74,19 @@ if (Number(repeat) > 0) {
     await work();
     return performance.now() - started;
   };
-  const samples = { hover: [], "hover after edit": [] };
+  const samples = { hover: [], "hover after edit": [], "completion after a dot": [], "hover after an interface edit": [] };
+  // a request answers only after the notifications before it are handled;
+  // one of the open document, which loads no other member of a workspace
+  const settled = () => hover([line, character]);
+  const change = (version, next) =>
+    send({ method: "textDocument/didChange", params: { textDocument: { uri, version }, contentChanges: [{ text: next }] } });
+  // a declaration being typed: the module does not parse to its end
+  const typed = `${text}\nlet bench_probe = List.`;
+  const end = typed.split("\n");
+  const afterDot = { line: end.length - 1, character: end.at(-1).length };
+  // one more export, for a module whose header lists them on its line
+  const header = /^(module [^\n]*exposing \()/m;
+  const exporting = header.test(text) ? `${text.replace(header, "$1bench_probe, ")}\nbench_probe : Float\nlet bench_probe = 1\n` : null;
   for (let i = 0; i < Number(repeat); i++) {
     // the edit takes the blank line out and puts it back in turn: each moves every declaration below it
     const blank = i % 2 === 1;
@@ -87,7 +101,30 @@ if (Number(repeat) > 0) {
     samples["hover after edit"].push(await sample(() => hover(shifted(positions[0]))));
     for (const position of positions) samples.hover.push(await sample(() => hover(shifted(position))));
   }
+  const versions = 3 + Number(repeat);
+  for (let i = 0; i < Number(repeat); i++) {
+    samples["completion after a dot"].push(
+      await sample(() => {
+        change(versions + 4 * i, typed);
+        return request("textDocument/completion", { textDocument: { uri }, position: afterDot });
+      }),
+    );
+    // the server analyzes an edit before it answers: a sample starts once
+    // the edit that restores the text is behind
+    change(versions + 4 * i + 1, text);
+    await settled();
+    if (exporting === null) continue;
+    samples["hover after an interface edit"].push(
+      await sample(() => {
+        change(versions + 4 * i + 2, exporting);
+        return hover([line, character]);
+      }),
+    );
+    change(versions + 4 * i + 3, text);
+    await settled();
+  }
   for (const [label, ms] of Object.entries(samples)) {
+    if (ms.length === 0) continue;
     ms.sort((a, b) => a - b);
     // nearest rank: the smallest sample with at least `percent` of them at or below it
     const at = (percent) => ms[Math.ceil((percent * ms.length) / 100) - 1].toFixed(1);

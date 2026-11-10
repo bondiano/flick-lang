@@ -63,10 +63,15 @@ go-test:
 # Go runtime and the language tests; CI runs the parts as jobs side by side
 e2e: e2e-js e2e-tests e2e-cases go-test language
 
+# The compiler in the `e2e` profile, built as a dependency of its own tests:
+# their dev-dependencies turn on features of the compiler's crates, so a plain
+# `cargo build -p flick` is another build, which the suites would then redo
+e2e-compiler:
+    cargo build -p flick --profile e2e --test e2e
+
 # What the e2e suites run against: the compiler in the `e2e` profile, the JS
 # packages, the runtime and the `.d.ts` importer
-e2e-prepare:
-    cargo build -p flick --profile e2e
+e2e-prepare: e2e-compiler
     pnpm install --frozen-lockfile
     pnpm -C runtime build
     pnpm -C packages/effect-ts build
@@ -83,24 +88,25 @@ e2e-js: docs-wasm e2e-prepare
     node docs/scripts/chunks.mjs
     pnpm -C docs e2e
 
-# The e2e suites of the compiler but the cases of tests/run, under nextest.
+# The e2e suites of the compiler but the cases of tests/run, on the Effect
+# runtime and on Flick's own, under nextest.
 # Every ignored test of `flick` and `flick-core` runs here: the selection is
 # "all their test targets, minus the exceptions", so a new suite is covered
 # without touching this recipe. Each exception belongs to the recipe named
 # beside it, and `flick/tests/ignored_tests.rs` holds this recipe to that.
 e2e-tests: e2e-prepare
     cargo nextest run --cargo-profile e2e --profile ci --run-ignored only -p flick -p flick-core \
-      -E 'not (test(=run_cases) | binary_id(flick::sql_postgres) | binary_id(flick::conduit) | test(~dump) | test(~write_fixes_of_built_in_signatures))'
+      -E 'not (test(=run_cases) | test(~rt_cases) | binary_id(flick::sql_postgres) | binary_id(flick::conduit) | test(~dump) | test(~write_fixes_of_built_in_signatures))'
 
-# The cases of tests/run: all of them, or the shard `k/n` of them
+# The cases of tests/run, and the same cases on Flick's own runtime: all of
+# them, or the shard `k/n` of them
 e2e-cases shard="": e2e-prepare
-    FLICK_E2E_SHARD={{shard}} cargo nextest run --cargo-profile e2e --profile ci --run-ignored only -p flick --test e2e -E 'test(=run_cases)'
+    FLICK_E2E_SHARD={{shard}} cargo nextest run --cargo-profile e2e --profile ci --run-ignored only -p flick --test e2e -E 'test(=run_cases) | test(=rt::rt_cases)'
 
 # The language tests of tests/language on Node and as a Go executable, with
 # one seed: both must pass and write the same report; on Flick's own runtime
 # too, but for the tests tests/language/rt-gaps.txt lists
-language seed="42":
-    cargo build -p flick --profile e2e
+language seed="42": e2e-compiler
     pnpm -C runtime build
     pnpm -C packages/effect-ts build
     cd tests/language && {{flick}} test --emit js --seed {{seed}} --reporter json > ../../target/language-js.txt || { cat ../../target/language-js.txt; exit 1; }
@@ -110,8 +116,8 @@ language seed="42":
     node tools/language-rt/index.mjs {{flick}} {{seed}} target/language-js.txt
 
 # Bundle the tracked programs (release) with rolldown and hold them to their gzip budgets
-bundle-size:
-    node tools/bundle-size/index.mjs "$(cargo build -p flick --profile e2e --message-format=json-render-diagnostics | jq -r 'select(.executable != null) | .executable')"
+bundle-size: e2e-compiler
+    node tools/bundle-size/index.mjs "{{flick}}"
 
 # Count the tokens of the Conduit example's source against the RealWorld Go backend and React client:
 # o200k_base, and Claude's tokenizer when ANTHROPIC_API_KEY or OPENROUTER_API_KEY is set
@@ -227,12 +233,13 @@ fuzz iterations="1000000":
     FLICK_FUZZ_ITERATIONS={{iterations}} cargo test --release -p flick-core --test fuzz
 
 # The test plugin built as a WebAssembly component, and the plugin tests of
-# the compiler with wasmtime, which release builds include
+# the compiler with wasmtime, which release builds include; the tests run in
+# the `e2e` profile, as an unoptimized wasmtime compiles a component slowly
 wasm-plugins:
     cargo build -p flick-test-pairs --features guest --target wasm32-wasip2 --release
     cargo clippy -p flick-test-pairs --features guest --target wasm32-wasip2 -- -D warnings
     cargo clippy -p flick --features wasm-plugins --all-targets -- -D warnings
-    cargo test -p flick --features wasm-plugins --test plugins
+    cargo test -p flick --profile e2e --features wasm-plugins --test plugins
 
 # Build the wasm module the in-browser demo loads and hold it to its size budget.
 # The raw-byte budget retains the playground editor queries (hover, completion,
