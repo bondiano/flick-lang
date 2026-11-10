@@ -532,3 +532,6 @@ impl Expander for Wasm {
         Ok(result?.into_iter().map(convert::from_diagnostic).collect())
     }
 }
+
+#[cfg(test)]
+mod tests;
