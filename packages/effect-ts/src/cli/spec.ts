@@ -4,13 +4,14 @@ import { type Config, type Effect, Option, type Result } from "effect";
 import type { Prompt } from "effect/cli";
 
 import { constructorName } from "@flick-lang/runtime/tags";
+import type { Run } from "@flick-lang/runtime/rt/fiber";
 import type { Result as NativeResult } from "@flick-lang/runtime/core/data";
 
-type ValueResult = Result.Result<unknown, string> | NativeResult<unknown, string>;
+export type ValueResult = Result.Result<unknown, string> | NativeResult<unknown, string>;
 
 /** `Cli.Value a`: parses one value; the error is shown to the user. */
 export interface ValueDict {
-  readonly parse: (text: string) => Effect.Effect<ValueResult> | ValueResult;
+  readonly parse: (text: string) => Effect.Effect<ValueResult> | ValueResult | Run;
 }
 
 /** Where the text of a value comes from before `Cli.Value` parses it. */
