@@ -75,8 +75,9 @@ if (Number(repeat) > 0) {
     return performance.now() - started;
   };
   const samples = { hover: [], "hover after edit": [], "completion after a dot": [], "hover after an interface edit": [] };
-  // a request answers only after the notifications before it are handled
-  const settled = () => request("workspace/symbol", { query: "" });
+  // a request answers only after the notifications before it are handled;
+  // one of the open document, which loads no other member of a workspace
+  const settled = () => hover([line, character]);
   const change = (version, next) =>
     send({ method: "textDocument/didChange", params: { textDocument: { uri, version }, contentChanges: [{ text: next }] } });
   // a declaration being typed: the module does not parse to its end
