@@ -112,7 +112,7 @@ fn prepare(options: &TestArguments, global: &GlobalArguments) -> Result<PathBuf,
     progress.stage("Compiling Flick modules");
     let (mut diagnostics, mut compilation) = package_cache::with_saved(|saved| {
         let (diagnostics, compilation, fresh) =
-            project::compile_with(&host, &mut sources, Some(&project), &roots, saved, rt);
+            project::compile_with(&host, &mut sources, Some(&project), &roots, saved, rt, None);
         ((diagnostics, compilation), fresh)
     });
     super::build::hooks::ir(Some(&project), &mut compilation, &mut diagnostics);

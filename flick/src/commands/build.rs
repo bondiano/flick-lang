@@ -174,6 +174,7 @@ impl Command for BuildCommand {
                 &roots,
                 saved,
                 plan.extras.rt,
+                None,
             );
             ((diagnostics, compilation), fresh)
         });

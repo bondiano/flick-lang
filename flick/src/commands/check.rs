@@ -110,7 +110,7 @@ impl CheckCommand {
         }
         timings::stage("Checking Flick modules");
         let diagnostics = package_cache::with_saved(|saved| {
-            project::check_with(host, &mut sources, project.as_ref(), &roots, saved)
+            project::check_with(host, &mut sources, project.as_ref(), &roots, saved, None)
         });
         (
             Outcome {

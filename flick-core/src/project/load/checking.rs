@@ -76,6 +76,7 @@ pub(crate) fn check_inline_file(
         project: None,
         stages_by_class: false,
         lower: false,
+        keeps_ir: false,
         lower_packages_only: false,
         precompiled: &precompiled,
         cache: None,
@@ -148,6 +149,8 @@ struct Key {
     /// The effective configuration, including programmatically supplied values.
     config: Option<Config>,
     lower: bool,
+    /// Whether the output keeps the IR: an editor's entry is none a build reads.
+    keeps_ir: bool,
     /// Each import's interface, without where its names are declared and
     /// their docs, which checking does not read, and whether it is a module
     /// of the project.
@@ -224,10 +227,19 @@ impl Loader<'_> {
                     .diagnostics
                     .iter()
                     .any(|d| d.severity == Severity::Error),
+            keeps_ir: !self.editing(),
             lower_packages_only: self.lower_packages_only,
             precompiled: &self.precompiled,
             cache: self.cache.as_deref(),
         }
+    }
+
+    /// Whether the run keeps what editors need of each module.
+    fn editing(&self) -> bool {
+        #[cfg(feature = "ide")]
+        return self.ide.is_some();
+        #[cfg(not(feature = "ide"))]
+        false
     }
 
     fn apply(&mut self, i: usize, (output, key): (Output, Option<Key>), known: &mut Known) {
@@ -271,6 +283,9 @@ struct Checking<'a> {
     project: Option<&'a Project>,
     stages_by_class: bool,
     lower: bool,
+    /// Whether a cached output keeps the IR: a check or a build reads it, an
+    /// editor does not.
+    keeps_ir: bool,
     lower_packages_only: bool,
     precompiled: &'a Precompiled,
     cache: Option<&'a ModuleCache>,
