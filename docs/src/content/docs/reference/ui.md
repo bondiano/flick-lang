@@ -27,7 +27,7 @@ let save_button props = ui {
 }
 ```
 
-`c` is a capture row (see [regions](../regions/#captures)). Like any new type
+`c` is a capture row (see [regions](../regions/#qualifiers)). Like any new type
 variable of a signature it is quantified over the whole signature, so
 `forall c.` can be left out ([types](../types/)).
 

@@ -105,18 +105,21 @@ and [ExceptT](https://github.com/bondiano/flick-lang/blob/main/examples/mtl/src/
 They use ordinary constructors, pattern matching and `do`; no transformer
 primitive or foreign implementation is needed.
 
-Three capture rules make these instances expressible:
+Under typing by use, three rules make these instances expressible:
 
 - A generic bound `a^c` bounds the complete value, including its existing
   qualifications; it does not add `c` to an otherwise unknown capture set.
   A function or nominal wrapper may still need a hidden-capture qualifier.
-- Curried stages retain generic values as well as named regions.
-  Constructors retain their fields' captures, and patterns project the
-  enclosing bound back to fields, including delayed computations.
+- A later stage holds nothing implicitly: it needs live what its earlier
+  parameters reach, which elision reads into the signature. Constructors
+  retain their fields' captures, and patterns project the enclosing bound
+  back to fields, including delayed computations. A pure callback may hold
+  a region it never uses.
 - Prelude callbacks are capture-polymorphic per invocation: for example,
   `flat_map` takes `(forall v. a^v -> (m b)^(c + v))^c`.
   `v` is independent of the computation's bound `d`: a `StateT` state or
-  `ReaderT` environment can arrive only when the computation is run.
+  `ReaderT` environment can arrive only when the computation is run, and
+  what the callback returns holds nothing of its input.
 
 These are bounds, not erasure: concrete scoped regions and explicit stored
 qualifications survive substitution, and mutable storage stays invariant.
