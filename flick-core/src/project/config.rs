@@ -245,6 +245,44 @@ pub struct Build {
     pub ui: Option<String>,
 }
 
+/// What checking a module reads of a project's configuration: the key of
+/// modules kept between runs holds this of it and nothing else, so no other
+/// setting, and no place of one in `flick.toml`, checks them again.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Checked {
+    pub limits: types::Limits,
+    pub no_let_assert: bool,
+    pub thresholds: types::Thresholds,
+    /// Whether effects are checked: not in a build without a runtime.
+    pub effects: bool,
+}
+
+impl Default for Checked {
+    /// What a file outside every project is checked with.
+    fn default() -> Self {
+        Checked {
+            limits: types::Limits::default(),
+            no_let_assert: false,
+            thresholds: types::Thresholds::default(),
+            effects: true,
+        }
+    }
+}
+
+impl Config {
+    pub fn checked(&self) -> Checked {
+        Checked {
+            limits: types::Limits {
+                steps: self.build.solver_steps,
+                depth: self.build.solver_depth,
+            },
+            no_let_assert: self.no_let_assert,
+            thresholds: self.thresholds,
+            effects: self.build.effect != Backend::None,
+        }
+    }
+}
+
 impl Default for Build {
     fn default() -> Self {
         Build {

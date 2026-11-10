@@ -79,8 +79,9 @@ pub(super) struct Precompiled {
 
 impl Precompiled {
     /// The libraries of `packages` with their keys and saved modules. A
-    /// library's key covers the compiler, the configuration of the project,
-    /// its sources and the keys of the libraries it depends on. A `--rt` build
+    /// library's key covers the compiler, what checking reads of the
+    /// configuration of the project, its sources and the keys of the
+    /// libraries it depends on. A `--rt` build
     /// keeps the configuration of the project, so the mode counts on its own.
     #[cfg(feature = "native-project")]
     pub(super) fn new(
@@ -93,7 +94,7 @@ impl Precompiled {
             .libraries()
             .map(|(name, dir, library)| (name, (dir, library)))
             .collect();
-        let config = format!("{:?} {stages_by_class}", project.config);
+        let config = format!("{:?} {stages_by_class}", project.config.checked());
         let mut keys: HashMap<String, Option<String>> = HashMap::new();
         let mut out = Precompiled::default();
         for &name in libraries.keys() {

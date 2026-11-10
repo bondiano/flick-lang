@@ -21,7 +21,7 @@ use crate::plugin::calls as plugin_calls;
 use crate::plugin::expansion::Expansion;
 use crate::plugin::first_party;
 use crate::project::Project;
-use crate::project::config::{Backend, Config};
+use crate::project::config::{Checked, Config};
 use crate::resolve::{self, Interface, ModuleSyntax};
 use crate::resolve::{Header, Import, Item, ItemKind};
 use crate::source::Span;

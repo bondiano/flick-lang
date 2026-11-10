@@ -246,19 +246,14 @@ impl Checking<'_> {
                 .package_of(name)
                 .is_some_and(|p| package_of(&loaded.root) == Some(p)),
         };
-        let build = self.project.map(|p| &p.config.build);
+        let read = (self.project).map_or_else(Checked::default, |p| p.config.checked());
         let options = types::Options {
             local: &local,
-            limits: build.map_or_else(types::Limits::default, |b| types::Limits {
-                steps: b.solver_steps,
-                depth: b.solver_depth,
-            }),
-            no_let_assert: self.project.is_some_and(|p| p.config.no_let_assert),
-            thresholds: self
-                .project
-                .map_or_else(Default::default, |p| p.config.thresholds),
+            limits: read.limits,
+            no_let_assert: read.no_let_assert,
+            thresholds: read.thresholds,
             watched: self.watched,
-            effects: build.is_none_or(|b| b.effect != Backend::None),
+            effects: read.effects,
             stages_by_class: self.stages_by_class,
         };
         let mut diagnostics = loaded.parse.diagnostics.clone();
