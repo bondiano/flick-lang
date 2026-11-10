@@ -17,7 +17,13 @@ const exercise = lesson ? loadExercise(lesson) : undefined;
 const starter = exercise?.starter ?? "";
 const solution = exercise?.solution ?? "";
 const gallery = lesson ? [{ id: "lesson", group: "Lesson", group_ru: "Урок", name: "Starter", name_ru: "Начало", source: starter }] : examples();
-const markup = renderToString(uiRenderStatic(await Effect.runPromise(initial_view({ locale, examples: gallery, lesson: Boolean(exercise), solution, done: false, lesson_title: exercise?.[locale === "ru" ? "title_ru" : "title"] ?? "", lesson_task: exercise?.[locale === "ru" ? "task_ru" : "task"] ?? "", lesson_hint_text: exercise?.[locale === "ru" ? "hint_ru" : "hint"] ?? "" }))));
+const configuration = {
+  locale, examples: gallery, lesson: Boolean(exercise), solution, done: false,
+  lesson_title: exercise?.[locale === "ru" ? "title_ru" : "title"] ?? "",
+  lesson_task: exercise?.[locale === "ru" ? "task_ru" : "task"] ?? "",
+  lesson_hint_text: exercise?.[locale === "ru" ? "hint_ru" : "hint"] ?? "",
+};
+const markup = renderToString(uiRenderStatic(await Effect.runPromise(initial_view(configuration))));
 // the browser reads the same examples back; `<` cannot end the script early
 const embedded = JSON.stringify(gallery).replaceAll("<", "\\u003c");
 ---
