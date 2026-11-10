@@ -1,17 +1,14 @@
-/// What an analysis says that a person reads and an importer is checked
-/// against: the diagnostics with their places, and each module's interface.
-fn said(
-    host: &Memory,
-    cache: Option<&mut ModuleCache>,
-) -> (Vec<String>, BTreeMap<String, Interface>) {
+/// What a run in `mode` says that a person reads, an importer is checked
+/// against and a build emits: the diagnostics with their places, and each
+/// module's interface with the IR a compilation lowered it to.
+type Said = (Vec<String>, BTreeMap<String, (Interface, Option<ir::Module>)>);
+
+fn said(host: &Memory, mode: Mode, cache: Option<&mut ModuleCache>) -> Said {
     let mut sources = SourceMap::default();
     let project = library(&mut sources);
     let roots = [PathBuf::from("/p/src/A/Use.fl")];
-    let analysis = match cache {
-        Some(cache) => analyze_with(host, &mut sources, Some(&project), &roots, cache),
-        None => analyze(host, &mut sources, Some(&project), &roots),
-    };
-    let mut diagnostics: Vec<String> = analysis
+    let output = run(host, &mut sources, Some(&project), &roots, mode, cache, None);
+    let mut diagnostics: Vec<String> = output
         .diagnostics
         .iter()
         .map(|d| {
@@ -22,17 +19,26 @@ fn said(
         })
         .collect();
     diagnostics.sort();
-    let interfaces = (analysis.modules.iter())
-        .map(|m| (m.name.clone(), m.interface.clone()))
-        .collect();
-    (diagnostics, interfaces)
+    // an editor's run with a cache keeps no IR, by design: its modules are
+    // the ones it analyzed
+    let modules = if mode == Mode::Analyze {
+        (output.analyzed.into_iter())
+            .map(|m| (m.name, (m.interface, None)))
+            .collect()
+    } else {
+        (output.compilation.modules.into_iter())
+            .map(|m| (m.name, (m.interface, Some(m.ir))))
+            .collect()
+    };
+    (diagnostics, modules)
 }
 
 /// A session of edits over three modules, each step one edit after the step
 /// before it: with one cache kept through all of them, every step says what
-/// an analysis without a cache says of the same texts.
+/// a run without a cache says of the same texts, for an editor, for a check
+/// and for a build.
 #[test]
-fn a_cache_kept_through_a_session_of_edits_changes_nothing_an_analysis_says() {
+fn a_cache_kept_through_a_session_of_edits_changes_nothing_a_run_says() {
     const BASE: &str = "module A.Base exposing (x)\nx : Float\nlet x = 1\n";
     const MID: &str = "module A.Mid exposing (twice)\nimport A.Base exposing (x)\ntwice : Float\nlet twice = x + x\n";
     const USE: &str =
@@ -94,17 +100,23 @@ fn a_cache_kept_through_a_session_of_edits_changes_nothing_an_analysis_says() {
         ),
         ("the start again", [BASE, MID, USE], true),
     ];
-    let mut cache = ModuleCache::default();
-    for (what, [base, mid, last], checks) in steps {
-        let host = Memory(BTreeMap::from([
-            (PathBuf::from("/p/src/A/Base.fl"), base.to_owned()),
-            (PathBuf::from("/p/src/A/Mid.fl"), mid.to_owned()),
-            (PathBuf::from("/p/src/A/Use.fl"), last.to_owned()),
-        ]));
-        let warm = said(&host, Some(&mut cache));
-        let cold = said(&host, None);
-        assert_eq!(cold.0.is_empty(), checks, "{what}: {:?}", cold.0);
-        assert_eq!(warm.0, cold.0, "{what}: the diagnostics");
-        assert_eq!(warm.1, cold.1, "{what}: the interfaces");
+    for mode in [Mode::Analyze, Mode::Check, Mode::Compile] {
+        let mut cache = ModuleCache::default();
+        let mut compiled = 0;
+        for (what, [base, mid, last], checks) in steps {
+            let host = Memory(BTreeMap::from([
+                (PathBuf::from("/p/src/A/Base.fl"), base.to_owned()),
+                (PathBuf::from("/p/src/A/Mid.fl"), mid.to_owned()),
+                (PathBuf::from("/p/src/A/Use.fl"), last.to_owned()),
+            ]));
+            let warm = said(&host, mode, Some(&mut cache));
+            let cold = said(&host, mode, None);
+            assert_eq!(cold.0.is_empty(), checks, "{what}: {:?}", cold.0);
+            assert_eq!(warm.0, cold.0, "{what}: the diagnostics");
+            assert_eq!(warm.1, cold.1, "{what}: the interfaces and the IR");
+            compiled += warm.1.values().filter(|(_, ir)| ir.is_some()).count();
+        }
+        // a compilation with a cache still gives every module it lowered
+        assert_eq!(compiled > 0, mode == Mode::Compile);
     }
 }

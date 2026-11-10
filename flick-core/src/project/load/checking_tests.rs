@@ -9,7 +9,7 @@ use std::sync::Arc;
 
 use super::checking::levels;
 #[cfg(feature = "ide")]
-use super::{ModuleCache, analyze, analyze_with};
+use super::{Mode, ModuleCache, analyze, analyze_with, run};
 #[cfg(feature = "ide")]
 use crate::iface::Interface;
 #[cfg(feature = "ide")]

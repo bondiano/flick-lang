@@ -10,13 +10,14 @@ use std::fs::OpenOptions;
 use std::io::{ErrorKind, Write as _};
 use std::path::{Path, PathBuf};
 use std::process::{Command as Process, ExitCode};
+use std::rc::Rc;
 use std::sync::atomic::AtomicUsize;
 use std::{fs, io, process};
 
 use flick_core::build::{go, runner_file};
 use flick_core::diagnostics::{Diagnostic, Severity, codes};
 use flick_core::project::config::{Backend, Emit, MAIN_ENTRY};
-use flick_core::project::{self, Project, cache};
+use flick_core::project::{self, ModuleCache, Project, cache};
 use flick_core::source::SourceMap;
 #[cfg(unix)]
 use rustix::io::Errno;
@@ -190,7 +191,7 @@ pub fn build_generation(
             return Err(2);
         }
     };
-    build_into_generation(project, options, global).map(|generation| (generation, name))
+    build_into_generation(project, options, global, None).map(|generation| (generation, name))
 }
 
 /// Builds the app into a new generation; `Err` once diagnostics are shown.
@@ -198,6 +199,7 @@ pub fn build_into_generation(
     project: &Project,
     options: &RunArguments,
     global: &GlobalArguments,
+    modules: Option<Rc<RefCell<ModuleCache>>>,
 ) -> Result<Generation, u8> {
     let mut generation = match Generation::reserve(&project.root) {
         Ok(generation) => generation,
@@ -235,6 +237,7 @@ pub fn build_into_generation(
         entry: options.entry.clone(),
         generation: true,
         built: RefCell::default(),
+        modules,
     };
     generation.rt = options.rt
         || (project.config.build.emit != Emit::Go && project.config.build.effect == Backend::Rt);

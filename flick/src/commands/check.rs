@@ -1,3 +1,4 @@
+use std::cell::RefCell;
 use std::cmp::Reverse;
 use std::collections::BTreeMap;
 use std::fs;
@@ -5,7 +6,7 @@ use std::path::{Path, PathBuf};
 
 use flick_core::diagnostics::{Diagnostic, Edit, Severity, codes};
 use flick_core::project::config::Backend;
-use flick_core::project::{self, Project};
+use flick_core::project::{self, ModuleCache, Project};
 use flick_core::source::{FileId, SourceMap};
 
 use crate::args::CheckArguments;
@@ -18,11 +19,18 @@ mod pages;
 pub struct CheckCommand {
     options: CheckArguments,
     project: Option<String>,
+    /// What the checks before this one checked, for a command that checks
+    /// again: the passes of `--fix` and the runs of `--watch`.
+    modules: RefCell<ModuleCache>,
 }
 
 impl CheckCommand {
     pub fn new(options: CheckArguments, project: Option<String>) -> Self {
-        Self { options, project }
+        Self {
+            options,
+            project,
+            modules: RefCell::default(),
+        }
     }
 }
 
@@ -109,8 +117,12 @@ impl CheckCommand {
             );
         }
         timings::stage("Checking Flick modules");
+        // one check keeps nothing: what it would keep is copied for no reader
+        let again = self.options.watch || self.options.fix;
+        let mut modules = self.modules.borrow_mut();
+        let kept = again.then_some(&mut *modules);
         let diagnostics = package_cache::with_saved(|saved| {
-            project::check_with(host, &mut sources, project.as_ref(), &roots, saved, None)
+            project::check_with(host, &mut sources, project.as_ref(), &roots, saved, kept)
         });
         (
             Outcome {
