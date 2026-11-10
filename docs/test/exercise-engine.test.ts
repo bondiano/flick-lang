@@ -42,7 +42,7 @@ test("reserved JavaScript export names use the compiler's dollar suffix", async 
 
 test("re-exported signatures follow declaration files and reject cycles", async () => {
   const dts = 'export { length } from "./_flick/String.js";';
-  const declarations = { "Main.d.ts": dts, "_flick/String.d.ts": "export declare const length: (arg: string) => number;" };
+  const declarations = { "_flick/String.d.ts": "export declare const length: (arg: string) => number;" };
   const rules = { ...contract, export: "length" };
   assert.equal(await evaluateExercise(rules, { ...operations, compile: async () => ({ dts, declarations, declarationEntry: "Main.d.ts" }) }), "passed");
   assert.equal(await evaluateExercise(rules, { ...operations, compile: async () => ({ dts, declarations: { ...declarations, "_flick/String.d.ts": "export declare const length: (arg: number) => number;" }, declarationEntry: "Main.d.ts" }) }), "type");

@@ -4,6 +4,9 @@
 
 mod common;
 
+#[path = "test_command/adapter_contract.rs"]
+mod adapter_contract;
+
 use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Output, Stdio};

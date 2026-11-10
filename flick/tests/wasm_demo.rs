@@ -213,6 +213,7 @@ fn reexport_declarations_are_available_on_demand() {
     );
     let emitted = json(&session.emit_declarations("debug"));
     assert_eq!(emitted["declaration_entry"], "Main.d.ts");
+    assert!(emitted["declarations"].get("Main.d.ts").is_none());
     assert!(
         emitted["dts"]
             .as_str()

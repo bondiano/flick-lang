@@ -25,9 +25,10 @@ const nativeOperations = (dir: string): ExerciseOperations => ({
     execFileSync(flick, ["check", "Main.fl", "--warnings-as-errors"], { cwd: dir });
     execFileSync(flick, ["build", "Main.fl", "--emit-dts", "--out-dir", "build"], { cwd: dir });
     const output = path.join(dir, "build");
-    const names = readdirSync(output, { recursive: true, encoding: "utf8" }).map((name) => name.replaceAll("\\", "/")).filter((name) => name.endsWith(".d.ts"));
+    const dts = readFileSync(path.join(output, "Main.d.ts"), "utf8");
+    const names = readdirSync(output, { recursive: true, encoding: "utf8" }).map((name) => name.replaceAll("\\", "/")).filter((name) => name.endsWith(".d.ts") && name !== "Main.d.ts");
     const declarations = Object.fromEntries(names.map((name) => [name, readFileSync(path.join(output, name), "utf8")]));
-    return { dts: declarations["Main.d.ts"] ?? "", declarations, declarationEntry: "Main.d.ts" };
+    return { dts, declarations, declarationEntry: "Main.d.ts" };
   },
   run: async () => ({ status: "exit", code: 0, lines: [{ stream: "stdout", text: execFileSync("node", [path.join(here, "run-linked.ts"), path.join(dir, "build"), "flick-main.js"], { cwd: here, encoding: "utf8", timeout: 10_000 }) }] }),
 });

@@ -66,6 +66,10 @@ pub fn key(project: &Project, roots: &[PathBuf], settings: &str, needs_effect: b
         key.add(format!("version {package}"), version);
     }
     if needs_effect {
+        // An absent contract is valid; unreadable or empty manifests are not.
+        if let Err(error) = toolchain::adapter_requirements(&project.root) {
+            key.add("invalid adapter contract", error);
+        }
         for path in toolchain::contract_inputs(&project.root) {
             key.add(
                 format!("contract {}", path.display()),

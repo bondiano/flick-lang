@@ -199,7 +199,10 @@ impl Session {
         let declarations: serde_json::Map<String, Value> = if include_declarations {
             artifacts
                 .iter()
-                .filter(|a| a.path.ends_with(".d.ts"))
+                .filter(|a| {
+                    a.path.ends_with(".d.ts")
+                        && Some(a.path.as_str()) != declaration_entry.as_deref()
+                })
                 .map(|a| (a.path.clone(), Value::String(a.contents.clone())))
                 .collect()
         } else {
