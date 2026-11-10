@@ -169,6 +169,7 @@ impl Checker<'_> {
     }
 
     fn report_mismatch(&mut self, mismatch: &Mismatch, actual: &Type, expected: &Type, span: Span) {
+        let through_live = matches!(mismatch, Mismatch::Escape(s) if self.needs_live(actual, *s));
         let (actual, expected) = self.mismatch_types(mismatch, actual, expected);
         let head = format!("expected `{expected}`, found `{actual}`");
         match mismatch {
@@ -229,21 +230,7 @@ impl Checker<'_> {
                     format!("{head}: the type would contain itself (`{t}`)"),
                 );
             }
-            Mismatch::Escape(skolem) => {
-                if !self.region_escape(*skolem, &head, span) {
-                    let name = self.store.skolem_name(*skolem).to_owned();
-                    let scope = if self.gadt.existentials.contains(skolem) {
-                        "the branch that matched the constructor hiding it"
-                    } else {
-                        "the scope of its `forall`"
-                    };
-                    self.error(
-                        codes::T007,
-                        span,
-                        format!("{head}: the type variable `{name}` would escape {scope}"),
-                    );
-                }
-            }
+            Mismatch::Escape(skolem) => self.report_escape(*skolem, head, through_live, span),
             Mismatch::Untouchable(t) => {
                 let t = self.show(t);
                 self.error(
@@ -269,6 +256,30 @@ impl Checker<'_> {
 }
 
 impl Checker<'_> {
+    /// A rigid variable that would leave its `forall`, or a region its
+    /// `scope`, as one a row needs live (`through_live`).
+    fn report_escape(&mut self, skolem: u32, head: String, through_live: bool, span: Span) {
+        let head = if through_live {
+            let name = self.store.skolem_name(skolem);
+            format!("this value needs region `{name}` live")
+        } else {
+            head
+        };
+        if !self.region_escape(skolem, &head, span) {
+            let name = self.store.skolem_name(skolem).to_owned();
+            let scope = if self.gadt.existentials.contains(&skolem) {
+                "the branch that matched the constructor hiding it"
+            } else {
+                "the scope of its `forall`"
+            };
+            self.error(
+                codes::T007,
+                span,
+                format!("{head}: the type variable `{name}` would escape {scope}"),
+            );
+        }
+    }
+
     /// E011: a `Server.Guarded` where a `Server.Function` goes, or the other
     /// way round; `false` when the mismatch is something else.
     fn served_wrong(&mut self, actual: &Type, expected: &Type, span: Span) -> bool {

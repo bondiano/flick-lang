@@ -10,16 +10,13 @@
 //!   the parameters of the stages before it, reach (`elide`).
 //! - Calling a function or awaiting a task qualified `^C` needs `Live C`
 //!   (`live_call`, `live_await`); one checked against `^C` may need it.
-//! - `scope s` discharges `Live` of `s` (`discharge_live`); a row whose
-//!   bound lacks a region it needs live is `FLICK-G002` (`report_live`).
-//! - Work an owner keeps needs every region of its `Live` to outlive the
-//!   owner (`keep_live`, `FLICK-G003`).
+//! - `scope s` discharges `Live` of `s`; a row whose bound lacks a region
+//!   it needs live, neither in its `Live` nor its `Scope`, is `FLICK-G002`;
+//!   work an owner keeps needs every region of its `Live` to outlive the
+//!   owner, `FLICK-G003` (`live_rows.rs`).
 
-use super::Outlives;
-use crate::diagnostics::{Diagnostic, codes};
-use crate::source::Span;
 use crate::types::Checker;
-use crate::types::effects::{Site, Stage};
+use crate::types::effects::Stage;
 use crate::types::kinds::Kind;
 use crate::types::lang::Lang;
 use crate::types::ty::{Effects, Norm, Row, Type};
@@ -42,6 +39,14 @@ pub const LIVE: &str = "Fiber.Live ";
 /// since every use of a signature elides it again.
 pub fn strip_live(t: &Type) -> Type {
     match t {
+        // a row of `Live` alone and a tail is the tail, not `{_}`
+        Type::Row(row)
+            if !row.entries.is_empty()
+                && row.entries.iter().all(|(l, _)| l == LIVE)
+                && row.tail.is_some() =>
+        {
+            strip_live(row.tail.as_deref().expect("a tail"))
+        }
         Type::Row(row) if row.entries.iter().any(|(l, _)| l == LIVE) => Type::Row(Row {
             entries: (row.entries.iter())
                 .filter(|(l, _)| l != LIVE)
@@ -57,6 +62,12 @@ pub fn strip_live(t: &Type) -> Type {
 /// Whether `t` has a `Live`.
 pub fn has_live(t: &Type) -> bool {
     t.contains(&mut |t| matches!(t, Type::Row(r) if r.entries.iter().any(|(l, _)| l == LIVE)))
+}
+
+/// Whether the row `r` needs the skolem `s` live.
+fn row_needs(r: &Type, s: u32) -> bool {
+    matches!(r, Type::Row(r) if (r.entries.iter())
+        .any(|(l, c)| l == LIVE && c.contains(&mut |a| *a == Type::Skolem(s))))
 }
 
 /// `services` that also need `atoms` live.
@@ -92,7 +103,7 @@ fn implied(captures: &Type) -> bool {
     }
 }
 
-fn merge(into: &mut Norm, atoms: Norm) {
+pub(super) fn merge(into: &mut Norm, atoms: Norm) {
     into.entries.extend(atoms.entries);
     into.entries.sort_by(|a, b| a.0.cmp(&b.0));
     into.entries.dedup_by(|a, b| a.0 == b.0);
@@ -108,10 +119,15 @@ impl Checker<'_> {
         self.options.regions == RegionMode::Live
     }
 
+    /// Whether a value of `t` needs the region `skolem` live.
+    pub(in crate::types) fn needs_live(&self, t: &Type, skolem: u32) -> bool {
+        self.live() && self.zonk(t).contains(&mut |r| row_needs(r, skolem))
+    }
+
     /// What of the capture row `captures` a stage needs alive: its regions
     /// and capture rows, and what is not known yet. A type variable is no
     /// use of what it stands for: generic code cannot take it apart.
-    fn live_atoms(&self, captures: &Type, kinds: &[(String, Kind)]) -> Norm {
+    pub(super) fn live_atoms(&self, captures: &Type, kinds: &[(String, Kind)]) -> Norm {
         let mut all = Norm::default();
         self.capture_row(captures, &mut all);
         let region = |t: &Type| {
@@ -127,7 +143,7 @@ impl Checker<'_> {
     }
 
     /// The regions the service row `services` needs live.
-    fn live_in(&self, services: &Norm) -> Norm {
+    pub(super) fn live_in(&self, services: &Norm) -> Norm {
         let mut out = Norm::default();
         for (label, ty) in &services.entries {
             if label == LIVE {
@@ -358,172 +374,5 @@ impl Checker<'_> {
             (self.captures_of(t).entries.iter())
                 .any(|(_, a)| matches!(a, Type::Skolem(s) if self.regions.lent.contains(s)))
         })
-    }
-
-    /// Unification of service rows: `Live` that one side has and the other,
-    /// a closed row, lacks, is left out while it needs no region known yet,
-    /// as of a cell's capacity a generic signature names.
-    pub(in crate::types) fn unify_live(&self, left: &mut Norm, right: &mut Norm) {
-        let lacks =
-            |n: &Norm| n.get(LIVE).is_none() && !n.tails.iter().any(|t| matches!(t, Type::Meta(_)));
-        let unknown = |this: &Self, t: &Type| {
-            (this.live_atoms(t, &[]).entries.iter())
-                .all(|(_, a)| matches!(this.store.resolve(a), Type::Meta(_)))
-        };
-        if lacks(right) {
-            left.entries.retain(|(l, t)| l != LIVE || !unknown(self, t));
-        }
-        if lacks(left) {
-            right
-                .entries
-                .retain(|(l, t)| l != LIVE || !unknown(self, t));
-        }
-    }
-
-    /// The end of `scope` of `region`: its region is live no further.
-    pub(in crate::types) fn discharge_live(&self, actual: &mut Norm, region: &Type) {
-        if !actual.entries.iter().any(|(l, _)| l == LIVE) {
-            return;
-        }
-        let region = self.store.resolve(region);
-        let mut live = self.live_in(actual);
-        actual.entries.retain(|(l, _)| l != LIVE);
-        live.entries
-            .retain(|(_, a)| self.store.resolve(a) != region);
-        if !live.entries.is_empty() || !live.tails.is_empty() {
-            let at = actual.entries.partition_point(|(l, _)| l.as_str() < LIVE);
-            actual
-                .entries
-                .insert(at, (LIVE.to_owned(), live.into_type()));
-        }
-    }
-
-    /// The regions `actual` needs live that `declared` does not.
-    fn live_missing(&self, actual: &Norm, declared: &Norm) -> Vec<(String, Type)> {
-        let (mine, theirs) = (self.live_in(actual), self.live_in(declared));
-        mine.entries
-            .into_iter()
-            .filter(|(label, _)| theirs.get(label).is_none())
-            .collect()
-    }
-
-    /// Grows what `declared` needs live by what `actual` needs and it lacks:
-    /// a qualifier not inferred yet in its `Live`, else its open row `open`.
-    pub(in crate::types) fn grow_live(
-        &mut self,
-        actual: &Norm,
-        declared: &Norm,
-        open: Option<u32>,
-    ) -> bool {
-        let missing = self.live_missing(actual, declared);
-        if missing.is_empty() {
-            return false;
-        }
-        let inner = (declared.entries.iter())
-            .filter(|(l, _)| l == LIVE)
-            .find_map(|(_, t)| {
-                self.store
-                    .normalize(t)
-                    .tails
-                    .into_iter()
-                    .find_map(|t| match t {
-                        Type::Meta(m) => Some(m),
-                        _ => None,
-                    })
-            });
-        let (m, grown) = match (inner, open) {
-            (Some(m), _) => {
-                let rest = self.store.fresh_beside(m);
-                let row = Row {
-                    entries: missing,
-                    tail: Some(Box::new(rest)),
-                    ..Row::default()
-                };
-                (m, Type::Row(row))
-            }
-            (None, Some(m)) => {
-                let rest = self.store.fresh_beside(m);
-                let live = Type::Row(Row::closed(missing));
-                let row = Row {
-                    entries: vec![(LIVE.to_owned(), live)],
-                    tail: Some(Box::new(rest)),
-                    ..Row::default()
-                };
-                (m, Type::Row(row))
-            }
-            (None, None) => return false,
-        };
-        self.bind(m, &grown).is_ok()
-    }
-
-    /// Once rows are solved: a region `actual` needs live and `declared`, the
-    /// bound of the stage at `site`, does not keep live (`FLICK-G002`).
-    pub(in crate::types) fn report_live(
-        &mut self,
-        actual: &Norm,
-        declared: &Norm,
-        site: usize,
-        span: Span,
-    ) {
-        if declared.tails.contains(&Type::Error) {
-            return;
-        }
-        let missing = self.live_missing(actual, declared);
-        let Some(atom) = (missing.iter())
-            .map(|(_, a)| self.store.resolve(a))
-            .find(|a| !matches!(a, Type::Meta(_)))
-        else {
-            return;
-        };
-        let reported = |d: &Diagnostic| d.code == codes::G002 && d.span == Some(span);
-        if self.diagnostics.iter().any(reported) {
-            return;
-        }
-        let (region, scope) = self.describe(&atom);
-        let bound = match &self.sites[site] {
-            Site::Signature(name, _) => format!("the signature of `{name}`"),
-            Site::Expected(ty, _) => format!("the expected type `{}`", self.show(ty)),
-            Site::Inferred => "the type of this function".to_owned(),
-        };
-        let mut diagnostic = Diagnostic::error(
-            codes::G002,
-            format!(
-                "this uses {region}, which {bound} does not keep live: a function or a task uses a region only while the region is live"
-            ),
-            span,
-        );
-        if let Some(scope) = scope {
-            diagnostic = diagnostic.with_related(scope, "the region's scope ends here");
-        }
-        self.diagnostics.push(diagnostic.with_fix(|| {
-            (
-                "use the value inside the region's `scope`, or name the region in a parameter of the signature",
-                Vec::new(),
-            )
-        }));
-    }
-
-    /// `Live` of the row of work an owner keeps (`Fiber.Provided`): each
-    /// region it needs outlives the owner (`Outlives`, `FLICK-G003`).
-    pub(in crate::types) fn keep_live(
-        &mut self,
-        live: &Type,
-        owner: &Type,
-        givens: &[Type],
-        span: Span,
-        last: bool,
-    ) {
-        let o = Outlives {
-            captures: live.clone(),
-            owner: owner.clone(),
-            givens: givens.to_vec(),
-            span,
-        };
-        if !last {
-            self.regions.outlives.push(o);
-        } else if !(self.diagnostics.iter()).any(|d| d.code == codes::G003 && d.span == Some(span))
-        {
-            self.check_outlives(&o);
-        }
     }
 }

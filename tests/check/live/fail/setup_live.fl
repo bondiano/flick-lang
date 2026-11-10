@@ -1,0 +1,14 @@
+// captures: accepts
+// `Ui.on_mount` takes a task of `Eff {Async, Atom.Write, Document} none Unit`,
+// a closed row with no `Live`: a task that uses the instance's region `s`
+// needs `Live s` there, and a setup's row has `Setup s`, which is no
+// `Scope s` and keeps nothing live (`regions.md` §6, "Scope keeps its region
+// live"). `FLICK-G002` until the checker can tell that `Setup s` is provided
+// only while the instance's region is open.
+module App.LiveSetupRegion exposing (..)
+
+component search () =
+  let found = Atom.local 0
+  let _mounted = Ui.on_mount (task { Atom.set found 0 })
+  ui { text (show (Atom.value found)) }
+//~ FLICK-G002 @12:18-12:57 this uses `s`

@@ -199,13 +199,13 @@ fn live_core_rejects_a_task_in_an_outer_cell() {
                 .any(|e| e.starts_with("FLICK-G001") || e.starts_with("FLICK-G002")),
             "{name}: {errors:?}"
         );
-        // a task bound first carries `Live s` in its row, which the cell's
-        // row lacks: flick-core reports that as a mismatch of the rows
         let errors = core_live(&p);
         assert!(
-            errors
-                .iter()
-                .any(|e| e.starts_with("FLICK-G002") || e.starts_with("FLICK-T003")),
+            errors.iter().any(|e| e.starts_with("FLICK-G002")),
+            "{name}: {errors:?}"
+        );
+        assert!(
+            !errors.iter().any(|e| e.starts_with("FLICK-T003")),
             "{name}: {errors:?}"
         );
     }

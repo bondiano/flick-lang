@@ -18,19 +18,22 @@ impl Checker<'_> {
     pub(super) fn within(&mut self, a: &Row, b: &Row) -> Check<()> {
         let (a, b) = (self.zonk_row(a), self.zonk_row(b));
         let mut extra = Row::none();
+        let scoped = self.scope_live(&b);
         for (name, args) in &a.elems {
             match b.elems.get(name) {
-                // `{Live C} ⊆ {Live C'}` is `C ⊆ C'`, which may grow `C'`
+                // `{Live C} ⊆ {Live C'}` is `C ⊆ C'`, which may grow `C'`;
+                // `Scope ϱ` of `ρ'` keeps `ϱ` live too
                 Some(theirs) if *name == live_service() => {
-                    let allowed = arg_caps(&theirs[0]);
+                    let allowed = arg_caps(&theirs[0]).union(&scoped);
                     self.hold(slice::from_ref(&args[0]), &[], &allowed, "Live");
                 }
                 // against a closed row, `Live C` needs `C` to hold no region
-                // or variable once known: what is unknown now may be none
+                // or variable but those its `Scope` keeps live, once known:
+                // what is unknown now may be none
                 None if *name == live_service()
                     && !b.vars.iter().any(|v| matches!(v, Var::Meta(_))) =>
                 {
-                    self.hold(slice::from_ref(&args[0]), &[], &Caps::default(), "Live");
+                    self.hold(slice::from_ref(&args[0]), &[], &scoped, "Live");
                 }
                 Some(theirs) if theirs.len() == args.len() => {
                     for (x, y) in args.iter().zip(theirs.iter()) {

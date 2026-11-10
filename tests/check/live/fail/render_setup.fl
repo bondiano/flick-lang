@@ -1,0 +1,10 @@
+// captures: FLICK-U004
+// A render that makes an atom without `Setup` is `FLICK-U004` alone: the
+// region of the atom, never known, is no region its view keeps live.
+module App.LiveRenderSetup exposing (..)
+
+component again (n : Float) = ui {
+  let made = Atom.local n
+  text (show (Atom.value made))
+}
+//~ FLICK-U004 @7:14-7:26 service `Setup _` is not allowed here

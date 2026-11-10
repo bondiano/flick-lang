@@ -11,11 +11,15 @@
 //!   a qualifier on a function or a task is what using it needs alive.
 //! - `scope s` discharges `Live` of `s`; work an owner keeps needs every
 //!   region of its `Live` to outlive the owner (`Outlives`, §2.4).
+//! - `Scope ϱ` of a row keeps `ϱ` live as `{Live {ϱ}}` does, the way Lean
+//!   has them as the same row atoms (`scope_live`); `Live ϱ` acquires
+//!   nothing into `ϱ` (`regions.md` §6, "Scope keeps its region live").
 
 use std::collections::BTreeSet;
 use std::rc::Rc;
 
 use super::super::Checker;
+use super::scope_service;
 use crate::syntax::{Name, Path};
 use crate::types::{Caps, Fields, Kind, Row, Scheme, Stage, Type, Var};
 
@@ -168,8 +172,28 @@ impl Checker<'_> {
         }
     }
 
+    /// The regions `Scope ϱ` of `r` keeps live: `Live C` and `Scope s`
+    /// are the same row atoms (`formal/Formal/Live/Mode.lean`,
+    /// `Row.scope s = Row.ofCaps s.reach`), so `{Scope ϱ}` has `{Live {ϱ}}`
+    /// where `Live` is checked within the row (`rows.rs` `within`). Not the
+    /// other way: `Live ϱ` acquires nothing into `ϱ`.
+    pub(in crate::check) fn scope_live(&self, r: &Row) -> Caps {
+        let mut out = Caps::default();
+        for t in r
+            .elems
+            .get(&scope_service())
+            .into_iter()
+            .flat_map(|a| a.iter())
+        {
+            out = out.union(&self.reach(t));
+        }
+        out
+    }
+
     /// Work an owner keeps (`Fiber.Provided R ϱ`): each region `R` needs
-    /// alive outlives `ϱ`, decided at the end with `Outlives` (§2.4).
+    /// alive outlives `ϱ`, decided at the end with `Outlives` (§2.4). Its
+    /// `Scope` is the owner's own, `ϱ` (children acquire in the region of
+    /// their owner), which `ϱ` outlives: `scope_live` adds nothing here.
     pub(in crate::check) fn keep_live(&mut self, wanted: &Row, owner: &Type) {
         if let Some(args) = wanted.elems.get(&live_service()) {
             let facts = self.regions.facts.clone();

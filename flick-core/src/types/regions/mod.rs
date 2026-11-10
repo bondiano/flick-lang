@@ -14,6 +14,7 @@
 mod compare;
 mod data;
 mod live;
+mod live_rows;
 mod provided;
 mod scopes;
 mod solve;
@@ -369,6 +370,12 @@ impl Checker<'_> {
         if self.live() {
             return t.clone();
         }
+        self.held_stages(t)
+    }
+
+    /// `t` with what each stage holds of the parameters before it, under
+    /// either discipline.
+    pub(in crate::types) fn held_stages(&self, t: &Type) -> Type {
         self.stages(t, &mut Vec::new(), &Type::empty_row())
     }
 
