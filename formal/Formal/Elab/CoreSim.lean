@@ -64,7 +64,7 @@ theorem kid_star {μ : List Flick.Tm} {e : Flick.Tm} {p j : Nat} {k k' : Flick.T
     exact .step ⟨_, .kid hg hl hk (s.step Λ μ)⟩ this
 
 /-- **`Rel` is a weak simulation** for the steps of the core's configurations. -/
-theorem cstep_sim (hroot : RootTyM S .live root) {c₁ c₂ c₁' : Cfg} {l : Lbl}
+theorem cstep_sim (hroot : RootTy S root) {c₁ c₂ c₁' : Cfg} {l : Lbl}
     (hr : CfgR (DP S root) c₁ c₂) (hs : CStep root l c₁ c₁') :
     ∃ c₂', Star (CS root) c₂ c₂' ∧ CfgR (DP S root) c₁' c₂' := by
   obtain ⟨Λ₂, μ₂, t₂⟩ := c₂

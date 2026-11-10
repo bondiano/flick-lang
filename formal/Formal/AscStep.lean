@@ -191,7 +191,7 @@ theorem RHead.asc {Λ μ r Λ' μ' r'} {n : Nat} {e : Tm} (hh : RHead Λ μ r Λ
     exact ⟨hr.2, fun e' he => hc.set hg (fun k hk => .inl (by simp at hk ⊢; exact .inl hk)) he⟩
 
 /-- A step of a thread keeps the order of `inside` forms and handlers. -/
-theorem Step.asc {root l Λ μ e Λ' μ' e'} {mode : TypingMode} (hroot : RootTyM S mode root)
+theorem Step.asc {root l Λ μ e Λ' μ' e'} (hroot : RootTy S root)
     (hs : Step root l Λ μ e (.cfg Λ' μ' e')) (hc : CfgAsc Λ μ e) (hb : e.Below Λ.length) :
     e'.Asc 0 ∧ ∀ x, x.Asc 0 → CfgAsc Λ' μ' x := by
   have keep : ∀ {x}, x.Asc 0 → CfgAsc Λ μ x := fun hx => ⟨hx, hc.rgs, hc.mem⟩

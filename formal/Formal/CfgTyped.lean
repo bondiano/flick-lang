@@ -10,25 +10,23 @@ the redex does to the regions keeps them typed.
 
 namespace Flick
 
-variable {S : Sig} {mode : TypingMode}
+variable {S : Sig}
 
 /-- Children and finalizers of the regions have types. -/
-def RgsTyM (S : Sig) (mode : TypingMode) (Ψ : List Ty) (Λ : List Rgn) : Prop :=
-  ∀ (p : Nat) (g : Rgn), Λ[p]? = some g → (∀ k ∈ g.kids, ∃ t φ, TypM S mode Ψ Facts.age [] k (.ex t φ)) ∧
-    ∀ f ∈ g.fins, ∃ t φ, TypM S mode Ψ Facts.age [] f (.ex t φ)
+def RgsTy (S : Sig) (Ψ : List Ty) (Λ : List Rgn) : Prop :=
+  ∀ (p : Nat) (g : Rgn), Λ[p]? = some g → (∀ k ∈ g.kids, ∃ t φ, Typ S Ψ Facts.age [] k (.ex t φ)) ∧
+    ∀ f ∈ g.fins, ∃ t φ, Typ S Ψ Facts.age [] f (.ex t φ)
 
-abbrev RgsTy (S : Sig) := RgsTyM S .captures
-
-theorem RgsTyM.weaken {Ψ Λ} (h : RgsTyM S mode Ψ Λ) (X : List Ty) : RgsTyM S mode (Ψ ++ X) Λ := by
+theorem RgsTy.weaken {Ψ Λ} (h : RgsTy S Ψ Λ) (X : List Ty) : RgsTy S (Ψ ++ X) Λ := by
   intro p g hg
   obtain ⟨hk, hf⟩ := h p g hg
   exact ⟨fun k hk' => let ⟨t, φ, h⟩ := hk k hk'; ⟨t, φ, h.weakenStore X⟩,
     fun f hf' => let ⟨t, φ, h⟩ := hf f hf'; ⟨t, φ, h.weakenStore X⟩⟩
 
-theorem RgsTyM.set {Ψ Λ p g g'} (h : RgsTyM S mode Ψ Λ) (hg : Λ[p]? = some g)
-    (hk : ∀ k ∈ g'.kids, k ∈ g.kids ∨ ∃ t φ, TypM S mode Ψ Facts.age [] k (.ex t φ))
-    (hf : ∀ f ∈ g'.fins, f ∈ g.fins ∨ ∃ t φ, TypM S mode Ψ Facts.age [] f (.ex t φ)) :
-    RgsTyM S mode Ψ (setRgn Λ p g') := by
+theorem RgsTy.set {Ψ Λ p g g'} (h : RgsTy S Ψ Λ) (hg : Λ[p]? = some g)
+    (hk : ∀ k ∈ g'.kids, k ∈ g.kids ∨ ∃ t φ, Typ S Ψ Facts.age [] k (.ex t φ))
+    (hf : ∀ f ∈ g'.fins, f ∈ g.fins ∨ ∃ t φ, Typ S Ψ Facts.age [] f (.ex t φ)) :
+    RgsTy S Ψ (setRgn Λ p g') := by
   intro q g'' hq
   by_cases hpq : p = q
   · subst hpq
@@ -38,7 +36,7 @@ theorem RgsTyM.set {Ψ Λ p g g'} (h : RgsTyM S mode Ψ Λ) (hg : Λ[p]? = some 
   · rw [setRgn, List.getElem?_set_ne hpq] at hq
     exact h q g'' hq
 
-theorem RgsTyM.append {Ψ Λ} (h : RgsTyM S mode Ψ Λ) : RgsTyM S mode Ψ (Λ ++ [Rgn.new]) := by
+theorem RgsTy.append {Ψ Λ} (h : RgsTy S Ψ Λ) : RgsTy S Ψ (Λ ++ [Rgn.new]) := by
   intro p g hg
   by_cases hp : p < Λ.length
   · rw [List.getElem?_append_left hp] at hg; exact h p g hg
@@ -48,9 +46,9 @@ theorem RgsTyM.append {Ψ Λ} (h : RgsTyM S mode Ψ Λ) : RgsTyM S mode Ψ (Λ +
     | succ => simp [hj] at hg
 
 /-- The computation a child or a finalizer runs has a type. -/
-theorem await_arg {Ψ Θ c w t₀ T φ} (h : TypM S mode Ψ Θ [] (.app (.app (.const c) w) t₀) (.ex T φ))
-    (hv : Value t₀) (hc : ∀ ι, ∃ a b r e τ C₁ C₂ ψ, c.ty S ι mode = .arrow a .pure (.arrow (.eff r e τ C₁) ψ b C₂) Caps.none) :
-    ∃ t φ, TypM S mode Ψ Θ [] (.await t₀) (.ex t φ) := by
+theorem await_arg {Ψ Θ c w t₀ T φ} (h : Typ S Ψ Θ [] (.app (.app (.const c) w) t₀) (.ex T φ))
+    (hv : Value t₀) (hc : ∀ ι, ∃ a b r e τ C₁ C₂ ψ, c.ty S ι = .arrow a .pure (.arrow (.eff r e τ C₁) ψ b C₂) Caps.none) :
+    ∃ t φ, Typ S Ψ Θ [] (.await t₀) (.ex t φ) := by
   cases h with
   | app hf ht _ _ =>
     cases hf with
@@ -66,8 +64,8 @@ theorem await_arg {Ψ Θ c w t₀ T φ} (h : TypM S mode Ψ Θ [] (.app (.app (.
         cases h
         obtain ⟨_, _, _, _, h, la, _, _, -⟩ := (lt.trans hT₁).arrow_left
         cases h
-        obtain ⟨_, _, _, _, rfl, -⟩ := TypingMode.subtype.eff_right_mode la
-        exact ⟨_, _, .await (ht.valueAny hv _) (Stage.le_refl _) TypingMode.subtype.refl⟩
+        obtain ⟨_, _, _, _, rfl, -⟩ := LeLive.eff_right la
+        exact ⟨_, _, .await (ht.valueAny hv _) (Stage.le_refl _) LeLive.refl⟩
   | allI hv' => exact absurd hv' (by
       intro hv''; cases hv'' with
       | ctorApp _ hK _ => simp [Tm.head] at hK)
@@ -76,15 +74,15 @@ theorem await_arg {Ψ Θ c w t₀ T φ} (h : TypM S mode Ψ Θ [] (.app (.app (.
       | ctorApp _ hK _ => simp [Tm.head] at hK)
 
 /-- The finalizer `open_` registers: `op` of the capability of its region. -/
-theorem op_cap_typ {Ψ Θ} {p : Nat} : ∃ t φ, TypM S mode Ψ Θ [] (.app (.const .op) (.cap p)) (.ex t φ) := by
-  cases mode <;> exact ⟨_, _, .app (.const (ι := { (default : CArg) with s := .rg p }) trivial
-    TypingMode.subtype.refl) .cap (Stage.le_refl _) TypingMode.subtype.refl⟩
+theorem op_cap_typ {Ψ Θ} {p : Nat} : ∃ t φ, Typ S Ψ Θ [] (.app (.const .op) (.cap p)) (.ex t φ) := by
+  exact ⟨_, _, .app (.const (ι := { (default : CArg) with s := .rg p }) trivial
+    LeLive.refl) .cap (Stage.le_refl _) LeLive.refl⟩
 
 /-- What a step at the redex does to the regions is typed. -/
-theorem rgs_preservation {Ψ Θ Λ μ r t φ Λ' μ' r'} (hΛ : RgsTyM S mode Ψ Λ)
-    (h : TypM S mode Ψ Θ [] r (.ex t φ)) (hout : Entails Θ Facts.age) (hh : RHead Λ μ r Λ' μ' r') :
-    RgsTyM S mode Ψ Λ' := by
-  have cut : (∃ t φ, TypM S mode Ψ Θ [] r' (.ex t φ)) → ∃ t φ, TypM S mode Ψ Facts.age [] r' (.ex t φ) :=
+theorem rgs_preservation {Ψ Θ Λ μ r t φ Λ' μ' r'} (hΛ : RgsTy S Ψ Λ)
+    (h : Typ S Ψ Θ [] r (.ex t φ)) (hout : Entails Θ Facts.age) (hh : RHead Λ μ r Λ' μ' r') :
+    RgsTy S Ψ Λ' := by
+  have cut : (∃ t φ, Typ S Ψ Θ [] r' (.ex t φ)) → ∃ t φ, Typ S Ψ Facts.age [] r' (.ex t φ) :=
     fun ⟨t, φ, h⟩ => ⟨t, φ, h.cut hout⟩
   cases hh with
   | scope => exact hΛ.append
@@ -105,11 +103,11 @@ theorem rgs_preservation {Ψ Θ Λ μ r t φ Λ' μ' r'} (hΛ : RgsTyM S mode Ψ
   | _ => exact hΛ
 
 /-- A step of one thread keeps the regions typed. -/
-theorem step_rgs {root Ψ Λ μ e t φ l Λ' μ' e'} (hΛ : RgsTyM S mode Ψ Λ)
-    (h : TypM S mode Ψ Facts.age [] e (.ex t φ)) (hbl : e.Below Λ.length) (hΨ : ∀ u ∈ Ψ, u.YF Λ.length)
-    (ha : e.Asc 0) (hs : Step root l Λ μ e (.cfg Λ' μ' e')) : RgsTyM S mode Ψ Λ' := by
+theorem step_rgs {root Ψ Λ μ e t φ l Λ' μ' e'} (hΛ : RgsTy S Ψ Λ)
+    (h : Typ S Ψ Facts.age [] e (.ex t φ)) (hbl : e.Below Λ.length) (hΨ : ∀ u ∈ Ψ, u.YF Λ.length)
+    (ha : e.Asc 0) (hs : Step root l Λ μ e (.cfg Λ' μ' e')) : RgsTy S Ψ Λ' := by
   have kid : ∀ {E c p w}, OkE E → e = plug E (.app (.app (.const c) (.own p)) w) →
-      (c = .addFin ∨ c = .spawn) → Value w → ∃ t φ, TypM S mode Ψ Facts.age [] (withs p E (.await w)) (.ex t φ) := by
+      (c = .addFin ∨ c = .spawn) → Value w → ∃ t φ, Typ S Ψ Facts.age [] (withs p E (.await w)) (.ex t φ) := by
     intro E c p w hE he hc hv
     subst he
     obtain ⟨hA, -⟩ := asc_of_plug (fin_not_value hc) hE ha
@@ -128,7 +126,7 @@ theorem step_rgs {root Ψ Λ μ e t φ l Λ' μ' e'} (hΛ : RgsTyM S mode Ψ Λ)
     · exact .inl hk
     · simp at hk; subst hk; exact .inr (kid hE rfl (.inr rfl) hv)
   | rt hE hh =>
-    obtain ⟨K, Θ', _, _, hr, _, hK, _⟩ := ctx_typing_mode _ hE hh.not_value h
+    obtain ⟨K, Θ', _, _, hr, _, hK, _⟩ := ctx_typing _ hE hh.not_value h
     obtain ⟨rfl, hΘ⟩ := hK.resolve_left fun hp => by subst hp; exact hh.not_pure hr
     have hr' := hole_kill hr hbl hΨ
     simp only [List.map_up_zero, liftT_zero] at hr'
@@ -155,12 +153,10 @@ theorem Stage.YF_mono {n m : Nat} {φ : Stage} (h : φ.substT (kill n) = φ) (hn
 /-- A typed configuration at the program's type: the store, the main thread, the
 children and finalizers are typed with the facts of creation, every term writes
 only regions that exist, and the store typing names none that does not. -/
-def CfgTyM (S : Sig) (mode : TypingMode) (Ψ : List Ty) (c : Cfg) (t : Ty) (φ : Stage) : Prop :=
-  StoreTyM S mode Ψ c.mem ∧ TypM S mode Ψ Facts.age [] c.main (.ex t φ) ∧ RgsTyM S mode Ψ c.rgs ∧
+def CfgTy (S : Sig) (Ψ : List Ty) (c : Cfg) (t : Ty) (φ : Stage) : Prop :=
+  StoreTy S Ψ c.mem ∧ Typ S Ψ Facts.age [] c.main (.ex t φ) ∧ RgsTy S Ψ c.rgs ∧
     CfgBelow c.rgs c.mem c.main ∧ (∀ u ∈ Ψ, u.YF c.rgs.length) ∧ CfgAsc c.rgs c.mem c.main ∧
     ∃ hs cell, CfgCaught hs cell 0 c.rgs c.main
-
-abbrev CfgTy (S : Sig) := CfgTyM S .captures
 
 theorem setKid_get {Λ : List Rgn} {p j k q g} (h : (setKid Λ p j k)[q]? = some g) :
     ∃ g₀, Λ[q]? = some g₀ ∧ (q = p → g = ⟨g₀.live, g₀.kids.set j k, g₀.fins⟩) ∧ (q ≠ p → g = g₀) := by
@@ -175,8 +171,8 @@ theorem setKid_get {Λ : List Rgn} {p j k q g} (h : (setKid Λ p j k)[q]? = some
       exact ⟨g, h, fun h' => (hq h'.symm).elim, fun _ => rfl⟩
   · exact ⟨g, h, fun h' => by subst h'; simp_all, fun _ => rfl⟩
 
-theorem RgsTyM.setKid {Ψ Λ p j k} (h : RgsTyM S mode Ψ Λ) (hk : ∃ t φ, TypM S mode Ψ Facts.age [] k (.ex t φ)) :
-    RgsTyM S mode Ψ (setKid Λ p j k) := by
+theorem RgsTy.setKid {Ψ Λ p j k} (h : RgsTy S Ψ Λ) (hk : ∃ t φ, Typ S Ψ Facts.age [] k (.ex t φ)) :
+    RgsTy S Ψ (setKid Λ p j k) := by
   intro q g hq
   obtain ⟨g₀, hg₀, h₁, h₂⟩ := setKid_get hq
   obtain ⟨hk₀, hf₀⟩ := h q g₀ hg₀

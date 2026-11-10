@@ -11,7 +11,7 @@ run-time forms of the configuration (`LNest`). The two are kept together: the ty
 the facts about names a step of the forms needs (the owner given work is a region of the hole,
 the row of a new handler's arms names regions of its place), and the forms supply the place
 at which a step registers work. With them no thread uses a region that is not live and every
-operation is answered by a handler of a live region: `T4'_live`.
+operation is answered by a handler of a live region: `T4'`.
 -/
 
 namespace Flick
@@ -51,7 +51,7 @@ theorem LRgs.reanc {Ψ anc anc' Λ n} (h : LRgs S Ψ anc Λ)
 /-- Every thread of a typed configuration runs at a stage of the regions of its base. -/
 theorem LCfgTy.thread {c t φ i e} (hc : LCfgTy S Ψ c t φ anc) (hφ : φ.substT (kill 0) = φ)
     (hi : c.at i = some e) :
-    ∃ t' ψ, TypM S .live Ψ Facts.age [] e (.ex t' ψ) ∧ ∀ x, ψ.svc (.atm (.r x)) → baseOf anc i x := by
+    ∃ t' ψ, Typ S Ψ Facts.age [] e (.ex t' ψ) ∧ ∀ x, ψ.svc (.atm (.r x)) → baseOf anc i x := by
   rcases i with _ | ⟨p, j⟩
   · simp only [Cfg.at, Option.some.injEq] at hi; subst hi
     exact ⟨t, φ, hc.1.2.1, fun x hx => (Stage.no_atm_zero hφ x hx).elim⟩
@@ -60,7 +60,7 @@ theorem LCfgTy.thread {c t φ i e} (hc : LCfgTy S Ψ c t φ anc) (hφ : φ.subst
 
 /-- The owner a thread gives work to is a region of its hole. -/
 theorem LNest.own_hole {c home i e t'} {ψ : Stage} (hn : LNest Ψ c anc home) (hi : c.at i = some e)
-    (h : TypM S .live Ψ Facts.age [] e (.ex t' ψ)) (hψ : ∀ x, ψ.svc (.atm (.r x)) → baseOf anc i x) :
+    (h : Typ S Ψ Facts.age [] e (.ex t' ψ)) (hψ : ∀ x, ψ.svc (.atm (.r x)) → baseOf anc i x) :
     ∀ E c' p w, OkE E → e = plug E (.app (.app (.const c') (.own p)) w) →
       (c' = .addFin ∨ c' = .spawn) → holeE (baseOf anc i) E p := by
   intro E c' p w hE he hc
@@ -72,7 +72,7 @@ theorem LNest.own_hole {c home i e t'} {ψ : Stage} (hn : LNest Ψ c anc home) (
 /-- The arms of a handler just installed name regions of its place or its own region. -/
 theorem LNest.new_cell {c home i E Ef al rf e₀ n ℓ t' Ψ'} {ψ : Stage} (hn : LNest Ψ c anc home)
     (hi : c.at i = some (plug E (.hdl Ef al rf e₀))) (hE : OkE E)
-    (h : TypM S .live Ψ' Facts.age [] (plug E (.inside n (.hwith n ℓ Ef al rf e₀))) (.ex t' ψ))
+    (h : Typ S Ψ' Facts.age [] (plug E (.inside n (.hwith n ℓ Ef al rf e₀))) (.ex t' ψ))
     (hψ : ∀ x, ψ.svc (.atm (.r x)) → baseOf anc i x) :
     ∃ r ε t, Ψ'[ℓ]? = some (.arrow (.base .unit) (.rt r ε) t Caps.none) ∧
       ∀ x, r (.atm (.r x)) → holeE (baseOf anc i) E x ∨ x = n := by
@@ -84,7 +84,7 @@ theorem LNest.new_cell {c home i E Ef al rf e₀ n ℓ t' Ψ'} {ψ : Stage} (hn 
   · subst h₁; exact .inl (holeE_iff.mpr (.inr hF))
   · exact .inl (hn.frame_reg hi hE F hF (Frame.rgn_reg h₁))
 
-theorem LInv.main {root Ψ Λ μ e Λ' μ' e' t φ l anc home} (hroot : RootTyM S .live root)
+theorem LInv.main {root Ψ Λ μ e Λ' μ' e' t φ l anc home} (hroot : RootTy S root)
     (ht : t.YF 0) (hφ : φ.substT (kill 0) = φ)
     (hc : LCfgTy S Ψ ⟨Λ, μ, e⟩ t φ anc) (hn : LNest Ψ ⟨Λ, μ, e⟩ anc home)
     (hs : Step root l Λ μ e (.cfg Λ' μ' e')) :
@@ -101,7 +101,7 @@ theorem LInv.main {root Ψ Λ μ e Λ' μ' e' t φ l anc home} (hroot : RootTyM 
     (fun E _ _ _ _ hE he he' => hn.new_cell (he ▸ hi) hE (he' ▸ hc'.1.2.1) hψ) hs
   exact ⟨X, anc', home', ⟨hc'.1, hc'.2.reanc hs.fresh hag⟩, hn'⟩
 
-theorem LInv.kid {root Ψ Λ μ e p g j k Λ' μ' k' t φ l anc home} (hroot : RootTyM S .live root)
+theorem LInv.kid {root Ψ Λ μ e p g j k Λ' μ' k' t φ l anc home} (hroot : RootTy S root)
     (hc : LCfgTy S Ψ ⟨Λ, μ, e⟩ t φ anc) (hn : LNest Ψ ⟨Λ, μ, e⟩ anc home)
     (hg : Λ[p]? = some g) (hl : g.live = true) (hj : g.kids[j]? = some k)
     (hs : Step root l Λ μ k (.cfg Λ' μ' k')) :
@@ -119,7 +119,7 @@ theorem LInv.kid {root Ψ Λ μ e p g j k Λ' μ' k' t φ l anc home} (hroot : R
     (fun E _ _ _ _ hE he he' => hn.new_cell (i := some (p, j)) (he ▸ hi) hE (he' ▸ hk₁) hψ₁) hs
   exact ⟨X, anc', home', ⟨hc'.1, hc'.2.reanc (CStep.kid (e := e) hg hl hj hs).fresh hag⟩, hn'⟩
 
-theorem LInv.steps {root c c'} (hroot : RootTyM S .live root)
+theorem LInv.steps {root c c'} (hroot : RootTy S root)
     (hs : CSteps root c c') :
     ∀ {Ψ t φ anc home}, t.YF 0 → φ.substT (kill 0) = φ → LCfgTy S Ψ c t φ anc →
       LNest Ψ c anc home → ∃ Ψ' anc' home', LCfgTy S Ψ' c' t φ anc' ∧ LNest Ψ' c' anc' home' := by
@@ -138,8 +138,8 @@ theorem LInv.steps {root c c'} (hroot : RootTyM S .live root)
 /-- **T4′ of the live discipline.** A program typed by use reaches no configuration where a
 thread is at a step that needs a region that is not live, or where an operation is answered by
 a handler of a region that ended. -/
-theorem T4'_live {root : Roots} (hroot : RootTyM S .live root) :
-    SafeUse root (fun e t φ => TypM S .live [] Facts.none [] e (.ex t φ)) := by
+theorem T4' {root : Roots} (hroot : RootTy S root) :
+    SafeUse root (fun e t φ => Typ S [] Facts.none [] e (.ex t φ)) := by
   intro e₀ t φ₀ c h₀ hp ht hφ hs
   obtain ⟨Ψ, anc, home, hc, hn⟩ := LInv.steps hroot hs ht hφ
     (LCfgTy.init h₀ hp (fun q x => x = q)) (LNest.init hp)

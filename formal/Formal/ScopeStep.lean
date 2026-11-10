@@ -14,7 +14,7 @@ region drops these facts: they follow from those of the context.
 
 namespace Flick
 
-variable {S : Sig} {mode : TypingMode}
+variable {S : Sig}
 
 /-- The facts and the store typing of a step at `n` regions: the store is typed
 with the facts of creation, the hole with facts that extend those of the regions
@@ -83,13 +83,13 @@ are renamed out, and `n` is put for the region of the scope. -/
 theorem scope_body {Ψ : List Ty} {Θ : Facts} {e : Tm} {t₀ : Ty} {φ' : Stage} {r ε : Row} {F : Facts}
     {n : Nat} (hn : e.NoIns) (hbelow : e.Below n)
     (hF : ∀ C s, F C s → s = .tvar 0 ∧ ¬ C (.v 0))
-    (h : TypM S mode (Ψ.map (Ty.up 1)) (Facts.union (Θ.substT (shiftV 1)) F)
+    (h : Typ S (Ψ.map (Ty.up 1)) (Facts.union (Θ.substT (shiftV 1)) F)
       (.mono (.owner (.tvar 0)) :: [].map (Scheme.up 1)) e (.ex (t₀.up 1) φ'))
     (hφ' : φ'.le (.rt (Row.union (Row.scope (.tvar 0))
       (Row.union (r.substT (shiftV 1)) (Row.disch (.v 0) (r.substT (shiftV 1))))) (ε.substT (shiftV 1))))
     (hΨ : ∀ u ∈ Ψ, u.YF n) (hidem : Θ.substT (kill n) = Θ) :
     ∃ F' φ₁, (∀ C s, F' C s → s = .rg n ∧ ∀ q, C (.r q) → q < n) ∧
-      TypM S mode Ψ (Facts.union Θ F') [] (e.subst (inst [.own n])) (.ex (t₀.substT (kill n)) φ₁) ∧
+      Typ S Ψ (Facts.union Θ F') [] (e.subst (inst [.own n])) (.ex (t₀.substT (kill n)) φ₁) ∧
       φ₁.le (.rt (Row.union (Row.scope (.rg n))
         (Row.union (r.substT (kill n)) (Row.disch (.r n) (r.substT (kill n))))) (ε.substT (kill n))) := by
   have hΨ' : Ψ.map (Ty.substT (kill n)) = Ψ := by
@@ -104,7 +104,7 @@ theorem scope_body {Ψ : List Ty} {Θ : Facts} {e : Tm} {t₀ : Ty} {φ' : Stage
   have h₂ := h₁.substT (instT [.rg n]) (Fits.noIns hn fun _ => rfl)
   simp only [List.map_map, Function.comp_def, Ty.up_inst1, List.map_id_fun', id, List.map_cons,
     List.map_nil, Scheme.mono_substT, Flick.J.substT, Facts.union_substT, Facts.up_inst1] at h₂
-  have hb : TypM S mode Ψ (Facts.union Θ ((F.substT (liftT 1 (kill n))).substT (instT [.rg n]))) []
+  have hb : Typ S Ψ (Facts.union Θ ((F.substT (liftT 1 (kill n))).substT (instT [.rg n]))) []
       (e.subst (inst [.own n])) (.ex (t₀.substT (kill n))
         ((φ'.substT (liftT 1 (kill n))).substT (instT [.rg n]))) := by
     refine h₂.inst (Δ := [_]) (.cons .own ?_ .nil)

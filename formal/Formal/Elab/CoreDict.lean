@@ -17,22 +17,22 @@ variable {P : Prog} {S : Sig} {N : Names}
 /-- `λδ₁ … λδₗ. b` over the premises `qs`, each arrow with the qualifier `q`. -/
 theorem lams_typ {Ψ Θ} {q : Ty} {T : TTy} {b' : Flick.Tm} (hns : ∀ s, ¬ b'.Has s) :
     ∀ (qs : List Cn) (Γc : List Flick.Scheme), qs ≠ [] →
-    TypM S .live Ψ Θ (dctx N qs ++ Γc) b' (.ex (trTT N T) .pure) →
-    ∀ φ, TypM S .live Ψ Θ Γc (lamsC qs.length b') (.ex (trTT N (dicts q qs T)) φ) := by
+    Typ S Ψ Θ (dctx N qs ++ Γc) b' (.ex (trTT N T) .pure) →
+    ∀ φ, Typ S Ψ Θ Γc (lamsC qs.length b') (.ex (trTT N (dicts q qs T)) φ) := by
   intro qs
   induction qs with
   | nil => intro _ h; exact absurd rfl h
   | cons c qs ih =>
     intro Γc _ hb φ
-    have hb' : TypM S .live Ψ Θ (dctx N qs ++ (Flick.Scheme.mono (trD N c) :: Γc)) b'
+    have hb' : Typ S Ψ Θ (dctx N qs ++ (Flick.Scheme.mono (trD N c) :: Γc)) b'
         (.ex (trTT N T) .pure) := by
       simpa [dctx, List.append_assoc] using hb
-    have inner : TypM S .live Ψ Θ (Flick.Scheme.mono (trD N c) :: Γc) (lamsC qs.length b')
+    have inner : Typ S Ψ Θ (Flick.Scheme.mono (trD N c) :: Γc) (lamsC qs.length b')
         (.ex (trTT N (dicts q qs T)) .pure) := by
       cases qs with
       | nil => exact hb'
       | cons c' qs' => exact ih _ (List.cons_ne_nil _ _) hb' .pure
-    exact .lam inner (fun h => hns _ (lamsC_has.1 h)) trivial .refl
+    exact .lam inner (fun h => hns _ (lamsC_has.1 h)) .refl
 
 theorem has_lamD {Γ Δ qs e t q φ} (he : Has S N Γ (qs ++ Δ) e t φ) (hφ : qs ≠ [] → φ = .P) :
     Has S N Γ Δ (.lamD qs.length e) (dicts q qs t) φ := by
@@ -81,7 +81,7 @@ theorem has_meth (hR : Real P S N) {Γ Δ e m C s c₀ rest θ φ} (hm : P.metho
   obtain ⟨e', he', te⟩ := he Ψ Θ Γc γ δ hc
   obtain ⟨fs, hd⟩ := hR.dict C p
   have hlen : ((vars p).map (·.subst θ)).length = p := by simp [vars]
-  have te' : TypM S .live Ψ Θ Γc e'
+  have te' : Typ S Ψ Θ Γc e'
       (.ex (.dict (N.cls C p) (Flick.Ty.spine (((vars p).map (·.subst θ)).map (trT N)))) (trStage N φ)) := by
     have := te; simp only [trTT, trD, Cn.subst, hlen] at this; exact this
   refine ⟨_, .meth he', .dproj te' hd (by simp [vars]) (hfs fs hd)

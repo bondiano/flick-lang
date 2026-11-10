@@ -6,10 +6,10 @@ import Formal.FrameTy
 
 namespace Flick
 
-variable {S : Sig} {mode : TypingMode}
+variable {S : Sig}
 
-theorem frame_typing_mode {Ψ Θ r t φ} (hr : ¬ Value r) (F : Frame) (hF : F.ok)
-    (h : TypM S mode Ψ Θ [] (F.plug r) (.ex t φ)) : FrameTyM S mode Ψ Θ F r t φ := by
+theorem frame_typing {Ψ Θ r t φ} (hr : ¬ Value r) (F : Frame) (hF : F.ok)
+    (h : Typ S Ψ Θ [] (F.plug r) (.ex t φ)) : FrameTy S Ψ Θ F r t φ := by
   have nv := not_value_plug hr F
   cases F <;> simp only [Frame.plug] at h nv
   case hwith p ℓ E al rf =>
@@ -19,21 +19,20 @@ theorem frame_typing_mode {Ψ Θ r t φ} (hr : ¬ Value r) (F : Frame) (hF : F.o
       have hp : σ (.r p) = .rg p := hσ.1 _ (.inr (.inl rfl))
       have h₁ := hal.sx (hσ.sub fun _ h => .inr (.inr (.inl h))) X
       simp only [Flick.J.substT, Ty.substT, hp] at h₁
-      exact .hwith (by simpa [Ty.substT, Stage.substT] using cell_sx (σ := σ) hℓ X) h₁ (hrf.sx (hσ.sub fun _ h => .inr (.inr (.inr (.inl h)))) X) (by simpa only [TypingMode.use_substT] using Stage.le_substT σ hψ) h'
+      exact .hwith (by simpa [Ty.substT, Stage.substT] using cell_sx (σ := σ) hℓ X) h₁ (hrf.sx (hσ.sub fun _ h => .inr (.inr (.inr (.inl h)))) X) (by simpa only [Stage.use_substT] using Stage.le_substT σ hψ) h'
         (Stage.le_rt_sub (by simpa [Stage.substT] using Stage.le_substT σ hφ₀)
           (Row.hP_substT hp (hσ.2.2.1 (.inl rfl)) (hσ.2.2.2 (.inl rfl))))
         ⟨hc.1, fun h => .inl (hc.2 h)⟩ (Stage.le_substT σ hφ) (hT.substT σ)
-        (fun hl => Stage.substT_svc_atm hp (hat hl))
+        (Stage.substT_svc_atm hp hat)
     | errVal hv | allI hv => exact (nv hv).elim
   case hctlA p ℓ κ tl E al rf k =>
     cases h with
     | hctl hℓ hal hrf hψ hop hc htl hE hk hp' hφ₀ ha hl hcm hφ hT hat =>
-      refine .mk0 ⟨_, _, ha, FRelM.use_rgn (fun hm x hx => by
-        cases hm
+      refine .mk0 ⟨_, _, ha, FRel.use_rgn (fun x hx => by
         cases tl with
         | true => exact absurd hx (by simp [Caps.none])
         | false => exact .inr ⟨p, rfl, congrArg Elem.atm hx⟩)
-        (TypingMode.use_mono mode hφ (Caps.Sub.refl _)), fun σ hσ X _ h' => ?_⟩
+        (Stage.use_mono hφ (Caps.Sub.refl _)), fun σ hσ X _ h' => ?_⟩
       subst hk
       obtain ⟨-, hb⟩ := S.op_closed _ _ _ _ _ σ hop
       have hp : σ (.r p) = .rg p := hσ.1 _ (.inr (.inl rfl))
@@ -41,12 +40,12 @@ theorem frame_typing_mode {Ψ Θ r t φ} (hr : ¬ Value r) (F : Frame) (hF : F.o
       simp only [Flick.J.substT, Ty.substT, hp] at h₁
       have h₃ := hp'.sx (hσ.sub fun _ h => .inr (.inr (.inr (.inr (.inr
         (plug_has_of_nosite (by simp [Tm.Has]) h)))))) X
-      refine .hctl (by simpa [Ty.substT, Stage.substT] using cell_sx (σ := σ) hℓ X) h₁ (hrf.sx (hσ.sub fun _ h => .inr (.inr (.inr (.inl h)))) X) (by simpa only [TypingMode.use_substT] using Stage.le_substT σ hψ)
+      refine .hctl (by simpa [Ty.substT, Stage.substT] using cell_sx (σ := σ) hℓ X) h₁ (hrf.sx (hσ.sub fun _ h => .inr (.inr (.inr (.inl h)))) X) (by simpa only [Stage.use_substT] using Stage.le_substT σ hψ)
         hop hc htl hE rfl h₃ (Stage.le_rt_sub (by simpa [Stage.substT] using Stage.le_substT σ hφ₀)
           (Row.hP_substT hp (hσ.2.2.1 (.inl rfl)) (hσ.2.2.2 (.inl rfl)))) ?_
         (fun h => ?_) ⟨hcm.1, fun h => .inl (hcm.2 h)⟩ (Stage.le_substT σ hφ) (hT.substT σ)
-        (fun hl => Stage.substT_svc_atm hp (hat hl))
-      · rw [TypingMode.use_substT_eq mode _ (Caps.substT_if_rg hp)] at h'
+        (Stage.substT_svc_atm hp hat)
+      · rw [Stage.use_substT_eq _ (Caps.substT_if_rg hp)] at h'
         cases tl <;> simpa [hb] using h'
       · obtain ⟨C', hl₁, hl₂⟩ := hl h
         refine ⟨C'.substT σ, ?_, ⟨_, hl₂, by simp [hp]⟩⟩
@@ -86,19 +85,19 @@ theorem frame_typing_mode {Ψ Θ r t φ} (hr : ¬ Value r) (F : Frame) (hF : F.o
   case hresB p ℓ a =>
     cases h with
     | hres hℓ hb hA ha hp' hl hcp hφ hT =>
-      refine .mk0 ⟨_, _, hb, FRelM.use_rgn (fun hm x hx => by
-        cases hm; exact .inr ⟨p, rfl, congrArg Elem.atm hx⟩)
-        (TypingMode.use_mono mode hφ (Caps.Sub.refl _)), fun σ hσ X _ h' => ?_⟩
+      refine .mk0 ⟨_, _, hb, FRel.use_rgn (fun x hx => by
+        exact .inr ⟨p, rfl, congrArg Elem.atm hx⟩)
+        (Stage.use_mono hφ (Caps.Sub.refl _)), fun σ hσ X _ h' => ?_⟩
       subst ha
       have hp : σ (.r p) = .rg p := hσ.1 _ (.inr (.inl rfl))
-      rw [TypingMode.use_substT_rg mode _ hp] at h'
+      rw [Stage.use_substT_rg _ hp] at h'
       have h₂ := hp'.sx (hσ.sub fun s h => by
         rcases plug_has_iff.mp h with h | h
         · exact .inr (.inr (.inl (plug_has_iff.mpr (.inl h))))
         · simp only [Tm.Has] at h; rcases h with h | h
           · subst h; exact .inr (.inl rfl)
           · exact h.elim) X
-      simp only [Flick.J.substT, TypingMode.use_substT_rg mode _ hp] at h₂
+      simp only [Flick.J.substT, Stage.use_substT_rg _ hp] at h₂
       exact .hres (by simpa [Ty.substT, Stage.substT] using cell_sx (σ := σ) hℓ X) h' hA rfl h₂
         (by rw [List.getElem?_append_left (by simpa using getElem?_lt hl), List.getElem?_map, hl]; rfl)
         (by exact ⟨.r _, hcp, by rw [hp]; rfl⟩) (Stage.le_substT σ hφ) (hT.substT σ)
@@ -106,23 +105,23 @@ theorem frame_typing_mode {Ψ Θ r t φ} (hr : ¬ Value r) (F : Frame) (hF : F.o
   case hdone p =>
     cases h with
     | hdone ha =>
-      refine .mk0 ⟨_, _, ha, FRelM.use_rgn (fun hm x hx => by
-        cases hm; exact .inr ⟨p, rfl, congrArg Elem.atm hx⟩)
+      refine .mk0 ⟨_, _, ha, FRel.use_rgn (fun x hx => by
+        exact .inr ⟨p, rfl, congrArg Elem.atm hx⟩)
         (Stage.le_refl _), fun σ hσ X _ h' => ?_⟩
       have hp : σ (.r p) = .rg p := hσ.1 _ (.inr (.inl rfl))
-      rw [TypingMode.use_substT_rg mode _ hp] at h'
+      rw [Stage.use_substT_rg _ hp] at h'
       exact .hdone h'
     | errVal hv | allI hv => exact (nv hv).elim
   case appL =>
     cases h with
     | app h₁ h₂ hψ hT =>
-      exact .mk0 ⟨_, _, h₁, .of_le (Stage.le_refl _), fun σ hσ X _ h' => .app h' (h₂.sx (hσ.sub fun _ h => .inr h) X) (by simpa only [TypingMode.use_substT] using Stage.le_substT σ hψ)
+      exact .mk0 ⟨_, _, h₁, .of_le (Stage.le_refl _), fun σ hσ X _ h' => .app h' (h₂.sx (hσ.sub fun _ h => .inr h) X) (by simpa only [Stage.use_substT] using Stage.le_substT σ hψ)
         (hT.substT σ)⟩
     | errVal hv | allI hv => exact (nv hv).elim
   case appR =>
     cases h with
     | app h₁ h₂ hψ hT =>
-      exact .mk0 ⟨_, _, h₂, .of_le (Stage.le_refl _), fun σ hσ X _ h' => .app (h₁.sx (hσ.sub fun _ h => .inl h) X) h' (by simpa only [TypingMode.use_substT] using Stage.le_substT σ hψ)
+      exact .mk0 ⟨_, _, h₂, .of_le (Stage.le_refl _), fun σ hσ X _ h' => .app (h₁.sx (hσ.sub fun _ h => .inl h) X) h' (by simpa only [Stage.use_substT] using Stage.le_substT σ hψ)
         (hT.substT σ)⟩
     | errVal hv | allI hv => exact (nv hv).elim
   case let_ =>
@@ -179,7 +178,7 @@ theorem frame_typing_mode {Ψ Θ r t φ} (hr : ¬ Value r) (F : Frame) (hF : F.o
   case await =>
     cases h with
     | await h₁ hφ hT =>
-      exact .mk0 ⟨_, _, h₁, .of_le (Stage.le_refl _), fun σ _ _ _ h' => .await h' (by simpa only [TypingMode.use_substT] using Stage.le_substT σ hφ) (hT.substT σ)⟩
+      exact .mk0 ⟨_, _, h₁, .of_le (Stage.le_refl _), fun σ _ _ _ h' => .await h' (by simpa only [Stage.use_substT] using Stage.le_substT σ hφ) (hT.substT σ)⟩
     | errVal hv | allI hv => exact (nv hv).elim
   case raise =>
     cases h with
@@ -213,12 +212,12 @@ theorem frame_typing_mode {Ψ Θ r t φ} (hr : ¬ Value r) (F : Frame) (hF : F.o
         fun σ hσ X _ h' => ?_⟩
       · rcases Stage.le_svc hφ' n hn with h | h | h
         · cases n with
-          | atm a => exact .inr (mode.dom_of (F := .inside p) ⟨p, rfl, h⟩)
+          | atm a => exact .inr (Frame.provides_of (F := .inside p) ⟨p, rfl, h⟩)
           | _ => exact h.elim
         · exact .inl (hr' n h)
         · cases n with
-          | ob N a => exact .inr (mode.dom_of (F := .inside p) (.inr ⟨p, rfl, h.1⟩))
-          | obv v a => exact .inr (mode.dom_of (F := .inside p) ⟨p, rfl, h.1⟩)
+          | ob N a => exact .inr (Frame.provides_of (F := .inside p) (.inr ⟨p, rfl, h.1⟩))
+          | obv v a => exact .inr (Frame.provides_of (F := .inside p) ⟨p, rfl, h.1⟩)
           | _ => exact h.elim
       · exact (Stage.le_err hφ').trans he'
       · have hp : σ (.r p) = .rg p := hσ.1 _ (.inl rfl)
@@ -239,8 +238,5 @@ theorem frame_typing_mode {Ψ Θ r t φ} (hr : ¬ Value r) (F : Frame) (hF : F.o
         · obtain ⟨b, hb, h''⟩ := (Ty.reach_substT σ _ _).mp h
           rwa [hav b _ h''] at hb
     | errVal hv | allI hv => exact (nv hv).elim
-
-theorem frame_typing {Ψ Θ r t φ} (hr : ¬ Value r) (F : Frame) (hF : F.ok)
-    (h : Typ S Ψ Θ [] (F.plug r) (.ex t φ)) : FrameTy S Ψ Θ F r t φ := frame_typing_mode hr F hF h
 
 end Flick

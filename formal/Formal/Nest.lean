@@ -1,23 +1,11 @@
 import Formal.WithinChain
 
 /-!
-# `⊢ Λ`: what live work names (regions.md §3.4, §5)
+# The threads of a configuration (regions.md §3.4, §5)
 
 The threads of a configuration are the main thread and the children of the live
-regions. `Nest` relates a configuration to the ancestors `anc` of its regions, the
-regions `B ℓ` each cell may hold, and the thread `home π` whose `inside π` form
-is that of `π`:
-
-- the ancestors of a region are earlier regions, and those of a live region are
-  live and nested (`Chain`); this is L5: a region closes after every region
-  created in it;
-- every thread is at the place of its base: the main thread names no region, a
-  child of `ϱ` names the ancestors of `ϱ`; the `inside` forms of a thread are
-  those of live regions whose home it is, and every live region has its form;
-- finalizers are at the place of their region, cells at their `B ℓ`.
-
-Hence every thread and finalizer reaches through the store only live regions
-(`Nest.reach`): T4.
+regions; `baseOf` is the place of a thread given the ancestors `anc` of the regions. The
+invariant over them that T4′ uses is `LNest` (`Live/LNest*.lean`).
 -/
 
 namespace Flick

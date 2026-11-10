@@ -7,33 +7,25 @@ import Formal.Live.Order
 
 namespace Flick
 
-variable {S : Sig} {mode : TypingMode}
-
-theorem held_weaken {Ψ Γ e} (X : List Ty) (hl : ∀ l, e.Has (.loc l) → l < Ψ.length) :
-    Caps.Sub (held (Ψ ++ X) Γ e) (held Ψ Γ e) := by
-  rintro a (h | ⟨p, hp, rfl⟩ | ⟨l, t, hle, ht, hr⟩)
-  · exact .inl h
-  · exact .inr (.inl ⟨p, hp, rfl⟩)
-  · rw [List.getElem?_append_left (hl l hle)] at ht
-    exact .inr (.inr ⟨l, t, hle, ht, hr⟩)
+variable {S : Sig}
 
 /-- Store weakening: `Ψ ⊆ Ψ'` keeps every judgment. -/
-theorem TypM.weakenStore {Ψ Θ Γ e J} (h : TypM S mode Ψ Θ Γ e J) (X : List Ty) :
-    TypM S mode (Ψ ++ X) Θ Γ e J := by
+theorem Typ.weakenStore {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) (X : List Ty) :
+    Typ S (Ψ ++ X) Θ Γ e J := by
   induction h generalizing X with
   | loc hl => exact .loc (by rw [List.getElem?_append_left (getElem?_lt hl)]; exact hl)
   | var hi hts hH hT => exact .var hi hts hH hT
   | allVar hi hk hc => exact .allVar hi hk hc
   | allI hv _ ih => refine .allI hv ?_; rw [List.map_append]; exact ih _
-  | lam hb hn hc hT ih => exact .lam (ih X) hn (TypingMode.held_mono (held_weaken X hb.locs) hc) hT
+  | lam hb hn hT ih => exact .lam (ih X) hn hT
   | app _ _ hψ hT ih₁ ih₂ => exact .app (ih₁ X) (ih₂ X) hψ hT
   | let_ _ _ ih₁ ih₂ => exact .let_ (ih₁ X) (ih₂ X)
   | letGen _ _ ih₁ ih₂ =>
     refine .letGen ?_ (ih₂ X)
     rw [List.map_append]; exact ih₁ _
-  | letrec hf hn hc _ ih₁ ih₂ =>
-    exact .letrec (ih₁ X) hn (TypingMode.held_mono (held_weaken X hf.locs) hc) (ih₂ X)
-  | fix hf hn hc hT ih => exact .fix (ih X) hn (TypingMode.held_mono (held_weaken X hf.locs) hc) hT
+  | letrec hf hn _ ih₁ ih₂ =>
+    exact .letrec (ih₁ X) hn (ih₂ X)
+  | fix hf hn hT ih => exact .fix (ih X) hn hT
   | lit => exact .lit
   | const hc hT => exact .const hc hT
   | ctor hK hk hH hT => exact .ctor hK hk hH hT
@@ -50,7 +42,7 @@ theorem TypM.weakenStore {Ψ Θ Γ e J} (h : TypM S mode Ψ Θ Γ e J) (X : List
       (fun θ hθ hu => ?_) (ihr X)
     rw [List.map_append, List.map_append]; exact ihA θ hθ hu _
   | todo => exact .todo
-  | task he hψ hn hc hT ih => exact .task (ih X) hψ hn (TypingMode.held_mono (held_weaken X he.locs) hc) hT
+  | task he hψ hn hT ih => exact .task (ih X) hψ hn hT
   | await _ hφ hT ih => exact .await (ih X) hφ hT
   | raise _ hφ ih => exact .raise (ih X) hφ
   | raiseAdt _ hU hφ ih => exact .raiseAdt (ih X) hU hφ
@@ -67,8 +59,8 @@ theorem TypM.weakenStore {Ψ Θ Γ e J} (h : TypM S mode Ψ Θ Γ e J) (X : List
   | inside hF _ hφ' ht hε hφ hT ih => exact .inside hF (ih X) hφ' ht hε hφ hT
   | cap => exact .cap
   | own => exact .own
-  | drec hc hk hr hn hh ih =>
-    exact .drec hc hk (ih X) hn (TypingMode.held_mono (held_weaken (e := .drec _ _) X hr.locs) hh)
+  | drec hc hk hr hn ih =>
+    exact .drec hc hk (ih X) hn
   | dnil => exact .dnil
   | dcons _ _ ih₁ ih₂ =>
     refine .dcons ?_ (ih₂ X)
@@ -99,10 +91,6 @@ theorem TypM.weakenStore {Ψ Θ Γ e J} (h : TypM S mode Ψ Θ Γ e J) (X : List
   | unw hℓ _ hφ ih => exact .unw (getElem?_ext hℓ) (ih X) hφ
   | kont hl hC hT => exact .kont (by rw [List.getElem?_append_left (getElem?_lt hl)]; exact hl) hC hT
 
-theorem Typ.weakenStore {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) (X : List Ty) :
-    Typ S (Ψ ++ X) Θ Γ e J :=
-  TypM.weakenStore h X
-
 /-- A renaming `ξ : Γ → Γ'`. -/
 def RenOk (Γ Γ' : List Scheme) (ξ : Nat → Nat) : Prop :=
   ∀ (i : Nat) t, Γ[i]? = some t → Γ'[ξ i]? = some t
@@ -131,17 +119,6 @@ theorem RenOk.lift {Γ Γ' ξ} (h : RenOk Γ Γ' ξ) (Δ : List Scheme) {n} (hn 
   · rw [List.getElem?_append_right (by omega)] at hi ⊢
     simpa using h _ _ hi
 
-theorem held_rename {Ψ Γ Γ' ξ} (hξ : RenOk Γ Γ' ξ) {e : Tm}
-    (hfree : ∀ i, e.Free i → i < Γ.length) :
-    Caps.Sub (held Ψ Γ' (e.rename ξ)) (held Ψ Γ e) := by
-  rintro a (⟨j, s, hj, hs, ha⟩ | ⟨p, hp, rfl⟩ | ⟨l, t, hle, ht, hr⟩)
-  · obtain ⟨i, hi, rfl⟩ := Tm.free_rename ξ e j hj
-    have hs' := List.getElem?_eq_getElem (hfree i hi)
-    rw [hξ _ _ hs'] at hs; cases hs
-    exact .inl ⟨i, _, hi, hs', ha⟩
-  · exact .inr (.inl ⟨p, (Tm.has_rename _ _ _).mp hp, rfl⟩)
-  · exact .inr (.inr ⟨l, t, (Tm.has_rename _ _ _).mp hle, ht, hr⟩)
-
 theorem RenOk.frees {Γ Γ' ξ} (h : RenOk Γ Γ' ξ) {e : Tm} (hf : ∀ i, e.Free i → i < Γ.length) :
     ∀ i, (e.rename ξ).Free i → i < Γ'.length := by
   intro i hi
@@ -160,7 +137,7 @@ theorem Tm.NoIns.rename {e : Tm} (ξ : Nat → Nat) (h : e.NoIns) : (e.rename ξ
   fun h' => h ((Tm.has_rename _ _ _).mp h')
 
 /-- A body parked at a hole whose filling is closed and typed is closed. -/
-theorem plug_hole_closed {Ψ Θ Ei x J} {p : Nat} (h : TypM S mode Ψ Θ [] (plug Ei x) J) :
+theorem plug_hole_closed {Ψ Θ Ei x J} {p : Nat} (h : Typ S Ψ Θ [] (plug Ei x) J) :
     (plug Ei (.hole p)).Closed :=
   fun i hi => absurd (h.frees i (plug_free_of_hole hi)) (Nat.not_lt_zero _)
 
@@ -173,31 +150,25 @@ theorem Tm.armOf_rename {ξ : Nat → Nat} {o : Name} :
     split <;> simp_all
   | _ => simp [Tm.rename, Tm.armOf]
 
-theorem TypM.rename {Ψ Θ Γ e J} (h : TypM S mode Ψ Θ Γ e J) :
-    ∀ {Γ' ξ}, RenOk Γ Γ' ξ → TypM S mode Ψ Θ Γ' (e.rename ξ) J := by
+theorem Typ.rename {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
+    ∀ {Γ' ξ}, RenOk Γ Γ' ξ → Typ S Ψ Θ Γ' (e.rename ξ) J := by
   induction h with
   | var hi hts hH hT => intro _ _ hξ; exact .var (hξ _ _ hi) hts hH hT
   | allVar hi hk hc => intro _ _ hξ; exact .allVar (hξ _ _ hi) hk hc
   | allI hv _ ih => intro _ _ hξ; exact .allI hv.rename (ih (hξ.up _))
-  | lam hb hn hc hT ih =>
+  | lam hb hn hT ih =>
     intro _ _ hξ
-    exact .lam (ih (hξ.lift [_] rfl)) (hn.rename _)
-      (TypingMode.held_mono (held_rename (e := .lam _) hξ fun i h => by
-        have := hb.frees _ h; simp at this; omega) hc) hT
+    exact .lam (ih (hξ.lift [_] rfl)) (hn.rename _) hT
   | app _ _ hψ hT ih₁ ih₂ => intro _ _ hξ; exact .app (ih₁ hξ) (ih₂ hξ) hψ hT
   | let_ _ _ ih₁ ih₂ => intro _ _ hξ; exact .let_ (ih₁ hξ) (ih₂ (hξ.lift [_] rfl))
   | letGen _ _ ih₁ ih₂ =>
     intro _ _ hξ; exact .letGen (ih₁ (hξ.up _)) (ih₂ (hξ.lift [_] rfl))
-  | letrec hf hn hc _ ih₁ ih₂ =>
+  | letrec hf hn _ ih₁ ih₂ =>
     intro _ _ hξ
-    exact .letrec (ih₁ (hξ.lift [_, _] rfl)) (hn.rename _)
-      (TypingMode.held_mono (held_rename (e := .fix _) hξ fun i h => by
-        have := hf.frees _ h; simp at this; omega) hc) (ih₂ (hξ.lift [_] rfl))
-  | fix hf hn hc hT ih =>
+    exact .letrec (ih₁ (hξ.lift [_, _] rfl)) (hn.rename _) (ih₂ (hξ.lift [_] rfl))
+  | fix hf hn hT ih =>
     intro _ _ hξ
-    exact .fix (ih (hξ.lift [_, _] rfl)) (hn.rename _)
-      (TypingMode.held_mono (held_rename (e := .fix _) hξ fun i h => by
-        have := hf.frees _ h; simp at this; omega) hc) hT
+    exact .fix (ih (hξ.lift [_, _] rfl)) (hn.rename _) hT
   | lit => intro _ _ _; exact .lit
   | loc hl => intro _ _ _; exact .loc hl
   | const hc hT => intro _ _ _; exact .const hc hT
@@ -225,10 +196,9 @@ theorem TypM.rename {Ψ Θ Γ e J} (h : TypM S mode Ψ Θ Γ e J) :
     exact .aguard hp (ih₁ (hξ.lift _ (by simpa using hp.binds)))
       (ih₂ (hξ.lift _ (by simpa using hp.binds))) (ih₃ hξ)
   | todo => intro _ _ _; exact .todo
-  | task he hψ hn hc hT ih =>
+  | task he hψ hn hT ih =>
     intro _ _ hξ
-    exact .task (ih hξ) hψ (hn.rename _)
-      (TypingMode.held_mono (held_rename (e := .task _) hξ he.frees) hc) hT
+    exact .task (ih hξ) hψ (hn.rename _) hT
   | await _ hφ hT ih => intro _ _ hξ; exact .await (ih hξ) hφ hT
   | raise _ hφ ih => intro _ _ hξ; exact .raise (ih hξ) hφ
   | raiseAdt _ hU hφ ih => intro _ _ hξ; exact .raiseAdt (ih hξ) hU hφ
@@ -250,10 +220,9 @@ theorem TypM.rename {Ψ Θ Γ e J} (h : TypM S mode Ψ Θ Γ e J) :
   | inside hF _ hφ' ht hε hφ hT ih => intro _ _ hξ; exact .inside hF (ih hξ) hφ' ht hε hφ hT
   | cap => intro _ _ _; exact .cap
   | own => intro _ _ _; exact .own
-  | drec hc hk hr hn hh ih =>
+  | drec hc hk hr hn ih =>
     intro _ _ hξ
     exact .drec hc hk (ih hξ) (hn.rename _)
-      (TypingMode.held_mono (held_rename (e := .drec _ _) hξ hr.frees) hh)
   | dnil => intro _ _ _; exact .dnil
   | dcons _ _ ih₁ ih₂ => intro _ _ hξ; exact .dcons (ih₁ (hξ.up _)) (ih₂ hξ)
   | dproj _ hc hk hl hts hH hT ih => intro _ _ hξ; exact .dproj (ih hξ) hc hk hl hts hH hT
@@ -295,9 +264,5 @@ theorem TypM.rename {Ψ Θ Γ e J} (h : TypM S mode Ψ Θ Γ e J) :
   | unw hℓ _ hφ ih => intro _ _ hξ; exact .unw hℓ (ih hξ) hφ
   | kont hl hC hT => intro _ _ _; exact .kont hl hC hT
   | glob hg hts hH hT => intro _ _ _; exact .glob hg hts hH hT
-
-theorem Typ.rename {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
-    ∀ {Γ' ξ}, RenOk Γ Γ' ξ → Typ S Ψ Θ Γ' (e.rename ξ) J :=
-  TypM.rename h
 
 end Flick

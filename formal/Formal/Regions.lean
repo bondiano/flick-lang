@@ -5,8 +5,8 @@ import Formal.Soundness
 
 A step that needs a region that is not live (`DeadUse`), and a finished region body that waits
 for a child (`Waits`). T4′ (`Live/T4Live.lean`) shows that no thread of a program typed by use
-reaches a `DeadUse`; it gives up T4.2 of the capture discipline, that nothing that can still
-step reaches a closed region.
+reaches a `DeadUse`; it does not promise that nothing that can still step reaches a closed
+region (the former T4.2).
 -/
 
 namespace Flick

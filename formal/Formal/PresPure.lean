@@ -8,7 +8,7 @@ import Formal.PresHdl
 
 namespace Flick
 
-variable {S : Sig} {mode : TypingMode}
+variable {S : Sig}
 
 theorem exh_bool : Exh S (.base .bool) [.lit (.bool true), .lit (.bool false)] := by
   intro v hs
@@ -38,28 +38,22 @@ theorem Covers.tail {t p ps v} (hc : Covers S t (p :: ps) v) (hv : Value v)
   · exact key hq hqm
 
 /-- The two arms that a guard step builds. -/
-theorem guard_typ_mode {Ψ Θ g b rest t' φ} (hg : TypM S mode Ψ Θ [] g (.ex (.base .bool) φ))
-    (hb : TypM S mode Ψ Θ [] b (.ex t' φ)) (hr : TypM S mode Ψ Θ [] rest (.ex t' φ)) :
-    TypM S mode Ψ Θ [] (.match_ g (.acons (.lit (.bool true)) b
-      (.acons (.lit (.bool false)) rest .anil))) (.ex t' φ) :=
-  .match_ hg (.acons .lit hb (.acons .lit hr .anil)) (.inl exh_bool)
-
 theorem guard_typ {Ψ Θ g b rest t' φ} (hg : Typ S Ψ Θ [] g (.ex (.base .bool) φ))
     (hb : Typ S Ψ Θ [] b (.ex t' φ)) (hr : Typ S Ψ Θ [] rest (.ex t' φ)) :
     Typ S Ψ Θ [] (.match_ g (.acons (.lit (.bool true)) b
       (.acons (.lit (.bool false)) rest .anil))) (.ex t' φ) :=
-  guard_typ_mode hg hb hr
+  .match_ hg (.acons .lit hb (.acons .lit hr .anil)) (.inl exh_bool)
 
-theorem pure_preservation_mode {Ψ Θ e t φ e'} (h : TypM S mode Ψ Θ [] e (.ex t φ))
-    (hh : PHead e e') : TypM S mode Ψ Θ [] e' (.ex t φ) := by
+theorem pure_preservation {Ψ Θ e t φ e'} (h : Typ S Ψ Θ [] e (.ex t φ))
+    (hh : PHead e e') : Typ S Ψ Θ [] e' (.ex t φ) := by
   have nv := hh.not_value
   cases hh with
   | beta hv =>
     cases h with
     | app hf ha hψ hT =>
       cases hf with
-      | lam hb _ _ hT' =>
-        obtain ⟨_, _, _, _, h, la, lψ, lt, -⟩ := TypingMode.subtype.arrow_left hT'
+      | lam hb _ hT' =>
+        obtain ⟨_, _, _, _, h, la, lψ, lt, -⟩ := LeLive.arrow_left hT'
         cases h
         exact (hb.inst (Δ := [_]) (.cons hv ((ha.valueAny hv _).sub ⟨la, Stage.le_refl _⟩) .nil)).sub
           ⟨lt.trans hT, Stage.le_trans lψ hψ⟩
@@ -68,39 +62,39 @@ theorem pure_preservation_mode {Ψ Θ e t φ e'} (h : TypM S mode Ψ Θ [] e (.e
     cases h with
     | app hf ha hψ hT =>
       cases hf with
-      | fix hb hn hc hT' =>
-        obtain ⟨_, _, _, _, h, la, lψ, lt, -⟩ := TypingMode.subtype.arrow_left hT'
+      | fix hb hn hT' =>
+        obtain ⟨_, _, _, _, h, la, lψ, lt, -⟩ := LeLive.arrow_left hT'
         cases h
         exact (hb.inst (Δ := [_, _]) (.cons hv ((ha.valueAny hv _).sub ⟨la, Stage.le_refl _⟩)
-          (.cons .fix (.fix hb hn hc (TypingMode.subtype.refl)) .nil))).sub
+          (.cons .fix (.fix hb hn (LeLive.refl)) .nil))).sub
           ⟨lt.trans hT, Stage.le_trans lψ hψ⟩
     | errVal hv' | allI hv' => exact (nv hv').elim
   | let_ hv =>
     cases h with
     | let_ h₁ h₂ => exact h₂.inst (Δ := [_]) (.cons hv (h₁.valueAny hv _) .nil)
-    | letGen h₁ h₂ => exact h₂.subst (SubOkM.one hv h₁)
+    | letGen h₁ h₂ => exact h₂.subst (SubOk.one hv h₁)
     | errVal hv'' | allI hv'' => exact (nv hv'').elim
   | letrec =>
     cases h with
-    | letrec h₁ hn hc h₂ =>
-      exact h₂.inst (Δ := [_]) (.cons .fix (.fix h₁ hn hc (TypingMode.subtype.refl)) .nil)
+    | letrec h₁ hn h₂ =>
+      exact h₂.inst (Δ := [_]) (.cons .fix (.fix h₁ hn (LeLive.refl)) .nil)
     | errVal hv'' | allI hv'' => exact (nv hv'').elim
   | proj _ hw =>
     cases h with
-    | proj h₁ hR hT => exact (field_typ_mode h₁ hw hR).sub ⟨hT, Stage.le_refl _⟩
+    | proj h₁ hR hT => exact (field_typ h₁ hw hR).sub ⟨hT, Stage.le_refl _⟩
     | dproj h₁ hc hk hl hts hH hT =>
-      exact (dict_field_mode ‹_› h₁ hc hl hts hH hw).sub ⟨hT, Stage.pure_le _⟩
+      exact (dict_field ‹_› h₁ hc hl hts hH hw).sub ⟨hT, Stage.pure_le _⟩
     | errVal hv'' | allI hv'' => exact (nv hv'').elim
   | update _ _ hv' =>
     cases h with
-    | update h₁ hR h₂ => exact setField_typ_mode h₂ h₁ hv' hR
+    | update h₁ hR h₂ => exact setField_typ h₂ h₁ hv' hR
     | errVal hv'' | allI hv'' => exact (nv hv'').elim
   | matchYes hv hm =>
     cases h with
     | match_ h₁ hA _ =>
       cases hA with
-      | acons hp hb _ => exact hb.inst (hp.inst_mode hv (h₁.valueAny hv _) hm)
-      | aref hK hU hn _ _ hpA hbA _ => exact aref_match_mode hv h₁ hK hU hn hpA hbA hm
+      | acons hp hb _ => exact hb.inst (hp.inst hv (h₁.valueAny hv _) hm)
+      | aref hK hU hn _ _ hpA hbA _ => exact aref_match hv h₁ hK hU hn hpA hbA hm
     | errVal hv'' | allI hv'' => exact (nv hv'').elim
   | matchNo hv hm =>
     cases h with
@@ -114,8 +108,8 @@ theorem pure_preservation_mode {Ψ Θ e t φ e'} (h : TypM S mode Ψ Θ [] e (.e
     | match_ h₁ hA hc =>
       cases hA with
       | aguard hp hg hb hr =>
-        have hδ := hp.inst_mode hv (h₁.valueAny hv _) hm
-        exact guard_typ_mode (hg.inst hδ) (hb.inst hδ) (.match_ h₁ hr hc)
+        have hδ := hp.inst hv (h₁.valueAny hv _) hm
+        exact guard_typ (hg.inst hδ) (hb.inst hδ) (.match_ h₁ hr hc)
     | errVal hv'' | allI hv'' => exact (nv hv'').elim
   | guardNo hv hm =>
     cases h with
@@ -133,27 +127,27 @@ theorem pure_preservation_mode {Ψ Θ e t φ e'} (h : TypM S mode Ψ Θ [] e (.e
       | app hc _ _ hT' =>
         cases hc with
         | const _ hT'' =>
-          obtain ⟨_, _, _, _, h, _, _, lt, -⟩ := TypingMode.subtype.arrow_left hT''
+          obtain ⟨_, _, _, _, h, _, _, lt, -⟩ := LeLive.arrow_left hT''
           cases h
-          obtain ⟨_, _, _, _, h, _, _, lt', -⟩ := TypingMode.subtype.arrow_left (lt.trans hT')
+          obtain ⟨_, _, _, _, h, _, _, lt', -⟩ := LeLive.arrow_left (lt.trans hT')
           cases h
-          obtain rfl := TypingMode.subtype.eq_base_left lt'
-          obtain rfl := TypingMode.subtype.eq_base_left hT
+          obtain rfl := LeLive.eq_base_left lt'
+          obtain rfl := LeLive.eq_base_left hT
           exact .lit
     | errVal hv'' | allI hv'' => exact (nv hv'').elim
   | hwithVal hv =>
     cases h with
     | hwith _ _ hrf hψ he _ _ hφ hT =>
-      exact .app (hrf.sub ⟨TypingMode.subtype.refl, hφ⟩) (he.valueAny hv _)
+      exact .app (hrf.sub ⟨LeLive.refl, hφ⟩) (he.valueAny hv _)
         (Stage.le_trans hψ hφ) hT
     | errVal hv'' | allI hv'' => exact (nv hv'').elim
   | hctlTail hE' hk' hv =>
     cases h with
     | hctl hℓ hal hrf hψ hop hc htl hE hk hp hφ₀ ha _ hcm hφ hT hat =>
       obtain ⟨rfl, -⟩ := plug_hole_inj hE' hE (hk'.symm.trans hk)
-      refine .hwith hℓ hal hrf hψ (refill_app_mode hE perform_not_value hp (perform_fn hop) perform_up
+      refine .hwith hℓ hal hrf hψ (refill_app hE perform_not_value hp (perform_fn hop) perform_up
         fun T φ' hΘ _ hb _ => ?_) hφ₀ hcm hφ hT hat
-      exact (((by simpa using ha : TypM S mode _ _ [] _ (.ex _ _)).valueAny hv φ').sub (J' := .ex T φ')
+      exact (((by simpa using ha : Typ S _ _ [] _ (.ex _ _)).valueAny hv φ').sub (J' := .ex T φ')
         ⟨hb hc, Stage.le_refl _⟩).cut hΘ.entails
     | errVal hv'' | allI hv'' => exact (nv hv'').elim
   | hkeepVal hv =>
@@ -164,7 +158,7 @@ theorem pure_preservation_mode {Ψ Θ e t φ e'} (h : TypM S mode Ψ Θ [] e (.e
     cases h with
     | hkarm hℓ hal hop hE hk hp hφ₀ hc hnt ha hle hφ hT =>
       obtain ⟨rfl, -⟩ := plug_hole_inj hE' hE (hk'.symm.trans hk)
-      refine .hkeep hℓ hal (refill_app_mode hE perform_not_value hp (perform_fn hop) perform_up
+      refine .hkeep hℓ hal (refill_app hE perform_not_value hp (perform_fn hop) perform_up
         fun T φ' hΘ _ hb _ => ?_) hφ₀ hc hnt hle hφ hT
       exact ((ha.valueAny hv φ').sub (J' := .ex T φ')
         ⟨hb (by decide), Stage.le_refl _⟩).cut hΘ.entails
@@ -173,27 +167,23 @@ theorem pure_preservation_mode {Ψ Θ e t φ e'} (h : TypM S mode Ψ Θ [] e (.e
     cases h with
     | hctl hℓ hal hrf hψ hop hc htl hE hk hp hφ₀ ha _ hcm hφ hT hat =>
       obtain ⟨rfl, -⟩ := plug_hole_inj hE' hE (hk'.symm.trans hk)
-      refine .hwith hℓ hal hrf hψ (refill_app_mode hE perform_not_value hp (perform_fn hop) perform_up
+      refine .hwith hℓ hal hrf hψ (refill_app hE perform_not_value hp (perform_fn hop) perform_up
         fun T φ' hΘ hψ₀ _ _ => ?_) hφ₀ hcm hφ hT hat
-      exact .unw hℓ ((by simpa using ha : TypM S mode _ _ [] _ (.ex _ _)).cut hΘ.entails)
+      exact .unw hℓ ((by simpa using ha : Typ S _ _ [] _ (.ex _ _)).cut hΘ.entails)
           (Stage.none_le (Stage.rt_ne_pure hψ₀))
     | errVal hv'' | allI hv'' => exact (nv hv'').elim
   | hresVal hA' ha' hv =>
     cases h with
     | hres _ hb hA ha hp hl hcp hφ hT =>
       obtain ⟨rfl, -⟩ := plug_hole_inj hA' hA (ha'.symm.trans ha)
-      have h₁ := refill_app_mode hA kont_not_value hp (kont_fn hl) (fun _ _ h l => h.trans l)
+      have h₁ := refill_app hA kont_not_value hp (kont_fn hl) (fun _ _ h l => h.trans l)
         fun T φ' hΘ _ hb' _ =>
           ((hb.valueAny hv φ').sub (J' := .ex T φ') ⟨hb', Stage.le_refl _⟩).cut hΘ.entails
-      exact .hdone (h₁.sub ⟨hT, TypingMode.use_mono mode hφ (Caps.Sub.refl _)⟩)
+      exact .hdone (h₁.sub ⟨hT, Stage.use_mono hφ (Caps.Sub.refl _)⟩)
     | errVal hv'' | allI hv'' => exact (nv hv'').elim
   | hdoneVal hv =>
     cases h with
     | hdone ha => exact ha.valueAny hv φ
     | errVal hv'' | allI hv'' => exact (nv hv'').elim
-
-theorem pure_preservation {Ψ Θ e t φ e'} (h : Typ S Ψ Θ [] e (.ex t φ)) (hh : PHead e e') :
-    Typ S Ψ Θ [] e' (.ex t φ) :=
-  pure_preservation_mode h hh
 
 end Flick

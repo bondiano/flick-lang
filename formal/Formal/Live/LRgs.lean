@@ -16,7 +16,7 @@ variable {S : Sig}
 
 /-- A term typed at a stage whose region atoms are in `A`. -/
 def LTy (S : Sig) (Ψ : List Ty) (A : Nat → Prop) (k : Tm) : Prop :=
-  ∃ t φ, TypM S .live Ψ Facts.age [] k (.ex t φ) ∧ ∀ x, φ.svc (.atm (.r x)) → A x
+  ∃ t φ, Typ S Ψ Facts.age [] k (.ex t φ) ∧ ∀ x, φ.svc (.atm (.r x)) → A x
 
 /-- The children and finalizers of a region `p` are typed at stages of ancestors of `p`. -/
 def LRgs (S : Sig) (Ψ : List Ty) (anc : Nat → Nat → Prop) (Λ : List Rgn) : Prop :=
@@ -31,11 +31,11 @@ theorem LTy.mono {Ψ A A' k} (h : LTy S Ψ A k) (hA : ∀ x, A x → A' x) : LTy
 
 /-- Renaming away regions not yet created can only remove stage atoms. -/
 theorem LTy.kill {Ψ A k n} {t : Ty} {φ : Stage}
-    (h : TypM S .live Ψ Facts.age [] k (.ex (t.substT (kill n)) (φ.substT (kill n))))
+    (h : Typ S Ψ Facts.age [] k (.ex (t.substT (kill n)) (φ.substT (kill n))))
     (ha : ∀ x, φ.svc (.atm (.r x)) → A x) : LTy S Ψ A k :=
   ⟨_, _, h, fun x hx => ha x (Stage.kill_atm hx).1⟩
 
-theorem LRgs.toRgs {Ψ anc Λ} (h : LRgs S Ψ anc Λ) : RgsTyM S .live Ψ Λ := fun p g hg =>
+theorem LRgs.toRgs {Ψ anc Λ} (h : LRgs S Ψ anc Λ) : RgsTy S Ψ Λ := fun p g hg =>
   ⟨fun k hk => let ⟨t, φ, h, _⟩ := (h p g hg).1 k hk; ⟨t, φ, h⟩,
     fun f hf => let ⟨t, φ, h, _⟩ := (h p g hg).2 f hf; ⟨t, φ, h⟩⟩
 
@@ -86,7 +86,7 @@ theorem LRgs.setKid {Ψ anc Λ p j k} (h : LRgs S Ψ anc Λ) (hk : LTy S Ψ (anc
 /-- The finalizer `open_` registers uses only its region. -/
 theorem op_cap_live {Ψ} (p : Nat) : LTy S Ψ (· = p) (.app (.const .op) (.cap p)) := by
   refine ⟨_, _, .app (.const (ι := { (default : CArg) with s := .rg p }) trivial
-    TypingMode.subtype.refl) .cap (Stage.le_refl _) TypingMode.subtype.refl, fun x hx => ?_⟩
+    LeLive.refl) .cap (Stage.le_refl _) LeLive.refl, fun x hx => ?_⟩
   rcases hx with hx | hx
   · cases hx; rfl
   · exact hx.elim
@@ -102,7 +102,7 @@ def Place (Ψ : List Ty) (anc : Nat → Nat → Prop) (φ : Stage) (E : List Fra
 
 /-- A child or a finalizer registered at a place runs at a stage of ancestors of its owner. -/
 theorem kid_live {Ψ anc E c p w t φ H} (hE : OkE E) (hc : c = .addFin ∨ c = .spawn) (hv : Value w)
-    (h : TypM S .live Ψ Facts.age [] (plug E (.app (.app (.const c) (.own p)) w)) (.ex t φ))
+    (h : Typ S Ψ Facts.age [] (plug E (.app (.app (.const c) (.own p)) w)) (.ex t φ))
     (ha : (plug E (.app (.app (.const c) (.own p)) w)).Asc 0) (hP : Place Ψ anc φ E H) :
     LTy S Ψ (anc p) (withs p E (.await w)) := by
   obtain ⟨hch, hφ, hfr, hcl⟩ := hP
@@ -145,7 +145,7 @@ theorem LRgs.rhead {Ψ anc Λ μ r Λ' μ' r'} (hΛ : LRgs S Ψ anc Λ)
 
 /-- Registration is the only thread step that adds new work. -/
 theorem LRgs.step {root Ψ anc Λ μ e t φ l Λ' μ' e'} (hΛ : LRgs S Ψ anc Λ)
-    (hself : ∀ p, anc p p) (h : TypM S .live Ψ Facts.age [] e (.ex t φ)) (ha : e.Asc 0)
+    (hself : ∀ p, anc p p) (h : Typ S Ψ Facts.age [] e (.ex t φ)) (ha : e.Asc 0)
     (hplace : ∀ E r, OkE E → e = plug E r → ¬ Value r → ∃ H, Place Ψ anc φ E H)
     (hs : Step root l Λ μ e (.cfg Λ' μ' e')) : LRgs S Ψ anc Λ' := by
   cases hs with

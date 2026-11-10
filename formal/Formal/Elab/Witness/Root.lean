@@ -40,7 +40,7 @@ def root : Roots := ⟨fun _ => none, bodyF⟩
 variable {Ψ : List Flick.Ty} {Θ : Facts}
 
 theorem typ_seqFlatMap_tr (c d a b e : Ty) {φ} :
-    TypM Sg .live Ψ Θ [] seqFlatMap (.ex (trT N (bindTy (.con 9) c d a b e)) φ) := by
+    Typ Sg Ψ Θ [] seqFlatMap (.ex (trT N (bindTy (.con 9) c d a b e)) φ) := by
   simp only [bindTy, arrP, appQ, trT, if_neg (show (9 : Nat) ≠ 2 by decide),
     if_neg (show (9 : Nat) ≠ 4 by decide)]
   exact typ_seqFlatMap
@@ -48,7 +48,7 @@ theorem typ_seqFlatMap_tr (c d a b e : Ty) {φ} :
 theorem frBody_has (s : Site) : ¬ frBody.Has s := by simp [frBody, Flick.Tm.Has]
 
 theorem const_typ {c s b} (hc : constSch c = some s) (hb : constBody c = some b) :
-    (∀ x, ¬ b.Has x) ∧ TypM Sg .live [] Facts.none [] b (.ex (trTT N (dicts .cnil s.ctx (.mono s.ty))) .pure) := by
+    (∀ x, ¬ b.Has x) ∧ Typ Sg [] Facts.none [] b (.ex (trTT N (dicts .cnil s.ctx (.mono s.ty))) .pure) := by
   unfold constSch at hc
   split at hc
   rotate_right
@@ -83,12 +83,12 @@ theorem const_typ {c s b} (hc : constSch c = some s) (hb : constBody c = some b)
   · exact ⟨fun _ h => by simp [seqEach, caseSeq, Flick.Tm.Has] at h, typ_seqEach⟩
   · exact ⟨fun _ h => h, typ_con0 (us := []) rfl⟩
 
-theorem typ_eqRec {Ψ Θ} : TypM Sg .live Ψ Θ [.mono (trD N ⟨cEq, [tyInt]⟩)] eqRec
+theorem typ_eqRec {Ψ Θ} : Typ Sg Ψ Θ [.mono (trD N ⟨cEq, [tyInt]⟩)] eqRec
     (.ex (trT N ((arrP (.var 0) (arrP (.var 0) boolTy)).subst (inst [.con 13]))) .pure) := by
   have hR : ∀ {Γ' : List Flick.Scheme} {e b t},
-      TypM Sg .live Ψ Θ Γ' e (.ex (tc "Rec" []) .pure) →
-      TypM Sg .live Ψ Θ (.mono (.base .int) :: Γ') b (.ex t .pure) →
-      TypM Sg .live Ψ Θ Γ' (.match_ e (.acons (pvars "MkRec" 1) b .anil)) (.ex t .pure) := fun he hb =>
+      Typ Sg Ψ Θ Γ' e (.ex (tc "Rec" []) .pure) →
+      Typ Sg Ψ Θ (.mono (.base .int) :: Γ') b (.ex t .pure) →
+      Typ Sg Ψ Θ Γ' (.match_ e (.acons (pvars "MkRec" 1) b .anil)) (.ex t .pure) := fun he hb =>
     .match_ he (.acons (.adt (.app (.head (K := "MkRec") (ts := [.base .int]) (us := []) rfl Sig.inj_plain rfl) .var)
       (tcon_hd _ _)) hb .anil) (.inl (exh_one (K := "MkRec") (ts := [.base .int]) rfl hone_rec []))
   refine typ_lam (typ_lam (hR (typ_var_mono rfl) (hR (typ_var_mono rfl)
@@ -101,12 +101,12 @@ theorem typ_eqRec {Ψ Θ} : TypM Sg .live Ψ Θ [.mono (trD N ⟨cEq, [tyInt]⟩
   rw [Flick.Scheme.inst, substT_instT_nil, mfield_t]; exact .refl
 
 theorem strct_typ : (∀ x, ¬ strctBody.Has x) ∧
-    TypM Sg .live [] Facts.none [] strctBody (.ex (trTT N (strctTy cEq tyRec [tyInt])) .pure) :=
+    Typ Sg [] Facts.none [] strctBody (.ex (trTT N (strctTy cEq tyRec [tyInt])) .pure) :=
   ⟨fun _ h => by simp [strctBody, eqRec, pvars, Flick.Tm.Has] at h,
    typ_lam (.drec (us := [trT N (.con 13)]) rfl rfl (.dcons (by
-      show TypM Sg .live ([].map (Flick.Ty.up 0)) _ (List.map (Flick.Scheme.up 0) _) _ _
+      show Typ Sg ([].map (Flick.Ty.up 0)) _ (List.map (Flick.Scheme.up 0) _) _ _
       rw [List.map_sup_zero, mfield_t]; exact typ_eqRec) .dnil)
-      (fun h => by simp [eqRec, pvars, Flick.Tm.Has] at h) trivial)
+      (fun h => by simp [eqRec, pvars, Flick.Tm.Has] at h))
     (fun _ h => by simp [eqRec, pvars, Flick.Tm.Has] at h)⟩
 
 theorem inst_body {I ins} (h : insts I = some ins) : ∃ b, instBody I = some b ∧ ∀ x, ¬ b.Has x := by
@@ -138,7 +138,7 @@ theorem constSch_body {c s} (h : constSch c = some s) : ∃ b, constBody c = som
     · exact ⟨frBody, by simp [constBody, *]⟩
     · cases h
 
-theorem rootTy : RootTyM Sg .live root where
+theorem rootTy : RootTy Sg root where
   svc _ _ h := by cases h
   svcBelow _ _ h := by cases h
   glob g v h := by

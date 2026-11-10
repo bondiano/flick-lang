@@ -225,11 +225,9 @@ structure RootBelow (root : Roots) : Prop where
   svc : ∀ N v, root.svc N = some v → ∀ p, ¬ v.Has (.rgn p)
   glob : ∀ g v, root.glob g = some v → ∀ x, ¬ v.Has x
 
-theorem RootTyM.below {mode : TypingMode} {root : Roots} (hroot : RootTyM S mode root) :
+theorem RootTy.below {root : Roots} (hroot : RootTy S root) :
     RootBelow root :=
   ⟨hroot.svcBelow, fun g v h => (hroot.glob g v h).1⟩
-
-theorem RootTy.below {root : Roots} (hroot : RootTy S root) : RootBelow root := RootTyM.below hroot
 
 theorem root_below {root : Roots} (hroot : RootBelow root) {N v} (h : root.svc N = some v)
     (n : Nat) : v.Below n := fun p hp => (hroot.svc _ _ h p hp).elim

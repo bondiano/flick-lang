@@ -101,7 +101,7 @@ theorem field_free {r w : Flick.Tm} {l : Label} (h : r.field l = some w) {j : Na
   | _ => simp [Flick.Tm.field] at h
 
 /-- **The slots of the instances name only their premises**: the bodies are closed. -/
-theorem slots_below (hRun : RealRun P N root) (hroot : RootTyM Sg .live root) : SlotsBelow P := by
+theorem slots_below (hRun : RealRun P N root) (hroot : RootTy Sg root) : SlotsBelow P := by
   intro I ins i s k hI hs hk
   obtain ⟨r, hg, hf⟩ := hRun.inst hI
   obtain ⟨-, sc, -, ht⟩ := hroot.glob _ _ hg
@@ -121,7 +121,7 @@ def RHas (Γ : List TSch) (Δ : List Cn) (e : Tm) (t : TTy) (φ : Stage) : Prop 
   Has Sg N Γ Δ e t φ ∧ ∀ d, e = .dict d → DTyp P Δ d t
 
 /-- **λFlick⁺ as a `Target` with the run of the core.** -/
-def runTarget (hR : Real P Sg N) (hRun : RealRun P N root) (hroot : RootTyM Sg .live root) : Target P where
+def runTarget (hR : Real P Sg N) (hRun : RealRun P N root) (hroot : RootTy Sg root) : Target P where
   Has := RHas P Sg N
   var hx hk := ⟨(typingTarget hR).var hx hk, fun _ h => by cases h⟩
   allLam h := ⟨(typingTarget hR).allLam h.1, fun _ h => by cases h⟩
@@ -161,7 +161,7 @@ def runTarget (hR : Real P Sg N) (hRun : RealRun P N root) (hroot : RootTyM Sg .
   final_rel hr ho := ⟨_, .refl, final_sim hr ho⟩
 
 /-- **T6(b) for the core with its run**: `Sim` is `Target.sim` of `runTarget`. -/
-theorem T6b_core (hR : Real P Sg N) (hRun : RealRun P N root) (hroot : RootTyM Sg .live root)
+theorem T6b_core (hR : Real P Sg N) (hRun : RealRun P N root) (hroot : RootTy Sg root)
     {lt : Cn → Cn → Prop} (h : Coherent P lt) (s : Tm) {t : TTy} {φ : Stage}
     {Δ : List Cn} {θ : Nat → Ty} {ρ : Nat → Dict} (hρ : Closes P Δ θ ρ) {qs : List Cn}
     {ds₁ ds₂ : List Dict} (h₁ : Ent P Δ qs ds₁) (h₂ : Ent P Δ qs ds₂)

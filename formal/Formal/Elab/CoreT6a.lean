@@ -58,12 +58,12 @@ theorem Corr.nil (γ δ : Nat → Nat) : Corr N [] [] [] γ δ := ⟨fun _ => rf
 every core context that corresponds to `⟦Γ⟧` and `⟦Δ⟧`. -/
 theorem T6a_core (hR : Real P Sg N) {Γ Δ e τ φ e'} (h : Elab P Γ Δ e τ φ e') {Ψ Θ Γc γ δ}
     (hc : Corr N Γc (Γ.map Scheme.tr) Δ γ δ) :
-    ∃ e'', Tr N γ δ e' e'' ∧ TypM Sg .live Ψ Θ Γc e'' (.ex (trT N τ) (trStage N φ)) :=
+    ∃ e'', Tr N γ δ e' e'' ∧ Typ Sg Ψ Θ Γc e'' (.ex (trT N τ) (trStage N φ)) :=
   T6a (typingTarget hR) h Ψ Θ Γc γ δ hc
 
 /-- A closed program: its elaboration is a closed core term of the translated type. -/
 theorem T6a_closed (hR : Real P Sg N) {e τ φ e'} (h : Elab P [] [] e τ φ e') (Ψ : List Flick.Ty)
-    (Θ : Facts) : ∃ e'', Tr N id id e' e'' ∧ TypM Sg .live Ψ Θ [] e'' (.ex (trT N τ) (trStage N φ)) :=
+    (Θ : Facts) : ∃ e'', Tr N id id e' e'' ∧ Typ Sg Ψ Θ [] e'' (.ex (trT N τ) (trStage N φ)) :=
   T6a_core hR h (Corr.nil id id)
 
 /-- `f (λx. x)` for a constant `f : (∀a. a → a) → Int` elaborates, and its elaboration is typed
@@ -72,7 +72,7 @@ example (hR : Real P Sg N) {c : Nat}
     (hc : P.consts c = some ⟨0, [], .arr .P (.all 1 (.arr .P (.var 0) (.var 0) .cnil)) intTy .cnil, .cnil⟩)
     (Ψ : List Flick.Ty) (Θ : Facts) :
     ∃ e'', Tr N id id (.app (.const c) (.lam (.var 0))) e'' ∧
-      TypM Sg .live Ψ Θ [] e'' (.ex (trT N intTy) .pure) := by
+      Typ Sg Ψ Θ [] e'' (.ex (trT N intTy) .pure) := by
   have hl : Elab P [] [] (.app (.const c) (.lam (.var 0))) intTy .P (.app (.const c) (.lam (.var 0))) := by
     refine .app (φ := .P) (ψ := .P) (.const (ts := []) (ds := []) hc rfl .nil) (.allLam (k := 1) ?_) (.inl rfl)
     exact .lam (.var (σ := ⟨0, [], .var 0, .cnil⟩) (ts := []) (ds := []) rfl rfl .nil)

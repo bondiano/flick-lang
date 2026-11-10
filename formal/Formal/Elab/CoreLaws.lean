@@ -61,8 +61,8 @@ structure Real : Prop where
   ctor : ∀ {K c}, P.ctors K = Option.some c →
     S.ctor (N.ctor K) = Option.some (c.k, c.ctx.map (trD N) ++ c.fields.map (trT N), N.con c.T) ∧
       S.res (N.ctor K) = c.res.map (trT N) ∧ c.T ≠ 2 ∧ c.T ≠ 4
-  /-- What a value of a constructor holds its type shows, through the hidden row of
-  captures of the checker. -/
+  /-- The fields of a constructor reach no more than the type it builds (`Sig.Holds`), the
+  premise of (Ctor). -/
   ctor_holds : ∀ {K c}, P.ctors K = Option.some c → ∀ us : List Flick.Ty, us.length = c.k →
     Sig.Holds (c.ctx.map (trD N) ++ c.fields.map (trT N)) (N.con c.T) (c.res.map (trT N)) us
   /-- In a program with data types, type constructors have names apart. -/
@@ -72,7 +72,7 @@ structure Real : Prop where
 /-- `Γ, ⟦Δ⟧ ⊢⁺ e : t ! φ` in the core. -/
 def Has (Γ : List TSch) (Δ : List Cn) (e : Tm) (t : TTy) (φ : Stage) : Prop :=
   ∀ Ψ Θ Γc γ δ, Corr N Γc Γ Δ γ δ →
-    ∃ e', Tr N γ δ e e' ∧ TypM S .live Ψ Θ Γc e' (.ex (trTT N t) (trStage N φ))
+    ∃ e', Tr N γ δ e e' ∧ Typ S Ψ Θ Γc e' (.ex (trTT N t) (trStage N φ))
 
 variable {P S N}
 
@@ -90,7 +90,7 @@ theorem trTT_inst_tr (t : TTy) (ts : List Ty) :
 /-- A call of an arrow at `ψ` with the qualifier `q` runs at the stage `φ` that keeps `q`
 live: the atoms of `⌈⟦q⟧⌉` are in the row of `⟦φ⟧` (`trT_keeps`). -/
 theorem trStage_use_le {ψ φ : Stage} {q : Ty} (h : ψ = .P ∨ ψ = φ ∧ φ.Keeps q) :
-    (TypingMode.live.use (trStage N ψ) (trT N q).reach).le (trStage N φ) := by
+    (Stage.use (trStage N ψ) (trT N q).reach).le (trStage N φ) := by
   rcases h with rfl | ⟨rfl, hk⟩
   · trivial
   · cases ψ with
@@ -176,7 +176,7 @@ theorem has_ite {Γ Δ c a b t φ} (hc : Has S N Γ Δ c (.mono boolTy) φ) (ha 
   obtain ⟨c', hc', tc⟩ := hc Ψ Θ Γc γ δ hC
   obtain ⟨a', ha', ta⟩ := ha Ψ Θ Γc γ δ hC
   obtain ⟨b', hb', tb⟩ := hb Ψ Θ Γc γ δ hC
-  have tc' : TypM S .live Ψ Θ Γc c' (.ex (.base (Lit.bool true).base) (trStage N φ)) := by
+  have tc' : Typ S Ψ Θ Γc c' (.ex (.base (Lit.bool true).base) (trStage N φ)) := by
     have := trT_bool N; simp only [trTT] at tc; rwa [this] at tc
   exact ⟨_, .ite hc' ha' hb', .match_ tc' (.acons .lit ta (.acons .wild tb .anil))
     (.inl fun _ _ => ⟨.wild, by simp [Flick.Tm.unguarded], rfl⟩)⟩
@@ -206,7 +206,7 @@ theorem has_lam {Γ Δ b a t q φ ψ} (hb : Has S N (⟨0, .mono a⟩ :: Γ) Δ 
   intro Ψ Θ Γc γ δ hc
   obtain ⟨b', hb', tb⟩ := hb Ψ Θ _ _ _ (hc.cons N ⟨0, .mono a⟩)
   simp only [trTT, trT_arr]
-  exact ⟨_, .lam hb', .lam (tb.sub ⟨.refl, TypingMode.le_use _ _ _⟩) (hb'.noIns N) trivial .refl⟩
+  exact ⟨_, .lam hb', .lam (tb.sub ⟨.refl, Stage.le_use _ _⟩) (hb'.noIns N) .refl⟩
 
 theorem has_let {Γ Δ e b k t u φ₁ φ}
     (he : Has S N (Γ.map (·.subst (up k))) (Δ.map (·.subst (up k))) e t φ₁)
@@ -215,7 +215,7 @@ theorem has_let {Γ Δ e b k t u φ₁ φ}
   intro Ψ Θ Γc γ δ hc
   obtain ⟨b', hb', tb⟩ := hb Ψ Θ _ _ _ (hc.cons N ⟨k, t⟩)
   have gen : φ₁ = .P → ∃ e', Tr N γ δ (.let_ e b) e' ∧
-      TypM S .live Ψ Θ Γc e' (.ex (trTT N u) (trStage N φ)) := fun h => by
+      Typ S Ψ Θ Γc e' (.ex (trTT N u) (trStage N φ)) := fun h => by
     subst h
     obtain ⟨e', he', te⟩ :=
       he (Ψ.map (Flick.Ty.up k)) (Facts.union (Θ.substT (shiftV k)) Facts.none) _ _ _ (hc.up N k)

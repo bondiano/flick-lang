@@ -11,7 +11,7 @@ substitution lemma drops them again with the facts the use of the variable check
 
 namespace Flick
 
-variable {S : Sig} {mode : TypingMode}
+variable {S : Sig}
 
 /-- `Θ₁` gives no more than `Θ₂`. -/
 def Entails (Θ₁ Θ₂ : Facts) : Prop := ∀ C s, Outl Θ₁ C s → Outl Θ₂ C s
@@ -91,20 +91,20 @@ theorem Row.hP_mono {Θ₁ Θ₂ : Facts} {q : Nat} {E : Name} {r : Row} (hΘ : 
   | ob N a => exact ⟨fun h => hΘ _ _ (hx.1 h), hx.2⟩
   | _ => exact hx
 
-theorem TypM.cut {Ψ Θ₁ Γ e J} (h : TypM S mode Ψ Θ₁ Γ e J) : ∀ {Θ₂}, Entails Θ₁ Θ₂ → TypM S mode Ψ Θ₂ Γ e J := by
+theorem Typ.cut {Ψ Θ₁ Γ e J} (h : Typ S Ψ Θ₁ Γ e J) : ∀ {Θ₂}, Entails Θ₁ Θ₂ → Typ S Ψ Θ₂ Γ e J := by
   induction h with
   | var hi hts hH hT => intro _ hΘ; exact .var hi hts (hH.mono hΘ) hT
   | allVar hi hk hc => intro _ _; exact .allVar hi hk hc
   | allI hv _ ih => intro _ hΘ; exact .allI hv (ih (hΘ.substT _))
-  | lam _ hn hc hT ih => intro _ hΘ; exact .lam (ih hΘ) hn hc hT
+  | lam _ hn hT ih => intro _ hΘ; exact .lam (ih hΘ) hn hT
   | app _ _ hψ hT ih₁ ih₂ => intro _ hΘ; exact .app (ih₁ hΘ) (ih₂ hΘ) hψ hT
   | let_ _ _ ih₁ ih₂ => intro _ hΘ; exact .let_ (ih₁ hΘ) (ih₂ hΘ)
   | letGen _ _ ih₁ ih₂ => intro _ hΘ; exact .letGen (ih₁ (hΘ.lift _ _)) (ih₂ hΘ)
-  | letrec _ hn hc _ ih₁ ih₂ => intro _ hΘ; exact .letrec (ih₁ hΘ) hn hc (ih₂ hΘ)
-  | fix _ hn hc hT ih => intro _ hΘ; exact .fix (ih hΘ) hn hc hT
+  | letrec _ hn _ ih₁ ih₂ => intro _ hΘ; exact .letrec (ih₁ hΘ) hn (ih₂ hΘ)
+  | fix _ hn hT ih => intro _ hΘ; exact .fix (ih hΘ) hn hT
   | lit => intro _ _; exact .lit
   | loc hl => intro _ _; exact .loc hl
-  | const hc hT => intro _ hΘ; exact .const (Const.ok_mono_mode hc hΘ) hT
+  | const hc hT => intro _ hΘ; exact .const (Const.ok_mono hc hΘ) hT
   | ctor hK hk hH hT => intro _ _; exact .ctor hK hk hH hT
   | rnil => intro _ _; exact .rnil
   | rcons hR hl _ _ ih₁ ih₂ => intro _ hΘ; exact .rcons hR hl (ih₁ hΘ) (ih₂ hΘ)
@@ -118,7 +118,7 @@ theorem TypM.cut {Ψ Θ₁ Γ e J} (h : TypM S mode Ψ Θ₁ Γ e J) : ∀ {Θ�
     intro _ hΘ
     exact .aref hK hU hn hfr hlc hpA (fun θ hθ hu => ihA θ hθ hu ((hΘ.substT _).substT θ)) (ihr hΘ)
   | todo => intro _ _; exact .todo
-  | task _ hψ hn hc hT ih => intro _ hΘ; exact .task (ih hΘ) hψ hn hc hT
+  | task _ hψ hn hT ih => intro _ hΘ; exact .task (ih hΘ) hψ hn hT
   | await _ hφ hT ih => intro _ hΘ; exact .await (ih hΘ) hφ hT
   | raise _ hφ ih => intro _ hΘ; exact .raise (ih hΘ) hφ
   | raiseAdt _ hU hφ ih => intro _ hΘ; exact .raiseAdt (ih hΘ) hU hφ
@@ -134,7 +134,7 @@ theorem TypM.cut {Ψ Θ₁ Γ e J} (h : TypM S mode Ψ Θ₁ Γ e J) : ∀ {Θ�
     intro _ hΘ; exact .inside hF (ih (hΘ.union _)) hφ' ht hε hφ hT
   | cap => intro _ _; exact .cap
   | own => intro _ _; exact .own
-  | drec hc hk _ hn hh ih => intro _ hΘ; exact .drec hc hk (ih hΘ) hn hh
+  | drec hc hk _ hn ih => intro _ hΘ; exact .drec hc hk (ih hΘ) hn
   | dnil => intro _ _; exact .dnil
   | dcons _ _ ih₁ ih₂ => intro _ hΘ; exact .dcons (ih₁ (hΘ.lift _ _)) (ih₂ hΘ)
   | dproj _ hc hk hl hts hH hT ih => intro _ hΘ; exact .dproj (ih hΘ) hc hk hl hts (hH.mono hΘ) hT
@@ -158,9 +158,5 @@ theorem TypM.cut {Ψ Θ₁ Γ e J} (h : TypM S mode Ψ Θ₁ Γ e J) : ∀ {Θ�
   | hdone _ ih => intro _ hΘ; exact .hdone (ih hΘ)
   | unw hℓ _ hφ ih => intro _ hΘ; exact .unw hℓ (ih hΘ) hφ
   | kont hl hC hT => intro _ _; exact .kont hl hC hT
-
-theorem Typ.cut {Ψ Θ₁ Γ e J} (h : Typ S Ψ Θ₁ Γ e J) :
-    ∀ {Θ₂}, Entails Θ₁ Θ₂ → Typ S Ψ Θ₂ Γ e J :=
-  TypM.cut h
 
 end Flick

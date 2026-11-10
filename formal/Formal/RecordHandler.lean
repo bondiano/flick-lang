@@ -114,7 +114,7 @@ effect of `tail` operations. -/
 structure Binding.Ok (S : Sig) (b : Binding) : Prop where
   val : Value b.2.2
   closed : b.2.2.Closed
-  typ : TypM S .live [] Facts.none [] b.2.2 (.ex (S.impl b.1) .pure)
+  typ : Typ S [] Facts.none [] b.2.2 (.ex (S.impl b.1) .pure)
   ne : S.impl b.1 ≠ .errors Row.none
   ops : ∀ o c x y, S.op b.1 o = some (c, x, y) → o ∈ b.2.1
   decl : ∃ o c x y, S.op b.1 o = some (c, x, y)
@@ -122,7 +122,7 @@ structure Binding.Ok (S : Sig) (b : Binding) : Prop where
 
 /-- A closed record is typed anywhere. -/
 theorem Binding.Ok.typAt {b : Binding} (h : b.Ok S) (Ψ : List Ty) (Θ : Facts) (Γ : List Scheme) (φ : Stage) :
-    TypM S .live Ψ Θ Γ b.2.2 (.ex (S.impl b.1) φ) := by
+    Typ S Ψ Θ Γ b.2.2 (.ex (S.impl b.1) φ) := by
   have h₁ := (h.typ.cut (Entails.none Θ)).weakenStore Ψ
   have h₂ := h₁.rename (Γ' := Γ) (ξ := id) (fun i _ hi => by simp at hi)
   rw [h.closed.rename] at h₂
@@ -130,9 +130,9 @@ theorem Binding.Ok.typAt {b : Binding} (h : b.Ok S) (Ψ : List Ty) (Θ : Facts) 
 
 /-- The arms of a record are typed at any stage. -/
 theorem recArms_typ {E : Name} {w : Tm} {Ψ Θ Γ t s} {r ε : Row}
-    (hw : ∀ a, TypM S .live Ψ Θ (.mono a :: Γ) w (.ex (S.impl E) (.rt r ε))) (hne : S.impl E ≠ .errors Row.none) :
+    (hw : ∀ a, Typ S Ψ Θ (.mono a :: Γ) w (.ex (S.impl E) (.rt r ε))) (hne : S.impl E ≠ .errors Row.none) :
     ∀ {os : List Name}, (∀ o ∈ os, ∃ x y, S.op E o = some (.tail, x, y)) →
-      TypM S .live Ψ Θ Γ (recArms w os) (.harms E t (.rt r ε) s)
+      Typ S Ψ Θ Γ (recArms w os) (.harms E t (.rt r ε) s)
   | [], _ => .hanil
   | o :: os, h => by
     obtain ⟨x, y, hop⟩ := h o (by simp)
@@ -140,7 +140,7 @@ theorem recArms_typ {E : Name} {w : Tm} {Ψ Θ Γ t s} {r ε : Row}
     exact .app (C := Caps.none) (ψ := .rt Row.none Row.none)
       (.proj (hw x) (S.op_field _ _ _ _ hop hne) .refl)
       (.var (ts := []) rfl rfl (fun _ _ h => h.elim) (by rw [Scheme.inst_mono]; exact .refl))
-      (by rw [TypingMode.use_none]; exact ⟨fun _ h => h.elim, fun _ h => h.elim⟩) .refl
+      (by rw [Stage.use_none]; exact ⟨fun _ h => h.elim, fun _ h => h.elim⟩) .refl
 
 theorem recArms_noIns {w : Tm} (hw : w.NoIns) : ∀ {os : List Name}, (recArms w os).NoIns
   | [] => fun h => h
@@ -152,15 +152,15 @@ theorem recArms_noIns {w : Tm} (hw : w.NoIns) : ∀ {os : List Name}, (recArms w
     · exact recArms_noIns hw h
 
 /-- The function `λx. x` of a handler that gives the value of its body back. -/
-theorem id_typ {Ψ Θ Γ t φ} : TypM S .live Ψ Θ Γ (.lam (.var 0)) (.ex (.arrow t .pure t (t.reach)) φ) := by
+theorem id_typ {Ψ Θ Γ t φ} : Typ S Ψ Θ Γ (.lam (.var 0)) (.ex (.arrow t .pure t (t.reach)) φ) := by
   exact .lam (.var (ts := []) rfl rfl (fun _ _ h => h.elim) (by rw [Scheme.inst_mono]; exact .refl))
-    (fun h => by simp [Tm.Has] at h) trivial .refl
+    (fun h => by simp [Tm.Has] at h) .refl
 
 /-- A layer of known bindings is (Provide): its outputs leave the row of the body, unless an
 obligation is about them. -/
 theorem layer_typ {Ψ Θ Γ t} {r ε : Row} : ∀ (bs : List Binding) {e : Tm} {φ₀ : Stage}, (∀ b ∈ bs, b.Ok S) →
-    TypM S .live Ψ Θ Γ e (.ex t φ₀) → φ₀.le (.rt (Row.union (outputs bs) r) ε) → φ₀.ObOut (outputs bs) →
-    TypM S .live Ψ Θ Γ (chain bs e) (.ex t (.rt r ε))
+    Typ S Ψ Θ Γ e (.ex t φ₀) → φ₀.le (.rt (Row.union (outputs bs) r) ε) → φ₀.ObOut (outputs bs) →
+    Typ S Ψ Θ Γ (chain bs e) (.ex t (.rt r ε))
   | [], _, φ₀, _, he, hle, _ => by
     refine he.sub ⟨.refl, ?_⟩
     cases φ₀ with
@@ -170,7 +170,7 @@ theorem layer_typ {Ψ Θ Γ t} {r ε : Row} : ∀ (bs : List Binding) {e : Tm} {
   | b :: bs, e, φ₀, hall, he, hle, hO => by
     have hb := hall b (by simp)
     let r₁ : Row := fun x => φ₀.svc x ∧ x ≠ .nm b.1
-    have hh : TypM S .live Ψ Θ Γ (b.hdl e) (.ex t (.rt r₁ ε)) := by
+    have hh : Typ S Ψ Θ Γ (b.hdl e) (.ex t (.rt r₁ ε)) := by
       refine .hdl (ψ := .pure) (C := t.reach) (t' := t) ?_ (recArms_noIns (hb.typ.noIns hb.val)) id_typ trivial he ?_ ?_
         ⟨hb.decl, fun hn => (hn fun o c x y hop => ?_).elim⟩ (Stage.le_refl _) .refl
       · simp only [Stage.substT]

@@ -65,10 +65,10 @@ theorem Live.not_dead {Λ : List Rgn} {p : Nat} (h : Live Λ p) (hd : Dead Λ p)
 region that is not live (T4.1). -/
 theorem LNest.not_dead {c home i E r t} {ψ : Stage} (hn : LNest Ψ c anc home)
     (hi : c.at i = some (plug E r)) (hE : OkE E)
-    (h : TypM S .live Ψ Facts.age [] (plug E r) (.ex t ψ))
+    (h : Typ S Ψ Facts.age [] (plug E r) (.ex t ψ))
     (hψ : ∀ x, ψ.svc (.atm (.r x)) → baseOf anc i x) : ¬ DeadUse c.rgs r := by
   rintro ⟨p, hd, hr⟩
-  have byAtm : ¬ Value r → (∀ {Ψ' Θ t' ψ'}, TypM S .live Ψ' Θ [] r (.ex t' ψ') → ψ'.svc (.atm (.r p))) →
+  have byAtm : ¬ Value r → (∀ {Ψ' Θ t' ψ'}, Typ S Ψ' Θ [] r (.ex t' ψ') → ψ'.svc (.atm (.r p))) →
       False := fun hv hat => by
     obtain ⟨K, Θ', t', ψ', hr', -, hx⟩ := hole_atm hE hv h
     exact (hn.atm_live hi hE hψ (hx p (hat hr'))).not_dead hd

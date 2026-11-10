@@ -76,12 +76,6 @@ inductive Const
   | scopeRun
   | perform (E o : Name) (c : OpClass)
 
-/-- The liveness contract used when typing the core constants and expressions. -/
-inductive TypingMode
-  | captures
-  | live
-  deriving DecidableEq, Repr
-
 def Const.arity : Const → Nat
   | .refSet | .addFin | .spawn | .intEq => 2
   | _ => 1
@@ -262,54 +256,48 @@ def Row.obs (r : Row) (s : Ty) : Row
 
 /-- The type of a constant at an instance. A spawned child and a finalizer are
 `Eff` with qualifier `C`; their owner is `s`. -/
-def Const.ty (S : Sig) : Const → CArg → (mode : TypingMode := .captures) → Ty
-  | .refMake, ι, _ => .arrow ι.t (.rt Row.none Row.none) (.ref ι.t) Caps.none
-  | .refGet, ι, _ => .arrow (.ref ι.t) (.rt Row.none Row.none) ι.t Caps.none
-  | .refSet, ι, _ =>
+def Const.ty (S : Sig) : Const → CArg → Ty
+  | .refMake, ι => .arrow ι.t (.rt Row.none Row.none) (.ref ι.t) Caps.none
+  | .refGet, ι => .arrow (.ref ι.t) (.rt Row.none Row.none) ι.t Caps.none
+  | .refSet, ι =>
     .arrow (.ref ι.t) .pure (.arrow ι.t (.rt Row.none Row.none) (.base .unit) Caps.none) Caps.none
-  | .open_, ι, _ => .arrow (.owner ι.s) (.rt (Row.scope ι.s) Row.none) (.hnd ι.s) Caps.none
-  | .op, ι, .captures => .arrow (.hnd ι.s) (.rt Row.none Row.none) (.base .unit) Caps.none
-  | .op, ι, .live =>
+  | .open_, ι => .arrow (.owner ι.s) (.rt (Row.scope ι.s) Row.none) (.hnd ι.s) Caps.none
+  | .op, ι =>
     .arrow (.hnd ι.s) (.rt (Row.scope ι.s) Row.none) (.base .unit) Caps.none
-  | .addFin, ι, _ =>
+  | .addFin, ι =>
     .arrow (.owner ι.s) .pure (.arrow (.eff ι.r Row.none (.base .unit) ι.C)
       (.rt (Row.union (Row.scope ι.s) (Row.union ι.r (Row.obs ι.r ι.s))) Row.none) (.base .unit)
       ι.s.reach) Caps.none
-  | .spawn, ι, _ =>
+  | .spawn, ι =>
     .arrow (.owner ι.s) .pure (.arrow (.eff (Row.union (Row.scope ι.s) ι.r) ι.e ι.t ι.C)
       (.rt (Row.union ι.r (Row.obs ι.r ι.s)) Row.none) (.base .unit) ι.s.reach) Caps.none
-  | .intEq, _, _ => .arrow (.base .int) .pure (.arrow (.base .int) .pure (.base .bool) Caps.none) Caps.none
-  | .scopeRun, ι, _ =>
+  | .intEq, _ => .arrow (.base .int) .pure (.arrow (.base .int) .pure (.base .bool) Caps.none) Caps.none
+  | .scopeRun, ι =>
     let r := ι.r.substT (shiftV 1)
     .arrow (.all 1 (.arrow (.owner (.tvar 0))
         (.rt (Row.union (Row.scope (.tvar 0)) (Row.union r (Row.obs r (.tvar 0)))) (ι.e.substT (shiftV 1)))
         (ι.t.up 1) (ι.C.substT (shiftV 1))))
       (.rt ι.r ι.e) ι.t Caps.none
-  | .perform E o _, ι, _ => match S.op E o with
+  | .perform E o _, ι => match S.op E o with
     | some (.abort, a, _) => .arrow a (.rt (Row.single E) Row.none) ι.t Caps.none
     | some (_, a, b) => .arrow a (.rt (Row.single E) Row.none) b Caps.none
     | none => .arrow (.base .unit) (.rt (Row.single E) Row.none) (.base .unit) Caps.none
 
 /-- Regions required by a work row must outlive the owner that keeps that work.
-Row variables are included: instantiating one may introduce a Live atom.
-In captures mode this condition is already carried by the value's qualifier. -/
-def TypingMode.keep : TypingMode → Facts → Row → Ty → Prop
-  | .captures, _, _, _ => True
-  | .live, Θ, r, s => Outl Θ (Ty.row r).reach s
+Row variables are included: instantiating one may introduce a Live atom. -/
+def Row.Outlives (Θ : Facts) (r : Row) (s : Ty) : Prop := Outl Θ (Ty.row r).reach s
 
 /-- Side conditions of a constant at an instance: a finalizer and a child outlive their
 owner, with everything they hold
 (`docs/formal/regions.md#spawn-bounds-everything-the-task-holds`). -/
-def Const.ok (Θ : Facts) : Const → CArg → (mode : TypingMode := .captures) → Prop
-  | .addFin, ι, .captures => Outl Θ ι.C ι.s
-  | .spawn, ι, .captures => Outl Θ (fun a => ι.C a ∨ ι.t.reach a) ι.s
-  | .addFin, ι, .live =>
-    Outl Θ ι.C ι.s ∧ TypingMode.live.keep Θ ι.r ι.s ∧ Row.Sub (Row.ofCaps ι.C) ι.r
-  | .scopeRun, ι, .live => Row.Sub (Row.ofCaps ι.C) ι.r
-  | .spawn, ι, .live =>
-    Outl Θ (fun a => ι.C a ∨ ι.t.reach a) ι.s ∧ TypingMode.live.keep Θ ι.r ι.s ∧
+def Const.ok (Θ : Facts) : Const → CArg → Prop
+  | .addFin, ι =>
+    Outl Θ ι.C ι.s ∧ Row.Outlives Θ ι.r ι.s ∧ Row.Sub (Row.ofCaps ι.C) ι.r
+  | .scopeRun, ι => Row.Sub (Row.ofCaps ι.C) ι.r
+  | .spawn, ι =>
+    Outl Θ (fun a => ι.C a ∨ ι.t.reach a) ι.s ∧ Row.Outlives Θ ι.r ι.s ∧
       Row.Sub (Row.ofCaps ι.C) ι.r
-  | .perform _ _ _, _, _ => False
-  | _, _, _ => True
+  | .perform _ _ _, _ => False
+  | _, _ => True
 
 end Flick

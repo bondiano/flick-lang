@@ -38,30 +38,30 @@ theorem hone_eff : ∀ K k ts, Sg.ctor K = some (k, ts, "Eff") → K = "MkEff" :
 variable {Ψ : List Flick.Ty} {Θ : Facts}
 
 theorem dcons_m {s : Scheme} {c : Nat} {v r : Flick.Tm} {fs l}
-    (hv : ∀ Ψ Θ, TypM Sg .live Ψ Θ [] v (.ex (trT N (s.ty.subst (inst [.con c]))) .pure))
-    (hr : TypM Sg .live Ψ Θ [] r (.dfs fs)) :
-    TypM Sg .live Ψ Θ [] (.rcons l v r) (.dfs ((l, (mfield s).substT (instT [trT N (.con c)])) :: fs)) :=
+    (hv : ∀ Ψ Θ, Typ Sg Ψ Θ [] v (.ex (trT N (s.ty.subst (inst [.con c]))) .pure))
+    (hr : Typ Sg Ψ Θ [] r (.dfs fs)) :
+    Typ Sg Ψ Θ [] (.rcons l v r) (.dfs ((l, (mfield s).substT (instT [trT N (.con c)])) :: fs)) :=
   .dcons (by rw [mfield_t]; exact hv _ _) hr
 
 theorem typ_optBind_tr (c d a b e : Ty) {φ} :
-    TypM Sg .live Ψ Θ [] optBind (.ex (trT N (bindTy (.con 6) c d a b e)) φ) := by
+    Typ Sg Ψ Θ [] optBind (.ex (trT N (bindTy (.con 6) c d a b e)) φ) := by
   simp only [bindTy, arrP, appQ, trT, if_neg (show (6 : Nat) ≠ 2 by decide),
     if_neg (show (6 : Nat) ≠ 4 by decide)]
   exact typ_optBind
 
 theorem typ_optMap2_tr (c d a b x g d' : Ty) {φ} :
-    TypM Sg .live Ψ Θ [] optMap2 (.ex (trT N (map2Ty (.con 6) c d a b x g d')) φ) := by
+    Typ Sg Ψ Θ [] optMap2 (.ex (trT N (map2Ty (.con 6) c d a b x g d')) φ) := by
   simp only [map2Ty, arrP, appQ, trT, if_neg (show (6 : Nat) ≠ 2 by decide),
     if_neg (show (6 : Nat) ≠ 4 by decide)]
   exact typ_optMap2
 
 theorem inst_typ {I ins b} (hI : insts I = some ins) (hb : instBody I = some b) :
-    TypM Sg .live [] Facts.none [] b (.ex (trTT N (instTy ins)) .pure) := by
+    Typ Sg [] Facts.none [] b (.ex (trTT N (instTy ins)) .pure) := by
   unfold insts at hI
   split at hI <;> cases hI <;> simp only [instBody, Option.some.injEq] at hb <;> subst hb <;>
     refine .drec (us := [trT N (.con _)]) rfl rfl ?_ (fun h => by
       simp [eqInt, effPure, effMap2, effBind, mkEff, unEff, optPure, optMap2, optBind, un1, someQ,
-        noneQ, iterL, caseLQ, scons, snil, pvars, Flick.Tm.Has] at h) trivial
+        noneQ, iterL, caseLQ, scons, snil, pvars, Flick.Tm.Has] at h)
   · exact dcons_m (s := ((methSch 0).get rfl).2) (fun _ _ => .const (ι := default) trivial .refl) .dnil
   · exact dcons_m (s := ((methSch 1).get rfl).2) (fun _ _ => typ_effPure_tr hmk hmkr N rfl (by decide) (by decide) _ _)
       (dcons_m (s := ((methSch 2).get rfl).2)
