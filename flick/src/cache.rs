@@ -65,6 +65,18 @@ pub fn key(project: &Project, roots: &[PathBuf], settings: &str, needs_effect: b
         let version = toolchain::resolved(&project.root, package).unwrap_or_default();
         key.add(format!("version {package}"), version);
     }
+    if needs_effect {
+        // An absent contract is valid; unreadable or empty manifests are not.
+        if let Err(error) = toolchain::adapter_requirements(&project.root) {
+            key.add("invalid adapter contract", error);
+        }
+        for path in toolchain::contract_inputs(&project.root) {
+            key.add(
+                format!("contract {}", path.display()),
+                fs::read(path).unwrap_or_default(),
+            );
+        }
+    }
     // a variable a plugin may read, by its SHA-256: the key's hash is weak
     for name in project.config.plugins.values().flat_map(|g| &g.env) {
         let value = env::var(name).unwrap_or_default();

@@ -15,23 +15,25 @@ An inline `module Child exposing (...) = ...` creates a child namespace in the s
 Two restrictions matter when reorganizing code:
 
 - Importing an inline child from another file is `FLICK-R018`, not a way to bypass visibility.
-- A named static functor application inside an inline child is currently rejected with `FLICK-R019`; place the application in a file module.
+- A named application of a parameterized module inside an inline child is currently rejected with `FLICK-R019`; place the application in a file module.
 
 These are implemented in `flick-core/src/project/load/checking_inline.rs` and the surrounding project loader, not solely by syntax.
 
-## Structural module contracts and static functors
+<div id="structural-module-contracts-and-static-functors"></div>
+
+## Structural module contracts and parameterized modules
 
 `type module Sig = ...` describes required exports. An abstract `type Key` hides the representation; `type Key = String` requires an equality. A concrete argument can export more than the contract requires.
 
-A file-module functor header such as `module App.Make(K : App.Contracts.Policy) ...` uses only the contract's members and equalities. `module Chosen = App.Make(App.Argument)` applies it to a **named module known at compile time**.
+A parameterized file-module header such as `module App.Make(K : App.Contracts.Policy) ...` uses only the contract's members and equalities. `module Chosen = App.Make(App.Argument)` applies it to a **named module known at compile time**.
 
 Each named application creates a distinct result identity, including its abstract result types. Reimporting that same result preserves identity. Therefore two applications with the same underlying representation are not automatically interchangeable. Convert through exported operations when changing policies intentionally.
 
-Contracts can require classes/services either abstractly by shape or by manifest identity, such as `class Eq = Prelude.Eq`. A class or service is nominal: matching method/operation signatures does not equate two declarations. Abstract nominal requirements work for static functors, but `pack` requires the manifest form.
+Contracts can require classes/services either abstractly by shape or by manifest identity, such as `class Eq = Prelude.Eq`. A class or service is nominal: matching method/operation signatures does not equate two declarations. Abstract nominal requirements work for parameterized modules, but `pack` requires the manifest form.
 
 ## Packed modules and existential witnesses
 
-`pack Argument as Sig` creates a value of `Module Sig`. `unpack packed as K in ...` opens a fresh lexical witness for abstract types. It is not a static functor argument.
+`pack Argument as Sig` creates a value of `Module Sig`. `unpack packed as K in ...` opens a fresh lexical witness for abstract types. It is not a parameterized module argument.
 
 If a value depending on that witness leaves the unpack, its type is existential, for example `exists K : Sig. K.Key`. `unpack value as K, item in ...` opens both the hidden module and its carried value. Separate openings have separate abstract witnesses; an exported existential binding requires an explicit type. The TypeScript facade represents an exported existential value as `unknown`, not a fabricated structural type.
 
@@ -39,7 +41,7 @@ If a value depending on that witness leaves the unpack, its type is existential,
 graph LR
     Contract["type module contract"] --> Match["Check named module exports"]
     Argument["Concrete module"] --> Match
-    Match --> Static["Named static functor result"]
+    Match --> Static["Named parameterized module result"]
     Match --> Packed["Module Sig value"]
     Static --> Identity["Stable result identity across imports"]
     Packed --> Open["unpack: fresh witness"]

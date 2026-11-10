@@ -9,7 +9,7 @@ Flick combines explicit types, effect requirements, scoped resources, and typed 
 | Capability | Read next | Main source boundary |
 | - | - | - |
 | Pure and runtime functions, typed errors, services, handlers, resource lifetimes | [Effects and regions](effects-and-regions.md) | `flick-core/src/types/effects.rs`, `flick-core/src/types/regions/` |
-| File and inline modules, contracts, functors, classes, dictionaries, conversions | [Modules and classes](modules-and-classes.md) | `flick-core/src/types/module_contract.rs`, `flick-core/src/types/classes/` |
+| File and inline modules, contracts, parameterized modules, classes, dictionaries, conversions | [Modules and classes](modules-and-classes.md) | `flick-core/src/types/module_contract.rs`, `flick-core/src/types/classes/` |
 | Choosing an application surface and a complete example | [Application features](application-features.md) | `examples/`, `packages/std/src/` |
 | Schemas, wire codecs, refinements, SQL templates and migrations | [Data and schema](data-and-schema.md) | `plugins/derive/src/`, `plugins/sql/src/` |
 | HTTP clients and servers, typed APIs, RPC, server functions | [Network services](http-rpc-and-server-functions.md) | `packages/std/src/Http/`, `packages/std/src/HttpApi.fl`, `packages/std/src/Rpc.fl` |

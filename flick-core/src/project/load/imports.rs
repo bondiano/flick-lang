@@ -183,13 +183,13 @@ impl Loader<'_> {
     fn virtual_source(
         &self,
         parent: usize,
-        functor: usize,
+        template: usize,
         name: &str,
         header: &resolve::Header,
         application: &ModuleApplication,
     ) -> Option<String> {
-        let source = self.sources.get(self.modules[functor].file).text.clone();
-        let header_node = self.modules[functor]
+        let source = self.sources.get(self.modules[template].file).text.clone();
+        let header_node = self.modules[template]
             .parse
             .tree
             .nodes()
@@ -252,12 +252,12 @@ impl Loader<'_> {
             }
             return;
         }
-        let Some(functor) =
-            self.find_module(parent, &application.functor, application.functor_span)
+        let Some(template) =
+            self.find_module(parent, &application.template, application.template_span)
         else {
             return;
         };
-        let Some(header) = self.modules[functor].syntax.header.clone() else {
+        let Some(header) = self.modules[template].syntax.header.clone() else {
             return;
         };
         if header.parameters.is_empty() || header.parameters.len() != application.arguments.len() {
@@ -265,7 +265,7 @@ impl Loader<'_> {
                 codes::T002,
                 format!(
                     "`{}` expects {} static module argument(s), found {}",
-                    application.functor,
+                    application.template,
                     header.parameters.len(),
                     application.arguments.len()
                 ),
@@ -282,11 +282,13 @@ impl Loader<'_> {
                 return;
             }
         }
-        let Some(generated) = self.virtual_source(parent, functor, &name, &header, application)
+        let Some(generated) = self.virtual_source(parent, template, &name, &header, application)
         else {
             return;
         };
-        let file = self.sources.add(format!("<functor {name}>"), generated);
+        let file = self
+            .sources
+            .add(format!("<parameterized module {name}>"), generated);
         let generated = &self.sources.get(file).text;
         let parse = Arc::new(syntax::parse(generated, file));
         let syntax = Arc::new(resolve::module_syntax(&parse.tree, generated, file));

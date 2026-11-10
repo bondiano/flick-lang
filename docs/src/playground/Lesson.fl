@@ -6,14 +6,8 @@ import State exposing (Model, tr)
 view : Atom.Writable Model -> Model -> Ui
 let view model m = ui {
   div { class_name = "fp-lesson" } [
-    heading_at H2 [text (tr m.locale "1. Make the signature honest" "1. Исправьте сигнатуру")],
-    paragraph [
-      text
-        (tr
-          m.locale
-          "The body returns the length of a String. Change the declared result type, then check your answer."
-          "Тело возвращает длину строки. Исправьте объявленный тип результата и проверьте ответ."),
-    ],
+    heading_at H2 [text (tr m.locale m.lesson_title m.lesson_title_ru)],
+    paragraph [text (tr m.locale m.lesson_task m.lesson_task_ru)],
     div { class_name = "fp-lesson-actions" } [
       button
         {
@@ -46,13 +40,7 @@ let view model m = ui {
         [text (tr m.locale "Reset" "Сбросить")],
     ],
     if m.lesson_hint then
-      paragraph [
-        text
-          (tr
-            m.locale
-            "String.length returns Int. The last type in the arrow is the result type."
-            "String.length возвращает Int. Последний тип после стрелки — тип результата."),
-      ]
+      paragraph [text (tr m.locale m.lesson_hint_text m.lesson_hint_text_ru)]
     else empty,
     if m.lesson_result != "" then
       Ui.with_host

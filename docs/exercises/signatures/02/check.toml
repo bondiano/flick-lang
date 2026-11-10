@@ -1,0 +1,10 @@
+export = "size_of"
+argument_types = ["string"]
+return_type = "number"
+output = "6"
+title = "2. Give the argument its type"
+title_ru = "2. Исправьте тип аргумента"
+task = "String.length needs a String. Fix the argument type and keep the result type Int."
+task_ru = "String.length принимает String. Исправьте тип аргумента, сохранив тип результата Int."
+hint = "The type before the arrow describes the argument."
+hint_ru = "Тип перед стрелкой описывает аргумент."

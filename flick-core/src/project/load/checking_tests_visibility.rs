@@ -101,7 +101,7 @@ fn a_public_facade_reexports_from_a_private_module() {
 
 #[cfg(feature = "ide")]
 #[test]
-fn named_functor_application_creates_an_importable_virtual_module() {
+fn named_parameterized_module_application_creates_an_importable_virtual_module() {
     let host = Memory(BTreeMap::from([
         (
             PathBuf::from("/p/src/App/Contracts.fl"),

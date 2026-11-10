@@ -289,7 +289,7 @@ let load_compiler model =
 
 edit : Atom.Writable Model -> String ->{Atom.Write} Unit
 let edit model source =
-  update model (fun m -> { m with source = source })
+  update model (fun m -> { m with source = source; lesson_result = "" })
   save_draft source
   notify "fp-compile"
 
@@ -357,6 +357,10 @@ let discard_draft model =
   })
   notify "fp-compile"
 
+complete_lesson : Unit ->{} Unit
+foreign complete_lesson from "./dom.ts" "completeLesson"
+  arity 0
+
 check_lesson : Atom.Writable Model ->{Async, Atom.Write} Unit
 let check_lesson model =
   let m = Atom.current model
@@ -368,27 +372,30 @@ let check_lesson model =
     if result == "passed" then
       tr
         m.locale
-        "Correct. The signature says String -> Int."
-        "Верно. Сигнатура указывает String -> Int."
+        "Correct. The signature and output match."
+        "Верно. Сигнатура и вывод совпадают с заданием."
     else if result == "fix-errors" then
       tr m.locale "Fix the compiler errors first." "Сначала исправьте ошибки компилятора."
     else if result == "type" then
       tr
         m.locale
-        "Export length_of with the type String -> Int."
-        "Экспортируйте length_of с типом String -> Int."
+        "Export the function with the signature requested in the task."
+        "Экспортируйте функцию с сигнатурой из задания."
     else if result == "output" then
-      tr m.locale "The program must print 5 for Flick." "Программа должна напечатать 5 для Flick."
+      tr m.locale "The output does not match the task." "Вывод не совпадает с заданием."
     else
       tr
         m.locale
         "The check could not finish. Try again."
         "Проверка не завершилась. Попробуйте ещё раз."
+  let current = Atom.current model
+  let fresh = current.source == m.source && current.revision == m.revision
+  if fresh && result == "passed" then complete_lesson ()
   update model (fun m -> {
     m with
     lesson_checking = false;
-    lesson_result = message;
-    lesson_done = m.lesson_done || result == "passed";
+    lesson_result = if fresh then message else "";
+    lesson_done = m.lesson_done || (fresh && result == "passed");
   })
 
 reveal_lesson_hint : Atom.Writable Model ->{Atom.Write} Unit

@@ -1,7 +1,7 @@
 #[test]
 #[ignore = "needs Node and Go; run `just e2e-tests`"]
-fn named_functor_result_runs_from_two_importers_on_js_and_go() {
-    let dir = Path::new(env!("CARGO_TARGET_TMPDIR")).join("md2_functor_result");
+fn named_parameterized_module_result_runs_from_two_importers_on_js_and_go() {
+    let dir = Path::new(env!("CARGO_TARGET_TMPDIR")).join("md2_parameterized_module_result");
     let source = dir.join("App");
     fs::create_dir_all(&source).expect("source directory");
     for (name, text) in [
@@ -201,8 +201,8 @@ fn case_insensitive_set_rejects_mixed_policy(source: &Path, dir: &Path) {
 
 #[test]
 #[ignore = "needs Node and Go; run `just e2e`"]
-fn functor_uses_its_argument_dictionary_on_js_and_go() {
-    let dir = Path::new(env!("CARGO_TARGET_TMPDIR")).join("md2_functor_dictionary");
+fn parameterized_module_uses_its_argument_dictionary_on_js_and_go() {
+    let dir = Path::new(env!("CARGO_TARGET_TMPDIR")).join("md2_parameterized_module_dictionary");
     let source = dir.join("App");
     fs::create_dir_all(&source).expect("source directory");
     for (name, text) in [

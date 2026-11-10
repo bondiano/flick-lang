@@ -1,1 +1,1 @@
-pub const EFFECT: &str = "1.0.0";
+pub const RUNTIME: &str = "0.1.0";

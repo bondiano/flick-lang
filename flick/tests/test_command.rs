@@ -4,6 +4,8 @@
 
 mod common;
 
+#[path = "test_command/adapter_contract.rs"]
+mod adapter_contract;
 #[path = "test_command/watch.rs"]
 mod watch;
 
