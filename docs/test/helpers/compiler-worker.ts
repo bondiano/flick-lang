@@ -11,4 +11,3 @@ export class WorkerHarness {
   reply(id: number, result: unknown): void { this.onmessage?.({ data: { id, result } }); }
   crash(): void { this.onerror?.({ error: new Error("compiler offline"), message: "compiler offline" }); }
 }
-
