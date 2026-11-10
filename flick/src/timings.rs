@@ -60,8 +60,12 @@ pub fn stage(label: &'static str) {
 
 /// Work inside a stage that took `elapsed`.
 pub fn phase(label: &str, elapsed: Duration) {
-    let micros = u64::try_from(elapsed.as_micros()).unwrap_or(u64::MAX);
-    debug!(micros, "{label}");
+    debug!(micros = micros(elapsed), "{label}");
+}
+
+/// `duration` in whole microseconds, the unit of a timing event.
+fn micros(duration: Duration) -> u64 {
+    u64::try_from(duration.as_micros()).unwrap_or(u64::MAX)
 }
 
 struct Collect;
@@ -144,8 +148,7 @@ impl Report {
             .chain([end]);
         let stages = (records.stages.iter().zip(ends))
             .map(|((label, began), end)| {
-                let micros = end.saturating_duration_since(*began).as_micros();
-                (label.clone(), u64::try_from(micros).unwrap_or(u64::MAX))
+                (label.clone(), micros(end.saturating_duration_since(*began)))
             })
             .collect();
         let mut modules = records.modules;
@@ -198,22 +201,29 @@ impl Report {
     }
 }
 
+/// What was collected since the last report, which starts anew.
+fn collected() -> Records {
+    let empty = Records {
+        stages: Vec::new(),
+        phases: Vec::new(),
+        modules: Vec::new(),
+        misses: Vec::new(),
+    };
+    mem::replace(&mut *records(), empty)
+}
+
 /// With `--timings`, writes what was collected since the last report on
-/// stderr and starts anew, as a watching command reports each of its runs.
+/// stderr and starts anew: a watching command reports each of its runs,
+/// and keeps the records of none.
 pub fn report(global: &GlobalArguments) {
     if !global.timings {
         return;
     }
-    let collected = {
-        let mut records = records();
-        let empty = Records {
-            stages: Vec::new(),
-            phases: Vec::new(),
-            modules: Vec::new(),
-            misses: Vec::new(),
-        };
-        mem::replace(&mut *records, empty)
-    };
+    let collected = collected();
+    // a watching command that reported its last run has nothing more to say
+    if collected.stages.is_empty() && collected.modules.is_empty() {
+        return;
+    }
     let report = Report::of(collected, Instant::now());
     let out = match global.diagnostics {
         DiagnosticsFormat::Human => report.human(),
@@ -221,6 +231,13 @@ pub fn report(global: &GlobalArguments) {
     };
     // stderr closed: nothing useful left to do with the error
     let _ = io::stderr().lock().write_all(out.as_bytes());
+}
+
+/// Forgets what was collected since the last report: what a watching
+/// command started ran, and then waited for a change, which is no phase of
+/// the run that follows.
+pub fn discard() {
+    drop(collected());
 }
 
 #[cfg(test)]

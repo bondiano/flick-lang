@@ -36,9 +36,6 @@ impl BuildCommand {
                         &build::go::executable(name),
                     )
                 }));
-        if !current {
-            debug!(miss = "the output directory no longer holds the cached artifacts");
-        }
         progress.stage("Restoring cached artifacts");
         self.record(&output, None, &output.entries);
         if current && !self.generation {

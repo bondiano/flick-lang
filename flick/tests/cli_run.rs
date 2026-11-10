@@ -260,7 +260,7 @@ fn dev_replaces_the_app_only_after_its_shutdown() {
         ],
     );
     let main = dir.join("src/App/Main.fl");
-    let mut dev = flick(&dir, &["--quiet", "dev"])
+    let mut dev = flick(&dir, &["--quiet", "--timings", "dev"])
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
@@ -301,6 +301,10 @@ fn dev_replaces_the_app_only_after_its_shutdown() {
         err.contains("FLICK-P021") && err.contains("exit code 1)"),
         "{err}"
     );
+    // each of the four builds reported itself, and none the version that
+    // ran and waited before it
+    assert_eq!(err.matches("Timings\n").count(), 4, "{err}");
+    assert!(!err.contains("Running a child process"), "{err}");
 }
 
 /// Logs `aborted` when interrupted but settles only after its own delay.

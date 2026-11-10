@@ -53,6 +53,14 @@ fn timings_name_the_phases_and_the_input_that_missed_the_cache() {
         "{hit}"
     );
     assert!(stderr(&["build"]).find("Timings").is_none());
+    // a hit that writes its artifacts again is no miss
+    fs::remove_dir_all(dir.join("dist")).expect("remove the output");
+    let restored = stderr(&["build", "--timings"]);
+    assert!(
+        restored.contains(" ms  Restoring cached artifacts\n"),
+        "{restored}"
+    );
+    assert!(!restored.contains("missed"), "{restored}");
 
     fs::write(dir.join("src/App/Main.fl"), format!("{MAIN}\n")).expect("edit");
     let events = stderr(&["build", "--timings", "--diagnostics", "json"]);
