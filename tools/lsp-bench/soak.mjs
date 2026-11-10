@@ -2,7 +2,8 @@
 // memory: the same file opened, edited and closed again and again, then
 // as many distinct standalone copies of it, each opened, edited and closed
 // once. Memory that keeps growing in the second phase is state a closed
-// document leaves behind. Linux only: it reads /proc.
+// document leaves behind: the last line is how much it grew over that
+// phase. Linux only: it reads /proc.
 //
 //   node tools/lsp-bench/soak.mjs <flick binary> <file.fl> [cycles]
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -37,10 +38,12 @@ const cycle = async (path) => {
   await settled();
 };
 const phase = async (label, pathOf) => {
+  const before = rss();
   for (let i = 1; i <= total; i++) {
     await cycle(pathOf(i));
     if (i % (total / 4) === 0) report(`${label} ${i}/${total}`);
   }
+  return rss() - before;
 };
 
 await request("initialize", { capabilities: {} });
@@ -49,11 +52,12 @@ report("initialized");
 const same = join(dir, "Same.fl");
 writeFileSync(same, text);
 await phase("same file", () => same);
-await phase("distinct files", (i) => {
+const growth = await phase("distinct files", (i) => {
   const path = join(dir, `Copy${i}.fl`);
   writeFileSync(path, text);
   return path;
 });
+console.log(`RSS, MiB: growth ${Math.max(0, growth).toFixed(1)}`);
 await request("shutdown", null);
 send({ method: "exit" });
 rmSync(dir, { recursive: true, force: true });
