@@ -20,7 +20,7 @@ The source of an expected error is `raise`; the source of a defect is `todo`.
 
 | Not included | Where | How the core accounts for it |
 | - | - | - |
-| Regions, captures `T^c`, `scope`, `NoCapture` | `regions.md` | Core types are checker types with the `Captured`/`Bounded` qualifiers erased. `close_over`, `value_bound` and `hold` take no part in the rules |
+| Regions, qualifiers `T^c` typed by use, `scope`, `Live` | `regions.md` | Core types are checker types with the `Captured`/`Bounded` qualifiers and the `Live` row elements erased. The region rules (`regions/live.rs`, `live_rows.rs`) take no part in the rules |
 | Classes, dictionaries, `do`, `for`, `?` | `elaboration.md` | The core receives a program with dictionaries already inserted; schemes carry no constraints |
 | `type module`, named functors, `Module Sig`, `exists K : Sig. T` | source checker and lowering | Static applications become named modules; packed modules and existential witnesses become records. The core does not prove the source rules for generativity, nominal identity, or existential opening |
 | Fibers, `parallel`, `race`, `spawn`, Cause, interruption, layer memoization | `runtime.md` (λRT) | The core has one thread of execution; the "interrupted" outcome appears only in λRT |
@@ -453,7 +453,7 @@ The checker generalizes no more than `Gen`. Fewer generalized variables give the
 1. "Not free in Γ" is decided by levels. `Store::level`: a meta deeper than the current level is not in Γ. The result of a runtime binding is lowered to the level of the environment (`Store::lower`).
 2. Variables of numeric literals are not generalized: the literal's type is chosen later.
 3. Variables of unsolved class constraints are not generalized. A scheme without a signature gets no constraints (see [class constraints and generalization](#class-constraints-and-generalization)).
-4. Variables of a value that holds an open capture obligation are not generalized. This belongs to regions.
+4. Variables of a value with an open region obligation are not generalized. This belongs to regions.
 5. Unknown call rows inside a binding are closed with `none` before generalization rather than quantified (`effects/solve.rs` `settle_rows`): the checker picks the least solution (see [unknown call rows](#unknown-call-rows-in-a-generalized-binding-close-to-none)).
 6. `let (a, b) = …` and `let assert` are always monomorphic. A top-level or recursive function without a signature is `FLICK-T004`; another local one is monomorphic.
 

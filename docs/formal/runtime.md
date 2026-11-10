@@ -412,7 +412,7 @@ R6 is a property of the library: no rule of the core builds or memoizes a layer,
 
 - JS: [E] the MemoMap by identity and the observer counter (G7e); [JS] the build goes into the `owner.resources` of the `provide` owner.
 - Go: [Go] `memoMap.getOrBuild`, `observers`.
-- A consumer that got the services not through the map but through the environment — a child of an outer owner started from inside `provide` ([the `provide` escape](#a-provide-service-outlives-the-release-of-its-layer)) — would use the service after `σ` closed; neither runtime prevents this. R6 rests on the premise "a fiber takes a service from the `θ` of a `provide` owner `πₚ` only before `πₚ` closes": a request `ask_S` answered by the environment is answered by a `provide` frame whose owner has not yet reached (C5). Typing gives it: `regions.md` §2.7 (`Fiber.Provided`, `FLICK-G003`), point 3 of T4. Typing gives nothing stronger: a child inherits the whole environment of the spawn site, and `Provided r ϱ` concerns only the services of its row `r`, so a fiber may keep running after a `provide` closes whose services it does not take ([the premise is per request](#the-provide-liveness-premise-is-stronger-than-typing-gives)). In Lean this is hypothesis G11 (`G11`); the core model proves it as `T4_3` (`formal/Formal/T43Main.lean`).
+- A consumer that got the services not through the map but through the environment — a child of an outer owner started from inside `provide` ([the `provide` escape](#a-provide-service-outlives-the-release-of-its-layer)) — would use the service after `σ` closed; neither runtime prevents this. R6 rests on the premise "a fiber takes a service from the `θ` of a `provide` owner `πₚ` only before `πₚ` closes": a request `ask_S` answered by the environment is answered by a `provide` frame whose owner has not yet reached (C5). Typing gives it: `regions.md` §2.7 (`Fiber.Provided`, `FLICK-G003`), point 3 of T4′. Typing gives nothing stronger: a child inherits the whole environment of the spawn site, and `Provided r ϱ` concerns only the services of its row `r`, so a fiber may keep running after a `provide` closes whose services it does not take ([the premise is per request](#the-provide-liveness-premise-is-stronger-than-typing-gives)). In Lean this is hypothesis G11 (`G11`); the core model proves it as the third conjunct of `T4'` (`formal/Formal/Live/T4Live.lean`).
 
 **R7 (`Ref.modify` is linearizable).** Each execution of `Ref.modify ℓ g` has a linearization point inside its interval, and the history of operations on `ℓ` is equivalent to a sequential one.
 
@@ -453,7 +453,7 @@ G1–G6 hold (`core.md`, `regions.md`). Added:
 
 **T5 (the runtime contract).** Let `e₀` be a program (`core.md` §2.6), let G1–G10 hold, and let `⟨{f₀ ↦ e₀}, {π₀ ↦ open}, ∅, ∅, ∅⟩ →* C` under any admissible interleaving (§3.1). Then R1–R7 hold on the path to `C`. The premise of R6 — a service is taken from the environment only of a live `provide` — is given by the typing of the program (`regions.md` §2.7, [the premise is per request](#the-provide-liveness-premise-is-stronger-than-typing-gives)).
 
-Lean: `T5` (`formal/Formal/RT/T5.lean`) — for any core (`Core`, a parameter) and any interleaving: R1–R4 (`R1`–`R4`), R6 (`R6`), R7 (`R7`) in every reachable configuration (`Reach`), and R5 (`R5`). The hypotheses are parameters: G7(a)–(g) except (c), G8 and G9 are fields of `Hyp` (`formal/Formal/RT/Hyp.lean`); the premise of R6 is `G11`: a request for a service from the environment is answered by the `provide` of a live owner. The typing rule of `regions.md` §2.7, point 3 of T4, gives it; in the core model it is `T4_3`. G7(c) is not needed: the model has no mask, and interruption is delivered at any point of user code, which is more interleavings than §3.2 allows. G10 and the liveness parts of G8 and G9 are not part of safety. The model's simplifications are listed in `formal/README.md`.
+Lean: `T5` (`formal/Formal/RT/T5.lean`) — for any core (`Core`, a parameter) and any interleaving: R1–R4 (`R1`–`R4`), R6 (`R6`), R7 (`R7`) in every reachable configuration (`Reach`), and R5 (`R5`). The hypotheses are parameters: G7(a)–(g) except (c), G8 and G9 are fields of `Hyp` (`formal/Formal/RT/Hyp.lean`); the premise of R6 is `G11`: a request for a service from the environment is answered by the `provide` of a live owner. The typing rule of `regions.md` §2.7, point 3 of T4′, gives it; in the core model it is the third conjunct of `T4'`. G7(c) is not needed: the model has no mask, and interruption is delivered at any point of user code, which is more interleavings than §3.2 allows. G10 and the liveness parts of G8 and G9 are not part of safety. The model's simplifications are listed in `formal/README.md`.
 
 R8 is not a statement about interleavings but a property of the functions `⊕`, `⧺`, `recover`, `pretty` and `report`. `tests/run/runtime/cause_laws.fl` checks it on both runtimes. Lean: `R8` (`formal/Formal/RT/Cause.lean`).
 
@@ -498,7 +498,7 @@ Sketches:
 - **R6.**
   - A memoizable `L` is built only when `L ∉ m`. The entry is inserted before the build — under a lock in Go, on the single thread in JS — so a second request waits.
   - By I6, `σ` closes when the last consuming owner has passed (C5). A consumer closes after its children (R2).
-  - A fiber that got `θ` not through the map takes services from it, by `regions.md` §2.7, only before `πₚ` closes (the premise of R6, point 3 of T4, [per request](#the-provide-liveness-premise-is-stronger-than-typing-gives)); it need not finish before `πₚ` closes.
+  - A fiber that got `θ` not through the map takes services from it, by `regions.md` §2.7, only before `πₚ` closes (the premise of R6, point 3 of T4′, [per request](#the-provide-liveness-premise-is-stronger-than-typing-gives)); it need not finish before `πₚ` closes.
   - Lean: `R6` (`formal/Formal/RT/T5.lean`): `Good6` — a rebuild only after the previous build is released, and a release only after the observers of all consumers; `GoodUse` — a service is not used after its release, under `G11`. I6 is `Inv6.obsIn`: an entry's observer is either in its `obs` (so `n` is their count) or its owner's (C5) has already run it.
 - **R7.** By §3.7 the `Ref.modify` step is atomic; the linearization point is the moment of that step.
   - Lean: `R7` (`formal/Formal/RT/RefLin.lean`): each `modify ℓ` read the value of the last `make` or `modify` of the same `ℓ`; memory is a replay of the log. Without G8 the model has `Local.modRead` and `Step.modWrite`, and R7 fails.
@@ -684,7 +684,7 @@ let main () =
   say "after"
 ```
 
-- Divergence: on Node, `close sup` comes after `outer body done`; on Go it came right after `inner done`. A resource of region `outer` was released when `inner` closed, while `outer` was alive; its handle could have escaped into a cell of `outer`. Breaks R1, R2 and, through G6, T4.
+- Divergence: on Node, `close sup` comes after `outer body done`; on Go it came right after `inner done`. A resource of region `outer` was released when `inner` closed, while `outer` was alive; its handle could have escaped into a cell of `outer`. Breaks R1, R2 and, through G6, T4′.
 - Cause: the watcher was a copy of the fiber that called `spawn` (`watcher := *fb`, `concurrency.go:119-121`), with that fiber's owner. JS runs the supervisor `inside(owner, …)` (`owner.ts:163`), as the type `Failure e ->{Scope s | r} Unit` requires.
 - Resolution — Go: the watcher's owner is the `owner` passed to `spawn`. Fixed; fixture: `close_phases.fl` `supervisor_owner`.
 
@@ -842,7 +842,7 @@ let main () =
   }
 ```
 
-- Divergence: the program was accepted; Node and Go alike print `release greeter` before `hello, child`. A child of the outer owner inherited the environment of `provide` and used the service after the layer closed. Breaks R6; through a service holding an external object closed by the layer's finalizer, this is the same "use after close" as in T4, but without a region in the type. `Scope.add_finalizer` of an outer region from inside `provide` behaves the same way.
+- Divergence: the program was accepted; Node and Go alike print `release greeter` before `hello, child`. A child of the outer owner inherited the environment of `provide` and used the service after the layer closed. Breaks R6; through a service holding an external object closed by the layer's finalizer, this is the same "use after close" as in T4′, but without a region in the type. `Scope.add_finalizer` of an outer region from inside `provide` behaves the same way.
 - Cause: service rows are not part of ⌈·⌉ (`regions.md` §2.1, [service implementations hold no captures](regions.md#service-implementations-hold-no-captures)), and `Fiber.spawn` takes the task row `r` from the call site (`builtins/Fiber.fl` `spawn`). Nothing tied the lifetime of the `provide` environment to the owner the work is handed to.
 - Resolution — the checker (`regions.md` §2.7). A single lexical check cannot close it: the service may come from the row of the calling function, and then the owner–`provide` relation is visible only at that function's caller. So `provide` introduces a region for the order of §2.4, the scheme of every constant with `retention owner` requires `Fiber.Provided r s` for the row of the retained work, and an obligation a stage does not discharge passes into its row and on to whoever runs it; a signature names it with the constraint `Fiber.Provided {S} s`. The runtime does not change. Fixtures: `tests/check/fail/regions/provide_escape.fl` (the program above and `Scope.add_finalizer` of an outer region), `tests/check/pass/regions/provide_owner.fl`.
 
@@ -865,7 +865,7 @@ let main () =
 ### Region closing as one step versus closing phases
 
 - `regions.md` closes a region in one step: children, finalizers, then `Λ(π) := closed`, and `op_H` on a closed region gets stuck. Both runtimes set "closed" before the finalizers (Effect `Closed`, Go `open = false`) and run a finalizer added to a closed scope at once (Fin-Now), and the hooks come before the children (C1).
-- Not a contradiction but a refinement: §3.3 here details that one step. Getting stuck on `op_H` remains the model of "use after close": T4 proves it unreachable, and (Fin-Now) is reachable only from a finalizer or a foreign callback. Resolution: `regions.md` §3.3 refers to λRT.
+- Not a contradiction but a refinement: §3.3 here details that one step. Getting stuck on `op_H` remains the model of "use after close": T4′ proves it unreachable, and (Fin-Now) is reachable only from a finalizer or a foreign callback. Resolution: `regions.md` §3.3 refers to λRT.
 
 ### A test closes its scope with success, and the shutdown flag is timed by the watcher
 
@@ -918,8 +918,8 @@ Found by the Lean development `formal/Formal/RT/`.
 Found by the Lean development of the core (`formal/Formal/`).
 
 - Divergence: R6, the sketch in §6 and hypothesis G11 in Lean (`G11`, `GoodUse`) required every fiber with a `θ` from the `provide` of owner `πₚ` to run only until `πₚ` closes. A child inherits the whole environment of the spawn site (§3.5), and the rule of `regions.md` §2.7 ties to the owner only the providers of the services in the task row. The program `provide L1 { scope outer { provide L2 { Fiber.spawn outer (task { …; ask S1 }) } } }`, where `L1` gives `S1` and `L2` gives `S2`, is accepted: `Provided {S1} outer` is discharged, since the provider of `S1` encloses `outer`. The child runs after `L2` closes and takes `S1`; `GoodUse` saw the released build of `L2` in its environment and reported a violation, although `S1` came from the live `L1`.
-- Cause: the premise was stated about the whole fiber, while typing (point 3 of T4) speaks about service requests.
-- Resolution — this document and the λRT model: the premise is "an operation answered from the environment is answered by the handler of a live owner". R6 and §6 state it this way; `G11` and `GoodUse` in `formal/Formal/RT/` speak of the environment entry that answers the request. The Lean core development proves the premise in this form (`T4_3`).
+- Cause: the premise was stated about the whole fiber, while typing (point 3 of T4′) speaks about service requests.
+- Resolution — this document and the λRT model: the premise is "an operation answered from the environment is answered by the handler of a live owner". R6 and §6 state it this way; `G11` and `GoodUse` in `formal/Formal/RT/` speak of the environment entry that answers the request. The Lean core development proves the premise in this form (the third conjunct of `T4'`, `formal/Formal/Live/T4Live.lean`).
 
 ### Go: leaving a close does not deliver a pending interruption
 
