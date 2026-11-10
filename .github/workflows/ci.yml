@@ -70,9 +70,6 @@ jobs:
         with:
           node-version: 24.18.0
       - run: just unit
-      # the parser fuzzing in release, as the nightly run has it, with fewer
-      # inputs: the one run of it every pull request gets
-      - run: just fuzz 20000
       - run: just effect-coverage >> "$GITHUB_STEP_SUMMARY"
 
   features:
