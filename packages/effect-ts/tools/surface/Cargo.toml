@@ -15,5 +15,5 @@ ide = ["flick-core/ide"]
 [dev-dependencies]
 flick-core = { path = "../../../../flick-core" }
 serde = { version = "1.0.229", features = ["derive"] }
-serde_json = "1.0.154"
+serde_json = { workspace = true }
 toml = "1.1.8"
