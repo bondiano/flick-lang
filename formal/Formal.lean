@@ -165,4 +165,5 @@ import Formal.FailAbort
 import Formal.Live
 import Formal.Live.T4Live
 import Formal.Live.Elide
+import Formal.Live.Install
 import Formal.Axioms

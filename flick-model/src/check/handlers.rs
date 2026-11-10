@@ -232,7 +232,11 @@ impl Checker<'_> {
         };
         self.settle_provide(&mut needed, &self.zonk_row(&outputs), Some(&p))?;
         let rest = self.minus(&needed, &outputs)?;
+        // a layer of a service a region indexes is provided where it is live
+        let live = (self.zonk_row(&outputs).elems.values())
+            .fold(Caps::default(), |out, args| out.union(&self.indexed_live(args)));
         let services = self.sum(&inputs, &rest)?;
+        let services = self.add_live(&services, &live);
         let errors = self.sum(&errors, &raised)?;
         self.perform(&Stage::Runtime(services, errors))?;
         Ok(t)

@@ -23,6 +23,14 @@ use : Handle s ->{} Unit
 foreign effect use from "./res.mjs" "use"
   retention call
 
+// A service a region indexes: a row with `Within s` keeps `s` live, so a
+// handler of it is installed only where `s` is live.
+service Within (s : Region) =
+  get : Unit ->{} Handle s
+
+touch : Unit ->{Within s} Unit
+let touch _ = use (Within.get ())
+
 // Data that stores only its parameter, and data that hides what it holds.
 type Wrapper s = Wrapper (Handle s)
 

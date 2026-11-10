@@ -71,7 +71,7 @@ fn row_needs(r: &Type, s: u32) -> bool {
 }
 
 /// `services` that also need `atoms` live.
-fn add_live(services: &Type, atoms: Norm) -> Type {
+pub(super) fn add_live(services: &Type, atoms: Norm) -> Type {
     if atoms.entries.is_empty() && atoms.tails.is_empty() {
         return services.clone();
     }

@@ -7,23 +7,64 @@
 //! owner keeps is the owner's own, so it adds nothing to what must outlive
 //! the owner (`keep_live`).
 
-use super::live::merge;
+use super::live::{add_live, merge};
 use super::{LIVE, Outlives};
 use crate::diagnostics::{Diagnostic, codes};
 use crate::source::Span;
 use crate::types::Checker;
 use crate::types::effects::Site;
+use crate::types::kinds::Kind;
 use crate::types::ty::{Norm, Row, Type};
 
 impl Checker<'_> {
-    /// The regions the `Scope` of the bound `services` keeps live.
+    /// The regions the services of the bound `services` keep live: `Scope
+    /// ϱ`, and every other service a region indexes, as `Setup ϱ` (in the
+    /// core `Row.err E U` has the atoms of `U`, `formal/Formal/RuleRows.lean`).
+    /// A handler of such a service needs its region live where it is
+    /// installed (`live_install`), so the body may take it for live.
     pub(in crate::types) fn scope_live(&self, services: &Norm) -> Norm {
-        let Some(scope) = services.get(super::scope()) else {
-            return Norm::default();
-        };
-        match scope.spine().1[..] {
-            [region] => self.live_atoms(region, &[]),
-            _ => Norm::default(),
+        let mut out = Norm::default();
+        for (label, entry) in &services.entries {
+            if label == super::scope() {
+                if let [region] = entry.spine().1[..] {
+                    merge(&mut out, self.live_atoms(region, &[]));
+                }
+            } else if label != LIVE {
+                merge(&mut out, self.indexed_live(entry));
+            }
+        }
+        out
+    }
+
+    /// The regions that index the row entry `entry`, `E ϱ`.
+    fn indexed_live(&self, entry: &Type) -> Norm {
+        let entry = self.zonk(entry);
+        let mut out = Norm::default();
+        for arg in entry.spine().1 {
+            if self.atom_kind(&self.store.resolve(arg), &[]) == Some(Kind::Region) {
+                merge(&mut out, self.live_atoms(arg, &[]));
+            }
+        }
+        out
+    }
+
+    /// A handler of `entries` installed at `span` needs the regions that
+    /// index them live there: its body takes them for live (`scope_live`).
+    pub(in crate::types) fn live_install<'t>(
+        &mut self,
+        entries: impl IntoIterator<Item = &'t Type>,
+        span: Span,
+    ) {
+        if !self.live() {
+            return;
+        }
+        let mut atoms = Norm::default();
+        for entry in entries {
+            merge(&mut atoms, self.indexed_live(entry));
+        }
+        if !atoms.entries.is_empty() {
+            let row = add_live(&Type::empty_row(), atoms);
+            self.perform(&row, &Type::empty_row(), span);
         }
     }
 

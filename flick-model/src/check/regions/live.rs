@@ -19,7 +19,6 @@ use std::collections::BTreeSet;
 use std::rc::Rc;
 
 use super::super::Checker;
-use super::scope_service;
 use crate::syntax::{Name, Path};
 use crate::types::{Caps, Fields, Kind, Row, Scheme, Stage, Type, Var};
 
@@ -177,17 +176,25 @@ impl Checker<'_> {
     /// `Row.scope s = Row.ofCaps s.reach`), so `{Scope ϱ}` has `{Live {ϱ}}`
     /// where `Live` is checked within the row (`rows.rs` `within`). Not the
     /// other way: `Live ϱ` acquires nothing into `ϱ`.
+    ///
+    /// Every other service indexed by a region keeps it live too, as `Setup
+    /// ϱ` (`Row.err E U` has the atoms of `U`): a handler of one needs what
+    /// indexes it live where it is installed (`indexed_live`).
     pub(in crate::check) fn scope_live(&self, r: &Row) -> Caps {
         let mut out = Caps::default();
-        for t in r
-            .elems
-            .get(&scope_service())
-            .into_iter()
-            .flat_map(|a| a.iter())
-        {
-            out = out.union(&self.reach(t));
+        for (service, args) in &r.elems {
+            if *service != live_service() {
+                out = out.union(&self.indexed_live(args));
+            }
         }
         out
+    }
+
+    /// What the parameters `args` of a service reach: what a handler of it
+    /// needs live where it is installed, and what its entry keeps live.
+    pub(in crate::check) fn indexed_live(&self, args: &[Type]) -> Caps {
+        args.iter()
+            .fold(Caps::default(), |out, t| out.union(&self.reach(t)))
     }
 
     /// Work an owner keeps (`Fiber.Provided R ϱ`): each region `R` needs

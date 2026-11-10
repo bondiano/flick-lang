@@ -166,6 +166,7 @@ impl Checker<'_> {
         if let Some(needed) = needed
             && self.stage.pure.is_none()
         {
+            self.live_install(handled.iter().map(|h| &h.entry), span);
             self.handled_row(&needed, &handled, span);
         }
         ty
@@ -301,6 +302,7 @@ impl Checker<'_> {
         let inner = mem::replace(&mut self.stage, outer);
         self.stage.calls = inner.calls;
         if self.stage.pure.is_none() {
+            self.live_install(provided.iter().map(|(_, t)| t), span);
             let tail = open
                 .into_iter()
                 .fold(self.stage.services.clone(), |rest, t| {
@@ -393,6 +395,7 @@ impl Checker<'_> {
         let inner = mem::replace(&mut self.stage, outer);
         self.stage.calls = inner.calls;
         if self.stage.pure.is_none() {
+            self.live_install([&entry], span);
             let rest = Type::Row(Row {
                 entries: vec![(label, entry)],
                 tail: Some(Box::new(self.stage.services.clone())),

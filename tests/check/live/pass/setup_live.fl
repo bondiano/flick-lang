@@ -1,0 +1,11 @@
+// captures: accepts
+// `Setup s` keeps the instance's region `s` live, as `Scope s` does: the
+// runtime provides `Setup s` only while the instance's region is open, and
+// a handler a program installs for it needs `s` live where it is installed
+// (`../fail/install.fl`). So the task `Ui.on_mount` starts may use `s`.
+module App.LiveSetupRegion exposing (..)
+
+component search () =
+  let found = Atom.local 0
+  let _mounted = Ui.on_mount (task { Atom.set found 0 })
+  ui { text (show (Atom.value found)) }

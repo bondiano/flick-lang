@@ -1,0 +1,42 @@
+// captures: FLICK-G001
+// A row with a service a region indexes keeps that region live, as
+// `Setup s` does (`../pass/setup_live.fl`), so a handler of such a service
+// needs its region live where it is installed. This closure installs
+// `Within s` for the region of the `scope` it leaves: its row would need
+// `s` live after `s` ends, whether the handler is a record or the arms of
+// a `try`.
+module App.LiveInstall exposing (..)
+
+type File (s : Region)
+
+service Files =
+  open_scoped : forall s. String ->{Scope s} File s
+  use : forall s. File s ->{} Unit
+
+service Within (s : Region) =
+  get : Unit ->{} File s
+
+touched : Unit ->{Files, Within s} Unit
+let touched _ = Files.use (Within.get ())
+
+effect Lend (s : Region) =
+  lend : Unit ->{} File s
+
+lent : Unit ->{Files, Lend s} Unit
+let lent _ = Files.use (Lend.lend ())
+
+installs : String ->{Files} (Unit ->{Files} Unit)
+let installs path = scope {
+  let file = Files.open_scoped path
+  fun () -> provide Within ({ get = fun () -> file }) { touched () }
+}
+//~ FLICK-G002 @31:13-31:20 this uses region `s`
+
+arms : String ->{Files} (Unit ->{Files} Unit)
+let arms path = scope {
+  let file = Files.open_scoped path
+  fun () ->
+    try lent () with
+    | Lend.lend () -> file
+}
+//~ FLICK-G002 @39:5-39:8 this uses region `s`

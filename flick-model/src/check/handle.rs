@@ -29,6 +29,7 @@ impl Checker<'_> {
             Stage::Runtime(r, e) => (r.clone(), e.clone()),
         };
         let mut covered = Row::none();
+        let mut installed = Vec::new();
         let outer = Stage::Runtime(self.fresh_row(), self.fresh_row());
         for handled in &h.effects {
             let Some(ops) = self.decls.services.get(&handled.effect).cloned() else {
@@ -58,6 +59,7 @@ impl Checker<'_> {
                 let arm = self.arm_type(&declared, op, &t, &outer)?;
                 self.check(&op.function, &arm)?;
             }
+            installed.extend(args.iter().cloned());
             let complete = ops
                 .iter()
                 .all(|(n, _)| handled.ops.iter().any(|o| o.name == *n && o.covers));
@@ -71,7 +73,9 @@ impl Checker<'_> {
         let rest = self.minus(&needed, &covered)?;
         let errors = self.error_arms(&h.errors, &raised, &t)?;
         self.stage_within(&Stage::Runtime(rest, errors), &outer)?;
-        self.perform(&outer)?;
+        // a handler of a service a region indexes is installed where it is live
+        let live = self.indexed_live(&installed);
+        self.perform(&self.live_stage(&outer, &live))?;
         Ok(t)
     }
 
