@@ -133,22 +133,21 @@ fn module_signature(p: &mut Parser) -> Option<Done> {
         let m = p.start();
         p.bump();
         p.push(Ctx::Bracket);
-        let binder = p.at(K::Con) && p.nth(1) == K::Colon;
-        if binder {
-            p.bump();
-            p.bump();
+        if p.at(K::Con) && p.nth(1) == K::Colon {
+            loop {
+                let binder = p.start();
+                p.expect(K::Con);
+                p.expect(K::Colon);
+                module_signature(p);
+                p.complete(binder, K::ModuleSignatureBinder);
+                if !p.eat(K::Comma) { break; }
+            }
+        } else {
+            module_signature(p);
         }
-        module_signature(p);
         p.pop();
         p.expect(K::RParen);
-        p.complete(
-            m,
-            if binder {
-                K::ModuleSignatureBinder
-            } else {
-                K::ModuleSignatureParen
-            },
-        )
+        p.complete(m, K::ModuleSignatureParen)
     } else {
         let m = p.start();
         if p.at(K::Con) {

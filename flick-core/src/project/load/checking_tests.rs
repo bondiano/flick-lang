@@ -11,6 +11,8 @@ use super::checking::levels;
 #[cfg(feature = "ide")]
 use super::{ModuleCache, analyze, analyze_with};
 #[cfg(feature = "ide")]
+use crate::iface::Namespace;
+#[cfg(feature = "ide")]
 use crate::project::config::{Build, Config, Kind};
 #[cfg(feature = "ide")]
 use crate::project::config::{Dependency, Source};

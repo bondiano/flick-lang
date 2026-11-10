@@ -12,7 +12,7 @@ use tracing::debug;
 use super::Analyzed;
 use super::plugins::Watching;
 use super::precompiled::Precompiled;
-use super::{Loaded, Loader, Root};
+use super::{BindingOrigin, CalleeOrigin, Loaded, Loader, Root, Virtual};
 use crate::clock::timed;
 use crate::diagnostics::{Diagnostic, Severity, codes};
 use crate::iface::Namespace;
@@ -154,6 +154,8 @@ struct Key {
     imports: Vec<(Option<Arc<Interface>>, bool)>,
     virtual_contracts: Vec<Option<Arc<Interface>>>,
     virtual_parameters: Vec<(String, String, String)>,
+    virtual_bindings: Vec<BindingOrigin>,
+    virtual_callee: Option<CalleeOrigin>,
     /// What tells the watching plugins apart: a module without blocks is
     /// checked again when one of them changes.
     watching: Vec<String>,
@@ -281,6 +283,7 @@ struct Checking<'a> {
 }
 
 include!("checking_core.rs");
+include!("checking_contracts.rs");
 
 include!("checking_inline.rs");
 include!("checking_relocate.rs");

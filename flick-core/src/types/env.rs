@@ -136,6 +136,8 @@ pub enum ModuleSignature {
         requirements: Vec<ModuleRequirement>,
     },
     Functor {
+        /// Number of arguments still required in this atomic parameter group.
+        group_size: usize,
         binder: String,
         parameter: Box<ModuleSignature>,
         result: Box<ModuleSignature>,

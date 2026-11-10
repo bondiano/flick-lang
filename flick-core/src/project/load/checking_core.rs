@@ -49,15 +49,27 @@ impl Checking<'_> {
             virtual_contracts: loaded
                 .virtual_of
                 .iter()
-                .flat_map(|virtual_of| &virtual_of.parameters)
-                .map(|(_, contract, _)| {
-                    let module = contract.rsplit_once('.')?.0;
-                    match self.by_name.get(module) {
-                        Some(&j) => comparable[j].clone(),
-                        None => self.from_packages.get(module).map(comparable_copy),
+                .flat_map(|v| {
+                    let mut names: Vec<_> = v.bindings.iter().map(|b| b.module.clone()).collect();
+                    match &v.callee {
+                        Some(CalleeOrigin::Module(name)) => names.push(name.clone()),
+                        Some(CalleeOrigin::Parameter { binding, .. }) => {
+                            names.push(binding.module.clone())
+                        }
+                        None => {}
                     }
+                    names
+                })
+                .map(|module| match self.by_name.get(&module) {
+                    Some(&j) => comparable[j].clone(),
+                    None => self.from_packages.get(&module).map(comparable_copy),
                 })
                 .collect(),
+            virtual_bindings: loaded
+                .virtual_of
+                .as_ref()
+                .map_or_else(Vec::new, |v| v.bindings.clone()),
+            virtual_callee: loaded.virtual_of.as_ref().and_then(|v| v.callee.clone()),
             virtual_parameters: loaded
                 .virtual_of
                 .as_ref()
@@ -125,97 +137,15 @@ impl Checking<'_> {
         }
     }
 
-    fn virtual_contracts(
-        loaded: &Loaded,
-        lookup: &dyn Fn(&str) -> Option<Interface>,
-    ) -> ContractView {
-        let mut projections = BTreeMap::new();
-        let mut local_dictionaries = Vec::new();
-        let mut contract_errors = Vec::new();
-        if let Some(virtual_of) = &loaded.virtual_of {
-            for (_, contract_path, argument) in &virtual_of.parameters {
-                let Some((contract_module, contract_name)) = contract_path.rsplit_once('.') else {
-                    contract_errors.push(Diagnostic::error(
-                        codes::T001,
-                        format!("`{contract_path}` must name a `type module` in a module"),
-                        virtual_of.at,
-                    ));
-                    continue;
-                };
-                let contract = lookup(contract_module)
-                    .and_then(|interface| interface.find(Namespace::Type, contract_name).cloned())
-                    .and_then(|export| export.definition);
-                let Some(contract) = contract else {
-                    contract_errors.push(Diagnostic::error(
-                        codes::T001,
-                        format!("unknown module contract `{contract_path}`"),
-                        virtual_of.at,
-                    ));
-                    continue;
-                };
-                let Some(actual) = lookup(argument) else {
-                    continue;
-                };
-                let mismatches = types::check_module_contract(&contract, &actual);
-                for mismatch in &mismatches {
-                    let (code, member, detail) = match mismatch {
-                        types::ModuleMismatch::Missing(name) => {
-                            (codes::T060, name, "is not exported")
-                        }
-                        types::ModuleMismatch::NominalIdentity(name) => {
-                            (codes::T062, name, "has the wrong nominal identity")
-                        }
-                        types::ModuleMismatch::Kind(name)
-                        | types::ModuleMismatch::TypeEquality(name)
-                        | types::ModuleMismatch::ValueType(name)
-                        | types::ModuleMismatch::Shape(name) => {
-                            (codes::T061, name, "has the wrong kind, type or shape")
-                        }
-                    };
-                    contract_errors.push(Diagnostic::error(
-                        code,
-                        format!(
-                            "`{argument}` does not satisfy `{contract_path}`: `{member}` {detail}"
-                        ),
-                        virtual_of.at,
-                    ));
-                }
-                if mismatches.is_empty() {
-                    for (head, dict) in types::module_local_dictionaries(&contract, &actual) {
-                        if local_dictionaries
-                            .iter()
-                            .any(|(existing, _)| existing == &head)
-                        {
-                            contract_errors.push(Diagnostic::error(
-                                codes::T066,
-                                format!("more than one static module argument supplies a dictionary for `{}`; keep one `instance ... from ...` requirement in this functor scope", types::show_type(&head)),
-                                virtual_of.at,
-                            ));
-                        } else {
-                            local_dictionaries.push((head, dict));
-                        }
-                    }
-                    projections.insert(
-                        argument.clone(),
-                        types::project_module_contract(&contract, &actual),
-                    );
-                }
-            }
-        }
-        (projections, local_dictionaries, contract_errors)
-    }
-
     #[allow(clippy::too_many_lines)]
     fn check(&self, loaded: &Loaded, lookup: &dyn Fn(&str) -> Option<Interface>) -> Output {
         let tree = loaded
             .expansion
             .as_ref()
             .map_or(&loaded.parse.tree, |e| &e.tree);
-        if let Some((index, inline)) = tree
-            .nodes()
-            .enumerate()
-            .find(|(_, n)| n.kind == K::InlineModuleDecl)
-        {
+        if let Some((index, inline)) = tree.nodes().enumerate().find(|(_, n)| {
+            n.kind == K::InlineModuleDecl && !n.nodes().any(|n| n.kind == K::ModuleParamGroup)
+        }) {
             return self.check_inline(loaded, tree, index, inline, lookup);
         }
         let (projections, local_dictionaries, contract_errors) =
@@ -275,6 +205,18 @@ impl Checking<'_> {
             &mut interface,
             &local_dictionaries,
         );
+        if let Some(expected) = Self::virtual_result_signature(loaded, lookup) {
+            if let Some(context) = &loaded.virtual_of {
+                Self::module_contract_errors(
+                    &expected,
+                    &interface,
+                    context.at,
+                    "functor result",
+                    &mut checked,
+                );
+            }
+            interface = expected.seal(&interface, &loaded.name);
+        }
         // what the plugins find from the types of their code stops lowering too
         if let Some(expansion) = &loaded.expansion {
             checked.extend(expansion.check_blocks(
@@ -285,11 +227,22 @@ impl Checking<'_> {
         }
         checked.extend(self.watched_calls(loaded, &typing));
         let checked = types::beside_syntax_errors(tree, checked);
-        let clean =
-            !broken && resolved_cleanly && !checked.iter().any(|d| d.severity == Severity::Error);
+        let clean = !broken
+            && resolved_cleanly
+            && !checked.iter().any(|d| d.severity == Severity::Error)
+            && !diagnostics.iter().any(|d| d.severity == Severity::Error);
+        if !clean {
+            untyped.functor = interface.functor.as_ref().map(types::ModuleSignature::inputs_only);
+        }
         diagnostics.extend(checked);
         let declarations = typing.declarations.clone();
-        let mut ir = self.lower_if_clean(loaded, &module, &typing, clean, &mut diagnostics);
+        let mut ir = self.lower_if_clean(
+            loaded,
+            &module,
+            &typing,
+            clean && interface.functor.is_none(),
+            &mut diagnostics,
+        );
         if let Some(expansion) = &loaded.expansion {
             expansion.restore(&mut diagnostics, ir.as_mut());
             expansion.place_interface(&mut interface);

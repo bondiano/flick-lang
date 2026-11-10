@@ -51,6 +51,15 @@ fn packed_paths(node: &Node, text: &str, out: &mut Vec<String>) {
     }
 }
 
+fn module_expression_paths(node: &Node, text: &str, out: &mut Vec<String>) {
+    if node.kind == K::ModulePath {
+        out.push(node.text(text).split_whitespace().collect());
+    }
+    for child in node.nodes() {
+        module_expression_paths(child, text, out);
+    }
+}
+
 impl Scope<'_> {
     /// Warnings for imports, and names they expose, that no reference and no
     /// export of the module uses.
@@ -73,7 +82,16 @@ impl Scope<'_> {
         // `M.S.op` uses the import `M` too: count each prefix of a qualifier
         let mut packed = Vec::new();
         packed_paths(module.tree, module.text, &mut packed);
+        if let Some(header) = &module.syntax.header {
+            if let Some(body) = &header.body {
+                module_expression_paths(body, module.text, &mut packed);
+            }
+            if let Some(target) = &header.materialized_body {
+                packed.push(target.clone());
+            }
+        }
         for application in &module.syntax.applications {
+            module_expression_paths(&application.expression, module.text, &mut packed);
             packed.push(application.functor.clone());
             packed.extend(application.arguments.iter().cloned());
             if names.contains(application.name.as_str()) {
@@ -127,6 +145,11 @@ impl Scope<'_> {
                 continue;
             }
             for item in unused {
+                // Synthesized imports have no separate source `exposing`
+                // clause, so they have no user-editable item to diagnose.
+                if item.span == import.span {
+                    continue;
+                }
                 diagnostics.push(unused_item(module.text, import, item));
             }
             for item in needless {

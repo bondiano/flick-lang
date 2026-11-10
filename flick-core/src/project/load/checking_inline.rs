@@ -134,8 +134,8 @@ fn inline_units(
     let mut child_syntax = (*loaded.syntax).clone();
     child_syntax.header = Some(Header {
         result: None,
-            body: None,
-            materialized_body: None,
+        body: None,
+        materialized_body: None,
         parameter_groups: Vec::new(),
         name: name.clone(),
         private: true,

@@ -3,7 +3,7 @@
 //! mapping, name collisions and import cycles, then resolves each module
 //! against the interfaces of its imports.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::io;
 use std::mem;
 use std::path::{Path, PathBuf};
@@ -13,6 +13,7 @@ mod checking;
 #[cfg(test)]
 mod checking_tests;
 mod entry;
+mod expressions;
 mod files;
 mod format_plugins;
 #[cfg(feature = "ide")]
@@ -97,6 +98,24 @@ struct Loaded {
 struct Virtual {
     at: Span,
     parameters: Vec<(String, String, String)>,
+    bindings: Vec<BindingOrigin>,
+    callee: Option<CalleeOrigin>,
+    arguments: Vec<String>,
+}
+
+/// The checked parameter signature that a static binding was introduced with.
+/// Prefix arguments instantiate dependencies on earlier parameters.
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct BindingOrigin {
+    module: String,
+    parameter: usize,
+    prefix: Vec<String>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+enum CalleeOrigin {
+    Module(String),
+    Parameter { binding: BindingOrigin, members: Vec<String> },
 }
 
 /// How far a run goes past checking.
@@ -120,6 +139,8 @@ struct Output {
 }
 
 struct Loader<'a> {
+    expression_serial: usize,
+    expressions_active: BTreeSet<String>,
     host: &'a dyn Host,
     sources: &'a mut SourceMap,
     project: Option<&'a Project>,
@@ -339,6 +360,8 @@ fn run_in(
     // a check lowers the modules of source packages only to save them
     let lower_packages_only = mode == Mode::Check && saved.is_some();
     let mut loader = Loader {
+        expression_serial: 0,
+        expressions_active: BTreeSet::new(),
         host,
         sources,
         project,

@@ -1,4 +1,16 @@
 impl<'b> Env<'b> {
+    pub(super) fn static_scope(&self) -> HashMap<String, Interface> {
+        self.builtins
+            .interfaces
+            .iter()
+            .map(|(name, interface)| (name.clone(), interface.clone()))
+            .chain(
+                self.interfaces.iter().filter_map(|(name, interface)| {
+                    Some((name.clone(), interface.as_ref()?.clone()))
+                }),
+            )
+            .collect()
+    }
     pub(super) fn static_parameter(&mut self, alias: &str, interface: Interface) {
         self.qualifiers
             .insert(alias.to_owned(), interface.module.clone());
@@ -118,6 +130,9 @@ impl<'b> Env<'b> {
 
     /// Records the types and instances an interface carries.
     fn learn(&mut self, interface: &Interface) {
+        for child in interface.modules.values() {
+            self.learn(child);
+        }
         for instance in &interface.instances {
             let known = |i: &Instance| i.module == instance.module && i.name == instance.name;
             if !self
@@ -337,6 +352,13 @@ impl<'b> Env<'b> {
     }
 
     pub fn qualified_module(&self, qualifier: &str) -> Option<(&str, Option<&Interface>)> {
+        if !self.qualifiers.contains_key(qualifier)
+            && let Some((parent, name)) = qualifier.rsplit_once('.')
+            && let Some((_, Some(parent))) = self.qualified_module(parent)
+            && let Some(child) = parent.modules.get(name)
+        {
+            return Some((&child.module, Some(child)));
+        }
         if self.private_builtin(qualifier) {
             return None;
         }

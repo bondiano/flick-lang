@@ -8,6 +8,32 @@ use crate::api_diff::canonical_type;
 use crate::iface::{Decl, Entity, Export, Interface, Namespace};
 
 impl ModuleSignature {
+    /// A broken body must not leak inference variables to another checker,
+    /// but its declared inputs still constrain applications and cache keys.
+    pub(crate) fn inputs_only(&self) -> Self {
+        match self {
+            Self::Functor { group_size, binder, parameter, result } => Self::Functor {
+                group_size: *group_size,
+                binder: binder.clone(),
+                parameter: parameter.clone(),
+                result: Box::new(result.inputs_only()),
+            },
+            Self::Structure { .. } => Self::Structure { requirements: Vec::new() },
+        }
+    }
+    pub(crate) fn definition(&self) -> TypeDef {
+        TypeDef {
+            kind: Kind::Module,
+            form: match self {
+                Self::Structure { requirements } => Form::ModuleContract {
+                    requirements: requirements.clone(),
+                },
+                Self::Functor { .. } => Form::ModuleSignature {
+                    signature: Box::new(self.clone()),
+                },
+            },
+        }
+    }
     pub fn from_interface(interface: &Interface) -> Self {
         fn local(ty: &Type, module: &str, names: &[String]) -> Type {
             if let Type::Con {
@@ -94,8 +120,10 @@ impl ModuleSignature {
                 binder,
                 parameter,
                 result,
+                ..
             } => format!(
-                "({binder} : {}) -> {}",
+                "({} : {}) -> {}",
+                binder.rsplit('#').next().unwrap_or(binder),
                 parameter.display(),
                 result.display()
             ),
@@ -394,23 +422,26 @@ impl ModuleSignature {
         match (self, expected) {
             (
                 Self::Functor {
+                    group_size: ag,
                     binder: a,
                     parameter: ap,
                     result: ar,
                 },
                 Self::Functor {
+                    group_size: bg,
                     binder: b,
                     parameter: bp,
                     result: br,
                 },
             ) => {
-                if !bp.is_subtype_of(ap) {
+                if ag != bg || !bp.is_subtype_of(ap) {
                     return false;
                 }
                 let mut ar = (**ar).clone();
                 let mut br = (**br).clone();
-                ar.rename_parameter(a, "$matched");
-                br.rename_parameter(b, "$matched");
+                let matched = format!("$matched({a})({b})");
+                ar.rename_parameter(a, &matched);
+                br.rename_parameter(b, &matched);
                 ar.is_subtype_of(&br)
             }
             (Self::Structure { .. }, Self::Structure { .. }) => {
@@ -440,6 +471,7 @@ impl ModuleSignature {
                 binder: inner,
                 parameter,
                 result,
+                ..
             } => {
                 parameter.rename_parameter(binder, path);
                 if inner != binder {
@@ -471,6 +503,7 @@ impl ModuleSignature {
                 binder,
                 parameter,
                 result,
+                ..
             } => {
                 parameter.canonicalize(next);
                 let fresh = format!("'{}", *next);
@@ -546,10 +579,17 @@ impl ModuleSignature {
                         R::Dictionary { head, .. } => *head = f(head),
                         R::Module { signature, .. } => signature.map_types(f),
                         R::Nominal {
+                            identity,
                             definition,
                             methods,
                             ..
                         } => {
+                            if let Some(entity) = identity {
+                                if let Type::Con { module, name } = f(&Type::con(&entity.module, &entity.name)) {
+                                    entity.module = module;
+                                    entity.name = name;
+                                }
+                            }
                             for (_, ty) in methods {
                                 *ty = f(ty);
                             }
@@ -612,6 +652,7 @@ mod tests {
 
     fn factory(input: ModuleSignature, output: ModuleSignature) -> ModuleSignature {
         ModuleSignature::Functor {
+            group_size: 1,
             binder: "K".into(),
             parameter: Box::new(input),
             result: Box::new(output),
@@ -730,6 +771,21 @@ mod tests {
                 }]
             }
         );
+    }
+
+    #[test]
+    fn parameter_renaming_preserves_dependent_nominal_identities() {
+        let mut signature = ModuleSignature::Structure {
+            requirements: vec![R::Nominal {
+                name: "Clock".into(), category: ModuleNominalKind::Service,
+                identity: Some(Entity { module: "$module:K.Child".into(), namespace: Namespace::Type, name: "Clock".into() }),
+                definition: None, methods: Vec::new(),
+            }],
+        };
+        signature.rename_parameter("K", "Actual");
+        let ModuleSignature::Structure { requirements } = signature else { panic!("structure") };
+        let R::Nominal { identity: Some(identity), .. } = &requirements[0] else { panic!("nominal") };
+        assert_eq!(identity.module, "Actual.Child");
     }
 
     #[test]

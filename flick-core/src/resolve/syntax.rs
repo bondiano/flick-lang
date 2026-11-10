@@ -126,9 +126,15 @@ pub fn module_syntax(tree: &Node, text: &str, file: FileId) -> ModuleSyntax {
     let mut imports = Vec::new();
     let mut applications = Vec::new();
     for node in tree.nodes() {
-        let file_expression = node.kind == K::ModuleApplyDecl && header.is_none()
-            && node.nodes().any(|n| n.kind == K::ModulePath && (n.has_token(K::Dot) || node.nodes().any(|n| n.kind == K::ModuleParamGroup)));
-        if node.kind == K::ModuleApplyDecl && !file_expression {
+        let file_expression = node.kind == K::ModuleApplyDecl
+            && header.is_none()
+            && node.nodes().any(|n| {
+                n.kind == K::ModulePath
+                    && (n.has_token(K::Dot) || node.nodes().any(|n| n.kind == K::ModuleParamGroup))
+            });
+        let nested_functor =
+            node.kind == K::InlineModuleDecl && node.nodes().any(|n| n.kind == K::ModuleParamGroup);
+        if (node.kind == K::ModuleApplyDecl && !file_expression) || nested_functor {
             fn paths<'a>(node: &'a Node, out: &mut Vec<&'a Node>) {
                 if node.kind == K::ModulePath {
                     out.push(node);
@@ -158,7 +164,30 @@ pub fn module_syntax(tree: &Node, text: &str, file: FileId) -> ModuleSyntax {
             } else {
                 continue;
             };
-            let expression = node.nodes().filter(|n| matches!(n.kind, K::ModuleApplyExpr | K::ModuleFunctorExpr | K::ModuleParenExpr | K::ModuleAnnotExpr)).last();
+            let nested_expression = nested_functor.then(|| Node {
+                kind: K::ModuleFunctorExpr,
+                children: node
+                    .nodes()
+                    .filter(|n| {
+                        matches!(n.kind, K::ModuleParamGroup | K::ModuleResult | K::Members)
+                    })
+                    .cloned()
+                    .map(Element::Node)
+                    .collect(),
+            });
+            let expression = nested_expression.as_ref().or_else(|| {
+                node.nodes()
+                    .filter(|n| {
+                        matches!(
+                            n.kind,
+                            K::ModuleApplyExpr
+                                | K::ModuleFunctorExpr
+                                | K::ModuleParenExpr
+                                | K::ModuleAnnotExpr
+                        )
+                    })
+                    .last()
+            });
             if let Some(expression) = expression {
                 fn groups(node: &Node, out: &mut Vec<usize>) {
                     if node.kind == K::ModuleApplyExpr {
@@ -174,10 +203,16 @@ pub fn module_syntax(tree: &Node, text: &str, file: FileId) -> ModuleSyntax {
                 }
                 applications.push(ModuleApplication {
                     expression: expression.clone(),
-                    annotation: node.nodes().find(|n| n.kind == K::ModuleResult).and_then(|n| n.nodes().next()).cloned(),
+                    annotation: node
+                        .nodes()
+                        .find(|n| n.kind == K::ModuleResult)
+                        .and_then(|n| n.nodes().next())
+                        .cloned(),
                     argument_groups,
                     name: local_name,
-                    functor: named.first().map_or(String::new(), |n| n.text(text).split_whitespace().collect()),
+                    functor: named
+                        .first()
+                        .map_or(String::new(), |n| n.text(text).split_whitespace().collect()),
                     functor_span: named.first().map_or(local_span, |n| span(n, file)),
                     arguments: named
                         .iter()
@@ -200,7 +235,9 @@ pub fn module_syntax(tree: &Node, text: &str, file: FileId) -> ModuleSyntax {
             K::ModuleHeader | K::ModuleApplyDecl if header.is_none() => {
                 header = Some(Header {
                     materialized_body: None,
-                    body: file_expression.then(|| node.nodes().last().cloned()).flatten(),
+                    body: file_expression
+                        .then(|| node.nodes().last().cloned())
+                        .flatten(),
                     parameter_groups: node
                         .nodes()
                         .filter(|n| n.kind == K::ModuleParamGroup)
@@ -276,6 +313,62 @@ pub fn module_syntax(tree: &Node, text: &str, file: FileId) -> ModuleSyntax {
                     signature_imports(child, text, file, imports);
                 }
             }
+        }
+        fn expression_imports(
+            node: &Node,
+            text: &str,
+            file: FileId,
+            bound: &[String],
+            imports: &mut Vec<Import>,
+        ) {
+            let mut bound = bound.to_vec();
+            if node.kind == K::ModuleFunctorExpr {
+                for parameter in node
+                    .nodes()
+                    .filter(|n| n.kind == K::ModuleParamGroup)
+                    .flat_map(Node::nodes)
+                {
+                    if let Some(name) = parameter.child_tokens().find(|t| t.kind == K::Con) {
+                        bound.push(name.text(text).to_owned());
+                    }
+                    for signature in parameter.nodes() {
+                        signature_imports(signature, text, file, imports);
+                    }
+                }
+            }
+            if node.kind == K::ModuleAnnotExpr
+                && let Some(signature) = node.nodes().last()
+            {
+                signature_imports(signature, text, file, imports);
+            }
+            if node.kind == K::ModulePath {
+                let name: String = node.text(text).split_whitespace().collect();
+                let root = name.split('.').next().unwrap_or(&name);
+                if name.contains('.')
+                    && !bound.iter().any(|n| n == root)
+                    && !imports
+                        .iter()
+                        .any(|i| i.module == name || i.qualifier() == root)
+                {
+                    imports.push(Import {
+                        module: name,
+                        alias: None,
+                        exposing: Vec::new(),
+                        plugins: Vec::new(),
+                        span: span(node, file),
+                    });
+                }
+            }
+            for child in node.nodes().filter(|n| n.kind != K::ModuleParamGroup) {
+                expression_imports(child, text, file, &bound, imports);
+            }
+        }
+        let bound: Vec<_> = header.parameters.iter().map(|p| p.name.clone()).collect();
+        for application in &applications {
+            expression_imports(&application.expression, text, file, &bound, &mut imports);
+        }
+        if let Some(body) = &header.body {
+            expression_imports(body, text, file, &bound, &mut imports);
         }
         for parameter in &header.parameters {
             signature_imports(&parameter.signature, text, file, &mut imports);

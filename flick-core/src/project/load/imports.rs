@@ -4,7 +4,7 @@
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use super::{Loaded, Loader, Root, Virtual, module_path};
+use super::{BindingOrigin, CalleeOrigin, Loaded, Loader, Root, Virtual, module_path};
 use crate::diagnostics::{Diagnostic, codes};
 use crate::resolve::{self, ItemKind, ModuleApplication};
 use crate::source::Span;
@@ -17,6 +17,7 @@ impl Loader<'_> {
         let mut edges = Vec::new();
         let mut i = 0;
         while i < self.modules.len() {
+            self.materialize_expression_body(i);
             let mut targets = Vec::new();
             for import in self.modules[i]
                 .syntax
@@ -44,10 +45,26 @@ impl Loader<'_> {
                 }
             }
             if let Some(virtual_of) = self.modules[i].virtual_of.clone() {
-                for (_, contract, _) in virtual_of.parameters {
-                    if let Some((module, _)) = contract.rsplit_once('.')
-                        && let Some(target) = self.find_module(i, module, virtual_of.at)
-                    {
+                let mut dependencies: Vec<_> = virtual_of
+                    .bindings
+                    .iter()
+                    .map(|b| b.module.clone())
+                    .collect();
+                dependencies.extend(
+                    virtual_of
+                        .parameters
+                        .iter()
+                        .map(|(_, _, argument)| argument.clone()),
+                );
+                match &virtual_of.callee {
+                    Some(CalleeOrigin::Module(name)) => dependencies.push(name.clone()),
+                    Some(CalleeOrigin::Parameter { binding, .. }) => {
+                        dependencies.push(binding.module.clone())
+                    }
+                    None => {}
+                }
+                for dependency in dependencies {
+                    if let Some(target) = self.find_module(i, &dependency, virtual_of.at) {
                         targets.push(target);
                     }
                 }
@@ -71,7 +88,7 @@ impl Loader<'_> {
     }
 
     #[allow(clippy::too_many_lines)]
-    fn find_module(&mut self, importer: usize, name: &str, span: Span) -> Option<usize> {
+    pub(super) fn find_module(&mut self, importer: usize, name: &str, span: Span) -> Option<usize> {
         let (head, tail) = name.split_once('.').unwrap_or((name, ""));
         if let Some(import) = self.modules[importer]
             .syntax
@@ -139,7 +156,7 @@ impl Loader<'_> {
                     self.instantiate(parent, &application);
                 }
             }
-            if self.report_inline_import(&dirs, name, span) {
+            if !self.by_name.contains_key(name) && self.report_inline_import(&dirs, name, span) {
                 return None;
             }
         }
@@ -229,7 +246,7 @@ impl Loader<'_> {
             .parse
             .tree
             .nodes()
-            .find(|node| node.kind == K::ModuleHeader)?;
+            .find(|node| matches!(node.kind, K::ModuleHeader | K::ModuleApplyDecl))?;
         let exposed = header
             .exposing
             .as_ref()
@@ -266,7 +283,12 @@ impl Loader<'_> {
             .skip(application.argument_groups.len())
             .map(|n| n.text(&source))
             .collect::<String>();
-        let mut generated = format!("{visibility}module {name}{groups}{result}{exposed}\n");
+        let expression_body = header
+            .body
+            .as_ref()
+            .map_or(String::new(), |body| format!(" = {}", body.text(&source)));
+        let mut generated =
+            format!("{visibility}module {name}{groups}{result}{exposed}{expression_body}\n");
         for (parameter, argument) in header.parameters.iter().zip(&application.arguments) {
             generated.push_str("import ");
             generated.push_str(argument);
@@ -278,7 +300,12 @@ impl Loader<'_> {
         Some(generated)
     }
 
-    fn instantiate(&mut self, parent: usize, application: &ModuleApplication) {
+    pub(super) fn instantiate_named(
+        &mut self,
+        parent: usize,
+        application: &ModuleApplication,
+        callee: CalleeOrigin,
+    ) {
         let name = format!("{}.{}", self.modules[parent].name, application.name);
         let path = PathBuf::from(format!(
             "{}#{}",
@@ -301,6 +328,9 @@ impl Loader<'_> {
         let Some(functor) =
             self.find_module(parent, &application.functor, application.functor_span)
         else {
+            return;
+        };
+        let Some(functor) = self.callable_template(functor, application.span) else {
             return;
         };
         let Some(header) = self.modules[functor].syntax.header.clone() else {
@@ -347,6 +377,26 @@ impl Loader<'_> {
         let syntax = Arc::new(resolve::module_syntax(&parse.tree, generated, file));
         let index = self.modules.len();
         self.by_name.insert(name.clone(), index);
+        let inherited = self.modules[functor].virtual_of.as_ref();
+        let mut parameters = inherited.map_or_else(Vec::new, |v| v.parameters.clone());
+        let mut bindings = inherited.map_or_else(Vec::new, |v| v.bindings.clone());
+        for (index, (parameter, argument)) in header
+            .parameters
+            .iter()
+            .zip(&application.arguments)
+            .enumerate()
+        {
+            parameters.push((
+                parameter.name.clone(),
+                parameter.contract.clone(),
+                argument.clone(),
+            ));
+            bindings.push(BindingOrigin {
+                module: self.modules[functor].name.clone(),
+                parameter: index,
+                prefix: application.arguments[..index].to_vec(),
+            });
+        }
         self.modules.push(Loaded {
             path,
             file,
@@ -359,18 +409,10 @@ impl Loader<'_> {
             loader: None,
             virtual_of: Some(Virtual {
                 at: application.span,
-                parameters: header
-                    .parameters
-                    .iter()
-                    .zip(&application.arguments)
-                    .map(|(parameter, argument)| {
-                        (
-                            parameter.name.clone(),
-                            parameter.contract.clone(),
-                            argument.clone(),
-                        )
-                    })
-                    .collect(),
+                parameters,
+                bindings,
+                callee: Some(callee),
+                arguments: application.arguments.clone(),
             }),
         });
     }
@@ -401,7 +443,8 @@ impl Loader<'_> {
                 .imports
                 .iter()
                 .find(|i| i.module == self.modules[next].name)
-                .map(|i| i.span);
+                .map(|i| i.span)
+                .or_else(|| module.virtual_of.as_ref().map(|v| v.at));
             self.diagnostics.push(
                 Diagnostic::error(
                     codes::R006,

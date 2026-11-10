@@ -52,7 +52,7 @@ mod module_signature;
 mod static_modules;
 pub(crate) use module_contract::{
     Mismatch as ModuleMismatch, check as check_module_contract,
-    local_dictionaries as module_local_dictionaries, project as project_module_contract,
+    local_dictionaries as module_local_dictionaries,
 };
 mod expression_fact;
 mod origin;

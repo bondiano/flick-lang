@@ -9,26 +9,33 @@ impl Checker<'_> {
                         requirements: Vec::new(),
                     };
                 };
-                let (binder, parameter) = if input.kind == K::ModuleSignatureBinder {
-                    let binder = self.con_token(input).unwrap_or_default();
-                    (
-                        binder,
-                        self.static_module_signature(
-                            children[0].nodes().next().expect("binder signature"),
-                        ),
-                    )
-                } else {
-                    (String::new(), self.static_module_signature(input))
-                };
+                let binders: Vec<_> = if input.kind == K::ModuleSignatureParen
+                    && input.nodes().all(|n| n.kind == K::ModuleSignatureBinder)
+                {
+                    input.nodes().collect()
+                } else { vec![*input] };
                 let mark = self.opened_modules.len();
-                self.bind_static_signature(&binder, &parameter);
-                let result = self.static_module_signature(children[1]);
-                self.opened_modules.truncate(mark);
-                S::Functor {
-                    binder,
-                    parameter: Box::new(parameter),
-                    result: Box::new(result),
+                let mut parameters = Vec::new();
+                for input in binders {
+                    let (alias, parameter) = if input.kind == K::ModuleSignatureBinder {
+                        (self.con_token(input).unwrap_or_default(),
+                         self.static_module_signature(input.nodes().next().expect("binder signature")))
+                    } else { (String::new(), self.static_module_signature(input)) };
+                    let binder = self.static_binder(&alias, input.range().0);
+                    self.bind_static_witness(&alias, &format!("$module:{binder}"), &parameter);
+                    parameters.push((binder, parameter));
                 }
+                let mut result = self.static_module_signature(children[1]);
+                self.opened_modules.truncate(mark);
+                for (index, (binder, parameter)) in parameters.into_iter().rev().enumerate() {
+                    result = S::Functor {
+                        group_size: index + 1,
+                        binder,
+                        parameter: Box::new(parameter),
+                        result: Box::new(result),
+                    };
+                }
+                result
             }
             K::ModuleSignatureParen | K::ModuleSignatureBinder | K::ModuleResult => {
                 self.static_module_signature(children[0])
@@ -76,49 +83,51 @@ impl Checker<'_> {
         }
     }
 
-    fn bind_static_signature(&mut self, binder: &str, signature: &super::ModuleSignature) {
-        if binder.is_empty() {
+    pub(super) fn static_binder(&self, alias: &str, start: u32) -> String {
+        if alias.is_empty() {
+            return String::new();
+        }
+        format!("{}@{start}#{alias}", self.env.module)
+    }
+
+    fn bind_static_signature(&mut self, alias: &str, signature: &super::ModuleSignature) {
+        self.bind_static_witness(alias, &format!("$module:{alias}"), signature);
+    }
+
+    fn bind_static_witness(
+        &mut self,
+        alias: &str,
+        witness: &str,
+        signature: &super::ModuleSignature,
+    ) {
+        if alias.is_empty() {
             return;
         }
-        let super::ModuleSignature::Structure { requirements } = signature else {
+        let interface = signature.interface(witness);
+        if interface.functor.is_some() {
             return;
-        };
-        let witness = format!("$module:{binder}");
-        let mut types = Vec::new();
-        for requirement in requirements {
-            match requirement {
-                ModuleRequirement::Type {
-                    name,
-                    params,
-                    manifest,
-                } => types.push((
-                    name.clone(),
-                    manifest
-                        .clone()
-                        .unwrap_or_else(|| Type::con(&witness, name)),
-                    Kind::arrows(params.iter().map(|p| p.kind.clone()), Kind::Type),
-                )),
-                ModuleRequirement::Nominal {
-                    name,
-                    definition,
-                    identity,
-                    ..
-                } => types.push((
-                    name.clone(),
-                    identity.as_ref().map_or_else(
-                        || Type::con(&witness, name),
-                        |e| Type::con(&e.module, &e.name),
-                    ),
-                    definition.as_ref().map_or(Kind::Type, |d| d.kind.clone()),
-                )),
-                ModuleRequirement::Module { name, signature } => {
-                    self.bind_static_signature(&format!("{binder}.{name}"), signature);
+        }
+        for (name, child) in &interface.modules {
+            let child_signature = super::ModuleSignature::from_interface(child);
+            self.bind_static_witness(&format!("{alias}.{name}"), &child.module, &child_signature);
+        }
+        let types = interface
+            .exports
+            .iter()
+            .filter_map(|export| {
+                if export.entity.namespace != Namespace::Type {
+                    return None;
                 }
-                _ => {}
-            }
-        }
+                let definition = export.definition.as_ref()?;
+                let ty = match &definition.form {
+                    Form::Alias { body, .. } => body.clone(),
+                    _ => Type::con(&export.entity.module, &export.entity.name),
+                };
+                Some((export.entity.name.clone(), ty, definition.kind.clone()))
+            })
+            .collect();
         self.opened_modules.push(super::module_contract::Opened {
-            alias: binder.to_owned(),
+            alias: alias.to_owned(),
             types,
             values: Vec::new(),
         });
