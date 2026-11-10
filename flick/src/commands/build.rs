@@ -87,9 +87,6 @@ impl Command for BuildCommand {
     #[allow(clippy::too_many_lines)]
     fn run(&self) -> Outcome {
         let progress = self.progress();
-        if let Err(outcome) = self.prepare(&progress) {
-            return outcome;
-        }
         let mut sources = SourceMap::default();
         let host = FsHost::new();
         progress.stage("Resolving project");
@@ -113,20 +110,12 @@ impl Command for BuildCommand {
         }
         let plan = self.plan(&host, project.as_ref(), Vec::new());
         let go = plan.go;
-        if plan.extras.rt {
-            if go || plan.extras.promise_facade {
-                let message = "Flick's own runtime does not support Go output or Promise façades";
-                return Outcome {
-                    sources,
-                    diagnostics: vec![Diagnostic::new(codes::F004, Severity::Error, message)],
-                };
-            }
-            if let Err(diagnostic) = builtins::prepare_in(true) {
-                return Outcome {
-                    sources,
-                    diagnostics: vec![diagnostic],
-                };
-            }
+        if plan.extras.rt && (go || plan.extras.promise_facade) {
+            let message = "Flick's own runtime does not support Go output or Promise façades";
+            return Outcome {
+                sources,
+                diagnostics: vec![Diagnostic::new(codes::F004, Severity::Error, message)],
+            };
         }
         if let Some(problem) = project
             .as_ref()
@@ -161,6 +150,19 @@ impl Command for BuildCommand {
             return Outcome {
                 sources,
                 diagnostics,
+            };
+        }
+        // only a build that compiles reads the built-in modules: a cache hit
+        // restored its artifacts above
+        if let Err(outcome) = self.prepare(&progress) {
+            return outcome;
+        }
+        if plan.extras.rt
+            && let Err(diagnostic) = builtins::prepare_in(true)
+        {
+            return Outcome {
+                sources,
+                diagnostics: vec![diagnostic],
             };
         }
         progress.stage("Compiling Flick modules");
