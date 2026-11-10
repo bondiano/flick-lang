@@ -243,7 +243,8 @@ jobs:
       - uses: actions/checkout@v7
       # The source of the derivation is the whole checkout, so no cache of it
       # can hit and every run builds the compiler anew. A pull request does
-      # that only when it changes the flake or what the flake pins; a push to
+      # that only when it changes the flake, what the flake pins or this
+      # workflow, whose steps it would otherwise never run; a push to
       # main, the nightly run and a release always do. A comparison that
       # fails counts as a change
       - name: Whether the flake's inputs changed
@@ -253,7 +254,7 @@ jobs:
         run: |
           changed=true
           if [ -n "$BASE" ] && git fetch --depth=1 origin "$BASE" &&
-            git diff --quiet FETCH_HEAD HEAD -- flake.nix flake.lock nix Cargo.lock rust-toolchain.toml; then
+            git diff --quiet FETCH_HEAD HEAD -- flake.nix flake.lock nix Cargo.lock rust-toolchain.toml .github/workflows/ci.yml; then
             changed=false
           fi
           echo "changed=$changed" >> "$GITHUB_OUTPUT"
