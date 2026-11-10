@@ -64,7 +64,7 @@ impl Gen<'_> {
                 // Build validation rejects reachable uses. Unused members of a
                 // mixed built-in module must not import an unavailable adapter.
                 let message = serde_json::to_string(&format!(
-                    "`{module}` `{}` requires the optional `{}` adapter",
+                    "`{spec}` `{}` requires the optional `{}` adapter",
                     f.binding.name,
                     bindings::ADAPTER_PREFIX
                 ))

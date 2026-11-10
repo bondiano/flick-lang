@@ -11,7 +11,7 @@ use flick_core::source::SourceMap;
 
 use super::run::{find_project, generations, locked};
 use crate::args::{CleanArguments, GlobalArguments};
-use crate::cache::{manifest, remove_empty_parents};
+use crate::cache::{inputs_path, manifest, remove_empty_parents};
 use crate::command::Outcome;
 use crate::report;
 
@@ -43,6 +43,7 @@ pub fn clean(options: &CleanArguments, global: &GlobalArguments) -> Outcome {
     let kept = clean_generations(root);
     if options.cache {
         let _ = fs::remove_dir_all(root.join(cache::DIR).join("cache"));
+        let _ = fs::remove_file(inputs_path(root));
     }
     let note = if kept > 0 {
         format!("clean: removed {removed} files; kept {kept} running generations")

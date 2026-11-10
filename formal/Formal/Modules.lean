@@ -2,14 +2,14 @@
 # Named module results and existential witnesses
 
 A small model of the source module boundary, before elaboration into core
-records. This proves the identity rules used by named functor applications and
+records. This proves the identity rules used by named applications of parameterized modules and
 the elimination shape of a packed abstract type. It does not relate the Rust
 checker or the ABI to this model.
 -/
 
 namespace Flick.Modules
 
-/-- The declaration site of a named functor application. Reimporting the same
+/-- The declaration site of a named application of a parameterized module. Reimporting the same
 site uses the same path; another name under the same parent is fresh. -/
 structure ResultPath where
   parent : String
@@ -35,7 +35,7 @@ theorem different_results_have_distinct_types {first second : ResultPath}
   exact different (congrArg TypePath.module same)
 
 /-- Two named applications under one parent remain distinct even if they use
-the same functor and argument; their declaration names are their identities. -/
+the same parameterized module and argument; their declaration names are their identities. -/
 theorem different_names_have_distinct_types (parent : String)
     {first second : String} (different : first ≠ second) (member : String) :
     TypePath.mk ⟨parent, first⟩ member ≠
@@ -68,7 +68,7 @@ theorem inline_siblings_are_distinct (file member : String)
   intro same
   exact different (Option.some.inj (congrArg InlineTypePath.child same))
 
-/-- An abstract class or service identity may be supplied by a static functor
+/-- An abstract class or service identity may be supplied by a parameterized module
 argument. A manifest requirement names the declaration itself. -/
 inductive Identity where
   | abstract

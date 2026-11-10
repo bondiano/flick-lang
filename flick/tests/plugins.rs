@@ -95,6 +95,7 @@ mod wasm {
     use super::common::project;
     use super::{APP, LIB, MAIN, PAIRS};
 
+    mod compiled;
     mod stages;
 
     /// The test plugin as a component, which `just wasm-plugins` builds.

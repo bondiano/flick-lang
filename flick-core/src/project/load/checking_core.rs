@@ -54,7 +54,7 @@ impl Checking<'_> {
                     match &v.callee {
                         Some(CalleeOrigin::Module(name)) => names.push(name.clone()),
                         Some(CalleeOrigin::Parameter { binding, .. }) => {
-                            names.push(binding.module.clone())
+                            names.push(binding.module.clone());
                         }
                         None => {}
                     }
@@ -98,7 +98,7 @@ impl Checking<'_> {
     /// [`Checking::check`], logging how long it took.
     fn timed(&self, loaded: &Loaded, lookup: &dyn Fn(&str) -> Option<Interface>) -> Output {
         let (output, elapsed) = timed(|| self.check(loaded, lookup));
-        debug!(module = %loaded.name, ?elapsed, "module checked");
+        debug!(module = %loaded.name, ?elapsed, micros = micros(elapsed), "module checked");
         output
     }
 
@@ -111,7 +111,7 @@ impl Checking<'_> {
             .map_or(&self.sources.get(loaded.file).text, |e| &e.text)
     }
 
-    fn is_functor_template(loaded: &Loaded) -> bool {
+    fn is_module_template(loaded: &Loaded) -> bool {
         loaded
             .syntax
             .header
@@ -119,7 +119,7 @@ impl Checking<'_> {
             .is_some_and(|header| !header.parameters.is_empty())
     }
 
-    fn functor_template(loaded: &Loaded) -> Output {
+    fn module_template(loaded: &Loaded) -> Output {
         let interface = Interface {
             module: loaded.name.clone(),
             ..Interface::default()
@@ -136,6 +136,7 @@ impl Checking<'_> {
             declarations: Arc::new(interface),
         }
     }
+
 
     #[allow(clippy::too_many_lines)]
     fn check(&self, loaded: &Loaded, lookup: &dyn Fn(&str) -> Option<Interface>) -> Output {
@@ -280,7 +281,7 @@ impl Checking<'_> {
         diagnostics: &mut Vec<Diagnostic>,
     ) -> Option<ir::Module> {
         let lowers = !self.lower_packages_only || matches!(loaded.root, Root::Package(_));
-        if clean && self.lower && lowers && !Self::is_functor_template(loaded) {
+        if clean && self.lower && lowers && !Self::is_module_template(loaded) {
             match ir::lower(module, typing) {
                 Ok(lowered) => return Some(lowered),
                 Err(d) => diagnostics.extend(d),
@@ -299,7 +300,7 @@ impl Checking<'_> {
     ) -> Output {
         let text = self.text_of(loaded);
         let Some(units) = inline_units(loaded, tree, index, inline, text) else {
-            return Self::functor_template(loaded);
+            return Self::module_template(loaded);
         };
         let prefix_output = self.check(&units.prefix, lookup);
         let child = &units.child;

@@ -205,7 +205,7 @@ pub(super) fn dictionary_type(head: &Type) -> Option<Type> {
     Some(Type::apps(dictionary, args.into_iter().cloned()))
 }
 
-/// The part of an argument visible through a functor parameter. Abstract
+/// The part of an argument visible through a parameterized module parameter. Abstract
 /// type requirements keep the argument's identity but hide its definition.
 /// The exact constraint and exported value supplied by each `instance ...
 /// from ...` requirement of a static module argument. These are local to the

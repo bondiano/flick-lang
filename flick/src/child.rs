@@ -14,7 +14,7 @@ use signal_hook::consts::{SIGINT, SIGTERM};
 use signal_hook::flag;
 
 use crate::args::{DiagnosticsFormat, GlobalArguments};
-use crate::report;
+use crate::{report, timings};
 
 /// The last signal `flick` received, `0` for none.
 pub fn signals() -> Arc<AtomicUsize> {
@@ -65,6 +65,8 @@ fn start(
     kind: &'static str,
     stdout_too: bool,
 ) -> io::Result<Running> {
+    // what the process takes is its own phase, not the end of the build's
+    timings::stage("Running a child process");
     let json = matches!(global.diagnostics, DiagnosticsFormat::Json);
     if json {
         command.stderr(Stdio::piped());

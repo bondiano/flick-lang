@@ -11,7 +11,7 @@ use super::checking::levels;
 #[cfg(feature = "ide")]
 use super::{ModuleCache, analyze, analyze_with};
 #[cfg(feature = "ide")]
-use crate::iface::Namespace;
+use crate::iface::{Interface, Namespace};
 #[cfg(feature = "ide")]
 use crate::project::config::{Build, Config, Kind};
 #[cfg(feature = "ide")]
@@ -48,6 +48,8 @@ impl Host for Memory {
 const USE: &str =
     "module A.Use exposing (y)\nimport A.Base exposing (x)\ny : Float\nlet y = x + 1\n";
 
+#[cfg(feature = "ide")]
+include!("checking_tests_replay.rs");
 #[cfg(feature = "ide")]
 include!("checking_tests_visibility.rs");
 include!("checking_tests_contracts.rs");

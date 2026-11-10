@@ -23,6 +23,16 @@ fn diagnostics(text: &str, bridge: EffectBridge, release: bool) -> Vec<Diagnosti
 }
 
 fn diagnostics_for(text: &str, bridge: EffectBridge, release: bool, app: bool) -> Vec<Diagnostic> {
+    diagnostics_with_ui(text, bridge, release, app, None)
+}
+
+fn diagnostics_with_ui(
+    text: &str,
+    bridge: EffectBridge,
+    release: bool,
+    app: bool,
+    ui: Option<&str>,
+) -> Vec<Diagnostic> {
     let (ir, interface) = check_text("App.Main", text).expect("the source checks");
     let mut sources = SourceMap::default();
     let file = sources.add("App/Main.fl", text);
@@ -54,7 +64,7 @@ fn diagnostics_for(text: &str, bridge: EffectBridge, release: bool, app: bool) -
         root: None,
         backend: Backend::Rt,
         effect_bridge: bridge,
-        ui: None,
+        ui,
         runners: &[],
         core_modules: &[],
         core_only: false,
@@ -137,4 +147,34 @@ fn adapter_policy_overrides_are_not_missing_native_implementations() {
         "@flick-lang/runtime/rt/effect/Schedule",
         "cron"
     ));
+}
+
+#[test]
+fn a_custom_ui_provider_can_supply_an_export_missing_from_the_native_renderer() {
+    let source = "module App.Main exposing (link)\nlink : Ui.RouteLinkProps a -> List (Ui^c) -> Ui^c\nlet link = Ui.route_link\n";
+    assert_eq!(
+        diagnostics_for(source, EffectBridge::Absent, false, false).len(),
+        1
+    );
+    let found = diagnostics_with_ui(
+        source,
+        EffectBridge::Absent,
+        false,
+        false,
+        Some("./renderer.mjs"),
+    );
+    assert!(found.is_empty(), "{found:?}");
+}
+
+#[test]
+fn a_library_reexport_requires_its_runtime_capability() {
+    let source = "module App.Main exposing (cron)\nimport Schedule exposing (cron)\n";
+    for release in [false, true] {
+        let found = diagnostics_for(source, EffectBridge::Absent, release, false);
+        assert_eq!(found.len(), 1, "release={release}: {found:?}");
+        assert_eq!(found[0].code, codes::P012);
+        let span = found[0].span.expect("the reexport has a source span");
+        assert_eq!(&source[span.start as usize..span.end as usize], "cron");
+        assert!(diagnostics_for(source, EffectBridge::Available, release, false).is_empty());
+    }
 }

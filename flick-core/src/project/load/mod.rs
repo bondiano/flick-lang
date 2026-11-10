@@ -115,7 +115,10 @@ struct BindingOrigin {
 #[derive(Clone, Debug, PartialEq, Eq)]
 enum CalleeOrigin {
     Module(String),
-    Parameter { binding: BindingOrigin, members: Vec<String> },
+    Parameter {
+        binding: BindingOrigin,
+        members: Vec<String>,
+    },
 }
 
 /// How far a run goes past checking.

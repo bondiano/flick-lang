@@ -15,7 +15,7 @@ pub struct ModuleSyntax {
     /// Imports written inside inline module bodies, used for dependency
     /// loading and cache invalidation, not the enclosing module's scope.
     pub inline_imports: Vec<Import>,
-    /// Named static functor applications declared by this file.
+    /// Named parameterized module applications declared by this file.
     pub applications: Vec<ModuleApplication>,
     /// The heads of std's plugin its imports expose that a block of it
     /// writes as only an import lets it, without `{`: `cli Main`.
@@ -31,7 +31,7 @@ pub struct Header {
     /// `None` without `exposing`: the module exports nothing.
     pub exposing: Option<Vec<Item>>,
     /// Static module parameters of a functor source file.
-    pub parameters: Vec<FunctorParam>,
+    pub parameters: Vec<ModuleParam>,
     pub result: Option<Node>,
     pub parameter_groups: Vec<usize>,
     /// An expression-bodied file functor; structure bodies remain top-level declarations.
@@ -41,7 +41,7 @@ pub struct Header {
 }
 
 #[derive(Debug, Clone)]
-pub struct FunctorParam {
+pub struct ModuleParam {
     pub name: String,
     pub contract: String,
     pub span: Span,
@@ -54,8 +54,8 @@ pub struct ModuleApplication {
     pub annotation: Option<Node>,
     pub argument_groups: Vec<usize>,
     pub name: String,
-    pub functor: String,
-    pub functor_span: Span,
+    pub template: String,
+    pub template_span: Span,
     pub arguments: Vec<String>,
     pub argument_spans: Vec<Span>,
     pub span: Span,
@@ -210,10 +210,10 @@ pub fn module_syntax(tree: &Node, text: &str, file: FileId) -> ModuleSyntax {
                         .cloned(),
                     argument_groups,
                     name: local_name,
-                    functor: named
+                    template: named
                         .first()
                         .map_or(String::new(), |n| n.text(text).split_whitespace().collect()),
-                    functor_span: named.first().map_or(local_span, |n| span(n, file)),
+                    template_span: named.first().map_or(local_span, |n| span(n, file)),
                     arguments: named
                         .iter()
                         .skip(1)
@@ -253,11 +253,11 @@ pub fn module_syntax(tree: &Node, text: &str, file: FileId) -> ModuleSyntax {
                         .nodes()
                         .filter(|n| n.kind == K::ModuleParamGroup)
                         .flat_map(Node::nodes)
-                        .filter(|n| n.kind == K::FunctorParam)
+                        .filter(|n| n.kind == K::ModuleParam)
                         .filter_map(|param| {
                             let name = param.child_tokens().find(|t| t.kind == K::Con)?;
                             let contract = param.nodes().next()?;
-                            Some(FunctorParam {
+                            Some(ModuleParam {
                                 name: name.text(text).to_owned(),
                                 contract: contract.text(text).split_whitespace().collect(),
                                 span: Span::new(file, name.start, name.end),

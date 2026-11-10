@@ -13,7 +13,6 @@ let pins = [
   ("packages/effect-ts/package.json", "(\"effect\": \")[^\"]+(\")"),
   ("packages/effect-ts/src/capabilities.ts", "(EFFECT_VERSION = \")[^\"]+(\")"),
   ("packages/effect-ts/test/effect-version.test.ts", "(PINNED_EFFECT = \")[^\"]+(\")"),
-  ("flick/src/toolchain.rs", "(pub const EFFECT: &str = \")[^\"]+(\")"),
 ]
 
 /// The capture groups of every match of `source`, a valid pattern.

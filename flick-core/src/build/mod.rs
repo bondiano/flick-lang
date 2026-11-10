@@ -26,6 +26,10 @@ use std::collections::{HashMap, HashSet};
 use std::path::{Component, Path, PathBuf};
 use std::sync::{Arc, OnceLock};
 
+use tracing::debug;
+
+use crate::clock::{micros, timed};
+
 #[cfg(feature = "source-maps")]
 use crate::codegen::sourcemap;
 #[cfg(feature = "typescript")]
@@ -163,7 +167,7 @@ pub fn emit(
     let mut diagnostics = Vec::new();
     #[cfg(not(target_arch = "wasm32"))]
     if settings.backend == Backend::Rt && !settings.effect_bridge.available() {
-        capabilities::check(compilation, settings, &mut diagnostics);
+        capabilities::check(compilation, settings, sources, &mut diagnostics);
         if !diagnostics.is_empty() {
             return (Vec::new(), diagnostics);
         }
@@ -930,24 +934,62 @@ pub fn builtin_modules() -> &'static [ir::Module] {
     builtin_modules_of(false)
 }
 
-/// The built-in modules, lowered from a check with `stages_by_class`.
+/// The built-in modules, lowered from a check with `stages_by_class`: read
+/// from the host's store, or checked and lowered once and given to it.
 pub fn builtin_modules_of(stages_by_class: bool) -> &'static [ir::Module] {
-    &lowered_builtins(stages_by_class).0
+    static MODULES: [OnceLock<Vec<ir::Module>>; 2] = [OnceLock::new(), OnceLock::new()];
+    MODULES[usize::from(stages_by_class)].get_or_init(|| {
+        let store = BUILTIN_STORE.get();
+        if let Some(kept) = store.and_then(|store| (store.load)(stages_by_class)) {
+            return kept;
+        }
+        let (modules, declarations) = lower_builtins(stages_by_class);
+        if !stages_by_class {
+            // the same pass serves the reference model
+            let _ = DECLARATIONS.set(declarations);
+        }
+        if let Some(store) = store {
+            (store.save)(stages_by_class, &modules);
+        }
+        modules
+    })
 }
+
+/// Where a host keeps the lowered built-in modules between its processes:
+/// lowering them takes longer than building a small project. What `load`
+/// gives must be what `save` got from this compiler for the same sources of
+/// the built-in modules and the same mode of `stages_by_class`. Asked for
+/// when a build first reads a mode, which only the emitters decide: a host
+/// that installed them up front would read both modes for every build.
+pub struct BuiltinStore {
+    pub load: fn(bool) -> Option<Vec<ir::Module>>,
+    pub save: fn(bool, &[ir::Module]),
+}
+
+static BUILTIN_STORE: OnceLock<BuiltinStore> = OnceLock::new();
+
+/// Keeps the lowered built-in modules in `store` from now on; false when a
+/// store is set already.
+pub fn keep_builtin_modules(store: BuiltinStore) -> bool {
+    BUILTIN_STORE.set(store).is_ok()
+}
+
+static DECLARATIONS: OnceLock<Vec<Arc<Interface>>> = OnceLock::new();
 
 /// What the reference model reads of each built-in module, in the order of
 /// [`builtin_modules`].
 pub fn builtin_declarations() -> &'static [Arc<Interface>] {
-    &lowered_builtins(false).1
+    // lowering the modules fills this too, unless a store had them
+    builtin_modules_of(false);
+    DECLARATIONS.get_or_init(|| lower_builtins(false).1)
 }
 
 /// The built-in modules lowered, with what the reference model reads of each.
 type Lowered = (Vec<ir::Module>, Vec<Arc<Interface>>);
 
-fn lowered_builtins(stages_by_class: bool) -> &'static Lowered {
-    static BUILTINS: [OnceLock<Lowered>; 2] = [OnceLock::new(), OnceLock::new()];
-    BUILTINS[usize::from(stages_by_class)].get_or_init(|| {
-        let (mut lowered, mut declarations) = (Vec::new(), Vec::new());
+fn lower_builtins(stages_by_class: bool) -> Lowered {
+    let (mut lowered, mut declarations) = (Vec::new(), Vec::new());
+    let ((), elapsed) = timed(|| {
         types::check_each(
             types::builtin_sources(),
             stages_by_class,
@@ -956,8 +998,14 @@ fn lowered_builtins(stages_by_class: bool) -> &'static Lowered {
                 declarations.push(typing.declarations.clone());
             },
         );
-        (lowered, declarations)
-    })
+    });
+    debug!(
+        modules = lowered.len(),
+        ?elapsed,
+        micros = micros(elapsed),
+        "built-in modules lowered"
+    );
+    (lowered, declarations)
 }
 
 #[cfg(all(test, any(feature = "build-artifacts", feature = "typescript")))]

@@ -2,7 +2,7 @@
 use super::{Checker, Form, Kind, ModuleSignature, TypeDef, module_local_dictionaries};
 use crate::diagnostics::codes;
 use crate::iface::Interface;
-use crate::resolve::{self, FunctorParam, Header, Import, Item};
+use crate::resolve::{self, Header, Import, Item, ModuleParam};
 use crate::resolve::{ItemKind, Module};
 use crate::source::Span;
 use crate::syntax::{cst::Node, kind::SyntaxKind as K};
@@ -32,7 +32,7 @@ impl Checker<'_> {
                             self.error(
                                 codes::T066,
                                 parameter.span,
-                                "more than one static parameter supplies the same local dictionary",
+                                "more than one static parameter supplies the same local dictionary in this parameterized module",
                             );
                         } else {
                             self.classes.local.push((head, dictionary));
@@ -42,9 +42,16 @@ impl Checker<'_> {
                 self.env
                     .static_parameter(&parameter.name, abstract_interface);
                 let index = static_parameters.len();
-                let consumed = header.parameter_groups.iter().scan(0, |start, size| {
-                    let end = *start + size; *start = end; Some(end)
-                }).find(|end| *end > index).unwrap_or(index + 1);
+                let consumed = header
+                    .parameter_groups
+                    .iter()
+                    .scan(0, |start, size| {
+                        let end = *start + size;
+                        *start = end;
+                        Some(end)
+                    })
+                    .find(|end| *end > index)
+                    .unwrap_or(index + 1);
                 static_parameters.push((consumed - index, binder, signature));
             }
         }
@@ -194,7 +201,11 @@ impl Checker<'_> {
                 if let ModuleSignature::Functor { group_size, .. } = &signature
                     && *group_size != node.nodes().skip(1).count()
                 {
-                    self.error(codes::T002, self.span(node), format!("functor requires {group_size} arguments in this parameter group"));
+                    self.error(
+                        codes::T002,
+                        self.span(node),
+                        format!("functor requires {group_size} arguments in this parameter group"),
+                    );
                     return None;
                 }
                 for argument in nodes {
@@ -249,16 +260,52 @@ impl Checker<'_> {
         }
     }
 
+    fn anonymous_header(&self, node: &Node, body: &Node, path: &str) -> Header {
+        let groups: Vec<_> = node
+            .nodes()
+            .filter(|n| n.kind == K::ModuleParamGroup)
+            .collect();
+        let span = self.span(node);
+        Header {
+            name: path.to_owned(),
+            private: true,
+            span,
+            exposing: Some(vec![Item {
+                kind: ItemKind::All,
+                name: String::new(),
+                span,
+            }]),
+            parameters: groups
+                .iter()
+                .flat_map(|g| g.nodes())
+                .filter_map(|p| {
+                    let name = p.child_tokens().find(|t| t.kind == K::Con)?;
+                    let signature = p.nodes().next()?;
+                    Some(ModuleParam {
+                        name: name.text(self.text).to_owned(),
+                        contract: signature.text(self.text).split_whitespace().collect(),
+                        span: Span::new(self.file, name.start, name.end),
+                        signature: signature.clone(),
+                    })
+                })
+                .collect(),
+            parameter_groups: groups.iter().map(|g| g.nodes().count()).collect(),
+            result: node
+                .nodes()
+                .find(|n| n.kind == K::ModuleResult)
+                .and_then(|n| n.nodes().next())
+                .cloned(),
+            body: (body.kind != K::Members).then(|| body.clone()),
+            materialized_body: None,
+        }
+    }
+
     fn static_anonymous_functor(
         &mut self,
         node: &Node,
         parent: &Module,
         path: &str,
     ) -> Option<Interface> {
-        let groups: Vec<_> = node
-            .nodes()
-            .filter(|n| n.kind == K::ModuleParamGroup)
-            .collect();
         let body = node
             .nodes()
             .find(|n| !matches!(n.kind, K::ModuleParamGroup | K::ModuleResult))?;
@@ -292,38 +339,7 @@ impl Checker<'_> {
             plugins: Vec::new(),
             span,
         });
-        syntax.header = Some(Header {
-            name: path.to_owned(),
-            private: true,
-            span,
-            exposing: Some(vec![Item {
-                kind: ItemKind::All,
-                name: String::new(),
-                span,
-            }]),
-            parameters: groups
-                .iter()
-                .flat_map(|g| g.nodes())
-                .filter_map(|p| {
-                    let name = p.child_tokens().find(|t| t.kind == K::Con)?;
-                    let signature = p.nodes().next()?;
-                    Some(FunctorParam {
-                        name: name.text(self.text).to_owned(),
-                        contract: signature.text(self.text).split_whitespace().collect(),
-                        span: Span::new(self.file, name.start, name.end),
-                        signature: signature.clone(),
-                    })
-                })
-                .collect(),
-            parameter_groups: groups.iter().map(|g| g.nodes().count()).collect(),
-            result: node
-                .nodes()
-                .find(|n| n.kind == K::ModuleResult)
-                .and_then(|n| n.nodes().next())
-                .cloned(),
-            body: (body.kind != K::Members).then(|| body.clone()),
-            materialized_body: None,
-        });
+        syntax.header = Some(self.anonymous_header(node, body, path));
         let parameters = &syntax.header.as_ref().expect("anonymous header").parameters;
         let names: Vec<_> = parameters.iter().map(|p| p.name.as_str()).collect();
         syntax

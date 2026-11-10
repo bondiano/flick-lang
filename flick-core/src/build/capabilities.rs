@@ -9,12 +9,15 @@ use crate::diagnostics::{Diagnostic, codes};
 use crate::iface::Namespace;
 use crate::ir::{Expr, ExprKind, Foreign, ForeignMode, Item, ItemKind, Module, reach};
 use crate::project::Compilation;
-use crate::source::Span;
+use crate::resolve::{self, ItemKind as ExportKind};
+use crate::source::{SourceMap, Span};
+use crate::syntax;
 use crate::types::builtins_of;
 
 pub(super) fn check(
     compilation: &Compilation,
     settings: &Settings<'_>,
+    sources: &SourceMap,
     diagnostics: &mut Vec<Diagnostic>,
 ) {
     let modules: Vec<_> = compilation
@@ -24,7 +27,7 @@ pub(super) fn check(
         .chain(builtin_modules_of(true))
         .collect();
     let index = reach::index(&modules);
-    let mut pending = roots(compilation, settings, &modules);
+    let mut pending = roots(compilation, settings, &modules, sources);
     let mut seen = HashSet::new();
     while let Some((key, origin)) = pending.pop() {
         let Some(&at) = index.get(&key) else {
@@ -36,7 +39,7 @@ pub(super) fn check(
         }
         let item = &modules[at.0].items[at.1];
         if let ItemKind::Foreign(foreign) = &item.kind
-            && needs_adapter(foreign)
+            && needs_adapter(foreign, settings)
         {
             diagnostics.push(Diagnostic::error(
                 codes::P012,
@@ -68,6 +71,7 @@ fn roots(
     compilation: &Compilation,
     settings: &Settings<'_>,
     modules: &[&Module],
+    sources: &SourceMap,
 ) -> Vec<(reach::Key, Span)> {
     let mut pending = Vec::new();
     let mut entries: HashSet<_> = settings
@@ -125,6 +129,11 @@ fn roots(
                 .map(|module| module.name.clone()),
         );
     }
+    if settings.entries.is_empty() {
+        let reexports = library_reexports(compilation, sources);
+        loading.extend(reexports.iter().map(|(key, _)| key.0.clone()));
+        pending.extend(reexports);
+    }
     let loaded = loaded_modules(modules, loading);
     for module in &compilation.modules {
         for item in &module.ir.items {
@@ -159,6 +168,47 @@ fn roots(
     pending
 }
 
+fn library_reexports(compilation: &Compilation, sources: &SourceMap) -> Vec<(reach::Key, Span)> {
+    let mut pending = Vec::new();
+    for module in &compilation.modules {
+        if module.package.is_some() || module.interface.private {
+            continue;
+        }
+        let reexports: Vec<_> = module
+            .interface
+            .exports
+            .iter()
+            .filter(|export| {
+                export.entity.namespace == Namespace::Value && export.entity.module != module.name
+            })
+            .collect();
+        if reexports.is_empty() {
+            continue;
+        }
+        let text = &sources.get(module.file).text;
+        let parsed = syntax::parse(text, module.file);
+        let syntax = resolve::module_syntax(&parsed.tree, text, module.file);
+        for export in reexports {
+            let Some(header) = &syntax.header else {
+                continue;
+            };
+            let span = header
+                .exposing
+                .as_ref()
+                .and_then(|items| {
+                    items
+                        .iter()
+                        .find(|item| item.name == export.entity.name)
+                        .or_else(|| items.iter().find(|item| item.kind == ExportKind::All))
+                })
+                .map_or(header.span, |item| item.span);
+            let key = (export.entity.module.clone(), export.entity.name.clone());
+            pending.push((key, span));
+        }
+    }
+    pending
+}
+
 /// Static imports load a module even when the referencing function is unused.
 fn loaded_modules(modules: &[&Module], mut pending: Vec<String>) -> HashSet<String> {
     let mut loaded = HashSet::new();
@@ -177,10 +227,14 @@ fn loaded_modules(modules: &[&Module], mut pending: Vec<String>) -> HashSet<Stri
     loaded
 }
 
-fn needs_adapter(foreign: &Foreign) -> bool {
+fn needs_adapter(foreign: &Foreign, settings: &Settings<'_>) -> bool {
     let Some(from) = foreign.binding.from.as_deref() else {
         return false;
     };
+    let from = settings
+        .ui
+        .filter(|_| super::bindings::UI_RENDERER.contains(&from))
+        .unwrap_or(from);
     let native = effects::rt_specifier(from);
     effects::requires_adapter(
         native.as_deref().unwrap_or(from),

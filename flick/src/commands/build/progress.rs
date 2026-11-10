@@ -1,6 +1,5 @@
-use std::sync::OnceLock;
+use std::sync::Once;
 
-use flick_core::diagnostics::Diagnostic;
 use flick_core::source::SourceMap;
 
 use super::BuildCommand;
@@ -17,18 +16,16 @@ impl BuildCommand {
         })
     }
 
-    /// The built-in modules checked, once a run, or the outcome of why they
-    /// cannot be. `--inputs` only names files and needs none.
+    /// The built-in modules checked, or the outcome of why they cannot be;
+    /// the phase shows once a process, as they are read once. `--inputs`
+    /// only names files and needs none.
     pub(super) fn prepare(&self, progress: &Progress) -> Result<(), Outcome> {
-        static PREPARED: OnceLock<Result<(), Diagnostic>> = OnceLock::new();
+        static SHOWN: Once = Once::new();
         if self.options.inputs {
             return Ok(());
         }
-        let prepared = PREPARED.get_or_init(|| {
-            progress.stage("Preparing compiler");
-            builtins::prepare()
-        });
-        prepared.clone().map_err(|diagnostic| Outcome {
+        SHOWN.call_once(|| progress.stage("Preparing compiler"));
+        builtins::prepare().map_err(|diagnostic| Outcome {
             sources: SourceMap::default(),
             diagnostics: vec![diagnostic],
         })

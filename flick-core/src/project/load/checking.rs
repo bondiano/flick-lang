@@ -13,7 +13,7 @@ use super::Analyzed;
 use super::plugins::Watching;
 use super::precompiled::Precompiled;
 use super::{BindingOrigin, CalleeOrigin, Loaded, Loader, Root, Virtual};
-use crate::clock::timed;
+use crate::clock::{micros, timed};
 use crate::diagnostics::{Diagnostic, Severity, codes};
 use crate::iface::Namespace;
 use crate::ir;

@@ -70,8 +70,8 @@ impl Loader<'_> {
             annotation: None,
             argument_groups: Vec::new(),
             name: String::new(),
-            functor: String::new(),
-            functor_span: header.span,
+            template: String::new(),
+            template_span: header.span,
             arguments: Vec::new(),
             argument_spans: Vec::new(),
             span: header.span,
@@ -102,17 +102,17 @@ impl Loader<'_> {
         });
     }
 
-    pub(super) fn callable_template(&mut self, mut functor: usize, at: Span) -> Option<usize> {
+    pub(super) fn callable_template(&mut self, mut template: usize, at: Span) -> Option<usize> {
         let mut aliases = Vec::new();
         loop {
-            if aliases.contains(&functor) {
+            if aliases.contains(&template) {
                 self.diagnostics
-                    .push(Diagnostic::error(codes::R006, "cyclic functor alias", at));
+                    .push(Diagnostic::error(codes::R006, "cyclic template alias", at));
                 return None;
             }
-            aliases.push(functor);
-            self.materialize_expression_body(functor);
-            let Some(target) = self.modules[functor]
+            aliases.push(template);
+            self.materialize_expression_body(template);
+            let Some(target) = self.modules[template]
                 .syntax
                 .header
                 .as_ref()
@@ -120,10 +120,31 @@ impl Loader<'_> {
             else {
                 break;
             };
-            let actual = self.find_module(functor, &target, at)?;
-            functor = actual;
+            let actual = self.find_module(template, &target, at)?;
+            template = actual;
         }
-        Some(functor)
+        Some(template)
+    }
+
+    /// Resolve source aliases only at module-expression use sites. Import
+    /// declarations already name canonical modules and must not be captured.
+    fn expression_module(&mut self, importer: usize, name: &str, span: Span) -> Option<usize> {
+        let (head, tail) = name.split_once('.').unwrap_or((name, ""));
+        if let Some(import) = self.modules[importer]
+            .syntax
+            .imports
+            .iter()
+            .find(|i| i.alias.as_deref() == Some(head) && i.module != head)
+            .cloned()
+        {
+            let expanded = if tail.is_empty() {
+                import.module
+            } else {
+                format!("{}.{tail}", import.module)
+            };
+            return self.find_module(importer, &expanded, span);
+        }
+        self.find_module(importer, name, span)
     }
 
     fn expression_name(&mut self, parent: usize, desired: Option<&str>) -> String {
@@ -160,7 +181,7 @@ impl Loader<'_> {
                     .text(&self.sources.get(self.modules[parent].file).text)
                     .split_whitespace()
                     .collect();
-                let index = self.find_module(parent, &name, site.span)?;
+                let index = self.expression_module(parent, &name, site.span)?;
                 let target = self.modules[index].name.clone();
                 if let Some(local) = desired {
                     return self.alias_expression(
@@ -188,7 +209,7 @@ impl Loader<'_> {
                 let local = self.expression_name(parent, desired);
                 let mut application = site.clone();
                 application.name.clone_from(&local);
-                application.functor = callee;
+                application.template = callee;
                 application.argument_groups = vec![arguments.len()];
                 application.argument_spans = vec![site.span; arguments.len()];
                 application.arguments = arguments;

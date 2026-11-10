@@ -432,6 +432,7 @@ fn run_cases() {
     }
 }
 
-include!("e2e/functors.rs");
+include!("e2e/parameterized_modules.rs");
+include!("e2e/module_expressions.rs");
 include!("e2e/modules.rs");
 include!("e2e/build.rs");

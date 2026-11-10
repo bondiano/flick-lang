@@ -33,6 +33,18 @@ impl SourceFile {
         (offset(line), pos - self.line_starts[line])
     }
 
+    /// 0-based line and UTF-16 column of a byte offset, as an editor counts
+    /// them: the line by the index, the column by reading only that line.
+    pub fn utf16_position(&self, pos: u32) -> (u32, u32) {
+        let pos = pos.min(offset(self.text.len()));
+        let (line, _) = self.line_col(pos);
+        let start = self.line_starts[line as usize] as usize;
+        let units: usize = (self.text[start..pos as usize].chars())
+            .map(char::len_utf16)
+            .sum();
+        (line, offset(units))
+    }
+
     /// Byte offset of the start of a 0-based line, if the line exists.
     pub fn line_start(&self, line: u32) -> Option<u32> {
         self.line_starts.get(line as usize).copied()
@@ -96,6 +108,21 @@ mod tests {
 
     fn file(text: &str) -> SourceFile {
         SourceFile::new("t.fl".into(), text.into())
+    }
+
+    #[test]
+    fn an_editor_position_counts_utf16_units_of_the_line() {
+        assert_eq!(file("").utf16_position(0), (0, 0));
+        // `π` is one unit and `𝄞` two, of two and four bytes
+        let f = file("a\nπ𝄞x\n");
+        let x = offset(f.text.find('x').expect("x"));
+        assert_eq!(f.utf16_position(x), (1, 3));
+        assert_eq!(f.utf16_position(x + 2), (2, 0));
+        assert_eq!(
+            f.utf16_position(u32::MAX),
+            (2, 0),
+            "past the end is the end"
+        );
     }
 
     #[test]

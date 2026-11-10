@@ -59,7 +59,7 @@ impl Loader<'_> {
                 match &virtual_of.callee {
                     Some(CalleeOrigin::Module(name)) => dependencies.push(name.clone()),
                     Some(CalleeOrigin::Parameter { binding, .. }) => {
-                        dependencies.push(binding.module.clone())
+                        dependencies.push(binding.module.clone());
                     }
                     None => {}
                 }
@@ -89,21 +89,6 @@ impl Loader<'_> {
 
     #[allow(clippy::too_many_lines)]
     pub(super) fn find_module(&mut self, importer: usize, name: &str, span: Span) -> Option<usize> {
-        let (head, tail) = name.split_once('.').unwrap_or((name, ""));
-        if let Some(import) = self.modules[importer]
-            .syntax
-            .imports
-            .iter()
-            .find(|i| i.alias.as_deref() == Some(head) && i.module != head)
-            .cloned()
-        {
-            let expanded = if tail.is_empty() {
-                import.module
-            } else {
-                format!("{}.{tail}", import.module)
-            };
-            return self.find_module(importer, &expanded, span);
-        }
         let packages = self.package_sources().into_iter().map(|(_, dir)| dir);
         // the project's own modules come before those of source packages
         let dirs: Vec<PathBuf> = match (&self.modules[importer].root, self.project) {
@@ -236,13 +221,13 @@ impl Loader<'_> {
     fn virtual_source(
         &self,
         parent: usize,
-        functor: usize,
+        template: usize,
         name: &str,
         header: &resolve::Header,
         application: &ModuleApplication,
     ) -> Option<String> {
-        let source = self.sources.get(self.modules[functor].file).text.clone();
-        let header_node = self.modules[functor]
+        let source = self.sources.get(self.modules[template].file).text.clone();
+        let header_node = self.modules[template]
             .parse
             .tree
             .nodes()
@@ -325,15 +310,15 @@ impl Loader<'_> {
             }
             return;
         }
-        let Some(functor) =
-            self.find_module(parent, &application.functor, application.functor_span)
+        let Some(template) =
+            self.find_module(parent, &application.template, application.template_span)
         else {
             return;
         };
-        let Some(functor) = self.callable_template(functor, application.span) else {
+        let Some(template) = self.callable_template(template, application.span) else {
             return;
         };
-        let Some(header) = self.modules[functor].syntax.header.clone() else {
+        let Some(header) = self.modules[template].syntax.header.clone() else {
             return;
         };
         if header.parameters.is_empty()
@@ -347,7 +332,7 @@ impl Loader<'_> {
                 codes::T002,
                 format!(
                     "`{}` expects {} static module argument(s), found {}",
-                    application.functor,
+                    application.template,
                     header.parameters.len(),
                     application.arguments.len()
                 ),
@@ -367,17 +352,41 @@ impl Loader<'_> {
             *argument = self.modules[index].name.clone();
         }
         let application = &normalized;
-        let Some(generated) = self.virtual_source(parent, functor, &name, &header, application)
+        let Some(generated) = self.virtual_source(parent, template, &name, &header, application)
         else {
             return;
         };
-        let file = self.sources.add(format!("<functor {name}>"), generated);
+        let file = self
+            .sources
+            .add(format!("<parameterized module {name}>"), generated);
         let generated = &self.sources.get(file).text;
         let parse = Arc::new(syntax::parse(generated, file));
         let syntax = Arc::new(resolve::module_syntax(&parse.tree, generated, file));
         let index = self.modules.len();
         self.by_name.insert(name.clone(), index);
-        let inherited = self.modules[functor].virtual_of.as_ref();
+        let virtual_of = self.application_context(template, &header, application, callee);
+        self.modules.push(Loaded {
+            path,
+            file,
+            root: self.modules[parent].root.clone(),
+            parse,
+            syntax,
+            name,
+            expansion: None,
+            editing: Vec::new(),
+            loader: None,
+            virtual_of: Some(virtual_of),
+        });
+    }
+
+    fn application_context(
+        &self,
+        template: usize,
+        header: &resolve::Header,
+        application: &ModuleApplication,
+        callee: CalleeOrigin,
+    ) -> Virtual {
+        let inherited = self.modules[template].virtual_of.as_ref();
         let mut parameters = inherited.map_or_else(Vec::new, |v| v.parameters.clone());
         let mut bindings = inherited.map_or_else(Vec::new, |v| v.bindings.clone());
         for (index, (parameter, argument)) in header
@@ -392,29 +401,18 @@ impl Loader<'_> {
                 argument.clone(),
             ));
             bindings.push(BindingOrigin {
-                module: self.modules[functor].name.clone(),
+                module: self.modules[template].name.clone(),
                 parameter: index,
                 prefix: application.arguments[..index].to_vec(),
             });
         }
-        self.modules.push(Loaded {
-            path,
-            file,
-            root: self.modules[parent].root.clone(),
-            parse,
-            syntax,
-            name,
-            expansion: None,
-            editing: Vec::new(),
-            loader: None,
-            virtual_of: Some(Virtual {
-                at: application.span,
-                parameters,
-                bindings,
-                callee: Some(callee),
-                arguments: application.arguments.clone(),
-            }),
-        });
+        Virtual {
+            at: application.span,
+            parameters,
+            bindings,
+            callee: Some(callee),
+            arguments: application.arguments.clone(),
+        }
     }
 
     pub(super) fn import_cycles(&mut self, edges: &[Vec<usize>]) {

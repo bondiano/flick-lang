@@ -120,7 +120,7 @@ impl Checking<'_> {
                     if dictionaries.iter().any(|(known, _)| *known == head) {
                         errors.push(Diagnostic::error(
                             codes::T066,
-                            "more than one static argument supplies the same local dictionary",
+                            "more than one static argument supplies the same local dictionary in this parameterized module",
                             context.at,
                         ));
                     } else {

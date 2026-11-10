@@ -240,7 +240,7 @@ pub fn check_typed(
     (diagnostics, typing)
 }
 
-/// Checks a named functor result with the dictionaries supplied by its
+/// Checks a named parameterized module result with the dictionaries supplied by its
 /// static module arguments in scope for every definition of the result.
 pub(crate) fn check_typed_with_module_dictionaries(
     module: &Module,

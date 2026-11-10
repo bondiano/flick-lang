@@ -12,13 +12,20 @@ impl ModuleSignature {
     /// but its declared inputs still constrain applications and cache keys.
     pub(crate) fn inputs_only(&self) -> Self {
         match self {
-            Self::Functor { group_size, binder, parameter, result } => Self::Functor {
+            Self::Functor {
+                group_size,
+                binder,
+                parameter,
+                result,
+            } => Self::Functor {
                 group_size: *group_size,
                 binder: binder.clone(),
                 parameter: parameter.clone(),
                 result: Box::new(result.inputs_only()),
             },
-            Self::Structure { .. } => Self::Structure { requirements: Vec::new() },
+            Self::Structure { .. } => Self::Structure {
+                requirements: Vec::new(),
+            },
         }
     }
     pub(crate) fn definition(&self) -> TypeDef {
@@ -584,11 +591,12 @@ impl ModuleSignature {
                             methods,
                             ..
                         } => {
-                            if let Some(entity) = identity {
-                                if let Type::Con { module, name } = f(&Type::con(&entity.module, &entity.name)) {
-                                    entity.module = module;
-                                    entity.name = name;
-                                }
+                            if let Some(entity) = identity
+                                && let Type::Con { module, name } =
+                                    f(&Type::con(&entity.module, &entity.name))
+                            {
+                                entity.module = module;
+                                entity.name = name;
                             }
                             for (_, ty) in methods {
                                 *ty = f(ty);
@@ -777,14 +785,28 @@ mod tests {
     fn parameter_renaming_preserves_dependent_nominal_identities() {
         let mut signature = ModuleSignature::Structure {
             requirements: vec![R::Nominal {
-                name: "Clock".into(), category: ModuleNominalKind::Service,
-                identity: Some(Entity { module: "$module:K.Child".into(), namespace: Namespace::Type, name: "Clock".into() }),
-                definition: None, methods: Vec::new(),
+                name: "Clock".into(),
+                category: ModuleNominalKind::Service,
+                identity: Some(Entity {
+                    module: "$module:K.Child".into(),
+                    namespace: Namespace::Type,
+                    name: "Clock".into(),
+                }),
+                definition: None,
+                methods: Vec::new(),
             }],
         };
         signature.rename_parameter("K", "Actual");
-        let ModuleSignature::Structure { requirements } = signature else { panic!("structure") };
-        let R::Nominal { identity: Some(identity), .. } = &requirements[0] else { panic!("nominal") };
+        let ModuleSignature::Structure { requirements } = signature else {
+            panic!("structure")
+        };
+        let R::Nominal {
+            identity: Some(identity),
+            ..
+        } = &requirements[0]
+        else {
+            panic!("nominal")
+        };
         assert_eq!(identity.module, "Actual.Child");
     }
 

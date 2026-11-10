@@ -92,7 +92,7 @@ impl Scope<'_> {
         }
         for application in &module.syntax.applications {
             module_expression_paths(&application.expression, module.text, &mut packed);
-            packed.push(application.functor.clone());
+            packed.push(application.template.clone());
             packed.extend(application.arguments.iter().cloned());
             if names.contains(application.name.as_str()) {
                 packed.push(application.name.clone());

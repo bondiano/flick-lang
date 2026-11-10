@@ -1,6 +1,6 @@
 #[cfg(feature = "ide")]
 #[test]
-fn functor_argument_must_satisfy_the_contract_at_the_application() {
+fn parameterized_module_argument_must_satisfy_the_contract_at_the_application() {
     use crate::diagnostics::codes;
 
     let host = Memory(BTreeMap::from([
@@ -36,7 +36,7 @@ fn functor_argument_must_satisfy_the_contract_at_the_application() {
 
 #[cfg(feature = "ide")]
 #[test]
-fn functor_rejects_same_shape_with_different_class_and_service_identities() {
+fn parameterized_module_rejects_same_shape_with_different_class_and_service_identities() {
     use crate::diagnostics::codes;
 
     let host = Memory(BTreeMap::from([
@@ -137,11 +137,9 @@ fn two_local_dictionaries_for_the_same_constraint_are_rejected() {
         Some(&project),
         &[PathBuf::from("/p/src/App/Parent.fl")],
     );
-    assert!(
-        analysis.diagnostics.iter().any(|d| d.code == codes::T066),
-        "{:?}",
-        analysis.diagnostics
-    );
+    let diagnostic = analysis.diagnostics.iter().find(|d| d.code == codes::T066)
+        .expect("ambiguous module dictionaries are rejected");
+    assert!(diagnostic.message.contains("parameterized module"), "{}", diagnostic.message);
 }
 
 #[cfg(feature = "ide")]
@@ -234,7 +232,7 @@ fn public_existential_result_requires_an_explicit_signature() {
 
 #[cfg(feature = "ide")]
 #[test]
-fn functor_body_sees_only_the_contract_projection() {
+fn parameterized_module_body_sees_only_the_contract_projection() {
     let host = Memory(BTreeMap::from([
         (PathBuf::from("/p/src/App/Contracts.fl"), "module App.Contracts exposing (Source)\ntype module Source =\n  value : Int\n".into()),
         (PathBuf::from("/p/src/App/Argument.fl"), "module App.Argument exposing (value, extra)\nvalue : Int\nlet value = 41\nextra : Int\nlet extra = 1\n".into()),
@@ -261,7 +259,7 @@ fn functor_body_sees_only_the_contract_projection() {
 
 #[cfg(feature = "ide")]
 #[test]
-fn two_named_functor_applications_have_distinct_abstract_result_types() {
+fn two_named_parameterized_module_applications_have_distinct_abstract_result_types() {
     use crate::diagnostics::codes;
 
     let host = Memory(BTreeMap::from([
@@ -301,7 +299,7 @@ fn two_named_functor_applications_have_distinct_abstract_result_types() {
 
 #[cfg(feature = "ide")]
 #[test]
-fn abstract_functor_parameter_hides_the_arguments_alias() {
+fn abstract_module_parameter_hides_the_arguments_alias() {
     use crate::diagnostics::codes;
 
     let host = Memory(BTreeMap::from([
@@ -327,7 +325,7 @@ fn abstract_functor_parameter_hides_the_arguments_alias() {
 
 #[cfg(feature = "ide")]
 #[test]
-fn virtual_functor_path_conflicts_with_a_file_module() {
+fn virtual_parameterized_module_path_conflicts_with_a_file_module() {
     use crate::diagnostics::codes;
 
     let host = Memory(BTreeMap::from([
@@ -355,7 +353,7 @@ fn virtual_functor_path_conflicts_with_a_file_module() {
 
 #[cfg(feature = "ide")]
 #[test]
-fn changing_a_functor_contract_invalidates_the_virtual_module_cache() {
+fn changing_a_parameterized_module_contract_invalidates_the_virtual_module_cache() {
     use crate::diagnostics::codes;
 
     let host = |contract: &str| {

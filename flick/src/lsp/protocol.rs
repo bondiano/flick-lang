@@ -5,6 +5,7 @@ use std::fmt::Write as _;
 use std::io::{self, BufRead, Write};
 use std::path::{Path, PathBuf};
 
+use flick_core::source::SourceFile;
 use serde_json::{Value, json};
 
 /// The next message, or `None` at the end of input.
@@ -66,6 +67,17 @@ pub fn position(text: &str, offset: u32) -> Value {
 
 pub fn range(text: &str, start: u32, end: u32) -> Value {
     json!({ "start": position(text, start), "end": position(text, end) })
+}
+
+/// The LSP position of a byte offset of `file`, found by the file's index
+/// of lines: what a request with many positions asks.
+pub fn position_in(file: &SourceFile, offset: u32) -> Value {
+    let (line, character) = file.utf16_position(offset);
+    json!({ "line": line, "character": character })
+}
+
+pub fn range_in(file: &SourceFile, start: u32, end: u32) -> Value {
+    json!({ "start": position_in(file, start), "end": position_in(file, end) })
 }
 
 /// The byte offset of an LSP position.

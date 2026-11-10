@@ -93,17 +93,17 @@ fn build_progress_preserves_stream_contracts() {
     );
     for expected in [
         &[
-            "Preparing compiler",
             "Resolving project",
             "Checking build cache",
+            "Preparing compiler",
             "Compiling Flick modules",
             "Emitting JavaScript",
             "Writing artifacts",
             "Recording build outputs",
             "Saving build cache",
         ][..],
+        // a hit restores what it built and never reads the built-in modules
         &[
-            "Preparing compiler",
             "Resolving project",
             "Checking build cache",
             "Restoring cached artifacts",

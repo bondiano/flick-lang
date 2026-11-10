@@ -51,7 +51,8 @@ impl Server {
     /// its workspace; none before an analysis exists.
     pub(super) fn workspace_symbols(&mut self, params: &Value) -> Value {
         let query = params["query"].as_str().unwrap_or("");
-        let Some(snapshot) = &self.snapshot else {
+        let latest = self.latest.as_ref();
+        let Some(snapshot) = latest.and_then(|context| self.snapshots.get(context)) else {
             return json!([]);
         };
         let mut found = features::symbols(snapshot, query);

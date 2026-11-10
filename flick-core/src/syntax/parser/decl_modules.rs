@@ -18,7 +18,7 @@ fn module_header(p: &mut Parser) {
     module_path(p);
     while p.at(K::LParen) {
         let group = p.start();
-        p.delimited(K::RParen, functor_param);
+        p.delimited(K::RParen, module_param);
         p.complete(group, K::ModuleParamGroup);
     }
     if p.eat(K::Colon) {
@@ -42,12 +42,12 @@ fn module_header(p: &mut Parser) {
     }
 }
 
-fn functor_param(p: &mut Parser) {
+fn module_param(p: &mut Parser) {
     let m = p.start();
     if p.expect(K::Con) && p.expect(K::Colon) {
         module_signature(p);
     }
-    p.complete(m, K::FunctorParam);
+    p.complete(m, K::ModuleParam);
 }
 
 fn module_apply_decl(p: &mut Parser) {
@@ -73,7 +73,7 @@ fn module_expr(p: &mut Parser) -> Option<Done> {
         p.bump();
         while p.at(K::LParen) {
             let group = p.start();
-            p.delimited(K::RParen, functor_param);
+            p.delimited(K::RParen, module_param);
             p.complete(group, K::ModuleParamGroup);
         }
         if p.expect(K::Arrow) {

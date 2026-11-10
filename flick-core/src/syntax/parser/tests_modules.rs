@@ -23,14 +23,14 @@ fn module_contract_rejects_implementations_in_its_body() {
 }
 
 #[test]
-fn named_functor_header_and_application_are_distinct_nodes() {
+fn named_parameterized_module_header_and_application_are_distinct_nodes() {
     let header = sexp("module HashSet.Make(K : HashKey) exposing (Set, empty)\n");
     assert!(
         header.contains("(ModuleHeader module (ModulePath HashSet . Make)"),
         "{header}"
     );
     assert!(
-        header.contains("(FunctorParam K : (NameType HashKey))"),
+        header.contains("(ModuleParam K : (NameType HashKey))"),
         "{header}"
     );
     let application = sexp("module Names = HashSet.Make(CaseInsensitive)\n");
@@ -63,11 +63,11 @@ fn inline_module_has_a_scoped_declaration_body() {
 
 #[test]
 fn module_syntax_records_static_parameters_and_named_applications() {
-    let functor = "module HashSet.Make(K : HashKey) exposing (Set)\n";
+    let template = "module HashSet.Make(K : HashKey) exposing (Set)\n";
     let mut map = SourceMap::default();
-    let file = map.add("HashSet/Make.fl", functor);
-    let parsed = parse_ok(functor);
-    let syntax = resolve::module_syntax(&parsed.tree, functor, file);
+    let file = map.add("HashSet/Make.fl", template);
+    let parsed = parse_ok(template);
+    let syntax = resolve::module_syntax(&parsed.tree, template, file);
     let params = &syntax.header.expect("header").parameters;
     assert_eq!(params.len(), 1);
     assert_eq!(params[0].name, "K");
@@ -80,12 +80,12 @@ fn module_syntax_records_static_parameters_and_named_applications() {
     let syntax = resolve::module_syntax(&parsed.tree, parent, file);
     assert_eq!(syntax.applications.len(), 1);
     assert_eq!(syntax.applications[0].name, "Names");
-    assert_eq!(syntax.applications[0].functor, "HashSet.Make");
+    assert_eq!(syntax.applications[0].template, "HashSet.Make");
     assert_eq!(syntax.applications[0].arguments, ["CaseInsensitive"]);
 }
 
 #[test]
-fn functor_application_rejects_a_dynamic_module_value_at_the_argument() {
+fn parameterized_module_application_rejects_a_dynamic_module_value_at_the_argument() {
     let source = "module App.Parent exposing (Chosen)\nmodule Chosen = App.Make(packed)\n";
     let parsed = parse_str(source);
     assert!(

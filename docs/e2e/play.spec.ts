@@ -7,6 +7,14 @@ const ready = async (page: Page): Promise<void> => {
   await expect(page.locator(".fp-cm .cm-content")).toBeVisible();
 };
 
+/** Replace the native editor contents through CodeMirror's normal input path. */
+const replaceSource = async (page: Page, source: string): Promise<void> => {
+  await page.locator(".cm-content").click();
+  await page.keyboard.press("ControlOrMeta+End");
+  await page.keyboard.press("ControlOrMeta+a");
+  await page.keyboard.insertText(source);
+};
+
 /** Moves the pointer onto the first `word` in the editor's line that holds `line`. */
 const hoverWord = async (page: Page, line: string, word: string): Promise<void> => {
   const box = await page.locator(".cm-line", { hasText: line }).first().evaluate((element, word) => {
@@ -95,7 +103,7 @@ test("a signature lesson checks a correction and remembers completion", async ({
   await expect(page.locator(".fp-lesson")).toContainText("String.length returns Int");
   await page.getByRole("button", { name: "Show solution" }).click();
   await page.getByRole("button", { name: "Check answer" }).click();
-  await expect(page.locator(".fp-lesson")).toContainText("Correct. The signature says String -> Int", { timeout: 30_000 });
+  await expect(page.locator(".fp-lesson")).toContainText("Correct. The signature and output match", { timeout: 30_000 });
   await page.reload();
   await expect(page.locator(".fp-cm .cm-content")).toBeVisible({ timeout: 60_000 });
   await expect(page.locator(".fp-lesson")).toContainText("Lesson completed");
@@ -224,4 +232,45 @@ test("a quick fix adds the forgotten case", async ({ page }) => {
   await page.locator(".cm-diagnosticAction").click();
   await expect(page.locator(".cm-content")).toContainText("| Paused ->");
   await expect(page.locator(".fp-status")).toContainText("Type-checked", { timeout: 30_000 });
+});
+
+for (const locale of ["en", "ru"]) {
+  test(`second signature lesson isolates progress and rejects a wrong answer (${locale})`, async ({ page }) => {
+    const ru = locale === "ru";
+    await page.goto(`/flick-lang/${ru ? "ru/" : ""}tour/arguments/`);
+    await expect(page.locator(".fp-cm .cm-content")).toBeVisible({ timeout: 60_000 });
+    const lesson = page.locator(".fp-lesson");
+    const check = page.getByRole("button", { name: ru ? "Проверить" : "Check answer", exact: true });
+    await check.click();
+    await expect(lesson).toContainText(ru ? "Сначала исправьте ошибки" : "Fix the compiler errors");
+    await page.getByRole("button", { name: ru ? "Показать решение" : "Show solution" }).click();
+    await expect(lesson).not.toContainText(ru ? "Урок пройден" : "Lesson completed");
+    await replaceSource(page, 'module Main exposing (main, size_of)\n\nsize_of : String -> Int\nlet size_of text = String.length text\n\nmain : Unit ->{} Unit\nlet main () = Platform.stdout_line "5"\n');
+    await check.click();
+    await expect(lesson).toContainText(ru ? "Вывод не совпадает" : "The output does not match");
+    await page.getByRole("button", { name: ru ? "Показать решение" : "Show solution" }).click();
+    await check.click();
+    await expect(lesson).toContainText(ru ? "Верно." : "Correct.");
+    expect(await page.evaluate(() => localStorage.getItem("flick.lesson.signatures.02.done"))).toBe("1");
+    expect(await page.evaluate(() => localStorage.getItem("flick.lesson.signatures.01.done"))).toBeNull();
+    await page.reload();
+    await expect(lesson).toContainText(ru ? "Урок пройден" : "Lesson completed");
+    await page.getByRole("button", { name: ru ? "Сбросить" : "Reset", exact: true }).click();
+    await expect(page.locator(".cm-content")).toContainText("size_of : Int -> Int");
+  });
+}
+
+test("exercise checks resolve a re-export through the worker declaration graph", async ({ page }) => {
+  await page.goto("/flick-lang/tour/signatures/");
+  await expect(page.locator(".fp-cm .cm-content")).toBeVisible({ timeout: 60_000 });
+  await page.evaluate(() => {
+    const element = document.getElementById("flick-lesson");
+    if (!element) throw new Error("missing exercise contract");
+    const exercise = JSON.parse(element.textContent ?? "{}");
+    exercise.check.export = "length";
+    element.textContent = JSON.stringify(exercise);
+  });
+  await replaceSource(page, 'module Main exposing (main, length)\nimport String exposing (length)\nmain : Unit ->{} Unit\nlet main () = Platform.stdout_line (show (length "Flick"))\n');
+  await page.getByRole("button", { name: "Check answer" }).click();
+  await expect(page.locator(".fp-lesson")).toContainText("Correct. The signature and output match.");
 });

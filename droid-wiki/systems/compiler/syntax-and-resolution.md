@@ -16,7 +16,7 @@ The recursive-descent parser uses Pratt operators and resolves indentation with 
 | Parser events | Start/token/finish events built into a tree; `flick-core/src/syntax/parser/build.rs` |
 | CST `Node` / `Element` / `Token` | Source-preserving structure and token ranges; `flick-core/src/syntax/cst.rs` |
 | Trivia-free AST view | Structural comparison without layout trivia; `flick-core/src/syntax/ast.rs` |
-| `ModuleSyntax` | Header, imports, inline imports, functor applications, plugin heads; `flick-core/src/resolve/syntax.rs` |
+| `ModuleSyntax` | Header, imports, inline imports, parameterized module applications, plugin heads; `flick-core/src/resolve/syntax.rs` |
 | `Interface` | Resolved exports and entity identities; `flick-core/src/iface.rs` |
 
 The central losslessness invariant is `tree.text(source) == source`. A node's `range()` covers its non-trivia tokens; it is not necessarily the full range of attached comments. The distinction matters for fixes and declaration formatting. Source: `flick-core/src/syntax/cst.rs`.
@@ -53,7 +53,7 @@ Important cases from `flick-core/src/resolve/syntax.rs`:
 
 - A module header with no `exposing` list exports nothing.
 - `inline_imports` are dependency-loading/cache inputs, not names automatically in scope for the enclosing module.
-- Static module applications retain their functor and arguments for project-level elaboration.
+- Static module applications retain their parameterized module and arguments for project-level elaboration.
 - Plugin heads have their own import exposure information.
 
 If an import interface is unavailable, the resolver takes its possible names on trust; the project loader owns the missing-import diagnostic. This avoids reporting the same missing module once for every reference, but means resolver success alone does not prove a complete program. Source: `flick-core/src/resolve/mod.rs`.

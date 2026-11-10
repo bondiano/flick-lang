@@ -141,7 +141,7 @@ pub enum SyntaxKind {
     InlineModuleDecl,
     /// A named static application: `module Names = Set.Make(Key)`.
     ModuleApplyDecl,
-    FunctorParam,
+    ModuleParam,
     ModuleParamGroup,
     ModuleResult,
     ModuleSignatureArrow,
