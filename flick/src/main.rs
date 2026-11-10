@@ -27,6 +27,7 @@ mod package_cache;
 mod plugins;
 mod progress;
 mod report;
+mod saved;
 mod sources;
 mod stdlib;
 mod timings;
