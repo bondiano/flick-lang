@@ -25,6 +25,7 @@ mod regions;
 mod rows;
 mod runtime;
 mod unify;
+mod zonk;
 
 #[cfg(test)]
 mod tests;
@@ -113,6 +114,9 @@ pub struct Checker<'d> {
     /// Whether `≡` may equate a rigid variable: the result of a constructor
     /// of a GADT against the type of the matched value.
     refining: bool,
+    /// The module of the definition being checked: its opaque aliases
+    /// are their representations.
+    module: Name,
 }
 
 impl<'d> Checker<'d> {
@@ -132,6 +136,7 @@ impl<'d> Checker<'d> {
             regions: regions::Regions::default(),
             equalities: Vec::new(),
             refining: false,
+            module: Name::from(""),
         }
     }
 
@@ -191,6 +196,7 @@ pub fn check_program<S: BuildHasher>(
     for (path, term) in globals {
         let scheme = decls.values.get(path).or_else(|| decls.instances.get(path));
         let mut checker = Checker::new(decls);
+        checker.module = path.module.clone();
         let result = match scheme {
             Some(s) => checker.check_top(term, s),
             None => checker.infer_top(term).map(|_| ()),

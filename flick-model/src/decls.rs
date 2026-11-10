@@ -6,12 +6,12 @@
 use std::collections::{HashMap, HashSet};
 
 use flick_core::iface::{Interface, Namespace};
-use flick_core::types::{Form, default_method};
+use flick_core::types::{self as fc, Form, default_method};
 
 use crate::syntax::{Name, Path};
 use crate::translate::instance;
-use crate::translate::types::{binders, constraint, scheme};
-use crate::types::{Scheme, Stage, Type};
+use crate::translate::types::{binders, constraint, kind, scheme, ty};
+use crate::types::{Kind, Scheme, Stage, Type};
 
 /// A class: its parameters, superclasses and methods.
 #[derive(Clone, Debug, Default)]
@@ -39,6 +39,11 @@ pub struct Decls {
     pub classes: HashMap<Path, Class>,
     /// The dictionary of each instance: a function of its context's.
     pub instances: HashMap<Path, Scheme>,
+    /// Each alias, with its parameters and representation: what an opaque
+    /// one is inside its module, which schemes still name.
+    pub opaque: HashMap<Path, (Vec<Name>, Type)>,
+    /// The kinds of the parameters of each type constructor.
+    pub params: HashMap<Path, Vec<Kind>>,
 }
 
 /// The arity of a constructor's scheme: its arrows.
@@ -71,6 +76,15 @@ impl Decls {
                     let Some(def) = &export.definition else {
                         continue;
                     };
+                    let mut params = Vec::new();
+                    let mut k = &def.kind;
+                    while let fc::Kind::Arrow(param, result) = k {
+                        params.push(kind(param).unwrap_or(Kind::Type));
+                        k = result;
+                    }
+                    if !params.is_empty() {
+                        self.params.insert(path.clone(), params);
+                    }
                     match &def.form {
                         Form::Adt { constructors, .. } => {
                             let names = constructors
@@ -78,6 +92,12 @@ impl Decls {
                                 .map(|c| (Name::from(c.as_str()), 0))
                                 .collect();
                             self.variants.insert(path, names);
+                        }
+                        // the module's own view opens an opaque alias; a
+                        // transparent one is expanded in every scheme
+                        Form::Alias { params, body, .. } => {
+                            let vars = params.iter().map(|p| Name::from(p.as_str())).collect();
+                            self.opaque.insert(path, (vars, ty(body)));
                         }
                         Form::Error => {
                             self.variants

@@ -605,6 +605,7 @@ let inside u = show u
 
 - Divergence: `inside` compiles to `Instances.$i_Show_String.show(u)`, while `show u` in another module compiles to `App_Ids.$i_Show_UserId.show(u)`. Both print the same. A hand-written `instance Pretty UserId` in its own module is `FLICK-C003` "`Pretty String` overlaps `Pretty String`": `instance_head` canonicalizes the head, and inside its module the alias expands (`unify.rs` `whnf`). Outside, `UserId` is nominal (`exports.rs`).
 - Resolution (recorded): coherence holds because the derived instance of an opaque alias delegates to the instance of the representation (`derive.rs`): the dictionaries differ, the computations coincide. An opaque alias cannot have its own instance. The `FLICK-C003` message for this case should be replaced by an explanation; this is not done yet.
+- The model checks the IR, where `inside` passes `Show String` at `UserId`: inside its module an opaque alias is its representation there too (`flick-model/src/check/zonk.rs` `unfold`; `tests/check/pass/classes/deriving.fl` `ids`).
 
 ### Equality operators do not use `Eq`
 

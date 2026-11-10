@@ -266,7 +266,8 @@ jobs:
           '
 
   # the reference model of λFlick (flick-model) against tests/run/model.txt,
-  # and the model properties on generated programs; it needs neither Node nor Go
+  # every pass fixture and docs example, and the model properties on
+  # generated programs; it needs neither Node nor Go
   model:
     runs-on: ubuntu-26.04
     timeout-minutes: 60

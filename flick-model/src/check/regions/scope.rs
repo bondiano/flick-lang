@@ -3,6 +3,7 @@
 //! owner a step acquires into (§1.4), and the errors (Err-Raise) checks.
 
 use std::collections::{BTreeSet, HashMap};
+use std::mem;
 use std::rc::Rc;
 
 use super::super::expr::mono;
@@ -161,20 +162,86 @@ impl Checker<'_> {
     }
 
     /// A step that needs `Scope ϱ`, `ϱ` not known yet, acquires into the
-    /// innermost `scope` (§1.4).
+    /// innermost `scope` (§1.4). Outside the `scope`s of its λ or task, into
+    /// the region the stage of that names (§6 "Leases instead of early
+    /// close"), else in a task argument once its call is checked, if no
+    /// later argument names `ϱ` (§6 "Scope region of a task argument is
+    /// resolved after the call").
     pub(in crate::check) fn lexical_owner(&mut self, s: &Stage) -> Check<()> {
-        let (Stage::Runtime(r, _), Some(inner)) = (s, self.regions.open.last()) else {
+        let (Stage::Runtime(r, _), Some(inner)) = (s, self.regions.open.last().cloned()) else {
             return Ok(());
         };
-        let inner = Type::Var(Var::Named(inner.clone()));
-        if let Some(args) = self.zonk_row(r).elems.get(&scope_service()) {
-            for a in args.iter() {
-                if matches!(self.follow(a), Type::Var(Var::Meta(_))) {
-                    self.unify(a, &inner)?;
+        let Some(args) = self.zonk_row(r).elems.get(&scope_service()).cloned() else {
+            return Ok(());
+        };
+        for a in args.iter() {
+            if !matches!(self.follow(a), Type::Var(Var::Meta(_))) {
+                continue;
+            }
+            let here = self.regions.open.len();
+            match (self.regions.declared.clone(), self.regions.task_argument) {
+                (Some((declared, open)), _) if open == here => self.unify(a, &declared)?,
+                (_, Some((call, open))) if open == here => {
+                    self.regions.calls[call].push((a.clone(), inner.clone()));
                 }
+                _ => self.unify(a, &Type::Var(Var::Named(inner.clone())))?,
             }
         }
         Ok(())
+    }
+
+    /// `check` of a call, then the regions its task arguments left open.
+    pub(in crate::check) fn call(
+        &mut self,
+        check: impl FnOnce(&mut Self) -> Check<Type>,
+    ) -> Check<Type> {
+        self.regions.calls.push(Vec::new());
+        let t = check(self);
+        let waiting = self.regions.calls.pop().unwrap_or_default();
+        let t = t?;
+        for (a, inner) in waiting {
+            if matches!(self.follow(&a), Type::Var(Var::Meta(_))) {
+                self.unify(&a, &Type::Var(Var::Named(inner)))?;
+            }
+        }
+        Ok(t)
+    }
+
+    /// `check` of the body of a λ or a task at `stage`, its declared one.
+    pub(in crate::check) fn declaring<T>(
+        &mut self,
+        stage: Option<&Stage>,
+        check: impl FnOnce(&mut Self) -> T,
+    ) -> T {
+        let declared = match stage {
+            Some(Stage::Runtime(r, _)) => self.zonk_row(r).elems.get(&scope_service()).cloned(),
+            _ => None,
+        };
+        let declared = match declared.as_deref() {
+            Some([region]) if !matches!(self.follow(region), Type::Var(Var::Meta(_))) => {
+                Some((region.clone(), self.regions.open.len()))
+            }
+            _ => None,
+        };
+        let outer = mem::replace(&mut self.regions.declared, declared);
+        let out = check(self);
+        self.regions.declared = outer;
+        out
+    }
+
+    /// `check` of an argument of type `Eff` of the innermost call.
+    pub(in crate::check) fn task_argument(
+        &mut self,
+        check: impl FnOnce(&mut Self) -> Check<()>,
+    ) -> Check<()> {
+        let Some(call) = self.regions.calls.len().checked_sub(1) else {
+            return check(self);
+        };
+        let here = Some((call, self.regions.open.len()));
+        let outer = mem::replace(&mut self.regions.task_argument, here);
+        let checked = check(self);
+        self.regions.task_argument = outer;
+        checked
     }
 
     /// (Err-Raise) is recorded with the step: the errors of a step under
