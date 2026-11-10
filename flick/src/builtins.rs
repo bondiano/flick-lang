@@ -7,7 +7,7 @@ use std::num::NonZero;
 use std::path::PathBuf;
 use std::sync::OnceLock;
 use std::time::Instant;
-use std::{fs, process, thread};
+use std::{fs, thread};
 
 use flick_core::build::{self, BuiltinStore};
 use flick_core::diagnostics::{Diagnostic, Severity, codes};
@@ -16,6 +16,7 @@ use flick_core::types;
 use flick_ir::{Module, Program};
 
 use crate::fetch;
+use crate::saved;
 use crate::stdlib;
 use crate::timings;
 use crate::toolchain;
@@ -66,24 +67,10 @@ fn read_or_check(stages_by_class: bool) -> Result<(), Diagnostic> {
         }
         json.push(b'\n');
     }
-    if fs::create_dir_all(&dir).is_err() {
-        return Ok(());
-    }
     // other binaries' files are stale once this one runs; its files for
     // other implicit packages serve other projects
-    if let Ok(entries) = fs::read_dir(&dir) {
-        for entry in entries.flatten() {
-            let file = entry.file_name();
-            let file = file.to_string_lossy();
-            if file.starts_with(PREFIX) && !file.starts_with(&binary) {
-                let _ = fs::remove_file(entry.path());
-            }
-        }
-    }
-    let pending = dir.join(format!("{name}.{}.tmp", process::id()));
-    if fs::write(&pending, json).is_ok() && fs::rename(&pending, &path).is_err() {
-        let _ = fs::remove_file(&pending);
-    }
+    saved::evict_others(&dir, PREFIX, &binary);
+    let _ = saved::write(&path, &json);
     Ok(())
 }
 
@@ -167,15 +154,7 @@ fn save_modules(stages_by_class: bool, modules: &[Module]) {
     };
     // every built-in module is the one file of its own source map
     let program = Program::new(toolchain::COMPILER, modules.to_vec(), &|_| String::new());
-    let pending = path.with_extension(format!("cbor.{}.tmp", process::id()));
-    if path
-        .parent()
-        .is_some_and(|dir| fs::create_dir_all(dir).is_ok())
-        && fs::write(&pending, program.to_cbor()).is_ok()
-        && fs::rename(&pending, &path).is_err()
-    {
-        let _ = fs::remove_file(&pending);
-    }
+    let _ = saved::write(&path, &program.to_cbor());
 }
 
 /// What `problem`, the first error of an implicit module, means for the run.
