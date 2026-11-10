@@ -18,6 +18,7 @@ use flick_core::diagnostics::{Diagnostic, Severity, codes};
 use flick_core::project::config::{Backend, Emit};
 use flick_core::project::{self, Project};
 use flick_core::source::SourceMap;
+use tracing::debug;
 
 use super::build::{BuildPlan, Emission, artifacts, release, write, write_artifacts};
 use super::check::select;
@@ -213,11 +214,14 @@ fn prepare(options: &TestArguments, global: &GlobalArguments) -> Result<PathBuf,
 
 fn cached_prepare(
     project: &Project,
-    key: &str,
+    key: &cache::Signed,
     out: &Path,
     progress: &Progress,
 ) -> Option<PathBuf> {
-    let artifacts = cache::load(&project.root, key)?;
+    let Some(artifacts) = cache::load(&project.root, key) else {
+        debug!(miss = %cache::missed(&project.root, key));
+        return None;
+    };
     let go = artifacts.iter().any(|a| a.path == "go/test/go.mod");
     let runner = out.join(if go {
         go::executable(go::TEST)

@@ -1,6 +1,7 @@
 use flick_core::build;
 use flick_core::diagnostics::{Diagnostic, Severity, codes};
 use flick_core::project::Project;
+use tracing::debug;
 
 use super::{BuildCommand, BuildPlan, Emission, write_artifacts};
 use crate::cache;
@@ -14,14 +15,17 @@ impl BuildCommand {
         project: &Project,
         host: &FsHost,
         progress: &Progress,
-        key: &str,
+        key: &cache::Signed,
     ) -> Option<Vec<Diagnostic>> {
         let output = self.plan(host, Some(project), self.entries(project));
         if output.extras.schema_aot {
             return None;
         }
         progress.stage("Checking build cache");
-        let artifacts = cache::load(&project.root, key)?;
+        let Some(artifacts) = cache::load(&project.root, key) else {
+            debug!(miss = %cache::missed(&project.root, key));
+            return None;
+        };
         let current = cache::artifacts_current(&output.out_dir, &artifacts)
             && (!output.go
                 || output.entries.iter().all(|(name, _)| {
@@ -32,6 +36,9 @@ impl BuildCommand {
                         &build::go::executable(name),
                     )
                 }));
+        if !current {
+            debug!(miss = "the output directory no longer holds the cached artifacts");
+        }
         progress.stage("Restoring cached artifacts");
         self.record(&output, None, &output.entries);
         if current && !self.generation {

@@ -15,7 +15,7 @@ use anstyle::{AnsiColor, Color, Style};
 use rustix::termios::tcgetwinsize;
 
 use crate::args::{DiagnosticsFormat, GlobalArguments};
-use crate::report;
+use crate::{report, timings};
 
 const BRAND: Style = Style::new()
     .bold()
@@ -102,6 +102,7 @@ impl Progress {
     }
 
     pub fn stage(&self, label: &'static str) {
+        timings::stage(label);
         match &self.output {
             Output::Hidden => {}
             Output::Plain { started, renderer } => {

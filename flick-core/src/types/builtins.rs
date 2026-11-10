@@ -19,7 +19,7 @@ use tracing::debug;
 use super::builtin_sources::CORE;
 use super::env::Builtins;
 use super::{Typing, Watched};
-use crate::clock::timed;
+use crate::clock::{micros, timed};
 use crate::diagnostics::{Code, Diagnostic, codes};
 use crate::iface::Interface;
 #[cfg(feature = "native-project")]
@@ -222,7 +222,12 @@ pub fn builtins() -> &'static [Interface] {
 pub fn builtins_of(stages_by_class: bool) -> &'static [Interface] {
     BUILTINS[usize::from(stages_by_class)].get_or_init(|| {
         let (done, elapsed) = timed(|| check_builtins(stages_by_class));
-        debug!(modules = done.len(), ?elapsed, "built-in modules checked");
+        debug!(
+            modules = done.len(),
+            ?elapsed,
+            micros = micros(elapsed),
+            "built-in modules checked"
+        );
         done
     })
 }

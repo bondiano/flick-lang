@@ -5,6 +5,7 @@
 
 use std::path::PathBuf;
 use std::sync::OnceLock;
+use std::time::Instant;
 use std::{fs, process};
 
 use flick_core::diagnostics::{Diagnostic, Severity, codes};
@@ -13,6 +14,7 @@ use flick_core::types;
 
 use crate::fetch;
 use crate::stdlib;
+use crate::timings;
 use crate::toolchain;
 use flick_core::project::store;
 use sha2::{Digest, Sha256};
@@ -35,15 +37,21 @@ pub fn prepare_in(stages_by_class: bool) -> Result<(), Diagnostic> {
             .map_err(|p| unfit(&p));
     };
     let path = dir.join(&name);
+    let started = Instant::now();
     if let Some(interfaces) = fs::read(&path)
         .ok()
         .and_then(|bytes| serde_json::from_slice::<Vec<Interface>>(&bytes).ok())
     {
+        timings::phase(
+            "built-in interfaces read from their cache",
+            started.elapsed(),
+        );
         types::install_builtins(stages_by_class, interfaces);
         return Ok(());
     }
-    let Ok(json) = serde_json::to_vec(types::try_builtins(stages_by_class).map_err(|p| unfit(&p))?)
-    else {
+    let checked = types::try_builtins(stages_by_class).map_err(|p| unfit(&p))?;
+    timings::phase("built-in modules checked", started.elapsed());
+    let Ok(json) = serde_json::to_vec(checked) else {
         return Ok(());
     };
     if fs::create_dir_all(&dir).is_err() {
