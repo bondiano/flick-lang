@@ -70,6 +70,9 @@ jobs:
         with:
           node-version: 24.18.0
       - run: just unit
+      # the parser fuzzing in release, as the nightly run has it, with fewer
+      # inputs: the one run of it every pull request gets
+      - run: just fuzz 20000
       - run: just effect-coverage >> "$GITHUB_STEP_SUMMARY"
 
   features:
@@ -241,21 +244,42 @@ jobs:
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v7
+      # The source of the derivation is the whole checkout, so no cache of it
+      # can hit and every run builds the compiler anew. A pull request does
+      # that only when it changes the flake or what the flake pins; a push to
+      # main, the nightly run and a release always do. A comparison that
+      # fails counts as a change
+      - name: Whether the flake's inputs changed
+        id: flake
+        env:
+          BASE: ${{ github.event_name == 'pull_request' && github.base_ref || '' }}
+        run: |
+          changed=true
+          if [ -n "$BASE" ] && git fetch --depth=1 origin "$BASE" &&
+            git diff --quiet FETCH_HEAD HEAD -- flake.nix flake.lock nix Cargo.lock rust-toolchain.toml; then
+            changed=false
+          fi
+          echo "changed=$changed" >> "$GITHUB_OUTPUT"
       - uses: cachix/install-nix-action@v31
+        if: steps.flake.outputs.changed == 'true'
         with:
           extra_nix_config: |
             experimental-features = nix-command flakes
       - name: Evaluate every supported platform
+        if: steps.flake.outputs.changed == 'true'
         run: nix flake check --all-systems --no-build
       - name: Build the package and its tests
+        if: steps.flake.outputs.changed == 'true'
         run: nix build .#flick --no-link
       # the std of this checkout, as a released compiler would fetch it by tag
       - name: Smoke-test the binary
+        if: steps.flake.outputs.changed == 'true'
         run: |
           out=$(nix build .#flick --no-link --print-out-paths)
           "$out/bin/flick" --version
           FLICK_STD_PATH="$PWD/packages/std" "$out/bin/flick" --project examples/first-slice check
       - name: Dev shell versions
+        if: steps.flake.outputs.changed == 'true'
         run: |
           nix develop --command bash -euo pipefail -c '
             want_rust=$(sed -n "s/^channel = \"\(.*\)\"/\1/p" rust-toolchain.toml)
