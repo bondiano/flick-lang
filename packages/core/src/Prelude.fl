@@ -87,9 +87,10 @@ effect Fail (e : ErrorRow)
 /// provides. It has no operations of its own.
 service Scope (s : Region)
 
-/// Work of a component instance that runs while it is mounted, which
-/// `Ui.on_mount` and `Ui.watch` describe.
-type Lifecycle
+/// Work of a component instance of region `s` that runs while it is
+/// mounted, which `Ui.on_mount` and `Ui.watch` describe: what it uses
+/// outlives `s`, as `Ui.mounted` and `Ui.watched` ask (`Fiber.Outlives`).
+type Lifecycle (s : Region)
 
 @lang setup
 /// The setup of a component instance, region `s`: it runs once when the
@@ -99,7 +100,7 @@ service Setup (s : Region) =
   /// region `s`, so it cannot leave the instance.
   own : forall a. a ->{} a^{s}
   /// Runs `work` from the instance's mount to its unmount.
-  start : forall c. Lifecycle^c ->{} Unit
+  start : forall c. (Lifecycle s)^c ->{} Unit
 
 @lang service_impl
 /// The implementation record of the one service of `r`:
