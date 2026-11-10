@@ -121,9 +121,14 @@ fn each_project_keeps_its_analysis_until_a_document_changes() {
     );
     assert!(hover(&mut lsp, &a).contains("String"), "the change is read");
     assert!(hover(&mut lsp, &b).contains("Float"));
+    // a completion of an open document reads what its last change analyzed
+    let at =
+        json!({ "textDocument": { "uri": uri(&a) }, "position": { "line": 2, "character": 11 } });
+    let items = lsp.request("textDocument/completion", &at)["result"].to_string();
+    assert!(items.contains("\"String\""), "{items}");
     lsp.close();
     // no request analyzed anew: opening and changing a document did
     let logs = fs::read_to_string(&log).expect("logs");
     let selected = |cached: bool| logs.matches(&format!("cached={cached}")).count();
-    assert_eq!((selected(true), selected(false)), (5, 0), "{logs}");
+    assert_eq!((selected(true), selected(false)), (6, 0), "{logs}");
 }

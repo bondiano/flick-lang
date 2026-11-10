@@ -476,7 +476,7 @@ fn the_projection_maps_names_exactly_and_comes_from_the_analysis() {
     let module = f.analysis.module("App.Main").expect("module");
     let text = &f.sources.get(module.file).text;
     let fingerprint = analysis_fingerprint(&f.analysis.compilation);
-    let lookup = |m: &str| ide.interface(m);
+    let lookup = |m: &str| ide.interface(m).cloned();
     let projected = projection::project(module, text, &fingerprint, &lookup, &|_| None, &|m| {
         projection::relative(&module.name, m)
     });
@@ -510,7 +510,7 @@ fn a_documented_declaration_keeps_its_exact_mappings() {
     let ide = f.ide();
     let module = f.analysis.module("App.Docs").expect("module");
     let text = &f.sources.get(module.file).text;
-    let lookup = |m: &str| ide.interface(m);
+    let lookup = |m: &str| ide.interface(m).cloned();
     let projected = projection::project(module, text, "", &lookup, &|_| None, &|m| {
         projection::relative(&module.name, m)
     });

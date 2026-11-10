@@ -214,20 +214,26 @@ impl Server {
             .last()
             .map_or(cursor, |(i, _)| i);
         let dotted = text[..word].ends_with('.');
+        let cut;
         let (snapshot, offset) = if dotted {
             let dot = word - 1;
             let mut docs = self.docs.clone();
             docs.insert(path.clone(), format!("{}{}", &text[..dot], &text[cursor..]));
-            (analyze(&docs, &path, &mut self.caches), dot)
+            cut = analyze(&docs, &path, &mut self.caches);
+            (&cut, dot)
+        } else if self.docs.contains_key(&path) {
+            // the text of an open document is what its last change analyzed
+            (self.snapshot_for(&path), word)
         } else {
             let mut docs = self.docs.clone();
             docs.insert(path.clone(), text.clone());
-            (analyze(&docs, &path, &mut self.caches), word)
+            cut = analyze(&docs, &path, &mut self.caches);
+            (&cut, word)
         };
         let Some(file) = snapshot.file(&path) else {
             return Ok(json!([]));
         };
-        let items: Vec<Value> = ide(&snapshot)
+        let items: Vec<Value> = ide(snapshot)
             .complete(file, u32::try_from(offset).unwrap_or(0), dotted)
             .into_iter()
             .map(|c| {

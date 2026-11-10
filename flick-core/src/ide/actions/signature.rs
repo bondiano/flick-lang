@@ -155,7 +155,7 @@ impl Ide<'_> {
             syntax: &syntax,
             generated: resolve::NO_GENERATED,
         };
-        let imported = |name: &str| self.interface(name);
+        let imported = |name: &str| self.interface(name).cloned();
         let (mut interface, resolved) = resolve::resolve(&module, &imported);
         if resolved.iter().any(|d| d.severity == Severity::Error) {
             return false;
