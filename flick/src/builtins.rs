@@ -3,10 +3,11 @@
 //! checks them once for each `std` it is given, and later runs read what it
 //! saved.
 
+use std::num::NonZero;
 use std::path::PathBuf;
 use std::sync::OnceLock;
 use std::time::Instant;
-use std::{fs, process};
+use std::{fs, process, thread};
 
 use flick_core::build::{self, BuiltinStore};
 use flick_core::diagnostics::{Diagnostic, Severity, codes};
@@ -48,10 +49,7 @@ fn read_or_check(stages_by_class: bool) -> Result<(), Diagnostic> {
     };
     let path = dir.join(&name);
     let started = Instant::now();
-    if let Some(interfaces) = fs::read(&path)
-        .ok()
-        .and_then(|bytes| serde_json::from_slice::<Vec<Interface>>(&bytes).ok())
-    {
+    if let Some(interfaces) = fs::read(&path).ok().and_then(|bytes| saved(&bytes)) {
         timings::phase(
             "built-in interfaces read from their cache",
             started.elapsed(),
@@ -61,9 +59,13 @@ fn read_or_check(stages_by_class: bool) -> Result<(), Diagnostic> {
     }
     let checked = types::try_builtins(stages_by_class).map_err(|p| unfit(&p))?;
     timings::phase("built-in modules checked", started.elapsed());
-    let Ok(json) = serde_json::to_vec(checked) else {
-        return Ok(());
-    };
+    let mut json = Vec::new();
+    for interface in checked {
+        if serde_json::to_writer(&mut json, interface).is_err() {
+            return Ok(());
+        }
+        json.push(b'\n');
+    }
     if fs::create_dir_all(&dir).is_err() {
         return Ok(());
     }
@@ -83,6 +85,41 @@ fn read_or_check(stages_by_class: bool) -> Result<(), Diagnostic> {
         let _ = fs::remove_file(&pending);
     }
     Ok(())
+}
+
+/// How many threads read the saved interfaces at most.
+const READERS: usize = 8;
+
+/// The interfaces of a saved file, one JSON document a line. Reading them
+/// is most of what a small check takes, so several threads share the lines,
+/// which a string of JSON never breaks.
+fn saved(bytes: &[u8]) -> Option<Vec<Interface>> {
+    let lines: Vec<&[u8]> = bytes
+        .split(|byte| *byte == b'\n')
+        .filter(|line| !line.is_empty())
+        .collect();
+    let available = thread::available_parallelism().map_or(1, NonZero::get);
+    let readers = available.min(READERS).min(lines.len()).max(1);
+    let lines = &lines;
+    thread::scope(|scope| {
+        // every `readers`-th line each: the big modules stand together
+        let parts: Vec<_> = (0..readers)
+            .map(|first| {
+                scope.spawn(move || {
+                    (lines.iter().skip(first).step_by(readers))
+                        .map(|line| serde_json::from_slice::<Interface>(line).ok())
+                        .collect::<Option<Vec<_>>>()
+                })
+            })
+            .collect();
+        let mut parts = parts
+            .into_iter()
+            .map(|part| Some(part.join().ok()??.into_iter()))
+            .collect::<Option<Vec<_>>>()?;
+        (0..lines.len())
+            .map(|line| parts[line % readers].next())
+            .collect()
+    })
 }
 
 /// Keeps the lowered built-in modules beside their interfaces, as a program
@@ -145,7 +182,7 @@ fn location(stages_by_class: bool) -> Option<(PathBuf, String, String)> {
     let dir = store::cache_dir()?;
     let binary = format!("{PREFIX}{}-", toolchain::fingerprint()?);
     let mode = if stages_by_class { "-by-class" } else { "" };
-    let name = format!("{binary}{}{mode}.json", &implicit_hash()[..16]);
+    let name = format!("{binary}{}{mode}.jsonl", &implicit_hash()[..16]);
     Some((dir, binary, name))
 }
 
