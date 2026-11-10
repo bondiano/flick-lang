@@ -262,7 +262,7 @@ for (const locale of ["en", "ru"]) {
 
 test("exercise checks resolve a re-export through the worker declaration graph", async ({ page }) => {
   await page.goto("/flick-lang/tour/signatures/");
-  await ready(page);
+  await expect(page.locator(".fp-cm .cm-content")).toBeVisible({ timeout: 60_000 });
   await page.evaluate(() => {
     const element = document.getElementById("flick-lesson");
     if (!element) throw new Error("missing exercise contract");
