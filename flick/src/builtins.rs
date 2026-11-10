@@ -29,8 +29,16 @@ pub fn prepare() -> Result<(), Diagnostic> {
 }
 
 /// [`prepare`], for checks with `stages_by_class` or without, each with a file
-/// of its own.
+/// of its own. Once a process for each: a watching command, the passes of
+/// `--fix` and a build inside `run` ask again.
 pub fn prepare_in(stages_by_class: bool) -> Result<(), Diagnostic> {
+    static PREPARED: [OnceLock<Result<(), Diagnostic>>; 2] = [OnceLock::new(), OnceLock::new()];
+    PREPARED[usize::from(stages_by_class)]
+        .get_or_init(|| read_or_check(stages_by_class))
+        .clone()
+}
+
+fn read_or_check(stages_by_class: bool) -> Result<(), Diagnostic> {
     let Some((dir, binary, name)) = location(stages_by_class) else {
         return types::try_builtins(stages_by_class)
             .map(drop)
