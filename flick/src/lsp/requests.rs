@@ -133,10 +133,10 @@ impl Server {
                         })
                     }))
             }
-            "textDocument/documentSymbol" => Ok(features::document_symbols(&ide, &text, file)),
-            "textDocument/semanticTokens/full" => Ok(features::semantic_tokens(&ide, &text, file)),
-            "textDocument/foldingRange" => Ok(features::folding_ranges(&ide, &text, file)),
-            "textDocument/inlayHint" => Ok(features::inlay_hints(&ide, &text, file)),
+            "textDocument/documentSymbol" => Ok(features::document_symbols(&ide, file)),
+            "textDocument/semanticTokens/full" => Ok(features::semantic_tokens(&ide, file)),
+            "textDocument/foldingRange" => Ok(features::folding_ranges(&ide, file)),
+            "textDocument/inlayHint" => Ok(features::inlay_hints(&ide, file)),
             "textDocument/signatureHelp" => Ok(features::signature_help(&ide, file, offset)),
             "textDocument/typeDefinition" => ide
                 .type_definition(file, offset)
