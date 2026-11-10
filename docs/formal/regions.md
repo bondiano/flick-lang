@@ -958,6 +958,25 @@ scope s1 {
 - Incompleteness of the reference checker: the program is accepted with `v3 : (Unit →R Unit)^{s1}`, and the state is typed by the same rule once (Fix) infers the qualifier as (Let-Sig) did.
 - Resolution, model: (Fix) checks the λ against the local signature with its own qualifier inferred, and gives `fix` that type (`flick-model/src/check/expr.rs` `fix`). Test: `a_function_keeps_the_qualifier_of_its_local_signature` (`flick-model/tests/props.rs`).
 
+### The work of a region is typed inside it
+
+Divergence: `⊢ Λ` of the reference checker typed a child or a finalizer of `π` outside every region, so a `scope` written in it was nested in nothing.
+
+```flick
+scope s1 {
+  let _ = Fiber.spawn s1 report (task {
+    (scope s4 {
+      let _ = Fiber.spawn s4 report (task {
+        let _ = Fiber.spawn s1 report (task { () })
+        () })
+      { a = (); b = 0 } }).a })
+  0 }
+```
+
+- Symptom: `FLICK-G003` "`π0` may end before region `s4`" in `progress_and_preservation_hold`, at the step that makes the outer task a child of `π0`: the child of `s4` holds the owner of `s1`, which needs `s1 ≥ s4`. The program has it by the first rule of §2.4, `s4` being written inside `scope s1`; in `K(π0)` the task stands apart from that `scope`.
+- Incompleteness of the reference checker: a child runs in the region of its owner ([children acquire in the region of their owner](#children-acquire-in-the-region-of-their-owner)), so a `scope` it opens is inside `π0` and the regions `π0` was made in, as the machine runs it.
+- Resolution, model: `⊢ Λ` types the work of `π` as nested in `π` and in every region `π` was made in (`flick-model/src/check/runtime.rs` `lambda`, `check/regions/scope.rs` `nested_in`). Test: `a_scope_in_a_child_is_inside_the_region_of_its_owner` (`flick-model/tests/props.rs`).
+
 ### Rules of typing by use found while porting
 
 - An instance method without a signature is checked against the class signature, elided before the instance arguments are substituted (`tests/check/pass/regions/instance_elided.fl`); a signature an instance method writes does not add the `Live` its own arrows would need (`tests/check/fail/regions/instance_signature.fl`).

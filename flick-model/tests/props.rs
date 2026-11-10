@@ -241,6 +241,29 @@ fn a_function_keeps_the_qualifier_of_its_local_signature() {
     assert!(checked.is_ok(), "{checked:?}\n{source}");
 }
 
+/// A child runs in the region of its owner: a `scope` it opens is inside
+/// that region, so a child of the inner `scope` may hold the outer one,
+/// `Fiber.spawn s1` in a child of `s4` in a child of `s1`. A case the model
+/// properties found.
+#[test]
+#[allow(
+    clippy::unreadable_literal,
+    reason = "the choices as proptest printed them"
+)]
+fn a_scope_in_a_child_is_inside_the_region_of_its_owner() {
+    let c = [
+        0, 0, 0, 0, 0, 1, 2103265675, 3241815428, 0, 0, 1685817865, 0, 2523900354, 3031439068, 0,
+        1, 318732972,
+    ];
+    let p = generate::program(&c);
+    let source = generate::source(&p);
+    assert_eq!(source.matches("Fiber.spawn s1").count(), 2, "{source}");
+    assert!(source.contains("Fiber.spawn s4"), "{source}");
+    assert!(model(&p).is_ok(), "{source}");
+    let checked = GEN.with(|(d, globals)| progress_and_preservation(globals, d, &p));
+    assert!(checked.is_ok(), "{checked:?}\n{source}");
+}
+
 proptest! {
     // a failure becomes a case of `tests/check`, not a file of seeds
     // (the programs with a hole of TypeScript are not run, below)

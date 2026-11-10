@@ -3,6 +3,7 @@
 //! owner a step acquires into (§1.4), and the errors (Err-Raise) checks.
 
 use std::collections::BTreeSet;
+use std::mem;
 use std::rc::Rc;
 
 use super::super::expr::mono;
@@ -35,6 +36,20 @@ impl Checker<'_> {
         expected: Option<&Type>,
     ) -> Check<Type> {
         self.scoped(name, Some(pi), body, expected)
+    }
+
+    /// `typed` as what runs in the regions `enclosing`, outermost first: a
+    /// `scope` it opens is inside the last of them, which therefore
+    /// outlives it (§2.4). The work `Λ` keeps of a region runs in it.
+    pub(in crate::check) fn nested_in<T>(
+        &mut self,
+        enclosing: Vec<Name>,
+        typed: impl FnOnce(&mut Self) -> T,
+    ) -> T {
+        let outer = mem::replace(&mut self.regions.nest, enclosing);
+        let out = typed(self);
+        self.regions.nest = outer;
+        out
     }
 
     /// Region `π` of `Λ`, made in `parent`: every one is declared, the
