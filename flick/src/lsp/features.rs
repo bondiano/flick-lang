@@ -4,41 +4,42 @@
 use std::path::Path;
 
 use flick_core::ide::{Ide, Outline};
-use flick_core::source::FileId;
+use flick_core::source::{FileId, SourceFile};
 use serde_json::{Value, json};
 
-use super::Snapshot;
-use super::protocol::{self, Lines};
 use super::requests::ide;
+use super::{Snapshot, protocol};
 
-pub(super) fn document_symbols(ide: &Ide, text: &str, file: FileId) -> Value {
-    fn symbol(lines: &Lines, o: &Outline) -> Value {
+pub(super) fn document_symbols(ide: &Ide, file: FileId) -> Value {
+    fn symbol(source: &SourceFile, o: &Outline) -> Value {
         json!({
             "name": o.name,
             "kind": o.kind,
-            "range": lines.range(o.range.0, o.range.1),
-            "selectionRange": lines.range(o.selection.0, o.selection.1),
-            "children": o.children.iter().map(|c| symbol(lines, c)).collect::<Vec<_>>(),
+            "range": protocol::range_in(source, o.range.0, o.range.1),
+            "selectionRange": protocol::range_in(source, o.selection.0, o.selection.1),
+            "children": o.children.iter().map(|c| symbol(source, c)).collect::<Vec<_>>(),
         })
     }
-    let lines = Lines::of(text);
+    let source = ide.sources.get(file);
     let symbols: Vec<Value> = ide
         .document_symbols(file)
         .iter()
-        .map(|o| symbol(&lines, o))
+        .map(|o| symbol(source, o))
         .collect();
     Value::Array(symbols)
 }
 
 /// `textDocument/semanticTokens/full`: five numbers per token, each
 /// position relative to the token before.
-pub(super) fn semantic_tokens(ide: &Ide, text: &str, file: FileId) -> Value {
+pub(super) fn semantic_tokens(ide: &Ide, file: FileId) -> Value {
+    let source = ide.sources.get(file);
     let mut data: Vec<u64> = Vec::new();
-    let lines = Lines::of(text);
     let (mut line, mut column) = (0, 0);
     for (start, end, kind) in ide.semantic_tokens(file) {
-        let (l, c) = lines.line_column(start);
-        let length = text[start as usize..end as usize].encode_utf16().count() as u64;
+        let (l, c) = source.utf16_position(start);
+        let (l, c) = (u64::from(l), u64::from(c));
+        let token = &source.text[start as usize..end as usize];
+        let length = token.encode_utf16().count() as u64;
         let delta_column = if l == line { c - column } else { c };
         data.extend([l - line, delta_column, length, u64::from(kind), 0]);
         (line, column) = (l, c);
@@ -46,24 +47,24 @@ pub(super) fn semantic_tokens(ide: &Ide, text: &str, file: FileId) -> Value {
     json!({ "data": data })
 }
 
-pub(super) fn folding_ranges(ide: &Ide, text: &str, file: FileId) -> Value {
-    let lines = Lines::of(text);
+pub(super) fn folding_ranges(ide: &Ide, file: FileId) -> Value {
+    let source = ide.sources.get(file);
     let ranges: Vec<Value> = ide
         .folding_ranges(file)
         .into_iter()
-        .map(|(s, e)| (lines.line_column(s).0, lines.line_column(e).0))
+        .map(|(s, e)| (source.utf16_position(s).0, source.utf16_position(e).0))
         .filter(|(s, e)| s < e)
         .map(|(s, e)| json!({ "startLine": s, "endLine": e }))
         .collect();
     Value::Array(ranges)
 }
 
-pub(super) fn inlay_hints(ide: &Ide, text: &str, file: FileId) -> Value {
-    let lines = Lines::of(text);
+pub(super) fn inlay_hints(ide: &Ide, file: FileId) -> Value {
+    let source = ide.sources.get(file);
     let hints: Vec<Value> = ide
         .inlay_hints(file)
         .into_iter()
-        .map(|(at, label)| json!({ "position": lines.position(at), "label": label, "kind": 1 }))
+        .map(|(at, label)| json!({ "position": protocol::position_in(source, at), "label": label, "kind": 1 }))
         .collect();
     Value::Array(hints)
 }
