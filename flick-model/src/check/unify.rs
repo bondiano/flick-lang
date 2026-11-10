@@ -136,6 +136,14 @@ impl Checker<'_> {
 
     /// `τ ≡ τ'`.
     pub(super) fn unify(&mut self, a: &Type, b: &Type) -> Check<()> {
+        // one opaque alias on both sides is equal by its arguments, as it is
+        // outside its module: unfolding one that names itself would not end
+        let (x, y) = (self.heads(a), self.heads(b));
+        if let (Some((p, xs)), Some((q, ys))) = (self.alias(&x), self.alias(&y))
+            && p == q
+        {
+            return xs.iter().zip(&ys).try_for_each(|(x, y)| self.unify(x, y));
+        }
         let (a, b) = (self.follow(a), self.follow(b));
         match (&a, &b) {
             (Type::Var(Var::Meta(m)), Type::Var(Var::Meta(n))) if m == n => Ok(()),

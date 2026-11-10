@@ -14,6 +14,15 @@ use crate::types::{Fields, Kind, Row, Scheme, Type, Var};
 /// An operation of `S τ̄`: the first variables of its scheme are the
 /// service's parameters, here `τ̄`; a row argument is `Errors ρ`, as
 /// instantiating gives it.
+/// An argument of a type as what it instantiates: a row written there is
+/// `Errors ρ`.
+pub(super) fn arg(a: &Type) -> Inst {
+    match a {
+        Type::Errors(r) => Inst::Row(r.clone()),
+        t => Inst::Type(t.clone()),
+    }
+}
+
 pub(super) fn at_args(op: &Scheme, args: &[Type]) -> Scheme {
     let n = args.len().min(op.vars.len());
     if n == 0 {
@@ -22,10 +31,7 @@ pub(super) fn at_args(op: &Scheme, args: &[Type]) -> Scheme {
     let map: HashMap<Name, Inst> = op.vars[..n]
         .iter()
         .map(|(v, _)| v.clone())
-        .zip(args.iter().map(|a| match a {
-            Type::Errors(r) => Inst::Row(r.clone()),
-            t => Inst::Type(t.clone()),
-        }))
+        .zip(args.iter().map(arg))
         .collect();
     Scheme {
         vars: op.vars[n..].to_vec(),

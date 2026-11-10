@@ -5,10 +5,11 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::rc::Rc;
 
-use super::generalize::{params, substitute};
+use super::dicts::arg;
+use super::generalize::substitute;
 use super::regions::drop_empty_live;
 use super::{Checker, Solved};
-use crate::syntax::Name;
+use crate::syntax::{Name, Path};
 use crate::types::{Caps, Fields, Row, Scheme, Stage, Type, Var};
 
 impl Checker<'_> {
@@ -25,8 +26,19 @@ impl Checker<'_> {
     }
 
     /// `t` with the metas at its head followed, and `EffOf ρ ρ' τ` as
-    /// `Eff ρ ρ' τ`; a qualifier is kept.
+    /// `Eff ρ ρ' τ`; a qualifier is kept, and an opaque alias of the module
+    /// is its representation.
     pub(super) fn follow(&self, t: &Type) -> Type {
+        let t = self.heads(t);
+        match self.unfold(&t) {
+            Some(u) => self.follow(&u),
+            None => t,
+        }
+    }
+
+    /// [`Checker::follow`] but for opaque aliases, which stay nominal: what
+    /// walks a whole type, as an alias may name itself.
+    pub(super) fn heads(&self, t: &Type) -> Type {
         let mut t = t.clone();
         while let Type::Var(v) = &t
             && let Some(Solved::Type(next)) = self.solution(v)
@@ -38,10 +50,7 @@ impl Checker<'_> {
         {
             return Type::Eff(r, e, a.clone());
         }
-        match self.unfold(&t) {
-            Some(u) => self.follow(&u),
-            None => t,
-        }
+        t
     }
 
     /// `t` followed, under its qualifiers: what a rule that takes the
@@ -82,7 +91,7 @@ impl Checker<'_> {
     /// `t` with every solved meta replaced.
     pub(super) fn zonk(&self, t: &Type) -> Type {
         let z = |t: &Rc<Type>| Rc::new(self.zonk(t));
-        match self.follow(t) {
+        match self.heads(t) {
             Type::Captured(t, c) => Type::Captured(z(&t), self.zonk_caps(&c)),
             Type::Bounded(t, c) => Type::Bounded(z(&t), self.zonk_caps(&c)),
             t @ (Type::Var(_) | Type::Con(_)) => t,
@@ -162,21 +171,21 @@ impl Checker<'_> {
     }
 
     /// An opaque alias of the module being checked, applied to all its
-    /// parameters: its representation.
-    fn unfold(&self, t: &Type) -> Option<Type> {
+    /// parameters: its name and arguments.
+    pub(super) fn alias<'t>(&self, t: &'t Type) -> Option<(&'t Path, Vec<&'t Type>)> {
         if self.decls.opaque.is_empty() {
             return None;
         }
         let mut args = Vec::new();
         let mut head = t;
         while let Type::App(h, a) = head {
-            args.push((**a).clone());
+            args.push(&**a);
             head = h;
         }
         let Type::Con(p) = head else {
             return None;
         };
-        let (vars, body) = self
+        let (vars, _) = self
             .decls
             .opaque
             .get(p)
@@ -185,6 +194,19 @@ impl Checker<'_> {
             return None;
         }
         args.reverse();
-        Some(substitute(body, &params(vars, &args)))
+        Some((p, args))
+    }
+
+    /// An opaque alias of the module being checked, applied to all its
+    /// parameters: its representation, each argument at its kind.
+    fn unfold(&self, t: &Type) -> Option<Type> {
+        let (p, args) = self.alias(t)?;
+        let (vars, body) = &self.decls.opaque[p];
+        let map = vars
+            .iter()
+            .cloned()
+            .zip(args.into_iter().map(arg))
+            .collect();
+        Some(substitute(body, &map))
     }
 }

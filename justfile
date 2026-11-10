@@ -52,7 +52,7 @@ formal-certs:
 # Certify a run of generated programs and check the certificates with Lean
 model-certs:
     cargo test -p flick-model --test certs -- --ignored
-    cd formal && lake env lean ../target/certs/Batch.lean
+    cd formal && lake build --wfail && lake env lean ../target/certs/Batch.lean
 
 # Check each capability independently, without workspace feature unification
 feature-check:

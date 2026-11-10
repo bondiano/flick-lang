@@ -285,11 +285,12 @@ fn rewrite(e: &Term, at: &mut usize, block: bool, g: &mut Gen, change: &mut Chan
     let mut go = |t: &Term, block: bool| Rc::new(rewrite(t, at, block, g, change));
     match e {
         Term::Lam(x, b) => Term::Lam(x.clone(), go(b, true)),
-        // a dictionary is no subterm of the source: flick-core resolves it
+        // a dictionary is no subterm of the source: flick-core resolves it,
+        // and its callee changes only with it, as the call the source writes
+        Term::App(_, a) if is_dict(a) => e.clone(),
         Term::App(f, a) => {
             let f2 = go(f, false);
             let a = match &**a {
-                _ if is_dict(a) => a.clone(),
                 // the annotation of a method's argument fixes its dictionary:
                 // only what it annotates changes
                 Term::Let(x, sig, rhs, rest)
@@ -364,4 +365,28 @@ fn arms_of(arms: &[Arm], go: &mut dyn FnMut(&Term, bool) -> Rc<Term>) -> Rc<[Arm
             body: (*go(&a.body, true)).clone(),
         })
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::syntax::Path;
+
+    /// A change does not reach the callee of a dictionary on its own: the
+    /// source writes `v1 0`, and the model's `v1 dict 0` must stay that call.
+    #[test]
+    fn a_change_keeps_a_callee_with_its_dictionary() {
+        let dict = Term::Global(Path::new(MODULE, "instance Describe Int"));
+        let call = Term::app(
+            Term::app(Term::Var("v1".into()), dict),
+            Term::Lit(Lit::Int(0)),
+        );
+        for start in 0..size(&call) {
+            let mut at = start;
+            let changed = rewrite(&call, &mut at, true, &mut Gen::new(&[]), &mut |t, _, _| {
+                matches!(t, Term::Var(x) if &**x == "v1").then(Term::unit)
+            });
+            assert_eq!(format!("{changed:?}"), format!("{call:?}"), "at {start}");
+        }
+    }
 }
