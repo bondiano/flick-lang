@@ -1,10 +1,11 @@
 //! Runtime, foreign and Flick imports for one generated module.
 
+use crate::build::bindings;
 use std::fmt::Write;
 
 use super::{Gen, RUNTIME, names, relative};
 
-const KERNEL_RUNTIME: &str = "@flick-lang/runtime";
+const KERNEL_RUNTIME: &str = bindings::OWNED_PREFIX;
 
 impl Gen<'_> {
     pub(super) fn write_imports(&self, code: &mut String, here: &str) {

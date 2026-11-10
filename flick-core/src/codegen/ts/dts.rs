@@ -228,7 +228,8 @@ pub fn facade_files(
     path: &dyn Fn(&str) -> String,
 ) -> (String, String) {
     let mut js = format!(
-        "import {{ promiseFacade }} from \"@flick-lang/effect-ts\";\nimport * as $m from {};\n\n",
+        "import {{ promiseFacade }} from \"{}\";\nimport * as $m from {};\n\n",
+        super::EFFECT_RUNTIME,
         names::string(module_js)
     );
     let mut dts = projection.imports(path);

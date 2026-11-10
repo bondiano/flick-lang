@@ -1,7 +1,13 @@
 //! A block's `check`: what its plugin finds wrong with its code from the
 //! types the checker found for the `_` of that code.
 
-use flick_plugin::{Fact, Span as BlockSpan};
+use crate::syntax::{
+    cst::{Element, Node},
+    kind::SyntaxKind as K,
+    structure,
+};
+use crate::types::Thresholds;
+use flick_plugin::{Fact, HoleKind, Span as BlockSpan};
 
 use super::Expansion;
 use crate::diagnostics::{Diagnostic, codes};
@@ -13,11 +19,12 @@ impl Expansion {
     /// The errors the plugin of each expanded block of `editing` finds from
     /// `wildcards`, the type of each `_` of the expanded text: each fact at
     /// the span of its block the plugin gave its `_`, the whole block when
-    /// that is the whole frame. A block without a `_` is not asked.
+    /// that is the whole frame. Source hooks also run without a `_`.
     pub fn check_blocks(
         &self,
         editing: &[EditorBlock],
         wildcards: &[(Range, Fact)],
+        limits: Thresholds,
     ) -> Vec<Diagnostic> {
         let mut out = Vec::new();
         for block in &self.blocks {
@@ -26,11 +33,47 @@ impl Expansion {
             };
             let (start, end) = block.frame;
             let facts = self.facts(start, wildcards);
-            if facts.is_empty() {
-                continue;
+            // Source holes only: patterns and generated wrappers do not count.
+            let mut nodes = Vec::new();
+            for (_, hole) in &block.holes {
+                if !matches!(hole.kind, HoleKind::Expr | HoleKind::Decl) {
+                    continue;
+                }
+                let range = (start + hole.span.start, start + hole.span.end);
+                if let Some(node) = source_node(&self.source_tree, range)
+                    && !nodes.iter().any(|n: &Node| n.range() == node.range())
+                {
+                    nodes.push(node.clone());
+                }
             }
+            nodes.sort_by_key(Node::range);
+            let structure = if nodes.is_empty() {
+                None
+            } else {
+                let body = Node {
+                    kind: K::Block,
+                    children: nodes.into_iter().map(Element::Node).collect(),
+                };
+                let mut structure = structure::measure(&body, &self.text, limits);
+                for n in &mut structure.nesting {
+                    n.span.start -= start;
+                    n.span.end -= start;
+                }
+                Some(structure)
+            };
             let whole = Span::new(self.file, block.range.0, block.range.1);
-            match editor.plugin.check(&editor.block, &editor.state, &facts) {
+            let found = if facts.is_empty() {
+                Ok(Vec::new())
+            } else {
+                editor.plugin.check(&editor.block, &editor.state, &facts)
+            }
+            .and_then(|mut found| {
+                if let Some(structure) = &structure {
+                    found.extend(editor.plugin.check_structure(&editor.block, structure)?);
+                }
+                Ok(found)
+            });
+            match found {
                 Ok(found) => {
                     let frame = Span::new(self.file, start, end);
                     out.extend(
@@ -79,4 +122,16 @@ impl Expansion {
             })
             .collect()
     }
+}
+
+fn source_node(node: &Node, range: Range) -> Option<&Node> {
+    if node.range() == range {
+        return Some(node);
+    }
+    node.nodes()
+        .filter(|child| {
+            let (start, end) = child.range();
+            start <= range.0 && range.1 <= end
+        })
+        .find_map(|child| source_node(child, range))
 }

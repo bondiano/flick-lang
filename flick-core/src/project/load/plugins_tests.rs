@@ -19,6 +19,8 @@ mod names;
 mod nested;
 mod published;
 mod reach;
+mod refined;
+mod structure;
 
 use super::{check, compile};
 use crate::diagnostics::{Diagnostic, Severity};

@@ -1,0 +1,774 @@
+WEBVTT
+
+1
+00:00:01.040 --> 00:00:03.778
+Flick asks a practical question: can one
+
+2
+00:00:03.778 --> 00:00:06.193
+typed language describe a browser
+
+3
+00:00:06.193 --> 00:00:08.851
+interface, a server, and a command-line
+
+4
+00:00:08.851 --> 00:00:09.414
+program?
+
+5
+00:00:09.734 --> 00:00:11.746
+This repository brings those paths
+
+6
+00:00:11.746 --> 00:00:14.026
+together through a shared compiler and
+
+7
+00:00:14.026 --> 00:00:15.702
+explicit runtime boundaries.
+
+8
+00:00:16.022 --> 00:00:18.268
+The interesting part is not just the
+
+9
+00:00:18.268 --> 00:00:18.717
+syntax.
+
+10
+00:00:19.037 --> 00:00:21.608
+It is how application code, effects,
+
+11
+00:00:21.608 --> 00:00:24.446
+libraries, and generated programs fit
+
+12
+00:00:24.446 --> 00:00:25.155
+together.
+
+13
+00:00:25.475 --> 00:00:27.862
+We will follow those boundaries, using the
+
+14
+00:00:27.862 --> 00:00:30.248
+current source tree rather than assuming
+
+15
+00:00:30.248 --> 00:00:32.225
+every target behaves identically.
+
+16
+00:00:33.495 --> 00:00:36.343
+First, find the center of the repository.
+
+17
+00:00:36.663 --> 00:00:38.983
+The native Flick command and the browser's
+
+18
+00:00:38.983 --> 00:00:41.303
+WebAssembly interface both call the Rust
+
+19
+00:00:41.303 --> 00:00:42.098
+compiler core.
+
+20
+00:00:42.418 --> 00:00:45.087
+Around that center sit smaller crates for
+
+21
+00:00:45.087 --> 00:00:47.603
+shared intermediate representations,
+
+22
+00:00:47.603 --> 00:00:49.128
+formatting, and plugins.
+
+23
+00:00:49.448 --> 00:00:52.150
+Execution lives elsewhere, in runtime
+
+24
+00:00:52.150 --> 00:00:52.826
+packages.
+
+25
+00:00:53.146 --> 00:00:55.634
+This separation matters when navigating a
+
+26
+00:00:55.634 --> 00:00:56.037
+change.
+
+27
+00:00:56.357 --> 00:00:59.094
+A browser feature can share checking logic
+
+28
+00:00:59.094 --> 00:01:01.682
+with the command line without sharing its
+
+29
+00:01:01.682 --> 00:01:04.049
+filesystem access, package loading, or
+
+30
+00:01:04.049 --> 00:01:05.528
+execution environment.
+
+31
+00:01:06.798 --> 00:01:09.258
+Next, look at a function signature.
+
+32
+00:01:09.578 --> 00:01:12.101
+In the first-slice example, describe takes
+
+33
+00:01:12.101 --> 00:01:14.623
+a string and declares asynchronous work
+
+34
+00:01:14.623 --> 00:01:16.498
+plus two service requirements.
+
+35
+00:01:16.818 --> 00:01:19.137
+Its body handles a typed not-found error
+
+36
+00:01:19.137 --> 00:01:21.388
+instead of treating every failure as an
+
+37
+00:01:21.388 --> 00:01:22.820
+unstructured exception.
+
+38
+00:01:23.140 --> 00:01:25.554
+Services are supplied at the application
+
+39
+00:01:25.554 --> 00:01:26.106
+boundary.
+
+40
+00:01:26.426 --> 00:01:28.175
+Regions add another dimension by
+
+41
+00:01:28.175 --> 00:01:30.300
+constraining how resources and running
+
+42
+00:01:30.300 --> 00:01:31.799
+work can escape their owners.
+
+43
+00:01:32.119 --> 00:01:34.543
+These declarations connect the language's
+
+44
+00:01:34.543 --> 00:01:36.764
+static checks to the lifetime rules its
+
+45
+00:01:36.764 --> 00:01:38.111
+runtimes must preserve.
+
+46
+00:01:39.381 --> 00:01:41.427
+Now follow a source file through the
+
+47
+00:01:41.427 --> 00:01:41.956
+compiler.
+
+48
+00:01:42.276 --> 00:01:44.868
+Parsing keeps a lossless syntax tree, so
+
+49
+00:01:44.868 --> 00:01:47.156
+source details remain available to
+
+50
+00:01:47.156 --> 00:01:48.986
+formatting and diagnostics.
+
+51
+00:01:49.306 --> 00:01:52.126
+Resolution establishes names and exports.
+
+52
+00:01:52.446 --> 00:01:55.168
+Checking determines types, effects, and
+
+53
+00:01:55.168 --> 00:01:57.807
+regions, while recording metadata for
+
+54
+00:01:57.807 --> 00:01:58.715
+later phases.
+
+55
+00:01:59.035 --> 00:02:01.202
+Lowering then makes those decisions
+
+56
+00:02:01.202 --> 00:02:03.090
+explicit in typed intermediate
+
+57
+00:02:03.090 --> 00:02:04.069
+representation.
+
+58
+00:02:04.389 --> 00:02:06.287
+Release builds may optimize that
+
+59
+00:02:06.287 --> 00:02:08.185
+representation before emission.
+
+60
+00:02:08.505 --> 00:02:10.929
+JavaScript, TypeScript, and Go backends
+
+61
+00:02:10.929 --> 00:02:13.207
+consume checked meaning, rather than
+
+62
+00:02:13.207 --> 00:02:15.631
+independently guessing it from source
+
+63
+00:02:15.631 --> 00:02:16.219
+spelling.
+
+64
+00:02:17.489 --> 00:02:19.801
+The intermediate representation is a
+
+65
+00:02:19.801 --> 00:02:21.553
+useful contributor landmark.
+
+66
+00:02:21.873 --> 00:02:24.712
+It distinguishes pure calls, synchronous
+
+67
+00:02:24.712 --> 00:02:27.469
+calls, and runtime calls that may suspend.
+
+68
+00:02:27.789 --> 00:02:30.162
+Those stages affect when work happens,
+
+69
+00:02:30.162 --> 00:02:32.017
+even when two signatures look
+
+70
+00:02:32.017 --> 00:02:33.500
+superficially similar.
+
+71
+00:02:33.820 --> 00:02:36.345
+The checker also records dictionary
+
+72
+00:02:36.345 --> 00:02:38.789
+arguments, resolved identities, and
+
+73
+00:02:38.789 --> 00:02:39.522
+coercions.
+
+74
+00:02:39.842 --> 00:02:42.252
+Lowering carries that information forward.
+
+75
+00:02:42.572 --> 00:02:44.985
+Optimization must preserve evaluation
+
+76
+00:02:44.985 --> 00:02:46.830
+order and observable failures.
+
+77
+00:02:47.150 --> 00:02:49.225
+You can remember this boundary as
+
+78
+00:02:49.225 --> 00:02:51.596
+decisions made once, then represented
+
+79
+00:02:51.596 --> 00:02:53.449
+explicitly for every backend.
+
+80
+00:02:54.719 --> 00:02:57.350
+A real project adds context around that
+
+81
+00:02:57.350 --> 00:02:57.969
+pipeline.
+
+82
+00:02:58.289 --> 00:03:00.864
+The Host interface supplies source access
+
+83
+00:03:00.864 --> 00:03:03.081
+and plugin access without making the
+
+84
+00:03:03.081 --> 00:03:05.442
+compiler core open native files itself.
+
+85
+00:03:05.762 --> 00:03:08.115
+Native commands combine manifests,
+
+86
+00:03:08.115 --> 00:03:10.861
+dependencies, and source roots through a
+
+87
+00:03:10.861 --> 00:03:11.959
+filesystem host.
+
+88
+00:03:12.279 --> 00:03:14.568
+Editor analysis can overlay unsaved
+
+89
+00:03:14.568 --> 00:03:16.783
+buffers on those same project rules.
+
+90
+00:03:17.103 --> 00:03:19.426
+One important distinction follows:
+
+91
+00:03:19.426 --> 00:03:22.291
+single-file checking can trust unavailable
+
+92
+00:03:22.291 --> 00:03:24.924
+imports, while project checking follows
+
+93
+00:03:24.924 --> 00:03:25.699
+interfaces.
+
+94
+00:03:26.019 --> 00:03:27.937
+Use the project entry point when
+
+95
+00:03:27.937 --> 00:03:30.565
+investigating an actual application build.
+
+96
+00:03:31.835 --> 00:03:34.317
+Runtime selection is a separate decision,
+
+97
+00:03:34.317 --> 00:03:36.523
+and the current defaults deserve care.
+
+98
+00:03:36.843 --> 00:03:39.479
+Native projects select Flick's own runtime
+
+99
+00:03:39.479 --> 00:03:40.138
+by default.
+
+100
+00:03:40.458 --> 00:03:42.918
+The browser compiler explicitly selects
+
+101
+00:03:42.918 --> 00:03:44.535
+the Effect adapter instead.
+
+102
+00:03:44.855 --> 00:03:47.153
+Go output uses its own whole-program
+
+103
+00:03:47.153 --> 00:03:48.456
+emitter and runtime.
+
+104
+00:03:48.776 --> 00:03:51.309
+The optional adapter also supports shaped
+
+105
+00:03:51.309 --> 00:03:53.280
+foreign crossings, but it is not a
+
+106
+00:03:53.280 --> 00:03:55.672
+promise that every external capability
+
+107
+00:03:55.672 --> 00:03:56.728
+works everywhere.
+
+108
+00:03:57.048 --> 00:03:59.541
+Follow the configured backend and the
+
+109
+00:03:59.541 --> 00:04:02.268
+binding policy together, especially when
+
+110
+00:04:02.268 --> 00:04:04.606
+debugging cancellation, cleanup, or
+
+111
+00:04:04.606 --> 00:04:05.619
+foreign values.
+
+112
+00:04:06.889 --> 00:04:09.762
+The language surface mostly lives in Flick
+
+113
+00:04:09.762 --> 00:04:12.475
+libraries, not only in Rust compiler code.
+
+114
+00:04:12.795 --> 00:04:15.403
+Core modules provide foundational data and
+
+115
+00:04:15.403 --> 00:04:16.743
+language definitions.
+
+116
+00:04:17.063 --> 00:04:19.112
+The standard library builds out
+
+117
+00:04:19.112 --> 00:04:21.540
+application areas such as networking,
+
+118
+00:04:21.540 --> 00:04:23.665
+reactive interfaces, and command
+
+119
+00:04:23.665 --> 00:04:24.576
+descriptions.
+
+120
+00:04:24.896 --> 00:04:27.229
+First-party plugins expand structured
+
+121
+00:04:27.229 --> 00:04:28.997
+declarations for those areas.
+
+122
+00:04:29.317 --> 00:04:31.707
+Their current heads are visible here, but
+
+123
+00:04:31.707 --> 00:04:33.956
+the pattern is more important than the
+
+124
+00:04:33.956 --> 00:04:36.276
+list: packages and plugins own reusable
+
+125
+00:04:36.276 --> 00:04:38.595
+application behavior, while the shared
+
+126
+00:04:38.595 --> 00:04:40.704
+compiler coordinates checking and
+
+127
+00:04:40.704 --> 00:04:42.391
+generated-source locations.
+
+128
+00:04:43.661 --> 00:04:46.046
+The browser tools show these boundaries in
+
+129
+00:04:46.046 --> 00:04:46.576
+practice.
+
+130
+00:04:46.896 --> 00:04:49.362
+Flick owns interactive state and event
+
+131
+00:04:49.362 --> 00:04:52.127
+policies, while TypeScript handles browser
+
+132
+00:04:52.127 --> 00:04:54.144
+and compiler interoperability.
+
+133
+00:04:54.464 --> 00:04:56.908
+A persistent compiler worker retains a
+
+134
+00:04:56.908 --> 00:04:59.421
+WebAssembly session as the source changes.
+
+135
+00:04:59.741 --> 00:05:02.306
+Running the result is separate: ordinary
+
+136
+00:05:02.306 --> 00:05:04.720
+programs use a disposable worker, and
+
+137
+00:05:04.720 --> 00:05:07.436
+interface previews use a sandboxed frame.
+
+138
+00:05:07.756 --> 00:05:09.423
+Shared code is checked without
+
+139
+00:05:09.423 --> 00:05:10.961
+automatically executing it.
+
+140
+00:05:11.281 --> 00:05:13.616
+This diagram describes source-level
+
+141
+00:05:13.616 --> 00:05:16.176
+architecture, not a live browser test or
+
+142
+00:05:16.176 --> 00:05:17.909
+a security certification.
+
+143
+00:05:19.179 --> 00:05:21.214
+How does the project check its own
+
+144
+00:05:21.214 --> 00:05:21.650
+claims?
+
+145
+00:05:21.970 --> 00:05:24.292
+Independent fixtures state expected
+
+146
+00:05:24.292 --> 00:05:24.873
+behavior.
+
+147
+00:05:25.193 --> 00:05:27.572
+A separate Rust reference model provides
+
+148
+00:05:27.572 --> 00:05:29.290
+another checker and evaluator.
+
+149
+00:05:29.610 --> 00:05:31.987
+Lean developments establish results for
+
+150
+00:05:31.987 --> 00:05:34.025
+stated mathematical contracts and
+
+151
+00:05:34.025 --> 00:05:34.772
+assumptions.
+
+152
+00:05:35.092 --> 00:05:37.837
+These are complementary forms of evidence,
+
+153
+00:05:37.837 --> 00:05:39.667
+not interchangeable badges.
+
+154
+00:05:39.987 --> 00:05:41.893
+A theorem about the model does not
+
+155
+00:05:41.893 --> 00:05:44.193
+prove the production compiler or runtime
+
+156
+00:05:44.193 --> 00:05:44.653
+correct.
+
+157
+00:05:44.973 --> 00:05:47.421
+Semantic changes therefore require an
+
+158
+00:05:47.421 --> 00:05:49.942
+explicit decision about model and proof
+
+159
+00:05:49.942 --> 00:05:52.093
+impact, alongside implementation
+
+160
+00:05:52.093 --> 00:05:54.614
+regressions and relevant backend tests.
+
+161
+00:05:55.884 --> 00:05:58.117
+The measured checkout is substantial and
+
+162
+00:05:58.117 --> 00:05:59.648
+deliberately multilingual.
+
+163
+00:05:59.968 --> 00:06:02.199
+Rust implements the compiler, Flick
+
+164
+00:06:02.199 --> 00:06:04.653
+implements libraries and interactive
+
+165
+00:06:04.653 --> 00:06:07.331
+application code, and TypeScript connects
+
+166
+00:06:07.331 --> 00:06:09.265
+execution and browser systems.
+
+167
+00:06:09.585 --> 00:06:12.165
+Go supplies another runtime, while Lean
+
+168
+00:06:12.165 --> 00:06:13.651
+states formal results.
+
+169
+00:06:13.971 --> 00:06:16.125
+This snapshot contains roughly four
+
+170
+00:06:16.125 --> 00:06:18.488
+hundred thousand physical source lines.
+
+171
+00:06:18.808 --> 00:06:21.154
+The chart shows the largest language
+
+172
+00:06:21.154 --> 00:06:23.500
+groups, including tests and fixtures.
+
+173
+00:06:23.820 --> 00:06:26.243
+These are inventory measurements, not
+
+174
+00:06:26.243 --> 00:06:28.894
+performance results, execution coverage,
+
+175
+00:06:28.894 --> 00:06:31.167
+or a claim that the current working
+
+176
+00:06:31.167 --> 00:06:31.924
+tree builds.
+
+177
+00:06:33.194 --> 00:06:35.919
+Finally, choose a contributor entry point
+
+178
+00:06:35.919 --> 00:06:38.039
+by the contract you want to change.
+
+179
+00:06:38.359 --> 00:06:40.686
+Syntax work reaches formatting,
+
+180
+00:06:40.686 --> 00:06:43.100
+diagnostics, and editor grammars.
+
+181
+00:06:43.420 --> 00:06:45.588
+Runtime work reaches cancellation and
+
+182
+00:06:45.588 --> 00:06:46.704
+resource ownership.
+
+183
+00:06:47.024 --> 00:06:49.576
+Project work reaches package resolution
+
+184
+00:06:49.576 --> 00:06:51.180
+and artifact publication.
+
+185
+00:06:51.500 --> 00:06:54.063
+Reproduce behavior, add an independently
+
+186
+00:06:54.063 --> 00:06:56.553
+expected regression, then run the checks
+
+187
+00:06:56.553 --> 00:06:57.652
+for that boundary.
+
+188
+00:06:57.972 --> 00:07:00.519
+The useful mental model is one shared
+
+189
+00:07:00.519 --> 00:07:03.395
+compiler, explicit execution choices, and
+
+190
+00:07:03.395 --> 00:07:05.531
+contracts carried across both.
+
+191
+00:07:05.851 --> 00:07:08.318
+This overview reflects a dirty source
+
+192
+00:07:08.318 --> 00:07:11.083
+snapshot; executable validation remains a
+
+193
+00:07:11.083 --> 00:07:11.980
+separate task.
+

@@ -65,14 +65,14 @@ test("checked BigInt division keeps a zero divisor as an arithmetic error", () =
   if (result._tag === "Failure") assert.equal(result.failure._0, "division by zero");
 });
 
+import policy from "../../packages/effect-ts/compiler-bindings.json" with { type: "json" };
+
 const repo = new URL("../../", import.meta.url);
 const read = (path: string): string => readFileSync(new URL(path, repo), "utf8");
 
-/** The built-in modules a build without effects may use, as the compiler lists them. */
+/** Package-owned declarations used by a build without effects. */
 const builtins = (): Array<string> => {
-  const list = /const BUILTINS: &\[&str\] = &\[([^\]]*)\]/.exec(read("flick-core/src/build/effects.rs"));
-  assert.ok(list, "`BUILTINS` in build/effects.rs");
-  return [...(list[1] ?? "").matchAll(/"([\w.]+)"/g)].map((m) => m[1] ?? "");
+  return policy.core_builtins;
 };
 
 /** The source of a built-in module: of the core package, else of std. */
@@ -127,7 +127,7 @@ test("core has every runtime helper compiled code calls", async () => {
 
 test("the compiler's RT export map names real runtime exports", async () => {
   execFileSync(process.execPath, ["tools/rt-exports.mjs", "--check"], { cwd: fileURLToPath(repo) });
-  const entries = read("flick-core/src/build/rt_exports.txt")
+  const entries = read("runtime/rt_exports.txt")
     .trim()
     .split("\n")
     .map((line) => {

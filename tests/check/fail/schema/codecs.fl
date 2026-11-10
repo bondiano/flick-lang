@@ -98,3 +98,14 @@ let bad_port = Port.parse 70000
 
 good_port : Result SchemaError Port
 let good_port = Port.parse 8080
+
+refined type Impossible = Float where fun n -> n > 0.0 && 1n == 2n
+
+impossible : Result SchemaError Impossible
+let impossible = Impossible.parse 3.0
+//                                ^^^ FLICK-D006 fails the check of `Impossible`
+
+refined type Possible = Float where fun n -> n > 0.0 && 1n < 2n
+
+possible : Result SchemaError Possible
+let possible = Possible.parse 4.0

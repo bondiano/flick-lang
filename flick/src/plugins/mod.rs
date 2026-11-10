@@ -176,6 +176,14 @@ impl Expander for Traced {
         self.inner.check(block, state, facts)
     }
 
+    fn check_structure(
+        &self,
+        block: &Block,
+        facts: &flick_plugin::Structure,
+    ) -> Result<Vec<Diagnostic>, String> {
+        self.inner.check_structure(block, facts)
+    }
+
     fn check_calls(&self, calls: &[CallSite], state: &[u8]) -> Result<Vec<Diagnostic>, String> {
         self.trace(&format!("check-calls {} {}", self.inner.id(), calls.len()));
         self.inner.check_calls(calls, state)

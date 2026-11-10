@@ -10,6 +10,7 @@ use super::bridge::Toward;
 use super::{Gen, names};
 #[cfg(not(target_arch = "wasm32"))]
 use crate::build::effects::{effect_specifier, selected_on_kernel};
+use crate::build::{bindings, effects::belongs_to};
 use crate::codegen::Options;
 use crate::ir::Copies;
 use crate::ir::{Foreign, ForeignMode, Item, ItemKind};
@@ -26,12 +27,9 @@ fn copies(f: &Foreign) -> Option<&Copies> {
 }
 
 fn trusted_runtime_package(spec: &str) -> bool {
-    ["@flick-lang/runtime", "@flick-lang/effect-ts"]
+    bindings::PACKAGES
         .iter()
-        .any(|package| {
-            spec.strip_prefix(package)
-                .is_some_and(|rest| rest.is_empty() || rest.starts_with('/'))
-        })
+        .any(|package| belongs_to(spec, package))
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -66,12 +64,11 @@ impl Gen<'_> {
                 bridged = true;
             }
             bridged |= self.kernel
-                && ((f.mode == ForeignMode::Effect && !spec.starts_with("@flick-lang/runtime"))
-                    || spec == "@flick-lang/effect-ts"
-                    || spec.starts_with("@flick-lang/effect-ts/"));
+                && ((f.mode == ForeignMode::Effect && !belongs_to(&spec, bindings::OWNED_PREFIX))
+                    || belongs_to(&spec, bindings::ADAPTER_PREFIX));
             bridged |= self.kernel
                 && self.options.effect_bridge.available()
-                && !spec.starts_with("@flick-lang/runtime")
+                && !belongs_to(&spec, bindings::OWNED_PREFIX)
                 && (f.adapter.shapes.iter().any(contains_eff)
                     || contains_eff(&f.adapter.result_shape));
             (spec, bridged)
@@ -315,8 +312,7 @@ pub(super) fn plain_foreigns(
                 if options.rt {
                     let source = f.binding.from.as_deref()?;
                     let spec = (options.foreign)(module, source);
-                    if spec == "@flick-lang/effect-ts"
-                        || spec.starts_with("@flick-lang/effect-ts/")
+                    if belongs_to(&spec, bindings::ADAPTER_PREFIX)
                         || !selected_on_kernel(&spec, &f.binding.name, options.effect_bridge)
                     {
                         return None;

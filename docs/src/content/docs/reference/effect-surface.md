@@ -57,7 +57,7 @@ cron = "cron expressions need a parser of their own"
 
 ## Linter
 
-`flick-core/tests/effect_surface.rs` fails, naming `Module.name` and why, on:
+`packages/effect-ts/tools/surface/tests/coverage.rs` fails, naming `Module.name` and why, on:
 
 - an export or entrypoint without a decision, or a decision for one that
   does not exist;

@@ -174,7 +174,7 @@ a `let` or a signature of the user's. A whole number is
 an integer literal, of any numeric type its use asks for; a declaration
 block whose group is empty declares nothing. A function in a
 plugin's code needs no signature: its type is inferred. The arena version is the version of the interface,
-`0.1.0`. Until Flick 0.2 the interface changes without a new version: build
+`0.2.0`. Build
 a component with the `flick-plugin` of the compiler it runs in. A component
 built for another version does not load: the import that exposes its heads
 is `FLICK-P035`, naming the version it was built for and the one the
@@ -217,8 +217,8 @@ them, with what the checker found there: the module and name applied, the
 span of the application, and for each argument where it is written, its
 type as `check` sees it and the constant it folds to, if any. A call of the
 `parse` of a refined type also carries how its check reads that constant:
-the literals of an enum, a check the compiler knows by name, or the
-compiler's verdict on the module's own predicate. Every span is of the
+the literals of an enum, or the syntax and resolved references of the
+module's own predicate. The plugin interprets those facts. Every span is of the
 module's own file, inside a block as well as outside one, so a diagnostic
 comes back at the code the user wrote.
 
@@ -525,3 +525,9 @@ built-in module the file hides by an alias, as `import Other as List`, is
 hidden from generated code too. `collect` sees the modules the run loads, so `flick check one.fl` gives it
 fewer blocks than a whole build. A package whose modules have plugin blocks
 is checked again in each build.
+
+### Source checks and refined predicates
+
+`check-structure` receives the structure of a block's original expression and declaration holes, together with the project's lint thresholds. It can report warnings without type wildcards. Generated wrappers do not contribute to these facts. The UI plugin uses it for T036–T038 on `component`.
+
+A refined call carries enum literals or an expression arena with resolved references. The refined plugin recognizes `Checks.*` and evaluates supported local predicates; an unknown result remains a runtime check. The host supplies no predicate verdict. Protocol 0.2.0 changes the WIT interface and invalidates expansion caches; rebuild external plugins with the matching SDK.

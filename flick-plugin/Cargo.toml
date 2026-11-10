@@ -17,5 +17,5 @@ guest = ["dep:wit-bindgen"]
 
 [dependencies]
 flick-plugin-macros = { path = "macros" }
-serde = { version = "1.0.229", features = ["derive"] }
+serde = { version = "1.0.229", features = ["derive", "rc"] }
 wit-bindgen = { version = "0.63.0", optional = true }

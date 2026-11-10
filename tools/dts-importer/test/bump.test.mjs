@@ -35,7 +35,7 @@ test("effect-bump reports the change, writes the snapshot and moves the pins", (
     ].join("\n"),
   );
   const written = readFileSync(path.join(root, "stdlib/Effect/snapshot.json"), "utf8");
-  // the coverage linter's fixture: `flick-core/tests/effect_surface.rs` lints it red
+  // the coverage linter's fixture: `packages/effect-ts/tools/surface/tests/coverage.rs` lints it red
   assert.equal(written, readFileSync(path.join(fixtures, "effect-1.1.0.snapshot.json"), "utf8"));
   const pins = {
     "packages/effect-ts/package.json": '"effect": "1.1.0"',

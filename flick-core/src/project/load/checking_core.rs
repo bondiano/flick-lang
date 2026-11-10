@@ -279,7 +279,7 @@ impl Checking<'_> {
         );
         // what the plugins find from the types of their code stops lowering too
         if let Some(expansion) = &loaded.expansion {
-            checked.extend(expansion.check_blocks(&loaded.editing, &typing.wildcards));
+            checked.extend(expansion.check_blocks(&loaded.editing, &typing.wildcards, options.thresholds));
         }
         checked.extend(self.watched_calls(loaded, &typing));
         let checked = types::beside_syntax_errors(tree, checked);

@@ -52,6 +52,7 @@ pub(crate) use module_contract::{
     Mismatch as ModuleMismatch, check as check_module_contract,
     local_dictionaries as module_local_dictionaries, project as project_module_contract,
 };
+mod expression_fact;
 mod origin;
 mod patterns;
 mod qualified;
@@ -60,7 +61,6 @@ mod ranges;
 mod records;
 mod recursion;
 mod redundant;
-mod refined;
 mod regions;
 mod report;
 mod route_template;

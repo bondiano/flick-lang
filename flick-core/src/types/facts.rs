@@ -3,13 +3,14 @@
 //! its `check-calls` reads of the places of the module that call a name its
 //! package watches.
 
-use std::mem;
+use std::{collections::HashMap, mem};
 
-use flick_plugin::{Argument, CallSite, Constant, Fact, FactField, FactType, Refinement, Span};
+use flick_plugin::{
+    Argument, CallSite, Constant, ExpressionFact, Fact, FactField, FactType, Refinement, Span,
+};
 
 use super::Checker;
 use super::env::{Abi, EnumLit, Form};
-use super::refined;
 use super::ty::Type;
 use crate::consteval::Const;
 use crate::source::Span as SourceSpan;
@@ -108,6 +109,7 @@ impl Checker<'_> {
     /// the solved module has them.
     pub(super) fn record_call_sites(&mut self) {
         let calls = mem::take(&mut self.calls);
+        let mut predicates = HashMap::new();
         let sites = (calls.iter())
             .map(|call| {
                 let arguments = (call.args.iter())
@@ -126,7 +128,7 @@ impl Checker<'_> {
                     name: call.name.clone(),
                     span: span_of(call.span),
                     arguments,
-                    refinement: self.refinement(call),
+                    refinement: self.refinement(call, &mut predicates),
                     binding: None,
                 }
             })
@@ -135,11 +137,15 @@ impl Checker<'_> {
     }
 
     /// How the refined type of a companion `T$parse` checks the constant the
-    /// call gives it: the literals of an enum, a check the compiler knows by
-    /// name, or its verdict on the module's own predicate.
-    fn refinement(&self, call: &PendingCall) -> Option<Refinement> {
+    /// call gives it: enum literals, or read-only syntax of the module's
+    /// own predicate. The plugin owns interpretation of that syntax.
+    fn refinement<'n>(
+        &self,
+        call: &'n PendingCall,
+        predicates: &mut HashMap<&'n str, ExpressionFact>,
+    ) -> Option<Refinement> {
         let ty = call.name.strip_suffix("$parse")?;
-        let constant = call.args.first().and_then(|(_, _, c)| c.as_ref())?;
+        call.args.first().and_then(|(_, _, c)| c.as_ref())?;
         // an enum's literals travel in its interface, an opaque one's too
         let literals = match self.env.type_def(&call.module, ty).map(|d| &d.form) {
             Some(Form::Adt {
@@ -160,16 +166,16 @@ impl Checker<'_> {
             return None;
         }
         let predicate = self.predicates.get(ty).copied()?;
-        if let Some(known) = self.known_check(predicate) {
-            return Some(Refinement::Known(known.to_owned()));
-        }
-        refined::holds(predicate, self.text, constant).map(Refinement::Holds)
+        let expression = predicates
+            .entry(ty)
+            .or_insert_with(|| self.expression_fact(predicate));
+        Some(Refinement::Predicate(expression.clone()))
     }
 }
 
 /// The constant a plugin gets; a `BigInt` is none, as no check of the
 /// compiler's reads one.
-fn constant_of(c: &Const) -> Option<Constant> {
+pub(super) fn constant_of(c: &Const) -> Option<Constant> {
     match c {
         Const::Number(n) => Some(Constant::Number(*n)),
         Const::String(s) => Some(Constant::Text(s.clone())),

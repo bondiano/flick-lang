@@ -7,6 +7,7 @@ pub mod kind;
 pub mod lexer;
 pub mod literal;
 mod parser;
+pub(crate) mod structure;
 mod validate;
 
 pub use parser::{

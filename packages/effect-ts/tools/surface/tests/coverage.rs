@@ -40,7 +40,7 @@ impl Host for Fs {
 }
 
 fn repo() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("..")
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../..")
 }
 
 fn files(dir: &Path, base: &Path, out: &mut Vec<(String, String)>) {

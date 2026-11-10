@@ -465,6 +465,19 @@ impl Expander for Wasm {
         Ok(result?.into_iter().map(convert::from_diagnostic).collect())
     }
 
+    fn check_structure(
+        &self,
+        block: &flick_plugin::Block,
+        facts: &flick_plugin::Structure,
+    ) -> Result<Vec<flick_plugin::Diagnostic>, String> {
+        let block = convert::to_block(block);
+        let facts = convert::to_structure(facts);
+        let (result, _) = self.run(BlockSource::default(), |plugin, store| {
+            plugin.call_check_structure(store, &block, &facts)
+        });
+        Ok(result?.into_iter().map(convert::from_diagnostic).collect())
+    }
+
     fn check_calls(
         &self,
         calls: &[flick_plugin::CallSite],

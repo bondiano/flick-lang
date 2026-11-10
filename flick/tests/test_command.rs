@@ -7,7 +7,7 @@ mod common;
 use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Output, Stdio};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, mpsc};
 use std::time::{Duration, Instant};
 use std::{fs, thread};
 
@@ -309,14 +309,16 @@ let tests =
   ]
 "#;
 
-/// Collects the child's stdout as it comes.
-fn collect(child: &mut Child) -> Arc<Mutex<String>> {
+/// Collects stdout as it comes and signals when its last writer closes it.
+fn collect(child: &mut Child) -> (Arc<Mutex<String>>, mpsc::Receiver<()>) {
     let out = Arc::new(Mutex::new(String::new()));
+    let (finished, closed) = mpsc::channel();
     let mut stdout = child.stdout.take().expect("piped");
     let sink = out.clone();
     thread::spawn(move || {
         let mut buf = [0u8; 256];
-        while let Ok(n) = stdout.read(&mut buf) {
+        loop {
+            let n = stdout.read(&mut buf).expect("read stdout");
             if n == 0 {
                 break;
             }
@@ -324,8 +326,10 @@ fn collect(child: &mut Child) -> Arc<Mutex<String>> {
                 .expect("lock")
                 .push_str(&String::from_utf8_lossy(&buf[..n]));
         }
+        drop(stdout);
+        let _ = finished.send(());
     });
-    out
+    (out, closed)
 }
 
 /// Waits up to a minute: each run of `flick test` compiles the project
@@ -358,7 +362,7 @@ fn watch_runs_again_after_the_previous_run_cleaned_up() {
         .stdout(Stdio::piped())
         .spawn()
         .expect("flick runs");
-    let out = collect(&mut child);
+    let (out, closed) = collect(&mut child);
     wait_for(&out, "acquired", 1);
     thread::sleep(Duration::from_millis(300));
     fs::write(
@@ -368,7 +372,12 @@ fn watch_runs_again_after_the_previous_run_cleaned_up() {
     .expect("write");
     let text = wait_for(&out, "acquired", 2);
     // the runner of the second run stops by itself: its stdin closes with the watcher
-    let _ = child.kill();
+    child.kill().expect("stop watcher");
+    child.wait().expect("wait for watcher");
+    closed
+        .recv_timeout(Duration::from_secs(10))
+        .expect("the runner exits after the watcher closes its stdin");
+    assert_eq!(out.lock().expect("lock").matches("released").count(), 2);
     let released = text
         .find("released")
         .expect("the first run released its resource");

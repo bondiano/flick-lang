@@ -58,8 +58,6 @@ rustPlatform.buildRustPackage {
     "--test"
     "corpus"
     "--test"
-    "effect_surface"
-    "--test"
     "features"
     "--test"
     "fuzz"
@@ -70,6 +68,10 @@ rustPlatform.buildRustPackage {
     "--test"
     "transformer_captures"
   ];
+
+  postCheck = ''
+    cargo test --offline --package flick-effect-surface --test coverage
+  '';
 
   meta = {
     description = "Compiler and language server for the Flick language";
