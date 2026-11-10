@@ -1,5 +1,5 @@
 //! The rules of `docs/formal/core.md` §2.3 that are not handlers: (Var),
-//! (Lam), (App), the `let`s, records and fields, with (Sub) where an
+//! (Lam), (App), records and fields (the `let`s are `bindings.rs`), with (Sub) where an
 //! expression meets the type it is checked against. Γ₀ (§1.5) is
 //! `constant`.
 
@@ -189,7 +189,12 @@ impl Checker<'_> {
     }
 
     /// (Let-Sig) against `(∀ᾱ. τ)^C`: the value has `τ^C`.
-    fn check_qualified_forall(&mut self, e: &Term, s: &Scheme, qualifier: Caps) -> Check<()> {
+    pub(super) fn check_qualified_forall(
+        &mut self,
+        e: &Term,
+        s: &Scheme,
+        qualifier: Caps,
+    ) -> Check<()> {
         let (facts, givens) = (self.regions.facts.len(), self.givens());
         let mut body = self.skolemize(s);
         if !qualifier.is_empty() {
@@ -321,102 +326,6 @@ impl Checker<'_> {
                 ),
             ),
         }
-    }
-
-    /// (Let-Gen), (Let-Mono) and (Let-Sig).
-    fn let_(
-        &mut self,
-        x: &Name,
-        sig: Option<&Scheme>,
-        e1: &Term,
-        e2: &Term,
-        expected: Option<&Type>,
-    ) -> Check<Type> {
-        let s = if let Some(s) = sig {
-            let s = self.local_signature(&self.live_scheme(s));
-            let (bare, qualifier) = match &s.body {
-                Type::Captured(t, c) => ((**t).clone(), c.clone()),
-                t => (t.clone(), Caps::default()),
-            };
-            let bare = Scheme {
-                body: bare,
-                ..s.clone()
-            };
-            self.check_qualified_forall(e1, &bare, qualifier)?;
-            s
-        } else {
-            self.level += 1;
-            let outer = mem::replace(&mut self.stage, Stage::Pure);
-            let t1 = self.infer(e1);
-            let inner = mem::replace(&mut self.stage, outer);
-            self.level -= 1;
-            let t1 = t1?;
-            if inner == Stage::Pure {
-                self.generalize(&t1)
-            } else {
-                // the result of a runtime step is not generalized, by a
-                // later `let` either
-                self.perform(&inner)?;
-                self.lower(&t1, self.level);
-                mono(t1)
-            }
-        };
-        self.body(x, s, e2, expected)
-    }
-
-    fn body(&mut self, x: &Name, s: Scheme, e2: &Term, expected: Option<&Type>) -> Check<Type> {
-        self.locals.push((x.clone(), s));
-        let t = match expected {
-            Some(t) => self.check(e2, t).map(|()| t.clone()),
-            None => self.infer(e2),
-        };
-        self.locals.pop();
-        t
-    }
-
-    /// A local signature of a function: its own qualifier is inferred, a
-    /// fresh capture row, unless written (`regions.md` §2.6, `docs/formal/regions.md#local-signatures-infer-only-the-outer-qualifier`).
-    fn local_signature(&mut self, s: &Scheme) -> Scheme {
-        let s = &self.in_scopes(s);
-        match &s.body {
-            Type::Fun(..) => {
-                let q = self.fresh_caps();
-                Scheme {
-                    body: Type::Captured(Rc::new(s.body.clone()), q),
-                    ..s.clone()
-                }
-            }
-            _ => s.clone(),
-        }
-    }
-
-    /// (Let-Rec): without a signature the recursive calls are monomorphic.
-    pub(super) fn let_rec(
-        &mut self,
-        f: &Name,
-        sig: Option<&Scheme>,
-        lam: &Term,
-        e2: &Term,
-        expected: Option<&Type>,
-    ) -> Check<Type> {
-        let s = if let Some(s) = sig {
-            let s = &self.in_scopes(&self.live_scheme(s));
-            self.locals.push((f.clone(), s.clone()));
-            let checked = self.check_forall(lam, s);
-            self.locals.pop();
-            checked?;
-            s.clone()
-        } else {
-            self.level += 1;
-            let t = self.fresh();
-            self.locals.push((f.clone(), mono(t.clone())));
-            let inferred = self.infer(lam);
-            self.locals.pop();
-            self.level -= 1;
-            self.unify(&t, &inferred?)?;
-            self.generalize(&t)
-        };
-        self.body(f, s, e2, expected)
     }
 
     /// (Rec): distinct labels, an exact record.

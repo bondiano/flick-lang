@@ -14,6 +14,7 @@
 //! which the translation never makes, are typed in `runtime.rs`, so that
 //! Preservation can be checked on the states of the machine (the model properties, `just model`).
 
+mod bindings;
 mod constants;
 mod dicts;
 mod expr;

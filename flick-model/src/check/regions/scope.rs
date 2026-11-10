@@ -111,6 +111,15 @@ impl Checker<'_> {
         Ok(t)
     }
 
+    /// The names the `scope`s around bind to their regions, for the work of
+    /// a region `Λ` types: the ones before.
+    pub(in crate::check) fn rename_scopes(
+        &mut self,
+        names: Vec<(Name, Name)>,
+    ) -> Vec<(Name, Name)> {
+        mem::replace(&mut self.regions.renamed, names)
+    }
+
     /// A signature written in the body of `scope`s: the regions it names
     /// are theirs.
     pub(in crate::check) fn in_scopes(&self, s: &Scheme) -> Scheme {

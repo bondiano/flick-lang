@@ -19,7 +19,10 @@ fn unit() -> Type {
 }
 
 fn handle(s: &str) -> Type {
-    Type::app(Type::con("Gen", "Handle"), Type::Var(Var::Named(s.into())))
+    Type::app(
+        Type::con("Fixture", "Handle"),
+        Type::Var(Var::Named(s.into())),
+    )
 }
 
 fn acquire() -> Term {

@@ -15,6 +15,8 @@ use crate::syntax::{Const, Env, Name, Path, RegionOp, Term};
 /// What `Λ` keeps of a region `π`.
 #[derive(Clone, Debug)]
 pub struct Region {
+    /// The name its `scope` binds, which the signatures of its work write.
+    pub name: Name,
     pub live: bool,
     /// The region it was made in, which closes after it (L5).
     pub parent: Option<usize>,
@@ -118,6 +120,7 @@ impl Machine<'_> {
     pub(super) fn open_scope(&mut self, s: Name, body: &Term) -> Control {
         let pi = self.lambda.regions.len();
         self.lambda.regions.push(Region {
+            name: s.clone(),
             live: true,
             parent: self.owner(),
             finalizers: Vec::new(),

@@ -3,10 +3,12 @@
 
 use std::rc::Rc;
 
+use super::classes::{annotated, is_dict};
 use super::holes::{cast, opaque_field, reshape, widen};
 use super::regions::leak;
-use super::{Gen, Program, mono, unit};
+use super::{Gen, MODULE, Program, mono, string, unit};
 use crate::syntax::{Arm, Const, Head, Lit, Term};
+use crate::translate::instance;
 use crate::types::{Row, Scheme, Stage, Type};
 
 /// `p` changed as `choices` say: a subterm replaced by a closed term of
@@ -15,12 +17,14 @@ use crate::types::{Row, Scheme, Stage, Type};
 /// put at the head of a block, a qualifier or `Outlives` taken off a local
 /// signature (`regions.md` §4); or what would open a hole of TypeScript
 /// (`ts-holes.md` §2): a stage widened in a parameter or a cell, a record
-/// with a field more or fewer, a field of an opaque value, a cast.
+/// with a field more or fewer, a field of an opaque value, a cast; or a
+/// method at a type without an instance, a signature without its class
+/// constraint, a method's argument without its type.
 pub fn mutate(p: &Program, choices: &[u32]) -> Program {
     let mut g = Gen::new(choices);
     // the names a change makes are not the program's: a `scope` would shadow one
     g.names = 100_000;
-    let kind = g.pick(10);
+    let kind = g.pick(13);
     let mut at = g.pick(size(&p.term) + 1);
     let mut p = p.clone();
     if kind == 3 && at == 0 {
@@ -82,6 +86,29 @@ pub fn mutate(p: &Program, choices: &[u32]) -> Program {
             // call could take its head apart, so neither is cast
             (9, Term::Apply(Head::Const(_), _) | Term::Field(..) | Term::App(..)) => None,
             (9, _) => Some(cast(g, e)),
+            // a method at a type without an instance: `describe ("" : String)`
+            (10, Term::App(f, _)) if method(f) => Some(Term::app(
+                Term::Field(
+                    Rc::new(Term::Global(instance(MODULE, "Describe String"))),
+                    "describe".into(),
+                ),
+                annotated("m0", Term::Lit(Lit::String("".into())), &string()),
+            )),
+            // a signature without its constraint
+            (11, Term::Let(x, Some(s), rhs, rest)) => Some(Term::Let(
+                x.clone(),
+                Some(Rc::new(unconstrained(s)?)),
+                rhs.clone(),
+                rest.clone(),
+            )),
+            // the argument of a method without its type, which flick-core
+            // may not know (`FLICK-C002`, `by_design`)
+            (12, Term::App(f, a)) if method(f) => match &**a {
+                Term::Let(x, Some(_), arg, rest) if matches!(&**rest, Term::Var(y) if y == x) => {
+                    Some(Term::App(f.clone(), arg.clone()))
+                }
+                _ => None,
+            },
             _ => None,
         }
     };
@@ -90,6 +117,22 @@ pub fn mutate(p: &Program, choices: &[u32]) -> Program {
 }
 
 type Change<'a> = dyn FnMut(&Term, bool, &mut Gen) -> Option<Term> + 'a;
+
+/// Whether `f` is the method of a dictionary, as `describe` is.
+fn method(f: &Term) -> bool {
+    matches!(f, Term::Field(d, _) if is_dict(d))
+}
+
+/// `σ` without its first class constraint, if it has one.
+fn unconstrained(s: &Scheme) -> Option<Scheme> {
+    match &s.body {
+        Type::Fun(p, Stage::Pure, r) if matches!(&**p, Type::Dict(..)) => Some(Scheme {
+            body: (**r).clone(),
+            ..s.clone()
+        }),
+        _ => None,
+    }
+}
 
 /// `Ref.set (Ref.make 0) 1`: a closed step of `->{}`.
 fn runtime_step() -> Term {
@@ -242,10 +285,28 @@ fn rewrite(e: &Term, at: &mut usize, block: bool, g: &mut Gen, change: &mut Chan
     let mut go = |t: &Term, block: bool| Rc::new(rewrite(t, at, block, g, change));
     match e {
         Term::Lam(x, b) => Term::Lam(x.clone(), go(b, true)),
+        // a dictionary is no subterm of the source: flick-core resolves it
         Term::App(f, a) => {
-            let f = go(f, false);
-            Term::App(f, go(a, false))
+            let f2 = go(f, false);
+            let a = match &**a {
+                _ if is_dict(a) => a.clone(),
+                // the annotation of a method's argument fixes its dictionary:
+                // only what it annotates changes
+                Term::Let(x, sig, rhs, rest)
+                    if method(f) && matches!(&**rest, Term::Var(y) if y == x) =>
+                {
+                    Rc::new(Term::Let(
+                        x.clone(),
+                        sig.clone(),
+                        go(rhs, false),
+                        rest.clone(),
+                    ))
+                }
+                _ => go(a, false),
+            };
+            Term::App(f2, a)
         }
+        Term::Field(r, l) if is_dict(r) => Term::Field(r.clone(), l.clone()),
         // `(e : σ)`: its `e` is no block, its variable no subterm
         Term::Let(x, sig @ Some(_), rhs, rest) if matches!(&**rest, Term::Var(y) if y == x) => {
             Term::Let(x.clone(), sig.clone(), go(rhs, false), rest.clone())

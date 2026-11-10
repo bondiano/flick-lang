@@ -7,6 +7,7 @@
 //! Flick source: flick-core and the model judge one program.
 
 mod bind;
+mod classes;
 mod handle;
 mod holds;
 mod holes;
@@ -19,6 +20,7 @@ mod term;
 
 use std::rc::Rc;
 
+pub use classes::instances;
 pub use holds::holding;
 pub use leaks::leak_used;
 pub use mutate::mutate;
@@ -109,6 +111,17 @@ pub fn runs(p: &Program) -> bool {
     )
 }
 
+/// Where flick-core rejects what the rules accept, by design: a local
+/// function needs a signature (`FLICK-T004`, `core.md` §2.5, 6), and a type
+/// a class constraint leaves open is ambiguous (`FLICK-C002`), where the
+/// model's term names the dictionary.
+pub fn by_design(errors: &[String]) -> bool {
+    !errors.is_empty()
+        && errors
+            .iter()
+            .all(|e| e.starts_with("FLICK-T004") || e.starts_with("FLICK-C002"))
+}
+
 /// The program `choices` build.
 pub fn program(choices: &[u32]) -> Program {
     Gen::new(choices).program()
@@ -126,7 +139,9 @@ pub fn runnable(e: Term) -> Term {
     })
 }
 
-const MODULE: &str = "Gen";
+/// The module of `Gen.fl`: not `Gen`, a module of std, whose instances a
+/// module of the same name would not export.
+const MODULE: &str = "Fixture";
 
 /// The services of `Gen.fl`.
 const SERVICES: [&str; 2] = ["Log", "Counter"];

@@ -166,17 +166,29 @@ impl Checker<'_> {
             });
             let kids = r.children.iter().flat_map(|(f, t, _)| [f, t]);
             let outer = lambda.outlived_by(pi);
+            // the signatures of its work name the regions of the `scope`s
+            // around the place that registered it, outermost first
+            let names = outer
+                .iter()
+                .map(|p| (lambda.regions[*p].name.clone(), region_name(*p)));
+            let renamed = self.rename_scopes(names.collect());
             for t in fins.chain(kids) {
                 let stage = mem::replace(&mut self.stage, Stage::Pure);
-                self.infer(t)?;
+                let typed = self.infer(t);
                 self.stage = stage;
+                if let Err(e) = typed {
+                    self.rename_scopes(renamed);
+                    return Err(e);
+                }
                 if let Some(q) = reach(t, mem).difference(&outer).next() {
+                    self.rename_scopes(renamed);
                     return error(
                         "Λ",
                         format!("work of region π{pi} reaches π{q}, which may close first"),
                     );
                 }
             }
+            self.rename_scopes(renamed);
         }
         Ok(())
     }

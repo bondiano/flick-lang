@@ -927,6 +927,18 @@ let group () =
 
 Fixtures: the cases of `accepted.rs`; `flick-model/tests/live.rs` `live_on_std` lists the std values the model still cannot type.
 
+### The work of a region is typed with the names of its scopes
+
+- Symptom: `progress_and_preservation_hold` failed: a task spawned in `scope s1 { … }` whose local signature writes `(Unit ->{} Unit)^{s1}` did not type once it was a child in `Λ`: "this value holds {π0}, which `` does not allow".
+- Cause: the model's `⊢ Λ` (`check/runtime.rs` `lambda`) typed the children and finalizers of a region outside the `inside π s` that names `s` the region `π`, so the signature's `s1` was no region. A model incompleteness, on `main` too; the checker has no `Λ`.
+- Resolution, model: a region keeps the name its `scope` binds (`eval/regions.rs` `Region::name`), and its work is typed with the names of it and the regions around it. Fixture: `flick-model/tests/props.rs` `work_of_a_region_names_its_scope`.
+
+### A signature keeps its inferred qualifier when its let steps
+
+- Symptom: `progress_and_preservation_hold` failed: `v4 : Unit ->{} Unit` uses a region of its `scope`, and once its `let` stepped to `fix v4. λx. …` (`core.md` §3.6) in a child, the child did not type.
+- Cause: the model's (Let-Sig) infers the outer qualifier of a local signature ([local signatures infer only the outer qualifier](#local-signatures-infer-only-the-outer-qualifier)), its (Let-Rec), which also types `fix`, read the signature bare. A model incompleteness, not of the checker.
+- Resolution, model: both check against the signature with its outer qualifier inferred (`check/bindings.rs` `signed`). Fixture: `flick-model/tests/props.rs` `a_stepped_signature_keeps_its_qualifier`.
+
 ### Rules of typing by use found while porting
 
 - An instance method without a signature is checked against the class signature, elided before the instance arguments are substituted (`tests/check/pass/regions/instance_elided.fl`); a signature an instance method writes does not add the `Live` its own arrows would need (`tests/check/fail/regions/instance_signature.fl`).
