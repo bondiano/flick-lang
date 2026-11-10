@@ -1,7 +1,7 @@
 /** Exercise facts and browser checks; Flick owns the lesson UI and its state. */
 import { evaluateExercise } from "./exercise.ts";
 import { lessonData } from "./dom.ts";
-import { check, compile, run } from "./compiler.ts";
+import { check, compileExercise, run } from "./compiler.ts";
 
 export const checkLesson = async (source: string): Promise<string> => {
   const controller = new AbortController();
@@ -11,7 +11,7 @@ export const checkLesson = async (source: string): Promise<string> => {
     if (!exercise) return "failed";
     return await evaluateExercise(exercise.check, {
       check: () => check(source, controller.signal),
-      compile: () => compile(source, "debug", controller.signal),
+      compile: () => compileExercise(source, controller.signal),
       run: async () => {
         const execution = await run(source, "debug", controller.signal);
         return { ...execution, code: Number(execution.detail) };

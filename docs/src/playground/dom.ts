@@ -1,3 +1,4 @@
+import { lessonConfiguration } from "./lesson-config.ts";
 import type { Exercise } from "../../exercises/load.ts";
 import type { Configuration } from "./State.fl";
 
@@ -28,12 +29,7 @@ export const configuration = (): Configuration => {
     examples,
     lesson: exercise !== undefined,
     solution: exercise?.solution ?? "",
-    lesson_title: exercise?.title ?? "",
-    lesson_title_ru: exercise?.title_ru ?? "",
-    lesson_task: exercise?.task ?? "",
-    lesson_task_ru: exercise?.task_ru ?? "",
-    lesson_hint_text: exercise?.hint ?? "",
-    lesson_hint_text_ru: exercise?.hint_ru ?? "",
+    ...lessonConfiguration(exercise),
     done,
   };
 };

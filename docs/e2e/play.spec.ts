@@ -7,6 +7,14 @@ const ready = async (page: Page): Promise<void> => {
   await expect(page.locator(".fp-cm .cm-content")).toBeVisible();
 };
 
+/** Replace the native editor contents through CodeMirror's normal input path. */
+const replaceSource = async (page: Page, source: string): Promise<void> => {
+  await page.locator(".cm-content").click();
+  await page.keyboard.press("ControlOrMeta+End");
+  await page.keyboard.press("ControlOrMeta+a");
+  await page.keyboard.insertText(source);
+};
+
 /** Moves the pointer onto the first `word` in the editor's line that holds `line`. */
 const hoverWord = async (page: Page, line: string, word: string): Promise<void> => {
   const box = await page.locator(".cm-line", { hasText: line }).first().evaluate((element, word) => {
@@ -237,10 +245,7 @@ for (const locale of ["en", "ru"]) {
     await expect(lesson).toContainText(ru ? "Сначала исправьте ошибки" : "Fix the compiler errors");
     await page.getByRole("button", { name: ru ? "Показать решение" : "Show solution" }).click();
     await expect(lesson).not.toContainText(ru ? "Урок пройден" : "Lesson completed");
-    await page.locator(".cm-content").click();
-    await page.keyboard.press("ControlOrMeta+End");
-    await page.keyboard.press("ControlOrMeta+a");
-    await page.keyboard.insertText('module Main exposing (main, size_of)\n\nsize_of : String -> Int\nlet size_of text = String.length text\n\nmain : Unit ->{} Unit\nlet main () = Platform.stdout_line "5"\n');
+    await replaceSource(page, 'module Main exposing (main, size_of)\n\nsize_of : String -> Int\nlet size_of text = String.length text\n\nmain : Unit ->{} Unit\nlet main () = Platform.stdout_line "5"\n');
     await check.click();
     await expect(lesson).toContainText(ru ? "Вывод не совпадает" : "The output does not match");
     await page.getByRole("button", { name: ru ? "Показать решение" : "Show solution" }).click();
@@ -254,3 +259,18 @@ for (const locale of ["en", "ru"]) {
     await expect(page.locator(".cm-content")).toContainText("size_of : Int -> Int");
   });
 }
+
+test("exercise checks resolve a re-export through the worker declaration graph", async ({ page }) => {
+  await page.goto("/flick-lang/tour/signatures/");
+  await ready(page);
+  await page.evaluate(() => {
+    const element = document.getElementById("flick-lesson");
+    if (!element) throw new Error("missing exercise contract");
+    const exercise = JSON.parse(element.textContent ?? "{}");
+    exercise.check.export = "length";
+    element.textContent = JSON.stringify(exercise);
+  });
+  await replaceSource(page, 'module Main exposing (main, length)\nimport String exposing (length)\nmain : Unit ->{} Unit\nlet main () = Platform.stdout_line (show (length "Flick"))\n');
+  await page.getByRole("button", { name: "Check answer" }).click();
+  await expect(page.locator(".fp-lesson")).toContainText("Correct. The signature and output match.");
+});

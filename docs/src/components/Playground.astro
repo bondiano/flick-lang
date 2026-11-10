@@ -1,4 +1,5 @@
 ---
+import { lessonConfiguration } from "../playground/lesson-config.ts";
 import "../styles/playground.css";
 import { loadExercise } from "../../exercises/load.ts";
 import { Effect } from "@flick-lang/effect-ts";
@@ -19,12 +20,7 @@ const solution = exercise?.solution ?? "";
 const gallery = lesson ? [{ id: "lesson", group: "Lesson", group_ru: "Урок", name: "Starter", name_ru: "Начало", source: starter }] : examples();
 const configuration = {
   locale, examples: gallery, lesson: Boolean(exercise), solution, done: false,
-  lesson_title: exercise?.title ?? "",
-  lesson_title_ru: exercise?.title_ru ?? "",
-  lesson_task: exercise?.task ?? "",
-  lesson_task_ru: exercise?.task_ru ?? "",
-  lesson_hint_text: exercise?.hint ?? "",
-  lesson_hint_text_ru: exercise?.hint_ru ?? "",
+  ...lessonConfiguration(exercise),
 };
 const markup = renderToString(uiRenderStatic(await Effect.runPromise(initial_view(configuration))));
 // the browser reads the same examples back; `<` cannot end the script early

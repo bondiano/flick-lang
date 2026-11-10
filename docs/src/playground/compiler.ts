@@ -120,6 +120,10 @@ export const check = (source: string, signal: AbortSignal): Promise<Array<Diagno
 export const compile = (source: string, profile: string, signal: AbortSignal): Promise<Generated> =>
   request<Generated>({ action: "compile", source, profile }, signal);
 
+/** Declaration graph is requested only for explicit exercise checks. */
+export const compileExercise = (source: string, signal: AbortSignal): Promise<Generated> =>
+  request<Generated>({ action: "compile", source, profile: "debug", declarations: true }, signal);
+
 /**
  * Markdown as plain text: a code block keeps its lines without its fences,
  * and the lines of a paragraph, which the compiler wraps, join.

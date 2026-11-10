@@ -205,3 +205,28 @@ fn what_the_dts_leaves_out_is_kept_apart() {
         "{emitted}"
     );
 }
+
+#[test]
+fn reexport_declarations_are_available_on_demand() {
+    let session = session(
+        "module Main exposing (main, length)\nimport String exposing (length)\nmain : Unit ->{} Unit\nlet main () = Platform.stdout_line (show (length \"Flick\"))\n",
+    );
+    let emitted = json(&session.emit_declarations("debug"));
+    assert_eq!(emitted["declaration_entry"], "Main.d.ts");
+    assert!(
+        emitted["dts"]
+            .as_str()
+            .expect("entry declarations")
+            .contains("export { length }")
+    );
+    assert!(
+        emitted["declarations"]["_flick/String.d.ts"]
+            .as_str()
+            .expect("String declarations")
+            .contains("export declare const length: (arg: string) => number;")
+    );
+    assert!(
+        json(&session.emit("debug"))["declarations"].is_null(),
+        "normal editor emits keep their existing payload"
+    );
+}
