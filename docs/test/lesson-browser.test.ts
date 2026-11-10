@@ -21,7 +21,7 @@ test("lesson timeout and compiler errors never persist completion", async (t) =>
   let writes = 0;
   Object.assign(globalThis, {
     Worker: WorkerHarness,
-    document: { getElementById: () => ({ textContent: JSON.stringify({ id: "signatures/02", check: { export: "size_of", argument_types: ["string"], return_type: "number", output: "6" } }) }) },
+    document: { getElementById: () => ({ textContent: JSON.stringify({ check: { export: "size_of", argument_types: ["string"], return_type: "number", output: "6" } }) }) },
     localStorage: { setItem: () => { writes += 1; } },
   });
   t.mock.timers.enable({ apis: ["setTimeout"] });

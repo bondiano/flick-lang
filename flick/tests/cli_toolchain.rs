@@ -341,3 +341,18 @@ fn adapter_cannot_select_another_kernel_abi() {
     assert!(stderr(&out).contains("FLICK-P015"));
     assert!(!dir.join("dist").exists());
 }
+
+#[test]
+fn doctor_reports_effect_without_an_adapter_owned_requirement() {
+    let dir = project(
+        "cli_doctor_effect_only",
+        &[
+            ("flick.toml", APP),
+            ("node_modules/effect/package.json", r#"{"version":"4.2.0"}"#),
+        ],
+    );
+    let out = flick_in(&dir, &["doctor"]);
+    let text = String::from_utf8_lossy(&out.stdout);
+    assert!(text.contains("note effect: 4.2.0"), "{text}");
+    assert!(!text.contains("FAIL effect"), "{text}");
+}

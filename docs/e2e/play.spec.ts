@@ -238,8 +238,8 @@ for (const locale of ["en", "ru"]) {
     await page.getByRole("button", { name: ru ? "Показать решение" : "Show solution" }).click();
     await expect(lesson).not.toContainText(ru ? "Урок пройден" : "Lesson completed");
     await page.locator(".cm-content").click();
-    await page.keyboard.press("MetaOrControl+End");
-    await page.keyboard.press("MetaOrControl+a");
+    await page.keyboard.press("ControlOrMeta+End");
+    await page.keyboard.press("ControlOrMeta+a");
     await page.keyboard.insertText('module Main exposing (main, size_of)\n\nsize_of : String -> Int\nlet size_of text = String.length text\n\nmain : Unit ->{} Unit\nlet main () = Platform.stdout_line "5"\n');
     await check.click();
     await expect(lesson).toContainText(ru ? "Вывод не совпадает" : "The output does not match");

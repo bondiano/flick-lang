@@ -221,7 +221,9 @@ fn installed(root: Option<&Path>, line: &mut impl FnMut(Option<bool>, &str, Stri
                 line(
                     None,
                     "effect",
-                    "not installed; requirements come from the adapter package".to_owned(),
+                    toolchain::installed(root, "effect").unwrap_or_else(|| {
+                        "not installed; requirements come from the adapter package".to_owned()
+                    }),
                 );
             }
             line(

@@ -4,13 +4,14 @@ import { mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "nod
 import path from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
-import { exerciseIds, loadExercise } from "../exercises/load.ts";
+import { loadExercise } from "../exercises/load.ts";
 import { evaluateExercise } from "../src/playground/exercise.ts";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repo = path.join(here, "../..");
 const flick = process.env.FLICK_BIN ?? path.join(repo, "target/debug/flick");
-for (const id of exerciseIds()) {
+const exerciseIds = readdirSync(path.join(repo, "docs/exercises"), { recursive: true, encoding: "utf8" }).map((name) => name.replaceAll("\\", "/")).filter((name) => name.endsWith("/check.toml")).map((name) => name.slice(0, -"/check.toml".length)).sort();
+for (const id of exerciseIds) {
   test(`${id}: starter fails, solution passes, compilable broken answer fails`, async () => {
     const exercise = loadExercise(id);
     for (const name of ["starter", "solution", "broken"]) {

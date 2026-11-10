@@ -1,13 +1,13 @@
 # Exercises
 
 Each `<topic>/<number>/` contains `check.toml`, `starter.fl`, `solution.fl`,
-`given.fl` (the original prompt), and `broken.fl`. The broken answer must compile
+and `broken.fl`. The starter is the original prompt. The broken answer must compile
 and have the requested export, but produce the wrong output.
 
 `check.toml` supplies the exported function name, its TypeScript
 `argument_types` and `return_type`, expected trimmed stdout (`output`), and
 English/Russian `title`, `task`, and `hint` strings (Russian keys end in `_ru`).
-The current checker supports primitive string, number, and boolean arguments,
+The current checker supports one or more curried primitive string, number, and boolean arguments,
 and those result types plus void. Add support in the shared checker and loader
 before using more complex signatures.
 

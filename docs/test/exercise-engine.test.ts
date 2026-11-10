@@ -19,3 +19,10 @@ test("rules control signature and output, including compilable wrong answers", a
   assert.equal(await evaluateExercise(contract, { ...operations, check: async () => [{ severity: "error" }] }), "fix-errors");
   assert.equal(await evaluateExercise(contract, { ...operations, run: async () => ({ status: "error", code: 1, lines: [{ stream: "stdout", text: "5" }] }) }), "output");
 });
+
+test("multiple arguments use Flick's curried declaration", async () => {
+  assert.equal(await evaluateExercise({ ...contract, argument_types: ["string", "number"], return_type: "string" }, {
+    ...operations,
+    compile: async () => ({ dts: "export declare const length_of: (arg: string) => (arg: number) => string;" }),
+  }), "passed");
+});
