@@ -247,15 +247,17 @@ pub fn check(
 }
 
 /// [`check`], taking the modules of source packages `packages` saved and
-/// giving those to save.
+/// giving those to save; a command that checks again and again keeps what
+/// it checked in `cache`.
 pub fn check_with(
     host: &dyn Host,
     sources: &mut SourceMap,
     project: Option<&Project>,
     roots: &[PathBuf],
     packages: Option<&PackageCache>,
+    cache: Option<&mut ModuleCache>,
 ) -> (Vec<Diagnostic>, Vec<Fresh>) {
-    let output = run(host, sources, project, roots, Mode::Check, None, packages);
+    let output = run(host, sources, project, roots, Mode::Check, cache, packages);
     (output.diagnostics, output.fresh)
 }
 
@@ -276,7 +278,8 @@ pub fn compile(
 
 /// [`compile`], taking the modules of source packages `packages` saved and
 /// giving those to save; `rt` builds for Flick's own runtime whatever the
-/// project says.
+/// project says; a command that builds again and again keeps what it
+/// compiled in `cache`.
 pub fn compile_with(
     host: &dyn Host,
     sources: &mut SourceMap,
@@ -284,9 +287,10 @@ pub fn compile_with(
     roots: &[PathBuf],
     packages: Option<&PackageCache>,
     rt: bool,
+    cache: Option<&mut ModuleCache>,
 ) -> (Vec<Diagnostic>, Compilation, Vec<Fresh>) {
     let mode = Mode::Compile;
-    let output = run_in(host, sources, project, roots, mode, None, packages, rt);
+    let output = run_in(host, sources, project, roots, mode, cache, packages, rt);
     (output.diagnostics, output.compilation, output.fresh)
 }
 

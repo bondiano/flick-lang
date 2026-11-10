@@ -16,7 +16,7 @@ use std::{env, fs, io, thread};
 use flick_core::build::{Artifact, go};
 use flick_core::diagnostics::{Diagnostic, Severity, codes};
 use flick_core::project::config::{Backend, Emit};
-use flick_core::project::{self, Project};
+use flick_core::project::{self, ModuleCache, Project};
 use flick_core::source::SourceMap;
 use tracing::debug;
 
@@ -36,7 +36,7 @@ pub fn test(options: &TestArguments, global: &GlobalArguments) -> ExitCode {
     if options.watch {
         return watch(options, global);
     }
-    let Ok(runner) = prepare(options, global) else {
+    let Ok(runner) = prepare(options, global, None) else {
         return ExitCode::from(1);
     };
     let signals = child::signals();
@@ -52,7 +52,11 @@ pub fn test(options: &TestArguments, global: &GlobalArguments) -> ExitCode {
 
 /// Builds the test run and writes its runner.
 #[allow(clippy::too_many_lines)]
-fn prepare(options: &TestArguments, global: &GlobalArguments) -> Result<PathBuf, ()> {
+fn prepare(
+    options: &TestArguments,
+    global: &GlobalArguments,
+    modules: Option<&mut ModuleCache>,
+) -> Result<PathBuf, ()> {
     let progress = Progress::new(if matches!(options.reporter, Reporter::Json) {
         Mode::Hidden
     } else {
@@ -111,8 +115,15 @@ fn prepare(options: &TestArguments, global: &GlobalArguments) -> Result<PathBuf,
     }
     progress.stage("Compiling Flick modules");
     let (mut diagnostics, mut compilation) = package_cache::with_saved(|saved| {
-        let (diagnostics, compilation, fresh) =
-            project::compile_with(&host, &mut sources, Some(&project), &roots, saved, rt);
+        let (diagnostics, compilation, fresh) = project::compile_with(
+            &host,
+            &mut sources,
+            Some(&project),
+            &roots,
+            saved,
+            rt,
+            modules,
+        );
         ((diagnostics, compilation), fresh)
     });
     super::build::hooks::ir(Some(&project), &mut compilation, &mut diagnostics);
@@ -420,9 +431,11 @@ fn stop(child: &mut Child) {
 
 fn watch(options: &TestArguments, global: &GlobalArguments) -> ExitCode {
     let paths = watched(global);
+    // what the runs of this session compiled: a change compiles what it reaches
+    let mut modules = ModuleCache::default();
     loop {
         let before = watch_snapshot(&paths);
-        let prepared = prepare(options, global);
+        let prepared = prepare(options, global, Some(&mut modules));
         // each run reports its build, before its tests start
         timings::report(global);
         let mut child = prepared
