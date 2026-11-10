@@ -1,13 +1,10 @@
 use std::mem;
 
-#[cfg(feature = "diagnostic-fixes")]
 use std::iter;
 
-#[cfg(feature = "diagnostic-fixes")]
 use annotate_snippets::Patch;
 use annotate_snippets::{AnnotationKind, Group, Level, Renderer, Snippet};
 
-#[cfg(feature = "diagnostic-fixes")]
 use crate::diagnostics::Fix;
 use crate::diagnostics::{Diagnostic, Severity};
 use crate::source::{FileId, SourceMap};
@@ -59,17 +56,11 @@ fn report<'a>(sources: &'a SourceMap, d: &'a Diagnostic) -> Vec<Group<'a>> {
         }
     }
     let main = title.elements(snippets.into_iter().map(|(_, s)| s));
-    #[cfg(feature = "diagnostic-fixes")]
-    {
-        iter::once(main)
-            .chain(d.fixes.iter().map(|fix| fix_group(sources, fix)))
-            .collect()
-    }
-    #[cfg(not(feature = "diagnostic-fixes"))]
-    vec![main]
+    iter::once(main)
+        .chain(d.fixes.iter().map(|fix| fix_group(sources, fix)))
+        .collect()
 }
 
-#[cfg(feature = "diagnostic-fixes")]
 fn fix_group<'a>(sources: &'a SourceMap, fix: &'a Fix) -> Group<'a> {
     let mut snippets: Vec<(FileId, Snippet<'a, Patch<'a>>)> = Vec::new();
     for edit in &fix.edits {

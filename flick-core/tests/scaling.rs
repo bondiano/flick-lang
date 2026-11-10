@@ -273,7 +273,7 @@ fn emitting_js(compilation: &Compilation, sources: &SourceMap) -> Duration {
 }
 
 // the Go backend is part of a build that writes its artifacts
-#[cfg(feature = "build-artifacts")]
+#[cfg(feature = "native-project")]
 fn emitting_go(compilation: &Compilation, sources: &SourceMap) -> Duration {
     let entries = [("main".to_owned(), "Main".to_owned())];
     let start = Instant::now();
@@ -355,7 +355,7 @@ fn function_of_2000_lines_emits_javascript_in_linear_time() {
     assert_stage_linear("JavaScript", emitting_js);
 }
 
-#[cfg(feature = "build-artifacts")]
+#[cfg(feature = "native-project")]
 #[test]
 fn function_of_2000_lines_emits_go_in_linear_time() {
     assert_stage_linear("Go", emitting_go);

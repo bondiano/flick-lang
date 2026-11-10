@@ -26,7 +26,7 @@ use std::sync::Arc;
 
 pub use config::Config;
 pub(crate) use load::check_inline_file;
-#[cfg(all(test, feature = "build-artifacts"))]
+#[cfg(all(test, feature = "native-project"))]
 pub(crate) use load::js_only;
 #[cfg(feature = "ide")]
 pub use load::{Analysis, Analyzed, analysis_fingerprint, analyze, analyze_with};

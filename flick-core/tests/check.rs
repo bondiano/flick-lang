@@ -8,7 +8,7 @@
 #[cfg(feature = "native-project")]
 use std::io;
 use std::path::{Path, PathBuf};
-#[cfg(all(feature = "native-project", feature = "diagnostic-fixes"))]
+#[cfg(feature = "native-project")]
 use std::slice;
 use std::{fmt, fs};
 
@@ -160,7 +160,6 @@ fn diff(sources: &SourceMap, actual: &[&Diagnostic], expected: Vec<Expected>) ->
         let pos = d.span.map(|s| to_pos(sources.get(s.file), s.start, s.end));
         let code = d.code.to_string();
         // help lines read as the message they explain: `message: help`
-        #[cfg(feature = "diagnostic-fixes")]
         let text = d
             .fixes
             .iter()
@@ -168,8 +167,6 @@ fn diff(sources: &SourceMap, actual: &[&Diagnostic], expected: Vec<Expected>) ->
             .fold(d.message.clone(), |text, f| {
                 format!("{text}: {}", f.message)
             });
-        #[cfg(not(feature = "diagnostic-fixes"))]
-        let text = d.message.clone();
         let hit = missing
             .iter()
             .position(|e| e.code == code && e.pos == pos && text.contains(&e.message));
@@ -353,7 +350,7 @@ struct FixtureHost {
     root: PathBuf,
 }
 
-#[cfg(all(feature = "native-project", feature = "diagnostic-fixes"))]
+#[cfg(feature = "native-project")]
 #[test]
 fn unauthorized_fix_adds_the_error_separator_only_when_needed() {
     struct EditedHost {

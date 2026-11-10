@@ -52,9 +52,7 @@ impl Checker<'_> {
             _ => format!("this pattern does not match `{shown}`; use `match` to handle every case"),
         };
         let mut diagnostic = diagnostics::Diagnostic::error(codes::T009, message, self.span(node));
-        if cfg!(feature = "diagnostic-fixes")
-            && let Some((decl, rest)) = binding
-        {
+        if let Some((decl, rest)) = binding {
             let value = let_parts(decl, self.text).body;
             if let Some(edits) = self.tuple_fix(node, value) {
                 diagnostic = diagnostic.with_fix(|| ("use a tuple", edits));
@@ -96,11 +94,9 @@ impl Checker<'_> {
             let message = "`let assert` is not allowed in this project (`[lint] no-let-assert`); \
                            use `match` to handle every case";
             let mut diagnostic = diagnostics::Diagnostic::error(codes::T027, message, span);
-            if cfg!(feature = "diagnostic-fixes") {
-                let value = let_parts(decl, self.text).body;
-                if let Some(edit) = self.match_fix(pat, pattern, decl, value, rest) {
-                    diagnostic = diagnostic.with_fix(|| ("use `match`", vec![edit]));
-                }
+            let value = let_parts(decl, self.text).body;
+            if let Some(edit) = self.match_fix(pat, pattern, decl, value, rest) {
+                diagnostic = diagnostic.with_fix(|| ("use `match`", vec![edit]));
             }
             self.diagnostics.push(diagnostic);
         } else if self.covers_all(pat) {

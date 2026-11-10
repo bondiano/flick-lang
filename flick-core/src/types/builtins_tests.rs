@@ -7,7 +7,6 @@ fn built_in_signatures_write_nothing_they_get_anyway() {
     super::check_allowing(super::builtin_sources(), &[], false, |_, _| {});
 }
 
-#[cfg(feature = "diagnostic-fixes")]
 mod fixes {
     use std::cmp::Reverse;
     use std::fs;

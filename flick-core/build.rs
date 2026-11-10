@@ -38,7 +38,7 @@ fn main() -> io::Result<()> {
     binding_policy(&output)?;
     go_runtime(&output)?;
     go_packages(&output)?;
-    let docs = cfg!(feature = "builtin-docs");
+    let docs = cfg!(feature = "native-project");
     if !docs {
         for package in ["core"].iter().chain(IMPLICIT_PACKAGES) {
             let sources = Path::new("../packages").join(package).join("src");
@@ -267,7 +267,7 @@ fn binding_policy(output: &Path) -> io::Result<()> {
             .map(|v| v.as_str().expect("string"))
             .collect();
         if name == "ZONE_EXPORTS" {
-            out.push_str("#[cfg(feature = \"build-artifacts\")]\n");
+            out.push_str("#[cfg(feature = \"native-project\")]\n");
         }
         writeln!(out, "pub const {name}: &[&str] = &{values:?};").expect("write string");
     }
@@ -280,10 +280,7 @@ fn binding_policy(output: &Path) -> io::Result<()> {
         ("zone_module", "ZONE_MODULE"),
     ] {
         if name == "ZONE_MODULE" {
-            out.push_str("#[cfg(feature = \"build-artifacts\")]\n");
-        }
-        if name == "ADAPTER_UI" {
-            out.push_str("#[cfg(feature = \"typescript\")]\n");
+            out.push_str("#[cfg(feature = \"native-project\")]\n");
         }
         if name == "ADAPTER_BRIDGE" {
             out.push_str("#[cfg(not(target_arch = \"wasm32\"))]\n");
@@ -359,7 +356,7 @@ fn binding_data() -> io::Result<serde_json::Value> {
 }
 
 fn binding_go(data: &serde_json::Value, out: &mut String) {
-    out.push_str("#[cfg(feature = \"build-artifacts\")]\npub const GO_OPTIONAL: &[(&str, &str, &[&str])] = &[\n");
+    out.push_str("#[cfg(feature = \"native-project\")]\npub const GO_OPTIONAL: &[(&str, &str, &[&str])] = &[\n");
     for row in data["go_optional"].as_array().expect("Go packages") {
         let exports: Vec<_> = row[2]
             .as_array()

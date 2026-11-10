@@ -42,13 +42,10 @@ fn spec_example_parses_with_defaults() {
 }
 
 #[test]
-fn typescript_settings_require_the_capability() {
+fn typescript_settings_are_read() {
     for setting in ["emit = \"ts\"", "emit-dts = true", "promise-facade = true"] {
         let text = format!("schema-version = 1\n[project]\nkind = \"lib\"\n[build]\n{setting}\n");
-        #[cfg(feature = "typescript")]
         assert!(parse_text(&text).is_ok(), "{setting}");
-        #[cfg(not(feature = "typescript"))]
-        assert_eq!(parse_text(&text).expect_err(setting).code, codes::P005);
     }
 }
 

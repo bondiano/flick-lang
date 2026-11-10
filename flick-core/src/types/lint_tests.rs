@@ -1,7 +1,6 @@
 //! Helpers for the tests of the lints and their fixes.
 
 use crate::diagnostics::Diagnostic;
-#[cfg(feature = "diagnostic-fixes")]
 use crate::diagnostics::Severity;
 use crate::source::SourceMap;
 
@@ -14,7 +13,6 @@ pub fn check(text: &str) -> Vec<Diagnostic> {
 }
 
 /// `text` after the fixes of its diagnostics coded `code`, if any.
-#[cfg(feature = "diagnostic-fixes")]
 pub fn fixed(text: &str, code: &str) -> Option<String> {
     let diagnostics = check(text);
     let mut edits: Vec<_> = diagnostics
@@ -39,25 +37,13 @@ pub fn fixed(text: &str, code: &str) -> Option<String> {
 /// Fixes the `code` diagnostics of `body` and checks the result compiles.
 pub fn assert_fix(body: &str, code: &str, want: &str) {
     let text = format!("{HEAD}{body}");
-    #[cfg(not(feature = "diagnostic-fixes"))]
-    let diagnostics = check(&text);
-    #[cfg(not(feature = "diagnostic-fixes"))]
-    assert!(
-        diagnostics.iter().any(|d| d.code.to_string() == code),
-        "no {code}: {diagnostics:?}"
-    );
-    #[cfg(feature = "diagnostic-fixes")]
-    {
-        let out = fixed(&text, code).unwrap_or_else(|| panic!("no {code} fix"));
-        assert_eq!(out, format!("{HEAD}{want}"));
-        let errors: Vec<_> = check(&out)
-            .into_iter()
-            .filter(|d| d.severity == Severity::Error)
-            .collect();
-        assert!(errors.is_empty(), "{errors:?}");
-    }
-    #[cfg(not(feature = "diagnostic-fixes"))]
-    let _ = want;
+    let out = fixed(&text, code).unwrap_or_else(|| panic!("no {code} fix"));
+    assert_eq!(out, format!("{HEAD}{want}"));
+    let errors: Vec<_> = check(&out)
+        .into_iter()
+        .filter(|d| d.severity == Severity::Error)
+        .collect();
+    assert!(errors.is_empty(), "{errors:?}");
 }
 
 #[test]

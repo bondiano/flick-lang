@@ -3,14 +3,14 @@
 
 /// The file `$path` of the sources of the package `$package` in
 /// `packages/`, as written or, without `builtin-docs`, without its docs.
-#[cfg(feature = "builtin-docs")]
+#[cfg(feature = "native-project")]
 macro_rules! builtin_source {
     ($package:literal, $path:literal) => {
         include_str!(concat!("../../../packages/", $package, "/src/", $path))
     };
 }
 
-#[cfg(not(feature = "builtin-docs"))]
+#[cfg(not(feature = "native-project"))]
 macro_rules! builtin_source {
     ($package:literal, $path:literal) => {
         include_str!(concat!(env!("OUT_DIR"), "/", $package, "/", $path))
