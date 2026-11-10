@@ -7,6 +7,7 @@ use std::collections::BTreeMap;
 use std::mem;
 use std::rc::Rc;
 
+use super::regions::live_stage;
 use super::{Check, Checker, error};
 use crate::syntax::{Head, Lit, Name, Path, Term};
 use crate::types::{Caps, Fields, Kind, Row, Scheme, Stage, Type, Var};
@@ -277,7 +278,7 @@ impl Checker<'_> {
         match self.resolve(f) {
             Type::Fun(p, s, r) => {
                 self.check(a, &p)?;
-                let s = self.live_stage(&s, &self.qualifier(f));
+                let s = live_stage(&s, &self.qualifier(f));
                 self.perform(&s)?;
                 Ok((*r).clone())
             }

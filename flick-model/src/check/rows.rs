@@ -8,7 +8,7 @@ use std::mem;
 use std::rc::Rc;
 use std::slice;
 
-use super::regions::{arg_caps, live_arg};
+use super::regions::{add_live, arg_caps, live_arg, live_stage};
 use super::{Check, Checker, error, live_service};
 use crate::types::{Caps, Row, Stage, Type, Var};
 
@@ -196,16 +196,16 @@ impl Checker<'_> {
         match (self.resolve(actual), self.resolve(expected)) {
             (Type::Fun(p, s, r), Type::Fun(p2, s2, r2)) => {
                 self.subsume(&p2, &p)?;
-                let s = self.live_stage(&s, &qa);
+                let s = live_stage(&s, &qa);
                 for qe in &qes {
-                    self.stage_within(&s, &self.live_stage(&s2, qe))?;
+                    self.stage_within(&s, &live_stage(&s2, qe))?;
                 }
                 self.subsume(&r, &r2)
             }
             (Type::Eff(r, e, t), Type::Eff(r2, e2, t2)) => {
-                let r = self.add_live(&r, &qa);
+                let r = add_live(&r, &qa);
                 for qe in &qes {
-                    self.within(&r, &self.add_live(&r2, qe))?;
+                    self.within(&r, &add_live(&r2, qe))?;
                 }
                 self.within(&e, &e2)?;
                 self.subsume(&t, &t2)

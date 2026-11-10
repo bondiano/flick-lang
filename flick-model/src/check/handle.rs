@@ -8,6 +8,7 @@
 use std::rc::Rc;
 
 use super::generalize::Inst;
+use super::regions::live_stage;
 use super::{Check, Checker, error};
 use crate::handler::{Handler, Op, OpClass};
 use crate::types::{Row, Stage, Type};
@@ -75,7 +76,7 @@ impl Checker<'_> {
         self.stage_within(&Stage::Runtime(rest, errors), &outer)?;
         // a handler of a service a region indexes is installed where it is live
         let live = self.indexed_live(&installed);
-        self.perform(&self.live_stage(&outer, &live))?;
+        self.perform(&live_stage(&outer, &live))?;
         Ok(t)
     }
 

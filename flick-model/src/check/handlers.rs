@@ -7,6 +7,7 @@ use std::mem;
 use std::rc::Rc;
 
 use super::expr::mono;
+use super::regions::add_live;
 use super::{Check, Checker, error};
 use crate::subst::matches;
 use crate::syntax::{Arm, Name, Pat, Term};
@@ -137,7 +138,7 @@ impl Checker<'_> {
                 (r, x, a)
             }
         };
-        let r = self.add_live(&r, &held);
+        let r = add_live(&r, &held);
         self.perform(&Stage::Runtime(r, x))?;
         Ok(a)
     }
@@ -231,7 +232,7 @@ impl Checker<'_> {
             out.union(&self.indexed_live(args))
         });
         let services = self.sum(&inputs, &rest)?;
-        let services = self.add_live(&services, &live);
+        let services = add_live(&services, &live);
         let errors = self.sum(&errors, &raised)?;
         self.perform(&Stage::Runtime(services, errors))?;
         Ok(t)

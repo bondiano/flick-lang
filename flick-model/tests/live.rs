@@ -81,8 +81,8 @@ fn live_accepts_only_what_runs() {
             match (&live, changed) {
                 (Ok(()), false) => programs += 1,
                 (Ok(()), true) => changes += 1,
-                (Err(e), false) if rejected.len() < 6 => {
-                    rejected.push(format!("{e}\n{}", generate::source(prog)));
+                (Err(error), false) if rejected.len() < 6 => {
+                    rejected.push(format!("{error}\n{}", generate::source(prog)));
                 }
                 (Err(_), _) => {}
             }

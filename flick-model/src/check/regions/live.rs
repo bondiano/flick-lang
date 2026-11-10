@@ -48,6 +48,30 @@ pub(in crate::check) fn live_arg(c: Caps) -> Type {
 }
 
 /// `C` of the argument of `{Live C}`.
+/// `ρ + {Live C}`.
+pub(in crate::check) fn add_live(r: &Row, c: &Caps) -> Row {
+    if c.is_empty() {
+        return r.clone();
+    }
+    let mut out = r.clone();
+    let mine = out
+        .elems
+        .get(&live_service())
+        .map(|a| arg_caps(&a[0]))
+        .unwrap_or_default();
+    out.elems
+        .insert(live_service(), Rc::from([live_arg(mine.union(c))]));
+    out
+}
+
+/// `φ` with `Live C` in its row; a pure stage stays pure.
+pub(in crate::check) fn live_stage(s: &Stage, c: &Caps) -> Stage {
+    match s {
+        Stage::Runtime(r, e) => Stage::Runtime(add_live(r, c), e.clone()),
+        Stage::Pure => Stage::Pure,
+    }
+}
+
 /// `r` without `Live` of nothing: once its qualifier is known, it needs
 /// nothing.
 pub(in crate::check) fn drop_empty_live(r: &mut Row) {
@@ -67,31 +91,6 @@ pub(in crate::check) fn arg_caps(t: &Type) -> Caps {
 }
 
 impl Checker<'_> {
-    /// `ρ + {Live C}`.
-    pub(in crate::check) fn add_live(&self, r: &Row, c: &Caps) -> Row {
-        if c.is_empty() {
-            return r.clone();
-        }
-        let mut out = r.clone();
-        let mine = out
-            .elems
-            .get(&live_service())
-            .map(|a| arg_caps(&a[0]))
-            .unwrap_or_default();
-        out.elems
-            .insert(live_service(), Rc::from([live_arg(mine.union(c))]));
-        out
-    }
-
-    /// `φ` with `Live C` in its row, under this discipline; a pure stage
-    /// stays pure.
-    pub(in crate::check) fn live_stage(&self, s: &Stage, c: &Caps) -> Stage {
-        match s {
-            Stage::Runtime(r, e) => Stage::Runtime(self.add_live(r, c), e.clone()),
-            other => other.clone(),
-        }
-    }
-
     /// `σ` with the `Live` its runtime arrows need: the elision rule.
     pub(in crate::check) fn live_scheme(&self, s: &Scheme) -> Scheme {
         Scheme {
@@ -131,15 +130,13 @@ impl Checker<'_> {
                 let p = go(p, &none);
                 let held = held.union(&self.shown(&self.reach(&p), regions));
                 let s = match s {
-                    Stage::Runtime(row, e) => Stage::Runtime(self.add_live(row, &held), e.clone()),
+                    Stage::Runtime(row, e) => Stage::Runtime(add_live(row, &held), e.clone()),
                     Stage::Pure => Stage::Pure,
                 };
                 let r = go(r, &held);
                 Type::Fun(Rc::new(p), s, Rc::new(r))
             }
-            Type::Eff(r, e, a) => {
-                Type::Eff(self.add_live(r, held), e.clone(), Rc::new(go(a, &none)))
-            }
+            Type::Eff(r, e, a) => Type::Eff(add_live(r, held), e.clone(), Rc::new(go(a, &none))),
             Type::Captured(x, c) => Type::Captured(Rc::new(go(x, held)), c.clone()),
             Type::Bounded(x, c) => Type::Bounded(Rc::new(go(x, held)), c.clone()),
             Type::Forall(s) => Type::Forall(Rc::new(Scheme {

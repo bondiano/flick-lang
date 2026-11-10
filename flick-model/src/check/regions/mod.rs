@@ -18,7 +18,9 @@ mod solve;
 use crate::syntax::{Con, Name, Path, Term};
 use crate::types::{Caps, Fields, Kind, Row, Scheme, Stage, Type, Var};
 pub(crate) use live::live_service;
-pub(in crate::check) use live::{arg_caps, drop_empty_live, live_arg, regions_of};
+pub(in crate::check) use live::{
+    add_live, arg_caps, drop_empty_live, live_arg, live_stage, regions_of,
+};
 
 /// `⋃ ⌈held⌉ ⊆ ⋃ ⌈within⌉ ∪ allowed`.
 #[derive(Clone, Debug)]
@@ -344,7 +346,7 @@ impl Checker<'_> {
             each.push(Caps::default());
         }
         for q in &each {
-            self.stage_within(inner, &self.live_stage(stage, q))?;
+            self.stage_within(inner, &live_stage(stage, q))?;
         }
         Ok(ty.clone())
     }

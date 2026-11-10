@@ -487,11 +487,8 @@ let children () =
   }}
 "
         );
-        if owner == "outer" {
-            accepts(&source);
-        } else {
-            accepts(&source);
-        }
+        // the child's pure log uses nothing of either owner's region
+        accepts(&source);
     }
 }
 
