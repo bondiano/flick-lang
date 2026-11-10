@@ -60,8 +60,12 @@ pub fn stage(label: &'static str) {
 
 /// Work inside a stage that took `elapsed`.
 pub fn phase(label: &str, elapsed: Duration) {
-    let micros = u64::try_from(elapsed.as_micros()).unwrap_or(u64::MAX);
-    debug!(micros, "{label}");
+    debug!(micros = micros(elapsed), "{label}");
+}
+
+/// `duration` in whole microseconds, the unit of a timing event.
+fn micros(duration: Duration) -> u64 {
+    u64::try_from(duration.as_micros()).unwrap_or(u64::MAX)
 }
 
 struct Collect;
@@ -144,8 +148,7 @@ impl Report {
             .chain([end]);
         let stages = (records.stages.iter().zip(ends))
             .map(|((label, began), end)| {
-                let micros = end.saturating_duration_since(*began).as_micros();
-                (label.clone(), u64::try_from(micros).unwrap_or(u64::MAX))
+                (label.clone(), micros(end.saturating_duration_since(*began)))
             })
             .collect();
         let mut modules = records.modules;
@@ -199,7 +202,8 @@ impl Report {
 }
 
 /// With `--timings`, writes what was collected since the last report on
-/// stderr and starts anew, as a watching command reports each of its runs.
+/// stderr and starts anew: a watching command reports each of its runs,
+/// and keeps the records of none.
 pub fn report(global: &GlobalArguments) {
     if !global.timings {
         return;
