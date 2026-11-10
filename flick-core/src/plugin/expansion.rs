@@ -338,7 +338,6 @@ impl Expansion {
             for related in &mut d.related {
                 related.span = self.place(related.span);
             }
-            #[cfg(feature = "diagnostic-fixes")]
             d.fixes.retain(|fix| {
                 fix.edits
                     .iter()

@@ -152,30 +152,26 @@ fn unused_import(module: &Module, import: &Import) -> Diagnostic {
         format!("`{}` is imported but never used", import.module),
         import.span,
     );
-    if cfg!(feature = "diagnostic-fixes") {
-        let decl = module.tree.nodes().find(|n| {
-            n.kind == K::ImportDecl
-                && n.range().0 <= import.span.start
-                && import.span.end <= n.range().1
-        });
-        match decl {
-            Some(decl) => {
-                let (start, end) = decl.range();
-                let end = end + u32::from(module.text[end as usize..].starts_with('\n'));
-                d.with_fix(|| {
-                    (
-                        "remove the import",
-                        vec![Edit {
-                            span: Span::new(import.span.file, start, end),
-                            replacement: String::new(),
-                        }],
-                    )
-                })
-            }
-            None => d,
+    let decl = module.tree.nodes().find(|n| {
+        n.kind == K::ImportDecl
+            && n.range().0 <= import.span.start
+            && import.span.end <= n.range().1
+    });
+    match decl {
+        Some(decl) => {
+            let (start, end) = decl.range();
+            let end = end + u32::from(module.text[end as usize..].starts_with('\n'));
+            d.with_fix(|| {
+                (
+                    "remove the import",
+                    vec![Edit {
+                        span: Span::new(import.span.file, start, end),
+                        replacement: String::new(),
+                    }],
+                )
+            })
         }
-    } else {
-        d
+        None => d,
     }
 }
 

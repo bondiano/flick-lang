@@ -182,12 +182,10 @@ impl Checker<'_> {
         args: &[&Node],
         defaults: &mut Vec<(Type, usize)>,
     ) -> Type {
-        #[cfg(feature = "diagnostic-fixes")]
         let since = self.diagnostics.len();
         // a local `forall v. τ^v -> σ` keeps its argument out of its result
         let parametric = self.local_parametric(head);
         let mut ty = self.infer(head);
-        #[cfg(feature = "diagnostic-fixes")]
         let mut unknown = Vec::new();
         let mut params = Vec::new();
         // the places a plugin watches: read before any argument, so an
@@ -238,10 +236,7 @@ impl Checker<'_> {
                 }
                 Type::Error => {
                     let inferred = self.infer(arg);
-                    #[cfg(feature = "diagnostic-fixes")]
                     unknown.push(inferred);
-                    #[cfg(not(feature = "diagnostic-fixes"))]
-                    let _ = inferred;
                 }
                 meta @ Type::Meta(_) => {
                     let (param, result) = (self.fresh(), self.fresh());
@@ -258,7 +253,6 @@ impl Checker<'_> {
                 other => return self.not_a_function(&other, span, &args[i..]),
             }
         }
-        #[cfg(feature = "diagnostic-fixes")]
         if unknown.len() == args.len() && head.kind == K::NameExpr {
             self.stub_fix(since, head, args, &unknown);
         }

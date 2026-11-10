@@ -287,7 +287,6 @@ fn two_named_parameterized_module_applications_have_distinct_abstract_result_typ
             && mismatch.message.contains("App.Parent.B.Token"),
         "{mismatch:?}"
     );
-    #[cfg(feature = "diagnostic-fixes")]
     assert!(
         mismatch
             .fixes

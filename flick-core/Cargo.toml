@@ -12,24 +12,12 @@ publish.workspace = true
 workspace = true
 
 [features]
-default = [
-    "ide",
-    "build-artifacts",
-    "source-maps",
-    "typescript",
-    "diagnostic-fixes",
-    "native-project",
-    "terminal-diagnostics",
-    "builtin-docs",
-]
-ide = ["typescript", "diagnostic-fixes"]
-build-artifacts = []
-source-maps = []
-typescript = []
-diagnostic-fixes = []
+default = ["ide", "native-project"]
+# editor queries, projections and the metadata they keep
+ide = []
+# projects on disk: manifests, installed packages, published artifacts,
+# source maps and the docs of the built-in sources
 native-project = ["dep:toml", "dep:semver", "dep:sha2"]
-terminal-diagnostics = ["dep:annotate-snippets"]
-builtin-docs = []
 # std in the binary, for a host with no packages: the playground
 embedded-std = []
 
@@ -46,7 +34,7 @@ insta = "1.49.0"
 toml = "1.1.8"
 
 [dependencies]
-annotate-snippets = { version = "0.12.17", optional = true }
+annotate-snippets = "0.12.17"
 flick-ir = { path = "../flick-ir" }
 flick-plugin = { path = "../flick-plugin" }
 flick-plugin-cli = { path = "../plugins/cli" }

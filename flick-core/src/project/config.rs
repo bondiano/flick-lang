@@ -230,9 +230,7 @@ pub struct Build {
     pub out_dir: String,
     pub profile: Profile,
     pub emit: Emit,
-    #[cfg(feature = "typescript")]
     pub emit_dts: bool,
-    #[cfg(feature = "typescript")]
     /// Write Promise façades of runtime functions beside the modules.
     pub promise_facade: bool,
     pub schema_aot: bool,
@@ -253,9 +251,7 @@ impl Default for Build {
             out_dir: "dist".into(),
             profile: Profile::Debug,
             emit: Emit::Js,
-            #[cfg(feature = "typescript")]
             emit_dts: false,
-            #[cfg(feature = "typescript")]
             promise_facade: false,
             schema_aot: false,
             solver_steps: types::Limits::default().steps,
@@ -292,7 +288,6 @@ pub enum Backend {
 #[cfg_attr(feature = "native-project", serde(rename_all = "lowercase"))]
 pub enum Emit {
     Js,
-    #[cfg(feature = "typescript")]
     Ts,
     /// A Go module per entry, built into an executable.
     Go,

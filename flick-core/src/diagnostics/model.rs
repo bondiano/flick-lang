@@ -19,7 +19,6 @@ pub struct Diagnostic {
     pub related: Vec<Related>,
     /// The checker relied on an error type while forming this diagnostic.
     pub(crate) incomplete: bool,
-    #[cfg(feature = "diagnostic-fixes")]
     pub fixes: Vec<Fix>,
 }
 
@@ -29,7 +28,6 @@ pub struct Related {
     pub message: String,
 }
 
-#[cfg(feature = "diagnostic-fixes")]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Fix {
     pub message: String,
@@ -53,7 +51,6 @@ impl Diagnostic {
             span: None,
             related: Vec::new(),
             incomplete: false,
-            #[cfg(feature = "diagnostic-fixes")]
             fixes: Vec::new(),
         }
     }
@@ -110,22 +107,14 @@ impl Diagnostic {
     }
 
     fn attach_fix<M: Into<String>>(self, safe: bool, fix: impl FnOnce() -> (M, Vec<Edit>)) -> Self {
-        #[cfg(feature = "diagnostic-fixes")]
-        {
-            let mut diagnostic = self;
-            let (message, edits) = fix();
-            diagnostic.fixes.push(Fix {
-                message: message.into(),
-                edits,
-                safe,
-            });
-            diagnostic
-        }
-        #[cfg(not(feature = "diagnostic-fixes"))]
-        {
-            let _ = (safe, fix);
-            self
-        }
+        let mut diagnostic = self;
+        let (message, edits) = fix();
+        diagnostic.fixes.push(Fix {
+            message: message.into(),
+            edits,
+            safe,
+        });
+        diagnostic
     }
 }
 
@@ -172,15 +161,10 @@ mod tests {
                 message: "used here".into()
             }]
         );
-        #[cfg(feature = "diagnostic-fixes")]
-        {
-            assert_eq!(called.get(), 2);
-            assert_eq!(diagnostic.fixes[0].edits[0].replacement, "total");
-            assert!(!diagnostic.fixes[0].safe);
-            assert_eq!(diagnostic.fixes[1].edits[0].replacement, "");
-            assert!(diagnostic.fixes[1].safe);
-        }
-        #[cfg(not(feature = "diagnostic-fixes"))]
-        assert_eq!(called.get(), 0);
+        assert_eq!(called.get(), 2);
+        assert_eq!(diagnostic.fixes[0].edits[0].replacement, "total");
+        assert!(!diagnostic.fixes[0].safe);
+        assert_eq!(diagnostic.fixes[1].edits[0].replacement, "");
+        assert!(diagnostic.fixes[1].safe);
     }
 }

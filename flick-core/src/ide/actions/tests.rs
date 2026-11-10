@@ -173,7 +173,6 @@ fn gadt_todo_signature_can_have_a_constant_result() {
     assert!(action(&f, at, at, "replace `todo`").is_none());
 }
 
-#[cfg(feature = "diagnostic-fixes")]
 #[test]
 fn nested_todo_type_is_an_error_with_a_replacement() {
     let src = "module App.Main exposing (wrap)\n\nwrap : Int -> Option todo\nlet wrap x = Some x\n";
@@ -201,7 +200,6 @@ fn nested_todo_type_is_an_error_with_a_replacement() {
     assert!(changed.contains("wrap : Int -> Option Int"), "{changed}");
 }
 
-#[cfg(feature = "diagnostic-fixes")]
 #[test]
 fn each_todo_type_gets_an_independent_replacement() {
     let src = "module App.Main exposing (wrap, identity)\n\nwrap : Int -> Option todo\nlet wrap x = Some x\n\nidentity : Int -> todo\nlet identity x = x\n";
