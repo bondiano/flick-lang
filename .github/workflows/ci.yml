@@ -199,7 +199,10 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - run: rustup show active-toolchain || rustup toolchain install
+      # the plugin tests build the compiler in the `e2e` profile, as the e2e jobs do
       - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: e2e
       - uses: taiki-e/install-action@v2
         with:
           tool: just@1.59.0
