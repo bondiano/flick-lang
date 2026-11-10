@@ -20,8 +20,8 @@ use crate::types::{Kind, Scheme, Type, Var};
 /// A constructor of the core: its variables, fields and type.
 pub(crate) struct Ctor {
     pub(crate) k: usize,
-    fields: Vec<String>,
-    adt: String,
+    pub(crate) fields: Vec<String>,
+    pub(crate) adt: String,
 }
 
 /// A global by what it stands for.
@@ -76,7 +76,7 @@ fn ctor(s: &Scheme) -> Option<Ctor> {
         .collect();
     let env = Env {
         vars: vars.iter().map(|(v, _)| v.to_string()).collect(),
-        inst: Vec::new(),
+        ..Env::default()
     };
     let mut fields = Vec::new();
     let mut t = bare(&s.body);
@@ -173,6 +173,17 @@ impl Sig {
         out.push_str(
             "def genRes (K : Name) : List Ty :=\n  match genCtor K with\n  | some (k, _, _) => idTs k\n  | none => []\n\n",
         );
+        out.push_str("/-- The constructors of each type, with their arity. -/\ndef genAdtCtors : Name → List (Name × Nat)\n");
+        let mut adts: BTreeMap<&str, Vec<String>> = BTreeMap::new();
+        for (name, c) in &self.ctors {
+            adts.entry(&c.adt)
+                .or_default()
+                .push(format!("({name:?}, {})", c.fields.len()));
+        }
+        for (adt, cs) in &adts {
+            let _ = writeln!(out, "  | {adt:?} => [{}]", cs.join(", "));
+        }
+        out.push_str("  | _ => []\n\n");
         out.push_str("def genGlob : Nat → Option Scheme\n");
         let mut skipped = String::new();
         for (i, (key, s)) in self.globs.iter().enumerate() {
@@ -202,7 +213,7 @@ fn scheme(s: &Scheme) -> Result<String, String> {
     }
     let env = Env {
         vars: s.vars.iter().map(|(v, _)| v.to_string()).collect(),
-        inst: Vec::new(),
+        ..Env::default()
     };
     Ok(format!(
         "⟨{}, Facts.none, {}⟩",
@@ -216,6 +227,14 @@ const WITNESS: &str = r"structure GenSig (S : Sig) : Prop where
   ctor : ∀ K, (genCtor K).isSome → S.ctor K = genCtor K
   res : ∀ K, (genCtor K).isSome → S.res K = genRes K
   glob : ∀ g, (genGlob g).isSome → S.glob g = genGlob g
+  /-- A type of the generator has no constructors but its own. -/
+  closed : ∀ K k ts T, S.ctor K = some (k, ts, T) → genAdtCtors T ≠ [] → genCtor K = some (k, ts, T)
+
+theorem genAdtCtors_complete : ∀ K k ts T, genCtor K = some (k, ts, T) →
+    (K, ts.length) ∈ genAdtCtors T := by
+  intro K k ts T h
+  unfold genCtor at h
+  split at h <;> cases h <;> decide
 
 theorem genCtor_closed : ∀ K k ts T σ, genCtor K = some (k, ts, T) →
     (∀ i, i < k → σ (.v i) = .tvar i) → ts.map (Ty.substT σ) = ts := by
@@ -265,7 +284,7 @@ def genSig : Sig where
 
 /-- The assumption of a certificate holds of a signature. -/
 theorem GenSig.inhabited : ∃ S, GenSig S :=
-  ⟨genSig, fun _ _ => rfl, fun _ _ => rfl, fun _ _ => rfl⟩
+  ⟨genSig, fun _ _ => rfl, fun _ _ => rfl, fun _ _ => rfl, fun _ _ _ _ h _ => h⟩
 
 end Flick.Cert
 ";

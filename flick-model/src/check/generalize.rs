@@ -63,9 +63,10 @@ impl Checker<'_> {
     }
 
     /// The body of `s` with its variables rigid and the stages of its
-    /// signature holding their parameters: what (Let-Sig) checks. Its
-    /// facts `Θ` are given from here on.
-    pub(super) fn skolemize(&mut self, s: &Scheme) -> Type {
+    /// signature holding their parameters: what (Let-Sig) checks, with the
+    /// names of the rigid variables. Its facts `Θ` are given from here on.
+    pub(super) fn skolemize(&mut self, s: &Scheme) -> (Type, Vec<Name>) {
+        let mut rigid = Vec::new();
         let insts: Vec<Inst> = s
             .vars
             .iter()
@@ -75,6 +76,7 @@ impl Checker<'_> {
                 if *k == Kind::Region {
                     self.regions.kinds.insert(Var::Named(name.as_str().into()));
                 }
+                rigid.push(Name::from(name.as_str()));
                 rigid_inst(&name, k)
             })
             .collect();
@@ -90,7 +92,7 @@ impl Checker<'_> {
         );
         let body = substitute(&body, &map);
         self.give_provided(&body);
-        body
+        (body, rigid)
     }
 
     /// `Gen(Γ, τ)`: the type metas of `t` deeper than the current level.

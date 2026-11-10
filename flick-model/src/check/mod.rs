@@ -160,7 +160,7 @@ impl<'d> Checker<'d> {
     /// as (Let-Sig) checks the right side of a `let` with a signature.
     pub fn check_top(&mut self, e: &Term, scheme: &Scheme) -> Check<()> {
         self.stage = Stage::Pure;
-        let expected = self.skolemize(scheme);
+        let (expected, _) = self.skolemize(scheme);
         self.check(e, &expected)?;
         self.finish()?;
         if self.stage != Stage::Pure {

@@ -12,6 +12,7 @@ use crate::translate::lean::elide::{Env, caps, row, stage, ty};
 use crate::types::{Caps, Fields, Row, Scheme, Stage, Type};
 
 use super::Unsupported;
+use super::pat::match_tm;
 use super::sig::{Key, Sig, bare, kept, prim_key};
 use crate::check::substitute;
 
@@ -58,6 +59,7 @@ pub(super) fn tm(e: &Term, ctx: &[Name], sig: &Sig) -> Result<String, Unsupporte
         }
         Term::Field(r, l) => format!("(.proj {} \"{l}\")", tm(r, ctx)?),
         Term::Update(r, l, v) => format!("(.update {} \"{l}\" {})", tm(r, ctx)?, tm(v, ctx)?),
+        Term::Match(s, arms) => match_tm(s, arms, ctx, sig)?,
         other => return Err(form(other)),
     })
 }
@@ -70,7 +72,7 @@ fn sorted(fs: &[(Name, Term)]) -> Vec<(&Name, &Term)> {
 }
 
 /// The type of field `l` of a record type.
-fn field<'a>(t: &'a Type, l: &str) -> Result<&'a Type, Unsupported> {
+pub(super) fn field<'a>(t: &'a Type, l: &str) -> Result<&'a Type, Unsupported> {
     let f = fields(t).ok_or("a field of no record")?;
     f.fields
         .get(l)
@@ -109,7 +111,7 @@ fn index(ctx: &[Name], x: &str) -> Result<usize, Unsupported> {
         .ok_or_else(|| format!("`{x}` is not bound"))
 }
 
-fn lit(l: &Lit) -> Result<String, Unsupported> {
+pub(super) fn lit(l: &Lit) -> Result<String, Unsupported> {
     Ok(match l {
         Lit::Unit => ".unit".into(),
         Lit::Bool(b) => format!("(.bool {b})"),
@@ -137,8 +139,11 @@ fn global<'s>(sig: &'s Sig, key: &Key) -> Result<(usize, &'s Scheme), Unsupporte
 
 /// What kind of term the certificates do not write yet.
 fn form(e: &Term) -> Unsupported {
-    let s = format!("{e:?}");
-    format!("the form {}", s.split(['(', ' ']).next().unwrap_or(""))
+    let first = |s: String| s.split(['(', ' ', '{']).next().unwrap_or("").to_owned();
+    match e {
+        Term::Apply(Head::Const(c), _) => format!("the constant {}", first(format!("{c:?}"))),
+        e => format!("the form {}", first(format!("{e:?}"))),
+    }
 }
 
 /// The arrow of `t`: its parameter, stage, result and qualifier.
@@ -157,9 +162,9 @@ fn arrow(t: &Type) -> Option<(&Type, &Stage, &Type, Caps)> {
 /// A proof of a typing, at the depth `col` of its line.
 pub(super) struct Cx<'t> {
     trace: &'t Trace,
-    sig: &'t Sig,
+    pub(super) sig: &'t Sig,
     /// The term variables, innermost first.
-    terms: Vec<Name>,
+    pub(super) terms: Vec<Name>,
     /// The type variables, innermost first.
     env: Env,
 }
@@ -170,7 +175,10 @@ impl<'t> Cx<'t> {
             trace,
             sig,
             terms: Vec::new(),
-            env: Env::default(),
+            env: Env {
+                ground: true,
+                ..Env::default()
+            },
         }
     }
 
@@ -180,7 +188,7 @@ impl<'t> Cx<'t> {
             .ok_or_else(|| "a term the check did not type".to_owned())
     }
 
-    fn ty(&self, t: &Type) -> Result<String, Unsupported> {
+    pub(super) fn ty(&self, t: &Type) -> Result<String, Unsupported> {
         ty(t, &self.env)
     }
 
@@ -268,11 +276,12 @@ impl<'t> Cx<'t> {
                 ))
             }
             Term::Let(x, _, e1, e2) => self.let_(x, e1, e2, t, col),
+            Term::Match(s, arms) => self.match_(s, arms, t, col),
             other => Err(form(other)),
         }
     }
 
-    fn inferred(&self, e: &Term) -> Result<Type, Unsupported> {
+    pub(super) fn inferred(&self, e: &Term) -> Result<Type, Unsupported> {
         self.node(e)?
             .inferred
             .clone()
@@ -440,24 +449,28 @@ impl<'t> Cx<'t> {
         col: usize,
     ) -> Result<String, Unsupported> {
         let pad = format!("\n{}", " ".repeat(col + 2));
-        let scheme = self
-            .node(e1)?
-            .scheme
-            .clone()
-            .ok_or("a `let` without its scheme")?;
+        let node = self.node(e1)?;
+        let scheme = node.scheme.clone().ok_or("a `let` without its scheme")?;
         if !scheme.outlives.is_empty() {
             return Err("a scheme with facts".into());
         }
         let k = scheme.vars.len();
         let outer = self.env.clone();
-        self.env.vars = scheme
-            .vars
-            .iter()
-            .map(|(v, _)| v.to_string())
-            .chain(outer.vars.iter().cloned())
-            .collect();
+        let under = |names: Vec<String>| -> Vec<String> {
+            names.into_iter().chain(outer.vars.iter().cloned()).collect()
+        };
+        self.env.vars = under(scheme.vars.iter().map(|(v, _)| v.to_string()).collect());
         let a = self.ty(&scheme.body);
-        let rhs = self.typing(e1, &scheme.body, col + 2);
+        // a signed right side is typed at its rigid variables, the binders
+        // of (Let-Gen)
+        let rhs_ty = match (&node.rigid, &node.expected) {
+            (Some(rigid), Some(t)) => {
+                self.env.vars = under(rigid.iter().map(ToString::to_string).collect());
+                t
+            }
+            _ => &scheme.body,
+        };
+        let rhs = self.typing(e1, rhs_ty, col + 2);
         self.env = outer;
         let (a, rhs) = (a?, rhs?);
         let rest = self.under(x, |c| c.typing(e2, t, col + 2))?;

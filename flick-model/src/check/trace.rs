@@ -7,7 +7,7 @@ use std::ptr;
 
 use super::Checker;
 use super::generalize::Inst;
-use crate::syntax::Term;
+use crate::syntax::{Name, Term};
 use crate::types::{Scheme, Type};
 
 #[derive(Clone, Debug, Default)]
@@ -20,6 +20,9 @@ pub struct Node {
     pub(crate) instance: Option<(Scheme, Vec<Inst>)>,
     /// The scheme a `let` binds, on its right side.
     pub(crate) scheme: Option<Scheme>,
+    /// The rigid variables a signed right side is checked at, those of its
+    /// scheme in order.
+    pub(crate) rigid: Option<Vec<Name>>,
 }
 
 /// The nodes of a check, by [`key`].
@@ -60,6 +63,7 @@ impl Checker<'_> {
                         .as_ref()
                         .map(|(s, is)| (scheme(s), is.iter().map(inst).collect())),
                     scheme: n.scheme.as_ref().map(scheme),
+                    rigid: n.rigid.clone(),
                 };
                 (*k, node)
             })

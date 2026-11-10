@@ -28,9 +28,20 @@ const STORED: [&str; 1] = ["Seq"];
 pub(crate) struct Env {
     pub(crate) vars: Vec<String>,
     pub(crate) inst: Vec<(String, String)>,
+    /// A meta the check left open is the least instance of its kind: a type
+    /// `Unit`, a row or capture row empty. A certificate's typing holds at
+    /// any instance of them, and Lean checks it at this one.
+    pub(crate) ground: bool,
 }
 
 impl Env {
+    /// The variables of `v` the core writes: an open meta of a row or a
+    /// capture row is empty in a grounded one.
+    fn kept<'v>(&self, vs: impl Iterator<Item = &'v Var>) -> impl Iterator<Item = &'v Var> {
+        let ground = self.ground;
+        vs.filter(move |v| !(ground && matches!(v, Var::Meta(_))))
+    }
+
     fn index(&self, v: &str) -> Result<usize, String> {
         self.vars
             .iter()
@@ -66,7 +77,7 @@ pub(crate) fn caps(c: &Caps, env: &Env) -> Result<String, String> {
     let atoms = c
         .atoms
         .iter()
-        .chain(&c.vars)
+        .chain(env.kept(c.vars.iter()))
         .map(|v| Ok(format!("x = .v {}", env.index_of(v)?)))
         .collect::<Result<Vec<_>, String>>()?;
     Ok(disjunction(&atoms, "Caps.none"))
@@ -90,7 +101,7 @@ pub(crate) fn row(r: &Row, env: &Env) -> Result<String, String> {
             return Err(format!("the element `{name}` with arguments"));
         }
     }
-    for v in &r.vars {
+    for v in env.kept(r.vars.iter()) {
         parts.push(format!("x = .rv (.v {})", env.index_of(v)?));
     }
     Ok(disjunction(&parts, "Row.none"))
@@ -143,6 +154,7 @@ fn qualified(t: &Type, q: Option<&Caps>, env: &Env) -> Result<String, String> {
     let c = |env: &Env| q.map_or(Ok("Caps.none".into()), |q| caps(q, env));
     Ok(match t {
         Type::Var(Var::Named(n)) => format!("(.tvar {})", env.index(n)?),
+        Type::Var(Var::Meta(_)) if env.ground => "(.base .unit)".into(),
         Type::Con(p) => con(p),
         Type::App(..) => data(t, q, env)?,
         Type::Fun(p, s, r) => {
@@ -267,7 +279,7 @@ fn visit(t: &Type, f: &mut dyn FnMut(&Type) -> bool) -> bool {
 pub(super) fn theorem(name: &str, doc: &str, s: &Scheme, live: &Scheme) -> Result<String, String> {
     let env = Env {
         vars: s.vars.iter().map(|(v, _)| v.to_string()).collect(),
-        inst: Vec::new(),
+        ..Env::default()
     };
     let k: Vec<String> = s
         .vars

@@ -217,7 +217,8 @@ impl Checker<'_> {
         qualifier: Caps,
     ) -> Check<()> {
         let (facts, givens) = (self.regions.facts.len(), self.givens());
-        let mut body = self.skolemize(s);
+        let (mut body, rigid) = self.skolemize(s);
+        self.note(e, |n| n.rigid = Some(rigid));
         if !qualifier.is_empty() {
             body = Type::Captured(Rc::new(body), qualifier);
         }

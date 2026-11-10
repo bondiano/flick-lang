@@ -28,6 +28,17 @@ def genRes (K : Name) : List Ty :=
   | some (k, _, _) => idTs k
   | none => []
 
+/-- The constructors of each type, with their arity. -/
+def genAdtCtors : Name → List (Name × Nat)
+  | "Fixture.Bad" => [("Fixture.Bad", 1)]
+  | "Fixture.Leaked" => [("Fixture.Leaked", 1)]
+  | "Fixture.Oops" => [("Fixture.Oops", 1)]
+  | "Fixture.Sealed" => [("Fixture.Sealed", 1)]
+  | "Fixture.Wrapper" => [("Fixture.Wrapper", 1)]
+  | "Prelude.Option" => [("Prelude.None", 0), ("Prelude.Some", 1)]
+  | "Tuple" => [("Tuple", 2)]
+  | _ => []
+
 def genGlob : Nat → Option Scheme
   -- Prim("Arith(Add, Int)")
   | 0 => some ⟨0, Facts.none, (.arrow (.base .int) .pure (.arrow (.base .int) .pure (.base .int) Caps.none) Caps.none)⟩
@@ -71,6 +82,14 @@ structure GenSig (S : Sig) : Prop where
   ctor : ∀ K, (genCtor K).isSome → S.ctor K = genCtor K
   res : ∀ K, (genCtor K).isSome → S.res K = genRes K
   glob : ∀ g, (genGlob g).isSome → S.glob g = genGlob g
+  /-- A type of the generator has no constructors but its own. -/
+  closed : ∀ K k ts T, S.ctor K = some (k, ts, T) → genAdtCtors T ≠ [] → genCtor K = some (k, ts, T)
+
+theorem genAdtCtors_complete : ∀ K k ts T, genCtor K = some (k, ts, T) →
+    (K, ts.length) ∈ genAdtCtors T := by
+  intro K k ts T h
+  unfold genCtor at h
+  split at h <;> cases h <;> decide
 
 theorem genCtor_closed : ∀ K k ts T σ, genCtor K = some (k, ts, T) →
     (∀ i, i < k → σ (.v i) = .tvar i) → ts.map (Ty.substT σ) = ts := by
@@ -120,7 +139,7 @@ def genSig : Sig where
 
 /-- The assumption of a certificate holds of a signature. -/
 theorem GenSig.inhabited : ∃ S, GenSig S :=
-  ⟨genSig, fun _ _ => rfl, fun _ _ => rfl, fun _ _ => rfl⟩
+  ⟨genSig, fun _ _ => rfl, fun _ _ => rfl, fun _ _ => rfl, fun _ _ _ _ h _ => h⟩
 
 end Flick.Cert
 
