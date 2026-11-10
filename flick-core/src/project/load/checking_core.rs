@@ -265,11 +265,7 @@ impl Checking<'_> {
         let resolved_cleanly = !resolved.iter().any(|d| d.severity == Severity::Error);
         diagnostics.extend(resolved);
         diagnostics.extend(contract_errors);
-        // Keep the resolved exports before checking: a failed module may leave
-        // store-local type variables in its inferred schemes. Importers must
-        // not read those variables with their own unification store.
         let broken = !loaded.parse.diagnostics.is_empty();
-        let mut untyped = interface.clone();
         let (mut checked, typing) = types::check_typed_with_module_dictionaries(
             &module,
             &projected_lookup,
@@ -292,7 +288,6 @@ impl Checking<'_> {
         if let Some(expansion) = &loaded.expansion {
             expansion.restore(&mut diagnostics, ir.as_mut());
             expansion.place_interface(&mut interface);
-            expansion.place_interface(&mut untyped);
         }
         #[cfg(feature = "ide")]
         let typing = match &loaded.expansion {
@@ -308,7 +303,7 @@ impl Checking<'_> {
             typing: Arc::new(typing),
             #[cfg(feature = "ide")]
             inline_ide: Vec::new(),
-            exported: if clean { interface.clone() } else { untyped },
+            exported: exported(&interface, clean),
             interface,
             ir: ir.filter(|_| self.cache.is_none() || self.cached_ir == CachedIr::Kept),
             declarations,
