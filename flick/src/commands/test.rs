@@ -434,6 +434,7 @@ fn watch(options: &TestArguments, global: &GlobalArguments) -> ExitCode {
         if let Some(child) = &mut child {
             stop(child);
         }
+        timings::discard();
         println!("\n— a file changed: running the tests again —\n");
     }
 }

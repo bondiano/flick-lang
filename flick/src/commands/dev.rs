@@ -87,6 +87,10 @@ pub fn dev(options: &RunArguments, global: &GlobalArguments) -> ExitCode {
     loop {
         let now = watch_snapshot(&paths);
         if seen.as_ref() != Some(&now) {
+            // the version running until now is no phase of the next build
+            if seen.is_some() {
+                timings::discard();
+            }
             seen = Some(now);
             let built = build_into_generation(&project, options, global);
             // each build reports itself, before the version it built starts

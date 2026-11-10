@@ -201,6 +201,17 @@ impl Report {
     }
 }
 
+/// What was collected since the last report, which starts anew.
+fn collected() -> Records {
+    let empty = Records {
+        stages: Vec::new(),
+        phases: Vec::new(),
+        modules: Vec::new(),
+        misses: Vec::new(),
+    };
+    mem::replace(&mut *records(), empty)
+}
+
 /// With `--timings`, writes what was collected since the last report on
 /// stderr and starts anew: a watching command reports each of its runs,
 /// and keeps the records of none.
@@ -208,16 +219,11 @@ pub fn report(global: &GlobalArguments) {
     if !global.timings {
         return;
     }
-    let collected = {
-        let mut records = records();
-        let empty = Records {
-            stages: Vec::new(),
-            phases: Vec::new(),
-            modules: Vec::new(),
-            misses: Vec::new(),
-        };
-        mem::replace(&mut *records, empty)
-    };
+    let collected = collected();
+    // a watching command that reported its last run has nothing more to say
+    if collected.stages.is_empty() && collected.modules.is_empty() {
+        return;
+    }
     let report = Report::of(collected, Instant::now());
     let out = match global.diagnostics {
         DiagnosticsFormat::Human => report.human(),
@@ -225,6 +231,13 @@ pub fn report(global: &GlobalArguments) {
     };
     // stderr closed: nothing useful left to do with the error
     let _ = io::stderr().lock().write_all(out.as_bytes());
+}
+
+/// Forgets what was collected since the last report: what a watching
+/// command started ran, and then waited for a change, which is no phase of
+/// the run that follows.
+pub fn discard() {
+    drop(collected());
 }
 
 #[cfg(test)]
