@@ -23,7 +23,7 @@ flick-core = { path = "../flick-core", features = ["ide"] }
 flick-ir = { path = "../flick-ir", features = ["json", "cbor"] }
 flick-plugin = { path = "../flick-plugin" }
 wasmtime = { version = "=48.0.8", default-features = false, features = ["runtime", "cranelift", "component-model", "std"], optional = true }
-serde_json = "1.0.154"
+serde_json = { workspace = true }
 sha2 = "0.10.9"
 signal-hook = "0.4.6"
 tar = "0.4.44"
@@ -38,4 +38,3 @@ rustix = { version = "1.1.6", features = ["process", "termios"] }
 flick-model = { path = "../flick-model" }
 flick-wasm = { path = "../flick-wasm" }
 insta = "1.49.0"
-serde_json = "1.0.154"

@@ -20,4 +20,4 @@ cbor = ["dep:ciborium"]
 [dependencies]
 ciborium = { version = "0.2.2", optional = true }
 serde = { version = "1.0.229", features = ["derive", "rc"] }
-serde_json = { version = "1.0.154", optional = true }
+serde_json = { workspace = true, optional = true }
