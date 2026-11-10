@@ -140,29 +140,6 @@ theorem T1_mode {root e₀ t φ₀ c} (hroot : RootTyM S mode root)
     | blocked hb => exact .inr (.inr (.inr hb))
     | unw h' => exact .inl (.inr (.inr h'))
 
-theorem cstep_typed {root Ψ c c' t φ l} (hroot : RootTy S root) (ht : t.YF 0)
-    (hφ : φ.substT (kill 0) = φ) (hc : CfgTy S Ψ c t φ) (hs : CStep root l c c') :
-    ∃ X, CfgTy S (Ψ ++ X) c' t φ ∧ ∀ u ∈ X, u.YF c.rgs.length :=
-  cstep_typed_mode hroot ht hφ hc hs
-
-theorem steps_typed {root c c'} (hroot : RootTy S root) (hs : CSteps root c c') :
-    ∀ {Ψ t φ}, t.YF 0 → φ.substT (kill 0) = φ → CfgTy S Ψ c t φ →
-      ∃ X, CfgTy S (Ψ ++ X) c' t φ :=
-  steps_typed_mode hroot hs
-
-/-- **T1** of the capture discipline. -/
-theorem T1 {root e₀ t φ₀ c} (hroot : RootTy S root)
-    (hcov : ∀ N, φ₀.svc (.nm N) → (root.svc N).isSome) (h₀ : Typ S [] Facts.none [] e₀ (.ex t φ₀))
-    (hp : e₀.Below 0) (ht : t.YF 0) (hφ : φ₀.substT (kill 0) = φ₀)
-    (hs : CSteps root ⟨[], [], e₀⟩ c) :
-    ((Value c.main ∧ ∃ Ψ, StoreTy S Ψ c.mem ∧ Typ S Ψ Facts.age [] c.main (.ex t .pure)) ∨
-      (∃ v, c.main = .raise v ∧ ∃ Ψ, Typ S Ψ Facts.age [] v (.ex (.errors φ₀.err) .pure)) ∨
-      (∃ l o, Step root l c.rgs c.mem c.main o) ∨ Blocked c.rgs c.main) ∧
-    ∀ (p : Nat) (g : Rgn), c.rgs[p]? = some g → g.live = true → ∀ k ∈ g.kids,
-      Final k ∨ (∃ l o, Step root l c.rgs c.mem k o) ∨ (∃ D, PerformStuck S root k D) ∨
-        Blocked c.rgs k :=
-  T1_mode hroot hcov h₀ hp ht hφ hs
-
 /-- **T1** of the live discipline. -/
 theorem T1_live {root e₀ t φ₀ c} (hroot : RootTyM S .live root)
     (hcov : ∀ N, φ₀.svc (.nm N) → (root.svc N).isSome) (h₀ : TypM S .live [] Facts.none [] e₀ (.ex t φ₀))

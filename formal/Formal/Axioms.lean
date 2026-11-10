@@ -13,10 +13,6 @@ of Lean: a `sorry` (`sorryAx`) or a new `axiom` changes what `#print axioms`
 prints, and `#guard_msgs` turns the difference into an error.
 -/
 
-/-- info: 'Flick.T1' depends on axioms: [propext, Classical.choice, Quot.sound] -/
-#guard_msgs in
-#print axioms Flick.T1
-
 /-- info: 'Flick.T1_live' depends on axioms: [propext, Classical.choice, Quot.sound] -/
 #guard_msgs in
 #print axioms Flick.T1_live

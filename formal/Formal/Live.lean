@@ -1,4 +1,5 @@
 import Formal.Regions
+import Formal.Nest
 import Formal.T43Main
 import Formal.LiveRules
 
@@ -134,20 +135,9 @@ def SafeUse (root : Roots) (Ok : Tm → Ty → Stage → Prop) : Prop :=
     (∀ i e E Ef o k v q, c.at i = some e → OkE E → e = plug E (.app (.const (.perform Ef o k)) v) →
       handlerOf E Ef o k = some q → Live c.rgs q)
 
-/-- The current rules satisfy T4′: it follows from T4 and T4.3. -/
-theorem T4'_captures {root : Roots} (hroot : RootTy S root) :
-    SafeUse root (fun e t φ => Typ S [] Facts.none [] e (.ex t φ)) := by
-  intro e₀ t φ₀ c h₀ hp ht hφ hs
-  obtain ⟨h1, h2, -, -⟩ := T4 hroot h₀ hp ht hφ hs
-  exact ⟨h1, h2, T4_3 hroot h₀ hp ht hφ hs⟩
-
 /-- T4′ is closed under a smaller judgment: a discipline that accepts less keeps it. -/
 theorem SafeUse.mono {root : Roots} {Ok Ok' : Tm → Ty → Stage → Prop}
     (h : SafeUse root Ok) (hle : ∀ e t φ, Ok' e t φ → Ok e t φ) : SafeUse root Ok' :=
   fun e₀ t φ₀ c h₀ => h e₀ t φ₀ c (hle _ _ _ h₀)
 
 end Flick
-
-/-- info: 'Flick.T4'_captures' depends on axioms: [propext, Classical.choice, Quot.sound] -/
-#guard_msgs in
-#print axioms Flick.T4'_captures

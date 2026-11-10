@@ -21,15 +21,6 @@ theorem use_none_le (r ε : Row) :
   · exact h
   · cases x <;> exact h.elim
 
-/-- In captures mode the parameter shows the region, so the qualifier may disappear. -/
-theorem captures_erases : Le qualified unqualified := by
-  refine .arrow .refl ⟨fun _ h => h, fun _ h => h⟩ .refl ?_
-  intro a h
-  rcases h with h | h | h
-  · exact .inl h
-  · exact h.elim
-  · exact .inl h
-
 /-- Under live, showing the region in a parameter must not erase its use obligation. -/
 theorem live_keeps_use : ¬ TypingMode.live.subtype qualified unqualified := by
   intro h
@@ -65,12 +56,6 @@ theorem holdsOnly_holds : held [] [] holdsOnly (.r 0) := by
 theorem holdsOnly_live (S : Sig) : TypLive S [] Facts.none [] holdsOnly (.ex thunk .pure) := by
   exact .lam (.let_ (a := .hnd (.rg 0)) .cap .lit)
     (by simp [Tm.NoIns, Tm.Has]) trivial .refl
-
-/-- The same unqualified closure remains rejected by the capture discipline. -/
-theorem holdsOnly_not_captures (S : Sig) : ¬ Typ S [] Facts.none [] holdsOnly (.ex thunk .pure) := by
-  intro h
-  have hr := (h.holds .lam rfl).1 _ holdsOnly_holds
-  simp [thunk, Ty.reach, Caps.none] at hr
 
 def scopeHold : Tm :=
   .scope (.let_ (.app (.const .open_) (.var 0)) (.lam (.let_ (.var 1) (.lit .unit))))
@@ -226,15 +211,12 @@ example : ¬ TypingMode.live.keep Facts.none (fun x => x = .rv (.v 0)) (.rg 1) :
   · exact h.elim
 
 /-- `Scope.run` of a function whose qualifier names a region not in the rows around the scope
-is rejected in the live discipline; the capture discipline asks nothing of the constant. -/
+is rejected: the scope's rows must keep what its body uses live. -/
 example : ¬ Const.ok Facts.none .scopeRun { (default : CArg) with C := fun a => a = .r 0 } .live :=
   fun h => h (.atm (.r 0)) rfl
 
 example : Const.ok Facts.none .scopeRun
     { (default : CArg) with C := fun a => a = .r 0, r := Row.ofCaps fun a => a = .r 0 } .live :=
   fun _ h => h
-
-example : Const.ok Facts.none .scopeRun { (default : CArg) with C := fun a => a = .r 0 } .captures :=
-  trivial
 
 end Flick.LiveChecks

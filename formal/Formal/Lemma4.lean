@@ -19,27 +19,6 @@ inductive Reaches (μ : List Tm) : Tm → Nat → Prop
   | here : e.Has (.rgn p) → Reaches μ e p
   | cell : e.Has (.loc l) → μ[l]? = some v → Reaches μ v p → Reaches μ e p
 
-/-- **L4.** If `·;Ψ ⊢ v : τ` and `⊢ μ : Ψ`, then `reach_μ(v) ⊆ ⌈τ⌉`. The cases of
-`regions.md` §5.2 are those of `Typ.holds`; a location reaches the cell's value,
-which is typed at `Ψ(ℓ)` exactly, so it reaches within `⌈Ψ(ℓ)⌉ ⊆ ⌈τ⌉`. -/
-theorem lemma_4 {Ψ μ p} (hμ : StoreTy S Ψ μ) {e : Tm} (hr : Reaches μ e p) :
-    ∀ {Θ τ φ}, Value e → Typ S Ψ Θ [] e (.ex τ φ) → τ.reach (.r p) := by
-  induction hr with
-  | here hp =>
-    intro _ _ _ hv h
-    exact (h.holds hv rfl).1 _ (.inr (.inl ⟨_, hp, rfl⟩))
-  | cell hl hv' _ ih =>
-    intro _ _ _ hv h
-    have hlt := h.locs _ hl
-    obtain ⟨hvv, hvt⟩ := hμ.2 _ _ _ hv' (List.getElem?_eq_getElem hlt)
-    exact (h.holds hv rfl).1 _ (.inr (.inr ⟨_, _, hl, List.getElem?_eq_getElem hlt, ih hvv hvt⟩))
-
-/-- A cell reaches no more than its type. -/
-theorem lemma_4_cell {Ψ : List Ty} {μ : List Tm} {l : Nat} {v : Tm} {t : Ty} {p : Nat} (hμ : StoreTy S Ψ μ) (hv : μ[l]? = some v)
-    (ht : Ψ[l]? = some t) (hr : Reaches μ v p) : t.reach (.r p) :=
-  let ⟨hvv, hvt⟩ := hμ.2 l v t hv ht
-  lemma_4 hμ hr hvv hvt
-
 /-- **L6 (old cells).** In every configuration reached by a program, the type of each
 cell names only regions that already exist, and later configurations keep the type
 of every cell: a region created after a cell is not in its type. -/
