@@ -244,7 +244,7 @@ impl Table {
         };
         for &(module, text) in sources {
             // most modules declare none: only one that may is parsed
-            if !text.contains("@lang") {
+            if !may_declare(text) {
                 continue;
             }
             let mut map = SourceMap::default();
@@ -279,6 +279,18 @@ impl Table {
         self.find(lang)
             .unwrap_or_else(|| panic!("no built-in module declares `@lang {}`", lang.name()))
     }
+}
+
+/// Whether `text` may hold a `@lang` attribute: an `@` whose next word is
+/// `lang`, however they are spaced, or one that no word follows, which only
+/// parsing tells apart.
+fn may_declare(text: &str) -> bool {
+    text.match_indices('@').any(|(at, _)| {
+        let rest = text[at + 1..].trim_start();
+        let end = rest.find(|c: char| !(c.is_alphanumeric() || c == '_'));
+        let word = end.map_or(rest, |end| &rest[..end]);
+        word.is_empty() || word == "lang"
+    })
 }
 
 /// The lang items of the built-in modules.
@@ -421,7 +433,25 @@ pub fn lang_of(attribute: &Node, text: &str) -> Option<Lang> {
 
 #[cfg(test)]
 mod tests {
-    use super::{Lang, table};
+    use super::{Lang, Table, may_declare, table};
+
+    /// A module is parsed for its lang items however the parser may read
+    /// the attribute, and not for an `@` of something else.
+    #[test]
+    fn a_lang_attribute_is_found_however_it_is_spaced() {
+        for spelling in ["@lang owner", "@ lang owner", "@\tlang owner"] {
+            let text =
+                format!("module Fiber exposing (Owner)\n\n{spelling}\ntype Owner (s : Region)\n");
+            let table = Table::of(&[("Fiber", &text)]);
+            let found = table.find(Lang::Owner).map(|item| item.name.as_str());
+            assert_eq!(found, Some("Owner"), "{spelling}");
+        }
+        assert!(may_declare("@"));
+        assert!(!may_declare(
+            "foreign f from \"@flick-lang/effect-ts\" \"f\""
+        ));
+        assert!(!may_declare("@language of the page"));
+    }
 
     /// Each lang item names one declaration of the built-in modules.
     #[test]

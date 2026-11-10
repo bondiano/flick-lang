@@ -90,31 +90,45 @@ fn read_or_check(stages_by_class: bool) -> Result<(), Diagnostic> {
 /// How many threads read the saved interfaces at most.
 const READERS: usize = 8;
 
-/// The interfaces of a saved file, one JSON document a line. Reading them
-/// is most of what a small check takes, so several threads share the lines,
-/// which a string of JSON never breaks.
+/// The interfaces of a saved file, one JSON document a line: all of them,
+/// or nothing when a line does not read or the file holds another number of
+/// them than there are built-in modules, as one cut short does. Reading
+/// them is most of what a small check takes, so several threads share the
+/// lines, which a string of JSON never breaks.
 fn saved(bytes: &[u8]) -> Option<Vec<Interface>> {
     let lines: Vec<&[u8]> = bytes
         .split(|byte| *byte == b'\n')
         .filter(|line| !line.is_empty())
         .collect();
+    if lines.len() != types::builtin_sources().len() {
+        return None;
+    }
     let available = thread::available_parallelism().map_or(1, NonZero::get);
     let readers = available.min(READERS).min(lines.len()).max(1);
     let lines = &lines;
+    // every `readers`-th line each: the big modules stand together
+    let read = move |first: usize| {
+        (lines.iter().skip(first).step_by(readers))
+            .map(|line| serde_json::from_slice::<Interface>(line).ok())
+            .collect::<Option<Vec<_>>>()
+    };
     thread::scope(|scope| {
-        // every `readers`-th line each: the big modules stand together
         let parts: Vec<_> = (0..readers)
             .map(|first| {
-                scope.spawn(move || {
-                    (lines.iter().skip(first).step_by(readers))
-                        .map(|line| serde_json::from_slice::<Interface>(line).ok())
-                        .collect::<Option<Vec<_>>>()
-                })
+                let reader = thread::Builder::new().spawn_scoped(scope, move || read(first));
+                reader.map_err(|_| first)
             })
             .collect();
         let mut parts = parts
             .into_iter()
-            .map(|part| Some(part.join().ok()??.into_iter()))
+            .map(|part| {
+                let read = match part {
+                    Ok(reader) => reader.join().ok()?,
+                    // a thread the system refuses is work this one does
+                    Err(first) => read(first),
+                };
+                Some(read?.into_iter())
+            })
             .collect::<Option<Vec<_>>>()?;
         (0..lines.len())
             .map(|line| parts[line % readers].next())
