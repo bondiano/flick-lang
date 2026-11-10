@@ -83,18 +83,20 @@ e2e-js: docs-wasm e2e-prepare
     node docs/scripts/chunks.mjs
     pnpm -C docs e2e
 
-# The e2e suites of the compiler but the cases of tests/run, under nextest.
+# The e2e suites of the compiler but the cases of tests/run, on the Effect
+# runtime and on Flick's own, under nextest.
 # Every ignored test of `flick` and `flick-core` runs here: the selection is
 # "all their test targets, minus the exceptions", so a new suite is covered
 # without touching this recipe. Each exception belongs to the recipe named
 # beside it, and `flick/tests/ignored_tests.rs` holds this recipe to that.
 e2e-tests: e2e-prepare
     cargo nextest run --cargo-profile e2e --profile ci --run-ignored only -p flick -p flick-core \
-      -E 'not (test(=run_cases) | binary_id(flick::sql_postgres) | binary_id(flick::conduit) | test(~dump) | test(~write_fixes_of_built_in_signatures))'
+      -E 'not (test(=run_cases) | test(~rt_cases) | binary_id(flick::sql_postgres) | binary_id(flick::conduit) | test(~dump) | test(~write_fixes_of_built_in_signatures))'
 
-# The cases of tests/run: all of them, or the shard `k/n` of them
+# The cases of tests/run, and the same cases on Flick's own runtime: all of
+# them, or the shard `k/n` of them
 e2e-cases shard="": e2e-prepare
-    FLICK_E2E_SHARD={{shard}} cargo nextest run --cargo-profile e2e --profile ci --run-ignored only -p flick --test e2e -E 'test(=run_cases)'
+    FLICK_E2E_SHARD={{shard}} cargo nextest run --cargo-profile e2e --profile ci --run-ignored only -p flick --test e2e -E 'test(=run_cases) | test(=rt::rt_cases)'
 
 # The language tests of tests/language on Node and as a Go executable, with
 # one seed: both must pass and write the same report; on Flick's own runtime
