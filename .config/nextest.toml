@@ -8,12 +8,12 @@ slow-timeout = { period = "60s" }
 
 # these keep a pool of their own, one case per CPU
 [[profile.default.overrides]]
-filter = "test(=run_cases) | test(=passing_fixtures_compile_to_valid_js)"
+filter = "test(=run_cases) | test(=rt::rt_cases) | test(=passing_fixtures_compile_to_valid_js)"
 threads-required = "num-cpus"
 
-# the time of each pass, which run_cases prints
+# the time of each pass, which run_cases prints, and the counts of rt_cases
 [[profile.default.overrides]]
-filter = "test(=run_cases)"
+filter = "test(=run_cases) | test(=rt::rt_cases)"
 success-output = "final"
 
 [profile.ci]
