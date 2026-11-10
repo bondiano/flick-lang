@@ -375,7 +375,7 @@ pub(super) fn balanced_without_yield(js: &str) -> bool {
 fn after_generator_head(js: &str) -> bool {
     let head = js.trim_end();
     let head = head
-        .strip_suffix(": Generator<any, any, any>")
+        .strip_suffix(": globalThis.Generator<any, any, any>")
         .unwrap_or(head);
     head.rfind("function* (")
         .is_some_and(|at| head[at..].find(')') == Some(head.len() - at - 1))
@@ -411,10 +411,10 @@ mod generator_header_tests {
     #[test]
     fn typed_nested_generators_keep_their_yields_local() {
         assert!(super::balanced_without_yield(
-            "(function* (x: any): Generator<any, any, any> { yield x; })"
+            "(function* (x: any): globalThis.Generator<any, any, any> { yield x; })"
         ));
         assert!(!super::balanced_without_yield(
-            "(function* (x: any): Generator<any, any, any> { yield x; }); yield 2;"
+            "(function* (x: any): globalThis.Generator<any, any, any> { yield x; }); yield 2;"
         ));
     }
 }

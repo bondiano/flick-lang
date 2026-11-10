@@ -254,7 +254,7 @@ fn supported_native_members_emit_typechecking_typescript() {
             ("package.json", "{\"type\":\"module\"}"),
             (
                 "src/App/Main.fl",
-                "module App.Main exposing (main)\nmain : Unit ->{} Unit\nlet main () = ignore (DateTime.now ())\n",
+                "module App.Main exposing (main, Generator)\nservice Generator =\n  value : Unit ->{} Unit\nmain : Unit ->{} Unit\nlet main () = ignore (DateTime.now ())\n",
             ),
         ],
     );

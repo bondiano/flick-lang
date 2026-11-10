@@ -363,7 +363,7 @@ impl Gen<'_> {
                     .map(|p| format!("{p}: any"))
                     .collect::<Vec<_>>()
                     .join(", "),
-                ": Generator<any, any, any>",
+                ": globalThis.Generator<any, any, any>",
             )
         } else {
             (params.to_owned(), "")
