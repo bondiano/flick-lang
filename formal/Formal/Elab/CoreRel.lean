@@ -41,7 +41,7 @@ termination_by sizeOf x
 and a closed term with the same values. -/
 def DP (S : Sig) (root : Roots) (a b : Flick.Tm) : Prop :=
   ¬ Value a ∧ b.Closed ∧ (a.NoIns ∧ b.NoIns ∧ ¬ IsAlts b) ∧ SemEq root a b ∧
-    ∃ Θ t, Typ S [] Θ [] a (.ex t .pure)
+    ∃ Θ t, TypM S .live [] Θ [] a (.ex t .pure)
 
 theorem DP.closed : BClosed (DP S root) := by
   rintro a b ⟨-, hb, -, -, Θ, t, ht⟩
@@ -77,7 +77,7 @@ theorem perform_redex {E o : Name} {c : OpClass} {v : Flick.Tm} (hv : Value v) :
   · exact ha.1 ▸ .const
   · exact ha.2 ▸ hv
 
-theorem perform_app_not_pure {Ψ Θ E o c v t} (h : Typ S Ψ Θ [] (.app (.const (.perform E o c)) v) (.ex t .pure)) :
+theorem perform_app_not_pure {Ψ Θ E o c v t} (h : TypM S .live Ψ Θ [] (.app (.const (.perform E o c)) v) (.ex t .pure)) :
     False := by
   cases h with
   | app hf _ hψ _ =>
@@ -132,22 +132,22 @@ theorem _root_.Flick.RHead.redex' {Λ Λ' : List Rgn} {μ μ' : List Flick.Tm} {
 
 /-- The hole of a pure term is typed at the pure stage. -/
 theorem hole_pure {Θ : Facts} {t : Flick.Ty} {E : List Frame} {r : Flick.Tm} (hE : OkE E)
-    (hr : ¬ Value r) (h : Typ S [] Θ [] (Flick.plug E r) (.ex t .pure)) :
-    ∃ Θ' t', Typ S [] Θ' [] r (.ex t' .pure) := by
-  obtain ⟨K, Θ', t', φ', hr', rel, -, -⟩ := ctx_typing E hE hr h
+    (hr : ¬ Value r) (h : TypM S .live [] Θ [] (Flick.plug E r) (.ex t .pure)) :
+    ∃ Θ' t', TypM S .live [] Θ' [] r (.ex t' .pure) := by
+  obtain ⟨K, Θ', t', φ', hr', rel, -, -⟩ := ctx_typing_mode E hE hr h
   rw [rel.pure rfl] at hr'
   exact ⟨Θ', t', by simpa using hr'⟩
 
 /-- **A step inside a pure term is a pure step of it.** -/
 theorem dp_calm {Θ : Facts} {t : Flick.Ty} {x : Flick.Tm} (hx : ¬ Value x)
-    (ht : Typ S [] Θ [] x (.ex t .pure)) {E₁ : List Frame} (hE₁ : OkE E₁) {l : Lbl}
+    (ht : TypM S .live [] Θ [] x (.ex t .pure)) {E₁ : List Frame} (hE₁ : OkE E₁) {l : Lbl}
     {Λ Λ' : List Rgn} {μ μ' : List Flick.Tm} {t' : Flick.Tm}
     (hs : Flick.Step root l Λ μ (Flick.plug E₁ x) (.cfg Λ' μ' t')) :
     Λ' = Λ ∧ μ' = μ ∧ ∃ x₁, PStep root x x₁ ∧ t' = Flick.plug E₁ x₁ := by
   obtain ⟨E₀, r₀, hE₀, hr₀, rfl⟩ := decomp_exists x hx
   have hE : OkE (E₀ ++ E₁) := fun F hF => (List.mem_append.mp hF).elim (hE₀ F) (hE₁ F)
   have typ : ∀ {E r}, OkE E → Redex r → Flick.plug E r = Flick.plug E₁ (Flick.plug E₀ r₀) →
-      E = E₀ ++ E₁ ∧ r = r₀ ∧ ∃ Θ' t', Typ S [] Θ' [] r (.ex t' .pure) := by
+      E = E₀ ++ E₁ ∧ r = r₀ ∧ ∃ Θ' t', TypM S .live [] Θ' [] r (.ex t' .pure) := by
     intro E r hE' hr h
     rw [← plug_append] at h
     obtain ⟨rfl, rfl⟩ := decomp_eq hr hr₀ hE' hE h
@@ -221,7 +221,7 @@ theorem dp_calm {Θ : Facts} {t : Flick.Ty} {x : Flick.Tm} (hx : ¬ Value x)
     | errVal hv | allI hv => exact (kont_not_value hv).elim
 
 /-- A pure step makes no run-time form. -/
-theorem _root_.Flick.PStep.noIns {x x₁ : Flick.Tm} (hs : PStep root x x₁) (hroot : RootTy S root) (hn : x.NoIns) :
+theorem _root_.Flick.PStep.noIns {x x₁ : Flick.Tm} (hs : PStep root x x₁) (hroot : RootTyM S .live root) (hn : x.NoIns) :
     x₁.NoIns := by
   obtain ⟨E, e, e', -, -, rfl, rfl, hh⟩ := hs.inv
   intro h
@@ -232,21 +232,21 @@ theorem _root_.Flick.PStep.noIns {x x₁ : Flick.Tm} (hs : PStep root x x₁) (h
     · exact (hroot.glob _ _ hg).1 _ h
 
 /-- A pure step keeps the typing at the pure stage. -/
-theorem pstep_typed (hroot : RootTy S root) {Θ : Facts} {t : Flick.Ty} {x x₁ : Flick.Tm}
-    (ht : Typ S [] Θ [] x (.ex t .pure)) (hs : PStep root x x₁) : Typ S [] Θ [] x₁ (.ex t .pure) := by
+theorem pstep_typed (hroot : RootTyM S .live root) {Θ : Facts} {t : Flick.Ty} {x x₁ : Flick.Tm}
+    (ht : TypM S .live [] Θ [] x (.ex t .pure)) (hs : PStep root x x₁) : TypM S .live [] Θ [] x₁ (.ex t .pure) := by
   obtain ⟨E, e, e', hE, he, rfl, rfl, hh⟩ := hs.inv
-  obtain ⟨K, Θ', t', φ', hr, -, -, back⟩ := ctx_typing E hE he.1 ht
+  obtain ⟨K, Θ', t', φ', hr, -, -, back⟩ := ctx_typing_mode E hE he.1 ht
   simp only [List.map_nil] at hr
   have := back.id [] e'
   simp only [List.nil_append, List.map_nil] at this
   apply this
   rcases hh with hh | ⟨g, rfl, hg⟩
-  · exact pure_preservation hr hh
+  · exact pure_preservation_mode hr hh
   · exact glob_preservation hroot hr hg
 
 /-- **A step of the left side of a base pair**: the pair stays a base pair, or its left side is
 a value that the right side reaches. -/
-theorem DP.step (hroot : RootTy S root) {x x₂ x₁ : Flick.Tm} (h : DP S root x x₂)
+theorem DP.step (hroot : RootTyM S .live root) {x x₂ x₁ : Flick.Tm} (h : DP S root x x₂)
     (hs : PStep root x x₁) : (¬ Value x₁ → DP S root x₁ x₂) ∧ (Value x₁ → Eval root x₂ x₁) := by
   obtain ⟨-, hc, ⟨hn, hp⟩, hse, Θ, t, ht⟩ := h
   have hse₁ : SemEq root x₁ x₂ := fun v => (Eval.of_step hs).symm.trans (hse v)

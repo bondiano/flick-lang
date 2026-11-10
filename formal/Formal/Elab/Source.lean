@@ -8,8 +8,10 @@ Source types are the `Ty` of constraints, with the arrow `a →φ^q b` (`docs/fo
 `con 2`, `Int` is `con 4` and `Option a` is `app (con 3) a`. Schemes bind `var 0 … var (k-1)`, capture
 variables among them; under a binder of `k` variables the context is shifted by `k`, as
 `Typ.letGen` does in the core. Terms are Curry-style with de Bruijn variables; a premise `δ`
-is an index into `Δ`. (Lam) and (Let-Sig-Dict) show what a closure holds, as (Lam) of
-`regions.md` (`docs/formal/elaboration.md#t6a-without-captures-does-not-carry-over-to-the-core-with-regions`); qualifiers match exactly, there is no (≤-Cap).
+is an index into `Δ`. Typing is by use, as in the core: the qualifier `q` of an arrow is what
+a call needs live, so (App) of a runtime arrow asks its stage to keep `q` live (`Stage.Keeps`),
+and (Lam) and (Let-Sig-Dict) ask nothing of what a closure holds. Qualifiers match exactly,
+there is no (≤-Cap).
 -/
 
 namespace Flick.Elab
@@ -37,9 +39,55 @@ def inst (ts : List Ty) : Nat → Ty :=
 def Scheme.subst (σ : Nat → Ty) (s : Scheme) : Scheme :=
   ⟨s.k, s.ctx.map (·.subst (lift s.k σ)), s.ty.subst (lift s.k σ), s.q.subst (lift s.k σ)⟩
 
-/-- `⌈s⌉` below its binders: the reach of `⟦s⟧ = ∀ᾱ. D_Q̄ →P^q τ`, as `⌈D_Q⌉ = ∅`. -/
-def Scheme.reach (s : Scheme) (n : Nat) : Prop :=
-  s.ty.reach (n + s.k) ∨ (s.ctx ≠ [] ∧ s.q.reach (n + s.k))
+/-- The variables of `t` that a translated value reaches: those of `t` but the rows of the
+stages of its arrows, which the qualifier of an arrow does not count. -/
+def Ty.Shown : Ty → Nat → Prop
+  | .var m, n => m = n
+  | .con _, _ => False
+  | .app t u, n => t.Shown n ∨ u.Shown n
+  | .arr _ a b q, n => a.Shown n ∨ b.Shown n ∨ q.Shown n
+  | .cnil, _ => False
+  | .cun q q', n => q.Shown n ∨ q'.Shown n
+  | .rnm _ t, n => t.Shown n
+  | .run r r', n => r.Shown n ∨ r'.Shown n
+  | .all k t, n => t.Shown (n + k)
+
+theorem Ty.Shown.occurs {t : Ty} {n : Nat} (h : t.Shown n) : t.Occurs n := by
+  induction t using Ty.ind generalizing n with
+  | var m => exact h
+  | con c => exact h.elim
+  | app t u iht ihu => exact Or.imp iht ihu h
+  | arr φ a b q iha ihb ihq _ =>
+    rcases h with h | h | h
+    · exact .inl (iha h)
+    · exact .inr (.inl (ihb h))
+    · exact .inr (.inr (.inl (ihq h)))
+  | cnil => exact h.elim
+  | cun q q' ihq ihq' => exact Or.imp ihq ihq' h
+  | rnm c t iht => exact iht h
+  | run r r' ihr ihr' => exact Or.imp ihr ihr' h
+  | all k t iht => exact iht h
+
+/-- The row `r` keeps `n` live: a variable of the index of a named element, as `Scope s`
+keeps `s`, or of a type written in the row, as `Live q` is the capture row `q` there. A row
+variable keeps nothing. -/
+def Ty.Keeps : Ty → Nat → Prop
+  | .var _, _ => False
+  | .rnm _ t, n => t.Shown n
+  | .run r r', n => r.Keeps n ∨ r'.Keeps n
+  | t, n => t.Shown n
+
+/-- The stage `φ` keeps the qualifier `q` live: its row of services keeps each variable `q`
+shows. -/
+def Stage.Keeps : Stage → Ty → Prop
+  | .P, _ => False
+  | .R r _, q => ∀ n, q.Shown n → r.Keeps n
+
+/-- An arrow with the empty qualifier applies at its own stage: it needs nothing live. -/
+theorem Stage.keeps_cnil (φ : Stage) : φ = .P ∨ φ = φ ∧ φ.Keeps .cnil := by
+  cases φ with
+  | P => exact .inl rfl
+  | R r e => exact .inr ⟨rfl, fun _ h => h.elim⟩
 
 /-- Source terms; `letSig σ e b` is `let x : σ = e in b`. -/
 inductive Exp where
@@ -109,10 +157,6 @@ def Tm.Free : Tm → Nat → Prop
   | .caseOpt e n s, x => e.Free x ∨ n.Free x ∨ s.Free (x + 1)
   | .con _, _ => False
   | .caseK e _ n _ b r, x => e.Free x ∨ b.Free (x + n) ∨ r.Free x
-
-/-- What `e` holds in `Γ`: the reach of its free variables. `Δ` adds nothing: `⌈D_Q⌉ = ∅`. -/
-def heldS (Γ : List Scheme) (e : Exp) (n : Nat) : Prop :=
-  ∃ x s, e.Free x ∧ Γ[x]? = some s ∧ s.reach n
 
 /-- `e d₁ … dₗ`. -/
 def Tm.dapps (f : Tm) (ds : List Dict) : Tm := ds.foldl (fun f d => .app f (.dict d)) f
@@ -258,8 +302,8 @@ variable (P : Prog)
 
 /-- `Γ; Δ ⊢ e : τ ! φ ⇝ e'` of §2.4. Values take any stage, and an application, a `let` or a
 `match` runs at one stage `φ`: the arrow applied and the right side of a `let` run at
-`ψ ⊑ φ` (the stage part of (Sub), `docs/formal/elaboration.md#let-sig-dict-lost-the-effect-of-the-right-hand-side`). A closure shows what it holds in its arrow, a
-function of dictionaries in the qualifier of its scheme (`docs/formal/elaboration.md#the-dictionary-function-of-let-sig-dict-holds-what-the-right-hand-side-holds`). -/
+`ψ ⊑ φ` (the stage part of (Sub), `docs/formal/elaboration.md#let-sig-dict-lost-the-effect-of-the-right-hand-side`). A runtime arrow is applied where its
+stage keeps its qualifier live; a closure may hold what its arrow does not show. -/
 inductive Elab : List Scheme → List Cn → Exp → Ty → Stage → Tm → Prop
   /-- (Var-Dict) -/
   | var {Γ Δ x σ ts ds φ} : Γ[x]? = some σ → ts.length = σ.k →
@@ -286,9 +330,8 @@ inductive Elab : List Scheme → List Cn → Exp → Ty → Stage → Tm → Pro
       σ.ty.subst (inst ts) = .all k t → us.length = k →
       Elab Γ Δ (.var x) (t.subst (inst us)) φ (.var x)
   | app {Γ Δ f x a b q ψ φ f' x'} : Elab Γ Δ f (.arr ψ a b q) φ f' → Elab Γ Δ x a φ x' →
-      (ψ = .P ∨ ψ = φ) → Elab Γ Δ (.app f x) b φ (.app f' x')
+      (ψ = .P ∨ ψ = φ ∧ φ.Keeps q) → Elab Γ Δ (.app f x) b φ (.app f' x')
   | lam {Γ Δ b a t q φ ψ b'} : Elab (⟨0, [], a, .cnil⟩ :: Γ) Δ b t φ b' →
-      (∀ n, heldS Γ (.lam b) n → (Ty.arr φ a t q).reach n) →
       Elab Γ Δ (.lam b) (.arr φ a t q) ψ (.lam b')
   | let_ {Γ Δ e b a t φ e' b'} : Elab Γ Δ e a φ e' → Elab (⟨0, [], a, .cnil⟩ :: Γ) Δ b t φ b' →
       Elab Γ Δ (.let_ e b) t φ (.let_ e' b')
@@ -296,7 +339,6 @@ inductive Elab : List Scheme → List Cn → Exp → Ty → Stage → Tm → Pro
   | letSig {Γ Δ σ e b t φ₁ φ e' b'} :
       Elab (Γ.map (·.subst (up σ.k))) (σ.ctx ++ Δ.map (·.subst (up σ.k))) e σ.ty φ₁ e' →
       (σ.ctx ≠ [] ∨ σ.k ≠ 0 → φ₁ = .P) → (φ₁ = .P ∨ φ₁ = φ) →
-      (σ.ctx ≠ [] → ∀ n, heldS (Γ.map (·.subst (up σ.k))) e n → σ.ty.reach n ∨ σ.q.reach n) →
       Elab (σ :: Γ) Δ b t φ b' →
       Elab Γ Δ (.letSig σ e b) t φ (.let_ (.lamD σ.ctx.length e') b')
   | ite {Γ Δ c a b t φ c' a' b'} : Elab Γ Δ c boolTy φ c' → Elab Γ Δ a t φ a' →

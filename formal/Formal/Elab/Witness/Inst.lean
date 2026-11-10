@@ -38,40 +38,30 @@ theorem hone_eff : ∀ K k ts, Sg.ctor K = some (k, ts, "Eff") → K = "MkEff" :
 variable {Ψ : List Flick.Ty} {Θ : Facts}
 
 theorem dcons_m {s : Scheme} {c : Nat} {v r : Flick.Tm} {fs l}
-    (hv : ∀ Ψ Θ, Typ Sg Ψ Θ [] v (.ex (trT N (s.ty.subst (inst [.con c]))) .pure))
-    (hr : Typ Sg Ψ Θ [] r (.dfs fs)) :
-    Typ Sg Ψ Θ [] (.rcons l v r) (.dfs ((l, (mfield s).substT (instT [trT N (.con c)])) :: fs)) :=
+    (hv : ∀ Ψ Θ, TypM Sg .live Ψ Θ [] v (.ex (trT N (s.ty.subst (inst [.con c]))) .pure))
+    (hr : TypM Sg .live Ψ Θ [] r (.dfs fs)) :
+    TypM Sg .live Ψ Θ [] (.rcons l v r) (.dfs ((l, (mfield s).substT (instT [trT N (.con c)])) :: fs)) :=
   .dcons (by rw [mfield_t]; exact hv _ _) hr
 
 theorem typ_optBind_tr (c d a b e : Ty) {φ} :
-    Typ Sg Ψ Θ [] optBind (.ex (trT N (bindTy (.con 6) c d a b e)) φ) := by
+    TypM Sg .live Ψ Θ [] optBind (.ex (trT N (bindTy (.con 6) c d a b e)) φ) := by
   simp only [bindTy, arrP, appQ, trT, if_neg (show (6 : Nat) ≠ 2 by decide),
     if_neg (show (6 : Nat) ≠ 4 by decide)]
-  refine typ_optBind ?_
-  intro x h; rcases x with n | p <;>
-    simp [optT, N, Flick.Ty.reach, trT_reach, Caps.none] at h ⊢ <;> grind
+  exact typ_optBind
 
 theorem typ_optMap2_tr (c d a b x g d' : Ty) {φ} :
-    Typ Sg Ψ Θ [] optMap2 (.ex (trT N (map2Ty (.con 6) c d a b x g d')) φ) := by
+    TypM Sg .live Ψ Θ [] optMap2 (.ex (trT N (map2Ty (.con 6) c d a b x g d')) φ) := by
   simp only [map2Ty, arrP, appQ, trT, if_neg (show (6 : Nat) ≠ 2 by decide),
     if_neg (show (6 : Nat) ≠ 4 by decide)]
-  refine typ_optMap2 ?_ ?_ ?_ <;> intro y h <;> rcases y with n | p <;>
-    simp [optT, N, Flick.Ty.reach, trT_reach, Caps.none] at h ⊢ <;> grind
-
-theorem hdrec {c : Nat} {r : Flick.Tm} (hn : ∀ s, ¬ r.Has s) :
-    Caps.Sub (held Ψ [] (.drec c r)) (Flick.Ty.dict c (Flick.Ty.spine [trT N (.con 5)])).reach :=
-  held_sub (fun s h => hn s h) (by simp)
+  exact typ_optMap2
 
 theorem inst_typ {I ins b} (hI : insts I = some ins) (hb : instBody I = some b) :
-    Typ Sg [] Facts.none [] b (.ex (trTT N (instTy ins)) .pure) := by
+    TypM Sg .live [] Facts.none [] b (.ex (trTT N (instTy ins)) .pure) := by
   unfold insts at hI
   split at hI <;> cases hI <;> simp only [instBody, Option.some.injEq] at hb <;> subst hb <;>
     refine .drec (us := [trT N (.con _)]) rfl rfl ?_ (fun h => by
       simp [eqInt, effPure, effMap2, effBind, mkEff, unEff, optPure, optMap2, optBind, un1, someQ,
-        noneQ, iterL, caseLQ, scons, snil, pvars, Flick.Tm.Has] at h)
-      (held_sub (fun s h => by
-        simp [eqInt, effPure, effMap2, effBind, mkEff, unEff, optPure, optMap2, optBind, un1, someQ,
-          noneQ, iterL, caseLQ, scons, snil, pvars, Flick.Tm.Has] at h) (by simp))
+        noneQ, iterL, caseLQ, scons, snil, pvars, Flick.Tm.Has] at h) trivial
   · exact dcons_m (s := ((methSch 0).get rfl).2) (fun _ _ => .const (ι := default) trivial .refl) .dnil
   · exact dcons_m (s := ((methSch 1).get rfl).2) (fun _ _ => typ_effPure_tr hmk hmkr N rfl (by decide) (by decide) _ _)
       (dcons_m (s := ((methSch 2).get rfl).2)

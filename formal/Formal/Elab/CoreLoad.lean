@@ -215,7 +215,7 @@ theorem trDt_shape (δ : Nat → Nat) (d : Dict) : ¬ Value (trDt N δ d) ∧
 
 /-- A closed typed dictionary: its translation is typed in the core at the pure stage. -/
 theorem DTyp.core (hR : Real P Sg N) {d : Dict} {T : TTy} (h : DTyp P [] d T) :
-    Typ Sg [] Facts.none [] (trDt N id d) (.ex (trTT N T) .pure) := by
+    TypM Sg .live [] Facts.none [] (trDt N id d) (.ex (trTT N T) .pure) := by
   obtain ⟨e', he, ht⟩ := DTyp.target (typingTarget hR) h [] .P [] Facts.none [] id id (Corr.nil id id)
   cases he with
   | dict hd => rw [← hd.eq]; exact ht

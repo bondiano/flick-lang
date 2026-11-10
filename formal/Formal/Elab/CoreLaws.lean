@@ -1,4 +1,5 @@
 import Formal.Elab.CoreTr
+import Formal.SubAdm
 
 /-!
 # λFlick⁺ as a `Target`: the typing and its laws
@@ -71,7 +72,7 @@ structure Real : Prop where
 /-- `Γ, ⟦Δ⟧ ⊢⁺ e : t ! φ` in the core. -/
 def Has (Γ : List TSch) (Δ : List Cn) (e : Tm) (t : TTy) (φ : Stage) : Prop :=
   ∀ Ψ Θ Γc γ δ, Corr N Γc Γ Δ γ δ →
-    ∃ e', Tr N γ δ e e' ∧ Typ S Ψ Θ Γc e' (.ex (trTT N t) (trStage N φ))
+    ∃ e', Tr N γ δ e e' ∧ TypM S .live Ψ Θ Γc e' (.ex (trTT N t) (trStage N φ))
 
 variable {P S N}
 
@@ -86,12 +87,23 @@ theorem trTT_inst_tr (t : TTy) (ts : List Ty) :
     (trTT N t).substT (instT (ts.map (trT N))) = trTT N (t.subst (inst ts)) := by
   rw [trTT_subst]; exact Flick.Ty.substT_congr fun a => (trσ_inst N ts a).symm
 
-theorem trStage_le {ψ φ : Stage} (h : ψ = .P ∨ ψ = φ) : (trStage N ψ).le (trStage N φ) := by
-  rcases h with rfl | rfl
+/-- A call of an arrow at `ψ` with the qualifier `q` runs at the stage `φ` that keeps `q`
+live: the atoms of `⌈⟦q⟧⌉` are in the row of `⟦φ⟧` (`trT_keeps`). -/
+theorem trStage_use_le {ψ φ : Stage} {q : Ty} (h : ψ = .P ∨ ψ = φ ∧ φ.Keeps q) :
+    (TypingMode.live.use (trStage N ψ) (trT N q).reach).le (trStage N φ) := by
+  rcases h with rfl | ⟨rfl, hk⟩
   · trivial
-  · cases ψ
-    · trivial
-    · exact ⟨fun _ h => h, fun _ h => h⟩
+  · cases ψ with
+    | P => trivial
+    | R r e =>
+      refine ⟨fun x hx => ?_, fun _ h => h⟩
+      rcases hx with hx | hx
+      · exact hx
+      · cases x with
+        | atm a =>
+          obtain ⟨n, rfl, hn⟩ := (trT_reach N q a).1 hx
+          exact trT_keeps N (hk n hn)
+        | _ => exact hx.elim
 
 theorem has_var {Γ Δ x s ts φ} (hx : Γ[x]? = some s) (hk : ts.length = s.k) :
     Has S N Γ Δ (.var x) (s.ty.subst (inst ts)) φ := fun _ _ _ _ _ hc =>
@@ -120,7 +132,7 @@ theorem has_varAll {Γ Δ x k₀ t₀ ts k t us φ} (hx : Γ[x]? = some ⟨k₀,
   rw [key] at hA'
   refine ⟨_, .var, .var (σ := trS N ⟨k₀, .mono t₀⟩) (ts := ts.map (trT N)) (by rw [hc.var, hx]; rfl)
     (by simpa [trS] using hts) (fun _ _ h => (h : False).elim) ?_⟩
-  show LeI ((trT N t₀).substT (instT (ts.map (trT N)))) (trT N (t.subst (inst us)))
+  show LeLiveI ((trT N t₀).substT (instT (ts.map (trT N)))) (trT N (t.subst (inst us)))
   rw [hA', key]
   exact .inst (by simpa using hus) .refl
 
@@ -131,12 +143,13 @@ theorem has_const (hR : Real P S N) {Γ Δ c s ts φ} (hc : P.consts c = some s)
     (fun _ _ h => (h : False).elim) (by rw [Flick.Scheme.inst, trTT_inst_tr]; exact .refl)⟩
 
 theorem has_app {Γ Δ f x a b q ψ φ} (hf : Has S N Γ Δ f (.mono (.arr ψ a b q)) φ)
-    (hx : Has S N Γ Δ x (.mono a) φ) (hψ : ψ = .P ∨ ψ = φ) : Has S N Γ Δ (.app f x) (.mono b) φ := by
+    (hx : Has S N Γ Δ x (.mono a) φ) (hψ : ψ = .P ∨ ψ = φ ∧ φ.Keeps q) :
+    Has S N Γ Δ (.app f x) (.mono b) φ := by
   intro Ψ Θ Γc γ δ hc
   obtain ⟨f', hf', tf⟩ := hf Ψ Θ Γc γ δ hc
   obtain ⟨x', hx', tx⟩ := hx Ψ Θ Γc γ δ hc
   simp only [trTT, trT_arr] at tf
-  exact ⟨_, .app hf' hx', .app tf tx (trStage_le hψ) .refl⟩
+  exact ⟨_, .app hf' hx', .app tf tx (trStage_use_le hψ) .refl⟩
 
 theorem has_dapp {Γ Δ f x a t q φ} (hf : Has S N Γ Δ f (.arr .P a t q) φ) (hx : Has S N Γ Δ x a φ) :
     Has S N Γ Δ (.app f x) t φ := by
@@ -163,7 +176,7 @@ theorem has_ite {Γ Δ c a b t φ} (hc : Has S N Γ Δ c (.mono boolTy) φ) (ha 
   obtain ⟨c', hc', tc⟩ := hc Ψ Θ Γc γ δ hC
   obtain ⟨a', ha', ta⟩ := ha Ψ Θ Γc γ δ hC
   obtain ⟨b', hb', tb⟩ := hb Ψ Θ Γc γ δ hC
-  have tc' : Typ S Ψ Θ Γc c' (.ex (.base (Lit.bool true).base) (trStage N φ)) := by
+  have tc' : TypM S .live Ψ Θ Γc c' (.ex (.base (Lit.bool true).base) (trStage N φ)) := by
     have := trT_bool N; simp only [trTT] at tc; rwa [this] at tc
   exact ⟨_, .ite hc' ha' hb', .match_ tc' (.acons .lit ta (.acons .wild tb .anil))
     (.inl fun _ _ => ⟨.wild, by simp [Flick.Tm.unguarded], rfl⟩)⟩
@@ -186,22 +199,14 @@ theorem has_caseOpt (hR : Real P S N) {Γ Δ e n s a t φ} (he : Has S N Γ Δ e
   exact ⟨_, .caseOpt he' hn' hs', .match_ te (.acons pat ts (.acons .wild tn .anil))
     (.inl fun _ _ => ⟨.wild, by simp [Flick.Tm.unguarded], rfl⟩)⟩
 
-theorem has_lam {Γ Δ b a t q φ ψ} (hb : Has S N (⟨0, .mono a⟩ :: Γ) Δ b (.mono t) φ)
-    (hh : ∀ n, heldT Γ (.lam b) n → (Ty.arr φ a t q).reach n) :
+/-- (Lam) by use: the body runs where the closure is called, at the stage of its arrow with
+its qualifier live; what the closure holds is not asked. -/
+theorem has_lam {Γ Δ b a t q φ ψ} (hb : Has S N (⟨0, .mono a⟩ :: Γ) Δ b (.mono t) φ) :
     Has S N Γ Δ (.lam b) (.mono (.arr φ a t q)) ψ := by
   intro Ψ Θ Γc γ δ hc
   obtain ⟨b', hb', tb⟩ := hb Ψ Θ _ _ _ (hc.cons N ⟨0, .mono a⟩)
   simp only [trTT, trT_arr]
-  refine ⟨_, .lam hb', .lam tb (hb'.noIns N) ?_ .refl⟩
-  rintro x (⟨i, s, hi, hs, hr⟩ | ⟨⟨p, hp, -⟩ | ⟨l, u, hl, -⟩⟩)
-  · obtain ⟨n, rfl, hn⟩ := corr_held N hc ((Tr.lam hb').free N hi) hs hr
-    rcases hh n hn with h | h | h | h
-    · exact .inl (trT_reach_v N h)
-    · exact .inr (.inl (trT_reach_v N h))
-    · exact .inr (.inr ((Stage.qual_reach _ _ _).2 (.inl (trT_reach_v N h))))
-    · exact .inr (.inr ((Stage.qual_reach _ _ _).2 (.inr ⟨n, rfl, h⟩)))
-  · exact absurd hp ((Tr.lam hb').has N _)
-  · exact absurd hl ((Tr.lam hb').has N _)
+  exact ⟨_, .lam hb', .lam (tb.sub ⟨.refl, TypingMode.le_use _ _ _⟩) (hb'.noIns N) trivial .refl⟩
 
 theorem has_let {Γ Δ e b k t u φ₁ φ}
     (he : Has S N (Γ.map (·.subst (up k))) (Δ.map (·.subst (up k))) e t φ₁)
@@ -210,7 +215,7 @@ theorem has_let {Γ Δ e b k t u φ₁ φ}
   intro Ψ Θ Γc γ δ hc
   obtain ⟨b', hb', tb⟩ := hb Ψ Θ _ _ _ (hc.cons N ⟨k, t⟩)
   have gen : φ₁ = .P → ∃ e', Tr N γ δ (.let_ e b) e' ∧
-      Typ S Ψ Θ Γc e' (.ex (trTT N u) (trStage N φ)) := fun h => by
+      TypM S .live Ψ Θ Γc e' (.ex (trTT N u) (trStage N φ)) := fun h => by
     subst h
     obtain ⟨e', he', te⟩ :=
       he (Ψ.map (Flick.Ty.up k)) (Facts.union (Θ.substT (shiftV k)) Facts.none) _ _ _ (hc.up N k)

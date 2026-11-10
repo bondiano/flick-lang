@@ -106,12 +106,6 @@ theorem Exp.free_rename {ρ : Nat → Nat} {e : Exp} {y : Nat} (h : (e.rename ρ
       exact ⟨x', .inr (.inl hx), rfl⟩
     · obtain ⟨x, hx, rfl⟩ := ihr h; exact ⟨x, .inr (.inr hx), rfl⟩
 
-theorem heldS_rename {Γ Γ' : List Scheme} {ρ : Nat → Nat} (hρ : ∀ x, Γ'[ρ x]? = Γ[x]?)
-    {e : Exp} {n : Nat} (h : heldS Γ' (e.rename ρ) n) : heldS Γ e n := by
-  obtain ⟨y, s, hy, hs, hr⟩ := h
-  obtain ⟨x, hx, rfl⟩ := Exp.free_rename hy
-  exact ⟨x, s, hx, by rw [← hρ]; exact hs, hr⟩
-
 variable {P : Prog}
 
 theorem liftR_get {Γ Γ' : List Scheme} {ρ : Nat → Nat} (h : ∀ x, Γ'[ρ x]? = Γ[x]?) (s : Scheme) :
@@ -146,14 +140,12 @@ theorem Elab.rename {Γ Δ e τ φ e'} (h : Elab P Γ Δ e τ φ e') {Γ' : List
   | varAll hx hc hts hA hus => exact .varAll (by rw [hρ]; exact hx) hc hts hA hus
   | @allLam Γ Δ k b t ψ b' _ ih =>
     exact .allLam (ih fun x => by simp only [List.getElem?_map, hρ])
-  | @lam Γ Δ b a t q φ ψ b' _ hh ih =>
-    exact .lam (ih (liftR_get hρ _)) fun n hn => hh n (heldS_rename (e := .lam b) hρ hn)
+  | lam _ ih => exact .lam (ih (liftR_get hρ _))
   | let_ _ _ ih₁ ih₂ => exact .let_ (ih₁ hρ) (ih₂ (liftR_get hρ _))
-  | @letSig Γ Δ σ e b t φ₁ φ e' b' _ hp hφ hq _ ih₁ ih₂ =>
+  | @letSig Γ Δ σ e b t φ₁ φ e' b' _ hp hφ _ ih₁ ih₂ =>
     have hρ' : ∀ x, (Γ'.map (·.subst (up σ.k)))[ρ x]? = (Γ.map (·.subst (up σ.k)))[x]? := by
       intro x; simp only [List.getElem?_map, hρ]
-    exact .letSig (ih₁ hρ') hp hφ (fun hc n hn => hq hc n (heldS_rename hρ' hn))
-      (ih₂ (liftR_get hρ _))
+    exact .letSig (ih₁ hρ') hp hφ (ih₂ (liftR_get hρ _))
   | ite _ _ _ ihc iha ihb => exact .ite (ihc hρ) (iha hρ) (ihb hρ)
   | caseOpt _ _ _ ihe ihn ihs => exact .caseOpt (ihe hρ) (ihn hρ) (ihs (liftR_get hρ _))
   | con hK hk he => rw [Tm.rename_dapps]; exact .con hK hk he
@@ -176,15 +168,15 @@ theorem Elab.anyStage {Γ Δ e τ φ e'} (h : Elab P Γ Δ e τ φ e') (hφ : φ
   | const hc hk he => exact .const hc hk he
   | app _ _ hψ ih₁ ih₂ =>
     subst hφ
-    exact .app (ih₁ rfl ψ) (ih₂ rfl ψ) (.inl (by rcases hψ with h | h <;> exact h))
-  | lam h hh _ => exact .lam h hh
+    exact .app (ih₁ rfl ψ) (ih₂ rfl ψ) (.inl (by rcases hψ with h | ⟨h, -⟩ <;> exact h))
+  | lam h _ => exact .lam h
   | allLam h => exact .allLam h
   | allVar hx hc hk => exact .allVar hx hc hk
   | varAll hx hc hts hA hus => exact .varAll hx hc hts hA hus
   | let_ _ _ ih₁ ih₂ => exact .let_ (ih₁ hφ ψ) (ih₂ hφ ψ)
-  | letSig h₁ hp hφ₁ hq _ _ ih₂ =>
+  | letSig h₁ hp hφ₁ _ _ ih₂ =>
     subst hφ
-    exact .letSig h₁ hp (.inl (by rcases hφ₁ with h | h <;> exact h)) hq (ih₂ rfl ψ)
+    exact .letSig h₁ hp (.inl (by rcases hφ₁ with h | h <;> exact h)) (ih₂ rfl ψ)
   | ite _ _ _ ihc iha ihb => exact .ite (ihc hφ ψ) (iha hφ ψ) (ihb hφ ψ)
   | caseOpt _ _ _ ihe ihn ihs => exact .caseOpt (ihe hφ ψ) (ihn hφ ψ) (ihs hφ ψ)
   | con hK hk he => exact .con hK hk he

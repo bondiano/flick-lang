@@ -30,7 +30,7 @@ def Waits (root : Roots) (B : Flick.Tm → Flick.Tm → Prop) (Λ Λ' : List Rgn
   Λ' = Λ ∧ μ' = μ ∧ ∃ t₂', Star (PStep root) t₂ t₂' ∧ Cg B false t₁' t₂'
 
 /-- **A step inside a base pair**: the other side waits, or reaches its value. -/
-theorem inside_sim (hroot : RootTy S root) {E₁ E₂ : List Frame} {x x₂ : Flick.Tm} (hE₁ : OkE E₁)
+theorem inside_sim (hroot : RootTyM S .live root) {E₁ E₂ : List Frame} {x x₂ : Flick.Tm} (hE₁ : OkE E₁)
     (hfr : All2 (FrR (DP S root)) E₁ E₂) (hb : DP S root x x₂) {l : Lbl} {Λ Λ' : List Rgn}
     {μ μ' : List Flick.Tm} {t' : Flick.Tm}
     (hs : Flick.Step root l Λ μ (Flick.plug E₁ x) (.cfg Λ' μ' t')) :
@@ -44,7 +44,7 @@ theorem inside_sim (hroot : RootTy S root) {E₁ E₂ : List Frame} {x x₂ : Fl
   · exact ⟨_, .refl, FrR.plugs hfr (.base (h₁ hv₁))⟩
 
 /-- The redex of a step: inside a base pair, or the same frames around a related hole. -/
-theorem around (hroot : RootTy S root) {E : List Frame} {e t₂ : Flick.Tm} (hE : OkE E)
+theorem around (hroot : RootTyM S .live root) {E : List Frame} {e t₂ : Flick.Tm} (hE : OkE E)
     (ht : Cg (DP S root) false (Flick.plug E e) t₂) {l : Lbl} {Λ Λ' : List Rgn}
     {μ μ' : List Flick.Tm} {t' : Flick.Tm}
     (hs : Flick.Step root l Λ μ (Flick.plug E e) (.cfg Λ' μ' t')) :
@@ -58,7 +58,7 @@ theorem around (hroot : RootTy S root) {E : List Frame} {e t₂ : Flick.Tm} (hE 
   · exact .inr ⟨E₂, e₂, rfl, hfr, FrR.okE DP.noVal hfr hE, he, fun hb => inside_sim hroot hE hfr hb hs⟩
 
 /-- **A step of one thread** is matched by the other side. -/
-theorem thread_sim (hroot : RootTy S root) {t₁ t₂ : Flick.Tm} (ht : Cg (DP S root) false t₁ t₂)
+theorem thread_sim (hroot : RootTyM S .live root) {t₁ t₂ : Flick.Tm} (ht : Cg (DP S root) false t₁ t₂)
     {Λ Λ₂ : List Rgn} {μ μ₂ : List Flick.Tm} (hst : StR (DP S root) Λ Λ₂ μ μ₂) {l : Lbl}
     {Λ' : List Rgn} {μ' : List Flick.Tm} {t₁' : Flick.Tm}
     (hs : Flick.Step root l Λ μ t₁ (.cfg Λ' μ' t₁')) :

@@ -101,7 +101,7 @@ theorem field_free {r w : Flick.Tm} {l : Label} (h : r.field l = some w) {j : Na
   | _ => simp [Flick.Tm.field] at h
 
 /-- **The slots of the instances name only their premises**: the bodies are closed. -/
-theorem slots_below (hRun : RealRun P N root) (hroot : RootTy Sg root) : SlotsBelow P := by
+theorem slots_below (hRun : RealRun P N root) (hroot : RootTyM Sg .live root) : SlotsBelow P := by
   intro I ins i s k hI hs hk
   obtain ⟨r, hg, hf⟩ := hRun.inst hI
   obtain ⟨-, sc, -, ht⟩ := hroot.glob _ _ hg
@@ -121,7 +121,7 @@ def RHas (Γ : List TSch) (Δ : List Cn) (e : Tm) (t : TTy) (φ : Stage) : Prop 
   Has Sg N Γ Δ e t φ ∧ ∀ d, e = .dict d → DTyp P Δ d t
 
 /-- **λFlick⁺ as a `Target` with the run of the core.** -/
-def runTarget (hR : Real P Sg N) (hRun : RealRun P N root) (hroot : RootTy Sg root) : Target P where
+def runTarget (hR : Real P Sg N) (hRun : RealRun P N root) (hroot : RootTyM Sg .live root) : Target P where
   Has := RHas P Sg N
   var hx hk := ⟨(typingTarget hR).var hx hk, fun _ h => by cases h⟩
   allLam h := ⟨(typingTarget hR).allLam h.1, fun _ h => by cases h⟩
@@ -136,9 +136,9 @@ def runTarget (hR : Real P Sg N) (hRun : RealRun P N root) (hroot : RootTy Sg ro
     ⟨(typingTarget hR).caseK he.1 hK hT hlen hn hU hb.1 hρ hg hcl hr.1, fun _ h => by cases h⟩
   caseKDead he hK hT hlen hC hr :=
     ⟨(typingTarget hR).caseKDead he.1 hK hT hlen hC hr.1, fun _ h => by cases h⟩
-  lam h hh := ⟨(typingTarget hR).lam h.1 hh, fun _ h => by cases h⟩
+  lam h := ⟨(typingTarget hR).lam h.1, fun _ h => by cases h⟩
   let_ h₁ hk hφ h₂ := ⟨(typingTarget hR).let_ h₁.1 hk hφ h₂.1, fun _ h => by cases h⟩
-  lamD h hφ hh := ⟨(typingTarget hR).lamD h.1 hφ hh, fun _ h => by cases h⟩
+  lamD h hφ := ⟨(typingTarget hR).lamD h.1 hφ, fun _ h => by cases h⟩
   dapp h₁ h₂ := ⟨(typingTarget hR).dapp h₁.1 h₂.1, fun _ h => by cases h⟩
   meth hm hc h := ⟨(typingTarget hR).meth hm hc h.1, fun _ h => by cases h⟩
   dvar hk := ⟨(typingTarget hR).dvar hk, fun _ h => by cases h; exact .var hk⟩
@@ -161,7 +161,7 @@ def runTarget (hR : Real P Sg N) (hRun : RealRun P N root) (hroot : RootTy Sg ro
   final_rel hr ho := ⟨_, .refl, final_sim hr ho⟩
 
 /-- **T6(b) for the core with its run**: `Sim` is `Target.sim` of `runTarget`. -/
-theorem T6b_core (hR : Real P Sg N) (hRun : RealRun P N root) (hroot : RootTy Sg root)
+theorem T6b_core (hR : Real P Sg N) (hRun : RealRun P N root) (hroot : RootTyM Sg .live root)
     {lt : Cn → Cn → Prop} (h : Coherent P lt) (s : Tm) {t : TTy} {φ : Stage}
     {Δ : List Cn} {θ : Nat → Ty} {ρ : Nat → Dict} (hρ : Closes P Δ θ ρ) {qs : List Cn}
     {ds₁ ds₂ : List Dict} (h₁ : Ent P Δ qs ds₁) (h₂ : Ent P Δ qs ds₂)

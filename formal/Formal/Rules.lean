@@ -283,9 +283,9 @@ structure RootTyM (mode : TypingMode) (root : Roots) : Prop where
 abbrev RootTy := RootTyM S .captures
 
 /-- An ordinary constructor at `T us`. -/
-theorem Typ.ctor_plain {Ψ Θ Γ K k ts T₀ us T φ} (hK : S.ctor K = some (k, ts, T₀))
-    (hres : S.res K = idTs k) (hk : us.length = k) (hT : Le (Sig.ctorTy ts T₀ us) T) :
-    Typ S Ψ Θ Γ (.ctor K) (.ex T φ) :=
+theorem TypM.ctor_plain {Ψ Θ Γ K k ts T₀ us T φ} (hK : S.ctor K = some (k, ts, T₀))
+    (hres : S.res K = idTs k) (hk : us.length = k) (hT : mode.subtype (Sig.ctorTy ts T₀ us) T) :
+    TypM S mode Ψ Θ Γ (.ctor K) (.ex T φ) :=
   .ctor hK hk (S.holds_plain hK hres hk) (by rw [Sig.ctorTyR_plain hres hk]; exact hT)
 
 end Flick

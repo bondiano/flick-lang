@@ -76,7 +76,7 @@ theorem asRow_trT_atoms {t : Ty} {b : Atom}
       (∃ M, (trT N t).asRow (.ob M b)) ∨
       ∃ c, (trT N t).asRow (.obv b c) ∨ (trT N t).asRow (.obv c b)) :
     ∃ n, b = .v n ∧ t.Occurs n := by
-  refine (trT_reach N t b).1 ((Flick.Ty.reach_asRow _ _).2 ?_)
+  refine trT_reach_sub N ((Flick.Ty.reach_asRow _ _).2 ?_)
   rcases h with h | h | ⟨M, h⟩ | ⟨c, h | h⟩
   · exact .inl h
   · exact .inr h
@@ -91,14 +91,14 @@ theorem errRow_trT_atoms {t : Ty} {b : Atom}
   simp only [errRow, Row.union, Row.ofCaps, or_false] at h
   rcases h with (h | h) | h | ⟨M, h⟩ | ⟨c, h | h⟩
   · exact asRow_trT_atoms N (.inl h)
-  · exact (trT_reach N t b).1 h
+  · exact trT_reach_sub N h
   · exact asRow_trT_atoms N (.inr (.inl h))
   all_goals simp at h
 
 theorem trT_substT_congr {σ σ' : Atom → Flick.Ty} {t : Ty}
     (h : ∀ n, t.Occurs n → σ (.v n) = σ' (.v n)) : (trT N t).substT σ = (trT N t).substT σ' := by
   have hc : ∀ b, (trT N t).reach b → σ b = σ' b := by
-    intro b hb; obtain ⟨n, rfl, hn⟩ := (trT_reach N t b).1 hb; exact h n hn
+    intro b hb; obtain ⟨n, rfl, hn⟩ := trT_reach_sub N hb; exact h n hn
   induction t using Ty.ind generalizing σ σ' with
   | all k t iht =>
     simp only [trT, Flick.Ty.substT]
@@ -106,7 +106,7 @@ theorem trT_substT_congr {σ σ' : Atom → Flick.Ty} {t : Ty}
       intro n hn; simp only [liftT]; split
       · rfl
       · rw [h (n - k) (by rwa [Ty.Occurs, Nat.sub_add_cancel (by omega)])]
-    rw [iht hl fun b hb => by obtain ⟨n, rfl, hn⟩ := (trT_reach N t b).1 hb; exact hl n hn]
+    rw [iht hl fun b hb => by obtain ⟨n, rfl, hn⟩ := trT_reach_sub N hb; exact hl n hn]
   | var n => exact h n rfl
   | con c => unfold trT; split <;> (try split) <;> rfl
   | cnil => simp [trT, Flick.Ty.substT]
@@ -128,8 +128,8 @@ theorem trT_substT_congr {σ σ' : Atom → Flick.Ty} {t : Ty}
       cases φ with
       | P => rfl
       | R r e =>
-        have stage : ∀ x, (∃ n, x = .v n ∧ (Stage.R r e).Occurs n) → σ x = σ' x := fun x hx =>
-          hc x (by rw [trT_arr]; exact .inr (.inr (.inr hx)))
+        have stage : ∀ x, (∃ n, x = .v n ∧ (Stage.R r e).Occurs n) → σ x = σ' x := by
+          rintro x ⟨n, rfl, hn⟩; exact h n (.inr (.inr (.inr hn)))
         simp only [trStage, Flick.Stage.substT]
         rw [Row.substT_congr fun x hx => stage x (let ⟨n, e, h⟩ := asRow_trT_atoms N hx; ⟨n, e, .inl h⟩),
           Row.substT_congr (r := Row.union _ allNames) fun x hx => stage x ?_]

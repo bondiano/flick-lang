@@ -48,7 +48,6 @@ theorem has_do (X : Target P) {dM dA dA' : Dict} (hM : DTyp P [] dM (.dict effMo
   have hk : X.Has [] [] (.lam (.app (.meth (.dict dA) 1) (.var 0)))
       (.mono (.arr .P (.con 1) (appQ (.con 5) .cnil (.con 1)) .cnil)) .P :=
     X.lam (X.app (hpure _ _ hA) (X.var (s := ⟨0, .mono (.con 1)⟩) (ts := []) rfl rfl) (.inl rfl))
-      (fun _ ⟨_, _, _, hs, _⟩ => by simp at hs)
   have hx : X.Has [] [] (.app (.meth (.dict dA') 1) (.const 8))
       (.mono (appQ (.con 5) .cnil (.con 1))) .P :=
     X.app (hpure _ _ hA') (X.const (s := ⟨0, [], .con 1, .cnil⟩) (ts := []) rfl rfl) (.inl rfl)

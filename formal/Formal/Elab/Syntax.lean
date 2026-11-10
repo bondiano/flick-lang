@@ -173,8 +173,8 @@ def Dict.subst (ρ : Nat → Dict) : Dict → Dict
 def args (ds : List Dict) : Nat → Dict := fun k => ds.getD k (.var 0)
 
 /-- A scheme `∀ᾱ. Q̄ ⇒ τ`: `k` binders `var 0 … var (k-1)`; the variables from `var k` on are
-free. `q` is the qualifier of its dictionary arrows, what the right side of its `let` holds
-(`docs/formal/elaboration.md#the-dictionary-function-of-let-sig-dict-holds-what-the-right-hand-side-holds`); nothing reads it for methods and constants of Γ₀. -/
+free. `q` is the qualifier of its dictionary arrows; as they are pure, a call of them needs
+nothing live, and nothing reads it for methods and constants of Γ₀. -/
 structure Scheme where
   k : Nat
   ctx : List Cn

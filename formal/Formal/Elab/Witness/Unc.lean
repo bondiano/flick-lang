@@ -21,7 +21,7 @@ open Flick.Elab
 variable {Ψ : List Flick.Ty} {Θ : Facts} {Γ : List Flick.Scheme}
 
 /-- A term typed in the empty context is typed in any context. -/
-theorem Typ.anyCtx {e : Flick.Tm} {J} (h : Typ Sg Ψ Θ [] e J) : Typ Sg Ψ Θ Γ e J := by
+theorem Typ.anyCtx {e : Flick.Tm} {J} (h : TypM Sg .live Ψ Θ [] e J) : TypM Sg .live Ψ Θ Γ e J := by
   have hc : e.Closed := fun i hi => by have := h.frees i hi; simp at this
   have := h.rename (Γ' := Γ) (ξ := id) (fun i t hi => by simp at hi)
   rwa [Flick.Tm.Closed.rename hc] at this
@@ -81,12 +81,12 @@ def uncB : Nat → Flick.Tm
 
 /-- **`unc (m+1)`** is typed at `(a₀ →^C … → aₘ →^C r) →P (((a₀, a₁), …, aₘ) →^C r)`. -/
 theorem typ_uncB : ∀ m (As : List Flick.Ty), As.length = m → ∀ {A₀ R : Flick.Ty} {C C0 : Caps} {φ},
-    Typ Sg Ψ Θ [] (uncB m) (.ex (.arrow (curryC C (A₀ :: As) R) .pure
+    TypM Sg .live Ψ Θ [] (uncB m) (.ex (.arrow (curryC C (A₀ :: As) R) .pure
       (.arrow (nestC A₀ As) .pure R C) C0) φ)
   | 0, [], _, A₀, R, C, C0, φ =>
     typ_lam (typ_lam (.app (ψ := .pure) (typ_var_mono rfl) (typ_var_mono rfl) trivial .refl)
-      (fun s h => by simp [Flick.Tm.Has] at h) (mem1 fun x h => (Flick.Scheme.reach_mono _ _).1 h))
-      (fun s h => by simp [Flick.Tm.Has] at h) (by simp)
+      (fun s h => by simp [Flick.Tm.Has] at h))
+      (fun s h => by simp [Flick.Tm.Has] at h)
   | m + 1, As, hl, A₀, R, C, C0, φ => by
     obtain ⟨As', A, rfl⟩ : ∃ As' A, As = As' ++ [A] :=
       ⟨As.dropLast, As.getLast (by rintro rfl; simp at hl), (List.dropLast_concat_getLast _).symm⟩
@@ -94,21 +94,14 @@ theorem typ_uncB : ∀ m (As : List Flick.Ty), As.length = m → ∀ {A₀ R : F
     have hc := curryC_snoc C (A₀ :: As') A R
     simp only [List.cons_append] at hc
     rw [hc, nestC_snoc]
-    refine typ_lam (typ_lam (.match_ (typ_var_mono rfl)
+    exact typ_lam (typ_lam (.match_ (typ_var_mono rfl)
       (.acons (.adt (.app (.app (.head (K := "Tup") (ts := [.tvar 0, .tvar 1]) (us := [nestC A₀ As', A]) rfl Sig.inj_plain rfl) .var) .var) (tcon_hd _ _))
         (.app (ψ := .pure) (.app (ψ := .pure) (.app (ψ := .pure)
           (Typ.anyCtx (typ_uncB m As' hl' (R := .arrow A .pure R C) (C := C) (C0 := Caps.none)))
           (typ_var_mono rfl) trivial .refl) (typ_var_mono rfl) trivial .refl)
           (typ_var_mono rfl) trivial .refl) .anil)
       (.inl (exh_one (rfl : Sg.ctor "Tup" = _) hone_tup _)))
-      (fun s h => by simp [Flick.Tm.Has] at h) ?_) (fun s h => by simp [Flick.Tm.Has] at h) (by simp)
-    refine mem1 fun x h => ?_
-    rcases curryC_reach ((Flick.Scheme.reach_mono _ _).1 h) with h | ⟨a, ha, h⟩ | (h | h | h)
-    · exact .inr (.inr h)
-    · exact .inl (.inl (.inr (nestC_reach ha h)))
-    · exact .inl (.inr h)
-    · exact .inr (.inl h)
-    · exact .inr (.inr h)
+      (fun s h => by simp [Flick.Tm.Has] at h)) (fun s h => by simp [Flick.Tm.Has] at h)
 
 theorem trT_curry (q : Ty) (as : List Ty) (r : Ty) :
     trT N (curry q as r) = curryC (trT N q).reach (as.map (trT N)) (trT N r) := by
@@ -121,7 +114,7 @@ theorem trT_nest (t : Ty) (as : List Ty) :
   | cons a as ih => simp only [nest, ih]; rfl
 
 /-- `unc (m+1)` is typed at the translation of its scheme. -/
-theorem typ_unc_tr (m : Nat) {φ} : Typ Sg Ψ Θ [] (uncB m) (.ex (trT N (uncSch 10 (m + 1)).ty) φ) := by
+theorem typ_unc_tr (m : Nat) {φ} : TypM Sg .live Ψ Θ [] (uncB m) (.ex (trT N (uncSch 10 (m + 1)).ty) φ) := by
   have hv : vars (m + 1) = .var 0 :: (List.range m).map fun i => .var (i + 1) := by
     simp [vars, List.range_succ_eq_map]
   simp only [uncSch, arrP, trT, trT_curry, trT_nest, hv, List.map_cons, List.tail_cons]
@@ -138,7 +131,7 @@ theorem hall_res : ∀ K k ts, Sg.ctor K = some (k, ts, "Result") →
 
 theorem typ_frBody {E A : Flick.Ty} {C0 : Caps} {e : Ty} {φ}
     (hE : ∀ x, E.reach x → errRow (trT N e) (.atm x)) :
-    Typ Sg Ψ Θ [] frBody (.ex (.arrow (tc "Result" [tc "Errors" [E], A]) (trStage N (.R .cnil e)) A
+    TypM Sg .live Ψ Θ [] frBody (.ex (.arrow (tc "Result" [tc "Errors" [E], A]) (trStage N (.R .cnil e)) A
       C0) φ) :=
   .lam (.match_ (typ_var_mono rfl)
       (.acons (.adt (.app (.head (K := "Ok") (ts := [.tvar 1]) (us := [tc "Errors" [E], A]) rfl Sig.inj_plain rfl)
@@ -157,7 +150,7 @@ theorem typ_frBody {E A : Flick.Ty} {C0 : Caps} {e : Ty} {φ}
             | _ => simp [Row.err, Row.union, Row.single, Row.ofCaps, allNames] at hx ⊢)) .anil))
       (.inl (exh_ctors hall_res _)))
     (fun h => by simp [Flick.Tm.Has] at h)
-    (held_sub (fun s h => by simp [Flick.Tm.Has] at h) (by simp)) .refl
+    trivial .refl
 
 /-- The method `eq` of the structural `D_{Eq Rec}`, under its argument `d : D_{Eq Int}`:
 `λa b. match a with MkRec x → match b with MkRec y → d.eq x y`. -/

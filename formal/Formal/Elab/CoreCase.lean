@@ -24,18 +24,14 @@ scheme without run-time sites. -/
 theorem SubOk.of_get {Ψ Θ Γ₁ Γ₂} {τ : Nat → Flick.Tm}
     (h : ∀ i s, Γ₁[i]? = some s → (∃ j, τ i = .var j ∧ Γ₂[j]? = some s) ∨
       ((∀ x, ¬ (τ i).Free x) ∧ (∀ a, ¬ (τ i).Has a) ∧
-        Typ S (Ψ.map (Flick.Ty.up s.k)) (Θ.at s) (Γ₂.map (Flick.Scheme.up s.k)) (τ i)
+        TypM S .live (Ψ.map (Flick.Ty.up s.k)) (Θ.at s) (Γ₂.map (Flick.Scheme.up s.k)) (τ i)
           (.ex s.t .pure) ∧ s.k = 0 ∧ ∃ c u, s.t = .dict c u)) :
-    SubOk S Ψ Θ Γ₁ Γ₂ τ := by
+    SubOkM S .live Ψ Θ Γ₁ Γ₂ τ := by
   intro i s hi
   rcases h i s hi with ⟨j, hj, hs⟩ | ⟨hf, hn, ht, hd⟩
   · rw [hj]
-    refine ⟨Typ.var_self hs, fun h => False.elim h, ?_, .inr (.inl ⟨_, rfl, hs⟩)⟩
-    rintro a (⟨j', s', hj', hs', ha⟩ | ⟨p, hp, _⟩ | ⟨l, _, hl, _⟩)
-    · cases hj'; rw [hs] at hs'; cases hs'; exact ha
-    · cases hp
-    · cases hl
-  · exact ⟨ht, hn .ins, fun a ha => (held_none hf hn a ha).elim, .inr (.inr (.inr hd))⟩
+    exact ⟨TypM.var_self hs, fun h => False.elim h, trivial, .inr (.inl ⟨_, rfl, hs⟩)⟩
+  · exact ⟨ht, hn .ins, trivial, .inr (.inr (.inr hd))⟩
 
 /-- The core context of `Γ` and `Δ`, the premises first. -/
 def canonC (Γ : List TSch) (Δ : List Cn) : List Flick.Scheme :=
@@ -114,7 +110,7 @@ theorem trDt_noFree {δ : Nat → Nat} : ∀ {d : Dict}, d.Below 0 → ∀ x, ¬
 /-- A closed dictionary of `Q`, at an instance of `⟦Q⟧`, in any context of the core. -/
 theorem closed_dict (hR : Real P S N) {Q : Cn} {d : Dict} (h : Ent P [] [Q] [d])
     (μ : Atom → Flick.Ty) (Ψ : List Flick.Ty) (Θ : Facts) (Γc : List Flick.Scheme) :
-    Typ S Ψ Θ Γc (trDt N (fun _ => 0) d) (.ex ((trD N Q).substT μ) .pure) := by
+    TypM S .live Ψ Θ Γc (trDt N (fun _ => 0) d) (.ex ((trD N Q).substT μ) .pure) := by
   have hb : d.Below 0 := by simpa using Ent.dbelow h d (.head _)
   cases ent_core (Γ := []) (φ := .P) hR h with
   | cons hd _ =>
