@@ -22,7 +22,7 @@ flate2 = "1.1.1"
 flick-core = { path = "../flick-core", features = ["ide"] }
 flick-ir = { path = "../flick-ir", features = ["json", "cbor"] }
 flick-plugin = { path = "../flick-plugin" }
-wasmtime = { version = "=48.0.8", default-features = false, features = ["runtime", "cranelift", "component-model", "std"], optional = true }
+wasmtime = { version = "=48.0.8", default-features = false, features = ["runtime", "cranelift", "component-model", "std", "cache"], optional = true }
 serde_json = { workspace = true }
 sha2 = "0.10.9"
 signal-hook = "0.4.6"
