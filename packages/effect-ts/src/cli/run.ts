@@ -21,7 +21,8 @@ import type { Tagged } from "../data.ts";
 import { env, nodeModule } from "../host.ts";
 import { constructorName, tag } from "@flick-lang/runtime/tags";
 import { type FlickFormatter, type FlickHelpDoc, fromEffectDoc, toEffectFormatter, withHelp } from "./output.ts";
-import type { Command as Spec, Param, Source } from "./spec.ts";
+import { callEffect } from "../bridge.ts";
+import type { Command as Spec, Param, Source, ValueResult } from "./spec.ts";
 
 /** `Cli.CliError`. */
 export type FlickCliError = Tagged<string, string>;
@@ -33,7 +34,11 @@ const parse =
   (param: Param) =>
   (text: string): Effect.Effect<unknown, CliError.CliError> => {
     const parsed = param.value.parse(text);
-    return Effect.flatMap(Effect.isEffect(parsed) ? parsed : Effect.succeed(parsed), (result) =>
+    // The dictionary signature fixes the result and has no typed error row;
+    // native runtime stages still need their driver even when that row is closed.
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- Cli.Value.parse fixes this boundary's result and error types
+    const evaluated = (Effect.isEffect(parsed) ? parsed : callEffect(() => parsed)) as Effect.Effect<ValueResult>;
+    return Effect.flatMap(evaluated, (result) =>
       result._tag === "Success"
         ? Effect.succeed(result.success)
         : Effect.fail(

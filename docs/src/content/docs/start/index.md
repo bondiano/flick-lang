@@ -13,7 +13,9 @@ have what you came for.
    takes a few commands and ends with a project you can edit.
 3. **Decide whether it suits you.** [Why Flick](./why/) says what the language
    promises, where those promises stop, and who it does not suit yet.
-4. **Learn the language.** The reference describes it in full: start with
+4. **Structure an application.** [Designing a program with effects](../handbook/designing-with-effects/)
+   walks through services, layers and tests using a small user lookup.
+5. **Look up language rules.** The reference describes them in full: start with
    [Kinds and types](../reference/types/) and
    [Effects, errors and services](../reference/effects/).
 

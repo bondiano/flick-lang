@@ -5,7 +5,7 @@
 // as an error. After a warm-up it
 // runs each concurrency `--runs` times and prints the medians, then holds
 // the highest one for `--soak` seconds. With `--pid` it samples the
-// server's resident memory (Linux, /proc) before the soak, at its peak and
+// server's resident memory (Linux /proc, macOS ps) before the soak, at its peak and
 // after `--idle` seconds of rest. With `--workers N` the clients are split
 // over N threads to spread load generation over several cores.
 // `--client http` uses direct HTTP/1 GETs with keep-alive and no redirects;
@@ -14,11 +14,11 @@
 //   node tools/load/index.mjs --url 'http://127.0.0.1:3000/render/{id}' \
 //     --expect 'request {id}' [--pid N] [--levels 1,16,64] [--run 10] \
 //     [--runs 3] [--warmup 10] [--soak 60] [--idle 30] [--timeout 5] [--workers 1] [--client fetch|http]
-import { readFileSync } from "node:fs";
 import { parseArgs } from "node:util";
 import { isMainThread, parentPort, Worker, workerData } from "node:worker_threads";
 
 import { HttpClient } from "./client.mjs";
+import { readRss } from "../perf/rss.mjs";
 
 const { values: options } = parseArgs({
   options: {
@@ -121,7 +121,7 @@ const load = async (c, ms) => {
 
 const median = (xs) => [...xs].sort((a, b) => a - b)[Math.floor(xs.length / 2)];
 const rss = () =>
-  options.pid ? Number(/VmRSS:\s+(\d+)/.exec(readFileSync(`/proc/${options.pid}/status`, "utf8"))[1]) / 1024 : NaN;
+  options.pid ? readRss(options.pid).current : NaN;
 const row = (label, c, r) =>
   console.log(
     `| ${label} | ${c} | ${r.rps.toFixed(0)} | ${r.p50.toFixed(2)} | ${r.p95.toFixed(2)} | ${r.p99.toFixed(2)} |`,

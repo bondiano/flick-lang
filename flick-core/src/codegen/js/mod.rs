@@ -352,6 +352,25 @@ impl Gen<'_> {
         format!("({}): any =>", typed.join(", "))
     }
 
+    /// Native generators have the same internal `any` convention as arrows.
+    /// Their public contracts are projected independently from checked Flick types.
+    fn generator_function(&self, params: &str, stmts: &[String]) -> String {
+        let (params, returns) = if self.options.typescript() {
+            (
+                params
+                    .split(", ")
+                    .filter(|p| !p.is_empty())
+                    .map(|p| format!("{p}: any"))
+                    .collect::<Vec<_>>()
+                    .join(", "),
+                ": Generator<any, any, any>",
+            )
+        } else {
+            (params.to_owned(), "")
+        };
+        format!("function* ({params}){returns} {{\n{}}}", indent(stmts))
+    }
+
     /// `const name = value;`, `any` in TypeScript.
     fn constant(&self, name: &str, value: &str) -> String {
         let ty = if self.options.typescript() {

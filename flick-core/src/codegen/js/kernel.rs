@@ -60,7 +60,7 @@ impl Gen<'_> {
             (&heads[..at], heads[at..].join(", "))
         };
         let mut text = if yields(stmts) {
-            format!("function* ({own}) {{\n{}}}", indent(stmts))
+            self.generator_function(&own, stmts)
         } else {
             let body = match stmts {
                 [only] if only.starts_with("return ") && !only.contains('\n') => {

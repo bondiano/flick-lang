@@ -1,14 +1,16 @@
 {
-  "check.corpus": { "budget": 3400, "tolerance": 0.25 },
-  "lsp.hover.p95": { "budget": 1, "tolerance": 0.5 },
-  "lsp.hover_after_edit.p95": { "budget": 40, "tolerance": 0.5 },
-  "lsp.completion_after_dot.p95": { "budget": null, "tolerance": 0.5 },
-  "lsp.hover_after_interface_edit.p95": { "budget": null, "tolerance": 0.5 },
-  "load.json.go.rps": { "budget": 8500, "tolerance": 0.25 },
-  "load.json.go.binary": { "budget": 10000000, "tolerance": 0.05 },
-  "load.ssr.rps": { "budget": 5200, "tolerance": 0.25 },
-  "lsp.rss.peak": { "budget": 120, "tolerance": 0.25 },
-  "lsp.soak.rss.growth": { "budget": 1, "tolerance": 0.5 },
-  "load.json.go.rss.peak": { "budget": null, "tolerance": 0.25 },
-  "load.ssr.rss.peak": { "budget": null, "tolerance": 0.25 }
+  "check.corpus": {"budget": 3400, "tolerance": 0.25},
+  "lsp.hover.p95": {"budget": 1, "tolerance": 0.5},
+  "lsp.hover_after_edit.p95": {"budget": 40, "tolerance": 0.5},
+  "lsp.completion_after_dot.p95": {"budget": null, "tolerance": 0.5},
+  "lsp.hover_after_interface_edit.p95": {"budget": null, "tolerance": 0.5},
+  "load.json.go.rps": {"budget": 8500, "tolerance": 0.25},
+  "load.json.go.binary": {"budget": 10000000, "tolerance": 0.05},
+  "load.ssr.rps": {"budget": 5200, "tolerance": 0.25},
+  "lsp.rss.peak": {"budget": 80, "tolerance": 0.25},
+  "load.json.go.rss.peak": {"budget": 70, "tolerance": 0.25},
+  "load.ssr.rss.peak": {"budget": 420, "tolerance": 0.25},
+  "load.json.go.cold_start": {"budget": 25, "tolerance": 0.25},
+  "load.ssr.cold_start": {"budget": 500, "tolerance": 0.25},
+  "lsp.soak.rss.growth": {"budget": 1, "tolerance": 0.5}
 }

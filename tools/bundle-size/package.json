@@ -7,7 +7,7 @@
   "type": "module",
   "exports": "./index.mjs",
   "scripts": {
-    "test": "node --test test/*.test.mjs"
+    "test": "node --test index.test.mjs test/*.test.mjs"
   },
   "dependencies": {
     "@flick-lang/runtime": "workspace:*",

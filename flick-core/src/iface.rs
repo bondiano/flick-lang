@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 use crate::types::{EnumLit, Instance, Type, TypeDef};
 
 /// Bumped on every change of the schema.
-pub const IFACE_VERSION: u32 = 12;
+pub const IFACE_VERSION: u32 = 13;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]

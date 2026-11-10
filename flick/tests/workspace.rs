@@ -40,13 +40,13 @@ const MAIN: &str = "module Main exposing (main)
 import Shared.Answer
 
 main : Unit ->{} Unit
-let main () = Console.log (show Shared.Answer.answer)
+let main () = Platform.stdout_line (show Shared.Answer.answer)
 ";
 
 const OTHER: &str = "module Other exposing (main)
 
 main : Unit ->{} Unit
-let main () = Console.log \"other\"
+let main () = Platform.stdout_line \"other\"
 ";
 
 fn workspace(name: &str) -> PathBuf {

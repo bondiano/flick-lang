@@ -34,6 +34,10 @@
       "types": "./dist/ui/react/index.d.ts",
       "default": "./dist/ui/react/index.js"
     },
+    "./ui/tracing": {
+      "types": "./dist/ui/tracing.d.ts",
+      "default": "./dist/ui/tracing.js"
+    },
     "./ui/html": {
       "types": "./dist/ui/html.d.ts",
       "default": "./dist/ui/html.js"

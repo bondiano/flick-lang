@@ -24,7 +24,7 @@ The source of an expected error is `raise`; the source of a defect is `todo`.
 | Classes, dictionaries, `do`, `for`, `?` | `elaboration.md` | The core receives a program with dictionaries already inserted; schemes carry no constraints |
 | `type module`, parameterized modules, `Module Sig`, `exists K : Sig. T` | source checker and lowering | Static applications become named modules; packed modules and existential witnesses become records. The core does not prove the source rules for generativity, nominal identity, or existential opening |
 | Fibers, `parallel`, `race`, `spawn`, Cause, interruption, layer memoization | `runtime.md` (λRT) | The core has one thread of execution; the "interrupted" outcome appears only in λRT |
-| The Sync stage | — | For typing this is the runtime arrow `R⟨ρ; ε⟩` with `ρ` a closed row of effects of `tail` and `abort` operations. Sync is a way of compiling such an arrow, not a separate kind of stage; what may suspend has the effect `Async` in `ρ` |
+| The Sync stage | — | For typing this is the runtime arrow `R⟨ρ; ε⟩`. Intrinsic UI Sync rows may use a synchronous calling convention; ordinary runtime arrows retain λRT interruption points even without `Async`. Asynchronous waiting requires `Async` in `ρ`; scheduler preemption does not. Sync is implementation metadata, not a separate core stage |
 | `foreign` | hypothesis G1 (§4) | Bindings enter Γ₀ with their declared types |
 
 ## 1. Syntax

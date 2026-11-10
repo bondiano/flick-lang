@@ -1,0 +1,22 @@
+module App.HostServices exposing (..)
+
+read_environment : Unit ->{} Option String
+let read_environment () = Host.Environment.env "MODE"
+
+read_clock : Unit -> Float
+let read_clock () = Host.Clock.current_time_millis ()
+
+read_random : Unit ->{} Float
+let read_random () = Host.Random.next ()
+
+read_arguments : Unit ->{} List String
+let read_arguments () = Host.Arguments.args ()
+
+write_console : String ->{} Unit
+let write_console text = Host.Console.stdout_line text
+
+//~ FLICK-E002 @4:27-4:54 the signature of `read_environment` does not allow service `Environment`
+//~ FLICK-E001 @7:21-7:54 this is a runtime call, but `read_clock` is pure
+//~ FLICK-E002 @10:22-10:41 the signature of `read_random` does not allow service `Random`
+//~ FLICK-E002 @13:25-13:47 the signature of `read_arguments` does not allow service `Arguments`
+//~ FLICK-E002 @16:26-16:55 the signature of `write_console` does not allow service `Console`

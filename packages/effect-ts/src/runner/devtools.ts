@@ -6,6 +6,7 @@ import { Effect, Layer, References } from "effect";
 
 import { devToolsLayer } from "../effect/devtools/DevTools.ts";
 import { aroundMain } from "../entry.ts";
+import { withActionSpans } from "../ui/tracing.ts";
 import { env } from "../host.ts";
 
 const layer = Layer.merge(
@@ -13,4 +14,4 @@ const layer = Layer.merge(
   Layer.succeed(References.MinimumLogLevel, "Debug"),
 );
 
-aroundMain((program) => Effect.provide(program, layer));
+aroundMain((program) => Effect.provide(withActionSpans(true)(program), layer));

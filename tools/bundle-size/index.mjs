@@ -26,6 +26,16 @@ const UNUSED = ["effect/dist/Graph.js", "effect/dist/Stream.js"];
 
 const host = (id) => id.startsWith("node:") || id === "jsdom" || (/^\.\.?\//.test(id) && /\.(m?ts|mjs)$/.test(id));
 
+/** Coarse minified source attribution; gzip cannot be apportioned additively. */
+export const costGroup = (file) => {
+  const name = file.replaceAll("\\", "/");
+  if (/\/node_modules\/(?:react|react-dom|scheduler)\//.test(name) || /\/runtime\/(?:src|dist)\/(?:rt\/)?ui\//.test(name)) return "ui";
+  if (name.includes("/node_modules/effect/")) return "effect";
+  if (name.includes("/packages/effect-ts/")) return "adapter";
+  if (/\/runtime\/(?:src|dist)\//.test(name)) return "runtime";
+  return "other";
+};
+
 const BASE64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
 /** The source-map segments of each generated line: `[column, source]`. */
@@ -57,8 +67,8 @@ const segments = (mappings) => {
   });
 };
 
-/** Characters of `code` per source of `map`, as source-map-explorer counts them. */
-const attribute = (code, map) => {
+/** UTF-8 bytes per source; source-map columns count UTF-16 code units. */
+export const attribute = (code, map) => {
   const bytes = new Map();
   const lines = code.split("\n");
   segments(map.mappings).forEach((line, i) => {
@@ -66,7 +76,7 @@ const attribute = (code, map) => {
       if (source < 0) return;
       const end = j + 1 < line.length ? line[j + 1][0] : (lines[i]?.length ?? column);
       const name = map.sources[source];
-      bytes.set(name, (bytes.get(name) ?? 0) + end - column);
+      bytes.set(name, (bytes.get(name) ?? 0) + Buffer.byteLength(lines[i].slice(column, end)));
     });
   });
   return bytes;
@@ -95,19 +105,21 @@ export const measure = async (entry) => {
       Object.entries(chunk.modules).flatMap(([id, m]) => (m.renderedLength > 0 ? [id] : [])),
     );
     let app = 0;
+    const costs = { runtime: 0, adapter: 0, effect: 0, ui: 0, other: 0 };
     for (const chunk of chunks) {
       for (const [source, n] of attribute(chunk.code, chunk.map)) {
         const file = path.resolve(dir, source);
+        costs[costGroup(file)] += n;
         const own = file.startsWith(dir + path.sep) && !file.includes(`${path.sep}_flick${path.sep}`);
         if (own && !/^flick-[a-z0-9-]+\.js$/.test(path.basename(file))) app += n;
       }
     }
-    return { bytes: Buffer.byteLength(code), gzip: gzipSync(code).length, modules, app };
+    return { bytes: Buffer.byteLength(code), gzip: gzipSync(code).length, modules, app, costs };
   };
   const raw = await sizes(false);
   const min = await sizes(true);
   await bundle.close();
-  return { raw: raw.bytes, min: min.bytes, gzip: min.gzip, modules: min.modules, app: min.app };
+  return { raw: raw.bytes, min: min.bytes, gzip: min.gzip, modules: min.modules, app: min.app, costs: min.costs };
 };
 
 /**
@@ -126,7 +138,7 @@ export const build = (flick, source, out, profile, labels, rt = false) => {
 };
 
 /** The emitted runner a program's bundle starts from. */
-const runner = (program) => `flick-${program.entry ?? "main"}.js`;
+const runner = (program) => program.module ?? `flick-${program.entry ?? "main"}.js`;
 
 const kb = (bytes) => (bytes / 1024).toFixed(1);
 
@@ -152,6 +164,9 @@ const main = async () => {
     const labels = r.gzip - r.components.gzip;
     console.log(`| ${r.name} | ${kb(r.raw)} | ${kb(r.min)} | ${kb(r.gzip)} | ${r.budget} | ${kb(r.app)} (${kb(r.debug.app)}) | ${labels} |`);
   }
+  console.log("\n| program | runtime min KB | adapter min KB | Effect min KB | UI/React min KB |");
+  console.log("|---|---:|---:|---:|---:|");
+  for (const r of rows) console.log(`| ${r.name} | ${kb(r.costs.runtime)} | ${kb(r.costs.adapter)} | ${kb(r.costs.effect)} | ${kb(r.costs.ui)} |`);
   const errors = rows.flatMap((r) => [
     ...(r.gzip > r.budget * 1024 ? [`${r.name} is ${kb(r.gzip)} KB gzip, over its budget of ${r.budget} KB`] : []),
     ...(r.min > r.debug.min ? [`${r.name} is ${r.min} B minified in release, more than ${r.debug.min} B in debug`] : []),

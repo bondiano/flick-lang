@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import { Context, Effect, Layer, Option } from "effect";
-import { ok } from "@flick-lang/runtime/core/data";
+import { err, ok } from "@flick-lang/runtime/core/data";
 import { layerSucceed, none, runIn, service, some } from "@flick-lang/runtime/rt";
 import { offer, unbounded } from "@flick-lang/runtime/rt/effect/Queue";
 import { tag } from "@flick-lang/runtime/tags";
@@ -27,6 +27,22 @@ test("a native Cli.Value dictionary parses a flag for an Effect CLI command", as
   const command = specHandle((options) => Effect.sync(() => { observed = options["name"]; }), spec);
   await run(cliRunVersion("1.0.0", command, ["--name", "Ada"]));
   assert.equal(observed, "Ada");
+});
+
+test("a native runtime Cli.Value parser is evaluated before its result is read", async () => {
+  let observed: unknown;
+  const value = { parse: function* (text: string) { yield undefined; return ok(text.toUpperCase()); } };
+  const spec = specFlag(value, undefined, undefined, "name", [], "", multiRequired, specCommand("tool"));
+  const command = specHandle((options) => Effect.sync(() => { observed = options["name"]; }), spec);
+  await run(cliRunVersion("1.0.0", command, ["--name", "Ada"]));
+  assert.equal(observed, "ADA");
+});
+
+test("a native runtime Cli.Value rejection retains its expected input message", async () => {
+  const value = { parse: function* (_text: string) { yield undefined; return err("choose a digit"); } };
+  const spec = specFlag(value, undefined, undefined, "digit", [], "", multiRequired, specCommand("tool"));
+  const command = specHandle(() => Effect.die("an invalid parameter must not run the handler"), spec);
+  await assert.rejects(run(cliRunVersion("1.0.0", command, ["--digit", "x"])), /choose a digit/);
 });
 
 test("a prompt reads a native Tty service through the bridge", async () => {

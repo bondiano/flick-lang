@@ -337,6 +337,10 @@ fn dev_starts_the_next_version_after_foreign_work_settles() {
         "dev_quiescence",
         &[
             ("flick.toml", APP),
+            (
+                "package.json",
+                "{\"type\":\"module\",\"dependencies\":{\"@flick-lang/effect-ts\":\"*\"}}",
+            ),
             ("src/App/Main.fl", LINGERING),
             ("src/App/linger.mjs", LINGER),
             ("src/App/forever.mjs", FOREVER),

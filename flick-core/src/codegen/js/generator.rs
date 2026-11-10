@@ -56,7 +56,7 @@ impl Gen<'_> {
             }
             (self.collector, self.sync, self.limit) = saved;
             self.generator = generator;
-            let function = format!("function* () {{\n{}}}", indent(&stmts));
+            let function = self.generator_function("", &stmts);
             if !sync {
                 format!("{}({function})", self.rt("seq"))
             } else if self.generator && !self.kernel {

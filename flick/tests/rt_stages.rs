@@ -275,12 +275,12 @@ fn optional_effect_arguments_cross_the_bridge_only_when_present() {
     }
 }
 
-/// Whether the build in `out` under `app` is one for the kernel, by what its main
-/// module imports, and whether its interface records a direct arrow.
+/// Whether the build in `out` under `app` is one for the kernel, by what its entry
+/// runner imports, and whether its interface records a direct arrow.
 fn on_the_kernel(app: &Path, out: &str) -> (bool, bool) {
     let read = |file: &str| fs::read_to_string(app.join(out).join(file)).expect(file);
     (
-        read("App/Main.js").contains("@flick-lang/runtime/rt"),
+        read("flick-main.js").contains("@flick-lang/runtime/rt"),
         read("App/Main.iface").contains("\"direct\""),
     )
 }
@@ -303,11 +303,11 @@ fn the_two_modes_do_not_read_what_the_other_saved() {
         "the Effect backend imports its adapter package"
     );
     build(&app, &kernel);
-    assert_eq!(on_the_kernel(&app, "kernel"), (true, true));
+    assert_eq!(on_the_kernel(&app, "kernel"), (true, false));
     // a new text, for the builds to read again what the first ones saved
     append(&app.join("src/App/Main.fl"), "// edited");
     build(&app, &default);
     assert_eq!(on_the_kernel(&app, "default"), (false, false));
     build(&app, &kernel);
-    assert_eq!(on_the_kernel(&app, "kernel"), (true, true));
+    assert_eq!(on_the_kernel(&app, "kernel"), (true, false));
 }

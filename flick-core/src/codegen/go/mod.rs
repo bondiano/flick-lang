@@ -23,7 +23,6 @@ mod loops;
 mod main_file;
 mod names;
 mod pattern;
-mod reach;
 mod runtime;
 
 pub use runtime::{GO_MOD, GO_SUM, PACKAGES, Package, RUNTIME};
@@ -34,7 +33,7 @@ use std::{mem, slice};
 use flick_pretty::{Document, DocumentArena, Documentable, docvec};
 
 use crate::diagnostics::{Diagnostic, Severity, codes};
-use crate::ir::{ExprKind, ItemKind, Module, Stage};
+use crate::ir::{ExprKind, ItemKind, Module, Stage, reach};
 use crate::source::Span;
 use layout::{Code, block, call, directive, list, statement};
 use reach::Key;

@@ -13,3 +13,12 @@ The js target builds the same program.
 When the construct is the program's own `foreign` binding, add its Go
 implementation beside the program (see the FFI reference). Otherwise keep
 the construct out of what `main` reaches, or build with `emit = "js"`.
+
+On JavaScript with Flick's own runtime (`effect = "rt"`), this code also
+reports a reachable binding that requires the optional Effect adapter when
+the project does not declare it. The diagnostic points to the use in your
+source. Add `@flick-lang/effect-ts` to the project's dependencies, or use a
+binding available on the native runtime. For example, `Schedule.cron` needs
+the adapter; native schedule operations do not require it merely because
+they share a module with `cron`. A library is checked against its public
+exports, including aliases of bindings.

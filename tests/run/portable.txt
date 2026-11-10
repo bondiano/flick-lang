@@ -232,3 +232,5 @@ runtime/abort_closes_scopes
 runtime/abort_stops_children
 runtime/discontinued_body
 runtime/discontinued_fiber
+
+effect/host_services
