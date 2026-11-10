@@ -3,6 +3,7 @@
 
 use std::fmt::Write as _;
 use std::io::{self, BufRead, Write};
+use std::iter;
 use std::path::{Path, PathBuf};
 
 use serde_json::{Value, json};
@@ -54,18 +55,44 @@ pub fn notification(method: &str, params: &Value) -> Value {
     json!({ "jsonrpc": "2.0", "method": method, "params": params })
 }
 
-/// The LSP position of a byte offset.
-pub fn position(text: &str, offset: u32) -> Value {
-    let offset = (offset as usize).min(text.len());
-    let before = &text[..offset];
-    let line = before.matches('\n').count();
-    let start = before.rfind('\n').map_or(0, |i| i + 1);
-    let character: usize = text[start..offset].chars().map(char::len_utf16).sum();
-    json!({ "line": line, "character": character })
+/// Where the lines of a text start, for the positions of many offsets in
+/// it: the text is read once, and each position reads only its line.
+pub struct Lines<'t> {
+    text: &'t str,
+    starts: Vec<usize>,
+}
+
+impl<'t> Lines<'t> {
+    pub fn of(text: &'t str) -> Self {
+        let starts = iter::once(0)
+            .chain(text.match_indices('\n').map(|(i, _)| i + 1))
+            .collect();
+        Lines { text, starts }
+    }
+
+    /// The line and the UTF-16 column of a byte offset.
+    pub fn line_column(&self, offset: u32) -> (u64, u64) {
+        let offset = (offset as usize).min(self.text.len());
+        let line = self.starts.partition_point(|&start| start <= offset) - 1;
+        let units: usize = (self.text[self.starts[line]..offset].chars())
+            .map(char::len_utf16)
+            .sum();
+        (line as u64, units as u64)
+    }
+
+    /// The LSP position of a byte offset.
+    pub fn position(&self, offset: u32) -> Value {
+        let (line, character) = self.line_column(offset);
+        json!({ "line": line, "character": character })
+    }
+
+    pub fn range(&self, start: u32, end: u32) -> Value {
+        json!({ "start": self.position(start), "end": self.position(end) })
+    }
 }
 
 pub fn range(text: &str, start: u32, end: u32) -> Value {
-    json!({ "start": position(text, start), "end": position(text, end) })
+    Lines::of(text).range(start, end)
 }
 
 /// The byte offset of an LSP position.
@@ -132,7 +159,10 @@ mod tests {
     fn positions_count_utf16_units() {
         let text = "a\nπ𝄞x\n";
         let x = u32::try_from(text.find('x').expect("x")).expect("small");
-        assert_eq!(position(text, x), json!({ "line": 1, "character": 3 }));
+        assert_eq!(
+            Lines::of(text).position(x),
+            json!({ "line": 1, "character": 3 })
+        );
         assert_eq!(offset(text, &json!({ "line": 1, "character": 3 })), x);
         assert_eq!(
             path_of(&uri_of(Path::new("/a b/ü.fl"))),
