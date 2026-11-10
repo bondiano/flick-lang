@@ -12,7 +12,8 @@ fn document(path: &Path) -> Value {
 fn a_closed_standalone_file_leaves_no_cache_behind() {
     let mut server = Server {
         docs: HashMap::new(),
-        snapshot: None,
+        snapshots: HashMap::new(),
+        latest: None,
         caches: Caches::new(),
         published: HashMap::new(),
         out: Box::new(io::sink()),
@@ -52,7 +53,8 @@ fn the_extensions_of_loaded_files_are_registered_once_where_the_client_lets_it()
     let written = Written::default();
     let mut server = Server {
         docs: HashMap::new(),
-        snapshot: None,
+        snapshots: HashMap::new(),
+        latest: None,
         caches: Caches::new(),
         published: HashMap::new(),
         out: Box::new(written.clone()),
