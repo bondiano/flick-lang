@@ -115,7 +115,7 @@ language seed="42": e2e-compiler
 
 # Bundle the tracked programs (release) with rolldown and hold them to their gzip budgets
 bundle-size: e2e-compiler
-    node tools/bundle-size/index.mjs {{flick}}
+    node tools/bundle-size/index.mjs "{{flick}}"
 
 # Count the tokens of the Conduit example's source against the RealWorld Go backend and React client:
 # o200k_base, and Claude's tokenizer when ANTHROPIC_API_KEY or OPENROUTER_API_KEY is set
