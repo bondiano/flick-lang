@@ -42,6 +42,8 @@ jobs:
       - run: node docs/scripts/parity.mjs
       - run: cargo test -p flick-core --test corpus docs_examples_check
       - run: just docs
+      - name: Check every exercise contract and its rejected answers
+        run: pnpm -C docs exec node --test test/exercise-engine.test.ts test/lesson.test.ts test/lesson-browser.test.ts
       - run: node docs/scripts/links.mjs
       - uses: actions/upload-pages-artifact@v5
         with:

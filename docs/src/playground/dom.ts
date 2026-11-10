@@ -1,3 +1,5 @@
+import type { Exercise } from "../../exercises/load.ts";
+
 export { attributes } from "../widgets/dom.ts";
 
 /** The examples of the gallery, as the page embeds them. */
@@ -10,20 +12,35 @@ interface Example {
   readonly source: string;
 }
 
+export const lessonData = (): Exercise | undefined => {
+  const text = document.getElementById("flick-lesson")?.textContent;
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the build validates and embeds this data
+  return text ? JSON.parse(text) as Exercise : undefined;
+};
+export const lessonKey = (kind: string): string => `flick.lesson.${(document.getElementById("flick-playground")?.dataset.lesson ?? "").replaceAll("/", ".")}.${kind}`;
+export const completeLesson = (): void => {
+  try { localStorage.setItem(lessonKey("done"), "1"); } catch { /* local progress is optional */ }
+};
+
 /** Page-provided configuration; decoding and all locale behavior belong to Flick. */
-export const configuration = (): { locale: string; examples: ReadonlyArray<Example>; lesson: boolean; solution: string; done: boolean } => {
+export const configuration = (): { locale: string; examples: ReadonlyArray<Example>; lesson: boolean; solution: string; done: boolean; lesson_title: string; lesson_task: string; lesson_hint_text: string } => {
   const root = document.getElementById("flick-playground");
   if (root === null) throw new Error("The page has no flick-playground container");
   const embedded = document.getElementById("flick-playground-examples")?.textContent ?? "[]";
   // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the page writes this JSON from the gallery's index
   const examples = JSON.parse(embedded) as ReadonlyArray<Example>;
   let done = false;
-  try { done = localStorage.getItem("flick.lesson.signatures.01.done") === "1"; } catch { /* local progress is optional */ }
+  try { done = localStorage.getItem(lessonKey("done")) === "1"; } catch { /* local progress is optional */ }
+  const exercise = lessonData();
+  const ru = root.dataset.locale === "ru";
   return {
     locale: root.dataset.locale ?? "",
     examples,
-    lesson: root.dataset.lesson === "true",
-    solution: document.getElementById("flick-lesson-solution")?.textContent ?? "",
+    lesson: exercise !== undefined,
+    solution: exercise?.solution ?? "",
+    lesson_title: exercise?.[ru ? "title_ru" : "title"] ?? "",
+    lesson_task: exercise?.[ru ? "task_ru" : "task"] ?? "",
+    lesson_hint_text: exercise?.[ru ? "hint_ru" : "hint"] ?? "",
     done,
   };
 };

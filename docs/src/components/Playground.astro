@@ -1,6 +1,6 @@
 ---
 import "../styles/playground.css";
-import { readFileSync } from "node:fs";
+import { loadExercise } from "../../exercises/load.ts";
 import { Effect } from "@flick-lang/effect-ts";
 import { uiRenderStatic } from "@flick-lang/effect-ts/ui/react";
 import { renderToString } from "react-dom/server";
@@ -9,21 +9,22 @@ import { examples } from "./gallery.ts";
 
 interface Props {
   locale: "en" | "ru";
-  lesson?: boolean;
+  lesson?: string;
 }
 
-const { locale, lesson = false } = Astro.props;
-const starter = lesson ? readFileSync("exercises/signatures/01/starter.fl", "utf8") : "";
-const solution = lesson ? readFileSync("exercises/signatures/01/solution.fl", "utf8") : "";
+const { locale, lesson = "" } = Astro.props;
+const exercise = lesson ? loadExercise(lesson) : undefined;
+const starter = exercise?.starter ?? "";
+const solution = exercise?.solution ?? "";
 const gallery = lesson ? [{ id: "lesson", group: "Lesson", group_ru: "Урок", name: "Starter", name_ru: "Начало", source: starter }] : examples();
-const markup = renderToString(uiRenderStatic(await Effect.runPromise(initial_view({ locale, examples: gallery, lesson, solution, done: false }))));
+const markup = renderToString(uiRenderStatic(await Effect.runPromise(initial_view({ locale, examples: gallery, lesson: Boolean(exercise), solution, done: false, lesson_title: exercise?.[locale === "ru" ? "title_ru" : "title"] ?? "", lesson_task: exercise?.[locale === "ru" ? "task_ru" : "task"] ?? "", lesson_hint_text: exercise?.[locale === "ru" ? "hint_ru" : "hint"] ?? "" }))));
 // the browser reads the same examples back; `<` cannot end the script early
 const embedded = JSON.stringify(gallery).replaceAll("<", "\\u003c");
 ---
 
-<div id="flick-playground" class="not-content flick-playground-shell" data-locale={locale} data-lesson={String(lesson)} data-flick-ssr data-pagefind-ignore set:html={markup}></div>
+<div id="flick-playground" class="not-content flick-playground-shell" data-locale={locale} data-lesson={lesson} data-flick-ssr data-pagefind-ignore set:html={markup}></div>
 <script is:inline type="application/json" id="flick-playground-examples" set:html={embedded}></script>
-{lesson && <script is:inline type="text/plain" id="flick-lesson-solution" set:html={solution.replaceAll("<", "&lt;")}></script>}
+{exercise && <script is:inline type="application/json" id="flick-lesson" set:html={JSON.stringify(exercise).replaceAll("<", "\\u003c")}></script>}
 <noscript>
   <p class="fp-boot">{locale === "ru" ? "Для компиляции и запуска в браузере нужен JavaScript." : "Browser compilation and execution require JavaScript."}</p>
 </noscript>

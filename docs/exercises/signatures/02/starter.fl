@@ -1,0 +1,7 @@
+module Main exposing (main, size_of)
+
+size_of : Int -> Int
+let size_of text = String.length text
+
+main : Unit ->{} Unit
+let main () = Platform.stdout_line (show (size_of "Flick!"))

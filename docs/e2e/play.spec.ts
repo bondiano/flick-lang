@@ -95,7 +95,7 @@ test("a signature lesson checks a correction and remembers completion", async ({
   await expect(page.locator(".fp-lesson")).toContainText("String.length returns Int");
   await page.getByRole("button", { name: "Show solution" }).click();
   await page.getByRole("button", { name: "Check answer" }).click();
-  await expect(page.locator(".fp-lesson")).toContainText("Correct. The signature says String -> Int", { timeout: 30_000 });
+  await expect(page.locator(".fp-lesson")).toContainText("Correct. The signature and output match", { timeout: 30_000 });
   await page.reload();
   await expect(page.locator(".fp-cm .cm-content")).toBeVisible({ timeout: 60_000 });
   await expect(page.locator(".fp-lesson")).toContainText("Lesson completed");
@@ -225,3 +225,32 @@ test("a quick fix adds the forgotten case", async ({ page }) => {
   await expect(page.locator(".cm-content")).toContainText("| Paused ->");
   await expect(page.locator(".fp-status")).toContainText("Type-checked", { timeout: 30_000 });
 });
+
+for (const locale of ["en", "ru"]) {
+  test(`second signature lesson isolates progress and rejects a wrong answer (${locale})`, async ({ page }) => {
+    const ru = locale === "ru";
+    await page.goto(`/flick-lang/${ru ? "ru/" : ""}tour/arguments/`);
+    await expect(page.locator(".fp-cm .cm-content")).toBeVisible({ timeout: 60_000 });
+    const lesson = page.locator(".fp-lesson");
+    const check = page.getByRole("button", { name: ru ? "Проверить" : "Check answer", exact: true });
+    await check.click();
+    await expect(lesson).toContainText(ru ? "Сначала исправьте ошибки" : "Fix the compiler errors");
+    await page.getByRole("button", { name: ru ? "Показать решение" : "Show solution" }).click();
+    await expect(lesson).not.toContainText(ru ? "Урок пройден" : "Lesson completed");
+    await page.locator(".cm-content").click();
+    await page.keyboard.press("MetaOrControl+End");
+    await page.keyboard.press("MetaOrControl+a");
+    await page.keyboard.insertText('module Main exposing (main, size_of)\n\nsize_of : String -> Int\nlet size_of text = String.length text\n\nmain : Unit ->{} Unit\nlet main () = Platform.stdout_line "5"\n');
+    await check.click();
+    await expect(lesson).toContainText(ru ? "Вывод не совпадает" : "The output does not match");
+    await page.getByRole("button", { name: ru ? "Показать решение" : "Show solution" }).click();
+    await check.click();
+    await expect(lesson).toContainText(ru ? "Верно." : "Correct.");
+    expect(await page.evaluate(() => localStorage.getItem("flick.lesson.signatures.02.done"))).toBe("1");
+    expect(await page.evaluate(() => localStorage.getItem("flick.lesson.signatures.01.done"))).toBeNull();
+    await page.reload();
+    await expect(lesson).toContainText(ru ? "Урок пройден" : "Lesson completed");
+    await page.getByRole("button", { name: ru ? "Сбросить" : "Reset", exact: true }).click();
+    await expect(page.locator(".cm-content")).toContainText("size_of : Int -> Int");
+  });
+}

@@ -1,6 +1,8 @@
+import { lessonKey } from "./dom.ts";
+
 /** Browser persistence and URL encoding for a single-file playground. */
-const key = (): string => document.getElementById("flick-playground")?.dataset.lesson === "true"
-  ? "flick.lesson.signatures.01.draft"
+const key = (): string => document.getElementById("flick-playground")?.dataset.lesson
+  ? lessonKey("draft")
   : "flick.playground.draft.v1";
 const maxSourceBytes = 64 * 1024;
 
