@@ -62,9 +62,8 @@ impl<'b> Env<'b> {
             }
         }
         for import in &syntax.imports {
-            let interface = env.interfaces[&import.module].clone();
             let open = import.exposing.iter().any(|i| i.kind == ItemKind::All);
-            match interface {
+            match &env.interfaces[&import.module] {
                 None => {
                     // names from a module that could not be loaded are taken on trust
                     env.open_unknown |=
@@ -86,7 +85,7 @@ impl<'b> Env<'b> {
         }
         let mut ambiguous = HashSet::new();
         for import in &syntax.imports {
-            let Some(interface) = env.interfaces[&import.module].clone() else {
+            let Some(interface) = &env.interfaces[&import.module] else {
                 continue;
             };
             for item in &import.exposing {

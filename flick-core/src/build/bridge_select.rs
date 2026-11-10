@@ -27,7 +27,7 @@ fn select_modules<'a>(
     // opaque atoms passed between them must use the same registry ABI.
     for module in modules {
         for item in &module.items {
-            references(item, &mut pending);
+            item.each_body(&mut |e| globals(e, &mut pending));
             if needs_host(item) {
                 return EffectBridge::AvailableWithUi;
             }
@@ -56,7 +56,7 @@ fn select_modules<'a>(
         if needs_host(item) {
             return EffectBridge::AvailableWithUi;
         }
-        references(item, &mut pending);
+        item.each_body(&mut |e| globals(e, &mut pending));
     }
     available
 }
@@ -79,21 +79,6 @@ fn needs_host(item: &Item) -> bool {
     };
     ui_family(&spec, &foreign.binding.name)
         && !on_kernel_with_bridge(&spec, &foreign.binding.name, true)
-}
-
-fn references(item: &Item, pending: &mut Vec<(String, String)>) {
-    let mut walk = |expr: &Expr| globals(expr, pending);
-    match &item.kind {
-        ItemKind::Value { body, .. } | ItemKind::Destructure { body, .. } => walk(body),
-        ItemKind::Refined { check, .. } => walk(check),
-        ItemKind::Instance { methods, .. } => methods.iter().for_each(|(_, method)| walk(method)),
-        ItemKind::Foreign(foreign) => {
-            if let Some(catch) = &foreign.catch {
-                walk(catch);
-            }
-        }
-        ItemKind::Constructor(_) | ItemKind::Service { .. } => {}
-    }
 }
 
 fn globals(expr: &Expr, pending: &mut Vec<(String, String)>) {

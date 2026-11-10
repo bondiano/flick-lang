@@ -46,7 +46,7 @@ pub(super) fn workers(
 ) -> HashMap<String, (usize, bool)> {
     let mut calls = HashMap::new();
     for item in items {
-        item_bodies(item, &mut |e| count_calls(e, module, &mut calls));
+        item.each_body(&mut |e| count_calls(e, module, &mut calls));
     }
     items
         .iter()
@@ -72,16 +72,6 @@ pub(super) fn workers(
             _ => None,
         })
         .collect()
-}
-
-fn item_bodies<'a>(item: &'a Item, f: &mut dyn FnMut(&'a Expr)) {
-    match &item.kind {
-        ItemKind::Value { body, .. } | ItemKind::Destructure { body, .. } => f(body),
-        ItemKind::Refined { check, .. } => f(check),
-        ItemKind::Instance { methods, .. } => methods.iter().for_each(|(_, m)| f(m)),
-        ItemKind::Foreign(foreign) => foreign.catch.iter().for_each(&mut *f),
-        ItemKind::Constructor(_) | ItemKind::Service { .. } => {}
-    }
 }
 
 /// For each value of `module`, how often it is named with each number of

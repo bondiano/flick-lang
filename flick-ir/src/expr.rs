@@ -34,6 +34,21 @@ pub struct Item {
     pub span: Span,
 }
 
+impl Item {
+    /// Each expression the item holds: a body, the check of a refined type,
+    /// the methods of an instance and the `catch` mapping of a foreign
+    /// function.
+    pub fn each_body<'a>(&'a self, f: &mut impl FnMut(&'a Expr)) {
+        match &self.kind {
+            ItemKind::Value { body, .. } | ItemKind::Destructure { body, .. } => f(body),
+            ItemKind::Refined { check, .. } => f(check),
+            ItemKind::Instance { methods, .. } => methods.iter().for_each(|(_, m)| f(m)),
+            ItemKind::Foreign(foreign) => foreign.catch.iter().for_each(f),
+            ItemKind::Constructor(_) | ItemKind::Service { .. } => {}
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum ItemKind {
     /// `let name … = …`; a definition with class constraints takes their
