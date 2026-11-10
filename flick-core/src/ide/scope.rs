@@ -46,16 +46,16 @@ impl Ide<'_> {
                 .skip_while(|t| t.kind != K::AsKw)
                 .find(|t| t.kind == K::Con)
                 .map_or(module, |t| t.text(text).to_owned());
-            for e in exported(&interface) {
+            for e in exported(interface) {
                 add(&mut scope, format!("{qualifier}.{}", e.entity.name), e);
             }
-            for e in exposed(import, &interface, text) {
+            for e in exposed(import, interface, text) {
                 add(&mut scope, e.entity.name.clone(), e);
             }
             interfaces.push(interface);
         }
         if let Some(prelude) = self.interface(lang::prelude()) {
-            for e in exported(&prelude) {
+            for e in exported(prelude) {
                 add(&mut scope, e.entity.name.clone(), e);
             }
             interfaces.push(prelude);
@@ -65,7 +65,7 @@ impl Ide<'_> {
                 .aliases
                 .insert((m.name.clone(), name.clone()), alias.clone());
         }
-        for e in interfaces.iter().flat_map(exported) {
+        for e in interfaces.iter().copied().flat_map(exported) {
             if let Some(Form::Alias { params, body, .. }) = e.definition.as_ref().map(|d| &d.form) {
                 let key = (e.entity.module.clone(), e.entity.name.clone());
                 scope

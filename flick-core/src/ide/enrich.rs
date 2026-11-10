@@ -121,7 +121,7 @@ impl Ide<'_> {
             {
                 continue;
             }
-            let items = exports(&interface);
+            let items = exports(interface);
             for e in &interface.exports {
                 let name = &e.entity.name;
                 if !name.starts_with(word)
