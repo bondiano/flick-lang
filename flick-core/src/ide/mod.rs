@@ -450,6 +450,8 @@ mod migration_tests;
 #[cfg(test)]
 mod pattern_tests;
 #[cfg(test)]
+mod privacy_tests;
+#[cfg(test)]
 mod set_tests;
 #[cfg(test)]
 mod tests;
