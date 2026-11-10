@@ -302,22 +302,6 @@ fn reference_span(item: &Item, key: &reach::Key) -> Option<Span> {
         expr.each_child(&mut |child| find(child, key, found));
     }
     let mut found = None;
-    match &item.kind {
-        ItemKind::Value { body, .. } | ItemKind::Destructure { body, .. } => {
-            find(body, key, &mut found);
-        }
-        ItemKind::Instance { methods, .. } => {
-            for (_, method) in methods {
-                find(method, key, &mut found);
-            }
-        }
-        ItemKind::Refined { check, .. } => find(check, key, &mut found),
-        ItemKind::Foreign(foreign) => {
-            if let Some(catch) = &foreign.catch {
-                find(catch, key, &mut found);
-            }
-        }
-        ItemKind::Constructor(_) | ItemKind::Service { .. } => {}
-    }
+    item.each_body(&mut |body| find(body, key, &mut found));
     found
 }
