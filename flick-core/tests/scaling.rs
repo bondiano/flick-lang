@@ -1,12 +1,19 @@
-//! Syntax and checking time scale with long lines, records and functions.
+//! Syntax, checking, lowering and both backends scale with long lines,
+//! records and functions.
 //! Checking budgets cover the target sizes (200 fields, 2000 lines);
 //! growth ratios catch quadratic behavior without a machine-specific syntax budget.
 
 use std::fmt::Write;
+use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
+use std::{io, thread};
 
+use flick_core::build::{self, Extras, Settings};
+use flick_core::codegen::EffectBridge;
 use flick_core::diagnostics::Severity;
-use flick_core::source::SourceMap;
+use flick_core::project::config::Backend;
+use flick_core::project::{self, Compilation, Host};
+use flick_core::source::{FileId, SourceMap};
 use flick_core::syntax::{self, lexer};
 
 fn record_module(fields: usize) -> String {
@@ -168,6 +175,174 @@ fn long_line_lexing_and_parsing_scale_linearly() {
             "lex"
         };
         let ratio = full.as_secs_f64() / small.as_secs_f64().max(1e-6);
-        eprintln!("long-line {name}: 2000 = {small:?}, 8000 = {full:?}, ratio = {ratio:.1}");
+        assert!(
+            ratio < 9.0,
+            "long-line {name}: 4x the size takes {ratio:.1}x the time ({small:?} -> {full:?})"
+        );
     }
+}
+
+/// One module at `/Main.fl`, as a build reads it.
+struct Module<'a>(&'a str);
+
+impl Host for Module<'_> {
+    fn read(&self, path: &Path) -> io::Result<Vec<u8>> {
+        if path == Path::new("/Main.fl") {
+            Ok(self.0.as_bytes().to_vec())
+        } else {
+            Err(io::ErrorKind::NotFound.into())
+        }
+    }
+
+    fn display(&self, path: &Path) -> String {
+        path.display().to_string()
+    }
+}
+
+fn source_path(_: FileId) -> String {
+    "file:///Main.fl".to_owned()
+}
+
+#[expect(
+    clippy::unnecessary_wraps,
+    reason = "the build settings require this shape"
+)]
+fn source_dir(_: &str) -> Option<PathBuf> {
+    Some(PathBuf::from("/"))
+}
+
+fn settings(entries: &[(String, String)]) -> Settings<'_> {
+    Settings {
+        package: None,
+        entries,
+        typescript: false,
+        release: false,
+        extras: Extras::default(),
+        source_path: &source_path,
+        source_dir: &source_dir,
+        out_dir: Path::new("/dist"),
+        root: None,
+        backend: Backend::Effect,
+        effect_bridge: EffectBridge::Absent,
+        ui: None,
+        runners: &[],
+        core_modules: &[],
+        core_only: false,
+    }
+}
+
+/// A function of `lines` lets that `main` runs, so every target reaches it.
+fn long_program(lines: usize) -> String {
+    let function = long_function(lines).replace("App.Long exposing (run)", "Main exposing (main)");
+    format!(
+        "{function}\nmain : Unit ->{{}} Unit\nlet main () = Platform.stdout_line (show (run 1))\n"
+    )
+}
+
+/// A stage of a build after checking, timed on a compiled module.
+type Stage = fn(&Compilation, &SourceMap) -> Duration;
+
+fn compiled(text: &str) -> (SourceMap, Compilation) {
+    let mut sources = SourceMap::default();
+    let roots = [PathBuf::from("/Main.fl")];
+    let (diagnostics, compilation) = project::compile(&Module(text), &mut sources, None, &roots);
+    let errors: Vec<_> = diagnostics
+        .iter()
+        .filter(|d| d.severity == Severity::Error)
+        .collect();
+    assert!(errors.is_empty(), "{errors:?}");
+    (sources, compilation)
+}
+
+fn emitting_js(compilation: &Compilation, sources: &SourceMap) -> Duration {
+    let start = Instant::now();
+    let (artifacts, diagnostics) = build::emit(compilation, sources, &settings(&[]));
+    let elapsed = start.elapsed();
+    assert_eq!(diagnostics, []);
+    assert!(artifacts.iter().any(|a| a.path == "Main.js"));
+    elapsed
+}
+
+// the Go backend is part of a build that writes its artifacts
+#[cfg(feature = "build-artifacts")]
+fn emitting_go(compilation: &Compilation, sources: &SourceMap) -> Duration {
+    let entries = [("main".to_owned(), "Main".to_owned())];
+    let start = Instant::now();
+    let (artifacts, diagnostics) =
+        build::go::emit(compilation, sources, &settings(&entries), &[], &|_| None);
+    let elapsed = start.elapsed();
+    assert_eq!(diagnostics, []);
+    assert!(!artifacts.is_empty());
+    elapsed
+}
+
+/// The fastest of a few runs of `stage` on `text`, less what the stage
+/// takes on a program of one line: the built-in modules every build emits.
+fn stage_time(text: &str, stage: Stage) -> Duration {
+    let fastest = |text: &str| {
+        let (sources, compilation) = compiled(text);
+        (0..3)
+            .map(|_| stage(&compilation, &sources))
+            .min()
+            .expect("runs")
+    };
+    fastest(text).saturating_sub(fastest(&long_program(2)))
+}
+
+/// `work` on a stack that holds the recursion over a block of thousands of
+/// lets: the passes after checking descend once per `let`.
+fn deep<T: Send + 'static>(work: impl FnOnce() -> T + Send + 'static) -> T {
+    thread::Builder::new()
+        .stack_size(256 << 20)
+        .spawn(work)
+        .expect("a thread")
+        .join()
+        .expect("the stage ends")
+}
+
+/// `stage` on a function of 2000 lines against one of 500.
+fn assert_stage_linear(name: &'static str, stage: Stage) {
+    let (small, full) = deep(move || {
+        let small = stage_time(&long_program(500), stage);
+        (small, stage_time(&long_program(2000), stage))
+    });
+    assert!(full < Duration::from_secs(2), "{name}: takes {full:?}");
+    // linear growth gives about 4; quadratic would give about 16
+    let ratio = full.as_secs_f64() / small.as_secs_f64().max(1e-6);
+    assert!(
+        ratio < 9.0,
+        "{name}: 4x the size takes {ratio:.1}x the time ({small:?} -> {full:?})"
+    );
+}
+
+#[test]
+fn function_of_2000_lines_checks_and_lowers_in_linear_time() {
+    let fastest = |lines| {
+        let text = long_program(lines);
+        (0..3)
+            .map(|_| {
+                let start = Instant::now();
+                compiled(&text);
+                start.elapsed()
+            })
+            .min()
+            .expect("runs")
+    };
+    let (small, full) = (fastest(500), fastest(2000));
+    let ratio = full.as_secs_f64() / small.as_secs_f64().max(1e-6);
+    assert!(
+        ratio < 9.0,
+        "4x the size takes {ratio:.1}x the time ({small:?} -> {full:?})"
+    );
+}
+
+#[test]
+fn function_of_2000_lines_emits_javascript_in_linear_time() {
+    assert_stage_linear("JavaScript", emitting_js);
+}
+
+#[cfg(feature = "build-artifacts")]
+#[test]
+fn function_of_2000_lines_emits_go_in_linear_time() {
+    assert_stage_linear("Go", emitting_go);
 }
