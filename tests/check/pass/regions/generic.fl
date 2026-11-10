@@ -1,8 +1,7 @@
-// captures: accepts
 // Generic code checks as under the default discipline: what a value of a
 // type variable holds is no use of a region, and an instance method may
 // write the signature its class gives it.
-module App.LiveGeneric exposing (..)
+module App.Generic exposing (..)
 
 type WriterT w (m : Type -> Type) a = WriterT (m (a, w))
 

@@ -238,8 +238,7 @@ fn docs_examples_parse() {
 /// the codes its fence names and no other error, a checked block no error, and
 /// an `ignore` block of the reference is a fragment the checker cannot compile,
 /// listed with its reason in `docs/error-examples.txt`; that list may only
-/// shrink, and changing an exempted example needs a new reviewed line. A `live`
-/// block checks under the live discipline of regions.
+/// shrink, and changing an exempted example needs a new reviewed line.
 #[test]
 fn docs_examples_check() {
     let mut pages = Vec::new();
@@ -365,7 +364,7 @@ fn checked(page: &str, block: &Block, counts: &mut Counts, failures: &mut Vec<St
     counts.checked += 1;
     let mut sources = SourceMap::default();
     let file = sources.add(format!("{page}:{line}"), block.text.as_str());
-    let diagnostics = flick_core::check_regions(&sources, file, block.regions());
+    let diagnostics = flick_core::check(&sources, file);
     let found: Vec<String> = diagnostics
         .iter()
         .map(|d| {

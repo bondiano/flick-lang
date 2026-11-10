@@ -189,11 +189,7 @@ impl Checker<'_> {
         // under `regions/live.rs` a qualifier on a function or a task is
         // the `Live` its use needs
         // each qualifier of the expected type bounds the `Live` of its use
-        let (qa, mut qes) = if self.live {
-            (self.qualifier(actual), self.qualifiers(expected))
-        } else {
-            (Caps::default(), Vec::new())
-        };
+        let (qa, mut qes) = (self.qualifier(actual), self.qualifiers(expected));
         if qes.is_empty() {
             qes.push(Caps::default());
         }

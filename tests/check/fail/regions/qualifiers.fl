@@ -1,6 +1,6 @@
-// A capture qualifier is an upper bound: a narrower one than what the value
-// holds is an error, mutable storage keeps its captures exactly, an error
-// carries no region, and a child holds nothing shorter than its owner.
+// A qualifier says what using a value needs: a closure may hold more than
+// it, not use more; mutable storage keeps its captures exactly, an error
+// carries no region, and a child uses nothing shorter than its owner.
 module App.Qualifiers exposing (..)
 
 type alias Path = String
@@ -49,8 +49,7 @@ spawn_given :
   Fiber.Owner s -> (Eff {FileSystem} {ReadError} String)^c ->{FileSystem; none} Unit
 let spawn_given owner work = ignore (Fiber.spawn owner report work)
 //~ FLICK-E005 @14:32-14:45 the payload of error `Leak` holds `File s`, a live value; an
-//~ FLICK-G001 @26:45-26:81 this function uses `second`, which holds `t`, but the expect
-//~ FLICK-G001 @29:20-29:42 this function uses `value`, which holds `a`, but the expecte
+//~ FLICK-G002 @26:55-26:81 this uses `t`, which the expected type
 //~ FLICK-T003 @33:22-33:26 expected `Ref (Unit ->{} String)`, found `Ref (Unit ->{} Str
 //~ FLICK-G003 @43:13-43:24 the child holds region `inner`, which may end before its own
 //~ FLICK-G003 @50:38-50:49 the child holds `c`, which may end before its owner `s`: a c

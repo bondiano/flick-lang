@@ -76,8 +76,7 @@ fn a_child_may_be_qualified_by_an_older_region() {
             ),
         ),
     );
-    let (captures, live, outcome) = probe("outer qualifier", &thunk_program(a));
-    assert!(captures.is_ok(), "{captures:?}");
+    let (live, outcome) = probe("outer qualifier", &thunk_program(a));
     assert!(live.is_ok(), "{live:?}");
     assert!(matches!(outcome, Outcome::Value(_)));
 }
@@ -120,7 +119,7 @@ fn a_child_qualified_by_a_younger_region_is_rejected() {
     );
     for (name, e) in [("inner held", held), ("inner qualifier", bare)] {
         let p = thunk_program(e);
-        let (_, live, _) = probe(name, &p);
+        let (live, _) = probe(name, &p);
         assert!(
             matches!(&live, Err(e) if e.starts_with("(Outlives)") && e.contains("FLICK-G003")),
             "{name}: {live:?}"

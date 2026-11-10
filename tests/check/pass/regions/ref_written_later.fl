@@ -1,0 +1,11 @@
+// A cell made from a value without captures still takes a later write
+// that holds one; a task that only reads the cell may leave with it, as
+// reading a value of `a` uses nothing of what it holds.
+module App.RefWrittenLater exposing (..)
+
+read_later : a -> a^{} -> a ->{} (Eff none none Unit)^{}
+let read_later exemplar empty full =
+  ignore exemplar
+  let ref = Ref.make empty
+  Ref.set ref full
+  task { ignore (Ref.get ref) }

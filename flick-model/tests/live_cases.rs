@@ -1,5 +1,5 @@
-//! Hand-written cases of the live discipline: holding without use is
-//! accepted and runs; using after close stays rejected, also through a
+//! Hand-written cases of regions by use: holding without use is accepted
+//! and runs; using after close stays rejected, also through a
 //! callback row, a generic helper or a local signature.
 
 mod live_support;
@@ -14,8 +14,7 @@ use flick_model::types::{Kind, Row, Scheme, Stage, Type, Var};
 use live_support::{core, g, open_in, probe, run, thunk_program, v, verdict};
 
 /// A closure that holds a capability and never uses it leaves its `scope`:
-/// the live discipline accepts it, the machine runs it without a use after
-/// close, and the discipline of captures rejects it.
+/// the model accepts it, and the machine runs it without a use after close.
 #[test]
 fn holding_without_use_is_accepted_and_safe() {
     let keep = Term::lam(
@@ -29,13 +28,12 @@ fn holding_without_use_is_accepted_and_safe() {
         Rc::new(leaked),
         Rc::new(Term::app(v("k"), Term::unit())),
     );
-    let (captures, live, outcome) = probe("hold", &thunk_program(e));
-    assert!(captures.is_err());
+    let (live, outcome) = probe("hold", &thunk_program(e));
     assert!(live.is_ok());
     assert!(!matches!(outcome, Outcome::Stuck(_)));
 }
 
-/// The same distinction holds for a delayed task, not only an arrow.
+/// The same holds for a delayed task, not only an arrow.
 #[test]
 fn a_task_that_only_holds_a_handle_can_run_after_close() {
     let held = Term::Task(Rc::new(Term::Let(
@@ -50,8 +48,7 @@ fn a_task_that_only_holds_a_handle_can_run_after_close() {
         Rc::new(open_in("s", held)),
         Rc::new(Term::Await(Rc::new(v("job")))),
     ));
-    assert!(verdict(&p, false).is_err());
-    assert!(verdict(&p, true).is_ok());
+    assert!(verdict(&p).is_ok());
     assert!(matches!(run(&p), Outcome::Value(_)));
 }
 
@@ -81,7 +78,7 @@ fn a_closed_callback_row_cannot_hide_live() {
             ),
         )),
     );
-    let result = verdict(&thunk_program(e), true);
+    let result = verdict(&thunk_program(e));
     assert!(
         matches!(&result, Err(e) if e.starts_with("(Live)")),
         "{result:?}"
@@ -124,8 +121,7 @@ fn a_generic_helper_keeps_live_in_its_row() {
         )),
     );
     let p = thunk_program(term);
-    let (captures, live, outcome) = probe("later", &p);
-    assert!(captures.is_err(), "captures accept a leak: {captures:?}");
+    let (live, outcome) = probe("later", &p);
     assert!(live.is_err());
     assert!(core(&p).iter().any(|e| e.starts_with("FLICK-G002")));
     assert!(matches!(outcome, Outcome::Stuck(w) if w.starts_with("use after")));
@@ -179,17 +175,14 @@ fn a_local_signature_keeps_its_stage_qualifiers() {
                 Term::Let("later".into(), sig, Rc::new(body()), Rc::new(rest(inside)))
             };
             let p = thunk_program(term);
-            let captures = verdict(&p, false);
+            let live = verdict(&p);
             let flick_core = core(&p);
             if inside {
-                assert!(captures.is_ok(), "rec {recursive}: {captures:?}");
+                assert!(live.is_ok(), "rec {recursive}: {live:?}");
                 assert!(flick_core.is_empty(), "rec {recursive}: {flick_core:?}");
                 assert!(!matches!(run(&p), Outcome::Stuck(_)));
             } else {
-                assert!(
-                    matches!(&captures, Err(e) if e.contains("FLICK-G002")),
-                    "rec {recursive}: {captures:?}"
-                );
+                assert!(live.is_err(), "rec {recursive}: accepted a use after close");
                 assert!(flick_core.iter().any(|e| e.starts_with("FLICK-G002")));
                 assert!(matches!(run(&p), Outcome::Stuck(w) if w.starts_with("use after")));
             }
@@ -197,7 +190,7 @@ fn a_local_signature_keeps_its_stage_qualifiers() {
     }
 }
 
-/// The same helper used inside the `scope` is accepted by both.
+/// The same helper used inside the `scope` is accepted.
 #[test]
 fn a_generic_helper_inside_its_scope_is_accepted() {
     let (a, r) = (
@@ -228,8 +221,7 @@ fn a_generic_helper_inside_its_scope_is_accepted() {
         Rc::new(body),
         Rc::new(inside),
     );
-    let (captures, live, outcome) = probe("later inside", &thunk_program(e));
-    assert!(captures.is_ok());
+    let (live, outcome) = probe("later inside", &thunk_program(e));
     assert!(live.is_ok());
     assert!(!matches!(outcome, Outcome::Stuck(_)));
 }
@@ -260,6 +252,5 @@ fn generic_ref_round_trip_does_not_use_its_contents() {
             ),
         ),
     };
-    assert!(verdict(&p, false).is_ok());
-    assert!(verdict(&p, true).is_ok(), "{:?}", verdict(&p, true));
+    assert!(verdict(&p).is_ok(), "{:?}", verdict(&p));
 }

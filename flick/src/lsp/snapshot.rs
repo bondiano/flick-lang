@@ -266,7 +266,6 @@ pub(super) fn analyze_builtin(path: &Path, index: usize) -> Snapshot {
         effects: true,
         watched: types::Watched::none(),
         stages_by_class: false,
-        regions: types::RegionMode::Captures,
     };
     let (checked, typing) =
         types::check_builtin_typed(&module, &imported, dependencies, options, &mut interface);

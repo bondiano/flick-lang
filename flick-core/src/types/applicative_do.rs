@@ -117,11 +117,11 @@ impl Checker<'_> {
         let patterns: Vec<Option<&Node>> = parts.iter().map(|(p, _)| *p).collect();
         if let (Some(value), Some((x, fx, captures))) = (applicative, result) {
             self.typing.applicative.insert(group.range());
-            let function = self.implicit_captures(&Type::Captured {
+            let function = Type::Captured {
                 ty: Box::new(curried(&items, x)),
                 captures: Box::new(captures),
                 value: false,
-            });
+            };
             let body = |c: &mut Self, result: Option<Type>| match result {
                 Some(result) => {
                     c.check(value, &result);
@@ -175,9 +175,8 @@ impl Checker<'_> {
             self.expect(&ty, expected, self.span(group));
         }
         let continuation = self.group_continuation(&continuation, items);
-        let function = self.implicit_captures(&continuation);
         let body = |c: &mut Self, result: Option<Type>| c.do_rest(node, rest, result.as_ref());
-        self.function_with(patterns, body, Some(&function), group);
+        self.function_with(patterns, body, Some(&continuation), group);
         ty
     }
 

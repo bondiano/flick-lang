@@ -196,7 +196,7 @@ impl Checker<'_> {
     fn exported(&self, t: &Type) -> Type {
         let t = self.zonk(t);
         // a use elides `Live` again from the signature (`regions/live.rs`)
-        let t = if self.live() && regions::has_live(&t) {
+        let t = if regions::has_live(&t) {
             regions::strip_live(&t)
         } else {
             t

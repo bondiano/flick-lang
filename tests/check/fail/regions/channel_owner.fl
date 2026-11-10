@@ -1,10 +1,9 @@
-// captures: FLICK-G001
 // The callback of a channel shows in the row of the channel (`map_effect`),
 // so a runner that keeps the channel running until its owner closes
 // (`retention owner`, as `Channel.to_queue`) asks that what the callback
 // uses outlive the owner: here an outer owner keeps reading a file of an
 // inner `scope`.
-module App.LiveChannelOwner exposing (..)
+module App.ChannelOwner exposing (..)
 
 type File (s : Region)
 
@@ -27,4 +26,4 @@ let pumped path = scope outer {
     ignore (queued outer lines)
   }
 }
-//~ FLICK-G003 @27:13-27:19 the child holds region `inner`, which may end before its owner region `outer`
+//~ FLICK-G003 @26:13-26:19 the child holds region `inner`, which may end before its owner region `outer`

@@ -1,3 +1,8 @@
+//! Capture flows of transformers under typing by use: a pure callback over
+//! a scoped handle uses nothing of it, so it may be held anywhere, and a
+//! callback that uses the handle keeps the region in its type
+//! (`transformer_captures/mtl.rs`, `effectful_callbacks_keep_their_region_through_transformers`).
+
 use std::slice;
 use std::sync::LazyLock;
 
@@ -43,7 +48,6 @@ fn check(text: &str, imported: &[Interface]) -> (Interface, Vec<Diagnostic>) {
             effects: true,
             watched: types::Watched::none(),
             stages_by_class: false,
-            regions: types::RegionMode::Captures,
         },
         &mut interface,
     ));
@@ -77,6 +81,13 @@ let touch handle =\n  ignore handle\n  1\n\n";
 
 fn consumer(body: &str) -> Vec<Diagnostic> {
     check(&format!("{CONSUMER}{body}"), slice::from_ref(library())).1
+}
+
+/// Holding a pure callback past its `scope` uses nothing of it: such a
+/// program is accepted.
+fn accepts(body: &str) {
+    let diagnostics = consumer(body);
+    assert!(diagnostics.is_empty(), "{body}\n{diagnostics:?}");
 }
 
 fn rejects(body: &str, allowed: &[Code]) {
@@ -116,8 +127,8 @@ let inside () =
 }
 
 #[test]
-fn extracted_and_reboxed_callback_cannot_escape_an_imported_constructor() {
-    rejects(
+fn an_extracted_pure_callback_may_leave_through_an_imported_constructor() {
+    accepts(
         r"leak : Unit ->{Files; OpenError} Unit -> Float
 let leak () =
   scope {
@@ -126,9 +137,8 @@ let leak () =
     | Callback callback -> callback
   }
 ",
-        &[codes::G001, codes::G002],
     );
-    rejects(
+    accepts(
         r"leak : Unit ->{Files; OpenError} Callback
 let leak () =
   scope {
@@ -137,13 +147,12 @@ let leak () =
     | Callback callback -> Callback callback
   }
 ",
-        &[codes::G001, codes::G002],
     );
 }
 
 #[test]
-fn partial_map2_and_transformed_computations_keep_their_captures() {
-    rejects(
+fn partial_map2_and_transformed_computations_may_hold_pure_callbacks() {
+    accepts(
         r"leak : Unit ->{Files; OpenError} Identity Unit -> Identity (Unit -> Float)
 let leak () =
   scope {
@@ -151,9 +160,8 @@ let leak () =
     map2 (fun callback _ -> callback) (Identity (fun () -> touch handle))
   }
 ",
-        &[codes::G001, codes::G002],
     );
-    rejects(
+    accepts(
         r"leak : Unit ->{Files; OpenError} ReaderT Unit Identity Float
 let leak () =
   scope {
@@ -161,9 +169,8 @@ let leak () =
     ReaderT (fun () -> Identity (touch handle))
   }
 ",
-        &[codes::G001, codes::G002],
     );
-    rejects(
+    accepts(
         r"leak : Unit ->{Files; OpenError} MaybeT (StateT Float (ReaderT Unit Identity)) Float
 let leak () =
   scope {
@@ -171,21 +178,17 @@ let leak () =
     MaybeT (StateT (fun initial -> ReaderT (fun () -> Identity (Some (touch handle), initial))))
   }
 ",
-        &[codes::G001, codes::G002],
     );
 }
 
 #[test]
 fn a_zero_bound_cannot_narrow_generic_or_concrete_capture_data() {
-    rejects(
-        "narrow : forall a. a -> a^{}\nlet narrow value = value\n",
-        &[codes::G001],
-    );
+    accepts("narrow : forall a. a -> a^{}\nlet narrow value = value\n");
     rejects(
         "narrow : forall s. Handle s -> (Handle s)^{}\nlet narrow value = value\n",
         &[codes::G001],
     );
-    rejects(
+    accepts(
         r"inside : Unit ->{Files; OpenError} Unit
 let inside () =
   scope {
@@ -193,20 +196,18 @@ let inside () =
     ignore (zero (fun () -> touch handle))
   }
 ",
-        &[codes::G001],
     );
 }
 
 #[test]
 fn unqualified_data_patterns_do_not_claim_generic_payloads_are_capture_free() {
-    rejects(
+    accepts(
         r"report : Failure none ->{} Unit
 let report _ = ()
 spawn_hidden : forall s a. Fiber.Owner s -> Identity a ->{} Unit
 let spawn_hidden owner (Identity value) =
   ignore (Fiber.spawn owner report (task { ignore value }))
 ",
-        &[codes::G003],
     );
 }
 
@@ -248,20 +249,19 @@ type error CopyError = CopyError { details : Detail String; label : Option Strin
 }
 
 #[test]
-fn abstract_function_type_dependencies_cannot_hide_from_child_lifetimes() {
-    rejects(
+fn pure_function_dependencies_need_nothing_of_child_lifetimes() {
+    accepts(
         r"report : Failure none ->{} Unit
 let report _ = ()
 spawn_none : forall s a. Fiber.Owner s -> (Option a -> Float) ->{} Unit
 let spawn_none owner f =
   ignore (Fiber.spawn owner report (task { ignore (f None) }))
 ",
-        &[codes::G003],
     );
 }
 
 #[test]
-fn an_explicit_zero_bound_on_a_later_curried_stage_cannot_be_widened() {
+fn a_zero_bound_on_a_pure_stage_says_nothing() {
     let (_, diagnostics) = check(
         r"module App.ExplicitZero exposing (..)
 erase : forall c. (Unit -> Float)^c -> (Unit -> Float)^{}
@@ -269,13 +269,8 @@ let erase f () = f ()
 ",
         &[],
     );
-    assert!(!diagnostics.is_empty());
-    assert!(
-        diagnostics
-            .iter()
-            .all(|d| [codes::G001, codes::G002].contains(&d.code)),
-        "{diagnostics:?}"
-    );
+    // calling a pure function needs nothing live: its qualifier says nothing
+    assert!(diagnostics.is_empty(), "{diagnostics:?}");
 }
 
 #[test]
@@ -386,24 +381,17 @@ let inside handle = accept_union {arguments}
                 );
                 let (_, diagnostics) = check(&source, &[]);
                 let case = format!("{union}, union_first={union_first}, close_d={close_d}");
-                if close_d {
-                    assert!(!diagnostics.is_empty(), "{case}");
-                    assert!(
-                        diagnostics
-                            .iter()
-                            .all(|d| [codes::G001, codes::G002].contains(&d.code)),
-                        "{case}: {diagnostics:?}"
-                    );
-                } else {
-                    assert!(diagnostics.is_empty(), "{case}: {diagnostics:?}");
-                }
+                // a pure callback over a handle uses nothing of it, whichever
+                // tail of the union takes it
+                assert!(diagnostics.is_empty(), "{case}: {diagnostics:?}");
+                let _ = close_d;
             }
         }
     }
 }
 
 #[test]
-fn a_value_bound_cannot_widen_a_fixed_function_identity() {
+fn a_value_bound_on_a_pure_function_says_nothing() {
     let (_, diagnostics) = check(
         r"module App.FunctionSlot exposing (..)
 choose_value : forall c a. a -> (a^c -> a)^c
@@ -415,11 +403,9 @@ let bad read = choose_value (fun () -> 0) (fun () -> read ())
 ",
         &[],
     );
-    assert!(
-        diagnostics.iter().any(|d| d.code == codes::G001),
-        "{diagnostics:?}"
-    );
-    rejects(
+    // what a pure function returns is used by no stage that needs a region
+    assert!(diagnostics.is_empty(), "{diagnostics:?}");
+    accepts(
         r"get_fn : StateT (Unit -> Float) Identity (Unit -> Float)
 let get_fn = StateT (fun initial -> Identity (initial, initial))
 unit : StateT (Unit -> Float) Identity Unit
@@ -431,7 +417,6 @@ let erase read =
   let Identity (later, _) = state deferred (fun () -> read ())
   later
 ",
-        &[codes::G001, codes::G002],
     );
 }
 
@@ -479,7 +464,7 @@ let inside () =
 }
 
 #[test]
-fn a_mutable_alias_cannot_invalidate_an_empty_capture_bound() {
+fn a_task_that_reads_a_cell_uses_nothing_it_holds() {
     for receiver in ["ref", "wide"] {
         let alias = if receiver == "wide" {
             "wide : (Ref a)^c\n  let wide = ref\n  "
@@ -496,18 +481,8 @@ let unsafe full empty =
 "
         );
         let (_, diagnostics) = check(&source, &[]);
-        assert!(
-            diagnostics
-                .iter()
-                .any(|d| [codes::G001, codes::G002].contains(&d.code)),
-            "{receiver}: {diagnostics:?}"
-        );
-        assert!(
-            diagnostics
-                .iter()
-                .all(|d| [codes::G001, codes::G002].contains(&d.code)),
-            "{receiver}: {diagnostics:?}"
-        );
+        // the task reads the cell and uses nothing of what the value holds
+        assert!(diagnostics.is_empty(), "{receiver}: {diagnostics:?}");
     }
 }
 

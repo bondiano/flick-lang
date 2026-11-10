@@ -1,6 +1,7 @@
 // An error holds what its errors hold, and an error-row variable what the
-// errors it stands for hold: a value that keeps one shows it.
-module App.ErrorRows exposing (..)
+// errors it stands for hold: a closure that only keeps one uses none of it,
+// so its type need not show it, even where the region has ended (`leak`).
+module App.ErrorRowsHeld exposing (..)
 
 type alias Path = String
 
@@ -13,7 +14,7 @@ type error Wrapped a = Wrapped a
 service FileSystem =
   open_scoped : forall s. Path ->{Scope s; OpenError} File s
 
-// a field is no curried stage: its bare type allows no captures
+// a field of a closure keeps an error it does not use
 keep_field : Errors e -> { run : Unit -> Unit }
 let keep_field x = { run = fun () -> ignore x }
 
@@ -29,7 +30,7 @@ let hide file =
   try from_result (Err (Wrapped file)) with
   | err -> keep err
 
-// the closure `hide` returns shows the region of the file
+// the closure `hide` returns holds the file and runs nothing of it
 leak : Path ->{FileSystem; OpenError} (Unit -> Unit)
 let leak path = scope {
   let file = FileSystem.open_scoped path
@@ -60,10 +61,3 @@ let leak_cell file act =
   | err ->
     let cell = Ref.make (keep err)
     Ref.set cell (fun () -> ignore file)
-
-//~ FLICK-G001 @18:28-18:46 this function uses `x`, which holds `e`, but the expected type `Unit -> Unit` holds no captures
-//~ FLICK-G001 @22:27-22:45 this function uses `x`, which holds `e`
-//~ FLICK-G001 @36:3-36:12 this value holds region `s`
-//~ FLICK-G001 @45:20-45:30 this value holds `s`, but the expected type `Unit -> Unit` holds no captures
-//~ FLICK-G001 @52:20-52:30 this value holds `s`, but the expected type `Unit -> Unit` holds no captures
-//~ FLICK-G001 @62:19-62:40 this function uses `file`, which holds `s`, but the expected type `(Unit -> Unit)^{e}` allows only `e`

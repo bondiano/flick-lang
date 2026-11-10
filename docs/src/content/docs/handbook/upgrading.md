@@ -397,7 +397,7 @@ hide a region its payload has. A curried stage keeps the variable, so
 holding `e`. A bare type that is no stage, such as a field, now rejects the
 closure:
 
-```flick fail G001
+```flick ignore accepted since regions are checked by use
 keep_field : forall e. Errors e -> { run : Unit -> Unit }
 let keep_field x = { run = fun () -> ignore x }
 ```

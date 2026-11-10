@@ -10,7 +10,7 @@ use std::mem;
 use std::rc::Rc;
 
 use super::expr::mono;
-use super::regions::owner;
+use super::regions::{arg_caps, live_arg, live_service, owner};
 use super::{Check, Checker, Inst, error, substitute};
 use crate::decls::Decls;
 use crate::eval::Lambda;
@@ -59,8 +59,20 @@ pub fn check_config(
     })
 }
 
+/// The least solution of what is still unknown: a row or a capture
+/// variable never solved stands for nothing, also in `Live`.
 fn least(mut r: Row) -> Row {
     r.vars.retain(|v| !matches!(v, Var::Meta(_)));
+    if let Some(args) = r.elems.get(&live_service()) {
+        let mut c = arg_caps(&args[0]);
+        c.atoms.retain(|v| !matches!(v, Var::Meta(_)));
+        c.vars.retain(|v| !matches!(v, Var::Meta(_)));
+        if c.is_empty() {
+            r.elems.remove(&live_service());
+        } else {
+            r.elems.insert(live_service(), Rc::from([live_arg(c)]));
+        }
+    }
     r
 }
 

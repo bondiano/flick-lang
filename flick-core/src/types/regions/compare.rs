@@ -155,13 +155,29 @@ impl Checker<'_> {
             _ => {}
         }
         let (a, e) = self.live_sides((a, ca.as_ref()), (e, ce.as_ref()));
-        let visible = if ce.is_some() {
+        let callable = matches!(self.whnf(&a), Type::Fun { .. }) || self.eff_parts(&a).is_some();
+        // what the type of a function or a task position shows is no more
+        // than its reach, as the core compares arrows (`LeLive.arrow`): a
+        // callback over `forall v. a^v` holds `v` where its type shows it
+        let visible = if ce.is_some() && !callable {
             Visible::Now(Vec::new())
         } else {
             Visible::Late(e.clone())
         };
         let bound = ce.unwrap_or_else(Type::empty_row);
         let written = !matches!(self.store.resolve(&bound), Type::Meta(_));
+        // against a written qualifier, a function or a task holds what it
+        // likes: the qualifier is the `Live` its use needs, which its row
+        // has now (`live_sides`), and the core bounds no value it holds
+        // (`TypingMode.held`). One still inferred grows from it below, which
+        // what an owner keeps needs; the reader of a lazy `for` is held too.
+        if written && callable && !self.holds_reader(&[(None, actual.clone())]) {
+            let a = match ca {
+                Some(_) => self.bounded_callable(a, &self.captures_of(actual).into_type()),
+                None => a,
+            };
+            return self.subsume(&a, &e, span);
+        }
         let mark = self.regions.holds.len();
         self.hold(Hold {
             held: vec![(None, actual.clone())],

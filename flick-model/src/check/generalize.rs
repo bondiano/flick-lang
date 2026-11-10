@@ -83,15 +83,11 @@ impl Checker<'_> {
             let fact = (substitute_caps(c, &map), substitute(r, &map));
             self.regions.facts.push(fact);
         }
-        let body = if self.live {
-            self.elide(
-                &s.body,
-                &Caps::default(),
-                &regions_of(&s.vars, &BTreeSet::new()),
-            )
-        } else {
-            self.implicit(&s.body, &Caps::default())
-        };
+        let body = self.elide(
+            &s.body,
+            &Caps::default(),
+            &regions_of(&s.vars, &BTreeSet::new()),
+        );
         let body = substitute(&body, &map);
         self.give_provided(&body);
         body

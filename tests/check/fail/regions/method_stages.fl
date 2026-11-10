@@ -1,5 +1,5 @@
-// What the head of `f a` holds stays in the stages of a class method, so a region
-// does not leave its scope through a closure that shows only `Int`.
+// The stages of a class method may hold what the head of `f a` holds: a
+// closure over a scoped file leaves its scope, as nothing it runs uses it.
 module App.MethodStages exposing (..)
 
 type File (s : Region)
@@ -37,7 +37,7 @@ let through_generic () =
   }
   later ()
 
-// a stage said to hold nothing refuses it
+// a stage said to hold nothing may still hold it: holding is no use
 class Empty (f : Type -> Type) =
   empty : f a -> (Unit -> Int)^{}
 
@@ -53,7 +53,4 @@ instance Written (Holder h) =
   written : Holder h a -> Unit -> Holder h a
   let written x () = x
 
-//~ FLICK-G002 @24:5-25:26 the value of this `scope` has type `(Unit -> Int)^{s, Int}^{s | _}`
-//~ FLICK-G002 @35:5-36:28 the value of this `scope` has type `(Unit -> Int)^{s, Int}^{s | _}`
-//~ FLICK-G001 @45:3-47:6 this function uses `x`, which holds `h`, but the expected type `Unit -> Int` holds no captures
 //~ FLICK-T059 @53:3-53:45 this method has the type its class gives it

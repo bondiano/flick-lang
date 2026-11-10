@@ -1,5 +1,5 @@
-//! flick-core under `[build] regions = "live"` against the live discipline
-//! of the model (`src/check/regions/live.rs`): the leaks of the generator,
+//! flick-core against the model on regions by use
+//! (`src/check/regions/live.rs`): the leaks of the generator,
 //! the programs that only hold a region past its `scope`, generated
 //! programs, and cases by hand. The machine judges what is accepted: a
 //! leak must be rejected because it reaches a use after close.
@@ -15,7 +15,7 @@ use flick_model::eval::Outcome;
 use flick_model::generate;
 use flick_model::syntax::{Const, Term};
 
-use live_support::{core, core_live, g, open_in, probe, run, thunk_program, v, verdict};
+use live_support::{core, g, open_in, probe, run, thunk_program, v, verdict};
 
 /// xorshift: choices without a dependency.
 struct Seeds(u64);
@@ -48,7 +48,7 @@ fn by_design(errors: &[String]) -> bool {
 }
 
 /// Every leak of the generator reaches a use after close, so flick-core
-/// rejects each under the live discipline, as the model does.
+/// rejects each, as the model does.
 #[test]
 fn live_core_rejects_every_leak() {
     let mut seen = 0;
@@ -58,8 +58,8 @@ fn live_core_rejects_every_leak() {
             continue;
         };
         seen += 1;
-        assert!(verdict(&p, true).is_err(), "path {path}: the model accepts");
-        let errors = core_live(&p);
+        assert!(verdict(&p).is_err(), "path {path}: the model accepts");
+        let errors = core(&p);
         println!("path {path}: {errors:?}");
         if errors.is_empty() {
             accepted.push(format!("path {path}:\n{}", generate::source(&p)));
@@ -74,7 +74,7 @@ fn live_core_rejects_every_leak() {
 }
 
 /// `generate::holding`: what only holds a region past its `scope` is
-/// accepted by both live checkers; with a use of it, rejected by both.
+/// accepted by flick-core and the model; with a use of it, rejected by both.
 #[test]
 fn live_core_on_holding() {
     let mut seeds = Seeds(0x2545_f491_4f6c_dd1d);
@@ -84,7 +84,7 @@ fn live_core_on_holding() {
         let c = seeds.choices(256);
         for used in [false, true] {
             let p = generate::holding(&c, used);
-            let (model, errors) = (verdict(&p, true), core_live(&p));
+            let (model, errors) = (verdict(&p), core(&p));
             let agree = if used {
                 used_rejected += usize::from(!errors.is_empty());
                 model.is_err() && !errors.is_empty()
@@ -122,7 +122,7 @@ fn live_core_agrees_on_generated() {
         let changed = generate::mutate(&original, &change);
         for prog in [&original, &changed] {
             programs += 1;
-            let (model, errors) = (verdict(prog, true), core_live(prog));
+            let (model, errors) = (verdict(prog), core(prog));
             let core_ok = errors.is_empty() || by_design(&errors);
             if core_ok {
                 accepted += 1;
@@ -185,21 +185,10 @@ fn live_core_rejects_a_task_in_an_outer_cell() {
         ("task in an outer cell", direct),
         ("named task in an outer cell", named),
     ] {
-        let (captures, live, outcome) = probe(name, &p);
+        let (live, outcome) = probe(name, &p);
         assert!(matches!(outcome, Outcome::Stuck(w) if w.starts_with("use after")));
-        assert!(
-            captures.is_err(),
-            "{name}: captures accepts a use after close"
-        );
-        assert!(live.is_err(), "{name}: live accepts a use after close");
+        assert!(live.is_err(), "{name}: the model accepts a use after close");
         let errors = core(&p);
-        assert!(
-            errors
-                .iter()
-                .any(|e| e.starts_with("FLICK-G001") || e.starts_with("FLICK-G002")),
-            "{name}: {errors:?}"
-        );
-        let errors = core_live(&p);
         assert!(
             errors.iter().any(|e| e.starts_with("FLICK-G002")),
             "{name}: {errors:?}"

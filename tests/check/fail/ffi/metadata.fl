@@ -62,5 +62,5 @@ leak : Unit ->{} Unit
 let leak () = scope {
   let file = open_file "a"
   later (fun () -> read_file file)
-  //~ FLICK-G001 @64:10-64:34 holds region
+  //~ FLICK-G002 @64:20-64:34 this uses region `s`
 }

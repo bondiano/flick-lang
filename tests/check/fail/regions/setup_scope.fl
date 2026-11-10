@@ -1,9 +1,8 @@
-// captures: FLICK-G003
 // Work `Ui.on_mount` starts runs from the instance's mount to its unmount,
 // so what it uses must outlive the instance's region: here it uses a
 // subscription of a `scope` inside the setup, which ends first. Both
 // disciplines ask it of `Ui.on_mount` and `Ui.watch` (`Fiber.Outlives`).
-module App.LiveSetupScope exposing (..)
+module App.SetupScope exposing (..)
 
 component feed (hub : PubSub.PubSub Float) =
   let _mounted = scope inner {
@@ -11,4 +10,4 @@ component feed (hub : PubSub.PubSub Float) =
     Ui.on_mount (task { ignore (PubSub.take sub) })
   }
   ui { text "feed" }
-//~ FLICK-G003 @11:5-11:16 the child holds region `inner`
+//~ FLICK-G003 @10:5-10:16 the child holds region `inner`

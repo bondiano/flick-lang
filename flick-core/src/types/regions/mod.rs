@@ -11,6 +11,7 @@
 //! allows none. These constraints are solved with the effect rows, once the
 //! declaration is inferred (see [`solve`]).
 
+mod applied;
 mod compare;
 mod data;
 mod live;
@@ -19,7 +20,7 @@ mod provided;
 mod scopes;
 mod solve;
 
-pub use live::{LIVE, RegionMode, has_live, strip_live};
+pub use live::{LIVE, has_live, strip_live};
 pub use provided::{PROVIDED, Provide};
 pub use solve::Outlives;
 
@@ -363,18 +364,8 @@ impl Checker<'_> {
         }
     }
 
-    /// A curried stage retains earlier parameters. Include projections of
-    /// generic value captures as well as regions, so partial application
-    /// has the same whole-value bound as an explicitly written closure.
-    pub fn implicit_captures(&self, t: &Type) -> Type {
-        if self.live() {
-            return t.clone();
-        }
-        self.held_stages(t)
-    }
-
-    /// `t` with what each stage holds of the parameters before it, under
-    /// either discipline.
+    /// `t` with what each stage holds of the parameters before it: what the
+    /// retention of a foreign function checks (`ffi/retention.rs`).
     pub(in crate::types) fn held_stages(&self, t: &Type) -> Type {
         self.stages(t, &mut Vec::new(), &Type::empty_row())
     }
@@ -552,7 +543,7 @@ impl Checker<'_> {
     ) -> Type {
         // under `live.rs` no qualifier says what a closure holds, but the
         // reader of a lazy `for`, which that discipline does not know
-        if held.is_empty() || self.live() && !self.holds_reader(&held) {
+        if held.is_empty() || !self.holds_reader(&held) {
             return ty;
         }
         if let Some(expected) = &expected

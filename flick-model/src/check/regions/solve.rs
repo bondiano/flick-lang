@@ -140,7 +140,7 @@ impl Checker<'_> {
         // Live is a use obligation, not a storage bound. An opaque type
         // atom cannot be inspected. Filter after zonking, since a capture
         // meta may have learned either such an atom or an actual region.
-        if self.live && h.rule == "Live" {
+        if h.rule == "Live" {
             held.atoms.retain(|v| self.is_region(v));
         }
         // an atom is a region or a type variable; a meta of a type never

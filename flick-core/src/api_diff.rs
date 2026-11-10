@@ -376,7 +376,6 @@ mod tests {
             effects: true,
             watched: types::Watched::none(),
             stages_by_class: false,
-            regions: types::RegionMode::Captures,
         };
         let _ = types::check(
             &module,
@@ -483,8 +482,8 @@ mod tests {
             changes[0].changes,
             [Change::Changed {
                 name: "value f".into(),
-                was: "forall a b. a -> (b -> a)^{a}".into(),
-                now: "forall a. a -> (a -> a)^{a}".into(),
+                was: "forall a b. a -> b -> a".into(),
+                now: "forall a. a -> a -> a".into(),
             }]
         );
     }

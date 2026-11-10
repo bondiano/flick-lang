@@ -117,9 +117,7 @@ impl Checker<'_> {
             _ => (self.fresh_row(), self.fresh_row()),
         };
         let wanted_stage = Stage::Runtime(r.clone(), e.clone());
-        let task = Term::Task(Rc::new(body.clone()));
         self.close_within(
-            &task,
             &Type::Eff(r, e, Rc::new(t)),
             &inner,
             &wanted_stage,
@@ -130,11 +128,7 @@ impl Checker<'_> {
     /// (Await): `φ ⊔ R⟨r; ε⟩`, one layer of `Eff` off.
     pub(super) fn await_(&mut self, e: &Term) -> Check<Type> {
         let t = self.infer(e)?;
-        let held = if self.live {
-            self.qualifier(&t)
-        } else {
-            Caps::default()
-        };
+        let held = self.qualifier(&t);
         let (r, x, a) = match self.resolve(&t) {
             Type::Eff(r, x, a) => (r, x, (*a).clone()),
             other => {
@@ -233,8 +227,9 @@ impl Checker<'_> {
         self.settle_provide(&mut needed, &self.zonk_row(&outputs), Some(&p))?;
         let rest = self.minus(&needed, &outputs)?;
         // a layer of a service a region indexes is provided where it is live
-        let live = (self.zonk_row(&outputs).elems.values())
-            .fold(Caps::default(), |out, args| out.union(&self.indexed_live(args)));
+        let live = (self.zonk_row(&outputs).elems.values()).fold(Caps::default(), |out, args| {
+            out.union(&self.indexed_live(args))
+        });
         let services = self.sum(&inputs, &rest)?;
         let services = self.add_live(&services, &live);
         let errors = self.sum(&errors, &raised)?;
