@@ -119,6 +119,13 @@ pub struct Checker<'d> {
     module: Name,
 }
 
+/// `σ` as the model reads a signature: with the `Live` elision adds
+/// (`regions/live.rs`), which `formal/Formal/Live/ElideSchemes.lean` proves
+/// to be `Ty.elide` of the core for the Prelude.
+pub fn elided(decls: &Decls, s: &Scheme) -> Scheme {
+    Checker::new(decls).live_scheme(s)
+}
+
 impl<'d> Checker<'d> {
     pub fn new(decls: &'d Decls) -> Self {
         Checker {

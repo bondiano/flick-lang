@@ -14,7 +14,9 @@ reading of a constant is a supertype of the constant's live type (`Const.ty_le_e
 the core types a constant at its elided type as well (`Typ.const_elided`): a call the model
 types through an elided signature of a constant is a call the core types by (Sub). The
 instance types are asked to be fixed by elision, also under the binder of `scope`
-(`CArg.Fixed`), which a type without runtime arrows and `Eff` is. Unlike the model, every atom of a reach counts, not only regions and capture rows.
+(`CArg.Fixed`), which a type without runtime arrows and `Eff` is. `K` is what a reach counts:
+the model counts regions and capture rows, and for each scheme of the Prelude its `elide` is
+`Ty.elide` at the binders of those kinds (`Live/ElideSchemes.lean`, generated).
 -/
 
 namespace Flick
@@ -22,29 +24,33 @@ namespace Flick
 /-- `H` under `k` binders. -/
 def Caps.under (k : Nat) (H : Caps) : Caps := fun a => ∃ b, H b ∧ a = b.up k
 
-/-- `t` with `Live` of `H` and of what the parameters before each stage reach. -/
-def Ty.elide : Ty → Caps → Ty
+/-- `t` with `Live` of `H` and of the atoms of `K` that the parameters before each stage
+reach. The model counts regions and capture rows (`shown`); under a `∀` `K` counts no binder of
+it, and the Prelude schemes keep none of those kinds there; `K := ⊤` counts every atom. -/
+def Ty.elide (K : Caps) : Ty → Caps → Ty
   | .arrow a φ b C, H =>
-    .arrow (a.elide Caps.none) (Stage.use φ fun x => H x ∨ (a.elide Caps.none).reach x)
-      (b.elide fun x => H x ∨ (a.elide Caps.none).reach x) C
-  | .eff r e t C, H => .eff (Row.union r (Row.ofCaps H)) e (t.elide Caps.none) C
-  | .all k t, H => .all k (t.elide (Caps.under k H))
-  | .ref t, _ => .ref (t.elide Caps.none)
-  | .tapp f a, _ => .tapp (f.elide Caps.none) (a.elide Caps.none)
-  | .rcons l t r, _ => .rcons l (t.elide Caps.none) (r.elide Caps.none)
+    .arrow (a.elide K Caps.none) (Stage.use φ fun x => H x ∨ K x ∧ (a.elide K Caps.none).reach x)
+      (b.elide K fun x => H x ∨ K x ∧ (a.elide K Caps.none).reach x) C
+  | .eff r e t C, H => .eff (Row.union r (Row.ofCaps H)) e (t.elide K Caps.none) C
+  | .all k t, H => .all k (t.elide (Caps.under k K) (Caps.under k H))
+  | .ref t, _ => .ref (t.elide K Caps.none)
+  | .tapp f a, _ => .tapp (f.elide K Caps.none) (a.elide K Caps.none)
+  | .rcons l t r, _ => .rcons l (t.elide K Caps.none) (r.elide K Caps.none)
   | t, _ => t
 
 /-- Elision changes nothing a value of the type holds. -/
-theorem Ty.reach_elide : ∀ (t : Ty) (H : Caps), (t.elide H).reach = t.reach
-  | .arrow a φ b C, H => by
-    funext x; simp only [Ty.elide, Ty.reach, Ty.reach_elide a, Ty.reach_elide b]
-  | .eff r e t C, H => by funext x; simp only [Ty.elide, Ty.reach, Ty.reach_elide t]
-  | .all k t, H => by funext x; simp only [Ty.elide, Ty.reach, Ty.reach_elide t]
-  | .ref t, _ => by simp only [Ty.elide, Ty.reach, Ty.reach_elide t]
-  | .tapp f a, _ => by funext x; simp only [Ty.elide, Ty.reach, Ty.reach_elide f, Ty.reach_elide a]
-  | .rcons l t r, _ => by funext x; simp only [Ty.elide, Ty.reach, Ty.reach_elide t, Ty.reach_elide r]
-  | .tvar _, _ | .rg _, _ | .caps _, _ | .row _, _ | .base _, _ | .adt _, _ | .rnil, _
-  | .errors _, _ | .hnd _, _ | .owner _, _ | .dict _ _, _ => rfl
+theorem Ty.reach_elide : ∀ (K : Caps) (t : Ty) (H : Caps), (t.elide K H).reach = t.reach
+  | K, .arrow a φ b C, H => by
+    funext x; simp only [Ty.elide, Ty.reach, Ty.reach_elide K a, Ty.reach_elide K b]
+  | K, .eff r e t C, H => by funext x; simp only [Ty.elide, Ty.reach, Ty.reach_elide K t]
+  | K, .all k t, H => by funext x; simp only [Ty.elide, Ty.reach, Ty.reach_elide _ t]
+  | K, .ref t, _ => by simp only [Ty.elide, Ty.reach, Ty.reach_elide K t]
+  | K, .tapp f a, _ => by
+    funext x; simp only [Ty.elide, Ty.reach, Ty.reach_elide K f, Ty.reach_elide K a]
+  | K, .rcons l t r, _ => by
+    funext x; simp only [Ty.elide, Ty.reach, Ty.reach_elide K t, Ty.reach_elide K r]
+  | _, .tvar _, _ | _, .rg _, _ | _, .caps _, _ | _, .row _, _ | _, .base _, _ | _, .adt _, _
+  | _, .rnil, _ | _, .errors _, _ | _, .hnd _, _ | _, .owner _, _ | _, .dict _ _, _ => rfl
 
 theorem Row.union_ofCaps_none (r : Row) : Row.union r (Row.ofCaps Caps.none) = r := by
   funext n; cases n <;> simp [Row.union, Row.ofCaps, Caps.none]
@@ -54,10 +60,10 @@ theorem Caps.under_none (k : Nat) : Caps.under k Caps.none = Caps.none := by
 
 /-- The types whose elided reading is a live supertype: a chain of arrows and `Eff` whose
 parameters elision leaves alone, ending in a type elision leaves alone. -/
-inductive Ty.Kept : Ty → Prop
-  | fix {t : Ty} : (∀ H, t.elide H = t) → Ty.Kept t
-  | arrow {a φ b C} : a.elide Caps.none = a → Ty.Kept b → Ty.Kept (.arrow a φ b C)
-  | eff {r e t C} : t.elide Caps.none = t → Ty.Kept (.eff r e t C)
+inductive Ty.Kept (K : Caps) : Ty → Prop
+  | fix {t : Ty} : (∀ H, t.elide K H = t) → Ty.Kept K t
+  | arrow {a φ b C} : a.elide K Caps.none = a → Ty.Kept K b → Ty.Kept K (.arrow a φ b C)
+  | eff {r e t C} : t.elide K Caps.none = t → Ty.Kept K (.eff r e t C)
 
 theorem Stage.use_live_mono {φ : Stage} {H C : Caps} :
     (Stage.use φ C).le (Stage.use (Stage.use φ H) C) := by
@@ -67,7 +73,7 @@ theorem Stage.use_live_mono {φ : Stage} {H C : Caps} :
     exact ⟨fun n h => h.elim (fun h => .inl (.inl h)) (fun h => .inr h), fun _ h => h⟩
 
 /-- The elided reading of a kept type is a supertype of it. -/
-theorem Ty.Kept.le_elide {t : Ty} (h : t.Kept) : ∀ H, LeLive t (t.elide H) := by
+theorem Ty.Kept.le_elide {K : Caps} {t : Ty} (h : t.Kept K) : ∀ H, LeLive t (t.elide K H) := by
   induction h with
   | fix hf => intro H; rw [hf H]; exact .refl
   | arrow ha _ ih =>
@@ -84,49 +90,63 @@ theorem Ty.Kept.le_elide {t : Ty} (h : t.Kept) : ∀ H, LeLive t (t.elide H) := 
 
 /-- Instance types that elision leaves alone, also under the binder of `scope`. -/
 def CArg.Fixed (ι : CArg) : Prop :=
-  (∀ H, ι.t.elide H = ι.t) ∧ ∀ H, (ι.t.up 1).elide H = ι.t.up 1
+  (∀ K H, ι.t.elide K H = ι.t) ∧ ∀ K H, (ι.t.up 1).elide K H = ι.t.up 1
 
 /-- The `Live` that `scope` adds to the body's stage is already its `Scope`. -/
-theorem Row.union_scope_self (D : Caps) (r : Row) :
-    Row.union (Row.union (Row.ofCaps D) r) (Row.ofCaps fun x => Caps.none x ∨ D x) =
+theorem Row.union_scope_self (K D : Caps) (r : Row) :
+    Row.union (Row.union (Row.ofCaps D) r) (Row.ofCaps fun x => Caps.none x ∨ K x ∧ D x) =
       Row.union (Row.ofCaps D) r := by
   funext n; apply propext; cases n with
   | atm a =>
     simp only [Row.union, Row.ofCaps, Caps.none, false_or]
-    exact ⟨fun h => h.elim id .inl, .inl⟩
+    exact ⟨fun h => h.elim id fun h => .inl h.2, .inl⟩
   | _ => simp only [Row.union, Row.ofCaps, or_false]
 
 /-- The live type of a constant that the core types is kept by elision. -/
-theorem Const.ty_kept {S : Sig} {Θ : Facts} {c : Const} {ι : CArg}
-    (hc : c.ok Θ ι) (hι : ι.Fixed) : (c.ty S ι).Kept := by
+theorem Const.ty_kept {S : Sig} {Θ : Facts} {c : Const} {ι : CArg} {K : Caps}
+    (hc : c.ok Θ ι) (hι : ι.Fixed) : (c.ty S ι).Kept K := by
   obtain ⟨ht, hup⟩ := hι
+  have hk := ht K
   cases c with
-  | refMake => exact .arrow (ht _) (.fix fun _ => by simp only [Ty.elide, ht])
-  | refGet => exact .arrow (by simp only [Ty.elide, ht]) (.fix ht)
-  | refSet => exact .arrow (by simp only [Ty.elide, ht]) (.arrow (ht _) (.fix fun _ => rfl))
+  | refMake => exact .arrow (hk _) (.fix fun _ => by simp only [Ty.elide, hk])
+  | refGet => exact .arrow (by simp only [Ty.elide, hk]) (.fix hk)
+  | refSet => exact .arrow (by simp only [Ty.elide, hk]) (.arrow (hk _) (.fix fun _ => rfl))
   | open_ => exact .arrow rfl (.fix fun _ => rfl)
   | op => exact .arrow rfl (.fix fun _ => rfl)
   | addFin =>
     exact .arrow rfl (.arrow (by simp only [Ty.elide, Row.union_ofCaps_none]) (.fix fun _ => rfl))
   | spawn =>
-    exact .arrow rfl (.arrow (by simp only [Ty.elide, Row.union_ofCaps_none, ht]) (.fix fun _ => rfl))
+    exact .arrow rfl (.arrow (by simp only [Ty.elide, Row.union_ofCaps_none, hk]) (.fix fun _ => rfl))
   | intEq => exact .arrow rfl (.arrow rfl (.fix fun _ => rfl))
   | scopeRun =>
-    refine .arrow ?_ (.fix ht)
+    refine .arrow ?_ (.fix hk)
     simp only [Ty.elide, Caps.under_none, hup, Stage.use, Ty.reach, Row.scope]
     rw [Row.union_scope_self]
   | perform => exact (hc : False).elim
 
 /-- The elided reading of a constant is a live supertype of its live type. -/
-theorem Const.ty_le_elide {S : Sig} {Θ : Facts} {c : Const} {ι : CArg}
+theorem Const.ty_le_elide {S : Sig} {Θ : Facts} {c : Const} {ι : CArg} {K : Caps}
     (hc : c.ok Θ ι) (hι : ι.Fixed) (H : Caps) :
-    LeLive (c.ty S ι) ((c.ty S ι).elide H) :=
+    LeLive (c.ty S ι) ((c.ty S ι).elide K H) :=
   (Const.ty_kept hc hι).le_elide H
 
 /-- The core types a constant at each supertype of its elided reading. -/
 theorem Typ.const_elided {S : Sig} {Ψ : List Ty} {Θ : Facts} {Γ : List Scheme} {c : Const}
-    {ι : CArg} {T : Ty} {φ : Stage} (hc : c.ok Θ ι) (hι : ι.Fixed) (H : Caps)
-    (hT : LeLive ((c.ty S ι).elide H) T) : Typ S Ψ Θ Γ (.const c) (.ex T φ) :=
+    {ι : CArg} {K : Caps} {T : Ty} {φ : Stage} (hc : c.ok Θ ι) (hι : ι.Fixed) (H : Caps)
+    (hT : LeLive ((c.ty S ι).elide K H) T) : Typ S Ψ Θ Γ (.const c) (.ex T φ) :=
   .const hc ((Const.ty_le_elide hc hι H).trans hT)
+
+/-- `Ty.elide K t H = t'` for closed `t`, `t'` written with predicates of finitely many atoms and
+elements (`Live/ElideSchemes.lean`): unfold elision, split the constructors, and compare each
+set point by point; an atom is `.v n` or `.r p`, so what is left is arithmetic. -/
+macro "elide_eq" : tactic => `(tactic| (
+  simp only [Ty.elide, Stage.use, Ty.arrow.injEq, Ty.tapp.injEq, Ty.eff.injEq, Ty.all.injEq,
+    Ty.ref.injEq, Ty.rcons.injEq, Stage.rt.injEq, true_and, and_true]
+  repeat' (first
+    | rfl
+    | constructor
+    | (funext x
+       rcases x with n | a | ⟨n, a⟩ | a | ⟨v, a⟩ <;> (try cases a) <;> (try cases v) <;>
+         simp [Row.union, Row.ofCaps, Ty.reach, Caps.none, Caps.under, Atom.up] <;> omega))))
 
 end Flick

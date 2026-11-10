@@ -162,5 +162,6 @@ import Formal.Live
 import Formal.Live.T4Live
 import Formal.Live.T1Regions
 import Formal.Live.Elide
+import Formal.Live.ElideSchemes
 import Formal.Live.Install
 import Formal.Axioms

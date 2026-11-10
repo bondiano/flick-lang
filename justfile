@@ -41,7 +41,7 @@ unit:
 model:
     cargo test -p flick-model -- --include-ignored
 
-# Regenerate formal/Formal/Elab/PreludeSchemes.lean from the checker's Prelude
+# Regenerate formal/Formal/Elab/PreludeSchemes.lean and formal/Formal/Live/ElideSchemes.lean from the checker's Prelude
 formal-schemes:
     FLICK_FORMAL_SCHEMES=1 cargo test -p flick-model --lib translate::lean
 

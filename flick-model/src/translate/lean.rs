@@ -30,6 +30,7 @@
 //! A scheme the model cannot write is a line of the skipped list, with its
 //! reason (`docs/formal/elaboration.md#the-scheme-generator-translated-only-the-sugar-names`).
 
+mod elide;
 mod tr;
 
 use std::fmt::{self, Write};
@@ -37,6 +38,7 @@ use std::fmt::{self, Write};
 use flick_core::iface::{Decl, Export};
 use flick_core::types::{self as fc, Kind, show_type};
 
+pub use self::elide::elide_schemes;
 use self::tr::{Tr, Ty, occurs};
 
 /// The modules whose exports the model takes, in this order.
