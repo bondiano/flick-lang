@@ -82,13 +82,15 @@ fn rt_cases() {
     let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
     let root = repo.join("tests/run");
     let only = env::var("FLICK_E2E_ONLY").ok();
+    // by the path, as `run_cases` and the unlisted cases below are selected:
+    // a part the list does not spell, `tests/run/`, selects the same cases
     let listed: Vec<PathBuf> = listed_cases(&root, "rt.txt")
         .into_iter()
+        .map(|c| root.join(format!("{c}.fl")))
         .filter(|c| {
             only.as_ref()
-                .is_none_or(|o| o.split(',').any(|p| c.contains(p)))
+                .is_none_or(|o| o.split(',').any(|p| c.to_string_lossy().contains(p)))
         })
-        .map(|c| root.join(format!("{c}.fl")))
         .collect();
     // a shard runs its part of the list, and what the list lacks is told
     // from all of it: a case of another shard is not an unlisted one
