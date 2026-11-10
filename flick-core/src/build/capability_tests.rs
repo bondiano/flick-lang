@@ -47,6 +47,7 @@ fn diagnostics_with_ui(
             ir,
             declarations: Arc::new(interface.clone()),
             interface,
+            expansion: None,
         }],
         ..Compilation::default()
     };
