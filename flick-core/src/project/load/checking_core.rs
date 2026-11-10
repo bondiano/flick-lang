@@ -205,10 +205,8 @@ impl Checking<'_> {
         (projections, local_dictionaries, contract_errors)
     }
 
+    #[allow(clippy::too_many_lines)]
     fn check(&self, loaded: &Loaded, lookup: &dyn Fn(&str) -> Option<Interface>) -> Output {
-        if Self::is_functor_template(loaded) {
-            return Self::functor_template(loaded);
-        }
         let tree = loaded
             .expansion
             .as_ref()
@@ -279,7 +277,11 @@ impl Checking<'_> {
         );
         // what the plugins find from the types of their code stops lowering too
         if let Some(expansion) = &loaded.expansion {
-            checked.extend(expansion.check_blocks(&loaded.editing, &typing.wildcards, options.thresholds));
+            checked.extend(expansion.check_blocks(
+                &loaded.editing,
+                &typing.wildcards,
+                options.thresholds,
+            ));
         }
         checked.extend(self.watched_calls(loaded, &typing));
         let checked = types::beside_syntax_errors(tree, checked);
@@ -325,7 +327,7 @@ impl Checking<'_> {
         diagnostics: &mut Vec<Diagnostic>,
     ) -> Option<ir::Module> {
         let lowers = !self.lower_packages_only || matches!(loaded.root, Root::Package(_));
-        if clean && self.lower && lowers {
+        if clean && self.lower && lowers && !Self::is_functor_template(loaded) {
             match ir::lower(module, typing) {
                 Ok(lowered) => return Some(lowered),
                 Err(d) => diagnostics.extend(d),

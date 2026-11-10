@@ -258,6 +258,7 @@ fn binding_policy(output: &Path) -> io::Result<()> {
         ("core_builtins", "CORE_BUILTINS"),
         ("families", "FAMILIES"),
         ("ui_renderer", "UI_RENDERER"),
+        ("ui_requirements", "UI_REQUIRED"),
         ("zone_exports", "ZONE_EXPORTS"),
     ] {
         let values: Vec<_> = data[key]
@@ -268,6 +269,9 @@ fn binding_policy(output: &Path) -> io::Result<()> {
             .collect();
         if name == "ZONE_EXPORTS" {
             out.push_str("#[cfg(feature = \"build-artifacts\")]\n");
+        }
+        if name == "UI_REQUIRED" {
+            out.push_str("#[cfg(not(target_arch = \"wasm32\"))]\n");
         }
         writeln!(out, "pub const {name}: &[&str] = &{values:?};").expect("write string");
     }
@@ -326,9 +330,13 @@ fn binding_policy(output: &Path) -> io::Result<()> {
     for (path, name) in [
         ("../runtime/rt_exports.txt", "EXPORTS"),
         ("../runtime/rt_stubs.txt", "STUBS"),
+        ("../runtime/rt_unavailable.txt", "UNAVAILABLE"),
         ("../packages/effect-ts/rt_bridge_stubs.txt", "BRIDGE_STUBS"),
     ] {
         println!("cargo:rerun-if-changed={path}");
+        if name == "UNAVAILABLE" {
+            out.push_str("#[cfg(not(target_arch = \"wasm32\"))]\n");
+        }
         writeln!(
             out,
             "pub const {name}: &str = {:?};",

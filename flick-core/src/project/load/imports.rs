@@ -26,6 +26,19 @@ impl Loader<'_> {
                 .cloned()
                 .collect::<Vec<_>>()
             {
+                if import.module.starts_with("$module:") {
+                    continue;
+                }
+                if self.modules[i].syntax.header.as_ref().is_some_and(|h| {
+                    !h.parameters.is_empty()
+                        && self.modules[i]
+                            .syntax
+                            .applications
+                            .iter()
+                            .any(|a| import.module == format!("{}.{}", h.name, a.name))
+                }) {
+                    continue;
+                }
                 if let Some(target) = self.find_module(i, &import.module, import.span) {
                     targets.push(target);
                 }
@@ -39,8 +52,15 @@ impl Loader<'_> {
                     }
                 }
             }
-            for application in self.modules[i].syntax.applications.clone() {
-                self.instantiate(i, &application);
+            if self.modules[i]
+                .syntax
+                .header
+                .as_ref()
+                .is_none_or(|h| h.parameters.is_empty())
+            {
+                for application in self.modules[i].syntax.applications.clone() {
+                    self.instantiate(i, &application);
+                }
             }
             targets.sort_by(|a, b| self.modules[*a].name.cmp(&self.modules[*b].name));
             targets.dedup();
@@ -50,7 +70,23 @@ impl Loader<'_> {
         edges
     }
 
+    #[allow(clippy::too_many_lines)]
     fn find_module(&mut self, importer: usize, name: &str, span: Span) -> Option<usize> {
+        let (head, tail) = name.split_once('.').unwrap_or((name, ""));
+        if let Some(import) = self.modules[importer]
+            .syntax
+            .imports
+            .iter()
+            .find(|i| i.alias.as_deref() == Some(head) && i.module != head)
+            .cloned()
+        {
+            let expanded = if tail.is_empty() {
+                import.module
+            } else {
+                format!("{}.{tail}", import.module)
+            };
+            return self.find_module(importer, &expanded, span);
+        }
         let packages = self.package_sources().into_iter().map(|(_, dir)| dir);
         // the project's own modules come before those of source packages
         let dirs: Vec<PathBuf> = match (&self.modules[importer].root, self.project) {
@@ -99,7 +135,7 @@ impl Loader<'_> {
                             .iter()
                             .any(|item| item.kind == ItemKind::All || item.name == child)
                     });
-                if exposed {
+                if exposed || parent == importer {
                     self.instantiate(parent, &application);
                 }
             }
@@ -220,7 +256,17 @@ impl Loader<'_> {
         } else {
             ""
         };
-        let mut generated = format!("{visibility}module {name}{exposed}\n");
+        let result = header
+            .result
+            .as_ref()
+            .map_or(String::new(), |r| format!(" : {}", r.text(&source)));
+        let groups = header_node
+            .nodes()
+            .filter(|n| n.kind == K::ModuleParamGroup)
+            .skip(application.argument_groups.len())
+            .map(|n| n.text(&source))
+            .collect::<String>();
+        let mut generated = format!("{visibility}module {name}{groups}{result}{exposed}\n");
         for (parameter, argument) in header.parameters.iter().zip(&application.arguments) {
             generated.push_str("import ");
             generated.push_str(argument);
@@ -260,7 +306,13 @@ impl Loader<'_> {
         let Some(header) = self.modules[functor].syntax.header.clone() else {
             return;
         };
-        if header.parameters.is_empty() || header.parameters.len() != application.arguments.len() {
+        if header.parameters.is_empty()
+            || application.argument_groups.is_empty()
+            || !header
+                .parameter_groups
+                .starts_with(&application.argument_groups)
+            || application.arguments.len() != application.argument_groups.iter().sum::<usize>()
+        {
             self.diagnostics.push(Diagnostic::error(
                 codes::T002,
                 format!(
@@ -273,15 +325,18 @@ impl Loader<'_> {
             ));
             return;
         }
-        for (argument, span) in application
+        let mut normalized = application.clone();
+        for (argument, span) in normalized
             .arguments
-            .iter()
+            .iter_mut()
             .zip(&application.argument_spans)
         {
-            if self.find_module(parent, argument, *span).is_none() {
+            let Some(index) = self.find_module(parent, argument, *span) else {
                 return;
-            }
+            };
+            *argument = self.modules[index].name.clone();
         }
+        let application = &normalized;
         let Some(generated) = self.virtual_source(parent, functor, &name, &header, application)
         else {
             return;

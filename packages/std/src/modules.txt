@@ -83,6 +83,7 @@ Cron
 Clock
 Jwt
 Random
+Host
 # end of Effect: time
 # Effect: concurrency
 SynchronizedRef
@@ -188,6 +189,7 @@ Reactivity.Atom
 Atom
 Ui.Safe
 Ui
+Ui.Tracing
 Ui.Event
 Ui.Dom
 Ui.Server

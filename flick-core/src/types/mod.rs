@@ -48,6 +48,8 @@ mod lint_tests;
 mod lints;
 mod makers;
 mod module_contract;
+mod module_signature;
+mod static_modules;
 pub(crate) use module_contract::{
     Mismatch as ModuleMismatch, check as check_module_contract,
     local_dictionaries as module_local_dictionaries, project as project_module_contract,
@@ -103,8 +105,8 @@ pub use display::{show_signature, show_type};
 pub use do_notation::{bind_key, guard_key};
 pub use effects::NO_EFFECTS;
 pub use env::{
-    Abi, EnumLit, Form, Fundep, Instance, JsClass, ModuleNominalKind, ModuleRequirement, Rep,
-    TypeDef,
+    Abi, EnumLit, Form, Fundep, Instance, JsClass, ModuleNominalKind, ModuleRequirement,
+    ModuleSignature, Rep, TypeDef,
 };
 pub use ffi::keeps_for_owner;
 pub use gadt::branch::dict_local;
@@ -361,6 +363,8 @@ fn run_in(
         gadt: gadt::branch::State::default(),
     };
     checker.classes.local.extend_from_slice(dictionaries);
+    let static_parameters = checker.prepare_static_parameters(module);
+    let static_results = checker.prepare_static_applications(module);
     checker.module(module.tree);
     for export in &interface.exports {
         if export.entity.module == module.name
@@ -382,6 +386,13 @@ fn run_in(
     checker.record_call_sites();
     checker.unannotated_codecs();
     checker.fill(interface);
+    checker.finish_static_module(
+        module,
+        imported,
+        interface,
+        static_parameters,
+        &static_results,
+    );
     checker.typing.declarations = Arc::new(checker.declarations());
     checker.sugar_lints(module.tree);
     let typing = checker.finish_typing();

@@ -930,13 +930,13 @@ Found by the Lean development of the core (`formal/Formal/`).
 ### JS: a group made while its owner closes runs nothing
 
 - Divergence: a supervisor or a stopping group child makes a `FiberSet` in the region of the closing owner and runs a task in it. On Go the group is open until its hook runs (§3.6): the task runs and has stopped before the finalizers. On Node `inOwner` refuses any child of a closing owner (`stdlib/fibers.ts`): the fiber is interrupted and the task does not run. R2 and R3 hold on both, and so a hook added during C1 or C3 cannot be observed on Node from a program.
-- Resolution: recorded; §3.6 is the rule. Case: `tests/run/runtime/group_in_closing.fl`, listed in `tests/run/known_gaps.txt` for JS.
+- Resolution — JS: admission belongs to the group, not the owner. `inOwner` admits work until that group's own closing hook marks it closed; the hook interrupts and joins it before resource finalizers. Case: `tests/run/runtime/group_in_closing.fl`, now required on every target. A direct adapter regression also creates a group from a C1 hook.
 
 ### The runtime of `effect = "rt"`
 
 `runtime/src/rt/` is the same contract without Effect, on generators and a driver of its own. Where the runtimes differ it takes a side:
 
-- Interruption points: as JS, a boundary between two steps of the driver: a call, a suspension, a jump of a looping generator. A plain function is one step, so a stage that runs at once cannot be interrupted, and on this runtime that is every closed row of `tail` and `abort` effects, `->{}` included: `spin : Float ->{} Float` looping for ever blocks the thread, and `codegen/release`, which stops it with `timeout_option`, does not finish. Go interrupts it at `Check`. Recorded: a function that loops for ever and must stop has a row that says so, `Async`.
+- Interruption points: as JS, a boundary between two steps of the driver: a call, a suspension, a jump of a looping generator. Ordinary runtime arrows, including `->{}` and closed rows of `tail`/`abort` operations, retain those steps. Absence of `Async` excludes asynchronous waits, not scheduler preemption. Intrinsic UI Sync stages and pure/foreign host calls stay atomic; a pure or foreign infinite loop can still block the thread. Cases: `codegen/release` and `tests/rt/interrupt_closed.fl`, including exactly-once cleanup after timeouts. This restores the existing runtime fixture and λRT step contract; it does not add a fairness or termination theorem about host calls.
 - A wait that ends moves its fiber on at once, on the stack that ended it, and a fiber forked by `spawn` starts on a later turn of a queue on microtasks; branches of a combinator start at once on the stack. As Effect, so that the order of output agrees with JS on Effect. Go's order comes from goroutines and turns (`startup.go`).
 - Foreign calls enter `P` when they start, as JS; Go puts them there when they are interrupted.
 - Discontinuing a body throws the handler's signal into its frames, as Go panics with it, rather than `gen.return()`: every frame sees it as a failure, `Effect.ensuring` and scopes close by the same path, and the order of finalizers is Go's.

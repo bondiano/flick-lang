@@ -2,11 +2,38 @@ import assert from "node:assert/strict";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { test } from "node:test";
+import { execFileSync } from "node:child_process";
+import { pathToFileURL } from "node:url";
 
 import { build, measure } from "../index.mjs";
 
 const repo = fileURLToPath(new URL("../../..", import.meta.url));
 const flick = process.env.FLICK_BIN ?? path.join(repo, "target/debug/flick");
+
+test("runtime size comparisons execute the same I/O program on both backends", () => {
+  for (const rt of [false, true]) {
+    const out = path.join(repo, "target/tmp/bundle-size", rt ? "io-rt" : "io-effect");
+    build(flick, "tools/bundle-size/pure.fl", out, "release", undefined, rt);
+    assert.equal(execFileSync(process.execPath, [path.join(out, "flick-main.js")], { encoding: "utf8" }), "24.560000000000002\n");
+  }
+});
+
+test("the no-runtime baseline is a usable pure library", async () => {
+  const out = path.join(repo, "target/tmp/bundle-size/pure-library");
+  build(flick, "tools/bundle-size/none", out, "release");
+  const library = await import(pathToFileURL(path.join(out, "App/Main.js")).href);
+  assert.equal(library.result, 24.560000000000002);
+  assert.equal(library.area(library.Rect(3)(4)), 12);
+});
+
+test("action span construction is retained only by roots that opt in", async () => {
+  const off = await measure(fileURLToPath(new URL("untraced-ui.mjs", import.meta.url)));
+  const on = await measure(fileURLToPath(new URL("traced-ui.mjs", import.meta.url)));
+  const tracing = (id) => /\/effect-ts\/dist\/ui\/tracing\.js$/.test(id.replaceAll("\\", "/"));
+  assert.equal(off.modules.some(tracing), false);
+  assert.equal(on.modules.some(tracing), true);
+  assert.ok(on.min > off.min);
+});
 
 test("importing only Effect from the runtime keeps no Schema", async () => {
   const { modules } = await measure(fileURLToPath(new URL("effect-only.mjs", import.meta.url)));

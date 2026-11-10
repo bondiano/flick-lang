@@ -303,11 +303,11 @@ fn the_two_modes_do_not_read_what_the_other_saved() {
         "the Effect backend imports its adapter package"
     );
     build(&app, &kernel);
-    assert_eq!(on_the_kernel(&app, "kernel"), (true, true));
+    assert_eq!(on_the_kernel(&app, "kernel"), (true, false));
     // a new text, for the builds to read again what the first ones saved
     append(&app.join("src/App/Main.fl"), "// edited");
     build(&app, &default);
     assert_eq!(on_the_kernel(&app, "default"), (false, false));
     build(&app, &kernel);
-    assert_eq!(on_the_kernel(&app, "kernel"), (true, true));
+    assert_eq!(on_the_kernel(&app, "kernel"), (true, false));
 }

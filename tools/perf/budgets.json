@@ -5,7 +5,9 @@
   "load.json.go.rps": { "budget": 8500, "tolerance": 0.25 },
   "load.json.go.binary": { "budget": 10000000, "tolerance": 0.05 },
   "load.ssr.rps": { "budget": 5200, "tolerance": 0.25 },
-  "lsp.rss.peak": { "budget": null, "tolerance": 0.25 },
-  "load.json.go.rss.peak": { "budget": null, "tolerance": 0.25 },
-  "load.ssr.rss.peak": { "budget": null, "tolerance": 0.25 }
+  "lsp.rss.peak": { "budget": 80, "tolerance": 0.25 },
+  "load.json.go.rss.peak": { "budget": 70, "tolerance": 0.25 },
+  "load.ssr.rss.peak": { "budget": 420, "tolerance": 0.25 },
+  "load.json.go.cold_start": { "budget": 25, "tolerance": 0.25 },
+  "load.ssr.cold_start": { "budget": 500, "tolerance": 0.25 }
 }

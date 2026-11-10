@@ -1,6 +1,6 @@
 ---
 title: "Direct effectful calls"
-source_hash: dc1a6d695f07054a
+source_hash: 3fd30797ee012d36
 ---
 
 An effectful function is called in an ordinary expression, and `let` binds its result. A sequence of operations is written with ordinary expressions and bindings.
@@ -97,7 +97,11 @@ A pure body or callback is allowed in an expected runtime position through a che
 
 ## Sync stages
 
-A runtime arrow whose effects are a closed row of effects with `tail` and `abort` operations, services and errors, is a *Sync* stage: it runs at once, without suspending. Suspension shows in the row: the built-in effect `Async`, of class `control`, which the runtime's scheduler handles at the root. A function that waits for time, input or output or another fiber has `Async` (`Effect.sleep : Duration ->{Async} Unit`), and `->{}` is Sync. A `foreign` without a mode word whose row has `Async` is a promise, and without it a call that returns at once; a `foreign effect` is as written: without `Async` it runs at once, and its suspending is a defect. For now the JavaScript backend compiles to a plain JS function without `Effect.gen` only a row of `Atom.Read` (`Atom a ->{Atom.Read} a`, the render of `Ui.view`, the computation of `Atom.derived`) with no errors; the rest of Sync stays an Effect; its calls of other Sync functions and of the operations of `Atom.Read` are plain calls, which read the services of the context the runtime set around the call (the reader of a render or a derived atom). The stage is decided where the arrow is written, so a row variable solved to `Atom.Read` later, as in `forall r. (a ->{r} b) -> …`, keeps the runtime stage its function was compiled with. A foreign function returns an Effect, so its arrows are never Sync.
+A closed row containing only `tail` and `abort` operations performs no asynchronous wait. `Async` marks waiting for time, input or output or another fiber (`Effect.sleep : Duration ->{Async} Unit`); the runtime's scheduler handles it at the root. Scheduler preemption is independent of this row: ordinary runtime calls and recursive loops have interruption points even at `->{}`. An empty row promises neither termination nor atomic execution. Pure calls and synchronous foreign calls run on the host stack and cannot be preempted there.
+
+The JavaScript backends reserve intrinsic *Sync* stages for closed, nonempty rows of `Atom.Read` and `Setup`, without errors. These are plain calls that read the context installed around a render, derived atom or setup. Other runtime stages retain scheduler steps; the native backend can still remove generator frames from a leaf that yields nothing. A row variable solved to `Atom.Read` later, as in `forall r. (a ->{r} b) -> …`, keeps the runtime calling convention selected where its arrow was written.
+
+A `foreign` without a mode word and with `Async` returns a promise; without it the call returns at once. A `foreign effect` follows its declared row: without `Async`, an asynchronous wait is a defect. A foreign declaration is a boundary of trust, not a termination proof.
 
 ```flick
 # count : Atom.Writable Float

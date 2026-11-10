@@ -1,4 +1,129 @@
 impl Checker<'_> {
+    pub(super) fn static_module_signature(&mut self, node: &Node) -> super::ModuleSignature {
+        use super::ModuleSignature as S;
+        let children: Vec<_> = node.nodes().collect();
+        match node.kind {
+            K::ModuleSignatureArrow => {
+                let Some(input) = children.first() else {
+                    return S::Structure {
+                        requirements: Vec::new(),
+                    };
+                };
+                let (binder, parameter) = if input.kind == K::ModuleSignatureBinder {
+                    let binder = self.con_token(input).unwrap_or_default();
+                    (
+                        binder,
+                        self.static_module_signature(
+                            children[0].nodes().next().expect("binder signature"),
+                        ),
+                    )
+                } else {
+                    (String::new(), self.static_module_signature(input))
+                };
+                let mark = self.opened_modules.len();
+                self.bind_static_signature(&binder, &parameter);
+                let result = self.static_module_signature(children[1]);
+                self.opened_modules.truncate(mark);
+                S::Functor {
+                    binder,
+                    parameter: Box::new(parameter),
+                    result: Box::new(result),
+                }
+            }
+            K::ModuleSignatureParen | K::ModuleSignatureBinder | K::ModuleResult => {
+                self.static_module_signature(children[0])
+            }
+            K::ModuleSignatureRefinement => {
+                let mut signature = self.static_module_signature(children[0]);
+                for equality in &children[1..] {
+                    let mut nodes = equality.nodes();
+                    let Some(path) = nodes.next() else {
+                        continue;
+                    };
+                    let Some(rhs) = nodes.next() else {
+                        continue;
+                    };
+                    let parts: Vec<_> = path
+                        .child_tokens()
+                        .filter(|t| t.kind == K::Con)
+                        .map(|t| t.text(self.text).to_owned())
+                        .collect();
+                    let ty = self.ty(rhs, &Kind::Type, Free::Reject);
+                    if let Err(detail) = signature.refine(&parts, ty) {
+                        self.error(codes::T061, self.span(equality), detail);
+                    }
+                }
+                signature
+            }
+            _ => {
+                let ty = self.ty(node, &Kind::Module, Free::Reject);
+                if let Type::Con { module, name } = ty {
+                    match self.env.type_def(&module, &name).map(|d| &d.form) {
+                        Some(Form::ModuleContract { requirements }) => {
+                            return S::Structure {
+                                requirements: requirements.clone(),
+                            };
+                        }
+                        Some(Form::ModuleSignature { signature }) => return (**signature).clone(),
+                        _ => {}
+                    }
+                }
+                self.error(codes::T002, self.span(node), "expected a module signature");
+                S::Structure {
+                    requirements: Vec::new(),
+                }
+            }
+        }
+    }
+
+    fn bind_static_signature(&mut self, binder: &str, signature: &super::ModuleSignature) {
+        if binder.is_empty() {
+            return;
+        }
+        let super::ModuleSignature::Structure { requirements } = signature else {
+            return;
+        };
+        let witness = format!("$module:{binder}");
+        let mut types = Vec::new();
+        for requirement in requirements {
+            match requirement {
+                ModuleRequirement::Type {
+                    name,
+                    params,
+                    manifest,
+                } => types.push((
+                    name.clone(),
+                    manifest
+                        .clone()
+                        .unwrap_or_else(|| Type::con(&witness, name)),
+                    Kind::arrows(params.iter().map(|p| p.kind.clone()), Kind::Type),
+                )),
+                ModuleRequirement::Nominal {
+                    name,
+                    definition,
+                    identity,
+                    ..
+                } => types.push((
+                    name.clone(),
+                    identity.as_ref().map_or_else(
+                        || Type::con(&witness, name),
+                        |e| Type::con(&e.module, &e.name),
+                    ),
+                    definition.as_ref().map_or(Kind::Type, |d| d.kind.clone()),
+                )),
+                ModuleRequirement::Module { name, signature } => {
+                    self.bind_static_signature(&format!("{binder}.{name}"), signature);
+                }
+                _ => {}
+            }
+        }
+        self.opened_modules.push(super::module_contract::Opened {
+            alias: binder.to_owned(),
+            types,
+            values: Vec::new(),
+        });
+    }
+
     fn module_contract(&mut self, decl: &Node) -> Vec<ModuleRequirement> {
         let members: Vec<&Node> = decl
             .nodes()
@@ -7,11 +132,13 @@ impl Checker<'_> {
             .collect();
         self.contract_duplicates(&members);
         let mark = self.contract_types.len();
+        let module_mark = self.opened_modules.len();
         let bound = self.bind_contract_members(&members);
         let mut requirements = self.contract_requirements(&members, &bound);
         self.validate_contract_dictionaries(&members, &requirements);
         self.default_contract_requirements(&mut requirements);
         self.contract_types.truncate(mark);
+        self.opened_modules.truncate(module_mark);
         requirements
     }
 
@@ -89,6 +216,12 @@ impl Checker<'_> {
                 }
             }
         }
+        for member in members.iter().filter(|m| m.kind == K::ModuleMember) {
+            if let (Some(name), Some(node)) = (self.con_token(member), member.nodes().next()) {
+                let signature = self.static_module_signature(node);
+                self.bind_static_signature(&name, &signature);
+            }
+        }
         bound
     }
 
@@ -100,6 +233,17 @@ impl Checker<'_> {
         let mut requirements = Vec::new();
         for member in members {
             match member.kind {
+                K::ModuleMember => {
+                    if let (Some(name), Some(node)) =
+                        (self.con_token(member), member.nodes().next())
+                    {
+                        let signature = self.static_module_signature(node);
+                        requirements.push(ModuleRequirement::Module {
+                            name,
+                            signature: Box::new(signature),
+                        });
+                    }
+                }
                 K::ModuleTypeMember => {
                     if let Some(name) = self.con_token(member) {
                         let params = bound.get(&name).cloned().unwrap_or_default();
@@ -329,6 +473,9 @@ impl Checker<'_> {
     fn default_contract_requirements(&mut self, requirements: &mut [ModuleRequirement]) {
         for requirement in requirements {
             match requirement {
+                ModuleRequirement::Module { signature, .. } => {
+                    signature.map_types(&mut |ty| self.default_kinds(ty));
+                }
                 ModuleRequirement::Type {
                     params, manifest, ..
                 } => {

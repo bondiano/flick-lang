@@ -85,7 +85,16 @@ impl Walker<'_> {
     fn walk(&mut self, node: &Node) {
         let mark = self.locals.len();
         match node.kind {
-            K::ModuleHeader | K::ImportDecl => return,
+            K::ImportDecl => return,
+            K::ModuleHeader => {
+                for child in node
+                    .nodes()
+                    .filter(|n| matches!(n.kind, K::ModuleParamGroup | K::ModuleResult))
+                {
+                    self.walk(child);
+                }
+                return;
+            }
             K::NameExpr | K::ConPat => self.reference(node, Namespace::Constructor),
             K::NameType => self.reference(node, Namespace::Type),
             K::DerivingClause => {

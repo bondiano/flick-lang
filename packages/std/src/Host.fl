@@ -1,0 +1,57 @@
+/// Explicit dependencies on the process and its environment. Provide only the
+/// live layers an application needs at its entry boundary, or substitute records
+/// in tests. No service here has an implicit default.
+module Host exposing (..)
+
+import Layer
+import Platform
+import Clock as AmbientClock
+import Random as AmbientRandom
+
+service Console =
+  stdout_line : String ->{} Unit
+  stderr_line : String ->{} Unit
+  stdout_write : String ->{} Unit
+
+service Clock =
+  current_time_millis : Unit ->{} Float
+  current_time_nanos : Unit ->{} BigInt
+  monotonic_time_nanos : Unit ->{} BigInt
+
+/// A draw in [0, 1). Implementations may hold their own seeded state.
+service Random =
+  next : Unit ->{} Float
+
+service Environment =
+  env : String ->{} Option String
+
+service Arguments =
+  args : Unit ->{} List String
+
+/// Trusted adapters to ambient host APIs; constructing a layer performs no I/O.
+console : Layer none none {Console}
+let console = Layer.succeed Console {
+  stdout_line = Platform.stdout_line;
+  stderr_line = Platform.stderr_line;
+  stdout_write = Platform.stdout_write
+}
+
+clock : Layer none none {Clock}
+let clock = Layer.succeed Clock {
+  current_time_millis = AmbientClock.current_time_millis;
+  current_time_nanos = AmbientClock.current_time_nanos;
+  monotonic_time_nanos = AmbientClock.monotonic_time_nanos
+}
+
+random : Layer none none {Random}
+let random = Layer.succeed Random { next = AmbientRandom.next }
+
+environment : Layer none none {Environment}
+let environment = Layer.succeed Environment { env = Platform.env }
+
+arguments : Layer none none {Arguments}
+let arguments = Layer.succeed Arguments { args = Platform.args }
+
+/// All five live services. Prefer individual layers for narrower boundaries.
+live : Layer none none {Console, Clock, Random, Environment, Arguments}
+let live = Layer.merge console (Layer.merge clock (Layer.merge random (Layer.merge environment arguments)))

@@ -65,7 +65,16 @@ fn needs_host(item: &Item) -> bool {
     let ItemKind::Foreign(foreign) = &item.kind else {
         return false;
     };
-    let Some(spec) = foreign.binding.from.as_deref().and_then(rt_specifier) else {
+    let Some(source) = foreign.binding.from.as_deref() else {
+        return false;
+    };
+    if super::bindings::UI_REQUIRED
+        .iter()
+        .any(|line| line.split_once(' ') == Some((source, foreign.binding.name.as_str())))
+    {
+        return true;
+    }
+    let Some(spec) = rt_specifier(source) else {
         return false;
     };
     ui_family(&spec, &foreign.binding.name)
@@ -100,6 +109,15 @@ mod tests {
     use crate::codegen::EffectBridge;
     use crate::ir::tests::lower_text;
     use std::iter::once;
+
+    #[test]
+    fn explicit_action_spans_select_the_adapter_ui_context() {
+        let module = lower_text("App", "module App exposing (run)\nrun : Unit ->{} Unit\nlet run () = Ui.Tracing.with_action_spans true (task { () })\n").expect("lowers");
+        assert_eq!(
+            select_modules(once(&module), EffectBridge::Available),
+            EffectBridge::AvailableWithUi
+        );
+    }
 
     #[test]
     fn a_native_atom_keeps_the_ui_free_of_effect() {

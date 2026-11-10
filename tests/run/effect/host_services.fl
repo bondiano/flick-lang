@@ -1,0 +1,56 @@
+module App.Main exposing (main)
+
+import Host
+
+inspect : Unit ->{Host.Clock, Host.Random, Host.Environment, Host.Arguments, Host.Console} Unit
+let inspect () =
+  let time = Host.Clock.current_time_millis ()
+  let draw = Host.Random.next ()
+  let mode = Host.Environment.env "MODE"
+  let args = Host.Arguments.args ()
+  let nanos = Host.Clock.current_time_nanos ()
+  let monotonic = Host.Clock.monotonic_time_nanos ()
+  let correct = time == 42 && nanos == 42000000n && monotonic == 7n && draw == 0.25 && mode == Some "test" && args == ["fixture"]
+  Host.Console.stdout_line (if correct then "mocked" else "wrong")
+  Host.Console.stderr_line "stderr"
+  Host.Console.stdout_write "partial"
+
+main : Unit ->{; AppError} Unit
+let main () =
+  let output = Ref.make []
+  let fake =
+    Layer.merge
+      (Layer.succeed Host.Clock {
+        current_time_millis = fun () -> 42;
+        current_time_nanos = fun () -> 42000000n;
+        monotonic_time_nanos = fun () -> 7n
+      })
+      (Layer.merge
+        (Layer.succeed Host.Random { next = fun () -> 0.25 })
+        (Layer.merge
+          (Layer.succeed Host.Environment { env = fun name -> if name == "MODE" then Some "test" else None })
+          (Layer.merge
+            (Layer.succeed Host.Arguments { args = fun () -> ["fixture"] })
+            (Layer.succeed Host.Console {
+              stdout_line = fun text -> Ref.update output (fun lines -> lines ++ [text]);
+              stderr_line = fun text -> Ref.update output (fun lines -> lines ++ [text]);
+              stdout_write = fun text -> Ref.update output (fun lines -> lines ++ [text])
+            }))))
+  // A task constructed outside the boundary reads its services when run.
+  let later = task { inspect () }
+  provide fake { await later }
+  provide (Layer.succeed Host.Environment { env = fun _ -> Some "outer" }) {
+    let outer = Host.Environment.env "MODE"
+    let inner = provide (Layer.succeed Host.Environment { env = fun _ -> Some "inner" }) { Host.Environment.env "MODE" }
+    Platform.stdout_line (show (outer == Some "outer" && inner == Some "inner" && Host.Environment.env "MODE" == Some "outer"))
+  }
+  Platform.stdout_line (show (Ref.get output == ["mocked", "stderr", "partial"]))
+  let live = provide Host.environment { Host.Environment.env "PATH" }
+  Platform.stdout_line (show (live == Platform.env "PATH"))
+  let now = provide Host.clock { Host.Clock.current_time_millis () }
+  Platform.stdout_line (show (now > 0))
+  let args = provide Host.arguments { Host.Arguments.args () }
+  Platform.stdout_line (show (args == Platform.args ()))
+  let draw = fun () -> Random.with_seed 7 (task { provide Host.random { Host.Random.next () } })
+  Platform.stdout_line (show (draw () == draw ()))
+  provide Host.console { Host.Console.stdout_line "live output" }

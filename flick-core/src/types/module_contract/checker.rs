@@ -196,6 +196,7 @@ impl super::Checker<'_> {
         (subst, types, values)
     }
 
+    #[allow(clippy::too_many_lines)]
     pub(super) fn pack_module(&mut self, node: &Node) -> Type {
         let Some(path) = node.nodes().find(|n| n.kind == K::ModulePath) else {
             return Type::Error;
@@ -215,8 +216,23 @@ impl super::Checker<'_> {
             return Type::Error;
         };
         let Form::ModuleContract { requirements } = &contract.form else {
+            self.error(
+                codes::T068,
+                self.span(contract_node),
+                "a static functor cannot be packed as a runtime module",
+            );
             return Type::Error;
         };
+        if requirements.iter().any(
+            |r| matches!(r, ModuleRequirement::Module { signature, .. } if signature.has_functor()),
+        ) {
+            self.error(
+                codes::T068,
+                self.span(contract_node),
+                "a module containing a static functor cannot be packed as a runtime module",
+            );
+            return Type::Error;
+        }
         let module_name: String = path.text(self.text).split_whitespace().collect();
         let Some((_, Some(actual))) = self.env.qualified_module(&module_name) else {
             self.error(

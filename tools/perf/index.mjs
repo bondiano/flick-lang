@@ -11,9 +11,10 @@
 //   node tools/perf/index.mjs <flick binary>
 import { execFileSync, spawn, spawnSync } from "node:child_process";
 import { appendFileSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
-import { availableParallelism } from "node:os";
+import { availableParallelism, cpus } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { once } from "node:events";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 
@@ -28,6 +29,8 @@ export const METRICS = {
   "lsp.rss.peak": { unit: "MiB", better: "lower" },
   "load.json.go.rss.peak": { unit: "MiB", better: "lower" },
   "load.ssr.rss.peak": { unit: "MiB", better: "lower" },
+  "load.json.go.cold_start": { unit: "ms", better: "lower" },
+  "load.ssr.cold_start": { unit: "ms", better: "lower" },
 };
 
 /** The peak in MiB that tools/load and tools/lsp-bench print. */
@@ -113,6 +116,29 @@ const answers = async (url) => {
   throw new Error(`${url} did not answer in 30 s`);
 };
 
+const stopServer = async (server) => {
+  if (server.exitCode !== null || server.signalCode !== null) return;
+  const ended = once(server, "exit");
+  server.kill();
+  await ended;
+};
+
+/** Spawn to the first successful HTTP response; fresh processes, no warm-up. */
+export const coldStart = async (command, { port, path: route, env = {} }, runs = RUNS) => {
+  const samples = [];
+  for (let i = 0; i < runs; i++) {
+    const started = performance.now();
+    const server = spawn(command[0], command.slice(1), { cwd: root, env: { ...process.env, ...env, PORT: String(port) }, stdio: "ignore" });
+    try {
+      await answers(`http://127.0.0.1:${port}${route.replace("{id}", "cold")}`);
+      samples.push(performance.now() - started);
+    } finally {
+      await stopServer(server);
+    }
+  }
+  return Math.round(median(samples));
+};
+
 /** Requests per second at 16 clients, the median of tools/load's runs, of the server `command` starts. */
 const throughput = async (command, { port, path: route, expect, env = {}, client = "fetch" }) => {
   const server = spawn(command[0], command.slice(1), { cwd: root, env: { ...process.env, ...env, PORT: String(port) }, stdio: "ignore" });
@@ -133,7 +159,7 @@ const throughput = async (command, { port, path: route, expect, env = {}, client
     process.stdout.write(out);
     return { rps: Number(/^\| median \| 16 \| (\d+) \|/m.exec(out)[1]), rss: peakRss(out) };
   } finally {
-    server.kill();
+    await stopServer(server);
   }
 };
 
@@ -142,6 +168,16 @@ const main = async () => {
   const build = (dir, args, env = process.env) =>
     execFileSync(flick, ["build", ...args, "--quiet", "--color", "never"], { cwd: path.join(root, dir), stdio: "inherit", env });
   const values = {};
+  mkdirSync(path.join(root, "target"), { recursive: true });
+  writeFileSync(path.join(root, "target/perf-environment.json"), `${JSON.stringify({
+    node: process.versions.node,
+    platform: process.platform,
+    arch: process.arch,
+    cpu: cpus()[0]?.model,
+    workers: Math.max(1, Math.min(8, availableParallelism() >> 1)),
+    coldStart: "median of 5 fresh processes, spawn to first successful HTTP response, 10 ms polling",
+    rss: process.platform === "linux" ? "LSP kernel high-water mark; servers sampled during soak" : "sampled RSS (ps): LSP every 250 ms, servers during soak",
+  }, null, 2)}\n`);
 
   const errors = [];
   try {
@@ -164,6 +200,7 @@ const main = async () => {
     build("tools/load/json", ["--emit", "go", "--out-dir", "dist/go"], withGo);
     const go = "tools/load/json/dist/go/flick-server";
     values["load.json.go.binary"] = statSync(path.join(root, go)).size;
+    values["load.json.go.cold_start"] = await coldStart([go], { port: 3930, path: "/item/{id}" });
     const json = await throughput([go], { port: 3930, path: "/item/{id}", expect: '"item {id}"', client: "http" });
     values["load.json.go.rps"] = json.rps;
     values["load.json.go.rss.peak"] = json.rss;
@@ -173,12 +210,15 @@ const main = async () => {
       cwd: root,
       stdio: "inherit",
     });
-    const ssr = await throughput(["node", "tools/load/ssr/dist/flick-server.js"], {
+    const ssrOptions = {
       port: 3931,
       path: "/render/{id}",
       expect: "request {id}",
       env: { NODE_ENV: "production", CLIENT_JS: "tools/load/ssr/dist/client.js" },
-    });
+    };
+    const ssrCommand = ["node", "tools/load/ssr/dist/flick-server.js"];
+    values["load.ssr.cold_start"] = await coldStart(ssrCommand, ssrOptions);
+    const ssr = await throughput(ssrCommand, ssrOptions);
     values["load.ssr.rps"] = ssr.rps;
     values["load.ssr.rss.peak"] = ssr.rss;
 

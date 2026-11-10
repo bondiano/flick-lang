@@ -73,6 +73,13 @@ impl Scope<'_> {
         // `M.S.op` uses the import `M` too: count each prefix of a qualifier
         let mut packed = Vec::new();
         packed_paths(module.tree, module.text, &mut packed);
+        for application in &module.syntax.applications {
+            packed.push(application.functor.clone());
+            packed.extend(application.arguments.iter().cloned());
+            if names.contains(application.name.as_str()) {
+                packed.push(application.name.clone());
+            }
+        }
         let qualifiers: BTreeSet<&str> = references
             .iter()
             .filter_map(|r| r.qualifier.as_deref())
@@ -100,7 +107,10 @@ impl Scope<'_> {
             // blocks of the plugins it exposes use it
             let whole =
                 unused.len() == import.exposing.len() && needless.len() == import.plugins.len();
-            if !qualifiers.contains(import.qualifier()) && whole {
+            if !qualifiers.contains(import.qualifier())
+                && !qualifiers.contains(import.module.as_str())
+                && whole
+            {
                 // importing a module brings its instances, which may be the point
                 if interface
                     .instances

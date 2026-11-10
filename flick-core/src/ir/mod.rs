@@ -10,6 +10,8 @@
 
 mod lower;
 mod print;
+#[cfg(any(not(target_arch = "wasm32"), feature = "build-artifacts"))]
+pub(crate) mod reach;
 
 pub use flick_ir::{
     Adapter, Arm, BinOp, Binding, Copies, Expr, ExprKind, Foreign, ForeignMode, Handled, Handler,

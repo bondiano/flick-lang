@@ -200,6 +200,9 @@ fn module_contract(name: &str, requirements: &[ModuleRequirement], out: &mut Str
     let mut lines = Vec::new();
     for requirement in requirements {
         lines.push(match requirement {
+            ModuleRequirement::Module { name, signature } => {
+                format!("  module {name} : {}", signature.display())
+            }
             ModuleRequirement::Type {
                 name,
                 params,
@@ -286,6 +289,13 @@ fn definition(interface: &Interface, e: &Export, form: &Form, out: &mut String) 
     let name = &e.entity.name;
     match form {
         Form::ModuleContract { requirements } => module_contract(name, requirements, out),
+        Form::ModuleSignature { signature } => {
+            let _ = writeln!(
+                out,
+                "\n```flick\ntype module {name} = {}\n```",
+                signature.display()
+            );
+        }
         Form::Alias { params, body, .. } => {
             let params: String = params.iter().fold(String::new(), |mut acc, p| {
                 let _ = write!(acc, " {p}");

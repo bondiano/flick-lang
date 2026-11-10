@@ -252,6 +252,109 @@ answer : Bool
 let answer = K.equal "A" "A"
 ```
 
+### Generative result types
+
+This example applies the same functor to the same argument twice. Each block
+is a complete file; save it at the path shown in its title. The functor
+exports `Token` without its constructor, and each application creates a
+distinct token type.
+
+```text title="src/App/Contracts.fl"
+module App.Contracts exposing (Source)
+
+type module Source =
+  seed : String
+```
+
+```text title="src/App/Argument.fl"
+module App.Argument exposing (seed)
+
+seed : String
+let seed = "Ada"
+```
+
+```text title="src/App/Make.fl"
+module App.Make(S : App.Contracts.Source) exposing (Token, value)
+
+type Token = Token String
+
+value : Token
+let value = Token S.seed
+```
+
+```text title="src/App/Instances.fl"
+module App.Instances exposing (A, B)
+
+module A = App.Make(App.Argument)
+module B = App.Make(App.Argument)
+```
+
+Both files below import the **same result**, `App.Instances.A`, so they can
+exchange its tokens. `flick check src/App/Consumer.fl` succeeds: importing
+`A` again does not create a new type.
+
+```text title="src/App/Producer.fl"
+module App.Producer exposing (value)
+
+import App.Instances.A as A
+
+value : A.Token
+let value = A.value
+```
+
+```text title="src/App/Consumer.fl"
+module App.Consumer exposing (value)
+
+import App.Instances.A as A
+import App.Producer
+
+value : A.Token
+let value = App.Producer.value
+```
+
+The second application, `B`, has its own type. Add this file and run
+`flick check src/App/Bad.fl`: it reports `FLICK-T003`, with
+`App.Instances.B.Token` expected and `App.Instances.A.Token` found.
+
+```text title="src/App/Bad.fl"
+module App.Bad exposing (value)
+
+import App.Instances.A as A
+import App.Instances.B as B
+
+value : B.Token
+let value = A.value
+```
+
+The declarations `module A = …` and `module B = …` create the identities;
+imports preserve them. The documentation tests check these files together
+and require the last file to fail with `FLICK-T003`.
+
+## Higher-order module signatures
+
+A module contract may describe a functor. Its named parameter is in scope in
+the result signature. `with type` exposes an equality that clients may rely
+on; it cannot introduce a missing member or contradict an existing equality.
+
+```flick
+# module App.Contracts exposing (..)
+type module Input =
+  type Key
+
+type module Output =
+  type Value
+  value : Value
+
+type module Factory =
+  (K : Input) -> Output with type Value = K.Key
+```
+
+An arrow is a static module signature, separate from a value function type.
+An implementation may accept fewer requirements and return more members than
+the signature requires. A result annotation hides members and type equalities
+that the contract does not expose. Runtime `Module Sig` values cannot carry
+functors, including through nested module members (`FLICK-T068`).
+
 ## Packed modules and existential results
 
 `pack Argument as Source` has type `Module Source`. Use `unpack packed as K

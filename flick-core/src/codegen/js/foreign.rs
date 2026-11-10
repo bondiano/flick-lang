@@ -9,7 +9,7 @@ use flick_ir::Shape;
 use super::bridge::Toward;
 use super::{Gen, names};
 #[cfg(not(target_arch = "wasm32"))]
-use crate::build::effects::{effect_specifier, selected_on_kernel};
+use crate::build::effects::{effect_specifier, requires_adapter, selected_on_kernel};
 use crate::build::{bindings, effects::belongs_to};
 use crate::codegen::Options;
 use crate::ir::Copies;
@@ -57,6 +57,20 @@ impl Gen<'_> {
         let (spec, bridged) = {
             let mut spec = spec;
             let mut bridged = false;
+            if self.kernel
+                && !self.options.effect_bridge.available()
+                && requires_adapter(&spec, &f.binding.name, f.mode == ForeignMode::Effect)
+            {
+                // Build validation rejects reachable uses. Unused members of a
+                // mixed built-in module must not import an unavailable adapter.
+                let message = serde_json::to_string(&format!(
+                    "`{module}` `{}` requires the optional `{}` adapter",
+                    f.binding.name,
+                    bindings::ADAPTER_PREFIX
+                ))
+                .expect("a diagnostic string serializes");
+                return (format!("(() => {{ throw new Error({message}); }})"), false);
+            }
             if self.kernel
                 && !selected_on_kernel(&spec, &f.binding.name, self.options.effect_bridge)
             {
@@ -313,6 +327,8 @@ pub(super) fn plain_foreigns(
                     let source = f.binding.from.as_deref()?;
                     let spec = (options.foreign)(module, source);
                     if belongs_to(&spec, bindings::ADAPTER_PREFIX)
+                        || (!options.effect_bridge.available()
+                            && requires_adapter(&spec, &f.binding.name, false))
                         || !selected_on_kernel(&spec, &f.binding.name, options.effect_bridge)
                     {
                         return None;

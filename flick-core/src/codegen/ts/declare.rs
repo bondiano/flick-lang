@@ -50,8 +50,10 @@ impl Projection<'_> {
         let Some(def) = &export.definition else {
             return Ok(None);
         };
-        if matches!(def.form, Form::ModuleContract { .. })
-            || self.module == "Prelude" && name == "Module"
+        if matches!(
+            def.form,
+            Form::ModuleContract { .. } | Form::ModuleSignature { .. }
+        ) || self.module == "Prelude" && name == "Module"
         {
             return Ok(None);
         }

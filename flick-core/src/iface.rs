@@ -8,10 +8,10 @@ use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 
-use crate::types::{EnumLit, Instance, Type, TypeDef};
+use crate::types::{EnumLit, Instance, ModuleSignature, Type, TypeDef};
 
 /// Bumped on every change of the schema.
-pub const IFACE_VERSION: u32 = 12;
+pub const IFACE_VERSION: u32 = 13;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -104,6 +104,10 @@ pub struct Hidden {
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Interface {
     pub module: String,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub modules: BTreeMap<String, Interface>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub functor: Option<ModuleSignature>,
     #[serde(default, skip_serializing_if = "is_false")]
     pub private: bool,
     pub exports: Vec<Export>,

@@ -298,5 +298,7 @@ ui/sync_data
 ui/sync_for
 ui/wake_chain
 
-# codegen/release: `spin` loops forever in a `->{}` stage, which runs at once
-# and cannot be interrupted: docs/formal/runtime.md#the-runtime-of-effect--rt
+codegen/release
+../rt/interrupt_closed
+
+effect/host_services

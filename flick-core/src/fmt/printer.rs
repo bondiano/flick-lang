@@ -317,7 +317,12 @@ fn space((a, a_parent): (K, K), (b, b_parent): (K, K)) -> bool {
         (K::Minus, _) => !matches!(a_parent, K::PrefixExpr | K::LitPat | K::RowOmit),
         (K::Con, K::LParen) => !matches!(
             b_parent,
-            K::ExposeItem | K::ModuleHeader | K::ModuleApplyDecl | K::InlineModuleDecl
+            K::ExposeItem
+                | K::ModuleHeader
+                | K::ModuleApplyDecl
+                | K::InlineModuleDecl
+                | K::ModuleParamGroup
+                | K::ModuleApplyExpr
         ),
         _ => true,
     }

@@ -341,7 +341,7 @@ impl Checker<'_> {
         let resume = Type::Fun {
             param: Box::new(value.clone()),
             effects: Some(Box::new(Effects {
-                direct: self.direct_row(&self.stage.services),
+                direct: self.direct_row(&self.stage.services, &self.stage.errors),
                 ..Effects::new(self.stage.services.clone(), self.stage.errors.clone())
             })),
             result: Box::new(result.clone()),

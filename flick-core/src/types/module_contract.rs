@@ -92,13 +92,22 @@ fn contract_subst(
                     errors.push(Mismatch::Missing(name.clone()));
                 }
             }
-            ModuleRequirement::Value { .. } | ModuleRequirement::Dictionary { .. } => {}
+            ModuleRequirement::Value { .. }
+            | ModuleRequirement::Dictionary { .. }
+            | ModuleRequirement::Module { .. } => {}
         }
     }
     subst
 }
 
 pub(crate) fn check(contract: &TypeDef, actual: &Interface) -> Vec<Mismatch> {
+    if let Form::ModuleSignature { signature } = &contract.form {
+        return if signature.accepts(actual) {
+            Vec::new()
+        } else {
+            vec![Mismatch::Shape("functor".into())]
+        };
+    }
     let Form::ModuleContract { requirements } = &contract.form else {
         return vec![Mismatch::Kind("module contract".into())];
     };
@@ -111,6 +120,14 @@ pub(crate) fn check(contract: &TypeDef, actual: &Interface) -> Vec<Mismatch> {
     };
     for requirement in requirements {
         match requirement {
+            ModuleRequirement::Module { name, signature } => match actual.modules.get(name) {
+                None => errors.push(Mismatch::Missing(name.clone())),
+                Some(actual) => {
+                    if !signature.accepts(actual) {
+                        errors.push(Mismatch::Shape(name.clone()));
+                    }
+                }
+            },
             ModuleRequirement::Type {
                 name,
                 manifest: Some(expected),
@@ -242,6 +259,9 @@ pub(crate) fn local_dictionaries(
 }
 
 pub(crate) fn project(contract: &TypeDef, actual: &Interface) -> Interface {
+    if let Form::ModuleSignature { signature } = &contract.form {
+        return signature.project(actual);
+    }
     let Form::ModuleContract { requirements } = &contract.form else {
         return Interface::default();
     };
@@ -265,6 +285,13 @@ pub(crate) fn project(contract: &TypeDef, actual: &Interface) -> Interface {
         .collect();
     for requirement in requirements {
         match requirement {
+            ModuleRequirement::Module { name, signature } => {
+                if let Some(actual) = actual.modules.get(name) {
+                    projected
+                        .modules
+                        .insert(name.clone(), signature.project(actual));
+                }
+            }
             ModuleRequirement::Type { name, manifest, .. } => {
                 if let Some(export) = actual.find(Namespace::Type, name) {
                     let mut export = export.clone();

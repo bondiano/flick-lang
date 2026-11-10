@@ -5,8 +5,27 @@ import { Cause, Deferred, Effect, Exit, Fiber } from "effect";
 
 import { type Owner, acquireRelease, bracket, fiberSpawn, foreignAsync, scope } from "../src/index.ts";
 import { causeOf, errorsOf } from "./support.ts";
+import { flickMake, flickRun } from "../src/effect/FiberSet.ts";
+import { inside } from "../src/owner.ts";
 
 const quiet = () => Effect.void;
+
+test("a group made by a closing hook runs until its own closing hook", async () => {
+  const log: Array<string> = [];
+  await Effect.runPromise(scope((owner) => Effect.gen(function* () {
+    yield* resource(log, "file");
+    owner.closing.add(() => inside(owner, Effect.gen(function* () {
+      const group = yield* flickMake<never, never>();
+      yield* flickRun({ propagateInterruption: false, startImmediately: true })(
+        Effect.ensuring(
+          Effect.andThen(Effect.sync(() => log.push("started")), Effect.never),
+          Effect.sync(() => log.push("stopped")),
+        ),
+      )(group);
+    })));
+  })));
+  assert.deepEqual(log, ["acquire file", "started", "stopped", "release file"]);
+});
 
 const resource = (log: Array<string>, name: string) =>
   acquireRelease(

@@ -123,6 +123,10 @@ impl Loader<'_> {
             span: at,
         };
         let header = Header {
+            result: None,
+            body: None,
+            materialized_body: None,
+            parameter_groups: Vec::new(),
             name: name.to_owned(),
             private: false,
             span: at,

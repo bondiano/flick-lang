@@ -1,4 +1,12 @@
 impl<'b> Env<'b> {
+    pub(super) fn static_parameter(&mut self, alias: &str, interface: Interface) {
+        self.qualifiers
+            .insert(alias.to_owned(), interface.module.clone());
+        self.imported.insert(alias.to_owned());
+        self.learn(&interface);
+        self.interfaces
+            .insert(interface.module.clone(), Some(interface));
+    }
     /// The environment of `module` before its own declarations are added.
     pub fn new(
         module: &str,

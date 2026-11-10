@@ -35,6 +35,8 @@ module.exports = grammar({
       $._plugin,
       $._server_fn,
       $._private_module,
+      $._module_functor,
+      $._type_refinement_and,
       $.parens,
       $.brackets,
       $.braces,
@@ -68,6 +70,8 @@ module.exports = grammar({
     _plugin: $ => seq(alias('plugin', $.keyword), $.identifier),
     _server_fn: $ => seq(alias('server', $.keyword), alias('fn', $.keyword)),
     _private_module: $ => seq(alias('private', $.keyword), alias('module', $.keyword)),
+    _module_functor: $ => seq(alias('functor', $.keyword), $.parens),
+    _type_refinement_and: $ => seq(alias('and', $.keyword), alias('type', $.keyword)),
     boolean: _ => choice('true', 'false'),
     // `@lang int`: the attribute's name; its arguments are plain identifiers
     attribute: _ => token(seq('@', /[a-z_][A-Za-z0-9_]*/)),

@@ -96,11 +96,10 @@ pub struct Effects {
     /// `Atom.Read` keeps the runtime stage its function was compiled with.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub sync: bool,
-    /// Whether the arrow is written, under `Options::stages_by_class`, with a
-    /// closed row without `Async` or an effect with a `control` operation: a
-    /// plain function on Flick's own runtime, where nothing else suspends. No
-    /// part of the type: `sync` still says what unifies, and the runtime adapts
-    /// a call of either stage to a function of the other.
+    /// Calling-convention metadata for intrinsically synchronous rows on the
+    /// native runtime. Ordinary closed rows remain preemptible; absence of an
+    /// `Async` operation does not promise termination. No part of the type:
+    /// `sync` still says what unifies, and runtime calls adapt either stage.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub direct: bool,
     /// Where the row is written, for a fix that adds to it.

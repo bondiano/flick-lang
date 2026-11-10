@@ -381,3 +381,70 @@ fn changing_a_functor_contract_invalidates_the_virtual_module_cache() {
         changed.diagnostics
     );
 }
+#[cfg(feature = "ide")]
+#[test]
+fn higher_order_factory_is_checked_and_applied_through_its_parameter() {
+    let mut host = Memory(BTreeMap::from([
+        (PathBuf::from("/p/src/App/Contracts.fl"), "module App.Contracts exposing (Input, Output, Factory)\ntype module Input =\n  seed : Int\ntype module Output =\n  answer : Int\ntype module Factory = (K : Input) -> Output\n".into()),
+        (PathBuf::from("/p/src/App/Argument.fl"), "module App.Argument exposing (seed)\nseed : Int\nlet seed = 41\n".into()),
+        (PathBuf::from("/p/src/App/Make.fl"), "module App.Make(K : App.Contracts.Input) : App.Contracts.Output exposing (answer)\nanswer : Int\nlet answer = K.seed + 1\n".into()),
+        (PathBuf::from("/p/src/App/Apply.fl"), "module App.Apply(F : App.Contracts.Factory, K : App.Contracts.Input) : App.Contracts.Output exposing (answer)\nmodule Built = F(K)\nanswer : Int\nlet answer = Built.answer\n".into()),
+        (PathBuf::from("/p/src/App/Main.fl"), "module App.Main exposing (Chosen)\nmodule Chosen = App.Apply(App.Make, App.Argument)\n".into()),
+    ]));
+    for curried in [false, true] {
+        if curried {
+            let apply = host
+                .0
+                .get_mut(&PathBuf::from("/p/src/App/Apply.fl"))
+                .expect("apply");
+            *apply = apply.replace("Factory, K", "Factory)(K");
+            let main = host
+                .0
+                .get_mut(&PathBuf::from("/p/src/App/Main.fl"))
+                .expect("main");
+            *main = "module App.Main exposing (Chosen)\nmodule Half = App.Apply(App.Make)\nmodule Chosen = App.Main.Half(App.Argument)\n".into();
+        }
+        let mut sources = SourceMap::default();
+        let project = library(&mut sources);
+        let analysis = analyze(
+            &host,
+            &mut sources,
+            Some(&project),
+            &[PathBuf::from("/p/src/App/Main.fl")],
+        );
+        assert!(
+            analysis.diagnostics.is_empty(),
+            "{:?}",
+            analysis.diagnostics
+        );
+        let result = analysis
+            .modules
+            .iter()
+            .find(|m| m.name == "App.Main.Chosen");
+        assert!(result.is_some(), "named result must be materialized");
+    }
+}
+
+#[cfg(feature = "ide")]
+#[test]
+fn anonymous_and_returned_factories_are_module_values() {
+    for (factory, main) in [
+        ("module App.Return(F : App.Contracts.Factory) : App.Contracts.Factory = F\n", "module App.Main exposing (Chosen)\nmodule Selected = App.Return(App.Make)\nmodule Chosen = App.Main.Selected(App.Argument)\n"),
+        ("module App.Return(F : App.Contracts.Factory)(K : App.Contracts.Input) : App.Contracts.Output\nmodule Built = F(K)\nanswer : Int\nlet answer = Built.answer\n", "module App.Main exposing (Chosen)\nmodule Chosen = App.Return((functor (K : App.Contracts.Input) ->\n  answer : Int\n  let answer = K.seed + 1\n))(App.Argument)\n"),
+    ] {
+        let host = Memory(BTreeMap::from([
+            (PathBuf::from("/p/src/App/Contracts.fl"), "module App.Contracts exposing (Input, Output, Factory)\ntype module Input =\n  seed : Int\ntype module Output =\n  answer : Int\ntype module Factory = (K : Input) -> Output\n".into()),
+            (PathBuf::from("/p/src/App/Argument.fl"), "module App.Argument exposing (seed)\nseed : Int\nlet seed = 41\n".into()),
+            (PathBuf::from("/p/src/App/Make.fl"), "module App.Make(K : App.Contracts.Input) : App.Contracts.Output exposing (answer)\nanswer : Int\nlet answer = K.seed + 1\n".into()),
+            (PathBuf::from("/p/src/App/Return.fl"), factory.into()),
+            (PathBuf::from("/p/src/App/Main.fl"), main.into()),
+        ]));
+        let mut sources = SourceMap::default();
+        let project = library(&mut sources);
+        let analysis = analyze(&host, &mut sources, Some(&project), &[PathBuf::from("/p/src/App/Main.fl")]);
+        assert!(analysis.diagnostics.is_empty(), "{main}: {:?}", analysis.diagnostics);
+        let chosen = analysis.module("App.Main.Chosen").expect("named result");
+        let answer = chosen.interface.find(crate::iface::Namespace::Value, "answer").expect("answer");
+        assert_eq!(answer.scheme, Some(types::Type::con("Prelude", "Int")));
+    }
+}

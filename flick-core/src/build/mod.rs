@@ -6,6 +6,10 @@
 mod abi;
 #[cfg(not(target_arch = "wasm32"))]
 mod bridge_select;
+#[cfg(not(target_arch = "wasm32"))]
+mod capabilities;
+#[cfg(all(test, not(target_arch = "wasm32")))]
+mod capability_tests;
 pub mod effects;
 pub(crate) mod bindings {
     include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
@@ -157,6 +161,13 @@ pub fn emit(
     #[cfg(not(feature = "source-maps"))]
     let _ = sources;
     let mut diagnostics = Vec::new();
+    #[cfg(not(target_arch = "wasm32"))]
+    if settings.backend == Backend::Rt && !settings.effect_bridge.available() {
+        capabilities::check(compilation, settings, &mut diagnostics);
+        if !diagnostics.is_empty() {
+            return (Vec::new(), diagnostics);
+        }
+    }
     let modules = &compilation.modules;
     let ext = if settings.typescript { "ts" } else { "js" };
     let is_builtin = |m: &str| types::builtin_sources().iter().any(|(n, _)| *n == m);

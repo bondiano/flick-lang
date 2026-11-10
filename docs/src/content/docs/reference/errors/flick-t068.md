@@ -1,0 +1,9 @@
+---
+title: "FLICK-T068"
+---
+
+# Static functor cannot be packed as a runtime module
+
+`Module Sig`, `pack` and `unpack` carry runtime structures. A functor is a
+static module constructor, including when it is nested in a structure.
+Apply it statically first, then pack a structure with a runtime contract.

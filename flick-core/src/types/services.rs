@@ -162,7 +162,7 @@ fn require(ty: Type, label: &str, service: &Type, never_suspends: bool) -> Type 
                     ..Row::default()
                 });
                 e.sync = super::ty::sync_rows(&e.services, &e.errors);
-                e.direct = e.direct && never_suspends;
+                e.direct = e.direct && e.sync && never_suspends;
                 e
             }),
             result: Box::new(require(*result, label, service, never_suspends)),

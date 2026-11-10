@@ -163,10 +163,13 @@ const MAIN: &str = "module App.Main exposing (main)
 
 import App.Greeting exposing (greet)
 
+run : Unit ->{Host.Arguments, Host.Console} Unit
+let run () =
+  let name = Host.Arguments.args () |> List.head |> Option.with_default \"world\"
+  Host.Console.stdout_line (greet name)
+
 main : Unit ->{; AppError} Unit
-let main () =
-  let name = Platform.args () |> List.head |> Option.with_default \"world\"
-  Platform.stdout_line (greet name)
+let main () = provide (Layer.merge Host.arguments Host.console) { run () }
 ";
 
 const CLI_MAIN: &str = "module App.Main exposing (main)

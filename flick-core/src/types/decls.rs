@@ -44,6 +44,21 @@ impl Checker<'_> {
         for i in self.conversion_order(&pending) {
             let p = &pending[i];
             bodies[i] = self.with_params(&p.params, |this| this.body(p, &mut refined));
+            if let Some(def) = self.env.type_def_mut(&p.name) {
+                match &bodies[i] {
+                    Body::ModuleContract(requirements) => {
+                        def.form = Form::ModuleContract {
+                            requirements: requirements.clone(),
+                        }
+                    }
+                    Body::ModuleSignature(signature) => {
+                        def.form = Form::ModuleSignature {
+                            signature: Box::new(signature.clone()),
+                        }
+                    }
+                    _ => {}
+                }
+            }
         }
         // before a constructor's scheme expands an alias it names
         self.break_alias_cycles(&pending);
@@ -120,10 +135,14 @@ impl Checker<'_> {
             matches!(
                 self.env.type_def(module, &p.name).map(|d| &d.form),
                 Some(Form::Alias { .. })
-            ) && !p
-                .node
-                .nodes()
-                .any(|n| n.kind == K::RowType && n.nodes().next().is_none())
+            ) || p.node.kind == K::ModuleTypeDecl
+        };
+        let converted_early = |p: &Pending| {
+            converted_early(p)
+                && !p
+                    .node
+                    .nodes()
+                    .any(|n| n.kind == K::RowType && n.nodes().next().is_none())
         };
         let aliases: HashMap<&str, usize> = pending
             .iter()
@@ -348,7 +367,20 @@ impl Checker<'_> {
     fn body<'n>(&mut self, p: &Pending<'n>, refined: &mut Vec<(&'n Node, Type)>) -> Body {
         let decl = p.node;
         match decl.kind {
-            K::ModuleTypeDecl => Body::ModuleContract(self.module_contract(decl)),
+            K::ModuleTypeDecl => {
+                if let Some(signature) = decl.nodes().find(|n| n.kind != K::Members) {
+                    match self.static_module_signature(signature) {
+                        super::ModuleSignature::Structure { requirements } => {
+                            Body::ModuleContract(requirements)
+                        }
+                        signature @ super::ModuleSignature::Functor { .. } => {
+                            Body::ModuleSignature(signature)
+                        }
+                    }
+                } else {
+                    Body::ModuleContract(self.module_contract(decl))
+                }
+            }
             K::TypeDecl => {
                 let variants: Vec<&Node> = decl.nodes().filter(|n| n.kind == K::Variant).collect();
                 if !variants.is_empty() {
@@ -456,6 +488,11 @@ impl Checker<'_> {
             Body::ModuleContract(requirements) => {
                 def.form = Form::ModuleContract { requirements };
             }
+            Body::ModuleSignature(signature) => {
+                def.form = Form::ModuleSignature {
+                    signature: Box::new(signature),
+                };
+            }
             Body::Variants(variants) => {
                 let error = p.node.kind == K::ErrorDecl;
                 self.constructor_schemes(&p.name, error, &params, variants);
@@ -508,6 +545,7 @@ impl Checker<'_> {
 include!("decls_contracts.rs");
 
 enum Body {
+    ModuleSignature(super::ModuleSignature),
     None,
     ModuleContract(Vec<ModuleRequirement>),
     Variants(Vec<Variant>),

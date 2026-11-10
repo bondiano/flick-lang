@@ -58,6 +58,9 @@ pub enum Form {
     ModuleContract {
         requirements: Vec<ModuleRequirement>,
     },
+    ModuleSignature {
+        signature: Box<ModuleSignature>,
+    },
     Service {
         params: Vec<String>,
         operations: Vec<Operation>,
@@ -94,6 +97,10 @@ pub enum Form {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "member", rename_all = "kebab-case")]
 pub enum ModuleRequirement {
+    Module {
+        name: String,
+        signature: Box<ModuleSignature>,
+    },
     Type {
         name: String,
         params: Vec<Binder>,
@@ -117,6 +124,21 @@ pub enum ModuleRequirement {
     Dictionary {
         head: Type,
         from: String,
+    },
+}
+
+/// A checked static module signature. Module arrows are distinct from value
+/// arrows: their binders name static identities, not runtime arguments.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "signature", rename_all = "kebab-case")]
+pub enum ModuleSignature {
+    Structure {
+        requirements: Vec<ModuleRequirement>,
+    },
+    Functor {
+        binder: String,
+        parameter: Box<ModuleSignature>,
+        result: Box<ModuleSignature>,
     },
 }
 

@@ -201,6 +201,7 @@ fn canonical(e: &Export) -> Export {
         };
         let mut types = |t: &mut Type| *t = rename(t, &names, next);
         match &mut form {
+            Form::ModuleSignature { signature } => signature.canonicalize(next),
             Form::Alias { body, .. } => types(body),
             Form::Service { operations, .. } => {
                 for o in operations {

@@ -230,13 +230,25 @@ fn module_type_decl(p: &mut Parser) {
     p.bump();
     p.bump();
     if p.expect(K::Con) && p.expect(K::Eq) {
-        p.body(K::Members, module_type_member);
+        if matches!(p.current(), K::Con | K::LParen) {
+            module_signature(p);
+        } else {
+            p.body(K::Members, module_type_member);
+        }
     }
     p.complete(m, K::ModuleTypeDecl);
 }
 
 fn module_type_member(p: &mut Parser) {
     match p.current() {
+        K::ModuleKw => {
+            let m = p.start();
+            p.bump();
+            if p.expect(K::Con) && p.expect(K::Colon) {
+                module_signature(p);
+            }
+            p.complete(m, K::ModuleMember);
+        }
         K::TypeKw => {
             let m = p.start();
             p.bump();

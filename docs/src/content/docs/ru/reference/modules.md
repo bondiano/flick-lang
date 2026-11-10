@@ -1,6 +1,6 @@
 ---
 title: "Модули и имена"
-source_hash: 22f5e52b3ba51c01
+source_hash: f7fba610ed230525
 ---
 
 Каждый файл `.fl` — отдельный модуль.
@@ -259,6 +259,110 @@ module App.Make(K : App.Contracts.EqualityPolicy) exposing (answer)
 answer : Bool
 let answer = K.equal "A" "A"
 ```
+
+### Генеративные типы результата
+
+В этом примере один функтор дважды применяется к одному аргументу. Каждый
+блок — полный файл; сохраните его по пути из заголовка. Функтор экспортирует
+`Token` без конструктора, и каждое применение создаёт отдельный тип токена.
+
+```text title="src/App/Contracts.fl"
+module App.Contracts exposing (Source)
+
+type module Source =
+  seed : String
+```
+
+```text title="src/App/Argument.fl"
+module App.Argument exposing (seed)
+
+seed : String
+let seed = "Ada"
+```
+
+```text title="src/App/Make.fl"
+module App.Make(S : App.Contracts.Source) exposing (Token, value)
+
+type Token = Token String
+
+value : Token
+let value = Token S.seed
+```
+
+```text title="src/App/Instances.fl"
+module App.Instances exposing (A, B)
+
+module A = App.Make(App.Argument)
+module B = App.Make(App.Argument)
+```
+
+Оба файла ниже импортируют **один результат**, `App.Instances.A`, поэтому
+могут обмениваться его токенами. `flick check src/App/Consumer.fl` проходит:
+повторный импорт `A` не создаёт новый тип.
+
+```text title="src/App/Producer.fl"
+module App.Producer exposing (value)
+
+import App.Instances.A as A
+
+value : A.Token
+let value = A.value
+```
+
+```text title="src/App/Consumer.fl"
+module App.Consumer exposing (value)
+
+import App.Instances.A as A
+import App.Producer
+
+value : A.Token
+let value = App.Producer.value
+```
+
+Второе применение, `B`, имеет собственный тип. Добавьте этот файл и выполните
+`flick check src/App/Bad.fl`: компилятор выдаст `FLICK-T003`, ожидая
+`App.Instances.B.Token` вместо полученного `App.Instances.A.Token`.
+
+```text title="src/App/Bad.fl"
+module App.Bad exposing (value)
+
+import App.Instances.A as A
+import App.Instances.B as B
+
+value : B.Token
+let value = A.value
+```
+
+Объявления `module A = …` и `module B = …` создают тождества типов,
+а импорты сохраняют их. Тесты документации проверяют эти файлы вместе
+и требуют от последнего файла ошибку `FLICK-T003`.
+
+## Сигнатуры модулей высшего порядка
+
+Контракт модуля может описывать функтор. Именованный параметр доступен в
+сигнатуре результата. `with type` раскрывает равенство, на которое может
+полагаться клиент; оно не добавляет отсутствующего члена и не может
+противоречить существующему равенству.
+
+```flick
+# module App.Contracts exposing (..)
+type module Input =
+  type Key
+
+type module Output =
+  type Value
+  value : Value
+
+type module Factory =
+  (K : Input) -> Output with type Value = K.Key
+```
+
+Стрелка задаёт статическую сигнатуру модуля отдельно от типа функции над
+значениями. Реализация может предъявлять меньше требований к аргументу и
+возвращать больше членов, чем требует сигнатура. Аннотация результата скрывает
+члены и равенства типов, которые контракт не раскрывает. Runtime-значения
+`Module Sig` не могут содержать функторы, в том числе через вложенные члены
+модуля (`FLICK-T068`).
 
 ## Упакованные модули и экзистенциальные результаты
 

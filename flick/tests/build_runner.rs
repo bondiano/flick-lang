@@ -7,6 +7,8 @@ use std::process::Command;
 use common::flick_in;
 use flick_core::build::runner_file;
 
+const ADAPTER: &str = r#"{"type":"module","dependencies":{"@flick-lang/effect-ts":"*"}}"#;
+
 /// An app at `name` whose entry `App.Main` has `main`, started by `runner`.
 fn app(name: &str, runner: &str, main: &str) -> PathBuf {
     let dir = Path::new(env!("CARGO_TARGET_TMPDIR")).join(name);
@@ -16,6 +18,8 @@ fn app(name: &str, runner: &str, main: &str) -> PathBuf {
         "schema-version = 1\n\n[project]\nkind = \"app\"\nentry = \"App.Main\"\nrunner = \"{runner}\"\n"
     );
     fs::write(dir.join("flick.toml"), config).expect("write");
+    // These host runners belong to the optional Effect adapter.
+    fs::write(dir.join("package.json"), ADAPTER).expect("manifest");
     fs::write(dir.join("src/App/Main.fl"), main).expect("write");
     let out = flick_in(&dir, &["build"]);
     assert!(out.status.success(), "{out:?}");
@@ -72,6 +76,7 @@ fn workers_and_cli(name: &str) -> PathBuf {
     let dir = Path::new(env!("CARGO_TARGET_TMPDIR")).join(name);
     let _ = fs::remove_dir_all(&dir);
     fs::create_dir_all(dir.join("src/App")).expect("dir");
+    fs::write(dir.join("package.json"), ADAPTER).expect("manifest");
     fs::write(
         dir.join("flick.toml"),
         "schema-version = 1\n\n[project]\nkind = \"app\"\nrunner = \"Runner.Node\"\nentries = { web = { module = \"App.Worker\", runner = \"Runner.Cloudflare\" }, cli = \"App.Cli\" }\n",
