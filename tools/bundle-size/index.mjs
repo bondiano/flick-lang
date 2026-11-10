@@ -67,8 +67,8 @@ const segments = (mappings) => {
   });
 };
 
-/** Characters of `code` per source of `map`, as source-map-explorer counts them. */
-const attribute = (code, map) => {
+/** UTF-8 bytes per source; source-map columns count UTF-16 code units. */
+export const attribute = (code, map) => {
   const bytes = new Map();
   const lines = code.split("\n");
   segments(map.mappings).forEach((line, i) => {
@@ -76,7 +76,7 @@ const attribute = (code, map) => {
       if (source < 0) return;
       const end = j + 1 < line.length ? line[j + 1][0] : (lines[i]?.length ?? column);
       const name = map.sources[source];
-      bytes.set(name, (bytes.get(name) ?? 0) + end - column);
+      bytes.set(name, (bytes.get(name) ?? 0) + Buffer.byteLength(lines[i].slice(column, end)));
     });
   });
   return bytes;
