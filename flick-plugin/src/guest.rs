@@ -232,6 +232,19 @@ pub fn derive(
 }
 
 #[doc(hidden)]
+pub fn check_structure(
+    plugin: &impl Plugin,
+    block: types::Block,
+    facts: types::Structure,
+) -> Vec<types::Diagnostic> {
+    plugin
+        .check_structure(&convert::from_block(block), &convert::from_structure(facts))
+        .into_iter()
+        .map(convert::to_diagnostic)
+        .collect()
+}
+
+#[doc(hidden)]
 pub fn check(
     plugin: &impl Plugin,
     block: types::Block,
@@ -361,6 +374,10 @@ macro_rules! export {
                 ::std::vec::Vec<$crate::guest::bindings::flick::plugin::types::Diagnostic>,
             > {
                 $crate::guest::derive(&$plugin, target, &class, args, module, &state)
+            }
+
+            fn check_structure(block: $crate::guest::bindings::flick::plugin::types::Block, facts: $crate::guest::bindings::flick::plugin::types::Structure) -> ::std::vec::Vec<$crate::guest::bindings::flick::plugin::types::Diagnostic> {
+                $crate::guest::check_structure(&$plugin, block, facts)
             }
 
             fn check(

@@ -67,6 +67,8 @@ max-params = 5
 | `lint.max-params` | parameters of a function past which `FLICK-T039` warns | `5` |
 | `plugins.<package>` | what the plugin of a dependency may reach for the project's blocks: `fs-read` (paths from the project's root), `net` (`host` or `host:port`) and `env` (names); not at a workspace root (see [Reaching outside](../plugins/#reaching-outside)) | nothing |
 
+The same T036–T038 limits apply to `component`: setup and render are measured together in the source, without generated wrappers. Local functions are measured separately.
+
 `flick new` creates an RT project with `@flick-lang/runtime` and no Effect dependency. `flick build --rt`, `flick run --rt` and `flick test --rt` also select RT for one invocation of an older Effect project. Set `effect = "effect"` explicitly when a project needs the Effect adapter and add `@flick-lang/effect-ts` to its dependencies.
 
 Errors in the configuration exit with code `2`:

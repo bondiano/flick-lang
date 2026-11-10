@@ -633,6 +633,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "flick-effect-surface"
+version = "0.1.0"
+dependencies = [
+ "flick-core",
+ "serde",
+ "serde_json",
+ "toml",
+]
+
+[[package]]
 name = "flick-ir"
 version = "0.1.0"
 dependencies = [

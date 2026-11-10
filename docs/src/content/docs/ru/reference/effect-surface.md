@@ -1,6 +1,6 @@
 ---
 title: "Покрытие Effect"
-source_hash: 91113113c1c957dd
+source_hash: 348bcffe24d1d7f8
 ---
 
 Стандартная библиотека оборачивает закреплённую версию Effect
@@ -61,7 +61,7 @@ cron = "cron expressions need a parser of their own"
 
 ## Линтер
 
-`flick-core/tests/effect_surface.rs` завершается с ошибкой и указывает
+`packages/effect-ts/tools/surface/tests/coverage.rs` завершается с ошибкой и указывает
 `Module.name` и причину, если:
 
 - у экспорта или точки входа нет решения;

@@ -7,3 +7,5 @@ runtime-go/flickrt/testdata/graphemes.txt linguist-generated=true
 runtime-go/flickrt/testdata/collation.txt linguist-generated=true
 # just formal-schemes writes the Prelude schemes from the checker
 formal/Formal/Elab/PreludeSchemes.lean linguist-generated=true
+# tools/rt-exports.mjs generates the native export manifest
+runtime/rt_exports.txt linguist-generated=true

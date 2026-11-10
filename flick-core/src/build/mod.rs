@@ -7,6 +7,9 @@ mod abi;
 #[cfg(not(target_arch = "wasm32"))]
 mod bridge_select;
 pub mod effects;
+pub(crate) mod bindings {
+    include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
+}
 #[cfg(feature = "build-artifacts")]
 pub mod go;
 
@@ -60,14 +63,6 @@ pub fn schema_aot_file(name: &str) -> String {
         format!("schemas.{name}.aot.js")
     }
 }
-
-/// The runtime modules `[build] ui` replaces.
-const UI_RENDERER: &[&str] = &[
-    "@flick-lang/effect-ts/ui",
-    "@flick-lang/effect-ts/ui/react",
-    "@flick-lang/runtime/ui",
-    "@flick-lang/runtime/ui/react",
-];
 
 /// A file of the output, by its path relative to the output directory.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -269,7 +264,9 @@ fn foreign_specifier(
 ) -> String {
     // `[build] ui` stands for the renderer and the mount of `Ui` and `Action`.
     let (spec, dir) = match settings.ui {
-        Some(ui) if UI_RENDERER.contains(&spec) => (ui, settings.root.map(Path::to_path_buf)),
+        Some(ui) if bindings::UI_RENDERER.contains(&spec) => {
+            (ui, settings.root.map(Path::to_path_buf))
+        }
         _ => (spec, (settings.source_dir)(module)),
     };
     let relative = spec.starts_with("./") || spec.starts_with("../");
@@ -762,11 +759,11 @@ fn runner(file: &str, entry: &str, start: &Start, schema_aot: Option<&str>) -> A
     let (import, run) = match start {
         Start::Call => (None, "main(undefined);"),
         Start::RunMain => (
-            Some(("runMain", "@flick-lang/effect-ts")),
+            Some(("runMain", bindings::ADAPTER_PREFIX)),
             "await runMain(main);",
         ),
         Start::RunMainRt => (
-            Some(("runMain", "@flick-lang/runtime/rt")),
+            Some(("runMain", bindings::NATIVE_ENTRY)),
             "await runMain(main);",
         ),
         // what `run` returns is what the host takes from the module, such as Cloudflare's `fetch`
@@ -777,7 +774,8 @@ fn runner(file: &str, entry: &str, start: &Start, schema_aot: Option<&str>) -> A
     });
     let contents = if let Some(aot) = schema_aot {
         format!(
-            "import {{ enableSchemaAot, installSchemaAot }} from \"@flick-lang/effect-ts\";\n{import}\nenableSchemaAot();\nconst {{ main }} = await import(\"{entry}\");\ninstallSchemaAot(await import(\"./{aot}\"));\n{run}\n"
+            "import {{ enableSchemaAot, installSchemaAot }} from \"{}\";\n{import}\nenableSchemaAot();\nconst {{ main }} = await import(\"{entry}\");\ninstallSchemaAot(await import(\"./{aot}\"));\n{run}\n",
+            bindings::ADAPTER_PREFIX
         )
     } else {
         format!("{import}import {{ main }} from \"{entry}\";\n\n{run}\n")

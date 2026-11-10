@@ -11,171 +11,45 @@ use crate::types::{NO_EFFECTS, OpClass};
 /// interfaces: the modules that need no Effect, and the built-in ones they use.
 pub const CORE_DIR: &str = "_core/";
 
-const RUNTIME: &str = "@flick-lang/runtime";
-const EFFECT_TS: &str = "@flick-lang/effect-ts";
+use super::bindings;
 
-/// The former Effect adapter specifier, accepted in foreign declarations
-/// written before the packages split. Generated imports use the new package.
 pub fn effect_specifier(spec: &str) -> String {
-    match spec.strip_prefix(RUNTIME) {
-        Some(rest)
-            if rest.is_empty()
-                || rest.starts_with("/effect/")
-                || rest.starts_with("/ui")
-                || rest.starts_with("/runner/")
-                || rest.starts_with("/sql")
-                || rest.starts_with("/cli") =>
-        {
-            format!("{EFFECT_TS}{rest}")
-        }
-        _ => spec.to_owned(),
-    }
+    bindings::ALIASES
+        .iter()
+        .find_map(|(from, to, prefix)| {
+            spec.strip_prefix(from)
+                .filter(|rest| rest.is_empty() || *prefix)
+                .map(|rest| format!("{to}{rest}"))
+        })
+        .unwrap_or_else(|| spec.to_owned())
 }
 
-/// The built-in modules whose foreign bindings `core` has, every one.
-const BUILTINS: &[&str] = &[
-    "Bool",
-    "Float",
-    "Instances",
-    "Int",
-    "List",
-    "List.Core",
-    "List.Search",
-    "List.Slice",
-    "List.Transform",
-    "Option",
-    "Prelude",
-    "Result",
-    "Monoids",
-    "Seq",
-    "String",
-    "Validation",
-];
+fn route(spec: &str, native: bool) -> Option<String> {
+    if let Some((_, core, rt)) = bindings::ROUTES.iter().find(|(from, _, _)| *from == spec) {
+        return if native { *rt } else { *core }.map(str::to_owned);
+    }
+    (!bindings::PACKAGES.iter().any(|p| belongs_to(spec, p))).then(|| spec.to_owned())
+}
 
-/// The modules of `@flick-lang/runtime/effect/` that `core` has too, with
-/// the exports the modules of [`BUILTINS`] bind.
-const IN_CORE: &[&str] = &[
-    "Array", "Boolean", "Iterable", "Number", "Option", "Result", "String",
-];
+pub fn belongs_to(spec: &str, package: &str) -> bool {
+    spec.strip_prefix(package)
+        .is_some_and(|rest| rest.is_empty() || rest.starts_with('/'))
+}
 
-/// What a foreign module `spec` is without effects; `None` when it has no
-/// version without Effect. A module of the program's own is itself.
 pub fn specifier(spec: &str) -> Option<String> {
-    match spec
-        .strip_prefix(EFFECT_TS)
-        .or_else(|| spec.strip_prefix(RUNTIME))
-    {
-        None => Some(spec.to_owned()),
-        Some("") => Some(format!("{RUNTIME}/core")),
-        Some(rest) => rest
-            .strip_prefix("/effect/")
-            .filter(|m| IN_CORE.contains(m))
-            .map(|m| format!("{RUNTIME}/core/{m}")),
-    }
+    route(spec, false)
 }
-
-/// The modules of `@flick-lang/runtime/effect/` that Flick's own runtime has,
-/// under `@flick-lang/runtime/rt/effect/`, for the exports it has.
-const IN_RT: &[&str] = &[
-    "Arbitrary",
-    "Array",
-    "BigInt",
-    "BigDecimal",
-    "ByteSize",
-    "Cause",
-    "Clock",
-    "Chunk",
-    "Combiner",
-    "Crypto",
-    "DateTime",
-    "Deferred",
-    "Differ",
-    "Duration",
-    "Effect",
-    "Exit",
-    "Fiber",
-    "FiberSet",
-    "Filter",
-    "Function",
-    "Hash",
-    "HashMap",
-    "HashRing",
-    "HashSet",
-    "Formatter",
-    "Inspectable",
-    "JsonPatch",
-    "JsonPointer",
-    "JsonSchema",
-    "Latch",
-    "Layer",
-    "Queue",
-    "Random",
-    "Number",
-    "Option",
-    "Optic",
-    "Record",
-    "Reducer",
-    "Predicate",
-    "RegExp",
-    "Redacted",
-    "Schedule",
-    "Schema",
-    "Scope",
-    "String",
-    "Struct",
-    "Tuple",
-    "Tracer",
-    "Trie",
-    "Version",
-    "reactivity/AsyncResult",
-    "reactivity/Atom",
-];
-
-/// The entry points of the UI layer, which Flick's own runtime has under
-/// `@flick-lang/runtime/rt/`.
-const UI_IN_RT: &[&str] = &["/ui", "/ui/react", "/ui/html", "/ui/server"];
-
-/// What a foreign module `spec` is on Flick's own runtime; `None` when it has no
-/// version there. A module of the program's own is itself.
 pub fn rt_specifier(spec: &str) -> Option<String> {
-    match spec
-        .strip_prefix(EFFECT_TS)
-        .or_else(|| spec.strip_prefix(RUNTIME))
-    {
-        None => Some(spec.to_owned()),
-        Some("") => Some(format!("{RUNTIME}/rt")),
-        Some(rest) if UI_IN_RT.contains(&rest) => Some(format!("{RUNTIME}/rt{rest}")),
-        Some(rest) => {
-            let module = rest.strip_prefix("/effect/")?;
-            if IN_RT.contains(&module) {
-                Some(format!("{RUNTIME}/rt/effect/{module}"))
-            } else if IN_CORE.contains(&module) {
-                Some(format!("{RUNTIME}/core/{module}"))
-            } else {
-                None
-            }
-        }
-    }
+    route(spec, true)
 }
-
-/// The exports implemented by the owned runtime. Other adapter exports cross
-/// into Effect through the optional bridge.
-const RT_EXPORTS: &str = include_str!("rt_exports.txt");
 
 pub fn on_kernel(spec: &str, export: &str) -> bool {
-    if !spec
-        .strip_prefix(RUNTIME)
-        .is_some_and(|rest| rest.is_empty() || rest.starts_with('/'))
-    {
-        return true;
-    }
-    RT_EXPORTS
-        .lines()
-        .any(|line| line.split_once(' ') == Some((spec, export)))
+    !belongs_to(spec, bindings::OWNED_PREFIX)
+        || bindings::EXPORTS
+            .lines()
+            .any(|line| line.split_once(' ') == Some((spec, export)))
 }
 
-/// Throwing `core` placeholders also appear in the RT index. A build with an
-/// installed Effect adapter must route them to their real implementations.
 pub fn on_kernel_with_bridge(spec: &str, export: &str, bridge: bool) -> bool {
     selected_on_kernel(
         spec,
@@ -189,46 +63,21 @@ pub fn on_kernel_with_bridge(spec: &str, export: &str, bridge: bool) -> bool {
 }
 
 pub fn ui_family(spec: &str, export: &str) -> bool {
-    // Both renderers re-export these exact inert constructors from
-    // runtime/ui/react/nodes. They hold no registry or runtime task, so
-    // crossing the adapter here only walks the same tree repeatedly.
-    if matches!(
-        spec,
-        "@flick-lang/runtime/rt/ui" | "@flick-lang/runtime/rt/ui/react"
-    ) && include_str!("shared_ui_exports.txt")
-        .lines()
-        .any(|name| name == export)
-    {
-        return false;
-    }
-    matches!(
-        spec,
-        "@flick-lang/runtime/rt/effect/reactivity/Atom"
-            | "@flick-lang/runtime/rt/ui"
-            | "@flick-lang/runtime/rt/ui/html"
-            | "@flick-lang/runtime/rt/ui/react"
-            | "@flick-lang/runtime/rt/ui/server"
-    ) || (spec == "@flick-lang/runtime/rt"
-        && (export == "label"
-            || ["atom", "form", "route"].iter().any(|prefix| {
-                export
-                    .strip_prefix(prefix)
-                    .is_some_and(|rest| rest.starts_with(char::is_uppercase))
-            })))
+    bindings::FAMILIES
+        .iter()
+        .any(|line| line.split_once(' ') == Some((spec, export)))
 }
 
 pub fn selected_on_kernel(spec: &str, export: &str, bridge: EffectBridge) -> bool {
-    const STUBS: &str = include_str!("rt_stubs.txt");
-    const BRIDGE_STUBS: &str = include_str!("rt_bridge_stubs.txt");
     if bridge == EffectBridge::AvailableWithUi && ui_family(spec, export) {
         return false;
     }
-    let bridge = bridge.available();
-    let core_stub = spec == "@flick-lang/runtime/rt" && STUBS.lines().any(|name| name == export);
-    let module_stub = BRIDGE_STUBS
+    let root = Some(bindings::NATIVE_ENTRY);
+    let stub = Some(spec) == root && bindings::STUBS.lines().any(|name| name == export);
+    let module_stub = bindings::BRIDGE_STUBS
         .lines()
         .any(|line| line.split_once(' ') == Some((spec, export)));
-    !(bridge && (core_stub || module_stub)) && on_kernel(spec, export)
+    !(bridge.available() && (stub || module_stub)) && on_kernel(spec, export)
 }
 
 /// E008 when the program's `module` binds a foreign module that needs
@@ -256,7 +105,7 @@ pub fn check(module: &ir::Module, diagnostics: &mut Vec<Diagnostic>) {
 
 /// Whether the built-in module `name` has a build without Effect.
 pub fn in_core(name: &str) -> bool {
-    BUILTINS.contains(&name)
+    bindings::CORE_BUILTINS.contains(&name)
 }
 
 /// E008 when the program uses the built-in module `name`, which needs Effect.
@@ -305,14 +154,14 @@ pub fn control_on_js(module: &ir::Module, diagnostics: &mut Vec<Diagnostic>) {
 
 #[cfg(test)]
 mod tests {
-    use super::{BUILTINS, effect_specifier, on_kernel, rt_specifier, specifier};
+    use super::{bindings, effect_specifier, on_kernel, rt_specifier, specifier};
     use crate::types::builtin_sources;
 
     #[test]
     fn builtins_without_effects_bind_only_core_and_import_each_other() {
         for (name, source) in builtin_sources()
             .iter()
-            .filter(|(n, _)| BUILTINS.contains(n))
+            .filter(|(n, _)| bindings::CORE_BUILTINS.contains(n))
         {
             for line in source.lines() {
                 if let Some(spec) = line
@@ -325,7 +174,10 @@ mod tests {
                 }
                 if let Some(import) = line.strip_prefix("import ") {
                     let module = import.split_whitespace().next().unwrap_or_default();
-                    assert!(BUILTINS.contains(&module), "{name} imports `{module}`");
+                    assert!(
+                        bindings::CORE_BUILTINS.contains(&module),
+                        "{name} imports `{module}`"
+                    );
                 }
             }
         }

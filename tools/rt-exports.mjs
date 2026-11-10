@@ -6,26 +6,13 @@ import { dirname, join, relative } from "node:path";
 
 const repo = dirname(dirname(fileURLToPath(import.meta.url)));
 const root = join(repo, "runtime/dist");
-const manifest = join(repo, "flick-core/src/build/rt_exports.txt");
-const stubManifest = join(repo, "flick-core/src/build/rt_stubs.txt");
-const bridgeStubManifest = join(repo, "flick-core/src/build/rt_bridge_stubs.txt");
-// These exports exist on RT, but the Effect adapter must own their ABI when
-// the same program also uses Effect's generators or duration values.
-const bridgeOverrides = [
-  "@flick-lang/runtime/rt durationFormat",
-  "@flick-lang/runtime/rt redactedMake",
-  "@flick-lang/runtime/rt redactedReveal",
-  "@flick-lang/runtime/rt/effect/Arbitrary Constant",
-  "@flick-lang/runtime/rt/effect/Arbitrary filter",
-  "@flick-lang/runtime/rt/effect/Arbitrary flickCheckEffect",
-  "@flick-lang/runtime/rt/effect/Arbitrary flickFormatCheckFailure",
-  "@flick-lang/runtime/rt/effect/Arbitrary flickSchema",
-  "@flick-lang/runtime/rt/effect/Arbitrary schema",
-  "@flick-lang/runtime/rt/effect/Redacted flickEquivalent",
-];
-// An installed tracer/exporter belongs to Effect's Context. Keep every span
-// operation on that side so creation, annotation and completion see it.
-const bridgeModules = new Set(["rt/effect/Tracer"]);
+const manifest = join(repo, "runtime/rt_exports.txt");
+const stubManifest = join(repo, "runtime/rt_stubs.txt");
+const bridgeStubManifest = join(repo, "packages/effect-ts/rt_bridge_stubs.txt");
+// The adapter owns overrides and modules that must share its runtime context.
+const policy = JSON.parse(await readFile(join(repo, "packages/effect-ts/compiler-bindings.json"), "utf8"));
+const bridgeOverrides = policy.bridge_overrides;
+const bridgeModules = new Set(policy.bridge_modules);
 const bridgeExport = (module) => bridgeModules.has(module);
 
 async function files(dir) {

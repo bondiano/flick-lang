@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["flick-core", "flick-ir", "flick", "flick-pretty", "flick-wasm", "flick-model", "flick-plugin", "flick-plugin/macros", "plugins/cli", "plugins/derive", "plugins/refined", "plugins/sql", "plugins/ui", "tests/plugins/pairs"]
+members = ["flick-core", "flick-ir", "flick", "flick-pretty", "flick-wasm", "flick-model", "flick-plugin", "flick-plugin/macros", "plugins/cli", "plugins/derive", "plugins/refined", "plugins/sql", "plugins/ui", "tests/plugins/pairs", "packages/effect-ts/tools/surface"]
 
 [workspace.package]
 edition = "2024"

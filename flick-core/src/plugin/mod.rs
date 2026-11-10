@@ -131,6 +131,14 @@ pub trait Expander: Send + Sync {
         let _ = (block, state, facts);
         Ok(Vec::new())
     }
+    fn check_structure(
+        &self,
+        block: &Block,
+        facts: &flick_plugin::Structure,
+    ) -> Result<Vec<Diagnostic>, String> {
+        let _ = (block, facts);
+        Ok(Vec::new())
+    }
     /// What the plugin finds wrong with `calls`, the places of one module
     /// that call the names its package watches, at spans of that module's
     /// own file; why the plugin failed.
@@ -304,6 +312,14 @@ impl<P: Plugin + Send + Sync> Expander for Native<P> {
         facts: &[Fact],
     ) -> Result<Vec<Diagnostic>, String> {
         guarded(|| self.plugin.check(block, state, facts))
+    }
+
+    fn check_structure(
+        &self,
+        block: &Block,
+        facts: &flick_plugin::Structure,
+    ) -> Result<Vec<Diagnostic>, String> {
+        guarded(|| self.plugin.check_structure(block, facts))
     }
 
     fn check_calls(&self, calls: &[CallSite], state: &[u8]) -> Result<Vec<Diagnostic>, String> {

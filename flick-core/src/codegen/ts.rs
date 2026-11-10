@@ -4,6 +4,7 @@
 //! higher-kinded variable, a region, an open record) is refused with the
 //! reason, never written as `any`.
 
+use crate::build::bindings;
 use std::cell::{Cell, RefCell};
 use std::collections::{BTreeSet, HashMap};
 use std::fmt::Write;
@@ -14,11 +15,11 @@ use crate::types::lang::{self, Lang};
 use crate::types::{Form, Kind, ModuleRequirement, Type, TypeDef, passes_dictionary};
 
 /// The runtime package generated code imports.
-const EFFECT_RUNTIME: &str = "@flick-lang/effect-ts";
+const EFFECT_RUNTIME: &str = bindings::ADAPTER_PREFIX;
 const FLICK_RUNTIME: &str = "@flick-lang/runtime/rt/types";
 
 /// The runtime module whose `Ui` a Flick `Ui` value is.
-const EFFECT_RUNTIME_UI: &str = "@flick-lang/effect-ts/ui/react";
+const EFFECT_RUNTIME_UI: &str = bindings::ADAPTER_UI;
 const FLICK_RUNTIME_UI: &str = "@flick-lang/runtime/rt/types";
 
 /// Built-in types TypeScript has natively.

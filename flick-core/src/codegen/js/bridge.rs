@@ -2,6 +2,7 @@
 //! has no export for is Effect's, and what crosses it is converted by its
 //! shape, from the signature. Emitted only for Flick's own runtime.
 
+use crate::build::bindings;
 use flick_ir::Shape;
 
 use super::{Gen, names};
@@ -32,10 +33,10 @@ impl Gen<'_> {
         if !self
             .foreign
             .iter()
-            .any(|(source, export, _)| source == "@flick-lang/effect-ts/bridge" && export == name)
+            .any(|(source, export, _)| source == bindings::ADAPTER_BRIDGE && export == name)
         {
             self.foreign.push((
-                "@flick-lang/effect-ts/bridge".to_owned(),
+                bindings::ADAPTER_BRIDGE.to_owned(),
                 name.to_owned(),
                 alias.clone(),
             ));

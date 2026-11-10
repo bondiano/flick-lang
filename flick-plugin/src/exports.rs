@@ -2,7 +2,7 @@
 
 use crate::{
     Arena, Artifact, Block, CallSite, Compiler, Completion, DeriveTarget, Diagnostic, Fact,
-    Highlight, Hover, Piece, Published, Span,
+    Highlight, Hover, Piece, Published, Span, Structure,
 };
 
 /// A plugin: what it learns from all its blocks of a group, and the code
@@ -111,6 +111,12 @@ pub trait Plugin {
     /// them. It only adds errors.
     fn check(&self, block: &Block, state: &[u8], facts: &[Fact]) -> Vec<Diagnostic> {
         let _ = (block, state, facts);
+        Vec::new()
+    }
+    /// Source structure of a block's expression/declaration holes, excluding
+    /// generated code, with the project's lint thresholds.
+    fn check_structure(&self, block: &Block, facts: &Structure) -> Vec<Diagnostic> {
+        let _ = (block, facts);
         Vec::new()
     }
     /// What is wrong with the places of one module that call the names the

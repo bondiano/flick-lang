@@ -3,6 +3,7 @@
 //! current statement list, earlier operands spilled into constants first so
 //! that evaluation stays left to right.
 
+use crate::build::bindings;
 macro_rules! mark {
     ($gen:expr, $span:expr) => {{
         #[cfg(feature = "source-maps")]
@@ -65,7 +66,7 @@ use crate::types::Dict;
 use exports::annotations;
 use exports::sync_exports;
 
-const RUNTIME: &str = "@flick-lang/effect-ts";
+const RUNTIME: &str = bindings::ADAPTER_PREFIX;
 const MARK_START: char = '\u{E000}';
 const MARK_END: char = '\u{E001}';
 

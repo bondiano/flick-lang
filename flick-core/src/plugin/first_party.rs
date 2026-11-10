@@ -58,7 +58,7 @@ pub const WATCH: [&str; 9] = [
 /// under its package: the checks that moved into it keep the code, the
 /// reference page and the `flick explain` text they had. Its other codes,
 /// such as `Q010`, stay `std/Q010`.
-pub const OWN_CODES: [&str; 3] = ["U001", "U003", "D006"];
+pub const OWN_CODES: [&str; 6] = ["U001", "U003", "D006", "T036", "T037", "T038"];
 
 /// The package whose plugin is linked into the compiler. An implicit package
 /// without a plugin of its own needs no entry here.
@@ -115,6 +115,14 @@ impl Plugin for Std {
             "codec" => codec::check(block, facts),
             "sql" => Sql.check(block, state, facts),
             _ => Vec::new(),
+        }
+    }
+
+    fn check_structure(&self, block: &Block, facts: &flick_plugin::Structure) -> Vec<Diagnostic> {
+        if block.head == "component" {
+            component::check(block, facts)
+        } else {
+            Vec::new()
         }
     }
 

@@ -1,9 +1,11 @@
 //! The plugin of std for refined types. `T.parse c` of a constant `c` is
-//! checked when the program compiles wherever the compiler knows the check
+//! checked when the program compiles wherever the host supplies the check
 //! of `T`: the literals of an enum, one of the checks of `Checks`, or the
-//! verdict of the compiler on the module's own predicate.
+//! syntax of the module's own predicate, interpreted here.
 
 use flick_plugin::{CallSite, Constant, Diagnostic, Refinement};
+
+mod predicate;
 
 /// `D006` on each `T.parse c` whose constant never passes the check of `T`.
 pub fn check(calls: &[CallSite]) -> Vec<Diagnostic> {
@@ -20,8 +22,7 @@ fn one(call: &CallSite) -> Option<Diagnostic> {
         Refinement::Literals(literals) if !literal_of(literals, constant)? => {
             format!("this constant is no literal of `{ty}`, so `{ty}.parse` of it always fails")
         }
-        Refinement::Known(check) if !passes(check, constant)? => fails,
-        Refinement::Holds(false) => fails,
+        Refinement::Predicate(expression) if !predicate::holds(expression, constant)? => fails,
         _ => return None,
     };
     Some(Diagnostic::error(message, argument.span).with_code("D006"))
@@ -44,7 +45,7 @@ fn literal_of(literals: &[Constant], constant: &Constant) -> Option<bool> {
     }
 }
 
-/// Whether `constant` passes the check the compiler knows as `name`, as the
+/// Whether `constant` passes the check this plugin recognizes as `name`, as the
 /// runtime applies it; none for a constant of another kind.
 fn passes(name: &str, constant: &Constant) -> Option<bool> {
     match (name, constant) {
@@ -73,7 +74,7 @@ fn email(s: &str) -> bool {
 mod tests {
     use std::slice;
 
-    use super::check;
+    use super::{check, predicate};
     use flick_plugin::{Argument, CallSite, Constant, FactType, Refinement, Span};
 
     fn call(name: &str, constant: Constant, refinement: Option<Refinement>) -> CallSite {
@@ -127,7 +128,8 @@ mod tests {
 
     #[test]
     fn a_constant_passes_a_check_the_compiler_knows() {
-        let known = |check: &str| Some(Refinement::Known(check.to_owned()));
+        let known =
+            |check: &str| Some(Refinement::Predicate(predicate::reference("Checks", check)));
         let email = |s: &str| call("Email$parse", Constant::Text(s.to_owned()), known("email"));
         assert_eq!(
             message(&email("nobody")).as_deref(),
@@ -178,20 +180,20 @@ mod tests {
     }
 
     #[test]
-    fn the_verdict_of_the_compiler_decides_a_predicate_of_the_module() {
+    fn a_predicate_of_the_module_is_interpreted_by_the_plugin() {
         let fails = call(
             "Even$parse",
             Constant::Number(3.0),
-            Some(Refinement::Holds(false)),
+            Some(Refinement::Predicate(predicate::literal(false))),
         );
         assert!(message(&fails).is_some());
         let holds = call(
             "Even$parse",
             Constant::Number(4.0),
-            Some(Refinement::Holds(true)),
+            Some(Refinement::Predicate(predicate::literal(true))),
         );
         assert_eq!(message(&holds), None);
-        // a check the compiler cannot fold is left to run time
+        // a check the plugin cannot fold is left to run time
         let unknown = call("Even$parse", Constant::Number(3.0), None);
         assert_eq!(message(&unknown), None);
     }

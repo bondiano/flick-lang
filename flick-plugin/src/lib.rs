@@ -24,6 +24,7 @@ mod wit;
 mod wit_arena;
 
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 
 pub use builder::Builder;
 pub use cursor::Cursor;
@@ -38,7 +39,7 @@ pub use splice::{Name, Splice, Wildcard};
 
 /// The version of the interface, as `wit/plugin.wit` declares it. Caches of
 /// expansions key on it.
-pub const VERSION: &str = "0.1.0";
+pub const VERSION: &str = "0.2.0";
 
 /// A UTF-8 byte range in the body of a block.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -398,8 +399,25 @@ pub struct FactField {
     pub ty: FactType,
 }
 
-/// The type of a `_` of a block's code, at the span its code gave it, and
-/// its fields when it is a closed record.
+/// Source structure, independent of generated wrappers. Nesting entries are
+/// the first nodes beyond the limit, in source order, without descendants.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Structure {
+    pub lines: u32,
+    pub complexity: u32,
+    pub nesting: Vec<Nesting>,
+    pub max_lines: u32,
+    pub max_complexity: u32,
+    pub max_nesting: u32,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Nesting {
+    pub span: Span,
+    pub depth: u32,
+}
+
+/// The type of a `_` of a block's code, and its closed-record fields.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Fact {
     pub span: Span,
@@ -427,16 +445,50 @@ pub struct Argument {
     pub constant: Option<Constant>,
 }
 
-/// How a refined type checks a value at `T$parse`.
+/// Read-only expression syntax. Children precede their parent, as in `Arena`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ExpressionFact {
+    /// Shared by calls of the same predicate in a checked module.
+    pub nodes: Arc<[ExpressionKind]>,
+    pub root: u32,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum ExpressionKind {
+    Constant(Constant),
+    /// An exact integer literal in decimal notation.
+    BigInt(String),
+    Reference {
+        module: String,
+        name: String,
+    },
+    Variable(String),
+    Unary {
+        op: String,
+        value: u32,
+    },
+    Binary {
+        op: String,
+        left: u32,
+        right: u32,
+    },
+    If {
+        condition: u32,
+        then: u32,
+        otherwise: u32,
+    },
+    Lambda {
+        parameter: String,
+        body: u32,
+    },
+    Unknown,
+}
+
+/// Facts about a parse companion's type, without a compiler verdict.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Refinement {
-    /// The literals of an enum: a constant that is none of them never parses.
     Literals(Vec<Constant>),
-    /// A check the compiler knows by name: `email`, `non_empty`, `positive`.
-    Known(String),
-    /// Whether the module's own predicate holds for the constant, as the
-    /// compiler folded it.
-    Holds(bool),
+    Predicate(ExpressionFact),
 }
 
 /// The enclosing top-level binding of a watched reference. These are

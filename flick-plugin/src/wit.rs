@@ -257,6 +257,13 @@ macro_rules! wit_conversions {
                 }
             }
 
+            pub fn to_structure(s: &$crate::Structure) -> w::Structure {
+                w::Structure { lines: s.lines, complexity: s.complexity, nesting: s.nesting.iter().map(|n| w::Nesting { span: to_span(n.span), depth: n.depth }).collect(), max_lines: s.max_lines, max_complexity: s.max_complexity, max_nesting: s.max_nesting }
+            }
+            pub fn from_structure(s: w::Structure) -> $crate::Structure {
+                $crate::Structure { lines: s.lines, complexity: s.complexity, nesting: s.nesting.into_iter().map(|n| $crate::Nesting { span: from_span(n.span), depth: n.depth }).collect(), max_lines: s.max_lines, max_complexity: s.max_complexity, max_nesting: s.max_nesting }
+            }
+
             pub fn to_fact(f: &$crate::Fact) -> w::Fact {
                 let ty = |t: &$crate::FactType| w::FactType { shown: t.shown.clone(), exact: t.exact.clone(), literal_of: t.literal_of.clone() };
                 w::Fact {
@@ -333,19 +340,46 @@ macro_rules! wit_conversions {
                 }
             }
 
+            fn to_expression_kind(e: &$crate::ExpressionKind) -> w::ExpressionKind {
+                use $crate::ExpressionKind as E;
+                match e {
+                    E::Constant(c) => w::ExpressionKind::Constant(to_constant(c)),
+                    E::BigInt(n) => w::ExpressionKind::BigInt(n.clone()),
+                    E::Reference { module, name } => w::ExpressionKind::Reference(w::ReferenceFact { module: module.clone(), name: name.clone() }),
+                    E::Variable(v) => w::ExpressionKind::Variable(v.clone()),
+                    E::Unary { op, value } => w::ExpressionKind::Unary(w::UnaryFact { op: op.clone(), value: *value }),
+                    E::Binary { op, left, right } => w::ExpressionKind::Binary(w::BinaryFact { op: op.clone(), left: *left, right: *right }),
+                    E::If { condition, then, otherwise } => w::ExpressionKind::If(w::IfFact { condition: *condition, then: *then, otherwise: *otherwise }),
+                    E::Lambda { parameter, body } => w::ExpressionKind::Lambda(w::LambdaFact { parameter: parameter.clone(), body: *body }),
+                    E::Unknown => w::ExpressionKind::Unknown,
+                }
+            }
+            fn from_expression_kind(e: w::ExpressionKind) -> $crate::ExpressionKind {
+                use $crate::ExpressionKind as E;
+                match e {
+                    w::ExpressionKind::Constant(c) => E::Constant(from_constant(c)),
+                    w::ExpressionKind::BigInt(n) => E::BigInt(n),
+                    w::ExpressionKind::Reference(r) => E::Reference { module: r.module, name: r.name },
+                    w::ExpressionKind::Variable(v) => E::Variable(v),
+                    w::ExpressionKind::Unary(u) => E::Unary { op: u.op, value: u.value },
+                    w::ExpressionKind::Binary(b) => E::Binary { op: b.op, left: b.left, right: b.right },
+                    w::ExpressionKind::If(i) => E::If { condition: i.condition, then: i.then, otherwise: i.otherwise },
+                    w::ExpressionKind::Lambda(l) => E::Lambda { parameter: l.parameter, body: l.body },
+                    w::ExpressionKind::Unknown => E::Unknown,
+                }
+            }
+
             fn to_refinement(r: &$crate::Refinement) -> w::Refinement {
                 match r {
                     $crate::Refinement::Literals(ls) => w::Refinement::Literals(ls.iter().map(to_constant).collect()),
-                    $crate::Refinement::Known(name) => w::Refinement::Known(name.clone()),
-                    $crate::Refinement::Holds(b) => w::Refinement::Holds(*b),
+                    $crate::Refinement::Predicate(e) => w::Refinement::Predicate(w::ExpressionFact { root: e.root, nodes: e.nodes.iter().map(to_expression_kind).collect() }),
                 }
             }
 
             fn from_refinement(r: w::Refinement) -> $crate::Refinement {
                 match r {
                     w::Refinement::Literals(ls) => $crate::Refinement::Literals(ls.into_iter().map(from_constant).collect()),
-                    w::Refinement::Known(name) => $crate::Refinement::Known(name),
-                    w::Refinement::Holds(b) => $crate::Refinement::Holds(b),
+                    w::Refinement::Predicate(e) => $crate::Refinement::Predicate($crate::ExpressionFact { root: e.root, nodes: e.nodes.into_iter().map(from_expression_kind).collect::<::std::vec::Vec<_>>().into() }),
                 }
             }
             pub fn to_hover(h: $crate::Hover) -> w::Hover {
