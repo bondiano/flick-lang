@@ -131,3 +131,23 @@ fn builtins_check_cleanly() {
     assert_eq!(names.iter().collect::<BTreeSet<_>>().len(), names.len());
     assert_eq!(names[..2], ["Prelude", "Instances"]);
 }
+
+/// `Live` in a row runs nothing: `Atom.value`, whose arrow needs the atom's
+/// qualifier live once elision reads it, is still read at once (Sync), and a
+/// row of `Live` alone is no Sync stage, as the empty row is not.
+#[test]
+fn live_in_a_row_keeps_a_read_sync() {
+    use crate::types::LIVE;
+    use crate::types::lang::{self, Lang};
+    use crate::types::ty::{Row, Type, sync_rows};
+    let read = lang::item(Lang::AtomRead).label.clone();
+    let live = (LIVE.to_owned(), Type::Var("d".into()));
+    let row = |entries| Type::Row(Row::closed(entries));
+    let none = Type::empty_row();
+    assert!(sync_rows(&row(vec![(read.clone(), none.clone())]), &none));
+    assert!(sync_rows(
+        &row(vec![live.clone(), (read, none.clone())]),
+        &none
+    ));
+    assert!(!sync_rows(&row(vec![live]), &none));
+}

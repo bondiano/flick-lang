@@ -74,7 +74,8 @@ theorem hole_arg {Ψ Θ E f x t₀ φ₀ a₀ ψ₀ B n} (hE : OkE E) (hn : ¬ V
   cases hr with
   | app hf' hx' hψ _ =>
     obtain ⟨hψp, hb'⟩ := hf hf'
-    have hφ : φ' ≠ .pure := fun h => hψp (Stage.eq_pure (h ▸ hψ))
+    have hφ : φ' ≠ .pure := fun h =>
+      hψp ((Stage.use_eq_pure _ _).mp (Stage.eq_pure (h ▸ hψ)))
     rcases hp with hp | ⟨rfl, hΘ⟩
     · exact (hφ hp).elim
     · simp only [List.map_up_zero] at hx'
@@ -119,12 +120,14 @@ theorem abort_pres {Ψ Θ p ℓ Ef al rf o v b t φ} {Ei : List Frame} (hEi : Ok
     (h : Typ S Ψ Θ [] (.hwith p ℓ Ef al rf (plug Ei (.app (.const (.perform Ef o .abort)) v))) (.ex t φ)) :
     Typ S Ψ Θ [] (.hwith p ℓ Ef al rf (plug Ei (.unw p ℓ (b.subst (inst [v]))))) (.ex t φ) := by
   cases h with
-  | hwith hℓ hal hrf hψ he hφ₀ hc hφ hT =>
+  | hwith hℓ hal hrf hψ he hφ₀ hc hφ hT hat =>
     obtain ⟨a₀, b₀, hop⟩ := perform_op hEi he
     have hb := (hal.arm_inv hop ha).2.1 rfl
     refine .hwith hℓ hal hrf hψ (refill_app hEi perform_not_value he (perform_fn hop) perform_up
-      fun T φ' hΘ hψ₀ _ hx => ?_) hφ₀ hc hφ hT
-    exact .unw hℓ ((hb.cut hΘ.entails).inst (Δ := [_]) (.cons hv (hx.valueAny hv _) .nil))
+      fun T φ' hΘ hψ₀ _ hx => ?_) hφ₀ hc hφ hT hat
+    exact .unw hℓ (((hb.cut hΘ.entails).inst (Δ := [_]) (.cons hv (hx.valueAny hv _) .nil)).sub
+      (J' := .ex _ (Stage.use (.rt _ _) (Ty.rg _).reach))
+      ⟨LeLive.refl, Stage.le_use _ _⟩)
       (Stage.none_le (Stage.rt_ne_pure hψ₀))
   | errVal hv | allI hv => cases hv
 
@@ -134,15 +137,16 @@ theorem tail_pres {Ψ Θ n p ℓ Ef al rf o v b t φ} {Ei : List Frame} (hc : Rt
     (h : Typ S Ψ Θ [] (.hwith p ℓ Ef al rf (plug Ei (.app (.const (.perform Ef o .tail)) v))) (.ex t φ)) :
     Typ S Ψ Θ [] (.hctl p ℓ 0 true Ef al rf (b.subst (inst [v])) (plug Ei (.hole p))) (.ex t φ) := by
   cases h with
-  | hwith hℓ hal hrf hψ he hφ₀ hc' hφ hT =>
+  | hwith hℓ hal hrf hψ he hφ₀ hc' hφ hT hat =>
     obtain ⟨a₀, b₀, hop⟩ := perform_op hEi he
     have hb := (hal.arm_inv hop ha).1 rfl
     have hx := hole_arg hEi perform_not_value hv he (perform_fn hop) hc hbv
       (S.op_closed _ _ _ _ _ (kill n) hop).1
     refine .hctl hℓ hal hrf hψ hop (by decide) (by simp) hEi rfl
-      (refill_todo hEi perform_not_value he) hφ₀ ?_ (fun h => by cases h) hc' hφ hT
+      (refill_todo hEi perform_not_value he) hφ₀ ?_ (fun h => by cases h) hc' hφ hT hat
     rw [if_pos rfl]
-    exact hb.inst (Δ := [_]) (.cons hv hx .nil)
+    exact (hb.inst (Δ := [_]) (.cons hv hx .nil)).sub
+      ⟨LeLive.refl, Stage.le_use _ _⟩
   | errVal hv | allI hv => cases hv
 
 /-- `tail` under a kept handler: its arm runs there while the body waits for its value. -/
@@ -170,7 +174,7 @@ theorem ctl_pres {Ψ Θ n p ℓ Ef al rf o v b t φ} {Ei : List Frame} (hc : RtC
       Typ S (Ψ ++ [c]) Θ [] (.hctl p ℓ Ψ.length false Ef al rf (b.subst (inst [v, .kont p Ψ.length]))
         (plug Ei (.hole p))) (.ex t φ) := by
   cases h with
-  | hwith hℓ hal hrf hψ he hφ₀ hc' hφ hT =>
+  | hwith hℓ hal hrf hψ he hφ₀ hc' hφ hT hat =>
     obtain ⟨a₀, b₀, hop⟩ := perform_op hEi he
     have hb := (hal.arm_inv hop ha).2.2 rfl
     have hx := hole_arg hEi perform_not_value hv he (perform_fn hop) hc hbv
@@ -178,11 +182,15 @@ theorem ctl_pres {Ψ Θ n p ℓ Ef al rf o v b t φ} {Ei : List Frame} (hc : RtC
     refine ⟨_, ctl_cell_yf hc hℓ (S.op_closed _ _ _ _ _ (kill n) hop).2 hp, lam_todo, ?_⟩
     refine .hctl (getElem?_ext hℓ) (hal.weakenStore _) (hrf.weakenStore _) hψ hop (by decide) (by simp)
       hEi rfl ((refill_todo hEi perform_not_value he).weakenStore _) hφ₀ ?_
-      (fun _ => ⟨_, List.getElem?_concat_length, rfl⟩) hc' hφ hT
+      (fun _ => ⟨_, List.getElem?_concat_length, rfl⟩) hc' hφ hT hat
     rw [if_neg (by decide)]
     exact (hb.weakenStore _).inst (Δ := [_, _])
       (.cons hv (hx.weakenStore _) (.cons .kont (.kont List.getElem?_concat_length rfl .refl) .nil))
   | errVal hv | allI hv => cases hv
+
+theorem Stage.use_rg_svc {r ε : Row} {p : Nat} :
+    (Stage.use (.rt r ε) (Ty.rg p).reach).svc (.atm (.r p)) := by
+  exact Or.inr rfl
 
 /-- `resume`: the body runs again under its handler, while the arm waits for its value. -/
 theorem resume_pres {Ψ Θ n p ℓh ℓ Ef al rf u k t φ} {A Ei : List Frame} (hc : RtCtx Ψ Θ n)
@@ -190,15 +198,16 @@ theorem resume_pres {Ψ Θ n p ℓh ℓ Ef al rf u k t φ} {A Ei : List Frame} (
     (h : Typ S Ψ Θ [] (.hctl p ℓh ℓ false Ef al rf (plug A (.app (.kont p ℓ) u)) k) (.ex t φ)) :
     Typ S Ψ Θ [] (.hres p ℓh (plug A (.hole p)) (.hwith p ℓh Ef al rf (plug Ei u))) (.ex t φ) := by
   cases h with
-  | hctl hℓh hal hrf hψ hop hc' _ hE hk' hp hφ₀ ha hl hcm hφ hT =>
+  | hctl hℓh hal hrf hψ hop hc' _ hE hk' hp hφ₀ ha hl hcm hφ hT _ =>
     obtain ⟨rfl, -⟩ := plug_hole_inj hEi hE (hk.symm.trans hk')
-    obtain ⟨C', hl₁, -⟩ := hl rfl
+    obtain ⟨C', hl₁, hcp⟩ := hl rfl
     rw [if_neg (by decide)] at ha
     have hx := hole_arg hA kont_not_value hu ha (kont_fn hl₁) hc hbu (S.op_closed _ _ _ _ _ (kill n) hop).2
     have hw := Typ.hwith hℓh hal hrf hψ (refill_app hE perform_not_value hp (perform_fn hop) perform_up
         fun T φ' hΘ _ hB _ => ((hx.valueAny hu φ').sub (J' := .ex T φ') ⟨hB hc', Stage.le_refl _⟩).cut
-          hΘ.entails) hφ₀ hcm (Stage.le_refl _) .refl
-    exact .hres hℓh hw hA rfl (refill_todo hA kont_not_value ha) hl₁ hφ hT
+          hΘ.entails) hφ₀ hcm (Stage.le_use _ _) LeLive.refl
+        (Stage.use_rg_svc)
+    exact .hres hℓh hw hA rfl (refill_todo hA kont_not_value ha) hl₁ hcp hφ hT
   | errVal hv | allI hv => cases hv
 
 end Flick

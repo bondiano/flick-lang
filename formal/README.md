@@ -1,7 +1,7 @@
 # λFlick in Lean 4
 
 A mechanization of the core calculus in [`docs/formal/core.md`](../docs/formal/core.md),
-extended in place with the regions and captures of
+extended in place with the regions and typing by use of
 [`docs/formal/regions.md`](../docs/formal/regions.md); separately, of the runtime
 contract λRT in [`docs/formal/runtime.md`](../docs/formal/runtime.md)
 (`Formal/RT/`, see [λRT and T5](#λrt-and-t5)); and of the elaboration of classes into
@@ -47,10 +47,38 @@ in the `lean` job (`leanprover/lean-action` with `build-args: --wfail`).
   `control`, with `resume` at most once: type soundness `T1` (Progress and
   Preservation over every reachable configuration), `T2a` (a pure computation makes only
   pure steps) and `T2b` (a runtime computation reaches the root only for the effects and raises
-  only the errors of its row), `lemma_3_1` and `T3` (generalization and the store typing), `T4` (T4.1, T4.2: live work reaches only live
-  regions), `T4_3` (no handler of a region that ended is used) and `T1_regions` (`T1` with
+  only the errors of its row), `lemma_3_1` and `T3` (generalization and the store typing),
+  `lemma_6` (the types of old cells), `T4'` (T4′, below) and `T1_regions` (`T1` with
   `op_H`, without the blocked outcome of a step that needs a region that is not live, which
-  `T4` rules out).
+  `T4'` rules out).
+- **Typing by use.** There is one judgment, `Typ` (`Rules.lean`): a region is needed alive
+  only where it is used. The qualifier `C` of an arrow or an `Eff` is what a call or an
+  await needs live, so the call runs at `Stage.use ψ C` (`Live/Mode.lean`) and a qualified
+  body is checked at that stage; no rule bounds what a value holds by its type, and (Lam),
+  (Fix), (Letrec), (Task) and (Drec) have no premise on it. Subtyping `LeLive` compares use
+  stages, so it cannot erase a qualifier by hiding it in an argument or a result
+  (`LeLive.arrow_use`, `LeLive.eff_use`). `op` needs `Scope s` (`Const.ty`), work an owner
+  keeps needs every region atom of its row to outlive the owner (`Row.Outlives`), and
+  `Scope.run`, `spawn` and `addFin` declare the qualifier of what they run in their row
+  (`Const.ok`). A frame provides the atom of its own region to its hole
+  (`Frame.provides`), so `resume` and the step that closes a handler's region
+  (`hwithCatch`) use that region where it is live. `LiveRules.lean` checks holding without
+  use, scope discharge, qualifier-preserving subtyping and owner bounds; `Live.lean` lists
+  the four rules that close the proofs. That the roots name no run-time region is part of
+  `RootTy` (`svcBelow`), since it cannot be read off a typing by use.
+- **T4′** (`Formal/Live.lean`, `Formal/Live/`): `SafeUse`, T4.1 and T4.3, the safety typing
+  by use promises, and `T4'` (`Live/T4Live.lean`) proves it of `Typ`. T4.2 (nothing that can
+  still step reaches a closed region) is given up: a closure or a task that holds a
+  capability and never uses it may outlive its region. The proof rests on an invariant of
+  run-time forms (`LNest`: the ancestors of the regions, the `inside` forms and handlers of
+  each thread, and handler cells that name only ancestors of their region) and of the stages
+  of child work (`LCfgTy`), with every region atom of the stage of a hole live
+  (`hole_atm`, `LNest.atm_live`). A handler of an effect that a region indexes, as
+  `Setup s`, is installed only where that region is live (`hdl_err_live`,
+  `Live/Install.lean`). `Live/Elide.lean` gives signature elision
+  (`Ty.elide`) and proves that the elided reading of each constant is a supertype of its
+  type (`Const.ty_le_elide`, `Typ.const_elided`), for instance types that elision leaves
+  alone; user signatures and the link to the model's `elide` are not proved.
 - **T5, the runtime contract** (`Formal/RT/`, `RT/T5.lean`): for any core and any
   interleaving, every reachable configuration of λRT satisfies R1–R4, R6 and R7, and R5 and
   R8 hold of the cause algebra, under the hypotheses on the libraries (`Hyp`) and `G11`.
@@ -76,26 +104,36 @@ in the `lean` job (`leanprover/lean-action` with `build-args: --wfail`).
   `witness_T6b_example`, `witness_T6b_closed` and `witness_T6b_open` (`Witness/T6b.lean`)
   are T6 on it, the last three without premises of typing.
 
-`#print axioms` of `T1`, `T2a`, `T2b`, `lemma_3_1`, `T3`, `lemma_4`, `lemma_6`, `T4`,
-`T4_3`, `T1_regions`, `T5`, `T6a`, `T6a_core`, `T6a_close`, `T6b`, `T6b_core`,
+`#print axioms` of `T1`, `T2a`, `T2b`, `T2b_await`, `lemma_3_1`, `T3`, `lemma_6`, `T4'`,
+`T1_regions`, `T5`, `T6a`, `T6a_core`, `T6a_close`, `T6b`, `T6b_core`,
 `witness_T6b_example`, `witness_T6b_closed` and `witness_T6b_open` lists only Lean's standard `propext`,
 `Classical.choice` and `Quot.sound`; the hypotheses of T5 (`Hyp`, `G11`), of T6(a)
 (`Target`; for the core, `Real`) and of T6(b) (`Coherent`, `Sim`) are their parameters.
-`Formal/Axioms.lean` pins what `#print axioms` prints for `T1`, `T6a`, `T6b`, `T6a_core`
-and `T6b_core` with `#guard_msgs`, so `lake build` fails on a `sorry` or a new axiom.
+`hdl_err_live` lists only `propext`. `Formal/Axioms.lean` pins what `#print axioms` prints
+for `T1`, `T1_regions`, `T2a`, `T2b`, `T2b_await`, `T3`, `lemma_6`, `T4'`, `hdl_err_live`,
+`T6a`, `T6b`, `T6a_core` and `T6b_core` with `#guard_msgs`, so `lake build` fails on a
+`sorry` or a new axiom.
 
 T4.3 is the premise G11 of T5 in the form [the answering provide must be live](../docs/formal/runtime.md#the-provide-liveness-premise-is-stronger-than-typing-gives) gives it: an operation answered by a handler of the region `q` happens only while `q` is live.
-Its Lean statement (`T43Main.lean`), the counterpart of `G11` in `Formal/RT/Hyp.lean`:
+It is the third conjunct of `SafeUse` (`Live.lean`), the counterpart of `G11` in
+`Formal/RT/Hyp.lean`:
 
 ```lean
-theorem T4_3 {root e₀ t φ₀ c} (hroot : RootTy S root) (h₀ : Typ S [] Facts.none [] e₀ (.ex t φ₀))
-    (hp : e₀.Below 0) (ht : t.YF 0) (hφ : φ₀.substT (kill 0) = φ₀)
-    (hs : CSteps root ⟨[], [], e₀⟩ c) :
-    ∀ i e E Ef o k v q, c.at i = some e → OkE E → e = plug E (.app (.const (.perform Ef o k)) v) →
-      handlerOf E Ef o k = some q → Live c.rgs q
+def SafeUse (root : Roots) (Ok : Tm → Ty → Stage → Prop) : Prop :=
+  ∀ e₀ t φ₀ c, Ok e₀ t φ₀ → e₀.Below 0 → t.YF 0 → φ₀.substT (kill 0) = φ₀ →
+    CSteps root ⟨[], [], e₀⟩ c →
+    (∀ E r, OkE E → c.main = plug E r → ¬ DeadUse c.rgs r) ∧
+    (∀ (p : Nat) (g : Rgn), c.rgs[p]? = some g → g.live = true → ∀ k ∈ g.kids, ∀ E r,
+      OkE E → k = plug E r → ¬ DeadUse c.rgs r) ∧
+    (∀ i e E Ef o k v q, c.at i = some e → OkE E → e = plug E (.app (.const (.perform Ef o k)) v) →
+      handlerOf E Ef o k = some q → Live c.rgs q)
+
+theorem T4' {root : Roots} (hroot : RootTy S root) :
+    SafeUse root (fun e t φ => Typ S [] Facts.none [] e (.ex t φ))
 ```
 
-Here `handlerOf E Ef o k` is the region of the innermost handler of `E` with an arm for the
+Here `DeadUse` is a step that needs a region that is not live (`Regions.lean`),
+`handlerOf E Ef o k` is the region of the innermost handler of `E` with an arm for the
 operation, and `c.at i` ranges over the main thread and the children of live regions.
 
 ## Handlers of effects
@@ -132,9 +170,9 @@ operation, and `c.at i` ranges over the main thread and the children of live reg
   old as it (`HLocs`, `Tm.Within.moveArm`). The row of the work holds no effect of a handler
   left out (`kid_dropped`); its row is what the place had or what a kept handler's arms need
   (`KidRow`), so a child stays within what the root answers (`KidCov`).
-- **Regions** (`Within.lean`, `NestHdl*.lean`). A handler is at the place of its region,
-  `anc p`; what a signal holds is at that place; the cell of a handler names no region younger
-  than it (`HCell`). Every step of a handler keeps `⊢ Λ` (`Nest.step`).
+- **Regions** (`Live/LNest*.lean`). A handler is at the place of its region, `anc p`, and the
+  arms of its cell name only ancestors of that region (`LCell`). Every step of a handler keeps
+  `LNest` (`LNestHdl.lean`, `LNestHdlStep.lean`, `LNestKept.lean`).
 - **Elaboration.** λFlick⁺ has no handlers; the simulation of T6 relates the steps of handlers
   in the core (`Elab/CoreHead.lean`, `Elab/CoreStep.lean`).
 
@@ -149,14 +187,15 @@ operation, and `c.at i` ranges over the main thread and the children of live reg
 | `regions.md` §2.4 `Θ ⊢ Outlives C ϱ` | `Facts`, `Outl` (`Syntax.lean`); dropping facts that follow: `Typ.cut` (`Cut.lean`) |
 | type substitution, `Gen` and instantiation | `Ty.substT`, `Ty.up`, `liftT`, `instT` (`TyOps.lean`); `Scheme.substT`, `Scheme.inst` (`SchemeOps.lean`) |
 | `core.md` §1.3 terms, patterns; §3.1 run-time forms; `regions.md` §1.3, §3.1 | `Tm`, `Pat` (`Syntax.lean`) |
-| what a term holds: free variables, run-time regions, locations (the premise of (Lam)/(Task)) | `Tm.Free`, `Tm.Has`, `held` (`Reach.lean`) |
+| what a term holds: free variables, run-time regions, locations (typing by use does not bound it) | `Tm.Free`, `Tm.Has`, `held` (`Reach.lean`) |
 | §1.3, §3.1 values | `Value` (`Typing.lean`) |
 | `core.md` §1.5, `regions.md` §1.5 constants | `Const`, `Const.ty`, `Const.ok` (`Syntax.lean`) |
-| §2.1 `⊑`, §2.2 `≤`, (≤-Cap) | `Stage.le`, `Le` (`Syntax.lean`, `Typing.lean`, `Order.lean`); `Le.reach` |
+| §2.1 `⊑`, §2.2 `≤` by use | `Stage.le`, `Stage.use`, `LeLive` (`Syntax.lean`, `Live/Mode.lean`, `Live/Order.lean`); `LeLive.arrow_use`, `LeLive.eff_use` |
+| a call needs its qualifier live; owners outlive the rows of their work; a frame provides its region | `Stage.use`; `Row.Outlives` (`Syntax.lean`); `Frame.provides` (`Frames.lean`) |
 | `core.md` §2.3, §3.6 rules; `regions.md` §2.3–§2.5, §3.4 | `Typ` (`Rules.lean`) |
 | (Sub) | admissible: `Typ.sub` (`SubAdm.lean`) |
 | §2.4 patterns, `Exh`; (Match-Val), [Match-Val: a value needs only its own coverage](../docs/formal/core.md#the-residual-match-after-a-false-guard-fails-exh) | `PatTy`, `Shp`, `Exh`, `Covers` (`Typing.lean`) |
-| §2.4 constructors of a GADT: the arguments of the type they build, the hidden row of captures, (Branch-GADT) under every unifier ([not the most general one](../docs/formal/core.md#the-most-general-unifier-is-not-kept-by-substitution), [the free names of a dead branch](../docs/formal/core.md#a-dead-branch-keeps-no-typing-of-its-body)); `Exh` without the constructors that build no value | `Sig.res`, `Sig.ctorTyR` (`Syntax.lean`, `TyOps.lean`); `Sig.Holds`, `Sig.Inj`, `PatsTy`, `Sig.Builds` (`Typing.lean`); `Typ.aref` (`Rules.lean`); `Typ.aref_substT` (`TySubstBase.lean`), `Typ.aref_subst` (`SubstArm.lean`), `aref_match` (`SpineMatch.lean`) |
+| §2.4 constructors of a GADT: the arguments of the type they build, fields that reach no more than the type built, (Branch-GADT) under every unifier ([not the most general one](../docs/formal/core.md#the-most-general-unifier-is-not-kept-by-substitution), [the free names of a dead branch](../docs/formal/core.md#a-dead-branch-keeps-no-typing-of-its-body)); `Exh` without the constructors that build no value | `Sig.res`, `Sig.ctorTyR` (`Syntax.lean`, `TyOps.lean`); `Sig.Holds`, `Sig.Inj`, `PatsTy`, `Sig.Builds` (`Typing.lean`); `Typ.aref` (`Rules.lean`); `Typ.aref_substT` (`TySubstBase.lean`), `Typ.aref_subst` (`SubstArm.lean`), `aref_match` (`SpineMatch.lean`) |
 | the checker's arm under the most general unifier, and a dropped dead arm | `Mgu`, `Typ.aref_mgu`, `Typ.aref_dead` (`ArefMgu.lean`) |
 | §1.4 `provide S impl`, `provide layer` | `recArms`, `T6c_tail`; `KnownLayer`, `chain`, `layer_typ`, `layer_answers` (`RecordHandler.lean`) |
 | (Try), (Handle) | `HPat`, `Catches`, `HCov`; `tryR`, `tryP`, `handle` |
@@ -166,25 +205,24 @@ operation, and `c.at i` ranges over the main thread and the children of live reg
 | `regions.md` §3.1 `Λ`, children step at any time | `Rgn`, `Cfg`, `CStep`, `CSteps` (`Semantics.lean`) |
 | L1 | `canonical_arrow`, `canonical_ref`, `canonical_eff`, `canonical_owner`, `canonical_hnd`, `canonical_errors`, `Typ.valueAny` (`CanonForms.lean`, `Canonical.lean`) |
 | (Let-Gen), (Let-Mono) | `Typ.letGen`, `Typ.let_` (`Rules.lean`) |
-| §2.3 (∀I), (∀I-Var), (Var) at an instance | `Typ.allI`, `Typ.allVar`, `LeI` (`Rules.lean`, `Typing.lean`); `Typ.allInv`, `Typ.elim`, `Tm.StandsAt` in `SubOk` (`AllElim.lean`) |
+| §2.3 (∀I), (∀I-Var), (Var) at an instance | `Typ.allI`, `Typ.allVar`, `LeLiveI` (`Rules.lean`, `Live/Mode.lean`); `Typ.allInv`, `Typ.elim`, `Tm.StandsAt` in `SubOk` (`AllElim.lean`) |
 | type substitution lemma | `Typ.substT`, with `Fits` (`TySubst.lean`, `SubstPat.lean`) |
 | L2 | `Typ.subst`, `Typ.instantiate`, `SubOk.one` (`Substitution.lean`) |
 | L3 | `ctx_typing` (`Lemma3.lean`); its `Refill` holds after any substitution that fits the term (`Context.lean`) |
-| L4 without the store: a value holds no more than its type shows | `Typ.holds` (`Held.lean`) |
-| §5.2 `reach_μ`; L4 | `Reaches`; `lemma_4`, `lemma_4_cell` (`Lemma4.lean`) |
+| §5.2 `reach_μ` | `Reaches` (`Lemma4.lean`) |
 | regions not yet created, renamed away; facts of the order of creation | `kill`, `Ty.YF`, `Tm.Below`, `Facts.age` (`Fresh.lean`, `Rules.lean`) |
 | `regions.md` §1.5 `Scope.run`, a `scope` whose body gives its argument the owner | `Const.scopeRun`, `RHead.scopeRun`, `scopeRun_body` (`Syntax.lean`, `Semantics.lean`, `ScopeRun.lean`) |
 | §2.3 `Scope.run (λ. e)` and (Scope) agree, with no facts about the region | `scopeRun_agrees`, `Typ.scopeRun_of_scope`, `Typ.scope_of_scopeRun` (`ScopeRun.lean`) |
 | (Scope) and (Inside) in a run-time configuration | `RtCtx`, `scope_body`, `inside_entails` (`ScopeStep.lean`) |
 | a configuration writes only regions that exist | `CfgBelow`, `Step.below` (`Below.lean`, `BelowStep.lean`) |
 | L6 | `lemma_6` (`Lemma4.lean`); the invariant of a configuration: `CfgTy` (`Soundness.lean`) |
-| §3.4 `⊢ Λ`: where a region may be written, the ancestors of a region | `Tm.Within`, `LocOk`, `Nest` (`Within.lean`, `Nest.lean`); kept by every step: `Nest.step`, `Nest.cstep` (`NestMain.lean`, `Regions.lean`) |
-| L5 | `Nest.nested` (`NestClose.lean`); in every reached configuration: `reach_nest`, `Nest.live` (`Regions.lean`) |
+| §3.4 `⊢ Λ` by use: the ancestors of a region, where the `inside` forms and handlers are | `LNest` (`Live/LNest.lean`); kept by every step: `LNest.step` (`Live/LNestMain.lean`); the stages of child work: `LCfgTy`, `LRgs` (`Live/LCfg.lean`, `Live/LRgs.lean`) |
+| L5 | `LNest.nested` (`Live/LNestClose.lean`) |
 | §2.7 obligations `{Provided {S} ϱ}` and `{Provided r ϱ}` over a row variable | `Elem.ob`, `Elem.obv`; `Row.obs` in `Const.ty` of `spawn`/`addFin` (`Syntax.lean`); `Row.hP`, `Row.disch`, `Stage.ObOut` in `Typ.hdl`, `Typ.hwith`, `Typ.scope`, `Typ.inside` (`Rules.lean`) |
 | an `inside` form is younger than the handlers around it | `Tm.Asc`, `CfgAsc`, `Step.asc` (`Asc.lean`, `AscStep.lean`) |
-| T4.1, T4.2 | `T4` (`Regions.lean`) |
-| T4.3: the handler of an operation is live | `handlerOf_has`, `T4_3` (`T43Main.lean`) |
-| T1 with `op_H` | `T1_regions` (`T43Main.lean`) |
+| T4′: T4.1 and T4.3 (the handler of an operation is live); T4.2 given up | `DeadUse` (`Regions.lean`), `SafeUse` (`Live.lean`), `T4'` (`Live/T4Live.lean`); `handlerOf_has` (`T43Main.lean`) |
+| a handler of an effect a region indexes (`Setup s`) is installed only where that region is live | `hdl_err_live` (`Live/Install.lean`) |
+| T1 with `op_H` | `T1_regions` (`Live/T1Regions.lean`) |
 | `elaboration.md` §0.1 λFlick⁺: `D_C ā`, dictionary records, projection with `∀`-instantiation, globals | `Ty.dict`, `Ty.spine`, `Sig.dict`, `Sig.glob` (`Syntax.lean`); `Tm.drec`, `Tm.glob`, `J.dfs`, `Typ.drec`, `Typ.dcons`, `Typ.dproj`, `Typ.glob`, `Roots`, `RootTy` (`Rules.lean`); `Step.glob` (`Semantics.lean`); `canonical_dict`, `dict_field` (`DictCanon.lean`); `glob_preservation` (`Preservation.lean`) |
 | Progress | `progress` (`ProgressMain.lean`) |
 | Preservation | `preservation` (`Preservation.lean`); of a configuration: `cstep_typed` (`Soundness.lean`) |
@@ -249,13 +287,13 @@ Rows are sets, `Elem → Prop`, with variables among their elements; equality of
 extensional, which is `≡` of §1.2. Every rule types its premises at the stage of its conclusion, and the
 subsumption `≤` is folded into the rules whose result may be an arrow or an `Eff`; (Sub)
 is then admissible (`Typ.sub`). With (Sub) this is equivalent to the `⊔` form of §2.3,
-and inversion stays a plain `cases`. (≤-Cap) is a premise of `Le.arrow` and `Le.eff`:
-`⌈τ⌉ ⊆ ⌈τ'⌉` of the whole value.
+and inversion stays a plain `cases`. `LeLive.arrow` and `LeLive.eff` compare the use
+stages `Stage.use ψ C`, so a qualifier may move into the runtime row of a supertype but
+not disappear.
 
-The premise of (Lam), (Task) and the fixpoint is `held Ψ Γ e ⊆ ⌈τ^C⌉`: `⌈Γ(y)⌉` of each
-free `y`, and also the run-time regions the body writes down and the cell types of its
-locations ([Lam and Task count runtime forms](../docs/formal/regions.md#lam-and-task-count-runtime-forms)). The substitution lemma keeps it because a substituted value holds no
-more than its scheme shows (`Typ.holds`, the part of L4 without the store).
+(Lam), (Task) and the fixpoint have no premise on what the body holds: typing by use asks
+the qualifier of a function only where it is called, and a closure that holds a
+capability without using it needs nothing of it.
 
 A thread steps in `⟨Λ, μ, e⟩`. `Λ` is a list of regions: live or closed, children and
 finalizers, both computations. A configuration is a main thread with `Λ` and `μ`, and
@@ -373,16 +411,14 @@ Each item narrows `core.md` or `regions.md` unless it says otherwise.
     every program, which has no run-time forms; T2 assumes the same of its configuration
     (`hb`, `hΨ`). T1 is stated with two blocked outcomes: a finished region body
     waiting for a child (deadlock freedom is λRT's), and a step that needs a region
-    that is not live; `T1_regions` drops the second by T4.
-20. **`⊢ Λ` is an invariant with ghost data.** `Nest` relates a configuration to the
-    ancestors `anc π` of each region, the regions `B ℓ` each cell may hold and the
-    thread `home π` of the `inside π` form; T4 needs no other change to the model.
-    A place in a thread names the regions of its base and of the `inside` forms
-    around it; a location sees through its cell exactly what its type names there.
-    `inside` forms stand only where the term evaluates, so a step neither copies nor
-    drops one, and only `scope` and closing change them. T4.2 is stated for every
-    reached configuration (live work reaches only live regions), which after a step
-    that closes `π` says that nothing that can step reaches `π`.
+    that is not live; `T1_regions` drops the second by T4′.
+20. **`⊢ Λ` is an invariant with ghost data.** `LNest` relates a configuration to the
+    ancestors `anc π` of each region and the thread `home π` of the `inside π` form; T4′
+    needs no other change to the model. `inside` forms stand only where the term
+    evaluates, so a step neither copies nor drops one, and only `scope` and closing change
+    them. What a thread names is not bounded, as typing by use gives up T4.2; T4.1 and
+    T4.3 follow from the stage of the redex instead: every region atom of the stage of a
+    hole is the thread's or a frame's, and so live (`hole_atm`, `LNest.atm_live`).
 21. **Obligations of handlers (regions.md §2.7) are row elements.** `Provided {S} ϱ` is
     an element `ob S ϱ` of a row of services, and `Provided r ϱ` over a row variable `r`
     an element `obv r ϱ`, which a substitution turns into the obligations of what `r` stands
@@ -409,7 +445,7 @@ Each item narrows `core.md` or `regions.md` unless it says otherwise.
   `Errors ∅`, which has no value, so `Σ₀` gives it nothing (`Sig.op_impl`, `root_answers`).
 - **A child keeps the handlers older than its owner.** `flick-model` keeps every handler around
   the registration; here `withs` leaves out one younger than the owner, whose region may close
-  while the child runs and whose arms it could not hold (`T4`). Nothing observes the difference
+  while the child runs and whose arms it could not use (`T4'`). Nothing observes the difference
   in a typed program: the obligation of the work keeps such an effect out of its row
   (`kid_dropped`).
 - **A child or a finalizer runs only `tail` arms.** An `abort` or `control` operation in one with no frame
@@ -455,9 +491,9 @@ that states the rule.
 - [what a resumed body gives back enters the scopes of the arm](../docs/formal/core.md#what-a-resumed-body-gives-back-enters-the-scopes-of-the-arm):
   a value moves into a deeper place; the handler's types name only regions older than it
   (`HCell`, `old_move`).
-- [Lam and Task count runtime forms](../docs/formal/regions.md#lam-and-task-count-runtime-forms): the premise of (Lam)/(Task) must count the run-time regions and cell
-  types written in the body, or L4 fails for `λx. (λy. ()) (cap π n)` (`held`,
-  `regions.md` §6).
+- [Lam and Task count runtime forms](../docs/formal/regions.md#lam-and-task-count-runtime-forms): the premise of (Lam)/(Task) of the capture discipline had to count the
+  run-time regions and cell types written in the body, or L4 failed for
+  `λx. (λy. ()) (cap π n)`; typing by use has neither the premise nor L4.
 
 ## λRT and T5
 
@@ -542,7 +578,7 @@ Simplifications of λRT:
     `release`). (c) No service is used after its build is released (`GoodUse`), under G11.
     `G11` is about the answering entry only: `Act.use π` names the owner whose handler answers
     the operation, and at such a step `π` is live. A child may carry
-    an entry of a closed `provide` that it never asks ([the answering provide must be live](../docs/formal/runtime.md#the-provide-liveness-premise-is-stronger-than-typing-gives)). The core development gives it as `T4_3`: the
+    an entry of a closed `provide` that it never asks ([the answering provide must be live](../docs/formal/runtime.md#the-provide-liveness-premise-is-stronger-than-typing-gives)). The core development gives it as the third conjunct of `T4'`: the
     region `q` that `handlerOf E Ef o k` finds for an operation is `Live`.
     A layer's build code runs in the providing fiber with the area `σ` as current owner; a
     failed build closes `σ` and makes the `provide` fail.
@@ -557,8 +593,8 @@ Its abstract part imports nothing from the core: λFlick⁺ is the structure `Ta
 typing, laws and run are fields, and T6(a) and T6(b) hold for every `Target`. The `Core*`
 modules instantiate `Target` with the core of `Formal/`, so T6 goes through the core with
 regions ([elaboration preserves captures and regions](../docs/formal/elaboration.md#t6a-without-captures-does-not-carry-over-to-the-core-with-regions)): λFlick⁺ is that core plus nominal dictionary records
-`D_C ā` with `∀`-fields ([dictionaries need polymorphic fields](../docs/formal/elaboration.md#dictionaries-need-polymorphic-fields-and-higher-rank-parameters)), and captures enter the elaboration source
-and `Target`. See [The core as the target](#the-core-as-the-target).
+`D_C ā` with `∀`-fields ([dictionaries need polymorphic fields](../docs/formal/elaboration.md#dictionaries-need-polymorphic-fields-and-higher-rank-parameters)), and qualifiers enter the elaboration source
+and `Target`, typed by use as in the core. See [The core as the target](#the-core-as-the-target).
 
 | `elaboration.md` | Lean |
 | - | - |
@@ -583,7 +619,7 @@ and `Target`. See [The core as the target](#the-core-as-the-target).
 | §0.1 elaborated terms in the core | `Tr`, `TrD`, `Corr`, `Tr.free`, `corr_held` (`Elab/CoreTr.lean`) |
 | §0.1 λFlick⁺ as `Target`, the declarations of the program in `Σ` | `Real`, `Has`, the laws `has_*` (`Elab/CoreLaws.lean`, `Elab/CoreDict.lean`), `typingTarget` (`Elab/CoreT6a.lean`) |
 | T6(a) for the core | `T6a_core`, `T6a_closed`, `T6a_do_core`, `T6a_sugar_core` (`Elab/CoreT6a.lean`) |
-| an elaboration with its premises closed by `θ`, `ρ` ([dictionaries typed closed in the run target](../docs/formal/elaboration.md#typing-the-whole-term-does-not-type-its-dictionaries-in-the-empty-context)) | `T6a_close`, `ent_close`, `closed_typed`, `Tm.Skel`, `fill_dsubst` (`Elab/Close.lean`); `Tm.dsubst`, `Tm.DB`, `Tm.dsubst_congr` (`Elab/Source.lean`); `lift_inst`, `up_lift`, `heldS_subst`, `Prog.ConstsClosed`, `Prog.CtorsClosed` (`Elab/CloseTy.lean`); `Cn.Ground` (`Elab/Syntax.lean`) |
+| an elaboration with its premises closed by `θ`, `ρ` ([dictionaries typed closed in the run target](../docs/formal/elaboration.md#typing-the-whole-term-does-not-type-its-dictionaries-in-the-empty-context)) | `T6a_close`, `ent_close`, `closed_typed`, `Tm.Skel`, `fill_dsubst` (`Elab/Close.lean`); `Tm.dsubst`, `Tm.DB`, `Tm.dsubst_congr` (`Elab/Source.lean`); `lift_inst`, `up_lift`, `Prog.ConstsClosed`, `Prog.CtorsClosed` (`Elab/CloseTy.lean`); `Cn.Ground` (`Elab/Syntax.lean`) |
 | the hypotheses of T6 hold together: a witness program | `P`, `S`, `N`, `Sg`, `root`, `coherent`, `real`, `rootTy`, `realRun`, `witness_T6a`, `witness_T6a_do`, `witness_T6b`, `witness_T6b_example`, `witness_T6b_closed`, `witness_T6b_open` (`Elab/Witness/`, `T6b.lean`), `consts_closed` (`Consts.lean`); the bodies `seqFlatMap`, `seqEach`, `seqToList`, `iterL` (`Seq.lean`), `uncB`, `frBody`, `eqRec` (`Unc.lean`); arms for every constructor are exhaustive, `exh_ctors` (`Elab/Exh.lean`) |
 | the lazy `Monad Eff` in the core ([Prelude schemes translated with CRow qualifiers](../docs/formal/elaboration.md#value-qualifiers-in-prelude-schemes)), `Eff q b` with the field `eff ∅ ∅ b {q}` | `effT`, `effField`, `effPure`, `effMap2`, `effBind`, `typ_effPure_tr`, `typ_effMap2_tr`, `typ_effBind_tr` (`Elab/LazyEff.lean`) |
 | the run of dictionaries in the core: closed derivations evaluate, `≈` keeps values | `RealRun`, `ent_eval`, `eqv_sem` (`Elab/CoreDictSem.lean`); `Eval`, `SemEq` (`Elab/CoreEval.lean`); `PStep`, `decomp_eq` (`Decomp.lean`) |
@@ -614,17 +650,18 @@ Simplifications:
    variable gives its instances (`Elab.varAll`). Its types are the first-order
    `Ty` with the arrow `a →φ^q b` (`Ty.arr`, [source arrow is a separate type form](../docs/formal/elaboration.md#the-source-arrow-was-a-reserved-constructor)), whose qualifier is a capture row
    written as a type (a variable, `cnil`, `cun`); `Bool` and `Option` are reserved
-   constructors (`boolTy`, `optTy`). (Lam) and (Let-Sig-Dict) show what a closure holds,
-   `heldS` ([elaboration preserves captures and regions](../docs/formal/elaboration.md#t6a-without-captures-does-not-carry-over-to-the-core-with-regions), [dictionary arrows carry the let qualifier](../docs/formal/elaboration.md#the-dictionary-function-of-let-sig-dict-holds-what-the-right-hand-side-holds)); qualifiers match exactly, there is no (≤-Cap). (Sub) is kept for stages only: a value has any stage, an application,
+   constructors (`boolTy`, `optTy`). Typing is by use: (App) of a runtime arrow asks its
+   stage to keep the qualifier live (`Stage.Keeps`), and (Lam) and (Let-Sig-Dict) ask
+   nothing of what a closure holds; qualifiers match exactly, there is no (≤-Cap). (Sub) is kept for stages only: a value has any stage, an application,
    a `let` and a `match` run at one stage `φ`, the arrow applied and the right side of a
    `let` at `ψ ⊑ φ` ([constrained let keeps the right-hand side effect](../docs/formal/elaboration.md#let-sig-dict-lost-the-effect-of-the-right-hand-side)). A term at `P` elaborates at any stage (`Elab.anyStage`), and
    renaming term variables keeps an elaboration (`Elab.rename`, weakening `Elab.shift`).
 7. `Target` is an interface, not λFlick⁺: its types are monotypes, stage arrows and `D_Q`,
    a context entry is `∀ᾱ. t`, and a `∀`-field of `D_Q` shows only through the law `meth`
    (projection with instantiation). Constants of Γ₀ are typed by their schemes (`const`).
-   Arrows carry qualifiers: `lam` and `lamD` have the held premises of the source, and
-   the arrows of methods, constants, instances and `struct_C` hold nothing (`cnil`), so the
-   `q` of their schemes is never read.
+   Arrows carry qualifiers: `app` has the use premise of the source, and the arrows of
+   methods, constants, instances and `struct_C` need nothing live (`cnil`), so the `q` of
+   their schemes is never read.
    The types of instances (`inst`: `I : ∀β̄. D_ctx →P
    D_head`, by (Instance) of §2.5 and K7) and of (Struct)/(Prim) dictionaries are laws.
    `lamD l` binds `l` premises at once, the `i`-th argument being the premise `i`;
@@ -650,7 +687,7 @@ Simplifications:
    row is a type: a variable, `cnil`, the row `{t}` of one service or error type `t` with
    constructor `c` (`rnm c t`) or a union `ρ₁ + ρ₂` (`run`), so `timeout` is at
    `R r ({TimeoutError} + e)`; a row may be the argument of a type (`FieldCodec (rd + r) a`,
-   `Exit e a`), which the model writes as data. `pair`, `unc n` and `each_P` have no Prelude name and are
+   `Exit e a`), which the model writes as data. `pair`, `unc n`, `each_P` and `each_R` have no Prelude name and are
    written in `Sugar.lean`. `from_result : ∀e a. Result (Errors e) a →R⟨∅; e⟩ a` is the
    generated scheme, and `e?` takes it at the row of errors of `e` (`tryResult_elab`, at the
    stage `R⟨∅; ε⟩`): its `raise` of `Errors e` adds the atom `e` to the row, which the stage
@@ -661,16 +698,17 @@ Simplifications:
    supplies is a variable of the scheme, a result shows what the arguments it holds reach
    (`flat_map : (a →^c m e b) →P (m d a →^(c ∪ e) m ((c ∪ e) ∪ (d ∪ a)) b)`, `bindTy`), and
    a block of `do` or `for … yield` has the row its desugaring shows (`∃q` in `do_elab`,
-   `gen_elab`, `T6a_do`). A lambda of the sugar takes as its qualifier a row that covers
-   its context (`ctxRow`). The checker's rules are the judgements `DoOk`, `GenOk` and
+   `gen_elab`, `T6a_do`). A lambda of the sugar has the qualifier `cnil`: what it holds is
+   not asked. The checker's rules are the judgements `DoOk`, `GenOk` and
    `LoopOk`; `?` and `s; rest` are premises of their lemmas. Patterns are variables (and `_`):
    a refutable pattern needs `match`, which the source lacks. The values of a group
    `p₁ <- e₁ and … and pₙ <- eₙ` form a left-nested tuple built by `map2 pair`, and
    `λ(p₁, …, pₙ). e` is `unc n (λp₁ … pₙ. e)` with a constant `unc n` per arity; the checker
    uses flat tuples with the same curried patterns. The clauses of `for … yield` run at `P`
    (Sync calls are not modelled) and the loop of `for … do` at its stage, with the constant
-   `Seq.each_P` at `P` and the one `Seq.each_effect : ∀c d a r e. …` at every `R r e`, used at
-   the rows of the loop ([for-do loops elaborate to Seq.each per stage](../docs/formal/elaboration.md#the-loop-rule-l-was-missing)). Each source of `for` goes through `iter` ([for sources elaborate through iter](../docs/formal/elaboration.md#g-elaborated-the-for-source-without-iter)). Only the
+   `Seq.each_P` at `P` and the one `each_R : ∀c d a r e. …` at every `R r e`, used at the rows
+   of the loop; neither is a Prelude name, as `Seq.each_effect` read through elision needs the
+   sequence's qualifier live, which the checker's loop does not ([for-do loops elaborate to Seq.each per stage](../docs/formal/elaboration.md#the-loop-rule-l-was-missing)). Each source of `for` goes through `iter` ([for sources elaborate through iter](../docs/formal/elaboration.md#g-elaborated-the-for-source-without-iter)). Only the
    last step of `?` on an `Option` is modelled, `let y = e? in b` ⇝ `match`; the A-normal
    form before it is not.
 10. The core instance. `⟦R r e⟧ = rt ⟦r⟧ (⟦e⟧ ∪ ⌈⟦e⟧⌉ ∪ ε)` with `ε` every name (`allNames`): a row
@@ -734,20 +772,19 @@ Simplifications:
   `Prog.consts` is never read: the laws `meth` and `const` use `cnil`, so `Prog` needs no
   well-formedness hypothesis for it. `Scheme.reach` is the reach of `Scheme.tr s` below its
   `k` binders, so it equals the core's `Scheme.reach` of the translation.
-- **Judgement** (`Elab/Source.lean`). `Exp.Free` and `Tm.Free` are the free term variables,
-  and `heldS Γ e n := ∃ x s, e.Free x ∧ Γ[x]? = some s ∧ s.reach n`. `Δ` adds nothing,
-  because `⌈D_Q⌉ = ∅`.
-  - (Lam) has the premise `heldS Γ (.lam b) ⊆ ⌈arr φ a t q⌉`.
-  - (Let-Sig-Dict) has the premise `σ.ctx ≠ [] → heldS (Γ↑σ.k) e ⊆ ⌈σ.ty⌉ ∪ ⌈σ.q⌉`.
+- **Judgement** (`Elab/Source.lean`). `Exp.Free` and `Tm.Free` are the free term variables.
+  `Ty.Shown t n` is a variable a translated value of `t` reaches, without the rows of the
+  stages of its arrows; `Ty.Keeps r n` says the row `r` keeps `n` live (an index of a named
+  element, as `Scope s` keeps `s`, or a capture row written in the row, as `Live q`), and
+  `Stage.Keeps φ q` that the row of services of `φ` keeps every variable `q` shows.
+  - (App) has the premise `ψ = P ∨ ψ = φ ∧ φ.Keeps q` of the arrow `a →ψ^q b` it applies.
+  - (Lam) and (Let-Sig-Dict) have no premise on what the closure holds.
   - There is no (≤-Cap) in the source: qualifiers match exactly. This is a simplification;
     T6(a) does not need completeness.
-  - Elaboration adds no term variables (`Elab.free`: `Elab … e' → e'.Free x → e.Free x`),
-    so the held premises of the source give those of the target (`heldT_of`), and
-    renaming keeps them (`heldS_rename`, `Weaken.lean`).
 - **`Target`.** `TTy.arr φ a b q`. `dicts q qs t` puts `q` on every dictionary arrow, and
   `Scheme.tr s = ⟨s.k, dicts s.q s.ctx (.mono s.ty)⟩`.
-  - The `lam` law has the held premise over `Tm.Free`.
-  - The `lamD` law has the premise `qs ≠ [] → heldT Γ e ⊆ ⌈t⌉ ∪ ⌈q⌉`.
+  - The `app` law has the use premise of (App); `lam` and `lamD` have none on what the
+    body holds.
   - `meth`, `const`, `inst`, `strct` and `prim` use `q = cnil`.
   - The `Rel` fields take typing premises, because the run of the core relates closed typed
     terms. `load_rel` takes the typings of two fillings of a skeleton and of the dictionaries
@@ -758,7 +795,7 @@ Simplifications:
 
 #### Dictionary records in the core
 
-λFlick⁺ is the core of `Formal/` with dictionary records and globals; T1–T4, T4.3 and
+λFlick⁺ is the core of `Formal/` with dictionary records and globals; T1–T3, T4′ and
 `T1_regions` hold for it with the same statements, `RootTy` covering the globals. Four choices
 keep the proofs of the core: projection is the core's `proj`, globals are a term form, fields
 are schemes, and fields need not be values.
@@ -778,10 +815,10 @@ are schemes, and fields need not be values.
 - **Typing** (`Rules.lean`). A judgment form `J.dfs fs` types the spine field by field:
   `Typ.dcons` types a field at its scheme as (Let-Gen) types its right-hand side, at `P`.
   `Typ.drec`: `S.dict c = some (k, fs)`, `us.length = k`, the spine at
-  `fs` instantiated by `us`, `r.NoIns` and `held Ψ Γ (drec c r) ⊆ ⌈dict c ūs⌉ = ∅`
-  (it holds nothing); conclusion `drec c r : dict c ūs` at any stage. `Typ.dproj`:
+  `fs` instantiated by `us` and `r.NoIns`; conclusion `drec c r : dict c ūs` at any
+  stage. `Typ.dproj`:
   `e : dict c ūs`, `fs.lookup l = some s`, and (Var) at the instantiated scheme of
-  `s`: `ts`, its facts, `Le`. `Typ.glob` is (Var) at `S.glob g`.
+  `s`: `ts`, its facts, `LeLive`. `Typ.glob` is (Var) at `S.glob g`.
 - **Globals.** `Tm.glob g` steps to its body in a pure step, `Step.glob`, with label
   `pure`. The bodies are a table next to `Σ₀`: `root : Roots` has `svc` (`Σ₀`) and
   `glob`. `RootTy` has `glob` (a body is closed source code without any `Site` and is
@@ -829,7 +866,7 @@ for the core, as instances of `T6a`, `T6a_do` and `T6a_sugar`.
   the last arm `_` makes `Covers` immediate, and `None` need not be declared.
 - **Typing.** `Has Γ Δ e t φ := ∀ Ψ Θ Γc γ δ, Corr Γc Γ Δ γ δ → ∃ e', Tr γ δ e e' ∧
   Typ S Ψ Θ Γc e' (.ex ⟦t⟧ ⟦φ⟧)`. `Corr` says `Γc[γ x]? = ⟦Γ[x]?⟧` and
-  `Γc[δ k]? = D_{Δ[k]?}`, `none` included, so the held premises transfer (`corr_held`).
+  `Γc[δ k]? = D_{Δ[k]?}`, `none` included.
 - **Hypotheses** (`Real`), on the signature only: a record type per class and
   number of parameters with its slots (`N.slot i : D_{Sᵢ}`, `Prog.super` of `⟨C, vars n⟩`),
   for the class's own parameters a field per method at its scheme with the own variables
@@ -847,9 +884,9 @@ for the core, as instances of `T6a`, `T6a_do` and `T6a_sugar`.
 - **Two targets.** `typingTarget` has an empty run (`Rel = True`, no steps): T6(a) reads
   no run. `runTarget` has the run of the core with the same laws.
 - **No value qualifier on other types.** `τ^q` on types other than arrows and `Eff` is not
-  in the core: it would be a new type former with its (≤-Cap) in `Le`, and every case
-  analysis on `Ty` and `Le` would change (substitution, `⌈·⌉`, canonical forms, shapes and
-  patterns, `held`, preservation, T4 and T4.3). Instead the hidden qualifier of `Eff` and
+  in the core: it would be a new type former with its use stage in `LeLive`, and every case
+  analysis on `Ty` and `LeLive` would change (substitution, `⌈·⌉`, canonical forms, shapes
+  and patterns, preservation and T4′). Instead the hidden qualifier of `Eff` and
   `Seq` is a parameter of kind `CRow` of the type (simplification 15), the schemes of
   `Sugar` show it (`elaboration.md` gives the translation of the checker's schemes,
   [Prelude schemes translated with CRow qualifiers](../docs/formal/elaboration.md#value-qualifiers-in-prelude-schemes)), and a lazy body is `MkEff (task …)` of the nominal type `Eff q b`

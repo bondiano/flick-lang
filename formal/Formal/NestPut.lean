@@ -84,46 +84,4 @@ theorem Cfg.at_put_ne {c : Cfg} {i i' : Option (Nat × Nat)} {e₀ e : Tm} (h : 
     (c.put i e).at i' = c.at i' := by
   rw [Cfg.at_put h]; simp [hi]
 
-/-- A thread replaced, the regions and the ancestors kept: the cells and the
-locations may change. -/
-theorem Nest.put_local {Ψ Ψ' : List Ty} {c : Cfg} {μ' : List Tm} {anc B B' home i e e'}
-    (hn : Nest Ψ c anc B home) (hi : c.at i = some e) (hl : ∀ A l, LocOk Ψ B A l → LocOk Ψ' B' A l)
-    (hh : ∀ p ℓ, HCell Ψ p ℓ → HCell Ψ' p ℓ) (h' : e'.Within Ψ' B' anc (baseOf anc i)) (hf : ∀ q, e'.Has (.frame q) ↔ e.Has (.frame q))
-    (hc : ∀ (l : Nat) (v : Tm), μ'[l]? = some v → v.Within Ψ' B' anc (B' l) ∧ v.NoIns) :
-    Nest Ψ' ((⟨c.rgs, μ', c.main⟩ : Cfg).put i e') anc B' home := by
-  have hi₁ : (⟨c.rgs, μ', c.main⟩ : Cfg).at i = some e := by
-    rcases i with _ | ⟨r, j⟩
-    · exact hi
-    · exact Cfg.at_some.mpr (Cfg.at_some.mp hi)
-  have hat : ∀ i', (((⟨c.rgs, μ', c.main⟩ : Cfg).put i e').at i' = if i' = i then some e' else c.at i') := by
-    intro i'; rw [Cfg.at_put hi₁]
-    rcases i' with _ | ⟨r, j⟩
-    · rfl
-    · split
-      · rfl
-      · apply Option.ext; intro k; rw [Cfg.at_some, Cfg.at_some]
-  have hlive : ∀ q, Live ((⟨c.rgs, μ', c.main⟩ : Cfg).put i e').rgs q ↔ Live c.rgs q :=
-    fun q => Cfg.put_live
-  refine ⟨hn.self, hn.le, fun q hq => hn.chain q ((hlive q).mp hq),
-    fun q x hq hx => (hlive x).mpr (hn.live q x ((hlive q).mp hq) hx), fun i' k hk => ?_,
-    fun q hq => ?_, fun r g hg hgl f hf' => ?_, by rw [Cfg.put_mem]; exact hc⟩
-  · rw [hat] at hk
-    split at hk
-    · subst i'; cases hk
-      refine ⟨h', fun q hq => ?_⟩
-      obtain ⟨h₁, h₂⟩ := (hn.thread i e hi).2 q ((hf q).mp hq)
-      exact ⟨h₁, (hlive q).mpr h₂⟩
-    · obtain ⟨h₁, h₂⟩ := hn.thread i' k hk
-      exact ⟨h₁.mono hl hh fun _ _ => rfl, fun q hq => let ⟨a, b⟩ := h₂ q hq; ⟨a, (hlive q).mpr b⟩⟩
-  · obtain ⟨k, hk, hkq⟩ := hn.home q ((hlive q).mp hq)
-    rw [hat]
-    by_cases hh : home q = i
-    · rw [if_pos hh]; rw [hh] at hk; rw [hi] at hk; cases hk
-      exact ⟨e', rfl, (hf q).mpr hkq⟩
-    · rw [if_neg hh]; exact ⟨k, hk, hkq⟩
-  · obtain ⟨g₀, h₀, h₁, h₂⟩ := Cfg.put_get hg
-    rw [h₂] at hf'
-    obtain ⟨h₃, h₄⟩ := hn.fins r g₀ h₀ (h₁ ▸ hgl) f hf'
-    exact ⟨h₃.mono hl hh fun _ _ => rfl, h₄⟩
-
 end Flick

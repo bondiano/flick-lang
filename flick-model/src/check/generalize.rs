@@ -6,6 +6,7 @@
 use std::collections::{BTreeSet, HashMap};
 use std::rc::Rc;
 
+use super::regions::regions_of;
 use super::{Checker, Solved};
 use crate::syntax::Name;
 use crate::types::{Caps, Fields, Kind, Row, Scheme, Stage, Type, Var};
@@ -82,7 +83,12 @@ impl Checker<'_> {
             let fact = (substitute_caps(c, &map), substitute(r, &map));
             self.regions.facts.push(fact);
         }
-        let body = substitute(&self.implicit(&s.body, &Caps::default()), &map);
+        let body = self.elide(
+            &s.body,
+            &Caps::default(),
+            &regions_of(&s.vars, &BTreeSet::new()),
+        );
+        let body = substitute(&body, &map);
         self.give_provided(&body);
         body
     }

@@ -1,4 +1,4 @@
-// Every way a scoped resource could outlive its scope: the result, a
+// Every way a scoped resource could be used after its scope: the result, a
 // callback, a task, a container, a wrapper, an outer cell and an error.
 module App.Escape exposing (..)
 
@@ -110,16 +110,16 @@ let empty_cell_out path =
     cell
   }
   ignore out
-//~ FLICK-G001 @26:3-26:36
-//~ FLICK-G001 @32:3-32:37
+//~ FLICK-G002 @26:10-26:34 this uses region `s`
+//~ FLICK-G002 @32:13-32:37 this uses region `s`
 //~ FLICK-G002 @37:22-37:49
-//~ FLICK-G001 @43:4-43:38
+//~ FLICK-G002 @43:14-43:38 this uses region `s`
 //~ FLICK-G002 @58:25-58:62
 //~ FLICK-G002 @63:24-63:60
 //~ FLICK-G002 @71:19-71:28
-//~ FLICK-G002 @97:24-97:57
-//~ FLICK-G001 @79:19-79:52
+//~ FLICK-G002 @96:5-97:60 region `s` ends with its `scope`
+//~ FLICK-G002 @79:26-79:50 this uses region `s`
 //~ FLICK-E005 @85:7-85:39
 //~ FLICK-G002 @108:5-110:9
 //~ FLICK-G004 @102:29-102:56
-//~ FLICK-G002 @51:5-51:43
+//~ FLICK-G002 @49:5-52:20 region `s` ends with its `scope`

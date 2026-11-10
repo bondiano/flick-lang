@@ -1,6 +1,6 @@
-// A task holds what its result holds, as a function does: a region shown
-// only in its result or its row does not hide the handle it captured, so
-// the task cannot pass where that region is not allowed.
+// A task that uses a region its type does not keep live is rejected where
+// it uses it; one that only holds what its result holds, as `forget_result`
+// awaiting a task of `Handle s`, may go where that region is not allowed.
 module App.EffResult exposing (..)
 
 type Handle (s : Region)
@@ -47,8 +47,6 @@ let in_row () = scope outer {
     ignore (Fiber.spawn outer report t)
   }
 }
-//~ FLICK-G001 @16:23-16:48
-//~ FLICK-G003 @26:13-26:24
-//~ FLICK-G001 @39:19-39:44
-//~ FLICK-G001 @46:50-46:72
+//~ FLICK-G002 @23:7-23:20 this uses region `inner`
+//~ FLICK-G002 @36:7-36:20 this uses region `inner`
 //~ FLICK-T008 @47:38-47:39

@@ -1,6 +1,6 @@
-// A closure compared late still holds what it uses: a scoped file is no
-// capture a position without captures allows.
-module App.LateCaptures exposing (..)
+// A closure compared late may hold a scoped file that nothing it runs
+// uses: a position without captures takes it inside the `scope`.
+module App.LateHolding exposing (..)
 
 type alias Path = String
 
@@ -23,4 +23,3 @@ let held path = scope {
   let collect = { flush = fun outputs -> ignore (file, Ref.set seen (Ref.get seen ++ outputs)) }
   take collect
 }
-//~ FLICK-G001 @24:8-24:15 this value holds region `s`, but the expected type `Batch String` holds no captures

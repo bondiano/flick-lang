@@ -10,7 +10,8 @@ variable {S : Sig}
 
 /-- How the stage of the hole relates to the stage of `E[e]`: services may
 grow by the effects of handlers, errors only under a `try` frame, and a pure
-context has a pure hole. -/
+context has a pure hole. In the live discipline a runtime form of a handler also
+provides its own region (`Frame.provides`). -/
 structure ERel (E : List Frame) (φ' φ : Stage) : Prop where
   svc : Row.Sub φ'.svc (Row.union φ.svc (domE E))
   err : (∀ F ∈ E, ¬ F.isTry) → Row.Sub φ'.err φ.err

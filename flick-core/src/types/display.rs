@@ -5,6 +5,7 @@ use std::fmt::Write;
 
 use super::Checker;
 use super::lang::Lang;
+use super::regions::{has_live, strip_live};
 use super::shown::short_form;
 use super::ty::{Binder, Effects, Row, Type};
 use super::unify::Store;
@@ -20,9 +21,15 @@ impl Checker<'_> {
             qualified: false,
             zero: true,
         };
-        let held = self.held_now(&self.zonk(t));
+        let held = self.held_now(&self.unlive(t));
         printer.print(&short_form(&held, &self.store), Prec::Top, &mut out);
         out
+    }
+
+    /// `t` zonked, without the `Live` of `regions/live.rs`: no row writes it.
+    fn unlive(&self, t: &Type) -> Type {
+        let t = self.zonk(t);
+        if has_live(&t) { strip_live(&t) } else { t }
     }
 
     /// `t` with its `forall` and its qualifiers, for a message about them and
@@ -34,7 +41,7 @@ impl Checker<'_> {
             qualified: false,
             zero: false,
         };
-        printer.print(&self.held_now(&self.zonk(t)), Prec::Top, &mut out);
+        printer.print(&self.held_now(&self.unlive(t)), Prec::Top, &mut out);
         out
     }
 
@@ -47,7 +54,7 @@ impl Checker<'_> {
             qualified: true,
             zero: false,
         };
-        printer.print(&self.zonk(t), Prec::Top, &mut out);
+        printer.print(&self.unlive(t), Prec::Top, &mut out);
         out
     }
 
@@ -74,6 +81,13 @@ impl Checker<'_> {
 
 /// A closed type, as an interface stores it, in source syntax.
 pub fn show_type(t: &Type) -> String {
+    let stripped;
+    let t = if has_live(t) {
+        stripped = strip_live(t);
+        &stripped
+    } else {
+        t
+    };
     let store = Store::default();
     let mut out = String::new();
     Printer {
@@ -89,6 +103,13 @@ pub fn show_type(t: &Type) -> String {
 /// written that way gets back (`shown`). A parameter or a field on its own
 /// keeps its `forall`: use [`show_type`] for those.
 pub fn show_signature(t: &Type) -> String {
+    let stripped;
+    let t = if has_live(t) {
+        stripped = strip_live(t);
+        &stripped
+    } else {
+        t
+    };
     let store = Store::default();
     let mut out = String::new();
     Printer {

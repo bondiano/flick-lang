@@ -107,8 +107,13 @@ theorem KidCov.step {root : Roots} {Λ : List Rgn} {μ : List Tm} {e : Tm} {l : 
       · exact .inl (List.mem_append_left _ hk')
       · exact .inl (List.mem_append_right _ hk')
       · simp at hk'; subst hk'
-        exact .inr ⟨_, .rt Row.none Row.none, .app (.const (ι := { (default : CArg) with s := .rg _ })
-          trivial .refl) .cap (Stage.le_refl _) .refl, fun N h => h.elim⟩
+        -- `op (cap p)` at the stage of its owner: the live `op` needs its region there
+        rename_i p _ _
+        have hcov : ∀ q, (Stage.rt (Row.scope (.rg q)) Row.none).Cov S root := fun _ N h => by
+          simp [Stage.svc, Row.scope, Row.ofCaps] at h
+        exact .inr ⟨_, .rt (Row.scope (.rg p)) Row.none,
+          .app (.const (ι := { (default : CArg) with s := .rg p }) trivial .refl) .cap
+            (by rw [Stage.use_none]; exact Stage.le_refl _) .refl, hcov _⟩
     | finRun hg _ _ _ hfs =>
       refine setold hg fun k hk' => .inl ?_
       simp only [List.mem_append, hfs] at hk' ⊢
@@ -156,7 +161,7 @@ theorem cstep_cov {root : Roots} {Ψ : List Ty} {c c' : Cfg} {t : Ty} {φ : Stag
     have hkb := (hb.rgs _ _ hg).1 _ hkm
     have hkA := ha.rgs _ _ hg _ (List.mem_append_left _ hkm)
     obtain ⟨X, hμ', hk', hX⟩ := preservation hroot hkt hμ hkb hb.mem hΨ hs'
-    obtain ⟨hb', hl'⟩ := hs'.below hroot ⟨hkb, hb.mem, hb.rgs⟩
+    obtain ⟨hb', hl'⟩ := hs'.below hroot.below ⟨hkb, hb.mem, hb.rgs⟩
     obtain ⟨ha', hka⟩ := hs'.asc hroot ⟨hkA, ha.rgs, ha.mem⟩ hkb
     obtain ⟨m, hm, hkm'⟩ := hcg.rgs _ _ hg _ (List.mem_append_left _ hkm)
     obtain ⟨hgs', hgc', hgg, hkc⟩ := hs'.caught hroot (n := m)

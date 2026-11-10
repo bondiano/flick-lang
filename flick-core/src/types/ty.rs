@@ -215,9 +215,11 @@ fn closed_labels(row: &Type) -> Option<Vec<&str>> {
     Some(labels)
 }
 
-/// Whether `services` and `errors` make a Sync stage.
+/// Whether `services` and `errors` make a Sync stage. `Live` is no service:
+/// what a stage needs live runs nothing.
 pub fn sync_rows(services: &Type, errors: &Type) -> bool {
-    closed_labels(services).is_some_and(|l| {
+    closed_labels(services).is_some_and(|mut l| {
+        l.retain(|l| *l != super::LIVE);
         !l.is_empty()
             && l.iter().all(|l| {
                 SYNC_SERVICES

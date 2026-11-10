@@ -17,7 +17,7 @@ use the current compiler to write an interface for a new package.
 
 ```json
 {
-  "iface-version": 11,
+  "iface-version": 12,
   "compiler": "0.1.0",
   "module": "App.Shapes",
   "exports": [

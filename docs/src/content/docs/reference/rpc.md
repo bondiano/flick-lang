@@ -176,7 +176,7 @@ A client starts one worker; calls over it share that worker.
 `Rpc.handler serialization group handlers` serves the group as an HTTP
 handler, a POST per call, that `Http.Router` mounts like any other route;
 `handler_websocket` is the same for a `GET` route of WebSockets. The
-handler holds the region `s` of the scope that made it, and so do the
+handler needs the region `s` of the scope that made it live, and so do the
 routes and the router over it: one of them returned out of that scope is
 `FLICK-G001`.
 

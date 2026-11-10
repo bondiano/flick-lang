@@ -1,6 +1,6 @@
 ---
 title: "Type-level programming and eDSLs"
-source_hash: d773d206dd72a7fe
+source_hash: b286bedd7df24636
 ---
 
 Flick's SQL, UI and CLI DSLs — `sql params { … }`, `ui { … }` with `component` declarations, and `cli "name" { … }` — are libraries over one type core: rows, labels, finite kinds, HKT and multiparameter classes with functional dependencies. Their backends are PostgreSQL, React (in the browser and on the server) and Effect CLI.
@@ -106,7 +106,7 @@ let save_button props = ui {
 
 `ui { … }` is a block in which the names of `Ui` need no `Ui.`: a local binding wins, then a name of `Ui`, then the module's own names. It compiles to the same IR as the calls `Ui.button … [Ui.text …]`, and applying a `Ui.Component p` to props inside it is `Ui.component value props`, including `props |> value`. JSX is not part of the language.
 
-Props are exact records: a missing field, an unknown one or a wrong type is an error. Children are an ordinary argument of the chosen type — `List Ui`, `Ui`, `Option Ui`, named places, `NonEmpty Tab` — and a key is metadata given with `Ui.keyed`, never a prop. Handlers keep their captures: a button whose handler holds a file of a scope cannot leave that scope (`FLICK-G001`). `Ui.text` inserts text through a safe channel; a URL is a `SafeUrl` and raw HTML a `SanitizedHtml`, which a plain `String` never is.
+Props are exact records: a missing field, an unknown one or a wrong type is an error. Children are an ordinary argument of the chosen type — `List Ui`, `Ui`, `Option Ui`, named places, `NonEmpty Tab` — and a key is metadata given with `Ui.keyed`, never a prop. Handlers keep what they need: a button whose handler uses a file of a scope cannot leave that scope (`FLICK-G001`). `Ui.text` inserts text through a safe channel; a URL is a `SafeUrl` and raw HTML a `SanitizedHtml`, which a plain `String` never is.
 
 ### Atoms, views and components
 
@@ -176,7 +176,7 @@ let greet = cli "greet" {
 | `subcommand e` | A nested command, `e : Cli.Command r e` |
 | `handle f` | The handler, `f : Options ->{r; e} Unit`; at most one |
 
-A `///` comment right above a `flag`, `arg` or `subcommand` is its help text. The handler gets an exact record with a field per `flag` and `arg`, so a typo in its pattern is an ordinary type error. The type decides parsing and multiplicity: `Bool` is a switch, `T` is required unless it has a default, `Option T` is optional and takes no default, `List T` and `NonEmpty T` repeat (for an `arg`, only the last). A value is parsed by the class `Cli.Value T`. The services and errors of a command are the union of the rows of its handler and subcommands; a command keeps the captures of its handler (`FLICK-G001`).
+A `///` comment right above a `flag`, `arg` or `subcommand` is its help text. The handler gets an exact record with a field per `flag` and `arg`, so a typo in its pattern is an ordinary type error. The type decides parsing and multiplicity: `Bool` is a switch, `T` is required unless it has a default, `Option T` is optional and takes no default, `List T` and `NonEmpty T` repeat (for an `arg`, only the last). A value is parsed by the class `Cli.Value T`. The services and errors of a command are the union of the rows of its handler and subcommands; a command needs what its handler uses (`FLICK-G001`).
 
 `Cli.run command args` parses the arguments with Effect's CLI and only then runs the handler in the current fiber. `--help`, `--version` and `--completions` run no handler; invalid input fails with `Cli.CliError` and runs no handler. Duplicate names, a default on `Option`, a many-valued `arg` before the last, a repeated `description` or `handle`, a command with neither a handler nor subcommands, and an `arg` beside subcommands are compile errors of the plugin (`std/L001`–`std/L007`). See [Command-line applications](../../reference/cli-dsl/).
 

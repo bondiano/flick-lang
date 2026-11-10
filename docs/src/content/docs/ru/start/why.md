@@ -1,7 +1,7 @@
 ---
 title: Зачем Flick
 description: Какие гарантии даёт Flick, каковы их ограничения и кому язык пока не подходит.
-source_hash: 71ac4276a85f03cf
+source_hash: 1088b1d76d59f8e7
 ---
 
 Flick — один язык для всего приложения: браузера, сервера и командной строки. Его
@@ -55,9 +55,9 @@ let load_view id =
   позволяет сохранить доступ к ним за пределами этой области.
 
 Замыкание ниже попыталось бы прочитать файл после его закрытия при выходе из
-области владения. Компилятор отвергает его с `FLICK-G001`.
+области владения. Компилятор отвергает его с `FLICK-G002`.
 
-```flick fail G001
+```flick fail G002
 # import File exposing (Path, FileSystem, OpenError, ReadError)
 #
 read_later : Path ->{Async, FileSystem; OpenError} (Unit ->{Async, FileSystem; ReadError} String)

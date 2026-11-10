@@ -57,9 +57,9 @@ A metadata line that does not fit the signature or the mode is `FLICK-F001`.
 A result of type `Unit` is `()` whatever JS returns. A parameter whose type
 may hold a scope's capabilities — a region, as in `File s`, or a capture
 qualifier `^c` — needs a `retention` line (`FLICK-F002`): without one the
-compiler cannot know how long JS keeps it. A bare callback type holds no
-captures at all, so a closure over a scoped value is refused where it is
-passed (`FLICK-G001`).
+compiler cannot know how long JS keeps it. A bare callback type keeps
+nothing live, so a closure that uses a scoped value is refused where it is
+passed (`FLICK-G002`).
 
 ## Callbacks
 

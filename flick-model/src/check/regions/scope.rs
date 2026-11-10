@@ -79,11 +79,13 @@ impl Checker<'_> {
         self.level -= 1;
         let s = &s;
         let (t, inner) = checked?;
+        self.grow_holds()?;
         let (mut r, e) = match inner {
             Stage::Pure => (Row::none(), Row::none()),
             Stage::Runtime(r, e) => (self.zonk_row(&r), self.zonk_row(&e)),
         };
         self.settle_scope(&mut r, s);
+        self.discharge_live(&mut r, s);
         if let Some(args) = r.elems.remove(&scope_service()) {
             for a in args.iter() {
                 self.unify(a, &Type::Var(region.clone()))?;

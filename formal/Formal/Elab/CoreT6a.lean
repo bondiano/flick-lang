@@ -75,9 +75,7 @@ example (hR : Real P Sg N) {c : Nat}
       Typ Sg Ψ Θ [] e'' (.ex (trT N intTy) .pure) := by
   have hl : Elab P [] [] (.app (.const c) (.lam (.var 0))) intTy .P (.app (.const c) (.lam (.var 0))) := by
     refine .app (φ := .P) (ψ := .P) (.const (ts := []) (ds := []) hc rfl .nil) (.allLam (k := 1) ?_) (.inl rfl)
-    refine .lam (.var (σ := ⟨0, [], .var 0, .cnil⟩) (ts := []) (ds := []) rfl rfl .nil) fun n hn => ?_
-    rcases hn with ⟨x, s, hx, hs, _⟩
-    cases x <;> simp_all [Exp.Free]
+    exact .lam (.var (σ := ⟨0, [], .var 0, .cnil⟩) (ts := []) (ds := []) rfl rfl .nil)
   exact T6a_closed hR hl Ψ Θ
 
 /-- **T6(a) for `do`** in the core. -/

@@ -40,25 +40,6 @@ fn fixed(signature: &str, meta: &str) -> String {
 }
 
 #[test]
-fn the_fix_leaves_what_a_stage_qualifier_qualifies() {
-    assert_eq!(
-        fixed("f : (Int -> Int)^c -> (Int -> Int)^c", "retention call"),
-        "f : (Int -> Int)^c -> Int -> Int"
-    );
-    assert_eq!(
-        fixed(
-            "f : (Int -> Int)^c -> (Int -> (Int -> Int)^c)^c",
-            "retention call"
-        ),
-        "f : (Int -> Int)^c -> Int -> Int -> Int"
-    );
-    assert_eq!(
-        fixed("f : (Int -> Int)^c -> Int -> Int", "retention call"),
-        "f : (Int -> Int)^c -> Int -> Int"
-    );
-}
-
-#[test]
 fn the_fix_leaves_the_constraints_retention_owner_does_not_give() {
     assert_eq!(
         fixed(
@@ -81,7 +62,7 @@ fn the_fix_leaves_the_constraints_retention_owner_does_not_give() {
 
 #[test]
 fn a_fix_would_not_take_a_comment_away() {
-    let text = "module Probe exposing (..)\nf :\n  (Int -> Int)^c -> (\n    // the rest\n    Int -> Int\n  )^c\nforeign pure f from \"./x.js\" \"f\"\n  retention call\n";
+    let text = "module Probe exposing (..)\nf :\n  (\n    // given anyway\n    Fiber.Outlives c s,\n    Fiber.Provided r s,\n    Detached r\n  ) =>\n  (Eff r none Unit)^c ->{Scope s | r} Unit\nforeign effect f from \"./x.js\" \"f\"\n  retention owner\n";
     let mut sources = SourceMap::default();
     let file = sources.add("Probe.fl", text);
     let diagnostics = crate::check(&sources, file);

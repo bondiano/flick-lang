@@ -115,6 +115,7 @@ pub use kinds::Kind;
 pub use patterns::is_pattern;
 pub use question::Question;
 pub use ranges::range_list;
+pub use regions::LIVE;
 pub use schemas::companion_name;
 pub use services::{OpClass, Operation};
 pub use ty::{Binder, Effects, Row, SYNC_SERVICES, Stage, Type, stage_of};

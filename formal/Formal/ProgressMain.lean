@@ -38,7 +38,8 @@ theorem hctl_progress {p ℓ κ E al r w k} {Ei : List Frame} {tl : Bool} (hE : 
   · exact ⟨_, .hctlTail hE hk hv⟩
 
 theorem progress {Λ μ root} (hroot : RootTy S root) :
-    ∀ {Ψ Θ Γ e J}, Typ S Ψ Θ Γ e J → μ.length = Ψ.length → Γ = [] → ∀ {t φ}, J = .ex t φ →
+    ∀ {Ψ Θ Γ e J}, Typ S Ψ Θ Γ e J → μ.length = Ψ.length → Γ = [] →
+      ∀ {t φ}, J = .ex t φ →
       Value e ∨ NV S root Λ μ e φ.svc := by
   intro Ψ Θ Γ e J h
   have step : ∀ {e l o D}, Step root l Λ μ e o → Value e ∨ NV S root Λ μ e D :=
@@ -165,7 +166,7 @@ theorem progress {Λ μ root} (hroot : RootTy S root) :
     | blocked hb => exact .inr (.blocked (hb.frame (F := .try_ _) trivial))
     | perform hp =>
       rcases hp.frame (root := root) (Λ := Λ) (μ := μ) (F := .try_ _) trivial
-          (fun n h => .inr (Stage.le_svc hφ n h))
+          (fun N h => .inr (Stage.le_svc hφ (.nm N) h))
           (fun _ _ _ _ h => by simp [Frame.installs] at h) with h | h | h
       · obtain ⟨_, _, hs'⟩ := h; exact step hs'
       · exact .inr (.perform h)
@@ -196,16 +197,6 @@ theorem progress {Λ μ root} (hroot : RootTy S root) :
   | inside _ _ hφ' _ _ hφ _ ih =>
     intro hμ hΓ _ _ hJ; cases hJ
     obtain ⟨_, _, rfl, hr', _⟩ := Stage.rt_le hφ
-    have hD : ∀ n, _ → Frame.dom (.inside _) n ∨ _ := fun n h => by
-        rcases Stage.le_svc hφ' n h with h | h | h
-        · cases n with
-          | atm a => exact .inl ⟨_, rfl, h⟩
-          | _ => exact h.elim
-        · exact .inr (hr' n h)
-        · cases n with
-          | ob N a => exact .inl (.inr ⟨_, rfl, h.1⟩)
-          | obv v a => exact .inl ⟨_, rfl, h.1⟩
-          | _ => exact h.elim
     rcases ih hμ hΓ rfl with hv | hn
     · exact inside_final (.inl hv)
     cases hn with
@@ -218,44 +209,57 @@ theorem progress {Λ μ root} (hroot : RootTy S root) :
       · exact .inr (.blocked hb)
     | blocked hb => exact .inr (.blocked (hb.frame (F := .inside _) trivial))
     | perform hp =>
-      rcases hp.frame (root := root) (Λ := Λ) (μ := μ) (F := .inside _) trivial hD
+      rcases hp.frame (root := root) (Λ := Λ) (μ := μ) (F := .inside _) trivial
+          (fun N h => by
+            rcases Stage.le_svc hφ' (.nm N) h with h | h | h
+            · exact h.elim
+            · exact .inr (hr' (.nm N) h)
+            · exact h.elim)
           (fun _ _ _ _ h => by simp [Frame.installs] at h) with h | h | h
       · obtain ⟨_, _, hs'⟩ := h; exact step hs'
       · exact .inr (.perform h)
       · exact .inr (.blocked h)
-  | hwith _ _ _ _ _ hφ₀ hc hφ _ _ _ ih =>
+  | hwith _ _ _ _ _ hφ₀ hc hφ _ _ _ _ ih =>
     intro hμ hΓ _ _ hJ; cases hJ
     rcases ih hμ hΓ rfl with hv | hn
     · exact step (Step.ofP (.hwithVal hv))
     obtain ⟨_, _, rfl, hr, _⟩ := Stage.rt_le hφ
-    refine .inr (hn.frame (F := .hwith _ _ _ _ _) trivial (nt id) (ni id) (fun n h => ?_)
+    refine .inr (hn.frame (F := .hwith _ _ _ _ _) trivial (nt id) (ni id) (fun N h => ?_)
       (hpart := fun N o c ⟨a, b, hop⟩ hN hh _ => ?_))
-    · exact ((FRel.installs (F := .hwith _ _ _ _ _) rfl hφ₀ hφ).svc n h).symm
+    · rcases (FRel.installs (F := .hwith _ _ _ _ _) rfl hφ₀ hφ).svc (.nm N) h
+        with h' | h'
+      · exact .inr h'
+      · exact .inl (Frame.provides_nm h')
     · cases hN
       exact hr _ (hc.2 fun hcomp => by
         have h₁ := hcomp o c a b hop
         simp [Frame.handles, h₁] at hh)
-  | hctl _ _ _ _ _ _ _ hE hk _ _ _ _ _ hφ _ _ _ _ ih =>
+  | hctl _ _ _ _ _ _ _ hE hk _ _ _ _ _ hφ _ _ _ _ _ ih =>
     intro hμ hΓ _ _ hJ; cases hJ
     rcases ih hμ hΓ rfl with hv | hn
     · obtain ⟨_, hh⟩ := hctl_progress hE hk hv
       exact step (Step.ofP hh)
     obtain ⟨_, _, rfl, hr, _⟩ := Stage.rt_le hφ
-    exact .inr (hn.frame (F := .hctlA _ _ _ _ _ _ _ _) trivial (nt id) (ni id) (fun n h => .inr (hr n h))
+    exact .inr (hn.frame (F := .hctlA _ _ _ _ _ _ _ _) trivial (nt id) (ni id) (fun N h => .inr (hr (.nm N) (Stage.use_svc_nm h)))
       ⟨_, hE, hk⟩)
-  | hres _ _ hA ha _ _ hφ _ ih _ =>
+  | hres _ _ hA ha _ _ _ hφ _ ih _ =>
     intro hμ hΓ _ _ hJ; cases hJ
     rcases ih hμ hΓ rfl with hv | hn
     · exact step (Step.ofP (.hresVal hA ha hv))
     obtain ⟨_, _, rfl, hr, _⟩ := Stage.rt_le hφ
-    exact .inr (hn.frame (F := .hresB _ _ _) trivial (nt id) (ni id) (fun n h => .inr (hr n h)) ⟨_, hA, ha⟩)
+    exact .inr (hn.frame (F := .hresB _ _ _) trivial (nt id) (ni id)
+      (fun N h => .inr (hr (.nm N) (Stage.use_svc_nm h))) ⟨_, hA, ha⟩)
   | hkeep _ _ _ hφ₀ hc hnt hle hφ _ _ ih =>
     intro hμ hΓ _ _ hJ; cases hJ
     rcases ih hμ hΓ rfl with hv | hn
     · exact step (Step.ofP (.hkeepVal hv))
     obtain ⟨_, _, rfl, hr, _⟩ := Stage.rt_le hφ
     refine .inr (hn.frame (F := .hkeep _ _ _ _) trivial (nt id) (ni id)
-      (fun n h => ((FRel.installs (F := .hkeep _ _ _ _) rfl hφ₀ hφ).svc n h).symm)
+      (fun N h => by
+        rcases (FRel.installs (F := .hkeep _ _ _ _) rfl hφ₀ hφ).svc (.nm N) h
+          with h' | h'
+        · exact .inr h'
+        · exact .inl (Frame.provides_nm h'))
       (hpart := fun N o c ⟨a, b, hop⟩ hN hh _ => ?_))
     cases hN
     refine hr _ ?_
@@ -270,12 +274,13 @@ theorem progress {Λ μ root} (hroot : RootTy S root) :
     rcases ih hμ hΓ rfl with hv | hn
     · exact step (Step.ofP (.hkarmVal hE hk hv))
     obtain ⟨_, _, rfl, hr, _⟩ := Stage.rt_le (Stage.le_trans hle hφ)
-    exact .inr (hn.frame (F := .hkarmA _ _ _ _ _) trivial (nt id) (ni id) (fun n h => .inr (hr n h))
+    exact .inr (hn.frame (F := .hkarmA _ _ _ _ _) trivial (nt id) (ni id) (fun N h => .inr (hr (.nm N) h))
       ⟨_, hE, hk⟩)
   | hdone _ ih =>
     intro hμ hΓ _ _ hJ; cases hJ
     rcases ih hμ hΓ rfl with hv | hn
     · exact step (Step.ofP (.hdoneVal hv))
-    · exact .inr (hn.frame' (F := .hdone _) trivial (nt id) (ni id))
+    · exact .inr (hn.frame (F := .hdone _) trivial (nt id) (ni id)
+        (fun N h => .inr (Stage.use_svc_nm h)))
 
 end Flick

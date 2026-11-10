@@ -45,11 +45,12 @@ theorem Typ.subst {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
   induction h with
   | var hi hts hH hT =>
     intro _ _ hσ
-    obtain ⟨ht, hnI, _, hV⟩ := hσ _ _ hi
-    exact (Typ.elim (hV.stands _) hnI (Typ.instantiate hts hH hnI ht) hT).sub ⟨.refl, Stage.pure_le _⟩
+    obtain ⟨ht, hnI, hV⟩ := hσ _ _ hi
+    exact (Typ.elim (hV.stands _) hnI (Typ.instantiate hts hH hnI ht) hT).sub
+      ⟨LeLive.refl, Stage.pure_le _⟩
   | allVar hi hk hc =>
     intro _ σ hσ
-    obtain ⟨ht, _, _, hV⟩ := hσ _ _ hi
+    obtain ⟨ht, _, hV⟩ := hσ _ _ hi
     show Typ _ _ _ _ (σ _) _
     rcases hV with hv | ⟨j, hj, hs⟩ | hj | ⟨hk', -⟩
     · refine .allI hv (ht.cut fun _ _ h x hx => (h x hx).imp_right fun ⟨C', hu, h₂⟩ => ⟨C', ?_, h₂⟩)
@@ -58,26 +59,25 @@ theorem Typ.subst {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
     · rw [hj]; exact .todo
     · omega
   | allI hv _ ih => intro _ _ hσ; exact .allI hv.subst (ih ((SubOk.up hσ _ _).mono Entails.union_none))
-  | lam hb hnb hcb hT ih =>
+  | lam hb hnb hT ih =>
     intro _ _ hσ
     have hΓ : ∀ i, (Tm.lam _).Free i → i < _ := fun i h => by
       have := hb.frees _ h; simp at this; omega
-    exact .lam (ih (SubOk.lift hσ [_] rfl)) (SubOk.noIns (e := .lam _) hσ hΓ hnb) (SubOk.held hσ hΓ hcb) hT
+    exact .lam (ih (SubOk.lift hσ [_] rfl)) (SubOk.noIns (e := .lam _) hσ hΓ hnb) hT
   | app _ _ hψ hT ih₁ ih₂ => intro _ _ hσ; exact .app (ih₁ hσ) (ih₂ hσ) hψ hT
   | let_ _ _ ih₁ ih₂ => intro _ _ hσ; exact .let_ (ih₁ hσ) (ih₂ (SubOk.lift hσ [_] rfl))
   | letGen _ _ ih₁ ih₂ =>
     intro _ _ hσ; exact .letGen (ih₁ (SubOk.up hσ _ _)) (ih₂ (SubOk.lift hσ [_] rfl))
-  | letrec hf hnf hcf _ ih₁ ih₂ =>
+  | letrec hf hnf _ ih₁ ih₂ =>
     intro _ _ hσ
     have hΓ : ∀ i, (Tm.fix _).Free i → i < _ := fun i h => by
       have := hf.frees _ h; simp at this; omega
-    exact .letrec (ih₁ (SubOk.lift hσ [_, _] rfl)) (SubOk.noIns (e := .fix _) hσ hΓ hnf)
-      (SubOk.held hσ hΓ hcf) (ih₂ (SubOk.lift hσ [_] rfl))
-  | fix hf hnf hcf hT ih =>
+    exact .letrec (ih₁ (SubOk.lift hσ [_, _] rfl)) (SubOk.noIns (e := .fix _) hσ hΓ hnf) (ih₂ (SubOk.lift hσ [_] rfl))
+  | fix hf hnf hT ih =>
     intro _ _ hσ
     have hΓ : ∀ i, (Tm.fix _).Free i → i < _ := fun i h => by
       have := hf.frees _ h; simp at this; omega
-    exact .fix (ih (SubOk.lift hσ [_, _] rfl)) (SubOk.noIns (e := .fix _) hσ hΓ hnf) (SubOk.held hσ hΓ hcf) hT
+    exact .fix (ih (SubOk.lift hσ [_, _] rfl)) (SubOk.noIns (e := .fix _) hσ hΓ hnf) hT
   | lit => intro _ _ _; exact .lit
   | loc hl => intro _ _ _; exact .loc hl
   | const hc hT => intro _ _ _; exact .const hc hT
@@ -100,9 +100,9 @@ theorem Typ.subst {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
   | aref hK hU hn hfr hlc hpA _ _ ihA ihr =>
     intro _ _ hσ; exact Typ.aref_subst hK hU hσ hn hfr hlc hpA ihA (ihr hσ)
   | todo => intro _ _ _; exact .todo
-  | task he hψ hne hce hT ih =>
+  | task he hψ hne hT ih =>
     intro _ _ hσ
-    exact .task (ih hσ) hψ (SubOk.noIns (e := .task _) hσ he.frees hne) (SubOk.held hσ he.frees hce) hT
+    exact .task (ih hσ) hψ (SubOk.noIns (e := .task _) hσ he.frees hne) hT
   | await _ hφ hT ih => intro _ _ hσ; exact .await (ih hσ) hφ hT
   | raise _ hφ ih => intro _ _ hσ; exact .raise (ih hσ) hφ
   | raiseAdt _ hU hφ ih => intro _ _ hσ; exact .raiseAdt (ih hσ) hU hφ
@@ -128,9 +128,9 @@ theorem Typ.subst {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
     intro _ _ hσ; exact .inside hF (ih (hσ.mono (Entails.union_left _ _))) hφ' ht hε hφ hT
   | cap => intro _ _ _; exact .cap
   | own => intro _ _ _; exact .own
-  | drec hc hk hr hn hh ih =>
+  | drec hc hk hr hn ih =>
     intro _ _ hσ
-    exact .drec hc hk (ih hσ) (SubOk.noIns hσ hr.frees hn) (SubOk.held (e := .drec _ _) hσ hr.frees hh)
+    exact .drec hc hk (ih hσ) (SubOk.noIns hσ hr.frees hn)
   | dnil => intro _ _ _; exact .dnil
   | dcons _ _ ih₁ ih₂ => intro _ _ hσ; exact .dcons (ih₁ (SubOk.up hσ _ _)) (ih₂ hσ)
   | dproj _ hc hk hl hts hH hT ih => intro _ _ hσ; exact .dproj (ih hσ) hc hk hl hts hH hT
@@ -146,16 +146,16 @@ theorem Typ.subst {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
       (h x hx).imp id fun ⟨C', h₁, h₂⟩ => ⟨C', h₁.elim id False.elim, h₂⟩)
     exact .hdl h₁ (SubOk.noIns hσ (by simpa using hal.frees) hn) (ih₂ hσ) hψ (ih₃ hσ) hφ₀ hOb ⟨hc.1, fun h => hc.2 fun hc' => h fun o c a b ho => by
       rw [hal.armOf_subst]; exact hc' o c a b ho⟩ hφ hT
-  | hwith hℓ hal _ hψ _ hφ₀ hc hφ hT ih₁ ih₂ ih₃ =>
+  | hwith hℓ hal _ hψ _ hφ₀ hc hφ hT hat ih₁ ih₂ ih₃ =>
     intro _ σ hσ
     exact .hwith hℓ (ih₁ hσ) (ih₂ hσ) hψ (ih₃ hσ) hφ₀ ⟨hc.1, fun h => hc.2 fun hc' => h fun o c a b ho => by
-      rw [hal.armOf_subst]; exact hc' o c a b ho⟩ hφ hT
-  | hctl hℓ hal _ hψ hop hc htl hE hk hp hφ₀ _ hl hcm hφ hT ih₁ ih₂ _ ih₄ =>
+      rw [hal.armOf_subst]; exact hc' o c a b ho⟩ hφ hT hat
+  | hctl hℓ hal _ hψ hop hc htl hE hk hp hφ₀ _ hl hcm hφ hT hat ih₁ ih₂ _ ih₄ =>
     intro _ σ hσ
     subst hk
     rw [Tm.subst, (plug_hole_closed hp).subst]
     exact .hctl hℓ (ih₁ hσ) (ih₂ hσ) hψ hop hc htl hE rfl hp hφ₀ (ih₄ hσ) hl ⟨hcm.1, fun h => hcm.2 fun hc' => h fun o c a b ho => by
-      rw [hal.armOf_subst]; exact hc' o c a b ho⟩ hφ hT
+      rw [hal.armOf_subst]; exact hc' o c a b ho⟩ hφ hT hat
   | hkeep hℓ hal _ hφ₀ hc hnt hle hφ hT ih₁ ih₂ =>
     intro _ σ hσ
     exact .hkeep hℓ (ih₁ hσ) (ih₂ hσ) hφ₀ ⟨hc.1, fun h => hc.2 fun hc' => h fun o c a b ho => by
@@ -166,11 +166,11 @@ theorem Typ.subst {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
     rw [Tm.subst, (plug_hole_closed hp).subst]
     exact .hkarm hℓ (ih₁ hσ) hop hE rfl hp hφ₀ ⟨hc.1, fun h => hc.2 fun hc' => h fun o c a b ho => by
       rw [hal.armOf_subst]; exact hc' o c a b ho⟩ hnt (ih₃ hσ) hle hφ hT
-  | hres hℓ _ hA ha hp hl hφ hT ih₁ _ =>
+  | hres hℓ _ hA ha hp hl hcp hφ hT ih₁ _ =>
     intro _ σ hσ
     subst ha
     rw [Tm.subst, (plug_hole_closed hp).subst]
-    exact .hres hℓ (ih₁ hσ) hA rfl hp hl hφ hT
+    exact .hres hℓ (ih₁ hσ) hA rfl hp hl hcp hφ hT
   | hdone _ ih => intro _ _ hσ; exact .hdone (ih hσ)
   | unw hℓ _ hφ ih => intro _ _ hσ; exact .unw hℓ (ih hσ) hφ
   | kont hl hC hT => intro _ _ _; exact .kont hl hC hT
@@ -233,12 +233,7 @@ theorem Inst.ok {Ψ Θ Γ δ Δ} (h : Inst S Ψ Θ Γ δ Δ) :
     exact ⟨hv', SubOk.value hvv hv'⟩
   · rw [List.getElem?_append_right (by simp; omega)] at hi
     have hi' : Γ[i - δ.length]? = some s := by simpa [h.1] using hi
-    refine ⟨Typ.var_self hi', ?_, ?_, .inr (.inl ⟨_, rfl, hi'⟩)⟩
-    · intro h; cases h
-    rintro a (⟨j, s', hj, hs, ha⟩ | ⟨p, hp, _⟩ | ⟨l, _, hl, _⟩)
-    · cases hj; rw [hi'] at hs; cases hs; exact ha
-    · cases hp
-    · cases hl
+    exact ⟨Typ.var_self hi', (fun h => by cases h), .inr (.inl ⟨_, rfl, hi'⟩)⟩
 
 /-- `e[δ]` for a body typed under `Δ`. -/
 theorem Typ.inst {Ψ Θ Γ e J δ Δ} (h : Typ S Ψ Θ (Δ.map .mono ++ Γ) e J) (hδ : Inst S Ψ Θ Γ δ Δ) :

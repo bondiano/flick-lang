@@ -1,0 +1,16 @@
+// An instance method is checked as its class signature reads under
+// elision: the callback `traverse` takes is `^c`, so the later stage keeps
+// `c` live and may call it, though no signature names `Live`.
+module App.InstanceElided exposing (..)
+
+type Box a = Box a
+
+instance Functor Box =
+  let map f value =
+    match value with
+    | Box x -> Box (f x)
+
+instance Traversable Box =
+  let traverse f value =
+    match value with
+    | Box x -> Box (f x)

@@ -36,7 +36,7 @@ impl Checker<'_> {
         let saved = mem::take(&mut self.runtime);
         let (uses, locals) = (self.uses_mark(), self.locals.len());
         let parts = expected.and_then(|t| Some((t.clone(), self.eff_parts(t)?)));
-        let (stage, result) = match parts {
+        let (mut stage, result) = match parts {
             Some((expected, (services, errors, result))) => {
                 // the services of an `Eff` written as a type: a fix adds to them there
                 let written = self.store.resolve(&services).written();
@@ -45,6 +45,7 @@ impl Checker<'_> {
             }
             None => (self.open_stage(), None),
         };
+        self.live_bound(&mut stage, expected);
         let outer = mem::replace(&mut self.stage, stage);
         let result = match result {
             Some(result) => {
@@ -165,6 +166,7 @@ impl Checker<'_> {
         if let Some(needed) = needed
             && self.stage.pure.is_none()
         {
+            self.live_install(handled.iter().map(|h| &h.entry), span);
             self.handled_row(&needed, &handled, span);
         }
         ty
@@ -300,6 +302,7 @@ impl Checker<'_> {
         let inner = mem::replace(&mut self.stage, outer);
         self.stage.calls = inner.calls;
         if self.stage.pure.is_none() {
+            self.live_install(provided.iter().map(|(_, t)| t), span);
             let tail = open
                 .into_iter()
                 .fold(self.stage.services.clone(), |rest, t| {
@@ -392,6 +395,7 @@ impl Checker<'_> {
         let inner = mem::replace(&mut self.stage, outer);
         self.stage.calls = inner.calls;
         if self.stage.pure.is_none() {
+            self.live_install([&entry], span);
             let rest = Type::Row(Row {
                 entries: vec![(label, entry)],
                 tail: Some(Box::new(self.stage.services.clone())),

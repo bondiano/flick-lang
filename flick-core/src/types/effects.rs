@@ -284,12 +284,6 @@ impl Checker<'_> {
             return self.subsume_captured((actual, a), (expected, e), span);
         }
         let (a, e) = (a.0, e.0);
-        if matches!((&a, &e), (Type::Fun { .. }, Type::Fun { .. })) {
-            let (left, right) = (self.implicit_captures(&a), self.implicit_captures(&e));
-            if left != a || right != e {
-                return self.subsume(&left, &right, span);
-            }
-        }
         match (&a, &e) {
             (
                 Type::Fun {

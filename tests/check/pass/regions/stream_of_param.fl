@@ -1,0 +1,22 @@
+// A stream over a parameter: its callback uses `file`, so running the
+// stream needs `s` live, which its qualifier says: `^{s}` is what using
+// the stream needs, as it is what a closure's use needs. Running it inside
+// the `scope` of the file keeps `s` live (`used_lines`).
+module App.StreamOfParam exposing (..)
+
+type File (s : Region)
+
+type error ReadError = ReadError String
+
+service Files =
+  open_scoped : forall s. String ->{Scope s} File s
+  read : forall s. File s ->{; ReadError} String
+
+lines : File s -> (Stream.Stream {Files} {ReadError} String)^{s}
+let lines file = Stream.map_effect (fun _ -> Files.read file) (Stream.from_list [1])
+
+used_lines : String ->{Files; ReadError} List String
+let used_lines path = scope {
+  let file = Files.open_scoped path
+  Stream.run_collect (lines file)
+}

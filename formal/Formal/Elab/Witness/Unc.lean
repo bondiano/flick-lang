@@ -85,8 +85,8 @@ theorem typ_uncB : ∀ m (As : List Flick.Ty), As.length = m → ∀ {A₀ R : F
       (.arrow (nestC A₀ As) .pure R C) C0) φ)
   | 0, [], _, A₀, R, C, C0, φ =>
     typ_lam (typ_lam (.app (ψ := .pure) (typ_var_mono rfl) (typ_var_mono rfl) trivial .refl)
-      (fun s h => by simp [Flick.Tm.Has] at h) (mem1 fun x h => (Flick.Scheme.reach_mono _ _).1 h))
-      (fun s h => by simp [Flick.Tm.Has] at h) (by simp)
+      (fun s h => by simp [Flick.Tm.Has] at h))
+      (fun s h => by simp [Flick.Tm.Has] at h)
   | m + 1, As, hl, A₀, R, C, C0, φ => by
     obtain ⟨As', A, rfl⟩ : ∃ As' A, As = As' ++ [A] :=
       ⟨As.dropLast, As.getLast (by rintro rfl; simp at hl), (List.dropLast_concat_getLast _).symm⟩
@@ -94,21 +94,14 @@ theorem typ_uncB : ∀ m (As : List Flick.Ty), As.length = m → ∀ {A₀ R : F
     have hc := curryC_snoc C (A₀ :: As') A R
     simp only [List.cons_append] at hc
     rw [hc, nestC_snoc]
-    refine typ_lam (typ_lam (.match_ (typ_var_mono rfl)
+    exact typ_lam (typ_lam (.match_ (typ_var_mono rfl)
       (.acons (.adt (.app (.app (.head (K := "Tup") (ts := [.tvar 0, .tvar 1]) (us := [nestC A₀ As', A]) rfl Sig.inj_plain rfl) .var) .var) (tcon_hd _ _))
         (.app (ψ := .pure) (.app (ψ := .pure) (.app (ψ := .pure)
           (Typ.anyCtx (typ_uncB m As' hl' (R := .arrow A .pure R C) (C := C) (C0 := Caps.none)))
           (typ_var_mono rfl) trivial .refl) (typ_var_mono rfl) trivial .refl)
           (typ_var_mono rfl) trivial .refl) .anil)
       (.inl (exh_one (rfl : Sg.ctor "Tup" = _) hone_tup _)))
-      (fun s h => by simp [Flick.Tm.Has] at h) ?_) (fun s h => by simp [Flick.Tm.Has] at h) (by simp)
-    refine mem1 fun x h => ?_
-    rcases curryC_reach ((Flick.Scheme.reach_mono _ _).1 h) with h | ⟨a, ha, h⟩ | (h | h | h)
-    · exact .inr (.inr h)
-    · exact .inl (.inl (.inr (nestC_reach ha h)))
-    · exact .inl (.inr h)
-    · exact .inr (.inl h)
-    · exact .inr (.inr h)
+      (fun s h => by simp [Flick.Tm.Has] at h)) (fun s h => by simp [Flick.Tm.Has] at h)
 
 theorem trT_curry (q : Ty) (as : List Ty) (r : Ty) :
     trT N (curry q as r) = curryC (trT N q).reach (as.map (trT N)) (trT N r) := by
@@ -156,8 +149,7 @@ theorem typ_frBody {E A : Flick.Ty} {C0 : Caps} {e : Ty} {φ}
               · exact .inl (hE _ h)
             | _ => simp [Row.err, Row.union, Row.single, Row.ofCaps, allNames] at hx ⊢)) .anil))
       (.inl (exh_ctors hall_res _)))
-    (fun h => by simp [Flick.Tm.Has] at h)
-    (held_sub (fun s h => by simp [Flick.Tm.Has] at h) (by simp)) .refl
+    (fun h => by simp [Flick.Tm.Has] at h) .refl
 
 /-- The method `eq` of the structural `D_{Eq Rec}`, under its argument `d : D_{Eq Int}`:
 `λa b. match a with MkRec x → match b with MkRec y → d.eq x y`. -/

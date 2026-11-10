@@ -1,6 +1,6 @@
 ---
 title: "`.iface` — нативный интерфейс модуля"
-source_hash: 75c5e53835c79070
+source_hash: faa24b57700fe6a3
 ---
 
 Файл `.iface` содержит интерфейс модуля в формате, который нужен модулю
@@ -21,7 +21,7 @@ source_hash: 75c5e53835c79070
 
 ```json
 {
-  "iface-version": 11,
+  "iface-version": 12,
   "compiler": "0.1.0",
   "module": "App.Shapes",
   "exports": [

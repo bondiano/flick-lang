@@ -10,8 +10,8 @@ namespace Flick
 variable {S : Sig}
 
 /-- The error type of a raised value. -/
-theorem err_type {Ψ Θ v ε} (hv : Value v) (h : Typ S Ψ Θ [] v (.ex (.errors ε) .pure)) {K k ts T}
-    (hK : v.head = .ctor K) (hS : S.ctor K = some (k, ts, T)) :
+theorem err_type {Ψ Θ v ε} (hv : Value v) (h : Typ S Ψ Θ [] v (.ex (.errors ε) .pure))
+    {K k ts T} (hK : v.head = .ctor K) (hS : S.ctor K = some (k, ts, T)) :
     ∃ U, ε (.nm T) ∧ U.hd = .adt T ∧ Typ S Ψ Θ [] v (.ex U .pure) ∧ Row.Sub (Row.err T U) ε := by
   obtain ⟨K', k', ts', T', U, hK', hS', hε, hU, ht, hsub⟩ := canonical_errors hv h
   rw [hK] at hK'; cases hK'; rw [hS] at hS'; cases hS'
@@ -51,7 +51,8 @@ theorem raise_inv {Ψ Θ v t φ} (hv : Value v) (h : Typ S Ψ Θ [] (.raise v) (
   | errVal hv' | allI hv' => cases hv'
 
 theorem StoreTy.alloc {Ψ μ v t₀} (hμ : StoreTy S Ψ μ) (hv : Value v)
-    (h : Typ S Ψ Facts.age [] v (.ex t₀ .pure)) : StoreTy S (Ψ ++ [t₀]) (μ ++ [v]) := by
+    (h : Typ S Ψ Facts.age [] v (.ex t₀ .pure)) :
+    StoreTy S (Ψ ++ [t₀]) (μ ++ [v]) := by
   refine ⟨by simp [hμ.1], fun i w s hw hs => ?_⟩
   by_cases hi : i < μ.length
   · rw [List.getElem?_append_left hi] at hw
@@ -106,7 +107,9 @@ theorem rt_preservation {Ψ Θ Λ μ e t φ Λ' μ' e'} (h : Typ S Ψ Θ [] e (.
       cases hf with
       | const _ hT' =>
         obtain ⟨_, _, _, _, h, la, _, lt, -⟩ := hT'.arrow_left
-        cases h; cases lt; cases hT
+        cases h
+        cases LeLive.eq_ref_left lt
+        cases LeLive.eq_ref_left hT
         exact ⟨_, hμ.alloc hv (((ha.valueAny hv .pure).sub (J' := .ex _ .pure) ⟨la, Stage.le_refl _⟩).cut
             hc.outΘ),
           .loc (by simp [hμ.1]), by simpa using ht.ref⟩
@@ -117,7 +120,7 @@ theorem rt_preservation {Ψ Θ Λ μ e t φ Λ' μ' e'} (h : Typ S Ψ Θ [] e (.
       cases hf with
       | const _ hT' =>
         obtain ⟨_, _, _, _, h, la, _, lt, -⟩ := hT'.arrow_left
-        cases h; cases la
+        cases h; cases LeLive.eq_ref la
         cases ha with
         | loc hl' =>
           have hv := (hμ.2 _ _ _ hl hl').2
@@ -137,9 +140,11 @@ theorem rt_preservation {Ψ Θ Λ μ e t φ Λ' μ' e'} (h : Typ S Ψ Θ [] e (.
         cases hc with
         | const _ hT' =>
           obtain ⟨_, _, _, _, h, la, _, lt, -⟩ := hT'.arrow_left
-          cases h; cases la
+          cases h; cases LeLive.eq_ref la
           obtain ⟨_, _, _, _, h, la', _, lt', -⟩ := (lt.trans hT₁).arrow_left
-          cases h; cases lt'; cases hT
+          cases h
+          cases LeLive.eq_base_left lt'
+          cases LeLive.eq_base_left hT
           cases hloc with
           | loc hl =>
             have hst := hμ.set hl hlt hv (((ha.valueAny hv .pure).sub (J' := .ex _ .pure)
@@ -150,10 +155,10 @@ theorem rt_preservation {Ψ Θ Λ μ e t φ Λ' μ' e'} (h : Typ S Ψ Θ [] e (.
     cases h with
     | await he hφ hT =>
       cases he with
-      | task he' hψ _ _ hT' =>
-        obtain ⟨_, _, _, _, h, hr, hε, lt, -⟩ := hT'.eff_left
+      | task he' hψ _ hT' =>
+        obtain ⟨_, _, _, _, h, hle, lt, -⟩ := LeLive.eff_left hT'
         cases h
-        exact same (he'.sub ⟨lt.trans hT, Stage.le_trans (Stage.le_trans hψ (Stage.rt_sub hr hε)) hφ⟩)
+        exact same (he'.sub ⟨lt.trans hT, Stage.le_trans (Stage.le_trans hψ hle) hφ⟩)
     | errVal hv'' | allI hv'' => exact (nv hv'').elim
   | tryRaise hv =>
     cases h with
@@ -228,10 +233,12 @@ theorem rt_preservation {Ψ Θ Λ μ e t φ Λ' μ' e'} (h : Typ S Ψ Θ [] e (.
     cases h with
     | app hf ha hψ hT =>
       cases hf with
-      | const _ hT' =>
+      | const hok hT' =>
         obtain ⟨_, _, _, _, h, la, lψ, lt, -⟩ := hT'.arrow_left
-        cases h; cases la
-        exact same (scopeRun_body hv ha (Stage.le_trans lψ hψ) (lt.trans hT))
+        cases h; cases LeLive.eq_all la
+        exact same (scopeRun_body hv ha
+          (Stage.le_trans (Stage.le_use _ _) (Stage.le_trans lψ hψ)) (lt.trans hT)
+          hok)
     | errVal hv' | allI hv' => exact (nv hv').elim
   | scope =>
     cases h with
@@ -248,7 +255,7 @@ theorem rt_preservation {Ψ Θ Λ μ e t φ Λ' μ' e'} (h : Typ S Ψ Θ [] e (.
       cases hf with
       | const _ hT' =>
         obtain ⟨_, _, _, _, h, la, _, lt, -⟩ := hT'.arrow_left
-        cases h; cases la
+        cases h; cases LeLive.eq_owner la
         obtain ⟨_, he, hs⟩ := canonical_owner .own ha
         cases he; rw [hs] at lt
         exact same ((Typ.cap).sub ⟨lt.trans hT, Stage.pure_le _⟩)
@@ -258,8 +265,13 @@ theorem rt_preservation {Ψ Θ Λ μ e t φ Λ' μ' e'} (h : Typ S Ψ Θ [] e (.
     | app hf _ _ hT =>
       cases hf with
       | const _ hT' =>
+        obtain ⟨_, hop⟩ := Const.ty_op_arrow S _
+        rw [hop] at hT'
         obtain ⟨_, _, _, _, h, _, _, lt, -⟩ := hT'.arrow_left
-        cases h; cases lt; cases hT; exact same .lit
+        cases h
+        cases LeLive.eq_base_left lt
+        cases LeLive.eq_base_left hT
+        exact same .lit
     | errVal hv' | allI hv' => exact (nv hv').elim
   | finRun => exact same h
   | close _ _ hw =>
@@ -290,5 +302,6 @@ theorem rt_preservation {Ψ Θ Λ μ e t φ Λ' μ' e'} (h : Typ S Ψ Θ [] e (.
       obtain ⟨c, hcy, hcl, hb⟩ := hdl_install hal hn hrf hψ he hφ₀ hOb hc' hφ' hT hbl hc.yf hc.idem ht hφ
       exact ⟨[c], hμ.alloc .lam hcl, by rw [hμ.1]; exact hb, by simpa using hcy⟩
     | errVal hv'' | allI hv'' => exact (nv hv'').elim
+
 
 end Flick

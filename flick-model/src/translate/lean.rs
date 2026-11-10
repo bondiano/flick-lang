@@ -19,6 +19,11 @@
 //!    data, `q` and the new variables inside of a function.
 //! 5. Binders: the class parameter, the checker's `∀` that remain in their
 //!    order, then the new variables in the order they appear.
+//! 6. Elision, as the checker reads a signature (`regions/live.rs` `elide`
+//!    of flick-core): the row of each runtime arrow gets `Live` of what its
+//!    parameter and those of the stages before it reach, the variables of
+//!    kind `CaptureRow` and `Region` only; `Live C` is the capture row
+//!    `.cun C .cnil` in the row. `Eff` drops its rows (rule 1), so its `Live`.
 //!
 //! A scheme the model cannot write is a line of the skipped list, with its
 //! reason (`docs/formal/elaboration.md#the-scheme-generator-translated-only-the-sugar-names`).
@@ -150,7 +155,10 @@ fn def(module: &str, name: &str, scheme: &fc::Type, class: Option<&str>) -> Resu
     let mut tr = Tr::default();
     for b in vars {
         match &b.kind {
-            Kind::Type | Kind::CaptureRow | Kind::ServiceRow | Kind::ErrorRow => {}
+            Kind::CaptureRow => {
+                tr.live_kinds.insert(b.name.clone());
+            }
+            Kind::Type | Kind::ServiceRow | Kind::ErrorRow => {}
             Kind::Arrow(..) => {
                 tr.containers.insert(b.name.clone());
             }
@@ -358,7 +366,7 @@ mod tests {
         );
         let text = super::def("Scope", "run", &scheme, None).expect("translated");
         assert!(
-            text.contains(".all 1 (.arr (.R (.run (.rnm scope"),
+            text.contains(".all 1 (.arr (.R (.run (.cun (.var 0) .cnil) (.run (.rnm scope"),
             "{text}"
         );
     }

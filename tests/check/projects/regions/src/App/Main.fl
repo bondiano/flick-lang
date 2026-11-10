@@ -21,5 +21,5 @@ let stored path =
     let file = FileSystem.open_scoped path
     Ref.set cell (Some (reader file))
   }
-//~ FLICK-G001 @14:3-14:18
+//~ FLICK-G002 @14:3-14:18 this uses region `s`
 //~ FLICK-G002 @22:19-22:37

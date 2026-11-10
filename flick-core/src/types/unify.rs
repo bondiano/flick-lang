@@ -626,12 +626,6 @@ impl Checker<'_> {
         if ca.is_some() || cb.is_some() {
             return self.unify_captured((a, ca), (b, cb));
         }
-        if matches!((&a, &b), (Type::Fun { .. }, Type::Fun { .. })) {
-            let (left, right) = (self.implicit_captures(&a), self.implicit_captures(&b));
-            if left != a || right != b {
-                return self.unify(&left, &right);
-            }
-        }
         if let Some(result) = self
             .unify_errors(&a, &b)
             .or_else(|| self.unify_errors(&b, &a))
@@ -654,6 +648,9 @@ impl Checker<'_> {
                     {
                         Mismatch::Types(x, y)
                     }
+                    // a region leaves its `scope` in the `Live` of a row,
+                    // which no type shows
+                    Mismatch::Escape(s) => Mismatch::Escape(s),
                     _ => Mismatch::Types(a.clone(), b.clone()),
                 })?;
                 self.unify(a1, a2)

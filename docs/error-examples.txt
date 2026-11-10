@@ -19,4 +19,3 @@ R005 2be4604999987b43 what a module exports is read across a project's files, no
 R006 22c8079870c2c719 an import cycle needs several modules of a project
 S011 d3a7fb91bf7ea880 the catch needs FsError.from_js, which the standalone checker does not know
 T002 4aac33470eaed38f a signature is shown without its definition: the page is about the kind of types
-T059 907ceb22cd869605 signatures are shown without a definition, to compare what a signature says twice

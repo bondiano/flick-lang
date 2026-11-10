@@ -1,0 +1,32 @@
+// Work an owner keeps runs until the owner closes: each region its row
+// needs live must outlive the owner (`FLICK-G003`).
+module App.Keep exposing (..)
+
+type alias Path = String
+
+type File (s : Region)
+
+type error OpenError = OpenError Path
+
+type error ReadError = ReadError Path
+
+service FileSystem =
+  open_scoped : forall s. Path ->{Scope s; OpenError} File s
+  read_all : forall s. File s ->{; ReadError} String
+
+report : Failure {ReadError} ->{FileSystem; none} Unit
+let report _ = ()
+
+younger_child : Path ->{FileSystem; OpenError} Unit
+let younger_child path = scope outer {
+  scope inner {
+    let data = FileSystem.open_scoped path
+    ignore (Fiber.spawn outer report (task { FileSystem.read_all data }))
+  }
+}
+
+// a finalizer runs when its owner closes, after what it was given may end
+finalizer : Fiber.Owner s -> (Eff none none Unit)^c ->{Scope s} Unit
+let finalizer _ work = Scope.add_finalizer work
+//~ FLICK-G003 @24:13-24:24
+//~ FLICK-G003 @30:24-30:43

@@ -25,7 +25,7 @@ theorem canonical_dict {Ψ Θ Γ v c U φ} (hv : Value v) (h : Typ S Ψ Θ Γ v 
       Typ S Ψ Θ Γ r (.dfs (fs.map fun f => (f.1, f.2.substT (instT us)))) ∧ r.NoIns := by
   have hk := h.vkind hv rfl (by simp [Ty.isAll])
   cases hv with
-  | drec => cases h with | drec hc hl hr hn _ => exact ⟨_, _, _, _, rfl, rfl, hc, hl, hr, hn⟩
+  | drec => cases h with | drec hc hl hr hn => exact ⟨_, _, _, _, rfl, rfl, hc, hl, hr, hn⟩
   | ctorApp _ hf _ => simp [VKind, Tm.head, hf, Ty.kind] at hk
   | constApp =>
     simp [VKind, Tm.head, Ty.kind] at hk

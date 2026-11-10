@@ -50,23 +50,28 @@ theorem Tm.StandsAt.rename {Γ Γ' s} {e : Tm} {ξ : Nat → Nat} (h : e.StandsA
 /-- A value of a binder's type is typed by (∀I): no other rule gives a value that type. -/
 theorem Typ.allInv {Ψ Θ Γ e k t φ} (hv : Value e) (h : Typ S Ψ Θ Γ e (.ex (.all k t) φ)) :
     Typ S (Ψ.map (Ty.up k)) (Θ.substT (shiftV k)) (Γ.map (Scheme.up k)) e (.ex t .pure) := by
+  have noArrow : ∀ {a φ t C T}, LeLive (.arrow a φ t C) T → ¬ T.isAll := fun h' => by
+    obtain ⟨_, _, _, _, rfl, -⟩ := h'.arrow_res; simp [Ty.isAll]
+  have noEff : ∀ {r ε t C T}, LeLive (.eff r ε t C) T → ¬ T.isAll := fun h' => by
+    cases h' <;> simp [Ty.isAll]
   cases h with
   | allI _ h => exact h
-  | lam _ _ _ hT | fix _ _ _ hT | perform _ hT | kont _ _ hT | task _ _ _ _ hT => cases hT
+  | lam _ _ hT | fix _ _ hT | perform _ hT | kont _ _ hT => exact (noArrow hT trivial).elim
+  | task _ _ _ hT => exact (noEff hT trivial).elim
   | const _ hT =>
     obtain ⟨_, _, _, _, hx⟩ := Const.ty_isArrow _ _ S
-    rw [hx] at hT; cases hT
+    rw [hx] at hT; exact (noArrow hT trivial).elim
   | ctor _ _ _ hT =>
     have := hT.res
     rw [Sig.ctorTyR, Ty.arrows_res _ _ (Ty.tcon_not_arrow _ _)] at this
-    exact (Le.not_all this (Ty.not_all_of_hd (Ty.tcon_hd _ _)) trivial).elim
+    exact (this.not_all (Ty.not_all_of_hd (Ty.tcon_hd _ _)) trivial).elim
   | app hf _ _ hT =>
-    cases hT
+    have hT0 : LeLive _ _ := hT
     cases hv with
     | ctorApp hvf hK _ =>
       rcases Typ.spine_notAll hf hvf hK rfl with h | h
       · exact h.elim
-      · exact (h trivial).elim
+      · obtain rfl := hT0.eq_all; exact (h trivial).elim
     | constApp hc _ =>
       cases hf with
       | const _ hT' =>
@@ -76,8 +81,8 @@ theorem Typ.allInv {Ψ Θ Γ e k t φ} (hv : Value e) (h : Typ S Ψ Θ Γ e (.ex
           cases c <;> simp [Const.arity] at hc <;> exact ⟨_, _, rfl, by simp [Ty.isAll]⟩
         obtain ⟨_, _, hxy, hy⟩ := key _ _ hc
         rw [hxy] at hT'
-        obtain ⟨_, _, _, _, he, _, _, lt, -⟩ := hT'.arrow_left
-        cases he; cases lt; exact (hy trivial).elim
+        obtain ⟨_, _, _, _, he, lt⟩ := hT'.arrow_res
+        cases he; exact (hT0.not_all (lt.not_all hy) trivial).elim
       | perform => simp [Const.arity] at hc
   | _ => cases hv
 
@@ -103,13 +108,14 @@ theorem Typ.instAll {Ψ Θ Γ e k t φ} {us : List Ty} (hV : e.Stands) (hn : e.N
     exact this
   · cases h with
     | var hi hts hH hT => exact .var hi hts hH (hT.snoc hus)
-    | allVar hi _ hc => exact .var hi hus (fun _ _ h => (hc _ _ h).elim) .refl
+    | allVar hi _ hc => exact .var hi hus (fun _ _ h => (hc _ _ h).elim) LeLiveI.refl
     | allI hv => cases hv
   · exact .todo
 
 /-- (Var) at an instance, for the term that stands for the variable. -/
 theorem Typ.elim {Ψ Θ Γ e A T} (hV : e.Stands ∨ ¬ A.isAll) (hn : e.NoIns)
-    (h : Typ S Ψ Θ Γ e (.ex A .pure)) (hT : LeI A T) : Typ S Ψ Θ Γ e (.ex T .pure) := by
+    (h : Typ S Ψ Θ Γ e (.ex A .pure)) (hT : LeLiveI A T) :
+    Typ S Ψ Θ Γ e (.ex T .pure) := by
   induction hT with
   | le hl => exact h.sub ⟨hl, Stage.le_refl _⟩
   | inst hus _ ih =>

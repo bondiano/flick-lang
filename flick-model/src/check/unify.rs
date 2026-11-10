@@ -9,6 +9,7 @@ use std::rc::Rc;
 use std::slice;
 
 use super::generalize::{Inst, rigid_inst, substitute_all};
+use super::regions::drop_empty_live;
 use super::{Check, Checker, Slot, Solved, error};
 use crate::syntax::{Name, Path};
 use crate::types::{Caps, Fields, Row, Scheme, Stage, Type, Var};
@@ -154,6 +155,7 @@ impl Checker<'_> {
                 }
             }
         }
+        drop_empty_live(&mut out);
         out
     }
 

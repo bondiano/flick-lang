@@ -2,6 +2,8 @@
 
 Extends `core.md`: everything not redefined here holds as there. Divergences from the spec, the checker and the built-in bindings, and how each is resolved, are in §6.
 
+Regions are typed **by use**, the only discipline of the checker, the reference model and Lean: the qualifier `C` of a function or a task is what calling or awaiting it needs live, not a bound on what it holds. A region must be live where it is used; a closure or a task that holds a capability and never uses it may outlive the region. §2.2 and §2.3 give the rules by use, and §5 the theorem they keep, T4′, which gives up T4.2 for exactly that closure. The reach bound `⌈τ⌉` of §2.1 still measures what a type shows, for (Con), (Inst), errors and `Outlives`; the held premises of (Lam) and (Task) and the lemma L4 of the former capture discipline are gone, and the divergences of §6 that speak of them are history.
+
 References are as in `core.md`. Checker paths are relative to `flick-core/src/types/`; bindings are `builtins/X.fl` in the same directory. The probes of §6 are built with `flick build` and run on Node with a JS resource that marks a closed handle and prints `USE AFTER CLOSE` if the handle is used after close.
 
 ## 0. Scope
@@ -20,7 +22,7 @@ Added to the core:
 | Not covered | Where | How the model accounts for it |
 | - | - | - |
 | Concurrent execution of children, cancellation, two-phase close | `runtime.md` (λRT) | A child of region `π` is work that may take a step at any moment while `π` is live; closing `π` waits for it to finish (§3.3). Step order and cancellation are given by λRT |
-| The reader region of a lazy `for` (`reader_region`) and the region of a UI instance (`Setup s`) | — | The same rules with a different source of the region: a function or a component instance instead of `scope`. Not formalized separately |
+| The reader region of a lazy `for` (`reader_region`) and the region of a UI instance (`Setup s`) | — | The same rules with a different source of the region: a function or a component instance instead of `scope`. `Setup s`, like any service indexed by a region, keeps that region live where its row has it, and a handler of it is installed only where the region is live ([Scope keeps its region live](#scope-keeps-its-region-live); Lean `hdl_err_live`) |
 | The internals of leases in `ScopedRef`, `Resource`, `ScopedCache` | hypothesis G5 (§5) | The value is available only inside `use`, with the lease region; release waits for the leases to end ([leases](#leases-instead-of-early-close)) |
 | Classes, `do`, dictionaries | `elaboration.md` | A dictionary is built from top-level values and has no captures of its own |
 
@@ -85,7 +87,7 @@ e ::= … | scope s { e }
 | Surface | Model |
 | - | - |
 | `scope { e }` | `scope s { e }`, `s` fresh |
-| A curried stage `a -> b -> c` in a signature | `a → (b → c)^{⌈a⌉}`: a stage holds the earlier parameters (`regions/mod.rs` `implicit_captures`, `stages`) |
+| A curried stage `a -> b -> c` in a signature | elision: each runtime arrow and `Eff` of the signature needs `Live` of what the earlier parameters reach, `a →R⟨r;ε⟩ (b →R⟨Live ⌈a⌉ + r;ε⟩ c)`; a pure stage needs nothing. Interfaces omit `Live`, and every use of the signature elides it again (`regions/live.rs` `elide`, `live_scheme`; Lean `Ty.elide`) |
 | `fun`, `task` without an expected type | the qualifier is a fresh variable of kind `CRow`; the solution is the least one (§2.6) |
 | A call with `Scope ϱ` where `ϱ` is not yet known | `ϱ` is the region of the `Scope` named by the stage row (a task against `Eff {Scope t \| r} e a`), otherwise of the nearest `scope` (`regions/scopes.rs` `lexical_owner`, `declared_scope`) |
 | A call with `Scope ϱ` of an outer region inside a nested `scope` | the requirement travels through the nested `scope`s to the one whose region is `ϱ` (`settle_needs`); codegen passes the owner lexically: `$rt.within(owner, …)` |
@@ -167,18 +169,19 @@ Checker:
 
 ### 2.2 Subtyping
 
-One rule is added to those of `core.md` §2.2:
+A call of `(τ₁ →ψ τ₂)^C` runs at the use stage `use(ψ, C)`: `ψ` with `Live C` added to its row of services when `ψ` is a runtime stage, and `P` when `ψ = P`. Subtyping compares use stages:
 
 ```text
-τ ≤ τ'    ⌈τ^C⌉ ⊆ ⌈τ'^C'⌉
-─────────────────────────── (≤-Cap)
-τ^C ≤ τ'^C'
+τ₁' ≤ τ₁    τ₂ ≤ τ₂'    use(ψ, C) ⊑ use(ψ', C')
+──────────────────────────────────────────── (≤-Use)
+(τ₁ →ψ τ₂)^C ≤ (τ₁' →ψ' τ₂')^C'
 ```
 
-A bare type is `τ^∅`, so (≤-Cap) also applies to an unqualified value in an unqualified position: ⌈·⌉ of the whole value is compared. Consequences:
+and likewise for `Eff r ε τ`. A qualifier may move into the runtime row of a supertype, but not disappear: `(Unit →R⟨∅;∅⟩ Unit)^{s}` is not a subtype of `Unit →R⟨∅;∅⟩ Unit`, even if a parameter or the result shows `s`. Lean: `Stage.use`, `LeLive`, `LeLive.arrow_use`, `LeLive.eff_use` (`Live/Mode.lean`), checked in `LiveRules.lean`. Consequences:
 
 - widening a qualifier is allowed, narrowing is `FLICK-G001`;
-- the closure `(Unit → File s)^{s}` passes as `Unit → File s`: the type shows `s`;
+- a function or task value is not held against a written qualifier: what it holds is not compared, only what its use needs live;
+- what a function position's type shows, and what a value bound's type shows (`a` of `List a`), counts as visible, not held;
 - inside `Ref`, `List`, records and ADTs, types are compared by `≡` together with their qualifiers: "explicit stored qualifications are part of type identity", and mutable storage is invariant (`FLICK-T003`);
 - `α^{≤C} ≤ α` and `α ≤ α^{≤C}` by §2.1: both reach `⌈υ⌉`. Hence `Option (a^{≤v}, b^{≤w}) ≡ Option (a, b)` ([bounded variable atoms](#a-bounded-variable-reaches-what-the-variable-reaches)).
 
@@ -193,22 +196,24 @@ Checker:
 The judgment is as in the core, `Γ ⊢ e : τ ! φ`. `Γ` additionally holds variables of kinds `Region` and `CRow`, facts `Θ` (§2.4), and the list of open `scope`s: the regions bound by `scope`s around the current position.
 
 ```text
-Γ, x : τ₁ ⊢ e : τ₂ ! φ      ⋃_{y ∈ fv(λx.e)} ⌈Γ(y)⌉ ⊆ ⌈(τ₁ →φ τ₂)^C⌉
-───────────────────────────────────────────────────────────── (Lam)
+Γ, x : τ₁ ⊢ e : τ₂ ! use(φ, C)
+────────────────────────────── (Lam)
 Γ ⊢ λx. e : (τ₁ →φ τ₂)^C ! P
 
-Γ ⊢ e : τ ! φ    φ ⊑ R⟨r; ε⟩    ⋃_{y ∈ fv(e)} ⌈Γ(y)⌉ ⊆ ⌈(Eff r ε τ)^C⌉
-───────────────────────────────────────────────────────────── (Task)
+Γ ⊢ e : τ ! use(R⟨r; ε⟩, C)
+──────────────────────────── (Task)
 Γ ⊢ task e : (Eff r ε τ)^C ! P
+
+Γ ⊢ f : (τ₁ →ψ τ₂)^C ! φ    Γ ⊢ e : τ₁ ! φ    use(ψ, C) ⊑ φ
+──────────────────────────────────────────────────────── (App)
+Γ ⊢ f e : τ₂ ! φ
 ```
 
-Services the body looks up at run time are not captures: they are in the row `r`.
+A body is checked where its qualifier is live, and a call or an await needs the qualifier live in its own stage (`Live C`, `FLICK-G002` "this uses `s`, which … does not keep live"). Nothing bounds what a closure or a task holds: one that holds a capability and never uses it gets the qualifier `∅` and may leave the `scope` of its region. Services the body looks up at run time are in the row `r`.
 
-Checker:
+Applying a local `f : (∀v. τ^v → σ)^C` with `v ∉ σ` adds nothing of the argument to the result: the result is parametric in what the argument holds. So `Option.map` returns `(Option b)^c` for a function qualified `c`.
 
-- (Lam): `infer.rs` `curry` → `regions/mod.rs` `close_over`; the locals used are `held_since`. Without an expected type the qualifier is a fresh variable; against an expected type its qualifier is taken; against a bare type, `∅`.
-- (Task): `handlers.rs` `task` → `close_over`.
-- The premise is checked by `Hold` at the end of the declaration (§2.6). It computes `hidden = ⋃ ⌈Γ(y)⌉ ∖ shown_by(τ)` and requires `hidden ⊆ C`. `shown_by(τ) = ⌈τ⌉`, so this is exactly (Lam)/(Task); a subtraction that sees more than ⌈·⌉ would be unsound ([the reach bound of `Eff`](#the-reach-bound-of-eff-includes-its-result)).
+Checker: `regions/live.rs` (`live_call`, `live_await`, `qualifier_live`), `regions/applied.rs` `parametric_in_argument`. Lean: (Lam), (App), (Task) of `Typ` (`Rules.lean`).
 
 ```text
 K : ∀ᾱ. τ̄ →P T ᾱ      Γ ⊢ eᵢ : τᵢ' ! φᵢ      τᵢ' ≤ τᵢ[ᾱ := ῡ]      ⋃ ⌈τᵢ'⌉ ⊆ ⌈(T ῡ)^C⌉
@@ -319,7 +324,7 @@ A qualifier without an expected type is a variable of kind `CRow`. Each `Hold` o
 
 Generalization (`core.md` §2.5) does not quantify the variables of a value whose obligation is still open. Otherwise `let f = fun () -> use h` would get `∀c. (Unit → Unit)^c`, and instantiating `c := ∅` would erase the capture (`FLICK-G002`).
 
-A local signature need not name the regions its function holds: the outer qualifier is inferred. The qualifiers of later stages added by `implicit_captures` are written bounds ([local signatures](#local-signatures-infer-only-the-outer-qualifier)).
+A local signature need not name the regions its function holds or uses: the outer qualifier is inferred, and the later stages need what elision gives them (§1.4), `Live` of what the earlier parameters reach. An instance method without a signature is checked against the class signature, elided before the instance arguments are substituted.
 
 Checker:
 
@@ -364,7 +369,7 @@ Checker:
 - `regions/provided.rs`: `Fiber.Provided` obligations: splitting by service at the end of a call (`calls.rs` `apply`), discharge, moving into the stage row and discharge at the `perform` of whoever runs it (`FLICK-G003`); an owner that will be inferred from rows waits for the end of the declaration;
 - `effects/solve.rs`: an obligation that reaches a written signature row (`FLICK-G003` with a `Fiber.Provided` hint).
 
-In Lean (`formal/`) `provide S impl` is a handler of `S` (`core.md` §1.4), and the rules below are those of a handler of an effect: an obligation is an element `ob S ϱ` of the service row (`Elem.ob`); `Fiber.spawn` and `Scope.add_finalizer` put them into the stage of the call (`Row.obs`); the end of a region discharges them by the second case (`Row.disch`); a handler of `S` does not let them through (`Stage.ObOut` in (Handle-E)); and at run time a handler discharges them when its region is older (`Row.hP`). A child and a finalizer keep the handlers of their registration site older than their owner (`withs`, `Tm.hkeep`); one younger than the owner ends first, and the obligation of the work keeps its effect out of the row of the work (`kid_dropped`). An operation of a kept handler whose region has closed is stuck (`DeadUse`), and `T4` shows that this does not happen.
+In Lean (`formal/`) `provide S impl` is a handler of `S` (`core.md` §1.4), and the rules below are those of a handler of an effect: an obligation is an element `ob S ϱ` of the service row (`Elem.ob`); `Fiber.spawn` and `Scope.add_finalizer` put them into the stage of the call (`Row.obs`); the end of a region discharges them by the second case (`Row.disch`); a handler of `S` does not let them through (`Stage.ObOut` in (Handle-E)); and at run time a handler discharges them when its region is older (`Row.hP`). A child and a finalizer keep the handlers of their registration site older than their owner (`withs`, `Tm.hkeep`); one younger than the owner ends first, and the obligation of the work keeps its effect out of the row of the work (`kid_dropped`). An operation of a kept handler whose region has closed is stuck (`DeadUse`), and `T4'` shows that this does not happen.
 
 The reference model (`flick-model/src/check/regions/provided.rs`) implements the same from this document. The `Provided R ϱ` of a scheme is an element `{Provided R ϱ}` in the row of its last runtime arrow, and the call splits it at `perform`. Elements move up with the stage row: `provide` discharges them by the first case, the `scope` of their region by the second, the end of a λ or task by a given `Provided`. Difference: a given constraint discharges at the end of the λ or task around the call, not at the call itself, so a λ with a written row in between rejects what this section accepts (`shortcut:`). The `with θ` of a configuration discharges the elements of its services without comparing regions: the layer is already built, and use after its end is caught by the machine (§3.3).
 
@@ -440,9 +445,9 @@ The model properties (`just model`) check (Inside) and `⊢ Λ` on every state. 
 Γ ⊢ inside π e : τ ! R⟨r; ε⟩
 ```
 
-`⊢ Λ`: the finalizers and children of each live `π` are typed with a bound `C` for which `Outlives C π` holds in the nesting order of live regions.
+`⊢ Λ`: the finalizers and children of each live `π` are typed at stages whose `Live` regions outlive `π` in the nesting order of live regions (Lean `LCfgTy`, `Row.Outlives`).
 
-For runtime terms, the premises of (Lam) and (Task) count the regions of `cap π n` and `own π` in the body and `⌈Ψ(ℓ)⌉` of its locations on a par with `⌈Γ(y)⌉` of the free variables; programs contain no such forms, so for them the rule is unchanged ([(Lam) and (Task) count runtime forms](#lam-and-task-count-runtime-forms)). The bodies of `λ`, `fix` and `task` contain no `inside`.
+(Lam) and (Task) ask nothing of what a runtime body holds, as of a program ([(Lam) and (Task) count runtime forms](#lam-and-task-count-runtime-forms) records the premise of the capture discipline). The bodies of `λ`, `fix` and `task` contain no `inside`.
 
 ## 4. Leak paths
 
@@ -461,7 +466,7 @@ The table of spec/05 "Static regions and captures": the model rule, the countere
 | A layer service in a child of an outer owner | (Spawn-Svc), (Provided), §2.7 | `Fiber.spawn outer` or `Scope.add_finalizer` of an outer region from inside a `provide` with a layer service ([provide services must not outlive their layer](runtime.md#a-provide-service-outlives-the-release-of-its-layer)) | `provide_escape.fl` (`FLICK-G003`); path 10 of the model's program generator (`flick-model/src/generate/provides.rs`) |
 | Foreign call | G4: the signature is a retention contract; what is retained under `retention owner` requires `Outlives` (`FLICK-F002`) | an acquired value outside its `scope`, including through a generic function; a lease value from `use` | `acquired.fl` ([acquired values](#acquired-values-carry-their-region), [value bounds](#a-value-bound-survives-an-unknown-type-position)), `leases.fl` ([leases](#leases-instead-of-early-close)), `fail/ffi/owner_retention.fl` |
 
-## 5. Theorem T4
+## 5. Theorem T4′
 
 ### 5.1 Hypotheses
 
@@ -480,53 +485,38 @@ G1–G3 of `core.md` hold, and the following are added:
 
 `reach_μ(e)` are the regions `π` that occur in `e` (in `cap π n`, `own π`, and inside the bodies of `λ` and `task`), together with `reach_μ(μ(ℓ))` for each location `ℓ` in `e`, transitively. In a substitution semantics this is exactly reachability.
 
-- **L4 (reachability is bounded by the type).** If `·;Ψ;Λ ⊢ v : τ ! P` and `⊢ μ : Ψ`, then `reach_μ(v) ⊆ ⌈τ⌉`. By induction on the derivation:
-  - (Cap), (Own): by definition;
-  - (Lam), (Task), (Con): the premise and the substitution lemma: the values substituted for free variables are bounded by their types;
-  - `ℓ`: `⊢ μ : Ψ` and invariance of `Ψ(ℓ)`: a write to `ℓ` has exactly type `Ψ(ℓ)`, qualifiers included;
-  - (≤-Cap): the premise `⌈τ^C⌉ ⊆ ⌈τ'^C'⌉`;
-  - (App-Pure): T2(a).
+Typing by use does not bound `reach_μ(v)` by the type of `v`: a closure may hold a capability its type does not show. The lemma L4 of the capture discipline (`reach_μ(v) ⊆ ⌈τ⌉`) is therefore gone, and with it T4.2 (§5.3).
 
-  The checker computes the premise of (Lam)/(Task) through `shown_by = ⌈·⌉`. The lemma fails in a checker that subtracts more than ⌈·⌉ ([reach bound of `Eff`](#the-reach-bound-of-eff-includes-its-result)) or drops a value bound in a position of unknown type ([value bounds](#a-value-bound-survives-an-unknown-type-position)).
 - **L5 (nesting).** If `π₂` is created inside `inside π₁` (in the body or in a child of `π₁`), then `π₂` closes before `π₁`. Follows from §3.3: `inside π₁ w` closes only when the body is a value and the children of `π₁` have finished.
 - **L6 (old cells).** If `ℓ` was allocated before `π` was created, then `π ∉ fr(Ψ(ℓ))`: `Ψ(ℓ)` is closed at allocation, and `π` is fresh.
 
-  In Lean: L4 is `Typ.holds` (without a store) and `lemma_4`, `lemma_4_cell` (`reach_μ` is `Reaches`); L5 is `Nest.nested` and `Nest.live`; L6 is `lemma_6`. Freshness of `π` is kept by renaming: each step renames the derivation through `kill |Λ|`, which replaces regions `≥ |Λ|` with `Unit`, and the configuration mentions only existing regions (`CfgBelow`). The facts of a configuration are the creation order (`Facts.age`): a region outlives all regions created after it.
+  In Lean: `reach_μ` is `Reaches`; L5 is `LNest.nested`; L6 is `lemma_6`. Freshness of `π` is kept by renaming: each step renames the derivation through `kill |Λ|`, which replaces regions `≥ |Λ|` with `Unit`, and the configuration mentions only existing regions (`CfgBelow`). The facts of a configuration are the creation order (`Facts.age`): a region outlives all regions created after it.
 
-  `⊢ Λ` in Lean is `Nest`: each region has ancestors `anc π` (the regions it was created in, and itself), and each cell has the regions `B ℓ` it may hold. A position in a thread names the regions of its base (none for the main thread, `anc ϱ` for a child or finalizer of `ϱ`) and of the `inside` forms around it; a location sees through a cell exactly what its type names at that position (`Tm.Within`). `inside` forms occur only where the term is being evaluated, so a step neither copies nor loses them. Every step preserves the invariant (`Nest.step`); hence live work reaches only live regions.
+  `⊢ Λ` in Lean is `LNest` (`Live/LNest.lean`): each region has ancestors `anc π` (the regions it was created in, and itself); the `inside` forms and the handlers of each thread are at the place of their region, and the arms of a handler's cell name only ancestors of its region (`LCell`). `inside` forms occur only where the term is being evaluated, so a step neither copies nor loses them. Every step preserves the invariant (`LNest.step`). What a thread names is not bounded; instead `LCfgTy` types the children and finalizers of each region `p` at stages naming only ancestors of `p`, and every region atom of the stage of a hole is the thread's or a frame's, and so live (`hole_atm`, `LNest.atm_live`).
 
 ### 5.3 Statement
 
-**T4 (regions).** Let `e₀` be a program (`core.md` §2.6) without `Scope` in `φ₀`, let G1–G6 hold, and let `⟨∅, ∅, e₀⟩ →* ⟨Λ, μ, e⟩` under any admissible order of child steps. Then:
+**T4′ (regions, by use).** Let `e₀` be a program (`core.md` §2.6) without `Scope` in `φ₀`, let G1–G6 hold, and let `⟨∅, ∅, e₀⟩ →* ⟨Λ, μ, e⟩` under any admissible order of child steps. Then:
 
-1. no step applies `op_H` to `cap π n` with `Λ(π) = closed`;
-2. more strongly, at the moment of a close step `E[inside π w] → E[w]`:
-   - neither `E[w]` nor the cells reachable from it reach `π`;
-   - the finalizers and children of other live regions do not reach `π`;
-   - if `w = raise v`, then `v` does not reach `π`;
-3. no fiber performs an operation of a service given by a `provide` with region `ϱₚ` after `ϱₚ` closes.
+1. (T4.1) no thread — the main thread, or a child or finalizer of a live region — is at a step that needs a region that is not live: `open_H`, `op_H`, registering a finalizer or a child, or closing a region;
+2. (T4.2, given up) nothing is said of what threads *reach*: a value may keep a closed capability reachable;
+3. (T4.3) no fiber performs an operation of a service given by a `provide` with region `ϱₚ` after `ϱₚ` closes.
 
-Sketch. Invariant: every reachable state is well typed, `⊢ μ : Ψ`, `⊢ Λ`, and everything that can take a step reaches only live regions. Preservation by step:
+T4.2 of the capture discipline said that at a close step of `π` nothing that can still step reaches `π`. Typing by use gives it up on purpose: a closure or a task that holds a capability of `π` and never uses it is accepted, may outlive `π`, and runs without a use after close. What it costs is memory, not safety: the runtime contract takes only T4.3 (G11 of `runtime.md`), so T5 is unaffected.
 
-- **Close of `π`**, `w` a value. `w : τ` with `π ∉ fr(τ)` by (Inside), and `π ∉ reach(w)` by L4. `E` was built before `π` was created and does not contain `π`. Cells older than `π` receive no values reaching `π`, by L6 and invariance. A cell younger than `π` with `π ∈ fr(Ψ(ℓ))` is unreachable: `ℓ` is reachable only through a value whose type contains `Ref Ψ(ℓ)`, and hence `π`.
-- **Finalizers and children of an outer `π'`** (`π' ≥ π`, `π' ≠ π`). Their bound `C` satisfies `Outlives C π'`, and `π ≥ π'` does not hold; by L4 they do not reach `π`. The regions inside `π` are already closed (L5).
-- **`w = raise v`.** By (Err-Raise) `π ∉ ⌈type of v⌉`, by L4 `π ∉ reach(v)`.
-- **Registration** (`open_H π`, `add_finalizer π`, `spawn (own π)`). The term contains `π`, so `π` is live by the invariant.
-- **Foreign calls**: by G4. Without it a constant could retain an argument past its type.
-
-Item 1 follows from item 2: after `π` closes, no computation that can take a step contains `cap π n`.
+Sketch. Invariant: every reachable state is well typed, `⊢ μ : Ψ`, `⊢ Λ`, and the stage of every thread names only live regions of its place. A step that needs a region has that region's atom in the stage of its redex — a call needs its qualifier live (`use(ψ, C) ⊑ φ`), `op` needs `Scope s`, registered work needs every region of its `Live` to outlive the owner — and every region atom of the stage of a hole is the thread's or a frame's, hence live. Foreign calls are covered by G4.
 
 Item 3. The environment `θ` of a `provide` is received by the body of the `provide` and by what it starts. The body and the children of owners inside `ϱₚ` finish before it closes (L5). Retained work of an owner `ϱ` from the body received `Provided S ϱ`, which is discharged only when `ϱₚ ≥ ϱ` (§2.7): `ϱ` closes no later than `ϱₚ`, and its children finish before that. An obligation that moved to the runner of a stage is discharged there by the same rule. This discharges the premise of R6 in `runtime.md` ([provide services must not outlive their layer](runtime.md#a-provide-service-outlives-the-release-of-its-layer)).
 
 **Corollary (progress for capabilities).** The stuck state of §3.2 is unreachable, and T1 of the core stays valid with the constants `op_H`.
 
-In Lean, items 1 and 2 are `T4`, item 3 is `T4_3`, and the corollary is `T1_regions`. Item 2 is stated there for every reachable state: the main thread and the children and finalizers of live regions reach only live regions; after the close step of `π` this is item 2. Item 3 is stated in the form of [the answering provide must be live](runtime.md#the-provide-liveness-premise-is-stronger-than-typing-gives): in every reachable state, an operation answered by a handler of region `ϱₚ`, its own or kept, occurs only while `ϱₚ` is live. A thread holds only handlers of its ancestors, which are live (`Nest`). What the obligation contributes is that nothing is lost by a child keeping only those: the row of the work names no effect whose handler is younger than the owner, because `Provided {S} ϱ` of the registration is discharged only by a handler of an older region (`kid_kept`, `kid_dropped`), so a `tail` operation of a child is answered by a handler it keeps or by the root (`KidCov`, `T1_regions`).
+In Lean, T4′ is `SafeUse` (`formal/Formal/Live.lean`), proved of the typing `Typ` as `T4'` (`formal/Formal/Live/T4Live.lean`): its first two conjuncts are item 1 for the main thread and for the children of live regions (`DeadUse`, `Regions.lean`), the third is item 3, and the corollary is `T1_regions` (`Live/T1Regions.lean`). Item 3 is stated in the form of [the answering provide must be live](runtime.md#the-provide-liveness-premise-is-stronger-than-typing-gives): in every reachable state, an operation answered by a handler of region `ϱₚ`, its own or kept, occurs only while `ϱₚ` is live. A thread holds only handlers of its ancestors, which are live (`LNest`). What the obligation contributes is that nothing is lost by a child keeping only those: the row of the work names no effect whose handler is younger than the owner, because `Provided {S} ϱ` of the registration is discharged only by a handler of an older region (`kid_kept`, `kid_dropped`), so a `tail` operation of a child is answered by a handler it keeps or by the root (`KidCov`, `T1_regions`).
 
-`Fiber e a` is not a capability of the owner's region: a child's handle may outlive the owner, and `join` then gets an interruption. T4 does not forbid this, and neither does spec/05.
+`Fiber e a` is not a capability of the owner's region: a child's handle may outlive the owner, and `join` then gets an interruption. T4′ does not forbid this, and neither does spec/05.
 
 ## 6. Known divergences
 
-Some divergences broke T4. [The reach bound of `Eff`](#the-reach-bound-of-eff-includes-its-result) broke it in the checker's rules. [Owner retention](#owner-retention-requires-outlives), [background work](#background-work-has-owner-retention) and [acquired values](#acquired-values-carry-their-region) broke hypothesis G4 in the built-in bindings, and through it T4. [Leases](#leases-instead-of-early-close) broke G6 and the "no early close" promise of spec/05. Each of these is confirmed by a probe: a program the checker accepted that prints `USE AFTER CLOSE` when run on Node, or a program accepted where the analogous form is rejected (`FLICK-G003`). The others are checker incompleteness or imprecise prose. All are resolved in the checker, the bindings, the runtime, the spec or this document, as each item states; every checker fix has a fixture.
+Some divergences broke T4, the theorem of the former capture discipline. [The reach bound of `Eff`](#the-reach-bound-of-eff-includes-its-result) broke it in the checker's rules. [Owner retention](#owner-retention-requires-outlives), [background work](#background-work-has-owner-retention) and [acquired values](#acquired-values-carry-their-region) broke hypothesis G4 in the built-in bindings, and through it T4. [Leases](#leases-instead-of-early-close) broke G6 and the "no early close" promise of spec/05. Each of these is confirmed by a probe: a program the checker accepted that prints `USE AFTER CLOSE` when run on Node, or a program accepted where the analogous form is rejected (`FLICK-G003`). The others are checker incompleteness or imprecise prose. All are resolved in the checker, the bindings, the runtime, the spec or this document, as each item states; every checker fix has a fixture.
 
 Common definitions for the probes:
 
@@ -690,8 +680,8 @@ let local () =
 ```
 
 - Symptom: `FLICK-G001` "the expected type `(Unit ->{} Unit)^{a}` allows only `a`", although the closure does not leave the `scope`.
-- reference/regions promised: "a local signature need not name the regions its function holds". The outer qualifier is indeed inferred, but the stage qualifiers from `implicit_captures` remain written bounds.
-- Incompleteness. Resolution, spec: reference/regions states that only the qualifier of the function itself is inferred. Workaround: name the region, `scope s { … }`, and write `(Unit ->{} Unit)^{a, s}`.
+- reference/regions promised: "a local signature need not name the regions its function holds". The outer qualifier was inferred, but the capture discipline made the qualifiers of later stages written bounds.
+- Incompleteness of the capture discipline. Resolution, checker: typing by use asks nothing of what the closure holds, and a later stage needs only what elision gives it (§1.4), so `wrap` is accepted; a later stage that uses a region the earlier parameters do not reach still needs it in its row.
 
 ### Children acquire in the region of their owner
 
@@ -892,7 +882,45 @@ let shown_by_result () =
 Divergence: (Lam) and (Task) did not see runtime forms in the body.
 
 - Symptom: the premise of (Lam) counted only the free variables of the body. The term `λx. (λy. ()) (cap π n)` has none and gets type `(Unit → Unit)^∅`, although the body holds a capability of region `π`, and L4 fails for it. Programs contain no such terms, but a step creates them: substituting a value for a free variable leaves `cap π n` inside a `λ`.
-- Imprecise §3.4. Resolution, document: for runtime forms, the premises of (Lam) and (Task) count the regions of `cap π n`, `own π` and `⌈Ψ(ℓ)⌉` of the body's locations on a par with `⌈Γ(y)⌉` of the free variables; for programs the rule is unchanged. Substituting a value preserves the premise by the syntactic part of L4: a value holds no more than its type shows. Lean: `held`, `Typ.lam`, `Typ.holds`. Found while proving T4 in Lean (`formal/Formal/Regions.lean`).
+- Imprecise §3.4. Resolution, document: for runtime forms, the premises of (Lam) and (Task) count the regions of `cap π n`, `own π` and `⌈Ψ(ℓ)⌉` of the body's locations on a par with `⌈Γ(y)⌉` of the free variables; for programs the rule is unchanged. Substituting a value preserves the premise by the syntactic part of L4: a value holds no more than its type shows. Typing by use has dropped the premise and that lemma (Lean keeps `held`, `Reach.lean`, as a measure only). Found while proving T4 in Lean (`formal/Formal/Regions.lean`).
+
+### A cell's content and the cell both bound what is stored
+
+Divergence: the model checked a value stored by `Ref.set` only against the outer of two qualifiers.
+
+```flick
+leak : Unit ->{} Unit
+let leak () =
+  let cell = Ref.make (task { () })
+  let _ = scope s { let h = open "x"; Ref.set cell (task { use h }) }
+  await (Ref.get cell)
+```
+
+- Symptom: the model's checkers, captures and live, accepted the program, and its machine stopped with "use after close". `Ref.set` takes `α^c` with `α` the cell's content `τ^{c₀}`, so the task was checked against `(τ^{c₀})^c`. (Lam), (Task) and (≤-Cap) took only `c`, which is free and grew to `s`; `c₀`, the capacity the cell was made with, was never asked. flick-core rejects the program in both modes.
+- Model hole, not a hole of the document or of Lean, where `Ref.set` takes exactly the cell's type. Resolution, model: a value checked against nested qualifiers is within each (`qualifiers`, `layers`, `close_within` in `check/regions/mod.rs`), so `c₀` grows to `s` and `s` would leave its `scope` (`FLICK-G002`). Found while porting the live discipline to flick-core. Test: `flick-model/tests/live_core.rs` `live_core_rejects_a_task_in_an_outer_cell`.
+
+### Scope keeps its region live
+
+Divergence: typing by use in the model and in flick-core kept `Live C` as a row element of its own, apart from `Scope s`.
+
+```flick
+group : Unit ->{Scope s, Async;} FiberSet.FiberSet s none Unit
+let group () =
+  let set : FiberSet.FiberSet s none Unit = FiberSet.make ()
+  let _ = FiberSet.run { propagateInterruption = false; startImmediately = true } (task { () }) set
+  set
+```
+
+- Symptom: both checkers rejected the helper (`FLICK-G002` "this uses `s`, which the signature of `group` does not keep live"). Its body uses region `s`, its row has `Scope s` and no `Live s`, and no program can write `Live s`. The same held for `tests/run/runtime/{closing_child_fails,closing_hooks,group_in_closing}.fl`, which the former capture discipline accepted and which run.
+- Stricter than Lean, not a hole: in `formal/Formal/Live/Mode.lean`, `Stage.use (.rt r ε) C` is `.rt (Row.union r (Row.ofCaps C)) ε`, and `Row.scope s = Row.ofCaps s.reach` (`Syntax.lean`), so `Live C` and `Scope s` are the same row atoms. Resolution, model and checker: where `Live C` is checked within a row, the regions of that row's `Scope ϱ` count as live. Work an owner keeps needs the regions of its `Live` to outlive the owner; its `Scope` is the owner's own ([children acquire in the region of their owner](#children-acquire-in-the-region-of-their-owner)), which adds nothing to that. Only one direction: `Live ϱ` gives no `Scope ϱ`, so an acquisition into `ϱ` still needs `Scope ϱ` (`FLICK-G004`). Model: `check/regions/live.rs` `scope_live`, `check/rows.rs` `within`; flick-core: `types/regions/live_rows.rs`. Tests: `flick-model/tests/live_scope.rs`; `tests/check/pass/regions/scope_helper.fl`, `tests/check/fail/regions/acquire.fl`.
+- Extended to `Setup s` of a component, like any service indexed by a region: a row with `Setup s` keeps `s` live, and a handler of it is installed only where `s` is live, so a `provide` of `Setup s` outside the instance of `s` is rejected. The runtime gives `Setup s` only while it sets up the instance of region `s` (`setUp` in `runtime/src/rt/ui/views.ts` and `runtime/src/ui/react/views.ts`). Checker: `regions/live_rows.rs` `live_install`; model: `check/regions/live.rs` `indexed_live`; Lean: `hdl_err_live` (`formal/Formal/Live/Install.lean`): (Handle) removes only the name of the effect from the body's row, so every region its index reaches stays in the stage where the handler is installed. Tests: `tests/check/pass/ui/component_setup.fl`, `tests/check/pass/regions/setup_region.fl`, `tests/check/fail/regions/install.fl`.
+
+### Rules of typing by use found while porting
+
+- An instance method without a signature is checked against the class signature, elided before the instance arguments are substituted (`tests/check/pass/regions/instance_elided.fl`); a signature an instance method writes does not add the `Live` its own arrows would need (`tests/check/fail/regions/instance_signature.fl`).
+- A function or task value is not held against a written qualifier: only what its use needs live is compared, and a qualifier does not hide that need (`tests/check/fail/regions/call_qualifier.fl`).
+- What a function position's type shows, and what a value bound's type shows (`a` of `List a`), counts as visible, not held.
+- Applying a local `f : (∀v. τ^v → σ)^C` with `v ∉ σ` adds nothing of the argument to the result (`regions/applied.rs` `parametric_in_argument`), so `Option.map` returns `(Option b)^c`.
 
 Outside regions, found along the way:
 

@@ -47,13 +47,13 @@ theorem Typ.spine_match {Ψ Θ Γ v J} (h : Typ S Ψ Θ Γ v J) :
     Value v → ∀ {K k ts T X}, v.head = .ctor K → S.ctor K = some (k, ts, T) →
       J = .ex X .pure → X.kind ≠ 7 → ¬ X.isAll →
       ∃ us, us.length = k ∧ X.res = Ty.tcon T ((S.res K).map (Ty.substT (instT us))) ∧
-        ∀ {p Z Δ δ}, SpTy S K us p Z Δ → matchP p v = some δ → Le Z X ∧ Inst S Ψ Θ Γ δ Δ := by
+        ∀ {p Z Δ δ}, SpTy S K us p Z Δ → matchP p v = some δ → LeLive Z X ∧ Inst S Ψ Θ Γ δ Δ := by
   induction h with
   | ctor hK hk _ hT =>
     intro _ _ _ _ _ _ hK' hS hJ _ _
     cases hJ; simp only [Tm.head] at hK'; cases hK'
     rw [hK] at hS; cases hS
-    refine ⟨_, hk, hT.res_tcon (Sig.ctorTyR_res _ _ _ _), fun hp hm => ?_⟩
+    refine ⟨_, hk, LeLive.res_tcon hT (Sig.ctorTyR_res _ _ _ _), fun hp hm => ?_⟩
     cases hp with
     | head hK'' =>
       rw [hK] at hK''; cases hK''
@@ -68,15 +68,16 @@ theorem Typ.spine_match {Ψ Θ Γ v J} (h : Typ S Ψ Θ Γ v J) :
       simp only [Tm.head] at hK
       obtain ⟨us, hl, hr, hus⟩ := ih₁ hvf hK hS rfl (by simp [Ty.kind]) (by simp [Ty.isAll])
       simp only [Ty.res] at hr
-      refine ⟨us, hl, hT.res_tcon hr, fun hp hm => ?_⟩
+      refine ⟨us, hl, LeLive.res_tcon hT hr, fun hp hm => ?_⟩
       cases hp with
       | head => simp [matchP] at hm
       | app hp' hq =>
         obtain ⟨δ₁, δ₂, h1, h2, rfl⟩ := matchP_app.mp hm
         obtain ⟨hl', i₁⟩ := hus hp' h1
-        obtain ⟨_, _, _, _, h, la, _, lt, -⟩ := hl'.arrow_left
+        obtain ⟨_, _, _, _, h, la, _, lt, -⟩ := LeLive.arrow_left hl'
         cases h
-        exact ⟨lt.trans hT, i₁.append (hq.inst hve (he.sub ⟨la, Stage.le_refl _⟩) h2)⟩
+        exact ⟨lt.trans hT, i₁.append (hq.inst hve
+          (he.sub (J' := .ex _ .pure) ⟨la, Stage.le_refl _⟩) h2)⟩
     | constApp => simp [Tm.head] at hK
   | errVal => intro _ _ _ _ _ _ _ _ hJ hk; cases hJ; simp [Ty.kind] at hk
   | allI => intro _ _ _ _ _ _ _ _ hJ _ hA; cases hJ; exact (hA trivial).elim

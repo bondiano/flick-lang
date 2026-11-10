@@ -1,4 +1,5 @@
 import Formal.Substitution
+import Formal.Live.Invert
 
 /-!
 # Values are pure (L1, last clause)
@@ -46,49 +47,49 @@ theorem Const.ty_arrow (c : Const) (ι : CArg) : ∃ x φ y C, c.ty S ι = .arro
 
 /-- What `Value.pure` gives. -/
 def PureTy (S : Sig) (Ψ : List Ty) (Θ : Facts) (Γ : List Scheme) (e : Tm) (T : Ty) : Prop :=
-  ∃ T₀, Le T₀ T ∧ Typ S Ψ Θ Γ e (.ex T₀ .pure) ∧
+  ∃ T₀, LeLive T₀ T ∧ Typ S Ψ Θ Γ e (.ex T₀ .pure) ∧
     (∀ K, e.head = .ctor K → T₀.PureSpine) ∧
     (∀ c, e = .const c → ¬ T.isAll → ∃ ι, T₀ = c.ty S ι)
 
 theorem Typ.pureTy {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
     Value e → ∀ {T φ}, J = .ex T φ → PureTy S Ψ Θ Γ e T := by
   induction h with
-  | lam hb hn hc hT =>
+  | lam hb hn hT =>
     intro _ _ _ hJ; cases hJ
-    exact ⟨_, hT, .lam hb hn hc .refl, by simp [Tm.head], by simp⟩
-  | fix hf hn hc hT =>
+    exact ⟨_, hT, .lam hb hn LeLive.refl, by simp [Tm.head], by simp⟩
+  | fix hf hn hT =>
     intro _ _ _ hJ; cases hJ
-    exact ⟨_, hT, .fix hf hn hc .refl, by simp [Tm.head], by simp⟩
-  | cap => intro _ _ _ hJ; cases hJ; exact ⟨_, .refl, .cap, by simp [Tm.head], by simp⟩
-  | own => intro _ _ _ hJ; cases hJ; exact ⟨_, .refl, .own, by simp [Tm.head], by simp⟩
-  | lit => intro _ _ _ hJ; cases hJ; exact ⟨_, .refl, .lit, by simp [Tm.head], by simp⟩
+    exact ⟨_, hT, .fix hf hn LeLive.refl, by simp [Tm.head], by simp⟩
+  | cap => intro _ _ _ hJ; cases hJ; exact ⟨_, LeLive.refl, .cap, by simp [Tm.head], by simp⟩
+  | own => intro _ _ _ hJ; cases hJ; exact ⟨_, LeLive.refl, .own, by simp [Tm.head], by simp⟩
+  | lit => intro _ _ _ hJ; cases hJ; exact ⟨_, LeLive.refl, .lit, by simp [Tm.head], by simp⟩
   | loc hl =>
-    intro _ _ _ hJ; cases hJ; exact ⟨_, .refl, .loc hl, by simp [Tm.head], by simp⟩
+    intro _ _ _ hJ; cases hJ; exact ⟨_, LeLive.refl, .loc hl, by simp [Tm.head], by simp⟩
   | const hc hT =>
     intro _ _ _ hJ; cases hJ
-    exact ⟨_, hT, .const hc .refl, by simp [Tm.head], fun _ h _ => by cases h; exact ⟨_, rfl⟩⟩
+    exact ⟨_, hT, .const hc LeLive.refl, by simp [Tm.head], fun _ h _ => by cases h; exact ⟨_, rfl⟩⟩
   | ctor hK hk hH hT =>
     intro _ _ _ hJ; cases hJ
-    exact ⟨_, hT, .ctor hK hk hH .refl, fun _ _ => Sig.ctorTyR_pureSpine _ _ _ _, by simp⟩
-  | rnil => intro _ _ _ hJ; cases hJ; exact ⟨_, .refl, .rnil, by simp [Tm.head], by simp⟩
-  | task he hψ hn hc hT =>
+    exact ⟨_, hT, .ctor hK hk hH LeLive.refl, fun _ _ => Sig.ctorTyR_pureSpine _ _ _ _, by simp⟩
+  | rnil => intro _ _ _ hJ; cases hJ; exact ⟨_, LeLive.refl, .rnil, by simp [Tm.head], by simp⟩
+  | task he hψ hn hT =>
     intro _ _ _ hJ; cases hJ
-    exact ⟨_, hT, .task he hψ hn hc .refl, by simp [Tm.head], by simp⟩
+    exact ⟨_, hT, .task he hψ hn LeLive.refl, by simp [Tm.head], by simp⟩
   | rcons hR hl _ _ ih₁ ih₂ =>
     intro hv _ _ hJ; cases hJ
     cases hv with
     | rcons hv₁ hv₂ =>
       obtain ⟨_, l₁, t₁, -⟩ := ih₁ hv₁ rfl
       obtain ⟨_, l₂, t₂, -⟩ := ih₂ hv₂ rfl
-      exact ⟨_, .refl, .rcons hR hl (t₁.sub ⟨l₁, Stage.le_refl _⟩) (t₂.sub ⟨l₂, Stage.le_refl _⟩),
+      exact ⟨_, LeLive.refl, .rcons hR hl (t₁.sub ⟨l₁, Stage.le_refl _⟩) (t₂.sub ⟨l₂, Stage.le_refl _⟩),
         by simp [Tm.head], by simp⟩
   | allI hv' h =>
     intro _ _ _ hJ; cases hJ
-    exact ⟨_, .refl, .allI hv' h, fun _ _ => trivial, fun _ _ h => (h trivial).elim⟩
+    exact ⟨_, LeLive.refl, .allI hv' h, fun _ _ => trivial, fun _ _ h => (h trivial).elim⟩
   | errVal hv' _ hU hE ih =>
     intro _ _ _ hJ; cases hJ
     obtain ⟨T₀, l, t, _, hc⟩ := ih hv' rfl
-    refine ⟨_, .refl, .errVal hv' (t.sub ⟨l, Stage.le_refl _⟩) hU hE, fun _ _ => trivial,
+    refine ⟨_, LeLive.refl, .errVal hv' (t.sub ⟨l, Stage.le_refl _⟩) hU hE, fun _ _ => trivial,
       fun c hc' _ => ?_⟩
     obtain ⟨ι, hι⟩ := hc c hc' (Ty.not_all_of_hd hU)
     obtain ⟨_, _, _, _, h⟩ := Const.ty_arrow (S := S) c ι
@@ -103,7 +104,7 @@ theorem Typ.pureTy {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
       obtain ⟨_, _, _, _, rfl, la, lφ, lt, -⟩ := l₀.arrow_right
       obtain ⟨rfl, sp'⟩ := sp _ hK
       obtain ⟨_, le, te, -⟩ := ih₂ hve rfl
-      refine ⟨_, lt.trans hT, .app t₀ (te.sub ⟨le.trans la, Stage.le_refl _⟩) trivial .refl,
+      refine ⟨_, lt.trans hT, .app t₀ (te.sub ⟨le.trans la, Stage.le_refl _⟩) (by trivial) LeLive.refl,
         fun _ _ => sp', fun _ h => (by cases h)⟩
     | constApp hc hve =>
       obtain ⟨T₀, l₀, t₀, _, hcT⟩ := ih₁ .const rfl
@@ -113,19 +114,19 @@ theorem Typ.pureTy {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
       obtain ⟨_, _, _, _, h, la, _, lt, -⟩ := l₀.arrow_left
       cases h
       obtain ⟨_, le, te, -⟩ := ih₂ hve rfl
-      exact ⟨_, lt.trans hT, .app t₀ (te.sub ⟨le.trans la, Stage.le_refl _⟩) trivial .refl,
+      exact ⟨_, lt.trans hT, .app t₀ (te.sub ⟨le.trans la, Stage.le_refl _⟩) (by trivial) LeLive.refl,
         by simp [Tm.head], fun _ h => (by cases h)⟩
-  | drec hc hk hr hn hh =>
+  | drec hc hk hr hn =>
     intro _ _ _ hJ; cases hJ
-    exact ⟨_, .refl, .drec hc hk hr hn hh, by simp [Tm.head], by simp⟩
+    exact ⟨_, LeLive.refl, .drec hc hk hr hn, by simp [Tm.head], by simp⟩
   | @perform E o c a b t T _ _ _ _ hop hT =>
     intro _ _ _ hJ; cases hJ
-    refine ⟨_, hT, .perform hop .refl, by simp [Tm.head], fun _ h _ => ?_⟩
+    refine ⟨_, hT, .perform hop LeLive.refl, by simp [Tm.head], fun _ h _ => ?_⟩
     cases h
     exact ⟨{ (default : CArg) with t := t }, by cases c <;> simp [Const.ty, hop]⟩
   | kont hl hC hT =>
     intro _ _ _ hJ; cases hJ
-    exact ⟨_, hT, .kont hl hC .refl, by simp [Tm.head], by simp⟩
+    exact ⟨_, hT, .kont hl hC LeLive.refl, by simp [Tm.head], by simp⟩
   | _ => intro hv _ _ hJ; cases hJ <;> cases hv
 
 /-- L1, last clause: a value has its type with any stage. -/

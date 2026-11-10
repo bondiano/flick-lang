@@ -7,6 +7,7 @@ use std::collections::BTreeMap;
 use std::mem;
 use std::rc::Rc;
 
+use super::regions::live_stage;
 use super::{Check, Checker, error};
 use crate::syntax::{Head, Lit, Name, Path, Term};
 use crate::types::{Caps, Fields, Kind, Row, Scheme, Stage, Type, Var};
@@ -117,10 +118,8 @@ impl Checker<'_> {
                 self.locals.pop();
                 let inner = mem::replace(&mut self.stage, outer);
                 checked?;
-                self.stage_within(&inner, s)?;
-                let qualifier = self.qualifier(&full);
-                self.close_over(e, expected.clone(), Some(qualifier));
-                Ok(())
+                self.close_within(&expected, &inner, s, Some(&full))
+                    .map(drop)
             }
             (Term::Scope(s, body), _) => self.scope(s, body, Some(&full)).map(drop),
             (Term::Apply(Head::Con(c), args), _) if args.len() == c.arity => {
@@ -223,7 +222,7 @@ impl Checker<'_> {
             .or_else(|| self.decls.instances.get(p));
         match s {
             Some(s) => {
-                let s = s.clone();
+                let s = self.live_scheme(s);
                 Ok(self.instantiate(&s))
             }
             None => error("Var", format!("no type for `{p}`")),
@@ -249,8 +248,7 @@ impl Checker<'_> {
         let r = self.infer(body);
         self.locals.pop();
         let inner = mem::replace(&mut self.stage, outer);
-        let lam = Term::Lam(x.clone(), Rc::new(body.clone()));
-        Ok(self.close_over(&lam, Type::fun(p, inner, r?), None))
+        Ok(Type::fun(p, inner, r?))
     }
 
     /// (App): `φ₁ ⊔ φ₂ ⊔ φ`. A callee of unknown type is a pure arrow (`docs/formal/core.md#a-callee-of-unknown-type-is-a-pure-arrow`).
@@ -280,6 +278,7 @@ impl Checker<'_> {
         match self.resolve(f) {
             Type::Fun(p, s, r) => {
                 self.check(a, &p)?;
+                let s = live_stage(&s, &self.qualifier(f));
                 self.perform(&s)?;
                 Ok((*r).clone())
             }
@@ -313,7 +312,7 @@ impl Checker<'_> {
         expected: Option<&Type>,
     ) -> Check<Type> {
         let s = if let Some(s) = sig {
-            let s = self.local_signature(s);
+            let s = self.local_signature(&self.live_scheme(s));
             let (bare, qualifier) = match &s.body {
                 Type::Captured(t, c) => ((**t).clone(), c.clone()),
                 t => (t.clone(), Caps::default()),
@@ -380,7 +379,7 @@ impl Checker<'_> {
         expected: Option<&Type>,
     ) -> Check<Type> {
         let s = if let Some(s) = sig {
-            let s = &self.in_scopes(s);
+            let s = &self.in_scopes(&self.live_scheme(s));
             self.locals.push((f.clone(), s.clone()));
             let checked = self.check_forall(lam, s);
             self.locals.pop();

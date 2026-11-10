@@ -4,47 +4,14 @@ import Formal.Elab.Sugar
 # Elaboration: the pieces of the sugar elaborate (elaboration.md §3)
 
 Constants and methods at an instance of their schemes, `λp₁ … pₙ`, the tuple of a group
-(`Sugar.tuple`) and `unc n`. A lambda of the sugar takes as its qualifier a row that covers
-its whole context (`Cov`, `ctxRow`).
+(`Sugar.tuple`) and `unc n`. A lambda of the sugar takes the empty qualifier: it needs nothing
+live where it is called.
 -/
 
 namespace Flick.Elab
 
 /-- A monomorphic binder `x : a`. -/
 abbrev Scheme.mono (a : Ty) : Scheme := ⟨0, [], a, .cnil⟩
-
-/-- `q` covers what every entry of `Γ` reaches. -/
-def Cov (Γ : List Scheme) (q : Ty) : Prop := ∀ s ∈ Γ, ∀ n, s.reach n → q.reach n
-
-/-- `⌈s⌉` as a row: the bound variables become `cnil`. -/
-def Scheme.row (s : Scheme) : Ty :=
-  (Ty.cun s.ty s.q).subst fun m => if m < s.k then .cnil else .var (m - s.k)
-
-/-- A row that covers the context. -/
-def ctxRow (Γ : List Scheme) : Ty := Γ.foldr (fun s q => .cun s.row q) .cnil
-
-theorem Ty.occurs_subst {σ : Nat → Ty} {m n : Nat} {t : Ty} (ht : t.Occurs m)
-    (hs : (σ m).Occurs n) : (t.subst σ).Occurs n :=
-  (Ty.occurs_subst_iff σ t n).mpr ⟨m, ht, hs⟩
-
-theorem cov_ctxRow (Γ : List Scheme) : Cov Γ (ctxRow Γ) := by
-  induction Γ with
-  | nil => intro s hs; cases hs
-  | cons s Γ ih =>
-    intro s' hs n hn
-    rcases List.mem_cons.1 hs with rfl | hs
-    · refine .inl (Ty.occurs_subst (m := n + s'.k) ?_ ?_)
-      · rcases hn with h | h
-        · exact .inl h
-        · exact .inr h.2
-      · rw [if_neg (by omega)]; show n + s'.k - s'.k = n; omega
-    · exact .inr (ih s' hs n hn)
-
-/-- A lambda in `Γ` holds no more than a row covering `Γ`. -/
-theorem lam_cov {Γ : List Scheme} {q : Ty} (h : Cov Γ q) {φ a t} {b : Exp} :
-    ∀ n, heldS Γ (.lam b) n → (Ty.arr φ a t q).reach n := by
-  rintro n ⟨x, s, -, hs, hr⟩
-  exact .inr (.inr (.inl (h s (List.mem_of_getElem? hs) n hr)))
 
 variable {P : Prog} (S : Sugar P)
 
@@ -91,18 +58,16 @@ theorem elab_unc {Γ Δ φ} (a : Ty) (as : List Ty) (r q : Ty) :
   simp only [Ty.subst, Stage.subst, Ty.subst_curry, Ty.subst_nest, List.map_tail, hv, h0, hn, hq,
     List.tail_cons]
 
-/-- `λp₁ … pₙ. b`, each arrow with a qualifier `q` that covers the innermost context. -/
+/-- `λp₁ … pₙ. b`, each arrow with the qualifier `q`. -/
 theorem elab_lams {Δ r b b' q} : ∀ {as : List Ty} {Γ : List Scheme} {ψ : Stage},
-    as ≠ [] → Cov (as.reverse.map Scheme.mono ++ Γ) q →
-    Elab P (as.reverse.map Scheme.mono ++ Γ) Δ b r .P b' →
+    as ≠ [] → Elab P (as.reverse.map Scheme.mono ++ Γ) Δ b r .P b' →
     ∃ e', Elab P Γ Δ (lams as.length b) (curry q as r) ψ e'
-  | [], _, _, h, _, _ => absurd rfl h
-  | [a], Γ, ψ, _, hq, hb =>
-    ⟨_, .lam (φ := .P) hb (lam_cov fun s hs => hq s (List.mem_append_right _ hs))⟩
-  | a :: a' :: as, Γ, ψ, _, hq, hb => by
+  | [], _, _, h, _ => absurd rfl h
+  | [a], Γ, ψ, _, hb => ⟨_, .lam (φ := .P) hb⟩
+  | a :: a' :: as, Γ, ψ, _, hb => by
     obtain ⟨e', he⟩ := elab_lams (as := a' :: as) (Γ := Scheme.mono a :: Γ) (ψ := .P)
-      (List.cons_ne_nil _ _) (by simpa using hq) (by simpa using hb)
-    exact ⟨_, .lam (φ := .P) he (lam_cov fun s hs => hq s (List.mem_append_right _ hs))⟩
+      (List.cons_ne_nil _ _) (by simpa using hb)
+    exact ⟨_, .lam (φ := .P) he⟩
 
 /-- The tuple of a group: `map2 pair` at each `and`; its row is whatever `map2` shows. -/
 theorem elab_tuple {Γ Δ φ m dk} (hd : Ent P Δ [⟨S.applicative, [m]⟩] [dk]) :
@@ -113,9 +78,9 @@ theorem elab_tuple {Γ Δ φ m dk} (hd : Ent P Δ [⟨S.applicative, [m]⟩] [dk
   | _, _, _, _, _, _, .nil, h => ⟨_, _, h⟩
   | _, _, acc, t, d, _, .cons (a := e) (b := a) ⟨d', _, he⟩ hs, h => by
     let ta : Ty := .app (.app (.con S.tup) t) a
-    have hm := elab_meth (Γ := Γ) (φ := φ) S.hMap2 rfl (ts := [m, .cnil, d, t, a, ta, .cnil, d'])
+    have hm := elab_meth (Γ := Γ) (φ := φ) S.hMap2 rfl (ts := [m, .cnil, d, t, a, ta, d'])
       rfl (by simpa [Cn.subst, Ty.subst, inst] using hd)
-      (τ := map2Ty m .cnil d t a ta .cnil d') rfl
+      (τ := map2Ty m .cnil d t a ta d') rfl
     have hp := elab_const (Γ := Γ) (Δ := Δ) (φ := φ) S.hPair (ts := [t, a])
       (τ := arrP t (arrP a ta)) rfl rfl
     have := elab_tuple hd hs (.app (.app (.app hm hp (.inl rfl)) h (.inl rfl)) he (.inl rfl))

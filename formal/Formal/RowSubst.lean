@@ -100,4 +100,15 @@ theorem Stage.ObOut.substT {φ₀ : Stage} {o : Row} (σ : Atom → Ty) (h : φ�
     · obtain ⟨ho, hN⟩ := h.2 v b hb
       exact ⟨ho.substT σ, none ho hN⟩
 
+/-- A region atom a stage carries is still carried after a substitution that keeps its
+region. -/
+theorem Stage.substT_svc_atm {σ : Atom → Ty} {p : Nat} {φ : Stage} (hp : σ (.r p) = .rg p)
+    (h : φ.svc (.atm (.r p))) : (Stage.substT σ φ).svc (.atm (.r p)) := by
+  cases φ with
+  | pure => cases h
+  | rt r e =>
+    simp only [Stage.substT, Stage.svc, Row.substT]
+    exact Or.inl ⟨.r p, h, by rw [hp]; rfl⟩
+
+
 end Flick

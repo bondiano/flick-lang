@@ -6,8 +6,8 @@ import Formal.Elab.Basic
 
 Closing the premises of an elaboration by types `θ` moves `θ` under binders: a scheme
 substitutes `lift k θ`, an instantiation commutes with it (`lift_inst`), a shift `up k` of
-`letSig` commutes with it (`up_lift`). What a substituted term holds comes from what it held
-(`heldS_subst`). A ground premise stays fixed by every substitution (`Cn.Ground`), and the
+`letSig` commutes with it (`up_lift`). A ground premise stays fixed by every substitution
+(`Cn.Ground`), and the
 constants of `Γ₀` have closed schemes (`Prog.ConstsClosed`).
 -/
 
@@ -90,25 +90,6 @@ theorem Ty.occurs_lift {σ : Nat → Ty} {k n : Nat} {t : Ty} (h : (t.subst (lif
     refine ⟨m' - k, ?_, ?_⟩
     · rwa [Nat.sub_add_cancel (by omega)]
     · rwa [show n = j by omega]
-
-theorem Scheme.reach_subst {σ : Nat → Ty} {s : Scheme} {n : Nat} (h : (s.subst σ).reach n) :
-    ∃ m, s.reach m ∧ (σ m).Occurs n := by
-  rcases h with h | ⟨hc, h⟩
-  · obtain ⟨m, hm, h⟩ := Ty.occurs_lift h; exact ⟨m, .inl hm, h⟩
-  · obtain ⟨m, hm, h⟩ := Ty.occurs_lift h
-    exact ⟨m, .inr ⟨fun e => hc (by simp [Scheme.subst, e]), hm⟩, h⟩
-
-/-- What a term holds in a substituted context. -/
-theorem heldS_subst {σ : Nat → Ty} {Γ : List Scheme} {e : Exp} {n : Nat}
-    (h : heldS (Γ.map (·.subst σ)) e n) : ∃ m, heldS Γ e m ∧ (σ m).Occurs n := by
-  obtain ⟨x, s, hx, hs, hr⟩ := h
-  rw [List.getElem?_map] at hs
-  cases hΓ : Γ[x]? with
-  | none => rw [hΓ] at hs; cases hs
-  | some s₀ =>
-    rw [hΓ] at hs; cases hs
-    obtain ⟨m, hm, h⟩ := Scheme.reach_subst hr
-    exact ⟨m, ⟨x, s₀, hx, hΓ, hm⟩, h⟩
 
 theorem Ty.subst_ground {t : Ty} (h : t.Ground) (σ : Nat → Ty) : t.subst σ = t := by
   rw [Ty.subst_agree (σ' := .var) fun n hn => (h n hn).elim, Ty.subst_id]

@@ -41,7 +41,7 @@ use crate::syntax::{Name, Path, Term};
 use crate::types::{Caps, Fields, Row, Scheme, Stage, Type};
 
 pub(crate) use generalize::{Inst, substitute};
-pub(crate) use regions::scope_service;
+pub(crate) use regions::{live_service, scope_service};
 pub use runtime::check_config;
 
 /// A rule whose premise fails, and why.

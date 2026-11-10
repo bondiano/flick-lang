@@ -7,8 +7,8 @@ import Formal.SchemeOps
 `e.Has` is what a term writes down: a run-time region (in `cap π`, `own π`,
 `inside π e`), a location, a run-time form, the `inside` form of a region. `e.Free i` is a
 free variable.
-`held Ψ Γ e` is what the premises of (Lam) and (Task) bound: `⌈Γ(y)⌉` of each
-free `y`, the run-time regions written in `e` and `⌈Ψ(ℓ)⌉` of each location.
+`held Ψ Γ e` is what a term holds: `⌈Γ(y)⌉` of each free `y`, the run-time regions
+written in `e` and `⌈Ψ(ℓ)⌉` of each location. Typing by use bounds none of it.
 -/
 
 namespace Flick
@@ -405,7 +405,7 @@ locations. -/
 def Tm.Atoms (Ψ : List Ty) (e : Tm) : Caps := fun a =>
   (∃ p, e.Has (.rgn p) ∧ a = .r p) ∨ ∃ l t, e.Has (.loc l) ∧ Ψ[l]? = some t ∧ t.reach a
 
-/-- What a term holds in a context: the premise of (Lam) and (Task). -/
+/-- What a term holds in a context. -/
 def held (Ψ : List Ty) (Γ : List Scheme) (e : Tm) : Caps := fun a =>
   (∃ i s, e.Free i ∧ Γ[i]? = some s ∧ s.reach a) ∨ e.Atoms Ψ a
 

@@ -49,7 +49,7 @@ theorem Typ.locs {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) : ∀ l, e.Has (.loc l)
     · exact ih₂ l h
   | scope _ _ _ _ _ _ ih => intro l h; simpa using ih l h
   | aref _ _ _ _ hlc _ _ _ _ ih => intro l h; exact h.elim (hlc l) (ih l)
-  | hctl _ _ _ _ _ _ _ _ hk _ _ _ _ _ _ _ ih₁ ih₂ ih₃ ih₄ =>
+  | hctl _ _ _ _ _ _ _ _ hk _ _ _ _ _ _ _ _ ih₁ ih₂ ih₃ ih₄ =>
     intro l h; subst hk
     simp only [Tm.Has] at h
     rcases h with h | h | h | h | h | h
@@ -72,7 +72,7 @@ theorem Typ.locs {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) : ∀ l, e.Has (.loc l)
     · rcases plug_has_iff.mp h with h | h
       · exact ih₂ l (plug_has_iff.mpr (.inl h))
       · simp [Tm.Has] at h
-  | hres _ _ _ ha _ _ _ _ ih₁ ih₂ =>
+  | hres _ _ _ ha _ _ _ _ _ ih₁ ih₂ =>
     intro l h; subst ha
     simp only [Tm.Has] at h
     rcases h with h | h | h | h
@@ -97,7 +97,7 @@ theorem Typ.frees {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) : ∀ i, e.Free i → 
   | var => intro i h; cases h; exact getElem?_lt ‹_›
   | allVar hi => intro i h; cases h; exact getElem?_lt hi
   | allI _ _ ih => intro i h; simpa using ih i h
-  | lam _ _ _ _ ih => intro i h; have := ih _ h; simp at this; omega
+  | lam _ _ _ ih => intro i h; have := ih _ h; simp at this; omega
   | let_ _ _ ih₁ ih₂ =>
     intro i h; rcases h with h | h
     · exact ih₁ i h
@@ -106,12 +106,12 @@ theorem Typ.frees {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) : ∀ i, e.Free i → 
     intro i h; rcases h with h | h
     · simpa using ih₁ i h
     · have := ih₂ _ h; simp at this; omega
-  | letrec _ _ _ _ ih₁ ih₂ =>
+  | letrec _ _ _ ih₁ ih₂ =>
     intro i h; rcases h with h | h
     · have := ih₁ _ h; simp at this; omega
     · have := ih₂ _ h; simp at this; omega
-  | fix _ _ _ _ ih => intro i h; have := ih _ h; simp at this; omega
-  | task _ _ _ _ _ ih => intro i h; exact ih i h
+  | fix _ _ _ ih => intro i h; have := ih _ h; simp at this; omega
+  | task _ _ _ _ ih => intro i h; exact ih i h
   | scope _ _ _ _ _ _ ih => intro i h; have := ih _ h; simp at this; omega
   | acons hp _ _ ih₁ ih₂ =>
     intro i h; rcases h with h | h
@@ -143,7 +143,7 @@ theorem Typ.frees {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) : ∀ i, e.Free i → 
     intro i h; rcases h with h | h
     · have := ih₁ _ h; simp [Pat.spine_binds, Pat.binds] at this; omega
     · exact ih₂ i h
-  | hctl _ _ _ _ _ _ _ _ hk _ _ _ _ _ _ _ ih₁ ih₂ ih₃ ih₄ =>
+  | hctl _ _ _ _ _ _ _ _ hk _ _ _ _ _ _ _ _ ih₁ ih₂ ih₃ ih₄ =>
     intro i h; subst hk
     rcases h with h | h | h | h
     · exact ih₁ i h
@@ -156,7 +156,7 @@ theorem Typ.frees {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) : ∀ i, e.Free i → 
     · exact ih₁ i h
     · exact ih₃ i h
     · exact absurd (ih₂ i (plug_free_of_hole h)) (Nat.not_lt_zero _)
-  | hres _ _ _ ha _ _ _ _ ih₁ ih₂ =>
+  | hres _ _ _ ha _ _ _ _ _ ih₁ ih₂ =>
     intro i h; subst ha
     rcases h with h | h
     · exact absurd (ih₂ i (plug_free_of_hole h)) (Nat.not_lt_zero _)

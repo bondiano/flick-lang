@@ -176,7 +176,7 @@ impl Checker<'_> {
         }
     }
 
-    fn refinable_result(&self, result: &Type) -> bool {
+    pub(super) fn refinable_result(&self, result: &Type) -> bool {
         let (bare, captures) = self.whnf_captured(result);
         if let Some(captures) = captures {
             return self
@@ -248,9 +248,11 @@ impl Checker<'_> {
             let mut allowed = Norm::default();
             while let Type::Bounded { ty, captures } = base {
                 self.capture_row(&captures, &mut allowed);
+                // what the bounded type shows, as `a` of `List a`, is no hold:
+                // a type argument carries its own qualifier
                 self.hold(Hold {
                     held: vec![(None, actual.clone())],
-                    visible: Visible::Now(Vec::new()),
+                    visible: Visible::Late((*ty).clone()),
                     bound: *captures.clone(),
                     expected: Some(expected.clone()),
                     written: !matches!(self.store.resolve(&captures), Type::Meta(_)),
@@ -322,7 +324,13 @@ impl Checker<'_> {
             && !matches!(e, Type::Captured { .. })
         {
             let identity = self.capture_identity(ty);
-            if self.hidden_fields(expected, &mut Vec::new()) {
+            // what a function or a task hides it may hold: its use is in its
+            // row (`compare.rs`, `subsume_captured`)
+            let callable = matches!(self.whnf(expected), Type::Fun { .. })
+                || self.eff_parts(expected).is_some();
+            if self.hidden_fields(expected, &mut Vec::new())
+                && (!callable || self.holds_reader(&[(None, actual.clone())]))
+            {
                 self.hold(Hold {
                     held: vec![(None, actual.clone())],
                     visible: Visible::Refined(expected.clone()),
@@ -373,36 +381,6 @@ impl Checker<'_> {
         norm.entries
             .iter()
             .any(|(_, atom)| matches!(self.atom_kind(atom, &[]), Some(Kind::Region)))
-    }
-
-    /// Pure parametric code can return only captures from its function and
-    /// argument. Refine abstract results, not independent concrete scalars.
-    pub fn application_result(&self, result: Type, function: &Type, argument: &Type) -> Type {
-        let result = self.value_bound(result);
-        if !self.refinable_result(&result)
-            || matches!(
-                self.whnf(function),
-                Type::Fun {
-                    effects: Some(_),
-                    ..
-                }
-            )
-        {
-            return result;
-        }
-        let mut captures = self.captures_of(function);
-        let arg = self.captures_of(argument);
-        captures.entries.extend(arg.entries);
-        captures.tails.extend(arg.tails);
-        // A reader region is the lending function's own, not data a result
-        // stores; its holds report every escape.
-        captures
-            .entries
-            .retain(|(_, atom)| !matches!(atom, Type::Skolem(s) if self.regions.lent.contains(s)));
-        Type::Bounded {
-            ty: Box::new(result),
-            captures: Box::new(captures.into_type()),
-        }
     }
 
     /// A projection refines an existing field; it never creates a new

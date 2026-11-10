@@ -3,9 +3,11 @@ title: "Regions and captures"
 ---
 
 A `scope` releases what it acquired when its body ends, and the checker
-proves that nothing usable outlives it (see [Resources](../../spec/05-errors-and-concurrency/#resources), [Static regions and captures](../../spec/05-errors-and-concurrency/#static-regions-and-captures)). Regions are checked after types and effects; there is no early
+proves that nothing uses it afterwards (see [Resources](../../spec/05-errors-and-concurrency/#resources), [Static regions and captures](../../spec/05-errors-and-concurrency/#static-regions-and-captures)). Regions are checked after types and effects; there is no early
 close and no linearity: a resource may be used any number of times while its
-scope is open.
+scope is open. What is checked is where a value **uses** a region, not what
+it **holds**: a value may keep a handle past the end of its scope, provided
+nothing uses it there.
 
 ## Scopes and owners
 
@@ -72,30 +74,85 @@ with_region : (forall s. Fiber.Owner s ->{Scope s; none} String) ->{} String
 let with_region body = Scope.run body
 ```
 
-## Captures
+## Holding is not using
 
-A resource has its region in its type: `File s`, and also `List (File s)`
-or a nominal `Wrapper s` around one. A closure, `task` or constructor can
-also retain values whose regions its type does not show.
+A closure, a `task` or a constructor may hold a handle past the end of its
+`scope` when nothing it runs uses the handle there:
 
-| Type | Bound |
+```flick
+# type File (s : Region)
+#
+# service Files =
+#   open_scoped : forall s. String ->{Scope s} File s
+#
+held_task : String ->{Files} Eff none none Unit
+let held_task path = scope {
+  let file = Files.open_scoped path
+  task { ignore file }
+}
+```
+
+A use that outlives its region is `FLICK-G002`:
+
+```flick fail G002
+# type File (s : Region)
+#
+# type error ReadError = ReadError String
+#
+# service Files =
+#   open_scoped : forall s. String ->{Scope s} File s
+#   read_all : forall s. File s ->{; ReadError} String
+#
+read_later : String ->{Files} (Unit ->{Files; ReadError} String)
+let read_later path = scope {
+  let file = Files.open_scoped path
+  fun () -> Files.read_all file
+}
+```
+
+```text
+FLICK-G002: this uses region `s`, which the expected type `Unit ->{Files; ReadError} String` does not keep live: a function or a task uses a region only while the region is live
+```
+
+What a stage uses of a region shows in its row as `Live`, an element no
+program writes: the checker reads it into signatures (elision) and leaves it
+out of messages, interfaces and emitted code.
+
+- **A runtime stage of a signature uses what its parameters reach.** Each
+  runtime arrow and `Eff` needs live what the parameters before it reach:
+  `read_all : File s ->{; ReadError} String` needs `s` live where it is
+  called, and so does the stage inside a function that returns a closure
+  over its parameter.
+- **A pure operation uses no region.** A pure stage cannot reach a
+  resource, so a lazy `for` sequence over a scoped file may leave its scope;
+  the strict `[for …]` builds its list inside.
+- **A `scope` is where its region is live.** `Scope s` in a row keeps `s`
+  live, and the end of `scope s` discharges `Live s`. A row that uses a
+  region and does not keep it live is `FLICK-G002`. `Live s` gives no
+  `Scope s`: a function that acquires into a region names `Scope s`
+  (`FLICK-G004`).
+- **A service a region indexes keeps it live.** `Setup s` of a component's
+  setup keeps the instance's region live, as `Scope s` does, so a setup may
+  run `Ui.on_mount`, `Ui.watch` and `Atom.value` of its instance. The runtime
+  provides `Setup s` only while the instance's region is open, and a handler
+  a program installs for such a service needs its region live where it is
+  installed (`FLICK-G002`).
+
+## Qualifiers
+
+| Type | What using it needs |
 | - | - |
-| `T^{s, t}` | at most the regions `s` and `t` in the qualified part |
-| `T^c` | at most the capture row `c` (kind `CaptureRow`) |
-| `T^(c + d)` | at most the union of both rows |
-| `T` | no extra hidden captures; captures exposed by `T` remain |
+| `T^{s, t}` | the regions `s` and `t` live |
+| `T^c` | the capture row `c` (kind `CaptureRow`) live |
+| `T^(c + d)` | both rows live |
+| `T` | nothing beyond what `T` shows |
 
-For a generic value, `a^c` bounds the **whole value**, not just captures
-beyond `a`. At a value boundary, `(f a)^c` likewise bounds parameter-held
-captures when `f` resolves to data that stores only its parameters.
-Functions and types with hidden storage, such as `StateT`, instead retain
-a hidden-capture qualifier. Explicit stored qualifications are part of
-type identity, not bounds that may be discarded.
-
-`Ref.make : forall c a. a^c ->{} Ref (a^c)` puts the stable capture capacity
-in the invariant payload type. Widening a cell alias's outer value bound
-cannot widen that inner bound to admit shorter-lived replacements.
-The distinction survives [`.iface` schema 2](../iface/#types-and-kinds).
+A qualifier says what using a value needs, not what it holds: calling a
+function `(τ₁ → τ₂)^C`, awaiting a task `(Eff r e τ)^C` or running a
+`(Stream r e a)^C` needs `C` live there. A narrower qualifier hides such a
+need and is `FLICK-G001`; a wider one is allowed. The parts of data take its
+qualifier: a function taken out of `(Option (Unit -> Unit))^C` needs `C`
+live when it is called.
 
 ```flick
 # import File exposing (File, FileSystem, ReadError)
@@ -105,43 +162,15 @@ let read_later file =
   task { File.read_all file }
 ```
 
-A bound can be wider than what a value holds; a narrower bound is
-`FLICK-G001`. `a^none` means a generic value holds no captures, not that
-substitution can erase a concrete `File s` or a closure's stored qualifier.
-For a concrete type, regions already exposed in it remain even under
-`^none`. Merely mentioning `s` in a parameter type does not make a function
-hold `s`; using a value of it does. For example, `fun () -> file` has type
-`Unit -> File s`.
+A type variable is no use of what it stands for: generic code cannot take a
+value of `a` apart, and a type argument carries its own qualifier, so
+`List a` holds an `a` without saying so. `Ref.make : forall c a. a^c ->{}
+Ref (a^c)` keeps the capacity of a cell in its invariant payload type:
+widening an alias of the cell cannot let a shorter-lived replacement in.
+The distinction survives [`.iface` schema 2](../iface/#types-and-kinds).
 
-Each stage of a curried function retains earlier parameters, including
-their generic value captures. `File s -> String -> String` is read as
-`File s -> (String -> String)^{s}`; `a -> b -> a` also retains the first
-value's captures in its second stage. These projections survive `.iface`
-serialization. A qualifier that says just this is noise (`FLICK-T059`); write
-one to say less: `a -> (b -> b)^{}` holds nothing of the first value.
-
-Locals are inferred: a closure without an expected type gets the qualifier
-of what it uses, and a local signature need not name the regions its
-function holds. The qualifiers of its later stages are bounds as written:
-`wrap : forall a. a -> (Unit ->{} Unit)` lets the closure it returns hold
-`a` only, so name the scope (`scope s { … }`) and write
-`(Unit ->{} Unit)^{a, s}` when it holds a resource of `s`. A top-level
-signature is checked as written, and `.iface` keeps its qualifiers for
-importers.
-
-| Construct | Holds |
-| - | - |
-| `fun`, `task` | the locals it uses |
-| a stage of a curried function | earlier parameters' value captures and the locals it uses |
-| record, tuple, list, constructor | what its parts hold |
-| type variable `a^c` | the whole value holds at most `c`, without erasing concrete regions or stored qualifiers |
-| type variable `a` without a qualifier | what the substituted type holds; curried stages retain its capture projection |
-| `f a`, for a type variable `f` | what `a` and what the substituted `f` hold: in an `instance Keep (Holder h)`, `f a` holds `h` |
-| `Errors e`, `Exit e a`, `Failure e` | what the errors of `e` hold; an error-row variable `e` is held as a type variable is: curried stages retain it, and `(Errors e)^c` bounds it elsewhere |
-| `Eff r e a`, a function | hidden captures from its qualifier, and what its result type (and a function's parameter type) shows: a dropped result does not take a capture with it |
-
-A function that takes a callback declares the callback's captures and keeps
-them in what it returns, as `map_effect` does:
+A function that takes a callback says what using its result needs, as
+`map_effect` does:
 
 ```flick
 map_effect : forall c a b r e. (a ->{r; e} b)^c -> (List a ->{r; e} List b)^c
@@ -149,34 +178,26 @@ foreign map_effect from "./list.js" "mapEffect"
   retention call
 ```
 
-Prelude's `map`, `map2` and `flat_map` callbacks quantify an input capture
-bound **per invocation**, independently of the container's bound `d`:
+Prelude's `map`, `map2` and `flat_map` callbacks quantify an input bound
+**per invocation**, independently of the container's bound `d`:
 `(forall v. a^v -> b)^c` for `map`,
 `(forall u v. a^u -> (b^v -> x)^(c + u))^c` for `map2`, and
-`(forall v. a^v -> (m b)^(c + v))^c` for `flat_map`.
-The second stage of `map2` retains its first input. This matters for
-`StateT` and `ReaderT`: state or environment supplied when running may
-hold regions not present when the computation was built.
-`pure : forall c a. a^c -> (f a)^c` preserves its input bound too.
-See the [user-defined transformer instances](../../contributing/implementation-decisions/#instances-of-user-types).
-
-Constructors retain field captures. Pattern matching and record/tuple/list
-projection propagate the enclosing bound to extracted values, including
-closure fields; applying a delayed field also retains the supplied input's
-captures. Explicit field qualifications are preserved, not overwritten by
-the enclosing bound. Primitive fields such as `Float` gain no captures.
+`(forall v. a^v -> (m b)^(c + v))^c` for `flat_map`. What such a callback
+returns holds nothing of its input, so `Option.map` gives `(Option b)^c`;
+a lazy `Seq.map`, an `Eff` and `Result.map`, which passes its error on, keep
+their source and give `^(c + d)`. `pure : forall c a. a^c -> (f a)^c` preserves its
+input bound. See the [user-defined transformer instances](../../contributing/implementation-decisions/#instances-of-user-types).
 
 ## What cannot leave a scope
 
 | Path | Rule |
 | - | - |
 | the value of the scope, directly or inside data | its type may not mention the region (`FLICK-G002`) |
-| a closure or `task` returned or stored | its qualifier may not hold the region (`FLICK-G002`, or `FLICK-G001` against a written type) |
+| a closure or `task` returned or stored | no row of it may need the region live (`FLICK-G002`) |
 | a value an acquisition gives | `Resource.acquire_release` gives `a^{s}`, a value of region `s` (`FLICK-G002`); a function it is passed to takes `Conn^c` for some `c` |
-| a nominal or opaque wrapper | a visible region or hidden field capture cannot be erased |
 | a cell or binding from outside the scope | its type may not come to mention the region; mutable storage and its qualified element types are invariant (`FLICK-T003`), even when a value bound could otherwise widen |
 | an error | its payload holds no region, even when a handler inside the scope catches it (`FLICK-E005`); `type error E (s : Region) = E (File s)` is rejected where it is declared |
-| a foreign function | its signature is its retention contract: what it keeps is in its result's qualifier; with `retention owner` and one region in the signature, it gets `Fiber.Outlives` for a capture row it keeps and `Fiber.Provided` and `Detached` for the services of kept work; with two regions the signature writes them (`FLICK-F002`) |
+| a foreign function | its signature is its retention contract: what using its result needs is in the result's qualifier; with `retention owner` and one region in the signature, it gets `Fiber.Outlives` for a capture row it keeps and `Fiber.Provided` and `Detached` for the services of kept work; with two regions the signature writes them (`FLICK-F002`) |
 
 ## Leases
 
@@ -197,12 +218,12 @@ from_acquire :
 # let from_acquire = ScopedRef.from_acquire
 ```
 
-The value holds the lease's region `t`, so the callback can neither give it
-back nor keep it (`FLICK-T007`, `FLICK-G002`). An acquisition acquires into
-a region `t` of its own, which ends when the resource is released: a value
-of a type that names its region, such as `File t`, cannot be kept in them.
-`RcRef`, `RcMap` and `Pool` lend their value to the `scope` of the call
-(`Scope t`) and keep it until that scope closes, so their `get` gives
+The value has the lease's region `t`, so the callback can neither give it
+back nor keep using it (`FLICK-T007`, `FLICK-G002`). An acquisition acquires
+into a region `t` of its own, which ends when the resource is released: a
+value of a type that names its region, such as `File t`, cannot be kept in
+them. `RcRef`, `RcMap` and `Pool` lend their value to the `scope` of the
+call (`Scope t`) and keep it until that scope closes, so their `get` gives
 `a^{t}`.
 
 ## Children
@@ -219,11 +240,11 @@ spawn :
 
 `Fiber.spawn owner supervisor task` registers `task` with `owner`; the
 supervisor observes its failure. A child runs until its owner's scope
-closes, so the task and the supervisor may hold only regions that end no
+closes, so each region the task and the supervisor use must end no
 earlier: the owner's region, the regions of scopes around it, and what the
 signature names when the owner is a local scope. `Fiber.Outlives c s` states
 it; the compiler decides it and a program declares no instance of it. A
-child that holds a shorter region is `FLICK-G003`. The child runs with the
+child that uses a shorter region is `FLICK-G003`. The child runs with the
 services of the place that spawned it, so they must outlive the owner as
 well: `Fiber.Provided r s` (see [Effects](../effects/), "Layers
 and `provide`").
@@ -233,7 +254,36 @@ A child acquires into its owner's region: a task that acquires names
 `FLICK-T008`. Work kept until an owner closes requires `Fiber.Outlives` the
 same way: a finalizer (`Scope.add_finalizer`), the release of
 `Resource.acquire_release`, an event handler (`Events.listen`), the source
-of a background `Stream` or `Channel`.
+of a background `Stream` or `Channel`, and the work a component starts with
+`Ui.on_mount` and `Ui.watch`, which runs until its instance unmounts.
+
+## Compared with Rust
+
+| Rust | Flick |
+| - | - |
+| a lifetime `'a` | a region: the one a `scope` opens, or a parameter `forall s` |
+| `T: 'a` | `Fiber.Outlives c s` for the capture row `c` of the work an owner keeps; the checker decides it, and a program declares no instance |
+| `fn(&'lt ())` | `File inner -> Unit` |
+| `for<'r> fn(&'r ())` | `forall r. File r -> Unit` |
+
+Rust decides `T: 'a` syntactically, as RFC 1214 made it: every lifetime that
+the type mentions or hides must outlive `'a`, including the argument of a
+function pointer that the value never calls. The comment in rustc's own
+`outlives` tests calls that rule stricter than it needs to be: the function
+pointer is itself `'static`, so it could be bivariant in its argument. Flick
+reads it the way that comment prefers: holding `File inner -> Unit` uses
+nothing, so such a function may leave the scope of `inner`. What makes it
+sound is not variance but a proof of the typing judgment: `T4'` in
+`formal/Formal/Live/T4Live.lean` shows that a program typed this way reaches
+no step that needs a region after its `scope` has closed, and no operation
+answered by a handler of a closed region. The compiler is compared with the
+model by tests, not proved equal to it.
+
+Rust accepts `outlives::<'static, _>((|_| ()) as fn(&'lt ()))` because an
+argument of type `&'static ()` fits a parameter of `&'lt ()`
+(contravariance), so `T` is inferred as `fn(&'static ())`. Flick has no
+subtyping between regions: `File inner` is no `File outer` (`FLICK-T008`).
+What it has instead is a region parameter, `forall r. File r -> Unit`.
 
 ## Not checked yet
 

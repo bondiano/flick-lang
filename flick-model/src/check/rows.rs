@@ -5,8 +5,11 @@
 //! is the least row, `none`: the least solution of §2.1.
 
 use std::mem;
+use std::rc::Rc;
+use std::slice;
 
-use super::{Check, Checker, error};
+use super::regions::{add_live, arg_caps, live_arg, live_stage};
+use super::{Check, Checker, error, live_service};
 use crate::types::{Caps, Row, Stage, Type, Var};
 
 impl Checker<'_> {
@@ -15,8 +18,23 @@ impl Checker<'_> {
     pub(super) fn within(&mut self, a: &Row, b: &Row) -> Check<()> {
         let (a, b) = (self.zonk_row(a), self.zonk_row(b));
         let mut extra = Row::none();
+        let scoped = self.scope_live(&b);
         for (name, args) in &a.elems {
             match b.elems.get(name) {
+                // `{Live C} ⊆ {Live C'}` is `C ⊆ C'`, which may grow `C'`;
+                // `Scope ϱ` of `ρ'` keeps `ϱ` live too
+                Some(theirs) if *name == live_service() => {
+                    let allowed = arg_caps(&theirs[0]).union(&scoped);
+                    self.hold(slice::from_ref(&args[0]), &[], &allowed, "Live");
+                }
+                // against a closed row, `Live C` needs `C` to hold no region
+                // or variable but those its `Scope` keeps live, once known:
+                // what is unknown now may be none
+                None if *name == live_service()
+                    && !b.vars.iter().any(|v| matches!(v, Var::Meta(_))) =>
+                {
+                    self.hold(slice::from_ref(&args[0]), &[], &scoped, "Live");
+                }
                 Some(theirs) if theirs.len() == args.len() => {
                     for (x, y) in args.iter().zip(theirs.iter()) {
                         self.unify(x, y)?;
@@ -96,6 +114,10 @@ impl Checker<'_> {
         let mut out = a.clone();
         for (name, args) in &b.elems {
             match a.elems.get(name) {
+                Some(mine) if *name == live_service() => {
+                    let both = arg_caps(&mine[0]).union(&arg_caps(&args[0]));
+                    out.elems.insert(name.clone(), Rc::from([live_arg(both)]));
+                }
                 Some(mine) if mine.len() == args.len() => {
                     for (x, y) in mine.iter().zip(args.iter()) {
                         self.unify(x, y)?;
@@ -157,19 +179,34 @@ impl Checker<'_> {
             return self.unify(&a, &b);
         }
         self.subsume_bare(actual, expected)?;
-        self.hold(&[a], &[b], &Caps::default(), "≤-Cap");
+        for b in self.layers(&b) {
+            self.hold(slice::from_ref(&a), &[b], &Caps::default(), "≤-Cap");
+        }
         Ok(())
     }
 
     fn subsume_bare(&mut self, actual: &Type, expected: &Type) -> Check<()> {
+        // under `regions/live.rs` a qualifier on a function or a task is
+        // the `Live` its use needs
+        // each qualifier of the expected type bounds the `Live` of its use
+        let (qa, mut qes) = (self.qualifier(actual), self.qualifiers(expected));
+        if qes.is_empty() {
+            qes.push(Caps::default());
+        }
         match (self.resolve(actual), self.resolve(expected)) {
             (Type::Fun(p, s, r), Type::Fun(p2, s2, r2)) => {
                 self.subsume(&p2, &p)?;
-                self.stage_within(&s, &s2)?;
+                let s = live_stage(&s, &qa);
+                for qe in &qes {
+                    self.stage_within(&s, &live_stage(&s2, qe))?;
+                }
                 self.subsume(&r, &r2)
             }
             (Type::Eff(r, e, t), Type::Eff(r2, e2, t2)) => {
-                self.within(&r, &r2)?;
+                let r = add_live(&r, &qa);
+                for qe in &qes {
+                    self.within(&r, &add_live(&r2, qe))?;
+                }
                 self.within(&e, &e2)?;
                 self.subsume(&t, &t2)
             }

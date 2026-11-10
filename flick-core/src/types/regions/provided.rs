@@ -10,7 +10,7 @@
 
 use std::mem;
 
-use super::{Scope, scope};
+use super::{LIVE, Scope, scope};
 use crate::diagnostics::{Diagnostic, Edit, codes};
 use crate::source::Span;
 use crate::syntax::cst::Node;
@@ -156,6 +156,15 @@ impl Checker<'_> {
         let norm = self.store.normalize(&want.row);
         let mut keep = Vec::new();
         for (label, ty) in norm.entries {
+            if label == LIVE {
+                let key = format!("{label}{ty:?}");
+                if !want.settled.contains(&key) {
+                    want.settled.push(key);
+                    let span = want.span;
+                    self.keep_live(&ty, &want.owner, &want.at.givens, span, last);
+                }
+                continue;
+            }
             // `Async` is the root's: no owner provides it
             let root = lang::label(Lang::Async) == Some(label.as_str());
             if root

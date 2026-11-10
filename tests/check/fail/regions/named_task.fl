@@ -1,0 +1,31 @@
+// A task stored in a cell made outside its `scope` would use the region
+// after it ends, whether it is named first or passed directly: its row
+// needs `s` live, which the cell's type cannot keep.
+module App.NamedTask exposing (..)
+
+type Handle (s : Region)
+
+service Files =
+  open_scoped : forall s. String ->{Scope s} Handle s
+  use : forall s. Handle s ->{} Unit
+
+named : Unit ->{Files} Unit
+let named () =
+  let cell = Ref.make (task { () })
+  let _ = scope s {
+    let h = Files.open_scoped "x"
+    let t = task { Files.use h }
+    Ref.set cell t
+  }
+  await (Ref.get cell)
+
+direct : Unit ->{Files} Unit
+let direct () =
+  let cell = Ref.make (task { () })
+  let _ = scope s {
+    let h = Files.open_scoped "x"
+    Ref.set cell (task { Files.use h })
+  }
+  await (Ref.get cell)
+//~ FLICK-G002 @18:18-18:19 this value needs region `s` live
+//~ FLICK-G002 @27:26-27:37 this uses region `s`

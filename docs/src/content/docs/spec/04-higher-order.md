@@ -1,6 +1,6 @@
 ---
 title: "Higher-order functions and collection traversal"
-source_hash: e05b4427f579cfad
+source_hash: a2e8b32136e29b4c
 ---
 
 ## Pure and effectful traversal
@@ -41,7 +41,7 @@ List.map : (a -> b)^c -> List a -> List b
 List.map_effect : (a ->{r; e} b)^c -> List a ->{r; e} List b
 ```
 
-Partial application retains the callback and its `c`: a later stage holds what its earlier parameters hold, so the signature need not write it. After an eager traversal, the resulting `List b` keeps the captures of `b` itself, but need not retain the already executed callback. This is more precise than the general `Functor.map`, which allows deferred application.
+Partial application keeps the callback: a later runtime stage needs live what its earlier parameters reach, which elision reads into the signature, so the signature need not write it. After an eager traversal, the resulting `List b` keeps the captures of `b` itself, but need not retain the already executed callback. This is more precise than the general `Functor.map`, which allows deferred application.
 
 Keeping the two families apart gives every callback one calling convention: a pure callback returns a plain value, a runtime callback an Effect.
 
@@ -74,7 +74,7 @@ let pair_optional left right =
 
 Bindings joined with `and`, `x <- a and y <- b`, run independently: neither value sees what the other binds, and `map2` of `Applicative` combines them. A group followed only by `pure e` needs `Applicative` alone, so it fits types that are not monads, such as a validation that collects every error; with more statements after it, the rest is `flat_map` over the tuple of the group. Over `Eff`, `map2` runs the two one after the other; running them concurrently stays explicit with `parallel`.
 
-`for { x <- xs; if p x; y <- ys x } yield e` is a lazy `Seq` compiled to one native generator; `[for … yield e]` is the strict `List`, compiled to a loop. `x <- source` takes the elements of an `Iterable` source (`List`, `Seq`), and a refutable pattern there skips the elements that do not match; `if c` skips the element unless `c`, and `let` scopes over the rest. Without braces the clauses are separated by `;`, and a guard's `if` starts a new one: `[for x <- xs if x > 0 yield x]`. The body of a generator makes Sync calls at most (`->{Atom.Read}`, [Sync stages](../01-direct-calls/#sync-stages)), and only where the stage that builds it may: each step of a lazy `Seq` reads the services of that stage, captured when the `Seq` is built, and a strict list reads them at once. A runtime call may suspend, so it is an error there; iterating a `Seq` again runs its Sync calls again, reading the atoms as they are then. A `Seq` keeps the captures of what it uses, since it runs later; one whose steps read atoms holds the reader of the function that builds it, which ends when that function returns, so the sequence cannot leave it (`FLICK-G001`, `FLICK-G002`): iterate it there, pass it to a function that consumes it, or build a list.
+`for { x <- xs; if p x; y <- ys x } yield e` is a lazy `Seq` compiled to one native generator; `[for … yield e]` is the strict `List`, compiled to a loop. `x <- source` takes the elements of an `Iterable` source (`List`, `Seq`), and a refutable pattern there skips the elements that do not match; `if c` skips the element unless `c`, and `let` scopes over the rest. Without braces the clauses are separated by `;`, and a guard's `if` starts a new one: `[for x <- xs if x > 0 yield x]`. The body of a generator makes Sync calls at most (`->{Atom.Read}`, [Sync stages](../01-direct-calls/#sync-stages)), and only where the stage that builds it may: each step of a lazy `Seq` reads the services of that stage, captured when the `Seq` is built, and a strict list reads them at once. A runtime call may suspend, so it is an error there; iterating a `Seq` again runs its Sync calls again, reading the atoms as they are then. A `Seq` runs its steps later, but they are pure and use no region; one whose steps read atoms holds the reader of the function that builds it, which ends when that function returns, so the sequence cannot leave it (`FLICK-G001`, `FLICK-G002`): iterate it there, pass it to a function that consumes it, or build a list.
 
 `for … do body` in place of `yield e` runs the body, a `Unit` block, for each element right there. Its clauses and body may make runtime calls, which join the rows of the enclosing function.
 

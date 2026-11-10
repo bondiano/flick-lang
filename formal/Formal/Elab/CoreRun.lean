@@ -136,9 +136,9 @@ def runTarget (hR : Real P Sg N) (hRun : RealRun P N root) (hroot : RootTy Sg ro
     ⟨(typingTarget hR).caseK he.1 hK hT hlen hn hU hb.1 hρ hg hcl hr.1, fun _ h => by cases h⟩
   caseKDead he hK hT hlen hC hr :=
     ⟨(typingTarget hR).caseKDead he.1 hK hT hlen hC hr.1, fun _ h => by cases h⟩
-  lam h hh := ⟨(typingTarget hR).lam h.1 hh, fun _ h => by cases h⟩
+  lam h := ⟨(typingTarget hR).lam h.1, fun _ h => by cases h⟩
   let_ h₁ hk hφ h₂ := ⟨(typingTarget hR).let_ h₁.1 hk hφ h₂.1, fun _ h => by cases h⟩
-  lamD h hφ hh := ⟨(typingTarget hR).lamD h.1 hφ hh, fun _ h => by cases h⟩
+  lamD h hφ := ⟨(typingTarget hR).lamD h.1 hφ, fun _ h => by cases h⟩
   dapp h₁ h₂ := ⟨(typingTarget hR).dapp h₁.1 h₂.1, fun _ h => by cases h⟩
   meth hm hc h := ⟨(typingTarget hR).meth hm hc h.1, fun _ h => by cases h⟩
   dvar hk := ⟨(typingTarget hR).dvar hk, fun _ h => by cases h; exact .var hk⟩

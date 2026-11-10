@@ -88,14 +88,6 @@ theorem Ty.tcon_inj {T : Name} {us us' : List Ty} (hl : us.length = us'.length)
     (h : Ty.tcon T us = Ty.tcon T us') : us = us' :=
   (Ty.foldl_tapp_inj hl h).2
 
-/-- Subtyping does not change a final result that is not a computation. -/
-theorem Le.res_eq {a b : Ty} (h : Le a b) (hb : ∀ r e t C, b.res ≠ .eff r e t C) :
-    a.res = b.res := by
-  induction h with
-  | refl => rfl
-  | arrow _ _ _ _ _ ih => exact ih hb
-  | eff => exact (hb _ _ _ _ rfl).elim
-
 theorem Ty.tcon_res (T : Name) (us : List Ty) : (Ty.tcon T us).res = Ty.tcon T us := by
   have h := Ty.tcon_not_arrow T us
   generalize Ty.tcon T us = t at h
@@ -107,20 +99,19 @@ theorem Ty.tcon_not_eff (T : Name) (us : List Ty) : ∀ r e t C, Ty.tcon T us �
   intro r e t C h
   have := Ty.tcon_kind T us; rw [h] at this; cases this
 
-theorem Le.res_tcon {a b : Ty} {T : Name} {us : List Ty} (h : Le a b) (ha : a.res = Ty.tcon T us) :
-    b.res = Ty.tcon T us := by
+theorem LeLive.res_tcon {a b : Ty} {T : Name} {us : List Ty}
+    (h : LeLive a b) (ha : a.res = Ty.tcon T us) : b.res = Ty.tcon T us := by
   induction h with
   | refl => exact ha
   | arrow _ _ _ _ _ ih => exact ih ha
   | eff => exact absurd ha.symm (Ty.tcon_not_eff _ _ _ _ _ _)
 
-theorem Le.res_tcon' {a b : Ty} {T : Name} {us : List Ty} (h : Le a b) (hb : b.res = Ty.tcon T us) :
-    a.res = Ty.tcon T us := by
+theorem LeLive.res_tcon' {a b : Ty} {T : Name} {us : List Ty}
+    (h : LeLive a b) (hb : b.res = Ty.tcon T us) : a.res = Ty.tcon T us := by
   induction h with
   | refl => exact hb
   | arrow _ _ _ _ _ ih => exact ih hb
   | eff => exact absurd hb.symm (Ty.tcon_not_eff _ _ _ _ _ _)
-
 theorem Ty.tcon_eq_adt {T T' : Name} {us : List Ty} (h : Ty.tcon T us = .adt T') :
     us = [] ∧ T = T' := by
   cases us with
@@ -183,19 +174,19 @@ the pattern is below the type of the value, at the same instance. -/
 theorem PatTy.typ_match {Ψ Θ Γ fl p t Δ} (hp : PatTy S fl p t Δ) :
     ∀ {v δ t'}, Value v → Typ S Ψ Θ Γ v (.ex t' .pure) → matchP p v = some δ →
       (fl = true → t' = t) → (fl = false → t'.kind ≠ 7 ∧ t'.res = t.res) →
-      Le t t' ∧ Inst S Ψ Θ Γ δ Δ := by
+      LeLive t t' ∧ Inst S Ψ Θ Γ δ Δ := by
   induction hp with
   | wild =>
     intro _ _ _ _ _ hm ht _; simp [matchP] at hm; subst hm; obtain rfl := ht rfl
-    exact ⟨.refl, .nil⟩
+    exact ⟨LeLive.refl, .nil⟩
   | var =>
     intro _ _ _ hvv hv hm ht _; simp [matchP] at hm; subst hm
-    obtain rfl := ht rfl; exact ⟨.refl, .cons hvv hv .nil⟩
+    obtain rfl := ht rfl; exact ⟨LeLive.refl, .cons hvv hv .nil⟩
   | lit =>
     intro v _ _ _ _ hm ht _
     obtain rfl := ht rfl
     cases v <;> simp [matchP] at hm
-    exact ⟨.refl, hm.2 ▸ .nil⟩
+    exact ⟨LeLive.refl, hm.2 ▸ .nil⟩
   | head hK hj hk =>
     intro v _ _ _ hv hm _ hk'
     cases v <;> simp [matchP] at hm
@@ -219,7 +210,7 @@ theorem PatTy.typ_match {Ψ Θ Γ fl p t Δ} (hp : PatTy S fl p t Δ) :
       obtain ⟨δ₁, δ₂, h1, h2, rfl⟩ := matchP_app.mp hm
       cases hv with
       | app hf he hψ hT =>
-        obtain rfl := Stage.eq_pure hψ
+        obtain rfl := Stage.eq_pure (Stage.le_trans (Stage.le_use _ _) hψ)
         have hvf : Value f ∧ Value e := by
           cases hvv with
           | ctorApp hf' _ he' => exact ⟨hf', he'⟩
@@ -247,14 +238,14 @@ theorem PatTy.typ_match {Ψ Θ Γ fl p t Δ} (hp : PatTy S fl p t Δ) :
   | rany =>
     intro v _ _ _ _ hm ht _
     obtain rfl := ht rfl
-    cases v <;> simp [matchP] at hm <;> exact ⟨.refl, hm ▸ .nil⟩
+    cases v <;> simp [matchP] at hm <;> exact ⟨LeLive.refl, hm ▸ .nil⟩
   | rfield hR _ _ ih₁ ih₂ =>
     intro v δ _ hvv hv hm ht _
     obtain rfl := ht rfl
     obtain ⟨x, δ₁, δ₂, hx, h1, h2, rfl⟩ := matchP_rfield.mp hm
     obtain ⟨_, i₁⟩ := ih₁ (hvv.field hv hx hR) (field_typ hv hx hR) h1 (fun _ => rfl) (fun h => by cases h)
     obtain ⟨_, i₂⟩ := ih₂ hvv hv h2 (fun _ => rfl) (fun h => by cases h)
-    exact ⟨.refl, i₁.append i₂⟩
+    exact ⟨LeLive.refl, i₁.append i₂⟩
   | or _ _ ih₁ ih₂ =>
     intro v δ _ hvv hv hm ht hk
     rcases matchP_or.mp hm with h | ⟨_, h⟩
@@ -285,6 +276,6 @@ theorem HPat.inst {Ψ Θ Γ ε₀ p θ Δ v δ} (hp : HPat S ε₀ p θ Δ) (hvv
     have hrs : S.res K = [] := List.map_eq_nil_iff.mp hnil
     obtain ⟨hl, i⟩ := hp.typ_match hvv hv' hm (fun h => by cases h)
       (fun _ => ⟨hU7, by rw [hr', hrs]; rfl⟩)
-    cases hl; exact ⟨i, hv'⟩
+    cases hl <;> exact ⟨i, hv'⟩
 
 end Flick

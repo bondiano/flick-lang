@@ -31,10 +31,11 @@ def TTy.subst (σ : Nat → Ty) : TTy → TTy
   | .arr φ a b q => .arr (φ.subst σ) (a.subst σ) (b.subst σ) (q.subst σ)
   | .dict q => .dict (q.subst σ)
 
-/-- `⌈t⌉`, with `⌈D_Q⌉ = ∅`; an arrow counts the variables of the rows of its stage. -/
+/-- `⌈t⌉`, with `⌈D_Q⌉ = ∅`: what `t` shows (`Ty.Shown`); an arrow does not count the rows of
+its stage. -/
 def TTy.reach : TTy → Nat → Prop
-  | .mono t, n => t.reach n
-  | .arr φ a b q, n => a.reach n ∨ b.reach n ∨ q.reach n ∨ φ.Occurs n
+  | .mono t, n => t.Shown n
+  | .arr _ a b q, n => a.reach n ∨ b.reach n ∨ q.Shown n
   | .dict _, _ => False
 
 /-- `D_{Q₁} →P^q … →P^q D_{Qₗ} →P^q t`. -/
@@ -48,15 +49,8 @@ structure TSch where
 
 def TSch.subst (σ : Nat → Ty) (s : TSch) : TSch := ⟨s.k, s.ty.subst (lift s.k σ)⟩
 
-/-- `⌈s⌉` below its binders. -/
-def TSch.reach (s : TSch) (n : Nat) : Prop := s.ty.reach (n + s.k)
-
 /-- `⟦∀ᾱ. Q̄ ⇒ τ⟧_q = ∀ᾱ. D_Q̄ →P^q τ` (`docs/formal/elaboration.md#the-dictionary-function-of-let-sig-dict-holds-what-the-right-hand-side-holds`). -/
 def Scheme.tr (s : Scheme) : TSch := ⟨s.k, dicts s.q s.ctx (.mono s.ty)⟩
-
-/-- What `e` holds in `Γ`; dictionary variables hold nothing. -/
-def heldT (Γ : List TSch) (e : Tm) (n : Nat) : Prop :=
-  ∃ x s, e.Free x ∧ Γ[x]? = some s ∧ s.reach n
 
 /-- Reflexive transitive closure. -/
 inductive Star {α : Type} (R : α → α → Prop) : α → α → Prop
@@ -103,9 +97,9 @@ structure Target (P : Prog) where
   varAll : ∀ {Γ Δ x k₀ t₀ ts k t us φ}, Γ[x]? = some ⟨k₀, .mono t₀⟩ → ts.length = k₀ →
     t₀.subst (inst ts) = .all k t → us.length = k →
     Has Γ Δ (.var x) (.mono (t.subst (inst us))) φ
-  /-- (App); a pure arrow applies at any stage -/
+  /-- (App); a pure arrow applies at any stage, a runtime one where its qualifier is live -/
   app : ∀ {Γ Δ f x a b q ψ φ}, Has Γ Δ f (.mono (.arr ψ a b q)) φ → Has Γ Δ x (.mono a) φ →
-    (ψ = .P ∨ ψ = φ) → Has Γ Δ (.app f x) (.mono b) φ
+    (ψ = .P ∨ ψ = φ ∧ φ.Keeps q) → Has Γ Δ (.app f x) (.mono b) φ
   ite : ∀ {Γ Δ c a b t φ}, Has Γ Δ c (.mono boolTy) φ → Has Γ Δ a (.mono t) φ →
     Has Γ Δ b (.mono t) φ → Has Γ Δ (.ite c a b) (.mono t) φ
   caseOpt : ∀ {Γ Δ e n s a t φ}, Has Γ Δ e (.mono (optTy a)) φ → Has Γ Δ n (.mono t) φ →
@@ -135,18 +129,15 @@ structure Target (P : Prog) where
       {σ : Nat → Ty} {t : Ty} {φ : Stage} {c : Ctor}, Has Γ Δ e (.mono ((Ty.tcon T us).subst σ)) φ →
     P.ctors K = some c → c.T = T → us.length = c.res.length → Clash (c.eqs us) →
     Has Γ Δ r (.mono t) φ → Has Γ Δ (.caseK e K n m .dead r) (.mono t) φ
-  /-- (Lam) of `regions.md`: the arrow shows what the closure holds -/
+  /-- (Lam) of the live discipline: the arrow need not show what the closure holds -/
   lam : ∀ {Γ Δ b a t q φ ψ}, Has (⟨0, .mono a⟩ :: Γ) Δ b (.mono t) φ →
-    (∀ n, heldT Γ (.lam b) n → (Ty.arr φ a t q).reach n) →
     Has Γ Δ (.lam b) (.mono (.arr φ a t q)) ψ
   /-- (Let-Sig) of λFlick⁺; `k = 0` is (Let-Mono) -/
   let_ : ∀ {Γ Δ e b k t u φ₁ φ}, Has (Γ.map (·.subst (up k))) (Δ.map (·.subst (up k))) e t φ₁ →
     (k ≠ 0 → φ₁ = .P) → (φ₁ = .P ∨ φ₁ = φ) → Has (⟨k, t⟩ :: Γ) Δ b u φ →
     Has Γ Δ (.let_ e b) u φ
-  /-- the abstraction over dictionaries: a pure function of a pure body, whose arrows show
-  what the body holds (`docs/formal/elaboration.md#the-dictionary-function-of-let-sig-dict-holds-what-the-right-hand-side-holds`) -/
+  /-- the abstraction over dictionaries: a pure function of a pure body -/
   lamD : ∀ {Γ Δ qs e t q φ}, Has Γ (qs ++ Δ) e t φ → (qs ≠ [] → φ = .P) →
-    (qs ≠ [] → ∀ n, heldT Γ e n → t.reach n ∨ q.reach n) →
     Has Γ Δ (.lamD qs.length e) (dicts q qs t) φ
   /-- applying a dictionary: a pure arrow, at any stage -/
   dapp : ∀ {Γ Δ f x a t q φ}, Has Γ Δ f (.arr .P a t q) φ → Has Γ Δ x a φ →

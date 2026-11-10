@@ -14,18 +14,6 @@ use crate::types::kinds::Kind;
 use crate::types::ty::{Norm, Row, Type};
 use crate::types::{Checker, ty};
 
-/// Whether `captures` is what `stages` gives a later stage, which starts from
-/// the empty row: a written `^(c + d)` does not.
-fn implied_stage(captures: &Type) -> bool {
-    match captures {
-        Type::Union(left, _) => {
-            matches!(&**left, Type::Row(r) if r.entries.is_empty() && r.tail.is_none())
-                || implied_stage(left)
-        }
-        _ => false,
-    }
-}
-
 /// `Outlives c s`: the captures `c` live at least as long as the region `s`.
 #[derive(Debug, Clone)]
 pub struct Outlives {
@@ -332,12 +320,6 @@ impl Checker<'_> {
                     format!("allows only {}", allowed.join(", "))
                 };
                 let what = format!("the expected type `{}`", self.show_exact(expected));
-                // a stage's qualifier may be one no one wrote, so say where it is from
-                let origin = if implied_stage(&hold.bound) {
-                    "; the signature does not write this qualifier: a later stage of a function holds what its earlier parameters hold"
-                } else {
-                    ""
-                };
                 let mut edits = Vec::new();
                 let advice = if reader {
                     "build a list with `[for …]`, or iterate the sequence in the function that builds it".to_owned()
@@ -362,7 +344,7 @@ impl Checker<'_> {
                 };
                 Diagnostic::error(
                     codes::G001,
-                    format!("{subject}, but {what} {allowed}{origin}"),
+                    format!("{subject}, but {what} {allowed}"),
                     hold.span,
                 )
                 .with_fix(|| (advice, edits))
@@ -401,7 +383,7 @@ impl Checker<'_> {
 
     /// A child registered with `owner` runs until the owner's scope closes,
     /// so it may hold only regions that end no earlier.
-    fn check_outlives(&mut self, o: &Outlives) {
+    pub(super) fn check_outlives(&mut self, o: &Outlives) {
         let owner = self.store.resolve(&o.owner);
         let owner_scope = self.scope_index(&owner);
         let mut held = Norm::default();

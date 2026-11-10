@@ -33,7 +33,7 @@
         { "id": "type-error", "en": "A type error", "ru": "Ошибка типа", "expect": "fail FLICK-T003" },
         { "id": "missing-service", "en": "A service the signature hides", "ru": "Сервис, которого нет в сигнатуре", "expect": "fail FLICK-E002" },
         { "id": "missing-case", "en": "A forgotten case", "ru": "Забытый вариант", "expect": "fail FLICK-T009" },
-        { "id": "escaping-resource", "en": "A resource leaving its scope", "ru": "Ресурс покидает scope", "expect": "fail FLICK-G001" }
+        { "id": "escaping-resource", "en": "A resource leaving its scope", "ru": "Ресурс покидает scope", "expect": "fail FLICK-G002" }
       ]
     },
     {

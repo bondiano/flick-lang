@@ -7,10 +7,11 @@ use std::mem;
 use std::rc::Rc;
 
 use super::expr::mono;
+use super::regions::add_live;
 use super::{Check, Checker, error};
 use crate::subst::matches;
 use crate::syntax::{Arm, Name, Pat, Term};
-use crate::types::{Row, Stage, Type};
+use crate::types::{Caps, Row, Stage, Type};
 
 impl Checker<'_> {
     /// (Match): every arm at one type; the arms without `when` cover `τ`.
@@ -106,7 +107,6 @@ impl Checker<'_> {
     /// (Task): `task e : (Eff r ε τ)^C ! P` with `φ ⊑ R⟨r; ε⟩`, and what
     /// `e` uses of `Γ` within `⌈(Eff r ε τ)^C⌉` (`regions.md` §2.3).
     pub(super) fn task(&mut self, body: &Term, expected: Option<&Type>) -> Check<Type> {
-        let qualifier = expected.map(|t| self.qualifier(t));
         let wanted = expected.map(|t| self.resolve(t));
         let result = match &wanted {
             Some(Type::Eff(_, _, a)) => Some((**a).clone()),
@@ -117,14 +117,19 @@ impl Checker<'_> {
             Some(Type::Eff(r, e, _)) => (r.clone(), e.clone()),
             _ => (self.fresh_row(), self.fresh_row()),
         };
-        self.stage_within(&inner, &Stage::Runtime(r.clone(), e.clone()))?;
-        let task = Term::Task(Rc::new(body.clone()));
-        Ok(self.close_over(&task, Type::Eff(r, e, Rc::new(t)), qualifier))
+        let wanted_stage = Stage::Runtime(r.clone(), e.clone());
+        self.close_within(
+            &Type::Eff(r, e, Rc::new(t)),
+            &inner,
+            &wanted_stage,
+            expected,
+        )
     }
 
     /// (Await): `φ ⊔ R⟨r; ε⟩`, one layer of `Eff` off.
     pub(super) fn await_(&mut self, e: &Term) -> Check<Type> {
         let t = self.infer(e)?;
+        let held = self.qualifier(&t);
         let (r, x, a) = match self.resolve(&t) {
             Type::Eff(r, x, a) => (r, x, (*a).clone()),
             other => {
@@ -133,6 +138,7 @@ impl Checker<'_> {
                 (r, x, a)
             }
         };
+        let r = add_live(&r, &held);
         self.perform(&Stage::Runtime(r, x))?;
         Ok(a)
     }
@@ -221,7 +227,12 @@ impl Checker<'_> {
         };
         self.settle_provide(&mut needed, &self.zonk_row(&outputs), Some(&p))?;
         let rest = self.minus(&needed, &outputs)?;
+        // a layer of a service a region indexes is provided where it is live
+        let live = (self.zonk_row(&outputs).elems.values()).fold(Caps::default(), |out, args| {
+            out.union(&self.indexed_live(args))
+        });
         let services = self.sum(&inputs, &rest)?;
+        let services = add_live(&services, &live);
         let errors = self.sum(&errors, &raised)?;
         self.perform(&Stage::Runtime(services, errors))?;
         Ok(t)
