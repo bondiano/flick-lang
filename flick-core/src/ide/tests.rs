@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 
 use super::{CompletionKind, Ide, Symbol, Target};
 use crate::diagnostics::Diagnostic;
-use crate::project::config::{Build, Config, Kind};
+use crate::project::config::{Build, Config, Dependency, Kind};
 use crate::project::{self, Analysis, Host, analysis_fingerprint};
 use crate::projection;
 use crate::source::{FileId, SourceMap};
@@ -143,6 +143,13 @@ fn fixture() -> Fixture {
 
 /// A library project of `files` (paths under `src/`), analysed from its last file.
 pub(super) fn fixture_of(files: &[(&str, &str)]) -> Fixture {
+    fixture_with_dependencies(files, Vec::new())
+}
+
+pub(super) fn fixture_with_dependencies(
+    files: &[(&str, &str)],
+    dependencies: Vec<Dependency>,
+) -> Fixture {
     let host = Memory(
         files
             .iter()
@@ -159,7 +166,7 @@ pub(super) fn fixture_of(files: &[(&str, &str)]) -> Fixture {
             source_dir: "src".into(),
             test_dir: "test".into(),
             entries: Vec::new(),
-            dependencies: Vec::new(),
+            dependencies,
             js_dependencies: Vec::new(),
             package: None,
             build: Build::default(),

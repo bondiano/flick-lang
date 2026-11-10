@@ -10,6 +10,10 @@ use std::process::Command;
 use std::time::Duration;
 
 use common::project;
+use flick_core::build::go::executable;
+use flick_core::build::runner_path;
+use flick_core::project::config::MAIN_ENTRY;
+use serde_json::{Value, json};
 
 const APP: &str = "schema-version = 1
 
@@ -161,9 +165,86 @@ fn cached_private_module_stays_private_to_a_dependent() {
     )
     .expect("import private dependency module");
     for cache in ["cache", "fresh"] {
-        let (status, stderr) = flick_output(&root, cache, &["check"]);
+        let (status, stderr) = flick_output(&root, cache, &["check", "--diagnostics", "json"]);
         assert_eq!(status, Some(1), "{stderr}");
-        assert!(stderr.contains("FLICK-R017"), "{stderr}");
+        let diagnostics: Vec<Value> = stderr
+            .lines()
+            .map(|line| serde_json::from_str(line).expect("JSON diagnostic"))
+            .filter(|event: &Value| event["severity"] == "error")
+            .collect();
+        assert_eq!(diagnostics.len(), 1, "{stderr}");
+        assert_eq!(diagnostics[0]["code"], "FLICK-R017");
+        assert!(
+            Path::new(diagnostics[0]["path"].as_str().expect("source path"))
+                .ends_with(Path::new("src").join("App").join("Main.fl")),
+            "{stderr}"
+        );
+        // R017 points at the forbidden module path, not the import keyword
+        // or its exposing list.
+        let start = MAIN.find("\n\nstart").expect("end of imports") + 1 + "import ".len();
+        assert_eq!(
+            diagnostics[0]["range"],
+            json!({ "start": start, "end": start + "Geo.Shift".len() })
+        );
+    }
+}
+
+#[test]
+#[ignore = "needs Node and Go; run `just e2e-tests`"]
+fn installed_private_module_public_facade_runs_on_js_and_go() {
+    for emit in ["js", "go"] {
+        for profile in ["debug", "release"] {
+            let (root, geo) = fetched(&format!("package-private-facade-{emit}-{profile}"));
+            fs::write(
+                root.join(format!("store/{HASH}/lib/src/Geo/Shift.fl")),
+                SHIFT.replacen("module Geo.Shift", "private module Geo.Shift", 1),
+            )
+            .expect("private implementation");
+            // Re-export the private implementation, rather than wrapping it.
+            fs::write(
+                geo,
+                "module Geo exposing (by)\nimport Geo.Shift exposing (by)\n",
+            )
+            .expect("public facade");
+            let main = "module App.Main exposing (main)\nimport Geo exposing (by)\n\
+                        main : Unit ->{; AppError} Unit\n\
+                        let main () = Platform.stdout_line (show (by 41.0))\n";
+            let main_path = root.join("app/src/App/Main.fl");
+            for (cache, out) in [("cache", "cold"), ("cache", "saved"), ("fresh", "fresh")] {
+                // Force a build-artifact miss: the saved run must lower the
+                // package interface, not just copy the first executable.
+                fs::write(&main_path, format!("{main}\n// {out}\n")).expect("app source");
+                let (status, stderr) = flick_output(
+                    &root,
+                    cache,
+                    &[
+                        "build",
+                        "--emit",
+                        emit,
+                        "--profile",
+                        profile,
+                        "--out-dir",
+                        out,
+                    ],
+                );
+                assert_eq!(status, Some(0), "{emit}/{profile}/{out}: {stderr}");
+                let dist = root.join("app").join(out);
+                let output = if emit == "js" {
+                    Command::new("node")
+                        .arg(dist.join(runner_path(false)))
+                        .output()
+                } else {
+                    Command::new(dist.join(executable(MAIN_ENTRY))).output()
+                }
+                .expect("program runs");
+                assert!(
+                    output.status.success(),
+                    "{emit}/{profile}/{out}: {output:?}"
+                );
+                assert_eq!(output.stdout, b"42\n", "{emit}/{profile}/{out}");
+                assert!(output.stderr.is_empty(), "{output:?}");
+            }
+        }
     }
 }
 
