@@ -324,8 +324,12 @@ jobs:
         env:
           FLICK_E2E_GO_ONLY: "1"
         run: cargo test --profile e2e -p flick --test e2e --test go_main --test unicode_path -- --ignored run_cases exit_codes_follow_the_outcome_and_signals run_and_test_use_the_go_executable a_project_builds_runs_and_tests_under_a_non_ascii_path
-      # the node half and the comparison of both reports run in `just e2e`
+      # the node half and the comparison of both reports run in `just e2e`;
+      # the compiler is the one the step above built for its tests, with the
+      # std of this checkout, as `cargo run` would name it
       - name: Language tests on the go target
         shell: bash
         working-directory: tests/language
-        run: cargo run -q --profile e2e -p flick -- test --emit go --seed 42
+        env:
+          FLICK_STD_PATH: ${{ github.workspace }}/packages/std
+        run: ../../target/e2e/flick test --emit go --seed 42

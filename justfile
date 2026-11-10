@@ -63,10 +63,15 @@ go-test:
 # Go runtime and the language tests; CI runs the parts as jobs side by side
 e2e: e2e-js e2e-tests e2e-cases go-test language
 
+# The compiler in the `e2e` profile, built as a dependency of its own tests:
+# their dev-dependencies turn on features of the compiler's crates, so a plain
+# `cargo build -p flick` is another build, which the suites would then redo
+e2e-compiler:
+    cargo build -p flick --profile e2e --test e2e
+
 # What the e2e suites run against: the compiler in the `e2e` profile, the JS
 # packages, the runtime and the `.d.ts` importer
-e2e-prepare:
-    cargo build -p flick --profile e2e
+e2e-prepare: e2e-compiler
     pnpm install --frozen-lockfile
     pnpm -C runtime build
     pnpm -C packages/effect-ts build
@@ -99,8 +104,7 @@ e2e-cases shard="": e2e-prepare
 # The language tests of tests/language on Node and as a Go executable, with
 # one seed: both must pass and write the same report; on Flick's own runtime
 # too, but for the tests tests/language/rt-gaps.txt lists
-language seed="42":
-    cargo build -p flick --profile e2e
+language seed="42": e2e-compiler
     pnpm -C runtime build
     pnpm -C packages/effect-ts build
     cd tests/language && {{flick}} test --emit js --seed {{seed}} --reporter json > ../../target/language-js.txt || { cat ../../target/language-js.txt; exit 1; }
@@ -110,8 +114,8 @@ language seed="42":
     node tools/language-rt/index.mjs {{flick}} {{seed}} target/language-js.txt
 
 # Bundle the tracked programs (release) with rolldown and hold them to their gzip budgets
-bundle-size:
-    node tools/bundle-size/index.mjs "$(cargo build -p flick --profile e2e --message-format=json-render-diagnostics | jq -r 'select(.executable != null) | .executable')"
+bundle-size: e2e-compiler
+    node tools/bundle-size/index.mjs {{flick}}
 
 # Count the tokens of the Conduit example's source against the RealWorld Go backend and React client:
 # o200k_base, and Claude's tokenizer when ANTHROPIC_API_KEY or OPENROUTER_API_KEY is set
