@@ -2,22 +2,28 @@
 //! runs in a fresh instance with a budget of fuel and memory: calls stay
 //! pure, so their results can be cached, and a plugin can neither hang the
 //! compiler nor take its memory. Imports other than the compiler's trap.
-//! A component is compiled once per process, on its first call: a build
-//! whose blocks all come from the cache never compiles it.
+//! A component is compiled on its first call: a build whose blocks all come
+//! from the cache never compiles it. A process keeps the plugin of a
+//! component for as long as its file stays as it is, so a language server
+//! compiles it once and not for every analysis; and wasmtime keeps the
+//! compiled code in the user's cache directory, so the next process reads it.
 
+use std::collections::HashMap;
 use std::fs;
 use std::io;
 use std::mem;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::str;
-use std::sync::{Arc, OnceLock};
+use std::sync::{Arc, Mutex, OnceLock, PoisonError};
+use std::time::SystemTime;
 
 use flick_core::plugin::source::BlockSource;
 use flick_core::plugin::{Expander, Failure};
+use flick_core::project::store;
 use flick_plugin::Compiler;
 use sha2::{Digest, Sha256};
 use wasmtime::component::{Component, HasSelf, Linker};
-use wasmtime::{Config, Engine, Store, StoreLimits, StoreLimitsBuilder, Trap};
+use wasmtime::{Cache, CacheConfig, Config, Engine, Store, StoreLimits, StoreLimitsBuilder, Trap};
 
 use crate::fetch;
 
@@ -33,8 +39,34 @@ flick_plugin::reach_conversions!(flick::plugin::types);
 const FUEL: u64 = 1_000_000_000;
 const MEMORY: usize = 64 << 20;
 
-/// The plugin of `package` in the component at `path`.
+/// The plugins this process loaded, by package and path, each with the
+/// time and size its file had: one of a file that changed is replaced.
+type Loaded = HashMap<(String, PathBuf), (Option<SystemTime>, u64, Arc<Wasm>)>;
+
+/// The plugin of `package` in the component at `path`: the one loaded
+/// before, with what it compiled, while the file is as it was.
 pub fn load(package: &str, path: &Path) -> Result<Arc<dyn Expander>, String> {
+    static LOADED: OnceLock<Mutex<Loaded>> = OnceLock::new();
+    let stamp = fs::metadata(path)
+        .ok()
+        .map(|m| (m.modified().ok(), m.len()));
+    let key = (package.to_owned(), path.to_path_buf());
+    let mut loaded =
+        (LOADED.get_or_init(Mutex::default).lock()).unwrap_or_else(PoisonError::into_inner);
+    if let Some((modified, len)) = stamp
+        && let Some((was_modified, was_len, plugin)) = loaded.get(&key)
+        && (*was_modified, *was_len) == (modified, len)
+    {
+        return Ok(plugin.clone());
+    }
+    let plugin = Arc::new(read(package, path)?);
+    if let Some((modified, len)) = stamp {
+        loaded.insert(key, (modified, len, plugin.clone()));
+    }
+    Ok(plugin)
+}
+
+fn read(package: &str, path: &Path) -> Result<Wasm, String> {
     let bytes = fs::read(path).map_err(|e| {
         let hint = match e.kind() {
             io::ErrorKind::NotFound => "; build it, as `flick run plugin` in its package does",
@@ -60,11 +92,11 @@ pub fn load(package: &str, path: &Path) -> Result<Arc<dyn Expander>, String> {
         }
     }
     let id = format!("{package} {}", fetch::hex(&Sha256::digest(&bytes)));
-    Ok(Arc::new(Wasm {
+    Ok(Wasm {
         id,
         bytes,
         compiled: OnceLock::new(),
-    }))
+    })
 }
 
 /// The version of `flick:plugin` a component imports the compiler of, as
@@ -190,6 +222,14 @@ impl flick::plugin::compiler::Host for State {
     }
 }
 
+/// Where wasmtime keeps compiled components, by their bytes, its own
+/// version and the settings of the engine.
+fn compiled_cache() -> Option<Cache> {
+    let mut config = CacheConfig::new();
+    config.with_directory(store::cache_dir()?.join("wasmtime"));
+    Cache::new(config).ok()
+}
+
 fn engine() -> Result<&'static Engine, String> {
     static ENGINE: OnceLock<Result<Engine, String>> = OnceLock::new();
     ENGINE
@@ -198,6 +238,8 @@ fn engine() -> Result<&'static Engine, String> {
             config.consume_fuel(true);
             // the same results on every machine, which caches rely on
             config.cranelift_nan_canonicalization(true);
+            // without a cache directory a component is only compiled anew
+            config.cache(compiled_cache());
             Engine::new(&config).map_err(|e| e.to_string())
         })
         .as_ref()
