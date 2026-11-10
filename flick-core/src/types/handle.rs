@@ -424,6 +424,9 @@ impl Checker<'_> {
     pub fn leave_resume(&mut self, ty: &Type, node: &Node) {
         self.regions.nest.pop();
         self.store.level -= 1;
+        if self.live() {
+            self.grow();
+        }
         if let Err(skolem) = self.store.leave(ty) {
             let shown = self.show(ty);
             let head = format!("the value of this handler has type `{shown}`");

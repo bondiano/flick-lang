@@ -319,6 +319,7 @@ impl Checking<'_> {
             watched: self.watched,
             effects: build.is_none_or(|b| b.effect != Backend::None),
             stages_by_class: self.stages_by_class,
+            regions: build.map_or_else(Default::default, |b| b.regions),
         };
         let mut diagnostics = loaded.parse.diagnostics.clone();
         let resolved_cleanly = !resolved.iter().any(|d| d.severity == Severity::Error);

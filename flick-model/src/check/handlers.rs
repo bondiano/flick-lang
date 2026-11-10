@@ -106,7 +106,6 @@ impl Checker<'_> {
     /// (Task): `task e : (Eff r ε τ)^C ! P` with `φ ⊑ R⟨r; ε⟩`, and what
     /// `e` uses of `Γ` within `⌈(Eff r ε τ)^C⌉` (`regions.md` §2.3).
     pub(super) fn task(&mut self, body: &Term, expected: Option<&Type>) -> Check<Type> {
-        let qualifier = expected.map(|t| self.qualifier(t));
         let wanted = expected.map(|t| self.resolve(t));
         let result = match &wanted {
             Some(Type::Eff(_, _, a)) => Some((**a).clone()),
@@ -118,10 +117,14 @@ impl Checker<'_> {
             _ => (self.fresh_row(), self.fresh_row()),
         };
         let wanted_stage = Stage::Runtime(r.clone(), e.clone());
-        let live = qualifier.clone().unwrap_or_default();
-        self.stage_within(&inner, &self.live_stage(&wanted_stage, &live))?;
         let task = Term::Task(Rc::new(body.clone()));
-        Ok(self.close_over(&task, Type::Eff(r, e, Rc::new(t)), qualifier))
+        self.close_within(
+            &task,
+            &Type::Eff(r, e, Rc::new(t)),
+            &inner,
+            &wanted_stage,
+            expected,
+        )
     }
 
     /// (Await): `φ ⊔ R⟨r; ε⟩`, one layer of `Eff` off.

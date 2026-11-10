@@ -1,0 +1,42 @@
+// captures: accepts
+// A child kept by an owner may use the regions that outlive the owner:
+// the outer one from inside the inner `scope`, and its own.
+module App.LiveChildren exposing (..)
+
+type alias Path = String
+
+type File (s : Region)
+
+type error OpenError = OpenError Path
+
+type error ReadError = ReadError Path
+
+service FileSystem =
+  open_scoped : forall s. Path ->{Scope s; OpenError} File s
+  read_all : forall s. File s ->{; ReadError} String
+
+report : Failure {ReadError} ->{FileSystem; none} Unit
+let report _ = ()
+
+children : Path ->{FileSystem; OpenError} Unit
+let children path = scope outer {
+  let config = FileSystem.open_scoped path
+  scope inner {
+    let data = FileSystem.open_scoped path
+    ignore (Fiber.spawn inner report (task { FileSystem.read_all data }))
+    ignore (Fiber.spawn inner report (task { FileSystem.read_all config }))
+    ignore (Fiber.spawn outer report (task { FileSystem.read_all config }))
+  }
+}
+
+// a qualifier a signature writes is what a use of the function needs live
+both_regions : Path ->{FileSystem; OpenError, ReadError} String
+let both_regions path = scope outer {
+  let config = FileSystem.open_scoped path
+  scope inner {
+    let data = FileSystem.open_scoped path
+    both : (Unit ->{FileSystem; ReadError} String)^{outer, inner}
+    let both = fun () -> FileSystem.read_all config ++ FileSystem.read_all data
+    both ()
+  }
+}

@@ -13,10 +13,12 @@
 
 mod compare;
 mod data;
+mod live;
 mod provided;
 mod scopes;
 mod solve;
 
+pub use live::{LIVE, RegionMode, has_live, strip_live};
 pub use provided::{PROVIDED, Provide};
 pub use solve::Outlives;
 
@@ -364,6 +366,9 @@ impl Checker<'_> {
     /// generic value captures as well as regions, so partial application
     /// has the same whole-value bound as an explicitly written closure.
     pub fn implicit_captures(&self, t: &Type) -> Type {
+        if self.live() {
+            return t.clone();
+        }
         self.stages(t, &mut Vec::new(), &Type::empty_row())
     }
 
@@ -538,7 +543,9 @@ impl Checker<'_> {
         what: &'static str,
         span: Span,
     ) -> Type {
-        if held.is_empty() {
+        // under `live.rs` no qualifier says what a closure holds, but the
+        // reader of a lazy `for`, which that discipline does not know
+        if held.is_empty() || self.live() && !self.holds_reader(&held) {
             return ty;
         }
         if let Some(expected) = &expected

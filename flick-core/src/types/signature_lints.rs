@@ -16,7 +16,8 @@ impl Checker<'_> {
     /// Warns of each qualifier of a later stage in `node`, the signature of
     /// type `scheme`, that says what the stage holds anyway.
     pub(super) fn redundant_stages(&mut self, node: &Node, scheme: &Type) {
-        if node.range().0 >= self.generated {
+        // under `regions/live.rs` a later stage holds nothing implicitly
+        if node.range().0 >= self.generated || self.live() {
             return;
         }
         let mut found = Vec::new();

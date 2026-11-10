@@ -9,7 +9,9 @@ use crate::iface::{self, Interface};
 use crate::resolve::{self, Module};
 use crate::source::SourceMap;
 use crate::syntax;
-use crate::types::{Limits, Options, Thresholds, Watched, builtins, check_with_evidence};
+use crate::types::{
+    Limits, Options, RegionMode, Thresholds, Watched, builtins, check_with_evidence,
+};
 
 /// Checks `modules` in order, each seeing the interfaces of those before;
 /// returns the diagnostics and dictionaries of the last one.
@@ -41,6 +43,7 @@ fn check_all(modules: &[(&str, &str)]) -> (Vec<Diagnostic>, Vec<Dict>) {
             effects: true,
             watched: Watched::none(),
             stages_by_class: false,
+            regions: RegionMode::Captures,
         };
         let (more, evidence) =
             check_with_evidence(&module, &imported, builtins(), options, &mut interface);

@@ -379,7 +379,12 @@ impl Checker<'_> {
     /// argument. Refine abstract results, not independent concrete scalars.
     pub fn application_result(&self, result: Type, function: &Type, argument: &Type) -> Type {
         let result = self.value_bound(result);
-        if !self.refinable_result(&result)
+        // under `live.rs` a function or a task holds nothing it needs live
+        let used = self.live()
+            && (self.eff_parts(&result).is_some()
+                || matches!(self.whnf(&result), Type::Fun { .. }));
+        if used
+            || !self.refinable_result(&result)
             || matches!(
                 self.whnf(function),
                 Type::Fun {
@@ -399,6 +404,16 @@ impl Checker<'_> {
         captures
             .entries
             .retain(|(_, atom)| !matches!(atom, Type::Skolem(s) if self.regions.lent.contains(s)));
+        // under `live.rs` a type variable is no use of what it stands for
+        if self.live() {
+            captures.entries.retain(|(_, atom)| {
+                matches!(self.store.resolve(atom), Type::Meta(_))
+                    || matches!(
+                        self.atom_kind(atom, &[]),
+                        Some(Kind::Region | Kind::CaptureRow)
+                    )
+            });
+        }
         Type::Bounded {
             ty: Box::new(result),
             captures: Box::new(captures.into_type()),

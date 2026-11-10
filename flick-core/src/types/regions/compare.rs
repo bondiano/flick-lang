@@ -154,6 +154,7 @@ impl Checker<'_> {
             (Type::Meta(_), _) if ca.is_none() => return self.unify(actual, expected),
             _ => {}
         }
+        let (a, e) = self.live_sides((a, ca.as_ref()), (e, ce.as_ref()));
         let visible = if ce.is_some() {
             Visible::Now(Vec::new())
         } else {

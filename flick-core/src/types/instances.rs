@@ -87,7 +87,11 @@ impl Checker<'_> {
                     }
                     match (sig, expected) {
                         (Some(sig), expected) => {
-                            let (scheme, _) = self.signature(sig);
+                            let (mut scheme, _) = self.signature(sig);
+                            // the class signature is what callers see, without `Live`
+                            if self.live() && expected.is_some() {
+                                scheme = super::regions::strip_live(&scheme);
+                            }
                             if let Some(expected) = expected {
                                 self.compare_method(&name, &scheme, &expected, self.span(sig));
                                 if let Some(signature) = signature {

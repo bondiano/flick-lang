@@ -117,10 +117,8 @@ impl Checker<'_> {
                 self.locals.pop();
                 let inner = mem::replace(&mut self.stage, outer);
                 checked?;
-                let qualifier = self.qualifier(&full);
-                self.stage_within(&inner, &self.live_stage(s, &qualifier))?;
-                self.close_over(e, expected.clone(), Some(qualifier));
-                Ok(())
+                self.close_within(e, &expected, &inner, s, Some(&full))
+                    .map(drop)
             }
             (Term::Scope(s, body), _) => self.scope(s, body, Some(&full)).map(drop),
             (Term::Apply(Head::Con(c), args), _) if args.len() == c.arity => {

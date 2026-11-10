@@ -331,6 +331,71 @@ impl Checker<'_> {
         }
     }
 
+    /// Every qualifier of `t`, outermost first: a value of `(τ^{≤C})^{≤D}`,
+    /// as `Ref.set` takes into a cell of `τ^{≤C}`, is within each.
+    pub(super) fn qualifiers(&self, t: &Type) -> Vec<Caps> {
+        let mut out = Vec::new();
+        let mut t = self.follow(t);
+        while let Type::Captured(inner, c) | Type::Bounded(inner, c) = &t {
+            out.push(self.zonk_caps(c));
+            t = self.follow(inner);
+        }
+        out
+    }
+
+    /// `t` once for each of its qualifiers, about the bare type: what is
+    /// within `(τ^{≤C})^{≤D}` is within `τ^{≤C}` and within `τ^{≤D}`, not
+    /// within what the two reach together.
+    pub(super) fn layers(&self, t: &Type) -> Vec<Type> {
+        let mut out = Vec::new();
+        let bare = Rc::new(self.resolve(t));
+        let mut cur = self.follow(t);
+        loop {
+            cur = match &cur {
+                Type::Captured(inner, c) => {
+                    out.push(Type::Captured(bare.clone(), c.clone()));
+                    self.follow(inner)
+                }
+                Type::Bounded(inner, c) => {
+                    out.push(Type::Bounded(bare.clone(), c.clone()));
+                    self.follow(inner)
+                }
+                _ => break,
+            };
+        }
+        if out.len() < 2 {
+            return vec![self.follow(t)];
+        }
+        out
+    }
+
+    /// The premises of (Lam) and (Task) against `expected`, for each of its
+    /// qualifiers: the body's stage `inner` within `stage` with its `Live`,
+    /// and what `e` uses of `Γ` within it. Returns `ty` with the outermost.
+    pub(super) fn close_within(
+        &mut self,
+        e: &Term,
+        ty: &Type,
+        inner: &Stage,
+        stage: &Stage,
+        expected: Option<&Type>,
+    ) -> Check<Type> {
+        let layers = expected.map_or_else(Vec::new, |t| self.qualifiers(t));
+        let mut each = layers.clone();
+        if each.is_empty() {
+            each.push(Caps::default());
+        }
+        for q in &each {
+            self.stage_within(inner, &self.live_stage(stage, q))?;
+        }
+        let given = expected.map(|_| each[0].clone());
+        let closed = self.close_over(e, ty.clone(), given);
+        for q in layers.into_iter().skip(1) {
+            self.close_over(e, ty.clone(), Some(q));
+        }
+        Ok(closed)
+    }
+
     /// (Proj): a part of a value of `(T ῡ)^C` taken apart has `C` too.
     pub(super) fn project_part(&self, whole: &Type, part: Type) -> Type {
         match self.follow(whole) {

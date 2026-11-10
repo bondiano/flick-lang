@@ -37,6 +37,16 @@ pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 /// are not loaded, so names from them are taken on trust. A whole program goes
 /// through [`project::check`].
 pub fn check(sources: &source::SourceMap, file: source::FileId) -> Vec<diagnostics::Diagnostic> {
+    check_regions(sources, file, types::RegionMode::Captures)
+}
+
+/// [`check`] under the discipline of regions `regions`, as `[build] regions`
+/// of `flick.toml` chooses it.
+pub fn check_regions(
+    sources: &source::SourceMap,
+    file: source::FileId,
+    regions: types::RegionMode,
+) -> Vec<diagnostics::Diagnostic> {
     let text = &sources.get(file).text;
     let parse = syntax::parse(text, file);
     let syntax = resolve::module_syntax(&parse.tree, text, file);
@@ -67,6 +77,7 @@ pub fn check(sources: &source::SourceMap, file: source::FileId) -> Vec<diagnosti
         effects: true,
         watched: &watched,
         stages_by_class: false,
+        regions,
     };
     let mut diagnostics = parse.diagnostics;
     diagnostics.extend(derived);

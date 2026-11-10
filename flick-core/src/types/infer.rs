@@ -475,6 +475,7 @@ impl Checker<'_> {
             Some(effects) => self.body_stage(effects.as_deref(), node, expected),
             None => self.open_stage(),
         };
+        self.live_bound(&mut stage, closures.last().and_then(|c| c.1.as_ref()));
         // `o?` in the body returns from this function, so it fixes the result type
         let inferred_result = rest.is_none();
         let returns = rest.clone().unwrap_or_else(|| self.fresh());

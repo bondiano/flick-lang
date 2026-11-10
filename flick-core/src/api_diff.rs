@@ -348,6 +348,7 @@ mod tests {
             effects: true,
             watched: types::Watched::none(),
             stages_by_class: false,
+            regions: types::RegionMode::Captures,
         };
         let _ = types::check(
             &module,

@@ -894,6 +894,19 @@ Divergence: (Lam) and (Task) did not see runtime forms in the body.
 - Symptom: the premise of (Lam) counted only the free variables of the body. The term `λx. (λy. ()) (cap π n)` has none and gets type `(Unit → Unit)^∅`, although the body holds a capability of region `π`, and L4 fails for it. Programs contain no such terms, but a step creates them: substituting a value for a free variable leaves `cap π n` inside a `λ`.
 - Imprecise §3.4. Resolution, document: for runtime forms, the premises of (Lam) and (Task) count the regions of `cap π n`, `own π` and `⌈Ψ(ℓ)⌉` of the body's locations on a par with `⌈Γ(y)⌉` of the free variables; for programs the rule is unchanged. Substituting a value preserves the premise by the syntactic part of L4: a value holds no more than its type shows. Lean: `held`, `Typ.lam`, `Typ.holds`. Found while proving T4 in Lean (`formal/Formal/Regions.lean`).
 
+### A cell's content and the cell both bound what is stored
+
+Divergence: the model checked a value stored by `Ref.set` only against the outer of two qualifiers.
+
+```flick
+let cell = Ref.make (task { () })
+scope s { let h = open "x"; Ref.set cell (task { use h }) }
+await (Ref.get cell)
+```
+
+- Symptom: the model's checkers, captures and live, accepted the program, and its machine stopped with "use after close". `Ref.set` takes `α^c` with `α` the cell's content `τ^{c₀}`, so the task was checked against `(τ^{c₀})^c`. (Lam), (Task) and (≤-Cap) took only `c`, which is free and grew to `s`; `c₀`, the capacity the cell was made with, was never asked. flick-core rejects the program in both modes.
+- Model hole, not a hole of the document or of Lean, where `Ref.set` takes exactly the cell's type. Resolution, model: a value checked against nested qualifiers is within each (`qualifiers`, `layers`, `close_within` in `check/regions/mod.rs`), so `c₀` grows to `s` and `s` would leave its `scope` (`FLICK-G002`). Found while porting the live discipline to flick-core. Test: `flick-model/tests/live_core.rs` `live_core_rejects_a_task_in_an_outer_cell`.
+
 Outside regions, found along the way:
 
 ### flick build stops at an unknown module

@@ -11,13 +11,14 @@ use std::path::{Path, PathBuf};
 use std::{fmt, fs};
 
 use flick_core::diagnostics::codes::Area;
-use flick_core::diagnostics::{Diagnostic, codes};
+use flick_core::diagnostics::{Diagnostic, Severity, codes};
 #[cfg(feature = "native-project")]
 use flick_core::project::{self, Host};
 use flick_core::source;
 use flick_core::source::{FileId, SourceFile, SourceMap};
 #[cfg(feature = "native-project")]
 use flick_core::syntax::{self, cst::Node, kind::SyntaxKind};
+use flick_core::types::RegionMode;
 
 /// 1-based `line:col-line:col`, columns in characters, end exclusive.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -202,6 +203,11 @@ fn fixtures(dir: &Path, out: &mut Vec<PathBuf>) {
 }
 
 fn check_fixture(path: &Path, should_fail: bool) -> Vec<String> {
+    check_fixture_in(path, should_fail, RegionMode::Captures)
+}
+
+/// [`check_fixture`] under the discipline of regions `regions`.
+fn check_fixture_in(path: &Path, should_fail: bool, regions: RegionMode) -> Vec<String> {
     let mut sources = SourceMap::default();
     let (file, utf8) = sources.add_bytes(
         path.display().to_string(),
@@ -209,7 +215,10 @@ fn check_fixture(path: &Path, should_fail: bool) -> Vec<String> {
     );
     let mut actual: Vec<_> = utf8.into_iter().collect();
     if actual.is_empty() {
-        actual = lone(&mut sources, path, file);
+        actual = match regions {
+            RegionMode::Captures => lone(&mut sources, path, file),
+            RegionMode::Live => flick_core::check_regions(&sources, file, regions),
+        };
     }
     let expected = match parse_annotations(&sources.get(file).text) {
         Ok(expected) => expected,
@@ -276,6 +285,62 @@ fn check_fixtures() {
         "fixture mismatches:\n{}",
         report.join("\n")
     );
+}
+
+/// `tests/check/live/{pass,fail}/**/*.fl` under `[build] regions = "live"`,
+/// with the annotations of `check_fixtures`; each is also checked under the
+/// default discipline, whose verdict its first line states: `// captures:
+/// accepts` or `// captures: FLICK-G002` and the like.
+#[test]
+fn live_fixtures() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../tests/check/live");
+    let mut report = Vec::new();
+    let mut count = 0;
+    for (kind, should_fail) in [("pass", false), ("fail", true)] {
+        let mut paths = Vec::new();
+        fixtures(&root.join(kind), &mut paths);
+        paths.sort();
+        count += paths.len();
+        for path in paths {
+            let mut problems = check_fixture_in(&path, should_fail, RegionMode::Live);
+            problems.extend(captures_verdict(&path));
+            if !problems.is_empty() {
+                let name = path.strip_prefix(&root).unwrap_or(&path).display();
+                report.push(format!("{name}:\n{}", problems.join("\n")));
+            }
+        }
+    }
+    assert!(count > 0, "no fixtures found under {}", root.display());
+    assert!(
+        report.is_empty(),
+        "live fixture mismatches:\n{}",
+        report.join("\n")
+    );
+}
+
+/// The codes of the errors of a live fixture under the default discipline,
+/// against what its first line states.
+fn captures_verdict(path: &Path) -> Option<String> {
+    let text = fs::read_to_string(path).expect("readable fixture");
+    let Some(stated) = (text.lines().next()).and_then(|l| l.strip_prefix("// captures: ")) else {
+        return Some("  no first line `// captures: …`".to_owned());
+    };
+    let stated = stated.trim();
+    let mut sources = SourceMap::default();
+    let file = sources.add(path.display().to_string(), text.clone());
+    let mut codes: Vec<String> = flick_core::check(&sources, file)
+        .iter()
+        .filter(|d| d.severity == Severity::Error)
+        .map(|d| d.code.to_string())
+        .collect();
+    codes.sort();
+    codes.dedup();
+    let actual = if codes.is_empty() {
+        "accepts".to_owned()
+    } else {
+        codes.join(" ")
+    };
+    (actual != stated).then(|| format!("  captures: stated `{stated}`, got `{actual}`"))
 }
 
 /// The first example of the UI reference, in English and Russian, is code of

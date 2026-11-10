@@ -105,6 +105,7 @@ pub use kinds::Kind;
 pub use patterns::is_pattern;
 pub use question::Question;
 pub use ranges::range_list;
+pub use regions::{LIVE, RegionMode};
 pub use schemas::companion_name;
 pub use services::{OpClass, Operation};
 pub use ty::{Binder, Effects, Row, SYNC_SERVICES, Stage, Type, stage_of};
@@ -187,6 +188,9 @@ pub struct Options<'a> {
     /// on Flick's own runtime: see [`Effects::direct`]. Every module of a build
     /// and the built-in modules it reads are checked alike.
     pub stages_by_class: bool,
+    /// `[build] regions`: the discipline of regions every module of a
+    /// build is checked under; the built-in modules are under captures.
+    pub regions: RegionMode,
 }
 
 /// Type-checks `module` and stores the types of its exports in `interface`.

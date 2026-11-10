@@ -110,3 +110,16 @@ pub fn probe(name: &str, p: &Program) -> (Result<(), String>, Result<(), String>
     );
     (captures, live, outcome)
 }
+
+/// flick-core's errors on the program printed as Flick, under
+/// `[build] regions = "live"`.
+pub fn core_live(p: &Program) -> Vec<String> {
+    use flick_core::types::RegionMode;
+    let mut sources = SourceMap::default();
+    let file = sources.add("Gen.fl", generate::source(p));
+    flick_core::check_regions(&sources, file, RegionMode::Live)
+        .into_iter()
+        .filter(|d| d.severity == Severity::Error)
+        .map(|d| format!("{}: {}", d.code, d.message))
+        .collect()
+}

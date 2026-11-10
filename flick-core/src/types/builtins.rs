@@ -339,6 +339,7 @@ fn check_reporting(
             effects: true,
             watched: Watched::none(),
             stages_by_class,
+            regions: super::RegionMode::Captures,
         };
         let (checked, typing, _) =
             super::run_in(&module, &imported, &known, options, &mut interface);

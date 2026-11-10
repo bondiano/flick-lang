@@ -125,7 +125,9 @@ impl Checker<'_> {
                 return Type::Error;
             }
             let scheme = entity.as_ref().and_then(|e| self.env.value(e).cloned());
-            let ty = scheme.map_or(Type::Error, |s| self.instantiate(&s, span));
+            let ty = scheme.map_or(Type::Error, |s| {
+                self.instantiate(&self.live_scheme(&s), span)
+            });
             if let Some(entity) = entity {
                 self.record_entity(&entity, &ty, span);
             }
@@ -149,7 +151,7 @@ impl Checker<'_> {
             name: super::companion_name(&e.name, name),
         };
         let scheme = self.env.value(&entity).cloned()?;
-        let ty = self.instantiate(&scheme, span);
+        let ty = self.instantiate(&self.live_scheme(&scheme), span);
         self.record_entity(&entity, &ty, span);
         Some(ty)
     }

@@ -401,7 +401,7 @@ impl Checker<'_> {
 
     /// A child registered with `owner` runs until the owner's scope closes,
     /// so it may hold only regions that end no earlier.
-    fn check_outlives(&mut self, o: &Outlives) {
+    pub(super) fn check_outlives(&mut self, o: &Outlives) {
         let owner = self.store.resolve(&o.owner);
         let owner_scope = self.scope_index(&owner);
         let mut held = Norm::default();
