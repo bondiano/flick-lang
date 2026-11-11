@@ -61,20 +61,8 @@ impl Loader<'_> {
                         .iter()
                         .map(|b| b.argument.module.clone()),
                 );
-                match &virtual_of.capture.callee {
-                    Some(CalleeOrigin::Module(name)) => dependencies.push(name.clone()),
-                    Some(CalleeOrigin::Member(member)) => dependencies.push(
-                        member
-                            .module
-                            .rsplit_once('.')
-                            .expect("namespace member")
-                            .0
-                            .to_owned(),
-                    ),
-                    Some(CalleeOrigin::Parameter { binding, .. }) => {
-                        dependencies.push(binding.module.clone());
-                    }
-                    None => {}
+                if let Some(callee) = &virtual_of.capture.callee {
+                    dependencies.push(callee.signature_owner().to_owned());
                 }
                 for dependency in dependencies {
                     if let Some(target) = self.find_module(i, &dependency, virtual_of.at) {
@@ -99,31 +87,75 @@ impl Loader<'_> {
             edges.push(targets);
             i += 1;
         }
+        self.namespace_edges(&mut edges);
+        edges
+    }
+
+    fn namespace_edges(&self, edges: &mut [Vec<usize>]) {
         for (i, targets) in edges.iter_mut().enumerate() {
-            for import in self.modules[i]
+            let loaded = &self.modules[i];
+            for import in loaded
                 .syntax
                 .imports
                 .iter()
-                .chain(&self.modules[i].syntax.inline_imports)
+                .chain(&loaded.syntax.inline_imports)
             {
-                if let Some(&j) = self.by_name.get(&import.module)
-                    && let Some(member) = &self.modules[j].member_of
-                    && (!self.modules[i].can_access_member(member)
-                        || self.modules[i].virtual_of.as_ref().is_some_and(|v| {
-                            v.capture.bindings.iter().any(|b| {
-                                b.argument.module == import.module
-                                    && !b.argument.access_modules.contains(&member.parent)
-                            })
-                        }))
-                    && let Some(&parent) = self.by_name.get(&member.parent)
-                {
-                    targets.push(parent);
+                let view = loaded.virtual_of.as_ref().and_then(|v| {
+                    v.capture.bindings.iter().rev().find(|binding| {
+                        binding.alias == import.qualifier()
+                            && binding.argument.module == import.module
+                    })
+                });
+                self.namespace_parents(
+                    i,
+                    &import.module,
+                    view.map(|b| b.argument.access_modules.as_slice()),
+                    targets,
+                );
+            }
+            if let Some(context) = &loaded.virtual_of {
+                for binding in &context.capture.bindings {
+                    self.namespace_parents(
+                        i,
+                        &binding.argument.module,
+                        Some(&binding.argument.access_modules),
+                        targets,
+                    );
+                }
+                if let Some(CalleeOrigin::Member(view)) = &context.capture.callee {
+                    self.namespace_parents(i, &view.module, Some(&view.access_modules), targets);
                 }
             }
             targets.sort_unstable();
             targets.dedup();
         }
-        edges
+    }
+
+    fn namespace_parents(
+        &self,
+        importer: usize,
+        name: &str,
+        access: Option<&[String]>,
+        targets: &mut Vec<usize>,
+    ) {
+        let mut next = self.by_name.get(name).copied();
+        while let Some(index) = next {
+            let Some(member) = &self.modules[index].member_of else {
+                break;
+            };
+            let allowed = access.map_or_else(
+                || self.modules[importer].can_access_member(member),
+                |access| access.contains(&member.parent),
+            );
+            if allowed {
+                break;
+            }
+            let Some(&parent) = self.by_name.get(&member.parent) else {
+                break;
+            };
+            targets.push(parent);
+            next = Some(parent);
+        }
     }
 
     #[allow(clippy::too_many_lines)]

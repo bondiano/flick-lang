@@ -3,6 +3,140 @@ use crate::diagnostics::Severity;
 
 #[cfg(feature = "ide")]
 #[test]
+fn changing_an_ancestor_namespace_invalidates_cached_callee_views() {
+    let files = [
+        (
+            "Contracts",
+            "module App.Contracts exposing (..)\ntype module Input =\n  seed : Int\ntype module Output =\n  answer : Int\ntype module Rich =\n  answer : Int\n  secret : Int\ntype module FactoriesWide =\n  module Make : (K : Input) -> Rich\ntype module FactoriesNarrow =\n  module Make : (K : Input) -> Output\ntype module Wide =\n  module Alias : FactoriesWide\ntype module Narrow =\n  module Alias : FactoriesNarrow\n",
+        ),
+        (
+            "Argument",
+            "module App.Argument exposing (seed)\nseed : Int\nlet seed = 1\n",
+        ),
+        (
+            "Make",
+            "module App.Make(K : App.Contracts.Input) : App.Contracts.Rich\nanswer : Int\nlet answer = K.seed\nsecret : Int\nlet secret = 42\n",
+        ),
+        (
+            "Factories",
+            "module App.Factories exposing (Make)\nmodule Make = App.Make\n",
+        ),
+        (
+            "Parent",
+            "module App.Parent : App.Contracts.Wide\nmodule Alias = App.Factories\n",
+        ),
+        (
+            "Root",
+            "module App.Root exposing (secret)\nmodule Chosen = App.Parent.Alias.Make(App.Argument)\nsecret : Int\nlet secret = Chosen.secret\n",
+        ),
+    ];
+    let mut host = Memory(
+        files
+            .iter()
+            .map(|(name, source)| {
+                (
+                    PathBuf::from(format!("/p/src/App/{name}.fl")),
+                    (*source).to_owned(),
+                )
+            })
+            .collect(),
+    );
+    let mut sources = SourceMap::default();
+    let project = library(&mut sources);
+    let mut cache = ModuleCache::default();
+    let roots = [PathBuf::from("/p/src/App/Root.fl")];
+    let first = analyze_with(&host, &mut sources, Some(&project), &roots, &mut cache);
+    assert!(first.diagnostics.is_empty(), "{:?}", first.diagnostics);
+    host.0.insert(
+        PathBuf::from("/p/src/App/Parent.fl"),
+        files[4].1.replace("Contracts.Wide", "Contracts.Narrow"),
+    );
+    let warm = analyze_with(&host, &mut sources, Some(&project), &roots, &mut cache);
+    let cold = analyze(&host, &mut sources, Some(&project), &roots);
+    let messages = |analysis: &super::Analysis| {
+        analysis
+            .diagnostics
+            .iter()
+            .map(|d| (d.code, d.message.clone()))
+            .collect::<Vec<_>>()
+    };
+    assert!(
+        cold.diagnostics
+            .iter()
+            .any(|d| d.code == codes::R004 && d.message.contains("secret")),
+        "{:?}",
+        cold.diagnostics
+    );
+    assert_eq!(messages(&warm), messages(&cold));
+}
+
+#[cfg(feature = "ide")]
+#[test]
+fn changing_a_namespace_ascription_invalidates_cached_argument_views() {
+    let files = [
+        (
+            "Contracts",
+            "module App.Contracts exposing (Small, Rich, Output, Wide, Narrow)\ntype module Small =\n  seed : Int\ntype module Rich =\n  seed : Int\n  secret : Int\ntype module Output =\n  answer : Int\ntype module Wide =\n  module Visible : Rich\ntype module Narrow =\n  module Visible : Small\n",
+        ),
+        (
+            "Argument",
+            "module App.Argument exposing (seed, secret)\nseed : Int\nlet seed = 1\nsecret : Int\nlet secret = 42\n",
+        ),
+        (
+            "Make",
+            "module App.Make(K : App.Contracts.Rich) : App.Contracts.Output\nanswer : Int\nlet answer = K.secret\n",
+        ),
+        (
+            "Parent",
+            "module App.Parent : App.Contracts.Wide\nmodule Visible = App.Argument\n",
+        ),
+        (
+            "Root",
+            "module App.Root exposing (answer)\nmodule Chosen = App.Make(App.Parent.Visible)\nanswer : Int\nlet answer = Chosen.answer\n",
+        ),
+    ];
+    let mut host = Memory(
+        files
+            .iter()
+            .map(|(name, source)| {
+                (
+                    PathBuf::from(format!("/p/src/App/{name}.fl")),
+                    (*source).to_owned(),
+                )
+            })
+            .collect(),
+    );
+    let mut sources = SourceMap::default();
+    let project = library(&mut sources);
+    let mut cache = ModuleCache::default();
+    let roots = [PathBuf::from("/p/src/App/Root.fl")];
+    let first = analyze_with(&host, &mut sources, Some(&project), &roots, &mut cache);
+    assert!(first.diagnostics.is_empty(), "{:?}", first.diagnostics);
+    host.0.insert(
+        PathBuf::from("/p/src/App/Parent.fl"),
+        files[3].1.replace("Contracts.Wide", "Contracts.Narrow"),
+    );
+    let warm = analyze_with(&host, &mut sources, Some(&project), &roots, &mut cache);
+    let cold = analyze(&host, &mut sources, Some(&project), &roots);
+    let codes = |analysis: &super::Analysis| {
+        analysis
+            .diagnostics
+            .iter()
+            .map(|d| (d.code, d.message.clone()))
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(codes(&warm), codes(&cold));
+    assert!(
+        warm.diagnostics
+            .iter()
+            .any(|d| d.code == codes::T060 && d.message.contains("secret")),
+        "{:?}",
+        warm.diagnostics
+    );
+}
+
+#[cfg(feature = "ide")]
+#[test]
 fn namespace_parent_cycles_report_the_original_nested_import_span() {
     let (sources, analysis) = hom_boundary_analysis(
         &[

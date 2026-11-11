@@ -78,20 +78,8 @@ impl Checking<'_> {
                         .iter()
                         .map(|b| b.origin.module.clone())
                         .collect();
-                    match &v.capture.callee {
-                        Some(CalleeOrigin::Module(name)) => names.push(name.clone()),
-                        Some(CalleeOrigin::Member(member)) => names.push(
-                            member
-                                .module
-                                .rsplit_once('.')
-                                .expect("namespace member")
-                                .0
-                                .to_owned(),
-                        ),
-                        Some(CalleeOrigin::Parameter { binding, .. }) => {
-                            names.push(binding.module.clone());
-                        }
-                        None => {}
+                    if let Some(callee) = &v.capture.callee {
+                        names.push(callee.signature_owner().to_owned());
                     }
                     names
                 })

@@ -78,6 +78,19 @@ pub enum CalleeOrigin {
     },
 }
 
+impl CalleeOrigin {
+    pub(crate) fn signature_owner(&self) -> &str {
+        match self {
+            Self::Module(module) => module,
+            Self::Member(view) => view
+                .module
+                .rsplit_once('.')
+                .map_or(&view.module, |(parent, _)| parent),
+            Self::Parameter { binding, .. } => &binding.module,
+        }
+    }
+}
+
 /// A lexical environment before a module-expression declaration. Binding
 /// counts keep later applications' dictionaries out of its definition scope.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
