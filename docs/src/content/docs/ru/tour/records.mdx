@@ -1,0 +1,26 @@
+---
+title: Записи
+description: Именованные поля, изменённая копия через `with` и список, построенный через `for`.
+tableOfContents: false
+source_hash: 45305d3bda02365c
+---
+
+import TourLesson from "../../../../components/TourLesson.astro";
+
+<TourLesson locale="ru" id="records">
+
+Запись хранит именованные поля. `type alias Book = { … }` даёт имя её типу.
+Значение задаёт каждое поле через `=`, а `book.title` читает поле.
+
+Запись не меняется. `{ book with read = true }` создаёт копию, в которой
+заменено одно поле.
+
+`[for b <- shelf; if not b.read yield b.pages]` строит список: для каждой
+ещё не прочитанной книги на полке — число её страниц. Спискам посвящён
+отдельный урок ниже.
+
+**Попробуйте:** напишите `{ book with red = true }`. Компилятор сообщит
+`FLICK-T003`: у `Book` нет поля `red`, а `with` заменяет только
+существующие поля.
+
+</TourLesson>

@@ -1,0 +1,24 @@
+---
+title: Records
+description: Named fields, a changed copy with `with`, and a list built with `for`.
+tableOfContents: false
+---
+
+import TourLesson from "../../../components/TourLesson.astro";
+
+<TourLesson locale="en" id="records">
+
+A record holds named fields. `type alias Book = { … }` names its type. A
+value gives each field with `=`, and `book.title` reads one.
+
+A record does not change. `{ book with read = true }` makes a copy with one
+field replaced.
+
+`[for b <- shelf; if not b.read yield b.pages]` builds a list: for each book
+on the shelf that is not read yet, its pages. Lists have a lesson of their own
+below.
+
+**Try:** write `{ book with red = true }`. The compiler reports `FLICK-T003`:
+`Book` has no field `red`, and `with` only replaces fields that exist.
+
+</TourLesson>

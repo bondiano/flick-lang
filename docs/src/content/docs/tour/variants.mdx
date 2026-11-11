@@ -1,0 +1,24 @@
+---
+title: Variants
+description: A type with several forms, and `match` to take it apart.
+tableOfContents: false
+---
+
+import TourLesson from "../../../components/TourLesson.astro";
+
+<TourLesson locale="en" id="variants">
+
+A `type` with `|` lists the forms its values take. A `Shape` is a `Circle`
+with a radius or a `Rect` with two sides. `Circle` and `Rect` are
+constructors and are called like functions: `Circle 1`.
+
+`match` takes a value apart. Each arm names a form and the values inside it,
+and gives the result for that form.
+
+`deriving Eq, Show` asks the compiler for equality and for `show`; the
+chapter on classes explains what that means.
+
+**Try:** add `| Square Float` to the type. The compiler reports `FLICK-T009`:
+`area` does not handle a `Square`. Add an arm for it.
+
+</TourLesson>

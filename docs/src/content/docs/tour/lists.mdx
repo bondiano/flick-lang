@@ -1,0 +1,23 @@
+---
+title: Lists
+description: Build a list with `for`, and work on it with the `List` module.
+tableOfContents: false
+---
+
+import TourLesson from "../../../components/TourLesson.astro";
+
+<TourLesson locale="en" id="lists">
+
+A list holds any number of values of one type, in square brackets.
+
+`[for n <- numbers; if n > 2 yield n * 10]` builds a list: for each `n`
+greater than 2, `n * 10`.
+
+`++` joins two lists, and the `List` module has the rest: `List.sort`,
+`List.zip`, which pairs two lists up to the shorter one, and
+`List.fold_left`, which keeps a running total from a start value.
+
+**Try:** put `"three"` in the list. The compiler reports `FLICK-T003`: every
+element of a list has the same type.
+
+</TourLesson>

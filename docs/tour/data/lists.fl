@@ -1,0 +1,10 @@
+module Main exposing (main)
+
+main : Unit ->{} Unit
+let main () =
+  let numbers = [5, 3, 8, 1]
+  Platform.stdout_line (show [for n <- numbers; if n > 2 yield n * 10])
+  Platform.stdout_line (show (List.sort numbers))
+  Platform.stdout_line (show (numbers ++ [13]))
+  Platform.stdout_line (show (List.zip numbers ["a", "b", "c"]))
+  Platform.stdout_line (show (List.fold_left (fun total n -> total + n) 0 numbers))

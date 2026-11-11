@@ -1,0 +1,14 @@
+module Main exposing (main)
+
+min_max : List Int -> (Int, Int)
+let min_max values = (
+  Option.with_default 0 (List.minimum values),
+  Option.with_default 0 (List.maximum values),
+)
+
+main : Unit ->{} Unit
+let main () =
+  let (low, high) = min_max [3, 9, 1, 4]
+  Platform.stdout_line "from \{low} to \{high}"
+  let pair = ("Ada", 36)
+  Platform.stdout_line (show pair)

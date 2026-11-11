@@ -1,0 +1,22 @@
+---
+title: Every case
+description: A `match` covers every value, and the compiler names the one it forgets.
+tableOfContents: false
+---
+
+import TourLesson from "../../../components/TourLesson.astro";
+
+<TourLesson locale="en" id="exhaustive">
+
+This program does not compile, on purpose. A `match` covers every value, and
+`label` forgets `Paused`. The compiler reports `FLICK-T009` and names the
+missing case. When you add a form to a type, it points at every `match` that
+now has to handle it.
+
+Nothing runs until the error is fixed.
+
+**Try:** apply the fix of the error in the editor. It adds the arm
+`| Paused -> todo`, and the program compiles with a warning,
+`FLICK-T022`: running a `todo` fails. Replace `todo` with `"paused"`.
+
+</TourLesson>

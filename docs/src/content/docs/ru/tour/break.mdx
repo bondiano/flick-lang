@@ -1,0 +1,23 @@
+---
+title: Циклы с результатом
+description: "`loop` повторяется до `break`, который даёт циклу значение."
+tableOfContents: false
+source_hash: b2fef17b5698e059
+---
+
+import TourLesson from "../../../../components/TourLesson.astro";
+
+<TourLesson locale="ru" id="break">
+
+`loop { … }` повторяется до `break`. `break value` завершает цикл, и цикл
+даёт это значение: здесь — найденную позицию или `None`. Поэтому весь
+`loop` — это результат `binary_search`, `Option Int`.
+
+`let middle = …` создаётся заново на каждом проходе, а переменные `low` и
+`high` сужают диапазон.
+
+**Попробуйте:** напишите `break 0` вместо первого `break None`. Компилятор
+сообщит `FLICK-T003`: каждый `break` цикла даёт один и тот же тип, здесь
+`Option Int`.
+
+</TourLesson>
