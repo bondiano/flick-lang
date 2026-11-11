@@ -26,6 +26,8 @@ pub struct Node {
     /// The stage of the body of a `try` on its own, and the errors of it
     /// that pass the arms.
     pub(crate) own: Option<(Stage, Row)>,
+    /// The region the body of a `scope` runs in, as the check named it.
+    pub(crate) region: Option<Name>,
 }
 
 /// The nodes of a check, by [`key`].
@@ -71,6 +73,7 @@ impl Checker<'_> {
                         .own
                         .as_ref()
                         .map(|(s, r)| (self.zonk_stage(s), self.zonk_row(r))),
+                    region: n.region.clone(),
                 };
                 (*k, node)
             })

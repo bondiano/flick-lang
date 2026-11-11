@@ -2,6 +2,7 @@
 # `certificates_of_generated_programs` (`tests/certs.rs`): `<count> <reason>`, a program counted
 # at the first form it stops at. The programs without a certificate may only fall: a new gap fails
 # the test, a closed one is taken off, and a count grows only by programs a closed gap lets on.
-47 a call of the constant RefMake
-53 a value bound, which the core does not have
-83 the form Scope
+1 the element `Fiber.Provided.Fixture.Log` with arguments
+2 a scheme with facts
+56 a call of the constant RefMake
+73 a value bound, which the core does not have

@@ -16,6 +16,7 @@ use super::list::list_tm;
 use super::pat::{arms_tm, match_tm};
 use super::provide::{operation, provide_tm};
 use super::raise::is_raise;
+use super::scope::scope_tm;
 use super::sig::{Key, Sig, bare, kept, prim_key};
 use crate::check::substitute;
 
@@ -79,6 +80,7 @@ pub(super) fn tm(e: &Term, ctx: &[Name], sig: &Sig) -> Result<String, Unsupporte
             format!("(.const (.perform {svc:?} {:?} .tail))", o.to_string())
         }
         Term::Provide(l, b) => provide_tm(l, b, ctx, sig)?,
+        Term::Scope(s, b) => scope_tm(s, b, ctx, sig)?,
         Term::Field(r, l) => format!("(.proj {} \"{l}\")", tm(r, ctx)?),
         Term::Update(r, l, v) => format!("(.update {} \"{l}\" {})", tm(r, ctx)?, tm(v, ctx)?),
         Term::Match(s, arms) => match_tm(s, arms, ctx, sig)?,
@@ -289,6 +291,7 @@ impl<'t> Cx<'t> {
                 self.await_(x, &at, col)
             }
             Term::Provide(l, b) => self.provide(l, b, t, col),
+            Term::Scope(s, b) => self.scope(s, b, t, col),
             Term::Field(..) if operation(e).is_some() => Err("an operation not called".into()),
             Term::Record(fs) => self.record(fs, t, col),
             Term::List(xs) => self.list(xs, t, col),

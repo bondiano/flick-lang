@@ -85,4 +85,17 @@ theorem typ_dproj {e : Tm} {c k : Nat} {us : List Ty} {fs : List (Label × Schem
       exact Ty.substT_congr (fun a => by cases a <;> simp [instT, Ty.ident])
     simpa [Scheme.substT, Scheme.inst, hid, ← hi] using hT
 
+/-! ## Regions -/
+
+/-- (Scope) with the type of its body written in the region's binder, `t.up 1` as `t'`. -/
+theorem typ_scope {F : Facts} {φ' : Stage} {r ε : Row} {t t' T : Ty} {e : Tm} {φ : Stage}
+    (hn : e.NoIns) (hF : ∀ C s, F C s → s = .tvar 0 ∧ ¬ C (.v 0))
+    (he : Typ S (Ψ.map (Ty.up 1)) (Facts.union (Θ.substT (shiftV 1)) F)
+      (.mono (.owner (.tvar 0)) :: Γ.map (Scheme.up 1)) e (.ex t' φ'))
+    (ht : t.up 1 = t')
+    (hle : φ'.le (.rt (Row.union (Row.scope (.tvar 0))
+      (Row.union (r.substT (shiftV 1)) (Row.disch (.v 0) (r.substT (shiftV 1))))) (ε.substT (shiftV 1))))
+    (hφ : (Stage.rt r ε).le φ) (hT : LeLive t T) : Typ S Ψ Θ Γ (.scope e) (.ex T φ) :=
+  .scope hn hF (ht ▸ he) hle hφ hT
+
 end Flick.Cert

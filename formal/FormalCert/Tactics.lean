@@ -17,11 +17,12 @@ namespace Flick.Cert
 /-- The simp set of the finite sets of a certificate: elements, atoms, reach, substitution. -/
 macro "cert_simp" : tactic => `(tactic| (simp_all [Row.union, Row.ofCaps, Row.plain, Row.single,
   Row.none, Row.substT, Caps.substT, Caps.none, Ty.reach, instT, Atom.up, Atom.ty, Ty.asRow,
-  Row.err] <;> omega))
+  Row.err, Row.scope, Row.disch, shiftV] <;> omega))
 
 /-- `h : x ∈ A` of a finite set `A`, split into one goal for each element `A` names. -/
 macro "split_mem " h:ident : tactic => `(tactic| (
-  (try simp only [Row.union, Row.ofCaps, Row.single, Row.none, Caps.none, Ty.reach] at $h:ident)
+  (try simp only [Row.union, Row.ofCaps, Row.single, Row.none, Caps.none, Ty.reach, Row.scope,
+    Row.disch] at $h:ident)
   repeat' (obtain $h:ident | $h:ident := $h:ident)))
 
 /-- `C = C'` or `C ⊆ C'` of finite sets of atoms. -/

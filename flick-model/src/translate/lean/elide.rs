@@ -137,6 +137,12 @@ fn data(t: &Type, c: Option<&Caps>, env: &Env) -> Result<String, String> {
         head = h;
     }
     args.reverse();
+    // the owner of a region is the core's own type
+    if let (Type::Con(p), [s]) = (head, &args[..])
+        && p.to_string() == "Fiber.Owner"
+    {
+        return Ok(format!("(.owner {})", ty(s, env)?));
+    }
     let mut out = ty(head, env)?;
     if let (Type::Con(p), Some(c)) = (head, c)
         && STORED.contains(&&*p.name)

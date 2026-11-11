@@ -14,6 +14,7 @@ mod list;
 mod pat;
 mod provide;
 mod raise;
+mod scope;
 pub mod sig;
 mod term;
 
