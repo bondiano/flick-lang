@@ -12,3 +12,7 @@ foreign pure combine from "flick:Hash" "combine"
 optimize : Int -> Int
 foreign pure optimize from "flick:Hash" "optimize"
   reviewed "effect@4.1.2 sha256:469fa27ccc5de639"
+
+/// The hash of a string, of its UTF-16 code units from the last to the first.
+string : String -> Int
+foreign pure string from "flick:Hash" "string"

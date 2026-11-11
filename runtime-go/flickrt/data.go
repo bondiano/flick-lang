@@ -174,6 +174,9 @@ func effectCombine(a, b int32) int32 {
 	return mix(int32(uint32(a)*0x9e3779b1 + uint32(b)*0x85ebca6b))
 }
 
+// HashString is `Hash.string`.
+func HashString(s Value) Value { return hashString(s.(string)) }
+
 // hashString is djb2 over the UTF-16 code units, from the last.
 func hashString(s string) int32 {
 	units := utf16Units(s)

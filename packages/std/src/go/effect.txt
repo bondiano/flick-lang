@@ -369,6 +369,7 @@ makeReducer TupleReducer
 [flick:Hash]
 combine HashCombine
 optimize HashOptimize
+string HashString
 
 [flick:RegExp]
 flickMake RegExpMake
