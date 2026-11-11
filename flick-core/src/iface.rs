@@ -126,6 +126,10 @@ pub struct Interface {
     pub template: Option<ModuleTemplate>,
     #[serde(default, skip_serializing_if = "is_false")]
     pub private: bool,
+    /// The module's source did not parse in full, so a declaration may have
+    /// lost names: importers take on trust what they do not find here.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub incomplete: bool,
     pub exports: Vec<Export>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub hidden: Vec<Hidden>,

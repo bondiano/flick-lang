@@ -96,3 +96,37 @@ fn an_error_beside_the_exports_checks_no_other_module_again() {
     assert!(Arc::ptr_eq(&clean["A.Other"], &fixed["A.Other"]));
     assert!(Arc::ptr_eq(&clean["A.Use"], &fixed["A.Use"]));
 }
+
+#[cfg(feature = "ide")]
+#[test]
+fn what_the_parser_lost_of_a_module_its_importers_take_on_trust() {
+    // the stray `)` costs the class its body, the method `lift` with it
+    let base = "module A.Base exposing (Trans(..), x)\n\
+                class Trans (t : Type -> Type)) =\n  lift : forall a. a -> t a\n\
+                x : Float\nlet x = 1\n";
+    // `w` asks for a `Make` that only the type of `lift` would choose
+    let user = "module A.Use exposing (Box, y, z, w)\n\
+                import A.Base exposing (Trans(..), x, lift)\nimport A.Base as B\n\
+                type Box a = Box a\n\
+                instance Trans Box =\n  let lift v = Box v\n\
+                class Make a =\n  make : a\ninstance Make Float =\n  let make = 1\n\
+                y : Box Float\nlet y = lift x\n\
+                z : Box Float\nlet z = B.lift x\n\
+                w : Box Float\nlet w = lift make\n";
+    let (_, diagnostics) = analyzed(&with_use(base, user), None);
+    assert_eq!(diagnostics, ["FLICK-S007 unexpected `)`"]);
+}
+
+#[cfg(feature = "ide")]
+#[test]
+fn an_importer_re_exports_on_trust_a_name_the_parser_lost() {
+    let base = "module A.Base exposing (..)\n\
+                class Trans (t : Type -> Type)) =\n  lift : forall a. a -> t a\n";
+    let user = "module A.Use exposing (lift)\nimport A.Base exposing (..)\n";
+    let (_, diagnostics) = analyzed(&with_use(base, user), None);
+    // a re-export of a name taken on trust does not count as a use of the import
+    let errors: Vec<_> = (diagnostics.iter())
+        .filter(|d| !d.starts_with("FLICK-R012"))
+        .collect();
+    assert_eq!(errors, ["FLICK-S007 unexpected `)`"]);
+}

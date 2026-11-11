@@ -100,7 +100,10 @@ impl Checker<'_> {
                 self.record_entity(&entity, &ty, span);
                 ty
             }
-            super::env::Found::Unknown => Type::Error,
+            super::env::Found::Unknown => {
+                self.cx.trusted = true;
+                Type::Error
+            }
             super::env::Found::Missing if namespace == Namespace::Constructor => {
                 if let super::env::Found::Entity(e) = self.env.find(Namespace::Type, name) {
                     self.record_name(span, Ref::ServiceTag(format!("{}.{}", e.module, e.name)));
