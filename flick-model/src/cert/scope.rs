@@ -41,6 +41,19 @@ impl Cx<'_> {
             Stage::Runtime(_, e) => row(e, &self.env)?,
         };
         let (outside, r) = (self.ty(t)?, row(&out, &self.env)?);
+        // what is outside outlives the region: the fact (Scope) lets the body
+        // assume, for the work its region keeps
+        let outer: Vec<String> = (1..=self.env.vars.len())
+            .map(|i| format!("x = .v {i}"))
+            .collect();
+        let (facts, hf) = if outer.is_empty() {
+            ("Facts.none".to_owned(), "(fun _ _ h => h.elim)".to_owned())
+        } else {
+            (
+                format!("(Facts.single (fun x => {}) (.tvar 0))", outer.join(" ∨ ")),
+                "(Cert.scope_single (by simp))".to_owned(),
+            )
+        };
         let env = self.env.clone();
         self.env.vars.insert(0, region.to_string());
         let inside = self.ty(t);
@@ -49,7 +62,7 @@ impl Cx<'_> {
         self.env = env;
         let (inside, phi, pb) = (inside?, phi?, pb?);
         Ok(format!(
-            "(Cert.typ_scope (F := Facts.none) (φ' := {phi}) (r := {r}) (ε := {errors}) (t := {outside}) (t' := {inside}){pad}(by simp [Tm.NoIns, Tm.Has]) (fun _ _ h => h.elim){pad}{pb}{pad}(by inst_eq) (by stage_le) (by stage_le) (by le_live))"
+            "(Cert.typ_scope (F := {facts}) (φ' := {phi}) (r := {r}) (ε := {errors}) (t := {outside}) (t' := {inside}){pad}(by simp [Tm.NoIns, Tm.Has]) {hf}{pad}{pb}{pad}(by inst_eq) (by stage_le) (by stage_le) (by le_live))"
         ))
     }
 }

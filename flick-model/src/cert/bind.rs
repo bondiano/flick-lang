@@ -7,6 +7,7 @@ use crate::types::{Type, Var};
 
 use super::Unsupported;
 use super::term::{Cx, arrow, index};
+use crate::translate::lean::elide::scheme_facts;
 
 impl Cx<'_> {
     /// (Let-Mono) or, for a scheme with variables, (Let-Gen).
@@ -22,9 +23,6 @@ impl Cx<'_> {
         let pad = format!("\n{}", " ".repeat(col + 2));
         let node = self.node(e1)?;
         let scheme = node.scheme.clone().ok_or("a `let` without its scheme")?;
-        if !scheme.outlives.is_empty() {
-            return Err("a scheme with facts".into());
-        }
         let k = scheme.vars.len();
         let outer = self.env.clone();
         let under = |names: Vec<String>| -> Vec<String> {
@@ -34,7 +32,7 @@ impl Cx<'_> {
                 .collect()
         };
         self.env.vars = under(scheme.vars.iter().map(|(v, _)| v.to_string()).collect());
-        let a = self.ty(&scheme.body);
+        let a = scheme_facts(&scheme, &self.env);
         // a signed right side is typed at its rigid variables, the binders
         // of (Let-Gen)
         let rhs_ty = match (&node.rigid, &node.expected) {
@@ -50,12 +48,12 @@ impl Cx<'_> {
             self.typing(e1, rhs_ty, col + 2)
         };
         self.env = outer;
-        let (a, rhs) = (a?, rhs?);
+        let ((phi, a), rhs) = (a?, rhs?);
         let rest = self.under(x, |c| c.typing(e2, t, col + 2))?;
-        Ok(if k == 0 {
-            format!("(.let_ (a := {a}){pad}{rhs}{pad}{rest})")
-        } else {
-            format!("(.letGen (k := {k}) (Φ := Facts.none) (a := {a}){pad}{rhs}{pad}{rest})")
+        Ok(match (k, phi.as_str()) {
+            (0, "Facts.none") => format!("(.let_ (a := {a}){pad}{rhs}{pad}{rest})"),
+            (0, _) => return Err("a monomorphic `let` with facts".into()),
+            _ => format!("(.letGen (k := {k}) (Φ := {phi}) (a := {a}){pad}{rhs}{pad}{rest})"),
         })
     }
 
@@ -83,13 +81,10 @@ impl Cx<'_> {
     pub(super) fn var(&mut self, e: &Term, x: &str) -> Result<String, Unsupported> {
         let at = self.terms.len() - 1 - index(&self.terms, x)?;
         let node = self.node(e)?;
-        let (scheme, insts) = node
+        let (_, insts) = node
             .instance
             .as_ref()
             .ok_or_else(|| format!("`{x}` without its instance"))?;
-        if !scheme.outlives.is_empty() {
-            return Err("a scheme with facts".into());
-        }
         let ts = match self.fixed.iter().find(|(p, _)| *p == at) {
             Some((_, rigid)) => {
                 let own = insts.len() == rigid.len()

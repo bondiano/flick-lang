@@ -14,7 +14,7 @@ use crate::check::{elided, prim_scheme};
 use crate::decls::Decls;
 use crate::generate::fixture_module;
 use crate::syntax::{Name, Path, Prim};
-use crate::translate::lean::elide::{Env, ty};
+use crate::translate::lean::elide::{Env, scheme_facts, ty};
 use crate::types::{Kind, Scheme, Stage, Type, Var};
 
 /// A constructor of the core: its variables, fields and type.
@@ -107,7 +107,12 @@ fn ops(schemes: &[(Name, Scheme)]) -> Option<Vec<Op>> {
 }
 
 /// The globals of other modules the generator calls.
-const EXTRA: [(&str, &str); 1] = [("List.Core", "get")];
+const EXTRA: [(&str, &str); 4] = [
+    ("List.Core", "get"),
+    ("Fiber", "spawn"),
+    ("Resource", "acquire_release"),
+    ("Scope", "add_finalizer"),
+];
 
 /// The operators the generator makes.
 pub(crate) const PRIMS: [Prim; 4] = [
@@ -376,19 +381,13 @@ impl Sig {
 
 /// `⟨k, Facts.none, τ⟩` of a scheme without facts.
 fn scheme(s: &Scheme, classes: &[String]) -> Result<String, String> {
-    if !s.outlives.is_empty() {
-        return Err("a scheme with facts".into());
-    }
     let env = Env {
         vars: s.vars.iter().map(|(v, _)| v.to_string()).collect(),
         classes: classes.to_vec(),
         ..Env::default()
     };
-    Ok(format!(
-        "⟨{}, Facts.none, {}⟩",
-        s.vars.len(),
-        ty(&s.body, &env)?
-    ))
+    let (cs, t) = scheme_facts(s, &env)?;
+    Ok(format!("⟨{}, {cs}, {t}⟩", s.vars.len()))
 }
 
 /// The structure, and the signature that has it.

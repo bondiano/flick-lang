@@ -20,7 +20,7 @@ use crate::check::{elided, live_service, scope_service};
 use crate::decls::Decls;
 use crate::syntax::Path;
 use crate::translate::types::scheme;
-use crate::types::{Caps, Kind, Row, Scheme, Stage, Type, Var};
+use crate::types::{Caps, Kind, PROVIDED, Row, Scheme, Stage, Type, Var, provided};
 
 /// Types with hidden storage: the qualifier of a value is their first
 /// argument, as `appQ` of the scheme translation.
@@ -112,6 +112,28 @@ pub(crate) fn row(r: &Row, env: &Env) -> Result<String, String> {
             for a in c.atoms.iter().chain(&c.vars) {
                 parts.push(format!("x = .atm (.v {})", env.index_of(a)?));
             }
+        } else if *name == provided() {
+            // `Provided {r} ϱ` of a scheme: an obligation for each service of `r`
+            let [Type::Tag(r), s] = &args[..] else {
+                return Err(format!("`{name}` with arguments the core does not write"));
+            };
+            let a = region(s, env)?;
+            for n in r.elems.keys() {
+                parts.push(format!("x = .ob \"{n}\" (.v {a})"));
+            }
+            for v in env.kept(r.vars.iter()) {
+                parts.push(format!("x = .obv (.v {}) (.v {a})", env.index_of(v)?));
+            }
+        } else if &*name.module == PROVIDED {
+            // `{Provided {S} ϱ}`, split by service
+            let [s] = &args[..] else {
+                return Err(format!("`{name}` with arguments the core does not write"));
+            };
+            parts.push(format!(
+                "x = .ob \"{}\" (.v {})",
+                name.name,
+                region(s, env)?
+            ));
         } else if args.is_empty() {
             parts.push(format!("x = .nm \"{name}\""));
         } else {
@@ -122,6 +144,34 @@ pub(crate) fn row(r: &Row, env: &Env) -> Result<String, String> {
         parts.push(format!("x = .rv (.v {})", env.index_of(v)?));
     }
     Ok(disjunction(&parts, "Row.none"))
+}
+
+/// The type of a scheme and its facts in the core, in `env`, whose variables
+/// start with the scheme's: each `Outlives C s` as `Facts.single`, and each
+/// value bound `a^c` on a variable as `Facts.bnd`, rule 1.
+pub(crate) fn scheme_facts(s: &Scheme, env: &Env) -> Result<(String, String), String> {
+    let bounds = Rc::new(RefCell::new(Vec::new()));
+    let env = Env {
+        bounds: Some(bounds.clone()),
+        ..env.clone()
+    };
+    let t = ty(&s.body, &env)?;
+    let mut parts: Vec<String> = (s.outlives.iter())
+        .map(|(c, r)| Ok(format!("Facts.single {} {}", caps(c, &env)?, ty(r, &env)?)))
+        .collect::<Result<_, String>>()?;
+    parts.extend(facts(&bounds.borrow(), &env)?);
+    let cs = (parts.into_iter())
+        .reduce(|a, b| format!("Facts.union ({a}) ({b})"))
+        .unwrap_or_else(|| "Facts.none".into());
+    Ok((cs, t))
+}
+
+/// The atom of the region an obligation is about.
+fn region(s: &Type, env: &Env) -> Result<usize, String> {
+    match s {
+        Type::Var(v) => env.index_of(v),
+        other => Err(format!("an obligation about `{other}`, no region")),
+    }
 }
 
 pub(crate) fn stage(s: &Stage, env: &Env) -> Result<String, String> {
@@ -201,7 +251,9 @@ fn qualified(t: &Type, q: Option<&Caps>, env: &Env) -> Result<String, String> {
                 // a certificate reads a bound as the core does: on data the
                 // data, `⌈τ⌉ ⊆ C` checked where a cell takes it (`Const.ok`);
                 // on a function or a computation the qualifier of its use
-                _ if env.ground && env.bounds.is_none() => {
+                _ if env.ground
+                    && (env.bounds.is_none() || !matches!(&**x, Type::Var(Var::Named(_)))) =>
+                {
                     let mut inner = &**x;
                     while let Type::Captured(y, _) | Type::Bounded(y, _) = inner {
                         inner = y;
@@ -438,59 +490,4 @@ pub fn elide_schemes() -> String {
 }
 
 #[cfg(test)]
-mod tests {
-    use std::{env, fs};
-
-    /// `ElideSchemes.lean` is what the model generates; with
-    /// `FLICK_FORMAL_SCHEMES` set the test writes it.
-    #[test]
-    fn elide_schemes_are_generated() {
-        let path = concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/../formal/Formal/Live/ElideSchemes.lean"
-        );
-        let text = super::elide_schemes();
-        if env::var_os("FLICK_FORMAL_SCHEMES").is_some() {
-            fs::write(path, &text).expect("write ElideSchemes.lean");
-        }
-        let committed = fs::read_to_string(path).unwrap_or_default();
-        assert!(
-            committed == text,
-            "ElideSchemes.lean is stale: run `just formal-schemes`"
-        );
-    }
-
-    /// Rule 1 reads a bound on a variable of the scheme as a fact; a bound
-    /// it cannot read so is skipped with its reason.
-    #[test]
-    fn a_value_bound_is_a_fact_of_the_scheme() {
-        use std::rc::Rc;
-
-        use crate::types::{Caps, Kind, Row, Scheme, Stage, Type, Var};
-
-        let var = |n: &str| Var::Named(n.into());
-        let a = Rc::new(Type::Var(var("a")));
-        let unit = || Rc::new(Type::Tuple(Rc::new([])));
-        let bounded = |t: Rc<Type>| Rc::new(Type::Bounded(t, Caps::atom(var("c"))));
-        let scheme = |param: Rc<Type>, stage: Stage| {
-            Scheme::new(
-                vec![("a".into(), Kind::Type), ("c".into(), Kind::Captures)],
-                Type::Fun(param, stage, unit()),
-            )
-        };
-        let theorem = |s: &Scheme| super::theorem("t", "t", s, s);
-        let pure = theorem(&scheme(bounded(a.clone()), Stage::Pure)).expect("a fact");
-        assert!(
-            pure.contains("Scheme.elide (fun x => x = .v 1) ⟨2, Facts.bnd 0 (fun x => x = .v 1),")
-        );
-        let runtime = Stage::Runtime(Row::none(), Row::none());
-        assert_eq!(
-            theorem(&scheme(bounded(a), runtime)),
-            Err("a value bound in a scheme with a runtime stage".into())
-        );
-        assert_eq!(
-            theorem(&scheme(bounded(unit()), Stage::Pure)),
-            Err("a value bound on a type that is not a variable".into())
-        );
-    }
-}
+mod tests;

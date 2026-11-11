@@ -345,9 +345,6 @@ impl<'t> Cx<'t> {
             .instance
             .as_ref()
             .ok_or("a term without its instance")?;
-        if !scheme.outlives.is_empty() {
-            return Err("a scheme with facts".into());
-        }
         let ts = insts
             .iter()
             .map(|i| self.inst(i))
@@ -425,6 +422,11 @@ impl<'t> Cx<'t> {
             Term::Field(d, l) if self.is_dict(d) => {
                 let at = self.inferred(head)?;
                 Ok((self.dproj(head, d, l, col)?, at))
+            }
+            // a function a record holds
+            Term::Field(..) => {
+                let at = self.inferred(head)?;
+                Ok((self.typing(head, &at, col)?, at))
             }
             Term::Tuple(xs) => {
                 let [x, y] = &xs[..] else {

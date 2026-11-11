@@ -81,18 +81,24 @@ def genGlob : Nat → Option Scheme
   | 18 => some ⟨1, Facts.none, (.arrow (.adt "Fixture.Raw") (.rt (fun x => x = .atm (.v 0)) Row.none) (.base .unit) Caps.none)⟩
   -- Value(Path { module: "List.Core", name: "get" })
   | 19 => some ⟨1, Facts.none, (.arrow (.base .int) .pure (.arrow (.tapp (.adt "Prelude.List") (.tvar 0)) .pure (.tapp (.adt "Prelude.Option") (.tvar 0)) Caps.none) Caps.none)⟩
+  -- Value(Path { module: "Fiber", name: "spawn" })
+  | 20 => some ⟨5, Facts.single (fun x => x = .v 3) (.tvar 0), (.arrow (.owner (.tvar 0)) .pure (.arrow (.arrow (.tapp (.adt "Prelude.Failure") (.tvar 1)) (.rt (fun x => x = .atm (.v 0) ∨ x = .rv (.v 2)) Row.none) (.base .unit) (fun x => x = .v 3)) .pure (.arrow (.eff (fun x => x = .atm (.v 0) ∨ x = .rv (.v 2)) (fun x => x = .rv (.v 1)) (.tvar 4) (fun x => x = .v 3)) (.rt (fun x => x = .obv (.v 2) (.v 0) ∨ x = .atm (.v 0) ∨ x = .atm (.v 3) ∨ x = .rv (.v 2)) Row.none) (.tapp (.tapp (.adt "Fiber.Fiber") (.tvar 1)) (.tvar 4)) Caps.none) Caps.none) Caps.none)⟩
+  -- Value(Path { module: "Resource", name: "acquire_release" })
+  | 21 => some ⟨5, Facts.union (Facts.single (fun x => x = .v 3) (.tvar 4)) (Facts.bnd 2 (fun x => x = .v 4)), (.arrow (.eff (fun x => x = .rv (.v 0)) (fun x => x = .rv (.v 1)) (.tvar 2) (fun x => x = .v 3)) .pure (.arrow (.arrow (.tvar 2) (.rt (fun x => x = .rv (.v 0)) Row.none) (.base .unit) (fun x => x = .v 3)) (.rt (fun x => x = .obv (.v 0) (.v 4) ∨ x = .atm (.v 3) ∨ x = .atm (.v 4) ∨ x = .rv (.v 0)) (fun x => x = .rv (.v 1))) (.tvar 2) Caps.none) Caps.none)⟩
+  -- Value(Path { module: "Scope", name: "add_finalizer" })
+  | 22 => some ⟨3, Facts.single (fun x => x = .v 1) (.tvar 2), (.arrow (.eff (fun x => x = .rv (.v 0)) Row.none (.base .unit) (fun x => x = .v 1)) (.rt (fun x => x = .obv (.v 0) (.v 2) ∨ x = .atm (.v 1) ∨ x = .atm (.v 2) ∨ x = .rv (.v 0)) Row.none) (.base .unit) Caps.none)⟩
   -- Value(Path { module: "Fixture", name: "instance Describe (Option a)" })
-  | 20 => some ⟨1, Facts.none, (.arrow (.dict 0 (Ty.spine [(.tvar 0)])) .pure (.dict 0 (Ty.spine [(.tapp (.adt "Prelude.Option") (.tvar 0))])) Caps.none)⟩
+  | 23 => some ⟨1, Facts.none, (.arrow (.dict 0 (Ty.spine [(.tvar 0)])) .pure (.dict 0 (Ty.spine [(.tapp (.adt "Prelude.Option") (.tvar 0))])) Caps.none)⟩
   -- Value(Path { module: "Fixture", name: "instance Describe Bool" })
-  | 21 => some ⟨0, Facts.none, (.dict 0 (Ty.spine [(.base .bool)]))⟩
+  | 24 => some ⟨0, Facts.none, (.dict 0 (Ty.spine [(.base .bool)]))⟩
   -- Value(Path { module: "Fixture", name: "instance Describe Int" })
-  | 22 => some ⟨0, Facts.none, (.dict 0 (Ty.spine [(.base .int)]))⟩
+  | 25 => some ⟨0, Facts.none, (.dict 0 (Ty.spine [(.base .int)]))⟩
   -- Value(Path { module: "Fixture", name: "instance Describe Oops" })
-  | 23 => some ⟨0, Facts.none, (.dict 0 (Ty.spine [(.adt "Fixture.Oops")]))⟩
+  | 26 => some ⟨0, Facts.none, (.dict 0 (Ty.spine [(.adt "Fixture.Oops")]))⟩
   -- Value(Path { module: "Fixture", name: "instance Rank Bool" })
-  | 24 => some ⟨0, Facts.none, (.dict 1 (Ty.spine [(.base .bool)]))⟩
+  | 27 => some ⟨0, Facts.none, (.dict 1 (Ty.spine [(.base .bool)]))⟩
   -- Value(Path { module: "Fixture", name: "instance Rank Int" })
-  | 25 => some ⟨0, Facts.none, (.dict 1 (Ty.spine [(.base .int)]))⟩
+  | 28 => some ⟨0, Facts.none, (.dict 1 (Ty.spine [(.base .int)]))⟩
   | _ => none
 
 def genOps : Name → List Name

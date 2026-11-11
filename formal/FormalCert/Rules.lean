@@ -87,6 +87,12 @@ theorem typ_dproj {e : Tm} {c k : Nat} {us : List Ty} {fs : List (Label × Schem
 
 /-! ## Regions -/
 
+/-- The fact a `scope` gives its body: what is outside outlives the region. -/
+theorem scope_single {C₀ : Caps} (h : ¬ C₀ (.v 0)) :
+    ∀ C s, Facts.single C₀ (.tvar 0) C s → s = .tvar 0 ∧ ¬ C (.v 0) := by
+  rintro C s ⟨rfl, rfl⟩
+  exact ⟨rfl, h⟩
+
 /-- (Scope) with the type of its body written in the region's binder, `t.up 1` as `t'`. -/
 theorem typ_scope {F : Facts} {φ' : Stage} {r ε : Row} {t t' T : Ty} {e : Tm} {φ : Stage}
     (hn : e.NoIns) (hF : ∀ C s, F C s → s = .tvar 0 ∧ ¬ C (.v 0))

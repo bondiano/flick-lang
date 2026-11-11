@@ -62,7 +62,7 @@ theorem program2 (S : Sig) (hS : GenSig S) :
 --       (open_scoped "x")
 --     (await (from_result (Err (Bad (describe ((from_result (Err (Bad ""))) : Bool)))))) })
 theorem program3 (S : Sig) (hS : GenSig S) :
-    Typ S [] Facts.none [] (.lam (.scope (.let_ (.app (.glob 11) (.lit (.str "x"))) (.await (.raise (.app (.ctor "Fixture.Bad") (.app (.proj (.glob 21) "describe") (.let_ (.raise (.app (.ctor "Fixture.Bad") (.lit (.str "")))) (.var 0)))))))))
+    Typ S [] Facts.none [] (.lam (.scope (.let_ (.app (.glob 11) (.lit (.str "x"))) (.await (.raise (.app (.ctor "Fixture.Bad") (.app (.proj (.glob 24) "describe") (.let_ (.raise (.app (.ctor "Fixture.Bad") (.lit (.str "")))) (.var 0)))))))))
       (.ex (.arrow (.base .unit) (.rt (fun x => x = .nm "Fixture.Counter") (fun x => x = .nm "Fixture.Bad" ∨ x = .nm "Fixture.Oops")) (.tapp (.adt "Prelude.Option") (.tapp (.tapp (.adt "Tuple") (.base .unit)) (.base .unit))) Caps.none) .pure) :=
   (.lam (a := (.base .unit)) (ψ := (.rt (fun x => x = .nm "Fixture.Counter") (fun x => x = .nm "Fixture.Bad" ∨ x = .nm "Fixture.Oops"))) (t := (.tapp (.adt "Prelude.Option") (.tapp (.tapp (.adt "Tuple") (.base .unit)) (.base .unit)))) (C := Caps.none)
     (Cert.typ_scope (F := Facts.none) (φ' := (.rt (fun x => x = .atm (.v 0)) (fun x => x = .nm "Fixture.Bad"))) (r := Row.none) (ε := (fun x => x = .nm "Fixture.Bad")) (t := (.tapp (.adt "Prelude.Option") (.tapp (.tapp (.adt "Tuple") (.base .unit)) (.base .unit)))) (t' := (.tapp (.adt "Prelude.Option") (.tapp (.tapp (.adt "Tuple") (.base .unit)) (.base .unit))))
@@ -78,7 +78,7 @@ theorem program3 (S : Sig) (hS : GenSig S) :
               (Typ.ctor_plain S (K := "Fixture.Bad") (us := []) ((hS.ctor _ rfl).trans rfl) ((hS.res _ rfl).trans rfl) rfl (by le_live))
               (.app (a := (.base .bool)) (ψ := .pure) (t := (.base .string)) (C := Caps.none)
                 (Cert.typ_dproj (c := 0) (us := [(.base .bool)]) (l := "describe") (T' := (.arrow (.base .bool) .pure (.base .string) Caps.none))
-                  (Cert.typ_glob (ts := []) (T' := (.dict 0 (Ty.spine [(.base .bool)]))) ((hS.glob 21 rfl).trans rfl) rfl (by holds) (by inst_eq) (by le_live))
+                  (Cert.typ_glob (ts := []) (T' := (.dict 0 (Ty.spine [(.base .bool)]))) ((hS.glob 24 rfl).trans rfl) rfl (by holds) (by inst_eq) (by le_live))
                   ((hS.dict _ rfl).trans rfl) rfl rfl (by inst_eq) (by le_live))
                 (.let_ (a := (.base .bool))
                   (.raiseAdt (U := (.adt "Fixture.Bad")) (E := "Fixture.Bad") (t := (.base .bool))
@@ -131,7 +131,7 @@ theorem program4 (S : Sig) (hS : GenSig S) :
 --   (task {
 --     (from_result (Err (Oops (rank ((true : Bool) : Bool))))) })
 theorem program5 (S : Sig) (hS : GenSig S) :
-    Typ S [] Facts.none [] (.task (.raise (.app (.ctor "Fixture.Oops") (.app (.proj (.glob 24) "rank") (.let_ (.let_ (.lit (.bool true)) (.var 0)) (.var 0))))))
+    Typ S [] Facts.none [] (.task (.raise (.app (.ctor "Fixture.Oops") (.app (.proj (.glob 27) "rank") (.let_ (.let_ (.lit (.bool true)) (.var 0)) (.var 0))))))
       (.ex (.eff (fun x => x = .nm "Fixture.Counter") (fun x => x = .nm "Fixture.Bad" ∨ x = .nm "Fixture.Oops") (.eff (fun x => x = .nm "Fixture.Log") Row.none (.tapp (.tapp (.adt "Tuple") (.base .string)) (.base .unit)) Caps.none) Caps.none) .pure) :=
   (.task (r := (fun x => x = .nm "Fixture.Counter")) (ε := (fun x => x = .nm "Fixture.Bad" ∨ x = .nm "Fixture.Oops")) (t := (.eff (fun x => x = .nm "Fixture.Log") Row.none (.tapp (.tapp (.adt "Tuple") (.base .string)) (.base .unit)) Caps.none)) (C := Caps.none)
     (.raiseAdt (U := (.adt "Fixture.Oops")) (E := "Fixture.Oops") (t := (.eff (fun x => x = .nm "Fixture.Log") Row.none (.tapp (.tapp (.adt "Tuple") (.base .string)) (.base .unit)) Caps.none))
@@ -139,7 +139,7 @@ theorem program5 (S : Sig) (hS : GenSig S) :
         (Typ.ctor_plain S (K := "Fixture.Oops") (us := []) ((hS.ctor _ rfl).trans rfl) ((hS.res _ rfl).trans rfl) rfl (by le_live))
         (.app (a := (.base .bool)) (ψ := .pure) (t := (.base .int)) (C := Caps.none)
           (Cert.typ_dproj (c := 1) (us := [(.base .bool)]) (l := "rank") (T' := (.arrow (.base .bool) .pure (.base .int) Caps.none))
-            (Cert.typ_glob (ts := []) (T' := (.dict 1 (Ty.spine [(.base .bool)]))) ((hS.glob 24 rfl).trans rfl) rfl (by holds) (by inst_eq) (by le_live))
+            (Cert.typ_glob (ts := []) (T' := (.dict 1 (Ty.spine [(.base .bool)]))) ((hS.glob 27 rfl).trans rfl) rfl (by holds) (by inst_eq) (by le_live))
             ((hS.dict _ rfl).trans rfl) rfl rfl (by inst_eq) (by le_live))
           (.let_ (a := (.base .bool))
             (.let_ (a := (.base .bool))
@@ -1060,8 +1060,8 @@ theorem program20 (S : Sig) (hS : GenSig S) :
             (by stage_le) (by le_live))
           (.let_ (a := (.base .bool))
             (.await (r := Row.none) (ε := Row.none) (t := (.base .bool)) (C := Caps.none)
-              (Cert.typ_scope (F := Facts.none) (φ' := (.rt (fun x => x = .atm (.v 0)) Row.none)) (r := Row.none) (ε := Row.none) (t := (.eff Row.none Row.none (.base .bool) Caps.none)) (t' := (.eff Row.none Row.none (.base .bool) Caps.none))
-                (by simp [Tm.NoIns, Tm.Has]) (fun _ _ h => h.elim)
+              (Cert.typ_scope (F := (Facts.single (fun x => x = .v 1) (.tvar 0))) (φ' := (.rt (fun x => x = .atm (.v 0)) Row.none)) (r := Row.none) (ε := Row.none) (t := (.eff Row.none Row.none (.base .bool) Caps.none)) (t' := (.eff Row.none Row.none (.base .bool) Caps.none))
+                (by simp [Tm.NoIns, Tm.Has]) (Cert.scope_single (by simp))
                 (.let_ (a := (.tapp (.adt "Fixture.Handle") (.tvar 0)))
                   (.app (a := (.base .string)) (ψ := (.rt (fun x => x = .atm (.v 0)) Row.none)) (t := (.tapp (.adt "Fixture.Handle") (.tvar 0))) (C := Caps.none)
                     (Cert.typ_glob (ts := [(.tvar 0)]) (T' := (.arrow (.base .string) (.rt (fun x => x = .atm (.v 0)) Row.none) (.tapp (.adt "Fixture.Handle") (.tvar 0)) Caps.none)) ((hS.glob 11 rfl).trans rfl) rfl (by holds) (by inst_eq) (by le_live))
@@ -1076,8 +1076,8 @@ theorem program20 (S : Sig) (hS : GenSig S) :
                       (Stage.le_refl _) (by simp [Tm.NoIns, Tm.Has]) (by le_live))))
                 (by inst_eq) (by stage_le) (by stage_le) (by le_live))
               (by stage_le) (by le_live))
-            (Cert.typ_scope (F := Facts.none) (φ' := (.rt (fun x => x = .atm (.v 1) ∨ x = .atm (.v 0)) Row.none)) (r := (fun x => x = .atm (.v 0))) (ε := Row.none) (t := (.arrow (.base .string) .pure (.adt "Fixture.Shape") Caps.none)) (t' := (.arrow (.base .string) .pure (.adt "Fixture.Shape") Caps.none))
-              (by simp [Tm.NoIns, Tm.Has]) (fun _ _ h => h.elim)
+            (Cert.typ_scope (F := (Facts.single (fun x => x = .v 1) (.tvar 0))) (φ' := (.rt (fun x => x = .atm (.v 1) ∨ x = .atm (.v 0)) Row.none)) (r := (fun x => x = .atm (.v 0))) (ε := Row.none) (t := (.arrow (.base .string) .pure (.adt "Fixture.Shape") Caps.none)) (t' := (.arrow (.base .string) .pure (.adt "Fixture.Shape") Caps.none))
+              (by simp [Tm.NoIns, Tm.Has]) (Cert.scope_single (by simp))
               (.let_ (a := (.tapp (.adt "Fixture.Handle") (.tvar 0)))
                 (.app (a := (.base .string)) (ψ := (.rt (fun x => x = .atm (.v 0)) Row.none)) (t := (.tapp (.adt "Fixture.Handle") (.tvar 0))) (C := Caps.none)
                   (Cert.typ_glob (ts := [(.tvar 0)]) (T' := (.arrow (.base .string) (.rt (fun x => x = .atm (.v 0)) Row.none) (.tapp (.adt "Fixture.Handle") (.tvar 0)) Caps.none)) ((hS.glob 11 rfl).trans rfl) rfl (by holds) (by inst_eq) (by le_live))
@@ -1762,7 +1762,7 @@ theorem program27 (S : Sig) (hS : GenSig S) :
 --   (fun x7 ->
 --     ())
 theorem program28 (S : Sig) (hS : GenSig S) :
-    Typ S [] Facts.none [] (.match_ (.match_ (.match_ (.match_ (.ctor "Prelude.None") (.acons (.app (.ctor "Prelude.Some") .var) (.lit .unit) (.acons (.ctor "Prelude.None") (.lit .unit) .anil))) (.acons (.lit .unit) (.let_ (.fix (.match_ (.app (.app (.glob 3) (.var 0)) (.lit (.int 1))) (.acons (.lit (.bool true)) (.task (.raise (.app (.ctor "Fixture.Oops") (.lit (.int 2))))) (.acons (.lit (.bool false)) (.app (.var 1) (.app (.app (.glob 1) (.var 0)) (.lit (.int 1)))) .anil)))) (.app (.app (.glob 2) (.app (.proj (.glob 22) "describe") (.let_ (.lit (.int 0)) (.var 0)))) (.lit (.str "")))) .anil)) (.acons (.lit (.str "ok")) (.app (.app (.ctor "Tuple") (.ctor "Prelude.None")) (.lit (.str ""))) (.acons .wild (.app (.app (.ctor "Tuple") (.ctor "Prelude.None")) (.lit (.str ""))) .anil))) (.acons (.app (.app (.ctor "Tuple") .var) .var) (.lam (.lit .unit)) .anil))
+    Typ S [] Facts.none [] (.match_ (.match_ (.match_ (.match_ (.ctor "Prelude.None") (.acons (.app (.ctor "Prelude.Some") .var) (.lit .unit) (.acons (.ctor "Prelude.None") (.lit .unit) .anil))) (.acons (.lit .unit) (.let_ (.fix (.match_ (.app (.app (.glob 3) (.var 0)) (.lit (.int 1))) (.acons (.lit (.bool true)) (.task (.raise (.app (.ctor "Fixture.Oops") (.lit (.int 2))))) (.acons (.lit (.bool false)) (.app (.var 1) (.app (.app (.glob 1) (.var 0)) (.lit (.int 1)))) .anil)))) (.app (.app (.glob 2) (.app (.proj (.glob 25) "describe") (.let_ (.lit (.int 0)) (.var 0)))) (.lit (.str "")))) .anil)) (.acons (.lit (.str "ok")) (.app (.app (.ctor "Tuple") (.ctor "Prelude.None")) (.lit (.str ""))) (.acons .wild (.app (.app (.ctor "Tuple") (.ctor "Prelude.None")) (.lit (.str ""))) .anil))) (.acons (.app (.app (.ctor "Tuple") .var) .var) (.lam (.lit .unit)) .anil))
       (.ex (.arrow (.adt "Prelude.JsValue") .pure (.base .unit) Caps.none) .pure) :=
   (.match_
     (.match_
@@ -1814,7 +1814,7 @@ theorem program28 (S : Sig) (hS : GenSig S) :
             (Cert.typ_glob (ts := []) (T' := (.arrow (.base .string) .pure (.arrow (.base .string) .pure (.base .string) Caps.none) Caps.none)) ((hS.glob 2 rfl).trans rfl) rfl (by holds) (by inst_eq) (by le_live))
             (.app (a := (.base .int)) (ψ := .pure) (t := (.base .string)) (C := Caps.none)
               (Cert.typ_dproj (c := 0) (us := [(.base .int)]) (l := "describe") (T' := (.arrow (.base .int) .pure (.base .string) Caps.none))
-                (Cert.typ_glob (ts := []) (T' := (.dict 0 (Ty.spine [(.base .int)]))) ((hS.glob 22 rfl).trans rfl) rfl (by holds) (by inst_eq) (by le_live))
+                (Cert.typ_glob (ts := []) (T' := (.dict 0 (Ty.spine [(.base .int)]))) ((hS.glob 25 rfl).trans rfl) rfl (by holds) (by inst_eq) (by le_live))
                 ((hS.dict _ rfl).trans rfl) rfl rfl (by inst_eq) (by le_live))
               (.let_ (a := (.base .int))
                 .lit
@@ -1985,7 +1985,7 @@ theorem program30 (S : Sig) (hS : GenSig S) :
 --     (fun x1 ->
 --       None) })
 theorem program31 (S : Sig) (hS : GenSig S) :
-    Typ S [] Facts.none [] (.lam (.let_ (.rcons "next" (.lam (.let_ (.app (.const .refMake) (.app (.glob 9) (.lit (.str "a")))) (.try_ (.let_ (.app (.proj (.glob 24) "rank") (.let_ (.await (.task (.lit (.bool true)))) (.var 0))) (.var 0)) (.acons (.app (.ctor "Fixture.Oops") .var) (.lit (.int 0)) (.acons (.app (.ctor "Fixture.Bad") .var) (.lit (.int 0)) .anil))))) .rnil) (.hdl "Fixture.Counter" (recArm "next") (.lam (.var 0)) (.lam (.ctor "Prelude.None")))))
+    Typ S [] Facts.none [] (.lam (.let_ (.rcons "next" (.lam (.let_ (.app (.const .refMake) (.app (.glob 9) (.lit (.str "a")))) (.try_ (.let_ (.app (.proj (.glob 27) "rank") (.let_ (.await (.task (.lit (.bool true)))) (.var 0))) (.var 0)) (.acons (.app (.ctor "Fixture.Oops") .var) (.lit (.int 0)) (.acons (.app (.ctor "Fixture.Bad") .var) (.lit (.int 0)) .anil))))) .rnil) (.hdl "Fixture.Counter" (recArm "next") (.lam (.var 0)) (.lam (.ctor "Prelude.None")))))
       (.ex (.arrow (.base .unit) (.rt Row.none (fun x => x = .nm "Fixture.Bad" ∨ x = .nm "Fixture.Oops")) (.arrow (.tapp (.tapp (.adt "Tuple") (.adt "Fixture.Shape")) (.base .bool)) (.rt (fun x => x = .nm "Fixture.Counter") (fun x => x = .nm "Fixture.Bad" ∨ x = .nm "Fixture.Oops")) (.tapp (.adt "Prelude.Option") (.base .unit)) Caps.none) Caps.none) .pure) :=
   (.lam (a := (.base .unit)) (ψ := (.rt Row.none (fun x => x = .nm "Fixture.Bad" ∨ x = .nm "Fixture.Oops"))) (t := (.arrow (.tapp (.tapp (.adt "Tuple") (.adt "Fixture.Shape")) (.base .bool)) (.rt (fun x => x = .nm "Fixture.Counter") (fun x => x = .nm "Fixture.Bad" ∨ x = .nm "Fixture.Oops")) (.tapp (.adt "Prelude.Option") (.base .unit)) Caps.none)) (C := Caps.none)
     (Cert.typ_provide (E := "Fixture.Counter") (o := "next") (R := (.rcons "next" (.arrow (.base .unit) (.rt Row.none Row.none) (.base .int) Caps.none) .rnil)) (t := (.arrow (.tapp (.tapp (.adt "Tuple") (.adt "Fixture.Shape")) (.base .bool)) (.rt (fun x => x = .nm "Fixture.Counter") (fun x => x = .nm "Fixture.Bad" ∨ x = .nm "Fixture.Oops")) (.tapp (.adt "Prelude.Option") (.base .unit)) Caps.none)) (r := Row.none) (ε := Row.none) (φ₀ := .pure)
@@ -2004,7 +2004,7 @@ theorem program31 (S : Sig) (hS : GenSig S) :
               (.let_ (a := (.base .int))
                 (.app (a := (.base .bool)) (ψ := .pure) (t := (.base .int)) (C := Caps.none)
                   (Cert.typ_dproj (c := 1) (us := [(.base .bool)]) (l := "rank") (T' := (.arrow (.base .bool) .pure (.base .int) Caps.none))
-                    (Cert.typ_glob (ts := []) (T' := (.dict 1 (Ty.spine [(.base .bool)]))) ((hS.glob 24 rfl).trans rfl) rfl (by holds) (by inst_eq) (by le_live))
+                    (Cert.typ_glob (ts := []) (T' := (.dict 1 (Ty.spine [(.base .bool)]))) ((hS.glob 27 rfl).trans rfl) rfl (by holds) (by inst_eq) (by le_live))
                     ((hS.dict _ rfl).trans rfl) rfl rfl (by inst_eq) (by le_live))
                   (.let_ (a := (.base .bool))
                     (.await (r := Row.none) (ε := Row.none) (t := (.base .bool)) (C := Caps.none)
