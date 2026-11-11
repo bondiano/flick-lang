@@ -29,6 +29,35 @@ fn compile_with(text: &str, release: bool, labels: Labels) -> super::Output {
     js(&ir, &options)
 }
 
+#[test]
+fn a_release_build_in_typescript_types_a_constructed_value_as_its_constructor_does() {
+    let text = "module App exposing (Token, start)\n\nopaque type Token = Token String Float\n\n\
+                start : Token\nlet start = Token \"a\" 1\n";
+    let ir = lower_text("App", text).expect("lowers");
+    let path = |m: &str| format!("{}.js", m.replace('.', "/"));
+    let foreign = |_: &str, spec: &str| effect_specifier(spec);
+    let emit = |typescript: bool| {
+        let options = Options {
+            path: &path,
+            package: &|_| None,
+            foreign: &foreign,
+            typescript,
+            interface: &|_| None,
+            release: true,
+            workers: &|_, _| None,
+            direct: &|_, _, _| false,
+            labels: Labels::default(),
+            rt: false,
+            effect_bridge: EffectBridge::Absent,
+        };
+        js(&ir, &options).code
+    };
+    // an opaque type is a brand in TypeScript, which the object does not have
+    let ts = emit(true);
+    assert!(ts.contains("_0: \"a\", _1: 1 } as any"), "{ts}");
+    assert!(!emit(false).contains("as any"));
+}
+
 /// The code of `text` on Flick's own runtime, in debug.
 fn on_rt(text: &str) -> String {
     on_rt_with_bridge(text, EffectBridge::Absent)

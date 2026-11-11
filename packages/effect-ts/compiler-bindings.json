@@ -273,11 +273,6 @@
       "@flick-lang/runtime/rt/effect/Tracer"
     ],
     [
-      "flick:Trie",
-      null,
-      "@flick-lang/runtime/rt/effect/Trie"
-    ],
-    [
       "flick:Tuple",
       null,
       "@flick-lang/runtime/rt/effect/Tuple"
