@@ -121,6 +121,8 @@ impl<'a> Gen<'a> {
                 _,
                 _,
             ) => Some(Native::Bool),
+            // a call of a known function that returns a Go type
+            ExprKind::App { .. } => self.typed_result(e),
             // a choice whose every branch is of one Go type is of that type
             ExprKind::If(_, then, other) => self.agreed([&**then, &**other]),
             ExprKind::Match(_, arms) => self.agreed(arms.iter().map(|arm| &arm.body)),

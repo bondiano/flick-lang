@@ -5,7 +5,11 @@ use std::iter;
 
 use flick_pretty::{Document, docvec};
 
-use super::layout::{Code, block, call, closure, list, named_again, print, signature, statement};
+use super::arith::Native;
+use super::layout::{
+    Code, block, call, closure, list, named_again, print, signature, statement, typed_signature,
+};
+use super::shape::Types;
 use super::{Gen, RUNTIME_PACKAGE, Shape, loops, names};
 use crate::codegen::names as js_names;
 use crate::codegen::tail::{Callee, Target};
@@ -182,7 +186,12 @@ impl<'a> Gen<'a> {
     fn function(&mut self, name: &str, dicts: &[String], body: &Expr) -> Document<'a> {
         let a = self.a;
         let id = names::func(self.module, name);
-        let effectful = self.shape_of(self.module, name).effectful();
+        let shape = self.shape_of(self.module, name);
+        let effectful = shape.effectful();
+        let types = match shape {
+            Shape::Func { types, .. } => types,
+            Shape::Var => Types::default(),
+        };
         self.fiber = effectful.then_some("fb");
         self.context = Some("fb");
         let mut heads = self.bind_givens(dicts);
@@ -193,8 +202,8 @@ impl<'a> Gen<'a> {
                     dicts: dicts.to_vec(),
                 };
                 let lines = self.lines;
-                let (bound, stmts) = self.function_body(params, body, Some(target));
-                let grouped = self.group_call(name, &bound);
+                let (bound, stmts) = self.function_body(params, body, Some(target), types);
+                let grouped = self.group_call(name, &bound, types.result());
                 if grouped.is_some() {
                     // the body is the group's: this function holds no directive
                     self.lines = lines;
@@ -207,14 +216,17 @@ impl<'a> Gen<'a> {
         self.givens.clear();
         self.fiber = None;
         self.context = None;
-        let params = signature(&heads);
+        let params = typed_signature(&heads, dicts.len(), types);
+        let result = types.result().map_or("flickrt.Value", Native::go);
         docvec![
             a,
             "func ",
             id,
             "(",
             params,
-            ") flickrt.Value ",
+            ") ",
+            result,
+            " ",
             block(a, stmts)
         ]
     }

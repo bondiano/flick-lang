@@ -9,6 +9,7 @@ use flick_pretty::{Document, docvec};
 use super::closures::{Call, at_once, callee, curried, poly, quiet, returning};
 use super::expr::enum_literal;
 use super::layout::{Code, block, call, closure, signature, single};
+use super::shape::Types;
 use super::{Gen, Shape, names};
 use crate::codegen::tail::Target;
 use crate::ir::{Expr, ExprKind, Lit, Param, Pat, Stage, operation_arity};
@@ -103,8 +104,12 @@ impl<'a> Gen<'a> {
                 dicts: n,
                 params,
                 effects,
+                types,
             } if dicts.len() == n => {
                 let f = names::func(module, name);
+                // a function of values is a value as it is; one that takes
+                // or gives a Go type is wrapped in one that converts them
+                let plain = n == 0 && effects == 0 && !types.any();
                 match params {
                     0 => call(
                         a,
@@ -112,17 +117,22 @@ impl<'a> Gen<'a> {
                         iter::once(self.context()).chain(dicts.into_iter().map(|d| d.doc)),
                     )
                     .into(),
-                    1 if n == 0 && effects == 0 => self.code(&f),
+                    1 if plain => self.code(&f),
                     // the Go function itself is the value: nothing wraps it
-                    2 | 3 if n == 0 && effects == 0 => call(
+                    2 | 3 if plain => call(
                         a,
                         at_once(params, 0).expect("two or three"),
                         [a.text(a.alloc_str(&f))],
                     )
                     .into(),
-                    _ => curried(a, &callee(a, &f), dicts, params, effects, &mut || {
-                        self.temp()
-                    }),
+                    _ => curried(
+                        a,
+                        &callee(a, &f, n, types),
+                        dicts,
+                        params,
+                        effects,
+                        &mut || self.temp(),
+                    ),
                 }
             }
             // a constrained value passed on before its dictionaries
@@ -130,6 +140,7 @@ impl<'a> Gen<'a> {
                 dicts: n,
                 params,
                 effects,
+                types,
             } => {
                 let given: Vec<Code<'a>> = (0..n).map(|i| self.code(&format!("ds[{i}]"))).collect();
                 let f = names::func(module, name);
@@ -140,9 +151,14 @@ impl<'a> Gen<'a> {
                         iter::once(a.text("fb")).chain(given.into_iter().map(|d| d.doc)),
                     )
                 } else {
-                    curried(a, &callee(a, &f), given, params, effects, &mut || {
-                        self.temp()
-                    })
+                    curried(
+                        a,
+                        &callee(a, &f, n, types),
+                        given,
+                        params,
+                        effects,
+                        &mut || self.temp(),
+                    )
                     .doc
                 };
                 let f = closure(
@@ -210,6 +226,7 @@ impl<'a> Gen<'a> {
                 (Box::new(move |_, _: &[Code<'a>]| f), Vec::new(), 0, 0)
             }
         };
+        let typed = self.typed_head(head).filter(|(_, types, _)| types.any());
         let exprs: Vec<&Expr> = args.iter().map(|(arg, _)| *arg).collect();
         let mut values: Vec<(Code<'a>, Stage)> = self
             .ordered(&exprs)
@@ -244,35 +261,40 @@ impl<'a> Gen<'a> {
             .into_iter()
             .chain(values.into_iter().map(|(v, _)| v))
             .collect();
-        let mut v = make(self.context.unwrap_or("nil"), &all);
-        let mut rest = rest.into_iter().zip(quiet).peekable();
-        while let Some(((arg, mut stage), _)) = rest.next() {
-            // an argument of a pure stage goes with the next, up to three
-            // at once: a function that takes them so is called once. The
-            // next one must be quiet: a function may fail, or not return,
-            // once it has an argument, and that comes before the next
-            // argument is evaluated
-            let mut group = vec![self.context(), v.doc, arg.doc];
-            while group.len() < 5 && stage == Stage::Pure {
-                let Some(((next, after), _)) = rest.next_if(|(_, quiet)| *quiet) else {
-                    break;
-                };
-                group.push(next.doc);
-                stage = after;
-            }
-            let apply = ["flickrt.Apply", "flickrt.Apply2", "flickrt.Apply3"][group.len() - 3];
-            v = call(a, apply, group).into();
-            if stage != Stage::Pure {
-                v = self.run(v);
-            }
-        }
-        v
+        let v = match typed {
+            Some(typed) => self.typed_call(typed, &all, &exprs),
+            None => make(self.context.unwrap_or("nil"), &all),
+        };
+        self.applied(v, rest, quiet)
     }
 
     /// The task `task` run in the fiber in scope.
     pub(super) fn run(&self, task: Code<'a>) -> Code<'a> {
         let fb = self.fiber.expect("effects run where a fiber is in scope");
         call(self.a, "flickrt.Run", [self.a.text(fb), task.doc]).into()
+    }
+
+    /// How a known function of `module` is called with `dicts` dictionaries
+    /// and all its arguments, when that is a call of its Go function: how
+    /// many parameters it takes, which run effects, and their Go types.
+    pub(super) fn direct_shape(
+        &self,
+        module: &str,
+        name: &str,
+        dicts: usize,
+    ) -> Option<(usize, u64, Types)> {
+        let shape = self.shape_of(module, name);
+        match shape {
+            Shape::Func {
+                dicts: n,
+                params,
+                effects,
+                types,
+            } if n == dicts && params > 0 && (self.fiber.is_some() || !shape.effectful()) => {
+                Some((params, effects, types))
+            }
+            _ => None,
+        }
     }
 
     /// How to call a top-level value of `module`: its Go function, how many
@@ -285,20 +307,13 @@ impl<'a> Gen<'a> {
         dicts: Vec<Code<'a>>,
     ) -> (Call<'a>, Vec<Code<'a>>, usize, u64) {
         self.reads(module);
-        let shape = self.shape_of(module, name);
-        match shape {
-            Shape::Func {
-                dicts: n,
-                params,
-                effects,
-            } if n == dicts.len() && params > 0 && (self.fiber.is_some() || !shape.effectful()) => {
-                let f = names::func(module, name);
-                (callee(self.a, &f), dicts, params, effects)
-            }
-            _ => {
-                let f = self.global_value(module, name, dicts);
-                (Box::new(move |_, _: &[Code<'a>]| f), Vec::new(), 0, 0)
-            }
+        if let Some((params, effects, types)) = self.direct_shape(module, name, dicts.len()) {
+            let f = names::func(module, name);
+            let make = callee(self.a, &f, dicts.len(), types);
+            (make, dicts, params, effects)
+        } else {
+            let f = self.global_value(module, name, dicts);
+            (Box::new(move |_, _: &[Code<'a>]| f), Vec::new(), 0, 0)
         }
     }
 
@@ -335,7 +350,7 @@ impl<'a> Gen<'a> {
             mem::replace(&mut self.fiber, last_effectful.then_some("fb")),
             self.context.replace("fb"),
         );
-        let (heads, stmts) = self.function_body(params, body, target);
+        let (heads, stmts) = self.function_body(params, body, target, Types::default());
         (self.fiber, self.context) = saved;
         let body = if last_effectful {
             let task = docvec![a, "func(fb *flickrt.Fiber) flickrt.Value ", block(a, stmts)];

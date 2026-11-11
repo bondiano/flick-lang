@@ -310,6 +310,11 @@ impl<'a> Gen<'a> {
             _ => {
                 self.line(e.span);
                 let v = self.expr(e);
+                // in the Go type the function returns, when it has one
+                let v = match self.returns {
+                    Some(native) => self.unboxed(e, v, native),
+                    None => v,
+                };
                 self.emit(docvec![self.a, "return ", v]);
             }
         }

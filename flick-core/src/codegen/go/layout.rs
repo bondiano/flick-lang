@@ -13,6 +13,9 @@ use flick_pretty::{
     Document, DocumentArena, Documentable, Indentation, NextBreakFitsMode, Position, docvec,
 };
 
+use super::arith::Native;
+use super::shape::Types;
+
 /// The columns of one level of nesting, written as a tab.
 pub(super) const INDENT: usize = 4;
 /// The width the printer keeps lines to where it can.
@@ -186,6 +189,20 @@ pub(super) fn signature<S: Borrow<str>>(names: &[S]) -> String {
     } else {
         format!("fb *flickrt.Fiber, {params}")
     }
+}
+
+/// The parameter list of a Go function taking the hidden fiber, `dicts`
+/// dictionaries, then parameters of `types`: each of the Go type it has
+/// there, a `Value` when it has none.
+pub(super) fn typed_signature(names: &[&str], dicts: usize, types: Types) -> String {
+    if !types.any() {
+        return signature(names);
+    }
+    let params = names.iter().enumerate().map(|(i, name)| {
+        let native = i.checked_sub(dicts).and_then(|p| types.param(p));
+        format!(", {name} {}", native.map_or("flickrt.Value", Native::go))
+    });
+    format!("fb *flickrt.Fiber{}", params.collect::<String>())
 }
 
 /// The parameter list of Go function taking `names`, each a `Value`.

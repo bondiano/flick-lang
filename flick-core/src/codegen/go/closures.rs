@@ -7,21 +7,30 @@ use std::iter;
 use flick_pretty::{Document, DocumentArena, docvec};
 
 use super::layout::{Code, block, call, closure, signature, statement};
+use super::shape::Types;
 use crate::ir::{Expr, ExprKind};
 
 /// How to build a call from the fiber in scope and its Go arguments.
 pub(super) type Call<'a> = Box<dyn Fn(&'static str, &[Code<'a>]) -> Code<'a> + 'a>;
 
-/// The call of the Go function `f`, with the hidden execution context.
-pub(super) fn callee<'a>(a: &'a DocumentArena<'a>, f: &str) -> Call<'a> {
+/// The call of the Go function `f` with arguments that are values, after
+/// the hidden execution context: `dicts` dictionaries, then the arguments
+/// of its parameters, each made the Go type `types` gives its parameter.
+pub(super) fn callee<'a>(
+    a: &'a DocumentArena<'a>,
+    f: &str,
+    dicts: usize,
+    types: Types,
+) -> Call<'a> {
     let f = a.alloc_str(f);
     Box::new(move |fb, args: &[Code<'a>]| {
-        call(
-            a,
-            f,
-            iter::once(a.text(fb)).chain(args.iter().map(|arg| arg.doc)),
-        )
-        .into()
+        let args = args.iter().enumerate().map(|(i, arg)| {
+            match i.checked_sub(dicts).and_then(|p| types.param(p)) {
+                Some(native) => native.unbox(a, arg.doc),
+                None => arg.doc,
+            }
+        });
+        call(a, f, iter::once(a.text(fb)).chain(args)).into()
     })
 }
 

@@ -2,10 +2,12 @@
 //! dictionary whoever builds it.
 
 use std::collections::{HashMap, HashSet};
+use std::iter;
 
+use super::arith::Native;
 use super::foreign;
 use crate::ir::reach::Key;
-use crate::ir::{Expr, ExprKind, Item, ItemKind, Stage};
+use crate::ir::{Expr, ExprKind, Item, ItemKind, Pat, Stage};
 use crate::types::{Dict, InstanceInfo, default_method};
 
 /// How a top-level name is held in Go.
@@ -20,7 +22,51 @@ pub(super) enum Shape {
         dicts: usize,
         params: usize,
         effects: u64,
+        types: Types,
     },
+}
+
+/// The parameters and the result of a function that are of Go's own types,
+/// in three bits each, the result first: a number passed to a function or
+/// returned by it is then no value made for the call. A function of more
+/// parameters than a word holds has none.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub(super) struct Types(u64);
+
+impl Types {
+    const ALL: [Native; 4] = [Native::Int, Native::Float, Native::Bool, Native::String];
+
+    fn of(result: Option<Native>, params: &[Option<Native>]) -> Types {
+        if params.len() > 20 {
+            return Types(0);
+        }
+        let code = |n: &Option<Native>| {
+            n.and_then(|n| Self::ALL.iter().position(|&m| m == n))
+                .map_or(0, |at| at as u64 + 1)
+        };
+        let slots = iter::once(&result).chain(params).enumerate();
+        Types(slots.fold(0, |bits, (i, n)| bits | code(n) << (3 * i)))
+    }
+
+    fn slot(self, i: usize) -> Option<Native> {
+        let shift = u32::try_from(3 * i).ok();
+        let code = shift.and_then(|s| self.0.checked_shr(s)).unwrap_or(0) & 7;
+        (code > 0).then(|| Self::ALL[code as usize - 1])
+    }
+
+    pub(super) fn result(self) -> Option<Native> {
+        self.slot(0)
+    }
+
+    pub(super) fn param(self, i: usize) -> Option<Native> {
+        self.slot(i + 1)
+    }
+
+    /// Whether the function has a parameter or a result of a Go type, so
+    /// that it is not itself a function of values.
+    pub(super) fn any(self) -> bool {
+        self.0 != 0
+    }
 }
 
 impl Shape {
@@ -41,16 +87,27 @@ fn effects(stages: impl IntoIterator<Item = bool>) -> u64 {
 pub(super) fn shape(kind: &ItemKind) -> Shape {
     match kind {
         ItemKind::Value { dicts, body, .. } => match &body.kind {
-            ExprKind::Lambda { params, .. } => Shape::Func {
-                dicts: dicts.len(),
-                params: params.len(),
-                effects: effects(params.iter().map(|p| p.stage != Stage::Pure)),
-            },
+            ExprKind::Lambda { params, body } => {
+                let natives: Vec<Option<Native>> = params
+                    .iter()
+                    .map(|p| match p.pat {
+                        Pat::Bind(_) => Native::of(p.ty.as_deref()),
+                        _ => None,
+                    })
+                    .collect();
+                Shape::Func {
+                    dicts: dicts.len(),
+                    params: params.len(),
+                    effects: effects(params.iter().map(|p| p.stage != Stage::Pure)),
+                    types: Types::of(Native::of(body.ty.as_deref()), &natives),
+                }
+            }
             _ if dicts.is_empty() => Shape::Var,
             _ => Shape::Func {
                 dicts: dicts.len(),
                 params: 0,
                 effects: 0,
+                types: Types::default(),
             },
         },
         ItemKind::Foreign(f) => {
@@ -64,6 +121,7 @@ pub(super) fn shape(kind: &ItemKind) -> Shape {
                     effects: effects(
                         (0..params).map(|i| f.stages.get(i).copied().unwrap_or(false)),
                     ),
+                    types: Types::default(),
                 }
             }
         }
@@ -71,6 +129,7 @@ pub(super) fn shape(kind: &ItemKind) -> Shape {
             dicts: info.context.len(),
             params: 0,
             effects: 0,
+            types: Types::default(),
         },
         _ => Shape::Var,
     }
