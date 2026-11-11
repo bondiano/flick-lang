@@ -10,6 +10,8 @@ import (
 var unitStrings = []string{
 	"", "a", "abc", "0123456789", "a\x00b", "é", "aéb", "\uE000", "\uFFFD", "ｚ", "😀", "a😀b", "😀😀",
 	"z😀ｚ", "\xED\xA0\x80", "a\xED\xB0\x80", "\xED\xA0\x80x", "é😀\uE000z",
+	// the high surrogate of 😀 alone, then nothing, a unit below and a unit above its low one
+	"\xED\xA0\xBD", "\xED\xA0\xBDa", "\xED\xA0\xBD\uE000", "\xED\xA0\xBD\xED\xA0\xBD",
 }
 
 // unitsOf is the reference: the whole string in UTF-16.
