@@ -6,6 +6,11 @@ break programs.
 
 ## Unreleased
 
+- **Playground on Flick's own runtime:** the browser compiler checks and builds
+  a program as `flick build --rt` does, and the playground runs it on Flick's
+  own runtime. Bindings that runtime does not have yet still reach the Effect
+  adapter, which the playground loads as before.
+
 - **Serializable atoms on Flick's runtime:** `Atom.serializable`,
   `serializable_family`, `serializable_task` and `serializable_result` run on
   the default runtime. `Ui.Server.state` hands their values to the client, and

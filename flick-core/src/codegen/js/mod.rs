@@ -19,10 +19,6 @@ macro_rules! mark {
 }
 
 mod binary;
-#[cfg(not(target_arch = "wasm32"))]
-mod bridge;
-#[cfg(target_arch = "wasm32")]
-#[path = "bridge_stub.rs"]
 mod bridge;
 mod control;
 mod exports;

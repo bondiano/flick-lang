@@ -40,7 +40,8 @@ export const verifyExample = (name: string, file: string, expect: string, stdout
   }
   execFileSync(flick, ["check", "Main.fl", "--warnings-as-errors"], { cwd: dir });
   for (const profile of ["debug", "release"]) {
-    execFileSync(flick, ["build", "Main.fl", "--profile", profile, "--out-dir", profile], { cwd: dir });
+    // as the playground builds it: for Flick's own runtime
+    execFileSync(flick, ["build", "Main.fl", "--rt", "--profile", profile, "--out-dir", profile], { cwd: dir });
     if (expect !== "run") continue;
     const out = execFileSync("node", [path.join(here, "../run-linked.ts"), path.join(dir, profile), "flick-main.js"], {
       cwd: path.join(here, ".."),

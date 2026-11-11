@@ -156,7 +156,7 @@ test("the old Transpile page opens the JavaScript tab", async ({ page }) => {
   await expect(page).toHaveURL(/\/play\/\?tab=js$/);
   await ready(page);
   await expect(page.locator(".fp-tabs .fp-on")).toHaveText("JavaScript");
-  await expect(page.locator(".fp-generated-code")).toContainText("@flick-lang/effect-ts");
+  await expect(page.locator(".fp-generated-code")).toContainText("export const main");
 });
 
 test("an example from the gallery fails with its code", async ({ page }) => {
@@ -305,6 +305,22 @@ let main () =
   await expect(page.locator(".fp-status")).toContainText("Type-checked", { timeout: 30_000 });
   await page.getByRole("button", { name: "Run", exact: true }).click();
   await expect(page.locator(".fp-output")).toContainText("(7, 4, 2)", { timeout: 60_000 });
+});
+
+test("gallery programs that reach the Effect adapter run on Flick's own runtime", async ({ page }) => {
+  await page.goto("/flick-lang/play/");
+  await ready(page);
+  const examples = [
+    { name: "Concurrency", output: "slow fast\nearly" },
+    { name: "Retry", output: "attempt 1\nattempt 2\nattempt 3\ndone after 3" },
+    { name: "Resources", output: "open file\nopen socket\nclose socket\nclose file\nused file and socket" },
+  ];
+  for (const example of examples) {
+    await page.locator(".fp-gallery-button").click();
+    await page.locator(".fp-gallery").getByRole("button", { name: example.name, exact: true }).click();
+    await page.getByRole("button", { name: "Run", exact: true }).click();
+    await expect(page.locator(".fp-output")).toContainText(example.output, { timeout: 60_000 });
+  }
 });
 
 for (const lang of ["en", "ru"]) {

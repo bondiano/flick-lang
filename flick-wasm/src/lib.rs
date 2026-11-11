@@ -48,7 +48,7 @@ impl Session {
     #[must_use]
     pub fn new() -> Session {
         let mut sources = SourceMap::default();
-        let analysis = project::analyze(&Demo(""), &mut sources, None, &[path()]);
+        let analysis = project::analyze_rt(&Demo(""), &mut sources, None, &[path()]);
         Session {
             text: String::new(),
             sources,
@@ -63,7 +63,7 @@ impl Session {
         if source != self.text {
             source.clone_into(&mut self.text);
             self.sources = SourceMap::default();
-            self.analysis = project::analyze(&Demo(source), &mut self.sources, None, &[path()]);
+            self.analysis = project::analyze_rt(&Demo(source), &mut self.sources, None, &[path()]);
         }
         self.diagnostics(&self.analysis.diagnostics).to_string()
     }
@@ -177,8 +177,9 @@ impl Session {
             source_dir: &source_dir,
             out_dir: Path::new("/dist"),
             root: None,
-            backend: Backend::Effect,
-            effect_bridge: EffectBridge::Absent,
+            // like `flick build --rt` without a project: the adapter takes what RT lacks
+            backend: Backend::Rt,
+            effect_bridge: EffectBridge::Available,
             ui: None,
             runners: &[],
             core_modules: &[],
@@ -424,5 +425,18 @@ mod tests {
                 .is_some_and(|text| text.contains("Int")),
             "{hover}"
         );
+    }
+
+    #[test]
+    fn a_playground_program_runs_on_flicks_own_runtime() {
+        let mut session = Session::new();
+        session.update("module Main exposing (main)\nmain : Unit ->{} Unit\nlet main () = Platform.stdout_line \"hi\"\n");
+        let built: Value = serde_json::from_str(&session.emit("debug")).expect("JSON");
+        let runner = built["files"]["flick-main.js"].as_str().expect("a runner");
+        assert!(
+            runner.contains("from \"@flick-lang/runtime/rt\""),
+            "{runner}"
+        );
+        assert!(!runner.contains("@flick-lang/effect-ts"), "{runner}");
     }
 }
