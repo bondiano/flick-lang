@@ -1,6 +1,6 @@
-/// Transactions over Effect's transactional values (`TxRef`, `TxQueue`,
-/// …): an operation on one needs `Transaction`, which only `atomically`
-/// provides, so it always runs inside a transaction.
+/// Transactions over transactional values (`TxRef`, `TxQueue`, …): an
+/// operation on one needs `Transaction`, which only `atomically` provides,
+/// so it always runs inside a transaction.
 module Tx exposing (..)
 
 /// Being inside a transaction: `atomically` provides it. It has no

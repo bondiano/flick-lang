@@ -48,8 +48,8 @@ func fsTestGlobTree(t *testing.T, root string, tree []json.RawMessage) {
 	}
 }
 
-// testdata/glob.txt is Effect's FileSystem.glob of each case in a fixture
-// tree, written by tools/go-glob/gen.mjs.
+// testdata/glob.txt is the FileSystem.glob of the Effect library for each
+// case in a fixture tree, written by tools/go-glob/gen.mjs.
 func TestFileSystemGlobAsEffect(t *testing.T) {
 	if runtime.GOOS == "windows" || os.Geteuid() == 0 {
 		t.Skip("the fixture needs symlinks and permission bits that bind")

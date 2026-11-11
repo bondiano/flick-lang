@@ -1,8 +1,8 @@
-/// Decimal numbers: Effect's `BigDecimal`, an integer coefficient and a
-/// scale. No global precision: division names its scale and rounding.
+/// Decimal numbers: an integer coefficient and a scale. No global
+/// precision: division names its scale and rounding.
 module BigDecimal exposing (..)
 
-/// Effect's `BigDecimal`: an exact decimal.
+/// An exact decimal.
 type BigDecimal
 
 /// How `divide_to_scale` and `round` round a result that needs more
@@ -97,7 +97,7 @@ multiply_all : List BigDecimal -> BigDecimal
 foreign pure multiply_all from "flick:BigDecimal" "multiplyAll"
   reviewed "effect@4.1.2 sha256:5df7122f8e0de431"
 
-/// `self / that` to Effect's default precision; `None` for a zero divisor:
+/// `self / that` to the default precision; `None` for a zero divisor:
 /// `a |> BigDecimal.divide b`.
 divide : BigDecimal -> BigDecimal -> Option BigDecimal
 foreign pure divide from "flick:BigDecimal" "divide"

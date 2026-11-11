@@ -1,5 +1,5 @@
-/// Non-negative lengths of time: Effect's `Duration`. Constructors are
-/// checked; `infinity` is explicit.
+/// Non-negative lengths of time. Constructors are checked; `infinity` is
+/// explicit.
 module Duration exposing (..)
 
 /// A length of time, finite or `infinity`, never negative.
@@ -261,7 +261,7 @@ json_nanos : PureCodec Json Duration
 foreign pure json_nanos from "flick:Schema" "flickDurationFromNanos"
   reviewed "effect@4.1.2 sha256:6b74c43c4c8154c4"
 
-/// A duration as Effect's text, such as `"1500 millis"` or `"2 seconds"`.
+/// A duration as text, such as `"1500 millis"` or `"2 seconds"`.
 json_string : PureCodec Json Duration
 foreign pure json_string from "flick:Schema" "flickDurationFromString"
   reviewed "effect@4.1.2 sha256:ffa95659e9b3c068"

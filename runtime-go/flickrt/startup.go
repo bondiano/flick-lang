@@ -2,20 +2,20 @@ package flickrt
 
 import "sync"
 
-// Turns. Effect runs a forked fiber after the fibers already scheduled,
-// each up to its next suspension, so what those do before they suspend
-// happens first: the requests fibers make "at the same time" meet in one
-// batch. Go runs fibers at once; where that order matters, a fiber takes a
-// turn: it waits until each fiber forked before the turn was queued has
-// suspended once (a blocking wait, a yield, its end) and each turn queued
-// before it has suspended, as Effect's queue of tasks would have it.
+// Turns. The JS runtime runs a forked fiber after the fibers already
+// scheduled, each up to its next suspension, so what those do before they
+// suspend happens first: the requests fibers make "at the same time" meet
+// in one batch. Go runs fibers at once; where that order matters, a fiber
+// takes a turn: it waits until each fiber forked before the turn was
+// queued has suspended once (a blocking wait, a yield, its end) and each
+// turn queued before it has suspended, as a queue of tasks would have it.
 //
 // A forked fiber belongs to the cohort of the fibers forked after the last
 // turn until it first suspends; a turn is a cohort of the one fiber that
 // takes it, from the moment it may run until it suspends. The tasks that
 // `all` and the races fork join one cohort, which their fiber holds until it
-// waits for them: Effect runs none of them before, so a turn one of them
-// queues comes after all of them.
+// waits for them: the JS runtime runs none of them before, so a turn one of
+// them queues comes after all of them.
 
 // A cohort is fibers before their first suspension, or a turn.
 type cohort struct {
@@ -138,6 +138,6 @@ func forkInTurn(fb *Fiber, owner *Owner, task func(fb *Fiber)) *child {
 	}), func(*child) { giveUp(t) })
 }
 
-// yieldTurn is Effect's `yieldNow` where the order matters: the fiber runs
-// again after the fibers scheduled before it.
+// yieldTurn is a yield where the order matters: the fiber runs again after
+// the fibers scheduled before it.
 func yieldTurn(fb *Fiber) { awaitTurn(fb, queueTurn()) }

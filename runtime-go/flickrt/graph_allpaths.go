@@ -5,7 +5,7 @@ import (
 	"strconv"
 )
 
-// Effect's Graph all-pairs shortest paths and path enumerations.
+// Graph all-pairs shortest paths and path enumerations.
 
 // witness is how Floyd-Warshall reached a target: by one edge, or by two
 // halves through another node.
@@ -125,7 +125,7 @@ func GraphFloydWarshall(fb *Fiber, cost, v Value) Value {
 	})
 }
 
-// enumerationLimit is Effect's `pathEnumerationLimit`: none is no limit.
+// enumerationLimit is the limit of a path enumeration: none is no limit.
 func enumerationLimit(o Value) int {
 	if l, ok := some(o); ok {
 		if l.(int32) < 0 {
@@ -136,8 +136,8 @@ func enumerationLimit(o Value) int {
 	return math.MaxInt
 }
 
-// GraphSimplePaths is Effect's depth-first enumeration of the paths that
-// repeat no node, each edge counting 1 toward the distance.
+// GraphSimplePaths is a depth-first enumeration of the paths that repeat
+// no node, each edge counting 1 toward the distance.
 func GraphSimplePaths(options, v Value) Value {
 	return graphAttempt(func() Value {
 		g, o := graphOf(v), record(options)
@@ -189,9 +189,8 @@ func GraphSimplePaths(options, v Value) Value {
 	})
 }
 
-// GraphAllShortestPaths is Effect's `allShortestPaths`: Dijkstra keeping
-// every predecessor at the shortest distance, then a walk back from the
-// target.
+// GraphAllShortestPaths is Dijkstra keeping every predecessor at the
+// shortest distance, then a walk back from the target.
 func GraphAllShortestPaths(fb *Fiber, options, v Value) Value {
 	return graphAttempt(func() Value {
 		g, o := graphOf(v), record(options)

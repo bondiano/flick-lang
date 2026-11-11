@@ -6,7 +6,7 @@ import (
 )
 
 // The checks of the standard library's `Check` that state what values
-// Arbitrary generates: Effect's filters with their arbitrary constraints.
+// Arbitrary generates: filters with their arbitrary constraints.
 // The rest are in check_strings.go, check_order.go and check_properties.go.
 
 // CheckApply is `Check.apply`.
@@ -59,7 +59,7 @@ func CheckBetween(options Value) Value {
 	}
 }
 
-// cardinality is Effect's `normalizeCardinality`: a whole count, 0 at least.
+// cardinality is a normalized cardinality: a whole count, 0 at least.
 func cardinality(n Value) int {
 	return int(math.Max(0, math.Floor(float64(n.(int32)))))
 }

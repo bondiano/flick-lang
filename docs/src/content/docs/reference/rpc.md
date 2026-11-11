@@ -116,7 +116,7 @@ WebSocket support can be removed from a browser bundle.
 | `json` | one JSON document; over HTTP the messages of a call come together, so a stream's elements arrive once it ends |
 | `json_rpc` | JSON-RPC 2.0 documents, for peers that speak it |
 | `ndjson_rpc` | JSON-RPC 2.0, one message a line |
-| `binary` | Effect's schema-driven frames: smaller than JSON, but both ends must be Effect's, and it adds to a bundle |
+| `binary` | the schema-driven frames of the Effect library: smaller than JSON, but both ends must use Effect, and it adds to a bundle |
 
 ## Serving
 
@@ -250,7 +250,8 @@ listen call. The hook sees the decoded payload and the headers of the
 call — those of its HTTP request or WebSocket, with the names in lower
 case — and its typed failure is answered as one of the handler's would
 be, so it must be one of the procedure's declared errors. A function per
-procedure replaces Effect's class-based middleware services.
+procedure replaces the class-based middleware services of the Effect
+library.
 
 `Rpc.with_headers headers task` runs `task` with its calls carrying the
 headers too, which the hooks read: `authorization`, say.
@@ -313,5 +314,5 @@ so a test of them still needs a real server; the hooks of
 
 In-memory calls are useful for handler logic and declared failures. Add
 a real transport round trip when testing codec compatibility, headers or
-stream framing. `Rpc` wraps Effect's unstable RPC modules; pin matching
+stream framing. `Rpc` wraps unstable RPC modules of Effect; pin matching
 compiler and runtime versions.

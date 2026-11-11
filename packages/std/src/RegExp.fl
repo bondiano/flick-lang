@@ -1,6 +1,6 @@
-/// Regular expressions, over Effect's `RegExp` and the regular-expression
-/// operations of its `String`. A regular expression is an immutable value:
-/// the sticky flag `y` is refused, and no operation keeps a position.
+/// Regular expressions and the string operations that take one. A regular
+/// expression is an immutable value: the sticky flag `y` is refused, and no
+/// operation keeps a position.
 module RegExp exposing (..)
 
 /// A JS regular expression with its flags.

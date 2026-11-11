@@ -1,5 +1,5 @@
-// Effect's `Path`, `Terminal` and `Stdio` as services: the layers of Effect
-// and Node.js, and fakes made with `Layer.succeed`. Stdin is not a terminal
+// `Path`, `Terminal` and `Stdio` as services: `Path.layer`, the layers of
+// Node.js, and fakes made with `Layer.succeed`. Stdin is not a terminal
 // here, so the terminal of Node.js has no size and its input has ended.
 module App.Main exposing (main)
 

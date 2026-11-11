@@ -4,7 +4,7 @@ import { combine, optimize, string } from "../src/rt/effect/Hash.ts";
 import { flickAdd, flickGet, flickHas, flickMake, flickRemove } from "../src/rt/effect/HashRing.ts";
 import { none } from "../src/core/data.ts";
 
-test("pure hashes preserve Effect's stable numeric values", () => {
+test("pure hashes keep their stable numeric values", () => {
   assert.equal(string("hello"), 181380007);
   assert.equal(string("world"), 164394279);
   assert.equal(combine(23)(17), -42410853);

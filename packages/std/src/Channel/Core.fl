@@ -1,6 +1,6 @@
-/// The type of Effect's `Channel` and the channels made from values,
-/// effects, queues, hubs, schedules and JS streams: the part of `Channel`
-/// that starts a pipeline.
+/// The type `Channel` and the channels made from values, effects, queues,
+/// hubs, schedules and JS streams: the part of `Channel` that starts a
+/// pipeline.
 module Channel.Core exposing (..)
 
 import Chunk
@@ -46,7 +46,7 @@ type TransformStream a b
 /// A JS `AsyncIterable` of `a` whose iterator returns `d`.
 type AsyncIterable a d
 
-/// How many elements Effect puts in one chunk by default.
+/// How many elements go in one chunk by default.
 default_chunk_size : Int
 foreign pure default_chunk_size from "flick:Channel" "DefaultChunkSize"
   reviewed "effect@4.1.2 sha256:328d7eb584c7877e"

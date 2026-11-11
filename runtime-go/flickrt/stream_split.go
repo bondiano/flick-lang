@@ -4,12 +4,13 @@ import (
 	"sync"
 )
 
-// Streams split for several consumers, as Effect's (Stream.ts): hubs of
-// takes, shared runs, partitions and groups, and their bindings. A take
-// (Effect's `Take`) is a chunk, or the `*Exit` the source ended with; the
-// source runs in a fiber of the scope the split belongs to.
+// Streams split for several consumers: hubs of takes, shared runs,
+// partitions and groups, and their bindings. A take is a chunk, or the
+// `*Exit` the source ended with; the source runs in a fiber of the scope
+// the split belongs to.
 
-// takeToPull is Effect's `Take.toPull`.
+// takeToPull is what a pull gives of a take: its chunk, or the end or the
+// failure of its exit.
 func takeToPull(t Value) Value {
 	if e, ok := t.(*Exit); ok {
 		if e.cause == nil {
@@ -101,8 +102,7 @@ func (r *shared) release(fb *Fiber) {
 	}
 }
 
-// StreamShare broadcasts the source while consumers run, as Effect's
-// `unwrap(RcRef.get(ref))` of an RcRef of `broadcast`.
+// StreamShare broadcasts the source while consumers run.
 func StreamShare(fb *Fiber, options, idle, s Value) Value {
 	o, source, parent := record(options), streamOf(s), fb.owner
 	ttl, hasTTL := some(idle)
@@ -228,7 +228,7 @@ func StreamPartitionQueue(fb *Fiber, filter, s Value) Value {
 
 // groups is the queues of a group by, by key in the order they came.
 //
-// shortcut: keys compared by `==` in a list, where Effect hashes them in a MutableHashMap; hash them if a program groups by many keys
+// shortcut: keys compared by `==` in a list, where the JS target hashes them; hash them if a program groups by many keys
 type groups struct {
 	mu     sync.Mutex // the source's fiber adds groups while the end may close them
 	keys   []Value
@@ -246,9 +246,9 @@ func (g *groups) get(k Value) *Queue {
 	return nil
 }
 
-// streamGroupBy is Effect's `groupByImpl` with groups that live as long
-// as the source runs: each new key's queue goes out with its key as a
-// stream, and ends once the source has.
+// streamGroupBy groups with groups that live as long as the source runs:
+// each new key's queue goes out with its key as a stream, and ends once
+// the source has.
 func streamGroupBy(self *Stream, f func(fb *Fiber, chunk []Value, queue func(fb *Fiber, k Value) *Queue)) *Stream {
 	return streamTransformPullBracket(self, func(fb *Fiber, pull Pull, scope, forked *Owner) Pull {
 		out := newQueue(unboundedCapacity, queueSuspend)

@@ -1,12 +1,11 @@
-/// Effect's `PartitionedSemaphore`: one pool of permits shared fairly by
-/// partitions, so that no key starves the others. Keys are compared by
-/// `==`.
+/// One pool of permits shared fairly by partitions, so that no key starves
+/// the others. Keys are compared by `==`.
 module PartitionedSemaphore exposing (..)
 
 /// A pool of permits whose waiters are grouped by keys of `k`.
 type PartitionedSemaphore k
 
-/// Effect's other name for a partitioned semaphore.
+/// Another name for a partitioned semaphore.
 type alias Partitioned k = PartitionedSemaphore k
 
 /// A partitioned semaphore with `permits` permits in all.

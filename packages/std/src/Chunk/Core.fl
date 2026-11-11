@@ -1,4 +1,4 @@
-/// Effect's immutable `Chunk`, for repeated concatenation.
+/// An immutable sequence for repeated concatenation.
 module Chunk.Core exposing (..)
 
 type Chunk a

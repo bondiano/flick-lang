@@ -1,4 +1,4 @@
-// Effect's `Layer`, `Context` and `Scope`: layers as values, built
+// `Layer`, `Context` and `Scope`: layers as values, built
 // services as a `Context`, references and finalizers of a scope.
 module App.Main exposing (main)
 

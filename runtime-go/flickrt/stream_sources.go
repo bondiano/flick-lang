@@ -1,8 +1,8 @@
 package flickrt
 
-// Stream's sources, as Effect's (Stream.ts): from values, effects,
-// schedules, queues, hubs and references, and their bindings. What a
-// Flick task acquires belongs to its lexical scope, as in the JS adapter.
+// Stream's sources: from values, effects, schedules, queues, hubs and
+// references, and their bindings. What a Flick task acquires belongs to
+// its lexical scope, as in the JS adapter.
 
 var StreamEmpty Value = streamEmpty
 var StreamNever Value = &Stream{channelNever}
@@ -80,9 +80,9 @@ func StreamUnwrap(task Value) Value {
 	return streamFlatMap(streamOf(StreamFromEffect(task)), func(_ *Fiber, s Value) *Stream { return streamOf(s) })
 }
 
-// StreamCallback is Effect's `callback` with an unbounded queue, the
-// producer forked into the stream's scope but acquiring into its lexical
-// one, as the JS adapter gives it.
+// StreamCallback is the stream of what a producer offers an unbounded
+// queue, the producer forked into the stream's scope but acquiring into
+// its lexical one, as the JS adapter gives it.
 func StreamCallback(f Value) Value {
 	return &Stream{fromTransform(func(fb *Fiber, _ Pull, scope *Owner) Pull {
 		q := newQueue(unboundedCapacity, queueSuspend)
@@ -207,8 +207,8 @@ func StreamRange(lo, hi Value) Value {
 	})}
 }
 
-// SubscriptionRefMake is Effect's: the value, and a hub replaying the last
-// one, to which each new value is published.
+// SubscriptionRefMake is the value, and a hub replaying the last one, to
+// which each new value is published.
 func SubscriptionRefMake(fb *Fiber, v Value) Value {
 	h := newPubSub(makeAtomicUnbounded(1), hubDropping)
 	h.publish(fb, v)

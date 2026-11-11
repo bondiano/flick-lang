@@ -2,10 +2,10 @@ package flickrt
 
 import "strings"
 
-// Http.Router as Effect's HttpRouter over find-my-way: a request goes to
-// the route whose pattern matches its path, a static segment before a
-// parameter before a wildcard, segment by segment, the first route of
-// equal ones; a route under a prefix sees the URL without it.
+// Http.Router, routing as find-my-way does: a request goes to the route
+// whose pattern matches its path, a static segment before a parameter
+// before a wildcard, segment by segment, the first route of equal ones; a
+// route under a prefix sees the URL without it.
 
 var (
 	routeContextKey = "Http.Router.RouteContext"
@@ -99,7 +99,7 @@ func collapseSlashes(path string) string {
 	return path
 }
 
-// routerConfig is find-my-way's options as Effect gives them: trailing and
+// routerConfig is find-my-way's options, by default: trailing and
 // duplicate slashes ignored, case ignored, parameters of 100 characters.
 type routerConfig struct {
 	trailing, duplicates, caseSensitive bool

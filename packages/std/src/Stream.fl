@@ -1,8 +1,8 @@
-/// Effect's `Stream`: a `Stream r e a` is a cold description of elements
-/// of `a` that needs the services `r` and may fail with `e`; a `run_*`
-/// call runs it in the current task. Callbacks stored in a stream are bare,
-/// and a stream made from a scoped handle holds its region, so it cannot
-/// leave that scope.
+/// Streams: a `Stream r e a` is a cold description of elements of `a` that
+/// needs the services `r` and may fail with `e`; a `run_*` call runs it in
+/// the current task. Callbacks stored in a stream are bare, and a stream
+/// made from a scoped handle holds its region, so it cannot leave that
+/// scope.
 module Stream exposing (
   Stream,
   HaltStrategy(..),

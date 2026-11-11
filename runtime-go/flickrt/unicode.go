@@ -281,7 +281,7 @@ func finalSigma(rs []rune, i int) ([]rune, bool) {
 func ToUpperCase(s Value) Value { return mapCase(s.(string), unicodeData().upper, nil) }
 func ToLowerCase(s Value) Value { return mapCase(s.(string), unicodeData().lower, finalSigma) }
 
-// Capitalize upper-cases the first code unit, as Effect does.
+// Capitalize upper-cases the first code unit.
 func Capitalize(s Value) Value { return mapFirst(s.(string), unicodeData().upper) }
 func Uncapitalize(s Value) Value {
 	return mapFirst(s.(string), unicodeData().lower)

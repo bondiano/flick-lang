@@ -5,10 +5,10 @@ import (
 	"strconv"
 )
 
-// Effect's Graph shortest paths: Dijkstra, A*, Bellman-Ford.
+// Graph shortest paths: Dijkstra, A*, Bellman-Ford.
 
-// minHeap is Effect's dense min-heap: ties pop in push order, and an
-// indexed heap moves a node already in it instead of adding it twice.
+// minHeap is a dense min-heap: ties pop in push order, and an indexed heap
+// moves a node already in it instead of adding it twice.
 type minHeap struct {
 	nodes      []int
 	priorities []float64
@@ -195,7 +195,7 @@ func GraphDijkstra(fb *Fiber, config, v Value) Value {
 	})
 }
 
-// GraphAstar is Effect's A*; the heuristic is curried, as Flick passes it.
+// GraphAstar is A*; the heuristic is curried, as Flick passes it.
 func GraphAstar(fb *Fiber, config, v Value) Value {
 	return graphAttempt(func() Value {
 		g, c := graphOf(v), record(config)

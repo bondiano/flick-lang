@@ -100,7 +100,7 @@ func TakeRight(n, s Value) Value {
 	return fromUnits(units[len(units)-min(count(n), len(units)):])
 }
 
-// Repeat repeats a string; a negative count is 0, as Effect counts.
+// Repeat repeats a string; a negative count is 0.
 func Repeat(n, s Value) Value { return strings.Repeat(s.(string), count(n)) }
 
 func pad(n, fill, s Value, start bool) Value {

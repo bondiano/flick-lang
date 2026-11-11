@@ -1,6 +1,6 @@
 package flickrt
 
-// Effect's `LogLevel`: a level is its name, ordered by Effect's ordinals.
+// `LogLevel`: a level is its name, ordered by its ordinal.
 
 import "math"
 
@@ -34,8 +34,8 @@ func logLevelCompare(that, self Value) float64 {
 	return logLevelOrdinal(self.(string)) - logLevelOrdinal(that.(string))
 }
 
-// LogLevelGreaterThan and the rest are Effect's data-last comparisons:
-// `self` against `that`.
+// LogLevelGreaterThan and the rest are data-last comparisons: `self`
+// against `that`.
 func LogLevelGreaterThan(that, self Value) Value        { return logLevelCompare(that, self) > 0 }
 func LogLevelGreaterThanOrEqual(that, self Value) Value { return logLevelCompare(that, self) >= 0 }
 func LogLevelLessThan(that, self Value) Value           { return logLevelCompare(that, self) < 0 }

@@ -5,7 +5,7 @@ import (
 	"strconv"
 )
 
-// The compiler of a schema's generator (internal/arbitrary/schema.ts):
+// The compiler of a schema's generator:
 // a node per AST node and inherited constraint, settled together so a
 // recursive type pays for each step into itself and prefers its base
 // cases when the budget runs out.
@@ -23,8 +23,8 @@ type arbFailure string
 
 func arbFail(what string) { panic(arbFailure(what)) }
 
-// arbError is Effect's error of a schema it cannot generate, at the path
-// of the node in it as Effect's `formatPath` writes one.
+// arbError is the error of a schema that cannot be generated, at the path
+// of the node in it.
 func arbError(what string, path []any) Defect {
 	message := "Error: Unable to derive an arbitrary for " + what
 	if len(path) > 0 {
@@ -52,7 +52,7 @@ func compiledGen(deps []*arbGen, cost func() float64, generate func(*genState) *
 	return &arbGen{minCost: infinity, deps: deps, computeMinCost: cost, generate: generate}
 }
 
-// compileSchema is the generator of a schema's values: Effect's `compile`.
+// compileSchema is the generator of a schema's values.
 func compileSchema(s *Schema) *arbGen {
 	asts := &arbASTs{nodes: map[astKey]*arbAST{}}
 	return compileAST(asts.of(s, false))
@@ -258,9 +258,9 @@ func (c *arbCompiler) compileBase(ast *arbAST, path []any, constraint *arbConstr
 }
 
 // compileDeclaration is an Option, a Result or a Redacted value: its
-// parameters', through the union of tagged structs Effect links it to; or
-// a link's declaration. The parameters come first, as Effect compiles
-// them, so the target's structs find them compiled at their paths.
+// parameters', through the union of tagged structs it is linked to; or a
+// link's declaration. The parameters are compiled first, so the target's
+// structs find them compiled at their paths.
 func (c *arbCompiler) compileDeclaration(ast *arbAST, path []any) *arbGen {
 	members := ast.members
 	if ast.tag == astLink {
@@ -353,8 +353,8 @@ func (c *arbCompiler) compileObjects(ast *arbAST, path []any) *arbGen {
 	})
 }
 
-// objectSample shrinks each property in turn, as Effect's `objectSample`
-// of properties none of which can be removed.
+// objectSample shrinks each property in turn: none of the properties can
+// be removed.
 func objectSample(children []*sample, make func([]Value) Value) *sample {
 	var rebuild func(entries []*retained, start int) *sample
 	rebuild = func(entries []*retained, start int) *sample {

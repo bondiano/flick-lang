@@ -6,9 +6,8 @@ import (
 	"strings"
 )
 
-// The combinators and the runner of Effect's Arbitrary
-// (internal/arbitrary/runner.ts): attempts at progressive sizes, discards,
-// shrinking of the first failure and the replay of it.
+// The combinators and the runner of Arbitrary: attempts at progressive
+// sizes, discards, shrinking of the first failure and the replay of it.
 
 func constantGen(v Value) *arbGen {
 	return makeGen(0, func(*genState) *sample { return &sample{v, nil} })
@@ -211,7 +210,8 @@ func generateAttempt(fb *Fiber, g *arbGen, seed arbSeed, attempt, size float64, 
 	return g.generate(&genState{fb, size, shrinks, bias, attemptRandom(seed, attempt), &budget})
 }
 
-// arbCount is an option of a count: Effect's `natural`.
+// arbCount is an option of a count: a non-negative integer, `otherwise`
+// when absent, and more than zero when `positive`.
 func arbCount(v Value, otherwise float64, label string, positive bool) float64 {
 	out := otherwise
 	if n, ok := some(v); ok {
@@ -356,7 +356,8 @@ func falsified(initial, shrunk, failure Value, runs, discards float64, shrinks i
 	))
 }
 
-// arbCheck is `Arbitrary.check`, Effect's `checkEffect`.
+// arbCheck is `Arbitrary.check`: the replay the options ask for, or runs of
+// the property, 100 unless they say how many.
 func arbCheck(fb *Fiber, g *arbGen, property, options Value) Value {
 	o := record(options)
 	if replay, ok := some(o.Get("replay")); ok {

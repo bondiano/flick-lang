@@ -1,6 +1,6 @@
-/// Effect's `Config`: a description of configuration to read, by name, from
-/// the current `ConfigProvider` (the environment by default). `get` reads
-/// it; a missing or malformed value is a `ConfigError`.
+/// A description of configuration to read, by name, from the current
+/// `ConfigProvider` (the environment by default). `get` reads it; a missing
+/// or malformed value is a `ConfigError`.
 module Config exposing (..)
 
 import ConfigProvider
@@ -11,7 +11,8 @@ import Server
 /// Configuration that reads to an `a`.
 type Config a
 
-/// A value that is missing or does not parse, with Effect's message.
+/// A value that is missing or does not parse, with the message of the
+/// failure.
 type error ConfigError = ConfigError String
   deriving Eq, Show
 
@@ -131,7 +132,7 @@ redacted : String ->{Server.Server} Config (Redacted String)
 foreign effect redacted from "flick:Config" "flickRedacted"
   reviewed "effect@4.1.2 sha256:39cdab7425a475a8"
 
-/// A duration as Effect writes it: `10 seconds`, `5 millis`.
+/// A duration written as a number and a unit: `10 seconds`, `5 millis`.
 duration : String -> Config Duration.Duration
 foreign pure duration from "flick:Config" "Duration"
   reviewed "effect@4.1.2 sha256:748c4be89c7407f3"
@@ -141,7 +142,7 @@ byte_size : String -> Config BigInt
 foreign pure byte_size from "flick:Config" "ByteSize"
   reviewed "effect@4.1.2 sha256:c5d36c61a6f435b3"
 
-/// A log level by Effect's name, as `Info`.
+/// A log level by its name, as `Info`.
 log_level : String -> Config LogLevel.LogLevel
 foreign pure log_level from "flick:Config" "LogLevel"
   reviewed "effect@4.1.2 sha256:7ef78dbcbdd27d64"

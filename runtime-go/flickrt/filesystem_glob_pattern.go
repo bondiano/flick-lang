@@ -5,9 +5,9 @@ import (
 	"strings"
 )
 
-// Effect's internal/glob.ts compilation: brace expansion, then every
-// expanded pattern's segment nodes laid out in one array, so a match state
-// is an index into `nodes`.
+// The compilation of a glob pattern: brace expansion, then every expanded
+// pattern's segment nodes laid out in one array, so a match state is an
+// index into `nodes`.
 
 type fsGlobNodeKind uint8
 

@@ -1,4 +1,4 @@
-// Transactional queues from Effect's `TxQueue`: offers and takes commit
+// Transactional queues from `TxQueue`: offers and takes commit
 // with their transaction, a take waits for an element, and a closed
 // queue fails or interrupts its takers.
 module App.Main exposing (main)

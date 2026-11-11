@@ -64,8 +64,8 @@ labels : Labels r => r -> List String
 foreign pure labels from "flick:rt" "recordLabels"
   reviewed "effect@4.1.2 sha256:59a472c41aac0334"
 
-/// A dictionary from string keys to values of one type, as Effect's
-/// `Record` keeps it: a plain JS object. Unlike a record, its keys are data.
+/// A dictionary from string keys to values of one type, kept as a plain JS
+/// object. Unlike a record, its keys are data.
 type ReadonlyRecord a
 
 instance Eq a => Eq (ReadonlyRecord a) =

@@ -2,13 +2,13 @@ package flickrt
 
 import "net/netip"
 
-// The JSON codecs of network addresses, as Effect Schema's *FromString
-// schemas: text decoded by an address parser, whose failure message is the
-// issue, written back in canonical form; refinements are checks of the
-// decoded address, and a host or socket address is a union of codecs.
+// The JSON codecs of network addresses: text decoded by an address parser,
+// whose failure message is the issue, written back in canonical form;
+// refinements are checks of the decoded address, and a host or socket
+// address is a union of codecs.
 
-// netCodec is Effect's `netAddressFromString`: `is` is the declared type's
-// guard, which encoding checks first.
+// netCodec is the codec of an address from its text: `is` is the declared
+// type's guard, which encoding checks first.
 func netCodec(name string, parse netParse, is func(Value) bool, format func(Value) string) codec {
 	return &stage{
 		CodecString.(codec),
@@ -23,15 +23,15 @@ func netCodec(name string, parse netParse, is func(Value) bool, format func(Valu
 	}
 }
 
-// netRefine is Effect's `refine` of an address codec: what it decodes
-// passes `test`, else "expected <expected>".
+// netRefine is a refinement of an address codec: what it decodes passes
+// `test`, else "expected <expected>".
 func netRefine(c codec, expected string, test func(Value) bool) codec {
 	return withChecks(c, &check{test: func(_ *Fiber, v Value) bool { return test(v) }, expected: expected})
 }
 
-// netUnion is Effect's `Union` of string codecs: the first member that
-// decodes, or encodes, the value, else every member's issues. Input no
-// member takes is the union's issue, as Effect has no candidate for it.
+// netUnion is a union of string codecs: the first member that decodes, or
+// encodes, the value, else every member's issues. Input no member takes is
+// the union's issue, as no member is a candidate for it.
 type netUnion []codec
 
 func (u netUnion) accepts(in Value) bool { _, ok := in.(string); return ok }
@@ -93,7 +93,7 @@ var (
 	domainCodec = netCodec("DomainName", domainNameFromString, isDomainName, formatText)
 	scopedCodec = netCodec("ScopedIpv6Literal", scopedFromString, isScopedLiteral, formatText)
 
-	// the predicates of Effect's refinements, over the decoded address
+	// the predicates of the refinements, over the decoded address
 	onAddr = func(p func(netip.Addr) bool) func(Value) bool { return func(v Value) bool { return p(addrOf(v)) } }
 	onMac  = func(p func(macAddress) bool) func(Value) bool {
 		return func(v Value) bool { return p(v.(macAddress)) }

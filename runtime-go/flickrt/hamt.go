@@ -2,11 +2,11 @@ package flickrt
 
 import "math/bits"
 
-// A persistent hash array mapped trie, walked as Effect's HAMT on the JS
-// target: a branch has its children by five bits of the hash, from the
-// lowest, in order of those bits; a leaf has the entries of one hash, in
-// insertion order. A leaf sits as high as its hash differs from the
-// others', so a lookup reads a few nodes and a change copies only them.
+// A persistent hash array mapped trie, walked as the one of the JS target
+// is: a branch has its children by five bits of the hash, from the lowest,
+// in order of those bits; a leaf has the entries of one hash, in insertion
+// order. A leaf sits as high as its hash differs from the others', so a
+// lookup reads a few nodes and a change copies only them.
 
 type hnode struct {
 	bitmap uint32

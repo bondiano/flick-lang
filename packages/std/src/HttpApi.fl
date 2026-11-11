@@ -1,9 +1,9 @@
-/// Typed HTTP APIs over Effect's HTTP server. An endpoint is described with
-/// codecs, endpoints form groups and groups an API; the type of the API is
-/// the record of handlers it needs, so `listen` takes exactly one handler
-/// per endpoint and a missing or extra one is a type error naming the group
-/// and the endpoint. `call` requests an endpoint from the same value, and
-/// `openapi` writes the API as strict OpenAPI 3.1.
+/// Typed HTTP APIs. An endpoint is described with codecs, endpoints form
+/// groups and groups an API; the type of the API is the record of handlers
+/// it needs, so `listen` takes exactly one handler per endpoint and a
+/// missing or extra one is a type error naming the group and the endpoint.
+/// `call` requests an endpoint from the same value, and `openapi` writes
+/// the API as strict OpenAPI 3.1.
 module HttpApi exposing (..)
 
 import Codec

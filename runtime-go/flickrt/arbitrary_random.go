@@ -5,10 +5,10 @@ import (
 	"math/big"
 )
 
-// The randomness of Effect's Arbitrary (internal/arbitrary/runner.ts and
-// model.ts), draw for draw: a seed hashed to two words, a xoshiro128**
-// generator per attempt, and the uniform and edge-biased draws over it.
-// Numbers are JS doubles, so the arithmetic is float64's.
+// The randomness of Arbitrary, draw for draw as on the JS target: a seed
+// hashed to two words, a xoshiro128** generator per attempt, and the
+// uniform and edge-biased draws over it. Numbers are JS doubles, so the
+// arithmetic is float64's.
 
 // arbSeed is a hashed seed: `hashSeed`.
 type arbSeed struct{ first, second uint32 }
@@ -81,7 +81,7 @@ func attemptRandom(seed arbSeed, attempt float64) *xoshiro {
 	return x
 }
 
-// genState is Effect's GenerationState; a copy shares the generator and
+// genState is the state of a generation; a copy shares the generator and
 // the budget unless it replaces them.
 type genState struct {
 	fb         *Fiber

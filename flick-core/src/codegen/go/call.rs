@@ -64,7 +64,7 @@ fn curried<'a>(
     };
     for (i, h) in heads.iter().enumerate().rev() {
         if i < last && effects >> i & 1 == 1 {
-            // an effectful stage before the last gives the next function, as Effect's `succeed`
+            // an effectful stage before the last is a task that gives the next function
             let task = closure(a, "func(*flickrt.Fiber) flickrt.Value", returning(a, body));
             body = call(a, "flickrt.Eff", [task]);
         }
@@ -410,7 +410,7 @@ impl<'a> Gen<'a> {
         for (h, p) in heads[..heads.len() - 1].iter().zip(params).rev() {
             let mut next = call(a, "flickrt.Fn", [text]);
             if effectful(p) {
-                // an effectful stage before the last gives the next function, as Effect's `succeed`
+                // an effectful stage before the last is a task that gives the next function
                 let task = single(a, docvec![a, "return ", next]);
                 let task = docvec![a, "func(*flickrt.Fiber) flickrt.Value ", task];
                 next = call(a, "flickrt.Eff", [task]);

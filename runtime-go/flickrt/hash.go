@@ -1,9 +1,9 @@
 package flickrt
 
-// HashSet and HashMap: the elements or keys are kept in the order Effect's
-// HAMT walks them on the JS target, by the witness's hash five bits at a
-// time from the lowest, and by insertion among equal hashes; a HAMT of
-// their own keeps them so (hamt.go).
+// HashSet and HashMap: the elements or keys are kept in the order the JS
+// target walks them, by the witness's hash five bits at a time from the
+// lowest, and by insertion among equal hashes; a HAMT of their own keeps
+// them so (hamt.go).
 
 // Witness is `EqHash w a`: the equality and hash of a collection.
 type Witness struct{ eq, hash Value }

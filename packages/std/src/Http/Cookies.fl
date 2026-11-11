@@ -1,8 +1,8 @@
-/// Effect's `Cookies`: the cookies of a response (`Set-Cookie`) or of a
-/// request (`Cookie`). A cookie's value is a `Redacted String`: `show`
-/// prints `<redacted>` for it, and reading it back is a runtime call. A
-/// name, value, domain or path that a header cannot carry, or an infinite
-/// `maxAge`, is a `CookiesError`.
+/// The cookies of a response (`Set-Cookie`) or of a request (`Cookie`). A
+/// cookie's value is a `Redacted String`: `show` prints `<redacted>` for
+/// it, and reading it back is a runtime call. A name, value, domain or path
+/// that a header cannot carry, or an infinite `maxAge`, is a
+/// `CookiesError`.
 module Http.Cookies exposing (..)
 
 import DateTime

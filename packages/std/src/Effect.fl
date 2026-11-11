@@ -1,6 +1,6 @@
-/// What Effect's `Effect` module offers beyond the language: a runtime
-/// function is already an effect, so much of it is direct calls, `task`,
-/// `try … with`, `provide` and `scope` (see the manifest
+/// Effects beyond the language: a runtime function is already an effect, so
+/// much of working with effects is direct calls, `task`, `try … with`,
+/// `provide` and `scope` (see the manifest
 /// `stdlib/Effect/surface/core/Effect.toml`). The rest is here: schedules,
 /// collections of tasks, whole failures and finalizers, interruption,
 /// caching, logs, spans and metrics.

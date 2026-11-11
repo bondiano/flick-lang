@@ -1,8 +1,7 @@
 package flickrt
 
-// Effect's Graph set operations: nodes and edges matched by identity in
-// Effect's `MutableHashMap`, which keeps the first equal key where it was
-// put and the last value.
+// Graph set operations: nodes and edges matched by identity in a map that
+// keeps the first equal key where it was put and the last value.
 
 // eqMap is an insertion-ordered map of keys equal by `eq`.
 type eqMap struct {
@@ -45,7 +44,7 @@ func (m *eqMap) get(k Value) (Value, bool) {
 	return nil, false
 }
 
-// identityHash buckets by Effect's hash where the runtime has one; equality
+// identityHash buckets by the runtime's hash where it has one; equality
 // decides either way.
 func identityHash(v Value) (h int32) {
 	defer func() {
@@ -56,7 +55,7 @@ func identityHash(v Value) (h int32) {
 	return hash(v)
 }
 
-// edgeIdentity is Effect's `EdgeIdentity`: the identities of its ends and
+// edgeIdentity is the identity of an edge: the identities of its ends and
 // its own; an undirected one matches either way round.
 type edgeIdentity struct{ source, target, identity Value }
 
@@ -91,8 +90,7 @@ func identitiesOf(fb *Fiber, options Value) identities {
 	return identities{of(o.Get("nodeIdentity")), of(o.Get("edgeIdentity"))}
 }
 
-// nodeMaps is Effect's `buildNodeMaps`: the data by identity, and the
-// identity of each node.
+// nodeMaps is the data by identity, and the identity of each node.
 func (ids identities) nodeMaps(g *Graph) (*eqMap, map[int]Value) {
 	byIdentity, byIndex := newEqMap(Equals, identityHash), map[int]Value{}
 	for _, n := range g.nodes {

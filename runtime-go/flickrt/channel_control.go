@@ -1,11 +1,10 @@
 package flickrt
 
-// How a channel fails, ends, repeats and runs beyond the core, as
-// Effect's (Channel.ts): recovery, finalizers, retries, services and
-// spans.
+// How a channel fails, ends, repeats and runs beyond the core: recovery,
+// finalizers, retries, services and spans.
 
-// channelCatchError is Effect's `catch`: the channel `f` makes of the
-// first typed error goes on; another failure fails as it is.
+// channelCatchError recovers from a typed error: the channel `f` makes of
+// the first typed error goes on; another failure fails as it is.
 func channelCatchError(self *Channel, f func(fb *Fiber, err Value) *Channel) *Channel {
 	return channelCatchCause(self, func(fb *Fiber, c *Cause) *Channel {
 		if r := c.firstOf(causeFail); r != nil {

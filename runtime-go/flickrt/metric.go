@@ -8,9 +8,9 @@ import (
 	"sync"
 )
 
-// Effect's Metric: counters, gauges, frequencies, histograms and summaries
-// in the program's registry. A metric finds its series in the registry by
-// its kind, name, description and attributes, the fiber's current metric
+// Metrics: counters, gauges, frequencies, histograms and summaries in the
+// program's registry. A metric finds its series in the registry by its
+// kind, name, description and attributes, the fiber's current metric
 // attributes among them, and makes it on first use; states are Flick
 // records.
 
@@ -27,8 +27,8 @@ type metric struct {
 	modify      func(c metricContext, in Value)
 }
 
-// metricContext is what Effect's metrics read of a fiber's context: its
-// clock and current metric attributes.
+// metricContext is what the metrics read of a fiber's context: its clock
+// and current metric attributes.
 type metricContext struct {
 	fb    *Fiber
 	extra *Record
@@ -86,8 +86,8 @@ func newMetric(id, kind string, description Value, attributes *Record, create fu
 	return m
 }
 
-// transformed is Effect's MetricTransform: the metric with other reads and
-// updates, and its series.
+// metricTransform is the metric with other reads and updates, and its
+// series.
 func metricTransform(m *metric, value func(metricContext) Value, update, modify func(metricContext, Value)) *metric {
 	return &metric{id: m.id, kind: m.kind, description: m.description, attributes: m.attributes, create: m.create,
 		value: value, update: update, modify: modify}
@@ -107,7 +107,7 @@ func mergeAttributes(self, other *Record) *Record {
 	return out
 }
 
-// attributesOf is a list of attribute pairs as Effect's record of them.
+// attributesOf is a list of attribute pairs as a record of them.
 func attributesOf(pairs Value) *Record {
 	out := newRecord(len(List(pairs)))
 	for _, kv := range List(pairs) {
@@ -116,7 +116,7 @@ func attributesOf(pairs Value) *Record {
 	return out
 }
 
-// metricKey is Effect's makeKey: the kind, name, description and the
+// metricKey is the key of a series: the kind, name, description and the
 // attributes by key.
 func metricKey(m *metric, attributes *Record) string {
 	idx := make([]int, len(attributes.keys))
@@ -261,8 +261,8 @@ func newHistogram(id string, description Value, attributes *Record, bounds []Val
 	})
 }
 
-// newSummary is Effect's SummaryMetric of (value, timestamp) inputs: the
-// quantiles of the last `maxSize` values at most `maxAge` old.
+// newSummary is a summary of (value, timestamp) inputs: the quantiles of
+// the last `maxSize` values at most `maxAge` old.
 func newSummary(id string, description Value, attributes *Record, maxAge float64, maxSize int, quantiles []Value) *metric {
 	maxAge = math.Max(maxAge, 0)
 	return newMetric(id, "Summary", description, attributes, func() *metricHooks {
@@ -324,7 +324,7 @@ func newSummary(id string, description Value, attributes *Record, maxAge float64
 	})
 }
 
-// mapInput is Effect's `Metric.mapInput`.
+// mapInput is the metric whose inputs go through `f` first.
 func mapInput(m *metric, f func(c metricContext, in Value) Value) *metric {
 	return metricTransform(m, m.value,
 		func(c metricContext, in Value) { m.update(c, f(c, in)) },

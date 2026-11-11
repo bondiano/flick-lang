@@ -1,4 +1,4 @@
-// Deferred values from Effect's `TxDeferred`: awaiting one retries the
+// Deferred values from `TxDeferred`: awaiting one retries the
 // transaction until another fiber completes it.
 module App.Main exposing (main)
 

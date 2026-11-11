@@ -6,16 +6,16 @@ import (
 	"unicode/utf8"
 )
 
-// Stream is Effect's (Stream.ts:131): a channel of chunks, non-empty lists
-// of the elements, ended with Unit. Its resources go to the scope a run
-// gives the channel; the Flick tasks it runs see the lexical owner. The
-// operations are in the stream_*.go files.
+// Stream is a channel of chunks, non-empty lists of the elements, ended
+// with Unit. Its resources go to the scope a run gives the channel; the
+// Flick tasks it runs see the lexical owner. The operations are in the
+// stream_*.go files.
 type Stream struct{ ch *Channel }
 
 func streamOf(v Value) *Stream { return v.(*Stream) }
 
-// pull is a pull of the streams written before the Effect core: the next
-// chunk, or false once the stream ended.
+// pull is a pull of the streams written before channels: the next chunk,
+// or false once the stream ended.
 type pull func(fb *Fiber) ([]Value, bool)
 
 // newPull is the Pull of chunks of an old pull; an empty chunk is skipped.
@@ -72,8 +72,7 @@ func streamTransformPullBracket(self *Stream, f func(fb *Fiber, pull Pull, scope
 
 var streamEmpty = &Stream{channelEmpty}
 
-// chunkStream is the stream of one chunk, or none when it is empty, as
-// Effect's fromArray.
+// chunkStream is the stream of one chunk, or none when it is empty.
 func chunkStream(chunk []Value) *Stream {
 	if len(chunk) == 0 {
 		return streamEmpty
@@ -180,7 +179,7 @@ func StreamFromListEffect(task Value) Value {
 	return &Stream{channelUnwrap(func(fb *Fiber) *Channel { return chunkStream(List(Run(fb, task))).ch })}
 }
 
-// streamChunkSize is Effect's chunk size of a stream of an iterable.
+// streamChunkSize is the chunk size of a stream of an iterable.
 const streamChunkSize = 4096
 
 // StreamFromSeq pulls the sequence's elements as the stream runs.
@@ -209,7 +208,7 @@ func StreamRunCollect(fb *Fiber, s Value) Value {
 }
 
 // StreamMapEffect runs the task of each element in turn, each result a
-// chunk of its own, as Effect's sequential `mapEffect` emits them.
+// chunk of its own.
 func StreamMapEffect(f, s Value) Value {
 	return &Stream{channelMap(channelFlattenArray(streamOf(s).ch),
 		func(fb *Fiber, x Value) Value { return []Value{Run(fb, Apply(fb, f, x))} })}

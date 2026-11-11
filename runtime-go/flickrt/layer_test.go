@@ -55,8 +55,8 @@ func TestLayerFromBuildCause(t *testing.T) {
 				if len(reasons) != test.wantReasons {
 					t.Fatalf("got %d reasons, want %d: %s", len(reasons), test.wantReasons, pretty(cause))
 				}
-				// a failed build closes its own scope as Effect's `onExit` does, electing the
-				// cleanup's defect; `provide` joins its body's cause with `Cause.combine`
+				// a failed build closes its own scope, electing the cleanup's
+				// defect; `provide` joins its body's cause without electing
 				elected := test.buildFails && test.cleanupFails
 				switch first := reasons[0]; {
 				case !elected && first != primary:

@@ -1,4 +1,4 @@
-// Effect's `Sink.make`: the sink of what a function does with the stream of
+// `Sink.make`: the sink of what a function does with the stream of
 // its input, run on chunks of two through its channel.
 module App.Main exposing (main)
 

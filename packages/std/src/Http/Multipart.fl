@@ -1,7 +1,7 @@
-/// Effect's `Multipart`: `multipart/form-data` bodies of server requests.
-/// `persisted` reads the whole form, writing its files to temporary files
-/// that the scope of region `s` removes; `with_limits` bounds what a form
-/// may hold. `parts` reads a form part by part, as a stream.
+/// The `multipart/form-data` bodies of server requests. `persisted` reads
+/// the whole form, writing its files to temporary files that the scope of
+/// region `s` removes; `with_limits` bounds what a form may hold. `parts`
+/// reads a form part by part, as a stream.
 module Http.Multipart exposing (..)
 
 import ByteSize

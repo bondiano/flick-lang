@@ -1,5 +1,5 @@
-/// Lists cut, padded and edited by position: the part of `List` over
-/// Effect's `Array` that keeps the elements as they are.
+/// Lists cut, padded and edited by position: the part of `List` that keeps
+/// the elements as they are.
 private module List.Slice exposing (..)
 
 /// The empty list.

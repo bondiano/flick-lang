@@ -1,7 +1,7 @@
 package flickrt
 
-// The part `Effect.Collections` of Effect's `Effect`: a task per element
-// of a list, run by an `Effect.Concurrency`, and filters of a task's value.
+// The part `Effect.Collections` of `Effect`: a task per element of a list,
+// run by an `Effect.Concurrency`, and filters of a task's value.
 
 // byConcurrency runs the tasks one after another for `Sequential`, else
 // concurrently, at most n at a time for `Bounded n`: their results in
@@ -38,7 +38,7 @@ func EffectForEach(fb *Fiber, concurrency, f, xs Value) Value {
 var validationError = Tag("Effect.Collections.ValidationError.ValidationError")
 
 // partition runs the task of `f` of each element: the values, and the
-// typed errors of those that failed with one, as Effect's `result`.
+// typed errors of those that failed with one.
 func partition(fb *Fiber, concurrency, f, xs Value) ([]Value, []Value) {
 	tasks := each(fb, f, xs)
 	for i, t := range tasks {
@@ -81,7 +81,7 @@ func EffectValidate(fb *Fiber, concurrency, f, xs Value) Value {
 // keeping runs the task of `f` of each element: what `keep` makes of
 // its value goes out.
 //
-// shortcut: in the order of the elements, where Effect's concurrent forms keep the order the tasks end in; the same for tasks that do not wait
+// shortcut: in the order of the elements, where the JS target's concurrent forms keep the order the tasks end in; the same for tasks that do not wait
 func keeping(fb *Fiber, concurrency, f, xs Value, keep func(x, v Value) (Value, bool)) Value {
 	in := List(xs)
 	out := []Value{}

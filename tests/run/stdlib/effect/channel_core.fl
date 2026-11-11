@@ -1,4 +1,4 @@
-// Effect's `Channel` core, on both targets: the constructors,
+// The core of `Channel`, on both targets: the constructors,
 // transformations, merges and runs the rest of Channel, Stream and Sink is
 // made of.
 module App.Main exposing (main)

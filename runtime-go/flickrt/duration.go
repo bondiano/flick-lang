@@ -8,9 +8,9 @@ import (
 	"strings"
 )
 
-// Duration is Effect's: whole milliseconds, nanoseconds, or infinite.
-// Flick's durations are never negative; its checked constructors and
-// arithmetic refuse what would be.
+// Duration is whole milliseconds, nanoseconds, or infinite. Flick's
+// durations are never negative; its checked constructors and arithmetic
+// refuse what would be.
 type Duration struct {
 	tag    durationTag
 	millis float64
@@ -40,7 +40,7 @@ func roundAway(x float64) *big.Int {
 	return n
 }
 
-// fromMillis is Effect's `make` of a number of milliseconds.
+// fromMillis is the duration of a number of milliseconds.
 func fromMillis(ms float64) *Duration {
 	switch {
 	case ms != ms || ms == 0:
@@ -62,7 +62,7 @@ func zeroMillis(ms float64) bool {
 	return d == dur(DurationZero) || d.tag == durationNanos && d.nanos.Sign() == 0
 }
 
-// fromNanos is Effect's `make` of a BigInt of nanoseconds.
+// fromNanos is the duration of a BigInt of nanoseconds.
 func fromNanos(n *big.Int) *Duration {
 	if n.Sign() == 0 {
 		return dur(DurationZero)
@@ -168,7 +168,7 @@ func parseNanos(text string, scale int64) *big.Int {
 
 var unitMillis = map[string]float64{"milli": 1, "second": 1000, "minute": 60000, "hour": 3600000, "day": 86400000, "week": 604800000}
 
-// DurationFromInput reads `"Infinity"` or `"<number> <unit>"`, as Effect.
+// DurationFromInput reads `"Infinity"` or `"<number> <unit>"`.
 func DurationFromInput(s Value) Value {
 	quoted := QuoteJSON(s.(string))
 	d, ok := parseDuration(s.(string))
@@ -178,7 +178,7 @@ func DurationFromInput(s Value) Value {
 	return nonNegative("from_input "+quoted, d)
 }
 
-// parseDuration is Effect's `fromInput` of a string, negative ones too.
+// parseDuration is the duration of a string, negative ones too.
 func parseDuration(text string) (*Duration, bool) {
 	if text == "Infinity" {
 		return dur(DurationInfinity), true
@@ -284,8 +284,8 @@ func DurationParts(d Value) Value {
 		"seconds", part(1e9, 60), "millis", part(1e6, 1000), "nanos", part(1, 1e6))
 }
 
-// DurationFormat is Effect's `Duration.format`: the non-zero parts of
-// days down to nanoseconds, the days as JS writes their Number.
+// DurationFormat is `Duration.format`: the non-zero parts of days down to
+// nanoseconds, the days as JS writes their Number.
 func DurationFormat(d Value) Value {
 	x := dur(d)
 	switch {

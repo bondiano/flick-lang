@@ -1,6 +1,6 @@
-/// Effect's `TxReentrantLock`: a read/write lock over transactional
-/// state. Many fibers may hold the read lock, one the write lock, and a
-/// fiber may take a lock it already holds again.
+/// A read/write lock over transactional state. Many fibers may hold the
+/// read lock, one the write lock, and a fiber may take a lock it already
+/// holds again.
 module TxReentrantLock exposing (..)
 
 import Tx

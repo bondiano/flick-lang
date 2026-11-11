@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-// Effect's GraphViz and Mermaid texts of a graph.
+// The GraphViz and Mermaid texts of a graph.
 
 // labelText is JS `String(value)` of a Flick value, a label's default.
 func labelText(v Value) string {
@@ -59,8 +59,8 @@ func GraphToGraphViz(fb *Fiber, options, v Value) Value {
 	return strings.Join(append(lines, "}"), "\n")
 }
 
-// mermaidEscape is Effect's `escapeMermaidLabel`: its replacements run one
-// after another, so the `#` of an earlier one is not escaped again.
+// mermaidEscape escapes a Mermaid label: its replacements run one after
+// another, so the `#` of an earlier one is not escaped again.
 func mermaidEscape(s string) string {
 	for _, r := range [][2]string{
 		{"#", "#35;"}, {`"`, "#quot;"}, {"<", "#lt;"}, {">", "#gt;"}, {"&", "#amp;"},

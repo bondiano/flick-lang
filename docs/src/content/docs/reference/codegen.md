@@ -377,8 +377,8 @@ beside it, which `flick build` compiles with `go build` into
 target does not compile yet is `FLICK-P012` with what it names, never a
 runtime stub; for now that is a lazy `for` that reads services,
 schemas deriving `Form`, and a `foreign` binding without a
-Go implementation: in the runtime for the standard library, which is still
-part of Effect beyond the core (most of `Stream`, queues, schedules beyond
+Go implementation: in the runtime for the standard library, part of which
+has none yet beyond the core (most of `Stream`, queues, schedules beyond
 `recurs`, parts of `Codec`), or beside the program for its own bindings
 (see [FFI](../ffi/#the-go-target)). Modules of the js target only are
 `FLICK-P030` already in `flick check`.
@@ -426,7 +426,7 @@ zone's name. A date in text (`DateTime.make`,
 `Config.date`, HTTP dates) is read by a port of V8's `Date.parse`, legacy
 forms included; a date-time without an offset is local time, Go's
 `time.Local`. `Cli.file_parse` reads INI, TOML and YAML with ports of
-Effect's `encoding` parsers, their errors included.
+the parsers of the JS target, their errors included.
 
 A pattern RE2 reads still means something else in a few places, because
 RE2 has no JS mode and Flick passes the source on as written:
@@ -448,8 +448,8 @@ RE2 has no JS mode and Flick passes the source on as written:
   give, all of which JS accepts.
 
 A `Seq` restarts on every iteration as on the JS target; a lazy `for` is
-one. A `HashMap` or `HashSet` lists its entries in the order Effect's HAMT
-walks them, by Effect's `Hash.hash` five bits at a time from the lowest,
+one. A `HashMap` or `HashSet` lists its entries in the order a HAMT
+walks them, by `Hash.hash` five bits at a time from the lowest,
 so an unsorted `to_list` prints the same on both targets.
 
 A top-level function is a Go function of its execution fiber, dictionaries
@@ -473,7 +473,7 @@ of its invocation, not its creation, so URL rendering observes the current
 redaction names without process-global state. Pure stages remain pure.
 A `task` is a Go closure of the fiber that runs again on each `await`.
 A typed failure, a defect or an interruption is a Go panic carrying a
-cause tree like Effect's; `try` recovers it by the rules of the JS target,
+cause tree; `try` recovers it by the rules of the JS target,
 and a failing `main` is reported as the JS runner reports it. A service is
 its key `M.S`, looked up in the fiber's services when the operation runs,
 so a task built outside `provide` and awaited inside it sees the provided
@@ -502,7 +502,7 @@ its resources through response-body streaming. After the grace period
 (20 seconds by default), remaining requests are interrupted and joined,
 including their finalizers, before the server owner's resources are released.
 The grace timeout does not bound cleanup or uninterruptible work. The rest of
-`Http` and `HttpApi` follows Effect and the JS target: headers, cookies,
+`Http` and `HttpApi` follows the JS target: headers, cookies,
 URLs, the router's defaults, middleware, multipart forms, static files,
 streamed bodies, the client on `net/http` (interrupting a fiber cancels its
 request), typed `HttpApi` clients and the same OpenAPI document. What

@@ -1,5 +1,5 @@
-/// Effect's `Channel`: the pull-based stage that streams and sinks are made
-/// of. `Channel r e i o d ie id` reads `i` from an upstream that fails with
+/// The pull-based stage that streams and sinks are made of.
+/// `Channel r e i o d ie id` reads `i` from an upstream that fails with
 /// `ie` and ends with `id`, emits `o`, fails with `e` and ends with `d`. A
 /// channel is a pure description; `Channel.run_*` runs it. Callbacks kept
 /// in a channel hold no captures. A channel of a scoped subscription holds

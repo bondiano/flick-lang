@@ -1,9 +1,9 @@
-/// Effect's `FileSystem`: files and directories through a service whose
-/// calls fail with `PlatformError`; `node` is the file system of Node.js.
-/// Bytes are lists of numbers from 0 to 255. An opened file and a scoped
-/// temporary path belong to the `scope` that owns their region. The
-/// streams of a file are `Stream.read_file` and `Stream.watch`; Effect's
-/// `sink` of a file is not wrapped yet.
+/// Files and directories through a service whose calls fail with
+/// `PlatformError`; `node` is the file system of Node.js. Bytes are lists
+/// of numbers from 0 to 255. An opened file and a scoped temporary path
+/// belong to the `scope` that owns their region. The streams of a file are
+/// `Stream.read_file` and `Stream.watch`; the runtime's `sink` of a file is
+/// not wrapped yet.
 module FileSystem exposing (..)
 
 import PlatformError
@@ -74,7 +74,7 @@ type alias OpenOptions = { flag : Option OpenFlag; mode : Option Int; noFollow :
 type alias RemoveOptions = { recursive : Bool; force : Bool }
 type alias WriteOptions = { flag : Option OpenFlag; mode : Option Int }
 
-/// The operations of Effect's `FileSystem`; the functions below call them.
+/// The operations of `FileSystem`; the functions below call them.
 service FileSystem =
   access : AccessOptions -> String ->{Async; PlatformError.PlatformError} Unit
   copy : CopyOptions -> String -> String ->{Async; PlatformError.PlatformError} Unit

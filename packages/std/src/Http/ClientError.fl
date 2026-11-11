@@ -1,5 +1,5 @@
-/// Effect's `HttpClientError`: how a request through `Http.Client` fails,
-/// as a Flick error with its reason. URLs in it have their secrets masked.
+/// How a request through `Http.Client` fails, as a Flick error with its
+/// reason. URLs in it have their secrets masked.
 module Http.ClientError exposing (..)
 
 import Http.Method

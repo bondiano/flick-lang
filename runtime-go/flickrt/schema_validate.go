@@ -6,9 +6,9 @@ import (
 	"strconv"
 )
 
-// `Schema.validate`: whether an input is a value of the type, as Effect
-// decodes the type side of a schema, with the JS runtime's names of what
-// each kind expects.
+// `Schema.validate`: whether an input is a value of the type, by the type
+// side of its schema, with the JS runtime's names of what each kind
+// expects.
 
 // customSchema is the schema of a type of the runtime: `valid` checks a
 // value of it and `json` is its canonical JSON codec.

@@ -1,5 +1,5 @@
-/// Effect's `Hash` beyond the class `Hash`: mixing hashes, for writing
-/// `hash` of an instance from the hashes of its parts.
+/// Hashing beyond the class `Hash`: mixing hashes, for writing `hash` of an
+/// instance from the hashes of its parts.
 module Hash exposing (..)
 
 /// Mixes the hash `b` into `self`: `hash x |> Hash.combine (hash y)`.

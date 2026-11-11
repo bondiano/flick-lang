@@ -6,8 +6,9 @@ import (
 	"testing"
 )
 
-// testdata/{ini,toml,yaml}.txt are Effect's parses of each input
-// (tools/go-encoding/gen.mjs): the JSON of the value or the error's text.
+// testdata/{ini,toml,yaml}.txt are the parses of each input by the Effect
+// library (tools/go-encoding/gen.mjs): the JSON of the value or the
+// error's text.
 func TestEncodingsParseAsEffect(t *testing.T) {
 	for name, parse := range map[string]func(string) (Value, string){"ini": parseIni, "toml": parseToml, "yaml": parseYaml} {
 		data, err := os.ReadFile("testdata/" + name + ".txt")

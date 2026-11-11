@@ -1,6 +1,6 @@
-/// Effect's `Graph`: immutable directed and undirected graphs with data on
-/// nodes and edges, their changes, queries, traversals and algorithms. A
-/// change returns a new graph; invalid input is a `GraphError` in a `Result`.
+/// Immutable directed and undirected graphs with data on nodes and edges,
+/// their changes, queries, traversals and algorithms. A change returns a
+/// new graph; invalid input is a `GraphError` in a `Result`.
 module Graph exposing (
   Graph,
   Directed,

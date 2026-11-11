@@ -1,8 +1,8 @@
 package flickrt
 
-// Effect's `Path`: its POSIX paths, adapted from Node.js as Effect adapts
-// them. Separators and dots are ASCII, so slicing WTF-8 bytes at them cuts
-// the same text as slicing UTF-16 code units in JS.
+// `Path`: POSIX paths, adapted from Node.js. Separators and dots are
+// ASCII, so slicing WTF-8 bytes at them cuts the same text as slicing
+// UTF-16 code units in JS.
 
 import (
 	"os"
@@ -414,7 +414,7 @@ func pathResolveWithin(root, input string) Value {
 	return Some(candidate)
 }
 
-// PathLayer is `Path.layer`, Effect's POSIX paths.
+// PathLayer is `Path.layer`, the POSIX paths.
 func PathLayer(key Value) Value {
 	return LayerSucceed(key, Rec(
 		"sep", Fn(func(*Fiber, Value) Value { return Succeed("/") }),

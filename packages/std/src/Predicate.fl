@@ -1,5 +1,5 @@
-/// Predicates as values: Effect's `Predicate` combinators over functions
-/// `a -> Bool`. The combined predicate keeps the ones it is made of.
+/// Predicates as values: combinators over functions `a -> Bool`. The
+/// combined predicate keeps the ones it is made of.
 module Predicate exposing (..)
 
 /// A test of a value.

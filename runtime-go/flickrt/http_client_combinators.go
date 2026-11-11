@@ -8,8 +8,8 @@ import (
 	"strings"
 )
 
-// The combinators of Http.Client, as Effect's: each makes a client of
-// another's preparation and sending.
+// The combinators of Http.Client: each makes a client of another's
+// preparation and sending.
 
 func (c *Client) withPre(pre func(fb *Fiber, request Value) Value) *Client {
 	return &Client{pre: pre, post: c.post}
@@ -26,8 +26,7 @@ func mapTask(task Value, f func(fb *Fiber, x Value) Value) Value {
 	return Eff(func(fb *Fiber) Value { return f(fb, Run(fb, task)) })
 }
 
-// typedError is the first typed failure of a cause without defects, as
-// Effect's `catch` takes it.
+// typedError is the first typed failure of a cause without defects.
 func typedError(c *Cause) (Value, bool) {
 	if c.has(causeDie) || !c.has(causeFail) {
 		return nil, false
@@ -331,7 +330,7 @@ func (u webURL) origin() string {
 }
 
 // withURL is the request of the URL, its query as the parameters and its
-// fragment as the hash, as Effect's `setUrl` of a URL.
+// fragment as the hash.
 func (c *ClientRequest) withURL(u webURL) *ClientRequest {
 	params, hash := u.searchParams(), None
 	if u.hasFragment && u.fragment != "" {

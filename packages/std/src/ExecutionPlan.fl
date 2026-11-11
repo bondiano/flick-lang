@@ -1,7 +1,7 @@
-/// Effect's `ExecutionPlan`: steps that each provide the services `p` of a
-/// task, tried in order until one succeeds (`Effect.with_execution_plan`).
-/// A step builds its layer, which needs `r` and may fail with `e`, and may
-/// be tried several times; the task's error, of type `i`, decides retries.
+/// An execution plan: steps that each provide the services `p` of a task,
+/// tried in order until one succeeds (`Effect.with_execution_plan`). A step
+/// builds its layer, which needs `r` and may fail with `e`, and may be
+/// tried several times; the task's error, of type `i`, decides retries.
 module ExecutionPlan exposing (..)
 
 import Duration

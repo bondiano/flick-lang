@@ -1,6 +1,6 @@
-/// Effect's `JsonPatch`: the differences between two JSON values as a list
-/// of operations (RFC 6902's `add`, `remove` and `replace`), and applying
-/// them. Paths are JSON Pointers, see `JsonPointer`.
+/// The differences between two JSON values as a list of operations (RFC
+/// 6902's `add`, `remove` and `replace`), and applying them. Paths are JSON
+/// Pointers, see `JsonPointer`.
 module JsonPatch exposing (..)
 
 /// One change at a path: add a value, remove one, or replace one.

@@ -1,5 +1,5 @@
-/// Effect's `LayerRef`: one layer's services, built on first use, shared
-/// while in use and built anew on `refresh` or after `invalidate`.
+/// One layer's services, built on first use, shared while in use and built
+/// anew on `refresh` or after `invalidate`.
 module LayerRef exposing (..)
 
 import Duration

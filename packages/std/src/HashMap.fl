@@ -1,5 +1,4 @@
-/// Immutable hash maps over Effect's `HashMap`; each map keeps the witness
-/// of its keys.
+/// Immutable hash maps; each map keeps the witness of its keys.
 module HashMap exposing (..)
 
 import EqHash

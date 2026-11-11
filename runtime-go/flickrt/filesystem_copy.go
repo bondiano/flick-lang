@@ -163,7 +163,7 @@ func fsCopyTree(src, dst string, info fs.FileInfo, overwrite, preserveTimes bool
 		if os.SameFile(info, dest) {
 			return &os.PathError{Op: "cp", Path: dst, Err: syscall.EINVAL}
 		}
-		// Node's ERR_FS_CP_DIR_TO_NON_DIR and ERR_FS_CP_NON_DIR_TO_DIR carry no errno, so Effect reads them as UnknownError
+		// Node's ERR_FS_CP_DIR_TO_NON_DIR and ERR_FS_CP_NON_DIR_TO_DIR carry no errno, so they are read as UnknownError
 		if info.IsDir() != dest.IsDir() {
 			return &os.PathError{Op: "cp", Path: dst, Err: syscall.EINVAL}
 		}

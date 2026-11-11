@@ -52,8 +52,8 @@ func TestFindDefectGivesTheMessage(t *testing.T) {
 	}
 }
 
-// Combining keeps each reason once, as Effect's `Cause.combine` does
-// (docs/formal/runtime.md §2.2); races and a scope's finalizers keep repeats.
+// Combining keeps each reason once (docs/formal/runtime.md); races and a
+// scope's finalizers keep repeats.
 func TestCombineKeepsEachReasonOnce(t *testing.T) {
 	fail := func(v Value) *Cause { return &Cause{kind: causeFail, err: v} }
 	die := &Cause{kind: causeDie, defect: "boom"}
@@ -142,7 +142,7 @@ func TestSequentialAndParallelAreOneCombination(t *testing.T) {
 	}
 }
 
-// The empty cause still fails, as Effect's `Cause.empty` (`docs/formal/runtime.md#go-an-empty-cause-is-not-a-failure`).
+// The empty cause still fails (`docs/formal/runtime.md#go-an-empty-cause-is-not-a-failure`).
 func TestTheEmptyCauseFails(t *testing.T) {
 	if _, c := catch(func() Value { return FailureRethrow(nil, CauseEmpty) }); c == nil || len(c.reasons()) != 0 {
 		t.Errorf("rethrowing the empty failure fails without reasons: %v", c)
@@ -176,9 +176,9 @@ func TestATypedErrorAsADefectIsItsValue(t *testing.T) {
 	}
 }
 
-// Effect 4.1 elects defects where it joins a failure with a finalizer's, a
-// late branch's or every racer's: each typed failure but a pull's end is
-// then a defect; elsewhere, as in `Cause.combine`, the kinds stay.
+// Defects are elected where a failure is joined with a finalizer's, a late
+// branch's or every racer's: each typed failure but a pull's end is then a
+// defect; elsewhere, where causes are only combined, the kinds stay.
 func TestElectDefects(t *testing.T) {
 	fail := &Cause{kind: causeFail, err: "boom"}
 	die := &Cause{kind: causeDie, defect: "d"}

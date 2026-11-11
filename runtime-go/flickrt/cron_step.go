@@ -5,16 +5,15 @@ import (
 	"slices"
 )
 
-// cronNotFound is Effect's `Unable to find cron date`.
+// cronNotFound is the failure `Unable to find cron date`.
 type cronNotFound struct{}
 
 func daysInMonth(date *jsDate) float64 {
 	return newJsDate(makeDate(makeDay(date.year(), date.month()+1, 0), 0)).date()
 }
 
-// step is Effect's `stepCron`: the first matching instant after `now`, or
-// the last before it in reverse; false when it finds none or `now` is out
-// of range.
+// step is the first matching instant after `now`, or the last before it in
+// reverse; false when it finds none or `now` is out of range.
 func (c *Cron) step(now *DateTime, reverse bool) (out float64, found bool) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -33,8 +32,8 @@ func (c *Cron) step(now *DateTime, reverse bool) (out float64, found bool) {
 		needsStep = func(next, current int) bool { return next < current }
 	}
 	utc := c.tz.loc != nil && c.tz.id == "UTC"
-	// Flick's crons keep Effect's default `onDstOverlap`, "earlier": the
-	// first occurrence of a repeated wall time
+	// Flick's crons take the earlier of a repeated wall time: its first
+	// occurrence
 	const disambiguation = "compatible"
 	wall := func(wallMillis float64) *DateTime {
 		if math.IsNaN(wallMillis) {
@@ -198,8 +197,8 @@ func (c *Cron) step(now *DateTime, reverse bool) (out float64, found bool) {
 	return result.ms, true
 }
 
-// daysToMatch is Effect's step to the nearer of the next matching weekday
-// and day of the month, when either may match.
+// daysToMatch is the step to the nearer of the next matching weekday and
+// day of the month, when either may match.
 func (c *Cron) daysToMatch(current *jsDate, reverse bool, table [6][]int, boundary [6]int) float64 {
 	a, b := math.Inf(1), math.Inf(1)
 	if reverse {
@@ -256,8 +255,8 @@ func cronFound(ms float64, found bool) Value {
 func CronNext(now, cron Value) Value { return cronFound(cron.(*Cron).step(dateTime(now), false)) }
 func CronPrev(now, cron Value) Value { return cronFound(cron.(*Cron).step(dateTime(now), true)) }
 
-// CronSequence is the adapter's: the first `n` matches, fewer when Effect
-// finds no further one.
+// CronSequence is the adapter's: the first `n` matches, fewer when there
+// is no further one.
 func CronSequence(n, now, cron Value) Value {
 	out, at := []Value{}, dateTime(now)
 	for len(out) < int(n.(int32)) {
@@ -271,8 +270,8 @@ func CronSequence(n, now, cron Value) Value {
 	return out
 }
 
-// ScheduleCron is Effect's `Schedule.cron`: recurs at each match, the
-// delay until it its output.
+// ScheduleCron is `Schedule.cron`: recurs at each match, the delay until
+// it its output.
 func ScheduleCron(cron Value) Value {
 	c := cron.(*Cron)
 	return &Schedule{func(*Fiber) scheduleStep {
@@ -281,7 +280,7 @@ func ScheduleCron(cron Value) Value {
 				return noDelay, nil, true
 			}
 			next, found := c.step(&DateTime{ms: timeClip(now)}, false)
-			// a run a fraction of a nanosecond away is the one after it (Effect 4.1.2)
+			// a run a fraction of a nanosecond away is the one after it
 			if found && zeroMillis(next-now) {
 				next, found = c.step(&DateTime{ms: timeClip(next)}, false)
 			}

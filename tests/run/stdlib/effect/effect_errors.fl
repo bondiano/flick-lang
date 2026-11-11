@@ -1,4 +1,4 @@
-// Effect's `Effect` on whole failures: causes as opaque `Failure`s, defects
+// `Effect` on whole failures: causes as opaque `Failure`s, defects
 // as inert text, exits, finalizers and interruption.
 module App.Main exposing (main)
 

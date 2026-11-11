@@ -5,8 +5,8 @@ import (
 	"strconv"
 )
 
-// Effect's Graph walkers, walked at once as the JS adapter's are, so a
-// `GraphError` of the walk is the `Err`: a walker is its visits in order.
+// Graph walkers, walked at once as the JS adapter's are, so a `GraphError`
+// of the walk is the `Err`: a walker is its visits in order.
 type graphWalker struct{ indices, values []Value }
 
 func (g *Graph) walker(positions []int) *graphWalker {
@@ -29,7 +29,8 @@ func GraphEntries(w Value) Value {
 	return out
 }
 
-// traversalRadius is Effect's: none is `fallback` (Infinity for a walk).
+// traversalRadius is the radius of a walk: none is `fallback` (Infinity
+// for a walk).
 func traversalRadius(o Value, fallback float64) float64 {
 	if r, ok := some(o); ok {
 		if r.(int32) < 0 {
@@ -40,8 +41,7 @@ func traversalRadius(o Value, fallback float64) float64 {
 	return fallback
 }
 
-// starts is Effect's `traversalStarts`: the positions of the start nodes,
-// none when not given.
+// starts is the positions of the start nodes, none when not given.
 func (g *Graph) starts(o Value) []int {
 	out := []int{}
 	if s, ok := some(o); ok {
@@ -63,8 +63,8 @@ func directionOf(o Value) string {
 	return "outgoing"
 }
 
-// within is Effect's bounded breadth-first pass: the nodes no further
-// than `radius` from the starts, marked.
+// within is a bounded breadth-first pass: the nodes no further than
+// `radius` from the starts, marked.
 func reachedWithin(n int, starts []int, primary, secondary [][]int, radius float64) []bool {
 	reached := make([]bool, n)
 	queue, depths := []int{}, []float64{}
@@ -94,7 +94,7 @@ func reachedWithin(n int, starts []int, primary, secondary [][]int, radius float
 	return reached
 }
 
-// bfs is Effect's `bfs` from the starts: positions in visiting order.
+// bfs is a breadth-first walk from the starts: positions in visiting order.
 func (g *Graph) bfs(starts []int, direction string, radius float64) []int {
 	for _, i := range starts {
 		if !g.hasNode(i) {
@@ -138,7 +138,7 @@ func (g *Graph) bfsFrom(starts []int, direction string, radius float64) []int {
 	return queue
 }
 
-// dfs is Effect's `dfs`: preorder, neighbors pushed in reverse so the
+// dfs is a depth-first walk: preorder, neighbors pushed in reverse so the
 // first is walked first; a bounded walk keeps to the nodes within reach.
 func (g *Graph) dfs(starts []int, direction string, radius float64) []int {
 	primary, secondary := g.adjacencies(direction)
@@ -176,8 +176,8 @@ func (g *Graph) dfs(starts []int, direction string, radius float64) []int {
 	return out
 }
 
-// dfsPostOrder is Effect's `dfsPostOrder`: each node after the nodes it
-// reaches, starts taken in order.
+// dfsPostOrder is a depth-first walk in postorder: each node after the
+// nodes it reaches, starts taken in order.
 func (g *Graph) dfsPostOrder(starts []int, direction string, radius float64) []int {
 	primary, secondary := g.adjacencies(direction)
 	var reached []bool
@@ -220,7 +220,7 @@ func (g *Graph) dfsPostOrder(starts []int, direction string, radius float64) []i
 
 type graphSearch func(g *Graph, starts []int, direction string, radius float64) []int
 
-// search runs a walk of a `SearchConfig`, checked as Effect checks it.
+// search runs a walk of a `SearchConfig`, its options checked first.
 func search(walk graphSearch, options, v Value) Value {
 	return graphAttempt(func() Value {
 		g, o := graphOf(v), record(options)
@@ -234,7 +234,7 @@ func GraphDfs(options, v Value) Value          { return search((*Graph).dfs, opt
 func GraphBfs(options, v Value) Value          { return search((*Graph).bfsFrom, options, v) }
 func GraphDfsPostOrder(options, v Value) Value { return search((*Graph).dfsPostOrder, options, v) }
 
-// GraphTopo is Effect's `topo`: Kahn's order, the initial nodes first.
+// GraphTopo is a topological order: Kahn's, the initial nodes first.
 func GraphTopo(options, v Value) Value {
 	return graphAttempt(func() Value {
 		g := graphOf(v)
@@ -310,8 +310,7 @@ func edgeRecord(e graphEdge) Value {
 	return Rec("source", int32(e.source), "target", int32(e.target), "data", e.data)
 }
 
-// GraphExternals is Effect's `externals`: the nodes without an edge in
-// the direction.
+// GraphExternals is the nodes without an edge in the direction.
 func GraphExternals(options, v Value) Value {
 	g := graphOf(v)
 	adjacency := g.adj

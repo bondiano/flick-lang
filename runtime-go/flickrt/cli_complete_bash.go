@@ -5,8 +5,8 @@ import (
 	"strings"
 )
 
-// Ported line for line from Effect 4's cli/internal/completions/bash.ts so
 // `--completions bash` prints the same static script as the TypeScript CLI.
+// Derived from Effect 4 cli/internal/completions/bash.ts.
 
 // completeEscapeBash is escapeForBash: close, escape and reopen a single quote.
 func completeEscapeBash(s string) string {
@@ -315,7 +315,7 @@ func completeBashFunction(d completeCommand, parent []string, lines []string, he
 	return lines
 }
 
-// completeBash is bash.ts's generate: a self-contained script that never
+// completeBash is the Bash script: a self-contained script that never
 // re-invokes the CLI.
 func completeBash(executable string, d completeCommand) string {
 	safe := completeSanitize(executable)

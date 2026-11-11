@@ -1,8 +1,8 @@
 package flickrt
 
-// Running channels, as Effect's `runWith` (Channel.ts:10537): the channel
-// runs in a scope of its own, closed with how the run ended, in the fiber
-// of the run, whose owner stays the lexical one.
+// Running channels: the channel runs in a scope of its own, closed with
+// how the run ended, in the fiber of the run, whose owner stays the lexical
+// one.
 
 // runWith gives the channel's pull to `f`, which pulls until it ends; the
 // done value goes to `onHalt` (nil: it is the result).

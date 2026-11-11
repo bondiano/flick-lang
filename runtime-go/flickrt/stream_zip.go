@@ -5,11 +5,11 @@ import (
 	"sync"
 )
 
-// Streams zipped, as Effect's (Stream.ts): chunk by chunk, with indices
-// and neighbours, and with the latest of each side, and their bindings.
+// Streams zipped: chunk by chunk, with indices and neighbours, and with
+// the latest of each side, and their bindings.
 
-// joinBoth is Effect's `Fiber.joinAll` of both pulls forked into the
-// scope: both values, or the first failure as it comes.
+// joinBoth joins both pulls forked into the scope: both values, or the
+// first failure as it comes.
 func joinBoth(fb *Fiber, fibers *fiberSet, left, right Pull) (Value, Value) {
 	l := fibers.fork(fb, func(fb *Fiber) Value { return left(fb) })
 	r := fibers.fork(fb, func(fb *Fiber) Value { return right(fb) })

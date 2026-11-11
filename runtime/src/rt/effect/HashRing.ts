@@ -1,5 +1,5 @@
-// Persistent weighted hash ring. The point ordering and shard allocation follow
-// effect@4.1.2 HashRing (MIT); Flick nodes use a user supplied string key.
+// Persistent weighted hash ring; a node is known by a user supplied string key.
+// Point ordering and shard allocation are derived from effect@4.1.2 HashRing (MIT).
 import { none, some, type Option } from "../../core/data.ts";
 import { item } from "../../internal.ts";
 import { string as hashString } from "./Hash.ts";

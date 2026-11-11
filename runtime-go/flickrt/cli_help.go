@@ -2,8 +2,7 @@ package flickrt
 
 import "strings"
 
-// Help documents (HelpDoc.ts, internal/help.ts, buildHelpDoc of
-// internal/command.ts) and Effect's default formatter (CliOutput.ts).
+// Help documents and the default formatter of them.
 
 type cliFlagDoc struct {
 	name        string
@@ -77,7 +76,7 @@ func cliToFlagDoc(p *cliParam) cliFlagDoc {
 	return cliFlagDoc{s.name, aliases, typ, description, s.prim.tag != "Boolean" && !p.optional}
 }
 
-// buildHelpDoc of internal/command.ts.
+// buildHelpDoc is the help document of the command at `path`.
 func (c *cliCommand) buildHelpDoc(path []string) *cliHelpDoc {
 	doc := &cliHelpDoc{description: c.description}
 	for _, p := range c.config.arguments {

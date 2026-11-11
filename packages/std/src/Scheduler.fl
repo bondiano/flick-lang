@@ -1,13 +1,13 @@
-/// Effect's `Scheduler`: how fibers take turns. A task runs with the
-/// scheduler and the yield policy its caller sets; Flick code never hands
-/// raw JS tasks to a dispatcher.
+/// How fibers take turns. A task runs with the scheduler and the yield
+/// policy its caller sets; Flick code never hands raw JS tasks to a
+/// dispatcher.
 module Scheduler exposing (..)
 
 /// A scheduler of fibers.
 type Scheduler
 
-/// A fresh scheduler of Effect's default kind: microtasks, then
-/// `setImmediate`, yielding by priority.
+/// A fresh scheduler of the default kind: microtasks, then `setImmediate`,
+/// yielding by priority.
 make_mixed : Unit ->{} Scheduler
 foreign make_mixed from "flick:Scheduler" "flickMakeMixed"
   arity 0

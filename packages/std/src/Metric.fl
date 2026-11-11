@@ -1,6 +1,6 @@
-/// Effect's `Metric`: counters, gauges, frequencies, histograms and
-/// summaries, kept in the metric registry of the program. A `Metric i s`
-/// takes inputs `i` and has a state `s`; `snapshot` reads them all.
+/// Counters, gauges, frequencies, histograms and summaries, kept in the
+/// metric registry of the program. A `Metric i s` takes inputs `i` and has
+/// a state `s`; `snapshot` reads them all.
 module Metric exposing (..)
 
 import Duration

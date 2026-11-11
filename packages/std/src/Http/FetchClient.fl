@@ -1,4 +1,4 @@
-/// Effect's `FetchHttpClient`: the client of the platform's `fetch`.
+/// The HTTP client of the platform's `fetch`.
 module Http.FetchClient exposing (layer)
 
 import Http.Client exposing (HttpClient)

@@ -1,10 +1,10 @@
 package flickrt
 
-// TxHashMap and TxHashSet as Effect 4's: a TxRef of a HashMap or HashSet
-// (hash.go), whose witness compares the keys; each change puts a new map
-// or set in the ref.
+// TxHashMap and TxHashSet: a TxRef of a HashMap or HashSet (hash.go),
+// whose witness compares the keys; each change puts a new map or set in
+// the ref.
 
-// TxHashMap is Effect's TxHashMap.
+// TxHashMap is a TxRef of a HashMap.
 type TxHashMap struct{ ref *TxRef }
 
 func txMapOf(v Value) *TxRef     { return v.(*TxHashMap).ref }
@@ -166,7 +166,7 @@ func TxHashMapForEach(fb *Fiber, f, m Value) Value {
 	})
 }
 
-// TxHashSet is Effect's TxHashSet.
+// TxHashSet is a TxRef of a HashSet.
 type TxHashSet struct{ ref *TxRef }
 
 func txSetOf(v Value) *TxRef     { return v.(*TxHashSet).ref }

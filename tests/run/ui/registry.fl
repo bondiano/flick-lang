@@ -1,4 +1,4 @@
-// `Atom.Registry` is Effect's `Reactivity.Atom.Registry`, re-exported: its
+// `Atom.Registry` is `Reactivity.Atom.Registry`, re-exported: its
 // operations are reached through `Atom`'s path, and the layer of `Atom`
 // provides it.
 module App.Main exposing (main)

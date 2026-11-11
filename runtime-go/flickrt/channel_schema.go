@@ -2,11 +2,10 @@ package flickrt
 
 import "strings"
 
-// Effect's `ChannelSchema` (ChannelSchema.ts): each chunk decoded or
-// encoded with the codec as Effect's `NonEmptyArray` of it, an issue's
-// path led by the element's index, failing with the program's
-// `SchemaError`. Decoding is strict, as `onExcessProperty: "error"`, and
-// an issue does not name the input, as without `reportInput`.
+// `ChannelSchema`: each chunk decoded or encoded with the codec as a
+// non-empty list of it, an issue's path led by the element's index, failing
+// with the program's `SchemaError`. Decoding is strict, an excess property
+// being an error, and an issue does not name the input.
 
 // channelCodec runs `code` of the chunk's codec on each chunk of the
 // upstream; its errors and end pass through.
@@ -24,7 +23,7 @@ func channelCodec(c Value, code func(l *listCodec, fb *Fiber, chunk Value) (Valu
 }
 
 // unreported is the issues without the inputs they name: a number with no
-// JSON form fails the wire's check, whose text Effect falls back to.
+// JSON form fails the wire's check, whose text it reports.
 func unreported(issues []issue) []issue {
 	out := make([]issue, len(issues))
 	for i, is := range issues {

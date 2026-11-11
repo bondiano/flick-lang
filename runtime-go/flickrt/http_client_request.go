@@ -7,9 +7,9 @@ import (
 	"unicode/utf8"
 )
 
-// Http.ClientRequest as Effect's HttpClientRequest: the method, the URL as
-// given, the parameters and the hash added to it, the headers and the body.
-// Each change makes a new request.
+// Http.ClientRequest: the method, the URL as given, the parameters and the
+// hash added to it, the headers and the body. Each change makes a new
+// request.
 
 type ClientRequest struct {
 	method  string
@@ -20,7 +20,7 @@ type ClientRequest struct {
 	body    *Body
 }
 
-// requestMarks are Effect's request state, one a handled request (a served
+// requestMarks are the state of a request, one a handled request (a served
 // one, or one of `to_handled`): whether the logger middleware is off for it
 // and the handlers to run on its response. Outside one nothing keeps them.
 type requestMarks struct {
@@ -68,8 +68,8 @@ func ClientRequestMake(m, url, options Value) Value {
 	return ClientRequestModify(options, clientOfMethod(methodName(m))(url))
 }
 
-// ClientRequestModify sets what the options give, as Effect's `modify`
-// does: an empty hash or accepted type sets nothing.
+// ClientRequestModify sets what the options give: an empty hash or
+// accepted type sets nothing.
 func ClientRequestModify(options, self Value) Value {
 	o, c := record(options), clientOf(self)
 	if h, ok := some(o.Get("headers")); ok {
@@ -179,7 +179,7 @@ var methods = func() map[string]Value {
 	return out
 }()
 
-// methodValue is the method of the name; Effect has no value for another.
+// methodValue is the method of the name; another name has no value.
 func methodValue(method string) Value {
 	if m, ok := methods[method]; ok {
 		return m

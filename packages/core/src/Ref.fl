@@ -1,6 +1,6 @@
-/// Mutable cells. Every operation runs through
-/// the runtime, so a fresh cell is never generalized. A cell is Effect's
-/// `Ref`: each operation is atomic, since nothing else runs during it.
+/// Mutable cells. Every operation runs through the runtime, so a fresh cell
+/// is never generalized. Each operation is atomic, since nothing else runs
+/// during it.
 /// A cell's capture bound covers both its current contents and every later write.
 module Ref exposing (
   make,

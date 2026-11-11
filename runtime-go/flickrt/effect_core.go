@@ -2,8 +2,8 @@ package flickrt
 
 import "math/big"
 
-// The rest of the part `Effect.Core` of Effect's `Effect`: one task timed,
-// delayed, repeated or zipped.
+// The rest of the part `Effect.Core` of `Effect`: one task timed, delayed,
+// repeated or zipped.
 
 func EffectFailCauseSync(fb *Fiber, f Value) Value {
 	return failCause(causeOfFailure(Apply(fb, f, Unit)))
@@ -84,8 +84,8 @@ func EffectWhen(fb *Fiber, condition, task Value) Value {
 	return Some(Run(fb, task))
 }
 
-// EffectResourceAuto is Effect's `Resource.auto`: a manual resource that
-// a fiber of its region refreshes by the schedule.
+// EffectResourceAuto is a manual resource that a fiber of its region
+// refreshes by the schedule.
 func EffectResourceAuto(fb *Fiber, schedule, acquire Value) Value {
 	r := ResourceManual(fb, acquire)
 	refresh := Eff(func(fb *Fiber) Value { return ResourceRefresh(fb, r) })

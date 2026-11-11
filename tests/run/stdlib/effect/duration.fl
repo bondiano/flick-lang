@@ -1,4 +1,4 @@
-// Effect's `Duration`: checked constructors, conversions, arithmetic that
+// `Duration`: checked constructors, conversions, arithmetic that
 // refuses a negative result, comparisons and matching.
 module App.Main exposing (main)
 

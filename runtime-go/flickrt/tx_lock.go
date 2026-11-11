@@ -2,13 +2,13 @@ package flickrt
 
 import "maps"
 
-// TxReentrantLock and TxSemaphore as Effect 4's: a TxRef of who holds the
-// lock, and a TxRef of the permits left.
+// TxReentrantLock and TxSemaphore: a TxRef of who holds the lock, and a
+// TxRef of the permits left.
 
-// TxReentrantLock is Effect's TxReentrantLock.
+// TxReentrantLock is a TxRef of who holds the lock.
 type TxReentrantLock struct{ ref *TxRef }
 
-// txLockState is Effect's LockState: the read locks of each fiber, and
+// txLockState is the state of a lock: the read locks of each fiber, and
 // the fiber holding the write lock (0: none) with its count; never
 // mutated.
 type txLockState struct {
@@ -105,8 +105,8 @@ func TxReentrantLockAcquireWrite(fb *Fiber, l Value) Value { return acquireWrite
 func TxReentrantLockReleaseRead(fb *Fiber, l Value) Value  { return releaseRead(fb, l, fb.state.id) }
 func TxReentrantLockReleaseWrite(fb *Fiber, l Value) Value { return releaseWrite(fb, l, fb.state.id) }
 
-// acquireScoped is Effect's interruptible acquireRelease: `release` of the
-// acquiring fiber runs as the scope closes.
+// acquireScoped is an interruptible acquisition with its release:
+// `release` of the acquiring fiber runs as the scope closes.
 func acquireScoped(fb *Fiber, l Value, acquire, release func(*Fiber, Value, int64) Value) Value {
 	id := fb.state.id
 	n := acquire(fb, l, id)
@@ -122,8 +122,8 @@ func TxReentrantLockWriteLock(fb *Fiber, l Value) Value {
 	return acquireScoped(fb, l, acquireWrite, releaseWrite)
 }
 
-// withAcquired is Effect's: `task` runs once `acquire` did, interruptibly
-// as the caller, and `release` after it, uninterruptibly.
+// withAcquired runs `task` once `acquire` did, interruptibly as the
+// caller, and `release` after it, uninterruptibly.
 func withAcquired(fb *Fiber, acquire, release func(*Fiber), task Value) Value {
 	acquire(fb)
 	out, cause := catch(func() Value { return Run(fb, task) })
@@ -133,7 +133,7 @@ func withAcquired(fb *Fiber, acquire, release func(*Fiber), task Value) Value {
 			return Unit
 		})
 	})
-	if cause = finalized(cause, released); cause != nil { // as Effect's ensuring
+	if cause = finalized(cause, released); cause != nil { // then the failure of the release
 		panic(&Failure{cause})
 	}
 	return out
@@ -187,7 +187,7 @@ func TxReentrantLockWriteLocked(fb *Fiber, l Value) Value {
 	return txLockRead(fb, l, func(s *txLockState) Value { return s.writer != 0 })
 }
 
-// TxSemaphore is Effect's TxSemaphore.
+// TxSemaphore is a TxRef of the permits left, and their number in all.
 type TxSemaphore struct {
 	ref      *TxRef
 	capacity int32

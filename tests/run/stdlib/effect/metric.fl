@@ -1,4 +1,4 @@
-// Effect's `Metric`: each kind of metric updated and read back, through
+// `Metric`: each kind of metric updated and read back, through
 // `value` and `snapshot`, and the metrics of the fiber runtime.
 module App.Main exposing (main)
 

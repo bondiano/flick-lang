@@ -6,7 +6,7 @@ import (
 	"unicode/utf8"
 )
 
-// Effect's multiple selection: two bulk actions above the choices.
+// The multiple selection: two bulk actions above the choices.
 
 type promptMultiState struct {
 	index    int

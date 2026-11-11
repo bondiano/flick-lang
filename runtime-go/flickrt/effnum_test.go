@@ -5,8 +5,8 @@ import (
 	"testing"
 )
 
-// Effect's `Order.Number` puts NaN below every number, so `Float.min`
-// picks NaN and `Float.max` the other number, whichever side NaN is on.
+// The order of numbers puts NaN below every number, so `Float.min` picks
+// NaN and `Float.max` the other number, whichever side NaN is on.
 func TestNumberOrderPutsNaNLeast(t *testing.T) {
 	nan := math.NaN()
 	for _, args := range [][2]float64{{nan, 1}, {1, nan}} {

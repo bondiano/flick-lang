@@ -27,8 +27,8 @@ func ChannelMapInputError(f, self Value) Value {
 	return channelMapInputError(channelOf(self), func(fb *Fiber, err Value) Value { return Run(fb, Apply(fb, f, err)) })
 }
 
-// ChannelSwitchMap is Effect's: the channels of the elements merged one at
-// a time, a new one interrupting the running one.
+// ChannelSwitchMap is the channels of the elements merged one at a time, a
+// new one interrupting the running one.
 func ChannelSwitchMap(f, self Value) Value {
 	return channelMergeAll(channelOf(ChannelMap(f, self)), 1, 16, true)
 }

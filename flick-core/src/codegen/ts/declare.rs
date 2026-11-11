@@ -35,8 +35,8 @@ impl Projection<'_> {
             && matches!(self.declaration(interface, export), Ok(Some(_)))
     }
 
-    /// A Prelude type TypeScript or Effect has, never declared; Effect's
-    /// `Stream` too.
+    /// A Prelude type TypeScript or Effect has, never declared; the Effect
+    /// library's `Stream` too.
     fn native(&self, name: &str) -> bool {
         native(self.module, name).is_some()
     }

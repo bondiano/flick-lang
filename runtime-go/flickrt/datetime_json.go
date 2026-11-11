@@ -2,11 +2,10 @@ package flickrt
 
 import "math"
 
-// The JSON codecs of date-times and zones, as Effect Schema's
-// DateTimeUtcFromString, DateTimeZonedFromString, TimeZoneFromString and
-// their kin read and write them.
+// The JSON codecs of date-times and zones, which read and write them as
+// strings.
 
-// typed is an encoding that first checks the value is what Effect's declared
+// typed is an encoding that first checks the value is what the declared
 // schema `name` accepts.
 func typed(name string, ok func(Value) bool, f func(Value) Value) func(*Fiber, Value) (Value, []issue) {
 	return func(_ *Fiber, v Value) (Value, []issue) {

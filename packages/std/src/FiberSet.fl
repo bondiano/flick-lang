@@ -1,6 +1,6 @@
-/// Effect's `FiberSet`: children owned by a `scope`, interrupted when it
-/// closes. `join` waits for the first failure of any of them, so the set is
-/// the supervisor of the children it runs.
+/// A set of children owned by a `scope`, interrupted when it closes. `join`
+/// waits for the first failure of any of them, so the set is the supervisor
+/// of the children it runs.
 module FiberSet exposing (..)
 
 import Fiber

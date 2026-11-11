@@ -1,6 +1,5 @@
-/// Effect's `HashRing`: consistent hashing of string inputs onto weighted
-/// nodes. The ring is persistent, and identifies a node by the string its key
-/// function gives.
+/// Consistent hashing of string inputs onto weighted nodes. The ring is
+/// persistent, and identifies a node by the string its key function gives.
 module HashRing exposing (..)
 
 /// A ring of nodes `a`.

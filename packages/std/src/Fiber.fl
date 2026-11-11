@@ -1,5 +1,5 @@
 /// Children of a `scope`: a child runs until its owner's scope closes, and
-/// its supervisor observes how it failed. Effect's `Fiber` over them.
+/// its supervisor observes how it failed.
 module Fiber exposing (
   Owner,
   Fiber,

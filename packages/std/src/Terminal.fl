@@ -1,6 +1,6 @@
-/// Effect's `Terminal`: the size of the terminal, its lines of input and
-/// output, as a service; `node` is the terminal of the Node.js process.
-/// Effect's queue of key presses (`readInput`) is not wrapped yet.
+/// The size of the terminal, its lines of input and output, as a service;
+/// `node` is the terminal of the Node.js process. The runtime's queue of
+/// key presses (`readInput`) is not wrapped yet.
 module Terminal exposing (..)
 
 import PlatformError
@@ -15,7 +15,7 @@ type alias UserInput = { input : Option String; key : Key }
 type error QuitError
   deriving Eq, Show
 
-/// The operations of Effect's `Terminal`; the functions below call them.
+/// The operations of `Terminal`; the functions below call them.
 service Terminal =
   columns : Unit ->{} Int
   rows : Unit ->{} Int

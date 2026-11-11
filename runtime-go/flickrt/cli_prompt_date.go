@@ -7,8 +7,8 @@ import (
 	"time"
 )
 
-// Effect's date prompt: the mask split into parts that edit one date in
-// local time, as JS `Date` setters do.
+// The date prompt: the mask split into parts that edit one date in local
+// time, as JS `Date` setters do.
 
 type promptDateLocales struct{ months, monthsShort, weekdays, weekdaysShort []string }
 

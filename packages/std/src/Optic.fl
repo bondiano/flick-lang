@@ -1,6 +1,6 @@
-/// Effect's `Optic`: values that focus on a part of a structure, to read it
-/// and to rebuild the structure with a new part. A `Lens` always has its
-/// part, a `Prism` and an `Optional` may not; an `Iso` converts both ways; a
+/// Optics: values that focus on a part of a structure, to read it and to
+/// rebuild the structure with a new part. A `Lens` always has its part, a
+/// `Prism` and an `Optional` may not; an `Iso` converts both ways; a
 /// `Traversal` focuses on a list of parts. An optic of a stronger kind
 /// becomes a weaker one with `Optic.iso_lens`, `Optic.lens_optional`, ….
 module Optic exposing (..)

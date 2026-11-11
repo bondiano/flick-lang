@@ -1,4 +1,4 @@
-// Codecs over Effect Schema's transformations and structures: each decodes
+// Codecs of transformations and structures: each decodes
 // a wire value, encodes it back, and the strict exporter states it exactly
 // or refuses what decoding decides beyond the wire type.
 module App.Main exposing (main)

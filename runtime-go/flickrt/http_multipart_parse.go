@@ -8,11 +8,11 @@ import (
 	"strings"
 )
 
-// The parser of `multipart/form-data` bodies, as Effect's MultipartParser:
-// Go's mime/multipart splits the parts, and the limits, the media types
-// and dispositions of parts, and which parts are files are Effect's.
+// The parser of `multipart/form-data` bodies: Go's mime/multipart splits
+// the parts; the limits, the media types and dispositions of parts, and
+// which parts are files are decided here.
 
-// contentType is Effect's parse of a `Content-Type` (or, without a slash,
+// contentType is the parse of a `Content-Type` (or, without a slash,
 // `Content-Disposition`) header: the lower-cased value, "" when the header
 // is malformed, and the parameters, later ones winning.
 type contentType struct {
@@ -139,7 +139,7 @@ func (l *formLimits) isFile(info partInfo) bool {
 	return defaultIsFile(info)
 }
 
-// The reasons a form is refused, as Effect's MultipartErrorReason names.
+// The names of the reasons a form is refused.
 const (
 	reasonTooManyParts  = "TooManyParts"
 	reasonFieldTooLarge = "FieldTooLarge"
@@ -188,8 +188,8 @@ func (c *countingReader) Read(p []byte) (int, error) {
 	return n, err
 }
 
-// headerSize is the size of a part's headers as sent: what Effect counts
-// toward a part's size besides its body.
+// headerSize is the size of a part's headers as sent: what counts toward a
+// part's size besides its body.
 //
 // shortcut: textproto keeps neither the headers' spelling nor their spacing, so the size is that of `Name: value` lines; count the raw bytes if a limit at the edge must match exactly
 func headerSize(p *multipart.Part) int64 {
@@ -202,8 +202,8 @@ func headerSize(p *multipart.Part) int64 {
 	return n
 }
 
-// single is the header's value when the part has it once, as Effect reads
-// a repeated one as malformed.
+// single is the header's value when the part has it once: a repeated one
+// is malformed.
 func single(p *multipart.Part, name string) (string, bool) {
 	vs := p.Header[name]
 	if len(vs) != 1 {
@@ -212,8 +212,8 @@ func single(p *multipart.Part, name string) (string, bool) {
 	return decodeUTF8([]byte(vs[0])), true
 }
 
-// infoOfPart is Effect's info of a part, or false for a form-data part
-// without a name.
+// infoOfPart is the info of a part, or false for a form-data part without
+// a name.
 func infoOfPart(p *multipart.Part) (partInfo, bool) {
 	h, ok := single(p, "Content-Type")
 	ct := parseContentType(h, ok, false)

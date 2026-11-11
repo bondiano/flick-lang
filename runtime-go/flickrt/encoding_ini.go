@@ -4,14 +4,15 @@ import (
 	"strings"
 )
 
-// The parsers of Effect's `encoding` modules that `Cli.file_parse` reads
-// files with, ported from effect 4.0.5: a file's data is a JSON value,
-// objects `*Record`s still built in place with `put`. An error is the
-// text of what the JS parser throws, `SyntaxError: …` or `TypeError: …`.
+// The parsers that `Cli.file_parse` reads files with: a file's data is a
+// JSON value, objects `*Record`s still built in place with `put`. An error
+// is the text of what the JS parser throws, `SyntaxError: …` or
+// `TypeError: …`.
+// Derived from the `encoding` modules of effect 4.0.5.
 
-// parseIni is Effect's encoding/Ini `parse` (adapted from `ini` 7.0.0):
-// dotted sections nest, repeated `key[]` make arrays, and `true`,
-// `false` and `null` are decoded; other values stay strings.
+// parseIni parses INI (adapted from `ini` 7.0.0): dotted sections nest,
+// repeated `key[]` make arrays, and `true`, `false` and `null` are
+// decoded; other values stay strings.
 //
 // shortcut: a section that names an array (`a[]=1` then `[a]`) takes no keys, where JS sets an index-like key as an element; follow JS when a file does that
 func parseIni(input string) (Value, string) {

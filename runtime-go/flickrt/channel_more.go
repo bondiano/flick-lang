@@ -1,16 +1,15 @@
 package flickrt
 
-// Channel's constructors beyond the core, as Effect's (Channel.ts): from
-// effects, queues, hubs and schedules, and their bindings.
+// Channel's constructors beyond the core: from effects, queues, hubs and
+// schedules, and their bindings.
 
-// channelFromPullOf is the channel whose pull is `p`, as Effect's
-// `fromPull(Effect.succeed(p))`.
+// channelFromPullOf is the channel whose pull is `p`.
 func channelFromPullOf(p Pull) *Channel { return fromPull(func(*Fiber) Pull { return p }) }
 
 var channelNever = channelFromPullOf(func(fb *Fiber) Value { return EffectNever(fb) })
 
-// channelFromSubscription is Effect's: the take of the subscription, an
-// interruption of which ends the channel.
+// channelFromSubscription is the take of the subscription, an interruption
+// of which ends the channel.
 func channelFromSubscription(s *Subscription) *Channel {
 	return channelFromPullOf(func(fb *Fiber) Value {
 		return onInterruptDone(fb, func(fb *Fiber) Value {
@@ -26,7 +25,7 @@ func channelFromSubscriptionArray(s *Subscription) *Channel {
 	})
 }
 
-// onInterruptDone is `Effect.onInterrupt(f, () => Cause.done())`.
+// onInterruptDone runs `f`, and joins the done cause to an interruption of it.
 func onInterruptDone(fb *Fiber, f func(fb *Fiber) Value) Value {
 	v, c := catch(func() Value { return f(fb) })
 	if c != nil {
@@ -63,9 +62,8 @@ func channelFromSchedule(s *Schedule) *Channel {
 	})
 }
 
-// channelCallback is Effect's `callback`: `f` runs in a fiber of the
-// channel's scope with a queue the channel takes from; its failure fails
-// the queue.
+// channelCallback runs `f` in a fiber of the channel's scope with a queue
+// the channel takes from; its failure fails the queue.
 func channelCallback(q *Queue, f func(fb *Fiber, q *Queue), take Pull) *Channel {
 	return fromTransform(func(fb *Fiber, _ Pull, scope *Owner) Pull {
 		scope.add(fb, func(*Fiber, *Cause) Value { q.shutdown(); return Unit })

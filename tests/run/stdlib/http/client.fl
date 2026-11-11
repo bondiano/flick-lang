@@ -1,4 +1,4 @@
-// Effect's HTTP client against a fake transport made by `Http.Client.make`:
+// The HTTP client against a fake transport made by `Http.Client.make`:
 // requests and their parts, responses and their bodies, and the client
 // combinators; errors are Flick errors.
 module App.Main exposing (main)

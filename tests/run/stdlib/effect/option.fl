@@ -1,4 +1,4 @@
-// Options and results over Effect's `Option` and `Result`.
+// `Option` and `Result`: options and results.
 module App.Main exposing (main)
 
 line : String -> String ->{} Unit

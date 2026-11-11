@@ -44,7 +44,7 @@ and `Monad`.
 | `Form` | forms of a record type that derives `Form`: `draft`, `input`, `validate`, `report` (see [Forms](../form/)) |
 | `Route` | URLs of a type that derives `Url`: `print` and `parse`; `Atom.route` holds the current page (see [Routes](../route/)) |
 | `NonEmpty` | lists with at least one element |
-| `Chunk` | Effect's `Chunk`, for repeated concatenation |
+| `Chunk` | sequences for repeated concatenation |
 | `Js.Array` | mutable JS arrays, behind runtime operations; lists are copied in and out |
 | `String` | `split`, `join`, `slice`, `index_of`, `to_number`, … over UTF-16 code units |
 | `Markdown` | `to_html`: the everyday CommonMark subset (headings, paragraphs, lists, quotes, fenced code, rules, `code`, strong, emphasis, links) into HTML in which every text is escaped and links go only to `http`, `https`, `mailto` and relative URLs, so a script in the source stays text; `escape` |
@@ -53,8 +53,8 @@ and `Monad`.
 | `BigInt` | conversions and checked `divide`, `remainder` |
 | `Ref` | `make`, `get`, `set`, `modify`, and `same` for identity; no `Eq` or `Hash` |
 | `Redacted` | `make`, `reveal` (runtime); `show` prints `<redacted>` |
-| `BigDecimal` | Effect's `BigDecimal`: `from_string`, exact `add`, `subtract`, checked `multiply`, `divide_to_scale` |
-| `Duration` | Effect's `Duration`: checked `nanos`, `millis`, `seconds`, `minutes`, explicit `infinity` |
+| `BigDecimal` | decimal numbers: `from_string`, exact `add`, `subtract`, checked `multiply`, `divide_to_scale` |
+| `Duration` | lengths of time: checked `nanos`, `millis`, `seconds`, `minutes`, explicit `infinity` |
 | `Bytes` | bytes as lists of numbers from 0 to 255: `from_string` and `to_string` (UTF-8, `None` when not UTF-8), `to_base64url` and `from_base64url`, and `equal`, whose time depends only on the lengths |
 | `Crypto` | the `Crypto` service over Web Crypto (`Crypto.system`): `random_bytes`, `digest` (SHA-1, SHA-256, SHA-384, SHA-512), `hmac` over `digest` (RFC 2104), random numbers, UUIDs and ULIDs; `pbkdf2` (RFC 8018), and `hash_password` / `verify_password`: PBKDF2-HMAC-SHA256 with 600000 rounds and a random salt, stored as `$pbkdf2-sha256$i=<rounds>$<salt>$<hash>` in URL-safe base64 and checked in constant time |
 | `Jwt` | JSON Web Tokens signed with HMAC-SHA256 (`alg` `HS256`): `sign` and `verify` over a JSON codec of the claims; `verify` refuses another `alg`, a wrong signature and an `exp` the clock has passed with `JwtError` (`Malformed`, `BadSignature`, `Expired`); `now` and `expires_in` give `iat` and `exp` in seconds since the epoch |
@@ -63,7 +63,7 @@ and `Monad`.
 | `Platform` | `stdout_line`, `stderr_line`, `stdout_write`, `args`, `env` |
 | `Log` | the `Log` service with `info`, `warn`, `error`, `debug`, and `Log.console` |
 | `File` | the `FileSystem` service: `open_scoped`, `read_all`, `read_text`, `write_text`, and `File.node` |
-| `ChildProcess` | child processes, as Effect's: a `Command` (`make`, `set_cwd`, `set_env`, `set_stdin`, `prefix`, `pipe_to`, `inherit_output`) run to its end by `string`, `lines` and `exit_code`, or started by `spawn` as a `Process` of a scope, with `stdout`, `stderr`, `wait`, `is_running`, `kill` and `kill_with` |
+| `ChildProcess` | child processes: a `Command` (`make`, `set_cwd`, `set_env`, `set_stdin`, `prefix`, `pipe_to`, `inherit_output`) run to its end by `string`, `lines` and `exit_code`, or started by `spawn` as a `Process` of a scope, with `stdout`, `stderr`, `wait`, `is_running`, `kill` and `kill_with` |
 | `Resource` | `acquire_release` into a scope's owner, and `bracket` |
 | `Events` | `queue` policies and the `log_failures` supervisor |
 | `Ui`, `Ui.Event` | user interfaces rendered with React, see [ui.md](../ui/) |
@@ -74,12 +74,12 @@ and `Monad`.
 | `JsError` | `JsError.from_js`, the error of a foreign throw or rejection, see [ffi.md](../ffi/) |
 | `Fiber`, `Failure`, `Exit`, `RawCause` | children of a scope and outcomes |
 | `Test`, `Gen` | tests and generators, see below |
-| `Schedule` | Effect's schedules: `recurs`, `spaced`, `exponential`, `fibonacci`, `up_to`, `while`, `tap`, … |
-| `Effect` | what Effect's `Effect` offers beyond the language: `retry` (typed failures only), `repeat`, `schedule`, `sleep`, … |
+| `Schedule` | schedules for `Effect.repeat` and `Effect.retry`: `recurs`, `spaced`, `exponential`, `fibonacci`, `up_to`, `while`, `tap`, … |
+| `Effect` | operations on tasks beyond the language: `retry` (typed failures only), `repeat`, `schedule`, `sleep`, … |
 
 ### More modules
 
-Thinner wrappers of Effect modules, each documented in its source under
+Each of these modules is documented in its source under
 `packages/std/src/`:
 
 | Module | Contents |
@@ -107,7 +107,7 @@ Thinner wrappers of Effect modules, each documented in its source under
 | `JsonPatch`, `JsonPointer` | the differences between two JSON values (RFC 6902) and JSON Pointers (RFC 6901) |
 | `Net` | network addresses and DNS records as JSON |
 | `Terminal`, `PlatformError` | the terminal as a service, and how the platform services fail |
-| `Formatter`, `Inspectable` | the text and JSON form Effect gives inert data |
+| `Formatter`, `Inspectable` | the text and JSON form of inert data |
 | `Version` | the release of Effect the program runs on |
 
 Every export of the pinned Effect is wrapped or decided in a manifest that

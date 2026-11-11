@@ -113,8 +113,8 @@ func catch(f func() Value) (out Value, cause *Cause) {
 }
 
 // add runs `finalizer` in `fb` when the owner closes, or at once when its
-// finalizers have started, as Effect's scopes do. A child still running
-// while the owner closes adds to the stack, released after it ended.
+// finalizers have started. A child still running while the owner closes
+// adds to the stack, released after it ended.
 func (o *Owner) add(fb *Fiber, run func(fb *Fiber, exit *Cause) Value) {
 	o.addTraced(fb, run, false)
 }
@@ -169,8 +169,8 @@ func (f finalizer) call(closer *Fiber, exit *Cause) *Cause {
 }
 
 // close closes the owner, uninterruptibly, after its body ended with `exit`
-// (nil on success): the cause the region ends with, joined as Effect's
-// `onExit(body, exit => Scope.close(scope, exit))` joins them.
+// (nil on success): the cause the region ends with, the body's joined with
+// its finalizers'.
 func (o *Owner) close(fb *Fiber, exit *Cause) *Cause {
 	return finalized(exit, o.closeFinalizers(fb, exit))
 }
@@ -260,8 +260,7 @@ func (o *Owner) closeFinalizers(fb *Fiber, exit *Cause) (cause *Cause) {
 	return Sequential(cause, released)
 }
 
-// owned runs `body` in a fiber whose owner is a fresh one, then closes it
-// as Effect's `scoped` does.
+// owned runs `body` in a fiber whose owner is a fresh one, then closes it.
 func owned(fb *Fiber, body func(fb *Fiber, owner *Owner) Value) Value {
 	return ownedWith(fb, (*Owner).close, body)
 }
@@ -338,7 +337,7 @@ func Bracket(fb *Fiber, acquire, use, release Value) Value {
 	_, released := catch(func() Value {
 		return masked(fb, inside+1, func() Value { return Run(fb, Apply(fb, release, v)) })
 	})
-	if cause = finalized(cause, released); cause != nil { // as Effect's acquireUseRelease
+	if cause = finalized(cause, released); cause != nil { // then the failure of the release
 		panic(&Failure{cause})
 	}
 	return out

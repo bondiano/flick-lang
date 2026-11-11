@@ -1,8 +1,7 @@
-/// Effect's `ScopedCache`: a `Cache` whose lookups acquire resources. A value
-/// is used only inside `use`, which holds it: an entry's resources are
-/// released when it is dropped and no `use` holds its value, and all of them
-/// when the `scope` owning the cache's region closes. Keys are compared by
-/// `==`.
+/// A `Cache` whose lookups acquire resources. A value is used only inside
+/// `use`, which holds it: an entry's resources are released when it is
+/// dropped and no `use` holds its value, and all of them when the `scope`
+/// owning the cache's region closes. Keys are compared by `==`.
 module ScopedCache exposing (..)
 
 import Duration

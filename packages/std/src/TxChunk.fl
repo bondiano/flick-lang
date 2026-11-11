@@ -1,5 +1,5 @@
-/// Effect's `TxChunk`: a `Chunk` in a transactional cell; each operation
-/// takes part in the enclosing `Tx.atomically` transaction.
+/// A `Chunk` in a transactional cell; each operation takes part in the
+/// enclosing `Tx.atomically` transaction.
 module TxChunk exposing (..)
 
 import Chunk

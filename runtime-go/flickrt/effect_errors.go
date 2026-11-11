@@ -1,8 +1,8 @@
 package flickrt
 
-// The part `Effect.Errors` of Effect's `Effect`: a task's whole failure as
-// an opaque `Failure`, its exit, and a defect as inert text. A filter
-// gives `Ok` of what it found, or `Err` of what stays.
+// The part `Effect.Errors` of `Effect`: a task's whole failure as an opaque
+// `Failure`, its exit, and a defect as inert text. A filter gives `Ok` of
+// what it found, or `Err` of what stays.
 
 // onCause runs `task`; when it fails, `handle` of the cause ends it.
 func onCause(fb *Fiber, task Value, handle func(*Cause) Value) Value {
@@ -114,8 +114,8 @@ func EffectMatchCauseEffect(fb *Fiber, onFailure, onSuccess, task Value) Value {
 	return Run(fb, Apply(fb, onSuccess, v))
 }
 
-// EffectOrDie is Effect's `catch_(self, die)`: a cause with a typed
-// failure becomes the defect of its first error.
+// EffectOrDie makes a typed failure a defect: a cause with a typed failure
+// becomes the defect of its first error.
 func EffectOrDie(fb *Fiber, task Value) Value {
 	return onCause(fb, task, func(c *Cause) Value {
 		r := c.firstOf(causeFail)

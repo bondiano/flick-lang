@@ -1,4 +1,4 @@
-/// Immutable hash sets over Effect's `HashSet`; each set keeps its witness.
+/// Immutable hash sets; each set keeps its witness.
 module HashSet exposing (..)
 
 import EqHash

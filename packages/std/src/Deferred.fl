@@ -1,6 +1,6 @@
-/// Effect's `Deferred`: a value that is set once, which tasks wait for.
-/// `Deferred e a` ends with an `a` or a typed error of `e`; each waiting
-/// task gets the same outcome, and completing it again does nothing.
+/// A value that is set once, which tasks wait for. `Deferred e a` ends with
+/// an `a` or a typed error of `e`; each waiting task gets the same outcome,
+/// and completing it again does nothing.
 module Deferred exposing (..)
 
 /// A one-time result of `a`, or a failure with an error of `e`.

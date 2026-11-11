@@ -187,8 +187,8 @@ func (s *usageTTL) run(fb *Fiber, p *pool) {
 	}
 }
 
-// identical is Effect's `===` on Flick values: primitives by value, other
-// values by reference.
+// identical is JS `===` on Flick values: primitives by value, other values
+// by reference.
 func identical(a, b Value) bool {
 	switch x := a.(type) {
 	case float64, string, bool, int32, UnitType:

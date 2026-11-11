@@ -1,9 +1,9 @@
-/// Effect's `HttpClient`: a client sends requests and gives responses. The
-/// service `HttpClient` holds the program's client (`Http.FetchClient.layer`
-/// provides one over `fetch`); `get`, `post`, … send through it. A `Client r
-/// e` is a client as a value, needing the services `r` and failing with the
-/// errors `e`: the combinators below change what it does around each
-/// request.
+/// An HTTP client sends requests and gives responses. The service
+/// `HttpClient` holds the program's client (`Http.FetchClient.layer`
+/// provides one over `fetch`); `get`, `post`, … send through it. A
+/// `Client r e` is a client as a value, needing the services `r` and
+/// failing with the errors `e`: the combinators below change what it does
+/// around each request.
 module Http.Client exposing (..)
 
 import Http.ClientError exposing (HttpClientError)

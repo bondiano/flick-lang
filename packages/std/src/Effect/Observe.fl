@@ -1,6 +1,5 @@
-/// The part of `Effect` that observes tasks: Effect's log messages and
-/// their annotations, spans of the current tracer, and metrics of how
-/// tasks end.
+/// The part of `Effect` that observes tasks: log messages and their
+/// annotations, spans of the current tracer, and metrics of how tasks end.
 module Effect.Observe exposing (..)
 
 import Cause

@@ -1,5 +1,5 @@
-/// Effect's `Semaphore`: a number of permits that tasks take and give back,
-/// limiting how many run at once.
+/// A number of permits that tasks take and give back, limiting how many run
+/// at once.
 module Semaphore exposing (..)
 
 /// A pool of permits.

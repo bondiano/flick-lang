@@ -1,6 +1,5 @@
-/// Effect's `TxDeferred`: a value completed at most once, read inside
-/// `Tx.atomically` transactions; awaiting it retries the transaction until
-/// it is completed.
+/// A value completed at most once, read inside `Tx.atomically`
+/// transactions; awaiting it retries the transaction until it is completed.
 module TxDeferred exposing (..)
 
 import Tx

@@ -4,9 +4,8 @@ import (
 	"io"
 )
 
-// Forms read part by part, as Effect's Multipart streams them: a field
-// whole, a file as a stream of its bytes that must be read before the next
-// part, the rest of it skipped otherwise.
+// Forms read part by part: a field whole, a file as a stream of its bytes
+// that must be read before the next part, the rest of it skipped otherwise.
 
 var (
 	partFieldTag = Tag("Http.Multipart.Part.Field")

@@ -1,8 +1,8 @@
-/// Effect's `Combiner`: a way to combine two values of a type into one, as
-/// a value. `Combiner.combine c x y` runs it; `Reducer` adds a start value.
+/// A way to combine two values of a type into one, as a value.
+/// `Combiner.combine c x y` runs it; `Reducer` adds a start value.
 module Combiner exposing (..)
 
-/// Effect's combiner of values of `a`.
+/// A combiner of values of `a`.
 type Combiner a
 
 /// The combiner of `combine`, called as `combine self that`.

@@ -1,4 +1,4 @@
-// Hubs from Effect's `TxPubSub` and cells from `TxSubscriptionRef`: each
+// Hubs from `TxPubSub` and cells from `TxSubscriptionRef`: each
 // subscription belongs to its `scope` and sees what was published after it
 // subscribed.
 module App.Main exposing (main)

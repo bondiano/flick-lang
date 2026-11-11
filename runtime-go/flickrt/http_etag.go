@@ -6,8 +6,8 @@ import (
 	"strconv"
 )
 
-// Http.Etag's generators as Effect's: a file's tag is its size and its
-// modification time in milliseconds, both in hex.
+// Http.Etag's generators: a file's tag is its size and its modification
+// time in milliseconds, both in hex.
 
 func etagLayer(key Value, ctor string) Value {
 	tag := Tag("Http.Etag.Etag." + ctor)

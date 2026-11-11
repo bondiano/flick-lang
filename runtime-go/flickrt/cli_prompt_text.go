@@ -6,13 +6,13 @@ import (
 	"strings"
 )
 
-// Effect's text, confirm and toggle prompts, and the drawing they share.
+// The text, confirm and toggle prompts, and the drawing they share.
 
 var promptNewline = regexp.MustCompile(`\r?\n`)
 
 func promptLines(text string) []string { return promptNewline.Split(text, -1) }
 
-// promptAnnotateSymbol is Effect's `annotateSymbol`: nothing for no symbol.
+// promptAnnotateSymbol is a symbol in its styles: nothing for no symbol.
 func promptAnnotateSymbol(t *promptTheme, symbol string, styles ...string) string {
 	if symbol == "" {
 		return ""
@@ -27,8 +27,7 @@ func promptSeparate(symbol, text string) string {
 	return symbol + " " + text
 }
 
-// promptRender is Effect's `renderPrompt`: the message between its symbols,
-// then what it asks for.
+// promptRender is the message between its symbols, then what it asks for.
 func promptRender(confirm, message, leading, trailing string, t *promptTheme, plain bool) string {
 	lines := promptLines(message)
 	if !plain {
@@ -52,8 +51,8 @@ func promptRender(confirm, message, leading, trailing string, t *promptTheme, pl
 }
 
 // promptEraseText clears the rows `text` took.
-// shortcut: rows count display columns where Effect counts UTF-16 units,
-// so wide characters wrap as the terminal wraps them.
+// shortcut: rows count display columns where the JS target counts UTF-16
+// units, so wide characters wrap as the terminal wraps them.
 func promptEraseText(text string, columns int) string {
 	if columns == 0 {
 		return ansiEraseLine + "\x1b[1G"
@@ -219,7 +218,7 @@ func (o *promptTextOptions) render(c *promptCtx, state Value, action promptActio
 	s := action.value.(promptTextState)
 	leading, trailing := promptAnnotateSymbol(t, t.prefix, t.primary), promptAnnotateSymbol(t, t.pointerSmall, t.muted)
 	// shortcut: the text after the cursor is measured in display columns where
-	// Effect counts UTF-16 units; the hidden prompt still moves as Effect's does
+	// the JS target counts UTF-16 units; the hidden prompt still moves as there
 	offset := -promptWidth(string(s.value[s.cursor:]))
 	if o.kind == "password" {
 		offset = (s.cursor - len(s.value)) * len([]rune(t.passwordMask))

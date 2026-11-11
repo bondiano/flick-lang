@@ -1,4 +1,4 @@
-// Effect's `MutableRef` operations, on Flick's runtime cells `Ref`.
+// The operations of a mutable reference, on the runtime cells `Ref`.
 module App.Main exposing (main)
 
 main : Unit ->{; AppError} Unit

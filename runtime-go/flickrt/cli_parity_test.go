@@ -96,8 +96,8 @@ func cliParityCommand(log func(string)) *cliSpec {
 	return tool.(*cliSpec)
 }
 
-// The command lines of parity.mjs print and fail as Effect's CLI does
-// through run.ts: testdata/cli_parity.txt.
+// The command lines of parity.mjs print and fail as the CLI of the Effect
+// library does through run.ts: testdata/cli_parity.txt.
 func TestCliParityAsEffect(t *testing.T) {
 	var out []string
 	log := func(s string) { out = append(out, s) }

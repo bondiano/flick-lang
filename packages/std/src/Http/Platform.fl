@@ -1,5 +1,5 @@
-/// Effect's `HttpPlatform`: what a server needs of its platform to send
-/// files, as a service; `node` is the platform of Node.js.
+/// What a server needs of its platform to send files, as a service; `node`
+/// is the platform of Node.js.
 module Http.Platform exposing (..)
 
 import ByteSize
@@ -28,7 +28,7 @@ let file_options = {
   response = Http.ServerResponse.defaults;
 }
 
-/// The operations of Effect's `HttpPlatform`.
+/// The operations of `HttpPlatform`.
 service HttpPlatform =
   file_response :
     FileOptions -> String ->{Async; PlatformError.PlatformError} Http.ServerResponse.ServerResponse

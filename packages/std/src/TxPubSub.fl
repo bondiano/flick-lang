@@ -1,6 +1,6 @@
-/// Effect's `TxPubSub`: a hub that hands each published element to every
-/// subscriber, inside `Tx.atomically` transactions. A subscription
-/// belongs to the `scope` that owns its region and ends when it closes.
+/// A hub that hands each published element to every subscriber, inside
+/// `Tx.atomically` transactions. A subscription belongs to the `scope` that
+/// owns its region and ends when it closes.
 module TxPubSub exposing (..)
 
 import Tx

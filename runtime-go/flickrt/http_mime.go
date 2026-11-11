@@ -6,8 +6,8 @@ import (
 	"sync"
 )
 
-// Http.Mime as Effect's: media types by extension and back, over the
-// table of the `mime` package.
+// Http.Mime: media types by extension and back, over the table of the
+// `mime` package.
 
 type mimeTables struct {
 	extensionToType map[string]string

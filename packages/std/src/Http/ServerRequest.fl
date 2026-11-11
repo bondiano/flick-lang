@@ -1,8 +1,8 @@
-/// Effect's `HttpServerRequest`: a request a server handles. Its body is
-/// read once, by one of `text`, `json`, `url_params_body` or `bytes`, or
-/// as a multipart form by `Http.Multipart.persisted`; reading fails with
-/// `HttpServerError`. Cookie values are secrets. Streamed bodies and
-/// WebSocket upgrades wait for Flick's streams.
+/// A request a server handles. Its body is read once, by one of `text`,
+/// `json`, `url_params_body` or `bytes`, or as a multipart form by
+/// `Http.Multipart.persisted`; reading fails with `HttpServerError`. Cookie
+/// values are secrets. Streamed bodies and WebSocket upgrades wait for
+/// Flick's streams.
 module Http.ServerRequest exposing (..)
 
 import ByteSize

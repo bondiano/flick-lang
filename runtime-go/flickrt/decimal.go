@@ -8,8 +8,8 @@ import (
 	"strings"
 )
 
-// Decimal is a BigDecimal as Effect's: value × 10^-scale. It is never
-// mutated, and its scale is a safe integer.
+// Decimal is a BigDecimal: value × 10^-scale. It is never mutated, and its
+// scale is a safe integer.
 type Decimal struct {
 	value *big.Int
 	scale int64
@@ -25,13 +25,13 @@ func dec(v Value) *Decimal { return v.(*Decimal) }
 
 func pow10(n int64) *big.Int { return new(big.Int).Exp(bigTen, big.NewInt(n), nil) }
 
-// Effect 4.1 bounds a parsed scale and the alignment of two scales.
+// A parsed scale and the alignment of two scales are bounded.
 const (
 	maxDecimalScale     = 10_000
 	maxDecimalAlignment = 2 * maxDecimalScale
 )
 
-// powerOfTen is Effect's: 10^n for aligning scales, a RangeError past the bound.
+// powerOfTen is 10^n for aligning scales, a RangeError past the bound.
 func powerOfTen(n int64) *big.Int {
 	if n > maxDecimalAlignment {
 		panic(rangeError("Scale alignment must not exceed " + strconv.Itoa(maxDecimalAlignment) + " digits, got " + strconv.FormatInt(n, 10)))
@@ -103,7 +103,7 @@ func decCompare(a, b *Decimal) int {
 
 var finiteInt = regexp.MustCompile(`^[+-]?\d+$`)
 
-// parseDecimal is Effect's `BigDecimal.fromString`: an empty string is 0.
+// parseDecimal reads a decimal from a string: an empty string is 0.
 func parseDecimal(s string) (*Decimal, bool) {
 	if s == "" {
 		return &Decimal{new(big.Int), 0}, true
@@ -132,7 +132,7 @@ func parseDecimal(s string) (*Decimal, bool) {
 	}
 	scale := offset - exp
 	v, _ := new(big.Int).SetString(strings.TrimPrefix(digits, "+"), 10)
-	// as Effect 4.1: a scale `format` can print back
+	// a scale `format` can print back
 	normalized := scale
 	if v.Sign() != 0 {
 		normalized -= int64(len(digits) - len(strings.TrimRight(digits, "0")))
@@ -181,8 +181,8 @@ func DecimalFromNumber(n Value) Value {
 	return Ok(&Decimal{v, int64(len(trail))})
 }
 
-// DecimalToString is Effect's `format`: normalized, in exponent form from
-// a scale of 16 either way.
+// DecimalToString is the text of a decimal: normalized, in exponent form
+// from a scale of 16 either way.
 func DecimalToString(d Value) Value {
 	n := dec(d).normalize()
 	if n.scale >= 16 || n.scale <= -16 {
@@ -344,7 +344,7 @@ func DecimalFloor(scale, d Value) Value {
 	return scaled(scale, func(s int64) Value { return decFloor(dec(d), s) })
 }
 
-// decRound is Effect's `BigDecimal.round`.
+// decRound rounds `d` to the scale `s` by `mode`.
 func decRound(d *Decimal, s int64, mode string) *Decimal {
 	if d.scale <= s {
 		return d
@@ -429,7 +429,7 @@ func DecimalMultiplyAll(xs Value) Value {
 }
 
 // DecimalDivide is `self / that` to 100 significant digits, rounding the
-// last half up, as Effect divides.
+// last half up.
 func DecimalDivide(that, self Value) Value {
 	a, b := dec(self), dec(that)
 	switch {

@@ -2,8 +2,8 @@ package flickrt
 
 import "strings"
 
-// Channel's transformations beyond the core, as Effect's (Channel.ts):
-// inputs, concatenation, repetition, filters, scans, buffers and text.
+// Channel's transformations beyond the core: inputs, concatenation,
+// repetition, filters, scans, buffers and text.
 
 // channelMapInput maps each element of the upstream before the channel
 // reads it.
@@ -13,8 +13,8 @@ func channelMapInput(self *Channel, f func(fb *Fiber, i Value) Value) *Channel {
 	})
 }
 
-// catchError is Effect's `catch`: `f` of the first typed error of a
-// failure that has one; another failure goes on.
+// catchError recovers from a typed error: `f` of the first typed error of
+// a failure that has one; another failure goes on.
 func catchError(fb *Fiber, p Pull, f func(fb *Fiber, err Value) Value) Value {
 	v, c := catch(func() Value { return p(fb) })
 	if c == nil {
@@ -82,8 +82,9 @@ func channelDrain(self *Channel) *Channel {
 	})
 }
 
-// repeatLoop is Effect's: each run in a scope of its own, closed when it
-// ends, after which `onDone` of its done value goes on or halts.
+// repeatLoop runs the channel again and again: each run in a scope of its
+// own, closed when it ends, after which `onDone` of its done value goes on
+// or halts.
 func repeatLoop(self *Channel, onDone func(fb *Fiber, d Value)) *Channel {
 	return fromTransform(func(_ *Fiber, upstream Pull, scope *Owner) Pull {
 		var current Pull
@@ -202,9 +203,8 @@ func channelBuffer(self *Channel, q *Queue, offer func(fb *Fiber, q *Queue, o Va
 	})
 }
 
-// channelSplitLines is Effect's `splitLines`: chunks of text as chunks of
-// lines, a line split across chunks joined, "\r\n", "\r" and "\n" ending
-// one.
+// channelSplitLines is chunks of text as chunks of lines, a line split
+// across chunks joined, "\r\n", "\r" and "\n" ending one.
 func channelSplitLines() *Channel {
 	return fromTransform(func(_ *Fiber, upstream Pull, _ *Owner) Pull {
 		var builder string

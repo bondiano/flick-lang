@@ -10,8 +10,8 @@ import (
 
 // A Schema is the witness of a type: what its values are, and how its
 // canonical JSON form reads and writes them, as the JS runtime's schemas
-// over Effect Schema do. Decoding stops at the first issue, except that an
-// untagged union reports the first issue of each case.
+// do. Decoding stops at the first issue, except that an untagged union
+// reports the first issue of each case.
 type Schema struct {
 	kind     schemaKind
 	item     *Schema     // list, option, redacted, chunk

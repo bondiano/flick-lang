@@ -1,7 +1,6 @@
-/// Effect's `HttpClientResponse`: the response to a request of
-/// `Http.Client`. Its body is read once, by one of `text`, `json`,
-/// `url_params_body`, `bytes` or `form_data`; reading fails with
-/// `HttpClientError`, or streamed by `stream`.
+/// The response to a request of `Http.Client`. Its body is read once, by
+/// one of `text`, `json`, `url_params_body`, `bytes` or `form_data`;
+/// reading fails with `HttpClientError`, or streamed by `stream`.
 module Http.ClientResponse exposing (..)
 
 import Http.ClientError exposing (HttpClientError)

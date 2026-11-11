@@ -5,11 +5,10 @@ import (
 	"strings"
 )
 
-// parseYaml is Effect's encoding/Yaml `parse` (based on `yaml` 2.9.0): one
-// document of block and flow collections, plain, quoted and block
-// scalars, anchors, aliases and merge keys (`<<`). As Effect's, it reads
-// no tags, compact nested sequences, multi-line quoted scalars in flow
-// collections or complex keys.
+// parseYaml parses YAML (based on `yaml` 2.9.0): one document of block and
+// flow collections, plain, quoted and block scalars, anchors, aliases and
+// merge keys (`<<`). It reads no tags, compact nested sequences,
+// multi-line quoted scalars in flow collections or complex keys.
 func parseYaml(input string) (v Value, err string) {
 	defer func() {
 		if r := recover(); r != nil {

@@ -1,6 +1,6 @@
-/// Cryptographic randomness and digests as a service, over Effect's
-/// `Crypto`; `Crypto.system` provides it from the platform's Web Crypto.
-/// Bytes are lists of numbers from 0 to 255.
+/// Cryptographic randomness and digests as a service; `Crypto.system`
+/// provides it from the platform's Web Crypto. Bytes are lists of numbers
+/// from 0 to 255.
 module Crypto exposing (
   CryptoError(..),
   DigestAlgorithm(..),
@@ -194,7 +194,8 @@ system_random_ulid : Unit ->{; CryptoError} String
 foreign effect system_random_ulid from "flick:Crypto" "flickRandomUlid"
   arity 0
 
-/// Effect's `Crypto` over the platform's Web Crypto (`globalThis.crypto`).
+/// The `Crypto` service over the platform's Web Crypto
+/// (`globalThis.crypto`).
 system : Layer none none {Crypto}
 let system =
   Layer.succeed Crypto {

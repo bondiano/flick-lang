@@ -6,9 +6,9 @@ import (
 	"time"
 )
 
-// Clock is Effect's: the fiber's source of time, which its sleeps,
-// timeouts and schedules wait on. It lives in the fiber's environment, so
-// that a test runs on a clock of its own.
+// Clock is the fiber's source of time, which its sleeps, timeouts and
+// schedules wait on. It lives in the fiber's environment, so that a test
+// runs on a clock of its own.
 type Clock interface {
 	millis() float64
 	nanos() *big.Int
@@ -56,7 +56,7 @@ func ClockCurrentTimeMillis(fb *Fiber) Value  { return clockOf(fb).millis() }
 func ClockCurrentTimeNanos(fb *Fiber) Value   { return clockOf(fb).nanos() }
 func ClockMonotonicTimeNanos(fb *Fiber) Value { return clockOf(fb).monotonic() }
 
-// millisOf is Effect's `Duration.toMillis`.
+// millisOf is the milliseconds of a duration.
 func millisOf(d *Duration) float64 {
 	switch d.tag {
 	case durationMillis:

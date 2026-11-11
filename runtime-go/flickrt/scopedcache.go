@@ -5,10 +5,10 @@ import (
 	"sync"
 )
 
-// ScopedCache is Effect's, each value kept with a lease count as
-// packages/effect-ts/src/effect/ScopedCache.ts does: a value is used only under a
-// lease, and dropping its entry releases it once the last lease ends. Each
-// entry has an owner of its own, which holds the value's holder.
+// ScopedCache keeps each value with a lease count, as
+// packages/effect-ts/src/effect/ScopedCache.ts does: a value is used only
+// under a lease, and dropping its entry releases it once the last lease
+// ends. Each entry has an owner of its own, which holds the value's holder.
 type scopedCache struct {
 	mu       sync.Mutex
 	closed   bool
@@ -205,7 +205,7 @@ func (c *scopedCache) await(fb *Fiber, key Value, e *scopedEntry, outer int) Val
 	if last {
 		stop(fb, lookup)
 		if lookup.cause.has(causeDie) {
-			cause = finalized(cause, lookup.cause) // as Effect's onExit in awaitEntry
+			cause = finalized(cause, lookup.cause) // then the defect of the lookup
 		}
 	}
 	if cause != nil {

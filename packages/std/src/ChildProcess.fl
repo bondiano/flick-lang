@@ -1,8 +1,8 @@
-/// Effect's child processes: a `Command` describes a program to run, its
-/// arguments, directory, environment and standard streams; `spawn` starts
-/// it as a `Process` of a scope, whose closing stops what still runs, and
-/// `string`, `lines` and `exit_code` run it to its end. A process starts in
-/// a process group of its own, which stopping it signals.
+/// Child processes: a `Command` describes a program to run, its arguments,
+/// directory, environment and standard streams; `spawn` starts it as a
+/// `Process` of a scope, whose closing stops what still runs, and `string`,
+/// `lines` and `exit_code` run it to its end. A process starts in a process
+/// group of its own, which stopping it signals.
 module ChildProcess exposing (..)
 
 import Duration

@@ -1,8 +1,8 @@
-/// Command-line applications on Effect's CLI: a `Command r e` is a pure
-/// description of flags, positional arguments, subcommands and a handler
-/// that needs `r` and fails with `e`. `cli "name" { … }` is sugar for the
-/// combinators below; both build the same value. `Cli.run` parses the
-/// arguments and only then runs the handler.
+/// Command-line applications: a `Command r e` is a pure description of
+/// flags, positional arguments, subcommands and a handler that needs `r`
+/// and fails with `e`. `cli "name" { … }` is sugar for the combinators
+/// below; both build the same value. `Cli.run` parses the arguments and
+/// only then runs the handler.
 module Cli exposing (..)
 
 import BigInt
@@ -21,7 +21,7 @@ type Spec (r : ServiceRow) (e : ErrorRow) o
 /// values of `a` into a field of type `t`.
 type Multi a t
 
-/// Invalid input on the command line: the text Effect's CLI shows.
+/// Invalid input on the command line: the text shown for it.
 type error CliError = CliError String
   deriving Eq, Show
 
@@ -356,7 +356,7 @@ type alias Formatter = {
   formatVersion : String -> String -> String;
 }
 
-/// Effect's formatter, with ANSI colors when `colors`.
+/// The default formatter, with ANSI colors when `colors`.
 default_formatter : Bool -> Formatter
 foreign pure default_formatter from "flick:cli" "cliDefaultFormatter"
   reviewed "effect@4.1.2 sha256:414e73326ef266bc"
@@ -398,21 +398,22 @@ foreign effect completions from "flick:cli" "cliCompletions"
 type BuiltIn = HelpFlag | VersionFlag | WizardFlag | CompletionsFlag | LogLevelFlag | TraceFlag
   deriving Eq, Show
 
-/// Every built-in flag: Effect's, in its order, then `--trace`.
+/// Every built-in flag, in the order `BuiltIn` lists them.
 builtins : List BuiltIn
 let builtins = [HelpFlag, VersionFlag, WizardFlag, CompletionsFlag, LogLevelFlag, TraceFlag]
 
-/// How `run_with` runs: the text of `--version`, the built-in flags, and the
-/// formatter of help (`None`: Effect's, colored on a terminal).
+/// How `run_with` runs: the text of `--version`, the built-in flags, and
+/// the formatter of help (`None`: the default one, colored on a terminal).
 type alias Settings = { version : String; builtIns : List BuiltIn; formatter : Option Formatter }
 
-/// Version `0.0.0`, every built-in flag, Effect's formatter.
+/// Version `0.0.0`, every built-in flag, the default formatter.
 settings : Settings
 let settings = { version = "0.0.0"; builtIns = builtins; formatter = None }
 
 /// Parses `args` and runs the handler of the command they name, in the
 /// current fiber, after the whole line parsed. The built-in flags print to
-/// stdout and run no handler; invalid input is `CliError` with Effect's text.
+/// stdout and run no handler; invalid input is `CliError` with the text
+/// shown for it.
 run_with : Settings -> (Command r e)^c -> List String ->{Async | r; CliError | e} Unit
 foreign effect run_with from "flick:cli" "cliRunWith"
   arity 3

@@ -1,4 +1,4 @@
-// Effect's `Cron`: parsing with typed errors, matching, the next and
+// `Cron`: parsing with typed errors, matching, the next and
 // previous dates, and `Schedule.cron`, whose delays lead to the next match.
 module App.Main exposing (main)
 

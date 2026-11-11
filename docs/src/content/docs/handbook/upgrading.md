@@ -362,7 +362,7 @@ constructors declared from least to most severe:
 | 0.1.0 | 0.2 |
 | - | - |
 | `LogLevel.all`, `trace`, `debug`, `info`, `warn`, `error`, `fatal` | `LogLevel.All`, `Trace`, `Debug`, `Info`, `Warn`, `Error`, `Fatal` |
-| `LogLevel.none_` | `LogLevel.Off`, whose literal is Effect's `"None"` |
+| `LogLevel.none_` | `LogLevel.Off`, whose literal is `"None"` |
 | `LogLevel.values` | `LogLevel.all`, in order of severity |
 | `LogLevel.name level` | `LogLevel.value level` |
 | `LogLevel.get_ordinal a < LogLevel.get_ordinal b` | `compare a b`, the derived `Ord` |

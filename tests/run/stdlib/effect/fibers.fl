@@ -1,4 +1,4 @@
-// Children of a scope through Effect's `Fiber`, `FiberSet`, `FiberMap` and
+// Children of a scope through `Fiber`, `FiberSet`, `FiberMap` and
 // `FiberHandle`, races, caching, the scheduler and execution plans.
 module App.Main exposing (main)
 

@@ -1,4 +1,4 @@
-// Effect's `DateTime` past the basics: `Intl` formatting in several
+// `DateTime` past the basics: `Intl` formatting in several
 // locales, styles and zones, zone names as V8 resolves them, wall-clock
 // times a transition skips or repeats, and the forms `make` reads.
 module App.Main exposing (main)

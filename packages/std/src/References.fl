@@ -1,6 +1,5 @@
-/// Effect's `References`: settings every fiber carries, read by the
-/// current task or set around a task (`with_*`), which keeps them for the
-/// fibers it starts.
+/// Settings every fiber carries, read by the current task or set around a
+/// task (`with_*`), which keeps them for the fibers it starts.
 module References exposing (..)
 
 import Cause

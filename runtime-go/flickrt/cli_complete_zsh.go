@@ -4,8 +4,8 @@ import (
 	"strings"
 )
 
-// Ported line for line from Effect 4's cli/internal/completions/zsh.ts so
 // `--completions zsh` prints the same static script as the TypeScript CLI.
+// Derived from Effect 4 cli/internal/completions/zsh.ts.
 
 var completeZshEscaper = strings.NewReplacer(`\`, `\\`, "'", `'\''`, ":", `\:`)
 
@@ -187,7 +187,7 @@ func completeZshFunction(d completeCommand, parent []string, lines []string) []s
 	return lines
 }
 
-// completeZsh is zsh.ts's generate: a self-contained script that never
+// completeZsh is the Zsh script: a self-contained script that never
 // re-invokes the CLI.
 func completeZsh(executable string, d completeCommand) string {
 	safe := completeSanitize(executable)

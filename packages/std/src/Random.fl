@@ -1,6 +1,6 @@
-/// Effect's `Random`: the fiber's source of randomness. It is a default
-/// service, so drawing needs no service row; each draw is a runtime call,
-/// and `with_seed` makes the draws of a task repeatable.
+/// The fiber's source of randomness. It is a default service, so drawing
+/// needs no service row; each draw is a runtime call, and `with_seed` makes
+/// the draws of a task repeatable.
 module Random exposing (..)
 
 /// A number in [0, 1).

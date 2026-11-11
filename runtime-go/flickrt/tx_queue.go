@@ -1,9 +1,9 @@
 package flickrt
 
-// TxQueue is Effect 4's: a TxRef of the elements (Effect's TxChunk) and a
-// TxRef of the state, open, closing with a cause, or done with it. The
-// strategies and states are those of Queue (queue.go); unbounded is a
-// suspending queue of unboundedCapacity.
+// TxQueue is a TxRef of the elements (a Chunk) and a TxRef of the state,
+// open, closing with a cause, or done with it. The strategies and states
+// are those of Queue (queue.go); unbounded is a suspending queue of
+// unboundedCapacity.
 type TxQueue struct {
 	strategy queueStrategy
 	capacity int
@@ -11,7 +11,7 @@ type TxQueue struct {
 	state    *TxRef // a *txQueueState
 }
 
-// txQueueState is Effect's TxQueue State; never mutated.
+// txQueueState is the state of a TxQueue; never mutated.
 type txQueueState struct {
 	tag   queueState
 	cause *Cause
@@ -141,9 +141,8 @@ func TxQueueTakeAll(fb *Fiber, q Value) Value {
 	})
 }
 
-// takeRange is Effect's takeN and takeBetween: at least `least` elements
-// and at most `most`, retrying for fewer unless the queue is closing,
-// which ends it with what is left.
+// takeRange takes at least `least` elements and at most `most`, retrying
+// for fewer unless the queue is closing, which ends it with what is left.
 func (q *TxQueue) takeRange(fb *Fiber, t *tx, s *txQueueState, least, most int) Value {
 	xs := q.itemsIn(fb, t)
 	if len(xs) < least {
@@ -197,7 +196,7 @@ func TxQueuePeek(fb *Fiber, q Value) Value {
 	})
 }
 
-// Effect reads the size by TxChunk's `modify`; see TxChunkSize.
+// The size is a read; see TxChunkSize.
 
 func txQueueItems(fb *Fiber, q Value, f func([]Value) Value) Value {
 	return txRead(fb, txQueueOf(q).items, func(v Value) Value { return f(items(v)) })
@@ -289,7 +288,7 @@ func TxQueueClear(fb *Fiber, q Value) Value {
 	})
 }
 
-// shutdownIn is Effect's `shutdown`: `clear`, its failure ignored, then
+// shutdownIn shuts the queue down: `clear`, its failure ignored, then
 // `interrupt`.
 func (q *TxQueue) shutdownIn(fb *Fiber, t *tx) bool {
 	if s := q.stateIn(fb, t); s.tag != queueDone {

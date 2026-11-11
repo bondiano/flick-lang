@@ -5,7 +5,7 @@ import (
 	"unicode/utf16"
 )
 
-// completeType is Effect's Completions.FlagType / ArgumentType.
+// completeType is the type of a flag or of an argument, for completions.
 type completeType struct {
 	tag      string   // "Boolean", "String", "Int", "Finite", "Date", "Choice", "Path"
 	values   []string // Choice keys
@@ -26,7 +26,7 @@ type completeArg struct {
 	typ                completeType
 }
 
-// completeCommand is Effect's Completions.CommandDescriptor.
+// completeCommand is the descriptor of a command, for completions.
 type completeCommand struct {
 	name, description string // description "" when absent
 	flags             []completeFlag
@@ -34,7 +34,8 @@ type completeCommand struct {
 	subcommands       []completeCommand
 }
 
-// completeTakesSeparateValue is descriptor.ts's takesSeparateValue.
+// completeTakesSeparateValue is whether a flag's value is a word of its
+// own: not for a boolean, nor for a flag whose value is optional.
 func completeTakesSeparateValue(f completeFlag) bool {
 	return f.typ.tag != "Boolean" && !f.optionalValue
 }
@@ -79,8 +80,8 @@ func completeFlagForms(f completeFlag, negate bool) []string {
 	return forms
 }
 
-// completeNegatedName is descriptor.ts's negatedName: the long name that
-// sets a boolean to false. Flick's flags keep Effect's default, `no-name`.
+// completeNegatedName is the long name that sets a boolean to false,
+// `no-name`.
 func completeNegatedName(f completeFlag) (string, bool) {
 	if f.typ.tag != "Boolean" {
 		return "", false

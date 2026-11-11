@@ -8,8 +8,8 @@ import (
 	"unicode"
 )
 
-// Effect's built-in loggers: logfmt, structured records and JSON, the
-// pretty consoles, the default logger and the tracer logger.
+// The built-in loggers: logfmt, structured records and JSON, the pretty
+// consoles, the default logger and the tracer logger.
 
 var (
 	LoggerDefault          Value = &logger{logDefault}
@@ -27,7 +27,7 @@ var (
 	}}
 )
 
-// labelReplaced is Effect's formatLabel: whitespace, `=` and `"` as `_`.
+// formatLabel is a label with whitespace, `=` and `"` as `_`.
 func formatLabel(key string) string {
 	return strings.Map(func(r rune) rune {
 		if r == '=' || r == '"' || unicode.IsSpace(r) || r == 0xfeff {
@@ -89,8 +89,8 @@ func logAnnotationsOf(fb *Fiber) *Record {
 
 func fiberLabel(fb *Fiber) string { return "#" + strconv.FormatInt(fb.state.id, 10) }
 
-// logfmt is Effect's `format` of formatSimple and formatLogFmt, which
-// quote a value with whitespace, `"` or `=` by `quote`.
+// logfmt is the format of the simple and logfmt loggers, which quote a
+// value with whitespace, `"` or `=` by `quote`.
 func logfmt(fb *Fiber, m *logEntry, quote func(string) string) string {
 	value := func(v string) string {
 		if strings.ContainsAny(v, "\"=") || strings.IndexFunc(v, unicode.IsSpace) >= 0 {
@@ -124,7 +124,7 @@ func logfmt(fb *Fiber, m *logEntry, quote func(string) string) string {
 	return b.String()
 }
 
-// structuredLog is the object of Effect's formatStructured.
+// structuredLog is the object of the structured format.
 type structuredLog struct {
 	message     []Value
 	level       string
@@ -163,7 +163,7 @@ func (s *structuredLog) record() Value {
 		"cause", s.cause, "annotations", pairs(s.annotations), "spans", pairs(s.spans))
 }
 
-// json is Effect's formatJson of the object.
+// json is the JSON text of the object.
 func (s *structuredLog) json() string {
 	object := func(r *Record) string {
 		parts := make([]string, len(r.keys))
@@ -256,8 +256,8 @@ func inspectEntries(entries []string, indentation int) string {
 	return "{" + indent + "  " + strings.Join(entries, ","+indent+"  ") + indent + "}"
 }
 
-// logDefault is Effect's defaultLogger: `[time] LEVEL (#fiber) spans:`
-// and the message, with the annotations, on the console.
+// logDefault is the default logger: `[time] LEVEL (#fiber) spans:` and the
+// message, with the annotations, on the console.
 func logDefault(fb *Fiber, m *logEntry) Value {
 	args := append([]Value{}, m.message...)
 	if m.cause != nil {
@@ -279,8 +279,8 @@ func logDefault(fb *Fiber, m *logEntry) Value {
 	return Unit
 }
 
-// logTracer is Effect's tracerLogger: the message as an event of the
-// fiber's span.
+// logTracer is the tracer logger: the message as an event of the fiber's
+// span.
 func logTracer(fb *Fiber, m *logEntry) Value {
 	s := currentSpanLocal(fb)
 	if s == nil {
@@ -318,7 +318,7 @@ func withColor(text string, colors ...string) string {
 
 func withoutColor(text string, _ ...string) string { return text }
 
-// prettyDate is the `formatDate` of the options, Effect's default without one.
+// prettyDate is the `formatDate` of the options, the default without one.
 func prettyDate(fb *Fiber, formatDate Value) func(float64) string {
 	if f, ok := some(formatDate); ok {
 		return func(millis float64) string { return Apply(fb, f, millis).(string) }
@@ -326,8 +326,8 @@ func prettyDate(fb *Fiber, formatDate Value) func(float64) string {
 	return defaultDateFormat
 }
 
-// prettyTty is Effect's prettyLoggerTty: a first line, then the rest of
-// the message and the annotations in a console group.
+// prettyTty is the pretty logger of a terminal: a first line, then the
+// rest of the message and the annotations in a console group.
 func prettyTty(colors bool, formatDate Value) Value {
 	color := withoutColor
 	if colors {
@@ -369,7 +369,7 @@ func prettyTty(colors bool, formatDate Value) Value {
 	}}
 }
 
-// prettyBrowser is Effect's prettyLoggerBrowser on Node's console, which
+// prettyBrowser is the pretty logger of a browser on Node's console, which
 // drops its `%c` styles: a collapsed group of the first line.
 func prettyBrowser(formatDate Value) Value {
 	return &logger{func(fb *Fiber, m *logEntry) Value {

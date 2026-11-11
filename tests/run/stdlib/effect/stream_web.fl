@@ -1,4 +1,4 @@
-// Sources of Effect's `Stream` over JS values: web streams, async
+// Sources of `Stream` over JS values: web streams, async
 // iterables and event targets, which only the JS target has.
 module App.Main exposing (main)
 

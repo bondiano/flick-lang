@@ -1,6 +1,6 @@
 ---
 title: "Схемы и кодеки"
-source_hash: 18faacde948508df
+source_hash: dd61a1c7c6603b98
 ---
 
 Схема описывает структуру значений типа и доступна во время выполнения.
@@ -192,8 +192,8 @@ codec`.
 Вместо них не подставляются `{}` или `true`.
 
 Из предикатов уточнённых типов экспортёр знает `Checks.email`,
-`Checks.non_empty` и `Checks.positive`. Проверки Effect из модуля `Check`
-записываются ключевыми словами, которые предоставляет Effect, но только
+`Checks.non_empty` и `Checks.positive`. Проверки из модуля `Check`
+записываются своими ключевыми словами JSON Schema, но только
 если они точно выражают проверку. Например, `Check.min_items 1`
 превращается в `minItems`, а `Check.lowercased` отклоняется: его шаблон
 менее строг, чем сама проверка.
@@ -209,20 +209,20 @@ codec`.
 `Schema.arbitrary schema` генерирует значения для тестов свойств.
 Для уточнённого типа нужно задать генератор через `Schema.with_generator`.
 
-## Проверки и кодеки Effect
+## Готовые проверки и кодеки
 
-`Check.apply check codec` добавляет проверку Effect Schema при декодировании
+`Check.apply check codec` добавляет проверку при декодировании
 и кодировании. Доступны проверки длины и кодовых точек, шаблонов и форматов
 строк (`Check.uuid`, `Check.base64`), границ для чисел, `BigInt`, `BigDecimal`
 и `Ord`, элементов и уникальности списка, размера множеств и ключей словаря
 `Codec.entries`.
 
-В `Codec` есть готовые преобразования Effect (`Codec.trim`,
+В `Codec` есть готовые преобразования (`Codec.trim`,
 `Codec.number_from_string`, `Codec.base64_string`, `Codec.json_string`,
 `Codec.split`), литералы, словари, резервные варианты декодирования
 и кодирования, эффектные проверки и кодирование XML.
 Для `Duration`, `BigDecimal`, `Chunk`, `HashSet` и `HashMap` есть JSON-кодеки.
-Модули `Arbitrary`, `JsonSchema` и `Differ` предоставляют генераторы Effect,
+Модули `Arbitrary`, `JsonSchema` и `Differ` предоставляют генераторы,
 преобразования диалектов и патчи JSON.
 
 ## Выполнение декодеров
