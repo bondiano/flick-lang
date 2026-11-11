@@ -37,7 +37,7 @@ It does not prove:
 | The derived rules | `formal/FormalCert/Rules.lean`, `Match.lean` | Theorems that `lake build --wfail` checks. They add nothing to the trusted base. |
 | The tactics | `formal/FormalCert/Tactics.lean`, `Checks.lean` | Macros over `simp`, `decide` and `omega`. The kernel checks what they produce, so a tactic that fails makes its certificate fail. `Checks.lean` keeps goals they once failed on. |
 | The signature | `formal/FormalCert/GenSig.lean` | Generated. `GenSig S` assumes that `S` has the generator's constructors at their declared types and that those types have no other constructors, the list constructors `Nil`/`Cons` among them. It assumes the globals at their elided schemes (`check::elided`), with their facts: the generator's values, `List.Core.get`, the region globals `open_scoped`, `use`, `Fiber.spawn`, `Resource.acquire_release` and `Scope.add_finalizer`, and the dictionary of each instance. It assumes the operations of each service without parameters, and no others, and the fields of each class's dictionary. `GenSig.inhabited` gives a signature that satisfies all of it, so the assumption is consistent. It says nothing about `Typ`. |
-| The printers | `flick-model/src/cert/`, `flick-model/src/translate/lean/elide.rs` | They write the term, its type and the signature. A wrong printer certifies the wrong statement. |
+| The printers | `flick-model/src/cert/`, `flick-model/src/translate/lean/elide.rs`, `elide/data.rs` | They write the term, its type and the signature. A wrong printer certifies the wrong statement. |
 
 Each certificate depends only on the axioms `propext`, `Classical.choice` and
 `Quot.sound`. No certificate uses `sorry`, `native_decide` or new axioms.
@@ -96,6 +96,11 @@ Each certificate depends only on the axioms `propext`, `Classical.choice` and
   `Ref.make`, `Ref.get` and `Ref.set` are the core's `.const` at the content
   and capacity of the cell, and `Const.ok` checks that the content reaches no
   more than the capacity.
+- **Hidden storage.** Data with a function field (`Fixture.Sealed`) is, as
+  `Seq`, `T C ā` in the core: its first argument is the capture row its value
+  hides, and a bare `T` hides none. Its constructor takes that row as its
+  first variable and qualifies each function field with it, as the model's
+  (Con) checks a field against `τᵢ^q` and gives the value `(T ῡ)^q`.
 
 Records are written in the order of their labels, and string literals are core
 literals of the base type `String` (simplification 3 of
@@ -124,9 +129,11 @@ closed gap lets through to a later form.
 
 ## Running
 
-- `just formal-certs` regenerates `GenSig.lean` and the 32 golden certificates of
-  `formal/FormalCert/Gen/Golden.lean`. A test of `cargo test -p flick-model`
-  fails when either is stale, and the `lean` job of CI checks both.
+- `just formal-certs` regenerates `GenSig.lean`, the 32 golden certificates of
+  `formal/FormalCert/Gen/Golden.lean` and the certificates of
+  `formal/FormalCert/Gen/Kept.lean`: programs of the fixed run whose
+  certificates were once wrong. A test of `cargo test -p flick-model` fails
+  when any of them is stale, and the `lean` job of CI checks them.
 - `just model-certs` certifies the fixed run and writes it to
   `target/certs/Batch/`, 50 certificates a file, which Lean then checks. With
   `CERT_PROGRAMS=n` it certifies `n` programs, but the gap list is compared only

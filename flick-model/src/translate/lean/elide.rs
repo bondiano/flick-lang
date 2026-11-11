@@ -11,7 +11,6 @@
 //! reason.
 
 use std::cell::RefCell;
-use std::collections::HashMap;
 use std::fmt::Write;
 use std::rc::Rc;
 
@@ -22,10 +21,8 @@ use crate::decls::Decls;
 use crate::syntax::Path;
 use crate::translate::types::scheme;
 use crate::types::{Caps, Kind, PROVIDED, Row, Scheme, Stage, Type, Var, provided};
-
-/// Types with hidden storage: the qualifier of a value is their first
-/// argument, as `appQ` of the scheme translation.
-const STORED: [&str; 1] = ["Seq"];
+use data::data;
+pub(crate) use data::{Types, hidden_at, hidden_by, hides};
 
 /// The value bounds a translation meets, by their variable.
 type Bounds = Rc<RefCell<Vec<(String, Caps)>>>;
@@ -50,8 +47,8 @@ pub(crate) struct Env {
     /// The binders of the `∀` of parameters around: the variables of the
     /// scheme come after them in `vars`.
     pub(crate) inner: usize,
-    /// The kinds of the parameters of each type constructor.
-    pub(crate) params: Option<Rc<HashMap<Path, Vec<Kind>>>>,
+    /// What a certificate knows of its data types.
+    pub(crate) types: Option<Rc<Types>>,
 }
 
 impl Env {
@@ -203,45 +200,6 @@ fn con(p: &Path) -> String {
     }
 }
 
-/// `T ā` with the qualifier `c` of its value: the first argument of a type
-/// with hidden storage, dropped by data without it.
-fn data(t: &Type, c: Option<&Caps>, env: &Env) -> Result<String, String> {
-    let mut args = Vec::new();
-    let mut head = t;
-    while let Type::App(h, a) = head {
-        args.push(&**a);
-        head = h;
-    }
-    args.reverse();
-    // the owner of a region is the core's own type
-    if let (Type::Con(p), [s]) = (head, &args[..])
-        && p.to_string() == "Fiber.Owner"
-    {
-        return Ok(format!("(.owner {})", ty(s, env)?));
-    }
-    let mut out = ty(head, env)?;
-    if let (Type::Con(p), Some(c)) = (head, c)
-        && STORED.contains(&&*p.name)
-    {
-        out = format!("(.tapp {out} (.caps {}))", caps(c, env)?);
-    }
-    let kinds = match head {
-        Type::Con(p) => env.params.as_ref().and_then(|ps| ps.get(p)),
-        _ => None,
-    };
-    for (i, a) in args.into_iter().enumerate() {
-        // a row parameter (`Failure e`) takes a row, as the core instantiates it
-        let a = match (a, kinds.and_then(|k| k.get(i))) {
-            (Type::Errors(r), Some(Kind::Errors | Kind::Services)) => {
-                format!("(.row {})", row(r, env)?)
-            }
-            (a, _) => ty(a, env)?,
-        };
-        out = format!("(.tapp {out} {a})");
-    }
-    Ok(out)
-}
-
 pub(crate) fn ty(t: &Type, env: &Env) -> Result<String, String> {
     qualified(t, None, env)
 }
@@ -251,8 +209,7 @@ fn qualified(t: &Type, q: Option<&Caps>, env: &Env) -> Result<String, String> {
     Ok(match t {
         Type::Var(Var::Named(n)) => format!("(.tvar {})", env.index(n)?),
         Type::Var(Var::Meta(_)) if env.ground => "(.base .unit)".into(),
-        Type::Con(p) => con(p),
-        Type::App(..) => data(t, q, env)?,
+        Type::Con(_) | Type::App(..) => data(t, q, env)?,
         Type::Fun(p, s, r) => {
             let (p, s, r) = (ty(p, env)?, stage(s, env)?, ty(r, env)?);
             format!("(.arrow {p} {s} {r} {})", c(env)?)
@@ -512,5 +469,6 @@ pub fn elide_schemes() -> String {
     out
 }
 
+mod data;
 #[cfg(test)]
 mod tests;
