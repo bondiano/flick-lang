@@ -251,6 +251,11 @@ impl Expansion {
             .collect()
     }
 
+    /// Whether every block of the module is a block of `plugin`.
+    pub fn only_of(&self, plugin: &str) -> bool {
+        self.blocks.iter().all(|b| b.plugin == plugin)
+    }
+
     /// The plugin whose code declares what stands at `span` of the module,
     /// which a block of it declares.
     pub fn plugin_at(&self, span: Span) -> Option<&str> {

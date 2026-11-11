@@ -1,6 +1,7 @@
 // The combinators `deriving Schema` writes in Flick: a constructor of a
 // variant type is given as a value, whose tag the runtime reads.
 import { Option, Result } from "effect";
+import { tagOf } from "@flick-lang/runtime/core/route";
 
 import {
   type AnySchema,
@@ -12,15 +13,7 @@ import {
   schemaTuple,
 } from "./schemas.ts";
 
-/** The tag of a constructor given as a value: a nullary one is its value, another a function of its fields. */
-export const tagOf = (constructor: unknown): string => {
-  let value: unknown = constructor;
-  // a constructor's stage takes one field, whose value does not change the tag
-  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- a constructor is curried over its fields
-  while (typeof value === "function") value = (value as (field: unknown) => unknown)(undefined);
-  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- a constructor's value is tagged data
-  return (value as { readonly _tag: string })._tag;
-};
+export { tagOf };
 
 /** `Schema.field label schema`. */
 export const schemaField = (label: string, schema: AnySchema): readonly [string, AnySchema] => [label, schema];

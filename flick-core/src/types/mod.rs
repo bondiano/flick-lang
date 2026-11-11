@@ -354,16 +354,11 @@ fn run_in(
         store: Store::default(),
         kinds: KindStore::default(),
         diagnostics: Vec::new(),
-        locals: Vec::new(),
+        cx: ItemCx::default(),
         ui: 0,
-        tyvars: Vec::new(),
         contract_types: Vec::new(),
         opened_modules: Vec::new(),
-        runtime: false,
-        stage: effects::Stage::default(),
         sites: Vec::new(),
-        subrows: Vec::new(),
-        operators: Vec::new(),
         literals: Vec::new(),
         signatures: Vec::new(),
         equalities: Vec::new(),
@@ -371,7 +366,6 @@ fn run_in(
         top: toplevel::TopLevel::default(),
         options,
         classes: classes::State::default(),
-        regions: regions::State::default(),
         typing: Typing::default(),
         predicates: HashMap::new(),
         calls: Vec::new(),
@@ -518,6 +512,24 @@ struct NumLiteral {
     givens: Vec<Type>,
 }
 
+/// What checking one declaration keeps of its own: a declaration that
+/// another names before its turn is checked from inside that one, and
+/// starts with none of this.
+#[derive(Default)]
+struct ItemCx {
+    locals: Vec<Local>,
+    tyvars: Vec<TyVar>,
+    /// Whether the expression being inferred runs a runtime call at this
+    /// stage; lambdas and `task` bodies are deferred and do not count.
+    runtime: bool,
+    /// The stage being checked: what its runtime calls may need.
+    stage: effects::Stage,
+    /// Row constraints of the declaration being checked.
+    subrows: Vec<effects::SubRow>,
+    operators: Vec<Operator>,
+    regions: regions::State,
+}
+
 struct Checker<'a> {
     static_witnesses: &'a [Interface],
     file: FileId,
@@ -530,24 +542,15 @@ struct Checker<'a> {
     store: Store,
     kinds: KindStore,
     diagnostics: Vec<Diagnostic>,
-    locals: Vec<Local>,
+    cx: ItemCx,
     /// How many `ui { … }` blocks enclose the expression: inside one, the
     /// names `Ui` exports need no `Ui.`.
     ui: usize,
-    tyvars: Vec<TyVar>,
     /// Capitalized type members visible only while checking a `type module` body.
     contract_types: Vec<(String, Type, kinds::Kind)>,
     /// Lexically opened `Module Sig` values, innermost first on lookup.
     opened_modules: Vec<module_contract::Opened>,
-    /// Whether the expression being inferred runs a runtime call at this
-    /// stage; lambdas and `task` bodies are deferred and do not count.
-    runtime: bool,
-    /// The stage being checked: what its runtime calls may need.
-    stage: effects::Stage,
     sites: Vec<effects::Site>,
-    /// Row constraints of the declaration being checked.
-    subrows: Vec<effects::SubRow>,
-    operators: Vec<Operator>,
     literals: Vec<NumLiteral>,
     signatures: Vec<bindings::PendingSignature>,
     /// `==` and `!=` with the type of their operands and the equalities of
@@ -564,7 +567,6 @@ struct Checker<'a> {
     top: toplevel::TopLevel<'a>,
     options: Options<'a>,
     classes: classes::State,
-    regions: regions::State,
     typing: Typing,
     /// The predicate of each refined type of the module, by type name.
     predicates: HashMap<String, &'a Node>,

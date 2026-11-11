@@ -156,14 +156,14 @@ impl Checker<'_> {
                 indexed: None,
             });
         };
-        let outer = mem::take(&mut self.tyvars);
+        let outer = mem::take(&mut self.cx.tyvars);
         let constraints = self.held_constraints(variant, Free::Quantify);
         let payload = self.fields(variant, Free::Quantify);
         let ty = match result.nodes().find(|n| is_type(n.kind)) {
             Some(node) => self.ty(node, &Kind::Type, Free::Quantify),
             None => Type::Error,
         };
-        let locals = mem::replace(&mut self.tyvars, outer)
+        let locals = mem::replace(&mut self.cx.tyvars, outer)
             .into_iter()
             .map(|v| Binder {
                 name: v.name,

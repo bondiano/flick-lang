@@ -60,7 +60,7 @@ impl Checker<'_> {
             }
             K::Ident => {
                 let name = first.text(self.text);
-                if let Some(v) = self.tyvars.iter().rev().find(|v| v.name == name) {
+                if let Some(v) = self.cx.tyvars.iter().rev().find(|v| v.name == name) {
                     return Some((v.ty.clone(), v.kind.clone()));
                 }
                 let kind = self.kinds.fresh();
@@ -76,7 +76,7 @@ impl Checker<'_> {
                         return None;
                     }
                 };
-                self.tyvars.push(TyVar {
+                self.cx.tyvars.push(TyVar {
                     name: name.to_owned(),
                     ty: ty.clone(),
                     kind: kind.clone(),

@@ -47,8 +47,8 @@ impl Checker<'_> {
         let (left, right) = (self.expanded(left), self.expanded(right));
         match self.unify(&left, &right) {
             Err(mismatch) if self.unknown_captures(&mismatch) => {
-                let span = self.regions.deferring.expect("checked");
-                self.regions.deferred.push((left, right, span));
+                let span = self.cx.regions.deferring.expect("checked");
+                self.cx.regions.deferred.push((left, right, span));
                 Ok(())
             }
             other => other,
@@ -61,7 +61,7 @@ impl Checker<'_> {
         let Mismatch::Label { label, .. } = mismatch else {
             return false;
         };
-        self.regions.deferring.is_some() && self.uninferred(label)
+        self.cx.regions.deferring.is_some() && self.uninferred(label)
     }
 
     /// Whether `label` is the captures `^?m` of a type not inferred yet.
@@ -124,7 +124,7 @@ impl Checker<'_> {
     /// Compares the qualifiers deferred until their types were inferred, and
     /// reports the captures no hold named.
     pub fn compare_deferred(&mut self) {
-        for (left, right, span) in mem::take(&mut self.regions.deferred) {
+        for (left, right, span) in mem::take(&mut self.cx.regions.deferred) {
             let (left, right) = (self.inferred(&left), self.inferred(&right));
             if let Err(mismatch) = self.unify(&left, &right)
                 && !self.hold_reported(span)
@@ -132,7 +132,7 @@ impl Checker<'_> {
                 self.mismatch(&mismatch, &left, &right, span);
             }
         }
-        for (mismatch, actual, expected, span) in mem::take(&mut self.regions.held) {
+        for (mismatch, actual, expected, span) in mem::take(&mut self.cx.regions.held) {
             if !self.hold_reported(span) {
                 self.mismatch(&mismatch, &actual, &expected, span);
             }
@@ -178,7 +178,7 @@ impl Checker<'_> {
             };
             return self.subsume(&a, &e, span);
         }
-        let mark = self.regions.holds.len();
+        let mark = self.cx.regions.holds.len();
         self.hold(Hold {
             held: vec![(None, actual.clone())],
             visible,
@@ -209,12 +209,12 @@ impl Checker<'_> {
             // what a value holds beyond its position is the hold's to name
             Err(mismatch) if capture_mismatch(&mismatch) => {
                 let held = (mismatch, actual.clone(), expected.clone(), span);
-                self.regions.held.push(held);
+                self.cx.regions.held.push(held);
                 Ok(())
             }
             // a value whose type does not fit is reported once, by the type
             Err(mismatch) => {
-                self.regions.holds.truncate(mark);
+                self.cx.regions.holds.truncate(mark);
                 Err(mismatch)
             }
             Ok(()) => Ok(()),

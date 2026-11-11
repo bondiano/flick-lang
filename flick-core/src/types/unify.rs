@@ -824,7 +824,7 @@ impl Checker<'_> {
                 found.extend(elements.map(|(_, element)| (element.clone(), span)));
             }
         });
-        self.regions.error_elements.extend(found);
+        self.cx.regions.error_elements.extend(found);
     }
 
     pub fn instantiate(&mut self, t: &Type, span: Span) -> Type {
@@ -905,7 +905,7 @@ impl Checker<'_> {
                     .map(|v| {
                         let ty = self.store.skolem(&self.unshadowed(&v.name, &constraints));
                         if let Type::Skolem(s) = &ty {
-                            self.regions.rigid_kinds.push((*s, v.kind.clone()));
+                            self.cx.regions.rigid_kinds.push((*s, v.kind.clone()));
                         }
                         (v.name.clone(), ty)
                     })

@@ -163,7 +163,7 @@ impl Checker<'_> {
     /// The region of `resume` of a handler whose arms run at this stage.
     fn arm_region(&self, atom: &Type) -> bool {
         matches!(self.store.resolve(atom), Type::Skolem(s) if self.scope_of(s)
-            .is_some_and(|scope| scope.handler && scope.outer == self.stage.services))
+            .is_some_and(|scope| scope.handler && scope.outer == self.cx.stage.services))
     }
 
     /// The rows a call of `function` needs: those of its arrow and, under
@@ -344,7 +344,7 @@ impl Checker<'_> {
     pub(in crate::types) fn holds_reader(&self, held: &[(Option<String>, Type)]) -> bool {
         held.iter().any(|(_, t)| {
             (self.captures_of(t).entries.iter())
-                .any(|(_, a)| matches!(a, Type::Skolem(s) if self.regions.lent.contains(s)))
+                .any(|(_, a)| matches!(a, Type::Skolem(s) if self.cx.regions.lent.contains(s)))
         })
     }
 }

@@ -250,7 +250,7 @@ impl Checker<'_> {
     /// A bound refines a complete generic type; unlike a nominal qualifier,
     /// it cannot replace that type's own hidden captures on instantiation.
     pub fn subsume_bound(&mut self, actual: &Type, expected: &Type, span: Span) -> Option<Unified> {
-        let mark = self.regions.holds.len();
+        let mark = self.cx.regions.holds.len();
         let fits = self.subsume_bound_at(actual, expected, span)?;
         Some(self.held_fits(fits, mark, actual, expected, span))
     }

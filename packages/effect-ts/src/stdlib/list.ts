@@ -2,9 +2,8 @@
 // adapted to its JS arity, `f(a, b)`; a runtime callback returns an `Effect`.
 import { Chunk, Effect, type Option, Result } from "effect";
 
-import { type Tagged, none, ok, some } from "../data.ts";
+import { none, ok, some } from "../data.ts";
 import { item } from "@flick-lang/runtime/internal";
-import { tag } from "@flick-lang/runtime/tags";
 
 type List<A> = ReadonlyArray<A>;
 
@@ -120,33 +119,4 @@ export const bindEff = <A, B, E, R, E2, R2>(
   f: (a: A) => Effect.Effect<B, E2, R2>,
 ): Effect.Effect<B, E | E2, R | R2> => Effect.flatMap(eff, (x) => f(x));
 
-const CONTINUE = /*#__PURE__*/ tag("Loop.Step.Continue");
-
-/** `Loop.Step s a`: the tags alone tell `Continue` from `Done`. */
-export type Step<S, A> = (Tagged<string, S> & { readonly continue?: true }) | (Tagged<string, A> & { readonly continue?: false });
-
-const isContinue = <S, A>(step: Step<S, A>): step is Tagged<string, S> & { readonly continue?: true } =>
-  step._tag === CONTINUE;
-
-/** `Loop.loop step state`: runs until `Done`, without growing the stack. */
-export const loop = <S, A>(step: (s: S) => Step<S, A>, state: S): A => {
-  let s = state;
-  for (;;) {
-    const next = step(s);
-    if (!isContinue(next)) return next._0;
-    s = next._0;
-  }
-};
-
-/** `Trampoline a`. */
-export type Trampoline<A> =
-  | { readonly done: true; readonly value: A }
-  | { readonly done: false; readonly thunk: (unit: undefined) => Trampoline<A> };
-
-export const trampolineDone = <A>(value: A): Trampoline<A> => ({ done: true, value });
-export const trampolineSuspend = <A>(thunk: (unit: undefined) => Trampoline<A>): Trampoline<A> => ({ done: false, thunk });
-export const trampolineRun = <A>(t: Trampoline<A>): A => {
-  let current = t;
-  while (!current.done) current = current.thunk(undefined);
-  return current.value;
-};
+export { type Step, type Trampoline, loop, trampolineDone, trampolineRun, trampolineSuspend } from "@flick-lang/runtime/rt/loop";

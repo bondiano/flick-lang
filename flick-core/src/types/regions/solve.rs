@@ -61,7 +61,8 @@ impl Checker<'_> {
 
     /// Each hold as solving reads it, until a qualifier is bound.
     fn summaries(&self) -> Vec<Summary> {
-        self.regions
+        self.cx
+            .regions
             .holds
             .iter()
             .map(|hold| self.summary(hold))
@@ -105,12 +106,18 @@ impl Checker<'_> {
             let bound = self.bound_of(hold);
             bound.tails.iter().any(|t| matches!(t, Type::Meta(_)))
         };
-        if !self.regions.holds.iter().any(open_bound) {
+        if !self.cx.regions.holds.iter().any(open_bound) {
             return false;
         }
         let mut changed = false;
         let mut summaries = self.summaries();
-        let mut open: Vec<_> = self.regions.holds.iter().map(|h| self.open_in(h)).collect();
+        let mut open: Vec<_> = self
+            .cx
+            .regions
+            .holds
+            .iter()
+            .map(|h| self.open_in(h))
+            .collect();
         for i in 0..summaries.len() {
             let Summary { bound, hidden, .. } = &summaries[i];
             if !bound.tails.iter().any(|t| matches!(t, Type::Meta(_))) {
@@ -147,7 +154,7 @@ impl Checker<'_> {
                 if let Some(m) = grew {
                     // only the holds that read it change: all of them at each
                     // growth would take time quadratic in the holds of a module
-                    for (j, hold) in self.regions.holds.iter().enumerate() {
+                    for (j, hold) in self.cx.regions.holds.iter().enumerate() {
                         if open[j].contains(&m) {
                             summaries[j] = self.summary(hold);
                             open[j] = self.open_in(hold);
@@ -165,7 +172,7 @@ impl Checker<'_> {
     /// those deeper than it.
     pub fn close_holds(&mut self, level: Option<u32>) {
         let mut open = Vec::new();
-        for hold in &self.regions.holds {
+        for hold in &self.cx.regions.holds {
             for t in self.store.normalize(&hold.bound).tails {
                 if let Type::Meta(m) = t {
                     open.push(m);
@@ -187,7 +194,7 @@ impl Checker<'_> {
     /// child that may outlive what it holds, and every error that would
     /// carry a region.
     pub fn report_regions(&mut self) {
-        let mut holds = mem::take(&mut self.regions.holds);
+        let mut holds = mem::take(&mut self.cx.regions.holds);
         // a written bound names the failure exactly; reporting it first lets
         // it cover an inferred one at the same span
         holds.sort_by_key(|hold| !hold.written);
@@ -210,17 +217,17 @@ impl Checker<'_> {
         }
         // after the holds: what a qualifier holds too much is theirs to name
         self.compare_deferred();
-        for o in mem::take(&mut self.regions.outlives) {
+        for o in mem::take(&mut self.cx.regions.outlives) {
             self.under(&o.givens, |this| this.check_outlives(&o));
         }
         self.settle_late_provided();
-        for (errors, span) in mem::take(&mut self.regions.raised) {
+        for (errors, span) in mem::take(&mut self.cx.regions.raised) {
             self.check_raised(&errors, span);
         }
-        for (needs, allowed, span) in mem::take(&mut self.regions.tail_calls) {
+        for (needs, allowed, span) in mem::take(&mut self.cx.regions.tail_calls) {
             self.check_tail_call(&needs, &allowed, span);
         }
-        for (element, span) in mem::take(&mut self.regions.error_elements) {
+        for (element, span) in mem::take(&mut self.cx.regions.error_elements) {
             let element = self.zonk(&element);
             if !self.may_be_error(&element) {
                 let shown = self.show_exact(&element);
@@ -249,7 +256,7 @@ impl Checker<'_> {
     /// The region `atom` as a diagnostic names it, and the scope it ends with.
     pub(super) fn describe(&self, atom: &Type) -> (String, Option<Span>) {
         match atom {
-            Type::Skolem(s) if self.regions.lent.contains(s) => (
+            Type::Skolem(s) if self.cx.regions.lent.contains(s) => (
                 "the reader of a lazy `for` that reads atoms".to_owned(),
                 None,
             ),
@@ -285,7 +292,7 @@ impl Checker<'_> {
         }) {
             return;
         }
-        let reader = matches!(atom, Type::Skolem(s) if self.regions.lent.contains(s));
+        let reader = matches!(atom, Type::Skolem(s) if self.cx.regions.lent.contains(s));
         let diagnostic = match hold.expected.as_ref().filter(|_| hold.written) {
             None if reader => Diagnostic::error(
                 codes::G002,
@@ -369,14 +376,14 @@ impl Checker<'_> {
             if i == outer {
                 return true;
             }
-            at = self.regions.scopes[i].parent;
+            at = self.cx.regions.scopes[i].parent;
         }
         false
     }
 
     pub(super) fn scope_index(&self, t: &Type) -> Option<usize> {
         match t {
-            Type::Skolem(s) => self.regions.scopes.iter().position(|x| x.region == *s),
+            Type::Skolem(s) => self.cx.regions.scopes.iter().position(|x| x.region == *s),
             _ => None,
         }
     }

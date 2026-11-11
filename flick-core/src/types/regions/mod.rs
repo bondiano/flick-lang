@@ -535,10 +535,11 @@ impl Checker<'_> {
                 .find(|(n, _)| n == name)
                 .map(|(_, k)| k.clone())
                 .or_else(|| {
-                    let v = self.tyvars.iter().rev().find(|v| v.name == *name)?;
+                    let v = self.cx.tyvars.iter().rev().find(|v| v.name == *name)?;
                     Some(v.kind.clone())
                 }),
             Type::Skolem(s) => self
+                .cx
                 .regions
                 .rigid_kinds
                 .iter()
@@ -563,24 +564,29 @@ impl Checker<'_> {
     }
 
     pub fn hold(&mut self, hold: Hold) {
-        self.regions.holds.push(hold);
+        self.cx.regions.holds.push(hold);
     }
 
     /// Marks where a closure starts: the uses after it are its body's.
     pub fn uses_mark(&self) -> usize {
-        self.regions.uses.len()
+        self.cx.regions.uses.len()
     }
 
     /// The locals below `locals` that were used since `uses`, by name.
     pub fn held_since(&self, uses: usize, locals: usize) -> Held {
         let mut seen: Vec<usize> = Vec::new();
-        for &i in &self.regions.uses[uses..] {
+        for &i in &self.cx.regions.uses[uses..] {
             if i < locals && !seen.contains(&i) {
                 seen.push(i);
             }
         }
         seen.into_iter()
-            .map(|i| (Some(self.locals[i].name.clone()), self.locals[i].ty.clone()))
+            .map(|i| {
+                (
+                    Some(self.cx.locals[i].name.clone()),
+                    self.cx.locals[i].ty.clone(),
+                )
+            })
             .collect()
     }
 
@@ -684,7 +690,7 @@ impl Checker<'_> {
     /// Starts the reader of a function whose body is checked next.
     pub fn begin_reader(&mut self) {
         let level = self.store.level;
-        self.regions.readers.push(Reader {
+        self.cx.regions.readers.push(Reader {
             level,
             region: None,
         });
@@ -694,6 +700,7 @@ impl Checker<'_> {
     /// `for` at `span`.
     pub fn reader_region(&mut self, span: Span) -> Type {
         let level = self
+            .cx
             .regions
             .readers
             .last()
@@ -701,14 +708,14 @@ impl Checker<'_> {
         if let Some(Reader {
             region: Some((id, _)),
             ..
-        }) = self.regions.readers.last()
+        }) = self.cx.regions.readers.last()
         {
             return Type::Skolem(*id);
         }
         let region = self.store.skolem_at("reader", level);
         if let Type::Skolem(id) = &region {
-            self.regions.lent.push(*id);
-            if let Some(reader) = self.regions.readers.last_mut() {
+            self.cx.regions.lent.push(*id);
+            if let Some(reader) = self.cx.regions.readers.last_mut() {
                 reader.region = Some((*id, span));
             }
         }
@@ -742,7 +749,7 @@ impl Checker<'_> {
         let Some(Reader {
             region: Some((id, at)),
             ..
-        }) = self.regions.readers.pop()
+        }) = self.cx.regions.readers.pop()
         else {
             return;
         };
@@ -766,7 +773,11 @@ impl Checker<'_> {
     }
     /// The scope whose region is the skolem `s`.
     pub fn scope_of(&self, s: u32) -> Option<&Scope> {
-        self.regions.scopes.iter().find(|scope| scope.region == s)
+        self.cx
+            .regions
+            .scopes
+            .iter()
+            .find(|scope| scope.region == s)
     }
 
     /// Reports a type that would take the region of a scope outside it;

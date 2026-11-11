@@ -37,9 +37,9 @@ impl Checker<'_> {
             return Type::Error;
         };
         let statements: Vec<&Node> = block.nodes().collect();
-        let mark = self.locals.len();
+        let mark = self.cx.locals.len();
         let ty = self.do_rest(node, &statements, expected);
-        self.locals.truncate(mark);
+        self.cx.locals.truncate(mark);
         self.sugar.push((node.range(), ty.clone()));
         ty
     }

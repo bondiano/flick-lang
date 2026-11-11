@@ -63,9 +63,9 @@ impl Checker<'_> {
             }
         }
         self.settle_signatures();
-        for op in mem::take(&mut self.operators) {
+        for op in mem::take(&mut self.cx.operators) {
             if waits(self, &op.ty) {
-                self.operators.push(op);
+                self.cx.operators.push(op);
                 continue;
             }
             self.under(&op.givens, |this| this.settle_operator(&op));
