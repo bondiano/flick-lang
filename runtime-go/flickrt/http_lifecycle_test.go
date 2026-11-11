@@ -2,6 +2,7 @@ package flickrt
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -155,5 +156,33 @@ func TestHTTPGraceDistinguishesDefaultZeroAndInfinite(t *testing.T) {
 		if grace, finite := httpGrace(c.timeout); grace != c.grace || finite != c.finite {
 			t.Errorf("timeout %v: got %v, %v, want %v, %v", c.timeout, grace, finite, c.grace, c.finite)
 		}
+	}
+}
+
+func TestHTTPRequestCleanupObservesHandlerFailure(t *testing.T) {
+	for _, kind := range []causeKind{causeFail, causeDie, causeInterrupt} {
+		t.Run(fmt.Sprint(kind), func(t *testing.T) {
+			observed := make(chan *Cause, 1)
+			owned(rootFiber(), func(fb *Fiber, _ *Owner) Value {
+				handler := Fn(func(fb *Fiber, _ Value) Value {
+					return Eff(func(fb *Fiber) Value {
+						fb.owner.add(fb, func(_ *Fiber, exit *Cause) Value { observed <- exit; return Unit })
+						panic(&Failure{&Cause{kind: kind, err: "failed", defect: "broken"}})
+					})
+				})
+				server := HttpServe(fb, Rec("host", "127.0.0.1", "port", 0.0,
+					"gracefulShutdownTimeout", None), handler).(*HttpServer)
+				response, err := http.Get("http://" + server.listener.Addr().String())
+				if err != nil {
+					t.Fatal(err)
+				}
+				io.Copy(io.Discard, response.Body)
+				response.Body.Close()
+				if exit := <-observed; exit == nil || !exit.has(kind) {
+					t.Errorf("cleanup must observe handler failure %v, got %v", kind, exit)
+				}
+				return Unit
+			})
+		})
 	}
 }

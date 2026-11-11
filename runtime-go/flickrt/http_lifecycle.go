@@ -23,6 +23,7 @@ type servedRequest struct {
 	source  requestSource
 	marks   requestMarks
 	request ServerRequest
+	exit    *Cause
 }
 
 func (q *servedRequest) interrupt() { q.state.interrupt(0) }
@@ -82,7 +83,11 @@ func (g *httpRequests) serve(q *servedRequest, w http.ResponseWriter, r *http.Re
 	stop := context.AfterFunc(r.Context(), q.interrupt)
 	defer stop()
 	_, cause := catch(func() Value {
-		return owned(&q.fiber, func(fb *Fiber, _ *Owner) Value {
+		return ownedWith(&q.fiber, func(owner *Owner, fb *Fiber, exit *Cause) *Cause {
+			// The response handled q.exit; cleanup still observes that original
+			// outcome. Only transport failures and cleanup failures escape.
+			return finalized(exit, owner.closeFinalizers(fb, Sequential(q.exit, exit)))
+		}, func(fb *Fiber, _ *Owner) Value {
 			return q.respond(fb, w, handler)
 		})
 	})
@@ -94,6 +99,7 @@ func (g *httpRequests) serve(q *servedRequest, w http.ResponseWriter, r *http.Re
 
 func (q *servedRequest) respond(fb *Fiber, w http.ResponseWriter, handler Value) Value {
 	out, cause := catch(func() Value { return Run(fb, Apply(fb, handler, &q.request)) })
+	q.exit = cause
 	if cause != nil {
 		out = causeResponse(cause)
 	}
@@ -104,6 +110,7 @@ func (q *servedRequest) respond(fb *Fiber, w http.ResponseWriter, handler Value)
 		if sent, failed := catch(func() Value { return q.request.preResponded(fb, &q.marks, out) }); failed == nil {
 			out = sent
 		} else {
+			q.exit = failed
 			out = causeResponse(failed)
 		}
 	}
