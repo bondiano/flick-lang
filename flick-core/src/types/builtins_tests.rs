@@ -173,3 +173,40 @@ fn a_built_in_module_imports_only_the_ones_before_it() {
         .collect();
     assert_eq!(found, [(codes::R003, "List.Core")], "{said:?}");
 }
+
+/// A built-in module that names a later one without importing it hears
+/// that the order of the built-in modules is why the name is unknown.
+#[test]
+fn a_built_in_module_names_only_the_ones_before_it() {
+    use crate::diagnostics::codes;
+    let early = "module Early exposing (..)\n\n\
+                 known : Option Int -> Bool\nlet known value = Option.is_some value\n";
+    let mut modules: Vec<(&str, &str)> = super::CORE.to_vec();
+    let at = (modules.iter().position(|(n, _)| *n == "Option")).expect("a core module");
+    modules.insert(at, ("Early", early));
+    let mut said = Vec::new();
+    let report = |name: &str, diagnostics: Vec<_>| {
+        if name == "Early" {
+            said = diagnostics;
+        }
+    };
+    super::check_reporting(&modules, report, false, |_, _| {});
+    let found: Vec<_> = (said.iter())
+        .map(|d| {
+            (
+                d.code,
+                &early[d.span.expect("a span").range()],
+                d.message.as_str(),
+            )
+        })
+        .collect();
+    assert_eq!(
+        found,
+        [(
+            codes::T001,
+            "Option.is_some",
+            "module `Option` comes after this one among the built-in modules: a built-in module names only the ones before it"
+        )],
+        "{said:?}"
+    );
+}
