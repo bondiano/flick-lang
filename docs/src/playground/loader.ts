@@ -8,8 +8,12 @@ export type Files = Readonly<Record<string, string>>;
 /** A module namespace, as `import()` gives it. */
 export type Namespace = Readonly<Record<string, unknown>>;
 
-/** `import … from "x"`, `export … from "x"`, `import "x"` and `import("x")`. */
-const SPECIFIER = /(\bfrom\s*|\bimport\s*\(\s*|\bimport\s+)"([^"]+)"/g;
+/**
+ * `import … from "x"`, `export … from "x"` and `import "x"`. The compiler
+ * writes each of them on a line of its own and no `import()`; anchoring
+ * them to the start of a line keeps a string such as `"from "` text.
+ */
+const SPECIFIER = /^((?:import|export)\b[^"\n]*?\bfrom\s*|import\s*)"([^"]+)"/gm;
 
 const isRelative = (spec: string): boolean => spec.startsWith("./") || spec.startsWith("../");
 
