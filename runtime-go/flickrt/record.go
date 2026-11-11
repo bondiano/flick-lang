@@ -39,7 +39,7 @@ func (r *Record) index(k string) int {
 // set is `r` with `k` as `v`: a key it has keeps its place.
 func (r *Record) set(k string, v Value) *Record {
 	if i := r.index(k); i >= 0 {
-		out := &Record{r.keys, append([]Value{}, r.vals...)}
+		out := r.copied()
 		out.vals[i] = v
 		return out
 	}
@@ -53,6 +53,40 @@ func (r *Record) set(k string, v Value) *Record {
 	out := &Record{make([]string, 0, len(r.keys)+1), make([]Value, 0, len(r.vals)+1)}
 	out.keys = append(append(append(out.keys, r.keys[:at]...), k), r.keys[at:]...)
 	out.vals = append(append(append(out.vals, r.vals[:at]...), v), r.vals[at:]...)
+	return out
+}
+
+// copied is a record of the values of `r` that shares its labels; a small
+// one is a single allocation.
+func (r *Record) copied() *Record {
+	n := len(r.vals)
+	var out *Record
+	switch {
+	case n <= 2:
+		b := &struct {
+			r Record
+			v [2]Value
+		}{}
+		b.r = Record{r.keys, b.v[:n]}
+		out = &b.r
+	case n <= 4:
+		b := &struct {
+			r Record
+			v [4]Value
+		}{}
+		b.r = Record{r.keys, b.v[:n]}
+		out = &b.r
+	case n <= 8:
+		b := &struct {
+			r Record
+			v [8]Value
+		}{}
+		b.r = Record{r.keys, b.v[:n]}
+		out = &b.r
+	default:
+		out = &Record{r.keys, make([]Value, n)}
+	}
+	copy(out.vals, r.vals)
 	return out
 }
 
@@ -159,6 +193,19 @@ func (r *Record) Get(k string) Value {
 // Update is a copy of a record with some fields replaced or added.
 func Update(base Value, fields Value) Value {
 	b, f := record(base), record(fields)
+	// fields the record has keep its labels: only its values are copied
+	replaced := b.copied()
+	for i, k := range f.keys {
+		at := b.index(k)
+		if at < 0 {
+			replaced = nil
+			break
+		}
+		replaced.vals[at] = f.vals[i]
+	}
+	if replaced != nil {
+		return replaced
+	}
 	out := newRecord(len(b.keys) + len(f.keys))
 	out.keys = append(out.keys, b.keys...)
 	out.vals = append(out.vals, b.vals...)

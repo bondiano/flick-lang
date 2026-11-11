@@ -202,6 +202,15 @@ func hashNumber(x float64) int32 {
 	return optimize(effectCombine(int32(bits>>32), int32(bits)))
 }
 
+// The hashes of the strings every hash of a Bool, a Unit or a variant
+// takes, made once.
+var (
+	hashTrue  = optimize(mix(hashString("true")))
+	hashFalse = optimize(mix(hashString("false")))
+	hashUnit  = optimize(mix(hashString("undefined")))
+	hashOfTag = hashString("_tag")
+)
+
 func hash(a Value) int32 {
 	switch x := a.(type) {
 	case int32:
@@ -213,9 +222,12 @@ func hash(a Value) int32 {
 	case *big.Int:
 		return hashString(x.String())
 	case bool:
-		return optimize(mix(hashString(strconv.FormatBool(x))))
+		if x {
+			return hashTrue
+		}
+		return hashFalse
 	case UnitType:
-		return optimize(mix(hashString("undefined")))
+		return hashUnit
 	case []Value:
 		h := int32(6151)
 		for _, v := range x {
@@ -224,7 +236,7 @@ func hash(a Value) int32 {
 		return optimize(h)
 	case *Data:
 		// the object `{ _tag, _0, … }`: its keys in any order
-		h := int32(12289) ^ effectCombine(hashString("_tag"), hashString(x.Tag))
+		h := int32(12289) ^ effectCombine(hashOfTag, hashString(x.Tag))
 		for i, v := range x.Fields {
 			h ^= effectCombine(hashString(nativeField(x.Tag, i)), hash(v))
 		}

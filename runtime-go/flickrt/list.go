@@ -1,7 +1,5 @@
 package flickrt
 
-import "sort"
-
 // Lists are immutable []Value: an operation returns a new slice, or the
 // same one when nothing changes. Callbacks are curried Flick functions.
 
@@ -170,10 +168,56 @@ func ListPartition(fb *Fiber, p, xs Value) Value {
 // ListSortBy is a stable sort on a copy.
 func ListSortBy(fb *Fiber, cmp, xs Value) Value {
 	out := append([]Value{}, List(xs)...)
-	sort.SliceStable(out, func(i, j int) bool {
-		return apply2(fb, cmp, out[i], out[j]).(*Data).Tag == LT.(*Data).Tag
-	})
+	lt := LT.(*Data).Tag
+	sortStable(out, func(a, b Value) bool { return apply2(fb, cmp, a, b).(*Data).Tag == lt })
 	return out
+}
+
+// sortStable sorts `xs` in place and keeps the order of equal elements: a
+// merge sort from runs of eight into one buffer. The order of a list is a
+// Flick function, so what counts is how few times it is asked; a sort in
+// place asks more and moves more.
+func sortStable(xs []Value, less func(a, b Value) bool) {
+	const run = 8
+	n := len(xs)
+	for lo := 0; lo < n; lo += run {
+		for i := lo + 1; i < min(lo+run, n); i++ {
+			for j := i; j > lo && less(xs[j], xs[j-1]); j-- {
+				xs[j], xs[j-1] = xs[j-1], xs[j]
+			}
+		}
+	}
+	if n <= run {
+		return
+	}
+	from, to := xs, make([]Value, n)
+	for width := run; width < n; width *= 2 {
+		for lo := 0; lo < n; lo += 2 * width {
+			mid, hi := min(lo+width, n), min(lo+2*width, n)
+			if mid == hi || !less(from[mid], from[mid-1]) {
+				// halves already in order, as in a list sorted before: one question
+				copy(to[lo:hi], from[lo:hi])
+				continue
+			}
+			i, j, k := lo, mid, lo
+			for ; i < mid && j < hi; k++ {
+				// the right one goes first only when it is less: equal ones keep their order
+				if less(from[j], from[i]) {
+					to[k] = from[j]
+					j++
+				} else {
+					to[k] = from[i]
+					i++
+				}
+			}
+			k += copy(to[k:], from[i:mid])
+			copy(to[k:], from[j:hi])
+		}
+		from, to = to, from
+	}
+	if &from[0] != &xs[0] {
+		copy(xs, from)
+	}
 }
 
 func ListLength(xs Value) Value { return int32(len(List(xs))) }
