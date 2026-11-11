@@ -444,6 +444,7 @@
 @flick-lang/runtime/core/list optionMap2
 @flick-lang/runtime/core/list resultMap2
 @flick-lang/runtime/core/list validationMap2
+@flick-lang/runtime/core/route routes
 @flick-lang/runtime/core/seq seq
 @flick-lang/runtime/core/seq seqAll
 @flick-lang/runtime/core/seq seqAny
