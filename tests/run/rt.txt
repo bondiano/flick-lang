@@ -309,3 +309,4 @@ codegen/release
 ../rt/interrupt_closed
 
 effect/host_services
+effect/row_without
