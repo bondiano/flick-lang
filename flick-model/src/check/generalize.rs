@@ -330,24 +330,16 @@ pub(super) fn substitute_row(r: &Row, map: &HashMap<Name, Inst>) -> Row {
             .iter()
             .map(|(n, args)| (n.clone(), args.iter().map(|a| substitute(a, map)).collect()))
             .collect(),
-        vars: BTreeSet::new(),
+        ..Row::default()
     };
     for v in &r.vars {
+        let gone = r.less_of(v).cloned().collect();
         match v {
             Var::Named(n) => match map.get(n) {
-                Some(Inst::Row(inner)) => {
-                    for (k, args) in &inner.elems {
-                        out.elems.entry(k.clone()).or_insert_with(|| args.clone());
-                    }
-                    out.vars.extend(inner.vars.iter().cloned());
-                }
-                _ => {
-                    out.vars.insert(v.clone());
-                }
+                Some(Inst::Row(inner)) => out.add_less(inner, &gone),
+                _ => out.add_var(v, &gone),
             },
-            Var::Meta(_) => {
-                out.vars.insert(v.clone());
-            }
+            Var::Meta(_) => out.add_var(v, &gone),
         }
     }
     out

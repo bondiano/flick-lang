@@ -251,7 +251,7 @@ def Row.scope (s : Ty) : Row := Row.ofCaps s.reach
 service and each row variable of `r`. -/
 def Row.obs (r : Row) (s : Ty) : Row
   | .ob N a => r (.nm N) ∧ s.reach a
-  | .obv v a => r (.rv v) ∧ s.reach a
+  | .obv v G a => r (.rv v G) ∧ s.reach a
   | _ => False
 
 /-- The type of a constant at an instance. A spawned child and a finalizer are

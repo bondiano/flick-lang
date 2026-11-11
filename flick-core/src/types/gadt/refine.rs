@@ -213,8 +213,8 @@ impl Refiner<'_, '_> {
                     Err(Stop::Unsupported(Unsupported::Row))
                 }
             }
-            (Type::Record(_) | Type::Row(_) | Type::Union(..), _)
-            | (_, Type::Record(_) | Type::Row(_) | Type::Union(..)) => {
+            (Type::Record(_) | Type::Row(_) | Type::Union(..) | Type::Without { .. }, _)
+            | (_, Type::Record(_) | Type::Row(_) | Type::Union(..) | Type::Without { .. }) => {
                 if self.full(&a) == self.full(&b) {
                     Ok(())
                 } else {

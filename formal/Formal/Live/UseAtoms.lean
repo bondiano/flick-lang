@@ -18,7 +18,7 @@ theorem Stage.kill_atm {n x : Nat} {φ : Stage} (h : (φ.substT (kill n)).svc (.
   | pure => exact h.elim
   | rt r e =>
     simp only [Stage.substT, Stage.svc, Row.substT] at h
-    rcases h with ⟨b, hb, hr⟩ | ⟨b, hb, hr⟩
+    rcases h with ⟨b, hb, hr⟩ | ⟨b, G, hb, hr⟩
     · cases b with
       | v i => simp [kill] at hr
       | r y =>

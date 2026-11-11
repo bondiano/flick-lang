@@ -2,6 +2,7 @@ import Formal.TyBase
 import Formal.Modules
 import Formal.HigherModules
 import Formal.Syntax
+import Formal.RowLess
 import Formal.TyComp
 import Formal.TyOps
 import Formal.SchemeOps

@@ -214,6 +214,11 @@ impl Printer<'_> {
                 out.push_str(" + ");
                 self.print(b, Prec::App, out);
             }),
+            Type::Without { .. } => {
+                out.push('{');
+                self.print_row_items(t, out);
+                out.push('}');
+            }
             Type::Captured { ty, captures, .. } | Type::Bounded { ty, captures } => {
                 self.print_captured(ty, captures, prec, out);
             }
@@ -358,9 +363,19 @@ impl Printer<'_> {
 
     /// The items of a service or error row without braces: `Users, Log | r`.
     fn print_row_items(&self, t: &Type, out: &mut String) {
-        let Type::Row(row) = t else {
-            self.print(t, Prec::App, out);
-            return;
+        let row = match t {
+            Type::Row(row) => row,
+            // `-S` before the `|`, as it is written
+            Type::Without { row, gone } => {
+                print_gone(gone, true, out);
+                out.push_str(" | ");
+                self.print(row, Prec::App, out);
+                return;
+            }
+            _ => {
+                self.print(t, Prec::App, out);
+                return;
+            }
         };
         if row.entries.is_empty() && row.tail.is_none() {
             out.push_str("none");
@@ -376,8 +391,19 @@ impl Printer<'_> {
             self.print(item, Prec::App, out);
         }
         let services = items.clone().any(|item| !is_fail(item));
-        if let Some(tail) = &row.tail {
-            out.push_str(if services { " | " } else { "" });
+        let tail = match row.tail.as_deref() {
+            Some(Type::Without { row, gone }) => {
+                print_gone(gone, !services, out);
+                out.push_str(" | ");
+                Some(&**row)
+            }
+            Some(tail) => {
+                out.push_str(if services { " | " } else { "" });
+                Some(tail)
+            }
+            None => None,
+        };
+        if let Some(tail) = tail {
             self.print(tail, Prec::App, out);
         }
         for item in items.filter(|item| is_fail(item)) {
@@ -420,6 +446,15 @@ enum Prec {
     App,
     /// Argument of an application.
     Arg,
+}
+
+/// `-A, -B`: the names a row variable is taken without, after the items
+/// before them unless they are the `first`.
+fn print_gone(gone: &[Elem], first: bool, out: &mut String) {
+    for (i, label) in gone.iter().enumerate() {
+        out.push_str(if i == 0 && first { "-" } else { ", -" });
+        out.push_str(&label.short());
+    }
 }
 
 #[cfg(test)]

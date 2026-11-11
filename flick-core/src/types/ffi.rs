@@ -404,6 +404,7 @@ fn mentions(t: &Type, names: &[String]) -> bool {
                 || row.tail.as_ref().is_some_and(|t| mentions(t, names))
         }
         Type::Union(a, b) => mentions(a, names) || mentions(b, names),
+        Type::Without { row, .. } => mentions(row, names),
         Type::Captured { ty, captures, .. } | Type::Bounded { ty, captures } => {
             mentions(ty, names) || mentions(captures, names)
         }

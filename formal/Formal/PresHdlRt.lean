@@ -127,7 +127,8 @@ theorem hdl_install {Ψ Θ E al rf e₀ T φ n t ψ C φ₀} {r ε : Row} {t' : 
       (.harms E (t'.up 1) ((Stage.rt r ε).substT (shiftV 1)) (.tvar 0))) (hn : al.NoIns)
     (hrf : Typ S Ψ Θ [] rf (.ex (.arrow t ψ t' C) (.rt r ε)))
     (hψ : (Stage.use ψ C).le (.rt r ε))
-    (he : Typ S Ψ Θ [] e₀ (.ex t φ₀)) (hφ₀ : φ₀.le (.rt (Row.union (Row.single E) r) ε))
+    (he : Typ S Ψ Θ [] e₀ (.ex t φ₀))
+    (hφ₀ : φ₀.le (.rt (Row.union (Row.single E) (r.back (Row.single E))) ε))
     (hOb : φ₀.ObOut (Row.single E)) (hc : S.Handles E al r) (hφ' : (Stage.rt r ε).le φ)
     (hT : LeLive t' T)
     (hbl : (Tm.hdl E al rf e₀).Below n) (hΨ : ∀ u ∈ Ψ, u.YF n) (hidem : Θ.substT (kill n) = Θ)
@@ -156,7 +157,7 @@ theorem hdl_install {Ψ Θ E al rf e₀ T φ n t ψ C φ₀} {r ε : Row} {t' : 
           rw [← Stage.use_substT ψ C (kill n)]
           simpa [Stage.substT] using Stage.le_substT (kill n) hψ)
         (h₃.weakenStore _)
-        (Stage.hP_of_out (by simpa [Stage.substT, Row.union_substT] using Stage.le_substT (kill n) hφ₀)
+        (Stage.hP_of_out (Stage.le_back_substT (kill n) hφ₀)
           (by simpa [Row.single_substT] using hOb.substT (kill n)))
         ⟨hc.1, fun h => .inl (hc.2 h)⟩
         (Stage.le_rt_sub (Stage.le_refl _) (fun _ h => Or.inr h)) .refl

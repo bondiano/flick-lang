@@ -35,6 +35,105 @@ theorem Stage.le_substT {φ φ' : Stage} (σ : Atom → Ty) (h : φ.le φ') :
   funext x; apply propext
   cases x <;> simp only [Row.substT, Row.union] <;> grind
 
+/-- A substitution keeps what the names of `H` give back to a row: a name it brings in
+through a variable taken without it is one `H` names. -/
+theorem Row.back_substT (σ : Atom → Ty) (r H : Row) :
+    Row.Sub ((r.back H).substT σ) (Row.union (H.substT σ) ((r.substT σ).back (H.substT σ))) := by
+  intro x hx
+  cases x with
+  | nm n =>
+    rcases hx with hx | ⟨b, G', ⟨G, hb, -, hback⟩, hG', h⟩
+    · exact .inr (.inl hx)
+    · by_cases hG : G n
+      · rcases hback n hG with h' | h'
+        · exact (hG' h').elim
+        · exact .inl (.inl h')
+      · exact .inr (.inr ⟨b, G, hb, hG, h⟩)
+  | atm a =>
+    rcases hx with ⟨b, hb, h⟩ | ⟨b, G', ⟨G, hb, -, -⟩, h⟩
+    · exact .inr (.inl ⟨b, hb, h⟩)
+    · exact .inr (.inr ⟨b, G, hb, h⟩)
+  | ob N a => exact .inr hx
+  | obv v K a => exact .inr hx
+  | rv c K =>
+    obtain ⟨b, G', ⟨G, hb, hsub, hback⟩, K', hc, rfl⟩ := hx
+    refine .inr ⟨fun n => G n ∨ K' n, ⟨b, G, hb, K', hc, rfl⟩, fun n hn => hn.imp (hsub n) id,
+      fun n hn => ?_⟩
+    rcases hn with hn | hn
+    · exact (hback n hn).imp .inl .inl
+    · exact .inl (.inr hn)
+
+theorem Row.Sub.back_substT {ε₀ H ε' : Row} (σ : Atom → Ty)
+    (h : Row.Sub ε₀ (Row.union H (ε'.back H))) :
+    Row.Sub (ε₀.substT σ) (Row.union (H.substT σ) ((ε'.substT σ).back (H.substT σ))) := by
+  intro x hx
+  have := h.substT σ x hx
+  rw [Row.union_substT] at this
+  exact this.elim .inl (Row.back_substT σ ε' H x)
+
+/-- A substitution keeps what the body of a handler of `E` may ask of its surroundings. -/
+theorem Stage.le_back_substT {φ₀ : Stage} {E : Name} {r ε : Row} (σ : Atom → Ty)
+    (h : φ₀.le (.rt (Row.union (Row.single E) (r.back (Row.single E))) ε)) :
+    (φ₀.substT σ).le
+      (.rt (Row.union (Row.single E) ((r.substT σ).back (Row.single E))) (ε.substT σ)) := by
+  cases φ₀ with
+  | pure => trivial
+  | rt r₀ e₀ =>
+    refine ⟨?_, h.2.substT σ⟩
+    have := Row.Sub.back_substT σ h.1
+    rwa [Row.single_substT] at this
+
+/-- A row gives back at least itself. -/
+theorem Row.le_back (r H : Row) : Row.Sub r (r.back H) := by
+  intro x hx
+  cases x with
+  | rv a G => exact ⟨G, hx, fun _ h => h, fun _ h => .inl h⟩
+  | _ => exact hx
+
+/-- What a row gives back is in it up to the names its variables are taken without. -/
+theorem Row.back_modNames {H r : Row} {x : Elem} (h : r.back H x) : r.modNames x := by
+  cases x with
+  | rv a G => obtain ⟨G', h, -⟩ := h; exact ⟨G', h⟩
+  | _ => exact h
+
+theorem Row.le_modNames {r : Row} {x : Elem} (h : r x) : r.modNames x := by
+  cases x with
+  | rv a G => exact ⟨G, h⟩
+  | _ => exact h
+
+theorem Row.modNames_mono {r r' : Row} (h : Row.Sub r r') : Row.Sub r.modNames r'.modNames := by
+  intro x hx
+  cases x with
+  | rv a G => obtain ⟨G', hx⟩ := hx; exact ⟨G', h _ hx⟩
+  | _ => exact h _ hx
+
+theorem Row.modNames_union {r r' : Row} {x : Elem} (h : (Row.union r r').modNames x) :
+    r.modNames x ∨ r'.modNames x := by
+  cases x with
+  | rv a G => obtain ⟨G', h⟩ := h; exact h.imp (fun h => ⟨G', h⟩) fun h => ⟨G', h⟩
+  | _ => exact h
+
+theorem Row.modNames_idem {r : Row} {x : Elem} (h : r.modNames.modNames x) : r.modNames x := by
+  cases x with
+  | rv a G => obtain ⟨_, G', h⟩ := h; exact ⟨G', h⟩
+  | _ => exact h
+
+/-- A substitution keeps a row up to the names its variables are taken without, but for
+the names it brings in. -/
+theorem Row.modNames_substT (σ : Atom → Ty) (r : Row) (x : Elem) (hx : r.modNames.substT σ x) :
+    (∃ N, x = .nm N) ∨ (r.substT σ).modNames x := by
+  cases x with
+  | nm N => exact .inl ⟨N, rfl⟩
+  | atm a =>
+    rcases hx with ⟨b, hb, h⟩ | ⟨b, G, ⟨G₂, hb⟩, h⟩
+    · exact .inr (.inl ⟨b, hb, h⟩)
+    · exact .inr (.inr ⟨b, G₂, hb, h⟩)
+  | ob N a => exact .inr hx
+  | obv v K a => exact .inr hx
+  | rv c K =>
+    obtain ⟨b, G, ⟨G₂, hb⟩, K', hc, -⟩ := hx
+    exact .inr ⟨_, b, G₂, hb, K', hc, rfl⟩
+
 @[simp] theorem Row.scope_substT (σ : Atom → Ty) (s : Ty) :
     (Row.scope s).substT σ = Row.scope (s.substT σ) := by
   funext x; apply propext
@@ -184,10 +283,10 @@ theorem Ty.reach_caps (s : Ty) (σ : Atom → Ty) : s.reach.substT σ = (s.subst
 /-- The names of a row without row variables stay the same under a substitution. -/
 theorem Row.Named.substT_nm {r : Row} (h : r.Named) (σ : Atom → Ty) (N : Name) :
     r.substT σ (.nm N) ↔ r (.nm N) := by
-  simp only [Row.substT]; exact ⟨fun h' => h'.elim id fun ⟨b, hb, _⟩ => (h b hb).elim, .inl⟩
+  simp only [Row.substT]; exact ⟨fun h' => h'.elim id fun ⟨b, G, hb, _⟩ => (h b G hb).elim, .inl⟩
 
 theorem Row.Named.substT {r : Row} (h : r.Named) (σ : Atom → Ty) : (r.substT σ).Named := by
-  rintro a ⟨b, hb, _⟩; exact h b hb
+  rintro a H ⟨b, G, hb, _⟩; exact h b G hb
 
 theorem Row.obs_substT (σ : Atom → Ty) (r : Row) (s : Ty) :
     (r.obs s).substT σ = (r.substT σ).obs (s.substT σ) := by

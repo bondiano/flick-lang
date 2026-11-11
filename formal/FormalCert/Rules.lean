@@ -53,7 +53,8 @@ theorem typ_provide {E o : Name} {a b R t T : Ty} {w e : Tm} {r ε : Row} {φ₀
     rw [Ty.up_def]
     have := Ty.field_substT (shiftV 1) hR
     simpa [Ty.substT, Stage.substT, ha, hb, Row.none_substT, Caps.none_substT] using this
-  refine .let_ hw (.hdl (ψ := .pure) (C := t.reach) (t' := t) ?_ ?_ id_typ trivial he hle hob
+  refine .let_ hw (.hdl (ψ := .pure) (C := t.reach) (t' := t) ?_ ?_ id_typ trivial he
+    (Stage.le_rt_sub hle fun x hx => hx.imp id (Row.le_back r _ x)) hob
     ⟨⟨o, _, _, _, hop⟩, fun hn => (hn hc).elim⟩ hφ hT)
   · refine .hatail hop ?_ .hanil
     refine .app (a := a) (ψ := .rt Row.none Row.none) (t := b) (C := Caps.none) ?_ ?_ ?_ .refl

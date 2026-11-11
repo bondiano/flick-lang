@@ -193,10 +193,10 @@ theorem frame_typing {Ψ Θ r t φ} (hr : ¬ Value r) (F : Frame) (hF : F.ok)
     cases h with
     | tryR h₁ h₂ hφ hs =>
       obtain ⟨_, _, rfl, hr', _⟩ := Stage.rt_le hφ
-      refine .mk0 ⟨_, _, h₁, ⟨fun n hn => .inl (hr' n hn), fun h => (h trivial).elim,
+      refine .mk0 ⟨_, _, h₁, ⟨fun n hn => .inl (Row.le_modNames (hr' n hn)), fun h => (h trivial).elim,
         fun hp => (by cases hp), fun h => (h trivial).elim⟩,
         fun σ hσ X _ h' => .tryR h' (h₂.sx (hσ.sub fun _ h => .inr h) X) (Stage.le_substT σ hφ)
-          (by simpa using hs.substT σ)⟩
+          (hs.back_substT σ)⟩
     | tryP h₁ h₂ =>
       refine .mk0 ⟨_, _, h₁, ⟨fun _ h => h.elim, fun h => (h trivial).elim, fun _ => rfl,
         fun h => (h trivial).elim⟩, fun σ hσ X _ h' => .tryP h' (by
@@ -214,7 +214,7 @@ theorem frame_typing {Ψ Θ r t φ} (hr : ¬ Value r) (F : Frame) (hF : F.ok)
         · cases n with
           | atm a => exact .inr (Frame.provides_of (F := .inside p) ⟨p, rfl, h⟩)
           | _ => exact h.elim
-        · exact .inl (hr' n h)
+        · exact .inl (Row.le_modNames (hr' n h))
         · cases n with
           | ob N a => exact .inr (Frame.provides_of (F := .inside p) (.inr ⟨p, rfl, h.1⟩))
           | obv v a => exact .inr (Frame.provides_of (F := .inside p) ⟨p, rfl, h.1⟩)

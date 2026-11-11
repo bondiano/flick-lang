@@ -169,7 +169,7 @@ example : Const.ok Facts.none .spawn
   · intro a h
     exact h.elim (fun h => h.elim) (fun h => h.elim)
   · intro a h
-    exact .inl (h.elim id False.elim)
+    exact .inl (h.elim id fun ⟨_, h⟩ => h.elim)
   · intro y hy
     cases y <;> first | exact (hy : False).elim | simp [Row.ofCaps] at hy
 
@@ -184,7 +184,7 @@ example : Const.ok Facts.none .spawn
   · intro a h
     exact .inl (h.elim id fun h => h.elim)
   · intro a h
-    exact .inl (h.elim id False.elim)
+    exact .inl (h.elim id fun ⟨_, h⟩ => h.elim)
 
 /-- The same holds of a finalizer. -/
 example : ¬ Const.ok Facts.none .addFin { (default : CArg) with s := .rg 0, C := region } :=
@@ -204,9 +204,9 @@ end Flick.LiveChecks
 namespace Flick.LiveChecks
 
 /-- A row variable may later contain Live, so it cannot bypass an owner's bound. -/
-example : ¬ Row.Outlives Facts.none (fun x => x = .rv (.v 0)) (.rg 1) := by
+example : ¬ Row.Outlives Facts.none (fun x => x = .rv (.v 0) fun _ => False) (.rg 1) := by
   intro h
-  rcases h (.v 0) (Or.inr rfl) with h | ⟨_, h, _⟩
+  rcases h (.v 0) (Or.inr ⟨_, rfl⟩) with h | ⟨_, h, _⟩
   · cases h
   · exact h.elim
 

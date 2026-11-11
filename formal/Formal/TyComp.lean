@@ -1,4 +1,4 @@
-import Formal.Syntax
+import Formal.RowLess
 
 /-!
 # Substitution of variables and regions: shifting, lifting under a binder, instantiation;
@@ -22,10 +22,6 @@ def instT (ts : List Ty) : Atom → Ty
 @[simp] theorem Ty.reach_ident (b a : Atom) : (Ty.ident b).reach a ↔ a = b := by
   cases b <;> simp [Ty.ident]
 
-/-- `⌈τ⌉` is what `τ` stands for in a row, as atoms and as row variables. -/
-theorem Ty.reach_asRow (t : Ty) (a : Atom) : t.reach a ↔ t.asRow (.atm a) ∨ t.asRow (.rv a) := by
-  cases t <;> simp [Ty.asRow, Ty.reach, Row.plain, Row.ofCaps]
-
 /-- A variable below `k` is not an atom under `k` binders. -/
 theorem Atom.up_ne {k i : Nat} {a : Atom} (hi : i < k) : a.up k ≠ .v i := by
   cases a <;> simp [Atom.up]; omega
@@ -35,6 +31,9 @@ theorem Atom.up_inj {k : Nat} {a b : Atom} (h : a.up k = b.up k) : a = b := by
 
 theorem Atom.ty_reach (b a : Atom) : b.ty.reach a ↔ a = b := by
   cases b <;> simp [Atom.ty]
+
+theorem Atom.ty_asRow (b : Atom) (x : Elem) : b.ty.asRow x ↔ x = .rv b fun _ => False := by
+  cases b <;> simp [Atom.ty, Ty.asRow]
 
 /-- The atoms under `k` binders, and those of a lifted renaming. -/
 theorem liftA_up (k : Nat) (ξ : Atom → Atom) (b : Atom) : liftA k ξ (b.up k) = (ξ b).up k := by
@@ -80,8 +79,8 @@ theorem Ty.reach_ren (ξ : Atom → Atom) (t : Ty) (a : Atom) :
   | rg p => simp [Ty.ren]
   | caps C => simp [Ty.ren, Ty.reach, Caps.substT]
   | row r =>
-    simp only [Ty.ren, Ty.reach, Row.substT]
-    grind [Ty.reach_asRow]
+    simp only [Ty.ren, Ty.reach]
+    exact Row.substT_reach _ _ a
   | arrow x φ y C ihx ihy =>
     simp only [Ty.ren, Ty.reach, Caps.substT, ihx, ihy]
     constructor
@@ -113,8 +112,8 @@ theorem Ty.reach_ren (ξ : Atom → Atom) (t : Ty) (a : Atom) :
       · exact .inl ⟨b, hb, h⟩
       · exact .inr ⟨b, hb, h⟩
   | errors e =>
-    simp only [Ty.ren, Ty.reach, Row.substT]
-    grind [Ty.reach_asRow]
+    simp only [Ty.ren, Ty.reach]
+    exact Row.substT_reach _ _ a
   | hnd s ih | owner s ih => simp only [Ty.ren, Ty.reach, ih]
   | base | adt | rnil | dict => simp [Ty.ren, Ty.reach, Caps.none]
   | all k t ih =>
@@ -163,8 +162,8 @@ theorem Ty.reach_substT (σ : Atom → Ty) (t : Ty) (a : Atom) :
   | rg p => simp [Ty.substT]
   | caps C => simp [Ty.substT, Ty.reach, Caps.substT]
   | row r =>
-    simp only [Ty.substT, Ty.reach, Row.substT]
-    grind [Ty.reach_asRow]
+    simp only [Ty.substT, Ty.reach]
+    exact Row.substT_reach σ _ a
   | arrow x φ y C ihx ihy =>
     simp only [Ty.substT, Ty.reach, Caps.substT, ihx, ihy]
     constructor
@@ -196,8 +195,8 @@ theorem Ty.reach_substT (σ : Atom → Ty) (t : Ty) (a : Atom) :
       · exact .inl ⟨b, hb, h⟩
       · exact .inr ⟨b, hb, h⟩
   | errors e =>
-    simp only [Ty.substT, Ty.reach, Row.substT]
-    grind [Ty.reach_asRow]
+    simp only [Ty.substT, Ty.reach]
+    exact Row.substT_reach σ _ a
   | hnd s ih | owner s ih => simp only [Ty.substT, Ty.reach, ih]
   | base | adt | rnil | dict => simp [Ty.substT, Ty.reach, Caps.none]
   | all k t ih =>
@@ -213,16 +212,10 @@ theorem Row.ofCaps_substT (C : Caps) (σ : Atom → Ty) :
     (Row.ofCaps C).substT σ = Row.ofCaps (C.substT σ) := by
   funext x; cases x <;> simp [Row.substT, Row.ofCaps, Caps.substT]
 
-theorem Ty.asRow_tvar (n : Nat) : (Ty.tvar n).asRow = fun x => x = .rv (.v n) := rfl
-theorem Ty.asRow_rg (p : Nat) : (Ty.rg p).asRow = fun x => x = .rv (.r p) := rfl
+theorem Ty.asRow_tvar (n : Nat) : (Ty.tvar n).asRow = fun x => x = .rv (.v n) fun _ => False :=
+  rfl
+theorem Ty.asRow_rg (p : Nat) : (Ty.rg p).asRow = fun x => x = .rv (.r p) fun _ => False := rfl
 theorem Ty.asRow_row (r : Row) : (Ty.row r).asRow = r.plain := rfl
-
-@[simp] theorem Ty.asRow_ob (t : Ty) (N : Name) (a : Atom) : ¬ t.asRow (.ob N a) := by
-  cases t <;> simp [Ty.asRow, Row.plain, Row.ofCaps]
-
-
-@[simp] theorem Ty.asRow_obv (t : Ty) (v a : Atom) : ¬ t.asRow (.obv v a) := by
-  cases t <;> simp [Ty.asRow, Row.plain, Row.ofCaps]
 
 /-- What a type stands for in a row commutes with substitution. -/
 theorem Ty.asRow_substT (σ : Atom → Ty) (t : Ty) : (t.substT σ).asRow = t.asRow.substT σ := by
@@ -231,10 +224,8 @@ theorem Ty.asRow_substT (σ : Atom → Ty) (t : Ty) : (t.substT σ).asRow = t.as
     intro t' h₁ h₂
     rw [h₁, h₂, Row.ofCaps_substT]; congr 1; funext a; apply propext; exact Ty.reach_substT σ t' a
   cases t with
-  | tvar n =>
-    funext x; apply propext; cases x <;> simp [Ty.substT, Ty.asRow_tvar, Row.substT]
-  | rg p =>
-    funext x; apply propext; cases x <;> simp [Ty.substT, Ty.asRow_rg, Row.substT]
+  | tvar n => exact (Row.var_substT σ (.v n)).symm
+  | rg p => exact (Row.var_substT σ (.r p)).symm
   | row r =>
     funext x; apply propext; cases x <;> simp [Ty.substT, Ty.asRow_row, Row.substT, Row.plain]
   | _ => exact hc _ rfl rfl
@@ -245,7 +236,7 @@ def NoNames (σ : Atom → Ty) : Prop := ∀ b N, ¬ (σ b).asRow (.nm N)
 
 theorem Row.substT_nm {σ : Atom → Ty} (h : NoNames σ) (r : Row) (N : Name) :
     r.substT σ (.nm N) ↔ r (.nm N) :=
-  ⟨fun h' => h'.elim id fun ⟨b, _, hb⟩ => (h b N hb).elim, .inl⟩
+  ⟨fun h' => h'.elim id fun ⟨b, _, _, _, hb⟩ => (h b N hb).elim, .inl⟩
 
 theorem Caps.substT_comp (C : Caps) (σ σ' : Atom → Ty) :
     (C.substT σ).substT σ' = C.substT fun a => (σ a).substT σ' := by
@@ -255,13 +246,74 @@ theorem Caps.substT_comp (C : Caps) (σ σ' : Atom → Ty) :
   · rintro ⟨b, ⟨c, hc, hb⟩, h⟩; exact ⟨c, hc, b, hb, h⟩
   · rintro ⟨c, hc, b, hb, h⟩; exact ⟨b, ⟨c, hc, hb⟩, h⟩
 
+theorem Ty.asRow_substT_iff (σ : Atom → Ty) (t : Ty) (x : Elem) :
+    (t.substT σ).asRow x ↔ t.asRow.substT σ x := by rw [Ty.asRow_substT]
+
+/-- Substitutions of a row compose. A variable taken without `G`, whose instance holds a
+variable without `H'`, becomes that one without both; `∨` is associative. -/
 theorem Row.substT_comp (r : Row) (σ σ' : Atom → Ty) :
     (r.substT σ).substT σ' = r.substT fun a => (σ a).substT σ' := by
+  have hr := fun t a => Ty.reach_substT σ' t a
+  have hs := fun t x => Ty.asRow_substT_iff σ' t x
   funext x; apply propext
   cases x with
-  | _ =>
-    simp only [Row.substT, Ty.reach_substT, Ty.asRow_substT]
-    grind
+  | nm N =>
+    constructor
+    · rintro ((h | ⟨b, G, hb, hG, h⟩) | ⟨c, K, ⟨b, G, hb, H', hc, rfl⟩, hK, h⟩)
+      · exact .inl h
+      · exact .inr ⟨b, G, hb, hG, (hs _ _).mpr (.inl h)⟩
+      · exact .inr ⟨b, G, hb, fun h' => hK (.inl h'),
+          (hs _ _).mpr (.inr ⟨c, H', hc, fun h' => hK (.inr h'), h⟩)⟩
+    · rintro (h | ⟨b, G, hb, hG, h⟩)
+      · exact .inl (.inl h)
+      · rcases (hs _ _).mp h with h | ⟨c, H', hc, hH, h⟩
+        · exact .inl (.inr ⟨b, G, hb, hG, h⟩)
+        · exact .inr ⟨c, _, ⟨b, G, hb, H', hc, rfl⟩, fun h' => h'.elim hG hH, h⟩
+  | atm a =>
+    constructor
+    · rintro (⟨c, (⟨b, hb, hc⟩ | ⟨b, G, hb, hc⟩), h⟩ | ⟨c, K, ⟨b, G, hb, H', hc, -⟩, h⟩)
+      · exact .inl ⟨b, hb, (hr _ a).mpr ⟨c, hc, h⟩⟩
+      · exact .inr ⟨b, G, hb, (hs _ _).mpr (.inl ⟨c, hc, h⟩)⟩
+      · exact .inr ⟨b, G, hb, (hs _ _).mpr (.inr ⟨c, H', hc, h⟩)⟩
+    · rintro (⟨b, hb, h⟩ | ⟨b, G, hb, h⟩)
+      · obtain ⟨c, hc, h⟩ := (hr _ a).mp h
+        exact .inl ⟨c, .inl ⟨b, hb, hc⟩, h⟩
+      · rcases (hs _ _).mp h with ⟨c, hc, h⟩ | ⟨c, H', hc, h⟩
+        · exact .inl ⟨c, .inr ⟨b, G, hb, hc⟩, h⟩
+        · exact .inr ⟨c, _, ⟨b, G, hb, H', hc, rfl⟩, h⟩
+  | ob N a =>
+    constructor
+    · rintro (⟨c, (⟨b, hb, hc⟩ | ⟨w, G, b, hb, hG, hw, hc⟩), h⟩ |
+        ⟨v, K, c, ⟨w, G, b, hb, ⟨H', hv, rfl⟩, hc⟩, hK, hn, h⟩)
+      · exact .inl ⟨b, hb, (hr _ a).mpr ⟨c, hc, h⟩⟩
+      · exact .inr ⟨w, G, b, hb, hG, (hs _ _).mpr (.inl hw), (hr _ a).mpr ⟨c, hc, h⟩⟩
+      · exact .inr ⟨w, G, b, hb, fun h' => hK (.inl h'),
+          (hs _ _).mpr (.inr ⟨v, H', hv, fun h' => hK (.inr h'), hn⟩), (hr _ a).mpr ⟨c, hc, h⟩⟩
+    · rintro (⟨b, hb, h⟩ | ⟨w, G, b, hb, hG, hw, h⟩)
+      · obtain ⟨c, hc, h⟩ := (hr _ a).mp h
+        exact .inl ⟨c, .inl ⟨b, hb, hc⟩, h⟩
+      · obtain ⟨c, hc, h⟩ := (hr _ a).mp h
+        rcases (hs _ _).mp hw with hw | ⟨v, H', hv, hH, hn⟩
+        · exact .inl ⟨c, .inr ⟨w, G, b, hb, hG, hw, hc⟩, h⟩
+        · exact .inr ⟨v, _, c, ⟨w, G, b, hb, ⟨H', hv, rfl⟩, hc⟩, fun h' => h'.elim hG hH, hn, h⟩
+  | obv v₀ H₀ a =>
+    constructor
+    · rintro ⟨v, K, c, ⟨w, G, b, hb, ⟨H', hv, rfl⟩, hc⟩, ⟨H'', hv', rfl⟩, h⟩
+      exact ⟨w, G, b, hb, ⟨fun n => H' n ∨ H'' n, (hs _ _).mpr ⟨v, H', hv, H'', hv', rfl⟩,
+        by funext n; exact propext or_assoc⟩, (hr _ a).mpr ⟨c, hc, h⟩⟩
+    · rintro ⟨w, G, b, hb, ⟨J, hJ, rfl⟩, h⟩
+      obtain ⟨c, hc, h⟩ := (hr _ a).mp h
+      obtain ⟨v, H', hv, H'', hv', rfl⟩ := (hs _ _).mp hJ
+      exact ⟨v, _, c, ⟨w, G, b, hb, ⟨H', hv, rfl⟩, hc⟩,
+        ⟨H'', hv', by funext n; exact propext or_assoc.symm⟩, h⟩
+  | rv c₀ H₀ =>
+    constructor
+    · rintro ⟨c, K, ⟨b, G, hb, H', hc, rfl⟩, H'', h, rfl⟩
+      exact ⟨b, G, hb, fun n => H' n ∨ H'' n, (hs _ _).mpr ⟨c, H', hc, H'', h, rfl⟩,
+        by funext n; exact propext or_assoc⟩
+    · rintro ⟨b, G, hb, J, hJ, rfl⟩
+      obtain ⟨c, H', hc, H'', h, rfl⟩ := (hs _ _).mp hJ
+      exact ⟨c, _, ⟨b, G, hb, H', hc, rfl⟩, H'', h, by funext n; exact propext or_assoc.symm⟩
 
 theorem Stage.substT_comp (φ : Stage) (σ σ' : Atom → Ty) :
     (φ.substT σ).substT σ' = φ.substT fun a => (σ a).substT σ' := by
@@ -270,11 +322,11 @@ theorem Stage.substT_comp (φ : Stage) (σ σ' : Atom → Ty) :
 theorem Caps.substT_ident (C : Caps) : C.substT Ty.ident = C := by
   funext a; apply propext; simp [Caps.substT]
 
-theorem Ty.asRow_ident (b : Atom) : (Ty.ident b).asRow = fun x => x = .rv b := by
+theorem Ty.asRow_ident (b : Atom) : (Ty.ident b).asRow = fun x => x = .rv b fun _ => False := by
   cases b <;> rfl
 
 theorem Row.substT_ident (r : Row) : r.substT Ty.ident = r := by
-  funext x; apply propext; cases x <;> simp [Row.substT, Ty.asRow_ident]
+  funext x; apply propext; cases x <;> simp [Row.substT, Ty.asRow_ident, Row.less_var]
 
 theorem Stage.substT_ident (φ : Stage) : φ.substT Ty.ident = φ := by
   cases φ <;> simp [Stage.substT, Row.substT_ident]

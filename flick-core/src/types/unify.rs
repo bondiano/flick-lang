@@ -281,6 +281,11 @@ impl Store {
             Type::Union(a, b) => self
                 .normalize(&Type::Union(Box::new(self.zonk(a)), Box::new(self.zonk(b))))
                 .into_type(),
+            Type::Without { row, gone } => {
+                let row = Box::new(self.zonk(row));
+                let gone = gone.clone();
+                self.normalize(&Type::Without { row, gone }).into_type()
+            }
             Type::Record(row) | Type::Row(row) => {
                 let row = self.zonk_row(row);
                 if matches!(t, Type::Record(_)) {
@@ -354,6 +359,20 @@ impl Store {
             Type::Union(a, b) => {
                 self.collect_row(&a, out);
                 self.collect_row(&b, out);
+            }
+            // a known row loses the elements; what is still a variable keeps
+            // the names to lose
+            Type::Without { row, gone } => {
+                let mut inner = Norm::default();
+                self.collect_row(&row, &mut inner);
+                let kept = (inner.entries.into_iter()).filter(|(label, _)| !gone.contains(label));
+                out.entries.extend(kept);
+                for tail in inner.tails {
+                    let tail = super::ty::without(tail, &gone);
+                    if !out.tails.contains(&tail) {
+                        out.tails.push(tail);
+                    }
+                }
             }
             other => {
                 if !out.tails.contains(&other) {
@@ -743,7 +762,8 @@ impl Checker<'_> {
                 self.unify(c1, c2)?;
                 self.unify(&alpha(b1, x), &alpha(b2, y))
             }
-            (Type::Row(_) | Type::Union(..), _) | (_, Type::Row(_) | Type::Union(..)) => {
+            (Type::Row(_) | Type::Union(..) | Type::Without { .. }, _)
+            | (_, Type::Row(_) | Type::Union(..) | Type::Without { .. }) => {
                 self.unify_row_types(&a, &b)
             }
             (

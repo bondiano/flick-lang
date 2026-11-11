@@ -240,3 +240,4 @@ runtime/discontinued_body
 runtime/discontinued_fiber
 
 effect/host_services
+effect/row_without

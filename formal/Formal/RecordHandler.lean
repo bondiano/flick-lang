@@ -181,20 +181,20 @@ theorem layer_typ {Ψ Θ Γ t} {r ε : Row} : ∀ (bs : List Binding) {e : Tm} {
           refine ⟨fun x hx => ?_, hle.2⟩
           by_cases hx' : x = .nm b.1
           · exact .inl hx'
-          · exact .inr ⟨hx, hx'⟩
-      · refine ⟨fun N a h => ⟨fun v h' => (by cases h'), fun h' => (hO.1 N a h).2 (.inl h')⟩,
-          fun v a h => ⟨fun w h' => (by cases h'), fun N h' => (hO.2 v a h).2 N (.inl h')⟩⟩
+          · exact .inr (Row.le_back _ _ _ ⟨hx, hx'⟩)
+      · refine ⟨fun N a h => ⟨fun v _ h' => (by cases h'), fun h' => (hO.1 N a h).2 (.inl h')⟩,
+          fun v G a h => ⟨fun w _ h' => (by cases h'), fun N h' => (hO.2 v G a h).2 N (.inl h')⟩⟩
       · rw [recArms_armOf (hb.ops o c x y hop)]; rfl
     refine layer_typ bs (fun b' h => hall b' (List.mem_cons_of_mem _ h)) hh ⟨fun x hx => ?_, fun _ h => h⟩ ?_
     · rcases Stage.le_svc hle x hx.1 with (h | h) | h
       · exact (hx.2 h).elim
       · exact .inl h
       · exact .inr h
-    · refine ⟨fun N a h => ?_, fun v a h => ?_⟩
+    · refine ⟨fun N a h => ?_, fun v G a h => ?_⟩
       · obtain ⟨h₁, h₂⟩ := hO.1 N a h.1
-        exact ⟨fun v h' => h₁ v (.inr h'), fun h' => h₂ (.inr h')⟩
-      · obtain ⟨h₁, h₂⟩ := hO.2 v a h.1
-        exact ⟨fun v h' => h₁ v (.inr h'), fun N h' => h₂ N (.inr h')⟩
+        exact ⟨fun v K h' => h₁ v K (.inr h'), fun h' => h₂ (.inr h')⟩
+      · obtain ⟨h₁, h₂⟩ := hO.2 v G a h.1
+        exact ⟨fun v K h' => h₁ v K (.inr h'), fun N h' => h₂ N (.inr h')⟩
 
 /-- The record that answers an operation: the first binding of its effect with it. -/
 def answer : List Binding → Name → Name → Option Tm

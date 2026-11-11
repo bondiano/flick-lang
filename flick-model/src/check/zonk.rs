@@ -2,7 +2,7 @@
 //! §1.2); an opaque alias of the module being checked is its
 //! representation there (`docs/formal/elaboration.md#an-opaque-alias-inside-its-module-resolves-through-its-representation`).
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 use std::rc::Rc;
 
 use super::dicts::arg;
@@ -132,20 +132,13 @@ impl Checker<'_> {
                 .iter()
                 .map(|(n, args)| (n.clone(), args.iter().map(|a| self.zonk(a)).collect()))
                 .collect(),
-            vars: BTreeSet::new(),
+            ..Row::default()
         };
         for v in &r.vars {
+            let gone = r.less_of(v).cloned().collect();
             match self.solution(v) {
-                Some(Solved::Row(inner)) => {
-                    let inner = self.zonk_row(inner);
-                    for (n, args) in inner.elems {
-                        out.elems.entry(n).or_insert(args);
-                    }
-                    out.vars.extend(inner.vars);
-                }
-                _ => {
-                    out.vars.insert(v.clone());
-                }
+                Some(Solved::Row(inner)) => out.add_less(&self.zonk_row(inner), &gone),
+                _ => out.add_var(v, &gone),
             }
         }
         drop_empty_live(&mut out);

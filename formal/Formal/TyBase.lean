@@ -27,14 +27,16 @@ def Caps.none : Caps := fun _ => False
 services the atom `ϱ` is `Scope ϱ`; in a row of errors the atoms bound what the
 errors reach, `⌈Errors ε⌉` (regions.md §2.1). A row of services also carries the
 obligations `{Provided {S} ϱ}` not yet discharged (`ob S ϱ`, regions.md §2.7) and those
-`{Provided r ϱ}` over a row variable `r` (`obv r ϱ`). `rv a` is a row variable: a
-substitution replaces it with the row that `σ a` stands for (`Ty.asRow`). -/
+`{Provided r ϱ}` over a row variable `r` (`obv r G ϱ`). `rv a G` is the row variable `a`
+without the names `G`: `G` is empty for `a` itself, and the tail of `{-S | a}` is `a`
+without `S`. A substitution replaces it with the row that `σ a` stands for (`Ty.asRow`)
+less the names of `G` (`Row.less`); an obligation is over a row variable in the same way. -/
 inductive Elem
   | nm (N : Name)
   | atm (a : Atom)
   | ob (N : Name) (a : Atom)
-  | rv (a : Atom)
-  | obv (v a : Atom)
+  | rv (a : Atom) (G : Name → Prop)
+  | obv (v : Atom) (G : Name → Prop) (a : Atom)
 
 instance : Coe Name Elem := ⟨Elem.nm⟩
 
@@ -46,10 +48,32 @@ def Row.none : Row := fun _ => False
 def Row.single (S : Name) : Row := fun n => n = .nm S
 def Row.union (r r' : Row) : Row := fun n => r n ∨ r' n
 /-- A row without row variables. -/
-def Row.Named (r : Row) : Prop := ∀ a, ¬ r (.rv a)
+def Row.Named (r : Row) : Prop := ∀ a G, ¬ r (.rv a G)
 
 /-- `ρ ⊆ ρ'`. -/
 def Row.Sub (r r' : Row) : Prop := ∀ n, r n → r' n
+
+/-- `ρ` less the names of `G`: its names out of `G`, its atoms, and each of its variables
+without `G` too. No obligation comes in through a row variable. -/
+def Row.less (G : Name → Prop) (r : Row) : Row
+  | .nm n => ¬ G n ∧ r (.nm n)
+  | .atm a => r (.atm a)
+  | .rv c H => ∃ H', r (.rv c H') ∧ H = fun n => G n ∨ H' n
+  | _ => False
+
+/-- `ρ` beside the names of `H`, which give back what its variables are taken without:
+beside `H`, a variable `a` without `G` is `a` without the names of `G` that `H` lacks,
+`H + (a − G) ≡ H + (a − (G − H))`. A handler of `H` leaves `ρ` to its surroundings when
+its body is within `H + ρ.back H`, so a body of the row `a` leaves `a − H`. -/
+def Row.back (r H : Row) : Row
+  | .rv a G' => ∃ G, r (.rv a G) ∧ (∀ n, G' n → G n) ∧ ∀ n, G n → G' n ∨ H (.nm n)
+  | x => r x
+/-- `ρ` up to the names its variables are taken without: what of a row passes a `handle`,
+which removes a name by the error value it holds, not by the row. -/
+def Row.modNames (r : Row) : Row
+  | .rv a _ => ∃ G, r (.rv a G)
+  | x => r x
+
 /-- The atoms of a set as row elements: `Scope ϱ` for a region `ϱ`. -/
 def Row.ofCaps (C : Caps) : Row
   | .atm a => C a
@@ -137,13 +161,13 @@ def Ty.reach : Ty → Caps
   | .tvar n => fun a => a = .v n
   | .rg p => fun a => a = .r p
   | .caps C => C
-  | .row r => fun a => r (.atm a) ∨ r (.rv a)
+  | .row r => fun a => r (.atm a) ∨ ∃ G, r (.rv a G)
   | .arrow a _ b C => fun x => a.reach x ∨ b.reach x ∨ C x
   | .ref t => t.reach
   | .tapp f a => fun x => f.reach x ∨ a.reach x
   | .rcons _ t r => fun x => t.reach x ∨ r.reach x
   | .eff _ _ t C => fun x => t.reach x ∨ C x
-  | .errors e => fun x => e (.atm x) ∨ e (.rv x)
+  | .errors e => fun x => e (.atm x) ∨ ∃ G, e (.rv x G)
   | .hnd s => s.reach
   | .owner s => s.reach
   | .all k t => fun a => t.reach (a.up k)
@@ -161,22 +185,22 @@ def Row.plain (r : Row) : Row
 /-- What a type stands for as the instance of a row variable: a variable is itself, a
 `row r` the plain part of `r`, any other type the atoms it reaches. -/
 def Ty.asRow : Ty → Row
-  | .tvar n => fun x => x = .rv (.v n)
-  | .rg p => fun x => x = .rv (.r p)
+  | .tvar n => fun x => x = .rv (.v n) fun _ => False
+  | .rg p => fun x => x = .rv (.r p) fun _ => False
   | .row r => r.plain
   | t => Row.ofCaps t.reach
 
 /-- A row after a substitution: a name stays, an atom `a` (also of an obligation)
-becomes the atoms of `⌈σ a⌉`, a row variable `a` the row `σ a` stands for, and so does
-the row variable of an obligation: `Provided v ϱ` becomes one for each name and variable
-of `σ v`. -/
+becomes the atoms of `⌈σ a⌉`, a row variable `b` without `G` the row `σ b` stands for
+less the names of `G`, and so does the row variable of an obligation: `Provided v ϱ`
+becomes one for each name and variable of that row. -/
 def Row.substT (σ : Atom → Ty) (r : Row) : Row
-  | .nm n => r (.nm n) ∨ ∃ b, r (.rv b) ∧ (σ b).asRow (.nm n)
-  | .atm a => (∃ b, r (.atm b) ∧ (σ b).reach a) ∨ ∃ b, r (.rv b) ∧ (σ b).asRow (.atm a)
+  | .nm n => r (.nm n) ∨ ∃ b G, r (.rv b G) ∧ ¬ G n ∧ (σ b).asRow (.nm n)
+  | .atm a => (∃ b, r (.atm b) ∧ (σ b).reach a) ∨ ∃ b G, r (.rv b G) ∧ (σ b).asRow (.atm a)
   | .ob n a => (∃ b, r (.ob n b) ∧ (σ b).reach a) ∨
-      ∃ v b, r (.obv v b) ∧ (σ v).asRow (.nm n) ∧ (σ b).reach a
-  | .obv w a => ∃ v b, r (.obv v b) ∧ (σ v).asRow (.rv w) ∧ (σ b).reach a
-  | .rv a => ∃ b, r (.rv b) ∧ (σ b).asRow (.rv a)
+      ∃ v G b, r (.obv v G b) ∧ ¬ G n ∧ (σ v).asRow (.nm n) ∧ (σ b).reach a
+  | .obv w H a => ∃ v G b, r (.obv v G b) ∧ (σ v).asRow.less G (.rv w H) ∧ (σ b).reach a
+  | .rv c H => ∃ b G, r (.rv b G) ∧ (σ b).asRow.less G (.rv c H)
 
 def Stage.substT (σ : Atom → Ty) : Stage → Stage
   | .pure => .pure

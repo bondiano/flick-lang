@@ -109,7 +109,7 @@ def Row.kid (S : Sig) (E : Name) (R' rout : Row) : Row
 theorem Row.kid_out {E : Name} {R' rout : Row} : ∀ y, rout y → Row.kid S E R' rout y
   | .nm _, h => .inr (.inl h)
   | .ob _ _, h => .inr h
-  | .atm _, h | .rv _, h | .obv _ _, h => .inr h
+  | .atm _, h | .rv _ _, h | .obv _ _ _, h => .inr h
 
 /-- An obligation about the effect of a handler that the work holds is discharged by it. -/
 theorem kid_outl {Θ : Facts} {φ₀ : Stage} {E : Name} {q b : Nat} {G : Frame} {E₀ : List Frame} {R' rout ε₀ : Row}
@@ -145,7 +145,8 @@ theorem kid_kept {o b q : Nat} {Θ : Facts} {φ₀ φ : Stage} {E : Name} {G : F
       refine ⟨fun hN => ?_, fun hN => .inl ⟨hN, hy⟩⟩
       subst hN
       exact kid_outl hΘ hG hA hrow (h1 N a) hy
-    | atm a | rv a | obv _ a => exact .inl hy
+    | atm a | obv _ a => exact .inl hy
+    | rv a G => exact Row.le_back (Row.kid S E R' rk) _ (.rv a G) (Or.inl hy)
   · rcases hy with ⟨hN, hy⟩ | hy
     · rcases h1 N a hy with h' | ⟨p, rfl, hp⟩ | ⟨F, hF, x⟩
       · exact .inl (up _ (hsub _ (fun _ h => by cases h) ((Stage.le_svc hrow _ h').2 hN)))

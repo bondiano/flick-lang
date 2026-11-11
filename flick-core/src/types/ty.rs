@@ -41,6 +41,13 @@ pub enum Type {
     Row(Row),
     /// `r1 + r2`.
     Union(Box<Type>, Box<Type>),
+    /// What `row` stands for without the elements named `gone`: the tail of
+    /// `{-S | r}`. A row that is known is that row without them, so only a
+    /// row variable keeps this form.
+    Without {
+        row: Box<Type>,
+        gone: Vec<Elem>,
+    },
     /// `T^c`: a qualifier on a value's captures or a stored type qualification.
     /// A bare type permits only captures exposed by its complete type.
     Captured {
@@ -296,6 +303,20 @@ impl Norm {
     }
 }
 
+/// `tail` of a row without the elements named `gone`: a tail already less
+/// some names is less these too.
+pub fn without(tail: Type, gone: &[Elem]) -> Type {
+    let (row, mut all) = match tail {
+        Type::Error => return Type::Error,
+        Type::Without { row, gone } => (row, gone),
+        other => (Box::new(other), Vec::new()),
+    };
+    all.extend(gone.iter().cloned());
+    all.sort();
+    all.dedup();
+    Type::Without { row, gone: all }
+}
+
 /// The label of a region, or of a type variable whose captures are meant, in
 /// a capture row. It follows the element, which unification may still
 /// change, so rows relabel such entries whenever they are taken apart.
@@ -415,6 +436,10 @@ impl Type {
             Type::Record(r) => Type::Record(row(r, f)),
             Type::Row(r) => Type::Row(row(r, f)),
             Type::Union(a, b) => Type::Union(Box::new(f(a)), Box::new(f(b))),
+            Type::Without { row, gone } => Type::Without {
+                row: Box::new(f(row)),
+                gone: gone.clone(),
+            },
             Type::Captured {
                 ty,
                 captures,
@@ -480,6 +505,7 @@ impl Type {
             }
             Type::Tuple(items) => items.iter().for_each(f),
             Type::Record(r) | Type::Row(r) => row(r, f),
+            Type::Without { row, .. } => f(row),
             Type::Union(a, b)
             | Type::Captured {
                 ty: a, captures: b, ..

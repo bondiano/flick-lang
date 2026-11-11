@@ -121,8 +121,8 @@ theorem fold_map :
 
 /-- `Prelude.traverse : forall f c a b r e. Traversable f => (a ->{r; e} b)^c -> f a ->{r; e} f b` -/
 theorem traverse :
-    Ty.elide (fun x => x = .v 1) (.arrow (.dict 0 (Ty.spine [(.tvar 0)])) .pure (.arrow (.arrow (.tvar 2) (.rt (fun x => x = .rv (.v 4)) (fun x => x = .rv (.v 5))) (.tvar 3) (fun x => x = .v 1)) .pure (.arrow (.tapp (.tvar 0) (.tvar 2)) (.rt (fun x => x = .rv (.v 4)) (fun x => x = .rv (.v 5))) (.tapp (.tvar 0) (.tvar 3)) Caps.none) Caps.none) Caps.none) Caps.none =
-      (.arrow (.dict 0 (Ty.spine [(.tvar 0)])) .pure (.arrow (.arrow (.tvar 2) (.rt (fun x => x = .rv (.v 4)) (fun x => x = .rv (.v 5))) (.tvar 3) (fun x => x = .v 1)) .pure (.arrow (.tapp (.tvar 0) (.tvar 2)) (.rt (fun x => x = .atm (.v 1) ∨ x = .rv (.v 4)) (fun x => x = .rv (.v 5))) (.tapp (.tvar 0) (.tvar 3)) Caps.none) Caps.none) Caps.none) := by
+    Ty.elide (fun x => x = .v 1) (.arrow (.dict 0 (Ty.spine [(.tvar 0)])) .pure (.arrow (.arrow (.tvar 2) (.rt (fun x => x = .rv (.v 4) (fun _ => False)) (fun x => x = .rv (.v 5) (fun _ => False))) (.tvar 3) (fun x => x = .v 1)) .pure (.arrow (.tapp (.tvar 0) (.tvar 2)) (.rt (fun x => x = .rv (.v 4) (fun _ => False)) (fun x => x = .rv (.v 5) (fun _ => False))) (.tapp (.tvar 0) (.tvar 3)) Caps.none) Caps.none) Caps.none) Caps.none =
+      (.arrow (.dict 0 (Ty.spine [(.tvar 0)])) .pure (.arrow (.arrow (.tvar 2) (.rt (fun x => x = .rv (.v 4) (fun _ => False)) (fun x => x = .rv (.v 5) (fun _ => False))) (.tvar 3) (fun x => x = .v 1)) .pure (.arrow (.tapp (.tvar 0) (.tvar 2)) (.rt (fun x => x = .atm (.v 1) ∨ x = .rv (.v 4) (fun _ => False)) (fun x => x = .rv (.v 5) (fun _ => False))) (.tapp (.tvar 0) (.tvar 3)) Caps.none) Caps.none) Caps.none) := by
   elide_eq
 
 /-- `Prelude.pure : forall f c a. Applicative f => a^c -> (f a)^c` -/
@@ -201,56 +201,56 @@ theorem identity :
 
 /-- `Prelude.from_result : forall e a. Result (Errors e) a ->{none; e} a` -/
 theorem from_result :
-    Ty.elide Caps.none (.arrow (.tapp (.tapp (.adt "Prelude.Result") (.errors (fun x => x = .rv (.v 0)))) (.tvar 1)) (.rt Row.none (fun x => x = .rv (.v 0))) (.tvar 1) Caps.none) Caps.none =
-      (.arrow (.tapp (.tapp (.adt "Prelude.Result") (.errors (fun x => x = .rv (.v 0)))) (.tvar 1)) (.rt Row.none (fun x => x = .rv (.v 0))) (.tvar 1) Caps.none) := by
+    Ty.elide Caps.none (.arrow (.tapp (.tapp (.adt "Prelude.Result") (.errors (fun x => x = .rv (.v 0) (fun _ => False)))) (.tvar 1)) (.rt Row.none (fun x => x = .rv (.v 0) (fun _ => False))) (.tvar 1) Caps.none) Caps.none =
+      (.arrow (.tapp (.tapp (.adt "Prelude.Result") (.errors (fun x => x = .rv (.v 0) (fun _ => False)))) (.tvar 1)) (.rt Row.none (fun x => x = .rv (.v 0) (fun _ => False))) (.tvar 1) Caps.none) := by
   elide_eq
 
 /-- `Prelude.parallel : forall r e a c b. Detached r => (Eff r e a)^c -> (Eff r e b)^c ->{r; e} (a, b)` -/
 theorem parallel :
-    Ty.elide (fun x => x = .v 3) (.arrow (.eff (fun x => x = .rv (.v 0)) (fun x => x = .rv (.v 1)) (.tvar 2) (fun x => x = .v 3)) .pure (.arrow (.eff (fun x => x = .rv (.v 0)) (fun x => x = .rv (.v 1)) (.tvar 4) (fun x => x = .v 3)) (.rt (fun x => x = .rv (.v 0)) (fun x => x = .rv (.v 1))) (.tapp (.tapp (.adt "Tuple") (.tvar 2)) (.tvar 4)) Caps.none) Caps.none) Caps.none =
-      (.arrow (.eff (fun x => x = .rv (.v 0)) (fun x => x = .rv (.v 1)) (.tvar 2) (fun x => x = .v 3)) .pure (.arrow (.eff (fun x => x = .rv (.v 0)) (fun x => x = .rv (.v 1)) (.tvar 4) (fun x => x = .v 3)) (.rt (fun x => x = .atm (.v 3) ∨ x = .rv (.v 0)) (fun x => x = .rv (.v 1))) (.tapp (.tapp (.adt "Tuple") (.tvar 2)) (.tvar 4)) Caps.none) Caps.none) := by
+    Ty.elide (fun x => x = .v 3) (.arrow (.eff (fun x => x = .rv (.v 0) (fun _ => False)) (fun x => x = .rv (.v 1) (fun _ => False)) (.tvar 2) (fun x => x = .v 3)) .pure (.arrow (.eff (fun x => x = .rv (.v 0) (fun _ => False)) (fun x => x = .rv (.v 1) (fun _ => False)) (.tvar 4) (fun x => x = .v 3)) (.rt (fun x => x = .rv (.v 0) (fun _ => False)) (fun x => x = .rv (.v 1) (fun _ => False))) (.tapp (.tapp (.adt "Tuple") (.tvar 2)) (.tvar 4)) Caps.none) Caps.none) Caps.none =
+      (.arrow (.eff (fun x => x = .rv (.v 0) (fun _ => False)) (fun x => x = .rv (.v 1) (fun _ => False)) (.tvar 2) (fun x => x = .v 3)) .pure (.arrow (.eff (fun x => x = .rv (.v 0) (fun _ => False)) (fun x => x = .rv (.v 1) (fun _ => False)) (.tvar 4) (fun x => x = .v 3)) (.rt (fun x => x = .atm (.v 3) ∨ x = .rv (.v 0) (fun _ => False)) (fun x => x = .rv (.v 1) (fun _ => False))) (.tapp (.tapp (.adt "Tuple") (.tvar 2)) (.tvar 4)) Caps.none) Caps.none) := by
   elide_eq
 
 /-- `Prelude.parallel_all : forall r e a c. Detached r => Int -> List (Eff r e a)^c ->{r; e} List a` -/
 theorem parallel_all :
-    Ty.elide (fun x => x = .v 3) (.arrow (.base .int) .pure (.arrow (.tapp (.adt "Prelude.List") (.eff (fun x => x = .rv (.v 0)) (fun x => x = .rv (.v 1)) (.tvar 2) (fun x => x = .v 3))) (.rt (fun x => x = .rv (.v 0)) (fun x => x = .rv (.v 1))) (.tapp (.adt "Prelude.List") (.tvar 2)) Caps.none) Caps.none) Caps.none =
-      (.arrow (.base .int) .pure (.arrow (.tapp (.adt "Prelude.List") (.eff (fun x => x = .rv (.v 0)) (fun x => x = .rv (.v 1)) (.tvar 2) (fun x => x = .v 3))) (.rt (fun x => x = .atm (.v 3) ∨ x = .rv (.v 0)) (fun x => x = .rv (.v 1))) (.tapp (.adt "Prelude.List") (.tvar 2)) Caps.none) Caps.none) := by
+    Ty.elide (fun x => x = .v 3) (.arrow (.base .int) .pure (.arrow (.tapp (.adt "Prelude.List") (.eff (fun x => x = .rv (.v 0) (fun _ => False)) (fun x => x = .rv (.v 1) (fun _ => False)) (.tvar 2) (fun x => x = .v 3))) (.rt (fun x => x = .rv (.v 0) (fun _ => False)) (fun x => x = .rv (.v 1) (fun _ => False))) (.tapp (.adt "Prelude.List") (.tvar 2)) Caps.none) Caps.none) Caps.none =
+      (.arrow (.base .int) .pure (.arrow (.tapp (.adt "Prelude.List") (.eff (fun x => x = .rv (.v 0) (fun _ => False)) (fun x => x = .rv (.v 1) (fun _ => False)) (.tvar 2) (fun x => x = .v 3))) (.rt (fun x => x = .atm (.v 3) ∨ x = .rv (.v 0) (fun _ => False)) (fun x => x = .rv (.v 1) (fun _ => False))) (.tapp (.adt "Prelude.List") (.tvar 2)) Caps.none) Caps.none) := by
   elide_eq
 
 /-- `Prelude.parallel_results : forall r e a c. Detached r => List (Eff r e a)^c ->{r; none} List (Result (Errors e) a)` -/
 theorem parallel_results :
-    Ty.elide (fun x => x = .v 3) (.arrow (.tapp (.adt "Prelude.List") (.eff (fun x => x = .rv (.v 0)) (fun x => x = .rv (.v 1)) (.tvar 2) (fun x => x = .v 3))) (.rt (fun x => x = .rv (.v 0)) Row.none) (.tapp (.adt "Prelude.List") (.tapp (.tapp (.adt "Prelude.Result") (.errors (fun x => x = .rv (.v 1)))) (.tvar 2))) Caps.none) Caps.none =
-      (.arrow (.tapp (.adt "Prelude.List") (.eff (fun x => x = .rv (.v 0)) (fun x => x = .rv (.v 1)) (.tvar 2) (fun x => x = .v 3))) (.rt (fun x => x = .atm (.v 3) ∨ x = .rv (.v 0)) Row.none) (.tapp (.adt "Prelude.List") (.tapp (.tapp (.adt "Prelude.Result") (.errors (fun x => x = .rv (.v 1)))) (.tvar 2))) Caps.none) := by
+    Ty.elide (fun x => x = .v 3) (.arrow (.tapp (.adt "Prelude.List") (.eff (fun x => x = .rv (.v 0) (fun _ => False)) (fun x => x = .rv (.v 1) (fun _ => False)) (.tvar 2) (fun x => x = .v 3))) (.rt (fun x => x = .rv (.v 0) (fun _ => False)) Row.none) (.tapp (.adt "Prelude.List") (.tapp (.tapp (.adt "Prelude.Result") (.errors (fun x => x = .rv (.v 1) (fun _ => False)))) (.tvar 2))) Caps.none) Caps.none =
+      (.arrow (.tapp (.adt "Prelude.List") (.eff (fun x => x = .rv (.v 0) (fun _ => False)) (fun x => x = .rv (.v 1) (fun _ => False)) (.tvar 2) (fun x => x = .v 3))) (.rt (fun x => x = .atm (.v 3) ∨ x = .rv (.v 0) (fun _ => False)) Row.none) (.tapp (.adt "Prelude.List") (.tapp (.tapp (.adt "Prelude.Result") (.errors (fun x => x = .rv (.v 1) (fun _ => False)))) (.tvar 2))) Caps.none) := by
   elide_eq
 
 /-- `Prelude.parallel_exits : forall r e a c. Detached r => List (Eff r e a)^c ->{r; none} List (Exit e a)` -/
 theorem parallel_exits :
-    Ty.elide (fun x => x = .v 3) (.arrow (.tapp (.adt "Prelude.List") (.eff (fun x => x = .rv (.v 0)) (fun x => x = .rv (.v 1)) (.tvar 2) (fun x => x = .v 3))) (.rt (fun x => x = .rv (.v 0)) Row.none) (.tapp (.adt "Prelude.List") (.tapp (.tapp (.adt "Prelude.Exit") (.tvar 1)) (.tvar 2))) Caps.none) Caps.none =
-      (.arrow (.tapp (.adt "Prelude.List") (.eff (fun x => x = .rv (.v 0)) (fun x => x = .rv (.v 1)) (.tvar 2) (fun x => x = .v 3))) (.rt (fun x => x = .atm (.v 3) ∨ x = .rv (.v 0)) Row.none) (.tapp (.adt "Prelude.List") (.tapp (.tapp (.adt "Prelude.Exit") (.tvar 1)) (.tvar 2))) Caps.none) := by
+    Ty.elide (fun x => x = .v 3) (.arrow (.tapp (.adt "Prelude.List") (.eff (fun x => x = .rv (.v 0) (fun _ => False)) (fun x => x = .rv (.v 1) (fun _ => False)) (.tvar 2) (fun x => x = .v 3))) (.rt (fun x => x = .rv (.v 0) (fun _ => False)) Row.none) (.tapp (.adt "Prelude.List") (.tapp (.tapp (.adt "Prelude.Exit") (.tvar 1)) (.tvar 2))) Caps.none) Caps.none =
+      (.arrow (.tapp (.adt "Prelude.List") (.eff (fun x => x = .rv (.v 0) (fun _ => False)) (fun x => x = .rv (.v 1) (fun _ => False)) (.tvar 2) (fun x => x = .v 3))) (.rt (fun x => x = .atm (.v 3) ∨ x = .rv (.v 0) (fun _ => False)) Row.none) (.tapp (.adt "Prelude.List") (.tapp (.tapp (.adt "Prelude.Exit") (.tvar 1)) (.tvar 2))) Caps.none) := by
   elide_eq
 
 /-- `Prelude.race_success : forall r e a c. Detached r => (Eff r e a)^c -> (Eff r e a)^c ->{r; e} a` -/
 theorem race_success :
-    Ty.elide (fun x => x = .v 3) (.arrow (.eff (fun x => x = .rv (.v 0)) (fun x => x = .rv (.v 1)) (.tvar 2) (fun x => x = .v 3)) .pure (.arrow (.eff (fun x => x = .rv (.v 0)) (fun x => x = .rv (.v 1)) (.tvar 2) (fun x => x = .v 3)) (.rt (fun x => x = .rv (.v 0)) (fun x => x = .rv (.v 1))) (.tvar 2) Caps.none) Caps.none) Caps.none =
-      (.arrow (.eff (fun x => x = .rv (.v 0)) (fun x => x = .rv (.v 1)) (.tvar 2) (fun x => x = .v 3)) .pure (.arrow (.eff (fun x => x = .rv (.v 0)) (fun x => x = .rv (.v 1)) (.tvar 2) (fun x => x = .v 3)) (.rt (fun x => x = .atm (.v 3) ∨ x = .rv (.v 0)) (fun x => x = .rv (.v 1))) (.tvar 2) Caps.none) Caps.none) := by
+    Ty.elide (fun x => x = .v 3) (.arrow (.eff (fun x => x = .rv (.v 0) (fun _ => False)) (fun x => x = .rv (.v 1) (fun _ => False)) (.tvar 2) (fun x => x = .v 3)) .pure (.arrow (.eff (fun x => x = .rv (.v 0) (fun _ => False)) (fun x => x = .rv (.v 1) (fun _ => False)) (.tvar 2) (fun x => x = .v 3)) (.rt (fun x => x = .rv (.v 0) (fun _ => False)) (fun x => x = .rv (.v 1) (fun _ => False))) (.tvar 2) Caps.none) Caps.none) Caps.none =
+      (.arrow (.eff (fun x => x = .rv (.v 0) (fun _ => False)) (fun x => x = .rv (.v 1) (fun _ => False)) (.tvar 2) (fun x => x = .v 3)) .pure (.arrow (.eff (fun x => x = .rv (.v 0) (fun _ => False)) (fun x => x = .rv (.v 1) (fun _ => False)) (.tvar 2) (fun x => x = .v 3)) (.rt (fun x => x = .atm (.v 3) ∨ x = .rv (.v 0) (fun _ => False)) (fun x => x = .rv (.v 1) (fun _ => False))) (.tvar 2) Caps.none) Caps.none) := by
   elide_eq
 
 /-- `Prelude.race_first : forall r e a c. Detached r => (Eff r e a)^c -> (Eff r e a)^c ->{r; e} a` -/
 theorem race_first :
-    Ty.elide (fun x => x = .v 3) (.arrow (.eff (fun x => x = .rv (.v 0)) (fun x => x = .rv (.v 1)) (.tvar 2) (fun x => x = .v 3)) .pure (.arrow (.eff (fun x => x = .rv (.v 0)) (fun x => x = .rv (.v 1)) (.tvar 2) (fun x => x = .v 3)) (.rt (fun x => x = .rv (.v 0)) (fun x => x = .rv (.v 1))) (.tvar 2) Caps.none) Caps.none) Caps.none =
-      (.arrow (.eff (fun x => x = .rv (.v 0)) (fun x => x = .rv (.v 1)) (.tvar 2) (fun x => x = .v 3)) .pure (.arrow (.eff (fun x => x = .rv (.v 0)) (fun x => x = .rv (.v 1)) (.tvar 2) (fun x => x = .v 3)) (.rt (fun x => x = .atm (.v 3) ∨ x = .rv (.v 0)) (fun x => x = .rv (.v 1))) (.tvar 2) Caps.none) Caps.none) := by
+    Ty.elide (fun x => x = .v 3) (.arrow (.eff (fun x => x = .rv (.v 0) (fun _ => False)) (fun x => x = .rv (.v 1) (fun _ => False)) (.tvar 2) (fun x => x = .v 3)) .pure (.arrow (.eff (fun x => x = .rv (.v 0) (fun _ => False)) (fun x => x = .rv (.v 1) (fun _ => False)) (.tvar 2) (fun x => x = .v 3)) (.rt (fun x => x = .rv (.v 0) (fun _ => False)) (fun x => x = .rv (.v 1) (fun _ => False))) (.tvar 2) Caps.none) Caps.none) Caps.none =
+      (.arrow (.eff (fun x => x = .rv (.v 0) (fun _ => False)) (fun x => x = .rv (.v 1) (fun _ => False)) (.tvar 2) (fun x => x = .v 3)) .pure (.arrow (.eff (fun x => x = .rv (.v 0) (fun _ => False)) (fun x => x = .rv (.v 1) (fun _ => False)) (.tvar 2) (fun x => x = .v 3)) (.rt (fun x => x = .atm (.v 3) ∨ x = .rv (.v 0) (fun _ => False)) (fun x => x = .rv (.v 1) (fun _ => False))) (.tvar 2) Caps.none) Caps.none) := by
   elide_eq
 
 /-- `Prelude.timeout : forall r e a c. Detached r => Float -> (Eff r e a)^c ->{r; TimeoutError | e} a` -/
 theorem timeout :
-    Ty.elide (fun x => x = .v 3) (.arrow (.adt "Prelude.Float") .pure (.arrow (.eff (fun x => x = .rv (.v 0)) (fun x => x = .rv (.v 1)) (.tvar 2) (fun x => x = .v 3)) (.rt (fun x => x = .rv (.v 0)) (fun x => x = .nm "Prelude.TimeoutError" ∨ x = .rv (.v 1))) (.tvar 2) Caps.none) Caps.none) Caps.none =
-      (.arrow (.adt "Prelude.Float") .pure (.arrow (.eff (fun x => x = .rv (.v 0)) (fun x => x = .rv (.v 1)) (.tvar 2) (fun x => x = .v 3)) (.rt (fun x => x = .atm (.v 3) ∨ x = .rv (.v 0)) (fun x => x = .nm "Prelude.TimeoutError" ∨ x = .rv (.v 1))) (.tvar 2) Caps.none) Caps.none) := by
+    Ty.elide (fun x => x = .v 3) (.arrow (.adt "Prelude.Float") .pure (.arrow (.eff (fun x => x = .rv (.v 0) (fun _ => False)) (fun x => x = .rv (.v 1) (fun _ => False)) (.tvar 2) (fun x => x = .v 3)) (.rt (fun x => x = .rv (.v 0) (fun _ => False)) (fun x => x = .nm "Prelude.TimeoutError" ∨ x = .rv (.v 1) (fun _ => False))) (.tvar 2) Caps.none) Caps.none) Caps.none =
+      (.arrow (.adt "Prelude.Float") .pure (.arrow (.eff (fun x => x = .rv (.v 0) (fun _ => False)) (fun x => x = .rv (.v 1) (fun _ => False)) (.tvar 2) (fun x => x = .v 3)) (.rt (fun x => x = .atm (.v 3) ∨ x = .rv (.v 0) (fun _ => False)) (fun x => x = .nm "Prelude.TimeoutError" ∨ x = .rv (.v 1) (fun _ => False))) (.tvar 2) Caps.none) Caps.none) := by
   elide_eq
 
 /-- `Prelude.timeout_option : forall r e a c. Detached r => Float -> (Eff r e a)^c ->{r; e} Option a` -/
 theorem timeout_option :
-    Ty.elide (fun x => x = .v 3) (.arrow (.adt "Prelude.Float") .pure (.arrow (.eff (fun x => x = .rv (.v 0)) (fun x => x = .rv (.v 1)) (.tvar 2) (fun x => x = .v 3)) (.rt (fun x => x = .rv (.v 0)) (fun x => x = .rv (.v 1))) (.tapp (.adt "Prelude.Option") (.tvar 2)) Caps.none) Caps.none) Caps.none =
-      (.arrow (.adt "Prelude.Float") .pure (.arrow (.eff (fun x => x = .rv (.v 0)) (fun x => x = .rv (.v 1)) (.tvar 2) (fun x => x = .v 3)) (.rt (fun x => x = .atm (.v 3) ∨ x = .rv (.v 0)) (fun x => x = .rv (.v 1))) (.tapp (.adt "Prelude.Option") (.tvar 2)) Caps.none) Caps.none) := by
+    Ty.elide (fun x => x = .v 3) (.arrow (.adt "Prelude.Float") .pure (.arrow (.eff (fun x => x = .rv (.v 0) (fun _ => False)) (fun x => x = .rv (.v 1) (fun _ => False)) (.tvar 2) (fun x => x = .v 3)) (.rt (fun x => x = .rv (.v 0) (fun _ => False)) (fun x => x = .rv (.v 1) (fun _ => False))) (.tapp (.adt "Prelude.Option") (.tvar 2)) Caps.none) Caps.none) Caps.none =
+      (.arrow (.adt "Prelude.Float") .pure (.arrow (.eff (fun x => x = .rv (.v 0) (fun _ => False)) (fun x => x = .rv (.v 1) (fun _ => False)) (.tvar 2) (fun x => x = .v 3)) (.rt (fun x => x = .atm (.v 3) ∨ x = .rv (.v 0) (fun _ => False)) (fun x => x = .rv (.v 1) (fun _ => False))) (.tapp (.adt "Prelude.Option") (.tvar 2)) Caps.none) Caps.none) := by
   elide_eq
 
 /-- `Prelude.bind : forall m a c b d. Monad m => (m a)^c -> (a -> (m b)^d)^d -> (m b)^(c + d)` -/
@@ -261,8 +261,8 @@ theorem bind :
 
 /-- `Prelude.bind_eff : forall r1 e1 a c r2 e2 b d. (Eff r1 e1 a)^c -> (a -> (Eff r2 e2 b)^d)^d -> (Eff (r1 + r2) (e1 + e2) b)^(c + d)` -/
 theorem bind_eff :
-    Ty.elide (fun x => x = .v 3 ∨ x = .v 7) (.arrow (.eff (fun x => x = .rv (.v 0)) (fun x => x = .rv (.v 1)) (.tvar 2) (fun x => x = .v 3)) .pure (.arrow (.arrow (.tvar 2) .pure (.eff (fun x => x = .rv (.v 4)) (fun x => x = .rv (.v 5)) (.tvar 6) (fun x => x = .v 7)) (fun x => x = .v 7)) .pure (.eff (fun x => x = .rv (.v 0) ∨ x = .rv (.v 4)) (fun x => x = .rv (.v 1) ∨ x = .rv (.v 5)) (.tvar 6) (fun x => x = .v 3 ∨ x = .v 7)) Caps.none) Caps.none) Caps.none =
-      (.arrow (.eff (fun x => x = .rv (.v 0)) (fun x => x = .rv (.v 1)) (.tvar 2) (fun x => x = .v 3)) .pure (.arrow (.arrow (.tvar 2) .pure (.eff (fun x => x = .rv (.v 4)) (fun x => x = .rv (.v 5)) (.tvar 6) (fun x => x = .v 7)) (fun x => x = .v 7)) .pure (.eff (fun x => x = .atm (.v 3) ∨ x = .atm (.v 7) ∨ x = .rv (.v 0) ∨ x = .rv (.v 4)) (fun x => x = .rv (.v 1) ∨ x = .rv (.v 5)) (.tvar 6) (fun x => x = .v 3 ∨ x = .v 7)) Caps.none) Caps.none) := by
+    Ty.elide (fun x => x = .v 3 ∨ x = .v 7) (.arrow (.eff (fun x => x = .rv (.v 0) (fun _ => False)) (fun x => x = .rv (.v 1) (fun _ => False)) (.tvar 2) (fun x => x = .v 3)) .pure (.arrow (.arrow (.tvar 2) .pure (.eff (fun x => x = .rv (.v 4) (fun _ => False)) (fun x => x = .rv (.v 5) (fun _ => False)) (.tvar 6) (fun x => x = .v 7)) (fun x => x = .v 7)) .pure (.eff (fun x => x = .rv (.v 0) (fun _ => False) ∨ x = .rv (.v 4) (fun _ => False)) (fun x => x = .rv (.v 1) (fun _ => False) ∨ x = .rv (.v 5) (fun _ => False)) (.tvar 6) (fun x => x = .v 3 ∨ x = .v 7)) Caps.none) Caps.none) Caps.none =
+      (.arrow (.eff (fun x => x = .rv (.v 0) (fun _ => False)) (fun x => x = .rv (.v 1) (fun _ => False)) (.tvar 2) (fun x => x = .v 3)) .pure (.arrow (.arrow (.tvar 2) .pure (.eff (fun x => x = .rv (.v 4) (fun _ => False)) (fun x => x = .rv (.v 5) (fun _ => False)) (.tvar 6) (fun x => x = .v 7)) (fun x => x = .v 7)) .pure (.eff (fun x => x = .atm (.v 3) ∨ x = .atm (.v 7) ∨ x = .rv (.v 0) (fun _ => False) ∨ x = .rv (.v 4) (fun _ => False)) (fun x => x = .rv (.v 1) (fun _ => False) ∨ x = .rv (.v 5) (fun _ => False)) (.tvar 6) (fun x => x = .v 3 ∨ x = .v 7)) Caps.none) Caps.none) := by
   elide_eq
 
 /-- `Prelude.field : forall a. String -> PureCodec Json a -> FieldCodec none a` -/
@@ -303,8 +303,8 @@ theorem on_missing :
 
 /-- `Prelude.on_missing_effect : forall r a c rd. (Unit ->{r; SchemaError} a)^c -> FieldCodec rd a -> FieldCodec (rd + r) a` -/
 theorem on_missing_effect :
-    Ty.elide (fun x => x = .v 2) (.arrow (.arrow (.base .unit) (.rt (fun x => x = .rv (.v 0)) (fun x => x = .nm "Prelude.SchemaError")) (.tvar 1) (fun x => x = .v 2)) .pure (.arrow (.tapp (.tapp (.adt "Prelude.FieldCodec") (.tvar 3)) (.tvar 1)) .pure (.tapp (.tapp (.adt "Prelude.FieldCodec") (.errors (fun x => x = .rv (.v 0) ∨ x = .rv (.v 3)))) (.tvar 1)) Caps.none) Caps.none) Caps.none =
-      (.arrow (.arrow (.base .unit) (.rt (fun x => x = .rv (.v 0)) (fun x => x = .nm "Prelude.SchemaError")) (.tvar 1) (fun x => x = .v 2)) .pure (.arrow (.tapp (.tapp (.adt "Prelude.FieldCodec") (.tvar 3)) (.tvar 1)) .pure (.tapp (.tapp (.adt "Prelude.FieldCodec") (.errors (fun x => x = .rv (.v 0) ∨ x = .rv (.v 3)))) (.tvar 1)) Caps.none) Caps.none) := by
+    Ty.elide (fun x => x = .v 2) (.arrow (.arrow (.base .unit) (.rt (fun x => x = .rv (.v 0) (fun _ => False)) (fun x => x = .nm "Prelude.SchemaError")) (.tvar 1) (fun x => x = .v 2)) .pure (.arrow (.tapp (.tapp (.adt "Prelude.FieldCodec") (.tvar 3)) (.tvar 1)) .pure (.tapp (.tapp (.adt "Prelude.FieldCodec") (.errors (fun x => x = .rv (.v 0) (fun _ => False) ∨ x = .rv (.v 3) (fun _ => False)))) (.tvar 1)) Caps.none) Caps.none) Caps.none =
+      (.arrow (.arrow (.base .unit) (.rt (fun x => x = .rv (.v 0) (fun _ => False)) (fun x => x = .nm "Prelude.SchemaError")) (.tvar 1) (fun x => x = .v 2)) .pure (.arrow (.tapp (.tapp (.adt "Prelude.FieldCodec") (.tvar 3)) (.tvar 1)) .pure (.tapp (.tapp (.adt "Prelude.FieldCodec") (.errors (fun x => x = .rv (.v 0) (fun _ => False) ∨ x = .rv (.v 3) (fun _ => False)))) (.tvar 1)) Caps.none) Caps.none) := by
   elide_eq
 
 /-- `Prelude.ignore_extra_fields : forall a. PureCodec Json a -> PureCodec Json a` -/
@@ -495,14 +495,14 @@ theorem Seq.first :
 
 /-- `Seq.each_effect : forall a r e c d. (a ->{r; e} Unit)^c -> (Seq a)^d ->{r; e} Unit` -/
 theorem Seq.each_effect :
-    Ty.elide (fun x => x = .v 3 ∨ x = .v 4) (.arrow (.arrow (.tvar 0) (.rt (fun x => x = .rv (.v 1)) (fun x => x = .rv (.v 2))) (.base .unit) (fun x => x = .v 3)) .pure (.arrow (.tapp (.tapp (.adt "Prelude.Seq") (.caps (fun x => x = .v 4))) (.tvar 0)) (.rt (fun x => x = .rv (.v 1)) (fun x => x = .rv (.v 2))) (.base .unit) Caps.none) Caps.none) Caps.none =
-      (.arrow (.arrow (.tvar 0) (.rt (fun x => x = .rv (.v 1)) (fun x => x = .rv (.v 2))) (.base .unit) (fun x => x = .v 3)) .pure (.arrow (.tapp (.tapp (.adt "Prelude.Seq") (.caps (fun x => x = .v 4))) (.tvar 0)) (.rt (fun x => x = .atm (.v 3) ∨ x = .atm (.v 4) ∨ x = .rv (.v 1)) (fun x => x = .rv (.v 2))) (.base .unit) Caps.none) Caps.none) := by
+    Ty.elide (fun x => x = .v 3 ∨ x = .v 4) (.arrow (.arrow (.tvar 0) (.rt (fun x => x = .rv (.v 1) (fun _ => False)) (fun x => x = .rv (.v 2) (fun _ => False))) (.base .unit) (fun x => x = .v 3)) .pure (.arrow (.tapp (.tapp (.adt "Prelude.Seq") (.caps (fun x => x = .v 4))) (.tvar 0)) (.rt (fun x => x = .rv (.v 1) (fun _ => False)) (fun x => x = .rv (.v 2) (fun _ => False))) (.base .unit) Caps.none) Caps.none) Caps.none =
+      (.arrow (.arrow (.tvar 0) (.rt (fun x => x = .rv (.v 1) (fun _ => False)) (fun x => x = .rv (.v 2) (fun _ => False))) (.base .unit) (fun x => x = .v 3)) .pure (.arrow (.tapp (.tapp (.adt "Prelude.Seq") (.caps (fun x => x = .v 4))) (.tvar 0)) (.rt (fun x => x = .atm (.v 3) ∨ x = .atm (.v 4) ∨ x = .rv (.v 1) (fun _ => False)) (fun x => x = .rv (.v 2) (fun _ => False))) (.base .unit) Caps.none) Caps.none) := by
   elide_eq
 
 /-- `Seq.fold_effect : forall b a r e c d. (b -> a ->{r; e} b)^c -> b -> ((Seq a)^d ->{r; e} b)^c` -/
 theorem Seq.fold_effect :
-    Ty.elide (fun x => x = .v 4 ∨ x = .v 5) (.arrow (.arrow (.tvar 0) .pure (.arrow (.tvar 1) (.rt (fun x => x = .rv (.v 2)) (fun x => x = .rv (.v 3))) (.tvar 0) Caps.none) (fun x => x = .v 4)) .pure (.arrow (.tvar 0) .pure (.arrow (.tapp (.tapp (.adt "Prelude.Seq") (.caps (fun x => x = .v 5))) (.tvar 1)) (.rt (fun x => x = .rv (.v 2)) (fun x => x = .rv (.v 3))) (.tvar 0) (fun x => x = .v 4)) Caps.none) Caps.none) Caps.none =
-      (.arrow (.arrow (.tvar 0) .pure (.arrow (.tvar 1) (.rt (fun x => x = .rv (.v 2)) (fun x => x = .rv (.v 3))) (.tvar 0) Caps.none) (fun x => x = .v 4)) .pure (.arrow (.tvar 0) .pure (.arrow (.tapp (.tapp (.adt "Prelude.Seq") (.caps (fun x => x = .v 5))) (.tvar 1)) (.rt (fun x => x = .atm (.v 4) ∨ x = .atm (.v 5) ∨ x = .rv (.v 2)) (fun x => x = .rv (.v 3))) (.tvar 0) (fun x => x = .v 4)) Caps.none) Caps.none) := by
+    Ty.elide (fun x => x = .v 4 ∨ x = .v 5) (.arrow (.arrow (.tvar 0) .pure (.arrow (.tvar 1) (.rt (fun x => x = .rv (.v 2) (fun _ => False)) (fun x => x = .rv (.v 3) (fun _ => False))) (.tvar 0) Caps.none) (fun x => x = .v 4)) .pure (.arrow (.tvar 0) .pure (.arrow (.tapp (.tapp (.adt "Prelude.Seq") (.caps (fun x => x = .v 5))) (.tvar 1)) (.rt (fun x => x = .rv (.v 2) (fun _ => False)) (fun x => x = .rv (.v 3) (fun _ => False))) (.tvar 0) (fun x => x = .v 4)) Caps.none) Caps.none) Caps.none =
+      (.arrow (.arrow (.tvar 0) .pure (.arrow (.tvar 1) (.rt (fun x => x = .rv (.v 2) (fun _ => False)) (fun x => x = .rv (.v 3) (fun _ => False))) (.tvar 0) Caps.none) (fun x => x = .v 4)) .pure (.arrow (.tvar 0) .pure (.arrow (.tapp (.tapp (.adt "Prelude.Seq") (.caps (fun x => x = .v 5))) (.tvar 1)) (.rt (fun x => x = .atm (.v 4) ∨ x = .atm (.v 5) ∨ x = .rv (.v 2) (fun _ => False)) (fun x => x = .rv (.v 3) (fun _ => False))) (.tvar 0) (fun x => x = .v 4)) Caps.none) Caps.none) := by
   elide_eq
 
 /-- `Seq.empty : forall a. Seq a` -/
@@ -861,8 +861,8 @@ theorem List.map :
 
 /-- `List.map_effect : forall a r e b c. (a ->{r; e} b)^c -> List a ->{r; e} List b` -/
 theorem List.map_effect :
-    Ty.elide (fun x => x = .v 4) (.arrow (.arrow (.tvar 0) (.rt (fun x => x = .rv (.v 1)) (fun x => x = .rv (.v 2))) (.tvar 3) (fun x => x = .v 4)) .pure (.arrow (.tapp (.adt "Prelude.List") (.tvar 0)) (.rt (fun x => x = .rv (.v 1)) (fun x => x = .rv (.v 2))) (.tapp (.adt "Prelude.List") (.tvar 3)) Caps.none) Caps.none) Caps.none =
-      (.arrow (.arrow (.tvar 0) (.rt (fun x => x = .rv (.v 1)) (fun x => x = .rv (.v 2))) (.tvar 3) (fun x => x = .v 4)) .pure (.arrow (.tapp (.adt "Prelude.List") (.tvar 0)) (.rt (fun x => x = .atm (.v 4) ∨ x = .rv (.v 1)) (fun x => x = .rv (.v 2))) (.tapp (.adt "Prelude.List") (.tvar 3)) Caps.none) Caps.none) := by
+    Ty.elide (fun x => x = .v 4) (.arrow (.arrow (.tvar 0) (.rt (fun x => x = .rv (.v 1) (fun _ => False)) (fun x => x = .rv (.v 2) (fun _ => False))) (.tvar 3) (fun x => x = .v 4)) .pure (.arrow (.tapp (.adt "Prelude.List") (.tvar 0)) (.rt (fun x => x = .rv (.v 1) (fun _ => False)) (fun x => x = .rv (.v 2) (fun _ => False))) (.tapp (.adt "Prelude.List") (.tvar 3)) Caps.none) Caps.none) Caps.none =
+      (.arrow (.arrow (.tvar 0) (.rt (fun x => x = .rv (.v 1) (fun _ => False)) (fun x => x = .rv (.v 2) (fun _ => False))) (.tvar 3) (fun x => x = .v 4)) .pure (.arrow (.tapp (.adt "Prelude.List") (.tvar 0)) (.rt (fun x => x = .atm (.v 4) ∨ x = .rv (.v 1) (fun _ => False)) (fun x => x = .rv (.v 2) (fun _ => False))) (.tapp (.adt "Prelude.List") (.tvar 3)) Caps.none) Caps.none) := by
   elide_eq
 
 /-- `List.map_indexed : forall a b c. (Int -> a -> b)^c -> List a -> List b` -/
@@ -873,8 +873,8 @@ theorem List.map_indexed :
 
 /-- `List.each_effect : forall a r e c. (a ->{r; e} Unit)^c -> List a ->{r; e} Unit` -/
 theorem List.each_effect :
-    Ty.elide (fun x => x = .v 3) (.arrow (.arrow (.tvar 0) (.rt (fun x => x = .rv (.v 1)) (fun x => x = .rv (.v 2))) (.base .unit) (fun x => x = .v 3)) .pure (.arrow (.tapp (.adt "Prelude.List") (.tvar 0)) (.rt (fun x => x = .rv (.v 1)) (fun x => x = .rv (.v 2))) (.base .unit) Caps.none) Caps.none) Caps.none =
-      (.arrow (.arrow (.tvar 0) (.rt (fun x => x = .rv (.v 1)) (fun x => x = .rv (.v 2))) (.base .unit) (fun x => x = .v 3)) .pure (.arrow (.tapp (.adt "Prelude.List") (.tvar 0)) (.rt (fun x => x = .atm (.v 3) ∨ x = .rv (.v 1)) (fun x => x = .rv (.v 2))) (.base .unit) Caps.none) Caps.none) := by
+    Ty.elide (fun x => x = .v 3) (.arrow (.arrow (.tvar 0) (.rt (fun x => x = .rv (.v 1) (fun _ => False)) (fun x => x = .rv (.v 2) (fun _ => False))) (.base .unit) (fun x => x = .v 3)) .pure (.arrow (.tapp (.adt "Prelude.List") (.tvar 0)) (.rt (fun x => x = .rv (.v 1) (fun _ => False)) (fun x => x = .rv (.v 2) (fun _ => False))) (.base .unit) Caps.none) Caps.none) Caps.none =
+      (.arrow (.arrow (.tvar 0) (.rt (fun x => x = .rv (.v 1) (fun _ => False)) (fun x => x = .rv (.v 2) (fun _ => False))) (.base .unit) (fun x => x = .v 3)) .pure (.arrow (.tapp (.adt "Prelude.List") (.tvar 0)) (.rt (fun x => x = .atm (.v 3) ∨ x = .rv (.v 1) (fun _ => False)) (fun x => x = .rv (.v 2) (fun _ => False))) (.base .unit) Caps.none) Caps.none) := by
   elide_eq
 
 /-- `List.fold_left : forall b a c. (b -> a -> b)^c -> b -> (List a -> b)^c` -/
@@ -891,8 +891,8 @@ theorem List.fold_right :
 
 /-- `List.fold_effect : forall b a r e c. (b -> a ->{r; e} b)^c -> b -> (List a ->{r; e} b)^c` -/
 theorem List.fold_effect :
-    Ty.elide (fun x => x = .v 4) (.arrow (.arrow (.tvar 0) .pure (.arrow (.tvar 1) (.rt (fun x => x = .rv (.v 2)) (fun x => x = .rv (.v 3))) (.tvar 0) Caps.none) (fun x => x = .v 4)) .pure (.arrow (.tvar 0) .pure (.arrow (.tapp (.adt "Prelude.List") (.tvar 1)) (.rt (fun x => x = .rv (.v 2)) (fun x => x = .rv (.v 3))) (.tvar 0) (fun x => x = .v 4)) Caps.none) Caps.none) Caps.none =
-      (.arrow (.arrow (.tvar 0) .pure (.arrow (.tvar 1) (.rt (fun x => x = .rv (.v 2)) (fun x => x = .rv (.v 3))) (.tvar 0) Caps.none) (fun x => x = .v 4)) .pure (.arrow (.tvar 0) .pure (.arrow (.tapp (.adt "Prelude.List") (.tvar 1)) (.rt (fun x => x = .atm (.v 4) ∨ x = .rv (.v 2)) (fun x => x = .rv (.v 3))) (.tvar 0) (fun x => x = .v 4)) Caps.none) Caps.none) := by
+    Ty.elide (fun x => x = .v 4) (.arrow (.arrow (.tvar 0) .pure (.arrow (.tvar 1) (.rt (fun x => x = .rv (.v 2) (fun _ => False)) (fun x => x = .rv (.v 3) (fun _ => False))) (.tvar 0) Caps.none) (fun x => x = .v 4)) .pure (.arrow (.tvar 0) .pure (.arrow (.tapp (.adt "Prelude.List") (.tvar 1)) (.rt (fun x => x = .rv (.v 2) (fun _ => False)) (fun x => x = .rv (.v 3) (fun _ => False))) (.tvar 0) (fun x => x = .v 4)) Caps.none) Caps.none) Caps.none =
+      (.arrow (.arrow (.tvar 0) .pure (.arrow (.tvar 1) (.rt (fun x => x = .rv (.v 2) (fun _ => False)) (fun x => x = .rv (.v 3) (fun _ => False))) (.tvar 0) Caps.none) (fun x => x = .v 4)) .pure (.arrow (.tvar 0) .pure (.arrow (.tapp (.adt "Prelude.List") (.tvar 1)) (.rt (fun x => x = .atm (.v 4) ∨ x = .rv (.v 2) (fun _ => False)) (fun x => x = .rv (.v 3) (fun _ => False))) (.tvar 0) (fun x => x = .v 4)) Caps.none) Caps.none) := by
   elide_eq
 
 /-- `List.filter : forall a c. (a -> Bool)^c -> List a -> List a` -/

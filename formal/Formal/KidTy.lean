@@ -167,7 +167,7 @@ theorem withs_typing_atm {x r : Tm} {o : Nat} (Q : Prop) (Old : Atom → Prop)
       · rw [hΘ' (fun h => h.elim)] at h₁
         simp only [List.map_up_zero] at h₁
         obtain ⟨t', R', ε', hw, ⟨h1, h2⟩, hat⟩ := ih hE₀ h₁ hΘ hA₀
-        have up : ∀ y, φ₁.svc y → (∀ a, y ≠ .atm a) → φ.svc y := fun y h' hy =>
+        have up : ∀ y, φ₁.svc y → (∀ a, y ≠ .atm a) → φ.svc.modNames y := fun y h' hy =>
           (rel.svc _ h').resolve_right fun h₂ => by
             have h₃ := Frame.provides_nonatm hy h₂
             cases y <;> simp [Frame.dom, Frame.installs] at h₃

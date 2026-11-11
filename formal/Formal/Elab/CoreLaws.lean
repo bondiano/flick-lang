@@ -151,7 +151,8 @@ theorem trStage_use_le {ψ φ : Stage} {q : Ty} (h : ψ.Applies φ q) :
 theorem trT_asRow_ob (t : Flick.Ty) (n : Flick.Name) (a : Atom) : ¬ t.asRow (.ob n a) := by
   cases t <;> simp [Flick.Ty.asRow, Row.plain, Row.ofCaps]
 
-theorem trT_asRow_obv (t : Flick.Ty) (v a : Atom) : ¬ t.asRow (.obv v a) := by
+theorem trT_asRow_obv (t : Flick.Ty) (v a : Atom) (G : Flick.Name → Prop) :
+    ¬ t.asRow (.obv v G a) := by
   cases t <;> simp [Flick.Ty.asRow, Row.plain, Row.ofCaps]
 
 /-- What a call of an arrow at `R r e` with the qualifier `c` needs live, `R⟨Live c + r; e⟩`
@@ -164,7 +165,7 @@ theorem trStage_use_live (r e c : Ty) :
   · refine .inl ?_
     cases x with
     | ob n a => exact (trT_asRow_ob _ n a hx).elim
-    | obv v a => exact (trT_asRow_obv _ v a hx).elim
+    | obv v G a => exact (trT_asRow_obv _ v a G hx).elim
     | atm a => exact .inr hx
     | nm n => exact .inr hx
     | rv a => exact .inr hx

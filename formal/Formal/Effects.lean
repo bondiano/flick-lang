@@ -81,20 +81,21 @@ theorem step_root {root Ψ Θ Λ μ e t r ε N o} (h : Typ S Ψ Θ [] e (.ex t (
 theorem Row.kill_sub (ε : Row) (n : Nat) : Row.Sub (ε.substT (kill n)) ε := by
   intro x hx
   cases x with
-  | nm => rcases hx with hx | ⟨b, _, hb⟩
+  | nm => rcases hx with hx | ⟨b, _, _, _, hb⟩
           · exact hx
           · cases kill_asRow hb
   | atm a =>
-    rcases hx with ⟨b, hb, h⟩ | ⟨b, _, hb⟩
+    rcases hx with ⟨b, hb, h⟩ | ⟨b, _, _, hb⟩
     · obtain ⟨rfl, _⟩ := kill_reach h; exact hb
     · cases kill_asRow hb
   | ob _ a =>
-    rcases hx with ⟨b, hb, h⟩ | ⟨_, _, _, hv, _⟩
+    rcases hx with ⟨b, hb, h⟩ | ⟨_, _, _, _, _, hv, _⟩
     · obtain ⟨rfl, _⟩ := kill_reach h; exact hb
     · cases kill_asRow hv
-  | rv a => obtain ⟨b, hb, h⟩ := hx; cases kill_asRow h; exact hb
-  | obv w a =>
-    obtain ⟨v, b, hb, hv, h⟩ := hx; cases kill_asRow hv; obtain ⟨rfl, _⟩ := kill_reach h; exact hb
+  | rv a H => obtain ⟨b, G, hb, H', h, rfl⟩ := hx; cases kill_asRow h; simpa using hb
+  | obv w H a =>
+    obtain ⟨v, G, b, hb, ⟨H', hv, rfl⟩, h⟩ := hx
+    cases kill_asRow hv; obtain ⟨rfl, _⟩ := kill_reach h; simpa using hb
 
 theorem Steps.mono {root : Roots} {Q Q' : Lbl → Prop} {Λ μ e Λ' μ' e'}
     (h : Steps root Q Λ μ e Λ' μ' e') (hQ : ∀ l, Q l → Q' l) : Steps root Q' Λ μ e Λ' μ' e' := by
