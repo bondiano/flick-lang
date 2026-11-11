@@ -22,7 +22,7 @@ let main () =
   let third = point 3
   let equal = List.count_by (fun p -> p == third) points
   let below = List.count_by (fun o -> compare o (Some 500) == LT) options
-  let lists = List.count_by (fun i -> [option i, None] == [option (i + 3000), None]) numbers
+  let lists = List.count_by (fun i -> [option i, None] == [option (i + 1500), None]) numbers
   let ordered = List.count_by (fun i -> compare [option i] [option (i + 1)] == GT) numbers
   let keyed =
     List.fold_left
