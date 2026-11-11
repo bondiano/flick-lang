@@ -196,6 +196,8 @@ impl Scope<'_> {
 
 fn used(item: &Item, interface: &Interface, names: &BTreeSet<&str>) -> bool {
     match item.kind {
+        // a module that did not parse in full may give any name it lost
+        ItemKind::All | ItemKind::ConAll if interface.incomplete => true,
         ItemKind::All => interface
             .exports
             .iter()
