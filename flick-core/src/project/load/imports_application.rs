@@ -37,7 +37,7 @@ impl Loader<'_> {
         let groups = header_node
             .nodes()
             .filter(|n| n.kind == K::ModuleParamGroup)
-            .skip(application.argument_groups.len())
+            .skip(1)
             .map(|n| n.text(&source))
             .collect::<String>();
         let expression_body = header
@@ -113,11 +113,7 @@ impl Loader<'_> {
             return;
         };
         if header.parameters.is_empty()
-            || application.argument_groups.is_empty()
-            || !header
-                .parameter_groups
-                .starts_with(&application.argument_groups)
-            || application.arguments.len() != application.argument_groups.iter().sum::<usize>()
+            || header.parameter_groups.first() != Some(&application.arguments.len())
         {
             self.diagnostics.push(Diagnostic::error(
                 codes::T002,
@@ -173,18 +169,18 @@ impl Loader<'_> {
     fn application_context(
         &self,
         parent: usize,
-        functor: usize,
+        parameterized: usize,
         application: &ModuleApplication,
         callee: CalleeOrigin,
         template: String,
         trace: Vec<ExpansionFrame>,
     ) -> Virtual {
-        let header = self.modules[functor]
+        let header = self.modules[parameterized]
             .syntax
             .header
             .as_ref()
-            .expect("checked functor header");
-        let inherited = self.modules[functor].virtual_of.as_ref();
+            .expect("checked parameterized header");
+        let inherited = self.modules[parameterized].virtual_of.as_ref();
         let access_modules = self.modules[parent].namespace_access();
         let arguments: Vec<_> = application
             .arguments
@@ -195,17 +191,36 @@ impl Loader<'_> {
             })
             .collect();
         let mut capture = inherited.map_or_else(StaticCapture::default, |v| v.capture.clone());
-        if !capture.access_modules.contains(&self.modules[functor].name) {
+        if let CalleeOrigin::Parameter { binding, .. } = &callee
+            && let Some(caller) = self.modules[parent]
+                .virtual_of
+                .as_ref()
+                .and_then(|context| {
+                    context
+                        .capture
+                        .bindings
+                        .iter()
+                        .find(|b| &b.origin == binding)
+                })
+            && !capture.bindings.iter().any(|b| b.origin == caller.origin)
+        {
+            capture.bindings.push(caller.clone());
+        }
+
+        if !capture
+            .access_modules
+            .contains(&self.modules[parameterized].name)
+        {
             capture
                 .access_modules
-                .push(self.modules[functor].name.clone());
+                .push(self.modules[parameterized].name.clone());
         }
         for (index, (parameter, argument)) in header.parameters.iter().zip(&arguments).enumerate() {
             capture.bindings.push(StaticBinding {
                 alias: parameter.name.clone(),
                 argument: argument.clone(),
                 origin: BindingOrigin {
-                    module: self.modules[functor].name.clone(),
+                    module: self.modules[parameterized].name.clone(),
                     group: header
                         .parameter_groups
                         .iter()
@@ -219,12 +234,12 @@ impl Loader<'_> {
                 },
             });
         }
-        if let Root::Package(package) = &self.modules[functor].root
+        if let Root::Package(package) = &self.modules[parameterized].root
             && !capture.access_packages.contains(package)
         {
             capture.access_packages.push(package.clone());
         }
-        capture.definition_package = self.modules[functor]
+        capture.definition_package = self.modules[parameterized]
             .definition_package()
             .map(str::to_owned);
         capture.callee = Some(callee);
@@ -241,16 +256,16 @@ impl Loader<'_> {
     fn expansion_trace(
         &mut self,
         parent: usize,
-        functor: usize,
+        parameterized: usize,
         application: &ModuleApplication,
     ) -> Option<(String, Vec<ExpansionFrame>)> {
         // An argument-changing recursive definition has no repeated key. Bound
         // active expansion depth as well as detecting exact recursive calls.
         const MAX_DEPTH: usize = 64;
-        let context = self.modules[functor].virtual_of.as_ref();
+        let context = self.modules[parameterized].virtual_of.as_ref();
         let template = context
             .and_then(|v| v.capture.template.clone())
-            .unwrap_or_else(|| self.modules[functor].name.clone());
+            .unwrap_or_else(|| self.modules[parameterized].name.clone());
         let mut trace = self.modules[parent]
             .virtual_of
             .as_ref()

@@ -1,6 +1,6 @@
 #[test]
 #[ignore = "needs Node and Go; run `just e2e-tests`"]
-fn anonymous_nested_and_returned_functors_execute_on_js_and_go() {
+fn anonymous_nested_and_returned_parameterized_modules_execute_on_js_and_go() {
     for &(case, factory, instances) in hom_expression_cases() {
         let dir = Path::new(env!("CARGO_TARGET_TMPDIR")).join(format!("hom_expression_{case}"));
         let source = dir.join("App");
@@ -35,7 +35,7 @@ fn hom_expression_cases() -> &'static [(&'static str, &'static str, &'static str
         ),
         (
             "private_returned",
-            "private module App.Factory(K : App.Contracts.Input) = functor (J : App.Contracts.Input) ->\n  answer : Int\n  let answer = K.seed + J.seed\n",
+            "private module App.Factory(K : App.Contracts.Input) = module (J : App.Contracts.Input) ->\n  answer : Int\n  let answer = K.seed + J.seed\n",
             "module App.Instances exposing (Chosen)\nmodule Selected = App.Factory(App.Other)\nmodule Chosen = Selected(App.Argument)\n",
         ),
         (
@@ -86,7 +86,7 @@ fn hom_expression_cases() -> &'static [(&'static str, &'static str, &'static str
         (
             "anonymous",
             "module App.Factory(F : App.Contracts.Factory)(K : App.Contracts.Input) : App.Contracts.Output\nmodule Built = F(K)\nanswer : Int\nlet answer = Built.answer\n",
-            "module App.Instances exposing (Chosen)\nmodule Chosen = App.Factory((functor (K : App.Contracts.Input) ->\n  answer : Int\n  let answer = K.seed + 1\n))(App.Argument)\n",
+            "module App.Instances exposing (Chosen)\nmodule Chosen = App.Factory((module (K : App.Contracts.Input) ->\n  answer : Int\n  let answer = K.seed + 1\n))(App.Argument)\n",
         ),
         (
             "nested",
@@ -95,12 +95,12 @@ fn hom_expression_cases() -> &'static [(&'static str, &'static str, &'static str
         ),
         (
             "returned_anonymous",
-            "module App.Factory(F : App.Contracts.Factory) : App.Contracts.Factory = functor (K : App.Contracts.Input) ->\n  module Built = F(K)\n  answer : Int\n  let answer = Built.answer\n",
+            "module App.Factory(F : App.Contracts.Factory) : App.Contracts.Factory = module (K : App.Contracts.Input) ->\n  module Built = F(K)\n  answer : Int\n  let answer = Built.answer\n",
             "module App.Instances exposing (Chosen)\nmodule Selected = App.Factory(App.Make)\nmodule Chosen = App.Instances.Selected(App.Argument)\n",
         ),
         (
             "shadowed_parameter",
-            "module App.Factory(K : App.Contracts.Input) : App.Contracts.Factory = functor (K : App.Contracts.Input) ->\n  answer : Int\n  let answer = K.seed + 1\n",
+            "module App.Factory(K : App.Contracts.Input) : App.Contracts.Factory = module (K : App.Contracts.Input) ->\n  answer : Int\n  let answer = K.seed + 1\n",
             "module App.Instances exposing (Chosen)\nmodule Selected = App.Factory(App.Other)\nmodule Chosen = Selected(App.Argument)\n",
         ),
         (
@@ -238,7 +238,7 @@ fn higher_order_dictionary_scopes_execute_locally_on_js_and_go() {
         ),
         (
             "Outer.fl",
-            "module App.Outer(A : App.Contracts.Policy) : App.Contracts.Factory = functor (B : App.Contracts.Policy) ->\n  answer : Bool\n  let answer = eq \"x\" \"x\"\n",
+            "module App.Outer(A : App.Contracts.Policy) : App.Contracts.Factory = module (B : App.Contracts.Policy) ->\n  answer : Bool\n  let answer = eq \"x\" \"x\"\n",
         ),
         (
             "Capture.fl",
@@ -295,4 +295,37 @@ fn higher_order_dictionary_scopes_execute_locally_on_js_and_go() {
             );
         }
     }
+}
+
+#[test]
+#[ignore = "needs Node and Go; run `just e2e-tests`"]
+fn nested_static_parameter_contract_dictionaries_execute_on_js_ts_and_go() {
+    let dir = Path::new(env!("CARGO_TARGET_TMPDIR")).join("nested_static_dictionary");
+    let source = dir.join("App");
+    fs::create_dir_all(&source).expect("source directory");
+    for (name, text) in [
+        (
+            "Contracts.fl",
+            "module App.Contracts exposing (Policy, Container, Output)\ntype module Policy =\n  type Item\n  item : Item\n  equality : Eq.Dict Item\n  instance Eq Item from equality\ntype module Container =\n  module Policy : Policy\ntype module Output =\n  answer : Bool\n",
+        ),
+        (
+            "Policy.fl",
+            "module App.Policy exposing (Item, item, equality)\ntype Item = Item\nitem : Item\nlet item = Item\nequality : Eq.Dict Item\nlet equality = Eq.dictionary { eq = fun _ _ -> true }\n",
+        ),
+        (
+            "Container.fl",
+            "module App.Container exposing (Policy)\nmodule Policy = App.Policy\n",
+        ),
+        (
+            "Make.fl",
+            "module App.Make(N : App.Contracts.Container) : App.Contracts.Output\nanswer : Bool\nlet answer = eq N.Policy.item N.Policy.item\n",
+        ),
+        (
+            "Main.fl",
+            "module App.Main exposing (main)\nmodule Chosen = App.Make(App.Container)\nmain : Unit ->{} Unit\nlet main () = Platform.stdout_line (if Chosen.answer then \"42\" else \"0\")\n",
+        ),
+    ] {
+        fs::write(source.join(name), text).expect("source");
+    }
+    assert_hom_execution(&source, &dir, "nested-static-dictionary", b"42\n");
 }

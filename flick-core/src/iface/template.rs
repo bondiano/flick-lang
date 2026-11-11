@@ -8,6 +8,9 @@ pub struct ModuleTemplate {
     /// Body checked against the interface's higher-order signature. A reader
     /// may instantiate it for either backend without the original checkout.
     pub source: String,
+    /// Canonical target selected while checking an alias, independent of its source import aliases.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub materialized_body: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub capture: Option<StaticCapture>,
 }
@@ -25,7 +28,7 @@ pub struct StaticCapture {
     pub inherited_imports: usize,
     /// Original template retained by a partial application.
     pub template: Option<String>,
-    /// Lexically active expansions, including captures of anonymous functors.
+    /// Lexically active expansions, including captures of anonymous parameterized modules.
     pub trace: Vec<ExpansionFrame>,
     /// Packages whose private implementation names this lexical body may use.
     pub access_packages: Vec<String>,

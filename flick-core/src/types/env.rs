@@ -97,6 +97,12 @@ pub enum Form {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "member", rename_all = "kebab-case")]
 pub enum ModuleRequirement {
+    /// A finite kind or a member retained by an inferred module signature.
+    Kind {
+        name: String,
+        identity: Option<Entity>,
+        definition: Box<TypeDef>,
+    },
     Module {
         name: String,
         /// Lexical identity of this member in dependent sibling requirements.
@@ -138,7 +144,7 @@ pub enum ModuleSignature {
     Structure {
         requirements: Vec<ModuleRequirement>,
     },
-    Functor {
+    Parameterized {
         /// Number of arguments still required in this atomic parameter group.
         group_size: usize,
         binder: String,
@@ -235,6 +241,12 @@ impl TypeDefs {
         self.0.get(module)?.get(name)
     }
 
+    fn remove(&mut self, module: &str, name: &str) {
+        if let Some(types) = self.0.get_mut(module) {
+            types.remove(name);
+        }
+    }
+
     fn define(&mut self, module: &str, name: String, def: TypeDef) {
         match self.0.get_mut(module) {
             Some(types) => types.insert(name, def),
@@ -244,12 +256,6 @@ impl TypeDefs {
                 .or_default()
                 .insert(name, def),
         };
-    }
-
-    fn remove(&mut self, module: &str, name: &str) {
-        if let Some(types) = self.0.get_mut(module) {
-            types.remove(name);
-        }
     }
 
     /// The types `module` defines, in no order.

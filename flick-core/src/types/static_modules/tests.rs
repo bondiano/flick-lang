@@ -14,7 +14,7 @@ fn applying_a_known_structure_reports_an_application_error_in_standalone_checkin
     assert!(
         diagnostics
             .iter()
-            .any(|d| d.code == codes::T002 && d.message.contains("not a functor")),
+            .any(|d| d.code == codes::T002 && d.message.contains("not a parameterized module")),
         "{diagnostics:?}"
     );
 }
@@ -32,7 +32,7 @@ fn dependent_signatures_keep_manifest_type_constructor_parameters_bound() {
     let Form::ModuleSignature { signature } = &definition.form else {
         panic!("arrow signature")
     };
-    let ModuleSignature::Functor { result, .. } = signature.as_ref() else {
+    let ModuleSignature::Parameterized { result, .. } = signature.as_ref() else {
         panic!("factory")
     };
     let ModuleSignature::Structure { requirements } = result.as_ref() else {

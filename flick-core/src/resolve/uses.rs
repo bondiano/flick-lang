@@ -91,11 +91,11 @@ impl Walker<'_> {
                 self.module_signature(node);
                 return;
             }
-            K::ModuleFunctorExpr | K::InlineModuleDecl
-                if node.kind == K::ModuleFunctorExpr
+            K::ModuleParamExpr | K::InlineModuleDecl
+                if node.kind == K::ModuleParamExpr
                     || node.nodes().any(|n| n.kind == K::ModuleParamGroup) =>
             {
-                self.module_functor(node);
+                self.module_parameterized(node);
                 return;
             }
             K::ImportDecl => return,
@@ -187,7 +187,7 @@ impl Walker<'_> {
         self.release(mark);
     }
 
-    fn module_functor(&mut self, node: &Node) {
+    fn module_parameterized(&mut self, node: &Node) {
         let mark = self.locals.len();
         let modules = self.module_locals.len();
         for parameter in node
@@ -210,10 +210,10 @@ impl Walker<'_> {
                 n.kind,
                 K::Members
                     | K::ModuleApplyExpr
-                    | K::ModuleFunctorExpr
+                    | K::ModuleParamExpr
                     | K::ModuleParenExpr
                     | K::ModuleAnnotExpr
-            ) || (node.kind == K::ModuleFunctorExpr && n.kind == K::ModulePath)
+            ) || (node.kind == K::ModuleParamExpr && n.kind == K::ModulePath)
         }) {
             for declaration in body.nodes().filter(|_| body.kind == K::Members) {
                 if declaration.kind == K::ImportDecl {

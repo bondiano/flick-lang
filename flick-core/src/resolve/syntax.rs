@@ -30,11 +30,11 @@ pub struct Header {
     pub span: Span,
     /// `None` without `exposing`: the module exports nothing.
     pub exposing: Option<Vec<Item>>,
-    /// Static module parameters of a functor source file.
+    /// Static module parameters of a parameterized source file.
     pub parameters: Vec<ModuleParam>,
     pub result: Option<Node>,
     pub parameter_groups: Vec<usize>,
-    /// An expression-bodied file functor; structure bodies remain top-level declarations.
+    /// An expression-bodied file parameterized; structure bodies remain top-level declarations.
     pub body: Option<Node>,
     /// Concrete value selected by elaborating an expression-bodied module.
     pub materialized_body: Option<String>,
@@ -51,7 +51,6 @@ pub struct ModuleParam {
 pub struct ModuleApplication {
     pub expression: Node,
     pub annotation: Option<Node>,
-    pub argument_groups: Vec<usize>,
     pub name: String,
     pub template: String,
     pub template_span: Span,
@@ -131,10 +130,10 @@ pub fn module_syntax(tree: &Node, text: &str, file: FileId) -> ModuleSyntax {
                 n.kind == K::ModulePath
                     && (n.has_token(K::Dot) || node.nodes().any(|n| n.kind == K::ModuleParamGroup))
             });
-        let nested_functor = matches!(node.kind, K::InlineModuleDecl | K::ModuleApplyDecl)
+        let nested_parameterized = matches!(node.kind, K::InlineModuleDecl | K::ModuleApplyDecl)
             && !file_expression
             && node.nodes().any(|n| n.kind == K::ModuleParamGroup);
-        if (node.kind == K::ModuleApplyDecl && !file_expression) || nested_functor {
+        if (node.kind == K::ModuleApplyDecl && !file_expression) || nested_parameterized {
             fn paths<'a>(node: &'a Node, out: &mut Vec<&'a Node>) {
                 if node.kind == K::ModulePath {
                     out.push(node);
@@ -164,8 +163,8 @@ pub fn module_syntax(tree: &Node, text: &str, file: FileId) -> ModuleSyntax {
             } else {
                 continue;
             };
-            let nested_expression = nested_functor.then(|| Node {
-                kind: K::ModuleFunctorExpr,
+            let nested_expression = nested_parameterized.then(|| Node {
+                kind: K::ModuleParamExpr,
                 children: node
                     .nodes()
                     .filter(|n| {
@@ -175,7 +174,7 @@ pub fn module_syntax(tree: &Node, text: &str, file: FileId) -> ModuleSyntax {
                                 | K::ModuleResult
                                 | K::Members
                                 | K::ModuleApplyExpr
-                                | K::ModuleFunctorExpr
+                                | K::ModuleParamExpr
                                 | K::ModuleParenExpr
                                 | K::ModuleAnnotExpr
                         )
@@ -190,7 +189,7 @@ pub fn module_syntax(tree: &Node, text: &str, file: FileId) -> ModuleSyntax {
                         matches!(
                             n.kind,
                             K::ModuleApplyExpr
-                                | K::ModuleFunctorExpr
+                                | K::ModuleParamExpr
                                 | K::ModuleParenExpr
                                 | K::ModuleAnnotExpr
                         )
@@ -198,21 +197,9 @@ pub fn module_syntax(tree: &Node, text: &str, file: FileId) -> ModuleSyntax {
                     .last()
             });
             if let Some(expression) = expression {
-                fn groups(node: &Node, out: &mut Vec<usize>) {
-                    if node.kind == K::ModuleApplyExpr {
-                        if let Some(callee) = node.nodes().next() {
-                            groups(callee, out);
-                        }
-                        out.push(node.nodes().count().saturating_sub(1));
-                    }
-                }
-                let mut argument_groups = Vec::new();
-                for child in node.nodes() {
-                    groups(child, &mut argument_groups);
-                }
                 applications.push(ModuleApplication {
                     expression: expression.clone(),
-                    annotation: (!nested_functor)
+                    annotation: (!nested_parameterized)
                         .then(|| {
                             node.nodes()
                                 .find(|n| n.kind == K::ModuleResult)
@@ -220,7 +207,6 @@ pub fn module_syntax(tree: &Node, text: &str, file: FileId) -> ModuleSyntax {
                                 .cloned()
                         })
                         .flatten(),
-                    argument_groups,
                     name: local_name,
                     template: named
                         .first()
@@ -308,10 +294,10 @@ pub fn module_syntax(tree: &Node, text: &str, file: FileId) -> ModuleSyntax {
                     .collect();
                 if parts.len() > 1 {
                     let module = parts[..parts.len() - 1].join(".");
-                    if !imports
-                        .iter()
-                        .any(|i| i.module == module || i.qualifier() == module)
-                    {
+                    if !imports.iter().any(|i| {
+                        i.module == module
+                            || i.qualifier() == module.split('.').next().unwrap_or(&module)
+                    }) {
                         imports.push(Import {
                             module,
                             alias: None,
@@ -339,7 +325,7 @@ pub fn module_syntax(tree: &Node, text: &str, file: FileId) -> ModuleSyntax {
                 return;
             }
             let mut bound = bound.to_vec();
-            if node.kind == K::ModuleFunctorExpr {
+            if node.kind == K::ModuleParamExpr {
                 for parameter in node
                     .nodes()
                     .filter(|n| n.kind == K::ModuleParamGroup)
@@ -353,7 +339,7 @@ pub fn module_syntax(tree: &Node, text: &str, file: FileId) -> ModuleSyntax {
                     }
                 }
             }
-            if node.kind == K::ModuleFunctorExpr
+            if node.kind == K::ModuleParamExpr
                 && let Some(result) = node.nodes().find(|n| n.kind == K::ModuleResult)
             {
                 signature_imports(result, text, file, imports);

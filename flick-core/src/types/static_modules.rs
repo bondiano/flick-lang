@@ -197,9 +197,9 @@ impl Checker<'_> {
             declarations.modules.insert(name.clone(), child.clone());
         }
         if let Some(header) = &module.syntax.header {
-            let mut signature = interface.functor.as_ref();
+            let mut signature = interface.parameterized.as_ref();
             for parameter in &header.parameters {
-                if let Some(ModuleSignature::Functor {
+                if let Some(ModuleSignature::Parameterized {
                     binder,
                     parameter: input,
                     result,
@@ -301,7 +301,7 @@ impl Checker<'_> {
                 *interface = result.seal(interface, module.name);
             }
             for (group_size, binder, parameter) in static_parameters.into_iter().rev() {
-                result = ModuleSignature::Functor {
+                result = ModuleSignature::Parameterized {
                     group_size,
                     binder,
                     parameter: Box::new(parameter),
@@ -311,7 +311,7 @@ impl Checker<'_> {
             if !matches!(result, ModuleSignature::Structure { .. }) {
                 interface.exports.clear();
                 interface.modules.clear();
-                interface.functor = Some(result);
+                interface.parameterized = Some(result);
                 interface.signature_explicit = module
                     .syntax
                     .header
@@ -343,7 +343,7 @@ impl Checker<'_> {
             self.error(
                 codes::T061,
                 module.syntax.header.as_ref().expect("header").span,
-                "functor result does not satisfy its declared module signature",
+                "parameterized module result does not satisfy its declared module signature",
             );
         }
     }
@@ -392,15 +392,15 @@ impl Checker<'_> {
         if let Some(header) = &module.syntax.header
             && !header.private
         {
-            if interface.functor.is_some() && !interface.signature_explicit {
+            if interface.parameterized.is_some() && !interface.signature_explicit {
                 self.error(
                     codes::T067,
                     header.span,
-                    "public functor requires an explicit result signature",
+                    "public parameterized module requires an explicit result signature",
                 );
             }
             for (name, child) in &interface.modules {
-                if child.functor.is_some() && !child.signature_explicit {
+                if child.parameterized.is_some() && !child.signature_explicit {
                     let at = module
                         .syntax
                         .applications
@@ -410,7 +410,7 @@ impl Checker<'_> {
                     self.error(
                         codes::T067,
                         at,
-                        format!("public functor `{name}` requires an explicit result signature"),
+                        format!("public parameterized module `{name}` requires an explicit result signature"),
                     );
                 }
             }
@@ -487,7 +487,7 @@ impl Checker<'_> {
                 }
             }
         }
-        if let Some(signature) = &mut interface.functor {
+        if let Some(signature) = &mut interface.parameterized {
             signature.map_types(&mut |ty| self.static_type(ty));
         }
         for child in interface.modules.values_mut() {

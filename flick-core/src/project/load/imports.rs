@@ -37,7 +37,7 @@ impl Loader<'_> {
                 if self.modules[i].syntax.header.as_ref().is_some_and(|h| {
                     !h.parameters.is_empty()
                         && self.modules[i].syntax.applications.iter().any(|a| {
-                            a.expression.kind != K::ModuleFunctorExpr
+                            a.expression.kind != K::ModuleParamExpr
                                 && import.module == format!("{}.{}", h.name, a.name)
                         })
                 }) {
@@ -77,7 +77,7 @@ impl Loader<'_> {
                         .header
                         .as_ref()
                         .is_some_and(|h| !h.parameters.is_empty());
-                    if !symbolic || application.expression.kind == K::ModuleFunctorExpr {
+                    if !symbolic || application.expression.kind == K::ModuleParamExpr {
                         self.instantiate(i, &application);
                     }
                 }
@@ -201,7 +201,17 @@ impl Loader<'_> {
                 };
                 prefix = parent;
             }
+            let active = format!("member:{name}");
+            if !self.expressions_active.insert(active.clone()) {
+                self.diagnostics.push(Diagnostic::error(
+                    codes::R006,
+                    format!("cyclic module member resolution for `{name}`"),
+                    span,
+                ));
+                return None;
+            }
             self.materialize_members(name);
+            self.expressions_active.remove(&active);
             if !self.by_name.contains_key(name) && self.report_inline_import(&dirs, name, span) {
                 return None;
             }

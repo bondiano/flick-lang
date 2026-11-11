@@ -1,6 +1,6 @@
 #[cfg(feature = "ide")]
 #[test]
-fn virtual_functor_path_conflicts_with_a_file_module() {
+fn virtual_parameterized_path_conflicts_with_a_file_module() {
     use crate::diagnostics::codes;
 
     let host = Memory(BTreeMap::from([
@@ -28,7 +28,7 @@ fn virtual_functor_path_conflicts_with_a_file_module() {
 
 #[cfg(feature = "ide")]
 #[test]
-fn changing_a_functor_contract_invalidates_the_virtual_module_cache() {
+fn changing_a_parameterized_contract_invalidates_the_virtual_module_cache() {
     use crate::diagnostics::codes;
 
     let host = |contract: &str| {
@@ -111,7 +111,7 @@ fn anonymous_and_returned_factories_are_module_values() {
             "module App.Main exposing (Chosen)\nmodule Chosen = App.Return.Make(App.Argument)\n",
         ),
         (
-            "module App.Return(F : App.Contracts.Factory) : App.Contracts.Factory = functor (K : App.Contracts.Input) ->\n  module Built = F(K)\n  answer : Int\n  let answer = Built.answer\n",
+            "module App.Return(F : App.Contracts.Factory) : App.Contracts.Factory = module (K : App.Contracts.Input) ->\n  module Built = F(K)\n  answer : Int\n  let answer = Built.answer\n",
             "module App.Main exposing (Chosen)\nmodule Selected = App.Return(App.Make)\nmodule Chosen = App.Main.Selected(App.Argument)\n",
         ),
         (
@@ -120,7 +120,7 @@ fn anonymous_and_returned_factories_are_module_values() {
         ),
         (
             "module App.Return(F : App.Contracts.Factory)(K : App.Contracts.Input) : App.Contracts.Output\nmodule Built = F(K)\nanswer : Int\nlet answer = Built.answer\n",
-            "module App.Main exposing (Chosen)\nmodule Chosen = App.Return((functor (K : App.Contracts.Input) ->\n  answer : Int\n  let answer = K.seed + 1\n))(App.Argument)\n",
+            "module App.Main exposing (Chosen)\nmodule Chosen = App.Return((module (K : App.Contracts.Input) ->\n  answer : Int\n  let answer = K.seed + 1\n))(App.Argument)\n",
         ),
     ] {
         let host = Memory(BTreeMap::from([
@@ -297,7 +297,7 @@ fn hom_boundary_shadowed_parameters_do_not_equate_outer_and_inner_types() {
             ),
             (
                 "Outer",
-                "module App.Outer(K : App.Contracts.Source) : App.Contracts.Factory = functor (K : App.Contracts.Source) ->\n  type alias Value = K.Key\n  value : Value\n  let value = Saved.value\nmodule Saved = K\n",
+                "module App.Outer(K : App.Contracts.Source) : App.Contracts.Factory = module (K : App.Contracts.Source) ->\n  type alias Value = K.Key\n  value : Value\n  let value = Saved.value\nmodule Saved = K\n",
             ),
         ],
         "Outer",

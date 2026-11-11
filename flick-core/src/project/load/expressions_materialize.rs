@@ -76,7 +76,6 @@ impl Loader<'_> {
         let application = ModuleApplication {
             expression: body.clone(),
             annotation: None,
-            argument_groups: Vec::new(),
             name: String::new(),
             template: String::new(),
             template_span: header.span,

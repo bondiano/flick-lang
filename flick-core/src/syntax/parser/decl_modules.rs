@@ -61,14 +61,14 @@ fn module_apply_decl(p: &mut Parser) {
 }
 
 fn at_module_expr(p: &Parser) -> bool {
-    matches!(p.current(), K::Con | K::LParen) || p.at_word("functor")
+    matches!(p.current(), K::Con | K::LParen) || p.at(K::ModuleKw) && p.nth(1) == K::LParen
 }
 
 fn module_expr(p: &mut Parser) -> Option<Done> {
     if !p.enter() {
         return None;
     }
-    let mut lhs = if p.at_word("functor") {
+    let mut lhs = if p.at(K::ModuleKw) {
         let m = p.start();
         p.bump();
         while p.at(K::LParen) {
@@ -83,7 +83,7 @@ fn module_expr(p: &mut Parser) -> Option<Done> {
                 p.body(K::Members, top_decl);
             }
         }
-        p.complete(m, K::ModuleFunctorExpr)
+        p.complete(m, K::ModuleParamExpr)
     } else if p.at(K::LParen) {
         let m = p.start();
         p.bump();

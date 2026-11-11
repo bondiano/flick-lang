@@ -384,6 +384,9 @@ impl Checker<'_> {
                         *ty = self.default_kinds(ty);
                     }
                 }
+                ModuleRequirement::Kind { definition, .. } => {
+                    definition.kind = self.kinds.zonk(&definition.kind, true);
+                }
                 ModuleRequirement::Value { ty, .. } => *ty = self.default_kinds(ty),
                 ModuleRequirement::Dictionary { head, .. } => *head = self.default_kinds(head),
                 ModuleRequirement::Nominal {

@@ -8,6 +8,7 @@
 use std::collections::BTreeMap;
 use std::fmt;
 use std::iter::once;
+use std::mem;
 
 use crate::iface::{Export, Interface, Namespace};
 use crate::types::{Binder, Form, Instance, ModuleSignature, Row, Type, TypeDef, show_type};
@@ -89,15 +90,15 @@ fn static_members(old: &Interface, new: &Interface) -> Vec<Change> {
         signature
     };
     let mut out = Vec::new();
-    if old.functor.as_ref().map(canonical) != new.functor.as_ref().map(canonical) {
+    if old.parameterized.as_ref().map(canonical) != new.parameterized.as_ref().map(canonical) {
         out.push(Change::Changed {
             name: format!("module {}", old.module),
             was: old
-                .functor
+                .parameterized
                 .as_ref()
                 .map_or_else(|| "structure".into(), ModuleSignature::display),
             now: new
-                .functor
+                .parameterized
                 .as_ref()
                 .map_or_else(|| "structure".into(), ModuleSignature::display),
         });
@@ -266,6 +267,19 @@ fn canonical(e: &Export) -> Export {
         let mut types = |t: &mut Type| *t = rename(t, &names, next);
         match &mut form {
             Form::ModuleSignature { signature } => signature.canonicalize(next),
+            Form::ModuleContract { requirements } => {
+                let mut signature = ModuleSignature::Structure {
+                    requirements: mem::take(requirements),
+                };
+                signature.canonicalize(next);
+                let ModuleSignature::Structure {
+                    requirements: canonical,
+                } = signature
+                else {
+                    unreachable!()
+                };
+                *requirements = canonical;
+            }
             Form::Alias { body, .. } => types(body),
             Form::Service { operations, .. } => {
                 for o in operations {

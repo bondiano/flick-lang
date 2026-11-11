@@ -296,7 +296,7 @@ impl Checking<'_> {
             } else {
                 expected.seal(&interface, &loaded.name)
             };
-            if interface.functor.is_some() {
+            if interface.parameterized.is_some() {
                 interface.signature_explicit = loaded
                     .virtual_of
                     .as_ref()
@@ -320,9 +320,14 @@ impl Checking<'_> {
         interface.private = loaded.syntax.header.as_ref().is_some_and(|h| h.private);
         interface.member_of.clone_from(&loaded.member_of);
         #[cfg(feature = "native-project")]
-        if clean && interface.functor.is_some() {
+        if clean && interface.parameterized.is_some() {
             interface.template = Some(ModuleTemplate {
                 source: self.text_of(loaded).to_owned(),
+                materialized_body: loaded
+                    .syntax
+                    .header
+                    .as_ref()
+                    .and_then(|header| header.materialized_body.clone()),
                 capture: loaded.virtual_of.as_ref().map(|v| v.capture.clone()),
             });
         }
@@ -332,7 +337,7 @@ impl Checking<'_> {
             loaded,
             &module,
             &typing,
-            clean && interface.functor.is_none(),
+            clean && interface.parameterized.is_none(),
             &mut diagnostics,
         );
         if let Some(ir) = &mut ir {

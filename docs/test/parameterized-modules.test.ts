@@ -22,13 +22,13 @@ const example = (locale: string) => {
   return blocks;
 };
 
-test("the English and Russian generative functor examples have identical source", () => {
+test("the English and Russian generative parameterized examples have identical source", () => {
   assert.deepEqual(example("ru"), example(""));
 });
 
 for (const locale of ["", "ru"]) {
-  test(`generative functors (${locale || "en"}): shared imports pass, separate applications do not mix`, () => {
-    const parent = path.join(repo, "target/tmp/docs-module-functors");
+  test(`generative parameterized modules (${locale || "en"}): shared imports pass, separate applications do not mix`, () => {
+    const parent = path.join(repo, "target/tmp/docs-parameterized-modules");
     mkdirSync(parent, { recursive: true });
     const dir = mkdtempSync(path.join(parent, "example-"));
     try {

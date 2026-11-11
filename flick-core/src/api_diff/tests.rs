@@ -42,7 +42,7 @@ fn interface(text: &str) -> Interface {
 #[test]
 fn higher_order_signature_changes_are_public_api() {
     use crate::types::{ModuleRequirement as R, ModuleSignature as S};
-    let signature = |binder: &str, input: &str| S::Functor {
+    let signature = |binder: &str, input: &str| S::Parameterized {
         group_size: 1,
         binder: binder.into(),
         parameter: Box::new(S::Structure {
@@ -60,16 +60,16 @@ fn higher_order_signature_changes_are_public_api() {
     };
     let old = Interface {
         module: "Lib.Make".into(),
-        functor: Some(signature("K", "Int")),
+        parameterized: Some(signature("K", "Int")),
         ..Interface::default()
     };
     let renamed = Interface {
-        functor: Some(signature("Other", "Int")),
+        parameterized: Some(signature("Other", "Int")),
         ..old.clone()
     };
     assert!(diff(slice::from_ref(&old), &[renamed]).is_empty());
     let changed = Interface {
-        functor: Some(signature("K", "String")),
+        parameterized: Some(signature("K", "String")),
         ..old.clone()
     };
     assert_eq!(bump(&diff(slice::from_ref(&old), &[changed])), Bump::Major);
@@ -96,6 +96,7 @@ fn nested_static_members_are_public_api_but_template_bodies_are_not() {
     implementation.template = Some(ModuleTemplate {
         source: "implementation changes".into(),
         capture: None,
+        materialized_body: None,
     });
     assert!(diff(&[old], &[implementation]).is_empty());
 }
@@ -256,4 +257,41 @@ fn a_renamed_type_variable_is_no_change() {
             now: "forall a. a -> a -> a".into(),
         }]
     );
+}
+
+#[test]
+fn ported_review_signature_type_parameter_names_do_not_change_the_public_api() {
+    use crate::types::{Kind, ModuleRequirement as R, ModuleSignature as S};
+    let signature = |name: &str| {
+        S::Parameterized {
+            group_size: 1,
+            binder: "K".into(),
+            parameter: Box::new(S::Structure {
+                requirements: vec![R::Type {
+                    name: "Items".into(),
+                    params: vec![Binder {
+                        name: name.into(),
+                        kind: Kind::Type,
+                    }],
+                    manifest: Some(Type::app(
+                        Type::con("Prelude", "List"),
+                        Type::Var(name.into()),
+                    )),
+                }],
+            }),
+            result: Box::new(S::Structure {
+                requirements: vec![],
+            }),
+        }
+        .interface("Lib")
+    };
+    assert!(diff(&[signature("a")], &[signature("item")]).is_empty());
+}
+
+#[test]
+fn ported_review_structure_signature_offsets_do_not_change_the_public_api() {
+    let source = "module Lib exposing (Outer)\ntype module Input =\n  type Key\ntype module Outer =\n  module Child : Input\n  value : Child.Key\n";
+    let old = interface(source);
+    let new = interface(&source.replace("  module Child", "\n  module Child"));
+    assert!(diff(&[old], &[new]).is_empty());
 }

@@ -5,6 +5,8 @@ mod capabilities;
 mod common;
 #[path = "build_command/ir.rs"]
 mod ir;
+#[path = "build_command/modules.rs"]
+mod modules;
 
 use std::fs;
 use std::path::Path;

@@ -17,7 +17,7 @@ pub use template::{
 };
 
 /// Bumped on every change of the schema.
-pub const IFACE_VERSION: u32 = 14;
+pub const IFACE_VERSION: u32 = 15;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -113,8 +113,8 @@ pub struct Interface {
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub modules: BTreeMap<String, Interface>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub functor: Option<ModuleSignature>,
-    /// The functor's result was advertised by a declaration or ascription,
+    pub parameterized: Option<ModuleSignature>,
+    /// The parameterized's result was advertised by a declaration or ascription,
     /// rather than inferred from a private implementation body.
     #[serde(default, skip_serializing_if = "is_false")]
     pub signature_explicit: bool,
@@ -354,6 +354,7 @@ mod tests {
                 source: "module App.Factory(K : App.Contracts.Empty) : App.Contracts.Empty\n"
                     .into(),
                 capture: None,
+                materialized_body: None,
             }),
             ..Interface::default()
         };

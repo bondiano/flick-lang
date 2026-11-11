@@ -76,7 +76,7 @@ pub type Code = u32;
 pub enum Expr {
     Structure(Vec<(String, Code)>),
     Variable(usize),
-    Functor {
+    Parameterized {
         arity: usize,
         body: Box<Self>,
     },
@@ -100,7 +100,7 @@ pub enum Value {
 pub enum Error {
     Fuel,
     Unbound(usize),
-    NotFunctor,
+    NotParameterized,
     GroupSize { expected: usize, actual: usize },
 }
 
@@ -112,7 +112,7 @@ pub fn evaluate(expr: &Expr, environment: &[Value], fuel: usize) -> Result<Value
             .get(*index)
             .cloned()
             .ok_or(Error::Unbound(*index)),
-        Expr::Functor { arity, body } => Ok(Value::Closure {
+        Expr::Parameterized { arity, body } => Ok(Value::Closure {
             arity: *arity,
             captured: environment.to_vec(),
             body: body.clone(),
@@ -127,7 +127,7 @@ pub fn evaluate(expr: &Expr, environment: &[Value], fuel: usize) -> Result<Value
                 body,
             } = evaluate(function, environment, fuel)?
             else {
-                return Err(Error::NotFunctor);
+                return Err(Error::NotParameterized);
             };
             if arity != arguments.len() {
                 return Err(Error::GroupSize {
@@ -177,10 +177,10 @@ mod tests {
 
     #[test]
     fn a_returned_factory_uses_its_definition_environment() {
-        // (functor A -> functor B -> A)(repo) returns a closure over repo.
-        let return_first = Expr::Functor {
+        // (parameterized A -> parameterized B -> A)(repo) returns a closure over repo.
+        let return_first = Expr::Parameterized {
             arity: 1,
-            body: Box::new(Expr::Functor {
+            body: Box::new(Expr::Parameterized {
                 arity: 1,
                 body: Box::new(Expr::Variable(1)),
             }),
@@ -212,7 +212,7 @@ mod tests {
 
     #[test]
     fn an_atomic_group_does_not_partially_apply() {
-        let factory = Expr::Functor {
+        let factory = Expr::Parameterized {
             arity: 2,
             body: Box::new(Expr::Variable(1)),
         };
@@ -309,5 +309,11 @@ mod tests {
         };
         assert!(nominal("Core.Clock").is_subtype_of(&nominal("Core.Clock")));
         assert!(!nominal("Other.Clock").is_subtype_of(&nominal("Core.Clock")));
+        let abstract_clock = Signature::Structure {
+            members: BTreeSet::from(["now".into()]),
+            identities: BTreeMap::from([("Clock".into(), Identity::Abstract)]),
+        };
+        assert!(nominal("Core.Clock").is_subtype_of(&abstract_clock));
+        assert!(!abstract_clock.is_subtype_of(&nominal("Core.Clock")));
     }
 }

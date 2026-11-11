@@ -60,6 +60,22 @@ impl Loader<'_> {
         if exported { "" } else { "private " }
     }
 
+    pub(super) fn select_expression_body(&mut self, module: usize, target: String, at: Span) {
+        let syntax = Arc::make_mut(&mut self.modules[module].syntax);
+        syntax.header.as_mut().expect("header").materialized_body = Some(target.clone());
+        syntax.imports.push(Import {
+            module: target,
+            alias: None,
+            exposing: vec![Item {
+                kind: ItemKind::All,
+                name: String::new(),
+                span: at,
+            }],
+            plugins: Vec::new(),
+            span: at,
+        });
+    }
+
     fn module_expression(
         &mut self,
         parent: usize,
@@ -104,14 +120,13 @@ impl Loader<'_> {
                 let mut application = site.clone();
                 application.name.clone_from(&local);
                 application.template = callee;
-                application.argument_groups = vec![arguments.len()];
                 application.argument_spans = vec![site.span; arguments.len()];
                 application.arguments = arguments;
                 self.instantiate_named(parent, &application, origin);
                 let full = format!("{}.{}", self.modules[parent].name, local);
                 self.by_name.contains_key(&full).then_some(full)
             }
-            K::ModuleFunctorExpr => self.functor_expression(parent, node, desired),
+            K::ModuleParamExpr => self.parameterized_expression(parent, node, desired),
             K::ModuleAnnotExpr => {
                 let mut children = node.nodes();
                 let target = self.module_expression(parent, children.next()?, None, site)?;
@@ -129,7 +144,7 @@ impl Loader<'_> {
         }
     }
 
-    fn functor_expression(
+    fn parameterized_expression(
         &mut self,
         parent: usize,
         node: &Node,
@@ -208,6 +223,7 @@ impl Loader<'_> {
         let generated =
             format!("{visibility}module {full}{annotation}{exposing} = {target}\n{imports}");
         self.register_expression(parent, &local, generated, inherited_imports, lexical_at);
+        self.select_expression_body(*self.by_name.get(&full)?, target.to_owned(), at);
         if let Some(context) = self.modules[*self.by_name.get(&full)?].virtual_of.as_mut() {
             context.capture.callee = origin;
         }
@@ -335,16 +351,16 @@ impl Loader<'_> {
         CalleeOrigin::Module(actual.to_owned())
     }
 
-    fn expression_captures(&self, parent: usize, functor: Option<&Node>) -> (String, usize) {
+    fn expression_captures(&self, parent: usize, parameterized: Option<&Node>) -> (String, usize) {
         let loaded = &self.modules[parent];
         let source = &self.sources.get(loaded.file).text;
-        let tokens: Vec<_> = functor
+        let tokens: Vec<_> = parameterized
             .into_iter()
             .flat_map(Node::tokens)
             .filter(|t| !t.kind.is_trivia())
             .map(|t| t.text(source))
             .collect();
-        let mut shadowed: Vec<_> = functor
+        let mut shadowed: Vec<_> = parameterized
             .into_iter()
             .flat_map(Node::nodes)
             .filter(|n| n.kind == K::ModuleParamGroup)
@@ -352,7 +368,7 @@ impl Loader<'_> {
             .filter_map(|p| p.child_tokens().find(|t| t.kind == K::Con))
             .map(|t| t.text(source).to_owned())
             .collect();
-        if let Some(body) = functor
+        if let Some(body) = parameterized
             .into_iter()
             .flat_map(Node::nodes)
             .find(|n| n.kind == K::Members)

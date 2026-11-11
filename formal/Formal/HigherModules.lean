@@ -91,7 +91,7 @@ abbrev Code := Nat
 inductive Expr where
   | structure (exports : List (String × Code))
   | variable (index : Nat)
-  | functor (arity : Nat) (body : Expr)
+  | module (arity : Nat) (body : Expr)
   | apply (function : Expr) (arguments : List Expr)
 
 inductive Value where
@@ -106,7 +106,7 @@ def evaluate : Nat → List Value → Expr → Option Value
       match expression with
       | .structure exports => some (.structure exports)
       | .variable index => environment[index]?
-      | .functor arity body => some (.closure arity environment body)
+      | .parameterized arity body => some (.closure arity environment body)
       | .apply function arguments => do
           let value ← evaluate fuel environment function
           match value with
@@ -117,8 +117,8 @@ def evaluate : Nat → List Value → Expr → Option Value
                 evaluate fuel (arguments.reverse ++ captured) body
               else none
 
-theorem functor_captures_lexically (fuel arity : Nat) (body : Expr) (environment : List Value) :
-    evaluate (fuel + 1) environment (.functor arity body) =
+theorem parameterized_captures_lexically (fuel arity : Nat) (body : Expr) (environment : List Value) :
+    evaluate (fuel + 1) environment (.parameterized arity body) =
       some (.closure arity environment body) := rfl
 
 /-- The caller's equally placed module cannot replace a captured module. -/
@@ -127,13 +127,13 @@ theorem application_uses_captured_module (captured argument : Value) (caller : L
       (.apply (.variable 0) [.variable 1]) = some captured := by
   rfl
 
-theorem returned_functor_retains_its_argument (code : List (String × Code)) :
-    evaluate 3 [] (.apply (.functor 1 (.functor 1 (.variable 1))) [.structure code]) =
+theorem returned_parameterized_retains_its_argument (code : List (String × Code)) :
+    evaluate 3 [] (.apply (.parameterized 1 (.parameterized 1 (.variable 1))) [.structure code]) =
       some (.closure 1 [.structure code] (.variable 1)) := by
   rfl
 
 theorem atomic_group_rejects_partial_application (body : Expr) (argument : Expr) :
-    evaluate 3 [] (.apply (.functor 2 body) [argument]) = none := by
+    evaluate 3 [] (.apply (.parameterized 2 body) [argument]) = none := by
   rfl
 
 def project (visible : List String) (exports : List (String × Code)) : List (String × Code) :=

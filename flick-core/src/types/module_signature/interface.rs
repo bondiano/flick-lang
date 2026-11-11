@@ -1,3 +1,30 @@
+fn rebase_kind_members(interface: &mut Interface, requirements: &[R], path: &str) {
+    fn replace(ty: &Type, replacements: &[(Type, Type)]) -> Type {
+        if let Some((_, new)) = replacements.iter().find(|(old, _)| old == ty) {
+            return new.clone();
+        }
+        map_module_children(ty, &mut |ty| replace(ty, replacements))
+    }
+    let replacements: Vec<_> = requirements
+        .iter()
+        .filter_map(|requirement| {
+            let R::Kind {
+                name,
+                identity: None,
+                definition,
+            } = requirement
+            else {
+                return None;
+            };
+            let Kind::Named { module, .. } = &definition.kind else {
+                return None;
+            };
+            Some((Type::con(module, name), Type::con(path, name)))
+        })
+        .collect();
+    map_interface_types(interface, &mut |ty| replace(ty, &replacements));
+}
+
 impl ModuleSignature {
     /// An abstract interface usable when checking a body independently of its
     /// implementations. Abstract members are stable names in this interface.
@@ -8,7 +35,7 @@ impl ModuleSignature {
             ..Interface::default()
         };
         let Self::Structure { requirements } = self else {
-            interface.functor = Some(self.clone());
+            interface.parameterized = Some(self.clone());
             interface.signature_explicit = true;
             return interface;
         };
@@ -27,7 +54,7 @@ impl ModuleSignature {
             .iter()
             .filter_map(|r| match r {
                 R::Type { name, .. } => Some((name.clone(), Type::con(path, name))),
-                R::Nominal { name, identity, .. } => Some((
+                R::Kind { name, identity, .. } | R::Nominal { name, identity, .. } => Some((
                     name.clone(),
                     identity
                         .as_ref()
@@ -55,6 +82,38 @@ impl ModuleSignature {
         }
         for requirement in &requirements {
             let (name, namespace, decl, definition, scheme) = match requirement {
+                R::Kind {
+                    name,
+                    identity,
+                    definition,
+                } => {
+                    interface.exports.push(Export {
+                        entity: identity.clone().unwrap_or(Entity {
+                            module: path.into(),
+                            namespace: Namespace::Type,
+                            name: name.clone(),
+                        }),
+                        decl: if matches!(definition.form, Form::Kind) {
+                            Decl::Kind
+                        } else {
+                            Decl::KindMember
+                        },
+                        parent: if matches!(definition.form, Form::KindMember) {
+                            if let Kind::Named { name, .. } = &definition.kind {
+                                Some(name.clone())
+                            } else {
+                                None
+                            }
+                        } else {
+                            None
+                        },
+                        definition: Some((**definition).clone()),
+                        scheme: None,
+                        blocked: None,
+                        at: None,
+                    });
+                    continue;
+                }
                 R::Type {
                     name,
                     params,
@@ -151,6 +210,7 @@ impl ModuleSignature {
                 at: None,
             });
         }
+        rebase_kind_members(&mut interface, &requirements, path);
         interface
     }
 }
