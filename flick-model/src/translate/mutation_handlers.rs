@@ -20,6 +20,8 @@ impl Tr {
                 ret,
                 errors: Rc::from([]),
             }))
+        } else if let Some(id) = self.control.clone() {
+            self.loop_cell_handler(h, &id, xs, true)
         } else {
             self.cell_handler(h, xs, true)
         }
@@ -51,8 +53,7 @@ impl Tr {
                 errors: Rc::from([]),
             }))
         } else {
-            let e = ir::Expr::new(ExprKind::Handle(Box::new(h.clone())), h.body.span);
-            self.with_value(&e, |tr, v| tr.loop_pack(true, v, xs))
+            self.loop_cell_handler(h, id, xs, false)
         }
     }
     fn loop_return(&mut self, e: &ir::Expr, id: &str, xs: &[String]) -> Term {
@@ -147,6 +148,22 @@ impl Tr {
         )
     }
     pub(super) fn cell_handler(&mut self, h: &ir::Handler, xs: &[String], protected: bool) -> Term {
+        self.with_cells(|tr| {
+            let value = Term::Handler(Rc::new(tr.handler(h)));
+            if protected {
+                tr.catch_atomic(value, xs, true)
+            } else {
+                let v = tr.fresh("value");
+                Term::Let(
+                    v.clone(),
+                    None,
+                    Rc::new(value),
+                    Rc::new(tr.pack(Term::Var(v), xs)),
+                )
+            }
+        })
+    }
+    pub(super) fn with_cells(&mut self, build: impl FnOnce(&mut Self) -> Term) -> Term {
         let tracked: Vec<_> = self
             .active_variables()
             .into_iter()
@@ -159,18 +176,7 @@ impl Tr {
         let mark = self.cells.len();
         self.cells
             .extend(initial.iter().map(|(x, n, _)| (x.clone(), n.clone())));
-        let value = Term::Handler(Rc::new(self.handler(h)));
-        let value = if protected {
-            self.catch_atomic(value, xs, true)
-        } else {
-            let v = self.fresh("value");
-            Term::Let(
-                v.clone(),
-                None,
-                Rc::new(value),
-                Rc::new(self.pack(Term::Var(v), xs)),
-            )
-        };
+        let value = build(self);
         self.cells.truncate(mark);
         initial
             .into_iter()

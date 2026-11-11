@@ -10,6 +10,7 @@
 //! lossless tree, attaching trivia between nodes.
 
 mod build;
+mod control;
 mod decl;
 mod expr;
 mod fragment;

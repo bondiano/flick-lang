@@ -69,3 +69,11 @@ fn an_option_match_with_a_default_is_with_default() {
     );
     assert_eq!(fixed(&used, "FLICK-T051"), None);
 }
+
+#[test]
+fn option_default_does_not_move_a_mutable_read_before_the_scrutinee() {
+    let text = format!(
+        "{HEAD}f : Unit -> Int\nlet f () =\n  let mut fallback = 0\n  match (loop {{ fallback = 1; break None }}) with\n  | Some value -> value\n  | None -> fallback\n"
+    );
+    assert_eq!(fixed(&text, "FLICK-T051"), None);
+}

@@ -6,7 +6,9 @@
 //! A node without a λFlick form becomes `Term::Stuck` naming it, so a
 //! program that never reaches it still runs.
 
+mod callbacks;
 mod collection;
+mod control_handlers;
 mod derive;
 mod expr;
 pub mod lean;
@@ -65,6 +67,7 @@ struct Tr {
     /// innermost last.
     versions: Vec<(String, Name)>,
     cells: Vec<(String, Name)>,
+    resumptions: Vec<(String, String)>,
     control: Option<String>,
     error_action: Option<Name>,
 }
@@ -76,6 +79,7 @@ impl Tr {
             fresh: 0,
             versions: Vec::new(),
             cells: Vec::new(),
+            resumptions: Vec::new(),
             control: None,
             error_action: None,
         }

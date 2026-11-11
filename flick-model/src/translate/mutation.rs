@@ -188,9 +188,11 @@ impl Tr {
                 let (yes, b) = (tr.pack(Term::bool(true), xs), tr.joined(b, xs));
                 cond(a, yes, b)
             }),
-            ExprKind::Match(s, arms) => {
-                self.with_value(s, |tr, value| tr.match_state(value, arms, xs))
-            }
+            ExprKind::Match(s, arms) => self.with_value(s, |tr, value| {
+                let name = tr.fresh("scrutinee");
+                let body = tr.match_state(Term::Var(name.clone()), arms, xs);
+                Term::Let(name, None, Rc::new(value), Rc::new(body))
+            }),
             ExprKind::Handle(h) if h.is_try() => self.try_state(&h.body, &h.errors, xs),
             ExprKind::Handle(h) => self.joined_handler(h, xs),
             ExprKind::App { func, arg, .. } if layer_run(func).is_some() => self

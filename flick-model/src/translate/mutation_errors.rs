@@ -6,9 +6,7 @@ mod loops;
 use super::{
     Tr,
     expr::{cond, is_global, layer_run, pat},
-    loops::{
-        effectful, list_step, none, option, result, rpat, some, state_function, state_pattern,
-    },
+    loops::{list_step, none, option, result, rpat, some, state_function, state_pattern},
 };
 use crate::syntax::{Arm, Name, Pat, Term};
 use crate::types::{Scheme, Stage as ModelStage, Type};
@@ -41,7 +39,7 @@ impl Tr {
         );
         self.catch_failure(body, xs, can_raise)
     }
-    fn catch_failure(&mut self, body: Term, xs: &[String], can_raise: bool) -> Term {
+    pub(super) fn catch_failure(&mut self, body: Term, xs: &[String], can_raise: bool) -> Term {
         if !can_raise {
             return body;
         }
@@ -59,6 +57,13 @@ impl Tr {
         out: &[String],
         k: impl FnOnce(&mut Self, Term) -> Term,
     ) -> Term {
+        if matches!(
+            e.kind,
+            ExprKind::Local(_) | ExprKind::Lambda { .. } | ExprKind::Lit(_)
+        ) {
+            let value = self.expr(e);
+            return k(self, value);
+        }
         let tracked = self.active_variables();
         let value = self.protected(e, &tracked);
         self.unpack_protected(value, &tracked, out, k)
@@ -79,13 +84,7 @@ impl Tr {
         let good = k(self, Term::Var(v.clone()));
         let bad = self.captured(false, Term::Var(error.clone()), out);
         self.versions.truncate(mark);
-        let pattern = |first| {
-            Pat::Tuple(
-                iter::once(first)
-                    .chain(names.iter().cloned().map(Pat::Var))
-                    .collect(),
-            )
-        };
+        let pattern = |first| state_pattern(first, &names);
         let good_pat = if self.control.is_some() {
             rpat(true, rpat(true, Pat::Var(v)))
         } else {
@@ -214,7 +213,14 @@ impl Tr {
                 self.protected_provide(layer_run(func).expect("layer"), arg, xs)
             }
             ExprKind::Loop { condition, body } => self.protected_loop(condition, body, xs),
-            ExprKind::Lambda { .. } | ExprKind::Task(_) | ExprKind::Generate { .. } => {
+            ExprKind::Lambda { .. }
+            | ExprKind::Abstract(..)
+            | ExprKind::Task(_)
+            | ExprKind::Generate { .. } => {
+                let value = self.expr(e);
+                self.catch_atomic(value, xs, false)
+            }
+            ExprKind::Dicts(inner, _) if matches!(inner.kind, ExprKind::Perform { .. }) => {
                 let value = self.expr(e);
                 self.catch_atomic(value, xs, false)
             }
@@ -301,13 +307,7 @@ impl Tr {
             self.pack(good_value, out)
         };
         let bad = self.handler_state(Term::Var(error.clone()), arms, out, protected_result);
-        let pattern = |first| {
-            Pat::Tuple(
-                iter::once(first)
-                    .chain(names.iter().cloned().map(Pat::Var))
-                    .collect(),
-            )
-        };
+        let pattern = |first| state_pattern(first, &names);
         let good_pat = if control.is_some() {
             rpat(true, rpat(true, Pat::Var(v)))
         } else {

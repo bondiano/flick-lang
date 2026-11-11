@@ -1,0 +1,19 @@
+==================
+Contextual loop heads and ordinary names
+==================
+
+let saved = loop
+let other = while
+loop { break }
+while ready do { continue }
+let f while = (while true, do { pure () })
+
+---
+
+(source_file
+  (keyword) (identifier) (operator) (identifier)
+  (keyword) (identifier) (operator) (identifier)
+  (keyword) (braces (keyword))
+  (keyword) (identifier) (keyword) (braces (keyword))
+  (keyword) (identifier) (identifier) (operator)
+  (parens (identifier) (boolean) (operator) (keyword) (braces (identifier) (parens))))

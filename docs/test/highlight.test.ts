@@ -170,3 +170,21 @@ test("`let mut` declares a variable, not a function", async () => {
     highlighter.dispose();
   }
 });
+
+test("loop and while keep ordinary-name highlighting outside loop syntax", async () => {
+  const highlighter = await createHighlighterCore({ engine: createJavaScriptRegexEngine(), themes: [], langs: [{ ...grammar, name: "flick" }] });
+  try {
+    const language = highlighter.getLanguage("flick");
+    for (const [line, word, keyword] of [
+      ["let saved = loop", "loop", false],
+      ["let saved = while", "while", false],
+      ["let f while = (while true, do { pure () })", "while", false],
+      ["loop { break }", "loop", true],
+      ["while ready do { continue }", "while", true],
+    ] as const) {
+      const at = line.lastIndexOf(word);
+      const scopes = language.tokenizeLine(line, null).tokens.find(t => t.startIndex <= at && at < t.endIndex)?.scopes ?? [];
+      assert.equal(scopes.includes("keyword.control.flick"), keyword, line);
+    }
+  } finally { highlighter.dispose(); }
+});

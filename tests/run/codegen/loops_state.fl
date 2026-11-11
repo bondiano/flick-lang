@@ -5,6 +5,25 @@ type error Missing = Missing
 effect Ask =
   ask : Unit ->{} Int
 
+effect Log =
+  log : forall a. Show a => a ->{} Unit
+
+deferred_log : Unit -> (Int ->{Log; none} Unit)
+let deferred_log () = loop { break Log.log }
+
+render_twice : (forall a. Show a => a -> String) -> (String, String)
+let render_twice render = (render 1, render true)
+
+rendered : Unit -> (String, String)
+let rendered () = loop { break (render_twice show) }
+
+return_pattern : Unit ->{} Int
+let return_pattern () =
+  loop {
+    try break 13 with
+    | return (a, b) -> ignore (a, b)
+  }
+
 type Box = Box Int
 class Pick a =
   pick : a -> Int
@@ -54,6 +73,36 @@ let find n =
 
 main : Unit ->{} Unit
 let main () =
+  Platform.stdout_line (show (return_pattern ()))
+  Platform.stdout_line (show (rendered ()))
+  let mut record = { value = 1 }
+  let snapshot = (
+    record.value,
+    (
+      if true then
+        record = { value = 2 }
+        0
+      else
+        0
+    ),
+  )
+  Platform.stdout_line (show snapshot)
+  record = { value = 1 }
+  let selected =
+    match record.value with
+    | 1 when (
+      if true then
+        record = { value = 2 }
+        false
+      else
+        false
+    ) ->
+      0
+    | 1 -> 1
+    | _ -> 2
+  Platform.stdout_line (show selected)
+  let collected = loop { break [for x <- [1, 2] yield x] }
+  Platform.stdout_line (show collected)
   Platform.stdout_line (show (count 0, count 4, find 3))
   let mut outer = 0
   while outer < 2 do {

@@ -398,6 +398,8 @@ Tail-only operation handlers carry the tuple through their protected body and
 return callback. Runtime handlers that catch typed errors or can abandon/resume
 the body use private core `Ref` cells, then return the cells' values with the
 result. This keeps the current state available when a continuation is discarded.
+Control and abort handlers carry lexical completion through the protected body,
+return callback and resumption, so a resumed exit bypasses the remaining body.
 The source handler already requires a runtime stage; pure blocks keep the SSA
 translation. These are existing typed core operations, with no new typing rules
 or proof axioms.

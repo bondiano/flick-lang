@@ -4,7 +4,7 @@ use super::{Arm, ModelStage, Name, Pat, Rc, Scheme, Term, Tr, Type, cond, ir, pa
 impl Tr {
     /// Select an error pattern under `try`, then run its guard/body outside
     /// that catch. A false guard calls the next arm with its updated store.
-    pub(super) fn handler_state(
+    pub(in crate::translate) fn handler_state(
         &mut self,
         action: Term,
         arms: &[ir::Arm],
@@ -86,7 +86,7 @@ fn consume_error(action: Term) -> Term {
     Term::Match(Rc::new(Term::Await(Rc::new(action))), Rc::from([]))
 }
 impl Tr {
-    pub(super) fn cast_error_action(&self, action: Term) -> Term {
+    pub(in crate::translate) fn cast_error_action(&self, action: Term) -> Term {
         match &self.error_action {
             Some(cast) => Term::app(Term::Var(cast.clone()), action),
             None => action,
@@ -99,7 +99,7 @@ impl Tr {
     /// A monomorphic identity shares an open Eff error row across captures.
     /// The unused task constrains only the shape (Eff _ _ Never). No witness
     /// is awaited; each real action contains only a previously caught raise.
-    pub(super) fn error_actions(&mut self, cast: Name, body: Term) -> Term {
+    pub(in crate::translate) fn error_actions(&mut self, cast: Name, body: Term) -> Term {
         self.task_actions(cast, body, true)
     }
     fn task_actions(&mut self, cast: Name, body: Term, throws: bool) -> Term {

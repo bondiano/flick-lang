@@ -28,6 +28,8 @@ pub enum Binding {
     Other,
     /// `let name = value`: `mut` would make it a variable.
     Let,
+    /// A `let` clause of `for`, whose syntax does not allow `mut`.
+    Clause,
     /// `let mut name = value`.
     Mut,
 }
@@ -147,6 +149,7 @@ impl Checker<'_> {
         if self.cx.locals[index].binding != Binding::Mut {
             return true;
         }
+        self.typing.mutable_reads.insert((span.start, span.end));
         let Some(&(_, what)) =
             (self.cx.mutation.apart.iter().rev()).find(|(below, _)| index < *below)
         else {
@@ -181,6 +184,11 @@ impl Checker<'_> {
         };
         self.diagnostics.push(diagnostic);
         false
+    }
+
+    pub(super) fn contains_mutable(&self, node: &Node) -> bool {
+        self.typing.mutable_reads.contains(&node.range())
+            || node.nodes().any(|n| self.contains_mutable(n))
     }
 
     /// `let mut name = value`: one type, fixed here, which a signature or
@@ -320,6 +328,16 @@ impl Checker<'_> {
                     )
                 })
             }
+            Some(Local {
+                binding: Binding::Clause,
+                ..
+            }) => Diagnostic::error(
+                codes::T069,
+                format!(
+                    "`{name}` is a `for` clause binding and cannot be assigned; move a `let mut` binding into the loop body"
+                ),
+                span,
+            ),
             Some(_) => Diagnostic::error(
                 codes::T069,
                 format!(

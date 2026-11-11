@@ -13,3 +13,4 @@ formal/FormalCert/GenSig.lean linguist-generated=true
 formal/FormalCert/Gen/Golden.lean linguist-generated=true
 # tools/rt-exports.mjs generates the native export manifest
 runtime/rt_exports.txt linguist-generated=true
+editors/tree-sitter-flick/src/grammar.json linguist-generated=true

@@ -210,7 +210,8 @@
     "keywords": {
       "patterns": [
         { "name": "constant.language.boolean.flick", "match": "(?<![.\\w])(?:true|false)\\b" },
-        { "name": "keyword.control.flick", "match": "(?<![.\\w])(?:match|with|try|if|then|else|when|await|in|for|yield|do|loop|while|break|continue)\\b" },
+        { "name": "keyword.control.flick", "match": "(?<![.\\w])(?:loop\\b(?=\\s*\\{)|while\\b(?=[^,;\\r\\n]*\\bdo\\b))" },
+        { "name": "keyword.control.flick", "match": "(?<![.\\w])(?:match|with|try|if|then|else|when|await|in|for|yield|do|break|continue)\\b" },
         { "name": "keyword.operator.word.flick", "match": "(?<![.\\w])not\\b" },
         { "name": "keyword.other.flick", "match": "(?<![.\\w])private(?=\\s+module\\b)" },
         { "name": "keyword.other.flick", "match": "(?<![.\\w])and(?=\\s+type\\b)" },

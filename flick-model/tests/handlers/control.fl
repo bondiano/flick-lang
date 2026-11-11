@@ -1,6 +1,12 @@
 module App.Main exposing (main)
 
 // the model's services and effects have no parameters
+type error Missing = Missing
+type error Other = Other
+
+effect Select =
+  control select : Unit ->{} Int
+
 effect Emit =
   control emit : Int ->{} Unit
 
@@ -51,6 +57,89 @@ let mutable_control () =
       7
   (value, result)
 
+control_exit : Unit ->{} (Int, Int)
+let control_exit () =
+  let mut seen = 0
+  let chosen =
+    loop {
+      try
+        seen = 1
+        let n = Select.select ()
+        seen = n
+        break n
+      with
+      | Select.select () -> resume 7
+      | return _ ->
+        seen = 99
+        ()
+    }
+  (seen, chosen)
+
+control_normal : Unit ->{} Int
+let control_normal () =
+  loop {
+    let n =
+      try Select.select () + 1 with
+      | Select.select () ->
+        let answer = resume 7
+        answer + 1
+      | return value -> value * 2
+    break n
+  }
+
+control_error_exit : Unit ->{} Int
+let control_error_exit () =
+  loop {
+    try
+      let _chosen = Select.select ()
+      from_result (Err Missing)
+    with
+    | Select.select () -> resume 7
+    | Missing when (if true then break 11 else false) -> ()
+    | Missing -> break 12
+  }
+
+control_unhandled : Unit ->{} Int
+let control_unhandled () =
+  try
+    loop {
+      try
+        let _chosen = Select.select ()
+        from_result (Err Other)
+      with
+      | Select.select () -> resume 7
+      | Missing -> break 8
+    }
+  with
+  | Other -> 9
+
+control_continue : Unit ->{} (Int, Int)
+let control_continue () =
+  let mut attempts = 0
+  let value =
+    loop {
+      attempts = attempts + 1
+      try
+        let n = Select.select ()
+        if attempts < 2 then continue
+        break n
+      with
+      | Select.select () -> resume 7
+    }
+  (attempts, value)
+
+control_local_loops : Unit ->{} (Int, Int)
+let control_local_loops () =
+  let mut value = 0
+  let result =
+    try
+      while value < 2 do value = value + 1
+      for n <- [1, 2] do value = value + n
+      if Choose.choose () then value else 0
+    with
+    | Choose.choose () -> resume true
+  (value, result)
+
 main : Unit ->{} Unit
 let main () =
   say (show (collect three))
@@ -71,6 +160,12 @@ let main () =
       | Choose.choose () -> resume true
     )
   say (show chosen)
+  say (show (control_exit ()))
+  say (show (control_normal ()))
+  say (show (control_error_exit ()))
+  say (show (control_unhandled ()))
+  say (show (control_continue ()))
+  say (show (control_local_loops ()))
   say (show (mutable_control ()))
   let twice =
     try (if Choose.choose () then 1 else 2) with

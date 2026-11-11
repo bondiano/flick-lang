@@ -30,7 +30,7 @@ impl Lower<'_> {
         let mark = self.scope.len();
         let control = looping.then(|| self.start_loop());
         let mut body = self.clauses(&clauses, element, looping, span);
-        if let Some((id, _)) = control {
+        if let Some(id) = control {
             self.loops.pop();
             body = Expr::new(
                 ExprKind::ControlLoop {

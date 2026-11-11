@@ -40,6 +40,8 @@ pub struct Typing {
     pub declarations: Arc<Interface>,
     /// Every name in an expression or a constructor pattern.
     pub names: HashMap<Range, Ref>,
+    /// Accesses to local mutable cells, for order- and capture-sensitive fixes.
+    pub mutable_reads: HashSet<Range>,
     /// The public runtime values captured by each `pack M as Sig`.
     pub packs: HashMap<Range, Vec<(String, String, String)>>,
     /// The binder of each name of the user's code that is a local, where an

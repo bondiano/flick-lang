@@ -30,7 +30,11 @@ pub(super) fn unused_locals(unused: Vec<Unused>) -> impl Iterator<Item = Diagnos
                 ("remove `mut`", vec![edit])
             });
         }
-        warning(codes::R013, format!("`{}` is never used", u.name), u.span).with_fix(|| {
+        let diagnostic = warning(codes::R013, format!("`{}` is never used", u.name), u.span);
+        if u.written {
+            return diagnostic;
+        }
+        diagnostic.with_fix(|| {
             let start = Span::new(u.span.file, u.span.start, u.span.start);
             let (message, edit) = if u.punned {
                 (

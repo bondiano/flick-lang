@@ -11,7 +11,7 @@ use std::mem;
 use super::Checker;
 use super::do_notation::bind_key;
 use super::effects::{Site, Stage};
-use super::mutation::Apart;
+use super::mutation::{Apart, Binding};
 use super::ty::{Row, Type};
 use crate::diagnostics::codes;
 use crate::source::Span;
@@ -184,7 +184,13 @@ impl Checker<'_> {
                     self.check(condition, &Type::lang(Lang::Bool));
                 }
             }
-            K::LetDecl => self.local_let(clause, None, &[]),
+            K::LetDecl => {
+                let mark = self.cx.locals.len();
+                self.local_let(clause, None, &[]);
+                for local in &mut self.cx.locals[mark..] {
+                    local.binding = Binding::Clause;
+                }
+            }
             _ => self.error(
                 codes::T019,
                 self.span(clause),

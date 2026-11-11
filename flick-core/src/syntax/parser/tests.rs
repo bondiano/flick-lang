@@ -509,3 +509,17 @@ fn a_handler_has_an_arm_for_the_value_of_its_body() {
         Vec::<String>::new()
     );
 }
+
+#[test]
+fn a_contextual_while_stops_at_the_current_expression() {
+    for text in [
+        "let f while = (while true, do { pure () })\n",
+        "let f while = (while (do { pure true }), ())\n",
+        "let f while = if while true then do { pure () } else None\n",
+    ] {
+        let tree = sexp(text);
+        assert!(!tree.contains("WhileExpr"), "{tree}");
+    }
+    assert!(sexp("let f () = while (do { pure true }) do ()\n").contains("WhileExpr"));
+    assert!(sexp("let f () = while if true then false else true do ()\n").contains("WhileExpr"));
+}

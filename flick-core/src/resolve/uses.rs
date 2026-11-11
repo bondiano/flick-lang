@@ -30,6 +30,7 @@ pub(super) struct Unused {
     /// keyword.
     pub needless_mut: Option<Span>,
     pub mut_fix: bool,
+    pub written: bool,
 }
 
 pub(super) fn references(module: &Module) -> (Vec<Reference>, Vec<Unused>) {
@@ -355,6 +356,7 @@ impl Walker<'_> {
                     punned,
                     needless_mut: None,
                     mut_fix: false,
+                    written: local.mutable.is_some_and(|(_, assigned)| assigned),
                 });
             }
             if let Some((kw, false)) = local.mutable {
@@ -367,6 +369,7 @@ impl Walker<'_> {
                     punned: false,
                     needless_mut: Some(Span::new(self.file, kw.start, end)),
                     mut_fix: local.mut_fix,
+                    written: false,
                 });
             }
         }

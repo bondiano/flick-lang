@@ -282,8 +282,58 @@ let long_protected_match n =
     | Missing -> 0
   (seen, value)
 
+abort_loop : Unit ->{} Int
+let abort_loop () =
+  loop {
+    let n =
+      try
+        let value = Stop.stop ()
+        break value
+      with
+      | Stop.stop () -> 8
+    break n
+  }
+
+scrutinee : Unit ->{} Int
+let scrutinee () =
+  Platform.stdout_line "scrutinee"
+  1
+
+scrutinee_once : Unit ->{} Int
+let scrutinee_once () =
+  let mut value = 0
+  match scrutinee () with
+  | 0 -> value = 10
+  | 1 -> value = 20
+  | _ -> value = 30
+  value
+
+callback_exit : Unit ->{} Int
+let callback_exit () =
+  let layer = Layer.succeed Ask { ask = fun () -> 5 }
+  loop { ignore (Layer.run layer (if true then break 7 else fun () -> Ask.ask ())) }
+
+scope_callback_exit : Unit ->{} Int
+let scope_callback_exit () =
+  loop { ignore (Scope.run (if true then break 8 else fun _ -> "scope")) }
+
+make_layer : Unit ->{} Layer {} {} {Ask}
+let make_layer () =
+  Platform.stdout_line "layer"
+  Layer.succeed Ask { ask = fun () -> 5 }
+
+make_callback : Unit ->{} (Unit ->{Ask; none} Int)
+let make_callback () =
+  Platform.stdout_line "callback"
+  fun () -> Ask.ask ()
+
 main : Unit ->{} Unit
 let main () =
+  Platform.stdout_line (show (scrutinee_once ()))
+  Platform.stdout_line (show (callback_exit ()))
+  Platform.stdout_line (show (scope_callback_exit ()))
+  Platform.stdout_line (show (Layer.run (make_layer ()) (make_callback ())))
+  Platform.stdout_line (show (abort_loop ()))
   let mut handled = 0
   try handled = Ask.ask () with
   | Ask.ask () -> 20

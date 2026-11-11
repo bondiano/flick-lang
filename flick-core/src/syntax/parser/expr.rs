@@ -1,5 +1,6 @@
 //! Expressions and block statements.
 
+use super::control::{control_expr, while_ahead};
 use super::{Done, K, Parser, decl, pattern, plugin, types};
 use crate::diagnostics::codes;
 
@@ -139,7 +140,7 @@ fn prefix(p: &mut Parser) -> Option<Done> {
         K::Ident if p.at_word("pack") && keyword_ahead(p, K::AsKw) => Some(pack_expr(p)),
         K::Ident if p.at_word("unpack") && keyword_ahead(p, K::AsKw) => Some(unpack_expr(p)),
         K::Ident if p.at_word("loop") && p.nth(1) == K::LBrace => Some(control_expr(p)),
-        K::Ident if p.at_word("while") && keyword_ahead(p, K::DoKw) => Some(control_expr(p)),
+        K::Ident if p.at_word("while") && while_ahead(p) => Some(control_expr(p)),
         K::BreakKw | K::ContinueKw => Some(control_expr(p)),
         K::FunKw => Some(fun_expr(p)),
         K::MatchKw => Some(match_expr(p)),
@@ -191,7 +192,7 @@ fn unpack_expr(p: &mut Parser) -> Done {
 }
 
 /// Whether the next token can start the operand of a prefix operator.
-fn at_operand_start(p: &Parser) -> bool {
+pub(super) fn at_operand_start(p: &Parser) -> bool {
     at_arg_start(p)
         || matches!(
             p.current(),
@@ -434,7 +435,7 @@ fn interpolation(p: &mut Parser) -> K {
     K::InterpExpr
 }
 
-fn head_without_braces(p: &mut Parser, head: fn(&mut Parser)) {
+pub(super) fn head_without_braces(p: &mut Parser, head: fn(&mut Parser)) {
     let saved = p.no_brace;
     p.no_brace = true;
     head(p);
@@ -702,43 +703,4 @@ fn if_expr(p: &mut Parser) -> Done {
         }
     }
     p.complete(m, K::IfExpr)
-}
-
-fn control_expr(p: &mut Parser) -> Done {
-    let m = p.start();
-    let keyword = if p.at_word("loop") {
-        K::LoopKw
-    } else if p.at_word("while") {
-        K::WhileKw
-    } else {
-        p.current()
-    };
-    p.bump_as(keyword);
-    let kind = match keyword {
-        K::LoopKw => {
-            p.braces(K::Block, stmt, |_| false);
-            K::LoopExpr
-        }
-        K::WhileKw => {
-            head_without_braces(p, |p| {
-                expr(p);
-            });
-            if p.expect(K::DoKw) {
-                if p.at(K::LBrace) {
-                    p.braces(K::Block, stmt, |_| false);
-                } else {
-                    p.body(K::Block, stmt);
-                }
-            }
-            K::WhileExpr
-        }
-        K::BreakKw => {
-            if at_operand_start(p) {
-                expr(p);
-            }
-            K::BreakExpr
-        }
-        _ => K::ContinueExpr,
-    };
-    p.complete(m, kind)
 }

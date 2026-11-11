@@ -123,7 +123,7 @@ struct Lower<'a> {
     /// The unique names of the `let mut` variables of the current
     /// definition: a read of one is `ExprKind::Var`.
     vars: HashSet<String>,
-    loops: Vec<(String, String)>,
+    loops: Vec<String>,
     /// Ranges whose lift or dictionaries are applied already: a block and
     /// its only expression share one.
     consumed: HashSet<(Range, bool)>,

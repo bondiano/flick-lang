@@ -1,6 +1,7 @@
 //! Backend-only completion flags. The shared IR retains typed lexical exits.
 use crate::ir::{Arm, BinOp, Expr, ExprKind, Handler, Lit, Param, Pat, Stage, Stmt};
 use crate::source::Span;
+use std::mem;
 fn unit(span: Span) -> Expr {
     Expr::new(ExprKind::Lit(Lit::Unit), span)
 }
@@ -171,8 +172,20 @@ impl Control {
         h.body = self.guarded_parts(h.body.clone(), flag);
         self.guarded_arms(&mut h.errors, flag, span);
         if let Some(ret) = &mut h.ret {
-            if let ExprKind::Lambda { body, .. } = &mut ret.kind {
-                **body = Self::guard(self.guarded_parts((**body).clone(), flag), flag);
+            if let ExprKind::Lambda { params, body } = &mut ret.kind {
+                let mut guarded = self.guarded_parts((**body).clone(), flag);
+                for param in params.iter_mut().rev() {
+                    let name = self.hidden("return");
+                    let pattern = mem::replace(&mut param.pat, Pat::Bind(name.clone()));
+                    guarded = Expr::new(
+                        ExprKind::Block(
+                            vec![Stmt::Let(pattern, Expr::new(ExprKind::Local(name), span))],
+                            Box::new(guarded),
+                        ),
+                        span,
+                    );
+                }
+                **body = Self::guard(guarded, flag);
             } else {
                 let name = self.hidden("return");
                 let call = Expr::new(
@@ -215,11 +228,13 @@ impl Control {
                 }
                 self.guarded_block(stmts, tail, flag, span)
             }
-            ExprKind::Lambda { body, .. } | ExprKind::Task(body) => {
+            ExprKind::Within(_, body) | ExprKind::Lambda { body, .. } | ExprKind::Task(body) => {
                 **body = self.guarded_parts((**body).clone(), flag);
                 e
             }
-            ExprKind::App { func, arg, .. } if matches!(&func.kind, ExprKind::Global { module, name } if module == "Scope" && name == "run") =>
+            ExprKind::App { func, arg, .. }
+                if matches!(&func.kind, ExprKind::Global { module, name } if module == "Scope" && name == "run")
+                    && matches!(arg.kind, ExprKind::Lambda { .. }) =>
             {
                 **arg = self.guarded_parts((**arg).clone(), flag);
                 Self::guard(e, flag)

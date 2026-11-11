@@ -245,3 +245,4 @@ effect/host_services
 codegen/loops_state
 codegen/loops_for_source
 codegen/loops_guards
+codegen/loops_owners

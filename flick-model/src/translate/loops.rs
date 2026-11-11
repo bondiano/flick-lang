@@ -3,6 +3,7 @@
 use super::{
     Tr,
     expr::{cond, is_global, layer_run, pat},
+    mutation::modified,
 };
 use crate::syntax::{Arm, Con, Name, Pat, Path, Term};
 use flick_core::ir::{self, ExprKind, Stmt};
@@ -109,9 +110,29 @@ impl Tr {
         out: &[String],
         k: &dyn Fn(&mut Self, Term) -> Term,
     ) -> Term {
+        if modified(e).is_empty() && !self.loop_completion(e, id) {
+            let value = self.expr(e);
+            return k(self, value);
+        }
         let tracked = self.active_variables();
         let value = self.loop_value(e, id, &tracked);
         self.unpack_loop(value, &tracked, out, k)
+    }
+    fn loop_completion(&self, e: &ir::Expr, id: &str) -> bool {
+        if matches!(&e.kind, ExprKind::LoopExit { id: target, .. } if target == id)
+            || matches!(&e.kind, ExprKind::App { func, .. } if matches!(&func.kind, ExprKind::Local(n) if self.resumptions.iter().any(|(r, target)| r == n && target == id)))
+        {
+            return true;
+        }
+        if matches!(
+            e.kind,
+            ExprKind::ControlLoop { .. } | ExprKind::Generate { .. }
+        ) {
+            return false;
+        }
+        let mut found = false;
+        e.each_child(&mut |c| found |= self.loop_completion(c, id));
+        found
     }
     pub(super) fn unpack_loop(
         &mut self,
@@ -185,6 +206,12 @@ impl Tr {
     }
     pub(super) fn loop_value(&mut self, e: &ir::Expr, id: &str, xs: &[String]) -> Term {
         match &e.kind {
+            ExprKind::App { func, arg, .. } if matches!(&func.kind, ExprKind::Local(n) if self.resumptions.iter().any(|(r, target)| r == n && target == id)) => {
+                self.loop_with(arg, id, xs, &|tr, v| {
+                    let resume = Term::app(tr.expr(func), v);
+                    tr.pack(resume, xs)
+                })
+            }
             ExprKind::LoopExit { id: target, value } if target == id => match value {
                 Some(value) => self.loop_with(value, id, xs, &|tr, v| {
                     tr.loop_pack(false, option(Some(v)), xs)
@@ -234,8 +261,15 @@ impl Tr {
                     tr.provide_value(layer, arg, &|tr, body| tr.loop_value(body, id, xs))
                 })
             }
-            ExprKind::Lambda { .. } | ExprKind::Task(_) | ExprKind::ControlLoop { .. } => {
+            ExprKind::Lambda { .. }
+            | ExprKind::Abstract(..)
+            | ExprKind::Task(_)
+            | ExprKind::ControlLoop { .. }
+            | ExprKind::Generate { .. } => {
                 // A nested source loop consumes only its own exits.
+                self.with_value(e, |tr, v| tr.loop_pack(true, v, xs))
+            }
+            ExprKind::Dicts(inner, _) if matches!(inner.kind, ExprKind::Perform { .. }) => {
                 self.with_value(e, |tr, v| tr.loop_pack(true, v, xs))
             }
             _ => {
@@ -277,7 +311,8 @@ impl Tr {
         body: &ir::Expr,
         xs: &[String],
     ) -> Term {
-        let effectful = effectful(body) || condition.is_some_and(effectful);
+        let effectful = self.iteration_effectful(body)
+            || condition.is_some_and(|c| self.iteration_effectful(c));
         let call = |t| {
             if effectful {
                 Term::Await(Rc::new(t))
@@ -383,7 +418,7 @@ impl Tr {
         let list = self.fresh("list");
         let head = self.fresh("head");
         let tail = self.fresh("tail");
-        let task = effectful(body);
+        let task = self.iteration_effectful(body);
         let call = |t| if task { Term::Await(Rc::new(t)) } else { t };
         let initial = self.pack(source, xs);
         let names: Vec<_> = xs.iter().map(|x| self.fresh(x)).collect();

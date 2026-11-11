@@ -6,9 +6,9 @@ use std::mem;
 use std::rc::Rc;
 
 use flick_core::ir::{self, BinOp, ExprKind, Stmt};
-use flick_core::source::Span;
 use flick_core::types::Constructor;
 
+pub(super) use super::callbacks::layer_run;
 use super::{Tr, dict, given, lams};
 use crate::handler::{Handled, Handler, Op};
 use crate::syntax::{Arm, Con, Const, Lit, Name, Pat, Path, Prim, Term};
@@ -63,11 +63,13 @@ impl Tr {
     fn delayed_expr(&mut self, body: &ir::Expr) -> Term {
         let versions = mem::take(&mut self.versions);
         let cells = mem::take(&mut self.cells);
+        let resumptions = mem::take(&mut self.resumptions);
         let control = self.control.take();
         let error_action = self.error_action.take();
         let body = self.expr(body);
         self.versions = versions;
         self.cells = cells;
+        self.resumptions = resumptions;
         self.control = control;
         self.error_action = error_action;
         body
@@ -390,105 +392,6 @@ fn binary(op: BinOp, a: Term, b: Term) -> Term {
     Term::apps(Term::prim(prim), [a, b])
 }
 
-impl Tr {
-    /// `Scope.run arg`, which is `scope s { body }`: the core's form of it.
-    fn scope(&mut self, arg: &ir::Expr) -> Term {
-        self.scope_with(arg, &|tr, body| tr.expr(body))
-    }
-
-    /// [`Self::scope`] with the body as `body` translates it.
-    pub(super) fn scope_with(&mut self, arg: &ir::Expr, body: Body) -> Term {
-        let translate = body;
-        if let ExprKind::Lambda { params, body } = &arg.kind
-            && let [ir::Param { pat, .. }] = &params[..]
-        {
-            match pat {
-                ir::Pat::Bind(s) => {
-                    return Term::Scope(Name::from(s.as_str()), Rc::new(translate(self, body)));
-                }
-                ir::Pat::Wild => {
-                    let s = self.fresh("s");
-                    return Term::Scope(s, Rc::new(translate(self, body)));
-                }
-                _ => {}
-            }
-        }
-        self.with_value(arg, |tr, callback| {
-            let name = tr.fresh("callback");
-            let s = tr.fresh("s");
-            let call = runtime_call(
-                &name,
-                ir::Expr::new(ExprKind::Local(s.to_string()), arg.span),
-                arg.span,
-            );
-            let body = Term::Scope(s, Rc::new(translate(tr, &call)));
-            Term::Let(name, None, Rc::new(callback), Rc::new(body))
-        })
-    }
-
-    /// `Layer.run layer arg`, which is `provide layer { body }`: the core's
-    /// form of it.
-    fn provide(&mut self, func: &ir::Expr, arg: &ir::Expr) -> Term {
-        self.provide_with(func, arg, &|tr, body| tr.expr(body))
-    }
-
-    /// [`Self::provide`] with the body as `body` translates it.
-    pub(super) fn provide_with(&mut self, func: &ir::Expr, arg: &ir::Expr, body: Body) -> Term {
-        let layer = self.expr(layer_run(func).expect("a call of `Layer.run`"));
-        self.provide_value(layer, arg, body)
-    }
-
-    pub(super) fn provide_value(&mut self, layer: Term, arg: &ir::Expr, body: Body) -> Term {
-        let translate = body;
-        let body = match &arg.kind {
-            ExprKind::Lambda { params, body } if params.len() == 1 => {
-                let body = translate(self, body);
-                Term::app(self.param(&params[0].pat, body), Term::unit())
-            }
-            _ => {
-                return self.with_value(arg, |tr, callback| {
-                    let name = tr.fresh("callback");
-                    let call = runtime_call(
-                        &name,
-                        ir::Expr::new(ExprKind::Lit(ir::Lit::Unit), arg.span),
-                        arg.span,
-                    );
-                    let body = Term::Provide(Rc::new(layer), Rc::new(translate(tr, &call)));
-                    Term::Let(name, None, Rc::new(callback), Rc::new(body))
-                });
-            }
-        };
-        Term::Provide(Rc::new(layer), Rc::new(body))
-    }
-}
-
-/// How the body of a `scope` or a `provide` is translated.
-pub(super) type Body<'b> = &'b dyn Fn(&mut Tr, &ir::Expr) -> Term;
-
 pub(super) fn is_global(func: &ir::Expr, m: &str, n: &str) -> bool {
     matches!(&func.kind, ExprKind::Global { module, name } if module == m && name == n)
-}
-
-/// The layer of `Layer.run layer`.
-pub(super) fn layer_run(func: &ir::Expr) -> Option<&ir::Expr> {
-    let ExprKind::App { func, arg, .. } = &func.kind else {
-        return None;
-    };
-    match &func.kind {
-        ExprKind::Global { module, name } if module == "Layer" && name == "run" => Some(arg),
-        _ => None,
-    }
-}
-
-/// An already evaluated callback, called under the state/completion protocol.
-fn runtime_call(name: &Name, arg: ir::Expr, span: Span) -> ir::Expr {
-    ir::Expr::new(
-        ExprKind::App {
-            func: Box::new(ir::Expr::new(ExprKind::Local(name.to_string()), span)),
-            arg: Box::new(arg),
-            stage: ir::Stage::Runtime,
-            arg_first: false,
-        },
-        span,
-    )
 }

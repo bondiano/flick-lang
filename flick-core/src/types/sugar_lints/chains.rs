@@ -29,6 +29,11 @@ impl Checker<'_> {
             body = rest;
         }
         if steps.len() < 2
+            || self.contains_mutable(body)
+            || steps
+                .iter()
+                .skip(1)
+                .any(|s| self.contains_mutable(s.source))
             || steps
                 .iter()
                 .any(|step| self.source_of(unparen(step.source)).trim().contains('\n'))

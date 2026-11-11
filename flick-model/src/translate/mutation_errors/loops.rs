@@ -1,6 +1,6 @@
 //! Loop completion and typed failure with the current store.
 use super::{
-    Arm, Pat, Rc, Term, Tr, cond, effectful, ir, list_step, none, option, pat, result, rpat, some,
+    Arm, Pat, Rc, Term, Tr, cond, ir, list_step, none, option, pat, result, rpat, some,
     state_function, state_pattern,
 };
 
@@ -14,7 +14,8 @@ impl Tr {
     ) -> Term {
         let tracked = self.active_variables();
         let outer = self.control.replace(id.into());
-        let task = effectful(body) || condition.is_some_and(effectful);
+        let task = self.iteration_effectful(body)
+            || condition.is_some_and(|c| self.iteration_effectful(c));
         let call = |t| if task { Term::Await(Rc::new(t)) } else { t };
         let name = self.fresh("loop");
         let arg = self.fresh("state");
@@ -136,7 +137,7 @@ impl Tr {
         let list = self.fresh("list");
         let head = self.fresh("head");
         let tail = self.fresh("tail");
-        let task = effectful(body);
+        let task = self.iteration_effectful(body);
         let call = |t| if task { Term::Await(Rc::new(t)) } else { t };
         let initial = self.pack(source, xs);
         let names: Vec<_> = xs.iter().map(|x| self.fresh(x)).collect();

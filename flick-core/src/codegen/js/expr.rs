@@ -24,6 +24,9 @@ pub fn atomic(js: &str) -> bool {
 }
 
 impl Gen<'_> {
+    fn stable(&self, js: &str) -> bool {
+        atomic(js) && !self.vars.contains(js.split('.').next().unwrap_or(js))
+    }
     /// Compiles expressions that are evaluated in order: an operand whose
     /// code needs statements makes the operands before it constants first.
     pub(super) fn ordered(&mut self, exprs: &[&Expr]) -> Vec<String> {
@@ -34,7 +37,7 @@ impl Gen<'_> {
             if self.buf.len() > mark {
                 let mut spills = Vec::new();
                 for prev in &mut out {
-                    if !atomic(prev) || self.vars.contains(prev.as_str()) {
+                    if !self.stable(prev) {
                         let t = self.temp();
                         spills.push(self.constant(&t, prev));
                         *prev = t;
@@ -49,7 +52,7 @@ impl Gen<'_> {
 
     /// `js` as a constant unless it is atomic.
     pub(super) fn spill(&mut self, js: String) -> String {
-        if atomic(&js) && !self.vars.contains(&js) {
+        if self.stable(&js) {
             return js;
         }
         let t = self.temp();

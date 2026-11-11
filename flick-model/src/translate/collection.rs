@@ -2,11 +2,7 @@
 //! Each iteration keeps its local SSA bindings; outer assignments are rejected.
 use std::rc::Rc;
 
-use super::{
-    Tr,
-    expr::pat,
-    loops::{effectful, list_step},
-};
+use super::{Tr, expr::pat, loops::list_step};
 use crate::syntax::{Arm, Pat, Prim, Term};
 use flick_core::ir::{self, ExprKind};
 
@@ -46,7 +42,7 @@ impl Tr {
         let list = self.fresh("list");
         let head = self.fresh("head");
         let tail = self.fresh("tail");
-        let task = effectful(body);
+        let task = self.iteration_effectful(body);
         let call = |term| {
             if task {
                 Term::Await(Rc::new(term))
