@@ -1,0 +1,22 @@
+---
+title: Numbers
+description: Int and Float, and why one never turns into the other by itself.
+tableOfContents: false
+---
+
+import TourLesson from "../../../components/TourLesson.astro";
+
+<TourLesson locale="en" id="numbers">
+
+`Int` is a whole number and `Float` a fractional one. An operator takes two
+numbers of the same type, and Flick never converts one into the other behind
+your back: `Int.to_float` does it when you ask.
+
+On `Int`, `/` drops the remainder and `%` gives it. An `Int` has 32 bits and
+wraps around: one more than the largest gives the smallest, as the last line
+shows.
+
+**Try:** call `add 1 2.5`. The compiler reports `FLICK-T003`: it expected an
+`Int` and found a `Float`.
+
+</TourLesson>

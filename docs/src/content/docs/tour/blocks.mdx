@@ -1,0 +1,24 @@
+---
+title: Names and blocks
+description: "`let` names a value, and a block's last line is its value."
+tableOfContents: false
+---
+
+import TourLesson from "../../../components/TourLesson.astro";
+
+<TourLesson locale="en" id="blocks">
+
+`let` gives a value a name. The name keeps that value: it cannot be assigned
+again.
+
+A block is a few lines indented under a `let`. Its last line is its value,
+and the names made in it stay inside it: `height` exists only while `area` is
+being computed.
+
+Every other line of a block has to be `Unit`, like a call that prints.
+
+**Try:** put `height` on a line of its own above `width * height`. The
+compiler reports `FLICK-T011`: that value would be thrown away, and only
+`Unit` may be.
+
+</TourLesson>

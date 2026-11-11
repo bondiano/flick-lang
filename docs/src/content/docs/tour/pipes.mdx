@@ -1,0 +1,23 @@
+---
+title: Partial calls and pipes
+description: A function given fewer arguments, a function without a name, and `|>`.
+tableOfContents: false
+---
+
+import TourLesson from "../../../components/TourLesson.astro";
+
+<TourLesson locale="en" id="pipes">
+
+Give a function fewer arguments than it takes, and you get a function of the
+rest: `add 10` waits for one more `Int`.
+
+`fun n -> n * 3` is a function without a name. It is handy as the argument of
+another function, like `List.map`.
+
+`x |> f` means `f x`. A chain of `|>` reads from top to bottom: take the list,
+triple each number, keep those above 5, add them up.
+
+**Try:** change `n > 5` to `n > 10`, or add a line `|> List.map (fun n -> n + 1)`
+before `List.sum`.
+
+</TourLesson>

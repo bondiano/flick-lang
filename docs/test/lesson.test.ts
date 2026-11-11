@@ -6,17 +6,18 @@ import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 import { loadExercise } from "../exercises/load.ts";
 import { evaluateExercise, type ExerciseOperations } from "../src/playground/exercise.ts";
+import { errorCodes } from "./helpers/verify-example.ts";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repo = path.join(here, "../..");
 const flick = process.env.FLICK_BIN ?? path.join(repo, "target/debug/flick");
 const exerciseIds = readdirSync(path.join(repo, "docs/exercises"), { recursive: true, encoding: "utf8" }).map((name) => name.replaceAll("\\", "/")).filter((name) => name.endsWith("/check.toml")).map((name) => name.slice(0, -"/check.toml".length)).sort();
-const nativeOperations = (dir: string): ExerciseOperations => ({
+const nativeOperations = (dir: string, starterError = "FLICK-T003"): ExerciseOperations => ({
   check: async () => {
     const checked = spawnSync(flick, ["check", "Main.fl", "--diagnostics", "json"], { cwd: dir, encoding: "utf8" });
     if (checked.error) throw checked.error;
     if (checked.status !== 0) {
-      assert.match(checked.stderr, /FLICK-T003/);
+      assert.deepEqual(errorCodes(checked.stderr), [starterError], checked.stderr);
       return [{ severity: "error" }];
     }
     return [];
@@ -40,7 +41,7 @@ for (const id of exerciseIds) {
       rmSync(dir, { recursive: true, force: true });
       mkdirSync(dir, { recursive: true });
       writeFileSync(path.join(dir, "Main.fl"), readFileSync(path.join(repo, "docs/exercises", id, `${name}.fl`)));
-      const result = await evaluateExercise(exercise.check, nativeOperations(dir));
+      const result = await evaluateExercise(exercise.check, nativeOperations(dir, exercise.starter_error));
       assert.equal(result, name === "starter" ? "fix-errors" : name === "broken" ? "output" : "passed");
     }
   });

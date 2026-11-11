@@ -652,6 +652,8 @@ fn fl_sources_are_formatted() {
         "tools",
         "docs/src/playground",
         "docs/src/widgets",
+        "docs/tour",
+        "docs/exercises",
         "packages",
         "flick/src/commands/templates",
     ];

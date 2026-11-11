@@ -1,0 +1,15 @@
+module Main exposing (main, fizzbuzz)
+
+fizzbuzz : Int -> String
+let fizzbuzz n =
+  if n % 3 == 0 then
+    "Fizz"
+  else if n % 5 == 0 then
+    "Buzz"
+  else if n % 15 == 0 then
+    "FizzBuzz"
+  else
+    show n
+
+main : Unit ->{} Unit
+let main () = Platform.stdout_line (String.join " " (List.map fizzbuzz (List.range 1 16)))

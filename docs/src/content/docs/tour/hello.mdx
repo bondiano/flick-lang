@@ -1,0 +1,21 @@
+---
+title: Hello
+description: The smallest program, and the first error worth reading.
+tableOfContents: false
+---
+
+import TourLesson from "../../../components/TourLesson.astro";
+
+<TourLesson locale="en" id="hello">
+
+Every program has a `main`. Its signature, `Unit ->{} Unit`, says that it
+takes `()`, the one value of the type `Unit`, and gives back `()`.
+
+`Platform.stdout_line` prints a line. A string is written in double quotes,
+and a comment runs from `//` to the end of its line.
+
+**Try:** print `42` in place of the string. The compiler reports
+`FLICK-T003`: `stdout_line` takes a `String`, and `42` is an `Int`. Then
+write `show 42`, which turns a value into its text.
+
+</TourLesson>
