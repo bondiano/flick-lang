@@ -83,12 +83,24 @@ def genGlob : Nat → Option Scheme
   | 19 => some ⟨1, Facts.none, (.arrow (.base .int) .pure (.arrow (.tapp (.adt "Prelude.List") (.tvar 0)) .pure (.tapp (.adt "Prelude.Option") (.tvar 0)) Caps.none) Caps.none)⟩
   | _ => none
 
+def genOps : Name → List Name
+  | "Fixture.Counter" => ["next"]
+  | "Fixture.Log" => ["log"]
+  | _ => []
+
+def genOp : Name → Name → Option (OpClass × Ty × Ty)
+  | "Fixture.Counter", "next" => some (.tail, (.base .unit), (.base .int))
+  | "Fixture.Log", "log" => some (.tail, (.base .string), (.base .unit))
+  | _, _ => none
+
 structure GenSig (S : Sig) : Prop where
   ctor : ∀ K, (genCtor K).isSome → S.ctor K = genCtor K
   res : ∀ K, (genCtor K).isSome → S.res K = genRes K
   glob : ∀ g, (genGlob g).isSome → S.glob g = genGlob g
   /-- A type of the generator has no constructors but its own. -/
   closed : ∀ K k ts T, S.ctor K = some (k, ts, T) → genAdtCtors T ≠ [] → genCtor K = some (k, ts, T)
+  /-- A service of the generator has its operations and no other. -/
+  op : ∀ E o, genOps E ≠ [] → S.op E o = genOp E o
 
 theorem genAdtCtors_complete : ∀ K k ts T, genCtor K = some (k, ts, T) →
     (K, ts.length) ∈ genAdtCtors T := by
@@ -125,26 +137,47 @@ theorem genGlob_closed : ∀ g s, genGlob g = some s → s.Closed s.k := by
   unfold genGlob at h
   split at h <;> cases h <;> closed_tac
 
+theorem genOp_closed : ∀ E o c a b σ, genOp E o = some (c, a, b) →
+    a.substT σ = a ∧ b.substT σ = b := by
+  intro E o c a b σ h
+  unfold genOp at h
+  split at h <;> cases h <;> simp [Ty.substT]
+
+theorem genOp_mem : ∀ E o x, genOp E o = some x → o ∈ genOps E := by
+  intro E o x h
+  unfold genOp at h
+  split at h <;> cases h <;> simp [genOps]
+
+/-- The arm of a service's one operation is all a handler of it needs. -/
+theorem GenSig.complete {S : Sig} (hS : GenSig S) {E o : Name} (h : genOps E = [o]) :
+    S.Complete E (recArm o) := by
+  intro o' c a b hop
+  rw [hS.op E o' (by simp [h])] at hop
+  have hm := genOp_mem E o' _ hop
+  rw [h, List.mem_singleton] at hm
+  subst hm
+  simp [Tm.armOf, Pat.spine, Pat.headName]
+
 def genSig : Sig where
   ctor := genCtor
-  impl _ := .rnil
+  impl _ := .errors Row.none
   ctor_closed := genCtor_closed
   ctor_reach := genCtor_reach
   res := genRes
   res_closed := genRes_closed
-  impl_closed _ _ := rfl
+  impl_closed _ _ := by simp [Ty.substT, Row.none_substT]
   dict _ := none
   glob := genGlob
   dict_closed _ _ _ h := by cases h
   glob_closed := genGlob_closed
-  op _ _ := none
-  op_closed _ _ _ _ _ _ h := by cases h
-  op_impl _ _ _ _ _ h := by cases h
-  op_field _ _ _ _ h := by cases h
+  op := genOp
+  op_closed := genOp_closed
+  op_impl _ _ _ _ _ _ _ := rfl
+  op_field _ _ _ _ _ h := (h rfl).elim
 
 /-- The assumption of a certificate holds of a signature. -/
 theorem GenSig.inhabited : ∃ S, GenSig S :=
-  ⟨genSig, fun _ _ => rfl, fun _ _ => rfl, fun _ _ => rfl, fun _ _ _ _ h _ => h⟩
+  ⟨genSig, fun _ _ => rfl, fun _ _ => rfl, fun _ _ => rfl, fun _ _ _ _ h _ => h, fun _ _ _ => rfl⟩
 
 end Flick.Cert
 

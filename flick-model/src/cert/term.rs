@@ -14,6 +14,7 @@ use crate::types::{Caps, Fields, Row, Scheme, Stage, Type, Var};
 use super::Unsupported;
 use super::list::list_tm;
 use super::pat::{arms_tm, match_tm};
+use super::provide::{operation, provide_tm};
 use super::raise::is_raise;
 use super::sig::{Key, Sig, bare, kept, prim_key};
 use crate::check::substitute;
@@ -73,6 +74,11 @@ pub(super) fn tm(e: &Term, ctx: &[Name], sig: &Sig) -> Result<String, Unsupporte
             }
             out
         }
+        Term::Field(..) if operation(e).is_some() => {
+            let (svc, o) = operation(e).ok_or("no operation")?;
+            format!("(.const (.perform {svc:?} {:?} .tail))", o.to_string())
+        }
+        Term::Provide(l, b) => provide_tm(l, b, ctx, sig)?,
         Term::Field(r, l) => format!("(.proj {} \"{l}\")", tm(r, ctx)?),
         Term::Update(r, l, v) => format!("(.update {} \"{l}\" {})", tm(r, ctx)?, tm(v, ctx)?),
         Term::Match(s, arms) => match_tm(s, arms, ctx, sig)?,
@@ -279,12 +285,10 @@ impl<'t> Cx<'t> {
             }
             Term::Await(x) => {
                 let at = self.inferred(x)?;
-                let args = self.eff_args(&at)?;
-                let x = self.typing(x, &at, col + 2)?;
-                Ok(format!(
-                    "(.await {args}{pad}{x}{pad}(by stage_le) (by le_live))"
-                ))
+                self.await_(x, &at, col)
             }
+            Term::Provide(l, b) => self.provide(l, b, t, col),
+            Term::Field(..) if operation(e).is_some() => Err("an operation not called".into()),
             Term::Record(fs) => self.record(fs, t, col),
             Term::List(xs) => self.list(xs, t, col),
             Term::Field(r, l) => {
@@ -310,6 +314,21 @@ impl<'t> Cx<'t> {
             Term::Match(s, arms) => self.match_(s, arms, t, col),
             other => Err(form(other)),
         }
+    }
+
+    /// (Await) of `x` at the computation `at`.
+    pub(super) fn await_(
+        &mut self,
+        x: &Term,
+        at: &Type,
+        col: usize,
+    ) -> Result<String, Unsupported> {
+        let pad = format!("\n{}", " ".repeat(col + 2));
+        let args = self.eff_args(at)?;
+        let x = self.typing(x, at, col + 2)?;
+        Ok(format!(
+            "(.await {args}{pad}{x}{pad}(by stage_le) (by le_live))"
+        ))
     }
 
     pub(super) fn inferred(&self, e: &Term) -> Result<Type, Unsupported> {
@@ -407,6 +426,7 @@ impl<'t> Cx<'t> {
                 let k = format!("{}.{}", c.ty.module, c.name);
                 Ok((self.ctor(&k, &us)?, at))
             }
+            h @ Term::Field(..) if operation(h).is_some() => self.operation(h),
             Term::Tuple(xs) => {
                 let [x, y] = &xs[..] else {
                     return Err("a tuple of more than two".into());

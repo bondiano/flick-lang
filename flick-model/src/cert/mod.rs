@@ -11,6 +11,7 @@
 mod bind;
 mod list;
 mod pat;
+mod provide;
 mod raise;
 pub mod sig;
 mod term;

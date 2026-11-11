@@ -443,6 +443,105 @@ theorem program41 (S : Sig) (hS : GenSig S) :
       (.ex (.tapp (.adt "Prelude.Option") (.rcons "a" (.base .unit) (.rcons "b" (.adt "Fixture.Shape") .rnil))) .pure) :=
   (Typ.ctor_plain S (K := "Prelude.None") (us := [(.rcons "a" (.base .unit) (.rcons "b" (.adt "Fixture.Shape") .rnil))]) ((hS.ctor _ rfl).trans rfl) ((hS.res _ rfl).trans rfl) rfl LeLive.refl)
 
+-- program : Unit ->{; Oops} (Option String, Shape)
+-- let program u =
+--   ({ ({ a = (); b = () }) with a = () }).a
+--   let as1 : (Option String, Shape) =
+--     (await (provide (Layer.succeed Log {
+--       log = (fun line ->
+--         let as3 : Unit =
+--           let as4 : Unit =
+--             ()
+--           as4
+--         as3) }) {
+--       (try
+--           (match (shape_of (js_of "a")) with
+--             | _ ->
+--               (task {
+--                 (None, (shape_of (js_of "a"))) }))
+--         with
+--         | Oops x2 ->
+--           (task {
+--             (None, (shape_of (js_of "a"))) })) }))
+--   as1
+theorem program42 (S : Sig) (hS : GenSig S) :
+    Typ S [] Facts.none [] (.lam (.let_ (.proj (.update (.rcons "a" (.lit .unit) (.rcons "b" (.lit .unit) .rnil)) "a" (.lit .unit)) "a") (.let_ (.await (.let_ (.rcons "log" (.lam (.let_ (.let_ (.lit .unit) (.var 0)) (.var 0))) .rnil) (.hdl "Fixture.Log" (recArm "log") (.lam (.var 0)) (.try_ (.match_ (.app (.glob 15) (.app (.glob 9) (.lit (.str "a")))) (.acons .wild (.task (.app (.app (.ctor "Tuple") (.ctor "Prelude.None")) (.app (.glob 15) (.app (.glob 9) (.lit (.str "a")))))) .anil)) (.acons (.app (.ctor "Fixture.Oops") .var) (.task (.app (.app (.ctor "Tuple") (.ctor "Prelude.None")) (.app (.glob 15) (.app (.glob 9) (.lit (.str "a")))))) .anil))))) (.var 0))))
+      (.ex (.arrow (.base .unit) (.rt Row.none (fun x => x = .nm "Fixture.Oops")) (.tapp (.tapp (.adt "Tuple") (.tapp (.adt "Prelude.Option") (.base .string))) (.adt "Fixture.Shape")) Caps.none) .pure) :=
+  (.lam (a := (.base .unit)) (ψ := (.rt Row.none (fun x => x = .nm "Fixture.Oops"))) (t := (.tapp (.tapp (.adt "Tuple") (.tapp (.adt "Prelude.Option") (.base .string))) (.adt "Fixture.Shape"))) (C := Caps.none)
+    (.let_ (a := (.base .unit))
+      (.proj (R := (.rcons "a" (.base .unit) (.rcons "b" (.base .unit) .rnil))) (t := (.base .unit))
+        (.update (R := (.rcons "a" (.base .unit) (.rcons "b" (.base .unit) .rnil))) (t := (.base .unit))
+          (.rcons (R := (.rcons "b" (.base .unit) .rnil)) trivial (by decide)
+            .lit
+            (.rcons (R := .rnil) trivial (by decide)
+            .lit
+            .rnil))
+          rfl
+          .lit)
+        rfl (by le_live))
+      (.let_ (a := (.tapp (.tapp (.adt "Tuple") (.tapp (.adt "Prelude.Option") (.base .string))) (.adt "Fixture.Shape")))
+        (.await (r := Row.none) (ε := Row.none) (t := (.tapp (.tapp (.adt "Tuple") (.tapp (.adt "Prelude.Option") (.base .string))) (.adt "Fixture.Shape"))) (C := Caps.none)
+          (Cert.typ_provide (E := "Fixture.Log") (o := "log") (R := (.rcons "log" (.arrow (.base .string) (.rt Row.none Row.none) (.base .unit) Caps.none) .rnil)) (t := (.eff Row.none Row.none (.tapp (.tapp (.adt "Tuple") (.tapp (.adt "Prelude.Option") (.base .string))) (.adt "Fixture.Shape")) Caps.none)) (r := Row.none) (ε := Row.none) (φ₀ := .pure)
+            ((hS.op _ _ (by decide)).trans rfl) (hS.complete rfl) rfl
+            (.rcons (R := .rnil) trivial (by decide)
+              (.lam (a := (.base .string)) (ψ := (.rt Row.none Row.none)) (t := (.base .unit)) (C := Caps.none)
+                (.let_ (a := (.base .unit))
+                  (.let_ (a := (.base .unit))
+                    .lit
+                    (Cert.typ_var (ts := []) (T' := (.base .unit)) rfl rfl (Cert.holds_none _) (by inst_eq) (by le_live)))
+                  (Cert.typ_var (ts := []) (T' := (.base .unit)) rfl rfl (Cert.holds_none _) (by inst_eq) (by le_live)))
+                (by simp [Tm.NoIns, Tm.Has]) (by le_live))
+              .rnil)
+            (.tryP (H := (fun x => x = .nm "Fixture.Oops" ∨ Row.none x))
+              (.match_
+                (.app (a := (.adt "Prelude.JsValue")) (ψ := .pure) (t := (.adt "Fixture.Shape")) (C := Caps.none)
+                  (Cert.typ_glob (ts := []) (T' := (.arrow (.adt "Prelude.JsValue") .pure (.adt "Fixture.Shape") Caps.none)) ((hS.glob 15 rfl).trans rfl) rfl (Cert.holds_none _) (by inst_eq) (by le_live))
+                  (.app (a := (.base .string)) (ψ := .pure) (t := (.adt "Prelude.JsValue")) (C := Caps.none)
+                    (Cert.typ_glob (ts := []) (T' := (.arrow (.base .string) .pure (.adt "Prelude.JsValue") Caps.none)) ((hS.glob 9 rfl).trans rfl) rfl (Cert.holds_none _) (by inst_eq) (by le_live))
+                    .lit
+                    (by stage_le) (by le_live))
+                  (by stage_le) (by le_live))
+                (.acons .wild
+                (.task (r := Row.none) (ε := Row.none) (t := (.tapp (.tapp (.adt "Tuple") (.tapp (.adt "Prelude.Option") (.base .string))) (.adt "Fixture.Shape"))) (C := Caps.none)
+                  (.app (a := (.adt "Fixture.Shape")) (ψ := .pure) (t := (.tapp (.tapp (.adt "Tuple") (.tapp (.adt "Prelude.Option") (.base .string))) (.adt "Fixture.Shape"))) (C := Caps.none)
+                    (.app (a := (.tapp (.adt "Prelude.Option") (.base .string))) (ψ := .pure) (t := (.arrow (.adt "Fixture.Shape") .pure (.tapp (.tapp (.adt "Tuple") (.tapp (.adt "Prelude.Option") (.base .string))) (.adt "Fixture.Shape")) Caps.none)) (C := Caps.none)
+                    (Typ.ctor_plain S (K := "Tuple") (us := [(.tapp (.adt "Prelude.Option") (.base .string)), (.adt "Fixture.Shape")]) ((hS.ctor _ rfl).trans rfl) ((hS.res _ rfl).trans rfl) rfl LeLive.refl)
+                    (Typ.ctor_plain S (K := "Prelude.None") (us := [(.base .string)]) ((hS.ctor _ rfl).trans rfl) ((hS.res _ rfl).trans rfl) rfl LeLive.refl)
+                    (by stage_le) (by le_live))
+                    (.app (a := (.adt "Prelude.JsValue")) (ψ := .pure) (t := (.adt "Fixture.Shape")) (C := Caps.none)
+                      (Cert.typ_glob (ts := []) (T' := (.arrow (.adt "Prelude.JsValue") .pure (.adt "Fixture.Shape") Caps.none)) ((hS.glob 15 rfl).trans rfl) rfl (Cert.holds_none _) (by inst_eq) (by le_live))
+                      (.app (a := (.base .string)) (ψ := .pure) (t := (.adt "Prelude.JsValue")) (C := Caps.none)
+                        (Cert.typ_glob (ts := []) (T' := (.arrow (.base .string) .pure (.adt "Prelude.JsValue") Caps.none)) ((hS.glob 9 rfl).trans rfl) rfl (Cert.holds_none _) (by inst_eq) (by le_live))
+                        .lit
+                        (by stage_le) (by le_live))
+                      (by stage_le) (by le_live))
+                    (by stage_le) (by le_live))
+                  (Stage.le_refl _) (by simp [Tm.NoIns, Tm.Has]) (by le_live))
+                .anil)
+                (.inl (exh_wild (by decide))))
+              (.hcons (H' := Row.none) (.ctor (.app (PatTy.head_plain S (K := "Fixture.Oops") (ts := [(.base .int)]) (T := "Fixture.Oops") (us := []) ((hS.ctor _ rfl).trans rfl) ((hS.res _ rfl).trans rfl) rfl) .var))
+              (.task (r := Row.none) (ε := Row.none) (t := (.tapp (.tapp (.adt "Tuple") (.tapp (.adt "Prelude.Option") (.base .string))) (.adt "Fixture.Shape"))) (C := Caps.none)
+                (.app (a := (.adt "Fixture.Shape")) (ψ := .pure) (t := (.tapp (.tapp (.adt "Tuple") (.tapp (.adt "Prelude.Option") (.base .string))) (.adt "Fixture.Shape"))) (C := Caps.none)
+                  (.app (a := (.tapp (.adt "Prelude.Option") (.base .string))) (ψ := .pure) (t := (.arrow (.adt "Fixture.Shape") .pure (.tapp (.tapp (.adt "Tuple") (.tapp (.adt "Prelude.Option") (.base .string))) (.adt "Fixture.Shape")) Caps.none)) (C := Caps.none)
+                  (Typ.ctor_plain S (K := "Tuple") (us := [(.tapp (.adt "Prelude.Option") (.base .string)), (.adt "Fixture.Shape")]) ((hS.ctor _ rfl).trans rfl) ((hS.res _ rfl).trans rfl) rfl LeLive.refl)
+                  (Typ.ctor_plain S (K := "Prelude.None") (us := [(.base .string)]) ((hS.ctor _ rfl).trans rfl) ((hS.res _ rfl).trans rfl) rfl LeLive.refl)
+                  (by stage_le) (by le_live))
+                  (.app (a := (.adt "Prelude.JsValue")) (ψ := .pure) (t := (.adt "Fixture.Shape")) (C := Caps.none)
+                    (Cert.typ_glob (ts := []) (T' := (.arrow (.adt "Prelude.JsValue") .pure (.adt "Fixture.Shape") Caps.none)) ((hS.glob 15 rfl).trans rfl) rfl (Cert.holds_none _) (by inst_eq) (by le_live))
+                    (.app (a := (.base .string)) (ψ := .pure) (t := (.adt "Prelude.JsValue")) (C := Caps.none)
+                      (Cert.typ_glob (ts := []) (T' := (.arrow (.base .string) .pure (.adt "Prelude.JsValue") Caps.none)) ((hS.glob 9 rfl).trans rfl) rfl (Cert.holds_none _) (by inst_eq) (by le_live))
+                      .lit
+                      (by stage_le) (by le_live))
+                    (by stage_le) (by le_live))
+                  (by stage_le) (by le_live))
+                (Stage.le_refl _) (by simp [Tm.NoIns, Tm.Has]) (by le_live))
+              (.hnil (fun _ h => h))
+              (catches_ctor (exh_gen hS (T := "Fixture.Oops") (us := []) (by decide) (by decide)))))
+            (by stage_le) (by ob_out) (by stage_le) (by le_live))
+          (by stage_le) (by le_live))
+        (Cert.typ_var (ts := []) (T' := (.tapp (.tapp (.adt "Tuple") (.tapp (.adt "Prelude.Option") (.base .string))) (.adt "Fixture.Shape"))) rfl rfl (Cert.holds_none _) (by inst_eq) (by le_live))))
+    (by simp [Tm.NoIns, Tm.Has]) (by le_live))
+
 -- program : Option (Option Bool)
 -- let program =
 --   let as1 : Option (Option Bool) =
@@ -738,22 +837,5 @@ theorem program55 (S : Sig) (hS : GenSig S) :
       .lit
       (by stage_le) (by le_live))
     (by stage_le) (by le_live))
-
--- program : Eff none {Oops} (Eff {Counter, Log} {Oops} (Eff {Counter} {Bad} Int))
--- let program =
---   (task {
---     (task {
---       (task {
---         0 }) }) })
-theorem program59 (S : Sig) (_ : GenSig S) :
-    Typ S [] Facts.none [] (.task (.task (.task (.lit (.int 0)))))
-      (.ex (.eff Row.none (fun x => x = .nm "Fixture.Oops") (.eff (fun x => x = .nm "Fixture.Counter" ∨ x = .nm "Fixture.Log") (fun x => x = .nm "Fixture.Oops") (.eff (fun x => x = .nm "Fixture.Counter") (fun x => x = .nm "Fixture.Bad") (.base .int) Caps.none) Caps.none) Caps.none) .pure) :=
-  (.task (r := Row.none) (ε := (fun x => x = .nm "Fixture.Oops")) (t := (.eff (fun x => x = .nm "Fixture.Counter" ∨ x = .nm "Fixture.Log") (fun x => x = .nm "Fixture.Oops") (.eff (fun x => x = .nm "Fixture.Counter") (fun x => x = .nm "Fixture.Bad") (.base .int) Caps.none) Caps.none)) (C := Caps.none)
-    (.task (r := (fun x => x = .nm "Fixture.Counter" ∨ x = .nm "Fixture.Log")) (ε := (fun x => x = .nm "Fixture.Oops")) (t := (.eff (fun x => x = .nm "Fixture.Counter") (fun x => x = .nm "Fixture.Bad") (.base .int) Caps.none)) (C := Caps.none)
-      (.task (r := (fun x => x = .nm "Fixture.Counter")) (ε := (fun x => x = .nm "Fixture.Bad")) (t := (.base .int)) (C := Caps.none)
-        .lit
-        (Stage.le_refl _) (by simp [Tm.NoIns, Tm.Has]) (by le_live))
-      (Stage.le_refl _) (by simp [Tm.NoIns, Tm.Has]) (by le_live))
-    (Stage.le_refl _) (by simp [Tm.NoIns, Tm.Has]) (by le_live))
 
 end Flick.Cert.Golden

@@ -77,4 +77,9 @@ macro_rules
     | (refine LeLive.arrow ?_ ?_ ?_ ?_ <;> first | le_live | stage_le | caps_set)
     | (refine LeLive.eff ?_ ?_ ?_ <;> first | le_live | stage_le | caps_set))
 
+/-- `φ₀.ObOut o` of a concrete stage with no obligation about `o`. -/
+macro "ob_out" : tactic => `(tactic| (
+  refine ⟨fun N a h => ?_, fun v a h => ?_⟩ <;>
+    simp_all [Stage.svc, Row.Named, Row.single, Row.none, Row.union]))
+
 end Flick.Cert
