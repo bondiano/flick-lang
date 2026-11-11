@@ -63,6 +63,9 @@ impl Loader<'_> {
                 );
                 if let Some(callee) = &virtual_of.capture.callee {
                     dependencies.push(callee.signature_owner().to_owned());
+                    if let CalleeOrigin::Parameter { argument, .. } = callee {
+                        dependencies.push(argument.module.clone());
+                    }
                 }
                 for dependency in dependencies {
                     if let Some(target) = self.find_module(i, &dependency, virtual_of.at) {
@@ -122,7 +125,10 @@ impl Loader<'_> {
                         targets,
                     );
                 }
-                if let Some(CalleeOrigin::Member(view)) = &context.capture.callee {
+                if let Some(
+                    CalleeOrigin::Member(view) | CalleeOrigin::Parameter { argument: view, .. },
+                ) = &context.capture.callee
+                {
                     self.namespace_parents(i, &view.module, Some(&view.access_modules), targets);
                 }
             }

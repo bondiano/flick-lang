@@ -4,3 +4,5 @@ type module Factory = Input -> Output with type Key = String and type Value = In
 //                                                           ^ keyword
 result = functor (first) (second)
 //       ^ variable
+private module Hidden = Prelude
+// <- keyword

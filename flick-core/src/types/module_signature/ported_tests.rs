@@ -51,3 +51,28 @@ fn ported_review_inferred_kind_witnesses_reconstruct_kind_declarations() {
     );
     assert!(signature.accepts(&witness));
 }
+#[test]
+fn inferred_kind_members_shadow_outer_type_names() {
+    let (_, child) = check_text("Child", "module Child exposing (Mode(..), Box, box)\nkind Mode = Fast | Slow\ntype Box (mode : Mode) = Box\nbox : Box Fast\nlet box = Box\n").expect("finite-kind child checks");
+    let mut parent = structure(&[]).interface("Outer");
+    let (_, outer) = check_text(
+        "Outer",
+        "module Outer exposing (Fast)\ntype alias Fast = Int\n",
+    )
+    .expect("outer type checks");
+    parent.exports = outer.exports;
+    parent.modules.insert("Child".into(), child);
+    let signature = ModuleSignature::from_interface(&parent);
+    let witness = signature.interface("Witness");
+    let child = witness.modules.get("Child").expect("child witness");
+    assert_eq!(
+        child
+            .find(Namespace::Value, "box")
+            .and_then(|e| e.scheme.clone()),
+        Some(Type::app(
+            Type::con("Witness.Child", "Box"),
+            Type::con("Witness.Child", "Fast")
+        ))
+    );
+    assert!(signature.accepts(&witness));
+}

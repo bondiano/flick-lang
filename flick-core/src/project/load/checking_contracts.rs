@@ -1,4 +1,37 @@
 impl Checking<'_> {
+    fn virtual_contract_inputs(
+        &self,
+        loaded: &Loaded,
+        comparable: &[Option<Arc<Interface>>],
+        lookup: &dyn Fn(&str) -> Option<Interface>,
+        contracts: &dyn Fn(&str) -> Option<Interface>,
+    ) -> Vec<Option<Arc<Interface>>> {
+        let mut inputs = Vec::new();
+        if let Some(context) = &loaded.virtual_of {
+            let origins = context
+                .capture
+                .bindings
+                .iter()
+                .map(|b| b.origin.module.as_str());
+            let callee = context.capture.callee.as_ref();
+            for owner in origins.chain(callee.map(CalleeOrigin::signature_owner)) {
+                inputs.push(match self.by_name.get(owner) {
+                    Some(&j) => comparable[j].clone(),
+                    None => self.from_packages.get(owner).map(comparable_copy),
+                });
+            }
+            if let Some(CalleeOrigin::Parameter { argument, .. }) = callee {
+                // Include the caller's view through all ancestor ascriptions.
+                inputs.push(
+                    Self::argument_interface(argument, lookup, contracts)
+                        .as_ref()
+                        .map(comparable_copy),
+                );
+            }
+        }
+        inputs
+    }
+
     fn argument_interface(
         argument: &StaticArgument,
         lookup: &dyn Fn(&str) -> Option<Interface>,

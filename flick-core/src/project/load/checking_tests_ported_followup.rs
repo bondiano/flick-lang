@@ -234,3 +234,165 @@ fn caller_parameter_names_do_not_shadow_factory_imports() {
         }
     }
 }
+#[cfg(feature = "ide")]
+#[test]
+fn parameter_callees_wait_for_delayed_namespace_contracts() {
+    for (namespace, member) in [
+        ("App.Space", "answer"),
+        ("App.Space", "secret"),
+        ("App.Parent.Child", "answer"),
+        ("App.Parent.Child", "secret"),
+    ] {
+        let root = format!(
+            "module App.Root exposing (answer)\nmodule Built = App.Apply({namespace})\nanswer : Int\nlet answer = Built.{member}\n"
+        );
+        let (_, analysis) = hom_boundary_analysis(
+            &[
+                (
+                    "Contracts",
+                    "module App.Contracts exposing (..)\ntype module Input =\n  seed : Int\ntype module Output =\n  answer : Int\ntype module Rich =\n  answer : Int\n  secret : Int\ntype module Namespace =\n  module Make : (K : Input) -> Output\n",
+                ),
+                (
+                    "Argument",
+                    "module App.Argument exposing (seed)\nseed : Int\nlet seed = 41\n",
+                ),
+                (
+                    "Make",
+                    "module App.Make(K : App.Contracts.Input) : App.Contracts.Rich\nanswer : Int\nlet answer = K.seed + 1\nsecret : Int\nlet secret = 99\n",
+                ),
+                (
+                    "Delay0",
+                    "module App.Delay0 exposing (value)\nvalue : Int\nlet value = 1\n",
+                ),
+                (
+                    "Delay1",
+                    "module App.Delay1 exposing (value)\nimport App.Delay0 as D\nvalue : Int\nlet value = D.value\n",
+                ),
+                (
+                    "Delay2",
+                    "module App.Delay2 exposing (value)\nimport App.Delay1 as D\nvalue : Int\nlet value = D.value\n",
+                ),
+                (
+                    "Delay3",
+                    "module App.Delay3 exposing (value)\nimport App.Delay2 as D\nvalue : Int\nlet value = D.value\n",
+                ),
+                (
+                    "Delay4",
+                    "module App.Delay4 exposing (value)\nimport App.Delay3 as D\nvalue : Int\nlet value = D.value\n",
+                ),
+                (
+                    "Delay5",
+                    "module App.Delay5 exposing (value)\nimport App.Delay4 as D\nvalue : Int\nlet value = D.value\n",
+                ),
+                (
+                    "Delay6",
+                    "module App.Delay6 exposing (value)\nimport App.Delay5 as D\nvalue : Int\nlet value = D.value\n",
+                ),
+                (
+                    "Delay7",
+                    "module App.Delay7 exposing (value)\nimport App.Delay6 as D\nvalue : Int\nlet value = D.value\n",
+                ),
+                (
+                    "Delay8",
+                    "module App.Delay8 exposing (value)\nimport App.Delay7 as D\nvalue : Int\nlet value = D.value\n",
+                ),
+                (
+                    "Delay9",
+                    "module App.Delay9 exposing (value)\nimport App.Delay8 as D\nvalue : Int\nlet value = D.value\n",
+                ),
+                (
+                    "Space",
+                    "module App.Space exposing (Make, marker)\nmodule Make = App.Make\nimport App.Delay9 as D\nmarker : Int\nlet marker = D.value\n",
+                ),
+                (
+                    "Parent",
+                    "module App.Parent exposing (Child)\nmodule Child = App.Space\n",
+                ),
+                (
+                    "Apply",
+                    "private module App.Apply(N : App.Contracts.Namespace) = N.Make(App.Argument)\n",
+                ),
+                ("Root", &root),
+            ],
+            "Root",
+        );
+        if member == "answer" {
+            assert!(
+                analysis.diagnostics.is_empty(),
+                "{:?}",
+                analysis.diagnostics
+            );
+        } else {
+            assert!(
+                analysis
+                    .diagnostics
+                    .iter()
+                    .any(|d| d.code == codes::R004 && d.message.contains("secret")),
+                "{:?}",
+                analysis.diagnostics
+            );
+        }
+    }
+}
+#[cfg(feature = "ide")]
+#[test]
+fn changing_a_parameter_callee_witness_invalidates_its_cached_result() {
+    let files = [
+        (
+            "Contracts",
+            "module App.Contracts exposing (..)\ntype module Input =\n  seed : Int\ntype module Output =\n  type Value\n  value : Value\ntype module Namespace =\n  type Key\n  module Make : (K : Input) -> Output with type Value = Key\n",
+        ),
+        (
+            "Argument",
+            "module App.Argument exposing (seed)\nseed : Int\nlet seed = 42\n",
+        ),
+        (
+            "Make",
+            "module App.Make(K : App.Contracts.Input) : App.Contracts.Output with type Value = Int\ntype alias Value = Int\nvalue : Value\nlet value = K.seed\n",
+        ),
+        (
+            "Space",
+            "module App.Space exposing (Key, Make)\ntype alias Key = Int\nmodule Make = App.Make\n",
+        ),
+        (
+            "Apply",
+            "private module App.Apply(N : App.Contracts.Namespace) = N.Make(App.Argument)\n",
+        ),
+        (
+            "Root",
+            "module App.Root exposing (value)\nmodule Built = App.Apply(App.Space)\nvalue : Int\nlet value = Built.value\n",
+        ),
+    ];
+    let mut host = Memory(
+        files
+            .iter()
+            .map(|(name, source)| {
+                (
+                    PathBuf::from(format!("/p/src/App/{name}.fl")),
+                    (*source).to_owned(),
+                )
+            })
+            .collect(),
+    );
+    let mut sources = SourceMap::default();
+    let project = library(&mut sources);
+    let mut cache = ModuleCache::default();
+    let roots = [PathBuf::from("/p/src/App/Root.fl")];
+    let first = analyze_with(&host, &mut sources, Some(&project), &roots, &mut cache);
+    assert!(first.diagnostics.is_empty(), "{:?}", first.diagnostics);
+    host.0.insert(
+        PathBuf::from("/p/src/App/Space.fl"),
+        files[3].1.replace("Key = Int", "Key = String"),
+    );
+    let warm = analyze_with(&host, &mut sources, Some(&project), &roots, &mut cache);
+    let cold = analyze(&host, &mut sources, Some(&project), &roots);
+    assert!(cold.diagnostics.iter().any(|d| d.code == codes::T061 && d.message.starts_with("parameterized module result:")), "{:?}", cold.diagnostics);
+    let messages = |analysis: &super::Analysis| {
+        analysis
+            .diagnostics
+            .iter()
+            .map(|d| (d.code, d.message.clone()))
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(messages(&warm), messages(&cold));
+}

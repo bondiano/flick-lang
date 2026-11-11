@@ -1,4 +1,21 @@
 impl Checker<'_> {
+    fn nominal_methods(&self, identity: &Entity, definition: &TypeDef) -> Vec<(String, Type)> {
+        let Form::Class { methods, .. } = &definition.form else {
+            return Vec::new();
+        };
+        methods
+            .iter()
+            .filter_map(|name| {
+                let entity = Entity {
+                    module: identity.module.clone(),
+                    namespace: Namespace::Value,
+                    name: name.clone(),
+                };
+                self.env.value(&entity).map(|ty| (name.clone(), ty.clone()))
+            })
+            .collect()
+    }
+
     fn finish_module_contracts(&mut self, pending: &[Pending<'_>]) {
         // Manifest nominal requirements may have observed skeletons while
         // contracts were converted. Publish snapshots of completed definitions.
@@ -49,23 +66,7 @@ impl Checker<'_> {
                             if let Some(completed) =
                                 self.env.type_def(&identity.module, &identity.name)
                             {
-                                *methods = if let Form::Class { methods, .. } = &completed.form {
-                                    methods
-                                        .iter()
-                                        .filter_map(|name| {
-                                            let entity = Entity {
-                                                module: identity.module.clone(),
-                                                namespace: Namespace::Value,
-                                                name: name.clone(),
-                                            };
-                                            self.env
-                                                .value(&entity)
-                                                .map(|ty| (name.clone(), ty.clone()))
-                                        })
-                                        .collect()
-                                } else {
-                                    Vec::new()
-                                };
+                                *methods = self.nominal_methods(identity, completed);
                                 *definition = Some(Box::new(completed.clone()));
                             }
                         }

@@ -68,26 +68,8 @@ impl Checking<'_> {
                     (interface, self.by_name.contains_key(&i.module))
                 })
                 .collect(),
-            virtual_contracts: loaded
-                .virtual_of
-                .iter()
-                .flat_map(|v| {
-                    let mut names: Vec<_> = v
-                        .capture
-                        .bindings
-                        .iter()
-                        .map(|b| b.origin.module.clone())
-                        .collect();
-                    if let Some(callee) = &v.capture.callee {
-                        names.push(callee.signature_owner().to_owned());
-                    }
-                    names
-                })
-                .map(|module| match self.by_name.get(&module) {
-                    Some(&j) => comparable[j].clone(),
-                    None => self.from_packages.get(&module).map(comparable_copy),
-                })
-                .collect(),
+            virtual_contracts: self
+                .virtual_contract_inputs(loaded, comparable, &lookup, &contracts),
             virtual_capture: loaded.virtual_of.as_ref().map(|v| v.capture.clone()),
             watching: (self.watching.iter())
                 .map(|w| w.plugin.id().to_owned())

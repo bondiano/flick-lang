@@ -59,7 +59,7 @@ impl ModuleSignature {
                         let base = name.strip_suffix("$Dict").unwrap_or(name);
                         !requirements.iter().any(|r| {
                             matches!(r,
-                        R::Type { name, .. } | R::Nominal { name, .. } if name == base)
+                        R::Type { name, .. } | R::Kind { name, .. } | R::Nominal { name, .. } if name == base)
                         })
                     })
                     .cloned()
