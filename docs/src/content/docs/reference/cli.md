@@ -65,7 +65,9 @@ A build writes into `build.out-dir` (or `--out-dir`) and records the files
 it wrote in `.flick/artifacts.json`. After successful publication, obsolete
 manifest-owned files are removed, including after an emit-mode change or a
 cache hit. `clean` removes the remaining owned files and empty directories;
-other files in a shared output directory stay.
+other files in a shared output directory stay. Files built alone, outside a
+project, list what the build wrote in `.flick-files` of the output instead,
+and the next build into it removes the listed files it no longer writes.
 
 The cache in `.flick/cache/` keeps the artifacts of each build by a key over
 the normalized selected roots separately from the available sources of the

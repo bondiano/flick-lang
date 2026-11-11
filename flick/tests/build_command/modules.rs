@@ -93,3 +93,41 @@ fn explicit_module_result_keeps_client_server_reachability_diagnostics() {
         "{checked:?}"
     );
 }
+
+/// A second build of files alone into the same directory removes what the
+/// first wrote of a module the program no longer has: its list in the
+/// directory names them. Files no build wrote stay.
+#[test]
+fn a_module_that_drops_out_leaves_no_js_file_behind() {
+    let with = "module A exposing (main)\nimport B\nmain : Unit ->{; AppError} Unit\nlet main () = Platform.stdout_line (Int.to_string (B.twice 21))\n";
+    let without = "module A exposing (main)\nmain : Unit ->{; AppError} Unit\nlet main () = Platform.stdout_line (Int.to_string 42)\n";
+    let b = "module B exposing (twice)\ntwice : Int -> Int\nlet twice x = x * 2\n";
+    for emit in ["js", "ts"] {
+        let root = project(
+            &format!("modules/dropped_{emit}"),
+            &[("A.fl", with), ("B.fl", b), ("out/notes.txt", "mine")],
+        );
+        let build = || {
+            flick_in(
+                &root,
+                &["build", "A.fl", "--emit", emit, "--out-dir", "out"],
+            )
+        };
+        let first = build();
+        assert!(first.status.success(), "{first:?}");
+        let dropped = ["B.iface", &format!("B.{emit}"), &format!("B.{emit}.map")];
+        for file in dropped {
+            assert!(root.join("out").join(file).is_file(), "{file}");
+        }
+        fs::write(root.join("A.fl"), without).expect("write");
+        let second = build();
+        assert!(second.status.success(), "{second:?}");
+        for file in dropped {
+            assert!(!root.join("out").join(file).exists(), "{file}");
+        }
+        assert_eq!(
+            fs::read_to_string(root.join("out/notes.txt")).expect("notes"),
+            "mine"
+        );
+    }
+}
