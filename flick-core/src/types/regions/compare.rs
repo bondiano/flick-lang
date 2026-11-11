@@ -93,7 +93,7 @@ impl Checker<'_> {
             }
             match self.store.resolve(&t) {
                 row @ (Type::Row(_) | Type::Union(..)) => {
-                    self.capture_row_filtered(&row, &mut out, false);
+                    self.capture_row_filtered(&row, &mut out, false, &mut Vec::new());
                 }
                 other => self.collect_captures(&other, &mut out),
             }

@@ -1,6 +1,7 @@
 //! Whole-value bounds on generic data and constructor fields.
 
 use super::{Hold, Visible};
+use super::{Unfold, leave_alias};
 use crate::iface::{Entity, Namespace};
 use crate::source::Span;
 use crate::types::Checker;
@@ -86,7 +87,21 @@ impl Checker<'_> {
         t
     }
 
+    /// `seen` holds the data types it has looked into and the aliases it is
+    /// unfolding: one met again inside its own unfolding hides what its
+    /// arguments hide.
     fn hidden_fields(&self, t: &Type, seen: &mut Vec<(String, String)>) -> bool {
+        let unfold = self.enter_alias(t, seen);
+        if matches!(unfold, Unfold::Again) {
+            let (_, args) = self.store.head(t).spine();
+            return args.iter().any(|a| self.hidden_fields(a, seen));
+        }
+        let hidden = self.hidden_unfolded(t, seen);
+        leave_alias(seen, unfold);
+        hidden
+    }
+
+    fn hidden_unfolded(&self, t: &Type, seen: &mut Vec<(String, String)>) -> bool {
         let t = self.borrowed_head(t);
         match &*t {
             Type::Captured { ty, .. } | Type::Bounded { ty, .. } => self.hidden_fields(ty, seen),

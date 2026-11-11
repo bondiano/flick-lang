@@ -378,6 +378,7 @@ fn run_in(
             .any(|(name, _)| *name == module.name),
         sugar: Vec::new(),
         gadt: gadt::branch::State::default(),
+        unfolding: Vec::new(),
     };
     checker
         .classes
@@ -556,6 +557,9 @@ struct Checker<'a> {
     /// the GADT branches they are in.
     equalities: Vec<(Type, Span, Vec<Type>)>,
     gadt: gadt::branch::State,
+    /// The aliases unification and subsumption are unfolding: one met again
+    /// inside its own unfolding is compared by its arguments.
+    unfolding: Vec<regions::AliasKey>,
     /// The types of `do` blocks and of their expression statements, by
     /// range, for the lints of `sugar_lints`.
     sugar: Vec<(typing::Range, Type)>,

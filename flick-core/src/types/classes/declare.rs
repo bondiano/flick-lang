@@ -246,8 +246,7 @@ impl<'n> Checker<'_> {
     /// Aliases expanded and qualifiers dropped only where they hold nothing,
     /// so a value that may capture never matches.
     pub(in crate::types) fn conversion_type(&self, ty: &Type) -> Type {
-        self.bound_head(&self.zonk(ty))
-            .map_children(&mut |t| self.conversion_type(t))
+        self.expand_all(ty, &|t| self.bound_head(&self.zonk(t)), &mut Vec::new())
     }
 
     /// Checks the coherence rules and makes the instance known; `false`

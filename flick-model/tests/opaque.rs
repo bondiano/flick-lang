@@ -10,6 +10,32 @@ fn model_errors(source: &str) -> Vec<String> {
     run::check(&modules, &run::program(&modules))
 }
 
+/// An opaque alias may name itself: inside its module two of it are equal
+/// by their arguments, as for flick-core.
+#[test]
+fn a_recursive_opaque_alias_is_checked() {
+    let errors = model_errors(
+        "module Streams exposing (Stream, identity)\n\n\
+         opaque type alias Stream = Option (Float, Stream)\n\n\
+         identity : Stream -> Stream\n\
+         let identity s = s\n",
+    );
+    assert!(errors.is_empty(), "{errors:?}");
+}
+
+/// One that names itself through an arrow: subsuming it unfolds it once on
+/// both sides, and the occurrence inside is compared by its arguments.
+#[test]
+fn a_recursive_opaque_alias_of_a_function_is_checked() {
+    let errors = model_errors(
+        "module Loops exposing (Loop, spin)\n\n\
+         opaque type alias Loop = Int -> Loop\n\n\
+         spin : Loop -> Loop\n\
+         let spin l = l\n",
+    );
+    assert!(errors.is_empty(), "{errors:?}");
+}
+
 /// A parameter of an opaque alias is replaced by its kind: `Job {Boom}` is
 /// `Eff none {Boom} Unit`.
 #[test]

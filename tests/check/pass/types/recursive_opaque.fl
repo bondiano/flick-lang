@@ -1,0 +1,64 @@
+// An opaque type is nominal: it may refer to itself, and its own module
+// reads it through its representation, which names it again.
+module App.RecursiveOpaque exposing (
+  Stream,
+  Chain,
+  Box,
+  Lost,
+  Loop,
+  Node,
+  Pair,
+  Many,
+  identity,
+  head,
+  unbox,
+  spin,
+  value,
+  swap,
+  size,
+)
+
+opaque type alias Stream = Option (Float, Stream)
+
+identity : Stream -> Stream
+let identity s = s
+
+// with a parameter, the occurrence inside takes the same one
+opaque type alias Chain a = Option (a, Chain a)
+
+head : Chain a -> Option a
+let head c =
+  match c with
+  | Some (x, _) -> Some x
+  | None -> None
+
+// a constructor's field and an error's payload
+type Box = Box Stream
+
+unbox : Box -> Stream
+let unbox b =
+  match b with
+  | Box s -> s
+
+type error Lost = Lost Stream
+
+// through an arrow, a record, a tuple and a list
+opaque type alias Loop = Int -> Loop
+
+spin : Loop -> Loop
+let spin l = l
+
+opaque type alias Node = { value : Int; next : Option Node }
+
+value : Node -> Int
+let value n = n.value
+
+opaque type alias Pair = (Pair, Int)
+
+swap : Pair -> Pair
+let swap p = p
+
+opaque type alias Many = List Many
+
+size : Many -> Int
+let size m = List.length m

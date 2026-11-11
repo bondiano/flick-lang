@@ -14,6 +14,7 @@
 //!   work an owner keeps needs every region of its `Live` to outlive the
 //!   owner, `FLICK-G003` (`live_rows.rs`).
 
+use super::{AliasKey, Unfold, leave_alias};
 use crate::types::Checker;
 use crate::types::effects::Stage;
 use crate::types::kinds::Kind;
@@ -200,12 +201,25 @@ impl Checker<'_> {
     /// out, which elision gives again; a type elided already is elided anew,
     /// not twice.
     pub(in crate::types) fn live_scheme(&self, t: &Type) -> Type {
-        self.elide(&strip_live(t), &Norm::default(), &mut Vec::new())
+        self.elide(
+            &strip_live(t),
+            &Norm::default(),
+            &mut Vec::new(),
+            &mut Vec::new(),
+        )
     }
 
     /// `t` with `Live` of `held` and of what the parameters of each stage
     /// reach in the row of every runtime arrow and `Eff` after them.
-    fn elide(&self, t: &Type, held: &Norm, kinds: &mut Vec<(String, Kind)>) -> Type {
+    /// `path` holds the aliases it is unfolding: one met again inside its
+    /// own unfolding stays as written.
+    fn elide(
+        &self,
+        t: &Type,
+        held: &Norm,
+        kinds: &mut Vec<(String, Kind)>,
+        path: &mut Vec<AliasKey>,
+    ) -> Type {
         let none = Norm::default();
         match t {
             Type::Forall {
@@ -215,7 +229,7 @@ impl Checker<'_> {
             } => {
                 let mark = kinds.len();
                 kinds.extend(vars.iter().map(|v| (v.name.clone(), v.kind.clone())));
-                let body = self.elide(body, held, kinds);
+                let body = self.elide(body, held, kinds, path);
                 kinds.truncate(mark);
                 Type::Forall {
                     vars: vars.clone(),
@@ -228,12 +242,12 @@ impl Checker<'_> {
                 captures,
                 value,
             } => Type::Captured {
-                ty: Box::new(self.elide(ty, held, kinds)),
+                ty: Box::new(self.elide(ty, held, kinds, path)),
                 captures: captures.clone(),
                 value: *value,
             },
             Type::Bounded { ty, captures } => Type::Bounded {
-                ty: Box::new(self.elide(ty, held, kinds)),
+                ty: Box::new(self.elide(ty, held, kinds, path)),
                 captures: captures.clone(),
             },
             Type::Fun {
@@ -241,7 +255,7 @@ impl Checker<'_> {
                 effects,
                 result,
             } => {
-                let param = self.elide(param, &none, kinds);
+                let param = self.elide(param, &none, kinds, path);
                 let mut held = held.clone();
                 let mut reached = self.captures_of(&param);
                 reached.entries.retain(|(_, atom)| {
@@ -260,7 +274,7 @@ impl Checker<'_> {
                 Type::Fun {
                     param: Box::new(param),
                     effects,
-                    result: Box::new(self.elide(result, &held, kinds)),
+                    result: Box::new(self.elide(result, &held, kinds, path)),
                 }
             }
             other => {
@@ -273,16 +287,22 @@ impl Checker<'_> {
                         [
                             add_live(services, held.clone()),
                             errors.clone(),
-                            self.elide(result, &none, kinds),
+                            self.elide(result, &none, kinds, path),
                         ],
                     );
                 }
-                let expanded = self.qualified_head(other);
-                if matches!(expanded, Type::Fun { .. }) {
-                    self.elide(&expanded, held, kinds)
-                } else {
-                    other.map_children(&mut |c| self.elide(c, &none, kinds))
+                let unfold = self.enter_alias(other, path);
+                if matches!(unfold, Unfold::Again) {
+                    return other.clone();
                 }
+                let expanded = self.qualified_head(other);
+                let elided = if matches!(expanded, Type::Fun { .. }) {
+                    self.elide(&expanded, held, kinds, path)
+                } else {
+                    other.map_children(&mut |c| self.elide(c, &none, kinds, path))
+                };
+                leave_alias(path, unfold);
+                elided
             }
         }
     }

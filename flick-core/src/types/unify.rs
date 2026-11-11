@@ -591,8 +591,12 @@ impl Checker<'_> {
         })
     }
 
-    #[allow(clippy::too_many_lines)]
     pub fn unify(&mut self, a: &Type, b: &Type) -> Unified {
+        self.compare_unfolding(a, b, |c| c.unify_unfolded(a, b))
+    }
+
+    #[allow(clippy::too_many_lines)]
+    fn unify_unfolded(&mut self, a: &Type, b: &Type) -> Unified {
         let (mut left, mut right) = (self.bound_head(a), self.bound_head(b));
         if matches!(&left, Type::Captured { value: true, .. })
             || matches!(&right, Type::Captured { value: true, .. })

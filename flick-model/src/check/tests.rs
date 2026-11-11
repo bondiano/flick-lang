@@ -245,8 +245,8 @@ fn let_sig_rule() {
 
 /// An opaque alias that names itself, `opaque type alias Stream = Option
 /// (Float, Stream)`, inside its module: two of it are equal by their
-/// arguments, and zonking a type does not unfold it. Its source makes
-/// flick-core overflow its stack as well, so the case is the model's alone.
+/// arguments, and zonking a type does not unfold it (`tests/opaque.rs`
+/// checks its source).
 #[test]
 fn a_recursive_opaque_alias_is_checked() {
     let mut d = decls();

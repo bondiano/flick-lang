@@ -276,6 +276,17 @@ impl Checker<'_> {
     }
 
     fn subsume_at(&mut self, actual: &Type, expected: &Type, span: Span) -> super::unify::Unified {
+        self.compare_unfolding(actual, expected, |c| {
+            c.subsume_unfolded(actual, expected, span)
+        })
+    }
+
+    fn subsume_unfolded(
+        &mut self,
+        actual: &Type,
+        expected: &Type,
+        span: Span,
+    ) -> super::unify::Unified {
         if let Some(result) = self.subsume_bound(actual, expected, span) {
             return result;
         }

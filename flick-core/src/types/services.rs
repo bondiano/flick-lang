@@ -10,6 +10,7 @@ use serde::{Deserialize, Serialize};
 use super::Checker;
 use super::env::{Form, TypeDef};
 use super::kinds::Kind;
+use super::regions::{Unfold, leave_alias};
 use super::ty::{Binder, Row, Type};
 use crate::diagnostics::codes;
 use crate::iface::{Entity, Namespace};
@@ -289,7 +290,21 @@ impl Checker<'_> {
         }
     }
 
+    /// `seen` holds the types it has looked into and the aliases it is
+    /// unfolding: one met again inside its own unfolding holds what its
+    /// arguments hold.
     fn live_part(&self, ty: &Type, seen: &mut Vec<(String, String)>) -> Option<Type> {
+        let unfold = self.enter_alias(ty, seen);
+        if matches!(unfold, Unfold::Again) {
+            let (_, args) = self.store.head(ty).spine();
+            return args.iter().find_map(|a| self.live_part(a, seen));
+        }
+        let live = self.live_unfolded(ty, seen);
+        leave_alias(seen, unfold);
+        live
+    }
+
+    fn live_unfolded(&self, ty: &Type, seen: &mut Vec<(String, String)>) -> Option<Type> {
         let normalized = self.bound_head(ty);
         let ty = &normalized;
         match ty {
