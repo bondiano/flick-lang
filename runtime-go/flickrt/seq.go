@@ -127,7 +127,7 @@ func SeqMap2(f, xs, ys Value) Value {
 	return seq(func(fb *Fiber, yield func(Value) bool) {
 		for x := range Iter(fb, xs) {
 			for y := range Iter(fb, ys) {
-				if !yield(apply2(fb, f, x, y)) {
+				if !yield(Apply2(fb, f, x, y)) {
 					return
 				}
 			}
@@ -239,7 +239,7 @@ func SeqZipWith(f, xs, ys Value) Value {
 		defer stop()
 		for x := range Iter(fb, xs) {
 			y, ok := next()
-			if !ok || !yield(apply2(fb, f, x, y)) {
+			if !ok || !yield(Apply2(fb, f, x, y)) {
 				return
 			}
 		}
@@ -260,7 +260,7 @@ func SeqScan(f, init, xs Value) Value {
 			return
 		}
 		for x := range Iter(fb, xs) {
-			if acc = apply2(fb, f, acc, x); !yield(acc) {
+			if acc = Apply2(fb, f, acc, x); !yield(acc) {
 				return
 			}
 		}
@@ -320,7 +320,7 @@ func SeqToList(fb *Fiber, xs Value) Value {
 func SeqFold(fb *Fiber, f, init, xs Value) Value {
 	acc := init
 	for x := range Iter(fb, xs) {
-		acc = apply2(fb, f, acc, x)
+		acc = Apply2(fb, f, acc, x)
 	}
 	return acc
 }
@@ -371,7 +371,7 @@ func SeqEachEffect(fb *Fiber, f, xs Value) Value {
 func SeqFoldEffect(fb *Fiber, f, init, xs Value) Value {
 	acc := init
 	for x := range Iter(fb, xs) {
-		acc = Run(fb, apply2(fb, f, acc, x))
+		acc = Run(fb, Apply2(fb, f, acc, x))
 	}
 	return acc
 }

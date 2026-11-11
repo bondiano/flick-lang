@@ -148,7 +148,7 @@ func mapped(t *table, f func(e entry) (Value, bool)) *table {
 }
 
 func HashMapMap(fb *Fiber, f, m Value) Value {
-	return mapOf(mapped(hmap(m), func(e entry) (Value, bool) { return apply2(fb, f, e.value, e.key), true }))
+	return mapOf(mapped(hmap(m), func(e entry) (Value, bool) { return Apply2(fb, f, e.value, e.key), true }))
 }
 
 // HashMapFlatMap is the union of what `f` makes of each entry, in order.
@@ -156,7 +156,7 @@ func HashMapFlatMap(fb *Fiber, f, m Value) Value {
 	t := hmap(m)
 	out := empty(t.w)
 	for _, e := range t.all() {
-		out = fromEntries(fb, out, HashMapToList(apply2(fb, f, e.value, e.key)))
+		out = fromEntries(fb, out, HashMapToList(Apply2(fb, f, e.value, e.key)))
 	}
 	return mapOf(out)
 }
@@ -164,14 +164,14 @@ func HashMapFlatMap(fb *Fiber, f, m Value) Value {
 func HashMapReduce(fb *Fiber, zero, f, m Value) Value {
 	acc := zero
 	for _, e := range hmap(m).all() {
-		acc = Apply(fb, apply2(fb, f, acc, e.value), e.key)
+		acc = Apply(fb, Apply2(fb, f, acc, e.value), e.key)
 	}
 	return acc
 }
 
 func HashMapFilter(fb *Fiber, f, m Value) Value {
 	return mapOf(mapped(hmap(m), func(e entry) (Value, bool) {
-		return e.value, Bool(apply2(fb, f, e.value, e.key))
+		return e.value, Bool(Apply2(fb, f, e.value, e.key))
 	}))
 }
 
@@ -187,7 +187,7 @@ func HashMapCompact(m Value) Value {
 
 func HashMapFilterMap(fb *Fiber, f, m Value) Value {
 	return mapOf(mapped(hmap(m), func(e entry) (Value, bool) {
-		r := apply2(fb, f, e.value, e.key).(*Data)
+		r := Apply2(fb, f, e.value, e.key).(*Data)
 		if r.Tag == "Success" {
 			return r.Fields[0], true
 		}
@@ -197,7 +197,7 @@ func HashMapFilterMap(fb *Fiber, f, m Value) Value {
 
 func HashMapFindFirst(fb *Fiber, f, m Value) Value {
 	for _, e := range hmap(m).all() {
-		if Bool(apply2(fb, f, e.value, e.key)) {
+		if Bool(Apply2(fb, f, e.value, e.key)) {
 			return Some([]Value{e.key, e.value})
 		}
 	}
@@ -206,7 +206,7 @@ func HashMapFindFirst(fb *Fiber, f, m Value) Value {
 
 func HashMapSome(fb *Fiber, f, m Value) Value {
 	for _, e := range hmap(m).all() {
-		if Bool(apply2(fb, f, e.value, e.key)) {
+		if Bool(Apply2(fb, f, e.value, e.key)) {
 			return true
 		}
 	}
@@ -215,7 +215,7 @@ func HashMapSome(fb *Fiber, f, m Value) Value {
 
 func HashMapEvery(fb *Fiber, f, m Value) Value {
 	for _, e := range hmap(m).all() {
-		if !Bool(apply2(fb, f, e.value, e.key)) {
+		if !Bool(Apply2(fb, f, e.value, e.key)) {
 			return false
 		}
 	}

@@ -102,11 +102,11 @@ func ChannelFilterMapArrayEffect(f, self Value) Value {
 }
 
 func ChannelScan(initial, f, self Value) Value {
-	return channelScan(channelOf(self), initial, func(fb *Fiber, s, o Value) Value { return apply2(fb, f, s, o) })
+	return channelScan(channelOf(self), initial, func(fb *Fiber, s, o Value) Value { return Apply2(fb, f, s, o) })
 }
 
 func ChannelScanEffect(initial, f, self Value) Value {
-	return channelScan(channelOf(self), initial, func(fb *Fiber, s, o Value) Value { return Run(fb, apply2(fb, f, s, o)) })
+	return channelScan(channelOf(self), initial, func(fb *Fiber, s, o Value) Value { return Run(fb, Apply2(fb, f, s, o)) })
 }
 
 func ChannelBuffer(options, self Value) Value {

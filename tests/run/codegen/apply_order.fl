@@ -1,0 +1,20 @@
+// A function applied through a value takes its arguments one at a time:
+// what it does with the first happens before the next one is evaluated.
+module App.Main exposing (main)
+
+say : String ->{} Unit
+let say line = Platform.stdout_line line
+
+/// Fails as soon as it has its first argument.
+early : Int -> Unit -> Int
+let early n =
+  let quotient = Int.unsafe_div 1 n
+  fun () -> quotient
+
+through : (Int -> Unit -> Int) ->{} Int
+let through f = f 0 (say "late")
+
+main : Unit ->{; AppError} Unit
+let main () =
+  say "before"
+  ignore (through early)

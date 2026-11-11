@@ -77,7 +77,7 @@ func zipArrays(f func(fb *Fiber, a, b Value) Value) func(fb *Fiber, l, r []Value
 }
 
 func StreamZipWith(that, f, s Value) Value {
-	return streamZipWithArray(streamOf(s), streamOf(that), zipArrays(func(fb *Fiber, a, b Value) Value { return apply2(fb, f, a, b) }))
+	return streamZipWithArray(streamOf(s), streamOf(that), zipArrays(func(fb *Fiber, a, b Value) Value { return Apply2(fb, f, a, b) }))
 }
 
 func StreamZip(that, s Value) Value {
@@ -92,7 +92,7 @@ func StreamZipFlatten(that, s Value) Value {
 
 func StreamZipWithArray(that, f, s Value) Value {
 	return streamZipWithArray(streamOf(s), streamOf(that), func(fb *Fiber, l, r []Value) ([]Value, []Value, []Value) {
-		t := List(apply2(fb, f, l, r))
+		t := List(Apply2(fb, f, l, r))
 		return List(t[0]), List(t[1]), List(t[2])
 	})
 }
@@ -250,6 +250,6 @@ func StreamZipLatest(that, s Value) Value { return streamZipLatestAll([]Value{s,
 func StreamZipLatestWith(that, f, s Value) Value {
 	return StreamMap(Fn(func(fb *Fiber, pair Value) Value {
 		p := List(pair)
-		return apply2(fb, f, p[0], p[1])
+		return Apply2(fb, f, p[0], p[1])
 	}), streamZipLatestAll([]Value{s, that}))
 }

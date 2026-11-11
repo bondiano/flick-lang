@@ -116,6 +116,31 @@ fn a_function_of_two_arguments_is_given_both_at_once() {
 }
 
 #[test]
+fn an_argument_that_runs_code_is_not_given_with_the_one_before_it() {
+    let go = app("module App exposing (main)\n\n\
+         next : Int -> Int\nlet next n = n + 1\n\n\
+         twice : (Int -> Int -> Int) -> Int -> Int\nlet twice f x = f x (next x)\n\n\
+         main : Unit ->{; AppError} Unit\n\
+         let main () = Platform.stdout_line (show (twice (fun a b -> a * b) 2))\n");
+    // `f x` may fail before `next x` runs, as it does on JavaScript
+    assert!(
+        go.contains("flickrt.Apply(fb, flickrt.Apply(fb, l_f, l_x), F_App__next(fb, l_x))"),
+        "{go}"
+    );
+}
+
+#[test]
+fn a_function_of_more_stages_than_a_word_has_bits_compiles() {
+    let names: Vec<String> = (0..65).map(|i| format!("a{i}")).collect();
+    let out = build(&format!(
+        "module App exposing (main)\n\nmain : Unit ->{{; AppError}} Unit\nlet main () =\n  \
+         let wide = fun {} -> 0\n  Platform.stdout_line (show (List.length [wide]))\n",
+        names.join(" ")
+    ));
+    assert!(!out.files.is_empty(), "{:?}", out.diagnostics);
+}
+
+#[test]
 fn a_loop_with_an_exit_keeps_the_flags_of_its_exits() {
     let go = app(&SUM.replace(
         "    i = i - 1\n",

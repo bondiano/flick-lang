@@ -121,7 +121,7 @@ func ChannelRunLast(fb *Fiber, self Value) Value { return runLast(fb, channelOf(
 
 func ChannelRunFoldEffect(fb *Fiber, initial, f, self Value) Value {
 	return runFold(fb, channelOf(self), Apply(fb, initial, Unit), func(fb *Fiber, z, o Value) Value {
-		return Run(fb, apply2(fb, f, z, o))
+		return Run(fb, Apply2(fb, f, z, o))
 	})
 }
 

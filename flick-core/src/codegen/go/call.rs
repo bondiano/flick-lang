@@ -41,6 +41,15 @@ fn at_once(n: usize, effects: u64) -> Option<&'static str> {
     (effects & ((1 << (n - 1)) - 1) == 0).then_some(wrap)
 }
 
+/// Whether evaluating `e` is nothing anyone can see: it cannot fail, print
+/// or run for ever, so it may be evaluated before a call written before it.
+fn quiet(e: &Expr) -> bool {
+    matches!(
+        e.kind,
+        ExprKind::Local(_) | ExprKind::Lit(_) | ExprKind::Lambda { .. }
+    )
+}
+
 /// `return value`, the body of a closure.
 fn returning<'a>(a: &'a DocumentArena<'a>, value: Document<'a>) -> [Document<'a>; 1] {
     [docvec![a, "return ", value]]
@@ -322,6 +331,10 @@ impl<'a> Gen<'a> {
             .into_iter()
             .zip(args.iter().map(|(_, s)| *s))
             .collect();
+        // whether the value of each argument is ready with nothing to see:
+        // a name, a literal or a function, and the one taken before the rest
+        let mut quiet: Vec<bool> = exprs.iter().map(|e| quiet(e)).collect();
+        quiet.extend(first.iter().map(|_| true));
         values.extend(first);
         if values.len() < arity {
             // a partial application keeps what it was given
@@ -341,18 +354,22 @@ impl<'a> Gen<'a> {
             );
         }
         let rest = values.split_off(arity);
+        let quiet = quiet.split_off(arity.min(quiet.len()));
         let all: Vec<Code<'a>> = given
             .into_iter()
             .chain(values.into_iter().map(|(v, _)| v))
             .collect();
         let mut v = make(self.context.unwrap_or("nil"), &all);
-        let mut rest = rest.into_iter();
-        while let Some((arg, mut stage)) = rest.next() {
+        let mut rest = rest.into_iter().zip(quiet).peekable();
+        while let Some(((arg, mut stage), _)) = rest.next() {
             // an argument of a pure stage goes with the next, up to three
-            // at once: a function that takes them so is called once
+            // at once: a function that takes them so is called once. The
+            // next one must be quiet: a function may fail, or not return,
+            // once it has an argument, and that comes before the next
+            // argument is evaluated
             let mut group = vec![self.context(), v.doc, arg.doc];
             while group.len() < 5 && stage == Stage::Pure {
-                let Some((next, after)) = rest.next() else {
+                let Some(((next, after), _)) = rest.next_if(|(_, quiet)| *quiet) else {
                     break;
                 };
                 group.push(next.doc);
@@ -441,8 +458,10 @@ impl<'a> Gen<'a> {
         } else {
             block(a, stmts)
         };
+        // only the first three stages matter to a function of up to three
         let effects = params
             .iter()
+            .take(3)
             .enumerate()
             .fold(0, |bits, (i, p)| bits | u64::from(effectful(p)) << i);
         if let Some(wrap) = at_once(params.len(), effects) {

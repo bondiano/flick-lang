@@ -32,7 +32,7 @@ func GraphFindNodes(fb *Fiber, f, v Value) Value {
 }
 
 func edgeTest(fb *Fiber, f Value, e graphEdge) bool {
-	return Bool(Apply(fb, apply2(fb, f, e.data, int32(e.source)), int32(e.target)))
+	return Bool(Apply(fb, Apply2(fb, f, e.data, int32(e.source)), int32(e.target)))
 }
 
 func GraphFindEdge(fb *Fiber, f, v Value) Value {

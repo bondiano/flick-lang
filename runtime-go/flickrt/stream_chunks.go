@@ -9,7 +9,7 @@ func StreamMapAccum(initial, f, s Value) Value {
 			var acc []Value
 			for _, a := range chunk {
 				var values []Value
-				state, values = statePair(apply2(fb, f, state, a))
+				state, values = statePair(Apply2(fb, f, state, a))
 				acc = append(acc, values...)
 			}
 			return state, acc
@@ -19,7 +19,7 @@ func StreamMapAccum(initial, f, s Value) Value {
 func StreamMapAccumArray(initial, f, s Value) Value {
 	return streamMapAccumArray(streamOf(s), func(*Fiber) Value { return initial },
 		func(fb *Fiber, state Value, chunk []Value) (Value, []Value) {
-			return statePair(apply2(fb, f, state, chunk))
+			return statePair(Apply2(fb, f, state, chunk))
 		}, nil)
 }
 
@@ -27,7 +27,7 @@ func StreamMapAccumArray(initial, f, s Value) Value {
 func StreamMapAccumEffect(initial, f, s Value) Value {
 	return &Stream{channelMapAccumHalt(channelFlattenArray(streamOf(s).ch), func(*Fiber) Value { return initial },
 		func(fb *Fiber, state, a Value) (Value, []Value) {
-			state, values := statePair(Run(fb, apply2(fb, f, state, a)))
+			state, values := statePair(Run(fb, Apply2(fb, f, state, a)))
 			return state, nonEmptyChunk(values)
 		}, nil)}
 }
@@ -35,7 +35,7 @@ func StreamMapAccumEffect(initial, f, s Value) Value {
 func StreamMapAccumArrayEffect(initial, f, s Value) Value {
 	return &Stream{channelMapAccumHalt(streamOf(s).ch, func(*Fiber) Value { return initial },
 		func(fb *Fiber, state, chunk Value) (Value, []Value) {
-			state, values := statePair(Run(fb, apply2(fb, f, state, chunk)))
+			state, values := statePair(Run(fb, Apply2(fb, f, state, chunk)))
 			return state, nonEmptyChunk(values)
 		}, nil)}
 }
@@ -47,7 +47,7 @@ func StreamScan(initial, f, s Value) Value {
 			arr := chunk.([]Value)
 			out := make([]Value, len(arr))
 			for i, a := range arr {
-				state = apply2(fb, f, state, a)
+				state = Apply2(fb, f, state, a)
 				out[i] = state
 			}
 			return state, []Value{out}
@@ -57,7 +57,7 @@ func StreamScan(initial, f, s Value) Value {
 
 func StreamScanEffect(initial, f, s Value) Value {
 	scanned := channelScan(channelFlattenArray(streamOf(s).ch), initial, func(fb *Fiber, state, a Value) Value {
-		return Run(fb, apply2(fb, f, state, a))
+		return Run(fb, Apply2(fb, f, state, a))
 	})
 	return &Stream{channelMap(scanned, func(_ *Fiber, state Value) Value { return []Value{state} })}
 }
