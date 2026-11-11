@@ -3,6 +3,6 @@
 module Ui.Tracing exposing (with_action_spans)
 
 with_action_spans : Bool -> (Eff r e a)^c ->{r; e} a
-foreign effect with_action_spans from "@flick-lang/effect-ts/ui/tracing" "withActionSpans"
+foreign effect with_action_spans from "flick:ui/tracing" "withActionSpans"
   arity 1
   retention call

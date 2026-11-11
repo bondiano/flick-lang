@@ -5,42 +5,42 @@ private module List.Search exposing (..)
 
 /// The last element that satisfies `p`.
 find_last : (a -> Bool)^c -> List a -> Option a
-foreign pure find_last from "@flick-lang/effect-ts/effect/Array" "findLast"
+foreign pure find_last from "flick:Array" "findLast"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:3e1ffdb3d63e475f"
 
 /// The index of the last element that satisfies `p`.
 find_last_index : (a -> Bool)^c -> List a -> Option Int
-foreign pure find_last_index from "@flick-lang/effect-ts/effect/Array" "findLastIndex"
+foreign pure find_last_index from "flick:Array" "findLastIndex"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:60671cf447ac27fe"
 
 /// The first element that satisfies `p`, with its index.
 find_first_with_index : (a -> Bool)^c -> List a -> Option (a, Int)
-foreign pure find_first_with_index from "@flick-lang/effect-ts/effect/Array" "findFirstWithIndex"
+foreign pure find_first_with_index from "flick:Array" "findFirstWithIndex"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:2c3ff7b37d76bcd1"
 
 /// How many elements satisfy `p`.
 count_by : (a -> Bool)^c -> List a -> Int
-foreign pure count_by from "@flick-lang/effect-ts/effect/Array" "countBy"
+foreign pure count_by from "flick:Array" "countBy"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:b2f09cf6564eb521"
 
 /// Whether an element is `same` as `x`.
 contains_with : (a -> a -> Bool)^c -> a -> List a -> Bool
-foreign pure contains_with from "@flick-lang/effect-ts/effect/Array" "containsWith"
+foreign pure contains_with from "flick:Array" "containsWith"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:a905b752122d8264"
 
 /// The first of each set of elements that are `same`, in order.
 dedupe_with : (a -> a -> Bool)^c -> List a -> List a
-foreign pure dedupe_with from "@flick-lang/effect-ts/effect/Array" "dedupeWith"
+foreign pure dedupe_with from "flick:Array" "dedupeWith"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:844a2faacd8c857f"
@@ -51,7 +51,7 @@ let dedupe xs = dedupe_with eq xs
 
 /// The list without an element `same` as the one before it.
 dedupe_adjacent_with : (a -> a -> Bool)^c -> List a -> List a
-foreign pure dedupe_adjacent_with from "@flick-lang/effect-ts/effect/Array" "dedupeAdjacentWith"
+foreign pure dedupe_adjacent_with from "flick:Array" "dedupeAdjacentWith"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:1181d539d087bfa9"
@@ -62,7 +62,7 @@ let dedupe_adjacent xs = dedupe_adjacent_with eq xs
 
 /// `xs |> difference_with same ys`: the elements of `xs` with none `same` in `ys`.
 difference_with : (a -> a -> Bool)^c -> List a -> List a -> List a
-foreign pure difference_with from "@flick-lang/effect-ts/effect/Array" "differenceWith"
+foreign pure difference_with from "flick:Array" "differenceWith"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:4afcd61244bc46d6"
@@ -73,7 +73,7 @@ let difference ys xs = difference_with eq ys xs
 
 /// `xs |> intersection_with same ys`: the elements of `xs` with one `same` in `ys`.
 intersection_with : (a -> a -> Bool)^c -> List a -> List a -> List a
-foreign pure intersection_with from "@flick-lang/effect-ts/effect/Array" "intersectionWith"
+foreign pure intersection_with from "flick:Array" "intersectionWith"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:77e65f4896025372"
@@ -85,7 +85,7 @@ let intersection ys xs = intersection_with eq ys xs
 /// `xs |> union_with ys same`: `xs`, then the elements of `ys` with none
 /// `same` in `xs`, without duplicates.
 union_with : List a -> (a -> a -> Bool)^c -> (List a -> List a)^c
-foreign pure union_with from "@flick-lang/effect-ts/effect/Array" "unionWith"
+foreign pure union_with from "flick:Array" "unionWith"
   arity 2
   retention call
   reviewed "effect@4.1.2 sha256:a10e448aef35d8ce"
@@ -107,13 +107,13 @@ let group xs = group_with eq xs
 
 /// The elements under the key `f` gives each, in order.
 group_by : (a -> String)^c -> List a -> Record.ReadonlyRecord (NonEmpty.NonEmpty a)
-foreign pure group_by from "@flick-lang/effect-ts/effect/Array" "groupBy"
+foreign pure group_by from "flick:Array" "groupBy"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:e61e2d5be7063971"
 
 /// The strings joined with `separator` between them.
 join : String -> List String -> String
-foreign pure join from "@flick-lang/effect-ts/effect/Array" "join"
+foreign pure join from "flick:Array" "join"
   arity 1
   reviewed "effect@4.1.2 sha256:2a4c74123b36ad16"

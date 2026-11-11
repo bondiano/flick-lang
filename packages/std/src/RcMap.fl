@@ -23,47 +23,47 @@ make :
     capacity : Option Int;
   } ->{Scope s | r}
   RcMap s k e a
-foreign effect make from "@flick-lang/effect-ts/effect/RcMap" "flickMake"
+foreign effect make from "flick:RcMap" "flickMake"
   reviewed "effect@4.1.2 sha256:a1751cbe903120cf"
 
 /// The resource of `key`, looking it up if no one holds it; the innermost
 /// `scope` (or the one of region `t`) holds it until it closes.
 get : k -> RcMap s k e a ->{Scope t; ExceededCapacity | e} a^{t}
-foreign effect get from "@flick-lang/effect-ts/effect/RcMap" "flickGet"
+foreign effect get from "flick:RcMap" "flickGet"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:361e3835af8b8aab"
 
 /// The resource of `key` if it is held now, holding it as `get` does.
 get_option : k -> RcMap s k e a ->{Scope t; e} (Option a)^{t}
-foreign effect get_option from "@flick-lang/effect-ts/effect/RcMap" "getOption"
+foreign effect get_option from "flick:RcMap" "getOption"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:1f853b27223bed36"
 
 /// The keys with a resource.
 keys : RcMap s k e a ->{} List k
-foreign effect keys from "@flick-lang/effect-ts/effect/RcMap" "flickKeys"
+foreign effect keys from "flick:RcMap" "flickKeys"
   retention call
   reviewed "effect@4.1.2 sha256:415be2871c1c1181"
 
 /// Releases the resource of `key` once its holders are done.
 invalidate : k -> RcMap s k e a ->{Async} Unit
-foreign effect invalidate from "@flick-lang/effect-ts/effect/RcMap" "invalidate"
+foreign effect invalidate from "flick:RcMap" "invalidate"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:7bef59e4b2678f52"
 
 /// Whether `key` has a resource.
 has : k -> RcMap s k e a ->{} Bool
-foreign effect has from "@flick-lang/effect-ts/effect/RcMap" "has"
+foreign effect has from "flick:RcMap" "has"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:c83c9f79b2b36805"
 
 /// Starts the idle time of `key`'s resource anew.
 touch : k -> RcMap s k e a ->{} Unit
-foreign effect touch from "@flick-lang/effect-ts/effect/RcMap" "touch"
+foreign effect touch from "flick:RcMap" "touch"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:292a9ca3a7723ca2"

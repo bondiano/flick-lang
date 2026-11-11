@@ -7,26 +7,26 @@ type Semaphore
 
 /// A semaphore with `permits` permits.
 make : Int ->{} Semaphore
-foreign effect make from "@flick-lang/effect-ts/effect/Semaphore" "make"
+foreign effect make from "flick:Semaphore" "make"
   reviewed "effect@4.1.2 sha256:bdb4b05fc373aa39"
 
 /// Changes the number of permits; tasks holding permits keep them.
 resize : Int -> Semaphore ->{} Unit
-foreign effect resize from "@flick-lang/effect-ts/effect/Semaphore" "resize"
+foreign effect resize from "flick:Semaphore" "resize"
   arity 1
   reviewed "effect@4.1.2 sha256:b62848d985c2f336"
 
 /// Runs `task` holding `permits` permits, waiting for them first; they are
 /// given back however it ends.
 with_permits : Semaphore -> Int -> (Eff r e a)^c ->{r; e} a
-foreign effect with_permits from "@flick-lang/effect-ts/effect/Semaphore" "withPermits"
+foreign effect with_permits from "flick:Semaphore" "withPermits"
   arity 2
   retention call
   reviewed "effect@4.1.2 sha256:1c963a339f788ddd"
 
 /// `with_permits` with one permit.
 with_permit : Semaphore -> (Eff r e a)^c ->{r; e} a
-foreign effect with_permit from "@flick-lang/effect-ts/effect/Semaphore" "withPermit"
+foreign effect with_permit from "flick:Semaphore" "withPermit"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:6747bcd8fefc97cf"
@@ -34,30 +34,30 @@ foreign effect with_permit from "@flick-lang/effect-ts/effect/Semaphore" "withPe
 /// Runs `task` with `permits` permits if they are free now, `None` without
 /// running it otherwise.
 with_permits_if_available : Semaphore -> Int -> (Eff r e a)^c ->{r; e} Option a
-foreign effect with_permits_if_available from "@flick-lang/effect-ts/effect/Semaphore" "withPermitsIfAvailable"
+foreign effect with_permits_if_available from "flick:Semaphore" "withPermitsIfAvailable"
   arity 2
   retention call
   reviewed "effect@4.1.2 sha256:8ce935520a994ce8"
 
 /// Takes `permits` permits, waiting until they are free; the number taken.
 take : Int -> Semaphore ->{Async} Int
-foreign effect take from "@flick-lang/effect-ts/effect/Semaphore" "take"
+foreign effect take from "flick:Semaphore" "take"
   arity 1
   reviewed "effect@4.1.2 sha256:0e705668842c0868"
 
 /// Takes `permits` permits if they are free now; whether it did.
 take_if_available : Int -> Semaphore ->{} Bool
-foreign effect take_if_available from "@flick-lang/effect-ts/effect/Semaphore" "takeIfAvailable"
+foreign effect take_if_available from "flick:Semaphore" "takeIfAvailable"
   arity 1
   reviewed "effect@4.1.2 sha256:96da3b6d578127bd"
 
 /// Gives back `permits` permits; the permits free after.
 release : Int -> Semaphore ->{} Int
-foreign effect release from "@flick-lang/effect-ts/effect/Semaphore" "release"
+foreign effect release from "flick:Semaphore" "release"
   arity 1
   reviewed "effect@4.1.2 sha256:29d25e627ab56bc9"
 
 /// Gives back every permit taken; the permits free after.
 release_all : Semaphore ->{} Int
-foreign effect release_all from "@flick-lang/effect-ts/effect/Semaphore" "releaseAll"
+foreign effect release_all from "flick:Semaphore" "releaseAll"
   reviewed "effect@4.1.2 sha256:2d52897abf63236f"

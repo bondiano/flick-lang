@@ -20,5 +20,5 @@ call :
   Endpoint l (Request p q h b ->{r; e} s) ->
   Request p q h b ->{Async | a; ClientError | e}
   s
-foreign effect call from "@flick-lang/effect-ts/effect/http-api/HttpApi" "httpApiInject"
+foreign effect call from "flick:http-api/HttpApi" "httpApiInject"
   arity 4

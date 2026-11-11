@@ -63,12 +63,12 @@ const agree = (core: Module, effect: Module, cases: Cases): void => {
   }
 };
 
-/** The JS names `file` binds from `@flick-lang/effect-ts/effect/<module>`. */
+/** The JS names `file` binds from `flick:<module>`. */
 const bound = (file: string, module: string): Array<string> => {
   const core = new URL(`../../../packages/core/src/${file}`, import.meta.url);
   const at = existsSync(core) ? core : new URL(`../../../packages/std/src/${file}`, import.meta.url);
   const text = readFileSync(at, "utf8");
-  const re = new RegExp(`foreign \\w+ \\w+ from "@flick-lang/effect-ts/effect/${module}" "(\\w+)"`, "g");
+  const re = new RegExp(`foreign \\w+ \\w+ from "flick:${module}" "(\\w+)"`, "g");
   return [...text.matchAll(re)].map((m) => m[1] ?? "").toSorted();
 };
 

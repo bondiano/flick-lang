@@ -2,4 +2,4 @@
 module App exposing (fail)
 
 fail : String ->{; AppError} a
-foreign effect fail from "@flick-lang/effect-ts" "appFail"
+foreign effect fail from "flick:rt" "appFail"

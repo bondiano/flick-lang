@@ -48,143 +48,143 @@ type AsyncIterable a d
 
 /// How many elements Effect puts in one chunk by default.
 default_chunk_size : Int
-foreign pure default_chunk_size from "@flick-lang/effect-ts/effect/Channel" "DefaultChunkSize"
+foreign pure default_chunk_size from "flick:Channel" "DefaultChunkSize"
   reviewed "effect@4.1.2 sha256:328d7eb584c7877e"
 
 /// Emits the elements of the list, then ends.
 from_list : List o -> Channel none none i o Unit ie id
-foreign pure from_list from "@flick-lang/effect-ts/effect/Channel" "fromArray"
+foreign pure from_list from "flick:Channel" "fromArray"
   reviewed "effect@4.1.2 sha256:c9d127266b1bbe58"
 
 /// Emits the list in chunks of at most `size` elements.
 from_list_chunked : Int -> List o -> Channel none none i (NonEmpty.NonEmpty o) Unit ie id
-foreign pure from_list_chunked from "@flick-lang/effect-ts/effect/Channel" "flickFromListChunked"
+foreign pure from_list_chunked from "flick:Channel" "flickFromListChunked"
   arity 1
   reviewed "effect@4.1.2 sha256:bc67202f83eefba0"
 
 /// Emits the elements of the chunk, then ends.
 from_chunk : Chunk.Chunk o -> Channel none none i o Unit ie id
-foreign pure from_chunk from "@flick-lang/effect-ts/effect/Channel" "fromChunk"
+foreign pure from_chunk from "flick:Channel" "fromChunk"
   reviewed "effect@4.1.2 sha256:b17cf3275f938240"
 
 /// Emits one element.
 succeed : o -> Channel none none i o Unit ie id
-foreign pure succeed from "@flick-lang/effect-ts/effect/Channel" "succeed"
+foreign pure succeed from "flick:Channel" "succeed"
   reviewed "effect@4.1.2 sha256:181b7effb3e44651"
 
 /// Emits the element `f` computes when the channel runs.
 sync : (Unit -> o) -> Channel none none i o Unit ie id
-foreign pure sync from "@flick-lang/effect-ts/effect/Channel" "sync"
+foreign pure sync from "flick:Channel" "sync"
   reviewed "effect@4.1.2 sha256:24e90371da3f7bc1"
 
 /// Ends at once with the done value.
 end : d -> Channel none none i o d ie id
-foreign pure end from "@flick-lang/effect-ts/effect/Channel" "end"
+foreign pure end from "flick:Channel" "end"
   reviewed "effect@4.1.2 sha256:2de9f7a64f2fe8ef"
 
 /// Ends at once with the done value `f` computes when the channel runs.
 end_sync : (Unit -> d) -> Channel none none i o d ie id
-foreign pure end_sync from "@flick-lang/effect-ts/effect/Channel" "endSync"
+foreign pure end_sync from "flick:Channel" "endSync"
   reviewed "effect@4.1.2 sha256:9920d5e85c000987"
 
 /// Emits nothing and ends.
 empty : Channel none none i o Unit ie id
-foreign pure empty from "@flick-lang/effect-ts/effect/Channel" "empty"
+foreign pure empty from "flick:Channel" "empty"
   reviewed "effect@4.1.2 sha256:26ffba117cc53b1d"
 
 /// Emits nothing and never ends.
 never : Channel none none i o d ie id
-foreign pure never from "@flick-lang/effect-ts/effect/Channel" "never"
+foreign pure never from "flick:Channel" "never"
   reviewed "effect@4.1.2 sha256:8fd13a9487350723"
 
 /// Fails with the error.
 fail : Errors e -> Channel none e i o d ie id
-foreign pure fail from "@flick-lang/effect-ts/effect/Channel" "fail"
+foreign pure fail from "flick:Channel" "fail"
   reviewed "effect@4.1.2 sha256:6a20ac62c873f996"
 
 /// Fails with the error `f` computes when the channel runs.
 fail_sync : (Unit -> Errors e) -> Channel none e i o d ie id
-foreign pure fail_sync from "@flick-lang/effect-ts/effect/Channel" "failSync"
+foreign pure fail_sync from "flick:Channel" "failSync"
   reviewed "effect@4.1.2 sha256:4c9494e53177ca0b"
 
 /// Fails with the whole cause of `failure`.
 fail_cause : Failure e -> Channel none e i o d ie id
-foreign pure fail_cause from "@flick-lang/effect-ts/effect/Channel" "flickFailCause"
+foreign pure fail_cause from "flick:Channel" "flickFailCause"
   reviewed "effect@4.1.2 sha256:03792d66697f02f4"
 
 /// Fails with the cause of the failure `f` computes when the channel runs.
 fail_cause_sync : (Unit -> Failure e) -> Channel none e i o d ie id
-foreign pure fail_cause_sync from "@flick-lang/effect-ts/effect/Channel" "flickFailCauseSync"
+foreign pure fail_cause_sync from "flick:Channel" "flickFailCauseSync"
   reviewed "effect@4.1.2 sha256:937d3dcba53a5d9c"
 
 /// Emits what the task gives, then ends.
 from_effect : Eff r e o -> Channel r e i o Unit ie id
-foreign pure from_effect from "@flick-lang/effect-ts/effect/Channel" "fromEffect"
+foreign pure from_effect from "flick:Channel" "fromEffect"
   reviewed "effect@4.1.2 sha256:389dcdd3d7221343"
 
 /// Runs the task and ends with what it gives, emitting nothing.
 from_effect_done : Eff r e d -> Channel r e i o d ie id
-foreign pure from_effect_done from "@flick-lang/effect-ts/effect/Channel" "fromEffectDone"
+foreign pure from_effect_done from "flick:Channel" "fromEffectDone"
   reviewed "effect@4.1.2 sha256:caa4510a6814846c"
 
 /// Runs the task for its effects, emitting nothing.
 from_effect_drain : Eff r e a -> Channel r e i o Unit ie id
-foreign pure from_effect_drain from "@flick-lang/effect-ts/effect/Channel" "fromEffectDrain"
+foreign pure from_effect_drain from "flick:Channel" "fromEffectDrain"
   reviewed "effect@4.1.2 sha256:4c955355be057a17"
 
 /// Emits the messages of the queue until it ends, failing when it fails.
 from_queue : Queue.Queue e o -> Channel none e i o Unit ie id
-foreign pure from_queue from "@flick-lang/effect-ts/effect/Channel" "fromQueue"
+foreign pure from_queue from "flick:Channel" "fromQueue"
   reviewed "effect@4.1.2 sha256:39a6a526e010d509"
 
 /// `from_queue`, a chunk of the messages there are at a time.
 from_queue_array : Queue.Queue e o -> Channel none e i (NonEmpty.NonEmpty o) Unit ie id
-foreign pure from_queue_array from "@flick-lang/effect-ts/effect/Channel" "fromQueueArray"
+foreign pure from_queue_array from "flick:Channel" "fromQueueArray"
   reviewed "effect@4.1.2 sha256:78d229cf3b587507"
 
 /// Emits the messages of a subscription; the channel holds its region, so
 /// it cannot leave the subscription's `scope`.
 from_subscription : PubSub.Subscription s a -> (Channel none none i a Unit ie id)^{s}
-foreign pure from_subscription from "@flick-lang/effect-ts/effect/Channel" "fromSubscription"
+foreign pure from_subscription from "flick:Channel" "fromSubscription"
   retention owner
   reviewed "effect@4.1.2 sha256:669854ebe54e976a"
 
 /// `from_subscription`, a chunk of the messages there are at a time.
 from_subscription_array :
   PubSub.Subscription s a -> (Channel none none i (NonEmpty.NonEmpty a) Unit ie id)^{s}
-foreign pure from_subscription_array from "@flick-lang/effect-ts/effect/Channel" "fromSubscriptionArray"
+foreign pure from_subscription_array from "flick:Channel" "fromSubscriptionArray"
   retention owner
   reviewed "effect@4.1.2 sha256:9f582a06b1b2f8df"
 
 /// Subscribes to the hub when it runs and emits what is published after.
 from_pubsub : PubSub.PubSub o -> Channel none none i o Unit ie id
-foreign pure from_pubsub from "@flick-lang/effect-ts/effect/Channel" "fromPubSub"
+foreign pure from_pubsub from "flick:Channel" "fromPubSub"
   reviewed "effect@4.1.2 sha256:d88d59eea611a6ae"
 
 /// `from_pubsub`, a chunk of the messages there are at a time.
 from_pubsub_array : PubSub.PubSub o -> Channel none none i (NonEmpty.NonEmpty o) Unit ie id
-foreign pure from_pubsub_array from "@flick-lang/effect-ts/effect/Channel" "fromPubSubArray"
+foreign pure from_pubsub_array from "flick:Channel" "fromPubSubArray"
   reviewed "effect@4.1.2 sha256:a6f2f8f41dcd3873"
 
 /// Emits each output of the schedule after its delay, and ends with the
 /// last one.
 from_schedule : Schedule.Schedule r e Unit o -> Channel r e i o o ie id
-foreign pure from_schedule from "@flick-lang/effect-ts/effect/Channel" "fromSchedule"
+foreign pure from_schedule from "flick:Channel" "fromSchedule"
   reviewed "effect@4.1.2 sha256:864848249a3516b2"
 
 /// The channel `f` builds each time it runs.
 suspend : (Unit -> Channel r e i o d ie id) -> Channel r e i o d ie id
-foreign pure suspend from "@flick-lang/effect-ts/effect/Channel" "suspend"
+foreign pure suspend from "flick:Channel" "suspend"
   reviewed "effect@4.1.2 sha256:31b5ac7e75b580bb"
 
 /// The channel the task builds when it runs.
 unwrap : Eff r1 e1 (Channel r e i o d ie id) -> Channel {Async | r + r1} (e + e1) i o d ie id
-foreign pure unwrap from "@flick-lang/effect-ts/effect/Channel" "unwrap"
+foreign pure unwrap from "flick:Channel" "unwrap"
   reviewed "effect@4.1.2 sha256:4a8553067c040687"
 
 /// Passes its input through unchanged.
 identity : Unit -> Channel none e a a d e d
-foreign pure identity from "@flick-lang/effect-ts/effect/Channel" "identity"
+foreign pure identity from "flick:Channel" "identity"
   arity 0
   reviewed "effect@4.1.2 sha256:f8dc97d1d9b0cfbc"
 
@@ -198,7 +198,7 @@ callback :
   { bufferSize : Option Int; strategy : Option Queue.Strategy } ->
   (Queue.Queue e o ->{r; e} x) ->
   Channel r e i o Unit ie id
-foreign pure callback from "@flick-lang/effect-ts/effect/Channel" "flickCallback"
+foreign pure callback from "flick:Channel" "flickCallback"
   arity 2
   reviewed "effect@4.1.2 sha256:e5b5a66020a45e56"
 
@@ -207,13 +207,13 @@ callback_array :
   { bufferSize : Option Int; strategy : Option Queue.Strategy } ->
   (Queue.Queue e o ->{r; e} x) ->
   Channel r e i (NonEmpty.NonEmpty o) Unit ie id
-foreign pure callback_array from "@flick-lang/effect-ts/effect/Channel" "flickCallbackArray"
+foreign pure callback_array from "flick:Channel" "flickCallbackArray"
   arity 2
   reviewed "effect@4.1.2 sha256:1193663f7d774b8b"
 
 /// Acquires a value and emits it; `release` runs when the channel ends.
 acquire_release : (a ->{} x) -> Eff r e a -> Channel {Async | r} e i a Unit ie id
-foreign pure acquire_release from "@flick-lang/effect-ts/effect/Channel" "flickAcquireRelease"
+foreign pure acquire_release from "flick:Channel" "flickAcquireRelease"
   arity 1
   reviewed "effect@4.1.2 sha256:124c2f0c8fc66cb3"
 
@@ -224,7 +224,7 @@ acquire_use_release :
   (a -> Channel r2 e2 i o d ie id) ->
   (a -> Exit e2 d ->{} x) ->
   Channel (r + r2) (e + e2) i o d ie id
-foreign pure acquire_use_release from "@flick-lang/effect-ts/effect/Channel" "flickAcquireUseRelease"
+foreign pure acquire_use_release from "flick:Channel" "flickAcquireUseRelease"
   arity 3
   reviewed "effect@4.1.2 sha256:528da9b357e55f5d"
 
@@ -233,7 +233,7 @@ foreign pure acquire_use_release from "@flick-lang/effect-ts/effect/Channel" "fl
 from_readable_stream :
   { evaluate : Unit -> ReadableStream a; onError : JsValue -> Errors e; releaseLockOnEnd : Bool } ->
   Channel {Async} e i (NonEmpty.NonEmpty a) Unit ie id
-foreign pure from_readable_stream from "@flick-lang/effect-ts/effect/Channel" "fromReadableStream"
+foreign pure from_readable_stream from "flick:Channel" "fromReadableStream"
   reviewed "effect@4.1.2 sha256:4e65be7c520e690e"
 
 /// Writes its input chunks to a web stream, closing it at the end when
@@ -241,7 +241,7 @@ foreign pure from_readable_stream from "@flick-lang/effect-ts/effect/Channel" "f
 from_writable_stream :
   { evaluate : Unit -> WritableStream a; onError : JsValue -> Errors e; closeOnDone : Bool } ->
   Channel {Async} (e + ie) (NonEmpty.NonEmpty a) o Unit ie id
-foreign pure from_writable_stream from "@flick-lang/effect-ts/effect/Channel" "fromWritableStream"
+foreign pure from_writable_stream from "flick:Channel" "fromWritableStream"
   reviewed "effect@4.1.2 sha256:869c7804ecd600e6"
 
 /// Sends its input chunks through a web transform stream and emits what
@@ -254,19 +254,19 @@ from_transform_stream :
     releaseLockOnEnd : Bool;
   } ->
   Channel {Async} (e + ie) (NonEmpty.NonEmpty a) (NonEmpty.NonEmpty b) Unit ie id
-foreign pure from_transform_stream from "@flick-lang/effect-ts/effect/Channel" "fromTransformStream"
+foreign pure from_transform_stream from "flick:Channel" "fromTransformStream"
   reviewed "effect@4.1.2 sha256:74bf5c837cbd1f20"
 
 /// Emits the values of a JS async iterable and ends with what its
 /// iterator returns.
 from_async_iterable : AsyncIterable a d -> (JsValue -> Errors e) -> Channel {Async} e i a d ie id
-foreign pure from_async_iterable from "@flick-lang/effect-ts/effect/Channel" "fromAsyncIterable"
+foreign pure from_async_iterable from "flick:Channel" "fromAsyncIterable"
   arity 2
   reviewed "effect@4.1.2 sha256:192927e13d1bf857"
 
 /// `from_async_iterable`, in chunks.
 from_async_iterable_array :
   AsyncIterable a d -> (JsValue -> Errors e) -> Channel {Async} e i (NonEmpty.NonEmpty a) d ie id
-foreign pure from_async_iterable_array from "@flick-lang/effect-ts/effect/Channel" "fromAsyncIterableArray"
+foreign pure from_async_iterable_array from "flick:Channel" "fromAsyncIterableArray"
   arity 2
   reviewed "effect@4.1.2 sha256:c86d9d2a6e4000ff"

@@ -87,18 +87,22 @@ const exportsOf = async (path: string): Promise<Set<string>> => {
   return new Set(typeof module === "object" && module !== null ? Object.keys(module) : []);
 };
 
-/** The `core` module standing for a runtime module a built-in binds. */
-const corePath = (spec: string): string =>
-  `${spec.replace(/^@flick-lang\/runtime(?:\/effect)?/, "../src/core").replace(/core$/, "core/index")}.ts`;
+/** The `core` module of a key a built-in binds. */
+const corePath = (spec: string): string => {
+  const core = policy.routes.find(([from]) => from === spec)?.[1];
+  assert.ok(core, `${spec} has no module of core`);
+  return `${core.replace("@flick-lang/runtime/", "../src/").replace(/core$/, "core/index")}.ts`;
+};
 
 test("core has every binding of the built-in modules without effects", async () => {
   const modules = builtins();
   assert.ok(modules.includes("Prelude") && modules.includes("List"), modules.join(", "));
   const bindings = modules.flatMap((module) =>
-    [...source(module).matchAll(/^foreign \w+ \w+ from "(@flick-lang\/runtime[^"]*)" "(\w+)"/gm)].map(
+    [...source(module).matchAll(/^foreign (?:\w+ )?\w+ from "(flick:[^"]*)" "(\w+)"/gm)].map(
       ([, spec = "", name = ""]) => ({ module, spec, name }),
     ),
   );
+  assert.ok(bindings.length > 100, `${bindings.length} bindings`);
   const paths = [...new Set(bindings.map((b) => corePath(b.spec)))];
   const exported = new Map(await Promise.all(paths.map(async (p) => [p, await exportsOf(p)] as const)));
   for (const { module, spec, name } of bindings) {

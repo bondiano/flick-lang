@@ -9,5 +9,5 @@ import HttpApi exposing (Api)
 /// documents them. A client of the same endpoints has the prefix in its
 /// base: `HttpApi.call "/api" Users.endpoints.login request`.
 under : String -> Api r gs -> Api r gs
-foreign pure under from "@flick-lang/effect-ts/effect/http-api/HttpApi" "httpApiUnder"
+foreign pure under from "flick:http-api/HttpApi" "httpApiUnder"
   arity 2

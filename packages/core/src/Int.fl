@@ -15,12 +15,12 @@ max_value : Int
 let max_value = 2147483647
 
 to_string : Int -> String
-foreign pure to_string from "@flick-lang/effect-ts" "stringFromNumber"
+foreign pure to_string from "flick:rt" "stringFromNumber"
 
 /// The `Int` the decimal digits spell, with an optional sign; `None` for
 /// other text and for numbers out of range.
 parse : String -> Option Int
-foreign pure parse from "@flick-lang/effect-ts" "intParse"
+foreign pure parse from "flick:rt" "intParse"
 
 /// The same number as a `Float`; every `Int` is exact.
 to_float : Int -> Float
@@ -28,16 +28,16 @@ foreign pure to_float from global "Number"
 
 /// `n` when it is a whole number in the range of `Int`.
 from_float : Float -> Option Int
-foreign pure from_float from "@flick-lang/effect-ts" "intFromFloat"
+foreign pure from_float from "flick:rt" "intFromFloat"
 
 /// `n` with its fraction dropped, wrapped around into `Int`; NaN and the
 /// infinities are 0.
 truncate : Float -> Int
-foreign pure truncate from "@flick-lang/effect-ts" "intTruncate"
+foreign pure truncate from "flick:rt" "intTruncate"
 
 /// `abs min_value` wraps around to `min_value`.
 abs : Int -> Int
-foreign pure abs from "@flick-lang/effect-ts" "intAbs"
+foreign pure abs from "flick:rt" "intAbs"
 
 min : Int -> Int -> Int
 let min a b = if a <= b then a else b
@@ -46,52 +46,52 @@ max : Int -> Int -> Int
 let max a b = if a >= b then a else b
 
 checked_add : Int -> Int -> Result ArithmeticError Int
-foreign pure checked_add from "@flick-lang/effect-ts" "intCheckedAdd"
+foreign pure checked_add from "flick:rt" "intCheckedAdd"
 
 checked_sub : Int -> Int -> Result ArithmeticError Int
-foreign pure checked_sub from "@flick-lang/effect-ts" "intCheckedSub"
+foreign pure checked_sub from "flick:rt" "intCheckedSub"
 
 checked_mul : Int -> Int -> Result ArithmeticError Int
-foreign pure checked_mul from "@flick-lang/effect-ts" "intCheckedMul"
+foreign pure checked_mul from "flick:rt" "intCheckedMul"
 
 /// Division dropping the fraction; division by zero and
 /// `min_value / -1` are errors.
 checked_div : Int -> Int -> Result ArithmeticError Int
-foreign pure checked_div from "@flick-lang/effect-ts" "intCheckedDiv"
+foreign pure checked_div from "flick:rt" "intCheckedDiv"
 
 checked_rem : Int -> Int -> Result ArithmeticError Int
-foreign pure checked_rem from "@flick-lang/effect-ts" "intCheckedRem"
+foreign pure checked_rem from "flick:rt" "intCheckedRem"
 
 /// `a / b`, a defect when `b` is 0.
 unsafe_div : Int -> Int -> Int
-foreign pure unsafe_div from "@flick-lang/effect-ts" "intUnsafeDiv"
+foreign pure unsafe_div from "flick:rt" "intUnsafeDiv"
 
 /// `a % b`, a defect when `b` is 0.
 unsafe_rem : Int -> Int -> Int
-foreign pure unsafe_rem from "@flick-lang/effect-ts" "intUnsafeRem"
+foreign pure unsafe_rem from "flick:rt" "intUnsafeRem"
 
 bit_and : Int -> Int -> Int
-foreign pure bit_and from "@flick-lang/effect-ts" "bitAnd"
+foreign pure bit_and from "flick:rt" "bitAnd"
 
 bit_or : Int -> Int -> Int
-foreign pure bit_or from "@flick-lang/effect-ts" "bitOr"
+foreign pure bit_or from "flick:rt" "bitOr"
 
 bit_xor : Int -> Int -> Int
-foreign pure bit_xor from "@flick-lang/effect-ts" "bitXor"
+foreign pure bit_xor from "flick:rt" "bitXor"
 
 bit_not : Int -> Int
-foreign pure bit_not from "@flick-lang/effect-ts" "bitNot"
+foreign pure bit_not from "flick:rt" "bitNot"
 
 shift_left : Int -> Int -> Int
-foreign pure shift_left from "@flick-lang/effect-ts" "shiftLeft"
+foreign pure shift_left from "flick:rt" "shiftLeft"
 
 shift_right : Int -> Int -> Int
-foreign pure shift_right from "@flick-lang/effect-ts" "shiftRight"
+foreign pure shift_right from "flick:rt" "shiftRight"
 
 /// The shift that fills with zeros, its 32 bits read back as an `Int`.
 shift_right_unsigned : Int -> Int -> Int
-foreign pure shift_right_unsigned from "@flick-lang/effect-ts" "shiftRightUnsignedInt"
+foreign pure shift_right_unsigned from "flick:rt" "shiftRightUnsignedInt"
 
 /// A JSON number that is an `Int`.
 json : PureCodec Json Int
-foreign pure json from "@flick-lang/effect-ts" "codecInt"
+foreign pure json from "flick:rt" "codecInt"

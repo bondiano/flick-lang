@@ -49,25 +49,25 @@ type Draft a
 /// Empty texts and no errors. Its atoms live as long as the program, so a
 /// draft is defined with a top-level `let`.
 draft : Form a -> Draft a
-foreign pure draft from "@flick-lang/effect-ts" "formDraft"
+foreign pure draft from "flick:rt" "formDraft"
 
 /// The text of `field`, which its input shows and writes.
 text : Draft a -> Field -> Atom.Writable String
-foreign pure text from "@flick-lang/effect-ts" "formText"
+foreign pure text from "flick:rt" "formText"
 
 /// The problem shown under `field`, its error.
 problem : Draft a -> Field -> Atom.Writable (Option String)
-foreign pure problem from "@flick-lang/effect-ts" "formError"
+foreign pure problem from "flick:rt" "formError"
 
 /// The id of the input of `field`; its error's is this with `-error`.
 id : Draft a -> Field -> String
-foreign pure id from "@flick-lang/effect-ts" "formId"
+foreign pure id from "flick:rt" "formId"
 
 /// The record of the texts, or `None` when a field is not valid: then each
 /// field's error is its first issue, and the first invalid input has the
 /// focus.
 validate : Draft a ->{Atom.Write} Option a
-foreign effect validate from "@flick-lang/effect-ts" "formValidate"
+foreign effect validate from "flick:rt" "formValidate"
 
 /// Sets the error of `field`: the verdict of a check of its own.
 report : Draft a -> Field -> Option String ->{Atom.Write} Unit
@@ -124,13 +124,13 @@ let input form field label on_input =
 type Spec
 
 spec : String -> Schema a -> Bool -> Spec
-foreign pure spec from "@flick-lang/effect-ts" "formFieldSpec"
+foreign pure spec from "flick:rt" "formFieldSpec"
 
 /// The form of the record type `name`, of `fields`.
 make : Schema a -> String -> List Spec -> Form a
-foreign pure make from "@flick-lang/effect-ts" "formSpec"
+foreign pure make from "flick:rt" "formSpec"
 
 /// The field labeled `label`, unchecked: `deriving Form` writes one for
 /// each field of the record.
 unsafe_field : String -> Field
-foreign pure unsafe_field from "@flick-lang/effect-ts" "formUnsafeField"
+foreign pure unsafe_field from "flick:rt" "formUnsafeField"

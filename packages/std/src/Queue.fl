@@ -13,145 +13,145 @@ type Strategy = Suspend | Dropping | Sliding
 /// A queue of `capacity` messages (`None`: unbounded) with the strategy
 /// for a full queue (`None`: `Suspend`).
 make : { capacity : Option Int; strategy : Option Strategy } ->{} Queue e a
-foreign effect make from "@flick-lang/effect-ts/effect/Queue" "flickMake"
+foreign effect make from "flick:Queue" "flickMake"
   reviewed "effect@4.1.2 sha256:009d8cb446c6e86d"
 
 /// A queue of `capacity` messages whose `offer` waits for room.
 bounded : Int ->{} Queue e a
-foreign effect bounded from "@flick-lang/effect-ts/effect/Queue" "bounded"
+foreign effect bounded from "flick:Queue" "bounded"
   reviewed "effect@4.1.2 sha256:d7c89540c619f6b3"
 
 /// A queue of `capacity` messages that drops the oldest to make room.
 sliding : Int ->{} Queue e a
-foreign effect sliding from "@flick-lang/effect-ts/effect/Queue" "sliding"
+foreign effect sliding from "flick:Queue" "sliding"
   reviewed "effect@4.1.2 sha256:3236daafd99c18df"
 
 /// A queue of `capacity` messages that drops new ones while full.
 dropping : Int ->{} Queue e a
-foreign effect dropping from "@flick-lang/effect-ts/effect/Queue" "dropping"
+foreign effect dropping from "flick:Queue" "dropping"
   reviewed "effect@4.1.2 sha256:e8890cc4127ac82e"
 
 /// A queue without a bound.
 unbounded : Unit ->{} Queue e a
-foreign effect unbounded from "@flick-lang/effect-ts/effect/Queue" "unbounded"
+foreign effect unbounded from "flick:Queue" "unbounded"
   arity 0
   reviewed "effect@4.1.2 sha256:9558a872951e64c3"
 
 /// Adds `message`, waiting for room in a full `Suspend` queue; whether it
 /// was added.
 offer : a -> Queue e a ->{Async} Bool
-foreign effect offer from "@flick-lang/effect-ts/effect/Queue" "offer"
+foreign effect offer from "flick:Queue" "offer"
   arity 1
   reviewed "effect@4.1.2 sha256:c5bcbfeef634138f"
 
 /// Adds the messages in order; the ones that were not added.
 offer_all : List a -> Queue e a ->{Async} List a
-foreign effect offer_all from "@flick-lang/effect-ts/effect/Queue" "offerAll"
+foreign effect offer_all from "flick:Queue" "offerAll"
   arity 1
   reviewed "effect@4.1.2 sha256:ae494cd6cde81db7"
 
 /// Fails the queue with `error`: takes drain what is left, then fail with
 /// it. Whether this call ended the queue.
 fail : Errors e -> Queue e a ->{} Bool
-foreign effect fail from "@flick-lang/effect-ts/effect/Queue" "fail"
+foreign effect fail from "flick:Queue" "fail"
   arity 1
   reviewed "effect@4.1.2 sha256:727c3289869f50ad"
 
 /// Fails the queue with the whole cause of `failure`.
 fail_cause : Failure e -> Queue e a ->{} Bool
-foreign effect fail_cause from "@flick-lang/effect-ts/effect/Queue" "flickFailCause"
+foreign effect fail_cause from "flick:Queue" "flickFailCause"
   arity 1
   reviewed "effect@4.1.2 sha256:cbf70a0ccaf94f66"
 
 /// Ends the queue: takes drain what is left, then give `None`. Whether
 /// this call ended it.
 end : Queue e a ->{} Bool
-foreign effect end from "@flick-lang/effect-ts/effect/Queue" "end"
+foreign effect end from "flick:Queue" "end"
   reviewed "effect@4.1.2 sha256:e803636ec2213063"
 
 /// Stops taking offers; once what is left is drained, the queue ends with
 /// an interruption.
 interrupt : Queue e a ->{} Bool
-foreign effect interrupt from "@flick-lang/effect-ts/effect/Queue" "interrupt"
+foreign effect interrupt from "flick:Queue" "interrupt"
   reviewed "effect@4.1.2 sha256:58cc87dde3142e84"
 
 /// Ends the queue at once, dropping what is left and interrupting the
 /// tasks that wait on it.
 shutdown : Queue e a ->{} Bool
-foreign effect shutdown from "@flick-lang/effect-ts/effect/Queue" "shutdown"
+foreign effect shutdown from "flick:Queue" "shutdown"
   reviewed "effect@4.1.2 sha256:7a2cf2f1690cd992"
 
 /// Takes every message there is, without waiting.
 clear : Queue e a ->{; e} List a
-foreign effect clear from "@flick-lang/effect-ts/effect/Queue" "clear"
+foreign effect clear from "flick:Queue" "clear"
   reviewed "effect@4.1.2 sha256:296b5e19c0eb2a0f"
 
 /// Takes every message there is, waiting for at least one; `None` once the
 /// queue has ended.
 take_all : Queue e a ->{Async; e} Option (NonEmpty.NonEmpty a)
-foreign effect take_all from "@flick-lang/effect-ts/effect/Queue" "flickTakeAll"
+foreign effect take_all from "flick:Queue" "flickTakeAll"
   reviewed "effect@4.1.2 sha256:170d42fe7835aca7"
 
 /// Takes messages until the queue ends.
 collect : Queue e a ->{Async; e} List a
-foreign effect collect from "@flick-lang/effect-ts/effect/Queue" "collect"
+foreign effect collect from "flick:Queue" "collect"
   reviewed "effect@4.1.2 sha256:bb7ddca7be71be4a"
 
 /// Takes `n` messages, waiting for them, or what is left of an ended
 /// queue; `None` once it is empty.
 take_n : Int -> Queue e a ->{Async; e} Option (List a)
-foreign effect take_n from "@flick-lang/effect-ts/effect/Queue" "flickTakeN"
+foreign effect take_n from "flick:Queue" "flickTakeN"
   arity 1
   reviewed "effect@4.1.2 sha256:9738231cc25a25cf"
 
 /// Takes at least `min` and at most `max` messages, as `take_n` does.
 take_between : Int -> Int -> Queue e a ->{Async; e} Option (List a)
-foreign effect take_between from "@flick-lang/effect-ts/effect/Queue" "flickTakeBetween"
+foreign effect take_between from "flick:Queue" "flickTakeBetween"
   arity 2
   reviewed "effect@4.1.2 sha256:171bd6b4aaaa6bb8"
 
 /// Takes the next message, waiting for one; `None` once the queue has
 /// ended.
 take : Queue e a ->{Async; e} Option a
-foreign effect take from "@flick-lang/effect-ts/effect/Queue" "flickTake"
+foreign effect take from "flick:Queue" "flickTake"
   reviewed "effect@4.1.2 sha256:67034406d934669f"
 
 /// Takes the next message if there is one, without waiting.
 poll : Queue e a ->{} Option a
-foreign effect poll from "@flick-lang/effect-ts/effect/Queue" "poll"
+foreign effect poll from "flick:Queue" "poll"
   reviewed "effect@4.1.2 sha256:1eaeb8dbf0140a50"
 
 /// The next message without taking it, waiting for one; `None` once the
 /// queue has ended.
 peek : Queue e a ->{Async; e} Option a
-foreign effect peek from "@flick-lang/effect-ts/effect/Queue" "flickPeek"
+foreign effect peek from "flick:Queue" "flickPeek"
   reviewed "effect@4.1.2 sha256:729ae505fa36662c"
 
 /// Wakes the tasks waiting to take now, instead of at the queue's next
 /// scheduled release.
 flush : Queue e a ->{} Unit
-foreign effect flush from "@flick-lang/effect-ts/effect/Queue" "flush"
+foreign effect flush from "flick:Queue" "flush"
   reviewed "effect@4.1.2 sha256:a02312bfbec68ab8"
 
 /// Waits until the queue has ended; fails if it was failed.
 await_ : Queue e a ->{Async; e} Unit
-foreign effect await_ from "@flick-lang/effect-ts/effect/Queue" "await"
+foreign effect await_ from "flick:Queue" "await"
   reviewed "effect@4.1.2 sha256:6d927f44cb6bdc97"
 
 /// The number of messages in the queue.
 size : Queue e a ->{} Int
-foreign effect size from "@flick-lang/effect-ts/effect/Queue" "size"
+foreign effect size from "flick:Queue" "size"
   reviewed "effect@4.1.2 sha256:a649f69a2297e842"
 
 /// Whether the queue is at its capacity.
 is_full : Queue e a ->{} Bool
-foreign effect is_full from "@flick-lang/effect-ts/effect/Queue" "isFull"
+foreign effect is_full from "flick:Queue" "isFull"
   reviewed "effect@4.1.2 sha256:c8455bf8afd3569e"
 
 /// Runs `task` and then ends `queue`, or fails it as the task failed:
 /// `task |> Queue.into queue`.
 into : Queue e a -> (Eff r e x)^c ->{r} Bool
-foreign effect into from "@flick-lang/effect-ts/effect/Queue" "into"
+foreign effect into from "flick:Queue" "into"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:a562d285d36514e8"

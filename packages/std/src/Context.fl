@@ -14,81 +14,81 @@ type Reference a
 
 /// No services.
 empty : Unit -> Context none
-foreign pure empty from "@flick-lang/effect-ts/effect/Context" "empty"
+foreign pure empty from "flick:Context" "empty"
   arity 0
   reviewed "effect@4.1.2 sha256:e98aad0c1688d8ec"
 
 /// The one service of `tag`.
 make : ServiceTag r -> ServiceImpl r -> Context r
-foreign pure make from "@flick-lang/effect-ts/effect/Context" "make"
+foreign pure make from "flick:Context" "make"
   reviewed "effect@4.1.2 sha256:7150290f90371e88"
 
 /// `context` with the service of `tag` added or replaced.
 add : ServiceTag r -> ServiceImpl r -> Context rest -> Context (r + rest)
-foreign pure add from "@flick-lang/effect-ts/effect/Context" "add"
+foreign pure add from "flick:Context" "add"
   arity 2
   reviewed "effect@4.1.2 sha256:3400ca95dbeb89f7"
 
 /// `add` for `Some impl`; for `None`, `context` without the service of `tag`.
 add_or_omit : ServiceTag r -> Option (ServiceImpl r) -> Context (r + rest) -> Context rest
-foreign pure add_or_omit from "@flick-lang/effect-ts/effect/Context" "addOrOmit"
+foreign pure add_or_omit from "flick:Context" "addOrOmit"
   arity 2
   reviewed "effect@4.1.2 sha256:43b962a0e2db7217"
 
 /// The service of `tag`, which the type says `context` has.
 get : ServiceTag r -> Context (r + rest) -> ServiceImpl r
-foreign pure get from "@flick-lang/effect-ts/effect/Context" "get"
+foreign pure get from "flick:Context" "get"
   arity 1
   reviewed "effect@4.1.2 sha256:ed6329e5df3589ba"
 
 /// The service of `tag` if `context` has it.
 get_option : ServiceTag r -> Context rest -> Option (ServiceImpl r)
-foreign pure get_option from "@flick-lang/effect-ts/effect/Context" "getOption"
+foreign pure get_option from "flick:Context" "getOption"
   arity 1
   reviewed "effect@4.1.2 sha256:482c0907d6550b14"
 
 /// The service of `tag`, or what `fallback` returns if `context` lacks it.
 get_or_else : ServiceTag r -> (Unit -> ServiceImpl r) -> Context rest -> ServiceImpl r
-foreign pure get_or_else from "@flick-lang/effect-ts/effect/Context" "getOrElse"
+foreign pure get_or_else from "flick:Context" "getOrElse"
   arity 2
   reviewed "effect@4.1.2 sha256:cafad73bf4a879d5"
 
 /// The services of both; those of `that` replace the same ones of `context`.
 merge : Context r1 -> Context r2 -> Context (r1 + r2)
-foreign pure merge from "@flick-lang/effect-ts/effect/Context" "merge"
+foreign pure merge from "flick:Context" "merge"
   arity 1
   reviewed "effect@4.1.2 sha256:80df21b6e10e1fd3"
 
 /// The services of `first` and every context of `rest`, later ones
 /// replacing earlier ones.
 merge_all : Context r -> List (Context r) -> Context r
-foreign pure merge_all from "@flick-lang/effect-ts/effect/Context" "flickMergeAll"
+foreign pure merge_all from "flick:Context" "flickMergeAll"
   reviewed "effect@4.1.2 sha256:77e6a3893c5da256"
 
 /// Only the service of `tag`.
 pick : ServiceTag r -> Context (r + rest) -> Context r
-foreign pure pick from "@flick-lang/effect-ts/effect/Context" "pick"
+foreign pure pick from "flick:Context" "pick"
   arity 1
   reviewed "effect@4.1.2 sha256:8372cb4fb975f11a"
 
 /// `context` without the service of `tag`.
 omit : ServiceTag r -> Context (r + rest) -> Context rest
-foreign pure omit from "@flick-lang/effect-ts/effect/Context" "omit"
+foreign pure omit from "flick:Context" "omit"
   arity 1
   reviewed "effect@4.1.2 sha256:eb5a435a796919f7"
 
 /// A reference named `key` whose value is `default ()` until a task gives
 /// another with `with_reference`; references are told apart by their key.
 reference : String -> (Unit -> a) -> Reference a
-foreign pure reference from "@flick-lang/effect-ts/effect/Context" "flickReference"
+foreign pure reference from "flick:Context" "flickReference"
   reviewed "effect@4.1.2 sha256:9057b7423964b7fb"
 
 /// The current value of `ref`.
 read : Reference a ->{} a
-foreign effect read from "@flick-lang/effect-ts/effect/Context" "flickRead"
+foreign effect read from "flick:Context" "flickRead"
 
 /// Runs `task` with `value` as the value of `ref`.
 with_reference : Reference a -> a -> (Eff r e b)^c ->{r; e} b
-foreign effect with_reference from "@flick-lang/effect-ts/effect/Context" "flickWithReference"
+foreign effect with_reference from "flick:Context" "flickWithReference"
   arity 2
   retention call
