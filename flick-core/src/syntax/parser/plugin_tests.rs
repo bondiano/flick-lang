@@ -280,3 +280,56 @@ fn a_hole_is_a_pattern_or_a_declaration_where_it_stands() {
     assert_eq!(decl.tree.kind, K::LetDecl);
     assert_eq!(text_of(&src, &decl.tree), "let f (n : Int) x =\n  n + x");
 }
+
+/// The shape of a node: its kind and those of its nodes, as `App(Name, Children(…))`.
+fn shape(node: &Node) -> String {
+    let inner: Vec<String> = node.nodes().map(shape).collect();
+    let kind = format!("{:?}", node.kind);
+    let kind = kind.trim_end_matches("Expr");
+    if inner.is_empty() {
+        kind.to_owned()
+    } else {
+        format!("{kind}({})", inner.join(", "))
+    }
+}
+
+#[test]
+fn the_lines_under_a_call_are_its_children_where_a_block_asks_for_them() {
+    let src = format!(
+        "{IMPORT}let v = pairs {{\n  div props\n    heading (text \"a\")\n    paragraph\n      text \"b\"\n      text \"c\"\n    spacer\n  last\n}}\n"
+    );
+    let (_, tokens) = body(&src);
+    let file = FileId::default();
+    let lines = parse_lines_at(&src, file, &from(&src, &tokens, "div"), &[]).expect("a body");
+    assert!(lines.diagnostics.is_empty(), "{:?}", lines.diagnostics);
+    // two statements: the call with its children, nested by their indent, and `last`
+    assert_eq!(
+        shape(&lines.tree),
+        "Block(App(Name, Name, Children(App(Name, Paren(App(Name, Literal))), \
+         App(Name, Children(App(Name, Literal), App(Name, Literal))), Name)), Name)"
+    );
+    // read as a body, the same lines are the arguments of the call, one by one
+    let body = parse_body_at(&src, file, &from(&src, &tokens, "div"), &[]).expect("a body");
+    assert!(
+        !shape(&body.tree).contains("Children"),
+        "{}",
+        shape(&body.tree)
+    );
+}
+
+#[test]
+fn a_line_that_goes_on_with_an_expression_is_no_child() {
+    // inside brackets, after an operator and at a branch of an `if`
+    let src = format!(
+        "{IMPORT}let v = pairs {{\n  text (join\n    names)\n  first\n    |> second\n  if ready then\n    shown\n  else\n    hidden\n}}\n"
+    );
+    let (_, tokens) = body(&src);
+    let lines =
+        parse_lines_at(&src, FileId::default(), &from(&src, &tokens, "text"), &[]).expect("a body");
+    assert!(lines.diagnostics.is_empty(), "{:?}", lines.diagnostics);
+    assert!(
+        !shape(&lines.tree).contains("Children"),
+        "{}",
+        shape(&lines.tree)
+    );
+}

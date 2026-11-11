@@ -1,0 +1,66 @@
+// The children of an element inside `ui { … }`: each a line of its own
+// under the call, or an argument on its line; none is the empty list, and
+// one argument that is a list is the list of them.
+module App.ChildrenLines exposing (..)
+
+title : String -> Ui
+let title shown = ui { heading (text "count \{shown}") }
+
+spacer : Ui
+let spacer = ui { div { class_name = "spacer" } }
+
+row : String -> Ui
+let row label = ui { item (text "row \{label}") }
+
+rows : List String -> Ui
+let rows labels = ui { list (List.map row labels) }
+
+each_row : List String -> Ui
+let each_row labels = ui {
+  list
+    item (text "first")
+    each labels row
+}
+
+passed : List Ui -> Ui
+let passed children = ui { div { class_name = "passed" } children }
+
+joined : List Ui -> Ui -> Ui
+let joined before last = ui { paragraph (before ++ [last]) }
+
+view : Ui.View Float
+let view =
+  Ui.view (fun n -> ui {
+    let shown = show n
+    div { class_name = "counter" }
+      // a line for each child
+      heading (text "count \{shown}")
+      paragraph
+        text "it is \{shown}"
+        text "today"
+      div { class_name = "spacer" }
+      if n > 0 then text "positive" else text "none"
+      match n with
+      | 0 -> empty
+      | _ -> text "some \{shown}"
+      (title shown)
+  })
+
+// two children on the line of the call
+pair : Ui
+let pair = ui { paragraph (text "one") (text "two") }
+
+// the lines under a call that takes no children are its arguments
+classed : String -> Ui -> Ui
+let classed name child = ui { div { class_name = name } child }
+
+wrapped : Ui
+let wrapped = ui {
+  classed
+    "wrapped"
+    (text "inside")
+}
+
+// outside `ui` the same functions take their list
+plain : Ui
+let plain = Ui.div { class_name = "plain" } [Ui.text "a", Ui.text "b"]
