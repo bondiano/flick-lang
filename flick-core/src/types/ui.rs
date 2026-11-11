@@ -238,7 +238,7 @@ impl Checker<'_> {
                 .entries
                 .iter()
                 .filter_map(|(l, _)| l.name())
-                .eq(["Prelude.Setup"])
+                .eq(lang::label(Lang::Setup))
     }
 
     /// `ty` resolved, without its captures and quantifiers.
