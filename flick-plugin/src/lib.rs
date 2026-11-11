@@ -189,6 +189,14 @@ pub enum Expr {
         statements: Vec<NodeId>,
         result: NodeId,
     },
+    /// `body` with the module `module` open: a name the module exports is
+    /// that one there, before the names of the file, unless a local of the
+    /// body hides it. No source writes this; a block that brings the names
+    /// of its library into sight stands for it.
+    Open {
+        module: String,
+        body: NodeId,
+    },
 }
 
 /// An arm of a `match`: its pattern, maybe a guard, and its value.

@@ -13,6 +13,7 @@ pub use decl::DECL_PLACEHOLDER;
 
 use super::source::{in_signature, signed};
 use crate::source::FileId;
+use crate::syntax::heads::OPEN;
 use crate::syntax::kind::SyntaxKind as K;
 use crate::syntax::lexer::{lex, lex_generated};
 
@@ -202,6 +203,17 @@ impl Printer<'_> {
                 return Err("a block is only the body of a `fun` or a `let`".into());
             }
             Expr::Block { statements, result } => self.block(statements, *result, d)?,
+            Expr::Open { module, body } => {
+                // the node ends with its own `)`, so that a span of it is the
+                // block's and not the body's
+                self.push(OPEN);
+                self.push(" ");
+                // by the name the file imports it under, as a name of it
+                self.name(module, Names::Module)?;
+                self.push(" (");
+                self.node(*body, Role::Expr, d)?;
+                self.push(")");
+            }
         }
         Ok(())
     }
@@ -463,6 +475,8 @@ enum Names {
     Constructor,
     /// A record label or a variable.
     Label,
+    /// A module by its path: `Ui`, `Ui.Event`.
+    Module,
 }
 
 impl Names {
@@ -481,7 +495,7 @@ impl Names {
         match self {
             Names::Label => kinds == [K::Ident],
             Names::Value | Names::Type => qualified && matches!(last, K::Ident | K::Con),
-            Names::Constructor => qualified && *last == K::Con,
+            Names::Constructor | Names::Module => qualified && *last == K::Con,
         }
     }
 
@@ -491,6 +505,7 @@ impl Names {
             Names::Type => "a type name",
             Names::Constructor => "a constructor name",
             Names::Label => "a lowercase name",
+            Names::Module => "a module",
         }
     }
 }

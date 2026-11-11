@@ -13,10 +13,17 @@ use crate::types::lang::{self, Lang};
 use flick_ir::Label;
 
 impl Checker<'_> {
+    /// The innermost module a block around the expression opens that exports
+    /// `name`, as the file names the module.
+    pub(super) fn opened_with(&self, namespace: Namespace, name: &str) -> Option<String> {
+        let exports = |module: &&String| matches!(self.env.qualified_module(module), Some((_, Some(i))) if i.find(namespace, name).is_some());
+        self.opened.iter().rev().find(exports).cloned()
+    }
+
     /// A foreign component takes props only inside `ui`, through `Ui.component`.
     pub fn ui_callable(&mut self, ty: &Type, call: Range, span: Span) -> Type {
         let target = self.whnf(ty);
-        if self.ui > 0
+        if self.opened.iter().any(|module| module == "Ui")
             && matches!(
                 &target,
                 Type::App { head, .. }

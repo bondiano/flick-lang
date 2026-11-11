@@ -303,6 +303,9 @@ syntax_kinds! {
         ScopeExpr,
         ProvideExpr,
         UiExpr,
+        /// A body with a module open, which only generated code writes: the
+        /// names of the module are in sight in it before the file's own.
+        OpenExpr,
         /// `head { … }` of a head an import exposes as `plugin head`: the body is
         /// kept as tokens, which the plugin reads.
         PluginExpr,

@@ -30,7 +30,7 @@ pub fn expand(
 ) -> Option<Result<Arena, Vec<Diagnostic>>> {
     let expression = matches!(
         block.head.as_str(),
-        "named" | "text_of" | "capture" | "typed" | "linted" | "twice"
+        "named" | "text_of" | "capture" | "typed" | "linted" | "twice" | "opens"
     );
     let declaration = matches!(
         block.head.as_str(),
@@ -58,6 +58,7 @@ pub fn expand(
         "capture" => capture(block, compiler, &mut b),
         "twice" => twice(block, compiler, &mut b),
         "typed" | "linted" => typed(block, compiler, &mut b),
+        "opens" => opens(block, compiler, &mut b),
         "define" => define(block, compiler, &mut b),
         "companion" => companion(block, compiler, &mut b),
         "table" => table(block, compiler, &mut b),
@@ -275,6 +276,20 @@ fn table(
     lower[..1].make_ascii_lowercase();
     let value = flick!(b @ at, let #(lower) : #(Name(&name)) = { #(..values) });
     Ok(b.group(vec![alias, value]))
+}
+
+/// The user's code with the module `Pairs` open: its names need no import.
+fn opens(
+    block: &Block,
+    compiler: &mut dyn Compiler,
+    b: &mut Builder,
+) -> Result<u32, Vec<Diagnostic>> {
+    let e = block.body().expr(compiler).map_err(|d| vec![d])?;
+    let body = b.at(e).expr(Expr::Hole(e));
+    Ok(b.at(block.whole()).expr(Expr::Open {
+        module: "Pairs".into(),
+        body,
+    }))
 }
 
 /// `(e : _)`, the `_` at `e`.

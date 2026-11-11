@@ -59,6 +59,8 @@ interface types {
   record branches { condition: node-id, then: node-id, otherwise: node-id }
   record statements { items: list<node-id>, %result: node-id }
 
+  record opened { module: string, body: node-id }
+
   variant expr {
     name(string),
     number(f64),
@@ -83,6 +85,9 @@ interface types {
     /// statement is a local `let`, a signature, a hole of one, or an
     /// expression.
     block(statements),
+    /// The body with a module open: its names are in sight there before
+    /// the file's own. No source writes it.
+    open(opened),
   }
 
   variant ty {

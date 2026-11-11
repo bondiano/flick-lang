@@ -158,7 +158,7 @@ and with the span of the block it stands for:
 
 | Kind | Nodes |
 | - | - |
-| expression | name, number, text, boolean, unit, application, lambda, record, field, list, tuple, annotation, hole, concatenation (`a ++ b`), `match` with guards, `if`, a block of statements and its value |
+| expression | name, number, text, boolean, unit, application, lambda, record, field, list, tuple, annotation, hole, concatenation (`a ++ b`), `match` with guards, `if`, a block of statements and its value, a body with a module open |
 | type | name, application, record, function, tuple, type-level text (`"name"`), `_`, `forall`, row, hole, a type of the signature |
 | pattern | variable, wildcard, constructor, record, tuple, hole |
 | declaration | `let`, signature, `type alias`, `type` with constructors and `deriving`, `instance` with members, a group of several or none, documentation of one, hole |
@@ -170,7 +170,11 @@ signature and an annotation, and a pattern too, as the props of a component
 its setup and its render bind), and its size and depth are bounded. A block
 is only the body of a `fun` or a `let`; its statements are `let`s,
 signatures, holes of them or expressions, and a hole of a declaration there is
-a `let` or a signature of the user's. A whole number is
+a `let` or a signature of the user's. A body with a module open names the
+module by its path: in the body, a name the module exports is that one,
+before the names of the file, unless a local hides it; no source writes
+this form, which is how a block brings the names of its library into
+sight. A whole number is
 an integer literal, of any numeric type its use asks for; a declaration
 block whose group is empty declares nothing. A function in a
 plugin's code needs no signature: its type is inferred. The arena version is the version of the interface,

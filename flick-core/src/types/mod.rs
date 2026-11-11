@@ -339,7 +339,7 @@ fn run_in(
         kinds: KindStore::default(),
         diagnostics: Vec::new(),
         cx: ItemCx::default(),
-        ui: 0,
+        opened: Vec::new(),
         contract_types: Vec::new(),
         opened_modules: Vec::new(),
         sites: Vec::new(),
@@ -533,9 +533,10 @@ struct Checker<'a> {
     kinds: KindStore,
     diagnostics: Vec<Diagnostic>,
     cx: ItemCx,
-    /// How many `ui { … }` blocks enclose the expression: inside one, the
-    /// names `Ui` exports need no `Ui.`.
-    ui: usize,
+    /// The modules the blocks around the expression open, innermost last,
+    /// each as the file names it: a name one of them exports is that one,
+    /// before the names of the file. `ui { … }` opens `Ui`.
+    opened: Vec<String>,
     /// Capitalized type members visible only while checking a `type module` body.
     contract_types: Vec<(String, Type, kinds::Kind)>,
     /// Lexically opened `Module Sig` values, innermost first on lookup.

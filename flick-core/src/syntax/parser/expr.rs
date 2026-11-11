@@ -3,6 +3,7 @@
 use super::control::{control_expr, while_ahead};
 use super::{Done, K, Parser, decl, pattern, plugin, types};
 use crate::diagnostics::codes;
+use crate::syntax::heads::OPEN;
 
 /// A statement of a block: `let`, a local signature, an assignment or an
 /// expression.
@@ -331,6 +332,12 @@ fn atom(p: &mut Parser) -> Option<Done> {
     let m = p.start();
     let kind = match p.current() {
         K::Ident if plugin::at_block(p) => plugin::block(p),
+        K::Ident if p.at_word(OPEN) => {
+            p.bump();
+            con_path(p);
+            atom(p);
+            K::OpenExpr
+        }
         K::Ident => {
             p.bump();
             K::NameExpr

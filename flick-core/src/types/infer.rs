@@ -290,12 +290,20 @@ impl Checker<'_> {
             K::ScopeExpr => self.scope_expr(node, None),
             K::ProvideExpr => self.provide(node, None),
             K::UiExpr => {
-                self.ui += 1;
+                self.opened.push("Ui".to_owned());
                 let ty = node
                     .nodes()
                     .find(|n| n.kind == K::Block)
                     .map_or(Type::Error, |b| self.block(b, None));
-                self.ui -= 1;
+                self.opened.pop();
+                ty
+            }
+            K::OpenExpr => {
+                let path = node.child_tokens().filter(|t| t.kind == K::Con);
+                let module: Vec<&str> = path.map(|t| t.text(self.text)).collect();
+                self.opened.push(module.join("."));
+                let ty = (node.nodes().next()).map_or(Type::Error, |body| self.infer(body));
+                self.opened.pop();
                 ty
             }
             _ => Type::Error,
