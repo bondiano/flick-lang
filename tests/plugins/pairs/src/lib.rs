@@ -241,10 +241,43 @@ impl Plugin for Pairs {
 
     /// What the calls the package watches must hold: `tally` counts from
     /// one, as `X005` at its argument. A call of `boom` fails the plugin.
+    /// A value a watched tag reaches is `X006` where a function names it,
+    /// and a function whose signature names a watched service is `X007`.
     fn check_calls(&self, calls: &[CallSite], _: &[u8]) -> Vec<Diagnostic> {
         let mut found = Vec::new();
         for call in calls {
             assert!(call.name != "boom", "no calls");
+            if let Some(tagged) = &call.tagged {
+                let around: Vec<String> = (tagged.inside.iter())
+                    .map(|f| {
+                        format!(
+                            "{{{}}}{}",
+                            f.services.join(", "),
+                            if f.open { ".." } else { "" }
+                        )
+                    })
+                    .collect();
+                let message = format!(
+                    "`{}` reaches `{}` of `@{}` inside {}",
+                    tagged.named,
+                    tagged.reaches,
+                    tagged.tag,
+                    around.join(" in ")
+                );
+                found.push(Diagnostic::error(message, call.span).with_code("X006"));
+                continue;
+            }
+            if let Some(binding) = &call.binding
+                && let Some(gives) = &binding.gives
+            {
+                let name = binding.name.as_deref().unwrap_or_default();
+                let message = format!(
+                    "`{name}` asks for `{}.{}` to give `{}`",
+                    call.module, call.name, gives.shown
+                );
+                found.push(Diagnostic::error(message, call.span).with_code("X007"));
+                continue;
+            }
             // A bare `tally` is a function value, not a zero-argument call;
             // the checker records applications only.
             let Some(argument) = call.arguments.first() else {

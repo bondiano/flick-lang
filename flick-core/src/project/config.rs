@@ -132,7 +132,8 @@ pub struct Package {
     pub hooks: Vec<String>,
     /// `watch = ["Ui.Event.queue", "*.parse"]`: the names whose places of
     /// call its plugin checks, each `Module.name` or `*.name` for the name
-    /// of any module.
+    /// of any module; a service, `Module.Service`, whose signatures it is
+    /// told of; or the tag `@maker`, for the values it reaches.
     pub watch: Vec<String>,
     pub span: Span,
 }

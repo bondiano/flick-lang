@@ -97,6 +97,7 @@ mod wasm {
 
     mod compiled;
     mod stages;
+    mod watched;
 
     /// The test plugin as a component, which `just wasm-plugins` builds.
     fn component() -> PathBuf {
