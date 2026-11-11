@@ -12,6 +12,10 @@ break programs.
   one whose type has variables there is `FLICK-T072`. The atoms of the
   standard library are cells; for an atom the refusal stays `FLICK-U005`,
   now worded by the UI plugin. A package's `watch` may name the tag `@cell`.
+- **Stream queries on Flick's runtime:** `Atom.query_stream` runs on the
+  default runtime: its atom shows the latest element of the adapter's
+  `Stream`, starts it anew on a mutation of its keys and stops it when no view
+  reads it. A program that uses it keeps its UI on the runtime.
 - **Routes on Flick's runtime:** `Atom.route` and `Ui.route_link` run on the
   default runtime: the route reads the served URL on a server and the page's
   in a browser, again on back and forward, and a write or a plain click on a
