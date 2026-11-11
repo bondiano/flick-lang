@@ -1,6 +1,8 @@
 // Scopes close in two phases: children are interrupted and end (their
 // supervisors see how), foreign work they left running settles, and only
-// then resources are released, last first.
+// then resources are released, last first. The child's write is under way
+// before the body goes on, and ends only when its supervisor lets it, so the
+// lines keep their order however the fibers are scheduled.
 module App.Main exposing (main)
 
 open_raw : String ->{} String
@@ -9,17 +11,28 @@ foreign effect open_raw from "./resources.mjs" "open"
 slow_write : String -> Float ->{Async} Unit
 foreign slow_write from "./resources.mjs" "slowWrite"
 
+held_write : String ->{Async} Unit
+foreign held_write from "./calls.mjs" "heldWrite"
+
+under_way : String ->{Async} Unit
+foreign under_way from "./calls.mjs" "underWay"
+
+release_write : String ->{} Unit
+foreign release_write from "./calls.mjs" "releaseWrite"
+
 type error Oops = Oops String
 
 report : Failure {Oops} ->{} Unit
-let report failure = Platform.stdout_line "supervisor saw a failure"
+let report failure =
+  Platform.stdout_line "supervisor saw a failure"
+  release_write "log"
 
 unexpected : Failure none ->{} Unit
 let unexpected failure = Platform.stdout_line "unexpected failure"
 
 worker : Unit ->{Async; Oops} Unit
 let worker () =
-  slow_write "log" 80
+  held_write "log"
   from_result (Err (Oops "late"))
 
 main : Unit ->{Async; AppError} Unit
@@ -27,6 +40,7 @@ let main () =
   scope owner {
     let first = open_raw "first"
     let child = Fiber.spawn owner report (task { worker () })
+    under_way "log"
     slow_write "body" 10
     let second = open_raw "second"
     Platform.stdout_line "body done"
