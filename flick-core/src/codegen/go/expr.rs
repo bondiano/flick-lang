@@ -42,7 +42,7 @@ pub(super) fn enum_literal(literal: &EnumLit) -> String {
 
 /// A Go function that adapts a function of one stage where one of another
 /// is expected, or the result of a task.
-fn lift(how: &Lift) -> String {
+pub(super) fn lift(how: &Lift) -> String {
     match how {
         Lift::Stage { from, to, result } => format!(
             "flickrt.LiftStage({}, {}, {})",
@@ -158,7 +158,10 @@ impl<'a> Gen<'a> {
             ExprKind::ControlLoop { .. } | ExprKind::LoopExit { .. } | ExprKind::Loop { .. } => {
                 self.loop_expr(e)
             }
-            ExprKind::Lit(lit) => self.code(&literal(lit)),
+            ExprKind::Lit(lit) => {
+                let go = self.literal(lit);
+                self.code(&go)
+            }
             ExprKind::Local(name) => self.code(&names::local(name)),
             // not atomic: an operand after it that assigns it is ordered after the read
             ExprKind::Var(name) => Code::from(a.text(a.alloc_str(&names::local(name)))),
@@ -222,7 +225,7 @@ impl<'a> Gen<'a> {
             }
             ExprKind::Lift(inner, how) => {
                 let v = self.expr(inner);
-                call(a, lift(how), [v.doc]).into()
+                call(a, self.once(&lift(how)), [v.doc]).into()
             }
             ExprKind::Each { .. } | ExprKind::Yield(_) => {
                 self.discard(e);

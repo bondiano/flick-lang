@@ -4,7 +4,7 @@
 
 use flick_pretty::{Document, Documentable, docvec};
 
-use super::expr::{enum_literal, literal};
+use super::expr::enum_literal;
 use super::layout::{block, call, conjunction, inline, statement};
 use super::{Gen, names};
 use crate::ir::{Arm, Expr, Lit, Pat};
@@ -25,7 +25,7 @@ impl<'a> Gen<'a> {
             Pat::Wild | Pat::Lit(Lit::Unit) => {}
             Pat::Bind(name) => t.binds.push((a.alloc_str(&names::local(name)), subject)),
             Pat::Lit(lit) => {
-                let lit = literal(lit).to_doc(a);
+                let lit = self.literal(lit).to_doc(a);
                 t.conds.push(call(a, "flickrt.Same", [subject, lit]));
             }
             Pat::Tuple(items) => {

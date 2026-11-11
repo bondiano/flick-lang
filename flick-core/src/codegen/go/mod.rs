@@ -22,6 +22,7 @@ mod layout;
 mod loops;
 mod main_file;
 mod names;
+mod once;
 mod pattern;
 mod runtime;
 
@@ -465,6 +466,8 @@ struct Gen<'a> {
     /// The locals of the definition being emitted whose Go type is not
     /// `flickrt.Value`.
     natives: HashMap<String, arith::Native>,
+    /// What the module makes once, each a package variable (`once.rs`).
+    once: Vec<String>,
 }
 
 impl<'a> Gen<'a> {
@@ -497,6 +500,7 @@ impl<'a> Gen<'a> {
             foreign_file: None,
             sources: BTreeMap::new(),
             natives: HashMap::new(),
+            once: Vec::new(),
         }
     }
 
