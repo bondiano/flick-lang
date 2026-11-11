@@ -27,7 +27,7 @@ impl Checking<'_> {
         let Some(cache) = self.cache else {
             return (self.timed(loaded, &lookup), None);
         };
-        let key = Key {
+        let mut key = Key {
             file: loaded.file,
             // the code of its blocks too, which other modules' blocks change
             text: self.text_of(loaded).to_owned(),
@@ -67,7 +67,11 @@ impl Checking<'_> {
                 .map(|w| w.plugin.id().to_owned())
                 .collect(),
         };
-        match cache.entries.get(&loaded.path) {
+        // an output that was lowered serves a run that would not lower: an
+        // error in another module changes nothing the module reads
+        let entry = cache.entries.get(&loaded.path);
+        key.lower |= entry.is_some_and(|(cached, _)| cached.lower);
+        match entry {
             Some((cached, output)) if *cached == key => {
                 let mut output = output.clone();
                 // re-exported names are declared where their module now says
@@ -80,7 +84,10 @@ impl Checking<'_> {
                 debug!(module = %loaded.name, "module reused");
                 (output, Some(key))
             }
-            _ => (self.timed(loaded, &lookup), Some(key)),
+            _ => {
+                key.lower = self.lower;
+                (self.timed(loaded, &lookup), Some(key))
+            }
         }
     }
 

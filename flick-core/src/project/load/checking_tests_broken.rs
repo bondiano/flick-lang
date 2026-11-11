@@ -68,3 +68,31 @@ fn an_export_left_unfinished_is_taken_on_trust() {
         "{diagnostics:?}"
     );
 }
+
+#[cfg(feature = "ide")]
+#[test]
+fn an_error_beside_the_exports_checks_no_other_module_again() {
+    // `A.Other` is checked after `A.Base` and imports none of it
+    let project = |base: &str| {
+        let user = "module A.Use exposing (y)\nimport A.Base exposing (x)\nimport A.Other exposing (z)\n\
+                    y : Float\nlet y = x + z\n";
+        let mut host = with_use(base, user);
+        let other = "module A.Other exposing (z)\nimport A.Leaf exposing (leaf)\nz : Float\nlet z = leaf\n";
+        let leaf = "module A.Leaf exposing (leaf)\nleaf : Float\nlet leaf = 1\n";
+        host.0.insert(PathBuf::from("/p/src/A/Other.fl"), other.to_owned());
+        host.0.insert(PathBuf::from("/p/src/A/Leaf.fl"), leaf.to_owned());
+        host
+    };
+    let mut cache = ModuleCache::default();
+    let (clean, _) = analyzed(&project(&base_then("")), Some(&mut cache));
+    let broken = project(&base_then("wrong : Float\nlet wrong = \"text\"\n"));
+    let (warm, diagnostics) = analyzed(&broken, Some(&mut cache));
+    assert!(Arc::ptr_eq(&clean["A.Other"], &warm["A.Other"]));
+    assert!(Arc::ptr_eq(&clean["A.Use"], &warm["A.Use"]));
+    assert!(!Arc::ptr_eq(&clean["A.Base"], &warm["A.Base"]));
+    assert_eq!(diagnostics, analyzed(&broken, None).1);
+    // nor does the fix of the error
+    let (fixed, _) = analyzed(&project(&base_then("")), Some(&mut cache));
+    assert!(Arc::ptr_eq(&clean["A.Other"], &fixed["A.Other"]));
+    assert!(Arc::ptr_eq(&clean["A.Use"], &fixed["A.Use"]));
+}
