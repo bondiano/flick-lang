@@ -6,28 +6,15 @@ mod loops;
 use super::{
     Tr,
     expr::{cond, is_global, layer_run, pat},
-    loops::{effectful, list_step, none, option, rpat, some, state_function, state_pattern},
+    loops::{
+        effectful, list_step, none, option, result, rpat, some, state_function, state_pattern,
+    },
 };
-use crate::syntax::{Arm, Con, Name, Pat, Path, Term};
+use crate::syntax::{Arm, Name, Pat, Term};
 use crate::types::{Scheme, Stage as ModelStage, Type};
 use flick_core::ir::{self, ExprKind, Stmt};
 use std::iter;
 use std::rc::Rc;
-
-fn constructor(ok: bool) -> Rc<Con> {
-    Rc::new(Con {
-        ty: Path::new("Prelude", "Result"),
-        name: if ok { "Ok" } else { "Err" }.into(),
-        arity: 1,
-        dicts: 0,
-    })
-}
-fn result(ok: bool, value: Term) -> Term {
-    Term::app(Term::konst_con(constructor(ok)), value)
-}
-fn result_pat(ok: bool, name: Name) -> Pat {
-    Pat::Con(constructor(ok), Rc::from([Pat::Var(name)]))
-}
 
 impl Tr {
     pub(super) fn active_variables(&self) -> Vec<String> {
@@ -44,7 +31,7 @@ impl Tr {
         };
         self.pack(result(ok, value), xs)
     }
-    fn catch_atomic(&mut self, value: Term, xs: &[String], can_raise: bool) -> Term {
+    pub(super) fn catch_atomic(&mut self, value: Term, xs: &[String], can_raise: bool) -> Term {
         let v = self.fresh("value");
         let body = Term::Let(
             v.clone(),
@@ -76,7 +63,7 @@ impl Tr {
         let value = self.protected(e, &tracked);
         self.unpack_protected(value, &tracked, out, k)
     }
-    fn unpack_protected(
+    pub(super) fn unpack_protected(
         &mut self,
         value: Term,
         tracked: &[String],
@@ -100,9 +87,9 @@ impl Tr {
             )
         };
         let good_pat = if self.control.is_some() {
-            rpat(true, result_pat(true, v))
+            rpat(true, rpat(true, Pat::Var(v)))
         } else {
-            result_pat(true, v)
+            rpat(true, Pat::Var(v))
         };
         let mut arms = vec![
             Arm {
@@ -111,7 +98,7 @@ impl Tr {
                 body: good,
             },
             Arm {
-                pat: pattern(result_pat(false, error)),
+                pat: pattern(rpat(false, Pat::Var(error))),
                 guard: None,
                 body: bad,
             },
@@ -124,7 +111,7 @@ impl Tr {
             let body = self.pack(result(true, result(false, Term::Var(exit.clone()))), out);
             self.versions.truncate(mark);
             arms.push(Arm {
-                pat: pattern(rpat(true, result_pat(false, exit))),
+                pat: pattern(rpat(true, rpat(false, Pat::Var(exit)))),
                 guard: None,
                 body,
             });
@@ -137,6 +124,10 @@ impl Tr {
             return self.protected(tail, xs);
         };
         match first {
+            Stmt::Assign(x, e) if self.cell(x).is_some() => self.protected_with(e, xs, |tr, v| {
+                let rest = tr.protected_block(rest, tail, xs);
+                tr.write_cell(x, v, rest)
+            }),
             Stmt::Var(x, e) | Stmt::Assign(x, e) => self.protected_with(e, xs, |tr, v| {
                 let name = tr.fresh(x);
                 tr.versions.push((x.clone(), name.clone()));
@@ -165,7 +156,7 @@ impl Tr {
             }
         }
     }
-    fn protected(&mut self, e: &ir::Expr, xs: &[String]) -> Term {
+    pub(super) fn protected(&mut self, e: &ir::Expr, xs: &[String]) -> Term {
         match &e.kind {
             ExprKind::LoopExit { id, value } if self.control.as_deref() == Some(id.as_str()) => {
                 match value {
@@ -215,6 +206,7 @@ impl Tr {
                 self.protected_with(s, xs, |tr, value| tr.protected_arms(value, arms, xs))
             }
             ExprKind::Handle(h) if h.is_try() => self.try_state_as(&h.body, &h.errors, xs, true),
+            ExprKind::Handle(h) => self.protected_handler(h, xs),
             ExprKind::App { func, arg, .. } if is_global(func, "Scope", "run") => {
                 self.scope_with(arg, &|tr, body| tr.protected(body, xs))
             }
@@ -317,9 +309,9 @@ impl Tr {
             )
         };
         let good_pat = if control.is_some() {
-            rpat(true, result_pat(true, v))
+            rpat(true, rpat(true, Pat::Var(v)))
         } else {
-            result_pat(true, v)
+            rpat(true, Pat::Var(v))
         };
         let mut matched = vec![
             Arm {
@@ -328,7 +320,7 @@ impl Tr {
                 body: good,
             },
             Arm {
-                pat: pattern(result_pat(false, error)),
+                pat: pattern(rpat(false, Pat::Var(error))),
                 guard: None,
                 body: bad,
             },
@@ -343,7 +335,7 @@ impl Tr {
             };
             let body = self.pack(completion, out);
             matched.push(Arm {
-                pat: pattern(rpat(true, result_pat(false, exit))),
+                pat: pattern(rpat(true, rpat(false, Pat::Var(exit)))),
                 guard: None,
                 body,
             });
@@ -395,17 +387,21 @@ impl Tr {
         let Some((arm, rest)) = arms.split_first() else {
             return Term::Die("unmatched source match".into());
         };
+        let tracked = self.active_variables();
+        let (next, fallback) =
+            self.state_thunk(&tracked, |tr| tr.protected_arms(value.clone(), rest, xs));
+        let call_next =
+            |tr: &Self| Term::app(Term::Var(next.clone()), tr.pack(Term::unit(), &tracked));
         let body = if let Some(g) = &arm.guard {
             self.protected_with(g, xs, |tr, condition| {
                 let yes = tr.protected(&arm.body, xs);
-                let no = tr.protected_arms(value.clone(), rest, xs);
+                let no = call_next(tr);
                 cond(condition, yes, no)
             })
         } else {
             self.protected(&arm.body, xs)
         };
-        let fallback = self.protected_arms(value.clone(), rest, xs);
-        Term::Match(
+        let matched = Term::Match(
             Rc::new(value),
             Rc::from([
                 Arm {
@@ -416,9 +412,10 @@ impl Tr {
                 Arm {
                     pat: Pat::Wild,
                     guard: None,
-                    body: fallback,
+                    body: call_next(self),
                 },
             ]),
-        )
+        );
+        Term::Let(next, None, Rc::new(fallback), Rc::new(matched))
     }
 }

@@ -47,7 +47,7 @@ change needs.
 | [`CallSite` replaces the `_at` writes](#callsite-replaces-the-_at-writes) | no | `FLICK-T001` |
 | [Regions are checked by use](#regions-are-checked-by-use) | no | `FLICK-G002`, `FLICK-G003` |
 | [Rust 1.95 builds the compiler](#rust-195-builds-the-compiler) | no | — |
-| [`mut` is a keyword](#mut-is-a-keyword) | no | `FLICK-S007` |
+| [`mut` is a keyword](#mut-is-a-keyword) | no | `FLICK-S007`, `FLICK-S016` |
 
 `flick check --fix page.md` rewrites the `flick` code blocks of a Markdown
 page, each checked on its own.
@@ -316,7 +316,7 @@ Source code does not change.
 ## `mut` is a keyword
 
 `let mut name = value` declares a variable of a function, which `name = value`
-assigns (see [Variables](../../reference/types/#variables)). The word `mut`
+assigns (see [Variables](../reference/types/#variables)). The word `mut`
 is a keyword now: a parameter, a value or a record field named `mut` is
 `FLICK-S007`, or `FLICK-S016` for `let mut = …`; rename it. After a dot,
 `r.mut` is still a name.

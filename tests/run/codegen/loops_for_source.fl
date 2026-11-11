@@ -17,8 +17,32 @@ let skip_inner_source () = for {
 } do
   Platform.stdout_line (show y)
 
+source : Int ->{} List Int
+let source x =
+  Platform.stdout_line ("source " ++ show x)
+  [x]
+
+skip_clause_suffix : Bool ->{} Unit
+let skip_clause_suffix stop = for {
+  x <- [1, 2, 3]
+  let y = if x == 2 && stop then break else x
+  let next = if y == 2 then continue else y
+  z <- source next
+} do
+  Platform.stdout_line ("body " ++ show z)
+
+skip_nested_loop : Unit ->{} Unit
+let skip_nested_loop () = for x <- [1, 2] do {
+  if x == 1 then continue
+  for y <- [x] do Platform.stdout_line ("nested " ++ show y)
+  Platform.stdout_line ("after nested " ++ show x)
+}
+
 main : Unit ->{} Unit
 let main () =
   stop_before_source true
   skip_before_source true
   skip_inner_source ()
+  skip_clause_suffix false
+  skip_clause_suffix true
+  skip_nested_loop ()

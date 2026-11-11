@@ -192,6 +192,7 @@ fn pat_binders(p: &Pat, names: &mut HashMap<String, String>, suffix: &str) {
 
 fn binders(e: &Expr, names: &mut HashMap<String, String>, suffix: &str) {
     match &e.kind {
+        ExprKind::ControlLoop { id, .. } => fresh(names, id, suffix),
         ExprKind::Lambda { params, .. } => {
             for p in params {
                 pat_binders(&p.pat, names, suffix);
@@ -229,6 +230,7 @@ fn apply(e: &mut Expr, names: &HashMap<String, String>) {
         }
     };
     match &mut e.kind {
+        ExprKind::ControlLoop { id, .. } | ExprKind::LoopExit { id, .. } => new(id),
         ExprKind::Local(n) | ExprKind::Var(n) | ExprKind::Within(n, _) => new(n),
         // a dictionary a matched value holds is a local of the pattern too
         ExprKind::Dicts(_, dicts) => {

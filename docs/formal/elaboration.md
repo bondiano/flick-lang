@@ -392,6 +392,13 @@ The reference translation threads values through the core. A block returns its
 value and the variables it changes; branches, scopes and handlers return the same
 state shape. Reading a variable selects its current version. Assignment evaluates
 the RHS first, so a failed RHS leaves that cell unchanged.
+Tail-only operation handlers carry the tuple through their protected body and
+return callback. Runtime handlers that catch typed errors or can abandon/resume
+the body use private core `Ref` cells, then return the cells' values with the
+result. This keeps the current state available when a continuation is discarded.
+The source handler already requires a runtime stage; pure blocks keep the SSA
+translation. These are existing typed core operations, with no new typing rules
+or proof axioms.
 
 A source loop has a lexical identity in the shared IR (`ControlLoop` and
 `LoopExit`). Its model translation uses a recursive function of the state.
@@ -399,7 +406,9 @@ An iteration returns either its normal value or an exit (`Result (Option a) t`):
 `Err (Some v)` is `break v`, `Err None` is `continue`, and `Ok v` is ordinary
 completion. A sequence stops on an exit; scopes return it normally and close
 before iteration resumes. Lists in imperative `for` use the same state protocol
-while consuming their remaining elements.
+while consuming their remaining elements. Strict list comprehensions use core
+list recursion too; each iteration keeps its local SSA bindings, while outer
+assignments remain a checker error.
 
 Within `try`, the model carries typed failure as another `Result` alongside the
 state; a source handler receives the store where the failure occurred. The error

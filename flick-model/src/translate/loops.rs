@@ -22,7 +22,7 @@ pub(super) fn option(value: Option<Term>) -> Term {
         |v| Term::app(Term::konst_con(con("Option", "Some", 1)), v),
     )
 }
-fn result(ok: bool, value: Term) -> Term {
+pub(super) fn result(ok: bool, value: Term) -> Term {
     Term::app(
         Term::konst_con(con("Result", if ok { "Ok" } else { "Err" }, 1)),
         value,
@@ -99,7 +99,7 @@ pub(super) fn list_step(list: &Name, head: Name, tail: Name, empty: Term, matche
 }
 
 impl Tr {
-    fn loop_pack(&self, ok: bool, v: Term, xs: &[String]) -> Term {
+    pub(super) fn loop_pack(&self, ok: bool, v: Term, xs: &[String]) -> Term {
         self.pack(result(ok, v), xs)
     }
     pub(super) fn loop_with(
@@ -111,6 +111,15 @@ impl Tr {
     ) -> Term {
         let tracked = self.active_variables();
         let value = self.loop_value(e, id, &tracked);
+        self.unpack_loop(value, &tracked, out, k)
+    }
+    pub(super) fn unpack_loop(
+        &mut self,
+        value: Term,
+        tracked: &[String],
+        out: &[String],
+        k: &dyn Fn(&mut Self, Term) -> Term,
+    ) -> Term {
         let names: Vec<_> = tracked.iter().map(|x| self.fresh(x)).collect();
         let mark = self.versions.len();
         self.versions
@@ -142,6 +151,10 @@ impl Tr {
             return self.loop_value(tail, id, xs);
         };
         match first {
+            Stmt::Assign(x, e) if self.cell(x).is_some() => self.loop_with(e, id, xs, &|tr, v| {
+                let rest = tr.loop_block(rest, tail, id, xs);
+                tr.write_cell(x, v, rest)
+            }),
             Stmt::Var(x, e) | Stmt::Assign(x, e) => self.loop_with(e, id, xs, &|tr, v| {
                 let name = tr.fresh(x);
                 tr.versions.push((x.clone(), name.clone()));
@@ -184,6 +197,7 @@ impl Tr {
                 self.control = saved;
                 value
             }
+            ExprKind::Handle(h) => self.loop_handler(h, id, xs),
             ExprKind::Each {
                 pat: p,
                 source,
@@ -449,17 +463,21 @@ impl Tr {
         let Some((arm, rest)) = arms.split_first() else {
             return Term::Die("unmatched source match".into());
         };
+        let tracked = self.active_variables();
+        let (next, fallback) =
+            self.state_thunk(&tracked, |tr| tr.loop_arms(value.clone(), rest, id, xs));
+        let call_next =
+            |tr: &Self| Term::app(Term::Var(next.clone()), tr.pack(Term::unit(), &tracked));
         let body = if let Some(g) = &arm.guard {
             self.loop_with(g, id, xs, &|tr, condition| {
                 let yes = tr.loop_value(&arm.body, id, xs);
-                let no = tr.loop_arms(value.clone(), rest, id, xs);
+                let no = call_next(tr);
                 cond(condition, yes, no)
             })
         } else {
             self.loop_value(&arm.body, id, xs)
         };
-        let fallback = self.loop_arms(value.clone(), rest, id, xs);
-        Term::Match(
+        let matched = Term::Match(
             Rc::new(value),
             Rc::from([
                 Arm {
@@ -470,10 +488,11 @@ impl Tr {
                 Arm {
                     pat: Pat::Wild,
                     guard: None,
-                    body: fallback,
+                    body: call_next(self),
                 },
             ]),
-        )
+        );
+        Term::Let(next, None, Rc::new(fallback), Rc::new(matched))
     }
 }
 

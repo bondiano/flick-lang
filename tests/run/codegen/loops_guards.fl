@@ -6,6 +6,12 @@ type error Other = Other
 service Counter =
   value : Unit ->{} Int
 
+effect Ask =
+  ask : Unit ->{} Int
+
+effect Stop =
+  abort stop : forall a. Unit ->{} a
+
 error_guard : Int ->{} (Int, Int)
 let error_guard n =
   let mut seen = 0
@@ -128,8 +134,160 @@ let provider_failure n =
     | Missing -> seen
   (seen, chosen)
 
+handler_error_state : Unit ->{} (Int, Int)
+let handler_error_state () =
+  let mut value = 0
+  let recovered =
+    try
+      value = Ask.ask ()
+      from_result (Err Missing)
+    with
+    | Ask.ask () -> 20
+    | Missing -> value
+  (value, recovered)
+
+handler_abort_state : Unit ->{} (Int, Int)
+let handler_abort_state () =
+  let mut value = 0
+  let result =
+    try
+      value = 2
+      let _unreachable = Stop.stop ()
+      value = 99
+      0
+    with
+    | Stop.stop () -> 7
+  (value, result)
+
+return_state : Unit ->{} (Int, Int)
+let return_state () =
+  let mut value = 0
+  let result =
+    try
+      value = 2
+      3
+    with
+    | return n ->
+      value = value + n
+      value
+  (value, result)
+
+nested_handler_state : Unit ->{} (Int, Int)
+let nested_handler_state () =
+  let mut value = 0
+  let result =
+    try
+      value = 1
+      let inner =
+        try
+          value = Ask.ask ()
+          from_result (Err Missing)
+        with
+        | Ask.ask () -> 20
+        | Missing -> value
+      ignore inner
+      from_result (Err Other)
+    with
+    | Ask.ask () -> 5
+    | Other -> value
+  (value, result)
+
+protected_operation : Unit ->{} Int
+let protected_operation () =
+  let mut value = 0
+  try
+    value = 1
+    loop {
+      try
+        value = Ask.ask ()
+        break value
+      with
+      | Ask.ask () -> 20
+    }
+  with
+  | Missing -> 0
+
+strict_collection : List Int -> List Int
+let strict_collection xs = [
+  for {
+    x <- xs
+    if x >= 0
+  } yield (
+    if x >= 0 then
+      let mut next = x
+      next = next + 1
+      next
+    else
+      x
+  ),
+]
+
+long_loop_match : Int -> Int
+let long_loop_match n =
+  loop {
+    match n with
+    | _ when n == 0 -> break 0
+    | _ when n == 1 -> break 1
+    | _ when n == 2 -> break 2
+    | _ when n == 3 -> break 3
+    | _ when n == 4 -> break 4
+    | _ when n == 5 -> break 5
+    | _ when n == 6 -> break 6
+    | _ when n == 7 -> break 7
+    | _ when n == 8 -> break 8
+    | _ when n == 9 -> break 9
+    | _ when n == 10 -> break 10
+    | _ when n == 11 -> break 11
+    | _ when n == 12 -> break 12
+    | _ when n == 13 -> break 13
+    | _ when n == 14 -> break 14
+    | _ when n == 15 -> break 15
+    | _ when n == 16 -> break 16
+    | _ when n == 17 -> break 17
+    | _ when n == 18 -> break 18
+    | _ when n == 19 -> break 19
+    | _ -> break n
+  }
+
+long_protected_match : Int ->{} (Int, Int)
+let long_protected_match n =
+  let mut seen = 0
+  let value =
+    try
+      seen = 1
+      if n < 0 then from_result (Err Missing)
+      match n with
+      | _ when n == 0 -> 0
+      | _ when n == 1 -> 1
+      | _ when n == 2 -> 2
+      | _ when n == 3 -> 3
+      | _ when n == 4 -> 4
+      | _ when n == 5 -> 5
+      | _ when n == 6 -> 6
+      | _ when n == 7 -> 7
+      | _ when n == 8 -> 8
+      | _ when n == 9 -> 9
+      | _ when n == 10 -> 10
+      | _ when n == 11 -> 11
+      | _ when n == 12 -> 12
+      | _ when n == 13 -> 13
+      | _ when n == 14 -> 14
+      | _ when n == 15 -> 15
+      | _ when n == 16 -> 16
+      | _ when n == 17 -> 17
+      | _ when n == 18 -> 18
+      | _ when n == 19 -> 19
+      | _ -> n
+    with
+    | Missing -> 0
+  (seen, value)
+
 main : Unit ->{} Unit
 let main () =
+  let mut handled = 0
+  try handled = Ask.ask () with
+  | Ask.ask () -> 20
+  Platform.stdout_line (show handled)
   Platform.stdout_line (show (error_guard 1))
   Platform.stdout_line (show (match_guard 1))
   Platform.stdout_line (show (mixed_errors 1))
@@ -139,3 +297,11 @@ let main () =
   Platform.stdout_line (show (delayed_loop ()))
   Platform.stdout_line (show (provider_failure 0))
   Platform.stdout_line (show (provider_failure 1))
+  Platform.stdout_line (show (long_loop_match 23))
+  Platform.stdout_line (show (long_protected_match 23))
+  Platform.stdout_line (show (handler_error_state ()))
+  Platform.stdout_line (show (handler_abort_state ()))
+  Platform.stdout_line (show (return_state ()))
+  Platform.stdout_line (show (nested_handler_state ()))
+  Platform.stdout_line (show (protected_operation ()))
+  Platform.stdout_line (show (strict_collection [1, -2, 3]))

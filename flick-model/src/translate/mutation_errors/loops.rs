@@ -1,7 +1,7 @@
 //! Loop completion and typed failure with the current store.
 use super::{
-    Arm, Pat, Rc, Term, Tr, cond, effectful, ir, list_step, none, option, pat, result, result_pat,
-    rpat, some, state_function, state_pattern,
+    Arm, Pat, Rc, Term, Tr, cond, effectful, ir, list_step, none, option, pat, result, rpat, some,
+    state_function, state_pattern,
 };
 
 impl Tr {
@@ -67,7 +67,7 @@ impl Tr {
                     body: done,
                 },
                 Arm {
-                    pat: pattern(result_pat(false, error)),
+                    pat: pattern(rpat(false, Pat::Var(error))),
                     guard: None,
                     body: failed,
                 },
@@ -117,7 +117,7 @@ impl Tr {
                     body: good,
                 },
                 Arm {
-                    pat: pattern(result_pat(false, error)),
+                    pat: pattern(rpat(false, Pat::Var(error))),
                     guard: None,
                     body: bad,
                 },
@@ -184,7 +184,7 @@ impl Tr {
                     body: done,
                 },
                 Arm {
-                    pat: pattern(result_pat(false, error)),
+                    pat: pattern(rpat(false, Pat::Var(error))),
                     guard: None,
                     body: bad,
                 },

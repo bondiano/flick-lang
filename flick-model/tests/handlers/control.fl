@@ -36,6 +36,21 @@ let three () =
   Emit.emit 2
   Emit.emit 3
 
+mutable_control : Unit ->{} (Int, Int)
+let mutable_control () =
+  let mut value = 0
+  let result =
+    try
+      value = 2
+      let chosen = Choose.choose ()
+      if chosen then value = value + 1
+      value
+    with
+    | Choose.choose () ->
+      let _body = resume true
+      7
+  (value, result)
+
 main : Unit ->{} Unit
 let main () =
   say (show (collect three))
@@ -56,6 +71,7 @@ let main () =
       | Choose.choose () -> resume true
     )
   say (show chosen)
+  say (show (mutable_control ()))
   let twice =
     try (if Choose.choose () then 1 else 2) with
     | Choose.choose () -> resume true + resume false

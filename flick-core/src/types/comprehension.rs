@@ -11,7 +11,7 @@ use std::mem;
 use super::Checker;
 use super::do_notation::bind_key;
 use super::effects::{Site, Stage};
-use super::mutation::{Apart, Settled};
+use super::mutation::Apart;
 use super::ty::{Row, Type};
 use crate::diagnostics::codes;
 use crate::source::Span;
@@ -83,8 +83,7 @@ impl Checker<'_> {
         let outer = mem::replace(&mut self.cx.stage, stage);
         // a lazy sequence runs its body when iterated; `[for …]` runs it now
         if strict {
-            self.enter_settled(Settled::Loop);
-            self.enter_loop_barrier();
+            self.enter_settled();
         } else {
             self.enter_apart(Apart::Sequence);
         }
@@ -109,7 +108,6 @@ impl Checker<'_> {
         };
         if strict {
             self.leave_settled();
-            self.leave_loop_barrier();
         } else {
             self.leave_apart();
         }

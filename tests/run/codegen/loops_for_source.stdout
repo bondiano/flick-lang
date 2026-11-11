@@ -2,3 +2,11 @@ after source break
 after source continue
 2
 3
+source 1
+body 1
+source 3
+body 3
+source 1
+body 1
+nested 2
+after nested 2

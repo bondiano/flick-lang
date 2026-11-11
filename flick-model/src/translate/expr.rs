@@ -6,6 +6,7 @@ use std::mem;
 use std::rc::Rc;
 
 use flick_core::ir::{self, BinOp, ExprKind, Stmt};
+use flick_core::source::Span;
 use flick_core::types::Constructor;
 
 use super::{Tr, dict, given, lams};
@@ -61,10 +62,12 @@ impl Tr {
 
     fn delayed_expr(&mut self, body: &ir::Expr) -> Term {
         let versions = mem::take(&mut self.versions);
+        let cells = mem::take(&mut self.cells);
         let control = self.control.take();
         let error_action = self.error_action.take();
         let body = self.expr(body);
         self.versions = versions;
+        self.cells = cells;
         self.control = control;
         self.error_action = error_action;
         body
@@ -195,6 +198,9 @@ impl Tr {
             ExprKind::Ignore(x) => Term::Let("_".into(), None, rc(self.expr(x)), rc(Term::unit())),
             ExprKind::Await(x) => Term::Await(rc(self.expr(x))),
             ExprKind::Task(x) => Term::Task(rc(self.delayed_expr(x))),
+            ExprKind::Generate {
+                body, strict: true, ..
+            } => self.strict_collection(body),
             ExprKind::Handle(h) => Term::Handler(Rc::new(self.handler(h))),
             // a lift does nothing in the model (§3.4); its correctness is G2
             ExprKind::Lift(x, _) => self.expr(x),
@@ -231,7 +237,7 @@ impl Tr {
     }
 
     /// `λp. body`, with a pattern that is not a variable matched inside.
-    fn param(&mut self, p: &ir::Pat, body: Term) -> Term {
+    pub(super) fn param(&mut self, p: &ir::Pat, body: Term) -> Term {
         if let ir::Pat::Bind(x) = p {
             return Term::lam(x, body);
         }
@@ -295,9 +301,17 @@ impl Tr {
     }
 
     /// A handler of effects: the function of each operation as it is.
-    fn handler(&mut self, h: &ir::Handler) -> Handler {
-        let effects = h
-            .effects
+    pub(super) fn handler(&mut self, h: &ir::Handler) -> Handler {
+        let effects = self.handled_effects(h);
+        Handler {
+            effects,
+            body: self.expr(&h.body),
+            ret: h.ret.as_ref().map(|r| self.handler_return(r)),
+            errors: self.arms(&h.errors),
+        }
+    }
+    pub(super) fn handled_effects(&mut self, h: &ir::Handler) -> Vec<Handled> {
+        h.effects
             .iter()
             .map(|e| Handled {
                 effect: Path::parse(&e.effect),
@@ -314,13 +328,7 @@ impl Tr {
                     })
                     .collect(),
             })
-            .collect();
-        Handler {
-            effects,
-            body: self.expr(&h.body),
-            ret: h.ret.as_ref().map(|r| self.expr(r)),
-            errors: self.arms(&h.errors),
-        }
+            .collect()
     }
 }
 
@@ -405,9 +413,17 @@ impl Tr {
                 _ => {}
             }
         }
-        let s = self.fresh("s");
-        let body = Term::app(self.expr(arg), Term::Var(s.clone()));
-        Term::Scope(s, Rc::new(body))
+        self.with_value(arg, |tr, callback| {
+            let name = tr.fresh("callback");
+            let s = tr.fresh("s");
+            let call = runtime_call(
+                &name,
+                ir::Expr::new(ExprKind::Local(s.to_string()), arg.span),
+                arg.span,
+            );
+            let body = Term::Scope(s, Rc::new(translate(tr, &call)));
+            Term::Let(name, None, Rc::new(callback), Rc::new(body))
+        })
     }
 
     /// `Layer.run layer arg`, which is `provide layer { body }`: the core's
@@ -425,19 +441,22 @@ impl Tr {
     pub(super) fn provide_value(&mut self, layer: Term, arg: &ir::Expr, body: Body) -> Term {
         let translate = body;
         let body = match &arg.kind {
-            // what `provide` lowers to, which binds nothing
-            ExprKind::Lambda { params, body }
-                if matches!(
-                    params[..],
-                    [ir::Param {
-                        pat: ir::Pat::Wild,
-                        ..
-                    }]
-                ) =>
-            {
-                translate(self, body)
+            ExprKind::Lambda { params, body } if params.len() == 1 => {
+                let body = translate(self, body);
+                Term::app(self.param(&params[0].pat, body), Term::unit())
             }
-            _ => Term::app(self.expr(arg), Term::unit()),
+            _ => {
+                return self.with_value(arg, |tr, callback| {
+                    let name = tr.fresh("callback");
+                    let call = runtime_call(
+                        &name,
+                        ir::Expr::new(ExprKind::Lit(ir::Lit::Unit), arg.span),
+                        arg.span,
+                    );
+                    let body = Term::Provide(Rc::new(layer), Rc::new(translate(tr, &call)));
+                    Term::Let(name, None, Rc::new(callback), Rc::new(body))
+                });
+            }
         };
         Term::Provide(Rc::new(layer), Rc::new(body))
     }
@@ -459,4 +478,17 @@ pub(super) fn layer_run(func: &ir::Expr) -> Option<&ir::Expr> {
         ExprKind::Global { module, name } if module == "Layer" && name == "run" => Some(arg),
         _ => None,
     }
+}
+
+/// An already evaluated callback, called under the state/completion protocol.
+fn runtime_call(name: &Name, arg: ir::Expr, span: Span) -> ir::Expr {
+    ir::Expr::new(
+        ExprKind::App {
+            func: Box::new(ir::Expr::new(ExprKind::Local(name.to_string()), span)),
+            arg: Box::new(arg),
+            stage: ir::Stage::Runtime,
+            arg_first: false,
+        },
+        span,
+    )
 }

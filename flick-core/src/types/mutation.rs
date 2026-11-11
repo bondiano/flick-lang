@@ -41,36 +41,23 @@ pub enum Apart {
     HandlerArm,
 }
 
-/// Where assignments to an outer variable are forbidden.
-#[derive(Debug, Clone, Copy)]
-pub enum Settled {
-    Loop,
-}
-
 #[derive(Debug, Default)]
 pub struct Frames {
     /// The locals below each enclosing function, `task`, sequence or arm.
     apart: Vec<(usize, Apart)>,
     /// The locals below each enclosing strict comprehension.
-    settled: Vec<(usize, Settled)>,
+    settled: Vec<usize>,
     loops: Vec<(usize, usize, Type, bool)>,
-    loop_barriers: usize,
 }
 
 impl Checker<'_> {
     pub fn enter_loop(&mut self, result: Type, value: bool) {
         self.cx.mutation.loops.push((
             self.cx.mutation.apart.len(),
-            self.cx.mutation.loop_barriers,
+            self.cx.mutation.settled.len(),
             result,
             value,
         ));
-    }
-    pub fn enter_loop_barrier(&mut self) {
-        self.cx.mutation.loop_barriers += 1;
-    }
-    pub fn leave_loop_barrier(&mut self) {
-        self.cx.mutation.loop_barriers -= 1;
     }
     pub fn leave_loop(&mut self) {
         self.cx.mutation.loops.pop();
@@ -108,7 +95,7 @@ impl Checker<'_> {
             .cloned()
             .filter(|(depth, barriers, _, _)| {
                 *depth == self.cx.mutation.apart.len()
-                    && *barriers == self.cx.mutation.loop_barriers
+                    && *barriers == self.cx.mutation.settled.len()
             });
         if let Some((_, _, ty, value)) = target {
             if node.kind == K::BreakExpr {
@@ -146,8 +133,8 @@ impl Checker<'_> {
     }
 
     /// A strict comprehension starts here.
-    pub fn enter_settled(&mut self, what: Settled) {
-        self.cx.mutation.settled.push((self.cx.locals.len(), what));
+    pub fn enter_settled(&mut self) {
+        self.cx.mutation.settled.push(self.cx.locals.len());
     }
 
     pub fn leave_settled(&mut self) {
@@ -212,7 +199,28 @@ impl Checker<'_> {
         self.store.level += 1;
         let ty = match written {
             Some(written) => {
-                let ty = self.annotation(written);
+                let ty = if sig.is_some() {
+                    self.signature(written).0
+                } else {
+                    self.annotation(written)
+                };
+                if matches!(self.whnf(&ty), Type::Forall { .. }) {
+                    let span = if sig.is_some() {
+                        self.span(written)
+                    } else {
+                        self.span(decl)
+                    };
+                    self.error(codes::T013, span, format!("`{name}` is a `let mut` variable, which has one type: it cannot be polymorphic"));
+                    if let Some(body) = parts.body {
+                        self.infer(body);
+                    }
+                    self.store.level -= 1;
+                    self.push_local(name, at, Type::Error);
+                    if let Some(local) = self.cx.locals.last_mut() {
+                        local.binding = Binding::Mut;
+                    }
+                    return;
+                }
                 if let Some(body) = parts.body {
                     self.check(body, &ty);
                 }
@@ -222,15 +230,6 @@ impl Checker<'_> {
         };
         self.store.level -= 1;
         self.store.lower(&ty);
-        if let Type::Forall { .. } = self.whnf(&ty) {
-            self.error(
-                codes::T013,
-                self.span(decl),
-                format!(
-                    "`{name}` is a `let mut` variable, which has one type: it cannot be polymorphic"
-                ),
-            );
-        }
         self.push_local(name, at, ty);
         if let Some(local) = self.cx.locals.last_mut() {
             local.binding = Binding::Mut;
@@ -283,16 +282,10 @@ impl Checker<'_> {
     /// `FLICK-T070` for an assignment of the local `index` inside a strict
     /// comprehension that started after it was declared.
     fn settled_assignment(&mut self, index: usize, name: &str, span: Span) {
-        let Some(&(_, what)) =
-            (self.cx.mutation.settled.iter().rev()).find(|(below, _)| index < *below)
-        else {
+        let Some(_) = (self.cx.mutation.settled.iter().rev()).find(|below| index < **below) else {
             return;
         };
-        let place = match what {
-            Settled::Loop => {
-                "a strict comprehension: use `for … do` to update state, or build the value with a fold"
-            }
-        };
+        let place = "a strict comprehension: use `for … do` to update state, or build the value with a fold";
         self.error(
             codes::T070,
             span,

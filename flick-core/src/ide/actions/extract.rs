@@ -46,11 +46,20 @@ impl Ide<'_> {
             node = inner;
         }
         // moved before its statement, a read of a variable could pass an assignment
-        if !EXTRACTABLE.contains(&node.kind) || self.uses_variable(file, node) {
+        if !EXTRACTABLE.contains(&node.kind) || self.unsafe_to_move(file, node) {
             return None;
         }
         // the statement of the innermost block around it, on a line of its own
         let path = tree::path_to(&m.tree, start);
+        if path.iter().any(|n| {
+            n.kind == K::WhileExpr
+                && n.nodes().next().is_some_and(|c| {
+                    let (a, b) = c.range();
+                    a <= start && end <= b
+                })
+        }) {
+            return None;
+        }
         let b = path
             .iter()
             .rposition(|n| n.kind == K::Block && n.range().0 <= start)?;
@@ -122,7 +131,7 @@ impl Ide<'_> {
         }
         let value = only_expression(decl.nodes().find(|n| n.kind == K::Block)?)?;
         // at a later use, a variable it reads may hold another value
-        if self.uses_variable(file, value) {
+        if self.unsafe_to_move(file, value) {
             return None;
         }
         let shown = value.text(text);
@@ -161,9 +170,9 @@ impl Ide<'_> {
 }
 
 impl Ide<'_> {
-    /// Whether `node` reads or assigns a `let mut` variable.
-    fn uses_variable(&self, file: FileId, node: &Node) -> bool {
-        if node.kind == K::AssignStmt {
+    /// Moving a variable access or lexical exit can change its meaning.
+    fn unsafe_to_move(&self, file: FileId, node: &Node) -> bool {
+        if matches!(node.kind, K::AssignStmt | K::BreakExpr | K::ContinueExpr) {
             return true;
         }
         if node.kind == K::NameExpr
@@ -175,7 +184,7 @@ impl Ide<'_> {
         {
             return true;
         }
-        node.nodes().any(|n| self.uses_variable(file, n))
+        node.nodes().any(|n| self.unsafe_to_move(file, n))
     }
 }
 

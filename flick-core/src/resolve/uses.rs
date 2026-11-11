@@ -29,6 +29,7 @@ pub(super) struct Unused {
     /// For a `let mut` never assigned, the `mut ` to remove; `span` is its
     /// keyword.
     pub needless_mut: Option<Span>,
+    pub mut_fix: bool,
 }
 
 pub(super) fn references(module: &Module) -> (Vec<Reference>, Vec<Unused>) {
@@ -73,6 +74,7 @@ struct Local<'a> {
     used: bool,
     /// The `mut` of a `let mut`, and whether a statement assigns it.
     mutable: Option<(Token, bool)>,
+    mut_fix: bool,
 }
 
 struct Walker<'a> {
@@ -105,6 +107,7 @@ impl Walker<'_> {
                 generated: payload.start >= self.generated,
                 binder: Some((payload, false)),
                 mutable: None,
+                mut_fix: false,
                 used: false,
             });
         }
@@ -200,6 +203,7 @@ impl Walker<'_> {
                     generated: t.start >= self.generated,
                     binder: None,
                     mutable: None,
+                    mut_fix: false,
                     used: false,
                 }));
             }
@@ -263,6 +267,7 @@ impl Walker<'_> {
                     generated: t.start >= self.generated,
                     binder: None,
                     mutable: None,
+                    mut_fix: false,
                     used: false,
                 }));
                 if let Some(pattern) = declaration.nodes().find(|n| is_pattern(n.kind)) {
@@ -273,6 +278,7 @@ impl Walker<'_> {
                         generated: t.start >= self.generated,
                         binder: None,
                         mutable: None,
+                        mut_fix: false,
                         used: false,
                     }));
                 }
@@ -348,6 +354,7 @@ impl Walker<'_> {
                     span: Span::new(self.file, token.start, token.end),
                     punned,
                     needless_mut: None,
+                    mut_fix: false,
                 });
             }
             if let Some((kw, false)) = local.mutable {
@@ -359,6 +366,7 @@ impl Walker<'_> {
                     span: Span::new(self.file, kw.start, kw.end),
                     punned: false,
                     needless_mut: Some(Span::new(self.file, kw.start, end)),
+                    mut_fix: local.mut_fix,
                 });
             }
         }
@@ -390,6 +398,7 @@ impl Walker<'_> {
             binder: Some((t, puns.contains(&t.start))),
             used: false,
             mutable: None,
+            mut_fix: false,
         }));
     }
 
@@ -409,6 +418,7 @@ impl Walker<'_> {
                 binder: None,
                 used: false,
                 mutable: None,
+                mut_fix: false,
             }));
         }
         for params in node.nodes().filter(|n| n.kind == K::Params) {
@@ -424,6 +434,7 @@ impl Walker<'_> {
             let mutable = node.child_tokens().find(|t| t.kind == K::MutKw);
             if let (Some(kw), [local]) = (mutable, &mut self.locals[mark..]) {
                 local.mutable = Some((kw, false));
+                local.mut_fix = !node.has_token(K::Colon);
             }
         }
     }

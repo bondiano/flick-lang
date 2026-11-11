@@ -6,12 +6,14 @@
 //! A node without a λFlick form becomes `Term::Stuck` naming it, so a
 //! program that never reaches it still runs.
 
+mod collection;
 mod derive;
 mod expr;
 pub mod lean;
 mod loops;
 mod mutation;
 mod mutation_errors;
+mod mutation_handlers;
 pub mod types;
 
 use std::rc::Rc;
@@ -62,6 +64,7 @@ struct Tr {
     /// Each `let mut` variable in scope and the name of its current value,
     /// innermost last.
     versions: Vec<(String, Name)>,
+    cells: Vec<(String, Name)>,
     control: Option<String>,
     error_action: Option<Name>,
 }
@@ -72,6 +75,7 @@ impl Tr {
             module: module.to_owned(),
             fresh: 0,
             versions: Vec::new(),
+            cells: Vec::new(),
             control: None,
             error_action: None,
         }

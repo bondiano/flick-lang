@@ -2,6 +2,41 @@ module Main exposing (main)
 
 type error Missing = Missing
 
+effect Ask =
+  ask : Unit ->{} Int
+
+type Box = Box Int
+class Pick a =
+  pick : a -> Int
+instance Pick Box =
+  let pick box =
+    match box with
+    | Box n -> loop { break n }
+
+scoped_callback : (forall s. Fiber.Owner s ->{Scope s; none} String) ->{} String
+let scoped_callback body = loop { break (Scope.run body) }
+
+provided_callback : (Unit ->{Ask; none} Int) ->{} Int
+let provided_callback body =
+  let layer = Layer.succeed Ask { ask = fun () -> 4 }
+  loop { break (Layer.run layer body) }
+
+handler_exits : Unit ->{} (Int, Int, Int)
+let handler_exits () =
+  let mut touched = 0
+  let guarded =
+    loop {
+      try from_result (Err Missing) with
+      | Missing when (if true then break 7 else false) -> ()
+      | Missing -> break 9
+    }
+  let returned =
+    loop {
+      try break 8 with
+      | return _ -> touched = 99
+    }
+  (guarded, returned, touched)
+
 count : Int -> Int
 let count n =
   let mut i = 0
@@ -93,3 +128,18 @@ let main () =
     with
     | Missing -> from_for
   Platform.stdout_line (show recovered_for)
+  Platform.stdout_line (show (pick (Box 1), pick (Box 2)))
+  Platform.stdout_line (show (handler_exits ()))
+  Platform.stdout_line (scoped_callback (fun _ -> "scoped"))
+  Platform.stdout_line (show (provided_callback (fun _unit -> Ask.ask ())))
+  let layer = Layer.succeed Ask { ask = fun () -> 5 }
+  let named_unit = loop { break (Layer.run layer (fun _unit -> Ask.ask ())) }
+  Platform.stdout_line (show named_unit)
+  let handled =
+    loop {
+      let n =
+        try Ask.ask () with
+        | Ask.ask () -> 20
+      break n
+    }
+  Platform.stdout_line (show handled)

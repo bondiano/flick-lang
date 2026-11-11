@@ -18,7 +18,11 @@ pub(super) fn unused_locals(unused: Vec<Unused>) -> impl Iterator<Item = Diagnos
     unused.into_iter().map(|u| {
         if let Some(removal) = u.needless_mut {
             let message = format!("`{}` is never assigned, so it needs no `mut`", u.name);
-            return warning(codes::R020, message, u.span).with_safe_fix(|| {
+            let diagnostic = warning(codes::R020, message, u.span);
+            if !u.mut_fix {
+                return diagnostic;
+            }
+            return diagnostic.with_safe_fix(|| {
                 let edit = Edit {
                     span: removal,
                     replacement: String::new(),

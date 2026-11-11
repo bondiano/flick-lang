@@ -100,3 +100,15 @@ let in_loop xs =
   let mut total = 0
   for x <- xs do total = total + x
   total
+
+strict_local : List Int -> List Int
+let strict_local xs = [
+  for x <- xs yield (
+    if x >= 0 then
+      let mut next = x
+      next = next + 1
+      next
+    else
+      x
+  ),
+]

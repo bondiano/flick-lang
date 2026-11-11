@@ -1,5 +1,5 @@
 //! Backend-only completion flags. The shared IR retains typed lexical exits.
-use crate::ir::{BinOp, Expr, ExprKind, Lit, Pat, Stmt};
+use crate::ir::{Arm, BinOp, Expr, ExprKind, Handler, Lit, Param, Pat, Stage, Stmt};
 use crate::source::Span;
 fn unit(span: Span) -> Expr {
     Expr::new(ExprKind::Lit(Lit::Unit), span)
@@ -137,6 +137,17 @@ impl Control {
         let name = self.hidden("$loop$scrutinee");
         let value = self.guarded_parts((**scrutinee).clone(), flag);
         **scrutinee = Expr::new(ExprKind::Local(name.clone()), span);
+        self.guarded_arms(arms, flag, span);
+        Expr::new(
+            ExprKind::Block(
+                vec![Stmt::Let(Pat::Bind(name), value)],
+                Box::new(Self::guard(e, flag)),
+            ),
+            span,
+        )
+    }
+
+    fn guarded_arms(&mut self, arms: &mut [Arm], flag: &str, span: Span) {
         for arm in arms {
             if let Some(g) = &mut arm.guard {
                 let name = self.hidden("guard");
@@ -154,13 +165,38 @@ impl Control {
             let body = self.guarded_parts(arm.body.clone(), flag);
             arm.body = Self::guard(body, flag);
         }
-        Expr::new(
-            ExprKind::Block(
-                vec![Stmt::Let(Pat::Bind(name), value)],
-                Box::new(Self::guard(e, flag)),
-            ),
-            span,
-        )
+    }
+
+    fn guarded_handler(&mut self, h: &mut Handler, flag: &str, span: Span) {
+        h.body = self.guarded_parts(h.body.clone(), flag);
+        self.guarded_arms(&mut h.errors, flag, span);
+        if let Some(ret) = &mut h.ret {
+            if let ExprKind::Lambda { body, .. } = &mut ret.kind {
+                **body = Self::guard(self.guarded_parts((**body).clone(), flag), flag);
+            } else {
+                let name = self.hidden("return");
+                let call = Expr::new(
+                    ExprKind::App {
+                        func: Box::new(ret.clone()),
+                        arg: Box::new(Expr::new(ExprKind::Local(name.clone()), span)),
+                        stage: Stage::Runtime,
+                        arg_first: false,
+                    },
+                    span,
+                );
+                *ret = Expr::new(
+                    ExprKind::Lambda {
+                        params: vec![Param {
+                            pat: Pat::Bind(name),
+                            stage: Stage::Runtime,
+                            ty: None,
+                        }],
+                        body: Box::new(Self::guard(call, flag)),
+                    },
+                    span,
+                );
+            }
+        }
     }
 
     fn guarded_parts(&mut self, mut e: Expr, flag: &str) -> Expr {
@@ -189,7 +225,7 @@ impl Control {
                 Self::guard(e, flag)
             }
             ExprKind::Handle(h) => {
-                h.each_child_mut(&mut |c| *c = self.guarded_parts(c.clone(), flag));
+                self.guarded_handler(h, flag, span);
                 e
             }
             ExprKind::If(c, t, f) => {
@@ -281,7 +317,10 @@ impl Control {
                 }
                 if matches!(
                     e.kind,
-                    ExprKind::Lambda { .. } | ExprKind::Generate { .. } | ExprKind::Loop { .. }
+                    ExprKind::Lambda { .. }
+                        | ExprKind::Generate { .. }
+                        | ExprKind::ControlLoop { .. }
+                        | ExprKind::Loop { .. }
                 ) {
                     return false;
                 }
@@ -291,6 +330,7 @@ impl Control {
             }
             if has_each(e) {
                 e.each_child_mut(&mut |c| self.control_each(c, flag));
+                *e = self.guarded_parts(e.clone(), flag);
             } else {
                 *e = self.guarded_parts(e.clone(), flag);
             }

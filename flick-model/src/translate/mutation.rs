@@ -5,9 +5,8 @@
 //! what those variables hold after it, which the rest of the block takes
 //! apart: the arms of an `if`, a `match` or a `try`, and the body of a
 //! `scope` or a `provide`, give their tuples where they end. The checker
-//! keeps assignments out of what may run later or again, and out of the
-//! bodies of `try` and loops, where this reading and that of the compiled
-//! code, which assigns in place, would differ.
+//! keeps assignments out of what may run later or again. Runtime handlers
+//! that can abandon or resume their body use private model cells instead.
 
 use std::iter;
 use std::rc::Rc;
@@ -61,6 +60,9 @@ impl Tr {
 
     /// The name the variable `x` holds its value under here.
     pub(super) fn version(&self, x: &str) -> Term {
+        if let Some(cell) = self.cell(x) {
+            return Self::read_cell(cell);
+        }
         (self.versions.iter().rev())
             .find(|(v, _)| v == x)
             .map_or_else(
@@ -85,6 +87,10 @@ impl Tr {
             });
         };
         match first {
+            Stmt::Assign(x, e) if self.cell(x).is_some() => self.with_value(e, |tr, v| {
+                let rest = tr.block(rest, tail, pack);
+                tr.write_cell(x, v, rest)
+            }),
             Stmt::Var(x, e) | Stmt::Assign(x, e) => self.with_value(e, |tr, v| {
                 let name = tr.fresh(x);
                 tr.versions.push((x.clone(), name.clone()));
@@ -186,6 +192,7 @@ impl Tr {
                 self.with_value(s, |tr, value| tr.match_state(value, arms, xs))
             }
             ExprKind::Handle(h) if h.is_try() => self.try_state(&h.body, &h.errors, xs),
+            ExprKind::Handle(h) => self.joined_handler(h, xs),
             ExprKind::App { func, arg, .. } if layer_run(func).is_some() => self
                 .with_value(layer_run(func).expect("layer"), |tr, layer| {
                     tr.provide_value(layer, arg, &|tr, body| tr.joined(body, xs))
@@ -194,8 +201,7 @@ impl Tr {
                 self.scope_with(arg, &|tr, body| tr.joined(body, xs))
             }
             ExprKind::Within(_, inner) | ExprKind::Lift(inner, _) => self.joined(inner, xs),
-            ExprKind::Handle(_)
-            | ExprKind::Lambda { .. }
+            ExprKind::Lambda { .. }
             | ExprKind::Task(_)
             | ExprKind::Abstract(..)
             | ExprKind::Generate { .. }

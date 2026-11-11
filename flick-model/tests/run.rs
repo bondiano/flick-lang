@@ -178,7 +178,7 @@ fn control_handlers_print_what_go_prints() {
     let ran = run::run_main(&program, &main, FUEL);
     assert_eq!(
         ran.stdout,
-        "[1, 2, 3]\n[3, 2, 1]\nscope closed\n7\n[1, 3]\n"
+        "[1, 2, 3]\n[3, 2, 1]\nscope closed\n7\n[1, 3]\n(3, 7)\n"
     );
     assert!(
         matches!(&ran.outcome, Outcome::Die(why) if why.contains("`resume` ran twice")),
