@@ -9,7 +9,7 @@ impl Checker<'_> {
                         super::ModuleSignature::Structure { requirements } => {
                             Body::ModuleContract(requirements)
                         }
-                        signature @ super::ModuleSignature::Functor { .. } => {
+                        signature @ super::ModuleSignature::Parameterized { .. } => {
                             Body::ModuleSignature(signature)
                         }
                     }

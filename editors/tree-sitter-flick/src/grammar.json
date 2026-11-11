@@ -43,10 +43,6 @@
         },
         {
           "type": "SYMBOL",
-          "name": "_module_functor"
-        },
-        {
-          "type": "SYMBOL",
           "name": "_type_refinement_and"
         },
         {
@@ -490,24 +486,6 @@
           },
           "named": true,
           "value": "keyword"
-        }
-      ]
-    },
-    "_module_functor": {
-      "type": "SEQ",
-      "members": [
-        {
-          "type": "ALIAS",
-          "content": {
-            "type": "STRING",
-            "value": "functor"
-          },
-          "named": true,
-          "value": "keyword"
-        },
-        {
-          "type": "SYMBOL",
-          "name": "parens"
         }
       ]
     },

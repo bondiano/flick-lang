@@ -25,7 +25,7 @@ pub struct StaticCapture {
     pub inherited_imports: usize,
     /// Original template retained by a partial application.
     pub template: Option<String>,
-    /// Lexically active expansions, including captures of anonymous functors.
+    /// Lexically active expansions, including captures of anonymous parameterized modules.
     pub trace: Vec<String>,
     /// Packages whose private implementation names this lexical body may use.
     pub access_packages: Vec<String>,

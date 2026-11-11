@@ -23,7 +23,7 @@ fn higher_order_dictionary_scopes_execute_locally_on_js_and_go() {
         ),
         (
             "Outer.fl",
-            "module App.Outer(A : App.Contracts.Policy) : App.Contracts.Factory = functor (B : App.Contracts.Policy) ->\n  answer : Bool\n  let answer = eq \"x\" \"x\"\n",
+            "module App.Outer(A : App.Contracts.Policy) : App.Contracts.Factory = module (B : App.Contracts.Policy) ->\n  answer : Bool\n  let answer = eq \"x\" \"x\"\n",
         ),
         (
             "Capture.fl",

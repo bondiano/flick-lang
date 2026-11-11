@@ -37,7 +37,7 @@ impl Loader<'_> {
                 if self.modules[i].syntax.header.as_ref().is_some_and(|h| {
                     !h.parameters.is_empty()
                         && self.modules[i].syntax.applications.iter().any(|a| {
-                            a.expression.kind != K::ModuleFunctorExpr
+                            a.expression.kind != K::ModuleParamExpr
                                 && import.module == format!("{}.{}", h.name, a.name)
                         })
                 }) {
@@ -82,7 +82,7 @@ impl Loader<'_> {
                         .header
                         .as_ref()
                         .is_some_and(|h| !h.parameters.is_empty());
-                    if !symbolic || application.expression.kind == K::ModuleFunctorExpr {
+                    if !symbolic || application.expression.kind == K::ModuleParamExpr {
                         self.instantiate(i, &application);
                     }
                 }

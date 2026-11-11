@@ -122,17 +122,24 @@ impl Loader<'_> {
         });
     }
 
-    pub(super) fn callable_template(&mut self, mut functor: usize, at: Span) -> Option<usize> {
+    pub(super) fn callable_template(
+        &mut self,
+        mut parameterized: usize,
+        at: Span,
+    ) -> Option<usize> {
         let mut aliases = Vec::new();
         loop {
-            if aliases.contains(&functor) {
-                self.diagnostics
-                    .push(Diagnostic::error(codes::R006, "cyclic functor alias", at));
+            if aliases.contains(&parameterized) {
+                self.diagnostics.push(Diagnostic::error(
+                    codes::R006,
+                    "cyclic parameterized module alias",
+                    at,
+                ));
                 return None;
             }
-            aliases.push(functor);
-            self.materialize_expression_body(functor);
-            let Some(target) = self.modules[functor]
+            aliases.push(parameterized);
+            self.materialize_expression_body(parameterized);
+            let Some(target) = self.modules[parameterized]
                 .syntax
                 .header
                 .as_ref()
@@ -140,10 +147,10 @@ impl Loader<'_> {
             else {
                 break;
             };
-            let actual = self.find_module(functor, &target, at)?;
-            functor = actual;
+            let actual = self.find_module(parameterized, &target, at)?;
+            parameterized = actual;
         }
-        Some(functor)
+        Some(parameterized)
     }
 
     fn expression_name(&mut self, parent: usize, desired: Option<&str>) -> String {
@@ -246,7 +253,7 @@ impl Loader<'_> {
                 let full = format!("{}.{}", self.modules[parent].name, local);
                 self.by_name.contains_key(&full).then_some(full)
             }
-            K::ModuleFunctorExpr => self.functor_expression(parent, node, desired),
+            K::ModuleParamExpr => self.parameterized_expression(parent, node, desired),
             K::ModuleAnnotExpr => {
                 let mut children = node.nodes();
                 let target = self.module_expression(parent, children.next()?, None, site)?;
@@ -264,7 +271,7 @@ impl Loader<'_> {
         }
     }
 
-    fn functor_expression(
+    fn parameterized_expression(
         &mut self,
         parent: usize,
         node: &Node,

@@ -105,7 +105,7 @@ pub(crate) fn check(contract: &TypeDef, actual: &Interface) -> Vec<Mismatch> {
         return if signature.accepts(actual) {
             Vec::new()
         } else {
-            vec![Mismatch::Shape("functor".into())]
+            vec![Mismatch::Shape("parameterized module".into())]
         };
     }
     let Form::ModuleContract { requirements } = &contract.form else {

@@ -83,7 +83,7 @@ fn hom_shadowed_anonymous_parameter_keeps_its_own_argument() {
             ),
             (
                 "Outer",
-                "module App.Outer(K : App.Contracts.Input) : App.Contracts.Factory = functor (K : App.Contracts.Input) ->\n  answer : Int\n  let answer = K.seed + 1\n",
+                "module App.Outer(K : App.Contracts.Input) : App.Contracts.Factory = module (K : App.Contracts.Input) ->\n  answer : Int\n  let answer = K.seed + 1\n",
             ),
             (
                 "Root",
@@ -141,7 +141,7 @@ fn hom_recursive_static_expansions_report_cycles() {
 
 #[cfg(feature = "ide")]
 #[test]
-fn hom_finite_nested_applications_can_reuse_a_functor() {
+fn hom_finite_nested_applications_can_reuse_a_parameterized() {
     let (_, analysis) = hom_boundary_analysis(
         &[
             (
@@ -172,7 +172,7 @@ fn hom_finite_nested_applications_can_reuse_a_functor() {
 
 #[cfg(feature = "ide")]
 #[test]
-fn hom_nested_expression_functor_does_not_capture_a_path_suffix() {
+fn hom_nested_expression_parameterized_does_not_capture_a_path_suffix() {
     let (_, analysis) = hom_boundary_analysis(
         &[
             (

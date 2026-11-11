@@ -1,6 +1,6 @@
 #[cfg(feature = "ide")]
 #[test]
-fn hom_nested_functors_capture_imports_without_widening_exposing() {
+fn hom_nested_parameterizeds_capture_imports_without_widening_exposing() {
     use crate::diagnostics::{Severity, codes};
     for (import, input, output, expression, rejected) in [
         (

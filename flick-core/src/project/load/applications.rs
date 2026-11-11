@@ -2,13 +2,17 @@ impl Loader<'_> {
     fn virtual_source(
         &self,
         parent: usize,
-        functor: usize,
+        parameterized: usize,
         name: &str,
         header: &resolve::Header,
         application: &ModuleApplication,
     ) -> Option<String> {
-        let source = self.sources.get(self.modules[functor].file).text.clone();
-        let header_node = self.modules[functor]
+        let source = self
+            .sources
+            .get(self.modules[parameterized].file)
+            .text
+            .clone();
+        let header_node = self.modules[parameterized]
             .parse
             .tree
             .nodes()
@@ -55,7 +59,7 @@ impl Loader<'_> {
         }
         let suffix = &source[header_node.range().1 as usize..];
         if header_node.has_token(K::Eq) && header.body.is_none() {
-            let indent = self.modules[functor]
+            let indent = self.modules[parameterized]
                 .parse
                 .tree
                 .nodes()
@@ -106,10 +110,10 @@ impl Loader<'_> {
         else {
             return;
         };
-        let Some(functor) = self.callable_template(template, application.span) else {
+        let Some(parameterized) = self.callable_template(template, application.span) else {
             return;
         };
-        let Some(header) = self.modules[functor].syntax.header.clone() else {
+        let Some(header) = self.modules[parameterized].syntax.header.clone() else {
             return;
         };
         if header.parameters.is_empty()
@@ -131,13 +135,14 @@ impl Loader<'_> {
             ));
             return;
         }
-        let Some((template, trace)) = self.expansion_trace(parent, functor, application.span)
+        let Some((template, trace)) = self.expansion_trace(parent, parameterized, application.span)
         else {
             return;
         };
         // Expression elaboration has already resolved callee and arguments to
         // canonical module identities. Do not apply source aliases again here.
-        let Some(generated) = self.virtual_source(parent, functor, &name, &header, application)
+        let Some(generated) =
+            self.virtual_source(parent, parameterized, &name, &header, application)
         else {
             return;
         };
@@ -150,7 +155,7 @@ impl Loader<'_> {
         let index = self.modules.len();
         self.by_name.insert(name.clone(), index);
         let context =
-            self.application_context(functor, &header, application, callee, template, trace);
+            self.application_context(parameterized, &header, application, callee, template, trace);
         self.modules.push(Loaded {
             path,
             file,
@@ -172,19 +177,22 @@ impl Loader<'_> {
 
     fn application_context(
         &self,
-        functor: usize,
+        parameterized: usize,
         header: &resolve::Header,
         application: &ModuleApplication,
         callee: CalleeOrigin,
         template: String,
         trace: Vec<String>,
     ) -> Virtual {
-        let inherited = self.modules[functor].virtual_of.as_ref();
+        let inherited = self.modules[parameterized].virtual_of.as_ref();
         let mut capture = inherited.map_or_else(StaticCapture::default, |v| v.capture.clone());
-        if !capture.access_modules.contains(&self.modules[functor].name) {
+        if !capture
+            .access_modules
+            .contains(&self.modules[parameterized].name)
+        {
             capture
                 .access_modules
-                .push(self.modules[functor].name.clone());
+                .push(self.modules[parameterized].name.clone());
         }
         for (index, (parameter, argument)) in header
             .parameters
@@ -196,7 +204,7 @@ impl Loader<'_> {
                 alias: parameter.name.clone(),
                 argument: argument.clone(),
                 origin: BindingOrigin {
-                    module: self.modules[functor].name.clone(),
+                    module: self.modules[parameterized].name.clone(),
                     parameter: index,
                     group: header
                         .parameter_groups
@@ -211,12 +219,12 @@ impl Loader<'_> {
                 },
             });
         }
-        if let Root::Package(package) = &self.modules[functor].root
+        if let Root::Package(package) = &self.modules[parameterized].root
             && !capture.access_packages.contains(package)
         {
             capture.access_packages.push(package.clone());
         }
-        capture.definition_package = self.modules[functor]
+        capture.definition_package = self.modules[parameterized]
             .definition_package()
             .map(str::to_owned);
         capture.callee = Some(callee);
@@ -233,13 +241,13 @@ impl Loader<'_> {
     fn expansion_trace(
         &mut self,
         parent: usize,
-        functor: usize,
+        parameterized: usize,
         at: Span,
     ) -> Option<(String, Vec<String>)> {
-        let context = self.modules[functor].virtual_of.as_ref();
+        let context = self.modules[parameterized].virtual_of.as_ref();
         let template = context
             .and_then(|v| v.capture.template.clone())
-            .unwrap_or_else(|| self.modules[functor].name.clone());
+            .unwrap_or_else(|| self.modules[parameterized].name.clone());
         let mut trace = self.modules[parent]
             .virtual_of
             .as_ref()

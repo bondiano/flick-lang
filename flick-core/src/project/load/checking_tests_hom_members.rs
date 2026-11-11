@@ -151,7 +151,7 @@ fn hom_structure_members_bind_dependent_type_paths() {
 
 #[cfg(feature = "ide")]
 #[test]
-fn hom_file_functor_accepts_an_indented_structure_body() {
+fn hom_file_parameterized_accepts_an_indented_structure_body() {
     let (_, analysis) = hom_boundary_analysis(
         &[
             (

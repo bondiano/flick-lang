@@ -24,7 +24,7 @@ fn higher_order_templates_run_offline_without_package_sources_on_js_and_go() {
                 ),
                 (
                     "Geo/Return.fl",
-                    "module Geo.Return(F : Geo.Contracts.Factory) : Geo.Contracts.Factory = functor (K : Geo.Contracts.Input) ->\n  module Built = F(K)\n  answer : Int\n  let answer = Built.answer\n",
+                    "module Geo.Return(F : Geo.Contracts.Factory) : Geo.Contracts.Factory = module (K : Geo.Contracts.Input) ->\n  module Built = F(K)\n  answer : Int\n  let answer = Built.answer\n",
                 ),
                 (
                     "Geo/Published.fl",
@@ -113,7 +113,7 @@ fn assert_hom_template_interfaces(root: &Path, dist: &Path, emit: &str) {
                 .expect("saved template")["interface"]
                 .clone()
         };
-        assert!(interface["functor"].is_object());
+        assert!(interface["parameterized module"].is_object());
         assert!(interface["template"]["source"].is_string());
         if module.ends_with("Selected") {
             assert!(
@@ -129,4 +129,3 @@ fn assert_hom_template_interfaces(root: &Path, dist: &Path, emit: &str) {
         }
     }
 }
-

@@ -42,7 +42,7 @@ fn interface(text: &str) -> Interface {
 #[test]
 fn higher_order_signature_changes_are_public_api() {
     use crate::types::{ModuleRequirement as R, ModuleSignature as S};
-    let signature = |binder: &str, input: &str| S::Functor {
+    let signature = |binder: &str, input: &str| S::Parameterized {
         group_size: 1,
         binder: binder.into(),
         parameter: Box::new(S::Structure {
@@ -60,16 +60,16 @@ fn higher_order_signature_changes_are_public_api() {
     };
     let old = Interface {
         module: "Lib.Make".into(),
-        functor: Some(signature("K", "Int")),
+        parameterized: Some(signature("K", "Int")),
         ..Interface::default()
     };
     let renamed = Interface {
-        functor: Some(signature("Other", "Int")),
+        parameterized: Some(signature("Other", "Int")),
         ..old.clone()
     };
     assert!(diff(slice::from_ref(&old), &[renamed]).is_empty());
     let changed = Interface {
-        functor: Some(signature("K", "String")),
+        parameterized: Some(signature("K", "String")),
         ..old.clone()
     };
     assert_eq!(bump(&diff(slice::from_ref(&old), &[changed])), Bump::Major);

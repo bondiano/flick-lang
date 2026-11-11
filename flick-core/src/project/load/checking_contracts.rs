@@ -20,9 +20,9 @@ impl Checking<'_> {
         lookup: &dyn Fn(&str) -> Option<Interface>,
         contracts: &dyn Fn(&str) -> Option<Interface>,
     ) -> Option<types::ModuleSignature> {
-        let mut signature = contracts(&origin.module)?.functor?;
+        let mut signature = contracts(&origin.module)?.parameterized?;
         for argument in &origin.prefix {
-            let types::ModuleSignature::Functor {
+            let types::ModuleSignature::Parameterized {
                 binder, mut result, ..
             } = signature
             else {
@@ -31,7 +31,7 @@ impl Checking<'_> {
             result.instantiate_parameter(&binder, &lookup(argument)?);
             signature = *result;
         }
-        let types::ModuleSignature::Functor { parameter, .. } = signature else {
+        let types::ModuleSignature::Parameterized { parameter, .. } = signature else {
             return None;
         };
         Some(*parameter)
@@ -47,7 +47,7 @@ impl Checking<'_> {
                 let actual = contracts(name)?;
                 Some(
                     actual
-                        .functor
+                        .parameterized
                         .clone()
                         .unwrap_or_else(|| types::ModuleSignature::from_interface(&actual)),
                 )
@@ -59,7 +59,7 @@ impl Checking<'_> {
                     .clone();
                 Some(
                     actual
-                        .functor
+                        .parameterized
                         .clone()
                         .unwrap_or_else(|| types::ModuleSignature::from_interface(&actual)),
                 )
@@ -78,7 +78,7 @@ impl Checking<'_> {
                 }
                 Some(
                     actual
-                        .functor
+                        .parameterized
                         .clone()
                         .unwrap_or_else(|| types::ModuleSignature::from_interface(&actual)),
                 )
@@ -115,7 +115,7 @@ impl Checking<'_> {
         let context = loaded.virtual_of.as_ref()?;
         let mut signature = Self::callee_signature(context, lookup, contracts)?;
         for argument in &context.capture.arguments {
-            let types::ModuleSignature::Functor {
+            let types::ModuleSignature::Parameterized {
                 binder, mut result, ..
             } = signature
             else {
@@ -170,7 +170,13 @@ impl Checking<'_> {
             expected.normalize_in(witness);
             types::normalize_module_interface(&mut actual, witness);
         }
-        Self::module_contract_errors(expected, &actual, context.at, "functor result", errors);
+        Self::module_contract_errors(
+            expected,
+            &actual,
+            context.at,
+            "parameterized module result",
+            errors,
+        );
     }
 
     fn virtual_contracts(
@@ -218,7 +224,7 @@ impl Checking<'_> {
         }
         if let Some(mut signature) = Self::callee_signature(context, lookup, contracts) {
             for argument in &context.capture.arguments {
-                let types::ModuleSignature::Functor {
+                let types::ModuleSignature::Parameterized {
                     binder,
                     parameter,
                     mut result,
@@ -227,7 +233,7 @@ impl Checking<'_> {
                 else {
                     errors.push(Diagnostic::error(
                         codes::T002,
-                        "module expression is not a functor",
+                        "module expression is not a parameterized module",
                         context.at,
                     ));
                     break;

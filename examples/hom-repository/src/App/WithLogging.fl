@@ -1,1 +1,1 @@
-module App.WithLogging(Factory : App.Contracts.Factory) : App.Contracts.LoggedFactory = functor (Database : App.Contracts.Database) -> App.Logged(Factory(Database))
+module App.WithLogging(Factory : App.Contracts.Factory) : App.Contracts.LoggedFactory = module (Database : App.Contracts.Database) -> App.Logged(Factory(Database))

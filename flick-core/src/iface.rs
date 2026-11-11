@@ -113,8 +113,8 @@ pub struct Interface {
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub modules: BTreeMap<String, Interface>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub functor: Option<ModuleSignature>,
-    /// The functor's result was advertised by a declaration or ascription,
+    pub parameterized: Option<ModuleSignature>,
+    /// The parameterized module's result was advertised by a declaration or ascription,
     /// rather than inferred from a private implementation body.
     #[serde(default, skip_serializing_if = "is_false")]
     pub signature_explicit: bool,

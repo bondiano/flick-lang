@@ -69,7 +69,7 @@ fn map_interface_types(interface: &mut Interface, f: &mut dyn FnMut(&Type) -> Ty
             map_definition_types(definition, f);
         }
     }
-    if let Some(signature) = &mut interface.functor {
+    if let Some(signature) = &mut interface.parameterized {
         signature.map_types(f);
     }
     for child in interface.modules.values_mut() {
@@ -192,7 +192,7 @@ impl ModuleSignature {
         let from = format!("$module:{binder}");
 
         match self {
-            Self::Functor {
+            Self::Parameterized {
                 binder: inner,
                 parameter,
                 result,
@@ -223,7 +223,7 @@ impl ModuleSignature {
             return;
         }
         match self {
-            Self::Functor {
+            Self::Parameterized {
                 parameter, result, ..
             } => {
                 parameter.substitute_outer_types(subst);
@@ -277,7 +277,7 @@ impl ModuleSignature {
             }
         }
         match self {
-            Self::Functor {
+            Self::Parameterized {
                 binder,
                 parameter,
                 result,
@@ -343,7 +343,7 @@ impl ModuleSignature {
     #[inline(never)]
     pub fn map_types(&mut self, f: &mut dyn FnMut(&Type) -> Type) {
         match self {
-            Self::Functor {
+            Self::Parameterized {
                 parameter, result, ..
             } => {
                 parameter.map_types(f);
@@ -357,12 +357,12 @@ impl ModuleSignature {
         }
     }
 
-    pub fn has_functor(&self) -> bool {
+    pub fn has_parameterized(&self) -> bool {
         match self {
-            Self::Functor { .. } => true,
+            Self::Parameterized { .. } => true,
             Self::Structure { requirements } => requirements
                 .iter()
-                .any(|r| matches!(r, R::Module { signature, .. } if signature.has_functor())),
+                .any(|r| matches!(r, R::Module { signature, .. } if signature.has_parameterized())),
         }
     }
 }

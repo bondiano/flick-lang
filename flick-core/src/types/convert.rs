@@ -458,23 +458,23 @@ impl Checker<'_> {
         }
         if first_class_module {
             let (_, applied) = ty.spine();
-            let static_functor = if let [signature] = &applied[..]
+            let static_parameterized = if let [signature] = &applied[..]
                 && let Type::Con { module, name } = self.whnf(signature)
                 && let Some(definition) = self.env.type_def(&module, &name)
             {
                 match &definition.form {
-                    Form::ModuleSignature { signature } => signature.has_functor(),
-                    Form::ModuleContract { requirements } => requirements.iter().any(|r| matches!(r, ModuleRequirement::Module { signature, .. } if signature.has_functor())),
+                    Form::ModuleSignature { signature } => signature.has_parameterized(),
+                    Form::ModuleContract { requirements } => requirements.iter().any(|r| matches!(r, ModuleRequirement::Module { signature, .. } if signature.has_parameterized())),
                     _ => false,
                 }
             } else {
                 false
             };
-            if static_functor {
+            if static_parameterized {
                 self.error(
                     codes::T068,
                     self.span(node),
-                    "a static functor cannot be carried by `Module Sig`; apply it before packing",
+                    "a static parameterized module cannot be carried by `Module Sig`; apply it before packing",
                 );
             }
             let (_, applied) = ty.spine();

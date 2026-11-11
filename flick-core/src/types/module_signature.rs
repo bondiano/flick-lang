@@ -95,12 +95,12 @@ impl ModuleSignature {
     /// but its declared inputs still constrain applications and cache keys.
     pub(crate) fn inputs_only(&self) -> Self {
         match self {
-            Self::Functor {
+            Self::Parameterized {
                 group_size,
                 binder,
                 parameter,
                 result,
-            } => Self::Functor {
+            } => Self::Parameterized {
                 group_size: *group_size,
                 binder: binder.clone(),
                 parameter: parameter.clone(),
@@ -118,14 +118,14 @@ impl ModuleSignature {
                 Self::Structure { requirements } => Form::ModuleContract {
                     requirements: requirements.clone(),
                 },
-                Self::Functor { .. } => Form::ModuleSignature {
+                Self::Parameterized { .. } => Form::ModuleSignature {
                     signature: Box::new(self.clone()),
                 },
             },
         }
     }
     pub fn from_interface(interface: &Interface) -> Self {
-        if let Some(signature) = &interface.functor {
+        if let Some(signature) = &interface.parameterized {
             return signature.clone();
         }
 
@@ -179,7 +179,7 @@ impl ModuleSignature {
                 binder: String::new(),
                 signature: Box::new(
                     child
-                        .functor
+                        .parameterized
                         .clone()
                         .unwrap_or_else(|| Self::from_interface(child)),
                 ),

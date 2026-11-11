@@ -1,6 +1,6 @@
 #[cfg(feature = "ide")]
 #[test]
-fn hom_private_factories_infer_returned_functor_signatures() {
+fn hom_private_factories_infer_returned_parameterized_signatures() {
     let (_, analysis) = hom_boundary_analysis(
         &[
             (
@@ -13,7 +13,7 @@ fn hom_private_factories_infer_returned_functor_signatures() {
             ),
             (
                 "Return",
-                "private module App.Return(K : App.Contracts.Input) = functor (J : App.Contracts.Input) ->\n  answer : Int\n  let answer = K.seed + J.seed\n",
+                "private module App.Return(K : App.Contracts.Input) = module (J : App.Contracts.Input) ->\n  answer : Int\n  let answer = K.seed + J.seed\n",
             ),
             (
                 "Root",
@@ -176,7 +176,7 @@ fn hom_parameterized_manifest_members_compare_bodies_under_their_binders() {
 
 #[cfg(feature = "ide")]
 #[test]
-fn hom_nested_functors_capture_earlier_local_signatures_types_and_values() {
+fn hom_nested_parameterizeds_capture_earlier_local_signatures_types_and_values() {
     use crate::diagnostics::codes;
     for late in [false, true] {
         let offset = "offset : Int\nlet offset = 1\n";
@@ -216,7 +216,7 @@ fn hom_nested_functors_capture_earlier_local_signatures_types_and_values() {
 
 #[cfg(feature = "ide")]
 #[test]
-fn hom_nested_functors_capture_values_of_an_enclosing_generic_functor() {
+fn hom_nested_parameterizeds_capture_values_of_an_enclosing_generic_parameterized() {
     let (_, analysis) = hom_boundary_analysis(
         &[
             (
@@ -289,7 +289,7 @@ let answer = eq "x" "x"
             ),
             (
                 "Outer",
-                r#"module App.Outer(A : App.Contracts.Policy) : App.Contracts.Factory = functor (B : App.Contracts.Policy) ->
+                r#"module App.Outer(A : App.Contracts.Policy) : App.Contracts.Factory = module (B : App.Contracts.Policy) ->
   answer : Bool
   let answer = eq "x" "x"
 "#,

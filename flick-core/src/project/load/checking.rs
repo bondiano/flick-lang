@@ -398,8 +398,8 @@ fn exported(interface: &Interface, clean: bool) -> Interface {
     for child in out.modules.values_mut() {
         *child = exported(child, false);
     }
-    out.functor = out
-        .functor
+    out.parameterized = out
+        .parameterized
         .map(|signature| {
             if written(&signature) {
                 signature

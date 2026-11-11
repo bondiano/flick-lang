@@ -58,16 +58,16 @@ impl Loader<'_> {
         CalleeOrigin::Module(actual.to_owned())
     }
 
-    fn expression_captures(&self, parent: usize, functor: Option<&Node>) -> (String, usize) {
+    fn expression_captures(&self, parent: usize, parameterized: Option<&Node>) -> (String, usize) {
         let loaded = &self.modules[parent];
         let source = &self.sources.get(loaded.file).text;
-        let tokens: Vec<_> = functor
+        let tokens: Vec<_> = parameterized
             .into_iter()
             .flat_map(Node::tokens)
             .filter(|t| !t.kind.is_trivia())
             .map(|t| t.text(source))
             .collect();
-        let mut shadowed: Vec<_> = functor
+        let mut shadowed: Vec<_> = parameterized
             .into_iter()
             .flat_map(Node::nodes)
             .filter(|n| n.kind == K::ModuleParamGroup)
@@ -75,7 +75,7 @@ impl Loader<'_> {
             .filter_map(|p| p.child_tokens().find(|t| t.kind == K::Con))
             .map(|t| t.text(source).to_owned())
             .collect();
-        if let Some(body) = functor
+        if let Some(body) = parameterized
             .into_iter()
             .flat_map(Node::nodes)
             .find(|n| n.kind == K::Members)

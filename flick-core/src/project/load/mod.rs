@@ -454,7 +454,7 @@ fn run_in(
                 }
                 let interface = interface?;
                 let lowered = lowered.or_else(|| {
-                    interface.functor.as_ref()?;
+                    interface.parameterized.as_ref()?;
                     Some((
                         ir::Module {
                             name: m.name.clone(),

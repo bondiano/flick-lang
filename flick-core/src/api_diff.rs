@@ -89,15 +89,15 @@ fn static_members(old: &Interface, new: &Interface) -> Vec<Change> {
         signature
     };
     let mut out = Vec::new();
-    if old.functor.as_ref().map(canonical) != new.functor.as_ref().map(canonical) {
+    if old.parameterized.as_ref().map(canonical) != new.parameterized.as_ref().map(canonical) {
         out.push(Change::Changed {
             name: format!("module {}", old.module),
             was: old
-                .functor
+                .parameterized
                 .as_ref()
                 .map_or_else(|| "structure".into(), ModuleSignature::display),
             now: new
-                .functor
+                .parameterized
                 .as_ref()
                 .map_or_else(|| "structure".into(), ModuleSignature::display),
         });

@@ -8,7 +8,7 @@ impl ModuleSignature {
             ..Interface::default()
         };
         let Self::Structure { requirements } = self else {
-            interface.functor = Some(self.clone());
+            interface.parameterized = Some(self.clone());
             interface.signature_explicit = true;
             return interface;
         };
@@ -186,9 +186,9 @@ impl ModuleSignature {
                 },
                 actual,
             ),
-            Self::Functor { .. } => Interface {
+            Self::Parameterized { .. } => Interface {
                 module: actual.module.clone(),
-                functor: Some(self.clone()),
+                parameterized: Some(self.clone()),
                 signature_explicit: true,
                 ..Interface::default()
             },
@@ -256,7 +256,7 @@ impl ModuleSignature {
     pub fn accepts(&self, actual: &Interface) -> bool {
         match self {
             Self::Structure { requirements } => {
-                actual.functor.is_none()
+                actual.parameterized.is_none()
                     && super::module_contract::check(
                         &TypeDef {
                             kind: Kind::Module,
@@ -268,8 +268,8 @@ impl ModuleSignature {
                     )
                     .is_empty()
             }
-            Self::Functor { .. } => actual
-                .functor
+            Self::Parameterized { .. } => actual
+                .parameterized
                 .as_ref()
                 .is_some_and(|provided| provided.is_subtype_of(self)),
         }
@@ -278,13 +278,13 @@ impl ModuleSignature {
     pub fn is_subtype_of(&self, expected: &Self) -> bool {
         match (self, expected) {
             (
-                Self::Functor {
+                Self::Parameterized {
                     group_size: ag,
                     binder: a,
                     parameter: ap,
                     result: ar,
                 },
-                Self::Functor {
+                Self::Parameterized {
                     group_size: bg,
                     binder: b,
                     parameter: bp,

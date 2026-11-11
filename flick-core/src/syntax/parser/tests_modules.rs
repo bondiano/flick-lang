@@ -324,12 +324,12 @@ fn checked_higher_order_signature_keeps_the_input_type_dependency() {
 
 #[test]
 fn higher_order_module_expressions_and_result_annotations() {
-    let source = "module App.Make(F : Factory)(K : KeyPolicy) : SetApi\nmodule Chosen : SetApi = App.Make(HashSet.Make)(Keys)\nmodule Alias = Chosen\nmodule Adapt = functor (F : Factory) -> F\n";
+    let source = "module App.Make(F : Factory)(K : KeyPolicy) : SetApi\nmodule Chosen : SetApi = App.Make(HashSet.Make)(Keys)\nmodule Alias = Chosen\nmodule Adapt = module (F : Factory) -> F\n";
     assert!(errors(source).is_empty(), "{:?}", errors(source));
 }
 
 #[test]
-fn module_contract_can_require_nested_modules_and_functors() {
+fn module_contract_can_require_nested_modules_and_parameterizeds() {
     let source = "type module Library =\n  module Make : Factory\n  module Keys : KeyPolicy\n";
     assert!(errors(source).is_empty(), "{:?}", errors(source));
 }

@@ -14,7 +14,7 @@ fn structure(fields: &[&str]) -> ModuleSignature {
 }
 
 fn factory(input: ModuleSignature, output: ModuleSignature) -> ModuleSignature {
-    ModuleSignature::Functor {
+    ModuleSignature::Parameterized {
         group_size: 1,
         binder: "K".into(),
         parameter: Box::new(input),
@@ -264,10 +264,10 @@ fn nested_signatures_capture_outer_types_and_respect_inner_type_binders() {
                 .scheme,
             Some(Type::con(&format!("{root}.Inner"), "Item"))
         );
-        let ModuleSignature::Functor {
+        let ModuleSignature::Parameterized {
             parameter, result, ..
         } = interface.modules["Build"]
-            .functor
+            .parameterized
             .as_ref()
             .expect("factory")
         else {
@@ -295,8 +295,8 @@ fn signature_display_distinguishes_atomic_and_curried_groups() {
         factory(structure(&["seed"]), structure(&["answer"])),
     );
     let mut grouped = curried.clone();
-    let ModuleSignature::Functor { group_size, .. } = &mut grouped else {
-        panic!("functor")
+    let ModuleSignature::Parameterized { group_size, .. } = &mut grouped else {
+        panic!("parameterized module")
     };
     *group_size = 2;
     assert_ne!(curried.display(), grouped.display());
@@ -305,7 +305,7 @@ fn signature_display_distinguishes_atomic_and_curried_groups() {
 
 #[test]
 fn signature_display_uses_scoped_names_for_dependent_types() {
-    let signature = ModuleSignature::Functor {
+    let signature = ModuleSignature::Parameterized {
         group_size: 1,
         binder: "Lib@12#K".into(),
         parameter: Box::new(structure(&[])),
@@ -516,6 +516,8 @@ fn higher_order_signatures_survive_interface_serialization() {
     );
     let interface = signature.interface("App.Factory");
     let written = write(&interface);
+    let json: serde_json::Value = serde_json::from_str(&written).expect("JSON interface");
+    assert_eq!(json["parameterized"]["signature"], "parameterized");
     let read = read(written.as_bytes(), "App.Factory").expect("interface");
-    assert_eq!(read.functor, Some(signature));
+    assert_eq!(read.parameterized, Some(signature));
 }

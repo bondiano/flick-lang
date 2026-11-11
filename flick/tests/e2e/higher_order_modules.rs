@@ -73,7 +73,7 @@ fn higher_order_factory_with_partial_application_runs_on_js_and_go() {
 
 #[test]
 #[ignore = "needs Node and Go; run `just e2e-tests`"]
-fn anonymous_nested_and_returned_functors_execute_on_js_and_go() {
+fn anonymous_nested_and_returned_parameterizeds_execute_on_js_and_go() {
     for &(case, factory, instances) in hom_expression_cases() {
         let dir = Path::new(env!("CARGO_TARGET_TMPDIR")).join(format!("hom_expression_{case}"));
         let source = dir.join("App");
@@ -108,7 +108,7 @@ fn hom_expression_cases() -> &'static [(&'static str, &'static str, &'static str
         ),
         (
             "private_returned",
-            "private module App.Factory(K : App.Contracts.Input) = functor (J : App.Contracts.Input) ->\n  answer : Int\n  let answer = K.seed + J.seed\n",
+            "private module App.Factory(K : App.Contracts.Input) = module (J : App.Contracts.Input) ->\n  answer : Int\n  let answer = K.seed + J.seed\n",
             "module App.Instances exposing (Chosen)\nmodule Selected = App.Factory(App.Other)\nmodule Chosen = Selected(App.Argument)\n",
         ),
         (
@@ -159,7 +159,7 @@ fn hom_expression_cases() -> &'static [(&'static str, &'static str, &'static str
         (
             "anonymous",
             "module App.Factory(F : App.Contracts.Factory)(K : App.Contracts.Input) : App.Contracts.Output\nmodule Built = F(K)\nanswer : Int\nlet answer = Built.answer\n",
-            "module App.Instances exposing (Chosen)\nmodule Chosen = App.Factory((functor (K : App.Contracts.Input) ->\n  answer : Int\n  let answer = K.seed + 1\n))(App.Argument)\n",
+            "module App.Instances exposing (Chosen)\nmodule Chosen = App.Factory((module (K : App.Contracts.Input) ->\n  answer : Int\n  let answer = K.seed + 1\n))(App.Argument)\n",
         ),
         (
             "nested",
@@ -168,12 +168,12 @@ fn hom_expression_cases() -> &'static [(&'static str, &'static str, &'static str
         ),
         (
             "returned_anonymous",
-            "module App.Factory(F : App.Contracts.Factory) : App.Contracts.Factory = functor (K : App.Contracts.Input) ->\n  module Built = F(K)\n  answer : Int\n  let answer = Built.answer\n",
+            "module App.Factory(F : App.Contracts.Factory) : App.Contracts.Factory = module (K : App.Contracts.Input) ->\n  module Built = F(K)\n  answer : Int\n  let answer = Built.answer\n",
             "module App.Instances exposing (Chosen)\nmodule Selected = App.Factory(App.Make)\nmodule Chosen = App.Instances.Selected(App.Argument)\n",
         ),
         (
             "shadowed_parameter",
-            "module App.Factory(K : App.Contracts.Input) : App.Contracts.Factory = functor (K : App.Contracts.Input) ->\n  answer : Int\n  let answer = K.seed + 1\n",
+            "module App.Factory(K : App.Contracts.Input) : App.Contracts.Factory = module (K : App.Contracts.Input) ->\n  answer : Int\n  let answer = K.seed + 1\n",
             "module App.Instances exposing (Chosen)\nmodule Selected = App.Factory(App.Other)\nmodule Chosen = Selected(App.Argument)\n",
         ),
         (

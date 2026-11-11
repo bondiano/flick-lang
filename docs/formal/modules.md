@@ -17,7 +17,7 @@ it has no rule that executes that code during static application.
 | Parameterized modules may require an abstract class or service; `Module Sig` needs manifest identities | `Identity.matches` accepts any supplied identity for an abstract requirement and requires exact path equality for a manifest requirement. `manifest_requires_same_path` excludes a same-shaped declaration at another path. `abstract_identity_cannot_be_packed` rejects an abstract requirement at the packed boundary. |
 | `exists K : Sig. K.Key` keeps its witness inside `unpack` | `Packed F` uses a polymorphic continuation. `unpack_pack` proves the introduction/elimination equation. `unpackTwo` requires a client polymorphic in *two* witness types; `unpackTwo_pack` proves the equation for two openings. |
 | `module Child =` keeps child types distinct from the parent's types while sharing one runtime file | `InlineTypePath` records the file, optional child and member. `inline_child_is_distinct_from_parent` and `inline_siblings_are_distinct` prove path separation. The compiler's source fixture and `flick-model` test check the concrete lowering. |
-| A factory accepts module-valued arguments and returns factories | `Expr.functor` captures a module environment. `application_uses_captured_module` excludes substitution by an equally placed caller binding; `returned_functor_retains_its_argument` proves the returned closure keeps its argument. The Rust evaluator tests the same behavior with independently chosen code references. |
+| A factory accepts module-valued arguments and returns factories | `Expr.parameterized` captures a module environment. `application_uses_captured_module` excludes substitution by an equally placed caller binding; `returned_parameterized_retains_its_argument` proves the returned closure keeps its argument. The Rust evaluator tests the same behavior with independently chosen code references. |
 | An atomic group cannot be partially applied or passed as a curried factory | `atomic_group_rejects_partial_application` checks evaluation; `matching_arrows_preserve_groups` proves that signature matching preserves the group size. |
 | Higher-order inputs are contravariant and results covariant | `Subtype.arrow` declares that rule. `subtype_refl` and `subtype_trans` prove reflexivity and transitivity, including nominal shape requirements. |
 | Result ascription hides unadvertised members | `project` filters public code references. `projection_hides_unadvertised` proves that a member of the projected view must be advertised. Source regressions additionally check nested parent views, result type abstraction and ascription of parameter aliases before concrete substitution. Narrowing one alias preserves the original parameter's separate view. |
@@ -26,7 +26,7 @@ it has no rule that executes that code during static application.
 `flick-model/tests/modules/App/Hom/` is also compiled through the real source
 loader, checked by the core reference checker and executed by its interpreter.
 The fixture covers a returned anonymous factory, a named nested structure
-functor, a captured preceding value, dependent manifest types, aliases and a captured local dictionary;
+parameterized module, a captured preceding value, dependent manifest types, aliases and a captured local dictionary;
 JS and Go execute the same fixture in debug and release profiles. Public source
 factories in these examples declare their result signature (`FLICK-T067`).
 

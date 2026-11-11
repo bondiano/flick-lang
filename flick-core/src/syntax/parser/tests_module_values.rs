@@ -239,7 +239,7 @@ fn static_module_contract_preserves_abstract_class_and_service_shapes() {
     assert!(page.contains("service Clock =\n    now :"), "{page}");
 }
 #[test]
-fn runtime_module_type_rejects_direct_and_nested_static_functors() {
+fn runtime_module_type_rejects_direct_and_nested_static_parameterizeds() {
     for signature in ["Factory", "Library"] {
         let src = format!(
             "module App.Contracts exposing (..)\ntype module Input =\n  seed : Int\ntype module Output =\n  answer : Int\ntype module Factory = Input -> Output\ntype module Library =\n  module Make : Factory\ntype alias Packed = Module {signature}\n"
