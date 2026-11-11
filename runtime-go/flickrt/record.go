@@ -39,7 +39,7 @@ func (r *Record) index(k string) int {
 // set is `r` with `k` as `v`: a key it has keeps its place.
 func (r *Record) set(k string, v Value) *Record {
 	if i := r.index(k); i >= 0 {
-		out := &Record{r.keys, append([]Value{}, r.vals...)}
+		out := r.copied()
 		out.vals[i] = v
 		return out
 	}
@@ -53,6 +53,17 @@ func (r *Record) set(k string, v Value) *Record {
 	out := &Record{make([]string, 0, len(r.keys)+1), make([]Value, 0, len(r.vals)+1)}
 	out.keys = append(append(append(out.keys, r.keys[:at]...), k), r.keys[at:]...)
 	out.vals = append(append(append(out.vals, r.vals[:at]...), v), r.vals[at:]...)
+	return out
+}
+
+// copied is a record of the labels and values of `r` in an allocation of
+// its own. Sharing the labels would be less to copy, but a small record
+// holds its labels and values together, so the copy would keep every value
+// of `r` alive for as long as it lives itself.
+func (r *Record) copied() *Record {
+	out := newRecord(len(r.keys))
+	out.keys = append(out.keys, r.keys...)
+	out.vals = append(out.vals, r.vals...)
 	return out
 }
 
@@ -159,6 +170,20 @@ func (r *Record) Get(k string) Value {
 // Update is a copy of a record with some fields replaced or added.
 func Update(base Value, fields Value) Value {
 	b, f := record(base), record(fields)
+	// fields the record has replace their values in a copy of it, with no
+	// room for more labels and no search for where a new one goes
+	replaced := b.copied()
+	for i, k := range f.keys {
+		at := b.index(k)
+		if at < 0 {
+			replaced = nil
+			break
+		}
+		replaced.vals[at] = f.vals[i]
+	}
+	if replaced != nil {
+		return replaced
+	}
 	out := newRecord(len(b.keys) + len(f.keys))
 	out.keys = append(out.keys, b.keys...)
 	out.vals = append(out.vals, b.vals...)
