@@ -140,6 +140,7 @@ stdlib/devtools/headers
 stdlib/effect/arbitrary
 stdlib/effect/array
 stdlib/effect/bytesize
+stdlib/effect/bytesize_text
 stdlib/effect/cache
 stdlib/effect/channel
 stdlib/effect/channel_control
