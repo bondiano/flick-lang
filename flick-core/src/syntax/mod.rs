@@ -5,6 +5,8 @@ pub mod ast;
 pub mod cst;
 pub(crate) mod heads;
 pub mod kind;
+#[cfg(test)]
+mod kind_tests;
 pub(crate) mod lang;
 pub mod lexer;
 pub mod literal;
