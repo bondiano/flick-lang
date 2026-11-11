@@ -54,7 +54,7 @@ foreign pure map from "flick:reactivity/Atom" "flickMap"
   reviewed "effect@4.1.2 sha256:66489a3049c532a3"
 
 /// One atom per key, made by `f` the first time and the same after: keys
-/// compare by structural equality, strings and numbers by value.
+/// that are strings or numbers compare by value.
 family : (k -> Atom a) -> k -> Atom a
 foreign pure family from "flick:reactivity/Atom" "family"
   arity 1
