@@ -351,8 +351,16 @@ impl Ide<'_> {
                         && decl.has_token(K::MutKw)
                         && decl.nodes().next().is_some_and(|p| p.range() == *binder)
                 });
-                let prefix = if mutable { "mut " } else { "" };
-                (format!("{prefix}{name} : {}", m.typing.shown(at, ty)), None)
+                let shown = m.typing.shown(at, ty);
+                // Reserve the name, type, separator and optional `mut ` prefix once.
+                let mut code = String::with_capacity(name.len() + shown.len() + 7);
+                if mutable {
+                    code.push_str("mut ");
+                }
+                code.push_str(name);
+                code.push_str(" : ");
+                code.push_str(&shown);
+                (code, None)
             }
             Symbol::Entity(e) => {
                 let interface = self.interface(&e.module)?;

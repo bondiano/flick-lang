@@ -322,3 +322,26 @@ let applied n =
         }
     }
 }
+
+#[test]
+fn mutable_hover_inside_an_inline_module_follows_the_local_binder() {
+    let source = "module App.Vars exposing (counted)
+module Counter exposing (counted) =
+  counted : Int -> Int
+  let counted n =
+    let mut total = n
+    total = total + 1
+    total
+counted : Int -> Int
+let counted n = Counter.counted n
+";
+    let f = fixture_of(&[("src/App/Vars.fl", source)]);
+    let ide = f.ide();
+    let file = f.file("App.Vars");
+    for (at, _) in source.match_indices("total") {
+        let at = u32::try_from(at).expect("small source");
+        let (markdown, range) = ide.hover(file, at).expect("inline mutable name hover");
+        assert_eq!(markdown, "```flick\nmut total : Int\n```");
+        assert_eq!(range, (at, at + 5));
+    }
+}
