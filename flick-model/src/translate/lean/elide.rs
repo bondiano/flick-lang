@@ -4,11 +4,15 @@
 //! `K` the binders of kind `Region` and `CaptureRow`, which the model's
 //! `shown` counts. A capture row is a set of atoms, a row a set of elements,
 //! both as predicates; `Live C` in a row is the atoms of `C`, `Scope ϱ` the
-//! atom `ϱ`. `∀v. a^v → …` of a parameter is `v := a`, as rule 2 of the
-//! scheme translation reads it. What the core has no form for is skipped,
-//! with its reason.
+//! atom `ϱ`. A value bound `a^c` on a variable of the scheme is the fact
+//! `Facts.bnd a ⟦c⟧` of the scheme and `a` in its type, as rule 1 of the
+//! scheme translation reads it; `∀v. a^v → …` of a parameter is `v := a`,
+//! as rule 2 reads it. What the core has no form for is skipped, with its
+//! reason.
 
+use std::cell::RefCell;
 use std::fmt::Write;
+use std::rc::Rc;
 
 use flick_core::types::{builtins, show_type};
 
@@ -22,6 +26,9 @@ use crate::types::{Caps, Kind, Row, Scheme, Stage, Type, Var};
 /// argument, as `appQ` of the scheme translation.
 const STORED: [&str; 1] = ["Seq"];
 
+/// The value bounds a translation meets, by their variable.
+type Bounds = Rc<RefCell<Vec<(String, Caps)>>>;
+
 /// The binders in scope, innermost first, with the capture rows rule 2 has
 /// instantiated: `v ↦ a`.
 #[derive(Clone, Default)]
@@ -32,6 +39,13 @@ pub(crate) struct Env {
     /// `Unit`, a row, capture row or record's rest empty. A certificate's typing holds at
     /// any instance of them, and Lean checks it at this one.
     pub(crate) ground: bool,
+    /// The value bounds on variables of the scheme met so far, rule 1: each
+    /// is a fact of the scheme. Without it a bound is not read, as a
+    /// certificate's type has no facts.
+    pub(crate) bounds: Option<Bounds>,
+    /// The binders of the `∀` of parameters around: the variables of the
+    /// scheme come after them in `vars`.
+    pub(crate) inner: usize,
 }
 
 impl Env {
@@ -175,7 +189,20 @@ fn qualified(t: &Type, q: Option<&Caps>, env: &Env) -> Result<String, String> {
                 {
                     ty(x, env)?
                 }
-                _ => return Err("a value bound, which the core does not have".into()),
+                _ => {
+                    let Some(bounds) = &env.bounds else {
+                        return Err("a value bound, which the core does not have".into());
+                    };
+                    let Type::Var(Var::Named(a)) = &**x else {
+                        return Err("a value bound on a type that is not a variable".into());
+                    };
+                    let outer = |v: &Var| env.index_of(v).is_ok_and(|i| i >= env.inner);
+                    if !outer(&Var::Named(a.clone())) || !bound.iter().all(|v| outer(v)) {
+                        return Err("a value bound over a variable of a `∀` of a parameter".into());
+                    }
+                    bounds.borrow_mut().push((a.to_string(), b.clone()));
+                    ty(x, env)?
+                }
             }
         }
         Type::Ref(x) => format!("(.ref {})", ty(x, env)?),
@@ -225,6 +252,7 @@ fn forall(s: &Scheme, env: &Env) -> Result<String, String> {
             _ => kept.push(v.to_string()),
         }
     }
+    inner.inner = env.inner + kept.len();
     inner.vars = kept
         .iter()
         .cloned()
@@ -277,10 +305,28 @@ fn visit(t: &Type, f: &mut dyn FnMut(&Type) -> bool) -> bool {
     }
 }
 
-/// The theorem of one scheme: `Ty.elide K ⟦σ⟧ Caps.none = ⟦elided σ⟧`.
+/// The facts of the value bounds of a scheme, rule 1: `Facts.bnd a ⟦c⟧`
+/// for each, joined by `Facts.union`.
+fn facts(bounds: &[(String, Caps)], env: &Env) -> Result<Option<String>, String> {
+    let mut parts: Vec<String> = Vec::new();
+    for (a, c) in bounds {
+        let fact = format!("Facts.bnd {} {}", env.index(a)?, caps(c, env)?);
+        if !parts.contains(&fact) {
+            parts.push(fact);
+        }
+    }
+    Ok(parts
+        .into_iter()
+        .reduce(|a, b| format!("Facts.union ({a}) ({b})")))
+}
+
+/// The theorem of one scheme: `Ty.elide K ⟦σ⟧ Caps.none = ⟦elided σ⟧`, or
+/// of a scheme with value bounds `Scheme.elide K ⟨k, Θ, ⟦σ⟧⟩ = ⟨k, Θ, ⟦elided σ⟧⟩`.
 pub(super) fn theorem(name: &str, doc: &str, s: &Scheme, live: &Scheme) -> Result<String, String> {
+    let bounds = Rc::new(RefCell::new(Vec::new()));
     let env = Env {
         vars: s.vars.iter().map(|(v, _)| v.to_string()).collect(),
+        bounds: Some(bounds.clone()),
         ..Env::default()
     };
     let k: Vec<String> = s
@@ -290,12 +336,31 @@ pub(super) fn theorem(name: &str, doc: &str, s: &Scheme, live: &Scheme) -> Resul
         .filter(|(_, (_, k))| matches!(k, Kind::Region | Kind::Captures))
         .map(|(i, _)| format!("x = .v {i}"))
         .collect();
-    let (src, out) = (ty(&s.body, &env)?, ty(&live.body, &env)?);
-    let mut text = format!(
-        "/-- `{doc}` -/\ntheorem {name} :\n    Ty.elide {} ",
-        disjunction(&k, "Caps.none")
-    );
-    let _ = write!(text, "{src} Caps.none =\n      {out} := by\n  elide_eq\n");
+    let k = disjunction(&k, "Caps.none");
+    let src = ty(&s.body, &env)?;
+    let facts = facts(&bounds.take(), &env)?;
+    let out = ty(&live.body, &env)?;
+    let mut text = format!("/-- `{doc}` -/\ntheorem {name} :\n");
+    let runtime = !visit(&s.body, &mut |t| {
+        !matches!(t, Type::Fun(_, Stage::Runtime(..), _) | Type::Eff(..))
+    });
+    match facts {
+        None => {
+            let _ = write!(text, "    Ty.elide {k} {src} Caps.none =\n      {out}");
+        }
+        // the model's elision keeps the bound live after its parameter, `Ty.elide` the variable
+        Some(_) if runtime => {
+            return Err("a value bound in a scheme with a runtime stage".into());
+        }
+        Some(facts) => {
+            let n = s.vars.len();
+            let _ = write!(
+                text,
+                "    Scheme.elide {k} ⟨{n}, {facts},\n      {src}⟩ =\n      ⟨{n}, {facts},\n      {out}⟩"
+            );
+        }
+    }
+    text.push_str(" := by\n  elide_eq\n");
     Ok(text)
 }
 
@@ -313,7 +378,9 @@ pub fn elide_schemes() -> String {
          Each export of `Prelude`, `Seq`, `Option`, `Result` and `List` the core can write, as the model\n\
          takes it (`flick-model/src/translate/types.rs`) and as the model reads it (`check::elided`):\n\
          `Ty.elide K` of the first is the second, `K` the binders of kind `Region` and `CaptureRow`\n\
-         (`flick-model/src/translate/lean/elide.rs`). The exports the core cannot write close the file.\n\
+         (`flick-model/src/translate/lean/elide.rs`). A value bound `a^c` on a variable of the scheme\n\
+         is the fact `Facts.bnd a c`, which `Scheme.elide` keeps. The exports the core cannot write\n\
+         close the file.\n\
          -/\n\n\
          namespace Flick.ElideSchemes\n",
     );
@@ -362,6 +429,40 @@ mod tests {
         assert!(
             committed == text,
             "ElideSchemes.lean is stale: run `just formal-schemes`"
+        );
+    }
+
+    /// Rule 1 reads a bound on a variable of the scheme as a fact; a bound
+    /// it cannot read so is skipped with its reason.
+    #[test]
+    fn a_value_bound_is_a_fact_of_the_scheme() {
+        use std::rc::Rc;
+
+        use crate::types::{Caps, Kind, Row, Scheme, Stage, Type, Var};
+
+        let var = |n: &str| Var::Named(n.into());
+        let a = Rc::new(Type::Var(var("a")));
+        let unit = || Rc::new(Type::Tuple(Rc::new([])));
+        let bounded = |t: Rc<Type>| Rc::new(Type::Bounded(t, Caps::atom(var("c"))));
+        let scheme = |param: Rc<Type>, stage: Stage| {
+            Scheme::new(
+                vec![("a".into(), Kind::Type), ("c".into(), Kind::Captures)],
+                Type::Fun(param, stage, unit()),
+            )
+        };
+        let theorem = |s: &Scheme| super::theorem("t", "t", s, s);
+        let pure = theorem(&scheme(bounded(a.clone()), Stage::Pure)).expect("a fact");
+        assert!(
+            pure.contains("Scheme.elide (fun x => x = .v 1) ⟨2, Facts.bnd 0 (fun x => x = .v 1),")
+        );
+        let runtime = Stage::Runtime(Row::none(), Row::none());
+        assert_eq!(
+            theorem(&scheme(bounded(a), runtime)),
+            Err("a value bound in a scheme with a runtime stage".into())
+        );
+        assert_eq!(
+            theorem(&scheme(bounded(unit()), Stage::Pure)),
+            Err("a value bound on a type that is not a variable".into())
         );
     }
 }
