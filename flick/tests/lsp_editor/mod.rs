@@ -6,6 +6,7 @@ mod features;
 mod ffi;
 mod foreign;
 mod manifests;
+mod mutable;
 mod privacy;
 mod quick_fix;
 mod sql_table;

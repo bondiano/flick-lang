@@ -26,6 +26,14 @@ use companions::enum_literal;
 use kinds::kind_description;
 use written::{as_written, signature_as_written};
 
+fn local_code(name: &str, ty: &str, mutable: bool) -> String {
+    let mut code = String::from(if mutable { "mut " } else { "" });
+    code.push_str(name);
+    code.push_str(" : ");
+    code.push_str(ty);
+    code
+}
+
 fn documentation(source: &Source, name: &str) -> Option<String> {
     source
         .tree
@@ -346,7 +354,12 @@ impl Ide<'_> {
                 let m = self.module(file)?;
                 let (at, ty) = tree::innermost(m.typing.types.iter(), offset)
                     .or_else(|| tree::innermost(m.typing.types.iter(), binder.0))?;
-                (format!("{name} : {}", m.typing.shown(at, ty)), None)
+                let mutable = tree::path_to(&m.tree, binder.0).iter().any(|decl| {
+                    decl.kind == K::LetDecl
+                        && decl.has_token(K::MutKw)
+                        && decl.nodes().next().is_some_and(|p| p.range() == *binder)
+                });
+                (local_code(name, &m.typing.shown(at, ty), mutable), None)
             }
             Symbol::Entity(e) => {
                 let interface = self.interface(&e.module)?;
