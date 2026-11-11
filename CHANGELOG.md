@@ -6,6 +6,12 @@ break programs.
 
 ## Unreleased
 
+- **Serializable atoms on Flick's runtime:** `Atom.serializable`,
+  `serializable_family`, `serializable_task` and `serializable_result` run on
+  the default runtime. `Ui.Server.state` hands their values to the client, and
+  `Ui.Dom.mount` starts from them, without running a hydrated task again. A
+  program that uses them no longer needs `@flick-lang/effect-ts`, and its UI
+  stays on the runtime unless it streams server markup.
 - **Local mutation and loops:** `let mut name = value` declares a local
   monomorphic variable and `name = value` assigns it. Pure functions may
   change their variables; nested functions, tasks and lazy sequences cannot

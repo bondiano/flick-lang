@@ -25,6 +25,19 @@ export interface Atom<A = unknown> {
   readonly label?: string;
   /** How long its value stays after nothing holds it, in milliseconds. */
   readonly idleTtl?: number;
+  /** How a server hands its value to the client: see `serial.ts`. */
+  readonly serial?: Serial;
+}
+
+/** The JSON coding of a serializable atom's value under its key. */
+export interface Serial {
+  readonly key: string;
+  /** Whether a server hands `value` over. */
+  handedOver(value: unknown): boolean;
+  encode(value: unknown): unknown;
+  /** The value of `wire`; for a task, the seed of its next run instead (`seeds`). */
+  decode(wire: unknown): unknown;
+  readonly seeds: boolean;
 }
 
 export const isAtom = (value: unknown): value is Atom => typeof value === "object" && value !== null && ATOM in value;
@@ -195,6 +208,8 @@ export class Registry {
   /** What a mutation of a key refreshes: the queries read with it. */
   private readonly queries = new Map<string, Set<() => void>>();
   private disposed = false;
+  /** The wire values a client root read for keys no atom of this registry has yet. */
+  readonly preloaded = new Map<string, unknown>();
   constructor(ctx: Ctx) {
     this.ctx = ctx;
   }
@@ -205,9 +220,20 @@ export class Registry {
       if (this.disposed) throw new Error(`the registry of the atom ${atom.label ?? ""} is disposed`);
       node = new Node(atom);
       this.nodes.set(atom, node);
+      const serial = atom.serial;
+      if (serial !== undefined && this.preloaded.has(serial.key)) {
+        const value = serial.decode(this.preloaded.get(serial.key));
+        this.preloaded.delete(serial.key);
+        if (!serial.seeds) [node.value, node.state] = [value, VALID];
+      }
       this.dropLater(node);
     }
     return node;
+  }
+
+  /** Its nodes, for the serializable atoms a server hands over. */
+  all(): IterableIterator<Node> {
+    return this.nodes.values();
   }
 
   valueOf(node: Node): unknown {
