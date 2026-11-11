@@ -38,3 +38,11 @@ codegen/applicative_do
 codegen/classes
 runtime/abort_closes_scopes
 runtime/discontinued_body
+codegen/category_classes
+codegen/effect_sets
+codegen/given_shadow
+codegen/implicit
+codegen/instance_names
+effect/row_without
+stdlib/effect/mutable_ref
+stdlib/effect/optic_parts

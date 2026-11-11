@@ -6,6 +6,7 @@ use std::rc::Rc;
 
 use flick_core::ir::{self, BinOp, ExprKind, Stmt};
 use flick_core::types::Constructor;
+use flick_core::types::lang::{self, Lang};
 
 use super::{Tr, dict, given, lams};
 use crate::handler::{Handled, Handler, Op};
@@ -70,8 +71,8 @@ impl Tr {
                 lams(names.iter().map(|n| given(n)), self.expr(body))
             }
             ExprKind::App { func, arg, .. } if layer_run(func).is_some() => self.provide(func, arg),
-            ExprKind::App { func, arg, .. } if is_global(func, "Scope", "run") => self.scope(arg),
-            ExprKind::App { func, .. } if is_global(func, "Scope", "current") => Term::unit(),
+            ExprKind::App { func, arg, .. } if is_lang(func, Lang::ScopeRun) => self.scope(arg),
+            ExprKind::App { func, .. } if is_lang(func, Lang::ScopeCurrent) => Term::unit(),
             ExprKind::App {
                 func,
                 arg,
@@ -358,8 +359,8 @@ impl Tr {
     }
 }
 
-fn is_global(func: &ir::Expr, m: &str, n: &str) -> bool {
-    matches!(&func.kind, ExprKind::Global { module, name } if module == m && name == n)
+fn is_lang(func: &ir::Expr, item: Lang) -> bool {
+    matches!(&func.kind, ExprKind::Global { module, name } if lang::is(item, module, name))
 }
 
 /// The layer of `Layer.run layer`.
@@ -367,8 +368,5 @@ fn layer_run(func: &ir::Expr) -> Option<&ir::Expr> {
     let ExprKind::App { func, arg, .. } = &func.kind else {
         return None;
     };
-    match &func.kind {
-        ExprKind::Global { module, name } if module == "Layer" && name == "run" => Some(arg),
-        _ => None,
-    }
+    is_lang(func, Lang::LayerRun).then_some(&**arg)
 }
