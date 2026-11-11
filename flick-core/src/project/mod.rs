@@ -35,6 +35,8 @@ pub use load::{
     check, check_with, compile, compile_with, main_kind, stages_by_class,
 };
 #[cfg(feature = "native-project")]
+pub use load::{ModuleStore, SavedModule};
+#[cfg(feature = "native-project")]
 pub use packages::project_name;
 
 /// The libraries of `project` whose plugins take part in `hook`, as

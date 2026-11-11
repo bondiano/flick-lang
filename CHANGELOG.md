@@ -44,6 +44,14 @@ break programs.
   `loop` and `while` are contextual words, preserving `Loop.loop` and
   `Schedule.while`. IR 0.7.0 adds variables and explicit sequential loops.
 
+- **Saved modules:** `flick check`, `build`, `run` and `test` save each module
+  of the project that checks without a diagnostic in the user's cache
+  directory (`flick/modules`), under a key of its text, the interfaces it
+  imports, the checked configuration, the compiler and std. The next process
+  takes it instead of checking it again. A module with plugin blocks, a
+  module application or an inline module, or in a project whose packages
+  watch calls, is checked each time.
+
 - **Watching:** `flick dev`, `flick test --watch` and `--watch` start a run
   once the watched files settle, so a save that truncates a file and then
   writes it is built once and `dev` restarts the app once for it.

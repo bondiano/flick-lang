@@ -50,6 +50,8 @@ const USE: &str =
 
 #[cfg(feature = "ide")]
 include!("checking_tests_replay.rs");
+#[cfg(all(feature = "ide", feature = "native-project"))]
+include!("checking_tests_stored.rs");
 #[cfg(feature = "ide")]
 include!("checking_tests_visibility.rs");
 include!("checking_tests_relocate.rs");

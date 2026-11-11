@@ -20,6 +20,7 @@ mod nested;
 mod published;
 mod reach;
 mod refined;
+mod stored;
 mod structure;
 
 use super::{check, compile};

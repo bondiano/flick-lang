@@ -18,7 +18,8 @@ impl Checking<'_> {
         i: usize,
         interfaces: &[Option<Interface>],
         comparable: &[Option<Arc<Interface>>],
-    ) -> (Output, Option<Key>) {
+        digests: &[Option<String>],
+    ) -> Outcome {
         let loaded = &self.modules[i];
         let known = |name: &str| self.visible_interface(loaded, interfaces, name);
         let lookup = |name: &str| known(name).cloned();
@@ -34,8 +35,15 @@ impl Checking<'_> {
             output
         };
         let Some(cache) = self.cache else {
-            return (check(), None);
+            return (check(), None, None);
         };
+        #[cfg(feature = "native-project")]
+        if let Some(store) = &cache.store {
+            let (output, digest) = self.stored(loaded, store, interfaces, digests, check);
+            return (output, None, digest);
+        }
+        #[cfg(not(feature = "native-project"))]
+        let _ = digests;
         let mut key = Key {
             file: loaded.file,
             // the code of its blocks too, which other modules' blocks change
@@ -90,11 +98,11 @@ impl Checking<'_> {
                     }
                 }
                 debug!(module = %loaded.name, "module reused");
-                (output, Some(key))
+                (output, Some(key), None)
             }
             _ => {
                 key.lower = self.lower;
-                (check(), Some(key))
+                (check(), Some(key), None)
             }
         }
     }

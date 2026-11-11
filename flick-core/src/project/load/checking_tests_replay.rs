@@ -4,8 +4,25 @@
 type Said = (Vec<String>, BTreeMap<String, (Interface, Option<ir::Module>)>);
 
 fn said(host: &Memory, mode: Mode, cache: Option<&mut ModuleCache>) -> Said {
+    said_in(host, mode, cache, 0, |_| {})
+}
+
+/// [`said`] as a process of its own says it: its first `shift` files are
+/// others, so each module has another file than in another process, and
+/// `edit` changes the project.
+fn said_in(
+    host: &Memory,
+    mode: Mode,
+    cache: Option<&mut ModuleCache>,
+    shift: usize,
+    edit: impl Fn(&mut Project),
+) -> Said {
     let mut sources = SourceMap::default();
-    let project = library(&mut sources);
+    for n in 0..shift {
+        sources.add(format!("/elsewhere/{n}.fl"), "");
+    }
+    let mut project = library(&mut sources);
+    edit(&mut project);
     let roots = [PathBuf::from("/p/src/A/Use.fl")];
     let output = run(host, &mut sources, Some(&project), &roots, mode, cache, None);
     let mut diagnostics: Vec<String> = output
@@ -36,7 +53,9 @@ fn said(host: &Memory, mode: Mode, cache: Option<&mut ModuleCache>) -> Said {
 /// A session of edits over three modules, each step one edit after the step
 /// before it: with one cache kept through all of them, every step says what
 /// a run without a cache says of the same texts, for an editor, for a check
-/// and for a build.
+/// and for a build. So does each step as a process of its own that takes
+/// what the processes before it saved, with its modules in other files; a
+/// build after the checks takes only modules saved with their IR.
 #[test]
 fn a_cache_kept_through_a_session_of_edits_changes_nothing_a_run_says() {
     const BASE: &str = "module A.Base exposing (x)\nx : Float\nlet x = 1\n";
@@ -100,10 +119,14 @@ fn a_cache_kept_through_a_session_of_edits_changes_nothing_a_run_says() {
         ),
         ("the start again", [BASE, MID, USE], true),
     ];
+    #[cfg(feature = "native-project")]
+    let (saved, taken): (Saved, Arc<AtomicUsize>) = Default::default();
     for mode in [Mode::Analyze, Mode::Check, Mode::Compile] {
         let mut cache = ModuleCache::default();
         let mut compiled = 0;
-        for (what, [base, mid, last], checks) in steps {
+        #[cfg(feature = "native-project")]
+        let taken_before = stored_count(&taken);
+        for (n, (what, [base, mid, last], checks)) in steps.into_iter().enumerate() {
             let host = Memory(BTreeMap::from([
                 (PathBuf::from("/p/src/A/Base.fl"), base.to_owned()),
                 (PathBuf::from("/p/src/A/Mid.fl"), mid.to_owned()),
@@ -115,7 +138,21 @@ fn a_cache_kept_through_a_session_of_edits_changes_nothing_a_run_says() {
             assert_eq!(warm.0, cold.0, "{what}: the diagnostics");
             assert_eq!(warm.1, cold.1, "{what}: the interfaces and the IR");
             compiled += warm.1.values().filter(|(_, ir)| ir.is_some()).count();
+            #[cfg(not(feature = "native-project"))]
+            let _ = n;
+            #[cfg(feature = "native-project")]
+            {
+                let shift = n % 3;
+                let mut apart = ModuleCache::stored(memory_store("one", &saved, &taken));
+                let apart = said_in(&host, mode, Some(&mut apart), shift, |_| {});
+                let alone = said_in(&host, mode, None, shift, |_| {});
+                assert_eq!(apart, alone, "{what}: a process of its own");
+            }
         }
+        // an editor's run saves and takes nothing; a check and a build take
+        // the modules no step changed
+        #[cfg(feature = "native-project")]
+        assert_eq!(stored_count(&taken) > taken_before, mode != Mode::Analyze);
         // a compilation with a cache still gives every module it lowered
         assert_eq!(compiled > 0, mode == Mode::Compile);
     }

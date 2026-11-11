@@ -3,10 +3,14 @@
 //! [`ModuleCache`] kept of earlier runs.
 
 use std::collections::{BTreeMap, HashMap, HashSet};
+#[cfg(feature = "native-project")]
+use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
 use std::slice;
 use std::sync::Arc;
 
+#[cfg(feature = "native-project")]
+use serde::{Deserialize, Serialize};
 use tracing::debug;
 
 #[cfg(feature = "ide")]
@@ -26,6 +30,8 @@ use crate::plugin::calls as plugin_calls;
 use crate::plugin::expansion::Expansion;
 use crate::plugin::first_party;
 use crate::project::Project;
+#[cfg(feature = "native-project")]
+use crate::project::cache::Key as Hashed;
 use crate::project::config::{Checked, Config};
 use crate::resolve::{self, Interface, ModuleSyntax};
 use crate::resolve::{Header, Import, Item, ItemKind};
@@ -131,6 +137,11 @@ pub struct ModuleCache {
     pub(super) plugins: HashMap<Vec<u8>, Vec<u8>>,
     /// The parse of each module, and the file and the text it is of.
     parses: HashMap<PathBuf, (FileId, String, Parsed)>,
+    /// Where a host keeps modules between processes. A cache with one
+    /// serves a single run and keeps nothing in memory: no later run of
+    /// the process reads it.
+    #[cfg(feature = "native-project")]
+    store: Option<ModuleStore>,
 }
 
 type Parsed = (Arc<Parse>, Arc<ModuleSyntax>);
@@ -141,6 +152,16 @@ type ContractView = (
 );
 
 impl ModuleCache {
+    /// A cache of one run that takes the modules `store` kept and gives it
+    /// those it checks.
+    #[cfg(feature = "native-project")]
+    pub fn stored(store: ModuleStore) -> Self {
+        Self {
+            store: Some(store),
+            ..Self::default()
+        }
+    }
+
     /// Drops the modules a run no longer loaded.
     pub(super) fn retain_loaded(&mut self, modules: &[Loaded]) {
         self.entries
@@ -158,6 +179,10 @@ impl ModuleCache {
     }
 
     pub(super) fn keep_parsed(&mut self, path: &Path, file: FileId, text: &str, parsed: Parsed) {
+        #[cfg(feature = "native-project")]
+        if self.store.is_some() {
+            return;
+        }
         let entry = (file, text.to_owned(), parsed);
         self.parses.insert(path.to_path_buf(), entry);
     }
@@ -191,6 +216,7 @@ impl Loader<'_> {
         let mut known = Known {
             interfaces: vec![None; self.modules.len()],
             comparable: vec![None; self.modules.len()],
+            digests: vec![None; self.modules.len()],
         };
         let Some(levels) = levels(edges) else {
             let mut visiting = vec![false; self.modules.len()];
@@ -202,7 +228,7 @@ impl Loader<'_> {
         for level in levels {
             let checking = self.checking();
             let outputs = parallel(&level, |i| {
-                checking.module(i, &known.interfaces, &known.comparable)
+                checking.module(i, &known.interfaces, &known.comparable, &known.digests)
             });
             for (i, output) in level.into_iter().zip(outputs) {
                 self.apply(i, output, &mut known);
@@ -225,9 +251,9 @@ impl Loader<'_> {
         for &j in &edges[i] {
             self.resolve_one(j, edges, known, visiting);
         }
-        let output = self
-            .checking()
-            .module(i, &known.interfaces, &known.comparable);
+        let output =
+            self.checking()
+                .module(i, &known.interfaces, &known.comparable, &known.digests);
         self.apply(i, output, known);
         visiting[i] = false;
     }
@@ -263,7 +289,8 @@ impl Loader<'_> {
         }
     }
 
-    fn apply(&mut self, i: usize, (output, key): (Output, Option<Key>), known: &mut Known) {
+    fn apply(&mut self, i: usize, (output, key, digest): Outcome, known: &mut Known) {
+        known.digests[i] = digest;
         if let (Some(cache), Some(key)) = (&mut self.cache, key) {
             known.comparable[i] = Some(comparable_copy(&output.exported));
             cache
@@ -304,7 +331,14 @@ struct Known {
     /// Each one as a cache key compares it, one copy for all its importers;
     /// only with a cache.
     comparable: Vec<Option<Arc<Interface>>>,
+    /// The digest of each one that importers' keys in a store take; only
+    /// with a store.
+    digests: Vec<Option<String>>,
 }
+
+/// A module's output, the key to keep it by in memory, and the digest its
+/// importers' keys in a store take.
+type Outcome = (Output, Option<Key>, Option<String>);
 
 /// What checking a module reads of the loader; shared by parallel checks.
 struct Checking<'a> {
@@ -332,6 +366,8 @@ include!("checking_lexical.rs");
 include!("checking_inline.rs");
 include!("checking_relocate.rs");
 include!("checking_relocate_decls.rs");
+#[cfg(feature = "native-project")]
+include!("checking_stored.rs");
 impl Checking<'_> {
     /// Adds to `checked` what the watching plugins find wrong with the places
     /// of `loaded` that call the names each watches, at spans of the module's

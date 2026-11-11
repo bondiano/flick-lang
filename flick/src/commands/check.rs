@@ -114,12 +114,15 @@ impl CheckCommand {
             );
         }
         timings::stage("Checking Flick modules");
-        // one check keeps nothing: what it would keep is copied for no reader
+        // one check keeps nothing in memory, which no later check reads; it
+        // saves its modules for the next process instead
         let again = self.options.watch || self.options.fix;
         let mut modules = self.modules.borrow_mut();
         let kept = again.then_some(&mut *modules);
-        let diagnostics = package_cache::with_saved(|saved| {
-            project::check_with(host, &mut sources, project.as_ref(), &roots, saved, kept)
+        let diagnostics = package_cache::with_modules(kept, |kept| {
+            package_cache::with_saved(|saved| {
+                project::check_with(host, &mut sources, project.as_ref(), &roots, saved, kept)
+            })
         });
         (
             Outcome {

@@ -131,6 +131,15 @@ impl Precompiled {
         self.saved.get(name).map(|(package, _)| package.as_str())
     }
 
+    /// The key of the package of the saved module `name`, which covers
+    /// everything its interface was checked from.
+    #[cfg(feature = "native-project")]
+    pub(super) fn key_of_saved(&self, name: &str) -> Option<&str> {
+        (self.saved.get(name))
+            .and_then(|(package, _)| self.packages.get(package))
+            .map(|(key, _)| key.as_str())
+    }
+
     /// Whether the saved module `name` belongs to the package in `dir`.
     #[cfg(feature = "native-project")]
     fn covers(&self, dir: &Path, name: &str) -> bool {
