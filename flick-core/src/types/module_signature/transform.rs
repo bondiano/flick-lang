@@ -126,11 +126,11 @@ impl ModuleSignature {
                                     let old = parameter.name.clone();
                                     parameter.name = format!("'{}", *next);
                                     *next += 1;
-                                    (old, Type::Var(parameter.name.clone()))
+                                    (old, parameter.name.clone())
                                 })
                                 .collect();
                             if let Some(ty) = manifest {
-                                *ty = ty.substitute(&subst);
+                                *ty = canonical_type_in(ty, &subst, next);
                             }
                         }
                         R::Nominal {
@@ -151,12 +151,14 @@ impl ModuleSignature {
                                         let old = parameter.clone();
                                         *parameter = format!("'{}", *next);
                                         *next += 1;
-                                        (old, Type::Var(parameter.clone()))
+                                        (old, parameter.clone())
                                     })
                                     .collect();
-                                map_definition_types(definition, &mut |ty| ty.substitute(&subst));
+                                map_definition_types(definition, &mut |ty| {
+                                    canonical_type_in(ty, &subst, next)
+                                });
                                 for (_, ty) in methods {
-                                    *ty = ty.substitute(&subst);
+                                    *ty = canonical_type_in(ty, &subst, next);
                                 }
                             }
                         }
@@ -165,7 +167,7 @@ impl ModuleSignature {
                 }
             }
         }
-        self.map_types(&mut |ty| canonical_type_in(ty, next));
+        self.map_types(&mut |ty| canonical_type_in(ty, &[], next));
     }
 
     pub fn refine(&mut self, path: &[String], ty: Type) -> Result<(), String> {

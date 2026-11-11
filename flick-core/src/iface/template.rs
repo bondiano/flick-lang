@@ -84,6 +84,18 @@ pub enum CalleeOrigin {
 }
 
 impl CalleeOrigin {
+    /// All caller views read while instantiating this callee's contract.
+    pub(crate) fn contract_arguments(&self) -> impl Iterator<Item = &StaticArgument> {
+        let (prefix, argument): (&[StaticArgument], Option<&StaticArgument>) = match self {
+            Self::Module(_) => (&[], None),
+            Self::Member(argument) => (&[], Some(argument)),
+            Self::Parameter {
+                binding, argument, ..
+            } => (&binding.prefix, Some(argument)),
+        };
+        prefix.iter().chain(argument)
+    }
+
     pub(crate) fn signature_owner(&self) -> &str {
         match self {
             Self::Module(module) => module,

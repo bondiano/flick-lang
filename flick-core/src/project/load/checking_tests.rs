@@ -264,5 +264,6 @@ include!("checking_tests_review_boundaries.rs");
 
 include!("checking_tests_ported_review.rs");
 include!("checking_tests_ported_followup.rs");
+include!("checking_tests_final_contracts.rs");
 #[cfg(all(feature = "ide", feature = "native-project"))]
 include!("checking_tests_ported_package.rs");

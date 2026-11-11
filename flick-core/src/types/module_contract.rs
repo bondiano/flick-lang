@@ -133,7 +133,7 @@ pub(crate) fn check(contract: &TypeDef, actual: &Interface) -> Vec<Mismatch> {
             } => match actual.modules.get(name) {
                 None => errors.push(Mismatch::Missing(name.clone())),
                 Some(child) => {
-                    if !matches_child(signature, child, actual, &subst) {
+                    if !matches_child(signature, child, actual, &subst, &kinds) {
                         errors.push(Mismatch::Shape(name.clone()));
                     }
                 }
@@ -228,9 +228,9 @@ fn matches_child(
     child: &Interface,
     parent: &Interface,
     subst: &[(String, Type)],
+    kinds: &[(super::Kind, super::Kind)],
 ) -> bool {
-    let mut signature = signature.clone();
-    signature.substitute_outer_types(subst);
+    let mut signature = substitute_child_signature(signature, subst, kinds);
     signature.normalize_in(parent);
     let mut child = child.clone();
     super::normalize_module_interface(&mut child, parent);
@@ -261,6 +261,7 @@ pub(crate) fn local_dictionaries(
         return Vec::new();
     };
     let requirements = super::ModuleSignature::instantiate_members(requirements, actual);
+    let kinds = kind_witnesses(&requirements, actual, &mut Vec::new());
     let subst: Vec<(String, Type)> = requirements
         .iter()
         .filter_map(|requirement| match requirement {
@@ -274,7 +275,7 @@ pub(crate) fn local_dictionaries(
                 };
                 Some((name.clone(), ty))
             }
-            ModuleRequirement::Nominal { name, .. } => {
+            ModuleRequirement::Kind { name, .. } | ModuleRequirement::Nominal { name, .. } => {
                 let export = actual.find(Namespace::Type, name)?;
                 Some((
                     name.clone(),
@@ -292,7 +293,7 @@ pub(crate) fn local_dictionaries(
             };
             let export = actual.find(Namespace::Value, from)?;
             Some((
-                head.substitute(&subst),
+                substitute_type_kinds(&head.substitute(&subst), &kinds),
                 super::Dict::Value {
                     module: export.entity.module.clone(),
                     name: export.entity.name.clone(),
@@ -306,8 +307,7 @@ pub(crate) fn local_dictionaries(
         } = requirement
             && let Some(child) = actual.modules.get(name)
         {
-            let mut signature = (**signature).clone();
-            signature.substitute_outer_types(&subst);
+            let signature = substitute_child_signature(signature, &subst, &kinds);
             dictionaries.extend(local_dictionaries(&signature.definition(), child));
         }
     }
@@ -349,8 +349,7 @@ pub(crate) fn project(contract: &TypeDef, actual: &Interface) -> Interface {
                 name, signature, ..
             } => {
                 if let Some(actual) = actual.modules.get(name) {
-                    let mut signature = (**signature).clone();
-                    signature.substitute_outer_types(&subst);
+                    let signature = substitute_child_signature(signature, &subst, &kinds);
                     projected
                         .modules
                         .insert(name.clone(), signature.project(actual));

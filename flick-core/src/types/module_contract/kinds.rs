@@ -55,6 +55,25 @@ fn substitute_kind(kind: &super::Kind, witnesses: &[(super::Kind, super::Kind)])
 }
 
 fn substitute_type_kinds(ty: &Type, witnesses: &[(super::Kind, super::Kind)]) -> Type {
+    if let Type::Con { module, name } = ty {
+        for (expected, actual) in witnesses {
+            if let (
+                super::Kind::Named {
+                    module: old_module,
+                    name: old_name,
+                },
+                super::Kind::Named {
+                    module: new_module,
+                    name: new_name,
+                },
+            ) = (expected, actual)
+                && module == old_module
+                && name == old_name
+            {
+                return Type::con(new_module, new_name);
+            }
+        }
+    }
     let mut mapped = ty.map_children(&mut |child| substitute_type_kinds(child, witnesses));
     if let Type::Forall { vars, .. } = &mut mapped {
         for var in vars {
@@ -62,4 +81,15 @@ fn substitute_type_kinds(ty: &Type, witnesses: &[(super::Kind, super::Kind)]) ->
         }
     }
     mapped
+}
+
+fn substitute_child_signature(
+    signature: &super::ModuleSignature,
+    subst: &[(String, Type)],
+    kinds: &[(super::Kind, super::Kind)],
+) -> super::ModuleSignature {
+    let mut signature = signature.clone();
+    signature.substitute_outer_types(subst);
+    signature.map_types(&mut |ty| substitute_type_kinds(ty, kinds));
+    signature
 }

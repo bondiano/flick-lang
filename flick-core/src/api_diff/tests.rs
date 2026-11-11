@@ -307,3 +307,16 @@ fn contract_parameters_and_inner_foralls_have_distinct_canonical_names() {
     let changes = diff(&[old], &[api("a", "b", "c", "c")]);
     assert_eq!(bump(&changes), Bump::Major, "{changes:?}");
 }
+#[test]
+fn contract_parameter_row_labels_are_alpha_equivalent() {
+    use crate::ir::tests::check_text;
+    let api = |parameter: &str, error: &str| {
+        check_text("Lib", &format!(
+            "module Lib exposing (Contract, Oops(..), Other(..))\ntype error Oops\ntype error Other\ntype module Contract =\n  type Action {parameter} = Unit ->{{; {error}, {parameter}}} Unit\n"
+        )).expect("error-row contract checks").1
+    };
+    let old = api("e", "Oops");
+    let renamed = api("err", "Oops");
+    assert!(diff(slice::from_ref(&old), &[renamed]).is_empty());
+    assert_eq!(bump(&diff(&[old], &[api("err", "Other")])), Bump::Major);
+}

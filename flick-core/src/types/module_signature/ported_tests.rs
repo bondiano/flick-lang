@@ -76,3 +76,68 @@ fn inferred_kind_members_shadow_outer_type_names() {
     );
     assert!(signature.accepts(&witness));
 }
+#[test]
+fn outer_kind_witnesses_reach_nested_type_parameters_and_schemes() {
+    use crate::types::Binder;
+    let (_, mut outer) = check_text(
+        "Outer",
+        "module Outer exposing (Mode(..))\nkind Mode = Fast | Slow\n",
+    )
+    .expect("outer kind checks");
+    let parameter = Binder {
+        name: "mode".into(),
+        kind: Kind::Named {
+            module: "Outer".into(),
+            name: "Mode".into(),
+        },
+    };
+    let boxed = Type::app(Type::Var("Box".into()), Type::Var("mode".into()));
+    let child = ModuleSignature::Structure {
+        requirements: vec![
+            R::Type {
+                name: "Box".into(),
+                params: vec![parameter.clone()],
+                manifest: None,
+            },
+            R::Value {
+                name: "identity".into(),
+                ty: Type::Forall {
+                    vars: vec![parameter],
+                    constraints: vec![],
+                    body: Box::new(Type::Fun {
+                        param: Box::new(boxed.clone()),
+                        effects: None,
+                        result: Box::new(boxed),
+                    }),
+                },
+            },
+        ],
+    }
+    .interface("Outer.Child");
+    outer.modules.insert("Child".into(), child);
+    let signature = ModuleSignature::from_interface(&outer);
+    let witness = signature.interface("Witness");
+    assert!(signature.accepts(&witness));
+    let projected = signature.project(&witness);
+    let child = &projected.modules["Child"];
+    let kind = Kind::Named {
+        module: "Witness".into(),
+        name: "Mode".into(),
+    };
+    assert_eq!(
+        child
+            .find(Namespace::Type, "Box")
+            .and_then(|e| e.definition.as_ref())
+            .map(|d| d.kind.clone()),
+        Some(Kind::arrow(kind.clone(), Kind::Type))
+    );
+    let Type::Forall { vars, .. } = child
+        .find(Namespace::Value, "identity")
+        .and_then(|e| e.scheme.as_ref())
+        .expect("identity scheme")
+    else {
+        panic!("expected quantified identity")
+    };
+    assert_eq!(vars[0].kind, kind);
+    assert!(signature.accepts(&projected));
+}

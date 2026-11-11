@@ -244,11 +244,12 @@ impl Checking<'_> {
             .virtual_of
             .iter()
             .flat_map(|v| {
-                let callee = match &v.capture.callee {
-                    Some(CalleeOrigin::Parameter { argument, .. }) => Some(argument),
-                    _ => None,
-                };
-                v.capture.bindings.iter().map(|b| &b.argument).chain(callee)
+                v.capture.bindings.iter().map(|b| &b.argument).chain(
+                    v.capture
+                        .callee
+                        .iter()
+                        .flat_map(CalleeOrigin::contract_arguments),
+                )
             })
             .filter_map(|argument| Self::argument_interface(argument, lookup, contracts))
             .collect();

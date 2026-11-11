@@ -20,7 +20,10 @@ impl Checking<'_> {
                     None => self.from_packages.get(owner).map(comparable_copy),
                 });
             }
-            if let Some(CalleeOrigin::Parameter { argument, .. }) = callee {
+            for argument in callee
+                .into_iter()
+                .flat_map(CalleeOrigin::contract_arguments)
+            {
                 // Include the caller's view through all ancestor ascriptions.
                 inputs.push(
                     Self::argument_interface(argument, lookup, contracts)
