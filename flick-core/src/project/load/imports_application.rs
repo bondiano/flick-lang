@@ -185,13 +185,7 @@ impl Loader<'_> {
             .as_ref()
             .expect("checked functor header");
         let inherited = self.modules[functor].virtual_of.as_ref();
-        let mut access_modules = self.modules[parent]
-            .virtual_of
-            .as_ref()
-            .map_or_else(Vec::new, |v| v.capture.access_modules.clone());
-        access_modules.push(self.modules[parent].name.clone());
-        access_modules.sort();
-        access_modules.dedup();
+        let access_modules = self.modules[parent].namespace_access();
         let arguments: Vec<_> = application
             .arguments
             .iter()

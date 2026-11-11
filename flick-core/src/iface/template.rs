@@ -71,7 +71,7 @@ pub struct StaticArgument {
 #[serde(tag = "kind", content = "value", rename_all = "kebab-case")]
 pub enum CalleeOrigin {
     Module(String),
-    Member(StaticMember),
+    Member(StaticArgument),
     Parameter {
         binding: BindingOrigin,
         members: Vec<String>,

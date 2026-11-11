@@ -30,6 +30,7 @@ impl Checking<'_> {
 
     fn callee_signature_explicit(
         context: &Virtual,
+        lookup: &dyn Fn(&str) -> Option<Interface>,
         contracts: &dyn Fn(&str) -> Option<Interface>,
     ) -> bool {
         match &context.capture.callee {
@@ -37,26 +38,12 @@ impl Checking<'_> {
                 contracts(name).is_some_and(|i| i.signature_explicit)
             }
             Some(CalleeOrigin::Member(member)) => {
-                Self::public_contract_interface(&member.parent, contracts)
-                    .and_then(|i| i.modules.get(&member.name).map(|m| m.signature_explicit))
-                    .unwrap_or(false)
+                Self::argument_interface(member, lookup, contracts)
+                    .is_some_and(|i| i.signature_explicit)
             }
             Some(CalleeOrigin::Parameter { .. }) => true,
             None => false,
         }
-    }
-
-    fn public_contract_interface(
-        name: &str,
-        contracts: &dyn Fn(&str) -> Option<Interface>,
-    ) -> Option<Interface> {
-        let actual = contracts(name)?;
-        if let Some(member) = &actual.member_of {
-            return Self::public_contract_interface(&member.parent, contracts)?
-                .modules
-                .remove(&member.name);
-        }
-        Some(actual)
     }
 
     fn binding_view_name(loaded: &Loaded, alias: &str) -> String {
@@ -103,10 +90,7 @@ impl Checking<'_> {
                 )
             }
             CalleeOrigin::Member(member) => {
-                let actual = Self::public_contract_interface(&member.parent, contracts)?
-                    .modules
-                    .get(&member.name)?
-                    .clone();
+                let actual = Self::argument_interface(member, lookup, contracts)?;
                 Some(
                     actual
                         .functor
@@ -149,7 +133,7 @@ impl Checking<'_> {
         // An inferred shape validates applications, but does not introduce an
         // abstraction boundary. In particular it must not erase ADT constructors
         // explicitly exposed by an unannotated private factory's source body.
-        if !Self::callee_signature_explicit(context, contracts) {
+        if !Self::callee_signature_explicit(context, lookup, contracts) {
             return None;
         }
         let mut signature = Self::callee_signature(context, lookup, contracts)?;
@@ -292,6 +276,15 @@ impl Checking<'_> {
                 result.instantiate_parameter(&binder, &actual);
                 signature = *result;
             }
+        } else if let Some(CalleeOrigin::Member(member)) = &context.capture.callee {
+            errors.push(Diagnostic::error(
+                codes::R018,
+                format!(
+                    "module `{}` is not exported through this namespace view",
+                    member.module
+                ),
+                context.at,
+            ));
         }
         let mut reported = Vec::new();
         errors.retain(|diagnostic| {

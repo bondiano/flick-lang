@@ -63,7 +63,14 @@ impl Loader<'_> {
                 );
                 match &virtual_of.capture.callee {
                     Some(CalleeOrigin::Module(name)) => dependencies.push(name.clone()),
-                    Some(CalleeOrigin::Member(member)) => dependencies.push(member.parent.clone()),
+                    Some(CalleeOrigin::Member(member)) => dependencies.push(
+                        member
+                            .module
+                            .rsplit_once('.')
+                            .expect("namespace member")
+                            .0
+                            .to_owned(),
+                    ),
                     Some(CalleeOrigin::Parameter { binding, .. }) => {
                         dependencies.push(binding.module.clone());
                     }

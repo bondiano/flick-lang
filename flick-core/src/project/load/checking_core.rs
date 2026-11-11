@@ -80,7 +80,14 @@ impl Checking<'_> {
                         .collect();
                     match &v.capture.callee {
                         Some(CalleeOrigin::Module(name)) => names.push(name.clone()),
-                        Some(CalleeOrigin::Member(member)) => names.push(member.parent.clone()),
+                        Some(CalleeOrigin::Member(member)) => names.push(
+                            member
+                                .module
+                                .rsplit_once('.')
+                                .expect("namespace member")
+                                .0
+                                .to_owned(),
+                        ),
                         Some(CalleeOrigin::Parameter { binding, .. }) => {
                             names.push(binding.module.clone());
                         }
@@ -298,7 +305,7 @@ impl Checking<'_> {
                 interface.signature_explicit = loaded
                     .virtual_of
                     .as_ref()
-                    .is_some_and(|v| Self::callee_signature_explicit(v, contracts));
+                    .is_some_and(|v| Self::callee_signature_explicit(v, lookup, contracts));
             }
         }
         // what the plugins find from the types of their code stops lowering too

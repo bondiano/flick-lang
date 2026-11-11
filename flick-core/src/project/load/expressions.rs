@@ -4,7 +4,7 @@
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use super::{CalleeOrigin, Loaded, Loader, StaticCapture, StaticMember, Virtual};
+use super::{CalleeOrigin, Loaded, Loader, StaticArgument, StaticCapture, StaticMember, Virtual};
 use crate::diagnostics::{Diagnostic, codes};
 use crate::resolve::{self, Import, Item, ItemKind, ModuleApplication};
 use crate::source::Span;
@@ -327,7 +327,10 @@ impl Loader<'_> {
             .and_then(|&i| self.modules[i].member_of.as_ref())
             && !self.modules[parent].can_access_member(member)
         {
-            return CalleeOrigin::Member(member.clone());
+            return CalleeOrigin::Member(StaticArgument {
+                module: actual.to_owned(),
+                access_modules: self.modules[parent].namespace_access(),
+            });
         }
         CalleeOrigin::Module(actual.to_owned())
     }
