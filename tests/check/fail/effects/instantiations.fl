@@ -1,0 +1,23 @@
+// A row has one element of each name: two instantiations of one service
+// are not two services, since a provider is found by the service's name.
+module App.Instantiations exposing (..)
+
+service Store a =
+  get : Unit ->{} a
+
+both : Unit ->{Store Int, Store String} Int
+let both () = Store.get ()
+
+ints : Unit ->{Store Int} Int
+let ints () = Store.get ()
+
+texts : Unit ->{Store String} String
+let texts () = Store.get ()
+
+mixed : Unit ->{Store Int} Int
+let mixed () =
+  let _ = texts ()
+  ints ()
+
+//~ FLICK-T003 @8:27-8:39 the row already holds `Store Int`, so it cannot hold `Store String` too: a row has one element of each name
+//~ FLICK-T003 @19:11-19:19 expected `Store Int`, found `Store String`: `String` is not `Int`
