@@ -316,7 +316,7 @@ Source code does not change.
 ## `mut` is a keyword
 
 `let mut name = value` declares a variable of a function, which `name = value`
-assigns (see [Variables](../reference/types/#variables)). The word `mut`
+assigns (see [Variables](../../reference/types/#variables)). The word `mut`
 is a keyword now: a parameter, a value or a record field named `mut` is
 `FLICK-S007`, or `FLICK-S016` for `let mut = …`; rename it. After a dot,
 `r.mut` is still a name.
