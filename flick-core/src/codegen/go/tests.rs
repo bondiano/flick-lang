@@ -40,6 +40,46 @@ fn app(text: &str) -> String {
         .expect("the file of App")
 }
 
+#[test]
+fn a_dictionary_built_from_others_is_built_once() {
+    let go = app("module App exposing (main)\n\n\
+         below : Option Int -> Bool\nlet below o = compare o (Some 5) == LT\n\n\
+         both : Option Int -> Bool\nlet both o = below o && compare o None == GT\n\n\
+         main : Unit ->{; AppError} Unit\n\
+         let main () = Platform.stdout_line (show (both (Some 1)))\n");
+    // `Ord (Option Int)`, needed in two functions, is one package variable
+    // built on first use; neither function builds it
+    let made = "= flickrt.Lazy(func() flickrt.Value { return I_Instances__Ord";
+    assert_eq!(go.matches(made).count(), 1, "{go}");
+    // set in `init`: a variable whose own value named an instance that names it is a cycle to Go
+    assert!(
+        go.contains("var K_App__0 func() flickrt.Value\n\nfunc init() { K_App__0 = "),
+        "{go}"
+    );
+    assert_eq!(
+        go.matches("I_Instances__Ord_x20__x28_Option").count(),
+        1,
+        "{go}"
+    );
+}
+
+#[test]
+fn a_dictionary_whose_method_is_computed_is_built_where_it_is_needed() {
+    let go = app("module App exposing (main)\n\n\
+         class Named a =\n  named : a -> String\n\n\
+         instance Show a => Named (Option a) =\n  \
+         let named =\n    let prefix = show 1\n    fun _ -> prefix\n\n\
+         main : Unit ->{; AppError} Unit\n\
+         let main () = Platform.stdout_line (named (Some 2))\n");
+    // `prefix` is computed when the dictionary is built, by code that may
+    // read what the fiber carries: built once it would keep the first answer
+    assert!(!go.contains("flickrt.Lazy("), "{go}");
+    assert!(
+        go.contains("I_App__Named_x20__x28_Option_x20_a_x29_(fb, I_Instances__Show_x20_Int)"),
+        "{go}"
+    );
+}
+
 const SUM: &str = "module App exposing (main, sum)\n\n\
 sum : Int -> Int\nlet sum n =\n  let mut acc = 0\n  let mut i = n\n  \
 while i > 0 do\n    acc = acc + i\n    i = i - 1\n  acc\n\n\

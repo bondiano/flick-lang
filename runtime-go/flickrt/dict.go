@@ -305,3 +305,7 @@ func fieldsOf(v Value) []Value {
 	}
 	return v.([]Value)
 }
+
+// Lazy is a value made the first time it is asked for, by whichever fiber
+// asks first, and the same value after: a dictionary built from others.
+func Lazy(make func() Value) func() Value { return sync.OnceValue(make) }

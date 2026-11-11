@@ -9,8 +9,13 @@ use flick_pretty::{Document, docvec};
 
 use super::expr::literal;
 use super::layout::{Code, call};
+use super::shape::builds_settled;
 use super::{Gen, names};
 use crate::ir::{Expr, Lit};
+use crate::types::Dict;
+
+/// How the Go of a value made on first use begins.
+const LAZY: &str = "flickrt.Lazy(";
 
 impl<'a> Gen<'a> {
     /// The package variable of `made`, a Go expression over the runtime
@@ -32,7 +37,16 @@ impl<'a> Gen<'a> {
         let a = self.a;
         let declare = |(at, made): (usize, &String)| {
             let name = a.alloc_str(&names::once(self.module, at));
-            docvec![a, "var ", name, " = ", a.alloc_str(made)]
+            let made = a.alloc_str(made);
+            if made.starts_with(LAZY) {
+                // set as the package starts, not where it is declared: Go
+                // refuses a variable whose value names a function that
+                // names the variable, as an instance of a recursive type does
+                let set = docvec![a, "func init() { ", name, " = ", made, " }"];
+                docvec![a, "var ", name, " func() flickrt.Value", a.lines(2), set]
+            } else {
+                docvec![a, "var ", name, " = ", made]
+            }
         };
         self.once.iter().enumerate().map(declare).collect()
     }
@@ -77,5 +91,38 @@ impl<'a> Gen<'a> {
             Some(b) => call(a, "flickrt.Update", [b.doc, record]).into(),
             None => record.into(),
         }
+    }
+
+    /// A dictionary built from others that names nothing of the code around
+    /// it and is the same whoever builds it, as `Ord (Option Int)` is: built
+    /// the first time it is needed, not every time. It reads the instances
+    /// of modules, which are made as the program starts, so it cannot be
+    /// made before them as a literal is.
+    pub(super) fn dict_once(&mut self, dict: &Dict) -> Option<Code<'a>> {
+        let built = matches!(dict, Dict::Instance { args, .. } if !args.is_empty())
+            || matches!(dict, Dict::Structural { .. });
+        let settled = self.settled?;
+        if !built || !closed(dict) || !builds_settled(dict, settled, self.shapes) {
+            return None;
+        }
+        // printed as any dictionary is, with no fiber to build it in
+        let fiber = self.context.replace("nil");
+        let made = self.dict_made(dict).doc.to_pretty_string(usize::MAX / 2);
+        self.context = fiber;
+        let lazy = format!("{LAZY}func() flickrt.Value {{ return {made} }})");
+        let name = self.once(&lazy);
+        Some(call(self.a, name, iter::empty::<Document<'a>>()).into())
+    }
+}
+
+/// Whether `dict` names no dictionary given to the code around it and no
+/// local of that code, so that it can be made outside it.
+fn closed(dict: &Dict) -> bool {
+    match dict {
+        Dict::Instance { args, .. } => args.iter().all(closed),
+        Dict::Structural { fields, .. } => fields.iter().all(closed),
+        Dict::Super { dict, .. } => closed(dict),
+        Dict::Primitive { .. } | Dict::Site { .. } => true,
+        _ => false,
     }
 }
