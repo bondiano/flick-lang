@@ -34,7 +34,7 @@ just ratchet  # budgets only go down against origin/main; a looser one needs a `
 ```
 
 Use the Node version pinned in [`.tool-versions`](.tool-versions) for golden
-e2e checks, matching CI. The Go Intl tables and localized DateTime fixtures
+e2e checks. CI reads the same file. The Go Intl tables and localized DateTime fixtures
 were generated with that version's ICU; another ICU can spell valid locale
 errors and time-zone names differently.
 

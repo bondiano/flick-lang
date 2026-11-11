@@ -35,7 +35,7 @@ jobs:
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v7
         with:
-          node-version: 24.18.0
+          node-version-file: .tool-versions
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       # nothing is published with a translation behind, a broken example or a dead link
