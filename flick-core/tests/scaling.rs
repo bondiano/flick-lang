@@ -170,6 +170,40 @@ fn query_with_10_joins_of_50_columns_checks_in_budget() {
     assert!(full < Duration::from_secs(2), "10 joins take {full:?}");
 }
 
+/// `L2 a = L1 (L1 (L1 (L1 a)))` nests an alias in its own argument; `show`
+/// of 256 nested lists reaches the budget of nested constraints. Each level
+/// of the constraint unfolds the aliases once: one left folded is unfolded
+/// again at every level below it (20 s in release).
+const NESTED_ALIASES: &str = "module App.Deep exposing (shown)
+
+type alias L1 a = List (List (List (List a)))
+type alias L2 a = L1 (L1 (L1 (L1 a)))
+type alias L3 a = L2 (L2 (L2 (L2 a)))
+type alias L4 a = L3 (L3 (L3 (L3 a)))
+
+shown : L4 Float -> String
+let shown value = show value
+";
+
+#[test]
+fn constraint_on_aliases_nested_in_their_arguments_meets_its_budget_in_time() {
+    let _alone = alone();
+    let [full] = fastest([&mut || {
+        let mut sources = SourceMap::default();
+        let file = sources.add("deep.fl", NESTED_ALIASES);
+        let start = Cpu::now();
+        let diagnostics = flick_core::check(&sources, file);
+        let elapsed = start.elapsed();
+        let codes: Vec<String> = diagnostics.iter().map(|d| d.code.to_string()).collect();
+        assert_eq!(codes, ["FLICK-C009"]);
+        elapsed
+    }]);
+    assert!(
+        full < Duration::from_secs(2),
+        "nested aliases take {full:?}"
+    );
+}
+
 fn long_line(items: usize) -> String {
     let mut out = String::from("module App.Line exposing (xs)\nlet xs = [");
     for i in 0..items {
