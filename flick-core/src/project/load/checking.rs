@@ -13,7 +13,7 @@ use super::Analyzed;
 use super::plugins::Watching;
 use super::precompiled::Precompiled;
 use super::{BindingOrigin, CalleeOrigin, Loaded, Loader, Root, StaticCapture, Virtual};
-use crate::clock::timed;
+use crate::clock::{micros, timed};
 use crate::diagnostics::{Diagnostic, Severity, codes};
 #[cfg(feature = "native-project")]
 use crate::iface::ModuleTemplate;

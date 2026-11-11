@@ -13,7 +13,7 @@ let main () =
 
 #[test]
 fn rt_checks_initializers_captured_by_a_static_module_closure() {
-    let source = "module App.Main exposing (main)\n\nzone : DateTime.TimeZone\nlet zone = DateTime.zone_make_offset 0\n\nprivate module Make(K : Input) =\n  value : DateTime.TimeZone\n  let value = zone\n\ntype module Input =\n  identity : a -> a\n\nmodule Chosen = Make(Prelude)\n\nmain : Unit -> Unit\nlet main () = ignore Chosen.value\n";
+    let source = "module App.Main exposing (main)\n\ntype module Input =\n  identity : a -> a\n\nzone : DateTime.TimeZone\nlet zone = DateTime.zone_make_offset 0\n\nprivate module Make(K : Input) =\n  value : DateTime.TimeZone\n  let value = zone\n\nmodule Chosen = Make(Prelude)\n\nmain : Unit -> Unit\nlet main () = ignore Chosen.value\n";
     let app = project(
         "capabilities/lexical_initializer",
         &[("flick.toml", APP), ("src/App/Main.fl", source)],

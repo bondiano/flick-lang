@@ -123,7 +123,7 @@ impl Checking<'_> {
         contracts: &dyn Fn(&str) -> Option<Interface>,
     ) -> Output {
         let (output, elapsed) = timed(|| self.check(loaded, lookup, contracts));
-        debug!(module = %loaded.name, ?elapsed, "module checked");
+        debug!(module = %loaded.name, ?elapsed, micros = micros(elapsed), "module checked");
         output
     }
 
