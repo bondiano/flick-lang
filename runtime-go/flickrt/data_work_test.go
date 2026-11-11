@@ -3,6 +3,7 @@ package flickrt
 import (
 	"math/rand"
 	"reflect"
+	"runtime"
 	"sort"
 	"testing"
 )
@@ -69,6 +70,25 @@ func TestAnUpdateOfARecordIsItsFieldsThenTheNewOnes(t *testing.T) {
 	if got := record(Update(wide, Rec("i", "I"))); got.Get("i") != "I" || got.Get("a") != 1 || len(got.vals) != 9 {
 		t.Errorf("a record of nine fields: %v", got.vals)
 	}
+}
+
+func TestAnUpdatedRecordDoesNotKeepTheValuesItReplaced(t *testing.T) {
+	// a record of eight megabytes, updated to hold nothing: with the first
+	// record dropped, its payload must be free
+	held := func() Value {
+		before := Rec("id", int32(1), "payload", make([]byte, 8<<20))
+		return Update(before, Rec("payload", ""))
+	}
+	var start, end runtime.MemStats
+	runtime.GC()
+	runtime.ReadMemStats(&start)
+	kept := held()
+	runtime.GC()
+	runtime.ReadMemStats(&end)
+	if grown := int64(end.HeapAlloc) - int64(start.HeapAlloc); grown > 1<<20 {
+		t.Errorf("the updated record keeps %d bytes alive", grown)
+	}
+	runtime.KeepAlive(kept)
 }
 
 func TestTheCharactersOfAStringAreItsCodePoints(t *testing.T) {
