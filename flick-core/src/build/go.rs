@@ -15,6 +15,12 @@ use crate::source::{SourceMap, Span};
 /// The name of the Go module and executable that runs a project's tests.
 pub const TEST: &str = "test";
 
+/// The file of each Go module that lists what the build wrote in it, one path
+/// of the output directory a line: `go build` compiles every file of a
+/// package, so the next build into that directory removes the listed files it
+/// no longer writes.
+pub const FILES: &str = ".flick-files";
+
 /// The directory of the Go module of the entry `name`.
 pub fn module_dir(name: &str) -> String {
     format!("go/{name}")
@@ -137,8 +143,23 @@ pub fn emit(
             path: format!("{dir}/flickrt/{path}"),
             contents: (*contents).to_owned(),
         }));
+        out.push(listing(&dir, &out));
     }
     (out, diagnostics)
+}
+
+/// The [`FILES`] of the Go module `dir`: the paths of `out` in it.
+fn listing(dir: &str, out: &[Artifact]) -> Artifact {
+    let prefix = format!("{dir}/");
+    let mut contents = String::new();
+    for artifact in out.iter().filter(|a| a.path.starts_with(&prefix)) {
+        contents.push_str(&artifact.path);
+        contents.push('\n');
+    }
+    Artifact {
+        path: format!("{prefix}{FILES}"),
+        contents,
+    }
 }
 
 /// The `go.mod` of a program with `packages`: the runtime's, requiring only
