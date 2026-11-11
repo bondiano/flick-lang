@@ -2,6 +2,7 @@
 //! across modules. Backends and build validation share this graph, so a
 //! built-in module may hold bindings a program never uses.
 
+#[cfg(any(not(target_arch = "wasm32"), feature = "native-project"))]
 use std::collections::HashMap;
 #[cfg(feature = "native-project")]
 use std::collections::HashSet;

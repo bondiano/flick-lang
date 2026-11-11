@@ -494,22 +494,26 @@
       ]
     },
     "_module_functor": {
-      "type": "SEQ",
-      "members": [
-        {
-          "type": "ALIAS",
-          "content": {
-            "type": "STRING",
-            "value": "functor"
+      "type": "PREC",
+      "value": 1,
+      "content": {
+        "type": "SEQ",
+        "members": [
+          {
+            "type": "ALIAS",
+            "content": {
+              "type": "STRING",
+              "value": "functor"
+            },
+            "named": true,
+            "value": "keyword"
           },
-          "named": true,
-          "value": "keyword"
-        },
-        {
-          "type": "SYMBOL",
-          "name": "parens"
-        }
-      ]
+          {
+            "type": "SYMBOL",
+            "name": "parens"
+          }
+        ]
+      }
     },
     "_type_refinement_and": {
       "type": "SEQ",
