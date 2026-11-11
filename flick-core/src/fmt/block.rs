@@ -46,6 +46,14 @@ impl<'a> Printer<'a> {
     /// value's last line; `closing` starts with the `)` around a function,
     /// which takes its own line when the body breaks.
     pub fn body(&mut self, head: Doc<'a>, value: Value<'a>, end: u32, closing: &[Part]) -> Doc<'a> {
+        // a body is laid out by its lines again, whatever is around it
+        let outer = mem::replace(&mut self.in_bracket, false);
+        let doc = self.body_of(head, value, end, closing);
+        self.in_bracket = outer;
+        doc
+    }
+
+    fn body_of(&mut self, head: Doc<'a>, value: Value<'a>, end: u32, closing: &[Part]) -> Doc<'a> {
         let a = self.a;
         let inline = mem::take(&mut self.inline_body);
         let statements = match value {
@@ -121,7 +129,9 @@ impl<'a> Printer<'a> {
     /// The statements of a block, one per line.
     pub fn block(&mut self, n: &'a Node) -> Doc<'a> {
         let end = n.range().1;
+        let outer = mem::replace(&mut self.in_bracket, false);
         let items = self.items(&nodes(n), end, Some(';'), &mut |p, n| p.statement(n));
+        self.in_bracket = outer;
         self.join_lines(&items)
     }
 
@@ -228,9 +238,11 @@ impl<'a> Printer<'a> {
         let first = statements.first().map_or(rbrace.start, |s| s.range().0);
         let after = self.comments.trailing(first, None);
         self.column += if members { INDENT } else { 0 };
+        let outer = mem::replace(&mut self.in_bracket, false);
         let items = self.items(statements, rbrace.start, Some(';'), &mut |p, s| {
             p.statement(s)
         });
+        self.in_bracket = outer;
         self.column -= if members { INDENT } else { 0 };
         let dangling = self.comments.leading(rbrace.start);
         let close = self.tok(rbrace);

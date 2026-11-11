@@ -123,6 +123,7 @@ source_hash: "17e177d55bd5f193"
 - [FLICK-T070](./flick-t070/)
 - [FLICK-T071](./flick-t071/)
 - [FLICK-T072](./flick-t072/)
+- [FLICK-T073](./flick-t073/)
 
 ## Эффекты
 

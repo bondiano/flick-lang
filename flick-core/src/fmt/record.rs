@@ -1,7 +1,7 @@
 //! Lists, tuples, `exposing (…)` and records of every kind: on one line, or
 //! one item per line ending with its separator.
 
-use std::ptr;
+use std::{mem, ptr};
 
 use flick_pretty::docvec;
 
@@ -57,6 +57,13 @@ fn last_two(n: &Node) -> (Option<Token>, Option<Token>) {
 impl<'a> Printer<'a> {
     /// `[a, b]`, `(a, b)`, `exposing (a, b)` and their patterns and types.
     pub fn bracket(&mut self, n: &'a Node, suffix: &[Part]) -> Doc<'a> {
+        let outer = mem::replace(&mut self.in_bracket, true);
+        let doc = self.bracketed(n, suffix);
+        self.in_bracket = outer;
+        doc
+    }
+
+    fn bracketed(&mut self, n: &'a Node, suffix: &[Part]) -> Doc<'a> {
         let a = self.a;
         let Some(open) = n.children.iter().position(
             |c| matches!(c, Element::Token(t) if matches!(t.kind, K::LParen | K::LBracket)),

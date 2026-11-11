@@ -3,10 +3,10 @@
 //! another stays as written, the lines after its first moving with its head.
 
 use std::collections::HashMap;
-use std::slice;
 use std::sync::Arc;
+use std::{mem, slice};
 
-use flick_plugin::Piece;
+use flick_plugin::{HoleKind, Piece};
 use flick_pretty::docvec;
 
 use super::printer::{Doc, INDENT, Printer, nodes};
@@ -35,6 +35,8 @@ pub(super) struct Layout {
     /// The layout is the user's body alone between the braces: the compiler
     /// lays it out as a block of its own, comments and all.
     braced: bool,
+    /// The body reads the lines under a call as its arguments.
+    lines: bool,
 }
 
 /// The layout of each block of a file, by its range.
@@ -144,6 +146,7 @@ fn layout(
     let opens = open.is_some_and(|o| o.end == source.start());
     let closes = node.has_token(K::RBrace);
     let braced = opens && closes && matches!(pieces[..], [Piece::Hole(_)]);
+    let lines = matches!(pieces[..], [Piece::Hole(h)] if h.kind == HoleKind::Lines);
     // a comment outside the user's code would be the plugin's to place
     if commented && !braced {
         return Ok(None);
@@ -154,6 +157,7 @@ fn layout(
         opens,
         closes,
         braced,
+        lines,
     }))
 }
 
@@ -182,7 +186,9 @@ impl<'a> Printer<'a> {
             } else {
                 vec![body]
             };
+            let outer = mem::replace(&mut self.line_children, layout.lines);
             let block = self.braces_of((open, close), &statements, (false, false), &[]);
+            self.line_children = outer;
             return docvec![a, self.str(head), " ", block];
         }
         // what comments the block has are the plugin's words or are dropped,

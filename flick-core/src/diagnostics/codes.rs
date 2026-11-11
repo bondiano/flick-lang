@@ -146,6 +146,7 @@ codes! {
     T070 = Types 70, "assignment inside a restricted construct";
     T071 = Types 71, "invalid loop control";
     T072 = Types 72, "one cell of a type for every type";
+    T073 = Types 73, "children of a call written as a list";
     E001 = Effects 1, "runtime call in a pure position";
     E002 = Effects 2, "services or errors not allowed by the bound";
     E003 = Effects 3, "argument runs before the function that takes an Eff";
