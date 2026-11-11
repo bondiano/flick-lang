@@ -207,6 +207,8 @@ interface types {
     ty: fact-type,
     fields: option<list<fact-field>>,
     constant: option<constant>,
+    /// Written as a `fun`, maybe in parentheses.
+    lambda: bool,
   }
 
   record reference-fact { module: string, name: string }
@@ -244,6 +246,8 @@ interface types {
     arguments: list<argument>,
     refinement: option<refinement>,
     binding: option<binding>,
+    /// The call is in code a plugin wrote, not in the module's own text.
+    generated: bool,
   }
 
   enum highlight-kind { keyword, parameter }

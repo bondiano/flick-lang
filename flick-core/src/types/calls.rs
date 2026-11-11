@@ -4,6 +4,7 @@
 
 use std::mem;
 
+use super::sugar_lints::unparen;
 use super::ty::Type;
 use super::typing::{Ref, range};
 use super::{Checker, Domain, Local, Operator};
@@ -219,10 +220,8 @@ impl Checker<'_> {
                     self.explain_argument(since, head, i, &param);
                     if watched.is_some() {
                         let folded = consteval::eval(arg, self.text);
-                        given.push((self.span(arg), argument.clone(), folded));
-                    }
-                    if i == 0 {
-                        self.ui_render_handlers(head, arg);
+                        let lambda = unparen(arg).kind == K::FunExpr;
+                        given.push((self.span(arg), argument.clone(), folded, lambda));
                     }
                     if eff {
                         if self.cx.stage.calls > calls {

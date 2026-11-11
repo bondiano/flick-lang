@@ -394,6 +394,7 @@ fn a_plugin_sees_the_calls_of_the_names_it_watches_and_no_others() {
         arguments: Vec::new(),
         refinement: None,
         binding: None,
+        generated: false,
     };
     let plugin = Native::new("panicking", Panicking);
     let file = FileId::default();

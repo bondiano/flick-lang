@@ -1,7 +1,8 @@
 //! What the types alone show about the calls of `Ui` the package watches:
-//! the capacity of an event policy, which must be a positive integer.
+//! the capacity of an event policy, which must be a positive integer, and a
+//! handler made of a `fun` where a view renders.
 
-use flick_plugin::{CallSite, Constant, Diagnostic};
+use flick_plugin::{CallSite, Constant, Diagnostic, Span};
 
 /// `U001` on each `queue c` or `concurrent c` of `Ui.Event` or `Action`
 /// whose constant capacity or limit is no positive integer; a computed one
@@ -9,7 +10,36 @@ use flick_plugin::{CallSite, Constant, Diagnostic};
 pub fn check(calls: &[CallSite]) -> Vec<Diagnostic> {
     let mut found: Vec<_> = calls.iter().filter_map(one).collect();
     found.extend(atom_keys(calls));
+    found.extend(handlers_in_render(calls));
     found
+}
+
+/// The constructors of `Ui.Event`, which make a handler of a function.
+const EVENTS: [&str; 4] = ["exhaust", "latest", "queue", "concurrent"];
+
+/// `U002` on each handler made of a `fun` inside the render of a `Ui.view`
+/// the module writes: a new closure on every render. A `component` is a
+/// view its plugin writes, and its handlers stay as they are.
+fn handlers_in_render(calls: &[CallSite]) -> Vec<Diagnostic> {
+    let renders: Vec<Span> = (calls.iter())
+        .filter(|call| call.module == "Ui" && call.name == "view" && !call.generated)
+        .filter_map(|view| view.arguments.first().map(|render| render.span))
+        .collect();
+    let within = |at: Span| (renders.iter()).any(|r| r.start <= at.start && at.end <= r.end);
+    (calls.iter())
+        .filter(|call| call.module == "Ui.Event" && EVENTS.contains(&call.name.as_str()))
+        .filter_map(|call| {
+            let last = call.arguments.last().filter(|last| last.lambda)?;
+            let span = Span {
+                start: call.span.start,
+                end: last.span.end,
+            };
+            within(span).then(|| {
+                let message = format!("`{}.{}` of a `fun` makes a handler on every render: declare an `Action` at the top level, or pass data with `Action.with`", call.module, call.name);
+                Diagnostic::warning(message, span).with_code("U002")
+            })
+        })
+        .collect()
 }
 
 fn one(call: &CallSite) -> Option<Diagnostic> {
@@ -76,10 +106,38 @@ mod tests {
                 },
                 fields: None,
                 constant,
+                lambda: false,
             }],
             refinement: None,
             binding: None,
+            generated: false,
         }
+    }
+
+    /// `Ui.view (fun _ -> … Ui.Event.exhaust (fun _ -> …) …)`, the view at 0.
+    fn view_with_handler(generated: bool, lambda: bool) -> [CallSite; 2] {
+        let mut view = call("Ui", "view", None);
+        view.arguments[0].span = Span { start: 8, end: 60 };
+        view.generated = generated;
+        let mut handler = call("Ui.Event", "exhaust", None);
+        handler.span = Span { start: 20, end: 36 };
+        handler.arguments[0].span = Span { start: 37, end: 55 };
+        handler.arguments[0].lambda = lambda;
+        [view, handler]
+    }
+
+    #[test]
+    fn a_handler_of_a_fun_in_a_written_render_is_made_on_every_render() {
+        let found = check(&view_with_handler(false, true));
+        assert_eq!(found.len(), 1);
+        assert_eq!(found[0].code.as_deref(), Some("U002"));
+        assert_eq!(found[0].span, Span { start: 20, end: 55 });
+        // a named function is made once, and a `component` renders as it did
+        assert!(check(&view_with_handler(false, false)).is_empty());
+        assert!(check(&view_with_handler(true, true)).is_empty());
+        // outside a render nothing renders again
+        let [_, handler] = view_with_handler(false, true);
+        assert!(check(&[handler]).is_empty());
     }
 
     #[test]

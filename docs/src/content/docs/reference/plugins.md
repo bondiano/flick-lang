@@ -214,8 +214,9 @@ watch = ["Ui.Event.queue", "*.parse"]
 
 `check-calls` then gets every place of a checked module that applies one of
 them, with what the checker found there: the module and name applied, the
-span of the application, and for each argument where it is written, its
-type as `check` sees it and the constant it folds to, if any. A call of the
+span of the application, whether it stands in code a plugin wrote, and for
+each argument where it is written, its type as `check` sees it, the constant
+it folds to, if any, and whether it is written as a `fun`. A call of the
 `parse` of a refined type also carries how its check reads that constant:
 the literals of an enum, or the syntax and resolved references of the
 module's own predicate. The plugin interprets those facts. Every span is of the
@@ -227,6 +228,11 @@ module and top-level name, the binding span, whether its scheme takes a
 dictionary, whether the reference is inside a function, and its applied
 argument count. This includes partial references. The UI plugin uses these
 facts for `FLICK-U003`; it does not change type inference.
+
+A handler made of a `fun` inside the render of a `Ui.view` is found the same
+way: the calls of `Ui.view` and of the constructors of `Ui.Event` are watched,
+and the plugin warns (`FLICK-U002`) where a constructor given a `fun` stands
+inside the first argument of a view the module itself writes.
 
 ```rust
 fn check_calls(&self, calls: &[CallSite], state: &[u8]) -> Vec<Diagnostic> {
