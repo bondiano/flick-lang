@@ -42,6 +42,9 @@ and offline instantiation with a new argument after deleting package sources.
 
 This is a model of the rules, not a proof that the Rust parser, checker, `.iface`
 serializer, or either backend implements them. In particular, it does not prove
+recursive runtime packing of nested module namespaces. Runtime `Module Sig`
+records remain flat; the source checker rejects nested namespaces with `T068`
+instead of accepting a record that omits its advertised members. It does not prove
 source-level progress or preservation for arbitrary modules, nor correctness of
 the generated record ABI. The static shape model does not represent source
 type schemes, dependent equality substitution or resource lifecycles; preserving

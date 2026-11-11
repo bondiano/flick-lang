@@ -260,7 +260,7 @@ impl Checking<'_> {
             .virtual_of
             .iter()
             .flat_map(|v| &v.capture.bindings)
-            .filter_map(|b| lookup(&b.argument))
+            .filter_map(|b| Self::argument_interface(&b.argument, lookup, contracts))
             .collect();
         let (mut checked, typing) = types::check_typed_with_static_context(
             &module,

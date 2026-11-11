@@ -260,3 +260,4 @@ fn standalone_check_of_inline_modules_rejects_a_private_builtin_import() {
 }
 
 include!("checking_tests_review.rs");
+include!("checking_tests_review_boundaries.rs");

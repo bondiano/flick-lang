@@ -51,7 +51,7 @@ later arguments do not enter that lexical environment.
 | `functor` | checked higher-order signature of a static functor; arrows retain scoped binder identities, parameter signatures, result signatures and atomic group sizes; omitted for structures |
 | `signature_explicit` | `true` when the functor result comes from an explicit declaration or ascription; public aliases cannot inherit a private inferred result |
 | `member_of` | owner namespace and member name for a generated static member; external access uses the checked parent view |
-| `template` | checked static body (`source`) and its lexical `capture`: module bindings, signature origins, partial arguments, lexical namespaces, inherited-import count and definition package; omitted for ordinary structures |
+| `template` | checked static body (`source`) and its lexical `capture`: module bindings, signature origins, partial arguments with the caller's namespace access, lexical namespaces, inherited-import count and definition package; omitted for ordinary structures |
 | `private` | `true` for a module importable only within its package; omitted otherwise |
 | `exports` | the module's interface, in the order of its `exposing` list |
 | `hidden` | constructors of exported types that are not exported, so an import of one gets a precise `FLICK-R005`; omitted when empty |

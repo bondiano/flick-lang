@@ -106,6 +106,9 @@ impl ModuleSignature {
                 let matched = format!("$matched({a})({b})");
                 ar.rename_parameter(a, &matched);
                 br.rename_parameter(b, &matched);
+                let witness = bp.interface(&matched);
+                ar.normalize_in(&witness);
+                br.normalize_in(&witness);
                 ar.is_subtype_of(&br)
             }
             (Self::Structure { .. }, Self::Structure { .. }) => {

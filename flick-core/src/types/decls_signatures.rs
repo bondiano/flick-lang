@@ -124,7 +124,7 @@ impl Checker<'_> {
                 }
                 let definition = export.definition.as_ref()?;
                 let ty = match &definition.form {
-                    Form::Alias { body, .. } => body.clone(),
+                    Form::Alias { params, body, .. } if params.is_empty() => body.clone(),
                     _ => Type::con(&export.entity.module, &export.entity.name),
                 };
                 Some((export.entity.name.clone(), ty, definition.kind.clone()))

@@ -430,8 +430,9 @@ applications such as `Identity(Identity(Argument))` may reuse the same functor.
 An arrow is a static module signature, separate from a value function type.
 An implementation may accept fewer requirements and return more members than
 the signature requires. A result annotation hides members and type equalities
-that the contract does not expose. Runtime `Module Sig` values cannot carry
-functors, including through nested module members (`FLICK-T068`).
+that the contract does not expose. Runtime `Module Sig` records are flat: they
+cannot carry functors or nested module namespaces (`FLICK-T068`). Apply factories
+statically and explicitly flatten the values and type witnesses before packing.
 
 ### Repository layers and logging
 

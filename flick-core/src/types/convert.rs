@@ -464,7 +464,9 @@ impl Checker<'_> {
             {
                 match &definition.form {
                     Form::ModuleSignature { signature } => signature.has_functor(),
-                    Form::ModuleContract { requirements } => requirements.iter().any(|r| matches!(r, ModuleRequirement::Module { signature, .. } if signature.has_functor())),
+                    Form::ModuleContract { requirements } => requirements
+                        .iter()
+                        .any(|r| matches!(r, ModuleRequirement::Module { .. })),
                     _ => false,
                 }
             } else {
@@ -474,7 +476,7 @@ impl Checker<'_> {
                 self.error(
                     codes::T068,
                     self.span(node),
-                    "a static functor cannot be carried by `Module Sig`; apply it before packing",
+                    "a static functor or nested module cannot be carried by `Module Sig`; apply factories and flatten the runtime contract before packing",
                 );
             }
             let (_, applied) = ty.spine();

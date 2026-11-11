@@ -46,8 +46,8 @@ use super::packages::Packages;
 use super::{Host, Project, module_path, normalize};
 use crate::diagnostics::{Diagnostic, Edit, Severity, codes};
 use crate::iface::{
-    BindingOrigin, CalleeOrigin, ExpansionFrame, LexicalScope, StaticBinding, StaticCapture,
-    StaticMember,
+    BindingOrigin, CalleeOrigin, ExpansionFrame, LexicalScope, StaticArgument, StaticBinding,
+    StaticCapture, StaticMember,
 };
 use crate::ir;
 use crate::plugin::EditorBlock;
@@ -106,11 +106,10 @@ impl Loaded {
         self.name == member.parent
             || self.virtual_of.as_ref().is_some_and(|context| {
                 context.capture.access_modules.contains(&member.parent)
-                    || context
-                        .capture
-                        .bindings
-                        .iter()
-                        .any(|b| b.argument == format!("{}.{}", member.parent, member.name))
+                    || context.capture.bindings.iter().any(|binding| {
+                        binding.argument.module == format!("{}.{}", member.parent, member.name)
+                            && binding.argument.access_modules.contains(&member.parent)
+                    })
             })
     }
     fn can_access(&self, owner: &Root, name: &str) -> bool {
@@ -121,7 +120,7 @@ impl Loaded {
                     || capture
                         .bindings
                         .iter()
-                        .any(|binding| binding.argument == name)
+                        .any(|binding| binding.argument.module == name)
             })
     }
 

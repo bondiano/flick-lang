@@ -175,6 +175,19 @@ pub fn page(interface: &Interface, text: &str) -> String {
                 && let Some(declaration) = contracts.get(name.as_str())
             {
                 let _ = writeln!(out, "\n```flick\n{declaration}\n```");
+                match &def.form {
+                    Form::ModuleSignature { signature } => {
+                        expanded_signature(name, signature, &mut out);
+                    }
+                    Form::ModuleContract { requirements } => expanded_signature(
+                        name,
+                        &ModuleSignature::Structure {
+                            requirements: requirements.clone(),
+                        },
+                        &mut out,
+                    ),
+                    _ => unreachable!("module contract declaration"),
+                }
             } else {
                 definition(interface, e, &def.form, &mut out);
             }
@@ -440,6 +453,15 @@ mod module_signature_tests {
     use crate::ir::tests::check_text;
     use crate::source::FileId;
     use crate::syntax;
+
+    #[test]
+    fn exported_contract_aliases_document_members_of_private_source_signatures() {
+        let source = "module Contracts exposing (Public)\ntype module Hidden =\n  seed : Int\ntype module Public = Hidden\n";
+        let (_, interface) = check_text("Contracts", source).expect("checks");
+        let page = super::page(&interface, source);
+        assert!(page.contains("type module Public = Hidden"), "{page}");
+        assert!(page.contains("seed : Int"), "{page}");
+    }
     #[test]
     fn module_signature_documentation_preserves_valid_source_declarations() {
         let source = "module App.Contracts exposing (..)\ntype module Input =\n  seed : Int\ntype module Output =\n  answer : Int\ntype module Factory = (K : Input) -> Output\ntype module Namespace =\n  module Make : Factory\n";

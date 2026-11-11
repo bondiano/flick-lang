@@ -335,6 +335,9 @@ pub fn module_syntax(tree: &Node, text: &str, file: FileId) -> ModuleSyntax {
             bound: &[String],
             imports: &mut Vec<Import>,
         ) {
+            if matches!(node.kind, K::ModuleNominalMember | K::ModuleTypeEquality) {
+                return;
+            }
             let mut bound = bound.to_vec();
             if node.kind == K::ModuleFunctorExpr {
                 for parameter in node

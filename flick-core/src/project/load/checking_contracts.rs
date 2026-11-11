@@ -1,4 +1,33 @@
 impl Checking<'_> {
+    fn argument_interface(
+        argument: &StaticArgument,
+        lookup: &dyn Fn(&str) -> Option<Interface>,
+        contracts: &dyn Fn(&str) -> Option<Interface>,
+    ) -> Option<Interface> {
+        fn view(
+            module: &str,
+            access: &[String],
+            lookup: &dyn Fn(&str) -> Option<Interface>,
+            contracts: &dyn Fn(&str) -> Option<Interface>,
+        ) -> Option<Interface> {
+            let raw = contracts(module).or_else(|| lookup(module))?;
+            if let Some(member) = &raw.member_of
+                && !access.contains(&member.parent)
+            {
+                return view(&member.parent, access, lookup, contracts)?
+                    .modules
+                    .remove(&member.name);
+            }
+            Some(raw)
+        }
+        view(
+            &argument.module,
+            &argument.access_modules,
+            lookup,
+            contracts,
+        )
+    }
+
     fn callee_signature_explicit(
         context: &Virtual,
         contracts: &dyn Fn(&str) -> Option<Interface>,
@@ -46,7 +75,10 @@ impl Checking<'_> {
             else {
                 return None;
             };
-            result.instantiate_parameter(&binder, &lookup(argument)?);
+            result.instantiate_parameter(
+                &binder,
+                &Self::argument_interface(argument, lookup, contracts)?,
+            );
             signature = *result;
         }
         let types::ModuleSignature::Functor { parameter, .. } = signature else {
@@ -90,7 +122,11 @@ impl Checking<'_> {
                     .iter()
                     .rev()
                     .find(|b| &b.origin == binding)?;
-                let mut actual = signature.project(&lookup(&argument.argument)?);
+                let mut actual = signature.project(&Self::argument_interface(
+                    &argument.argument,
+                    lookup,
+                    contracts,
+                )?);
                 for name in members {
                     actual = actual.modules.remove(name)?;
                 }
@@ -124,7 +160,10 @@ impl Checking<'_> {
             else {
                 return None;
             };
-            result.instantiate_parameter(&binder, &lookup(argument)?);
+            result.instantiate_parameter(
+                &binder,
+                &Self::argument_interface(argument, lookup, contracts)?,
+            );
             signature = *result;
         }
         Some(signature)
@@ -193,11 +232,16 @@ impl Checking<'_> {
             let Some(signature) = Self::binding_signature(origin, lookup, contracts) else {
                 continue;
             };
-            let Some(actual) = lookup(argument) else {
+            let Some(actual) = Self::argument_interface(argument, lookup, contracts) else {
                 continue;
             };
-            if Self::module_contract_errors(&signature, &actual, context.at, argument, &mut errors)
-            {
+            if Self::module_contract_errors(
+                &signature,
+                &actual,
+                context.at,
+                &argument.module,
+                &mut errors,
+            ) {
                 for (head, dictionary) in
                     types::module_local_dictionaries(&signature.definition(), &actual)
                 {
@@ -235,14 +279,14 @@ impl Checking<'_> {
                     ));
                     break;
                 };
-                let Some(actual) = lookup(argument) else {
+                let Some(actual) = Self::argument_interface(argument, lookup, contracts) else {
                     break;
                 };
                 Self::module_contract_errors(
                     &parameter,
                     &actual,
                     context.at,
-                    argument,
+                    &argument.module,
                     &mut errors,
                 );
                 result.instantiate_parameter(&binder, &actual);

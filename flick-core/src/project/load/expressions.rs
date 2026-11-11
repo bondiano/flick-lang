@@ -179,7 +179,7 @@ impl Loader<'_> {
         Some(full)
     }
 
-    fn alias_expression(
+    pub(super) fn alias_expression(
         &mut self,
         parent: usize,
         desired: Option<&str>,

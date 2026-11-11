@@ -12,8 +12,8 @@ use crate::types::{EnumLit, Instance, ModuleSignature, Type, TypeDef};
 
 mod template;
 pub use template::{
-    BindingOrigin, CalleeOrigin, ExpansionFrame, LexicalScope, ModuleTemplate, StaticBinding,
-    StaticCapture, StaticMember,
+    BindingOrigin, CalleeOrigin, ExpansionFrame, LexicalScope, ModuleTemplate, StaticArgument,
+    StaticBinding, StaticCapture, StaticMember,
 };
 
 /// Bumped on every change of the schema.

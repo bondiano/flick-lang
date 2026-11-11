@@ -12,7 +12,9 @@ use tracing::debug;
 use super::Analyzed;
 use super::plugins::Watching;
 use super::precompiled::Precompiled;
-use super::{BindingOrigin, CalleeOrigin, Loaded, Loader, Root, StaticCapture, Virtual};
+use super::{
+    BindingOrigin, CalleeOrigin, Loaded, Loader, Root, StaticArgument, StaticCapture, Virtual,
+};
 use crate::clock::{micros, timed};
 use crate::diagnostics::{Diagnostic, Severity, codes};
 #[cfg(feature = "native-project")]

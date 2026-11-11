@@ -56,6 +56,36 @@ fn factory(input: ModuleSignature, output: ModuleSignature) -> ModuleSignature {
     }
 }
 
+#[test]
+fn dependent_covariance_uses_the_expected_parameters_manifest_equalities() {
+    let input = |manifest| ModuleSignature::Structure {
+        requirements: vec![
+            R::Type {
+                name: "Item".into(),
+                params: Vec::new(),
+                manifest,
+            },
+            R::Value {
+                name: "value".into(),
+                ty: Type::Var("Item".into()),
+            },
+        ],
+    };
+    let output = |ty| ModuleSignature::Structure {
+        requirements: vec![R::Value {
+            name: "value".into(),
+            ty,
+        }],
+    };
+    let provider = factory(input(None), output(Type::con("$module:K", "Item")));
+    let expected = factory(
+        input(Some(Type::con("Prelude", "String"))),
+        output(Type::con("Prelude", "String")),
+    );
+    assert!(provider.is_subtype_of(&expected));
+    assert!(!expected.is_subtype_of(&provider));
+}
+
 fn dependent_structure(binder: &str) -> ModuleSignature {
     let child = ModuleSignature::Structure {
         requirements: vec![R::Type {

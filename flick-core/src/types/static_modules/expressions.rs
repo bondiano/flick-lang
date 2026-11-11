@@ -17,7 +17,14 @@ impl Checker<'_> {
                 let mut nodes = node.nodes();
                 let function = self.static_module_expression(nodes.next()?, module, path)?;
                 let explicit = function.signature_explicit;
-                let mut signature = function.functor?;
+                let Some(mut signature) = function.functor else {
+                    self.error(
+                        codes::T002,
+                        self.span(node),
+                        "module expression is not a functor",
+                    );
+                    return None;
+                };
                 if let ModuleSignature::Functor { group_size, .. } = &signature
                     && *group_size != node.nodes().skip(1).count()
                 {

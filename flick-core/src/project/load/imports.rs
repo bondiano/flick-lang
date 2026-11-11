@@ -5,8 +5,8 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use super::{
-    BindingOrigin, CalleeOrigin, ExpansionFrame, Loaded, Loader, Root, StaticBinding,
-    StaticCapture, StaticMember, Virtual, module_path,
+    BindingOrigin, CalleeOrigin, ExpansionFrame, Loaded, Loader, Root, StaticArgument,
+    StaticBinding, StaticCapture, StaticMember, Virtual, module_path,
 };
 use crate::diagnostics::{Diagnostic, codes};
 use crate::resolve::{self, ItemKind, ModuleApplication};
@@ -59,7 +59,7 @@ impl Loader<'_> {
                         .capture
                         .bindings
                         .iter()
-                        .map(|b| b.argument.clone()),
+                        .map(|b| b.argument.module.clone()),
                 );
                 match &virtual_of.capture.callee {
                     Some(CalleeOrigin::Module(name)) => dependencies.push(name.clone()),
@@ -101,7 +101,13 @@ impl Loader<'_> {
             {
                 if let Some(&j) = self.by_name.get(&import.module)
                     && let Some(member) = &self.modules[j].member_of
-                    && !self.modules[i].can_access_member(member)
+                    && (!self.modules[i].can_access_member(member)
+                        || self.modules[i].virtual_of.as_ref().is_some_and(|v| {
+                            v.capture.bindings.iter().any(|b| {
+                                b.argument.module == import.module
+                                    && !b.argument.access_modules.contains(&member.parent)
+                            })
+                        }))
                     && let Some(&parent) = self.by_name.get(&member.parent)
                 {
                     targets.push(parent);
@@ -225,17 +231,38 @@ impl Loader<'_> {
             let Some(&parent) = self.by_name.get(parent) else {
                 return;
             };
-            let Some(application) = self.modules[parent]
+            if let Some(application) = self.modules[parent]
                 .syntax
                 .applications
                 .iter()
                 .find(|app| app.name == child)
                 .cloned()
+            {
+                // Availability is checked through the parent's advertised view.
+                self.instantiate(parent, &application);
+                continue;
+            }
+            self.materialize_expression_body(parent);
+            let Some(body) = self.modules[parent]
+                .syntax
+                .header
+                .as_ref()
+                .and_then(|h| h.materialized_body.clone())
+                .filter(|body| body != &self.modules[parent].name)
             else {
                 return;
             };
-            // Availability is checked through the parent's advertised view.
-            self.instantiate(parent, &application);
+            let at = self.modules[parent]
+                .syntax
+                .header
+                .as_ref()
+                .expect("alias header")
+                .span;
+            let target = format!("{body}.{child}");
+            self.find_module(parent, &target, at);
+            if self.by_name.contains_key(&target) || self.from_packages.contains_key(&target) {
+                self.alias_expression(parent, Some(child), &target, None, at, None);
+            }
         }
     }
 
@@ -333,14 +360,21 @@ impl Loader<'_> {
                 .syntax
                 .imports
                 .iter()
-                .find(|i| i.module == self.modules[next].name)
+                .find(|i| {
+                    i.module == self.modules[next].name
+                        || i.module
+                            .strip_prefix(&self.modules[next].name)
+                            .is_some_and(|suffix| suffix.starts_with('.'))
+                })
                 .map(|i| i.span)
-                .or_else(|| module.virtual_of.as_ref().map(|v| v.at));
+                .or_else(|| module.virtual_of.as_ref().map(|v| v.at))
+                .or_else(|| module.syntax.header.as_ref().map(|h| h.span))
+                .unwrap_or_else(|| Span::new(module.file, 0, 0));
             self.diagnostics.push(
                 Diagnostic::error(
                     codes::R006,
                     format!("import cycle: {}", chain.join(" -> ")),
-                    span.expect("edge has an import"),
+                    span,
                 )
                 .with_fix(|| {
                     (

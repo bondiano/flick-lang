@@ -223,13 +223,11 @@ impl super::Checker<'_> {
             );
             return Type::Error;
         };
-        if requirements.iter().any(
-            |r| matches!(r, ModuleRequirement::Module { signature, .. } if signature.has_functor()),
-        ) {
+        if requirements.iter().any(|r| matches!(r, ModuleRequirement::Module { .. })) {
             self.error(
                 codes::T068,
                 self.span(contract_node),
-                "a module containing a static functor cannot be packed as a runtime module",
+                "nested static modules cannot be packed as a runtime module; flatten the runtime contract",
             );
             return Type::Error;
         }

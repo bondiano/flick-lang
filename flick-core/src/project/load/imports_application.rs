@@ -150,7 +150,7 @@ impl Loader<'_> {
         let index = self.modules.len();
         self.by_name.insert(name.clone(), index);
         let context =
-            self.application_context(template, &header, application, callee, origin, trace);
+            self.application_context(parent, template, application, callee, origin, trace);
         self.modules.push(Loaded {
             path,
             file,
@@ -172,26 +172,41 @@ impl Loader<'_> {
 
     fn application_context(
         &self,
+        parent: usize,
         functor: usize,
-        header: &resolve::Header,
         application: &ModuleApplication,
         callee: CalleeOrigin,
         template: String,
         trace: Vec<ExpansionFrame>,
     ) -> Virtual {
+        let header = self.modules[functor]
+            .syntax
+            .header
+            .as_ref()
+            .expect("checked functor header");
         let inherited = self.modules[functor].virtual_of.as_ref();
+        let mut access_modules = self.modules[parent]
+            .virtual_of
+            .as_ref()
+            .map_or_else(Vec::new, |v| v.capture.access_modules.clone());
+        access_modules.push(self.modules[parent].name.clone());
+        access_modules.sort();
+        access_modules.dedup();
+        let arguments: Vec<_> = application
+            .arguments
+            .iter()
+            .map(|module| StaticArgument {
+                module: module.clone(),
+                access_modules: access_modules.clone(),
+            })
+            .collect();
         let mut capture = inherited.map_or_else(StaticCapture::default, |v| v.capture.clone());
         if !capture.access_modules.contains(&self.modules[functor].name) {
             capture
                 .access_modules
                 .push(self.modules[functor].name.clone());
         }
-        for (index, (parameter, argument)) in header
-            .parameters
-            .iter()
-            .zip(&application.arguments)
-            .enumerate()
-        {
+        for (index, (parameter, argument)) in header.parameters.iter().zip(&arguments).enumerate() {
             capture.bindings.push(StaticBinding {
                 alias: parameter.name.clone(),
                 argument: argument.clone(),
@@ -206,7 +221,7 @@ impl Loader<'_> {
                         })
                         .position(|end| end > index)
                         .unwrap_or(0),
-                    prefix: application.arguments[..index].to_vec(),
+                    prefix: arguments[..index].to_vec(),
                 },
             });
         }
@@ -220,7 +235,7 @@ impl Loader<'_> {
             .map(str::to_owned);
         capture.callee = Some(callee);
         capture.inherited_imports += application.arguments.len();
-        capture.arguments.clone_from(&application.arguments);
+        capture.arguments = arguments;
         capture.template = Some(template);
         capture.trace = trace;
         Virtual {

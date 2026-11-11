@@ -59,6 +59,18 @@ pub(crate) fn phases(module: &Module) -> Vec<Option<u32>> {
 }
 
 impl RuntimeLayout {
+    pub(crate) fn owner<'a>(&'a self, physical: &'a str) -> &'a str {
+        self.symbols
+            .iter()
+            .find_map(|(owner, _)| {
+                physical
+                    .strip_prefix(owner)
+                    .filter(|suffix| suffix.starts_with("$lexical$"))
+                    .map(|_| owner.as_str())
+            })
+            .unwrap_or(physical)
+    }
+
     pub(crate) fn new<'a>(modules: impl Iterator<Item = &'a Module>) -> Self {
         let mut layout = Self::default();
         for module in modules {

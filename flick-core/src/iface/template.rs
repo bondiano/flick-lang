@@ -18,7 +18,7 @@ pub struct StaticCapture {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub scopes: Vec<LexicalScope>,
     pub callee: Option<CalleeOrigin>,
-    pub arguments: Vec<String>,
+    pub arguments: Vec<StaticArgument>,
     /// Leading import declarations copied from the lexical environment. Their
     /// use diagnostics belong to the source that originally wrote the import.
     #[serde(default)]
@@ -45,7 +45,7 @@ pub struct StaticMember {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct StaticBinding {
     pub alias: String,
-    pub argument: String,
+    pub argument: StaticArgument,
     pub origin: BindingOrigin,
 }
 
@@ -55,7 +55,16 @@ pub struct StaticBinding {
 pub struct BindingOrigin {
     pub module: String,
     pub group: usize,
-    pub prefix: Vec<String>,
+    pub prefix: Vec<StaticArgument>,
+}
+
+/// An argument's implementation identity and the namespaces the caller could
+/// access when it supplied that argument. A callee cannot widen this view with
+/// its own implementation privileges; closures retain it across partial calls.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct StaticArgument {
+    pub module: String,
+    pub access_modules: Vec<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

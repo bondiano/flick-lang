@@ -87,6 +87,10 @@ impl Walker<'_> {
     fn walk(&mut self, node: &Node) {
         let mark = self.locals.len();
         match node.kind {
+            K::ModuleSignatureArrow => {
+                self.module_signature(node);
+                return;
+            }
             K::ModuleFunctorExpr | K::InlineModuleDecl
                 if node.kind == K::ModuleFunctorExpr
                     || node.nodes().any(|n| n.kind == K::ModuleParamGroup) =>
@@ -212,6 +216,21 @@ impl Walker<'_> {
             ) || (node.kind == K::ModuleFunctorExpr && n.kind == K::ModulePath)
         }) {
             for declaration in body.nodes().filter(|_| body.kind == K::Members) {
+                if declaration.kind == K::ImportDecl {
+                    let qualifier = declaration
+                        .child_tokens()
+                        .find(|t| t.kind == K::Con)
+                        .or_else(|| {
+                            declaration
+                                .nodes()
+                                .find(|n| n.kind == K::ModulePath)
+                                .and_then(|p| p.child_tokens().find(|t| t.kind == K::Con))
+                        });
+                    if let Some(qualifier) = qualifier {
+                        self.module_locals.push(qualifier.text(self.text));
+                    }
+                    continue;
+                }
                 let names = declaration
                     .child_tokens()
                     .filter(|t| matches!(t.kind, K::Ident | K::Con));
@@ -236,6 +255,31 @@ impl Walker<'_> {
         }
         self.module_locals.truncate(modules);
         self.locals.truncate(mark);
+    }
+
+    fn module_signature(&mut self, node: &Node) {
+        let mark = self.module_locals.len();
+        let mut parts = node.nodes();
+        if let Some(input) = parts.next() {
+            if input.kind == K::ModuleSignatureParen
+                && input.nodes().all(|n| n.kind == K::ModuleSignatureBinder)
+            {
+                for binder in input.nodes() {
+                    for signature in binder.nodes() {
+                        self.walk(signature);
+                    }
+                    if let Some(name) = binder.child_tokens().find(|t| t.kind == K::Con) {
+                        self.module_locals.push(name.text(self.text));
+                    }
+                }
+            } else {
+                self.walk(input);
+            }
+        }
+        for result in parts {
+            self.walk(result);
+        }
+        self.module_locals.truncate(mark);
     }
 
     /// The statements of a block: a `let` scopes over those after it.
