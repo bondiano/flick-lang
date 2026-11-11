@@ -84,6 +84,8 @@ enum Comparison {
     Call(&'static str),
     /// An operator.
     Infix(&'static str),
+    /// A test of the order the runtime gives two strings.
+    Order(&'static str),
 }
 
 impl<'a> Gen<'a> {
@@ -104,6 +106,7 @@ impl<'a> Gen<'a> {
                 Native::of_num(*num)
             }
             ExprKind::Lit(Lit::Bool(_))
+            | ExprKind::Not(_)
             | ExprKind::Binary(
                 BinOp::Eq
                 | BinOp::NotEq
@@ -112,12 +115,35 @@ impl<'a> Gen<'a> {
                 | BinOp::Lt
                 | BinOp::Le
                 | BinOp::Gt
-                | BinOp::Ge,
+                | BinOp::Ge
+                | BinOp::And
+                | BinOp::Or,
                 _,
                 _,
             ) => Some(Native::Bool),
+            // a choice whose every branch is of one Go type is of that type
+            ExprKind::If(_, then, other) => self.agreed([&**then, &**other]),
+            ExprKind::Match(_, arms) => self.agreed(arms.iter().map(|arm| &arm.body)),
             _ => None,
         }
+    }
+
+    /// The Go type every one of `branches` has, when they have one.
+    pub(super) fn agreed<'e>(
+        &self,
+        branches: impl IntoIterator<Item = &'e Expr>,
+    ) -> Option<Native> {
+        let mut branches = branches.into_iter();
+        let first = self.native(branches.next()?)?;
+        branches
+            .all(|b| self.native(b) == Some(first))
+            .then_some(first)
+    }
+
+    /// `go`, the code of the condition `e`, as a Go `bool`: a condition Go
+    /// already holds as one is not made a value to be read back from it.
+    pub(super) fn truth(&self, e: &Expr, go: Code<'a>) -> Document<'a> {
+        self.unboxed(e, go, Native::Bool).doc
     }
 
     /// `go`, the code of `e`, as a `want`.
@@ -180,8 +206,12 @@ impl<'a> Gen<'a> {
                 (BinOp::NotEq, Native::Float) => Some(Comparison::Call("!flickrt.EqFloat")),
                 (BinOp::Eq | BinOp::Same, _) => Some(Comparison::Infix(" == ")),
                 (BinOp::NotEq | BinOp::NotSame, _) => Some(Comparison::Infix(" != ")),
-                // JS orders strings by UTF-16 code units, and NaN by nothing
-                (_, Native::String | Native::Bool) => None,
+                (_, Native::Bool) => None,
+                // JS orders strings by UTF-16 code units, as the runtime does
+                (BinOp::Lt, Native::String) => Some(Comparison::Order(" < 0")),
+                (BinOp::Le, Native::String) => Some(Comparison::Order(" <= 0")),
+                (BinOp::Gt, Native::String) => Some(Comparison::Order(" > 0")),
+                (BinOp::Ge, Native::String) => Some(Comparison::Order(" >= 0")),
                 (BinOp::Lt, _) => Some(Comparison::Infix(" < ")),
                 (BinOp::Le, _) => Some(Comparison::Infix(" <= ")),
                 (BinOp::Gt, _) => Some(Comparison::Infix(" > ")),
@@ -195,6 +225,10 @@ impl<'a> Gen<'a> {
                     Comparison::Infix(op) => {
                         let [l, r] = operands;
                         docvec![a, "(", l, op, r, ")"]
+                    }
+                    Comparison::Order(test) => {
+                        let order = call(a, "flickrt.CompareStrings", operands);
+                        docvec![a, "(", order, test, ")"]
                     }
                 }
                 .into();
@@ -227,27 +261,17 @@ impl<'a> Gen<'a> {
         let a = self.a;
         let l = self.expr(lhs);
         let (mut rs, rv) = self.block(|g| g.expr(rhs));
+        let (l, r) = (self.truth(lhs, l), self.truth(rhs, rv));
         if rs.is_empty() {
             let go = if op == BinOp::And { " && " } else { " || " };
-            let l = call(a, "flickrt.Bool", [l.doc]);
-            let r = call(a, "flickrt.Bool", [rv.doc]);
             return docvec![a, "(", l, go, r, ")"].into();
         }
+        // either way the result is a Go `bool`, as `native` says of it
         let t = self.temp();
-        let test = if op == BinOp::And {
-            "flickrt.Bool"
-        } else {
-            "!flickrt.Bool"
-        };
-        rs.push(statement(a, docvec![a, t, " = ", rv]));
-        self.emit(docvec![a, "var ", t, " flickrt.Value = ", l]);
-        self.emit(docvec![
-            a,
-            "if ",
-            call(a, test, [a.text(t)]),
-            " ",
-            block(a, rs)
-        ]);
+        let test = if op == BinOp::And { "" } else { "!" };
+        rs.push(statement(a, docvec![a, t, " = ", r]));
+        self.emit(docvec![a, "var ", t, " bool = ", l]);
+        self.emit(docvec![a, "if ", test, t, " ", block(a, rs)]);
         self.code(t)
     }
 }

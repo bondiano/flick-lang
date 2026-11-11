@@ -95,8 +95,8 @@ impl<'a> Gen<'a> {
                         _ => g.arm(a.text(var), pat, None, body, Self::discard),
                     }
                     if let Some(stop) = stop {
-                        let stop = g.expr(stop);
-                        let stop = call(a, "flickrt.Bool", [stop.doc]);
+                        let go = g.expr(stop);
+                        let stop = g.truth(stop, go);
                         g.emit(docvec![a, "if ", stop, " ", single(a, "break")]);
                     }
                 });
@@ -106,8 +106,8 @@ impl<'a> Gen<'a> {
                 let range = call(a, "flickrt.Iter", [self.context(), s.doc]);
                 let loop_ = docvec![a, "for ", var, " := range ", range, " ", body];
                 if let Some(stop) = stop {
-                    let stop = self.expr(stop);
-                    let stop = call(a, "flickrt.Bool", [stop.doc]);
+                    let go = self.expr(stop);
+                    let stop = self.truth(stop, go);
                     self.emit(docvec![
                         a,
                         "if !",
@@ -138,10 +138,11 @@ impl<'a> Gen<'a> {
                 }
             }
             ExprKind::If(cond, then, other) => {
-                let cond = self.expr(cond);
+                let test = self.expr(cond);
+                let test = self.truth(cond, test);
                 let (then, ()) = self.block(|g| g.discard(then));
                 let (other, ()) = self.block(|g| g.discard(other));
-                self.emit(if_else(a, cond, then, other));
+                self.emit(if_else(a, test, then, other));
             }
             ExprKind::Block(stmts, result) => {
                 for stmt in stmts {
