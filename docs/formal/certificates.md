@@ -127,7 +127,7 @@ closed gap lets through to a later form.
 - `just formal-certs` regenerates `GenSig.lean` and the 32 golden certificates of
   `formal/FormalCert/Gen/Golden.lean`. A test of `cargo test -p flick-model`
   fails when either is stale, and the `lean` job of CI checks both.
-- `just model-certs` certifies the fixed run and writes
-  `target/certs/Batch.lean`, which Lean then checks. With `CERT_PROGRAMS=n` it
-  certifies `n` programs, but the gap list is compared only when `n` is 500. The
-  nightly `certs` job runs it over 2000 programs.
+- `just model-certs` certifies the fixed run and writes it to
+  `target/certs/Batch/`, 50 certificates a file, which Lean then checks. With
+  `CERT_PROGRAMS=n` it certifies `n` programs, but the gap list is compared only
+  when `n` is 500. The nightly `certs` job runs it over 2000 programs.
