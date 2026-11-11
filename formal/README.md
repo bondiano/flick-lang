@@ -203,7 +203,7 @@ operation, and `c.at i` ranges over the main thread and the children of live reg
 | `core.md` §1.3 terms, patterns; §3.1 run-time forms; `regions.md` §1.3, §3.1 | `Tm`, `Pat` (`Syntax.lean`) |
 | what a term holds: free variables, run-time regions, locations (typing by use does not bound it) | `Tm.Free`, `Tm.Has`, `held` (`Reach.lean`) |
 | §1.3, §3.1 values | `Value` (`Typing.lean`) |
-| `core.md` §1.5, `regions.md` §1.5 constants | `Const`, `Const.ty`, `Const.ok` (`Syntax.lean`) |
+| `core.md` §1.5, `regions.md` §1.5 constants; the capacity `c` of `Ref.*`, the instance `ι.C` with `⌈τ⌉ ⊆ c` | `Const`, `Const.ty`, `Const.ok` (`Syntax.lean`); `refSet_needs_capacity` (`LiveRules.lean`) |
 | §2.1 `⊑`, §2.2 `≤` by use | `Stage.le`, `Stage.use`, `LeLive` (`Syntax.lean`, `Live/Mode.lean`, `Live/Order.lean`); `LeLive.arrow_use`, `LeLive.eff_use` |
 | a call needs its qualifier live; owners outlive the rows of their work; a frame provides its region | `Stage.use`; `Row.Outlives` (`Syntax.lean`); `Frame.provides` (`Frames.lean`) |
 | `core.md` §2.3, §3.6 rules; `regions.md` §2.3–§2.5, §3.4 | `Typ` (`Rules.lean`) |

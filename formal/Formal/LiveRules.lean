@@ -219,4 +219,31 @@ example : Const.ok Facts.none .scopeRun
     { (default : CArg) with C := fun a => a = .r 0, r := Row.ofCaps fun a => a = .r 0 } :=
   fun _ h => h
 
+/-- A cell of a capability: its contents reach region 0. -/
+def hndCell : CArg := { (default : CArg) with t := .hnd (.rg 0) }
+
+/-- A cell's capacity, the qualifier `C` of a `Ref` constant, bounds what the cell stores:
+`Ref.make` rejects a capacity smaller than its contents. -/
+example : ¬ Const.ok Facts.none .refMake hndCell := by
+  intro h
+  rcases h (.r 0) rfl with h | ⟨_, h, _⟩
+  · exact h
+  · exact h.elim
+
+example : Const.ok Facts.none .refMake { hndCell with C := region } :=
+  fun _ h => .inl h
+
+/-- `Ref.set` needs its capacity live: storing into a cell that may hold a capability of
+region 0 is a call whose stage keeps region 0 live, whatever its row says. -/
+theorem refSet_needs_capacity (S : Sig) (ι : CArg) (hok : Const.ok Facts.none .refSet ι)
+    (ht : ι.t = .hnd (.rg 0)) {T : Ty} (hT : Const.ty S .refSet ι = .arrow (.ref ι.t) .pure T Caps.none) :
+    ¬ LeLive T (.arrow ι.t emptyStage (.base .unit) Caps.none) := by
+  injection hT with _ _ hT; subst hT
+  intro h
+  have hC : ι.C (.r 0) := by
+    rcases hok (.r 0) (by rw [ht]; rfl) with h | ⟨_, h, _⟩
+    · exact h
+    · exact h.elim
+  exact (h.arrow_use.1 (.atm (.r 0)) (Or.inr hC)).elim id id
+
 end Flick.LiveChecks

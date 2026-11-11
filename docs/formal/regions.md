@@ -119,6 +119,8 @@ Sources:
 - `Fiber.spawn` is in `builtins/Fiber.fl`, `Scope.add_finalizer` in `builtins/Scope.fl`. The finalizer's `Outlives c s` is required because [owner retention requires `Outlives`](#owner-retention-requires-outlives); the child's rows name `Scope s` because [children acquire in the region of their owner](#children-acquire-in-the-region-of-their-owner).
 - `Ref.*` are in `builtins/Ref.fl`: the capacity `c` sits inside the invariant argument of `Ref`, so it cannot be widened through the outer bound of the reference.
 
+Lean: `Const.ty`, `Const.ok` (`formal/Formal/Syntax.lean`). A cell type is `Ref τ` with `τ` the contents, as in `core.md`, and the capacity `c` is the instance `ι.C` of the constant, fixed for each use: `Const.ok` of `Ref.*` is the premise (Inst) of the bound `α^c`, `⌈τ⌉ ⊆ c` up to the facts, and the arrow `Ref.set ℓ` has the qualifier `c`, so storing needs the capacity live. `LiveRules.lean` checks both: `Ref.make` rejects a capacity smaller than its contents, and `refSet_needs_capacity`.
+
 ## 2. Statics
 
 ### 2.1 The reach bound ⌈τ⌉
