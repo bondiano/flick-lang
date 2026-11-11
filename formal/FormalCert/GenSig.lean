@@ -16,7 +16,7 @@ def genCtor : Name → Option (Nat × List Ty × Name)
   | "Fixture.Bad" => some (0, [(.base .string)], "Fixture.Bad")
   | "Fixture.Leaked" => some (1, [(.tvar 0)], "Fixture.Leaked")
   | "Fixture.Oops" => some (0, [(.base .int)], "Fixture.Oops")
-  | "Fixture.Sealed" => some (0, [(.arrow (.base .unit) (.rt Row.none Row.none) (.base .unit) Caps.none)], "Fixture.Sealed")
+  | "Fixture.Sealed" => some (1, [(.arrow (.base .unit) (.rt Row.none Row.none) (.base .unit) (fun x => x = .v 0))], "Fixture.Sealed")
   | "Fixture.Wrapper" => some (1, [(.tapp (.adt "Fixture.Handle") (.tvar 0))], "Fixture.Wrapper")
   | "Prelude.Cons" => some (1, [(.tvar 0), (.tapp (.adt "Prelude.List") (.tvar 0))], "Prelude.List")
   | "Prelude.Nil" => some (1, [], "Prelude.List")
@@ -144,7 +144,8 @@ theorem genCtor_closed : ∀ K k ts T σ, genCtor K = some (k, ts, T) →
     (∀ i, i < k → σ (.v i) = .tvar i) → ts.map (Ty.substT σ) = ts := by
   intro K k ts T σ hK hσ
   unfold genCtor at hK
-  split at hK <;> cases hK <;> simp [Ty.substT, Stage.substT, hσ]
+  split at hK <;> cases hK <;> simp [Ty.substT, Stage.substT, hσ] <;>
+    funext a <;> simp [Caps.substT, hσ]
 
 theorem genCtor_reach : ∀ K k ts T, genCtor K = some (k, ts, T) →
     ∀ t ∈ ts, ∀ a, t.reach a → ∃ i, i < k ∧ a = .v i := by

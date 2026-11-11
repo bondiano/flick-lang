@@ -5,7 +5,7 @@
 //! no contradiction. A global is at its elided scheme, as the check
 //! instantiates it (`check::elided`).
 
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, HashSet};
 use std::fmt::Write;
 use std::rc::Rc;
 
@@ -15,8 +15,8 @@ use crate::check::{elided, prim_scheme};
 use crate::decls::Decls;
 use crate::generate::fixture_module;
 use crate::syntax::{Name, Path, Prim};
-use crate::translate::lean::elide::{Env, scheme_facts, ty};
-use crate::types::{Kind, Scheme, Stage, Type, Var};
+use crate::translate::lean::elide::{Env, Types, hides, scheme_facts, ty};
+use crate::types::{Caps, Kind, Scheme, Stage, Type, Var};
 
 /// A constructor of the core: its variables, fields and type.
 pub(crate) struct Ctor {
@@ -44,8 +44,9 @@ pub struct Sig {
     /// Each class's number of parameters and fields, `$S` of a superclass
     /// `S` first, as schemes in the core.
     dicts: Vec<(usize, Vec<(String, String)>)>,
-    /// The kinds of the parameters of each type constructor.
-    pub(crate) params: Rc<HashMap<Path, Vec<Kind>>>,
+    /// The kinds of the parameters of the data types, and those with hidden
+    /// storage.
+    pub(crate) types: Rc<Types>,
 }
 
 /// An operation `o : a ->{} b` of a service.
@@ -64,7 +65,7 @@ fn dict(
     decls: &Decls,
     p: &Path,
     classes: &[String],
-    kinds: &Rc<HashMap<Path, Vec<Kind>>>,
+    types: &Rc<Types>,
 ) -> Option<(usize, Vec<(String, String)>)> {
     let class = decls.classes.get(p)?;
     let params: Vec<String> = class.params.iter().map(ToString::to_string).collect();
@@ -75,7 +76,7 @@ fn dict(
             .chain(params.iter().cloned())
             .collect(),
         classes: classes.to_vec(),
-        params: Some(kinds.clone()),
+        types: Some(types.clone()),
         ..Env::default()
     };
     let mut fields = Vec::new();
@@ -95,7 +96,7 @@ fn dict(
 
 /// The operations of a service, if each is `a ->{} b` of types the core
 /// writes.
-fn ops(schemes: &[(Name, Scheme)], kinds: &Rc<HashMap<Path, Vec<Kind>>>) -> Option<Vec<Op>> {
+fn ops(schemes: &[(Name, Scheme)], types: &Rc<Types>) -> Option<Vec<Op>> {
     schemes
         .iter()
         .map(|(name, s)| {
@@ -104,7 +105,7 @@ fn ops(schemes: &[(Name, Scheme)], kinds: &Rc<HashMap<Path, Vec<Kind>>>) -> Opti
                 return None;
             };
             let none = Env {
-                params: Some(kinds.clone()),
+                types: Some(types.clone()),
                 ..Env::default()
             };
             (s.vars.is_empty() && r.is_none() && e.is_none()).then_some(())?;
@@ -153,7 +154,7 @@ pub(crate) fn kept(s: &Scheme) -> Vec<bool> {
 }
 
 /// The fields and type of a constructor's scheme, if it builds `T ᾱ`.
-fn ctor(s: &Scheme, kinds: &Rc<HashMap<Path, Vec<Kind>>>) -> Option<Ctor> {
+fn ctor(s: &Scheme, types: &Rc<Types>) -> Option<Ctor> {
     let keep = kept(s);
     let vars: Vec<&(Name, Kind)> = s
         .vars
@@ -162,15 +163,10 @@ fn ctor(s: &Scheme, kinds: &Rc<HashMap<Path, Vec<Kind>>>) -> Option<Ctor> {
         .filter(|(_, k)| **k)
         .map(|(v, _)| v)
         .collect();
-    let env = Env {
-        vars: vars.iter().map(|(v, _)| v.to_string()).collect(),
-        params: Some(kinds.clone()),
-        ..Env::default()
-    };
-    let mut fields = Vec::new();
     let mut t = bare(&s.body);
+    let mut ps = Vec::new();
     while let Type::Fun(p, _, r) = t {
-        fields.push(ty(bare(p), &env).ok()?);
+        ps.push(bare(p));
         t = bare(r);
     }
     let mut args = Vec::new();
@@ -180,27 +176,71 @@ fn ctor(s: &Scheme, kinds: &Rc<HashMap<Path, Vec<Kind>>>) -> Option<Ctor> {
     }
     args.reverse();
     let Type::Con(adt) = t else { return None };
+    // data with hidden storage takes first the capture row its value hides,
+    // which qualifies each field that hides captures
+    let stored = types.stored.contains(adt);
+    let hidden = Caps::var(Var::Named("$c".into()));
+    let env = Env {
+        vars: (stored.then(|| "$c".to_owned()).into_iter())
+            .chain(vars.iter().map(|(v, _)| v.to_string()))
+            .collect(),
+        types: Some(types.clone()),
+        ..Env::default()
+    };
+    let fields = ps
+        .iter()
+        .map(|p| {
+            if stored && hides(p) {
+                ty(&Type::Captured(Rc::new((*p).clone()), hidden.clone()), &env).ok()
+            } else {
+                ty(p, &env).ok()
+            }
+        })
+        .collect::<Option<Vec<_>>>()?;
     let plain = args.len() == vars.len()
         && args
             .iter()
             .zip(&vars)
             .all(|(a, (v, _))| matches!(a, Type::Var(Var::Named(w)) if w == v));
     plain.then(|| Ctor {
-        k: vars.len(),
+        k: vars.len() + usize::from(stored),
         fields,
         adt: adt.to_string(),
     })
 }
 
+/// The data a constructor of which has a field that hides captures.
+fn stored(decls: &Decls) -> HashSet<Path> {
+    let mut out = HashSet::new();
+    for s in decls.constructors.values() {
+        let mut t = bare(&s.body);
+        let mut hidden = false;
+        while let Type::Fun(p, _, r) = t {
+            hidden |= hides(p);
+            t = bare(r);
+        }
+        while let Type::App(h, _) = t {
+            t = h;
+        }
+        if let (true, Type::Con(adt)) = (hidden, t) {
+            out.insert(adt.clone());
+        }
+    }
+    out
+}
+
 impl Sig {
     pub fn of(decls: &Decls) -> Sig {
         let module = fixture_module();
-        let params = Rc::new(decls.params.clone());
+        let types = Rc::new(Types {
+            params: decls.params.clone(),
+            stored: stored(decls),
+        });
         let mut ctors = BTreeMap::new();
         for (p, s) in &decls.constructors {
             let ours = &*p.module == module
                 || (&*p.module == "Prelude" && ["Some", "None"].contains(&&*p.name));
-            if let (true, Some(c)) = (ours, ctor(s, &params)) {
+            if let (true, Some(c)) = (ours, ctor(s, &types)) {
                 ctors.insert(p.to_string(), c);
             }
         }
@@ -258,7 +298,7 @@ impl Sig {
         let classes: Vec<String> = paths.iter().map(ToString::to_string).collect();
         let dicts = paths
             .iter()
-            .map(|p| dict(decls, p, &classes, &params).unwrap_or_default())
+            .map(|p| dict(decls, p, &classes, &types).unwrap_or_default())
             .collect();
         // the instances, after the values the generator calls
         let mut instances: Vec<_> = (decls.instances.iter())
@@ -270,7 +310,7 @@ impl Sig {
         }
         let ops = (decls.services.iter())
             .filter(|(p, _)| &*p.module == module)
-            .filter_map(|(p, schemes)| Some((p.to_string(), ops(schemes, &params)?)))
+            .filter_map(|(p, schemes)| Some((p.to_string(), ops(schemes, &types)?)))
             .collect();
         Sig {
             ctors,
@@ -278,7 +318,7 @@ impl Sig {
             ops,
             classes,
             dicts,
-            params,
+            types,
         }
     }
 
@@ -331,7 +371,7 @@ impl Sig {
         out.push_str("def genGlob : Nat → Option Scheme\n");
         let mut skipped = String::new();
         for (i, (key, s)) in self.globs.iter().enumerate() {
-            match scheme(s, &self.classes, &self.params) {
+            match scheme(s, &self.classes, &self.types) {
                 Ok(text) => {
                     let _ = writeln!(out, "  -- {key:?}\n  | {i} => some {text}");
                 }
@@ -395,15 +435,11 @@ impl Sig {
 }
 
 /// `⟨k, Facts.none, τ⟩` of a scheme without facts.
-fn scheme(
-    s: &Scheme,
-    classes: &[String],
-    kinds: &Rc<HashMap<Path, Vec<Kind>>>,
-) -> Result<String, String> {
+fn scheme(s: &Scheme, classes: &[String], types: &Rc<Types>) -> Result<String, String> {
     let env = Env {
         vars: s.vars.iter().map(|(v, _)| v.to_string()).collect(),
         classes: classes.to_vec(),
-        params: Some(kinds.clone()),
+        types: Some(types.clone()),
         ..Env::default()
     };
     let (cs, t) = scheme_facts(s, &env)?;
@@ -431,7 +467,8 @@ theorem genCtor_closed : ∀ K k ts T σ, genCtor K = some (k, ts, T) →
     (∀ i, i < k → σ (.v i) = .tvar i) → ts.map (Ty.substT σ) = ts := by
   intro K k ts T σ hK hσ
   unfold genCtor at hK
-  split at hK <;> cases hK <;> simp [Ty.substT, Stage.substT, hσ]
+  split at hK <;> cases hK <;> simp [Ty.substT, Stage.substT, hσ] <;>
+    funext a <;> simp [Caps.substT, hσ]
 
 theorem genCtor_reach : ∀ K k ts T, genCtor K = some (k, ts, T) →
     ∀ t ∈ ts, ∀ a, t.reach a → ∃ i, i < k ∧ a = .v i := by

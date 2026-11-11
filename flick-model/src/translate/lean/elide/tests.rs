@@ -70,10 +70,13 @@ fn a_row_given_to_a_row_parameter_is_its_instance() {
     let e = || Type::Var(Var::Named("e".into()));
     let at = HashMap::from([("e".into(), Inst::Row(Row::none()))]);
     let env = super::Env {
-        params: Some(Rc::new(HashMap::from([
-            (Path::new("Prelude", "Failure"), vec![Kind::Errors]),
-            (Path::new("Prelude", "Option"), vec![Kind::Type]),
-        ]))),
+        types: Some(Rc::new(super::Types {
+            params: HashMap::from([
+                (Path::new("Prelude", "Failure"), vec![Kind::Errors]),
+                (Path::new("Prelude", "Option"), vec![Kind::Type]),
+            ]),
+            ..super::Types::default()
+        })),
         ..super::Env::default()
     };
     let written = |t: &Type| super::ty(&substitute(t, &at), &env);
@@ -87,5 +90,35 @@ fn a_row_given_to_a_row_parameter_is_its_instance() {
             Type::Errors(Row::var(Var::Named("e".into())))
         )),
         Ok("(.tapp (.adt \"Prelude.Option\") (.errors Row.none))".into())
+    );
+}
+
+/// A value of data with hidden storage carries the capture row it hides as
+/// its first argument, as `Seq`; a bare one hides none.
+#[test]
+fn data_with_hidden_storage_shows_what_its_value_hides() {
+    use std::collections::HashSet;
+    use std::rc::Rc;
+
+    use crate::syntax::Path;
+    use crate::types::{Caps, Type, Var};
+
+    let env = super::Env {
+        vars: vec!["c".into()],
+        types: Some(Rc::new(super::Types {
+            stored: HashSet::from([Path::new("Fixture", "Sealed")]),
+            ..super::Types::default()
+        })),
+        ..super::Env::default()
+    };
+    let sealed = || Rc::new(Type::con("Fixture", "Sealed"));
+    let hidden = Type::Captured(sealed(), Caps::var(Var::Named("c".into())));
+    assert_eq!(
+        super::ty(&hidden, &env),
+        Ok("(.tapp (.adt \"Fixture.Sealed\") (.caps (fun x => x = .v 0)))".into())
+    );
+    assert_eq!(
+        super::ty(&sealed(), &env),
+        Ok("(.tapp (.adt \"Fixture.Sealed\") (.caps Caps.none))".into())
     );
 }
