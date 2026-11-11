@@ -31,3 +31,10 @@ test("a starter fails with T003 unless its exercise names another code", () => {
   assert.equal(parseExerciseMetadata(`${source}starter_error = "FLICK-T009"\n`, "test").starter_error, "FLICK-T009");
   assert.throws(() => parseExerciseMetadata(`${source}starter_error = "T009"\n`, "test"), /starter_error/);
 });
+
+test("an exercise whose export runs says so with a Boolean", () => {
+  const source = readFileSync(new URL("../exercises/signatures/01/check.toml", import.meta.url), "utf8");
+  assert.equal(parseExerciseMetadata(source, "test").check.runs, undefined);
+  assert.equal(parseExerciseMetadata(`${source}runs = true\n`, "test").check.runs, true);
+  assert.throws(() => parseExerciseMetadata(`${source}runs = "yes"\n`, "test"), /runs/);
+});

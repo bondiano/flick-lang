@@ -29,10 +29,12 @@ export const parseExerciseMetadata = (source: string, id: string): ExerciseMetad
   const exported = text("export");
   const result = text("return_type");
   if (!/^[A-Za-z_]\w*$/.test(exported) || !/^(string|number|boolean|void)$/.test(result)) throw new Error(`${id}: invalid signature`);
+  const runs = config.runs ?? false;
+  if (typeof runs !== "boolean") throw new Error(`${id}: invalid runs`);
   const starterError = config.starter_error ?? "FLICK-T003";
   if (typeof starterError !== "string" || !/^FLICK-[A-Z]\d{3}$/.test(starterError)) throw new Error(`${id}: invalid starter_error`);
   return {
-    check: { export: exported, argument_types: args, return_type: result, output: text("output", true) },
+    check: { export: exported, argument_types: args, return_type: result, output: text("output", true), ...(runs ? { runs } : {}) },
     title: text("title"), title_ru: text("title_ru"), task: text("task"), task_ru: text("task_ru"), hint: text("hint"), hint_ru: text("hint_ru"),
     starter_error: starterError,
   };

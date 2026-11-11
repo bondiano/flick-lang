@@ -1,4 +1,4 @@
-module Main exposing (main, describe_total)
+module Main exposing (main, total_age)
 
 type error Invalid = Invalid String
 
@@ -14,15 +14,10 @@ let sum_ages text =
   for part <- String.split "," text do total = total + parse_age part
   total
 
-describe_total : Int -> String
-let describe_total total = if total < 0 then "not a list of ages" else "\{total} years"
-
 total_age : String ->{} Int
 let total_age text =
   try sum_ages text with
   | Invalid _ -> 0
 
 main : Unit ->{} Unit
-let main () =
-  Platform.stdout_line
-    (describe_total (total_age "36,41") ++ "; " ++ describe_total (total_age "36,x"))
+let main () = Platform.stdout_line "\{total_age "36,41"} \{total_age "36,x"}"

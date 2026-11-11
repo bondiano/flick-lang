@@ -6,6 +6,8 @@ export interface ExerciseCheck {
   readonly argument_types: ReadonlyArray<string>;
   readonly return_type: string;
   readonly output: string;
+  /** The export runs (`->{}`): its result comes in an Effect that needs and fails with nothing. */
+  readonly runs?: boolean;
 }
 export interface ExerciseDeclarations {
   readonly dts: string;
@@ -22,7 +24,9 @@ export const evaluateExercise = async (rules: ExerciseCheck, operations: Exercis
   if ((await operations.check()).some((problem) => problem.severity === "error")) return "fix-errors";
   const generated = await operations.compile();
   const args = rules.argument_types.map((type) => `\\(\\s*[$\\w]+:\\s*${escape(type)}\\s*\\)\\s*=>\\s*`).join("");
-  const result = rules.return_type === "void" ? "undefined" : rules.return_type;
+  const value = escape(rules.return_type === "void" ? "undefined" : rules.return_type);
+  // the Effect build declares `$Effect.Effect<…>`, Flick's own runtime `$Effect<…>`
+  const result = rules.runs ? `\\$Effect(?:\\.Effect)?<${value},\\s*never,\\s*never>` : value;
   const entry = generated.declarationEntry ?? "Main.d.ts";
   const declarations = { ...generated.declarations, [entry]: generated.dts };
   const seen = new Set<string>();
@@ -31,7 +35,7 @@ export const evaluateExercise = async (rules: ExerciseCheck, operations: Exercis
     if (seen.has(key)) return false;
     seen.add(key);
     const text = declarations[file] ?? "";
-    const signature = new RegExp(`^export declare const ${escape(name)}:\\s*${args}${escape(result)}\\s*;`, "m");
+    const signature = new RegExp(`^export declare const ${escape(name)}:\\s*${args}${result}\\s*;`, "m");
     if (signature.test(text)) return true;
     for (const reexport of text.matchAll(/^export\s*\{([^}]+)\}\s*from\s*"([^"]+)";/gm)) {
       const specifier = reexport[2] ?? "";
