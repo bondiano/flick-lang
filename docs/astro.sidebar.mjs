@@ -3,10 +3,10 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 
 const reference = (name) => ({ slug: `reference/${name}` });
-// The tour's order is its index's; Back and Next follow the sidebar.
-const tour = JSON.parse(readFileSync(new URL("./tour/index.json", import.meta.url), "utf8"));
+// The tour's order is its index's, and a course's its own; Back and Next follow the sidebar. From the
+// site's root, as their loaders read them: `llms.txt` bundles this module where its own URL means nothing.
+const tour = JSON.parse(readFileSync(path.join(process.cwd(), "tour/index.json"), "utf8"));
 // A course's exercises, a page each, by lesson; `values/01` is `course/values-01`.
-// From the site's root, as the loaders read it: a bundle that imports this module has another URL.
 const course = JSON.parse(readFileSync(path.join(process.cwd(), "course/index.json"), "utf8")).courses[0];
 
 export const sidebar = [
