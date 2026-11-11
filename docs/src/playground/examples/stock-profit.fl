@@ -1,0 +1,23 @@
+// Buy once, then sell on a later day. Return 0 if no trade makes money.
+// Keep the cheapest earlier price and the best profit in one pass: O(n).
+module Main exposing (main)
+
+max_profit : List Int -> Int
+let max_profit prices =
+  match prices with
+  | [] -> 0
+  | [first, ...rest] ->
+    let mut cheapest = first
+    let mut best = 0
+    for price <- rest do {
+      let profit = price - cheapest
+      if profit > best then best = profit
+      if price < cheapest then cheapest = price
+    }
+    best
+
+main : Unit ->{} Unit
+let main () =
+  Platform.stdout_line (show (max_profit [7, 1, 5, 3, 6, 4]))
+  Platform.stdout_line (show (max_profit [7, 6, 4, 3, 1]))
+  Platform.stdout_line (show (max_profit []))

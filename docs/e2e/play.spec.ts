@@ -336,3 +336,21 @@ let main () =
   await page.getByRole("button", { name: "Run", exact: true }).click();
   await expect(page.locator(".fp-output")).toContainText("(7, 4, 2)", { timeout: 60_000 });
 });
+
+for (const lang of ["en", "ru"]) {
+  test(`loop challenges run from the gallery (${lang})`, async ({ page }) => {
+    await page.goto(lang === "ru" ? "/flick-lang/ru/play/" : "/flick-lang/play/");
+    await ready(page);
+    const examples = [
+      { name: lang === "ru" ? "Бинарный поиск" : "Binary search", output: "Some 4\nNone\nNone" },
+      { name: lang === "ru" ? "Лучшая сделка с акцией" : "Best stock trade", output: "5\n0\n0" },
+      { name: lang === "ru" ? "Число-палиндром" : "Palindrome number", output: "true\ntrue\nfalse\nfalse\ntrue" },
+    ];
+    for (const example of examples) {
+      await page.locator(".fp-gallery-button").click();
+      await page.locator(".fp-gallery").getByRole("button", { name: example.name, exact: true }).click();
+      await page.getByRole("button", { name: lang === "ru" ? "Запустить" : "Run", exact: true }).click();
+      await expect(page.locator(".fp-output")).toContainText(example.output, { timeout: 60_000 });
+    }
+  });
+}
