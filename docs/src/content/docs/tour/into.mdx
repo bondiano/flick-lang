@@ -1,0 +1,21 @@
+---
+title: Conversions
+description: "`into` converts a value to the type its place expects."
+tableOfContents: false
+---
+
+import TourLesson from "../../../components/TourLesson.astro";
+
+<TourLesson locale="en" id="into">
+
+`into` converts a value to the type its place expects, when nothing is lost.
+`half` divides by `2.0`, so `into n` becomes a `Float`.
+
+A program converts its own types the same way. `instance Into Celsius Fahrenheit`
+says how, and `degrees` takes a `Fahrenheit`, so `into (Celsius 100.0)` turns
+into one. An `unboxed type` has one form and costs nothing at run time.
+
+**Try:** write `let x = into 3` in `main` and print `x`. The compiler reports
+`FLICK-C002`: nothing says which type `x` should have.
+
+</TourLesson>

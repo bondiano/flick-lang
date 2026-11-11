@@ -31,6 +31,20 @@
         { "id": "break", "example": "binary-search" },
         { "id": "coins", "exercise": "data/01" }
       ]
+    },
+    {
+      "id": "types", "en": "Types and classes", "ru": "Типы и классы",
+      "lessons": [
+        { "id": "aliases", "expect": "run" },
+        { "id": "generics", "expect": "run" },
+        { "id": "deriving", "expect": "run" },
+        { "id": "classes", "example": "classes" },
+        { "id": "constraints", "expect": "run" },
+        { "id": "into", "expect": "run" },
+        { "id": "modules", "expect": "run" },
+        { "id": "gadt", "example": "gadt" },
+        { "id": "show-size", "exercise": "types/01" }
+      ]
     }
   ]
 }

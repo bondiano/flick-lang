@@ -1,0 +1,23 @@
+---
+title: Модули
+description: Что модуль показывает и что оставляет себе.
+tableOfContents: false
+source_hash: c7ef601bea7aafb1
+---
+
+import TourLesson from "../../../../components/TourLesson.astro";
+
+<TourLesson locale="ru" id="modules">
+
+В проекте каждый файл — это модуль, и другой файл пользуется им через
+`import`. На этой странице один файл, поэтому урок использует вложенный
+модуль: правила у него те же.
+
+`module Greeting exposing (greet) =` создаёт модуль внутри `Main`. Снаружи
+можно использовать только то, что перечислено в `exposing`, с именем модуля
+впереди: `Greeting.greet`. Остальное, как `mark`, остаётся закрытым.
+
+**Попробуйте:** напечатайте `Greeting.mark`. Компилятор сообщит
+`FLICK-R004`: `Greeting` не экспортирует `mark`.
+
+</TourLesson>

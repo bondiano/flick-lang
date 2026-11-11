@@ -1,0 +1,22 @@
+---
+title: Modules
+description: What a module shows, and what it keeps to itself.
+tableOfContents: false
+---
+
+import TourLesson from "../../../components/TourLesson.astro";
+
+<TourLesson locale="en" id="modules">
+
+In a project each file is a module, and another file uses it with `import`.
+This page has one file, so the lesson uses an inline module, which follows
+the same rules.
+
+`module Greeting exposing (greet) =` makes a module inside `Main`. Only what
+`exposing` lists can be used from outside, with the module's name in front:
+`Greeting.greet`. The rest, like `mark`, stays private.
+
+**Try:** print `Greeting.mark`. The compiler reports `FLICK-R004`: `Greeting`
+does not export `mark`.
+
+</TourLesson>

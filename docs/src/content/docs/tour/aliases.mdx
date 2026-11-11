@@ -1,0 +1,22 @@
+---
+title: Type aliases and holes
+description: A shorter name for a type, and `_` to ask the compiler for one.
+tableOfContents: false
+---
+
+import TourLesson from "../../../components/TourLesson.astro";
+
+<TourLesson locale="en" id="aliases">
+
+`type alias Point = { x : Int; y : Int }` gives a type a shorter name. It is
+only a name: any record with those fields is a `Point`, as `start` shows,
+written without it.
+
+A signature can leave a part to the compiler with `_`. The program still
+compiles, with a warning that says what `_` stands for, and the fix of that
+warning writes it in. It is a quick way to ask the compiler for a type.
+
+**Try:** write `move : Point -> Int -> _`. The compiler warns with
+`FLICK-T024` that `_` is `{ x : Int; y : Int }`. Apply the fix.
+
+</TourLesson>

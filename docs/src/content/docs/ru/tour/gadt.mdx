@@ -1,0 +1,24 @@
+---
+title: Типы, которые несут свой результат
+description: Каждая форма типа говорит, какой тип она строит.
+tableOfContents: false
+source_hash: 74625258c1428a61
+---
+
+import TourLesson from "../../../../components/TourLesson.astro";
+
+<TourLesson locale="ru" id="gadt">
+
+Тип может сказать для каждой формы, какой тип она строит. В `Expr a`
+`Num` строит `Expr Int`, а `Yes` и `Less` — `Expr Bool`.
+
+Тогда `eval : forall a. Expr a -> a` возвращает ровно этот тип: `Int` для
+суммы, `Bool` для сравнения, без проверок во время выполнения. Выражение,
+которое складывает `Bool`, даже не получится записать.
+
+Это самый сложный урок главы; при первом чтении его можно пропустить.
+
+**Попробуйте:** напишите `Add (Num 1) (Yes true)`. Компилятор сообщит
+`FLICK-T003`: `Add` принимает `Expr Int`, а не `Expr Bool`.
+
+</TourLesson>

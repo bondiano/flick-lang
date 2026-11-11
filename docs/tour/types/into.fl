@@ -1,0 +1,23 @@
+module Main exposing (main)
+
+unboxed type Celsius = Celsius Float
+
+unboxed type Fahrenheit = Fahrenheit Float
+
+instance Into Celsius Fahrenheit =
+  let into c =
+    match c with
+    | Celsius t -> Fahrenheit (t * 9.0 / 5.0 + 32.0)
+
+degrees : Fahrenheit -> Float
+let degrees f =
+  match f with
+  | Fahrenheit t -> t
+
+half : Int -> Float
+let half n = into n / 2.0
+
+main : Unit ->{} Unit
+let main () =
+  Platform.stdout_line (show (half 7))
+  Platform.stdout_line (show (degrees (into (Celsius 100.0))))

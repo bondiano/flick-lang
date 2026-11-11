@@ -1,0 +1,15 @@
+module Main exposing (main)
+
+type alias Point = { x : Int; y : Int }
+
+move : Point -> Int -> Point
+let move point dx = { point with x = point.x + dx }
+
+distance : Point -> Int
+let distance point = Int.abs point.x + Int.abs point.y
+
+main : Unit ->{} Unit
+let main () =
+  let start = { x = 1; y = -2 }
+  Platform.stdout_line (show (move start 3))
+  Platform.stdout_line (show (distance start))

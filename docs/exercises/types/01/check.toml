@@ -1,0 +1,11 @@
+export = "size_name"
+argument_types = ["number"]
+return_type = "string"
+output = "Small Medium Large"
+starter_error = "FLICK-C001"
+title = "Practice: show a size"
+title_ru = "Практика: покажите размер"
+task = "size_name shows the Size of a number, but Size has no Show instance yet. Give it one, then check your answer."
+task_ru = "size_name показывает Size числа, но у Size ещё нет экземпляра Show. Дайте его типу и проверьте ответ."
+hint = "The compiler can write the instance: add Show to the deriving line."
+hint_ru = "Экземпляр может написать компилятор: добавьте Show в строку deriving."

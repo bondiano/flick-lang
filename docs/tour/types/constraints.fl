@@ -1,0 +1,15 @@
+module Main exposing (main)
+
+import Numeric exposing (Floating, Numeric)
+
+square : Numeric a => a -> a
+let square x = x * x
+
+mean : Floating a => List a -> a
+let mean xs = List.sum xs / Numeric.from_int (List.length xs)
+
+main : Unit ->{} Unit
+let main () =
+  Platform.stdout_line (show (square 4))
+  Platform.stdout_line (show (square 1.5))
+  Platform.stdout_line (show (mean [1.0, 2.0, 4.5]))

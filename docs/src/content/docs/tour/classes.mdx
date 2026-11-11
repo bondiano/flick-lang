@@ -1,0 +1,22 @@
+---
+title: Classes and instances
+description: A class names what a type can do; an instance says how.
+tableOfContents: false
+---
+
+import TourLesson from "../../../components/TourLesson.astro";
+
+<TourLesson locale="en" id="classes">
+
+A class names something a type can do, and an instance says how one type
+does it. `Describe` has one function, `describe`, and
+`instance Describe Weather` gives it for `Weather`.
+
+The second instance works for a list of any `a` that can itself be
+described: `Describe a =>` is that condition. So `describe [Sun, Rain, Sun]`
+uses both instances.
+
+**Try:** call `describe 3`. The compiler reports `FLICK-C001`: there is no
+`Describe Int`, and it lists the instances there are.
+
+</TourLesson>

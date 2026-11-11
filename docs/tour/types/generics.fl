@@ -1,0 +1,20 @@
+module Main exposing (main)
+
+type Tree a = Leaf | Node (Tree a) a (Tree a)
+
+to_list : Tree a -> List a
+let rec to_list tree =
+  match tree with
+  | Leaf -> []
+  | Node left value right -> to_list left ++ [value] ++ to_list right
+
+size : Tree a -> Int
+let size tree = List.length (to_list tree)
+
+main : Unit ->{} Unit
+let main () =
+  let numbers = Node (Node Leaf 1 Leaf) 2 (Node Leaf 3 Leaf)
+  let words = Node Leaf "only" Leaf
+  Platform.stdout_line (show (to_list numbers))
+  Platform.stdout_line (show (to_list words))
+  Platform.stdout_line "\{size numbers} and \{size words}"
