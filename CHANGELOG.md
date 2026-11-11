@@ -6,6 +6,11 @@ break programs.
 
 ## Unreleased
 
+- **`show` of `Option` and `Result`:** an argument with fields is shown in
+  parentheses, as a derived `Show` writes one: `Some (Card Spades 3)` and
+  `Err (ArithmeticError "division by zero")`, where they were
+  `Some Card Spades 3` and `Err ArithmeticError "division by zero"`. A number,
+  a string, a list, a tuple or a record stays as it was (`Some -1`).
 - **Cells:** `@cell` before a type declaration marks a type whose values
   hold one value each, as a state made by a pure call does. A value of such a
   type that is no function is not generalized over what the cell holds, and

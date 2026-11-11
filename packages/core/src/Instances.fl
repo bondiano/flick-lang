@@ -27,6 +27,25 @@ foreign pure hash_list from "flick:rt" "listHash"
 show_list : (a -> String) -> List a -> String
 foreign pure show_list from "flick:rt" "listShow"
 
+text_contains : String -> String -> Bool
+foreign pure text_contains from "flick:String" "includes"
+  arity 1
+
+text_starts_with : String -> String -> Bool
+foreign pure text_starts_with from "flick:String" "startsWith"
+  arity 1
+
+/// The shown argument of a constructor, in parentheses when it has a space
+/// and opens no bracket or string, as a derived `Show` writes it.
+show_arg : String -> String
+let show_arg text =
+  let opens =
+    text_starts_with "[" text
+      || text_starts_with "(" text
+      || text_starts_with "{" text
+      || text_starts_with "\"" text
+  if opens || not (text_contains " " text) then text else "(" ++ text ++ ")"
+
 instance Eq Int =
   let eq x y = eq_prim x y
 
@@ -189,14 +208,14 @@ instance Show a => Show (List a) =
 instance Show a => Show (Option a) =
   let show x =
     match x with
-    | Some a -> "Some " ++ show a
+    | Some a -> "Some " ++ show_arg (show a)
     | None -> "None"
 
 instance (Show e, Show a) => Show (Result e a) =
   let show x =
     match x with
-    | Ok a -> "Ok " ++ show a
-    | Err e -> "Err " ++ show e
+    | Ok a -> "Ok " ++ show_arg (show a)
+    | Err e -> "Err " ++ show_arg (show e)
 
 instance (Ord e, Ord a) => Ord (Result e a) =
   let compare x y =

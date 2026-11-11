@@ -32,7 +32,7 @@ let tests = [
   ),
   Test.test "by zero" (fun () -> Test.equal [0n, 0n] [div 5n 0n, rem 5n 0n]),
   Test.test "checked divide" (fun () ->
-    Test.equal "Err ArithmeticError \"division by zero\"" (show (BigInt.divide 5n (div 0n 1n)))
+    Test.equal "Err (ArithmeticError \"division by zero\")" (show (BigInt.divide 5n (div 0n 1n)))
   ),
   Test.test "**" (fun () -> Test.equal 1267650600228229401496703205376n (pow 2n 100n)),
   Test.test "to_number rounds" (fun () ->

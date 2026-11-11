@@ -70,9 +70,14 @@ natives! {
     RT, "layerMerge", 2 => layer_merge;
     "flick:Layer", "effect", 2 => layer_effect;
     RT, "flickTodo", 1 => todo;
+    STRING, "includes", 2 => includes;
+    STRING, "startsWith", 2 => starts_with;
     MODEL, "structShow", 2 => struct_show;
     MODEL, "structEq", 3 => struct_eq;
 }
+
+/// The methods of JS strings, the receiver last, as `arity 1` binds them.
+const STRING: &str = "flick:String";
 
 /// Natives of the model itself: what flick-core leaves to the runtime
 /// without a foreign binding.
@@ -182,6 +187,26 @@ fn stdout_line(args: &[Term], out: &mut String) -> Result<Term, String> {
             out.push_str(s);
             out.push('\n');
             Ok(Term::unit())
+        }
+        _ => Err(format!("{args:?}")),
+    }
+}
+
+/// `text.includes(part)`, called `includes part text`.
+fn includes(args: &[Term], _: &mut String) -> Result<Term, String> {
+    match args {
+        [Term::Lit(Lit::String(part)), Term::Lit(Lit::String(text))] => {
+            Ok(Term::bool(text.contains(&**part)))
+        }
+        _ => Err(format!("{args:?}")),
+    }
+}
+
+/// `text.startsWith(prefix)`, called `startsWith prefix text`.
+fn starts_with(args: &[Term], _: &mut String) -> Result<Term, String> {
+    match args {
+        [Term::Lit(Lit::String(prefix)), Term::Lit(Lit::String(text))] => {
+            Ok(Term::bool(text.starts_with(&**prefix)))
         }
         _ => Err(format!("{args:?}")),
     }

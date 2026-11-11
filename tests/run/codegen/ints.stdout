@@ -15,8 +15,8 @@
 3n
 0n
 11n
-Err ArithmeticError "Int.checked_add: 2147483648 does not fit in Int"
-Err ArithmeticError "Int.checked_div: division by zero"
+Err (ArithmeticError "Int.checked_add: 2147483648 does not fit in Int")
+Err (ArithmeticError "Int.checked_div: division by zero")
 2147483647.5
 None
 -2

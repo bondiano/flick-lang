@@ -8,4 +8,4 @@ supervised, a defect: true
 owner finalizer, after the supervisor
 the body's value
 supervised, a defect: true
-(false, Some Oops "the body's")
+(false, Some (Oops "the body's"))

@@ -49,9 +49,9 @@ refused {"method": "GET", "status": 200, "level": "low"}
 }
 /calls/DELETE
 /code/404/2
-/calls/POST -> Some Calls Post
+/calls/POST -> Some (Calls Post)
 /calls/post -> None
-/code/200/1 -> Some Code Ok200 1
+/code/200/1 -> Some (Code Ok200 1)
 ok Known Post
 ok Unknown "PATCH"
 "DELETE"

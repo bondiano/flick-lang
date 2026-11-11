@@ -28,6 +28,16 @@ let tests = [
   Test.test "Result" (fun () ->
     Test.equal "[Ok \"a\", Err 2.5]" (show [(Ok "a" : Result Float String), Err 2.5])
   ),
+  Test.test "a constructor with fields inside Option and Result" (fun () ->
+    Test.equal
+      "(Some (Problem \"bad\" 1), Some (Some 2), Some \"a b\", Ok (Some -1))"
+      (show (
+        Some (Problem "bad" 1),
+        Some (Some 2),
+        Some "a b",
+        (Ok (Some (-1)) : Result Int (Option Int)),
+      ))
+  ),
   Test.test "tuples" (fun () ->
     Test.equal "(1, (\"two\", 3n), [()])" (show (1, ("two", 3n), [()]))
   ),
