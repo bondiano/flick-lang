@@ -5,10 +5,10 @@
 // route type, the rest of the path. A parsed value is checked by the type's
 // own schema, so refined fields stay valid.
 //
-// One codec for both runtimes: each gives its schemas and its `Option`s.
+// One codec for both runtimes: each gives its schemas and its `Option`s, which
+// both are read by `_tag`.
+import type { Option as Opt } from "./data.ts";
 
-/** An `Option` as either runtime builds it: both are read by `_tag`. */
-export type Opt<A> = { readonly _tag: "None" } | { readonly _tag: "Some"; readonly value: A };
 
 /** What a schema says of a value. */
 export type Checked = { readonly _tag: "Failure" } | { readonly _tag: "Success"; readonly success: unknown };
@@ -23,14 +23,14 @@ export interface RouteHost<S, O extends Opt<unknown>> {
 /** A query field: its label, its schema, and whether it is an `Option`. */
 export type QueryField<S> = readonly [label: string, schema: S, optional: boolean];
 
-const WORDS: unique symbol = Symbol("flick/route-words");
+const WORDS: unique symbol = /*#__PURE__*/ Symbol("flick/route-words");
 
 /** A segment of constructors without fields: each word with its tag. */
 export interface Words {
   readonly [WORDS]: ReadonlyArray<readonly [word: string, tag: string]>;
 }
 
-const NESTED: unique symbol = Symbol("flick/route-nested");
+const NESTED: unique symbol = /*#__PURE__*/ Symbol("flick/route-nested");
 
 /** The last segment of another route type: the rest of the path. */
 export interface Nested<S> {
@@ -61,7 +61,7 @@ export interface UrlCodec<S> {
 type Fields = Readonly<Record<string, unknown>>;
 
 /** The tag of a constructor given as a value: a nullary one is its value, another a function of its fields. */
-const tagOf = (constructor: unknown): string => {
+export const tagOf = (constructor: unknown): string => {
   let value = constructor;
   // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- compiler-generated constructor stages
   while (typeof value === "function") value = (value as (field: unknown) => unknown)(undefined);

@@ -119,4 +119,4 @@ export const bindEff = <A, B, E, R, E2, R2>(
   f: (a: A) => Effect.Effect<B, E2, R2>,
 ): Effect.Effect<B, E | E2, R | R2> => Effect.flatMap(eff, (x) => f(x));
 
-export { type Trampoline, loop, trampolineDone, trampolineRun, trampolineSuspend } from "@flick-lang/runtime/rt/loop";
+export { type Step, type Trampoline, loop, trampolineDone, trampolineRun, trampolineSuspend } from "@flick-lang/runtime/rt/loop";
