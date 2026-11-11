@@ -71,6 +71,10 @@ impl Gen<'_> {
             BinOp::Arith(Arith::Pow, Num::Int) => format!("{}({l}, {r})", self.rt("powInt")),
             BinOp::Arith(Arith::Div, Num::BigInt) => format!("{}({l}, {r})", self.rt("divBigInt")),
             BinOp::Arith(Arith::Rem, Num::BigInt) => format!("{}({l}, {r})", self.rt("remBigInt")),
+            // TypeScript types `any * any` as a number, which no `bigint` meets
+            BinOp::Arith(_, Num::BigInt) if self.options.typescript() => {
+                format!("(({l} as bigint) {} ({r} as bigint))", op.symbol())
+            }
             _ => format!("({l} {} {r})", op.symbol()),
         }
     }

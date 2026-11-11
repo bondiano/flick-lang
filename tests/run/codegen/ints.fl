@@ -9,6 +9,10 @@ let big = 2147483647
 half : Float -> Float
 let half x = x / 2
 
+/// `value * scale / by`, rounded half up: a product of parameters first
+rounded : BigInt -> BigInt -> BigInt -> BigInt
+let rounded value by scale = (value * scale * 2n + by) / (by * 2n)
+
 main : Unit ->{; AppError} Unit
 let main () =
   let zero = 0
@@ -28,6 +32,7 @@ let main () =
   Platform.stdout_line (show (half 7))
   Platform.stdout_line (show (1 + 2n))
   Platform.stdout_line (show (5n / 0n))
+  Platform.stdout_line (show (rounded 7n 2n 3n))
   Platform.stdout_line (show (Int.checked_add big 1))
   Platform.stdout_line (show (Int.checked_div 1 zero))
   Platform.stdout_line (show (Int.to_float big + 0.5))
