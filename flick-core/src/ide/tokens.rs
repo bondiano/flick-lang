@@ -63,8 +63,9 @@ impl Ide<'_> {
         };
         let text = self.text(file);
         let mut out = Vec::new();
+        let nodes = tree::by_range(&m.tree);
         for (range, r) in &m.typing.names {
-            let Some(node) = tree::find(&m.tree, *range) else {
+            let Some(&node) = nodes.get(range) else {
                 continue;
             };
             qualifiers(node, &mut out);
@@ -81,7 +82,7 @@ impl Ide<'_> {
             out.push((token.start, token.end, kind));
         }
         for range in m.typing.type_names.keys() {
-            if let Some(node) = tree::find(&m.tree, *range) {
+            if let Some(&node) = nodes.get(range) {
                 qualifiers(node, &mut out);
                 if let Some(token) = tree::last_name(node) {
                     out.push((token.start, token.end, TYPE));
