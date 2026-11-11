@@ -91,18 +91,16 @@ impl Checker<'_> {
     /// function `name` names: each is a place its plugin is told of, at the
     /// function's name, with what the function gives at last.
     fn named_in_signature(&mut self, name: &str, at: Span, decl: &Node) {
-        let Some(mut ty) = self.signed_type(name) else {
+        let Some(signed) = self.signed_type(name) else {
             return;
         };
-        let mut constrained = false;
-        if let Type::Forall {
-            body, constraints, ..
-        } = ty
-        {
-            constrained = !constraints.is_empty();
-            ty = *body;
-        }
-        let mut services = Vec::new();
+        let (mut ty, constrained) = match &signed {
+            Type::Forall {
+                body, constraints, ..
+            } => (&**body, !constraints.is_empty()),
+            other => (other, false),
+        };
+        let mut found: Vec<(&str, &str)> = Vec::new();
         while let Type::Fun {
             effects, result, ..
         } = ty
@@ -110,30 +108,24 @@ impl Checker<'_> {
             if let Some(effects) = effects
                 && let Type::Row(row) = &effects.services
             {
-                services.extend(
-                    row.entries
-                        .iter()
-                        .filter_map(|(l, _)| l.name().map(str::to_owned)),
-                );
+                let named = row.entries.iter().filter_map(|(l, _)| l.name());
+                for service in named.filter_map(|n| n.rsplit_once('.')) {
+                    if self.options.watched.holds(service.0, service.1) && !found.contains(&service)
+                    {
+                        found.push(service);
+                    }
+                }
             }
-            ty = *result;
+            ty = result;
         }
         if let Type::Captured { ty: inner, .. } = ty {
-            ty = *inner;
+            ty = inner;
         }
-        services.sort();
-        services.dedup();
-        let watched = |service: &String| {
-            let (module, service) = service.rsplit_once('.')?;
-            (self.options.watched.holds(module, service))
-                .then(|| (module.to_owned(), service.to_owned()))
-        };
-        let found: Vec<(String, String)> = services.iter().filter_map(watched).collect();
         let span = |(start, end)| flick_plugin::Span { start, end };
         for (module, service) in found {
             self.typing.call_sites.push(CallSite {
-                module,
-                name: service,
+                module: module.to_owned(),
+                name: service.to_owned(),
                 span: span((at.start, at.end)),
                 arguments: Vec::new(),
                 refinement: None,
@@ -145,7 +137,7 @@ impl Checker<'_> {
                     constrained,
                     in_function: false,
                     applied: 0,
-                    gives: Some(self.fact_type(&ty)),
+                    gives: Some(self.fact_type(ty)),
                 }),
             });
         }
