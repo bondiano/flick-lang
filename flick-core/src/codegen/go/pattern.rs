@@ -4,6 +4,7 @@
 
 use flick_pretty::{Document, Documentable, docvec};
 
+use super::arith::Native;
 use super::expr::enum_literal;
 use super::layout::{block, call, conjunction, inline, statement};
 use super::{Gen, names};
@@ -193,7 +194,7 @@ impl<'a> Gen<'a> {
             match guard {
                 Some(guard) => {
                     let c = g.expr(guard);
-                    let test = g.truth(guard, c);
+                    let test = g.unboxed(guard, c, Native::Bool).doc;
                     let (b, ()) = g.block(|g| body(g, value));
                     g.emit(docvec![a, "if ", test, " ", block(a, b)]);
                 }

@@ -8,6 +8,7 @@ use std::{iter, mem};
 use flick_pretty::docvec;
 
 use super::Gen;
+use super::arith::Native;
 use super::layout::{Code, block, call, if_else, single, statement};
 use crate::ir::{Expr, ExprKind, Lit, Pat};
 
@@ -96,7 +97,7 @@ impl<'a> Gen<'a> {
                     }
                     if let Some(stop) = stop {
                         let go = g.expr(stop);
-                        let stop = g.truth(stop, go);
+                        let stop = g.unboxed(stop, go, Native::Bool).doc;
                         g.emit(docvec![a, "if ", stop, " ", single(a, "break")]);
                     }
                 });
@@ -107,7 +108,7 @@ impl<'a> Gen<'a> {
                 let loop_ = docvec![a, "for ", var, " := range ", range, " ", body];
                 if let Some(stop) = stop {
                     let go = self.expr(stop);
-                    let stop = self.truth(stop, go);
+                    let stop = self.unboxed(stop, go, Native::Bool).doc;
                     self.emit(docvec![
                         a,
                         "if !",
@@ -139,7 +140,7 @@ impl<'a> Gen<'a> {
             }
             ExprKind::If(cond, then, other) => {
                 let test = self.expr(cond);
-                let test = self.truth(cond, test);
+                let test = self.unboxed(cond, test, Native::Bool).doc;
                 let (then, ()) = self.block(|g| g.discard(then));
                 let (other, ()) = self.block(|g| g.discard(other));
                 self.emit(if_else(a, test, then, other));

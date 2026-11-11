@@ -307,7 +307,7 @@ impl<'a> Gen<'a> {
         } else {
             ("", "true")
         };
-        let test = docvec![a, not, self.truth(lhs, l)];
+        let test = docvec![a, not, self.unboxed(lhs, l, Native::Bool).doc];
         self.emit(docvec![
             a,
             "if ",

@@ -140,13 +140,8 @@ impl<'a> Gen<'a> {
             .then_some(first)
     }
 
-    /// `go`, the code of the condition `e`, as a Go `bool`: a condition Go
-    /// already holds as one is not made a value to be read back from it.
-    pub(super) fn truth(&self, e: &Expr, go: Code<'a>) -> Document<'a> {
-        self.unboxed(e, go, Native::Bool).doc
-    }
-
-    /// `go`, the code of `e`, as a `want`.
+    /// `go`, the code of `e`, as a `want`: code that already is one, as a
+    /// condition Go holds as a `bool`, is not made a value to be read back.
     pub(super) fn unboxed(&self, e: &Expr, go: Code<'a>, want: Native) -> Code<'a> {
         if self.native(e) == Some(want) {
             go
@@ -261,7 +256,10 @@ impl<'a> Gen<'a> {
         let a = self.a;
         let l = self.expr(lhs);
         let (mut rs, rv) = self.block(|g| g.expr(rhs));
-        let (l, r) = (self.truth(lhs, l), self.truth(rhs, rv));
+        let (l, r) = (
+            self.unboxed(lhs, l, Native::Bool).doc,
+            self.unboxed(rhs, rv, Native::Bool).doc,
+        );
         if rs.is_empty() {
             let go = if op == BinOp::And { " && " } else { " || " };
             return docvec![a, "(", l, go, r, ")"].into();

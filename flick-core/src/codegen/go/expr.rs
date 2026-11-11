@@ -209,7 +209,7 @@ impl<'a> Gen<'a> {
             ExprKind::Binary(op, lhs, rhs) => self.binary(*op, lhs, rhs),
             ExprKind::Not(inner) => {
                 let v = self.expr(inner);
-                docvec![a, "!", self.truth(inner, v)].into()
+                docvec![a, "!", self.unboxed(inner, v, Native::Bool).doc].into()
             }
             ExprKind::Unwrap(inner) => self.unwrap(inner),
             ExprKind::Neg(num, inner) => self.neg(*num, inner),
@@ -270,7 +270,7 @@ impl<'a> Gen<'a> {
     fn if_expr(&mut self, e: &Expr, cond: &Expr, then: &Expr, other: &Expr) -> Code<'a> {
         let a = self.a;
         let test = self.expr(cond);
-        let test = self.truth(cond, test);
+        let test = self.unboxed(cond, test, Native::Bool).doc;
         // the branches are compiled after the variable is declared, and
         // nothing they bind is a branch itself: the type is known before
         let r = self.result(e);
@@ -293,7 +293,7 @@ impl<'a> Gen<'a> {
             }
             ExprKind::If(cond, then, other) => {
                 let test = self.expr(cond);
-                let test = self.truth(cond, test);
+                let test = self.unboxed(cond, test, Native::Bool).doc;
                 let (then, ()) = self.block(|g| g.tail_expr(then));
                 let (other, ()) = self.block(|g| g.tail_expr(other));
                 self.emit(if_else(self.a, test, then, other));
