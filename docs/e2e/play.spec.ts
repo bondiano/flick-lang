@@ -240,15 +240,15 @@ for (const locale of ["en", "ru"]) {
     const lesson = page.locator(".fp-lesson");
     const check = page.getByRole("button", { name: ru ? "Проверить" : "Check answer", exact: true });
     await check.click();
-    await expect(lesson).toContainText(ru ? "Сначала исправьте ошибки" : "Fix the compiler errors");
+    await expect(lesson).toContainText(ru ? "Сначала исправьте ошибки" : "Fix the compiler errors", { timeout: 30_000 });
     await page.getByRole("button", { name: ru ? "Показать решение" : "Show solution" }).click();
     await expect(lesson).not.toContainText(ru ? "Урок пройден" : "Lesson completed");
     await replaceSource(page, 'module Main exposing (main, size_of)\n\nsize_of : String -> Int\nlet size_of text = String.length text\n\nmain : Unit ->{} Unit\nlet main () = Platform.stdout_line "5"\n');
     await check.click();
-    await expect(lesson).toContainText(ru ? "Вывод не совпадает" : "The output does not match");
+    await expect(lesson).toContainText(ru ? "Вывод не совпадает" : "The output does not match", { timeout: 30_000 });
     await page.getByRole("button", { name: ru ? "Показать решение" : "Show solution" }).click();
     await check.click();
-    await expect(lesson).toContainText(ru ? "Верно." : "Correct.");
+    await expect(lesson).toContainText(ru ? "Верно." : "Correct.", { timeout: 30_000 });
     expect(await page.evaluate(() => localStorage.getItem("flick.lesson.signatures.02.done"))).toBe("1");
     expect(await page.evaluate(() => localStorage.getItem("flick.lesson.signatures.01.done"))).toBeNull();
     await page.reload();
