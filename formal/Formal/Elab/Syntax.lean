@@ -174,12 +174,15 @@ def args (ds : List Dict) : Nat → Dict := fun k => ds.getD k (.var 0)
 
 /-- A scheme `∀ᾱ. Q̄ ⇒ τ`: `k` binders `var 0 … var (k-1)`; the variables from `var k` on are
 free. `q` is the qualifier of its dictionary arrows; as they are pure, a call of them needs
-nothing live, and nothing reads it for methods and constants of Γ₀. -/
+nothing live, and nothing reads it for methods and constants of Γ₀. `bd` are its value bounds
+(regions.md §2.1): `(t, D)` asks that what `t` shows is within what `D` shows at every
+instance; a bound `αᵢ^{≤D}` of the checker is `(var i, D)`, and `τ` writes `αᵢ` for it. -/
 structure Scheme where
   k : Nat
   ctx : List Cn
   ty : Ty
   q : Ty
+  bd : List (Ty × Ty)
 
 /-- An instance `instance Q̄ ⇒ C τ̄` of §2.5: its head, its context (the premises `δ̄`) and the
 dictionaries of its superclass slots, written over the context. -/

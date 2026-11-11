@@ -101,8 +101,22 @@ def trTT : TTy → Flick.Ty
 theorem trTT_arr (φ : Stage) (a b : TTy) (q : Ty) :
     trTT N (.arr φ a b q) = .arrow (trTT N a) (trStage N φ) (trTT N b) (trT N q).reach := rfl
 
-/-- `⟦∀ᾱ. t⟧`, without facts. -/
-def trS (s : TSch) : Flick.Scheme := ⟨s.k, Facts.none, trTT N s.ty⟩
+/-- A value bound `(t, D)` as a fact of the core: `Outlives ⌈⟦t⟧⌉ ⌈⟦D⟧⌉`, so `⌈⟦t⟧⌉ ⊆ ⌈⟦D⟧⌉`;
+for `t = var i` it is `Facts.bnd i ⌈⟦D⟧⌉` (`trB_var`). -/
+def trB (b : Ty × Ty) : Facts := fun C r => C = (trT N b.1).reach ∧ r = .caps (trT N b.2).reach
+
+/-- The value bounds of a scheme as its facts. -/
+def trBd : List (Ty × Ty) → Facts
+  | [] => Facts.none
+  | b :: bd => Facts.union (trB N b) (trBd bd)
+
+/-- The facts of the value bounds of a scheme with `k` variables. A scheme without variables
+has no instance to check them at: the source checks them at each use (`Elab.var`), and the
+core binds it by (Let-Mono), without facts. -/
+def trFacts (k : Nat) (bd : List (Ty × Ty)) : Facts := if k = 0 then Facts.none else trBd N bd
+
+/-- `⟦∀ᾱ. t⟧`, with its value bounds as facts. -/
+def trS (s : TSch) : Flick.Scheme := ⟨s.k, trFacts N s.k s.bd, trTT N s.ty⟩
 
 /-- `⟦σ⟧` of a substitution; regions stay. -/
 def trσ (σ : Nat → Ty) : Atom → Flick.Ty
@@ -296,9 +310,59 @@ theorem trσ_inst (ts : List Ty) (a : Atom) : trσ N (inst ts) a = instT (ts.map
   | v n => simp only [trσ, inst, instT, List.length_map]; split <;> simp [trT]
   | r p => rfl
 
+theorem trB_var (i : Nat) (D : Ty) : trB N (.var i, D) = Facts.bnd i (trT N D).reach := rfl
+
+/-- A value bound as a fact under any substitution of the core. -/
+theorem trB_substT_any (b : Ty × Ty) (ρ : Atom → Flick.Ty) :
+    (trB N b).substT ρ =
+      fun C r => C = ((trT N b.1).substT ρ).reach ∧ r = .caps ((trT N b.2).substT ρ).reach := by
+  funext C r; apply propext
+  simp only [trB, Facts.substT, ← Ty.reach_caps]
+  constructor
+  · rintro ⟨_, _, ⟨rfl, rfl⟩, rfl, rfl⟩; exact ⟨rfl, rfl⟩
+  · rintro ⟨rfl, rfl⟩; exact ⟨_, _, ⟨rfl, rfl⟩, rfl, rfl⟩
+
+theorem trB_substT (b : Ty × Ty) (σ : Nat → Ty) :
+    (trB N b).substT (trσ N σ) = trB N (Bound.subst σ b) := by
+  rw [trB_substT_any]; unfold trB; simp only [Bound.subst, trT_subst]
+
+theorem trBd_substT (bd : List (Ty × Ty)) (σ : Nat → Ty) :
+    (trBd N bd).substT (trσ N σ) = trBd N (bd.map (Bound.subst σ)) := by
+  induction bd with
+  | nil => exact Facts.none_substT _
+  | cons b bd ih => simp only [trBd, List.map_cons, Facts.union_substT, trB_substT, ih]
+
+/-- The facts of value bounds hold under the translation of a substitution that makes the
+bounds hold: `⌈⟦t⟧⌉ ⊆ ⌈⟦D⟧⌉` is what `t` shows within what `D` shows (`trT_reach`). -/
+theorem trBd_holds {bd : List (Ty × Ty)} {σ : Nat → Ty} {ρ : Atom → Flick.Ty}
+    (hρ : ∀ a, ρ a = trσ N σ a) (h : Bounds.Hold (bd.map (Bound.subst σ))) (Θ : Facts) :
+    ∀ C r, trBd N bd C r → Outl Θ (C.substT ρ) (r.substT ρ) := by
+  rw [funext hρ]
+  induction bd with
+  | nil => intro _ _ h; exact h.elim
+  | cons b bd ih =>
+    rintro C r (⟨rfl, rfl⟩ | hr)
+    · refine Outl.caps_of_sub fun a ha => ?_
+      rw [Ty.reach_caps, ← trT_subst] at ha ⊢
+      obtain ⟨n, rfl, hn⟩ := (trT_reach N _ a).1 ha
+      exact trT_reach_v N (h _ (.head _) n hn)
+    · exact ih (fun b hb => h b (.tail _ hb)) C r hr
+
+theorem trFacts_holds {k : Nat} {bd : List (Ty × Ty)} {σ : Nat → Ty} {ρ : Atom → Flick.Ty}
+    (hρ : ∀ a, ρ a = trσ N σ a) (h : Bounds.Hold (bd.map (Bound.subst σ))) (Θ : Facts) :
+    ∀ C r, trFacts N k bd C r → Outl Θ (C.substT ρ) (r.substT ρ) := by
+  unfold trFacts; split
+  · intro _ _ h; exact h.elim
+  · exact trBd_holds N hρ h Θ
+
 theorem trS_subst (s : TSch) (σ : Nat → Ty) : trS N (s.subst σ) = (trS N s).substT (trσ N σ) := by
-  simp only [trS, TSch.subst, Flick.Scheme.substT, Facts.none_substT, trTT_subst]
+  simp only [trS, TSch.subst, Flick.Scheme.substT, trTT_subst, Flick.Scheme.mk.injEq, true_and]
   rw [funext (trσ_lift N s.k σ)]
+  refine ⟨?_, rfl⟩
+  rw [← funext (trσ_lift N s.k σ)]
+  unfold trFacts; split
+  · exact (Facts.none_substT _).symm
+  · exact (trBd_substT N _ _).symm
 
 theorem trS_up (s : TSch) (k : Nat) : trS N (s.subst (up k)) = (trS N s).up k := by
   rw [trS_subst, Flick.Scheme.up, funext (trσ_up N k)]

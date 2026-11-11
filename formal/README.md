@@ -624,6 +624,7 @@ and `Target`, typed by use as in the core. See [The core as the target](#the-cor
 | Lemma 6.1, Lemma 6.2, T6(b) | `lemma_6_1`, `lemma_6_2`, `T6b` (`Elab/Coherence.lean`) |
 | §1.1 method schemes | `Scheme`, `Prog.methods` (`Elab/Syntax.lean`) |
 | §2.2, §2.4 `Γ; Δ ⊢ e : τ ! φ ⇝ e'`: (Var-Dict), (Method), (Let-Sig-Dict) | `Exp`, `Tm`, `Elab` (`Elab/Source.lean`) |
+| value bounds of a scheme and (Inst) at a use ([value bounds in the core](../docs/formal/regions.md#value-bounds-in-the-core)) | `Scheme.bd`, `Bound.subst`, `Bounds.Hold` (`Elab/Syntax.lean`, `Elab/Source.lean`); `TSch.bd` and the laws `var`, `const`, `meth` (`Elab/Target.lean`); in the core the facts `trB`, `trBd`, `trFacts`, `trB_var` (`Facts.bnd`), `trBd_holds` (`Elab/CoreTy.lean`), `holds_trS`, `holds_trBd`, `BdClosed`, `Real.const`, `Real.meth` (`Elab/CoreLaws.lean`), `has_meth` (`Elab/CoreDict.lean`) |
 | §0.1, §2.1 λFlick⁺, `D_Q`, `⟦σ⟧`, `⊢⁺` | `TTy`, `TSch`, `Scheme.tr`, `Target` (`Elab/Target.lean`) |
 | `Δ ⊩ Q ⇝ d ⇒ ⟦Δ⟧ ⊢⁺ d : D_Q`; T6(a) | `ent_typed`, `T6a` (`Elab/T6a.lean`) |
 | §3.1 `do` | `Stmt`, `Sugar.desugarDo`, `DoOk`, `do_elab`, `T6a_do` (`Elab/Sugar.lean`, `Elab/DoNotation.lean`) |
@@ -716,7 +717,10 @@ Simplifications:
    supplies is a variable of the scheme, a result shows what the arguments it holds reach
    (`flat_map : (a →^c m e b) →P (m d a →^(c ∪ e) m ((c ∪ e) ∪ d) b)`, `bindTy`), and
    a block of `do` or `for … yield` has the row its desugaring shows (`∃q` in `do_elab`,
-   `gen_elab`, `T6a_do`). A lambda of the sugar has the qualifier `cnil`: what it holds is
+   `gen_elab`, `T6a_do`). A value bound `a^c` on a variable of the scheme is the bound `(a, c)` of
+   the scheme (`Scheme.bd`), checked at each instance (`Bounds.Hold` in `Elab.var`, `Elab.meth`,
+   `Elab.const`) and a fact of the scheme in the core (`trB`, `trS`, [value bounds in the
+   core](../docs/formal/regions.md#value-bounds-in-the-core)). A lambda of the sugar has the qualifier `cnil`: what it holds is
    not asked. The checker's rules are the judgements `DoOk`, `GenOk` and
    `LoopOk`; `?` and `s; rest` are premises of their lemmas. Patterns are variables (and `_`):
    a refutable pattern needs `match`, which the source lacks. The values of a group
@@ -889,15 +893,17 @@ for the core, as instances of `T6a`, `T6a_do` and `T6a_sugar`.
 - **Hypotheses** (`Real`), on the signature only: a record type per class and
   number of parameters with its slots (`N.slot i : D_{Sᵢ}`, `Prog.super` of `⟨C, vars n⟩`),
   for the class's own parameters a field per method at its scheme with the own variables
-  first (`rot`), the method scheme closed and `s.ctx = ⟨C, vars p⟩ :: rest`; the closed
-  schemes of the globals of instances (`instTy`), constants, structural and primitive
-  dictionaries; `Some : ∀a. a → Option a`. The bodies of the globals (`RootTy`) and the
+  first (`rot`) and the facts of its value bounds, the method scheme and its bounds closed
+  (`BdClosed`) and `s.ctx = ⟨C, vars p⟩ :: rest`; the closed
+  schemes of the globals of instances (`instTy`), constants (with the facts of their value
+  bounds, `trBd`), structural and primitive dictionaries; `Some : ∀a. a → Option a`. The bodies of the globals (`RootTy`) and the
   slot fields of `struct_C` ([structural slot equals structural superclass dictionary](../docs/formal/elaboration.md#equivalence-did-not-relate-structural-slots-to-superclass-dictionaries)) are about the run: `RealRun` and
   `RootTy` below.
 - **The laws** (`CoreLaws.lean`, `CoreDict.lean`), each one rule of the core:
   `var`, `dvar` — `Typ.var`; `const`, `inst`, `strct`, `prim` — `Typ.glob` (`has_glob`,
-  `trTT_inst`); `app`, `dapp`, `dap` — `Typ.app`; `lam` — `Typ.lam`; `lamD` — `Typ.lam`
-  `l` times (`lams_typ`); `let_` — `Typ.letGen` with `Φ = ∅`, and `Typ.let_` when `k = 0`
+  `trTT_inst`), whose facts hold by the premise on the value bounds (`holds_trS`,
+  `holds_trBd`; `has_meth` for a field); `app`, `dapp`, `dap` — `Typ.app`; `lam` — `Typ.lam`; `lamD` — `Typ.lam`
+  `l` times (`lams_typ`); `let_` — `Typ.letGen` with `Φ` the facts of the value bounds (`trFacts`), and `Typ.let_` when `k = 0`
   and the right side runs at `φ`; `meth`, `slot` — `Typ.dproj` (`rot_inst`); `ite`,
   `caseOpt` — `Typ.match_`.
 - **Two targets.** `typingTarget` has an empty run (`Rel = True`, no steps): T6(a) reads
