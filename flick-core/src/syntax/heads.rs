@@ -4,12 +4,13 @@
 /// The heads of the plugins linked into the compiler and the module that
 /// exposes each. Every module has them without an import: `cli "x" { … }`
 /// is a block of std's plugin, and no other plugin may give the head.
-pub const HEADS: [(&str, &str); 5] = [
+pub const HEADS: [(&str, &str); 6] = [
     ("cli", "Cli"),
     ("server", "Server"),
     ("codec", "Codec"),
     ("sql", "Sql"),
     ("component", "Ui"),
+    ("ui", "Ui"),
 ];
 
 /// The word of generated code before the module a body opens: `open$module

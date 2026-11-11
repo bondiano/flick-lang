@@ -240,8 +240,7 @@ pub(super) fn at_arg_start(p: &Parser) -> bool {
         | K::TaskKw
         | K::TodoKw
         | K::ScopeKw
-        | K::ProvideKw
-        | K::UiKw => true,
+        | K::ProvideKw => true,
         K::LBrace => !p.no_brace,
         _ => false,
     }
@@ -362,15 +361,10 @@ fn atom(p: &mut Parser) -> Option<Done> {
         K::LBrace if !p.no_brace => record(p),
         K::DoKw => do_expr(p),
         K::ForKw => for_expr(p),
-        K::TaskKw | K::UiKw => {
-            let kind = if p.at(K::TaskKw) {
-                K::TaskExpr
-            } else {
-                K::UiExpr
-            };
+        K::TaskKw => {
             p.bump();
             p.braces(K::Block, stmt, |_| false);
-            kind
+            K::TaskExpr
         }
         K::ScopeKw => {
             p.bump();

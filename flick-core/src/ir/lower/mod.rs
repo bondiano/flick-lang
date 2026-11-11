@@ -475,7 +475,6 @@ impl Lower<'_> {
 
     fn unsupported(&mut self, node: &Node) {
         let what = match node.kind {
-            K::UiExpr => "`ui` blocks",
             K::TryExpr | K::ProvideExpr => "handlers of effects",
             _ => "`schema` expressions",
         };

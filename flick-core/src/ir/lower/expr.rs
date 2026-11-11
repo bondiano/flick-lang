@@ -259,17 +259,11 @@ impl Lower<'_> {
             }
             K::FunExpr => return self.lambda(node, &children),
             K::Block => return self.block(node),
-            // the names of the open module were resolved by the checker
+            // the names of the open module, and inside `Ui` the implicit component
+            // applications, were resolved by the checker
             K::OpenExpr => {
                 return match children.first() {
                     Some(body) => self.expr(body),
-                    None => Expr::new(ExprKind::Lit(Lit::Unit), span),
-                };
-            }
-            // `Ui` names and implicit component applications were resolved by the checker.
-            K::UiExpr => {
-                return match children.iter().find(|n| n.kind == K::Block) {
-                    Some(body) => self.block(body),
                     None => Expr::new(ExprKind::Lit(Lit::Unit), span),
                 };
             }

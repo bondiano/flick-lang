@@ -92,8 +92,9 @@ impl Ide<'_> {
             show_signature(ty)
         );
         // the plugin answers for its head at an offset past the block
-        let first =
-            (block.tokens().into_iter()).find(|t| !t.kind.is_trivia() && t.start > head.start);
+        // the `{` right after a head is the compiler's, not of the block's text
+        let first = (block.tokens().into_iter())
+            .find(|t| !t.kind.is_trivia() && t.kind != K::LBrace && t.start > head.start);
         if let Some(b) = first.and_then(|t| self.editor_block(file, t.start)) {
             let past = u32::try_from(b.block.text.len()).ok()?.saturating_add(1);
             let facts = Vec::new();

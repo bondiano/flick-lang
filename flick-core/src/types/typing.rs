@@ -305,6 +305,11 @@ impl Checker<'_> {
         if let t @ (Type::Con { .. } | Type::Meta(_)) = self.store.head(ty) {
             self.typing.pending_values.push((node.range(), t.clone()));
         }
+        // a body with a module open has no keyword of the user's: its type is
+        // at the whole of it, where the head of its block finds it
+        if node.kind == K::OpenExpr {
+            return self.note_type(self.span(node), ty);
+        }
         let head = match node.kind {
             K::TaskExpr => K::TaskKw,
             K::DoExpr => K::DoKw,
@@ -315,7 +320,6 @@ impl Checker<'_> {
             K::MatchExpr => K::MatchKw,
             K::IfExpr => K::IfKw,
             K::FunExpr => K::FunKw,
-            K::UiExpr => K::UiKw,
             _ => return,
         };
         if let Some(kw) = node.child_tokens().find(|t| t.kind == head) {

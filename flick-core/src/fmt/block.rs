@@ -6,7 +6,7 @@ use flick_pretty::{NextBreakFitsMode, docvec};
 
 use super::expr::Part;
 use super::printer::{Doc, INDENT, Printer, node_position, nodes, position, token};
-use crate::syntax::cst::{Element, Node};
+use crate::syntax::cst::{Element, Node, Token};
 use crate::syntax::kind::SyntaxKind as K;
 
 /// What follows `=`, `->` or `<-`: the block of a body, or one expression.
@@ -27,7 +27,6 @@ pub(super) fn hugs(n: &Node) -> bool {
             | K::ListExpr
             | K::TupleExpr
             | K::TaskExpr
-            | K::UiExpr
             | K::ScopeExpr
             | K::ProvideExpr
             | K::DoExpr
@@ -194,7 +193,6 @@ impl<'a> Printer<'a> {
 
     /// The block in braces starting at the child `open` of `n`.
     pub fn braces(&mut self, n: &'a Node, open: usize, suffix: &[Part]) -> Doc<'a> {
-        let a = self.a;
         let Element::Token(lbrace) = n.children[open] else {
             unreachable!("a token position")
         };
@@ -209,13 +207,28 @@ impl<'a> Printer<'a> {
         let Some(rbrace) = rbrace else {
             return self.generic(n);
         };
-        let lbrace = self.tok(lbrace);
         let statements = inner.map(nodes).unwrap_or_default();
+        let members = inner.is_some_and(|i| i.kind == K::Members);
+        let always = n.kind == K::RecGroup;
+        self.braces_of((lbrace, rbrace), &statements, (members, always), suffix)
+    }
+
+    /// `{ statements }` between the braces `around`: on one line when it is
+    /// one expression that fits, else a line for each. `members` are one
+    /// level further in, and `always` breaks whatever fits.
+    pub fn braces_of(
+        &mut self,
+        (lbrace, rbrace): (Token, Token),
+        statements: &[&'a Node],
+        (members, always): (bool, bool),
+        suffix: &[Part],
+    ) -> Doc<'a> {
+        let a = self.a;
+        let lbrace = self.tok(lbrace);
         let first = statements.first().map_or(rbrace.start, |s| s.range().0);
         let after = self.comments.trailing(first, None);
-        let members = inner.is_some_and(|i| i.kind == K::Members);
         self.column += if members { INDENT } else { 0 };
-        let items = self.items(&statements, rbrace.start, Some(';'), &mut |p, s| {
+        let items = self.items(statements, rbrace.start, Some(';'), &mut |p, s| {
             p.statement(s)
         });
         self.column -= if members { INDENT } else { 0 };
@@ -223,7 +236,6 @@ impl<'a> Printer<'a> {
         let close = self.tok(rbrace);
         let suffix = self.suffix(suffix);
         let close = docvec![a, close, suffix];
-        let always = n.kind == K::RecGroup;
         let plain = after.is_none()
             && dangling.is_empty()
             && items

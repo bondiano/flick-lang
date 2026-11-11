@@ -7,8 +7,9 @@ use std::slice;
 use std::sync::Arc;
 
 use flick_plugin::Piece;
+use flick_pretty::docvec;
 
-use super::printer::{Doc, INDENT, Printer};
+use super::printer::{Doc, INDENT, Printer, nodes};
 use crate::diagnostics::{Diagnostic, codes};
 use crate::plugin::source::BlockSource;
 use crate::plugin::{Expander, blocks_under, first_party, head_token};
@@ -31,6 +32,9 @@ pub(super) struct Layout {
     opens: bool,
     /// The block ends with a `}` the compiler writes.
     closes: bool,
+    /// The layout is the user's body alone between the braces: the compiler
+    /// lays it out as a block of its own, comments and all.
+    braced: bool,
 }
 
 /// The layout of each block of a file, by its range.
@@ -119,7 +123,7 @@ fn layout(
     node: &Node,
 ) -> Result<Option<Layout>, String> {
     let commented = (node.tokens().iter()).any(|t| t.kind.is_comment() && t.kind != K::DocComment);
-    if !source.closed() || commented {
+    if !source.closed() {
         return Ok(None);
     }
     let block = source.block();
@@ -137,11 +141,19 @@ fn layout(
         return Ok(None);
     };
     let open = node.child_tokens().find(|t| t.kind == K::LBrace);
+    let opens = open.is_some_and(|o| o.end == source.start());
+    let closes = node.has_token(K::RBrace);
+    let braced = opens && closes && matches!(pieces[..], [Piece::Hole(_)]);
+    // a comment outside the user's code would be the plugin's to place
+    if commented && !braced {
+        return Ok(None);
+    }
     Ok(Some(Layout {
         pieces,
         holes,
-        opens: open.is_some_and(|o| o.end == source.start()),
-        closes: node.has_token(K::RBrace),
+        opens,
+        closes,
+        braced,
     }))
 }
 
@@ -157,6 +169,22 @@ impl<'a> Printer<'a> {
     /// `head`, then the pieces of `layout`, its holes laid out here.
     fn laid_out(&mut self, n: &'a Node, layout: &'a Layout) -> Doc<'a> {
         let a = self.a;
+        let braces = (
+            n.child_tokens().find(|t| t.kind == K::LBrace),
+            n.child_tokens().filter(|t| t.kind == K::RBrace).last(),
+        );
+        if let (true, [body], (Some(open), Some(close))) =
+            (layout.braced, &layout.holes[..], braces)
+        {
+            let head = head_token(n).map_or("", |t| t.text(self.text));
+            let statements = if body.kind == K::Block {
+                nodes(body)
+            } else {
+                vec![body]
+            };
+            let block = self.braces_of((open, close), &statements, (false, false), &[]);
+            return docvec![a, self.str(head), " ", block];
+        }
         // what comments the block has are the plugin's words or are dropped,
         // which the check of the declaration then refuses
         self.comments.skip(n.range().1);

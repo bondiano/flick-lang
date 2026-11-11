@@ -289,15 +289,6 @@ impl Checker<'_> {
             K::DoExpr => self.do_expr(node, None),
             K::ScopeExpr => self.scope_expr(node, None),
             K::ProvideExpr => self.provide(node, None),
-            K::UiExpr => {
-                self.opened.push("Ui".to_owned());
-                let ty = node
-                    .nodes()
-                    .find(|n| n.kind == K::Block)
-                    .map_or(Type::Error, |b| self.block(b, None));
-                self.opened.pop();
-                ty
-            }
             K::OpenExpr => {
                 let path = node.child_tokens().filter(|t| t.kind == K::Con);
                 let module: Vec<&str> = path.map(|t| t.text(self.text)).collect();

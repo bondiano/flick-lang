@@ -105,7 +105,6 @@ syntax_kinds! {
         NoneKw = "none",
         TrueKw = "true",
         FalseKw = "false",
-        UiKw = "ui",
         InKw = "in",
         WhenKw = "when",
         LoopKw,
@@ -302,7 +301,6 @@ syntax_kinds! {
         ForExpr,
         ScopeExpr,
         ProvideExpr,
-        UiExpr,
         /// A body with a module open, which only generated code writes: the
         /// names of the module are in sight in it before the file's own.
         OpenExpr,

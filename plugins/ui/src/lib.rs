@@ -5,5 +5,6 @@
 //! fun props -> render)`. The setup runs once per instance, in the
 //! instance's region; the render again whenever an atom it read changes.
 
+pub mod block;
 pub mod calls;
 pub mod component;
