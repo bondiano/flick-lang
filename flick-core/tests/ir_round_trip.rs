@@ -112,6 +112,7 @@ fn every_example_project_round_trips() {
     for name in [
         "cli-tool",
         "first-slice",
+        "hom-repository",
         "mtl",
         "observability",
         "typed-interpreter",

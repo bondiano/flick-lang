@@ -5,7 +5,7 @@ use crate::ide::Target;
 use crate::iface::Entity;
 use crate::source::FileId;
 use crate::syntax::kind::SyntaxKind as K;
-use crate::types::{Form, TypeDef, show_type};
+use crate::types::{Form, ModuleSignature, TypeDef, show_type};
 
 impl Ide<'_> {
     pub(super) fn type_hover(
@@ -64,7 +64,59 @@ impl Ide<'_> {
             }
             Form::Error => format!("type error {}", entity.name),
             Form::Service { .. } => format!("service {}", entity.name),
+            Form::ModuleContract { .. } | Form::ModuleSignature { .. } => {
+                if let Some(source) = source
+                    && let Some(decl) = source.tree.nodes().find(|decl| {
+                        decl.kind == K::ModuleTypeDecl
+                            && tree::name_of(decl, K::Con, &source.text)
+                                == Some(entity.name.as_str())
+                    })
+                {
+                    return Some(as_written(decl, &source.text));
+                }
+                let signature = match &definition.form {
+                    Form::ModuleContract { requirements } => ModuleSignature::Structure {
+                        requirements: requirements.clone(),
+                    }
+                    .display(),
+                    Form::ModuleSignature { signature } => signature.display(),
+                    _ => unreachable!("module signature form"),
+                };
+                format!("type module {} =\n{signature}", entity.name)
+            }
             _ => format!("type {} : {}", entity.name, definition.kind),
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::ide::tests::fixture_of;
+    use crate::iface::Namespace;
+
+    #[test]
+    fn a_module_signature_hover_without_source_retains_dependent_names() {
+        let fixture = fixture_of(&[(
+            "src/App/Contracts.fl",
+            "module App.Contracts exposing (Factory)\ntype module Input =\n  type Key\ntype module Output =\n  type Value\ntype module Factory = (K : Input) -> Output with type Value = K.Key\n",
+        )]);
+        let ide = fixture.ide();
+        let module = ide.analysis.module("App.Contracts").expect("contracts");
+        let factory = module
+            .interface
+            .find(Namespace::Type, "Factory")
+            .expect("factory");
+        let shown = ide
+            .type_hover(
+                module.file,
+                &factory.entity,
+                None,
+                factory.definition.as_ref(),
+                &mut (0, 0),
+            )
+            .expect("hover");
+        assert!(shown.contains("type module Factory"), "{shown}");
+        assert!(shown.contains("K.Key"), "{shown}");
+        assert!(!shown.contains("$module:"), "{shown}");
     }
 }

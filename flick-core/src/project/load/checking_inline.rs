@@ -123,6 +123,8 @@ fn inline_units(
     let mut prefix_syntax = (*loaded.syntax).clone();
     if let Some(header) = &mut prefix_syntax.header {
         header.exposing = Some(vec![all.clone()]);
+        header.result = None;
+        header.private = true;
     }
     let prefix = inline_unit(
         loaded,
@@ -133,6 +135,10 @@ fn inline_units(
     );
     let mut child_syntax = (*loaded.syntax).clone();
     child_syntax.header = Some(Header {
+        result: None,
+        body: None,
+        materialized_body: None,
+        parameter_groups: Vec::new(),
         name: name.clone(),
         private: true,
         span: at,
@@ -254,6 +260,11 @@ fn inline_unit(
     syntax: ModuleSyntax,
     diagnostics: bool,
 ) -> Loaded {
+    let mut virtual_of = loaded.virtual_of.clone();
+    if !diagnostics && let Some(context) = &mut virtual_of {
+        context.capture.callee = None;
+        context.capture.arguments.clear();
+    }
     let mut expansion = loaded.expansion.as_deref().cloned();
     if let Some(expansion) = &mut expansion {
         expansion.tree = tree.clone();
@@ -278,6 +289,8 @@ fn inline_unit(
         expansion: expansion.map(Arc::new),
         editing: loaded.editing.clone(),
         loader: loaded.loader.clone(),
-        virtual_of: loaded.virtual_of.clone(),
+        virtual_of,
+        member_of: loaded.member_of.clone(),
+        scope_of: loaded.scope_of.clone(),
     }
 }

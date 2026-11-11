@@ -187,6 +187,7 @@ impl Checker<'_> {
             }
             _ if *kind == Kind::CaptureRow => ty::capture_label(ty),
             _ if *kind == Kind::ErrorRow => ty::error_label(ty),
+            _ if *kind == Kind::ServiceRow => ty::service_label(ty),
             Type::Var(name) => Some(name.clone()),
             Type::Skolem(s) => Some(self.store.skolem_name(*s).to_owned()),
             _ => None,

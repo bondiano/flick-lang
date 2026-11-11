@@ -7,11 +7,14 @@ impl Checker<'_> {
             .collect();
         self.contract_duplicates(&members);
         let mark = self.contract_types.len();
+        let module_mark = self.opened_modules.len();
         let bound = self.bind_contract_members(&members);
         let mut requirements = self.contract_requirements(&members, &bound);
+        self.reject_contract_cycles(&members, &mut requirements);
         self.validate_contract_dictionaries(&members, &requirements);
         self.default_contract_requirements(&mut requirements);
         self.contract_types.truncate(mark);
+        self.opened_modules.truncate(module_mark);
         requirements
     }
 
@@ -89,6 +92,13 @@ impl Checker<'_> {
                 }
             }
         }
+        for member in members.iter().filter(|m| m.kind == K::ModuleMember) {
+            if let (Some(name), Some(node)) = (self.con_token(member), member.nodes().next()) {
+                let signature = self.static_module_signature(node);
+                let binder = self.static_binder(&name, member.range().0);
+                self.bind_static_witness(&name, &format!("$module:{binder}"), &signature);
+            }
+        }
         bound
     }
 
@@ -100,6 +110,18 @@ impl Checker<'_> {
         let mut requirements = Vec::new();
         for member in members {
             match member.kind {
+                K::ModuleMember => {
+                    if let (Some(name), Some(node)) =
+                        (self.con_token(member), member.nodes().next())
+                    {
+                        let signature = self.static_module_signature(node);
+                        requirements.push(ModuleRequirement::Module {
+                            binder: self.static_binder(&name, member.range().0),
+                            name,
+                            signature: Box::new(signature),
+                        });
+                    }
+                }
                 K::ModuleTypeMember => {
                     if let Some(name) = self.con_token(member) {
                         let params = bound.get(&name).cloned().unwrap_or_default();
@@ -169,7 +191,7 @@ impl Checker<'_> {
                 } else {
                     ModuleNominalKind::Service
                 };
-                let identity = self.find_type(path, &qualifier, actual).and_then(
+                let resolved = self.find_type(path, &qualifier, actual).and_then(
                                 |(module, def)| {
                                     let matches = matches!(
                                         (category, &def.form),
@@ -191,19 +213,39 @@ impl Checker<'_> {
                                         );
                                         return None;
                                     }
-                                    Some(Entity {
+                                    Some((Entity {
                                         module,
                                         namespace: Namespace::Type,
                                         name: (*actual).to_owned(),
-                                    })
+                                    }, def))
                                 },
                             );
+                let (identity, definition, methods) = match resolved {
+                    Some((identity, definition)) => {
+                        let methods = match &definition.form {
+                            Form::Class { methods, .. } => methods
+                                .iter()
+                                .filter_map(|name| {
+                                    let entity = Entity {
+                                        module: identity.module.clone(),
+                                        namespace: Namespace::Value,
+                                        name: name.clone(),
+                                    };
+                                    self.env.value(&entity).map(|ty| (name.clone(), ty.clone()))
+                                })
+                                .collect(),
+                            _ => Vec::new(),
+                        };
+                        (Some(identity), Some(Box::new(definition)), methods)
+                    }
+                    None => (None, None, Vec::new()),
+                };
                 requirements.push(ModuleRequirement::Nominal {
                     name,
                     category,
                     identity,
-                    definition: None,
-                    methods: Vec::new(),
+                    definition,
+                    methods,
                 });
             }
         }
@@ -329,6 +371,9 @@ impl Checker<'_> {
     fn default_contract_requirements(&mut self, requirements: &mut [ModuleRequirement]) {
         for requirement in requirements {
             match requirement {
+                ModuleRequirement::Module { signature, .. } => {
+                    signature.map_types(&mut |ty| self.default_kinds(ty));
+                }
                 ModuleRequirement::Type {
                     params, manifest, ..
                 } => {
@@ -401,3 +446,5 @@ impl Checker<'_> {
             .map(|t| t.text(self.text).to_owned())
     }
 }
+
+include!("decls_cycles.rs");

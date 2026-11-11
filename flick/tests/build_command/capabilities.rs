@@ -12,6 +12,50 @@ let main () =
 "#;
 
 #[test]
+fn a_pure_library_retains_core_artifacts_for_lexical_prefixes() {
+    let source = "module App.Library exposing (Make, base)\ntype module Input =\n  seed : Int\ntype module Output =\n  answer : Int\nbase : Int\nlet base = 1\nmodule Make(K : Input) : Output =\n  answer : Int\n  let answer = K.seed + base\n";
+    let library = "schema-version = 1\n[project]\nkind = \"lib\"\n[build]\neffect = \"effect\"\n";
+    let root = project(
+        "core_lexical_prefix",
+        &[
+            ("flick.toml", library),
+            ("src/App/Library.fl", source),
+            (
+                "src/App/Use.fl",
+                "module App.Use exposing (value)\nimport App.Library exposing (base)\nvalue : Int\nlet value = base\n",
+            ),
+        ],
+    );
+    let out = flick_in(&root, &["build", "--offline"]);
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(root.join("dist/_core/App/Library.js").is_file());
+    assert!(root.join("dist/_core/App/Use.js").is_file());
+}
+
+#[test]
+fn rt_checks_initializers_captured_by_a_static_module_closure() {
+    let source = "module App.Main exposing (main)\n\ntype module Input =\n  identity : a -> a\n\nzone : DateTime.TimeZone\nlet zone = DateTime.zone_make_offset 0\n\nprivate module Make(K : Input) =\n  value : DateTime.TimeZone\n  let value = zone\n\nmodule Chosen = Make(Prelude)\n\nmain : Unit -> Unit\nlet main () = ignore Chosen.value\n";
+    let app = project(
+        "capabilities/lexical_initializer",
+        &[("flick.toml", APP), ("src/App/Main.fl", source)],
+    );
+    for profile in ["debug", "release"] {
+        let out = flick_in(&app, &["build", "--offline", "--profile", profile]);
+        assert_eq!(out.status.code(), Some(1), "{profile}: {out:?}");
+        let stderr = String::from_utf8(out.stderr).expect("UTF-8 diagnostics");
+        assert!(
+            stderr.contains("FLICK-P012") && stderr.contains("DateTime.zone_make_offset"),
+            "{stderr}"
+        );
+        assert!(!app.join("dist/flick-main.js").exists());
+    }
+}
+
+#[test]
 fn rt_checks_the_selected_custom_runner() {
     let config = APP.replace(
         "entry = \"App.Main\"",

@@ -11,7 +11,7 @@ use super::checking::levels;
 #[cfg(feature = "ide")]
 use super::{Mode, ModuleCache, analyze, analyze_with, run};
 #[cfg(feature = "ide")]
-use crate::iface::Interface;
+use crate::iface::{Interface, Namespace};
 #[cfg(feature = "ide")]
 use crate::project::config::{Build, Config, Kind};
 #[cfg(feature = "ide")]
@@ -55,6 +55,8 @@ include!("checking_tests_visibility.rs");
 #[cfg(feature = "ide")]
 include!("checking_tests_broken.rs");
 include!("checking_tests_contracts.rs");
+#[cfg(all(feature = "ide", feature = "native-project"))]
+include!("checking_tests_packages.rs");
 #[cfg(feature = "ide")]
 #[test]
 fn private_builtin_cannot_be_imported_or_named_without_an_import() {
@@ -256,3 +258,6 @@ fn standalone_check_of_inline_modules_rejects_a_private_builtin_import() {
         "{diagnostics:?}"
     );
 }
+
+include!("checking_tests_review.rs");
+include!("checking_tests_review_boundaries.rs");

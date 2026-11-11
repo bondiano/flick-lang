@@ -1,5 +1,21 @@
 impl Checker<'_> {
     fn dictionary_type_name(&self, qualifier: &str) -> Option<(Type, Kind)> {
+        if let Some((alias, member)) = qualifier.rsplit_once('.')
+            && let Some(opened) = self.opened_modules.iter().rev().find(|m| m.alias == alias)
+            && let Some((_, Type::Con { module, name }, kind)) =
+                opened.types.iter().find(|(name, _, _)| name == member)
+        {
+            let mut result = kind;
+            while let Kind::Arrow(_, inner) = result {
+                result = inner;
+            }
+            if *result == Kind::Constraint {
+                return Some((
+                    Type::con(module, &format!("{name}$Dict")),
+                    as_value_kind(kind.clone()),
+                ));
+            }
+        }
         let local_class = self
             .contract_types
             .iter()

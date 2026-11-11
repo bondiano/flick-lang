@@ -15,7 +15,7 @@ fn named_parameterized_module_result_runs_from_two_importers_on_js_and_go() {
         ),
         (
             "Make.fl",
-            "module App.Make(K : App.Contracts.Source) exposing (answer)\nanswer : Int\nlet answer = K.value + 1\n",
+            "module App.Make(K : App.Contracts.Source) : PublicResult exposing (answer)\nanswer : Int\nlet answer = K.value + 1\n\ntype module PublicResult =\n  answer : Int\n",
         ),
         (
             "Parent.fl",
@@ -97,7 +97,7 @@ fn case_insensitive_set_keeps_its_policy_across_importers_on_js_and_go() {
         ),
         (
             "Make.fl",
-            "module App.Make(K : App.Contracts.Policy) exposing (Set, empty, insert, member, size, from_list, to_list)\ntype Set = Set (List K.Key)\nempty : Set\nlet empty = Set []\ninsert : K.Key -> Set -> Set\nlet insert key (Set values) = if List.contains key values then Set values else Set ([key] ++ values)\nmember : K.Key -> Set -> Bool\nlet member key (Set values) = List.contains key values\nsize : Set -> Int\nlet size (Set values) = List.length values\nfrom_list : List K.Key -> Set\nlet from_list values = List.fold_left (fun set key -> insert key set) empty values\nto_list : Set -> List K.Key\nlet to_list (Set values) = values\n",
+            "module App.Make(K : App.Contracts.Policy) : PublicResult exposing (Set, empty, insert, member, size, from_list, to_list)\ntype Set = Set (List K.Key)\nempty : Set\nlet empty = Set []\ninsert : K.Key -> Set -> Set\nlet insert key (Set values) = if List.contains key values then Set values else Set ([key] ++ values)\nmember : K.Key -> Set -> Bool\nlet member key (Set values) = List.contains key values\nsize : Set -> Int\nlet size (Set values) = List.length values\nfrom_list : List K.Key -> Set\nlet from_list values = List.fold_left (fun set key -> insert key set) empty values\nto_list : Set -> List K.Key\nlet to_list (Set values) = values\n\ntype module PublicResult =\n  type Set\n  empty : Set\n  insert : K.Key -> Set -> Set\n  member : K.Key -> Set -> Bool\n  size : Set -> Int\n  from_list : List K.Key -> Set\n  to_list : Set -> List K.Key\n",
         ),
         (
             "Collections.fl",
@@ -216,7 +216,7 @@ fn parameterized_module_uses_its_argument_dictionary_on_js_and_go() {
         ),
         (
             "Make.fl",
-            "module App.Make(K : App.Contracts.Policy) exposing (answer)\nanswer : Bool\nlet answer = eq \"A\" \"A\"\n",
+            "module App.Make(K : App.Contracts.Policy) : PublicResult exposing (answer)\nanswer : Bool\nlet answer = eq \"A\" \"A\"\n\ntype module PublicResult =\n  answer : Bool\n",
         ),
         (
             "HashContracts.fl",
@@ -228,7 +228,7 @@ fn parameterized_module_uses_its_argument_dictionary_on_js_and_go() {
         ),
         (
             "MakeHash.fl",
-            "module App.MakeHash(K : App.HashContracts.Policy) exposing (answer, hash_answer)\nanswer : Bool\nlet answer = eq \"A\" \"A\"\nhash_answer : Int\nlet hash_answer = hash \"A\"\n",
+            "module App.MakeHash(K : App.HashContracts.Policy) : PublicResult exposing (answer, hash_answer)\nanswer : Bool\nlet answer = eq \"A\" \"A\"\nhash_answer : Int\nlet hash_answer = hash \"A\"\n\ntype module PublicResult =\n  answer : Bool\n  hash_answer : Int\n",
         ),
         (
             "Parent.fl",
@@ -284,6 +284,78 @@ fn parameterized_module_uses_its_argument_dictionary_on_js_and_go() {
                 String::from_utf8_lossy(&output.stderr)
             );
             assert_eq!(output.stdout, expected.as_bytes(), "{emit}/{policy}");
+        }
+    }
+}
+#[test]
+#[ignore = "needs Node and Go; run `just e2e-tests`"]
+fn higher_order_factory_with_partial_application_runs_on_js_and_go() {
+    let dir = Path::new(env!("CARGO_TARGET_TMPDIR")).join("hom_factory");
+    let source = dir.join("App");
+    fs::create_dir_all(&source).expect("source directory");
+    for (name, text) in [
+        (
+            "Contracts.fl",
+            "module App.Contracts exposing (Input, Output, Factory)\ntype module Input =\n  seed : Int\ntype module Output =\n  answer : Int\ntype module Factory = (K : Input) -> Output\n",
+        ),
+        (
+            "Argument.fl",
+            "module App.Argument exposing (seed)\nseed : Int\nlet seed = 41\n",
+        ),
+        (
+            "Make.fl",
+            "module App.Make(K : App.Contracts.Input) : App.Contracts.Output exposing (answer)\nanswer : Int\nlet answer = K.seed + 1\n",
+        ),
+        (
+            "Apply.fl",
+            "module App.Apply(F : App.Contracts.Factory)(K : App.Contracts.Input) : App.Contracts.Output exposing (answer)\nmodule Built = F(K)\nanswer : Int\nlet answer = Built.answer\n",
+        ),
+        (
+            "Instances.fl",
+            "module App.Instances exposing (Chosen)\nmodule Half = App.Apply(App.Make)\nmodule Chosen = App.Instances.Half(App.Argument)\n",
+        ),
+        (
+            "Main.fl",
+            "module App.Main exposing (main)\nimport App.Instances.Chosen as Chosen\nmain : Unit ->{} Unit\nlet main () = Platform.stdout_line (show Chosen.answer)\n",
+        ),
+    ] {
+        fs::write(source.join(name), text).expect("source");
+    }
+    for profile in ["debug", "release"] {
+        for emit in ["js", "go"] {
+            let out = dir.join(format!("out-{emit}-{profile}"));
+            let build = Command::new(env!("CARGO_BIN_EXE_flick"))
+                .arg("build")
+                .arg(source.join("Main.fl"))
+                .arg("--out-dir")
+                .arg(&out)
+                .arg("--emit")
+                .arg(emit)
+                .arg("--profile")
+                .arg(profile)
+                .output()
+                .expect("build");
+            assert!(
+                build.status.success(),
+                "{emit}/{profile}: {}",
+                String::from_utf8_lossy(&build.stderr)
+            );
+            let output = if emit == "js" {
+                Command::new("node")
+                    .arg(out.join(runner_path(false)))
+                    .output()
+                    .expect("Node")
+            } else {
+                Command::new(out.join(executable(MAIN_ENTRY)))
+                    .output()
+                    .expect("Go executable")
+            };
+            assert!(
+                output.status.success(),
+                "{emit}/{profile}: {}",
+                String::from_utf8_lossy(&output.stderr)
+            );
+            assert_eq!(output.stdout, b"42\n", "{emit}/{profile}");
         }
     }
 }

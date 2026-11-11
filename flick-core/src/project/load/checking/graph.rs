@@ -1,8 +1,6 @@
 //! The import graph of the loaded modules: their levels, each module after
 //! those it imports, and running one level over the available cores.
 
-use super::Root;
-
 /// The modules by level of the import graph, each after every module it
 /// imports; `None` when imports form a cycle.
 pub(in crate::project::load) fn levels(edges: &[Vec<usize>]) -> Option<Vec<Vec<usize>>> {
@@ -79,12 +77,4 @@ pub(super) fn parallel<T: Send>(items: &[usize], f: impl Fn(usize) -> T + Sync) 
 #[cfg(target_arch = "wasm32")]
 pub(super) fn parallel<T>(items: &[usize], f: impl Fn(usize) -> T) -> Vec<T> {
     items.iter().map(|&i| f(i)).collect()
-}
-
-/// The library a module of `root` belongs to; `None` for the project's own.
-pub(super) fn package_of(root: &Root) -> Option<&str> {
-    match root {
-        Root::Package(name) => Some(name),
-        _ => None,
-    }
 }

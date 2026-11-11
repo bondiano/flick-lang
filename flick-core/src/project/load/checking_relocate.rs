@@ -133,10 +133,15 @@ fn relocate_declarations(
 ) -> Interface {
     let mut own = interface.clone();
     own.instances.retain(|i| i.module == child);
-    let mut value = serde_json::to_value(&own).expect("declarations serialize");
+    // Only these two fields enter the flattened model view. Serializing the
+    // entire source interface also retains its nested module/ABI codecs in
+    // the browser compiler, although none of that metadata is consumed here.
+    let mut value = serde_json::to_value((&own.exports, &own.instances))
+        .expect("declarations serialize");
     relocate_decl_value(&mut value, child, parent, local);
-    let mut declarations: Interface =
+    let (exports, instances) =
         serde_json::from_value(value).expect("declarations keep their shape");
+    let mut declarations = Interface { exports, instances, ..Interface::default() };
     // Model method lookup uses the method's field name, while the runtime
     // value in the merged file has a prefixed symbol.
     let method_names: HashSet<String> = own

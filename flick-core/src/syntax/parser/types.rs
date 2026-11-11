@@ -151,7 +151,9 @@ pub(super) fn at_atom_start(p: &Parser) -> bool {
 fn app(p: &mut Parser) -> Option<Done> {
     let head = capture(p)?;
     // `List _`: a hole is an argument too, though not a constructor field
-    let at_arg = |p: &Parser| at_atom_start(p) || p.at(K::Underscore);
+    let at_arg = |p: &Parser| {
+        (at_atom_start(p) || p.at(K::Underscore)) && !(p.at_word("and") && p.nth(1) == K::TypeKw)
+    };
     if !at_arg(p) {
         return Some(head);
     }

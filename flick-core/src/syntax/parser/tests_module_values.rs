@@ -238,3 +238,22 @@ fn static_module_contract_preserves_abstract_class_and_service_shapes() {
     assert!(page.contains("class Equality a =\n    equal :"), "{page}");
     assert!(page.contains("service Clock =\n    now :"), "{page}");
 }
+#[test]
+fn runtime_module_type_rejects_direct_and_nested_static_functors() {
+    for signature in ["Factory", "Library"] {
+        let src = format!(
+            "module App.Contracts exposing (..)\ntype module Input =\n  seed : Int\ntype module Output =\n  answer : Int\ntype module Factory = Input -> Output\ntype module Library =\n  module Make : Factory\ntype alias Packed = Module {signature}\n"
+        );
+        let mut sources = SourceMap::default();
+        let file = sources.add("App/Contracts.fl", &src);
+        let diagnostics = crate::check(&sources, file);
+        assert_eq!(diagnostics.len(), 1, "{diagnostics:?}");
+        let diagnostic = &diagnostics[0];
+        assert_eq!(diagnostic.code, codes::T068, "{diagnostics:?}");
+        let span = diagnostic.span.expect("module type span");
+        assert_eq!(
+            &src[span.start as usize..span.end as usize],
+            format!("Module {signature}")
+        );
+    }
+}

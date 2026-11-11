@@ -53,7 +53,7 @@ impl Checker<'_> {
                 warning.with_fix(|| (help, edits))
             }
         };
-        self.diagnostics.push(warning);
+        self.diagnostic(warning);
     }
 
     /// The edit that writes `replacement` over `node`.

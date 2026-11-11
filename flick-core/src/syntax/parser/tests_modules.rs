@@ -71,7 +71,7 @@ fn module_syntax_records_static_parameters_and_named_applications() {
     let params = &syntax.header.expect("header").parameters;
     assert_eq!(params.len(), 1);
     assert_eq!(params[0].name, "K");
-    assert_eq!(params[0].contract, "HashKey");
+    assert_eq!(params[0].signature.text(template), "HashKey");
 
     let parent =
         "module App.Collections exposing (Names)\nmodule Names = HashSet.Make(CaseInsensitive)\n";
@@ -303,4 +303,33 @@ fn manifest_class_name_can_be_used_by_later_dictionary_requirement() {
         other => panic!("expected module contract, got {other:?}"),
     };
     assert!(requirements.iter().any(|r| matches!(r, types::ModuleRequirement::Dictionary { head, from } if from == "equality" && matches!(head.spine().0, types::Type::Con { module, name } if module == "Prelude" && name == "Eq"))), "{requirements:?}");
+}
+#[test]
+fn higher_order_module_signatures_and_dependent_refinements() {
+    let source = "type module Factory = (K : KeyPolicy) -> SetApi with type Element = K.Key\ntype module Adapter = Factory -> Factory\n";
+    assert!(errors(source).is_empty(), "{:?}", errors(source));
+    let tree = sexp(source);
+    assert!(tree.contains("ModuleSignatureArrow"), "{tree}");
+    assert!(tree.contains("ModuleSignatureRefinement"), "{tree}");
+}
+
+#[test]
+fn checked_higher_order_signature_keeps_the_input_type_dependency() {
+    let source = "module App.Contracts exposing (Factory, KeyPolicy, SetApi)\ntype module Factory = (K : KeyPolicy) -> SetApi with type Element = K.Key\ntype module SetApi =\n  type Element\n  type Set\n  insert : Element -> Set -> Set\ntype module KeyPolicy =\n  type Key\n";
+    let mut sources = SourceMap::default();
+    let file = sources.add("App/Contracts.fl", source);
+    let diagnostics = crate::check(&sources, file);
+    assert!(diagnostics.is_empty(), "{diagnostics:?}");
+}
+
+#[test]
+fn higher_order_module_expressions_and_result_annotations() {
+    let source = "module App.Make(F : Factory)(K : KeyPolicy) : SetApi\nmodule Chosen : SetApi = App.Make(HashSet.Make)(Keys)\nmodule Alias = Chosen\nmodule Adapt = functor (F : Factory) -> F\n";
+    assert!(errors(source).is_empty(), "{:?}", errors(source));
+}
+
+#[test]
+fn module_contract_can_require_nested_modules_and_functors() {
+    let source = "type module Library =\n  module Make : Factory\n  module Keys : KeyPolicy\n";
+    assert!(errors(source).is_empty(), "{:?}", errors(source));
 }

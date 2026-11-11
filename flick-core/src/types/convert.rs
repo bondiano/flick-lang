@@ -401,6 +401,7 @@ impl Checker<'_> {
     }
 
     /// A name or an application `F a b`, with its kind.
+    #[allow(clippy::too_many_lines)]
     fn applied(&mut self, node: &Node, children: &[&Node], free: Free) -> (Type, Kind) {
         let (head_node, args) = match node.kind {
             K::AppType => (children[0], &children[1..]),
@@ -456,6 +457,28 @@ impl Checker<'_> {
             kind = result;
         }
         if first_class_module {
+            let (_, applied) = ty.spine();
+            let static_functor = if let [signature] = &applied[..]
+                && let Type::Con { module, name } = self.whnf(signature)
+                && let Some(definition) = self.env.type_def(&module, &name)
+            {
+                match &definition.form {
+                    Form::ModuleSignature { signature } => signature.has_functor(),
+                    Form::ModuleContract { requirements } => requirements
+                        .iter()
+                        .any(|r| matches!(r, ModuleRequirement::Module { .. })),
+                    _ => false,
+                }
+            } else {
+                false
+            };
+            if static_functor {
+                self.error(
+                    codes::T068,
+                    self.span(node),
+                    "a static functor or nested module cannot be carried by `Module Sig`; apply factories and flatten the runtime contract before packing",
+                );
+            }
             let (_, applied) = ty.spine();
             if let [signature] = &applied[..]
                 && let Type::Con { module, name } = self.whnf(signature)

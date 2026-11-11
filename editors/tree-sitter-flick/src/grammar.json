@@ -43,6 +43,10 @@
         },
         {
           "type": "SYMBOL",
+          "name": "_type_refinement_and"
+        },
+        {
+          "type": "SYMBOL",
           "name": "parens"
         },
         {
@@ -479,6 +483,29 @@
           "content": {
             "type": "STRING",
             "value": "module"
+          },
+          "named": true,
+          "value": "keyword"
+        }
+      ]
+    },
+    "_type_refinement_and": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "ALIAS",
+          "content": {
+            "type": "STRING",
+            "value": "and"
+          },
+          "named": true,
+          "value": "keyword"
+        },
+        {
+          "type": "ALIAS",
+          "content": {
+            "type": "STRING",
+            "value": "type"
           },
           "named": true,
           "value": "keyword"

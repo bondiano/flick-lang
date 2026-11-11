@@ -12,6 +12,7 @@ use std::time::Duration;
 use common::project;
 use flick_core::build::go::executable;
 use flick_core::build::runner_path;
+use flick_core::iface::IFACE_VERSION;
 use flick_core::project::config::MAIN_ENTRY;
 use serde_json::{Value, json};
 
@@ -247,6 +248,8 @@ fn installed_private_module_public_facade_runs_on_js_and_go() {
         }
     }
 }
+
+include!("package_cache/modules.rs");
 
 #[test]
 fn a_build_from_saved_modules_is_the_build_from_sources() {

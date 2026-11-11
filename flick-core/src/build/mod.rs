@@ -208,7 +208,9 @@ pub fn emit(
     if !settings.core_only {
         out.push(package_json(settings));
     }
+    let layout = codegen::RuntimeLayout::new(compilation.modules.iter().map(|m| &m.ir));
     let ctx = Context {
+        layout: &layout,
         modules: &compilation.modules,
         settings,
         #[cfg(feature = "native-project")]
@@ -430,10 +432,11 @@ fn core_modules(ctx: &Context, compilation: &Compilation, out: &mut Vec<Artifact
             .filter(|(name, _, imports, _)| {
                 core.contains(name)
                     && !imports.iter().all(|i| {
-                        if compilation.modules.iter().any(|m| &m.name == i) {
-                            core.contains(i.as_str())
+                        let owner = ctx.layout.owner(i);
+                        if compilation.modules.iter().any(|m| m.name == owner) {
+                            core.contains(owner)
                         } else {
-                            effects::in_core(i)
+                            effects::in_core(owner)
                         }
                     })
             })
@@ -607,6 +610,7 @@ fn generic_of(
 
 /// What the compilation of every module shares.
 struct Context<'a> {
+    layout: &'a codegen::RuntimeLayout,
     modules: &'a [Compiled],
     settings: &'a Settings<'a>,
     #[cfg(feature = "native-project")]
@@ -640,42 +644,17 @@ fn compiled_module(
     if ctx.settings.backend != Backend::Rt {
         effects::control_on_js(&module.ir, diagnostics);
     }
-    let output = codegen::js(optimized.as_ref().unwrap_or(&module.ir), ctx.options);
+    let mut imports = Vec::new();
+    for (physical, output) in codegen::js_parts(
+        optimized.as_ref().unwrap_or(&module.ir),
+        ctx.options,
+        ctx.layout,
+    ) {
+        imports.extend(write_js_output(ctx, &(ctx.path)(&physical), output, out));
+    }
     let file = (ctx.path)(&module.name);
-    #[cfg(feature = "native-project")]
-    {
-        let base = file.rsplit('/').next().unwrap_or(&file);
-        // an absolute source becomes relative to the map, so no build path ships
-        let map_dir = normalize(&ctx.settings.out_dir.join(&file));
-        let map_dir = map_dir.parent().unwrap_or(ctx.settings.out_dir);
-        let source_path = |file: FileId| {
-            let source = (ctx.settings.source_path)(file);
-            if Path::new(&source).is_absolute() {
-                specifier(map_dir, &normalize(Path::new(&source)))
-            } else {
-                source
-            }
-        };
-        let map = sourcemap::source_map(base, &output, ctx.sources, &source_path);
-        out.push(Artifact {
-            path: file.clone(),
-            contents: format!("{}//# sourceMappingURL={base}.map\n", output.code),
-        });
-        out.push(Artifact {
-            path: format!("{file}.map"),
-            contents: map,
-        });
-    }
-    #[cfg(not(feature = "native-project"))]
-    {
-        let path = file.clone();
-        out.push(Artifact {
-            path,
-            contents: output.code,
-        });
-    }
     if ctx.settings.core_only {
-        return output.imports;
+        return imports;
     }
     let built = ctx
         .published_interfaces
@@ -716,6 +695,49 @@ fn compiled_module(
         path: format!("{}.iface", module.name.replace('.', "/")),
         contents: iface::write(built),
     });
+    imports
+}
+
+fn write_js_output(
+    ctx: &Context,
+    file: &str,
+    output: codegen::Output,
+    out: &mut Vec<Artifact>,
+) -> Vec<String> {
+    #[cfg(not(feature = "native-project"))]
+    let _ = ctx;
+    #[cfg(feature = "native-project")]
+    {
+        let base = file.rsplit('/').next().unwrap_or(file);
+        // an absolute source becomes relative to the map, so no build path ships
+        let map_dir = normalize(&ctx.settings.out_dir.join(file));
+        let map_dir = map_dir.parent().unwrap_or(ctx.settings.out_dir);
+        let source_path = |file: FileId| {
+            let source = (ctx.settings.source_path)(file);
+            if Path::new(&source).is_absolute() {
+                specifier(map_dir, &normalize(Path::new(&source)))
+            } else {
+                source
+            }
+        };
+        let map = sourcemap::source_map(base, &output, ctx.sources, &source_path);
+        out.push(Artifact {
+            path: file.to_owned(),
+            contents: format!("{}//# sourceMappingURL={base}.map\n", output.code),
+        });
+        out.push(Artifact {
+            path: format!("{file}.map"),
+            contents: map,
+        });
+    }
+    #[cfg(not(feature = "native-project"))]
+    {
+        let path = file.to_owned();
+        out.push(Artifact {
+            path,
+            contents: output.code,
+        });
+    }
     output.imports
 }
 
@@ -874,7 +896,15 @@ fn specifier(from: &Path, target: &Path) -> String {
 /// it, for every target alike; `by_class` is the mode the build is checked in.
 pub fn optimized(modules: &[Compiled], module: &Compiled, by_class: bool) -> ir::Module {
     let mut ir = module.ir.clone();
-    let exported = |name: &str| module.interface.exports_value(name);
+    let exported = |name: &str| {
+        module.interface.exports_value(name)
+            || module
+                .ir
+                .initialization
+                .prefixes
+                .iter()
+                .any(|p| p.bindings.iter().any(|n| n == name))
+    };
     let generics = |m: &str, name: &str| generic_of(modules, m, name, by_class);
     opt::optimize(&mut ir, &exported, &generics);
     ir
