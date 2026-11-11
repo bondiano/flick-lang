@@ -1,0 +1,100 @@
+// Where a hash ring puts each input and each shard, name by name: by weight,
+// after a node leaves or changes its weight, and at the least weights.
+module App.Main exposing (main)
+
+line : String -> String ->{} Unit
+let line label text = Platform.stdout_line (label ++ ": " ++ text)
+
+type alias Server = { name : String; zone : Float }
+
+node_of : String -> Server
+let node_of name = { name = name; zone = 0 }
+
+ring_of : Option Int -> List (String, Option Float) -> HashRing.HashRing Server
+let ring_of base nodes =
+  List.fold_left
+    (fun ring (name, weight) -> HashRing.add { weight = weight } (node_of name) ring)
+    (HashRing.make { baseWeight = base } (fun s -> s.name))
+    nodes
+
+inputs : List String
+let inputs =
+  List.map (fun i -> show (i * 104729 % 9973) ++ "/" ++ String.repeat (i % 4) "k") (List.range 0 40)
+    ++ ["", "é", "😀", "a longer input, with spaces"]
+
+/// The names the inputs land on, joined.
+landing : HashRing.HashRing Server -> String
+let landing ring =
+  String.join
+    ""
+    (List.map
+      (fun input ->
+        Option.with_default "-" (Option.map (fun s -> s.name) (HashRing.get input ring))
+      )
+      inputs)
+
+/// The names of the shards, joined; `-` for no ring.
+shards : Int -> HashRing.HashRing Server -> String
+let shards count ring =
+  match HashRing.get_shards count ring with
+  | Some nodes -> String.join "" (List.map (fun s -> s.name) nodes)
+  | None -> "-"
+
+main : Unit ->{; AppError} Unit
+let main () =
+  let empty = ring_of None []
+  let three = ring_of None [("a", None), ("b", Some 2), ("c", Some 0.5)]
+  line "empty" (landing empty ++ " " ++ shards 4 empty)
+  line "three" (landing three)
+  line "one" (landing (ring_of None [("a", None)]))
+  line "shards" (show (List.map (fun count -> shards count three) [0, 1, 2, 3, 6, 16, 64]))
+  line "no shards" (show (shards (-3) three, shards 0 three))
+  let without_b = HashRing.remove (node_of "b") three
+  line "without b" (landing without_b ++ " " ++ shards 8 without_b)
+  line "b gone twice" (landing (HashRing.remove (node_of "b") without_b))
+  let heavier = HashRing.add { weight = Some 4 } (node_of "c") three
+  line "c heavier" (landing heavier ++ " " ++ shards 8 heavier)
+  line
+    "has"
+    (show (List.map (fun name -> HashRing.has (node_of name) heavier) ["a", "b", "c", "d"]))
+  let many = HashRing.add_many { weight = Some 1.5 } (List.map node_of ["d", "e", "f", "g"]) three
+  line "seven" (landing many ++ " " ++ shards 21 many)
+  let twice =
+    HashRing.add_many
+      { weight = Some 3 }
+      [{ name = "a"; zone = 1 }, { name = "h"; zone = 2 }, { name = "a"; zone = 3 }]
+      three
+  line
+    "one key twice"
+    (show (
+      Option.map (fun s -> s.zone) (HashRing.get "0/" twice),
+      List.map (fun s -> s.zone) (Option.with_default [] (HashRing.get_shards 5 twice)),
+      landing twice,
+    ))
+  line "three is as it was" (landing three ++ " " ++ shards 6 three)
+  let even = ring_of None [("a", None), ("b", None), ("c", None)]
+  line
+    "more shards than shares"
+    (show (List.map (fun count -> shards count even) [4, 5, 7, 8, 11, 14, 20]))
+  let light = ring_of (Some 16) [("a", None), ("z", Some 0.1)]
+  line "shards once every node is full" (show (List.map (fun count -> shards count light) [33, 66]))
+  line
+    "base weights"
+    (show
+      (List.map (fun base -> landing (ring_of base [("a", None), ("b", None)])) [
+        Some 1,
+        Some 4,
+        Some 0,
+        Some (-5),
+      ]))
+  line
+    "least weights"
+    (show
+      (List.map (fun weight -> shards 6 (ring_of (Some 8) [("a", Some weight), ("b", None)])) [
+        0.1,
+        0.05,
+        0,
+        -1,
+        0.06,
+        3.3,
+      ]))

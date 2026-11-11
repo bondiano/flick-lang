@@ -170,6 +170,7 @@ stdlib/effect/mutable_ref
 stdlib/effect/clock
 stdlib/effect/schedule
 stdlib/effect/hash_ring
+stdlib/effect/hash_ring_places
 stdlib/effect/crypto
 stdlib/effect/hmac
 stdlib/effect/password

@@ -1,13 +1,4 @@
-# Data structures: Chunk, Trie, HashRing, ByteSize, Crypto, checks.
-
-[flick:HashRing]
-flickMake HashRingMake
-flickAdd *HashRingAdd
-flickAddMany *HashRingAddMany
-flickRemove *HashRingRemove
-flickHas *HashRingHas
-flickGet HashRingGet
-flickGetShards HashRingGetShards
+# Data structures: Chunk, Trie, ByteSize, Crypto, checks.
 
 [flick:Crypto]
 flickRandomBytes CryptoRandomBytes

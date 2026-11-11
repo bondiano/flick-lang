@@ -1,0 +1,33 @@
+// A hash ring of 40 nodes added one at a time, 100 000 inputs looked up on
+// it, and 2 000 shards spread over it.
+module App.Main exposing (main)
+
+type alias Node = { name : String; rack : Int }
+
+names : List Node
+let names =
+  List.map (fun i -> { name = "node-" ++ show (i * 7919 % 1009); rack = i % 4 }) (List.range 0 40)
+
+ring : HashRing.HashRing Node
+let ring =
+  List.fold_left
+    (fun acc node -> HashRing.add { weight = Some (Int.to_float (node.rack + 1) / 2) } node acc)
+    (HashRing.make { baseWeight = None } (fun node -> node.name))
+    names
+
+/// The rack an input lands on.
+rack : Int -> Int
+let rack i =
+  match HashRing.get (show (i * 104729 % 99991) ++ "/" ++ show i) ring with
+  | Some node -> node.rack
+  | None -> 0
+
+main : Unit ->{; AppError} Unit
+let main () =
+  let landed = List.fold_left (fun acc i -> acc + rack i) 0 (List.range 0 100000)
+  let spread =
+    match HashRing.get_shards 2000 ring with
+    | Some nodes -> List.fold_left (fun acc node -> acc + node.rack) 0 nodes
+    | None -> 0
+  let smaller = List.fold_left (fun acc node -> HashRing.remove node acc) ring (List.take 20 names)
+  Platform.stdout_line (show (landed, spread, HashRing.has { name = "node-0"; rack = 0 } smaller))

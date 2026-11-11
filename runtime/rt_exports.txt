@@ -1474,13 +1474,6 @@
 @flick-lang/runtime/rt/effect/HashMap flickSetMany
 @flick-lang/runtime/rt/effect/HashMap flickSome
 @flick-lang/runtime/rt/effect/HashMap flickValues
-@flick-lang/runtime/rt/effect/HashRing flickAdd
-@flick-lang/runtime/rt/effect/HashRing flickAddMany
-@flick-lang/runtime/rt/effect/HashRing flickGet
-@flick-lang/runtime/rt/effect/HashRing flickGetShards
-@flick-lang/runtime/rt/effect/HashRing flickHas
-@flick-lang/runtime/rt/effect/HashRing flickMake
-@flick-lang/runtime/rt/effect/HashRing flickRemove
 @flick-lang/runtime/rt/effect/HashSet flickDifference
 @flick-lang/runtime/rt/effect/HashSet flickEvery
 @flick-lang/runtime/rt/effect/HashSet flickFilter
