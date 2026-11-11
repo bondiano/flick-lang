@@ -8,6 +8,7 @@
 use std::collections::BTreeMap;
 use std::rc::Rc;
 
+use flick_core::types::lang::Lang;
 use flick_core::types::{self as fc, Binder};
 
 use crate::syntax::Path;
@@ -46,9 +47,9 @@ pub fn scheme(t: &fc::Type) -> Scheme {
                 out = Type::fun(constraint(c), Stage::Pure, out);
             }
             for c in constraints.iter().filter(|c| !passes(c)) {
-                if let (fc::Type::Con { name, .. }, args) = c.spine()
+                if let (head, args) = c.spine()
                     && let [r, s] = &args[..]
-                    && name == "Provided"
+                    && head.is_lang(Lang::Provided)
                 {
                     out = out.with_provided(&row(r), &ty(s));
                 }
@@ -57,7 +58,7 @@ pub fn scheme(t: &fc::Type) -> Scheme {
                 .iter()
                 .filter(|c| !passes(c))
                 .filter_map(|c| match c.spine() {
-                    (fc::Type::Con { name, .. }, args) if name == "Outlives" => match &args[..] {
+                    (head, args) if head.is_lang(Lang::Outlives) => match &args[..] {
                         [c, s] => Some((caps(c), ty(s))),
                         _ => None,
                     },
@@ -146,19 +147,18 @@ fn app(t: &fc::Type) -> Type {
     {
         return Type::Dict(Path::new(module, class), args.into_iter().map(ty).collect());
     }
-    if let fc::Type::Con { module, name } = head
-        && module == PRELUDE
-    {
-        match (name.as_str(), &args[..]) {
-            ("Eff", [r, e, a]) => return Type::Eff(row(r), row(e), Rc::new(ty(a))),
-            ("Eff", [r, e]) => return Type::EffOf(row(r), row(e)),
-            ("Layer", [i, e, o]) => return Type::Layer(row(i), row(e), row(o)),
-            ("Errors", [r]) => return Type::Errors(row(r)),
-            ("Ref", [a]) => return Type::Ref(Rc::new(ty(a))),
-            ("ServiceImpl", [r]) => return Type::Impl(row(r)),
-            ("ServiceTag", [r]) => return Type::Tag(row(r)),
-            _ => {}
-        }
+    // the forms of the core, by the lang item of their constructor: the
+    // library may move or rename what it declares
+    let form = |item| head.is_lang(item);
+    match &args[..] {
+        [r, e, a] if form(Lang::Eff) => return Type::Eff(row(r), row(e), Rc::new(ty(a))),
+        [r, e] if form(Lang::Eff) => return Type::EffOf(row(r), row(e)),
+        [i, e, o] if form(Lang::Layer) => return Type::Layer(row(i), row(e), row(o)),
+        [r] if form(Lang::Errors) => return Type::Errors(row(r)),
+        [a] if form(Lang::Ref) => return Type::Ref(Rc::new(ty(a))),
+        [r] if form(Lang::ServiceImpl) => return Type::Impl(row(r)),
+        [r] if form(Lang::ServiceTag) => return Type::Tag(row(r)),
+        _ => {}
     }
     args.into_iter().fold(ty(head), |h, a| Type::app(h, ty(a)))
 }

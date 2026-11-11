@@ -36,7 +36,8 @@ unit:
     cargo test --workspace --exclude flick-model
 
 # The reference model of λFlick: its unit tests, the cases of
-# tests/run/model.txt checked and run against their `.stdout`, and the
+# tests/run/model.txt checked and run against their `.stdout`, the other
+# cases against the reasons of tests/run/model_gaps.txt, and the
 # model properties on generated programs (`PROPTEST_CASES` sets how many)
 model:
     cargo test -p flick-model -- --include-ignored
