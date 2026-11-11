@@ -8,7 +8,9 @@ import Formal.Live.Elide
 Each export of `Prelude`, `Seq`, `Option`, `Result` and `List` the core can write, as the model
 takes it (`flick-model/src/translate/types.rs`) and as the model reads it (`check::elided`):
 `Ty.elide K` of the first is the second, `K` the binders of kind `Region` and `CaptureRow`
-(`flick-model/src/translate/lean/elide.rs`). The exports the core cannot write close the file.
+(`flick-model/src/translate/lean/elide.rs`). A value bound `a^c` on a variable of the scheme
+is the fact `Facts.bnd a c`, which `Scheme.elide` keeps. The exports the core cannot write
+close the file.
 -/
 
 namespace Flick.ElideSchemes
@@ -17,6 +19,30 @@ namespace Flick.ElideSchemes
 theorem None :
     Ty.elide Caps.none (.tapp (.adt "Prelude.Option") (.tvar 0)) Caps.none =
       (.tapp (.adt "Prelude.Option") (.tvar 0)) := by
+  elide_eq
+
+/-- `Prelude.Some : forall a captures. a^captures -> (Option a)^{captures}` -/
+theorem Some :
+    Scheme.elide (fun x => x = .v 1) ⟨2, Facts.bnd 0 (fun x => x = .v 1),
+      (.arrow (.tvar 0) .pure (.tapp (.adt "Prelude.Option") (.tvar 0)) Caps.none)⟩ =
+      ⟨2, Facts.bnd 0 (fun x => x = .v 1),
+      (.arrow (.tvar 0) .pure (.tapp (.adt "Prelude.Option") (.tvar 0)) Caps.none)⟩ := by
+  elide_eq
+
+/-- `Prelude.Err : forall e a captures. e^captures -> (Result e a)^{captures}` -/
+theorem Err :
+    Scheme.elide (fun x => x = .v 2) ⟨3, Facts.bnd 0 (fun x => x = .v 2),
+      (.arrow (.tvar 0) .pure (.tapp (.tapp (.adt "Prelude.Result") (.tvar 0)) (.tvar 1)) Caps.none)⟩ =
+      ⟨3, Facts.bnd 0 (fun x => x = .v 2),
+      (.arrow (.tvar 0) .pure (.tapp (.tapp (.adt "Prelude.Result") (.tvar 0)) (.tvar 1)) Caps.none)⟩ := by
+  elide_eq
+
+/-- `Prelude.Ok : forall e a captures. a^captures -> (Result e a)^{captures}` -/
+theorem Ok :
+    Scheme.elide (fun x => x = .v 2) ⟨3, Facts.bnd 1 (fun x => x = .v 2),
+      (.arrow (.tvar 1) .pure (.tapp (.tapp (.adt "Prelude.Result") (.tvar 0)) (.tvar 1)) Caps.none)⟩ =
+      ⟨3, Facts.bnd 1 (fun x => x = .v 2),
+      (.arrow (.tvar 1) .pure (.tapp (.tapp (.adt "Prelude.Result") (.tvar 0)) (.tvar 1)) Caps.none)⟩ := by
   elide_eq
 
 /-- `Prelude.LT : Ordering` -/
@@ -79,6 +105,14 @@ theorem map :
       (.arrow (.dict 0 (Ty.spine [(.tvar 0)])) .pure (.arrow (.arrow (.tvar 3) .pure (.tvar 4) Caps.none) .pure (.arrow (.tapp (.tvar 0) (.tvar 3)) .pure (.tapp (.tvar 0) (.tvar 4)) Caps.none) Caps.none) Caps.none) := by
   elide_eq
 
+/-- `Prelude.fold : forall f c a b. Foldable f => (b -> a -> b)^c -> b^c -> f a -> b` -/
+theorem fold :
+    Scheme.elide (fun x => x = .v 1) ⟨4, Facts.bnd 3 (fun x => x = .v 1),
+      (.arrow (.dict 0 (Ty.spine [(.tvar 0)])) .pure (.arrow (.arrow (.tvar 3) .pure (.arrow (.tvar 2) .pure (.tvar 3) Caps.none) (fun x => x = .v 1)) .pure (.arrow (.tvar 3) .pure (.arrow (.tapp (.tvar 0) (.tvar 2)) .pure (.tvar 3) Caps.none) Caps.none) Caps.none) Caps.none)⟩ =
+      ⟨4, Facts.bnd 3 (fun x => x = .v 1),
+      (.arrow (.dict 0 (Ty.spine [(.tvar 0)])) .pure (.arrow (.arrow (.tvar 3) .pure (.arrow (.tvar 2) .pure (.tvar 3) Caps.none) (fun x => x = .v 1)) .pure (.arrow (.tvar 3) .pure (.arrow (.tapp (.tvar 0) (.tvar 2)) .pure (.tvar 3) Caps.none) Caps.none) Caps.none) Caps.none)⟩ := by
+  elide_eq
+
 /-- `Prelude.fold_map : forall f a m. (Foldable f, Monoid m) => (a -> m) -> f a -> m` -/
 theorem fold_map :
     Ty.elide Caps.none (.arrow (.dict 0 (Ty.spine [(.tvar 0)])) .pure (.arrow (.dict 0 (Ty.spine [(.tvar 2)])) .pure (.arrow (.arrow (.tvar 1) .pure (.tvar 2) Caps.none) .pure (.arrow (.tapp (.tvar 0) (.tvar 1)) .pure (.tvar 2) Caps.none) Caps.none) Caps.none) Caps.none) Caps.none =
@@ -89,6 +123,14 @@ theorem fold_map :
 theorem traverse :
     Ty.elide (fun x => x = .v 1) (.arrow (.dict 0 (Ty.spine [(.tvar 0)])) .pure (.arrow (.arrow (.tvar 2) (.rt (fun x => x = .rv (.v 4)) (fun x => x = .rv (.v 5))) (.tvar 3) (fun x => x = .v 1)) .pure (.arrow (.tapp (.tvar 0) (.tvar 2)) (.rt (fun x => x = .rv (.v 4)) (fun x => x = .rv (.v 5))) (.tapp (.tvar 0) (.tvar 3)) Caps.none) Caps.none) Caps.none) Caps.none =
       (.arrow (.dict 0 (Ty.spine [(.tvar 0)])) .pure (.arrow (.arrow (.tvar 2) (.rt (fun x => x = .rv (.v 4)) (fun x => x = .rv (.v 5))) (.tvar 3) (fun x => x = .v 1)) .pure (.arrow (.tapp (.tvar 0) (.tvar 2)) (.rt (fun x => x = .atm (.v 1) ∨ x = .rv (.v 4)) (fun x => x = .rv (.v 5))) (.tapp (.tvar 0) (.tvar 3)) Caps.none) Caps.none) Caps.none) := by
+  elide_eq
+
+/-- `Prelude.pure : forall f c a. Applicative f => a^c -> (f a)^c` -/
+theorem pure :
+    Scheme.elide (fun x => x = .v 1) ⟨3, Facts.bnd 2 (fun x => x = .v 1),
+      (.arrow (.dict 0 (Ty.spine [(.tvar 0)])) .pure (.arrow (.tvar 2) .pure (.tapp (.tvar 0) (.tvar 2)) Caps.none) Caps.none)⟩ =
+      ⟨3, Facts.bnd 2 (fun x => x = .v 1),
+      (.arrow (.dict 0 (Ty.spine [(.tvar 0)])) .pure (.arrow (.tvar 2) .pure (.tapp (.tvar 0) (.tvar 2)) Caps.none) Caps.none)⟩ := by
   elide_eq
 
 /-- `Prelude.map2 : forall f c d a b x. Applicative f => (forall u v. a^u -> b^v -> x)^c -> (f a)^d -> (f b)^d -> (f x)^(c + d)` -/
@@ -1442,11 +1484,3 @@ theorem List.match_right :
   elide_eq
 
 end Flick.ElideSchemes
-
-/-! ## Skipped -/
-
--- skip Prelude.Some: a value bound, which the core does not have
--- skip Prelude.Err: a value bound, which the core does not have
--- skip Prelude.Ok: a value bound, which the core does not have
--- skip Prelude.fold: a value bound, which the core does not have
--- skip Prelude.pure: a value bound, which the core does not have

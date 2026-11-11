@@ -74,6 +74,8 @@ Checker:
 - `regions/data.rs` `value_bound`, `bound_head`, `hidden_fields` decide which of the two applies;
 - `regions/data.rs` `scalar`: scalars have no captures under any qualifier.
 
+Lean: a hidden qualifier is the `C` of `Ty.arrow` and `Ty.eff`, or a parameter of kind `CRow` of data with hidden storage. A value bound on a variable of a scheme is a fact of the scheme, `Facts.bnd i D` (`formal/Formal/SchemeOps.lean`), and the body writes `α` for `α^{≤D}` ([value bounds in the core](#value-bounds-in-the-core)).
+
 ### 1.3 Expressions
 
 ```text
@@ -119,6 +121,8 @@ Sources:
 - `Fiber.spawn` is in `builtins/Fiber.fl`, `Scope.add_finalizer` in `builtins/Scope.fl`. The finalizer's `Outlives c s` is required because [owner retention requires `Outlives`](#owner-retention-requires-outlives); the child's rows name `Scope s` because [children acquire in the region of their owner](#children-acquire-in-the-region-of-their-owner).
 - `Ref.*` are in `builtins/Ref.fl`: the capacity `c` sits inside the invariant argument of `Ref`, so it cannot be widened through the outer bound of the reference.
 
+Lean: `Const.ty`, `Const.ok` (`formal/Formal/Syntax.lean`). A cell type is `Ref τ` with `τ` the contents, as in `core.md`, and the capacity `c` is the instance `ι.C` of the constant, fixed for each use: `Const.ok` of `Ref.*` is the premise (Inst) of the bound `α^c`, `⌈τ⌉ ⊆ c` up to the facts, and the arrow `Ref.set ℓ` has the qualifier `c`, so storing needs the capacity live. `LiveRules.lean` checks both: `Ref.make` rejects a capacity smaller than its contents, and `refSet_needs_capacity`.
+
 ## 2. Statics
 
 ### 2.1 The reach bound ⌈τ⌉
@@ -152,6 +156,8 @@ bound on a variable:     ⌈α^{≤C}⌉ = {α^{≤C}}
 - `K ⊆ X` with the atom `α^{≤C}` in `K` holds if `α ∈ X` or `C ⊆ X`;
 - in `X`, the atom `α^{≤C}` admits only `α`: `C` may be wider than `⌈υ⌉`;
 - in the other judgments (§2.4, §2.5) `α^{≤C}` reads as `C`; this is not weaker.
+
+Lean: `α^{≤C}` is the variable `α` under the fact `Outlives α C` (`Facts.bnd`), and `Outl Θ K (.caps X)` is `K ⊆ X` up to the facts (`Outl.caps_iff`). Facts are not chained (`formal/README.md`), so the atom fits into `X` if `α ∈ X` or `X` is `C` itself; (Inst) asks no more, as it compares an instance with the instance of its bound.
 
 Why service rows are excluded from ⌈·⌉: a value of type `Eff r e τ`, `τ₁ →R⟨r;e⟩ τ₂` or `Layer ri e ro` is used only through `await`, application or `provide`, and these add `r` (`ri`) to the stage of the user. A region from the row, for example `Scope s`, appears in the type of every place where the value runs; an unused value reaches nothing.
 
@@ -249,6 +255,8 @@ for each occurrence αᵢ^D in τ:   ⌈τᵢ⌉ ⊆ D[c̄ := C̄]
 A value bound bounds the whole substituted value. `a^{}` with `a := File s` is rejected at the call site: `FLICK-G001` "the expected type `File s` holds no captures".
 
 Checker: `unify.rs` `Checker::instantiate`; the bound condition is a `Hold` from `subsume_bound` with `Visible::Now`; `Outlives` constraints are `classes/mod.rs` `want`.
+
+Lean: (Var), a global and the projection of a dictionary field ask `Scheme.Holds`, the facts of the scheme at the instance; a bound is the fact `Facts.bnd i D`, so this is the premise `⌈τᵢ⌉ ⊆ D[c̄ := C̄]` (`Scheme.holds_bnd`). (Let-Gen), a global and a field of a dictionary assume the facts of their scheme in its body. `Examples.lean` types a generic `let` whose body makes a cell under the bound `α^{≤c}`, and shows an instance beyond the bound rejected.
 
 ```text
 s ∉ fr(Γ)    Γ, s : Region, s : Owner s ⊢ e : τ ! φ    φ ⊑ R⟨{Scope s} + r; ε⟩
@@ -819,6 +827,15 @@ Divergence: the document did not say how the bound `α^{≤C}` relates to the at
 - Symptom: in `tests/run/codegen/do_notation.fl` `pair_optional`, the value `Option (a^{≤v₁}, b^{≤v₂})` is checked against `Option (a, b)`. By the earlier §2.1, `⌈a^{≤v}⌉ = {v}` while `⌈a⌉ = {a}`, so (≤-Cap) fails; the same for `carry` and `shadowed` in `applicative_do.fl`. The checker accepts them.
 - Incompleteness: the document did not connect variable atoms `α` (§1.2) with the value bounds that substitution (Inst) checks only at the call site. The model compared only regions in obligations and merely grew capture row variables for `Outlives`. This suffices for T4 as long as generic code does not hide a type variable.
 - Resolution, document and model. §2.1: `⌈α^{≤C}⌉ = {α^{≤C}}`, the atom `α` with the fact "no wider than `C`"; it fits into a set containing `α` or `C`, and in an admitting set it gives only `α`. Then `a^{≤v} ≡ a` (§2.2), and `pair_optional`, `carry`, `shadowed` derive. The model (`flick-model/src/check/regions/mod.rs` `reach_bounded`, `solve.rs` `excess`) keeps the atom together with its bound and also compares atoms `α` in obligations: a type variable that generic code hides behind a qualifier is `FLICK-G001`, like a region. The corpus `tests/run/model.txt` and the model properties (`just model`) show no divergence from the checker.
+
+### Value bounds in the core
+
+Decision: Lean has value bounds as facts of schemes, not as a type former.
+
+- Before: Lean had only hidden qualifiers. `Some`, `Ok`, `Err`, `fold` and `pure` were skipped in `formal/Formal/Live/ElideSchemes.lean` ("a value bound, which the core does not have"), the elaboration dropped their bounds, and `Ref.*` instantiated the cell type with no capacity.
+- Decision: a bound `αᵢ^{≤D}` on a variable of a scheme is the fact `Outlives αᵢ D` of the scheme, `Facts.bnd i D` (`SchemeOps.lean`), and the body of the scheme writes `α`. `Outl Θ C (.caps D)` is `C ⊆ D` up to the facts, so `Scheme.Holds` at an instance is (Inst) `⌈τᵢ⌉ ⊆ D[c̄ := C̄]` (`Scheme.holds_bnd`): (Var), a global and the projection of a dictionary field check it, and (Let-Gen), a global and a field of a dictionary assume it in their bodies. By §2.1, `α^{≤C}` and `α` reach the same, so a type former would add a case to every analysis of `Ty` (substitution, ⌈·⌉, `LeLive`, canonical forms, shapes, preservation, T4′) and no judgment that reads it.
+- The capacity of a cell is the instance `ι.C` of `Ref.*` (§1.5): a cell type stays `Ref τ`, `Const.ok` asks `⌈τ⌉ ⊆ c`, and the arrow `Ref.set ℓ` has the qualifier `c`, so storing needs the capacity live. The store typing and canonical forms are unchanged.
+- Left out: a bound on a type that is not a variable is read as `⌈υ⌉ ⊆ C`, not `C ∪ regions(υ)` (`formal/README.md`, simplification 15); and since facts are not chained, `K ⊆ X` with `α^{≤C}` in `K` follows from `C ⊆ X` only for `X = C` (§2.1).
 
 ### A Scope in a local function row is not a capture
 

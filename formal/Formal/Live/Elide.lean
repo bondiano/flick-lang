@@ -136,12 +136,17 @@ theorem Typ.const_elided {S : Sig} {Ψ : List Ty} {Θ : Facts} {Γ : List Scheme
     (hT : LeLive ((c.ty S ι).elide K H) T) : Typ S Ψ Θ Γ (.const c) (.ex T φ) :=
   .const hc ((Const.ty_le_elide hc hι H).trans hT)
 
+/-- A scheme read with `Ty.elide`; its facts, the value bounds, stay, as the model's
+`live_scheme` keeps them. -/
+def Scheme.elide (K : Caps) (s : Scheme) : Scheme := ⟨s.k, s.cs, s.t.elide K Caps.none⟩
+
 /-- `Ty.elide K t H = t'` for closed `t`, `t'` written with predicates of finitely many atoms and
-elements (`Live/ElideSchemes.lean`): unfold elision, split the constructors, and compare each
-set point by point; an atom is `.v n` or `.r p`, so what is left is arithmetic. -/
+elements (`Live/ElideSchemes.lean`), and so `Scheme.elide`: unfold elision, split the
+constructors, and compare each set point by point; an atom is `.v n` or `.r p`, so what is
+left is arithmetic. -/
 macro "elide_eq" : tactic => `(tactic| (
-  simp only [Ty.elide, Stage.use, Ty.arrow.injEq, Ty.tapp.injEq, Ty.eff.injEq, Ty.all.injEq,
-    Ty.ref.injEq, Ty.rcons.injEq, Stage.rt.injEq, true_and, and_true]
+  simp only [Scheme.elide, Scheme.mk.injEq, Ty.elide, Stage.use, Ty.arrow.injEq, Ty.tapp.injEq,
+    Ty.eff.injEq, Ty.all.injEq, Ty.ref.injEq, Ty.rcons.injEq, Stage.rt.injEq, true_and, and_true]
   repeat' (first
     | rfl
     | constructor

@@ -49,6 +49,17 @@ theorem Outl.substT {Θ C s} (σ : Atom → Ty) (h : Outl Θ C s) :
 theorem Outl.mono {Θ Θ' C s} (h : Outl Θ C s) (hΘ : ∀ C s, Θ C s → Θ' C s) : Outl Θ' C s :=
   fun k hk => (h k hk).imp id fun ⟨C', h₁, h₂⟩ => ⟨C', hΘ _ _ h₁, h₂⟩
 
+/-- `Outlives C D` for a capture set `D` is `C ⊆ D` up to the facts. -/
+theorem Outl.caps_iff {Θ C D} : Outl Θ C (.caps D) ↔ ∀ k, C k → D k ∨ ∃ C', Θ C' (.caps D) ∧ C' k :=
+  Iff.rfl
+
+theorem Outl.caps_of_sub {Θ C D} (h : ∀ k, C k → D k) : Outl Θ C (.caps D) :=
+  fun k hk => .inl (h k hk)
+
+/-- The value bound `αᵢ^{≤D}` of a scheme (regions.md §2.1): the fact `Outlives αᵢ D`, so
+(Inst) asks `⌈τᵢ⌉ ⊆ D[ᾱ := τ̄]` of every instance, and the body of the scheme may assume it. -/
+def Facts.bnd (i : Nat) (D : Caps) : Facts := fun C s => C = (· = .v i) ∧ s = .caps D
+
 def Scheme.substT (σ : Atom → Ty) (s : Scheme) : Scheme :=
   ⟨s.k, s.cs.substT (liftT s.k σ), s.t.substT (liftT s.k σ)⟩
 
@@ -60,6 +71,18 @@ def Scheme.inst (s : Scheme) (ts : List Ty) : Ty := s.t.substT (instT ts)
 /-- The facts of a scheme at an instance hold. -/
 def Scheme.Holds (Θ : Facts) (s : Scheme) (ts : List Ty) : Prop :=
   ∀ C r, s.cs C r → Outl Θ (C.substT (instT ts)) (r.substT (instT ts))
+
+/-- The facts of a scheme with one value bound hold at an instance iff the instance of the
+variable reaches no more than the instance of the bound. -/
+theorem Scheme.holds_bnd {Θ k i D t ts} :
+    (⟨k, Facts.bnd i D, t⟩ : Scheme).Holds Θ ts ↔
+      Outl Θ (instT ts (.v i)).reach (.caps (D.substT (instT ts))) := by
+  have hC : Caps.substT (instT ts) (· = .v i) = (instT ts (.v i)).reach := by
+    funext a; apply propext
+    exact ⟨fun ⟨_, h, h'⟩ => h ▸ h', fun h => ⟨_, rfl, h⟩⟩
+  constructor
+  · intro h; have := h _ _ ⟨rfl, rfl⟩; rwa [hC] at this
+  · rintro h C r ⟨rfl, rfl⟩; rw [hC]; exact h
 
 theorem Scheme.substT_comp (s : Scheme) (σ σ' : Atom → Ty) :
     (s.substT σ).substT σ' = s.substT fun a => (σ a).substT σ' := by
