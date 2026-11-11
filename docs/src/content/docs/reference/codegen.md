@@ -373,7 +373,10 @@ cancellation points, explicit yields and finalizers of the program do not.
 Node: for each entry, a Go module under `go/<entry>/` of the output, `package
 main` with one file per Flick module and the runtime package `flickrt`
 beside it, which `flick build` compiles with `go build` into
-`flick-<entry>`. Only what `main` reaches is compiled, and a construct the
+`flick-<entry>`. `go build` compiles every file of a package, so the module
+lists what the build wrote in `go/<entry>/.flick-files`, and the next build
+into the same output removes the listed files it no longer writes; files it
+did not write stay. Only what `main` reaches is compiled, and a construct the
 target does not compile yet is `FLICK-P012` with what it names, never a
 runtime stub; for now that is a lazy `for` that reads services,
 schemas deriving `Form`, and a `foreign` binding without a
