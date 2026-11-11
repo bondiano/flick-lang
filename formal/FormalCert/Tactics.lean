@@ -91,4 +91,10 @@ macro "holds" : tactic => `(tactic| first
      simp only [Scheme.up, Scheme.substT, Scheme.mono, Facts.none_substT] at h
      exact h.elim))
 
+/-- `Const.ok` of a cell's constant: what the content reaches is in the capacity. -/
+macro "cell_ok" : tactic => `(tactic| (
+  intro k hk
+  left
+  rcases k with n | p <;> cert_simp))
+
 end Flick.Cert

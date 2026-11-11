@@ -9,6 +9,7 @@
 //! certificates do not write yet is `Unsupported`, with its reason.
 
 mod bind;
+mod cell;
 mod field;
 mod list;
 mod pat;

@@ -43,7 +43,7 @@ impl Cx<'_> {
         let (at, lt) = (self.ty(a)?, self.ty(t)?);
         let ctor = |k: &str| {
             format!(
-                "(Typ.ctor_plain S (K := \"Prelude.{k}\") (us := [{at}]) ((hS.ctor _ rfl).trans rfl) ((hS.res _ rfl).trans rfl) rfl LeLive.refl)"
+                "(Typ.ctor_plain S (K := \"Prelude.{k}\") (us := [{at}]) ((hS.ctor _ rfl).trans rfl) ((hS.res _ rfl).trans rfl) rfl (by le_live))"
             )
         };
         let mut proof = ctor("Nil");

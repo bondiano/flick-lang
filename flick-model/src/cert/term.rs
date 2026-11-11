@@ -12,6 +12,7 @@ use crate::translate::lean::elide::{Env, caps, row, stage, ty};
 use crate::types::{Caps, Fields, Row, Scheme, Stage, Type, Var};
 
 use super::Unsupported;
+use super::cell::cell;
 use super::list::list_tm;
 use super::pat::{arms_tm, match_tm};
 use super::provide::{operation, provide_tm};
@@ -29,6 +30,9 @@ pub(super) fn tm(e: &Term, ctx: &[Name], sig: &Sig) -> Result<String, Unsupporte
         Term::Global(p) => format!("(.glob {})", global(sig, &Key::Value(p.clone()))?.0),
         Term::Apply(Head::Const(Const::Prim(p)), xs) if xs.is_empty() => {
             format!("(.glob {})", global(sig, &prim_key(*p))?.0)
+        }
+        Term::Apply(Head::Const(c), xs) if xs.is_empty() && cell(c).is_some() => {
+            format!("(.const .{})", cell(c).unwrap_or_default())
         }
         Term::Apply(Head::Con(c), xs) => {
             let k = c.ty.module.to_string() + "." + &c.name;
@@ -373,7 +377,7 @@ impl<'t> Cx<'t> {
             return Err(format!("the constructor `{k}`, not in the signature"));
         }
         Ok(format!(
-            "(Typ.ctor_plain S (K := {k:?}) (us := [{}]) ((hS.ctor _ rfl).trans rfl) ((hS.res _ rfl).trans rfl) rfl LeLive.refl)",
+            "(Typ.ctor_plain S (K := {k:?}) (us := [{}]) ((hS.ctor _ rfl).trans rfl) ((hS.res _ rfl).trans rfl) rfl (by le_live))",
             us.join(", ")
         ))
     }
@@ -415,6 +419,9 @@ impl<'t> Cx<'t> {
                 Ok((self.ctor(&k, &us)?, at))
             }
             h @ Term::Field(..) if operation(h).is_some() => self.operation(h),
+            Term::Apply(Head::Const(c), xs) if xs.is_empty() && cell(c).is_some() => {
+                self.cell(c, head)
+            }
             Term::Field(d, l) if self.is_dict(d) => {
                 let at = self.inferred(head)?;
                 Ok((self.dproj(head, d, l, col)?, at))
