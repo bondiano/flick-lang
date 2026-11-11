@@ -346,7 +346,13 @@ impl Ide<'_> {
                 let m = self.module(file)?;
                 let (at, ty) = tree::innermost(m.typing.types.iter(), offset)
                     .or_else(|| tree::innermost(m.typing.types.iter(), binder.0))?;
-                (format!("{name} : {}", m.typing.shown(at, ty)), None)
+                let mutable = tree::path_to(&m.tree, binder.0).iter().any(|decl| {
+                    decl.kind == K::LetDecl
+                        && decl.has_token(K::MutKw)
+                        && decl.nodes().next().is_some_and(|p| p.range() == *binder)
+                });
+                let prefix = if mutable { "mut " } else { "" };
+                (format!("{prefix}{name} : {}", m.typing.shown(at, ty)), None)
             }
             Symbol::Entity(e) => {
                 let interface = self.interface(&e.module)?;

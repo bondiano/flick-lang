@@ -261,8 +261,64 @@ let counted n =
     assert_eq!(from_target.len(), 4, "{from_target:?}");
     let (markdown, range) = ide.hover(file, target).expect("hover of the assigned name");
     assert_eq!(range, (target, target + 5));
-    assert!(markdown.contains("total : Int"), "{markdown}");
+    assert_eq!(markdown, "```flick\nmut total : Int\n```");
+    for (at, _) in source.match_indices("total") {
+        let at = u32::try_from(at).expect("small source");
+        let (markdown, range) = ide.hover(file, at).expect("mutable name hover");
+        assert_eq!(range, (at, at + 5));
+        assert_eq!(markdown, "```flick\nmut total : Int\n```");
+    }
     let (symbol, _) = ide.symbol_at(file, target).expect("symbol");
     let definition = ide.definition(&symbol).expect("definition");
     assert_eq!(definition.start, declared);
+}
+
+#[test]
+fn mutable_hover_follows_the_binder_through_shadowing() {
+    let source = "module App.Vars exposing (counted)
+counted : Int -> (Int, Int)
+let counted n =
+  let mut total = n
+  total = total + 1
+  let other =
+    let total = total
+    total
+  (total, other)
+";
+    let f = fixture_of(&[("src/App/Vars.fl", source)]);
+    let ide = f.ide();
+    let file = f.file("App.Vars");
+    let expected = [true, true, true, false, true, false, true];
+    let occurrences: Vec<_> = source.match_indices("total").collect();
+    assert_eq!(occurrences.len(), expected.len());
+    for ((at, _), mutable) in occurrences.into_iter().zip(expected) {
+        let at = u32::try_from(at).expect("small source");
+        let (markdown, range) = ide.hover(file, at).expect("local name hover");
+        let prefix = if mutable { "mut " } else { "" };
+        assert_eq!(markdown, format!("```flick\n{prefix}total : Int\n```"));
+        assert_eq!(range, (at, at + 5));
+    }
+}
+
+#[test]
+fn mutable_function_values_do_not_mark_their_parameters_mutable() {
+    let source = "module App.Vars exposing (applied)
+applied : Int -> Int
+let applied n =
+  let mut step : Int -> Int = fun value -> value
+  step = fun value -> value + 1
+  step n
+";
+    let f = fixture_of(&[("src/App/Vars.fl", source)]);
+    let ide = f.ide();
+    let file = f.file("App.Vars");
+    for (name, expected) in [
+        ("step", "```flick\nmut step : Int -> Int\n```"),
+        ("value", "```flick\nvalue : Int\n```"),
+    ] {
+        for (at, _) in source.match_indices(name) {
+            let at = u32::try_from(at).expect("small source");
+            assert_eq!(ide.hover(file, at).expect("local name hover").0, expected);
+        }
+    }
 }
