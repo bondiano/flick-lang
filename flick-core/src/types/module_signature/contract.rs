@@ -2,9 +2,9 @@ impl ModuleSignature {
     pub fn project(&self, actual: &Interface) -> Interface {
         match self {
             Self::Structure { .. } => super::module_contract::project(&self.definition(), actual),
-            Self::Functor { .. } => Interface {
+            Self::Parameterized { .. } => Interface {
                 module: actual.module.clone(),
-                functor: Some(self.clone()),
+                parameterized: Some(self.clone()),
                 signature_explicit: true,
                 ..Interface::default()
             },
@@ -15,12 +15,6 @@ impl ModuleSignature {
     /// uses `project` instead: it hides representations while keeping the
     /// argument's existing identities.
     pub fn seal(&self, actual: &Interface, path: &str) -> Interface {
-        fn replace(ty: &Type, replacements: &[(Type, Type)]) -> Type {
-            if let Some((_, new)) = replacements.iter().find(|(old, _)| old == ty) {
-                return new.clone();
-            }
-            map_module_children(ty, &mut |ty| replace(ty, replacements))
-        }
         let Self::Structure { requirements } = self else {
             return self.project(actual);
         };
@@ -64,7 +58,7 @@ impl ModuleSignature {
                 path.clone_into(&mut export.entity.module);
             }
         }
-        map_interface_types(&mut projected, &mut |ty| replace(ty, &replacements));
+        map_interface_types(&mut projected, &mut |ty| replace_types(ty, &replacements));
         path.clone_into(&mut projected.module);
         projected
     }
@@ -72,11 +66,11 @@ impl ModuleSignature {
     pub fn accepts(&self, actual: &Interface) -> bool {
         match self {
             Self::Structure { .. } => {
-                actual.functor.is_none()
+                actual.parameterized.is_none()
                     && super::module_contract::check(&self.definition(), actual).is_empty()
             }
-            Self::Functor { .. } => actual
-                .functor
+            Self::Parameterized { .. } => actual
+                .parameterized
                 .as_ref()
                 .is_some_and(|provided| provided.is_subtype_of(self)),
         }
@@ -85,13 +79,13 @@ impl ModuleSignature {
     pub fn is_subtype_of(&self, expected: &Self) -> bool {
         match (self, expected) {
             (
-                Self::Functor {
+                Self::Parameterized {
                     group_size: ag,
                     binder: a,
                     parameter: ap,
                     result: ar,
                 },
-                Self::Functor {
+                Self::Parameterized {
                     group_size: bg,
                     binder: b,
                     parameter: bp,

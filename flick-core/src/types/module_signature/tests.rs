@@ -1,5 +1,6 @@
 use super::*;
 use crate::iface::{read, write};
+use crate::types::{Atom, Elem};
 
 #[test]
 fn symbolic_interfaces_keep_manifest_aliases_as_bounded_witness_references() {
@@ -48,7 +49,7 @@ fn structure(fields: &[&str]) -> ModuleSignature {
 }
 
 fn factory(input: ModuleSignature, output: ModuleSignature) -> ModuleSignature {
-    ModuleSignature::Functor {
+    ModuleSignature::Parameterized {
         group_size: 1,
         binder: "K".into(),
         parameter: Box::new(input),
@@ -148,14 +149,20 @@ fn inferred_rows_distinguish_local_errors_services_and_reexported_identities() {
         };
         assert_eq!(
             errors.entries,
-            vec![("~Failure".into(), Type::Var("Failure".into()))]
+            vec![(
+                Elem::Error(Atom::Var("Failure".into())),
+                Type::Var("Failure".into())
+            )]
         );
         assert_eq!(
             services.entries,
             if imported {
                 vec![("External.Clock".into(), Type::con("External", "Clock"))]
             } else {
-                vec![("@Clock".into(), Type::Var("Clock".into()))]
+                vec![(
+                    Elem::Service(Atom::Var("Clock".into())),
+                    Type::Var("Clock".into()),
+                )]
             }
         );
     }
@@ -209,7 +216,7 @@ fn nominal_row_source(owner: &str) -> Interface {
             param: Box::new(Type::con("Prelude", "Unit")),
             effects: Some(Box::new(Effects::new(
                 Type::Row(Row::closed(vec![(
-                    format!("{owner}.Clock"),
+                    Elem::Named(format!("{owner}.Clock")),
                     Type::con(owner, "Clock"),
                 )])),
                 Type::Row(Row::closed(vec![(
@@ -328,10 +335,10 @@ fn nested_signatures_capture_outer_types_and_respect_inner_type_binders() {
                 .scheme,
             Some(Type::con(&format!("{root}.Inner"), "Item"))
         );
-        let ModuleSignature::Functor {
+        let ModuleSignature::Parameterized {
             parameter, result, ..
         } = interface.modules["Build"]
-            .functor
+            .parameterized
             .as_ref()
             .expect("factory")
         else {
@@ -359,8 +366,8 @@ fn signature_display_distinguishes_atomic_and_curried_groups() {
         factory(structure(&["seed"]), structure(&["answer"])),
     );
     let mut grouped = curried.clone();
-    let ModuleSignature::Functor { group_size, .. } = &mut grouped else {
-        panic!("functor")
+    let ModuleSignature::Parameterized { group_size, .. } = &mut grouped else {
+        panic!("parameterized")
     };
     *group_size = 2;
     assert_ne!(curried.display(), grouped.display());
@@ -369,7 +376,7 @@ fn signature_display_distinguishes_atomic_and_curried_groups() {
 
 #[test]
 fn signature_display_uses_scoped_names_for_dependent_types() {
-    let signature = ModuleSignature::Functor {
+    let signature = ModuleSignature::Parameterized {
         group_size: 1,
         binder: "Lib@12#K".into(),
         parameter: Box::new(structure(&[])),
@@ -581,5 +588,7 @@ fn higher_order_signatures_survive_interface_serialization() {
     let interface = signature.interface("App.Factory");
     let written = write(&interface);
     let read = read(written.as_bytes(), "App.Factory").expect("interface");
-    assert_eq!(read.functor, Some(signature));
+    assert_eq!(read.parameterized, Some(signature));
 }
+
+include!("ported_tests.rs");

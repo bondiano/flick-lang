@@ -76,7 +76,9 @@ stdlib/effect/hash_map
 stdlib/effect/hash_set
 stdlib/effect/json_schema
 stdlib/effect/number
+stdlib/effect/optic_parts
 stdlib/effect/option
+stdlib/effect/option_pairs
 stdlib/effect/order
 stdlib/effect/record
 stdlib/effect/string
@@ -139,6 +141,9 @@ stdlib/http/types
 stdlib/http/server
 stdlib/http/streams
 stdlib/http/lifecycle
+stdlib/http/shutdown_masked
+stdlib/http/shutdown_stream
+stdlib/http/shutdown_timeout
 stdlib/http/api
 stdlib/http/api_bodies
 stdlib/http/auth
@@ -170,6 +175,7 @@ stdlib/effect/hmac
 stdlib/effect/password
 stdlib/effect/jwt
 stdlib/effect/trie
+stdlib/effect/trie_keys
 stdlib/effect/bytesize
 stdlib/effect/chunk
 stdlib/effect/check

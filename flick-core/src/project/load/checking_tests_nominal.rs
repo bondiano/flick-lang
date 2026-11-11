@@ -211,7 +211,7 @@ fn hom_structure_members_bind_dependent_type_paths() {
 
 #[cfg(feature = "ide")]
 #[test]
-fn hom_file_functor_accepts_an_indented_structure_body() {
+fn hom_file_parameterized_accepts_an_indented_structure_body() {
     let (_, analysis) = hom_boundary_analysis(
         &[
             (
@@ -375,7 +375,7 @@ fn hom_factory_members_capture_the_structures_abstract_type() {
 
 #[cfg(feature = "ide")]
 #[test]
-fn hom_nested_functors_capture_imports_without_widening_exposing() {
+fn hom_nested_parameterized_modules_capture_imports_without_widening_exposing() {
     use crate::diagnostics::{Severity, codes};
     for (import, input, output, expression, rejected) in [
         (

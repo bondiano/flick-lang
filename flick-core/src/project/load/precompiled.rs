@@ -18,14 +18,12 @@ use std::str;
 use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 
 use super::{Compiled, Loader, Mode};
 #[cfg(feature = "native-project")]
 use super::{Loaded, Root, Virtual, module_path};
 #[cfg(feature = "native-project")]
 use crate::diagnostics::{Diagnostic, Severity, codes};
-#[cfg(feature = "native-project")]
 use crate::ir;
 #[cfg(feature = "native-project")]
 use crate::project::Project;
@@ -52,7 +50,7 @@ pub struct CachedModule {
     /// Every top-level entity with its type, for the reference model.
     declarations: Arc<Interface>,
     /// The IR with its spans in file 0; a run moves them to the module's file.
-    ir: Value,
+    ir: ir::Module,
     /// A hash of the text it was checked from, which its spans point into.
     source: u64,
     /// Checked source for portable template instantiation and source-map
@@ -226,10 +224,13 @@ fn key_of(
 /// `compiled`, checked from `text`, to save, unless its IR has spans in
 /// another file.
 fn cached(compiled: &Compiled, dir: &Path, text: &str) -> Option<CachedModule> {
-    let mut ir = serde_json::to_value(&compiled.ir).ok()?;
-    let own = serde_json::to_value(compiled.file).ok()?;
-    let zero = serde_json::to_value(FileId::default()).ok()?;
-    if !move_spans(&mut ir, Some(&own), &zero) {
+    let mut ir = compiled.ir.clone();
+    let mut own = true;
+    ir.each_span_mut(&mut |span| {
+        own &= span.file == compiled.file;
+        span.file = FileId::default();
+    });
+    if !own {
         return None;
     }
     Some(CachedModule {
@@ -257,33 +258,6 @@ fn hash(text: &str) -> u64 {
     hasher.finish()
 }
 
-#[cfg(feature = "native-project")]
-/// Sets the file of every span in `value` to `to`; false when one is not in
-/// `from`.
-fn move_spans(value: &mut Value, from: Option<&Value>, to: &Value) -> bool {
-    match value {
-        Value::Object(fields) if is_span(fields) => {
-            let file = fields.get_mut("file").expect("a span has a file");
-            if from.is_some_and(|from| file != from) {
-                return false;
-            }
-            *file = to.clone();
-            true
-        }
-        Value::Object(fields) => fields.values_mut().all(|v| move_spans(v, from, to)),
-        Value::Array(items) => items.iter_mut().all(|v| move_spans(v, from, to)),
-        _ => true,
-    }
-}
-
-#[cfg(feature = "native-project")]
-fn is_span(fields: &serde_json::Map<String, Value>) -> bool {
-    fields.len() == 3
-        && ["file", "start", "end"]
-            .iter()
-            .all(|k| fields.contains_key(*k))
-}
-
 impl Loader<'_> {
     /// Uses the saved module `name` of the package in `dir`, and what it
     /// imports, instead of loading their sources; false when none is saved.
@@ -307,91 +281,6 @@ impl Loader<'_> {
             self.find_in_packages(&import);
         }
         true
-    }
-
-    #[cfg(feature = "native-project")]
-    fn restore_template(&mut self, name: &str) -> bool {
-        let (package, module) = &self.precompiled.saved[name];
-        let Some(template) = &module.interface.template else {
-            return false;
-        };
-        let path = self.precompiled.packages[package].1.join(&module.path);
-        #[cfg(feature = "native-project")]
-        if self.host.read(&path).ok().is_some_and(|bytes| {
-            str::from_utf8(&bytes).map_or(true, |text| hash(text) != module.source)
-        }) {
-            self.diagnostics.push(Diagnostic::new(codes::P034, Severity::Error,
-                format!("`{}` changed since its package was checked: `flick install` restores the package store", self.host.display(&path))));
-        }
-        let file = self
-            .sources
-            .add(self.host.display(&path), template.source.clone());
-        let parse = Arc::new(syntax::parse(&template.source, file).into_module());
-        let syntax = Arc::new(resolve::module_syntax(&parse.tree, &template.source, file));
-        let at = syntax
-            .header
-            .as_ref()
-            .map_or(Span::new(file, 0, 0), |h| h.span);
-        let virtual_of = template.capture.clone().map(|mut capture| {
-            capture
-                .definition_package
-                .get_or_insert_with(|| package.clone());
-            Virtual { at, capture }
-        });
-        let index = self.modules.len();
-        self.by_name.insert(name.to_owned(), index);
-        self.modules.push(Loaded {
-            name: name.to_owned(),
-            path,
-            file,
-            root: Root::Package(package.clone()),
-            parse,
-            syntax,
-            virtual_of,
-            member_of: module.interface.member_of.clone(),
-            scope_of: None,
-            expansion: None,
-            editing: Vec::new(),
-            loader: None,
-        });
-        true
-    }
-
-    /// A saved ordinary module can own a functor's lexical declarations even
-    /// when only the nested template is restored as a loaded source module.
-    #[cfg(feature = "native-project")]
-    pub(super) fn scope_source(&mut self, name: &str) -> Option<Loaded> {
-        let (package, saved) = self.precompiled.saved.get(name)?;
-        let source = saved
-            .interface
-            .template
-            .as_ref()
-            .map(|t| &t.source)
-            .or(saved.source_text.as_ref())?
-            .clone();
-        let path = self.precompiled.packages[package].1.join(&saved.path);
-        if self.host.read(&path).ok().is_some_and(|bytes| {
-            str::from_utf8(&bytes).map_or(true, |text| hash(text) != saved.source)
-        }) {
-            self.diagnostics.push(Diagnostic::new(codes::P034, Severity::Error, format!("`{}` changed since its package was checked: `flick install` restores the package store", self.host.display(&path))));
-        }
-        let file = self.sources.add(self.host.display(&path), source.clone());
-        let parse = Arc::new(syntax::parse(&source, file).into_module());
-        let syntax = Arc::new(resolve::module_syntax(&parse.tree, &source, file));
-        Some(Loaded {
-            name: name.into(),
-            path,
-            file,
-            root: Root::Package(package.clone()),
-            parse,
-            syntax,
-            virtual_of: None,
-            member_of: None,
-            scope_of: None,
-            expansion: None,
-            editing: Vec::new(),
-            loader: None,
-        })
     }
 
     /// Finds `name`, imported by a saved module, as a module of a source
@@ -490,17 +379,7 @@ impl Loader<'_> {
                 continue;
             }
             let mut ir = module.ir.clone();
-            let to = serde_json::to_value(file).expect("a file id serializes");
-            move_spans(&mut ir, None, &to);
-            let ir = match serde_json::from_value::<ir::Module>(ir) {
-                Ok(ir) => ir,
-                Err(err) => {
-                    let message = format!("the saved IR of `{name}` does not load: {err}");
-                    self.diagnostics
-                        .push(Diagnostic::new(codes::P001, Severity::Error, message));
-                    continue;
-                }
-            };
+            ir.each_span_mut(&mut |span| span.file = file);
             out.push(Compiled {
                 name: module.name.clone(),
                 path,
@@ -517,3 +396,6 @@ impl Loader<'_> {
         out
     }
 }
+
+#[cfg(feature = "native-project")]
+include!("precompiled_templates.rs");

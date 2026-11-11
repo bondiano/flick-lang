@@ -21,7 +21,7 @@ impl ModuleSignature {
             }
         }
         match self {
-            Self::Functor {
+            Self::Parameterized {
                 binder,
                 parameter,
                 result,
@@ -54,11 +54,11 @@ impl ModuleSignature {
 
     fn display_body(&self) -> String {
         match self {
-            Self::Functor { group_size, .. } => {
+            Self::Parameterized { group_size, .. } => {
                 let mut parameters = Vec::new();
                 let mut tail = self;
                 for _ in 0..(*group_size).max(1) {
-                    let Self::Functor {
+                    let Self::Parameterized {
                         binder,
                         parameter,
                         result,
@@ -69,7 +69,7 @@ impl ModuleSignature {
                     };
                     let input = parameter.display_body();
                     parameters.push(if binder.is_empty() {
-                        if matches!(parameter.as_ref(), Self::Functor { .. }) {
+                        if matches!(parameter.as_ref(), Self::Parameterized { .. }) {
                             format!("({input})")
                         } else {
                             input
@@ -80,7 +80,8 @@ impl ModuleSignature {
                     tail = result;
                 }
                 let input = parameters.join(", ");
-                let bound = matches!(self, Self::Functor { binder, .. } if !binder.is_empty());
+                let bound =
+                    matches!(self, Self::Parameterized { binder, .. } if !binder.is_empty());
                 if parameters.len() > 1 || bound {
                     format!("({input}) -> {}", tail.display_body())
                 } else {
@@ -91,6 +92,7 @@ impl ModuleSignature {
             Self::Structure { requirements } => requirements
                 .iter()
                 .map(|r| match r {
+                    R::Kind { name, .. } => format!("kind {name}"),
                     R::Type { name, manifest, .. } => manifest.as_ref().map_or_else(
                         || format!("type {name}"),
                         |ty| format!("type {name} = {}", display_type(ty)),

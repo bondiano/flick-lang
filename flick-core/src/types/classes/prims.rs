@@ -4,6 +4,7 @@
 use super::solve::{Givens, Outcome};
 use super::{Dict, has_metas};
 use crate::types::Checker;
+use crate::types::Elem;
 use crate::types::lang::Lang;
 use crate::types::ty::{Row, Type};
 
@@ -79,7 +80,7 @@ impl Checker<'_> {
                 let entries = row
                     .entries
                     .iter()
-                    .filter(|(l, _)| l != label)
+                    .filter(|(l, _)| *l != label.as_str())
                     .cloned()
                     .collect();
                 let removed = Type::Record(Row {
@@ -106,7 +107,7 @@ impl Checker<'_> {
                     }
                 }
                 // shortcut: an open `out` keeps only its known fields at run time
-                let labels = out.entries.iter().map(|(l, _)| l.clone());
+                let labels = out.entries.iter().map(|(l, _)| l.to_string());
                 primitive(self.show_exact(c), labels.collect())
             }
             (Lang::UnionDisjoint, [Type::Record(a), Type::Record(b), out]) => {
@@ -144,7 +145,9 @@ impl Checker<'_> {
         let refuse = |reason: String| Outcome::Missing(c.clone(), Some(reason));
         let fields = match self.whnf(part) {
             Type::Record(row) => match rest(&row) {
-                Rest::Closed => row.entries.into_iter().map(|(l, _)| l).collect(),
+                Rest::Closed => (row.entries.into_iter())
+                    .map(|(l, _)| l.to_string())
+                    .collect(),
                 Rest::Unknown => return Outcome::Stuck,
                 Rest::Open => {
                     return refuse(
@@ -178,7 +181,7 @@ impl Checker<'_> {
                 )),
             );
         }
-        let entries: Vec<(String, Type)> = a.entries.iter().chain(&b.entries).cloned().collect();
+        let entries: Vec<(Elem, Type)> = a.entries.iter().chain(&b.entries).cloned().collect();
         match (rest(a), rest(b)) {
             (Rest::Closed, Rest::Closed) => {
                 self.result(c, out, &Type::Record(Row::closed(entries)))
@@ -201,7 +204,7 @@ impl Checker<'_> {
         c: &Type,
         open: &Row,
         closed: &Row,
-        mut entries: Vec<(String, Type)>,
+        mut entries: Vec<(Elem, Type)>,
         out: &Type,
         givens: &Givens,
         chain: &mut Vec<Type>,
@@ -209,7 +212,7 @@ impl Checker<'_> {
         for (label, _) in &closed.entries {
             let lacks = Type::apps(
                 Type::lang(Lang::Lacks),
-                [Type::Symbol(label.clone()), Type::Record(open.clone())],
+                [Type::Symbol(label.to_string()), Type::Record(open.clone())],
             );
             match self.entail(&lacks, givens, chain) {
                 Outcome::Solved(_) => {}

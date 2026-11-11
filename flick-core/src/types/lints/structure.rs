@@ -104,8 +104,7 @@ impl Checker<'_> {
             if let Some(effects) = effects
                 && let Type::Row(row) = &effects.services
             {
-                reads |= (row.entries.iter())
-                    .any(|(l, _)| Some(l.as_str()) == lang::label(Lang::AtomRead));
+                reads |= (row.entries.iter()).any(|(l, _)| l.name() == lang::label(Lang::AtomRead));
             }
             ty = *result;
         }

@@ -5,6 +5,7 @@ use std::hash::{Hash, Hasher};
 
 use serde::{Deserialize, Serialize};
 
+use super::elem::{Atom, Elem, Label};
 use super::kinds::Kind;
 use super::lang::{self, Lang};
 use crate::source::Span;
@@ -205,9 +206,9 @@ pub fn stage_of(effects: Option<&Effects>) -> Stage {
 }
 
 /// The labels of a row without a variable or a meta in it.
-fn closed_labels(row: &Type) -> Option<Vec<&str>> {
+fn closed_labels(row: &Type) -> Option<Vec<&Elem>> {
     let Type::Row(r) = row else { return None };
-    let mut labels: Vec<&str> = r.entries.iter().map(|(l, _)| l.as_str()).collect();
+    let mut labels: Vec<&Elem> = r.entries.iter().map(|(l, _)| l).collect();
     if let Some(tail) = &r.tail {
         labels.extend(closed_labels(tail)?);
     }
@@ -218,12 +219,14 @@ fn closed_labels(row: &Type) -> Option<Vec<&str>> {
 /// what a stage needs live runs nothing.
 pub fn sync_rows(services: &Type, errors: &Type) -> bool {
     closed_labels(services).is_some_and(|mut l| {
-        l.retain(|l| *l != super::LIVE);
+        l.retain(|l| **l != Elem::Live);
         !l.is_empty()
             && l.iter().all(|l| {
-                SYNC_SERVICES
-                    .iter()
-                    .any(|&s| lang::table().find(s).is_some_and(|i| i.label == *l))
+                SYNC_SERVICES.iter().any(|&s| {
+                    lang::table()
+                        .find(s)
+                        .is_some_and(|i| l.name() == Some(&i.label))
+                })
             })
     }) && closed_labels(errors).is_some_and(|l| l.is_empty())
 }
@@ -232,7 +235,7 @@ pub fn sync_rows(services: &Type, errors: &Type) -> bool {
 /// field names; a service or error row with the element's qualified name.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct Row {
-    pub entries: Vec<(String, Type)>,
+    pub entries: Vec<(Elem, Type)>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tail: Option<Box<Type>>,
     /// Where the row is written as a type, `none` or `{…}`, for a fix that
@@ -242,7 +245,7 @@ pub struct Row {
 }
 
 impl Row {
-    pub fn closed(mut entries: Vec<(String, Type)>) -> Row {
+    pub fn closed(mut entries: Vec<(Elem, Type)>) -> Row {
         entries.sort_by(|a, b| a.0.cmp(&b.0));
         Row {
             entries,
@@ -251,9 +254,9 @@ impl Row {
         }
     }
 
-    pub fn get(&self, label: &str) -> Option<&Type> {
+    pub fn get(&self, label: &(impl Label + ?Sized)) -> Option<&Type> {
         self.entries
-            .binary_search_by(|(l, _)| l.as_str().cmp(label))
+            .binary_search_by(|(l, _)| label.against(l))
             .ok()
             .map(|i| &self.entries[i].1)
     }
@@ -263,15 +266,15 @@ impl Row {
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Norm {
     /// Sorted by label, each label once.
-    pub entries: Vec<(String, Type)>,
+    pub entries: Vec<(Elem, Type)>,
     /// Row variables, unknown rows and error markers the row extends.
     pub tails: Vec<Type>,
 }
 
 impl Norm {
-    pub fn get(&self, label: &str) -> Option<&Type> {
+    pub fn get(&self, label: &(impl Label + ?Sized)) -> Option<&Type> {
         self.entries
-            .binary_search_by(|(l, _)| l.as_str().cmp(label))
+            .binary_search_by(|(l, _)| label.against(l))
             .ok()
             .map(|i| &self.entries[i].1)
     }
@@ -296,37 +299,26 @@ impl Norm {
 /// The label of a region, or of a type variable whose captures are meant, in
 /// a capture row. It follows the element, which unification may still
 /// change, so rows relabel such entries whenever they are taken apart.
-pub fn capture_label(t: &Type) -> Option<String> {
-    match t {
-        Type::Var(name) => Some(format!("^{name}")),
-        Type::Skolem(s) => Some(format!("^'{s}")),
-        Type::Meta(m) => Some(format!("^?{m}")),
-        _ => None,
-    }
+pub fn capture_label(t: &Type) -> Option<Elem> {
+    Atom::of(t).map(Elem::Capture)
 }
 
 /// The label of a type variable as an element of an error row, `{t | e}`.
 /// It follows the element until the variable stands for an error type,
 /// which is then labelled by its name like any other.
-pub fn error_label(t: &Type) -> Option<String> {
+pub fn error_label(t: &Type) -> Option<Elem> {
     match t.spine().0 {
-        Type::Con { module, name } => Some(format!("{module}.{name}")),
-        Type::Var(name) => Some(format!("~{name}")),
-        Type::Skolem(s) => Some(format!("~'{s}")),
-        Type::Meta(m) => Some(format!("~?{m}")),
-        _ => None,
+        Type::Con { module, name } => Some(Elem::Named(format!("{module}.{name}"))),
+        head => Atom::of(head).map(Elem::Error),
     }
 }
 
 /// A service atom supplied by a static module may still be a bound variable.
 /// Its row key must follow that variable when the witness is instantiated.
-pub fn service_label(t: &Type) -> Option<String> {
+pub fn service_label(t: &Type) -> Option<Elem> {
     match t.spine().0 {
-        Type::Con { module, name } => Some(format!("{module}.{name}")),
-        Type::Var(name) => Some(format!("@{name}")),
-        Type::Skolem(s) => Some(format!("@'{s}")),
-        Type::Meta(m) => Some(format!("@?{m}")),
-        _ => None,
+        Type::Con { module, name } => Some(Elem::Named(format!("{module}.{name}"))),
+        head => Atom::of(head).map(Elem::Service),
     }
 }
 

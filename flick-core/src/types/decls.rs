@@ -65,6 +65,7 @@ impl Checker<'_> {
         for (p, body) in pending.iter().zip(bodies) {
             self.finish(p, body);
         }
+        self.finish_module_contracts(&pending);
         // Aliases are converted before contract bodies so a contract may use
         // an alias declared later. Validate `Module Sig` again once the local
         // contract's members are known.
@@ -242,7 +243,7 @@ impl Checker<'_> {
                         super::ModuleSignature::Structure { requirements } => {
                             Body::ModuleContract(requirements)
                         }
-                        signature @ super::ModuleSignature::Functor { .. } => {
+                        signature @ super::ModuleSignature::Parameterized { .. } => {
                             Body::ModuleSignature(signature)
                         }
                     }
@@ -430,3 +431,5 @@ enum Body {
         Vec<(String, Type)>,
     ),
 }
+
+include!("decls_nominal_snapshots.rs");

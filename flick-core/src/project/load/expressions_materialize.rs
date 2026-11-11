@@ -76,7 +76,6 @@ impl Loader<'_> {
         let application = ModuleApplication {
             expression: body.clone(),
             annotation: None,
-            argument_groups: Vec::new(),
             name: String::new(),
             template: String::new(),
             template_span: header.span,
@@ -95,19 +94,7 @@ impl Loader<'_> {
             ));
             return;
         }
-        let syntax = Arc::make_mut(&mut self.modules[module].syntax);
-        syntax.header.as_mut().expect("header").materialized_body = Some(target.clone());
-        syntax.imports.push(Import {
-            module: target,
-            alias: None,
-            exposing: vec![Item {
-                kind: ItemKind::All,
-                name: String::new(),
-                span: header.span,
-            }],
-            plugins: Vec::new(),
-            span: header.span,
-        });
+        self.select_expression_body(module, target, header.span);
     }
 
     pub(super) fn callable_template(&mut self, mut template: usize, at: Span) -> Option<usize> {

@@ -3,6 +3,7 @@
 //! Both work on canonical types.
 
 use super::has_metas;
+use crate::types::Elem;
 use crate::types::ty::{Row, Type};
 
 /// Whether a head matches; `Unknown` when only unknown types in the
@@ -88,7 +89,7 @@ fn match_row(pattern: &Row, target: &Row, subst: &mut Subst) -> Match {
             None => Match::No,
         });
     }
-    let rest: Vec<(String, Type)> = target
+    let rest: Vec<(Elem, Type)> = target
         .entries
         .iter()
         .filter(|(l, _)| pattern.get(l).is_none())

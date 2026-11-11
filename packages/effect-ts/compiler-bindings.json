@@ -198,11 +198,6 @@
       "@flick-lang/runtime/rt/effect/Number"
     ],
     [
-      "flick:Optic",
-      null,
-      "@flick-lang/runtime/rt/effect/Optic"
-    ],
-    [
       "flick:Option",
       "@flick-lang/runtime/core/Option",
       "@flick-lang/runtime/rt/effect/Option"
@@ -276,11 +271,6 @@
       "flick:Tracer",
       null,
       "@flick-lang/runtime/rt/effect/Tracer"
-    ],
-    [
-      "flick:Trie",
-      null,
-      "@flick-lang/runtime/rt/effect/Trie"
     ],
     [
       "flick:Tuple",

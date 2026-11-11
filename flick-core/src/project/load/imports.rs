@@ -37,7 +37,7 @@ impl Loader<'_> {
                 if self.modules[i].syntax.header.as_ref().is_some_and(|h| {
                     !h.parameters.is_empty()
                         && self.modules[i].syntax.applications.iter().any(|a| {
-                            a.expression.kind != K::ModuleFunctorExpr
+                            a.expression.kind != K::ModuleParamExpr
                                 && import.module == format!("{}.{}", h.name, a.name)
                         })
                 }) {
@@ -63,6 +63,7 @@ impl Loader<'_> {
                 );
                 if let Some(callee) = &virtual_of.capture.callee {
                     dependencies.push(callee.signature_owner().to_owned());
+                    dependencies.extend(callee.contract_arguments().map(|a| a.module.clone()));
                 }
                 for dependency in dependencies {
                     if let Some(target) = self.find_module(i, &dependency, virtual_of.at) {
@@ -77,7 +78,7 @@ impl Loader<'_> {
                         .header
                         .as_ref()
                         .is_some_and(|h| !h.parameters.is_empty());
-                    if !symbolic || application.expression.kind == K::ModuleFunctorExpr {
+                    if !symbolic || application.expression.kind == K::ModuleParamExpr {
                         self.instantiate(i, &application);
                     }
                 }
@@ -122,8 +123,15 @@ impl Loader<'_> {
                         targets,
                     );
                 }
-                if let Some(CalleeOrigin::Member(view)) = &context.capture.callee {
-                    self.namespace_parents(i, &view.module, Some(&view.access_modules), targets);
+                if let Some(callee) = &context.capture.callee {
+                    for view in callee.contract_arguments() {
+                        self.namespace_parents(
+                            i,
+                            &view.module,
+                            Some(&view.access_modules),
+                            targets,
+                        );
+                    }
                 }
             }
             targets.sort_unstable();
@@ -201,7 +209,17 @@ impl Loader<'_> {
                 };
                 prefix = parent;
             }
+            let active = format!("member:{name}");
+            if !self.expressions_active.insert(active.clone()) {
+                self.diagnostics.push(Diagnostic::error(
+                    codes::R006,
+                    format!("cyclic module member resolution for `{name}`"),
+                    span,
+                ));
+                return None;
+            }
             self.materialize_members(name);
+            self.expressions_active.remove(&active);
             if !self.by_name.contains_key(name) && self.report_inline_import(&dirs, name, span) {
                 return None;
             }

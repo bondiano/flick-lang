@@ -205,7 +205,7 @@
         { "name": "keyword.control.flick", "match": "(?<![.\\w])(?:match|with|try|if|then|else|when|await|in|for|yield|do)\\b" },
         { "name": "keyword.operator.word.flick", "match": "(?<![.\\w])not\\b" },
         { "name": "keyword.other.flick", "match": "(?<![.\\w])private(?=\\s+module\\b)" },
-        { "name": "keyword.other.flick", "match": "(?<![.\\w])functor(?=\\s*\\()|(?<![.\\w])and(?=\\s+type\\b)" },
+        { "name": "keyword.other.flick", "match": "(?<![.\\w])and(?=\\s+type\\b)" },
         {
           "name": "keyword.other.flick",
           "match": "(?<![.\\w])(?:module|exposing|import|as|let|rec|assert|fun|task|scope|provide|ignore|todo|echo|type|opaque|refined|where|kind|error|service|class|instance|deriving|foreign|from|forall|none|ui)\\b"

@@ -222,20 +222,7 @@ impl Checker<'_> {
                             );
                 let (identity, definition, methods) = match resolved {
                     Some((identity, definition)) => {
-                        let methods = match &definition.form {
-                            Form::Class { methods, .. } => methods
-                                .iter()
-                                .filter_map(|name| {
-                                    let entity = Entity {
-                                        module: identity.module.clone(),
-                                        namespace: Namespace::Value,
-                                        name: name.clone(),
-                                    };
-                                    self.env.value(&entity).map(|ty| (name.clone(), ty.clone()))
-                                })
-                                .collect(),
-                            _ => Vec::new(),
-                        };
+                        let methods = self.nominal_methods(&identity, &definition);
                         (Some(identity), Some(Box::new(definition)), methods)
                     }
                     None => (None, None, Vec::new()),
@@ -383,6 +370,9 @@ impl Checker<'_> {
                     if let Some(ty) = manifest {
                         *ty = self.default_kinds(ty);
                     }
+                }
+                ModuleRequirement::Kind { definition, .. } => {
+                    definition.kind = self.kinds.zonk(&definition.kind, true);
                 }
                 ModuleRequirement::Value { ty, .. } => *ty = self.default_kinds(ty),
                 ModuleRequirement::Dictionary { head, .. } => *head = self.default_kinds(head),

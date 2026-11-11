@@ -1,0 +1,59 @@
+// The grace period bounds normal work, not cleanup. Request finalizers finish
+// before the server's owner releases resources, including ones acquired later.
+module App.Main exposing (main)
+
+start : String ->{} JsValue
+foreign start from "./raw.mjs" "start"
+
+wait : JsValue ->{Async} String
+foreign wait from "./raw.mjs" "wait"
+
+ms : Float -> Duration.Duration
+let ms n = Result.with_default Duration.zero (Duration.millis n)
+
+handle :
+  Deferred.Deferred {} Unit ->
+  Http.ServerRequest.ServerRequest ->{Async}
+  Http.ServerResponse.ServerResponse
+let handle started _ = scope {
+  Resource.acquire_release (task { () }) (fun _ ->
+    Platform.stdout_line "request cleanup started"
+    Effect.sleep (ms 50)
+    Platform.stdout_line "request cleanup finished"
+  )
+  Effect.uninterruptible
+    (task {
+      Platform.stdout_line "request started"
+      ignore (Deferred.succeed () started)
+      Effect.sleep (ms 80)
+      Platform.stdout_line "masked work finished"
+    })
+  Http.ServerResponse.text "done" Http.ServerResponse.defaults
+}
+
+main : Unit ->{Async; AppError} Unit
+let main () =
+  let started : Deferred.Deferred {} Unit = Deferred.make ()
+  let pending =
+    try
+      scope {
+        let server =
+          Http.Server.serve
+            { host = "127.0.0.1"; port = 0; gracefulShutdownTimeout = Some (ms 20) }
+            (handle started)
+        let request = start (Http.Server.format_address (Http.Server.address server))
+        Deferred.await_ started
+        Resource.acquire_release (task { () }) (fun _ ->
+          Platform.stdout_line "server resource released"
+        )
+        Platform.stdout_line "closing server"
+        Some request
+      }
+    with
+    | Http.ServerError.ServeError message ->
+      Platform.stdout_line message
+      None
+  Platform.stdout_line "server closed"
+  match pending with
+  | Some request -> ignore (wait request)
+  | None -> ()

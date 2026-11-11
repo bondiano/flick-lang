@@ -118,6 +118,11 @@ pub fn resolve(
     let mut diagnostics = defs::duplicates(&all);
     let defs = defs::defined(all.clone());
     diagnostics.extend(defs::alias_cycles(module.tree, module.text, module.file));
+    diagnostics.extend(defs::module_signature_cycles(
+        module.tree,
+        module.text,
+        module.file,
+    ));
     let scope = scope::Scope::new(module, &defs, imported, &mut diagnostics);
     let mut interface = scope.exports(&mut diagnostics);
     interface.private = module.syntax.header.as_ref().is_some_and(|h| h.private);

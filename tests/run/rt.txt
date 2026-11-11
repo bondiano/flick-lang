@@ -185,7 +185,9 @@ stdlib/effect/metric
 stdlib/effect/mutable_ref
 stdlib/effect/number
 stdlib/effect/observe
+stdlib/effect/optic_parts
 stdlib/effect/option
+stdlib/effect/option_pairs
 stdlib/effect/order
 stdlib/effect/password
 stdlib/effect/platform
@@ -213,6 +215,7 @@ stdlib/effect/string
 stdlib/effect/string_locale
 stdlib/effect/tracer
 stdlib/effect/trie
+stdlib/effect/trie_keys
 stdlib/effect/txchunk
 stdlib/effect/txdeferred
 stdlib/effect/txhashmap
@@ -241,6 +244,9 @@ stdlib/http/redaction_context
 stdlib/http/router_patterns
 stdlib/http/serve
 stdlib/http/server
+stdlib/http/shutdown_masked
+stdlib/http/shutdown_stream
+stdlib/http/shutdown_timeout
 stdlib/http/spa
 stdlib/http/spans
 stdlib/http/streams

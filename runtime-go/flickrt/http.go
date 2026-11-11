@@ -1,14 +1,11 @@
 package flickrt
 
 import (
-	"context"
-	"errors"
 	"io"
 	"net"
 	"net/http"
 	"strconv"
 	"strings"
-	"time"
 )
 
 // An HTTP server on net/http, as the JS runtime's on Node: each request
@@ -28,17 +25,6 @@ var (
 	tcpAddressTag  = Tag("Http.Server.Address.TcpAddress")
 )
 
-// servedRequest is a request with the fiber its handler runs in.
-type servedRequest struct {
-	state   fiberState
-	fiber   Fiber
-	source  requestSource
-	marks   requestMarks
-	request ServerRequest
-}
-
-func (q *servedRequest) interrupt() { q.state.interrupt(0) }
-
 // HttpServer is a server listening in the owner of a scope.
 type HttpServer struct {
 	srv      *http.Server
@@ -54,6 +40,7 @@ func HttpServe(fb *Fiber, options, handler Value) Value {
 	}
 	concurrent.Store(true)
 	serving := *fb
+	requests := newHTTPRequests()
 	srv := &http.Server{Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// one allocation for what a request's fiber needs
 		q := &servedRequest{fiber: serving}
@@ -62,45 +49,11 @@ func HttpServe(fb *Fiber, options, handler Value) Value {
 		q.state.id, q.state.signal = fibers.Add(1), make(chan struct{})
 		q.fiber.state = &q.state
 		q.fiber.env = serving.env.with(requestStateKey, &q.marks)
-		stop := context.AfterFunc(r.Context(), q.interrupt)
-		out, cause := catch(func() Value { return Run(&q.fiber, Apply(&q.fiber, handler, &q.request)) })
-		if cause != nil {
-			out = causeResponse(cause)
-		}
-		q.marks.mu.Lock()
-		pre := len(q.marks.preResponse) > 0
-		q.marks.mu.Unlock()
-		if pre {
-			if sent, failed := catch(func() Value { return q.request.preResponded(&q.fiber, &q.marks, out) }); failed == nil {
-				out = sent
-			} else {
-				out = causeResponse(failed)
-			}
-		}
-		// a streamed body runs in the request's fiber, which a client gone interrupts
-		aborted := writeResponse(w, out.(*ServerResponse), &q.fiber)
-		stop()
-		if aborted {
-			panic(http.ErrAbortHandler)
-		}
+		requests.serve(q, w, r, handler)
 	}), ConnContext: orderContext}
 	go srv.Serve(orderListener{listener})
-	var grace time.Duration
-	if d, ok := some(o.Get("gracefulShutdownTimeout")); ok && !dur(d).infinite() {
-		grace = time.Duration(dur(d).toNanos().Int64())
-	}
-	fb.owner.add(fb, func(*Fiber, *Cause) Value {
-		ctx := context.Background()
-		if grace > 0 {
-			var cancel context.CancelFunc
-			ctx, cancel = context.WithTimeout(ctx, grace)
-			defer cancel()
-		}
-		if err := srv.Shutdown(ctx); err != nil && !errors.Is(err, context.DeadlineExceeded) {
-			panic(Defect{err.Error()})
-		}
-		srv.Close()
-		return Unit
+	fb.owner.onClose(fb, func(*Fiber) {
+		requests.close(srv, o.Get("gracefulShutdownTimeout"))
 	})
 	return &HttpServer{srv, listener}
 }

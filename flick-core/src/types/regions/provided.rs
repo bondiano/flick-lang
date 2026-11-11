@@ -8,9 +8,10 @@
 //! `scope` of the stage, or by a given `Provided`; otherwise it stays in the
 //! stage's row as `Provided {S} s` and goes to whatever runs the stage.
 
+use crate::types::Elem;
 use std::mem;
 
-use super::{LIVE, Scope, scope};
+use super::{Scope, scope};
 use crate::diagnostics::{Diagnostic, Edit, codes};
 use crate::source::Span;
 use crate::syntax::cst::Node;
@@ -22,15 +23,11 @@ use crate::types::gadt::branch::type_eqs;
 use crate::types::lang::{self, Lang};
 use crate::types::ty::{Norm, Row, Type};
 
-/// Labels of the obligations in a services row: the prefix, then the
-/// service's label.
-pub const PROVIDED: &str = "Fiber.Provided ";
-
 /// A `provide` around the code being checked.
 #[derive(Debug, Clone)]
 pub struct Provide {
     /// The labels of the services it builds.
-    pub labels: Vec<String>,
+    pub labels: Vec<Elem>,
     /// Whether it also builds a row variable's services, unknown here.
     pub open: bool,
     /// Its entry in `State::scopes`.
@@ -63,7 +60,7 @@ pub struct Want {
 impl Checker<'_> {
     /// The body of a `provide` at `span` building the services `labels`:
     /// it nests like a `scope`, so owners compare with it (`encloses`).
-    pub fn enter_provide(&mut self, node: &Node, span: Span, labels: Vec<String>, open: bool) {
+    pub fn enter_provide(&mut self, node: &Node, span: Span, labels: Vec<Elem>, open: bool) {
         let Type::Skolem(region) = self.store.skolem("provide") else {
             unreachable!("a skolem")
         };
@@ -156,7 +153,7 @@ impl Checker<'_> {
         let norm = self.store.normalize(&want.row);
         let mut keep = Vec::new();
         for (label, ty) in norm.entries {
-            if label == LIVE {
+            if matches!(label, Elem::Live) {
                 let key = format!("{label}{ty:?}");
                 if !want.settled.contains(&key) {
                     want.settled.push(key);
@@ -166,15 +163,16 @@ impl Checker<'_> {
                 continue;
             }
             // `Async` is the root's: no owner provides it
-            let root = lang::label(Lang::Async) == Some(label.as_str());
+            let root = lang::label(Lang::Async) == label.name();
+            let key = label.to_string();
             if root
-                || label == scope()
-                || label.starts_with(PROVIDED)
-                || want.settled.contains(&label)
+                || label.name() == Some(scope())
+                || matches!(label, Elem::Provided(_))
+                || want.settled.contains(&key)
             {
                 continue;
             }
-            want.settled.push(label.clone());
+            want.settled.push(key);
             if !self.discharge(&label, &want.owner, &want.at, want.span) {
                 keep.push(obligation(&label, ty, &want.owner));
             }
@@ -204,7 +202,11 @@ impl Checker<'_> {
     /// settles are left out of the row.
     pub fn settle_performed(&mut self, services: &Type, span: Span) -> Type {
         let mut norm = self.store.normalize(services);
-        if !norm.entries.iter().any(|(l, _)| l.starts_with(PROVIDED)) {
+        if !norm
+            .entries
+            .iter()
+            .any(|(l, _)| matches!(l, Elem::Provided(_)))
+        {
             return services.clone();
         }
         let at = self.lexical();
@@ -214,8 +216,10 @@ impl Checker<'_> {
                 [_, owner] => Some(owner.clone()),
                 _ => None,
             };
-            let settled = match (label.strip_prefix(PROVIDED), owner) {
-                (Some(service), Some(owner)) => self.discharge(service, &owner, &at, span),
+            let settled = match (&label, owner) {
+                (Elem::Provided(service), Some(owner)) => {
+                    self.discharge(service, &owner, &at, span)
+                }
                 _ => false,
             };
             if !settled {
@@ -226,7 +230,7 @@ impl Checker<'_> {
     }
 
     /// Whether the place `at` settles that `service` outlives `owner`.
-    fn discharge(&mut self, service: &str, owner: &Type, at: &Lexical, span: Span) -> bool {
+    fn discharge(&mut self, service: &Elem, owner: &Type, at: &Lexical, span: Span) -> bool {
         let provider = at
             .provides
             .iter()
@@ -273,7 +277,7 @@ impl Checker<'_> {
     }
 
     /// Obligations the stage cannot settle go to its row.
-    fn pass_on(&mut self, entries: Vec<(String, Type)>, at: &Lexical, span: Span) {
+    fn pass_on(&mut self, entries: Vec<(Elem, Type)>, at: &Lexical, span: Span) {
         if entries.is_empty() || at.pure {
             return;
         }
@@ -286,7 +290,7 @@ impl Checker<'_> {
     }
 
     /// Once rows are solved, an obligation not settled must be in its row.
-    fn check_passed(&mut self, entries: Vec<(String, Type)>, at: &Lexical, span: Span) {
+    fn check_passed(&mut self, entries: Vec<(Elem, Type)>, at: &Lexical, span: Span) {
         if at.pure {
             return;
         }
@@ -302,10 +306,11 @@ impl Checker<'_> {
         }
     }
 
-    fn outlived_provide(&mut self, service: &str, provide: usize, owner: &Type, span: Span) {
+    fn outlived_provide(&mut self, service: &Elem, provide: usize, owner: &Type, span: Span) {
         let Scope { span: at, .. } = self.cx.regions.scopes[provide];
         let (region, _) = self.describe(owner);
-        let name = service.rsplit('.').next().unwrap_or(service);
+        let service = service.to_string();
+        let name = service.rsplit('.').next().unwrap_or(&service);
         self.diagnostics.push(
             Diagnostic::error(
                 codes::G003,
@@ -387,12 +392,12 @@ impl Checker<'_> {
 }
 
 /// The row element `Provided {S} owner`.
-fn obligation(label: &str, service: Type, owner: &Type) -> (String, Type) {
+fn obligation(label: &Elem, service: Type, owner: &Type) -> (Elem, Type) {
     let row = Type::Row(Row {
-        entries: vec![(label.to_owned(), service)],
+        entries: vec![(label.clone(), service)],
         tail: None,
         ..Row::default()
     });
     let ty = Type::apps(Type::lang(Lang::Provided), [row, owner.clone()]);
-    (format!("{PROVIDED}{label}"), ty)
+    (Elem::Provided(Box::new(label.clone())), ty)
 }

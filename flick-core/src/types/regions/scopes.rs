@@ -1,5 +1,6 @@
 //! `scope` expressions and the calls that acquire into their owners.
 
+use crate::types::Elem;
 use std::mem;
 
 use super::{Need, Scope, scope};
@@ -200,7 +201,7 @@ impl Checker<'_> {
             if !provided {
                 let row = Type::Row(Row {
                     entries: vec![(
-                        scope().to_owned(),
+                        Elem::named(scope()),
                         Type::app(Type::lang(Lang::Scope), need.region.clone()),
                     )],
                     tail: None,

@@ -6,6 +6,13 @@ break programs.
 
 ## Unreleased
 
+- **HTTP request ownership:** each request owns its resources through response
+  streaming. Closing a server stops admission before outer resources are
+  released, interrupts requests left after the grace period and waits for
+  their finalizers on native JS, Effect and Go. Cleanup and uninterruptible
+  work may outlast that period. Go now applies the documented 20-second
+  default and distinguishes an immediate timeout from an infinite one.
+
 - **Regions by use:** the checker asks where a value uses a region, not what
   it holds, everywhere: a value may keep a handle past its `scope` while
   nothing uses it there, and a use there is `FLICK-G002`. The `captures`

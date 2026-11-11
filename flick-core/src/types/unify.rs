@@ -12,6 +12,7 @@ use std::collections::HashSet;
 use std::ptr;
 
 use super::Checker;
+use super::elem::Elem;
 use super::env::Form;
 use super::kinds::Kind;
 use super::ty::{Norm, Row, Type};
@@ -69,7 +70,7 @@ pub enum Mismatch {
     /// A record or row lacks a label the other one has; `left` is the side
     /// that has it.
     Label {
-        label: String,
+        label: Elem,
         left: bool,
     },
     /// Binding the variable would make the type infinite.
@@ -305,7 +306,7 @@ impl Store {
 
     /// A row with nested row tails merged into one entry list.
     pub fn zonk_row(&self, row: &Row) -> Row {
-        let mut entries: Vec<(String, Type)> = row
+        let mut entries: Vec<(Elem, Type)> = row
             .entries
             .iter()
             .map(|(l, t)| {
@@ -416,17 +417,14 @@ impl Store {
 
 /// The current label of a row entry: a capture row entry, and a type
 /// variable of an error row, follow their element.
-fn relabel(label: &str, t: &Type) -> String {
-    let current = if label.starts_with('^') {
-        super::ty::capture_label(t)
-    } else if label.starts_with('~') {
-        super::ty::error_label(t)
-    } else if label.starts_with('@') {
-        super::ty::service_label(t)
-    } else {
-        None
+fn relabel(label: &Elem, t: &Type) -> Elem {
+    let current = match label {
+        Elem::Capture(_) => super::ty::capture_label(t),
+        Elem::Error(_) => super::ty::error_label(t),
+        Elem::Service(_) => super::ty::service_label(t),
+        Elem::Named(_) | Elem::Live | Elem::Provided(_) => None,
     };
-    current.unwrap_or_else(|| label.to_owned())
+    current.unwrap_or_else(|| label.clone())
 }
 
 impl Checker<'_> {
@@ -540,7 +538,10 @@ impl Checker<'_> {
             && lang::is(Lang::Field, module, name)
             && let Type::Symbol(label) = self.store.resolve(label)
         {
-            return Some(Type::Record(Row::closed(vec![(label, (*field).clone())])));
+            return Some(Type::Record(Row::closed(vec![(
+                Elem::Named(label),
+                (*field).clone(),
+            )])));
         }
         let [row] = args[..] else { return None };
         if !head.is_lang(Lang::Errors) && !head.is_lang(Lang::ServiceImpl) {
@@ -820,7 +821,7 @@ impl Checker<'_> {
                 let elements = row
                     .entries
                     .iter()
-                    .filter(|(label, _)| label.starts_with('~'));
+                    .filter(|(label, _)| matches!(label, Elem::Error(_)));
                 found.extend(elements.map(|(_, element)| (element.clone(), span)));
             }
         });

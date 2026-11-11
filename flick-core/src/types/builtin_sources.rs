@@ -31,10 +31,10 @@ pub(super) const CORE: &[(&str, &str)] = &[
     ("Int", builtin_source!("core", "Int.fl")),
     ("Numeric", builtin_source!("core", "Numeric.fl")),
     ("NonEmpty", builtin_source!("core", "NonEmpty.fl")),
-    ("Option", builtin_source!("core", "Option.fl")),
     ("Result", builtin_source!("core", "Result.fl")),
     ("Fail", builtin_source!("core", "Fail.fl")),
     ("List.Core", builtin_source!("core", "List/Core.fl")),
+    ("Option", builtin_source!("core", "Option.fl")),
     ("List.Slice", builtin_source!("core", "List/Slice.fl")),
     ("List.Search", builtin_source!("core", "List/Search.fl")),
     (

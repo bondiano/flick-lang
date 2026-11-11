@@ -138,16 +138,7 @@ fn declared(line: &str) -> Option<String> {
 /// The page of `interface`, its comments from `text`.
 pub fn page(interface: &Interface, text: &str) -> String {
     let docs = comments(text);
-    let parsed = syntax::parse(text, FileId::new(0));
-    let contracts: HashMap<_, _> = parsed
-        .tree
-        .nodes()
-        .filter(|node| node.kind == K::ModuleTypeDecl)
-        .filter_map(|node| {
-            let name = node.child_tokens().find(|token| token.kind == K::Con)?;
-            Some((name.text(text), node.text(text)))
-        })
-        .collect();
+    let contracts = source_module_declarations(text, &interface.module);
     let mut out = format!("# {}\n", interface.module);
     let doc = |name: &str, out: &mut String| {
         if let Some(d) = docs.get(name) {
@@ -241,10 +232,12 @@ fn expanded_signature(name: &str, signature: &ModuleSignature, out: &mut String)
 }
 
 fn module_contract(name: &str, requirements: &[ModuleRequirement], out: &mut String) {
-    if requirements
-        .iter()
-        .any(|r| matches!(r, ModuleRequirement::Module { .. }))
-    {
+    if requirements.iter().any(|r| {
+        matches!(
+            r,
+            ModuleRequirement::Module { .. } | ModuleRequirement::Kind { .. }
+        )
+    }) {
         let signature = ModuleSignature::Structure {
             requirements: requirements.to_vec(),
         };
@@ -254,10 +247,8 @@ fn module_contract(name: &str, requirements: &[ModuleRequirement], out: &mut Str
     let mut lines = Vec::new();
     for requirement in requirements {
         lines.push(match requirement {
-            ModuleRequirement::Module {
-                name, signature, ..
-            } => {
-                format!("  module {name} : {}", signature.display())
+            ModuleRequirement::Kind { .. } | ModuleRequirement::Module { .. } => {
+                unreachable!("structured signature descriptions are rendered above")
             }
             ModuleRequirement::Type {
                 name,
@@ -488,3 +479,5 @@ mod module_signature_tests {
         assert!(without_source.contains("```text\n"), "{without_source}");
     }
 }
+
+include!("doc/module_source.rs");

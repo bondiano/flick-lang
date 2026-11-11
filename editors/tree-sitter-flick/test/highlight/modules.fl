@@ -1,8 +1,8 @@
-module Adapter = functor (F : Factory) -> F
+module Adapter = module (F : Factory) -> F
 //               ^ keyword
 type module Factory = Input -> Output with type Key = String and type Value = Int
 //                                                           ^ keyword
+result = functor (first) (second)
+//       ^ variable
 private module Hidden = Prelude
 // <- keyword
-let functor = 1
-//  ^ function

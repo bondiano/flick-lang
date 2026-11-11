@@ -8,6 +8,9 @@ pub struct ModuleTemplate {
     /// Body checked against the interface's higher-order signature. A reader
     /// may instantiate it for either backend without the original checkout.
     pub source: String,
+    /// Canonical target selected while checking an alias, independent of its source import aliases.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub materialized_body: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub capture: Option<StaticCapture>,
 }
@@ -25,7 +28,7 @@ pub struct StaticCapture {
     pub inherited_imports: usize,
     /// Original template retained by a partial application.
     pub template: Option<String>,
-    /// Lexically active expansions, including captures of anonymous functors.
+    /// Lexically active expansions, including captures of anonymous parameterized modules.
     pub trace: Vec<ExpansionFrame>,
     /// Packages whose private implementation names this lexical body may use.
     pub access_packages: Vec<String>,
@@ -74,11 +77,25 @@ pub enum CalleeOrigin {
     Member(StaticArgument),
     Parameter {
         binding: BindingOrigin,
+        /// Caller-visible argument evidence, separate from the callee's lexical bindings.
+        argument: StaticArgument,
         members: Vec<String>,
     },
 }
 
 impl CalleeOrigin {
+    /// All caller views read while instantiating this callee's contract.
+    pub(crate) fn contract_arguments(&self) -> impl Iterator<Item = &StaticArgument> {
+        let (prefix, argument): (&[StaticArgument], Option<&StaticArgument>) = match self {
+            Self::Module(_) => (&[], None),
+            Self::Member(argument) => (&[], Some(argument)),
+            Self::Parameter {
+                binding, argument, ..
+            } => (&binding.prefix, Some(argument)),
+        };
+        prefix.iter().chain(argument)
+    }
+
     pub(crate) fn signature_owner(&self) -> &str {
         match self {
             Self::Module(module) => module,

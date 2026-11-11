@@ -226,7 +226,7 @@ fn hom_package_private_static_artifacts_stay_private() {
         "module Lib.Make(K : Lib.Contracts.Input) : Lib.Contracts.Output\nanswer : Int\nlet answer = K.seed + 1\n",
         "module App.Root exposing (Chosen)\nmodule Chosen = Lib.Published.Selected(App.Argument)\n",
     );
-    host.0.insert(PathBuf::from("/lib/src/Lib/Return.fl"), "module Lib.Return(F : Lib.Contracts.Factory) : Lib.Contracts.Factory = functor (K : Lib.Contracts.Input) ->\n  module Built = F(K)\n  answer : Int\n  let answer = Built.answer\n".into());
+    host.0.insert(PathBuf::from("/lib/src/Lib/Return.fl"), "module Lib.Return(F : Lib.Contracts.Factory) : Lib.Contracts.Factory = module (K : Lib.Contracts.Input) ->\n  module Built = F(K)\n  answer : Int\n  let answer = Built.answer\n".into());
     host.0.insert(
         PathBuf::from("/lib/src/Lib/Published.fl"),
         "module Lib.Published exposing (Selected)\nmodule Selected = Lib.Return(Lib.Make)\n".into(),
@@ -235,7 +235,9 @@ fn hom_package_private_static_artifacts_stay_private() {
     let closure = saved
         .values()
         .flatten()
-        .find(|m| m.name.starts_with("Lib.Published.Selected.") && m.interface.functor.is_some())
+        .find(|m| {
+            m.name.starts_with("Lib.Published.Selected.") && m.interface.parameterized.is_some()
+        })
         .expect("stored anonymous closure");
     assert!(closure.interface.private, "{}", closure.name);
     let selected = saved

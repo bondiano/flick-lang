@@ -136,11 +136,11 @@ fn builtins_check_cleanly() {
 /// row of `Live` alone is no Sync stage, as the empty row is not.
 #[test]
 fn live_in_a_row_keeps_a_read_sync() {
-    use crate::types::LIVE;
+    use crate::types::Elem;
     use crate::types::lang::{self, Lang};
     use crate::types::ty::{Row, Type, sync_rows};
-    let read = lang::item(Lang::AtomRead).label.clone();
-    let live = (LIVE.to_owned(), Type::Var("d".into()));
+    let read = Elem::named(&lang::item(Lang::AtomRead).label);
+    let live = (Elem::Live, Type::Var("d".into()));
     let row = |entries| Type::Row(Row::closed(entries));
     let none = Type::empty_row();
     assert!(sync_rows(&row(vec![(read.clone(), none.clone())]), &none));

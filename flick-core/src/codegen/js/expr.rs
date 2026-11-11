@@ -324,11 +324,15 @@ impl Gen<'_> {
             .enumerate()
             .map(|(i, v)| format!("_{i}: {v}"))
             .collect();
-        Some(format!(
-            "{}{{ _tag: {tag}, {} }}",
-            mark!(self, e.span),
-            fields.join(", ")
-        ))
+        let object = format!("{{ _tag: {tag}, {} }}", fields.join(", "));
+        // as what the constructor returns in debug: the type of an opaque type
+        // in TypeScript shows no fields, and the object would not fit it
+        let object = if self.options.typescript() {
+            format!("({object} as any)")
+        } else {
+            object
+        };
+        Some(format!("{}{object}", mark!(self, e.span)))
     }
 
     /// `yield*` of the effect `js`, in `owner` when a `Within` gave one.

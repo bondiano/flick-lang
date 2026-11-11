@@ -3,6 +3,7 @@
 //! unknown at the end is the empty row, the least solution. Then every
 //! constraint either holds or names what its bound lacks.
 
+use crate::types::Elem;
 use std::mem;
 
 use super::Site;
@@ -38,7 +39,7 @@ struct Excess {
     services: Vec<String>,
     errors: Vec<String>,
     /// The row labels of what is lacking, for the fixes that name a service.
-    labels: Vec<String>,
+    labels: Vec<Elem>,
     /// Where the bound's row is written, once rows are solved: a variable
     /// may stand for a row written elsewhere.
     bound: Written,
@@ -100,7 +101,11 @@ impl Checker<'_> {
         if self.grow_live(&actual, &declared, open) {
             return true;
         }
-        for (label, ty) in actual.entries.iter().filter(|(l, _)| l != regions::LIVE) {
+        for (label, ty) in actual
+            .entries
+            .iter()
+            .filter(|(l, _)| !matches!(l, Elem::Live))
+        {
             match declared.get(label) {
                 Some(bound) => {
                     let bound = bound.clone();
@@ -209,7 +214,11 @@ impl Checker<'_> {
             let mut lacking = Vec::new();
             let mut labels = Vec::new();
             self.report_live(&actual, &declared, c.site, c.span);
-            for (label, ty) in actual.entries.iter().filter(|(l, _)| l != regions::LIVE) {
+            for (label, ty) in actual
+                .entries
+                .iter()
+                .filter(|(l, _)| !matches!(l, Elem::Live))
+            {
                 match declared.get(label) {
                     Some(bound) => {
                         if let Err(m) = self.unify(ty, bound) {
@@ -217,7 +226,7 @@ impl Checker<'_> {
                         }
                     }
                     None if label == regions::scope() => self.no_owner(ty, &c),
-                    None if label.starts_with(regions::PROVIDED) => {
+                    None if matches!(label, Elem::Provided(_)) => {
                         if let [service, owner] = ty.spine().1[..] {
                             let service = self.show(service);
                             let owner = self.show(owner);
@@ -396,7 +405,7 @@ impl Checker<'_> {
                 && !edits.is_empty()
                 // a row variable it lacks has no label
                 && e.labels.len() == e.services.len()
-                && (e.labels.iter()).all(|l| lang::label(Lang::Async) == Some(l.as_str()));
+                && (e.labels.iter()).all(|l| lang::label(Lang::Async) == l.name());
             let fix = || (format!("add {list} to {bound}"), edits);
             diagnostic = if only_async {
                 diagnostic.with_safe_fix(fix)
@@ -417,7 +426,7 @@ impl Checker<'_> {
                 ),
                 e.span,
             ).with_fix(|| {
-        let is = |l: Lang| e.labels.iter().any(|s| lang::label(l) == Some(s.as_str()));
+        let is = |l: Lang| e.labels.iter().any(|s| lang::label(l) == s.name());
         let writes = is(Lang::AtomWrite) || is(Lang::AtomRegistry);
         let (setup, document) = (is(Lang::Setup), is(Lang::UiDocument));
         let fixes = [

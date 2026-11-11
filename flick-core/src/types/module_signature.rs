@@ -1,13 +1,21 @@
 //! Static module signatures and their dependency-preserving operations.
 
+use crate::types::Elem;
 use std::mem;
 
 use super::{
     Form, Kind, ModuleNominalKind, ModuleRequirement as R, ModuleSignature, Type, TypeDef,
     show_type,
 };
-use crate::api_diff::canonical_type;
+use crate::api_diff::{canonical_type, canonical_type_in};
 use crate::iface::{Decl, Entity, Export, Interface, Namespace};
+
+fn replace_types(ty: &Type, replacements: &[(Type, Type)]) -> Type {
+    if let Some((_, new)) = replacements.iter().find(|(old, _)| old == ty) {
+        return new.clone();
+    }
+    map_module_children(ty, &mut |ty| replace_types(ty, replacements))
+}
 
 fn display_type(ty: &Type) -> String {
     fn scoped(ty: &Type) -> Type {
@@ -23,8 +31,27 @@ fn display_type(ty: &Type) -> String {
 
 /// Module substitution changes service/error identities and their derived
 /// set keys together. Record field labels are source names and stay fixed.
+fn map_kind_types(kind: &Kind, f: &mut dyn FnMut(&Type) -> Type) -> Kind {
+    match kind {
+        Kind::Named { module, name } => match f(&Type::con(module, name)) {
+            Type::Con { module, name } => Kind::Named { module, name },
+            _ => kind.clone(),
+        },
+        Kind::Row(inner) => Kind::Row(Box::new(map_kind_types(inner, f))),
+        Kind::Arrow(input, output) => {
+            Kind::arrow(map_kind_types(input, f), map_kind_types(output, f))
+        }
+        _ => kind.clone(),
+    }
+}
+
 fn map_module_children(ty: &Type, f: &mut dyn FnMut(&Type) -> Type) -> Type {
     let mut mapped = ty.map_children(f);
+    if let Type::Forall { vars, .. } = &mut mapped {
+        for var in vars {
+            var.kind = map_kind_types(&var.kind, f);
+        }
+    }
     if let (Type::Row(before), Type::Row(after)) = (ty, &mut mapped) {
         for ((old_key, old), (key, new)) in before.entries.iter().zip(&mut after.entries) {
             if let (
@@ -36,7 +63,7 @@ fn map_module_children(ty: &Type, f: &mut dyn FnMut(&Type) -> Type) -> Type {
             ) = (old.spine().0, new.spine().0)
                 && *old_key == format!("{module}.{name}")
             {
-                *key = format!("{actual}.{member}");
+                *key = Elem::Named(format!("{actual}.{member}"));
             }
         }
         after.entries.sort_by(|a, b| a.0.cmp(&b.0));
@@ -45,6 +72,7 @@ fn map_module_children(ty: &Type, f: &mut dyn FnMut(&Type) -> Type) -> Type {
 }
 
 fn map_definition_types(definition: &mut TypeDef, f: &mut dyn FnMut(&Type) -> Type) {
+    definition.kind = map_kind_types(&definition.kind, f);
     match &mut definition.form {
         Form::Alias { body, .. } => *body = f(body),
         Form::Class {
@@ -91,7 +119,7 @@ fn map_interface_types(interface: &mut Interface, f: &mut dyn FnMut(&Type) -> Ty
             map_definition_types(definition, f);
         }
     }
-    if let Some(signature) = &mut interface.functor {
+    if let Some(signature) = &mut interface.parameterized {
         signature.map_types(f);
     }
     for child in interface.modules.values_mut() {
@@ -102,9 +130,29 @@ fn map_interface_types(interface: &mut Interface, f: &mut dyn FnMut(&Type) -> Ty
 fn map_requirement_types(requirement: &mut R, f: &mut dyn FnMut(&Type) -> Type) {
     match requirement {
         R::Type {
-            manifest: Some(ty), ..
+            params, manifest, ..
+        } => {
+            for param in params {
+                param.kind = map_kind_types(&param.kind, f);
+            }
+            if let Some(ty) = manifest {
+                *ty = f(ty);
+            }
         }
-        | R::Value { ty, .. } => *ty = f(ty),
+        R::Value { ty, .. } => *ty = f(ty),
+        R::Kind {
+            identity,
+            definition,
+            ..
+        } => {
+            if let Some(entity) = identity
+                && let Type::Con { module, name } = f(&Type::con(&entity.module, &entity.name))
+            {
+                entity.module = module;
+                entity.name = name;
+            }
+            map_definition_types(definition, f);
+        }
         R::Dictionary { head, .. } => *head = f(head),
         R::Module { signature, .. } => signature.map_types(f),
         R::Nominal {
@@ -126,7 +174,6 @@ fn map_requirement_types(requirement: &mut R, f: &mut dyn FnMut(&Type) -> Type) 
                 map_definition_types(definition, f);
             }
         }
-        R::Type { manifest: None, .. } => {}
     }
 }
 
@@ -203,6 +250,28 @@ fn generalize_local_type(ty: &Type, module: &str, names: &[(String, bool)]) -> T
     mapped
 }
 
+fn exported_methods(interface: &Interface, class: &Entity) -> Vec<(String, Type)> {
+    interface
+        .exports
+        .iter()
+        .filter(|method| {
+            method.parent.as_deref() == Some(&class.name)
+                && method.entity.module == class.module
+                && method.decl == Decl::Method
+        })
+        .filter_map(|method| Some((method.entity.name.clone(), method.scheme.clone()?)))
+        .collect()
+}
+
+fn exported_class_method(interface: &Interface, method: &Export) -> bool {
+    method.decl == Decl::Method
+        && interface.exports.iter().any(|class| {
+            class.decl == Decl::Class
+                && class.entity.module == method.entity.module
+                && method.parent.as_deref() == Some(&class.entity.name)
+        })
+}
+
 impl ModuleSignature {
     pub(crate) fn normalize_in(&mut self, witness: &Interface) {
         self.map_types(&mut |ty| super::module_contract::expand_actual(ty, witness, 32));
@@ -212,12 +281,12 @@ impl ModuleSignature {
     /// but its declared inputs still constrain applications and cache keys.
     pub(crate) fn inputs_only(&self) -> Self {
         match self {
-            Self::Functor {
+            Self::Parameterized {
                 group_size,
                 binder,
                 parameter,
                 result,
-            } => Self::Functor {
+            } => Self::Parameterized {
                 group_size: *group_size,
                 binder: binder.clone(),
                 parameter: parameter.clone(),
@@ -235,14 +304,14 @@ impl ModuleSignature {
                 Self::Structure { requirements } => Form::ModuleContract {
                     requirements: requirements.clone(),
                 },
-                Self::Functor { .. } => Form::ModuleSignature {
+                Self::Parameterized { .. } => Form::ModuleSignature {
                     signature: Box::new(self.clone()),
                 },
             },
         }
     }
     pub fn from_interface(interface: &Interface) -> Self {
-        if let Some(signature) = &interface.functor {
+        if let Some(signature) = &interface.parameterized {
             return signature.clone();
         }
 
@@ -250,6 +319,9 @@ impl ModuleSignature {
         for export in &interface.exports {
             match export.entity.namespace {
                 Namespace::Value => {
+                    if exported_class_method(interface, export) {
+                        continue;
+                    }
                     if let Some(ty) = &export.scheme {
                         requirements.push(R::Value {
                             name: export.entity.name.clone(),
@@ -271,19 +343,34 @@ impl ModuleSignature {
                                     identity: (export.entity.module != interface.module)
                                         .then(|| export.entity.clone()),
                                     definition: Some(Box::new(definition.clone())),
-                                    methods: Vec::new(),
+                                    methods: exported_methods(interface, &export.entity),
                                 });
                             }
                             Form::ModuleContract { .. } | Form::ModuleSignature { .. } => {}
-                            form => requirements.push(R::Type {
+                            Form::Kind | Form::KindMember => requirements.push(R::Kind {
                                 name: export.entity.name.clone(),
-                                params: inferred_type_parameters(definition),
-                                manifest: if let Form::Alias { body, .. } = form {
+                                identity: (export.entity.module != interface.module)
+                                    .then(|| export.entity.clone()),
+                                definition: Box::new(definition.clone()),
+                            }),
+                            form => {
+                                let params = inferred_type_parameters(definition);
+                                let manifest = if let Form::Alias { body, .. } = form {
                                     Some(body.clone())
+                                } else if export.entity.module != interface.module {
+                                    Some(Type::apps(
+                                        Type::con(&export.entity.module, &export.entity.name),
+                                        params.iter().map(|p| Type::Var(p.name.clone())),
+                                    ))
                                 } else {
                                     None
-                                },
-                            }),
+                                };
+                                requirements.push(R::Type {
+                                    name: export.entity.name.clone(),
+                                    params,
+                                    manifest,
+                                });
+                            }
                         }
                     }
                 }
@@ -296,7 +383,7 @@ impl ModuleSignature {
                 binder: String::new(),
                 signature: Box::new(
                     child
-                        .functor
+                        .parameterized
                         .clone()
                         .unwrap_or_else(|| Self::from_interface(child)),
                 ),
@@ -305,7 +392,12 @@ impl ModuleSignature {
         let names: Vec<_> = requirements
             .iter()
             .filter_map(|r| match r {
-                R::Type { name, .. } => Some((name.clone(), false)),
+                R::Type { name, .. }
+                | R::Kind {
+                    name,
+                    identity: None,
+                    ..
+                } => Some((name.clone(), false)),
                 R::Nominal {
                     name,
                     identity: None,
@@ -379,12 +471,12 @@ impl ModuleSignature {
         requirements
     }
 
-    pub fn has_functor(&self) -> bool {
+    pub fn has_parameterized(&self) -> bool {
         match self {
-            Self::Functor { .. } => true,
+            Self::Parameterized { .. } => true,
             Self::Structure { requirements } => requirements
                 .iter()
-                .any(|r| matches!(r, R::Module { signature, .. } if signature.has_functor())),
+                .any(|r| matches!(r, R::Module { signature, .. } if signature.has_parameterized())),
         }
     }
 }

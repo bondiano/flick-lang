@@ -69,7 +69,7 @@ fn recursive_static_expansions_with_changing_arguments_are_bounded() {
             ),
             (
                 "Loop",
-                "module App.Loop(K : App.Contracts.Input) : App.Contracts.Output = App.Loop((functor (X : App.Contracts.Input) ->\n  seed : Int\n  let seed = X.seed\n)(K))\n",
+                "module App.Loop(K : App.Contracts.Input) : App.Contracts.Output = App.Loop((module (X : App.Contracts.Input) ->\n  seed : Int\n  let seed = X.seed\n)(K))\n",
             ),
             (
                 "Root",

@@ -5,6 +5,7 @@
 //! the services of the stage that built it; a lazy `Seq` holds what it
 //! uses, a strict `[for …]` is a `List` built at once.
 
+use crate::types::Elem;
 use std::mem;
 
 use super::Checker;
@@ -24,7 +25,7 @@ fn reader() -> Type {
         return Type::empty_row();
     };
     Type::Row(Row {
-        entries: vec![(label.to_owned(), Type::lang(Lang::AtomRead))],
+        entries: vec![(Elem::named(label), Type::lang(Lang::AtomRead))],
         tail: None,
         ..Row::default()
     })

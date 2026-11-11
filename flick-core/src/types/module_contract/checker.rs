@@ -219,11 +219,14 @@ impl super::Checker<'_> {
             self.error(
                 codes::T068,
                 self.span(contract_node),
-                "a static functor cannot be packed as a runtime module",
+                "a static parameterized module cannot be packed as a runtime module",
             );
             return Type::Error;
         };
-        if requirements.iter().any(|r| matches!(r, ModuleRequirement::Module { .. })) {
+        if requirements
+            .iter()
+            .any(|r| matches!(r, ModuleRequirement::Module { .. }))
+        {
             self.error(
                 codes::T068,
                 self.span(contract_node),

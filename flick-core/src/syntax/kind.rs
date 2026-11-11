@@ -151,7 +151,7 @@ pub enum SyntaxKind {
     ModuleTypeEquality,
     ModuleMember,
     ModuleApplyExpr,
-    ModuleFunctorExpr,
+    ModuleParamExpr,
     ModuleParenExpr,
     ModuleAnnotExpr,
     Exposing,

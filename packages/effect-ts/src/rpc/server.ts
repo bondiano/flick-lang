@@ -5,18 +5,17 @@ import { type ChildProcess, spawn } from "node:child_process";
 import { Duplex } from "node:stream";
 import { Worker } from "node:worker_threads";
 
-import * as NodeHttpServer from "@effect/platform-node/NodeHttpServer";
 import * as NodeSocket from "@effect/platform-node/NodeSocket";
 import * as NodeSocketServer from "@effect/platform-node/NodeSocketServer";
 import * as NodeWorker from "@effect/platform-node/NodeWorker";
 import * as NodeWorkerRunner from "@effect/platform-node/NodeWorkerRunner";
-import { Effect, Exit, Layer, Scope, Stdio } from "effect";
+import { Effect, Exit, Layer, Option, Scope, Stdio } from "effect";
 import { RpcSerialization } from "effect/rpc/RpcSerialization";
 import { HttpRouter } from "effect/http";
 import * as RpcClient from "effect/rpc/RpcClient";
 import * as RpcServer from "effect/rpc/RpcServer";
 
-import { nodeHttp } from "../host.ts";
+import { ownedServer } from "../effect/http/HttpServer.ts";
 import { service } from "../effects.ts";
 import { nativeStdio } from "../effect/Stdio.ts";
 import { acquireRelease } from "../owner.ts";
@@ -39,12 +38,11 @@ const start = (transport: Served, options: ServeOptions, group: Group, handlers:
     const router = yield* HttpRouter.make;
     const path: `/${string}` = isRoutePath(options.path) ? options.path : `/${options.path}`;
     yield* router.add(transport === "http" ? "POST" : "GET", path, app);
-    const made = yield* NodeHttpServer.make(() => nodeHttp().createServer(), { host: options.host, port: options.port }).pipe(
-      Effect.provideService(Scope.Scope, scope),
+    const made = yield* ownedServer(scope, {
+      host: options.host, port: options.port, gracefulShutdownTimeout: Option.none(),
+    }, router.asHttpEffect()).pipe(
       Effect.mapError((error) => serveError(error.message)),
-      Effect.onError((cause) => Scope.close(scope, Exit.failCause(cause))),
     );
-    yield* made.serve(router.asHttpEffect()).pipe(Effect.provideService(Scope.Scope, scope));
     const port = made.address._tag === "UnixPathAddress" ? 0 : made.address.port;
     return { port, scope } satisfies Server;
   });

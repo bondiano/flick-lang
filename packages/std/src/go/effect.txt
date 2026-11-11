@@ -286,30 +286,7 @@ makeReducerUnion RecordReducerUnion
 makeReducerIntersection RecordReducerIntersection
 
 [flick:Option]
-all OptionAll
-as OptionAs
-asVoid OptionAsVoid
-composeK *OptionComposeK
-containsWith *OptionContainsWith
-exists *OptionExists
-filter *OptionFilter
-filterMap *OptionFilterMap
-firstSomeOf OptionFirstSomeOf
-flatten OptionFlatten
-lift2 *OptionLift2
-liftPredicate *OptionLiftPredicate
-match *OptionMatch
-orElseResult *OptionOrElseResult
-orElseSome *OptionOrElseSome
-partitionMap *OptionPartitionMap
-product OptionProduct
 productMany OptionProductMany
-reduceCompact *OptionReduceCompact
-tap *OptionTap
-zipLeft OptionZipLeft
-zipRight OptionZipRight
-zipWith *OptionZipWith
-void OptionVoid
 makeReducer OptionReducer
 makeCombinerFailFast OptionCombinerFailFast
 makeReducerFailFast OptionReducerFailFast

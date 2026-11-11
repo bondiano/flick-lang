@@ -5,9 +5,11 @@
 //! an importer sees each one, so removing one, or making its context
 //! stronger, breaks code that used it.
 
+use crate::types::{Atom, Elem};
 use std::collections::BTreeMap;
 use std::fmt;
 use std::iter::once;
+use std::mem;
 
 use crate::iface::{Export, Interface, Namespace};
 use crate::types::{Binder, Form, Instance, ModuleSignature, Row, Type, TypeDef, show_type};
@@ -89,15 +91,15 @@ fn static_members(old: &Interface, new: &Interface) -> Vec<Change> {
         signature
     };
     let mut out = Vec::new();
-    if old.functor.as_ref().map(canonical) != new.functor.as_ref().map(canonical) {
+    if old.parameterized.as_ref().map(canonical) != new.parameterized.as_ref().map(canonical) {
         out.push(Change::Changed {
             name: format!("module {}", old.module),
             was: old
-                .functor
+                .parameterized
                 .as_ref()
                 .map_or_else(|| "structure".into(), ModuleSignature::display),
             now: new
-                .functor
+                .parameterized
                 .as_ref()
                 .map_or_else(|| "structure".into(), ModuleSignature::display),
         });
@@ -266,6 +268,19 @@ fn canonical(e: &Export) -> Export {
         let mut types = |t: &mut Type| *t = rename(t, &names, next);
         match &mut form {
             Form::ModuleSignature { signature } => signature.canonicalize(next),
+            Form::ModuleContract { requirements } => {
+                let mut signature = ModuleSignature::Structure {
+                    requirements: mem::take(requirements),
+                };
+                signature.canonicalize(next);
+                let ModuleSignature::Structure {
+                    requirements: canonical,
+                } = signature
+                else {
+                    unreachable!()
+                };
+                *requirements = canonical;
+            }
             Form::Alias { body, .. } => types(body),
             Form::Service { operations, .. } => {
                 for o in operations {
@@ -313,7 +328,13 @@ fn bind<'a>(
 
 /// A scheme with its quantified variables named by binder order.
 pub(crate) fn canonical_type(ty: &Type) -> Type {
-    rename(ty, &[], &mut 0)
+    canonical_type_in(ty, &[], &mut 0)
+}
+
+/// Rename the enclosing contract's parameters and row labels with the same
+/// fresh-name supply as its inner quantifiers.
+pub(crate) fn canonical_type_in(ty: &Type, names: &[(String, String)], next: &mut usize) -> Type {
+    rename(ty, names, next)
 }
 
 /// `ty` with its free variables renamed by `names` and those its `forall`s
@@ -368,7 +389,7 @@ fn rename(ty: &Type, names: &[(String, String)], next: &mut usize) -> Type {
         }
         // Entries of bound capture, error and service atoms follow their names.
         Type::Row(row) => {
-            let mut entries: Vec<(String, Type)> = (row.entries.iter())
+            let mut entries: Vec<(Elem, Type)> = (row.entries.iter())
                 .map(|(label, t)| (relabel(label, names), rename(t, names, next)))
                 .collect();
             entries.sort_by(|a, b| a.0.cmp(&b.0));
@@ -383,12 +404,20 @@ fn rename(ty: &Type, names: &[(String, String)], next: &mut usize) -> Type {
 }
 
 /// `label` of a bound row atom (`^a`, `~a` or `@a`) after `names`.
-fn relabel(label: &str, names: &[(String, String)]) -> String {
-    let Some((sigil @ ("^" | "~" | "@"), name)) = label.split_at_checked(1) else {
-        return label.to_owned();
+fn relabel(label: &Elem, names: &[(String, String)]) -> Elem {
+    let fresh = |atom: &Atom| match atom {
+        Atom::Var(name) => {
+            (names.iter().find(|(n, _)| n == name)).map(|(_, f)| Atom::Var(f.clone()))
+        }
+        Atom::Skolem(_) | Atom::Meta(_) => None,
     };
-    (names.iter().find(|(n, _)| n == name))
-        .map_or_else(|| label.to_owned(), |(_, fresh)| format!("{sigil}{fresh}"))
+    let renamed = match label {
+        Elem::Capture(atom) => fresh(atom).map(Elem::Capture),
+        Elem::Error(atom) => fresh(atom).map(Elem::Error),
+        Elem::Service(atom) => fresh(atom).map(Elem::Service),
+        Elem::Named(_) | Elem::Live | Elem::Provided(_) => None,
+    };
+    renamed.unwrap_or_else(|| label.clone())
 }
 
 fn label(e: &Export) -> String {

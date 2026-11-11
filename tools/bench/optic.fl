@@ -1,0 +1,65 @@
+// Optics on 200 000 points: a lens composed with a lens, an optional through
+// a prism and a traversal read and rebuild each point, three rounds.
+module App.Main exposing (main)
+
+type alias Point = { x : Int; y : Int }
+
+type alias Shape = { id : Int; corner : Point; tags : List Int }
+
+size : Int
+let size = 200000
+
+corner : Optic.Lens Shape Point
+let corner =
+  Optic.make_lens (fun s -> s.corner) (fun p s -> { id = s.id; corner = p; tags = s.tags })
+
+x_of : Optic.Lens Point Int
+let x_of = Optic.make_lens (fun p -> p.x) (fun x p -> { x = x; y = p.y })
+
+corner_x : Optic.Lens Shape Int
+let corner_x = corner |> Optic.compose_lens x_of
+
+even : Optic.Prism Int Int
+let even = Optic.make_prism (fun n -> if n % 2 == 0 then Ok n else Err "odd") (fun n -> n)
+
+even_x : Optic.Optional Shape Int
+let even_x = Optic.lens_optional corner_x |> Optic.compose (Optic.prism_optional even)
+
+tags : Optic.Traversal Shape Int
+let tags =
+  Optic.traversal
+    (Optic.lens_optional
+      (Optic.make_lens (fun s -> s.tags) (fun ts s -> { id = s.id; corner = s.corner; tags = ts })))
+
+shapes : Int -> List Shape
+let shapes seed =
+  List.map
+    (fun i ->
+      let x = (i * 1103515245 + seed) % 1000003
+      { id = i; corner = { x = x; y = x % 97 }; tags = [x % 5, x % 7, x % 11] }
+    )
+    (List.range 0 size)
+
+/// What the optics make of one shape.
+one : Shape -> Int
+let one shape =
+  let moved = shape |> Optic.replace (Optic.lens_optional corner_x) (Optic.get corner_x shape + 1)
+  let halved = moved |> Optic.modify even_x (fun x -> x / 2)
+  let tagged = halved |> Optic.modify_all tags (fun t -> t + 1)
+  let read =
+    match Optic.get_result even_x tagged with
+    | Ok x -> x
+    | Err _ -> 1
+  read
+    + Optic.get corner_x tagged
+    + List.fold_left (fun acc t -> acc + t) 0 (Optic.get_all tags tagged)
+
+rounds : Int -> Int -> Int
+let rec rounds left acc =
+  if left == 0 then
+    acc
+  else
+    rounds (left - 1) (acc + List.fold_left (fun sum shape -> sum + one shape) 0 (shapes left))
+
+main : Unit ->{; AppError} Unit
+let main () = Platform.stdout_line (show (rounds 3 0))
