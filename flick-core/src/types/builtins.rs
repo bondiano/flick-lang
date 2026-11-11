@@ -334,6 +334,19 @@ fn check_reporting(
         let imported = |m: &str| done.iter().find(|i| i.module == m).cloned();
         let (mut interface, mut diagnostics) = resolve::resolve(&module, &imported);
         diagnostics.extend(parse.diagnostics);
+        // resolving takes the names of a module it has no interface for on
+        // faith, as a project's loader reports that module itself
+        diagnostics.extend(
+            (module_syntax.imports.iter())
+                .filter(|i| !done.iter().any(|d| d.module == i.module))
+                .map(|i| {
+                    let message = format!(
+                        "unknown module `{}`: a built-in module imports only the ones before it",
+                        i.module
+                    );
+                    Diagnostic::error(codes::R003, message, i.span)
+                }),
+        );
         // the built-in modules are one package
         let local = |name: &str| modules.iter().any(|(n, _)| *n == name);
         let options = super::Options {
