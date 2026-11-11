@@ -12,15 +12,17 @@ namespace Flick
 
 variable {S : Sig}
 
-/-- How the stage of a hole relates to the stage around one frame. -/
+/-- How the stage of a hole relates to the stage around one frame. A row variable of the
+hole is one of the stage around up to the names it is taken without: a handler gives its
+effect back to it (`Row.back`). -/
 structure FRel (F : Frame) (φ' φ : Stage) : Prop where
-  svc : Row.Sub φ'.svc (Row.union φ.svc (Frame.provides F))
+  svc : Row.Sub φ'.svc (Row.union φ.svc.modNames (Frame.provides F))
   err : ¬ F.isTry → Row.Sub φ'.err φ.err
   pure : φ = .pure → φ' = .pure
   rt : ¬ F.isTry → φ' ≠ .pure → φ ≠ .pure
 
 theorem FRel.of_le {F φ' φ} (h : φ'.le φ) : FRel F φ' φ where
-  svc := fun n hn => .inl (Stage.le_svc h n hn)
+  svc := fun n hn => .inl (Row.le_modNames (Stage.le_svc h n hn))
   err := fun _ => Stage.le_err h
   pure := fun hp => by subst hp; exact Stage.eq_pure h
   rt := fun _ hp hφ => by subst hφ; exact hp (Stage.eq_pure h)
@@ -32,7 +34,7 @@ theorem FRel.use_rgn {F φ ψ} {C : Caps}
     FRel F ψ φ where
   svc := fun n hn => by
     rcases Stage.use_svc φ C (Stage.le_svc h n hn) with h' | ⟨a, ha, rfl⟩
-    · exact .inl h'
+    · exact .inl (Row.le_modNames h')
     · exact .inr (hF a ha)
   err := fun _ => by simpa only [Stage.use_err] using Stage.le_err h
   pure := fun hp => by
@@ -122,6 +124,7 @@ theorem FRel.installs {F : Frame} {E : Name} {φ₀ φ : Stage} {r ε : Row}
     by_cases hN : N = E
     · subst hN; exact .inr (Frame.provides_of (.inl hE))
     · exact .inl (hr _ (h₁.2 hN))
-  | atm a | rv a | obv v a => exact .inl (hr _ h₁)
+  | atm a | obv v a => exact .inl (hr _ h₁)
+  | rv a G' => obtain ⟨G, h₁, -⟩ := h₁; exact .inl ⟨G, hr _ h₁⟩
 
 end Flick

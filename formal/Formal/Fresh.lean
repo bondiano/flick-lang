@@ -54,7 +54,8 @@ theorem kill_noNames (n : Nat) : NoNames (kill n) := by
     split at hb <;> simp [Ty.asRow, Row.ofCaps] at hb
 
 /-- `kill n` sends a row variable to itself or to nothing. -/
-theorem kill_asRow {n : Nat} {b : Atom} {x : Elem} (h : (kill n b).asRow x) : x = .rv b := by
+theorem kill_asRow {n : Nat} {b : Atom} {x : Elem} (h : (kill n b).asRow x) :
+    x = .rv b fun _ => False := by
   cases b with
   | v i => simpa [kill, Ty.asRow_tvar] using h
   | r q =>

@@ -148,11 +148,6 @@
       "@flick-lang/runtime/rt/effect/HashMap"
     ],
     [
-      "flick:HashRing",
-      null,
-      "@flick-lang/runtime/rt/effect/HashRing"
-    ],
-    [
       "flick:HashSet",
       null,
       "@flick-lang/runtime/rt/effect/HashSet"

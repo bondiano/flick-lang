@@ -260,6 +260,7 @@ impl Checker<'_> {
         }
         for (x, y) in [(&a, &b), (&b, &a)] {
             if x.elems.is_empty()
+                && x.less.is_empty()
                 && let [Var::Meta(m)] = x.vars.iter().collect::<Vec<_>>()[..]
             {
                 return self.bind_row(*m, y.clone());

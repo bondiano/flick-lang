@@ -122,7 +122,10 @@ pub(crate) fn row(r: &Row, env: &Env) -> Result<String, String> {
                 parts.push(format!("x = .ob \"{n}\" (.v {a})"));
             }
             for v in env.kept(r.vars.iter()) {
-                parts.push(format!("x = .obv (.v {}) (.v {a})", env.index_of(v)?));
+                parts.push(format!(
+                    "x = .obv (.v {}) (fun _ => False) (.v {a})",
+                    env.index_of(v)?
+                ));
             }
         } else if &*name.module == PROVIDED {
             // `{Provided {S} ϱ}`, split by service
@@ -141,7 +144,13 @@ pub(crate) fn row(r: &Row, env: &Env) -> Result<String, String> {
         }
     }
     for v in env.kept(r.vars.iter()) {
-        parts.push(format!("x = .rv (.v {})", env.index_of(v)?));
+        if let Some(n) = r.less_of(v).next() {
+            return Err(format!("the row variable `{v}` without `{}`", n.name));
+        }
+        parts.push(format!(
+            "x = .rv (.v {}) (fun _ => False)",
+            env.index_of(v)?
+        ));
     }
     Ok(disjunction(&parts, "Row.none"))
 }

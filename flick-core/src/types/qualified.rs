@@ -171,8 +171,10 @@ impl Checker<'_> {
             let ty = scheme.map_or(Type::Error, |s| {
                 self.instantiate(&self.live_scheme(&s), span)
             });
-            if let Some(entity) = entity {
-                self.record_entity(&entity, &ty, span);
+            match entity {
+                Some(entity) => self.record_entity(&entity, &ty, span),
+                // reported by name resolution, or taken on trust
+                None => self.cx.trusted = true,
             }
             return ty;
         }

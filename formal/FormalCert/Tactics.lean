@@ -54,7 +54,7 @@ namespace Flick.Cert
 /-- The simp set of the finite sets of a certificate: elements, atoms, reach, substitution. -/
 macro "cert_simp" : tactic => `(tactic| (simp_all [Row.union, Row.ofCaps, Row.plain, Row.single,
   Row.none, Row.substT, Caps.substT, Caps.none, Ty.reach, instT, Atom.up, Atom.ty, Ty.asRow,
-  Row.err, Row.scope, Row.disch, shiftV] <;> omega))
+  Row.err, Row.scope, Row.disch, Row.back, shiftV, and_assoc] <;> omega))
 
 /-- `h : x ∈ A` of a finite set `A`, split into one goal for each element `A` names. -/
 macro "split_mem " h:ident : tactic => `(tactic| (
@@ -70,10 +70,10 @@ macro "caps_set" : tactic => `(tactic| first
 /-- `r = r'` or `r ⊆ r'` of finite rows. -/
 macro "row_set" : tactic => `(tactic| first
   | (funext x
-     rcases x with _ | a | ⟨_, a⟩ | a | ⟨v, a⟩ <;> (try cases a) <;> (try cases v) <;> cert_simp)
+     rcases x with _ | a | ⟨_, a⟩ | ⟨a, _⟩ | ⟨v, _, a⟩ <;> (try cases a) <;> (try cases v) <;> cert_simp)
   | (simp only [Row.Sub]
      intro x hx
-     rcases x with _ | a | ⟨_, a⟩ | a | ⟨v, a⟩ <;> (try cases a) <;> (try cases v) <;> split_mem hx <;>
+     rcases x with _ | a | ⟨_, a⟩ | ⟨a, _⟩ | ⟨v, _, a⟩ <;> (try cases a) <;> (try cases v) <;> split_mem hx <;>
        cert_simp))
 
 /-- `φ ≤ φ'` of concrete stages, `Stage.use` unfolded. -/
@@ -125,7 +125,7 @@ macro_rules
 
 /-- `φ₀.ObOut o` of a concrete stage with no obligation about `o`. -/
 macro "ob_out" : tactic => `(tactic| (
-  refine ⟨fun N a h => ?_, fun v a h => ?_⟩ <;>
+  refine ⟨fun N a h => ?_, fun v G a h => ?_⟩ <;>
     simp_all [Stage.svc, Row.Named, Row.single, Row.none, Row.union]))
 
 /-- `Outl Θ C s` of concrete sets: each atom of `C` is reached by `s` or is in a fact about

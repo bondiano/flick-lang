@@ -121,6 +121,14 @@ jobs:
           key: playwright-${{ runner.os }}-1.64.1
       - run: pnpm install --frozen-lockfile && pnpm -C docs exec playwright install chromium
       - run: just e2e-js
+      # the site the Docs workflow deploys once this run passes
+      - if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/upload-artifact@v7
+        with:
+          name: site
+          path: docs/dist
+          retention-days: 1
+          if-no-files-found: error
       - run: just go-test
       - run: just language
       - run: just bundle-size >> "$GITHUB_STEP_SUMMARY"
@@ -350,9 +358,11 @@ jobs:
         with:
           go-version-file: runtime-go/go.mod
           cache-dependency-path: runtime-go/go.sum
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: just@1.59.0
       - name: Go runtime
-        working-directory: runtime-go
-        run: go vet ./... && go test ./...
+        run: just go-test
       # Windows is the slowest of the three: a push to main holds it to the
       # cases of tests/run/runtime, and the nightly run and a release, which
       # call this workflow with another event or ref, run every portable case
@@ -362,15 +372,8 @@ jobs:
         shell: bash
         run: echo 'FLICK_E2E_ONLY=runtime\' >> "$GITHUB_ENV"
       - name: Portable cases, the go executable and a non-ASCII project path
-        env:
-          FLICK_E2E_GO_ONLY: "1"
-        run: cargo test --profile e2e -p flick --test e2e --test go_main --test unicode_path -- --ignored run_cases exit_codes_follow_the_outcome_and_signals run_and_test_use_the_go_executable a_project_builds_runs_and_tests_under_a_non_ascii_path
+        run: just e2e-go
       # the node half and the comparison of both reports run in `just e2e`;
-      # the compiler is the one the step above built for its tests, with the
-      # std of this checkout, as `cargo run` would name it
+      # the compiler is the one the step above built for its tests
       - name: Language tests on the go target
-        shell: bash
-        working-directory: tests/language
-        env:
-          FLICK_STD_PATH: ${{ github.workspace }}/packages/std
-        run: ../../target/e2e/flick test --emit go --seed 42
+        run: just language-go

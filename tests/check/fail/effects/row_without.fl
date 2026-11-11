@@ -1,0 +1,57 @@
+// What `-S | r` does not say: that the body may leave `S` to nobody, that
+// the rest of the row is settled too, or anything of an element with
+// arguments.
+module App.RowWithout exposing (..)
+
+service Log =
+  line : String ->{} Unit
+
+service Clock =
+  now : Unit ->{} Float
+
+service Store a =
+  get : Unit ->{} a
+
+/// Nothing gives `Log` here, and the caller is told it owes none.
+leaky : Eff s none a ->{-Log | s} a
+let leaky t = await t
+
+/// Nor may the body ask for it itself.
+loud : Eff s none Unit ->{-Log | s} Unit
+let loud t =
+  Log.line "still needed"
+  await t
+
+quiet : Layer none none {Log} -> Eff s none a ->{-Log | s} a
+let quiet layer t = provide layer { await t }
+
+/// `Clock` is still owed.
+unpaid : Layer none none {Log} -> Eff {Clock, Log} none a ->{} a
+let unpaid layer t = quiet layer t
+
+/// The variable may hold `Store` at another type.
+typed : Layer none none {Store Int} -> Eff s none a ->{-Store Int | s} a
+let typed layer t = provide layer { await t }
+
+idle : Unit -> Eff s none Unit
+let idle () = task { () }
+
+later : Layer none none {Log} -> Eff s none Unit -> Unit ->{-Log | s} Unit
+let later layer t () = provide layer { await t }
+
+/// No row less `Log` is exactly a row that holds it.
+misaligned : Layer none none {Log} -> (Unit ->{Log} Unit) ->{} Bool
+let misaligned layer logged = Ref.same (Ref.make (later layer (idle ()))) (Ref.make logged)
+
+/// What is asked of an unknown row less `Log` cannot be `Log`.
+shrunk : Layer none none {Log} -> (Unit ->{Log} Unit) ->{} Unit
+let shrunk layer logged =
+  let cell = Ref.make (later layer (idle ()))
+  Ref.set cell logged
+
+//~ FLICK-E002 @17:15-17:22 the signature of `leaky` does not allow service `Log`, which its body needs
+//~ FLICK-E002 @22:3-22:26 the signature of `loud` does not allow service `Log`, which its body needs
+//~ FLICK-E002 @30:22-30:35 the signature of `unpaid` does not allow service `Clock`, which its body needs
+//~ FLICK-T002 @33:56-33:66 `-` takes an element out of a row variable by its name, and `Store Int` has arguments: write the row as `{Store Int | r}` and leave `r`
+//~ FLICK-T003 @44:76-44:91 expected `Ref (Unit ->{-Log | _; none} Unit)`, found `Ref (Unit ->{Log; none} Unit)`: `Log` is in the row, which the expected type does not allow
+//~ FLICK-T003 @50:16-50:22 expected `Unit ->{-Log | _; none} Unit`, found `Unit ->{Log; none} Unit`: `Log` is in the row, which the expected type does not allow

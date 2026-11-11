@@ -100,7 +100,7 @@ theorem Typ.substT {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
   | tryR _ _ hφ hs ih₁ ih₂ =>
     intro σ hσ
     exact .tryR (ih₁ σ (hσ.sub fun _ h => .inl h)) (ih₂ σ (hσ.sub fun _ h => .inr h))
-      (Stage.le_substT σ hφ) (by simpa using hs.substT σ)
+      (Stage.le_substT σ hφ) (hs.back_substT σ)
   | tryP _ _ ih₁ ih₂ =>
     intro σ hσ
     have := ih₂ σ (hσ.sub fun _ h => .inr h)
@@ -111,7 +111,12 @@ theorem Typ.substT {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
     refine .handle hv (ih₁ σ (hσ.sub fun _ h => .inl h)) (ih₂ σ (hσ.sub fun _ h => .inr h))
       ?_ ?_ (by simpa [Stage.substT] using Stage.le_substT σ hφ)
     · exact fun K k ts T h₁ h₂ => (hc K k ts T h₁ h₂).imp .inl .inl
-    · simpa using Row.passes_substT σ ha
+    · intro x hx
+      rcases Row.passes_substT σ ha x hx with h | h
+      · exact .inl h
+      · rw [Row.union_substT] at h
+        exact h.elim (fun h => .inr (.inl h)) fun h =>
+          (Row.modNames_substT σ _ x h).imp_right .inr
   | hnil hH =>
     intro σ _
     obtain rfl : _ = Row.none := funext fun n => propext ⟨fun h => hH n h, False.elim⟩
@@ -224,7 +229,7 @@ theorem Typ.substT {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
     have h₃ := ih₃ σ (hσ.sub fun _ h => .inr (.inr h))
     simp only [Flick.J.substT, Ty.substT, Stage.substT] at h₂ h₃ h₁
     refine .hdl h₁ hn h₂ (by simpa only [Stage.use_substT] using Stage.le_substT σ hψ) h₃ ?_ ?_ ⟨hc.1, fun h => .inl (hc.2 h)⟩ (by simpa only [Stage.use_substT] using Stage.le_substT σ hφ) (hT.substT σ)
-    · simpa [Stage.substT, Row.union_substT] using Stage.le_substT σ hφ₀
+    · exact Stage.le_back_substT σ hφ₀
     · simpa [Row.single_substT] using hOb.substT σ
   | hwith hℓ _ _ hψ _ hφ₀ hc hφ hT hat ih₁ ih₂ ih₃ =>
     intro σ hσ

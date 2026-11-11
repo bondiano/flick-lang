@@ -1,5 +1,7 @@
 //! Diagnostics for unresolved class constraints and resolution budgets.
 
+use std::mem;
+
 use super::solve::Outcome;
 use super::{Wanted, args_of, split};
 use crate::diagnostics::{Diagnostic, Severity, codes};
@@ -11,6 +13,7 @@ use crate::types::ty::Type;
 impl Checker<'_> {
     pub(super) fn report_classes(&mut self, left: Vec<(Wanted, Outcome)>) {
         let mut budget = false;
+        let trusted = mem::take(&mut self.cx.trusted);
         for (w, outcome) in left {
             if self.explained(w.span) {
                 continue;
@@ -23,7 +26,8 @@ impl Checker<'_> {
                 // a route that is no path has its error where it is written;
                 // services still unknown at the end are none, so no `control` one
                 Outcome::Stuck
-                    if args_of(&constraint, Lang::PathParams).is_some()
+                    if trusted
+                        || args_of(&constraint, Lang::PathParams).is_some()
                         || args_of(&constraint, Lang::Detached).is_some() => {}
                 Outcome::Stuck => {
                     let shown = self.show(&constraint);

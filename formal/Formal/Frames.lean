@@ -34,8 +34,8 @@ def Frame.dom (F : Frame) : Row
   | .nm N => F.installs N
   | .atm a => ∃ p, F = .inside p ∧ a = .r p
   | .ob N a => F.installs N ∨ ∃ p, F = .inside p ∧ a = .r p
-  | .obv _ a => ∃ p, F = .inside p ∧ a = .r p
-  | .rv _ => False
+  | .obv _ _ a => ∃ p, F = .inside p ∧ a = .r p
+  | .rv _ _ => False
 
 /-- The region of a runtime form of a handler. Such a frame is created inside the
 `inside` form of its region (`Step.resume`, `PHead.hresVal`), so in the live
@@ -64,6 +64,16 @@ def domE : List Frame → Row
 
 theorem domE_cons (F : Frame) (E : List Frame) (n : Elem) :
     domE (F :: E) n ↔ F.provides n ∨ domE E n := Iff.rfl
+
+/-- No frame provides a row variable. -/
+theorem Frame.provides_rv {F : Frame} {a : Atom} {G : Name → Prop} : ¬ F.provides (.rv a G) := by
+  rintro (h | ⟨_, _, h⟩)
+  · exact h
+  · cases h
+
+theorem domE_rv : ∀ {E : List Frame} {a : Atom} {G : Name → Prop}, ¬ domE E (.rv a G)
+  | [], _, _, h => h
+  | _ :: _, _, _, h => h.elim Frame.provides_rv domE_rv
 theorem not_value_plug {r : Tm} (hr : ¬ Value r) (F : Frame) : ¬ Value (F.plug r) := by
   intro hv
   cases F <;> simp only [Frame.plug] at hv

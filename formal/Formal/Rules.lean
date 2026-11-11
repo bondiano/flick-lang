@@ -105,11 +105,12 @@ inductive Typ : List Ty → Facts → List Scheme → Tm → J → Prop
   | errVal : Value e → Typ Ψ Θ Γ e (.ex U φ) → U.hd = .adt E → Row.Sub (Row.err E U) ε →
       Typ Ψ Θ Γ e (.ex (.errors ε) φ)
   | tryR : Typ Ψ Θ Γ e (.ex t (.rt r ε₀)) → Typ Ψ Θ Γ A (.halts ε₀ H t φ) →
-      (Stage.rt r ε').le φ → Row.Sub ε₀ (Row.union H ε') → Typ Ψ Θ Γ (.try_ e A) (.ex t φ)
+      (Stage.rt r ε').le φ → Row.Sub ε₀ (Row.union H (ε'.back H)) →
+      Typ Ψ Θ Γ (.try_ e A) (.ex t φ)
   | tryP : Typ Ψ Θ Γ e (.ex t .pure) → Typ Ψ Θ Γ A (.halts Row.none H t φ) →
       Typ Ψ Θ Γ (.try_ e A) (.ex t φ)
   | handle : Value v → Typ Ψ Θ Γ v (.ex (.errors ε₀) .pure) → Typ Ψ Θ Γ A (.halts ε₀ H t φ) →
-      HCov S v H ε' → (∀ x, ε₀ x → (∃ N, x = .nm N) ∨ Row.union H ε' x) →
+      HCov S v H ε' → (∀ x, ε₀ x → (∃ N, x = .nm N) ∨ Row.union H ε'.modNames x) →
       (Stage.rt Row.none ε').le φ →
       Typ Ψ Θ Γ (.handle v A) (.ex t φ)
   | hnil : (∀ n, ¬ H n) → Typ Ψ Θ Γ .anil (.halts ε₀ H t φ)
@@ -167,7 +168,8 @@ inductive Typ : List Ty → Facts → List Scheme → Tm → J → Prop
   | hdl {al rf : Tm} : Typ (Ψ.map (Ty.up 1)) (Θ.substT (shiftV 1)) (Γ.map (Scheme.up 1)) al
         (.harms E (t'.up 1) ((Stage.rt r ε).substT (shiftV 1)) (.tvar 0)) → al.NoIns →
       Typ Ψ Θ Γ rf (.ex (.arrow t ψ t' C) (.rt r ε)) → (Stage.use ψ C).le (.rt r ε) →
-      Typ Ψ Θ Γ e (.ex t φ₀) → φ₀.le (.rt (Row.union (Row.single E) r) ε) → φ₀.ObOut (Row.single E) →
+      Typ Ψ Θ Γ e (.ex t φ₀) → φ₀.le (.rt (Row.union (Row.single E) (r.back (Row.single E))) ε) →
+      φ₀.ObOut (Row.single E) →
       S.Handles E al r → (Stage.rt r ε).le φ → LeLive t' T →
       Typ Ψ Θ Γ (.hdl E al rf e) (.ex T φ)
   /-- The run-time forms of a handler, whose region is `p`; the cell `ℓ` holds the type and

@@ -114,18 +114,8 @@ fn prepare(
         return fail(&sources, vec![diagnostic]);
     }
     progress.stage("Compiling Flick modules");
-    let (mut diagnostics, mut compilation) = package_cache::with_saved(|saved| {
-        let (diagnostics, compilation, fresh) = project::compile_with(
-            &host,
-            &mut sources,
-            Some(&project),
-            &roots,
-            saved,
-            rt,
-            modules,
-        );
-        ((diagnostics, compilation), fresh)
-    });
+    let (mut diagnostics, mut compilation) =
+        package_cache::compile(&host, &mut sources, Some(&project), &roots, rt, modules);
     super::build::hooks::ir(Some(&project), &mut compilation, &mut diagnostics);
     let errors = diagnostics.iter().any(|d| d.severity == Severity::Error);
     let progress = if diagnostics.is_empty() {
@@ -191,12 +181,13 @@ fn prepare(
         drop(progress);
         return fail(&sources, emitted.diagnostics);
     }
+    let read = (&roots[..], &*host.cwd, &sources);
+    let store = |artifacts: &[Artifact]| {
+        let now = cache::key(&project, &roots, &settings, !go_requested && !rt);
+        diagnostics.is_empty() && cache::store_built(&project, read, &key, &now, artifacts)
+    };
     if go {
-        if diagnostics.is_empty()
-            && cache::key(&project, &roots, &settings, !go_requested && !rt) == key
-            && cache::read_unchanged(&project, &roots, &host.cwd, &sources)
-        {
-            cache::store(&project.root, &key, &emitted.artifacts);
+        if store(&emitted.artifacts) {
             cache::mark_go(&project.root, &key, &out, &go::executable(go::TEST));
         }
         drop(progress);
@@ -209,16 +200,11 @@ fn prepare(
         eprintln!("error: cannot write `{}`: {err}", runner.display());
         return Err(());
     }
-    if diagnostics.is_empty()
-        && cache::key(&project, &roots, &settings, !go_requested && !rt) == key
-        && cache::read_unchanged(&project, &roots, &host.cwd, &sources)
-    {
-        emitted.artifacts.push(Artifact {
-            path: "test.js".to_owned(),
-            contents: runner_source(&suites, rt),
-        });
-        cache::store(&project.root, &key, &emitted.artifacts);
-    }
+    emitted.artifacts.push(Artifact {
+        path: "test.js".to_owned(),
+        contents: runner_source(&suites, rt),
+    });
+    store(&emitted.artifacts);
     drop(progress);
     Ok(runner)
 }
@@ -422,6 +408,27 @@ pub fn watch_snapshot(paths: &[PathBuf]) -> WatchSnapshot {
     WatchSnapshot(out)
 }
 
+/// The snapshot once two in a row agree: a save that truncates a file and
+/// then writes it is one change, not a build of each state. A file that
+/// keeps changing (a log in a watched directory) ends the wait after about
+/// a second, with the latest snapshot.
+pub fn settled_snapshot(paths: &[PathBuf]) -> WatchSnapshot {
+    settle(paths, || thread::sleep(Duration::from_millis(50)))
+}
+
+fn settle(paths: &[PathBuf], mut pause: impl FnMut()) -> WatchSnapshot {
+    let mut last = watch_snapshot(paths);
+    for _ in 0..20 {
+        pause();
+        let now = watch_snapshot(paths);
+        if now == last {
+            break;
+        }
+        last = now;
+    }
+    last
+}
+
 /// Stops a run: closing its stdin lets every running test close its scope,
 /// and the wait returns only once the runner has exited.
 fn stop(child: &mut Child) {
@@ -434,7 +441,7 @@ fn watch(options: &TestArguments, global: &GlobalArguments) -> ExitCode {
     // what the runs of this session compiled: a change compiles what it reaches
     let mut modules = ModuleCache::default();
     loop {
-        let before = watch_snapshot(&paths);
+        let before = settled_snapshot(&paths);
         let prepared = prepare(options, global, Some(&mut modules));
         // each run reports its build, before its tests start
         timings::report(global);
@@ -498,5 +505,35 @@ mod tests {
         );
         fs::remove_dir_all(&root).expect("delete root");
         assert_eq!(watch_snapshot(&paths), WatchSnapshot(Vec::new()));
+    }
+
+    #[test]
+    fn a_save_settles_on_the_saved_file_and_a_busy_file_ends_the_wait() {
+        let root = env::temp_dir().join(format!("flick-watch-settle-{}", process::id()));
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(&root).expect("fixture");
+        let main = root.join("Main.fl");
+        fs::write(&main, "old").expect("old");
+        let paths = [root.clone()];
+        // a save has truncated the file and writes it during the first pause
+        File::create(&main).expect("truncate");
+        let mut saved = false;
+        let mut save = || {
+            if !saved {
+                fs::write(&main, "saved").expect("write");
+                saved = true;
+            }
+        };
+        let settled = settle(&paths, &mut save);
+        save();
+        assert_eq!(settled, watch_snapshot(&paths), "the saved file");
+        let mut writes = 0;
+        let busy = settle(&paths, || {
+            writes += 1;
+            fs::write(&main, "x".repeat(writes)).expect("write");
+        });
+        assert_eq!(writes, 20, "the wait is bounded");
+        assert_eq!(busy, watch_snapshot(&paths), "the latest state");
+        fs::remove_dir_all(&root).expect("delete root");
     }
 }

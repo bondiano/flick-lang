@@ -21,7 +21,7 @@ theorem Row.hP_substT {Θ : Facts} {q : Nat} {E : Name} {r : Row} {σ : Atom →
     simp only [Row.hP, Row.substT_nm hn]
     exact hx
   | ob N a =>
-    rcases hx with ⟨b, ⟨h₁, h₂⟩, hb⟩ | ⟨v, _, _, hv, _⟩
+    rcases hx with ⟨b, ⟨h₁, h₂⟩, hb⟩ | ⟨v, _, _, _, _, hv, _⟩
     · simp only [Row.hP]
       refine ⟨fun h => ?_, fun h => .inl ⟨b, h₂ h, hb⟩⟩
       have ho := (h₁ h).substT σ
@@ -29,18 +29,26 @@ theorem Row.hP_substT {Θ : Facts} {q : Nat} {E : Name} {r : Row} {σ : Atom →
       intro k hk
       exact ho k ⟨.r q, rfl, by rw [hq]; exact hk⟩
     · exact (hn v N hv).elim
-  | atm a | rv a | obv v a => exact hx
+  | atm a =>
+    rcases hx with ⟨b, hb, h⟩ | ⟨b, G', ⟨G, hb, -, -⟩, h⟩
+    · exact .inl ⟨b, hb, h⟩
+    · exact .inr ⟨b, G, hb, h⟩
+  | rv c K =>
+    obtain ⟨b, G', ⟨G, hb, hsub, hback⟩, K', hc, rfl⟩ := hx
+    exact ⟨fun n => G n ∨ K' n, ⟨b, G, hb, K', hc, rfl⟩, fun n hn => hn.imp (hsub n) id,
+      fun n hn => hn.elim (fun h => (hback n h).imp_left .inl) fun h => .inl (.inr h)⟩
+  | obv v a => exact hx
 
 theorem Row.disch_substT {a a' : Atom} {r : Row} {σ : Atom → Ty} (h : ∀ x, (σ a).reach x → x = a') :
     Row.Sub ((Row.disch a r).substT σ) (Row.disch a' (r.substT σ)) := by
   intro x hx
   cases x with
   | ob N y =>
-    obtain ⟨b, ⟨rfl, h₁⟩, hb⟩ | ⟨v, b, ⟨rfl, h₁⟩, hv, hb⟩ := hx
+    obtain ⟨b, ⟨rfl, h₁⟩, hb⟩ | ⟨v, G, b, ⟨rfl, h₁⟩, hG, hv, hb⟩ := hx
     · exact ⟨h y hb, .inl h₁⟩
-    · exact ⟨h y hb, .inr ⟨v, h₁, hv⟩⟩
-  | obv w y => obtain ⟨v, b, ⟨rfl, h₁⟩, hv, hb⟩ := hx; exact ⟨h y hb, v, h₁, hv⟩
-  | nm N | atm _ | rv _ => simp [Row.substT, Row.disch] at hx
+    · exact ⟨h y hb, .inr ⟨v, G, h₁, hG, hv⟩⟩
+  | obv w H y => obtain ⟨v, G, b, ⟨rfl, h₁⟩, hv, hb⟩ := hx; exact ⟨h y hb, v, G, h₁, hv⟩
+  | nm N | atm _ | rv _ _ => simp [Row.substT, Row.disch] at hx
 
 theorem Row.disch_substT_eq {a a' : Atom} {r : Row} {σ : Atom → Ty} (h : ∀ x, (σ a).reach x ↔ x = a')
     (hn : NoNames σ) : (Row.disch a r).substT σ = Row.disch a' (r.substT σ) := by
@@ -49,20 +57,21 @@ theorem Row.disch_substT_eq {a a' : Atom} {r : Row} {σ : Atom → Ty} (h : ∀ 
   | ob N y =>
     simp only [Row.disch, Row.substT_nm hn]
     constructor
-    · rintro (⟨b, ⟨rfl, h₁⟩, hb⟩ | ⟨v, _, _, hv, _⟩)
+    · rintro (⟨b, ⟨rfl, h₁⟩, hb⟩ | ⟨v, _, _, _, _, hv, _⟩)
       · exact ⟨(h y).mp hb, h₁⟩
       · exact (hn v N hv).elim
     · rintro ⟨rfl, h₁⟩; exact .inl ⟨a, ⟨rfl, h₁⟩, (h _).mpr rfl⟩
-  | obv w y =>
+  | obv w H y =>
     simp only [Row.substT, Row.disch]
     constructor
-    · rintro ⟨v, b, ⟨rfl, h₁⟩, hv, hb⟩; exact ⟨(h y).mp hb, v, h₁, hv⟩
-    · rintro ⟨rfl, v, h₁, hv⟩; exact ⟨v, a, ⟨rfl, h₁⟩, hv, (h _).mpr rfl⟩
+    · rintro ⟨v, G, b, ⟨rfl, h₁⟩, hv, hb⟩; exact ⟨(h y).mp hb, v, G, h₁, hv⟩
+    · rintro ⟨rfl, v, G, h₁, hv⟩; exact ⟨v, G, a, ⟨rfl, h₁⟩, hv, (h _).mpr rfl⟩
   | _ => simp [Row.substT, Row.disch]
 
 /-- A body with no obligation about the effect of its handler has what the handler gives. -/
 theorem Stage.hP_of_out {φ₀ : Stage} {E : Name} {r ε : Row} {Θ : Facts} {q : Nat}
-    (h : φ₀.le (.rt (Row.union (Row.single E) r) ε)) (hO : φ₀.ObOut (Row.single E)) :
+    (h : φ₀.le (.rt (Row.union (Row.single E) (r.back (Row.single E))) ε))
+    (hO : φ₀.ObOut (Row.single E)) :
     φ₀.le (.rt (Row.hP Θ q E r) ε) := by
   cases φ₀ with
   | pure => trivial
@@ -89,15 +98,15 @@ theorem Stage.ObOut.substT {φ₀ : Stage} {o : Row} (σ : Atom → Ty) (h : φ�
   have none : ∀ {o : Row}, o.Named → (∀ N, ¬ o (.nm N)) → ∀ N, ¬ (o.substT σ) (.nm N) :=
     fun ho h N => by rw [ho.substT_nm σ N]; exact h N
   cases φ₀ with
-  | pure => exact ⟨fun _ _ h => h.elim, fun _ _ h => h.elim⟩
+  | pure => exact ⟨fun _ _ h => h.elim, fun _ _ _ h => h.elim⟩
   | rt r e =>
-    refine ⟨fun N a ha => ?_, fun w a ⟨v, b, hb, _, _⟩ => ?_⟩
-    · rcases ha with ⟨b, hb, -⟩ | ⟨v, b, hb, -, -⟩
+    refine ⟨fun N a ha => ?_, fun w H a ⟨v, G, b, hb, _, _⟩ => ?_⟩
+    · rcases ha with ⟨b, hb, -⟩ | ⟨v, G, b, hb, -, -, -⟩
       · obtain ⟨ho, hN⟩ := h.1 N b hb
         exact ⟨ho.substT σ, by rw [ho.substT_nm σ N]; exact hN⟩
-      · obtain ⟨ho, hN⟩ := h.2 v b hb
+      · obtain ⟨ho, hN⟩ := h.2 v G b hb
         exact ⟨ho.substT σ, none ho hN N⟩
-    · obtain ⟨ho, hN⟩ := h.2 v b hb
+    · obtain ⟨ho, hN⟩ := h.2 v G b hb
       exact ⟨ho.substT σ, none ho hN⟩
 
 /-- A region atom a stage carries is still carried after a substitution that keeps its

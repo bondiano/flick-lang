@@ -18,6 +18,11 @@ break programs.
   loop control is `FLICK-T071`, and unused `mut` is `FLICK-R020`.
   `loop` and `while` are contextual words, preserving `Loop.loop` and
   `Schedule.while`. IR 0.7.0 adds variables and explicit sequential loops.
+
+- **Watching:** `flick dev`, `flick test --watch` and `--watch` start a run
+  once the watched files settle, so a save that truncates a file and then
+  writes it is built once and `dev` restarts the app once for it.
+
 - **HTTP request ownership:** each request owns its resources through response
   streaming. Closing a server stops admission before outer resources are
   released, interrupts requests left after the grace period and waits for

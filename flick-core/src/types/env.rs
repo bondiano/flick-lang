@@ -291,6 +291,9 @@ pub struct Env<'b> {
     interfaces: HashMap<String, Option<Interface>>,
     /// Some open import could not be loaded, so a missing name may exist.
     open_unknown: bool,
+    /// Some open import did not parse in full, so a name found nowhere,
+    /// not even in the prelude, may be one its module lost.
+    lost_unknown: bool,
     /// The instances this module sees beyond the built-in ones: of the
     /// modules it depends on, however they are imported, and its own.
     instances: Vec<Instance>,

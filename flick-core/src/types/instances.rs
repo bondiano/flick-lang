@@ -64,11 +64,13 @@ impl Checker<'_> {
                     let parts = let_parts(member, self.text);
                     let name = parts.name.clone().unwrap_or_default();
                     if !info.methods.contains(&name) {
-                        self.error(
-                            codes::C011,
-                            self.span(member),
-                            format!("`{name}` is not a method of class `{cn}`"),
-                        );
+                        if !self.env.incomplete(&cm) {
+                            self.error(
+                                codes::C011,
+                                self.span(member),
+                                format!("`{name}` is not a method of class `{cn}`"),
+                            );
+                        }
                         continue;
                     }
                     defined.push(name.clone());

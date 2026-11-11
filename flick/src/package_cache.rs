@@ -6,7 +6,11 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use flick_core::project::{CachedModule, Fresh, PackageCache, store};
+use flick_core::diagnostics::Diagnostic;
+use flick_core::project::{
+    self, CachedModule, Compilation, Fresh, Host, ModuleCache, PackageCache, Project, store,
+};
+use flick_core::source::SourceMap;
 use sha2::{Digest, Sha256};
 
 use crate::cache::files_under;
@@ -23,6 +27,23 @@ pub fn with_saved<R>(run: impl FnOnce(Option<&PackageCache>) -> (R, Vec<Fresh>))
     let (result, fresh) = saved.with(|cache| run(Some(cache)));
     saved.save(fresh);
     result
+}
+
+/// Compiles what `roots` reach, with the saved modules of packages, and
+/// saves those of the packages it checked.
+pub fn compile(
+    host: &dyn Host,
+    sources: &mut SourceMap,
+    project: Option<&Project>,
+    roots: &[PathBuf],
+    rt: bool,
+    kept: Option<&mut ModuleCache>,
+) -> (Vec<Diagnostic>, Compilation) {
+    with_saved(|saved| {
+        let (diagnostics, compilation, fresh) =
+            project::compile_with(host, sources, project, roots, saved, rt, kept);
+        ((diagnostics, compilation), fresh)
+    })
 }
 
 /// Where this compiler keeps the modules of packages, and what keys them

@@ -56,7 +56,7 @@ Checker: `kinds.rs`, `convert/kinds.rs`, `convert/rows.rs` `Checker::row`, `row_
 φ ::= P                           pure stage:      a -> b
     | R⟨ρ; ρ⟩                     runtime stage:   a ->{r; e} b
 
-ρ ::= α | none | {a₁, …, aₙ} | {a₁, …, aₙ | ρ} | ρ + ρ
+ρ ::= α | α − N̄ | none | {a₁, …, aₙ} | {a₁, …, aₙ | ρ} | ρ + ρ
 
 a ::= S τ̄                         SRow element: a service
     | E τ̄                         ERow element: a type declared with `type error`
@@ -81,15 +81,27 @@ The checker also takes a type variable as an element of an error row: in `{t | e
 - `{ā | ρ} ≡ {ā} + ρ` and `ρ + ρ ≡ ρ`;
 - an element is identified by its name `Module.Name`, and a row has at most one element with a given name. `{N τ̄} + {N τ̄'}` is well-formed only when `τ̄ = τ̄'`, and then equals `{N τ̄}`.
 
-The normal form of a row is a pair: a set of elements keyed by name and a set of variables.
+**A variable without names** (SRow, ERow). `α − N̄` is the row `α` stands for less the elements named `N̄`; the language writes it `{-N | α}`. Only a name whose element takes no arguments is taken out of a variable: the variable may hold the element at other arguments, and then nothing says which one is meant (`FLICK-T002`).
 
-**Inclusion:** `ρ ⊆ ρ'` ⇔ `ρ' ≡ ρ + ρ''` for some `ρ''`. On normal forms this is inclusion of both sets.
+- a substitution takes the names out of what it puts there: `(α − N̄)[α := ρ]` is `ρ` without its elements named in `N̄`, and with each of its variables `β − M̄` as `β − (N̄ ∪ M̄)`;
+- `(α − N̄) + (α − M̄) ≡ α − (N̄ ∩ M̄)`, so `α + (α − N̄) ≡ α`;
+- `{N} + (α − N) ≡ {N} + α`: beside `N` the variable has it back.
+
+The normal form of a row is a pair: a set of elements keyed by name and a set of variables, each with the set of names it stands without, none of which the row names itself.
+
+**Inclusion:** `ρ ⊆ ρ'` ⇔ `ρ' ≡ ρ + ρ''` for some `ρ''`. On normal forms the elements of `ρ` are elements of `ρ'`, and a variable `α − N̄` of `ρ` is a variable `α − M̄` of `ρ'` with `M̄ ⊆ N̄`. So `α − N ⊆ α` and `α ⊆ {N | α − N}`, while `α ⊄ α − N`: the variable may hold `N`.
+
+With `ε_b = α` and `H = {E}`, the least remainder `ε'` of (Try) is `α − E`, and so is the row a handler of `E` leaves its surroundings in (Handle-E) when its body needs `α`: `provide` gives a service to a body it knows only by a row variable.
 
 A field row works differently. Labels are unique, order does not matter, and a repeated label is an error (`FLICK-T014`), not a merge. There is no inclusion, only equality: there is no width subtyping.
 
 Checker:
 
-- `unify.rs` `Store::normalize`: the normal form;
+- `unify.rs` `Store::normalize`: the normal form; `Type::Without` is a variable without names;
+- `effects/solve.rs` `owed`: what a variable may hold that a row takes out of it and does not name;
+
+Model: `Row.less` (`flick-model/src/types.rs`), with `Row::within` and `Row::add_less` for inclusion and substitution. Lean: a row variable is `Elem.rv a G`, the variable `a` without the names `G`; `Row.less` and `Row.substT` are the substitution, and `Row.back` is the third equality, read by the pointwise `Row.Sub` in the premises of `Typ.tryR` and `Typ.hdl`. A frame of a context keeps a row variable of its hole up to the names it stands without (`Row.modNames` in `FRel`, and in `Typ.handle`), since an element with a name is found by the name. `formal/Formal/Examples.lean` has the three facts above about `α` and `α − N`.
+
 - `rows.rs` `Checker::unify_row_types`, `merge_same_names`: one element per name;
 - `convert/rows.rs` `element_label`.
 

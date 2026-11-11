@@ -10,6 +10,7 @@ use std::slice;
 
 use super::regions::{add_live, arg_caps, live_arg, live_stage};
 use super::{Check, Checker, error, live_service};
+use crate::syntax::Path;
 use crate::types::{Caps, PROVIDED, Row, Stage, Type, Var};
 
 impl Checker<'_> {
@@ -47,14 +48,17 @@ impl Checker<'_> {
             }
         }
         for v in &a.vars {
-            if b.vars.contains(v) {
-                continue;
-            }
+            let held = b.vars.contains(v);
             match v {
-                Var::Named(_) => {
-                    extra.vars.insert(v.clone());
+                // what `ρ'` takes out of `ρ` it has to name itself
+                Var::Named(_) if held => {
+                    for n in a.owed(v, &b) {
+                        extra.elems.insert(n.clone(), Rc::from([]));
+                    }
                 }
-                Var::Meta(_) => self.pending.push((Row::var(v.clone()), b.clone())),
+                Var::Named(_) => extra.add_var(v, &a.less_of(v).cloned().collect()),
+                Var::Meta(_) if held && a.owed(v, &b).next().is_none() => {}
+                Var::Meta(_) => self.pending.push((a.only(v), b.clone())),
             }
         }
         if extra.is_none() {
@@ -64,7 +68,16 @@ impl Checker<'_> {
             Var::Meta(m) => Some(*m),
             Var::Named(_) => None,
         });
-        match tail {
+        // a row taken without `S` does not grow by `S`, nor by a variable
+        // that may hold it
+        let closed = |m: u32| {
+            let m = Var::Meta(m);
+            b.less_of(&m).any(|n| {
+                extra.elems.contains_key(n)
+                    || (extra.vars.iter()).any(|v| !extra.less.contains(&(v.clone(), n.clone())))
+            })
+        };
+        match tail.filter(|m| !closed(*m)) {
             Some(m) => {
                 let mut grown = extra;
                 grown.vars.insert(Var::Meta(self.meta()));
@@ -133,7 +146,9 @@ impl Checker<'_> {
                 }
             }
         }
-        out.vars.extend(b.vars.iter().cloned());
+        for v in &b.vars {
+            out.add_var(v, &b.less_of(v).cloned().collect());
+        }
         Ok(out)
     }
 
@@ -244,7 +259,8 @@ impl Checker<'_> {
     }
 
     /// `ρ` without what `of` has: the services `provide` leaves its
-    /// surroundings to give.
+    /// surroundings to give. A variable of `ρ` is left without the names of
+    /// `of`, which it may hold.
     pub(super) fn minus(&mut self, r: &Row, of: &Row) -> Check<Row> {
         let (r, of) = (self.zonk_row(r), self.zonk_row(of));
         let mut out = Row::none();
@@ -260,7 +276,14 @@ impl Checker<'_> {
                 }
             }
         }
-        out.vars = r.vars.difference(&of.vars).cloned().collect();
+        let named = (of.elems.iter()).filter(|(_, args)| args.is_empty());
+        let gone: Vec<&Path> = named.map(|(n, _)| n).collect();
+        for v in r.vars.difference(&of.vars) {
+            out.add_var(
+                v,
+                &r.less_of(v).chain(gone.iter().copied()).cloned().collect(),
+            );
+        }
         Ok(out)
     }
 }

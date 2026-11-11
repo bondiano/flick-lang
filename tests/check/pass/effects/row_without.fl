@@ -1,0 +1,62 @@
+// `-S` before the `|` of a row takes `S` out of what the row variable
+// stands for, whatever that is: what a layer or a handler settles is no
+// longer asked of the caller, and nothing is said of the rest.
+module App.RowWithout exposing (..)
+
+service Log =
+  line : String ->{} Unit
+
+service Clock =
+  now : Unit ->{} Float
+
+type error Missing = Missing String
+
+/// The body needs `s`, the layer gives `Log`, the caller owes the rest.
+quiet : Layer none none {Log} -> Eff s none a ->{-Log | s} a
+let quiet layer t = provide layer { await t }
+
+/// A row that holds `Log` is left with what else it holds,
+used : Layer none none {Log} -> Eff {Clock, Log} none a ->{Clock} a
+let used layer t = quiet layer t
+
+/// one that does not, with all of it,
+unused : Layer none none {Log} -> Eff {Clock} none a ->{Clock} a
+let unused layer t = quiet layer t
+
+/// and one still a variable, with that variable less `Log` again.
+again : Layer none none {Log} -> Eff r none a ->{-Log | r} a
+let again layer t = quiet layer t
+
+/// Less is asked than the whole row, so the whole row allows it.
+whole : Layer none none {Log} -> Eff r none a ->{r} a
+let whole layer t = quiet layer t
+
+/// The same for a row of errors: the handler settles `Missing`.
+recover : Eff r e Float ->{r; -Missing | e} Float
+let recover t =
+  try await t with
+  | Missing _ -> 0.0
+
+/// Several names at once, of both rows.
+settled : Layer none none {Clock, Log} -> Eff s e Float ->{-Clock, -Log | s; -Missing | e} Float
+let settled layer t =
+  try provide layer { await t } with
+  | Missing _ -> 0.0
+
+idle : Unit -> Eff s none Unit
+let idle () = task { () }
+
+later : Layer none none {Log} -> Eff s none Unit -> Unit ->{-Log | s} Unit
+let later layer t () = provide layer { await t }
+
+/// Two references to one type of function: the row of the first, less
+/// `Log` and not inferred yet, is exactly `{Clock}`, so it is the least
+/// such row, `{Clock}` itself.
+aligned : Layer none none {Log} -> (Unit ->{Clock} Unit) ->{} Bool
+let aligned layer clocked = Ref.same (Ref.make (later layer (idle ()))) (Ref.make clocked)
+
+/// What is asked of an unknown row less `Log` goes into that row.
+grown : Layer none none {Log} -> (Unit ->{Clock} Unit) ->{} Unit
+let grown layer clocked =
+  let cell = Ref.make (later layer (idle ()))
+  Ref.set cell clocked

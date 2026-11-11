@@ -532,6 +532,9 @@ struct ItemCx {
     subrows: Vec<effects::SubRow>,
     operators: Vec<Operator>,
     regions: regions::State,
+    /// A name was taken on trust: a class constraint left open has no type
+    /// to choose an instance by, and no error of its own.
+    trusted: bool,
 }
 
 struct Checker<'a> {

@@ -248,7 +248,7 @@ impl Projection<'_> {
             // abstract module identity. `unknown` keeps the exported value
             // present without claiming that its witness may be inspected.
             Type::Exists { .. } => Ok("unknown".to_owned()),
-            Type::Row(_) | Type::Union(..) => self.row(t, vars),
+            Type::Row(_) | Type::Union(..) | Type::Without { .. } => self.row(t, vars),
             Type::Symbol(s) => Ok(names::string(s)),
             Type::Meta(_) | Type::Skolem(_) | Type::Error => {
                 Err("the type is not fully known".to_owned())
@@ -286,6 +286,8 @@ impl Projection<'_> {
                 self.row_parts(a, vars, out)?;
                 self.row_parts(b, vars, out)
             }
+            // what a caller no longer owes is no part of what the value is
+            Type::Without { row, .. } => self.row_parts(row, vars, out),
             other => {
                 out.push(self.ty(other, vars)?);
                 Ok(())

@@ -278,6 +278,24 @@ pub fn load(root: &Path, key: &str) -> Option<Vec<Artifact>> {
 /// leaves a whole copy of what it built, and a Go build its stamp beside it.
 const KEPT: usize = 16;
 
+/// Caches `artifacts` under `key` when the build read the inputs the key is
+/// of: `before` is the key from before it ran, and `read` the roots, the
+/// working directory and the sources it compiled. Says whether it did.
+pub fn store_built(
+    project: &Project,
+    read: (&[PathBuf], &Path, &SourceMap),
+    before: &Signed,
+    key: &Signed,
+    artifacts: &[Artifact],
+) -> bool {
+    let (roots, cwd, sources) = read;
+    let current = before == key && read_unchanged(project, roots, cwd, sources);
+    if current {
+        store(&project.root, key, artifacts);
+    }
+    current
+}
+
 /// Caches `artifacts` under `key`; a cache that cannot be written is only
 /// slower.
 pub fn store(root: &Path, key: &Signed, artifacts: &[Artifact]) {
