@@ -1,0 +1,70 @@
+// Option combinators on 300 000 pseudo-random options: one chain of them per
+// element, then the folds over the whole list, three rounds.
+module App.Main exposing (main)
+
+size : Int
+let size = 300000
+
+/// A linear congruential sequence; every third number is absent.
+options : Int -> List (Option Int)
+let options seed =
+  List.map
+    (fun i ->
+      let x = (i * 1103515245 + seed) % 1000003
+      if x % 3 == 0 then None else Some x
+    )
+    (List.range 0 size)
+
+halve : Int -> Result String Int
+let halve x = if x % 2 == 0 then Ok (x / 2) else Err "odd"
+
+/// What the combinators make of one option.
+one : Option Int -> Int
+let one value =
+  let kept =
+    value
+    |> Option.filter (fun x -> x % 5 != 0)
+    |> Option.tap (fun x -> Option.lift_predicate (fun y -> y > 10) x)
+  let summed =
+    kept
+    |> Option.zip_with (Some 3) (fun a b -> a + b)
+    |> Option.zip_left (Some ())
+    |> Option.zip_right (Some 7)
+  let paired =
+    value |> Option.product (Some 2) |> Option.as_ 11 |> Option.or_else_some (fun () -> 13)
+  let halved = value |> Option.filter_map halve |> Option.lift2 (fun a b -> a - b) (Some 1)
+  let (evens, odds) = Option.partition_map halve value
+  let nested = Option.flatten (Some (Option.or_else_result (fun () -> Some 5) value))
+  let chained =
+    Option.compose_k
+      (fun x -> Some (x + 1))
+      (fun x -> Option.lift_predicate (fun y -> y % 7 != 0) x)
+      21
+  let found =
+    if Option.exists (fun x -> x % 2 == 1) value && Option.contains 17 summed then 1 else 0
+  Option.with_default 0 summed
+    + Option.with_default 0 paired
+    + Option.with_default 0 halved
+    + Option.match_ { onNone = fun () -> 1; onSome = fun x -> x % 3 } evens
+    + Option.match_ { onNone = fun () -> 2; onSome = fun x -> String.length x } odds
+    + (if Option.is_some nested then 3 else 4)
+    + Option.with_default 0 chained
+    + (if Option.is_some (Option.as_void value) then 1 else 0)
+    + found
+
+/// One round's checksum.
+round : Int -> Int
+let round seed =
+  let xs = options seed
+  let each = List.fold_left (fun acc x -> acc + one x) 0 xs
+  let total = Option.reduce_compact 0 (fun acc x -> acc + x) xs
+  let first = Option.with_default 0 (Option.first_some_of xs)
+  let whole = Option.all (List.map (fun x -> Option.or_else_some (fun () -> 1) x) xs)
+  let count = Option.with_default 0 (Option.map List.length whole)
+  each + total + first + count + (if Option.is_none (Option.all xs) then 1 else 0)
+
+rounds : Int -> Int -> Int
+let rec rounds left acc = if left == 0 then acc else rounds (left - 1) (acc + round left)
+
+main : Unit ->{; AppError} Unit
+let main () = Platform.stdout_line (show (rounds 3 0))

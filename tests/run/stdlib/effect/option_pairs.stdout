@@ -1,0 +1,28 @@
+as: [None, Some "b", Some "b", Some "b"]
+as_void: [None, Some (), Some (), Some ()]
+exists: [false, false, true, false]
+filter: [None, None, Some 1, None]
+filter_map: [None, Some 0, None, Some -1]
+tap: [None, None, Some 1, None]
+or_else_some: [Some 9, Some 0, Some 1, Some -2]
+or_else_result none: [None, Some Err 0, Some Err 1, Some Err -2]
+or_else_result some: [Some Ok "b", Some Err 0, Some Err 1, Some Err -2]
+partition_map: [(None, None), (Some 0, None), (None, Some "odd 1"), (Some -1, None)]
+match: ["none", "some 0", "some 1", "some -2"]
+contains: [false, false, true, false]
+contains_with: [false, false, true, false]
+flatten: [None, Some 0, Some 1, Some -2]
+flatten none: None
+lift_predicate: [None, None, Some 2]
+compose_k: [Some 3, None, None]
+product: [None, None, None, None, None, Some (0, 0), Some (0, 1), Some (0, -2), None, Some (1, 0), Some (1, 1), Some (1, -2), None, Some (-2, 0), Some (-2, 1), Some (-2, -2)]
+zip_left: [None, None, None, None, None, Some 0, Some 0, Some 0, None, Some 1, Some 1, Some 1, None, Some -2, Some -2, Some -2]
+zip_right: [None, None, None, None, None, Some 0, Some 1, Some -2, None, Some 0, Some 1, Some -2, None, Some 0, Some 1, Some -2]
+zip_with: [None, None, None, None, None, Some 0, Some -1, Some 2, None, Some 1, Some 0, Some 3, None, Some -2, Some -3, Some 0]
+lift2: [None, None, None, None, None, Some 0, Some -1, Some 2, None, Some 1, Some 0, Some 3, None, Some -2, Some -3, Some 0]
+or_else: [None, Some 0, Some 1, Some -2, Some 0, Some 0, Some 0, Some 0, Some 1, Some 1, Some 1, Some 1, Some -2, Some -2, Some -2, Some -2]
+all: (Some [], None, Some [1, 0], None)
+first_some_of: (None, None, Some 0)
+reduce_compact: (10, 11, 10)
+product_many: [None, Some NonEmpty [0, 2, 3], Some NonEmpty [1, 2, 3], Some NonEmpty [-2, 2, 3]]
+product_many of none: [None, Some NonEmpty [0], Some NonEmpty [1], Some NonEmpty [-2]] [None, None, None, None]
