@@ -3,7 +3,7 @@ source: flick-core/src/build/mod.rs
 expression: json
 ---
 {
-  "iface-version": 16,
+  "iface-version": 17,
   "compiler": "0.1.0",
   "module": "App.Shapes",
   "exports": [

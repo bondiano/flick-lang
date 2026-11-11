@@ -23,7 +23,7 @@ impl Checker<'_> {
     /// The top-level functions of this module that make an atom, an action
     /// or a view, each with the maker of the library it ends at.
     pub fn makers(&mut self, decls: &[&Node]) {
-        for name in marked(decls, self.text) {
+        for name in marked(decls, self.text, iface::MAKER, K::Ident) {
             let maker = format!("{}.{name}", self.env.module);
             self.typing.makers.insert(name, maker);
         }
@@ -288,18 +288,19 @@ fn needs_setup(ty: &Type) -> bool {
     found
 }
 
-/// The values `decls` mark `@maker`: the makers of the library.
-fn marked(decls: &[&Node], text: &str) -> Vec<String> {
+/// The names of the declarations an attribute `@tag` stands before: each by
+/// its first token of `kind`, an identifier of a value or the name of a type.
+pub(super) fn marked(decls: &[&Node], text: &str, tag: &str, kind: K) -> Vec<String> {
     let mut out = Vec::new();
     let mut pending = false;
     for decl in decls {
         if decl.kind == K::Attribute {
             let mut words = (decl.child_tokens()).filter(|t| t.kind == K::Ident);
-            pending |= words.next().is_some_and(|w| w.text(text) == "maker");
+            pending |= words.next().is_some_and(|w| w.text(text) == tag);
             continue;
         }
         if mem::take(&mut pending)
-            && let Some(name) = decl.child_tokens().find(|t| t.kind == K::Ident)
+            && let Some(name) = decl.child_tokens().find(|t| t.kind == kind)
         {
             out.push(name.text(text).to_owned());
         }

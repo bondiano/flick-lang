@@ -203,8 +203,8 @@ fn check(&self, block: &Block, _: &[u8], facts: &[Fact]) -> Vec<Diagnostic> {
 A package may watch calls of names, not only its own blocks. `watch` of its
 `[package]`, beside `plugin`, names them, each `Module.name`,
 `Module.Sub.name` or `*.name` for the name in any module. It may also name a
-service, `Module.Service`, and the tag `@maker`; what the plugin is told of
-those is below.
+service, `Module.Service`, and a tag, `@maker` or `@cell`; what the plugin
+is told of those is below.
 
 ```toml
 [package]
@@ -262,6 +262,14 @@ an error the plugin gives at the span of the place stands for the
 compiler's, so the plugin can say where the code belongs. The UI plugin
 does so for a render that does more than read atoms (`FLICK-U004`) and for
 the setup of a component.
+
+The tag `@cell` marks a type whose values hold one value each. Where a
+value that is no function would hold such a type at every type its
+variables stand for, the compiler refuses it (`FLICK-T072`) and the place is
+one with `tagged`: the tag, in `named` the value's type as shown, in
+`reaches` the marked type, and nothing in `inside`; `binding` names the
+value, if it has a name. An error the plugin gives there stands for the
+compiler's, as above: the UI plugin says it of an atom (`FLICK-U005`).
 
 ```rust
 fn check_calls(&self, calls: &[CallSite], state: &[u8]) -> Vec<Diagnostic> {

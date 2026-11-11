@@ -121,6 +121,7 @@ Every compiler code has an explanation and an example. Plugin codes belong to th
 - [FLICK-T069](./flick-t069/)
 - [FLICK-T070](./flick-t070/)
 - [FLICK-T071](./flick-t071/)
+- [FLICK-T072](./flick-t072/)
 
 ## Effects
 

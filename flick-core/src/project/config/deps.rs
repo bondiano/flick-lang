@@ -143,7 +143,7 @@ pub(super) fn package(raw: Spanned<RawPackage>, at: Span) -> Result<Package, Dia
     }
     if let Some(bad) = watch.iter().find(|w| !is_watched(w)) {
         return Err(error(format!(
-            "`watch = [\"{bad}\"]`: a watched name is `Module.name`, `Module.Sub.name` or `*.name` for the name of any module, `Module.Service` for a service, or the tag `@maker`"
+            "`watch = [\"{bad}\"]`: a watched name is `Module.name`, `Module.Sub.name` or `*.name` for the name of any module, `Module.Service` for a service, or a tag, `@maker` or `@cell`"
         )));
     }
     if let Some(bad) = hooks.iter().find(|h| !matches!(h.as_str(), "emit" | "ir")) {
@@ -177,10 +177,10 @@ pub(super) fn package(raw: Spanned<RawPackage>, at: Span) -> Result<Package, Dia
 
 /// Whether `watched` names what a plugin is told of: a value of a module
 /// (`Ui.Event.queue`, or `*.parse` for the name of any module), a service
-/// (`Atom.Read`), or a tag the compiler follows (`@maker`).
+/// (`Atom.Read`), or a tag the compiler follows (`@maker`, `@cell`).
 fn is_watched(watched: &str) -> bool {
     if let Some(tag) = watched.strip_prefix('@') {
-        return tag == iface::MAKER;
+        return tag == iface::MAKER || tag == iface::CELL;
     }
     let Some((module, name)) = watched.rsplit_once('.') else {
         return false;

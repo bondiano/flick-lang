@@ -145,6 +145,7 @@ codes! {
     T069 = Types 69, "assignment to a name that is not a `let mut` variable";
     T070 = Types 70, "assignment inside a restricted construct";
     T071 = Types 71, "invalid loop control";
+    T072 = Types 72, "one cell of a type for every type";
     E001 = Effects 1, "runtime call in a pure position";
     E002 = Effects 2, "services or errors not allowed by the bound";
     E003 = Effects 3, "argument runs before the function that takes an Eff";

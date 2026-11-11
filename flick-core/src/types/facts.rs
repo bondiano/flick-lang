@@ -71,7 +71,7 @@ impl Checker<'_> {
 
     /// `t` with every alias in it expanded, but one inside its own
     /// expansion.
-    fn unaliased(&self, t: &Type) -> Type {
+    pub(super) fn unaliased(&self, t: &Type) -> Type {
         self.expand_all(t, &|t| self.whnf(t), &mut Vec::new())
     }
 }

@@ -18,6 +18,7 @@ mod bindings;
 mod builtin_sources;
 mod builtins;
 mod calls;
+mod cells;
 mod class_members;
 mod classes;
 mod comprehension;
@@ -351,6 +352,7 @@ fn run_in(
         classes: classes::State::default(),
         typing: Typing::default(),
         predicates: HashMap::new(),
+        cells: HashMap::new(),
         calls: Vec::new(),
         field_path: Vec::new(),
         holes: Vec::new(),
@@ -558,6 +560,9 @@ struct Checker<'a> {
     typing: Typing,
     /// The predicate of each refined type of the module, by type name.
     predicates: HashMap<String, &'a Node>,
+    /// The types marked `@cell`, by module: this module's own, and those the
+    /// interfaces it knows declare or pass on.
+    cells: HashMap<String, Vec<String>>,
     /// The applications of a watched name, whose types settle once the
     /// module is solved.
     calls: Vec<facts::PendingCall>,
