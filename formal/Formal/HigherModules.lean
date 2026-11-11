@@ -91,7 +91,7 @@ abbrev Code := Nat
 inductive Expr where
   | structure (exports : List (String × Code))
   | variable (index : Nat)
-  | module (arity : Nat) (body : Expr)
+  | parameterized (arity : Nat) (body : Expr)
   | apply (function : Expr) (arguments : List Expr)
 
 inductive Value where
