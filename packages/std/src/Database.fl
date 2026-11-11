@@ -24,7 +24,7 @@ let execute q = Database.run_execute q
 /// whose answer is lost, as when the connection breaks, fails with the code
 /// `"commit_unknown"`: the transaction may or may not have happened.
 transaction : (Eff {Database | r} e a)^c ->{Database | r; Sql.DbError | e} a
-foreign effect transaction from "@flick-lang/effect-ts/sql" "pgTransaction"
+foreign effect transaction from "flick:sql" "pgTransaction"
   retention call
 
 /// Where, how many connections at most, how long a statement may run
@@ -47,7 +47,7 @@ let config url = {
 }
 
 pg_layer : ServiceTag {Database} -> PgConfig -> Layer none none {Database}
-foreign pure pg_layer from "@flick-lang/effect-ts/sql" "pgLayer"
+foreign pure pg_layer from "flick:sql" "pgLayer"
 
 /// A pool of PostgreSQL connections. An interrupted query is cancelled on
 /// the server and its connection closed, never returned to the pool, so

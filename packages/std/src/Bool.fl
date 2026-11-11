@@ -4,73 +4,73 @@ module Bool exposing (..)
 
 /// `not`, as a function.
 not_ : Bool -> Bool
-foreign pure not_ from "@flick-lang/effect-ts/effect/Boolean" "not"
+foreign pure not_ from "flick:Boolean" "not"
   reviewed "effect@4.1.2 sha256:92ca3f39b61d9d06"
 
 /// Both hold.
 and : Bool -> Bool -> Bool
-foreign pure and from "@flick-lang/effect-ts/effect/Boolean" "and"
+foreign pure and from "flick:Boolean" "and"
   arity 1
   reviewed "effect@4.1.2 sha256:dcb09663081957a3"
 
 /// Not both hold.
 nand : Bool -> Bool -> Bool
-foreign pure nand from "@flick-lang/effect-ts/effect/Boolean" "nand"
+foreign pure nand from "flick:Boolean" "nand"
   arity 1
   reviewed "effect@4.1.2 sha256:f9548161f8e51ffa"
 
 /// Either holds.
 or : Bool -> Bool -> Bool
-foreign pure or from "@flick-lang/effect-ts/effect/Boolean" "or"
+foreign pure or from "flick:Boolean" "or"
   arity 1
   reviewed "effect@4.1.2 sha256:f6769cc0c2d7691e"
 
 /// Neither holds.
 nor : Bool -> Bool -> Bool
-foreign pure nor from "@flick-lang/effect-ts/effect/Boolean" "nor"
+foreign pure nor from "flick:Boolean" "nor"
   arity 1
   reviewed "effect@4.1.2 sha256:9ebd3bb0df9297cc"
 
 /// Exactly one holds.
 xor : Bool -> Bool -> Bool
-foreign pure xor from "@flick-lang/effect-ts/effect/Boolean" "xor"
+foreign pure xor from "flick:Boolean" "xor"
   arity 1
   reviewed "effect@4.1.2 sha256:283639866f91d605"
 
 /// Both are the same.
 eqv : Bool -> Bool -> Bool
-foreign pure eqv from "@flick-lang/effect-ts/effect/Boolean" "eqv"
+foreign pure eqv from "flick:Boolean" "eqv"
   arity 1
   reviewed "effect@4.1.2 sha256:d9bef331f739b066"
 
 /// `self |> implies that`: `that` holds whenever `self` does.
 implies : Bool -> Bool -> Bool
-foreign pure implies from "@flick-lang/effect-ts/effect/Boolean" "implies"
+foreign pure implies from "flick:Boolean" "implies"
   arity 1
   reviewed "effect@4.1.2 sha256:4339c8290ee01c94"
 
 /// Every element holds; `true` for the empty list.
 every : List Bool -> Bool
-foreign pure every from "@flick-lang/effect-ts/effect/Boolean" "every"
+foreign pure every from "flick:Boolean" "every"
   reviewed "effect@4.1.2 sha256:e2e8cc5e13bcc6ca"
 
 /// Some element holds; `false` for the empty list.
 some : List Bool -> Bool
-foreign pure some from "@flick-lang/effect-ts/effect/Boolean" "some"
+foreign pure some from "flick:Boolean" "some"
   reviewed "effect@4.1.2 sha256:8d208581d86b345c"
 
 /// `onTrue ()` or `onFalse ()`.
 match_ : { onFalse : Unit -> a; onTrue : Unit -> a } -> Bool -> a
-foreign pure match_ from "@flick-lang/effect-ts/effect/Boolean" "match"
+foreign pure match_ from "flick:Boolean" "match"
   arity 1
   reviewed "effect@4.1.2 sha256:4b014132f01259fa"
 
 /// `&&` over a list, from `true`.
 reducer_and : Reducer.Reducer Bool
-foreign pure reducer_and from "@flick-lang/effect-ts/effect/Boolean" "ReducerAnd"
+foreign pure reducer_and from "flick:Boolean" "ReducerAnd"
   reviewed "effect@4.1.2 sha256:79e99da315caa107"
 
 /// `||` over a list, from `false`.
 reducer_or : Reducer.Reducer Bool
-foreign pure reducer_or from "@flick-lang/effect-ts/effect/Boolean" "ReducerOr"
+foreign pure reducer_or from "flick:Boolean" "ReducerOr"
   reviewed "effect@4.1.2 sha256:a5da2cb09b99525e"

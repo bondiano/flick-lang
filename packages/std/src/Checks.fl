@@ -5,10 +5,10 @@ module Checks exposing (..)
 /// One `@` with text on both sides and a dot in the domain; not every rule
 /// of email addresses.
 email : String -> Bool
-foreign pure email from "@flick-lang/effect-ts" "checkEmail"
+foreign pure email from "flick:rt" "checkEmail"
 
 non_empty : String -> Bool
-foreign pure non_empty from "@flick-lang/effect-ts" "checkNonEmpty"
+foreign pure non_empty from "flick:rt" "checkNonEmpty"
 
 positive : Float -> Bool
-foreign pure positive from "@flick-lang/effect-ts" "checkPositive"
+foreign pure positive from "flick:rt" "checkPositive"

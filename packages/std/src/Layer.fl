@@ -13,130 +13,130 @@ type MemoMap
 
 /// The service of `tag` implemented by `impl`.
 succeed : ServiceTag r -> ServiceImpl r -> Layer none none r
-foreign pure succeed from "@flick-lang/effect-ts" "layerSucceed"
+foreign pure succeed from "flick:rt" "layerSucceed"
   reviewed "effect@4.1.2 sha256:607ec49d4694de5a"
 
 @lang layer_merge
 /// Both layers' services; they must not build the same service.
 merge : Layer i1 e1 o1 -> Layer i2 e2 o2 -> Layer (i1 + i2) (e1 + e2) (o1 + o2)
-foreign pure merge from "@flick-lang/effect-ts" "layerMerge"
+foreign pure merge from "flick:rt" "layerMerge"
   reviewed "effect@4.1.2 sha256:2c3a2aa8a2f7b0ce"
 
 /// Both layers' services; the second replaces what the first builds too.
 override : Layer i1 e1 o1 -> Layer i2 e2 o2 -> Layer (i1 + i2) (e1 + e2) (o1 + o2)
-foreign pure override from "@flick-lang/effect-ts" "layerOverride"
+foreign pure override from "flick:rt" "layerOverride"
 
 /// A layer that builds nothing.
 empty : Layer none none none
-foreign pure empty from "@flick-lang/effect-ts/effect/Layer" "empty"
+foreign pure empty from "flick:Layer" "empty"
   reviewed "effect@4.1.2 sha256:74287346e5435649"
 
 /// The services of a `Context`, as they are.
 succeed_context : Context r -> Layer none none r
-foreign pure succeed_context from "@flick-lang/effect-ts/effect/Layer" "succeedContext"
+foreign pure succeed_context from "flick:Layer" "succeedContext"
   reviewed "effect@4.1.2 sha256:d302cb773edb9444"
 
 /// The service `make` returns, called when the layer is built.
 sync : ServiceTag r -> (Unit -> ServiceImpl r) -> Layer none none r
-foreign pure sync from "@flick-lang/effect-ts/effect/Layer" "sync"
+foreign pure sync from "flick:Layer" "sync"
   arity 1
   reviewed "effect@4.1.2 sha256:6ec23da973c85985"
 
 /// The services of the `Context` that `make` returns when the layer is built.
 sync_context : (Unit -> Context r) -> Layer none none r
-foreign pure sync_context from "@flick-lang/effect-ts/effect/Layer" "syncContext"
+foreign pure sync_context from "flick:Layer" "syncContext"
   reviewed "effect@4.1.2 sha256:92e8b318a8766e3e"
 
 /// The service `make` computes when the layer is built; what it acquires
 /// is released with the owner of the `provide`.
 effect : ServiceTag r -> Eff ri e (ServiceImpl r) -> Layer ri e r
-foreign pure effect from "@flick-lang/effect-ts/effect/Layer" "effect"
+foreign pure effect from "flick:Layer" "effect"
   arity 1
   reviewed "effect@4.1.2 sha256:0c7d728841391ed7"
 
 /// The services of the `Context` that `make` computes when the layer is built.
 effect_context : Eff ri e (Context r) -> Layer ri e r
-foreign pure effect_context from "@flick-lang/effect-ts/effect/Layer" "effectContext"
+foreign pure effect_context from "flick:Layer" "effectContext"
   reviewed "effect@4.1.2 sha256:82507a12fd127960"
 
 /// Runs `task` when the layer is built, and builds no service.
 effect_discard : Eff ri e a -> Layer ri e none
-foreign pure effect_discard from "@flick-lang/effect-ts/effect/Layer" "effectDiscard"
+foreign pure effect_discard from "flick:Layer" "effectDiscard"
   reviewed "effect@4.1.2 sha256:ae547054f5ed15e6"
 
 /// The layer `make` returns, made when it is built.
 suspend : (Unit -> Layer ri e ro) -> Layer ri e ro
-foreign pure suspend from "@flick-lang/effect-ts/effect/Layer" "suspend"
+foreign pure suspend from "flick:Layer" "suspend"
   reviewed "effect@4.1.2 sha256:8487eb01ae8169d6"
 
 /// The layer `task` computes when it is built.
 unwrap : Eff r e (Layer ri e2 ro) -> Layer (r + ri) (e + e2) ro
-foreign pure unwrap from "@flick-lang/effect-ts/effect/Layer" "unwrap"
+foreign pure unwrap from "flick:Layer" "unwrap"
   reviewed "effect@4.1.2 sha256:02eb836682b350fd"
 
 /// The services of `first` and every layer of `rest`; a later one replaces
 /// what an earlier one builds too.
 merge_all : Layer ri e ro -> List (Layer ri e ro) -> Layer ri e ro
-foreign pure merge_all from "@flick-lang/effect-ts/effect/Layer" "flickMergeAll"
+foreign pure merge_all from "flick:Layer" "flickMergeAll"
   reviewed "effect@4.1.2 sha256:978fac7c8e0e77e3"
 
 @lang layer_run
 /// Runs `body` with the services `layer` builds, which last until it ends;
 /// `provide layer { body }` stands for it. `layer` is built once for the run.
 run : Layer ri e ro -> (Unit ->{ro + r; e2} a) ->{ri + r; e + e2} a
-foreign effect run from "@flick-lang/effect-ts" "layerRun"
+foreign effect run from "flick:rt" "layerRun"
 
 /// `layer` with the services `deps` builds given to it: `layer` needs all
 /// of them, and the result needs the rest of its inputs and those of `deps`.
 provide_ : Layer ri2 e2 ro2 -> Layer (ro2 + ri) e ro -> Layer (ri + ri2) (e + e2) ro
-foreign pure provide_ from "@flick-lang/effect-ts/effect/Layer" "provide"
+foreign pure provide_ from "flick:Layer" "provide"
   arity 1
   reviewed "effect@4.1.2 sha256:f0d272c9fb09fe65"
 
 /// `provide_`, keeping the services of `deps` in the output too.
 provide_merge : Layer ri2 e2 ro2 -> Layer (ro2 + ri) e ro -> Layer (ri + ri2) (e + e2) (ro + ro2)
-foreign pure provide_merge from "@flick-lang/effect-ts/effect/Layer" "provideMerge"
+foreign pure provide_merge from "flick:Layer" "provideMerge"
   arity 1
   reviewed "effect@4.1.2 sha256:76813831f4ff3da8"
 
 /// The layer `f` makes from the services `layer` built.
 flat_map : (Context ro -> Layer ri2 e2 ro2) -> Layer ri e ro -> Layer (ri + ri2) (e + e2) ro2
-foreign pure flat_map from "@flick-lang/effect-ts/effect/Layer" "flatMap"
+foreign pure flat_map from "flick:Layer" "flatMap"
   arity 1
   reviewed "effect@4.1.2 sha256:a527594fac18775b"
 
 /// Runs `f` on the services once `layer` built them.
 tap : (Context ro ->{ri2; e2} a) -> Layer ri e ro -> Layer (ri + ri2) (e + e2) ro
-foreign pure tap from "@flick-lang/effect-ts/effect/Layer" "tap"
+foreign pure tap from "flick:Layer" "tap"
   arity 1
   reviewed "effect@4.1.2 sha256:4d5d9fcfc39c2d64"
 
 /// Runs `f` on the error when the build of `layer` fails, which still fails.
 tap_error : (Errors e ->{ri2; e2} a) -> Layer ri e ro -> Layer (ri + ri2) (e + e2) ro
-foreign pure tap_error from "@flick-lang/effect-ts/effect/Layer" "tapError"
+foreign pure tap_error from "flick:Layer" "tapError"
   arity 1
   reviewed "effect@4.1.2 sha256:a75df25b38fe532e"
 
 /// Runs `f` on how the build of `layer` failed, defects included.
 tap_cause : (Failure e ->{ri2; e2} a) -> Layer ri e ro -> Layer (ri + ri2) (e + e2) ro
-foreign pure tap_cause from "@flick-lang/effect-ts/effect/Layer" "flickTapCause"
+foreign pure tap_cause from "flick:Layer" "flickTapCause"
   arity 1
   reviewed "effect@4.1.2 sha256:a6b134322358395f"
 
 /// The failures of `layer`'s build as defects.
 or_die : Layer ri e ro -> Layer ri none ro
-foreign pure or_die from "@flick-lang/effect-ts/effect/Layer" "orDie"
+foreign pure or_die from "flick:Layer" "orDie"
   reviewed "effect@4.1.2 sha256:4ee83c49587fcd46"
 
 /// When the build of `layer` fails, the layer `f` makes from the error.
 catch : (Errors e -> Layer ri2 e2 ro) -> Layer ri e ro -> Layer (ri + ri2) e2 ro
-foreign pure catch from "@flick-lang/effect-ts/effect/Layer" "catch"
+foreign pure catch from "flick:Layer" "catch"
   arity 1
   reviewed "effect@4.1.2 sha256:0af128c581632770"
 
 /// When the build of `layer` fails or dies, the layer `f` makes from how.
 catch_cause : (Failure e -> Layer ri2 e2 ro) -> Layer ri e ro -> Layer (ri + ri2) e2 ro
-foreign pure catch_cause from "@flick-lang/effect-ts/effect/Layer" "flickCatchCause"
+foreign pure catch_cause from "flick:Layer" "flickCatchCause"
   arity 1
   reviewed "effect@4.1.2 sha256:2a8addb7e0aa5d2e"
 
@@ -144,56 +144,56 @@ foreign pure catch_cause from "@flick-lang/effect-ts/effect/Layer" "flickCatchCa
 /// needs.
 update_service :
   ServiceTag r -> (ServiceImpl r -> ServiceImpl r) -> Layer ri e ro -> Layer (r + ri) e ro
-foreign pure update_service from "@flick-lang/effect-ts/effect/Layer" "updateService"
+foreign pure update_service from "flick:Layer" "updateService"
   arity 2
   reviewed "effect@4.1.2 sha256:be7e2b49661255f9"
 
 /// `layer`, built anew each time instead of shared with other uses.
 fresh : Layer ri e ro -> Layer ri e ro
-foreign pure fresh from "@flick-lang/effect-ts/effect/Layer" "fresh"
+foreign pure fresh from "flick:Layer" "fresh"
   reviewed "effect@4.1.2 sha256:f71c827129ff4b9e"
 
 /// Builds `layer` and keeps its services until the call is interrupted:
 /// an application made of layers, such as a server.
 launch : Layer ri e ro ->{Async | ri; e} Never
-foreign effect launch from "@flick-lang/effect-ts/effect/Layer" "launch"
+foreign effect launch from "flick:Layer" "launch"
   reviewed "effect@4.1.2 sha256:3ab16e9245162df2"
 
 /// Builds `layer` into the owner of region `s`, which releases what it
 /// acquired when it closes.
 build : Layer ri e ro ->{Scope s | ri; e} Context ro
-foreign effect build from "@flick-lang/effect-ts/effect/Layer" "build"
+foreign effect build from "flick:Layer" "build"
   reviewed "effect@4.1.2 sha256:e6fa5d2a3e92d126"
 
 /// `build` sharing what `memo` already built.
 build_with_memo_map : MemoMap -> Layer ri e ro ->{Scope s | ri; e} Context ro
-foreign effect build_with_memo_map from "@flick-lang/effect-ts/effect/Layer" "flickBuildWithMemoMap"
+foreign effect build_with_memo_map from "flick:Layer" "flickBuildWithMemoMap"
   arity 1
   reviewed "effect@4.1.2 sha256:43ddd3e3348080ce"
 
 /// A new, empty memo map.
 make_memo_map : Unit ->{} MemoMap
-foreign effect make_memo_map from "@flick-lang/effect-ts/effect/Layer" "flickMakeMemoMap"
+foreign effect make_memo_map from "flick:Layer" "flickMakeMemoMap"
   reviewed "effect@4.1.2 sha256:196a975e38d3c07d"
 
 /// A memo map that sees what `parent` built; what it builds itself stays
 /// its own.
 fork_memo_map : MemoMap ->{} MemoMap
-foreign effect fork_memo_map from "@flick-lang/effect-ts/effect/Layer" "forkMemoMap"
+foreign effect fork_memo_map from "flick:Layer" "forkMemoMap"
   reviewed "effect@4.1.2 sha256:5ad94f666802ac03"
 
 /// The memo map of the layer being built, forked, or a new one.
 current_memo_map : Unit ->{} MemoMap
-foreign effect current_memo_map from "@flick-lang/effect-ts/effect/Layer" "flickCurrentMemoMap"
+foreign effect current_memo_map from "flick:Layer" "flickCurrentMemoMap"
   reviewed "effect@4.1.2 sha256:37eb2283cd6887c7"
 
 /// A layer whose build is `f`: it gets the memo map of the build and runs
 /// in the owner the services are built into.
 from_build : (forall s. MemoMap ->{Scope s | ri; e} Context ro) -> Layer ri e ro
-foreign pure from_build from "@flick-lang/effect-ts/effect/Layer" "flickFromBuild"
+foreign pure from_build from "flick:Layer" "flickFromBuild"
   reviewed "effect@4.1.2 sha256:67bc89d5255266f9"
 
 /// `from_build`, built once per memo map like any other layer.
 from_build_memo : (forall s. MemoMap ->{Scope s | ri; e} Context ro) -> Layer ri e ro
-foreign pure from_build_memo from "@flick-lang/effect-ts/effect/Layer" "flickFromBuildMemo"
+foreign pure from_build_memo from "flick:Layer" "flickFromBuildMemo"
   reviewed "effect@4.1.2 sha256:1a6b5fada5fcccce"

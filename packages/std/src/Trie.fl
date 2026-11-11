@@ -7,137 +7,137 @@ type Trie v
 
 /// The trie without entries.
 empty : Trie v
-foreign pure empty from "@flick-lang/effect-ts/effect/Trie" "flickEmpty"
+foreign pure empty from "flick:Trie" "flickEmpty"
   reviewed "effect@4.1.2 sha256:e39035fbcb30cf32"
 
 /// A trie of the entries; a later entry for a key replaces an earlier one.
 from_list : List (String, v) -> Trie v
-foreign pure from_list from "@flick-lang/effect-ts/effect/Trie" "fromIterable"
+foreign pure from_list from "flick:Trie" "fromIterable"
   reviewed "effect@4.1.2 sha256:910987f277269bb9"
 
 /// The trie with `key` bound to `value`.
 insert : String -> v -> Trie v -> Trie v
-foreign pure insert from "@flick-lang/effect-ts/effect/Trie" "insert"
+foreign pure insert from "flick:Trie" "insert"
   arity 2
   reviewed "effect@4.1.2 sha256:e614b9079bab336f"
 
 /// The trie with each entry inserted in order.
 insert_many : List (String, v) -> Trie v -> Trie v
-foreign pure insert_many from "@flick-lang/effect-ts/effect/Trie" "insertMany"
+foreign pure insert_many from "flick:Trie" "insertMany"
   arity 1
   reviewed "effect@4.1.2 sha256:4465a09ef58ced93"
 
 /// The trie without `key`.
 remove : String -> Trie v -> Trie v
-foreign pure remove from "@flick-lang/effect-ts/effect/Trie" "remove"
+foreign pure remove from "flick:Trie" "remove"
   arity 1
   reviewed "effect@4.1.2 sha256:d442b29bfed2f75c"
 
 /// The trie without any of the keys.
 remove_many : List String -> Trie v -> Trie v
-foreign pure remove_many from "@flick-lang/effect-ts/effect/Trie" "removeMany"
+foreign pure remove_many from "flick:Trie" "removeMany"
   arity 1
   reviewed "effect@4.1.2 sha256:836902c2a987afda"
 
 /// The value of `key`, if the trie has it.
 get : String -> Trie v -> Option v
-foreign pure get from "@flick-lang/effect-ts/effect/Trie" "get"
+foreign pure get from "flick:Trie" "get"
   arity 1
   reviewed "effect@4.1.2 sha256:dbda6cc6eaada79b"
 
 /// Whether the trie has `key`.
 has : String -> Trie v -> Bool
-foreign pure has from "@flick-lang/effect-ts/effect/Trie" "has"
+foreign pure has from "flick:Trie" "has"
   arity 1
   reviewed "effect@4.1.2 sha256:f32218615f90e46d"
 
 /// The number of entries.
 size : Trie v -> Int
-foreign pure size from "@flick-lang/effect-ts/effect/Trie" "size"
+foreign pure size from "flick:Trie" "size"
   reviewed "effect@4.1.2 sha256:5ab09b0aa12d105d"
 
 /// Whether the trie has no entries.
 is_empty : Trie v -> Bool
-foreign pure is_empty from "@flick-lang/effect-ts/effect/Trie" "isEmpty"
+foreign pure is_empty from "flick:Trie" "isEmpty"
   reviewed "effect@4.1.2 sha256:4415176de8e37e1f"
 
 /// The keys in order.
 keys : Trie v -> List String
-foreign pure keys from "@flick-lang/effect-ts/effect/Trie" "flickKeys"
+foreign pure keys from "flick:Trie" "flickKeys"
   reviewed "effect@4.1.2 sha256:702c25147e99d486"
 
 /// The values in the order of their keys.
 values : Trie v -> List v
-foreign pure values from "@flick-lang/effect-ts/effect/Trie" "flickValues"
+foreign pure values from "flick:Trie" "flickValues"
   reviewed "effect@4.1.2 sha256:bf3596cdb2a8c04f"
 
 /// The entries in key order.
 entries : Trie v -> List (String, v)
-foreign pure entries from "@flick-lang/effect-ts/effect/Trie" "toEntries"
+foreign pure entries from "flick:Trie" "toEntries"
   reviewed "effect@4.1.2 sha256:72ecd97fb8a1e688"
 
 /// The keys that start with `prefix`, in order.
 keys_with_prefix : String -> Trie v -> List String
-foreign pure keys_with_prefix from "@flick-lang/effect-ts/effect/Trie" "flickKeysWithPrefix"
+foreign pure keys_with_prefix from "flick:Trie" "flickKeysWithPrefix"
   arity 1
   reviewed "effect@4.1.2 sha256:07e47487c4af8824"
 
 /// The values whose keys start with `prefix`, in key order.
 values_with_prefix : String -> Trie v -> List v
-foreign pure values_with_prefix from "@flick-lang/effect-ts/effect/Trie" "flickValuesWithPrefix"
+foreign pure values_with_prefix from "flick:Trie" "flickValuesWithPrefix"
   arity 1
   reviewed "effect@4.1.2 sha256:11cda72c0e578a9e"
 
 /// The entries whose keys start with `prefix`, in key order.
 entries_with_prefix : String -> Trie v -> List (String, v)
-foreign pure entries_with_prefix from "@flick-lang/effect-ts/effect/Trie" "toEntriesWithPrefix"
+foreign pure entries_with_prefix from "flick:Trie" "toEntriesWithPrefix"
   arity 1
   reviewed "effect@4.1.2 sha256:697a0cec28ad358f"
 
 /// The entry with the longest key that is a prefix of `key`.
 longest_prefix_of : String -> Trie v -> Option (String, v)
-foreign pure longest_prefix_of from "@flick-lang/effect-ts/effect/Trie" "longestPrefixOf"
+foreign pure longest_prefix_of from "flick:Trie" "longestPrefixOf"
   arity 1
   reviewed "effect@4.1.2 sha256:fc45c3158c2361e5"
 
 /// The trie with the value of `key` replaced by `f value`, if it has the key.
 modify : String -> (v -> v)^c -> Trie v -> Trie v
-foreign pure modify from "@flick-lang/effect-ts/effect/Trie" "modify"
+foreign pure modify from "flick:Trie" "modify"
   arity 2
   retention call
   reviewed "effect@4.1.2 sha256:78662eed9ba277ca"
 
 /// Folds the entries in key order: `f acc value key`.
 reduce : z -> (z -> v -> String -> z)^c -> (Trie v -> z)^c
-foreign pure reduce from "@flick-lang/effect-ts/effect/Trie" "reduce"
+foreign pure reduce from "flick:Trie" "reduce"
   arity 2
   retention call
   reviewed "effect@4.1.2 sha256:7ae1c8eb56558fb8"
 
 /// Each value mapped by `f value key`.
 map : (v -> String -> b)^c -> Trie v -> Trie b
-foreign pure map from "@flick-lang/effect-ts/effect/Trie" "map"
+foreign pure map from "flick:Trie" "map"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:9e54d3639492a8d3"
 
 /// The entries for which `f value key` holds.
 filter : (v -> String -> Bool)^c -> Trie v -> Trie v
-foreign pure filter from "@flick-lang/effect-ts/effect/Trie" "filter"
+foreign pure filter from "flick:Trie" "filter"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:6448cac4164e2537"
 
 /// The entries `f value key` keeps with `Ok`, mapped to its value.
 filter_map : (v -> String -> Result x b)^c -> Trie v -> Trie b
-foreign pure filter_map from "@flick-lang/effect-ts/effect/Trie" "filterMap"
+foreign pure filter_map from "flick:Trie" "filterMap"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:446b83fff322dae5"
 
 /// The entries whose value is `Some`, unwrapped.
 compact : Trie (Option v) -> Trie v
-foreign pure compact from "@flick-lang/effect-ts/effect/Trie" "compact"
+foreign pure compact from "flick:Trie" "compact"
   reviewed "effect@4.1.2 sha256:e9226ab10cebd82a"
 
 /// Runs `f value key` on each entry in key order.

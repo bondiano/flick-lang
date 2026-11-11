@@ -1,4 +1,5 @@
 use super::{EffectBridge, Labels, Options, js};
+use crate::build::effects::effect_specifier;
 use crate::ir::tests::lower_text;
 use crate::types::{Constructor, Rep};
 
@@ -10,7 +11,8 @@ fn compile_with(text: &str, release: bool, labels: Labels) -> super::Output {
     let ir = lower_text("App", text).expect("lowers");
     let path = |m: &str| format!("{}.js", m.replace('.', "/"));
     let package = |m: &str| (m == "App.Users").then(|| "@acme/users".to_owned());
-    let foreign = |_: &str, spec: &str| spec.to_owned();
+    // as a build on Effect has it: a key is the module of the adapter
+    let foreign = |_: &str, spec: &str| effect_specifier(spec);
     let options = Options {
         path: &path,
         package: &package,
@@ -36,7 +38,8 @@ fn on_rt_with_bridge(text: &str, effect_bridge: EffectBridge) -> String {
     let ir = lower_text("App", text).expect("lowers");
     let path = |m: &str| format!("{}.js", m.replace('.', "/"));
     let package = |_: &str| None;
-    let foreign = |_: &str, spec: &str| spec.to_owned();
+    // as a build on Effect has it: a key is the module of the adapter
+    let foreign = |_: &str, spec: &str| effect_specifier(spec);
     let options = Options {
         path: &path,
         package: &package,

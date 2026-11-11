@@ -10,103 +10,103 @@ type alias FilterEffect (r : ServiceRow) (e : ErrorRow) i p f = i ->{r; e} Resul
 
 /// The function as a filter.
 make : (i -> Result f p) -> Filter i p f
-foreign pure make from "@flick-lang/effect-ts/effect/Filter" "make"
+foreign pure make from "flick:Filter" "make"
   arity 1
   reviewed "effect@4.1.2 sha256:003028bfafbeeff8"
 
 /// The runtime function as an effectful filter.
 make_effect : (i ->{r; e} Result f p) -> FilterEffect r e i p f
-foreign pure make_effect from "@flick-lang/effect-ts/effect/Filter" "makeEffect"
+foreign pure make_effect from "flick:Filter" "makeEffect"
   arity 1
   reviewed "effect@4.1.2 sha256:056f57020ab536ba"
 
 /// The failures mapped by `f`.
 map_fail : (f -> f2) -> Filter i p f -> Filter i p f2
-foreign pure map_fail from "@flick-lang/effect-ts/effect/Filter" "mapFail"
+foreign pure map_fail from "flick:Filter" "mapFail"
   arity 1
   reviewed "effect@4.1.2 sha256:e7212726c637ca3d"
 
 /// Passes the values that satisfy `p`, fails with the others.
 from_predicate : (a -> Bool) -> Filter a a a
-foreign pure from_predicate from "@flick-lang/effect-ts/effect/Filter" "fromPredicate"
+foreign pure from_predicate from "flick:Filter" "fromPredicate"
   arity 1
   reviewed "effect@4.1.2 sha256:475d6764d988bf86"
 
 /// Passes the `Some` of `f`, fails with the input for `None`.
 from_predicate_option : (a -> Option b) -> Filter a b a
-foreign pure from_predicate_option from "@flick-lang/effect-ts/effect/Filter" "fromPredicateOption"
+foreign pure from_predicate_option from "flick:Filter" "fromPredicateOption"
   arity 1
   reviewed "effect@4.1.2 sha256:fcfc31937c9e10b1"
 
 /// Whether the filter passes the value.
 to_predicate : Filter a p f -> a -> Bool
-foreign pure to_predicate from "@flick-lang/effect-ts/effect/Filter" "toPredicate"
+foreign pure to_predicate from "flick:Filter" "toPredicate"
   arity 1
   reviewed "effect@4.1.2 sha256:85a058b620348865"
 
 /// What passes, as `Some`.
 to_option : Filter a p f -> a -> Option p
-foreign pure to_option from "@flick-lang/effect-ts/effect/Filter" "toOption"
+foreign pure to_option from "flick:Filter" "toOption"
   arity 1
   reviewed "effect@4.1.2 sha256:dbbb980359c1dcff"
 
 /// The filter as the function it is.
 to_result : Filter a p f -> a -> Result f p
-foreign pure to_result from "@flick-lang/effect-ts/effect/Filter" "toResult"
+foreign pure to_result from "flick:Filter" "toResult"
   arity 1
   reviewed "effect@4.1.2 sha256:0edf7cebba0fd076"
 
 /// Passes values `==` to `value`.
 equals : a -> Filter a a a
-foreign pure equals from "@flick-lang/effect-ts/effect/Filter" "equals"
+foreign pure equals from "flick:Filter" "equals"
   arity 1
   reviewed "effect@4.1.2 sha256:41f40b5aa0bcce58"
 
 /// Passes values `===` to `value`: the same primitive, or the very same object.
 equals_strict : a -> Filter a a a
-foreign pure equals_strict from "@flick-lang/effect-ts/effect/Filter" "equalsStrict"
+foreign pure equals_strict from "flick:Filter" "equalsStrict"
   arity 1
   reviewed "effect@4.1.2 sha256:ecaa20d52cb1d88f"
 
 /// `self |> or that`: what `self` passes, else what `that` passes or its failure.
 or : Filter i p f2 -> Filter i p f -> Filter i p f2
-foreign pure or from "@flick-lang/effect-ts/effect/Filter" "or"
+foreign pure or from "flick:Filter" "or"
   arity 1
   reviewed "effect@4.1.2 sha256:8feb302288ff50e9"
 
 /// `left |> zip_with right f`: passes `f` of what both pass; the first failure.
 zip_with : Filter i b f -> (a -> b -> c) -> Filter i a f -> Filter i c f
-foreign pure zip_with from "@flick-lang/effect-ts/effect/Filter" "zipWith"
+foreign pure zip_with from "flick:Filter" "zipWith"
   arity 2
   reviewed "effect@4.1.2 sha256:b7ff31f2a7e5d1c2"
 
 /// `left |> zip right`: passes what both pass, as a pair.
 zip : Filter i b f -> Filter i a f -> Filter i (a, b) f
-foreign pure zip from "@flick-lang/effect-ts/effect/Filter" "zip"
+foreign pure zip from "flick:Filter" "zip"
   arity 1
   reviewed "effect@4.1.2 sha256:e952e0b8173729c4"
 
 /// `left |> and_left right`: passes what `left` passes when both pass.
 and_left : Filter i b f -> Filter i a f -> Filter i a f
-foreign pure and_left from "@flick-lang/effect-ts/effect/Filter" "andLeft"
+foreign pure and_left from "flick:Filter" "andLeft"
   arity 1
   reviewed "effect@4.1.2 sha256:113b3940ef4d8e4a"
 
 /// `left |> and_right right`: passes what `right` passes when both pass.
 and_right : Filter i b f -> Filter i a f -> Filter i b f
-foreign pure and_right from "@flick-lang/effect-ts/effect/Filter" "andRight"
+foreign pure and_right from "flick:Filter" "andRight"
   arity 1
   reviewed "effect@4.1.2 sha256:2b94d43bd417aa6b"
 
 /// `left |> compose right`: `right` on what `left` passes.
 compose : Filter a b f -> Filter i a f -> Filter i b f
-foreign pure compose from "@flick-lang/effect-ts/effect/Filter" "compose"
+foreign pure compose from "flick:Filter" "compose"
   arity 1
   reviewed "effect@4.1.2 sha256:4f82daf97cf6b189"
 
 /// `left |> compose_passthrough right`: `compose`, failing with the
 /// original input.
 compose_passthrough : Filter a b f2 -> Filter i a f -> Filter i b i
-foreign pure compose_passthrough from "@flick-lang/effect-ts/effect/Filter" "composePassthrough"
+foreign pure compose_passthrough from "flick:Filter" "composePassthrough"
   arity 1
   reviewed "effect@4.1.2 sha256:45b29a017928d5b2"

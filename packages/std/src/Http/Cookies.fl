@@ -64,138 +64,138 @@ type error CookiesError = CookiesError CookiesErrorReason
 
 /// No cookies.
 empty : Cookies
-foreign pure empty from "@flick-lang/effect-ts/effect/http/Cookies" "empty"
+foreign pure empty from "flick:http/Cookies" "empty"
   reviewed "effect@4.1.2 sha256:7380f714940d942d"
 
 /// Whether there are no cookies.
 is_empty : Cookies -> Bool
-foreign pure is_empty from "@flick-lang/effect-ts/effect/http/Cookies" "isEmpty"
+foreign pure is_empty from "flick:http/Cookies" "isEmpty"
   arity 1
   reviewed "effect@4.1.2 sha256:bdab5bce94d74c27"
 
 /// The cookies of `Set-Cookie` header values; a value that is no cookie is
 /// left out.
 from_set_cookie : List String -> Cookies
-foreign pure from_set_cookie from "@flick-lang/effect-ts/effect/http/Cookies" "fromSetCookie"
+foreign pure from_set_cookie from "flick:http/Cookies" "fromSetCookie"
   arity 1
   reviewed "effect@4.1.2 sha256:0abf1daf451077cf"
 
 /// The cookies, a later one of a name replacing an earlier one.
 from_iterable : List Cookie -> Cookies
-foreign pure from_iterable from "@flick-lang/effect-ts/effect/http/Cookies" "fromIterable"
+foreign pure from_iterable from "flick:http/Cookies" "fromIterable"
   arity 1
   reviewed "effect@4.1.2 sha256:b382fa08b6105caa"
 
 /// The cookies of the pairs, each under the name it is paired with.
 from_readonly_record : List (String, Cookie) -> Cookies
-foreign pure from_readonly_record from "@flick-lang/effect-ts/effect/http/Cookies" "flickFromReadonlyRecord"
+foreign pure from_readonly_record from "flick:http/Cookies" "flickFromReadonlyRecord"
   reviewed "effect@4.1.2 sha256:a82a8f6760e8e099"
 
 /// A cookie of the name, value and attributes.
 make_cookie : String -> Redacted String -> Attributes ->{; CookiesError} Cookie
-foreign effect make_cookie from "@flick-lang/effect-ts/effect/http/Cookies" "flickMakeCookie"
+foreign effect make_cookie from "flick:http/Cookies" "flickMakeCookie"
   arity 3
   reviewed "effect@4.1.2 sha256:3c959b2278654e6c"
 
 /// Adds the cookie, replacing one of its name.
 set_cookie : Cookie -> Cookies -> Cookies
-foreign pure set_cookie from "@flick-lang/effect-ts/effect/http/Cookies" "setCookie"
+foreign pure set_cookie from "flick:http/Cookies" "setCookie"
   arity 1
   reviewed "effect@4.1.2 sha256:f76af7afa599de21"
 
 /// Adds each of the cookies.
 set_all_cookie : List Cookie -> Cookies -> Cookies
-foreign pure set_all_cookie from "@flick-lang/effect-ts/effect/http/Cookies" "setAllCookie"
+foreign pure set_all_cookie from "flick:http/Cookies" "setAllCookie"
   arity 1
   reviewed "effect@4.1.2 sha256:9986de9715a32353"
 
 /// The cookies with those of the first argument set over them.
 merge : Cookies -> Cookies -> Cookies
-foreign pure merge from "@flick-lang/effect-ts/effect/http/Cookies" "merge"
+foreign pure merge from "flick:http/Cookies" "merge"
   arity 1
   reviewed "effect@4.1.2 sha256:8f4b02c873c99f65"
 
 /// Removes the cookie of the name.
 remove : String -> Cookies -> Cookies
-foreign pure remove from "@flick-lang/effect-ts/effect/http/Cookies" "remove"
+foreign pure remove from "flick:http/Cookies" "remove"
   arity 1
   reviewed "effect@4.1.2 sha256:c36b40db4629e769"
 
 /// The cookie of the name.
 get : String -> Cookies -> Option Cookie
-foreign pure get from "@flick-lang/effect-ts/effect/http/Cookies" "get"
+foreign pure get from "flick:http/Cookies" "get"
   arity 1
   reviewed "effect@4.1.2 sha256:929b55e983e3905e"
 
 /// The value of the cookie of the name.
 get_value : String -> Cookies ->{} Option (Redacted String)
-foreign get_value from "@flick-lang/effect-ts/effect/http/Cookies" "flickGetValue"
+foreign get_value from "flick:http/Cookies" "flickGetValue"
   arity 2
   reviewed "effect@4.1.2 sha256:fa506a7939671456"
 
 /// Sets a cookie: `set name value attributes cookies`.
 set : String -> Redacted String -> Attributes -> Cookies ->{; CookiesError} Cookies
-foreign effect set from "@flick-lang/effect-ts/effect/http/Cookies" "flickSet"
+foreign effect set from "flick:http/Cookies" "flickSet"
   arity 4
   reviewed "effect@4.1.2 sha256:d8a4af45abb838ea"
 
 /// Sets each cookie of name, value and attributes.
 set_all : List (String, Redacted String, Attributes) -> Cookies ->{; CookiesError} Cookies
-foreign effect set_all from "@flick-lang/effect-ts/effect/http/Cookies" "flickSetAll"
+foreign effect set_all from "flick:http/Cookies" "flickSetAll"
   arity 2
   reviewed "effect@4.1.2 sha256:92237867dd230dc9"
 
 /// Sets an empty cookie of the name that has expired, so that a browser
 /// drops it; `expires` and `maxAge` of the attributes are ignored.
 expire_cookie : String -> Attributes -> Cookies ->{; CookiesError} Cookies
-foreign effect expire_cookie from "@flick-lang/effect-ts/effect/http/Cookies" "flickExpireCookie"
+foreign effect expire_cookie from "flick:http/Cookies" "flickExpireCookie"
   arity 3
   reviewed "effect@4.1.2 sha256:5374918ad36dfaea"
 
 /// The `Set-Cookie` header value of the cookie.
 serialize_cookie : Cookie -> String
-foreign pure serialize_cookie from "@flick-lang/effect-ts/effect/http/Cookies" "serializeCookie"
+foreign pure serialize_cookie from "flick:http/Cookies" "serializeCookie"
   arity 1
   reviewed "effect@4.1.2 sha256:492e18a93ea26c94"
 
 /// The `Cookie` header value of the cookies: `a=1; b=2`.
 to_cookie_header : Cookies -> String
-foreign pure to_cookie_header from "@flick-lang/effect-ts/effect/http/Cookies" "toCookieHeader"
+foreign pure to_cookie_header from "flick:http/Cookies" "toCookieHeader"
   arity 1
   reviewed "effect@4.1.2 sha256:28082bb22f2904a7"
 
 /// Each cookie's name and value.
 to_record : Cookies ->{} List (String, Redacted String)
-foreign to_record from "@flick-lang/effect-ts/effect/http/Cookies" "flickToRecord"
+foreign to_record from "flick:http/Cookies" "flickToRecord"
   reviewed "effect@4.1.2 sha256:6d115ad56694d8bc"
 
 /// The `Set-Cookie` header values of the cookies.
 to_set_cookie_headers : Cookies -> List String
-foreign pure to_set_cookie_headers from "@flick-lang/effect-ts/effect/http/Cookies" "toSetCookieHeaders"
+foreign pure to_set_cookie_headers from "flick:http/Cookies" "toSetCookieHeaders"
   arity 1
   reviewed "effect@4.1.2 sha256:8b99faa31941349d"
 
 /// The names and values of a `Cookie` header.
 parse_header : String ->{} List (String, Redacted String)
-foreign parse_header from "@flick-lang/effect-ts/effect/http/Cookies" "flickParseHeader"
+foreign parse_header from "flick:http/Cookies" "flickParseHeader"
   reviewed "effect@4.1.2 sha256:8580f6aa239d05af"
 
 /// The cookie's name.
 name : Cookie -> String
-foreign pure name from "@flick-lang/effect-ts/effect/http/Cookies" "flickName"
+foreign pure name from "flick:http/Cookies" "flickName"
   reviewed "effect@4.1.2 sha256:0f91a2590a4c6757"
 
 /// The cookie's value.
 value : Cookie ->{} Redacted String
-foreign value from "@flick-lang/effect-ts/effect/http/Cookies" "flickValue"
+foreign value from "flick:http/Cookies" "flickValue"
   reviewed "effect@4.1.2 sha256:0f91a2590a4c6757"
 
 show_cookie : Cookie -> String
-foreign pure show_cookie from "@flick-lang/effect-ts/effect/http/Cookies" "flickShowCookie"
+foreign pure show_cookie from "flick:http/Cookies" "flickShowCookie"
   reviewed "effect@4.1.2 sha256:0f91a2590a4c6757"
 
 show_cookies : Cookies -> String
-foreign pure show_cookies from "@flick-lang/effect-ts/effect/http/Cookies" "flickShowCookies"
+foreign pure show_cookies from "flick:http/Cookies" "flickShowCookies"
   reviewed "effect@4.1.2 sha256:11fd4e6d22a3d7d7"
 
 instance Show Cookie =

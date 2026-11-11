@@ -15,104 +15,104 @@ type Subscription (s : Region) a
 /// A new hub that holds at most `capacity` elements a subscriber has not
 /// taken; a publish to a full one waits.
 bounded : Int ->{} TxPubSub a
-foreign effect bounded from "@flick-lang/effect-ts/effect/TxPubSub" "bounded"
+foreign effect bounded from "flick:TxPubSub" "bounded"
   reviewed "effect@4.1.2 sha256:1a3bc6a2a1facbbf"
 
 /// A new bounded hub that drops what a full one is given.
 dropping : Int ->{} TxPubSub a
-foreign effect dropping from "@flick-lang/effect-ts/effect/TxPubSub" "dropping"
+foreign effect dropping from "flick:TxPubSub" "dropping"
   reviewed "effect@4.1.2 sha256:e556246504ee8df7"
 
 /// A new bounded hub that drops the oldest element when it is full.
 sliding : Int ->{} TxPubSub a
-foreign effect sliding from "@flick-lang/effect-ts/effect/TxPubSub" "sliding"
+foreign effect sliding from "flick:TxPubSub" "sliding"
   reviewed "effect@4.1.2 sha256:2dbb9dc4eb92256a"
 
 /// A new hub without a bound.
 unbounded : Unit ->{} TxPubSub a
-foreign effect unbounded from "@flick-lang/effect-ts/effect/TxPubSub" "unbounded"
+foreign effect unbounded from "flick:TxPubSub" "unbounded"
   arity 0
   reviewed "effect@4.1.2 sha256:25fdbb53af6e9157"
 
 /// The bound it was made with.
 capacity : TxPubSub a -> Int
-foreign pure capacity from "@flick-lang/effect-ts/effect/TxPubSub" "capacity"
+foreign pure capacity from "flick:TxPubSub" "capacity"
   reviewed "effect@4.1.2 sha256:f245cdaa1143da88"
 
 /// The most elements a subscriber has not taken yet.
 size : TxPubSub a ->{Tx.Transaction} Int
-foreign effect size from "@flick-lang/effect-ts/effect/TxPubSub" "size"
+foreign effect size from "flick:TxPubSub" "size"
   reviewed "effect@4.1.2 sha256:c888a453afec8f90"
 
 /// Whether every subscriber has taken everything.
 is_empty : TxPubSub a ->{Tx.Transaction} Bool
-foreign effect is_empty from "@flick-lang/effect-ts/effect/TxPubSub" "isEmpty"
+foreign effect is_empty from "flick:TxPubSub" "isEmpty"
   reviewed "effect@4.1.2 sha256:177493ac2ce03d85"
 
 /// Whether a subscriber has an element to take.
 is_non_empty : TxPubSub a ->{Tx.Transaction} Bool
-foreign effect is_non_empty from "@flick-lang/effect-ts/effect/TxPubSub" "isNonEmpty"
+foreign effect is_non_empty from "flick:TxPubSub" "isNonEmpty"
   reviewed "effect@4.1.2 sha256:03eeeb8180e1981a"
 
 /// Whether a subscriber holds as many elements as the capacity.
 is_full : TxPubSub a ->{Tx.Transaction} Bool
-foreign effect is_full from "@flick-lang/effect-ts/effect/TxPubSub" "isFull"
+foreign effect is_full from "flick:TxPubSub" "isFull"
   reviewed "effect@4.1.2 sha256:278b3ee5ef9fc3e1"
 
 /// Whether it was shut down.
 is_shutdown : TxPubSub a ->{Tx.Transaction} Bool
-foreign effect is_shutdown from "@flick-lang/effect-ts/effect/TxPubSub" "isShutdown"
+foreign effect is_shutdown from "flick:TxPubSub" "isShutdown"
   reviewed "effect@4.1.2 sha256:8ed3f8e8aab16715"
 
 /// Hands the element to every subscriber; false when it was dropped or
 /// the hub is shut down.
 publish : a -> TxPubSub a ->{Async, Tx.Transaction} Bool
-foreign effect publish from "@flick-lang/effect-ts/effect/TxPubSub" "publish"
+foreign effect publish from "flick:TxPubSub" "publish"
   arity 1
   reviewed "effect@4.1.2 sha256:63779402c69879d4"
 
 /// Publishes the elements in order; false when one was dropped.
 publish_all : List a -> TxPubSub a ->{Async, Tx.Transaction} Bool
-foreign effect publish_all from "@flick-lang/effect-ts/effect/TxPubSub" "publishAll"
+foreign effect publish_all from "flick:TxPubSub" "publishAll"
   arity 1
   reviewed "effect@4.1.2 sha256:0f2fc6b1f4a733b6"
 
 /// Subscribes until the scope of region `s` closes.
 subscribe : TxPubSub a ->{Scope s} Subscription s a
-foreign effect subscribe from "@flick-lang/effect-ts/effect/TxPubSub" "subscribe"
+foreign effect subscribe from "flick:TxPubSub" "subscribe"
   reviewed "effect@4.1.2 sha256:c0f21797880736f7"
 
 /// Shuts it down: later publishes are refused and takes from its
 /// subscriptions interrupt the fiber.
 shutdown : TxPubSub a ->{Tx.Transaction} Unit
-foreign effect shutdown from "@flick-lang/effect-ts/effect/TxPubSub" "shutdown"
+foreign effect shutdown from "flick:TxPubSub" "shutdown"
   reviewed "effect@4.1.2 sha256:e8534b436917ff59"
 
 /// Retries the transaction until the hub is shut down.
 await_shutdown : TxPubSub a ->{Async, Tx.Transaction} Unit
-foreign effect await_shutdown from "@flick-lang/effect-ts/effect/TxPubSub" "awaitShutdown"
+foreign effect await_shutdown from "flick:TxPubSub" "awaitShutdown"
   reviewed "effect@4.1.2 sha256:2e6d0d63d84a3814"
 
 /// Removes the oldest element of the subscription, waiting for one.
 take : Subscription s a ->{Tx.Transaction} a
-foreign effect take from "@flick-lang/effect-ts/effect/TxQueue" "take"
+foreign effect take from "flick:TxQueue" "take"
   retention call
   reviewed "effect@4.1.2 sha256:98a03d7d64e0d279"
 
 /// Removes the oldest element of the subscription, if there is one.
 poll : Subscription s a ->{Tx.Transaction} Option a
-foreign effect poll from "@flick-lang/effect-ts/effect/TxQueue" "poll"
+foreign effect poll from "flick:TxQueue" "poll"
   retention call
   reviewed "effect@4.1.2 sha256:d90ea7655e719948"
 
 /// Removes every element of the subscription, waiting for at least one.
 take_all : Subscription s a ->{Tx.Transaction} NonEmpty.NonEmpty a
-foreign effect take_all from "@flick-lang/effect-ts/effect/TxQueue" "takeAll"
+foreign effect take_all from "flick:TxQueue" "takeAll"
   retention call
   reviewed "effect@4.1.2 sha256:4308b512040656d0"
 
 /// The number of elements waiting in the subscription.
 pending : Subscription s a ->{Tx.Transaction} Int
-foreign effect pending from "@flick-lang/effect-ts/effect/TxQueue" "size"
+foreign effect pending from "flick:TxQueue" "size"
   retention call
   reviewed "effect@4.1.2 sha256:4f107de686c5ad9d"

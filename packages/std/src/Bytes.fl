@@ -6,21 +6,21 @@ module Bytes exposing (from_string, to_string, to_base64url, from_base64url, equ
 /// The UTF-8 bytes of the text; a lone surrogate, which has no UTF-8 form,
 /// is written as U+FFFD, as `TextEncoder` writes it.
 from_string : String -> List Int
-foreign pure from_string from "@flick-lang/effect-ts/effect/Crypto" "flickUtf8Encode"
+foreign pure from_string from "flick:Crypto" "flickUtf8Encode"
 
 /// The text of UTF-8 bytes, or `None` when they are not UTF-8. A byte order
 /// mark is kept as U+FEFF.
 to_string : List Int -> Option String
-foreign pure to_string from "@flick-lang/effect-ts/effect/Crypto" "flickUtf8Decode"
+foreign pure to_string from "flick:Crypto" "flickUtf8Decode"
 
 /// The bytes in URL-safe base64, without padding.
 to_base64url : List Int -> String
-foreign pure to_base64url from "@flick-lang/effect-ts/effect/Crypto" "flickBase64UrlEncode"
+foreign pure to_base64url from "flick:Crypto" "flickBase64UrlEncode"
 
 /// The bytes of URL-safe base64, padded or not, or `None` when the text is
 /// not base64.
 from_base64url : String -> Option (List Int)
-foreign pure from_base64url from "@flick-lang/effect-ts/effect/Crypto" "flickBase64UrlDecode"
+foreign pure from_base64url from "flick:Crypto" "flickBase64UrlDecode"
 
 /// Whether the bytes are equal, in a time that depends only on their
 /// lengths: for comparing secrets such as signatures.

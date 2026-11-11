@@ -6,39 +6,39 @@ type Latch
 
 /// A fresh latch, open when `open` holds.
 make : Bool ->{} Latch
-foreign effect make from "@flick-lang/effect-ts/effect/Latch" "make"
+foreign effect make from "flick:Latch" "make"
   reviewed "effect@4.1.2 sha256:67ed46496c6d77b0"
 
 /// Opens the latch, letting every waiting and later task through; whether
 /// it was closed.
 open : Latch ->{} Bool
-foreign effect open from "@flick-lang/effect-ts/effect/Latch" "open"
+foreign effect open from "flick:Latch" "open"
   reviewed "effect@4.1.2 sha256:f3459ede2d23a9ee"
 
 /// Lets the tasks waiting now through, leaving the latch closed; whether
 /// any waited.
 release : Latch ->{} Bool
-foreign effect release from "@flick-lang/effect-ts/effect/Latch" "release"
+foreign effect release from "flick:Latch" "release"
   reviewed "effect@4.1.2 sha256:31dc1ac73ff6aea2"
 
 /// Waits until the latch opens or releases its waiters.
 await_ : Latch ->{Async} Unit
-foreign effect await_ from "@flick-lang/effect-ts/effect/Latch" "await"
+foreign effect await_ from "flick:Latch" "await"
   reviewed "effect@4.1.2 sha256:208393efc057b171"
 
 /// Closes the latch; whether it was open.
 close : Latch ->{} Bool
-foreign effect close from "@flick-lang/effect-ts/effect/Latch" "close"
+foreign effect close from "flick:Latch" "close"
   reviewed "effect@4.1.2 sha256:709612a527ca08b3"
 
 /// Runs `task` once the latch is open: `task |> Latch.when_open latch`.
 when_open : Latch -> (Eff r e a)^c ->{r; e} a
-foreign effect when_open from "@flick-lang/effect-ts/effect/Latch" "whenOpen"
+foreign effect when_open from "flick:Latch" "whenOpen"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:52253a5b2f456520"
 
 /// Whether the latch is open now.
 is_open : Latch ->{} Bool
-foreign is_open from "@flick-lang/effect-ts/effect/Latch" "isOpen"
+foreign is_open from "flick:Latch" "isOpen"
   reviewed "effect@4.1.2 sha256:b6a31a0d043ec7a0"

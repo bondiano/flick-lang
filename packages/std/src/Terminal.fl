@@ -39,7 +39,7 @@ display : String ->{Terminal; PlatformError.PlatformError} Unit
 let display text = Terminal.display text
 
 node_of : ServiceTag {Terminal} -> Option (UserInput -> Bool) -> Layer none none {Terminal}
-foreign pure node_of from "@flick-lang/effect-ts/effect/Terminal" "flickNode"
+foreign pure node_of from "flick:Terminal" "flickNode"
   arity 2
   reviewed "effect@4.1.2 sha256:3cb7418d241dbb23"
 

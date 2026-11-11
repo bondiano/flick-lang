@@ -3,17 +3,17 @@ module Http.Mime exposing (..)
 
 /// The media type of the path's extension: `Some "text/html"` for `a.html`.
 get_type : String -> Option String
-foreign pure get_type from "@flick-lang/effect-ts/effect/http/Mime" "getType"
+foreign pure get_type from "flick:http/Mime" "getType"
   arity 1
   reviewed "effect@4.1.2 sha256:7e29c2efab05938e"
 
 /// The usual extension of the media type, without a dot.
 get_extension : String -> Option String
-foreign pure get_extension from "@flick-lang/effect-ts/effect/http/Mime" "getExtension"
+foreign pure get_extension from "flick:http/Mime" "getExtension"
   arity 1
   reviewed "effect@4.1.2 sha256:1bcd3c537679f752"
 
 /// Every extension of the media type, sorted.
 get_all_extensions : String -> Option (List String)
-foreign pure get_all_extensions from "@flick-lang/effect-ts/effect/http/Mime" "flickGetAllExtensions"
+foreign pure get_all_extensions from "flick:http/Mime" "flickGetAllExtensions"
   reviewed "effect@4.1.2 sha256:1629bc2a0074a697"

@@ -9,39 +9,39 @@ type Scheduler
 /// A fresh scheduler of Effect's default kind: microtasks, then
 /// `setImmediate`, yielding by priority.
 make_mixed : Unit ->{} Scheduler
-foreign make_mixed from "@flick-lang/effect-ts/effect/Scheduler" "flickMakeMixed"
+foreign make_mixed from "flick:Scheduler" "flickMakeMixed"
   arity 0
   reviewed "effect@4.1.2 sha256:599cb79ccc778b11"
 
 /// The scheduler of the current fiber.
 current : Unit ->{} Scheduler
-foreign effect current from "@flick-lang/effect-ts/effect/Scheduler" "flickCurrent"
+foreign effect current from "flick:Scheduler" "flickCurrent"
   arity 0
   reviewed "effect@4.1.2 sha256:70845d060d47fc95"
 
 /// Runs `task` with the scheduler.
 with_scheduler : Scheduler -> (Eff r e a)^c ->{r; e} a
-foreign effect with_scheduler from "@flick-lang/effect-ts/effect/Scheduler" "flickWithScheduler"
+foreign effect with_scheduler from "flick:Scheduler" "flickWithScheduler"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:70845d060d47fc95"
 
 /// The number of steps a fiber of the current task runs before it yields.
 max_ops_before_yield : Unit ->{} Int
-foreign effect max_ops_before_yield from "@flick-lang/effect-ts/effect/Scheduler" "flickMaxOpsBeforeYield"
+foreign effect max_ops_before_yield from "flick:Scheduler" "flickMaxOpsBeforeYield"
   arity 0
   reviewed "effect@4.1.2 sha256:5382e7fca4410878"
 
 /// Runs `task` with fibers yielding after that many steps.
 with_max_ops_before_yield : Int -> (Eff r e a)^c ->{r; e} a
-foreign effect with_max_ops_before_yield from "@flick-lang/effect-ts/effect/Scheduler" "flickWithMaxOpsBeforeYield"
+foreign effect with_max_ops_before_yield from "flick:Scheduler" "flickWithMaxOpsBeforeYield"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:5382e7fca4410878"
 
 /// Runs `task` with fibers that, if `prevent`, never yield to the scheduler.
 with_prevent_scheduler_yield : Bool -> (Eff r e a)^c ->{r; e} a
-foreign effect with_prevent_scheduler_yield from "@flick-lang/effect-ts/effect/Scheduler" "flickWithPreventSchedulerYield"
+foreign effect with_prevent_scheduler_yield from "flick:Scheduler" "flickWithPreventSchedulerYield"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:9f51c84fce10c69a"

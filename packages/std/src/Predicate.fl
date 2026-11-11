@@ -7,66 +7,66 @@ type alias Predicate a = a -> Bool
 
 /// `p |> map_input f` tests `f x` with `p`.
 map_input : (b -> a) -> Predicate a -> Predicate b
-foreign pure map_input from "@flick-lang/effect-ts/effect/Predicate" "mapInput"
+foreign pure map_input from "flick:Predicate" "mapInput"
   arity 1
   reviewed "effect@4.1.2 sha256:15ae97b1e42a7f07"
 
 /// Holds when `p` does not.
 not_ : Predicate a -> Predicate a
-foreign pure not_ from "@flick-lang/effect-ts/effect/Predicate" "not"
+foreign pure not_ from "flick:Predicate" "not"
   arity 1
   reviewed "effect@4.1.2 sha256:1e766c3087cd50e3"
 
 /// Holds when both do.
 and : Predicate a -> Predicate a -> Predicate a
-foreign pure and from "@flick-lang/effect-ts/effect/Predicate" "and"
+foreign pure and from "flick:Predicate" "and"
   arity 1
   reviewed "effect@4.1.2 sha256:d5a53f572ab73d2e"
 
 /// Holds when either does.
 or : Predicate a -> Predicate a -> Predicate a
-foreign pure or from "@flick-lang/effect-ts/effect/Predicate" "or"
+foreign pure or from "flick:Predicate" "or"
   arity 1
   reviewed "effect@4.1.2 sha256:23d453654c2c9438"
 
 /// Holds when exactly one does.
 xor : Predicate a -> Predicate a -> Predicate a
-foreign pure xor from "@flick-lang/effect-ts/effect/Predicate" "xor"
+foreign pure xor from "flick:Predicate" "xor"
   arity 1
   reviewed "effect@4.1.2 sha256:860f901746e584b9"
 
 /// Holds when both agree.
 eqv : Predicate a -> Predicate a -> Predicate a
-foreign pure eqv from "@flick-lang/effect-ts/effect/Predicate" "eqv"
+foreign pure eqv from "flick:Predicate" "eqv"
   arity 1
   reviewed "effect@4.1.2 sha256:2c920c62681b0eb2"
 
 /// `p |> implies q` holds when `q` does whenever `p` does.
 implies : Predicate a -> Predicate a -> Predicate a
-foreign pure implies from "@flick-lang/effect-ts/effect/Predicate" "implies"
+foreign pure implies from "flick:Predicate" "implies"
   arity 1
   reviewed "effect@4.1.2 sha256:cde603a333111451"
 
 /// Holds when not both do.
 nand : Predicate a -> Predicate a -> Predicate a
-foreign pure nand from "@flick-lang/effect-ts/effect/Predicate" "nand"
+foreign pure nand from "flick:Predicate" "nand"
   arity 1
   reviewed "effect@4.1.2 sha256:78106a3c3abd8c20"
 
 /// Holds when neither does.
 nor : Predicate a -> Predicate a -> Predicate a
-foreign pure nor from "@flick-lang/effect-ts/effect/Predicate" "nor"
+foreign pure nor from "flick:Predicate" "nor"
   arity 1
   reviewed "effect@4.1.2 sha256:296a0c3589f30204"
 
 /// Holds when every predicate of the list does.
 every : List (Predicate a) -> Predicate a
-foreign pure every from "@flick-lang/effect-ts/effect/Predicate" "every"
+foreign pure every from "flick:Predicate" "every"
   arity 1
   reviewed "effect@4.1.2 sha256:996ecd4c136e3130"
 
 /// Holds when some predicate of the list does.
 some : List (Predicate a) -> Predicate a
-foreign pure some from "@flick-lang/effect-ts/effect/Predicate" "some"
+foreign pure some from "flick:Predicate" "some"
   arity 1
   reviewed "effect@4.1.2 sha256:98e9cab8881a5a12"

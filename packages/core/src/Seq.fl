@@ -6,76 +6,76 @@ module Seq exposing (..)
 
 /// The elements of a list, which is a sequence already.
 of_list : List a -> Seq a
-foreign pure of_list from "@flick-lang/effect-ts" "seqOfList"
+foreign pure of_list from "flick:rt" "seqOfList"
 
 @lang seq_from
 /// `n`, `n + 1`, … without end.
 from : Int -> Seq Int
-foreign pure from from "@flick-lang/effect-ts" "seqFrom"
+foreign pure from from "flick:rt" "seqFrom"
 
 @lang seq_range
 /// `[from, from + 1, …]` below `until`, as `List.range`.
 range : Int -> Int -> Seq Int
-foreign pure range from "@flick-lang/effect-ts" "seqRange"
+foreign pure range from "flick:rt" "seqRange"
   arity 2
 
 @lang seq_range_to
 /// The numbers from `start` up to `end`, `end` too: what `start..end` is.
 range_to : Int -> Int -> Seq Int
-foreign pure range_to from "@flick-lang/effect-ts" "seqRangeTo"
+foreign pure range_to from "flick:rt" "seqRangeTo"
   arity 2
 
 /// From `from` by `step` while short of `until`; nothing when `step` is 0.
 range_by : Int -> Int -> Int -> Seq Int
-foreign pure range_by from "@flick-lang/effect-ts" "seqRangeBy"
+foreign pure range_by from "flick:rt" "seqRangeBy"
   arity 3
 
 /// `x`, `f x`, `f (f x)`, … without end.
 iterate : (a -> a)^c -> a -> (Seq a)^c
-foreign pure iterate from "@flick-lang/effect-ts" "seqIterate"
+foreign pure iterate from "flick:rt" "seqIterate"
   arity 2
   retention call
 
 /// `x` without end.
 repeat : a -> Seq a
-foreign pure repeat from "@flick-lang/effect-ts" "seqRepeat"
+foreign pure repeat from "flick:rt" "seqRepeat"
 
 /// The elements of the list over and over; nothing for an empty list.
 cycle : List a -> Seq a
-foreign pure cycle from "@flick-lang/effect-ts" "seqCycle"
+foreign pure cycle from "flick:rt" "seqCycle"
 
 /// The values of `f` from the seed until it gives `None`.
 unfold : (s -> Option (a, s))^c -> s -> (Seq a)^c
-foreign pure unfold from "@flick-lang/effect-ts" "seqUnfold"
+foreign pure unfold from "flick:rt" "seqUnfold"
   arity 2
   retention call
 
 /// The elements of the first, then those of the second.
 append : (Seq a)^d -> (Seq a)^d -> (Seq a)^d
-foreign pure append from "@flick-lang/effect-ts" "seqAppend"
+foreign pure append from "flick:rt" "seqAppend"
   arity 2
   retention call
 
 @lang seq_map
 map : (forall v. a^v -> b)^c -> (Seq a)^d -> (Seq b)^(c + d)
-foreign pure map from "@flick-lang/effect-ts" "seqMap"
+foreign pure map from "flick:rt" "seqMap"
   arity 2
   retention call
 
 @lang seq_filter
 filter : (a -> Bool)^c -> (Seq a)^d -> (Seq a)^(c + d)
-foreign pure filter from "@flick-lang/effect-ts" "seqFilter"
+foreign pure filter from "flick:rt" "seqFilter"
   arity 2
   retention call
 
 filter_map : (a -> Option b)^c -> (Seq a)^d -> (Seq b)^(c + d)
-foreign pure filter_map from "@flick-lang/effect-ts" "seqFilterMap"
+foreign pure filter_map from "flick:rt" "seqFilterMap"
   arity 2
   retention call
 
 @lang seq_flat_map
 flat_map : (forall v. a^v -> (Seq b)^(c + v))^c -> (Seq a)^d -> (Seq b)^(c + d)
-foreign pure flat_map from "@flick-lang/effect-ts" "seqFlatMap"
+foreign pure flat_map from "flick:rt" "seqFlatMap"
   arity 2
   retention call
 
@@ -83,102 +83,102 @@ foreign pure flat_map from "@flick-lang/effect-ts" "seqFlatMap"
 /// At most `n` elements, `n` truncated as by `List.take`; pulls none
 /// after the last, so it ends an infinite sequence.
 take : Int -> ((Seq a)^d -> (Seq a)^d)
-foreign pure take from "@flick-lang/effect-ts" "seqTake"
+foreign pure take from "flick:rt" "seqTake"
   arity 2
   retention call
 
 take_while : (a -> Bool)^c -> (Seq a)^d -> (Seq a)^(c + d)
-foreign pure take_while from "@flick-lang/effect-ts" "seqTakeWhile"
+foreign pure take_while from "flick:rt" "seqTakeWhile"
   arity 2
   retention call
 
 /// Without the first `n` elements, `n` truncated as by `List.drop`.
 drop : Int -> ((Seq a)^d -> (Seq a)^d)
-foreign pure drop from "@flick-lang/effect-ts" "seqDrop"
+foreign pure drop from "flick:rt" "seqDrop"
   arity 2
   retention call
 
 drop_while : (a -> Bool)^c -> (Seq a)^d -> (Seq a)^(c + d)
-foreign pure drop_while from "@flick-lang/effect-ts" "seqDropWhile"
+foreign pure drop_while from "flick:rt" "seqDropWhile"
   arity 2
   retention call
 
 /// Pairs in order, as long as the shorter one.
 zip : (Seq a)^d -> (Seq b)^d -> (Seq (a, b))^d
-foreign pure zip from "@flick-lang/effect-ts" "seqZip"
+foreign pure zip from "flick:rt" "seqZip"
   arity 2
   retention call
 
 zip_with : (a -> b -> x)^c -> (Seq a)^d -> (Seq b)^d -> (Seq x)^(c + d)
-foreign pure zip_with from "@flick-lang/effect-ts" "seqZipWith"
+foreign pure zip_with from "flick:rt" "seqZipWith"
   arity 3
   retention call
 
 /// Each element with its index from 0.
 enumerate : (Seq a)^d -> (Seq (Int, a))^d
-foreign pure enumerate from "@flick-lang/effect-ts" "seqEnumerate"
+foreign pure enumerate from "flick:rt" "seqEnumerate"
   retention call
 
 /// `init`, then each running fold: `scan (+) 0 [1, 2]` is `0, 1, 3`.
 scan : (b -> a -> b)^c -> b -> ((Seq a)^d -> (Seq b)^(c + d))^c
-foreign pure scan from "@flick-lang/effect-ts" "seqScan"
+foreign pure scan from "flick:rt" "seqScan"
   arity 3
   retention call
 
 /// Lists of `n` elements, the last one shorter; nothing when `n` is not positive.
 chunks : Int -> ((Seq a)^d -> (Seq (List a))^d)
-foreign pure chunks from "@flick-lang/effect-ts" "seqChunks"
+foreign pure chunks from "flick:rt" "seqChunks"
   arity 2
   retention call
 
 /// Every run of `n` neighbouring elements, from the first.
 windows : Int -> ((Seq a)^d -> (Seq (List a))^d)
-foreign pure windows from "@flick-lang/effect-ts" "seqWindows"
+foreign pure windows from "flick:rt" "seqWindows"
   arity 2
   retention call
 
 @lang seq_to_list
 /// All the elements: never ends on an infinite sequence.
 to_list : (Seq a)^d -> List a
-foreign pure to_list from "@flick-lang/effect-ts" "seqToList"
+foreign pure to_list from "flick:rt" "seqToList"
   retention call
 
 /// Folds from the first element; never ends on an infinite sequence.
 fold : (b -> a -> b)^c -> b -> ((Seq a)^d -> b)^c
-foreign pure fold from "@flick-lang/effect-ts" "seqFold"
+foreign pure fold from "flick:rt" "seqFold"
   arity 3
   retention call
 
 /// Stops at the first element that satisfies `p`.
 any : (a -> Bool)^c -> (Seq a)^d -> Bool
-foreign pure any from "@flick-lang/effect-ts" "seqAny"
+foreign pure any from "flick:rt" "seqAny"
   arity 2
   retention call
 
 /// Stops at the first element that does not satisfy `p`.
 all : (a -> Bool)^c -> (Seq a)^d -> Bool
-foreign pure all from "@flick-lang/effect-ts" "seqAll"
+foreign pure all from "flick:rt" "seqAll"
   arity 2
   retention call
 
 /// The first element that satisfies `p`.
 find : (a -> Bool)^c -> (Seq a)^d -> Option a
-foreign pure find from "@flick-lang/effect-ts" "seqFind"
+foreign pure find from "flick:rt" "seqFind"
   arity 2
   retention call
 
 first : (Seq a)^d -> Option a
-foreign pure first from "@flick-lang/effect-ts" "seqFirst"
+foreign pure first from "flick:rt" "seqFirst"
   retention call
 
 /// Runs a runtime function on each element in order, for what it does.
 each_effect : (a ->{r; e} Unit)^c -> (Seq a)^d ->{r; e} Unit
-foreign effect each_effect from "@flick-lang/effect-ts" "seqEachEffect"
+foreign effect each_effect from "flick:rt" "seqEachEffect"
   retention call
 
 /// Folds from the first element with a runtime function.
 fold_effect : (b -> a ->{r; e} b)^c -> b -> ((Seq a)^d ->{r; e} b)^c
-foreign effect fold_effect from "@flick-lang/effect-ts" "seqFoldEffect"
+foreign effect fold_effect from "flick:rt" "seqFoldEffect"
   retention call
 
 empty : Seq a

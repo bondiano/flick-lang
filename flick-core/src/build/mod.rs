@@ -261,10 +261,11 @@ fn foreign_specifier(
         .filter(|rt| dir.as_ref().is_some_and(|d| d.join(rt).is_file()));
     let spec = beside.as_deref().unwrap_or(spec);
     if settings.backend == Backend::None && !relative {
-        return effects::specifier(spec).unwrap_or_else(|| spec.to_owned());
+        return effects::specifier(spec).unwrap_or_else(|| effects::effect_specifier(spec));
     }
     if settings.backend == Backend::Rt && !relative {
-        return effects::rt_specifier(spec).unwrap_or_else(|| spec.to_owned());
+        // a module neither target has is the adapter's
+        return effects::rt_specifier(spec).unwrap_or_else(|| effects::effect_specifier(spec));
     }
     if settings.backend == Backend::Effect && !relative {
         return effects::effect_specifier(spec);

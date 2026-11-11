@@ -37,7 +37,7 @@ fn con_pat(c: &Constructor, xs: &[Name]) -> Pat {
 }
 
 fn native(export: &str) -> Term {
-    let n = native::find("@flick-lang/effect-ts", export).expect("a native of the table");
+    let n = native::find("flick:rt", export).expect("a native of the table");
     Term::konst(Const::Native(n))
 }
 

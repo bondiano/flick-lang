@@ -47,7 +47,7 @@ const kernelPath = (spec: string): string | undefined => {
 
 test("the kernel has every binding of its first tier of built-in modules", async () => {
   const bindings = MODULES.flatMap((module) =>
-    [...source(module).matchAll(/^foreign (?:\w+ )?\w+ from "(@flick-lang\/effect-ts[^"]*)" "(\w+)"/gm)].map(
+    [...source(module).matchAll(/^foreign (?:\w+ )?\w+ from "(flick:[^"]*)" "(\w+)"/gm)].map(
       ([, spec = "", name = ""]) => ({ module, spec, name }),
     ),
   );

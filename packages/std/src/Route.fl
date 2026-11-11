@@ -18,12 +18,12 @@ module Route exposing (..)
 /// The path and query of a value. Text is percent-encoded as UTF-8; a
 /// lone surrogate, which has no UTF-8 form, prints as U+FFFD.
 print : Url a -> a -> String
-foreign pure print from "@flick-lang/effect-ts" "routePrint"
+foreign pure print from "flick:rt" "routePrint"
 
 /// The value whose URL is `text`, ignoring its origin and fragment; `None`
 /// when no constructor matches or a field is not valid.
 parse : Url a -> String -> Option a
-foreign pure parse from "@flick-lang/effect-ts" "routeParse"
+foreign pure parse from "flick:rt" "routeParse"
   nullable
 
 /// A constructor of a route type as `deriving Url` writes it: the
@@ -32,30 +32,30 @@ foreign pure parse from "@flick-lang/effect-ts" "routeParse"
 type Path
 
 path : c -> String -> List Segment -> Option (List Query) -> Bool -> Path
-foreign pure path from "@flick-lang/effect-ts" "routePath"
+foreign pure path from "flick:rt" "routePath"
 
 /// A segment of a path after the constructor's.
 type Segment
 
 /// A segment of a field's value.
 segment : Schema a -> Segment
-foreign pure segment from "@flick-lang/effect-ts" "routeSegment"
+foreign pure segment from "flick:rt" "routeSegment"
 
 /// A segment of a field of a type whose constructors have no fields: each
 /// word with its constructor.
 words : List (String, c) -> Segment
-foreign pure words from "@flick-lang/effect-ts" "routeWordsOf"
+foreign pure words from "flick:rt" "routeWordsOf"
 
 /// The last segment, another route type's: the rest of the path.
 nested : (Unit -> Url a) -> Segment
-foreign pure nested from "@flick-lang/effect-ts" "routeNestedOf"
+foreign pure nested from "flick:rt" "routeNestedOf"
 
 /// A query parameter: its label, its schema, and whether it may be missing.
 type Query
 
 query : String -> Schema a -> Bool -> Query
-foreign pure query from "@flick-lang/effect-ts" "routeQuery"
+foreign pure query from "flick:rt" "routeQuery"
 
 /// The URLs of the type of `schema`, a path for each constructor.
 codec : Schema a -> List Path -> Url a
-foreign pure codec from "@flick-lang/effect-ts" "routeCodec"
+foreign pure codec from "flick:rt" "routeCodec"

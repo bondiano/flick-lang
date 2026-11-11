@@ -1,5 +1,5 @@
 # Clock, and the virtual time of tests.
-[@flick-lang/effect-ts/effect/Clock]
+[flick:Clock]
 clockWith *ClockWith
 flickMillisOf ClockMillisOf
 flickNanosOf ClockNanosOf
@@ -8,7 +8,7 @@ flickCurrentTimeMillis *ClockCurrentTimeMillis
 flickCurrentTimeNanos *ClockCurrentTimeNanos
 flickMonotonicTimeNanos *ClockMonotonicTimeNanos
 
-[@flick-lang/effect-ts]
+[flick:rt]
 testClock TestClock
 testAdjust *TestAdjust
 testSetTime *TestSetTime

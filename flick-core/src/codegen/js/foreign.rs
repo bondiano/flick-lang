@@ -8,8 +8,10 @@ use flick_ir::Shape;
 
 use super::bridge::Toward;
 use super::{Gen, names};
+use crate::build::effects::owned;
 #[cfg(not(target_arch = "wasm32"))]
 use crate::build::effects::{effect_specifier, requires_adapter, selected_on_kernel};
+#[cfg(not(target_arch = "wasm32"))]
 use crate::build::{bindings, effects::belongs_to};
 use crate::codegen::Options;
 use crate::ir::Copies;
@@ -27,9 +29,7 @@ fn copies(f: &Foreign) -> Option<&Copies> {
 }
 
 fn trusted_runtime_package(spec: &str) -> bool {
-    bindings::PACKAGES
-        .iter()
-        .any(|package| belongs_to(spec, package))
+    owned(spec)
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -361,6 +361,7 @@ mod tests {
         assert!(trusted_runtime_package(
             "@flick-lang/effect-ts/effect/Effect"
         ));
+        assert!(trusted_runtime_package("flick:Effect"));
         assert!(!trusted_runtime_package("@flick-lang/runtime-extra"));
         assert!(!trusted_runtime_package("@flick-lang/effect-ts-extra"));
     }

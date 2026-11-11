@@ -94,11 +94,11 @@ to_namespaced_path : String ->{Path} String
 let to_namespaced_path path = Path.to_namespaced_path path
 
 layer_of : ServiceTag {Path} -> Layer none none {Path}
-foreign pure layer_of from "@flick-lang/effect-ts/effect/Path" "flickLayer"
+foreign pure layer_of from "flick:Path" "flickLayer"
   reviewed "effect@4.1.2 sha256:b30d228cd978968d"
 
 node_of : ServiceTag {Path} -> Layer none none {Path}
-foreign pure node_of from "@flick-lang/effect-ts/effect/Path" "flickNode"
+foreign pure node_of from "flick:Path" "flickNode"
   reviewed "effect@4.1.2 sha256:4c4fc166a1beee53"
 
 /// Effect's own POSIX paths, the same on every platform.
