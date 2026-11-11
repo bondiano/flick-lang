@@ -162,16 +162,30 @@ theorem rot_v {p kk n : Nat} (h : n < p + kk) : ∃ m, rot p kk (.v n) = .tvar m
   · rw [if_pos h1]; exact ⟨_, rfl, by omega⟩
   · rw [if_neg h1, if_pos h]; exact ⟨_, rfl, by omega⟩
 
-/-- The field of a method with the variables of its type below `p + kk` is closed. -/
-theorem mfield_closed {p kk k' : Nat} {t : Ty} (h : ∀ n, t.Occurs n → n < p + kk) :
-    Flick.Scheme.Closed (p + kk) ⟨k', Facts.none, (trT N t).substT (rot p kk)⟩ := by
+/-- The facts of value bounds under substitutions that agree on the variables of the bounds. -/
+theorem trBd_substT_congr {ρ ρ' : Atom → Flick.Ty} :
+    ∀ {bd : List (Ty × Ty)}, (∀ b ∈ bd, ∀ n, b.1.Occurs n ∨ b.2.Occurs n → ρ (.v n) = ρ' (.v n)) →
+      (trBd N bd).substT ρ = (trBd N bd).substT ρ'
+  | [], _ => by simp [trBd]
+  | b :: bd, h => by
+    simp only [trBd, Facts.union_substT, trB_substT_any]
+    rw [trT_substT_congr N fun n hn => h b (.head _) n (.inl hn),
+      trT_substT_congr N (t := b.2) fun n hn => h b (.head _) n (.inr hn),
+      trBd_substT_congr fun b' hb => h b' (.tail _ hb)]
+
+/-- The field of a method with the variables of its type and of its value bounds below
+`p + kk` is closed. -/
+theorem mfield_closed {p kk k' : Nat} {t : Ty} {bd : List (Ty × Ty)}
+    (h : ∀ n, t.Occurs n → n < p + kk) (hb : ∀ b ∈ bd, ∀ n, b.1.Occurs n ∨ b.2.Occurs n → n < p + kk) :
+    Flick.Scheme.Closed (p + kk) ⟨k', (trBd N bd).substT (rot p kk), (trT N t).substT (rot p kk)⟩ := by
   intro σ σ' hσ
-  refine ⟨?_, by simp⟩
-  simp only [Flick.Ty.substT_comp]
-  apply trT_substT_congr
-  intro n hn
-  obtain ⟨m, e, hm⟩ := rot_v (h n hn)
-  rw [e]; exact hσ m hm
+  have hr : ∀ {n}, n < p + kk → (rot p kk (.v n)).substT σ = (rot p kk (.v n)).substT σ' := by
+    intro n hn; obtain ⟨m, e, hm⟩ := rot_v hn; rw [e]; exact hσ m hm
+  refine ⟨?_, ?_⟩
+  · simp only [Flick.Ty.substT_comp]
+    exact trT_substT_congr N fun n hn => hr (h n hn)
+  · simp only [Facts.substT_comp]
+    exact trBd_substT_congr N fun b hb' n hn => hr (hb b hb' n hn)
 
 theorem trT_con_up (c kk : Nat) : (trT N (.con c)).up kk = trT N (.con c) := by
   unfold trT; split <;> (try split) <;> rfl

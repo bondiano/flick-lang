@@ -126,7 +126,7 @@ theorem seqUnit_elab {Γ Δ s rest τ φ s' r'} (hs : Elab P Γ Δ s (.con S.uni
     (hr : Elab P Γ Δ rest τ φ r') : ∃ e', Elab P Γ Δ (S.seqUnit s rest) τ φ e' := by
   have hs' : Elab P (Γ.map (·.subst (up 0))) ([] ++ Δ.map (·.subst (up 0))) s (.con S.unit) φ s' := by
     simpa [Scheme.subst_up_zero, Cn.subst_up_zero] using hs
-  exact ⟨_, .letSig (σ := ⟨0, [], .con S.unit, .cnil⟩) hs' (by simp) (.inr rfl) (hr.shift _)⟩
+  exact ⟨_, .letSig (σ := ⟨0, [], .con S.unit, .cnil, []⟩) hs' (by simp) (.inr rfl) (hr.shift _)⟩
 
 /-- **T6(a) for `for`, `?` and blocks**: each elaboration above is typed in the target. -/
 theorem T6a_sugar (X : Target P) {Γ Δ e τ φ} (h : ∃ e', Elab P Γ Δ e τ φ e') :

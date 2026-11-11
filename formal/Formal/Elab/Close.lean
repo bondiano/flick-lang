@@ -84,11 +84,15 @@ theorem T6a_close (hP : P.ConstsClosed) (hC : P.CtorsClosed) {Γ D e τ φ e'}
       X.Has ((Γ.map (·.subst θ)).map Scheme.tr) (Δl.map (·.subst θ)) (e'.dsubst ρ Δl.length)
         (.mono (τ.subst θ)) (φ.subst θ) := by
   induction h with
-  | @var Γ D x σ ts ds φ hx hk he =>
+  | @var Γ D x σ ts ds φ hx hk hb he =>
     intro Δl Δ θ ρ hD hρ _; subst hD
     have hv := X.var (Γ := (Γ.map (·.subst θ)).map Scheme.tr) (Δ := Δl.map (·.subst θ)) (φ := φ.subst θ)
       (s := (σ.subst θ).tr) (ts := ts.map (·.subst θ))
       (by rw [List.getElem?_map, List.getElem?_map, hx]; rfl) (by simpa [Scheme.subst] using hk)
+      (by
+        have := hb.subst θ
+        simp only [Scheme.tr, Scheme.subst, List.map_map, Function.comp_def] at this ⊢
+        simpa [Bound.subst, Ty.lift_inst hk] using this)
     rw [show (σ.subst θ).tr.ty.subst (inst (ts.map (·.subst θ))) =
         dicts ((σ.q.subst (inst ts)).subst θ) ((σ.ctx.map (·.subst (inst ts))).map (·.subst θ))
           (.mono ((σ.ty.subst (inst ts)).subst θ)) by
@@ -96,20 +100,21 @@ theorem T6a_close (hP : P.ConstsClosed) (hC : P.CtorsClosed) {Γ D e τ φ e'}
         Function.comp_def, Cn.lift_inst hk, Ty.lift_inst hk]] at hv
     rw [Tm.dsubst_dapps]
     exact tm_dapps X hv (ent_close X hρ he)
-  | @meth Γ D m C σ c₀ rest ts d₀ ds φ hm hc _ _ h₀ he =>
+  | @meth Γ D m C σ c₀ rest ts d₀ ds φ hm hc _ _ hb h₀ he =>
     intro Δl Δ θ ρ hD hρ _; subst hD
     rw [Tm.dsubst_dapps]
     cases ent_close X (Γ := (Γ.map (·.subst θ)).map Scheme.tr) (φ := φ.subst θ) hρ h₀ with
     | cons r _ =>
       simp only [Cn.subst_comp] at r
-      have hv := X.meth hm hc r
+      have hv := X.meth hm hc (by rw [← Bound.subst_comp]; exact hb.subst θ) r
       rw [Ty.subst_comp]
       refine tm_dapps X hv ?_
       simpa [List.map_map, Function.comp_def, Cn.subst_comp] using ent_close X hρ he
-  | @const Γ D c σ ts ds φ hc hk he =>
+  | @const Γ D c σ ts ds φ hc hk hb he =>
     intro Δl Δ θ ρ hD hρ _; subst hD
     have hv := X.const (Γ := (Γ.map (·.subst θ)).map Scheme.tr) (Δ := Δl.map (·.subst θ))
       (φ := φ.subst θ) (ts := ts.map (·.subst θ)) hc (by simpa using hk)
+      (by rw [const_bd_inst hP hc hk θ]; exact hb.subst θ)
     rw [const_inst hP hc hk θ] at hv
     rw [Tm.dsubst_dapps]
     exact tm_dapps X hv (ent_close X hρ he)
@@ -151,12 +156,12 @@ theorem T6a_close (hP : P.ConstsClosed) (hC : P.CtorsClosed) {Γ D e τ φ e'}
   | app _ _ hψ ih₁ ih₂ =>
     intro _ _ θ _ hD hρ hg
     exact X.app (ih₁ hD hρ hg) (ih₂ hD hρ hg) (Stage.subst_keeps_or θ hψ)
-  | @allVar Γ D x σ ψ hx hc hk =>
+  | @allVar Γ D x σ ψ hx hc hb hk =>
     intro _ _ θ _ _ _ _
     simp only [Ty.subst, liftTy_eq]
     refine X.allVar (k := σ.k) (t := σ.ty.subst (lift σ.k θ)) ?_ hk
-    rw [List.getElem?_map, List.getElem?_map, hx]; simp [Scheme.tr, Scheme.subst, hc, dicts]
-  | @varAll Γ D x σ ts k t us φ hx hc hts hA hus =>
+    rw [List.getElem?_map, List.getElem?_map, hx]; simp [Scheme.tr, Scheme.subst, hc, hb, dicts]
+  | @varAll Γ D x σ ts k t us φ hx hc hb hts hA hus =>
     intro _ _ θ _ _ _ _
     have hA' := congrArg (Ty.subst θ) hA
     simp only [Ty.subst, liftTy_eq] at hA'
@@ -164,7 +169,7 @@ theorem T6a_close (hP : P.ConstsClosed) (hC : P.CtorsClosed) {Γ D e τ φ e'}
     rw [← Ty.lift_inst hus]
     refine X.varAll (k₀ := σ.k) (t₀ := σ.ty.subst (lift σ.k θ)) (ts := ts.map (·.subst θ))
       ?_ (by simpa using hts) hA' (by simpa using hus)
-    rw [List.getElem?_map, List.getElem?_map, hx]; simp [Scheme.tr, Scheme.subst, hc, dicts]
+    rw [List.getElem?_map, List.getElem?_map, hx]; simp [Scheme.tr, Scheme.subst, hc, hb, dicts]
   | @allLam Γ D k b t ψ b' _ ih =>
     intro Δl Δ θ ρ hD hρ hg; subst hD
     have hΔ : ∀ (j : Nat) (Q : Cn), (Δ.map (·.subst (up k)))[j]? = some Q →
@@ -203,7 +208,7 @@ theorem T6a_close (hP : P.ConstsClosed) (hC : P.CtorsClosed) {Γ D e τ φ e'}
     intro _ _ _ _ hD hρ hg
     have h₂ := ih₂ hD hρ hg
     simp only [List.map_cons, Scheme.subst, lift_zero, List.map_nil, Ty.subst] at h₂
-    refine X.let_ (k := 0) ?_ (fun h => absurd rfl h) (.inr rfl) h₂
+    refine X.let_ (k := 0) (bd := []) ?_ (fun h => absurd rfl h) (.inr rfl) h₂
     simpa [TSch.subst_up_zero, Cn.subst_up_zero] using ih₁ hD hρ hg
   | @letSig Γ D σ e b t φ₁ φ e' b' he hp hφ _ ih₁ ih₂ =>
     intro Δl Δ θ ρ hD hρ hg; subst hD

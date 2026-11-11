@@ -4,8 +4,10 @@
 //! (`docs/formal/elaboration.md`):
 //!
 //! 1. `(T ā)^q` is `T q ā` (`appQ`) for a type with hidden storage and for
-//!    a variable over containers; data without storage and a type variable
-//!    drop `q`; `(A → B)^q` is `.arr φ A B q`, without `q` `.cnil`; an arrow
+//!    a variable over containers; data without storage drops `q`; a value
+//!    bound `a^q` on a variable of the scheme is `a` with the bound
+//!    `(a, q)` of the scheme (`Scheme.bd`), and a hidden qualifier on a type
+//!    variable is dropped; `(A → B)^q` is `.arr φ A B q`, without `q` `.cnil`; an arrow
 //!    with rows `{r; e}` is at the stage `R r e`; a row is a variable,
 //!    `.cnil`, a named element `.rnm c t` or a union `.run`, also as an
 //!    argument of a type.
@@ -147,6 +149,22 @@ fn lean(t: &Ty, vars: &[String], out: &mut String) {
     }
 }
 
+/// The value bounds of a scheme, `Scheme.bd`: `[(a, c), …]`.
+fn bounds(bounds: &[(Ty, Ty)], vars: &[String], out: &mut String) {
+    out.push('[');
+    for (i, (a, c)) in bounds.iter().enumerate() {
+        if i > 0 {
+            out.push_str(", ");
+        }
+        out.push('(');
+        lean(a, vars, out);
+        out.push_str(", ");
+        lean(c, vars, out);
+        out.push(')');
+    }
+    out.push(']');
+}
+
 /// The doc comment of a `def`, and its name.
 fn header<'a>(
     module: &str,
@@ -235,7 +253,11 @@ fn def(
                 .map(|b| &b.name)
                 .filter(|v| first.as_ref() != Some(*v)),
         )
-        .filter(|v| occurs(&t, v) || ctx.iter().flat_map(|c| &c.1).any(|a| occurs(a, v)))
+        .filter(|v| {
+            occurs(&t, v)
+                || ctx.iter().flat_map(|c| &c.1).any(|a| occurs(a, v))
+                || tr.bounds.iter().any(|(a, c)| occurs(a, v) || occurs(c, v))
+        })
         .chain(&tr.fresh)
         .cloned()
         .collect();
@@ -267,7 +289,9 @@ fn def(
     }
     out.push_str("],\n    ");
     lean(&t, &binders, &mut out);
-    out.push_str(", .cnil⟩\n");
+    out.push_str(", .cnil, ");
+    bounds(&tr.bounds, &binders, &mut out);
+    out.push_str("⟩\n");
     Ok(out)
 }
 
@@ -378,7 +402,7 @@ mod tests {
         let scheme = arrow(param, None, fc::Type::con("Prelude", "Int"));
         let text = super::def("M", "apply_twice", &scheme, None, false).expect("translated");
         assert!(
-            text.contains("⟨0, [],\n    .arr .P (.all 1 (.arr .P (.var 0) (.var 0) .cnil)) (.con int) .cnil, .cnil⟩"),
+            text.contains("⟨0, [],\n    .arr .P (.all 1 (.arr .P (.var 0) (.var 0) .cnil)) (.con int) .cnil, .cnil, []⟩"),
             "{text}"
         );
     }
@@ -411,6 +435,34 @@ mod tests {
             text.contains(".all 1 (.arr (.R (.run (.cun (.var 0) .cnil) (.run (.rnm scope"),
             "{text}"
         );
+    }
+
+    /// Rule 1: a bound on a variable of the scheme is a bound of the
+    /// scheme; one over a variable of a `∀` of a parameter is skipped.
+    #[test]
+    fn a_value_bound_is_a_bound_of_the_scheme() {
+        let bounded = |a: &str, c: &str| fc::Type::Bounded {
+            ty: Box::new(var(a)),
+            captures: Box::new(var(c)),
+        };
+        let vars = [("a", Kind::Type), ("c", Kind::CaptureRow)];
+        let scheme = forall(&vars, arrow(bounded("a", "c"), None, var("a")));
+        let text = super::def("M", "keep", &scheme, None, false).expect("translated");
+        assert!(
+            text.contains(
+                "⟨2, [],\n    .arr .P (.var 0) (.var 0) .cnil, .cnil, [(.var 0, .var 1)]⟩"
+            ),
+            "{text}"
+        );
+        let param = forall(
+            &[("u", Kind::Type)],
+            arrow(bounded("u", "c"), None, var("u")),
+        );
+        let scheme = forall(&vars, arrow(param, None, var("a")));
+        assert!(matches!(
+            super::def("M", "inner", &scheme, None, false),
+            Err(super::Skip::Other(why)) if why.contains("`∀` of a parameter")
+        ));
     }
 
     #[test]

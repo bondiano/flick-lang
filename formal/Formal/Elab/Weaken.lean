@@ -124,20 +124,20 @@ theorem armS_get {Γ Γ' : List Scheme} {ρ : Nat → Nat} (h : ∀ x, Γ'[ρ x]
   have h' : ∀ x, ((Γ'.map (·.subst (up c.k))).map (·.subst θ))[ρ x]? =
       ((Γ.map (·.subst (up c.k))).map (·.subst θ))[x]? := fun x => by
     simp only [List.getElem?_map, h]
-  have := liftRn_get h' (c.fields.map fun t => (⟨0, [], t.subst θ, .cnil⟩ : Scheme))
+  have := liftRn_get h' (c.fields.map fun t => (⟨0, [], t.subst θ, .cnil, []⟩ : Scheme))
   simpa [armS] using this
 
 /-- **Renaming.** -/
 theorem Elab.rename {Γ Δ e τ φ e'} (h : Elab P Γ Δ e τ φ e') {Γ' : List Scheme} {ρ : Nat → Nat}
     (hρ : ∀ x, Γ'[ρ x]? = Γ[x]?) : Elab P Γ' Δ (e.rename ρ) τ φ (e'.rename ρ) := by
   induction h generalizing Γ' ρ with
-  | var hx hk he =>
-    rw [Tm.rename_dapps]; exact .var (by rw [hρ]; exact hx) hk he
-  | meth hm hc hC hk h₀ he => rw [Tm.rename_dapps]; exact .meth hm hc hC hk h₀ he
-  | const hc hk he => rw [Tm.rename_dapps]; exact .const hc hk he
+  | var hx hk hb he =>
+    rw [Tm.rename_dapps]; exact .var (by rw [hρ]; exact hx) hk hb he
+  | meth hm hc hC hk hb h₀ he => rw [Tm.rename_dapps]; exact .meth hm hc hC hk hb h₀ he
+  | const hc hk hb he => rw [Tm.rename_dapps]; exact .const hc hk hb he
   | app _ _ hψ ih₁ ih₂ => exact .app (ih₁ hρ) (ih₂ hρ) hψ
-  | allVar hx hc hk => exact .allVar (by rw [hρ]; exact hx) hc hk
-  | varAll hx hc hts hA hus => exact .varAll (by rw [hρ]; exact hx) hc hts hA hus
+  | allVar hx hc hb hk => exact .allVar (by rw [hρ]; exact hx) hc hb hk
+  | varAll hx hc hb hts hA hus => exact .varAll (by rw [hρ]; exact hx) hc hb hts hA hus
   | @allLam Γ Δ k b t ψ b' _ ih =>
     exact .allLam (ih fun x => by simp only [List.getElem?_map, hρ])
   | lam _ ih => exact .lam (ih (liftR_get hρ _))
@@ -163,16 +163,16 @@ theorem Elab.shift {Γ Δ e τ φ e'} (h : Elab P Γ Δ e τ φ e') (s : Scheme)
 theorem Elab.anyStage {Γ Δ e τ φ e'} (h : Elab P Γ Δ e τ φ e') (hφ : φ = .P) (ψ : Stage) :
     Elab P Γ Δ e τ ψ e' := by
   induction h generalizing ψ with
-  | var hx hk he => exact .var hx hk he
-  | meth hm hc hC hk h₀ he => exact .meth hm hc hC hk h₀ he
-  | const hc hk he => exact .const hc hk he
+  | var hx hk hb he => exact .var hx hk hb he
+  | meth hm hc hC hk hb h₀ he => exact .meth hm hc hC hk hb h₀ he
+  | const hc hk hb he => exact .const hc hk hb he
   | app _ _ hψ ih₁ ih₂ =>
     subst hφ
     exact .app (ih₁ rfl ψ) (ih₂ rfl ψ) (.inl (by rcases hψ with h | ⟨h, -⟩ <;> first | exact h | exact h.elim))
   | lam h _ => exact .lam h
   | allLam h => exact .allLam h
-  | allVar hx hc hk => exact .allVar hx hc hk
-  | varAll hx hc hts hA hus => exact .varAll hx hc hts hA hus
+  | allVar hx hc hb hk => exact .allVar hx hc hb hk
+  | varAll hx hc hb hts hA hus => exact .varAll hx hc hb hts hA hus
   | let_ _ _ ih₁ ih₂ => exact .let_ (ih₁ hφ ψ) (ih₂ hφ ψ)
   | letSig h₁ hp hφ₁ _ _ ih₂ =>
     subst hφ

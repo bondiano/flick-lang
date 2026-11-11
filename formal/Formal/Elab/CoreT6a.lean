@@ -69,13 +69,15 @@ theorem T6a_closed (hR : Real P Sg N) {e τ φ e'} (h : Elab P [] [] e τ φ e')
 /-- `f (λx. x)` for a constant `f : (∀a. a → a) → Int` elaborates, and its elaboration is typed
 in the core: a parameter of rank 2. -/
 example (hR : Real P Sg N) {c : Nat}
-    (hc : P.consts c = some ⟨0, [], .arr .P (.all 1 (.arr .P (.var 0) (.var 0) .cnil)) intTy .cnil, .cnil⟩)
+    (hc : P.consts c = some ⟨0, [], .arr .P (.all 1 (.arr .P (.var 0) (.var 0) .cnil)) intTy .cnil, .cnil, []⟩)
     (Ψ : List Flick.Ty) (Θ : Facts) :
     ∃ e'', Tr N id id (.app (.const c) (.lam (.var 0))) e'' ∧
       Typ Sg Ψ Θ [] e'' (.ex (trT N intTy) .pure) := by
   have hl : Elab P [] [] (.app (.const c) (.lam (.var 0))) intTy .P (.app (.const c) (.lam (.var 0))) := by
-    refine .app (φ := .P) (ψ := .P) (.const (ts := []) (ds := []) hc rfl .nil) (.allLam (k := 1) ?_) (.inl rfl)
-    exact .lam (.var (σ := ⟨0, [], .var 0, .cnil⟩) (ts := []) (ds := []) rfl rfl .nil)
+    refine .app (φ := .P) (ψ := .P) (.const (ts := []) (ds := []) hc rfl Bounds.hold_nil .nil)
+      (.allLam (k := 1) ?_) (.inl rfl)
+    exact .lam (.var (σ := ⟨0, [], .var 0, .cnil, []⟩) (ts := []) (ds := []) rfl rfl
+      Bounds.hold_nil .nil)
   exact T6a_closed hR hl Ψ Θ
 
 /-- **T6(a) for `do`** in the core. -/

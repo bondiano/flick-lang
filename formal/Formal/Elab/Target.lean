@@ -8,7 +8,7 @@ The target is abstract: `Target` gives its typing `⊢⁺` of elaborated terms a
 fields, and the laws T6 needs as fields too. `Elab/Core*.lean` instantiate it with λFlick⁺ (`docs/formal/elaboration.md#dictionaries-need-polymorphic-fields-and-higher-rank-parameters`).
 
 Types of elaborated terms: monotypes `⟦τ⟧ = τ`, also a parameter's `∀ᾱ. τ`, arrows `a →φ^q b` and dictionary types `D_Q`.
-A context entry is `∀ᾱ. t`; a record of `D_Q` with `∀`-fields shows only through its laws:
+A context entry is `∀ᾱ. t` with the value bounds of its scheme, which (Var) checks at the instance; a record of `D_Q` with `∀`-fields shows only through its laws:
 projecting a method instantiates the field's `∀`, projecting a slot gives the superclass.
 `⌈D_Q⌉ = ∅`: a dictionary holds nothing (§0.1), so the arrows of methods, instances and
 `struct_C` have the qualifier `cnil`; so do those of the constants of Γ₀, top-level values.
@@ -42,15 +42,18 @@ def TTy.reach : TTy → Nat → Prop
 def dicts (q : Ty) (qs : List Cn) (t : TTy) : TTy :=
   qs.foldr (fun c t => .arr .P (.dict c) t q) t
 
-/-- `∀ᾱ. t` with `k` binders. -/
+/-- `∀ᾱ. t` with `k` binders and the value bounds `bd` of the scheme (`Scheme.bd`). -/
 structure TSch where
   k : Nat
   ty : TTy
+  bd : List (Ty × Ty)
 
-def TSch.subst (σ : Nat → Ty) (s : TSch) : TSch := ⟨s.k, s.ty.subst (lift s.k σ)⟩
+def TSch.subst (σ : Nat → Ty) (s : TSch) : TSch :=
+  ⟨s.k, s.ty.subst (lift s.k σ), s.bd.map (Bound.subst (lift s.k σ))⟩
 
-/-- `⟦∀ᾱ. Q̄ ⇒ τ⟧_q = ∀ᾱ. D_Q̄ →P^q τ` (`docs/formal/elaboration.md#the-dictionary-function-of-let-sig-dict-holds-what-the-right-hand-side-holds`). -/
-def Scheme.tr (s : Scheme) : TSch := ⟨s.k, dicts s.q s.ctx (.mono s.ty)⟩
+/-- `⟦∀ᾱ. Q̄ ⇒ τ⟧_q = ∀ᾱ. D_Q̄ →P^q τ` (`docs/formal/elaboration.md#the-dictionary-function-of-let-sig-dict-holds-what-the-right-hand-side-holds`),
+with the value bounds of the scheme. -/
+def Scheme.tr (s : Scheme) : TSch := ⟨s.k, dicts s.q s.ctx (.mono s.ty), s.bd⟩
 
 /-- Reflexive transitive closure. -/
 inductive Star {α : Type} (R : α → α → Prop) : α → α → Prop
@@ -76,25 +79,28 @@ def Tm.fill (ds : List Dict) : Tm → Tm
 /-- The context of an arm on `c` under `θ` in the target: its fields, then `Γ` past the
 variables of `c`. -/
 def armT (c : Ctor) (θ : Nat → Ty) (Γ : List TSch) : List TSch :=
-  c.fields.map (fun t => (⟨0, .mono (t.subst θ)⟩ : TSch)) ++ (Γ.map (·.subst (up c.k))).map (·.subst θ)
+  c.fields.map (fun t => (⟨0, .mono (t.subst θ), []⟩ : TSch)) ++ (Γ.map (·.subst (up c.k))).map (·.subst θ)
 
 /-- The target. `Has Γ Δ e t φ` is `Γ, ⟦Δ⟧ ⊢⁺ e : t ! φ`, where a premise `δ : Q` of `Δ` is
 the variable `δ : D_Q`. -/
 structure Target (P : Prog) where
   Has : List TSch → List Cn → Tm → TTy → Stage → Prop
-  /-- (Var) with the instantiation of `∀` -/
+  /-- (Var) with the instantiation of `∀`, where the value bounds hold -/
   var : ∀ {Γ Δ x s ts φ}, Γ[x]? = some s → ts.length = s.k →
+    Bounds.Hold (s.bd.map (Bound.subst (inst ts))) →
     Has Γ Δ (.var x) (s.ty.subst (inst ts)) φ
-  /-- (Const) with the instantiation of `∀` -/
+  /-- (Const) with the instantiation of `∀`, where the value bounds hold -/
   const : ∀ {Γ Δ c s ts φ}, P.consts c = some s → ts.length = s.k →
+    Bounds.Hold (s.bd.map (Bound.subst (inst ts))) →
     Has Γ Δ (.const c) ((dicts .cnil s.ctx (.mono s.ty)).subst (inst ts)) φ
   /-- (∀I) at a lambda -/
   allLam : ∀ {Γ Δ k b t ψ}, Has (Γ.map (·.subst (up k))) (Δ.map (·.subst (up k))) (.lam b) (.mono t) .P →
     Has Γ Δ (.lam b) (.mono (.all k t)) ψ
   /-- (∀I-Var) -/
-  allVar : ∀ {Γ Δ x k t ψ}, Γ[x]? = some ⟨k, .mono t⟩ → 0 < k → Has Γ Δ (.var x) (.mono (.all k t)) ψ
+  allVar : ∀ {Γ Δ x k t ψ}, Γ[x]? = some ⟨k, .mono t, []⟩ → 0 < k →
+    Has Γ Δ (.var x) (.mono (.all k t)) ψ
   /-- (Var) at an instance of a binder -/
-  varAll : ∀ {Γ Δ x k₀ t₀ ts k t us φ}, Γ[x]? = some ⟨k₀, .mono t₀⟩ → ts.length = k₀ →
+  varAll : ∀ {Γ Δ x k₀ t₀ ts k t us φ}, Γ[x]? = some ⟨k₀, .mono t₀, []⟩ → ts.length = k₀ →
     t₀.subst (inst ts) = .all k t → us.length = k →
     Has Γ Δ (.var x) (.mono (t.subst (inst us))) φ
   /-- (App); a pure arrow applies at any stage, a runtime one where its qualifier is live -/
@@ -103,7 +109,7 @@ structure Target (P : Prog) where
   ite : ∀ {Γ Δ c a b t φ}, Has Γ Δ c (.mono boolTy) φ → Has Γ Δ a (.mono t) φ →
     Has Γ Δ b (.mono t) φ → Has Γ Δ (.ite c a b) (.mono t) φ
   caseOpt : ∀ {Γ Δ e n s a t φ}, Has Γ Δ e (.mono (optTy a)) φ → Has Γ Δ n (.mono t) φ →
-    Has (⟨0, .mono a⟩ :: Γ) Δ s (.mono t) φ → Has Γ Δ (.caseOpt e n s) (.mono t) φ
+    Has (⟨0, .mono a, []⟩ :: Γ) Δ s (.mono t) φ → Has Γ Δ (.caseOpt e n s) (.mono t) φ
   /-- (Con) with the instantiation of `∀`: a pure function of its dictionaries and fields -/
   con : ∀ {Γ Δ K c ts φ}, P.ctors K = some c → ts.length = c.k →
     Has Γ Δ (.con K) ((dicts .cnil c.ctx (.mono c.ty)).subst (inst ts)) φ
@@ -130,11 +136,11 @@ structure Target (P : Prog) where
     P.ctors K = some c → c.T = T → us.length = c.res.length → Clash (c.eqs us) →
     Has Γ Δ r (.mono t) φ → Has Γ Δ (.caseK e K n m .dead r) (.mono t) φ
   /-- (Lam) of the live discipline: the arrow need not show what the closure holds -/
-  lam : ∀ {Γ Δ b a t q φ ψ}, Has (⟨0, .mono a⟩ :: Γ) Δ b (.mono t) φ →
+  lam : ∀ {Γ Δ b a t q φ ψ}, Has (⟨0, .mono a, []⟩ :: Γ) Δ b (.mono t) φ →
     Has Γ Δ (.lam b) (.mono (.arr φ a t q)) ψ
-  /-- (Let-Sig) of λFlick⁺; `k = 0` is (Let-Mono) -/
-  let_ : ∀ {Γ Δ e b k t u φ₁ φ}, Has (Γ.map (·.subst (up k))) (Δ.map (·.subst (up k))) e t φ₁ →
-    (k ≠ 0 → φ₁ = .P) → (φ₁ = .P ∨ φ₁ = φ) → Has (⟨k, t⟩ :: Γ) Δ b u φ →
+  /-- (Let-Sig) of λFlick⁺, with the value bounds `bd`; `k = 0` is (Let-Mono) -/
+  let_ : ∀ {Γ Δ e b k t bd u φ₁ φ}, Has (Γ.map (·.subst (up k))) (Δ.map (·.subst (up k))) e t φ₁ →
+    (k ≠ 0 → φ₁ = .P) → (φ₁ = .P ∨ φ₁ = φ) → Has (⟨k, t, bd⟩ :: Γ) Δ b u φ →
     Has Γ Δ (.let_ e b) u φ
   /-- the abstraction over dictionaries: a pure function of a pure body -/
   lamD : ∀ {Γ Δ qs e t q φ}, Has Γ (qs ++ Δ) e t φ → (qs ≠ [] → φ = .P) →
@@ -142,9 +148,10 @@ structure Target (P : Prog) where
   /-- applying a dictionary: a pure arrow, at any stage -/
   dapp : ∀ {Γ Δ f x a t q φ}, Has Γ Δ f (.arr .P a t q) φ → Has Γ Δ x a φ →
     Has Γ Δ (.app f x) t φ
-  /-- a method of `D_{C ᾱθ}`: projection and instantiation of `∀β̄` -/
+  /-- a method of `D_{C ᾱθ}`: projection and instantiation of `∀β̄`, where the value bounds
+  hold -/
   meth : ∀ {Γ Δ e m C s c₀ rest θ φ}, P.methods m = some (C, s) → s.ctx = c₀ :: rest →
-    Has Γ Δ e (.dict (c₀.subst θ)) φ →
+    Bounds.Hold (s.bd.map (Bound.subst θ)) → Has Γ Δ e (.dict (c₀.subst θ)) φ →
     Has Γ Δ (.meth e m) (dicts .cnil (rest.map (·.subst θ)) (.mono (s.ty.subst θ))) φ
   dvar : ∀ {Γ Δ k q φ}, Δ[k]? = some q → Has Γ Δ (.dict (.var k)) (.dict q) φ
   /-- the superclass slots of `D_Q` -/

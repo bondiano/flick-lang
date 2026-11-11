@@ -78,6 +78,18 @@ theorem Ty.Keeps.subst {σ : Nat → Ty} {r : Ty} {n m : Nat} (h : r.Keeps n) (h
   | cun q q' _ _ => exact (Ty.shown_subst_iff σ (.cun q q') m).2 ⟨n, h, hm⟩
   | all k t _ => exact (Ty.shown_subst_iff σ (.all k t) m).2 ⟨n, h, hm⟩
 
+/-- Value bounds that hold hold at every instance. -/
+theorem Bounds.Hold.subst {bd : List (Ty × Ty)} (h : Bounds.Hold bd) (σ : Nat → Ty) :
+    Bounds.Hold (bd.map (Bound.subst σ)) := by
+  intro b hb n hn
+  obtain ⟨b₀, hb₀, rfl⟩ := List.mem_map.1 hb
+  obtain ⟨m, hm, hσ⟩ := (Ty.shown_subst_iff σ _ n).1 hn
+  exact (Ty.shown_subst_iff σ _ n).2 ⟨m, h b₀ hb₀ m hm, hσ⟩
+
+theorem Bound.subst_comp (bd : List (Ty × Ty)) (σ θ : Nat → Ty) :
+    (bd.map (Bound.subst σ)).map (Bound.subst θ) = bd.map (Bound.subst fun n => (σ n).subst θ) := by
+  simp [Bound.subst, Ty.subst_comp]
+
 /-- A stage that keeps a qualifier live keeps it live at every instance. -/
 theorem Stage.Keeps.subst {φ : Stage} {q : Ty} (σ : Nat → Ty) (h : φ.Keeps q) :
     (φ.subst σ).Keeps (q.subst σ) := by
