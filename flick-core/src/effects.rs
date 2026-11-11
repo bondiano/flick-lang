@@ -115,7 +115,6 @@ pub fn selected_on_kernel(spec: &str, export: &str, bridge: EffectBridge) -> boo
 
 /// A native export that is a placeholder, rather than an implementation.
 /// Bridge policy also names working native exports, so it cannot answer this.
-#[cfg(not(target_arch = "wasm32"))]
 pub(crate) fn unavailable_on_kernel(spec: &str, export: &str) -> bool {
     (spec == bindings::NATIVE_ENTRY && bindings::STUBS.lines().any(|name| name == export))
         || bindings::UNAVAILABLE
@@ -124,7 +123,6 @@ pub(crate) fn unavailable_on_kernel(spec: &str, export: &str) -> bool {
 }
 
 /// Whether a routed binding needs the adapter rather than a native implementation.
-#[cfg(not(target_arch = "wasm32"))]
 pub(crate) fn requires_adapter(spec: &str, export: &str, effect: bool) -> bool {
     if belongs_to(spec, bindings::OWNED_PREFIX) {
         !on_kernel(spec, export) || unavailable_on_kernel(spec, export)

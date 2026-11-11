@@ -7,7 +7,7 @@ use std::fmt::Write;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use super::{Compilation, Loaded, Mode, ModuleCache, Root, run};
+use super::{Compilation, Loaded, Mode, ModuleCache, Root, run, run_in};
 use crate::diagnostics::Diagnostic;
 use crate::iface::{Interface, fingerprint};
 use crate::ir;
@@ -89,6 +89,31 @@ pub fn analyze(
     roots: &[PathBuf],
 ) -> Analysis {
     let output = run(host, sources, project, roots, Mode::Analyze, None, None);
+    Analysis {
+        modules: output.analyzed,
+        compilation: output.compilation,
+        diagnostics: output.diagnostics,
+    }
+}
+
+/// [`analyze`] with the stages Flick's own runtime gives a class, whatever
+/// `project` says, as `build --rt` checks: the playground builds only for it.
+pub fn analyze_rt(
+    host: &dyn Host,
+    sources: &mut SourceMap,
+    project: Option<&Project>,
+    roots: &[PathBuf],
+) -> Analysis {
+    let output = run_in(
+        host,
+        sources,
+        project,
+        roots,
+        Mode::Analyze,
+        None,
+        None,
+        true,
+    );
     Analysis {
         modules: output.analyzed,
         compilation: output.compilation,
