@@ -442,6 +442,7 @@ main:has(#flick-playground):not(:has(.tour-lesson)) .sl-container { max-width: n
 /* An exercise adds its task and buttons above the editor, which keeps its own height. */
 .tour-editor .fp-workspace:has(.fp-lesson) { height: auto; }
 .tour-editor .fp-workspace:has(.fp-lesson) .fp-panes { grid-template-rows: minmax(14rem, auto) minmax(8rem, auto); }
+.tour-editor .fp-toolbar { flex-shrink: 0; }
 .tour-editor .fp-panes { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 3fr) minmax(0, 2fr); }
 .tour-editor .fp-split { display: none; }
 .tour-editor .fp-result { border-top: 1px solid var(--fp-rule); }

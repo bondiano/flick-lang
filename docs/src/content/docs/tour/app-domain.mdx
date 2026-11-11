@@ -1,0 +1,22 @@
+---
+title: The domain
+description: Start a reading list with plain data and pure functions.
+tableOfContents: false
+---
+
+import TourLesson from "../../../components/TourLesson.astro";
+
+<TourLesson locale="en" id="app-domain">
+
+The last chapter builds one small app, a reading list, from the pieces of
+the tour. It starts where a program should: with data and pure functions.
+
+The inline module `Books` holds the type `Book` and what can happen to a
+list of books: add one, finish one, count the pages left, describe one in a
+line. None of it runs anything, so it is easy to read and to test.
+
+`main` chains the steps with `|>` and prints the result.
+
+**Try:** add a third book and finish it.
+
+</TourLesson>

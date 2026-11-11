@@ -1,0 +1,50 @@
+module Main exposing (main)
+
+module Books exposing (Book, add, finish, pages_left, line) =
+  type alias Book = { title : String; pages : Int; read : Bool }
+
+  add : String -> Int -> List Book -> List Book
+  let add title pages books = books ++ [{ title = title; pages = pages; read = false }]
+
+  finish : String -> List Book -> List Book
+  let finish title books =
+    List.map (fun book -> if book.title == title then { book with read = true } else book) books
+
+  pages_left : List Book -> Int
+  let pages_left books = List.sum [for book <- books; if not book.read yield book.pages]
+
+  line : Book -> String
+  let line book = (if book.read then "[x] " else "[ ] ") ++ book.title
+
+shelf : Atom.Writable (List Books.Book)
+let shelf = Atom.make ([] |> Books.add "Dune" 412 |> Books.add "Emma" 474)
+
+finish_button : String -> Ui
+let finish_button title = ui {
+  button
+    {
+      disabled = false;
+      on_click = Ui.Event.exhaust (fun _ -> task { Atom.update shelf (Books.finish title) });
+    }
+    [text "finish"]
+}
+
+component book_row (book : Books.Book) = ui {
+  item [text (Books.line book ++ " "), if book.read then empty else finish_button book.title]
+}
+
+component reading_list () = ui {
+  let books = Atom.value shelf
+  div { class_name = "books" } [
+    list [for book <- books yield Ui.keyed book.title (Ui.render book_row book)],
+    paragraph [text "pages left: \{Books.pages_left books}"],
+  ]
+}
+
+main : Unit ->{Async; AppError} Unit
+let main () =
+  match Ui.Dom.container "app" with
+  | None -> App.fail "the page has no #app"
+  | Some root -> provide Atom.layer {
+    ignore (Ui.Dom.mount root (fun _ -> ()) (Ui.render reading_list ()))
+  }

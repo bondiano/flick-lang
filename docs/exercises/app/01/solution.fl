@@ -1,0 +1,43 @@
+module Main exposing (main, summary)
+
+module Books exposing (Book, add, finish, pages_left) =
+  type alias Book = { title : String; pages : Int; read : Bool }
+
+  add : String -> Int -> List Book -> List Book
+  let add title pages books = books ++ [{ title = title; pages = pages; read = false }]
+
+  finish : String -> List Book -> List Book
+  let finish title books =
+    List.map (fun book -> if book.title == title then { book with read = true } else book) books
+
+  pages_left : List Book -> Int
+  let pages_left books = List.sum [for book <- books; if not book.read yield book.pages]
+
+service Shelf =
+  add : String -> Int ->{} Unit
+  finish : String ->{} Unit
+  books : Unit ->{} List Books.Book
+
+memory : Ref (List Books.Book) -> Layer {} none {Shelf}
+let memory store =
+  Layer.succeed Shelf {
+    add = fun title pages -> Ref.update store (Books.add title pages);
+    finish = fun title -> Ref.update store (Books.finish title);
+    books = fun () -> Ref.get store;
+  }
+
+summary : Int -> String
+let summary pages = if pages == 0 then "all read" else "\{pages} pages to go"
+
+pages_left : Unit ->{Shelf; none} Int
+let pages_left () = Books.pages_left (Shelf.books ())
+
+main : Unit ->{} Unit
+let main () =
+  let left = provide (memory (Ref.make [])) {
+    Shelf.add "Dune" 412
+    Shelf.add "Emma" 474
+    Shelf.finish "Dune"
+    pages_left ()
+  }
+  Platform.stdout_line (summary left)

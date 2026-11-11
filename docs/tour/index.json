@@ -72,6 +72,17 @@
         { "id": "fibers", "expect": "run" },
         { "id": "owner", "exercise": "resources/01" }
       ]
+    },
+    {
+      "id": "app", "en": "A whole app", "ru": "Целое приложение",
+      "lessons": [
+        { "id": "app-domain", "expect": "run" },
+        { "id": "app-store", "expect": "run" },
+        { "id": "app-commands", "expect": "run" },
+        { "id": "app-tests", "expect": "run" },
+        { "id": "app-ui", "expect": "ui" },
+        { "id": "app-practice", "exercise": "app/01" }
+      ]
     }
   ]
 }

@@ -19,7 +19,10 @@ const shows = async (page: Page, entry: Lesson): Promise<void> => {
   } else if (entry.expect === "run") {
     await expect(page.locator(".fp-output")).toContainText(firstLine(entry.stdout ?? ""), { timeout: 30_000 });
   } else if (entry.expect === "ui") {
-    await expect(page.locator(".fp-frame-open iframe")).toBeVisible({ timeout: 30_000 });
+    // as the playground's own test of an interface, give the first preview a minute
+    await expect(page.frameLocator(".fp-frame iframe").locator("#app")).not.toBeEmpty({ timeout: 60_000 }).catch(async (error: unknown) => {
+      throw new Error(`${entry.id} shows no interface; the result says: ${await page.locator(".fp-result").innerText()}`, { cause: error });
+    });
   } else {
     await expect(page.locator(".fp-problems-panel")).toContainText(entry.expect.slice("fail ".length), { timeout: 30_000 });
   }

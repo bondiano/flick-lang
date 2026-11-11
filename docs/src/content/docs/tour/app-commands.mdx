@@ -1,0 +1,24 @@
+---
+title: Commands and errors
+description: Parse a script of commands, and handle a bad one without stopping.
+tableOfContents: false
+---
+
+import TourLesson from "../../../components/TourLesson.astro";
+
+<TourLesson locale="en" id="app-commands">
+
+An app takes input. There is no keyboard in this sandbox, so `script` plays
+the part of a user who types commands.
+
+`run` splits a command into words and matches the list: a pattern such as
+`["add", title, pages]` takes the words apart. A command it does not know,
+or pages that are not a number, fail with the typed error `BadCommand`.
+`pages_of` fails inside `run`, whose signature allows that error, so the
+failure passes through `run` with no extra code.
+
+The loop in `main` handles each failure and goes on to the next command.
+
+**Try:** add the command `"finish Emma"` before `"report"`.
+
+</TourLesson>

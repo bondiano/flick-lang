@@ -1,0 +1,22 @@
+---
+title: A store as a service
+description: Put the books behind a service, so the program does not care where they live.
+tableOfContents: false
+---
+
+import TourLesson from "../../../components/TourLesson.astro";
+
+<TourLesson locale="en" id="app-store">
+
+The books need a home. `service Shelf` names what the program needs from
+one: add, finish and list books. `memory` builds a `Shelf` over a `Ref`, a
+cell that holds the list, with the pure functions of `Books`.
+
+`report` says `->{Shelf; none}`: it reads the shelf and fails with nothing.
+`main` provides the memory shelf around the steps. A shelf in a database
+would be another layer with the same service, and `report` would not
+change.
+
+**Try:** call `report ()` once more before `Shelf.finish "Dune"`.
+
+</TourLesson>
