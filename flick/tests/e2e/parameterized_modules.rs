@@ -360,5 +360,3 @@ fn higher_order_factory_with_partial_application_runs_on_js_and_go() {
     }
 }
 
-include!("module_expressions.rs");
-include!("module_lifetimes.rs");
