@@ -138,7 +138,7 @@ impl<'n> Checker<'_> {
 
     /// The head and context of an `instance`, over its own variables.
     fn instance_head(&mut self, decl: &Node) -> Option<Instance> {
-        let mark = self.tyvars.len();
+        let mark = self.cx.tyvars.len();
         let reported = self.diagnostics.len();
         let mut context = Vec::new();
         let mut head = None;
@@ -155,14 +155,14 @@ impl<'n> Checker<'_> {
                 _ => {}
             }
         }
-        let vars: Vec<Binder> = self.tyvars[mark..]
+        let vars: Vec<Binder> = self.cx.tyvars[mark..]
             .iter()
             .map(|v| Binder {
                 name: v.name.clone(),
                 kind: v.kind.clone(),
             })
             .collect();
-        self.tyvars.truncate(mark);
+        self.cx.tyvars.truncate(mark);
         if self.diagnostics.len() > reported {
             return None;
         }

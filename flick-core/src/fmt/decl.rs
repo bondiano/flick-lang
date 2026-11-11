@@ -132,11 +132,11 @@ impl<'a> Printer<'a> {
         !line.contains('\n') && self.column + line.chars().count() <= WIDTH
     }
 
-    /// Declarations with members, including anonymous static functors: the
+    /// Declarations with members, including anonymous static parameterized modules: the
     /// head, then the members one per line, one level in.
     pub fn class(&mut self, n: &'a Node) -> Doc<'a> {
         let a = self.a;
-        let separator = if n.kind == K::ModuleFunctorExpr {
+        let separator = if n.kind == K::ModuleParamExpr {
             K::Arrow
         } else {
             K::Eq

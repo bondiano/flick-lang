@@ -3,13 +3,13 @@ title: "`.iface` — native module interface"
 ---
 
 An `.iface` file describes what one module exposes, in the form the checker
-needs. Ordinary imports use those checked types directly. Static functors also
+needs. Ordinary imports use those checked types directly. Static parameterized modules also
 carry a checked template that is instantiated for its module arguments. A saved
 native package can instantiate it without the original checkout (see
 [Compiler architecture](../../contributing/implementation-decisions/#compiler-architecture)).
 It is versioned JSON. `.d.ts` is only a projection for TypeScript; `.iface` is the source of truth for Flick importers.
 
-The current schema is `iface-version` 14. It includes module visibility,
+The current schema is `iface-version` 15. It includes module visibility,
 `type module` contracts, nested static modules, higher-order signatures, the
 `exists` type form and implicit conversion instances. Every schema change
 bumps the version; a compiler rejects any other version with `FLICK-P010`. The simplified example below shows the envelope;
@@ -19,7 +19,7 @@ use the current compiler to write an interface for a new package.
 
 ```json
 {
-  "iface-version": 14,
+  "iface-version": 15,
   "compiler": "0.1.0",
   "module": "App.Shapes",
   "exports": [
@@ -48,8 +48,8 @@ later arguments do not enter that lexical environment.
 | `compiler` | version of the compiler that wrote the file; must equal the reader's |
 | `module` | full name of the described module |
 | `modules` | exported static module members, each with its own interface; omitted when empty |
-| `functor` | checked higher-order signature of a static functor; arrows retain scoped binder identities, parameter signatures, result signatures and atomic group sizes; omitted for structures |
-| `signature_explicit` | `true` when the functor result comes from an explicit declaration or ascription; public aliases cannot inherit a private inferred result |
+| `parameterized` | checked higher-order signature of a static parameterized module; arrows retain scoped binder identities, parameter signatures, result signatures and atomic group sizes; omitted for structures |
+| `signature_explicit` | `true` when the parameterized module result comes from an explicit declaration or ascription; public aliases cannot inherit a private inferred result |
 | `member_of` | owner namespace and member name for a generated static member; external access uses the checked parent view |
 | `template` | checked static body (`source`) and its lexical `capture`: module bindings, signature origins, partial arguments with the caller's namespace access, lexical namespaces, inherited-import count and definition package; omitted for ordinary structures |
 | `private` | `true` for a module importable only within its package; omitted otherwise |

@@ -1,4 +1,40 @@
 impl Checking<'_> {
+    fn virtual_contract_inputs(
+        &self,
+        loaded: &Loaded,
+        comparable: &[Option<Arc<Interface>>],
+        lookup: &dyn Fn(&str) -> Option<Interface>,
+        contracts: &dyn Fn(&str) -> Option<Interface>,
+    ) -> Vec<Option<Arc<Interface>>> {
+        let mut inputs = Vec::new();
+        if let Some(context) = &loaded.virtual_of {
+            let origins = context
+                .capture
+                .bindings
+                .iter()
+                .map(|b| b.origin.module.as_str());
+            let callee = context.capture.callee.as_ref();
+            for owner in origins.chain(callee.map(CalleeOrigin::signature_owner)) {
+                inputs.push(match self.by_name.get(owner) {
+                    Some(&j) => comparable[j].clone(),
+                    None => self.from_packages.get(owner).map(comparable_copy),
+                });
+            }
+            for argument in callee
+                .into_iter()
+                .flat_map(CalleeOrigin::contract_arguments)
+            {
+                // Include the caller's view through all ancestor ascriptions.
+                inputs.push(
+                    Self::argument_interface(argument, lookup, contracts)
+                        .as_ref()
+                        .map(comparable_copy),
+                );
+            }
+        }
+        inputs
+    }
+
     fn argument_interface(
         argument: &StaticArgument,
         lookup: &dyn Fn(&str) -> Option<Interface>,
@@ -54,9 +90,9 @@ impl Checking<'_> {
         lookup: &dyn Fn(&str) -> Option<Interface>,
         contracts: &dyn Fn(&str) -> Option<Interface>,
     ) -> Option<types::ModuleSignature> {
-        let mut signature = contracts(&origin.module)?.functor?;
+        let mut signature = contracts(&origin.module)?.parameterized?;
         for argument in &origin.prefix {
-            let types::ModuleSignature::Functor {
+            let types::ModuleSignature::Parameterized {
                 binder, mut result, ..
             } = signature
             else {
@@ -68,7 +104,7 @@ impl Checking<'_> {
             );
             signature = *result;
         }
-        let types::ModuleSignature::Functor { parameter, .. } = signature else {
+        let types::ModuleSignature::Parameterized { parameter, .. } = signature else {
             return None;
         };
         Some(*parameter)
@@ -84,7 +120,7 @@ impl Checking<'_> {
                 let actual = contracts(name)?;
                 Some(
                     actual
-                        .functor
+                        .parameterized
                         .clone()
                         .unwrap_or_else(|| types::ModuleSignature::from_interface(&actual)),
                 )
@@ -93,30 +129,25 @@ impl Checking<'_> {
                 let actual = Self::argument_interface(member, lookup, contracts)?;
                 Some(
                     actual
-                        .functor
+                        .parameterized
                         .clone()
                         .unwrap_or_else(|| types::ModuleSignature::from_interface(&actual)),
                 )
             }
-            CalleeOrigin::Parameter { binding, members } => {
+            CalleeOrigin::Parameter {
+                binding,
+                argument,
+                members,
+            } => {
                 let signature = Self::binding_signature(binding, lookup, contracts)?;
-                let argument = context
-                    .capture
-                    .bindings
-                    .iter()
-                    .rev()
-                    .find(|b| &b.origin == binding)?;
-                let mut actual = signature.project(&Self::argument_interface(
-                    &argument.argument,
-                    lookup,
-                    contracts,
-                )?);
+                let mut actual =
+                    signature.project(&Self::argument_interface(argument, lookup, contracts)?);
                 for name in members {
                     actual = actual.modules.remove(name)?;
                 }
                 Some(
                     actual
-                        .functor
+                        .parameterized
                         .clone()
                         .unwrap_or_else(|| types::ModuleSignature::from_interface(&actual)),
                 )
@@ -138,7 +169,7 @@ impl Checking<'_> {
         }
         let mut signature = Self::callee_signature(context, lookup, contracts)?;
         for argument in &context.capture.arguments {
-            let types::ModuleSignature::Functor {
+            let types::ModuleSignature::Parameterized {
                 binder, mut result, ..
             } = signature
             else {
@@ -196,7 +227,13 @@ impl Checking<'_> {
             expected.normalize_in(witness);
             types::normalize_module_interface(&mut actual, witness);
         }
-        Self::module_contract_errors(expected, &actual, context.at, "functor result", errors);
+        Self::module_contract_errors(
+            expected,
+            &actual,
+            context.at,
+            "parameterized module result",
+            errors,
+        );
     }
 
     fn virtual_contracts(
@@ -249,7 +286,7 @@ impl Checking<'_> {
         }
         if let Some(mut signature) = Self::callee_signature(context, lookup, contracts) {
             for argument in &context.capture.arguments {
-                let types::ModuleSignature::Functor {
+                let types::ModuleSignature::Parameterized {
                     binder,
                     parameter,
                     mut result,
@@ -258,7 +295,7 @@ impl Checking<'_> {
                 else {
                     errors.push(Diagnostic::error(
                         codes::T002,
-                        "module expression is not a functor",
+                        "module expression is not a parameterized module",
                         context.at,
                     ));
                     break;

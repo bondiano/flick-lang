@@ -3,7 +3,7 @@ fn lexical_scope_output(mut output: Output) -> Output {
         .diagnostics
         .iter()
         .any(|d| d.severity == Severity::Error);
-    let functor = output.interface.functor.take();
+    let parameterized = output.interface.parameterized.take();
     output.interface = if failed {
         Interface {
             module: output.interface.module.clone(),
@@ -12,7 +12,8 @@ fn lexical_scope_output(mut output: Output) -> Output {
     } else {
         (*output.declarations).clone()
     };
-    output.interface.functor = functor.map(|s| if failed { s.inputs_only() } else { s });
+    output.interface.parameterized =
+        parameterized.map(|s| if failed { s.inputs_only() } else { s });
     output.interface.private = true;
     output.exported = output.interface.clone();
     output.ir = None;
@@ -48,14 +49,14 @@ impl Checking<'_> {
             }
             scope.modules.extend(prefix.modules.clone());
             scope.instances.extend(prefix.instances.clone());
-            let mut arrow = prefix.functor.as_ref();
+            let mut arrow = prefix.parameterized.as_ref();
             if let Some(header) = self
                 .by_name
                 .get(&captured.key())
                 .and_then(|&i| self.modules[i].syntax.header.as_ref())
             {
                 for parameter in &header.parameters {
-                    if let Some(types::ModuleSignature::Functor {
+                    if let Some(types::ModuleSignature::Parameterized {
                         parameter: input,
                         result,
                         ..

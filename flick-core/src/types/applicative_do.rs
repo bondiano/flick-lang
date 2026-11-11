@@ -292,7 +292,7 @@ impl Checker<'_> {
             None => {
                 name == "pure"
                     && !bound.iter().any(|b| b == "pure")
-                    && !self.locals.iter().any(|l| l.name == "pure")
+                    && !self.cx.locals.iter().any(|l| l.name == "pure")
                     && matches!(self.env.find(Namespace::Value, "pure"),
                         Found::Entity(e) if lang::is(Lang::Pure, &e.module, &e.name))
             }

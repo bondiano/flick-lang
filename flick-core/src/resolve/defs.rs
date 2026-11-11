@@ -347,3 +347,5 @@ pub(crate) fn shortest_cycle(start: usize, edges: &[Vec<usize>]) -> Option<Vec<u
     }
     None
 }
+
+include!("module_cycles.rs");

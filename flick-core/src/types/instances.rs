@@ -35,14 +35,14 @@ impl Checker<'_> {
         let Some(info) = self.class_info(&cm, &cn) else {
             return Vec::new();
         };
-        let mark = self.tyvars.len();
+        let mark = self.cx.tyvars.len();
         let skolems: Vec<(String, Type)> = instance
             .vars
             .iter()
             .map(|v| (v.name.clone(), self.store.skolem(&v.name)))
             .collect();
         for (v, (name, ty)) in instance.vars.iter().zip(&skolems) {
-            self.tyvars.push(TyVar {
+            self.cx.tyvars.push(TyVar {
                 name: name.clone(),
                 ty: ty.clone(),
                 kind: v.kind.clone(),
@@ -159,7 +159,7 @@ impl Checker<'_> {
         }
         self.solve_classes(true);
         self.classes.givens.truncate(assumed);
-        self.tyvars.truncate(mark);
+        self.cx.tyvars.truncate(mark);
         defaulted
     }
 

@@ -56,9 +56,9 @@ impl Checker<'_> {
         if is_loop(node) {
             return self.for_loop(node, expected);
         }
-        let mark = self.locals.len();
+        let mark = self.cx.locals.len();
         let uses = self.uses_mark();
-        let saved = mem::take(&mut self.runtime);
+        let saved = mem::take(&mut self.cx.runtime);
         let (reason, sync_reason) = if strict {
             (
                 "a `[for …]` list is built from pure clauses: bind the result of a runtime call with `let` before it",
@@ -71,14 +71,14 @@ impl Checker<'_> {
             )
         };
         // a stage that may read atoms lends its reader to the clauses
-        let stage = if self.stage.pure.is_none() {
+        let stage = if self.cx.stage.pure.is_none() {
             let mut stage = self.bounded_stage(reader(), Type::empty_row(), Site::Inferred);
             stage.only_sync = Some(sync_reason);
             stage
         } else {
             Stage::pure(reason)
         };
-        let outer = mem::replace(&mut self.stage, stage);
+        let outer = mem::replace(&mut self.cx.stage, stage);
         let (clauses, element) = for_parts(node);
         for clause in clauses {
             self.for_clause(clause);
@@ -98,8 +98,8 @@ impl Checker<'_> {
             (Some(body), None) => self.infer(body),
             (None, _) => Type::Error,
         };
-        let inner = mem::replace(&mut self.stage, outer);
-        self.runtime = saved;
+        let inner = mem::replace(&mut self.cx.stage, outer);
+        self.cx.runtime = saved;
         let mut held = self.held_since(uses, mark);
         let mut region = None;
         if inner.only_sync.is_some() && inner.calls > 0 {
@@ -112,7 +112,7 @@ impl Checker<'_> {
                 region = Some(reader);
             }
         }
-        self.locals.truncate(mark);
+        self.cx.locals.truncate(mark);
         if strict {
             return Type::app(Type::lang(Lang::List), item);
         }
@@ -127,7 +127,7 @@ impl Checker<'_> {
     /// `for { clauses } do body`: the body runs for each element, here and
     /// now, so the clauses and the body may make runtime calls.
     fn for_loop(&mut self, node: &Node, expected: Option<&Type>) -> Type {
-        let mark = self.locals.len();
+        let mark = self.cx.locals.len();
         let (clauses, body) = for_parts(node);
         for clause in clauses {
             self.for_clause(clause);
@@ -136,7 +136,7 @@ impl Checker<'_> {
         if let Some(body) = body {
             self.check(body, &unit);
         }
-        self.locals.truncate(mark);
+        self.cx.locals.truncate(mark);
         if let Some(expected) = expected {
             self.expect(&unit, expected, self.span(node));
         }

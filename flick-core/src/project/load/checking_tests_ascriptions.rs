@@ -42,7 +42,7 @@ let answer = eq "x" "x"
             ),
             (
                 "Outer",
-                r#"module App.Outer(A : App.Contracts.Policy) : App.Contracts.Factory = functor (B : App.Contracts.Policy) ->
+                r#"module App.Outer(A : App.Contracts.Policy) : App.Contracts.Factory = module (B : App.Contracts.Policy) ->
   answer : Bool
   let answer = eq "x" "x"
 "#,

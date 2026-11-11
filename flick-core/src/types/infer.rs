@@ -61,17 +61,17 @@ impl Checker<'_> {
             };
             self.record_givens(self.span(node), &givens);
             self.classes.givens.extend(givens);
-            let saved = mem::take(&mut self.runtime);
-            let (holds, held) = (self.regions.holds.len(), self.regions.held.len());
+            let saved = mem::take(&mut self.cx.runtime);
+            let (holds, held) = (self.cx.regions.holds.len(), self.cx.regions.held.len());
             self.check(node, &body);
             if self.names_top_level(node) {
                 // a top-level value has no environment: the regions its
                 // instantiated type names under the `forall` it does not hold
-                self.regions.holds.truncate(holds);
-                self.regions.held.truncate(held);
+                self.cx.regions.holds.truncate(holds);
+                self.cx.regions.held.truncate(held);
             }
-            let runtime = mem::replace(&mut self.runtime, saved);
-            self.runtime |= runtime;
+            let runtime = mem::replace(&mut self.cx.runtime, saved);
+            self.cx.runtime |= runtime;
             self.classes.givens.truncate(mark);
             self.store.level -= 1;
             let span = self.span(node);
@@ -410,8 +410,8 @@ impl Checker<'_> {
         expected: Option<&Type>,
         node: &Node,
     ) -> Type {
-        let saved = mem::take(&mut self.runtime);
-        let mark = self.locals.len();
+        let saved = mem::take(&mut self.cx.runtime);
+        let mark = self.cx.locals.len();
         let givens = self.classes.givens.len();
         let uses = self.uses_mark();
         self.begin_reader();
@@ -430,7 +430,7 @@ impl Checker<'_> {
             let known = rest.clone().filter(|t| {
                 !matches!(target, Some(Type::Meta(_))) || self.whnf_captured(t).1.is_some()
             });
-            closures.push((self.locals.len(), known));
+            closures.push((self.cx.locals.len(), known));
             let target = match target {
                 Some(t @ Type::Forall { .. }) => {
                     self.store.level += 1;
@@ -483,9 +483,9 @@ impl Checker<'_> {
         let inferred_result = rest.is_none();
         let returns = rest.clone().unwrap_or_else(|| self.fresh());
         stage.returns = Some(returns.clone());
-        let outer = mem::replace(&mut self.stage, stage);
+        let outer = mem::replace(&mut self.cx.stage, stage);
         let result = body(self, rest);
-        let inner = mem::replace(&mut self.stage, outer);
+        let inner = mem::replace(&mut self.cx.stage, outer);
         if inferred_result && self.unify(&returns, &result).is_err() {
             let (returns, result) = (self.show(&returns), self.show(&result));
             self.error(
@@ -503,9 +503,9 @@ impl Checker<'_> {
             .into_iter()
             .map(|(locals, expected)| (self.held_since(uses, locals), expected))
             .collect();
-        self.locals.truncate(mark);
+        self.cx.locals.truncate(mark);
         self.classes.givens.truncate(givens);
-        self.runtime = saved;
+        self.cx.runtime = saved;
         let span = self.span(node);
         self.end_reader(&result, span);
         let result = self.curry(stages, closures, unknown.as_ref(), result, span);
@@ -602,7 +602,7 @@ impl Checker<'_> {
         scrutinee: &Type,
         result: &Type,
     ) -> (super::patterns::Pat, bool, source::Span) {
-        let mark = self.locals.len();
+        let mark = self.cx.locals.len();
         let mut pat = super::patterns::Pat::Wild;
         let mut guarded = false;
         let mut span = self.span(arm);
@@ -633,7 +633,7 @@ impl Checker<'_> {
                 .dead_arms
                 .insert(super::typing::range(self.span(arm)));
         }
-        self.locals.truncate(mark);
+        self.cx.locals.truncate(mark);
         (pat, guarded, span)
     }
 }

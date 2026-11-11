@@ -49,7 +49,8 @@ impl Checker<'_> {
     pub fn grow(&mut self) {
         loop {
             // `|`, not `||`: every row grows in each round
-            let rows = (0..self.subrows.len()).fold(false, |changed, i| changed | self.grow_one(i));
+            let rows =
+                (0..self.cx.subrows.len()).fold(false, |changed, i| changed | self.grow_one(i));
             if !(self.grow_holds() || rows) {
                 break;
             }
@@ -58,8 +59,8 @@ impl Checker<'_> {
 
     /// The actual row of constraint `i` without what its scope provides.
     fn actual(&mut self, i: usize) -> Norm {
-        let mut actual = self.store.normalize(&self.subrows[i].actual);
-        let Some(region) = self.subrows[i].provides.clone() else {
+        let mut actual = self.store.normalize(&self.cx.subrows[i].actual);
+        let Some(region) = self.cx.subrows[i].provides.clone() else {
             return actual;
         };
         self.discharge_live(&mut actual, &region);
@@ -83,15 +84,15 @@ impl Checker<'_> {
     /// Adds to the declared row of constraint `i` one label or row variable
     /// it lacks, if that row is open; `true` when it did.
     fn grow_one(&mut self, i: usize) -> bool {
-        let givens = mem::take(&mut self.subrows[i].givens);
+        let givens = mem::take(&mut self.cx.subrows[i].givens);
         let grown = self.under(&givens, |this| this.grow_row(i));
-        self.subrows[i].givens = givens;
+        self.cx.subrows[i].givens = givens;
         grown
     }
 
     fn grow_row(&mut self, i: usize) -> bool {
         let actual = self.actual(i);
-        let declared = self.store.normalize(&self.subrows[i].declared);
+        let declared = self.store.normalize(&self.cx.subrows[i].declared);
         let open = declared.tails.iter().find_map(|t| match t {
             Type::Meta(m) => Some(*m),
             _ => None,
@@ -138,7 +139,7 @@ impl Checker<'_> {
         self.grow();
         let level = self.store.level;
         let mut close = Vec::new();
-        for c in &self.subrows {
+        for c in &self.cx.subrows {
             for t in self.store.normalize(&c.actual).tails {
                 if let Type::Meta(m) = t
                     && self.store.meta_level(m).is_some_and(|l| l > level)
@@ -174,7 +175,7 @@ impl Checker<'_> {
     pub fn close_rows_above(&mut self, level: Option<u32>) {
         self.grow();
         let mut open = Vec::new();
-        for c in &self.subrows {
+        for c in &self.cx.subrows {
             for side in [&c.actual, &c.declared] {
                 for t in self.store.normalize(side).tails {
                     if let Type::Meta(m) = t {
@@ -197,9 +198,9 @@ impl Checker<'_> {
 
     fn report_rows(&mut self) {
         let mut excess: Vec<Excess> = Vec::new();
-        for i in 0..self.subrows.len() {
+        for i in 0..self.cx.subrows.len() {
             let actual = self.actual(i);
-            let c = self.subrows[i].clone();
+            let c = self.cx.subrows[i].clone();
             let declared = self.store.normalize(&c.declared);
             // a declared element that is no error is reported as such, once
             if c.errors && declared.entries.iter().any(|(_, t)| !self.may_be_error(t)) {
@@ -270,7 +271,7 @@ impl Checker<'_> {
                 excess[i].bound = self.local_place(&c.declared);
             }
         }
-        self.subrows.clear();
+        self.cx.subrows.clear();
         for e in excess {
             self.report_excess(&e);
         }

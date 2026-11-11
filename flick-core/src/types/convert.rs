@@ -58,18 +58,18 @@ impl Checker<'_> {
     /// A signature's type with its new free variables quantified, and
     /// whether the signature starts with a `forall` that binds all of them.
     pub fn signature(&mut self, node: &Node) -> (Type, bool) {
-        let mark = self.tyvars.len();
+        let mark = self.cx.tyvars.len();
         let hole_ok = mem::replace(&mut self.hole_ok, true);
         let ty = self.ty(node, &Kind::Type, Free::Quantify);
         self.hole_ok = hole_ok;
-        let new: Vec<Binder> = self.tyvars[mark..]
+        let new: Vec<Binder> = self.cx.tyvars[mark..]
             .iter()
             .map(|v| Binder {
                 name: v.name.clone(),
                 kind: v.kind.clone(),
             })
             .collect();
-        self.tyvars.truncate(mark);
+        self.cx.tyvars.truncate(mark);
         let explicit = node.kind == K::ForallType && new.is_empty();
         let ty = match (new.is_empty(), ty) {
             (true, ty) => ty,
@@ -103,11 +103,11 @@ impl Checker<'_> {
 
     /// A local type annotation; its unknown variables are inferred.
     pub fn annotation(&mut self, node: &Node) -> Type {
-        let mark = self.tyvars.len();
+        let mark = self.cx.tyvars.len();
         let hole_ok = mem::replace(&mut self.hole_ok, true);
         let ty = self.ty(node, &Kind::Type, Free::Fresh);
         self.hole_ok = hole_ok;
-        self.tyvars.truncate(mark);
+        self.cx.tyvars.truncate(mark);
         self.default_kinds(&ty)
     }
 
@@ -346,7 +346,7 @@ impl Checker<'_> {
     }
 
     fn forall(&mut self, node: &Node, children: &[&Node], expected: &Kind, free: Free) -> Type {
-        let mark = self.tyvars.len();
+        let mark = self.cx.tyvars.len();
         let mut vars = Vec::new();
         for t in node.child_tokens().filter(|t| t.kind == K::Ident) {
             let name = t.text(self.text).to_owned();
@@ -355,7 +355,7 @@ impl Checker<'_> {
                 name: name.clone(),
                 kind: kind.clone(),
             });
-            self.tyvars.push(TyVar {
+            self.cx.tyvars.push(TyVar {
                 ty: Type::Var(name.clone()),
                 name,
                 kind,
@@ -365,9 +365,9 @@ impl Checker<'_> {
             .first()
             .map_or(Type::Error, |b| self.ty(b, expected, free));
         // implicit variables met inside stay in scope for the signature
-        let implicit: Vec<TyVar> = self.tyvars.drain(mark + vars.len()..).collect();
-        self.tyvars.truncate(mark);
-        self.tyvars.extend(implicit);
+        let implicit: Vec<TyVar> = self.cx.tyvars.drain(mark + vars.len()..).collect();
+        self.cx.tyvars.truncate(mark);
+        self.cx.tyvars.extend(implicit);
         match body {
             Type::Forall {
                 vars: inner,
@@ -458,12 +458,12 @@ impl Checker<'_> {
         }
         if first_class_module {
             let (_, applied) = ty.spine();
-            let static_functor = if let [signature] = &applied[..]
+            let static_parameterized = if let [signature] = &applied[..]
                 && let Type::Con { module, name } = self.whnf(signature)
                 && let Some(definition) = self.env.type_def(&module, &name)
             {
                 match &definition.form {
-                    Form::ModuleSignature { signature } => signature.has_functor(),
+                    Form::ModuleSignature { signature } => signature.has_parameterized(),
                     Form::ModuleContract { requirements } => requirements
                         .iter()
                         .any(|r| matches!(r, ModuleRequirement::Module { .. })),
@@ -472,11 +472,11 @@ impl Checker<'_> {
             } else {
                 false
             };
-            if static_functor {
+            if static_parameterized {
                 self.error(
                     codes::T068,
                     self.span(node),
-                    "a static functor or nested module cannot be carried by `Module Sig`; apply factories and flatten the runtime contract before packing",
+                    "a static parameterized module or nested module cannot be carried by `Module Sig`; apply factories and flatten the runtime contract before packing",
                 );
             }
             let (_, applied) = ty.spine();

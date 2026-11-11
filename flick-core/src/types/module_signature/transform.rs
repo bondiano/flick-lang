@@ -15,7 +15,7 @@ impl ModuleSignature {
         let from = format!("$module:{binder}");
 
         match self {
-            Self::Functor {
+            Self::Parameterized {
                 binder: inner,
                 parameter,
                 result,
@@ -46,7 +46,7 @@ impl ModuleSignature {
             return;
         }
         match self {
-            Self::Functor {
+            Self::Parameterized {
                 parameter, result, ..
             } => {
                 parameter.substitute_outer_types(subst);
@@ -59,7 +59,7 @@ impl ModuleSignature {
                         let base = name.strip_suffix("$Dict").unwrap_or(name);
                         !requirements.iter().any(|r| {
                             matches!(r,
-                        R::Type { name, .. } | R::Nominal { name, .. } if name == base)
+                        R::Type { name, .. } | R::Kind { name, .. } | R::Nominal { name, .. } if name == base)
                         })
                     })
                     .cloned()
@@ -100,7 +100,7 @@ impl ModuleSignature {
             }
         }
         match self {
-            Self::Functor {
+            Self::Parameterized {
                 binder,
                 parameter,
                 result,
@@ -115,13 +115,59 @@ impl ModuleSignature {
             }
             Self::Structure { requirements } => {
                 for requirement in requirements {
-                    if let R::Module { signature, .. } = requirement {
-                        signature.canonicalize(next);
+                    match requirement {
+                        R::Module { signature, .. } => signature.canonicalize(next),
+                        R::Type {
+                            params, manifest, ..
+                        } => {
+                            let subst: Vec<_> = params
+                                .iter_mut()
+                                .map(|parameter| {
+                                    let old = parameter.name.clone();
+                                    parameter.name = format!("'{}", *next);
+                                    *next += 1;
+                                    (old, parameter.name.clone())
+                                })
+                                .collect();
+                            if let Some(ty) = manifest {
+                                *ty = canonical_type_in(ty, &subst, next);
+                            }
+                        }
+                        R::Nominal {
+                            definition: Some(definition),
+                            methods,
+                            ..
+                        } => {
+                            let params = match &mut definition.form {
+                                Form::Class { params, .. } | Form::Service { params, .. } => {
+                                    Some(params)
+                                }
+                                _ => None,
+                            };
+                            if let Some(params) = params {
+                                let subst: Vec<_> = params
+                                    .iter_mut()
+                                    .map(|parameter| {
+                                        let old = parameter.clone();
+                                        *parameter = format!("'{}", *next);
+                                        *next += 1;
+                                        (old, parameter.clone())
+                                    })
+                                    .collect();
+                                map_definition_types(definition, &mut |ty| {
+                                    canonical_type_in(ty, &subst, next)
+                                });
+                                for (_, ty) in methods {
+                                    *ty = canonical_type_in(ty, &subst, next);
+                                }
+                            }
+                        }
+                        _ => {}
                     }
                 }
             }
         }
-        self.map_types(&mut canonical_type);
+        self.map_types(&mut |ty| canonical_type_in(ty, &[], next));
     }
 
     pub fn refine(&mut self, path: &[String], ty: Type) -> Result<(), String> {
@@ -165,7 +211,7 @@ impl ModuleSignature {
     /// Visits all types, including types inside nested nominal requirements.
     pub fn map_types(&mut self, f: &mut dyn FnMut(&Type) -> Type) {
         match self {
-            Self::Functor {
+            Self::Parameterized {
                 parameter, result, ..
             } => {
                 parameter.map_types(f);

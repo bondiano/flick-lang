@@ -65,6 +65,7 @@ impl Checker<'_> {
         for (p, body) in pending.iter().zip(bodies) {
             self.finish(p, body);
         }
+        self.finish_module_contracts(&pending);
         // Aliases are converted before contract bodies so a contract may use
         // an alias declared later. Validate `Module Sig` again once the local
         // contract's members are known.
@@ -221,14 +222,14 @@ impl Checker<'_> {
     }
 
     fn with_params<T>(&mut self, params: &[Binder], f: impl FnOnce(&mut Self) -> T) -> T {
-        let mark = self.tyvars.len();
-        self.tyvars.extend(params.iter().map(|p| TyVar {
+        let mark = self.cx.tyvars.len();
+        self.cx.tyvars.extend(params.iter().map(|p| TyVar {
             name: p.name.clone(),
             ty: Type::Var(p.name.clone()),
             kind: p.kind.clone(),
         }));
         let out = f(self);
-        self.tyvars.truncate(mark);
+        self.cx.tyvars.truncate(mark);
         out
     }
 
@@ -242,7 +243,7 @@ impl Checker<'_> {
                         super::ModuleSignature::Structure { requirements } => {
                             Body::ModuleContract(requirements)
                         }
-                        signature @ super::ModuleSignature::Functor { .. } => {
+                        signature @ super::ModuleSignature::Parameterized { .. } => {
                             Body::ModuleSignature(signature)
                         }
                     }
@@ -430,3 +431,5 @@ enum Body {
         Vec<(String, Type)>,
     ),
 }
+
+include!("decls_nominal_snapshots.rs");

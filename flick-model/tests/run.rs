@@ -47,7 +47,7 @@ fn higher_order_modules_erase_to_checked_core() {
     let modules = run::compile(&file).expect("higher-order fixture compiles");
     let templates: Vec<_> = modules
         .iter()
-        .filter(|m| m.interface.functor.is_some())
+        .filter(|m| m.interface.parameterized.is_some())
         .collect();
     assert!(
         !templates.is_empty(),

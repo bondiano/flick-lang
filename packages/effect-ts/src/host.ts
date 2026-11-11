@@ -11,55 +11,10 @@ import type * as NodeStdio from "@effect/platform-node/NodeStdio";
 import type * as NodeTerminal from "@effect/platform-node/NodeTerminal";
 import { format } from "effect/Formatter";
 
-type SignalName = "SIGINT" | "SIGTERM";
+export { args, env, nodeFs, offSignal, onSignal, setExitCode, takeEnv, writeStderr, writeStdout } from "@flick-lang/runtime/rt/host";
 
-interface Process {
-  readonly stdout: { write(text: string): unknown };
-  readonly stderr: { write(text: string): unknown };
-  readonly argv: ReadonlyArray<string>;
-  readonly env: Readonly<Record<string, string | undefined>>;
-  exitCode?: number | string | null | undefined;
-  on(signal: SignalName, handler: () => void): unknown;
-  off(signal: SignalName, handler: () => void): unknown;
-  readonly getBuiltinModule?: NodeJS.Process["getBuiltinModule"];
-}
-
-const host = (): Process | undefined => (globalThis as { process?: Process }).process;
-
-export const writeStdout = (text: string): void => {
-  const p = host();
-  if (p === undefined) console.log(text.replace(/\n$/, ""));
-  else p.stdout.write(text);
-};
-
-export const writeStderr = (text: string): void => {
-  const p = host();
-  if (p === undefined) console.error(text.replace(/\n$/, ""));
-  else p.stderr.write(text);
-};
-
-export const args = (): Array<string> => host()?.argv.slice(2) ?? [];
-
-export const env = (name: string): string | undefined => host()?.env[name];
-
-/** The variable `name`, removed so that the processes and workers this one starts do not inherit it. */
-export const takeEnv = (name: string): string | undefined => {
-  const p = host();
-  const value = p?.env[name];
-  if (value !== undefined) Reflect.deleteProperty(p?.env ?? {}, name);
-  return value;
-};
-
-export const setExitCode = (code: number): void => {
-  const p = host();
-  if (p !== undefined) p.exitCode = code;
-};
-
-export const onSignal = (signal: SignalName, handler: () => void): void => void host()?.on(signal, handler);
-
-export const offSignal = (signal: SignalName, handler: () => void): void => void host()?.off(signal, handler);
-
-const builtin = (): NodeJS.Process["getBuiltinModule"] | undefined => host()?.getBuiltinModule;
+const builtin = (): NodeJS.Process["getBuiltinModule"] | undefined =>
+  (globalThis as { process?: Pick<NodeJS.Process, "getBuiltinModule"> }).process?.getBuiltinModule;
 
 /** `node:util`, or `undefined` on another host. */
 export const nodeUtil = () => builtin()?.("node:util");
@@ -71,7 +26,6 @@ const required = <T>(module: T | undefined, id: string): T => {
   return module;
 };
 
-export const nodeFs = () => required(builtin()?.("node:fs"), "node:fs");
 export const nodeFsPromises = () => required(builtin()?.("node:fs/promises"), "node:fs/promises");
 export const nodeUrl = () => required(builtin()?.("node:url"), "node:url");
 export const nodeHttp = () => required(builtin()?.("node:http"), "node:http");

@@ -64,12 +64,12 @@ impl super::Checker<'_> {
             types,
             values,
         });
-        let value_mark = self.locals.len();
+        let value_mark = self.cx.locals.len();
         if let (Some(payload), Some(value)) = (payload, opened_value) {
             self.push_local(payload.text(self.text), payload.start, value);
         }
         let result = self.block(body, None);
-        self.locals.truncate(value_mark);
+        self.cx.locals.truncate(value_mark);
         self.opened_modules.pop();
         self.classes.local.truncate(local_mark);
         if result.contains(&mut |ty| matches!(ty, Type::Con { module, .. } if module == &witness)) {
@@ -219,11 +219,14 @@ impl super::Checker<'_> {
             self.error(
                 codes::T068,
                 self.span(contract_node),
-                "a static functor cannot be packed as a runtime module",
+                "a static parameterized module cannot be packed as a runtime module",
             );
             return Type::Error;
         };
-        if requirements.iter().any(|r| matches!(r, ModuleRequirement::Module { .. })) {
+        if requirements
+            .iter()
+            .any(|r| matches!(r, ModuleRequirement::Module { .. }))
+        {
             self.error(
                 codes::T068,
                 self.span(contract_node),

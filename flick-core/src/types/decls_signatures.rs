@@ -36,7 +36,7 @@ impl Checker<'_> {
                 let mut result = self.static_module_signature(children[1]);
                 self.opened_modules.truncate(mark);
                 for (index, (binder, parameter)) in parameters.into_iter().rev().enumerate() {
-                    result = S::Functor {
+                    result = S::Parameterized {
                         group_size: index + 1,
                         binder,
                         parameter: Box::new(parameter),
@@ -108,7 +108,7 @@ impl Checker<'_> {
             return;
         }
         let interface = signature.interface(witness);
-        if interface.functor.is_some() {
+        if interface.parameterized.is_some() {
             return;
         }
         for (name, child) in &interface.modules {

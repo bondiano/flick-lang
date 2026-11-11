@@ -89,41 +89,15 @@ const opts = [none, some(0), some(1), some(-0), some(NaN), some(some(2)), some(n
 const results = [ok(1), err("e"), ok(-0), err(none)];
 const isPos = (n: number) => n > 0;
 const toResult = (n: number) => (n > 0 ? ok(n * 2) : err(`neg ${n}`));
-const toOption = (n: number) => (n > 0 ? some(n + 1) : none);
-const add = (a: number, b: number) => a + b;
-const sub = (a: number, b: number) => a - b;
-const optionArgs = opts.map((o) => [[o]]);
 
 /** A call per value: the stage `first`, then the value. */
 const over = (values: ReadonlyArray<unknown>, first: ReadonlyArray<unknown>) => values.map((v) => [first, [v]]);
 
+// the rest of Option is written in Flick: tests/run/stdlib/effect/option_pairs.fl
 test("Option agrees with Effect", () => {
   agree(CoreOption, EffOption, {
-    all: [[[[]]], [[[some(1), some(2)]]], [[[some(1), none, some(3)]]], [[[none]]]],
-    as: over(opts, ["b"]),
-    asVoid: optionArgs,
-    composeK: [1, 0, -1].map((n) => [[toOption], [toOption], [n]]),
-    containsWith: opts.flatMap((o) => [0, 1, NaN].map((x) => [[Object.is], [x], [o]])),
-    exists: over(opts, [isPos]),
-    filter: over(opts, [isPos]),
-    filterMap: over(opts, [toResult]),
-    firstSomeOf: [[], [none], [none, none], [none, some(1), some(2)], [some(0)]].map((xs) => [[xs]]),
-    flatten: [none, some(none), some(some(1))].map((o) => [[o]]),
-    lift2: opts.flatMap((a) => opts.map((b) => [[sub], [a], [b]])),
-    liftPredicate: [-1, 0, 2, NaN].map((n) => [[isPos], [n]]),
-    match: over(opts, [{ onNone: () => "none", onSome: (x: unknown) => [x] }]),
-    orElseResult: [...over(opts, [() => none]), ...over(opts, [() => some("b")])],
-    orElseSome: over(opts, [() => 9]),
-    partitionMap: over(opts, [toResult]),
-    product: opts.flatMap((a) => opts.map((b) => [[a], [b]])),
     productMany: [...over(opts, [[]]), ...over(opts, [[some(2), some(3)]]), ...over(opts, [[some(2), none]])],
-    reduceCompact: [[[0, add], [[]]], [[10, sub], [[some(1), none, some(2)]]], [[0, add], [[none, none]]]],
-    tap: over(opts, [toOption]),
-    zipLeft: opts.flatMap((a) => opts.map((b) => [[a], [b]])),
-    zipRight: opts.flatMap((a) => opts.map((b) => [[a], [b]])),
-    zipWith: opts.flatMap((a) => opts.map((b) => [[a, sub], [b]])),
   });
-  assert.deepStrictEqual(plain(CoreOption.void), plain(EffOption.void));
 });
 
 test("Result agrees with Effect", () => {

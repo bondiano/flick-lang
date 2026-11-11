@@ -33,11 +33,11 @@ fn formats_parameterized_module_headers_and_named_applications() {
 }
 
 #[test]
-fn formats_anonymous_functor_declarations_and_preserves_comments() {
-    let src = "module App.Return(F:Factory):Factory=functor (K:Input) ->\n  // Keep the application inside the closure.\n  module Built=F(K)\n\n  answer:Int\n  let answer=Built.answer\n";
+fn formats_anonymous_parameterized_declarations_and_preserves_comments() {
+    let src = "module App.Return(F:Factory):Factory=module (K:Input) ->\n  // Keep the application inside the closure.\n  module Built=F(K)\n\n  answer:Int\n  let answer=Built.answer\n";
     assert_eq!(
         fmt(src),
-        "module App.Return(F : Factory) : Factory = functor (K : Input) ->\n  // Keep the application inside the closure.\n  module Built = F(K)\n\n  answer : Int\n  let answer = Built.answer\n"
+        "module App.Return(F : Factory) : Factory = module (K : Input) ->\n  // Keep the application inside the closure.\n  module Built = F(K)\n\n  answer : Int\n  let answer = Built.answer\n"
     );
 }
 

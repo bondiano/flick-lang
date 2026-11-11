@@ -149,7 +149,7 @@ impl Checker<'_> {
                 givens: self.classes.givens.clone(),
                 span,
             };
-            self.regions.outlives.push(outlives);
+            self.cx.regions.outlives.push(outlives);
             return;
         }
         if let Some(args) = args_of(&constraint, Lang::Provided)

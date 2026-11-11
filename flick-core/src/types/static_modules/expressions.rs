@@ -17,21 +17,23 @@ impl Checker<'_> {
                 let mut nodes = node.nodes();
                 let function = self.static_module_expression(nodes.next()?, module, path)?;
                 let explicit = function.signature_explicit;
-                let Some(mut signature) = function.functor else {
+                let Some(mut signature) = function.parameterized else {
                     self.error(
                         codes::T002,
                         self.span(node),
-                        "module expression is not a functor",
+                        "module expression is not a parameterized module",
                     );
                     return None;
                 };
-                if let ModuleSignature::Functor { group_size, .. } = &signature
+                if let ModuleSignature::Parameterized { group_size, .. } = &signature
                     && *group_size != node.nodes().skip(1).count()
                 {
                     self.error(
                         codes::T002,
                         self.span(node),
-                        format!("functor requires {group_size} arguments in this parameter group"),
+                        format!(
+                            "parameterized requires {group_size} arguments in this parameter group"
+                        ),
                     );
                     return None;
                 }
@@ -41,7 +43,7 @@ impl Checker<'_> {
                         module,
                         &format!("{path}.Argument{}", argument.range().0),
                     )?;
-                    let ModuleSignature::Functor {
+                    let ModuleSignature::Parameterized {
                         binder,
                         parameter,
                         mut result,
@@ -51,7 +53,7 @@ impl Checker<'_> {
                         self.error(
                             codes::T002,
                             self.span(node),
-                            "module expression is not a functor",
+                            "module expression is not a parameterized module",
                         );
                         return None;
                     };
@@ -59,7 +61,7 @@ impl Checker<'_> {
                         self.error(
                             codes::T061,
                             self.span(argument),
-                            "module argument does not satisfy the functor signature",
+                            "module argument does not satisfy the parameterized signature",
                         );
                         return None;
                     }
@@ -84,12 +86,12 @@ impl Checker<'_> {
                 }
                 Some(signature.seal(&actual, path))
             }
-            K::ModuleFunctorExpr => self.static_anonymous_functor(node, module, path),
+            K::ModuleParamExpr => self.static_anonymous_parameterized(node, module, path),
             _ => None,
         }
     }
 
-    fn static_functor_header(&self, node: &Node, path: &str, body: &Node) -> Header {
+    fn static_parameterized_header(&self, node: &Node, path: &str, body: &Node) -> Header {
         let groups: Vec<_> = node
             .nodes()
             .filter(|n| n.kind == K::ModuleParamGroup)
@@ -130,7 +132,7 @@ impl Checker<'_> {
         }
     }
 
-    fn static_anonymous_functor(
+    fn static_anonymous_parameterized(
         &mut self,
         node: &Node,
         parent: &Module,
@@ -169,7 +171,7 @@ impl Checker<'_> {
             plugins: Vec::new(),
             span,
         });
-        syntax.header = Some(self.static_functor_header(node, path, body));
+        syntax.header = Some(self.static_parameterized_header(node, path, body));
         let parameters = &syntax.header.as_ref().expect("anonymous header").parameters;
         let names: Vec<_> = parameters.iter().map(|p| p.name.as_str()).collect();
         syntax

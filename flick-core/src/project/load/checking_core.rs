@@ -68,26 +68,8 @@ impl Checking<'_> {
                     (interface, self.by_name.contains_key(&i.module))
                 })
                 .collect(),
-            virtual_contracts: loaded
-                .virtual_of
-                .iter()
-                .flat_map(|v| {
-                    let mut names: Vec<_> = v
-                        .capture
-                        .bindings
-                        .iter()
-                        .map(|b| b.origin.module.clone())
-                        .collect();
-                    if let Some(callee) = &v.capture.callee {
-                        names.push(callee.signature_owner().to_owned());
-                    }
-                    names
-                })
-                .map(|module| match self.by_name.get(&module) {
-                    Some(&j) => comparable[j].clone(),
-                    None => self.from_packages.get(&module).map(comparable_copy),
-                })
-                .collect(),
+            virtual_contracts: self
+                .virtual_contract_inputs(loaded, comparable, &lookup, &contracts),
             virtual_capture: loaded.virtual_of.as_ref().map(|v| v.capture.clone()),
             watching: (self.watching.iter())
                 .map(|w| w.plugin.id().to_owned())
@@ -261,8 +243,15 @@ impl Checking<'_> {
         let witnesses: Vec<_> = loaded
             .virtual_of
             .iter()
-            .flat_map(|v| &v.capture.bindings)
-            .filter_map(|b| Self::argument_interface(&b.argument, lookup, contracts))
+            .flat_map(|v| {
+                v.capture.bindings.iter().map(|b| &b.argument).chain(
+                    v.capture
+                        .callee
+                        .iter()
+                        .flat_map(CalleeOrigin::contract_arguments),
+                )
+            })
+            .filter_map(|argument| Self::argument_interface(argument, lookup, contracts))
             .collect();
         let (mut checked, typing) = types::check_typed_with_static_context(
             &module,
@@ -296,7 +285,7 @@ impl Checking<'_> {
             } else {
                 expected.seal(&interface, &loaded.name)
             };
-            if interface.functor.is_some() {
+            if interface.parameterized.is_some() {
                 interface.signature_explicit = loaded
                     .virtual_of
                     .as_ref()
@@ -320,9 +309,14 @@ impl Checking<'_> {
         interface.private = loaded.syntax.header.as_ref().is_some_and(|h| h.private);
         interface.member_of.clone_from(&loaded.member_of);
         #[cfg(feature = "native-project")]
-        if clean && interface.functor.is_some() {
+        if clean && interface.parameterized.is_some() {
             interface.template = Some(ModuleTemplate {
                 source: self.text_of(loaded).to_owned(),
+                materialized_body: loaded
+                    .syntax
+                    .header
+                    .as_ref()
+                    .and_then(|header| header.materialized_body.clone()),
                 capture: loaded.virtual_of.as_ref().map(|v| v.capture.clone()),
             });
         }
@@ -332,7 +326,7 @@ impl Checking<'_> {
             loaded,
             &module,
             &typing,
-            clean && interface.functor.is_none(),
+            clean && interface.parameterized.is_none(),
             &mut diagnostics,
         );
         if let Some(ir) = &mut ir {
