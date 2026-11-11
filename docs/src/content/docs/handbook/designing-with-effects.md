@@ -91,8 +91,11 @@ let to_view user = {
 ordinary value. It does not decide where a user comes from or where to
 write a log.
 
-`UserId` is opaque outside `App.Users`: callers go through `user_id` to
-construct it. Here that function wraps a string without validating it; an
+`UserId` is opaque outside `App.Users`: callers see a distinct type whose
+internal representation, a string in this example, is hidden. They can store
+and pass an identifier, but cannot substitute an ordinary string for `UserId`
+or apply string operations to it. Callers use `user_id` to construct one.
+Here that function wraps a string without validating it; an
 opaque type alone does not make an identifier valid.
 
 ## See what direct external calls couple together
