@@ -1,6 +1,6 @@
 ---
 title: "FLICK-T072"
-source_hash: d37b3a9edf44d126
+source_hash: "d37b3a9edf44d126"
 ---
 
 # Одна ячейка типа для каждого типа
