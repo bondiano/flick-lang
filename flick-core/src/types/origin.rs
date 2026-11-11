@@ -56,7 +56,7 @@ impl Checker<'_> {
                 format!("the {nth} argument of `{name}` is declared as `{t}` here")
             }),
             (Some(name), None) => {
-                let unsigned = (self.locals.iter().rev())
+                let unsigned = (self.cx.locals.iter().rev())
                     .find(|l| l.name == name)
                     .is_some_and(|l| l.unsigned);
                 self.explain_since(since, param, span, &|t| {

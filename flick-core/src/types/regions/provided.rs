@@ -67,17 +67,17 @@ impl Checker<'_> {
         let Type::Skolem(region) = self.store.skolem("provide") else {
             unreachable!("a skolem")
         };
-        self.regions.scopes.push(Scope {
+        self.cx.regions.scopes.push(Scope {
             region,
             span,
             node: node.range(),
-            outer: self.stage.services.clone(),
-            parent: self.regions.nest.last().copied(),
+            outer: self.cx.stage.services.clone(),
+            parent: self.cx.regions.nest.last().copied(),
             handler: false,
         });
-        let scope = self.regions.scopes.len() - 1;
-        self.regions.nest.push(scope);
-        self.regions.provides.push(Provide {
+        let scope = self.cx.regions.scopes.len() - 1;
+        self.cx.regions.nest.push(scope);
+        self.cx.regions.provides.push(Provide {
             labels,
             open,
             scope,
@@ -85,18 +85,18 @@ impl Checker<'_> {
     }
 
     pub fn leave_provide(&mut self) {
-        self.regions.provides.pop();
-        self.regions.nest.pop();
+        self.cx.regions.provides.pop();
+        self.cx.regions.nest.pop();
     }
 
     fn lexical(&self) -> Lexical {
         Lexical {
-            provides: self.regions.provides[self.stage.provides..].to_vec(),
-            scopes: self.regions.open[self.stage.scopes..].to_vec(),
+            provides: self.cx.regions.provides[self.cx.stage.provides..].to_vec(),
+            scopes: self.cx.regions.open[self.cx.stage.scopes..].to_vec(),
             givens: self.classes.givens.clone(),
-            services: self.stage.services.clone(),
-            site: self.stage.site,
-            pure: self.stage.pure.is_some(),
+            services: self.cx.stage.services.clone(),
+            site: self.cx.stage.site,
+            pure: self.cx.stage.pure.is_some(),
         }
     }
 
@@ -104,7 +104,7 @@ impl Checker<'_> {
     /// call, once its arguments say what the task needs.
     pub fn want_provided(&mut self, row: Type, owner: Type, span: Span) {
         let at = self.lexical();
-        self.regions.provided.push(Want {
+        self.cx.regions.provided.push(Want {
             row,
             owner,
             span,
@@ -117,11 +117,11 @@ impl Checker<'_> {
     /// inferred yet, as of a function applied to fewer arguments, waits for
     /// the end of the declaration.
     pub fn settle_provided(&mut self, mark: usize) {
-        let wanted: Vec<Want> = self.regions.provided.drain(mark..).collect();
+        let wanted: Vec<Want> = self.cx.regions.provided.drain(mark..).collect();
         for mut want in wanted {
             let equalities = type_eqs(&want.at.givens);
             if self.under(&equalities, |this| this.settle_want(&mut want, false)) {
-                self.regions.provided_late.push(want);
+                self.cx.regions.provided_late.push(want);
             }
         }
     }
@@ -129,13 +129,13 @@ impl Checker<'_> {
     /// At the end of the declaration, when rows no longer grow: what is
     /// left must already be in the row of its stage.
     pub fn settle_late_provided(&mut self) {
-        let mut wanted = mem::take(&mut self.regions.provided);
-        wanted.append(&mut self.regions.provided_late);
+        let mut wanted = mem::take(&mut self.cx.regions.provided);
+        wanted.append(&mut self.cx.regions.provided_late);
         for mut want in wanted {
             let equalities = type_eqs(&want.at.givens);
             self.under(&equalities, |this| this.settle_want(&mut want, true));
         }
-        for (provide, owner, service, span) in mem::take(&mut self.regions.late_owners) {
+        for (provide, owner, service, span) in mem::take(&mut self.cx.regions.late_owners) {
             let owner = self.store.resolve(&owner);
             match self.scope_index(&owner) {
                 Some(scope) if self.encloses(provide, scope) => {}
@@ -239,7 +239,7 @@ impl Checker<'_> {
                 (Some(scope), _) if self.encloses(provide, scope) => {}
                 (_, Type::Meta(_)) => {
                     let late = (provide, owner.clone(), service.to_owned(), span);
-                    self.regions.late_owners.push(late);
+                    self.cx.regions.late_owners.push(late);
                 }
                 _ => self.outlived_provide(service, provide, &owner, span),
             }
@@ -303,7 +303,7 @@ impl Checker<'_> {
     }
 
     fn outlived_provide(&mut self, service: &str, provide: usize, owner: &Type, span: Span) {
-        let Scope { span: at, .. } = self.regions.scopes[provide];
+        let Scope { span: at, .. } = self.cx.regions.scopes[provide];
         let (region, _) = self.describe(owner);
         let name = service.rsplit('.').next().unwrap_or(service);
         self.diagnostics.push(
