@@ -13,6 +13,8 @@ use super::{Mode, ModuleCache, analyze, analyze_with, run};
 #[cfg(feature = "ide")]
 use crate::iface::Interface;
 #[cfg(feature = "ide")]
+use crate::iface::Namespace;
+#[cfg(feature = "ide")]
 use crate::project::config::{Build, Config, Kind};
 #[cfg(feature = "ide")]
 use crate::project::config::{Dependency, Source};
@@ -53,6 +55,8 @@ include!("checking_tests_replay.rs");
 #[cfg(feature = "ide")]
 include!("checking_tests_visibility.rs");
 include!("checking_tests_contracts.rs");
+#[cfg(all(feature = "ide", feature = "native-project"))]
+include!("checking_tests_packages.rs");
 #[cfg(feature = "ide")]
 #[test]
 fn private_builtin_cannot_be_imported_or_named_without_an_import() {

@@ -2,6 +2,7 @@
 //! belongs to exactly one token, so `tree.text(src) == src`.
 
 use std::fmt::Write;
+use std::slice::Iter;
 
 use super::kind::SyntaxKind;
 
@@ -30,6 +31,50 @@ pub struct Node {
     pub children: Vec<Element>,
 }
 
+/// Keep traversal shared across the many consumers of the CST. This has no
+/// allocation; outlining `next` avoids duplicating token skipping at each use.
+struct Nodes<'a>(Iter<'a, Element>);
+
+struct Tokens<'a>(Iter<'a, Element>);
+
+impl Iterator for Tokens<'_> {
+    type Item = Token;
+
+    #[inline(never)]
+    fn next(&mut self) -> Option<Self::Item> {
+        for child in self.0.by_ref() {
+            if let Element::Token(token) = child
+                && !token.kind.is_trivia()
+            {
+                return Some(*token);
+            }
+        }
+        None
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        (0, Some(self.0.len()))
+    }
+}
+
+impl<'a> Iterator for Nodes<'a> {
+    type Item = &'a Node;
+
+    #[inline(never)]
+    fn next(&mut self) -> Option<Self::Item> {
+        for child in self.0.by_ref() {
+            if let Element::Node(node) = child {
+                return Some(node);
+            }
+        }
+        None
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        (0, Some(self.0.len()))
+    }
+}
+
 impl Node {
     /// All tokens in source order.
     pub fn tokens(&self) -> Vec<Token> {
@@ -47,15 +92,22 @@ impl Node {
     }
 
     pub fn text(&self, src: &str) -> String {
-        self.tokens().iter().map(|t| t.text(src)).collect()
+        fn append(node: &Node, src: &str, out: &mut String) {
+            for child in &node.children {
+                match child {
+                    Element::Node(node) => append(node, src, out),
+                    Element::Token(token) => out.push_str(token.text(src)),
+                }
+            }
+        }
+        let mut out = String::new();
+        append(self, src, &mut out);
+        out
     }
 
     /// Direct child tokens that are not trivia.
     pub fn child_tokens(&self) -> impl Iterator<Item = Token> + '_ {
-        self.children.iter().filter_map(|c| match c {
-            Element::Token(t) if !t.kind.is_trivia() => Some(*t),
-            _ => None,
-        })
+        Tokens(self.children.iter())
     }
 
     pub fn has_token(&self, kind: SyntaxKind) -> bool {
@@ -63,6 +115,7 @@ impl Node {
     }
 
     /// Byte range of the non-trivia tokens; `0..0` for a node without any.
+    #[inline(never)]
     pub fn range(&self) -> (u32, u32) {
         let first = self.code_token(false);
         let last = self.code_token(true);
@@ -83,10 +136,7 @@ impl Node {
     }
 
     pub fn nodes(&self) -> impl Iterator<Item = &Node> {
-        self.children.iter().filter_map(|c| match c {
-            Element::Node(n) => Some(n),
-            Element::Token(_) => None,
-        })
+        Nodes(self.children.iter())
     }
 
     /// Indented S-expression dump without trivia, for tests and debugging.

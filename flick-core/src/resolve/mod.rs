@@ -11,7 +11,9 @@ mod unused;
 mod uses;
 
 pub(crate) use defs::{alias_names, shortest_cycle};
-pub use syntax::{Header, Import, Item, ItemKind, ModuleApplication, ModuleSyntax, module_syntax};
+pub use syntax::{
+    Header, Import, Item, ItemKind, ModuleApplication, ModuleParam, ModuleSyntax, module_syntax,
+};
 #[cfg(feature = "ide")]
 pub(crate) use unused::item_removal;
 

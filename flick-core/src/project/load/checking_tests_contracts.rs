@@ -1,5 +1,27 @@
 #[cfg(feature = "ide")]
 #[test]
+fn hom_builtin_modules_are_static_arguments_and_aliases() {
+    let host = Memory(BTreeMap::from([(
+        PathBuf::from("/p/src/App/Main.fl"),
+        "module App.Main exposing (answer)\ntype module Input =\n  identity : forall a. a -> a\ntype module Output =\n  answer : Int\noffset : Int\nlet offset = 1\nmodule Make(K : Input) : Output =\n  answer : Int\n  let answer = K.identity (41 + offset)\nmodule Alias = Prelude\nmodule Chosen = Make(Alias)\nanswer : Int\nlet answer = Chosen.answer\n".into(),
+    )]));
+    let mut sources = SourceMap::default();
+    let project = library(&mut sources);
+    let analysis = analyze(
+        &host,
+        &mut sources,
+        Some(&project),
+        &[PathBuf::from("/p/src/App/Main.fl")],
+    );
+    assert!(
+        analysis.diagnostics.is_empty(),
+        "{:?}",
+        analysis.diagnostics
+    );
+}
+
+#[cfg(feature = "ide")]
+#[test]
 fn parameterized_module_argument_must_satisfy_the_contract_at_the_application() {
     use crate::diagnostics::codes;
 
@@ -12,7 +34,7 @@ fn parameterized_module_argument_must_satisfy_the_contract_at_the_application() 
             "module App.Argument exposing (other)\nother : Int\nlet other = 41\n".into()),
         (
             PathBuf::from("/p/src/App/Make.fl"),
-            "module App.Make(K : App.Contracts.Source) exposing (answer)\nanswer : Int\nlet answer = 42\n".into()),
+            "module App.Make(K : App.Contracts.Source) : PublicResult exposing (answer)\nanswer : Int\nlet answer = 42\n\ntype module PublicResult =\n  answer : Int\n".into()),
         (
             PathBuf::from("/p/src/App/Collections.fl"),
             "module App.Collections exposing (Names)\nmodule Names = App.Make(App.Argument)\n".into()),
@@ -44,7 +66,7 @@ fn parameterized_module_rejects_same_shape_with_different_class_and_service_iden
         (PathBuf::from("/p/src/App/Other.fl"), "module App.Other exposing (Equality(..), Clock)\nclass Equality a =\n  equal : a -> a -> Bool\nservice Clock =\n  now : Unit ->{} Int\n".into()),
         (PathBuf::from("/p/src/App/Contracts.fl"), "module App.Contracts exposing (Source)\nimport App.Core as Core\ntype module Source =\n  class Equality = Core.Equality\n  service Clock = Core.Clock\n".into()),
         (PathBuf::from("/p/src/App/Argument.fl"), "module App.Argument exposing (Equality(..), Clock)\nimport App.Other exposing (Equality(..), Clock)\n".into()),
-        (PathBuf::from("/p/src/App/Make.fl"), "module App.Make(K : App.Contracts.Source) exposing (answer)\nanswer : Int\nlet answer = 1\n".into()),
+        (PathBuf::from("/p/src/App/Make.fl"), "module App.Make(K : App.Contracts.Source) : PublicResult exposing (answer)\nanswer : Int\nlet answer = 1\n\ntype module PublicResult =\n  answer : Int\n".into()),
         (PathBuf::from("/p/src/App/Parent.fl"), "module App.Parent exposing (Chosen)\nmodule Chosen = App.Make(App.Argument)\n".into()),
     ]));
     let mut sources = SourceMap::default();
@@ -75,7 +97,7 @@ fn abstract_class_requirement_checks_functional_dependencies() {
     let host = Memory(BTreeMap::from([
         (PathBuf::from("/p/src/App/Contracts.fl"), "module App.Contracts exposing (Policy)\ntype module Policy =\n  class Convert a b | a -> b =\n    convert : a -> b\n".into()),
         (PathBuf::from("/p/src/App/Argument.fl"), "module App.Argument exposing (Convert(..))\nclass Convert a b | b -> a =\n  convert : a -> b\n".into()),
-        (PathBuf::from("/p/src/App/Make.fl"), "module App.Make(K : App.Contracts.Policy) exposing (answer)\nanswer : Int\nlet answer = 1\n".into()),
+        (PathBuf::from("/p/src/App/Make.fl"), "module App.Make(K : App.Contracts.Policy) : PublicResult exposing (answer)\nanswer : Int\nlet answer = 1\n\ntype module PublicResult =\n  answer : Int\n".into()),
         (PathBuf::from("/p/src/App/Parent.fl"), "module App.Parent exposing (Chosen)\nmodule Chosen = App.Make(App.Argument)\n".into()),
     ]));
     let mut sources = SourceMap::default();
@@ -99,7 +121,7 @@ fn abstract_class_requirement_can_name_its_dictionary_type() {
     let host = Memory(BTreeMap::from([
         (PathBuf::from("/p/src/App/Contracts.fl"), "module App.Contracts exposing (Policy)\ntype module Policy =\n  class Equality a =\n    equal : a -> a -> Bool\n  equality : Equality.Dict String\n  instance Equality String from equality\n".into()),
         (PathBuf::from("/p/src/App/Argument.fl"), "module App.Argument exposing (Equality(..), equality)\nclass Equality a =\n  equal : a -> a -> Bool\nequality : Equality.Dict String\nlet equality = Equality.dictionary { equal = fun _ _ -> false }\n".into()),
-        (PathBuf::from("/p/src/App/Make.fl"), "module App.Make(K : App.Contracts.Policy) exposing (answer)\nanswer : Bool\nlet answer = K.equal \"A\" \"A\"\n".into()),
+        (PathBuf::from("/p/src/App/Make.fl"), "module App.Make(K : App.Contracts.Policy) : PublicResult exposing (answer)\nanswer : Bool\nlet answer = K.equal \"A\" \"A\"\n\ntype module PublicResult =\n  answer : Bool\n".into()),
         (PathBuf::from("/p/src/App/Parent.fl"), "module App.Parent exposing (Chosen)\nmodule Chosen = App.Make(App.Argument)\n".into()),
     ]));
     let mut sources = SourceMap::default();
@@ -126,7 +148,7 @@ fn two_local_dictionaries_for_the_same_constraint_are_rejected() {
         (PathBuf::from("/p/src/App/Contracts.fl"), "module App.Contracts exposing (Policy)\ntype module Policy =\n  type Key = String\n  equality : Eq.Dict Key\n  instance Eq Key from equality\n".into()),
         (PathBuf::from("/p/src/App/A.fl"), "module App.A exposing (Key, equality)\ntype alias Key = String\nequality : Eq.Dict Key\nlet equality = Eq.dictionary { eq = fun _ _ -> false }\n".into()),
         (PathBuf::from("/p/src/App/B.fl"), "module App.B exposing (Key, equality)\ntype alias Key = String\nequality : Eq.Dict Key\nlet equality = Eq.dictionary { eq = fun _ _ -> true }\n".into()),
-        (PathBuf::from("/p/src/App/Make.fl"), "module App.Make(A : App.Contracts.Policy, B : App.Contracts.Policy) exposing (answer)\nanswer : Bool\nlet answer = eq \"x\" \"x\"\n".into()),
+        (PathBuf::from("/p/src/App/Make.fl"), "module App.Make(A : App.Contracts.Policy, B : App.Contracts.Policy) : PublicResult exposing (answer)\nanswer : Bool\nlet answer = eq \"x\" \"x\"\n\ntype module PublicResult =\n  answer : Bool\n".into()),
         (PathBuf::from("/p/src/App/Parent.fl"), "module App.Parent exposing (Chosen)\nmodule Chosen = App.Make(App.A, App.B)\n".into()),
     ]));
     let mut sources = SourceMap::default();
@@ -137,9 +159,16 @@ fn two_local_dictionaries_for_the_same_constraint_are_rejected() {
         Some(&project),
         &[PathBuf::from("/p/src/App/Parent.fl")],
     );
-    let diagnostic = analysis.diagnostics.iter().find(|d| d.code == codes::T066)
+    let diagnostic = analysis
+        .diagnostics
+        .iter()
+        .find(|d| d.code == codes::T066)
         .expect("ambiguous module dictionaries are rejected");
-    assert!(diagnostic.message.contains("parameterized module"), "{}", diagnostic.message);
+    assert!(
+        diagnostic.message.contains("parameterized module"),
+        "{}",
+        diagnostic.message
+    );
 }
 
 #[cfg(feature = "ide")]
@@ -236,7 +265,7 @@ fn parameterized_module_body_sees_only_the_contract_projection() {
     let host = Memory(BTreeMap::from([
         (PathBuf::from("/p/src/App/Contracts.fl"), "module App.Contracts exposing (Source)\ntype module Source =\n  value : Int\n".into()),
         (PathBuf::from("/p/src/App/Argument.fl"), "module App.Argument exposing (value, extra)\nvalue : Int\nlet value = 41\nextra : Int\nlet extra = 1\n".into()),
-        (PathBuf::from("/p/src/App/Make.fl"), "module App.Make(K : App.Contracts.Source) exposing (answer)\nanswer : Int\nlet answer = K.extra\n".into()),
+        (PathBuf::from("/p/src/App/Make.fl"), "module App.Make(K : App.Contracts.Source) : PublicResult exposing (answer)\nanswer : Int\nlet answer = K.extra\n\ntype module PublicResult =\n  answer : Int\n".into()),
         (PathBuf::from("/p/src/App/Collections.fl"), "module App.Collections exposing (Names)\nmodule Names = App.Make(App.Argument)\n".into()),
     ]));
     let mut sources = SourceMap::default();
@@ -265,7 +294,7 @@ fn two_named_parameterized_module_applications_have_distinct_abstract_result_typ
     let host = Memory(BTreeMap::from([
         (PathBuf::from("/p/src/App/Contracts.fl"), "module App.Contracts exposing (Source)\ntype module Source =\n  type Key\n".into()),
         (PathBuf::from("/p/src/App/Argument.fl"), "module App.Argument exposing (Key)\ntype alias Key = String\n".into()),
-        (PathBuf::from("/p/src/App/Make.fl"), "module App.Make(K : App.Contracts.Source) exposing (Token)\ntype Token\n".into()),
+        (PathBuf::from("/p/src/App/Make.fl"), "module App.Make(K : App.Contracts.Source) : PublicResult exposing (Token)\ntype Token\n\ntype module PublicResult =\n  type Token\n".into()),
         (PathBuf::from("/p/src/App/Parent.fl"), "module App.Parent exposing (A, B)\nmodule A = App.Make(App.Argument)\nmodule B = App.Make(App.Argument)\n".into()),
         (PathBuf::from("/p/src/App/Use.fl"), "module App.Use exposing (mix)\nimport App.Parent.A as A\nimport App.Parent.B as B\nmix : A.Token -> B.Token\nlet mix x = x\n".into()),
     ]));
@@ -304,7 +333,7 @@ fn abstract_module_parameter_hides_the_arguments_alias() {
     let host = Memory(BTreeMap::from([
         (PathBuf::from("/p/src/App/Contracts.fl"), "module App.Contracts exposing (Source)\ntype module Source =\n  type Key\n".into()),
         (PathBuf::from("/p/src/App/Argument.fl"), "module App.Argument exposing (Key)\ntype alias Key = String\n".into()),
-        (PathBuf::from("/p/src/App/Make.fl"), "module App.Make(K : App.Contracts.Source) exposing (answer)\nanswer : K.Key\nlet answer = \"string\"\n".into()),
+        (PathBuf::from("/p/src/App/Make.fl"), "module App.Make(K : App.Contracts.Source) : PublicResult exposing (answer)\nanswer : K.Key\nlet answer = \"string\"\n\ntype module PublicResult =\n  answer : K.Key\n".into()),
         (PathBuf::from("/p/src/App/Parent.fl"), "module App.Parent exposing (A)\nmodule A = App.Make(App.Argument)\n".into()),
     ]));
     let mut sources = SourceMap::default();
@@ -330,7 +359,7 @@ fn virtual_parameterized_module_path_conflicts_with_a_file_module() {
     let host = Memory(BTreeMap::from([
         (PathBuf::from("/p/src/App/Contracts.fl"), "module App.Contracts exposing (Source)\ntype module Source =\n  value : Int\n".into()),
         (PathBuf::from("/p/src/App/Argument.fl"), "module App.Argument exposing (value)\nvalue : Int\nlet value = 1\n".into()),
-        (PathBuf::from("/p/src/App/Make.fl"), "module App.Make(K : App.Contracts.Source) exposing (answer)\nanswer : Int\nlet answer = K.value\n".into()),
+        (PathBuf::from("/p/src/App/Make.fl"), "module App.Make(K : App.Contracts.Source) : PublicResult exposing (answer)\nanswer : Int\nlet answer = K.value\n\ntype module PublicResult =\n  answer : Int\n".into()),
         (PathBuf::from("/p/src/App/Parent.fl"), "module App.Parent exposing (A)\nmodule A = App.Make(App.Argument)\n".into()),
         (PathBuf::from("/p/src/App/Parent/A.fl"), "module App.Parent.A exposing (answer)\nanswer : Int\nlet answer = 2\n".into()),
         (PathBuf::from("/p/src/App/Use.fl"), "module App.Use exposing (answer)\nimport App.Parent\nimport App.Parent.A exposing (answer)\n".into()),
@@ -359,7 +388,7 @@ fn changing_a_parameterized_module_contract_invalidates_the_virtual_module_cache
         Memory(BTreeMap::from([
         (PathBuf::from("/p/src/App/Contracts.fl"), "module App.Contracts exposing (A, B)\ntype module A =\n  value : Int\ntype module B =\n  value : String\n".into()),
         (PathBuf::from("/p/src/App/Argument.fl"), "module App.Argument exposing (value)\nvalue : Int\nlet value = 1\n".into()),
-        (PathBuf::from("/p/src/App/Make.fl"), format!("module App.Make(K : App.Contracts.{contract}) exposing (answer)\nanswer : Int\nlet answer = K.value\n")),
+        (PathBuf::from("/p/src/App/Make.fl"), format!("module App.Make(K : App.Contracts.{contract}) : PublicResult exposing (answer)\nanswer : Int\nlet answer = K.value\n\ntype module PublicResult =\n  answer : Int\n")),
         (PathBuf::from("/p/src/App/Parent.fl"), "module App.Parent exposing (Result)\nmodule Result = App.Make(App.Argument)\n".into()),
     ]))
     };
@@ -378,3 +407,5 @@ fn changing_a_parameterized_module_contract_invalidates_the_virtual_module_cache
         changed.diagnostics
     );
 }
+
+include!("checking_tests_hom.rs");

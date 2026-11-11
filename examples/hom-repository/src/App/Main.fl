@@ -1,0 +1,116 @@
+module App.Main exposing (main)
+
+import App.Driver as Driver
+import App.Instances.Base as Base
+import App.Instances.Other as Other
+import App.Instances.Logged as Logged
+import App.Instances.Alias as Alias
+
+type error BodyError = BodyError
+
+report : String -> Driver.State ->{} Unit
+let report name state =
+  Platform.stdout_line
+    (name
+      ++ " attempts="
+      ++ show state.attempts
+      ++ " acquired="
+      ++ show state.next
+      ++ " released="
+      ++ show (List.length state.closed)
+      ++ " active="
+      ++ show state.active
+      ++ " peak="
+      ++ show state.peak
+      ++ " unique="
+      ++ show (List.length (List.dedupe state.closed) == List.length state.closed))
+
+logging : Ref (List String) -> Layer none none {Log.Log}
+let logging messages =
+  Layer.succeed Log.Log { write = fun _ message -> Ref.update messages (fun xs -> xs ++ [message]) }
+
+success : Unit ->{} Unit
+let success () =
+  let state = Ref.make Driver.initial
+  let messages = Ref.make []
+  let live = Driver.live 0 state
+  report "construction" (Ref.get state)
+  let outcome =
+    Effect.exit
+      (task {
+        provide live {
+          provide logging messages {
+            provide Logged.layer { Logged.get "a" ++ " " ++ Alias.get "b" }
+          }
+        }
+      })
+  Platform.stdout_line ("value=" ++ Option.with_default "failed" (Exit.value outcome))
+  Platform.stdout_line ("logs=" ++ String.join "|" (Ref.get messages))
+  report "success" (Ref.get state)
+
+failure : Int -> String ->{} Unit
+let failure mode name =
+  let state = Ref.make Driver.initial
+  let outcome =
+    Effect.exit
+      (task {
+        provide Driver.live mode state { provide Base.layer { from_result (Err BodyError) } }
+      })
+  Platform.stdout_line (name ++ " failed=" ++ show (Exit.is_failure outcome))
+  report name (Ref.get state)
+
+interruption : Unit ->{} Unit
+let interruption () =
+  let state = Ref.make Driver.initial
+  let outcome =
+    Effect.exit
+      (task {
+        provide Driver.live 0 state {
+          provide Base.layer {
+            let _ = Base.get "interrupted"
+            Effect.interrupt ()
+          }
+        }
+      })
+  Platform.stdout_line
+    ("interrupted="
+      ++ show (Option.with_default false (Option.map Cause.has_interrupts (Exit.failure outcome))))
+  report "interruption" (Ref.get state)
+
+overlap : Unit ->{Async} Unit
+let overlap () =
+  let state = Ref.make Driver.initial
+  let first = Deferred.make ()
+  let second = Deferred.make ()
+  let outcome =
+    Effect.exit
+      (task {
+        provide Driver.live 0 state {
+          parallel
+            (task {
+              provide Base.layer {
+                ignore (Deferred.succeed () first)
+                Deferred.await_ second
+                Base.get "one"
+              }
+            })
+            (task {
+              provide Other.layer {
+                ignore (Deferred.succeed () second)
+                Deferred.await_ first
+                Other.get "two"
+              }
+            })
+        }
+      })
+  Platform.stdout_line ("overlap success=" ++ show (Exit.is_success outcome))
+  report "overlap" (Ref.get state)
+
+main : Unit ->{Async} Unit
+let main () =
+  success ()
+  failure 0 "body failure"
+  failure 1 "acquisition failure"
+  failure 2 "initialization failure"
+  interruption ()
+  overlap ()

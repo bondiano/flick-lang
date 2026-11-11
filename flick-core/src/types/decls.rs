@@ -44,6 +44,21 @@ impl Checker<'_> {
         for i in self.conversion_order(&pending) {
             let p = &pending[i];
             bodies[i] = self.with_params(&p.params, |this| this.body(p, &mut refined));
+            if let Some(def) = self.env.type_def_mut(&p.name) {
+                match &bodies[i] {
+                    Body::ModuleContract(requirements) => {
+                        def.form = Form::ModuleContract {
+                            requirements: requirements.clone(),
+                        }
+                    }
+                    Body::ModuleSignature(signature) => {
+                        def.form = Form::ModuleSignature {
+                            signature: Box::new(signature.clone()),
+                        }
+                    }
+                    _ => {}
+                }
+            }
         }
         // before a constructor's scheme expands an alias it names
         self.break_alias_cycles(&pending);
@@ -120,10 +135,14 @@ impl Checker<'_> {
             matches!(
                 self.env.type_def(module, &p.name).map(|d| &d.form),
                 Some(Form::Alias { .. })
-            ) && !p
-                .node
-                .nodes()
-                .any(|n| n.kind == K::RowType && n.nodes().next().is_none())
+            ) || p.node.kind == K::ModuleTypeDecl
+        };
+        let converted_early = |p: &Pending| {
+            converted_early(p)
+                && !p
+                    .node
+                    .nodes()
+                    .any(|n| n.kind == K::RowType && n.nodes().next().is_none())
         };
         let aliases: HashMap<&str, usize> = pending
             .iter()
@@ -344,96 +363,6 @@ impl Checker<'_> {
         out
     }
 
-    /// Converts what a declaration defines with its parameters in scope.
-    fn body<'n>(&mut self, p: &Pending<'n>, refined: &mut Vec<(&'n Node, Type)>) -> Body {
-        let decl = p.node;
-        match decl.kind {
-            K::ModuleTypeDecl => Body::ModuleContract(self.module_contract(decl)),
-            K::TypeDecl => {
-                let variants: Vec<&Node> = decl.nodes().filter(|n| n.kind == K::Variant).collect();
-                if !variants.is_empty() {
-                    return Body::Variants(
-                        variants.iter().filter_map(|v| self.variant(v)).collect(),
-                    );
-                }
-                let Some(body) = decl.nodes().find(|n| is_type(n.kind)) else {
-                    return Body::None;
-                };
-                if decl.has_token(K::RefinedKw) {
-                    let base = self.ty(body, &Kind::Type, Free::Reject);
-                    if let Some(predicate) = decl.nodes().find(|n| n.kind == K::Refinement) {
-                        refined.push((predicate, base));
-                    }
-                    return Body::None;
-                }
-                let Some(TypeDef { kind, .. }) = self.env.type_def(&self.env.module, &p.name)
-                else {
-                    return Body::None;
-                };
-                let mut result = kind.clone();
-                for _ in &p.params {
-                    result = match self.kinds.resolve(&result) {
-                        Kind::Arrow(_, r) => *r,
-                        other => other,
-                    };
-                }
-                let converted = self.ty(body, &result, Free::Reject);
-                if decl.has_token(K::OpaqueKw) && self.kinds.resolve(&result).is_row() {
-                    self.error(
-                        codes::T002,
-                        self.span(decl),
-                        format!(
-                            "`{}` cannot be opaque: a set is its row, which a signature that names it must show",
-                            p.name
-                        ),
-                    );
-                }
-                if let Some(TypeDef {
-                    form: Form::Alias { body, .. },
-                    ..
-                }) = self.env.type_def_mut(&p.name)
-                {
-                    *body = converted;
-                }
-                Body::None
-            }
-            K::ErrorDecl => {
-                let payload = decl
-                    .nodes()
-                    .find(|n| n.kind == K::Variant)
-                    .map(|v| self.payload(v))
-                    .unwrap_or_default();
-                Body::Variants(vec![Variant {
-                    name: p.name.clone(),
-                    payload,
-                    constraints: Vec::new(),
-                    indexed: None,
-                }])
-            }
-            K::ServiceDecl => Body::Members(self.operations(decl)),
-            K::ClassDecl => {
-                let mut supers = Vec::new();
-                for context in decl.nodes().filter(|n| n.kind == K::Context) {
-                    for c in context.nodes() {
-                        supers.extend(self.constraints(c, Free::Reject));
-                    }
-                }
-                let fundeps = decl
-                    .nodes()
-                    .filter(|n| n.kind == K::Fundep)
-                    .filter_map(|f| self.fundep(f, &p.params))
-                    .collect();
-                let head = Type::apps(
-                    Type::con(&self.env.module, &p.name),
-                    p.params.iter().map(|b| Type::Var(b.name.clone())),
-                );
-                let (members, defaults) = self.class_members(decl, head);
-                Body::Class(supers, fundeps, members, defaults)
-            }
-            _ => Body::None,
-        }
-    }
-
     /// Fixes the kinds and stores what the declaration defines.
     #[allow(clippy::too_many_lines)]
     fn finish(&mut self, p: &Pending, body: Body) {
@@ -455,6 +384,11 @@ impl Checker<'_> {
             Body::None => {}
             Body::ModuleContract(requirements) => {
                 def.form = Form::ModuleContract { requirements };
+            }
+            Body::ModuleSignature(signature) => {
+                def.form = Form::ModuleSignature {
+                    signature: Box::new(signature),
+                };
             }
             Body::Variants(variants) => {
                 let error = p.node.kind == K::ErrorDecl;
@@ -508,6 +442,7 @@ impl Checker<'_> {
 include!("decls_contracts.rs");
 
 enum Body {
+    ModuleSignature(super::ModuleSignature),
     None,
     ModuleContract(Vec<ModuleRequirement>),
     Variants(Vec<Variant>),
@@ -521,3 +456,5 @@ enum Body {
         Vec<(String, Type)>,
     ),
 }
+
+include!("decls_body.rs");

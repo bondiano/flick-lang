@@ -421,6 +421,8 @@ fn relabel(label: &str, t: &Type) -> String {
         super::ty::capture_label(t)
     } else if label.starts_with('~') {
         super::ty::error_label(t)
+    } else if label.starts_with('@') {
+        super::ty::service_label(t)
     } else {
         None
     };

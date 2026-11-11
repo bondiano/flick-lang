@@ -1,0 +1,12 @@
+module App.Hom.Make(K : App.Hom.Contracts.Input) : App.Hom.Contracts.Output with type Value = K.Item
+
+type alias Value = K.Item
+
+value : Value
+let value = K.sample
+
+answer : Int
+let answer = K.seed + 1
+
+same : Value -> Value -> Bool
+let same a b = eq a b

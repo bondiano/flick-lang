@@ -12,10 +12,12 @@ use tracing::debug;
 use super::Analyzed;
 use super::plugins::Watching;
 use super::precompiled::Precompiled;
-use super::{Loaded, Loader, Root};
+use super::{BindingOrigin, CalleeOrigin, Loaded, Loader, Root, StaticCapture, Virtual};
 use crate::clock::{micros, timed};
 use crate::diagnostics::{Diagnostic, Severity, codes};
-use crate::iface::Namespace;
+#[cfg(feature = "native-project")]
+use crate::iface::ModuleTemplate;
+use crate::iface::{Decl, Namespace};
 use crate::ir;
 use crate::plugin::calls as plugin_calls;
 use crate::plugin::expansion::Expansion;
@@ -55,6 +57,8 @@ pub(crate) fn check_file(
         editing: Vec::new(),
         loader: None,
         virtual_of: None,
+        member_of: None,
+        scope_of: None,
     };
     let modules = [loaded];
     let mut by_name = BTreeMap::new();
@@ -89,7 +93,7 @@ pub(crate) fn check_file(
             .find(|i| i.module == name && !i.private)
             .cloned()
     };
-    let mut diagnostics = checking.check(&modules[0], &builtin).diagnostics;
+    let mut diagnostics = checking.check(&modules[0], &builtin, &builtin).diagnostics;
     diagnostics.append(&mut derived);
     // a lone file has no package, so no private module of one is its own
     for import in &modules[0].syntax.imports {
@@ -112,7 +116,7 @@ pub(crate) fn check_file(
 mod graph;
 
 pub(super) use graph::levels;
-use graph::{package_of, parallel};
+use graph::parallel;
 
 /// The output of checking each module in earlier runs, reused while the
 /// module's text, the interfaces of its imports and the configuration stay
@@ -170,7 +174,7 @@ struct Key {
     /// of the project.
     imports: Vec<(Option<Arc<Interface>>, bool)>,
     virtual_contracts: Vec<Option<Arc<Interface>>>,
-    virtual_parameters: Vec<(String, String, String)>,
+    virtual_capture: Option<StaticCapture>,
     /// What tells the watching plugins apart: a module without blocks is
     /// checked again when one of them changes.
     watching: Vec<String>,
@@ -268,7 +272,9 @@ impl Loader<'_> {
             lowered[i] = Some((ir, output.declarations));
         }
         #[cfg(feature = "ide")]
-        if let Some(ide) = &mut self.ide {
+        if let Some(ide) = &mut self.ide
+            && self.modules[i].scope_of.is_none()
+        {
             ide.push(Analyzed::new(
                 &self.modules[i],
                 output.typing,
@@ -317,6 +323,8 @@ struct Checking<'a> {
 }
 
 include!("checking_core.rs");
+include!("checking_contracts.rs");
+include!("checking_lexical.rs");
 
 include!("checking_inline.rs");
 include!("checking_relocate.rs");

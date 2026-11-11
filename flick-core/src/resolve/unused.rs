@@ -41,13 +41,22 @@ pub(super) fn unused_locals(unused: Vec<Unused>) -> impl Iterator<Item = Diagnos
 }
 
 fn packed_paths(node: &Node, text: &str, out: &mut Vec<String>) {
-    if node.kind == K::PackExpr
+    if matches!(node.kind, K::PackExpr | K::ModuleNominalMember)
         && let Some(path) = node.nodes().find(|n| n.kind == K::ModulePath)
     {
         out.push(path.text(text).split_whitespace().collect());
     }
     for child in node.nodes() {
         packed_paths(child, text, out);
+    }
+}
+
+fn module_expression_paths(node: &Node, text: &str, out: &mut Vec<String>) {
+    if node.kind == K::ModulePath {
+        out.push(node.text(text).split_whitespace().collect());
+    }
+    for child in node.nodes() {
+        module_expression_paths(child, text, out);
     }
 }
 
@@ -73,15 +82,48 @@ impl Scope<'_> {
         // `M.S.op` uses the import `M` too: count each prefix of a qualifier
         let mut packed = Vec::new();
         packed_paths(module.tree, module.text, &mut packed);
+        if let Some(header) = &module.syntax.header {
+            if let Some(body) = &header.body {
+                module_expression_paths(body, module.text, &mut packed);
+            }
+            if let Some(target) = &header.materialized_body {
+                packed.push(target.clone());
+            }
+        }
+        for application in &module.syntax.applications {
+            module_expression_paths(&application.expression, module.text, &mut packed);
+            packed.push(application.template.clone());
+            packed.extend(application.arguments.iter().cloned());
+            if names.contains(application.name.as_str()) {
+                packed.push(application.name.clone());
+            }
+        }
         let qualifiers: BTreeSet<&str> = references
             .iter()
             .filter_map(|r| r.qualifier.as_deref())
             .flat_map(|q| q.match_indices('.').map(|(i, _)| &q[..i]).chain([q]))
-            .chain(packed.iter().map(String::as_str))
+            .chain(packed.iter().flat_map(|q| {
+                q.match_indices('.')
+                    .map(|(i, _)| &q[..i])
+                    .chain([q.as_str()])
+            }))
             .collect();
         // `T.member`, a companion, uses the type `T`
         names.extend(qualifiers.iter().filter(|q| !q.contains('.')));
         for (import, interface) in self.imports() {
+            if import.module.starts_with("$scope:") || import.module.starts_with("$lexical:") {
+                continue;
+            }
+            // A module expression's synthetic binding import has no source
+            // import to remove; its public view may come from a result signature.
+            if module
+                .syntax
+                .applications
+                .iter()
+                .any(|application| import.module == format!("{}.{}", module.name, application.name))
+            {
+                continue;
+            }
             let Some(interface) = interface else {
                 continue;
             };
@@ -100,7 +142,10 @@ impl Scope<'_> {
             // blocks of the plugins it exposes use it
             let whole =
                 unused.len() == import.exposing.len() && needless.len() == import.plugins.len();
-            if !qualifiers.contains(import.qualifier()) && whole {
+            if !qualifiers.contains(import.qualifier())
+                && !qualifiers.contains(import.module.as_str())
+                && whole
+            {
                 // importing a module brings its instances, which may be the point
                 if interface
                     .instances
@@ -117,6 +162,11 @@ impl Scope<'_> {
                 continue;
             }
             for item in unused {
+                // Synthesized imports have no separate source `exposing`
+                // clause, so they have no user-editable item to diagnose.
+                if item.span == import.span {
+                    continue;
+                }
                 diagnostics.push(unused_item(module.text, import, item));
             }
             for item in needless {

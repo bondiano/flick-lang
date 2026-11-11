@@ -34,6 +34,7 @@ pub(super) fn references(module: &Module) -> (Vec<Reference>, Vec<Unused>) {
         file: module.file,
         generated: module.generated,
         locals: Vec::new(),
+        module_locals: Vec::new(),
         out: Vec::new(),
         unused: Vec::new(),
         used: Vec::new(),
@@ -74,6 +75,7 @@ struct Walker<'a> {
     file: FileId,
     generated: u32,
     locals: Vec<Local<'a>>,
+    module_locals: Vec<&'a str>,
     out: Vec<Reference>,
     unused: Vec<Unused>,
     /// Where each binder that was used is written.
@@ -85,7 +87,23 @@ impl Walker<'_> {
     fn walk(&mut self, node: &Node) {
         let mark = self.locals.len();
         match node.kind {
-            K::ModuleHeader | K::ImportDecl => return,
+            K::ModuleFunctorExpr | K::InlineModuleDecl
+                if node.kind == K::ModuleFunctorExpr
+                    || node.nodes().any(|n| n.kind == K::ModuleParamGroup) =>
+            {
+                self.module_functor(node);
+                return;
+            }
+            K::ImportDecl => return,
+            K::ModuleHeader => {
+                for child in node
+                    .nodes()
+                    .filter(|n| matches!(n.kind, K::ModuleParamGroup | K::ModuleResult))
+                {
+                    self.walk(child);
+                }
+                return;
+            }
             K::NameExpr | K::ConPat => self.reference(node, Namespace::Constructor),
             K::NameType => self.reference(node, Namespace::Type),
             K::DerivingClause => {
@@ -163,6 +181,61 @@ impl Walker<'_> {
             self.walk(child);
         }
         self.release(mark);
+    }
+
+    fn module_functor(&mut self, node: &Node) {
+        let mark = self.locals.len();
+        let modules = self.module_locals.len();
+        for parameter in node
+            .nodes()
+            .filter(|n| n.kind == K::ModuleParamGroup)
+            .flat_map(Node::nodes)
+        {
+            for signature in parameter.nodes() {
+                self.walk(signature);
+            }
+            if let Some(name) = parameter.child_tokens().find(|t| t.kind == K::Con) {
+                self.module_locals.push(name.text(self.text));
+            }
+        }
+        for result in node.nodes().filter(|n| n.kind == K::ModuleResult) {
+            self.walk(result);
+        }
+        if let Some(body) = node.nodes().find(|n| {
+            matches!(
+                n.kind,
+                K::Members
+                    | K::ModuleApplyExpr
+                    | K::ModuleFunctorExpr
+                    | K::ModuleParenExpr
+                    | K::ModuleAnnotExpr
+            ) || (node.kind == K::ModuleFunctorExpr && n.kind == K::ModulePath)
+        }) {
+            for declaration in body.nodes().filter(|_| body.kind == K::Members) {
+                let names = declaration
+                    .child_tokens()
+                    .filter(|t| matches!(t.kind, K::Ident | K::Con));
+                self.locals.extend(names.map(|t| Local {
+                    name: t.text(self.text),
+                    generated: t.start >= self.generated,
+                    binder: None,
+                    used: false,
+                }));
+                if let Some(pattern) = declaration.nodes().find(|n| is_pattern(n.kind)) {
+                    let mut names = Vec::new();
+                    binders(pattern, &mut names);
+                    self.locals.extend(names.into_iter().map(|t| Local {
+                        name: t.text(self.text),
+                        generated: t.start >= self.generated,
+                        binder: None,
+                        used: false,
+                    }));
+                }
+            }
+            self.walk(body);
+        }
+        self.module_locals.truncate(modules);
+        self.locals.truncate(mark);
     }
 
     /// The statements of a block: a `let` scopes over those after it.
@@ -295,6 +368,12 @@ impl Walker<'_> {
         let Some((&name, qualifier)) = parts.split_last() else {
             return;
         };
+        if qualifier
+            .first()
+            .is_some_and(|name| self.module_locals.contains(name))
+        {
+            return;
+        }
         // a companion `T$schema` of generated code is a value, its token one
         let namespace = if last.kind == K::Con {
             con_namespace

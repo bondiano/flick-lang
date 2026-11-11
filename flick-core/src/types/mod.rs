@@ -48,9 +48,12 @@ mod lint_tests;
 mod lints;
 mod makers;
 mod module_contract;
+mod module_signature;
+pub(crate) use module_signature::normalize_module_interface;
+mod static_modules;
 pub(crate) use module_contract::{
     Mismatch as ModuleMismatch, check as check_module_contract,
-    local_dictionaries as module_local_dictionaries, project as project_module_contract,
+    local_dictionaries as module_local_dictionaries,
 };
 mod expression_fact;
 mod origin;
@@ -102,8 +105,8 @@ pub use display::{show_signature, show_type};
 pub use do_notation::{bind_key, guard_key};
 pub use effects::NO_EFFECTS;
 pub use env::{
-    Abi, EnumLit, Form, Fundep, Instance, JsClass, ModuleNominalKind, ModuleRequirement, Rep,
-    TypeDef,
+    Abi, EnumLit, Form, Fundep, Instance, JsClass, ModuleNominalKind, ModuleRequirement,
+    ModuleSignature, Rep, TypeDef,
 };
 pub use ffi::keeps_for_owner;
 pub use gadt::branch::dict_local;
@@ -237,18 +240,26 @@ pub fn check_typed(
     (diagnostics, typing)
 }
 
-/// Checks a named parameterized module result with the dictionaries supplied by its
-/// static module arguments in scope for every definition of the result.
-pub(crate) fn check_typed_with_module_dictionaries(
+#[derive(Clone, Copy, Default)]
+pub(crate) struct StaticContext<'a> {
+    pub dictionaries: &'a [(Type, Dict)],
+    /// Transparent definitions available when comparing a concrete result.
+    /// They are not added to the body's abstract parameter environment.
+    pub witnesses: &'a [Interface],
+}
+
+/// Checks a named result with its static arguments' dictionaries and
+/// equality context. Body lookup still uses only the projected interfaces.
+pub(crate) fn check_typed_with_static_context(
     module: &Module,
     imported: &dyn Fn(&str) -> Option<Interface>,
     builtins: &[Interface],
     options: Options,
     interface: &mut Interface,
-    dictionaries: &[(Type, Dict)],
+    context: StaticContext<'_>,
 ) -> (Vec<Diagnostic>, Typing) {
     let (diagnostics, typing, _) =
-        run_with_dictionaries(module, imported, builtins, options, interface, dictionaries);
+        run_with_static_context(module, imported, builtins, options, interface, context);
     (diagnostics, typing)
 }
 
@@ -262,7 +273,14 @@ pub fn check_builtin_typed(
     interface: &mut Interface,
 ) -> (Vec<Diagnostic>, Typing) {
     let known = Builtins::new(dependencies);
-    let (diagnostics, typing, _) = run_in(module, imported, &known, options, interface, &[]);
+    let (diagnostics, typing, _) = run_in(
+        module,
+        imported,
+        &known,
+        options,
+        interface,
+        StaticContext::default(),
+    );
     (diagnostics, typing)
 }
 
@@ -273,16 +291,23 @@ fn run(
     options: Options,
     interface: &mut Interface,
 ) -> (Vec<Diagnostic>, Typing, Vec<(Span, Dict)>) {
-    run_with_dictionaries(module, imported, builtins, options, interface, &[])
+    run_with_static_context(
+        module,
+        imported,
+        builtins,
+        options,
+        interface,
+        StaticContext::default(),
+    )
 }
 
-fn run_with_dictionaries(
+fn run_with_static_context(
     module: &Module,
     imported: &dyn Fn(&str) -> Option<Interface>,
     builtins: &[Interface],
     options: Options,
     interface: &mut Interface,
-    dictionaries: &[(Type, Dict)],
+    context: StaticContext<'_>,
 ) -> (Vec<Diagnostic>, Typing, Vec<(Span, Dict)>) {
     let owned;
     let builtins = if let Some(by_class) = builtins::are_builtins(builtins) {
@@ -292,7 +317,7 @@ fn run_with_dictionaries(
         &owned
     };
     let (mut diagnostics, typing, evidence) =
-        run_in(module, imported, builtins, options, interface, dictionaries);
+        run_in(module, imported, builtins, options, interface, context);
     // only the built-in modules, which `run_in` checks directly, mark lang items
     let marks = lang::attributes(module.tree);
     for attribute in marks
@@ -316,7 +341,7 @@ fn run_in(
     builtins: &Builtins,
     options: Options,
     interface: &mut Interface,
-    dictionaries: &[(Type, Dict)],
+    context: StaticContext<'_>,
 ) -> (Vec<Diagnostic>, Typing, Vec<(Span, Dict)>) {
     let env = Env::new(module.name, module.syntax, imported, builtins);
     let mut checker = Checker {
@@ -325,6 +350,7 @@ fn run_in(
         generated: module.generated,
         derived: derived_classes(module.tree, module.text),
         env,
+        static_witnesses: context.witnesses,
         store: Store::default(),
         kinds: KindStore::default(),
         diagnostics: Vec::new(),
@@ -359,7 +385,12 @@ fn run_in(
         sugar: Vec::new(),
         gadt: gadt::branch::State::default(),
     };
-    checker.classes.local.extend_from_slice(dictionaries);
+    checker
+        .classes
+        .local
+        .extend_from_slice(context.dictionaries);
+    let static_parameters = checker.prepare_static_parameters(module);
+    let static_results = checker.prepare_static_applications(module);
     checker.module(module.tree);
     for export in &interface.exports {
         if export.entity.module == module.name
@@ -381,7 +412,15 @@ fn run_in(
     checker.record_call_sites();
     checker.unannotated_codecs();
     checker.fill(interface);
-    checker.typing.declarations = Arc::new(checker.declarations());
+    checker.finish_static_module(
+        module,
+        imported,
+        interface,
+        static_parameters,
+        &static_results,
+    );
+    checker.typing.declarations =
+        Arc::new(checker.static_declarations(module, interface, &static_results));
     checker.sugar_lints(module.tree);
     let typing = checker.finish_typing();
     let mut evidence = checker.classes.evidence;
@@ -389,32 +428,7 @@ fn run_in(
     (checker.diagnostics, typing, evidence)
 }
 
-/// The diagnostics of checking a module with syntax errors that do not
-/// touch the code the parser could not read, where the checker only guessed.
-pub fn beside_syntax_errors(tree: &Node, checked: Vec<Diagnostic>) -> Vec<Diagnostic> {
-    fn errors(node: &Node, out: &mut Vec<(u32, u32)>) {
-        for child in node.nodes() {
-            if child.kind == K::Error {
-                out.push(child.range());
-            } else {
-                errors(child, out);
-            }
-        }
-    }
-    let mut broken = Vec::new();
-    errors(tree, &mut broken);
-    // a type the checker could not finish is no news while code is missing
-    let unfinished = |text: &str| text.contains("?`") || text.contains("? ");
-    let guessed = |d: &Diagnostic| d.code == codes::T013 || unfinished(&d.message) || d.incomplete;
-    checked
-        .into_iter()
-        .filter(|d| {
-            (broken.is_empty() || !guessed(d))
-                && d.span
-                    .is_none_or(|s| !broken.iter().any(|(b, e)| s.start <= *e && *b <= s.end))
-        })
-        .collect()
-}
+include!("beside_syntax.rs");
 
 /// A value in scope inside a declaration.
 #[derive(Debug, Clone)]
@@ -504,6 +518,7 @@ struct NumLiteral {
 }
 
 struct Checker<'a> {
+    static_witnesses: &'a [Interface],
     file: FileId,
     text: &'a str,
     /// Where generated code starts in `text`.

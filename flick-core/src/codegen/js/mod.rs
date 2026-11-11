@@ -56,7 +56,8 @@ use super::exports::reexports;
 use super::tail::{Callee, Target};
 use super::ts::Projection;
 use super::{Options, Output, names};
-use crate::ir::{ItemKind, Label, Module};
+use crate::iface::Namespace;
+use crate::ir::{Item, ItemKind, Label, Module};
 #[cfg(feature = "native-project")]
 use crate::source::Span;
 use crate::types::Dict;
@@ -69,9 +70,20 @@ const MARK_END: char = '\u{E001}';
 
 /// Compiles `module` to ESM (or TypeScript, see [`Options::typescript`]).
 pub fn js(module: &Module, options: &Options) -> Output {
+    js_at(module, options, &module.name, &|_, _| None)
+}
+
+pub(crate) fn js_at(
+    module: &Module,
+    options: &Options,
+    physical: &str,
+    location: &dyn Fn(&str, &str) -> Option<String>,
+) -> Output {
     let mut g = Gen::new(module, options);
+    g.physical = physical;
+    g.location = location;
     let projection =
-        Projection::for_runtime(&module.name, options.interface, options.package, options.rt);
+        Projection::for_runtime(physical, options.interface, options.package, options.rt);
     let mut declarations = Vec::new();
     let interface = (options.interface)(&module.name);
     if let Some(interface) = interface.as_ref().filter(|_| !options.rt) {
@@ -82,21 +94,30 @@ pub fn js(module: &Module, options: &Options) -> Output {
     if options.typescript
         && let Some(interface) = &interface
     {
-        declarations = projection.declarations(interface).0;
-        g.annotations = annotations(&projection, interface);
+        let mut interface = interface.clone();
+        if physical != module.name {
+            for export in &mut interface.exports {
+                if export.entity.module == module.name && export.entity.namespace != Namespace::Type
+                {
+                    export.entity.module = physical.into();
+                }
+            }
+        }
+        declarations = projection.declarations(&interface).0;
+        g.annotations = annotations(&projection, &interface);
     }
     let body = g.items(&module.items);
     let mut code = String::new();
     let typed = RefCell::new(Vec::new());
     if options.typescript {
-        let here = (options.path)(&module.name);
+        let here = (options.path)(physical);
         let path = |m: &str| {
             typed.borrow_mut().push(m.to_owned());
             relative(&here, &(options.path)(m))
         };
         code.push_str(&projection.imports(&path));
     }
-    let here = (options.path)(&module.name);
+    let here = (options.path)(physical);
     g.write_imports(&mut code, &here);
     if !code.is_empty() {
         code.push('\n');
@@ -108,7 +129,9 @@ pub fn js(module: &Module, options: &Options) -> Output {
     code.push_str(&body);
     // a module exposing what it imports: JS consumers find it here too
     let mut barrel = Vec::new();
-    if let Some(interface) = (options.interface)(&module.name) {
+    if let Some(interface) = (options.interface)(&module.name)
+        && physical == module.name
+    {
         let path = |m: &str| relative(&here, &(options.path)(m));
         let (lines, modules) = reexports(&module.name, &interface, &path, &|_| true, &|_| {
             options.typescript()
@@ -144,6 +167,8 @@ impl<'a> Gen<'a> {
         let grouped = group::grouped(&module.name, &module.items, &groups, calls);
         Gen {
             module: &module.name,
+            physical: &module.name,
+            location: &|_, _| None,
             options,
             labels: &module.labels,
             #[cfg(feature = "native-project")]
@@ -172,8 +197,14 @@ impl<'a> Gen<'a> {
             sync_exports: HashMap::new(),
             workers: if options.release {
                 let interface = (options.interface)(&module.name);
-                let exported =
-                    |name: &str| interface.as_ref().is_none_or(|i| i.exports_value(name));
+                let exported = |name: &str| {
+                    interface.as_ref().is_none_or(|i| i.exports_value(name))
+                        || module
+                            .initialization
+                            .prefixes
+                            .iter()
+                            .any(|p| p.bindings.iter().any(|n| n == name))
+                };
                 let exported_arity = |name: &str| (options.workers)(&module.name, name);
                 release::workers(&module.name, &module.items, &exported, &exported_arity)
             } else {
@@ -202,49 +233,7 @@ impl<'a> Gen<'a> {
     }
 }
 
-fn finish(
-    #[cfg(feature = "native-project")] code: &str,
-    #[cfg(not(feature = "native-project"))] code: String,
-    #[cfg(feature = "native-project")] spans: &[Span],
-    #[cfg(feature = "native-project")] names: &HashMap<usize, String>,
-) -> Output {
-    #[cfg(feature = "native-project")]
-    {
-        let mut out = String::with_capacity(code.len());
-        let mut mappings = Vec::new();
-        let (mut line, mut col) = (0u32, 0u32);
-        let mut chars = code.chars();
-        while let Some(c) = chars.next() {
-            match c {
-                MARK_START => {
-                    let id: String = chars.by_ref().take_while(|&c| c != MARK_END).collect();
-                    if let Ok(id) = id.parse::<usize>() {
-                        mappings.push((line, col, spans[id], names.get(&id).cloned()));
-                    }
-                }
-                '\n' => {
-                    out.push(c);
-                    line += 1;
-                    col = 0;
-                }
-                c => {
-                    out.push(c);
-                    col += u32::try_from(c.len_utf16()).unwrap_or(1);
-                }
-            }
-        }
-        Output {
-            code: out,
-            mappings,
-            imports: Vec::new(),
-        }
-    }
-    #[cfg(not(feature = "native-project"))]
-    Output {
-        code,
-        imports: Vec::new(),
-    }
-}
+include!("finish.rs");
 
 /// Where a tail call jumps: the function, or the members of its group (see
 /// [`group`]), with their arity; the loop variables; the local each
@@ -268,6 +257,8 @@ struct Tail {
 )]
 struct Gen<'a> {
     module: &'a str,
+    physical: &'a str,
+    location: &'a dyn Fn(&str, &str) -> Option<String>,
     options: &'a Options<'a>,
     /// The module's labelled top-level values (see [`Gen::labelled`]).
     labels: &'a BTreeMap<String, Label>,
@@ -428,11 +419,13 @@ impl Gen<'_> {
 
     /// A top-level value of `module` by its JS name.
     fn global(&mut self, module: &str, name: &str) -> String {
-        if module == self.module {
+        let relocated = (self.location)(module, name);
+        let target = relocated.as_deref().unwrap_or(module);
+        if target == self.physical {
             name.to_owned()
         } else {
-            self.imports.insert(module.to_owned());
-            format!("{}.{name}", self.alias(module))
+            self.imports.insert(target.to_owned());
+            format!("{}.{name}", self.alias(target))
         }
     }
 
@@ -527,31 +520,4 @@ impl Gen<'_> {
     }
 }
 
-/// Statements as the lines of a block, indented one level.
-fn indent(stmts: &[String]) -> String {
-    let mut out = String::new();
-    for stmt in stmts {
-        for line in stmt.lines() {
-            out.push_str("  ");
-            out.push_str(line);
-            out.push('\n');
-        }
-    }
-    out
-}
-
-/// A top-level `value` that is a call or an immediately run arrow, marked
-/// `/*#__PURE__*/`: top-level initialization is pure (spec 11), so a bundler
-/// may drop it when nothing uses it.
-fn pure(value: &str) -> String {
-    // a call starts with the marker of its span
-    let code = expr::unmarked(value);
-    let rest =
-        code.trim_start_matches(|c: char| c.is_alphanumeric() || c == '_' || c == '$' || c == '.');
-    let call = rest.len() < code.len() && rest.starts_with('(');
-    if call || code.starts_with("((") {
-        format!("/*#__PURE__*/ {value}")
-    } else {
-        value.to_owned()
-    }
-}
+include!("statements.rs");

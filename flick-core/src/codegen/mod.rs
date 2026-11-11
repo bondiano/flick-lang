@@ -7,6 +7,8 @@ pub(crate) mod exports;
 #[cfg(feature = "native-project")]
 pub mod go;
 mod js;
+mod lexical;
+pub(crate) use lexical::{RuntimeLayout, js_parts};
 mod names;
 #[cfg(feature = "native-project")]
 pub mod sourcemap;

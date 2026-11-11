@@ -58,6 +58,9 @@ pub enum Form {
     ModuleContract {
         requirements: Vec<ModuleRequirement>,
     },
+    ModuleSignature {
+        signature: Box<ModuleSignature>,
+    },
     Service {
         params: Vec<String>,
         operations: Vec<Operation>,
@@ -94,6 +97,13 @@ pub enum Form {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "member", rename_all = "kebab-case")]
 pub enum ModuleRequirement {
+    Module {
+        name: String,
+        /// Lexical identity of this member in dependent sibling requirements.
+        #[serde(default, skip_serializing_if = "String::is_empty")]
+        binder: String,
+        signature: Box<ModuleSignature>,
+    },
     Type {
         name: String,
         params: Vec<Binder>,
@@ -117,6 +127,23 @@ pub enum ModuleRequirement {
     Dictionary {
         head: Type,
         from: String,
+    },
+}
+
+/// A checked static module signature. Module arrows are distinct from value
+/// arrows: their binders name static identities, not runtime arguments.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "signature", rename_all = "kebab-case")]
+pub enum ModuleSignature {
+    Structure {
+        requirements: Vec<ModuleRequirement>,
+    },
+    Functor {
+        /// Number of arguments still required in this atomic parameter group.
+        group_size: usize,
+        binder: String,
+        parameter: Box<ModuleSignature>,
+        result: Box<ModuleSignature>,
     },
 }
 
@@ -208,6 +235,12 @@ impl TypeDefs {
         self.0.get(module)?.get(name)
     }
 
+    fn remove(&mut self, module: &str, name: &str) {
+        if let Some(types) = self.0.get_mut(module) {
+            types.remove(name);
+        }
+    }
+
     fn define(&mut self, module: &str, name: String, def: TypeDef) {
         match self.0.get_mut(module) {
             Some(types) => types.insert(name, def),
@@ -255,6 +288,11 @@ pub struct Env<'b> {
     /// The instances this module sees beyond the built-in ones: of the
     /// modules it depends on, however they are imported, and its own.
     instances: Vec<Instance>,
+}
+
+pub(super) struct StaticLexical {
+    names: Vec<((Namespace, String), Option<Entity>, bool)>,
+    instances: usize,
 }
 
 include!("env_impl.rs");

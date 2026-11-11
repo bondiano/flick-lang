@@ -133,6 +133,10 @@ fn inline_units(
     );
     let mut child_syntax = (*loaded.syntax).clone();
     child_syntax.header = Some(Header {
+        result: None,
+        body: None,
+        materialized_body: None,
+        parameter_groups: Vec::new(),
         name: name.clone(),
         private: true,
         span: at,
@@ -279,5 +283,7 @@ fn inline_unit(
         editing: loaded.editing.clone(),
         loader: loaded.loader.clone(),
         virtual_of: loaded.virtual_of.clone(),
+        member_of: loaded.member_of.clone(),
+        scope_of: loaded.scope_of.clone(),
     }
 }

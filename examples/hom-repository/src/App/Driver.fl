@@ -1,0 +1,68 @@
+module App.Driver exposing (
+  Db,
+  Boot(..),
+  Connection,
+  State,
+  initial,
+  live,
+  acquire,
+  release,
+  initialize,
+  fetch,
+)
+
+type error Boot = Boot String
+
+type alias Connection = {
+  release : Unit ->{} Unit;
+  initialize : Unit ->{; Boot} Unit;
+  fetch : String ->{} String;
+}
+
+service Db =
+  acquire : Unit ->{; Boot} Connection
+
+type alias State = {
+  attempts : Int;
+  next : Int;
+  active : Int;
+  peak : Int;
+  closed : List Int;
+}
+
+initial : State
+let initial = { attempts = 0; next = 0; active = 0; peak = 0; closed = [] }
+
+// Mode 1 fails acquisition; mode 2 fails initialization after acquisition.
+live : Int -> Ref State -> Layer none none {Db}
+let live mode state =
+  Layer.succeed Db {
+    acquire = fun () ->
+      Ref.update state (fun s -> { s with attempts = s.attempts + 1 })
+      if mode == 1 then
+        from_result (Err (Boot "acquire"))
+      else
+        let id =
+          Ref.modify state (fun s ->
+            let active = s.active + 1
+            (s.next, { s with next = s.next + 1; active = active; peak = Int.max s.peak active })
+          )
+        {
+          release = fun () ->
+            Ref.update state (fun s -> { s with active = s.active - 1; closed = s.closed ++ [id] });
+          initialize = fun () -> if mode == 2 then from_result (Err (Boot "initialize"));
+          fetch = fun key -> show id ++ ":" ++ key;
+        };
+  }
+
+acquire : Unit ->{Db; Boot} Connection
+let acquire () = Db.acquire ()
+
+release : Connection ->{} Unit
+let release connection = connection.release ()
+
+initialize : Connection ->{; Boot} Unit
+let initialize connection = connection.initialize ()
+
+fetch : Connection -> String ->{} String
+let fetch connection key = connection.fetch key

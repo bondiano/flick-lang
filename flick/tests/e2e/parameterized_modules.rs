@@ -15,7 +15,7 @@ fn named_parameterized_module_result_runs_from_two_importers_on_js_and_go() {
         ),
         (
             "Make.fl",
-            "module App.Make(K : App.Contracts.Source) exposing (answer)\nanswer : Int\nlet answer = K.value + 1\n",
+            "module App.Make(K : App.Contracts.Source) : PublicResult exposing (answer)\nanswer : Int\nlet answer = K.value + 1\n\ntype module PublicResult =\n  answer : Int\n",
         ),
         (
             "Parent.fl",
@@ -97,7 +97,7 @@ fn case_insensitive_set_keeps_its_policy_across_importers_on_js_and_go() {
         ),
         (
             "Make.fl",
-            "module App.Make(K : App.Contracts.Policy) exposing (Set, empty, insert, member, size, from_list, to_list)\ntype Set = Set (List K.Key)\nempty : Set\nlet empty = Set []\ninsert : K.Key -> Set -> Set\nlet insert key (Set values) = if List.contains key values then Set values else Set ([key] ++ values)\nmember : K.Key -> Set -> Bool\nlet member key (Set values) = List.contains key values\nsize : Set -> Int\nlet size (Set values) = List.length values\nfrom_list : List K.Key -> Set\nlet from_list values = List.fold_left (fun set key -> insert key set) empty values\nto_list : Set -> List K.Key\nlet to_list (Set values) = values\n",
+            "module App.Make(K : App.Contracts.Policy) : PublicResult exposing (Set, empty, insert, member, size, from_list, to_list)\ntype Set = Set (List K.Key)\nempty : Set\nlet empty = Set []\ninsert : K.Key -> Set -> Set\nlet insert key (Set values) = if List.contains key values then Set values else Set ([key] ++ values)\nmember : K.Key -> Set -> Bool\nlet member key (Set values) = List.contains key values\nsize : Set -> Int\nlet size (Set values) = List.length values\nfrom_list : List K.Key -> Set\nlet from_list values = List.fold_left (fun set key -> insert key set) empty values\nto_list : Set -> List K.Key\nlet to_list (Set values) = values\n\ntype module PublicResult =\n  type Set\n  empty : Set\n  insert : K.Key -> Set -> Set\n  member : K.Key -> Set -> Bool\n  size : Set -> Int\n  from_list : List K.Key -> Set\n  to_list : Set -> List K.Key\n",
         ),
         (
             "Collections.fl",
@@ -216,7 +216,7 @@ fn parameterized_module_uses_its_argument_dictionary_on_js_and_go() {
         ),
         (
             "Make.fl",
-            "module App.Make(K : App.Contracts.Policy) exposing (answer)\nanswer : Bool\nlet answer = eq \"A\" \"A\"\n",
+            "module App.Make(K : App.Contracts.Policy) : PublicResult exposing (answer)\nanswer : Bool\nlet answer = eq \"A\" \"A\"\n\ntype module PublicResult =\n  answer : Bool\n",
         ),
         (
             "HashContracts.fl",
@@ -228,7 +228,7 @@ fn parameterized_module_uses_its_argument_dictionary_on_js_and_go() {
         ),
         (
             "MakeHash.fl",
-            "module App.MakeHash(K : App.HashContracts.Policy) exposing (answer, hash_answer)\nanswer : Bool\nlet answer = eq \"A\" \"A\"\nhash_answer : Int\nlet hash_answer = hash \"A\"\n",
+            "module App.MakeHash(K : App.HashContracts.Policy) : PublicResult exposing (answer, hash_answer)\nanswer : Bool\nlet answer = eq \"A\" \"A\"\nhash_answer : Int\nlet hash_answer = hash \"A\"\n\ntype module PublicResult =\n  answer : Bool\n  hash_answer : Int\n",
         ),
         (
             "Parent.fl",
@@ -287,3 +287,5 @@ fn parameterized_module_uses_its_argument_dictionary_on_js_and_go() {
         }
     }
 }
+
+include!("higher_order_modules.rs");

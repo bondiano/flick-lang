@@ -1,0 +1,14 @@
+module App.Hom.Never exposing (Item, Eq(..), seed, sample, equality)
+
+import Prelude exposing (Eq(..))
+
+type alias Item = String
+
+seed : Int
+let seed = 41
+
+sample : Item
+let sample = "x"
+
+equality : Eq.Dict Item
+let equality = Eq.dictionary { eq = fun _ _ -> false }
