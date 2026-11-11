@@ -1,6 +1,6 @@
 ---
 title: "Генерация кода"
-source_hash: 1a80f0e27b5e2f3a
+source_hash: 6bceae8e590c1176
 ---
 
 `flick build` компилирует каждый модуль в ES-модуль (см. [Генерация TypeScript и граница FFI](../../spec/06-typescript-and-ffi/), [Архитектура компилятора](../../contributing/implementation-decisions/#архитектура-компилятора)).
