@@ -134,6 +134,10 @@ without `exposing` exports nothing.
 | `Type(..)` | the type and its constructors; the methods of a class; the members of a `kind` |
 | `..` | every definition of the module; constructors of opaque types stay private |
 
+A definition may spell a keyword: `let none`, `foreign with`. The list names
+it as any other value, `exposing (none)`, and other modules reach it
+qualified, `Optic.none`, since unqualified the word stays a keyword.
+
 Exporting a type does not export its constructors. An `opaque type` never
 exports its representation: `Id(..)` for an opaque `Id` is `FLICK-R011`, as are
 `Alias(..)` for a type without constructors and a name the module neither
