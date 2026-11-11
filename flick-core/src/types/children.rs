@@ -107,6 +107,36 @@ impl Checker<'_> {
                 replacement: String::new(),
             })
             .collect();
+        // a list that opens on a line of its own, under the arguments before
+        // it, has its elements one level further in: as lines under the call
+        // they stand where the `[` stood
+        let open = list.child_tokens().find(|t| t.kind == K::LBracket);
+        let column = |at: u32| {
+            let before = &self.text[..at as usize];
+            before.len() - before.rfind('\n').map_or(0, |i| i + 1)
+        };
+        if let (true, Some(open), Some(first)) = (lines, open, elements.first())
+            && starts_line(open.start)
+            && starts_line(first.range().0)
+            && column(first.range().0) > column(open.start)
+        {
+            let shift = column(first.range().0) - column(open.start);
+            let (from, to) = (open.end as usize, list.range().1 as usize);
+            let mut line = from + self.text[from..to].find('\n').map_or(to - from, |i| i + 1);
+            while line < to {
+                let rest = &self.text[line..to];
+                let indent = rest.len() - rest.trim_start_matches(' ').len();
+                if indent >= shift {
+                    let start = u32::try_from(line).expect("source fits in u32");
+                    let end = u32::try_from(line + shift).expect("source fits in u32");
+                    edits.push(Edit {
+                        span: at(start, end),
+                        replacement: String::new(),
+                    });
+                }
+                line += rest.find('\n').map_or(rest.len(), |i| i + 1);
+            }
+        }
         for element in &elements {
             let (start, end) = element.range();
             if atomic(element) || lines && starts_line(start) {

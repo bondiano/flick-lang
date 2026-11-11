@@ -27,7 +27,7 @@ let save_button props = ui {
       disabled = props.disabled;
       on_click = Ui.Event.exhaust (fun _ -> task { props.on_save () });
     }
-    [text props.label]
+    (text props.label)
 }
 ```
 
@@ -109,7 +109,7 @@ badge : Ui.Component { label : String }
 foreign pure badge from "./badge.mjs" "Badge"
 
 example : Ui
-let example = ui { div { class_name = "badges" } [badge { label = "new" }] }
+let example = ui { div { class_name = "badges" } (badge { label = "new" }) }
 ```
 
 Это работает и для локальных привязок, полей записей, значений,
@@ -164,7 +164,7 @@ component counter_view () = ui {
       disabled = false;
       on_click = Ui.Event.exhaust (fun _ -> task { Atom.update count (fun n -> n + 1) });
     }
-    [text (Atom.value count |> show)]
+    (text (Atom.value count |> show))
 }
 ```
 
@@ -241,7 +241,7 @@ React и состояние политики событий этого ключ�
 component badge (props : { label : String }) = ui { text props.label }
 
 component card (person : { name : String; label : String }) =
-  ui { div { class_name = "card" } [text person.name, Ui.render badge { label = person.label }] }
+  ui { div { class_name = "card" } (text person.name) (Ui.render badge { label = person.label }) }
 ```
 
 Операторы перед последним выражением — setup каждого экземпляра. Он
@@ -262,7 +262,7 @@ component counter (start : Float) =
   let bump = Action.exhaust (fun _ -> task { Atom.update count (fun n -> n + 1) })
   ui {
     let n = Atom.value count
-    button { on_click = bump; disabled = false } [text (show n)]
+    button { on_click = bump; disabled = false } (text (show n))
   }
 ```
 
@@ -321,10 +321,8 @@ component search () =
   ui {
     div
       { class_name = "search" }
-      [
-        input_at field { value = ""; placeholder = "find"; on_input = Ui.Event.latest (fun _ -> task { () }) },
-        button { disabled = false; on_click = focus } [text "focus"],
-      ]
+      input_at field { value = ""; placeholder = "find"; on_input = Ui.Event.latest (fun _ -> task { () }) }
+      button { disabled = false; on_click = focus } (text "focus")
   }
 ```
 
@@ -697,7 +695,7 @@ HTML. Внешний компонент, который умеет отобра�
 #
 receipt : Order -> String
 let receipt order =
-  Ui.Server.to_html (ui { div { class_name = "mail" } [paragraph [text ("Спасибо, " ++ order.customer)]] })
+  Ui.Server.to_html (ui { div { class_name = "mail" } (paragraph (text ("Спасибо, " ++ order.customer))) })
 ```
 
 ## Другие рендереры React

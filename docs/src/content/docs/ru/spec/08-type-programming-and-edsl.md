@@ -103,7 +103,7 @@ let save_button props = ui {
       disabled = props.disabled;
       on_click = Ui.Event.exhaust (fun _ -> task { props.on_save () });
     }
-    [text props.label]
+    (text props.label)
 }
 ```
 
@@ -123,7 +123,7 @@ component counter (start : Float) =
   let bump = Action.exhaust (fun _ -> task { Atom.update count (fun n -> n + 1) })
   ui {
     let n = Atom.value count
-    button { on_click = bump; disabled = false } [text (show n)]
+    button { on_click = bump; disabled = false } (text (show n))
   }
 ```
 

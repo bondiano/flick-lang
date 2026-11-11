@@ -39,12 +39,10 @@ let check_name =
 page : Ui
 let page = ui {
   fragment
-    [
-      Form.input signup Signup.fields.name "Name" (Some check_name),
-      Form.input signup Signup.fields.age "Age" None,
-      Form.input signup Signup.fields.nick "Nickname" None,
-      button { disabled = false; on_click = send } [text "Send"],
-    ]
+    Form.input signup Signup.fields.name "Name" (Some check_name)
+    Form.input signup Signup.fields.age "Age" None
+    Form.input signup Signup.fields.nick "Nickname" None
+    button { disabled = false; on_click = send } (text "Send")
 }
 ```
 

@@ -23,7 +23,7 @@ let save_button props = ui {
       disabled = props.disabled;
       on_click = Ui.Event.exhaust (fun _ -> task { props.on_save () });
     }
-    [text props.label]
+    (text props.label)
 }
 ```
 
@@ -93,7 +93,7 @@ badge : Ui.Component { label : String }
 foreign pure badge from "./badge.mjs" "Badge"
 
 example : Ui
-let example = ui { div { class_name = "badges" } [badge { label = "new" }] }
+let example = ui { div { class_name = "badges" } (badge { label = "new" }) }
 ```
 
 This also works for local bindings, record fields, values returned by
@@ -146,7 +146,7 @@ component counter_view () = ui {
       disabled = false;
       on_click = Ui.Event.exhaust (fun _ -> task { Atom.update count (fun n -> n + 1) });
     }
-    [text (Atom.value count |> show)]
+    (text (Atom.value count |> show))
 }
 ```
 
@@ -217,7 +217,7 @@ its props do. A body that is that expression alone is
 component badge (props : { label : String }) = ui { text props.label }
 
 component card (person : { name : String; label : String }) =
-  ui { div { class_name = "card" } [text person.name, Ui.render badge { label = person.label }] }
+  ui { div { class_name = "card" } (text person.name) (Ui.render badge { label = person.label }) }
 ```
 
 The statements before the last expression are the setup of each instance.
@@ -239,7 +239,7 @@ component counter (start : Float) =
   let bump = Action.exhaust (fun _ -> task { Atom.update count (fun n -> n + 1) })
   ui {
     let n = Atom.value count
-    button { on_click = bump; disabled = false } [text (show n)]
+    button { on_click = bump; disabled = false } (text (show n))
   }
 ```
 
@@ -299,10 +299,8 @@ component search () =
   ui {
     div
       { class_name = "search" }
-      [
-        input_at field { value = ""; placeholder = "find"; on_input = Ui.Event.latest (fun _ -> task { () }) },
-        button { disabled = false; on_click = focus } [text "focus"],
-      ]
+      input_at field { value = ""; placeholder = "find"; on_input = Ui.Event.latest (fun _ -> task { () }) }
+      button { disabled = false; on_click = focus } (text "focus")
   }
 ```
 
@@ -660,7 +658,7 @@ only React renders, is a defect. It comes from
 #
 receipt : Order -> String
 let receipt order =
-  Ui.Server.to_html (ui { div { class_name = "mail" } [paragraph [text ("Thanks, " ++ order.customer)]] })
+  Ui.Server.to_html (ui { div { class_name = "mail" } (paragraph (text ("Thanks, " ++ order.customer))) })
 ```
 
 ## Other React renderers
