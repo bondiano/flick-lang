@@ -215,6 +215,7 @@ stdlib/effect/string
 stdlib/effect/string_locale
 stdlib/effect/tracer
 stdlib/effect/trie
+stdlib/effect/trie_keys
 stdlib/effect/txchunk
 stdlib/effect/txdeferred
 stdlib/effect/txhashmap

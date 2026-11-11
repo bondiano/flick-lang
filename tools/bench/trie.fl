@@ -1,0 +1,56 @@
+// A trie of 20 000 pseudo-random words: built by inserts, then read by key,
+// by prefix and in order, and half of it removed.
+module App.Main exposing (main)
+
+size : Int
+let size = 20000
+
+letters : List String
+let letters = String.chars "abcdefghijklmnopqrstuvwxyz"
+
+/// The next number of a linear congruential sequence, in 0 .. 1000002.
+next : Int -> Int
+let next seed =
+  let n = (seed * 1103515245 + 12345) % 1000003
+  if n < 0 then 0 - n else n
+
+/// `left` more letters after `text`.
+spell : Int -> Int -> String -> String
+let rec spell left seed text =
+  if left == 0 then
+    text
+  else
+    spell (left - 1) (next seed) (text ++ Option.with_default "a" (List.get (seed % 26) letters))
+
+/// A word of three to eight letters.
+word : Int -> String
+let word i = spell (i % 6 + 3) (next (i * 7919 + 13)) ""
+
+words : List String
+let words = List.map word (List.range 0 size)
+
+main : Unit ->{; AppError} Unit
+let main () =
+  let trie =
+    List.fold_left (fun acc key -> Trie.insert key (String.length key) acc) Trie.empty words
+  let found =
+    List.fold_left (fun acc key -> acc + Option.with_default 0 (Trie.get key trie)) 0 words
+  let prefixed =
+    List.fold_left
+      (fun acc key -> acc + List.length (Trie.keys_with_prefix (String.slice 0 2 key) trie))
+      0
+      (List.take 2000 words)
+  let longest =
+    List.fold_left
+      (fun acc key ->
+        match Trie.longest_prefix_of (key ++ "zz") trie with
+        | Some (_, n) -> acc + n
+        | None -> acc
+      )
+      0
+      words
+  let half = Trie.remove_many (List.take (size / 2) words) trie
+  let ordered = Trie.reduce 0 (fun acc n key -> acc + n + String.length key) half
+  let doubled = Trie.size (Trie.filter (fun n _ -> n % 2 == 0) (Trie.map (fun n _ -> n * 2) half))
+  Platform.stdout_line
+    (show (Trie.size trie, found, prefixed, longest, Trie.size half, ordered, doubled))

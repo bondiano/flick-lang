@@ -172,6 +172,7 @@ stdlib/effect/hmac
 stdlib/effect/password
 stdlib/effect/jwt
 stdlib/effect/trie
+stdlib/effect/trie_keys
 stdlib/effect/bytesize
 stdlib/effect/chunk
 stdlib/effect/check
