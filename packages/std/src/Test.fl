@@ -47,12 +47,12 @@ let expect assertion =
 
 /// A pure test.
 test : String -> (Unit -> Assertion) -> Test
-foreign pure test from "@flick-lang/effect-ts" "testPure"
+foreign pure test from "flick:rt" "testPure"
 
 /// An effectful test: it passes when the task succeeds and its scope, which
 /// owns what the task acquires, closes cleanly.
 effect_test : forall e. String -> (forall s. Eff {Async, Scope s} e Unit) -> Test
-foreign pure effect_test from "@flick-lang/effect-ts" "testEffect"
+foreign pure effect_test from "flick:rt" "testEffect"
 
 /// Virtual time: the clock a `clock_test` runs on, which moves only when
 /// the test moves it.
@@ -62,24 +62,24 @@ service VirtualTime
 /// by `adjust` and `set_time`: a sleep, a timeout or a retry schedule waits
 /// for virtual time, not real time. Each test has its own clock.
 clock_test : forall e. String -> (forall s. Eff {Async, Scope s, VirtualTime} e Unit) -> Test
-foreign pure clock_test from "@flick-lang/effect-ts" "testClock"
+foreign pure clock_test from "flick:rt" "testClock"
 
 /// Moves the clock forward by `duration`, running what was waiting for it.
 adjust : Duration.Duration ->{Async, VirtualTime} Unit
-foreign effect adjust from "@flick-lang/effect-ts" "testAdjust"
+foreign effect adjust from "flick:rt" "testAdjust"
 
 /// Sets the clock to `millis` since the epoch, running what was waiting
 /// until then.
 set_time : Float ->{Async, VirtualTime} Unit
-foreign effect set_time from "@flick-lang/effect-ts" "testSetTime"
+foreign effect set_time from "flick:rt" "testSetTime"
 
 /// Checks `check` on 100 values of `gen`, from the run's seed.
 property : String -> Gen.Gen a -> (a -> Assertion) -> Test
-foreign pure property from "@flick-lang/effect-ts" "testProperty"
+foreign pure property from "flick:rt" "testProperty"
 
 /// Tests under a common name prefix.
 group : String -> List Test -> Test
-foreign pure group from "@flick-lang/effect-ts" "testGroup"
+foreign pure group from "flick:rt" "testGroup"
 
 /// A test of a suite, which gets the services `o` of its layer.
 type Spec (o : ServiceRow)
@@ -88,8 +88,8 @@ type Spec (o : ServiceRow)
 /// of them that runs, and released after the last, the `beforeAll` and
 /// `afterAll` of the suite. A failed build fails each of its tests.
 suite : String -> Layer {Async} e o -> List (Spec o) -> Test
-foreign pure suite from "@flick-lang/effect-ts" "testSuite"
+foreign pure suite from "flick:rt" "testSuite"
 
 /// An effectful test of a suite: `effect_test` with the suite's services.
 it : forall o e. String -> (forall s. Eff {Async, Scope s | o} e Unit) -> Spec o
-foreign pure it from "@flick-lang/effect-ts" "testEffect"
+foreign pure it from "flick:rt" "testEffect"

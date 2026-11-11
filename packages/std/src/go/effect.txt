@@ -1,7 +1,7 @@
 # The Go functions of the JS exports the go target supports: under each
 # `[module]`, an export and the function of package `flickrt`.
 
-[@flick-lang/effect-ts/effect/BigDecimal]
+[flick:BigDecimal]
 normalize DecimalNormalize
 flickScale DecimalSetScale
 sumAll DecimalSumAll
@@ -29,7 +29,7 @@ flickTruncate DecimalTruncate
 flickCeil DecimalCeil
 flickFloor DecimalFloor
 
-[@flick-lang/effect-ts/effect/BigInt]
+[flick:BigInt]
 abs BigIntAbs
 sum BigIntSum
 subtract BigIntSubtract
@@ -54,7 +54,7 @@ fromNumber BigIntFromNumber
 fromString BigIntFromString
 flickSign BigIntSign
 
-[@flick-lang/effect-ts/effect/HashMap]
+[flick:HashMap]
 flickFromList *HashMapFromList
 flickIsEmpty HashMapIsEmpty
 flickHas *HashMapHas
@@ -78,7 +78,7 @@ flickFindFirst *HashMapFindFirst
 flickSome *HashMapSome
 flickEvery *HashMapEvery
 
-[@flick-lang/effect-ts/effect/HashSet]
+[flick:HashSet]
 flickIsEmpty HashSetIsEmpty
 flickIntersection *HashSetIntersection
 flickDifference *HashSetDifference
@@ -89,7 +89,7 @@ flickSome *HashSetSome
 flickEvery *HashSetEvery
 flickReduce *HashSetReduce
 
-[@flick-lang/effect-ts/effect/Number]
+[flick:Number]
 min NumberMin
 max NumberMax
 sum NumberSum
@@ -112,10 +112,10 @@ nextPow2 NumberNextPow2
 round NumberRoundTo
 parse NumberParse
 
-[@flick-lang/effect-ts/effect/Redacted]
+[flick:Redacted]
 flickEquivalent *RedactedEquivalent
 
-[@flick-lang/effect-ts/effect/String]
+[flick:String]
 flickLocaleCompare LocaleCompare
 flickLines Lines
 flickLinesWithSeparators LinesWithSeparators
@@ -166,7 +166,7 @@ padStart PadStart
 padEnd PadEnd
 repeat Repeat
 
-[@flick-lang/effect-ts/effect/Array]
+[flick:Array]
 findLast *ArrayFindLast
 findLastIndex *ArrayFindLastIndex
 findFirstWithIndex *ArrayFindFirstWithIndex
@@ -240,11 +240,11 @@ flickMatchLeft *ArrayMatchLeft
 flickMatchRight *ArrayMatchRight
 getReadonlyReducerConcat ListReducerConcat
 
-[@flick-lang/effect-ts/effect/Iterable]
+[flick:Iterable]
 flickFilterMapWhile *ArrayFilterMapWhile
 flickRepeat ArrayRepeat
 
-[@flick-lang/effect-ts/effect/Record]
+[flick:Record]
 collect *RecordCollect
 difference RecordDifference
 empty RecordEmpty
@@ -285,7 +285,7 @@ fromEntries RecordFromEntries
 makeReducerUnion RecordReducerUnion
 makeReducerIntersection RecordReducerIntersection
 
-[@flick-lang/effect-ts/effect/Option]
+[flick:Option]
 all OptionAll
 as OptionAs
 asVoid OptionAsVoid
@@ -314,7 +314,7 @@ makeReducer OptionReducer
 makeCombinerFailFast OptionCombinerFailFast
 makeReducerFailFast OptionReducerFailFast
 
-[@flick-lang/effect-ts/effect/Result]
+[flick:Result]
 all ResultAll
 failVoid ResultFailVoid
 filterOrFail *ResultFilterOrFail
@@ -331,7 +331,7 @@ transposeOption *ResultTransposeOption
 transposeMapOption *ResultTransposeMapOption
 void ResultVoid
 
-[@flick-lang/effect-ts/effect/Combiner]
+[flick:Combiner]
 make CombinerMake
 flickCombine *CombinerCombine
 flip CombinerFlip
@@ -342,7 +342,7 @@ last CombinerLast
 constant CombinerConstant
 intercalate CombinerIntercalate
 
-[@flick-lang/effect-ts/effect/Reducer]
+[flick:Reducer]
 make ReducerMake
 flickCombine *CombinerCombine
 flickInitialValue ReducerInitialValue
@@ -350,22 +350,22 @@ flickCombineAll *ReducerCombineAll
 flickToCombiner ReducerToCombiner
 flip ReducerFlip
 
-[@flick-lang/effect-ts/effect/Number]
+[flick:Number]
 ReducerSum NumberReducerSum
 ReducerMultiply NumberReducerMultiply
 ReducerMax NumberReducerMax
 ReducerMin NumberReducerMin
 
-[@flick-lang/effect-ts/effect/BigInt]
+[flick:BigInt]
 CombinerMax BigIntCombinerMax
 CombinerMin BigIntCombinerMin
 ReducerSum BigIntReducerSum
 ReducerMultiply BigIntReducerMultiply
 
-[@flick-lang/effect-ts/effect/String]
+[flick:String]
 ReducerConcat StringConcat
 
-[@flick-lang/effect-ts/effect/Boolean]
+[flick:Boolean]
 not BoolNot
 and BoolAnd
 nand BoolNand
@@ -380,27 +380,27 @@ match *BoolMatch
 ReducerAnd BooleanAnd
 ReducerOr BooleanOr
 
-[@flick-lang/effect-ts/effect/Struct]
+[flick:Struct]
 Record RecordFromKeys
 flickMakeCombiner StructCombiner
 flickMakeReducer StructReducer
 
-[@flick-lang/effect-ts/effect/Tuple]
+[flick:Tuple]
 makeCombiner TupleCombiner
 makeReducer TupleReducer
 
-[@flick-lang/effect-ts/effect/Hash]
+[flick:Hash]
 combine HashCombine
 optimize HashOptimize
 
-[@flick-lang/effect-ts/effect/RegExp]
+[flick:RegExp]
 flickMake RegExpMake
 escape RegExpEscape
 flickMatch RegExpMatch
 flickMatchAll RegExpMatchAll
 flickReplaceAll RegExpReplaceAll
 
-[@flick-lang/effect-ts/effect/Duration]
+[flick:Duration]
 between DurationBetween
 clamp DurationClamp
 flickDays DurationDays
@@ -430,7 +430,7 @@ min DurationMin
 parts DurationParts
 toNanos DurationToNanos
 
-[@flick-lang/effect-ts/effect/Predicate]
+[flick:Predicate]
 mapInput *PredicateMapInput
 not *PredicateNot
 and *PredicateAnd
@@ -443,7 +443,7 @@ nor *PredicateNor
 every *PredicateEvery
 some *PredicateSome
 
-[@flick-lang/effect-ts/effect/Filter]
+[flick:Filter]
 make *FilterMake
 mapFail *FilterMapFail
 fromPredicate *FilterFromPredicate
@@ -462,7 +462,7 @@ compose *FilterCompose
 composePassthrough *FilterComposePassthrough
 makeEffect *FilterMakeEffect
 
-[@flick-lang/effect-ts/effect/Function]
+[flick:Function]
 constant FunctionConstant
 constTrue FunctionConstTrue
 constFalse FunctionConstFalse
@@ -474,7 +474,7 @@ tupled *FunctionTupled
 flickUntupled *FunctionUntupled
 SK FunctionSK
 
-[@flick-lang/effect-ts/effect/Effect]
+[flick:Effect]
 sleep *EffectSleep
 flickNever *EffectNever
 flickYieldNow *EffectYieldNow
@@ -488,14 +488,14 @@ void EffectVoid
 zip *EffectZip
 flickAll *EffectAll
 
-[@flick-lang/effect-ts/effect/Scope]
+[flick:Scope]
 flickAddFinalizer *AddFinalizer
 flickAddFinalizerExit *AddFinalizerExit
 
-[@flick-lang/effect-ts/effect/Fiber]
+[flick:Fiber]
 flickInterrupt *FiberInterrupt
 
-[@flick-lang/effect-ts/effect/Deferred]
+[flick:Deferred]
 make *DeferredMake
 await *DeferredAwait
 complete *DeferredComplete
@@ -512,7 +512,7 @@ succeed *DeferredSucceed
 sync *DeferredSync
 into *DeferredInto
 
-[@flick-lang/effect-ts/effect/Latch]
+[flick:Latch]
 make *LatchMake
 open *LatchOpen
 release *LatchRelease
@@ -521,7 +521,7 @@ close *LatchClose
 whenOpen *LatchWhenOpen
 isOpen LatchIsOpen
 
-[@flick-lang/effect-ts/effect/Exit]
+[flick:Exit]
 flickSucceed ExitSucceed
 flickFail ExitFail
 flickFailCause ExitFailCause
@@ -547,7 +547,7 @@ flickMapBoth *ExitMapBoth
 flickAsVoid ExitAsVoid
 flickAsVoidAll ExitAsVoidAll
 
-[@flick-lang/effect-ts/effect/Cause]
+[flick:Cause]
 flickEmpty CauseEmpty
 flickFail CauseFail
 flickDie CauseDie
@@ -562,7 +562,7 @@ flickMap *CauseMap
 flickFindErrorOption CauseFindErrorOption
 flickInterruptors CauseInterruptors
 
-[@flick-lang/effect-ts/effect/Fiber]
+[flick:Fiber]
 flickAwait *FiberAwait
 flickAwaitAll *FiberAwaitAll
 flickJoinAll *FiberJoinAll
@@ -570,15 +570,15 @@ flickInterruptAs *FiberInterruptAs
 flickInterruptAll *FiberInterruptAll
 flickInterruptAllAs *FiberInterruptAllAs
 
-[@flick-lang/effect-ts/effect/Effect]
+[flick:Effect]
 flickExit *EffectExit
 flickOnExit *EffectOnExit
 flickOnInterrupt *EffectOnInterrupt
 
-[@flick-lang/effect-ts/effect/Deferred]
+[flick:Deferred]
 flickDone *DeferredDone
 
-[@flick-lang/effect-ts/effect/Semaphore]
+[flick:Semaphore]
 make *SemaphoreMake
 take *SemaphoreTake
 takeIfAvailable *SemaphoreTakeIfAvailable
@@ -589,7 +589,7 @@ withPermits *SemaphoreWithPermits
 withPermit *SemaphoreWithPermit
 withPermitsIfAvailable *SemaphoreWithPermitsIfAvailable
 
-[@flick-lang/effect-ts/effect/PartitionedSemaphore]
+[flick:PartitionedSemaphore]
 make *PartitionedMake
 capacity PartitionedCapacity
 available *PartitionedAvailable
@@ -599,7 +599,7 @@ withPermits *PartitionedWithPermits
 withPermit *PartitionedWithPermit
 withPermitsIfAvailable *PartitionedWithPermitsIfAvailable
 
-[@flick-lang/effect-ts/effect/SynchronizedRef]
+[flick:SynchronizedRef]
 make *SyncRefMake
 get *SyncRefGet
 set *SyncRefSet
@@ -622,7 +622,7 @@ modifyEffect *SyncRefModifyEffect
 modifySome *SyncRefModifySome
 modifySomeEffect *SyncRefModifySomeEffect
 
-[@flick-lang/effect-ts/effect/SubscriptionRef]
+[flick:SubscriptionRef]
 make *SubscriptionRefMake
 get *SyncRefGet
 set *SyncRefSet
@@ -645,7 +645,7 @@ modifyEffect *SyncRefModifyEffect
 modifySome *SyncRefModifySome
 modifySomeEffect *SyncRefModifySomeEffect
 
-[@flick-lang/effect-ts/effect/FiberSet]
+[flick:FiberSet]
 flickMake *FiberGroupMake
 flickRun *FiberSetRun
 flickAdd *FiberSetAdd
@@ -654,7 +654,7 @@ size *FiberGroupSize
 join *FiberGroupJoin
 awaitEmpty *FiberGroupAwaitEmpty
 
-[@flick-lang/effect-ts/effect/FiberMap]
+[flick:FiberMap]
 flickMake *FiberGroupMake
 flickRun *FiberMapRun
 flickSet *FiberMapSet
@@ -666,7 +666,7 @@ size *FiberGroupSize
 join *FiberGroupJoin
 awaitEmpty *FiberGroupAwaitEmpty
 
-[@flick-lang/effect-ts/effect/FiberHandle]
+[flick:FiberHandle]
 flickMake *FiberGroupMake
 flickRun *FiberHandleRun
 flickSet *FiberHandleSet
@@ -675,7 +675,7 @@ clear *FiberGroupClear
 join *FiberGroupJoin
 awaitEmpty *FiberGroupAwaitEmpty
 
-[@flick-lang/effect-ts/effect/Effect]
+[flick:Effect]
 raceAll *RaceAll
 raceAllFirst *RaceAllFirst
 flickFiberId *FiberId
@@ -684,7 +684,7 @@ cachedWithTTL *CachedWithTTL
 cachedInvalidateWithTTL *CachedInvalidateWithTTL
 flickWithExecutionPlan *WithExecutionPlan
 
-[@flick-lang/effect-ts/effect/Scheduler]
+[flick:Scheduler]
 flickMakeMixed SchedulerMakeMixed
 flickCurrent *SchedulerCurrent
 flickWithScheduler *SchedulerWith
@@ -692,7 +692,7 @@ flickMaxOpsBeforeYield *SchedulerMaxOps
 flickWithMaxOpsBeforeYield *SchedulerWithMaxOps
 flickWithPreventSchedulerYield *SchedulerWithPreventYield
 
-[@flick-lang/effect-ts/effect/ExecutionPlan]
+[flick:ExecutionPlan]
 flickStep PlanStep
 flickWithAttempts PlanWithAttempts
 flickWithSchedule PlanWithSchedule
@@ -701,11 +701,11 @@ flickMake PlanMake
 flickMerge PlanMerge
 flickCurrentMetadata *PlanCurrentMetadata
 
-[@flick-lang/effect-ts/effect/Schema]
+[flick:Schema]
 Json JsonCodec
 flickStringTree CodecStringTree
 
-[@flick-lang/effect-ts/effect/ByteSize]
+[flick:ByteSize]
 zero ByteSizeZero
 flickBytes ByteSizeBytes
 flickFormat ByteSizeFormat
@@ -713,18 +713,18 @@ flickJson CodecByteSize
 flickJsonNumber CodecByteSizeNumber
 flickJsonBigint CodecByteSizeBigint
 
-[@flick-lang/effect-ts/effect/Graph]
+[flick:Graph]
 flickJson GraphJson
 nodeCount GraphNodeCount
 edgeCount GraphEdgeCount
 
-[@flick-lang/effect-ts/effect/Logger]
+[flick:Logger]
 flickMake LoggerMake
 withConsoleLog LoggerWithConsoleLog
 flickLayer LoggerLayer
 flickWithLoggers *LoggerWithLoggers
 
-[@flick-lang/effect-ts/effect/Effect]
+[flick:Effect]
 log *EffectLog
 logFatal *EffectLogFatal
 logError *EffectLogError

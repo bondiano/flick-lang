@@ -5,10 +5,10 @@ module Inspectable exposing (..)
 /// The data as Effect prints it for debugging, indented by `indent` spaces
 /// (0 for one line).
 to_string_unknown : Int -> Unknown -> String
-foreign pure to_string_unknown from "@flick-lang/effect-ts/effect/Inspectable" "flickToStringUnknown"
+foreign pure to_string_unknown from "flick:Inspectable" "flickToStringUnknown"
   reviewed "effect@4.1.2 sha256:ea5d81bca700957a"
 
 /// The data in the JSON form Effect logs it in.
 to_json : Unknown -> Unknown
-foreign pure to_json from "@flick-lang/effect-ts/effect/Inspectable" "toJson"
+foreign pure to_json from "flick:Inspectable" "toJson"
   reviewed "effect@4.1.2 sha256:ce435a1e920b496d"

@@ -4,16 +4,16 @@ module Failure exposing (primary, raw_cause, inspect, rethrow)
 
 /// The typed error `try … with` would handle, if any.
 primary : Failure e -> Option (Errors e)
-foreign pure primary from "@flick-lang/effect-ts" "failurePrimary"
+foreign pure primary from "flick:rt" "failurePrimary"
 
 raw_cause : Failure e -> RawCause
-foreign pure raw_cause from "@flick-lang/effect-ts" "failureRawCause"
+foreign pure raw_cause from "flick:rt" "failureRawCause"
 
 /// An inert report; building it runs no code of a payload.
 inspect : Failure e ->{} CauseReport
-foreign effect inspect from "@flick-lang/effect-ts" "failureInspect"
+foreign effect inspect from "flick:rt" "failureInspect"
 
 /// Fails with the original cause, unchanged.
 rethrow : Failure e ->{; e} a
-foreign effect rethrow from "@flick-lang/effect-ts" "failureRethrow"
+foreign effect rethrow from "flick:rt" "failureRethrow"
   reviewed "effect@4.1.2 sha256:352717014c3964f7"

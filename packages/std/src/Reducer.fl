@@ -9,106 +9,106 @@ type Reducer a
 
 /// The reducer of `combine` starting from `initial`.
 make : (a -> a -> a) -> a -> Reducer a
-foreign pure make from "@flick-lang/effect-ts/effect/Reducer" "make"
+foreign pure make from "flick:Reducer" "make"
   arity 2
   reviewed "effect@4.1.2 sha256:ee774290311a23cf"
 
 /// Combines `self` with `that`.
 combine : Reducer a -> a -> a -> a
-foreign pure combine from "@flick-lang/effect-ts/effect/Reducer" "flickCombine"
+foreign pure combine from "flick:Reducer" "flickCombine"
 
 /// The start value: what an empty list reduces to.
 initial_value : Reducer a -> a
-foreign pure initial_value from "@flick-lang/effect-ts/effect/Reducer" "flickInitialValue"
+foreign pure initial_value from "flick:Reducer" "flickInitialValue"
 
 /// Folds the list from the start value, first to last.
 combine_all : Reducer a -> List a -> a
-foreign pure combine_all from "@flick-lang/effect-ts/effect/Reducer" "flickCombineAll"
+foreign pure combine_all from "flick:Reducer" "flickCombineAll"
 
 /// The reducer's combination without its start value.
 to_combiner : Reducer a -> Combiner.Combiner a
-foreign pure to_combiner from "@flick-lang/effect-ts/effect/Reducer" "flickToCombiner"
+foreign pure to_combiner from "flick:Reducer" "flickToCombiner"
 
 /// The reducer with the arguments of its combination swapped.
 flip : Reducer a -> Reducer a
-foreign pure flip from "@flick-lang/effect-ts/effect/Reducer" "flip"
+foreign pure flip from "flick:Reducer" "flip"
   reviewed "effect@4.1.2 sha256:f89f57f47aa5dc8a"
 
 /// Sums numbers from 0.
 number_sum : Reducer Float
-foreign pure number_sum from "@flick-lang/effect-ts/effect/Number" "ReducerSum"
+foreign pure number_sum from "flick:Number" "ReducerSum"
   reviewed "effect@4.1.2 sha256:6c0fb4b3ca47aa81"
 
 /// Multiplies numbers from 1.
 number_multiply : Reducer Float
-foreign pure number_multiply from "@flick-lang/effect-ts/effect/Number" "ReducerMultiply"
+foreign pure number_multiply from "flick:Number" "ReducerMultiply"
   reviewed "effect@4.1.2 sha256:51d34f295c4ba603"
 
 /// The greatest number, from `-Infinity`.
 number_max : Reducer Float
-foreign pure number_max from "@flick-lang/effect-ts/effect/Number" "ReducerMax"
+foreign pure number_max from "flick:Number" "ReducerMax"
   reviewed "effect@4.1.2 sha256:576f6a67af67fdd5"
 
 /// The least number, from `Infinity`.
 number_min : Reducer Float
-foreign pure number_min from "@flick-lang/effect-ts/effect/Number" "ReducerMin"
+foreign pure number_min from "flick:Number" "ReducerMin"
   reviewed "effect@4.1.2 sha256:1c3d89fc958e5de2"
 
 /// Sums BigInts from 0.
 bigint_sum : Reducer BigInt
-foreign pure bigint_sum from "@flick-lang/effect-ts/effect/BigInt" "ReducerSum"
+foreign pure bigint_sum from "flick:BigInt" "ReducerSum"
   reviewed "effect@4.1.2 sha256:2fb87e39bb66711a"
 
 /// Multiplies BigInts from 1.
 bigint_multiply : Reducer BigInt
-foreign pure bigint_multiply from "@flick-lang/effect-ts/effect/BigInt" "ReducerMultiply"
+foreign pure bigint_multiply from "flick:BigInt" "ReducerMultiply"
   reviewed "effect@4.1.2 sha256:c43ba632b7583b43"
 
 /// Joins strings from `""`.
 string_concat : Reducer String
-foreign pure string_concat from "@flick-lang/effect-ts/effect/String" "ReducerConcat"
+foreign pure string_concat from "flick:String" "ReducerConcat"
   reviewed "effect@4.1.2 sha256:f005936903549672"
 
 /// Joins lists from `[]`.
 list_concat : Unit -> Reducer (List a)
-foreign pure list_concat from "@flick-lang/effect-ts/effect/Array" "getReadonlyReducerConcat"
+foreign pure list_concat from "flick:Array" "getReadonlyReducerConcat"
   arity 0
   reviewed "effect@4.1.2 sha256:2846d408f33ea840"
 
 /// Combines the `Some`s with the combiner, skipping `None`s, from `None`.
 option : Combiner.Combiner a -> Reducer (Option a)
-foreign pure option from "@flick-lang/effect-ts/effect/Option" "makeReducer"
+foreign pure option from "flick:Option" "makeReducer"
   reviewed "effect@4.1.2 sha256:f3bc69e157cb83ca"
 
 /// Combines `Some`s with the reducer from `Some` of its start value; a
 /// `None` anywhere makes the result `None`.
 option_fail_fast : Reducer a -> Reducer (Option a)
-foreign pure option_fail_fast from "@flick-lang/effect-ts/effect/Option" "makeReducerFailFast"
+foreign pure option_fail_fast from "flick:Option" "makeReducerFailFast"
   reviewed "effect@4.1.2 sha256:4f1d76faa5d133ee"
 
 /// Merges dictionaries from the empty one, keeping every key; the values of
 /// a key in both are combined.
 record_union : Combiner.Combiner a -> Reducer (Record.ReadonlyRecord a)
-foreign pure record_union from "@flick-lang/effect-ts/effect/Record" "makeReducerUnion"
+foreign pure record_union from "flick:Record" "makeReducerUnion"
   reviewed "effect@4.1.2 sha256:08fd43a07eb3cf4e"
 
 /// Merges dictionaries keeping only the keys in both, their values combined.
 record_intersection : Combiner.Combiner a -> Reducer (Record.ReadonlyRecord a)
-foreign pure record_intersection from "@flick-lang/effect-ts/effect/Record" "makeReducerIntersection"
+foreign pure record_intersection from "flick:Record" "makeReducerIntersection"
   reviewed "effect@4.1.2 sha256:e99799583e430bac"
 
 /// Reduces records field by field, each field with its own reducer; the
 /// start value is the record of their start values.
 struct : Record.Map Reducer r rs => rs -> Reducer r
-foreign pure struct from "@flick-lang/effect-ts/effect/Struct" "flickMakeReducer"
+foreign pure struct from "flick:Struct" "flickMakeReducer"
   reviewed "effect@4.1.2 sha256:634cd82769808e1c"
 
 /// Reduces pairs element by element.
 tuple2 : (Reducer a, Reducer b) -> Reducer (a, b)
-foreign pure tuple2 from "@flick-lang/effect-ts/effect/Tuple" "makeReducer"
+foreign pure tuple2 from "flick:Tuple" "makeReducer"
   reviewed "effect@4.1.2 sha256:648ef4fcfc81715b"
 
 /// Reduces triples element by element.
 tuple3 : (Reducer a, Reducer b, Reducer c) -> Reducer (a, b, c)
-foreign pure tuple3 from "@flick-lang/effect-ts/effect/Tuple" "makeReducer"
+foreign pure tuple3 from "flick:Tuple" "makeReducer"
   reviewed "effect@4.1.2 sha256:648ef4fcfc81715b"

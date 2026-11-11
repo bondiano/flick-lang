@@ -27,6 +27,7 @@ use std::sync::Arc;
 use super::{
     Binding, Expr, ExprKind, Foreign, Item, ItemKind, Lit, Module, Param, Stage, TypeName,
 };
+use crate::build::effects::key;
 use crate::diagnostics::{Diagnostic, codes};
 use crate::resolve;
 use crate::source::{FileId, Span};
@@ -452,7 +453,8 @@ impl Lower<'_> {
             name,
             mode: info.mode,
             binding: Binding {
-                from: module,
+                // the built-in packages are bound by key, however a source spells it
+                from: module.map(|spec| key(&spec).into_owned()),
                 name: export,
             },
             stages: info.stages.clone(),

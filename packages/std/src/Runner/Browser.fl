@@ -8,4 +8,4 @@ type alias Main = Unit ->{Async; AppError} Unit
 
 /// Starts `main`; the runner of the entry exports what it returns.
 run : Main -> Unknown
-foreign pure run from "@flick-lang/effect-ts/runner/browser" "run"
+foreign pure run from "flick:runner/browser" "run"

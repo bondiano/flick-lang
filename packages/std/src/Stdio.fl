@@ -40,7 +40,7 @@ write_stderr : String ->{Stdio; PlatformError.PlatformError} Unit
 let write_stderr text = Stdio.write_stderr text
 
 node_of : ServiceTag {Stdio} -> Layer none none {Stdio}
-foreign pure node_of from "@flick-lang/effect-ts/effect/Stdio" "flickNode"
+foreign pure node_of from "flick:Stdio" "flickNode"
   reviewed "effect@4.1.2 sha256:92ea6c7dce0e93e7"
 
 /// The arguments and standard streams of the Node.js process.

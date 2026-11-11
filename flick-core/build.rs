@@ -279,6 +279,7 @@ fn binding_policy(output: &Path) -> io::Result<()> {
         writeln!(out, "pub const {name}: &[&str] = &{values:?};").expect("write string");
     }
     for (key, name) in [
+        ("key", "KEY"),
         ("owned_prefix", "OWNED_PREFIX"),
         ("adapter_prefix", "ADAPTER_PREFIX"),
         ("native_entry", "NATIVE_ENTRY"),

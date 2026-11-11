@@ -1,7 +1,7 @@
 # Graphs and their algorithms; `flickJson`, `nodeCount` and `edgeCount` are
 # in effect.txt.
 
-[@flick-lang/effect-ts/effect/Graph]
+[flick:Graph]
 flickMake GraphMake
 directed GraphDirected
 undirected GraphUndirected

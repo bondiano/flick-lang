@@ -42,7 +42,7 @@ file :
 let file options path = HttpPlatform.file_response options path
 
 node_of : ServiceTag {HttpPlatform} -> Layer none none {HttpPlatform}
-foreign pure node_of from "@flick-lang/effect-ts/effect/http/HttpPlatform" "flickNode"
+foreign pure node_of from "flick:http/HttpPlatform" "flickNode"
   reviewed "effect@4.1.2 sha256:ebf6939f7483ac21"
 
 /// The platform of Node.js, with strong entity tags.
