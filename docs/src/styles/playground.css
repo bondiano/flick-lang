@@ -453,7 +453,8 @@ main:has(#flick-playground):not(:has(.tour-lesson)) .sl-container { max-width: n
 /* A phone or a narrow window stacks the panels and lets the page scroll. */
 @media (max-width: 56rem) {
   .fp-workspace, .tour-editor .fp-workspace { height: auto; }
-  .tour-editor .fp-panes { grid-template-rows: none; }
+  .tour-editor .fp-panes,
+  .tour-editor .fp-workspace:has(.fp-lesson) .fp-panes { grid-template-rows: none; }
   .fp-panes { grid-template-columns: minmax(0, 1fr); }
   .fp-split { display: none; }
   .fp-result { border-top: 1px solid var(--fp-rule); }

@@ -1,6 +1,6 @@
 module View exposing (view)
 
-import Actions exposing (edited, load_compiler, refresh, runtime_messages, update)
+import Actions exposing (edited, load_compiler, refresh, rerun, runtime_messages, update)
 import Dom exposing (notify)
 import Editor exposing (declarations_pane, generated_pane, source_pane)
 import Lesson
@@ -16,7 +16,8 @@ let result_pane model m =
   let tab name label =
     choice label (m.tab == name) false (fun () ->
       update model (fun m -> { m with tab = name })
-      if name == Js || name == Dts then notify "fp-compile"
+      // a lesson that did not run while the compiler's output was shown runs now
+      if name == Js || name == Dts then notify "fp-compile" else rerun model
     )
   let body =
     match m.tab with
