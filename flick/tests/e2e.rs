@@ -11,6 +11,11 @@
 //! skipped for it. `FLICK_E2E_GO_ONLY` runs only those, without Node: the
 //! platform jobs of CI.
 //!
+//! `FLICK_E2E_TS_BUILD_ONLY` builds the TypeScript passes and typechecks
+//! them without running them: what the TypeScript output catches beyond the
+//! JS one is `tsc`, so the pull requests and pushes to main of CI skip those
+//! runs, and the nightly run and a release keep them.
+//!
 //! The cases `tests/run/known_gaps.txt` lists for a target are a law that
 //! target does not hold yet: they must fail there, and one that passes is
 //! reported, so its line goes and the case holds the target from then on.
@@ -97,32 +102,9 @@ fn run_case_with(
     flags: &[&str],
     limit: Option<Duration>,
 ) -> Ran {
-    let _ = fs::remove_dir_all(out_dir);
-    let started = Instant::now();
-    let build = Command::new(env!("CARGO_BIN_EXE_flick"))
-        .arg("build")
-        .arg(case)
-        .arg("--out-dir")
-        .arg(out_dir)
-        .arg("--emit")
-        .arg(emit)
-        .arg("--profile")
-        .arg(profile)
-        .args(flags)
-        .output()
-        .expect("flick runs");
-    let build_time = started.elapsed();
-    if !build.status.success() {
-        let report = format!(
-            "  build failed:\n{}",
-            String::from_utf8_lossy(&build.stderr)
-        );
-        return Ran {
-            problem: Some(report),
-            built: build_time,
-            executed: Duration::ZERO,
-            projection: None,
-        };
+    let built = build_case(case, out_dir, emit, profile, flags);
+    if built.problem.is_some() {
+        return built;
     }
     let mut command = if emit == "go" {
         Command::new(out_dir.join(executable(MAIN_ENTRY)))
@@ -174,9 +156,40 @@ fn run_case_with(
     .collect();
     Ran {
         problem: (!problems.is_empty()).then(|| problems.join("\n")),
-        built: build_time,
+        built: built.built,
         executed: run_time,
         projection: traced.ok().filter(|_| trace::compared(rel)),
+    }
+}
+
+/// Builds one case into `out_dir`, without running it: a problem only when
+/// the build fails.
+fn build_case(case: &Path, out_dir: &Path, emit: &str, profile: &str, flags: &[&str]) -> Ran {
+    let _ = fs::remove_dir_all(out_dir);
+    let started = Instant::now();
+    let build = Command::new(env!("CARGO_BIN_EXE_flick"))
+        .arg("build")
+        .arg(case)
+        .arg("--out-dir")
+        .arg(out_dir)
+        .arg("--emit")
+        .arg(emit)
+        .arg("--profile")
+        .arg(profile)
+        .args(flags)
+        .output()
+        .expect("flick runs");
+    let problem = (!build.status.success()).then(|| {
+        format!(
+            "  build failed:\n{}",
+            String::from_utf8_lossy(&build.stderr)
+        )
+    });
+    Ran {
+        problem,
+        built: started.elapsed(),
+        executed: Duration::ZERO,
+        projection: None,
     }
 }
 
@@ -330,6 +343,7 @@ fn e2e_output_root(part: bool) -> PathBuf {
 fn run_cases() {
     let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
     let go_only = env::var_os("FLICK_E2E_GO_ONLY").is_some();
+    let ts_runs = env::var_os("FLICK_E2E_TS_BUILD_ONLY").is_none();
     installed_js_packages(&repo, go_only);
     let root = repo.join("tests/run");
     let (paths, part) = selected(&root);
@@ -346,22 +360,28 @@ fn run_cases() {
     let mut projections: HashMap<PathBuf, String> = HashMap::new();
     // release must agree with the debug reference: same stdout, stderr and exit
     let node_runs = [
-        ("js", "debug"),
-        ("ts", "debug"),
-        ("js", "release"),
-        ("ts", "release"),
+        ("js", "debug", true),
+        ("ts", "debug", ts_runs),
+        ("js", "release", true),
+        ("ts", "release", ts_runs),
     ];
-    for &(emit, profile) in if go_only { &[][..] } else { &node_runs } {
+    for &(emit, profile, runs) in if go_only { &[][..] } else { &node_runs } {
         let (results, timed) = pass(emit, profile, &paths, jobs, |case| {
             let rel = case.strip_prefix(&root).expect("case under root");
             let out_dir = out_root
                 .join(profile)
                 .join(emit)
                 .join(rel.with_extension(""));
-            let ran = run_case(case, rel, &out_dir, emit, profile);
+            let ran = if runs {
+                run_case(case, rel, &out_dir, emit, profile)
+            } else {
+                build_case(case, &out_dir, emit, profile, &[])
+            };
             let timing = ran.timing(rel);
             let gap = is_gap("js", case);
+            // a gap fails when it runs, so a build alone says nothing of it
             let problem = gaps::verdict(gap, ran.problem)
+                .filter(|_| runs || !gap)
                 .map(|p| format!("{} ({emit}, {profile}):\n{p}", rel.display()));
             ((problem, ran.projection.filter(|_| !gap)), timing)
         });
