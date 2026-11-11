@@ -5,7 +5,10 @@
 
 use std::fmt::Write;
 use std::path::{Path, PathBuf};
-use std::time::{Duration, Instant};
+use std::sync::{Mutex, MutexGuard, PoisonError};
+use std::time::Duration;
+#[cfg(not(unix))]
+use std::time::Instant as Cpu;
 use std::{io, thread};
 
 use flick_core::build::{self, Extras, Settings};
@@ -15,6 +18,8 @@ use flick_core::project::config::Backend;
 use flick_core::project::{self, Compilation, Host};
 use flick_core::source::{FileId, SourceMap};
 use flick_core::syntax::{self, lexer};
+#[cfg(unix)]
+use rustix::time::{ClockId, clock_gettime};
 
 fn record_module(fields: usize) -> String {
     let names: Vec<String> = (0..fields).map(|i| format!("f{i}")).collect();
@@ -44,40 +49,80 @@ fn long_function(lines: usize) -> String {
     out
 }
 
-/// The fastest of a few runs, to keep noise out of the comparison.
-fn time(text: &str) -> Duration {
-    (0..3)
-        .map(|_| {
-            let mut sources = SourceMap::default();
-            let file = sources.add("big.fl", text);
-            let start = Instant::now();
-            let diagnostics = flick_core::check(&sources, file);
-            let elapsed = start.elapsed();
-            // the functions are long on purpose, so only errors count
-            let errors: Vec<_> = diagnostics
-                .iter()
-                .filter(|d| d.severity == Severity::Error)
-                .collect();
-            assert!(errors.is_empty(), "{errors:?}");
-            elapsed
-        })
-        .min()
-        .expect("runs")
+/// A point in the CPU time of this process: unlike the wall clock, it leaves
+/// out the time the scheduler gives to other processes, which would slow a
+/// long run more than a short one.
+#[cfg(unix)]
+struct Cpu(Duration);
+
+#[cfg(unix)]
+impl Cpu {
+    fn now() -> Self {
+        let now = clock_gettime(ClockId::ProcessCPUTime);
+        Self(Duration::new(
+            u64::try_from(now.tv_sec).expect("a time since the start"),
+            u32::try_from(now.tv_nsec).expect("nanoseconds"),
+        ))
+    }
+
+    fn elapsed(&self) -> Duration {
+        Self::now().0.saturating_sub(self.0)
+    }
 }
 
-fn assert_linear(name: &str, make: fn(usize) -> String, size: usize) {
-    let small = time(&make(size / 4));
-    let full = time(&make(size));
-    assert!(
-        full < Duration::from_secs(2),
-        "{name}: {size} takes {full:?}"
-    );
+/// Holds the other tests of this file back: the CPU time of the process
+/// would count their work too.
+fn alone() -> MutexGuard<'static, ()> {
+    static ALONE: Mutex<()> = Mutex::new(());
+    ALONE.lock().unwrap_or_else(PoisonError::into_inner)
+}
+
+/// One check of `text`.
+fn time(text: &str) -> Duration {
+    let mut sources = SourceMap::default();
+    let file = sources.add("big.fl", text);
+    let start = Cpu::now();
+    let diagnostics = flick_core::check(&sources, file);
+    let elapsed = start.elapsed();
+    // the functions are long on purpose, so only errors count
+    let errors: Vec<_> = diagnostics
+        .iter()
+        .filter(|d| d.severity == Severity::Error)
+        .collect();
+    assert!(errors.is_empty(), "{errors:?}");
+    elapsed
+}
+
+/// The fastest of five rounds of `runs`, one run of each per round: a load
+/// that outlasts a run slows every size alike instead of only one of them.
+fn fastest<const N: usize>(mut runs: [&mut dyn FnMut() -> Duration; N]) -> [Duration; N] {
+    let mut best = [Duration::MAX; N];
+    for _ in 0..5 {
+        for (best, run) in best.iter_mut().zip(&mut runs) {
+            *best = (*best).min(run());
+        }
+    }
+    best
+}
+
+fn assert_ratio(name: &str, small: Duration, full: Duration) {
     // linear growth gives about 4; quadratic would give about 16
     let ratio = full.as_secs_f64() / small.as_secs_f64().max(1e-6);
     assert!(
         ratio < 9.0,
         "{name}: 4x the size takes {ratio:.1}x the time ({small:?} -> {full:?})"
     );
+}
+
+fn assert_linear(name: &str, make: fn(usize) -> String, size: usize) {
+    let _alone = alone();
+    let (small, full) = (make(size / 4), make(size));
+    let [small, full] = fastest([&mut || time(&small), &mut || time(&full)]);
+    assert!(
+        full < Duration::from_secs(2),
+        "{name}: {size} takes {full:?}"
+    );
+    assert_ratio(name, small, full);
 }
 
 #[test]
@@ -119,7 +164,9 @@ fn wide_join(tables: usize) -> String {
 
 #[test]
 fn query_with_10_joins_of_50_columns_checks_in_budget() {
-    let full = time(&wide_join(11));
+    let _alone = alone();
+    let text = wide_join(11);
+    let [full] = fastest([&mut || time(&text)]);
     assert!(full < Duration::from_secs(2), "10 joins take {full:?}");
 }
 
@@ -137,48 +184,39 @@ fn long_line(items: usize) -> String {
 
 #[test]
 fn long_line_lexing_and_parsing_scale_linearly() {
+    let _alone = alone();
     for parse in [false, true] {
-        let measure = |items| {
-            let text = long_line(items);
+        let measure = |text: &str| {
             let mut sources = SourceMap::default();
-            let file = sources.add("line.fl", &text);
-            (0..3)
-                .map(|_| {
-                    let start = Instant::now();
-                    if parse {
-                        let parsed = syntax::parse(&text, file);
-                        let elapsed = start.elapsed();
-                        assert!(parsed.diagnostics.is_empty(), "{:?}", parsed.diagnostics);
-                        assert_eq!(parsed.tree.text(&text), text);
-                        elapsed
-                    } else {
-                        let (tokens, diagnostics) = lexer::lex(&text, file);
-                        let elapsed = start.elapsed();
-                        // the functions are long on purpose, so only errors count
-                        let errors: Vec<_> = diagnostics
-                            .iter()
-                            .filter(|d| d.severity == Severity::Error)
-                            .collect();
-                        assert!(errors.is_empty(), "{errors:?}");
-                        assert_eq!(tokens.last().expect("EOF token").end as usize, text.len());
-                        elapsed
-                    }
-                })
-                .min()
-                .expect("runs")
+            let file = sources.add("line.fl", text);
+            let start = Cpu::now();
+            if parse {
+                let parsed = syntax::parse(text, file);
+                let elapsed = start.elapsed();
+                assert!(parsed.diagnostics.is_empty(), "{:?}", parsed.diagnostics);
+                assert_eq!(parsed.tree.text(text), text);
+                elapsed
+            } else {
+                let (tokens, diagnostics) = lexer::lex(text, file);
+                let elapsed = start.elapsed();
+                // the functions are long on purpose, so only errors count
+                let errors: Vec<_> = diagnostics
+                    .iter()
+                    .filter(|d| d.severity == Severity::Error)
+                    .collect();
+                assert!(errors.is_empty(), "{errors:?}");
+                assert_eq!(tokens.last().expect("EOF token").end as usize, text.len());
+                elapsed
+            }
         };
-        let small = measure(2000);
-        let full = measure(8000);
+        let (small, full) = (long_line(2000), long_line(8000));
+        let [small, full] = fastest([&mut || measure(&small), &mut || measure(&full)]);
         let name = if parse {
-            "parse (including lex)"
+            "long-line parse (including lex)"
         } else {
-            "lex"
+            "long-line lex"
         };
-        let ratio = full.as_secs_f64() / small.as_secs_f64().max(1e-6);
-        assert!(
-            ratio < 9.0,
-            "long-line {name}: 4x the size takes {ratio:.1}x the time ({small:?} -> {full:?})"
-        );
+        assert_ratio(name, small, full);
     }
 }
 
@@ -256,7 +294,7 @@ fn compiled(text: &str) -> (SourceMap, Compilation) {
 
 fn optimizing(compilation: &Compilation, _: &SourceMap) -> Duration {
     let modules = &compilation.modules;
-    let start = Instant::now();
+    let start = Cpu::now();
     for module in modules {
         build::optimized(modules, module, false);
     }
@@ -264,7 +302,7 @@ fn optimizing(compilation: &Compilation, _: &SourceMap) -> Duration {
 }
 
 fn emitting_js(compilation: &Compilation, sources: &SourceMap) -> Duration {
-    let start = Instant::now();
+    let start = Cpu::now();
     let (artifacts, diagnostics) = build::emit(compilation, sources, &settings(&[]));
     let elapsed = start.elapsed();
     assert_eq!(diagnostics, []);
@@ -276,26 +314,13 @@ fn emitting_js(compilation: &Compilation, sources: &SourceMap) -> Duration {
 #[cfg(feature = "native-project")]
 fn emitting_go(compilation: &Compilation, sources: &SourceMap) -> Duration {
     let entries = [("main".to_owned(), "Main".to_owned())];
-    let start = Instant::now();
+    let start = Cpu::now();
     let (artifacts, diagnostics) =
         build::go::emit(compilation, sources, &settings(&entries), &[], &|_| None);
     let elapsed = start.elapsed();
     assert_eq!(diagnostics, []);
     assert!(!artifacts.is_empty());
     elapsed
-}
-
-/// The fastest of a few runs of `stage` on `text`, less what the stage
-/// takes on a program of one line: the built-in modules every build emits.
-fn stage_time(text: &str, stage: Stage) -> Duration {
-    let fastest = |text: &str| {
-        let (sources, compilation) = compiled(text);
-        (0..3)
-            .map(|_| stage(&compilation, &sources))
-            .min()
-            .expect("runs")
-    };
-    fastest(text).saturating_sub(fastest(&long_program(2)))
 }
 
 /// `work` on a stack that holds the recursion over a block of thousands of
@@ -309,40 +334,32 @@ fn deep<T: Send + 'static>(work: impl FnOnce() -> T + Send + 'static) -> T {
         .expect("the stage ends")
 }
 
-/// `stage` on a function of 2000 lines against one of 500.
+/// `stage` on a function of 2000 lines against one of 500, each less what
+/// the stage takes on a program of one line: the built-in modules every
+/// build emits.
 fn assert_stage_linear(name: &'static str, stage: Stage) {
-    let (small, full) = deep(move || {
-        let small = stage_time(&long_program(500), stage);
-        (small, stage_time(&long_program(2000), stage))
+    let _alone = alone();
+    let [base, small, full] = deep(move || {
+        let [base, small, full] = [2, 500, 2000].map(|lines| compiled(&long_program(lines)));
+        let run = |(sources, compilation): &(SourceMap, Compilation)| stage(compilation, sources);
+        fastest([&mut || run(&base), &mut || run(&small), &mut || run(&full)])
     });
+    let (small, full) = (small.saturating_sub(base), full.saturating_sub(base));
     assert!(full < Duration::from_secs(2), "{name}: takes {full:?}");
-    // linear growth gives about 4; quadratic would give about 16
-    let ratio = full.as_secs_f64() / small.as_secs_f64().max(1e-6);
-    assert!(
-        ratio < 9.0,
-        "{name}: 4x the size takes {ratio:.1}x the time ({small:?} -> {full:?})"
-    );
+    assert_ratio(name, small, full);
 }
 
 #[test]
 fn function_of_2000_lines_checks_and_lowers_in_linear_time() {
-    let fastest = |lines| {
-        let text = long_program(lines);
-        (0..3)
-            .map(|_| {
-                let start = Instant::now();
-                compiled(&text);
-                start.elapsed()
-            })
-            .min()
-            .expect("runs")
+    let _alone = alone();
+    let compile = |text: &str| {
+        let start = Cpu::now();
+        compiled(text);
+        start.elapsed()
     };
-    let (small, full) = (fastest(500), fastest(2000));
-    let ratio = full.as_secs_f64() / small.as_secs_f64().max(1e-6);
-    assert!(
-        ratio < 9.0,
-        "4x the size takes {ratio:.1}x the time ({small:?} -> {full:?})"
-    );
+    let (small, full) = (long_program(500), long_program(2000));
+    let [small, full] = fastest([&mut || compile(&small), &mut || compile(&full)]);
+    assert_ratio("check and lower", small, full);
 }
 
 #[test]
