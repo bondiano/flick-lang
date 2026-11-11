@@ -2,7 +2,7 @@
 title: Deriving
 description: Пусть компилятор напишет для типа равенство, порядок и `show`.
 tableOfContents: false
-source_hash: 7ab2c9a71773f69b
+source_hash: 1b4255952cbe24a0
 ---
 
 import TourLesson from "../../../../components/TourLesson.astro";
@@ -14,7 +14,8 @@ import TourLesson from "../../../../components/TourLesson.astro";
 
 Выведенный `Ord` сравнивает сначала по порядку форм, затем по значениям
 внутри: черви идут раньше пик, а две карты червей сравниваются по номеру.
-`List.sort` нужен `Ord`, а `compare` возвращает `LT`, `EQ` или `GT`.
+`Ord` нужен `List.sort`, а также `<` и другим сравнениям, которые
+упорядочивают по нему `Card`.
 
 **Попробуйте:** уберите `Ord` у `Card`. Компилятор сообщит `FLICK-C001` у
 `List.sort`: экземпляра `Ord Card` нет.

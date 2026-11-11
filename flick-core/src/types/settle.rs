@@ -91,6 +91,19 @@ impl Checker<'_> {
                 }
                 return;
             }
+            // any other type a comparison orders by its `Ord`, as it does a type
+            // variable: `Bool`, a derived type, a record, a list
+            if op.domain == Domain::Ordered
+                && !matches!(head, Type::Error | Type::Meta(_))
+                && !op.domain.allows(head)
+            {
+                let class = Type::app(Type::lang(Lang::Ord), ty.clone());
+                self.want_under(class, op.span, op.givens.clone());
+                self.typing
+                    .generic_ordered
+                    .insert(super::typing::range(op.span));
+                return;
+            }
             let allowed = op.domain.names();
             let fits = match head {
                 Type::Error => true,
