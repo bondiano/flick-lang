@@ -150,4 +150,29 @@ pub struct CallSite {
     pub binding: Option<Binding>,
     /// The call is in code a plugin wrote, not in the module's own text.
     pub generated: bool,
+    /// What marks the value named here, for a tag the package watches.
+    pub tagged: Option<Tagged>,
+}
+
+/// A value a tag marks, where a module names it inside a function: `watch`
+/// asks for the tag as `@tag`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Tagged {
+    pub tag: String,
+    /// The value as the module writes it: `fresh`, or `State.fresh`.
+    pub named: String,
+    /// The value of the library the tag is written on, which `named` is or
+    /// reaches.
+    pub reaches: String,
+    /// The functions around the place, innermost first, up to the nearest
+    /// `task`: what runs later is not inside them.
+    pub inside: Vec<Enclosing>,
+}
+
+/// A function around a place: the services its arrow names, and whether its
+/// row is open to more.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Enclosing {
+    pub services: Vec<String>,
+    pub open: bool,
 }

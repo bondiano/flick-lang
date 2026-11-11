@@ -240,6 +240,20 @@ way: the calls of `Ui.view` and of the constructors of `Ui.Event` are watched,
 and the plugin warns (`FLICK-U002`) where a constructor given a `fun` stands
 inside the first argument of a view the module itself writes.
 
+A plugin may also watch a tag, the attribute that marks values of a kind, as
+`@maker` marks what makes an atom, an action or a view. Each place inside a
+function that names a value the tag reaches, itself or through the functions
+it calls, is then a place with `tagged`: the tag, the name as written, the
+marked value it ends at, and in `inside` the functions around the place from
+the nearest outwards, each with the services of its arrow and whether its
+row is open. The task of a handler runs later, so the functions around a
+`task` are not around what is inside it. The UI plugin refuses
+(`FLICK-U006`) a maker named in a render, a function whose services are
+`Atom.Read` alone.
+
+The `watch` of a manifest names values. Services and tags are watched by the
+plugins the compiler ships.
+
 ```rust
 fn check_calls(&self, calls: &[CallSite], state: &[u8]) -> Vec<Diagnostic> {
     (calls.iter())

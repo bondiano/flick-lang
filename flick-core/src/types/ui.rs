@@ -73,6 +73,7 @@ impl Checker<'_> {
                     arguments: Vec::new(),
                     refinement: None,
                     generated: range.0 >= self.generated,
+                    tagged: None,
                     binding: Some(flick_plugin::Binding {
                         module: self.env.module.clone(),
                         name: binding.clone(),
@@ -228,86 +229,6 @@ impl Checker<'_> {
             ty = self.store.resolve(&inner);
         }
         ty
-    }
-
-    /// Atoms, actions and views made while rendering: a view renders again
-    /// at any time, and each render would make another one, losing its
-    /// state, its subscribers or its policy. A render is a `fun` or a
-    /// top-level function whose services are `Atom.Read` alone; the task of
-    /// a handler in it runs on an event, not while rendering.
-    pub fn made_in_render(&mut self, decls: &[&Node]) {
-        let heads: HashMap<Range, Type> = self
-            .typing
-            .pending_types
-            .iter()
-            .map(|(at, ty)| (*at, ty.clone()))
-            .collect();
-        let mut renders = Vec::new();
-        for decl in members(decls) {
-            if decl.kind != K::LetDecl {
-                continue;
-            }
-            let parts = let_parts(decl, self.text);
-            if let (Some(name), Some(body)) = (&parts.name, parts.body)
-                && !parts.params.is_empty()
-            {
-                let entity = self.env.entity(Namespace::Value, name);
-                let mut ty = self.env.value(&entity).cloned();
-                while let Some(t) = ty.take() {
-                    if self.reads_only(&t) {
-                        renders.push(body);
-                    } else if let Type::Fun { result, .. } = self.bare(&t) {
-                        ty = Some(*result);
-                    }
-                }
-            }
-            funs(
-                decl,
-                &mut |fun| {
-                    let keyword = fun.child_tokens().find(|t| t.kind == K::FunKw);
-                    keyword.and_then(|t| heads.get(&(t.start, t.end)).cloned())
-                },
-                &mut |fun, ty| {
-                    if self.reads_only(&ty) {
-                        renders.push(fun);
-                    }
-                },
-            );
-        }
-        let mut found = Vec::new();
-        for render in renders {
-            self.made(render, &mut found);
-        }
-        found.sort_unstable();
-        found.dedup();
-        for (range, what, maker) in found {
-            let what = if what == maker {
-                format!("`{what}`")
-            } else {
-                format!("`{what}`, which calls `{maker}`,")
-            };
-            self.error(
-                codes::U006,
-                Span::new(self.file, range.0, range.1),
-                format!("{what} while rendering makes another one on every render: make it once, with a top-level `let`, or one per key with `Atom.family`"),
-            );
-        }
-    }
-}
-
-/// Every `fun` under `node` with the type `head` finds for it.
-fn funs<'n>(
-    node: &'n Node,
-    head: &mut impl FnMut(&Node) -> Option<Type>,
-    found: &mut impl FnMut(&'n Node, Type),
-) {
-    if node.kind == K::FunExpr
-        && let Some(ty) = head(node)
-    {
-        found(node, ty);
-    }
-    for child in node.nodes() {
-        funs(child, head, found);
     }
 }
 

@@ -135,6 +135,7 @@ impl Checker<'_> {
                     refinement: self.refinement(call, &mut predicates),
                     binding: None,
                     generated: call.span.start >= self.generated,
+                    tagged: None,
                 }
             })
             .collect::<Vec<_>>();
