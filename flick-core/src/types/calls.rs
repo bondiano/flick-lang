@@ -83,11 +83,8 @@ impl Checker<'_> {
             self.gadt.declared = self.declared_local(i);
             return self.use_local(i, span);
         }
-        if self.ui > 0
-            && let Some((_, Some(ui))) = self.env.qualified_module("Ui")
-            && ui.find(namespace, name).is_some()
-        {
-            return self.qualified("Ui", namespace, name, span);
+        if let Some(module) = self.opened_with(namespace, name) {
+            return self.qualified(&module, namespace, name, span);
         }
         match self.env.find(namespace, name) {
             super::env::Found::Entity(entity) => {

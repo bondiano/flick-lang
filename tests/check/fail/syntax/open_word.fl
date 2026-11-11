@@ -1,0 +1,6 @@
+module App.OpenWord exposing (x)
+
+// The word of generated code that opens a module is no source: `$` is no
+// character of a name.
+let x = open$module Ui (1)
+//~ FLICK-S007 @5:13-5:14 unexpected `$`

@@ -12,6 +12,10 @@ pub const HEADS: [(&str, &str); 5] = [
     ("component", "Ui"),
 ];
 
+/// The word of generated code before the module a body opens: `open$module
+/// Ui (body)`. No source writes a name with `$` in it.
+pub const OPEN: &str = "open$module";
+
 /// The heads whose blocks need no body even where no import exposes them,
 /// as the compiler read them before: `server fn f x = …` and `server f`.
 pub const BARE: [&str; 1] = ["server"];

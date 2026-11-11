@@ -96,6 +96,7 @@ mod wasm {
     use super::{APP, LIB, MAIN, PAIRS};
 
     mod compiled;
+    mod opened;
     mod stages;
     mod watched;
 

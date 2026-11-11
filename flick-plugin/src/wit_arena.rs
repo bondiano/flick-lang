@@ -69,6 +69,9 @@ macro_rules! wit_arena_conversions {
                                     result,
                                 })
                             }
+                            $crate::Expr::Open { module, body } => {
+                                w::Expr::Open(w::Opened { module, body })
+                            }
                         }),
                         $crate::Kind::Ty(t) => w::Kind::Ty(match t {
                             $crate::Ty::Name(s) => w::Ty::Name(s),
@@ -215,6 +218,10 @@ macro_rules! wit_arena_conversions {
                             w::Expr::Block(s) => $crate::Expr::Block {
                                 statements: s.items,
                                 result: s.result,
+                            },
+                            w::Expr::Open(o) => $crate::Expr::Open {
+                                module: o.module,
+                                body: o.body,
                             },
                         }),
                         w::Kind::Ty(t) => $crate::Kind::Ty(match t {
