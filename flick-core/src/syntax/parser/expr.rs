@@ -32,21 +32,6 @@ pub(super) fn expr(p: &mut Parser) -> Option<Done> {
     expr_bp(p, 0)
 }
 
-/// Binding powers of the fixed operator table, weakest first (grammar.md).
-fn infix(kind: K) -> Option<(u8, u8)> {
-    Some(match kind {
-        K::PipeGt => (2, 3),
-        K::OrOr => (4, 4),
-        K::AndAnd => (6, 6),
-        K::EqEq | K::NotEq | K::Lt | K::Le | K::Gt | K::Ge => (8, 9),
-        K::PlusPlus => (10, 10),
-        K::Plus | K::Minus => (12, 13),
-        K::Star | K::Slash | K::Percent => (14, 15),
-        K::StarStar => (18, 18),
-        _ => return None,
-    })
-}
-
 /// Operand of a prefix operator: binds tighter than `*`, looser than `**`.
 const PREFIX_OPERAND: u8 = 18;
 
@@ -99,7 +84,7 @@ fn expr_bp(p: &mut Parser, min_bp: u8) -> Option<Done> {
             }
             continue;
         }
-        let Some((left, right)) = infix(op) else {
+        let Some((left, right)) = op.binding_power() else {
             break;
         };
         if left < min_bp {
