@@ -136,6 +136,9 @@ main:has(#flick-playground):not(:has(.tour-lesson)) .sl-container { max-width: n
 .fp-lesson h2 { margin: 0 0 0.5rem; font-size: 1.25rem; }
 .fp-lesson p { max-width: 66ch; margin: 0.5rem 0; }
 .fp-lesson-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 0.875rem 0; }
+.fp-lesson-question > p { margin-bottom: 0.25rem; }
+.fp-lesson-choices { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.fp-lesson ol, .fp-lesson ul { max-width: 66ch; margin: 0.5rem 0; padding-left: 1.25rem; }
 .fp .fp-lesson-actions button { border: 1px solid var(--fp-rule); background: var(--sl-color-bg); }
 .fp .fp-lesson-actions button:hover { border-color: var(--sl-color-text-accent); }
 .fp-status {

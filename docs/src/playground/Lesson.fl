@@ -1,32 +1,107 @@
 module Lesson exposing (view)
 
-import Actions exposing (check_lesson, reset_lesson, reveal_lesson_hint, show_lesson_solution)
+import Actions exposing (
+  check_lesson,
+  choose_answer,
+  reset_lesson,
+  reveal_lesson_hint,
+  show_lesson_solution,
+)
 import State exposing (Model, tr)
+
+/// The question to answer as well, if the exercise has one: a choice is a
+/// pressed button.
+question_view : Atom.Writable Model -> Model -> Ui
+let question_view model m =
+  if m.lesson_answer < 0 then
+    Ui.fragment []
+  else
+    let choices = if m.locale == State.Ru then m.lesson_choices_ru else m.lesson_choices
+    let choice index label =
+      Ui.with_host
+        {
+          Ui.host with
+          class_name = Some (if m.lesson_choice == index then "fp-choice fp-on" else "fp-choice");
+          aria_pressed = Some (m.lesson_choice == index);
+        }
+        (Ui.button
+          {
+            disabled = false;
+            on_click = Ui.Event.exhaust (fun _ -> task { choose_answer model index });
+          }
+          [Ui.text label])
+    ui {
+      Ui.with_host
+        {
+          Ui.host with
+          role = Some "group";
+          aria_label = Some (tr m.locale m.lesson_question m.lesson_question_ru);
+        }
+        (div
+          { class_name = "fp-lesson-question" }
+          (paragraph (text (tr m.locale m.lesson_question m.lesson_question_ru)))
+          (div { class_name = "fp-lesson-choices" } (List.map_indexed choice choices)))
+    }
+
+/// The hints shown so far, in order, and the button that shows the next.
+hint_button : Atom.Writable Model -> Model -> Ui
+let hint_button model m =
+  let total = List.length m.lesson_hints
+  if total == 0 then
+    Ui.fragment []
+  else
+    let label =
+      if m.lesson_hints_shown == 0 then
+        tr m.locale "Hint" "Подсказка"
+      else
+        tr m.locale "Next hint" "Ещё подсказка"
+    ui {
+      button
+        {
+          disabled = m.lesson_hints_shown >= total;
+          on_click = Ui.Event.exhaust (fun _ -> task { reveal_lesson_hint model });
+        }
+        (text label)
+    }
+
+hints_view : Model -> Ui
+let hints_view m =
+  let hints = if m.locale == State.Ru then m.lesson_hints_ru else m.lesson_hints
+  let shown = List.take m.lesson_hints_shown hints
+  if shown == [] then
+    Ui.fragment []
+  else
+    ui { list (List.map (fun hint -> ui { item (text hint) }) shown) }
+
+check_button : Atom.Writable Model -> Model -> Ui
+let check_button model m =
+  Ui.with_host
+    // Ctrl+Enter in the editor presses it
+    { Ui.host with id = Some "fp-check" }
+    (Ui.button
+      {
+        disabled = m.lesson_checking || m.loading;
+        on_click = Ui.Event.exhaust (fun _ -> task { check_lesson model });
+      }
+      [
+        Ui.text
+          (
+            if m.lesson_checking then
+              tr m.locale "Checking…" "Проверка…"
+            else
+              tr m.locale "Check answer" "Проверить"
+          ),
+      ])
 
 view : Atom.Writable Model -> Model -> Ui
 let view model m = ui {
   div { class_name = "fp-lesson" }
     heading_at H2 (text (tr m.locale m.lesson_title m.lesson_title_ru))
     paragraph (text (tr m.locale m.lesson_task m.lesson_task_ru))
+    question_view model m
     div { class_name = "fp-lesson-actions" }
-      (button
-        {
-          disabled = m.lesson_checking || m.loading;
-          on_click = Ui.Event.exhaust (fun _ -> task { check_lesson model });
-        }
-        (text
-          (
-            if m.lesson_checking then
-              tr m.locale "Checking…" "Проверка…"
-            else
-              tr m.locale "Check answer" "Проверить"
-          )))
-      (button
-        {
-          disabled = false;
-          on_click = Ui.Event.exhaust (fun _ -> task { reveal_lesson_hint model });
-        }
-        (text (tr m.locale "Hint" "Подсказка")))
+      (check_button model m)
+      (hint_button model m)
       (button
         {
           disabled = false;
@@ -37,10 +112,7 @@ let view model m = ui {
         { disabled = false; on_click = Ui.Event.exhaust (fun _ -> task { reset_lesson model }) }
         (text (tr m.locale "Reset" "Сбросить")))
 
-    if m.lesson_hint then
-      paragraph (text (tr m.locale m.lesson_hint_text m.lesson_hint_text_ru))
-    else
-      empty
+    hints_view m
     if m.lesson_result != "" then
       Ui.with_host
         { Ui.host with role = Some "status"; aria_live = Some Ui.Polite }

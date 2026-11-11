@@ -38,3 +38,17 @@ test("an exercise whose export runs says so with a Boolean", () => {
   assert.equal(parseExerciseMetadata(`${source}runs = true\n`, "test").check.runs, true);
   assert.throws(() => parseExerciseMetadata(`${source}runs = "yes"\n`, "test"), /runs/);
 });
+
+test("hints come one or several, and a question names its right choice", () => {
+  const base = readFileSync(new URL("../exercises/signatures/01/check.toml", import.meta.url), "utf8");
+  assert.deepEqual(parseExerciseMetadata(base, "test").hints.length, 1);
+  const without = base.replace(/^hint(_ru)? = .*\n/gm, "");
+  const several = `${without}hints = ["first", "second"]\nhints_ru = ["первая", "вторая"]\n`;
+  assert.deepEqual(parseExerciseMetadata(several, "test").hints, ["first", "second"]);
+  assert.deepEqual(parseExerciseMetadata(`${without}hints = []\nhints_ru = []\n`, "test").hints, []);
+  assert.throws(() => parseExerciseMetadata(`${without}hints = ["a"]\nhints_ru = []\n`, "test"), /differ/);
+  const asked = `${several}question = "Which?"\nquestion_ru = "Какой?"\nchoices = ["Int", "String"]\nchoices_ru = ["Int", "String"]\nanswer = 1\n`;
+  assert.equal(parseExerciseMetadata(asked, "test").question?.answer, 1);
+  assert.throws(() => parseExerciseMetadata(asked.replace("answer = 1", "answer = 2"), "test"), /answer/);
+  assert.throws(() => parseExerciseMetadata(asked.replace('choices_ru = ["Int", "String"]', 'choices_ru = ["Int"]'), "test"), /choices/);
+});

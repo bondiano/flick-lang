@@ -44,8 +44,13 @@ type alias Configuration = {
   lesson_title_ru : String;
   lesson_task : String;
   lesson_task_ru : String;
-  lesson_hint_text : String;
-  lesson_hint_text_ru : String;
+  lesson_hints : List String;
+  lesson_hints_ru : List String;
+  lesson_question : String;
+  lesson_question_ru : String;
+  lesson_choices : List String;
+  lesson_choices_ru : List String;
+  lesson_answer : Int;
   solution : String;
   done : Bool;
   /// Whether a clean source runs by itself once typing pauses, as on a page of the tour.
@@ -111,10 +116,19 @@ type alias Model = {
   lesson_title_ru : String;
   lesson_task : String;
   lesson_task_ru : String;
-  lesson_hint_text : String;
-  lesson_hint_text_ru : String;
+  lesson_hints : List String;
+  lesson_hints_ru : List String;
+  /// How many of the hints are shown, in order.
+  lesson_hints_shown : Int;
+  /// A question to answer as well: the right choice, or -1 without one.
+  lesson_question : String;
+  lesson_question_ru : String;
+  lesson_choices : List String;
+  lesson_choices_ru : List String;
+  lesson_answer : Int;
+  /// The choice picked, or -1.
+  lesson_choice : Int;
   lesson_solution : String;
-  lesson_hint : Bool;
   lesson_result : String;
   lesson_done : Bool;
   lesson_checking : Bool;
@@ -216,10 +230,16 @@ let initial_model config = {
   lesson_title_ru = config.lesson_title_ru;
   lesson_task = config.lesson_task;
   lesson_task_ru = config.lesson_task_ru;
-  lesson_hint_text = config.lesson_hint_text;
-  lesson_hint_text_ru = config.lesson_hint_text_ru;
+  lesson_hints = config.lesson_hints;
+  lesson_hints_ru = config.lesson_hints_ru;
+  lesson_hints_shown = 0;
+  lesson_question = config.lesson_question;
+  lesson_question_ru = config.lesson_question_ru;
+  lesson_choices = config.lesson_choices;
+  lesson_choices_ru = config.lesson_choices_ru;
+  lesson_answer = config.lesson_answer;
+  lesson_choice = -1;
   lesson_solution = config.solution;
-  lesson_hint = false;
   lesson_result = "";
   lesson_done = config.done;
   lesson_checking = false;

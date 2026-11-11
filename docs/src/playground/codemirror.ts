@@ -100,6 +100,13 @@ const completions = async (context: CompletionContext): Promise<CompletionResult
 const SEVERITIES: Readonly<Record<string, Mark["severity"]>> = { error: "error", warning: "warning" };
 
 /** CodeMirror in `parent` over `text`; `changed` hears of each edit the reader makes. */
+const pressCheckOrRun = (): boolean => {
+  const button = document.getElementById("fp-check") ?? document.getElementById("fp-run");
+  if (!(button instanceof HTMLButtonElement) || button.disabled) return false;
+  button.click();
+  return true;
+};
+
 export const create = (parent: HTMLElement, text: string, label: string, describedBy: string, changed: () => void): EditorView =>
   new EditorView({
     parent,
@@ -111,7 +118,8 @@ export const create = (parent: HTMLElement, text: string, label: string, describ
         colors,
         types,
         autocompletion({ override: [completions] }),
-        keymap.of([...completionKeymap, ...lintKeymap, ...defaultKeymap, ...historyKeymap, indentWithTab]),
+        // Ctrl+Enter checks an exercise's answer, or runs the program; Flick owns both buttons
+        keymap.of([{ key: "Mod-Enter", run: pressCheckOrRun }, ...completionKeymap, ...lintKeymap, ...defaultKeymap, ...historyKeymap, indentWithTab]),
         EditorView.contentAttributes.of({
           "aria-label": label,
           "aria-describedby": describedBy,

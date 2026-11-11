@@ -19,6 +19,7 @@ module Actions exposing (
   download,
   discard_draft,
   check_lesson,
+  choose_answer,
   reveal_lesson_hint,
   show_lesson_solution,
   reset_lesson,
@@ -383,8 +384,25 @@ complete_lesson : Unit ->{} Unit
 foreign complete_lesson from "./dom.ts" "completeLesson"
   arity 0
 
+/// Checks the answer to the question first, then the code.
 check_lesson : Atom.Writable Model ->{Async, Atom.Write} Unit
 let check_lesson model =
+  let m = Atom.current model
+  if m.lesson_answer >= 0 && m.lesson_choice != m.lesson_answer then
+    let message =
+      if m.lesson_choice < 0 then
+        tr m.locale "Answer the question first." "Сначала ответьте на вопрос."
+      else
+        tr
+          m.locale
+          "That answer is not right. Look again at what the compiler says."
+          "Этот ответ неверный. Посмотрите ещё раз, что говорит компилятор."
+    update model (fun m -> { m with lesson_result = message })
+  else
+    check_code model
+
+check_code : Atom.Writable Model ->{Async, Atom.Write} Unit
+let check_code model =
   let m = Atom.current model
   update model (fun m -> { m with lesson_checking = true; lesson_result = "" })
   let result =
@@ -421,7 +439,12 @@ let check_lesson model =
   })
 
 reveal_lesson_hint : Atom.Writable Model ->{Atom.Write} Unit
-let reveal_lesson_hint model = update model (fun m -> { m with lesson_hint = true })
+let reveal_lesson_hint model =
+  update model (fun m -> { m with lesson_hints_shown = m.lesson_hints_shown + 1 })
+
+choose_answer : Atom.Writable Model -> Int ->{Atom.Write} Unit
+let choose_answer model choice =
+  update model (fun m -> { m with lesson_choice = choice; lesson_result = "" })
 
 show_lesson_solution : Atom.Writable Model ->{Atom.Write} Unit
 let show_lesson_solution model =
@@ -431,7 +454,7 @@ let show_lesson_solution model =
 reset_lesson : Atom.Writable Model ->{Atom.Write} Unit
 let reset_lesson model =
   replace model (first_source (Atom.current model).examples)
-  update model (fun m -> { m with lesson_result = ""; lesson_hint = false })
+  update model (fun m -> { m with lesson_result = ""; lesson_hints_shown = 0; lesson_choice = -1 })
 
 choose : Atom.Writable Model -> Example ->{Atom.Write} Unit
 let choose model example =
