@@ -65,3 +65,40 @@ func BenchmarkCaseTakeAndPad(b *testing.B) {
 		})
 	}
 }
+
+// What JavaScript answers for strings of ASCII, written out.
+func TestAStringOfAsciiIsCasedTakenAndPaddedAsInJavaScript(t *testing.T) {
+	cases := []struct {
+		name      string
+		got, want Value
+	}{
+		{"upper", ToUpperCase("Hello, World 1!"), "HELLO, WORLD 1!"},
+		{"upper of controls", ToUpperCase("a\x00b\x7f"), "A\x00B\x7f"},
+		{"upper of nothing", ToUpperCase(""), ""},
+		{"lower", ToLowerCase("Hello, World 1!"), "hello, world 1!"},
+		{"lower of brackets", ToLowerCase("@AZ[`az{"), "@az[`az{"},
+		{"take left below zero", TakeLeft(int32(-1), "abc"), ""},
+		{"take left zero", TakeLeft(int32(0), "abc"), ""},
+		{"take left", TakeLeft(int32(2), "abc"), "ab"},
+		{"take left past the end", TakeLeft(int32(5), "abc"), "abc"},
+		{"take right below zero", TakeRight(int32(-1), "abc"), ""},
+		{"take right zero", TakeRight(int32(0), "abc"), ""},
+		{"take right", TakeRight(int32(2), "abc"), "bc"},
+		{"take right past the end", TakeRight(int32(5), "abc"), "abc"},
+		{"pad start", PadStart(int32(7), "ab", "xyz"), "ababxyz"},
+		{"pad start with part of the fill", PadStart(int32(6), "ab", "xyz"), "abaxyz"},
+		{"pad start to less", PadStart(int32(2), "ab", "xyz"), "xyz"},
+		{"pad start below zero", PadStart(int32(-1), "ab", "xyz"), "xyz"},
+		{"pad start with nothing", PadStart(int32(5), "", "xyz"), "xyz"},
+		{"pad start of nothing", PadStart(int32(3), "ab", ""), "aba"},
+		{"pad end", PadEnd(int32(7), "ab", "xyz"), "xyzabab"},
+		{"pad end with part of the fill", PadEnd(int32(6), "ab", "xyz"), "xyzaba"},
+		{"pad end to its length", PadEnd(int32(3), "ab", "xyz"), "xyz"},
+		{"pad end with nothing", PadEnd(int32(5), "", "xyz"), "xyz"},
+	}
+	for _, c := range cases {
+		if c.got != c.want {
+			t.Errorf("%s: %q, want %q", c.name, c.got, c.want)
+		}
+	}
+}
