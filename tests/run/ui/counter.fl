@@ -48,15 +48,14 @@ let counter =
     "App.Main.counter"
     (Ui.view (fun () -> ui {
       let widgets = { badge = badge }
-      div { class_name = "counter" } [
-        heading [text ("count " ++ show (Atom.value count))],
-        button { disabled = false; on_click = increment } [text "+1"],
-        button { disabled = false; on_click = refuse } [text "refuse"],
-        paragraph [text "<b>bold?</b>"],
-        badge { label = "new" },
-        badge_for () { label = "returned" },
-        ({ label = "piped" } |> (if true then widgets.badge else badge)),
-      ]
+      div { class_name = "counter" }
+        heading (text ("count " ++ show (Atom.value count)))
+        button { disabled = false; on_click = increment } (text "+1")
+        button { disabled = false; on_click = refuse } (text "refuse")
+        paragraph (text "<b>bold?</b>")
+        badge { label = "new" }
+        badge_for () { label = "returned" }
+        ({ label = "piped" } |> (if true then widgets.badge else badge))
     }))
 
 report : Failure e ->{} Unit

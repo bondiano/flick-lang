@@ -35,15 +35,14 @@ let counter_view =
     (Ui.view (fun () ->
       let n = Atom.value count
       ui {
-        div { class_name = "counter" } [
-          text ("count " ++ show n),
+        div { class_name = "counter" }
+          text ("count " ++ show n)
           button
             {
               disabled = false;
               on_click = increment;
             }
-            [text "+1"],
-        ]
+            (text "+1")
       }
     ))
 
@@ -65,7 +64,7 @@ let main () =
   | Some root ->
     provide Atom.layer {
       scope s {
-        let app = ui { fragment [Ui.render counter_view (), Ui.render doubled_view ()] }
+        let app = ui { fragment (Ui.render counter_view ()) (Ui.render doubled_view ()) }
         let _mounted = Fiber.spawn s report (task { Ui.Dom.mount root report app })
         settle ()
         Platform.stdout_line (text ())

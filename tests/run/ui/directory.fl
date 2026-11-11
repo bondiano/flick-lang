@@ -45,11 +45,11 @@ foreign release from "./dom.mjs" "release"
 picker : String -> Ui.SelectProps a c -> Ui^c
 let picker title props = ui {
   panel {
-    header = heading [text title];
+    header = heading (text title);
     body = select props;
     footer =
       match props.selected with
-      | Some item -> Some (paragraph [text ("chosen " ++ props.key item)])
+      | Some item -> Some (paragraph (text ("chosen " ++ props.key item)))
       | None -> None;
   }
 }
@@ -85,7 +85,7 @@ let directory model log selected = ui {
               | Refused name -> Platform.stdout_line ("refused " ++ name)
             });
         }))
-      [tab "About" (paragraph [text "about"])])
+      [tab "About" (paragraph (text "about"))])
 }
 
 report : Failure e ->{} Unit

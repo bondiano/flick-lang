@@ -9,14 +9,14 @@ let counted start = Atom.local (start + 1)
 component counter (start : Float) =
   let count = counted start
   let bump = Action.exhaust (fun _ -> task { Atom.update count (fun n -> n + 1) })
-  ui { button { on_click = bump; disabled = false } [text (show (Atom.value count))] }
+  ui { button { on_click = bump; disabled = false } (text (show (Atom.value count))) }
 
 type alias Labelled = { label : String; start : Float }
 
 // the props are the first ones in `setup`, the current ones in `render`
 component labelled (props : Labelled) =
   let count = Atom.local props.start
-  ui { paragraph [text (props.label ++ show (Atom.value count))] }
+  ui { paragraph (text (props.label ++ show (Atom.value count))) }
 
 query : Atom.Writable String
 let query = Atom.make ""

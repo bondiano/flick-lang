@@ -18,6 +18,27 @@ use crate::source::Span;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
 
+/// Whether `target`, somewhere under `node`, stands inside `( … )`, `[ … ]`,
+/// a record or the hole of a string with no block of lines in between:
+/// there a line break means nothing. `None` when it is not under `node`.
+fn bracketed(node: &Node, target: &Node, inside: bool) -> Option<bool> {
+    if ptr::eq(node, target) {
+        return Some(inside);
+    }
+    let inside = match node.kind {
+        K::ParenExpr
+        | K::ListExpr
+        | K::TupleExpr
+        | K::RecordExpr
+        | K::RecordUpdate
+        | K::InterpExpr => true,
+        K::Block | K::Children => false,
+        _ => inside,
+    };
+    node.nodes()
+        .find_map(|child| bracketed(child, target, inside))
+}
+
 /// Whether `node` needs no parentheses to be an argument on a line.
 fn atomic(node: &Node) -> bool {
     matches!(
@@ -73,7 +94,11 @@ impl Checker<'_> {
                 .trim()
                 .is_empty()
         };
-        let lines = starts_line(head.range().0);
+        // lines under the call are its children only outside brackets
+        let lines = starts_line(head.range().0)
+            && self
+                .root
+                .is_some_and(|root| bracketed(root, list, false) == Some(false));
         let at = |start: u32, end: u32| Span::new(self.file, start, end);
         let mut edits: Vec<Edit> = (list.child_tokens())
             .filter(|t| matches!(t.kind, K::LBracket | K::Comma | K::RBracket))
@@ -103,6 +128,33 @@ impl Checker<'_> {
         (self.diagnostics)
             .push(diagnostic.with_safe_fix(|| ("write the children one by one", edits)));
         Some(elements)
+    }
+
+    /// The type of `written`, the one argument where children go, and
+    /// whether it is the list of them (`list`) rather than a child (`item`);
+    /// `None` for an expression that is read by the type expected of it,
+    /// which is a child.
+    fn child_or_list(&mut self, written: &Node, list: &Type, item: &Type) -> Option<(Type, bool)> {
+        let inner = unparen(written);
+        if inner.kind == K::ListExpr {
+            // a range or a comprehension: `listed` took the literal
+            return Some((self.check_value(written, list), true));
+        }
+        // a function or a record is read by the type expected of it, and is
+        // no list: a child, which the caller checks
+        let by_expected = matches!(
+            inner.kind,
+            K::FunExpr | K::LoopExpr | K::WhileExpr | K::RecordExpr | K::DoExpr | K::TaskExpr
+        );
+        if by_expected {
+            return None;
+        }
+        let actual = self.infer(inner);
+        let listed = self.list_item(&actual).is_some();
+        let expected = if listed { list } else { item };
+        self.expect(&actual, expected, self.span(inner));
+        self.note_head(inner, expected);
+        Some((actual, listed))
     }
 
     /// What `function`, a function of the list of its children alone, gives
@@ -144,9 +196,26 @@ impl Checker<'_> {
             }
             return Some(*result);
         }
+        // one argument that is a list is the list of them: a value, a call
+        // or a comprehension, as `List.map row items`
+        let alone = match children {
+            [one] => self.child_or_list(one, &param, &item),
+            _ => None,
+        };
+        if let Some((argument, true)) = &alone {
+            let span = Span::new(self.file, head.range().0, children[0].range().1);
+            if let Some(effects) = effects {
+                self.call_effects(&self.live_call(function, &effects), span);
+            }
+            let result = self.instantiate(&result, span);
+            return Some(self.application_result(result, function, argument, false));
+        }
         let mut captures = Norm::default();
-        for written in children {
-            let actual = self.check_value(written, &item);
+        for (i, written) in children.iter().enumerate() {
+            let actual = match &alone {
+                Some((actual, _)) if i == 0 => actual.clone(),
+                _ => self.check_value(written, &item),
+            };
             let held = self.captures_of(&actual);
             captures.entries.extend(held.entries);
             captures.tails.extend(held.tails);

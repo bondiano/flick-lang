@@ -20,10 +20,10 @@ let problem model m diagnostic =
   let key = code ++ " " ++ diagnostic.at ++ " " ++ diagnostic.message
   let open = m.explained == key
   ui {
-    item [
-      span { class_name = "fp-diagnostic-code fp-" ++ diagnostic.severity } [text code],
-      span { class_name = "fp-diagnostic-at" } [text (severity_label m.locale diagnostic.severity)],
-      span { class_name = "fp-diagnostic-at" } [text diagnostic.at],
+    item
+      span { class_name = "fp-diagnostic-code fp-" ++ diagnostic.severity } (text code)
+      span { class_name = "fp-diagnostic-at" } (text (severity_label m.locale diagnostic.severity))
+      span { class_name = "fp-diagnostic-at" } (text diagnostic.at)
       attributes
         [("aria-expanded", if open then "true" else "false")]
         (Ui.with_host
@@ -33,12 +33,10 @@ let problem model m diagnostic =
               disabled = false;
               on_click = Ui.Event.exhaust (fun _ -> task { explain model key code });
             }
-            [
-              text
-                (if open then tr m.locale "Hide" "Скрыть" else tr m.locale "Explain" "Объяснить"),
-            ])),
-      paragraph [text diagnostic.message],
-      if open then pre { class_name = "fp-explanation" } [text m.explanation] else empty,
+            (text
+              (if open then tr m.locale "Hide" "Скрыть" else tr m.locale "Explain" "Объяснить"))))
+      paragraph (text diagnostic.message)
+      if open then pre { class_name = "fp-explanation" } (text m.explanation) else empty
       if String.starts_with "FLICK-" code then
         match
           Ui.safe_url
@@ -49,10 +47,10 @@ let problem model m diagnostic =
               ++ "/")
         with
         | Some url ->
-          Ui.link { href = url } [text (tr m.locale "Full explanation" "Полное объяснение")]
+          Ui.link { href = url } (text (tr m.locale "Full explanation" "Полное объяснение"))
         | None -> empty
-      else empty,
-    ]
+      else
+        empty
   }
 
 type alias Problems = { model : Atom.Writable Model; m : Model; diagnostics : List Diagnostic }
@@ -68,22 +66,21 @@ component problems_pane (props : Problems) =
         List.filter (fun d -> d.severity == "error") props.diagnostics
       else
         props.diagnostics
-    div { class_name = "fp-diagnostics" } [
+    div { class_name = "fp-diagnostics" }
       Ui.with_host
         { Ui.host with class_name = Some "fp-filter" }
-        (button { disabled = props.diagnostics == []; on_click = toggle } [
-          text
+        (button
+          { disabled = props.diagnostics == []; on_click = toggle }
+          (text
             (
               if only then
                 tr props.m.locale "Show all" "Показать все"
               else
                 tr props.m.locale "Errors only" "Только ошибки"
-            ),
-        ]),
+            )))
       match shown with
-      | [] -> paragraph [text (tr props.m.locale "No diagnostics." "Ошибок и предупреждений нет.")]
-      | items -> list (List.map (problem props.model props.m) items),
-    ]
+      | [] -> paragraph (text (tr props.m.locale "No diagnostics." "Ошибок и предупреждений нет."))
+      | items -> list (List.map (problem props.model props.m) items)
   }
 
 current_problems : Atom.Writable Model -> Model -> Ui
@@ -146,18 +143,18 @@ let printed m = ui {
       (
         match m.execution.lines with
         | [] -> [
-          span { class_name = "fp-muted" } [
-            text
+          span
+            { class_name = "fp-muted" }
+            (text
               (
                 if m.execution.status == "exit" then
                   tr m.locale "The program wrote no output." "Программа ничего не вывела."
                 else
                   tr m.locale "No output captured." "Вывод не получен."
-              ),
-          ],
+              )),
         ]
         | lines ->
-          List.map (fun line -> span { class_name = "fp-" ++ line.stream } [text line.text]) lines
+          List.map (fun line -> span { class_name = "fp-" ++ line.stream } (text line.text)) lines
       ))
 }
 
@@ -165,9 +162,9 @@ output_pane : Atom.Writable Model -> Model -> Ui
 let output_pane model m =
   if m.running || m.execution.status == "" then
     ui {
-      div { class_name = "fp-empty" } [
-        paragraph [
-          text
+      div { class_name = "fp-empty" }
+        paragraph
+          (text
             (
               if m.running then
                 tr
@@ -176,10 +173,10 @@ let output_pane model m =
                   "Программа выполняется в отдельном потоке…"
               else
                 tr m.locale "Your program’s output goes here." "Здесь появится вывод программы."
-            ),
-        ],
-        paragraph [
-          text
+            ))
+
+        paragraph
+          (text
             (
               if m.running then
                 tr
@@ -191,14 +188,12 @@ let output_pane model m =
                   m.locale
                   "Choose an example or edit Main.fl, then press Run."
                   "Выберите пример или измените Main.fl, затем нажмите «Запустить»."
-            ),
-        ],
-      ]
+            ))
     }
   else
     ui {
-      div { class_name = "fp-execution" } [
-        if m.execution.status == "preview" && m.execution.lines == [] then empty else printed m,
+      div { class_name = "fp-execution" }
+        if m.execution.status == "preview" && m.execution.lines == [] then empty else printed m
         Ui.with_host
           { Ui.host with role = Some "status" }
           (div
@@ -210,23 +205,24 @@ let output_pane model m =
                 else
                   "fp-exit fp-bad";
             }
-            [text (execution_status m ++ " · " ++ profile_name m.ran_profile)]),
+            (text (execution_status m ++ " · " ++ profile_name m.ran_profile)))
         if m.execution.status == "failure" then
-          pre { class_name = "fp-failure-detail" } [text m.execution.detail]
-        else empty,
+          pre { class_name = "fp-failure-detail" } (text m.execution.detail)
+        else
+          empty
         if m.execution.status == "invalid" then
           Ui.render problems_pane { model = model; m = m; diagnostics = m.execution.diagnostics }
-        else empty,
+        else
+          empty
         if m.source != m.ran_source || m.profile != m.ran_profile then
-          div { class_name = "fp-stale" } [
+          div { class_name = "fp-stale" }
             text
               (tr
                 m.locale
                 "Source or build profile changed. Run again for fresh output."
-                "Код или профиль сборки изменился. Запустите снова, чтобы обновить вывод."),
-          ]
-        else empty,
-      ]
+                "Код или профиль сборки изменился. Запустите снова, чтобы обновить вывод.")
+        else
+          empty
     }
 
 diagnostic_label : Model -> String

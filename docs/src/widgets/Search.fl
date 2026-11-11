@@ -47,30 +47,29 @@ let find model query =
 
 hit : Hit -> Ui
 let hit result = ui {
-  item [
-    span { class_name = "search-result-title" } [route result.url result.title],
-    paragraph [text result.excerpt],
-  ]
+  item
+    span { class_name = "search-result-title" } (route result.url result.title)
+    paragraph (text result.excerpt)
 }
 
 view : Atom.Writable Model -> Model -> Ui
 let view model m =
   let prefix = locale_prefix m.ru
   ui {
-    div { class_name = "search-widget" } [
-      div { class_name = "search-heading" } [
-        span { class_name = "search-dialog-title" } [
-          text (if m.ru then "Найти в документации" else "Find it in the docs"),
-        ],
-        attributes
+    div { class_name = "search-widget" }
+      div { class_name = "search-heading" }
+        (span
+          { class_name = "search-dialog-title" }
+          (text (if m.ru then "Найти в документации" else "Find it in the docs")))
+        (attributes
           [("aria-label", if m.ru then "Закрыть поиск" else "Close search")]
           (button
             { disabled = false; on_click = Ui.Event.latest (fun _ -> task { close_search () }) }
-            [Elements.icon "close"]),
-      ],
-      div { class_name = "search-field" } [
-        Elements.icon "search",
-        attributes
+            (Elements.icon "close")))
+
+      div { class_name = "search-field" }
+        (Elements.icon "search")
+        (attributes
           [
             ("aria-label", if m.ru then "Поисковый запрос" else "Search query"),
             ("id", "flick-search-input"),
@@ -80,41 +79,42 @@ let view model m =
             value = m.query;
             placeholder = if m.ru then "Эффекты, типы, сервисы…" else "Effects, types, services…";
             on_input = Ui.Event.latest (fun event -> task { find model event.value });
-          }),
-      ],
+          }))
+
       attributes
         [("aria-live", "polite"), ("aria-atomic", "true")]
-        (div { class_name = "search-results" } [
-          if m.problem != "" then
-            paragraph [text m.problem]
-          else if String.trim m.query == "" then
-            div { class_name = "search-suggestions" } [
-              paragraph [text (if m.ru then "С чего начать" else "Good places to start")],
-              route
-                (prefix ++ "/start/getting-started/")
-                (if m.ru then "Начало работы" else "Getting started"),
-              route (prefix ++ "/start/why/") (if m.ru then "Зачем Flick" else "Why Flick"),
-              route
-                (prefix ++ "/reference/effects/")
-                (if m.ru then "Эффекты, ошибки и сервисы" else "Effects, errors and services"),
-              route
-                (prefix ++ "/reference/types/")
-                (if m.ru then "Кинды и типы" else "Kinds and types"),
-            ]
-          else match m.hits with
-            | [] ->
-              paragraph [
-                text
-                  (
-                    if m.ru then
-                      "Ничего не найдено. Попробуйте другой запрос."
-                    else
-                      "No matches. Try a different term."
-                  ),
-              ]
-            | hits -> list (List.map hit hits),
-        ]),
-    ]
+        (div
+          { class_name = "search-results" }
+          (
+            if m.problem != "" then
+              paragraph (text m.problem)
+            else if String.trim m.query == "" then
+              div { class_name = "search-suggestions" }
+                paragraph (text (if m.ru then "С чего начать" else "Good places to start"))
+                route
+                  (prefix ++ "/start/getting-started/")
+                  (if m.ru then "Начало работы" else "Getting started")
+                route (prefix ++ "/start/why/") (if m.ru then "Зачем Flick" else "Why Flick")
+                route
+                  (prefix ++ "/reference/effects/")
+                  (if m.ru then "Эффекты, ошибки и сервисы" else "Effects, errors and services")
+                route
+                  (prefix ++ "/reference/types/")
+                  (if m.ru then "Кинды и типы" else "Kinds and types")
+            else
+              match m.hits with
+              | [] ->
+                paragraph
+                  text
+                    (
+                      if m.ru then
+                        "Ничего не найдено. Попробуйте другой запрос."
+                      else
+                        "No matches. Try a different term."
+                    )
+
+              | hits -> list (List.map hit hits)
+          ))
   }
 
 report : Failure e ->{} Unit

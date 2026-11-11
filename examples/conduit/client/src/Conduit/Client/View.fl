@@ -65,40 +65,37 @@ let navbar user = ui {
   let links =
     match user with
     | None -> [
-      anchor "nav-link" Route.home [text "Home"],
-      anchor "nav-link" Login [text "Sign in"],
-      anchor "nav-link" Register [text "Sign up"],
+      anchor "nav-link" Route.home (text "Home"),
+      anchor "nav-link" Login (text "Sign in"),
+      anchor "nav-link" Register (text "Sign up"),
     ]
     | Some me -> [
-      anchor "nav-link" Route.home [text "Home"],
-      anchor "nav-link" (Editor None) [icon { class_name = "ion-compose" }, text " New Article"],
-      anchor "nav-link" Settings [icon { class_name = "ion-gear-a" }, text " Settings"],
-      anchor "nav-link" (Profile me.username None) [
-        avatar "user-pic" me.image,
-        text (" " ++ me.username),
-      ],
+      anchor "nav-link" Route.home (text "Home"),
+      anchor "nav-link" (Editor None) (icon { class_name = "ion-compose" }) (text " New Article"),
+      anchor "nav-link" Settings (icon { class_name = "ion-gear-a" }) (text " Settings"),
+      anchor
+        "nav-link"
+        (Profile me.username None)
+        (avatar "user-pic" me.image)
+        (text (" " ++ me.username)),
     ]
-  nav { class_name = "navbar navbar-light" } [
-    div { class_name = "container" } [
-      anchor "navbar-brand" Route.home [text "conduit"],
-      classed
+  nav { class_name = "navbar navbar-light" }
+    div { class_name = "container" }
+      (anchor "navbar-brand" Route.home (text "conduit"))
+      (classed
         "nav navbar-nav pull-xs-right"
-        (list (List.map (fun l -> classed "nav-item" (item [l])) links)),
-    ],
-  ]
+        (list (List.map (fun l -> classed "nav-item" (item l)) links)))
 }
 
 /// The footer of every page.
 page_footer : Ui
 let page_footer = ui {
-  footer { class_name = "" } [
-    div { class_name = "container" } [
-      anchor "logo-font" Route.home [text "conduit"],
-      span { class_name = "attribution" } [
-        text " An interactive learning project from Thinkster, written in Flick.",
-      ],
-    ],
-  ]
+  footer { class_name = "" }
+    div { class_name = "container" }
+      (anchor "logo-font" Route.home (text "conduit"))
+      (span
+        { class_name = "attribution" }
+        (text " An interactive learning project from Thinkster, written in Flick."))
 }
 
 /// Each problem of a form as `field message`, in `ul.error-messages`.
@@ -111,7 +108,7 @@ let problems found = ui {
   if lines == [] then
     empty
   else
-    classed "error-messages" (list (List.map (fun l -> item [text l]) lines))
+    classed "error-messages" (list (List.map (fun l -> item (text l)) lines))
 }
 
 /// What the last submit of a form went wrong with; leaving a page clears it.
@@ -126,7 +123,7 @@ tag_list : List String -> Ui
 let tag_list tags = ui {
   classed
     "tag-list"
-    (list (List.map (fun t -> classed "tag-default tag-pill tag-outline" (item [text t])) tags))
+    (list (List.map (fun t -> classed "tag-default tag-pill tag-outline" (item (text t))) tags))
 }
 
 /// The author and the date of an article.
@@ -136,11 +133,11 @@ let meta author created more = ui {
   div
     { class_name = "article-meta" }
     ([
-      anchor "" profile [avatar "" author.image],
-      div { class_name = "info" } [
-        anchor "author" profile [text author.username],
-        span { class_name = "date" } [text (date created)],
-      ],
+      anchor "" profile (avatar "" author.image),
+      div
+        { class_name = "info" }
+        (anchor "author" profile (text author.username))
+        (span { class_name = "date" } (text (date created))),
     ]
       ++ more)
 }
@@ -179,30 +176,28 @@ let favorite_button place label article = ui {
     if article.favorited then "btn btn-sm btn-primary" else "btn btn-sm btn-outline-primary"
   classed
     (style ++ " " ++ place)
-    (button { disabled = false; on_click = Action.with favorite article } [
-      icon { class_name = "ion-heart" },
-      text (" " ++ label ++ show article.favoritesCount),
-    ])
+    (button
+      { disabled = false; on_click = Action.with favorite article }
+      (icon { class_name = "ion-heart" })
+      (text (" " ++ label ++ show article.favoritesCount)))
 }
 
 /// An article in a feed: its meta, title, description and tags.
 component preview (article : ArticlePreview) = ui {
-  div { class_name = "article-preview" } [
-    meta article.author article.createdAt [favorite_button "pull-xs-right" "" article],
-    anchor "preview-link" (Article article.slug) [
-      heading_at H1 [text article.title],
-      paragraph [text article.description],
-      span { class_name = "" } [text "Read more..."],
-      tag_list article.tagList,
-    ],
-  ]
+  div { class_name = "article-preview" }
+    meta article.author article.createdAt (favorite_button "pull-xs-right" "" article)
+    anchor "preview-link" (Article article.slug)
+      (heading_at H1 (text article.title))
+      (paragraph (text article.description))
+      (span { class_name = "" } (text "Read more..."))
+      (tag_list article.tagList)
 }
 
 /// The link to page `n` of a list, `active` when it is the one shown.
 page_link : Int -> (Int -> Page) -> Int -> Ui
 let page_link current page_of n = ui {
   let style = if n == current then "page-item active" else "page-item"
-  classed style (item [anchor "page-link" (page_of n) [text (Int.to_string n)]])
+  classed style (item (anchor "page-link" (page_of n) (text (Int.to_string n))))
 }
 
 /// The page links of a list of `count` articles, ten a page.
@@ -212,9 +207,8 @@ let pagination count current page_of = ui {
   if pages <= 1 then
     empty
   else
-    nav { class_name = "" } [
-      classed "pagination" (list (List.map (page_link current page_of) (List.range 1 (pages + 1)))),
-    ]
+    nav { class_name = "" }
+      classed "pagination" (list (List.map (page_link current page_of) (List.range 1 (pages + 1))))
 }
 
 /// Each article of a feed, by its slug.
@@ -225,7 +219,7 @@ let previews found = ui { fragment (List.map (fun a -> keyed a.slug (render prev
 articles : List ArticlePreview -> Ui
 let articles found = ui {
   if found == [] then
-    div { class_name = "article-preview empty-feed-message" } [text "No articles are here... yet."]
+    div { class_name = "article-preview empty-feed-message" } (text "No articles are here... yet.")
   else
     previews found
 }
@@ -234,11 +228,10 @@ let articles found = ui {
 followed : List ArticlePreview -> Ui
 let followed found = ui {
   if found == [] then
-    div { class_name = "article-preview empty-feed-message" } [
-      text "Your feed is empty. Follow some authors, or see the ",
-      Route.to Route.home [text "Global Feed"],
-      text ".",
-    ]
+    div { class_name = "article-preview empty-feed-message" }
+      text "Your feed is empty. Follow some authors, or see the "
+      Route.to Route.home (text "Global Feed")
+      text "."
   else
     previews found
 }

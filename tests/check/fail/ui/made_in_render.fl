@@ -20,12 +20,11 @@ let states =
 actions : Ui.View Float
 let actions =
   Ui.view (fun n -> ui {
-    fragment [
-      button { disabled = false; on_click = Action.exhaust (fun _ -> task { Atom.set count n }) } [
-        text "set",
-      ],
-      button { disabled = false; on_click = Action.with remove n } [text "remove"],
-    ]
+    fragment
+      button { disabled = false; on_click = Action.exhaust (fun _ -> task { Atom.set count n }) }
+        (text "set")
+
+      button { disabled = false; on_click = Action.with remove n } (text "remove")
   })
 
 inner : Ui.View Unit
@@ -42,10 +41,9 @@ let row n =
 keyed : Ui.View Float
 let keyed =
   Ui.view (fun id -> ui {
-    fragment [
-      Ui.field { bind = Atom.at drafts id; placeholder = ""; on_input = None },
-      Ui.render inner (),
-    ]
+    fragment
+      Ui.field { bind = Atom.at drafts id; placeholder = ""; on_input = None }
+      Ui.render inner ()
   })
 
 // a handler's task runs on an event, not while rendering
@@ -57,7 +55,7 @@ let handler =
         let fresh = Atom.make 0
         Atom.set count (Atom.current fresh)
       })
-    ui { button { disabled = false; on_click = reset } [text "reset"] }
+    ui { button { disabled = false; on_click = reset } (text "reset") }
   )
 
 fresh : Float -> Atom.Writable Float
@@ -88,10 +86,10 @@ let through =
 //~ FLICK-U006 @15:17-15:26 `Atom.make` while rendering makes another one on every render: make it once, with a top-level `let`, or one per key with `Atom.family`
 //~ FLICK-U006 @16:17-16:29 `Atom.derived` while rendering
 //~ FLICK-U006 @24:45-24:59 `Action.exhaust` while rendering
-//~ FLICK-U006 @35:48-35:55 `Ui.view` while rendering
-//~ FLICK-U006 @39:14-39:23 `Atom.make` while rendering
-//~ FLICK-U002 @56:7-59:9 `Ui.Event.exhaust` of a `fun` makes a handler on every render
-//~ FLICK-U006 @78:25-78:30 `fresh`, which calls `Atom.make`, while rendering
-//~ FLICK-U006 @77:13-77:22 `new_state`, which calls `Atom.make`, while rendering
-//~ FLICK-U006 @76:13-76:18 `fresh`, which calls `Atom.make`, while rendering
-//~ FLICK-U007 @38:5-38:8 `row` reads atoms to build a `Ui`
+//~ FLICK-U006 @34:48-34:55 `Ui.view` while rendering
+//~ FLICK-U006 @38:14-38:23 `Atom.make` while rendering
+//~ FLICK-U002 @54:7-57:9 `Ui.Event.exhaust` of a `fun` makes a handler on every render
+//~ FLICK-U006 @76:25-76:30 `fresh`, which calls `Atom.make`, while rendering
+//~ FLICK-U006 @75:13-75:22 `new_state`, which calls `Atom.make`, while rendering
+//~ FLICK-U006 @74:13-74:18 `fresh`, which calls `Atom.make`, while rendering
+//~ FLICK-U007 @37:5-37:8 `row` reads atoms to build a `Ui`

@@ -9,12 +9,11 @@ let remove = Action.exhaust (fun (n, _) -> task { Atom.set count n })
 counter : Ui.View Float
 let counter =
   Ui.view (fun n -> ui {
-    fragment [
+    fragment
       button
         { disabled = false; on_click = Ui.Event.exhaust (fun _ -> task { Atom.set count n }) }
-        [text "set"],
-      button { disabled = false; on_click = Action.with remove n } [text "remove"],
-    ]
+        (text "set")
+      button { disabled = false; on_click = Action.with remove n } (text "remove")
   })
 
 //~ FLICK-U002 @14:40-14:93 `Ui.Event.exhaust` of a `fun` makes a handler on every render: declare an `Action` at the top level, or pass data with `Action.with`

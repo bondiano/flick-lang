@@ -86,10 +86,10 @@ let follow_button author = ui {
       ("btn btn-sm btn-outline-secondary", "Follow ")
   View.classed
     style
-    (button { disabled = false; on_click = Action.with follow author } [
-      icon { class_name = "ion-plus-round" },
-      text (" " ++ label ++ author.username),
-    ])
+    (button
+      { disabled = false; on_click = Action.with follow author }
+      (icon { class_name = "ion-plus-round" })
+      (text (" " ++ label ++ author.username)))
 }
 
 /// Deletes the reader's article and goes home.
@@ -115,17 +115,18 @@ actions : Article -> Option User -> List Ui
 let actions article reader = ui {
   match reader with
   | Some me when me.username == article.author.username -> [
-    View.anchor "btn btn-sm btn-outline-secondary" (Editor (Some article.slug)) [
-      icon { class_name = "ion-edit" },
-      text " Edit Article",
-    ],
+    View.anchor
+      "btn btn-sm btn-outline-secondary"
+      (Editor (Some article.slug))
+      (icon { class_name = "ion-edit" })
+      (text " Edit Article"),
     text " ",
     View.classed
       "btn btn-sm btn-outline-danger"
-      (button { disabled = false; on_click = Action.with remove article.slug } [
-        icon { class_name = "ion-trash-a" },
-        text " Delete Article",
-      ]),
+      (button
+        { disabled = false; on_click = Action.with remove article.slug }
+        (icon { class_name = "ion-trash-a" })
+        (text " Delete Article")),
   ]
   | _ -> [
     follow_button article.author,
@@ -214,54 +215,53 @@ module Comments exposing (thread) =
     let author = Profile comment.author.username None
     let delete =
       if mine then
-        span { class_name = "mod-options" } [
-          button
-            { disabled = false; on_click = Action.with delete_comment (props.slug, comment.id) }
-            [
-              icon { class_name = "ion-trash-a" },
-            ],
-        ]
+        span { class_name = "mod-options" }
+          button {
+            disabled = false;
+            on_click = Action.with delete_comment (props.slug, comment.id);
+          }
+            icon { class_name = "ion-trash-a" }
       else
         empty
-    div { class_name = "card" } [
-      div { class_name = "card-block" } [View.classed "card-text" (paragraph [text comment.body])],
-      div { class_name = "card-footer" } [
-        View.anchor "comment-author" author [View.avatar "comment-author-img" comment.author.image],
-        text " ",
-        View.anchor "comment-author" author [text comment.author.username],
-        span { class_name = "date-posted" } [text (View.date comment.createdAt)],
-        delete,
-      ],
-    ]
+    div { class_name = "card" }
+      div { class_name = "card-block" } (View.classed "card-text" (paragraph (text comment.body)))
+      div { class_name = "card-footer" }
+        (View.anchor
+          "comment-author"
+          author
+          (View.avatar "comment-author-img" comment.author.image))
+        (text " ")
+        (View.anchor "comment-author" author (text comment.author.username))
+        (span { class_name = "date-posted" } (text (View.date comment.createdAt)))
+        delete
   }
 
   /// The comment form of a reader, or the link to sign up.
   component comment_form (props : Reading) = ui {
     match props.reader with
     | None ->
-      paragraph [
-        Route.to Register [text "Sign up"],
-        text " or sign in to add comments on this article.",
-      ]
+      paragraph
+        Route.to Register (text "Sign up")
+        text " or sign in to add comments on this article."
+
     | Some me ->
-      fragment [
-        render View.errors (),
+      fragment
+        render View.errors ()
         View.classed
           "card comment-form"
-          (form { on_submit = Action.with post props.slug } [
-            div { class_name = "card-block" } [
-              with_host
+          (form
+            { on_submit = Action.with post props.slug }
+            (div
+              { class_name = "card-block" }
+              (with_host
                 { host with class_name = Some "form-control"; name = Some "comment" }
-                (field_area { bind = draft; placeholder = "Write a comment..."; on_input = None }),
-            ],
-            div { class_name = "card-footer" } [
-              View.avatar "comment-author-img" me.image,
-              View.classed
+                (field_area { bind = draft; placeholder = "Write a comment..."; on_input = None })))
+            (div
+              { class_name = "card-footer" }
+              (View.avatar "comment-author-img" me.image)
+              (View.classed
                 "btn btn-sm btn-primary"
-                (submit { disabled = false } [text "Post Comment"]),
-            ],
-          ]),
-      ]
+                (submit { disabled = false } (text "Post Comment")))))
   }
 
   /// A comment of the article being read, by its id.
@@ -289,24 +289,22 @@ module Comments exposing (thread) =
 component shown (props : { article : Article; reader : Option User; key : Key }) = ui {
   let article = props.article
   let meta = View.meta article.author article.createdAt (actions article props.reader)
-  div { class_name = "article-page" } [
-    div { class_name = "banner" } [
-      div { class_name = "container" } [heading_at H1 [text article.title], meta],
-    ],
-    div { class_name = "container page" } [
-      div { class_name = "row article-content" } [
-        div { class_name = "col-md-12" } [
-          html (trusted_html (Markdown.to_html article.body)),
-          View.tag_list article.tagList,
-        ],
-      ],
-      hr,
-      div { class_name = "article-actions" } [meta],
-      div { class_name = "row" } [
-        div { class_name = "col-xs-12 col-md-8 offset-md-2" } [render Comments.thread props.key],
-      ],
-    ],
-  ]
+  div { class_name = "article-page" }
+    div { class_name = "banner" }
+      (div { class_name = "container" } (heading_at H1 (text article.title)) meta)
+
+    div { class_name = "container page" }
+      (div
+        { class_name = "row article-content" }
+        (div
+          { class_name = "col-md-12" }
+          (html (trusted_html (Markdown.to_html article.body)))
+          (View.tag_list article.tagList)))
+      hr
+      (div { class_name = "article-actions" } meta)
+      (div
+        { class_name = "row" }
+        (div { class_name = "col-xs-12 col-md-8 offset-md-2" } (render Comments.thread props.key)))
 }
 
 /// The page of the article at `slug`.
@@ -317,11 +315,10 @@ component page (slug : String) = ui {
   | Atom.Loaded body ->
     render shown { article = body.article; reader = Session.signed_in (); key = key }
   | Atom.Loading ->
-    div { class_name = "article-page" } [
-      div { class_name = "container page" } [text "Loading article..."],
-    ]
+    div { class_name = "article-page" }
+      div { class_name = "container page" } (text "Loading article...")
+
   | Atom.Failed _ ->
-    div { class_name = "article-page" } [
-      div { class_name = "container page" } [text "The article cannot be found."],
-    ]
+    div { class_name = "article-page" }
+      div { class_name = "container page" } (text "The article cannot be found.")
 }

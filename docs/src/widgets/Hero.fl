@@ -91,7 +91,7 @@ let press model =
     Atom.set model { current with lying = lying; answer = answer }
 
 part : String -> String -> Ui
-let part class_name value = ui { span { class_name = class_name } [text value] }
+let part class_name value = ui { span { class_name = class_name } (text value) }
 
 sign : Bool -> Ui
 let sign lying =
@@ -112,62 +112,56 @@ let sign lying =
       part "sign-returns" "UserView",
     ]
   ui {
-    div { class_name = "hero-sign" } [
-      span { class_name = "sign-head" } [
-        part "sign-name" "load_view",
-        text " : UserId ",
-      ],
-      span { class_name = "sign-row" } row,
-    ]
+    div { class_name = "hero-sign" }
+      span { class_name = "sign-head" }
+        (part "sign-name" "load_view")
+        (text " : UserId ")
+
+      span { class_name = "sign-row" } row
   }
 
 status : Model -> Ui
 let status m =
   match m.answer with
   | Untested -> ui {
-    div { class_name = "status-text" } [
+    div { class_name = "status-text" }
       text
         (
           if m.ru then
             "Это настоящий компилятор, он работает прямо в браузере."
           else
             "This is the real compiler, running in your browser."
-        ),
-    ]
+        )
   }
   | Asking -> ui {
-    div { class_name = "status-text" } [
-      text (if m.ru then "Спрашиваем компилятор…" else "Asking the compiler…"),
-    ]
+    div { class_name = "status-text" }
+      text (if m.ru then "Спрашиваем компилятор…" else "Asking the compiler…")
   }
   | Holds -> ui {
-    div { class_name = "status-text" } [
+    div { class_name = "status-text" }
       text
         (
           if m.ru then
             "Компилируется. Сигнатура снова говорит правду."
           else
             "It compiles. The signature tells the truth again."
-        ),
-    ]
+        )
   }
   | Unavailable -> ui {
-    div { class_name = "status-text is-error" } [
+    div { class_name = "status-text is-error" }
       text
         (
           if m.ru then
             "Компилятор не загрузился. Проверьте соединение и попробуйте ещё раз."
           else
             "The compiler could not load. Check your connection and try again."
-        ),
-    ]
+        )
   }
   | Caught diagnostic -> ui {
-    div { class_name = "status-text is-error" } [
-      span { class_name = "status-code" } [text diagnostic.code],
-      text " ",
-      span { class_name = "status-message" } [text diagnostic.message],
-    ]
+    div { class_name = "status-text is-error" }
+      span { class_name = "status-code" } (text diagnostic.code)
+      text " "
+      span { class_name = "status-message" } (text diagnostic.message)
   }
 
 view : Atom.Writable Model -> Model -> Ui
@@ -185,26 +179,25 @@ let view model m =
     | (false, false, true) -> "Заставить соврать"
     | (false, false, false) -> "Try to make it lie"
   ui {
-    div { class_name = "hero-proof" } [
-      sign m.lying,
-      div { class_name = "hero-stem" } [],
-      div { class_name = "hero-press" } [
-        attributes
+    div { class_name = "hero-proof" }
+      sign m.lying
+      div { class_name = "hero-stem" }
+      div { class_name = "hero-press" }
+        (attributes
           [("aria-pressed", if m.lying then "true" else "false")]
           (button
             {
               disabled = not m.ready || asking;
               on_click = Ui.Event.exhaust (fun _ -> task { press model });
             }
-            [text label]),
-      ],
+            (text label)))
+
       attributes
         [("role", "status"), ("aria-live", "polite")]
-        (div { class_name = "hero-status" } [status m]),
+        (div { class_name = "hero-status" } (status m))
       attributes
         [("id", "flick-hero-refresh"), ("hidden", "hidden"), ("tabIndex", "-1")]
-        (button { disabled = false; on_click = Ui.Event.latest (fun _ -> Effect.void) } []),
-    ]
+        (button { disabled = false; on_click = Ui.Event.latest (fun _ -> Effect.void) })
   }
 
 initial_model : Bool -> Model

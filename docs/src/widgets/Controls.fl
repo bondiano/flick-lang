@@ -21,20 +21,18 @@ let view model m =
   let search_label = if m.ru then "Поиск" else "Search"
   let theme_label = if m.ru then "Переключить тему" else "Toggle color theme"
   ui {
-    div { class_name = "site-controls" } [
-      span { class_name = "search-control" } [
-        attributes
+    div { class_name = "site-controls" }
+      span { class_name = "search-control" }
+        (attributes
           [("id", "flick-search-open"), ("aria-label", search_label), ("aria-haspopup", "dialog")]
           (button
             { disabled = false; on_click = Ui.Event.latest (fun _ -> task { open_search () }) }
-            [
-              Elements.icon "search",
-              span { class_name = "search-word" } [text search_label],
-              span { class_name = "search-shortcut" } [text "⌘ K"],
-            ]),
-      ],
-      span { class_name = "icon-control theme-control" } [
-        attributes
+            (Elements.icon "search")
+            (span { class_name = "search-word" } (text search_label))
+            (span { class_name = "search-shortcut" } (text "⌘ K"))))
+
+      span { class_name = "icon-control theme-control" }
+        (attributes
           [("aria-label", theme_label), ("title", theme_label)]
           (button
             {
@@ -46,22 +44,18 @@ let view model m =
                   Atom.set model { m with dark = dark }
                 });
             }
-            [
-              span { class_name = "theme-light-icon" } [Elements.icon "moon"],
-              span { class_name = "theme-dark-icon" } [Elements.icon "sun"],
-            ]),
-      ],
-      span { class_name = "icon-control mobile-menu-control" } [
-        attributes
+            (span { class_name = "theme-light-icon" } (Elements.icon "moon"))
+            (span { class_name = "theme-dark-icon" } (Elements.icon "sun"))))
+
+      span { class_name = "icon-control mobile-menu-control" }
+        (attributes
           [
             ("aria-label", if m.ru then "Навигация" else "Navigation"),
             ("popoverTarget", "flick-navigation"),
           ]
-          (button { disabled = false; on_click = Ui.Event.latest (fun _ -> Effect.void) } [
-            Elements.icon "menu",
-          ]),
-      ],
-    ]
+          (button
+            { disabled = false; on_click = Ui.Event.latest (fun _ -> Effect.void) }
+            (Elements.icon "menu")))
   }
 
 shell : Bool ->{} Ui

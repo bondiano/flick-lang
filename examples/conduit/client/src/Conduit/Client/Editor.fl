@@ -154,12 +154,11 @@ classed_tag : String -> Ui
 let classed_tag t = ui {
   View.classed
     "tag-default tag-pill"
-    (item [
-      button { disabled = false; on_click = Action.with remove_tag t } [
-        icon { class_name = "ion-close-round" },
-      ],
-      text (" " ++ t),
-    ])
+    (item
+      (button
+        { disabled = false; on_click = Action.with remove_tag t }
+        (icon { class_name = "ion-close-round" }))
+      (text (" " ++ t)))
 }
 
 /// The editor of a new article, or of the one at `slug`.
@@ -172,31 +171,29 @@ component page (slug : Option String) =
         | None -> fill None
       })
   ui {
-    div { class_name = "editor-page" } [
-      div { class_name = "container page" } [
-        div { class_name = "row" } [
-          div { class_name = "col-md-10 offset-md-1 col-xs-12" } [
-            render View.errors (),
-            form { on_submit = Action.with submitted slug } [
-              Auth.form_input "title" TextInput "Article Title" title,
-              Auth.form_input "description" TextInput "What's this article about?" description,
-              Auth.form_area "body" "Write your article (in markdown)" body,
-            ],
-            form { on_submit = add_tag } [
-              fieldset { class_name = "form-group" } [
-                with_host
+    div { class_name = "editor-page" }
+      div { class_name = "container page" }
+        (div
+          { class_name = "row" }
+          (div
+            { class_name = "col-md-10 offset-md-1 col-xs-12" }
+            (render View.errors ())
+            (form
+              { on_submit = Action.with submitted slug }
+              (Auth.form_input "title" TextInput "Article Title" title)
+              (Auth.form_input "description" TextInput "What's this article about?" description)
+              (Auth.form_area "body" "Write your article (in markdown)" body))
+            (form
+              { on_submit = add_tag }
+              (fieldset
+                { class_name = "form-group" }
+                (with_host
                   { host with class_name = Some "form-control"; name = Some "tags" }
-                  (field { bind = tag; placeholder = "Enter tags"; on_input = None }),
-                render chosen (),
-              ],
-            ],
-            View.classed
+                  (field { bind = tag; placeholder = "Enter tags"; on_input = None }))
+                (render chosen ())))
+            (View.classed
               "btn btn-lg pull-xs-right btn-primary"
-              (button { disabled = false; on_click = Action.with clicked slug } [
-                text "Publish Article",
-              ]),
-          ],
-        ],
-      ],
-    ]
+              (button
+                { disabled = false; on_click = Action.with clicked slug }
+                (text "Publish Article")))))
   }

@@ -64,28 +64,26 @@ profile_tab : Bool -> Page -> String -> Ui
 let profile_tab active target label = ui {
   View.classed
     "nav-item"
-    (item [View.anchor (if active then "nav-link active" else "nav-link") target [text label]])
+    (item (View.anchor (if active then "nav-link active" else "nav-link") target (text label)))
 }
 
 /// The tabs of a profile's articles.
 article_tabs : String -> Bool -> Ui
 let article_tabs name favorites = ui {
-  div { class_name = "articles-toggle" } [
+  div { class_name = "articles-toggle" }
     View.classed
       "nav nav-pills outline-active"
-      (list [
-        profile_tab (not favorites) (Profile name None) "My Articles",
-        profile_tab favorites (Profile name (Some Favorites)) "Favorited Articles",
-      ]),
-  ]
+      (list
+        (profile_tab (not favorites) (Profile name None) "My Articles")
+        (profile_tab favorites (Profile name (Some Favorites)) "Favorited Articles"))
 }
 
 /// The articles of a profile's tab.
 component articles (key : Listed) = ui {
   match Atom.get (Atom.at listed key) with
   | Atom.Loaded body -> View.articles body.articles
-  | Atom.Loading -> div { class_name = "article-preview" } [text "Loading articles..."]
-  | Atom.Failed _ -> div { class_name = "article-preview" } [text "The articles cannot be loaded."]
+  | Atom.Loading -> div { class_name = "article-preview" } (text "Loading articles...")
+  | Atom.Failed _ -> div { class_name = "article-preview" } (text "The articles cannot be loaded.")
 }
 
 /// The reader's follow of the profile, or their own settings link.
@@ -93,28 +91,26 @@ action : Profile -> Option User -> Ui
 let action profile reader = ui {
   match reader with
   | Some me when me.username == profile.username ->
-    View.anchor "btn btn-sm btn-outline-secondary action-btn" Settings [
-      icon { class_name = "ion-gear-a" },
-      text " Edit Profile Settings",
-    ]
+    View.anchor "btn btn-sm btn-outline-secondary action-btn" Settings
+      icon { class_name = "ion-gear-a" }
+      text " Edit Profile Settings"
+
   | _ -> Article.follow_button profile
 }
 
 /// The user of a profile: their picture, name and bio.
 component user_info (props : { profile : Profile; reader : Option User }) = ui {
   let profile = props.profile
-  div { class_name = "user-info" } [
-    div { class_name = "container" } [
-      div { class_name = "row" } [
-        div { class_name = "col-xs-12 col-md-10 offset-md-1" } [
-          View.avatar "user-img" profile.image,
-          heading_at H4 [text profile.username],
-          paragraph [text (Option.with_default "" profile.bio)],
-          action profile props.reader,
-        ],
-      ],
-    ],
-  ]
+  div { class_name = "user-info" }
+    div { class_name = "container" }
+      (div
+        { class_name = "row" }
+        (div
+          { class_name = "col-xs-12 col-md-10 offset-md-1" }
+          (View.avatar "user-img" profile.image)
+          (heading_at H4 (text profile.username))
+          (paragraph (text (Option.with_default "" profile.bio)))
+          (action profile props.reader)))
 }
 
 /// The profile of `name`, on its tab of favored articles when `favorites`.
@@ -123,23 +119,21 @@ component page (props : { name : String; favorites : Bool }) = ui {
   match Atom.get (Atom.at profiles (Key jwt props.name)) with
   | Atom.Loaded body ->
     let profile = body.profile
-    div { class_name = "profile-page" } [
-      render user_info { profile = profile; reader = Session.signed_in () },
-      div { class_name = "container" } [
-        div { class_name = "row" } [
-          div { class_name = "col-xs-12 col-md-10 offset-md-1" } [
-            article_tabs profile.username props.favorites,
-            render articles (Listed jwt profile.username props.favorites),
-          ],
-        ],
-      ],
-    ]
+    div { class_name = "profile-page" }
+      render user_info { profile = profile; reader = Session.signed_in () }
+      div { class_name = "container" }
+        (div
+          { class_name = "row" }
+          (div
+            { class_name = "col-xs-12 col-md-10 offset-md-1" }
+            (article_tabs profile.username props.favorites)
+            (render articles (Listed jwt profile.username props.favorites))))
+
   | Atom.Loading ->
-    div { class_name = "profile-page" } [
-      div { class_name = "container" } [text "Loading profile..."],
-    ]
+    div { class_name = "profile-page" }
+      div { class_name = "container" } (text "Loading profile...")
+
   | Atom.Failed _ ->
-    div { class_name = "profile-page" } [
-      div { class_name = "container" } [text "The profile cannot be found."],
-    ]
+    div { class_name = "profile-page" }
+      div { class_name = "container" } (text "The profile cannot be found.")
 }

@@ -20,10 +20,9 @@ let numbers = List.range 1 51
 rows : Ui.View Unit
 let rows =
   Ui.view (fun () -> ui {
-    div { class_name = "page" } [
-      heading [text ("request " ++ Atom.value request)],
-      div { class_name = "rows" } (List.map (fun n -> paragraph [text ("row " ++ show n)]) numbers),
-    ]
+    div { class_name = "page" }
+      heading (text ("request " ++ Atom.value request))
+      div { class_name = "rows" } (List.map (fun n -> paragraph (text ("row " ++ show n))) numbers)
   })
 
 wait : Duration.Duration
@@ -53,7 +52,7 @@ let shown =
 counter : Ui.View Unit
 let counter =
   Ui.view (fun () -> ui {
-    button { disabled = false; on_click = click } [text ("clicks " ++ show (Atom.value clicks))]
+    button { disabled = false; on_click = click } (text ("clicks " ++ show (Atom.value clicks)))
   })
 
 /// The rows, the request's item behind a suspended view, and a button the

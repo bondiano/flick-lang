@@ -40,7 +40,7 @@ let main () =
   | None -> Platform.stdout_line "no container"
   | Some root -> provide Atom.layer {
     scope s {
-      let app = ui { fragment [Ui.render name_view name, Ui.render offline_view offline] }
+      let app = ui { fragment (Ui.render name_view name) (Ui.render offline_view offline) }
       let _mounted = Fiber.spawn s report (task { Ui.Dom.mount root report app })
       settle ()
       Platform.stdout_line (text ())

@@ -60,11 +60,10 @@ let main () =
     let cells = List.map (fun _ -> Ui.render cell ()) (List.range 0 2000)
     scope s {
       let app = ui {
-        fragment [
-          button { disabled = false; on_click = increment } [text "+1"],
-          Ui.render end_view (),
-          fragment cells,
-        ]
+        fragment
+          button { disabled = false; on_click = increment } (text "+1")
+          Ui.render end_view ()
+          fragment cells
       }
       let _ui = Fiber.spawn s report (task { Ui.Dom.mount root report app })
       settle ()

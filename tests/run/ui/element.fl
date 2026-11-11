@@ -33,15 +33,14 @@ component search () =
       | Ui.Detached -> Platform.stdout_line "detached"
     })
   ui {
-    div { class_name = "search" } [
+    div { class_name = "search" }
       input_at field {
         value = "";
         placeholder = "find";
         on_input = Ui.Event.latest (fun _ -> task { () });
-      },
-      button { disabled = false; on_click = focus } [text "focus"],
-      button { disabled = false; on_click = lost } [text "lost"],
-    ]
+      }
+      button { disabled = false; on_click = focus } (text "focus")
+      button { disabled = false; on_click = lost } (text "lost")
   }
 
 report : Failure e ->{} Unit

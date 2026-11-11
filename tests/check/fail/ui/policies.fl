@@ -12,7 +12,7 @@ component counter () = ui {
       disabled = false;
       on_click = Ui.Event.queue 0 (fun _ -> task { Atom.update count (fun n -> n + 1) });
     }
-    [text (show (Atom.value count))]
+    (text (show (Atom.value count)))
 }
 //~ FLICK-U001 @13:33-13:34 the capacity of `Ui.Event.queue` must be a positive integer
 
