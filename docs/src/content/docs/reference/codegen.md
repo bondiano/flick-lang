@@ -497,7 +497,11 @@ issues, paths and texts, and `Json.parse` fails with V8's messages. An
 `Http.Server.serve` listens with Go's `net/http`: each request runs its
 handler in a fiber of its own with the services of the call, a failure
 answers with the status of the JS target, and closing the scope stops
-accepting connections and waits for the running requests. The rest of
+accepting connections and waits for the running requests. Each request owns
+its resources through response-body streaming. After the grace period
+(20 seconds by default), remaining requests are interrupted and joined,
+including their finalizers, before the server owner's resources are released.
+The grace timeout does not bound cleanup or uninterruptible work. The rest of
 `Http` and `HttpApi` follows Effect and the JS target: headers, cookies,
 URLs, the router's defaults, middleware, multipart forms, static files,
 streamed bodies, the client on `net/http` (interrupting a fiber cancels its

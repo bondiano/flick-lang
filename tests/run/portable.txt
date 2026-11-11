@@ -141,6 +141,9 @@ stdlib/http/types
 stdlib/http/server
 stdlib/http/streams
 stdlib/http/lifecycle
+stdlib/http/shutdown_masked
+stdlib/http/shutdown_stream
+stdlib/http/shutdown_timeout
 stdlib/http/api
 stdlib/http/api_bodies
 stdlib/http/auth

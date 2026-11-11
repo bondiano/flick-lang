@@ -243,6 +243,9 @@ stdlib/http/redaction_context
 stdlib/http/router_patterns
 stdlib/http/serve
 stdlib/http/server
+stdlib/http/shutdown_masked
+stdlib/http/shutdown_stream
+stdlib/http/shutdown_timeout
 stdlib/http/spa
 stdlib/http/spans
 stdlib/http/streams

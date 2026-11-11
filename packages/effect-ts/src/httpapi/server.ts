@@ -4,12 +4,11 @@
 // handler with the services of `listen`, and its typed error is sent with
 // the declared status. Closing the scope stops accepting, lets the running
 // requests finish and runs their finalizers.
-import * as NodeHttpServer from "@effect/platform-node/NodeHttpServer";
 import { type Context, Effect, Exit, Option, Result, Schema, Scope } from "effect";
 import { HttpRouter, type HttpServerRequest, HttpServerResponse } from "effect/http";
 
 import type { Tagged } from "../data.ts";
-import { nodeHttp } from "../host.ts";
+import { ownedServer } from "../effect/http/HttpServer.ts";
 import { acquireRelease } from "../owner.ts";
 import { codecDecode, codecEncode } from "../schema/index.ts";
 import type { SchemaError } from "../schema/issues.ts";
@@ -249,15 +248,13 @@ const start = (options: ServeOptions, api: Api, handlers: Handlers) =>
       yield* router.add("GET", routePath(options.scalar.value), HttpServerResponse.html(scalarPage(yield* bundle<Scalar>("httpApiScalar"), api.name, text)));
     }
     const scope = yield* Scope.make();
-    const made = yield* NodeHttpServer.make(() => nodeHttp().createServer(), {
+    const made = yield* ownedServer(scope, {
       host: options.host,
       port: options.port,
-    }).pipe(
-      Effect.provideService(Scope.Scope, scope),
+      gracefulShutdownTimeout: Option.none(),
+    }, router.asHttpEffect()).pipe(
       Effect.mapError((error) => serveError(error.message)),
-      Effect.onError((cause) => Scope.close(scope, Exit.failCause(cause))),
     );
-    yield* made.serve(router.asHttpEffect()).pipe(Effect.provideService(Scope.Scope, scope));
     const port = made.address._tag === "UnixPathAddress" ? 0 : made.address.port;
     return { port, scope } satisfies Server;
   });

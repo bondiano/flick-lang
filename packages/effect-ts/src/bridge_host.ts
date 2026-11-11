@@ -63,6 +63,23 @@ const hostOwnerOf = (owner: Owner): HostOwner => {
   if (found !== undefined) return found;
   const made = new HostOwner(EScope.makeUnsafe());
   hostOwners.set(owner, made);
+  // External sources must stop in the native owner's C1, even though their
+  // Effect resource scope stays on its C5 stack. Both closes share one hook.
+  made.onClose = (hook) => {
+    let ran = false;
+    const once = () => Effect.suspend(() => {
+      if (ran) return Effect.void;
+      ran = true;
+      return Effect.asVoid(hook());
+    });
+    return Effect.asVoid(callEffect(() => {
+      made.closing.add(once);
+      const run = () => fromEffect(once());
+      if (owner.finalizing || made.finalizing) return run();
+      owner.closing.add(run);
+      return undefined;
+    }));
+  };
   addTo(owner, (exit: Exit) => fromEffect(closeHost(made, exit.cause === undefined ? EExit.void : EExit.failCause(causeToEffect(exit.cause)))), true);
   return made;
 };

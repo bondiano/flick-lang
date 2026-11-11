@@ -9,13 +9,15 @@ export type Handler<E = unknown, R = unknown> = (request: HttpServerRequest) => 
 
 /** Effect's app of a Flick handler. */
 export const toApp = <E, R>(handler: Handler<E, R>): Effect.Effect<HttpServerResponse, E, R | HttpServerRequest> =>
-  Effect.flatMap(Effect.service(HttpServerRequest), handler);
+  Effect.flatMap(Effect.service(HttpServerRequest), (request) => Effect.interruptible(handler(request)));
 
 /** The Flick handler of Effect's app. */
 export const toHandler =
   <A, E, R>(app: Effect.Effect<A, E, R>) =>
   (request: HttpServerRequest): Effect.Effect<A, E, Exclude<R, HttpServerRequest>> =>
-    Effect.provideService(app, HttpServerRequest, request);
+    // Native HTTP apps enter under HttpEffect's mask; routers restore ordinary
+    // routes themselves and preserve explicitly uninterruptible routes.
+    Effect.uninterruptible(Effect.provideService(app, HttpServerRequest, request));
 
 /** A middleware of Effect's apps as a function of Flick handlers. */
 export const lift =
