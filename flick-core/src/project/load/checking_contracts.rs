@@ -1,4 +1,22 @@
 impl Checking<'_> {
+    fn callee_signature_explicit(
+        context: &Virtual,
+        contracts: &dyn Fn(&str) -> Option<Interface>,
+    ) -> bool {
+        match &context.capture.callee {
+            Some(CalleeOrigin::Module(name)) => {
+                contracts(name).is_some_and(|i| i.signature_explicit)
+            }
+            Some(CalleeOrigin::Member(member)) => {
+                Self::public_contract_interface(&member.parent, contracts)
+                    .and_then(|i| i.modules.get(&member.name).map(|m| m.signature_explicit))
+                    .unwrap_or(false)
+            }
+            Some(CalleeOrigin::Parameter { .. }) => true,
+            None => false,
+        }
+    }
+
     fn public_contract_interface(
         name: &str,
         contracts: &dyn Fn(&str) -> Option<Interface>,
@@ -92,6 +110,12 @@ impl Checking<'_> {
         contracts: &dyn Fn(&str) -> Option<Interface>,
     ) -> Option<types::ModuleSignature> {
         let context = loaded.virtual_of.as_ref()?;
+        // An inferred shape validates applications, but does not introduce an
+        // abstraction boundary. In particular it must not erase ADT constructors
+        // explicitly exposed by an unannotated private factory's source body.
+        if !Self::callee_signature_explicit(context, contracts) {
+            return None;
+        }
         let mut signature = Self::callee_signature(context, lookup, contracts)?;
         for argument in &context.capture.arguments {
             let types::ModuleSignature::Functor {

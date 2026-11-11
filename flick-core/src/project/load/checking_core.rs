@@ -295,21 +295,10 @@ impl Checking<'_> {
                 expected.seal(&interface, &loaded.name)
             };
             if interface.functor.is_some() {
-                interface.signature_explicit = loaded.virtual_of.as_ref().is_some_and(|v| match &v
-                    .capture
-                    .callee
-                {
-                    Some(CalleeOrigin::Module(name)) => {
-                        contracts(name).is_some_and(|i| i.signature_explicit)
-                    }
-                    Some(CalleeOrigin::Member(member)) => {
-                        Self::public_contract_interface(&member.parent, contracts)
-                            .and_then(|i| i.modules.get(&member.name).map(|m| m.signature_explicit))
-                            .unwrap_or(false)
-                    }
-                    Some(CalleeOrigin::Parameter { .. }) => true,
-                    None => false,
-                });
+                interface.signature_explicit = loaded
+                    .virtual_of
+                    .as_ref()
+                    .is_some_and(|v| Self::callee_signature_explicit(v, contracts));
             }
         }
         // what the plugins find from the types of their code stops lowering too
