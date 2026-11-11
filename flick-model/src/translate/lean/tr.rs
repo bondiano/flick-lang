@@ -76,6 +76,11 @@ pub(super) struct Tr {
     pub callback_only: bool,
     /// the arrows on the way to the result so far
     stages: usize,
+    /// the value bounds `a^c` on variables of the scheme, rule 1: `(a, c)`,
+    /// a fact of the scheme
+    pub bounds: Vec<(Ty, Ty)>,
+    /// the binders of the `∀` of parameters open here
+    inner: Vec<String>,
 }
 
 /// What a qualified argument reaches besides its qualifier.
@@ -137,7 +142,15 @@ impl Tr {
                 app(h, fields)
             }
             fc::Type::Row(_) | fc::Type::Union(..) => self.row(t)?,
-            fc::Type::Captured { ty, captures, .. } | fc::Type::Bounded { ty, captures } => {
+            fc::Type::Bounded { ty, captures } => {
+                let fc::Type::Var(a) = &**ty else {
+                    return Err(Skip::Other(
+                        "a value bound on a type that is not a variable".into(),
+                    ));
+                };
+                self.bound(a, captures)?
+            }
+            fc::Type::Captured { ty, captures, .. } => {
                 let (names, inner) = self.open(ty)?;
                 let t = match inner {
                     fc::Type::Fun {
@@ -148,19 +161,21 @@ impl Tr {
                         self.arrow(param, effects.as_deref(), result, Some(captures), neg, held)?
                     }
                     fc::Type::App { .. } => self.data(inner, Some(captures), neg)?,
-                    // a type variable: its bound is not modelled; other data
-                    // has no storage
+                    // a hidden qualifier on a type variable adds nothing
                     _ => {
                         self.held = held;
                         self.ty(inner, neg)?
                     }
                 };
+                self.close(&names);
                 all(names, t)
             }
             fc::Type::Forall { .. } => {
                 let (names, body) = self.open(t)?;
                 self.held = held;
-                all(names, self.ty(body, neg)?)
+                let t = self.ty(body, neg)?;
+                self.close(&names);
+                all(names, t)
             }
             other => return Err(Skip::Other(format!("no type {}", show_type(other)))),
         })
@@ -192,7 +207,31 @@ impl Tr {
                 None => names.push(v.name.clone()),
             }
         }
+        self.inner.extend(names.iter().cloned());
         Ok((names, body))
+    }
+
+    /// The binders `names` of a `∀` of a parameter are out of scope again.
+    fn close(&mut self, names: &[String]) {
+        self.inner.truncate(self.inner.len() - names.len());
+    }
+
+    /// `a^c` on a type variable: `∀v. a^v` of rule 2 is `a`, and a bound on
+    /// a variable of the scheme is `a` with the fact `(a, c)` (rule 1).
+    fn bound(&mut self, a: &String, captures: &fc::Type) -> Result<Ty, Skip> {
+        if matches!(captures, fc::Type::Var(v) if self.inst.get(v) == Some(a)) {
+            return Ok(Ty::Var(a.clone()));
+        }
+        let mut atoms = Vec::new();
+        self.atoms(captures, &mut atoms)?;
+        if iter::once(a).chain(&atoms).any(|v| self.inner.contains(v)) {
+            return Err(Skip::Other(
+                "a value bound over a variable of a `∀` of a parameter".into(),
+            ));
+        }
+        let c = cun(atoms.into_iter().map(Ty::Var).collect());
+        self.bounds.push((Ty::Var(a.clone()), c));
+        Ok(Ty::Var(a.clone()))
     }
 
     /// An arrow, its row with `Live` of what `held` and its parameter reach

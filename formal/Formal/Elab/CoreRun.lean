@@ -123,11 +123,11 @@ def RHas (Γ : List TSch) (Δ : List Cn) (e : Tm) (t : TTy) (φ : Stage) : Prop 
 /-- **λFlick⁺ as a `Target` with the run of the core.** -/
 def runTarget (hR : Real P Sg N) (hRun : RealRun P N root) (hroot : RootTy Sg root) : Target P where
   Has := RHas P Sg N
-  var hx hk := ⟨(typingTarget hR).var hx hk, fun _ h => by cases h⟩
+  var hx hk hb := ⟨(typingTarget hR).var hx hk hb, fun _ h => by cases h⟩
   allLam h := ⟨(typingTarget hR).allLam h.1, fun _ h => by cases h⟩
   allVar hx hk := ⟨(typingTarget hR).allVar hx hk, fun _ h => by cases h⟩
   varAll hx hk hA hus := ⟨(typingTarget hR).varAll hx hk hA hus, fun _ h => by cases h⟩
-  const hc hk := ⟨(typingTarget hR).const hc hk, fun _ h => by cases h⟩
+  const hc hk hb := ⟨(typingTarget hR).const hc hk hb, fun _ h => by cases h⟩
   app h₁ h₂ hψ := ⟨(typingTarget hR).app h₁.1 h₂.1 hψ, fun _ h => by cases h⟩
   ite h₁ h₂ h₃ := ⟨(typingTarget hR).ite h₁.1 h₂.1 h₃.1, fun _ h => by cases h⟩
   caseOpt h₁ h₂ h₃ := ⟨(typingTarget hR).caseOpt h₁.1 h₂.1 h₃.1, fun _ h => by cases h⟩
@@ -140,7 +140,7 @@ def runTarget (hR : Real P Sg N) (hRun : RealRun P N root) (hroot : RootTy Sg ro
   let_ h₁ hk hφ h₂ := ⟨(typingTarget hR).let_ h₁.1 hk hφ h₂.1, fun _ h => by cases h⟩
   lamD h hφ := ⟨(typingTarget hR).lamD h.1 hφ, fun _ h => by cases h⟩
   dapp h₁ h₂ := ⟨(typingTarget hR).dapp h₁.1 h₂.1, fun _ h => by cases h⟩
-  meth hm hc h := ⟨(typingTarget hR).meth hm hc h.1, fun _ h => by cases h⟩
+  meth hm hc hb h := ⟨(typingTarget hR).meth hm hc hb h.1, fun _ h => by cases h⟩
   dvar hk := ⟨(typingTarget hR).dvar hk, fun _ h => by cases h; exact .var hk⟩
   slot h hs := ⟨(typingTarget hR).slot h.1 hs, fun _ e => by cases e; exact .slot (h.2 _ rfl) hs⟩
   dap h₁ h₂ := ⟨(typingTarget hR).dap h₁.1 h₂.1,

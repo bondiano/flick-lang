@@ -7,7 +7,7 @@ import Formal.Elab.Exh
 
 `Eff` of the model is a nominal type of the core, `Eff q b`, whose constructor `MkEff` has
 the field `eff ∅ ∅ b {q}`: the hidden qualifier of the computation is the parameter `q` of
-kind `CRow` (simplification 15). `⌈Eff q b⌉ = ⌈q⌉ ∪ ⌈b⌉` through `tapp`. A lazy body is
+kind `CRow` (simplification 16). `⌈Eff q b⌉ = ⌈q⌉ ∪ ⌈b⌉` through `tapp`. A lazy body is
 `MkEff (task …)`, typed by (Task) of the core: the task runs where the result's qualifier
 is live, so it awaits only tasks whose qualifiers that one covers. `pure`, `map2` and `flat_map` of `Monad Eff` are typed at the translations of their
 schemes in `Sugar` (`bindTy`, `map2Ty`), the class variable instantiated by `Eff`.

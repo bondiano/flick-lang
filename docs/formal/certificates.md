@@ -36,7 +36,7 @@ It does not prove:
 | The core | `formal/Formal/` | The typing rules the certificates use. |
 | The derived rules | `formal/FormalCert/Rules.lean`, `Match.lean` | Theorems that `lake build --wfail` checks. They add nothing to the trusted base. |
 | The tactics | `formal/FormalCert/Tactics.lean` | Macros over `simp`, `decide` and `omega`. The kernel checks what they produce, so a tactic that fails makes its certificate fail. |
-| The signature | `formal/FormalCert/GenSig.lean` | Generated. `GenSig S` assumes that `S` has the generator's constructors at their declared types, that those types have no other constructors, and that `S` has the globals at their elided schemes (`check::elided`). `GenSig.inhabited` gives a signature that satisfies all of it, so the assumption is consistent. It says nothing about `Typ`. |
+| The signature | `formal/FormalCert/GenSig.lean` | Generated. `GenSig S` assumes that `S` has the generator's constructors at their declared types and that those types have no other constructors, the list constructors `Nil`/`Cons` among them. It assumes the globals at their elided schemes (`check::elided`), with their facts: the generator's values, `List.Core.get`, the region globals `open_scoped`, `use`, `Fiber.spawn`, `Resource.acquire_release` and `Scope.add_finalizer`, and the dictionary of each instance. It assumes the operations of each service without parameters, and no others, and the fields of each class's dictionary. `GenSig.inhabited` gives a signature that satisfies all of it, so the assumption is consistent. It says nothing about `Typ`. |
 | The printers | `flick-model/src/cert/`, `flick-model/src/translate/lean/elide.rs` | They write the term, its type and the signature. A wrong printer certifies the wrong statement. |
 
 Each certificate depends only on the axioms `propext`, `Classical.choice` and
@@ -70,31 +70,53 @@ Each certificate depends only on the axioms `propext`, `Classical.choice` and
   `{ℓ = x, ..}`. A `try` arm catches all of the body's errors with `x` or `_`,
   or the error `E` with an arm `E x̄` (`catches_all`, `catches_ctor`).
 
+- **Lists.** The core has no list. A literal `[x, y]` is the spine
+  `Cons x (Cons y Nil)` of constructors only the signature has.
+- **Services.** An operation `(ask_S ()).o` is the core's `perform`, at the
+  arrow `a →{S} b`. The model types it `a →{} b` and asks for `S` where it
+  runs. `provide (Layer.succeed S w) e` is lowered to
+  `let w = ⟦w⟧ in hdl S (o x → w.o x) (λv. v) ⟦e⟧` (`Cert.typ_provide`): the
+  arm reads the layer's record through a variable, so the record may hold
+  anything. `Layer.effect S task` builds the record once, before the body,
+  with `await ⟦task⟧`.
+- **Dictionaries.** A method `d.m` or a superclass `d.$S` is (Dproj) of the
+  dictionary's class, numbered by the sorted classes of the generator
+  (`Cert.typ_dproj`). An instance is a global.
+- **Regions.** `scope s { e }` binds its region as type variable 0 and its
+  owner as term variable 0 (`Cert.typ_scope`). Its body is written in that
+  binder, `Fiber.Owner s` as the core's `.owner s`, and may assume that what
+  is outside outlives the region (`Cert.scope_single`), the fact work kept in
+  it needs. The obligations `Provided {S} ϱ` of that work are the core's
+  `.ob`/`.obv` elements, which the end of the scope discharges.
+- **Facts and value bounds.** A scheme's `Outlives C s` is `Facts.single C s`,
+  and a value bound `a^c` on one of its variables is `Facts.bnd`, rule 1 of
+  the scheme translation. The `holds` tactic proves them at each instance. A
+  bound on any other type is read as the core reads it: on data, the data; on
+  a function or a computation, its use qualifier. A cell's constants
+  `Ref.make`, `Ref.get` and `Ref.set` are the core's `.const` at the content
+  and capacity of the cell, and `Const.ok` checks that the content reaches no
+  more than the capacity.
+
 Records are written in the order of their labels, and string literals are core
 literals of the base type `String` (simplification 3 of
 [`formal/README.md`](../../formal/README.md#assumptions-and-simplifications)).
 
 The plan was to close side conditions with reflective deciders proved sound in
 Lean. The tactics were enough, and they are fast. In the first measurement, four
-certificates took about 0.24 s. A run of 2000 generated programs gives 1094
-certificates, and Lean checks all of them in about 20 s (200 s of CPU time over
-the cores).
+certificates took about 0.24 s. Every program of a run of 2000 generated programs
+has a certificate, and Lean checks all of them in about 35 s.
 
 ## What is not written yet
 
 `flick-model/tests/cert_gaps.txt` lists the forms that certificates do not write
 yet. It is computed over a fixed run of 500 programs, and each program is
-counted at the first form it stops at. On that run, 259 of the 500 programs have
-a certificate. The rest stop at:
-
-- `provide`, whose handler is the core's (Hdl) under a fresh region;
-- `scope` and the region constants;
-- method calls through dictionaries;
-- the list literal and `List.Core.get`;
-- value bounds `a^C`. The core has no value bounds, and the model's
-  `Ref.make : ∀c a. a^c →{} Ref (a^c)` bounds a cell's value. Certifying the
-  programs that use cells needs a core with these bounds, or a decided reading
-  of them.
+counted at the first form it stops at. On that run, every program has a
+certificate, so the list is empty. What a certificate still refuses, with its
+reason, is what the generator does not make today: an operation used without
+being called, a service with several operations or with parameters (`Within s`,
+whose global `touch` the signature skips), a layer that is neither `succeed`
+nor `effect`, a monomorphic `let` with facts, polymorphic recursion, a float,
+an open record, and a value bound over a variable of a parameter's `∀`.
 
 The list may only shrink. The test fails when a new gap appears, and a gap is
 taken off the list once it is closed. A count can grow only by programs that a

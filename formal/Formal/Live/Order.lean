@@ -236,12 +236,14 @@ theorem Const.ok_substT {Θ c ι} (σ : Atom → Ty)
     · obtain ⟨b, hb, h'⟩ := (Ty.reach_substT σ _ a).mp ha
       exact ⟨b, .inr hb, h'⟩
   case scopeRun => rw [← Row.ofCaps_substT]; exact h.substT σ
+  case refMake | refGet | refSet => rw [← Ty.reach_caps]; exact h.substT σ
   all_goals exact h
 
 theorem Const.ok_mono {Θ Θ' c ι} (h : Const.ok Θ c ι)
     (hΘ : ∀ C s, Outl Θ C s → Outl Θ' C s) : Const.ok Θ' c ι := by
   cases c <;> simp only [Const.ok] at h ⊢
   case addFin | spawn => exact ⟨hΘ _ _ h.1, hΘ _ _ h.2.1, h.2.2⟩
+  case refMake | refGet | refSet => exact hΘ _ _ h
   all_goals exact h
 
 end Flick

@@ -38,6 +38,9 @@ theorem TTy.subst_id (t : TTy) : t.subst .var = t := by
 
 theorem up_zero : up 0 = .var := by funext n; simp [up]
 
+@[simp] theorem Bound.subst_var : Bound.subst .var = id := by
+  funext b; simp [Bound.subst, Ty.subst_id]
+
 theorem TSch.subst_up_zero (s : TSch) : s.subst (up 0) = s := by
   simp [TSch.subst, lift_up_zero, TTy.subst_id]
 
@@ -141,9 +144,9 @@ theorem Tm.dapps_DB {L : Nat} : ∀ {f : Tm} {ds : List Dict}, f.DB L → (∀ d
 /-- **An elaboration names only premises of `Δ`.** -/
 theorem Elab.dbelow {Γ Δ e τ φ e'} (h : Elab P Γ Δ e τ φ e') : e'.DB Δ.length := by
   induction h with
-  | var _ _ he => exact Tm.dapps_DB trivial he.dbelow
-  | meth _ _ _ _ h₀ he => exact Tm.dapps_DB (h₀.dbelow _ (.head _)) he.dbelow
-  | const _ _ he => exact Tm.dapps_DB trivial he.dbelow
+  | var _ _ _ he => exact Tm.dapps_DB trivial he.dbelow
+  | meth _ _ _ _ _ h₀ he => exact Tm.dapps_DB (h₀.dbelow _ (.head _)) he.dbelow
+  | const _ _ _ he => exact Tm.dapps_DB trivial he.dbelow
   | con _ _ he => exact Tm.dapps_DB trivial he.dbelow
   | app _ _ _ ih₁ ih₂ => exact ⟨ih₁, ih₂⟩
   | lam _ ih => exact ih
@@ -166,27 +169,27 @@ theorem armS_tr (c : Ctor) (θ : Nat → Ty) (Γ : List Scheme) :
 theorem T6a {Γ Δ e τ φ e'} (h : Elab P Γ Δ e τ φ e') :
     X.Has (Γ.map Scheme.tr) Δ e' (.mono τ) φ := by
   induction h with
-  | @var Γ Δ x σ ts ds φ hx hk he =>
+  | @var Γ Δ x σ ts ds φ hx hk hb he =>
     have hv := X.var (Γ := Γ.map Scheme.tr) (Δ := Δ) (φ := φ) (ts := ts)
-      (by rw [List.getElem?_map, hx]; rfl) hk
+      (by rw [List.getElem?_map, hx]; rfl) hk hb
     simp only [Scheme.tr, TTy.subst_dicts, TTy.subst] at hv
     exact tm_dapps X hv (ent_typed X he)
-  | meth hm hc _ _ h₀ he =>
+  | meth hm hc _ _ hb h₀ he =>
     cases ent_typed X h₀ with
-    | cons r _ => exact tm_dapps X (X.meth hm hc r) (ent_typed X he)
-  | @const Γ Δ c σ ts ds φ hc hk he =>
-    have hv := X.const (Γ := Γ.map Scheme.tr) (Δ := Δ) (φ := φ) hc hk
+    | cons r _ => exact tm_dapps X (X.meth hm hc hb r) (ent_typed X he)
+  | @const Γ Δ c σ ts ds φ hc hk hb he =>
+    have hv := X.const (Γ := Γ.map Scheme.tr) (Δ := Δ) (φ := φ) hc hk hb
     simp only [TTy.subst_dicts, TTy.subst] at hv
     exact tm_dapps X hv (ent_typed X he)
   | @allLam Γ Δ k b t ψ b' _ ih =>
     refine X.allLam ?_
     simpa only [List.map_map, Function.comp_def, Scheme.tr_subst] using ih
-  | allVar hx hc hk =>
+  | allVar hx hc hb hk =>
     refine X.allVar ?_ hk
-    rw [List.getElem?_map, hx]; simp [Scheme.tr, hc, dicts]
-  | varAll hx hc hts hA hus =>
+    rw [List.getElem?_map, hx]; simp [Scheme.tr, hc, hb, dicts]
+  | varAll hx hc hb hts hA hus =>
     refine X.varAll ?_ hts hA hus
-    rw [List.getElem?_map, hx]; simp [Scheme.tr, hc, dicts]
+    rw [List.getElem?_map, hx]; simp [Scheme.tr, hc, hb, dicts]
   | app _ _ hψ ih₁ ih₂ => exact X.app ih₁ ih₂ hψ
   | ite _ _ _ ihc iha ihb => exact X.ite ihc iha ihb
   | caseOpt _ _ _ ihe ihn ihs => exact X.caseOpt ihe ihn ihs
@@ -211,7 +214,7 @@ theorem T6a {Γ Δ e τ φ e'} (h : Elab P Γ Δ e τ φ e') :
     exact X.caseKDead (σ := .var) (by rw [Ty.subst_id]; exact ihe) hK hT hlen hC ihr
   | lam _ ih => exact X.lam ih
   | let_ _ _ ih₁ ih₂ =>
-    refine X.let_ (k := 0) ?_ (fun h => absurd rfl h) (.inr rfl) ih₂
+    refine X.let_ (k := 0) (bd := []) ?_ (fun h => absurd rfl h) (.inr rfl) ih₂
     simpa [TSch.subst_up_zero, Cn.subst_up_zero] using ih₁
   | @letSig Γ Δ σ e b t φ₁ φ e' b' he hp hφ _ ih₁ ih₂ =>
     have hd := X.lamD (q := σ.q) ih₁ (fun h => hp (.inl h))

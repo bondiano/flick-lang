@@ -61,7 +61,7 @@ def map2Ty (f c d a b x d' : Ty) : Ty :=
 /-- `∀a₁ … aₙ r c. (a₁ →^c … → aₙ →^c r) →P (T_n →^c r)`, for `n ≥ 1`. -/
 def uncSch (tup n : Nat) : Scheme :=
   ⟨n + 2, [], arrP (curry (.var (n + 1)) (vars n) (.var n))
-    (.arr .P (nest tup (.var 0) (vars n).tail) (.var n) (.var (n + 1))), .cnil⟩
+    (.arr .P (nest tup (.var 0) (vars n).tail) (.var n) (.var (n + 1))), .cnil, []⟩
 
 /-- `each_φ`, the loop of `for … do` at the stage `φ` (`docs/formal/elaboration.md#the-loop-rule-l-was-missing`):
 `each_P : ∀c d a. (a →P^c Unit) →P (Seq d a →P^c Unit)`, and for every `R r e` the one
@@ -71,7 +71,7 @@ the checker's `for_loop` reads a loop, its body live and nothing of the source, 
 the other schemes (`PreludeSchemes`). -/
 def eachSch (unit seq : Nat) : Stage → Scheme
   | .P => ⟨3, [], arrP (.arr .P (.var 2) (.con unit) (.var 0))
-      (.arr .P (appQ (.con seq) (.var 1) (.var 2)) (.con unit) (.var 0)), .cnil⟩
+      (.arr .P (appQ (.con seq) (.var 1) (.var 2)) (.con unit) (.var 0)), .cnil, []⟩
   | .R _ _ => PreludeSchemes.Seq.each_loop unit seq
 
 /-- The Prelude classes and methods, the constants of Γ₀ and the types the sugar uses. -/
@@ -116,10 +116,10 @@ structure Sugar (P : Prog) where
   /-- `pair : ∀a b. a →P b →P (a, b)`, a constant of the model: no Prelude name (`docs/formal/elaboration.md#the-loop-rule-l-was-missing`,
   README simplification 9) -/
   hPair : P.consts pair = some ⟨2, [], arrP (.var 0) (arrP (.var 1)
-    (.app (.app (.con tup) (.var 0)) (.var 1))), .cnil⟩
+    (.app (.app (.con tup) (.var 0)) (.var 1))), .cnil, []⟩
   /-- `unc n`, a constant of the model: no Prelude name (`docs/formal/elaboration.md#the-loop-rule-l-was-missing`, README simplification 9) -/
   hUnc : ∀ n, 0 < n → P.consts (unc n) = some (uncSch tup n)
-  hNone : P.consts noneC = some ⟨1, [], optTy (.var 0), .cnil⟩
+  hNone : P.consts noneC = some ⟨1, [], optTy (.var 0), .cnil, []⟩
   /-- `Seq.flat_map : ∀c d a b e. bindTy Seq c d a b e` (`Seq.fl`) -/
   hSeqFlatMap : P.consts seqFlatMap = some (PreludeSchemes.Seq.flat_map seq)
   /-- `singleton : ∀a r. a →P Seq r a` (`a → Seq a`) -/
@@ -130,7 +130,7 @@ structure Sugar (P : Prog) where
   hToList : P.consts toList = some (PreludeSchemes.Seq.to_list seq list)
   /-- `each_φ` (`eachSch`) -/
   hEach : ∀ φ, P.consts (each φ) = some (eachSch unit seq φ)
-  hUnitV : P.consts unitV = some ⟨0, [], .con unit, .cnil⟩
+  hUnitV : P.consts unitV = some ⟨0, [], .con unit, .cnil, []⟩
   /-- `from_result : ∀e a. Result (Errors e) a →R⟨∅; e⟩ a` (`core.md` §1.4) -/
   hFromResult : P.consts fromResult = some (PreludeSchemes.from_result result errors)
 
@@ -212,6 +212,6 @@ def Sugar.tryOption (e b : Exp) : Exp := .caseOpt e (.const S.noneC) b
 
 /-- `s; rest` of a block: `let _ : Unit = s in rest`. -/
 def Sugar.seqUnit (s rest : Exp) : Exp :=
-  .letSig ⟨0, [], .con S.unit, .cnil⟩ s (rest.rename Nat.succ)
+  .letSig ⟨0, [], .con S.unit, .cnil, []⟩ s (rest.rename Nat.succ)
 
 end Flick.Elab

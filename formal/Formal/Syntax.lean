@@ -255,12 +255,13 @@ def Row.obs (r : Row) (s : Ty) : Row
   | _ => False
 
 /-- The type of a constant at an instance. A spawned child and a finalizer are
-`Eff` with qualifier `C`; their owner is `s`. -/
+`Eff` with qualifier `C`; their owner is `s`. A cell stores `t`, and `C` is its capacity,
+the bound `α^c` of `Ref.*`: storing into a cell needs the capacity live. -/
 def Const.ty (S : Sig) : Const → CArg → Ty
   | .refMake, ι => .arrow ι.t (.rt Row.none Row.none) (.ref ι.t) Caps.none
   | .refGet, ι => .arrow (.ref ι.t) (.rt Row.none Row.none) ι.t Caps.none
   | .refSet, ι =>
-    .arrow (.ref ι.t) .pure (.arrow ι.t (.rt Row.none Row.none) (.base .unit) Caps.none) Caps.none
+    .arrow (.ref ι.t) .pure (.arrow ι.t (.rt Row.none Row.none) (.base .unit) ι.C) Caps.none
   | .open_, ι => .arrow (.owner ι.s) (.rt (Row.scope ι.s) Row.none) (.hnd ι.s) Caps.none
   | .op, ι =>
     .arrow (.hnd ι.s) (.rt (Row.scope ι.s) Row.none) (.base .unit) Caps.none
@@ -289,7 +290,8 @@ def Row.Outlives (Θ : Facts) (r : Row) (s : Ty) : Prop := Outl Θ (Ty.row r).re
 
 /-- Side conditions of a constant at an instance: a finalizer and a child outlive their
 owner, with everything they hold
-(`docs/formal/regions.md#spawn-bounds-everything-the-task-holds`). -/
+(`docs/formal/regions.md#spawn-bounds-everything-the-task-holds`); a cell's capacity
+bounds what the cell stores, `⌈t⌉ ⊆ C`, the premise (Inst) gives the value bound `α^c`. -/
 def Const.ok (Θ : Facts) : Const → CArg → Prop
   | .addFin, ι =>
     Outl Θ ι.C ι.s ∧ Row.Outlives Θ ι.r ι.s ∧ Row.Sub (Row.ofCaps ι.C) ι.r
@@ -297,6 +299,7 @@ def Const.ok (Θ : Facts) : Const → CArg → Prop
   | .spawn, ι =>
     Outl Θ (fun a => ι.C a ∨ ι.t.reach a) ι.s ∧ Row.Outlives Θ ι.r ι.s ∧
       Row.Sub (Row.ofCaps ι.C) ι.r
+  | .refMake, ι | .refGet, ι | .refSet, ι => Outl Θ ι.t.reach (.caps ι.C)
   | .perform _ _ _, _ => False
   | _, _ => True
 

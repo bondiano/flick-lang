@@ -96,7 +96,7 @@ theorem typ_eqRec {Ψ Θ} : Typ Sg Ψ Θ [.mono (trD N ⟨cEq, [tyInt]⟩)] eqRe
       (.app (ψ := .pure) (.app (ψ := .pure)
         (.dproj (us := [trT N (.con 4)]) (ts := []) (s := mfield ((methSch 0).get rfl).2)
           (T := trT N ((arrP (.var 0) (arrP (.var 0) boolTy)).subst (inst [.con 4])))
-          (typ_var_mono rfl) rfl rfl rfl rfl (fun _ _ ⟨_, _, h, _⟩ => h.elim) ?_)
+          (typ_var_mono rfl) rfl rfl rfl rfl (fun _ _ ⟨_, _, ⟨_, _, h, _⟩, _⟩ => (h : False).elim) ?_)
         (typ_var_mono rfl) trivial .refl) (typ_var_mono rfl) trivial .refl)))
       (fun s h => by simp [Flick.Tm.Has] at h)) (fun s h => by simp [Flick.Tm.Has] at h)
   rw [Flick.Scheme.inst, substT_instT_nil, mfield_t]; exact .refl
@@ -155,7 +155,9 @@ theorem rootTy : RootTy Sg root where
       · obtain ⟨s, hs⟩ := constBody_some h
         obtain ⟨hn, ht⟩ := const_typ hs h
         rw [if_neg (by assumption), if_pos (by assumption), hs]
-        exact ⟨hn, _, rfl, ht⟩
+        refine ⟨hn, _, rfl, ?_⟩
+        show Typ Sg [] (trBd N s.bd) [] v _
+        rw [constSch_bd hs]; exact ht
       · split at h
         · cases h
           rw [if_neg (by assumption), if_neg (by assumption), if_pos (by assumption)]
