@@ -1,6 +1,6 @@
 //! T036–T039: a function too long, nested too deep, with too many branches
-//! or parameters, past the `[lint]` thresholds. U007: a function that reads
-//! atoms to build a `Ui`, which a `component` does with its own re-render.
+//! or parameters, past the `[lint]` thresholds; and the functions whose
+//! signatures name a service a plugin watches, which that plugin is told of.
 
 use super::super::Checker;
 use super::super::let_parts;
@@ -8,7 +8,7 @@ use super::super::ty::Type;
 use crate::diagnostics::{Diagnostic, Severity, codes};
 use crate::source::Span;
 use crate::syntax::{cst::Node, structure};
-use crate::types::lang::{self, Lang};
+use flick_plugin::{Binding, CallSite};
 
 impl Checker<'_> {
     /// The lints of a function `decl`, a `let` with parameters; other
@@ -84,19 +84,25 @@ impl Checker<'_> {
                 .with_fix(|| ("move the inner part into a function of its own", Vec::new())),
             );
         }
-        self.reads_atoms(&name, at);
+        self.named_in_signature(&name, at, decl);
     }
 
-    /// U007: a top-level function whose result is a `Ui` it builds from
-    /// atoms it reads.
-    fn reads_atoms(&mut self, name: &str, at: Span) {
+    /// The services a plugin watches that the signature of the top-level
+    /// function `name` names: each is a place its plugin is told of, at the
+    /// function's name, with what the function gives at last.
+    fn named_in_signature(&mut self, name: &str, at: Span, decl: &Node) {
         let Some(mut ty) = self.signed_type(name) else {
             return;
         };
-        if let Type::Forall { body, .. } = ty {
+        let mut constrained = false;
+        if let Type::Forall {
+            body, constraints, ..
+        } = ty
+        {
+            constrained = !constraints.is_empty();
             ty = *body;
         }
-        let mut reads = false;
+        let mut services = Vec::new();
         while let Type::Fun {
             effects, result, ..
         } = ty
@@ -104,22 +110,44 @@ impl Checker<'_> {
             if let Some(effects) = effects
                 && let Type::Row(row) = &effects.services
             {
-                reads |= (row.entries.iter()).any(|(l, _)| l.name() == lang::label(Lang::AtomRead));
+                services.extend(
+                    row.entries
+                        .iter()
+                        .filter_map(|(l, _)| l.name().map(str::to_owned)),
+                );
             }
             ty = *result;
         }
         if let Type::Captured { ty: inner, .. } = ty {
             ty = *inner;
         }
-        if reads && ty.is_lang(Lang::Ui) {
-            self.diagnostics.push(
-                Diagnostic::new(
-                    codes::U007,
-                    Severity::Warning,
-                    format!("`{name}` reads atoms to build a `Ui`: whatever calls it renders again when they change"),
-                )
-                .with_span(at).with_fix(|| ("make it a `component`: it renders again on its own, not with its parent", Vec::new())),
-            );
+        services.sort();
+        services.dedup();
+        let watched = |service: &String| {
+            let (module, service) = service.rsplit_once('.')?;
+            (self.options.watched.holds(module, service))
+                .then(|| (module.to_owned(), service.to_owned()))
+        };
+        let found: Vec<(String, String)> = services.iter().filter_map(watched).collect();
+        let span = |(start, end)| flick_plugin::Span { start, end };
+        for (module, service) in found {
+            self.typing.call_sites.push(CallSite {
+                module,
+                name: service,
+                span: span((at.start, at.end)),
+                arguments: Vec::new(),
+                refinement: None,
+                generated: at.start >= self.generated,
+                binding: Some(Binding {
+                    module: self.env.module.clone(),
+                    name: Some(name.to_owned()),
+                    span: span(decl.range()),
+                    constrained,
+                    in_function: false,
+                    applied: 0,
+                    gives: Some(self.fact_type(&ty)),
+                }),
+            });
         }
     }
 }

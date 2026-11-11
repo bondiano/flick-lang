@@ -84,6 +84,7 @@ impl Checker<'_> {
                         in_function,
                         applied: u32::try_from(keyed.applied.get(&range).copied().unwrap_or(0))
                             .unwrap_or(u32::MAX),
+                        gives: None,
                     }),
                 });
             }

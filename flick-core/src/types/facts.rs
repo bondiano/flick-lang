@@ -39,7 +39,7 @@ impl Checker<'_> {
         }
     }
 
-    fn fact_type(&self, t: &Type) -> FactType {
+    pub(super) fn fact_type(&self, t: &Type) -> FactType {
         let expanded = self.unaliased(t);
         let unknown = expanded.contains(&mut |x| matches!(x, Type::Meta(_) | Type::Error));
         FactType {
