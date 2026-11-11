@@ -1,0 +1,198 @@
+// Sizes made from numbers and text that are whole bytes only just, or not, and
+// sizes written back with each precision, unit and rounding.
+module App.Main exposing (main)
+
+line : String -> String ->{} Unit
+let line label text = Platform.stdout_line (label ++ ": " ++ text)
+
+size : Option ByteSize.ByteSize -> String
+let size made =
+  match made with
+  | Some bytes -> BigInt.to_string (ByteSize.to_bigint bytes)
+  | None -> "-"
+
+sizes : List (Option ByteSize.ByteSize) -> String
+let sizes made = String.join " " (List.map size made)
+
+numbers : Unit ->{} Unit
+let numbers () =
+  line
+    "bytes"
+    (sizes (List.map ByteSize.bytes [0, 1, 0.5, -0, -1, 9007199254740991, 9007199254740992]))
+  line
+    "kilobytes"
+    (sizes (List.map ByteSize.kilobytes [0.001, 0.0005, 1.0005, 0.1, 1e-3, 1e-7, 2.5e3]))
+  line "kibibytes" (sizes (List.map ByteSize.kibibytes [0.5, 0.25, 0.1, 1.5, 0.0009765625]))
+  line
+    "large"
+    (sizes [
+      ByteSize.petabytes 9,
+      ByteSize.petabytes 10,
+      ByteSize.exabytes 1,
+      ByteSize.quettabytes 1e-21,
+    ])
+  line "not numbers" (sizes (List.map ByteSize.megabytes [0 / 0, 1 / 0, -1 / 0]))
+
+texts : Unit ->{} Unit
+let texts () =
+  line
+    "units"
+    (sizes
+      (List.map ByteSize.from_string [
+        "1 B",
+        "1 byte",
+        "2 bytes",
+        "1 kB",
+        "1 KB",
+        "1 kb",
+        "1 kilobyte",
+        "3 kilobytes",
+        "1 KiB",
+        "1 kibibyte",
+        "1 QB",
+        "1 YiB",
+      ]))
+  line
+    "spacing"
+    (sizes
+      (List.map ByteSize.from_string ["1.5kB", " 2 KiB ", "2  KiB", "2\tKiB", "", " ", "kB", "1"]))
+  line
+    "quantities"
+    (sizes
+      (List.map ByteSize.from_string [
+        "1.5 B",
+        "0.001 kB",
+        "0.0001 kB",
+        "1. kB",
+        ".5 kB",
+        "1e3 B",
+        "-1 B",
+        "+1 B",
+        "1,5 kB",
+        "01 kB",
+        "1.50 kB",
+      ]))
+  line
+    "beyond safe numbers"
+    (sizes
+      (List.map ByteSize.from_string ["9007199254740993 B", "1000000 QB", "1 kB extra", "1 kB B"]))
+
+with_precision : Option Int -> Option Bool -> ByteSize.FormatOptions
+let with_precision precision zeros = {
+  precision = precision;
+  trailingZeros = zeros;
+  binary = false;
+  unit = None;
+}
+
+in_unit : ByteSize.ByteUnit -> ByteSize.FormatOptions
+let in_unit unit = { precision = Some 3; trailingZeros = None; binary = false; unit = Some unit }
+
+of_bytes : Float -> ByteSize.ByteSize
+let of_bytes n = Option.with_default ByteSize.zero (ByteSize.bytes n)
+
+written : Unit ->{} Unit
+let written () =
+  let all =
+    List.map of_bytes [
+      0,
+      1,
+      999,
+      1000,
+      1023,
+      1024,
+      1500,
+      999994,
+      999995,
+      999999,
+      1048575,
+      123456789,
+    ]
+  line "binary" (show (List.map (ByteSize.format ByteSize.default_format) all))
+  line "decimal" (show (List.map (ByteSize.format (with_precision None None)) all))
+  line
+    "precisions"
+    (show
+      (List.map (fun p -> ByteSize.format (with_precision (Some p) None) (of_bytes 1234567)) [
+        0,
+        1,
+        3,
+        6,
+        20,
+        25,
+        -1,
+      ]))
+  line
+    "zeros"
+    (show
+      (List.map
+        (fun p -> ByteSize.format (with_precision (Some p) (Some true)) (of_bytes 1500000))
+        [0, 1, 3]))
+  line
+    "units"
+    (show
+      (List.map (fun unit -> ByteSize.format (in_unit unit) (of_bytes 1500000)) [
+        ByteSize.B,
+        ByteSize.KB,
+        ByteSize.MB,
+        ByteSize.GB,
+        ByteSize.KiB,
+        ByteSize.MiB,
+        ByteSize.YiB,
+        ByteSize.QB,
+      ]))
+  let huge = Option.with_default ByteSize.zero (ByteSize.from_string "123456789 QB")
+  line
+    "past the largest unit"
+    (show (
+      ByteSize.format ByteSize.default_format huge,
+      ByteSize.format (with_precision None None) huge,
+      show huge,
+      ByteSize.to_number huge,
+      ByteSize.to_unit ByteSize.QB huge,
+    ))
+  line
+    "to_unit"
+    (show
+      (List.map (fun unit -> ByteSize.to_unit unit (of_bytes 1536)) [
+        ByteSize.B,
+        ByteSize.KB,
+        ByteSize.KiB,
+        ByteSize.MiB,
+      ]))
+
+arithmetic : Unit ->{} Unit
+let arithmetic () =
+  let k = of_bytes 1024
+  let m = of_bytes 1000000
+  line
+    "times"
+    (sizes
+      (List.map (fun n -> ByteSize.times n k) [0, 3, 1.5, -1, 9007199254740991, 9007199254740992]))
+  line "divide" (sizes (List.map (fun n -> ByteSize.divide n k) [1, 3, 1024, 2000, 0, 0.5, -2]))
+  line "subtract" (sizes [ByteSize.subtract k m, ByteSize.subtract m k, ByteSize.subtract k k])
+  line
+    "bounds"
+    (show (
+      ByteSize.between { minimum = k; maximum = m } k,
+      ByteSize.between { minimum = k; maximum = m } ByteSize.zero,
+      size (Some (ByteSize.clamp { minimum = k; maximum = m } ByteSize.zero)),
+      size (Some (ByteSize.clamp { minimum = k; maximum = m } (ByteSize.sum m m))),
+      size (Some (ByteSize.min k m)),
+      size (Some (ByteSize.max k m)),
+    ))
+  line
+    "folds"
+    (show (
+      size (Some (Reducer.combine_all ByteSize.reducer_sum [k, m, k])),
+      size (Some (Reducer.combine_all ByteSize.reducer_sum [])),
+      size (Some (Combiner.combine ByteSize.combiner_max k m)),
+      size (Some (Combiner.combine ByteSize.combiner_min k m)),
+    ))
+
+main : Unit ->{; AppError} Unit
+let main () =
+  numbers ()
+  texts ()
+  written ()
+  arithmetic ()
