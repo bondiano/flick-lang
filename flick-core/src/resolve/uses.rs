@@ -19,13 +19,16 @@ pub(super) struct Reference {
     pub top: usize,
 }
 
-/// A local name bound and never used.
+/// A local name bound and never used, or a `let mut` never assigned.
 #[derive(Debug)]
 pub(super) struct Unused {
     pub name: String,
     pub span: Span,
     /// Bound by a record pattern field without `=`: `{ name }`.
     pub punned: bool,
+    /// For a `let mut` never assigned, the `mut ` to remove; `span` is its
+    /// keyword.
+    pub needless_mut: Option<Span>,
 }
 
 pub(super) fn references(module: &Module) -> (Vec<Reference>, Vec<Unused>) {
@@ -68,6 +71,8 @@ struct Local<'a> {
     /// region of `scope`.
     binder: Option<(Token, bool)>,
     used: bool,
+    /// The `mut` of a `let mut`, and whether a statement assigns it.
+    mutable: Option<(Token, bool)>,
 }
 
 struct Walker<'a> {
@@ -84,6 +89,31 @@ struct Walker<'a> {
 }
 
 impl Walker<'_> {
+    fn unpack(&mut self, node: &Node) {
+        let mark = self.locals.len();
+        let mut children = node.nodes();
+        if let Some(source) = children.next() {
+            self.walk(source);
+        }
+        let mut tokens = node.child_tokens();
+        let payload = tokens
+            .find(|t| t.kind == K::Comma)
+            .and_then(|_| tokens.find(|t| t.kind == K::Ident));
+        if let Some(payload) = payload {
+            self.locals.push(Local {
+                name: payload.text(self.text),
+                generated: payload.start >= self.generated,
+                binder: Some((payload, false)),
+                mutable: None,
+                used: false,
+            });
+        }
+        for child in children {
+            self.walk(child);
+        }
+        self.release(mark);
+    }
+
     fn walk(&mut self, node: &Node) {
         let mark = self.locals.len();
         match node.kind {
@@ -126,26 +156,7 @@ impl Walker<'_> {
                 return;
             }
             K::UnpackExpr => {
-                let mut children = node.nodes();
-                if let Some(source) = children.next() {
-                    self.walk(source);
-                }
-                let mut tokens = node.child_tokens();
-                let payload = tokens
-                    .find(|t| t.kind == K::Comma)
-                    .and_then(|_| tokens.find(|t| t.kind == K::Ident));
-                if let Some(payload) = payload {
-                    self.locals.push(Local {
-                        name: payload.text(self.text),
-                        generated: payload.start >= self.generated,
-                        binder: Some((payload, false)),
-                        used: false,
-                    });
-                }
-                for child in children {
-                    self.walk(child);
-                }
-                self.release(mark);
+                self.unpack(node);
                 return;
             }
             K::ForExpr => {
@@ -170,12 +181,25 @@ impl Walker<'_> {
                 return;
             }
             K::FunExpr | K::MatchArm => self.bind_patterns(node),
+            K::AssignStmt => {
+                // the target is not a use: a variable only assigned is unused
+                if let Some(token) = (node.nodes().next())
+                    .and_then(|n| n.child_tokens().find(|t| t.kind == K::Ident))
+                {
+                    self.assigned(token);
+                }
+                for value in node.nodes().skip(1) {
+                    self.walk(value);
+                }
+                return;
+            }
             K::ScopeExpr => {
                 let name = node.child_tokens().find(|t| t.kind == K::Ident);
                 self.locals.extend(name.map(|t| Local {
                     name: t.text(self.text),
                     generated: t.start >= self.generated,
                     binder: None,
+                    mutable: None,
                     used: false,
                 }));
             }
@@ -238,6 +262,7 @@ impl Walker<'_> {
                     name: t.text(self.text),
                     generated: t.start >= self.generated,
                     binder: None,
+                    mutable: None,
                     used: false,
                 }));
                 if let Some(pattern) = declaration.nodes().find(|n| is_pattern(n.kind)) {
@@ -247,6 +272,7 @@ impl Walker<'_> {
                         name: t.text(self.text),
                         generated: t.start >= self.generated,
                         binder: None,
+                        mutable: None,
                         used: false,
                     }));
                 }
@@ -307,7 +333,8 @@ impl Walker<'_> {
         }
     }
 
-    /// Leaves the scope of the locals above `mark`, noting those never used.
+    /// Leaves the scope of the locals above `mark`, noting those never used
+    /// and the `let mut` never assigned.
     fn release(&mut self, mark: usize) {
         for local in self.locals.drain(mark..) {
             if let (Some((token, _)), true) = (local.binder, local.used) {
@@ -320,8 +347,35 @@ impl Walker<'_> {
                     name: local.name.to_owned(),
                     span: Span::new(self.file, token.start, token.end),
                     punned,
+                    needless_mut: None,
                 });
             }
+            if let Some((kw, false)) = local.mutable {
+                let after = &self.text[kw.end as usize..];
+                let space = after.len() - after.trim_start_matches(' ').len();
+                let end = kw.end + u32::try_from(space).expect("source fits in u32");
+                self.unused.push(Unused {
+                    name: local.name.to_owned(),
+                    span: Span::new(self.file, kw.start, kw.end),
+                    punned: false,
+                    needless_mut: Some(Span::new(self.file, kw.start, end)),
+                });
+            }
+        }
+    }
+
+    /// `name = …`: the innermost local `name` is assigned.
+    fn assigned(&mut self, token: Token) {
+        let name = token.text(self.text);
+        let generated = token.start >= self.generated;
+        let local =
+            (self.locals.iter_mut().rev()).find(|l| l.name == name && l.generated == generated);
+        if let Some(Local {
+            mutable: Some((_, assigned)),
+            ..
+        }) = local
+        {
+            *assigned = true;
         }
     }
 
@@ -335,6 +389,7 @@ impl Walker<'_> {
             generated: t.start >= self.generated,
             binder: Some((t, puns.contains(&t.start))),
             used: false,
+            mutable: None,
         }));
     }
 
@@ -353,6 +408,7 @@ impl Walker<'_> {
                 generated: t.start >= self.generated,
                 binder: None,
                 used: false,
+                mutable: None,
             }));
         }
         for params in node.nodes().filter(|n| n.kind == K::Params) {
@@ -363,7 +419,12 @@ impl Walker<'_> {
         }
         self.release(mark);
         if let Some(pattern) = pattern {
+            let mark = self.locals.len();
             self.bind(pattern);
+            let mutable = node.child_tokens().find(|t| t.kind == K::MutKw);
+            if let (Some(kw), [local]) = (mutable, &mut self.locals[mark..]) {
+                local.mutable = Some((kw, false));
+            }
         }
     }
 

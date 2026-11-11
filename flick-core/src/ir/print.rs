@@ -133,6 +133,7 @@ pub fn expr(e: &Expr) -> String {
     match &e.kind {
         ExprKind::Lit(l) => lit(l),
         ExprKind::Local(n) => n.clone(),
+        ExprKind::Var(n) => format!("!{n}"),
         ExprKind::Global { module, name } => format!("{module}.{name}"),
         ExprKind::Method { dict: d, name } => format!("{}.{name}", dict(d)),
         ExprKind::Con(c) => c.name.clone(),
@@ -208,8 +209,13 @@ pub fn expr(e: &Expr) -> String {
             pat: p,
             source,
             body,
+            stop,
         } => {
+            let _ = stop;
             format!("(each {} <- {} {})", pat(p), expr(source), expr(body))
+        }
+        ExprKind::ControlLoop { .. } | ExprKind::LoopExit { .. } | ExprKind::Loop { .. } => {
+            loop_expr(e)
         }
         ExprKind::Yield(e) => format!("(yield {})", expr(e)),
         ExprKind::Within(owner, e) => format!("(within {owner} {})", expr(e)),
@@ -222,6 +228,8 @@ pub fn expr(e: &Expr) -> String {
 fn stmt(s: &Stmt) -> String {
     match s {
         Stmt::Let(p, e) => format!("let {} = {}", pat(p), expr(e)),
+        Stmt::Var(n, e) => format!("let mut {n} = {}", expr(e)),
+        Stmt::Assign(n, e) => format!("{n} := {}", expr(e)),
         Stmt::Fun {
             name,
             rec,
@@ -317,4 +325,25 @@ fn handler(h: &Handler) -> String {
         expr(&h.body),
         arms(&h.errors)
     )
+}
+
+fn loop_expr(e: &Expr) -> String {
+    match &e.kind {
+        ExprKind::ControlLoop {
+            id,
+            condition,
+            body,
+            iterable,
+        } => format!(
+            "(control-loop {id} {iterable} {} {})",
+            condition.as_deref().map_or("true".into(), expr),
+            expr(body)
+        ),
+        ExprKind::LoopExit { id, value } => format!(
+            "(exit {id} {})",
+            value.as_deref().map_or("continue".into(), expr)
+        ),
+        ExprKind::Loop { condition, body } => format!("(loop {} {})", expr(condition), expr(body)),
+        _ => unreachable!("loop"),
+    }
 }

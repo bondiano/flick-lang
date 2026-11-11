@@ -91,6 +91,9 @@ impl Checker<'_> {
             (K::FunExpr, _) => {
                 self.lambda(node, Some(expected));
             }
+            (K::LoopExpr | K::WhileExpr, _) => {
+                self.control_loop(node, Some(expected));
+            }
             (K::IfExpr, _) => self.if_expr(node, expected),
             (K::MatchExpr, _) => {
                 self.match_expr(node, Some(expected));
@@ -219,6 +222,9 @@ impl Checker<'_> {
                 token => literal_type(token.map(|t| t.kind)),
             },
             K::NameExpr => self.name(node),
+            K::AssignStmt => self.assign(node),
+            K::LoopExpr | K::WhileExpr => self.control_loop(node, None),
+            K::BreakExpr | K::ContinueExpr => self.loop_exit(node),
             K::InterpExpr => self.interpolation(node),
             K::PackExpr => self.pack_module(node),
             K::UnpackExpr => self.unpack_module(node),
@@ -414,6 +420,7 @@ impl Checker<'_> {
         let mark = self.cx.locals.len();
         let givens = self.classes.givens.len();
         let uses = self.uses_mark();
+        self.enter_apart(super::mutation::Apart::Function);
         self.begin_reader();
         let mut rest = expected.cloned();
         let mut stages = Vec::new();
@@ -499,6 +506,7 @@ impl Checker<'_> {
         if inferred && let Some(stage) = stages.last_mut() {
             stage.1 = Self::stage_effects(&inner);
         }
+        self.leave_apart();
         let closures: Vec<_> = closures
             .into_iter()
             .map(|(locals, expected)| (self.held_since(uses, locals), expected))

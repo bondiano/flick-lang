@@ -1,0 +1,28 @@
+module App.LoopRegions exposing (..)
+
+type File (s : Region)
+
+service Files =
+  open_scoped : forall s. String ->{Scope s} File s
+  use : forall s. File s ->{} Unit
+
+returned : Unit ->{Files} (Unit ->{Files} Unit)
+let returned () = loop {
+  scope {
+    let file = Files.open_scoped "x"
+    break (fun () -> Files.use file)
+  }
+}
+
+used : Unit ->{Files} Unit
+let used () =
+  let callback = loop {
+    scope {
+      let file = Files.open_scoped "x"
+      break (fun () -> Files.use file)
+    }
+  }
+  callback ()
+
+//~ FLICK-G002 @13:22-13:36
+//~ FLICK-G002 @22:24-22:38

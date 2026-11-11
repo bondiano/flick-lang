@@ -3,15 +3,28 @@
 use super::{Done, K, Parser, decl, pattern, plugin, types};
 use crate::diagnostics::codes;
 
-/// A statement of a block: `let`, a local signature or an expression.
+/// A statement of a block: `let`, a local signature, an assignment or an
+/// expression.
 pub(super) fn stmt(p: &mut Parser) {
     match p.current() {
         K::LetKw => decl::let_decl(p),
         K::Ident if p.nth(1) == K::Colon => decl::signature(p),
+        K::Ident if p.nth(1) == K::Eq => assign_stmt(p),
         _ => {
             expr(p);
         }
     }
+}
+
+/// `name = value`: the name is a `NameExpr`, as any use of it.
+fn assign_stmt(p: &mut Parser) {
+    let m = p.start();
+    let name = p.start();
+    p.bump();
+    p.complete(name, K::NameExpr);
+    p.bump();
+    p.body(K::Block, stmt);
+    p.complete(m, K::AssignStmt);
 }
 
 pub(super) fn expr(p: &mut Parser) -> Option<Done> {
@@ -125,6 +138,9 @@ fn prefix(p: &mut Parser) -> Option<Done> {
     match p.current() {
         K::Ident if p.at_word("pack") && keyword_ahead(p, K::AsKw) => Some(pack_expr(p)),
         K::Ident if p.at_word("unpack") && keyword_ahead(p, K::AsKw) => Some(unpack_expr(p)),
+        K::Ident if p.at_word("loop") && p.nth(1) == K::LBrace => Some(control_expr(p)),
+        K::Ident if p.at_word("while") && keyword_ahead(p, K::DoKw) => Some(control_expr(p)),
+        K::BreakKw | K::ContinueKw => Some(control_expr(p)),
         K::FunKw => Some(fun_expr(p)),
         K::MatchKw => Some(match_expr(p)),
         K::TryKw => Some(try_expr(p)),
@@ -686,4 +702,43 @@ fn if_expr(p: &mut Parser) -> Done {
         }
     }
     p.complete(m, K::IfExpr)
+}
+
+fn control_expr(p: &mut Parser) -> Done {
+    let m = p.start();
+    let keyword = if p.at_word("loop") {
+        K::LoopKw
+    } else if p.at_word("while") {
+        K::WhileKw
+    } else {
+        p.current()
+    };
+    p.bump_as(keyword);
+    let kind = match keyword {
+        K::LoopKw => {
+            p.braces(K::Block, stmt, |_| false);
+            K::LoopExpr
+        }
+        K::WhileKw => {
+            head_without_braces(p, |p| {
+                expr(p);
+            });
+            if p.expect(K::DoKw) {
+                if p.at(K::LBrace) {
+                    p.braces(K::Block, stmt, |_| false);
+                } else {
+                    p.body(K::Block, stmt);
+                }
+            }
+            K::WhileExpr
+        }
+        K::BreakKw => {
+            if at_operand_start(p) {
+                expr(p);
+            }
+            K::BreakExpr
+        }
+        _ => K::ContinueExpr,
+    };
+    p.complete(m, kind)
 }

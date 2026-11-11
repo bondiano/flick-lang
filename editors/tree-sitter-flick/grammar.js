@@ -2,12 +2,12 @@
 // compiler, so this tree only nests brackets and keeps every token flat.
 
 const KEYWORDS = [
-  'module', 'exposing', 'import', 'as', 'let', 'rec', 'assert', 'fun', 'match', 'with',
+  'module', 'exposing', 'import', 'as', 'let', 'mut', 'rec', 'assert', 'fun', 'match', 'with',
   'try', 'if', 'then', 'else', 'task', 'await', 'scope', 'provide', 'ignore',
   'todo', 'echo',
   'type', 'opaque', 'refined', 'where', 'kind', 'error', 'service', 'class',
   'instance', 'deriving', 'forall', 'not', 'none',
-  'ui', 'in', 'when', 'for', 'yield', 'do',
+  'ui', 'in', 'when', 'for', 'yield', 'do', 'loop', 'while', 'break', 'continue',
 ];
 
 const OPERATORS = [

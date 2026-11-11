@@ -1,0 +1,42 @@
+// A mutable variable retains its monotype. Nominal region escape is rejected;
+// a closure that merely inspects held data without using the region is allowed
+// by the current typing-by-use contract.
+module App.LetMutRegions exposing (..)
+
+type File (s : Region) = File String
+
+service Files =
+  open : forall s. String ->{Scope s; none} File s
+
+path_of : File s -> String
+let path_of file = match file with
+  | File path -> path
+
+outer_file : String ->{Files} Unit
+let outer_file path =
+  let mut last = None
+  scope {
+    let file = Files.open path
+    last = Some file
+  }
+
+outer_callback : String ->{Files} String
+let outer_callback path =
+  let mut reader = fun () -> ""
+  scope {
+    let file = Files.open path
+    reader = fun () -> path_of file
+  }
+  reader ()
+
+written_callback : String ->{Files} String
+let written_callback path =
+  reader : Unit -> String
+  let mut reader = fun () -> ""
+  scope {
+    let file = Files.open path
+    reader = fun () -> path_of file
+  }
+  reader ()
+
+//~ FLICK-G002 @20:12-20:21

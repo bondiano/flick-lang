@@ -28,7 +28,20 @@ impl Lower<'_> {
         let clauses: Vec<&Node> = clauses.collect();
         let looping = node.has_token(K::DoKw);
         let mark = self.scope.len();
-        let body = self.clauses(&clauses, element, looping, span);
+        let control = looping.then(|| self.start_loop());
+        let mut body = self.clauses(&clauses, element, looping, span);
+        if let Some((id, _)) = control {
+            self.loops.pop();
+            body = Expr::new(
+                ExprKind::ControlLoop {
+                    id,
+                    condition: None,
+                    body: Box::new(body),
+                    iterable: true,
+                },
+                span,
+            );
+        }
         self.scope.truncate(mark);
         // the loop of `for … do` runs here, outside any `Generate`
         if looping {
@@ -73,6 +86,7 @@ impl Lower<'_> {
                 let pat = pattern.map_or(Pat::Wild, |p| self.pattern(p));
                 let body = self.clauses(rest, element, looping, span);
                 ExprKind::Each {
+                    stop: None,
                     pat,
                     source: Box::new(source),
                     body: Box::new(body),

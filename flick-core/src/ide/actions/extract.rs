@@ -45,7 +45,8 @@ impl Ide<'_> {
         while let Some(inner) = node.nodes().find(|n| n.range() == (start, end)) {
             node = inner;
         }
-        if !EXTRACTABLE.contains(&node.kind) {
+        // moved before its statement, a read of a variable could pass an assignment
+        if !EXTRACTABLE.contains(&node.kind) || self.uses_variable(file, node) {
             return None;
         }
         // the statement of the innermost block around it, on a line of its own
@@ -113,10 +114,17 @@ impl Ide<'_> {
             return None;
         }
         let pattern = decl.nodes().find(|n| n.kind == K::VarPat)?;
-        if pattern.range() != binder || decl.nodes().any(|n| n.kind == K::Params) {
+        if pattern.range() != binder
+            || decl.nodes().any(|n| n.kind == K::Params)
+            || decl.has_token(K::MutKw)
+        {
             return None;
         }
         let value = only_expression(decl.nodes().find(|n| n.kind == K::Block)?)?;
+        // at a later use, a variable it reads may hold another value
+        if self.uses_variable(file, value) {
+            return None;
+        }
         let shown = value.text(text);
         if shown.contains('\n') {
             return None;
@@ -149,6 +157,25 @@ impl Ide<'_> {
             kind: "refactor.inline",
             edits,
         })
+    }
+}
+
+impl Ide<'_> {
+    /// Whether `node` reads or assigns a `let mut` variable.
+    fn uses_variable(&self, file: FileId, node: &Node) -> bool {
+        if node.kind == K::AssignStmt {
+            return true;
+        }
+        if node.kind == K::NameExpr
+            && let Some((Symbol::Local { binder, .. }, _)) = self.symbol_at(file, node.range().0)
+            && let Some(m) = self.module(file)
+            && let Some(decl) =
+                (tree::path_to(&m.tree, binder.0).into_iter().rev()).find(|n| n.kind == K::LetDecl)
+            && decl.has_token(K::MutKw)
+        {
+            return true;
+        }
+        node.nodes().any(|n| self.uses_variable(file, n))
     }
 }
 

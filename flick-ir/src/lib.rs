@@ -15,6 +15,7 @@ mod program;
 mod span;
 mod stage;
 mod validate;
+mod visit;
 
 pub use data::{Constructor, EnumLit, JsClass, Rep, TypeName};
 pub use dict::Dict;

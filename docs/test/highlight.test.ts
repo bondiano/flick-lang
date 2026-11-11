@@ -148,3 +148,25 @@ test("a hole of a string is code, and a brace in it does not close the hole", as
     highlighter.dispose();
   }
 });
+
+test("`let mut` declares a variable, not a function", async () => {
+  const highlighter = await createHighlighterCore({
+    engine: createJavaScriptRegexEngine(),
+    themes: [],
+    langs: [{ ...grammar, name: "flick" }],
+  });
+  try {
+    const language = highlighter.getLanguage("flick");
+    const line = "  let mut total = n";
+    const { tokens } = language.tokenizeLine(line, null);
+    const scopes = (word: string): readonly string[] => {
+      const start = line.indexOf(word);
+      return tokens.find((token) => token.startIndex <= start && start < token.endIndex)?.scopes ?? [];
+    };
+    assert.ok(scopes("mut").includes("keyword.other.flick"));
+    assert.ok(scopes("total").includes("variable.other.flick"));
+    assert.ok(!scopes("total").includes("entity.name.function.flick"));
+  } finally {
+    highlighter.dispose();
+  }
+});

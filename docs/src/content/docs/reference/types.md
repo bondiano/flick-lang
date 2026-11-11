@@ -320,6 +320,64 @@ Every statement before the last must have type `Unit`; another value is
 dropped only with `ignore` (`FLICK-T011`, with that fix). The last statement
 is the value of the block and must be an expression (`FLICK-T019`).
 
+## Variables
+
+`let mut name = value` declares a variable of the function whose block holds
+it, and `name = value`, a statement of type `Unit`, assigns it. A read sees
+the last value assigned before it; a value read earlier stays as it was.
+
+```flick
+clamp : Int -> Int -> Int -> Int
+let clamp low high n =
+  let mut value = n
+  if value < low then value = low
+  if value > high then value = high
+  value
+```
+
+The variable has one type, fixed where it is declared, by its signature or
+its value; it is not generalized, and a value assigned to it is checked
+against it (`FLICK-T003`). An assignment is not a runtime call: a pure
+function may assign its variables. Only a name of one `let mut` of a block
+is a variable: not a definition of the module, a function, a pattern,
+`let assert`, or a binding of `do` or `for` (`FLICK-S016`). A parameter, a
+plain `let` or a definition of the module is not assigned (`FLICK-T069`,
+whose fix adds `mut` to a plain `let`); a `mut` never assigned is the warning
+`FLICK-R020`, whose fix removes it.
+
+A variable belongs to its function. A `fun`, a local function, a `task`, a
+lazy `for`, the rest of a `do` block or an arm of a handler of operations
+inside it may run later, again or at the same time, so none of them reads or
+assigns the variable (`FLICK-G005`): the function stays pure from the outside.
+Bind the value with `let` first and use that name. A `scope`, a `provide`, a
+branch and an arm of `match` or of a `try` run in place and may assign. The
+body of `try … with` and sequential loops may also assign. A failed
+right-hand side leaves its target unchanged; a handler sees earlier completed
+assignments. Strict `[for …]` comprehensions still reject external assignments
+(`FLICK-T070`). Region safety follows the same typing-by-use rules as other
+values (see [Regions](../regions/)).
+
+## Local loops
+
+`loop { … }` returns the value of `break value`; all exits agree on its type.
+A bare `break` is `break ()`. `while condition do body` and `for … do body`
+return `Unit`; the condition is `Bool` and their bodies return `Unit`.
+`continue` skips the rest of an iteration. Exits target the nearest loop,
+without labels, and close each scope they leave before continuing. A nested
+function, task, lazy sequence or operation handler cannot exit an outer loop
+(`FLICK-T071`). `loop` and `while` are contextual words: existing names such
+as `Loop.loop` and `Schedule.while` remain valid.
+
+```flick
+module App.Count exposing (count)
+
+count : Int -> Int
+let count n =
+  let mut i = 0
+  while i < n do i = i + 1
+  i
+```
+
 ## Recursion
 
 Top-level declarations may use each other in any order, but recursion is

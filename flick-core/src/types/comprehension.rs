@@ -11,6 +11,7 @@ use std::mem;
 use super::Checker;
 use super::do_notation::bind_key;
 use super::effects::{Site, Stage};
+use super::mutation::{Apart, Settled};
 use super::ty::{Row, Type};
 use crate::diagnostics::codes;
 use crate::source::Span;
@@ -80,6 +81,13 @@ impl Checker<'_> {
             Stage::pure(reason)
         };
         let outer = mem::replace(&mut self.cx.stage, stage);
+        // a lazy sequence runs its body when iterated; `[for …]` runs it now
+        if strict {
+            self.enter_settled(Settled::Loop);
+            self.enter_loop_barrier();
+        } else {
+            self.enter_apart(Apart::Sequence);
+        }
         let (clauses, element) = for_parts(node);
         for clause in clauses {
             self.for_clause(clause);
@@ -99,6 +107,12 @@ impl Checker<'_> {
             (Some(body), None) => self.infer(body),
             (None, _) => Type::Error,
         };
+        if strict {
+            self.leave_settled();
+            self.leave_loop_barrier();
+        } else {
+            self.leave_apart();
+        }
         let inner = mem::replace(&mut self.cx.stage, outer);
         self.cx.runtime = saved;
         let mut held = self.held_since(uses, mark);
@@ -129,6 +143,7 @@ impl Checker<'_> {
     /// now, so the clauses and the body may make runtime calls.
     fn for_loop(&mut self, node: &Node, expected: Option<&Type>) -> Type {
         let mark = self.cx.locals.len();
+        self.enter_loop(Type::lang(Lang::Unit), false);
         let (clauses, body) = for_parts(node);
         for clause in clauses {
             self.for_clause(clause);
@@ -137,6 +152,7 @@ impl Checker<'_> {
         if let Some(body) = body {
             self.check(body, &unit);
         }
+        self.leave_loop();
         self.cx.locals.truncate(mark);
         if let Some(expected) = expected {
             self.expect(&unit, expected, self.span(node));

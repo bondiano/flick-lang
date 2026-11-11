@@ -3,122 +3,13 @@
 //! being emitted stays registered and is marked retired in its explanation.
 //! A plugin's codes are its own, shown under its package: `std/L001`.
 
-use std::sync::{Mutex, MutexGuard, PoisonError};
-use std::{fmt, str};
+#[path = "codes/code.rs"]
+mod code;
+pub use code::{Area, Code};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub enum Area {
-    Syntax,
-    Resolve,
-    Types,
-    Effects,
-    Classes,
-    Regions,
-    Ffi,
-    Schema,
-    Sql,
-    Ui,
-    Cli,
-    Project,
-    /// The codes of plugins, outside the registry: the number of one is its
-    /// place among the codes plugins gave in this process.
-    Plugin,
-}
-
-impl Area {
-    pub const ALL: [Area; 12] = [
-        Area::Syntax,
-        Area::Resolve,
-        Area::Types,
-        Area::Effects,
-        Area::Classes,
-        Area::Regions,
-        Area::Ffi,
-        Area::Schema,
-        Area::Sql,
-        Area::Ui,
-        Area::Cli,
-        Area::Project,
-    ];
-
-    pub const fn letter(self) -> char {
-        match self {
-            Area::Syntax => 'S',
-            Area::Resolve => 'R',
-            Area::Types => 'T',
-            Area::Effects => 'E',
-            Area::Classes => 'C',
-            Area::Regions => 'G',
-            Area::Ffi => 'F',
-            Area::Schema => 'D',
-            Area::Sql => 'Q',
-            Area::Ui => 'U',
-            Area::Cli => 'L',
-            Area::Project => 'P',
-            // never shown: a plugin's code is spelled whole
-            Area::Plugin => '?',
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub struct Code {
-    pub area: Area,
-    pub number: u16,
-}
-
-impl fmt::Display for Code {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self.area {
-            Area::Plugin => f.write_str(plugin_codes()[usize::from(self.number)]),
-            area => write!(f, "FLICK-{}{:03}", area.letter(), self.number),
-        }
-    }
-}
-
-// shortcut: a plugin's codes are interned for the process, a few strings per
-// plugin; make `Code` carry its text if that ever grows without bound.
-static PLUGIN_CODES: Mutex<Vec<&'static str>> = Mutex::new(Vec::new());
-
-fn plugin_codes() -> MutexGuard<'static, Vec<&'static str>> {
-    PLUGIN_CODES.lock().unwrap_or_else(PoisonError::into_inner)
-}
-
-/// The code `code` a plugin of `package` gives, shown as `<package>/<code>`;
-/// `None` when `code` is not capital letters and three digits, such as
-/// `L001`, or plugins gave too many codes.
+/// Interns a plugin code, keeping its package namespace.
 pub fn plugin(package: &str, code: &str) -> Option<Code> {
-    if !code.is_ascii() {
-        return None;
-    }
-    let (letters, digits) = code.split_at(code.len().checked_sub(3)?);
-    let well_formed = (1..=4).contains(&letters.len())
-        && letters.bytes().all(|b| b.is_ascii_uppercase())
-        && digits.bytes().all(|b| b.is_ascii_digit());
-    if !well_formed {
-        return None;
-    }
-    let whole = format!("{package}/{code}");
-    let mut codes = plugin_codes();
-    let number = if let Some(i) = codes.iter().position(|c| *c == whole) {
-        i
-    } else {
-        codes.push(whole.leak());
-        codes.len() - 1
-    };
-    let number = u16::try_from(number).ok()?;
-    Some(Code {
-        area: Area::Plugin,
-        number,
-    })
-}
-
-impl str::FromStr for Code {
-    type Err = ();
-
-    fn from_str(s: &str) -> Result<Self, ()> {
-        lookup(s).map(|info| info.code).ok_or(())
-    }
+    self::code::plugin(package, code)
 }
 
 #[derive(Debug)]
@@ -162,6 +53,7 @@ codes! {
     S013 = Syntax 13, "`<-` outside a `do` block";
     S014 = Syntax 14, "unknown attribute";
     S015 = Syntax 15, "a constructor result where none can be written";
+    S016 = Syntax 16, "`mut` where only a local variable of one name can be";
     R001 = Resolve 1, "module name does not match the file path";
     R002 = Resolve 2, "two files declare the same module";
     R003 = Resolve 3, "unknown module";
@@ -181,6 +73,7 @@ codes! {
     R017 = Resolve 17, "private module belongs to another package";
     R018 = Resolve 18, "inline module is private to its source file";
     R019 = Resolve 19, "static module application inside an inline module";
+    R020 = Resolve 20, "`let mut` variable never assigned";
     T001 = Types 1, "unknown name";
     T002 = Types 2, "kind mismatch";
     T003 = Types 3, "type mismatch";
@@ -249,6 +142,9 @@ codes! {
     T066 = Types 66, "ambiguous local module dictionaries";
     T067 = Types 67, "public parameterized module requires an explicit result signature";
     T068 = Types 68, "static parameterized module or nested module cannot be packed";
+    T069 = Types 69, "assignment to a name that is not a `let mut` variable";
+    T070 = Types 70, "assignment inside a restricted construct";
+    T071 = Types 71, "invalid loop control";
     E001 = Effects 1, "runtime call in a pure position";
     E002 = Effects 2, "services or errors not allowed by the bound";
     E003 = Effects 3, "argument runs before the function that takes an Eff";
@@ -285,6 +181,7 @@ codes! {
     G002 = Regions 2, "scoped value leaves its scope";
     G003 = Regions 3, "child may outlive what it holds";
     G004 = Regions 4, "resource acquired outside a scope";
+    G005 = Regions 5, "`let mut` variable used in a function it is not a variable of";
     F001 = Ffi 1, "invalid foreign metadata";
     F002 = Ffi 2, "foreign parameter may hold a scope without a retention contract";
     F003 = Ffi 3, "catch mapping does not make an error of the signature";

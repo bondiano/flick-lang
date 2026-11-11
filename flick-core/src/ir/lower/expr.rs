@@ -219,6 +219,8 @@ impl Lower<'_> {
             K::ParenExpr | K::AnnotExpr => return self.expr(children[0]),
             K::TupleExpr => ExprKind::Tuple(children.iter().map(|c| self.expr(c)).collect()),
             K::ListExpr => return self.list(node, &children),
+            K::LoopExpr | K::WhileExpr => return self.control_loop(node),
+            K::BreakExpr | K::ContinueExpr => return self.loop_exit(node),
             K::ForExpr => return self.for_expr(node, false),
             K::RangeExpr => return self.range(node, false),
             K::QuestionExpr => return self.question(node, children[0]),
@@ -319,11 +321,16 @@ impl Lower<'_> {
             .unwrap_or_else(|| panic!("the checker resolved `{last}`"));
         let mut dicts = self.dictionaries(key);
         let kind = match r {
-            Ref::Local => ExprKind::Local(
-                self.local(&last, key.0)
+            Ref::Local => {
+                let unique = (self.local(&last, key.0))
                     .unwrap_or_else(|| panic!("`{last}` is a local in scope"))
-                    .to_owned(),
-            ),
+                    .to_owned();
+                if self.vars.contains(&unique) {
+                    ExprKind::Var(unique)
+                } else {
+                    ExprKind::Local(unique)
+                }
+            }
             Ref::PackedField { binder, field } => {
                 let local = self
                     .local(binder, key.0)

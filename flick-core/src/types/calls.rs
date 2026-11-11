@@ -26,6 +26,7 @@ impl Checker<'_> {
             ty,
             rec: None,
             unsigned: false,
+            binding: super::mutation::Binding::Other,
         });
     }
 
@@ -140,6 +141,7 @@ impl Checker<'_> {
 
     pub fn use_local(&mut self, index: usize, span: Span) -> Type {
         self.cx.regions.uses.push(index);
+        self.mutable_use(index, span);
         let Local { ty, rec, .. } = self.cx.locals[index].clone();
         let ty = self.instantiate(&ty, span);
         if let Some(rec) = rec {

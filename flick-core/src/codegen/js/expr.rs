@@ -4,7 +4,7 @@
 use std::mem;
 
 use super::{Callee, Gen, Target, indent, literal, names, tidy};
-use crate::ir::{Arm, Expr, ExprKind, Pat, Stage, Stmt};
+use crate::ir::{Expr, ExprKind, Pat, Stage, Stmt};
 use crate::numeric::Num;
 use crate::types::{Constructor, Dict, Rep};
 
@@ -34,7 +34,7 @@ impl Gen<'_> {
             if self.buf.len() > mark {
                 let mut spills = Vec::new();
                 for prev in &mut out {
-                    if !atomic(prev) {
+                    if !atomic(prev) || self.vars.contains(prev.as_str()) {
                         let t = self.temp();
                         spills.push(self.constant(&t, prev));
                         *prev = t;
@@ -49,7 +49,7 @@ impl Gen<'_> {
 
     /// `js` as a constant unless it is atomic.
     pub(super) fn spill(&mut self, js: String) -> String {
-        if atomic(&js) {
+        if atomic(&js) && !self.vars.contains(&js) {
             return js;
         }
         let t = self.temp();
@@ -71,8 +71,11 @@ impl Gen<'_> {
 
     pub(super) fn expr(&mut self, e: &Expr) -> String {
         match &e.kind {
+            ExprKind::ControlLoop { .. } | ExprKind::LoopExit { .. } | ExprKind::Loop { .. } => {
+                self.loop_expr(e)
+            }
             ExprKind::Lit(lit) => literal::literal(lit),
-            ExprKind::Local(name) => names::ident(name),
+            ExprKind::Local(name) | ExprKind::Var(name) => names::ident(name),
             ExprKind::Global { module, name } => self.global(module, &names::ident(name)),
             ExprKind::Method { dict, name } => match self.direct_method(dict, name) {
                 Some(direct) => direct,
@@ -116,14 +119,7 @@ impl Gen<'_> {
                 self.expr(result)
             }
             ExprKind::If(c, t, f) => self.if_expr(c, t, f),
-            ExprKind::Match(scrutinee, arms) => {
-                let s = self.expr(scrutinee);
-                let s = self.spill(s);
-                let r = self.temp();
-                self.buf.push(self.declare(&r));
-                self.arms(&s, arms, Some(&r));
-                r
-            }
+            ExprKind::Match(scrutinee, arms) => self.matched(scrutinee, arms),
             ExprKind::Handle(h) if h.is_try() => self.try_expr(&h.body, &h.errors),
             ExprKind::Tuple(items) | ExprKind::List(items) => {
                 let items: Vec<&Expr> = items.iter().collect();
@@ -368,51 +364,6 @@ impl Gen<'_> {
         format!("{} {}", self.arrow(&params), arrow_body(&stmts, &value))
     }
 
-    fn if_expr(&mut self, c: &Expr, t: &Expr, f: &Expr) -> String {
-        let c = self.expr(c);
-        let (ts, tv) = self.block(|g| g.expr(t));
-        let (fs, fv) = self.block(|g| g.expr(f));
-        if ts.is_empty() && fs.is_empty() {
-            return format!("({c} ? {tv} : {fv})");
-        }
-        let r = self.temp();
-        let declare = self.declare(&r);
-        self.buf.push(format!(
-            "{declare}\nif ({c}) {{\n{}  {r} = {tv};\n}} else {{\n{}  {r} = {fv};\n}}",
-            indent(&ts),
-            indent(&fs)
-        ));
-        r
-    }
-
-    fn try_expr(&mut self, body: &Expr, arms: &[Arm]) -> String {
-        if !self.generator && !self.sync {
-            return self.expr(body);
-        }
-        if self.kernel && !self.generator {
-            return self.try_at_once(body, arms);
-        }
-        let body = self.gen_block(body);
-        let error = self.temp();
-        let (stmts, ()) = self.block(|g| g.handlers(&error, arms));
-        let try_with = self.rt("tryWith");
-        let tried = format!(
-            "{try_with}({body}, {} {{\n{}}})",
-            self.arrow(&error),
-            indent(&stmts)
-        );
-        self.run(None, &tried)
-    }
-
-    /// `o?`: the value of the `Some`, after returning a `None` at once.
-    fn unwrap(&mut self, option: &Expr) -> String {
-        let v = self.expr(option);
-        let v = self.spill(v);
-        self.buf
-            .push(format!("if ({v}._tag === \"None\") return {v};"));
-        format!("{v}.value")
-    }
-
     /// A record literal, or `{ base with … }`.
     fn record(&mut self, base: Option<&Expr>, fields: &[(String, Expr)]) -> String {
         let mut all: Vec<&Expr> = base.into_iter().collect();
@@ -432,7 +383,11 @@ impl Gen<'_> {
     pub(super) fn stmt(&mut self, stmt: &Stmt) {
         #[cfg(feature = "native-project")]
         let span = match stmt {
-            Stmt::Let(_, e) | Stmt::Expr(e) | Stmt::Fun { value: e, .. } => e.span,
+            Stmt::Let(_, e)
+            | Stmt::Var(_, e)
+            | Stmt::Assign(_, e)
+            | Stmt::Expr(e)
+            | Stmt::Fun { value: e, .. } => e.span,
         };
         #[cfg(feature = "native-project")]
         let first = self.buf.len();
@@ -454,6 +409,16 @@ impl Gen<'_> {
                 let v = self.expr(value);
                 let v = self.spill(v);
                 self.destructure(pat, &v);
+            }
+            Stmt::Var(name, value) => {
+                let v = self.expr(value);
+                let name = names::ident(name);
+                self.buf.push(self.variable(&name, &v));
+                self.vars.insert(name);
+            }
+            Stmt::Assign(name, value) => {
+                let v = self.expr(value);
+                self.buf.push(format!("{} = {v};", names::ident(name)));
             }
             Stmt::Fun {
                 name,

@@ -28,6 +28,7 @@ pub enum SyntaxKind {
     ImportKw,
     AsKw,
     LetKw,
+    MutKw,
     RecKw,
     AssertKw,
     FunKw,
@@ -64,6 +65,10 @@ pub enum SyntaxKind {
     UiKw,
     InKw,
     WhenKw,
+    LoopKw,
+    WhileKw,
+    BreakKw,
+    ContinueKw,
     ForKw,
     YieldKw,
     DoKw,
@@ -238,11 +243,17 @@ pub enum SyntaxKind {
     DoExpr,
     /// `pattern <- expr` in a `do` block.
     BindStmt,
+    /// `name = expr`: an assignment to a `let mut` variable.
+    AssignStmt,
     /// `p <- a and q <- b`: bindings that run independently (`map2`).
     BindGroup,
     /// `if condition` without `then` in a `do` block: a guard through `Alternative`.
     GuardStmt,
     /// `for { … } yield e`: a lazy `Seq`; in `[ ]` alone, a strict `List`.
+    LoopExpr,
+    WhileExpr,
+    BreakExpr,
+    ContinueExpr,
     ForExpr,
     ScopeExpr,
     ProvideExpr,
@@ -352,6 +363,9 @@ pub fn keyword(text: &str) -> Option<SyntaxKind> {
         "import" => K::ImportKw,
         "as" => K::AsKw,
         "let" => K::LetKw,
+        "mut" => K::MutKw,
+        "break" => K::BreakKw,
+        "continue" => K::ContinueKw,
         "rec" => K::RecKw,
         "assert" => K::AssertKw,
         "fun" => K::FunKw,

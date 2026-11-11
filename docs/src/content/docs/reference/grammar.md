@@ -34,14 +34,15 @@ Qualified names are written without spaces around `.`: `Users.get`,
 ### Keywords
 
 ```text
-module exposing import as let rec fun match with try if then else task await
+module exposing import as let mut rec fun match with try if then else task await
 scope provide ignore todo echo type opaque refined where kind error service class
 instance deriving foreign from forall not none true false
-ui in when for yield do
+ui in when for yield do break continue
 ```
 
 Contextual words are ordinary names everywhere except in one position:
 
+- `loop` before `{` and `while` before a condition followed by `do`;
 - `unboxed` and `untagged` right before `type` (see `codegen.md`);
 - foreign modes `pure`, `effect`, `blocked` and the source
   `global`;
@@ -255,6 +256,7 @@ module_application = "module" Con "=" ModulePath "(" ModulePath { "," ModulePath
 signature   = name ":" type
 let         = "let" ["rec"] (name { atom_pattern } | pattern) [":" type] "=" block
             | "let" "assert" pattern [":" type] "=" block ["as" String]
+            | "let" "mut" name [":" type] "=" block            (in a block only)
 rec_group   = "rec" "{" { signature | let } "}"
 type_decl   = ["opaque"] "type" Con { param } ["=" variants] [deriving]
             | ["opaque"] "type" "alias" Con { param } "=" type [deriving]
@@ -418,8 +420,11 @@ save_with :
 
 ```text
 block       = statement { line break statement }
-statement   = "let" … | signature | expr
+statement   = "let" … | signature | name "=" block | expr
 expr        = "fun" atom_pattern { atom_pattern } "->" block
+            | "loop" "{" block "}"
+            | "while" expr "do" block
+            | "break" [expr] | "continue"
             | "match" expr "with" arm { arm }
             | "try" block "with" handler_arm { handler_arm }
             | "if" expr "then" block [ "else" (if_expr | block) ]

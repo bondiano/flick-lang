@@ -1,6 +1,6 @@
 ---
 title: "Грамматика Flick"
-source_hash: 4dbd059a6a212f86
+source_hash: 3cd5856d7900590d
 ---
 
 Здесь описан синтаксис исходного кода, который принимают `flick check`
@@ -38,14 +38,15 @@ source_hash: 4dbd059a6a212f86
 ### Ключевые слова
 
 ```text
-module exposing import as let rec fun match with try if then else task await
+module exposing import as let mut rec fun match with try if then else task await
 scope provide ignore todo echo type opaque refined where kind error service class
 instance deriving foreign from forall not none true false
-ui in when for yield do
+ui in when for yield do break continue
 ```
 
 Контекстные слова считаются обычными именами, кроме следующих позиций:
 
+- `loop` перед `{` и `while` перед условием, за которым идёт `do`;
 - `unboxed` и `untagged` непосредственно перед `type` (см. `codegen.md`);
 - режимы внешних функций `pure`, `effect`, `blocked` и источник
   `global`;
@@ -276,6 +277,7 @@ module_application = "module" Con "=" ModulePath "(" ModulePath { "," ModulePath
 signature   = name ":" type
 let         = "let" ["rec"] (name { atom_pattern } | pattern) [":" type] "=" block
             | "let" "assert" pattern [":" type] "=" block ["as" String]
+            | "let" "mut" name [":" type] "=" block            (только в блоке)
 rec_group   = "rec" "{" { signature | let } "}"
 type_decl   = ["opaque"] "type" Con { param } ["=" variants] [deriving]
             | ["opaque"] "type" "alias" Con { param } "=" type [deriving]
@@ -444,8 +446,11 @@ save_with :
 
 ```text
 block       = statement { line break statement }
-statement   = "let" … | signature | expr
+statement   = "let" … | signature | name "=" block | expr
 expr        = "fun" atom_pattern { atom_pattern } "->" block
+            | "loop" "{" block "}"
+            | "while" expr "do" block
+            | "break" [expr] | "continue"
             | "match" expr "with" arm { arm }
             | "try" block "with" handler_arm { handler_arm }
             | "if" expr "then" block [ "else" (if_expr | block) ]

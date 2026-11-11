@@ -1,0 +1,24 @@
+module Main exposing (main)
+
+stop_before_source : Bool ->{} Unit
+let stop_before_source flag =
+  for _ <- (if flag then break else [1]) do Platform.stdout_line "unreachable"
+  Platform.stdout_line "after source break"
+
+skip_before_source : Bool ->{} Unit
+let skip_before_source flag =
+  for _ <- (if flag then continue else [1]) do Platform.stdout_line "unreachable"
+  Platform.stdout_line "after source continue"
+
+skip_inner_source : Unit ->{} Unit
+let skip_inner_source () = for {
+  x <- [1, 2, 3]
+  y <- (if x == 1 then continue else [x])
+} do
+  Platform.stdout_line (show y)
+
+main : Unit ->{} Unit
+let main () =
+  stop_before_source true
+  skip_before_source true
+  skip_inner_source ()

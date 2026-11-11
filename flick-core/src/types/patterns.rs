@@ -70,6 +70,7 @@ impl Checker<'_> {
                         ty: ty.clone(),
                         rec: None,
                         unsigned: false,
+                        binding: super::mutation::Binding::Other,
                     });
                 }
                 Pat::Wild
@@ -289,6 +290,7 @@ impl Checker<'_> {
                         ty: field_ty,
                         rec: None,
                         unsigned: false,
+                        binding: super::mutation::Binding::Other,
                     });
                     Pat::Wild
                 };

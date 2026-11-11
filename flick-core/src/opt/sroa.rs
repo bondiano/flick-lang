@@ -77,7 +77,11 @@ fn only(
                 total += 1;
                 parts += 1;
             }
-            Stmt::Let(_, v) | Stmt::Expr(v) | Stmt::Fun { value: v, .. } => {
+            Stmt::Let(_, v)
+            | Stmt::Var(_, v)
+            | Stmt::Assign(_, v)
+            | Stmt::Expr(v)
+            | Stmt::Fun { value: v, .. } => {
                 total += uses(v, name);
                 parts += self::parts(v, is_part);
             }
@@ -122,6 +126,14 @@ fn replace_stmt(stmt: Stmt, name: &str, local: &dyn Fn(&str) -> String) -> Vec<S
         Stmt::Expr(mut v) => {
             replace(&mut v, name, local);
             vec![Stmt::Expr(v)]
+        }
+        Stmt::Var(x, mut v) => {
+            replace(&mut v, name, local);
+            vec![Stmt::Var(x, v)]
+        }
+        Stmt::Assign(x, mut v) => {
+            replace(&mut v, name, local);
+            vec![Stmt::Assign(x, v)]
         }
         Stmt::Fun {
             name: f,

@@ -48,6 +48,7 @@ impl Checker<'_> {
         };
         self.live_bound(&mut stage, expected);
         let outer = mem::replace(&mut self.cx.stage, stage);
+        self.enter_apart(super::mutation::Apart::Task);
         let result = match result {
             Some(result) => {
                 self.check(body, &result);
@@ -55,6 +56,7 @@ impl Checker<'_> {
             }
             None => self.infer(body),
         };
+        self.leave_apart();
         let inner = mem::replace(&mut self.cx.stage, outer);
         self.cx.runtime = saved;
         let held = self.held_since(uses, locals);
@@ -129,7 +131,9 @@ impl Checker<'_> {
         let mut returned = false;
         for (arm, operation) in arms.iter().zip(&operations) {
             if let Some((index, op)) = operation {
+                self.enter_apart(super::mutation::Apart::HandlerArm);
                 let covers = self.operation_arm(arm, &handled[*index], op, &ty, region.as_ref());
+                self.leave_apart();
                 if covers {
                     handled[*index].covered.push(op.name.clone());
                 }

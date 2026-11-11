@@ -1,6 +1,6 @@
 ---
 title: "Types and classes"
-source_hash: 33f31e56ad78d7d2
+source_hash: dff57c5ed2abae4d
 ---
 
 ## Computations and kinds
@@ -285,6 +285,8 @@ let use_separate_cells () =
 ```
 
 The value of the function `make_empty` is polymorphic: creating the closure is pure. Each runtime call allocates a new cell; `numbers` itself is monomorphic and stores only `Option Int`, and `names` only `Option String`. This distinction preserves the useful polymorphism of factories without allowing the type of already created state to change.
+
+A `let mut` variable is state of one function, not a cell: an assignment is not a runtime step, and a pure function may assign its variables. It obeys the same rule as a cell: its type is fixed where it is declared, is never generalized, and every assigned value is checked against it, so a write and a read cannot choose different types and a `scope` cannot give the variable its region. No function, task, lazy sequence or arm of a handler inside the function reads or assigns the variable, which keeps the function pure from the outside ([Variables](../../reference/types/#variables)).
 
 ### Pure calls and cold descriptions
 

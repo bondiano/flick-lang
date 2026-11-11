@@ -123,14 +123,18 @@ impl<'a> Printer<'a> {
             K::FunExpr => self.fun(n, &[]),
             K::IfExpr => self.if_(n),
             K::MatchExpr | K::TryExpr => self.match_(n),
-            K::LetDecl => self.let_(n),
+            K::LetDecl | K::AssignStmt => self.let_(n),
             K::BindStmt => self.bind(n),
             K::BindGroup => self.bind_group(n),
             K::Block => self.block(n),
-            K::TaskExpr | K::UiExpr | K::ScopeExpr | K::ProvideExpr | K::DoExpr | K::RecGroup => {
-                self.braced(n, &[])
-            }
-            K::ForExpr => self.for_(n),
+            K::LoopExpr
+            | K::TaskExpr
+            | K::UiExpr
+            | K::ScopeExpr
+            | K::ProvideExpr
+            | K::DoExpr
+            | K::RecGroup => self.braced(n, &[]),
+            K::ForExpr | K::WhileExpr => self.for_(n),
             K::ListExpr | K::TupleExpr | K::ListPat | K::TuplePat | K::TupleType | K::Exposing => {
                 self.bracket(n, &[])
             }

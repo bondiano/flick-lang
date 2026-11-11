@@ -1,6 +1,6 @@
 # λFlick: elaboration
 
-This document describes the elaboration of the surface language into the core of `core.md`. Classes and instances become dictionary passing. `do`, `for`, `?` and direct calls become core forms. Divergences from the spec, the checker and the code generator, and how each is resolved, are in §5.
+This document describes the elaboration of the surface language into the core of `core.md`. Classes and instances become dictionary passing. `do`, `for`, `?`, direct calls and `let mut` variables become core forms. Divergences from the spec, the checker and the code generator, and how each is resolved, are in §5.
 
 References are as in `core.md`. Checker paths are relative to `flick-core/src/types/`, IR lowering paths to `flick-core/src/ir/`, code generator paths to `flick-core/src/codegen/`. The probes of §5 were built with `flick build` and run on Node (`--emit js`) and as a Go executable (`--emit go`).
 
@@ -15,6 +15,7 @@ Elaborated here:
 - `for … yield`, `[for …]`, `for … do`;
 - postfix `?`;
 - direct calls;
+- `let mut` variables and assignment;
 - `CallSite`, the place of a use, which the checker gives.
 
 | Not covered | Where | How the model accounts for it |
@@ -376,6 +377,60 @@ Calling an effectful function without `await` (spec/01) rewrites nothing in the 
 - the `≤-Fun` lift: a `Lift` node from `typing.lifts`;
 - `task e`, `await e`: `ExprKind::Task`, `Await`;
 - a block statement: `let _ : Unit = s in rest` (`core.md` §1.4).
+
+### 3.5 Local mutable variables and control
+
+`let mut x = e` declares a monomorphic variable local to its function. Assignment
+checks the RHS against that fixed type and returns `Unit`, without introducing
+a runtime effect. Nested functions, tasks, lazy generators and operation arms
+cannot capture the variable (`FLICK-G005`). Strict comprehensions cannot assign
+external variables (`FLICK-T070`). Region checking uses the current typing-by-use
+contract: holding an unused capability is different from using it after its region
+ends. A mutable cell does not erase the qualifier of a stored callable.
+
+The reference translation threads values through the core. A block returns its
+value and the variables it changes; branches, scopes and handlers return the same
+state shape. Reading a variable selects its current version. Assignment evaluates
+the RHS first, so a failed RHS leaves that cell unchanged.
+
+A source loop has a lexical identity in the shared IR (`ControlLoop` and
+`LoopExit`). Its model translation uses a recursive function of the state.
+An iteration returns either its normal value or an exit (`Result (Option a) t`):
+`Err (Some v)` is `break v`, `Err None` is `continue`, and `Ok v` is ordinary
+completion. A sequence stops on an exit; scopes return it normally and close
+before iteration resumes. Lists in imperative `for` use the same state protocol
+while consuming their remaining elements.
+
+Within `try`, the model carries typed failure as another `Result` alongside the
+state; a source handler receives the store where the failure occurred. The error
+and loop completion protocols nest when `try` and loops nest. A pure atomic
+expression introduces no artificial error type; runtime calls catch their typed
+errors at the call boundary. Evaluation of ordinary operands is ordered and
+short-circuited operands remain conditional.
+
+The failure payload is a cold task returning `Never` that only re-raises the
+caught error. A shared monomorphic identity gives these tasks a common open
+error row, using the core's existing `Eff` subtyping. Dispatch selects a handler
+under `try` and runs its task outside that catch; errors from a guard or body
+therefore reach the enclosing handler. A false guard passes its updated state
+to the next arm. Eliminating `Never` uses its empty constructor set.
+
+Backends lower lexical exits to private completion flags after the shared IR:
+normal completion, break and continue guard the remaining operands and statements.
+The flags cross compiler-generated scope callbacks as local state, so an exit
+closes a scope normally. They are not source variables or part of the reference
+model's typed state. JS and Go use the same control lowering.
+
+T7 (`formal/Formal/LetMut.lean`) proves typed elaboration for the original block
+fragment: bindings, assignments, scope and two-armed match. `T7_pure` applies T2a,
+and `T7_regions` applies T4′ (safety by use). `Formal/LocalControl.lean` states
+completion independently: successful assignment commits, failed assignment does
+not, error handlers receive the current store, and break/continue skip suffixes.
+`iterate_preserves` proves that finite iteration preserves any store invariant
+preserved by its body; fuel exhaustion is not a terminating loop. These theorems
+do not establish Rust compiler or backend equivalence. The model typechecks and
+runs the shared corpus against independently specified output, including local
+control and errors (`tests/run/codegen/loops*.fl`).
 
 ## 4. Coherence and T6
 

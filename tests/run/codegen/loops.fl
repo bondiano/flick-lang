@@ -1,0 +1,116 @@
+module Main exposing (main)
+
+type error Missing = Missing
+
+count : Int -> Int
+let count n =
+  let mut i = 0
+  while i < n do i = i + 1
+  i
+
+find : Int -> Int
+let find n =
+  let mut i = 0
+  loop {
+    i = i + 1
+    if i < n then continue
+    break i
+  }
+
+sum : List Int -> Int
+let sum xs =
+  let mut total = 0
+  for x <- xs do {
+    if x < 0 then continue
+    if x > 10 then break
+    total = total + x
+  }
+  total
+
+main : Unit ->{} Unit
+let main () =
+  Platform.stdout_line (show (count 0, count 4, find 3))
+  Platform.stdout_line (show (sum [1, -2, 3, 20, 5]))
+  let mut outer = 0
+  while outer < 2 do {
+    outer = outer + 1
+    let mut inner = 0
+    loop {
+      inner = inner + 1
+      if inner < 2 then continue
+      break
+    }
+  }
+  Platform.stdout_line (show outer)
+  let result =
+    loop {
+      scope {
+        Scope.add_finalizer (task { Platform.stdout_line "closed" })
+        Platform.stdout_line "scope"
+        break 42
+      }
+      Platform.stdout_line "unreachable"
+    }
+  Platform.stdout_line (show result)
+  let mut status = 0
+  let recovered =
+    try
+      status = 5
+      status = from_result (Err Missing)
+      status
+    with
+    | Missing -> status
+  Platform.stdout_line (show (status, recovered))
+  let mut iteration = 0
+  while iteration < 2 do {
+    iteration = iteration + 1
+    scope {
+      Scope.add_finalizer (task { Platform.stdout_line "iteration closed" })
+      continue
+    }
+    Platform.stdout_line "unreachable"
+  }
+  let mut attempts = 0
+  let combined =
+    loop {
+      attempts = attempts + 1
+      try
+        if attempts < 2 then from_result (Err Missing)
+        break attempts
+      with
+      | Missing -> continue
+    }
+  Platform.stdout_line (show combined)
+  let mut changes = 0
+  let after_error =
+    try
+      while changes < 3 do {
+        changes = changes + 1
+        if changes == 2 then from_result (Err Missing)
+      }
+      changes
+    with
+    | Missing -> changes
+  Platform.stdout_line (show after_error)
+  let in_operand = loop { ignore (1, (if true then break 7 else 0), 2) }
+  Platform.stdout_line (show in_operand)
+  let in_guard =
+    loop {
+      match 1 with
+      | n when (if n == 1 then break 9 else false) -> ()
+      | _ -> Platform.stdout_line "unreachable"
+    }
+  Platform.stdout_line (show in_guard)
+  let nested_exit = loop { break (if true then break 11 else 0) }
+  Platform.stdout_line (show nested_exit)
+  let mut from_for = 0
+  let recovered_for =
+    try
+      for x <- [1, 2, 3] do {
+        from_for = from_for + x
+        if x == 2 then from_result (Err Missing)
+      }
+      from_for
+    with
+    | Missing -> from_for
+  Platform.stdout_line (show recovered_for)

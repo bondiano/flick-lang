@@ -50,6 +50,7 @@ mod lints;
 mod makers;
 mod module_contract;
 mod module_signature;
+mod mutation;
 pub(crate) use module_signature::normalize_module_interface;
 mod static_modules;
 pub(crate) use module_contract::{
@@ -442,6 +443,7 @@ struct Local {
     /// A local function without a signature: it has one type, from its body
     /// and its first uses.
     unsigned: bool,
+    binding: mutation::Binding,
 }
 
 /// A recursive function whose signature has no explicit `forall`: its
@@ -518,6 +520,7 @@ struct NumLiteral {
 /// starts with none of this.
 #[derive(Default)]
 struct ItemCx {
+    mutation: mutation::Frames,
     locals: Vec<Local>,
     tyvars: Vec<TyVar>,
     /// Whether the expression being inferred runs a runtime call at this

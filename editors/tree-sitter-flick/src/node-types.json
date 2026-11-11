@@ -519,12 +519,20 @@
     "extra": true
   },
   {
+    "type": "break",
+    "named": false
+  },
+  {
     "type": "class",
     "named": false
   },
   {
     "type": "constructor",
     "named": true
+  },
+  {
+    "type": "continue",
+    "named": false
   },
   {
     "type": "deriving",
@@ -609,6 +617,10 @@
     "extra": true
   },
   {
+    "type": "loop",
+    "named": false
+  },
+  {
     "type": "match",
     "named": false
   },
@@ -623,6 +635,10 @@
   {
     "type": "multiline_string",
     "named": true
+  },
+  {
+    "type": "mut",
+    "named": false
   },
   {
     "type": "none",
@@ -698,6 +714,10 @@
   },
   {
     "type": "where",
+    "named": false
+  },
+  {
+    "type": "while",
     "named": false
   },
   {

@@ -9,6 +9,9 @@
 mod derive;
 mod expr;
 pub mod lean;
+mod loops;
+mod mutation;
+mod mutation_errors;
 pub mod types;
 
 use std::rc::Rc;
@@ -56,6 +59,11 @@ pub fn lams(names: impl IntoIterator<Item = Name>, body: Term) -> Term {
 struct Tr {
     module: String,
     fresh: usize,
+    /// Each `let mut` variable in scope and the name of its current value,
+    /// innermost last.
+    versions: Vec<(String, Name)>,
+    control: Option<String>,
+    error_action: Option<Name>,
 }
 
 impl Tr {
@@ -63,6 +71,9 @@ impl Tr {
         Tr {
             module: module.to_owned(),
             fresh: 0,
+            versions: Vec::new(),
+            control: None,
+            error_action: None,
         }
     }
 

@@ -184,6 +184,10 @@
         },
         {
           "type": "STRING",
+          "value": "mut"
+        },
+        {
+          "type": "STRING",
           "value": "rec"
         },
         {
@@ -321,6 +325,22 @@
         {
           "type": "STRING",
           "value": "do"
+        },
+        {
+          "type": "STRING",
+          "value": "loop"
+        },
+        {
+          "type": "STRING",
+          "value": "while"
+        },
+        {
+          "type": "STRING",
+          "value": "break"
+        },
+        {
+          "type": "STRING",
+          "value": "continue"
         }
       ]
     },

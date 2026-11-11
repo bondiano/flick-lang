@@ -271,3 +271,21 @@ fn extract_and_inline_round_trip() {
         "module App.Main exposing (total)\n\ntotal : Float -> Float\nlet total n =\n  (n + 1) * (n - 2)\n"
     );
 }
+
+#[test]
+fn a_let_mut_variable_is_neither_extracted_from_nor_inlined() {
+    let src = "module App.Main exposing (count)\n\ncount : Int -> (Int, Int)\nlet count n =\n  let mut x = n\n  let before = x\n  x = x + 1\n  (before, x * 2)\n";
+    let (f, _) = main(src);
+    let at = f.at("App.Main", "x =", 1);
+    assert!(action(&f, at, at, "inline `x`").is_none(), "the variable");
+    let at = f.at("App.Main", "before =", 0);
+    assert!(
+        action(&f, at, at, "inline `before`").is_none(),
+        "a value that reads the variable, used after it changes"
+    );
+    let start = f.at("App.Main", "x * 2", 0);
+    assert!(
+        action(&f, start, start + 5, "extract `value`").is_none(),
+        "a read moved before its statement"
+    );
+}

@@ -1,0 +1,22 @@
+// A `let mut` that is never assigned needs no `mut`.
+module App.LetMutLint exposing (..)
+
+never_assigned : Int -> Int
+let never_assigned n =
+  let mut x = n + 1
+  x * 2
+
+assigned : Int -> Int
+let assigned n =
+  let mut x = n
+  x = x + 1
+  x
+
+shadowed : Int -> Int
+let shadowed n =
+  let mut x = n
+  let x = x + 1
+  x
+
+//~ FLICK-R020 @6:7-6:10 `x` is never assigned, so it needs no `mut`
+//~ FLICK-R020 @17:7-17:10 `x` is never assigned, so it needs no `mut`

@@ -302,3 +302,37 @@ test("exercise checks resolve a re-export through the worker declaration graph",
   await page.getByRole("button", { name: "Check answer" }).click();
   await expect(page.locator(".fp-lesson")).toContainText("Correct. The signature and output match.");
 });
+
+test("local mutation, loops and typed errors run in the browser", async ({ page }) => {
+  await page.goto("/flick-lang/play/");
+  await ready(page);
+  await replaceSource(page, `module Main exposing (main)
+
+type error Missing = Missing
+
+main : Unit ->{} Unit
+let main () =
+  let mut i = 0
+  while i < 3 do i = i + 1
+  let answer = loop {
+    if i == 3 then break 7
+    break 0
+  }
+  let mut visited = 0
+  for {
+    x <- [1, 2]
+    y <- (if x == 1 then continue else [x])
+  } do visited = visited + y
+  let after =
+    try
+      i = i + 1
+      i = from_result (Err Missing)
+      i
+    with
+    | Missing -> i
+  Platform.stdout_line (show (answer, after, visited))
+`);
+  await expect(page.locator(".fp-status")).toContainText("Type-checked", { timeout: 30_000 });
+  await page.getByRole("button", { name: "Run", exact: true }).click();
+  await expect(page.locator(".fp-output")).toContainText("(7, 4, 2)", { timeout: 60_000 });
+});
