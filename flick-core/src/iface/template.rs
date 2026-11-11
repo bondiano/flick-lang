@@ -77,6 +77,8 @@ pub enum CalleeOrigin {
     Member(StaticArgument),
     Parameter {
         binding: BindingOrigin,
+        /// Caller-visible argument evidence, separate from the callee's lexical bindings.
+        argument: StaticArgument,
         members: Vec<String>,
     },
 }

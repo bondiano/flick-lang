@@ -261,8 +261,14 @@ impl Checking<'_> {
         let witnesses: Vec<_> = loaded
             .virtual_of
             .iter()
-            .flat_map(|v| &v.capture.bindings)
-            .filter_map(|b| Self::argument_interface(&b.argument, lookup, contracts))
+            .flat_map(|v| {
+                let callee = match &v.capture.callee {
+                    Some(CalleeOrigin::Parameter { argument, .. }) => Some(argument),
+                    _ => None,
+                };
+                v.capture.bindings.iter().map(|b| &b.argument).chain(callee)
+            })
+            .filter_map(|argument| Self::argument_interface(argument, lookup, contracts))
             .collect();
         let (mut checked, typing) = types::check_typed_with_static_context(
             &module,

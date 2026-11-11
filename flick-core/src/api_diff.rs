@@ -327,7 +327,13 @@ fn bind<'a>(
 
 /// A scheme with its quantified variables named by binder order.
 pub(crate) fn canonical_type(ty: &Type) -> Type {
-    rename(ty, &[], &mut 0)
+    canonical_type_in(ty, &mut 0)
+}
+
+/// Use the enclosing contract's fresh-name supply so inner quantifiers cannot
+/// capture names already assigned to its type parameters.
+pub(crate) fn canonical_type_in(ty: &Type, next: &mut usize) -> Type {
+    rename(ty, &[], next)
 }
 
 /// `ty` with its free variables renamed by `names` and those its `forall`s

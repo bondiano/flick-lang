@@ -191,22 +191,6 @@ impl Loader<'_> {
             })
             .collect();
         let mut capture = inherited.map_or_else(StaticCapture::default, |v| v.capture.clone());
-        if let CalleeOrigin::Parameter { binding, .. } = &callee
-            && let Some(caller) = self.modules[parent]
-                .virtual_of
-                .as_ref()
-                .and_then(|context| {
-                    context
-                        .capture
-                        .bindings
-                        .iter()
-                        .find(|b| &b.origin == binding)
-                })
-            && !capture.bindings.iter().any(|b| b.origin == caller.origin)
-        {
-            capture.bindings.push(caller.clone());
-        }
-
         if !capture
             .access_modules
             .contains(&self.modules[parameterized].name)

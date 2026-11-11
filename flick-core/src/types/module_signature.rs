@@ -9,6 +9,13 @@ use super::{
 use crate::api_diff::canonical_type;
 use crate::iface::{Decl, Entity, Export, Interface, Namespace};
 
+fn replace_types(ty: &Type, replacements: &[(Type, Type)]) -> Type {
+    if let Some((_, new)) = replacements.iter().find(|(old, _)| old == ty) {
+        return new.clone();
+    }
+    map_module_children(ty, &mut |ty| replace_types(ty, replacements))
+}
+
 fn display_type(ty: &Type) -> String {
     fn scoped(ty: &Type) -> Type {
         if let Type::Con { module, name } = ty

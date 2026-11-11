@@ -15,12 +15,6 @@ impl ModuleSignature {
     /// uses `project` instead: it hides representations while keeping the
     /// argument's existing identities.
     pub fn seal(&self, actual: &Interface, path: &str) -> Interface {
-        fn replace(ty: &Type, replacements: &[(Type, Type)]) -> Type {
-            if let Some((_, new)) = replacements.iter().find(|(old, _)| old == ty) {
-                return new.clone();
-            }
-            map_module_children(ty, &mut |ty| replace(ty, replacements))
-        }
         let Self::Structure { requirements } = self else {
             return self.project(actual);
         };
@@ -64,7 +58,7 @@ impl ModuleSignature {
                 path.clone_into(&mut export.entity.module);
             }
         }
-        map_interface_types(&mut projected, &mut |ty| replace(ty, &replacements));
+        map_interface_types(&mut projected, &mut |ty| replace_types(ty, &replacements));
         path.clone_into(&mut projected.module);
         projected
     }

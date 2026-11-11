@@ -98,19 +98,14 @@ impl Checking<'_> {
                         .unwrap_or_else(|| types::ModuleSignature::from_interface(&actual)),
                 )
             }
-            CalleeOrigin::Parameter { binding, members } => {
+            CalleeOrigin::Parameter {
+                binding,
+                argument,
+                members,
+            } => {
                 let signature = Self::binding_signature(binding, lookup, contracts)?;
-                let argument = context
-                    .capture
-                    .bindings
-                    .iter()
-                    .rev()
-                    .find(|b| &b.origin == binding)?;
-                let mut actual = signature.project(&Self::argument_interface(
-                    &argument.argument,
-                    lookup,
-                    contracts,
-                )?);
+                let mut actual =
+                    signature.project(&Self::argument_interface(argument, lookup, contracts)?);
                 for name in members {
                     actual = actual.modules.remove(name)?;
                 }

@@ -1,10 +1,4 @@
 fn rebase_kind_members(interface: &mut Interface, requirements: &[R], path: &str) {
-    fn replace(ty: &Type, replacements: &[(Type, Type)]) -> Type {
-        if let Some((_, new)) = replacements.iter().find(|(old, _)| old == ty) {
-            return new.clone();
-        }
-        map_module_children(ty, &mut |ty| replace(ty, replacements))
-    }
     let replacements: Vec<_> = requirements
         .iter()
         .filter_map(|requirement| {
@@ -22,7 +16,7 @@ fn rebase_kind_members(interface: &mut Interface, requirements: &[R], path: &str
             Some((Type::con(module, name), Type::con(path, name)))
         })
         .collect();
-    map_interface_types(interface, &mut |ty| replace(ty, &replacements));
+    map_interface_types(interface, &mut |ty| replace_types(ty, &replacements));
 }
 
 impl ModuleSignature {

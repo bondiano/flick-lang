@@ -295,3 +295,15 @@ fn ported_review_structure_signature_offsets_do_not_change_the_public_api() {
     let new = interface(&source.replace("  module Child", "\n  module Child"));
     assert!(diff(&[old], &[new]).is_empty());
 }
+#[test]
+fn contract_parameters_and_inner_foralls_have_distinct_canonical_names() {
+    let api = |first: &str, second: &str, inner: &str, input: &str| {
+        interface(&format!(
+            "module Lib exposing (Contract)\ntype module Contract =\n  type Items {first} {second} = forall {inner}. {input} -> {inner}\n"
+        ))
+    };
+    let old = api("a", "b", "c", "b");
+    assert!(diff(slice::from_ref(&old), &[api("x", "y", "z", "y")]).is_empty());
+    let changes = diff(&[old], &[api("a", "b", "c", "c")]);
+    assert_eq!(bump(&changes), Bump::Major, "{changes:?}");
+}

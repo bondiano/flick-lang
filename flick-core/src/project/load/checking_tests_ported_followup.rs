@@ -184,3 +184,53 @@ fn ported_review_nested_alias_ancestors_are_checked_before_member_applications()
         }
     }
 }
+#[cfg(feature = "ide")]
+#[test]
+fn caller_parameter_names_do_not_shadow_factory_imports() {
+    for member in ["answer", "extra"] {
+        let root = format!(
+            "module App.Root exposing (answer)\nmodule Applied = App.Apply(App.Make)\nmodule Built = Applied(App.Argument)\nanswer : Int\nlet answer = Built.{member}\n"
+        );
+        let (_, analysis) = hom_boundary_analysis(
+            &[
+                (
+                    "Contracts",
+                    "module App.Contracts exposing (Input, Output, Rich, Factory)\ntype module Input =\n  seed : Int\ntype module Output =\n  answer : Int\ntype module Rich =\n  answer : Int\n  extra : Int\ntype module Factory = (K : Input) -> Output\n",
+                ),
+                (
+                    "Helpers",
+                    "module App.Helpers exposing (offset)\noffset : Int\nlet offset = 1\n",
+                ),
+                (
+                    "Argument",
+                    "module App.Argument exposing (seed)\nseed : Int\nlet seed = 41\n",
+                ),
+                (
+                    "Make",
+                    "module App.Make(K : App.Contracts.Input) : App.Contracts.Rich exposing (answer, extra)\nimport App.Helpers as F\nanswer : Int\nlet answer = K.seed + F.offset\nextra : Int\nlet extra = 99\n",
+                ),
+                (
+                    "Apply",
+                    "module App.Apply(F : App.Contracts.Factory)(K : App.Contracts.Input) : App.Contracts.Output = F(K)\n",
+                ),
+                ("Root", &root),
+            ],
+            "Root",
+        );
+        if member == "answer" {
+            assert!(
+                analysis.diagnostics.is_empty(),
+                "{:?}",
+                analysis.diagnostics
+            );
+        } else {
+            assert!(
+                analysis.diagnostics.iter().any(|d| {
+                    matches!(d.code, codes::R004 | codes::T001) && d.message.contains("extra")
+                }),
+                "{:?}",
+                analysis.diagnostics
+            );
+        }
+    }
+}

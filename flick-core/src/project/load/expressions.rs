@@ -316,6 +316,7 @@ impl Loader<'_> {
             {
                 return CalleeOrigin::Parameter {
                     binding: binding.origin.clone(),
+                    argument: binding.argument.clone(),
                     members: tail
                         .split('.')
                         .filter(|s| !s.is_empty())
