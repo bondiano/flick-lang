@@ -52,6 +52,8 @@ const USE: &str =
 include!("checking_tests_replay.rs");
 #[cfg(feature = "ide")]
 include!("checking_tests_visibility.rs");
+#[cfg(feature = "ide")]
+include!("checking_tests_broken.rs");
 include!("checking_tests_contracts.rs");
 #[cfg(feature = "ide")]
 #[test]
