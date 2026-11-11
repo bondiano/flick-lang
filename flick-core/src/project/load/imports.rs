@@ -13,7 +13,65 @@ use crate::resolve::{self, ItemKind, ModuleApplication};
 use crate::source::Span;
 use crate::syntax::{self, kind::SyntaxKind as K};
 
+/// The public view of a member can depend on ascriptions at each ancestor.
+/// Lexically accessible ancestors are already supplied by the body capture.
+pub(super) fn contract_ancestors(
+    caller: &Loaded,
+    start: &str,
+    member_of: &dyn Fn(&str) -> Option<StaticMember>,
+) -> Vec<String> {
+    let mut names = vec![start.to_owned()];
+    while let Some(member) = member_of(names.last().expect("starting contract")) {
+        if caller.can_access_member(&member) || names.contains(&member.parent) {
+            break;
+        }
+        names.push(member.parent);
+    }
+    names
+}
+
 impl Loader<'_> {
+    fn virtual_dependencies(&self, i: usize, virtual_of: &Virtual) -> Vec<String> {
+        let mut dependencies: Vec<_> = virtual_of
+            .capture
+            .bindings
+            .iter()
+            .map(|b| b.origin.module.clone())
+            .collect();
+        dependencies.extend(
+            virtual_of
+                .capture
+                .bindings
+                .iter()
+                .map(|b| b.argument.clone()),
+        );
+        match &virtual_of.capture.callee {
+            Some(CalleeOrigin::Module(name)) => dependencies.push(name.clone()),
+            Some(CalleeOrigin::Member(member)) => {
+                let caller = self.modules[i]
+                    .member_of
+                    .as_ref()
+                    .and_then(|member| self.by_name.get(&member.parent))
+                    .map_or(&self.modules[i], |&index| &self.modules[index]);
+                dependencies.extend(contract_ancestors(caller, &member.parent, &|name| {
+                    self.by_name
+                        .get(name)
+                        .and_then(|&index| self.modules[index].member_of.clone())
+                        .or_else(|| {
+                            self.from_packages
+                                .get(name)
+                                .and_then(|i| i.member_of.clone())
+                        })
+                }));
+            }
+            Some(CalleeOrigin::Parameter { binding, .. }) => {
+                dependencies.push(binding.module.clone());
+            }
+            None => {}
+        }
+        dependencies
+    }
+
     /// Loads imported modules until the set is closed; returns the local
     /// import edges of each module, sorted by module name.
     pub(super) fn load_imports(&mut self) -> Vec<Vec<usize>> {
@@ -48,27 +106,7 @@ impl Loader<'_> {
                 }
             }
             if let Some(virtual_of) = self.modules[i].virtual_of.clone() {
-                let mut dependencies: Vec<_> = virtual_of
-                    .capture
-                    .bindings
-                    .iter()
-                    .map(|b| b.origin.module.clone())
-                    .collect();
-                dependencies.extend(
-                    virtual_of
-                        .capture
-                        .bindings
-                        .iter()
-                        .map(|b| b.argument.clone()),
-                );
-                match &virtual_of.capture.callee {
-                    Some(CalleeOrigin::Module(name)) => dependencies.push(name.clone()),
-                    Some(CalleeOrigin::Member(member)) => dependencies.push(member.parent.clone()),
-                    Some(CalleeOrigin::Parameter { binding, .. }) => {
-                        dependencies.push(binding.module.clone());
-                    }
-                    None => {}
-                }
+                let dependencies = self.virtual_dependencies(i, &virtual_of);
                 for dependency in dependencies {
                     if let Some(target) = self.find_module(i, &dependency, virtual_of.at) {
                         targets.push(target);
@@ -156,7 +194,17 @@ impl Loader<'_> {
                 };
                 prefix = parent;
             }
+            let active = format!("member:{name}");
+            if !self.expressions_active.insert(active.clone()) {
+                self.diagnostics.push(Diagnostic::error(
+                    codes::R006,
+                    format!("cyclic module member resolution for `{name}`"),
+                    span,
+                ));
+                return None;
+            }
             self.materialize_members(name);
+            self.expressions_active.remove(&active);
             if !self.by_name.contains_key(name) && self.report_inline_import(&dirs, name, span) {
                 return None;
             }

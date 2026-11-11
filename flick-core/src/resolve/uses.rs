@@ -88,7 +88,10 @@ impl Walker<'_> {
         let modules = self.module_locals.len();
         let mut children = node.nodes();
         if let Some(parameters) = children.next() {
-            for parameter in parameters.nodes() {
+            for parameter in parameters
+                .nodes()
+                .filter(|n| n.kind == K::ModuleSignatureBinder)
+            {
                 for signature in parameter.nodes() {
                     self.walk(signature);
                 }
@@ -96,7 +99,10 @@ impl Walker<'_> {
                     self.module_locals.push(name.text(self.text));
                 }
             }
-            if parameters.kind != K::ModuleSignatureParen {
+            if !parameters
+                .nodes()
+                .any(|n| n.kind == K::ModuleSignatureBinder)
+            {
                 self.walk(parameters);
             }
         }

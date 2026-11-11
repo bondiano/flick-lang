@@ -373,6 +373,11 @@ impl Checking<'_> {
         if clean && interface.parameterized.is_some() {
             interface.template = Some(ModuleTemplate {
                 source: self.text_of(loaded).to_owned(),
+                materialized_body: loaded
+                    .syntax
+                    .header
+                    .as_ref()
+                    .and_then(|h| h.materialized_body.clone()),
                 capture: loaded.virtual_of.as_ref().map(|v| v.capture.clone()),
             });
         }

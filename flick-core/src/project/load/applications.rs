@@ -41,7 +41,7 @@ impl Loader<'_> {
         let groups = header_node
             .nodes()
             .filter(|n| n.kind == K::ModuleParamGroup)
-            .skip(application.argument_groups.len())
+            .skip(1)
             .map(|n| n.text(&source))
             .collect::<String>();
         let expression_body = header
@@ -117,11 +117,7 @@ impl Loader<'_> {
             return;
         };
         if header.parameters.is_empty()
-            || application.argument_groups.is_empty()
-            || !header
-                .parameter_groups
-                .starts_with(&application.argument_groups)
-            || application.arguments.len() != application.argument_groups.iter().sum::<usize>()
+            || header.parameter_groups.first() != Some(&application.arguments.len())
         {
             self.diagnostics.push(Diagnostic::error(
                 codes::T002,

@@ -8,6 +8,10 @@ pub struct ModuleTemplate {
     /// Body checked against the interface's higher-order signature. A reader
     /// may instantiate it for either backend without the original checkout.
     pub source: String,
+    /// A checked alias target is canonical; reparsing source aliases cannot
+    /// safely recover it after restoring a portable template.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub materialized_body: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub capture: Option<StaticCapture>,
 }

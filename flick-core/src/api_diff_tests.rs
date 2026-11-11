@@ -96,6 +96,7 @@ fn nested_static_members_are_public_api_but_template_bodies_are_not() {
     implementation.template = Some(ModuleTemplate {
         source: "implementation changes".into(),
         capture: None,
+        materialized_body: None,
     });
     assert!(diff(&[old], &[implementation]).is_empty());
 }

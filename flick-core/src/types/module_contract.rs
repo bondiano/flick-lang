@@ -285,7 +285,7 @@ pub(crate) fn local_dictionaries(
             _ => None,
         })
         .collect();
-    requirements
+    let mut dictionaries: Vec<_> = requirements
         .iter()
         .filter_map(|requirement| {
             let ModuleRequirement::Dictionary { head, from } = requirement else {
@@ -300,7 +300,19 @@ pub(crate) fn local_dictionaries(
                 },
             ))
         })
-        .collect()
+        .collect();
+    for requirement in &requirements {
+        if let ModuleRequirement::Module {
+            name, signature, ..
+        } = requirement
+            && let Some(child) = actual.modules.get(name)
+        {
+            let mut signature = (**signature).clone();
+            signature.substitute_outer_types(&subst);
+            dictionaries.extend(local_dictionaries(&signature.definition(), child));
+        }
+    }
+    dictionaries
 }
 
 pub(crate) fn project(contract: &TypeDef, actual: &Interface) -> Interface {
@@ -387,6 +399,19 @@ pub(crate) fn project(contract: &TypeDef, actual: &Interface) -> Interface {
             ModuleRequirement::Dictionary { .. } => {}
         }
     }
+    projected.servers = actual
+        .servers
+        .iter()
+        .filter(|(name, _)| projected.find(Namespace::Value, name).is_some())
+        .cloned()
+        .collect();
+    projected.makers = actual
+        .makers
+        .iter()
+        .filter(|name| projected.find(Namespace::Value, name).is_some())
+        .cloned()
+        .collect();
+    projected.targets.clone_from(&actual.targets);
     projected
 }
 

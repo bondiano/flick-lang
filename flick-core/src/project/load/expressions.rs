@@ -88,7 +88,6 @@ impl Loader<'_> {
         let application = ModuleApplication {
             expression: body.clone(),
             annotation: None,
-            argument_groups: Vec::new(),
             name: String::new(),
             template: String::new(),
             template_span: header.span,
@@ -110,7 +109,7 @@ impl Loader<'_> {
         self.select_expression_body(module, target, header.span);
     }
 
-    fn select_expression_body(&mut self, module: usize, target: String, at: Span) {
+    pub(super) fn select_expression_body(&mut self, module: usize, target: String, at: Span) {
         let syntax = Arc::make_mut(&mut self.modules[module].syntax);
         syntax.header.as_mut().expect("header").materialized_body = Some(target.clone());
         syntax.imports.push(Import {
@@ -250,7 +249,6 @@ impl Loader<'_> {
                 let mut application = site.clone();
                 application.name.clone_from(&local);
                 application.template = callee;
-                application.argument_groups = vec![arguments.len()];
                 application.argument_spans = vec![site.span; arguments.len()];
                 application.arguments = arguments;
                 self.instantiate_named(parent, &application, origin);

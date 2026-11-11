@@ -86,6 +86,28 @@ fn generalize_local_type(ty: &Type, module: &str, names: &[(String, bool)]) -> T
     mapped
 }
 
+fn exported_methods(interface: &Interface, class: &Entity) -> Vec<(String, Type)> {
+    interface
+        .exports
+        .iter()
+        .filter(|method| {
+            method.parent.as_deref() == Some(&class.name)
+                && method.entity.module == class.module
+                && method.decl == Decl::Method
+        })
+        .filter_map(|method| Some((method.entity.name.clone(), method.scheme.clone()?)))
+        .collect()
+}
+
+fn exported_class_method(interface: &Interface, method: &Export) -> bool {
+    method.decl == Decl::Method
+        && interface.exports.iter().any(|class| {
+            class.decl == Decl::Class
+                && class.entity.module == method.entity.module
+                && method.parent.as_deref() == Some(&class.entity.name)
+        })
+}
+
 impl ModuleSignature {
     pub(crate) fn normalize_in(&mut self, witness: &Interface) {
         self.map_types(&mut |ty| super::module_contract::expand_actual(ty, witness, 32));
@@ -133,6 +155,9 @@ impl ModuleSignature {
         for export in &interface.exports {
             match export.entity.namespace {
                 Namespace::Value => {
+                    if exported_class_method(interface, export) {
+                        continue;
+                    }
                     if let Some(ty) = &export.scheme {
                         requirements.push(R::Value {
                             name: export.entity.name.clone(),
@@ -154,7 +179,7 @@ impl ModuleSignature {
                                     identity: (export.entity.module != interface.module)
                                         .then(|| export.entity.clone()),
                                     definition: Some(Box::new(definition.clone())),
-                                    methods: Vec::new(),
+                                    methods: exported_methods(interface, &export.entity),
                                 });
                             }
                             Form::ModuleContract { .. } | Form::ModuleSignature { .. } => {}

@@ -546,3 +546,14 @@ fn review_dependent_variance_uses_expected_parameter_equalities() {
     assert!(provided.is_subtype_of(&expected));
     assert!(!expected.is_subtype_of(&provided));
 }
+
+#[test]
+fn review_result_sealing_preserves_server_reachability_metadata() {
+    let signature = structure(&["main"]);
+    let mut actual = signature.interface("Web");
+    actual.servers.push((
+        "main".into(),
+        vec!["Web.page".into(), "Page.load".into(), "Server.node".into()],
+    ));
+    assert_eq!(signature.seal(&actual, "Web").servers, actual.servers);
+}

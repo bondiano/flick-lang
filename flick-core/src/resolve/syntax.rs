@@ -43,7 +43,6 @@ pub struct Header {
 #[derive(Debug, Clone)]
 pub struct ModuleParam {
     pub name: String,
-    pub contract: String,
     pub span: Span,
     pub signature: Node,
 }
@@ -52,7 +51,6 @@ pub struct ModuleParam {
 pub struct ModuleApplication {
     pub expression: Node,
     pub annotation: Option<Node>,
-    pub argument_groups: Vec<usize>,
     pub name: String,
     pub template: String,
     pub template_span: Span,
@@ -199,18 +197,6 @@ pub fn module_syntax(tree: &Node, text: &str, file: FileId) -> ModuleSyntax {
                     .last()
             });
             if let Some(expression) = expression {
-                fn groups(node: &Node, out: &mut Vec<usize>) {
-                    if node.kind == K::ModuleApplyExpr {
-                        if let Some(callee) = node.nodes().next() {
-                            groups(callee, out);
-                        }
-                        out.push(node.nodes().count().saturating_sub(1));
-                    }
-                }
-                let mut argument_groups = Vec::new();
-                for child in node.nodes() {
-                    groups(child, &mut argument_groups);
-                }
                 applications.push(ModuleApplication {
                     expression: expression.clone(),
                     annotation: (!nested_parameterized)
@@ -221,7 +207,6 @@ pub fn module_syntax(tree: &Node, text: &str, file: FileId) -> ModuleSyntax {
                                 .cloned()
                         })
                         .flatten(),
-                    argument_groups,
                     name: local_name,
                     template: named
                         .first()
@@ -272,7 +257,6 @@ pub fn module_syntax(tree: &Node, text: &str, file: FileId) -> ModuleSyntax {
                             let contract = param.nodes().next()?;
                             Some(ModuleParam {
                                 name: name.text(text).to_owned(),
-                                contract: contract.text(text).split_whitespace().collect(),
                                 span: Span::new(file, name.start, name.end),
                                 signature: contract.clone(),
                             })
@@ -380,7 +364,11 @@ pub fn module_syntax(tree: &Node, text: &str, file: FileId) -> ModuleSyntax {
                     });
                 }
             }
-            for child in node.nodes().filter(|n| n.kind != K::ModuleParamGroup) {
+            for child in node.nodes().filter(|n| {
+                !(matches!(n.kind, K::ModuleParamGroup | K::ModuleResult)
+                    || node.kind == K::ModuleAnnotExpr
+                        && Some(n.range()) == node.nodes().last().map(Node::range))
+            }) {
                 expression_imports(child, text, file, &bound, imports);
             }
         }

@@ -272,3 +272,36 @@ fn inferred_private_factory_exports_adt_constructors_on_js_and_go() {
     fs::write(source.join("Main.fl"), "module App.Main exposing (main)\nimport App.Instances.Chosen as Chosen\nmain : Unit ->{} Unit\nlet main () =\n  let answer = match Chosen.Box 42 with\n    | Chosen.Box n -> n\n  Platform.stdout_line (show answer)\n").expect("main source");
     assert_hom_execution(&source, &dir, "inferred-constructors", b"42\n");
 }
+
+#[test]
+#[ignore = "needs Node and Go; run `just e2e-tests`"]
+fn nested_static_parameter_contract_dictionaries_execute_on_js_ts_and_go() {
+    let dir = Path::new(env!("CARGO_TARGET_TMPDIR")).join("nested_static_dictionary");
+    let source = dir.join("App");
+    fs::create_dir_all(&source).expect("source directory");
+    for (name, text) in [
+        (
+            "Contracts.fl",
+            "module App.Contracts exposing (Policy, Container, Output)\ntype module Policy =\n  type Item\n  item : Item\n  equality : Eq.Dict Item\n  instance Eq Item from equality\ntype module Container =\n  module Policy : Policy\ntype module Output =\n  answer : Bool\n",
+        ),
+        (
+            "Policy.fl",
+            "module App.Policy exposing (Item, item, equality)\ntype Item = Item\nitem : Item\nlet item = Item\nequality : Eq.Dict Item\nlet equality = Eq.dictionary { eq = fun _ _ -> true }\n",
+        ),
+        (
+            "Container.fl",
+            "module App.Container exposing (Policy)\nmodule Policy = App.Policy\n",
+        ),
+        (
+            "Make.fl",
+            "module App.Make(N : App.Contracts.Container) : App.Contracts.Output\nanswer : Bool\nlet answer = eq N.Policy.item N.Policy.item\n",
+        ),
+        (
+            "Main.fl",
+            "module App.Main exposing (main)\nmodule Chosen = App.Make(App.Container)\nmain : Unit ->{} Unit\nlet main () = Platform.stdout_line (if Chosen.answer then \"42\" else \"0\")\n",
+        ),
+    ] {
+        fs::write(source.join(name), text).expect("source");
+    }
+    assert_hom_execution(&source, &dir, "nested-static-dictionary", b"42\n");
+}

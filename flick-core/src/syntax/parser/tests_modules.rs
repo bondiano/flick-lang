@@ -71,7 +71,7 @@ fn module_syntax_records_static_parameters_and_named_applications() {
     let params = &syntax.header.expect("header").parameters;
     assert_eq!(params.len(), 1);
     assert_eq!(params[0].name, "K");
-    assert_eq!(params[0].contract, "HashKey");
+    assert_eq!(params[0].signature.text(template), "HashKey");
 
     let parent =
         "module App.Collections exposing (Names)\nmodule Names = HashSet.Make(CaseInsensitive)\n";

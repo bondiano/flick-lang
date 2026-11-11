@@ -107,7 +107,6 @@ impl Checker<'_> {
                     let signature = p.nodes().next()?;
                     Some(ModuleParam {
                         name: name.text(self.text).to_owned(),
-                        contract: signature.text(self.text).split_whitespace().collect(),
                         span: Span::new(self.file, name.start, name.end),
                         signature: signature.clone(),
                     })

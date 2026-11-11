@@ -17,7 +17,7 @@ pub use template::{
 };
 
 /// Bumped on every change of the schema.
-pub const IFACE_VERSION: u32 = 13;
+pub const IFACE_VERSION: u32 = 14;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -354,6 +354,7 @@ mod tests {
                 source: "module App.Factory(K : App.Contracts.Empty) : App.Contracts.Empty\n"
                     .into(),
                 capture: None,
+                materialized_body: None,
             }),
             ..Interface::default()
         };
