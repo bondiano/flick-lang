@@ -30,6 +30,12 @@ func TestAVariantHasTheFieldsItWasMadeWith(t *testing.T) {
 			t.Errorf("%s: %q %v", name, d.Tag, d.Fields())
 		}
 	}
+	// what is appended to the fields of a value is no field of it
+	one := Some("v").(*Data)
+	grown := append(one.Fields(), "more")
+	if len(one.Fields()) != 1 || Get(one, 0) != "v" || len(grown) != 2 || one.in[1] != nil {
+		t.Errorf("appending to the fields changed the value: %v, %v", one.Fields(), one.in)
+	}
 	if none := None.(*Data); len(none.Fields()) != 0 || len(Nullary("B#1").(*Data).Fields()) != 0 {
 		t.Errorf("a constructor without fields has fields")
 	}

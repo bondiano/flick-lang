@@ -45,7 +45,9 @@ func (d *Data) Fields() []Value {
 	if d.more != nil {
 		return d.more
 	}
-	return d.in[:d.n]
+	// no room after them: appending to the list copies it, as it did when
+	// the list was the value's own
+	return d.in[:d.n:d.n]
 }
 
 // Option and Result have the tags of the JS runtime's native values.
