@@ -131,7 +131,7 @@ impl<'a> Checker<'a> {
         self.solve_rows();
         self.makers(&decls);
         self.servers(&decls);
-        self.made_in_render(&decls);
+        self.tagged_references(&decls);
         self.labelled(&decls);
         self.recursion();
         self.unknown_types();

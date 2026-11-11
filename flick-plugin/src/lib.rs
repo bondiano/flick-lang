@@ -23,6 +23,7 @@ mod reach;
 mod splice;
 mod wit;
 mod wit_arena;
+mod wit_calls;
 
 use serde::{Deserialize, Serialize};
 
@@ -31,8 +32,8 @@ pub use cursor::Cursor;
 pub use diagnostic::{Diagnostic, Edit, Fix, Severity};
 pub use exports::Plugin;
 pub use facts::{
-    Argument, Binding, CallSite, Constant, ExpressionFact, ExpressionKind, Fact, FactField,
-    FactType, Nesting, Refinement, Structure,
+    Argument, Binding, CallSite, Constant, Enclosing, ExpressionFact, ExpressionKind, Fact,
+    FactField, FactType, Nesting, Refinement, Structure, Tagged,
 };
 pub use flick_plugin_macros::flick;
 pub use literal::{literal_text, string_value};

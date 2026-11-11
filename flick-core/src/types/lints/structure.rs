@@ -130,6 +130,7 @@ impl Checker<'_> {
                 arguments: Vec::new(),
                 refinement: None,
                 generated: at.start >= self.generated,
+                tagged: None,
                 binding: Some(Binding {
                     module: self.env.module.clone(),
                     name: Some(name.to_owned()),

@@ -12,7 +12,27 @@ pub fn check(calls: &[CallSite]) -> Vec<Diagnostic> {
     found.extend(atom_keys(calls));
     found.extend(handlers_in_render(calls));
     found.extend(calls.iter().filter_map(reads_atoms_for_a_ui));
+    found.extend(calls.iter().filter_map(made_in_render));
     found
+}
+
+/// `U006` on an atom, an action or a view made while rendering: a view
+/// renders again at any time, and each render would make another one,
+/// losing its state, its subscribers or its policy. A render is a function
+/// whose services are `Atom.Read` alone; the task of a handler in it runs
+/// on an event, and the compiler leaves it out of what is around the place.
+fn made_in_render(call: &CallSite) -> Option<Diagnostic> {
+    let tagged = call.tagged.as_ref().filter(|t| t.tag == "maker")?;
+    let render = (tagged.inside.iter()).any(|f| !f.open && f.services == ["Atom.Read"]);
+    render.then(|| {
+        let what = if tagged.named == tagged.reaches {
+            format!("`{}`", tagged.named)
+        } else {
+            format!("`{}`, which calls `{}`,", tagged.named, tagged.reaches)
+        };
+        let message = format!("{what} while rendering makes another one on every render: make it once, with a top-level `let`, or one per key with `Atom.family`");
+        Diagnostic::error(message, call.span).with_code("U006")
+    })
 }
 
 /// `U007` on a top-level function whose signature reads atoms and which
@@ -131,6 +151,7 @@ mod tests {
             refinement: None,
             binding: None,
             generated: false,
+            tagged: None,
         }
     }
 
@@ -144,6 +165,42 @@ mod tests {
         handler.arguments[0].span = Span { start: 37, end: 55 };
         handler.arguments[0].lambda = lambda;
         [view, handler]
+    }
+
+    #[test]
+    fn a_maker_named_in_a_render_is_refused_and_one_in_a_task_is_not() {
+        use flick_plugin::{Enclosing, Tagged};
+        let named = |named: &str, inside: &[(&[&str], bool)]| {
+            let mut site = call("Atom", "make", None);
+            site.arguments.clear();
+            site.tagged = Some(Tagged {
+                tag: "maker".into(),
+                named: named.into(),
+                reaches: "Atom.make".into(),
+                inside: (inside.iter())
+                    .map(|(services, open)| Enclosing {
+                        services: services.iter().map(|s| (*s).to_owned()).collect(),
+                        open: *open,
+                    })
+                    .collect(),
+            });
+            site
+        };
+        let render: (&[&str], bool) = (&["Atom.Read"], false);
+        let found = check(&[named("Atom.make", &[(&[], false), render])]);
+        assert_eq!(found.len(), 1);
+        assert_eq!(found[0].code.as_deref(), Some("U006"));
+        assert!(found[0].message.starts_with("`Atom.make` while rendering"));
+        let through = check(&[named("fresh", &[render])]);
+        assert!(
+            through[0]
+                .message
+                .starts_with("`fresh`, which calls `Atom.make`,")
+        );
+        // a function that may do more is no render, nor is one that asks for more
+        assert!(check(&[named("fresh", &[(&["Atom.Read"], true)])]).is_empty());
+        assert!(check(&[named("fresh", &[(&["Atom.Read", "Atom.Write"], false)])]).is_empty());
+        assert!(check(&[named("fresh", &[])]).is_empty());
     }
 
     #[test]

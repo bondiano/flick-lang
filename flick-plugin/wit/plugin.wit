@@ -237,6 +237,16 @@ interface types {
     gives: option<fact-type>,
   }
 
+  /// A function around a place: the services its arrow names, and whether
+  /// its row is open to more.
+  record enclosing { services: list<string>, open: bool }
+
+  /// A value a tag marks, where a module names it inside a function: the
+  /// tag, the value as the module writes it, the value of the library it
+  /// is or reaches, and the functions around the place, innermost first,
+  /// up to the nearest `task`.
+  record tagged { tag: string, named: string, reaches: string, inside: list<enclosing> }
+
   /// A place that calls a name the plugin's package watches: the module and
   /// the name as the compiler knows them, where the call is written, its
   /// arguments, and, for a `T$parse`, how `T` checks its value. Every span
@@ -251,6 +261,8 @@ interface types {
     binding: option<binding>,
     /// The call is in code a plugin wrote, not in the module's own text.
     generated: bool,
+    /// What marks the value named here, for a tag the package watches.
+    tagged: option<tagged>,
   }
 
   enum highlight-kind { keyword, parameter }
