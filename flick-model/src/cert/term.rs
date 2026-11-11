@@ -210,6 +210,7 @@ impl<'t> Cx<'t> {
             env: Env {
                 ground: true,
                 classes: sig.classes.clone(),
+                params: Some(sig.params.clone()),
                 ..Env::default()
             },
             fixed: Vec::new(),

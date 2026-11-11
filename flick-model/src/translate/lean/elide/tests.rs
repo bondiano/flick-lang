@@ -52,3 +52,40 @@ fn a_value_bound_is_a_fact_of_the_scheme() {
         Err("a value bound on a type that is not a variable".into())
     );
 }
+
+/// A row the model substitutes for a row parameter (`Failure e`) is written
+/// as the core instantiates the parameter, `.row`, so the instance of
+/// `Failure (.tvar 0)` at `[.row r]` is the type written; `Errors e` given to
+/// a type parameter (`Result (Errors e) a`) stays the type `.errors`.
+#[test]
+fn a_row_given_to_a_row_parameter_is_its_instance() {
+    use std::collections::HashMap;
+    use std::rc::Rc;
+
+    use crate::check::{Inst, substitute};
+    use crate::syntax::Path;
+    use crate::types::{Kind, Row, Type, Var};
+
+    let app = |name: &str, a: Type| Type::App(Rc::new(Type::con("Prelude", name)), Rc::new(a));
+    let e = || Type::Var(Var::Named("e".into()));
+    let at = HashMap::from([("e".into(), Inst::Row(Row::none()))]);
+    let env = super::Env {
+        params: Some(Rc::new(HashMap::from([
+            (Path::new("Prelude", "Failure"), vec![Kind::Errors]),
+            (Path::new("Prelude", "Option"), vec![Kind::Type]),
+        ]))),
+        ..super::Env::default()
+    };
+    let written = |t: &Type| super::ty(&substitute(t, &at), &env);
+    assert_eq!(
+        written(&app("Failure", e())),
+        Ok("(.tapp (.adt \"Prelude.Failure\") (.row Row.none))".into())
+    );
+    assert_eq!(
+        written(&app(
+            "Option",
+            Type::Errors(Row::var(Var::Named("e".into())))
+        )),
+        Ok("(.tapp (.adt \"Prelude.Option\") (.errors Row.none))".into())
+    );
+}

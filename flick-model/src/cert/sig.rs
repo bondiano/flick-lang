@@ -5,8 +5,9 @@
 //! no contradiction. A global is at its elided scheme, as the check
 //! instantiates it (`check::elided`).
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 use std::fmt::Write;
+use std::rc::Rc;
 
 use flick_core::numeric::{Arith, Num};
 
@@ -43,6 +44,8 @@ pub struct Sig {
     /// Each class's number of parameters and fields, `$S` of a superclass
     /// `S` first, as schemes in the core.
     dicts: Vec<(usize, Vec<(String, String)>)>,
+    /// The kinds of the parameters of each type constructor.
+    pub(crate) params: Rc<HashMap<Path, Vec<Kind>>>,
 }
 
 /// An operation `o : a ->{} b` of a service.
@@ -57,7 +60,12 @@ pub(crate) struct Op {
 /// The number of parameters and the fields of class `p`: `$S` of each
 /// superclass `S`, then each method, its own variables bound before the
 /// class's parameters.
-fn dict(decls: &Decls, p: &Path, classes: &[String]) -> Option<(usize, Vec<(String, String)>)> {
+fn dict(
+    decls: &Decls,
+    p: &Path,
+    classes: &[String],
+    kinds: &Rc<HashMap<Path, Vec<Kind>>>,
+) -> Option<(usize, Vec<(String, String)>)> {
     let class = decls.classes.get(p)?;
     let params: Vec<String> = class.params.iter().map(ToString::to_string).collect();
     let env = |own: &[Name]| Env {
@@ -67,6 +75,7 @@ fn dict(decls: &Decls, p: &Path, classes: &[String]) -> Option<(usize, Vec<(Stri
             .chain(params.iter().cloned())
             .collect(),
         classes: classes.to_vec(),
+        params: Some(kinds.clone()),
         ..Env::default()
     };
     let mut fields = Vec::new();
@@ -86,7 +95,7 @@ fn dict(decls: &Decls, p: &Path, classes: &[String]) -> Option<(usize, Vec<(Stri
 
 /// The operations of a service, if each is `a ->{} b` of types the core
 /// writes.
-fn ops(schemes: &[(Name, Scheme)]) -> Option<Vec<Op>> {
+fn ops(schemes: &[(Name, Scheme)], kinds: &Rc<HashMap<Path, Vec<Kind>>>) -> Option<Vec<Op>> {
     schemes
         .iter()
         .map(|(name, s)| {
@@ -94,7 +103,10 @@ fn ops(schemes: &[(Name, Scheme)]) -> Option<Vec<Op>> {
             let Type::Fun(a, Stage::Runtime(r, e), b) = t else {
                 return None;
             };
-            let none = Env::default();
+            let none = Env {
+                params: Some(kinds.clone()),
+                ..Env::default()
+            };
             (s.vars.is_empty() && r.is_none() && e.is_none()).then_some(())?;
             Some(Op {
                 name: name.clone(),
@@ -141,7 +153,7 @@ pub(crate) fn kept(s: &Scheme) -> Vec<bool> {
 }
 
 /// The fields and type of a constructor's scheme, if it builds `T ᾱ`.
-fn ctor(s: &Scheme) -> Option<Ctor> {
+fn ctor(s: &Scheme, kinds: &Rc<HashMap<Path, Vec<Kind>>>) -> Option<Ctor> {
     let keep = kept(s);
     let vars: Vec<&(Name, Kind)> = s
         .vars
@@ -152,6 +164,7 @@ fn ctor(s: &Scheme) -> Option<Ctor> {
         .collect();
     let env = Env {
         vars: vars.iter().map(|(v, _)| v.to_string()).collect(),
+        params: Some(kinds.clone()),
         ..Env::default()
     };
     let mut fields = Vec::new();
@@ -182,11 +195,12 @@ fn ctor(s: &Scheme) -> Option<Ctor> {
 impl Sig {
     pub fn of(decls: &Decls) -> Sig {
         let module = fixture_module();
+        let params = Rc::new(decls.params.clone());
         let mut ctors = BTreeMap::new();
         for (p, s) in &decls.constructors {
             let ours = &*p.module == module
                 || (&*p.module == "Prelude" && ["Some", "None"].contains(&&*p.name));
-            if let (true, Some(c)) = (ours, ctor(s)) {
+            if let (true, Some(c)) = (ours, ctor(s, &params)) {
                 ctors.insert(p.to_string(), c);
             }
         }
@@ -244,7 +258,7 @@ impl Sig {
         let classes: Vec<String> = paths.iter().map(ToString::to_string).collect();
         let dicts = paths
             .iter()
-            .map(|p| dict(decls, p, &classes).unwrap_or_default())
+            .map(|p| dict(decls, p, &classes, &params).unwrap_or_default())
             .collect();
         // the instances, after the values the generator calls
         let mut instances: Vec<_> = (decls.instances.iter())
@@ -256,7 +270,7 @@ impl Sig {
         }
         let ops = (decls.services.iter())
             .filter(|(p, _)| &*p.module == module)
-            .filter_map(|(p, schemes)| Some((p.to_string(), ops(schemes)?)))
+            .filter_map(|(p, schemes)| Some((p.to_string(), ops(schemes, &params)?)))
             .collect();
         Sig {
             ctors,
@@ -264,6 +278,7 @@ impl Sig {
             ops,
             classes,
             dicts,
+            params,
         }
     }
 
@@ -316,7 +331,7 @@ impl Sig {
         out.push_str("def genGlob : Nat → Option Scheme\n");
         let mut skipped = String::new();
         for (i, (key, s)) in self.globs.iter().enumerate() {
-            match scheme(s, &self.classes) {
+            match scheme(s, &self.classes, &self.params) {
                 Ok(text) => {
                     let _ = writeln!(out, "  -- {key:?}\n  | {i} => some {text}");
                 }
@@ -380,10 +395,15 @@ impl Sig {
 }
 
 /// `⟨k, Facts.none, τ⟩` of a scheme without facts.
-fn scheme(s: &Scheme, classes: &[String]) -> Result<String, String> {
+fn scheme(
+    s: &Scheme,
+    classes: &[String],
+    kinds: &Rc<HashMap<Path, Vec<Kind>>>,
+) -> Result<String, String> {
     let env = Env {
         vars: s.vars.iter().map(|(v, _)| v.to_string()).collect(),
         classes: classes.to_vec(),
+        params: Some(kinds.clone()),
         ..Env::default()
     };
     let (cs, t) = scheme_facts(s, &env)?;
