@@ -1,5 +1,5 @@
-/// Effect's `Url`: parsed absolute URLs as immutable values; each `set_*`
-/// gives a changed copy. `show` is the URL with its password masked.
+/// Parsed absolute URLs as immutable values; each `set_*` gives a changed
+/// copy. `show` is the URL with its password masked.
 module Http.Url exposing (..)
 
 import Http.UrlParams

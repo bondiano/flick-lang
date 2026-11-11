@@ -1,5 +1,5 @@
-// Booleans, predicates, filters and function helpers over Effect's
-// `Boolean`, `Predicate`, `Filter` and `Function`.
+// Booleans, predicates, filters and function helpers through
+// `Bool`, `Predicate`, `Filter` and `Function`.
 module App.Main exposing (main)
 
 line : String -> String ->{} Unit

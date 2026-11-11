@@ -1,7 +1,7 @@
-/// Effect's `HttpServerResponse`: what a handler answers, an immutable
-/// value of status, headers, cookies and body. Cookie values are secrets;
-/// `show` masks them and secret headers. A streamed body holds no services
-/// or region; files are sent by `Http.Platform.file`.
+/// What a handler answers, an immutable value of status, headers, cookies
+/// and body. Cookie values are secrets; `show` masks them and secret
+/// headers. A streamed body holds no services or region; files are sent by
+/// `Http.Platform.file`.
 module Http.ServerResponse exposing (..)
 
 import Exit

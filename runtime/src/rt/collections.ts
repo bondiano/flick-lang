@@ -1,5 +1,5 @@
 // Persistent hash collections without Effect. Entries retain the witness that
-// defines equality and hashing; iteration follows Effect's HAMT traversal:
+// defines equality and hashing; iteration walks the hash trie in a fixed order:
 // hash fragments from low to high, with insertion order for collisions.
 import { type HashDict, type Option, none, some } from "../core/data.ts";
 

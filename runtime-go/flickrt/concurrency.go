@@ -251,15 +251,15 @@ func all(fb *Fiber, tasks []Value, limit int) []Value {
 		if c.cause == nil {
 			continue
 		}
-		// as Effect's forEachConcurrent: the others are interrupted, and what
-		// they fail with besides that interruption joins the first failure
+		// the others are interrupted, and what they fail with besides that
+		// interruption joins the first failure
 		failed := c.cause
 		for _, other := range children {
 			other.state.interrupt(fb.state.id)
 		}
 		for pending--; pending > 0; pending-- {
 			if rest := withoutInterrupts(nextEnded(fb, ended, nil).cause); rest != nil {
-				failed = Sequential(failed, rest).electDefects() // as Effect 4.1's forEachConcurrent
+				failed = Sequential(failed, rest).electDefects() // joined, its defects elected
 			}
 		}
 		panic(&Failure{failed})
@@ -343,7 +343,7 @@ func race(fb *Fiber, a, b Value, success bool) Value {
 		}
 		failed = concat(failed, c.cause)
 	}
-	panic(&Failure{failed.electDefects()}) // as Effect's raceAll when every branch failed
+	panic(&Failure{failed.electDefects()}) // every branch failed
 }
 
 func RaceSuccess(fb *Fiber, a, b Value) Value { return race(fb, a, b, true) }
@@ -383,8 +383,8 @@ func sleep(fb *Fiber, d time.Duration) {
 	wait(fb, ch)
 }
 
-// sleepFor is Effect's `sleep`: a duration that is not positive yields,
-// an infinite one never ends.
+// sleepFor sleeps for a duration: one that is not positive yields, an
+// infinite one never ends.
 func sleepFor(fb *Fiber, d *Duration) {
 	switch {
 	case !DurationIsPositive(d).(bool):
@@ -414,15 +414,15 @@ func EffectYieldNow(fb *Fiber) Value {
 	return Unit
 }
 
-// EffectInterrupt fails with the fiber's own interruption, as Effect's
-// `interrupt`: a recovery handles it, the fiber goes on.
+// EffectInterrupt fails with the fiber's own interruption: a recovery
+// handles it, the fiber goes on.
 func EffectInterrupt(fb *Fiber) Value {
 	panic(&Failure{&Cause{kind: causeInterrupt, fiber: fb.state.id}})
 }
 
 func Uninterruptible(fb *Fiber, task Value) Value {
 	v := uninterruptible(fb, task)
-	// a request that came in while masked interrupts as the mask ends, as in Effect
+	// a request that came in while masked interrupts as the mask ends
 	Check(fb)
 	return v
 }

@@ -10,10 +10,10 @@ import (
 	"strings"
 )
 
-// Http.Platform.node and Http.StaticServer as Effect's on Node: a file's
-// response with its media type, strong ETag, modification time and the
-// range of it asked for, read as it is sent, and a handler of the files
-// below a directory.
+// Http.Platform.node and Http.StaticServer, as on Node: a file's response
+// with its media type, strong ETag, modification time and the range of it
+// asked for, read as it is sent, and a handler of the files below a
+// directory.
 
 var internalErrorTag = Tag("Http.ServerError.ServerErrorReason.InternalError")
 
@@ -201,7 +201,7 @@ func notModified(q *ServerRequest, full *ServerResponse) *ServerResponse {
 		}
 	} else if ims, ok := q.header("if-modified-since"); ok {
 		lm, hasLm := responseHeader(full, "last-modified")
-		// NaN compares false, as in Effect's isNotModifiedSince
+		// NaN compares false
 		matches = hasLm && parseJsDate(lm) <= parseJsDate(ims)
 	}
 	if !matches {
@@ -337,7 +337,7 @@ func (s *staticServer) handle(fb *Fiber, q *ServerRequest) Value {
 
 // StaticServerMake answers the request with the files below the root; the
 // go target calls it with the options and the request at once. The index is
-// `index.html` unless the options name one, as Effect's default.
+// `index.html` unless the options name one.
 func StaticServerMake(fb *Fiber, options, request Value) Value {
 	o := record(options)
 	root, _ := filepath.Abs(o.Get("root").(string))

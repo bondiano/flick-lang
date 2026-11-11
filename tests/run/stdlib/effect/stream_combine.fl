@@ -1,4 +1,4 @@
-// Streams of Effect's `Stream` combined, merged, zipped and split.
+// `Stream`: streams combined, merged, zipped and split.
 module App.Main exposing (main)
 
 ms1 : Duration.Duration

@@ -2,13 +2,12 @@ package flickrt
 
 import "slices"
 
-// Effect's Command (Command.ts, internal/command.ts) as run.ts builds it of
-// a Flick command: the flags of a command with subcommands are shared
-// flags, parsed before the subcommand's name and seen only by its own
-// handler.
+// The command a Flick command is run as: the flags of a command with
+// subcommands are shared flags, parsed before the subcommand's name and
+// seen only by its own handler.
 
-// cliConfig is internal/config.ts's ConfigInternal; labels are the fields
-// of the options record, by orderedParams.
+// cliConfig is the parameters of a command; labels are the fields of the
+// options record, by orderedParams.
 type cliConfig struct {
 	arguments, flags, ordered []*cliParam
 	labels                    []string

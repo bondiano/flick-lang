@@ -4,10 +4,9 @@ import (
 	"strings"
 )
 
-// Effect's Param and Primitive (Param.ts, Primitive.ts) for what a Flick
-// parameter becomes: one single flag or argument, wrapped by its
-// multiplicity. Parsing returns the arguments left and the value, or the
-// CliError that stops it.
+// Parameters and their primitives, for what a Flick parameter becomes: one
+// single flag or argument, wrapped by its multiplicity. Parsing returns the
+// arguments left and the value, or the CliError that stops it.
 
 type cliPrim struct {
 	tag          string // "Boolean", "String", "Path", "FileText", "FileParse" or "Choice"
@@ -69,7 +68,7 @@ type cliParam struct {
 func (p *cliPrim) parse(fb *Fiber, text string) (Value, string) {
 	switch p.tag {
 	case "Boolean":
-		// Effect's message of the issue, which names no input
+		// the message of the issue, which names no input
 		return decodeBoolean(text)
 	case "Choice":
 		for i, k := range p.choiceKeys {
@@ -230,7 +229,7 @@ func cliConfigFallback(config Value) func(*Fiber, *cliError) (Value, *cliError) 
 
 func cliPromptFallback(prompt Value) func(*Fiber, *cliError) (Value, *cliError) {
 	return func(fb *Fiber, missingErr *cliError) (Value, *cliError) {
-		// skipped when the terminal cannot prompt (Effect 4.0.7)
+		// skipped when the terminal cannot prompt
 		if !cliTerminal().canPrompt {
 			return nil, missingErr
 		}
@@ -255,8 +254,8 @@ func cliPrimOf(source cliSource) *cliPrim {
 
 var cliBoolean = &cliPrim{tag: "Boolean"}
 
-// cliParamOf is run.ts's `param` and `flagParam`: Effect's parameter of a
-// Flick one, its multiplicity and modifiers applied.
+// cliParamOf is the parameter of a Flick one, its multiplicity and
+// modifiers applied.
 func cliParamOf(kind string, p cliSpecParam) *cliParam {
 	m := p.multi
 	s := &cliSingle{kind: kind, name: strings.ReplaceAll(p.label, "_", "-"), prim: cliBoolean, hidden: m.mods.hidden, typeName: m.mods.metavar}

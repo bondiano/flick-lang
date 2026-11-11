@@ -1,7 +1,7 @@
 package flickrt
 
 // Tasks made from values and other tasks: the `Functor`, `Applicative` and
-// `Monad` instances of `Eff`, and Effect's combinators of tasks.
+// `Monad` instances of `Eff`, and the combinators of tasks.
 
 func Succeed(x Value) Value { return Eff(func(*Fiber) Value { return x }) }
 

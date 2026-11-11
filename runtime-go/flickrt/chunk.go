@@ -1,9 +1,8 @@
 package flickrt
 
-// Effect's `Chunk` functions on `Chunk{items}`, in the order Flick passes
-// the arguments: data-last. Effect's rope and a slice hold the same
-// elements, so most are Effect's `Array` functions over the items; neither
-// ever changes items it shares.
+// The `Chunk` functions on `Chunk{items}`, in the order Flick passes the
+// arguments: data-last. A chunk holds its elements in a slice, so most are
+// the `Array` functions over the items; none ever changes items it shares.
 
 func items(c Value) []Value   { return c.(*Chunk).items }
 func chunkOf(xs Value) Value  { return &Chunk{List(xs)} }
@@ -142,7 +141,7 @@ func ChunkContainsWith(fb *Fiber, eq, a, c Value) Value {
 	return ArrayContainsWith(fb, eq, a, items(c))
 }
 
-// equalsFn is Effect's `Equal.equivalence()`, the structural `==`.
+// equalsFn is the structural `==` as an equivalence.
 var equalsFn = Curry2(func(_ *Fiber, a, b Value) Value { return Equals(a, b) })
 
 func ChunkDedupe(c Value) Value { return chunkOf(ArrayDedupeWith(nil, equalsFn, items(c))) }

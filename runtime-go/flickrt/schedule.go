@@ -4,20 +4,20 @@ import (
 	"math"
 )
 
-// Schedule is Effect 4's: each run of it starts a step function, which
-// from the clock's time and an input decides the step's output and the
-// delay before the next one, or ends the schedule with a last output.
+// A Schedule starts a step function for each run of it, which from the
+// clock's time and an input decides the step's output and the delay before
+// the next one, or ends the schedule with a last output.
 type Schedule struct {
 	step func(fb *Fiber) scheduleStep
 }
 
-// scheduleStep is a step of a run of a schedule: `done` is Effect's
-// `Cause.done`, the end of the run, with the last output.
+// scheduleStep is a step of a run of a schedule: `done` is the end of the
+// run, with the last output.
 type scheduleStep func(fb *Fiber, now float64, input Value) (out Value, delay *Duration, done bool)
 
 func scheduleOf(v Value) *Schedule { return v.(*Schedule) }
 
-// start is Effect's `toStep`: a run whose start failed fails each step.
+// start starts a run: one whose start failed fails each step.
 func (s *Schedule) start(fb *Fiber) scheduleStep {
 	step, cause := catch(func() Value { return s.step(fb) })
 	if cause != nil {
@@ -26,7 +26,7 @@ func (s *Schedule) start(fb *Fiber) scheduleStep {
 	return step.(scheduleStep)
 }
 
-// metadata is what a step of a run is told of itself (Effect's Metadata).
+// metadata is what a step of a run is told of itself.
 type metadata struct {
 	input, output                      Value
 	duration                           *Duration
@@ -39,7 +39,7 @@ func (m metadata) record() Value {
 		"start", m.start, "now", m.now, "elapsed", m.elapsed, "elapsedSincePrevious", m.sincePrevious)
 }
 
-// counter is Effect's `metadataFn`: the attempts and times of a run's steps.
+// counter is the attempts and times of a run's steps.
 type counter struct {
 	n               int32
 	start, previous float64
@@ -59,7 +59,7 @@ func (c *counter) next(now float64, input Value) metadata {
 
 type metaStep func(fb *Fiber, m metadata) (Value, *Duration, bool)
 
-// withMeta is Effect's `fromStepWithMetadata`.
+// withMeta is a schedule whose steps are decided from their metadata.
 func withMeta(start func() metaStep) *Schedule {
 	return &Schedule{func(*Fiber) scheduleStep {
 		f, count := start(), &counter{}
@@ -133,7 +133,7 @@ func ScheduleFibonacci(one Value) Value {
 	oneMillis := millisOf(dur(one))
 	return &Schedule{func(*Fiber) scheduleStep {
 		a, b := 0.0, oneMillis
-		// as Effect 4.1: the first delay is `one`, then 1, 2, 3, 5 times it
+		// the first delay is `one`, then 1, 2, 3, 5 times it
 		return func(*Fiber, float64, Value) (Value, *Duration, bool) {
 			d := fromMillis(b)
 			a, b = b, a+b
@@ -186,7 +186,7 @@ func ScheduleWindowed(interval Value) Value {
 	}))
 }
 
-// mapOutput is Effect's `map`: `f` also maps the last output.
+// mapOutput maps each output by `f`, the last output too.
 func mapOutput(self *Schedule, f func(*Fiber, metadata) Value) *Schedule {
 	return stepAround(self, func(fb *Fiber, step scheduleStep, meta func() metadata, now float64, input Value) (Value, *Duration, bool) {
 		out, delay, done := step(fb, now, input)
@@ -203,7 +203,7 @@ func ScheduleMap(f, self Value) Value {
 	return mapOutput(scheduleOf(self), func(fb *Fiber, m metadata) Value { return Run(fb, Apply(fb, f, m.record())) })
 }
 
-// whileMeta is Effect's `while`.
+// whileMeta recurs while `f` holds of a step's metadata.
 func whileMeta(self *Schedule, f func(*Fiber, metadata) bool) *Schedule {
 	return stepAround(self, func(fb *Fiber, step scheduleStep, meta func() metadata, now float64, input Value) (Value, *Duration, bool) {
 		out, delay, done := step(fb, now, input)
@@ -232,7 +232,7 @@ func ScheduleTap(f, self Value) Value {
 	})
 }
 
-// modifyDelay is Effect's: `f` replaces each delay.
+// modifyDelay is the schedule where `f` replaces each delay.
 func modifyDelay(self *Schedule, f func(*Fiber, metadata) *Duration) *Schedule {
 	return stepAround(self, func(fb *Fiber, step scheduleStep, meta func() metadata, now float64, input Value) (Value, *Duration, bool) {
 		out, delay, done := step(fb, now, input)
@@ -312,7 +312,7 @@ func ScheduleConcat(other, self Value) Value {
 	})
 }
 
-// combined is Effect's `max` and `min`: each step runs every schedule's
+// combined runs the schedules together: each step runs every schedule's
 // and `pick` chooses among their delays, nil where one ended.
 func combined(schedules Value, pick func([]*Duration) *Duration) *Schedule {
 	all := List(schedules)

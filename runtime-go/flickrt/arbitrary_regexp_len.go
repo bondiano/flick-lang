@@ -5,9 +5,9 @@ import (
 	"strings"
 )
 
-// The exact-length analysis of a pattern's nodes (internal/arbitrary/
-// regexp.ts): which lengths each matches up to a limit, and a value of a
-// chosen length, random or canonical.
+// The exact-length analysis of a pattern's nodes: which lengths each
+// matches up to a limit, and a value of a chosen length, random or
+// canonical.
 
 func concatLengths(left, right []bool, limit int) []bool {
 	out := make([]bool, limit+1)
@@ -214,7 +214,7 @@ const jsWhitespace = `\t-\r \x{a0}\x{1680}\x{2000}-\x{200a}\x{2028}\x{2029}\x{20
 // goPattern is a JS pattern without flags in Go's syntax, for the
 // generator's final test of a value.
 //
-// shortcut: lookarounds, backreferences and `{` as a literal have no Go form, so a value of such a pattern is not tested (Effect does not generate from most of them either)
+// shortcut: lookarounds, backreferences and `{` as a literal have no Go form, so a value of such a pattern is not tested (the generator does not support most of them either)
 func goPattern(src []uint16) string {
 	var b strings.Builder
 	inClass := false

@@ -1,6 +1,6 @@
-/// Effect's `ByteSize`: an exact, non-negative number of bytes, made from
-/// decimal (`kilobytes`, 1000) or binary (`kibibytes`, 1024) units and
-/// formatted back into them. Constructors refuse a negative or inexact size.
+/// An exact, non-negative number of bytes, made from decimal (`kilobytes`,
+/// 1000) or binary (`kibibytes`, 1024) units and formatted back into them.
+/// Constructors refuse a negative or inexact size.
 module ByteSize exposing (..)
 
 import Combiner

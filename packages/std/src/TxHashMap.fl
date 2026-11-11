@@ -1,6 +1,6 @@
-/// Effect's `TxHashMap`: a hash map in a transactional cell, read and
-/// changed inside `Tx.atomically` transactions. Like `HashMap`, each map
-/// keeps the witness of its keys.
+/// A hash map in a transactional cell, read and changed inside
+/// `Tx.atomically` transactions. Like `HashMap`, each map keeps the witness
+/// of its keys.
 module TxHashMap exposing (..)
 
 import EqHash

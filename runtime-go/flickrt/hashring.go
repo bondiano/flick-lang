@@ -5,8 +5,8 @@ import (
 	"sort"
 )
 
-// Effect's `HashRing`, persistent as the JS adapter's: each change works on
-// a copy, and a node is known by the string the ring's key function gives.
+// `HashRing`, persistent as the JS adapter's: each change works on a copy,
+// and a node is known by the string the ring's key function gives.
 
 type ringNode struct {
 	value  Value
@@ -100,7 +100,7 @@ func (r *HashRing) addToRing(keys []string, weight float64) {
 			r.ring = append(r.ring, ringPoint{hashString(key + ":" + formatNumber(i)), key})
 		}
 	}
-	// ties break by node key, as Effect's, so the order is independent of history
+	// ties break by node key, so the order is independent of history
 	sort.SliceStable(r.ring, func(i, j int) bool {
 		a, b := r.ring[i], r.ring[j]
 		if a.hash != b.hash {
@@ -110,7 +110,7 @@ func (r *HashRing) addToRing(keys []string, weight float64) {
 	})
 }
 
-// updateTotalWeight sums in key order, as Effect's, for the same rounding.
+// updateTotalWeight sums in key order, for the same rounding on every target.
 func (r *HashRing) updateTotalWeight() {
 	keys := make([]string, 0, len(r.nodes))
 	for k := range r.nodes {

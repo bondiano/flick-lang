@@ -6,9 +6,9 @@ import (
 	"strings"
 )
 
-// Codecs over codecs, as Effect Schema's structures and combinators: a
-// dictionary as entries, lists of one or more, a codec the other way
-// round, its two sides as schemas, fallbacks and runtime decoding.
+// Codecs over codecs: a dictionary as entries, lists of one or more, a
+// codec the other way round, its two sides as schemas, fallbacks and
+// runtime decoding.
 
 // entries is `Codec.entries`: a JSON object as the list of its entries.
 type entriesCodec struct{ value codec }
@@ -51,7 +51,7 @@ func (e *entriesCodec) jsonSchema(x *schemaExport, path string) Value {
 	return Rec("type", "object", "additionalProperties", x.codec(e.value, path+".*"))
 }
 
-// nonEmptyList is `Codec.non_empty_list`, Effect's NonEmptyArray.
+// nonEmptyList is `Codec.non_empty_list`: a list of one or more.
 type nonEmptyList struct{ listCodec }
 
 func CodecNonEmptyList(item Value) Value { return &nonEmptyList{listCodec{codecOf(item)}} }
@@ -68,8 +68,8 @@ func (n *nonEmptyList) jsonSchema(x *schemaExport, path string) Value {
 		"items", x.codec(n.item, path+"[]"), "minItems", float64(1))
 }
 
-// listEnsure is `Codec.list_ensure`, Effect's ArrayEnsure: the union of an
-// element and an array, a list of one written as its element.
+// listEnsure is `Codec.list_ensure`: the union of an element and an array,
+// a list of one written as its element.
 type listEnsure struct{ item codec }
 
 func CodecListEnsure(item Value) Value { return &listEnsure{codecOf(item)} }
@@ -114,7 +114,7 @@ func (l *listEnsure) jsonSchema(x *schemaExport, path string) Value {
 
 // flipped is `Codec.flip`: decoding encodes and encoding decodes.
 //
-// shortcut: decoding hands the input to the codec's encoder, which takes it to be a value of the decoded type, as Effect checks first; a value of another type is a defect
+// shortcut: decoding hands the input to the codec's encoder, which takes it to be a value of the decoded type, where the JS target checks it first; a value of another type is a defect
 type flipped struct{ c codec }
 
 func CodecFlip(c Value) Value {
@@ -144,7 +144,7 @@ func CodecToSchema(c Value) Value {
 
 // wireOnly is a codec's wire values as themselves.
 //
-// shortcut: a wire value is one the codec decodes, a stricter test than Effect's encoded side when decoding refuses a value of the right JSON type
+// shortcut: a wire value is one the codec decodes, a stricter test than the JS target's encoded side when decoding refuses a value of the right JSON type
 type wireOnly struct{ c codec }
 
 func (w *wireOnly) accepts(in Value) bool { return w.c.accepts(in) }
@@ -276,10 +276,10 @@ func CodecCheckEffect(f, c Value) Value {
 	}
 }
 
-// CodecEncodeXml is `Codec.encode_xml`: the encoded value as Effect's
-// pretty XML under the codec's title, or `root`, keys sorted.
+// CodecEncodeXml is `Codec.encode_xml`: the encoded value as pretty XML
+// under the codec's title, or `root`, keys sorted.
 //
-// shortcut: the leaves are the JS text of the JSON encoding, which is Effect's string tree for JSON codecs; port toCodecStringTree if a codec writes leaves another way
+// shortcut: the leaves are the JS text of the JSON encoding, which is the string tree of a JSON codec; build the string tree itself if a codec writes leaves another way
 func CodecEncodeXml(fb *Fiber, c, v Value) Value {
 	w, issues := codecOf(c).encode(fb, v)
 	if issues != nil {

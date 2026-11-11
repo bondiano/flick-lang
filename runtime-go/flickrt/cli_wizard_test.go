@@ -6,9 +6,9 @@ import (
 	"testing"
 )
 
-// The wizard on a scripted terminal prints what Effect's prints:
-// testdata/cli_wizard.txt is the output of the same scenarios run by
-// Effect 4.0.5 on Node, with the command run.ts would build.
+// The wizard on a scripted terminal prints what the wizard of the Effect
+// library prints: testdata/cli_wizard.txt is the output of the same
+// scenarios run by Effect 4.0.5 on Node, with the command run.ts would build.
 func TestCliWizardPrintsAsEffect(t *testing.T) {
 	text := NewDict().Set("parse", Fn(func(_ *Fiber, s Value) Value { return Succeed(Ok(s)) }))
 	var lines []string

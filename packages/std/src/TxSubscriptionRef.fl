@@ -1,5 +1,4 @@
-/// Effect's `TxSubscriptionRef`: a transactional cell that hands each new
-/// value to its subscribers.
+/// A transactional cell that hands each new value to its subscribers.
 module TxSubscriptionRef exposing (..)
 
 import Tx

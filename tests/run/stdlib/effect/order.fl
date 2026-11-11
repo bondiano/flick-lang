@@ -1,4 +1,4 @@
-// Orders, equivalences, combiners and reducers from Effect's `Order`,
+// Orders, equivalences, combiners and reducers from `Order`,
 // `Ordering`, `Equivalence`, `Combiner`, `Reducer` and `Hash`.
 module App.Main exposing (main)
 

@@ -8,10 +8,9 @@ import (
 	"strings"
 )
 
-// parseToml is Effect's encoding/Toml `parse` (based on `toml` 4.1.2) under
-// `Result.getOrThrow`: an error is its EncodingError. An offset date-time
-// is the ISO string JSON writes of its `Date`; local dates and times stay
-// strings.
+// parseToml parses TOML (based on `toml` 4.1.2): an error is its
+// EncodingError. An offset date-time is the ISO string JSON writes of its
+// `Date`; local dates and times stay strings.
 func parseToml(input string) (v Value, err string) {
 	p := &tomlParser{
 		in: strings.TrimPrefix(input, "\uFEFF"), line: 1, column: 1,
@@ -45,7 +44,7 @@ type tomlParser struct {
 	explicit      map[*Record]bool
 	// tables defined by dotted keys; a header cannot define them again
 	dotted map[*Record]bool
-	// Effect's inlineValues: the values of key/value pairs are complete, so
+	// inline marks the values of key/value pairs: they are complete, so
 	// headers and dotted keys cannot extend them. A value is never replaced
 	// once assigned, so its slot stands for it; a scalar is marked too, as
 	// it fails as a non-table either way.
@@ -582,9 +581,8 @@ func (p *tomlParser) expect(c rune) {
 }
 
 // advance moves past `count` characters, ASCII but for a single one; as
-// in JS, past the end it still counts columns. A control character fails
-// as Effect's does; its "Bare carriage return" is unreachable, a lone CR
-// failing as a control character first.
+// in JS, past the end it still counts columns. A control character fails,
+// and a lone CR fails as one.
 func (p *tomlParser) advance(count int) {
 	for range count {
 		if p.done() {

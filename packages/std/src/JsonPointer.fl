@@ -1,5 +1,5 @@
-/// Effect's `JsonPointer`: the tokens of an RFC 6901 JSON Pointer, as the
-/// paths of `JsonPatch` use them.
+/// The tokens of an RFC 6901 JSON Pointer, as the paths of `JsonPatch` use
+/// them.
 module JsonPointer exposing (..)
 
 /// A key as a pointer token: `~` as `~0`, `/` as `~1`.

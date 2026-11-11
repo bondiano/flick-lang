@@ -1,6 +1,6 @@
 // The clock fibers read and sleep by: the host's, or the virtual one of a test
-// in the evidence, which moves only when the test moves it (Effect's TestClock,
-// as Go's `flickrt` has it).
+// in the evidence, which moves only when the test moves it (the test clock, as
+// Go's `flickrt` has it).
 import { type Run, Suspend, Tracker, awaitFiber, currentCtx, fork, lookup, tracked, yieldNow } from "./fiber.ts";
 import { writeStderr } from "./host.ts";
 

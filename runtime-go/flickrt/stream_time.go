@@ -6,9 +6,9 @@ import (
 	"sync"
 )
 
-// Stream's operations in time and concurrency, as Effect's (Stream.ts):
-// concurrent maps, debouncing, throttling and timeouts, on the fiber's
-// clock, waiting only where the test clock sees it.
+// Stream's operations in time and concurrency: concurrent maps,
+// debouncing, throttling and timeouts, on the fiber's clock, waiting only
+// where the test clock sees it.
 
 // StreamDebounce emits the last element of each burst once `d` passes
 // without another.
@@ -92,9 +92,9 @@ func StreamDebounce(d, s Value) Value {
 	})
 }
 
-// streamThrottle is Effect's `throttleEffect` of the Flick options: a
-// token bucket of `units` per `duration` and `burst` more; `Enforce` (the
-// default) drops a chunk that costs too much, `Shape` delays it.
+// streamThrottle throttles by the Flick options: a token bucket of `units`
+// per `duration` and `burst` more; `Enforce` (the default) drops a chunk
+// that costs too much, `Shape` delays it.
 func streamThrottle(self *Stream, o *Record, cost func(fb *Fiber, chunk Value) float64) *Stream {
 	units := o.Get("units").(float64)
 	durationMs := millisOf(dur(o.Get("duration")))

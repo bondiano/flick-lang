@@ -11,10 +11,10 @@ import (
 	"time"
 )
 
-// TimeZone is Effect's: a named IANA zone or a fixed offset. Named zones
-// come from Go's time zone database, which a program that reaches them
-// embeds (`time/tzdata`), under the name V8 resolves each to. Intl also
-// takes an offset (`+01:00`, `+01`, `+0100`) as a zone's name.
+// TimeZone is a named IANA zone or a fixed offset. Named zones come from
+// Go's time zone database, which a program that reaches them embeds
+// (`time/tzdata`), under the name V8 resolves each to. Intl also takes an
+// offset (`+01:00`, `+01`, `+0100`) as a zone's name.
 type TimeZone struct {
 	id     string         // named: the IANA identifier
 	loc    *time.Location // named; nil for an offset
@@ -63,7 +63,7 @@ var zoneCache sync.Map // resolved id → *TimeZone
 // offsetZoneName is the offsets Intl takes as a zone's name.
 var offsetZoneName = regexp.MustCompile(`^([+\-\x{2212}])([01]\d|2[0-3])(?::?([0-5]\d))?$`)
 
-// zoneNamed is Effect's `zoneMakeNamed`.
+// zoneNamed is the zone of a name: an IANA identifier, or an offset.
 func zoneNamed(id string) (*TimeZone, bool) {
 	var loc *time.Location
 	resolved, ok := resolveZone(id)
@@ -95,9 +95,9 @@ func zoneNamed(id string) (*TimeZone, bool) {
 
 var localZoneValue onFirstUse[*TimeZone]
 
-// localZone is Effect's `zoneMakeLocal`: the machine's zone, named as ICU
-// names it from `TZ` or `/etc/localtime` (`Etc/UTC` as `UTC`), with the
-// machine's rules, so that it needs no zone database of its own.
+// localZone is the machine's zone, named as ICU names it from `TZ` or
+// `/etc/localtime` (`Etc/UTC` as `UTC`), with the machine's rules, so that
+// it needs no zone database of its own.
 func localZone() *TimeZone {
 	return localZoneValue.get(func() *TimeZone {
 		name := strings.TrimPrefix(os.Getenv("TZ"), ":")
@@ -119,7 +119,7 @@ func localZone() *TimeZone {
 
 var offsetText = regexp.MustCompile(`([+-])(\d{2}):(\d{2})$`)
 
-// parseOffset is Effect's: `+hh:mm` at the end of `s`, in milliseconds.
+// parseOffset reads `+hh:mm` at the end of `s`, in milliseconds.
 func parseOffset(s string) (float64, bool) {
 	m := offsetText.FindStringSubmatch(s)
 	if m == nil {
@@ -134,7 +134,7 @@ func parseOffset(s string) (float64, bool) {
 	return sign * float64((h*60+mm)*60*1000), true
 }
 
-// zoneFromString is Effect's `zoneFromString`: an offset, or an IANA name.
+// zoneFromString is the zone of a string: an offset, or an IANA name.
 func zoneFromString(s string) (*TimeZone, bool) {
 	if strings.HasPrefix(s, "GMT") || strings.HasPrefix(s, "+") || strings.HasPrefix(s, "-") {
 		off, ok := parseOffset(s)
@@ -143,7 +143,7 @@ func zoneFromString(s string) (*TimeZone, bool) {
 	return zoneNamed(s)
 }
 
-// String is Effect's `zoneToString`.
+// String is the zone's text: its identifier, or its offset.
 func (z *TimeZone) String() string {
 	if z.loc != nil {
 		return z.id
@@ -183,8 +183,8 @@ func offsetToString(offset float64) string {
 	return fmt.Sprintf("%s%02d:%02d", sign, int(hours), int(minutes))
 }
 
-// calculateNamedOffset is Effect's: the offset Intl names at `utc`, or,
-// when it names one with seconds, the offset at `adjusted` as a wall clock.
+// calculateNamedOffset is the offset Intl names at `utc`, or, when it
+// names one with seconds, the offset at `adjusted` as a wall clock.
 func (z *TimeZone) calculateNamedOffset(utc, adjusted float64) float64 {
 	offset := z.namedOffset(utc)
 	if math.Mod(offset, 60000) != 0 {
@@ -193,9 +193,9 @@ func (z *TimeZone) calculateNamedOffset(utc, adjusted float64) float64 {
 	return offset
 }
 
-// makeZonedFromAdjusted is Effect's: the date-time whose wall clock in the
-// zone is `adjusted` read as UTC, with a time a transition skips or repeats
-// placed by the disambiguation.
+// makeZonedFromAdjusted is the date-time whose wall clock in the zone is
+// `adjusted` read as UTC, with a time a transition skips or repeats placed
+// by the disambiguation.
 func makeZonedFromAdjusted(adjusted float64, zone *TimeZone, disambiguation string) *DateTime {
 	if zone.loc == nil {
 		return &DateTime{adjusted - zone.offset, zone}
@@ -235,8 +235,8 @@ func makeZonedFromAdjusted(adjusted float64, zone *TimeZone, disambiguation stri
 	return &DateTime{adjusted - after, zone}
 }
 
-// rangeError is a JS RangeError that Effect throws: a binding that catches
-// it, as the JS adapter's do, gives its message; uncaught it is a defect.
+// rangeError is a JS RangeError: a binding that catches it, as the JS
+// adapter's do, gives its message; uncaught it is a defect.
 type rangeError string
 
 func (e rangeError) Error() string { return "RangeError: " + string(e) }

@@ -1,5 +1,5 @@
-// Effect's ReadonlyRecord operations on plain JavaScript objects. Values keep
-// ECMAScript own-key order, and updates return a new dictionary.
+// Dictionary operations on plain JavaScript objects with string keys. Values
+// keep ECMAScript own-key order, and updates return a new dictionary.
 // oxlint-disable typescript/no-unsafe-type-assertion -- every keyed read follows hasOwn
 import { none, some as someOption, type Option, type Result } from "../../core/data.ts";
 

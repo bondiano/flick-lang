@@ -1,5 +1,5 @@
-/// Effect's `HttpTraceContext`: trace context headers of requests, W3C
-/// `traceparent` and Zipkin's B3, to and from spans.
+/// Trace context headers of requests, W3C `traceparent` and Zipkin's B3, to
+/// and from spans.
 module Http.TraceContext exposing (..)
 
 import Http.Headers

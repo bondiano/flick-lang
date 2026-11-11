@@ -1,13 +1,13 @@
-/// Effect's `Cause` over Flick's opaque `Failure e`: build, combine and
-/// read how a computation failed. Its reasons keep a typed failure, a
-/// defect and an interruption apart; a defect is read only as inert text.
+/// Causes over the opaque `Failure e`: build, combine and read how a
+/// computation failed. A cause's reasons keep a typed failure, a defect and
+/// an interruption apart; a defect is read only as inert text.
 module Cause exposing (..)
 
 /// One reason of a failure: a typed failure with an error of `e`, a
 /// defect, or an interruption.
 type Reason (e : ErrorRow)
 
-/// A frame of the stack trace Effect attaches to a failure.
+/// A frame of the stack trace attached to a failure.
 type StackFrame
 
 /// A value that should be there is not: the first element of an empty

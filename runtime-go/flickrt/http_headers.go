@@ -2,8 +2,8 @@ package flickrt
 
 import "strings"
 
-// Http.Headers as Effect's: a record of lower-case names, in the order JS
-// keeps an object's keys; `show` masks the values of secret names.
+// Http.Headers: a record of lower-case names, in the order JS keeps an
+// object's keys; `show` masks the values of secret names.
 
 var (
 	plainTag            = Tag("Http.Headers.Redaction.Plain")

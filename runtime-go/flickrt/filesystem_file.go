@@ -1,6 +1,6 @@
 package flickrt
 
-// An open file of `FileSystem.open`, as Effect's on Node: it keeps its own
+// An open file of `FileSystem.open`, as on Node: it keeps its own
 // position, which reads and writes move unless the file appends.
 
 import (

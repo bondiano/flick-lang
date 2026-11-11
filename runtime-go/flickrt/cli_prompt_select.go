@@ -6,7 +6,7 @@ import (
 	"unicode/utf8"
 )
 
-// Effect's select, auto-complete and multiple selection prompts.
+// The select, auto-complete and multiple selection prompts.
 
 type promptChoice struct {
 	title, description string
@@ -45,7 +45,7 @@ func promptSelectInitial(choices []promptChoice) int {
 	return max(initial, 0)
 }
 
-// promptWindow is Effect's `entriesToDisplay`: the page around `cursor`.
+// promptWindow is the entries to display: the page around `cursor`.
 func promptWindow(cursor, total, perPage int) (int, int) {
 	start := max(min(total-perPage, cursor-perPage/2), 0)
 	return start, min(start+perPage, total)

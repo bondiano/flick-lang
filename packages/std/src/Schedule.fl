@@ -1,8 +1,8 @@
-/// Effect's `Schedule`: when an effect is repeated or retried, with what
-/// delay, and what each step outputs. `Schedule r e i o` takes inputs `i`
-/// (the values of a repeat, the errors of a retry), outputs `o`, and its
-/// callbacks need `r` and fail with `e`. `Effect.repeat` and
-/// `Effect.retry` run a task by a schedule.
+/// When an effect is repeated or retried, with what delay, and what each
+/// step outputs. `Schedule r e i o` takes inputs `i` (the values of a
+/// repeat, the errors of a retry), outputs `o`, and its callbacks need `r`
+/// and fail with `e`. `Effect.repeat` and `Effect.retry` run a task by a
+/// schedule.
 module Schedule exposing (..)
 
 import Cron

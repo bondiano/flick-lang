@@ -5,8 +5,8 @@ import (
 	"strings"
 )
 
-// Effect's http/internal/tracing.ts: the attributes the HTTP server and
-// client spans record of a URL and of headers.
+// The attributes the HTTP server and client spans record of a URL and of
+// headers.
 
 var tracingDefaultPorts = map[string]int32{"http": 80, "https": 443, "ws": 80, "wss": 443}
 
@@ -43,7 +43,7 @@ func (s *span) addURLAttributes(u webURL, names []string) {
 func (s *span) addHeaderAttributes(fb *Fiber, phase string, headers *Record, filterKey string) {
 	filter, ok := fb.env.get(filterKey)
 	if !ok {
-		return // Effect's default filter passes none
+		return // the default filter passes none
 	}
 	names := defaultRedactedName
 	if ns, ok := fb.env.get(redactedNamesKey); ok {

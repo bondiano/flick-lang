@@ -1,7 +1,7 @@
 package flickrt
 
-// Effect's `References`: the settings every fiber carries, read by the
-// current task or set around one.
+// `References`: the settings every fiber carries, read by the current task
+// or set around one.
 
 func ReferencesCurrentLogLevel(fb *Fiber) Value { return currentLogLevel(fb) }
 
@@ -19,7 +19,7 @@ func unhandledLogLevel(fb *Fiber) (string, bool) {
 }
 
 // logUnhandled logs `message` with a failure no one handles, if any, at
-// the unhandled log level: Effect's `ignoreCause` with `log: "Unhandled"`.
+// the unhandled log level.
 func logUnhandled(fb *Fiber, message string, cause *Cause) {
 	if level, ok := unhandledLogLevel(fb); ok && cause != nil {
 		logWith(fb, level, []Value{message}, cause)

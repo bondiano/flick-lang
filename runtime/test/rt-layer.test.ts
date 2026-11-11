@@ -33,7 +33,7 @@ test("a merged layer builds its sides side by side and releases them so, the las
   const both = layerMerge(side(0, 1), side(1, 0));
   const exit = await root(() => layerRun(both, () => seen.push("body")));
   assert.equal(exit.cause, undefined);
-  // as Effect and Go, the side acquired last starts its release first
+  // as on Go, the side acquired last starts its release first
   assert.deepEqual(seen.slice(0, 3), ["body", "release 1 starts", "release 0 starts"]);
   assert.deepEqual(seen.slice(3).toSorted(), ["released 0", "released 1"]);
 });

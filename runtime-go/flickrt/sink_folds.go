@@ -1,8 +1,7 @@
 package flickrt
 
-// Sink's folds, takes and loops, as Effect's (Sink.ts): each reads chunks
-// until it is done or its upstream is, the rest of the chunk it stopped
-// in left over.
+// Sink's folds, takes and loops: each reads chunks until it is done or its
+// upstream is, the rest of the chunk it stopped in left over.
 
 // untilDone runs `each` until it or the upstream it pulls halts: the done
 // value.
@@ -55,8 +54,8 @@ func sinkFoldArray(initial func(fb *Fiber) Value, cont func(fb *Fiber, s Value) 
 	})
 }
 
-// sinkReduceWhile is Effect's `reduceWhile` and `reduceWhileEffect`: it
-// checks the initial state too.
+// sinkReduceWhile reduces while `pred` holds of the state: it checks the
+// initial state too.
 func sinkReduceWhile(initial func(fb *Fiber) Value, pred func(fb *Fiber, s Value) bool, f func(fb *Fiber, s, x Value) Value) *Sink {
 	return sinkFromTransform(func(fb *Fiber, upstream Pull, _ *Owner) (Value, []Value) {
 		state := initial(fb)

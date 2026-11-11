@@ -1,5 +1,5 @@
-# The schemas, codecs and checks over Effect Schema beyond the core ones of
-# runtime.txt: Effect's combinators and the standard library's types.
+# The schemas, codecs and checks beyond the core ones of runtime.txt: the
+# combinators and the standard library's types.
 
 [flick:rt]
 schemaValidate *SchemaValidate

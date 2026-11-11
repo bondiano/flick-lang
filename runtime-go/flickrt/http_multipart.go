@@ -10,11 +10,11 @@ import (
 	"unicode/utf8"
 )
 
-// Http.Multipart as Effect's Multipart: the whole form of a request, its
-// fields and its files, which are written to a temporary directory the
-// scope of the call removes. A request reads its form once; later reads
-// get the same form. The form of a request made of a client request's
-// form data is that data, without the parser or its limits.
+// Http.Multipart: the whole form of a request, its fields and its files,
+// which are written to a temporary directory the scope of the call
+// removes. A request reads its form once; later reads get the same form.
+// The form of a request made of a client request's form data is that data,
+// without the parser or its limits.
 
 const (
 	maxPartsKey       = "effect/http/Multipart/MaxParts"
@@ -39,7 +39,7 @@ func multipartError(reason string) Value {
 	return NewData(multipartErrorTag, Nullary(Tag("Http.Multipart.MultipartErrorReason."+reason)))
 }
 
-// limitsOf are the limits `with_limits` set for the fiber, or Effect's
+// limitsOf are the limits `with_limits` set for the fiber, or the
 // defaults: fields of at most 10 MiB, JSON parts read as fields.
 func limitsOf(fb *Fiber) *formLimits {
 	l := &formLimits{maxParts: -1, maxFieldSize: 10 << 20, maxPartSize: -1, maxTotalSize: -1, fieldTypes: []string{"application/json"}}
@@ -73,8 +73,8 @@ func MultipartWithLimits(fb *Fiber, limits, task Value) Value {
 	return Run(&inner, task)
 }
 
-// persister builds the form, as Effect's `toPersisted`: a field's values
-// a string or a list of them, a file's a list of PersistedFile records.
+// persister builds the form: a field's values a string or a list of them,
+// a file's a list of PersistedFile records.
 type persister struct {
 	fb   *Fiber
 	form *Record

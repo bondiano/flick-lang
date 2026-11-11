@@ -1,16 +1,15 @@
-// The bindings of `Queue` on the kernel, as Go's `flickrt` has Effect 4's:
+// The bindings of `Queue` on the kernel, as Go's `flickrt` has them:
 // messages up to a capacity, a strategy for a full queue, and an end. Failing
 // or ending a queue lets takers drain what is left, then fail as it was failed;
 // the end reaches Flick as `None`. A wait that ends is moved on from the
-// scheduler, as Effect releases takers from its dispatcher, so a queue is never
-// changed under a loop over its waiters.
+// scheduler, so a queue is never changed under a loop over its waiters.
 import { type Option, none, some } from "../../core/data.ts";
 import { tag } from "../../tags.ts";
 import { type Cause, fail, fromReasons, interrupt, isFail, isInterrupt, raise, unwinds } from "../cause.ts";
 import { type Run, Suspend, asExit, atMask, currentFiber, exitOf, schedule } from "../fiber.ts";
 import type { Failure } from "../outcome.ts";
 
-/** The error of the cause that ends a queue: `Cause.done` of Effect. */
+/** The error of the cause that ends a queue. */
 const END: object = /*#__PURE__*/ Object.freeze({});
 const ENDED: Cause = /*#__PURE__*/ fail(END);
 

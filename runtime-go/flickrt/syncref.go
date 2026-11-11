@@ -2,9 +2,9 @@ package flickrt
 
 import "sync"
 
-// SyncRef is Effect's SynchronizedRef, and SubscriptionRef with the hub
-// its changes are published to: an update holds the lock while its task
-// runs, and a failing update leaves the value as it was.
+// SyncRef is a SynchronizedRef, and a SubscriptionRef with the hub its
+// changes are published to: an update holds the lock while its task runs,
+// and a failing update leaves the value as it was.
 type SyncRef struct {
 	mu    sync.Mutex
 	value Value

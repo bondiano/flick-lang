@@ -1,4 +1,4 @@
-// Effect's HTTP server on Node.js at an ephemeral port of 127.0.0.1: a
+// The HTTP server on Node.js at an ephemeral port of 127.0.0.1: a
 // router of handlers, request bodies, cookies whose values never reach the
 // log, static files and forms; closing the server's scope waits for the
 // running request and its finalizer, and then the port refuses connections.
@@ -35,7 +35,7 @@ let stdout_log =
     write = fun level message -> Platform.stdout_line ("log " ++ level ++ ": " ++ message);
   }
 
-/// Effect's log of the address, without the port the system picked.
+/// The server's log of the address, without the port the system picked.
 listening : Logger.Logger String
 let listening =
   Logger.make (fun o ->

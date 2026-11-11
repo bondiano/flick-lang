@@ -1,5 +1,5 @@
-/// Effect's `Etag`: entity tags of files, made by a `Generator` service;
-/// `layer` makes strong tags, `layer_weak` weak ones.
+/// Entity tags of files, made by a `Generator` service; `layer` makes
+/// strong tags, `layer_weak` weak ones.
 module Http.Etag exposing (..)
 
 import FileSystem

@@ -58,7 +58,7 @@ const delays = async (s: Schedule): Promise<Array<number>> => {
   return seen;
 };
 
-test("schedules recur as many times as Effect's do", async () => {
+test("schedules recur the expected number of times", async () => {
   assert.equal(await count(recurs(2)), 3);
   assert.equal(await count(upTo(2)(forever)), 3);
   assert.equal(await count(upTo(2)(spaced(ms(1)))), 3);

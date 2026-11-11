@@ -1,4 +1,4 @@
-// Effect's `LayerMap`, `LayerRef` and `ErrorReporter`: layers built on
+// `LayerMap`, `LayerRef` and `ErrorReporter`: layers built on
 // demand by key or once and refreshed, and failures reported to a listener.
 module App.Main exposing (main)
 

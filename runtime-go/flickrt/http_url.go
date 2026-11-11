@@ -2,15 +2,15 @@ package flickrt
 
 import "strings"
 
-// Http.Url as Effect's over JS's `URL`: each setter gives a changed copy,
-// and does what assigning the property of a `URL` does, ignoring a value
-// the property refuses.
+// Http.Url over JS's `URL`: each setter gives a changed copy, and does
+// what assigning the property of a `URL` does, ignoring a value the
+// property refuses.
 
 var urlErrorTag = Tag("Http.Url.UrlError.UrlError")
 
 func urlOf(v Value) webURL { return v.(webURL) }
 
-// UrlFromString is the URL of the text, or Effect's error for it.
+// UrlFromString is the URL of the text, or the error for it.
 func UrlFromString(s Value) Value {
 	if u, ok := parseURL(s.(string)); ok {
 		return Ok(*u)

@@ -1,10 +1,10 @@
 package flickrt
 
-// Running effects by a schedule: Effect's repeat, retry and scheduleFrom.
+// Running effects by a schedule: repeat, retry and scheduleFrom.
 
-// stepper is Effect's `toStepWithMetadata`: a run of the schedule that
-// reads the clock for each input and sleeps the step's delay, giving the
-// step's metadata, or with `done` the last output.
+// stepper is a run of the schedule that reads the clock for each input and
+// sleeps the step's delay, giving the step's metadata, or with `done` the
+// last output.
 func (s *Schedule) stepper(fb *Fiber) func(fb *Fiber, input Value) (metadata, bool) {
 	clock, step, count := clockOf(fb), s.start(fb), &counter{}
 	return func(fb *Fiber, input Value) (metadata, bool) {
@@ -37,8 +37,7 @@ func runWithMetadata(fb *Fiber, m metadata, task Value) Value {
 	return withEnv(fb, scheduleMetadataKey, m.record(), task)
 }
 
-// errorOnly is the first error of a cause that holds only typed errors
-// (Effect's `findErrorOnly`).
+// errorOnly is the first error of a cause that holds only typed errors.
 func errorOnly(c *Cause) (Value, bool) {
 	reasons := c.reasons()
 	for _, r := range reasons {
@@ -142,7 +141,7 @@ func EffectScheduleFrom(fb *Fiber, initial, s, task Value) Value {
 	return scheduleFrom(fb, scheduleOf(s), initial, task)
 }
 
-// fromOptions is Effect's `buildFromOptions` of a repeat or a retry: the
+// fromOptions is the schedule of the options of a repeat or a retry: the
 // inputs of `schedule` (or of `forever`), while `while` holds of them,
 // at most `times` times when it is not negative.
 func fromOptions(schedule *Schedule, while func(fb *Fiber, input Value) bool, times int32) *Schedule {

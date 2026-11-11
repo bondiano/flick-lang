@@ -3,9 +3,8 @@ package flickrt
 // The explicit wire policies: an Option as `null`, a Redacted value
 // revealed or masked, and a type with no wire form at all.
 
-// nullOption is `option_as_null` (Effect's OptionFromNullOr): `null` is
-// None and None is written `null`; `option_as_nullish` also takes a
-// missing key as None.
+// nullOption is `option_as_null`: `null` is None and None is written
+// `null`; `option_as_nullish` also takes a missing key as None.
 type nullOption struct {
 	item    codec
 	nullish bool

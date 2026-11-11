@@ -1,5 +1,5 @@
-/// Effect's `PlatformError`: how the platform services (`FileSystem`,
-/// `Path`, `Terminal`, `Stdio`) fail, as a Flick error with its reason.
+/// How the platform services (`FileSystem`, `Path`, `Terminal`, `Stdio`)
+/// fail, as a Flick error with its reason.
 module PlatformError exposing (..)
 
 /// The kind of a failed system call.

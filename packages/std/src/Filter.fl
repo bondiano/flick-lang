@@ -1,5 +1,5 @@
 /// Filters: functions that let a value pass, maybe changed, as `Ok`, or
-/// refuse it as `Err`, combined with Effect's `Filter`.
+/// refuse it as `Err`, and their combinators.
 module Filter exposing (..)
 
 /// Passes `p` or fails with `f` for an input `i`.

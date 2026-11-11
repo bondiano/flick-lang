@@ -169,7 +169,7 @@ func TestPromptTextCancellation(t *testing.T) {
 		key  Value
 	}{
 		{"eof", nil},
-		// as Effect's, the prompt beeps at these; the terminal decides to quit
+		// the prompt beeps at these; the terminal decides to quit
 		{"escape", promptTestPress("escape")},
 		{"ctrl_c", promptInput("c", None, true, false, false)},
 	}

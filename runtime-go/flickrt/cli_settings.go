@@ -11,14 +11,13 @@ import (
 
 // The built-in behavior of `--trace`.
 
-// cliTraced is run.ts's `traced`: under `--trace` the handler of command
-// `name` runs as a span of that name with Effect's `Otlp.layer`, sending
-// to OTEL_EXPORTER_OTLP_ENDPOINT as service OTEL_SERVICE_NAME. Sampled
-// spans go to /v1/traces as they end, every 5 s; log records to /v1/logs
-// through a logger added to the fiber's, every second; the metrics to
-// /v1/metrics, every 10 s. What is left is sent as the command ends, each
-// within 3 s. Log messages also reach the spans as the tracer logger's
-// events.
+// cliTraced traces a handler: under `--trace` the handler of command `name`
+// runs as a span of that name, sending to OTEL_EXPORTER_OTLP_ENDPOINT as
+// service OTEL_SERVICE_NAME. Sampled spans go to /v1/traces as they end,
+// every 5 s; log records to /v1/logs through a logger added to the fiber's,
+// every second; the metrics to /v1/metrics, every 10 s. What is left is
+// sent as the command ends, each within 3 s. Log messages also reach the
+// spans as the tracer logger's events.
 func cliTraced(fb *Fiber, name string, run func(*Fiber) Value) Value {
 	endpoint, service := os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT"), os.Getenv("OTEL_SERVICE_NAME")
 	if endpoint == "" {
@@ -71,7 +70,7 @@ func cliTraced(fb *Fiber, name string, run func(*Fiber) Value) Value {
 
 var otlpKinds = map[string]string{"internal": "1", "server": "2", "client": "3", "producer": "4", "consumer": "5"}
 
-// otlpValue is Effect's unknownToAttributeValue.
+// otlpValue is the OTLP attribute value of a Flick value.
 func otlpValue(v Value) string {
 	switch x := v.(type) {
 	case string:
@@ -110,7 +109,7 @@ func otlpTraceId(id string) string {
 	return id
 }
 
-// otlpSpan is Effect's makeOtlpSpan of an ended span.
+// otlpSpan is the OTLP form of an ended span.
 func otlpSpan(s *span) string {
 	s.mu.Lock()
 	defer s.mu.Unlock()

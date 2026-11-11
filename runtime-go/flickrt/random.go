@@ -5,15 +5,15 @@ import (
 	"math/rand/v2"
 )
 
-// Random is Effect's: the fiber's source of randomness, in its
-// environment as the clock is, so that `Random.with_seed` repeats draws.
+// Random is the fiber's source of randomness, in its environment as the
+// clock is, so that `Random.with_seed` repeats draws.
 type Random interface {
 	nextDouble() float64
 }
 
 const randomKey = "$random"
 
-// liveRandom is Effect's default: `Math.random`.
+// liveRandom is the default: math/rand.
 type liveRandom struct{}
 
 func (liveRandom) nextDouble() float64 { return rand.Float64() }
@@ -32,7 +32,7 @@ func RandomNextBoolean(fb *Fiber) Value { return randomOf(fb).nextDouble() > 0.5
 // RandomNextInt draws over Flick's 32-bit `Int`, as the JS adapter's.
 func RandomNextInt(fb *Fiber) Value { return randomIntBetween(fb, math.MinInt32, math.MaxInt32, 1) }
 
-// randomIntBetween is Effect's `nextIntBetween`; `extra` is 0 half open.
+// randomIntBetween is an integer from `min` to `max`; `extra` is 0 half open.
 func randomIntBetween(fb *Fiber, min, max, extra float64) Value {
 	lo, hi := math.Ceil(min), math.Floor(max)
 	return int32(math.Floor(randomOf(fb).nextDouble()*(hi-lo+extra)) + lo)
@@ -50,8 +50,8 @@ func RandomNextBetween(fb *Fiber, min, max Value) Value {
 	return nextBetween(min.(float64), max.(float64), randomOf(fb).nextDouble())
 }
 
-// nextBetween is Effect's: a draw that rounds up to the excluded `max`
-// gives its predecessor.
+// nextBetween is `draw` scaled between `lo` and `hi`: a draw that rounds
+// up to the excluded `max` gives its predecessor.
 func nextBetween(lo, hi, draw float64) float64 {
 	v := draw*(hi-lo) + lo
 	if v != hi || lo >= hi || math.IsInf(hi, 0) || math.IsNaN(hi) {
@@ -76,20 +76,20 @@ func RandomChoice(fb *Fiber, xs Value) Value {
 	return buffer[min(n-1, int(math.Floor(randomOf(fb).nextDouble()*float64(n))))]
 }
 
-// RandomWithSeed runs `task` with Effect's ISAAC generator seeded by `seed`.
+// RandomWithSeed runs `task` with the ISAAC generator seeded by `seed`.
 func RandomWithSeed(fb *Fiber, seed, task Value) Value {
 	return withEnv(fb, randomKey, newIsaac([]float64{seed.(float64)}), task)
 }
 
-// isaac is Effect's ISAAC_CSPRNG, bit for bit: its JS numbers that only
-// pass through 32-bit operators are uint32s here.
+// isaac is ISAAC_CSPRNG, bit for bit as on the JS target: its JS numbers
+// that only pass through 32-bit operators are uint32s here.
 type isaac struct {
 	memory, result                 [256]uint32
 	accumulator, lastResult, count uint32
 	generation                     int
 }
 
-// newIsaac seeds the generator with Effect's seed array: one number, or a
+// newIsaac seeds the generator with a seed array: one number, or a
 // string's `toIntArray`, each added to its slot as a JS number.
 func newIsaac(seed []float64) *isaac {
 	r := &isaac{}
@@ -183,8 +183,8 @@ func (r *isaac) nextDouble() float64 {
 	return (float64(hi)*4294967296 + float64(lo)) / (1 << 53)
 }
 
-// toIntArray is Effect's: a string seed's UTF-8 bytes as little-endian
-// 32-bit words, signed as JS's `|` gives them.
+// toIntArray is a string seed's UTF-8 bytes as little-endian 32-bit words,
+// signed as JS's `|` gives them.
 func toIntArray(seed string) []float64 {
 	out := []float64{}
 	for i := 0; i < len(seed); i += 4 {

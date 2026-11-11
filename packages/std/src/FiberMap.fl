@@ -1,4 +1,4 @@
-/// Effect's `FiberMap`: at most one child per key, owned by a `scope` and
+/// A map of children, at most one per key, owned by a `scope` and
 /// interrupted when it closes; running a key again interrupts its child.
 /// `join` waits for the first failure, so the map supervises its children.
 module FiberMap exposing (..)

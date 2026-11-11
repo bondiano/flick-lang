@@ -272,6 +272,6 @@ export const cliHelpDoc = (path: ReadonlyArray<string>, spec: Spec): Effect.Effe
     return "";
   });
   return Effect.flatMap(printed(spec, [...path, "--help"], capture), () =>
-    doc === undefined ? Effect.die(new Error("Effect's CLI printed no help")) : Effect.succeed(fromEffectDoc(doc)),
+    doc === undefined ? Effect.die(new Error("the CLI printed no help")) : Effect.succeed(fromEffectDoc(doc)),
   );
 };

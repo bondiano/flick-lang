@@ -6,7 +6,7 @@ import (
 )
 
 // `Bytes`: text as UTF-8, bytes as URL-safe base64, as the JS adapter's
-// `TextEncoder`, fatal `TextDecoder` and Effect's `Base64Url`.
+// `TextEncoder`, fatal `TextDecoder` and `Base64Url`.
 
 // CryptoUtf8Encode writes a lone surrogate as U+FFFD, as `TextEncoder` does.
 func CryptoUtf8Encode(text Value) Value {

@@ -1,6 +1,6 @@
-/// Instants with an optional time zone: Effect's `DateTime`. A date-time is
-/// UTC or zoned; constructors and zone changes are checked and fail with
-/// `DateTimeError`, never with a raw Effect error.
+/// Instants with an optional time zone. A date-time is UTC or zoned;
+/// constructors and zone changes are checked and fail with `DateTimeError`,
+/// never with a raw error of the runtime.
 module DateTime exposing (..)
 
 import Duration

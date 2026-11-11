@@ -1,6 +1,6 @@
 /// The metrics a program records, in Prometheus's text format, for a
-/// `/metrics` route to answer: `route` is that route. The module is unstable, as Effect marks
-/// `effect/observability`.
+/// `/metrics` route to answer: `route` is that route. The module is
+/// experimental.
 module Prometheus exposing (..)
 
 import Http.Method

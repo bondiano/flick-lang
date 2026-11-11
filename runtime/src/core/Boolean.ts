@@ -1,7 +1,7 @@
-// `Bool` of the standard library without Effect: the bindings of Bool.fl,
-// with Effect's semantics; a binary connective takes `that`, then `self`.
+// `Bool` of the standard library without Effect: the bindings of Bool.fl; a
+// binary connective takes `that`, then `self`.
 
-/** Effect's `Reducer` shape, which `Reducer.fl` reads. */
+/** The shape of a reducer, which `Reducer.fl` reads. */
 export interface Reducer<A> {
   readonly combine: (self: A, that: A) => A;
   readonly initial: A;

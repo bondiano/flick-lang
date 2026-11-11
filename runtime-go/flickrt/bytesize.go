@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-// ByteSize as Effect's: a non-negative whole number of bytes, a BigInt.
+// A ByteSize is a non-negative whole number of bytes, a BigInt.
 
 var ByteSizeZero Value = big.NewInt(0)
 
@@ -25,7 +25,7 @@ type byteUnit struct {
 	factor *big.Int
 }
 
-// Effect's units, the decimal then the binary ones, each from the byte up.
+// The units, the decimal then the binary ones, each from the byte up.
 var decimalUnits, binaryUnits = func() ([]byteUnit, []byteUnit) {
 	pow := func(base, n int64) *big.Int { return new(big.Int).Exp(big.NewInt(base), big.NewInt(n), nil) }
 	decimal := []byteUnit{{"B", big.NewInt(1)}}
@@ -62,8 +62,8 @@ func formatWithUnit(n *big.Int, unit byteUnit, precision int, trailingZeros bool
 	return whole.String() + fraction + " " + unit.symbol
 }
 
-// ByteSizeFormat is Effect's `ByteSize.format`, the precision cut to an
-// integer from 0 to 20.
+// ByteSizeFormat is `ByteSize.format`, the precision cut to an integer
+// from 0 to 20.
 func ByteSizeFormat(options, self Value) Value {
 	o, n := record(options), self.(*big.Int)
 	precision := 2
@@ -98,8 +98,8 @@ func ByteSizeFormat(options, self Value) Value {
 }
 
 var (
-	// CodecByteSize is `ByteSize.json`: Effect's text of a size, written
-	// back as a count of bytes.
+	// CodecByteSize is `ByteSize.json`: the text of a size, written back as a
+	// count of bytes.
 	CodecByteSize Value = &fallible{&stage{
 		&stringAs{"a string that will be decoded as a ByteSize"},
 		func(_ *Fiber, v Value) (Value, []issue) {

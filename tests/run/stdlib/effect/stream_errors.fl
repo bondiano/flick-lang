@@ -1,4 +1,4 @@
-// Failures of Effect's `Stream`, what runs around a stream, and its services.
+// Failures of `Stream`, what runs around a stream, and its services.
 module App.Main exposing (main)
 
 type error Boom = Boom Float

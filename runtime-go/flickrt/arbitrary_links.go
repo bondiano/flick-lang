@@ -6,12 +6,10 @@ import (
 	"sync"
 )
 
-// The declarations Effect generates through a link to another schema, as
-// far as the program's types reach them: JSON values for Unknown,
-// Duration, Chunk, and DateTime with its zones. A link is a node of the
-// declaration, with the declaration's checks, over the node of what Effect
-// generates (Schema.ts's toCodecArbitrary and toCodecJson links,
-// internal/arbitrary/schema.ts's `jsonSchema`).
+// The declarations generated through a link to another schema, as far as
+// the program's types reach them: JSON values for Unknown, Duration, Chunk,
+// and DateTime with its zones. A link is a node of the declaration, with
+// the declaration's checks, over the node of what is generated.
 
 // linkNode is a declaration whose values are `decode` of `target`'s.
 func linkNode(target *arbAST, decode func(Value) Value, params ...*arbAST) *arbAST {
@@ -20,7 +18,7 @@ func linkNode(target *arbAST, decode func(Value) Value, params ...*arbAST) *arbA
 
 func checkFilter(c Value) arbFilter { k := c.(*check); return arbFilter{k.arb, k.test} }
 
-// intBetween is Effect's `Int.check(isBetween({ minimum, maximum }))`.
+// intBetween is an integer from `minimum` to `maximum`, both included.
 func intBetween(minimum, maximum float64) *arbAST {
 	between := CheckBetween(Rec("minimum", minimum, "maximum", maximum, "exclusiveMinimum", false, "exclusiveMaximum", false))
 	return astNumberNode.withChecks(checkFilter(CheckInt), checkFilter(between))
@@ -36,8 +34,8 @@ func literalUnion(vs ...string) *arbAST {
 
 func floatOf(v Value) float64 { return v.(float64) }
 
-// durationNode is Effect's Duration, linked by its JSON codec to a union
-// of the infinities, nanoseconds and milliseconds.
+// durationNode is a Duration, linked by its JSON codec to a union of the
+// infinities, nanoseconds and milliseconds.
 func durationNode() *arbAST {
 	infinite := func(tag string, d Value) *arbAST {
 		return structNode(tag, nil, func([]Value) Value { return d })
@@ -77,7 +75,7 @@ func zoneOf(v Value) Value {
 	return namedZone(v)
 }
 
-// zones is Effect's `timeZoneArbitrarySchema`: an offset or a named zone.
+// zones is a time zone: an offset or a named zone.
 func zones() *arbAST {
 	return &arbAST{tag: astUnion, members: []*arbAST{intBetween(-12*60*60*1000, zoneSlackMillis), literalUnion(namedZones...)}}
 }
@@ -93,7 +91,7 @@ func zonedNode() *arbAST {
 	}}, Identity)
 }
 
-// jsonNode is Effect's Json declaration, linked to null, finite numbers,
+// jsonNode is the Json declaration, linked to null, finite numbers,
 // booleans, strings, and arrays and string-keyed records of JSON values.
 func (b *arbASTs) jsonNode() *arbAST {
 	if b.json == nil {
@@ -137,9 +135,9 @@ func init() {
 	})
 }
 
-// compileRecord is Effect's `compileObjects` of a record without
-// properties and with one index signature: keys drawn from its key's
-// node, each new, each with a value of its value's node.
+// compileRecord compiles a record without properties and with one index
+// signature: keys drawn from its key's node, each new, each with a value of
+// its value's node.
 func (c *arbCompiler) compileRecord(ast *arbAST, path []any) *arbGen {
 	value := c.recur(ast.members[1], at(path, "index-0-value"), nil)
 	key := c.recur(ast.members[0], at(path, "index-0-key"), nil)
@@ -220,9 +218,8 @@ func entriesRecord(keys []string, vals []Value) Value {
 	return out
 }
 
-// entriesSample is Effect's `objectSample` of removable entries: shrunk by
-// removing an entry, then by shrinking a value, then a key to one no
-// other entry has.
+// entriesSample is a sample of removable entries: shrunk by removing an
+// entry, then by shrinking a value, then a key to one no other entry has.
 func entriesSample(keySamples, valueSamples []*sample, shrinks bool) *sample {
 	keys, vals := make([]string, len(keySamples)), values(valueSamples)
 	for i, k := range keySamples {

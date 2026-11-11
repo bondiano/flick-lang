@@ -1,8 +1,8 @@
-/// Effect's `TxQueue`: a queue whose offers and takes take part in the
-/// enclosing `Tx.atomically` transaction. A take from an empty queue, or
-/// an offer to a full bounded one, retries the transaction until it can
-/// go on. Once failed, takes fail with the queue's error; once shut down
-/// or interrupted, they interrupt the fiber.
+/// A queue whose offers and takes take part in the enclosing
+/// `Tx.atomically` transaction. A take from an empty queue, or an offer to
+/// a full bounded one, retries the transaction until it can go on. Once
+/// failed, takes fail with the queue's error; once shut down or
+/// interrupted, they interrupt the fiber.
 module TxQueue exposing (..)
 
 import Tx

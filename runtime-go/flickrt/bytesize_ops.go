@@ -5,8 +5,8 @@ import (
 	"math/big"
 )
 
-// Effect's `ByteSize` constructors, conversions, comparisons and arithmetic.
-// A constructor gives `None` where Effect's throws, as the JS adapter's.
+// The `ByteSize` constructors, conversions, comparisons and arithmetic. A
+// constructor gives `None` for a size it refuses, as the JS adapter's.
 
 // unitOf is the unit of a `ByteSize.ByteUnit`: its constructor name, `KB`
 // as `kB`.
@@ -23,8 +23,8 @@ func unitOf(u Value) byteUnit {
 	return decimalUnits[0]
 }
 
-// byteSizeIn is Effect's constructor of a unit: `None` unless the bytes
-// are a whole, non-negative, safe number.
+// byteSizeIn is the constructor of a unit: `None` unless the bytes are a
+// whole, non-negative, safe number.
 func byteSizeIn(units []byteUnit, symbol string) func(Value) Value {
 	for _, u := range units {
 		if u.symbol == symbol {
@@ -121,7 +121,7 @@ func ByteSizeSubtract(that, self Value) Value {
 	return Some(new(big.Int).Sub(bsize(self), bsize(that)))
 }
 
-// byteScalar is Effect's `scalar`: a safe integer of at least `least`.
+// byteScalar is a scalar: a safe integer of at least `least`.
 func byteScalar(x float64, least float64) (*big.Int, bool) {
 	if x != math.Trunc(x) || math.Abs(x) > 1<<53-1 || x < least {
 		return nil, false

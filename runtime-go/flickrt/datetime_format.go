@@ -8,8 +8,8 @@ import (
 	"unicode/utf8"
 )
 
-// Effect's DateTime formatting through `Intl.DateTimeFormat`, on the
-// tables tools/go-intl/gen.mjs writes from Node's ICU (datetime_intl.go).
+// DateTime formatting through `Intl.DateTimeFormat`, on the tables
+// tools/go-intl/gen.mjs writes from Node's ICU (datetime_intl.go).
 //
 // shortcut: the tables have the languages of 52 common locales on the Gregorian calendar, a tag of another falls back to the default locale; Unicode extensions (`-u-hc-h23`, `-u-ca-…`) are ignored; regenerate with more languages when a program needs them
 // shortcut: a named zone has its metazone's names at the offsets it has in 2024, by its offset at other times, where ICU follows the metazone's history (Europe/Berlin is `GMT+1` in 1900); generate the history when a program formats old dates

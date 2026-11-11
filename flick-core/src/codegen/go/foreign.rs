@@ -68,7 +68,7 @@ pub(super) fn lookup(
 
 /// How many parameters the Go function of a binding takes after its
 /// dictionaries: every stage, though the JS function takes `arity` and
-/// returns a function of the rest, as Effect's data-last functions do.
+/// returns a function of the rest, the data-last form.
 pub(super) fn parameters(f: &Foreign) -> usize {
     if f.arity == 0 {
         f.taken()

@@ -1,4 +1,4 @@
-// Schedules from Effect's `Schedule`, run by `Effect.repeat` and `Effect.retry`.
+// Schedules from `Schedule`, run by `Effect.repeat` and `Effect.retry`.
 module App.Main exposing (main)
 
 type error Flaky = Flaky Float

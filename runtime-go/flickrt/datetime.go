@@ -7,9 +7,9 @@ import (
 	"time"
 )
 
-// DateTime is Effect's: an instant as JS keeps it, epoch milliseconds that
-// may be fractional or NaN, in UTC or zoned. Its arithmetic goes through
-// JS `Date` semantics (jsDate), as Effect's does.
+// DateTime is an instant as JS keeps it, epoch milliseconds that may be
+// fractional or NaN, in UTC or zoned. Its arithmetic goes through JS `Date`
+// semantics (jsDate).
 type DateTime struct {
 	ms   float64
 	zone *TimeZone // nil: UTC
@@ -20,7 +20,7 @@ func dateTime(v Value) *DateTime { return v.(*DateTime) }
 // time is the instant as a Go time, to the millisecond.
 func (d *DateTime) time() time.Time { return time.UnixMilli(int64(d.ms)).UTC() }
 
-// toDate is Effect's: a `Date` whose UTC parts are the wall clock.
+// toDate is a `Date` whose UTC parts are the wall clock.
 func (d *DateTime) toDate() *jsDate {
 	switch {
 	case d.zone == nil:
@@ -31,14 +31,14 @@ func (d *DateTime) toDate() *jsDate {
 	return newJsDate(timeClip(d.ms) + d.zone.namedOffset(d.ms))
 }
 
-// zonedOffset is Effect's: the wall clock's distance from UTC.
+// zonedOffset is the wall clock's distance from UTC.
 func (d *DateTime) zonedOffset() float64 { return d.toDate().t - d.ms }
 
 // with is a date-time of the same kind and zone at `ms`.
 func (d *DateTime) with(ms float64) *DateTime { return &DateTime{ms, d.zone} }
 
-// mutate is Effect's: `f` changes the wall clock, which the zone then
-// places, a skipped or repeated time as `compatible` does.
+// mutate changes the wall clock by `f`, which the zone then places, a
+// skipped or repeated time as `compatible` does.
 func (d *DateTime) mutate(f func(*jsDate)) *DateTime {
 	date := d.toDate()
 	f(date)
@@ -48,7 +48,7 @@ func (d *DateTime) mutate(f func(*jsDate)) *DateTime {
 	return makeZonedFromAdjusted(date.t, d.zone, "compatible")
 }
 
-// mutateUtc is Effect's: `f` changes the instant's UTC parts.
+// mutateUtc changes the instant's UTC parts by `f`.
 func (d *DateTime) mutateUtc(f func(*jsDate)) *DateTime {
 	date := newJsDate(d.ms)
 	f(date)
@@ -59,8 +59,8 @@ var dateTimeErrorTag = Tag("DateTime.DateTimeError.DateTimeError")
 
 func dateTimeError(message string) Value { return Err(NewData(dateTimeErrorTag, message)) }
 
-// checkedDateTime is the adapter's: the date-time, or the error when Effect gave
-// none or an invalid one.
+// checkedDateTime is the adapter's: the date-time, or the error when there
+// is none or it is invalid.
 func checkedDateTime(what string, d *DateTime, ok bool) Value {
 	if !ok || !finite(d.ms) {
 		return dateTimeError(what)
@@ -79,8 +79,8 @@ func attempt(what string, f func() Value) Value {
 
 var hasZone = regexp.MustCompile(`Z|GMT|[+-]\d{2}$|[+-]\d{2}:?\d{2}$|\]$`)
 
-// parseInstant is Effect's `makeUnsafe` of a string: one without a zone
-// is read as UTC.
+// parseInstant is the instant of a string: one without a zone is read as
+// UTC.
 func parseInstant(s string) (*DateTime, bool) {
 	if !hasZone.MatchString(s) {
 		s += "Z"
@@ -110,7 +110,8 @@ const (
 	maxEpochMillis = 8640000000000000 - 14*60*60*1000
 )
 
-// makeZoned is Effect's `makeZonedUnsafe` of a date-time with a zone.
+// makeZoned is a date-time in a zone: the same instant, or with `adjust`
+// the one whose wall clock in the zone is `d` read as UTC.
 func makeZoned(d *DateTime, zone *TimeZone, adjust bool, disambiguation string) *DateTime {
 	if d.ms < minEpochMillis || d.ms > maxEpochMillis {
 		panic(rangeError("Epoch millis out of range: " + formatNumber(d.ms)))
@@ -147,8 +148,8 @@ func DateTimeMakeZonedFromString(s Value) Value {
 
 var zonedText = regexp.MustCompile(`^(.{17,35})\[(.+)\]$`)
 
-// makeZonedFromString is Effect's: ISO text with an offset, then maybe the
-// zone in brackets; the instant keeps its offset's meaning.
+// makeZonedFromString reads ISO text with an offset, then maybe the zone
+// in brackets; the instant keeps its offset's meaning.
 func makeZonedFromString(s string) (*DateTime, bool) {
 	iso := s
 	var zone *TimeZone
@@ -185,7 +186,8 @@ func DateTimeMatch(fb *Fiber, options, self Value) Value {
 
 func DateTimeToUtc(d Value) Value { return &DateTime{ms: dateTime(d).ms} }
 
-// setZone is Effect's.
+// setZone is `d` in `zone`: the same instant, or, when the options adjust,
+// the date-time whose wall clock in the zone is `d` read as UTC.
 func setZone(d *DateTime, zone *TimeZone, o Value) Value {
 	adjust, disambiguation := zoneOptions(o)
 	if adjust {

@@ -1,5 +1,5 @@
-/// Effect's `RcMap`: resources by key, each shared by reference count as
-/// an `RcRef` is. Keys are compared by `==`.
+/// Resources by key, each shared by reference count as an `RcRef` is. Keys
+/// are compared by `==`.
 module RcMap exposing (..)
 
 import Duration

@@ -1,7 +1,7 @@
 package flickrt
 
 // `Stdio.node` and `Terminal.node`: the standard streams and the terminal
-// of the process, as Effect's Node.js layers give them.
+// of the process, as on Node.js.
 
 import "os"
 

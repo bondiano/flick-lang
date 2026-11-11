@@ -2,7 +2,7 @@ package flickrt
 
 import "testing"
 
-// The expected texts are Effect 4.1.2's output for the same inputs.
+// The expected texts are the output of Effect 4.1.2 for the same inputs.
 
 func parsedJSON(t *testing.T, text string) Value {
 	t.Helper()
@@ -13,7 +13,8 @@ func parsedJSON(t *testing.T, text string) Value {
 	return value(r)
 }
 
-// effectDocument is a Flick document as Effect's, `root` named `schema`.
+// effectDocument is a Flick document in the form the Effect library has,
+// `root` named `schema`.
 func effectDocument(d Value) string {
 	r := record(d)
 	return JsonStringify(Rec("dialect", r.Get("dialect"), "schema", r.Get("root"), "definitions", r.Get("definitions"))).(string)

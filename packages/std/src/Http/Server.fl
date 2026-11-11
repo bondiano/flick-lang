@@ -1,4 +1,4 @@
-/// Effect's `HttpServer` on Node.js: `serve` starts a server of a handler
+/// An HTTP server on Node.js: `serve` starts a server of a handler
 /// that belongs to the scope of region `s`. Each request runs in a fiber of
 /// the server; when the scope closes, the server stops accepting
 /// connections, waits for the requests that are running and their
@@ -66,7 +66,8 @@ let format_address a =
 address_formatted_with : (String ->{r; e} a) -> Server s ->{r; e} a
 let address_formatted_with f server = f (format_address (address server))
 
-/// Logs `Listening on <url>` at the info level of Effect's logger.
+/// Logs `Listening on <url>` at the info level, through the current
+/// loggers.
 log_address : Server s ->{} Unit
 foreign effect log_address from "flick:http/HttpServer" "flickLogAddress"
   retention call

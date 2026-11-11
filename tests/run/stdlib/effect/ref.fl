@@ -1,4 +1,4 @@
-// Effect's `Ref` as Flick cells, and `SynchronizedRef` and `SubscriptionRef`,
+// The cells `Ref`, and `SynchronizedRef` and `SubscriptionRef`,
 // whose updates may run tasks.
 module App.Main exposing (main)
 

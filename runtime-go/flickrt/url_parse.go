@@ -6,8 +6,8 @@ import (
 )
 
 // webURL is a URL as the URL Standard's parser gives it, which JS's `URL`
-// follows. It is a Go value of comparable fields, so `==` compares URLs as
-// Effect's structural equality does; setters change a copy.
+// follows. It is a Go value of comparable fields, so `==` compares URLs
+// structurally; setters change a copy.
 //
 // shortcut: file URLs are parsed as a special scheme without the Windows drive-letter rules, and a non-ASCII host gets lower case and Punycode without the rest of UTS 46 (mapping, validity checks); port those if a program needs them
 type webURL struct {

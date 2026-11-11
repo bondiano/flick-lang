@@ -1,7 +1,7 @@
-/// Effect's `HttpRouter`: routes of a method and a path pattern (`/users/:id`,
-/// `/files/*`) to handlers; `router` makes one handler of them that answers
-/// a request no route matches with `RouteNotFound`. A route's handler reads
-/// the parameters of its path through the service `RouteContext`.
+/// Routes of a method and a path pattern (`/users/:id`, `/files/*`) to
+/// handlers; `router` makes one handler of them that answers a request no
+/// route matches with `RouteNotFound`. A route's handler reads the
+/// parameters of its path through the service `RouteContext`.
 module Http.Router exposing (..)
 
 import Codec
@@ -13,7 +13,7 @@ import Http.ServerResponse exposing (ServerResponse)
 /// A route to a handler that needs the services `r` and may fail with `e`.
 type Route (r : ServiceRow) (e : ErrorRow)
 
-/// How paths match; `None` keeps Effect's default: trailing slashes count,
+/// How paths match; `None` keeps the default: trailing slashes count,
 /// duplicate slashes do not, case counts, parameters up to 100 characters.
 type alias RouterConfig = {
   ignoreTrailingSlash : Option Bool;
@@ -22,7 +22,7 @@ type alias RouterConfig = {
   maxParamLength : Option Int;
 }
 
-/// Effect's defaults.
+/// The defaults.
 config : RouterConfig
 let config = {
   ignoreTrailingSlash = None;

@@ -7,8 +7,8 @@ import (
 	"time"
 )
 
-// RcMap is Effect's: resources by key, each looked up in a fiber of its
-// own and shared by reference count as an RcRef is.
+// RcMap is resources by key, each looked up in a fiber of its own and
+// shared by reference count as an RcRef is.
 type rcMap struct {
 	mu       sync.Mutex
 	closed   bool
@@ -54,7 +54,7 @@ func RcMapMake(fb *Fiber, options Value) Value {
 		m.entries.clear()
 		m.mu.Unlock()
 		for _, e := range entries {
-			// each one's failure is dropped, as Effect.exit does
+			// each one's failure is dropped
 			catch(func() Value { m.closeEntry(fb, e); return Unit })
 		}
 		return Unit

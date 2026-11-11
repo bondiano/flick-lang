@@ -1,5 +1,5 @@
-# Effect's DateTime: instants in UTC or a zone, their parts, arithmetic,
-# comparisons and formatting, and their JSON codecs.
+# DateTime: instants in UTC or a zone, their parts, arithmetic, comparisons
+# and formatting, and their JSON codecs.
 [flick:DateTime]
 flickMake DateTimeMake
 flickFromParts DateTimeFromParts

@@ -8,11 +8,11 @@ import (
 	"syscall"
 )
 
-// FileSystem.glob is Effect's internal/glob.ts walk over the node file
-// system: results are `/`-separated paths relative to the root (absolute
-// for an absolute pattern), depth-first with each directory's entries in
-// UTF-16 order. Wildcards are case-sensitive; leading literal segments are
-// probed with `stat`, so they follow the file system's case rules.
+// FileSystem.glob walks the node file system: results are `/`-separated
+// paths relative to the root (absolute for an absolute pattern),
+// depth-first with each directory's entries in UTF-16 order. Wildcards are
+// case-sensitive; leading literal segments are probed with `stat`, so they
+// follow the file system's case rules.
 
 func fsGlob(fb *Fiber, options Value, pattern string) Value {
 	o := record(options)
@@ -69,7 +69,7 @@ func fsGlobMissing(err error) bool {
 	return tag == "NotFound" || tag == "BadResource"
 }
 
-// fsGlobIgnorable counts EPERM, which Effect maps to PermissionDenied.
+// fsGlobIgnorable counts EPERM too, as a denied permission.
 func fsGlobIgnorable(err error) bool {
 	return fsGlobMissing(err) || systemTagOf(err) == "PermissionDenied" || errors.Is(err, syscall.EPERM)
 }

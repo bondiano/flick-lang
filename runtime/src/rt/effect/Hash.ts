@@ -1,4 +1,4 @@
-// The same 32-bit mixing and string hash as Effect's pure Hash module.
+// The 32-bit mixing and string hash of `Hash`; the Effect library gives the same values.
 const mix = (hash: number): number => {
   let value = hash;
   value ^= value >>> 16;

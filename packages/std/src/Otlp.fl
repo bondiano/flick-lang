@@ -1,8 +1,8 @@
 /// Exporters of OpenTelemetry's protocol over HTTP: a program provides one,
 /// and its spans, log records or metrics are sent to the collector in
 /// batches, the rest when the layer's scope closes. `Options` sends JSON
-/// with Effect's defaults; `Settings` and the `_with` layers say the rest. The module
-/// is unstable, as Effect marks `effect/observability`.
+/// with the defaults; `Settings` and the `_with` layers say the rest. The
+/// module is experimental.
 module Otlp exposing (..)
 
 import Duration
@@ -63,8 +63,8 @@ type alias Settings = {
   shutdown_timeout : Option Duration.Duration;
 }
 
-/// The settings of `url` and `service_name`, everything else Effect's
-/// default: JSON, no gzip, no headers or attributes.
+/// The settings of `url` and `service_name`, everything else the default:
+/// JSON, no gzip, no headers or attributes.
 settings : String -> String -> Settings
 let settings url service_name = {
   url = url;

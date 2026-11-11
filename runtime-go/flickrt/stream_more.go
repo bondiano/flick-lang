@@ -1,7 +1,7 @@
 package flickrt
 
-// More of Effect's Stream: constructors, transformations and runs of
-// elements, and the byte streams of files and stdin.
+// More of Stream: constructors, transformations and runs of elements, and
+// the byte streams of files and stdin.
 
 import (
 	"io"
@@ -73,8 +73,8 @@ func StreamTake(n, s Value) Value {
 	})
 }
 
-// StreamMergeEffect is Effect's `mergeEffect`: the task runs beside the
-// stream; its failure fails the stream, and the stream's end interrupts it.
+// StreamMergeEffect runs the task beside the stream; its failure fails the
+// stream, and the stream's end interrupts it.
 func StreamMergeEffect(task, s Value) Value {
 	return streamMergeEffect(streamOf(s), func(fb *Fiber) { Run(fb, task) })
 }
@@ -101,8 +101,7 @@ func StreamMkBytes(fb *Fiber, s Value) Value {
 	return out
 }
 
-// StreamSplitLines splits the text at `\n`, `\r\n` and `\r`, across chunks,
-// as Effect's splitLines.
+// StreamSplitLines splits the text at `\n`, `\r\n` and `\r`, across chunks.
 func StreamSplitLines(s Value) Value {
 	src := streamOf(s)
 	return streamOpen(func(fb *Fiber) pull {

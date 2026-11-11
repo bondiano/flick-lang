@@ -1,11 +1,11 @@
-/// Effect's `LogLevel`: the levels of log messages, an enum of Effect's
-/// own names (`"Info"`, …) ordered by severity.
+/// The levels of log messages, an enum of their names (`"Info"`, …) ordered
+/// by severity.
 module LogLevel exposing (..)
 
 import Enum
 
-/// Effect's levels, declared from least to most severe, so `Ord` is
-/// severity; each is Effect's own name of it, `Off` is `"None"`.
+/// The levels, declared from least to most severe, so `Ord` is severity;
+/// each is its own name, `Off` is `"None"`.
 untagged type LogLevel =
   | All = "All"
   | Trace = "Trace"
@@ -24,7 +24,7 @@ type alias Severity = LogLevel
 all : List LogLevel
 let all = Enum.all
 
-/// Effect's name of the level, `"None"` for `Off`.
+/// The name of the level, `"None"` for `Off`.
 value : LogLevel -> String
 let value level = Enum.value level
 

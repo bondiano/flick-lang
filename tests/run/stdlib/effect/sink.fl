@@ -1,4 +1,4 @@
-// Effect's `Sink`, run on chunks of two through its channel: the value it
+// `Sink`, run on chunks of two through its channel: the value it
 // gives and the elements it leaves over.
 module App.Main exposing (main)
 

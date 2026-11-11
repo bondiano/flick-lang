@@ -8,13 +8,13 @@ import (
 	"strings"
 )
 
-// The log records and metrics `--trace` sends, in OTLP's JSON as Effect's
-// OtlpLogger and OtlpMetrics (cumulative) write them.
+// The log records and metrics `--trace` sends, in OTLP's JSON, the metrics
+// cumulative.
 
-// otlpResource is Effect's OtlpResource.fromConfig of the service, its
-// version OTEL_SERVICE_VERSION.
+// otlpResource is the OTLP resource of the service, its version
+// OTEL_SERVICE_VERSION.
 //
-// shortcut: OTEL_RESOURCE_ATTRIBUTES is not read; port Effect's Config.Record of it when a program sets it
+// shortcut: OTEL_RESOURCE_ATTRIBUTES is not read; read a record of it when a program sets it
 func otlpResource(service string) string {
 	version := ""
 	if v := os.Getenv("OTEL_SERVICE_VERSION"); v != "" {
@@ -41,7 +41,7 @@ func withAttr(attrs []spanAttr, key string, value Value) []spanAttr {
 
 var otlpSeverities = map[string]int{"Trace": 1, "Debug": 5, "Info": 9, "Warn": 13, "Error": 17, "Fatal": 21}
 
-// otlpLogRecord is Effect's makeLogRecord of a message the fiber logs.
+// otlpLogRecord is the log record of a message the fiber logs.
 func otlpLogRecord(fb *Fiber, m *logEntry) string {
 	a := logAnnotationsOf(fb)
 	attrs := make([]spanAttr, 0, len(a.keys)+4)

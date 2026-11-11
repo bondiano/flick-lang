@@ -1,6 +1,6 @@
-/// Effect's `Queue`: an asynchronous queue of messages between tasks.
-/// `Queue e a` carries messages of `a` and may be failed with an error of
-/// `e`; once it is ended, takes drain what is left and then give `None`.
+/// An asynchronous queue of messages between tasks. `Queue e a` carries
+/// messages of `a` and may be failed with an error of `e`; once it is
+/// ended, takes drain what is left and then give `None`.
 module Queue exposing (..)
 
 /// A queue of messages of `a` that may fail with an error of `e`.

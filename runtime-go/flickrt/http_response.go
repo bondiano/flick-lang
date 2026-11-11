@@ -5,11 +5,11 @@ import (
 	"strings"
 )
 
-// Http.ServerResponse as Effect's HttpServerResponse: an immutable status,
-// status text, headers, cookies and body. As Effect makes a response, the
-// content type and length of its body become its headers; a response of
-// no other headers keeps them implicit, so the common answer of a text or
-// JSON body costs one allocation and the server writes them directly.
+// Http.ServerResponse: an immutable status, status text, headers, cookies
+// and body. When a response is made, the content type and length of its
+// body become its headers; a response of no other headers keeps them
+// implicit, so the common answer of a text or JSON body costs one
+// allocation and the server writes them directly.
 
 type ServerResponse struct {
 	status     int32
@@ -28,9 +28,8 @@ func derivesHeaders(b *Body) bool {
 	return b.kind != bodyEmpty && (b.hasType && b.contentType != "" || b.length >= 0)
 }
 
-// newResponse is Effect's `makeResponse`: headers `owned` were just made
-// for the response, and a content type or length they set wins over the
-// body's.
+// newResponse makes a response: headers `owned` were just made for the
+// response, and a content type or length they set wins over the body's.
 func newResponse(status int32, statusText string, hasText bool, headers, cookies *Record, body *Body, owned bool) *ServerResponse {
 	r := &ServerResponse{status: status, statusText: statusText, hasText: hasText, cookies: cookies, body: body}
 	if r.cookies == nil {
@@ -101,8 +100,8 @@ func optionHeaders(o *Record) *Record {
 	return nil
 }
 
-// contentTypeOf is Effect's content type of a body the options make: theirs,
-// or that of their headers.
+// contentTypeOf is the content type of a body the options make: theirs, or
+// that of their headers.
 func contentTypeOf(o *Record, headers *Record, otherwise string) string {
 	if t, ok := some(o.Get("contentType")); ok && t != "" {
 		return t.(string)
@@ -213,8 +212,7 @@ func ResponseHeaders(r Value) Value { return responseOf(r).headerRecord() }
 func ResponseCookies(r Value) Value { return responseOf(r).cookies }
 func ResponseBody(r Value) Value    { return responseOf(r).body }
 
-// changed is the response with other headers, cookies or body, as Effect's
-// `makeResponse({ ...self, … })` makes it.
+// changed is the response with other headers, cookies or body.
 func (r *ServerResponse) changed(headers, cookies *Record, body *Body, owned bool) Value {
 	return newResponse(r.status, r.statusText, r.hasText, headers, cookies, body, owned)
 }

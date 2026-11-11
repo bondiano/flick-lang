@@ -1,4 +1,4 @@
-// The schema and codec API over Effect Schema: witnesses of the built-in
+// The schema and codec API: witnesses of the built-in
 // types, the field policies of a codec block, transformations and checks,
 // decoding and encoding both ways, and the Standard Schema adapter.
 module App.Main exposing (main)

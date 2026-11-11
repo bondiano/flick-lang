@@ -1,6 +1,5 @@
-/// Effect's `ChannelSchema`: channels that decode or encode each chunk
-/// with a codec, failing with `SchemaError`; upstream errors and the done
-/// value pass through.
+/// Channels that decode or encode each chunk with a codec, failing with
+/// `SchemaError`; upstream errors and the done value pass through.
 module ChannelSchema exposing (..)
 
 import Channel exposing (Channel)

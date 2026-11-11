@@ -8,10 +8,10 @@ import (
 	"sync"
 )
 
-// `Cli.Prompt`: Effect's prompts as a tree of three nodes, run on the
-// service `Cli.Prompt.Tty`. The runner reads one key press each time a
-// prompt waits for one, so the keys a prompt does not need stay with the
-// service for the next prompt, as the JS runner does.
+// `Cli.Prompt`: prompts as a tree of three nodes, run on the service
+// `Cli.Prompt.Tty`. The runner reads one key press each time a prompt waits
+// for one, so the keys a prompt does not need stay with the service for the
+// next prompt, as the JS runner does.
 
 // A promptAction is a step's outcome: ring the bell, draw the next state,
 // or end with a value.
@@ -34,7 +34,7 @@ type promptCtx struct {
 
 func (c *promptCtx) columns() int { return int(promptCall(c.fb, c.tty, "columns", Unit).(int32)) }
 
-// promptLoop is Effect's `Loop`: a render loop from a first state.
+// promptLoop is a render loop from a first state.
 type promptLoop struct {
 	initial func(*promptCtx) Value
 	render  func(c *promptCtx, state Value, action promptAction) string
@@ -43,8 +43,8 @@ type promptLoop struct {
 	events  *Queue // with one, a message is an input too
 }
 
-// promptThen is Effect's `OnSuccess`, promptDone its `Succeed`, and
-// promptAll the prompts one after another.
+// promptThen is a prompt and what follows its value, promptDone a value
+// already there, and promptAll the prompts one after another.
 type promptThen struct {
 	prompt Value
 	next   func(*Fiber, Value) Value
@@ -93,8 +93,8 @@ func promptRunOp(c *promptCtx, prompt Value) Value {
 	}
 }
 
-// promptRunLoop is Effect's `runLoop`; the cursor is shown again however
-// the loop ends.
+// promptRunLoop runs a loop to its value; the cursor is shown again
+// however the loop ends.
 func promptRunLoop(c *promptCtx, loop *promptLoop) Value {
 	out, cause := catch(func() Value {
 		state := loop.initial(c)
@@ -265,8 +265,8 @@ func promptThemeOf(v Value) *promptTheme {
 	return t
 }
 
-// promptMakeTheme is Effect's `makeTheme()`: the Windows symbols on
-// Windows, colors when stdout is a terminal and NO_COLOR is unset or empty.
+// promptMakeTheme is the default theme: the Windows symbols on Windows,
+// colors when stdout is a terminal and NO_COLOR is unset or empty.
 func promptMakeTheme() *promptTheme {
 	t := &promptTheme{"?", "❯", "›", "…", "✔", "↑", "↓", "☒", "☐", "- ", "*", "/",
 		ansiCyanBright, ansiBlackBright, ansiGreen, ansiRed, ansiWhite, false}
@@ -278,7 +278,7 @@ func promptMakeTheme() *promptTheme {
 	return t
 }
 
-// The theme of `run`, made once per process as Effect's `Theme` default.
+// The theme of `run`, made once per process.
 var promptCurrentTheme = sync.OnceValue(promptMakeTheme)
 
 func PromptDefaultTheme() Value {
@@ -290,7 +290,7 @@ func PromptDefaultTheme() Value {
 	return Rec(append(fields, "colors", t.colors)...)
 }
 
-// Effect's `internal/ansi`.
+// ANSI escape sequences.
 
 const (
 	ansiReset         = "\x1b[0m"

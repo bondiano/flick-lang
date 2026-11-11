@@ -134,10 +134,10 @@ func (p *process) wait(fb *Fiber) Value {
 	return int32(p.state.ExitCode())
 }
 
-// terminate signals the process groups, last first, and waits as Effect's
-// spawner does: for the process to end with no limit, then a second for
-// the rest of its groups; with `forceAfter`, SIGKILL follows if the process
-// or its groups still run by then.
+// terminate signals the process groups, last first, and waits: for the
+// process to end with no limit, then a second for the rest of its groups;
+// with `forceAfter`, SIGKILL follows if the process or its groups still run
+// by then.
 func (p *process) terminate(fb *Fiber, signal string, forceAfter time.Duration) Value {
 	for i := len(p.cmds) - 1; i >= 0; i-- {
 		if err := processKill(p.cmds[i], signal); err != nil && p.running() {
@@ -220,7 +220,7 @@ func (p *process) start(fb *Fiber) Value {
 		processGroup(cmd)
 		// The children get pipes the runtime reads and writes itself, so
 		// that `cmd.Wait` waits for the process alone and not for whoever
-		// else holds its pipes, as Effect's exit code does.
+		// else holds its pipes.
 		switch {
 		case command.stdin != nil:
 			r, w, err := os.Pipe()
@@ -289,8 +289,7 @@ func (p *process) start(fb *Fiber) Value {
 }
 
 // ChildProcessSpawn starts the command; the scope stops what still runs,
-// and signals the process group of one that failed or that left children,
-// as Effect's spawner on Node does.
+// and signals the process group of one that failed or that left children.
 func ChildProcessSpawn(fb *Fiber, command Value) Value {
 	p := &process{command: procOf(command), out: newOutputQueue(), err: newOutputQueue(), exited: make(chan struct{})}
 	p.start(fb)

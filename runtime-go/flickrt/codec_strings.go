@@ -6,11 +6,10 @@ import (
 	"strings"
 )
 
-// Codecs of Effect Schema over strings and literals: transformations of a
-// JSON string, the text forms of numbers and bytes, and exact values.
+// Codecs over strings and literals: transformations of a JSON string, the
+// text forms of numbers and bytes, and exact values.
 
-// literals is Effect's `Literal` (one value) or `Literals` (a union of
-// them, even of one).
+// literals is one literal value, or a union of them, even of one.
 type literalCodec struct {
 	values []Value
 	union  bool
@@ -54,7 +53,7 @@ func stringStage(to, back func(Value) Value) codec {
 	return &stage{CodecString.(codec), pure(to), pure(back)}
 }
 
-// noChange is the encoding of a transformation Effect writes as it is.
+// noChange is the encoding of a transformation that writes a value as it is.
 func noChange(v Value) Value { return v }
 
 var (
@@ -64,12 +63,12 @@ var (
 	CodecUncapitalize Value = stringStage(Uncapitalize, noChange)
 	CodecSnakeToCamel Value = stringStage(SnakeToCamel, CamelToSnake)
 
-	// CodecTrim is Effect's `Trim`: decoded trimmed, and only a trimmed
+	// CodecTrim is a trimmed string: decoded trimmed, and only a trimmed
 	// string is encoded.
 	CodecTrim Value = withChecks(&stage{&stringAs{"a string that will be decoded as a trimmed string"}, pure(Trim), identityStage}, isTrimmed())
 
-	// CodecNumberFromString is Effect's: JS `Number` of the text, and the
-	// number's JS text back.
+	// CodecNumberFromString is JS `Number` of the text, and the number's JS
+	// text back.
 	CodecNumberFromString Value = &stage{&stringAs{"a string that will be decoded as a number"}, pure(jsNumber), pure(jsText)}
 
 	CodecFiniteFromString Value = &fallible{withChecks(
@@ -77,7 +76,7 @@ var (
 		isFinite(),
 	)}
 
-	// CodecBoolFromBit is Effect's `BooleanFromBit`: 0 or 1.
+	// CodecBoolFromBit is a boolean of a bit: 0 or 1.
 	CodecBoolFromBit Value = &stage{
 		&literalCodec{[]Value{float64(0), float64(1)}, true},
 		pure(func(v Value) Value { return v == float64(1) }),
@@ -113,16 +112,16 @@ var (
 		},
 	}}
 
-	// CodecChar is Effect's `Char`: one UTF-16 unit.
+	// CodecChar is one UTF-16 unit.
 	CodecChar Value = withChecks(CodecString.(codec), isBetweenLength(1, 1))
 
-	// CodecNatural is Effect's `Natural`: a non-negative safe integer.
+	// CodecNatural is a non-negative safe integer.
 	CodecNatural Value = withChecks(numberType, isInt(), isGreaterThanOrEqualTo(0))
 
 	CodecPort Value = withChecks(numberType, isInt(), isBetween(0, 65535, "a port number"))
 )
 
-// numberType is Effect's `Number`: any number, NaN and the infinities too.
+// numberType is any number, NaN and the infinities too.
 var numberType codec = &numberAs{"a number"}
 
 type numberAs struct{ expected string }
@@ -213,7 +212,7 @@ func decodeBase64(s string, enc *base64.Encoding) ([]byte, bool) {
 	return b, err == nil
 }
 
-// decodeBase64Url is Effect's: padding optional.
+// decodeBase64Url decodes URL-safe base64: padding optional.
 func decodeBase64Url(s string) ([]byte, bool) {
 	s = strings.NewReplacer("\n", "", "\r", "").Replace(s)
 	if len(s)%4 == 1 {

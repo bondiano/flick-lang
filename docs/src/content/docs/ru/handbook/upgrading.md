@@ -1,7 +1,7 @@
 ---
 title: Переход на 0.2
 description: Что изменилось после Flick 0.1.0 и как обновить проект.
-source_hash: 93263bb9cf4df540
+source_hash: 4888f956dcc2ba95
 ---
 
 До 1.0 минорный релиз может ломать программы, и 0.2 ломает: `std` стал
@@ -369,7 +369,7 @@ HTTP сохраняются в `.flick/plugin-snapshots/`, и проект их 
 | 0.1.0 | 0.2 |
 | - | - |
 | `LogLevel.all`, `trace`, `debug`, `info`, `warn`, `error`, `fatal` | `LogLevel.All`, `Trace`, `Debug`, `Info`, `Warn`, `Error`, `Fatal` |
-| `LogLevel.none_` | `LogLevel.Off`, литерал которого — `"None"` из Effect |
+| `LogLevel.none_` | `LogLevel.Off`, литерал которого — `"None"` |
 | `LogLevel.values` | `LogLevel.all`, по возрастанию строгости |
 | `LogLevel.name level` | `LogLevel.value level` |
 | `LogLevel.get_ordinal a < LogLevel.get_ordinal b` | `compare a b`, выведенный `Ord` |

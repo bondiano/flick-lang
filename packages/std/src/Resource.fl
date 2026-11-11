@@ -1,5 +1,5 @@
-/// Resources owned by a `scope`, and Effect's `Resource`: a value acquired
-/// again on `refresh`, released when its `scope` closes.
+/// Resources owned by a `scope`, and `Resource`: a value acquired again on
+/// `refresh`, released when its `scope` closes.
 module Resource exposing (acquire_release, bracket, Resource, manual, use, refresh)
 
 /// A value of `a` of region `s` that its acquisition, failing with `e`,

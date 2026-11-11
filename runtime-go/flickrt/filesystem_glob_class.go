@@ -1,7 +1,7 @@
 package flickrt
 
-// The bracket classes of Effect's internal/glob.ts: `[...]` with `!` or `^`
-// negation, ranges, `\` escapes and POSIX classes, over code points.
+// The bracket classes of glob patterns: `[...]` with `!` or `^` negation,
+// ranges, `\` escapes and POSIX classes, over code points.
 
 type fsGlobTokenKind uint8
 

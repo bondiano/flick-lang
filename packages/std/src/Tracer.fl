@@ -1,6 +1,6 @@
-/// Effect's `Tracer`: spans around tasks, with their attributes, links and
-/// parents. `with_span` runs a task in a new span of the current tracer
-/// (Effect's native one by default); `parent_span` is the span a task runs in.
+/// Spans around tasks, with their attributes, links and parents.
+/// `with_span` runs a task in a new span of the current tracer (the native
+/// one by default); `parent_span` is the span a task runs in.
 module Tracer exposing (..)
 
 import LogLevel
@@ -123,7 +123,7 @@ attributes : Span ->{} List (String, String)
 foreign attributes from "flick:Tracer" "flickAttributes"
   reviewed "effect@4.1.2 sha256:516a3c9b0ebd1a4d"
 
-/// Effect's tracer, which keeps spans in memory only.
+/// The native tracer, which keeps spans in memory only.
 native_tracer : Tracer
 foreign pure native_tracer from "flick:Tracer" "nativeTracer"
   reviewed "effect@4.1.2 sha256:c95d10bdbe12721c"

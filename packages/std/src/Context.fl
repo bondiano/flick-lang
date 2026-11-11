@@ -1,7 +1,7 @@
-/// Effect's `Context`: built services as a value. A `Context r` holds the
-/// implementations of the services of `r`; `Layer.build` makes one from a
-/// layer and `Layer.succeed_context` turns one back into a layer. A
-/// `Reference` is a value with a default that a task may replace for a body.
+/// Built services as a value. A `Context r` holds the implementations of
+/// the services of `r`; `Layer.build` makes one from a layer and
+/// `Layer.succeed_context` turns one back into a layer. A `Reference` is a
+/// value with a default that a task may replace for a body.
 module Context exposing (..)
 
 import Layer

@@ -1,7 +1,7 @@
-/// Codecs of HTTP values, in the JSON forms Effect Schema gives them, and
-/// codecs that decode parameters, cookies, query strings and forms with a
-/// codec of the program. Their decoding may refuse a wire value of the right
-/// JSON type, so strict JSON Schema export refuses them.
+/// Codecs of HTTP values in their JSON forms, and codecs that decode
+/// parameters, cookies, query strings and forms with a codec of the
+/// program. Their decoding may refuse a wire value of the right JSON type,
+/// so strict JSON Schema export refuses them.
 module Http.Codecs exposing (..)
 
 import Http.Cookies

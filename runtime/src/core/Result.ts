@@ -1,5 +1,5 @@
 // `Result` of the standard library without Effect: the bindings of Result.fl,
-// with Effect's semantics, curried after their declared arity as Option.ts.
+// curried after their declared arity as Option.ts.
 import { err, none, ok, type Option, type Result, some } from "./data.ts";
 
 export const all = <A, E>(results: ReadonlyArray<Result<A, E>>): Result<Array<A>, E> => {

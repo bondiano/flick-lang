@@ -1,4 +1,4 @@
-// Effect's `Arbitrary`: seeded samples of generators made from schemas and
+// `Arbitrary`: seeded samples of generators made from schemas and
 // combinators, and property checks that pass, shrink a failure, report a
 // typed error of the property, or run out of values.
 module App.Main exposing (main)
@@ -24,7 +24,7 @@ let checking = {
   replay = None;
 }
 
-/// Effect generates within the bounds its checks state.
+/// Generated within the bounds its checks state.
 digit_json : PureCodec Json Float
 let digit_json =
   Float.json_finite
@@ -170,7 +170,7 @@ report : Arbitrary.CheckResult e a ->{} Unit
 let report result =
   Platform.stdout_line (Option.with_default "passed" (Arbitrary.format_check_failure result))
 
-/// Reports of falsified checks, their values as Effect's Formatter writes them.
+/// Reports of falsified checks, with their values.
 reports : Unit ->{} Unit
 let reports () =
   report (Arbitrary.check checking (fun p -> p.x < 5) (Arbitrary.from_schema Point.schema))
@@ -192,7 +192,7 @@ let reports () =
   report
     (Arbitrary.check checking (fun s -> String.length s < 2) (Arbitrary.from_schema Schema.string))
 
-/// Values Effect generates through the link of their declaration.
+/// Values generated through the link of their declaration.
 linked : Unit ->{; Arbitrary.SampleError} Unit
 let linked () =
   Platform.stdout_line

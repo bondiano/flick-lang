@@ -3,7 +3,7 @@ package flickrt
 import "strings"
 
 // `Cli.Command r e` and its parts: plain data the combinators of the
-// standard library build, turned into Effect's CLI model only when a
+// standard library build, turned into the model that runs only when a
 // command runs (`cli_command.go`). Descriptions retain callbacks, not their
 // construction-time fiber.
 

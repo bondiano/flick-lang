@@ -171,8 +171,8 @@ after a transformation, a fallible or runtime transformation or decoding
 fallback, a `Redacted` value without a policy, an opaque witness
 (`Schema.opaque`) and `Unknown` are refused; nothing is written as `{}` or
 `true`. The checks of refined types it knows are `Checks.email`,
-`Checks.non_empty` and `Checks.positive`; an Effect check of the `Check`
-module is written with the keywords Effect gives it when they are exact
+`Checks.non_empty` and `Checks.positive`; a check of the `Check`
+module is written with its JSON Schema keywords when they are exact
 (`Check.min_items 1` is `minItems`, `Check.lowercased` is refused because
 its pattern is looser than the check). A recursive type becomes a `$ref`
 into `$defs`; `Codec.annotate` adds a `title` and `description`.
@@ -185,18 +185,18 @@ where it was made, and once that scope has closed it reports an issue.
 `Schema.arbitrary schema` generates values for property tests; a refined
 type needs `Schema.with_generator`.
 
-## Effect checks and codecs
+## Ready-made checks and codecs
 
 `Check.apply check codec` restricts what a codec decodes and encodes with
-one of Effect Schema's checks: lengths and code points, patterns, string
+a check: lengths and code points, patterns, string
 forms (`Check.uuid`, `Check.base64`), number, `BigInt`, `BigDecimal` and
 `Ord` bounds, list items and uniqueness, set sizes, and the keys of a
-`Codec.entries` dictionary. `Codec` adds Effect's ready transformations
+`Codec.entries` dictionary. `Codec` adds ready transformations
 (`Codec.trim`, `Codec.number_from_string`, `Codec.base64_string`,
 `Codec.json_string`, `Codec.split`), literals, dictionaries, decoding and
 encoding fallbacks, runtime checks and XML encoding; `Duration`,
 `BigDecimal`, `Chunk`, `HashSet` and `HashMap` have JSON codecs, and
-`Arbitrary`, `JsonSchema` and `Differ` wrap Effect's generators, dialect
+`Arbitrary`, `JsonSchema` and `Differ` provide generators, dialect
 conversions and JSON patches.
 
 ## Running decoders
@@ -204,10 +204,10 @@ conversions and JSON patches.
 Schemas and codecs are Effect Schema values: a `Schema a` is an Effect
 Schema of the program's values of `a`, and a codec an Effect Schema codec
 from its wire form, so JS code can use them with Effect directly, and
-`--emit-dts` projects them as `Schema.Codec<A, I, RD, RE>`. Effect's
+`--emit-dts` projects them as `Schema.Codec<A, I, RD, RE>`. The Effect Schema
 interpreter is the baseline. `flick build --schema-aot` (or
 `schema-aot = true`) loads the app's modules once on Node, hands the codecs
-they make while loading to Effect's `SchemaAOTCompiler` and writes the
+they make while loading to the `SchemaAOTCompiler` of Effect and writes the
 static module `schemas.aot.js`; the runner collects the same codecs and
 installs it before `main` starts. A codec made later, or a node the
 compiler does not handle, keeps the interpreter, and a module that no

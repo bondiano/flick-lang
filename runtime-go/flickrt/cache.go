@@ -5,8 +5,8 @@ import (
 	"sync"
 )
 
-// An ordMap is a mutable map in insertion order whose keys compare by `==`,
-// as Effect's MutableHashMap; setting a key it has keeps its place.
+// An ordMap is a mutable map in insertion order whose keys compare by
+// `==`; setting a key it has keeps its place.
 //
 // shortcut: a key is found by a linear scan; index the keys by hash if caches grow large
 type ordMap[V any] struct {
@@ -87,8 +87,9 @@ func expiry(clock Clock, ttl *Duration) float64 {
 	return clock.millis() + millisOf(ttl)
 }
 
-// A lookupCache is Effect's Cache: each lookup runs in a fiber of its own,
-// which the last caller waiting for it interrupts when it is interrupted.
+// A lookupCache is a cache of lookups: each lookup runs in a fiber of its
+// own, which the last caller waiting for it interrupts when it is
+// interrupted.
 type lookupCache struct {
 	mu       sync.Mutex
 	entries  ordMap[*cacheEntry]

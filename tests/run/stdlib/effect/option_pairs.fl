@@ -1,5 +1,5 @@
 // Every combinator of `Option` on each absent and present value, and on each
-// pair of them: what Effect's functions of the same names give.
+// pair of them: the Effect library gives the same under the same names.
 module App.Main exposing (main)
 
 line : String -> String ->{} Unit

@@ -1,5 +1,5 @@
-# Effect's network addresses and DNS records (Net): their JSON codecs,
-# parsers and canonical texts.
+# Network addresses and DNS records (Net): their JSON codecs, parsers and
+# canonical texts.
 [flick:Net]
 flickFormatIp NetFormatIp
 flickFormatInterface NetFormatInterface

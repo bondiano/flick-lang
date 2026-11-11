@@ -1,4 +1,4 @@
-// Lists over Effect's `Array` and `Iterable`, and non-empty lists.
+// `List` and `NonEmpty`: lists and non-empty lists.
 module App.Main exposing (main)
 
 say : String -> List String -> Unit ->{} Unit

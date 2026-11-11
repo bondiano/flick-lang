@@ -1,7 +1,7 @@
-/// Effect's `UrlParams`: the parameters of a query string or of a form body,
-/// in order, a key possibly given more than once. `show` masks the values
-/// of signature parameters (`Signature`, `sig`, …, or the names
-/// `with_redacted_names` sets).
+/// The parameters of a query string or of a form body, in order, a key
+/// possibly given more than once. `show` masks the values of signature
+/// parameters (`Signature`, `sig`, …, or the names `with_redacted_names`
+/// sets).
 module Http.UrlParams exposing (..)
 
 import Http.Headers
@@ -18,7 +18,7 @@ foreign pure make from "flick:http/UrlParams" "make"
   arity 1
   reviewed "effect@4.1.2 sha256:89f59bdb49c50212"
 
-/// `make`, as Effect's `fromInput` reads pairs.
+/// The same as `make`: the parameters of the pairs, in order.
 from_input : Input -> UrlParams
 foreign pure from_input from "flick:http/UrlParams" "fromInput"
   arity 1

@@ -3,7 +3,7 @@
 /// A view reads atoms through `Read` while it renders and renders again
 /// only when one of them changes; a derived atom does the same for its
 /// value. The task of an action writes them through `Write`. `Registry`,
-/// which roots and server markup read atoms from, is Effect's
+/// which roots and server markup read atoms from, is
 /// `Reactivity.Atom.Registry`, re-exported.
 module Atom exposing (.., Registry)
 

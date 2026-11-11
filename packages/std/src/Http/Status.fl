@@ -2,7 +2,7 @@
 /// `Int` everywhere else in `Http`.
 module Http.Status exposing (..)
 
-/// The names of the status codes Effect knows; `OK` and `Ok` are both 200.
+/// The names of the known status codes; `OK` and `Ok` are both 200.
 type Literal =
   | Continue
   | SwitchingProtocols

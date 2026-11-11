@@ -1,7 +1,7 @@
-/// Effect's `Sink`: what consumes a stream. `Sink r e i l a` reads chunks
-/// of `i`, may stop early and hand back leftovers of `l`, fails with `e`,
-/// needs `r`, and gives `a`. A sink is a pure description; a stream runs
-/// it. Callbacks kept in a sink hold no captures.
+/// What consumes a stream. `Sink r e i l a` reads chunks of `i`, may stop
+/// early and hand back leftovers of `l`, fails with `e`, needs `r`, and
+/// gives `a`. A sink is a pure description; a stream runs it. Callbacks
+/// kept in a sink hold no captures.
 module Sink exposing (..)
 
 import Channel exposing (Channel, WritableStream)

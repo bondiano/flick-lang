@@ -2,11 +2,10 @@ package flickrt
 
 import "math"
 
-// The model of Effect's Arbitrary (internal/arbitrary/model.ts and
-// array.ts): a generated value with the lazy tree of its shrinks. A shrinkPull
-// is a cursor over candidates, each a sample or a discard; Effect's pulls
-// are effects, the go target's are synchronous, as the property and the
-// filters run on the calling fiber.
+// The model of Arbitrary: a generated value with the lazy tree of its
+// shrinks. A shrinkPull is a cursor over candidates, each a sample or a
+// discard; a pull is synchronous, as the property and the filters run on
+// the calling fiber.
 
 // sample is a generated value and its shrinks, nil when it has none. A
 // nil *sample is a discarded attempt.
@@ -20,8 +19,8 @@ type shrinkPull func() (*sample, bool)
 
 func donePull() (*sample, bool) { return nil, false }
 
-// gen is a generator: Effect's Generator, and the Compiled node of a
-// schema, whose cost and recursion the compiler settles.
+// gen is a generator, and the compiled node of a schema, whose cost and
+// recursion the compiler settles.
 type arbGen struct {
 	minCost        float64
 	recursive      bool

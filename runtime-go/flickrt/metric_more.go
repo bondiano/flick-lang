@@ -153,7 +153,7 @@ func MetricSnapshot(fb *Fiber) Value {
 	return out
 }
 
-// attributesText is Effect's attributesToString: by key.
+// attributesText is the text of the attributes: by key.
 func attributesText(r *Record) string {
 	pairs := attributePairs(r)
 	sort.SliceStable(pairs, func(i, j int) bool { return At(pairs[i], 0).(string) < At(pairs[j], 0).(string) })
@@ -202,7 +202,7 @@ func padEnd(s string, n int) string { return s + strings.Repeat(" ", max(0, n-ut
 
 func utf16Len(s string) int { return int(Length(s).(int32)) }
 
-// MetricDump is Effect's `Metric.dump`: a line per series, by name.
+// MetricDump is `Metric.dump`: a line per series, by name.
 func MetricDump(fb *Fiber) Value {
 	all := snapshotOf(metricContextOf(fb))
 	if len(all) == 0 {
@@ -258,7 +258,7 @@ func MetricBoundariesFromIterable(numbers Value) Value {
 	return append(out, math.Inf(1))
 }
 
-// makeBy is Effect's `Array.makeBy`: at least one element.
+// makeBy is `f` of each index below `n`: at least one element.
 func makeBy(n float64, f func(i int) float64) []Value {
 	out := make([]Value, max(1, int(math.Floor(n))))
 	for i := range out {

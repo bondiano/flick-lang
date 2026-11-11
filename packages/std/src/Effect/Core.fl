@@ -184,9 +184,9 @@ foreign effect when_ from "flick:Effect" "when"
   retention call
   reviewed "effect@4.1.2 sha256:ad1ba2755fec89b6"
 
-/// The value `task` gives the resource Effect's `Resource.auto` makes: it
-/// is acquired now and again by the schedule, and released when the
-/// innermost `scope` (or the one of region `s`) closes.
+/// A resource of the value `task` gives, refreshed automatically: it is
+/// acquired now and again by the schedule, and released when the innermost
+/// `scope` (or the one of region `s`) closes.
 resource_auto :
   Fiber.Provided r2 s =>
   Schedule.Schedule r2 e2 i o ->

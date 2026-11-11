@@ -1,5 +1,5 @@
-/// Effect's `TxRef`: a cell whose reads and writes take part in the
-/// enclosing `Tx.atomically` transaction.
+/// A cell whose reads and writes take part in the enclosing `Tx.atomically`
+/// transaction.
 module TxRef exposing (..)
 
 import Tx

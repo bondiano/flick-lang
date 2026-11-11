@@ -1,6 +1,6 @@
 // Combiners and reducers of options, lists, booleans, dictionaries,
-// records and tuples, from Effect's `Option`, `Array`, `Boolean`, `Record`,
-// `Struct` and `Tuple`.
+// records and tuples, through `Combiner`, `Reducer`, `Bool` and
+// `Record`.
 module App.Main exposing (main)
 
 type alias Stats = { hits : Float; tags : List String }

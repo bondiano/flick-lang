@@ -1,5 +1,5 @@
-/// Lists combined, accumulated and taken apart: the part of `List` over
-/// Effect's `Array` that computes new elements.
+/// Lists combined, accumulated and taken apart: the part of `List` that
+/// computes new elements.
 private module List.Transform exposing (..)
 
 import List.Core

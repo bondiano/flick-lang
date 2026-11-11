@@ -1,6 +1,6 @@
 ---
 title: "Стандартная библиотека"
-source_hash: b815007010ee8d67
+source_hash: 4b69265cc26faa35
 ---
 
 Стандартная библиотека написана на Flick и использует адаптер среды выполнения
@@ -47,7 +47,7 @@ source_hash: b815007010ee8d67
 | `Route` | URL типа с `deriving Url`: `print` и `parse`; текущую страницу держит `Atom.route` (см. [Маршруты](../route/)) |
 | `Option`, `Result` | `map`, `bind`, `with_default` и преобразования |
 | `NonEmpty` | списки как минимум с одним элементом |
-| `Chunk` | `Chunk` из Effect для многократной конкатенации |
+| `Chunk` | последовательности для многократной конкатенации |
 | `Js.Array` | изменяемые массивы JS, доступные через эффектные операции; списки копируются на входе и выходе |
 | `String` | `split`, `join`, `slice`, `index_of`, `to_number`, … над кодовыми единицами UTF-16 |
 | `Markdown` | `to_html`: наиболее употребительные конструкции CommonMark (заголовки, абзацы, списки, цитаты, блоки кода, линии, `code`, жирный, курсив, ссылки) в HTML, где каждый текст экранирован, а ссылки ведут только на `http`, `https`, `mailto` и относительные URL, так что скрипт из исходника остаётся текстом; `escape` |
@@ -56,8 +56,8 @@ source_hash: b815007010ee8d67
 | `BigInt` | преобразования и проверяемые `divide`, `remainder` |
 | `Ref` | `make`, `get`, `set`, `modify` и `same` для проверки идентичности; без `Eq` и `Hash` |
 | `Redacted` | эффектные `make`, `reveal`; `show` выводит `<redacted>` |
-| `BigDecimal` | `BigDecimal` из Effect: `from_string`, точные `add`, `subtract`, проверяемые `multiply`, `divide_to_scale` |
-| `Duration` | `Duration` из Effect: проверяемые `nanos`, `millis`, `seconds`, `minutes`; для неограниченной длительности — явное `infinity` |
+| `BigDecimal` | десятичные числа: `from_string`, точные `add`, `subtract`, проверяемые `multiply`, `divide_to_scale` |
+| `Duration` | длительности: проверяемые `nanos`, `millis`, `seconds`, `minutes`; для неограниченной длительности — явное `infinity` |
 | `Bytes` | байты как списки чисел от 0 до 255: `from_string` и `to_string` (UTF-8, `None`, если это не UTF-8), `to_base64url` и `from_base64url`, и `equal`, время которого зависит только от длин |
 | `Crypto` | сервис `Crypto` поверх Web Crypto (`Crypto.system`): `random_bytes`, `digest` (SHA-1, SHA-256, SHA-384, SHA-512), `hmac` поверх `digest` (RFC 2104), случайные числа, UUID и ULID; `pbkdf2` (RFC 8018), а также `hash_password` / `verify_password`: PBKDF2-HMAC-SHA256 на 600000 раундов со случайной солью, хранится как `$pbkdf2-sha256$i=<раунды>$<соль>$<хеш>` в URL-safe base64, проверка за постоянное время |
 | `Jwt` | JSON Web Token с подписью HMAC-SHA256 (`alg` `HS256`): `sign` и `verify` над JSON-кодеком утверждений; `verify` отвергает другой `alg`, неверную подпись и просроченный токен (по значению `exp`) ошибкой `JwtError` (`Malformed`, `BadSignature`, `Expired`); `now` и `expires_in` дают `iat` и `exp` в секундах от эпохи |
@@ -66,7 +66,7 @@ source_hash: b815007010ee8d67
 | `Platform` | `stdout_line`, `stderr_line`, `stdout_write`, `args`, `env` |
 | `Log` | сервис `Log` с `info`, `warn`, `error`, `debug` и `Log.console` |
 | `File` | сервис `FileSystem`: `open_scoped`, `read_all`, `read_text`, `write_text` и `File.node` |
-| `ChildProcess` | дочерние процессы, как в Effect: команда `Command` (`make`, `set_cwd`, `set_env`, `set_stdin`, `prefix`, `pipe_to`, `inherit_output`) выполняется до конца через `string`, `lines` и `exit_code` или запускается `spawn` как `Process` scope'а, с `stdout`, `stderr`, `wait`, `is_running`, `kill` и `kill_with` |
+| `ChildProcess` | дочерние процессы: команда `Command` (`make`, `set_cwd`, `set_env`, `set_stdin`, `prefix`, `pipe_to`, `inherit_output`) выполняется до конца через `string`, `lines` и `exit_code` или запускается `spawn` как `Process` scope'а, с `stdout`, `stderr`, `wait`, `is_running`, `kill` и `kill_with` |
 | `Resource` | `acquire_release` с передачей ресурса владельцу области и `bracket` |
 | `Events` | политики `queue` и супервизор `log_failures` |
 | `Ui`, `Ui.Event` | пользовательские интерфейсы, отображаемые с помощью React, см. [пользовательские интерфейсы](../ui/) |
@@ -77,12 +77,12 @@ source_hash: b815007010ee8d67
 | `JsError` | `JsError.from_js`, ошибка внешнего исключения или отклонения промиса, см. [внешние функции](../ffi/) |
 | `Fiber`, `Failure`, `Exit`, `RawCause` | дочерние задачи области и исходы выполнения |
 | `Test`, `Gen` | тесты и генераторы, см. ниже |
-| `Schedule` | расписания Effect: `recurs`, `spaced`, `exponential`, `fibonacci`, `up_to`, `while`, `tap`, … |
-| `Effect` | операции Effect, дополняющие встроенные возможности языка: `retry` (только типизированные ошибки), `repeat`, `schedule`, `sleep`, … |
+| `Schedule` | расписания для `Effect.repeat` и `Effect.retry`: `recurs`, `spaced`, `exponential`, `fibonacci`, `up_to`, `while`, `tap`, … |
+| `Effect` | операции над задачами, дополняющие встроенные возможности языка: `retry` (только типизированные ошибки), `repeat`, `schedule`, `sleep`, … |
 
 ### Другие модули
 
-Более тонкие обёртки модулей Effect; каждая описана в своём исходнике в
+Каждый из этих модулей описан в своём исходнике в
 `packages/std/src/`:
 
 | Модуль | Содержимое |
@@ -110,7 +110,7 @@ source_hash: b815007010ee8d67
 | `JsonPatch`, `JsonPointer` | разница двух значений JSON (RFC 6902) и JSON Pointer (RFC 6901) |
 | `Net` | сетевые адреса и записи DNS как JSON |
 | `Terminal`, `PlatformError` | терминал как сервис и сбои платформенных сервисов |
-| `Formatter`, `Inspectable` | текстовая и JSON-форма, которую Effect даёт инертным данным |
+| `Formatter`, `Inspectable` | текстовая и JSON-форма инертных данных |
 | `Version` | версия Effect, на которой работает программа |
 
 У каждого экспорта закреплённой версии Effect есть обёртка или другое

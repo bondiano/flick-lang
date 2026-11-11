@@ -1,7 +1,7 @@
 package flickrt
 
-// Effect's `Console`: the console of the fiber, by default the process's,
-// writing as Node's `console` does.
+// `Console`: the console of the fiber, by default the process's, writing
+// as Node's `console` does.
 
 import (
 	"math"

@@ -8,9 +8,9 @@ import (
 	"strings"
 )
 
-// Cron is Effect's: sets of seconds, minutes, hours, days, months and
-// weekdays, each sorted (empty for every value), in a zone, with the tables
-// its search for the next or previous match steps by.
+// Cron is sets of seconds, minutes, hours, days, months and weekdays, each
+// sorted (empty for every value), in a zone, with the tables its search
+// for the next or previous match steps by.
 type Cron struct {
 	tz     *TimeZone
 	fields [6][]int // seconds, minutes, hours, days, months, weekdays
@@ -48,8 +48,8 @@ func normalizeWeekday(v int) int {
 	return v
 }
 
-// makeCron is Effect's `make`: it throws a RangeError for a value out of
-// its field's range.
+// makeCron is the Cron of the values of its fields: it throws a RangeError
+// for a value out of its field's range.
 func makeCron(tz *TimeZone, values [6][]int, and bool) *Cron {
 	c := &Cron{tz: tz, and: and}
 	firsts, lasts := [6]int{0, 0, 0, 1, 1, 0}, [6]int{59, 59, 23, 31, 12, 6}
@@ -78,9 +78,9 @@ func makeCron(tz *TimeZone, values [6][]int, and bool) *Cron {
 	return c
 }
 
-// cronLookup is Effect's `makeLookupTable`: for each value of the field,
-// the least set one at or after it, or with `next` false the greatest at
-// or before it; -1 for none.
+// cronLookup is a lookup table: for each value of the field, the least set
+// one at or after it, or with `next` false the greatest at or before it;
+// -1 for none.
 func cronLookup(values []int, size int, next bool) []int {
 	out := make([]int, size)
 	for i := range out {
@@ -126,7 +126,8 @@ var (
 	decimalText    = regexp.MustCompile(`^\d+$`)
 )
 
-// cronNumber is Effect's `Number` of a field's text: NaN unless decimal.
+// cronNumber is the number of a field's text: an alias's, else NaN unless
+// decimal.
 func cronNumber(s string, aliases map[string]int) float64 {
 	if v, ok := aliases[strings.ToLower(s)]; ok {
 		return float64(v)
@@ -140,8 +141,8 @@ func cronNumber(s string, aliases map[string]int) float64 {
 
 func isInteger(x float64) bool { return x == math.Trunc(x) && !math.IsInf(x, 0) }
 
-// parseCronSegment is Effect's `parseSegment`: the values, whether it
-// starts with a wildcard, or the error's message.
+// parseCronSegment parses a segment: the values, whether it starts with a
+// wildcard, or the error's message.
 func parseCronSegment(input string, f int) ([]int, bool, string) {
 	field := cronFields[f]
 	max := field.max
@@ -235,8 +236,8 @@ func parseCronSegment(input string, f int) ([]int, bool, string) {
 	return values, wildcard, ""
 }
 
-// CronParse is the adapter's: Effect's `parse` in the zone, its error's
-// message followed by the expression.
+// CronParse is the adapter's: the expression parsed in the zone, an
+// error's message followed by the expression.
 func CronParse(tz, s Value) Value {
 	text := s.(string)
 	segments := strings.Fields(text)
@@ -259,8 +260,8 @@ func CronParse(tz, s Value) Value {
 	return Ok(makeCron(tz.(*TimeZone), values, and))
 }
 
-// formatCronSegment is Effect's `formatSegment`: runs of three or more
-// values a step apart as ranges.
+// formatCronSegment is the text of a segment: runs of three or more values
+// a step apart as ranges.
 func formatCronSegment(values []int) string {
 	if len(values) == 0 {
 		return "*"
@@ -324,7 +325,7 @@ func CronMatch(now, cron Value) Value {
 	return has(cronDay) || has(cronWeekday)
 }
 
-// CronEquivalence is Effect's: the same zone, fields and `and`.
+// CronEquivalence is the same zone, fields and `and`.
 func CronEquivalence(a, b Value) Value {
 	x, y := a.(*Cron), b.(*Cron)
 	if !x.tz.equals(y.tz) || x.and != y.and {

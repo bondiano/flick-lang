@@ -2,7 +2,7 @@ package flickrt
 
 import "math"
 
-// Effect's DateTime parts, arithmetic, comparisons and ISO formatting.
+// DateTime's parts, arithmetic, comparisons and ISO formatting.
 
 func DateTimeToEpochMillis(d Value) Value  { return dateTime(d).ms }
 func DateTimeToEpochSeconds(d Value) Value { return math.Floor(dateTime(d).ms / 1000) }
@@ -21,7 +21,7 @@ func partsOf(date *jsDate) Value {
 func DateTimeToParts(d Value) Value    { return partsOf(dateTime(d).toDate()) }
 func DateTimeToPartsUtc(d Value) Value { return partsOf(newJsDate(dateTime(d).ms)) }
 
-// setParts is Effect's `setPartsDate` of the adapter's PartialParts.
+// setParts sets the parts of the adapter's PartialParts on a date.
 func setParts(date *jsDate, parts Value) {
 	r := record(parts)
 	part := func(name string) (float64, bool) {
@@ -92,8 +92,8 @@ func DateTimeZonedOffsetIso(d Value) Value {
 	return Some(offsetToString(dateTime(d).zonedOffset()))
 }
 
-// add is Effect's: time units move the instant, calendar units the wall
-// clock; a part of 0 or NaN does nothing, as JS's truthiness has it.
+// add moves a date-time: time units move the instant, calendar units the
+// wall clock; a part of 0 or NaN does nothing, as JS's truthiness has it.
 func add(d *DateTime, unit string, n float64) *DateTime {
 	set := n != 0 && !math.IsNaN(n)
 	scale, instant := map[string]float64{"Millisecond": 1, "Second": 1000, "Minute": msPerMinute, "Hour": msPerHour}[unit]
@@ -229,7 +229,7 @@ func DateTimeDistance(other, self Value) Value {
 	return fromMillis(math.Abs(dateTime(other).ms - dateTime(self).ms))
 }
 
-// dateTimeOrder is Effect's Order of date-times: by instant.
+// dateTimeOrder is the order of date-times: by instant.
 func dateTimeOrder(a, b Value) int {
 	x, y := dateTime(a).ms, dateTime(b).ms
 	switch {
@@ -243,7 +243,7 @@ func dateTimeOrder(a, b Value) int {
 
 func DateTimeCompare(a, b Value) Value { return ordering(dateTimeOrder(a, b)) }
 
-// The comparisons take `that` first, as Effect's data-last ones do.
+// The comparisons are data-last: they take `that` first.
 func DateTimeMin(that, self Value) Value                 { return orderMin(dateTimeOrder, self, that) }
 func DateTimeMax(that, self Value) Value                 { return orderMax(dateTimeOrder, self, that) }
 func DateTimeClamp(bounds, self Value) Value             { return clamp(dateTimeOrder, bounds, self) }
@@ -276,7 +276,7 @@ func (d *DateTime) formatIsoOffset() string {
 
 func DateTimeFormatIsoOffset(d Value) Value { return dateTime(d).formatIsoOffset() }
 
-// formatIsoZoned is Effect's: with the zone's name unless it is an offset.
+// formatIsoZoned is the ISO text with the zone's name unless it is an offset.
 func (d *DateTime) formatIsoZoned() string {
 	if d.zone.loc == nil {
 		return d.formatIsoOffset()

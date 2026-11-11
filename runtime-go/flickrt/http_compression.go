@@ -13,9 +13,9 @@ import (
 	"sync"
 )
 
-// The compression middlewares as Effect's: responses compressed by the
-// request's `Accept-Encoding` before they are sent, request bodies
-// decompressed by their `Content-Encoding`.
+// The compression middlewares: responses compressed by the request's
+// `Accept-Encoding` before they are sent, request bodies decompressed by
+// their `Content-Encoding`.
 
 var (
 	acceptMember = regexp.MustCompile(`^([a-z0-9!#$%&'*+.^_` + "`" + `|~-]+)(?:;q=(0(?:\.[0-9]{0,3})?|1(?:\.0{0,3})?))?$`)

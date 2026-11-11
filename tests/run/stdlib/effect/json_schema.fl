@@ -1,4 +1,4 @@
-// Effect's `JsonSchema` dialect conversions over JSON values, and `Differ`
+// `JsonSchema` dialect conversions over JSON values, and `Differ`
 // patches of values through their codec's JSON form.
 module App.Main exposing (main)
 

@@ -455,7 +455,7 @@ func PathWin32(key Value) Value {
 	))
 }
 
-// win32ResolveWithin is Effect's `resolveWithin` over win32 paths.
+// win32ResolveWithin is `input` resolved within `root`, over win32 paths.
 func win32ResolveWithin(root, input string) Value {
 	if record(win32Parse(input)).Get("root").(string) != "" {
 		return None

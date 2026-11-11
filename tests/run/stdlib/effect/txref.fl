@@ -1,4 +1,4 @@
-// Transactional cells from Effect's `TxRef`, inside `Tx.atomically`: all
+// Transactional cells from `TxRef`, inside `Tx.atomically`: all
 // or nothing, joined when nested, and run again after `Tx.retry`.
 module App.Main exposing (main)
 

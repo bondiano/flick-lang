@@ -1,4 +1,4 @@
-// Effect's `Cron` past the basics: aliases and steps, their errors, days
+// `Cron` past the basics: aliases and steps, their errors, days
 // and weekdays together, months without the day, and searches across a
 // zone's daylight saving transitions.
 module App.Main exposing (main)

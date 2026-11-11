@@ -1,7 +1,7 @@
 package flickrt
 
-// Running channels beyond the core, as Effect's (Channel.ts): heads and
-// lasts, effectful folds, and running into queues and hubs.
+// Running channels beyond the core: heads and lasts, effectful folds, and
+// running into queues and hubs.
 
 func runHead(fb *Fiber, self *Channel) Value {
 	head := None
@@ -48,8 +48,7 @@ func toQueue(fb *Fiber, self *Channel, options Value, offer func(q *Queue) func(
 	return q
 }
 
-// makePubSub is Effect's: the hub of the options, shut down with the
-// owner's scope.
+// makePubSub is the hub of the options, shut down with the owner's scope.
 func makePubSub(fb *Fiber, o *Record) *PubSub {
 	replay := hubReplay(o.Get("replay"))
 	var h *PubSub

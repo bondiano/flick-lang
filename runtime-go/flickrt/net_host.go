@@ -7,8 +7,8 @@ import (
 	"strings"
 )
 
-// Effect's hosts and socket addresses (effect/net Host, NetAddress): domain
-// names and scoped IPv6 literals are their canonical strings.
+// Hosts and socket addresses: domain names and scoped IPv6 literals are
+// their canonical strings.
 
 // inetAddress is an IP socket address; scope is an IPv6 one's zone index.
 type inetAddress struct {
@@ -65,7 +65,7 @@ func validateDomainName(name string) string {
 }
 
 // toAsciiDomainName lowercases an ASCII name; another goes through the
-// URL host parser, as Effect's does.
+// URL host parser.
 func toAsciiDomainName(s string) (string, bool) {
 	ascii := true
 	for _, r := range s {
