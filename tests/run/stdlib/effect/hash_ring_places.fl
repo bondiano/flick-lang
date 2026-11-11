@@ -59,6 +59,19 @@ let main () =
     (show (List.map (fun name -> HashRing.has (node_of name) heavier) ["a", "b", "c", "d"]))
   let many = HashRing.add_many { weight = Some 1.5 } (List.map node_of ["d", "e", "f", "g"]) three
   line "seven" (landing many ++ " " ++ shards 21 many)
+  let twice =
+    HashRing.add_many
+      { weight = Some 3 }
+      [{ name = "a"; zone = 1 }, { name = "h"; zone = 2 }, { name = "a"; zone = 3 }]
+      three
+  line
+    "one key twice"
+    (show (
+      Option.map (fun s -> s.zone) (HashRing.get "0/" twice),
+      List.map (fun s -> s.zone) (Option.with_default [] (HashRing.get_shards 5 twice)),
+      landing twice,
+    ))
+  line "three is as it was" (landing three ++ " " ++ shards 6 three)
   line
     "base weights"
     (show
