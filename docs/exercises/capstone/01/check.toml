@@ -1,0 +1,10 @@
+export = "roman"
+argument_types = ["number"]
+return_type = "string"
+output = "IV IX MMXXVI"
+title = "Roman numerals"
+title_ru = "Римские числа"
+task = "Write roman: it gives the Roman numeral of a number from 1 to 3999, as IV for 4 and MMXXVI for 2026."
+task_ru = "Напишите roman: она даёт римскую запись числа от 1 до 3999, например IV для 4 и MMXXVI для 2026."
+hints = []
+hints_ru = []

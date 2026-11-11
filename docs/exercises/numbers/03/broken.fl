@@ -1,0 +1,7 @@
+module Main exposing (main, clamp)
+
+clamp : Int -> Int -> Int -> Int
+let clamp low high x = if x < low then low else if x > high then x else x
+
+main : Unit ->{} Unit
+let main () = Platform.stdout_line "\{clamp 0 10 (-5)} \{clamp 0 10 5} \{clamp 0 10 50}"

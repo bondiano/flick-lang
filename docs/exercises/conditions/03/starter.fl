@@ -1,0 +1,7 @@
+module Main exposing (main, countdown)
+
+countdown : Int -> String
+let rec countdown n = if n == 0 then 0 else "\{n} " ++ countdown (n - 1)
+
+main : Unit ->{} Unit
+let main () = Platform.stdout_line (countdown 3)

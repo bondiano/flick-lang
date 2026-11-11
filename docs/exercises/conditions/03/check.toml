@@ -1,0 +1,10 @@
+export = "countdown"
+argument_types = ["number"]
+return_type = "string"
+output = "3 2 1 go"
+title = "Count down"
+title_ru = "Обратный отсчёт"
+task = "countdown n counts from n down to 1 and says go. Its last case gives a number; give it a String."
+task_ru = "countdown n считает от n до 1 и говорит go. Последний случай даёт число; пусть он даёт String."
+hints = ["Both branches of an if give the same type.", "When n reaches 0, the text is \"go\"."]
+hints_ru = ["Обе ветки if дают один тип.", "Когда n доходит до 0, текст — \"go\"."]

@@ -1,0 +1,7 @@
+module Main exposing (main, greet)
+
+greet : String -> String
+let greet name = "Hello, \{name}!"
+
+main : Unit ->{} Unit
+let main () = Platform.stdout_line (greet "Ada")

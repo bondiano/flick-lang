@@ -1,0 +1,7 @@
+module Main exposing (main, sign)
+
+sign : Int -> String
+let sign n = if n <= 0 then "negative" else if n == 0 then "zero" else "positive"
+
+main : Unit ->{} Unit
+let main () = Platform.stdout_line "\{sign (-2)} \{sign 0} \{sign 5}"

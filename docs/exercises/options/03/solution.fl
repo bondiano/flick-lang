@@ -1,0 +1,10 @@
+module Main exposing (main, check_age)
+
+age : Int -> Result String Int
+let age n = if n < 0 then Err "negative" else Ok n
+
+check_age : Int -> String
+let check_age n = show (age n)
+
+main : Unit ->{} Unit
+let main () = Platform.stdout_line "\{check_age 30} \{check_age (-1)}"

@@ -1,0 +1,10 @@
+export = "collatz"
+argument_types = ["number"]
+return_type = "number"
+output = "8"
+title = "Stop a loop with its result"
+title_ru = "Остановите цикл с результатом"
+task = "collatz counts the steps that bring n to 1. Its loop breaks with the wrong type; break with the count."
+task_ru = "collatz считает шаги, за которые n доходит до 1. Цикл прерывается со значением не того типа; прервите его со счётчиком."
+hints = ["The loop's value is what break gives it, and the function returns an Int.", "break steps"]
+hints_ru = ["Значение цикла — то, что даёт break, а функция возвращает Int.", "break steps"]

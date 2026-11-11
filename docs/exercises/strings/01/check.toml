@@ -1,0 +1,10 @@
+export = "greet"
+argument_types = ["string"]
+return_type = "string"
+output = "Hello, Ada!"
+title = "Greet by name"
+title_ru = "Поздоровайтесь по имени"
+task = "greet builds a greeting for a name. It joins a number to a string; make it a string with the name and an exclamation mark."
+task_ru = "greet строит приветствие по имени. Она присоединяет к строке число; сделайте из этого строку с именем и восклицательным знаком."
+hints = ["++ joins two strings only.", "\"Hello, \\{name}!\" puts the name inside the string."]
+hints_ru = ["++ соединяет только две строки.", "\"Hello, \\{name}!\" подставляет имя внутрь строки."]

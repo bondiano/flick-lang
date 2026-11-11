@@ -1,0 +1,11 @@
+export = "sum_squares"
+argument_types = ["number"]
+return_type = "number"
+output = "14"
+starter_error = "FLICK-C001"
+title = "Ask for a class"
+title_ru = "Попросите класс"
+task = "squares adds up the squares of any numbers, but its signature does not say they are numbers. Add the constraint."
+task_ru = "squares складывает квадраты любых чисел, но сигнатура не говорит, что это числа. Добавьте ограничение."
+hints = ["* and List.sum need a Numeric type.", "squares : Numeric a => List a -> a"]
+hints_ru = ["* и List.sum требуют числовой тип Numeric.", "squares : Numeric a => List a -> a"]

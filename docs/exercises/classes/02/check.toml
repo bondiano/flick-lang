@@ -1,0 +1,10 @@
+export = "count_long"
+argument_types = ["number"]
+return_type = "number"
+output = "2"
+title = "A generic function"
+title_ru = "Обобщённая функция"
+task = "count works for a list of anything, but its signature ties it to Int, and count_long gives it words. Make it generic."
+task_ru = "count работает для списка чего угодно, но её сигнатура привязывает её к Int, а count_long передаёт ей слова. Сделайте её обобщённой."
+hints = ["A type variable such as a stands for any type the caller chooses.", "count : (a -> Bool) -> List a -> Int"]
+hints_ru = ["Переменная типа, например a, означает любой тип, который выберет вызывающий.", "count : (a -> Bool) -> List a -> Int"]

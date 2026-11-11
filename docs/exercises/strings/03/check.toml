@@ -1,0 +1,10 @@
+export = "word_count"
+argument_types = ["string"]
+return_type = "number"
+output = "5"
+title = "Count the words"
+title_ru = "Посчитайте слова"
+task = "word_count gives the number of words in a sentence, but it gives back the words themselves. Count them."
+task_ru = "word_count должна давать число слов в предложении, а возвращает сами слова. Посчитайте их."
+hints = ["String.split \" \" text is a List String.", "List.length counts the elements of a list."]
+hints_ru = ["String.split \" \" text — это List String.", "List.length считает элементы списка."]

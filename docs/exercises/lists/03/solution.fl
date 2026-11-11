@@ -1,0 +1,7 @@
+module Main exposing (main, first_over)
+
+first_over : Int -> String
+let first_over limit = show (List.find (fun x -> x > limit) [3, 8, 12, 5])
+
+main : Unit ->{} Unit
+let main () = Platform.stdout_line "\{first_over 7} \{first_over 20}"

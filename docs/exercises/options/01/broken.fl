@@ -1,0 +1,10 @@
+module Main exposing (main, safe_div)
+
+divide : Int -> Int -> Option Int
+let divide a b = if b == 0 then Some 0 else Some (a / b)
+
+safe_div : Int -> Int -> String
+let safe_div a b = show (divide a b)
+
+main : Unit ->{} Unit
+let main () = Platform.stdout_line "\{safe_div 7 2} \{safe_div 1 0}"

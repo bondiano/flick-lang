@@ -1,0 +1,10 @@
+export = "birthday"
+argument_types = ["number"]
+return_type = "number"
+output = "42"
+title = "Change one field"
+title_ru = "Измените одно поле"
+task = "birthday makes a person one year older with a changed copy, but it names a field the record does not have. Name the right one."
+task_ru = "birthday делает человека на год старше через изменённую копию, но называет поле, которого у записи нет. Назовите правильное."
+hints = ["with only replaces fields that exist.", "Person has the fields name and age."]
+hints_ru = ["with заменяет только существующие поля.", "У Person есть поля name и age."]

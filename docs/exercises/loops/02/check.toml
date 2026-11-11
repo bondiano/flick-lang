@@ -1,0 +1,10 @@
+export = "digit_sum"
+argument_types = ["number"]
+return_type = "number"
+output = "10"
+title = "Add up the digits"
+title_ru = "Сложите цифры"
+task = "digit_sum adds up the digits of a number, but it divides by a Float. Keep the arithmetic in Int."
+task_ru = "digit_sum складывает цифры числа, но делит на Float. Оставьте вычисления в Int."
+hints = ["left is an Int; 10.0 is a Float.", "Divide by 10: on Int, / drops the remainder."]
+hints_ru = ["left — это Int, а 10.0 — Float.", "Делите на 10: на Int операция / отбрасывает остаток."]

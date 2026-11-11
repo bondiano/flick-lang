@@ -1,0 +1,16 @@
+module Main exposing (main, describe)
+
+type Status = Running | Paused | Done
+
+label : Status -> String
+let label status =
+  match status with
+  | Running -> "running"
+  | Paused -> "paused"
+  | Done -> "done"
+
+describe : String -> String
+let describe name = label (if name == "r" then Running else if name == "p" then Paused else Done)
+
+main : Unit ->{} Unit
+let main () = Platform.stdout_line (String.join " " (List.map describe ["r", "p", "d"]))

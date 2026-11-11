@@ -1,0 +1,10 @@
+export = "first_over"
+argument_types = ["number"]
+return_type = "string"
+output = "Some 8 None"
+title = "Find the first"
+title_ru = "Найдите первое"
+task = "first_over gives the first number over the limit, if there is one. Its test gives a number; make it say whether x is over the limit."
+task_ru = "first_over даёт первое число больше предела, если оно есть. Проверка возвращает число; пусть она говорит, больше ли x предела."
+hints = ["List.find takes a function that gives a Bool.", "fun x -> x > limit"]
+hints_ru = ["List.find принимает функцию, которая возвращает Bool.", "fun x -> x > limit"]

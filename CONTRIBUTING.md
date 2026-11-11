@@ -124,7 +124,10 @@ runs), an example of the gallery, or an exercise of `docs/exercises/`, beside
 the text of `tour/<page>.mdx`. `docs/test/tour.test.ts` checks the index
 against the files and pages and runs each program; `docs/e2e/tour.spec.ts`
 walks the tour in a browser. A lesson's program runs by itself once typing
-pauses, except code that came from a link.
+pauses, except code that came from a link. The courses' order is
+`docs/course/index.json`: each lesson lists its exercises, and each exercise
+has a page `course/<topic>-<nn>.mdx`; the contents page shows this browser's
+progress with the Flick widget `docs/src/widgets/Progress.fl`.
 
 Interactive widgets are Flick programs: `docs/src/widgets/` owns search,
 theme controls, the live homepage example and code copying;

@@ -1,0 +1,52 @@
+// The progress of a course: how many of its exercises this browser has
+// completed, and the first one left to do.
+module Progress exposing (mount)
+
+import Elements exposing (route)
+
+type alias Exercise = { key : String; title : String; href : String }
+type alias Input = { id : String; ru : Bool; exercises : List Exercise }
+
+/// Whether this browser completed the exercise stored under `key`.
+completed : String ->{} Bool
+foreign completed from "./browser.ts" "exerciseDone"
+  arity 1
+
+/// The first exercise left, or the end of the course.
+next_view : Bool -> List Exercise -> Ui
+let next_view ru left =
+  match left with
+  | [] -> ui { paragraph (text (if ru then "Курс пройден." else "You have finished the course.")) }
+  | [next, ..._] -> ui {
+    paragraph (text (if ru then "Продолжить: " else "Continue with ")) (route next.href next.title)
+  }
+
+view : Input -> List Bool -> Ui
+let view input done =
+  let total = List.length input.exercises
+  let count = List.length (List.filter (fun finished -> finished) done)
+  let left = [
+    for (exercise, finished) <- List.zip input.exercises done; if not finished yield exercise,
+  ]
+  let summary =
+    if input.ru then
+      "Пройдено упражнений: \{count} из \{total}."
+    else
+      "Exercises done: \{count} of \{total}."
+  ui { div { class_name = "course-progress" } (paragraph (text summary)) (next_view input.ru left) }
+
+report : Failure e ->{} Unit
+let report failure = Platform.stderr_line (RawCause.describe (Failure.inspect failure))
+
+mount : Input ->{Async; AppError} Unit
+let mount input =
+  match Ui.Dom.container input.id with
+  | None -> App.fail "Missing course progress container"
+  | Some root ->
+    let mut read = []
+    for exercise <- input.exercises do read = read ++ [completed exercise.key]
+    // the view keeps what this browser had when the page opened
+    let done = read
+    provide Atom.layer {
+      ignore (Ui.Dom.mount root report (Ui.render (Ui.view (fun () -> view input done)) ()))
+    }

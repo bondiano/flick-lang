@@ -1,0 +1,6 @@
+module Main exposing (main, double)
+
+let double n = n * 2
+
+main : Unit ->{} Unit
+let main () = Platform.stdout_line (show (double 21))

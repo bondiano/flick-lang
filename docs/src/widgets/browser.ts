@@ -57,3 +57,8 @@ export const search = async (query: string) => {
   }));
 };
 
+
+// The flag a completed exercise leaves, as the playground writes it (`lessonKey` in `playground/dom.ts`).
+export const exerciseDone = (key: string): boolean => {
+  try { return localStorage.getItem(`flick.lesson.${key}.done`) === "1"; } catch { return false; }
+};

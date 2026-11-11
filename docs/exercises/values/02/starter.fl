@@ -1,0 +1,7 @@
+module Main exposing (main, area)
+
+area : Int -> String -> Int
+let area width height = width * height
+
+main : Unit ->{} Unit
+let main () = Platform.stdout_line (show (area 3 4))

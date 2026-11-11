@@ -324,3 +324,7 @@ h1#_top code { padding: 0.04em 0.22em; background: var(--sl-color-bg-inline-code
 @media (prefers-reduced-motion: reduce) {
   .doc-nav-token, .sl-markdown-content .sl-anchor-link { transition: none; }
 }
+
+/* A course's progress, which a Flick widget writes above its contents. */
+.course-progress p { margin: 0.25rem 0; }
+.course-progress a { color: var(--sl-color-text-accent); }

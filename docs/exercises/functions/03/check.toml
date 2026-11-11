@@ -1,0 +1,10 @@
+export = "sum_of_squares"
+argument_types = ["number"]
+return_type = "number"
+output = "14"
+title = "Finish the pipeline"
+title_ru = "Допишите конвейер"
+task = "sum_of_squares squares the numbers from 1 to n, but the pipeline stops at a list. Add them up."
+task_ru = "sum_of_squares возводит в квадрат числа от 1 до n, но конвейер останавливается на списке. Сложите их."
+hints = ["The pipeline gives a List Int, the signature an Int.", "One more line: |> List.sum"]
+hints_ru = ["Конвейер даёт List Int, а сигнатура — Int.", "Ещё одна строка: |> List.sum"]

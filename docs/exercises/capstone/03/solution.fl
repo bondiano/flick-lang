@@ -1,0 +1,15 @@
+module Main exposing (main, balanced)
+
+balanced : String -> Bool
+let balanced text =
+  let mut depth = 0
+  let mut ok = true
+  for char <- String.chars text do {
+    if char == "(" then depth = depth + 1
+    if char == ")" then depth = depth - 1
+    if depth < 0 then ok = false
+  }
+  ok && depth == 0
+
+main : Unit ->{} Unit
+let main () = Platform.stdout_line "\{balanced "(())"} \{balanced "(()"} \{balanced ")("}"

@@ -1,0 +1,7 @@
+module Main exposing (main, even_squares)
+
+even_squares : Int -> String
+let even_squares top = show [for n <- List.range 1 (top + 1); if n % 2 yield n * n]
+
+main : Unit ->{} Unit
+let main () = Platform.stdout_line (even_squares 6)

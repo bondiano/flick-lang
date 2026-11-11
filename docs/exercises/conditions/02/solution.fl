@@ -1,0 +1,7 @@
+module Main exposing (main, power)
+
+power : Int -> Int -> Int
+let rec power base exp = if exp == 0 then 1 else base * power base (exp - 1)
+
+main : Unit ->{} Unit
+let main () = Platform.stdout_line (show (power 2 10))

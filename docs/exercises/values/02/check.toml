@@ -1,0 +1,10 @@
+export = "area"
+argument_types = ["number", "number"]
+return_type = "number"
+output = "12"
+title = "The second argument"
+title_ru = "Второй аргумент"
+task = "area multiplies the width by the height, but its signature takes the height as a String. Fix the type of the second argument."
+task_ru = "area умножает ширину на высоту, но её сигнатура принимает высоту как String. Исправьте тип второго аргумента."
+hints = ["Each argument has its own type before an arrow, in order.", "Two Int arguments and an Int result: Int -> Int -> Int."]
+hints_ru = ["У каждого аргумента свой тип перед стрелкой, по порядку.", "Два аргумента Int и результат Int: Int -> Int -> Int."]

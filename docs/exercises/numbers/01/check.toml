@@ -1,0 +1,10 @@
+export = "percent"
+argument_types = ["number", "number"]
+return_type = "number"
+output = "25"
+title = "Convert on purpose"
+title_ru = "Преобразуйте явно"
+task = "percent gives part as a percentage of whole. Its body mixes Int and Float; convert the Ints so the division keeps its fraction."
+task_ru = "percent даёт part в процентах от whole. Тело смешивает Int и Float; преобразуйте Int, чтобы деление сохранило дробную часть."
+hints = ["An operator takes two numbers of one type; Flick does not convert them for you.", "Int.to_float part / Int.to_float whole is a Float division."]
+hints_ru = ["Оператор принимает два числа одного типа; Flick не преобразует их сам.", "Int.to_float part / Int.to_float whole — деление над Float."]

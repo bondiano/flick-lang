@@ -1,0 +1,7 @@
+module Main exposing (main, parse_or_zero)
+
+parse_or_zero : String -> Int
+let parse_or_zero text = Option.with_default 0 (Int.parse text)
+
+main : Unit ->{} Unit
+let main () = Platform.stdout_line "\{parse_or_zero "42"} \{parse_or_zero "x"}"

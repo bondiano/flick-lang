@@ -1,0 +1,10 @@
+export = "add_tax"
+argument_types = ["number"]
+return_type = "number"
+output = "120"
+title = "Give fewer arguments"
+title_ru = "Дайте меньше аргументов"
+task = "add_tax adds 20 to a price by giving add one argument of two. Give it that argument."
+task_ru = "add_tax прибавляет к цене 20, давая add один аргумент из двух. Дайте ей этот аргумент."
+hints = ["add alone is Int -> Int -> Int; add_tax must be Int -> Int.", "add 20 waits for the second Int."]
+hints_ru = ["add сама по себе — Int -> Int -> Int, а add_tax должна быть Int -> Int.", "add 20 ждёт второй Int."]

@@ -1,0 +1,11 @@
+export = "sum_to"
+argument_types = ["number"]
+return_type = "number"
+output = "5050"
+starter_error = "FLICK-T069"
+title = "Sum with a loop"
+title_ru = "Сумма в цикле"
+task = "sum_to n adds the numbers from 1 to n in a loop, but its variables cannot change. Let them."
+task_ru = "sum_to n складывает числа от 1 до n в цикле, но её переменные не могут меняться. Разрешите им."
+hints = ["A variable that a loop changes is made with let mut.", "Both total and i are assigned."]
+hints_ru = ["Переменная, которую меняет цикл, создаётся через let mut.", "Присваиваются и total, и i."]

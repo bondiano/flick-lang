@@ -1,0 +1,17 @@
+module Main exposing (main, spread)
+
+min_max : List Int -> (Int, Int)
+let min_max xs = (
+  Option.with_default 0 (List.minimum xs),
+  Option.with_default 0 (List.maximum xs),
+)
+
+spread : String -> Int
+let spread text =
+  let numbers =
+    List.map (fun part -> Option.with_default 0 (Int.parse part)) (String.split "," text)
+  let (low, high, mid) = min_max numbers
+  high - low
+
+main : Unit ->{} Unit
+let main () = Platform.stdout_line (show (spread "3,9,1"))

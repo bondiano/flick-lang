@@ -1,0 +1,10 @@
+module Main exposing (main, flip)
+
+type Coin = Heads | Tails
+  deriving Show
+
+flip : Bool -> String
+let flip up = show (if up then Tails else Heads)
+
+main : Unit ->{} Unit
+let main () = Platform.stdout_line "\{flip true} \{flip false}"

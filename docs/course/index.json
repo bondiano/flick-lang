@@ -1,0 +1,142 @@
+{
+  "courses": [
+    {
+      "id": "foundations",
+      "en": "Flick foundations",
+      "ru": "Основы Flick",
+      "lessons": [
+        {
+          "id": "values",
+          "en": "Values and signatures",
+          "ru": "Значения и сигнатуры",
+          "tour": "functions",
+          "exercises": [
+            "values/01",
+            "values/02",
+            "values/03"
+          ]
+        },
+        {
+          "id": "numbers",
+          "en": "Numbers",
+          "ru": "Числа",
+          "tour": "numbers",
+          "exercises": [
+            "numbers/01",
+            "numbers/02",
+            "numbers/03"
+          ]
+        },
+        {
+          "id": "strings",
+          "en": "Strings",
+          "ru": "Строки",
+          "tour": "strings",
+          "exercises": [
+            "strings/01",
+            "strings/02",
+            "strings/03"
+          ]
+        },
+        {
+          "id": "functions",
+          "en": "Functions and pipes",
+          "ru": "Функции и конвейеры",
+          "tour": "pipes",
+          "exercises": [
+            "functions/01",
+            "functions/02",
+            "functions/03"
+          ]
+        },
+        {
+          "id": "conditions",
+          "en": "Conditions and recursion",
+          "ru": "Условия и рекурсия",
+          "tour": "conditions",
+          "exercises": [
+            "conditions/01",
+            "conditions/02",
+            "conditions/03"
+          ]
+        },
+        {
+          "id": "loops",
+          "en": "Variables and loops",
+          "ru": "Переменные и циклы",
+          "tour": "loops",
+          "exercises": [
+            "loops/01",
+            "loops/02",
+            "loops/03"
+          ]
+        },
+        {
+          "id": "records",
+          "en": "Tuples and records",
+          "ru": "Кортежи и записи",
+          "tour": "records",
+          "exercises": [
+            "records/01",
+            "records/02",
+            "records/03"
+          ]
+        },
+        {
+          "id": "variants",
+          "en": "Variants and match",
+          "ru": "Варианты и match",
+          "tour": "variants",
+          "exercises": [
+            "variants/01",
+            "variants/02",
+            "variants/03"
+          ]
+        },
+        {
+          "id": "options",
+          "en": "Option and Result",
+          "ru": "Option и Result",
+          "tour": "options",
+          "exercises": [
+            "options/01",
+            "options/02",
+            "options/03"
+          ]
+        },
+        {
+          "id": "lists",
+          "en": "Lists",
+          "ru": "Списки",
+          "tour": "lists",
+          "exercises": [
+            "lists/01",
+            "lists/02",
+            "lists/03"
+          ]
+        },
+        {
+          "id": "classes",
+          "en": "Types and classes",
+          "ru": "Типы и классы",
+          "tour": "classes",
+          "exercises": [
+            "classes/01",
+            "classes/02",
+            "classes/03"
+          ]
+        },
+        {
+          "id": "capstone",
+          "en": "Build it yourself",
+          "ru": "Соберите сами",
+          "exercises": [
+            "capstone/01",
+            "capstone/02",
+            "capstone/03"
+          ]
+        }
+      ]
+    }
+  ]
+}

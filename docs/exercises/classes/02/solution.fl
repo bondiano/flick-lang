@@ -1,0 +1,10 @@
+module Main exposing (main, count_long)
+
+count : (a -> Bool) -> List a -> Int
+let count test xs = List.length (List.filter test xs)
+
+count_long : Int -> Int
+let count_long size = count (fun word -> String.length word > size) ["flick", "is", "a", "language"]
+
+main : Unit ->{} Unit
+let main () = Platform.stdout_line (show (count_long 3))

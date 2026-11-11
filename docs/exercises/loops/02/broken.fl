@@ -1,0 +1,14 @@
+module Main exposing (main, digit_sum)
+
+digit_sum : Int -> Int
+let digit_sum n =
+  let mut left = n
+  let mut total = 0
+  while left > 9 do {
+    total = total + left % 10
+    left = left / 10
+  }
+  total
+
+main : Unit ->{} Unit
+let main () = Platform.stdout_line (show (digit_sum 2026))

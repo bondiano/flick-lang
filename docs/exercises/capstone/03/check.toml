@@ -1,0 +1,10 @@
+export = "balanced"
+argument_types = ["string"]
+return_type = "boolean"
+output = "true false false"
+title = "Balanced brackets"
+title_ru = "Сбалансированные скобки"
+task = "Write balanced: it says whether every ( in a text has its ) after it and no ) comes before its (."
+task_ru = "Напишите balanced: она говорит, есть ли у каждой ( своя ) после неё и не идёт ли ) раньше своей (."
+hints = []
+hints_ru = []

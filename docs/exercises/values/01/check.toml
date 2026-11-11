@@ -1,0 +1,10 @@
+export = "half"
+argument_types = ["number"]
+return_type = "number"
+output = "3.5"
+title = "Name the result type"
+title_ru = "Назовите тип результата"
+task = "half divides a whole number by two and gives back a fraction. Make its signature say so."
+task_ru = "half делит целое число пополам и возвращает дробь. Пусть сигнатура скажет об этом."
+hints = ["Int.to_float turns the Int into a Float, so the division is a Float one.", "The last type after the arrow is the result: Float."]
+hints_ru = ["Int.to_float превращает Int во Float, поэтому и деление идёт над Float.", "Последний тип после стрелки — результат: Float."]

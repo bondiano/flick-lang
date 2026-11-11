@@ -1,0 +1,15 @@
+module Main exposing (main, square_area)
+
+type Shape = Square Int | Rect Int Int
+
+area : Shape -> Int
+let area shape =
+  match shape with
+  | Square side -> side * 2
+  | Rect width height -> width * height
+
+square_area : Int -> Int
+let square_area side = area (Square side)
+
+main : Unit ->{} Unit
+let main () = Platform.stdout_line "\{square_area 4} \{area (Rect 3 4)}"

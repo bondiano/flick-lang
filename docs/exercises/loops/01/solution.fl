@@ -1,0 +1,14 @@
+module Main exposing (main, sum_to)
+
+sum_to : Int -> Int
+let sum_to n =
+  let mut total = 0
+  let mut i = 1
+  while i <= n do {
+    total = total + i
+    i = i + 1
+  }
+  total
+
+main : Unit ->{} Unit
+let main () = Platform.stdout_line (show (sum_to 100))

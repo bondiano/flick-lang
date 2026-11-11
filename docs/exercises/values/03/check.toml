@@ -1,0 +1,16 @@
+export = "average"
+argument_types = ["number", "number"]
+return_type = "number"
+output = "3.5"
+starter_error = "FLICK-T024"
+title = "Ask the compiler"
+title_ru = "Спросите компилятор"
+task = "The signature of average is todo. Read the type the compiler infers for it, answer the question, and write the type in."
+task_ru = "Сигнатура average — todo. Прочитайте тип, который выводит для неё компилятор, ответьте на вопрос и впишите тип."
+hints = ["The error on todo names the type it stands for, and its fix writes it in.", "Both arguments are added as Int; the sum becomes a Float before the division."]
+hints_ru = ["Ошибка на todo называет тип, который он заменяет, а её исправление вписывает его.", "Аргументы складываются как Int; сумма становится Float перед делением."]
+question = "Which type does the compiler infer for average?"
+question_ru = "Какой тип компилятор выводит для average?"
+choices = ["Int -> Int -> Int", "Int -> Int -> Float", "Float -> Float -> Float"]
+choices_ru = ["Int -> Int -> Int", "Int -> Int -> Float", "Float -> Float -> Float"]
+answer = 1

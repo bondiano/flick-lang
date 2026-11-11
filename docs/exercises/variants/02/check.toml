@@ -1,0 +1,10 @@
+export = "square_area"
+argument_types = ["number"]
+return_type = "number"
+output = "16 12"
+title = "Build a variant"
+title_ru = "Постройте вариант"
+task = "A Rect has a width and a height. The program builds one with a single number; give it both."
+task_ru = "У Rect есть ширина и высота. Программа строит его из одного числа; дайте ему оба."
+hints = ["A constructor takes its fields as a function takes arguments.", "Rect 3 4"]
+hints_ru = ["Конструктор принимает поля так же, как функция — аргументы.", "Rect 3 4"]

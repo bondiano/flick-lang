@@ -1,9 +1,13 @@
 // The sections of the documentation; the sidebar draws each one as a line of its pages.
 import { readFileSync } from "node:fs";
+import path from "node:path";
 
 const reference = (name) => ({ slug: `reference/${name}` });
 // The tour's order is its index's; Back and Next follow the sidebar.
 const tour = JSON.parse(readFileSync(new URL("./tour/index.json", import.meta.url), "utf8"));
+// A course's exercises, a page each, by lesson; `values/01` is `course/values-01`.
+// From the site's root, as the loaders read it: a bundle that imports this module has another URL.
+const course = JSON.parse(readFileSync(path.join(process.cwd(), "course/index.json"), "utf8")).courses[0];
 
 export const sidebar = [
   {
@@ -15,6 +19,18 @@ export const sidebar = [
         label: chapter.en,
         translations: { ru: chapter.ru },
         items: chapter.lessons.map((lesson) => ({ slug: `tour/${lesson.id}` })),
+      })),
+    ],
+  },
+  {
+    label: "Course",
+    translations: { ru: "Курс" },
+    items: [
+      { slug: "course" },
+      ...course.lessons.map((lesson) => ({
+        label: lesson.en,
+        translations: { ru: lesson.ru },
+        items: lesson.exercises.map((exercise) => ({ slug: `course/${exercise.replace("/", "-")}` })),
       })),
     ],
   },

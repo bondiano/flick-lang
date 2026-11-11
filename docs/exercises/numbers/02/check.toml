@@ -1,0 +1,10 @@
+export = "is_even"
+argument_types = ["number"]
+return_type = "boolean"
+output = "true false"
+title = "Even numbers"
+title_ru = "Чётные числа"
+task = "is_even says whether a number is even. Compare its remainder with the right number."
+task_ru = "is_even говорит, чётно ли число. Сравните остаток с правильным числом."
+hints = ["% gives the remainder of an Int division, an Int.", "An even number leaves the remainder 0 when divided by 2."]
+hints_ru = ["% даёт остаток от деления Int, тоже Int.", "Чётное число даёт остаток 0 при делении на 2."]

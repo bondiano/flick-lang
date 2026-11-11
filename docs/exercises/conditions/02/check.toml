@@ -1,0 +1,11 @@
+export = "power"
+argument_types = ["number", "number"]
+return_type = "number"
+output = "1024"
+starter_error = "FLICK-T017"
+title = "A function that calls itself"
+title_ru = "Функция, которая вызывает себя"
+task = "power base exp multiplies base by itself exp times by calling itself. Declare it so it may."
+task_ru = "power base exp умножает base на себя exp раз, вызывая саму себя. Объявите её так, чтобы это было можно."
+hints = ["A recursive function is declared with let rec.", "let rec power base exp = …"]
+hints_ru = ["Рекурсивная функция объявляется через let rec.", "let rec power base exp = …"]

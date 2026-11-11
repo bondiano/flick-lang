@@ -1,0 +1,40 @@
+---
+// A course's contents: its lessons and their exercises, with this browser's progress, which a Flick widget reads.
+import { loadExercise } from "../../exercises/load.ts";
+import { courses, pageOf } from "../../course/load.ts";
+
+interface Props { locale: "en" | "ru"; course: string }
+const ru = Astro.props.locale === "ru";
+const found = courses().find((course) => course.id === Astro.props.course);
+if (found === undefined) throw new Error(`No course ${Astro.props.course}`);
+const lessons = found.lessons.map((lesson) => ({
+  ...lesson,
+  exercises: lesson.exercises.map((id) => {
+    const exercise = loadExercise(id);
+    return { key: id.replaceAll("/", "."), title: ru ? exercise.title_ru : exercise.title, href: `./${pageOf(id)}/` };
+  }),
+}));
+const input = { id: `course-progress-${found.id}`, ru, exercises: lessons.flatMap((lesson) => lesson.exercises) };
+---
+
+<div id={input.id} class="course-progress-shell not-content"></div>
+<script is:inline type="application/json" id={`${input.id}-input`} set:html={JSON.stringify(input).replaceAll("<", "\\u003c")}></script>
+<ol class="tour-chapters">
+  {lessons.map((lesson) => (
+    <li>
+      <h2 id={lesson.id}>{ru ? lesson.ru : lesson.en}</h2>
+      <ol>{lesson.exercises.map((exercise) => <li><a href={exercise.href}>{exercise.title}</a></li>)}</ol>
+    </li>
+  ))}
+</ol>
+
+<script>
+  import { run } from "@flick-lang/effect-ts/runner/browser";
+  import { mount } from "../widgets/Progress.fl";
+
+  // The widget's input is the page's; its state and view are Flick.
+  document.querySelectorAll<HTMLElement>(".course-progress-shell").forEach((root) => {
+    const text = document.getElementById(`${root.id}-input`)?.textContent;
+    if (text) void run(mount, JSON.parse(text));
+  });
+</script>

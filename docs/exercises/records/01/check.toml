@@ -1,0 +1,10 @@
+export = "spread"
+argument_types = ["string"]
+return_type = "number"
+output = "8"
+title = "Two results at once"
+title_ru = "Два результата сразу"
+task = "spread gives the distance between the smallest and the largest number of a list. min_max gives both as a pair; take the pair apart with the right pattern."
+task_ru = "spread даёт расстояние между наименьшим и наибольшим числом списка. min_max возвращает оба парой; разберите пару правильным образцом."
+hints = ["min_max gives a pair: two values, not three.", "let (low, high) = min_max numbers"]
+hints_ru = ["min_max возвращает пару: два значения, а не три.", "let (low, high) = min_max numbers"]

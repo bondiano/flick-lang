@@ -1,0 +1,16 @@
+export = "describe"
+argument_types = ["string"]
+return_type = "string"
+output = "running paused done"
+starter_error = "FLICK-T009"
+title = "Ask the compiler about a match"
+title_ru = "Спросите компилятор о match"
+task = "label forgets a case. Read which one the compiler names, answer the question, and cover it."
+task_ru = "label забывает один случай. Прочитайте, какой называет компилятор, ответьте на вопрос и обработайте его."
+hints = ["The error FLICK-T009 says which value is not matched.", "Its fix adds the arm with todo; write \"paused\" there."]
+hints_ru = ["Ошибка FLICK-T009 говорит, какое значение не сопоставлено.", "Её исправление добавит ветку с todo; напишите там \"paused\"."]
+question = "Which value does label not handle?"
+question_ru = "Какое значение не обрабатывает label?"
+choices = ["Running", "Paused", "Done"]
+choices_ru = ["Running", "Paused", "Done"]
+answer = 1

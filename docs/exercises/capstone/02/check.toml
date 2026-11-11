@@ -1,0 +1,10 @@
+export = "most_common"
+argument_types = ["string"]
+return_type = "string"
+output = "red"
+title = "The most common word"
+title_ru = "Самое частое слово"
+task = "Write most_common: it gives the word that occurs most often in a text of words separated by spaces."
+task_ru = "Напишите most_common: она даёт слово, которое чаще всего встречается в тексте из слов через пробел."
+hints = []
+hints_ru = []

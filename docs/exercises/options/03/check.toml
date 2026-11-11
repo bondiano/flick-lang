@@ -1,0 +1,10 @@
+export = "check_age"
+argument_types = ["number"]
+return_type = "string"
+output = "Ok 30 Err \"negative\""
+title = "Say why it failed"
+title_ru = "Скажите, почему не вышло"
+task = "age gives an Ok age or an Err with a message. Its error is a number; make it the message \"negative\"."
+task_ru = "age даёт Ok с возрастом или Err с сообщением. Ошибка у неё — число; сделайте её сообщением \"negative\"."
+hints = ["The signature says Result String Int: the error is a String.", "Err \"negative\""]
+hints_ru = ["Сигнатура говорит Result String Int: ошибка — это String.", "Err \"negative\""]

@@ -1,0 +1,11 @@
+export = "flip"
+argument_types = ["boolean"]
+return_type = "string"
+output = "Heads Tails"
+starter_error = "FLICK-C001"
+title = "Derive what show needs"
+title_ru = "Выведите то, что нужно show"
+task = "flip shows a side of a coin, but Coin has no Show instance. Give it one."
+task_ru = "flip показывает сторону монеты, но у Coin нет экземпляра Show. Дайте ему его."
+hints = ["show needs an instance of Show for the type.", "deriving Show under the type writes it."]
+hints_ru = ["show требует экземпляр Show для типа.", "deriving Show под типом пишет его."]

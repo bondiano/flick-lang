@@ -1,0 +1,7 @@
+module Main exposing (main, is_even)
+
+is_even : Int -> Bool
+let is_even n = n % 2 == 0
+
+main : Unit ->{} Unit
+let main () = Platform.stdout_line "\{is_even 10} \{is_even 7}"

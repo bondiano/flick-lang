@@ -1,0 +1,12 @@
+module Main exposing (main, sum_squares)
+
+import Numeric exposing (Numeric)
+
+squares : Numeric a => List a -> a
+let squares xs = List.sum (List.map (fun x -> x * x) xs)
+
+sum_squares : Int -> Int
+let sum_squares n = squares (List.range 0 n)
+
+main : Unit ->{} Unit
+let main () = Platform.stdout_line (show (sum_squares 3))

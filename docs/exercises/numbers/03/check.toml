@@ -1,0 +1,10 @@
+export = "clamp"
+argument_types = ["number", "number", "number"]
+return_type = "number"
+output = "0 5 10"
+title = "Keep a number in range"
+title_ru = "Удержите число в пределах"
+task = "clamp low high x keeps x between low and high. Finish the conditions so every branch gives an Int."
+task_ru = "clamp low high x держит x между low и high. Допишите условия, чтобы каждая ветка давала Int."
+hints = ["An if without else is Unit, not Int.", "Below low give low, above high give high, otherwise x."]
+hints_ru = ["if без else имеет тип Unit, а не Int.", "Ниже low — low, выше high — high, иначе x."]

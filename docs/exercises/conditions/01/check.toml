@@ -1,0 +1,10 @@
+export = "sign"
+argument_types = ["number"]
+return_type = "string"
+output = "negative zero positive"
+title = "The sign of a number"
+title_ru = "Знак числа"
+task = "sign names the sign of a number, but its last case is missing. Give every branch a String."
+task_ru = "sign называет знак числа, но последнего случая нет. Дайте каждой ветке String."
+hints = ["An if without else is Unit.", "Finish with else \"positive\"."]
+hints_ru = ["if без else имеет тип Unit.", "Закончите веткой else \"positive\"."]

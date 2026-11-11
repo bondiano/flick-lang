@@ -1,0 +1,10 @@
+export = "parse_or_zero"
+argument_types = ["string"]
+return_type = "number"
+output = "42 0"
+title = "A default value"
+title_ru = "Значение по умолчанию"
+task = "parse_or_zero reads a number from text and gives 0 when there is none. Int.parse gives an Option; take the number out of it."
+task_ru = "parse_or_zero читает число из текста и даёт 0, если числа нет. Int.parse возвращает Option; достаньте из него число."
+hints = ["An Option Int is not an Int.", "Option.with_default 0 (Int.parse text)"]
+hints_ru = ["Option Int — это не Int.", "Option.with_default 0 (Int.parse text)"]

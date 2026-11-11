@@ -1,0 +1,10 @@
+export = "product_to"
+argument_types = ["number"]
+return_type = "number"
+output = "120"
+title = "Fold a list"
+title_ru = "Сверните список"
+task = "product_to n multiplies the numbers from 1 to n with List.fold_left. Its start value is text; make it the right number."
+task_ru = "product_to n перемножает числа от 1 до n через List.fold_left. Начальное значение — текст; сделайте его правильным числом."
+hints = ["The start value has the type of the total.", "A product starts at 1, not 0."]
+hints_ru = ["Начальное значение имеет тип итога.", "Произведение начинается с 1, а не с 0."]

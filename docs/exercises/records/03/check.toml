@@ -1,0 +1,10 @@
+export = "label"
+argument_types = ["number"]
+return_type = "string"
+output = "Dune (412 pages)"
+title = "Read a field"
+title_ru = "Прочитайте поле"
+task = "label describes a book by its title and its pages, but it reads a field the book does not have. Read the right one."
+task_ru = "label описывает книгу по названию и числу страниц, но читает поле, которого у книги нет. Прочитайте правильное."
+hints = ["book.x reads the field x of a record.", "The field is pages, not page."]
+hints_ru = ["book.x читает поле x записи.", "Поле называется pages, а не page."]

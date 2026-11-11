@@ -1,0 +1,10 @@
+export = "safe_div"
+argument_types = ["number", "number"]
+return_type = "string"
+output = "Some 3 None"
+title = "No division by zero"
+title_ru = "Без деления на ноль"
+task = "divide gives no result for a zero divisor. Its signature promises an Option; wrap the quotient."
+task_ru = "divide не даёт результата при нулевом делителе. Сигнатура обещает Option; оберните частное."
+hints = ["An Option is Some value or None.", "Some (a / b)"]
+hints_ru = ["Option — это Some value или None.", "Some (a / b)"]

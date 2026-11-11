@@ -1,0 +1,11 @@
+module Main exposing (main, label)
+
+type alias Book = { title : String; pages : Int }
+
+label : Int -> String
+let label pages =
+  let book = { title = "Dune"; pages = pages }
+  "\{book.title} (\{book.pages} pages)"
+
+main : Unit ->{} Unit
+let main () = Platform.stdout_line (label 412)

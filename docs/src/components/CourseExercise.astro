@@ -1,0 +1,22 @@
+---
+// A page of the course: what it says, beside the exercise it is about.
+import Playground from "./Playground.astro";
+
+interface Props {
+  locale: "en" | "ru";
+  /** The exercise, by its directory under `exercises/`. */
+  exercise: string;
+}
+
+const { locale, exercise } = Astro.props;
+---
+
+<div class="tour-lesson">
+  <div class="tour-prose">
+    <slot />
+    <p class="tour-contents-link"><a href="../">{locale === "ru" ? "Содержание курса" : "Course contents"}</a></p>
+  </div>
+  <div class="tour-editor">
+    <Playground locale={locale} lesson={exercise} />
+  </div>
+</div>

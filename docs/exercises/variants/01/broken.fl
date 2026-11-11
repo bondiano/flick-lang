@@ -1,0 +1,21 @@
+module Main exposing (main, next_light)
+
+type Light = Red | Yellow | Green
+  deriving Show
+
+next : Light -> Light
+let next light =
+  match light with
+  | Green -> Yellow
+  | Yellow -> Red
+  | Red -> Yellow
+
+parse : String -> Light
+let parse name = if name == "green" then Green else if name == "yellow" then Yellow else Red
+
+next_light : String -> String
+let next_light name = show (next (parse name))
+
+main : Unit ->{} Unit
+let main () =
+  Platform.stdout_line (String.join " " (List.map next_light ["green", "yellow", "red"]))

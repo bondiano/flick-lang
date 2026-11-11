@@ -1,0 +1,10 @@
+export = "even_squares"
+argument_types = ["number"]
+return_type = "string"
+output = "[4, 16, 36]"
+title = "Build a list"
+title_ru = "Постройте список"
+task = "even_squares gives the squares of the even numbers up to top. The condition of its comprehension is a number; make it a Bool."
+task_ru = "even_squares даёт квадраты чётных чисел до top. Условие в построении списка — число; сделайте его Bool."
+hints = ["The if of a comprehension needs a Bool.", "n % 2 == 0"]
+hints_ru = ["if в построении списка требует Bool.", "n % 2 == 0"]

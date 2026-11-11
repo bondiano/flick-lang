@@ -1,0 +1,11 @@
+export = "next_light"
+argument_types = ["string"]
+return_type = "string"
+output = "Yellow Red Green"
+starter_error = "FLICK-T009"
+title = "Every case of a light"
+title_ru = "Каждый случай светофора"
+task = "next_light gives the light after the one named. Its match forgets one light; cover it."
+task_ru = "next_light даёт сигнал, который идёт после названного. Её match забывает один сигнал; обработайте его."
+hints = ["The compiler names the light the match does not cover.", "After Yellow comes Red."]
+hints_ru = ["Компилятор называет сигнал, который не покрывает match.", "После Yellow идёт Red."]

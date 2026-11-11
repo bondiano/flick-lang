@@ -1,0 +1,7 @@
+module Main exposing (main, product_to)
+
+product_to : Int -> Int
+let product_to n = List.fold_left (fun total x -> total * x) "1" (List.range 1 (n + 1))
+
+main : Unit ->{} Unit
+let main () = Platform.stdout_line (show (product_to 5))

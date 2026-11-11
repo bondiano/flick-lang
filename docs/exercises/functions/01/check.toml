@@ -1,0 +1,11 @@
+export = "double"
+argument_types = ["number"]
+return_type = "number"
+output = "42"
+starter_error = "FLICK-T004"
+title = "Give a function its signature"
+title_ru = "Дайте функции сигнатуру"
+task = "double has no signature, and a function at the top of a module needs one. Write it."
+task_ru = "У double нет сигнатуры, а она нужна каждой функции на верхнем уровне модуля. Напишите её."
+hints = ["The error's fix writes the inferred signature for you.", "double : Int -> Int"]
+hints_ru = ["Исправление ошибки впишет выведенную сигнатуру за вас.", "double : Int -> Int"]

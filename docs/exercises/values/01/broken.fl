@@ -1,0 +1,7 @@
+module Main exposing (main, half)
+
+half : Int -> Float
+let half n = Int.to_float (n / 2)
+
+main : Unit ->{} Unit
+let main () = Platform.stdout_line (show (half 7))

@@ -1,0 +1,12 @@
+module Main exposing (main, birthday)
+
+type alias Person = { name : String; age : Int }
+
+older : Person -> Person
+let older person = { person with age = person.age + 1 }
+
+birthday : Int -> Int
+let birthday age = (older { name = "Ada"; age = age }).age
+
+main : Unit ->{} Unit
+let main () = Platform.stdout_line (show (birthday 41))

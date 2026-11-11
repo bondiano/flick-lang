@@ -1,0 +1,17 @@
+module Main exposing (main, most_common)
+
+most_common : String -> String
+let most_common text =
+  let words = String.split " " text
+  let mut best = ""
+  let mut best_count = 0
+  for word <- words do {
+    let count = List.length (List.filter (fun other -> other == word) words)
+    if count > best_count then
+      best = word
+      best_count = count
+  }
+  best
+
+main : Unit ->{} Unit
+let main () = Platform.stdout_line (most_common "blue red green red red blue")
