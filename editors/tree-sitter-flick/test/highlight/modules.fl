@@ -2,3 +2,5 @@ module Adapter = module (F : Factory) -> F
 //               ^ keyword
 type module Factory = Input -> Output with type Key = String and type Value = Int
 //                                                           ^ keyword
+result = functor (first) (second)
+//       ^ variable
