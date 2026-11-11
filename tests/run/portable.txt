@@ -77,6 +77,7 @@ stdlib/effect/hash_set
 stdlib/effect/json_schema
 stdlib/effect/number
 stdlib/effect/option
+stdlib/effect/option_pairs
 stdlib/effect/order
 stdlib/effect/record
 stdlib/effect/string

@@ -186,6 +186,7 @@ stdlib/effect/mutable_ref
 stdlib/effect/number
 stdlib/effect/observe
 stdlib/effect/option
+stdlib/effect/option_pairs
 stdlib/effect/order
 stdlib/effect/password
 stdlib/effect/platform
