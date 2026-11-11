@@ -320,6 +320,14 @@ impl Checker<'_> {
     /// `FLICK-T069` for `name = …` where `name` is not a `let mut` variable
     /// of this function; the local `found` is the name if it is one.
     fn not_assignable(&mut self, name: &str, span: Span, found: Option<usize>) {
+        let can_mutate = found.is_some_and(|index| {
+            self.cx
+                .mutation
+                .apart
+                .iter()
+                .all(|(below, _)| index >= *below)
+                && self.cx.mutation.settled.iter().all(|below| index >= *below)
+        });
         let diagnostic = match found.map(|i| self.cx.locals[i].clone()) {
             Some(Local {
                 binding: Binding::Let,
@@ -328,21 +336,25 @@ impl Checker<'_> {
                 ..
             }) => {
                 let end = at + u32::try_from(name.len()).expect("source fits in u32");
-                Diagnostic::error(
+                let diagnostic = Diagnostic::error(
                     codes::T069,
                     format!("`{name}` is not `let mut`, so it cannot be assigned"),
                     span,
                 )
-                .with_related(Span::new(self.file, at, end), "bound here")
-                .with_safe_fix(|| {
-                    (
-                        format!("declare it with `let mut {name}`"),
-                        vec![Edit {
-                            span: Span::new(self.file, at, at),
-                            replacement: "mut ".to_owned(),
-                        }],
-                    )
-                })
+                .with_related(Span::new(self.file, at, end), "bound here");
+                if can_mutate {
+                    diagnostic.with_safe_fix(|| {
+                        (
+                            format!("declare it with `let mut {name}`"),
+                            vec![Edit {
+                                span: Span::new(self.file, at, at),
+                                replacement: "mut ".to_owned(),
+                            }],
+                        )
+                    })
+                } else {
+                    diagnostic
+                }
             }
             Some(Local {
                 binding: Binding::Restricted(context),

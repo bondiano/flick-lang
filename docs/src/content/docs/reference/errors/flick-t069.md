@@ -10,6 +10,8 @@ the module or an import cannot be assigned. Declare the variable with
 
 `let mut` is not allowed directly in a `do` block or a `for` clause. Those
 declarations receive no automatic insertion; use an ordinary function or loop body.
+The fix is also withheld when mutation would cross a function, task, handler-arm
+or comprehension boundary.
 
 ```flick
 module App.Count exposing (next)

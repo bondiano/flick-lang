@@ -110,3 +110,18 @@ fn a_do_binding_does_not_get_an_invalid_mut_fix() {
         "let mut is not valid directly in do"
     );
 }
+
+#[test]
+fn an_outer_binding_does_not_get_a_mut_fix_across_a_capture_barrier() {
+    for body in [
+        "f : Int -> Int\nlet f n =\n  let x = n\n  let bump () = x = n + 1\n  bump ()\n  x\n",
+        "f : List Int -> List Unit\nlet f ns =\n  let x = 0\n  [for n <- ns yield (if n > 0 then x = n)]\n",
+    ] {
+        let diagnostics = check(&format!("{HEAD}{body}"));
+        let error = diagnostics
+            .iter()
+            .find(|d| d.code.to_string() == "FLICK-T069")
+            .unwrap_or_else(|| panic!("immutable assignment in {body}: {diagnostics:?}"));
+        assert!(error.fixes.is_empty(), "mut would cross a capture barrier");
+    }
+}
