@@ -1,0 +1,23 @@
+---
+title: Loops over a list
+description: "`for` runs its body once for each element."
+tableOfContents: false
+---
+
+import TourLesson from "../../../components/TourLesson.astro";
+
+<TourLesson locale="en" id="for-loops">
+
+`for x <- list do …` runs its body once for each element. With `let mut`, it
+says a one-pass algorithm plainly: `max_profit` keeps the cheapest price so
+far and the best profit so far.
+
+The `match` before the loop takes the list apart: an empty list makes no
+trade, and the first price starts the search.
+
+An `if` without `else` is fine here: its branch is an assignment, which is
+`Unit`.
+
+**Try:** change the prices of the first list, or add one more list of prices.
+
+</TourLesson>

@@ -226,7 +226,7 @@ func StreamWatchWith(backend, options, path Value) Value {
 			Fail(systemError(err, "stat", "stat", p))
 		}
 		if backend != nil {
-			if s, ok := some(Apply(fb, Apply(fb, backend, p), infoOf(info))); ok {
+			if s, ok := some(Apply2(fb, backend, p, infoOf(info))); ok {
 				return streamOf(s).open(fb)
 			}
 		}

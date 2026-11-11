@@ -149,11 +149,11 @@ func holds(f Value) func(fb *Fiber, s Value) bool {
 }
 
 func step2(f Value) func(fb *Fiber, s, x Value) Value {
-	return func(fb *Fiber, s, x Value) Value { return apply2(fb, f, s, x) }
+	return func(fb *Fiber, s, x Value) Value { return Apply2(fb, f, s, x) }
 }
 
 func step2Effect(f Value) func(fb *Fiber, s, x Value) Value {
-	return func(fb *Fiber, s, x Value) Value { return Run(fb, apply2(fb, f, s, x)) }
+	return func(fb *Fiber, s, x Value) Value { return Run(fb, Apply2(fb, f, s, x)) }
 }
 
 func always(*Fiber, Value) bool { return true }
@@ -178,7 +178,7 @@ func SinkFoldUntil(initial, max, f Value) Value {
 		func(_ *Fiber, s Value) bool { return s.([]Value)[1].(int32) < count },
 		func(fb *Fiber, s, x Value) Value {
 			pair := s.([]Value)
-			return []Value{Run(fb, apply2(fb, f, pair[0], x)), pair[1].(int32) + 1}
+			return []Value{Run(fb, Apply2(fb, f, pair[0], x)), pair[1].(int32) + 1}
 		})
 	return sinkMapEnd(folded, func(_ *Fiber, v Value, l []Value) (Value, []Value) { return v.([]Value)[0], l })
 }
@@ -240,7 +240,7 @@ func SinkReduceWhileArrayEffect(initial, pred, f Value) Value {
 func SinkReduce(initial, f Value) Value {
 	return sinkReduceArray(lazy(initial), func(fb *Fiber, s, chunk Value) Value {
 		for _, x := range chunk.([]Value) {
-			s = apply2(fb, f, s, x)
+			s = Apply2(fb, f, s, x)
 		}
 		return s
 	})

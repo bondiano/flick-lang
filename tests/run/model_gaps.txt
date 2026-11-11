@@ -13,6 +13,7 @@ bootstrap/inline_pack_nominals # the model's (Field) rejects `App.Main.main`
 bootstrap/packed_module # the model's (Field) rejects `App.Main.main`
 bootstrap/stderr # no native for `stderr_line` (flick:rt stderrLine)
 codegen/abi # no native for `js_type` (./abi.mjs kind)
+codegen/apply_order # no native for `unsafe_div` (flick:rt intUnsafeDiv)
 codegen/deep_recursion # runs out of the model's steps
 codegen/defect # no native for `unsafe_div` (flick:rt intUnsafeDiv)
 codegen/derive_default # the model's (App) rejects `App.Main.instance Default (Pair a)`
@@ -255,7 +256,7 @@ ui/parity # no native for `complaints` (./dom.mjs complaints)
 ui/query # no native for `run_of` (./query.mjs run)
 ui/registry # no native for `layer` (flick:reactivity/Atom atomLayer)
 ui/route # no native for `back` (./route.mjs back)
-ui/serializable # no native for `dehydrated` (./hydration.mjs dehydrated)
+ui/serializable # no native for `layer` (flick:reactivity/Atom atomLayer)
 ui/server # no native for `settle` (./dom.mjs settle)
 ui/stream # no native for `close` (./stream.mjs close)
 ui/sync # no native for `layer` (flick:reactivity/Atom atomLayer)

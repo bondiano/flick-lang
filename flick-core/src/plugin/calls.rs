@@ -6,7 +6,8 @@ use flick_plugin::CallSite;
 
 use super::expansion::Expansion;
 use super::{Expander, placed_call};
-use crate::diagnostics::{Diagnostic, codes};
+use crate::diagnostics::{Diagnostic, Severity, codes};
+use crate::iface;
 use crate::source::{FileId, Span};
 use crate::types::Watched;
 
@@ -40,6 +41,34 @@ pub fn placed_sites(
     sites
 }
 
+/// Drops from `checked` the refusals of the compiler that a plugin answered:
+/// where a row does not allow what is asked, or a cell would hold a value of
+/// every type, and `answers` has an error at the place, the plugin's words
+/// stand for the compiler's. `sites` are the places as checked, `placed` the
+/// same in the module's own text.
+pub fn answered(
+    checked: &mut Vec<Diagnostic>,
+    answers: &[Diagnostic],
+    sites: &[CallSite],
+    placed: &[CallSite],
+    file: FileId,
+) {
+    let at = |span: flick_plugin::Span| Some(Span::new(file, span.start, span.end));
+    for (site, placed) in sites.iter().zip(placed) {
+        let answer = at(placed.span);
+        let cell = (site.tagged.as_ref()).is_some_and(|tagged| tagged.tag == iface::CELL);
+        let code = match (site.lacking.is_some(), cell) {
+            (true, _) => codes::E002,
+            (_, true) => codes::T072,
+            _ => continue,
+        };
+        if (answers.iter()).any(|d| d.severity == Severity::Error && d.span == answer) {
+            let refused = at(site.span);
+            checked.retain(|d| !(d.code == code && d.span == refused));
+        }
+    }
+}
+
 /// What the plugin of `package` finds wrong with the calls of `sites` it
 /// watches, given `state`, what it collected from the module's blocks;
 /// `P036` when the plugin itself fails.
@@ -52,7 +81,10 @@ pub fn check_calls(
     file: FileId,
 ) -> Vec<Diagnostic> {
     let mine: Vec<CallSite> = (sites.iter())
-        .filter(|c| watched.holds(&c.module, &c.name))
+        .filter(|c| match &c.tagged {
+            Some(tagged) => watched.tag(&tagged.tag),
+            None => watched.holds(&c.module, &c.name),
+        })
         .cloned()
         .collect();
     let Some(first) = mine.first() else {
@@ -68,5 +100,93 @@ pub fn check_calls(
             format!("plugin `{package}` failed: {why}"),
             at,
         )],
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use flick_plugin::{CallSite, Enclosing, Lacking, Tagged};
+
+    use super::answered;
+    use crate::diagnostics::{Diagnostic, Severity, codes};
+    use crate::source::{FileId, Span};
+
+    #[test]
+    fn an_error_a_plugin_gives_at_a_lacking_place_stands_for_the_refusal() {
+        let file = FileId::default();
+        let at = |start, end| Span::new(file, start, end);
+        let site = |start, end, lacking: bool| CallSite {
+            module: "Atom".into(),
+            name: "Read".into(),
+            span: flick_plugin::Span { start, end },
+            arguments: Vec::new(),
+            refinement: None,
+            binding: None,
+            generated: false,
+            tagged: None,
+            lacking: lacking.then(|| Lacking {
+                allowed: Enclosing {
+                    services: vec!["Atom.Read".into()],
+                    open: false,
+                },
+                what: "service `Write`".into(),
+                services: vec!["Write".into()],
+                labels: vec!["Atom.Write".into()],
+                errors: Vec::new(),
+            }),
+        };
+        let refusals = || {
+            vec![
+                Diagnostic::error(codes::E002, "does not allow", at(110, 115)),
+                Diagnostic::error(codes::E002, "does not allow", at(30, 35)),
+                Diagnostic::error(codes::T003, "another error there", at(110, 115)),
+            ]
+        };
+        // the place as checked, in a plugin's code, and in the module's text
+        let (sites, placed) = ([site(110, 115, true)], [site(10, 15, true)]);
+        let mut checked = refusals();
+        let answer = Diagnostic::error(codes::U004, "only reads atoms", at(10, 15));
+        answered(&mut checked, &[answer], &sites, &placed, file);
+        let left: Vec<_> = checked.iter().map(|d| (d.code, d.span)).collect();
+        assert_eq!(
+            left,
+            [
+                (codes::E002, Some(at(30, 35))),
+                (codes::T003, Some(at(110, 115)))
+            ]
+        );
+        // no answer, a warning, or an answer about a call: the refusal stays
+        let warning =
+            Diagnostic::new(codes::U002, Severity::Warning, "a handler").with_span(at(10, 15));
+        let elsewhere = Diagnostic::error(codes::U004, "only reads atoms", at(40, 45));
+        for answers in [Vec::new(), vec![warning], vec![elsewhere]] {
+            let mut checked = refusals();
+            answered(&mut checked, &answers, &sites, &placed, file);
+            assert_eq!(checked.len(), 3);
+        }
+        let mut checked = refusals();
+        let answer = Diagnostic::error(codes::U001, "a capacity", at(10, 15));
+        answered(
+            &mut checked,
+            &[answer],
+            &[site(110, 115, false)],
+            &placed,
+            file,
+        );
+        assert_eq!(checked.len(), 3);
+        // a cell of a type for every type: the answer stands for `T072`
+        let mut cell = site(110, 115, false);
+        cell.tagged = Some(Tagged {
+            tag: "cell".into(),
+            named: "Writable a".into(),
+            reaches: "Atom.Writable".into(),
+            inside: Vec::new(),
+        });
+        let mut checked = refusals();
+        checked.push(Diagnostic::error(codes::T072, "one cell", at(110, 115)));
+        let answer = Diagnostic::error(codes::U005, "the atom", at(10, 15));
+        answered(&mut checked, &[answer], &[cell], &placed, file);
+        assert!(checked.iter().all(|d| d.code != codes::T072));
+        assert_eq!(checked.len(), 3);
     }
 }

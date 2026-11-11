@@ -1,0 +1,23 @@
+module Main exposing (main, count_coins)
+
+type Coin = Quarter | Dime | Nickel | Penny
+
+cents : Coin -> Int
+let cents coin =
+  match coin with
+  | Dime -> 10
+  | Nickel -> 5
+  | Penny -> 1
+
+count_coins : Int -> Int
+let count_coins amount =
+  let mut left = amount
+  let mut coins = 0
+  for coin <- [Quarter, Dime, Nickel, Penny] do {
+    coins = coins + left / cents coin
+    left = left % cents coin
+  }
+  coins
+
+main : Unit ->{} Unit
+let main () = Platform.stdout_line "\{count_coins 68} \{count_coins 99}"

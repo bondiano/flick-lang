@@ -217,6 +217,8 @@ fn expose_item(p: &mut Parser) {
     match p.current() {
         K::Ident if super::plugin::at_head(p) => super::plugin::head(p),
         K::Ident | K::DotDot => p.bump(),
+        // `let none` defines a name that spells a keyword: the list names it
+        k if k.is_keyword() && matches!(p.nth(1), K::Comma | K::RParen) => p.bump_as(K::Ident),
         K::Con => {
             p.bump();
             if p.at(K::LParen) && p.adjacent() {

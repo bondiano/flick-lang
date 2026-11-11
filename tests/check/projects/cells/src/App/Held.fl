@@ -1,0 +1,8 @@
+module App.Held exposing (Held, fresh)
+
+import App.Slots
+
+type alias Held a = App.Slots.Slot (List a)
+
+fresh : Unit -> Held a
+let fresh () = App.Slots.empty ()

@@ -10,9 +10,7 @@ use super::bridge::Toward;
 use super::{Gen, names};
 use crate::codegen::Options;
 use crate::effects::owned;
-#[cfg(not(target_arch = "wasm32"))]
 use crate::effects::{belongs_to, bindings};
-#[cfg(not(target_arch = "wasm32"))]
 use crate::effects::{effect_specifier, requires_adapter, selected_on_kernel};
 use crate::ir::Copies;
 use crate::ir::{Foreign, ForeignMode, Item, ItemKind};
@@ -32,7 +30,6 @@ fn trusted_runtime_package(spec: &str) -> bool {
     owned(spec)
 }
 
-#[cfg(not(target_arch = "wasm32"))]
 fn contains_eff(shape: &Shape) -> bool {
     match shape {
         Shape::Eff(_) => true,
@@ -53,7 +50,6 @@ impl Gen<'_> {
         };
         let alias = format!("$f_{}", f.name);
         let spec = (self.options.foreign)(self.module, module);
-        #[cfg(not(target_arch = "wasm32"))]
         let (spec, bridged) = {
             let mut spec = spec;
             let mut bridged = false;
@@ -95,8 +91,6 @@ impl Gen<'_> {
                     || contains_eff(&f.adapter.result_shape));
             (spec, bridged)
         };
-        #[cfg(target_arch = "wasm32")]
-        let bridged = false;
         self.foreign
             .push((spec, f.binding.name.clone(), alias.clone()));
         (alias, bridged)
@@ -330,7 +324,6 @@ pub(super) fn plain_foreigns(
         .iter()
         .filter_map(|item| match &item.kind {
             ItemKind::Foreign(f) if plain(f, options.rt) => {
-                #[cfg(not(target_arch = "wasm32"))]
                 if options.rt {
                     let source = f.binding.from.as_deref()?;
                     let spec = (options.foreign)(module, source);
@@ -342,8 +335,6 @@ pub(super) fn plain_foreigns(
                         return None;
                     }
                 }
-                #[cfg(target_arch = "wasm32")]
-                let _ = module;
                 Some((f.name.clone(), (f.stages.len(), format!("$f_{}", f.name))))
             }
             _ => None,

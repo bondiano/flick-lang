@@ -95,8 +95,50 @@ func TagOf(v Value) Value { return v.(*Data).Tag }
 // Get is the field `i` of a variant value.
 func Get(v Value, i int) Value { return v.(*Data).Fields[i] }
 
+// Fn2 and Fn3 are functions of two and three arguments whose stages before
+// the last are pure. Given all their arguments they are one call; given the
+// first, they are the function of the rest, as one function a stage is.
+type (
+	Fn2 func(*Fiber, Value, Value) Value
+	Fn3 func(*Fiber, Value, Value, Value) Value
+)
+
 // Apply calls a function of one stage in the caller's fiber.
-func Apply(fb *Fiber, f Value, a Value) Value { return f.(Fn)(fb, a) }
+func Apply(fb *Fiber, f Value, a Value) Value {
+	if g, ok := f.(Fn); ok {
+		return g(fb, a)
+	}
+	return applyFirst(f, a)
+}
+
+// applyFirst is a function of more arguments than one given its first.
+func applyFirst(f Value, a Value) Value {
+	switch g := f.(type) {
+	case Fn2:
+		return Fn(func(fb *Fiber, b Value) Value { return g(fb, a, b) })
+	case Fn3:
+		return Fn2(func(fb *Fiber, b, c Value) Value { return g(fb, a, b, c) })
+	}
+	// what is no function fails as an application of it always did
+	return f.(Fn)(nil, a)
+}
+
+// Apply2 calls a function with two arguments: at once where it takes them
+// so, and one at a time where it does not.
+func Apply2(fb *Fiber, f, a, b Value) Value {
+	if g, ok := f.(Fn2); ok {
+		return g(fb, a, b)
+	}
+	return Apply(fb, Apply(fb, f, a), b)
+}
+
+// Apply3 calls a function with three arguments, as Apply2 does with two.
+func Apply3(fb *Fiber, f, a, b, c Value) Value {
+	if g, ok := f.(Fn3); ok {
+		return g(fb, a, b, c)
+	}
+	return Apply(fb, Apply2(fb, f, a, b), c)
+}
 
 // Inst gives a constrained value its dictionaries in the caller's fiber.
 func Inst(fb *Fiber, f Value, dicts ...Value) Value { return f.(Poly)(fb, dicts...) }
@@ -137,19 +179,11 @@ func ListConcat(a, b Value) Value {
 	return append(append(out, xs...), ys...)
 }
 
-// Curry2 is a function of two arguments taken one at a time.
-func Curry2(f func(*Fiber, Value, Value) Value) Fn {
-	return func(_ *Fiber, a Value) Value {
-		return Fn(func(fb *Fiber, b Value) Value { return f(fb, a, b) })
-	}
-}
+// Curry2 is a Go function of two arguments as a Flick function of them.
+func Curry2(f func(*Fiber, Value, Value) Value) Fn2 { return f }
 
-// Curry3 is a function of three arguments taken one at a time.
-func Curry3(f func(*Fiber, Value, Value, Value) Value) Fn {
-	return func(_ *Fiber, a Value) Value {
-		return Curry2(func(fb *Fiber, b, c Value) Value { return f(fb, a, b, c) })
-	}
-}
+// Curry3 is a Go function of three arguments as a Flick function of them.
+func Curry3(f func(*Fiber, Value, Value, Value) Value) Fn3 { return f }
 
 // Defect stops the program with an error that is not a typed failure.
 type Defect struct{ Message string }

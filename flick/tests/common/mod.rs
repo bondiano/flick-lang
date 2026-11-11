@@ -46,6 +46,22 @@ pub fn flick_stdin(args: &[&str], input: &str) -> Output {
     child.wait_with_output().expect("flick exits")
 }
 
+/// Writes the script `path` runs as, executable, by a `cp` of its own: a
+/// child another test forks while this process writes the file holds it open
+/// for writing until its `exec`, and running the script then fails with
+/// "Text file busy".
+#[cfg(unix)]
+#[allow(dead_code, reason = "not every test file uses it")]
+pub fn write_script(path: &path::Path, contents: &str) {
+    use std::os::unix::fs::PermissionsExt;
+    let draft = path.with_extension("draft");
+    fs::write(&draft, contents).expect("write");
+    let copied = Command::new("cp").arg(&draft).arg(path).status();
+    assert!(copied.expect("cp runs").success());
+    fs::remove_file(&draft).expect("remove the draft");
+    fs::set_permissions(path, fs::Permissions::from_mode(0o755)).expect("executable");
+}
+
 /// A fresh directory `name` of the target's temporary directory with `files`.
 #[allow(dead_code, reason = "not every test file uses it")]
 pub fn project(name: &str, files: &[(&str, &str)]) -> path::PathBuf {

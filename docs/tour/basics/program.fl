@@ -1,0 +1,15 @@
+module Main exposing (main)
+
+type alias Bird = { name : String; seen : Int }
+
+total : List Bird -> Int
+let total birds = List.sum (List.map (fun bird -> bird.seen) birds)
+
+describe : Bird -> String
+let describe bird = "\{bird.name}: \{bird.seen}"
+
+main : Unit ->{} Unit
+let main () =
+  let birds = [{ name = "sparrow"; seen = 3 }, { name = "crow"; seen = 1 }]
+  List.each_effect (fun bird -> Platform.stdout_line (describe bird)) birds
+  Platform.stdout_line "in all: \{total birds}"

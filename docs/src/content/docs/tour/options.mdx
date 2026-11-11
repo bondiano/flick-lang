@@ -1,0 +1,24 @@
+---
+title: Option and Result
+description: "No `null`: a value that may be missing, and a step that may fail."
+tableOfContents: false
+---
+
+import TourLesson from "../../../components/TourLesson.astro";
+
+<TourLesson locale="en" id="options">
+
+Flick has no `null`. A value that may be missing is an `Option`: `Some value`
+or `None`. A step that may fail gives a `Result`: `Ok value` or
+`Err problem`.
+
+`Int.parse` gives an `Option Int`, and `age` turns it into a `Result` with a
+message. Its `match` takes both apart, and `when n >= 0` refines an arm.
+
+`List.head` of an empty list is `None`, not a crash.
+
+**Try:** print `Int.parse "36" + 1`. The compiler reports `FLICK-T003`: an
+`Option Int` is not an `Int` until a `match` or `Option.with_default` takes
+the number out.
+
+</TourLesson>

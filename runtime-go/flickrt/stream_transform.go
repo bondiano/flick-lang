@@ -296,12 +296,12 @@ func StreamChanges(s Value) Value {
 }
 
 func StreamChangesWith(f, s Value) Value {
-	return streamChangesWith(streamOf(s), func(fb *Fiber, a, last Value) bool { return apply2(fb, f, a, last).(bool) })
+	return streamChangesWith(streamOf(s), func(fb *Fiber, a, last Value) bool { return Apply2(fb, f, a, last).(bool) })
 }
 
 func StreamChangesWithEffect(f, s Value) Value {
 	return streamChangesWith(streamOf(s), func(fb *Fiber, a, last Value) bool {
-		return Run(fb, apply2(fb, f, a, last)).(bool)
+		return Run(fb, Apply2(fb, f, a, last)).(bool)
 	})
 }
 

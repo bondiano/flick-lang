@@ -1,0 +1,30 @@
+---
+title: A program, top to bottom
+description: Read a whole Flick program before taking it apart.
+tableOfContents: false
+---
+
+import TourLesson from "../../../components/TourLesson.astro";
+
+<TourLesson locale="en" id="program">
+
+Here is a whole Flick program. Read it from the top.
+
+- `module Main exposing (main)` names the module and the one thing it lets
+  others use. A program starts at `main`.
+- `type alias Bird = { name : String; seen : Int }` names a record type: a
+  value with named fields.
+- `total : List Bird -> Int` is a **signature**: `total` takes a list of birds
+  and gives back an `Int`. The `let` under it is the definition. It takes the
+  `seen` of each bird and adds them up.
+- `describe` puts values inside a string with `\{…}`.
+- `main : Unit ->{} Unit` takes nothing and gives back nothing. The braces
+  after its arrow mark a function that does something as it runs: here it
+  prints. A plain arrow, as in `total`, only computes a result.
+
+The next lessons take these pieces one at a time.
+
+**Try:** add `{ name = "owl"; seen = 2 }` to the list. The output changes when
+you stop typing.
+
+</TourLesson>

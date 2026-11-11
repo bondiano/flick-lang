@@ -1,0 +1,30 @@
+module Main exposing (main)
+
+say : String ->{} Unit
+let say line = Platform.stdout_line line
+
+quiet : Failure e ->{} Unit
+let quiet _ = ()
+
+main : Unit ->{Async} Unit
+let main () =
+  scope owner {
+    Scope.add_finalizer (task { say "the finalizer runs last" })
+    let started : Deferred.Deferred none Unit = Deferred.make ()
+    let _child =
+      Fiber.spawn
+        owner
+        quiet
+        (task {
+          Effect.ensuring
+            (task { say "the child stops" })
+            (task {
+              say "the child starts"
+              ignore (Deferred.succeed () started)
+              Effect.never ()
+            })
+        })
+    Deferred.await_ started
+    say "the scope ends"
+  }
+  say "after the scope"

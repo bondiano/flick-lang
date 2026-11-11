@@ -1,0 +1,25 @@
+---
+title: Functions
+description: A signature names what a function takes and gives back.
+tableOfContents: false
+---
+
+import TourLesson from "../../../components/TourLesson.astro";
+
+<TourLesson locale="en" id="functions">
+
+A function has two lines: its signature, then its `let`. In
+`hypotenuse_squared : Int -> Int -> Int`, each type before an arrow is an
+argument, and the last one is the result.
+
+Arguments are written after the name and separated by spaces, with no
+parentheses or commas, both in the definition and in a call: `square a`.
+Parentheses only group: `show (hypotenuse_squared 3 4)`.
+
+A function at the top of a module always has a signature. It is the
+contract the rest of the program relies on.
+
+**Try:** delete the line `square : Int -> Int`. The compiler asks for it
+with `FLICK-T004`.
+
+</TourLesson>

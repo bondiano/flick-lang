@@ -6,7 +6,7 @@ import { type ReactNode, createContext, createElement, useContext, useMemo } fro
 import type { Handler } from "../../ui/react/handlers.ts";
 import type { Ui } from "../../ui/react/nodes.ts";
 import { type Listeners, toReact } from "../../ui/react/tree.ts";
-import { Registry } from "../atoms/registry.ts";
+import { type Atom, Registry } from "../atoms/registry.ts";
 import { type Fiber, currentCtx } from "../fiber.ts";
 
 /** What views and fields need of a root's bridge. */
@@ -17,6 +17,14 @@ export interface Events extends Listeners {
 
 /** The registry views read atoms from: `Ui.Dom.mount` provides it. */
 export const RegistryContext = /*#__PURE__*/ createContext<Registry | undefined>(undefined);
+
+/** How a server streaming markup waits for a change of the atoms a suspended view read, with the values it read. */
+export interface Streaming {
+  readonly wait: (read: ReadonlyMap<Atom, unknown>) => PromiseLike<void>;
+}
+
+/** Given by `Ui.Server.stream`: a suspended view then suspends while a task loads, and its markup follows later. */
+export const StreamContext = /*#__PURE__*/ createContext<Streaming | undefined>(undefined);
 
 /** The events of the root, for components that render a `Ui` of their own. */
 export const BridgeContext = /*#__PURE__*/ createContext<Events | undefined>(undefined);

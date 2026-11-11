@@ -1,0 +1,28 @@
+---
+// The whole tour on one page, in the order of `tour/index.json`: each lesson's text and its program as code.
+import { getEntry, render } from "astro:content";
+import CodeText from "./CodeText.astro";
+import { chapters, lessons } from "../../tour/load.ts";
+
+interface Props { locale: "en" | "ru" }
+const ru = Astro.props.locale === "ru";
+const all = lessons();
+const pages = await Promise.all(all.map(async (entry) => {
+  const page = await getEntry("docs", `${ru ? "ru/" : ""}tour/${entry.id}`);
+  if (page === undefined) throw new Error(`The tour lesson ${entry.id} has no page`);
+  const { Content } = await render(page);
+  return { entry, title: page.data.title, Content };
+}));
+---
+
+{chapters(all).map((chapter) => (
+  <section class="tour-all-chapter">
+    <h2 id={chapter.id}>{ru ? chapter.ru : chapter.en}</h2>
+    {pages.filter(({ entry }) => entry.chapter.id === chapter.id).map(({ entry, title, Content }) => (
+      <section class="tour-all-lesson">
+        <h3 id={entry.id}><CodeText text={title} /></h3>
+        <Content />
+      </section>
+    ))}
+  </section>
+))}

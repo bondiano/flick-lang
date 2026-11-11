@@ -353,6 +353,25 @@ fn check_reporting(
         if let Some(expansion) = &expansion {
             expansion.restore(&mut diagnostics, None);
         }
+        // a later built-in module is no module here yet, so its name may
+        // stand for a type of the same name
+        for d in &mut diagnostics {
+            let later = (d.code == codes::T001)
+                .then_some(d.span)
+                .flatten()
+                .and_then(|s| text.get(s.range()))
+                .and_then(|named| named.rsplit_once('.'))
+                .map(|(qualifier, _)| qualifier)
+                .filter(|q| {
+                    modules.iter().any(|(n, _)| n == q) && !done.iter().any(|i| i.module == *q)
+                });
+            if let Some(qualifier) = later {
+                d.message = format!(
+                    "module `{qualifier}` comes after this one among the built-in modules: a built-in module names only the ones before it"
+                );
+                d.fixes.clear();
+            }
+        }
         report(name, diagnostics);
         each(&module, &typing);
         known.add(&interface);

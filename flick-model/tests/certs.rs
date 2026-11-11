@@ -19,6 +19,11 @@ use flick_model::run;
 /// How many certificates `Golden.lean` has.
 const GOLDEN: usize = 32;
 
+/// Programs of the fixed run whose certificates were once wrong, which
+/// `Kept.lean` keeps: both put a closure over a region into the opaque
+/// `Fixture.Sealed`, data with hidden storage.
+const KEPT: [usize; 2] = [435, 1929];
+
 fn repo() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("..")
 }
@@ -108,6 +113,17 @@ fn the_certificates_are_fresh() {
     let header = "/-!\n# Golden certificates\n\nThe first programs of a fixed run of the model's generator that have a certificate\n\
                   (`flick-model/tests/certs.rs`), each above its typing in the core.\n-/\n\n";
     fresh("formal/FormalCert/Gen/Golden.lean", &file(header, &body));
+    let mut kept = String::new();
+    for (i, p) in programs(KEPT[KEPT.len() - 1] + 1).filter(|(i, _)| KEPT.contains(i)) {
+        let cert = certify(&decls, &sig, &format!("program{i}"), &p).expect("a certificate");
+        kept.push_str(&comment(&p));
+        kept.push_str(&cert);
+        kept.push('\n');
+    }
+    let header = "set_option maxHeartbeats 400000\n\n/-!\n# Kept certificates\n\nPrograms of the fixed run of \
+                  the model's generator whose certificates were once wrong\n(`flick-model/tests/certs.rs`), \
+                  each above its typing in the core.\n-/\n\n";
+    fresh("formal/FormalCert/Gen/Kept.lean", &file(header, &kept));
 }
 
 /// `reason -> count` of `cert_gaps.txt`.

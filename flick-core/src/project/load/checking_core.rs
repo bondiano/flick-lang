@@ -300,7 +300,7 @@ impl Checking<'_> {
                 options.thresholds,
             ));
         }
-        checked.extend(self.watched_calls(loaded, &typing));
+        self.watched_calls(loaded, &typing, &mut checked);
         let checked = types::beside_syntax_errors(tree, checked);
         let clean = !broken
             && resolved_cleanly

@@ -1,7 +1,8 @@
 // `Reactivity.Atom` on Flick's own runtime: atoms of the kernel's registry. A
 // state is built from its value alone, so a function or a task as the value
 // stays a value.
-import { absent } from "../../builtins.ts";
+import type { Codec } from "../../schema.ts";
+import { serializable } from "../../atoms/serial.ts";
 import type { Duration } from "../../duration.ts";
 import { type Atom, type Reading, mapped, patched, readable as make, state, taskAtom } from "../../atoms/registry.ts";
 
@@ -46,7 +47,9 @@ export const keepAlive = <A>(atom: Atom<A>): Atom<A> => patched(atom, { keepAliv
 /** `Reactivity.Atom.idle_ttl`. */
 export const flickIdleTtl = <A>(ttl: Duration, atom: Atom<A>): Atom<A> => patched(atom, { idleTtl: ttl.millis });
 
-// a serializable atom codes its value with a `Schema`, which this runtime does not have yet
-const MODULE = "@flick-lang/effect-ts/effect/reactivity/Atom";
-export const flickSerializable = /*#__PURE__*/ absent(MODULE, "flickSerializable");
-export const flickSerializableFamily = /*#__PURE__*/ absent(MODULE, "flickSerializableFamily");
+/** `Reactivity.Atom.serializable`: the state under `key`, coded by a JSON codec for hydration. */
+export const flickSerializable = <A>(key: string, codec: Codec<A>, atom: Atom<A>): Atom<A> => serializable(key, codec, atom);
+
+/** `Reactivity.Atom.serializable_family`: one serializable state per key, under `prefix/key`. */
+export const flickSerializableFamily = <A>(prefix: string, codec: Codec<A>, f: (key: string) => Atom<A>): ((key: string) => Atom<A>) =>
+  family((key: string) => serializable(`${prefix}/${key}`, codec, f(key)));

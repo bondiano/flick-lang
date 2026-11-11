@@ -6,6 +6,31 @@ break programs.
 
 ## Unreleased
 
+- **Cells:** `@cell` before a type declaration marks a type whose values
+  hold one value each, as a state made by a pure call does. A value of such a
+  type that is no function is not generalized over what the cell holds, and
+  one whose type has variables there is `FLICK-T072`. The atoms of the
+  standard library are cells; for an atom the refusal stays `FLICK-U005`,
+  now worded by the UI plugin. A package's `watch` may name the tag `@cell`.
+- **Routes on Flick's runtime:** `Atom.route` and `Ui.route_link` run on the
+  default runtime: the route reads the served URL on a server and the page's
+  in a browser, again on back and forward, and a write or a plain click on a
+  link pushes its URL without a reload. A program that uses them keeps its UI
+  on the runtime.
+- **Playground on Flick's own runtime:** the browser compiler checks and builds
+  a program as `flick build --rt` does, and the playground runs it on Flick's
+  own runtime. Bindings that runtime does not have yet still reach the Effect
+  adapter, which the playground loads as before.
+
+- **Serializable atoms on Flick's runtime:** `Atom.serializable`,
+  `serializable_family`, `serializable_task` and `serializable_result` run on
+  the default runtime. `Ui.Server.state` hands their values to the client, and
+  `Ui.Dom.mount` starts from them, without running a hydrated task again. A
+  program that uses them no longer needs `@flick-lang/effect-ts`.
+- **Streamed server markup on Flick's runtime:** `Ui.Server.stream` renders on
+  the default runtime and hands its chunks to the adapter's `Stream`, so a
+  program that streams pages keeps its atoms and views on the runtime instead
+  of moving its whole UI to the adapter.
 - **Local mutation and loops:** `let mut name = value` declares a local
   monomorphic variable and `name = value` assigns it. Pure functions may
   change their variables; nested functions, tasks and lazy sequences cannot

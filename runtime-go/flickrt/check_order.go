@@ -177,7 +177,7 @@ func effectFormat(v Value) string { return formatSpaced(v, 0) }
 func byOrd(d Value) orderChecks {
 	return orderChecks{
 		compare: func(fb *Fiber, a, b Value) int {
-			switch apply2(fb, Method(fb, d, "compare"), a, b).(*Data).Tag {
+			switch Apply2(fb, Method(fb, d, "compare"), a, b).(*Data).Tag {
 			case LT.(*Data).Tag:
 				return -1
 			case EQ.(*Data).Tag:
@@ -203,7 +203,7 @@ func CheckBetweenBy(d, minimum, maximum Value) Value {
 // program: the remainder is `zero` by JS `===`.
 func CheckMultipleOfBy(remainder, zero, divisor Value) Value {
 	return &check{
-		test:     func(fb *Fiber, v Value) bool { return Same(apply2(fb, remainder, v, divisor), zero) },
+		test:     func(fb *Fiber, v Value) bool { return Same(Apply2(fb, remainder, v, divisor), zero) },
 		expected: "a value that is a multiple of " + effectFormat(divisor),
 	}
 }

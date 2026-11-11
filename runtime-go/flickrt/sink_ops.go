@@ -326,7 +326,7 @@ func SinkUnwrap(task Value) Value {
 
 func SinkSummarized(summary, f, self Value) Value {
 	return sinkSummarized(sinkOf(self), func(fb *Fiber) Value { return Run(fb, summary) },
-		func(fb *Fiber, start, end Value) Value { return apply2(fb, f, start, end) })
+		func(fb *Fiber, start, end Value) Value { return Apply2(fb, f, start, end) })
 }
 
 func SinkWithDuration(self Value) Value { return sinkWithDuration(sinkOf(self)) }

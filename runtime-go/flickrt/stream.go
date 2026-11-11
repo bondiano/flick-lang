@@ -158,7 +158,7 @@ func StreamRun(fb *Fiber, sink, s Value) Value { return streamRun(fb, streamOf(s
 func StreamRunFold(fb *Fiber, initial, f, s Value) Value {
 	return runFold(fb, streamOf(s).ch, initial, func(fb *Fiber, z, chunk Value) Value {
 		for _, x := range chunk.([]Value) {
-			z = Apply(fb, Apply(fb, f, z), x)
+			z = Apply2(fb, f, z, x)
 		}
 		return z
 	})

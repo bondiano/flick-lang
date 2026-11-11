@@ -1,0 +1,24 @@
+---
+title: Types that carry their result
+description: Each form of a type says which type it builds.
+tableOfContents: false
+---
+
+import TourLesson from "../../../components/TourLesson.astro";
+
+<TourLesson locale="en" id="gadt">
+
+A type can say, for each form, which type it builds. In `Expr a`, `Num`
+builds an `Expr Int`, while `Yes` and `Less` build an `Expr Bool`.
+
+Then `eval : forall a. Expr a -> a` gives exactly that type: an `Int` for a
+sum, a `Bool` for a comparison, with no check at run time. An expression that
+adds a `Bool` cannot even be written.
+
+This is the most advanced lesson of the chapter; skip it on a first read if
+you like.
+
+**Try:** write `Add (Num 1) (Yes true)`. The compiler reports `FLICK-T003`:
+`Add` takes an `Expr Int`, not an `Expr Bool`.
+
+</TourLesson>

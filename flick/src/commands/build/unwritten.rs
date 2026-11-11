@@ -1,6 +1,6 @@
-//! The files an earlier build wrote in a Go module of the output directory
-//! that this build does not write, which `go build` would compile with the
-//! rest of their package.
+//! The files an earlier build wrote that this build does not write: in a Go
+//! module, `go build` would compile them with the rest of their package; in
+//! the output of files built alone, which has no manifest, they would stay.
 
 use std::collections::HashSet;
 use std::fs;
@@ -12,7 +12,7 @@ use flick_core::build::go::FILES;
 
 use crate::cache::remove_empty_parents;
 
-/// Removes from `out_dir` what the lists of its Go modules on disk name and
+/// Removes from `out_dir` what the lists on disk name and
 /// `artifacts` no longer has. Only a listed path inside the module of its
 /// list goes: a file nobody listed, or a list edited to name others, keeps
 /// every file it does not own.

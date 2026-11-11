@@ -1,0 +1,5 @@
+the child starts
+the scope ends
+the child stops
+the finalizer runs last
+after the scope

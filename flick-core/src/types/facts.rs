@@ -39,7 +39,7 @@ impl Checker<'_> {
         }
     }
 
-    fn fact_type(&self, t: &Type) -> FactType {
+    pub(super) fn fact_type(&self, t: &Type) -> FactType {
         let expanded = self.unaliased(t);
         let unknown = expanded.contains(&mut |x| matches!(x, Type::Meta(_) | Type::Error));
         FactType {
@@ -71,7 +71,7 @@ impl Checker<'_> {
 
     /// `t` with every alias in it expanded, but one inside its own
     /// expansion.
-    fn unaliased(&self, t: &Type) -> Type {
+    pub(super) fn unaliased(&self, t: &Type) -> Type {
         self.expand_all(t, &|t| self.whnf(t), &mut Vec::new())
     }
 }
@@ -135,6 +135,8 @@ impl Checker<'_> {
                     refinement: self.refinement(call, &mut predicates),
                     binding: None,
                     generated: call.span.start >= self.generated,
+                    tagged: None,
+                    lacking: None,
                 }
             })
             .collect::<Vec<_>>();

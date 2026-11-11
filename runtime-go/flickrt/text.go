@@ -90,12 +90,20 @@ func EndsWith(part, s Value) Value   { return strings.HasSuffix(s.(string), part
 
 func count(n Value) int { return max(0, int(n.(int32))) }
 
+// In a string of ASCII a code unit is a byte, so its ends are taken and it
+// is padded as it is, without its copy in UTF-16.
 func TakeLeft(n, s Value) Value {
+	if text := s.(string); ascii(text) {
+		return text[:min(count(n), len(text))]
+	}
 	units := utf16Units(s.(string))
 	return fromUnits(units[:min(count(n), len(units))])
 }
 
 func TakeRight(n, s Value) Value {
+	if text := s.(string); ascii(text) {
+		return text[len(text)-min(count(n), len(text)):]
+	}
 	units := utf16Units(s.(string))
 	return fromUnits(units[len(units)-min(count(n), len(units)):])
 }
@@ -104,6 +112,17 @@ func TakeRight(n, s Value) Value {
 func Repeat(n, s Value) Value { return strings.Repeat(s.(string), count(n)) }
 
 func pad(n, fill, s Value, start bool) Value {
+	if text, with := s.(string), fill.(string); ascii(text) && ascii(with) {
+		missing := int(n.(int32)) - len(text)
+		if missing <= 0 || with == "" {
+			return s
+		}
+		padding := strings.Repeat(with, (missing+len(with)-1)/len(with))[:missing]
+		if start {
+			return padding + text
+		}
+		return text + padding
+	}
 	units, filler := utf16Units(s.(string)), utf16Units(fill.(string))
 	missing := int(n.(int32)) - len(units)
 	if missing <= 0 || len(filler) == 0 {

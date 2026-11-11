@@ -8,7 +8,7 @@ package flickrt
 // Witness is `EqHash w a`: the equality and hash of a collection.
 type Witness struct{ eq, hash Value }
 
-func (w *Witness) equal(fb *Fiber, a, b Value) bool { return Bool(apply2(fb, w.eq, a, b)) }
+func (w *Witness) equal(fb *Fiber, a, b Value) bool { return Bool(Apply2(fb, w.eq, a, b)) }
 func (w *Witness) of(fb *Fiber, a Value) int32      { return Apply(fb, w.hash, a).(int32) }
 
 // EqHashWith is `EqHash.with eq hash body`: `body` gets a fresh witness.
@@ -204,7 +204,7 @@ func HashSetEvery(fb *Fiber, f, s Value) Value {
 func HashSetReduce(fb *Fiber, zero, f, s Value) Value {
 	acc := zero
 	for _, e := range set(s).all() {
-		acc = apply2(fb, f, acc, e.key)
+		acc = Apply2(fb, f, acc, e.key)
 	}
 	return acc
 }
@@ -215,7 +215,7 @@ type Redacted struct{ value Value }
 func RedactedMake(v Value) Value   { return &Redacted{v} }
 func RedactedReveal(r Value) Value { return r.(*Redacted).value }
 func RedactedEquivalent(fb *Fiber, eq, a, b Value) Value {
-	return apply2(fb, eq, a.(*Redacted).value, b.(*Redacted).value)
+	return Apply2(fb, eq, a.(*Redacted).value, b.(*Redacted).value)
 }
 
 var continueTag = Tag("Loop.Step.Continue")
@@ -255,11 +255,11 @@ func ValidationMap2(fb *Fiber, combine, f, x, y Value) Value {
 	a, b := x.(*Data), y.(*Data)
 	switch {
 	case a.Tag == "Failure" && b.Tag == "Failure":
-		return Err(apply2(fb, combine, a.Fields[0], b.Fields[0]))
+		return Err(Apply2(fb, combine, a.Fields[0], b.Fields[0]))
 	case a.Tag == "Failure":
 		return a
 	case b.Tag == "Failure":
 		return b
 	}
-	return Ok(apply2(fb, f, a.Fields[0], b.Fields[0]))
+	return Ok(Apply2(fb, f, a.Fields[0], b.Fields[0]))
 }

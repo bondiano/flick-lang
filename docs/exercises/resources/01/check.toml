@@ -1,0 +1,11 @@
+export = "label"
+argument_types = ["string"]
+return_type = "string"
+output = "open [db], release [db], used [db]"
+starter_error = "FLICK-G004"
+title = "Practice: give the resource an owner"
+title_ru = "Практика: дайте ресурсу владельца"
+task = "main opens a resource with open_res outside every scope, so nothing would ever close it. Give it a scope, then check your answer."
+task_ru = "main открывает ресурс через open_res вне всякого scope, поэтому его никто бы не закрыл. Дайте ему scope и проверьте ответ."
+hint = "Wrap the call in scope { … }: the scope's value is the value of its last line."
+hint_ru = "Оберните вызов в scope { … }: значение scope — значение его последней строки."

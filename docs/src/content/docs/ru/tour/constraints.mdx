@@ -1,0 +1,23 @@
+---
+title: Ограничения
+description: Обобщённая функция, которая требует класс.
+tableOfContents: false
+source_hash: 23f4277eefb0db82
+---
+
+import TourLesson from "../../../../components/TourLesson.astro";
+
+<TourLesson locale="ru" id="constraints">
+
+Ограничение позволяет обобщённой функции пользоваться классом.
+`square : Numeric a => a -> a` работает для любого числового типа, поэтому
+одна функция возводит в квадрат и `Int`, и `Float`. `mean` делит, поэтому
+требует `Floating`.
+
+Классы и функции других модулей подключаются через `import`:
+`import Numeric exposing (Floating, Numeric)`.
+
+**Попробуйте:** уберите `Numeric a =>` у `square`. Компилятор сообщит
+`FLICK-C001`: он не может вывести `Numeric a`.
+
+</TourLesson>

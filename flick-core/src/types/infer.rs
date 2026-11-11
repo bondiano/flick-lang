@@ -77,7 +77,7 @@ impl Checker<'_> {
             let span = self.span(node);
             self.polymorphic_runtime(None, &target, runtime, span);
             if !runtime {
-                self.polymorphic_atom(None, &target, span);
+                self.polymorphic_cell(None, &target, span);
             }
             return expected.clone();
         }
@@ -168,8 +168,8 @@ impl Checker<'_> {
             }
             (K::RecordExpr, Type::Record(row)) => {
                 let row = self.store.zonk_row(row);
-                let row = if let Some(captures) = self.whnf_captured(expected).1 {
-                    super::ty::Row {
+                if let Some(captures) = self.whnf_captured(expected).1 {
+                    let row = super::ty::Row {
                         entries: row
                             .entries
                             .into_iter()
@@ -177,12 +177,16 @@ impl Checker<'_> {
                             .collect(),
                         tail: row.tail,
                         ..super::ty::Row::default()
-                    }
+                    };
+                    // each field holds within the bound where it is checked; the
+                    // literal is compared with those fields, as the value's own
+                    // record shows its fields bare
+                    let actual = self.record(node, Some(&row));
+                    self.expect(&actual, &Type::Record(row), self.span(node));
                 } else {
-                    row
-                };
-                let actual = self.record(node, Some(&row));
-                self.expect(&actual, expected, self.span(node));
+                    let actual = self.record(node, Some(&row));
+                    self.expect(&actual, expected, self.span(node));
+                }
             }
             (K::DoExpr, _) => {
                 self.do_expr(node, Some(expected));

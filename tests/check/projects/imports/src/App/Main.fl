@@ -1,4 +1,4 @@
-module App.Main exposing (use)
+module App.Main exposing (use, nothing)
 
 import App.Missing exposing (thing)
 //     ^^^^^^^^^^^ FLICK-R003 unknown module `App.Missing`
@@ -17,3 +17,6 @@ let use n =
   //~ FLICK-R005 @16:11-16:19 constructor `Square` is not exported
   S.radius b
 //^^^^^^^^ FLICK-R004 `App.Shapes` does not export `radius`
+
+nothing : Unit -> Float
+let nothing () = S.none ()

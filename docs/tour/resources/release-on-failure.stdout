@@ -1,0 +1,4 @@
+open file
+reading file
+close file
+handled -3

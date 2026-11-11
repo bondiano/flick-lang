@@ -66,7 +66,7 @@ impl Checker<'_> {
     ) {
         self.polymorphic_runtime(Some(name), scheme, runtime, self.span(decl));
         if let (false, false, Some(body)) = (runtime, parts.is_function(), parts.body) {
-            self.polymorphic_atom(Some(name), scheme, self.span(body));
+            self.polymorphic_cell(Some(name), scheme, self.span(body));
         }
     }
 

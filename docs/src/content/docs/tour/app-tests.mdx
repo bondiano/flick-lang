@@ -1,0 +1,22 @@
+---
+title: Tests
+description: Run the commands on a fresh shelf and check what they did.
+tableOfContents: false
+---
+
+import TourLesson from "../../../components/TourLesson.astro";
+
+<TourLesson locale="en" id="app-tests">
+
+Tests here are plain functions. `left_after` runs a script on a fresh memory
+shelf and gives back the pages left, and `check` prints whether a condition
+holds.
+
+Each test gets its own `Ref`, so they cannot affect each other. A project
+would put them in its tests and run `flick test`; the idea is the same: the
+services a function names are the ones a test replaces.
+
+**Try:** break `Books.finish` by writing `read = false` in it. The second
+test prints `FAILED`.
+
+</TourLesson>

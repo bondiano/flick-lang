@@ -1,0 +1,22 @@
+---
+title: Passing failures on
+description: "`?` takes the value out of a `Result` or fails with its error."
+tableOfContents: false
+---
+
+import TourLesson from "../../../components/TourLesson.astro";
+
+<TourLesson locale="en" id="question">
+
+`?` passes a failure on. `parse` gives a `Result`. In a function whose
+signature allows its error, `(parse a)?` gives the number of an `Ok` and fails
+with the error of an `Err`. So `sum` reads like plain arithmetic, and
+`summed` handles the failure once.
+
+On an `Option`, in a function that gives an `Option`, `?` returns `None` early
+in the same way.
+
+**Try:** drop the `?` after `parse b`. The compiler reports `FLICK-T003`: a
+`Result Invalid Float` is not a `Float`.
+
+</TourLesson>

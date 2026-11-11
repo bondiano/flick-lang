@@ -1942,10 +1942,12 @@
 @flick-lang/runtime/rt/ui/react uiWithHost
 @flick-lang/runtime/rt/ui/render BridgeContext
 @flick-lang/runtime/rt/ui/render RegistryContext
+@flick-lang/runtime/rt/ui/render StreamContext
 @flick-lang/runtime/rt/ui/render uiRenderStatic
 @flick-lang/runtime/rt/ui/server uiServerRender
 @flick-lang/runtime/rt/ui/server uiServerState
 @flick-lang/runtime/rt/ui/server uiServerStream
+@flick-lang/runtime/rt/ui/stream_hook streamHooks
 @flick-lang/runtime/rt/ui/views uiField
 @flick-lang/runtime/rt/ui/views uiFieldArea
 @flick-lang/runtime/rt/ui/views uiMounted

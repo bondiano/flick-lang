@@ -1,0 +1,24 @@
+---
+title: An interface
+description: Show the reading list in the browser, with a button to finish a book.
+tableOfContents: false
+---
+
+import TourLesson from "../../../components/TourLesson.astro";
+
+<TourLesson locale="en" id="app-ui">
+
+The same `Books` module now drives an interface, shown beside the editor.
+
+`shelf` is an atom: a value the interface watches. `reading_list` is a
+component that reads it with `Atom.value` and shows a line for each book and
+the pages left. The button of an unread book updates the atom with
+`Books.finish`, and every component that read it shows the change.
+
+`main` mounts the view on the page's `#app` element. The interface runs in a
+sandboxed frame, separate from this page.
+
+**Try:** press **finish** next to a book, then add a third book to the atom
+and press it again.
+
+</TourLesson>

@@ -128,14 +128,13 @@ pub(super) fn single<'a>(a: &'a DocumentArena<'a>, stmt: impl Documentable<'a>) 
     block(a, [statement(a, stmt)])
 }
 
-/// `if flickrt.Bool(cond) { then } else { other }`.
+/// `if test { then } else { other }`, of a test that is a Go `bool`.
 pub(super) fn if_else<'a>(
     a: &'a DocumentArena<'a>,
-    cond: Code<'a>,
+    test: Document<'a>,
     then: Vec<Document<'a>>,
     other: Vec<Document<'a>>,
 ) -> Document<'a> {
-    let test = call(a, "flickrt.Bool", [cond.doc]);
     docvec![
         a,
         "if ",

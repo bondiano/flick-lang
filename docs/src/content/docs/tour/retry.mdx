@@ -1,0 +1,20 @@
+---
+title: Retrying
+description: Run a failing task again on a schedule.
+tableOfContents: false
+---
+
+import TourLesson from "../../../components/TourLesson.astro";
+
+<TourLesson locale="en" id="retry">
+
+A task that fails can run again. `flaky` fails twice, then succeeds.
+`Effect.retry (Schedule.recurs 5)` runs it again after each failure, up to
+five more times, and `try … with` handles the error if every attempt fails.
+
+The `Ref` counts the attempts across the runs of the task.
+
+**Try:** change `Schedule.recurs 5` to `Schedule.recurs 1`. The second attempt
+fails too, and the handler gives up.
+
+</TourLesson>

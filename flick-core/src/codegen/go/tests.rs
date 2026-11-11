@@ -57,6 +57,89 @@ fn a_while_nothing_leaves_is_a_plain_loop_over_variables_of_their_go_type() {
     );
 }
 
+const ONCE: &str = "module App exposing (main)\n\n\
+type Mark = Low | High Int\n\n\
+scale : BigInt -> BigInt\nlet scale n =\n  match n with\n  | 0n -> 10n\n  | _ -> n * 10n\n\n\
+pick : Bool -> Mark\nlet pick high = if high then High 1 else Low\n\n\
+label : Mark -> String\nlet label mark =\n  match mark with\n  | Low -> \"low\"\n  | High _ -> \"high\"\n\n\
+main : Unit ->{; AppError} Unit\n\
+let main () = Platform.stdout_line (label (pick false) ++ BigInt.to_string (scale 2n))\n";
+
+#[test]
+fn a_bigint_literal_and_a_constructor_without_fields_are_made_once() {
+    let go = app(ONCE);
+    // `10n` twice is one variable, and with `0n` in the pattern and `2n` three
+    assert_eq!(go.matches("flickrt.BigLit(\"10\")").count(), 1, "{go}");
+    assert_eq!(go.matches("flickrt.BigLit(").count(), 3, "{go}");
+    assert_eq!(go.matches("flickrt.Nullary(").count(), 1, "{go}");
+    // each is made by a package variable, not where the code runs
+    let made = |line: &&str| line.contains("flickrt.BigLit(") || line.contains("flickrt.Nullary(");
+    for line in go.lines().filter(made) {
+        assert!(line.starts_with("var K_App__"), "{line}");
+    }
+}
+
+#[test]
+fn the_labels_of_a_record_literal_are_placed_once() {
+    let go = app("module App exposing (main)\n\n\
+         type alias Point = { x : Int; y : Int }\n\n\
+         point : Int -> Point\nlet point n = { y = n; x = n + 1 }\n\n\
+         moved : Point -> Point\nlet moved p = { y = p.x; x = p.y }\n\n\
+         main : Unit ->{; AppError} Unit\n\
+         let main () = Platform.stdout_line (show (moved (point 1)).x)\n");
+    // two literals of the same labels in the same order: one shape, no label where a record is made
+    assert_eq!(
+        go.matches("flickrt.ShapeOf(\"y\", \"x\")").count(),
+        1,
+        "{go}"
+    );
+    assert_eq!(go.matches("flickrt.Shaped(K_App__").count(), 2, "{go}");
+    assert!(!go.contains("flickrt.Rec("), "{go}");
+}
+
+#[test]
+fn a_function_of_two_arguments_is_given_both_at_once() {
+    let go = app("module App exposing (main)\n\n\
+         add : Int -> Int -> Int\nlet add a b = a + b\n\n\
+         twice : (Int -> Int -> Int) -> Int -> Int\nlet twice f x = f x x\n\n\
+         main : Unit ->{; AppError} Unit\n\
+         let main () = Platform.stdout_line (show (twice add 1 + twice (fun a b -> a * b) 2))\n");
+    // the Go function is the value, a lambda is one Go function, and a call
+    // through a value gives both arguments: no function is made per argument
+    assert!(go.contains("flickrt.Fn2(F_App__add)"), "{go}");
+    assert!(
+        go.contains("flickrt.Fn2(func(fb *flickrt.Fiber, l_a, l_b flickrt.Value) flickrt.Value"),
+        "{go}"
+    );
+    assert!(go.contains("flickrt.Apply2(fb, l_f, l_x, l_x)"), "{go}");
+    assert!(!go.contains("flickrt.Fn(func"), "{go}");
+}
+
+#[test]
+fn an_argument_that_runs_code_is_not_given_with_the_one_before_it() {
+    let go = app("module App exposing (main)\n\n\
+         next : Int -> Int\nlet next n = n + 1\n\n\
+         twice : (Int -> Int -> Int) -> Int -> Int\nlet twice f x = f x (next x)\n\n\
+         main : Unit ->{; AppError} Unit\n\
+         let main () = Platform.stdout_line (show (twice (fun a b -> a * b) 2))\n");
+    // `f x` may fail before `next x` runs, as it does on JavaScript
+    assert!(
+        go.contains("flickrt.Apply(fb, flickrt.Apply(fb, l_f, l_x), F_App__next(fb, l_x))"),
+        "{go}"
+    );
+}
+
+#[test]
+fn a_function_of_more_stages_than_a_word_has_bits_compiles() {
+    let names: Vec<String> = (0..65).map(|i| format!("a{i}")).collect();
+    let out = build(&format!(
+        "module App exposing (main)\n\nmain : Unit ->{{; AppError}} Unit\nlet main () =\n  \
+         let wide = fun {} -> 0\n  Platform.stdout_line (show (List.length [wide]))\n",
+        names.join(" ")
+    ));
+    assert!(!out.files.is_empty(), "{:?}", out.diagnostics);
+}
+
 #[test]
 fn a_loop_with_an_exit_keeps_the_flags_of_its_exits() {
     let go = app(&SUM.replace(
@@ -296,4 +379,41 @@ fn go_bindings_name_runtime_functions() {
         unknown.is_empty(),
         "bindings to no function of flickrt: {unknown:?}"
     );
+}
+
+#[test]
+fn a_scalar_stays_in_its_go_type_through_a_choice_and_a_test() {
+    let go = app("module App exposing (main)\n\n\
+         spread : Int -> Int -> String -> Int\n\
+         let spread a b word =\n  \
+         let wide = if a > b && not (word < \"m\") then a - b else b - a\n  \
+         let mark =\n    match word with\n    | \"none\" -> 0\n    | _ -> 1\n  \
+         wide * 2 + mark\n\n\
+         main : Unit ->{; AppError} Unit\n\
+         let main () = Platform.stdout_line (show (spread 5 2 \"word\"))\n");
+    // the result of an `if` and of a `match` whose branches are numbers is a number
+    assert!(
+        go.contains("var t1 int32\n") && go.contains("var t2 int32\n"),
+        "{go}"
+    );
+    assert!(
+        go.contains("var l_wide int32 = t1") && go.contains("var l_mark int32 = t2"),
+        "{go}"
+    );
+    // a condition Go holds as a `bool` is tested as it is, strings are
+    // ordered by the runtime with no value made of them, and a literal in a
+    // pattern is compared as Go compares
+    assert!(
+        go.contains("if ((flickrt.AsInt(l_a) > flickrt.AsInt(l_b)) && !(flickrt.CompareStrings("),
+        "{go}"
+    );
+    assert!(go.contains("if (l_word == \"none\") {"), "{go}");
+    for call in [
+        "flickrt.Bool(",
+        "flickrt.Not(",
+        "flickrt.Same(",
+        "flickrt.Lt(",
+    ] {
+        assert!(!go.contains(call), "{call} in {go}");
+    }
 }

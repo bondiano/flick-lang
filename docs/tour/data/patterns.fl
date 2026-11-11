@@ -1,0 +1,15 @@
+module Main exposing (main)
+
+describe : List Int -> String
+let describe numbers =
+  match numbers with
+  | [] -> "empty"
+  | [only] -> "just \{only}"
+  | [0, ..._] | [1, ..._] -> "starts small"
+  | [first, ...rest] when List.length rest > 2 -> "long, from \{first}"
+  | [first, ..._] -> "starts with \{first}"
+
+main : Unit ->{} Unit
+let main () =
+  let samples = [[], [7], [1, 2], [5, 6, 7, 8], [5, 6]]
+  List.each_effect (fun numbers -> Platform.stdout_line (describe numbers)) samples

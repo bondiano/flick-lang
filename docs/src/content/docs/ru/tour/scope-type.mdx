@@ -1,0 +1,22 @@
+---
+title: Scope в сигнатурах
+description: Функция, которая открывает ресурс для вызывающего, говорит об этом.
+tableOfContents: false
+source_hash: d6b0784f4221cf58
+---
+
+import TourLesson from "../../../../components/TourLesson.astro";
+
+<TourLesson locale="ru" id="scope-type">
+
+Функция, которая открывает ресурс в scope вызывающего, говорит об этом:
+`open_res : String ->{Scope s} String` требует scope `s` от того, кто её
+вызывает. `both` передаёт это требование дальше, а `main` даёт scope,
+который закрывает оба ресурса, когда `both ()` закончит.
+
+Так сигнатура сообщает, что функция открывает то, что придётся закрыть.
+
+**Попробуйте:** вызовите `both ()` в `main` без `scope { … }`. Компилятор
+сообщит `FLICK-G004`: ресурсами никто не владеет.
+
+</TourLesson>

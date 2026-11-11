@@ -3,7 +3,6 @@
 //! for an app the runner that starts `main`.
 
 mod abi;
-#[cfg(not(target_arch = "wasm32"))]
 mod bridge_select;
 #[cfg(not(target_arch = "wasm32"))]
 mod capabilities;
@@ -196,10 +195,7 @@ pub fn emit(
         direct: &direct,
         labels: settings.extras.labels,
         rt: settings.backend == Backend::Rt,
-        #[cfg(not(target_arch = "wasm32"))]
         effect_bridge: bridge_select::select(compilation, settings.effect_bridge),
-        #[cfg(target_arch = "wasm32")]
-        effect_bridge: settings.effect_bridge,
     };
     let mut out = Vec::new();
     #[cfg(feature = "native-project")]

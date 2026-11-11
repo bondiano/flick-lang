@@ -232,6 +232,32 @@ interface types {
     constrained: bool,
     in-function: bool,
     applied: u32,
+    /// What the binding's function gives at last, where its signature names
+    /// the watched name.
+    gives: option<fact-type>,
+  }
+
+  /// A function around a place: the services its arrow names, and whether
+  /// its row is open to more.
+  record enclosing { services: list<string>, open: bool }
+
+  /// A value a tag marks, where a module names it inside a function: the
+  /// tag, the value as the module writes it, the value of the library it
+  /// is or reaches, and the functions around the place, innermost first,
+  /// up to the nearest `task`.
+  record tagged { tag: string, named: string, reaches: string, inside: list<enclosing> }
+
+  /// Code that asks for more than the function expected at its place
+  /// allows, where that function's row names a watched service: the
+  /// function, what is not allowed as the compiler words it, the services
+  /// as shown and by qualified name, and the errors. An error of
+  /// `check-calls` at the place's span stands for the compiler's own.
+  record lacking {
+    allowed: enclosing,
+    what: string,
+    services: list<string>,
+    labels: list<string>,
+    errors: list<string>,
   }
 
   /// A place that calls a name the plugin's package watches: the module and
@@ -248,6 +274,11 @@ interface types {
     binding: option<binding>,
     /// The call is in code a plugin wrote, not in the module's own text.
     generated: bool,
+    /// What marks the value named here, for a tag the package watches.
+    tagged: option<tagged>,
+    /// What the code here asks for that a function naming the watched
+    /// service does not allow.
+    lacking: option<lacking>,
   }
 
   enum highlight-kind { keyword, parameter }

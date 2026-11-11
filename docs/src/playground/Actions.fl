@@ -3,6 +3,7 @@ module Actions exposing (
   prepare_highlighting,
   prepare_editor,
   refresh,
+  rerun,
   load_compiler,
   edit,
   edited,
@@ -35,6 +36,7 @@ import State exposing (
   Tab(..),
   emit_key,
   empty_execution,
+  errors,
   first_source,
   profile_name,
   requested_tab,
@@ -238,6 +240,24 @@ let refresh model =
         let current = Atom.current model
         if wants_code current && not failing && current.emitted_key != emit_key current then
           emit model
+        autorun model
+
+/// Runs a lesson once typing pauses: an edit starts a new check under `latest`,
+/// which cancels this wait.
+autorun : Atom.Writable Model ->{Async, Atom.Write} Unit
+let autorun model =
+  if (Atom.current model).autorun then
+    Effect.sleep (Result.with_default Duration.zero (Duration.millis 600))
+    rerun model
+
+/// Presses Run for a clean source that has not run yet, unless a tab of the
+/// compiler's output is open; while a run is on, the end of that run asks again.
+rerun : Atom.Writable Model ->{Atom.Write} Unit
+let rerun model =
+  let m = Atom.current model
+  let fresh = m.ran_source != m.source || m.ran_profile != m.profile
+  let idle = not m.running && not m.checking && not (wants_code m)
+  if m.autorun && fresh && idle && errors m == 0 then notify "fp-run"
 
 /// Emits the current source for the current profile.
 emit : Atom.Writable Model ->{Async, Atom.Write} Unit
@@ -311,6 +331,8 @@ let restore_source model =
   match result with
   | Err () -> ()
   | Ok restored ->
+    // code from a link, or a broken link, never runs by itself
+    if restored.status != "" then update model (fun m -> { m with autorun = false })
     if restored.source != "" && (Atom.current model).revision == 0 then
       set_editor_text restored.source
       update model (fun m -> { m with source = restored.source; revision = 1 })
@@ -478,6 +500,9 @@ let run_program model =
       | JsError failure -> { empty_execution with status = "failure"; detail = failure.message }
     update model (fun m -> { m with running = false; execution = execution })
     runtime_messages model
+    // an edit made while this ran waits for its own pause, through a new check
+    let current = Atom.current model
+    if current.autorun && current.source != m.source then notify "fp-compile"
 
 /// Receives output and failures after a preview has mounted.
 runtime_messages : Atom.Writable Model ->{Atom.Write} Unit

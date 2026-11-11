@@ -1,0 +1,22 @@
+---
+title: Scopes in signatures
+description: A function that opens a resource for its caller says so.
+tableOfContents: false
+---
+
+import TourLesson from "../../../components/TourLesson.astro";
+
+<TourLesson locale="en" id="scope-type">
+
+A function that opens a resource in its caller's scope says so:
+`open_res : String ->{Scope s} String` needs a scope `s` from whoever calls
+it. `both` passes that need on, and `main` provides the scope, which closes
+both resources once `both ()` is done.
+
+This is how a signature tells you that a function opens something that has
+to be closed.
+
+**Try:** call `both ()` in `main` without `scope { … }`. The compiler reports
+`FLICK-G004`: nothing owns the resources.
+
+</TourLesson>

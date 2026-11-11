@@ -31,6 +31,7 @@ export const configuration = (): Configuration => {
     solution: exercise?.solution ?? "",
     ...lessonConfiguration(exercise),
     done,
+    autorun: root.dataset.autorun === "true",
   };
 };
 

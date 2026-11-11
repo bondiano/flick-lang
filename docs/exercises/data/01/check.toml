@@ -1,0 +1,11 @@
+export = "count_coins"
+argument_types = ["number"]
+return_type = "number"
+output = "7 9"
+starter_error = "FLICK-T009"
+title = "Practice: count the coins"
+title_ru = "Практика: посчитайте монеты"
+task = "count_coins gives the fewest coins that make an amount of cents, but cents forgets one coin. Cover every coin, then check your answer."
+task_ru = "count_coins даёт наименьшее число монет на сумму в центах, но cents забывает одну монету. Обработайте каждую монету и проверьте ответ."
+hint = "The compiler names the coin the match does not cover. A quarter is 25 cents."
+hint_ru = "Компилятор называет монету, которую не покрывает match. Quarter — это 25 центов."

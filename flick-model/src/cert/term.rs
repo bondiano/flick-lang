@@ -8,7 +8,7 @@ use std::rc::Rc;
 
 use crate::check::trace::{Node, Trace, key};
 use crate::syntax::{Const, Head, Lit, Name, Term};
-use crate::translate::lean::elide::{Env, caps, row, stage, ty};
+use crate::translate::lean::elide::{Env, caps, hidden_at, hidden_by, row, stage, ty};
 use crate::types::{Caps, Fields, Row, Scheme, Stage, Type, Var};
 
 use super::Unsupported;
@@ -210,7 +210,7 @@ impl<'t> Cx<'t> {
             env: Env {
                 ground: true,
                 classes: sig.classes.clone(),
-                params: Some(sig.params.clone()),
+                types: Some(sig.types.clone()),
                 ..Env::default()
             },
             fixed: Vec::new(),
@@ -282,7 +282,7 @@ impl<'t> Cx<'t> {
             }
             Term::App(f, a) if is_raise(f) => self.raise(a, t, col),
             Term::Try(body, arms) => self.try_(body, arms, t, col),
-            Term::App(..) | Term::Apply(Head::Con(_), _) | Term::Tuple(_) => self.app(e, col),
+            Term::App(..) | Term::Apply(Head::Con(_), _) | Term::Tuple(_) => self.app(e, t, col),
             Term::Task(body) => {
                 let args = self.eff_args(t)?;
                 let (_, _, a, _) = eff(t).ok_or("a task at no `Eff`")?;
@@ -381,11 +381,13 @@ impl<'t> Cx<'t> {
     }
 
     /// The head of a call, its proof and type: a constructor and a tuple
-    /// take their fields as arguments, before those of the call.
+    /// take their fields as arguments, before those of the call, which has
+    /// the type `t`.
     fn head<'e>(
         &mut self,
         head: &'e Term,
         args: &mut Vec<&'e Term>,
+        t: &Type,
         col: usize,
     ) -> Result<(String, Type), Unsupported> {
         match head {
@@ -406,13 +408,23 @@ impl<'t> Cx<'t> {
                     .map(|(v, _)| v.clone())
                     .zip(insts.iter().cloned())
                     .collect();
-                let at = substitute(&plain(&scheme.body), &map);
-                let us = kept(scheme)
+                let mut at = substitute(&plain(&scheme.body), &map);
+                let mut us = kept(scheme)
                     .into_iter()
                     .zip(insts)
                     .filter(|(k, _)| *k)
                     .map(|(_, i)| self.inst(i))
                     .collect::<Result<Vec<_>, _>>()?;
+                // data with hidden storage: the capture row its value hides
+                if self.sig.types.stored.contains(&c.ty) {
+                    let mut value = t;
+                    while let Some((_, _, r, _)) = arrow(value) {
+                        value = r;
+                    }
+                    let q = hidden_by(value);
+                    at = hidden_at(&at, &q);
+                    us.insert(0, format!("(.caps {})", caps(&q, &self.env)?));
+                }
                 let k = format!("{}.{}", c.ty.module, c.name);
                 Ok((self.ctor(&k, &us)?, at))
             }
@@ -452,7 +464,7 @@ impl<'t> Cx<'t> {
     }
 
     /// `f a₁ … aₙ`: each call at the arrow the instance of `f` gives.
-    fn app(&mut self, e: &Term, col: usize) -> Result<String, Unsupported> {
+    fn app(&mut self, e: &Term, t: &Type, col: usize) -> Result<String, Unsupported> {
         let mut args = Vec::new();
         let mut head = e;
         while let Term::App(f, a) = head {
@@ -461,7 +473,7 @@ impl<'t> Cx<'t> {
         }
         args.reverse();
         let pad = format!("\n{}", " ".repeat(col + 2));
-        let (mut proof, mut at) = self.head(head, &mut args, col + 2)?;
+        let (mut proof, mut at) = self.head(head, &mut args, t, col + 2)?;
         for a in args {
             let (p, _, r, _) = arrow(&at).ok_or_else(|| format!("a call of `{at}`"))?;
             let (p, r) = (p.clone(), r.clone());

@@ -270,9 +270,6 @@ fn binding_policy(output: &Path) -> io::Result<()> {
         if name == "ZONE_EXPORTS" {
             out.push_str("#[cfg(feature = \"native-project\")]\n");
         }
-        if name == "UI_REQUIRED" {
-            out.push_str("#[cfg(not(target_arch = \"wasm32\"))]\n");
-        }
         writeln!(out, "pub const {name}: &[&str] = &{values:?};").expect("write string");
     }
     for (key, name) in [
@@ -286,9 +283,6 @@ fn binding_policy(output: &Path) -> io::Result<()> {
     ] {
         if name == "ZONE_MODULE" {
             out.push_str("#[cfg(feature = \"native-project\")]\n");
-        }
-        if name == "ADAPTER_BRIDGE" {
-            out.push_str("#[cfg(not(target_arch = \"wasm32\"))]\n");
         }
         writeln!(
             out,
@@ -332,9 +326,6 @@ fn binding_policy(output: &Path) -> io::Result<()> {
         ("../packages/effect-ts/rt_bridge_stubs.txt", "BRIDGE_STUBS"),
     ] {
         println!("cargo:rerun-if-changed={path}");
-        if name == "UNAVAILABLE" {
-            out.push_str("#[cfg(not(target_arch = \"wasm32\"))]\n");
-        }
         writeln!(
             out,
             "pub const {name}: &str = {:?};",

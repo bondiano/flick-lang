@@ -27,8 +27,9 @@ fn session(source: &str) -> Session {
     session
 }
 
+/// The playground builds for Flick's own runtime, as `flick build --rt` does.
 #[test]
-fn the_demo_compiles_a_module_as_flick_build_does() {
+fn the_demo_compiles_a_module_as_flick_build_rt_does() {
     let session = session(MODULE);
     for profile in ["debug", "release"] {
         let dir = Path::new(env!("CARGO_TARGET_TMPDIR")).join(format!("wasm_demo_{profile}"));
@@ -37,7 +38,14 @@ fn the_demo_compiles_a_module_as_flick_build_does() {
         fs::write(dir.join("Main.fl"), MODULE).expect("write");
         let out = flick_in(
             &dir,
-            &["build", "Main.fl", "--profile", profile, "--emit-dts"],
+            &[
+                "build",
+                "Main.fl",
+                "--rt",
+                "--profile",
+                profile,
+                "--emit-dts",
+            ],
         );
         assert!(out.status.success(), "{out:?}");
         let built = fs::read_to_string(dir.join("dist/Main.js")).expect("module");

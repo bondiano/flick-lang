@@ -60,7 +60,7 @@ func StreamCatchCauseFilter(filter, f, s Value) Value {
 		if !isOk(r) {
 			return streamFailCause(causeOfFailure(value(r)))
 		}
-		return streamOf(apply2(fb, f, value(r), failure))
+		return streamOf(Apply2(fb, f, value(r), failure))
 	})
 }
 

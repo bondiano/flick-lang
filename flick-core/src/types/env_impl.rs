@@ -370,6 +370,16 @@ impl<'b> Env<'b> {
             .map(|(_, name)| name.as_str())
     }
 
+    /// The interfaces of the imported and of the built-in modules.
+    pub fn known_interfaces(&self) -> impl Iterator<Item = &Interface> {
+        (self.interfaces.values().flatten()).chain(self.builtins.interfaces.values())
+    }
+
+    /// Whether `module` is one every module knows without importing it.
+    pub fn is_builtin(&self, module: &str) -> bool {
+        self.builtins.interfaces.contains_key(module)
+    }
+
     /// Every import qualifier and built-in module name.
     pub fn qualifier_names(&self) -> impl Iterator<Item = &str> {
         self.qualifiers

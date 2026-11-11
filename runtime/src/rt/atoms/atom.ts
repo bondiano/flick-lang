@@ -5,8 +5,11 @@ import { none, some } from "../../core/data.ts";
 import { absent } from "../builtins.ts";
 import type { Run } from "../fiber.ts";
 import { implementation } from "../handle.ts";
-import { type Atom, type Reading, isAtom, mapped, patched, readable, state, taskAtom } from "./registry.ts";
-import { WRITE, reading, registryHere, registryOf, toAsync } from "./services.ts";
+import type { Codec } from "../schema.ts";
+import { type UrlCodec, routeParse, routePrint } from "../route.ts";
+import { type Atom, type Reading, isAtom, mapped, patched, readable, state } from "./registry.ts";
+import { seededTask, serializableTask, withSeed } from "./serial.ts";
+import { WRITE, reading, registryHere, registryOf } from "./services.ts";
 
 export { atomPending } from "./services.ts";
 
@@ -21,7 +24,7 @@ export const atomDerived = <A>(compute: (unit: undefined) => A): Atom<A> =>
   readable((r) => reading((atom) => r.get(atom), () => compute(undefined)));
 
 /** `Atom.task`: the atom of a task's result, run by the registry that first reads it. */
-export const atomTask = (task: () => unknown): Atom => mapped(taskAtom(() => task), toAsync);
+export const atomTask = (task: () => unknown): Atom => seededTask(() => task);
 
 /** `atom`, which a mutation of one of `keys` refreshes in the registry that reads it. */
 const withReactivity = (keys: ReadonlyArray<string>, atom: Atom): Atom =>
@@ -34,14 +37,17 @@ const withReactivity = (keys: ReadonlyArray<string>, atom: Atom): Atom =>
   );
 
 /** `Atom.query keys task`: a task atom that a mutation of one of `keys` runs anew. */
-export const atomQuery = (keys: ReadonlyArray<string>, task: () => unknown): Atom => withReactivity(keys, atomTask(task));
+export const atomQuery = (keys: ReadonlyArray<string>, task: () => unknown): Atom => {
+  const result = atomTask(task);
+  return withSeed(withReactivity(keys, result), result);
+};
 
-/** `Atom.loader route load`: the task atom of `load` of the route's value, run anew when the route changes. */
-export const atomLoader = <R>(route: Atom<R>, load: (value: R) => () => unknown): Atom =>
-  mapped(
-    taskAtom((r) => load(r.get(route))),
-    toAsync,
-  );
+/**
+ * `Atom.loader route load`: the task atom of `load` of the route's value, run
+ * anew when the route changes. A hydrated result is its first run's, which
+ * still reads the route, so later changes run it.
+ */
+export const atomLoader = <R>(route: Atom<R>, load: (value: R) => () => unknown): Atom => seededTask((r) => load(r.get(route)));
 
 /** `Atom.mutation keys f payload`: `f payload`, then, when it succeeds, the queries of `keys` run anew. */
 export function* atomMutation(keys: ReadonlyArray<string>, f: (payload: unknown) => unknown, payload: unknown): Run {
@@ -227,9 +233,55 @@ export const atomStored = (key: string): Atom => {
   };
 };
 
-// a route parses its URL, and a serializable task codes its value, with a `Schema`;
-// a stream query reads a `Stream`: this runtime has neither yet
-export const atomRoute = /*#__PURE__*/ absent("@flick-lang/runtime", "atomRoute");
+/** `Atom.serializable_task` under the key the compiler gives. */
+export const atomSerializableTask = (key: string, codec: Codec, atom: Atom<object>): Atom<object> => serializableTask(key, codec, atom);
+
+/** `Atom.serializable_result` under the key the compiler gives: `serializable_task` that also hands over a typed failure. */
+export const atomSerializableResult = (key: string, codec: Codec, errors: Codec, atom: Atom<object>): Atom<object> =>
+  serializableTask(key, codec, atom, errors);
+
+const location = (): string | undefined => (typeof window === "undefined" ? undefined : window.location.href);
+
+/**
+ * `Atom.route codec fallback`: the state of the URL, `fallback` when it does
+ * not parse. A server reads the URL `Atom.serving` set; a browser the page's,
+ * again on back and forward; a write pushes its URL without a reload.
+ */
+export const atomRoute = <A>(codec: UrlCodec, fallback: A): Atom<A> => {
+  // the same URL gives the same value: a server's stream compares what a view read by identity
+  let last: { readonly url: string | undefined; readonly value: A } | undefined;
+  const parse = (url: string | undefined): A => {
+    if (last !== undefined && last.url === url) return last.value;
+    const parsed = url === undefined ? undefined : routeParse(codec, url);
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- `parse` gives a value of the route type
+    const value = parsed === undefined ? fallback : (parsed as A);
+    last = { url, value };
+    return value;
+  };
+  return {
+    ...readable((r) => {
+      const served = r.get(requestUrl);
+      if (served !== undefined || typeof window === "undefined") return parse(served);
+      const update = (): void => r.setSelf(parse(location()));
+      window.addEventListener("popstate", update);
+      r.addFinalizer(() => window.removeEventListener("popstate", update));
+      return parse(location());
+    }),
+    keepAlive: true,
+    write: (value, setSelf) => {
+      if (typeof window !== "undefined") {
+        // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- a value of the route type
+        const url = routePrint(codec, value as Readonly<Record<string, unknown>>);
+        if (url !== window.location.pathname + window.location.search) window.history.pushState(null, "", url);
+      }
+      setSelf(value);
+    },
+    server: (get) => {
+      const served = get(requestUrl);
+      return parse(typeof served === "string" ? served : location());
+    },
+  };
+};
+
+// a stream query reads a `Stream`, which this runtime does not have yet
 export const atomQueryStream = /*#__PURE__*/ absent("@flick-lang/runtime", "atomQueryStream");
-export const atomSerializableTask = /*#__PURE__*/ absent("@flick-lang/runtime", "atomSerializableTask");
-export const atomSerializableResult = /*#__PURE__*/ absent("@flick-lang/runtime", "atomSerializableResult");

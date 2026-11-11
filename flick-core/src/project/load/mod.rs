@@ -35,7 +35,7 @@ pub(crate) use checking::check_file;
 pub use entry::{MainKind, main_kind};
 pub use format_plugins::FormatPlugins;
 #[cfg(feature = "ide")]
-pub use ide::{Analysis, Analyzed, analysis_fingerprint, analyze, analyze_with};
+pub use ide::{Analysis, Analyzed, analysis_fingerprint, analyze, analyze_rt, analyze_with};
 pub use precompiled::{CachedModule, Fresh, PackageCache};
 #[cfg(all(test, feature = "native-project"))]
 pub(crate) use target::js_only;

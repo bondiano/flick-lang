@@ -1,0 +1,22 @@
+---
+title: Concurrency
+description: Run tasks at once, or take the first to finish.
+tableOfContents: false
+---
+
+import TourLesson from "../../../components/TourLesson.astro";
+
+<TourLesson locale="en" id="concurrency">
+
+`parallel` runs two tasks at once and waits for both: the slow and the fast
+one finish in the time of the slower. `race_first` runs two and takes the
+result of the first to finish, stopping the other. `Effect.sleep` waits
+without blocking anything else.
+
+All of it needs `Async` in the signature: these functions suspend while they
+wait.
+
+**Try:** remove `Async` from the signature of `main`. The compiler reports
+`FLICK-E002`, and its fix puts `Async` back.
+
+</TourLesson>

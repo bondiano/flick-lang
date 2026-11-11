@@ -1,0 +1,16 @@
+module Main exposing (main)
+
+digits : Int -> Int
+let digits n =
+  let mut left = n
+  let mut count = 1
+  while left >= 10 do {
+    left = left / 10
+    count = count + 1
+  }
+  count
+
+main : Unit ->{} Unit
+let main () =
+  Platform.stdout_line (show (digits 7))
+  Platform.stdout_line (show (digits 2026))

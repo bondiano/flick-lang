@@ -123,13 +123,13 @@ func EffectRetry(fb *Fiber, s, task Value) Value {
 
 func EffectRepeatOrElse(fb *Fiber, s, orElse, task Value) Value {
 	return repeatOrElse(fb, scheduleOf(s), func(fb *Fiber, err, last Value) Value {
-		return Run(fb, apply2(fb, orElse, err, last))
+		return Run(fb, Apply2(fb, orElse, err, last))
 	}, task)
 }
 
 func EffectRetryOrElse(fb *Fiber, s, orElse, task Value) Value {
 	return retryOrElse(fb, scheduleOf(s), func(fb *Fiber, err, out Value) Value {
-		return Run(fb, apply2(fb, orElse, err, out))
+		return Run(fb, Apply2(fb, orElse, err, out))
 	}, task)
 }
 

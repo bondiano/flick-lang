@@ -69,8 +69,9 @@ export default defineConfig({
       rolldownOptions: { output },
     },
     // the playground's preview frame has an opaque origin and loads the runtime as GitHub Pages
-    // serves it, to any origin; `astro dev` keeps Vite's narrower default, so try a preview after a build
-    preview: { headers: { "Access-Control-Allow-Origin": "*" } },
+    // serves it, to any origin; `astro dev` keeps Vite's narrower default, so try a preview after a build.
+    // Vite's own CORS answers a local page with its origin, a copy the cache then refuses the frame.
+    preview: { cors: false, headers: { "Access-Control-Allow-Origin": "*" } },
   },
   integrations: [
     flick({ binary: process.env.FLICK_BIN ?? local ?? "flick" }),

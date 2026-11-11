@@ -42,7 +42,7 @@ pub(super) fn enum_literal(literal: &EnumLit) -> String {
 
 /// A Go function that adapts a function of one stage where one of another
 /// is expected, or the result of a task.
-fn lift(how: &Lift) -> String {
+pub(super) fn lift(how: &Lift) -> String {
     match how {
         Lift::Stage { from, to, result } => format!(
             "flickrt.LiftStage({}, {}, {})",
@@ -158,7 +158,7 @@ impl<'a> Gen<'a> {
             ExprKind::ControlLoop { .. } | ExprKind::LoopExit { .. } | ExprKind::Loop { .. } => {
                 self.loop_expr(e)
             }
-            ExprKind::Lit(lit) => self.code(&literal(lit)),
+            ExprKind::Lit(lit) => self.lit(lit),
             ExprKind::Local(name) => self.code(&names::local(name)),
             // not atomic: an operand after it that assigns it is ordered after the read
             ExprKind::Var(name) => Code::from(a.text(a.alloc_str(&names::local(name)))),
@@ -182,12 +182,11 @@ impl<'a> Gen<'a> {
                 }
                 self.expr(result)
             }
-            ExprKind::If(cond, then, other) => self.if_expr(cond, then, other),
+            ExprKind::If(cond, then, other) => self.if_expr(e, cond, then, other),
             ExprKind::Match(scrutinee, arms) => {
                 let s = self.expr(scrutinee);
                 let s = self.spill(s);
-                let r = self.temp();
-                self.emit(docvec![a, "var ", r, " flickrt.Value"]);
+                let r = self.result(e);
                 self.arms(s.doc, arms, Some(r));
                 self.code(r)
             }
@@ -210,7 +209,7 @@ impl<'a> Gen<'a> {
             ExprKind::Binary(op, lhs, rhs) => self.binary(*op, lhs, rhs),
             ExprKind::Not(inner) => {
                 let v = self.expr(inner);
-                call(a, "flickrt.Not", [v.doc]).into()
+                docvec![a, "!", self.unboxed(inner, v, Native::Bool).doc].into()
             }
             ExprKind::Unwrap(inner) => self.unwrap(inner),
             ExprKind::Neg(num, inner) => self.neg(*num, inner),
@@ -222,7 +221,7 @@ impl<'a> Gen<'a> {
             }
             ExprKind::Lift(inner, how) => {
                 let v = self.expr(inner);
-                call(a, lift(how), [v.doc]).into()
+                call(a, self.once(&lift(how)), [v.doc]).into()
             }
             ExprKind::Each { .. } | ExprKind::Yield(_) => {
                 self.discard(e);
@@ -258,16 +257,28 @@ impl<'a> Gen<'a> {
         }
     }
 
-    fn if_expr(&mut self, cond: &Expr, then: &Expr, other: &Expr) -> Code<'a> {
+    /// Declares the variable of the result of `e`, an `if` or a `match`:
+    /// of the Go type every branch has, when they have one, so that a number
+    /// is not made a value on the way from a branch to what uses it.
+    fn result(&mut self, e: &Expr) -> &'a str {
+        let r = self.temp();
+        let ty = self.native(e).map_or("flickrt.Value", Native::go);
+        self.emit(docvec![self.a, "var ", r, " ", ty]);
+        r
+    }
+
+    fn if_expr(&mut self, e: &Expr, cond: &Expr, then: &Expr, other: &Expr) -> Code<'a> {
         let a = self.a;
-        let cond = self.expr(cond);
+        let test = self.expr(cond);
+        let test = self.unboxed(cond, test, Native::Bool).doc;
+        // the branches are compiled after the variable is declared, and
+        // nothing they bind is a branch itself: the type is known before
+        let r = self.result(e);
         let (mut then_stmts, then_value) = self.block(|g| g.expr(then));
         let (mut other_stmts, other_value) = self.block(|g| g.expr(other));
-        let r = self.temp();
         then_stmts.push(statement(a, docvec![a, r, " = ", then_value]));
         other_stmts.push(statement(a, docvec![a, r, " = ", other_value]));
-        self.emit(docvec![a, "var ", r, " flickrt.Value"]);
-        self.emit(if_else(a, cond, then_stmts, other_stmts));
+        self.emit(if_else(a, test, then_stmts, other_stmts));
         self.code(r)
     }
 
@@ -281,10 +292,11 @@ impl<'a> Gen<'a> {
                 self.tail_expr(result);
             }
             ExprKind::If(cond, then, other) => {
-                let cond = self.expr(cond);
+                let test = self.expr(cond);
+                let test = self.unboxed(cond, test, Native::Bool).doc;
                 let (then, ()) = self.block(|g| g.tail_expr(then));
                 let (other, ()) = self.block(|g| g.tail_expr(other));
-                self.emit(if_else(self.a, cond, then, other));
+                self.emit(if_else(self.a, test, then, other));
             }
             ExprKind::Match(scrutinee, arms) => {
                 let s = self.expr(scrutinee);
@@ -303,21 +315,12 @@ impl<'a> Gen<'a> {
         }
     }
 
-    fn record(&mut self, base: Option<&Expr>, fields: &[(String, Expr)]) -> Code<'a> {
-        let a = self.a;
-        let mut all: Vec<&Expr> = base.into_iter().collect();
-        all.extend(fields.iter().map(|(_, v)| v));
-        let mut go = self.ordered(&all);
-        let base = base.map(|_| go.remove(0));
-        let record = call(a, "flickrt.Rec", self.entries(fields, go));
-        match base {
-            Some(b) => call(a, "flickrt.Update", [b.doc, record]).into(),
-            None => record.into(),
-        }
-    }
-
     /// Each label, then its value, as one item of a list.
-    fn entries(&self, fields: &[(String, Expr)], values: Vec<Code<'a>>) -> Vec<Document<'a>> {
+    pub(super) fn entries(
+        &self,
+        fields: &[(String, Expr)],
+        values: Vec<Code<'a>>,
+    ) -> Vec<Document<'a>> {
         fields
             .iter()
             .zip(values)

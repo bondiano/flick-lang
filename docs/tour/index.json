@@ -1,0 +1,88 @@
+{
+  "chapters": [
+    {
+      "id": "basics", "en": "Basics", "ru": "Основы",
+      "lessons": [
+        { "id": "program", "expect": "run" },
+        { "id": "hello", "example": "hello" },
+        { "id": "numbers", "expect": "run" },
+        { "id": "strings", "expect": "run" },
+        { "id": "blocks", "expect": "run" },
+        { "id": "functions", "expect": "run" },
+        { "id": "signatures", "exercise": "signatures/01" },
+        { "id": "arguments", "exercise": "signatures/02" },
+        { "id": "pipes", "expect": "run" },
+        { "id": "conditions", "expect": "run" },
+        { "id": "loops", "expect": "run" },
+        { "id": "fizzbuzz", "exercise": "basics/01" }
+      ]
+    },
+    {
+      "id": "data", "en": "Data and patterns", "ru": "Данные и образцы",
+      "lessons": [
+        { "id": "tuples", "expect": "run" },
+        { "id": "records", "example": "records" },
+        { "id": "variants", "example": "shapes" },
+        { "id": "exhaustive", "example": "missing-case" },
+        { "id": "patterns", "expect": "run" },
+        { "id": "options", "example": "options" },
+        { "id": "lists", "expect": "run" },
+        { "id": "for-loops", "example": "stock-profit" },
+        { "id": "break", "example": "binary-search" },
+        { "id": "coins", "exercise": "data/01" }
+      ]
+    },
+    {
+      "id": "types", "en": "Types and classes", "ru": "Типы и классы",
+      "lessons": [
+        { "id": "aliases", "expect": "run" },
+        { "id": "generics", "expect": "run" },
+        { "id": "deriving", "expect": "run" },
+        { "id": "classes", "example": "classes" },
+        { "id": "constraints", "expect": "run" },
+        { "id": "into", "expect": "run" },
+        { "id": "modules", "expect": "run" },
+        { "id": "gadt", "example": "gadt" },
+        { "id": "show-size", "exercise": "types/01" }
+      ]
+    },
+    {
+      "id": "effects", "en": "Effects", "ru": "Эффекты",
+      "lessons": [
+        { "id": "arrows", "expect": "run" },
+        { "id": "errors", "example": "typed-errors" },
+        { "id": "question", "expect": "run" },
+        { "id": "services", "example": "services" },
+        { "id": "hidden-service", "example": "missing-service" },
+        { "id": "layers", "expect": "run" },
+        { "id": "handlers", "example": "handlers" },
+        { "id": "tasks", "expect": "run" },
+        { "id": "concurrency", "example": "concurrency" },
+        { "id": "retry", "example": "retry" },
+        { "id": "failures", "exercise": "effects/01" }
+      ]
+    },
+    {
+      "id": "resources", "en": "Resources and regions", "ru": "Ресурсы и регионы",
+      "lessons": [
+        { "id": "scope", "example": "resources" },
+        { "id": "release-on-failure", "expect": "run" },
+        { "id": "scope-type", "expect": "run" },
+        { "id": "leaks", "example": "escaping-resource" },
+        { "id": "fibers", "expect": "run" },
+        { "id": "owner", "exercise": "resources/01" }
+      ]
+    },
+    {
+      "id": "app", "en": "A whole app", "ru": "Целое приложение",
+      "lessons": [
+        { "id": "app-domain", "expect": "run" },
+        { "id": "app-store", "expect": "run" },
+        { "id": "app-commands", "expect": "run" },
+        { "id": "app-tests", "expect": "run" },
+        { "id": "app-ui", "expect": "ui" },
+        { "id": "app-practice", "exercise": "app/01" }
+      ]
+    }
+  ]
+}

@@ -8,13 +8,13 @@ fn a_small_function_of_another_module_is_inlined() {
     let js = release(
         "module App exposing (pick, empty)\n\n\
          pick : Int\nlet pick = Int.min 3 5\n\n\
-         empty : String -> Bool\nlet empty s = String.is_empty s\n",
+         empty : List Int -> Bool\nlet empty xs = List.is_empty xs\n",
     );
-    // the bodies of `Int.min` and `String.is_empty`, which name only what
+    // the bodies of `Int.min` and `List.is_empty`, which name only what
     // their modules export
     assert!(js.contains("export const pick = 3;"), "{js}");
     assert!(
-        js.contains("export const empty = (s) => $m_String.length(s) === 0;"),
+        js.contains("export const empty = (xs) => $m_List$Core.length(xs) === 0;"),
         "{js}"
     );
 }

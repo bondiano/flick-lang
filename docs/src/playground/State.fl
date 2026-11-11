@@ -48,6 +48,8 @@ type alias Configuration = {
   lesson_hint_text_ru : String;
   solution : String;
   done : Bool;
+  /// Whether a clean source runs by itself once typing pauses, as on a page of the tour.
+  autorun : Bool;
 }
 type alias SyntaxToken = { text : String; class_name : String }
 /// A change a fix makes; `start` and `end` are UTF-16 offsets of the module.
@@ -116,6 +118,8 @@ type alias Model = {
   lesson_result : String;
   lesson_done : Bool;
   lesson_checking : Bool;
+  /// Off for code that came from a link, which runs only on Run.
+  autorun : Bool;
 }
 
 empty_generated : Generated
@@ -219,4 +223,5 @@ let initial_model config = {
   lesson_result = "";
   lesson_done = config.done;
   lesson_checking = false;
+  autorun = config.autorun;
 }

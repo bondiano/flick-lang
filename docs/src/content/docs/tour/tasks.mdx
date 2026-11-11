@@ -1,0 +1,26 @@
+---
+title: Tasks
+description: "`task` describes work, and `await` runs it."
+tableOfContents: false
+---
+
+import TourLesson from "../../../components/TourLesson.astro";
+
+<TourLesson locale="en" id="tasks">
+
+`task { … }` describes work without doing it: a task is cold. `counted` adds
+1 to `runs` and gives it back, but `before: 0` shows that making it ran
+nothing.
+
+`await` runs a task and gives its result, and each `await` runs it again, so
+the two results differ.
+
+`Ref.make` makes a cell that holds a changing value. `let mut` from the first
+chapter belongs to one function, while a `Ref` can be shared, here with the
+task.
+
+**Try:** remove the first `await`. The compiler reports `FLICK-C001`: a task
+is not a value that can be shown, and `await` is what turns it into its
+result.
+
+</TourLesson>

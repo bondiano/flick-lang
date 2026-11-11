@@ -53,7 +53,7 @@ func ArrayCountBy(fb *Fiber, f, xs Value) Value {
 // ArrayContainsWith is whether `eq a x` holds for an element `x`.
 func ArrayContainsWith(fb *Fiber, eq, a, xs Value) Value {
 	for _, x := range List(xs) {
-		if Bool(apply2(fb, eq, a, x)) {
+		if Bool(Apply2(fb, eq, a, x)) {
 			return true
 		}
 	}
@@ -66,7 +66,7 @@ func ArrayDedupeWith(fb *Fiber, eq, xs Value) Value {
 next:
 	for _, x := range List(xs) {
 		for _, kept := range out {
-			if Bool(apply2(fb, eq, x, kept)) {
+			if Bool(Apply2(fb, eq, x, kept)) {
 				continue next
 			}
 		}
@@ -78,7 +78,7 @@ next:
 func ArrayDedupeAdjacentWith(fb *Fiber, eq, xs Value) Value {
 	out := []Value{}
 	for _, x := range List(xs) {
-		if len(out) == 0 || !Bool(apply2(fb, eq, x, out[len(out)-1])) {
+		if len(out) == 0 || !Bool(Apply2(fb, eq, x, out[len(out)-1])) {
 			out = append(out, x)
 		}
 	}
@@ -111,7 +111,7 @@ func ArrayUnionWith(fb *Fiber, that, eq, self Value) Value {
 next:
 	for _, y := range b {
 		for _, x := range a {
-			if Bool(apply2(fb, eq, x, y)) {
+			if Bool(Apply2(fb, eq, x, y)) {
 				continue next
 			}
 		}
@@ -319,7 +319,7 @@ func ArrayCartesianWith(fb *Fiber, that, f, self Value) Value {
 	out := []Value{}
 	for _, a := range List(self) {
 		for _, b := range List(that) {
-			out = append(out, apply2(fb, f, a, b))
+			out = append(out, Apply2(fb, f, a, b))
 		}
 	}
 	return out
@@ -333,7 +333,7 @@ func ArrayZipWith(fb *Fiber, that, f, self Value) Value {
 	a, b := List(self), List(that)
 	out := make([]Value, min(len(a), len(b)))
 	for i := range out {
-		out[i] = apply2(fb, f, a[i], b[i])
+		out[i] = Apply2(fb, f, a[i], b[i])
 	}
 	return out
 }
@@ -341,7 +341,7 @@ func ArrayZipWith(fb *Fiber, that, f, self Value) Value {
 func ArrayMapAccum(fb *Fiber, s, f, xs Value) Value {
 	acc, out := s, []Value{}
 	for _, x := range List(xs) {
-		r := apply2(fb, f, acc, x).([]Value)
+		r := Apply2(fb, f, acc, x).([]Value)
 		acc = r[0]
 		out = append(out, r[1])
 	}
@@ -351,7 +351,7 @@ func ArrayMapAccum(fb *Fiber, s, f, xs Value) Value {
 func ArrayScan(fb *Fiber, b, f, xs Value) Value {
 	out := []Value{b}
 	for _, x := range List(xs) {
-		out = append(out, apply2(fb, f, out[len(out)-1], x))
+		out = append(out, Apply2(fb, f, out[len(out)-1], x))
 	}
 	return out
 }
@@ -361,7 +361,7 @@ func ArrayScanRight(fb *Fiber, b, f, xs Value) Value {
 	out := make([]Value, len(in)+1)
 	out[len(in)] = b
 	for i := len(in) - 1; i >= 0; i-- {
-		out[i] = apply2(fb, f, out[i+1], in[i])
+		out[i] = Apply2(fb, f, out[i+1], in[i])
 	}
 	return out
 }
@@ -468,7 +468,7 @@ func ArrayMatch(fb *Fiber, options, xs Value) Value {
 func ArrayMatchLeft(fb *Fiber, options, xs Value) Value {
 	r := record(options)
 	if in := List(xs); len(in) > 0 {
-		return apply2(fb, r.Get("onNonEmpty"), in[0], in[1:])
+		return Apply2(fb, r.Get("onNonEmpty"), in[0], in[1:])
 	}
 	return Apply(fb, r.Get("onEmpty"), Unit)
 }
@@ -476,7 +476,7 @@ func ArrayMatchLeft(fb *Fiber, options, xs Value) Value {
 func ArrayMatchRight(fb *Fiber, options, xs Value) Value {
 	r := record(options)
 	if in := List(xs); len(in) > 0 {
-		return apply2(fb, r.Get("onNonEmpty"), in[:len(in)-1], in[len(in)-1])
+		return Apply2(fb, r.Get("onNonEmpty"), in[:len(in)-1], in[len(in)-1])
 	}
 	return Apply(fb, r.Get("onEmpty"), Unit)
 }
@@ -553,7 +553,7 @@ func NonEmptyGroupWith(fb *Fiber, eq, xs Value) Value {
 	out := []Value{}
 	for i := 0; i < len(in); {
 		j := i + 1
-		for j < len(in) && Bool(apply2(fb, eq, in[j], in[i])) {
+		for j < len(in) && Bool(Apply2(fb, eq, in[j], in[i])) {
 			j++
 		}
 		out = append(out, in[i:j])

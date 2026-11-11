@@ -1,6 +1,7 @@
 // What a build runs on in the playground, in a worker or in the preview's frame:
 // `process` is an object whose streams post their text to the page, and
-// the runtime's packages are loaded on demand from its built files.
+// the runtime's packages are loaded on demand from their built files: Flick's
+// own runtime, and the Effect adapter for the bindings it does not have yet.
 import runtimePackage from "../../../runtime/package.json" with { type: "json" };
 import effectPackage from "../../../packages/effect-ts/package.json" with { type: "json" };
 import { type Files, type Namespace, link, packages } from "./loader.ts";
@@ -18,7 +19,9 @@ export interface Program {
 }
 
 const modules = import.meta.glob<Namespace>([
+  "../../../runtime/dist/**/*.js",
   "../../../packages/effect-ts/dist/index.js",
+  "../../../packages/effect-ts/dist/bridge.js",
   "../../../packages/effect-ts/dist/cli/index.js",
   "../../../packages/effect-ts/dist/ui/index.js",
   "../../../packages/effect-ts/dist/ui/react/index.js",

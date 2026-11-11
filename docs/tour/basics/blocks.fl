@@ -1,0 +1,9 @@
+module Main exposing (main)
+
+main : Unit ->{} Unit
+let main () =
+  let width = 4
+  let area =
+    let height = 3
+    width * height
+  Platform.stdout_line "area: \{area}"

@@ -28,7 +28,7 @@ foreign pure length from "flick:String" "length"
 
 /// Whether the string is `""`.
 is_empty : String -> Bool
-let is_empty s = length s == 0
+let is_empty s = s == ""
 
 /// Whether the string has a code unit.
 is_non_empty : String -> Bool

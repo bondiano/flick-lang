@@ -270,13 +270,14 @@ wasm-plugins:
 # Build the wasm module the in-browser demo loads and hold it to its size budget.
 # The raw-byte budget retains the playground editor queries (hover, completion,
 # fixes and `.d.ts`). Size optimization uses LLVM Oz and whole-program LTO;
-# native release builds retain thin LTO. The PX5 measurement is
-# about 4.71 MB raw and 1.35 MB gzip, with about 3% headroom.
+# native release builds retain thin LTO. With the playground on Flick's own
+# runtime and its bridge to the Effect adapter it is about 4.47 MB raw and
+# 1.35 MB gzip, with about 1% headroom.
 wasm:
     CARGO_PROFILE_RELEASE_OPT_LEVEL=z CARGO_PROFILE_RELEASE_LTO=fat cargo build -p flick-wasm --target wasm32-unknown-unknown --release
     @wasm=target/wasm32-unknown-unknown/release/flick_wasm.wasm; \
     echo "flick_wasm.wasm: $(wc -c < $wasm) bytes, $(gzip -6c $wasm | wc -c) gzipped"; \
-    test $(wc -c < $wasm) -le 4650000
+    test $(wc -c < $wasm) -le 4520000
 
 # Build the playground's compiler: the wasm module and its JS bindings
 docs-wasm: wasm

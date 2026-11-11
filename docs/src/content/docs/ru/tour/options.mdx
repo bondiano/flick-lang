@@ -1,0 +1,25 @@
+---
+title: Option и Result
+description: "Без `null`: значение, которого может не быть, и шаг, который может не удаться."
+tableOfContents: false
+source_hash: e77e7597a2277e0c
+---
+
+import TourLesson from "../../../../components/TourLesson.astro";
+
+<TourLesson locale="ru" id="options">
+
+Во Flick нет `null`. Значение, которого может не быть, — это `Option`:
+`Some value` или `None`. Шаг, который может не удаться, даёт `Result`:
+`Ok value` или `Err problem`.
+
+`Int.parse` возвращает `Option Int`, а `age` превращает его в `Result` с
+сообщением. Её `match` разбирает оба, а `when n >= 0` уточняет ветку.
+
+`List.head` пустого списка — это `None`, а не падение.
+
+**Попробуйте:** напечатайте `Int.parse "36" + 1`. Компилятор сообщит
+`FLICK-T003`: `Option Int` не становится `Int`, пока `match` или
+`Option.with_default` не достанет из него число.
+
+</TourLesson>

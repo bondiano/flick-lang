@@ -118,7 +118,45 @@ mod tests {
     }
 
     #[test]
-    fn a_reexported_stream_renderer_selects_one_adapter_ui_family() {
+    fn a_serializable_atom_keeps_the_ui_free_of_effect() {
+        let module = lower_text(
+            "App",
+            "module App exposing (count, draft, item)\n\
+             let count = Atom.serializable (Codec.json Schema.number) (Atom.make 0)\n\
+             draft : String -> Atom.Writable String\n\
+             let draft = Atom.serializable_family (Codec.json Schema.string) (fun _ -> Atom.make \"\")\n\
+             item : Atom.Atom (Atom.Async String none)\n\
+             let item = Atom.serializable_task (Codec.json Schema.string) (Atom.task (task { \"x\" }))\n",
+        )
+        .expect("lowers");
+        assert_eq!(
+            select_modules(once(&module), EffectBridge::Available),
+            EffectBridge::Available
+        );
+    }
+
+    #[test]
+    fn a_route_and_its_links_keep_the_ui_free_of_effect() {
+        let module = lower_text(
+            "App",
+            r"module App exposing (page, to)
+type Page = Home | User Float
+  deriving Eq, Show, Schema, Url
+page : Atom.Writable Page
+let page = Atom.route Page.url Home
+to : Page -> List Ui -> Ui
+let to target children = Ui.route_link { route = page; url = Page.url; to = target } children
+",
+        )
+        .expect("lowers");
+        assert_eq!(
+            select_modules(once(&module), EffectBridge::Available),
+            EffectBridge::Available
+        );
+    }
+
+    #[test]
+    fn a_reexported_stream_renderer_keeps_the_ui_free_of_effect() {
         let module = lower_text(
             "App",
             "module App exposing (stream)\nstream : String -> Ui -> Stream.Core.Stream {Async, Reactivity.Atom.Registry} none String\nlet stream = Ui.Server.stream\n",
@@ -126,7 +164,7 @@ mod tests {
         .expect("lowers");
         assert_eq!(
             select_modules(once(&module), EffectBridge::Available),
-            EffectBridge::AvailableWithUi
+            EffectBridge::Available
         );
         assert_eq!(
             select_modules(once(&module), EffectBridge::Absent),

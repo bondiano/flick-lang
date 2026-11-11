@@ -1,0 +1,22 @@
+---
+title: Очистка при сбое
+description: Scope закрывает свои ресурсы, как бы он ни закончился.
+tableOfContents: false
+source_hash: 4b000cca8fa1da19
+---
+
+import TourLesson from "../../../../components/TourLesson.astro";
+
+<TourLesson locale="ru" id="release-on-failure">
+
+Scope закрывает свои ресурсы, как бы он ни закончился. Здесь `check (-3)`
+падает с `Invalid` внутри scope: сначала закрывается файл, а потом сбой
+доходит до обработчика, который печатает `handled -3`.
+
+Поэтому очистка не зависит от того, вспомнили ли про `finally`, и сбой не
+может её пропустить.
+
+**Попробуйте:** замените `check (-3)` на `check 3`. Scope закончится
+обычным образом, а файл всё равно закроется.
+
+</TourLesson>

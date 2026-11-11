@@ -608,6 +608,8 @@ impl<'t> Parser<'t> {
 }
 
 #[cfg(test)]
+mod exposing_tests;
+#[cfg(test)]
 mod plugin_tests;
 #[cfg(test)]
 mod tests;

@@ -119,12 +119,10 @@ fn the_project_package_json_counts_as_one_requirement() {
 /// A `pnpm` on `PATH` that `install` turns into an installed `left-pad`.
 #[cfg(unix)]
 fn fake_pnpm(dir: &Path) -> PathBuf {
-    use std::os::unix::fs::PermissionsExt;
     let bin = dir.join("bin");
     fs::create_dir_all(&bin).expect("dir");
-    let script = bin.join("pnpm");
-    fs::write(
-        &script,
+    common::write_script(
+        &bin.join("pnpm"),
         "#!/bin/sh
 if [ \"$1\" = --version ]; then echo 9.9.9; exit 0; fi
 touch pnpm-lock.yaml
@@ -132,9 +130,7 @@ mkdir -p node_modules/left-pad
 echo '{ \"name\": \"left-pad\", \"exports\": \"./index.mjs\" }' > node_modules/left-pad/package.json
 echo 'export default (s, n) => s.padStart(n);' > node_modules/left-pad/index.mjs
 ",
-    )
-    .expect("write");
-    fs::set_permissions(&script, fs::Permissions::from_mode(0o755)).expect("chmod");
+    );
     bin
 }
 

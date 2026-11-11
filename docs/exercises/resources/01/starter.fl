@@ -1,0 +1,22 @@
+module Main exposing (main, label)
+
+label : String -> String
+let label name = "[" ++ name ++ "]"
+
+note : Ref (List String) -> String ->{} Unit
+let note log line = Ref.update log (fun lines -> lines ++ [line])
+
+open_res : Ref (List String) -> String ->{Scope s} String
+let open_res log name =
+  Resource.acquire_release
+    (task {
+      note log ("open " ++ name)
+      name
+    })
+    (fun n -> note log ("release " ++ n))
+
+main : Unit ->{} Unit
+let main () =
+  let log = Ref.make []
+  let used = open_res log (label "db")
+  Platform.stdout_line (String.join ", " (Ref.get log ++ ["used " ++ used]))

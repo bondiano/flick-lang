@@ -383,10 +383,30 @@ func LastIndexOf(part, v Value) Value {
 }
 
 // Chars is the code points of a string, each a string.
+// asciiChars is each ASCII character as a string value, made once: a
+// string as a value is an allocation otherwise.
+var asciiChars = func() (chars [128]Value) {
+	for i := range chars {
+		chars[i] = string(rune(i))
+	}
+	return chars
+}()
+
 func Chars(v Value) Value {
 	s := v.(string)
-	out := []Value{}
+	count := 0
+	for i := 0; i < len(s); i++ {
+		if s[i]&0xC0 != 0x80 {
+			count++
+		}
+	}
+	out := make([]Value, 0, count)
 	for len(s) > 0 {
+		if s[0] < 0x80 {
+			out = append(out, asciiChars[s[0]])
+			s = s[1:]
+			continue
+		}
 		_, n := decode(s)
 		out = append(out, s[:n])
 		s = s[n:]

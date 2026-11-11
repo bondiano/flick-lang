@@ -96,6 +96,8 @@ mod tests {
             refinement,
             binding: None,
             generated: false,
+            tagged: None,
+            lacking: None,
         }
     }
 

@@ -1,0 +1,23 @@
+module Main exposing (main)
+
+module Books exposing (Book, add, finish, pages_left, line) =
+  type alias Book = { title : String; pages : Int; read : Bool }
+
+  add : String -> Int -> List Book -> List Book
+  let add title pages books = books ++ [{ title = title; pages = pages; read = false }]
+
+  finish : String -> List Book -> List Book
+  let finish title books =
+    List.map (fun book -> if book.title == title then { book with read = true } else book) books
+
+  pages_left : List Book -> Int
+  let pages_left books = List.sum [for book <- books; if not book.read yield book.pages]
+
+  line : Book -> String
+  let line book = (if book.read then "[x] " else "[ ] ") ++ book.title
+
+main : Unit ->{} Unit
+let main () =
+  let books = [] |> Books.add "Dune" 412 |> Books.add "Emma" 474 |> Books.finish "Dune"
+  List.each_effect (fun book -> Platform.stdout_line (Books.line book)) books
+  Platform.stdout_line "pages left: \{Books.pages_left books}"

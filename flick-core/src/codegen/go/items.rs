@@ -56,6 +56,7 @@ impl<'a> Gen<'a> {
                 self.item(&module.items[i], &mut decls, &mut init);
             }
         }
+        decls.extend(self.once_decls().into_iter().map(|decl| (decl, false)));
         let decls = decls.into_iter().map(|(decl, located)| {
             // the lines after a `//line` count from it: name the Go file again
             let again = if located {

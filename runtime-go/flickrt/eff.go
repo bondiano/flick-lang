@@ -19,7 +19,7 @@ func BindEff(task, f Value) Value { return FlatMapEff(f, task) }
 func Map2Eff(f, a, b Value) Value {
 	return Eff(func(fb *Fiber) Value {
 		x := Run(fb, a)
-		return apply2(fb, f, x, Run(fb, b))
+		return Apply2(fb, f, x, Run(fb, b))
 	})
 }
 

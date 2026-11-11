@@ -110,6 +110,8 @@ pub struct Typing {
     /// The top-level functions that make an atom, an action or a view, each
     /// with the maker of the library it ends at.
     pub makers: HashMap<String, String>,
+    /// The types of the module marked `@cell`: a value of one holds one value.
+    pub cells: Vec<String>,
     /// The top-level values that reach `Server`, each with its path to it.
     pub servers: HashMap<String, Vec<String>>,
     /// Each `foreign`: its calling convention.

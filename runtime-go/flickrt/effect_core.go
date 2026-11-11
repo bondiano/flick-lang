@@ -15,7 +15,7 @@ func EffectYieldNowWith(fb *Fiber, _ Value) Value { return EffectYieldNow(fb) }
 // EffectZipWith runs `self`, then `that`: `f` of both values.
 func EffectZipWith(fb *Fiber, that, f, self Value) Value {
 	a := Run(fb, self)
-	return apply2(fb, f, a, Run(fb, that))
+	return Apply2(fb, f, a, Run(fb, that))
 }
 
 func EffectDelay(fb *Fiber, d, task Value) Value {

@@ -1,15 +1,19 @@
 /// An inline module with what its parent's file must hold under a prefix:
 /// constructors in expressions and patterns, classes with their instances,
 /// one with a context and one under a superclass, derived instances over a
-/// type of the module, an effect with a handler, a service and an error.
+/// type of the module, an effect with a handler, a service and an error;
+/// a kind, a type indexed by it and an alias for its declarations.
 #[cfg(feature = "ide")]
 const RELOCATED: &str = "module App.Parent exposing (answer, label, silence)
-module Child exposing (Shape(..), Pair(..), Named(..), Titled(..), Ask, Log, Missing(..), area, probe, twice, unit) =
+module Child exposing (Shape(..), Pair(..), Named(..), Titled(..), Ask, Log, Missing(..), Shade(..), Tinted(..), Shapes, area, probe, twice, unit) =
   type Shape = Circle Float | Square Float
     deriving Eq, Show
   type Pair = Pair Shape Shape
     deriving Eq, Show
   type error Missing = Missing String
+  kind Shade = Light | Dark
+  type Tinted (s : Shade) = Tinted Shape
+  type alias Shapes = List Shape
   class Named a =
     name_of : a -> String
   instance Named Shape =

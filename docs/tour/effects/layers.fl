@@ -1,0 +1,17 @@
+module Main exposing (main)
+
+service Clock =
+  hour : Unit ->{} Int
+
+greeting : Unit ->{Clock; none} String
+let greeting () = if Clock.hour () < 12 then "Good morning" else "Good afternoon"
+
+at : Int -> Layer {} none {Clock}
+let at hour = Layer.succeed Clock { hour = fun () -> hour }
+
+main : Unit ->{} Unit
+let main () =
+  Platform.stdout_line (provide (at 9) { greeting () })
+  Platform.stdout_line (provide (at 15) { greeting () })
+  let passed = provide (at 11) { greeting () } == "Good morning"
+  Platform.stdout_line (if passed then "test passed" else "test failed")

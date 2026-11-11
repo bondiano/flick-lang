@@ -24,3 +24,10 @@ test("empty expected stdout is a valid contract", () => {
   assert.throws(() => parseExerciseMetadata(source.replace('output = "5"', ''), "test"), /output/);
   assert.throws(() => parseExerciseMetadata(source.replace('output = "5"', 'output = 5'), "test"), /output/);
 });
+
+test("a starter fails with T003 unless its exercise names another code", () => {
+  const source = readFileSync(new URL("../exercises/signatures/01/check.toml", import.meta.url), "utf8");
+  assert.equal(parseExerciseMetadata(source, "test").starter_error, "FLICK-T003");
+  assert.equal(parseExerciseMetadata(`${source}starter_error = "FLICK-T009"\n`, "test").starter_error, "FLICK-T009");
+  assert.throws(() => parseExerciseMetadata(`${source}starter_error = "T009"\n`, "test"), /starter_error/);
+});

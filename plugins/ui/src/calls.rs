@@ -11,7 +11,109 @@ pub fn check(calls: &[CallSite]) -> Vec<Diagnostic> {
     let mut found: Vec<_> = calls.iter().filter_map(one).collect();
     found.extend(atom_keys(calls));
     found.extend(handlers_in_render(calls));
+    found.extend(calls.iter().filter_map(reads_atoms_for_a_ui));
+    found.extend(calls.iter().filter_map(made_in_render));
+    found.extend(calls.iter().filter_map(beyond_its_row));
+    found.extend(calls.iter().filter_map(atom_of_every_type));
     found
+}
+
+/// `U005` on a value that holds an atom at every type its variables stand
+/// for: the compiler refuses a cell of a type for every type, and this
+/// says it of an atom.
+fn atom_of_every_type(call: &CallSite) -> Option<Diagnostic> {
+    let tagged = call.tagged.as_ref().filter(|t| t.tag == "cell")?;
+    if !matches!(call.module.as_str(), "Atom" | "Reactivity.Atom") {
+        return None;
+    }
+    let name = call.binding.as_ref().and_then(|b| b.name.as_deref());
+    let (atom, it) = name.map_or_else(
+        || ("this atom".to_owned(), "it".to_owned()),
+        |n| (format!("the atom `{n}`"), format!("`{n}`")),
+    );
+    let message = format!(
+        "{atom} has the type `{}` for every type its variables stand for, yet holds one value: give {it} the type of its value, without variables",
+        tagged.named
+    );
+    Some(Diagnostic::error(message, call.span).with_code("U005"))
+}
+
+/// `U004` on what a render asks for besides reading atoms, and `E002` in
+/// the words of a component on what its setup asks for besides `Setup`:
+/// the compiler refuses both as a row that does not allow a service, and
+/// these say where the code belongs instead.
+fn beyond_its_row(call: &CallSite) -> Option<Diagnostic> {
+    let lacking = call.lacking.as_ref()?;
+    let (what, allowed) = (&lacking.what, &lacking.allowed);
+    if allowed.open {
+        return None;
+    }
+    if allowed.services == ["Prelude.Setup"] {
+        let message =
+            format!("a component's setup runs once per instance, so {what} is not allowed in it");
+        let fix = "read atoms in the component's last expression, its render, as `ui { let x = … }`, or make an `Atom.derived` here";
+        let refusal = Diagnostic::error(message, call.span).with_code("E002");
+        return Some(refusal.with_fix(fix, Vec::new(), false));
+    }
+    if allowed.services != ["Atom.Read"] {
+        return None;
+    }
+    let is = |label: &str| lacking.labels.iter().any(|l| l == label);
+    let writes = is("Atom.Write") || is("Reactivity.Atom.Registry");
+    let (setup, document) = (is("Prelude.Setup"), is("Ui.Document"));
+    let fixes = [
+        setup.then_some("call it before a component's last expression, in its setup, which runs once per instance"),
+        document.then_some("reach the DOM in a task: of an `Action`, `Ui.on_mount` or `Ui.watch`"),
+        writes.then_some("write atoms in an `Action`, which runs on an event"),
+        (!writes && !setup && !document && !lacking.services.is_empty())
+            .then_some("run the task as `Atom.task` and read its result"),
+        (!lacking.errors.is_empty()).then_some(
+            "handle the failure here, or render with `Ui.suspended`, which gives it a view",
+        ),
+    ];
+    let fix = fixes.into_iter().flatten().collect::<Vec<_>>().join("; ");
+    let message =
+        format!("a view's render and a derived atom only read atoms: {what} is not allowed here");
+    let refusal = Diagnostic::error(message, call.span).with_code("U004");
+    Some(refusal.with_fix(&fix, Vec::new(), false))
+}
+
+/// `U006` on an atom, an action or a view made while rendering: a view
+/// renders again at any time, and each render would make another one,
+/// losing its state, its subscribers or its policy. A render is a function
+/// whose services are `Atom.Read` alone; the task of a handler in it runs
+/// on an event, and the compiler leaves it out of what is around the place.
+fn made_in_render(call: &CallSite) -> Option<Diagnostic> {
+    let tagged = call.tagged.as_ref().filter(|t| t.tag == "maker")?;
+    let render = (tagged.inside.iter()).any(|f| !f.open && f.services == ["Atom.Read"]);
+    render.then(|| {
+        let what = if tagged.named == tagged.reaches {
+            format!("`{}`", tagged.named)
+        } else {
+            format!("`{}`, which calls `{}`,", tagged.named, tagged.reaches)
+        };
+        let message = format!("{what} while rendering makes another one on every render: make it once, with a top-level `let`, or one per key with `Atom.family`");
+        Diagnostic::error(message, call.span).with_code("U006")
+    })
+}
+
+/// `U007` on a top-level function whose signature reads atoms and which
+/// gives a `Ui`: whatever calls it renders again with it, where a
+/// `component` would render on its own.
+fn reads_atoms_for_a_ui(call: &CallSite) -> Option<Diagnostic> {
+    let binding = call.binding.as_ref()?;
+    let gives = binding.gives.as_ref()?;
+    let reads = call.module == "Atom" && call.name == "Read";
+    (reads && gives.exact.as_deref() == Some("Prelude.Ui")).then(|| {
+        let name = binding.name.as_deref().unwrap_or_default();
+        let message = format!(
+            "`{name}` reads atoms to build a `Ui`: whatever calls it renders again when they change"
+        );
+        let fix = "make it a `component`: it renders again on its own, not with its parent";
+        Diagnostic::warning(message, call.span)
+            .with_code("U007")
+            .with_fix(fix, Vec::new(), false)
+    })
 }
 
 /// The constructors of `Ui.Event`, which make a handler of a function.
@@ -88,117 +190,4 @@ fn atom_keys(calls: &[CallSite]) -> Vec<Diagnostic> {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::check;
-    use flick_plugin::{Argument, CallSite, Constant, FactType, Span};
-
-    fn call(module: &str, name: &str, constant: Option<Constant>) -> CallSite {
-        CallSite {
-            module: module.to_owned(),
-            name: name.to_owned(),
-            span: Span { start: 0, end: 5 },
-            arguments: vec![Argument {
-                span: Span { start: 6, end: 7 },
-                ty: FactType {
-                    shown: "Int".to_owned(),
-                    exact: Some("Prelude.Int".to_owned()),
-                    literal_of: None,
-                },
-                fields: None,
-                constant,
-                lambda: false,
-            }],
-            refinement: None,
-            binding: None,
-            generated: false,
-        }
-    }
-
-    /// `Ui.view (fun _ -> … Ui.Event.exhaust (fun _ -> …) …)`, the view at 0.
-    fn view_with_handler(generated: bool, lambda: bool) -> [CallSite; 2] {
-        let mut view = call("Ui", "view", None);
-        view.arguments[0].span = Span { start: 8, end: 60 };
-        view.generated = generated;
-        let mut handler = call("Ui.Event", "exhaust", None);
-        handler.span = Span { start: 20, end: 36 };
-        handler.arguments[0].span = Span { start: 37, end: 55 };
-        handler.arguments[0].lambda = lambda;
-        [view, handler]
-    }
-
-    #[test]
-    fn a_handler_of_a_fun_in_a_written_render_is_made_on_every_render() {
-        let found = check(&view_with_handler(false, true));
-        assert_eq!(found.len(), 1);
-        assert_eq!(found[0].code.as_deref(), Some("U002"));
-        assert_eq!(found[0].span, Span { start: 20, end: 55 });
-        // a named function is made once, and a `component` renders as it did
-        assert!(check(&view_with_handler(false, false)).is_empty());
-        assert!(check(&view_with_handler(true, true)).is_empty());
-        // outside a render nothing renders again
-        let [_, handler] = view_with_handler(false, true);
-        assert!(check(&[handler]).is_empty());
-    }
-
-    #[test]
-    fn serializable_keys_are_checked_from_binding_facts() {
-        use flick_plugin::Binding;
-        let mut site = call("Atom", "serializable", None);
-        site.binding = Some(Binding {
-            module: "App".into(),
-            name: Some("count".into()),
-            span: Span { start: 0, end: 30 },
-            constrained: false,
-            in_function: false,
-            applied: 2,
-        });
-        assert!(check(&[site.clone()]).is_empty());
-        let mut second = site.clone();
-        second.span = Span { start: 31, end: 48 };
-        let found = check(&[site.clone(), second]);
-        assert_eq!(found.len(), 1);
-        assert_eq!(found[0].code.as_deref(), Some("U003"));
-        assert_eq!(found[0].span, Span { start: 31, end: 48 });
-        assert!(found[0].message.contains("App.count"));
-        for (name, constrained, in_function, applied, message) in [
-            (None, false, false, 2, "top-level binding"),
-            (Some("count"), true, false, 2, "takes a dictionary"),
-            (Some("count"), false, true, 2, "inside a function"),
-            (Some("count"), false, false, 1, "codec and state"),
-        ] {
-            let mut invalid = site.clone();
-            let binding = invalid.binding.as_mut().expect("binding");
-            binding.name = name.map(str::to_owned);
-            binding.constrained = constrained;
-            binding.in_function = in_function;
-            binding.applied = applied;
-            let found = check(&[invalid]);
-            assert_eq!(found.len(), 1);
-            assert!(found[0].message.contains(message), "{:?}", found[0]);
-        }
-    }
-
-    #[test]
-    fn a_policy_takes_a_positive_integer() {
-        let refused = |n: f64| {
-            let found = check(&[call("Ui.Event", "queue", Some(Constant::Number(n)))]);
-            found.first().map(|d| d.message.clone())
-        };
-        assert_eq!(
-            refused(0.0).as_deref(),
-            Some("the capacity of `Ui.Event.queue` must be a positive integer")
-        );
-        assert!(refused(1.5).is_some());
-        assert!(refused(-1.0).is_some());
-        assert!(refused(1.0).is_none());
-        // a computed bound is checked when the handler is made
-        assert!(check(&[call("Ui.Event", "queue", None)]).is_empty());
-        // another `queue`, of no policy, is none of this plugin's business
-        assert!(check(&[call("App.Jobs", "queue", Some(Constant::Number(0.0)))]).is_empty());
-        let limit = check(&[call("Action", "concurrent", Some(Constant::Number(0.0)))]);
-        assert_eq!(
-            limit.first().map(|d| d.message.clone()).as_deref(),
-            Some("the limit of `Action.concurrent` must be a positive integer")
-        );
-    }
-}
+mod tests;

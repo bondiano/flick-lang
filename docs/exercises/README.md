@@ -7,6 +7,8 @@ and have the requested export, but produce the wrong output.
 `check.toml` supplies the exported function name, its TypeScript
 `argument_types` and `return_type`, expected trimmed stdout (`output`), and
 English/Russian `title`, `task`, and `hint` strings (Russian keys end in `_ru`).
+`starter_error` names the one error code the starter reports (`FLICK-T003`
+when absent); CI checks it, while the browser only asks to fix the errors.
 The current checker supports one or more curried primitive string, number, and boolean arguments,
 and those result types plus void. Add support in the shared checker and loader
 before using more complex signatures.
@@ -18,7 +20,9 @@ CLI results. `test/lesson.test.ts` discovers all exercises automatically and
 checks each starter, solution, and broken answer. The Docs workflow runs these
 checks before publishing.
 
-Mount an exercise with `<Playground locale="en" lesson="signatures/02" />`
-(and a corresponding Russian page). State and actions live in Flick. Drafts
+A page of the tour mounts an exercise through `tour/index.json`, with
+`{ "id": "<page>", "exercise": "signatures/02" }`; other pages can use
+`<Playground locale="en" lesson="signatures/02" />` (and a corresponding
+Russian page). State and actions live in Flick. Drafts
 and completion use per-exercise local storage keys; existing signatures/01 keys
 remain compatible. Showing a solution does not mark it complete.

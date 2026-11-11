@@ -433,7 +433,7 @@ func describeInput(in Value) string {
 		return "an array"
 	case *Record, *Data:
 		return "an object"
-	case Fn, Poly:
+	case Fn, Fn2, Fn3, Poly:
 		return "function"
 	}
 	if in == Unit {

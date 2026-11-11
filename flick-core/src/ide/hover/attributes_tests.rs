@@ -5,12 +5,13 @@ use crate::types::lang::{self, Lang};
 
 #[test]
 fn attribute_hover_explains_all_attributes_and_derive_providers() {
-    let source = "module App.Main exposing (..)\n\n@maker\nlet make = 1\n\n@derive\nclass First a\n\n@derive std\nclass Second a\n\n@implicit\ninstance Into Int Float =\n  let into n = Int.to_float n\n";
+    let source = "module App.Main exposing (..)\n\n@maker\nlet make = 1\n\n@cell\ntype Slot a\n\n@derive\nclass First a\n\n@derive std\nclass Second a\n\n@implicit\ninstance Into Int Float =\n  let into n = Int.to_float n\n";
     let f = fixture_of(&[("src/App/Main.fl", source)]);
     let ide = f.ide();
     let file = f.file("App.Main");
     for (needle, word, expected) in [
         ("@maker", "@maker", "atom, action or view"),
+        ("@cell", "@cell", "hold one value each"),
         ("@derive\n", "@derive", "plugin of the class's package"),
         ("@derive std", "@derive", "`std`"),
         ("std\nclass", "std", "deriving"),

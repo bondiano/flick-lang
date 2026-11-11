@@ -1,0 +1,23 @@
+---
+title: Work a scope owns
+description: Children stop before finalizers, when their scope ends.
+tableOfContents: false
+---
+
+import TourLesson from "../../../components/TourLesson.astro";
+
+<TourLesson locale="en" id="fibers">
+
+A scope can own running work too. `Fiber.spawn owner quiet task` starts a
+child that belongs to the scope `owner`, and `quiet` decides what a failure
+of the child does. `Scope.add_finalizer` adds work for the scope's end.
+
+When the scope ends, its children stop first, which `Effect.ensuring` lets
+the child report, and then its finalizers run, each once, in reverse order.
+The child here waits forever with `Effect.never`, and the scope still ends.
+`Deferred` lets `main` wait until the child has started.
+
+**Try:** add a second finalizer below the first. It runs before the first:
+finalizers run in reverse order.
+
+</TourLesson>

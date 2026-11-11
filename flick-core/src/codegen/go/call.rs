@@ -29,6 +29,27 @@ fn callee<'a>(a: &'a DocumentArena<'a>, f: &str) -> Call<'a> {
     })
 }
 
+/// The runtime's function of `n` arguments taken at once, where it has one:
+/// two or three whose stages before the last, by the bits of `effects`, are
+/// pure. Given them all it is one call, with no function made per argument.
+fn at_once(n: usize, effects: u64) -> Option<&'static str> {
+    let wrap = match n {
+        2 => "flickrt.Fn2",
+        3 => "flickrt.Fn3",
+        _ => return None,
+    };
+    (effects & ((1 << (n - 1)) - 1) == 0).then_some(wrap)
+}
+
+/// Whether evaluating `e` is nothing anyone can see: it cannot fail, print
+/// or run for ever, so it may be evaluated before a call written before it.
+fn quiet(e: &Expr) -> bool {
+    matches!(
+        e.kind,
+        ExprKind::Local(_) | ExprKind::Lit(_) | ExprKind::Lambda { .. }
+    )
+}
+
 /// `return value`, the body of a closure.
 fn returning<'a>(a: &'a DocumentArena<'a>, value: Document<'a>) -> [Document<'a>; 1] {
     [docvec![a, "return ", value]]
@@ -62,6 +83,10 @@ fn curried<'a>(
     } else {
         make("fb", &args).doc
     };
+    if let Some(wrap) = at_once(n, effects) {
+        let head = format!("func({}) flickrt.Value", signature(&heads));
+        return call(a, wrap, [closure(a, head, returning(a, body))]).into();
+    }
     for (i, h) in heads.iter().enumerate().rev() {
         if i < last && effects >> i & 1 == 1 {
             // an effectful stage before the last is a task that gives the next function
@@ -116,7 +141,8 @@ impl<'a> Gen<'a> {
                 Box::new(move |_, _: &[Code<'a>]| a.text(lit).into())
             }
             Rep::Tagged if c.arity == 0 && held.is_empty() => {
-                Box::new(move |_, _: &[Code<'a>]| call(a, "flickrt.Nullary", [a.text(tag)]).into())
+                let value = self.once(&format!("flickrt.Nullary({tag})"));
+                Box::new(move |_, _: &[Code<'a>]| a.text(value).into())
             }
             Rep::Tagged => Box::new(move |_, args: &[Code<'a>]| {
                 let args = args.iter().map(|arg| arg.doc).chain(held.iter().copied());
@@ -202,6 +228,13 @@ impl<'a> Gen<'a> {
                     )
                     .into(),
                     1 if n == 0 && effects == 0 => self.code(&f),
+                    // the Go function itself is the value: nothing wraps it
+                    2 | 3 if n == 0 && effects == 0 => call(
+                        a,
+                        at_once(params, 0).expect("two or three"),
+                        [a.text(a.alloc_str(&f))],
+                    )
+                    .into(),
                     _ => curried(a, &callee(a, &f), dicts, params, effects, &mut || {
                         self.temp()
                     }),
@@ -298,6 +331,10 @@ impl<'a> Gen<'a> {
             .into_iter()
             .zip(args.iter().map(|(_, s)| *s))
             .collect();
+        // whether the value of each argument is ready with nothing to see:
+        // a name, a literal or a function, and the one taken before the rest
+        let mut quiet: Vec<bool> = exprs.iter().map(|e| quiet(e)).collect();
+        quiet.extend(first.iter().map(|_| true));
         values.extend(first);
         if values.len() < arity {
             // a partial application keeps what it was given
@@ -317,13 +354,29 @@ impl<'a> Gen<'a> {
             );
         }
         let rest = values.split_off(arity);
+        let quiet = quiet.split_off(arity.min(quiet.len()));
         let all: Vec<Code<'a>> = given
             .into_iter()
             .chain(values.into_iter().map(|(v, _)| v))
             .collect();
         let mut v = make(self.context.unwrap_or("nil"), &all);
-        for (arg, stage) in rest {
-            v = call(a, "flickrt.Apply", [self.context(), v.doc, arg.doc]).into();
+        let mut rest = rest.into_iter().zip(quiet).peekable();
+        while let Some(((arg, mut stage), _)) = rest.next() {
+            // an argument of a pure stage goes with the next, up to three
+            // at once: a function that takes them so is called once. The
+            // next one must be quiet: a function may fail, or not return,
+            // once it has an argument, and that comes before the next
+            // argument is evaluated
+            let mut group = vec![self.context(), v.doc, arg.doc];
+            while group.len() < 5 && stage == Stage::Pure {
+                let Some(((next, after), _)) = rest.next_if(|(_, quiet)| *quiet) else {
+                    break;
+                };
+                group.push(next.doc);
+                stage = after;
+            }
+            let apply = ["flickrt.Apply", "flickrt.Apply2", "flickrt.Apply3"][group.len() - 3];
+            v = call(a, apply, group).into();
             if stage != Stage::Pure {
                 v = self.run(v);
             }
@@ -405,6 +458,21 @@ impl<'a> Gen<'a> {
         } else {
             block(a, stmts)
         };
+        // only the first three stages matter to a function of up to three
+        let effects = params
+            .iter()
+            .take(3)
+            .enumerate()
+            .fold(0, |bits, (i, p)| bits | u64::from(effectful(p)) << i);
+        if let Some(wrap) = at_once(params.len(), effects) {
+            let all = signature(&heads);
+            return call(
+                a,
+                wrap,
+                [docvec![a, "func(", all, ") flickrt.Value ", body]],
+            )
+            .into();
+        }
         let last = signature(&heads[heads.len() - 1..]);
         let mut text = docvec![a, "func(", last, ") flickrt.Value ", body];
         for (h, p) in heads[..heads.len() - 1].iter().zip(params).rev() {

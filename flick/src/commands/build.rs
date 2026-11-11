@@ -537,6 +537,18 @@ pub fn artifacts(
         let needs = &mut emission.diagnostics;
         needs.extend(js::conflicts(host, &project.root, wanted));
         needs.extend(js::unmet(host, &project.root, wanted));
+    } else {
+        // files built alone have no manifest of the outputs: the list names
+        // them, so the next build removes those it does not write
+        let contents = (emission.artifacts.iter()).fold(String::new(), |mut list, a| {
+            list.push_str(&a.path);
+            list.push('\n');
+            list
+        });
+        emission.artifacts.push(Artifact {
+            path: build::go::FILES.to_owned(),
+            contents,
+        });
     }
     emission
 }

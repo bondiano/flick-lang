@@ -1,11 +1,7 @@
 package flickrt
 
-import "sort"
-
 // Lists are immutable []Value: an operation returns a new slice, or the
 // same one when nothing changes. Callbacks are curried Flick functions.
-
-func apply2(fb *Fiber, f, a, b Value) Value { return Apply(fb, Apply(fb, f, a), b) }
 
 func ListMap(fb *Fiber, f, xs Value) Value {
 	in := List(xs)
@@ -20,7 +16,7 @@ func ListMapIndexed(fb *Fiber, f, xs Value) Value {
 	in := List(xs)
 	out := make([]Value, len(in))
 	for i, x := range in {
-		out[i] = apply2(fb, f, int32(i), x)
+		out[i] = Apply2(fb, f, int32(i), x)
 	}
 	return out
 }
@@ -36,7 +32,7 @@ func ListEachEffect(fb *Fiber, f, xs Value) Value {
 func ListFold(fb *Fiber, f, init, xs Value) Value {
 	acc := init
 	for _, x := range List(xs) {
-		acc = apply2(fb, f, acc, x)
+		acc = Apply2(fb, f, acc, x)
 	}
 	return acc
 }
@@ -46,7 +42,7 @@ func ListFold(fb *Fiber, f, init, xs Value) Value {
 func ListFoldEffect(fb *Fiber, f, init, xs Value) Value {
 	acc := init
 	for _, x := range List(xs) {
-		acc = Run(fb, apply2(fb, f, acc, x))
+		acc = Run(fb, Apply2(fb, f, acc, x))
 	}
 	return acc
 }
@@ -55,7 +51,7 @@ func ListFoldRight(fb *Fiber, f, init, xs Value) Value {
 	in := List(xs)
 	acc := init
 	for i := len(in) - 1; i >= 0; i-- {
-		acc = apply2(fb, f, in[i], acc)
+		acc = Apply2(fb, f, in[i], acc)
 	}
 	return acc
 }
@@ -94,7 +90,7 @@ func ListMap2(fb *Fiber, f, xs, ys Value) Value {
 	out := []Value{}
 	for _, x := range List(xs) {
 		for _, y := range List(ys) {
-			out = append(out, apply2(fb, f, x, y))
+			out = append(out, Apply2(fb, f, x, y))
 		}
 	}
 	return out
@@ -103,7 +99,7 @@ func ListMap2(fb *Fiber, f, xs, ys Value) Value {
 func OptionMap2(fb *Fiber, f, x, y Value) Value {
 	a, b := x.(*Data), y.(*Data)
 	if a.Tag == "Some" && b.Tag == "Some" {
-		return Some(apply2(fb, f, a.Fields[0], b.Fields[0]))
+		return Some(Apply2(fb, f, a.Fields[0], b.Fields[0]))
 	}
 	return None
 }
@@ -116,7 +112,7 @@ func ResultMap2(fb *Fiber, f, x, y Value) Value {
 	case b.Tag == "Failure":
 		return b
 	}
-	return Ok(apply2(fb, f, a.Fields[0], b.Fields[0]))
+	return Ok(Apply2(fb, f, a.Fields[0], b.Fields[0]))
 }
 
 func ListFind(fb *Fiber, p, xs Value) Value {
@@ -170,10 +166,56 @@ func ListPartition(fb *Fiber, p, xs Value) Value {
 // ListSortBy is a stable sort on a copy.
 func ListSortBy(fb *Fiber, cmp, xs Value) Value {
 	out := append([]Value{}, List(xs)...)
-	sort.SliceStable(out, func(i, j int) bool {
-		return apply2(fb, cmp, out[i], out[j]).(*Data).Tag == LT.(*Data).Tag
-	})
+	lt := LT.(*Data).Tag
+	sortStable(out, func(a, b Value) bool { return Apply2(fb, cmp, a, b).(*Data).Tag == lt })
 	return out
+}
+
+// sortStable sorts `xs` in place and keeps the order of equal elements: a
+// merge sort from runs of eight into one buffer. The order of a list is a
+// Flick function, so what counts is how few times it is asked; a sort in
+// place asks more and moves more.
+func sortStable(xs []Value, less func(a, b Value) bool) {
+	const run = 8
+	n := len(xs)
+	for lo := 0; lo < n; lo += run {
+		for i := lo + 1; i < min(lo+run, n); i++ {
+			for j := i; j > lo && less(xs[j], xs[j-1]); j-- {
+				xs[j], xs[j-1] = xs[j-1], xs[j]
+			}
+		}
+	}
+	if n <= run {
+		return
+	}
+	from, to := xs, make([]Value, n)
+	for width := run; width < n; width *= 2 {
+		for lo := 0; lo < n; lo += 2 * width {
+			mid, hi := min(lo+width, n), min(lo+2*width, n)
+			if mid == hi || !less(from[mid], from[mid-1]) {
+				// halves already in order, as in a list sorted before: one question
+				copy(to[lo:hi], from[lo:hi])
+				continue
+			}
+			i, j, k := lo, mid, lo
+			for ; i < mid && j < hi; k++ {
+				// the right one goes first only when it is less: equal ones keep their order
+				if less(from[j], from[i]) {
+					to[k] = from[j]
+					j++
+				} else {
+					to[k] = from[i]
+					i++
+				}
+			}
+			k += copy(to[k:], from[i:mid])
+			copy(to[k:], from[j:hi])
+		}
+		from, to = to, from
+	}
+	if &from[0] != &xs[0] {
+		copy(xs, from)
+	}
 }
 
 func ListLength(xs Value) Value { return int32(len(List(xs))) }

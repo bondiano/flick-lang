@@ -29,7 +29,7 @@ pub(crate) use load::check_file;
 #[cfg(all(test, feature = "native-project"))]
 pub(crate) use load::js_only;
 #[cfg(feature = "ide")]
-pub use load::{Analysis, Analyzed, analysis_fingerprint, analyze, analyze_with};
+pub use load::{Analysis, Analyzed, analysis_fingerprint, analyze, analyze_rt, analyze_with};
 pub use load::{
     CachedModule, Compilation, Compiled, FormatPlugins, Fresh, MainKind, ModuleCache, PackageCache,
     check, check_with, compile, compile_with, main_kind, stages_by_class,

@@ -5,7 +5,6 @@ use std::collections::HashMap;
 use super::ty::Type;
 use super::typing::Ref;
 use super::{Checker, Range, let_parts};
-use crate::diagnostics::codes;
 use crate::iface::Namespace;
 use crate::source::Span;
 use crate::syntax::cst::Node;
@@ -73,6 +72,8 @@ impl Checker<'_> {
                     arguments: Vec::new(),
                     refinement: None,
                     generated: range.0 >= self.generated,
+                    tagged: None,
+                    lacking: None,
                     binding: Some(flick_plugin::Binding {
                         module: self.env.module.clone(),
                         name: binding.clone(),
@@ -84,6 +85,7 @@ impl Checker<'_> {
                         in_function,
                         applied: u32::try_from(keyed.applied.get(&range).copied().unwrap_or(0))
                             .unwrap_or(u32::MAX),
+                        gives: None,
                     }),
                 });
             }
@@ -127,96 +129,9 @@ impl Checker<'_> {
             self.typing.labelled.insert(name, Label { kind });
         }
     }
-
-    /// Keeps the unknowns inside the types of atoms in `ty` from being
-    /// generalized: one atom holds one value.
-    pub fn lower_atoms(&mut self, ty: &Type) {
-        let mut held = Vec::new();
-        self.zonk(ty).visit(&mut |t| {
-            if let (Type::Con { module, name }, args) = t.spine()
-                && is_atom(module, name)
-            {
-                held.extend(args.into_iter().cloned());
-            }
-        });
-        for t in &held {
-            self.store.lower(t);
-        }
-    }
-
-    /// A value of the type `scheme`, not a function, holding an atom whose
-    /// type has a variable the scheme quantifies: one atom would hold a value
-    /// of every type the variable stands for, each reader taking it for its own.
-    pub fn polymorphic_atom(&mut self, name: Option<&str>, scheme: &Type, span: Span) {
-        let ty = match scheme {
-            Type::Forall { body, .. } => body,
-            ty => ty,
-        };
-        if matches!(self.whnf(ty), Type::Fun { .. }) {
-            return;
-        }
-        // a variable of a scheme is one it quantifies, written or not
-        let quantified = |t: &Type| t.contains(&mut |v| matches!(v, Type::Var(_)));
-        let polymorphic = ty.contains(&mut |t| match t.spine() {
-            (Type::Con { module, name }, args) => {
-                is_atom(module, name) && args.into_iter().any(quantified)
-            }
-            _ => false,
-        });
-        if polymorphic {
-            let shown = self.show(ty);
-            let (atom, it) = name.map_or_else(
-                || ("this atom".to_owned(), "it".to_owned()),
-                |n| (format!("the atom `{n}`"), format!("`{n}`")),
-            );
-            self.error(
-                codes::U005,
-                span,
-                format!("{atom} has the type `{shown}` for every type its variables stand for, yet holds one value: give {it} the type of its value, without variables"),
-            );
-        }
-    }
 }
 
 impl Checker<'_> {
-    /// Whether `ty` is a render: a function whose services are `Atom.Read`
-    /// alone, as a view's render and a derived atom's computation are.
-    pub(crate) fn reads_only(&mut self, ty: &Type) -> bool {
-        let Type::Fun {
-            effects: Some(effects),
-            ..
-        } = self.bare(ty)
-        else {
-            return false;
-        };
-        let services = self.store.normalize(&effects.services);
-        services.tails.is_empty()
-            && services
-                .entries
-                .iter()
-                .filter_map(|(l, _)| l.name())
-                .eq(lang::label(Lang::AtomRead))
-    }
-
-    /// Whether `ty` is the setup of a component: a function whose services
-    /// are `Setup` alone.
-    pub(crate) fn setup_only(&mut self, ty: &Type) -> bool {
-        let Type::Fun {
-            effects: Some(effects),
-            ..
-        } = self.bare(ty)
-        else {
-            return false;
-        };
-        let services = self.store.normalize(&effects.services);
-        services.tails.is_empty()
-            && services
-                .entries
-                .iter()
-                .filter_map(|(l, _)| l.name())
-                .eq(lang::label(Lang::Setup))
-    }
-
     /// `ty` resolved, without its captures and quantifiers.
     pub(super) fn bare(&self, ty: &Type) -> Type {
         let mut ty = self.store.resolve(ty);
@@ -227,86 +142,6 @@ impl Checker<'_> {
             ty = self.store.resolve(&inner);
         }
         ty
-    }
-
-    /// Atoms, actions and views made while rendering: a view renders again
-    /// at any time, and each render would make another one, losing its
-    /// state, its subscribers or its policy. A render is a `fun` or a
-    /// top-level function whose services are `Atom.Read` alone; the task of
-    /// a handler in it runs on an event, not while rendering.
-    pub fn made_in_render(&mut self, decls: &[&Node]) {
-        let heads: HashMap<Range, Type> = self
-            .typing
-            .pending_types
-            .iter()
-            .map(|(at, ty)| (*at, ty.clone()))
-            .collect();
-        let mut renders = Vec::new();
-        for decl in members(decls) {
-            if decl.kind != K::LetDecl {
-                continue;
-            }
-            let parts = let_parts(decl, self.text);
-            if let (Some(name), Some(body)) = (&parts.name, parts.body)
-                && !parts.params.is_empty()
-            {
-                let entity = self.env.entity(Namespace::Value, name);
-                let mut ty = self.env.value(&entity).cloned();
-                while let Some(t) = ty.take() {
-                    if self.reads_only(&t) {
-                        renders.push(body);
-                    } else if let Type::Fun { result, .. } = self.bare(&t) {
-                        ty = Some(*result);
-                    }
-                }
-            }
-            funs(
-                decl,
-                &mut |fun| {
-                    let keyword = fun.child_tokens().find(|t| t.kind == K::FunKw);
-                    keyword.and_then(|t| heads.get(&(t.start, t.end)).cloned())
-                },
-                &mut |fun, ty| {
-                    if self.reads_only(&ty) {
-                        renders.push(fun);
-                    }
-                },
-            );
-        }
-        let mut found = Vec::new();
-        for render in renders {
-            self.made(render, &mut found);
-        }
-        found.sort_unstable();
-        found.dedup();
-        for (range, what, maker) in found {
-            let what = if what == maker {
-                format!("`{what}`")
-            } else {
-                format!("`{what}`, which calls `{maker}`,")
-            };
-            self.error(
-                codes::U006,
-                Span::new(self.file, range.0, range.1),
-                format!("{what} while rendering makes another one on every render: make it once, with a top-level `let`, or one per key with `Atom.family`"),
-            );
-        }
-    }
-}
-
-/// Every `fun` under `node` with the type `head` finds for it.
-fn funs<'n>(
-    node: &'n Node,
-    head: &mut impl FnMut(&Node) -> Option<Type>,
-    found: &mut impl FnMut(&'n Node, Type),
-) {
-    if node.kind == K::FunExpr
-        && let Some(ty) = head(node)
-    {
-        found(node, ty);
-    }
-    for child in node.nodes() {
-        funs(child, head, found);
     }
 }
 

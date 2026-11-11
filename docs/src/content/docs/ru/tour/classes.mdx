@@ -1,0 +1,23 @@
+---
+title: Классы и экземпляры
+description: Класс называет, что умеет тип, а экземпляр — как.
+tableOfContents: false
+source_hash: f07dcc418e49f3b8
+---
+
+import TourLesson from "../../../../components/TourLesson.astro";
+
+<TourLesson locale="ru" id="classes">
+
+Класс называет то, что умеет тип, а экземпляр говорит, как это делает
+конкретный тип. В `Describe` одна функция, `describe`, а
+`instance Describe Weather` даёт её для `Weather`.
+
+Второй экземпляр работает для списка любых `a`, которые сами умеют
+описываться: `Describe a =>` и есть это условие. Поэтому
+`describe [Sun, Rain, Sun]` использует оба экземпляра.
+
+**Попробуйте:** вызовите `describe 3`. Компилятор сообщит `FLICK-C001`:
+`Describe Int` нет, и он перечислит, какие экземпляры есть.
+
+</TourLesson>

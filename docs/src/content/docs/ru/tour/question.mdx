@@ -1,0 +1,23 @@
+---
+title: Передача сбоев дальше
+description: "`?` достаёт значение из `Result` или падает с его ошибкой."
+tableOfContents: false
+source_hash: de503e1746ece641
+---
+
+import TourLesson from "../../../../components/TourLesson.astro";
+
+<TourLesson locale="ru" id="question">
+
+`?` передаёт сбой дальше. `parse` возвращает `Result`. В функции, чья
+сигнатура разрешает его ошибку, `(parse a)?` даёт число из `Ok` и падает с
+ошибкой из `Err`. Поэтому `sum` читается как обычная арифметика, а `summed`
+обрабатывает сбой один раз.
+
+С `Option` в функции, которая возвращает `Option`, `?` так же досрочно
+возвращает `None`.
+
+**Попробуйте:** уберите `?` после `parse b`. Компилятор сообщит
+`FLICK-T003`: `Result Invalid Float` — это не `Float`.
+
+</TourLesson>

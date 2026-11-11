@@ -1,0 +1,24 @@
+---
+title: Generic types
+description: A type that takes a type, and functions that work for any of them.
+tableOfContents: false
+---
+
+import TourLesson from "../../../components/TourLesson.astro";
+
+<TourLesson locale="en" id="generics">
+
+A type can take another type as a parameter. `Tree a` is a tree of values of
+some type `a`: a `Tree Int`, a `Tree String`, and so on.
+
+A function over it can be generic too. `to_list : Tree a -> List a` works for
+any `a`, and `size` does not care what the tree holds.
+
+Inside a generic function nothing is known about `a`, so its values can only
+be moved around.
+
+**Try:** write `[value + 1]` in `to_list`. The compiler reports `FLICK-C001`:
+it cannot know that `a` has `+`. The lesson on constraints shows how to ask
+for it.
+
+</TourLesson>

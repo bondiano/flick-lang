@@ -302,12 +302,12 @@ impl<'a> Gen<'a> {
     pub(super) fn tail_logic(&mut self, op: BinOp, lhs: &Expr, rhs: &Expr) {
         let a = self.a;
         let l = self.expr(lhs);
-        let (test, value) = if op == BinOp::And {
-            ("!flickrt.Bool", "false")
+        let (not, value) = if op == BinOp::And {
+            ("!", "false")
         } else {
-            ("flickrt.Bool", "true")
+            ("", "true")
         };
-        let test = call(a, test, [l.doc]);
+        let test = docvec![a, not, self.unboxed(lhs, l, Native::Bool).doc];
         self.emit(docvec![
             a,
             "if ",

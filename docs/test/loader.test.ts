@@ -23,6 +23,21 @@ test("package discovery follows reachable module imports", () => {
   ]);
 });
 
+test("a string that reads like an import is not linked", () => {
+  const code = 'import "./a.js";\nconst s = "taken from " + n + " to ";\nexport const t = "export { x } from " + s;';
+  assert.deepEqual(packages({ "flick-main.js": code, "a.js": 'export * from "b";' }, "flick-main.js"), ["b"]);
+  const dir = path.join(repo, "target/tmp/docs-loader-string");
+  rmSync(dir, { recursive: true, force: true });
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(
+    path.join(dir, "Main.fl"),
+    'module Main exposing (main)\n\nmain : Unit ->{} Unit\nlet main () = Platform.stdout_line "from \\{1} to \\{2}"\n',
+  );
+  execFileSync(flick, ["build", "Main.fl", "--out-dir", "out"], { cwd: dir });
+  const out = execFileSync("node", [path.join(here, "run-linked.ts"), path.join(dir, "out"), "flick-main.js"], { cwd: here, encoding: "utf8" });
+  assert.equal(out, "from 1 to 2\n");
+});
+
 test("a linked build runs as `flick build` output does", () => {
   const dir = path.join(repo, "target/tmp/docs-loader");
   rmSync(dir, { recursive: true, force: true });

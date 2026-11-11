@@ -1,0 +1,19 @@
+---
+title: "Практика: дайте ресурсу владельца"
+description: Поместите захват ресурса внутрь scope.
+tableOfContents: false
+source_hash: e65bf429eaaa241d
+---
+
+import TourLesson from "../../../../components/TourLesson.astro";
+
+<TourLesson locale="ru" id="owner">
+
+Упражнение главы. `main` открывает ресурс через `open_res` вне всякого
+scope, поэтому его никто бы не закрыл, и компилятор сообщает
+`FLICK-G004`.
+
+Дайте ему scope и нажмите **Проверить**. Ресурс записывает, что с ним
+происходит, в список, который `main` печатает одной строкой.
+
+</TourLesson>

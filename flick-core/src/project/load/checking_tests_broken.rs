@@ -124,9 +124,6 @@ fn an_importer_re_exports_on_trust_a_name_the_parser_lost() {
                 class Trans (t : Type -> Type)) =\n  lift : forall a. a -> t a\n";
     let user = "module A.Use exposing (lift)\nimport A.Base exposing (..)\n";
     let (_, diagnostics) = analyzed(&with_use(base, user), None);
-    // a re-export of a name taken on trust does not count as a use of the import
-    let errors: Vec<_> = (diagnostics.iter())
-        .filter(|d| !d.starts_with("FLICK-R012"))
-        .collect();
-    assert_eq!(errors, ["FLICK-S007 unexpected `)`"]);
+    // the import may give what the parser lost, so it is no unused one
+    assert_eq!(diagnostics, ["FLICK-S007 unexpected `)`"]);
 }

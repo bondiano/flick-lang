@@ -64,7 +64,7 @@ func Equals(a, b Value) bool {
 		// a dictionary a value of a GADT holds: the fields beside it decide
 		_, ok := b.(*Dict)
 		return ok
-	case Fn, Poly:
+	case Fn, Fn2, Fn3, Poly:
 		// functions compare by identity on the JS target; Go cannot compare them
 		return false
 	default:
@@ -202,6 +202,15 @@ func hashNumber(x float64) int32 {
 	return optimize(effectCombine(int32(bits>>32), int32(bits)))
 }
 
+// The hashes of the strings every hash of a Bool, a Unit or a variant
+// takes, made once.
+var (
+	hashTrue  = optimize(mix(hashString("true")))
+	hashFalse = optimize(mix(hashString("false")))
+	hashUnit  = optimize(mix(hashString("undefined")))
+	hashOfTag = hashString("_tag")
+)
+
 func hash(a Value) int32 {
 	switch x := a.(type) {
 	case int32:
@@ -213,9 +222,12 @@ func hash(a Value) int32 {
 	case *big.Int:
 		return hashString(x.String())
 	case bool:
-		return optimize(mix(hashString(strconv.FormatBool(x))))
+		if x {
+			return hashTrue
+		}
+		return hashFalse
 	case UnitType:
-		return optimize(mix(hashString("undefined")))
+		return hashUnit
 	case []Value:
 		h := int32(6151)
 		for _, v := range x {
@@ -224,7 +236,7 @@ func hash(a Value) int32 {
 		return optimize(h)
 	case *Data:
 		// the object `{ _tag, _0, … }`: its keys in any order
-		h := int32(12289) ^ effectCombine(hashString("_tag"), hashString(x.Tag))
+		h := int32(12289) ^ effectCombine(hashOfTag, hashString(x.Tag))
 		for i, v := range x.Fields {
 			h ^= effectCombine(hashString(nativeField(x.Tag, i)), hash(v))
 		}
@@ -285,7 +297,7 @@ func ListEquals(fb *Fiber, eq, a, b Value) Value {
 		return false
 	}
 	for i := range xs {
-		if !Bool(Apply(fb, Apply(fb, eq, xs[i]), ys[i])) {
+		if !Bool(Apply2(fb, eq, xs[i], ys[i])) {
 			return false
 		}
 	}
@@ -295,7 +307,7 @@ func ListEquals(fb *Fiber, eq, a, b Value) Value {
 func ListCompare(fb *Fiber, cmp, a, b Value) Value {
 	xs, ys := a.([]Value), b.([]Value)
 	for i := 0; i < len(xs) && i < len(ys); i++ {
-		o := Apply(fb, Apply(fb, cmp, xs[i]), ys[i])
+		o := Apply2(fb, cmp, xs[i], ys[i])
 		if o.(*Data).Tag != EQ.(*Data).Tag {
 			return o
 		}

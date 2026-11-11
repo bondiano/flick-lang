@@ -1,0 +1,22 @@
+---
+title: Loops with a result
+description: "`loop` repeats until `break`, which gives the loop its value."
+tableOfContents: false
+---
+
+import TourLesson from "../../../components/TourLesson.astro";
+
+<TourLesson locale="en" id="break">
+
+`loop { … }` repeats until a `break`. `break value` ends the loop, and the
+loop gives that value: here, the position found, or `None`. So the whole
+`loop` is the result of `binary_search`, an `Option Int`.
+
+`let middle = …` is new on each pass, while the variables `low` and `high`
+narrow the range.
+
+**Try:** write `break 0` in place of the first `break None`. The compiler
+reports `FLICK-T003`: every `break` of a loop gives the same type, here
+`Option Int`.
+
+</TourLesson>

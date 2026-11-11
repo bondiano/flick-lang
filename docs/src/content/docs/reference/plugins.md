@@ -202,7 +202,9 @@ fn check(&self, block: &Block, _: &[u8], facts: &[Fact]) -> Vec<Diagnostic> {
 
 A package may watch calls of names, not only its own blocks. `watch` of its
 `[package]`, beside `plugin`, names them, each `Module.name`,
-`Module.Sub.name` or `*.name` for the name in any module:
+`Module.Sub.name` or `*.name` for the name in any module. It may also name a
+service, `Module.Service`, and a tag, `@maker` or `@cell`; what the plugin
+is told of those is below.
 
 ```toml
 [package]
@@ -229,10 +231,45 @@ dictionary, whether the reference is inside a function, and its applied
 argument count. This includes partial references. The UI plugin uses these
 facts for `FLICK-U003`; it does not change type inference.
 
+A watched service that the signature of a top-level function names is a place
+too: at the function's name, with no arguments and with `binding` saying
+which function it is and, in `gives`, the type it gives when all its arrows
+are applied. The UI plugin warns (`FLICK-U007`) where a function reads atoms
+to give a `Ui`.
+
 A handler made of a `fun` inside the render of a `Ui.view` is found the same
 way: the calls of `Ui.view` and of the constructors of `Ui.Event` are watched,
 and the plugin warns (`FLICK-U002`) where a constructor given a `fun` stands
 inside the first argument of a view the module itself writes.
+
+A plugin may also watch a tag, the attribute that marks values of a kind, as
+`@maker` marks what makes an atom, an action or a view. Each place inside a
+function that names a value the tag reaches, itself or through the functions
+it calls, is then a place with `tagged`: the tag, the name as written, the
+marked value it ends at, and in `inside` the functions around the place from
+the nearest outwards, each with the services of its arrow and whether its
+row is open. The task of a handler runs later, so the functions around a
+`task` are not around what is inside it. The UI plugin refuses
+(`FLICK-U006`) a maker named in a render, a function whose services are
+`Atom.Read` alone.
+
+A watched service is also a place where the function expected names it and
+the code given there asks for more: a service or an error its row does not
+allow. The place carries `lacking`: the function expected, what is not
+allowed as the compiler words it, the services as shown and by qualified
+name, and the errors. The compiler refuses such code itself (`FLICK-E002`);
+an error the plugin gives at the span of the place stands for the
+compiler's, so the plugin can say where the code belongs. The UI plugin
+does so for a render that does more than read atoms (`FLICK-U004`) and for
+the setup of a component.
+
+The tag `@cell` marks a type whose values hold one value each. Where a
+value that is no function would hold such a type at every type its
+variables stand for, the compiler refuses it (`FLICK-T072`) and the place is
+one with `tagged`: the tag, in `named` the value's type as shown, in
+`reaches` the marked type, and nothing in `inside`; `binding` names the
+value, if it has a name. An error the plugin gives there stands for the
+compiler's, as above: the UI plugin says it of an atom (`FLICK-U005`).
 
 ```rust
 fn check_calls(&self, calls: &[CallSite], state: &[u8]) -> Vec<Diagnostic> {

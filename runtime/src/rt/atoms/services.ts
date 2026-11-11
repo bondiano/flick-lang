@@ -4,7 +4,7 @@
 import { tag } from "../../tags.ts";
 import { type Cause, die, raise } from "../cause.ts";
 import { currentCtx, extend, inCtx, runIn } from "../fiber.ts";
-import { implementation, service } from "../handle.ts";
+import { bridgeHooks, implementation, service } from "../handle.ts";
 import { type Layer, memoizable } from "../layer.ts";
 import { Failure } from "../outcome.ts";
 import { addTo } from "../owner.ts";
@@ -40,9 +40,13 @@ export const registryOf = (impl: unknown): Registry | undefined => {
   return registry instanceof Registry ? registry : undefined;
 };
 
-/** The registry of the service `key` in effect here. */
+/**
+ * The registry of the service `key` in effect here: on the kernel, or, as a
+ * service operation does, on the host, where a layer the adapter provides
+ * (`Stream.provide_ Reactivity.Atom.layer`) puts it.
+ */
 export const registryHere = (key: object = REGISTRY): Registry => {
-  const registry = registryOf(implementation(key));
+  const registry = registryOf(implementation(key) ?? bridgeHooks.operation?.(key));
   if (registry === undefined) throw new Error("`Reactivity.Atom.Registry` was not built by its `layer`");
   return registry;
 };

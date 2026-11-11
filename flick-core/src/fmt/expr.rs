@@ -18,18 +18,9 @@ pub(super) enum Part {
     Text(&'static str),
 }
 
-/// Binding strength of a binary operator, weakest first.
+/// Binding strength of a binary operator: the parser's left power.
 fn precedence(kind: K) -> u8 {
-    match kind {
-        K::PipeGt => 1,
-        K::OrOr => 2,
-        K::AndAnd => 3,
-        K::EqEq | K::NotEq | K::Lt | K::Le | K::Gt | K::Ge => 4,
-        K::PlusPlus => 5,
-        K::Plus | K::Minus => 6,
-        K::Star | K::Slash | K::Percent => 7,
-        _ => 8,
-    }
+    kind.binding_power().map_or(0, |(left, _)| left)
 }
 
 fn operator(n: &Node) -> Option<Token> {

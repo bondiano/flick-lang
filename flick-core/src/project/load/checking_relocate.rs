@@ -245,6 +245,7 @@ fn relocate_value(value: &mut serde_json::Value, child: &str, parent: &str, loca
     }
 }
 
+#[cfg(test)]
 fn relocate_name(
     fields: &mut serde_json::Map<String, serde_json::Value>,
     child: &str,
@@ -309,92 +310,5 @@ fn rename_pattern(pattern: &mut ir::Pat, local: &str) {
             }
         }
         ir::Pat::Wild | ir::Pat::Lit(_) => {}
-    }
-}
-
-/// The reference model checks the same flattened runtime names as the IR.
-/// This view is not published as the source module's `.iface`.
-fn relocate_declarations(
-    interface: &Interface,
-    child: &str,
-    parent: &str,
-    local: &str,
-) -> Interface {
-    let mut own = interface.clone();
-    own.instances.retain(|i| i.module == child);
-    // Only these two fields enter the flattened model view. Serializing the
-    // entire source interface also retains its nested module/ABI codecs in
-    // the browser compiler, although none of that metadata is consumed here.
-    let mut value = serde_json::to_value((&own.exports, &own.instances))
-        .expect("declarations serialize");
-    relocate_decl_value(&mut value, child, parent, local);
-    let (exports, instances) =
-        serde_json::from_value(value).expect("declarations keep their shape");
-    let mut declarations = Interface { exports, instances, ..Interface::default() };
-    // Model method lookup uses the method's field name, while the runtime
-    // value in the merged file has a prefixed symbol.
-    let method_names: HashSet<String> = own
-        .exports
-        .iter()
-        .filter_map(|e| e.definition.as_ref())
-        .filter_map(|d| match &d.form {
-            types::Form::Class { methods, .. } => Some(methods),
-            _ => None,
-        })
-        .flat_map(|methods| methods.iter().cloned())
-        .collect();
-    let methods: Vec<_> = declarations
-        .exports
-        .iter()
-        .filter(|e| e.entity.namespace == Namespace::Value)
-        .cloned()
-        .filter_map(|mut e| {
-            let prefix = format!("{local}$");
-            if !e.entity.name.starts_with(&prefix) {
-                return None;
-            }
-            e.entity.name.replace_range(..prefix.len(), "");
-            method_names.contains(&e.entity.name).then_some(e)
-        })
-        .collect();
-    declarations.exports.extend(methods);
-    declarations
-}
-
-fn relocate_decl_value(value: &mut serde_json::Value, child: &str, parent: &str, local: &str) {
-    match value {
-        serde_json::Value::Object(fields) => {
-            relocate_name(fields, child, parent, local, false);
-            if let Some(serde_json::Value::String(name)) = fields.get_mut("parent") {
-                *name = format!("{local}${name}");
-            }
-            if let Some(serde_json::Value::Array(constructors)) = fields.get_mut("constructors") {
-                for constructor in constructors {
-                    if let Some(name) = constructor.as_str() {
-                        *constructor = format!("{local}${name}").into();
-                    }
-                }
-            }
-            if let Some(serde_json::Value::Array(entries)) = fields.get_mut("entries") {
-                for entry in entries {
-                    if let serde_json::Value::Array(pair) = entry
-                        && let Some(serde_json::Value::String(label)) = pair.first_mut()
-                        && let Some(member) =
-                            label.strip_prefix(child).and_then(|s| s.strip_prefix('.'))
-                    {
-                        *label = format!("{parent}.{local}${member}");
-                    }
-                }
-            }
-            for field in fields.values_mut() {
-                relocate_decl_value(field, child, parent, local);
-            }
-        }
-        serde_json::Value::Array(items) => {
-            for item in items {
-                relocate_decl_value(item, child, parent, local);
-            }
-        }
-        _ => {}
     }
 }

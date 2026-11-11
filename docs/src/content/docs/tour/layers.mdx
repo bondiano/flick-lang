@@ -1,0 +1,23 @@
+---
+title: Swapping a service
+description: A test gives a function a service of its own.
+tableOfContents: false
+---
+
+import TourLesson from "../../../components/TourLesson.astro";
+
+<TourLesson locale="en" id="layers">
+
+Because a function names the services it needs, a test can give it others.
+`greeting` asks `Clock` for the hour, and `at 9` is a layer whose clock always
+says 9. Its type, `Layer {} none {Clock}`, says that it needs nothing, fails
+with nothing and provides a `Clock`.
+
+The same code runs with a real clock in production and with a fixed one in a
+test, as the last lines do: they check the greeting at 11 o'clock. When a
+function needs several services, `Layer.merge` combines their layers.
+
+**Try:** call `greeting ()` without `provide`. The compiler reports
+`FLICK-E002`: `main` has no `Clock`.
+
+</TourLesson>

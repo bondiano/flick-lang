@@ -1,0 +1,22 @@
+module Main exposing (main)
+
+type error Invalid = Invalid String
+
+parse : String -> Result Invalid Float
+let parse text =
+  match String.to_number text with
+  | Some n -> Ok n
+  | None -> Err (Invalid text)
+
+sum : String -> String ->{; Invalid} Float
+let sum a b = (parse a)? + (parse b)?
+
+summed : String -> String ->{} String
+let summed a b =
+  try show (sum a b) with
+  | Invalid text -> "not a number: " ++ text
+
+main : Unit ->{} Unit
+let main () =
+  Platform.stdout_line (summed "1" "2.5")
+  Platform.stdout_line (summed "1" "two")

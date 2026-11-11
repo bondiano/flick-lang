@@ -1,0 +1,24 @@
+---
+title: Patterns
+description: Literals, choices with `|`, conditions with `when`, and lists.
+tableOfContents: false
+---
+
+import TourLesson from "../../../components/TourLesson.astro";
+
+<TourLesson locale="en" id="patterns">
+
+Patterns can do more than name a form. In `describe`:
+
+- `[]` is the empty list and `[only]` a list of one element.
+- `[0, ..._] | [1, ..._]`: `|` between patterns takes either, and `..._` is
+  the rest of the list, ignored.
+- `when` adds a condition to an arm, and `...rest` names the rest.
+
+Arms are tried from the top, and the first that fits wins.
+
+**Try:** delete the last arm. The compiler reports `FLICK-T009` and shows a
+list that no arm covers: an arm with `when` may not match, so it does not
+count.
+
+</TourLesson>

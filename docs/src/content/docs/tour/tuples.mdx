@@ -1,0 +1,24 @@
+---
+title: Tuples
+description: A few values side by side, and a pattern that takes them apart.
+tableOfContents: false
+---
+
+import TourLesson from "../../../components/TourLesson.astro";
+
+<TourLesson locale="en" id="tuples">
+
+A tuple holds a fixed number of values, each of its own type, in
+parentheses: `("Ada", 36)` is a `(String, Int)`. It suits a function that
+gives back two things at once, like `min_max`.
+
+A pattern takes a tuple apart: `let (low, high) = …` names both parts.
+
+`List.minimum` gives an `Option`, because an empty list has no minimum, and
+`Option.with_default 0` picks 0 in that case. Options have a lesson of their
+own later in this chapter.
+
+**Try:** write `let (low, high, mid) = …`. The compiler reports
+`FLICK-T003`: `min_max` gives a pair, not three values.
+
+</TourLesson>

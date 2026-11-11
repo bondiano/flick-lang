@@ -1,0 +1,21 @@
+---
+title: Constraints
+description: A generic function that asks for a class.
+tableOfContents: false
+---
+
+import TourLesson from "../../../components/TourLesson.astro";
+
+<TourLesson locale="en" id="constraints">
+
+A constraint lets a generic function use a class.
+`square : Numeric a => a -> a` works for any numeric type, so one function
+squares an `Int` and a `Float`. `mean` divides, so it asks for `Floating`.
+
+Classes and functions of other modules come in with `import`:
+`import Numeric exposing (Floating, Numeric)`.
+
+**Try:** remove `Numeric a =>` from `square`. The compiler reports
+`FLICK-C001`: it cannot deduce `Numeric a`.
+
+</TourLesson>

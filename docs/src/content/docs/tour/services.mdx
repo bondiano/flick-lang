@@ -1,0 +1,23 @@
+---
+title: Services
+description: What a function needs, and `provide` to give it one implementation.
+tableOfContents: false
+---
+
+import TourLesson from "../../../components/TourLesson.astro";
+
+<TourLesson locale="en" id="services">
+
+A service is something a function needs from outside: a database, a logger,
+a way to greet. `service Greeter =` lists its operations, and
+`welcome : String ->{Greeter; none} String` says that `welcome` needs it;
+`none` means it fails with nothing.
+
+`Layer.succeed Greeter { … }` builds an implementation from a record of the
+operations, and `provide layer { … }` makes it available inside a block. The
+same `welcome` greets politely or casually, depending on what its caller
+provides.
+
+**Try:** add a third layer that greets in another language, and provide it.
+
+</TourLesson>

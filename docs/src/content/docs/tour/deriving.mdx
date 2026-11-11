@@ -1,0 +1,21 @@
+---
+title: Deriving
+description: Let the compiler write equality, ordering and `show` for a type.
+tableOfContents: false
+---
+
+import TourLesson from "../../../components/TourLesson.astro";
+
+<TourLesson locale="en" id="deriving">
+
+`deriving` asks the compiler to write the instances of common classes for a
+type: `Eq` for `==`, `Ord` for ordering, `Show` for `show`.
+
+A derived `Ord` compares by the order of the forms, then by the values
+inside: hearts come before spades, and two hearts compare by their number.
+`List.sort` needs `Ord`, and `compare` gives `LT`, `EQ` or `GT`.
+
+**Try:** take `Ord` off `Card`. The compiler reports `FLICK-C001` at
+`List.sort`: there is no instance `Ord Card`.
+
+</TourLesson>

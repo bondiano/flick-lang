@@ -1,0 +1,22 @@
+---
+title: A resource that would leak
+description: The compiler rejects a use of a resource after its scope.
+tableOfContents: false
+---
+
+import TourLesson from "../../../components/TourLesson.astro";
+
+<TourLesson locale="en" id="leaks">
+
+This program does not compile, on purpose. `reader` opens a file in a scope
+and returns a function that reads it. But the scope closes the file when it
+ends, so that function would read a closed file.
+
+The type `File s` belongs to the region `s` of its scope, and the compiler
+reports `FLICK-G002`: the returned function uses a region that is no longer
+live.
+
+**Try:** read inside the scope: make the result type of `reader` `String`
+and its last line `Files.read file`. The program compiles.
+
+</TourLesson>

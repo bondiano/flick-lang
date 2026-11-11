@@ -169,7 +169,7 @@ func EffectHead(fb *Fiber, task Value) Value {
 func EffectReduce(fb *Fiber, zero, f, xs Value) Value {
 	acc := zero
 	for _, x := range List(xs) {
-		acc = Run(fb, apply2(fb, f, acc, x))
+		acc = Run(fb, Apply2(fb, f, acc, x))
 	}
 	return acc
 }

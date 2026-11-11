@@ -1,0 +1,22 @@
+---
+title: Deriving
+description: Пусть компилятор напишет для типа равенство, порядок и `show`.
+tableOfContents: false
+source_hash: 7ab2c9a71773f69b
+---
+
+import TourLesson from "../../../../components/TourLesson.astro";
+
+<TourLesson locale="ru" id="deriving">
+
+`deriving` просит компилятор написать для типа экземпляры распространённых
+классов: `Eq` для `==`, `Ord` для порядка, `Show` для `show`.
+
+Выведенный `Ord` сравнивает сначала по порядку форм, затем по значениям
+внутри: черви идут раньше пик, а две карты червей сравниваются по номеру.
+`List.sort` нужен `Ord`, а `compare` возвращает `LT`, `EQ` или `GT`.
+
+**Попробуйте:** уберите `Ord` у `Card`. Компилятор сообщит `FLICK-C001` у
+`List.sort`: экземпляра `Ord Card` нет.
+
+</TourLesson>

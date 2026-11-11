@@ -340,9 +340,9 @@ func matchPair(self, that *Duration, millis func(a, b float64) Value, nanos func
 func DurationMatchPair(fb *Fiber, that, options, self Value) Value {
 	r := record(options)
 	return matchPair(dur(self), dur(that),
-		func(a, b float64) Value { return apply2(fb, r.Get("onMillis"), a, b) },
-		func(a, b *big.Int) Value { return apply2(fb, r.Get("onNanos"), a, b) },
-		func() Value { return apply2(fb, r.Get("onInfinity"), self, that) })
+		func(a, b float64) Value { return Apply2(fb, r.Get("onMillis"), a, b) },
+		func(a, b *big.Int) Value { return Apply2(fb, r.Get("onNanos"), a, b) },
+		func() Value { return Apply2(fb, r.Get("onInfinity"), self, that) })
 }
 
 func DurationAdd(a, b Value) Value {

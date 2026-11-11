@@ -1,0 +1,24 @@
+---
+title: Преобразования
+description: "`into` превращает значение в тип, который ждёт его место."
+tableOfContents: false
+source_hash: 8ca813b8568816d8
+---
+
+import TourLesson from "../../../../components/TourLesson.astro";
+
+<TourLesson locale="ru" id="into">
+
+`into` превращает значение в тип, который ждёт его место, если ничего не
+теряется. `half` делит на `2.0`, поэтому `into n` становится `Float`.
+
+Свои типы программа преобразует так же. `instance Into Celsius Fahrenheit`
+говорит, как это сделать, а `degrees` принимает `Fahrenheit`, поэтому
+`into (Celsius 100.0)` превращается в него. У `unboxed type` одна форма, и
+во время выполнения он ничего не стоит.
+
+**Попробуйте:** напишите в `main` `let x = into 3` и напечатайте `x`.
+Компилятор сообщит `FLICK-C002`: ничто не говорит, какой тип должен быть у
+`x`.
+
+</TourLesson>

@@ -59,7 +59,7 @@ func runCollect(fb *Fiber, self *Channel) []Value {
 
 func ChannelRunFold(fb *Fiber, initial, f, self Value) Value {
 	return runFold(fb, channelOf(self), Apply(fb, initial, Unit), func(fb *Fiber, z, o Value) Value {
-		return Apply(fb, Apply(fb, f, z), o)
+		return Apply2(fb, f, z, o)
 	})
 }
 
