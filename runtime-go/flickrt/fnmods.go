@@ -155,7 +155,7 @@ func FilterZipWith(fb *Fiber, right, f, left, i Value) Value {
 	if !isOk(r) {
 		return r
 	}
-	return Ok(apply2(fb, f, value(l), value(r)))
+	return Ok(Apply2(fb, f, value(l), value(r)))
 }
 
 func FilterZip(fb *Fiber, right, left, i Value) Value {
@@ -193,14 +193,14 @@ func FunctionConstTrue(Value) Value     { return true }
 func FunctionConstFalse(Value) Value    { return false }
 func FunctionConstVoid(Value) Value     { return Unit }
 
-func FunctionFlip(fb *Fiber, f, b, a Value) Value      { return apply2(fb, f, a, b) }
+func FunctionFlip(fb *Fiber, f, b, a Value) Value      { return Apply2(fb, f, a, b) }
 func FunctionCompose(fb *Fiber, bc, ab, a Value) Value { return Apply(fb, bc, Apply(fb, ab, a)) }
 func FunctionAbsurd(Value) Value                       { panic(Defect{"Error: Cannot call absurd"}) }
 func FunctionSK(_, b Value) Value                      { return b }
 
 func FunctionTupled(fb *Fiber, f, pair Value) Value {
 	p := List(pair)
-	return apply2(fb, f, p[0], p[1])
+	return Apply2(fb, f, p[0], p[1])
 }
 
 func FunctionUntupled(fb *Fiber, f, a, b Value) Value { return Apply(fb, f, []Value{a, b}) }

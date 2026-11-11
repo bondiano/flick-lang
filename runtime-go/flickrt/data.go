@@ -64,7 +64,7 @@ func Equals(a, b Value) bool {
 		// a dictionary a value of a GADT holds: the fields beside it decide
 		_, ok := b.(*Dict)
 		return ok
-	case Fn, Poly:
+	case Fn, Fn2, Fn3, Poly:
 		// functions compare by identity on the JS target; Go cannot compare them
 		return false
 	default:
@@ -297,7 +297,7 @@ func ListEquals(fb *Fiber, eq, a, b Value) Value {
 		return false
 	}
 	for i := range xs {
-		if !Bool(Apply(fb, Apply(fb, eq, xs[i]), ys[i])) {
+		if !Bool(Apply2(fb, eq, xs[i], ys[i])) {
 			return false
 		}
 	}
@@ -307,7 +307,7 @@ func ListEquals(fb *Fiber, eq, a, b Value) Value {
 func ListCompare(fb *Fiber, cmp, a, b Value) Value {
 	xs, ys := a.([]Value), b.([]Value)
 	for i := 0; i < len(xs) && i < len(ys); i++ {
-		o := Apply(fb, Apply(fb, cmp, xs[i]), ys[i])
+		o := Apply2(fb, cmp, xs[i], ys[i])
 		if o.(*Data).Tag != EQ.(*Data).Tag {
 			return o
 		}

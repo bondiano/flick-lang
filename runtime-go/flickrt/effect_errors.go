@@ -37,7 +37,7 @@ func EffectCatchCauseFilter(fb *Fiber, filter, f, task Value) Value {
 		if !isOk(r) {
 			return failCause(causeOfFailure(value(r)))
 		}
-		return Run(fb, apply2(fb, f, value(r), failureOf(c)))
+		return Run(fb, Apply2(fb, f, value(r), failureOf(c)))
 	})
 }
 
@@ -81,7 +81,7 @@ func EffectTapCauseFilter(fb *Fiber, filter, f, task Value) Value {
 		if !isOk(r) {
 			return nil
 		}
-		return apply2(fb, f, value(r), failureOf(c))
+		return Apply2(fb, f, value(r), failureOf(c))
 	})
 }
 
@@ -176,7 +176,7 @@ func EffectOnErrorFilter(fb *Fiber, filter, f, task Value) Value {
 		if !isOk(r) {
 			return nil
 		}
-		return apply2(fb, f, value(r), failureOf(e.cause))
+		return Apply2(fb, f, value(r), failureOf(e.cause))
 	})
 }
 
@@ -195,7 +195,7 @@ func EffectOnExitFilter(fb *Fiber, filter, f, task Value) Value {
 		if !isOk(r) {
 			return nil
 		}
-		return apply2(fb, f, value(r), e)
+		return Apply2(fb, f, value(r), e)
 	})
 }
 

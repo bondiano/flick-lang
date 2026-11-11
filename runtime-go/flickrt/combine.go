@@ -30,7 +30,7 @@ func reducer(f func(*Fiber, Value, Value) Value, initial Value) *Combiner {
 func comb(c Value) *Combiner { return c.(*Combiner) }
 
 func CombinerMake(f Value) Value {
-	return combiner(func(fb *Fiber, a, b Value) Value { return apply2(fb, f, a, b) })
+	return combiner(func(fb *Fiber, a, b Value) Value { return Apply2(fb, f, a, b) })
 }
 func CombinerCombine(fb *Fiber, c, a, b Value) Value { return comb(c).combine(fb, a, b) }
 
@@ -41,7 +41,7 @@ func CombinerFlip(c Value) Value {
 
 func orderOf(cmp Value) func(*Fiber, Value, Value) int {
 	return func(fb *Fiber, a, b Value) int {
-		switch apply2(fb, cmp, a, b).(*Data).Tag {
+		switch Apply2(fb, cmp, a, b).(*Data).Tag {
 		case LT.(*Data).Tag:
 			return -1
 		case GT.(*Data).Tag:
@@ -152,7 +152,7 @@ func TupleReducer(reducers Value) Value {
 }
 
 func ReducerMake(f, initial Value) Value {
-	return reducer(func(fb *Fiber, a, b Value) Value { return apply2(fb, f, a, b) }, initial)
+	return reducer(func(fb *Fiber, a, b Value) Value { return Apply2(fb, f, a, b) }, initial)
 }
 
 func ReducerInitialValue(r Value) Value              { return comb(r).initial }

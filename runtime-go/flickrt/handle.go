@@ -60,6 +60,10 @@ func around(f Value, k func(Eff) Value) Value {
 		return Poly(func(fb *Fiber, dicts ...Value) Value { return around(g(fb, dicts...), k) })
 	case Fn:
 		return Fn(func(fb *Fiber, a Value) Value { return around(g(fb, a), k) })
+	case Fn2:
+		return Fn2(func(fb *Fiber, a, b Value) Value { return around(g(fb, a, b), k) })
+	case Fn3:
+		return Fn3(func(fb *Fiber, a, b, c Value) Value { return around(g(fb, a, b, c), k) })
 	case Eff:
 		return k(g)
 	}

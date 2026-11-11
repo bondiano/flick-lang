@@ -203,7 +203,7 @@ func GraphAstar(fb *Fiber, config, v Value) Value {
 		outgoing, edgeRows := g.rows(false)
 		weights := g.weights(fb, c.Get("cost"), negativeOrNaN, "A* algorithm requires non-negative edge weights")
 		heuristic := func(data Value) float64 {
-			h := apply2(fb, c.Get("heuristic"), data, g.nodes[target].data).(float64)
+			h := Apply2(fb, c.Get("heuristic"), data, g.nodes[target].data).(float64)
 			if !finite(h) {
 				graphFail("A* algorithm requires finite heuristic values")
 			}

@@ -463,7 +463,7 @@ func GraphComplement(fb *Fiber, f, self Value) Value {
 			if i == j || marks[j] == i+1 {
 				continue
 			}
-			out.addEdge(i, j, apply2(fb, f, g.nodes[i].data, g.nodes[j].data))
+			out.addEdge(i, j, Apply2(fb, f, g.nodes[i].data, g.nodes[j].data))
 		}
 	}
 	return out

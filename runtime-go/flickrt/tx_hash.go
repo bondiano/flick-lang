@@ -133,7 +133,7 @@ func TxHashMapFlatMap(fb *Fiber, f, m Value) Value {
 		current := t.get(fb, txMapOf(m))
 		result := &TxHashMap{newTxRef(HashMapWith(hmap(current).w))}
 		for _, e := range hmap(current).all() {
-			entries := HashMapToList(t.get(fb, txMapOf(Run(fb, apply2(fb, f, e.value, e.key)))))
+			entries := HashMapToList(t.get(fb, txMapOf(Run(fb, Apply2(fb, f, e.value, e.key)))))
 			t.update(fb, result.ref, func(v Value) Value { return HashMapSetMany(fb, entries, v) })
 		}
 		return result
@@ -160,7 +160,7 @@ func TxHashMapFindFirst(fb *Fiber, f, m Value) Value {
 func TxHashMapForEach(fb *Fiber, f, m Value) Value {
 	return txDo(fb, func(fb *Fiber, t *tx) Value {
 		for _, e := range hmap(t.get(fb, txMapOf(m))).all() {
-			Run(fb, apply2(fb, f, e.value, e.key))
+			Run(fb, Apply2(fb, f, e.value, e.key))
 		}
 		return Unit
 	})

@@ -387,7 +387,7 @@ func ending(fb *Fiber, name, options Value, scope *Owner) *span {
 			if exit != nil {
 				how = Some(failureOf(exit))
 			}
-			return Run(fb, Apply(fb, Apply(fb, onEnd, s), how))
+			return Run(fb, Apply2(fb, onEnd, s, how))
 		})
 	}
 	return s

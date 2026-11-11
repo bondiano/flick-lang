@@ -196,7 +196,7 @@ func identical(a, b Value) bool {
 	case []Value:
 		y, ok := b.([]Value)
 		return ok && len(x) == len(y) && (len(x) == 0 || &x[0] == &y[0])
-	case Fn, Poly:
+	case Fn, Fn2, Fn3, Poly:
 		return false
 	}
 	return Same(a, b)

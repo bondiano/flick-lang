@@ -13,6 +13,7 @@ bootstrap/inline_pack
 bootstrap/inline_pack_nominals
 bootstrap/packed_module
 bootstrap/stderr
+codegen/apply_order
 codegen/applicative_do
 codegen/category_classes
 codegen/classes

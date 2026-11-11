@@ -28,7 +28,7 @@ func running(f Value) func(*Fiber, []Value, Value) {
 
 // runningKeyed is `runAll` of the Flick function `f` of a batch and its key.
 func runningKeyed(f Value) func(*Fiber, []Value, Value) {
-	return func(fb *Fiber, entries []Value, key Value) { Run(fb, Apply(fb, Apply(fb, f, entries), key)) }
+	return func(fb *Fiber, entries []Value, key Value) { Run(fb, Apply2(fb, f, entries, key)) }
 }
 
 // batchKeyOf is a batch key of the Flick function `f` of an entry.
@@ -127,7 +127,7 @@ func RequestResolverAround(before, after, self Value) Value {
 				return masked(fb, outer, func() Value { inner(fb, entries, key); return Unit })
 			})
 			_, released := catch(func() Value {
-				return masked(fb, outer+1, func() Value { return Run(fb, Apply(fb, Apply(fb, after, entries), a)) })
+				return masked(fb, outer+1, func() Value { return Run(fb, Apply2(fb, after, entries, a)) })
 			})
 			if cause = finalized(cause, released); cause != nil { // then the failure of `after`
 				panic(&Failure{cause})

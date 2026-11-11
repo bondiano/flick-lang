@@ -50,7 +50,7 @@ func (s *span) addHeaderAttributes(fb *Fiber, phase string, headers *Record, fil
 		names = stringsOf(ns)
 	}
 	for i, name := range headers.keys {
-		if !Apply(fb, Apply(fb, filter, name), phase).(bool) {
+		if !Apply2(fb, filter, name, phase).(bool) {
 			continue
 		}
 		v := headers.vals[i]

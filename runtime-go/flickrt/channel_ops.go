@@ -220,7 +220,7 @@ func ChannelMapEffect(f, self Value) Value {
 func ChannelMapAccum(initial, f, self Value) Value {
 	return channelMapAccum(channelOf(self), func(fb *Fiber) Value { return Apply(fb, initial, Unit) },
 		func(fb *Fiber, s, o Value) (Value, []Value) {
-			pair := List(Run(fb, Apply(fb, Apply(fb, f, s), o)))
+			pair := List(Run(fb, Apply2(fb, f, s, o)))
 			return pair[0], List(pair[1])
 		})
 }

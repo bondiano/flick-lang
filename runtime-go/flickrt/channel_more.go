@@ -184,6 +184,6 @@ func ChannelAcquireUseRelease(acquire, use, release Value) Value {
 	return channelAcquireUseRelease(
 		func(fb *Fiber) Value { return Run(fb, acquire) },
 		func(fb *Fiber, a Value) *Channel { return channelOf(Apply(fb, use, a)) },
-		func(fb *Fiber, a Value, exit *Exit) Value { return Run(fb, apply2(fb, release, a, exit)) },
+		func(fb *Fiber, a Value, exit *Exit) Value { return Run(fb, Apply2(fb, release, a, exit)) },
 	)
 }

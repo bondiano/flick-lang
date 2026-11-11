@@ -181,7 +181,7 @@ func ChunkSeparate(c Value) Value                { return chunkPair(ArraySeparat
 func ChunkReduce(fb *Fiber, b, f, c Value) Value {
 	acc := b
 	for _, x := range items(c) {
-		acc = apply2(fb, f, acc, x)
+		acc = Apply2(fb, f, acc, x)
 	}
 	return acc
 }
@@ -189,7 +189,7 @@ func ChunkReduce(fb *Fiber, b, f, c Value) Value {
 func ChunkReduceRight(fb *Fiber, b, f, c Value) Value {
 	acc, in := b, items(c)
 	for i := len(in) - 1; i >= 0; i-- {
-		acc = apply2(fb, f, acc, in[i])
+		acc = Apply2(fb, f, acc, in[i])
 	}
 	return acc
 }

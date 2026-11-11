@@ -36,7 +36,7 @@ func StreamRunLast(fb *Fiber, s Value) Value {
 func StreamRunFoldEffect(fb *Fiber, initial, f, s Value) Value {
 	return runFold(fb, streamOf(s).ch, initial, func(fb *Fiber, z, chunk Value) Value {
 		for _, x := range chunk.([]Value) {
-			z = Run(fb, apply2(fb, f, z, x))
+			z = Run(fb, Apply2(fb, f, z, x))
 		}
 		return z
 	})
