@@ -75,6 +75,7 @@ impl Diagnostic {
     }
 
     #[must_use]
+    #[cfg_attr(target_arch = "wasm32", inline(never))]
     pub fn with_span(self, span: Span) -> Self {
         Diagnostic {
             span: Some(span),

@@ -343,6 +343,8 @@ impl BinOp {
 }
 
 impl Expr {
+    // Share initialization of the large IR node in the browser compiler.
+    #[cfg_attr(target_arch = "wasm32", inline(never))]
     pub fn new(kind: ExprKind, span: Span) -> Self {
         Expr {
             kind,
