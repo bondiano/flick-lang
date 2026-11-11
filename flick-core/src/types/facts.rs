@@ -136,6 +136,7 @@ impl Checker<'_> {
                     binding: None,
                     generated: call.span.start >= self.generated,
                     tagged: None,
+                    lacking: None,
                 }
             })
             .collect::<Vec<_>>();

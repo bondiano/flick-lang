@@ -74,6 +74,7 @@ impl Checker<'_> {
                     refinement: None,
                     generated: range.0 >= self.generated,
                     tagged: None,
+                    lacking: None,
                     binding: Some(flick_plugin::Binding {
                         module: self.env.module.clone(),
                         name: binding.clone(),
@@ -181,44 +182,6 @@ impl Checker<'_> {
 }
 
 impl Checker<'_> {
-    /// Whether `ty` is a render: a function whose services are `Atom.Read`
-    /// alone, as a view's render and a derived atom's computation are.
-    pub(crate) fn reads_only(&mut self, ty: &Type) -> bool {
-        let Type::Fun {
-            effects: Some(effects),
-            ..
-        } = self.bare(ty)
-        else {
-            return false;
-        };
-        let services = self.store.normalize(&effects.services);
-        services.tails.is_empty()
-            && services
-                .entries
-                .iter()
-                .filter_map(|(l, _)| l.name())
-                .eq(lang::label(Lang::AtomRead))
-    }
-
-    /// Whether `ty` is the setup of a component: a function whose services
-    /// are `Setup` alone.
-    pub(crate) fn setup_only(&mut self, ty: &Type) -> bool {
-        let Type::Fun {
-            effects: Some(effects),
-            ..
-        } = self.bare(ty)
-        else {
-            return false;
-        };
-        let services = self.store.normalize(&effects.services);
-        services.tails.is_empty()
-            && services
-                .entries
-                .iter()
-                .filter_map(|(l, _)| l.name())
-                .eq(lang::label(Lang::Setup))
-    }
-
     /// `ty` resolved, without its captures and quantifiers.
     pub(super) fn bare(&self, ty: &Type) -> Type {
         let mut ty = self.store.resolve(ty);

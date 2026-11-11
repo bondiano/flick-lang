@@ -364,21 +364,9 @@ impl Checker<'_> {
             .flatten()
             .collect::<Vec<_>>()
             .join(" and ");
-        if let Site::Expected(ty, _) = &self.sites[e.site]
-            && self.reads_only(&ty.clone())
-        {
-            return self.render_excess(e, &list);
-        }
-        if let Site::Expected(ty, _) = &self.sites[e.site]
-            && self.setup_only(&ty.clone())
-        {
-            let diagnostic = Diagnostic::error(
-                codes::E002,
-                format!("a component's setup runs once per instance, so {list} is not allowed in it"),
-                e.span,
-            ).with_fix(|| ("read atoms in the component's last expression, its render, as `ui { let x = … }`, or make an `Atom.derived` here", Vec::new()));
-            self.diagnostics.push(diagnostic);
-            return;
+        if let Site::Expected(ty, _) = &self.sites[e.site] {
+            let ty = ty.clone();
+            self.lacking_under(&ty, e.span, &list, (&e.services, &e.labels, &e.errors));
         }
         let (bound, needer, written) = match &self.sites[e.site] {
             Site::Signature(name, written) => (
@@ -425,35 +413,6 @@ impl Checker<'_> {
             };
         }
         self.diagnostics.push(diagnostic);
-    }
-
-    /// A render that does more than read atoms.
-    fn render_excess(&mut self, e: &Excess, list: &str) {
-        self.diagnostics.push(
-            Diagnostic::error(
-                codes::U004,
-                format!(
-                    "a view's render and a derived atom only read atoms: {list} is not allowed here"
-                ),
-                e.span,
-            ).with_fix(|| {
-        let is = |l: Lang| e.labels.iter().any(|s| lang::label(l) == s.name());
-        let writes = is(Lang::AtomWrite) || is(Lang::AtomRegistry);
-        let (setup, document) = (is(Lang::Setup), is(Lang::UiDocument));
-        let fixes = [
-            setup.then_some("call it before a component's last expression, in its setup, which runs once per instance"),
-            document.then_some("reach the DOM in a task: of an `Action`, `Ui.on_mount` or `Ui.watch`"),
-            writes.then_some("write atoms in an `Action`, which runs on an event"),
-            (!writes && !setup && !document && !e.services.is_empty())
-                .then_some("run the task as `Atom.task` and read its result"),
-            (!e.errors.is_empty()).then_some(
-                "handle the failure here, or render with `Ui.suspended`, which gives it a view",
-            ),
-        ];
-        let fix = fixes.into_iter().flatten().collect::<Vec<_>>().join("; ");
-                (fix, Vec::new())
-            }),
-        );
     }
 }
 

@@ -152,6 +152,28 @@ pub struct CallSite {
     pub generated: bool,
     /// What marks the value named here, for a tag the package watches.
     pub tagged: Option<Tagged>,
+    /// What the code here asks for that a function naming the watched
+    /// service does not allow.
+    pub lacking: Option<Lacking>,
+}
+
+/// Code that asks for more than the function expected at its place allows,
+/// where that function's row names a service the package watches. The
+/// compiler refuses it in its own words; an error the plugin gives at the
+/// place's span stands for the compiler's.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Lacking {
+    /// The function expected: its services and whether its row is open.
+    pub allowed: Enclosing,
+    /// What is not allowed, as the compiler's message words it: ``service
+    /// `Write` ``, or ``services `Log`, `Clock` and error `Missing` ``.
+    pub what: String,
+    /// The services not allowed, as shown, and those of them with a name,
+    /// qualified.
+    pub services: Vec<String>,
+    pub labels: Vec<String>,
+    /// The errors not allowed, as shown.
+    pub errors: Vec<String>,
 }
 
 /// A value a tag marks, where a module names it inside a function: `watch`

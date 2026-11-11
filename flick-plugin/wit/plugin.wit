@@ -247,6 +247,19 @@ interface types {
   /// up to the nearest `task`.
   record tagged { tag: string, named: string, reaches: string, inside: list<enclosing> }
 
+  /// Code that asks for more than the function expected at its place
+  /// allows, where that function's row names a watched service: the
+  /// function, what is not allowed as the compiler words it, the services
+  /// as shown and by qualified name, and the errors. An error of
+  /// `check-calls` at the place's span stands for the compiler's own.
+  record lacking {
+    allowed: enclosing,
+    what: string,
+    services: list<string>,
+    labels: list<string>,
+    errors: list<string>,
+  }
+
   /// A place that calls a name the plugin's package watches: the module and
   /// the name as the compiler knows them, where the call is written, its
   /// arguments, and, for a `T$parse`, how `T` checks its value. Every span
@@ -263,6 +276,9 @@ interface types {
     generated: bool,
     /// What marks the value named here, for a tag the package watches.
     tagged: option<tagged>,
+    /// What the code here asks for that a function naming the watched
+    /// service does not allow.
+    lacking: option<lacking>,
   }
 
   enum highlight-kind { keyword, parameter }

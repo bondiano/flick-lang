@@ -97,6 +97,7 @@ mod tests {
             binding: None,
             generated: false,
             tagged: None,
+            lacking: None,
         }
     }
 

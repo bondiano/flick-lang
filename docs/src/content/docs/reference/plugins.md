@@ -253,6 +253,16 @@ row is open. The task of a handler runs later, so the functions around a
 (`FLICK-U006`) a maker named in a render, a function whose services are
 `Atom.Read` alone.
 
+A watched service is also a place where the function expected names it and
+the code given there asks for more: a service or an error its row does not
+allow. The place carries `lacking`: the function expected, what is not
+allowed as the compiler words it, the services as shown and by qualified
+name, and the errors. The compiler refuses such code itself (`FLICK-E002`);
+an error the plugin gives at the span of the place stands for the
+compiler's, so the plugin can say where the code belongs. The UI plugin
+does so for a render that does more than read atoms (`FLICK-U004`) and for
+the setup of a component.
+
 ```rust
 fn check_calls(&self, calls: &[CallSite], state: &[u8]) -> Vec<Diagnostic> {
     (calls.iter())

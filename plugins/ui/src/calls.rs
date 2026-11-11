@@ -13,7 +13,48 @@ pub fn check(calls: &[CallSite]) -> Vec<Diagnostic> {
     found.extend(handlers_in_render(calls));
     found.extend(calls.iter().filter_map(reads_atoms_for_a_ui));
     found.extend(calls.iter().filter_map(made_in_render));
+    found.extend(calls.iter().filter_map(beyond_its_row));
     found
+}
+
+/// `U004` on what a render asks for besides reading atoms, and `E002` in
+/// the words of a component on what its setup asks for besides `Setup`:
+/// the compiler refuses both as a row that does not allow a service, and
+/// these say where the code belongs instead.
+fn beyond_its_row(call: &CallSite) -> Option<Diagnostic> {
+    let lacking = call.lacking.as_ref()?;
+    let (what, allowed) = (&lacking.what, &lacking.allowed);
+    if allowed.open {
+        return None;
+    }
+    if allowed.services == ["Prelude.Setup"] {
+        let message =
+            format!("a component's setup runs once per instance, so {what} is not allowed in it");
+        let fix = "read atoms in the component's last expression, its render, as `ui { let x = … }`, or make an `Atom.derived` here";
+        let refusal = Diagnostic::error(message, call.span).with_code("E002");
+        return Some(refusal.with_fix(fix, Vec::new(), false));
+    }
+    if allowed.services != ["Atom.Read"] {
+        return None;
+    }
+    let is = |label: &str| lacking.labels.iter().any(|l| l == label);
+    let writes = is("Atom.Write") || is("Reactivity.Atom.Registry");
+    let (setup, document) = (is("Prelude.Setup"), is("Ui.Document"));
+    let fixes = [
+        setup.then_some("call it before a component's last expression, in its setup, which runs once per instance"),
+        document.then_some("reach the DOM in a task: of an `Action`, `Ui.on_mount` or `Ui.watch`"),
+        writes.then_some("write atoms in an `Action`, which runs on an event"),
+        (!writes && !setup && !document && !lacking.services.is_empty())
+            .then_some("run the task as `Atom.task` and read its result"),
+        (!lacking.errors.is_empty()).then_some(
+            "handle the failure here, or render with `Ui.suspended`, which gives it a view",
+        ),
+    ];
+    let fix = fixes.into_iter().flatten().collect::<Vec<_>>().join("; ");
+    let message =
+        format!("a view's render and a derived atom only read atoms: {what} is not allowed here");
+    let refusal = Diagnostic::error(message, call.span).with_code("U004");
+    Some(refusal.with_fix(&fix, Vec::new(), false))
 }
 
 /// `U006` on an atom, an action or a view made while rendering: a view
@@ -152,6 +193,7 @@ mod tests {
             binding: None,
             generated: false,
             tagged: None,
+            lacking: None,
         }
     }
 
@@ -165,6 +207,54 @@ mod tests {
         handler.arguments[0].span = Span { start: 37, end: 55 };
         handler.arguments[0].lambda = lambda;
         [view, handler]
+    }
+
+    #[test]
+    fn what_a_render_or_a_setup_asks_for_beyond_its_row_is_told_where_it_belongs() {
+        use flick_plugin::{Enclosing, Lacking};
+        let under = |allowed: &str, open: bool, labels: &[&str]| {
+            let mut site = call("Atom", "Read", None);
+            site.arguments.clear();
+            site.lacking = Some(Lacking {
+                allowed: Enclosing {
+                    services: vec![allowed.to_owned()],
+                    open,
+                },
+                what: "service `Write`".into(),
+                services: vec!["Write".into()],
+                labels: labels.iter().map(|l| (*l).to_owned()).collect(),
+                errors: Vec::new(),
+            });
+            check(&[site])
+        };
+        let render = under("Atom.Read", false, &["Atom.Write"]);
+        assert_eq!(render[0].code.as_deref(), Some("U004"));
+        assert!(
+            render[0]
+                .message
+                .ends_with("service `Write` is not allowed here")
+        );
+        assert_eq!(
+            render[0].fixes[0].message,
+            "write atoms in an `Action`, which runs on an event"
+        );
+        // a service the library does not know is a task to run as an atom
+        let task = under("Atom.Read", false, &["App.Log"]);
+        assert!(
+            task[0].fixes[0]
+                .message
+                .starts_with("run the task as `Atom.task`")
+        );
+        let setup = under("Prelude.Setup", false, &["Atom.Read"]);
+        assert_eq!(setup[0].code.as_deref(), Some("E002"));
+        assert!(
+            setup[0]
+                .message
+                .starts_with("a component's setup runs once")
+        );
+        // a row open to more, and a row of another service, are the compiler's
+        assert!(under("Atom.Read", true, &["Atom.Write"]).is_empty());
+        assert!(under("App.Log", false, &["Atom.Write"]).is_empty());
     }
 
     #[test]
