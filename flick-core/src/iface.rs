@@ -17,7 +17,7 @@ pub use template::{
 };
 
 /// Bumped on every change of the schema.
-pub const IFACE_VERSION: u32 = 16;
+pub const IFACE_VERSION: u32 = 17;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -271,6 +271,8 @@ pub fn fingerprint(interface: &Interface) -> String {
 
 /// The tag of the makers of an interface.
 pub const MAKER: &str = "maker";
+/// The tag of the types whose values hold one value each.
+pub const CELL: &str = "cell";
 /// The tag of what reaches `Server`.
 pub const SERVER: &str = "server";
 

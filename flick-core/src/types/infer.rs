@@ -77,7 +77,7 @@ impl Checker<'_> {
             let span = self.span(node);
             self.polymorphic_runtime(None, &target, runtime, span);
             if !runtime {
-                self.polymorphic_atom(None, &target, span);
+                self.polymorphic_cell(None, &target, span);
             }
             return expected.clone();
         }

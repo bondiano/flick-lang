@@ -1,0 +1,7 @@
+module App.Slots exposing (Slot, empty)
+
+@cell
+type Slot a
+
+empty : Unit -> Slot a
+foreign pure empty from "./slot.js" "empty"

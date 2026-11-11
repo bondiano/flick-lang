@@ -6,6 +6,12 @@ break programs.
 
 ## Unreleased
 
+- **Cells:** `@cell` before a type declaration marks a type whose values
+  hold one value each, as a state made by a pure call does. A value of such a
+  type that is no function is not generalized over what the cell holds, and
+  one whose type has variables there is `FLICK-T072`. The atoms of the
+  standard library are cells; for an atom the refusal stays `FLICK-U005`,
+  now worded by the UI plugin. A package's `watch` may name the tag `@cell`.
 - **Routes on Flick's runtime:** `Atom.route` and `Ui.route_link` run on the
   default runtime: the route reads the served URL on a server and the page's
   in a browser, again on back and forward, and a write or a plain click on a

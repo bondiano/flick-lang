@@ -19,7 +19,8 @@ pub use crate::syntax::heads::{BARE, DECLARATIONS, HEADS, NAMED};
 /// The names whose places of call the plugin of std checks, as the `watch`
 /// of a package declares them. Every module is watched for them without a
 /// manifest, as every module has std's heads.
-pub const WATCH: [&str; 15] = [
+pub const WATCH: [&str; 16] = [
+    "@cell",
     "@maker",
     "Atom.Read",
     "Prelude.Setup",
@@ -41,8 +42,8 @@ pub const WATCH: [&str; 15] = [
 /// under its package: the checks that moved into it keep the code, the
 /// reference page and the `flick explain` text they had. Its other codes,
 /// such as `Q010`, stay `std/Q010`.
-pub const OWN_CODES: [&str; 11] = [
-    "U001", "U002", "U003", "U004", "U006", "U007", "D006", "E002", "T036", "T037", "T038",
+pub const OWN_CODES: [&str; 12] = [
+    "U001", "U002", "U003", "U004", "U005", "U006", "U007", "D006", "E002", "T036", "T037", "T038",
 ];
 
 /// The package whose plugin is linked into the compiler. An implicit package

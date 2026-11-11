@@ -1,0 +1,11 @@
+// The mark of a type goes with it through an alias of another module, to a
+// module that imports neither the type nor its module.
+module App.Use exposing (numbers, anything)
+
+import App.Held
+
+numbers : App.Held.Held Float
+let numbers = App.Held.fresh ()
+
+let anything = App.Held.fresh ()
+//~ FLICK-T072 @10:16-10:33 `anything` has the type `Slot (List a)` for every type its variables stand for, yet a `Slot` holds one value

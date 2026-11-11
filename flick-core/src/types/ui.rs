@@ -5,7 +5,6 @@ use std::collections::HashMap;
 use super::ty::Type;
 use super::typing::Ref;
 use super::{Checker, Range, let_parts};
-use crate::diagnostics::codes;
 use crate::iface::Namespace;
 use crate::source::Span;
 use crate::syntax::cst::Node;
@@ -128,55 +127,6 @@ impl Checker<'_> {
             };
             let kind = label.to_owned();
             self.typing.labelled.insert(name, Label { kind });
-        }
-    }
-
-    /// Keeps the unknowns inside the types of atoms in `ty` from being
-    /// generalized: one atom holds one value.
-    pub fn lower_atoms(&mut self, ty: &Type) {
-        let mut held = Vec::new();
-        self.zonk(ty).visit(&mut |t| {
-            if let (Type::Con { module, name }, args) = t.spine()
-                && is_atom(module, name)
-            {
-                held.extend(args.into_iter().cloned());
-            }
-        });
-        for t in &held {
-            self.store.lower(t);
-        }
-    }
-
-    /// A value of the type `scheme`, not a function, holding an atom whose
-    /// type has a variable the scheme quantifies: one atom would hold a value
-    /// of every type the variable stands for, each reader taking it for its own.
-    pub fn polymorphic_atom(&mut self, name: Option<&str>, scheme: &Type, span: Span) {
-        let ty = match scheme {
-            Type::Forall { body, .. } => body,
-            ty => ty,
-        };
-        if matches!(self.whnf(ty), Type::Fun { .. }) {
-            return;
-        }
-        // a variable of a scheme is one it quantifies, written or not
-        let quantified = |t: &Type| t.contains(&mut |v| matches!(v, Type::Var(_)));
-        let polymorphic = ty.contains(&mut |t| match t.spine() {
-            (Type::Con { module, name }, args) => {
-                is_atom(module, name) && args.into_iter().any(quantified)
-            }
-            _ => false,
-        });
-        if polymorphic {
-            let shown = self.show(ty);
-            let (atom, it) = name.map_or_else(
-                || ("this atom".to_owned(), "it".to_owned()),
-                |n| (format!("the atom `{n}`"), format!("`{n}`")),
-            );
-            self.error(
-                codes::U005,
-                span,
-                format!("{atom} has the type `{shown}` for every type its variables stand for, yet holds one value: give {it} the type of its value, without variables"),
-            );
         }
     }
 }

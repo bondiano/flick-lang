@@ -1,0 +1,39 @@
+// A type marked `@cell` holds one value: a value of it that is no function
+// has a type without variables.
+module App.Cells exposing (..)
+
+@cell
+type Slot a
+
+empty : Unit -> Slot a
+foreign pure empty from "./slot.js" "empty"
+
+put : Slot a -> a ->{} Unit
+foreign put from "./slot.js" "put"
+
+let anything = empty ()
+//             ^^^^^^^^ FLICK-T072 `anything` has the type `Slot a` for every type its variables stand for, yet a `Slot` holds one value: give `anything` a type without variables
+
+signed : (Slot (List a), Float)
+let signed = (empty (), 0)
+//           ^^^^^^^^^^^^^ FLICK-T072 `signed` has the type `(Slot (List a), Float)`
+
+numbers : Slot Float
+let numbers = empty ()
+
+per_call : Unit -> Slot a
+let per_call () = empty ()
+
+// a local cell is not generalized: its uses decide its one type
+poke : Unit ->{} Unit
+let poke () =
+  let slot = empty ()
+  put slot 1
+  put slot "one"
+//         ^^^^^ FLICK-T003 expected `Int`, found `String`
+
+poke_annotated : Unit ->{} Unit
+let poke_annotated () =
+  let annotated : forall a. Slot (Option a) = empty ()
+//                                            ^^^^^^^^ FLICK-T072 this value has the type `Slot (Option a)` for every type
+  put annotated (Some 1)

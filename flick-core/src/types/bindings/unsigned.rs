@@ -63,14 +63,14 @@ impl Checker<'_> {
             self.store.lower(&ty);
             ty
         } else {
-            // a local atom's uses, all in sight, decide its one type
+            // a local cell's uses, all in sight, decide its one type
             if self.store.level > 0 {
-                self.lower_atoms(&ty);
+                self.lower_cells(&ty);
             }
             let ty = self.generalize(&ty);
             // an annotation was checked as the value's type already
             if let (None, Some(body)) = (parts.header, parts.body) {
-                self.polymorphic_atom(Some(name), &ty, self.span(body));
+                self.polymorphic_cell(Some(name), &ty, self.span(body));
             }
             ty
         }

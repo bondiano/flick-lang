@@ -75,6 +75,7 @@ let serializable wire atom = Reactivity.Atom.serializable CallSite.definition wi
 serializable_family : CallSite => PureCodec Json a -> (String -> Writable a) -> String -> Writable a
 let serializable_family wire f = Reactivity.Atom.serializable_family CallSite.definition wire f
 
+@cell
 @lang atom_browser
 /// A state the browser holds, such as the URL. A server has no browser, so
 /// a view reads one only through `on_server` or `client_only`, which say
@@ -256,6 +257,7 @@ serializable_result_at :
   Atom (Async a {x | none})
 foreign pure serializable_result_at from "flick:rt" "atomSerializableResult"
 
+@cell
 @lang atom_family
 /// Atoms by key: `at family key` makes the atom of `key` the first time
 /// and gives the same one for every equal key after, so a view takes the

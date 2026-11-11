@@ -371,10 +371,11 @@ fn a_package_names_the_calls_its_plugin_watches() {
     );
     // a service, by its signatures, and a tag, by the values it reaches
     let config =
-        package("plugin = \"protos.wasm\"\nwatch = [\"Atom.Read\", \"@maker\"]").expect("valid");
+        package("plugin = \"protos.wasm\"\nwatch = [\"Atom.Read\", \"@maker\", \"@cell\"]")
+            .expect("valid");
     assert_eq!(
         config.package.map(|p| p.watch),
-        Some(vec!["Atom.Read".into(), "@maker".into()])
+        Some(vec!["Atom.Read".into(), "@maker".into(), "@cell".into()])
     );
     for refused in [
         "watch = [\"Ui.Event.queue\"]",

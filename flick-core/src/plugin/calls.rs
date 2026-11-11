@@ -7,6 +7,7 @@ use flick_plugin::CallSite;
 use super::expansion::Expansion;
 use super::{Expander, placed_call};
 use crate::diagnostics::{Diagnostic, Severity, codes};
+use crate::iface;
 use crate::source::{FileId, Span};
 use crate::types::Watched;
 
@@ -41,9 +42,10 @@ pub fn placed_sites(
 }
 
 /// Drops from `checked` the refusals of the compiler that a plugin answered:
-/// where a row does not allow what is asked and `answers` has an error at the
-/// place, the plugin's words stand for the compiler's. `sites` are the
-/// places as checked, `placed` the same in the module's own text.
+/// where a row does not allow what is asked, or a cell would hold a value of
+/// every type, and `answers` has an error at the place, the plugin's words
+/// stand for the compiler's. `sites` are the places as checked, `placed` the
+/// same in the module's own text.
 pub fn answered(
     checked: &mut Vec<Diagnostic>,
     answers: &[Diagnostic],
@@ -54,11 +56,15 @@ pub fn answered(
     let at = |span: flick_plugin::Span| Some(Span::new(file, span.start, span.end));
     for (site, placed) in sites.iter().zip(placed) {
         let answer = at(placed.span);
-        if site.lacking.is_some()
-            && (answers.iter()).any(|d| d.severity == Severity::Error && d.span == answer)
-        {
+        let cell = (site.tagged.as_ref()).is_some_and(|tagged| tagged.tag == iface::CELL);
+        let code = match (site.lacking.is_some(), cell) {
+            (true, _) => codes::E002,
+            (_, true) => codes::T072,
+            _ => continue,
+        };
+        if (answers.iter()).any(|d| d.severity == Severity::Error && d.span == answer) {
             let refused = at(site.span);
-            checked.retain(|d| !(d.code == codes::E002 && d.span == refused));
+            checked.retain(|d| !(d.code == code && d.span == refused));
         }
     }
 }
@@ -99,7 +105,7 @@ pub fn check_calls(
 
 #[cfg(test)]
 mod tests {
-    use flick_plugin::{CallSite, Enclosing, Lacking};
+    use flick_plugin::{CallSite, Enclosing, Lacking, Tagged};
 
     use super::answered;
     use crate::diagnostics::{Diagnostic, Severity, codes};
@@ -167,6 +173,20 @@ mod tests {
             &placed,
             file,
         );
+        assert_eq!(checked.len(), 3);
+        // a cell of a type for every type: the answer stands for `T072`
+        let mut cell = site(110, 115, false);
+        cell.tagged = Some(Tagged {
+            tag: "cell".into(),
+            named: "Writable a".into(),
+            reaches: "Atom.Writable".into(),
+            inside: Vec::new(),
+        });
+        let mut checked = refusals();
+        checked.push(Diagnostic::error(codes::T072, "one cell", at(110, 115)));
+        let answer = Diagnostic::error(codes::U005, "the atom", at(10, 15));
+        answered(&mut checked, &[answer], &[cell], &placed, file);
+        assert!(checked.iter().all(|d| d.code != codes::T072));
         assert_eq!(checked.len(), 3);
     }
 }

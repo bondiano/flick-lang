@@ -47,6 +47,52 @@ impl Checker<'_> {
                 }
             }
         }
+        let cells = self.exported_cells(interface);
+        if !cells.is_empty() {
+            interface.tags.insert(iface::CELL.to_owned(), cells);
+        }
+    }
+
+    /// The types marked `@cell` an importer learns of: those the module
+    /// exports, and those of other modules that its exports mention, each
+    /// with its module, as the importer may not import that one. A built-in
+    /// module is known to all.
+    fn exported_cells(&self, interface: &Interface) -> Vec<(String, Vec<String>)> {
+        let own = &self.env.module;
+        let mut cells = Vec::new();
+        let mut mentioned = |t: &Type| {
+            if let Type::Con { module, name } = t
+                && module != own
+                && !self.env.is_builtin(module)
+                && self.cell(module, name)
+            {
+                cells.push((name.clone(), vec![module.clone()]));
+            }
+        };
+        for export in interface.exports.iter().filter(|e| e.entity.module == *own) {
+            if let Some(scheme) = &export.scheme {
+                scheme.visit(&mut mentioned);
+            }
+            if let Some(Form::Alias { body, .. }) = export.definition.as_ref().map(|d| &d.form) {
+                body.visit(&mut mentioned);
+            }
+        }
+        let exported = |name: &&String| {
+            let entity =
+                |e: &Export| e.entity.namespace == Namespace::Type && e.entity.name == **name;
+            interface
+                .exports
+                .iter()
+                .any(|e| e.entity.module == *own && entity(e))
+        };
+        cells.extend(
+            (self.typing.cells.iter())
+                .filter(exported)
+                .map(|name| (name.clone(), Vec::new())),
+        );
+        cells.sort();
+        cells.dedup();
+        cells
     }
 
     /// A type definition as importers see it: an opaque alias, and an ADT
