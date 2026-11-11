@@ -134,7 +134,9 @@ macro "outl" : tactic => `(tactic| (
   intro k hk
   rcases k with n | p <;>
     simp_all [Facts.union, Flick.Facts.single, Facts.none, Facts.bnd, Facts.substT, Ty.substT,
-      shiftV, Ty.reach, Caps.substT, instT, liftT, Ty.up, Ty.ren, Atom.up, Atom.ty] <;> omega))
+      shiftV, Ty.reach, Caps.substT, Caps.none, instT, liftT, Ty.up, Ty.ren, Atom.up, Atom.ty,
+      or_and_right, exists_or] <;>
+      omega))
 
 /-- `σ.Holds Θ ts`: each fact of the scheme at the instance, shifted under binders or not. -/
 macro "holds" : tactic => `(tactic| first
