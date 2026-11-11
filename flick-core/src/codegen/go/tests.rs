@@ -80,6 +80,24 @@ fn a_bigint_literal_and_a_constructor_without_fields_are_made_once() {
 }
 
 #[test]
+fn the_labels_of_a_record_literal_are_placed_once() {
+    let go = app("module App exposing (main)\n\n\
+         type alias Point = { x : Int; y : Int }\n\n\
+         point : Int -> Point\nlet point n = { y = n; x = n + 1 }\n\n\
+         moved : Point -> Point\nlet moved p = { y = p.x; x = p.y }\n\n\
+         main : Unit ->{; AppError} Unit\n\
+         let main () = Platform.stdout_line (show (moved (point 1)).x)\n");
+    // two literals of the same labels in the same order: one shape, no label where a record is made
+    assert_eq!(
+        go.matches("flickrt.ShapeOf(\"y\", \"x\")").count(),
+        1,
+        "{go}"
+    );
+    assert_eq!(go.matches("flickrt.Shaped(K_App__").count(), 2, "{go}");
+    assert!(!go.contains("flickrt.Rec("), "{go}");
+}
+
+#[test]
 fn a_loop_with_an_exit_keeps_the_flags_of_its_exits() {
     let go = app(&SUM.replace(
         "    i = i - 1\n",

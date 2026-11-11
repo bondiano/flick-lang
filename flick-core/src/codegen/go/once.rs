@@ -1,13 +1,16 @@
 //! Values a module makes once. A `BigInt` literal, a constructor without
-//! fields and an adapter of stages read nothing but the runtime, so each is
-//! a package variable, made when the program starts, and not made again
-//! every time the code that names it runs.
+//! fields, the labels of a record and an adapter of stages read nothing but
+//! the runtime, so each is a package variable, made when the program
+//! starts, and not made again every time the code that names it runs.
+
+use std::iter;
 
 use flick_pretty::{Document, docvec};
 
 use super::expr::literal;
+use super::layout::{Code, call};
 use super::{Gen, names};
-use crate::ir::Lit;
+use crate::ir::{Expr, Lit};
 
 impl<'a> Gen<'a> {
     /// The package variable of `made`, a Go expression over the runtime
@@ -41,6 +44,38 @@ impl<'a> Gen<'a> {
             self.once(&go).to_owned()
         } else {
             go
+        }
+    }
+
+    /// A literal as an expression.
+    pub(super) fn lit(&mut self, lit: &Lit) -> Code<'a> {
+        let go = self.literal(lit);
+        self.code(&go)
+    }
+
+    /// A record of `fields`, or `base` with them. Where each label goes in a
+    /// record is found once for the literal, not for every record it makes.
+    pub(super) fn record(&mut self, base: Option<&Expr>, fields: &[(String, Expr)]) -> Code<'a> {
+        let a = self.a;
+        let mut all: Vec<&Expr> = base.into_iter().collect();
+        all.extend(fields.iter().map(|(_, v)| v));
+        let mut go = self.ordered(&all);
+        let base = base.map(|_| go.remove(0));
+        let mut labels: Vec<&str> = fields.iter().map(|(label, _)| label.as_str()).collect();
+        labels.sort_unstable();
+        labels.dedup();
+        let record = if fields.is_empty() || labels.len() < fields.len() {
+            // a label written twice is its last value: the runtime sorts that out
+            call(a, "flickrt.Rec", self.entries(fields, go))
+        } else {
+            let written: Vec<String> = fields.iter().map(|(l, _)| names::string(l)).collect();
+            let shape = self.once(&format!("flickrt.ShapeOf({})", written.join(", ")));
+            let values = go.iter().map(|v| v.doc);
+            call(a, "flickrt.Shaped", iter::once(a.text(shape)).chain(values))
+        };
+        match base {
+            Some(b) => call(a, "flickrt.Update", [b.doc, record]).into(),
+            None => record.into(),
         }
     }
 }

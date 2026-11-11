@@ -158,10 +158,7 @@ impl<'a> Gen<'a> {
             ExprKind::ControlLoop { .. } | ExprKind::LoopExit { .. } | ExprKind::Loop { .. } => {
                 self.loop_expr(e)
             }
-            ExprKind::Lit(lit) => {
-                let go = self.literal(lit);
-                self.code(&go)
-            }
+            ExprKind::Lit(lit) => self.lit(lit),
             ExprKind::Local(name) => self.code(&names::local(name)),
             // not atomic: an operand after it that assigns it is ordered after the read
             ExprKind::Var(name) => Code::from(a.text(a.alloc_str(&names::local(name)))),
@@ -306,21 +303,12 @@ impl<'a> Gen<'a> {
         }
     }
 
-    fn record(&mut self, base: Option<&Expr>, fields: &[(String, Expr)]) -> Code<'a> {
-        let a = self.a;
-        let mut all: Vec<&Expr> = base.into_iter().collect();
-        all.extend(fields.iter().map(|(_, v)| v));
-        let mut go = self.ordered(&all);
-        let base = base.map(|_| go.remove(0));
-        let record = call(a, "flickrt.Rec", self.entries(fields, go));
-        match base {
-            Some(b) => call(a, "flickrt.Update", [b.doc, record]).into(),
-            None => record.into(),
-        }
-    }
-
     /// Each label, then its value, as one item of a list.
-    fn entries(&self, fields: &[(String, Expr)], values: Vec<Code<'a>>) -> Vec<Document<'a>> {
+    pub(super) fn entries(
+        &self,
+        fields: &[(String, Expr)],
+        values: Vec<Code<'a>>,
+    ) -> Vec<Document<'a>> {
         fields
             .iter()
             .zip(values)
