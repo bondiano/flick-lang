@@ -31,4 +31,3 @@
 @flick-lang/runtime/rt/effect/Tracer tracerHooks
 @flick-lang/runtime/rt/ui uiRouteLink
 @flick-lang/runtime/rt/ui/react uiRouteLink
-@flick-lang/runtime/rt/ui/server uiServerStream
