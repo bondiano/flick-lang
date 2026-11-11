@@ -61,6 +61,17 @@
         { "id": "retry", "example": "retry" },
         { "id": "failures", "exercise": "effects/01" }
       ]
+    },
+    {
+      "id": "resources", "en": "Resources and regions", "ru": "Ресурсы и регионы",
+      "lessons": [
+        { "id": "scope", "example": "resources" },
+        { "id": "release-on-failure", "expect": "run" },
+        { "id": "scope-type", "expect": "run" },
+        { "id": "leaks", "example": "escaping-resource" },
+        { "id": "fibers", "expect": "run" },
+        { "id": "owner", "exercise": "resources/01" }
+      ]
     }
   ]
 }

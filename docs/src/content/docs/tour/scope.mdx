@@ -1,0 +1,22 @@
+---
+title: Scopes and resources
+description: A scope owns what it opens and closes it in reverse order.
+tableOfContents: false
+---
+
+import TourLesson from "../../../components/TourLesson.astro";
+
+<TourLesson locale="en" id="scope">
+
+A resource, such as a file or a connection, has to be closed after use,
+even when something goes wrong. `scope s { … }` opens a part of the program
+that owns resources, and `Resource.acquire_release` opens one in it: the task
+opens it, and the function closes it.
+
+When the scope ends, it closes what it owns in reverse order: the socket
+first, then the file. The value of the block is the value of the scope.
+
+**Try:** move the line that opens the file above `let result = scope s {`.
+The compiler reports `FLICK-G004`: a resource needs a scope to own it.
+
+</TourLesson>

@@ -1,0 +1,18 @@
+module Main exposing (main)
+
+open_res : String ->{Scope s} String
+let open_res name =
+  Resource.acquire_release
+    (task {
+      Platform.stdout_line ("open " ++ name)
+      name
+    })
+    (fun n -> Platform.stdout_line ("release " ++ n))
+
+both : Unit ->{Scope s} String
+let both () = open_res "config" ++ " + " ++ open_res "cache"
+
+main : Unit ->{} Unit
+let main () =
+  let used = scope { both () }
+  Platform.stdout_line "used \{used}"

@@ -1,0 +1,21 @@
+---
+title: Cleanup on failure
+description: A scope closes its resources however it ends.
+tableOfContents: false
+---
+
+import TourLesson from "../../../components/TourLesson.astro";
+
+<TourLesson locale="en" id="release-on-failure">
+
+A scope closes its resources however it ends. Here `check (-3)` fails with
+`Invalid` inside the scope: the file is closed first, and then the failure
+reaches its handler, which prints `handled -3`.
+
+So cleanup does not depend on remembering a `finally`, and a failure cannot
+skip it.
+
+**Try:** change `check (-3)` to `check 3`. The scope ends normally, and the
+file is closed all the same.
+
+</TourLesson>
