@@ -150,3 +150,26 @@ fn live_in_a_row_keeps_a_read_sync() {
     ));
     assert!(!sync_rows(&row(vec![live]), &none));
 }
+
+/// A built-in module sees only the ones before it: an import of a later
+/// one is unknown there, and lowering would find none of its names.
+#[test]
+fn a_built_in_module_imports_only_the_ones_before_it() {
+    use crate::diagnostics::codes;
+    let early = "module Early exposing (..)\n\nimport List.Core\n\n\
+                 count : List Int -> Int\nlet count xs = List.Core.length xs\n";
+    let mut modules: Vec<(&str, &str)> = super::CORE.to_vec();
+    let at = (modules.iter().position(|(n, _)| *n == "List.Core")).expect("a core module");
+    modules.insert(at, ("Early", early));
+    let mut said = Vec::new();
+    let report = |name: &str, diagnostics: Vec<_>| {
+        if name == "Early" {
+            said = diagnostics;
+        }
+    };
+    super::check_reporting(&modules, report, false, |_, _| {});
+    let found: Vec<_> = (said.iter())
+        .map(|d| (d.code, &early[d.span.expect("a span").range()]))
+        .collect();
+    assert_eq!(found, [(codes::R003, "List.Core")], "{said:?}");
+}
