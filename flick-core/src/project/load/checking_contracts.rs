@@ -1,57 +1,49 @@
 impl Checking<'_> {
-    fn virtual_contract_dependencies(
-        &self,
-        loaded: &Loaded,
-        contracts: &dyn Fn(&str) -> Option<Interface>,
-    ) -> Vec<String> {
-        let Some(v) = &loaded.virtual_of else {
-            return Vec::new();
-        };
-        let mut names: Vec<_> = v
-            .capture
-            .bindings
-            .iter()
-            .map(|b| b.origin.module.clone())
-            .collect();
-        let caller = loaded
-            .member_of
-            .as_ref()
-            .and_then(|member| self.by_name.get(&member.parent))
-            .map_or(loaded, |&index| &self.modules[index]);
-        match &v.capture.callee {
-            Some(CalleeOrigin::Module(name)) => names.push(name.clone()),
-            Some(CalleeOrigin::Member(member)) => names.extend(super::imports::contract_ancestors(
-                caller,
-                &member.parent,
-                &|name| contracts(name).and_then(|i| i.member_of),
-            )),
-            Some(CalleeOrigin::Parameter { binding, .. }) => names.push(binding.module.clone()),
-            None => {}
-        }
-        names
-    }
-
-    fn public_contract_interface(
-        &self,
-        loaded: &Loaded,
-        name: &str,
+    fn argument_interface(
+        argument: &StaticArgument,
+        lookup: &dyn Fn(&str) -> Option<Interface>,
         contracts: &dyn Fn(&str) -> Option<Interface>,
     ) -> Option<Interface> {
-        let actual = contracts(name)?;
-        let caller = loaded
-            .member_of
-            .as_ref()
-            .and_then(|member| self.by_name.get(&member.parent))
-            .map_or(loaded, |&index| &self.modules[index]);
-        if let Some(member) = &actual.member_of
-            && !caller.can_access_member(member)
-        {
-            return self
-                .public_contract_interface(loaded, &member.parent, contracts)?
-                .modules
-                .remove(&member.name);
+        fn view(
+            module: &str,
+            access: &[String],
+            lookup: &dyn Fn(&str) -> Option<Interface>,
+            contracts: &dyn Fn(&str) -> Option<Interface>,
+        ) -> Option<Interface> {
+            let raw = contracts(module).or_else(|| lookup(module))?;
+            if let Some(member) = &raw.member_of
+                && !access.contains(&member.parent)
+            {
+                return view(&member.parent, access, lookup, contracts)?
+                    .modules
+                    .remove(&member.name);
+            }
+            Some(raw)
         }
-        Some(actual)
+        view(
+            &argument.module,
+            &argument.access_modules,
+            lookup,
+            contracts,
+        )
+    }
+
+    fn callee_signature_explicit(
+        context: &Virtual,
+        lookup: &dyn Fn(&str) -> Option<Interface>,
+        contracts: &dyn Fn(&str) -> Option<Interface>,
+    ) -> bool {
+        match &context.capture.callee {
+            Some(CalleeOrigin::Module(name)) => {
+                contracts(name).is_some_and(|i| i.signature_explicit)
+            }
+            Some(CalleeOrigin::Member(member)) => {
+                Self::argument_interface(member, lookup, contracts)
+                    .is_some_and(|i| i.signature_explicit)
+            }
+            Some(CalleeOrigin::Parameter { .. }) => true,
+            None => false,
+        }
     }
 
     fn binding_view_name(loaded: &Loaded, alias: &str) -> String {
@@ -70,7 +62,10 @@ impl Checking<'_> {
             else {
                 return None;
             };
-            result.instantiate_parameter(&binder, &lookup(argument)?);
+            result.instantiate_parameter(
+                &binder,
+                &Self::argument_interface(argument, lookup, contracts)?,
+            );
             signature = *result;
         }
         let types::ModuleSignature::Parameterized { parameter, .. } = signature else {
@@ -80,12 +75,10 @@ impl Checking<'_> {
     }
 
     fn callee_signature(
-        &self,
-        loaded: &Loaded,
+        context: &Virtual,
         lookup: &dyn Fn(&str) -> Option<Interface>,
         contracts: &dyn Fn(&str) -> Option<Interface>,
     ) -> Option<types::ModuleSignature> {
-        let context = loaded.virtual_of.as_ref()?;
         match context.capture.callee.as_ref()? {
             CalleeOrigin::Module(name) => {
                 let actual = contracts(name)?;
@@ -97,11 +90,7 @@ impl Checking<'_> {
                 )
             }
             CalleeOrigin::Member(member) => {
-                let actual = self
-                    .public_contract_interface(loaded, &member.parent, contracts)?
-                    .modules
-                    .get(&member.name)?
-                    .clone();
+                let actual = Self::argument_interface(member, lookup, contracts)?;
                 Some(
                     actual
                         .parameterized
@@ -117,7 +106,11 @@ impl Checking<'_> {
                     .iter()
                     .rev()
                     .find(|b| &b.origin == binding)?;
-                let mut actual = signature.project(&lookup(&argument.argument)?);
+                let mut actual = signature.project(&Self::argument_interface(
+                    &argument.argument,
+                    lookup,
+                    contracts,
+                )?);
                 for name in members {
                     actual = actual.modules.remove(name)?;
                 }
@@ -131,35 +124,19 @@ impl Checking<'_> {
         }
     }
 
-    fn callee_has_explicit_result(
-        &self,
-        loaded: &Loaded,
-        contracts: &dyn Fn(&str) -> Option<Interface>,
-    ) -> bool {
-        loaded
-            .virtual_of
-            .as_ref()
-            .is_some_and(|v| match &v.capture.callee {
-                Some(CalleeOrigin::Module(name)) => {
-                    contracts(name).is_some_and(|i| i.signature_explicit)
-                }
-                Some(CalleeOrigin::Member(member)) => self
-                    .public_contract_interface(loaded, &member.parent, contracts)
-                    .and_then(|i| i.modules.get(&member.name).map(|m| m.signature_explicit))
-                    .unwrap_or(false),
-                Some(CalleeOrigin::Parameter { .. }) => true,
-                None => false,
-            })
-    }
-
     fn virtual_result_signature(
-        &self,
         loaded: &Loaded,
         lookup: &dyn Fn(&str) -> Option<Interface>,
         contracts: &dyn Fn(&str) -> Option<Interface>,
     ) -> Option<types::ModuleSignature> {
         let context = loaded.virtual_of.as_ref()?;
-        let mut signature = self.callee_signature(loaded, lookup, contracts)?;
+        // An inferred shape validates applications, but does not introduce an
+        // abstraction boundary. In particular it must not erase ADT constructors
+        // explicitly exposed by an unannotated private factory's source body.
+        if !Self::callee_signature_explicit(context, lookup, contracts) {
+            return None;
+        }
+        let mut signature = Self::callee_signature(context, lookup, contracts)?;
         for argument in &context.capture.arguments {
             let types::ModuleSignature::Parameterized {
                 binder, mut result, ..
@@ -167,7 +144,10 @@ impl Checking<'_> {
             else {
                 return None;
             };
-            result.instantiate_parameter(&binder, &lookup(argument)?);
+            result.instantiate_parameter(
+                &binder,
+                &Self::argument_interface(argument, lookup, contracts)?,
+            );
             signature = *result;
         }
         Some(signature)
@@ -226,7 +206,6 @@ impl Checking<'_> {
     }
 
     fn virtual_contracts(
-        &self,
         loaded: &Loaded,
         lookup: &dyn Fn(&str) -> Option<Interface>,
         contracts: &dyn Fn(&str) -> Option<Interface>,
@@ -243,11 +222,16 @@ impl Checking<'_> {
             let Some(signature) = Self::binding_signature(origin, lookup, contracts) else {
                 continue;
             };
-            let Some(actual) = lookup(argument) else {
+            let Some(actual) = Self::argument_interface(argument, lookup, contracts) else {
                 continue;
             };
-            if Self::module_contract_errors(&signature, &actual, context.at, argument, &mut errors)
-            {
+            if Self::module_contract_errors(
+                &signature,
+                &actual,
+                context.at,
+                &argument.module,
+                &mut errors,
+            ) {
                 for (head, dictionary) in
                     types::module_local_dictionaries(&signature.definition(), &actual)
                 {
@@ -269,7 +253,7 @@ impl Checking<'_> {
                 );
             }
         }
-        if let Some(mut signature) = self.callee_signature(loaded, lookup, contracts) {
+        if let Some(mut signature) = Self::callee_signature(context, lookup, contracts) {
             for argument in &context.capture.arguments {
                 let types::ModuleSignature::Parameterized {
                     binder,
@@ -285,19 +269,28 @@ impl Checking<'_> {
                     ));
                     break;
                 };
-                let Some(actual) = lookup(argument) else {
+                let Some(actual) = Self::argument_interface(argument, lookup, contracts) else {
                     break;
                 };
                 Self::module_contract_errors(
                     &parameter,
                     &actual,
                     context.at,
-                    argument,
+                    &argument.module,
                     &mut errors,
                 );
                 result.instantiate_parameter(&binder, &actual);
                 signature = *result;
             }
+        } else if let Some(CalleeOrigin::Member(member)) = &context.capture.callee {
+            errors.push(Diagnostic::error(
+                codes::R018,
+                format!(
+                    "module `{}` is not exported through this namespace view",
+                    member.module
+                ),
+                context.at,
+            ));
         }
         let mut reported = Vec::new();
         errors.retain(|diagnostic| {

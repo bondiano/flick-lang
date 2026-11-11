@@ -30,11 +30,11 @@ pub struct Header {
     pub span: Span,
     /// `None` without `exposing`: the module exports nothing.
     pub exposing: Option<Vec<Item>>,
-    /// Static module parameters of a parameterized module source file.
+    /// Static module parameters of a parameterized source file.
     pub parameters: Vec<ModuleParam>,
     pub result: Option<Node>,
     pub parameter_groups: Vec<usize>,
-    /// An expression-bodied file parameterized module; structure bodies remain top-level declarations.
+    /// An expression-bodied file parameterized; structure bodies remain top-level declarations.
     pub body: Option<Node>,
     /// Concrete value selected by elaborating an expression-bodied module.
     pub materialized_body: Option<String>,
@@ -321,6 +321,9 @@ pub fn module_syntax(tree: &Node, text: &str, file: FileId) -> ModuleSyntax {
             bound: &[String],
             imports: &mut Vec<Import>,
         ) {
+            if matches!(node.kind, K::ModuleNominalMember | K::ModuleTypeEquality) {
+                return;
+            }
             let mut bound = bound.to_vec();
             if node.kind == K::ModuleParamExpr {
                 for parameter in node
@@ -364,11 +367,7 @@ pub fn module_syntax(tree: &Node, text: &str, file: FileId) -> ModuleSyntax {
                     });
                 }
             }
-            for child in node.nodes().filter(|n| {
-                !(matches!(n.kind, K::ModuleParamGroup | K::ModuleResult)
-                    || node.kind == K::ModuleAnnotExpr
-                        && Some(n.range()) == node.nodes().last().map(Node::range))
-            }) {
+            for child in node.nodes().filter(|n| n.kind != K::ModuleParamGroup) {
                 expression_imports(child, text, file, &bound, imports);
             }
         }
@@ -423,4 +422,5 @@ pub fn module_syntax(tree: &Node, text: &str, file: FileId) -> ModuleSyntax {
         bodiless,
     }
 }
-include!("syntax_items.rs");
+
+include!("syntax_helpers.rs");

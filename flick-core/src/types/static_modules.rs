@@ -53,7 +53,7 @@ impl Checker<'_> {
                             self.error(
                                 codes::T066,
                                 parameter.span,
-                                "more than one static parameter supplies the same local dictionary in this parameterized module",
+                                "more than one static parameter supplies the same local dictionary",
                             );
                         } else {
                             self.classes.local.push((head, dictionary));
@@ -497,7 +497,6 @@ impl Checker<'_> {
 }
 
 #[cfg(test)]
-#[path = "static_modules/tests.rs"]
 mod tests;
 
 include!("static_modules/expressions.rs");

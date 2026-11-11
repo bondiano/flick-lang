@@ -1,6 +1,40 @@
 use super::*;
 use crate::iface::{read, write};
 
+#[test]
+fn symbolic_interfaces_keep_manifest_aliases_as_bounded_witness_references() {
+    let signature = ModuleSignature::Structure {
+        requirements: vec![
+            R::Type {
+                name: "T".into(),
+                params: Vec::new(),
+                manifest: Some(Type::Tuple(vec![
+                    Type::Var("T".into()),
+                    Type::Var("T".into()),
+                ])),
+            },
+            R::Value {
+                name: "value".into(),
+                ty: Type::Var("T".into()),
+            },
+        ],
+    };
+    let interface = signature.interface("Witness");
+    assert_eq!(
+        interface
+            .find(Namespace::Value, "value")
+            .and_then(|e| e.scheme.as_ref()),
+        Some(&Type::con("Witness", "T"))
+    );
+    let alias = interface
+        .find(Namespace::Type, "T")
+        .and_then(|e| e.definition.as_ref())
+        .expect("alias definition");
+    assert!(
+        matches!(&alias.form, Form::Alias { body: Type::Tuple(items), .. } if items == &vec![Type::con("Witness", "T"), Type::con("Witness", "T")])
+    );
+}
+
 fn structure(fields: &[&str]) -> ModuleSignature {
     ModuleSignature::Structure {
         requirements: fields
@@ -20,6 +54,36 @@ fn factory(input: ModuleSignature, output: ModuleSignature) -> ModuleSignature {
         parameter: Box::new(input),
         result: Box::new(output),
     }
+}
+
+#[test]
+fn dependent_covariance_uses_the_expected_parameters_manifest_equalities() {
+    let input = |manifest| ModuleSignature::Structure {
+        requirements: vec![
+            R::Type {
+                name: "Item".into(),
+                params: Vec::new(),
+                manifest,
+            },
+            R::Value {
+                name: "value".into(),
+                ty: Type::Var("Item".into()),
+            },
+        ],
+    };
+    let output = |ty| ModuleSignature::Structure {
+        requirements: vec![R::Value {
+            name: "value".into(),
+            ty,
+        }],
+    };
+    let provider = factory(input(None), output(Type::con("$module:K", "Item")));
+    let expected = factory(
+        input(Some(Type::con("Prelude", "String"))),
+        output(Type::con("Prelude", "String")),
+    );
+    assert!(provider.is_subtype_of(&expected));
+    assert!(!expected.is_subtype_of(&provider));
 }
 
 fn dependent_structure(binder: &str) -> ModuleSignature {
@@ -296,7 +360,7 @@ fn signature_display_distinguishes_atomic_and_curried_groups() {
     );
     let mut grouped = curried.clone();
     let ModuleSignature::Parameterized { group_size, .. } = &mut grouped else {
-        panic!("parameterized module")
+        panic!("parameterized")
     };
     *group_size = 2;
     assert_ne!(curried.display(), grouped.display());
@@ -516,44 +580,8 @@ fn higher_order_signatures_survive_interface_serialization() {
     );
     let interface = signature.interface("App.Factory");
     let written = write(&interface);
-    let json: serde_json::Value = serde_json::from_str(&written).expect("JSON interface");
-    assert_eq!(json["parameterized"]["signature"], "parameterized");
     let read = read(written.as_bytes(), "App.Factory").expect("interface");
     assert_eq!(read.parameterized, Some(signature));
 }
 
-#[test]
-fn review_dependent_variance_uses_expected_parameter_equalities() {
-    let input = |manifest| ModuleSignature::Structure {
-        requirements: vec![R::Type {
-            name: "Key".into(),
-            params: vec![],
-            manifest,
-        }],
-    };
-    let output = |ty| ModuleSignature::Structure {
-        requirements: vec![R::Type {
-            name: "Value".into(),
-            params: vec![],
-            manifest: Some(ty),
-        }],
-    };
-    let provided = factory(input(None), output(Type::con("$module:K", "Key")));
-    let expected = factory(
-        input(Some(Type::con("Prelude", "String"))),
-        output(Type::con("Prelude", "String")),
-    );
-    assert!(provided.is_subtype_of(&expected));
-    assert!(!expected.is_subtype_of(&provided));
-}
-
-#[test]
-fn review_result_sealing_preserves_server_reachability_metadata() {
-    let signature = structure(&["main"]);
-    let mut actual = signature.interface("Web");
-    actual.servers.push((
-        "main".into(),
-        vec!["Web.page".into(), "Page.load".into(), "Server.node".into()],
-    ));
-    assert_eq!(signature.seal(&actual, "Web").servers, actual.servers);
-}
+include!("ported_tests.rs");

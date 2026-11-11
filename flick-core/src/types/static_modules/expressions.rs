@@ -17,14 +17,23 @@ impl Checker<'_> {
                 let mut nodes = node.nodes();
                 let function = self.static_module_expression(nodes.next()?, module, path)?;
                 let explicit = function.signature_explicit;
-                let mut signature = function.parameterized?;
+                let Some(mut signature) = function.parameterized else {
+                    self.error(
+                        codes::T002,
+                        self.span(node),
+                        "module expression is not a parameterized module",
+                    );
+                    return None;
+                };
                 if let ModuleSignature::Parameterized { group_size, .. } = &signature
                     && *group_size != node.nodes().skip(1).count()
                 {
                     self.error(
                         codes::T002,
                         self.span(node),
-                        format!("parameterized module requires {group_size} arguments in this parameter group"),
+                        format!(
+                            "parameterized requires {group_size} arguments in this parameter group"
+                        ),
                     );
                     return None;
                 }
@@ -52,7 +61,7 @@ impl Checker<'_> {
                         self.error(
                             codes::T061,
                             self.span(argument),
-                            "module argument does not satisfy the parameterized module signature",
+                            "module argument does not satisfy the parameterized signature",
                         );
                         return None;
                     }

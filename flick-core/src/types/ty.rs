@@ -394,7 +394,6 @@ impl Type {
 
     /// Applies `f` to every direct child type.
     #[must_use]
-    #[inline(never)]
     pub fn map_children(&self, f: &mut dyn FnMut(&Type) -> Type) -> Type {
         let row = |row: &Row, f: &mut dyn FnMut(&Type) -> Type| Row {
             entries: row.entries.iter().map(|(l, t)| (l.clone(), f(t))).collect(),
@@ -465,7 +464,6 @@ impl Type {
     }
 
     /// Calls `f` on every direct child type.
-    #[inline(never)]
     pub fn for_each_child(&self, f: &mut dyn FnMut(&Type)) {
         let row = |row: &Row, f: &mut dyn FnMut(&Type)| {
             row.entries.iter().for_each(|(_, t)| f(t));
@@ -518,7 +516,6 @@ impl Type {
     }
 
     /// Calls `f` on every type inside, this one first.
-    #[inline(never)]
     pub fn visit(&self, f: &mut dyn FnMut(&Type)) {
         f(self);
         self.for_each_child(&mut |t| t.visit(f));
@@ -527,7 +524,6 @@ impl Type {
     /// Replaces the free variables named in `subst`; stops at a `forall`
     /// that rebinds a name.
     #[must_use]
-    #[inline(never)]
     pub fn substitute(&self, subst: &[(String, Type)]) -> Type {
         if subst.is_empty() {
             return self.clone();
@@ -576,5 +572,4 @@ impl Type {
 }
 
 #[cfg(test)]
-#[path = "ty_tests.rs"]
 mod tests;

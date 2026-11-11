@@ -248,7 +248,7 @@ codes! {
     T065 = Types 65, "module contract dictionary source has the wrong type";
     T066 = Types 66, "ambiguous local module dictionaries";
     T067 = Types 67, "public parameterized module requires an explicit result signature";
-    T068 = Types 68, "static parameterized module cannot be packed as a runtime module";
+    T068 = Types 68, "static parameterized module or nested module cannot be packed";
     E001 = Effects 1, "runtime call in a pure position";
     E002 = Effects 2, "services or errors not allowed by the bound";
     E003 = Effects 3, "argument runs before the function that takes an Eff";

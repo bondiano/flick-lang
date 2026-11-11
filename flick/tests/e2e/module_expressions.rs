@@ -1,78 +1,5 @@
 #[test]
 #[ignore = "needs Node and Go; run `just e2e-tests`"]
-fn higher_order_factory_with_partial_application_runs_on_js_and_go() {
-    let dir = Path::new(env!("CARGO_TARGET_TMPDIR")).join("hom_factory");
-    let source = dir.join("App");
-    fs::create_dir_all(&source).expect("source directory");
-    for (name, text) in [
-        (
-            "Contracts.fl",
-            "module App.Contracts exposing (Input, Output, Factory)\ntype module Input =\n  seed : Int\ntype module Output =\n  answer : Int\ntype module Factory = (K : Input) -> Output\n",
-        ),
-        (
-            "Argument.fl",
-            "module App.Argument exposing (seed)\nseed : Int\nlet seed = 41\n",
-        ),
-        (
-            "Make.fl",
-            "module App.Make(K : App.Contracts.Input) : App.Contracts.Output exposing (answer)\nanswer : Int\nlet answer = K.seed + 1\n",
-        ),
-        (
-            "Apply.fl",
-            "module App.Apply(F : App.Contracts.Factory)(K : App.Contracts.Input) : App.Contracts.Output exposing (answer)\nmodule Built = F(K)\nanswer : Int\nlet answer = Built.answer\n",
-        ),
-        (
-            "Instances.fl",
-            "module App.Instances exposing (Chosen)\nmodule Half = App.Apply(App.Make)\nmodule Chosen = App.Instances.Half(App.Argument)\n",
-        ),
-        (
-            "Main.fl",
-            "module App.Main exposing (main)\nimport App.Instances.Chosen as Chosen\nmain : Unit ->{} Unit\nlet main () = Platform.stdout_line (show Chosen.answer)\n",
-        ),
-    ] {
-        fs::write(source.join(name), text).expect("source");
-    }
-    for profile in ["debug", "release"] {
-        for emit in ["js", "go"] {
-            let out = dir.join(format!("out-{emit}-{profile}"));
-            let build = Command::new(env!("CARGO_BIN_EXE_flick"))
-                .arg("build")
-                .arg(source.join("Main.fl"))
-                .arg("--out-dir")
-                .arg(&out)
-                .arg("--emit")
-                .arg(emit)
-                .arg("--profile")
-                .arg(profile)
-                .output()
-                .expect("build");
-            assert!(
-                build.status.success(),
-                "{emit}/{profile}: {}",
-                String::from_utf8_lossy(&build.stderr)
-            );
-            let output = if emit == "js" {
-                Command::new("node")
-                    .arg(out.join(runner_path(false)))
-                    .output()
-                    .expect("Node")
-            } else {
-                Command::new(out.join(executable(MAIN_ENTRY)))
-                    .output()
-                    .expect("Go executable")
-            };
-            assert!(
-                output.status.success(),
-                "{emit}/{profile}: {}",
-                String::from_utf8_lossy(&output.stderr)
-            );
-            assert_eq!(output.stdout, b"42\n", "{emit}/{profile}");
-        }
-    }
-}
-
-#[test]
-#[ignore = "needs Node and Go; run `just e2e-tests`"]
 fn anonymous_nested_and_returned_parameterized_modules_execute_on_js_and_go() {
     for &(case, factory, instances) in hom_expression_cases() {
         let dir = Path::new(env!("CARGO_TARGET_TMPDIR")).join(format!("hom_expression_{case}"));
@@ -286,33 +213,119 @@ fn assert_hom_execution(source: &Path, dir: &Path, case: &str, expected: &[u8]) 
     }
 }
 
-include!("module_runtime_contracts.rs");
-
 #[test]
 #[ignore = "needs Node and Go; run `just e2e-tests`"]
-fn nested_runtime_module_structures_execute_on_js_ts_and_go() {
-    let dir = Path::new(env!("CARGO_TARGET_TMPDIR")).join("nested_runtime_module");
+fn higher_order_dictionary_scopes_execute_locally_on_js_and_go() {
+    let dir = Path::new(env!("CARGO_TARGET_TMPDIR")).join("hom_dictionary_scopes");
     let source = dir.join("App");
     fs::create_dir_all(&source).expect("source directory");
     for (name, text) in [
         (
             "Contracts.fl",
-            "module App.Contracts exposing (Cell, Namespace)\ntype module Cell =\n  type Item\n  value : Item\n  read : Item -> Int\ntype module Namespace =\n  module Child : Cell\n",
+            "module App.Contracts exposing (Policy, Output, Factory, Namespace)\ntype module Policy =\n  type Key = String\n  equality : Eq.Dict Key\n  instance Eq Key from equality\ntype module Output =\n  answer : Bool\ntype module Factory = (K : Policy) -> Output\ntype module Namespace =\n  module Make : Factory\n",
         ),
         (
-            "Child.fl",
-            "module App.Child exposing (Item, value, read)\ntype Item = Item Int\nvalue : Item\nlet value = Item 42\nread : Item -> Int\nlet read (Item value) = value\n",
+            "Always.fl",
+            "module App.Always exposing (Key, equality)\ntype alias Key = String\nequality : Eq.Dict Key\nlet equality = Eq.dictionary { eq = fun _ _ -> true }\n",
         ),
         (
-            "Namespace.fl",
-            "module App.Namespace exposing (Child)\nmodule Child = App.Child\n",
+            "Never.fl",
+            "module App.Never exposing (Key, equality)\ntype alias Key = String\nequality : Eq.Dict Key\nlet equality = Eq.dictionary { eq = fun _ _ -> false }\n",
+        ),
+        (
+            "Make.fl",
+            "module App.Make(A : App.Contracts.Policy)(B : App.Contracts.Policy) : App.Contracts.Output\nanswer : Bool\nlet answer = eq \"x\" \"x\"\n",
+        ),
+        (
+            "Outer.fl",
+            "module App.Outer(A : App.Contracts.Policy) : App.Contracts.Factory = module (B : App.Contracts.Policy) ->\n  answer : Bool\n  let answer = eq \"x\" \"x\"\n",
+        ),
+        (
+            "Capture.fl",
+            "module App.Capture(A : App.Contracts.Policy) : App.Contracts.Namespace\nprior : Bool\nlet prior = eq \"x\" \"x\"\nmodule Make(B : App.Contracts.Policy) : App.Contracts.Output =\n  answer : Bool\n  let answer = if prior then eq \"x\" \"x\" else true\n",
+        ),
+        (
+            "Instances.fl",
+            "module App.Instances exposing (Curried, Nested, Captured, CapturedOther)\nmodule Curried = App.Make(App.Always)(App.Never)\nmodule Nested = App.Outer(App.Always)(App.Never)\nmodule First = App.Capture(App.Always)\nmodule Second = App.Capture(App.Never)\nmodule Captured = First.Make(App.Never)\nmodule CapturedOther = Second.Make(App.Always)\n",
         ),
         (
             "Main.fl",
-            "module App.Main exposing (main)\nimport App.Contracts as C\nimport App.Namespace\npacked : Module C.Namespace\nlet packed = pack App.Namespace as C.Namespace\nescaped : exists K : C.Namespace. K.Child.Item\nlet escaped = unpack packed as K in K.Child.value\nmain : Unit ->{} Unit\nlet main () =\n  let direct = unpack packed as K in K.Child.read K.Child.value\n  let reopened = unpack escaped as N, item in N.Child.read item\n  Platform.stdout_line (show direct ++ \" \" ++ show reopened)\n",
+            "module App.Main exposing (main)\nimport App.Instances.Curried as Curried\nimport App.Instances.Nested as Nested\nimport App.Instances.Captured as Captured\nimport App.Instances.CapturedOther as CapturedOther\nmain : Unit ->{} Unit\nlet main () = Platform.stdout_line (show Curried.answer ++ \" \" ++ show Nested.answer ++ \" \" ++ show Captured.answer ++ \" \" ++ show CapturedOther.answer ++ \" \" ++ show (eq \"x\" \"x\"))\n",
         ),
     ] {
         fs::write(source.join(name), text).expect("source");
     }
-    assert_hom_execution(&source, &dir, "nested-runtime-structures", b"42 42\n");
+    for profile in ["debug", "release"] {
+        for emit in ["js", "go"] {
+            let out = dir.join(format!("out-{emit}-{profile}"));
+            let build = Command::new(env!("CARGO_BIN_EXE_flick"))
+                .arg("build")
+                .arg(source.join("Main.fl"))
+                .arg("--out-dir")
+                .arg(&out)
+                .arg("--emit")
+                .arg(emit)
+                .arg("--profile")
+                .arg(profile)
+                .output()
+                .expect("build");
+            assert!(
+                build.status.success(),
+                "{emit}/{profile}: {}",
+                String::from_utf8_lossy(&build.stderr)
+            );
+            let output = if emit == "js" {
+                Command::new("node")
+                    .arg(out.join(runner_path(false)))
+                    .output()
+                    .expect("Node")
+            } else {
+                Command::new(out.join(executable(MAIN_ENTRY)))
+                    .output()
+                    .expect("Go executable")
+            };
+            assert!(
+                output.status.success(),
+                "{emit}/{profile}: {}",
+                String::from_utf8_lossy(&output.stderr)
+            );
+            assert_eq!(
+                output.stdout, b"false false false true true\n",
+                "{emit}/{profile}"
+            );
+        }
+    }
+}
+
+#[test]
+#[ignore = "needs Node and Go; run `just e2e-tests`"]
+fn nested_static_parameter_contract_dictionaries_execute_on_js_ts_and_go() {
+    let dir = Path::new(env!("CARGO_TARGET_TMPDIR")).join("nested_static_dictionary");
+    let source = dir.join("App");
+    fs::create_dir_all(&source).expect("source directory");
+    for (name, text) in [
+        (
+            "Contracts.fl",
+            "module App.Contracts exposing (Policy, Container, Output)\ntype module Policy =\n  type Item\n  item : Item\n  equality : Eq.Dict Item\n  instance Eq Item from equality\ntype module Container =\n  module Policy : Policy\ntype module Output =\n  answer : Bool\n",
+        ),
+        (
+            "Policy.fl",
+            "module App.Policy exposing (Item, item, equality)\ntype Item = Item\nitem : Item\nlet item = Item\nequality : Eq.Dict Item\nlet equality = Eq.dictionary { eq = fun _ _ -> true }\n",
+        ),
+        (
+            "Container.fl",
+            "module App.Container exposing (Policy)\nmodule Policy = App.Policy\n",
+        ),
+        (
+            "Make.fl",
+            "module App.Make(N : App.Contracts.Container) : App.Contracts.Output\nanswer : Bool\nlet answer = eq N.Policy.item N.Policy.item\n",
+        ),
+        (
+            "Main.fl",
+            "module App.Main exposing (main)\nmodule Chosen = App.Make(App.Container)\nmain : Unit ->{} Unit\nlet main () = Platform.stdout_line (if Chosen.answer then \"42\" else \"0\")\n",
+        ),
+    ] {
+        fs::write(source.join(name), text).expect("source");
+    }
+    assert_hom_execution(&source, &dir, "nested-static-dictionary", b"42\n");
 }

@@ -260,15 +260,7 @@ fn a_renamed_type_variable_is_no_change() {
 }
 
 #[test]
-fn review_structure_signature_offsets_do_not_change_the_public_api() {
-    let source = "module Lib exposing (Outer)\ntype module Input =\n  type Key\ntype module Outer =\n  module Child : Input\n  value : Child.Key\n";
-    let old = interface(source);
-    let new = interface(&source.replace("  module Child", "\n  module Child"));
-    assert!(diff(&[old], &[new]).is_empty());
-}
-
-#[test]
-fn review_signature_type_parameter_names_do_not_change_the_public_api() {
+fn ported_review_signature_type_parameter_names_do_not_change_the_public_api() {
     use crate::types::{Kind, ModuleRequirement as R, ModuleSignature as S};
     let signature = |name: &str| {
         S::Parameterized {
@@ -294,4 +286,12 @@ fn review_signature_type_parameter_names_do_not_change_the_public_api() {
         .interface("Lib")
     };
     assert!(diff(&[signature("a")], &[signature("item")]).is_empty());
+}
+
+#[test]
+fn ported_review_structure_signature_offsets_do_not_change_the_public_api() {
+    let source = "module Lib exposing (Outer)\ntype module Input =\n  type Key\ntype module Outer =\n  module Child : Input\n  value : Child.Key\n";
+    let old = interface(source);
+    let new = interface(&source.replace("  module Child", "\n  module Child"));
+    assert!(diff(&[old], &[new]).is_empty());
 }

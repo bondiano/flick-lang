@@ -1,6 +1,6 @@
 #[cfg(feature = "ide")]
 #[test]
-fn review_inferred_nominals_retain_their_exported_methods() {
+fn ported_review_inferred_nominals_retain_their_exported_methods() {
     let (_, analysis) = hom_boundary_analysis(
         &[
             (
@@ -27,7 +27,7 @@ fn review_inferred_nominals_retain_their_exported_methods() {
 
 #[cfg(feature = "ide")]
 #[test]
-fn review_nested_parameter_contracts_supply_only_declared_dictionaries() {
+fn ported_review_nested_parameter_contracts_supply_only_declared_dictionaries() {
     for required in [true, false] {
         let dictionary = if required {
             "  instance Eq Item from equality\n"
@@ -68,7 +68,7 @@ fn review_nested_parameter_contracts_supply_only_declared_dictionaries() {
 
 #[cfg(feature = "ide")]
 #[test]
-fn review_parenthesized_signature_inputs_keep_import_references() {
+fn ported_review_parenthesized_signature_inputs_keep_import_references() {
     let (_, analysis) = hom_boundary_analysis(
         &[
             (
@@ -91,7 +91,7 @@ fn review_parenthesized_signature_inputs_keep_import_references() {
 
 #[cfg(feature = "ide")]
 #[test]
-fn review_refinement_paths_are_not_expression_dependencies() {
+fn ported_review_refinement_paths_are_not_expression_dependencies() {
     let (_, analysis) = hom_boundary_analysis(
         &[
             (
@@ -122,7 +122,7 @@ fn review_refinement_paths_are_not_expression_dependencies() {
 
 #[cfg(feature = "ide")]
 #[test]
-fn review_module_signature_cycles_are_rejected() {
+fn ported_review_module_signature_cycles_are_rejected() {
     for source in [
         "module App.Root exposing (A, B)\ntype module A = B\ntype module B = A\n",
         "module App.Root exposing (A, B)\ntype module A =\n  module Child : B\ntype module B =\n  module Child : A\n",
@@ -138,7 +138,7 @@ fn review_module_signature_cycles_are_rejected() {
 
 #[cfg(feature = "ide")]
 #[test]
-fn review_nested_alias_ancestors_are_checked_before_member_applications() {
+fn ported_review_nested_alias_ancestors_are_checked_before_member_applications() {
     for member in ["answer", "extra"] {
         let root = format!(
             "module App.Root exposing (answer)\nmodule Chosen = App.Parent.Inner.Make(App.Argument)\nanswer : Int\nlet answer = Chosen.{member}\n"

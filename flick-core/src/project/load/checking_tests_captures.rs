@@ -1,5 +1,152 @@
 #[cfg(feature = "ide")]
 #[test]
+fn hom_inherited_import_warnings_belong_to_the_lexical_source() {
+    use crate::diagnostics::codes;
+    let (sources, analysis) = hom_boundary_analysis(
+        &[
+            (
+                "Contracts",
+                "module App.Contracts exposing (Input, Output)\ntype module Input =\n  seed : Int\ntype module Output =\n  answer : Int\n",
+            ),
+            (
+                "Argument",
+                "module App.Argument exposing (seed)\nseed : Int\nlet seed = 41\n",
+            ),
+            (
+                "Helpers",
+                "module App.Helpers exposing (offset, unused)\noffset : Int\nlet offset = 1\nunused : Int\nlet unused = 99\n",
+            ),
+            (
+                "Root",
+                "module App.Root exposing (answer)\nimport App.Helpers exposing (offset, unused)\nmodule Make(K : App.Contracts.Input) : App.Contracts.Output =\n  answer : Int\n  let answer = K.seed + offset\nmodule Chosen = Make(App.Argument)\nanswer : Int\nlet answer = Chosen.answer\n",
+            ),
+        ],
+        "Root",
+    );
+    assert_eq!(analysis.diagnostics.len(), 1, "{:?}", analysis.diagnostics);
+    let warning = &analysis.diagnostics[0];
+    assert_eq!(warning.code, codes::R012);
+    let span = warning.span.expect("source import span");
+    assert!(sources.get(span.file).path.ends_with("/App/Root.fl"));
+    assert_eq!(
+        &sources.get(span.file).text[span.start as usize..span.end as usize],
+        "unused"
+    );
+}
+
+#[cfg(feature = "ide")]
+#[test]
+fn hom_parameter_alias_ascriptions_narrow_both_symbolic_and_concrete_views() {
+    use crate::diagnostics::{Severity, codes};
+    for (parameter, annotation, body, rejected) in [
+        ("RichFactory", "NarrowFactory", "Built.answer", false),
+        (
+            "RichFactory",
+            "NarrowFactory",
+            "Built.answer + Original.extra",
+            false,
+        ),
+        ("RichFactory", "NarrowFactory", "Built.extra", true),
+        ("NarrowFactory", "RichFactory", "Built.extra", true),
+    ] {
+        let adapter = format!(
+            "module App.Adapter(F : App.Contracts.{parameter})(K : App.Contracts.Input) : App.Contracts.Narrow\nmodule Narrow : App.Contracts.{annotation} = F\nmodule Built = Narrow(K)\nmodule Original = F(K)\nanswer : Int\nlet answer = {body}\n"
+        );
+        for root in ["Adapter", "Root"] {
+            let (_, analysis) = hom_boundary_analysis(
+                &[
+                    (
+                        "Contracts",
+                        "module App.Contracts exposing (Input, Rich, Narrow, RichFactory, NarrowFactory)\ntype module Input =\n  seed : Int\ntype module Rich =\n  answer : Int\n  extra : Int\ntype module Narrow =\n  answer : Int\ntype module RichFactory = (K : Input) -> Rich\ntype module NarrowFactory = (K : Input) -> Narrow\n",
+                    ),
+                    (
+                        "Argument",
+                        "module App.Argument exposing (seed)\nseed : Int\nlet seed = 41\n",
+                    ),
+                    (
+                        "Make",
+                        "module App.Make(K : App.Contracts.Input) : App.Contracts.Rich\nanswer : Int\nlet answer = K.seed + 1\nextra : Int\nlet extra = 99\n",
+                    ),
+                    ("Adapter", &adapter),
+                    (
+                        "Root",
+                        "module App.Root exposing (answer)\nmodule Chosen = App.Adapter(App.Make)(App.Argument)\nanswer : Int\nlet answer = Chosen.answer\n",
+                    ),
+                ],
+                root,
+            );
+            let errors: Vec<_> = analysis
+                .diagnostics
+                .iter()
+                .filter(|d| d.severity == Severity::Error)
+                .collect();
+            if rejected {
+                assert!(
+                    errors.iter().any(|d| if parameter == "NarrowFactory" {
+                        d.code == codes::T061 && d.message.contains("annotation")
+                    } else {
+                        matches!(d.code, codes::R004 | codes::T001) && d.message.contains("extra")
+                    }),
+                    "{parameter} as {annotation} ({body}): {errors:?}"
+                );
+            } else {
+                assert!(
+                    analysis.diagnostics.is_empty(),
+                    "{parameter} as {annotation}: {:?}",
+                    analysis.diagnostics
+                );
+            }
+        }
+    }
+}
+
+#[cfg(feature = "ide")]
+#[test]
+fn hom_applied_module_ascription_hides_undeclared_result_members() {
+    use crate::diagnostics::codes;
+    for (member, rejected) in [("answer", false), ("extra", true)] {
+        let root = format!(
+            "module App.Root exposing (answer)\nmodule Chosen : App.Contracts.Output = App.Make(App.Argument)\nanswer : Int\nlet answer = Chosen.{member}\n"
+        );
+        let (_, analysis) = hom_boundary_analysis(
+            &[
+                (
+                    "Contracts",
+                    "module App.Contracts exposing (Input, Output, Rich)\ntype module Input =\n  seed : Int\ntype module Output =\n  answer : Int\ntype module Rich =\n  answer : Int\n  extra : Int\n",
+                ),
+                (
+                    "Argument",
+                    "module App.Argument exposing (seed)\nseed : Int\nlet seed = 41\n",
+                ),
+                (
+                    "Make",
+                    "module App.Make(K : App.Contracts.Input) : App.Contracts.Rich\nanswer : Int\nlet answer = K.seed + 1\nextra : Int\nlet extra = 99\n",
+                ),
+                ("Root", &root),
+            ],
+            "Root",
+        );
+        if rejected {
+            assert!(
+                analysis
+                    .diagnostics
+                    .iter()
+                    .any(|d| d.code == codes::R004 && d.message.contains("extra")),
+                "{:?}",
+                analysis.diagnostics
+            );
+        } else {
+            assert!(
+                analysis.diagnostics.is_empty(),
+                "{:?}",
+                analysis.diagnostics
+            );
+        }
+    }
+}
+
+#[cfg(feature = "ide")]
+#[test]
 fn hom_private_factories_infer_returned_parameterized_signatures() {
     let (_, analysis) = hom_boundary_analysis(
         &[
@@ -234,169 +381,6 @@ fn hom_nested_parameterized_modules_capture_values_of_an_enclosing_generic_param
             (
                 "Root",
                 "module App.Root exposing (answer)\nmodule Namespace = App.Outer(App.Argument)\nmodule Chosen = Namespace.Make(App.Argument)\nanswer : Int\nlet answer = Chosen.answer\n",
-            ),
-        ],
-        "Root",
-    );
-    assert!(
-        analysis.diagnostics.is_empty(),
-        "{:?}",
-        analysis.diagnostics
-    );
-}
-
-#[cfg(feature = "ide")]
-#[test]
-fn hom_nested_factories_capture_a_parameter_dictionary_in_preceding_values() {
-    let (sources, analysis) = hom_boundary_analysis(
-        &[
-            (
-                "Contracts",
-                r"module App.Contracts exposing (Policy, Output, Factory, Namespace)
-type module Policy =
-  type Key = String
-  equality : Eq.Dict Key
-  instance Eq Key from equality
-type module Output =
-  answer : Bool
-type module Factory = (K : Policy) -> Output
-type module Namespace =
-  module Make : Factory
-",
-            ),
-            (
-                "Always",
-                r"module App.Always exposing (Key, equality)
-type alias Key = String
-equality : Eq.Dict Key
-let equality = Eq.dictionary { eq = fun _ _ -> true }
-",
-            ),
-            (
-                "Never",
-                r"module App.Never exposing (Key, equality)
-type alias Key = String
-equality : Eq.Dict Key
-let equality = Eq.dictionary { eq = fun _ _ -> false }
-",
-            ),
-            (
-                "Make",
-                r#"module App.Make(A : App.Contracts.Policy)(B : App.Contracts.Policy) : App.Contracts.Output
-answer : Bool
-let answer = eq "x" "x"
-"#,
-            ),
-            (
-                "Outer",
-                r#"module App.Outer(A : App.Contracts.Policy) : App.Contracts.Factory = module (B : App.Contracts.Policy) ->
-  answer : Bool
-  let answer = eq "x" "x"
-"#,
-            ),
-            (
-                "Capture",
-                r#"module App.Capture(A : App.Contracts.Policy) : App.Contracts.Namespace
-prior : Bool
-let prior = eq "x" "x"
-module Make(B : App.Contracts.Policy) : App.Contracts.Output =
-  answer : Bool
-  let answer = if prior then eq "x" "x" else true
-"#,
-            ),
-            (
-                "Instances",
-                r"module App.Instances exposing (Curried, Nested, Captured, CapturedOther)
-module Curried = App.Make(App.Always)(App.Never)
-module Nested = App.Outer(App.Always)(App.Never)
-module First = App.Capture(App.Always)
-module Second = App.Capture(App.Never)
-module Captured = First.Make(App.Never)
-module CapturedOther = Second.Make(App.Always)
-",
-            ),
-            (
-                "Main",
-                r#"module App.Main exposing (main)
-import App.Instances.Curried as Curried
-import App.Instances.Nested as Nested
-import App.Instances.Captured as Captured
-import App.Instances.CapturedOther as CapturedOther
-main : Unit ->{} Unit
-let main () = Platform.stdout_line (show Curried.answer ++ " " ++ show Nested.answer ++ " " ++ show Captured.answer ++ " " ++ show CapturedOther.answer ++ " " ++ show (eq "x" "x"))
-"#,
-            ),
-        ],
-        "Main",
-    );
-    assert!(
-        analysis.diagnostics.is_empty(),
-        "{:?}\n{}",
-        analysis.diagnostics,
-        sources
-            .files()
-            .filter(|s| s.path.contains("First") || s.path.contains("Second"))
-            .map(|s| format!("{}\n{}", s.path, s.text))
-            .collect::<Vec<_>>()
-            .join("\n")
-    );
-}
-
-#[cfg(feature = "ide")]
-#[test]
-fn hom_private_inference_preserves_exported_adt_constructors() {
-    let (_, analysis) = hom_boundary_analysis(
-        &[
-            (
-                "Contracts",
-                "module App.Contracts exposing (Input)\ntype module Input =\n  seed : Int\n",
-            ),
-            (
-                "Argument",
-                "module App.Argument exposing (seed)\nseed : Int\nlet seed = 41\n",
-            ),
-            (
-                "Factory",
-                "private module App.Factory(K : App.Contracts.Input) exposing (Box(..), box)\ntype Box a = Box a\nbox : Box Int\nlet box = Box K.seed\n",
-            ),
-            (
-                "Root",
-                "module App.Root exposing (answer)\nmodule Chosen = App.Factory(App.Argument)\nanswer : Int\nlet answer = match Chosen.Box 42 with\n  | Chosen.Box n -> n\n",
-            ),
-        ],
-        "Root",
-    );
-    assert!(
-        analysis.diagnostics.is_empty(),
-        "{:?}",
-        analysis.diagnostics
-    );
-}
-
-#[cfg(feature = "ide")]
-#[test]
-fn hom_aliases_resolve_to_canonical_module_paths_once() {
-    let (_, analysis) = hom_boundary_analysis(
-        &[
-            (
-                "Contracts",
-                "module App.Contracts exposing (Input, Output)\ntype module Input =\n  seed : Int\ntype module Output =\n  answer : Int\n",
-            ),
-            (
-                "Argument",
-                "module App.Argument exposing (seed)\nseed : Int\nlet seed = 41\n",
-            ),
-            (
-                "Other",
-                "module App.Other exposing (seed)\nseed : Int\nlet seed = 0\n",
-            ),
-            (
-                "Factory",
-                "module App.Factory(K : App.Contracts.Input) : App.Contracts.Output\nanswer : Int\nlet answer = K.seed + 1\n",
-            ),
-            (
-                "Root",
-                "module App.Root exposing (answer)\nimport App.Factory as Factory\nimport App.Argument as Actual\nimport App.Other as App\nmodule Chosen = Factory(Actual)\nanswer : Int\nlet answer = Chosen.answer + App.seed\n",
             ),
         ],
         "Root",

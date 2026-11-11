@@ -1,5 +1,5 @@
 #[test]
-fn review_cached_alias_templates_preserve_canonical_materialized_targets() {
+fn ported_review_cached_alias_templates_preserve_canonical_materialized_targets() {
     use crate::project::{CachedModule, PackageCache, compile_with};
     use crate::source::Span;
 

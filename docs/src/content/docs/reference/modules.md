@@ -343,6 +343,8 @@ and require the last file to fail with `FLICK-T003`.
 
 ## Higher-order module signatures
 
+Static expansion compares the active template and its module arguments, so a finite higher-order callback may revisit a template with different arguments. Repeating the same active application reports `FLICK-R006`. Expansion also stops at 64 active applications with `FLICK-R006`, including recursive definitions that keep producing fresh arguments. This is a compiler resource bound, not a termination proof.
+
 Public parameterized modules declare their result signature (`FLICK-T067`). Private and local
 parameterized modules may infer it. A public alias may inherit an explicitly advertised
 signature or add an ascription. An optional `exposing` list must agree with
@@ -428,8 +430,9 @@ applications such as `Identity(Identity(Argument))` may reuse the same parameter
 An arrow is a static module signature, separate from a value function type.
 An implementation may accept fewer requirements and return more members than
 the signature requires. A result annotation hides members and type equalities
-that the contract does not expose. Runtime `Module Sig` values cannot carry
-parameterized modules, including through nested module members (`FLICK-T068`).
+that the contract does not expose. Runtime `Module Sig` records are flat: they
+cannot carry parameterized modules or nested module namespaces (`FLICK-T068`). Apply factories
+statically and explicitly flatten the values and type witnesses before packing.
 
 ### Repository layers and logging
 

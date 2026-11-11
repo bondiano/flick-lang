@@ -8,12 +8,11 @@ use flick_ir::Shape;
 
 use super::bridge::Toward;
 use super::{Gen, names};
-use crate::build::bindings;
-#[cfg(not(target_arch = "wasm32"))]
-use crate::build::effects::belongs_to;
 use crate::build::effects::owned;
 #[cfg(not(target_arch = "wasm32"))]
 use crate::build::effects::{effect_specifier, requires_adapter, selected_on_kernel};
+#[cfg(not(target_arch = "wasm32"))]
+use crate::build::{bindings, effects::belongs_to};
 use crate::codegen::Options;
 use crate::ir::Copies;
 use crate::ir::{Foreign, ForeignMode, Item, ItemKind};
@@ -54,16 +53,6 @@ impl Gen<'_> {
         };
         let alias = format!("$f_{}", f.name);
         let spec = (self.options.foreign)(self.module, module);
-        // An explicit native renderer supplies the Ui ABI itself, including
-        // effectful mount operations; it does not imply the optional adapter.
-        if self.kernel
-            && bindings::UI_RENDERER.contains(&module.as_str())
-            && !trusted_runtime_package(&spec)
-        {
-            self.foreign
-                .push((spec, f.binding.name.clone(), alias.clone()));
-            return (alias, false);
-        }
         #[cfg(not(target_arch = "wasm32"))]
         let (spec, bridged) = {
             let mut spec = spec;
@@ -75,12 +64,14 @@ impl Gen<'_> {
                 // Build validation rejects reachable uses. Unused members of a
                 // mixed built-in module must not import an unavailable adapter.
                 let message = serde_json::to_string(&format!(
-                    "`{module}` `{}` requires the optional `{}` adapter",
+                    "`{spec}` `{}` requires the optional `{}` adapter",
                     f.binding.name,
                     bindings::ADAPTER_PREFIX
                 ))
                 .expect("a diagnostic string serializes");
                 let missing = format!("(() => {{ throw new Error({message}); }})");
+                // An unreachable foreign value can also be a Schema or other
+                // opaque constant. Keep its emitted TS declaration assignable.
                 let missing = if self.options.typescript() {
                     format!("({missing} as any)")
                 } else {

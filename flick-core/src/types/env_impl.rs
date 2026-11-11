@@ -39,7 +39,8 @@ impl<'b> Env<'b> {
     pub(super) fn restore_static_lexical(&mut self, interface: &Interface, saved: StaticLexical) {
         for export in &interface.exports {
             let entity = &export.entity;
-            self.types.remove(&entity.module, &entity.name);
+            self.types
+                .remove(&entity.module, &entity.name);
             self.types
                 .remove(&entity.module, &format!("{}.Impl", entity.name));
             self.values.remove(entity);

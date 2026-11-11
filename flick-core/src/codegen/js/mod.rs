@@ -520,4 +520,17 @@ impl Gen<'_> {
     }
 }
 
-include!("statements.rs");
+/// Includes optional release workers and direct instance methods, whose
+/// physical owner is the same as the binding that defines them.
+pub(crate) fn runtime_exports(item: &Item) -> Vec<String> {
+    let mut names = items::defined(item);
+    if let Some((name, arity)) = release::exported_worker(item) {
+        names.push(format!("{}${arity}", self::names::ident(name)));
+    }
+    names.extend(
+        release::direct_methods(item)
+            .into_iter()
+            .map(|(instance, method)| format!("{}${method}", self::names::instance(instance))),
+    );
+    names
+}

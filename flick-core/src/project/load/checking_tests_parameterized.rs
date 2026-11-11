@@ -1,5 +1,61 @@
 #[cfg(feature = "ide")]
 #[test]
+fn virtual_parameterized_path_conflicts_with_a_file_module() {
+    use crate::diagnostics::codes;
+
+    let host = Memory(BTreeMap::from([
+        (PathBuf::from("/p/src/App/Contracts.fl"), "module App.Contracts exposing (Source)\ntype module Source =\n  value : Int\n".into()),
+        (PathBuf::from("/p/src/App/Argument.fl"), "module App.Argument exposing (value)\nvalue : Int\nlet value = 1\n".into()),
+        (PathBuf::from("/p/src/App/Make.fl"), "module App.Make(K : App.Contracts.Source) : PublicResult exposing (answer)\nanswer : Int\nlet answer = K.value\n\ntype module PublicResult =\n  answer : Int\n".into()),
+        (PathBuf::from("/p/src/App/Parent.fl"), "module App.Parent exposing (A)\nmodule A = App.Make(App.Argument)\n".into()),
+        (PathBuf::from("/p/src/App/Parent/A.fl"), "module App.Parent.A exposing (answer)\nanswer : Int\nlet answer = 2\n".into()),
+        (PathBuf::from("/p/src/App/Use.fl"), "module App.Use exposing (answer)\nimport App.Parent\nimport App.Parent.A exposing (answer)\n".into()),
+    ]));
+    let mut sources = SourceMap::default();
+    let project = library(&mut sources);
+    let analysis = analyze(
+        &host,
+        &mut sources,
+        Some(&project),
+        &[PathBuf::from("/p/src/App/Use.fl")],
+    );
+    assert!(
+        analysis.diagnostics.iter().any(|d| d.code == codes::R002),
+        "{:?}",
+        analysis.diagnostics
+    );
+}
+
+#[cfg(feature = "ide")]
+#[test]
+fn changing_a_parameterized_contract_invalidates_the_virtual_module_cache() {
+    use crate::diagnostics::codes;
+
+    let host = |contract: &str| {
+        Memory(BTreeMap::from([
+        (PathBuf::from("/p/src/App/Contracts.fl"), "module App.Contracts exposing (A, B)\ntype module A =\n  value : Int\ntype module B =\n  value : String\n".into()),
+        (PathBuf::from("/p/src/App/Argument.fl"), "module App.Argument exposing (value)\nvalue : Int\nlet value = 1\n".into()),
+        (PathBuf::from("/p/src/App/Make.fl"), format!("module App.Make(K : App.Contracts.{contract}) : PublicResult exposing (answer)\nanswer : Int\nlet answer = K.value\n\ntype module PublicResult =\n  answer : Int\n")),
+        (PathBuf::from("/p/src/App/Parent.fl"), "module App.Parent exposing (Result)\nmodule Result = App.Make(App.Argument)\n".into()),
+    ]))
+    };
+    let roots = [PathBuf::from("/p/src/App/Parent.fl")];
+    let mut cache = ModuleCache::default();
+    let mut sources = SourceMap::default();
+    let project = library(&mut sources);
+    let first = analyze_with(&host("A"), &mut sources, Some(&project), &roots, &mut cache);
+    assert!(first.diagnostics.is_empty(), "{:?}", first.diagnostics);
+    let mut sources = SourceMap::default();
+    let project = library(&mut sources);
+    let changed = analyze_with(&host("B"), &mut sources, Some(&project), &roots, &mut cache);
+    assert!(
+        changed.diagnostics.iter().any(|d| d.code == codes::T061),
+        "{:?}",
+        changed.diagnostics
+    );
+}
+#[cfg(feature = "ide")]
+#[test]
 fn higher_order_factory_is_checked_and_applied_through_its_parameter() {
     let mut host = Memory(BTreeMap::from([
         (PathBuf::from("/p/src/App/Contracts.fl"), "module App.Contracts exposing (Input, Output, Factory)\ntype module Input =\n  seed : Int\ntype module Output =\n  answer : Int\ntype module Factory = (K : Input) -> Output\n".into()),
@@ -324,89 +380,3 @@ fn hom_grouped_signature_accepts_and_applies_a_matching_factory() {
         analysis.diagnostics
     );
 }
-
-#[cfg(feature = "ide")]
-#[test]
-fn hom_boundary_parameter_views_stay_separate_for_the_same_argument() {
-    use crate::diagnostics::codes;
-    let (_, analysis) = hom_boundary_analysis(
-        &[
-            (
-                "Contracts",
-                "module App.Contracts exposing (Small, Large, Output)\ntype module Small =\n  seed : Int\ntype module Large =\n  seed : Int\n  secret : Int\ntype module Output =\n  answer : Int\n",
-            ),
-            (
-                "Argument",
-                "module App.Argument exposing (seed, secret)\nseed : Int\nlet seed = 1\nsecret : Int\nlet secret = 42\n",
-            ),
-            (
-                "Make",
-                "module App.Make(A : App.Contracts.Small, B : App.Contracts.Large) : App.Contracts.Output\nanswer : Int\nlet answer = A.secret\n",
-            ),
-            (
-                "Root",
-                "module App.Root exposing (Chosen)\nmodule Chosen = App.Make(App.Argument, App.Argument)\n",
-            ),
-        ],
-        "Root",
-    );
-    let errors: Vec<_> = analysis
-        .diagnostics
-        .iter()
-        .filter(|d| {
-            (d.code == codes::T001 || d.code == codes::R004) && d.message.contains("secret")
-        })
-        .collect();
-    // Both the symbolic template and its concrete application must reject it.
-    assert_eq!(errors.len(), 2, "{:?}", analysis.diagnostics);
-}
-
-#[cfg(feature = "ide")]
-#[test]
-fn hom_dependent_results_preserve_types_through_argument_aliases() {
-    use crate::diagnostics::codes;
-    for (declaration, rejected) in [("type alias", false), ("opaque type alias", true)] {
-        let argument = format!(
-            "module App.Argument exposing (Key, value)\n{declaration} Key = String\nvalue : Key\nlet value = \"x\"\n"
-        );
-        let (sources, analysis) = hom_boundary_analysis(
-            &[
-                (
-                    "Contracts",
-                    "module App.Contracts exposing (Source, Output)\ntype module Source =\n  type Key\n  value : Key\ntype module Output =\n  type Value\n  value : Value\n",
-                ),
-                ("Argument", &argument),
-                (
-                    "Make",
-                    "module App.Make(K : App.Contracts.Source) : App.Contracts.Output with type Value = K.Key\ntype alias Value = K.Key\nvalue : Value\nlet value = K.value\n",
-                ),
-                (
-                    "Root",
-                    "module App.Root exposing (Chosen)\nmodule Alias = App.Argument\nmodule Chosen = App.Make(Alias)\n",
-                ),
-                (
-                    "Use",
-                    "module App.Use exposing (value)\nimport App.Root.Chosen as Chosen\nvalue : String\nlet value = Chosen.value\n",
-                ),
-            ],
-            "Use",
-        );
-        if rejected {
-            assert!(
-                analysis.diagnostics.iter().any(|d| d.code == codes::T003
-                    && d.span
-                        .is_some_and(|s| sources.get(s.file).path == "/p/src/App/Use.fl")),
-                "{:?}",
-                analysis.diagnostics
-            );
-        } else {
-            assert!(
-                analysis.diagnostics.is_empty(),
-                "{:?}",
-                analysis.diagnostics
-            );
-        }
-    }
-}
-
-include!("checking_tests_hom_boundaries.rs");

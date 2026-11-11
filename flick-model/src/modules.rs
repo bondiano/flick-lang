@@ -100,7 +100,7 @@ pub enum Value {
 pub enum Error {
     Fuel,
     Unbound(usize),
-    NotParameterizedModule,
+    NotParameterized,
     GroupSize { expected: usize, actual: usize },
 }
 
@@ -127,7 +127,7 @@ pub fn evaluate(expr: &Expr, environment: &[Value], fuel: usize) -> Result<Value
                 body,
             } = evaluate(function, environment, fuel)?
             else {
-                return Err(Error::NotParameterizedModule);
+                return Err(Error::NotParameterized);
             };
             if arity != arguments.len() {
                 return Err(Error::GroupSize {
@@ -177,7 +177,7 @@ mod tests {
 
     #[test]
     fn a_returned_factory_uses_its_definition_environment() {
-        // (parameterized module A -> parameterized module B -> A)(repo) returns a closure over repo.
+        // (parameterized A -> parameterized B -> A)(repo) returns a closure over repo.
         let return_first = Expr::Parameterized {
             arity: 1,
             body: Box::new(Expr::Parameterized {

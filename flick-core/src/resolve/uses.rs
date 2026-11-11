@@ -84,46 +84,18 @@ struct Walker<'a> {
 }
 
 impl Walker<'_> {
-    fn module_signature(&mut self, node: &Node) {
-        let modules = self.module_locals.len();
-        let mut children = node.nodes();
-        if let Some(parameters) = children.next() {
-            for parameter in parameters
-                .nodes()
-                .filter(|n| n.kind == K::ModuleSignatureBinder)
-            {
-                for signature in parameter.nodes() {
-                    self.walk(signature);
-                }
-                if let Some(name) = parameter.child_tokens().find(|t| t.kind == K::Con) {
-                    self.module_locals.push(name.text(self.text));
-                }
-            }
-            if !parameters
-                .nodes()
-                .any(|n| n.kind == K::ModuleSignatureBinder)
-            {
-                self.walk(parameters);
-            }
-        }
-        for result in children {
-            self.walk(result);
-        }
-        self.module_locals.truncate(modules);
-    }
-
     fn walk(&mut self, node: &Node) {
         let mark = self.locals.len();
         match node.kind {
+            K::ModuleSignatureArrow => {
+                self.module_signature(node);
+                return;
+            }
             K::ModuleParamExpr | K::InlineModuleDecl
                 if node.kind == K::ModuleParamExpr
                     || node.nodes().any(|n| n.kind == K::ModuleParamGroup) =>
             {
                 self.module_parameterized(node);
-                return;
-            }
-            K::ModuleSignatureArrow => {
-                self.module_signature(node);
                 return;
             }
             K::ImportDecl => return,
@@ -244,6 +216,21 @@ impl Walker<'_> {
             ) || (node.kind == K::ModuleParamExpr && n.kind == K::ModulePath)
         }) {
             for declaration in body.nodes().filter(|_| body.kind == K::Members) {
+                if declaration.kind == K::ImportDecl {
+                    let qualifier = declaration
+                        .child_tokens()
+                        .find(|t| t.kind == K::Con)
+                        .or_else(|| {
+                            declaration
+                                .nodes()
+                                .find(|n| n.kind == K::ModulePath)
+                                .and_then(|p| p.child_tokens().find(|t| t.kind == K::Con))
+                        });
+                    if let Some(qualifier) = qualifier {
+                        self.module_locals.push(qualifier.text(self.text));
+                    }
+                    continue;
+                }
                 let names = declaration
                     .child_tokens()
                     .filter(|t| matches!(t.kind, K::Ident | K::Con));
@@ -268,6 +255,31 @@ impl Walker<'_> {
         }
         self.module_locals.truncate(modules);
         self.locals.truncate(mark);
+    }
+
+    fn module_signature(&mut self, node: &Node) {
+        let mark = self.module_locals.len();
+        let mut parts = node.nodes();
+        if let Some(input) = parts.next() {
+            if input.kind == K::ModuleSignatureParen
+                && input.nodes().all(|n| n.kind == K::ModuleSignatureBinder)
+            {
+                for binder in input.nodes() {
+                    for signature in binder.nodes() {
+                        self.walk(signature);
+                    }
+                    if let Some(name) = binder.child_tokens().find(|t| t.kind == K::Con) {
+                        self.module_locals.push(name.text(self.text));
+                    }
+                }
+            } else {
+                self.walk(input);
+            }
+        }
+        for result in parts {
+            self.walk(result);
+        }
+        self.module_locals.truncate(mark);
     }
 
     /// The statements of a block: a `let` scopes over those after it.

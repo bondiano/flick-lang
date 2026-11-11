@@ -7,7 +7,6 @@
   },
   "devDependencies": {
     "@flick-lang/runtime": "workspace:*",
-    "binaryen": "132.0.0",
     "jsdom": "30.1.3",
     "react-dom": "19.3.1",
     "typescript": "7.1.0-beta",

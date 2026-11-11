@@ -2,17 +2,13 @@ impl Loader<'_> {
     fn virtual_source(
         &self,
         parent: usize,
-        parameterized: usize,
+        template: usize,
         name: &str,
         header: &resolve::Header,
         application: &ModuleApplication,
     ) -> Option<String> {
-        let source = self
-            .sources
-            .get(self.modules[parameterized].file)
-            .text
-            .clone();
-        let header_node = self.modules[parameterized]
+        let source = self.sources.get(self.modules[template].file).text.clone();
+        let header_node = self.modules[template]
             .parse
             .tree
             .nodes()
@@ -59,7 +55,7 @@ impl Loader<'_> {
         }
         let suffix = &source[header_node.range().1 as usize..];
         if header_node.has_token(K::Eq) && header.body.is_none() {
-            let indent = self.modules[parameterized]
+            let indent = self.modules[template]
                 .parse
                 .tree
                 .nodes()
@@ -110,10 +106,10 @@ impl Loader<'_> {
         else {
             return;
         };
-        let Some(parameterized) = self.callable_template(template, application.span) else {
+        let Some(template) = self.callable_template(template, application.span) else {
             return;
         };
-        let Some(header) = self.modules[parameterized].syntax.header.clone() else {
+        let Some(header) = self.modules[template].syntax.header.clone() else {
             return;
         };
         if header.parameters.is_empty()
@@ -131,14 +127,13 @@ impl Loader<'_> {
             ));
             return;
         }
-        let Some((template, trace)) = self.expansion_trace(parent, parameterized, application.span)
-        else {
+        // Module-expression evaluation has already resolved every argument.
+        // Canonical identities must not pass through the caller's aliases again.
+        let Some((origin, trace)) = self.expansion_trace(parent, template, application) else {
             return;
         };
-        // Expression elaboration has already resolved callee and arguments to
-        // canonical module identities. Do not apply source aliases again here.
-        let Some(generated) =
-            self.virtual_source(parent, parameterized, &name, &header, application)
+
+        let Some(generated) = self.virtual_source(parent, template, &name, &header, application)
         else {
             return;
         };
@@ -150,14 +145,8 @@ impl Loader<'_> {
         let syntax = Arc::new(resolve::module_syntax(&parse.tree, generated, file));
         let index = self.modules.len();
         self.by_name.insert(name.clone(), index);
-        let context = self.application_context(
-            parent,
-            parameterized,
-            &header,
-            application,
-            callee,
-            (template, trace),
-        );
+        let context =
+            self.application_context(parent, template, application, callee, origin, trace);
         self.modules.push(Loaded {
             path,
             file,
@@ -181,12 +170,26 @@ impl Loader<'_> {
         &self,
         parent: usize,
         parameterized: usize,
-        header: &resolve::Header,
         application: &ModuleApplication,
         callee: CalleeOrigin,
-        (template, trace): (String, Vec<String>),
+        template: String,
+        trace: Vec<ExpansionFrame>,
     ) -> Virtual {
+        let header = self.modules[parameterized]
+            .syntax
+            .header
+            .as_ref()
+            .expect("checked parameterized header");
         let inherited = self.modules[parameterized].virtual_of.as_ref();
+        let access_modules = self.modules[parent].namespace_access();
+        let arguments: Vec<_> = application
+            .arguments
+            .iter()
+            .map(|module| StaticArgument {
+                module: module.clone(),
+                access_modules: access_modules.clone(),
+            })
+            .collect();
         let mut capture = inherited.map_or_else(StaticCapture::default, |v| v.capture.clone());
         if let CalleeOrigin::Parameter { binding, .. } = &callee
             && let Some(caller) = self.modules[parent]
@@ -212,12 +215,7 @@ impl Loader<'_> {
                 .access_modules
                 .push(self.modules[parameterized].name.clone());
         }
-        for (index, (parameter, argument)) in header
-            .parameters
-            .iter()
-            .zip(&application.arguments)
-            .enumerate()
-        {
+        for (index, (parameter, argument)) in header.parameters.iter().zip(&arguments).enumerate() {
             capture.bindings.push(StaticBinding {
                 alias: parameter.name.clone(),
                 argument: argument.clone(),
@@ -232,7 +230,7 @@ impl Loader<'_> {
                         })
                         .position(|end| end > index)
                         .unwrap_or(0),
-                    prefix: application.arguments[..index].to_vec(),
+                    prefix: arguments[..index].to_vec(),
                 },
             });
         }
@@ -246,7 +244,7 @@ impl Loader<'_> {
             .map(str::to_owned);
         capture.callee = Some(callee);
         capture.inherited_imports += application.arguments.len();
-        capture.arguments.clone_from(&application.arguments);
+        capture.arguments = arguments;
         capture.template = Some(template);
         capture.trace = trace;
         Virtual {
@@ -259,8 +257,11 @@ impl Loader<'_> {
         &mut self,
         parent: usize,
         parameterized: usize,
-        at: Span,
-    ) -> Option<(String, Vec<String>)> {
+        application: &ModuleApplication,
+    ) -> Option<(String, Vec<ExpansionFrame>)> {
+        // An argument-changing recursive definition has no repeated key. Bound
+        // active expansion depth as well as detecting exact recursive calls.
+        const MAX_DEPTH: usize = 64;
         let context = self.modules[parameterized].virtual_of.as_ref();
         let template = context
             .and_then(|v| v.capture.template.clone())
@@ -269,25 +270,50 @@ impl Loader<'_> {
             .virtual_of
             .as_ref()
             .map_or_else(Vec::new, |v| v.capture.trace.clone());
+        let mut arguments = Vec::new();
         if let Some(context) = context {
             let mut captured = context.capture.trace.as_slice();
-            // A partial application resumes its own last expansion. Earlier
-            // captured expansions remain active in its lexical environment.
-            if context.capture.template.is_some() && captured.last() == Some(&template) {
+            if context.capture.template.is_some()
+                && captured
+                    .last()
+                    .is_some_and(|frame| frame.template == template)
+            {
+                arguments.clone_from(&captured.last().expect("partial application").arguments);
                 captured = &captured[..captured.len() - 1];
             }
-            trace.extend_from_slice(captured);
+            let shared = trace
+                .iter()
+                .zip(captured)
+                .take_while(|(a, b)| a == b)
+                .count();
+            trace.extend_from_slice(&captured[shared..]);
         }
-        if trace.contains(&template) {
-            trace.push(template);
+        arguments.extend(application.arguments.iter().cloned());
+        let frame = ExpansionFrame {
+            template: template.clone(),
+            arguments,
+        };
+        let repeated = trace.contains(&frame);
+        if repeated || trace.len() >= MAX_DEPTH {
+            trace.push(frame);
+            let chain = trace
+                .iter()
+                .map(|f| format!("{}({})", f.template, f.arguments.join(", ")))
+                .collect::<Vec<_>>()
+                .join(" -> ");
+            let reason = if repeated {
+                "recursive static module expansion".to_owned()
+            } else {
+                format!("static module expansion exceeds {MAX_DEPTH} active applications")
+            };
             self.diagnostics.push(Diagnostic::error(
                 codes::R006,
-                format!("recursive static module expansion: {}", trace.join(" -> ")),
-                at,
+                format!("{reason}: {chain}"),
+                application.span,
             ));
             return None;
         }
-        trace.push(template.clone());
+        trace.push(frame);
         Some((template, trace))
     }
 }

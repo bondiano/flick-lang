@@ -27,16 +27,11 @@ impl Checker<'_> {
             );
             return Some(Type::Error);
         };
-        let (binder, prefix) = opened.alias.split_once('.').unwrap_or((&opened.alias, ""));
         self.record_name(
             span,
             Ref::PackedField {
-                binder: binder.to_owned(),
-                field: if prefix.is_empty() {
-                    name.to_owned()
-                } else {
-                    format!("{prefix}.{name}")
-                },
+                binder: opened.alias,
+                field: name.to_owned(),
             },
         );
         Some(self.instantiate(scheme, span))

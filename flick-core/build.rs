@@ -273,9 +273,6 @@ fn binding_policy(output: &Path) -> io::Result<()> {
         if name == "UI_REQUIRED" {
             out.push_str("#[cfg(not(target_arch = \"wasm32\"))]\n");
         }
-        if name == "UI_REQUIRED" {
-            out.push_str("#[cfg(not(target_arch = \"wasm32\"))]\n");
-        }
         writeln!(out, "pub const {name}: &[&str] = &{values:?};").expect("write string");
     }
     for (key, name) in [

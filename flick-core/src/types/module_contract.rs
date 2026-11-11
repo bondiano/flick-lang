@@ -23,9 +23,9 @@ type OpenedRequirements = (
 
 fn open_existential_type(ty: &Type, binder: &str, witness: &str) -> Type {
     if let Type::Con { module, name } = ty
-        && let Some(suffix) = within_witness(module, &format!("$exists:{binder}"))
+        && module == &format!("$exists:{binder}")
     {
-        return Type::con(&format!("{witness}{suffix}"), name);
+        return Type::con(witness, name);
     }
     if matches!(ty, Type::Exists { binder: inner, .. } if inner == binder) {
         return ty.clone();
@@ -35,15 +35,14 @@ fn open_existential_type(ty: &Type, binder: &str, witness: &str) -> Type {
 
 fn close_existential_type(ty: &Type, witness: &str, binder: &str) -> Type {
     if let Type::Con { module, name } = ty
-        && let Some(suffix) = within_witness(module, witness)
+        && module == witness
     {
-        return Type::con(&format!("$exists:{binder}{suffix}"), name);
+        return Type::con(&format!("$exists:{binder}"), name);
     }
     ty.map_children(&mut |child| close_existential_type(child, witness, binder))
 }
 
 include!("module_contract/checker.rs");
-include!("module_contract/runtime.rs");
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum Mismatch {

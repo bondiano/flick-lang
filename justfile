@@ -253,20 +253,18 @@ wasm-plugins:
 
 # Build the wasm module the in-browser demo loads and hold it to its size budget.
 # The raw-byte budget retains the playground editor queries (hover, completion,
-# fixes and `.d.ts`). LLVM Oz and the pinned Binaryen optimizer retain the
-# complete compiler; the budget measures the uncompressed input to wasm-bindgen.
+# fixes and `.d.ts`). Size optimization uses LLVM Oz; the PX5 measurement is
+# about 4.71 MB raw and 1.35 MB gzip, with about 3% headroom.
 wasm:
     CARGO_PROFILE_RELEASE_OPT_LEVEL=z cargo build -p flick-wasm --target wasm32-unknown-unknown --release
-    mkdir -p target/wasm
-    pnpm exec wasm-opt target/wasm32-unknown-unknown/release/flick_wasm.wasm -O1 --enable-bulk-memory --enable-mutable-globals --enable-nontrapping-float-to-int --enable-sign-ext --enable-reference-types --enable-multivalue -o target/wasm/flick_wasm.wasm
-    @wasm=target/wasm/flick_wasm.wasm; \
+    @wasm=target/wasm32-unknown-unknown/release/flick_wasm.wasm; \
     echo "flick_wasm.wasm: $(wc -c < $wasm) bytes, $(gzip -6c $wasm | wc -c) gzipped"; \
     test $(wc -c < $wasm) -le 4850000
 
 # Build the playground's compiler: the wasm module and its JS bindings
 docs-wasm: wasm
     cargo install wasm-bindgen-cli --version 0.2.130 --locked --root target/tools
-    target/tools/bin/wasm-bindgen --target web --out-dir docs/src/playground/wasm target/wasm/flick_wasm.wasm
+    target/tools/bin/wasm-bindgen --target web --out-dir docs/src/playground/wasm target/wasm32-unknown-unknown/release/flick_wasm.wasm
 
 # Serve the documentation site; its playground is a Flick program
 docs-dev: docs-wasm

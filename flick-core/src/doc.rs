@@ -9,11 +9,9 @@ use std::ptr;
 
 use crate::iface::{Decl, Export, Interface, Namespace};
 use crate::source::FileId;
+use crate::syntax;
+use crate::syntax::cst::{Element, Node};
 use crate::syntax::kind::SyntaxKind as K;
-use crate::syntax::{
-    self,
-    cst::{Element, Node},
-};
 use crate::types::{
     Form, ModuleNominalKind, ModuleRequirement, ModuleSignature, show_signature, show_type,
 };
@@ -140,7 +138,7 @@ fn declared(line: &str) -> Option<String> {
 /// The page of `interface`, its comments from `text`.
 pub fn page(interface: &Interface, text: &str) -> String {
     let docs = comments(text);
-    let module_declarations = source_module_declarations(text, &interface.module);
+    let contracts = source_module_declarations(text, &interface.module);
     let mut out = format!("# {}\n", interface.module);
     let doc = |name: &str, out: &mut String| {
         if let Some(d) = docs.get(name) {
@@ -165,9 +163,22 @@ pub fn page(interface: &Interface, text: &str) -> String {
                 def.form,
                 Form::ModuleContract { .. } | Form::ModuleSignature { .. }
             ) && e.entity.module == interface.module
-                && let Some(declaration) = module_declarations.get(name)
+                && let Some(declaration) = contracts.get(name.as_str())
             {
                 let _ = writeln!(out, "\n```flick\n{declaration}\n```");
+                match &def.form {
+                    Form::ModuleSignature { signature } => {
+                        expanded_signature(name, signature, &mut out);
+                    }
+                    Form::ModuleContract { requirements } => expanded_signature(
+                        name,
+                        &ModuleSignature::Structure {
+                            requirements: requirements.clone(),
+                        },
+                        &mut out,
+                    ),
+                    _ => unreachable!("module contract declaration"),
+                }
             } else {
                 definition(interface, e, &def.form, &mut out);
             }
@@ -212,62 +223,32 @@ pub fn page(interface: &Interface, text: &str) -> String {
     out
 }
 
-// Keep named references from checked declarations. A structural signature's
-// display is useful for hover, but is not source syntax for an anonymous contract.
-fn source_module_declarations(text: &str, owner: &str) -> HashMap<String, String> {
-    fn collect(
-        node: &Node,
-        text: &str,
-        scope: &str,
-        owner: &str,
-        out: &mut HashMap<String, String>,
-    ) {
-        for declaration in node.nodes() {
-            if scope == owner
-                && declaration.kind == K::ModuleTypeDecl
-                && let Some(name) = declaration
-                    .child_tokens()
-                    .find(|token| token.kind == K::Con)
-            {
-                let (start, end) = declaration.range();
-                out.insert(
-                    name.text(text).to_owned(),
-                    text[start as usize..end as usize].to_owned(),
-                );
-            }
-            if declaration.kind == K::InlineModuleDecl
-                && let Some(path) = declaration.nodes().find(|n| n.kind == K::ModulePath)
-                && let Some(body) = declaration.nodes().find(|n| n.kind == K::Members)
-            {
-                let local: String = path.text(text).split_whitespace().collect();
-                collect(body, text, &format!("{scope}.{local}"), owner, out);
-            }
-        }
-    }
-    let parsed = syntax::parse(text, FileId::default());
-    let root = parsed
-        .tree
-        .nodes()
-        .find(|n| n.kind == K::ModuleHeader)
-        .and_then(|header| header.nodes().find(|n| n.kind == K::ModulePath))
-        .map_or_else(
-            || owner.to_owned(),
-            |path| path.text(text).split_whitespace().collect(),
-        );
-    let mut declarations = HashMap::new();
-    collect(&parsed.tree, text, &root, owner, &mut declarations);
-    declarations
+fn expanded_signature(name: &str, signature: &ModuleSignature, out: &mut String) {
+    let _ = writeln!(
+        out,
+        "\nExpanded module signature:\n\n```text\n{name} : {}\n```",
+        signature.display()
+    );
 }
 
 fn module_contract(name: &str, requirements: &[ModuleRequirement], out: &mut String) {
+    if requirements.iter().any(|r| {
+        matches!(
+            r,
+            ModuleRequirement::Module { .. } | ModuleRequirement::Kind { .. }
+        )
+    }) {
+        let signature = ModuleSignature::Structure {
+            requirements: requirements.to_vec(),
+        };
+        expanded_signature(name, &signature, out);
+        return;
+    }
     let mut lines = Vec::new();
     for requirement in requirements {
         lines.push(match requirement {
-            ModuleRequirement::Kind { name, .. } => format!("  kind {name}"),
-            ModuleRequirement::Module {
-                name, signature, ..
-            } => {
-                format!("  module {name} : {}", signature.display())
+            ModuleRequirement::Kind { .. } | ModuleRequirement::Module { .. } => {
+                unreachable!("structured signature descriptions are rendered above")
             }
             ModuleRequirement::Type {
                 name,
@@ -351,43 +332,11 @@ fn module_contract(name: &str, requirements: &[ModuleRequirement], out: &mut Str
     );
 }
 
-fn module_definition(name: &str, form: &Form, out: &mut String) {
-    match form {
-        Form::ModuleContract { requirements }
-            if requirements.iter().any(|r| {
-                matches!(
-                    r,
-                    ModuleRequirement::Module { .. } | ModuleRequirement::Kind { .. }
-                )
-            }) =>
-        {
-            let signature = ModuleSignature::Structure {
-                requirements: requirements.clone(),
-            };
-            let _ = writeln!(
-                out,
-                "\nSignature shape:\n\n```text\n{}\n```",
-                signature.display()
-            );
-        }
-        Form::ModuleContract { requirements } => module_contract(name, requirements, out),
-        Form::ModuleSignature { signature } => {
-            let _ = writeln!(
-                out,
-                "\nSignature shape:\n\n```text\n{}\n```",
-                signature.display()
-            );
-        }
-        _ => unreachable!(),
-    }
-}
-
 fn definition(interface: &Interface, e: &Export, form: &Form, out: &mut String) {
     let name = &e.entity.name;
     match form {
-        Form::ModuleContract { .. } | Form::ModuleSignature { .. } => {
-            module_definition(name, form, out);
-        }
+        Form::ModuleContract { requirements } => module_contract(name, requirements, out),
+        Form::ModuleSignature { signature } => expanded_signature(name, signature, out),
         Form::Alias { params, body, .. } => {
             let params: String = params.iter().fold(String::new(), |mut acc, p| {
                 let _ = write!(acc, " {p}");
@@ -492,42 +441,43 @@ mod tests {
 
 #[cfg(test)]
 mod module_signature_tests {
-    use crate::{ir::tests::check_text, source::FileId, syntax};
+    use crate::ir::tests::check_text;
+    use crate::source::FileId;
+    use crate::syntax;
+
     #[test]
-    fn review_generated_module_signatures_are_valid_flick_declarations() {
-        let source = "module Api exposing (Factory, Namespace)\ntype module Input =\n  type Key\ntype module Output =\n  type Value\ntype module Factory = (K : Input) -> Output with type Value = K.Key\ntype module Namespace =\n  module Make : Factory\n";
-        let (_, interface) = check_text("Api", source).expect("source checks");
+    fn exported_contract_aliases_document_members_of_private_source_signatures() {
+        let source = "module Contracts exposing (Public)\ntype module Hidden =\n  seed : Int\ntype module Public = Hidden\n";
+        let (_, interface) = check_text("Contracts", source).expect("checks");
         let page = super::page(&interface, source);
-        for fence in page.split("```flick\n").skip(1) {
-            let text = fence.split("```").next().expect("closed fence");
-            let parsed = syntax::parse(text, FileId::default());
+        assert!(page.contains("type module Public = Hidden"), "{page}");
+        assert!(page.contains("seed : Int"), "{page}");
+    }
+    #[test]
+    fn module_signature_documentation_preserves_valid_source_declarations() {
+        let source = "module App.Contracts exposing (..)\ntype module Input =\n  seed : Int\ntype module Output =\n  answer : Int\ntype module Factory = (K : Input) -> Output\ntype module Namespace =\n  module Make : Factory\n";
+        let (_, interface) = check_text("App.Contracts", source).expect("checks");
+        let page = super::page(&interface, source);
+        assert!(
+            page.contains("type module Factory = (K : Input) -> Output"),
+            "{page}"
+        );
+        for block in page.split("```flick\n").skip(1) {
+            let code = block.split("```").next().expect("code fence");
+            let parsed = syntax::parse(code, FileId::new(0));
             assert!(
                 parsed.diagnostics.is_empty(),
-                "{text}: {:?}",
+                "{code}: {:?}",
                 parsed.diagnostics
             );
         }
+        let without_source = super::page(&interface, "");
+        assert!(
+            without_source.contains("Expanded module signature"),
+            "{without_source}"
+        );
+        assert!(without_source.contains("```text\n"), "{without_source}");
     }
 }
 
-#[cfg(test)]
-mod scoped_module_tests {
-    use crate::ir::tests::check_text;
-
-    #[test]
-    fn review_source_contracts_stay_in_their_defining_scope() {
-        let source = "module Api exposing (Input)\ntype module Input =\n  value : Int\nmodule Child exposing (Input) =\n  type module Input =\n    value : String\n";
-        let (_, interface) = check_text("Api", source).expect("source checks");
-        let page = super::page(&interface, source);
-        assert!(page.contains("value : Int"), "{page}");
-        assert!(!page.contains("value : String"), "{page}");
-        let (_, child) = check_text(
-            "Api.Child",
-            "module Api.Child exposing (Input)\ntype module Input =\n  value : String\n",
-        )
-        .expect("child checks");
-        let page = super::page(&child, source);
-        assert!(page.contains("value : String"), "{page}");
-        assert!(!page.contains("value : Int"), "{page}");
-    }
-}
+include!("doc/module_source.rs");

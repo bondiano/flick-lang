@@ -65,9 +65,6 @@ from the built-in sources, not user-program documentation or string contents.
 Use `just wasm` or `just docs-wasm` for this smaller browser compiler.
 Build the package separately: Cargo unifies dependency features in workspace
 builds, where the native CLI enables the complete core.
-The WASM recipes also use the pinned Binaryen optimizer from the workspace's
-pnpm dependencies. The size gate checks the optimized, uncompressed compiler
-that `wasm-bindgen` packages for the playground; Cargo's original stays intact.
 
 For a reduced builtin surface, build `flick-wasm` with `--no-default-features`.
 This removes `File`, `Runner.Node`, `Ui.Server`, `Runner.Cloudflare`,

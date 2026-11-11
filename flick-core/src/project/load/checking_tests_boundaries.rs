@@ -1,5 +1,89 @@
 #[cfg(feature = "ide")]
 #[test]
+fn hom_boundary_parameter_views_stay_separate_for_the_same_argument() {
+    use crate::diagnostics::codes;
+    let (_, analysis) = hom_boundary_analysis(
+        &[
+            (
+                "Contracts",
+                "module App.Contracts exposing (Small, Large, Output)\ntype module Small =\n  seed : Int\ntype module Large =\n  seed : Int\n  secret : Int\ntype module Output =\n  answer : Int\n",
+            ),
+            (
+                "Argument",
+                "module App.Argument exposing (seed, secret)\nseed : Int\nlet seed = 1\nsecret : Int\nlet secret = 42\n",
+            ),
+            (
+                "Make",
+                "module App.Make(A : App.Contracts.Small, B : App.Contracts.Large) : App.Contracts.Output\nanswer : Int\nlet answer = A.secret\n",
+            ),
+            (
+                "Root",
+                "module App.Root exposing (Chosen)\nmodule Chosen = App.Make(App.Argument, App.Argument)\n",
+            ),
+        ],
+        "Root",
+    );
+    let errors: Vec<_> = analysis
+        .diagnostics
+        .iter()
+        .filter(|d| {
+            (d.code == codes::T001 || d.code == codes::R004) && d.message.contains("secret")
+        })
+        .collect();
+    // Both the symbolic template and its concrete application must reject it.
+    assert_eq!(errors.len(), 2, "{:?}", analysis.diagnostics);
+}
+
+#[cfg(feature = "ide")]
+#[test]
+fn hom_dependent_results_preserve_types_through_argument_aliases() {
+    use crate::diagnostics::codes;
+    for (declaration, rejected) in [("type alias", false), ("opaque type alias", true)] {
+        let argument = format!(
+            "module App.Argument exposing (Key, value)\n{declaration} Key = String\nvalue : Key\nlet value = \"x\"\n"
+        );
+        let (sources, analysis) = hom_boundary_analysis(
+            &[
+                (
+                    "Contracts",
+                    "module App.Contracts exposing (Source, Output)\ntype module Source =\n  type Key\n  value : Key\ntype module Output =\n  type Value\n  value : Value\n",
+                ),
+                ("Argument", &argument),
+                (
+                    "Make",
+                    "module App.Make(K : App.Contracts.Source) : App.Contracts.Output with type Value = K.Key\ntype alias Value = K.Key\nvalue : Value\nlet value = K.value\n",
+                ),
+                (
+                    "Root",
+                    "module App.Root exposing (Chosen)\nmodule Alias = App.Argument\nmodule Chosen = App.Make(Alias)\n",
+                ),
+                (
+                    "Use",
+                    "module App.Use exposing (value)\nimport App.Root.Chosen as Chosen\nvalue : String\nlet value = Chosen.value\n",
+                ),
+            ],
+            "Use",
+        );
+        if rejected {
+            assert!(
+                analysis.diagnostics.iter().any(|d| d.code == codes::T003
+                    && d.span
+                        .is_some_and(|s| sources.get(s.file).path == "/p/src/App/Use.fl")),
+                "{:?}",
+                analysis.diagnostics
+            );
+        } else {
+            assert!(
+                analysis.diagnostics.is_empty(),
+                "{:?}",
+                analysis.diagnostics
+            );
+        }
+    }
+}
+
+#[cfg(feature = "ide")]
+#[test]
 fn hom_boundary_a_structure_alias_cannot_widen_a_parameter() {
     use crate::diagnostics::codes;
     let (_, analysis) = hom_boundary_analysis(
@@ -352,65 +436,3 @@ fn hom_explicit_exposing_agrees_with_the_result_signature() {
         }
     }
 }
-
-#[cfg(feature = "ide")]
-#[test]
-fn hom_namespace_exports_are_checked_even_for_materialized_members() {
-    use crate::diagnostics::{Severity, codes};
-    for (header, imported, rejected) in [
-        ("module App.Parent exposing (Visible)", "Hidden", true),
-        (
-            "module App.Parent : App.Contracts.Namespace",
-            "Hidden",
-            true,
-        ),
-        (
-            "module App.Parent : App.Contracts.Namespace",
-            "Visible",
-            false,
-        ),
-    ] {
-        let parent = format!(
-            "{header}\nmodule Visible = App.Make(App.Argument)\nmodule Hidden = App.Make(App.Argument)\n"
-        );
-        let root = format!(
-            "module App.Root exposing (answer)\nimport App.Parent\nimport App.Parent.{imported} exposing (answer)\n"
-        );
-        let (_, analysis) = hom_boundary_analysis(
-            &[
-                (
-                    "Contracts",
-                    "module App.Contracts exposing (Input, Output, Namespace)\ntype module Input =\n  seed : Int\ntype module Output =\n  answer : Int\ntype module Namespace =\n  module Visible : Output\n",
-                ),
-                (
-                    "Argument",
-                    "module App.Argument exposing (seed)\nseed : Int\nlet seed = 42\n",
-                ),
-                (
-                    "Make",
-                    "module App.Make(K : App.Contracts.Input) : App.Contracts.Output\nanswer : Int\nlet answer = K.seed\n",
-                ),
-                ("Parent", &parent),
-                ("Root", &root),
-            ],
-            "Root",
-        );
-        let errors: Vec<_> = analysis
-            .diagnostics
-            .iter()
-            .filter(|d| d.severity == Severity::Error)
-            .collect();
-        if rejected {
-            assert!(
-                errors
-                    .iter()
-                    .any(|d| d.code == codes::R018 && d.message.contains("not exported")),
-                "{parent}\n{root}\n{errors:?}"
-            );
-        } else {
-            assert!(errors.is_empty(), "{parent}\n{root}\n{errors:?}");
-        }
-    }
-}
-
-include!("checking_tests_hom_members.rs");

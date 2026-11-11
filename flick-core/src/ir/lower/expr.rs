@@ -76,41 +76,26 @@ impl Lower<'_> {
     }
 
     fn pack_module_expr(&mut self, node: &Node, span: Span) -> Expr {
-        fn record(fields: &[(String, String, String)], prefix: &str, span: Span) -> Expr {
-            let mut children = Vec::new();
-            for (path, module, name) in fields {
-                let Some(rest) = path.strip_prefix(prefix) else {
-                    continue;
-                };
-                let (field, nested) = rest
-                    .split_once('.')
-                    .map_or((rest, false), |(first, _)| (first, true));
-                if children.iter().any(|(known, _)| known == field) {
-                    continue;
-                }
-                let value = if nested {
-                    record(fields, &format!("{prefix}{field}."), span)
-                } else {
+        let fields = self
+            .typing
+            .packs
+            .get(&node.range())
+            .expect("the checker validated `pack`")
+            .iter()
+            .map(|(field, module, name)| {
+                (
+                    field.clone(),
                     Expr::new(
                         ExprKind::Global {
                             module: module.clone(),
                             name: name.clone(),
                         },
                         span,
-                    )
-                };
-                children.push((field.to_owned(), value));
-            }
-            Expr::new(ExprKind::Record(children), span)
-        }
-        record(
-            self.typing
-                .packs
-                .get(&node.range())
-                .expect("the checker validated `pack`"),
-            "",
-            span,
-        )
+                    ),
+                )
+            })
+            .collect();
+        Expr::new(ExprKind::Record(fields), span)
     }
 
     fn unpack_module_expr(&mut self, node: &Node, children: &[&Node], span: Span) -> Expr {
@@ -344,11 +329,10 @@ impl Lower<'_> {
                     .local(binder, key.0)
                     .unwrap_or_else(|| panic!("`{binder}` is an opened module in scope"))
                     .to_owned();
-                let mut value = Expr::new(ExprKind::Local(local), span);
-                for part in field.split('.') {
-                    value = Expr::new(ExprKind::Field(Box::new(value), part.to_owned()), span);
-                }
-                value.kind
+                ExprKind::Field(
+                    Box::new(Expr::new(ExprKind::Local(local), span)),
+                    field.clone(),
+                )
             }
             Ref::Value { module, name } if lang::is(Lang::RecordLabel, module, name) => {
                 ExprKind::Label(self.typing.labels.get(&key).cloned().unwrap_or_default())

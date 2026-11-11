@@ -1,4 +1,4 @@
-use super::common::{flick_in, project};
+use crate::common::{flick_in, project};
 use std::fs;
 
 #[test]

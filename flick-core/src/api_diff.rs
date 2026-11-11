@@ -335,21 +335,12 @@ pub(crate) fn canonical_type(ty: &Type) -> Type {
 fn rename(ty: &Type, names: &[(String, String)], next: &mut usize) -> Type {
     match ty {
         Type::Con { module, name } if let Some(binder) = module.strip_prefix("$exists:") => {
-            let (root, suffix) = binder
-                .split_once('.')
-                .map_or((binder, ""), |(root, rest)| (root, rest));
-            let fresh = names
+            let binder = names
                 .iter()
-                .find(|(old, _)| old == root)
-                .map_or(root, |(_, fresh)| fresh);
-            let path = if suffix.is_empty() {
-                fresh.to_owned()
-            } else {
-                format!("{fresh}.{suffix}")
-            };
-            Type::con(&format!("$exists:{path}"), name)
+                .find(|(old, _)| old == binder)
+                .map_or(binder, |(_, fresh)| fresh);
+            Type::con(&format!("$exists:{binder}"), name)
         }
-
         Type::Var(name) => (names.iter().find(|(n, _)| n == name))
             .map_or_else(|| ty.clone(), |(_, fresh)| Type::Var(fresh.clone())),
         Type::Forall {
@@ -433,5 +424,4 @@ fn shape(e: &Export) -> String {
 }
 
 #[cfg(test)]
-#[path = "api_diff_tests.rs"]
 mod tests;

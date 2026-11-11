@@ -432,7 +432,7 @@ fn core_modules(ctx: &Context, compilation: &Compilation, out: &mut Vec<Artifact
             .filter(|(name, _, imports, _)| {
                 core.contains(name)
                     && !imports.iter().all(|i| {
-                        let owner = ctx.layout.owner(i).unwrap_or(i);
+                        let owner = ctx.layout.owner(i);
                         if compilation.modules.iter().any(|m| m.name == owner) {
                             core.contains(owner)
                         } else {

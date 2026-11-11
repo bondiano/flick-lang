@@ -10,66 +10,6 @@ impl Checking<'_> {
         }
     }
 
-    fn visible_interface<'i>(
-        &'i self,
-        loaded: &Loaded,
-        interfaces: &'i [Option<Interface>],
-        name: &str,
-    ) -> Option<&'i Interface> {
-        let raw = self.raw_interface(interfaces, name)?;
-        if let Some(member) = &raw.member_of
-            && !loaded.can_access_member(member)
-        {
-            return self
-                .visible_interface(loaded, interfaces, &member.parent)?
-                .modules
-                .get(&member.name);
-        }
-        let owner = self
-            .by_name
-            .get(name)
-            .map(|&i| self.modules[i].root.clone())
-            .or_else(|| {
-                self.precompiled
-                    .package_of(name)
-                    .map(|p| Root::Package(p.to_owned()))
-            });
-        (!raw.private || owner.as_ref().is_some_and(|r| loaded.can_access(r, name))).then_some(raw)
-    }
-
-    fn namespace_import_errors(
-        &self,
-        loaded: &Loaded,
-        interfaces: &[Option<Interface>],
-    ) -> Vec<Diagnostic> {
-        let known = |name: &str| self.visible_interface(loaded, interfaces, name);
-        let mut errors = Vec::new();
-        for import in loaded
-            .syntax
-            .imports
-            .iter()
-            .chain(&loaded.syntax.inline_imports)
-        {
-            if let Some(member) = self
-                .raw_interface(interfaces, &import.module)
-                .and_then(|raw| raw.member_of.as_ref())
-                && !loaded.can_access_member(member)
-                && known(&import.module).is_none()
-                && known(&member.parent).is_some()
-            {
-                errors.push(Diagnostic::error(
-                    codes::R018,
-                    format!(
-                        "module `{}` is not exported by `{}`",
-                        import.module, member.parent
-                    ),
-                    import.span,
-                ));
-            }
-        }
-        errors
-    }
-
     /// Resolves, checks and, when asked and clean, lowers module `i` against
     /// the interfaces known so far, or reuses the cached output; with a
     /// cache, also the key to cache it by.
@@ -128,9 +68,21 @@ impl Checking<'_> {
                     (interface, self.by_name.contains_key(&i.module))
                 })
                 .collect(),
-            virtual_contracts: self
-                .virtual_contract_dependencies(loaded, &contracts)
-                .into_iter()
+            virtual_contracts: loaded
+                .virtual_of
+                .iter()
+                .flat_map(|v| {
+                    let mut names: Vec<_> = v
+                        .capture
+                        .bindings
+                        .iter()
+                        .map(|b| b.origin.module.clone())
+                        .collect();
+                    if let Some(callee) = &v.capture.callee {
+                        names.push(callee.signature_owner().to_owned());
+                    }
+                    names
+                })
                 .map(|module| match self.by_name.get(&module) {
                     Some(&j) => comparable[j].clone(),
                     None => self.from_packages.get(&module).map(comparable_copy),
@@ -229,7 +181,7 @@ impl Checking<'_> {
             return self.check_inline(loaded, tree, index, inline, lookup, contracts);
         }
         let (mut projections, mut local_dictionaries, contract_errors) =
-            self.virtual_contracts(loaded, lookup, contracts);
+            Self::virtual_contracts(loaded, lookup, contracts);
         let mut projected_syntax = (*loaded.syntax).clone();
         let (lexical, mut lexical_dictionaries) =
             self.lexical_environment(loaded, lookup, &mut projected_syntax);
@@ -237,7 +189,7 @@ impl Checking<'_> {
         lexical_dictionaries.append(&mut local_dictionaries);
         let local_dictionaries = lexical_dictionaries;
         let projected_lookup = |name: &str| projections.get(name).cloned().or_else(|| lookup(name));
-        let result_signature = self.virtual_result_signature(loaded, lookup, contracts);
+        let result_signature = Self::virtual_result_signature(loaded, lookup, contracts);
         for import in &mut projected_syntax.imports {
             let key = Self::binding_view_name(loaded, import.qualifier());
             if projections.contains_key(&key) {
@@ -310,7 +262,7 @@ impl Checking<'_> {
             .virtual_of
             .iter()
             .flat_map(|v| &v.capture.bindings)
-            .filter_map(|b| lookup(&b.argument))
+            .filter_map(|b| Self::argument_interface(&b.argument, lookup, contracts))
             .collect();
         let (mut checked, typing) = types::check_typed_with_static_context(
             &module,
@@ -335,22 +287,20 @@ impl Checking<'_> {
                     &mut checked,
                 );
             }
-            let explicit = self.callee_has_explicit_result(loaded, contracts);
-            // An inferred private factory exports its ordinary checked declarations,
-            // including ADT constructors. Only an advertised signature seals them.
-            if explicit {
-                interface = if loaded
+            interface = if loaded
+                .virtual_of
+                .as_ref()
+                .is_some_and(|v| v.capture.arguments.is_empty())
+            {
+                expected.project(&interface)
+            } else {
+                expected.seal(&interface, &loaded.name)
+            };
+            if interface.parameterized.is_some() {
+                interface.signature_explicit = loaded
                     .virtual_of
                     .as_ref()
-                    .is_some_and(|v| v.capture.arguments.is_empty())
-                {
-                    expected.project(&interface)
-                } else {
-                    expected.seal(&interface, &loaded.name)
-                };
-            }
-            if interface.parameterized.is_some() {
-                interface.signature_explicit = explicit;
+                    .is_some_and(|v| Self::callee_signature_explicit(v, lookup, contracts));
             }
         }
         // what the plugins find from the types of their code stops lowering too
@@ -377,7 +327,7 @@ impl Checking<'_> {
                     .syntax
                     .header
                     .as_ref()
-                    .and_then(|h| h.materialized_body.clone()),
+                    .and_then(|header| header.materialized_body.clone()),
                 capture: loaded.virtual_of.as_ref().map(|v| v.capture.clone()),
             });
         }
@@ -448,6 +398,31 @@ impl Checking<'_> {
             declarations,
         }
     }
+
+    fn lower_if_clean(
+        &self,
+        loaded: &Loaded,
+        module: &resolve::Module<'_>,
+        typing: &types::Typing,
+        clean: bool,
+        diagnostics: &mut Vec<Diagnostic>,
+    ) -> Option<ir::Module> {
+        let lowers = !self.lower_packages_only || matches!(loaded.root, Root::Package(_));
+        if clean
+            && self.lower
+            && lowers
+            && loaded.scope_of.is_none()
+            && !Self::is_module_template(loaded)
+        {
+            match ir::lower(module, typing) {
+                Ok(lowered) => return Some(lowered),
+                Err(d) => diagnostics.extend(d),
+            }
+        }
+        None
+    }
 }
 
-include!("checking_lower.rs");
+include!("checking_inline_values.rs");
+
+include!("checking_visibility.rs");

@@ -249,6 +249,8 @@ fn installed_private_module_public_facade_runs_on_js_and_go() {
     }
 }
 
+include!("package_cache/modules.rs");
+
 #[test]
 fn a_build_from_saved_modules_is_the_build_from_sources() {
     let (root, _) = fetched("package-cache-same");
@@ -374,5 +376,3 @@ fn files(dir: &Path) -> Vec<(PathBuf, Vec<u8>)> {
     out.sort();
     out
 }
-
-include!("package_cache/higher_order_modules.rs");

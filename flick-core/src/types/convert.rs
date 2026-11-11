@@ -248,10 +248,47 @@ impl Checker<'_> {
                 let Form::ModuleContract { requirements } = def.form else {
                     return Type::Error;
                 };
-                let opened_mark = self.opened_modules.len();
-                self.open_structure(&requirements, &format!("$exists:{binder}"), &binder);
+                let mut subst = Vec::new();
+                let mut types = Vec::new();
+                for requirement in &requirements {
+                    match requirement {
+                        ModuleRequirement::Type {
+                            name,
+                            params,
+                            manifest,
+                        } => {
+                            let ty = manifest.as_ref().map_or_else(
+                                || Type::con(&format!("$exists:{binder}"), name),
+                                |ty| ty.substitute(&subst),
+                            );
+                            let kind =
+                                Kind::arrows(params.iter().map(|p| p.kind.clone()), Kind::Type);
+                            subst.push((name.clone(), ty.clone()));
+                            types.push((name.clone(), ty, kind));
+                        }
+                        ModuleRequirement::Nominal {
+                            name,
+                            identity: Some(identity),
+                            ..
+                        } => {
+                            let ty = Type::con(&identity.module, &identity.name);
+                            let kind = self
+                                .env
+                                .type_def(&identity.module, &identity.name)
+                                .map_or(Kind::Type, |def| def.kind.clone());
+                            subst.push((name.clone(), ty.clone()));
+                            types.push((name.clone(), ty, kind));
+                        }
+                        _ => {}
+                    }
+                }
+                self.opened_modules.push(super::module_contract::Opened {
+                    alias: binder.clone(),
+                    types,
+                    values: Vec::new(),
+                });
                 let body = self.ty(body_node, &Kind::Type, free);
-                self.opened_modules.truncate(opened_mark);
+                self.opened_modules.pop();
                 return Type::Exists {
                     binder,
                     contract: Box::new(contract),
@@ -427,7 +464,9 @@ impl Checker<'_> {
             {
                 match &definition.form {
                     Form::ModuleSignature { signature } => signature.has_parameterized(),
-                    Form::ModuleContract { requirements } => requirements.iter().any(|r| matches!(r, ModuleRequirement::Module { signature, .. } if signature.has_parameterized())),
+                    Form::ModuleContract { requirements } => requirements
+                        .iter()
+                        .any(|r| matches!(r, ModuleRequirement::Module { .. })),
                     _ => false,
                 }
             } else {
@@ -437,7 +476,7 @@ impl Checker<'_> {
                 self.error(
                     codes::T068,
                     self.span(node),
-                    "a static parameterized module cannot be carried by `Module Sig`; apply it before packing",
+                    "a static parameterized module or nested module cannot be carried by `Module Sig`; apply factories and flatten the runtime contract before packing",
                 );
             }
             let (_, applied) = ty.spine();

@@ -34,5 +34,13 @@
 (_ (keyword) @_plugin . (identifier) @function.macro
   (#eq? @_plugin "plugin"))
 
+; `functor` stays a value name outside module expressions. Match its parameter
+; group and the following arrow or result annotation without reserving the word.
+(_ (identifier) @keyword . (parens) . (operator) @_next
+  (#eq? @keyword "functor")
+  (#any-of? @_next "->" ":"))
+(_ (identifier) @keyword . (parens) . (parens)
+  (#eq? @keyword "functor"))
+
 ["(" ")" "[" "]" "{" "}"] @punctuation.bracket
 (operator ["," ";"]) @punctuation.delimiter

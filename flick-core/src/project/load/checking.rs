@@ -12,7 +12,9 @@ use tracing::debug;
 use super::Analyzed;
 use super::plugins::Watching;
 use super::precompiled::Precompiled;
-use super::{BindingOrigin, CalleeOrigin, Loaded, Loader, Root, StaticCapture, Virtual};
+use super::{
+    BindingOrigin, CalleeOrigin, Loaded, Loader, Root, StaticArgument, StaticCapture, Virtual,
+};
 use crate::clock::{micros, timed};
 use crate::diagnostics::{Diagnostic, Severity, codes};
 #[cfg(feature = "native-project")]
@@ -395,19 +397,6 @@ fn exported(interface: &Interface, clean: bool) -> Interface {
             (export.scheme, export.definition) = (None, None);
         }
     }
-    for child in out.modules.values_mut() {
-        *child = exported(child, false);
-    }
-    out.parameterized = out
-        .parameterized
-        .map(|signature| {
-            if written(&signature) {
-                signature
-            } else {
-                signature.inputs_only()
-            }
-        })
-        .filter(written);
     out.instances.retain(written);
     out
 }

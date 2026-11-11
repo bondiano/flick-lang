@@ -22,7 +22,7 @@ const example = (locale: string) => {
   return blocks;
 };
 
-test("the English and Russian generative parameterized module examples have identical source", () => {
+test("the English and Russian generative parameterized examples have identical source", () => {
   assert.deepEqual(example("ru"), example(""));
 });
 

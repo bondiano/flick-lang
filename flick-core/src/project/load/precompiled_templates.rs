@@ -1,5 +1,3 @@
-// Restoring checked static templates and their lexical source owners.
-
 impl Loader<'_> {
     #[cfg(feature = "native-project")]
     fn restore_template(&mut self, name: &str) -> bool {
@@ -52,7 +50,7 @@ impl Loader<'_> {
         true
     }
 
-    /// A saved ordinary module can own a parameterized module's lexical declarations even
+    /// A saved ordinary module can own a parameterized's lexical declarations even
     /// when only the nested template is restored as a loaded source module.
     #[cfg(feature = "native-project")]
     pub(super) fn scope_source(&mut self, name: &str) -> Option<Loaded> {

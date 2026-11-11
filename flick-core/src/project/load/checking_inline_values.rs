@@ -1,27 +1,4 @@
 impl Checking<'_> {
-    fn lower_if_clean(
-        &self,
-        loaded: &Loaded,
-        module: &resolve::Module<'_>,
-        typing: &types::Typing,
-        clean: bool,
-        diagnostics: &mut Vec<Diagnostic>,
-    ) -> Option<ir::Module> {
-        let lowers = !self.lower_packages_only || matches!(loaded.root, Root::Package(_));
-        if clean
-            && self.lower
-            && lowers
-            && loaded.scope_of.is_none()
-            && !Self::is_module_template(loaded)
-        {
-            match ir::lower(module, typing) {
-                Ok(lowered) => return Some(lowered),
-                Err(d) => diagnostics.extend(d),
-            }
-        }
-        None
-    }
-
     fn check_inline(
         &self,
         loaded: &Loaded,
@@ -55,12 +32,23 @@ impl Checking<'_> {
         let child_defs = resolve::declarations(child_module.tree, text, loaded.file);
         let prefix_lookup = |module: &str| {
             if module == loaded.name {
-                Some(prefix_output.interface.clone())
+                Some((*prefix_output.declarations).clone())
+            } else if let Some(parameter) = prefix_output
+                .declarations
+                .modules
+                .values()
+                .find(|i| i.module == module)
+            {
+                Some(parameter.clone())
             } else {
                 lookup(module)
             }
         };
-        let mut child_output = self.check(child, &prefix_lookup, contracts);
+        let child_checking = Checking {
+            lower: self.lower && !Self::is_module_template(loaded),
+            ..*self
+        };
+        let mut child_output = child_checking.check(child, &prefix_lookup, contracts);
         // The child sees its parent's prior instances, but importing the
         // child back must not import those instances a second time.
         child_output

@@ -46,7 +46,8 @@ use super::packages::Packages;
 use super::{Host, Project, module_path, normalize};
 use crate::diagnostics::{Diagnostic, Edit, Severity, codes};
 use crate::iface::{
-    BindingOrigin, CalleeOrigin, LexicalScope, StaticBinding, StaticCapture, StaticMember,
+    BindingOrigin, CalleeOrigin, ExpansionFrame, LexicalScope, StaticArgument, StaticBinding,
+    StaticCapture, StaticMember,
 };
 use crate::ir;
 use crate::plugin::EditorBlock;
@@ -100,40 +101,7 @@ struct Loaded {
     scope_of: Option<LexicalScope>,
 }
 
-impl Loaded {
-    fn can_access_member(&self, member: &StaticMember) -> bool {
-        self.name == member.parent
-            || self.virtual_of.as_ref().is_some_and(|context| {
-                context.capture.access_modules.contains(&member.parent)
-                    || context
-                        .capture
-                        .bindings
-                        .iter()
-                        .any(|b| b.argument == format!("{}.{}", member.parent, member.name))
-            })
-    }
-    fn can_access(&self, owner: &Root, name: &str) -> bool {
-        self.root.same_package(owner)
-            || self.virtual_of.as_ref().is_some_and(|context| {
-                let capture = &context.capture;
-                matches!(owner, Root::Package(package) if capture.access_packages.contains(package))
-                    || capture
-                        .bindings
-                        .iter()
-                        .any(|binding| binding.argument == name)
-            })
-    }
-
-    fn definition_package(&self) -> Option<&str> {
-        self.virtual_of
-            .as_ref()
-            .and_then(|v| v.capture.definition_package.as_deref())
-            .or(match &self.root {
-                Root::Package(package) => Some(package.as_str()),
-                _ => None,
-            })
-    }
-}
+include!("loaded.rs");
 
 #[derive(Clone)]
 struct Virtual {

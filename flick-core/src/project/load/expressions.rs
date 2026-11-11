@@ -4,158 +4,13 @@
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use super::{CalleeOrigin, Loaded, Loader, StaticCapture, StaticMember, Virtual};
+use super::{CalleeOrigin, Loaded, Loader, StaticArgument, StaticCapture, StaticMember, Virtual};
 use crate::diagnostics::{Diagnostic, codes};
 use crate::resolve::{self, Import, Item, ItemKind, ModuleApplication};
 use crate::source::Span;
 use crate::syntax::{self, cst::Node, kind::SyntaxKind as K};
 
 impl Loader<'_> {
-    pub(super) fn instantiate(&mut self, parent: usize, application: &ModuleApplication) {
-        let name = format!("{}.{}", self.modules[parent].name, application.name);
-        if let Some(&existing) = self.by_name.get(&name) {
-            let expected = PathBuf::from(format!(
-                "{}#{}",
-                self.modules[parent].path.display(),
-                application.name
-            ));
-            if self.modules[existing].path != expected {
-                self.diagnostics.push(Diagnostic::error(
-                    codes::R002,
-                    format!(
-                        "virtual module `{name}` conflicts with `{}`",
-                        self.host.display(&self.modules[existing].path)
-                    ),
-                    application.span,
-                ));
-            }
-            return;
-        }
-        if !self.expressions_active.insert(name.clone()) {
-            self.diagnostics.push(Diagnostic::error(
-                codes::R006,
-                "cyclic module expression",
-                application.span,
-            ));
-            return;
-        }
-        if let Some(annotation) = &application.annotation {
-            // Ascription follows evaluation of the underlying expression. In
-            // particular, a parameter alias must first acquire its restricted
-            // parameter view before its own result annotation is checked.
-            let mut unannotated = application.clone();
-            unannotated.annotation = None;
-            if let Some(target) =
-                self.module_expression(parent, &application.expression, None, &unannotated)
-            {
-                self.alias_expression(
-                    parent,
-                    Some(&application.name),
-                    &target,
-                    Some(annotation),
-                    application.span,
-                    None,
-                );
-            }
-        } else {
-            self.module_expression(
-                parent,
-                &application.expression,
-                Some(&application.name),
-                application,
-            );
-        }
-        self.expressions_active.remove(&name);
-    }
-
-    pub(super) fn materialize_expression_body(&mut self, module: usize) {
-        let Some(header) = self.modules[module].syntax.header.clone() else {
-            return;
-        };
-        if !header.parameters.is_empty() || header.materialized_body.is_some() {
-            return;
-        }
-        let Some(body) = header.body else {
-            return;
-        };
-        // Mark entry before resolving the expression, so a self-reference is
-        // diagnosed rather than recursively materialized.
-        Arc::make_mut(&mut self.modules[module].syntax)
-            .header
-            .as_mut()
-            .expect("header")
-            .materialized_body = Some(self.modules[module].name.clone());
-        let application = ModuleApplication {
-            expression: body.clone(),
-            annotation: None,
-            name: String::new(),
-            template: String::new(),
-            template_span: header.span,
-            arguments: Vec::new(),
-            argument_spans: Vec::new(),
-            span: header.span,
-        };
-        let Some(target) = self.module_expression(module, &body, None, &application) else {
-            return;
-        };
-        if target == self.modules[module].name {
-            self.diagnostics.push(Diagnostic::error(
-                codes::R006,
-                "cyclic module expression",
-                header.span,
-            ));
-            return;
-        }
-        self.select_expression_body(module, target, header.span);
-    }
-
-    pub(super) fn select_expression_body(&mut self, module: usize, target: String, at: Span) {
-        let syntax = Arc::make_mut(&mut self.modules[module].syntax);
-        syntax.header.as_mut().expect("header").materialized_body = Some(target.clone());
-        syntax.imports.push(Import {
-            module: target,
-            alias: None,
-            exposing: vec![Item {
-                kind: ItemKind::All,
-                name: String::new(),
-                span: at,
-            }],
-            plugins: Vec::new(),
-            span: at,
-        });
-    }
-
-    pub(super) fn callable_template(
-        &mut self,
-        mut parameterized: usize,
-        at: Span,
-    ) -> Option<usize> {
-        let mut aliases = Vec::new();
-        loop {
-            if aliases.contains(&parameterized) {
-                self.diagnostics.push(Diagnostic::error(
-                    codes::R006,
-                    "cyclic parameterized module alias",
-                    at,
-                ));
-                return None;
-            }
-            aliases.push(parameterized);
-            self.materialize_expression_body(parameterized);
-            let Some(target) = self.modules[parameterized]
-                .syntax
-                .header
-                .as_ref()
-                .and_then(|h| h.materialized_body.clone())
-            else {
-                break;
-            };
-            let actual = self.find_module(parameterized, &target, at)?;
-            parameterized = actual;
-        }
-        Some(parameterized)
-    }
-
     fn expression_name(&mut self, parent: usize, desired: Option<&str>) -> String {
         if let Some(desired) = desired {
             return desired.to_owned();
@@ -203,6 +58,22 @@ impl Loader<'_> {
                 })
         });
         if exported { "" } else { "private " }
+    }
+
+    pub(super) fn select_expression_body(&mut self, module: usize, target: String, at: Span) {
+        let syntax = Arc::make_mut(&mut self.modules[module].syntax);
+        syntax.header.as_mut().expect("header").materialized_body = Some(target.clone());
+        syntax.imports.push(Import {
+            module: target,
+            alias: None,
+            exposing: vec![Item {
+                kind: ItemKind::All,
+                name: String::new(),
+                span: at,
+            }],
+            plugins: Vec::new(),
+            span: at,
+        });
     }
 
     fn module_expression(
@@ -352,9 +223,8 @@ impl Loader<'_> {
         let generated =
             format!("{visibility}module {full}{annotation}{exposing} = {target}\n{imports}");
         self.register_expression(parent, &local, generated, inherited_imports, lexical_at);
-        let index = *self.by_name.get(&full)?;
-        self.select_expression_body(index, target.to_owned(), at);
-        if let Some(context) = self.modules[index].virtual_of.as_mut() {
+        self.select_expression_body(*self.by_name.get(&full)?, target.to_owned(), at);
+        if let Some(context) = self.modules[*self.by_name.get(&full)?].virtual_of.as_mut() {
             context.capture.callee = origin;
         }
         Some(full)
@@ -418,6 +288,178 @@ impl Loader<'_> {
             scope_of: None,
         });
     }
+
+    fn callee_origin(&self, parent: usize, expression: &Node, actual: &str) -> CalleeOrigin {
+        fn path(node: &Node, source: &str) -> Option<String> {
+            match node.kind {
+                K::ModulePath => Some(node.text(source).split_whitespace().collect()),
+                K::ModuleParenExpr => path(node.nodes().next()?, source),
+                _ => None,
+            }
+        }
+        let source = &self.sources.get(self.modules[parent].file).text;
+        let mut reference = path(expression, source);
+        let mut seen = Vec::new();
+        while let Some(name) = reference.take() {
+            if seen.contains(&name) {
+                break;
+            }
+            seen.push(name.clone());
+            let (head, tail) = name.split_once('.').unwrap_or((&name, ""));
+            if let Some(context) = &self.modules[parent].virtual_of
+                && let Some(binding) = context
+                    .capture
+                    .bindings
+                    .iter()
+                    .rev()
+                    .find(|b| b.alias == head)
+            {
+                return CalleeOrigin::Parameter {
+                    binding: binding.origin.clone(),
+                    members: tail
+                        .split('.')
+                        .filter(|s| !s.is_empty())
+                        .map(str::to_owned)
+                        .collect(),
+                };
+            }
+            reference = self.modules[parent]
+                .syntax
+                .applications
+                .iter()
+                .find(|a| a.name == head && a.annotation.is_none())
+                .and_then(|a| path(&a.expression, source))
+                .map(|target| {
+                    if tail.is_empty() {
+                        target
+                    } else {
+                        format!("{target}.{tail}")
+                    }
+                });
+        }
+        if let Some(member) = self
+            .by_name
+            .get(actual)
+            .and_then(|&i| self.modules[i].member_of.as_ref())
+            && !self.modules[parent].can_access_member(member)
+        {
+            return CalleeOrigin::Member(StaticArgument {
+                module: actual.to_owned(),
+                access_modules: self.modules[parent].namespace_access(),
+            });
+        }
+        CalleeOrigin::Module(actual.to_owned())
+    }
+
+    fn expression_captures(&self, parent: usize, parameterized: Option<&Node>) -> (String, usize) {
+        let loaded = &self.modules[parent];
+        let source = &self.sources.get(loaded.file).text;
+        let tokens: Vec<_> = parameterized
+            .into_iter()
+            .flat_map(Node::tokens)
+            .filter(|t| !t.kind.is_trivia())
+            .map(|t| t.text(source))
+            .collect();
+        let mut shadowed: Vec<_> = parameterized
+            .into_iter()
+            .flat_map(Node::nodes)
+            .filter(|n| n.kind == K::ModuleParamGroup)
+            .flat_map(Node::nodes)
+            .filter_map(|p| p.child_tokens().find(|t| t.kind == K::Con))
+            .map(|t| t.text(source).to_owned())
+            .collect();
+        if let Some(body) = parameterized
+            .into_iter()
+            .flat_map(Node::nodes)
+            .find(|n| n.kind == K::Members)
+        {
+            shadowed.extend(
+                resolve::module_syntax(body, source, loaded.file)
+                    .imports
+                    .into_iter()
+                    .map(|i| i.qualifier().to_owned()),
+            );
+        }
+        let mut imports = String::new();
+        let mut count = 0;
+        for import in &loaded.syntax.imports {
+            if import.module.starts_with('$') || shadowed.iter().any(|q| q == import.qualifier()) {
+                continue;
+            }
+            // Written imports also bring lexical instances. Inferred signature
+            // and module-expression imports are dependencies only when used;
+            // copying the enclosing declaration's own binding creates a cycle.
+            let written = loaded.parse.tree.nodes().any(|n| {
+                let (start, end) = n.range();
+                n.kind == K::ImportDecl && start <= import.span.start && import.span.end <= end
+            });
+            if !written {
+                let qualifier = import
+                    .qualifier()
+                    .split('.')
+                    .collect::<Vec<_>>()
+                    .join(" . ");
+                let path: Vec<_> = qualifier.split_whitespace().collect();
+                if !tokens
+                    .windows(path.len())
+                    .enumerate()
+                    .any(|(i, ts)| ts == path && (i == 0 || tokens[i - 1] != "."))
+                {
+                    continue;
+                }
+            }
+            imports.push_str("import ");
+            imports.push_str(&import.module);
+            if let Some(alias) = &import.alias {
+                imports.push_str(" as ");
+                imports.push_str(alias);
+            }
+            let items: Vec<_> = import
+                .exposing
+                .iter()
+                .map(|item| match item.kind {
+                    ItemKind::All => "..".to_owned(),
+                    ItemKind::ConAll => format!("{}(..)", item.name),
+                    _ => item.name.clone(),
+                })
+                .chain(
+                    import
+                        .plugins
+                        .iter()
+                        .map(|item| format!("plugin {}", item.name)),
+                )
+                .collect();
+            if !items.is_empty() {
+                imports.push_str(" exposing (");
+                imports.push_str(&items.join(", "));
+                imports.push(')');
+            }
+            imports.push('\n');
+            count += 1;
+        }
+        (imports, count)
+    }
 }
 
-include!("expression_captures.rs");
+fn body_source(node: &Node, source: &str) -> String {
+    let (start, end) = node.range();
+    let indent = source[..start as usize]
+        .rsplit('\n')
+        .next()
+        .map_or(0, str::len);
+    source[start as usize..end as usize]
+        .lines()
+        .enumerate()
+        .map(|(i, line)| {
+            if i == 0 {
+                line
+            } else {
+                let spaces = line.bytes().take_while(|b| *b == b' ').count().min(indent);
+                &line[spaces..]
+            }
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+include!("expressions_materialize.rs");

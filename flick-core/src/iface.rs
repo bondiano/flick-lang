@@ -12,12 +12,12 @@ use crate::types::{EnumLit, Instance, ModuleSignature, Type, TypeDef};
 
 mod template;
 pub use template::{
-    BindingOrigin, CalleeOrigin, LexicalScope, ModuleTemplate, StaticBinding, StaticCapture,
-    StaticMember,
+    BindingOrigin, CalleeOrigin, ExpansionFrame, LexicalScope, ModuleTemplate, StaticArgument,
+    StaticBinding, StaticCapture, StaticMember,
 };
 
 /// Bumped on every change of the schema.
-pub const IFACE_VERSION: u32 = 14;
+pub const IFACE_VERSION: u32 = 15;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -114,7 +114,7 @@ pub struct Interface {
     pub modules: BTreeMap<String, Interface>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub parameterized: Option<ModuleSignature>,
-    /// The parameterized module's result was advertised by a declaration or ascription,
+    /// The parameterized's result was advertised by a declaration or ascription,
     /// rather than inferred from a private implementation body.
     #[serde(default, skip_serializing_if = "is_false")]
     pub signature_explicit: bool,

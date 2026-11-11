@@ -1,5 +1,65 @@
 #[cfg(feature = "ide")]
 #[test]
+fn hom_namespace_exports_are_checked_even_for_materialized_members() {
+    use crate::diagnostics::{Severity, codes};
+    for (header, imported, rejected) in [
+        ("module App.Parent exposing (Visible)", "Hidden", true),
+        (
+            "module App.Parent : App.Contracts.Namespace",
+            "Hidden",
+            true,
+        ),
+        (
+            "module App.Parent : App.Contracts.Namespace",
+            "Visible",
+            false,
+        ),
+    ] {
+        let parent = format!(
+            "{header}\nmodule Visible = App.Make(App.Argument)\nmodule Hidden = App.Make(App.Argument)\n"
+        );
+        let root = format!(
+            "module App.Root exposing (answer)\nimport App.Parent\nimport App.Parent.{imported} exposing (answer)\n"
+        );
+        let (_, analysis) = hom_boundary_analysis(
+            &[
+                (
+                    "Contracts",
+                    "module App.Contracts exposing (Input, Output, Namespace)\ntype module Input =\n  seed : Int\ntype module Output =\n  answer : Int\ntype module Namespace =\n  module Visible : Output\n",
+                ),
+                (
+                    "Argument",
+                    "module App.Argument exposing (seed)\nseed : Int\nlet seed = 42\n",
+                ),
+                (
+                    "Make",
+                    "module App.Make(K : App.Contracts.Input) : App.Contracts.Output\nanswer : Int\nlet answer = K.seed\n",
+                ),
+                ("Parent", &parent),
+                ("Root", &root),
+            ],
+            "Root",
+        );
+        let errors: Vec<_> = analysis
+            .diagnostics
+            .iter()
+            .filter(|d| d.severity == Severity::Error)
+            .collect();
+        if rejected {
+            assert!(
+                errors
+                    .iter()
+                    .any(|d| d.code == codes::R018 && d.message.contains("not exported")),
+                "{parent}\n{root}\n{errors:?}"
+            );
+        } else {
+            assert!(errors.is_empty(), "{parent}\n{root}\n{errors:?}");
+        }
+    }
+}
+
+#[cfg(feature = "ide")]
+#[test]
 fn hom_exported_factory_member_uses_the_parents_sealed_contract() {
     use crate::diagnostics::codes;
     let (_, analysis) = hom_boundary_analysis(
@@ -313,4 +373,84 @@ fn hom_factory_members_capture_the_structures_abstract_type() {
     }
 }
 
-include!("checking_tests_hom_captures.rs");
+#[cfg(feature = "ide")]
+#[test]
+fn hom_nested_parameterized_modules_capture_imports_without_widening_exposing() {
+    use crate::diagnostics::{Severity, codes};
+    for (import, input, output, expression, rejected) in [
+        (
+            "import App.Contracts as Contracts",
+            "Contracts.Input",
+            "Contracts.Output",
+            "K.seed + 1",
+            false,
+        ),
+        (
+            "import App.Helpers exposing (offset)",
+            "App.Contracts.Input",
+            "App.Contracts.Output",
+            "K.seed + offset",
+            false,
+        ),
+        (
+            "import App.Helpers exposing (..)",
+            "App.Contracts.Input",
+            "App.Contracts.Output",
+            "K.seed + offset",
+            false,
+        ),
+        (
+            "import App.Helpers exposing (offset)",
+            "App.Contracts.Input",
+            "App.Contracts.Output",
+            "K.seed + offset + hidden",
+            true,
+        ),
+    ] {
+        let root = format!(
+            "module App.Root exposing (answer)\n{import}\nmodule Make(K : {input}) : {output} =\n  answer : Int\n  let answer = {expression}\nmodule Chosen = Make(App.Argument)\nanswer : Int\nlet answer = Chosen.answer\n"
+        );
+        let (_, analysis) = hom_boundary_analysis(
+            &[
+                (
+                    "Contracts",
+                    "module App.Contracts exposing (Input, Output)\ntype module Input =\n  seed : Int\ntype module Output =\n  answer : Int\n",
+                ),
+                (
+                    "Argument",
+                    "module App.Argument exposing (seed)\nseed : Int\nlet seed = 41\n",
+                ),
+                (
+                    "Helpers",
+                    "module App.Helpers exposing (offset, hidden)\noffset : Int\nlet offset = 1\nhidden : Int\nlet hidden = 99\n",
+                ),
+                ("Root", &root),
+            ],
+            "Root",
+        );
+        if rejected {
+            assert!(
+                analysis
+                    .diagnostics
+                    .iter()
+                    .any(|d| d.code == codes::T001 && d.message.contains("hidden")),
+                "{import}: {:?}",
+                analysis.diagnostics
+            );
+        } else {
+            assert!(
+                analysis
+                    .diagnostics
+                    .iter()
+                    .all(|d| d.severity != Severity::Error),
+                "{import}: {:?}",
+                analysis.diagnostics
+            );
+            assert!(
+                analysis.diagnostics.is_empty(),
+                "{import}: {:?}",
+                analysis.diagnostics
+            );
+        }
+    }
+}

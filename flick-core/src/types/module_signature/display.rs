@@ -92,15 +92,7 @@ impl ModuleSignature {
             Self::Structure { requirements } => requirements
                 .iter()
                 .map(|r| match r {
-                    R::Kind {
-                        name, definition, ..
-                    } => {
-                        if matches!(definition.form, Form::Kind) {
-                            format!("kind {name}")
-                        } else {
-                            format!("{name} : {}", definition.kind)
-                        }
-                    }
+                    R::Kind { name, .. } => format!("kind {name}"),
                     R::Type { name, manifest, .. } => manifest.as_ref().map_or_else(
                         || format!("type {name}"),
                         |ty| format!("type {name} = {}", display_type(ty)),
