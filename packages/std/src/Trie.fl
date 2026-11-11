@@ -1,5 +1,5 @@
-/// Effect's immutable `Trie`: a map from string keys, kept in key order,
-/// with queries by key prefix.
+/// An immutable map from string keys, kept in key order, with queries by key
+/// prefix.
 module Trie exposing (
   Trie,
   empty,

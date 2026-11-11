@@ -1,4 +1,4 @@
-// Effect's `Trie`: string keys in order, prefix queries, persistent updates.
+// A trie: string keys in order, prefix queries, persistent updates.
 module App.Main exposing (main)
 
 words : Trie.Trie Float
