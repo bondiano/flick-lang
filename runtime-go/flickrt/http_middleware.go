@@ -68,7 +68,7 @@ func (q *ServerRequest) preResponded(fb *Fiber, m *requestMarks, response Value)
 // flickPreResponse is a Flick function of the request and the response.
 func flickPreResponse(f Value) preResponse {
 	return func(fb *Fiber, request, response Value) Value {
-		return Run(fb, Apply(fb, Apply(fb, f, request), response))
+		return Run(fb, Apply2(fb, f, request, response))
 	}
 }
 
@@ -92,7 +92,7 @@ func MiddlewareToHandled(fb *Fiber, send, handler, request Value) Value {
 	if cause != nil {
 		out = causeResponse(cause)
 	}
-	Run(fb, Apply(fb, Apply(fb, send, request), q.preResponded(inner, m, out)))
+	Run(fb, Apply2(fb, send, request, q.preResponded(inner, m, out)))
 	if cause != nil {
 		panic(&Failure{cause})
 	}

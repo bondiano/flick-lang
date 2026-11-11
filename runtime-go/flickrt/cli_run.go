@@ -263,7 +263,7 @@ func CliRunWith(fb *Fiber, settings, spec, args Value) Value {
 		env.format = cliFormatter{
 			func(fb *Fiber, doc *cliHelpDoc) string { return Apply(fb, formatHelp, cliDocRecord(doc)).(string) },
 			func(fb *Fiber, name, version string) string {
-				return Apply(fb, Apply(fb, formatVersion, name), version).(string)
+				return Apply2(fb, formatVersion, name, version).(string)
 			},
 		}
 	}

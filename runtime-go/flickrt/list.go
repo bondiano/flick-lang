@@ -3,7 +3,7 @@ package flickrt
 // Lists are immutable []Value: an operation returns a new slice, or the
 // same one when nothing changes. Callbacks are curried Flick functions.
 
-func apply2(fb *Fiber, f, a, b Value) Value { return Apply(fb, Apply(fb, f, a), b) }
+func apply2(fb *Fiber, f, a, b Value) Value { return Apply2(fb, f, a, b) }
 
 func ListMap(fb *Fiber, f, xs Value) Value {
 	in := List(xs)

@@ -289,7 +289,7 @@ func previewJSON(v Value) (string, bool) {
 		return ShowNumber(x), true
 	case *big.Int:
 		return QuoteJSON(x.String() + "n"), true
-	case Fn, Poly:
+	case Fn, Fn2, Fn3, Poly:
 		return `"<function>"`, true
 	case *Redacted:
 		return `"<redacted>"`, true // its toJSON

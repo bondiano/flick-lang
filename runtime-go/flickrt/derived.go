@@ -11,13 +11,17 @@ import "strings"
 func tagOf(constructor Value) string {
 	v := constructor
 	for {
-		f, ok := v.(Fn)
-		if !ok {
-			break
+		switch f := v.(type) {
+		case Fn:
+			v = f(nil, nil)
+		case Fn2:
+			v = f(nil, nil, nil)
+		case Fn3:
+			v = f(nil, nil, nil, nil)
+		default:
+			return v.(*Data).Tag
 		}
-		v = f(nil, nil)
 	}
-	return v.(*Data).Tag
 }
 
 // SchemaField is `Schema.field label schema`.

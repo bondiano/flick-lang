@@ -73,7 +73,7 @@ func entryTTL(o Value, curried bool) timeToLive {
 	case !ok:
 		return func(*Fiber, *Exit, Value) *Duration { return dur(DurationInfinity) }
 	case curried:
-		return func(fb *Fiber, exit *Exit, key Value) *Duration { return dur(Apply(fb, Apply(fb, f, exit), key)) }
+		return func(fb *Fiber, exit *Exit, key Value) *Duration { return dur(Apply2(fb, f, exit, key)) }
 	}
 	return func(*Fiber, *Exit, Value) *Duration { return dur(f) }
 }

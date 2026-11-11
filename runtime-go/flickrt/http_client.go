@@ -35,7 +35,7 @@ type transport func(fb *Fiber, request *ClientRequest, url Value) Value
 // URL.
 func HttpClientMake(f Value) Value {
 	return clientOfTransport(func(fb *Fiber, request *ClientRequest, url Value) Value {
-		return Run(fb, Apply(fb, Apply(fb, f, request), url))
+		return Run(fb, Apply2(fb, f, request, url))
 	})
 }
 
