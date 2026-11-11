@@ -69,10 +69,10 @@ impl Checker<'_> {
         Some(self.show_qualified(&Type::lang(base)))
     }
 
-    /// `t` with every alias in it expanded.
+    /// `t` with every alias in it expanded, but one inside its own
+    /// expansion.
     fn unaliased(&self, t: &Type) -> Type {
-        self.whnf(t)
-            .map_children(&mut |child| self.unaliased(child))
+        self.expand_all(t, &|t| self.whnf(t), &mut Vec::new())
     }
 }
 

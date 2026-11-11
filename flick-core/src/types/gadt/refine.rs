@@ -7,6 +7,7 @@ use std::collections::HashMap;
 
 use crate::types::Checker;
 use crate::types::kinds::Kind;
+use crate::types::regions::{AliasKey, Unfold, leave_alias};
 use crate::types::ty::{Effects, Type};
 
 /// The outcome of matching a constructor against a value's type.
@@ -101,8 +102,19 @@ impl Refiner<'_, '_> {
 
     /// `t` with everything solved substituted.
     fn full(&self, t: &Type) -> Type {
-        let t = self.walk(t);
-        t.map_children(&mut |c| self.full(c))
+        self.full_in(t, &mut Vec::new())
+    }
+
+    /// `path` holds the aliases it is unfolding: one met again inside its
+    /// own unfolding stays as written, its arguments substituted.
+    fn full_in(&self, t: &Type, path: &mut Vec<AliasKey>) -> Type {
+        let unfold = self.checker.enter_alias(t, path);
+        let full = match unfold {
+            Unfold::Again => t.map_children(&mut |c| self.full_in(c, path)),
+            _ => self.walk(t).map_children(&mut |c| self.full_in(c, path)),
+        };
+        leave_alias(path, unfold);
+        full
     }
 
     fn occurs(&self, t: &Type, x: &Type) -> bool {

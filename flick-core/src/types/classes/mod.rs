@@ -218,7 +218,7 @@ impl Checker<'_> {
     }
 
     fn expand(&self, t: &Type) -> Type {
-        self.whnf(t).map_children(&mut |c| self.expand(c))
+        self.expand_all(t, &|t| self.whnf(t), &mut Vec::new())
     }
 
     /// Whether `class` is one whose records and tuples the compiler serves.

@@ -124,6 +124,9 @@ pub struct Checker<'d> {
     trace: Option<trace::Trace>,
     /// The scheme and instance of the variable or global just typed.
     instanced: Option<(Scheme, Vec<Inst>)>,
+    /// The opaque aliases subsumption is unfolding on both sides: one met
+    /// again inside its own unfolding is equal by its arguments.
+    unfolding: Vec<Path>,
 }
 
 /// `σ` as the model reads a signature: with the `Live` elision adds
@@ -153,6 +156,7 @@ impl<'d> Checker<'d> {
             module: Name::from(""),
             trace: None,
             instanced: None,
+            unfolding: Vec::new(),
         }
     }
 

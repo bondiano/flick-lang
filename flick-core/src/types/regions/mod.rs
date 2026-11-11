@@ -19,10 +19,12 @@ mod live_rows;
 mod provided;
 mod scopes;
 mod solve;
+mod unfold;
 
 pub use live::{LIVE, has_live, strip_live};
 pub use provided::{PROVIDED, Provide};
 pub use solve::Outlives;
+pub(in crate::types) use unfold::{AliasKey, Unfold, leave_alias};
 
 use super::Checker;
 use super::kinds::Kind;
@@ -182,25 +184,43 @@ impl Checker<'_> {
     }
 
     fn collect_captures(&self, t: &Type, out: &mut Norm) {
-        self.collect_bounded_captures(t, out, false);
+        self.collect_bounded_captures(t, out, false, &mut Vec::new());
     }
 
-    fn collect_bounded_captures(&self, t: &Type, out: &mut Norm, bounded: bool) {
+    /// `path` holds the aliases the walk is unfolding: one met again inside
+    /// its own unfolding holds what its arguments hold.
+    fn collect_bounded_captures(
+        &self,
+        t: &Type,
+        out: &mut Norm,
+        bounded: bool,
+        path: &mut Vec<AliasKey>,
+    ) {
+        match self.enter_alias(t, path) {
+            Unfold::Again => self.applied_captures(t, out, bounded, path, false),
+            unfold => {
+                self.collect_unfolded(t, out, bounded, path);
+                leave_alias(path, unfold);
+            }
+        }
+    }
+
+    fn collect_unfolded(&self, t: &Type, out: &mut Norm, bounded: bool, path: &mut Vec<AliasKey>) {
         let t = self.borrowed_head(t);
         match &*t {
             Type::Bounded { ty, captures } => {
                 if self.holds_nothing(ty) {
                     return;
                 }
-                self.capture_row_filtered(captures, out, false);
-                self.collect_bounded_captures(ty, out, true);
+                self.capture_row_filtered(captures, out, false, path);
+                self.collect_bounded_captures(ty, out, true, path);
             }
             Type::Captured { ty, captures, .. } => {
                 if self.holds_nothing(ty) {
                     return;
                 }
-                self.capture_row_filtered(captures, out, bounded);
-                self.collect_bounded_captures(ty, out, true);
+                self.capture_row_filtered(captures, out, bounded, path);
+                self.collect_bounded_captures(ty, out, true, path);
             }
             // a capture row not inferred yet is a tail: it may still be empty
             #[allow(
@@ -219,14 +239,14 @@ impl Checker<'_> {
             {
                 push_atom(out, &t);
             }
-            Type::App { .. } => self.applied_captures(&t, out, bounded),
+            Type::App { .. } => self.applied_captures(&t, out, bounded, path, true),
             Type::Tuple(items) => items
                 .iter()
-                .for_each(|i| self.collect_bounded_captures(i, out, bounded)),
+                .for_each(|i| self.collect_bounded_captures(i, out, bounded, path)),
             Type::Record(row) => row
                 .entries
                 .iter()
-                .for_each(|(_, t)| self.collect_bounded_captures(t, out, bounded)),
+                .for_each(|(_, t)| self.collect_bounded_captures(t, out, bounded, path)),
             Type::Fun { param, result, .. } => {
                 if bounded {
                     without_rows(&self.zonk(&t)).visit(&mut |t| {
@@ -235,15 +255,15 @@ impl Checker<'_> {
                         }
                     });
                 } else {
-                    self.collect_bounded_captures(param, out, false);
-                    self.collect_bounded_captures(result, out, false);
+                    self.collect_bounded_captures(param, out, false, path);
+                    self.collect_bounded_captures(result, out, false, path);
                 }
             }
             // what the `forall` binds is no capture of the value: each use
             // instantiates it (a recursive local sees its own scheme)
             Type::Forall { vars, body, .. } => {
                 let mut inner = Norm::default();
-                self.collect_bounded_captures(body, &mut inner, bounded);
+                self.collect_bounded_captures(body, &mut inner, bounded, path);
                 let bound =
                     |t: &Type| matches!(t, Type::Var(v) if vars.iter().any(|b| b.name == *v));
                 out.entries
@@ -260,7 +280,14 @@ impl Checker<'_> {
 
     /// What the application `t` holds, of a head and the arguments of a kind
     /// that holds.
-    fn applied_captures(&self, t: &Type, out: &mut Norm, bounded: bool) {
+    fn applied_captures(
+        &self,
+        t: &Type,
+        out: &mut Norm,
+        bounded: bool,
+        path: &mut Vec<AliasKey>,
+        with_head: bool,
+    ) {
         let (head, args) = t.spine();
         // an `Eff` holds what its result holds, as a function does: a
         // capture shown only in the result is lost when the result is dropped
@@ -268,8 +295,8 @@ impl Checker<'_> {
             return;
         }
         // `f a` holds what `f` stands for, as `Holder h a` holds `h`
-        if !bounded {
-            self.collect_bounded_captures(head, out, false);
+        if with_head && !bounded {
+            self.collect_bounded_captures(head, out, false, path);
         }
         let kinds = match head {
             Type::Con { module, name } => self
@@ -293,12 +320,12 @@ impl Checker<'_> {
             match param {
                 Some(Kind::ServiceRow | Kind::Symbol) => {}
                 Some(Kind::ErrorRow) if head.is_lang(Lang::Eff) => {}
-                Some(Kind::ErrorRow) => self.error_row_captures(arg, out, bounded),
+                Some(Kind::ErrorRow) => self.error_row_captures(arg, out, bounded, path),
                 _ => match self.store.resolve(arg) {
                     row @ (Type::Row(_) | Type::Union(..)) => {
-                        self.capture_row_filtered(&row, out, bounded);
+                        self.capture_row_filtered(&row, out, bounded, path);
                     }
-                    _ => self.collect_bounded_captures(arg, out, bounded),
+                    _ => self.collect_bounded_captures(arg, out, bounded, path),
                 },
             }
         }
@@ -307,12 +334,18 @@ impl Checker<'_> {
     /// Adds the regions of a capture row; its rigid variables count as
     /// entries, so `{s | c}` and `{s, c}` are the same set.
     pub fn capture_row(&self, row: &Type, out: &mut Norm) {
-        self.capture_row_filtered(row, out, false);
+        self.capture_row_filtered(row, out, false, &mut Vec::new());
         out.entries.sort_by(|a, b| a.0.cmp(&b.0));
         out.entries.dedup_by(|a, b| a.0 == b.0);
     }
 
-    fn capture_row_filtered(&self, row: &Type, out: &mut Norm, bounded: bool) {
+    fn capture_row_filtered(
+        &self,
+        row: &Type,
+        out: &mut Norm,
+        bounded: bool,
+        path: &mut Vec<AliasKey>,
+    ) {
         let norm = self.store.normalize(row);
         for (label, t) in &norm.entries {
             if label.starts_with('^') {
@@ -321,12 +354,12 @@ impl Checker<'_> {
                     // have become a row of errors
                     row @ (Type::Row(_) | Type::Union(..)) => {
                         if self.of_errors(&self.store.normalize(&row)) {
-                            self.error_row_captures(&row, out, bounded);
+                            self.error_row_captures(&row, out, bounded, path);
                         } else {
-                            self.capture_row_filtered(&row, out, bounded);
+                            self.capture_row_filtered(&row, out, bounded, path);
                         }
                     }
-                    other => self.collect_bounded_captures(&other, out, bounded),
+                    other => self.collect_bounded_captures(&other, out, bounded, path),
                 }
             }
         }
@@ -350,10 +383,16 @@ impl Checker<'_> {
     /// closed before it is known still holds what it becomes, a row or the
     /// variable it is generalized into; it is no tail, which a capture row
     /// would grow.
-    fn error_row_captures(&self, row: &Type, out: &mut Norm, bounded: bool) {
+    fn error_row_captures(
+        &self,
+        row: &Type,
+        out: &mut Norm,
+        bounded: bool,
+        path: &mut Vec<AliasKey>,
+    ) {
         let norm = self.store.normalize(row);
         for (_, error) in &norm.entries {
-            self.collect_bounded_captures(error, out, bounded);
+            self.collect_bounded_captures(error, out, bounded, path);
         }
         for tail in norm.tails {
             match tail {
@@ -367,10 +406,18 @@ impl Checker<'_> {
     /// `t` with what each stage holds of the parameters before it: what the
     /// retention of a foreign function checks (`ffi/retention.rs`).
     pub(in crate::types) fn held_stages(&self, t: &Type) -> Type {
-        self.stages(t, &mut Vec::new(), &Type::empty_row())
+        self.stages(t, &mut Vec::new(), &Type::empty_row(), &mut Vec::new())
     }
 
-    fn stages(&self, t: &Type, kinds: &mut Vec<(String, Kind)>, held: &Type) -> Type {
+    /// `path` holds the aliases it is unfolding: one met again inside its
+    /// own unfolding stays as written.
+    fn stages(
+        &self,
+        t: &Type,
+        kinds: &mut Vec<(String, Kind)>,
+        held: &Type,
+        path: &mut Vec<AliasKey>,
+    ) -> Type {
         match t {
             Type::Forall {
                 vars,
@@ -379,7 +426,7 @@ impl Checker<'_> {
             } => {
                 let mark = kinds.len();
                 kinds.extend(vars.iter().map(|v| (v.name.clone(), v.kind.clone())));
-                let body = self.stages(body, kinds, held);
+                let body = self.stages(body, kinds, held, path);
                 kinds.truncate(mark);
                 Type::Forall {
                     vars: vars.clone(),
@@ -388,7 +435,7 @@ impl Checker<'_> {
                 }
             }
             Type::Captured { ty, captures, .. } | Type::Bounded { ty, captures } => {
-                let ty = Box::new(self.stages(ty, kinds, captures));
+                let ty = Box::new(self.stages(ty, kinds, captures, path));
                 if matches!(t, Type::Bounded { .. }) {
                     Type::Bounded {
                         ty,
@@ -407,10 +454,10 @@ impl Checker<'_> {
                 effects,
                 result,
             } => {
-                let param = self.stages(param, kinds, &Type::empty_row());
+                let param = self.stages(param, kinds, &Type::empty_row(), path);
                 let held = self.stage_holds(&param, kinds, held);
                 let explicit = self.whnf_captured(result).1.is_some();
-                let mut result = self.stages(result, kinds, &held);
+                let mut result = self.stages(result, kinds, &held, path);
                 let retained = self.store.normalize(&held);
                 if !explicit
                     && matches!(self.whnf(&result), Type::Fun { .. })
@@ -425,12 +472,18 @@ impl Checker<'_> {
                 }
             }
             other => {
-                let expanded = self.qualified_head(other);
-                if matches!(expanded, Type::Fun { .. }) {
-                    self.stages(&expanded, kinds, held)
-                } else {
-                    other.map_children(&mut |c| self.stages(c, kinds, &Type::empty_row()))
+                let unfold = self.enter_alias(other, path);
+                if matches!(unfold, Unfold::Again) {
+                    return other.clone();
                 }
+                let expanded = self.qualified_head(other);
+                let staged = if matches!(expanded, Type::Fun { .. }) {
+                    self.stages(&expanded, kinds, held, path)
+                } else {
+                    other.map_children(&mut |c| self.stages(c, kinds, &Type::empty_row(), path))
+                };
+                leave_alias(path, unfold);
+                staged
             }
         }
     }

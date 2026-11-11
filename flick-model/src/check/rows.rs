@@ -178,6 +178,27 @@ impl Checker<'_> {
     /// `τ ≤ τ'`: ≤-Fun and ≤-Eff, else ≤-Refl; with (≤-Cap) of
     /// `regions.md` §2.2 on the whole value, qualified or bare.
     pub(super) fn subsume(&mut self, actual: &Type, expected: &Type) -> Check<()> {
+        // an opaque alias on both sides met again inside its own unfolding
+        // is equal by its arguments, as `unify` reads it: unfolding one that
+        // names itself would not end
+        let (x, y) = (self.heads(actual), self.heads(expected));
+        let alias = match (self.alias(&x), self.alias(&y)) {
+            (Some((p, _)), Some((q, _))) if p == q => Some(p.clone()),
+            _ => None,
+        };
+        let Some(p) = alias else {
+            return self.subsume_unfolded(actual, expected);
+        };
+        if self.unfolding.contains(&p) {
+            return self.unify(&x, &y);
+        }
+        self.unfolding.push(p);
+        let checked = self.subsume_unfolded(actual, expected);
+        self.unfolding.pop();
+        checked
+    }
+
+    fn subsume_unfolded(&mut self, actual: &Type, expected: &Type) -> Check<()> {
         let (a, b) = (self.follow(actual), self.follow(expected));
         if matches!(b, Type::Var(Var::Meta(_))) {
             return self.unify(&a, &b);
