@@ -380,3 +380,40 @@ fn go_bindings_name_runtime_functions() {
         "bindings to no function of flickrt: {unknown:?}"
     );
 }
+
+#[test]
+fn a_scalar_stays_in_its_go_type_through_a_choice_and_a_test() {
+    let go = app("module App exposing (main)\n\n\
+         spread : Int -> Int -> String -> Int\n\
+         let spread a b word =\n  \
+         let wide = if a > b && not (word < \"m\") then a - b else b - a\n  \
+         let mark =\n    match word with\n    | \"none\" -> 0\n    | _ -> 1\n  \
+         wide * 2 + mark\n\n\
+         main : Unit ->{; AppError} Unit\n\
+         let main () = Platform.stdout_line (show (spread 5 2 \"word\"))\n");
+    // the result of an `if` and of a `match` whose branches are numbers is a number
+    assert!(
+        go.contains("var t1 int32\n") && go.contains("var t2 int32\n"),
+        "{go}"
+    );
+    assert!(
+        go.contains("var l_wide int32 = t1") && go.contains("var l_mark int32 = t2"),
+        "{go}"
+    );
+    // a condition Go holds as a `bool` is tested as it is, strings are
+    // ordered by the runtime with no value made of them, and a literal in a
+    // pattern is compared as Go compares
+    assert!(
+        go.contains("if ((flickrt.AsInt(l_a) > flickrt.AsInt(l_b)) && !(flickrt.CompareStrings("),
+        "{go}"
+    );
+    assert!(go.contains("if (l_word == \"none\") {"), "{go}");
+    for call in [
+        "flickrt.Bool(",
+        "flickrt.Not(",
+        "flickrt.Same(",
+        "flickrt.Lt(",
+    ] {
+        assert!(!go.contains(call), "{call} in {go}");
+    }
+}

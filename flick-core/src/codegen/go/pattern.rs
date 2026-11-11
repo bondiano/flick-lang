@@ -4,6 +4,7 @@
 
 use flick_pretty::{Document, Documentable, docvec};
 
+use super::arith::Native;
 use super::expr::enum_literal;
 use super::layout::{block, call, conjunction, inline, statement};
 use super::{Gen, names};
@@ -24,9 +25,15 @@ impl<'a> Gen<'a> {
         match pat {
             Pat::Wild | Pat::Lit(Lit::Unit) => {}
             Pat::Bind(name) => t.binds.push((a.alloc_str(&names::local(name)), subject)),
-            Pat::Lit(lit) => {
+            // a `BigInt` is equal by its number, any other literal as Go
+            // compares a value with one: by its type, then by what it holds
+            Pat::Lit(lit @ Lit::BigInt(_)) => {
                 let lit = self.literal(lit).to_doc(a);
                 t.conds.push(call(a, "flickrt.Same", [subject, lit]));
+            }
+            Pat::Lit(lit) => {
+                let lit = self.literal(lit).to_doc(a);
+                t.conds.push(docvec![a, "(", subject, " == ", lit, ")"]);
             }
             Pat::Tuple(items) => {
                 for (i, item) in items.iter().enumerate() {
@@ -187,8 +194,8 @@ impl<'a> Gen<'a> {
             match guard {
                 Some(guard) => {
                     let c = g.expr(guard);
+                    let test = g.unboxed(guard, c, Native::Bool).doc;
                     let (b, ()) = g.block(|g| body(g, value));
-                    let test = call(a, "flickrt.Bool", [c.doc]);
                     g.emit(docvec![a, "if ", test, " ", block(a, b)]);
                 }
                 None => body(g, value),
