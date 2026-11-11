@@ -22,4 +22,12 @@ example : Outl (Facts.union ((Facts.single (fun x => x = .v 1) (.tvar 0)).substT
       (Facts.single (fun x => x = .v 1) (.tvar 0))) (fun x => x = .v 1) (.tvar 0) := by
   outl
 
+/-- The instance of a scheme shifted under a binder (`inst_eq` through `liftT`). -/
+example : (Scheme.up 1 ⟨1, Facts.none,
+      .rcons "go" (.arrow (.tvar 0) (.rt (fun x => x = .atm (.v 1)) Row.none) (.base .unit) Caps.none)
+        .rnil⟩).inst [.base .unit] =
+    .rcons "go" (.arrow (.base .unit) (.rt (fun x => x = .atm (.v 1)) Row.none) (.base .unit) Caps.none)
+      .rnil := by
+  inst_eq
+
 end Flick.Cert.Checks

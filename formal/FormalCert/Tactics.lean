@@ -53,8 +53,8 @@ namespace Flick.Cert
 
 /-- The simp set of the finite sets of a certificate: elements, atoms, reach, substitution. -/
 macro "cert_simp" : tactic => `(tactic| (simp_all [Row.union, Row.ofCaps, Row.plain, Row.single,
-  Row.none, Row.substT, Caps.substT, Caps.none, Ty.reach, instT, Atom.up, Atom.ty, Ty.asRow,
-  Row.err, Row.scope, Row.disch, Row.back, shiftV, and_assoc] <;> omega))
+  Row.none, Row.substT, Caps.substT, Caps.none, Ty.reach, instT, liftT, Ty.up, Ty.ren, Atom.up,
+  Atom.ty, Ty.asRow, Row.err, Row.scope, Row.disch, Row.back, shiftV, and_assoc] <;> omega))
 
 /-- `h : x ∈ A` of a finite set `A`, split into one goal for each element `A` names. -/
 macro "split_mem " h:ident : tactic => `(tactic| (
@@ -89,7 +89,7 @@ macro "stage_le" : tactic => `(tactic| first
 macro "inst_eq" : tactic => `(tactic| (
   simp only [Scheme.inst, Scheme.mono, Scheme.up, Scheme.substT, liftT_zero, Ty.up_def, Ty.substT,
     Stage.substT, Ty.spine, Lit.base]
-  try simp [instT, Ty.substT, Stage.substT, Ty.spine, shiftV, Lit.base]
+  try simp [instT, liftT, Ty.up, Ty.ren, Ty.substT, Stage.substT, Ty.spine, shiftV, Lit.base]
   all_goals first
     | caps_set
     | row_set
