@@ -297,12 +297,14 @@ fn a_changed_library_project_or_compiler_checks_again() {
         .set_times(fs::FileTimes::new().set_modified(earlier))
         .expect("change copied binary timestamp");
     assert_eq!(flick_with(&copy, &root, "cache", &["check"]), Some(1));
-    // the project's configuration
+    // a setting of the project that checking does not read keeps the library
     let config = root.join("app/flick.toml");
-    let changed = APP
-        .replace("DEPENDENCY", FETCHED)
-        .replace("kind = \"app\"", "kind = \"app\"\ntest-dir = \"spec\"");
-    fs::write(&config, changed).expect("write");
+    let app = APP.replace("DEPENDENCY", FETCHED);
+    let moved = app.replace("kind = \"app\"", "kind = \"app\"\ntest-dir = \"spec\"");
+    fs::write(&config, moved).expect("write");
+    assert_eq!(flick(&root, "cache", &["check"]), Some(0));
+    // one that it reads does not
+    fs::write(&config, format!("{app}\n[lint]\nno-let-assert = true\n")).expect("write");
     assert_eq!(flick(&root, "cache", &["check"]), Some(1));
 
     // the sources of a path library
