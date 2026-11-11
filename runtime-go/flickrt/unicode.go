@@ -278,8 +278,20 @@ func finalSigma(rs []rune, i int) ([]rune, bool) {
 }
 
 // ToUpperCase and ToLowerCase are JS's full case mappings.
-func ToUpperCase(s Value) Value { return mapCase(s.(string), unicodeData().upper, nil) }
-func ToLowerCase(s Value) Value { return mapCase(s.(string), unicodeData().lower, finalSigma) }
+// A string of ASCII has only its letters to map, each to one letter.
+func ToUpperCase(s Value) Value {
+	if text := s.(string); ascii(text) {
+		return strings.ToUpper(text)
+	}
+	return mapCase(s.(string), unicodeData().upper, nil)
+}
+
+func ToLowerCase(s Value) Value {
+	if text := s.(string); ascii(text) {
+		return strings.ToLower(text)
+	}
+	return mapCase(s.(string), unicodeData().lower, finalSigma)
+}
 
 // Capitalize upper-cases the first code unit.
 func Capitalize(s Value) Value { return mapFirst(s.(string), unicodeData().upper) }
