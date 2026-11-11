@@ -332,7 +332,7 @@ fn visit(i: usize, uses: &[Vec<usize>], state: &mut [u8], out: &mut Vec<usize>) 
 }
 
 /// The JS names an item defines.
-fn defined(item: &Item) -> Vec<String> {
+pub(super) fn defined(item: &Item) -> Vec<String> {
     match &item.kind {
         ItemKind::Value { name, .. } => vec![names::ident(name)],
         ItemKind::Destructure { pattern, .. } => {

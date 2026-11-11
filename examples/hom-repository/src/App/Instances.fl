@@ -1,0 +1,7 @@
+module App.Instances exposing (Base, Other, Decorated, Logged, Alias)
+
+module Base = App.Make(App.Driver)
+module Other = App.Make(App.Driver)
+module Decorated = App.WithLogging(App.Make)
+module Logged = Decorated(App.Driver)
+module Alias = Logged

@@ -1,0 +1,5 @@
+module App.Domain exposing (Repo)
+
+// One deliberately shared nominal API, implemented by each repository layer.
+service Repo =
+  get : String ->{} String

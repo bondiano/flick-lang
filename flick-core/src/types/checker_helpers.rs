@@ -30,9 +30,14 @@ impl Checker<'_> {
             .join(" ")
     }
 
+    #[inline(never)]
     fn error(&mut self, code: Code, span: Span, message: impl Into<String>) {
-        self.diagnostics
-            .push(Diagnostic::error(code, message, span));
+        self.diagnostic(Diagnostic::error(code, message, span));
+    }
+
+    #[inline(never)]
+    fn diagnostic(&mut self, diagnostic: Diagnostic) {
+        self.diagnostics.push(diagnostic);
     }
 
     /// An error that offers `guess` as the replacement of `span`'s text.
@@ -44,12 +49,12 @@ impl Checker<'_> {
         guess: impl FnOnce(&Self) -> Option<String>,
     ) {
         let diagnostic = Diagnostic::error(code, message, span).did_you_mean(span, || guess(self));
-        self.diagnostics.push(diagnostic);
+        self.diagnostic(diagnostic);
     }
 
+    #[inline(never)]
     fn warning(&mut self, code: Code, span: Span, message: impl Into<String>) {
-        self.diagnostics
-            .push(Diagnostic::new(code, Severity::Warning, message).with_span(span));
+        self.diagnostic(Diagnostic::new(code, Severity::Warning, message).with_span(span));
     }
 
     fn duplicate_label(&mut self, label: &str, span: Span) {

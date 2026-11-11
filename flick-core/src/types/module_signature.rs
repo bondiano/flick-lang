@@ -1,5 +1,7 @@
 //! Static module signatures and their dependency-preserving operations.
 
+use std::mem;
+
 use super::{
     Form, Kind, ModuleNominalKind, ModuleRequirement as R, ModuleSignature, Type, TypeDef,
     show_type,
@@ -7,7 +9,205 @@ use super::{
 use crate::api_diff::canonical_type;
 use crate::iface::{Decl, Entity, Export, Interface, Namespace};
 
+fn display_type(ty: &Type) -> String {
+    fn scoped(ty: &Type) -> Type {
+        if let Type::Con { module, name } = ty
+            && let Some(alias) = module.strip_prefix("$display:")
+        {
+            return Type::con("", &format!("{alias}.{name}"));
+        }
+        ty.map_children(&mut scoped)
+    }
+    show_type(&scoped(ty))
+}
+
+/// Module substitution changes service/error identities and their derived
+/// set keys together. Record field labels are source names and stay fixed.
+fn map_module_children(ty: &Type, f: &mut dyn FnMut(&Type) -> Type) -> Type {
+    let mut mapped = ty.map_children(f);
+    if let (Type::Row(before), Type::Row(after)) = (ty, &mut mapped) {
+        for ((old_key, old), (key, new)) in before.entries.iter().zip(&mut after.entries) {
+            if let (
+                Type::Con { module, name },
+                Type::Con {
+                    module: actual,
+                    name: member,
+                },
+            ) = (old.spine().0, new.spine().0)
+                && *old_key == format!("{module}.{name}")
+            {
+                *key = format!("{actual}.{member}");
+            }
+        }
+        after.entries.sort_by(|a, b| a.0.cmp(&b.0));
+    }
+    mapped
+}
+
+fn map_definition_types(definition: &mut TypeDef, f: &mut dyn FnMut(&Type) -> Type) {
+    match &mut definition.form {
+        Form::Alias { body, .. } => *body = f(body),
+        Form::Class {
+            supers,
+            default_sigs,
+            ..
+        } => {
+            for ty in supers
+                .iter_mut()
+                .chain(default_sigs.iter_mut().map(|(_, ty)| ty))
+            {
+                *ty = f(ty);
+            }
+        }
+        Form::Service { operations, .. } => {
+            for operation in operations {
+                operation.ty = f(&operation.ty);
+            }
+        }
+        Form::ModuleContract { requirements } => {
+            let mut signature = ModuleSignature::Structure {
+                requirements: mem::take(requirements),
+            };
+            signature.map_types(f);
+            let ModuleSignature::Structure {
+                requirements: mapped,
+            } = signature
+            else {
+                unreachable!()
+            };
+            *requirements = mapped;
+        }
+        Form::ModuleSignature { signature } => signature.map_types(f),
+        _ => {}
+    }
+}
+
+fn map_interface_types(interface: &mut Interface, f: &mut dyn FnMut(&Type) -> Type) {
+    for export in &mut interface.exports {
+        if let Some(ty) = &mut export.scheme {
+            *ty = f(ty);
+        }
+        if let Some(definition) = &mut export.definition {
+            map_definition_types(definition, f);
+        }
+    }
+    if let Some(signature) = &mut interface.functor {
+        signature.map_types(f);
+    }
+    for child in interface.modules.values_mut() {
+        map_interface_types(child, f);
+    }
+}
+
+fn map_requirement_types(requirement: &mut R, f: &mut dyn FnMut(&Type) -> Type) {
+    match requirement {
+        R::Type {
+            manifest: Some(ty), ..
+        }
+        | R::Value { ty, .. } => *ty = f(ty),
+        R::Dictionary { head, .. } => *head = f(head),
+        R::Module { signature, .. } => signature.map_types(f),
+        R::Nominal {
+            identity,
+            definition,
+            methods,
+            ..
+        } => {
+            if let Some(entity) = identity
+                && let Type::Con { module, name } = f(&Type::con(&entity.module, &entity.name))
+            {
+                entity.module = module;
+                entity.name = name;
+            }
+            for (_, ty) in methods {
+                *ty = f(ty);
+            }
+            if let Some(definition) = definition {
+                map_definition_types(definition, f);
+            }
+        }
+        R::Type { manifest: None, .. } => {}
+    }
+}
+
+/// Equality checking may use transparent definitions in a known argument;
+/// its abstraction-preserving parameter projection stays unchanged.
+pub(crate) fn normalize_module_interface(interface: &mut Interface, witness: &Interface) {
+    map_interface_types(interface, &mut |ty| {
+        super::module_contract::expand_actual(ty, witness, 32)
+    });
+}
+
+fn inferred_type_parameters(definition: &TypeDef) -> Vec<super::ty::Binder> {
+    let names = match &definition.form {
+        Form::Alias { params, .. } => params.as_slice(),
+        _ => &[],
+    };
+    let mut parameters = Vec::new();
+    let mut kind = &definition.kind;
+    while let Kind::Arrow(parameter, result) = kind {
+        let index = parameters.len();
+        parameters.push(super::ty::Binder {
+            name: names
+                .get(index)
+                .cloned()
+                .unwrap_or_else(|| format!("a{index}")),
+            kind: (**parameter).clone(),
+        });
+        kind = result;
+    }
+    parameters
+}
+
+/// Local declarations bind fresh result members. Services and errors use
+/// different labels while these identities are represented by bound variables.
+fn generalize_local_type(ty: &Type, module: &str, names: &[(String, bool)]) -> Type {
+    let binding = |name: &str| {
+        names
+            .iter()
+            .find(|(known, _)| known == name || name.strip_suffix("$Dict") == Some(known))
+    };
+    if let Type::Con {
+        module: owner,
+        name,
+    } = ty
+        && owner == module
+        && binding(name).is_some()
+    {
+        return Type::Var(name.clone());
+    }
+    let mut mapped = map_module_children(ty, &mut |ty| generalize_local_type(ty, module, names));
+    if let (Type::Row(before), Type::Row(after)) = (ty, &mut mapped) {
+        for ((old_key, old), (key, new)) in before.entries.iter().zip(&mut after.entries) {
+            if let (
+                Type::Con {
+                    module: owner,
+                    name,
+                },
+                Type::Var(variable),
+            ) = (old.spine().0, new.spine().0)
+                && owner == module
+                && *old_key == format!("{owner}.{name}")
+                && let Some((_, service)) = binding(variable)
+            {
+                *key = if *service {
+                    super::ty::service_label(new)
+                } else {
+                    super::ty::error_label(new)
+                }
+                .expect("a bound row atom");
+            }
+        }
+        after.entries.sort_by(|a, b| a.0.cmp(&b.0));
+    }
+    mapped
+}
+
 impl ModuleSignature {
+    pub(crate) fn normalize_in(&mut self, witness: &Interface) {
+        self.map_types(&mut |ty| super::module_contract::expand_actual(ty, witness, 32));
+    }
+
     /// A broken body must not leak inference variables to another checker,
     /// but its declared inputs still constrain applications and cache keys.
     pub(crate) fn inputs_only(&self) -> Self {
@@ -42,17 +242,8 @@ impl ModuleSignature {
         }
     }
     pub fn from_interface(interface: &Interface) -> Self {
-        fn local(ty: &Type, module: &str, names: &[String]) -> Type {
-            if let Type::Con {
-                module: owner,
-                name,
-            } = ty
-                && owner == module
-                && names.contains(name)
-            {
-                return Type::Var(name.clone());
-            }
-            ty.map_children(&mut |ty| local(ty, module, names))
+        if let Some(signature) = &interface.functor {
+            return signature.clone();
         }
 
         let mut requirements = Vec::new();
@@ -77,7 +268,8 @@ impl ModuleSignature {
                                     } else {
                                         ModuleNominalKind::Service
                                     },
-                                    identity: Some(export.entity.clone()),
+                                    identity: (export.entity.module != interface.module)
+                                        .then(|| export.entity.clone()),
                                     definition: Some(Box::new(definition.clone())),
                                     methods: Vec::new(),
                                 });
@@ -85,7 +277,7 @@ impl ModuleSignature {
                             Form::ModuleContract { .. } | Form::ModuleSignature { .. } => {}
                             form => requirements.push(R::Type {
                                 name: export.entity.name.clone(),
-                                params: Vec::new(),
+                                params: inferred_type_parameters(definition),
                                 manifest: if let Form::Alias { body, .. } = form {
                                     Some(body.clone())
                                 } else {
@@ -101,6 +293,7 @@ impl ModuleSignature {
         for (name, child) in &interface.modules {
             requirements.push(R::Module {
                 name: name.clone(),
+                binder: String::new(),
                 signature: Box::new(
                     child
                         .functor
@@ -112,355 +305,97 @@ impl ModuleSignature {
         let names: Vec<_> = requirements
             .iter()
             .filter_map(|r| match r {
-                R::Type { name, .. } => Some(name.clone()),
+                R::Type { name, .. } => Some((name.clone(), false)),
+                R::Nominal {
+                    name,
+                    identity: None,
+                    category,
+                    ..
+                } => Some((name.clone(), *category == ModuleNominalKind::Service)),
                 _ => None,
             })
             .collect();
         let mut signature = Self::Structure { requirements };
 
-        signature.map_types(&mut |ty| local(ty, &interface.module, &names));
+        signature.map_types(&mut |ty| generalize_local_type(ty, &interface.module, &names));
         signature
     }
-    pub fn display(&self) -> String {
-        match self {
-            Self::Functor {
-                binder,
-                parameter,
-                result,
-                ..
-            } => format!(
-                "({} : {}) -> {}",
-                binder.rsplit('#').next().unwrap_or(binder),
-                parameter.display(),
-                result.display()
-            ),
-            Self::Structure { requirements } => requirements
-                .iter()
-                .map(|r| match r {
-                    R::Type { name, manifest, .. } => manifest.as_ref().map_or_else(
-                        || format!("type {name}"),
-                        |ty| format!("type {name} = {}", show_type(ty)),
-                    ),
-                    R::Value { name, ty } => format!("{name} : {}", show_type(ty)),
-                    R::Module { name, signature } => {
-                        format!("module {name} : {}", signature.display())
-                    }
-                    R::Dictionary { head, from } => {
-                        format!("instance {} from {from}", show_type(head))
-                    }
-                    R::Nominal {
-                        name,
-                        category,
-                        identity,
-                        ..
-                    } => format!(
-                        "{} {name}{}",
-                        if matches!(category, ModuleNominalKind::Class) {
-                            "class"
-                        } else {
-                            "service"
-                        },
-                        identity
-                            .as_ref()
-                            .map_or(String::new(), |e| format!(" = {}.{}", e.module, e.name))
-                    ),
-                })
-                .collect::<Vec<_>>()
-                .join("\n"),
-        }
-    }
-
-    /// An abstract interface usable when checking a body independently of its
-    /// implementations. Abstract members are stable names in this interface.
-    #[allow(clippy::too_many_lines)]
-    pub fn interface(&self, path: &str) -> Interface {
-        let mut interface = Interface {
-            module: path.into(),
-            ..Interface::default()
-        };
-        let Self::Structure { requirements } = self else {
-            interface.functor = Some(self.clone());
-            return interface;
-        };
-        let mut subst: Vec<_> = requirements
-            .iter()
-            .filter_map(|r| match r {
-                R::Type { name, manifest, .. } => Some((
-                    name.clone(),
-                    manifest.clone().unwrap_or_else(|| Type::con(path, name)),
-                )),
-                R::Nominal { name, identity, .. } => Some((
-                    name.clone(),
-                    identity
-                        .as_ref()
-                        .map_or_else(|| Type::con(path, name), |e| Type::con(&e.module, &e.name)),
-                )),
-                _ => None,
-            })
-            .collect();
-        for requirement in requirements {
-            if let R::Nominal {
-                name,
-                category: ModuleNominalKind::Class,
-                identity,
-                ..
-            } = requirement
-            {
-                let (module, actual_name) = identity.as_ref().map_or((path, name.as_str()), |e| {
-                    (e.module.as_str(), e.name.as_str())
-                });
-                subst.push((
-                    format!("{name}$Dict"),
-                    Type::con(module, &format!("{actual_name}$Dict")),
-                ));
-            }
-        }
-        for _ in 0..subst.len() {
-            let next: Vec<_> = subst
-                .iter()
-                .map(|(name, ty)| (name.clone(), ty.substitute(&subst)))
-                .collect();
-            if next == subst {
-                break;
-            }
-            subst = next;
-        }
-        for requirement in requirements {
-            let (name, namespace, decl, definition, scheme) = match requirement {
-                R::Type {
-                    name,
-                    params,
-                    manifest,
-                } => (
-                    name,
-                    Namespace::Type,
-                    Decl::Abstract,
-                    Some(TypeDef {
-                        kind: Kind::arrows(params.iter().map(|p| p.kind.clone()), Kind::Type),
-                        form: manifest.as_ref().map_or(Form::NOMINAL, |ty| Form::Alias {
-                            params: params.iter().map(|p| p.name.clone()).collect(),
-                            body: ty.substitute(&subst),
-                            opaque: false,
-                        }),
-                    }),
-                    None,
-                ),
-                R::Value { name, ty } => (
-                    name,
-                    Namespace::Value,
-                    Decl::Let,
-                    None,
-                    Some(ty.substitute(&subst)),
-                ),
-                R::Nominal {
-                    name,
-                    category,
-                    identity,
-                    definition,
-                    methods,
-                } => {
-                    let entity = identity.clone().unwrap_or(Entity {
-                        module: path.into(),
-                        namespace: Namespace::Type,
-                        name: name.clone(),
-                    });
-                    for (name, ty) in methods {
-                        interface.exports.push(Export {
-                            entity: Entity {
-                                module: entity.module.clone(),
-                                namespace: Namespace::Value,
-                                name: name.clone(),
-                            },
-                            decl: Decl::Method,
-                            scheme: Some(ty.substitute(&subst)),
-                            definition: None,
-                            parent: Some(entity.name.clone()),
-                            blocked: None,
-                            at: None,
-                        });
-                    }
-                    interface.exports.push(Export {
-                        entity,
-                        decl: if matches!(category, ModuleNominalKind::Class) {
-                            Decl::Class
-                        } else {
-                            Decl::Service
-                        },
-                        definition: definition.as_deref().cloned(),
-                        scheme: None,
-                        parent: None,
-                        blocked: None,
-                        at: None,
-                    });
-                    continue;
-                }
-                R::Module { name, signature } => {
-                    interface
-                        .modules
-                        .insert(name.clone(), signature.interface(&format!("{path}.{name}")));
-                    continue;
-                }
-                R::Dictionary { .. } => continue,
-            };
-            interface.exports.push(Export {
-                entity: Entity {
-                    module: path.into(),
-                    namespace,
-                    name: name.clone(),
-                },
-                decl,
-                definition,
-                scheme,
-                parent: None,
-                blocked: None,
-                at: None,
-            });
-        }
-        interface
-    }
-
-    pub fn project(&self, actual: &Interface) -> Interface {
-        match self {
-            Self::Structure { requirements } => super::module_contract::project(
-                &TypeDef {
-                    kind: Kind::Module,
-                    form: Form::ModuleContract {
-                        requirements: requirements.clone(),
-                    },
-                },
-                actual,
-            ),
-            Self::Functor { .. } => Interface {
-                module: actual.module.clone(),
-                functor: Some(self.clone()),
-                ..Interface::default()
-            },
-        }
-    }
-
-    /// A result annotation is an abstraction boundary. Parameter projection
-    /// uses `project` instead: it hides representations while keeping the
-    /// argument's existing identities.
-    pub fn seal(&self, actual: &Interface, path: &str) -> Interface {
-        fn replace(ty: &Type, replacements: &[(Type, Type)]) -> Type {
-            if let Some((_, new)) = replacements.iter().find(|(old, _)| old == ty) {
-                return new.clone();
-            }
-            ty.map_children(&mut |ty| replace(ty, replacements))
-        }
-
-        let mut projected = self.project(actual);
-        let Self::Structure { requirements } = self else {
-            return projected;
-        };
-        let replacements: Vec<_> = requirements
-            .iter()
-            .filter_map(|r| {
-                if let R::Type {
-                    name,
-                    manifest: None,
-                    ..
-                } = r
-                {
-                    let export = projected.find(Namespace::Type, name)?;
-                    Some((
-                        Type::con(&export.entity.module, &export.entity.name),
-                        Type::con(path, name),
-                    ))
+    /// Substitute an argument's exported identities, rather than inventing
+    /// identities below the name of a module alias.
+    pub(crate) fn instantiate_parameter(&mut self, binder: &str, actual: &Interface) {
+        fn member(ty: &Type, marker: &str, actual: &Interface) -> Type {
+            if let Type::Con { module, name } = ty {
+                let suffix = if module == marker {
+                    Some("")
                 } else {
-                    None
+                    module
+                        .strip_prefix(marker)
+                        .and_then(|s| s.strip_prefix('.'))
+                };
+                if let Some(suffix) = suffix {
+                    let child = suffix
+                        .split('.')
+                        .filter(|s| !s.is_empty())
+                        .try_fold(actual, |child, name| child.modules.get(name));
+                    if let Some(child) = child {
+                        if let Some(export) = child.find(Namespace::Type, name) {
+                            return Type::con(&export.entity.module, &export.entity.name);
+                        }
+                        if let Some(class) = name.strip_suffix("$Dict")
+                            && let Some(export) = child.find(Namespace::Type, class)
+                        {
+                            return Type::con(
+                                &export.entity.module,
+                                &format!("{}$Dict", export.entity.name),
+                            );
+                        }
+                        return Type::con(&child.module, name);
+                    }
                 }
-            })
-            .collect();
-
-        for export in &mut projected.exports {
-            let old = Type::con(&export.entity.module, &export.entity.name);
-            if replacements.iter().any(|(ty, _)| ty == &old) {
-                path.clone_into(&mut export.entity.module);
             }
-            if let Some(ty) = &mut export.scheme {
-                *ty = replace(ty, &replacements);
-            }
-            if let Some(TypeDef {
-                form: Form::Alias { body, .. },
-                ..
-            }) = &mut export.definition
-            {
-                *body = replace(body, &replacements);
-            }
+            map_module_children(ty, &mut |ty| member(ty, marker, actual))
         }
+        let marker = format!("$argument({binder})({})", actual.module);
+        self.rename_parameter(binder, &marker);
+        self.map_types(&mut |ty| member(ty, &marker, actual));
+    }
+
+    /// Resolve structure-bound paths through the supplied child identities.
+    pub(crate) fn instantiate_members(requirements: &[R], actual: &Interface) -> Vec<R> {
+        let mut signature = Self::Structure {
+            requirements: requirements.to_vec(),
+        };
         for requirement in requirements {
-            if let R::Module { name, signature } = requirement
+            if let R::Module { name, binder, .. } = requirement
+                && !binder.is_empty()
                 && let Some(child) = actual.modules.get(name)
             {
-                projected.modules.insert(
-                    name.clone(),
-                    signature.seal(child, &format!("{path}.{name}")),
-                );
+                signature.instantiate_parameter(binder, child);
             }
         }
-        path.clone_into(&mut projected.module);
-        projected
+        let Self::Structure { requirements } = signature else {
+            unreachable!()
+        };
+        requirements
     }
 
-    pub fn accepts(&self, actual: &Interface) -> bool {
+    pub fn has_functor(&self) -> bool {
         match self {
-            Self::Structure { requirements } => {
-                actual.functor.is_none()
-                    && super::module_contract::check(
-                        &TypeDef {
-                            kind: Kind::Module,
-                            form: Form::ModuleContract {
-                                requirements: requirements.clone(),
-                            },
-                        },
-                        actual,
-                    )
-                    .is_empty()
-            }
-            Self::Functor { .. } => actual
-                .functor
-                .as_ref()
-                .is_some_and(|provided| provided.is_subtype_of(self)),
-        }
-    }
-
-    pub fn is_subtype_of(&self, expected: &Self) -> bool {
-        match (self, expected) {
-            (
-                Self::Functor {
-                    group_size: ag,
-                    binder: a,
-                    parameter: ap,
-                    result: ar,
-                },
-                Self::Functor {
-                    group_size: bg,
-                    binder: b,
-                    parameter: bp,
-                    result: br,
-                },
-            ) => {
-                if ag != bg || !bp.is_subtype_of(ap) {
-                    return false;
-                }
-                let mut ar = (**ar).clone();
-                let mut br = (**br).clone();
-                let matched = format!("$matched({a})({b})");
-                ar.rename_parameter(a, &matched);
-                br.rename_parameter(b, &matched);
-                ar.is_subtype_of(&br)
-            }
-            (Self::Structure { .. }, Self::Structure { .. }) => {
-                expected.accepts(&self.interface("$signature"))
-            }
-            _ => false,
+            Self::Functor { .. } => true,
+            Self::Structure { requirements } => requirements
+                .iter()
+                .any(|r| matches!(r, R::Module { signature, .. } if signature.has_functor())),
         }
     }
 }
 
+#[cfg(test)]
+mod tests;
+
 include!("module_signature/transform.rs");
 
-#[cfg(test)]
-#[path = "module_signature/tests.rs"]
-mod tests;
+include!("module_signature/interface.rs");
+
+include!("module_signature/display.rs");
+
+include!("module_signature/contract.rs");

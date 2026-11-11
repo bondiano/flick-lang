@@ -43,6 +43,7 @@ pub struct Edit {
 }
 
 impl Diagnostic {
+    #[inline(never)]
     pub fn new(code: Code, severity: Severity, message: impl Into<String>) -> Self {
         Diagnostic {
             code,
@@ -55,6 +56,7 @@ impl Diagnostic {
         }
     }
 
+    #[inline(never)]
     pub fn error(code: Code, message: impl Into<String>, span: Span) -> Self {
         Diagnostic::new(code, Severity::Error, message).with_span(span)
     }
@@ -74,6 +76,7 @@ impl Diagnostic {
     }
 
     #[must_use]
+    #[inline(never)]
     pub fn with_related(mut self, span: Span, message: impl Into<String>) -> Self {
         self.related.push(Related {
             span,
@@ -107,14 +110,20 @@ impl Diagnostic {
     }
 
     fn attach_fix<M: Into<String>>(self, safe: bool, fix: impl FnOnce() -> (M, Vec<Edit>)) -> Self {
-        let mut diagnostic = self;
         let (message, edits) = fix();
-        diagnostic.fixes.push(Fix {
-            message: message.into(),
+        self.push_fix(safe, message.into(), edits)
+    }
+
+    // Fix factories have distinct closure types at each diagnostic site.
+    // Share attachment after the lazy factory has produced its payload.
+    #[inline(never)]
+    fn push_fix(mut self, safe: bool, message: String, edits: Vec<Edit>) -> Self {
+        self.fixes.push(Fix {
+            message,
             edits,
             safe,
         });
-        diagnostic
+        self
     }
 }
 

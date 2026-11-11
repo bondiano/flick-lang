@@ -251,6 +251,7 @@ mod tests {
                 name: "App.Main".into(),
                 items: vec![item],
                 labels: BTreeMap::default(),
+                initialization: crate::Initialization::default(),
             }],
         }
     }

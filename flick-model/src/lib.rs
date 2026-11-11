@@ -18,6 +18,7 @@ pub mod decls;
 pub mod eval;
 pub mod generate;
 pub mod handler;
+pub mod modules;
 pub mod native;
 pub mod rt;
 pub mod run;

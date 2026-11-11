@@ -1,0 +1,5 @@
+module App.Unsigned(K : App.Contracts.Input) exposing (answer)
+//     ^^^^^^^^^^^^ FLICK-T067 public functor requires an explicit result signature
+
+answer : Int
+let answer = K.seed

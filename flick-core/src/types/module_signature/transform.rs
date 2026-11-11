@@ -9,7 +9,7 @@ impl ModuleSignature {
                     return Type::con(&format!("{path}.{suffix}"), name);
                 }
             }
-            ty.map_children(&mut |ty| replace(ty, from, path))
+            map_module_children(ty, &mut |ty| replace(ty, from, path))
         }
 
         let from = format!("$module:{binder}");
@@ -31,14 +31,44 @@ impl ModuleSignature {
                     if let R::Module { signature, .. } = requirement {
                         signature.rename_parameter(binder, path);
                     } else {
-                        let mut single = Self::Structure {
-                            requirements: vec![requirement.clone()],
-                        };
-                        single.map_types(&mut |ty| replace(ty, &from, path));
-                        let Self::Structure { mut requirements } = single else {
-                            unreachable!()
-                        };
-                        *requirement = requirements.remove(0);
+                        map_requirement_types(requirement, &mut |ty| replace(ty, &from, path));
+                    }
+                }
+            }
+        }
+    }
+
+    /// A nested signature can mention types bound by its containing
+    /// structure. Its own structure members shadow those outer type names;
+    /// the input of an arrow does not bind unqualified names in its result.
+    pub(crate) fn substitute_outer_types(&mut self, subst: &[(String, Type)]) {
+        if subst.is_empty() {
+            return;
+        }
+        match self {
+            Self::Functor {
+                parameter, result, ..
+            } => {
+                parameter.substitute_outer_types(subst);
+                result.substitute_outer_types(subst);
+            }
+            Self::Structure { requirements } => {
+                let subst: Vec<_> = subst
+                    .iter()
+                    .filter(|(name, _)| {
+                        let base = name.strip_suffix("$Dict").unwrap_or(name);
+                        !requirements.iter().any(|r| {
+                            matches!(r,
+                        R::Type { name, .. } | R::Nominal { name, .. } if name == base)
+                        })
+                    })
+                    .cloned()
+                    .collect();
+                for requirement in requirements {
+                    if let R::Module { signature, .. } = requirement {
+                        signature.substitute_outer_types(&subst);
+                    } else {
+                        map_requirement_types(requirement, &mut |ty| ty.substitute(&subst));
                     }
                 }
             }
@@ -46,6 +76,29 @@ impl ModuleSignature {
     }
 
     pub(crate) fn canonicalize(&mut self, next: &mut usize) {
+        if let Self::Structure { requirements } = self {
+            let binders: Vec<_> = requirements
+                .iter()
+                .filter_map(|r| match r {
+                    R::Module { binder, .. } if !binder.is_empty() => Some(binder.clone()),
+                    _ => None,
+                })
+                .collect();
+            for binder in binders {
+                let fresh = format!("'{}", *next);
+                *next += 1;
+                self.rename_parameter(&binder, &format!("$module:{fresh}"));
+                if let Self::Structure { requirements } = self {
+                    for requirement in requirements {
+                        if let R::Module { binder: old, .. } = requirement
+                            && old == &binder
+                        {
+                            old.clone_from(&fresh);
+                        }
+                    }
+                }
+            }
+        }
         match self {
             Self::Functor {
                 binder,
@@ -101,6 +154,7 @@ impl ModuleSignature {
                 R::Module {
                     name: member,
                     signature,
+                    ..
                 } if member == name && !rest.is_empty() => return signature.refine(rest, ty),
                 _ => {}
             }
@@ -109,7 +163,7 @@ impl ModuleSignature {
     }
 
     /// Visits all types, including types inside nested nominal requirements.
-    pub fn map_types(&mut self, f: &mut impl FnMut(&Type) -> Type) {
+    pub fn map_types(&mut self, f: &mut dyn FnMut(&Type) -> Type) {
         match self {
             Self::Functor {
                 parameter, result, ..
@@ -119,65 +173,9 @@ impl ModuleSignature {
             }
             Self::Structure { requirements } => {
                 for requirement in requirements {
-                    match requirement {
-                        R::Type {
-                            manifest: Some(ty), ..
-                        }
-                        | R::Value { ty, .. } => *ty = f(ty),
-                        R::Dictionary { head, .. } => *head = f(head),
-                        R::Module { signature, .. } => signature.map_types(f),
-                        R::Nominal {
-                            identity,
-                            definition,
-                            methods,
-                            ..
-                        } => {
-                            if let Some(entity) = identity
-                                && let Type::Con { module, name } =
-                                    f(&Type::con(&entity.module, &entity.name))
-                            {
-                                entity.module = module;
-                                entity.name = name;
-                            }
-                            for (_, ty) in methods {
-                                *ty = f(ty);
-                            }
-                            if let Some(definition) = definition {
-                                match &mut definition.form {
-                                    Form::Class {
-                                        supers,
-                                        default_sigs,
-                                        ..
-                                    } => {
-                                        for ty in supers
-                                            .iter_mut()
-                                            .chain(default_sigs.iter_mut().map(|(_, ty)| ty))
-                                        {
-                                            *ty = f(ty);
-                                        }
-                                    }
-                                    Form::Service { operations, .. } => {
-                                        for operation in operations {
-                                            operation.ty = f(&operation.ty);
-                                        }
-                                    }
-                                    _ => {}
-                                }
-                            }
-                        }
-                        R::Type { manifest: None, .. } => {}
-                    }
+                    map_requirement_types(requirement, f);
                 }
             }
-        }
-    }
-
-    pub fn has_functor(&self) -> bool {
-        match self {
-            Self::Functor { .. } => true,
-            Self::Structure { requirements } => requirements
-                .iter()
-                .any(|r| matches!(r, R::Module { signature, .. } if signature.has_functor())),
         }
     }
 }

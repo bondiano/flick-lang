@@ -10,6 +10,12 @@ use serde::{Deserialize, Serialize};
 
 use crate::types::{EnumLit, Instance, ModuleSignature, Type, TypeDef};
 
+mod template;
+pub use template::{
+    BindingOrigin, CalleeOrigin, LexicalScope, ModuleTemplate, StaticBinding, StaticCapture,
+    StaticMember,
+};
+
 /// Bumped on every change of the schema.
 pub const IFACE_VERSION: u32 = 13;
 
@@ -108,6 +114,19 @@ pub struct Interface {
     pub modules: BTreeMap<String, Interface>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub functor: Option<ModuleSignature>,
+    /// The functor's result was advertised by a declaration or ascription,
+    /// rather than inferred from a private implementation body.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub signature_explicit: bool,
+    /// A static namespace member is imported through its parent's public view.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub member_of: Option<StaticMember>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(
+        not(any(feature = "native-project", feature = "native-project")),
+        serde(skip)
+    )]
+    pub template: Option<ModuleTemplate>,
     #[serde(default, skip_serializing_if = "is_false")]
     pub private: bool,
     pub exports: Vec<Export>,
@@ -329,6 +348,28 @@ mod tests {
     use crate::resolve::{self, Module};
     use crate::source::SourceMap;
     use crate::{syntax, types};
+
+    #[test]
+    fn persistent_templates_follow_the_artifact_capability() {
+        let interface = Interface {
+            module: "App.Factory".into(),
+            template: Some(ModuleTemplate {
+                source: "module App.Factory(K : App.Contracts.Empty) : App.Contracts.Empty\n"
+                    .into(),
+                capture: None,
+            }),
+            ..Interface::default()
+        };
+        let serialized = serde_json::to_value(&interface).expect("interface serializes");
+        let persistent = cfg!(any(feature = "native-project", feature = "native-project"));
+        assert_eq!(serialized.get("template").is_some(), persistent);
+        let restored: Interface = serde_json::from_value(serialized).expect("interface reads");
+        if persistent {
+            assert_eq!(restored.template, interface.template);
+        } else {
+            assert!(restored.template.is_none());
+        }
+    }
 
     fn interface_of(text: &str) -> Interface {
         let mut sources = SourceMap::default();

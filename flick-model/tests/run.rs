@@ -42,6 +42,42 @@ fn module_dictionaries_are_checked_and_run_in_the_model() {
 }
 
 #[test]
+fn higher_order_modules_erase_to_checked_core() {
+    let file = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/modules/App/Hom/Main.fl");
+    let modules = run::compile(&file).expect("higher-order fixture compiles");
+    let templates: Vec<_> = modules
+        .iter()
+        .filter(|m| m.interface.functor.is_some())
+        .collect();
+    assert!(
+        !templates.is_empty(),
+        "fixture must include static templates"
+    );
+    assert!(
+        templates.iter().all(|m| m.ir.items.is_empty()),
+        "unapplied templates have no executable core items"
+    );
+    let program = run::program(&modules);
+    let errors = run::check(&modules, &program);
+    assert!(
+        errors.is_empty(),
+        "model rejects the higher-order fixture: {errors:?}"
+    );
+    let main = run::main_of(&modules).expect("main");
+    let ran = run::run_main(&program, &main, FUEL);
+    assert_eq!(
+        ran.stdout, "42 false false false true\n",
+        "{:?}",
+        ran.outcome
+    );
+    assert!(
+        matches!(ran.outcome, Outcome::Value(_)),
+        "{:?}",
+        ran.outcome
+    );
+}
+
+#[test]
 fn existential_module_witnesses_run_in_the_model() {
     let file = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/modules/App/Main.fl");
     let modules = run::compile(&file).expect("module fixture compiles");

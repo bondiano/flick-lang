@@ -113,7 +113,7 @@ fn named_parameterized_module_application_creates_an_importable_virtual_module()
         ),
         (
             PathBuf::from("/p/src/App/Make.fl"),
-            "module App.Make(K : App.Contracts.Source) exposing (answer)\nanswer : Int\nlet answer = K.value + 1\n".into(),
+            "module App.Make(K : App.Contracts.Source) : PublicResult exposing (answer)\nanswer : Int\nlet answer = K.value + 1\n\ntype module PublicResult =\n  answer : Int\n".into(),
         ),
         (
             PathBuf::from("/p/src/App/Collections.fl"),

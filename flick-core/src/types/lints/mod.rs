@@ -53,7 +53,9 @@ impl Checker<'_> {
                 warning.with_fix(|| (help, edits))
             }
         };
-        self.diagnostics.push(warning);
+        #[cfg(not(feature = "diagnostic-fixes"))]
+        let _ = fix;
+        self.diagnostic(warning);
     }
 
     /// The edit that writes `replacement` over `node`.

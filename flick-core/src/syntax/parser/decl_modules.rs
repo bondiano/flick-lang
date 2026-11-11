@@ -140,7 +140,9 @@ fn module_signature(p: &mut Parser) -> Option<Done> {
                 p.expect(K::Colon);
                 module_signature(p);
                 p.complete(binder, K::ModuleSignatureBinder);
-                if !p.eat(K::Comma) { break; }
+                if !p.eat(K::Comma) {
+                    break;
+                }
             }
         } else {
             module_signature(p);

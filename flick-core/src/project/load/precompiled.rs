@@ -9,14 +9,20 @@ use std::collections::HashMap;
 #[cfg(feature = "native-project")]
 use std::hash::{DefaultHasher, Hash, Hasher};
 #[cfg(feature = "native-project")]
+use std::io::ErrorKind;
+#[cfg(feature = "native-project")]
 use std::mem;
 use std::path::{Path, PathBuf};
+#[cfg(feature = "native-project")]
+use std::str;
 use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use super::{Compiled, Loader, Mode, module_path};
+use super::{Compiled, Loader, Mode};
+#[cfg(feature = "native-project")]
+use super::{Loaded, Root, Virtual, module_path};
 #[cfg(feature = "native-project")]
 use crate::diagnostics::{Diagnostic, Severity, codes};
 #[cfg(feature = "native-project")]
@@ -29,7 +35,11 @@ use crate::project::cache::Key;
 use crate::project::packages::{Library, Packages};
 use crate::resolve::Interface;
 #[cfg(feature = "native-project")]
+use crate::source::Span;
+#[cfg(feature = "native-project")]
 use crate::source::{FileId, SourceMap};
+#[cfg(feature = "native-project")]
+use crate::{resolve, syntax};
 
 /// A module of a source package as a run checked and lowered it.
 #[derive(Clone, Serialize, Deserialize)]
@@ -45,6 +55,10 @@ pub struct CachedModule {
     ir: Value,
     /// A hash of the text it was checked from, which its spans point into.
     source: u64,
+    /// Checked source for portable template instantiation and source-map
+    /// locations when the immutable package's original files are unavailable.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    source_text: Option<String>,
 }
 
 /// What a host keeps of source packages between runs.
@@ -70,10 +84,12 @@ pub struct Fresh {
 #[derive(Default)]
 pub(super) struct Precompiled {
     /// The key and source directory of each package that has one.
+    #[cfg(feature = "native-project")]
     packages: BTreeMap<String, (String, PathBuf)>,
     /// The saved modules by name, with their package.
     saved: BTreeMap<String, (String, CachedModule)>,
     /// The saved modules the run used, in the order it took them.
+    #[cfg(feature = "native-project")]
     used: Vec<String>,
 }
 
@@ -117,6 +133,7 @@ impl Precompiled {
     }
 
     /// Whether the saved module `name` belongs to the package in `dir`.
+    #[cfg(feature = "native-project")]
     fn covers(&self, dir: &Path, name: &str) -> bool {
         self.saved.get(name).is_some_and(|(package, _)| {
             self.packages
@@ -221,6 +238,11 @@ fn cached(compiled: &Compiled, dir: &Path, text: &str) -> Option<CachedModule> {
         declarations: compiled.declarations.clone(),
         ir,
         source: hash(text),
+        source_text: compiled
+            .interface
+            .template
+            .is_none()
+            .then(|| text.to_owned()),
     })
 }
 
@@ -263,11 +285,15 @@ fn is_span(fields: &serde_json::Map<String, Value>) -> bool {
 impl Loader<'_> {
     /// Uses the saved module `name` of the package in `dir`, and what it
     /// imports, instead of loading their sources; false when none is saved.
+    #[cfg(feature = "native-project")]
     pub(super) fn use_saved(&mut self, dir: &Path, name: &str) -> bool {
         if !self.precompiled.covers(dir, name) {
             return false;
         }
-        if self.from_packages.contains_key(name) {
+        if self.from_packages.contains_key(name) || self.by_name.contains_key(name) {
+            return true;
+        }
+        if self.restore_template(name) {
             return true;
         }
         let (_, module) = &self.precompiled.saved[name];
@@ -281,8 +307,94 @@ impl Loader<'_> {
         true
     }
 
+    #[cfg(feature = "native-project")]
+    fn restore_template(&mut self, name: &str) -> bool {
+        let (package, module) = &self.precompiled.saved[name];
+        let Some(template) = &module.interface.template else {
+            return false;
+        };
+        let path = self.precompiled.packages[package].1.join(&module.path);
+        #[cfg(feature = "native-project")]
+        if self.host.read(&path).ok().is_some_and(|bytes| {
+            str::from_utf8(&bytes).map_or(true, |text| hash(text) != module.source)
+        }) {
+            self.diagnostics.push(Diagnostic::new(codes::P034, Severity::Error,
+                format!("`{}` changed since its package was checked: `flick install` restores the package store", self.host.display(&path))));
+        }
+        let file = self
+            .sources
+            .add(self.host.display(&path), template.source.clone());
+        let parse = Arc::new(syntax::parse(&template.source, file).into_module());
+        let syntax = Arc::new(resolve::module_syntax(&parse.tree, &template.source, file));
+        let at = syntax
+            .header
+            .as_ref()
+            .map_or(Span::new(file, 0, 0), |h| h.span);
+        let virtual_of = template.capture.clone().map(|mut capture| {
+            capture
+                .definition_package
+                .get_or_insert_with(|| package.clone());
+            Virtual { at, capture }
+        });
+        let index = self.modules.len();
+        self.by_name.insert(name.to_owned(), index);
+        self.modules.push(Loaded {
+            name: name.to_owned(),
+            path,
+            file,
+            root: Root::Package(package.clone()),
+            parse,
+            syntax,
+            virtual_of,
+            member_of: module.interface.member_of.clone(),
+            scope_of: None,
+            expansion: None,
+            editing: Vec::new(),
+            loader: None,
+        });
+        true
+    }
+
+    /// A saved ordinary module can own a functor's lexical declarations even
+    /// when only the nested template is restored as a loaded source module.
+    #[cfg(feature = "native-project")]
+    pub(super) fn scope_source(&mut self, name: &str) -> Option<Loaded> {
+        let (package, saved) = self.precompiled.saved.get(name)?;
+        let source = saved
+            .interface
+            .template
+            .as_ref()
+            .map(|t| &t.source)
+            .or(saved.source_text.as_ref())?
+            .clone();
+        let path = self.precompiled.packages[package].1.join(&saved.path);
+        if self.host.read(&path).ok().is_some_and(|bytes| {
+            str::from_utf8(&bytes).map_or(true, |text| hash(text) != saved.source)
+        }) {
+            self.diagnostics.push(Diagnostic::new(codes::P034, Severity::Error, format!("`{}` changed since its package was checked: `flick install` restores the package store", self.host.display(&path))));
+        }
+        let file = self.sources.add(self.host.display(&path), source.clone());
+        let parse = Arc::new(syntax::parse(&source, file).into_module());
+        let syntax = Arc::new(resolve::module_syntax(&parse.tree, &source, file));
+        Some(Loaded {
+            name: name.into(),
+            path,
+            file,
+            root: Root::Package(package.clone()),
+            parse,
+            syntax,
+            virtual_of: None,
+            member_of: None,
+            scope_of: None,
+            expansion: None,
+            editing: Vec::new(),
+            loader: None,
+        })
+    }
+
     /// Finds `name`, imported by a saved module, as a module of a source
     /// package or a built-in one.
+    #[cfg(feature = "native-project")]
     fn find_in_packages(&mut self, name: &str) {
         if self.by_name.contains_key(name) || self.from_packages.contains_key(name) {
             return;
@@ -349,6 +461,14 @@ impl Loader<'_> {
             let path = dir.join(&module.path);
             let bytes = match self.host.read(&path) {
                 Ok(bytes) => bytes,
+                Err(err) if err.kind() == ErrorKind::NotFound && module.source_text.is_some() => {
+                    module
+                        .source_text
+                        .as_ref()
+                        .expect("saved source")
+                        .as_bytes()
+                        .to_vec()
+                }
                 Err(err) => {
                     let message = format!("cannot read `{}`: {err}", self.host.display(&path));
                     self.diagnostics

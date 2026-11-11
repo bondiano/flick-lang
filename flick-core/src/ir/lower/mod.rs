@@ -83,6 +83,7 @@ pub fn lower(module: &resolve::Module, typing: &Typing) -> Result<Module, Vec<Di
             name: module.name.to_owned(),
             items,
             labels: typing.labelled.clone(),
+            initialization: flick_ir::Initialization::default(),
         })
     } else {
         Err(lower.diagnostics)

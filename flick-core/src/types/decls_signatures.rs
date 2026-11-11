@@ -98,10 +98,6 @@ impl Checker<'_> {
         format!("{}@{start}#{alias}", self.env.module)
     }
 
-    fn bind_static_signature(&mut self, alias: &str, signature: &super::ModuleSignature) {
-        self.bind_static_witness(alias, &format!("$module:{alias}"), signature);
-    }
-
     fn bind_static_witness(
         &mut self,
         alias: &str,

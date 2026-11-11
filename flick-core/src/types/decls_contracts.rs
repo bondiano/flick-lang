@@ -94,7 +94,8 @@ impl Checker<'_> {
         for member in members.iter().filter(|m| m.kind == K::ModuleMember) {
             if let (Some(name), Some(node)) = (self.con_token(member), member.nodes().next()) {
                 let signature = self.static_module_signature(node);
-                self.bind_static_signature(&name, &signature);
+                let binder = self.static_binder(&name, member.range().0);
+                self.bind_static_witness(&name, &format!("$module:{binder}"), &signature);
             }
         }
         bound
@@ -114,6 +115,7 @@ impl Checker<'_> {
                     {
                         let signature = self.static_module_signature(node);
                         requirements.push(ModuleRequirement::Module {
+                            binder: self.static_binder(&name, member.range().0),
                             name,
                             signature: Box::new(signature),
                         });
@@ -188,7 +190,7 @@ impl Checker<'_> {
                 } else {
                     ModuleNominalKind::Service
                 };
-                let identity = self.find_type(path, &qualifier, actual).and_then(
+                let resolved = self.find_type(path, &qualifier, actual).and_then(
                                 |(module, def)| {
                                     let matches = matches!(
                                         (category, &def.form),
@@ -210,19 +212,39 @@ impl Checker<'_> {
                                         );
                                         return None;
                                     }
-                                    Some(Entity {
+                                    Some((Entity {
                                         module,
                                         namespace: Namespace::Type,
                                         name: (*actual).to_owned(),
-                                    })
+                                    }, def))
                                 },
                             );
+                let (identity, definition, methods) = match resolved {
+                    Some((identity, definition)) => {
+                        let methods = match &definition.form {
+                            Form::Class { methods, .. } => methods
+                                .iter()
+                                .filter_map(|name| {
+                                    let entity = Entity {
+                                        module: identity.module.clone(),
+                                        namespace: Namespace::Value,
+                                        name: name.clone(),
+                                    };
+                                    self.env.value(&entity).map(|ty| (name.clone(), ty.clone()))
+                                })
+                                .collect(),
+                            _ => Vec::new(),
+                        };
+                        (Some(identity), Some(Box::new(definition)), methods)
+                    }
+                    None => (None, None, Vec::new()),
+                };
                 requirements.push(ModuleRequirement::Nominal {
                     name,
                     category,
                     identity,
-                    definition: None,
-                    methods: Vec::new(),
+                    definition,
+                    methods,
                 });
             }
         }

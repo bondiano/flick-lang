@@ -140,6 +140,7 @@ impl<'a> Printer<'a> {
             K::Signature => self.signature(n),
             K::TypeDecl | K::ModuleTypeMember | K::KindDecl | K::ErrorDecl => self.type_decl(n),
             K::ModuleTypeDecl
+            | K::ModuleFunctorExpr
             | K::ClassDecl
             | K::InstanceDecl
             | K::ServiceDecl

@@ -50,6 +50,11 @@ pub fn init(module: &str) -> String {
     format!("init_{}", mangle(&module.replace('.', "_")))
 }
 
+/// The initializer of one reached top-level item.
+pub fn item_init(module: &str, index: usize) -> String {
+    format!("{}__item_{index}", init(module))
+}
+
 /// The file of a module's code.
 pub fn file(module: &str) -> String {
     format!("m_{}.go", mangle(&module.replace('.', "_")))

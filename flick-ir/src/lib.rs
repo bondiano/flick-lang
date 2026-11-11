@@ -19,8 +19,8 @@ mod validate;
 pub use data::{Constructor, EnumLit, JsClass, Rep, TypeName};
 pub use dict::Dict;
 pub use expr::{
-    Arm, BinOp, Expr, ExprKind, Item, ItemKind, Label, Lit, Module, Param, Pat, Stmt,
-    operation_arity,
+    Arm, BinOp, Expr, ExprKind, Initialization, Item, ItemKind, Label, Lit, Module, Param, Pat,
+    Prefix, Stmt, operation_arity,
 };
 pub use foreign::{Adapter, Binding, Copies, Foreign, ForeignMode, ResultAdapter, Shape};
 pub use handler::{Handled, Handler, OpArm};

@@ -15,7 +15,7 @@ fn abstract_class_requirement_method_runs_on_js_and_go() {
         ),
         (
             "Make.fl",
-            "module App.Make(K : App.Contracts.Policy) exposing (answer)\nanswer : Bool\nlet answer = K.equal \"A\" \"A\"\n",
+            "module App.Make(K : App.Contracts.Policy) : PublicResult exposing (answer)\nanswer : Bool\nlet answer = K.equal \"A\" \"A\"\n\ntype module PublicResult =\n  answer : Bool\n",
         ),
         (
             "Parent.fl",

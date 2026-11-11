@@ -198,10 +198,19 @@ impl Walker<'_> {
                 self.module_locals.push(name.text(self.text));
             }
         }
-        if let Some(body) = node
-            .nodes()
-            .find(|n| !matches!(n.kind, K::ModuleParamGroup | K::ModuleResult))
-        {
+        for result in node.nodes().filter(|n| n.kind == K::ModuleResult) {
+            self.walk(result);
+        }
+        if let Some(body) = node.nodes().find(|n| {
+            matches!(
+                n.kind,
+                K::Members
+                    | K::ModuleApplyExpr
+                    | K::ModuleFunctorExpr
+                    | K::ModuleParenExpr
+                    | K::ModuleAnnotExpr
+            ) || (node.kind == K::ModuleFunctorExpr && n.kind == K::ModulePath)
+        }) {
             for declaration in body.nodes().filter(|_| body.kind == K::Members) {
                 let names = declaration
                     .child_tokens()

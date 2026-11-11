@@ -14,6 +14,13 @@ name, `Ui.div`, `Ui_Event.exhaust`, unless a constructor of the module or a
 JS global has it, and an ignored parameter is `_`; release uses `$m_Ui` and
 `$_`. Release output stays compact; read it through its source maps.
 
+A factory that captures preceding local values may require extra physical
+files such as `App/Factory$lexical$123.js`. These contain the original prefix
+bindings; the normal module re-exports them. Results import the prefix directly
+so an enclosing module may itself use a result without an initialization
+cycle. Constructor tags, service keys and type identities still use the Flick
+module path. Go orders individual initializers by their value dependencies.
+
 ## Output
 
 | Path in the output directory | Contents |

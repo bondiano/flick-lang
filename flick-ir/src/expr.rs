@@ -18,6 +18,27 @@ pub struct Module {
     pub items: Vec<Item>,
     /// The top-level values debugging tools know by `Module.name`.
     pub labels: BTreeMap<String, Label>,
+    #[serde(default, skip_serializing_if = "Initialization::is_empty")]
+    pub initialization: Initialization,
+}
+
+/// Lexical source prefixes keep canonical entity owners while the backends
+/// schedule their initializers independently of the rest of the module.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Initialization {
+    pub prefixes: Vec<Prefix>,
+}
+
+impl Initialization {
+    pub fn is_empty(&self) -> bool {
+        self.prefixes.is_empty()
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Prefix {
+    pub before: u32,
+    pub bindings: Vec<String>,
 }
 
 /// The label of a top-level value, `Module.name`, which debugging tools
