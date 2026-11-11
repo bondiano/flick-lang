@@ -90,7 +90,7 @@ impl Checker<'_> {
         expected: Option<&Type>,
         mut tail: Option<Tail<'_, Self>>,
     ) -> Type {
-        let mark = self.locals.len();
+        let mark = self.cx.locals.len();
         let statements: Vec<&Node> = node.nodes().collect();
         let mut result = None;
         let mut i = 0;
@@ -129,7 +129,7 @@ impl Checker<'_> {
             }
             i += 1;
         }
-        self.locals.truncate(mark);
+        self.cx.locals.truncate(mark);
         result.unwrap_or_else(|| {
             let end = node.range().1;
             self.error(
@@ -186,7 +186,7 @@ impl Checker<'_> {
         if let Some((scheme, explicit)) = signature {
             let rec = parts.rec.then(|| {
                 let rec = (!explicit).then(|| self.new_rec(&name));
-                self.locals.push(Local {
+                self.cx.locals.push(Local {
                     name: name.clone(),
                     at: Some(at),
                     generated: at >= self.generated,
@@ -196,11 +196,11 @@ impl Checker<'_> {
                 });
                 rec
             });
-            let mark = self.locals.len();
+            let mark = self.cx.locals.len();
             // what a local holds is inferred: its signature need not name the regions
             let captures = self.fresh();
             let runtime = self.check_signed(decl, &parts, &scheme, rec.flatten(), Some(&captures));
-            self.locals.truncate(mark - usize::from(rec.is_some()));
+            self.cx.locals.truncate(mark - usize::from(rec.is_some()));
             if let Some(Some(rec)) = rec {
                 self.finish_recs(&[rec]);
             }
@@ -214,14 +214,14 @@ impl Checker<'_> {
             }
             let ty = self.unsigned(decl, &parts, &name);
             if parts.rec {
-                self.locals.pop();
+                self.cx.locals.pop();
             }
             self.push_local(&name, at, ty);
-            if let Some(local) = self.locals.last_mut() {
+            if let Some(local) = self.cx.locals.last_mut() {
                 local.unsigned = parts.is_function();
             }
         }
-        if let (Some(binder), Some(local)) = (binder, self.locals.last()) {
+        if let (Some(binder), Some(local)) = (binder, self.cx.locals.last()) {
             let ty = local.ty.clone();
             self.note_type(self.span(binder), &ty);
         }
@@ -269,13 +269,13 @@ impl Checker<'_> {
         };
         let assumed = self.classes.givens.len();
         self.classes.givens.extend(givens);
-        let mark = self.tyvars.len();
+        let mark = self.cx.tyvars.len();
         for (name, ty) in skolems.iter().cloned() {
             let kind = kinds
                 .iter()
                 .find(|b| b.name == name)
                 .map_or(super::kinds::Kind::Type, |b| b.kind.clone());
-            self.tyvars.push(TyVar { name, ty, kind });
+            self.cx.tyvars.push(TyVar { name, ty, kind });
         }
         if let Some(rec) = rec {
             let rec = &mut self.recs[rec];
@@ -283,7 +283,7 @@ impl Checker<'_> {
             rec.target = Some(body.clone());
             rec.skolems.clone_from(&skolems);
         }
-        let saved = mem::take(&mut self.runtime);
+        let saved = mem::take(&mut self.cx.runtime);
         let complete = !scheme.contains(&mut |t| matches!(t, Type::Meta(_)));
         let signed = mem::replace(&mut self.gadt.signed, complete);
         if parts.params.is_empty() {
@@ -294,9 +294,9 @@ impl Checker<'_> {
             self.function(&parts.params, parts.body, Some(&body), decl);
         }
         self.gadt.signed = signed;
-        let runtime = mem::replace(&mut self.runtime, saved);
+        let runtime = mem::replace(&mut self.cx.runtime, saved);
         self.classes.givens.truncate(assumed);
-        self.tyvars.truncate(mark);
+        self.cx.tyvars.truncate(mark);
         self.store.level -= 1;
         runtime
     }
@@ -359,7 +359,7 @@ impl Checker<'_> {
             );
         }
         self.store.level += 1;
-        let saved = mem::take(&mut self.runtime);
+        let saved = mem::take(&mut self.cx.runtime);
         let signed = mem::take(&mut self.gadt.signed);
         let errors = self.diagnostics.len();
         let mut redundant = None;
@@ -376,7 +376,7 @@ impl Checker<'_> {
             }
             (true, None) => parts.body.map_or(Type::Error, |b| self.infer(b)),
         };
-        let runtime = mem::replace(&mut self.runtime, saved);
+        let runtime = mem::replace(&mut self.cx.runtime, saved);
         self.gadt.signed = signed;
         self.store.level -= 1;
         let is_fun = matches!(self.whnf(&ty), Type::Fun { .. });

@@ -227,7 +227,7 @@ impl Checker<'_> {
             span,
         };
         if !last {
-            self.regions.outlives.push(o);
+            self.cx.regions.outlives.push(o);
         } else if !(self.diagnostics.iter()).any(|d| d.code == codes::G003 && d.span == Some(span))
         {
             self.check_outlives(&o);

@@ -36,7 +36,7 @@ impl Checker<'_> {
     /// reports a mismatch at `span`. `false` after a diagnostic.
     pub fn expect(&mut self, actual: &Type, expected: &Type, span: Span) -> bool {
         let ground = self.coercion_types(actual, expected);
-        let marks = (self.regions.holds.len(), self.subrows.len());
+        let marks = (self.cx.regions.holds.len(), self.cx.subrows.len());
         match self.subsume(actual, expected, span) {
             Ok(()) => {
                 if let Some(lift) = self.lift(actual, expected) {
@@ -50,8 +50,8 @@ impl Checker<'_> {
                 {
                     // ground nominal types bind no metas; what the failed
                     // comparison queued is about a value no longer placed here
-                    self.regions.holds.truncate(marks.0);
-                    self.subrows.truncate(marks.1);
+                    self.cx.regions.holds.truncate(marks.0);
+                    self.cx.subrows.truncate(marks.1);
                     return true;
                 }
                 self.mismatch(&mismatch, actual, expected, span);

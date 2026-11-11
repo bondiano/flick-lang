@@ -45,9 +45,9 @@ impl Checker<'_> {
         captures.tails.extend(arg.tails);
         // A reader region is the lending function's own, not data a result
         // stores; its holds report every escape.
-        captures
-            .entries
-            .retain(|(_, atom)| !matches!(atom, Type::Skolem(s) if self.regions.lent.contains(s)));
+        captures.entries.retain(
+            |(_, atom)| !matches!(atom, Type::Skolem(s) if self.cx.regions.lent.contains(s)),
+        );
         // a type variable is no use of what it stands for
         captures.entries.retain(|(_, atom)| {
             matches!(self.store.resolve(atom), Type::Meta(_))
@@ -73,9 +73,9 @@ impl Checker<'_> {
             return false;
         };
         let (name, span) = (token.text(self.text), self.span(head));
-        (self.locals.iter())
+        (self.cx.locals.iter())
             .rposition(|l| l.name == name && l.generated == (span.start >= self.generated))
-            .is_some_and(|i| self.parametric_in_argument(&self.locals[i].ty))
+            .is_some_and(|i| self.parametric_in_argument(&self.cx.locals[i].ty))
     }
 
     /// Whether `function`, the type of a local before a use instantiates it,
