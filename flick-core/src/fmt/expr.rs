@@ -5,7 +5,7 @@ use std::{mem, ptr};
 use flick_pretty::{NextBreakFitsMode, docvec};
 
 use super::block::Value;
-use super::printer::{Doc, INDENT, Printer, nodes, position, token};
+use super::printer::{Calls, Doc, INDENT, Printer, nodes, position, token};
 use crate::syntax::cst::{Element, Node, Token};
 use crate::syntax::kind::SyntaxKind as K;
 
@@ -143,7 +143,7 @@ impl<'a> Printer<'a> {
         let count = docs.len();
         // where a line under a call is a child of it, its arguments stay on
         // its line
-        let fixed = self.line_children && !self.in_bracket;
+        let fixed = self.calls == Calls::Lines;
         let args = a.concat(docs.into_iter().enumerate().map(|(i, (comments, doc))| {
             let doc = if hug && i + 1 == count {
                 doc.group(a).next_break_fits(a, NextBreakFitsMode::Enabled)
@@ -238,9 +238,12 @@ impl<'a> Printer<'a> {
     /// on its own line when its body breaks; a `match`, `try` or broken `if`
     /// goes on lines of its own between them.
     pub fn paren(&mut self, n: &'a Node, suffix: &[Part]) -> Doc<'a> {
-        let outer = mem::replace(&mut self.in_bracket, true);
+        let outer = self.calls;
+        if outer == Calls::Lines {
+            self.calls = Calls::Bracketed;
+        }
         let doc = self.parenthesized(n, suffix);
-        self.in_bracket = outer;
+        self.calls = outer;
         doc
     }
 

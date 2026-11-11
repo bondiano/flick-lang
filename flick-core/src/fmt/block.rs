@@ -5,7 +5,7 @@ use std::mem;
 use flick_pretty::{NextBreakFitsMode, docvec};
 
 use super::expr::Part;
-use super::printer::{Doc, INDENT, Printer, node_position, nodes, position, token};
+use super::printer::{Calls, Doc, INDENT, Printer, node_position, nodes, position, token};
 use crate::syntax::cst::{Element, Node, Token};
 use crate::syntax::kind::SyntaxKind as K;
 
@@ -39,6 +39,16 @@ fn is_expression(n: &Node) -> bool {
 }
 
 impl<'a> Printer<'a> {
+    /// Leaves the brackets around for a block of lines, where a line under
+    /// a call is its child again; what [`Printer::calls`] was, to put back.
+    fn lines_again(&mut self) -> Calls {
+        let outer = self.calls;
+        if outer == Calls::Bracketed {
+            self.calls = Calls::Lines;
+        }
+        outer
+    }
+
     /// `head`, which ends in `=`, `->` or `<-`, and its value: on the same
     /// line when it fits, else on the next lines one level in. A hugging
     /// value stays on the line and breaks inside; several statements always
@@ -47,9 +57,9 @@ impl<'a> Printer<'a> {
     /// which takes its own line when the body breaks.
     pub fn body(&mut self, head: Doc<'a>, value: Value<'a>, end: u32, closing: &[Part]) -> Doc<'a> {
         // a body is laid out by its lines again, whatever is around it
-        let outer = mem::replace(&mut self.in_bracket, false);
+        let outer = self.lines_again();
         let doc = self.body_of(head, value, end, closing);
-        self.in_bracket = outer;
+        self.calls = outer;
         doc
     }
 
@@ -129,9 +139,9 @@ impl<'a> Printer<'a> {
     /// The statements of a block, one per line.
     pub fn block(&mut self, n: &'a Node) -> Doc<'a> {
         let end = n.range().1;
-        let outer = mem::replace(&mut self.in_bracket, false);
+        let outer = self.lines_again();
         let items = self.items(&nodes(n), end, Some(';'), &mut |p, n| p.statement(n));
-        self.in_bracket = outer;
+        self.calls = outer;
         self.join_lines(&items)
     }
 
@@ -238,11 +248,11 @@ impl<'a> Printer<'a> {
         let first = statements.first().map_or(rbrace.start, |s| s.range().0);
         let after = self.comments.trailing(first, None);
         self.column += if members { INDENT } else { 0 };
-        let outer = mem::replace(&mut self.in_bracket, false);
+        let outer = self.lines_again();
         let items = self.items(statements, rbrace.start, Some(';'), &mut |p, s| {
             p.statement(s)
         });
-        self.in_bracket = outer;
+        self.calls = outer;
         self.column -= if members { INDENT } else { 0 };
         let dangling = self.comments.leading(rbrace.start);
         let close = self.tok(rbrace);

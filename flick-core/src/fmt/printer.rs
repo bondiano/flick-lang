@@ -29,13 +29,22 @@ pub(super) struct Printer<'a> {
     pub tail_inline: bool,
     /// The next [`body`](Printer::body) stays on the line of its `->`.
     pub inline_body: bool,
-    /// The code being laid out reads the lines under a call as its
-    /// arguments, one each, as the body of a `ui` block does: a call there
-    /// keeps its arguments on its line, or a line each would be its children.
-    pub line_children: bool,
-    /// The innermost construct around is `( … )` or `[ … ]`, where a line
-    /// break means nothing.
-    pub in_bracket: bool,
+    /// How a call is laid out where the code being laid out stands.
+    pub calls: Calls,
+}
+
+/// How a call that does not fit its line is laid out.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum Calls {
+    /// An argument a line.
+    Free,
+    /// On its line still: the code reads the lines under a call as its
+    /// arguments, one each, as the body of a `ui` block does, so an
+    /// argument a line would be the call's children.
+    Lines,
+    /// An argument a line again: inside `( … )` or `[ … ]` of such code,
+    /// where a line break means nothing.
+    Bracketed,
 }
 
 /// An item of a block, a list or a record, with the comments around it.
@@ -69,8 +78,7 @@ impl<'a> Printer<'a> {
             column: 0,
             tail_inline: false,
             inline_body: false,
-            line_children: false,
-            in_bracket: false,
+            calls: Calls::Free,
         }
     }
 

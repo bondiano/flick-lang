@@ -246,9 +246,9 @@ impl Checker<'_> {
                 Some((actual, _)) if i == 0 => actual.clone(),
                 _ => self.check_value(written, &item),
             };
-            let held = self.captures_of(&actual);
-            captures.entries.extend(held.entries);
-            captures.tails.extend(held.tails);
+            let kept = self.captures_of(&actual);
+            captures.entries.extend(kept.entries);
+            captures.tails.extend(kept.tails);
         }
         let start = head.range().0;
         // no child leaves the call no text of its own: its place is its end
