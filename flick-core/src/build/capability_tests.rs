@@ -150,12 +150,11 @@ fn adapter_policy_overrides_are_not_missing_native_implementations() {
 }
 
 #[test]
-fn a_custom_ui_provider_can_supply_an_export_missing_from_the_native_renderer() {
+fn a_route_link_needs_neither_the_adapter_nor_a_custom_renderer() {
+    // the native renderer has every export of `flick:ui/react` since `Ui.route_link` moved to RT
     let source = "module App.Main exposing (link)\nlink : Ui.RouteLinkProps a -> List (Ui^c) -> Ui^c\nlet link = Ui.route_link\n";
-    assert_eq!(
-        diagnostics_for(source, EffectBridge::Absent, false, false).len(),
-        1
-    );
+    let native = diagnostics_for(source, EffectBridge::Absent, false, false);
+    assert!(native.is_empty(), "{native:?}");
     let found = diagnostics_with_ui(
         source,
         EffectBridge::Absent,
