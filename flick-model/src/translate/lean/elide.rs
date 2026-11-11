@@ -50,7 +50,7 @@ pub(crate) struct Env {
     /// The binders of the `∀` of parameters around: the variables of the
     /// scheme come after them in `vars`.
     pub(crate) inner: usize,
-    /// The kinds of the parameters of each type constructor (`Decls::params`).
+    /// The kinds of the parameters of each type constructor.
     pub(crate) params: Option<Rc<HashMap<Path, Vec<Kind>>>>,
 }
 
@@ -230,8 +230,7 @@ fn data(t: &Type, c: Option<&Caps>, env: &Env) -> Result<String, String> {
         _ => None,
     };
     for (i, a) in args.into_iter().enumerate() {
-        // the model substitutes `Errors r` for a row parameter (`Failure e`);
-        // the core instantiates it with `.row r`, `.errors` types a raised value
+        // a row parameter (`Failure e`) takes a row, as the core instantiates it
         let a = match (a, kinds.and_then(|k| k.get(i))) {
             (Type::Errors(r), Some(Kind::Errors | Kind::Services)) => {
                 format!("(.row {})", row(r, env)?)

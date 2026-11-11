@@ -126,8 +126,8 @@ fn gaps() -> BTreeMap<String, usize> {
 
 /// The forms a fixed run of programs needs and the certificates do not
 /// write: exactly `cert_gaps.txt`, so a new gap fails and a closed one is
-/// taken off the list. The certificates go to `target/certs/Batch.lean`,
-/// which `just model-certs` checks with Lean.
+/// taken off the list. The certificates go to `target/certs/Batch/`, which
+/// `just model-certs` checks with Lean.
 #[test]
 #[ignore = "certifies a run of generated programs; run `just model-certs`"]
 fn certificates_of_generated_programs() {
@@ -137,23 +137,29 @@ fn certificates_of_generated_programs() {
         .unwrap_or(500);
     let decls = decls();
     let sig = Sig::of(&decls);
-    let mut body = String::new();
+    let mut certs = Vec::new();
     let mut reasons: BTreeMap<String, usize> = BTreeMap::new();
-    let mut certified = 0;
     for (i, p) in programs(n) {
         match certify(&decls, &sig, &format!("program{i}"), &p) {
-            Ok(cert) => {
-                body.push_str(&cert);
-                body.push('\n');
-                certified += 1;
-            }
+            Ok(cert) => certs.push(cert + "\n"),
             Err(why) => *reasons.entry(why).or_default() += 1,
         }
     }
-    let dir = repo().join("target/certs");
-    fs::create_dir_all(&dir).expect("target/certs");
-    fs::write(dir.join("Batch.lean"), file("", &body)).expect("write");
-    println!("{certified} of {n} programs have a certificate");
+    // Lean keeps what it checked of a file to its end: 2000 certificates in
+    // one file take more memory than a CI runner has
+    let dir = repo().join("target/certs/Batch");
+    let _ = fs::remove_dir_all(&dir);
+    fs::create_dir_all(&dir).expect("target/certs/Batch");
+    // a certificate's tactics share the budget of one declaration
+    let header = "set_option maxHeartbeats 400000\n\n";
+    for (i, part) in certs.chunks(50).enumerate() {
+        fs::write(
+            dir.join(format!("{i:03}.lean")),
+            file(header, &part.concat()),
+        )
+        .expect("write");
+    }
+    println!("{} of {n} programs have a certificate", certs.len());
     if n == 500 {
         let listed = gaps();
         let mut lines: Vec<String> = reasons.iter().map(|(r, c)| format!("{c} {r}")).collect();
