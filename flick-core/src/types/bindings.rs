@@ -12,6 +12,7 @@ use crate::diagnostics::{Diagnostic, Edit, codes};
 use crate::source::Span;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
+use crate::syntax::patterns;
 use crate::types::lang::Lang;
 
 mod header;
@@ -402,25 +403,9 @@ fn binders(scheme: &Type) -> Vec<super::ty::Binder> {
 
 /// The names a top-level pattern binds, a field pun among them.
 pub(super) fn pattern_names(pattern: &Node, text: &str, out: &mut Vec<String>) {
-    match pattern.kind {
-        K::VarPat => out.extend(
-            pattern
-                .child_tokens()
-                .find(|t| t.kind == K::Ident)
-                .map(|t| t.text(text).to_owned()),
-        ),
-        K::RecordPatField if !pattern.has_token(K::Eq) => out.extend(
-            pattern
-                .child_tokens()
-                .find(|t| t.kind == K::Ident)
-                .map(|t| t.text(text).to_owned()),
-        ),
-        _ => {
-            for child in pattern.nodes() {
-                pattern_names(child, text, out);
-            }
-        }
-    }
+    let mut names = Vec::new();
+    patterns::binders(pattern, &mut names);
+    out.extend(names.iter().map(|name| name.text(text).to_owned()));
 }
 
 /// A signature suggested for a function, to write later: the literals of

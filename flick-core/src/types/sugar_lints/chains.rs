@@ -8,6 +8,7 @@ use super::{Checker, Ref, block_statements, unparen, words};
 use crate::diagnostics::{Diagnostic, Severity, codes};
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
+use crate::syntax::patterns;
 use crate::types::lang::{self, Lang};
 
 /// `var <- source`: one step of a chain.
@@ -205,9 +206,7 @@ impl Checker<'_> {
 /// The variables the statements of the `do` block `node` bind.
 fn binders(node: &Node, text: &str) -> Vec<String> {
     fn vars(node: &Node, text: &str, out: &mut Vec<String>) {
-        if node.kind == K::VarPat {
-            out.push(node.text(text).trim().to_owned());
-        }
+        out.extend(patterns::binder(node).map(|name| name.text(text).to_owned()));
         node.nodes().for_each(|n| vars(n, text, out));
     }
     let mut out = Vec::new();

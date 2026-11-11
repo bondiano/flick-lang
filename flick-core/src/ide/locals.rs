@@ -4,19 +4,17 @@
 use super::tree::path_to;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
-use crate::types::is_pattern;
+use crate::syntax::patterns::{self, is_pattern};
 
 /// The variable patterns of `pattern`.
 pub fn binders(pattern: &Node, out: &mut Vec<(String, (u32, u32))>, text: &str) {
-    if pattern.kind == K::VarPat {
-        if let Some(t) = pattern.child_tokens().find(|t| t.kind == K::Ident) {
-            out.push((t.text(text).to_owned(), (t.start, t.end)));
-        }
-        return;
-    }
-    for child in pattern.nodes() {
-        binders(child, out, text);
-    }
+    let mut names = Vec::new();
+    patterns::binders(pattern, &mut names);
+    out.extend(
+        names
+            .iter()
+            .map(|t| (t.text(text).to_owned(), (t.start, t.end))),
+    );
 }
 
 /// The names a `let` binds for the statements after it.

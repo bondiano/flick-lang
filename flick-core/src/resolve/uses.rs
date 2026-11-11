@@ -2,11 +2,11 @@
 //! bound locally by a parameter, pattern, `let` or `scope`; and the local
 //! names nothing refers to.
 
-use super::defs::{binders, is_pattern};
 use super::{Module, Namespace};
 use crate::source::{FileId, Span};
 use crate::syntax::cst::{Node, Token};
 use crate::syntax::kind::SyntaxKind as K;
+use crate::syntax::patterns::{binders, is_part, is_pattern};
 
 #[derive(Debug)]
 pub(super) struct Reference {
@@ -535,7 +535,7 @@ fn punned(pattern: &Node, out: &mut Vec<u32>) {
                 .map(|t| t.start),
         );
     }
-    for child in pattern.nodes().filter(|n| is_pattern(n.kind)) {
+    for child in pattern.nodes().filter(|n| is_part(n.kind)) {
         punned(child, out);
     }
 }

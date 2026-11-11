@@ -7,6 +7,7 @@ use crate::resolve::declarations;
 use crate::source::FileId;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::{FOREIGN_MODES, SyntaxKind as K};
+use crate::syntax::patterns;
 use crate::types::{Ref, Type};
 use flick_plugin::HighlightKind;
 
@@ -29,7 +30,7 @@ const CONSTRUCTOR: u32 = 2;
 const FUNCTION: u32 = 3;
 const VARIABLE: u32 = 4;
 const METHOD: u32 = 5;
-const PARAMETER: u32 = 6;
+pub(super) const PARAMETER: u32 = 6;
 /// A word that is a keyword only where it stands.
 const KEYWORD: u32 = 7;
 /// The head of a plugin's blocks.
@@ -168,9 +169,7 @@ fn qualifiers(node: &Node, out: &mut Vec<(u32, u32, u32)>) {
 /// Names that patterns bind.
 fn binders(node: &Node, out: &mut Vec<(u32, u32, u32)>) {
     for child in node.nodes() {
-        if child.kind == K::VarPat
-            && let Some(t) = child.child_tokens().find(|t| t.kind == K::Ident)
-        {
+        if let Some(t) = patterns::binder(child) {
             out.push((t.start, t.end, PARAMETER));
         }
         binders(child, out);

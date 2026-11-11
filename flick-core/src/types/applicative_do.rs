@@ -12,6 +12,7 @@ use crate::iface::Namespace;
 use crate::source::Span;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
+use crate::syntax::patterns;
 use crate::types::env::Found;
 use crate::types::lang::{self, Lang};
 
@@ -331,11 +332,7 @@ fn curried(items: &[Type], result: Type) -> Type {
 
 /// The names `pattern` binds.
 fn binders(pattern: &Node, text: &str, out: &mut Vec<String>) {
-    if pattern.kind == K::VarPat {
-        let (start, end) = pattern.range();
-        out.push(text[start as usize..end as usize].trim().to_owned());
-    }
-    for child in pattern.nodes() {
-        binders(child, text, out);
-    }
+    let mut names = Vec::new();
+    patterns::binders(pattern, &mut names);
+    out.extend(names.iter().map(|name| name.text(text).to_owned()));
 }

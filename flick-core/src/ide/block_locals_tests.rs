@@ -49,3 +49,26 @@ fn the_render_of_a_component_sees_its_props_and_the_names_of_its_setup() {
         .collect();
     assert_eq!(names, ["p", "n"]);
 }
+
+#[test]
+fn a_field_a_record_pattern_puns_is_a_name_in_scope() {
+    let source = "module App.P exposing (f)\n\nf : { x : Int, y : Int } -> Int\nlet f r =\n  let { x; y = other } = r\n  x + other\n";
+    let f = fixture_of(&[("src/App/P.fl", source)]);
+    let ide = f.ide();
+    let file = f.file("App.P");
+    let m = ide.analysis.by_file(file).expect("the module");
+    let offset = u32::try_from(source.rfind("other").expect("a use")).expect("small");
+    let names: Vec<String> = super::locals::in_scope(&m.tree, offset, source)
+        .into_iter()
+        .map(|(name, _)| name)
+        .collect();
+    assert_eq!(names, ["r", "x", "other"]);
+    // and both are parameters to the editor's colours
+    let tokens = ide.semantic_tokens(file);
+    let pun = u32::try_from(source.find("{ x;").expect("the pun")).expect("small") + 2;
+    assert!(
+        tokens
+            .iter()
+            .any(|&(start, _, kind)| start == pun && kind == super::tokens::PARAMETER)
+    );
+}

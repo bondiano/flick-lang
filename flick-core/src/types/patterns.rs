@@ -47,9 +47,7 @@ pub enum Ctor {
     Literal(String),
 }
 
-pub fn is_pattern(kind: K) -> bool {
-    (K::WildcardPat..=K::OrPat).contains(&kind)
-}
+pub use crate::syntax::patterns::is_pattern;
 
 impl Checker<'_> {
     /// Checks `node` against `ty` and brings its names into scope. A
