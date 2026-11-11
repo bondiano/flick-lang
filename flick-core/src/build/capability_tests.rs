@@ -150,11 +150,13 @@ fn adapter_policy_overrides_are_not_missing_native_implementations() {
 }
 
 #[test]
-fn a_route_link_needs_neither_the_adapter_nor_a_custom_renderer() {
-    // the native renderer has every export of `flick:ui/react` since `Ui.route_link` moved to RT
-    let source = "module App.Main exposing (link)\nlink : Ui.RouteLinkProps a -> List (Ui^c) -> Ui^c\nlet link = Ui.route_link\n";
-    let native = diagnostics_for(source, EffectBridge::Absent, false, false);
-    assert!(native.is_empty(), "{native:?}");
+fn a_custom_ui_provider_can_supply_an_export_missing_from_the_native_renderer() {
+    // no export of `flick:ui/react` is missing on RT any more, so the binding names one RT lacks
+    let source = "module App.Main exposing (gap)\ngap : String -> Ui\nforeign pure gap from \"flick:ui/react\" \"uiNotOnTheRuntime\"\n";
+    assert_eq!(
+        diagnostics_for(source, EffectBridge::Absent, false, false).len(),
+        1
+    );
     let found = diagnostics_with_ui(
         source,
         EffectBridge::Absent,
@@ -163,6 +165,13 @@ fn a_route_link_needs_neither_the_adapter_nor_a_custom_renderer() {
         Some("./renderer.mjs"),
     );
     assert!(found.is_empty(), "{found:?}");
+}
+
+#[test]
+fn a_route_link_needs_neither_the_adapter_nor_a_custom_renderer() {
+    let source = "module App.Main exposing (link)\nlink : Ui.RouteLinkProps a -> List (Ui^c) -> Ui^c\nlet link = Ui.route_link\n";
+    let native = diagnostics_for(source, EffectBridge::Absent, false, false);
+    assert!(native.is_empty(), "{native:?}");
 }
 
 #[test]
