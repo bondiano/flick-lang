@@ -128,41 +128,9 @@ impl Checking<'_> {
                     (interface, self.by_name.contains_key(&i.module))
                 })
                 .collect(),
-            virtual_contracts: loaded
-                .virtual_of
-                .iter()
-                .flat_map(|v| {
-                    let mut names: Vec<_> = v
-                        .capture
-                        .bindings
-                        .iter()
-                        .map(|b| b.origin.module.clone())
-                        .collect();
-                    match &v.capture.callee {
-                        Some(CalleeOrigin::Module(name)) => names.push(name.clone()),
-                        Some(CalleeOrigin::Member(member)) => names.push(member.parent.clone()),
-                        Some(CalleeOrigin::Parameter { binding, .. }) => {
-                            names.push(binding.module.clone());
-                        }
-                        None => {}
-                    }
-                    let caller = loaded
-                        .member_of
-                        .as_ref()
-                        .and_then(|member| self.by_name.get(&member.parent))
-                        .map_or(loaded, |&index| &self.modules[index]);
-                    let mut index = 0;
-                    while index < names.len() {
-                        if let Some(member) = contracts(&names[index]).and_then(|i| i.member_of)
-                            && !caller.can_access_member(&member)
-                            && !names.contains(&member.parent)
-                        {
-                            names.push(member.parent);
-                        }
-                        index += 1;
-                    }
-                    names
-                })
+            virtual_contracts: self
+                .virtual_contract_dependencies(loaded, &contracts)
+                .into_iter()
                 .map(|module| match self.by_name.get(&module) {
                     Some(&j) => comparable[j].clone(),
                     None => self.from_packages.get(&module).map(comparable_copy),

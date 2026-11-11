@@ -1,4 +1,44 @@
 impl Checking<'_> {
+    fn virtual_contract_dependencies(
+        &self,
+        loaded: &Loaded,
+        contracts: &dyn Fn(&str) -> Option<Interface>,
+    ) -> Vec<String> {
+        let Some(v) = &loaded.virtual_of else {
+            return Vec::new();
+        };
+        let mut names: Vec<_> = v
+            .capture
+            .bindings
+            .iter()
+            .map(|b| b.origin.module.clone())
+            .collect();
+        match &v.capture.callee {
+            Some(CalleeOrigin::Module(name)) => names.push(name.clone()),
+            Some(CalleeOrigin::Member(member)) => names.push(member.parent.clone()),
+            Some(CalleeOrigin::Parameter { binding, .. }) => {
+                names.push(binding.module.clone());
+            }
+            None => {}
+        }
+        let caller = loaded
+            .member_of
+            .as_ref()
+            .and_then(|member| self.by_name.get(&member.parent))
+            .map_or(loaded, |&index| &self.modules[index]);
+        let mut index = 0;
+        while index < names.len() {
+            if let Some(member) = contracts(&names[index]).and_then(|i| i.member_of)
+                && !caller.can_access_member(&member)
+                && !names.contains(&member.parent)
+            {
+                names.push(member.parent);
+            }
+            index += 1;
+        }
+        names
+    }
+
     fn public_contract_interface(
         &self,
         loaded: &Loaded,

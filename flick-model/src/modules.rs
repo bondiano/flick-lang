@@ -309,5 +309,11 @@ mod tests {
         };
         assert!(nominal("Core.Clock").is_subtype_of(&nominal("Core.Clock")));
         assert!(!nominal("Other.Clock").is_subtype_of(&nominal("Core.Clock")));
+        let abstract_clock = Signature::Structure {
+            members: BTreeSet::from(["now".into()]),
+            identities: BTreeMap::from([("Clock".into(), Identity::Abstract)]),
+        };
+        assert!(nominal("Core.Clock").is_subtype_of(&abstract_clock));
+        assert!(!abstract_clock.is_subtype_of(&nominal("Core.Clock")));
     }
 }

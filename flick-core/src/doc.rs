@@ -8,9 +8,15 @@ use std::fmt::Write;
 use std::ptr;
 
 use crate::iface::{Decl, Export, Interface, Namespace};
-use crate::syntax::cst::{Element, Node};
+use crate::source::FileId;
 use crate::syntax::kind::SyntaxKind as K;
-use crate::types::{Form, ModuleNominalKind, ModuleRequirement, show_signature, show_type};
+use crate::syntax::{
+    self,
+    cst::{Element, Node},
+};
+use crate::types::{
+    Form, ModuleNominalKind, ModuleRequirement, ModuleSignature, show_signature, show_type,
+};
 
 /// The `///` comment right above each top-level declaration, and above
 /// each constructor on a line of its own (`| Circle Float`), by name. A
@@ -209,7 +215,6 @@ pub fn page(interface: &Interface, text: &str) -> String {
 // Keep named references from checked declarations. A structural signature's
 // display is useful for hover, but is not source syntax for an anonymous contract.
 fn source_module_declarations(text: &str) -> HashMap<String, String> {
-    let parsed = crate::syntax::parse(text, crate::source::FileId::default());
     fn collect(node: &Node, text: &str, out: &mut HashMap<String, String>) {
         if node.kind == K::ModuleTypeDecl
             && let Some(name) = node.child_tokens().find(|token| token.kind == K::Con)
@@ -224,6 +229,7 @@ fn source_module_declarations(text: &str) -> HashMap<String, String> {
             collect(child, text, out);
         }
     }
+    let parsed = syntax::parse(text, FileId::default());
     let mut declarations = HashMap::new();
     collect(&parsed.tree, text, &mut declarations);
     declarations
@@ -321,8 +327,7 @@ fn module_contract(name: &str, requirements: &[ModuleRequirement], out: &mut Str
     );
 }
 
-fn definition(interface: &Interface, e: &Export, form: &Form, out: &mut String) {
-    let name = &e.entity.name;
+fn module_definition(name: &str, form: &Form, out: &mut String) {
     match form {
         Form::ModuleContract { requirements }
             if requirements.iter().any(|r| {
@@ -332,7 +337,7 @@ fn definition(interface: &Interface, e: &Export, form: &Form, out: &mut String) 
                 )
             }) =>
         {
-            let signature = crate::types::ModuleSignature::Structure {
+            let signature = ModuleSignature::Structure {
                 requirements: requirements.clone(),
             };
             let _ = writeln!(
@@ -348,6 +353,16 @@ fn definition(interface: &Interface, e: &Export, form: &Form, out: &mut String) 
                 "\nSignature shape:\n\n```text\n{}\n```",
                 signature.display()
             );
+        }
+        _ => unreachable!(),
+    }
+}
+
+fn definition(interface: &Interface, e: &Export, form: &Form, out: &mut String) {
+    let name = &e.entity.name;
+    match form {
+        Form::ModuleContract { .. } | Form::ModuleSignature { .. } => {
+            module_definition(name, form, out);
         }
         Form::Alias { params, body, .. } => {
             let params: String = params.iter().fold(String::new(), |mut acc, p| {
@@ -453,14 +468,15 @@ mod tests {
 
 #[cfg(test)]
 mod module_signature_tests {
+    use crate::{ir::tests::check_text, source::FileId, syntax};
     #[test]
     fn review_generated_module_signatures_are_valid_flick_declarations() {
         let source = "module Api exposing (Factory, Namespace)\ntype module Input =\n  type Key\ntype module Output =\n  type Value\ntype module Factory = (K : Input) -> Output with type Value = K.Key\ntype module Namespace =\n  module Make : Factory\n";
-        let (_, interface) = crate::ir::tests::check_text("Api", source).expect("source checks");
+        let (_, interface) = check_text("Api", source).expect("source checks");
         let page = super::page(&interface, source);
         for fence in page.split("```flick\n").skip(1) {
             let text = fence.split("```").next().expect("closed fence");
-            let parsed = crate::syntax::parse(text, crate::source::FileId::default());
+            let parsed = syntax::parse(text, FileId::default());
             assert!(
                 parsed.diagnostics.is_empty(),
                 "{text}: {:?}",

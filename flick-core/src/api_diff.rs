@@ -8,6 +8,7 @@
 use std::collections::BTreeMap;
 use std::fmt;
 use std::iter::once;
+use std::mem;
 
 use crate::iface::{Export, Interface, Namespace};
 use crate::types::{Binder, Form, Instance, ModuleSignature, Row, Type, TypeDef, show_type};
@@ -268,7 +269,7 @@ fn canonical(e: &Export) -> Export {
             Form::ModuleSignature { signature } => signature.canonicalize(next),
             Form::ModuleContract { requirements } => {
                 let mut signature = ModuleSignature::Structure {
-                    requirements: std::mem::take(requirements),
+                    requirements: mem::take(requirements),
                 };
                 signature.canonicalize(next);
                 let ModuleSignature::Structure {

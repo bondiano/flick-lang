@@ -1,4 +1,34 @@
 impl Checker<'_> {
+    fn finish_module_contracts(&mut self, pending: &[Pending<'_>]) {
+        // Manifest nominal requirements may have observed skeletons while
+        // contracts were converted. Publish snapshots of completed definitions.
+        for p in pending.iter().filter(|p| p.node.kind == K::ModuleTypeDecl) {
+            let Some(mut definition) = self.env.type_def(&self.env.module, &p.name).cloned() else {
+                continue;
+            };
+            match &mut definition.form {
+                Form::ModuleContract { requirements } => {
+                    let mut signature = super::ModuleSignature::Structure {
+                        requirements: mem::take(requirements),
+                    };
+                    self.refresh_nominal_requirements(&mut signature);
+                    let super::ModuleSignature::Structure {
+                        requirements: completed,
+                    } = signature
+                    else {
+                        unreachable!()
+                    };
+                    *requirements = completed;
+                }
+                Form::ModuleSignature { signature } => self.refresh_nominal_requirements(signature),
+                _ => {}
+            }
+            self.env.define_type(&p.name, definition);
+        }
+    }
+}
+
+impl Checker<'_> {
     fn refresh_nominal_requirements(&self, signature: &mut super::ModuleSignature) {
         match signature {
             super::ModuleSignature::Parameterized {
@@ -11,7 +41,7 @@ impl Checker<'_> {
                 for requirement in requirements {
                     match requirement {
                         ModuleRequirement::Module { signature, .. } => {
-                            self.refresh_nominal_requirements(signature)
+                            self.refresh_nominal_requirements(signature);
                         }
                         ModuleRequirement::Nominal {
                             identity: Some(identity),

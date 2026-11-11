@@ -3,6 +3,12 @@ impl ModuleSignature {
     /// implementations. Abstract members are stable names in this interface.
     #[allow(clippy::too_many_lines)]
     pub fn interface(&self, path: &str) -> Interface {
+        fn replace(ty: &Type, replacements: &[(Type, Type)]) -> Type {
+            if let Some((_, new)) = replacements.iter().find(|(old, _)| old == ty) {
+                return new.clone();
+            }
+            map_module_children(ty, &mut |child| replace(child, replacements))
+        }
         let mut interface = Interface {
             module: path.into(),
             ..Interface::default()
@@ -221,12 +227,6 @@ impl ModuleSignature {
                 Some((Type::con(module, name), Type::con(path, name)))
             })
             .collect();
-        fn replace(ty: &Type, replacements: &[(Type, Type)]) -> Type {
-            if let Some((_, new)) = replacements.iter().find(|(old, _)| old == ty) {
-                return new.clone();
-            }
-            map_module_children(ty, &mut |child| replace(child, replacements))
-        }
         map_interface_types(&mut interface, &mut |ty| replace(ty, &replacements));
         interface
     }

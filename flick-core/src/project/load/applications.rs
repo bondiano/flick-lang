@@ -160,8 +160,7 @@ impl Loader<'_> {
             &header,
             application,
             callee,
-            template,
-            trace,
+            (template, trace),
         );
         self.modules.push(Loaded {
             path,
@@ -189,8 +188,7 @@ impl Loader<'_> {
         header: &resolve::Header,
         application: &ModuleApplication,
         callee: CalleeOrigin,
-        template: String,
-        trace: Vec<String>,
+        (template, trace): (String, Vec<String>),
     ) -> Virtual {
         let inherited = self.modules[parameterized].virtual_of.as_ref();
         let mut capture = inherited.map_or_else(StaticCapture::default, |v| v.capture.clone());
