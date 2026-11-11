@@ -4,6 +4,7 @@
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::{Path, PathBuf};
+use std::slice;
 use std::sync::Arc;
 
 use tracing::debug;
