@@ -369,6 +369,14 @@ impl<'a> Gen<'a> {
     }
 
     pub(super) fn dict(&mut self, dict: &Dict) -> Code<'a> {
+        match self.dict_once(dict) {
+            Some(once) => once,
+            None => self.dict_made(dict),
+        }
+    }
+
+    /// The dictionary `dict`, made where the code is.
+    pub(super) fn dict_made(&mut self, dict: &Dict) -> Code<'a> {
         let a = self.a;
         match dict {
             Dict::Instance { module, name, args } => {

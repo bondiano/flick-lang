@@ -1,0 +1,32 @@
+// Class dictionaries at work: `show`, `==` and `compare` of options, of lists
+// of options and of records, 200 000 of each, and a HashMap keyed by pairs.
+module App.Main exposing (main)
+
+type alias Point = { x : Int; y : Int; label : String }
+
+size : Int
+let size = 200000
+
+point : Int -> Point
+let point i = { x = i % 97; y = i % 31; label = if i % 2 == 0 then "even" else "odd" }
+
+option : Int -> Option Int
+let option i = if i % 3 == 0 then None else Some (i % 1000)
+
+main : Unit ->{; AppError} Unit
+let main () =
+  let numbers = List.range 0 size
+  let options = List.map option numbers
+  let points = List.map point numbers
+  let shown = List.fold_left (fun acc o -> acc + String.length (show o)) 0 options
+  let third = point 3
+  let equal = List.count_by (fun p -> p == third) points
+  let below = List.count_by (fun o -> compare o (Some 500) == LT) options
+  let lists = List.count_by (fun i -> [option i, None] == [option (i + 3000), None]) numbers
+  let ordered = List.count_by (fun i -> compare [option i] [option (i + 1)] == GT) numbers
+  let keyed =
+    List.fold_left
+      (fun m i -> HashMap.insert (i % 500, option i) i m)
+      HashMap.empty
+      (List.range 0 (size / 10))
+  Platform.stdout_line (show [shown, equal, below, lists, ordered, HashMap.size keyed])

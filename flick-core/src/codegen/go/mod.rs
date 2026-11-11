@@ -25,6 +25,7 @@ mod names;
 mod once;
 mod pattern;
 mod runtime;
+mod shape;
 
 pub use runtime::{GO_MOD, GO_SUM, PACKAGES, Package, RUNTIME};
 
@@ -34,10 +35,11 @@ use std::{mem, slice};
 use flick_pretty::{Document, DocumentArena, Documentable, docvec};
 
 use crate::diagnostics::{Diagnostic, Severity, codes};
-use crate::ir::{ExprKind, ItemKind, Module, Stage, reach};
+use crate::ir::{ItemKind, Module, reach};
 use crate::source::Span;
 use layout::{Code, block, call, directive, list, statement};
 use reach::Key;
+use shape::{Shape, shape};
 
 /// The Go import path of the runtime package.
 pub const RUNTIME_PACKAGE: &str = "flick.app/flickrt";
@@ -78,74 +80,6 @@ pub struct Output {
     /// The optional packages the program reaches (`main_file::OPTIONAL`), whose
     /// modules its Go module then requires.
     pub packages: Vec<&'static str>,
-}
-
-/// How a top-level name is held in Go.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum Shape {
-    /// A variable assigned at initialization.
-    Var,
-    /// A Go function of the fiber, dictionaries, then parameters; `effects`
-    /// has bit `i` set when parameter `i`'s language stage runs effects
-    /// (Sync or Runtime), independently of the hidden execution context.
-    Func {
-        dicts: usize,
-        params: usize,
-        effects: u64,
-    },
-}
-
-impl Shape {
-    /// Whether the function's last language stage runs effects.
-    fn effectful(self) -> bool {
-        matches!(self, Shape::Func { params, effects, .. } if params > 0 && effects >> (params - 1) & 1 == 1)
-    }
-}
-
-/// The effects mask of stages, by whether each runs effects.
-fn effects(stages: impl IntoIterator<Item = bool>) -> u64 {
-    stages
-        .into_iter()
-        .enumerate()
-        .fold(0, |mask, (i, effectful)| mask | u64::from(effectful) << i)
-}
-
-fn shape(kind: &ItemKind) -> Shape {
-    match kind {
-        ItemKind::Value { dicts, body, .. } => match &body.kind {
-            ExprKind::Lambda { params, .. } => Shape::Func {
-                dicts: dicts.len(),
-                params: params.len(),
-                effects: effects(params.iter().map(|p| p.stage != Stage::Pure)),
-            },
-            _ if dicts.is_empty() => Shape::Var,
-            _ => Shape::Func {
-                dicts: dicts.len(),
-                params: 0,
-                effects: 0,
-            },
-        },
-        ItemKind::Foreign(f) => {
-            let params = foreign::parameters(f);
-            if f.dicts == 0 && params == 0 {
-                Shape::Var
-            } else {
-                Shape::Func {
-                    dicts: f.dicts,
-                    params,
-                    effects: effects(
-                        (0..params).map(|i| f.stages.get(i).copied().unwrap_or(false)),
-                    ),
-                }
-            }
-        }
-        ItemKind::Instance { info, .. } if !info.context.is_empty() => Shape::Func {
-            dicts: info.context.len(),
-            params: 0,
-            effects: 0,
-        },
-        _ => Shape::Var,
-    }
 }
 
 /// Compiles the program that runs `main` of `program.entry`, or the tests
@@ -245,6 +179,10 @@ fn compile<'a>(
             shapes.insert((modules[m].name.clone(), name), shape(&item.kind));
         }
     }
+    let reached_items = reached
+        .iter()
+        .map(|&(m, i)| (&*modules[m].name, &modules[m].items[i]));
+    let settled = shape::settled(reached_items, &shapes);
     let item_initializers = modules.iter().any(|m| !m.initialization.is_empty());
     let mut files = Vec::new();
     let mut sources = BTreeMap::new();
@@ -260,6 +198,7 @@ fn compile<'a>(
         }
         let arena = DocumentArena::new();
         let mut g = Gen::new(&module.name, &shapes, program.package, &arena);
+        g.settled = Some(&settled);
         g.item_initializers = item_initializers;
         if (program.own)(&module.name) {
             g.location = Some(program.location);
@@ -468,6 +407,8 @@ struct Gen<'a> {
     natives: HashMap<String, arith::Native>,
     /// What the module makes once, each a package variable (`once.rs`).
     once: Vec<String>,
+    /// The instances whose dictionary is the same whoever builds it.
+    settled: Option<&'a HashSet<Key>>,
 }
 
 impl<'a> Gen<'a> {
@@ -501,6 +442,7 @@ impl<'a> Gen<'a> {
             sources: BTreeMap::new(),
             natives: HashMap::new(),
             once: Vec::new(),
+            settled: None,
         }
     }
 
