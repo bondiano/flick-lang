@@ -26,6 +26,14 @@ use companions::enum_literal;
 use kinds::kind_description;
 use written::{as_written, signature_as_written};
 
+fn local_code(name: &str, ty: &str, mutable: bool) -> String {
+    let mut code = String::from(if mutable { "mut " } else { "" });
+    code.push_str(name);
+    code.push_str(" : ");
+    code.push_str(ty);
+    code
+}
+
 fn documentation(source: &Source, name: &str) -> Option<String> {
     source
         .tree
@@ -351,16 +359,7 @@ impl Ide<'_> {
                         && decl.has_token(K::MutKw)
                         && decl.nodes().next().is_some_and(|p| p.range() == *binder)
                 });
-                let shown = m.typing.shown(at, ty);
-                // Reserve the name, type, separator and optional `mut ` prefix once.
-                let mut code = String::with_capacity(name.len() + shown.len() + 7);
-                if mutable {
-                    code.push_str("mut ");
-                }
-                code.push_str(name);
-                code.push_str(" : ");
-                code.push_str(&shown);
-                (code, None)
+                (local_code(name, &m.typing.shown(at, ty), mutable), None)
             }
             Symbol::Entity(e) => {
                 let interface = self.interface(&e.module)?;
