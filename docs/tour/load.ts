@@ -57,6 +57,11 @@ export const lessons = (): ReadonlyArray<Lesson> => {
   );
 };
 
+/** The chapters of `entries`, each once, in their order. */
+export const chapters = (entries: ReadonlyArray<Lesson>): ReadonlyArray<Chapter> => [
+  ...new Map(entries.map((entry) => [entry.chapter.id, entry.chapter])).values(),
+];
+
 /** The lesson of a tour page, by its slug under `tour/`. */
 export const lesson = (id: string): Lesson => {
   const found = lessons().find((entry) => entry.id === id);

@@ -28,7 +28,7 @@ test("the index, the lesson files and the pages match one to one", () => {
   }
   for (const locale of ["", "ru/"]) {
     const pages = readdirSync(path.join(docs, "src/content/docs", locale, "tour")).map((name) => name.replace(/\.mdx?$/, ""));
-    assert.deepEqual(pages.filter((name) => name !== "index").sort(), [...ids].sort(), `pages of ${locale || "en/"}tour`);
+    assert.deepEqual(pages.filter((name) => name !== "index" && name !== "all").sort(), [...ids].sort(), `pages of ${locale || "en/"}tour`);
   }
 });
 

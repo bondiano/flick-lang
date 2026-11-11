@@ -1,7 +1,9 @@
 ---
 // A page of the tour: what it says, beside the program it is about.
 import { readFileSync } from "node:fs";
+import { Code } from "@astrojs/starlight/components";
 import Playground from "./Playground.astro";
+import { loadExercise } from "../../exercises/load.ts";
 import { lesson } from "../../tour/load.ts";
 
 interface Props {
@@ -13,16 +15,26 @@ interface Props {
 const { locale, id } = Astro.props;
 const { file, exercise } = lesson(id);
 const ru = locale === "ru";
+// The whole tour on one page shows each program as text: a page holds one editor.
+const whole = /\/tour\/all\/$/.test(Astro.url.pathname);
+// an exercise's own Playground reads its starter; only the static code needs it here
+const source = file !== undefined ? readFileSync(file, "utf8") : whole ? loadExercise(exercise ?? "").starter : "";
 ---
 
-<div class="tour-lesson">
-  <div class="tour-prose">
-    <slot />
-    <p class="tour-contents-link"><a href="../">{ru ? "Содержание тура" : "Tour contents"}</a></p>
-  </div>
-  <div class="tour-editor">
-    {exercise === undefined
-      ? <Playground locale={locale} source={readFileSync(file ?? "", "utf8")} id={`tour/${id}`} />
-      : <Playground locale={locale} lesson={exercise} />}
-  </div>
-</div>
+{whole
+  ? <div class="tour-all-body">
+      <slot />
+      <Code code={source} lang="flick" />
+      <p><a href={`../${id}/`}>{ru ? "Открыть в редакторе" : "Open in the editor"}</a></p>
+    </div>
+  : <div class="tour-lesson">
+      <div class="tour-prose">
+        <slot />
+        <p class="tour-contents-link"><a href="../">{ru ? "Содержание тура" : "Tour contents"}</a></p>
+      </div>
+      <div class="tour-editor">
+        {exercise === undefined
+          ? <Playground locale={locale} source={source} id={`tour/${id}`} />
+          : <Playground locale={locale} lesson={exercise} />}
+      </div>
+    </div>}

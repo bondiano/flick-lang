@@ -90,6 +90,17 @@ test("code from a link waits for Run on a page of the tour", async ({ page }) =>
   await expect(other.locator(".fp-output")).toContainText("from a link", { timeout: 30_000 });
 });
 
+for (const locale of ["", "ru/"]) {
+  test(`the whole tour is one page of text and code, without an editor (${locale || "en/"})`, async ({ page }) => {
+    await page.goto(`/flick-lang/${locale}tour/all/`);
+    await expect(page.locator(".tour-all-lesson")).toHaveCount(all.length);
+    await expect(page.locator("#flick-playground")).toHaveCount(0);
+    const open = page.locator(`.tour-all-lesson a[href="../${all[0]?.id ?? ""}/"]`);
+    await open.click();
+    await expect(page).toHaveURL(new RegExp(`/${locale}tour/${all[0]?.id ?? ""}/$`));
+  });
+}
+
 test("a Russian lesson leads to the next Russian lesson", async ({ page }) => {
   const [first, second] = all;
   test.skip(second === undefined, "the tour has one lesson");
