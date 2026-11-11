@@ -9,10 +9,7 @@ fn cyclic_contract_equalities_are_rejected_without_expanding_their_bodies() {
         "Contracts",
     );
     assert!(
-        analysis
-            .diagnostics
-            .iter()
-            .any(|d| d.code == crate::diagnostics::codes::R007),
+        analysis.diagnostics.iter().any(|d| d.code == codes::R007),
         "{:?}",
         analysis.diagnostics
     );
@@ -82,10 +79,7 @@ fn recursive_static_expansions_with_changing_arguments_are_bounded() {
         "Root",
     );
     assert!(
-        analysis
-            .diagnostics
-            .iter()
-            .any(|d| d.code == crate::diagnostics::codes::R006),
+        analysis.diagnostics.iter().any(|d| d.code == codes::R006),
         "{:?}",
         analysis.diagnostics
     );
@@ -120,4 +114,41 @@ fn static_arguments_resolve_aliases_once_before_using_canonical_module_identitie
         "{:?}",
         analysis.diagnostics
     );
+}
+#[cfg(feature = "ide")]
+use crate::diagnostics::codes;
+
+#[cfg(feature = "ide")]
+#[test]
+fn inferred_factory_results_retain_explicitly_exported_adt_constructors() {
+    let (_, analysis) = hom_boundary_analysis(
+        &[
+            (
+                "Contracts",
+                "module App.Contracts exposing (Input)\ntype module Input =\n  identity : a -> a\n",
+            ),
+            (
+                "Factory",
+                "private module App.Factory(K : App.Contracts.Input) exposing (Color(..), value)\ntype Color = Red | Blue\nvalue : Color\nlet value = K.identity Red\n",
+            ),
+            (
+                "Root",
+                "module App.Root exposing (..)\nmodule Chosen = App.Factory(Prelude)\nimport App.Root.Chosen exposing (Color(..))\nvalue : Color\nlet value = Chosen.Red\nrender : Color -> String\nlet render color = match color with\n  | Red -> \"red\"\n  | Blue -> \"blue\"\n",
+            ),
+        ],
+        "Root",
+    );
+    assert!(
+        analysis.diagnostics.is_empty(),
+        "{:?}",
+        analysis.diagnostics
+    );
+    let root = analysis.module("App.Root").expect("root");
+    let color = root
+        .interface
+        .modules
+        .get("Chosen")
+        .expect("factory result");
+    assert!(color.find(Namespace::Constructor, "Red").is_some());
+    assert!(color.find(Namespace::Constructor, "Blue").is_some());
 }

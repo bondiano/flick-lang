@@ -12,7 +12,9 @@ use crate::source::FileId;
 use crate::syntax;
 use crate::syntax::cst::{Element, Node};
 use crate::syntax::kind::SyntaxKind as K;
-use crate::types::{Form, ModuleNominalKind, ModuleRequirement, show_signature, show_type};
+use crate::types::{
+    Form, ModuleNominalKind, ModuleRequirement, ModuleSignature, show_signature, show_type,
+};
 
 /// The `///` comment right above each top-level declaration, and above
 /// each constructor on a line of its own (`| Circle Float`), by name. A
@@ -217,19 +219,23 @@ pub fn page(interface: &Interface, text: &str) -> String {
     out
 }
 
+fn expanded_signature(name: &str, signature: &ModuleSignature, out: &mut String) {
+    let _ = writeln!(
+        out,
+        "\nExpanded module signature:\n\n```text\n{name} : {}\n```",
+        signature.display()
+    );
+}
+
 fn module_contract(name: &str, requirements: &[ModuleRequirement], out: &mut String) {
     if requirements
         .iter()
         .any(|r| matches!(r, ModuleRequirement::Module { .. }))
     {
-        let signature = crate::types::ModuleSignature::Structure {
+        let signature = ModuleSignature::Structure {
             requirements: requirements.to_vec(),
         };
-        let _ = writeln!(
-            out,
-            "\nExpanded module contract:\n\n```text\n{name} : {}\n```",
-            signature.display()
-        );
+        expanded_signature(name, &signature, out);
         return;
     }
     let mut lines = Vec::new();
@@ -326,13 +332,7 @@ fn definition(interface: &Interface, e: &Export, form: &Form, out: &mut String) 
     let name = &e.entity.name;
     match form {
         Form::ModuleContract { requirements } => module_contract(name, requirements, out),
-        Form::ModuleSignature { signature } => {
-            let _ = writeln!(
-                out,
-                "\nExpanded module signature:\n\n```text\n{name} : {}\n```",
-                signature.display()
-            );
-        }
+        Form::ModuleSignature { signature } => expanded_signature(name, signature, out),
         Form::Alias { params, body, .. } => {
             let params: String = params.iter().fold(String::new(), |mut acc, p| {
                 let _ = write!(acc, " {p}");
@@ -437,10 +437,13 @@ mod tests {
 
 #[cfg(test)]
 mod module_signature_tests {
+    use crate::ir::tests::check_text;
+    use crate::source::FileId;
+    use crate::syntax;
     #[test]
     fn module_signature_documentation_preserves_valid_source_declarations() {
         let source = "module App.Contracts exposing (..)\ntype module Input =\n  seed : Int\ntype module Output =\n  answer : Int\ntype module Factory = (K : Input) -> Output\ntype module Namespace =\n  module Make : Factory\n";
-        let (_, interface) = crate::ir::tests::check_text("App.Contracts", source).expect("checks");
+        let (_, interface) = check_text("App.Contracts", source).expect("checks");
         let page = super::page(&interface, source);
         assert!(
             page.contains("type module Factory = (K : Input) -> Output"),
@@ -448,7 +451,7 @@ mod module_signature_tests {
         );
         for block in page.split("```flick\n").skip(1) {
             let code = block.split("```").next().expect("code fence");
-            let parsed = crate::syntax::parse(code, crate::source::FileId::new(0));
+            let parsed = syntax::parse(code, FileId::new(0));
             assert!(
                 parsed.diagnostics.is_empty(),
                 "{code}: {:?}",
