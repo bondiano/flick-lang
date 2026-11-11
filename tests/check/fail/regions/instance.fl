@@ -42,4 +42,4 @@ let keep () = scope s {
 
 //~ FLICK-G001 @27:51-27:56 holds `s`
 //~ FLICK-G001 @28:53-28:58 holds `s`
-//~ FLICK-G001 @40:20-40:45 uses `file`, which holds region `s`
+//~ FLICK-G002 @40:30-40:45 this uses region `s`

@@ -1,0 +1,51 @@
+module Language.Loops exposing (tests)
+
+type error Missing = Missing
+
+count : Int -> Int
+let count n =
+  let mut i = 0
+  while i < n do i = i + 1
+  i
+
+find : Int -> Int
+let find n =
+  let mut i = 0
+  loop {
+    i = i + 1
+    if i < n then continue
+    break i
+  }
+
+sum : List Int -> Int
+let sum xs =
+  let mut total = 0
+  for x <- xs do {
+    if x < 0 then continue
+    if x > 10 then break
+    total = total + x
+  }
+  total
+
+recover : Unit ->{} (Int, Int)
+let recover () =
+  let mut value = 0
+  let recovered =
+    try
+      value = 5
+      value = from_result (Err Missing)
+      value
+    with
+    | Missing -> value
+  (value, recovered)
+
+tests : List Test.Test
+let tests = [
+  Test.test "while starts with its condition" (fun () -> Test.equal 0 (count 0)),
+  Test.test "while repeats mutation" (fun () -> Test.equal 5 (count 5)),
+  Test.test "loop returns break value after continue" (fun () -> Test.equal 3 (find 3)),
+  Test.test "for skips and stops" (fun () -> Test.equal 4 (sum [1, -2, 3, 20, 5])),
+  Test.effect_test
+    "try preserves completed assignment"
+    (task { Test.expect (Test.equal (5, 5) (recover ())) }),
+]

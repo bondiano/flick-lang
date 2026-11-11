@@ -7,7 +7,7 @@ const KEYWORDS = [
   'todo', 'echo',
   'type', 'opaque', 'refined', 'where', 'kind', 'error', 'service', 'class',
   'instance', 'deriving', 'forall', 'not', 'none',
-  'ui', 'in', 'when', 'for', 'yield', 'do',
+  'ui', 'in', 'when', 'for', 'yield', 'do', 'break', 'continue',
 ];
 
 const OPERATORS = [
@@ -20,20 +20,27 @@ module.exports = grammar({
 
   externals: $ => [$.block_comment, $.raw_string, $.multiline_string],
 
-  extras: $ => [/\s/, $.doc_comment, $.line_comment, $.block_comment],
+  extras: $ => [/[ \t\r]/, $.doc_comment, $.line_comment, $.block_comment],
 
-  word: $ => $.identifier,
+  word: $ => $._identifier,
+
+  conflicts: $ => [[$._loop, $.identifier], [$._while, $.identifier]],
 
   rules: {
     source_file: $ => repeat($._token),
 
     _token: $ => choice(
+      $._newline,
+      $._loop,
+      $._while,
       $.attribute,
       $._foreign,
       $._from,
       $._component,
       $._plugin,
       $._server_fn,
+      $._private_module,
+      $._type_refinement_and,
       $.parens,
       $.brackets,
       $.braces,
@@ -53,6 +60,16 @@ module.exports = grammar({
     brackets: $ => seq('[', repeat($._token), ']'),
     braces: $ => seq('{', repeat($._token), '}'),
 
+    _newline: _ => '\n',
+    _loop: $ => prec.dynamic(1, seq(alias('loop', $.keyword), $.braces)),
+    _while: $ => prec.dynamic(1, seq(alias('while', $.keyword), repeat1($._condition_token), alias('do', $.keyword))),
+    _condition_token: $ => choice(
+      $.parens, $.brackets, $.braces, $.identifier, $.constructor, $.boolean,
+      $.number, $.string, $.raw_string, $.multiline_string, $.member,
+      alias(choice(...KEYWORDS.filter(k => !['do', 'let', 'module', 'import', 'type', 'service', 'class', 'instance'].includes(k))), $.keyword),
+      alias(choice(...OPERATORS.filter(k => ![',', ';', '='].includes(k))), $.operator),
+    ),
+
     keyword: _ => choice(...KEYWORDS),
 
     // the mode after `foreign` and `global` after `from` are keywords only there
@@ -66,6 +83,8 @@ module.exports = grammar({
     // `plugin head` in an import's `exposing`, and `server fn`
     _plugin: $ => seq(alias('plugin', $.keyword), $.identifier),
     _server_fn: $ => seq(alias('server', $.keyword), alias('fn', $.keyword)),
+    _private_module: $ => seq(alias('private', $.keyword), alias('module', $.keyword)),
+    _type_refinement_and: $ => seq(alias('and', $.keyword), alias('type', $.keyword)),
     boolean: _ => choice('true', 'false'),
     // `@lang int`: the attribute's name; its arguments are plain identifiers
     attribute: _ => token(seq('@', /[a-z_][A-Za-z0-9_]*/)),
@@ -74,7 +93,8 @@ module.exports = grammar({
     // `.name` is a field or module member even when it spells a keyword
     member: _ => token(seq('.', /[a-z_][A-Za-z0-9_]*/)),
 
-    identifier: _ => /[a-z_][A-Za-z0-9_]*/,
+    _identifier: _ => /[a-z_][A-Za-z0-9_]*/,
+    identifier: $ => choice($._identifier, 'loop', 'while'),
     constructor: _ => /[A-Z][A-Za-z0-9_]*/,
 
     number: _ => token(choice(

@@ -27,21 +27,21 @@ let save_button props = ui {
 }
 ```
 
-`c` is a capture row (see [regions](../regions/#captures)). Like any new type
+`c` is a capture row (see [regions](../regions/#qualifiers)). Like any new type
 variable of a signature it is quantified over the whole signature, so
 `forall c.` can be left out ([types](../types/)).
 
 The two `^c` are what let `save_button` accept any callback. A function type
-without a qualifier holds no regions. So with `on_save : Unit ->{Atom.Write} Unit`, a callback that uses a `File s` from an enclosing `scope`
-is rejected where it is passed (`FLICK-G001`), even when the `Ui` never
+without a qualifier keeps no region live. So with `on_save : Unit ->{Atom.Write} Unit`, a callback that uses a `File s` from an enclosing `scope`
+is rejected where it is passed (`FLICK-G002`), even when the `Ui` never
 leaves the scope. A callback that needs a service, such as saving through
 `Users`, provides it and handles its errors inside, writing the outcome to
-an atom. With `^c` on the field the callback may hold anything, and
-`^c` on the result keeps those captures in the `Ui`, so a `Ui` that holds a
-region still cannot leave its scope. A qualifier on the result alone does not
-help, since the field would still allow no captures. A top-level signature is
+an atom. With `^c` on the field the callback may use what `c` keeps
+live, and `^c` on the result says that using the `Ui` needs it too, so a `Ui`
+whose callbacks use a region cannot leave its scope. A qualifier on the result
+alone does not help, since the field would still keep nothing live. A top-level signature is
 checked as written, so these qualifiers are never inferred. A component whose
-callbacks never hold scoped resources can drop both of them.
+callbacks never use scoped resources can drop both of them.
 
 `ui { … }` is a block in which the names `Ui` exports need no `Ui.`: a local
 binding still wins, then a name of `Ui`, then the module's own names.
@@ -128,7 +128,7 @@ from the atoms it reads, and `Atom.set`/`Atom.update` write a state
 through the service `Atom.Write`, which the task of an action has and a
 render does not. `Atom.layer` provides one registry as both
 `Atom.Registry`, which roots and server markup read, and `Atom.Write`;
-`Atom.Registry` is Effect's `Reactivity.Atom.Registry`, which `Atom`
+`Atom.Registry` is `Reactivity.Atom.Registry`, which `Atom`
 re-exports.
 
 A view is a component whose render reads atoms through the service
@@ -151,8 +151,8 @@ component counter_view () = ui {
 ```
 
 `Ui.render view props` places a view in a `Ui`. The compiler names each
-top-level view, action and atom `Module.name`, as React's developer tools
-and Effect's show it (`App.Counter.counter_view`); a release build keeps
+top-level view, action and atom `Module.name`, as the developer tools
+of React and of Effect show it (`App.Counter.counter_view`); a release build keeps
 them all, or only those of views and actions with `[build] labels = "components"`.
 `Ui.named` gives a view another name. A view subscribes to what it read after React
 commits, and a write between its render and its subscription renders it
@@ -440,7 +440,7 @@ calls the pure `decide` on the snapshot before the callback returns and
 prevents the default action when it says so; otherwise the default action
 happens.
 
-Handlers keep their captures: a button whose handler holds a file of a
+Handlers keep what they need: a button whose handler uses a file of a
 scope cannot leave that scope (`FLICK-G001`). Building a `Ui` is pure, so
 `Ref.get` there is a runtime call where none is allowed (`FLICK-E001`); a
 view reads atoms instead.
@@ -640,7 +640,7 @@ arrive.
 user : Atom.Atom (Atom.Async String none)
 let user = Atom.serializable_task (Codec.json Schema.string) (Atom.task (task { fetch_name () }))
 
-chunks : Unit ->{} List String
+chunks : Unit ->{Async;} List String
 let chunks () = provide Atom.layer { Stream.run_collect (Ui.Server.stream "app" page) }
 ```
 
@@ -701,7 +701,7 @@ typed primitives and event snapshots, or foreign React components through
 The state of a Flick UI is in atoms: a view renders from the atoms it reads,
 and a handler is a supervised task that writes them. There is no
 `Msg → update` loop, and none is planned: what Elm puts in commands is a
-task of an action, run by the Effect fibers, scopes and event policies that
+task of an action, run by the fibers, scopes and event policies that
 already exist. Sources that write atoms on their own, Elm's subscriptions,
 are among the [limitations](#limitations) below.
 

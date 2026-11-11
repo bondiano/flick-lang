@@ -4,6 +4,7 @@
 
 use std::mem;
 
+use super::sugar_lints::unparen;
 use super::ty::Type;
 use super::typing::{Ref, range};
 use super::{Checker, Domain, Local, Operator};
@@ -19,7 +20,7 @@ use crate::types::lang::{self, Lang};
 impl Checker<'_> {
     /// Binds `name`, written at `at`, to `ty`.
     pub fn push_local(&mut self, name: &str, at: u32, ty: Type) {
-        self.locals.push(Local {
+        self.cx.locals.push(Local {
             name: name.to_owned(),
             at: Some(at),
             generated: at >= self.generated,
@@ -67,11 +68,11 @@ impl Checker<'_> {
             return self.qualified(&qualifier.join("."), namespace, name, span);
         }
         if namespace == Namespace::Value
-            && let Some(i) = (self.locals.iter())
+            && let Some(i) = (self.cx.locals.iter())
                 .rposition(|l| l.name == name && l.generated == (span.start >= self.generated))
         {
             self.record_name(span, Ref::Local);
-            if let Some(at) = self.locals[i].at
+            if let Some(at) = self.cx.locals[i].at
                 && span.start < self.generated
             {
                 let end = at + u32::try_from(name.len()).expect("source fits in u32");
@@ -94,12 +95,17 @@ impl Checker<'_> {
                     self.top_value(name, span)
                 } else {
                     let scheme = self.env.value(&entity).cloned();
-                    scheme.map_or(Type::Error, |s| self.instantiate(&s, span))
+                    scheme.map_or(Type::Error, |s| {
+                        self.instantiate(&self.live_scheme(&s), span)
+                    })
                 };
                 self.record_entity(&entity, &ty, span);
                 ty
             }
-            super::env::Found::Unknown => Type::Error,
+            super::env::Found::Unknown => {
+                self.cx.trusted = true;
+                Type::Error
+            }
             super::env::Found::Missing if namespace == Namespace::Constructor => {
                 if let super::env::Found::Entity(e) = self.env.find(Namespace::Type, name) {
                     self.record_name(span, Ref::ServiceTag(format!("{}.{}", e.module, e.name)));
@@ -128,7 +134,7 @@ impl Checker<'_> {
                     span,
                     format!("cannot find {what} `{name}`"),
                     |this| {
-                        let locals = this.locals.iter().map(|l| l.name.as_str());
+                        let locals = this.cx.locals.iter().map(|l| l.name.as_str());
                         closest(name, this.env.names(namespace).chain(locals)).map(str::to_owned)
                     },
                 );
@@ -138,9 +144,9 @@ impl Checker<'_> {
     }
 
     pub fn use_local(&mut self, index: usize, span: Span) -> Type {
-        self.regions.uses.push(index);
+        self.cx.regions.uses.push(index);
         self.mutable_use(index, span);
-        let Local { ty, rec, .. } = self.locals[index].clone();
+        let Local { ty, rec, .. } = self.cx.locals[index].clone();
         let ty = self.instantiate(&ty, span);
         if let Some(rec) = rec {
             self.recs[rec].uses.push((ty.clone(), span));
@@ -169,7 +175,7 @@ impl Checker<'_> {
     /// at a stage makes the application a runtime call.
     pub fn apply(&mut self, head: &Node, args: &[&Node]) -> Type {
         let mut defaults = Vec::new();
-        let provided = self.regions.provided.len();
+        let provided = self.cx.regions.provided.len();
         let ty = self.apply_args(head, args, &mut defaults);
         self.settle_defaults(defaults);
         self.settle_provided(provided);
@@ -182,10 +188,10 @@ impl Checker<'_> {
         args: &[&Node],
         defaults: &mut Vec<(Type, usize)>,
     ) -> Type {
-        #[cfg(feature = "diagnostic-fixes")]
         let since = self.diagnostics.len();
+        // a local `forall v. τ^v -> σ` keeps its argument out of its result
+        let parametric = self.local_parametric(head);
         let mut ty = self.infer(head);
-        #[cfg(feature = "diagnostic-fixes")]
         let mut unknown = Vec::new();
         let mut params = Vec::new();
         // the places a plugin watches: read before any argument, so an
@@ -200,27 +206,25 @@ impl Checker<'_> {
                     effects,
                     result,
                 } => {
-                    let calls = self.stage.calls;
+                    let calls = self.cx.stage.calls;
                     let since = self.diagnostics.len();
                     // a task acquiring into a region a later argument names
                     // waits for it (`docs/formal/regions.md#scope-region-of-a-task-argument-is-resolved-after-the-call`)
                     let eff = self.eff_parts(&param).is_some();
-                    let outer = eff.then(|| self.regions.defaults.replace(Vec::new()));
+                    let outer = eff.then(|| self.cx.regions.defaults.replace(Vec::new()));
                     let argument = self.check_value(arg, &param);
                     if let Some(outer) = outer {
-                        let mine = mem::replace(&mut self.regions.defaults, outer);
+                        let mine = mem::replace(&mut self.cx.regions.defaults, outer);
                         defaults.extend(mine.unwrap_or_default());
                     }
                     self.explain_argument(since, head, i, &param);
                     if watched.is_some() {
                         let folded = consteval::eval(arg, self.text);
-                        given.push((self.span(arg), argument.clone(), folded));
-                    }
-                    if i == 0 {
-                        self.ui_render_handlers(head, arg);
+                        let lambda = unparen(arg).kind == K::FunExpr;
+                        given.push((self.span(arg), argument.clone(), folded, lambda));
                     }
                     if eff {
-                        if self.stage.calls > calls {
+                        if self.cx.stage.calls > calls {
                             self.early_argument(head, arg);
                         }
                         // the rows the `Eff` needs are lower bounds of the parameter's: grown
@@ -228,18 +232,15 @@ impl Checker<'_> {
                         self.grow();
                     }
                     if let Some(e) = effects {
-                        self.call_effects(&e, span);
+                        self.call_effects(&self.live_call(&ty, &e), span);
                     }
                     params.push(*param);
                     let result = self.instantiate(&result, span);
-                    ty = self.application_result(result, &ty, &argument);
+                    ty = self.application_result(result, &ty, &argument, parametric && i == 0);
                 }
                 Type::Error => {
                     let inferred = self.infer(arg);
-                    #[cfg(feature = "diagnostic-fixes")]
                     unknown.push(inferred);
-                    #[cfg(not(feature = "diagnostic-fixes"))]
-                    let _ = inferred;
                 }
                 meta @ Type::Meta(_) => {
                     let (param, result) = (self.fresh(), self.fresh());
@@ -256,7 +257,6 @@ impl Checker<'_> {
                 other => return self.not_a_function(&other, span, &args[i..]),
             }
         }
-        #[cfg(feature = "diagnostic-fixes")]
         if unknown.len() == args.len() && head.kind == K::NameExpr {
             self.stub_fix(since, head, args, &unknown);
         }
@@ -373,7 +373,7 @@ impl Checker<'_> {
                     K::Percent => ("%", Domain::Numeric),
                     _ => ("**", Domain::Numeric),
                 };
-                self.operators.push(Operator {
+                self.cx.operators.push(Operator {
                     ty: ty.clone(),
                     span,
                     op: name,
@@ -400,11 +400,12 @@ impl Checker<'_> {
                 if let Some(e) = effects {
                     let (start, _) = lhs.range();
                     let (_, end) = rhs.range();
+                    let e = self.live_call(&function, &e);
                     self.call_effects(&e, Span::new(self.file, start, end));
                 }
                 let span = Span::new(self.file, lhs.range().0, rhs.range().1);
                 let result = self.instantiate(&result, span);
-                self.application_result(result, &function, &arg)
+                self.application_result(result, &function, &arg, false)
             }
             Type::Error => Type::Error,
             meta @ Type::Meta(_) => {
@@ -462,6 +463,7 @@ impl Checker<'_> {
                 }
                 let span = self.span(node);
                 if self.runtime_allowed(span) {
+                    let services = self.live_await(&ty, services);
                     self.perform(&services, &errors, span);
                 }
                 result
@@ -476,7 +478,7 @@ impl Checker<'_> {
                 {
                     literal.value = literal.value.map(|v| -v);
                 }
-                self.operators.push(Operator {
+                self.cx.operators.push(Operator {
                     ty: ty.clone(),
                     span: self.span(node),
                     op: "-",

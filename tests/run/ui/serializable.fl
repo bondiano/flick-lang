@@ -1,10 +1,8 @@
 // Serializable atoms take their keys from the bindings that define them:
-// `Module.name`, and `Module.name/key` for each atom of a family.
+// `Module.name`, and `Module.name/key` for each atom of a family. The state
+// a server hands over lists each serializable atom of the registry with its
+// coded value, and no other atom.
 module App.Main exposing (main)
-
-dehydrated : Unit ->{Atom.Registry; none} String
-foreign effect dehydrated from "./hydration.mjs" "dehydrated"
-  arity 0
 
 count : Atom.Writable Float
 let count = Atom.serializable (Codec.json Schema.number) (Atom.make 0)
@@ -21,5 +19,5 @@ let main () = provide Atom.layer {
   Atom.set (draft "intro") "hello"
   Atom.set (draft "outro") "bye"
   Atom.set local 8
-  Platform.stdout_line (dehydrated ())
+  Platform.stdout_line (Ui.Server.state "app")
 }

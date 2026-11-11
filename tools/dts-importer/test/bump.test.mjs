@@ -34,14 +34,14 @@ test("effect-bump reports the change, writes the snapshot and moves the pins", (
       "  Effect.sync",
     ].join("\n"),
   );
+  assert.equal(readFileSync(path.join(root, "flick/src/toolchain.rs"), "utf8"), readFileSync(path.join(fixtures, "repo/flick/src/toolchain.rs"), "utf8"), "bumping Effect leaves compiler toolchain versions unchanged");
   const written = readFileSync(path.join(root, "stdlib/Effect/snapshot.json"), "utf8");
-  // the coverage linter's fixture: `flick-core/tests/effect_surface.rs` lints it red
+  // the coverage linter's fixture: `packages/effect-ts/tools/surface/tests/coverage.rs` lints it red
   assert.equal(written, readFileSync(path.join(fixtures, "effect-1.1.0.snapshot.json"), "utf8"));
   const pins = {
     "packages/effect-ts/package.json": '"effect": "1.1.0"',
     "packages/effect-ts/src/capabilities.ts": 'EFFECT_VERSION = "1.1.0"',
     "packages/effect-ts/test/effect-version.test.ts": 'PINNED_EFFECT = "1.1.0"',
-    "flick/src/toolchain.rs": 'EFFECT: &str = "1.1.0"',
   };
   for (const [file, pin] of Object.entries(pins)) {
     assert.ok(readFileSync(path.join(root, file), "utf8").includes(pin), file);

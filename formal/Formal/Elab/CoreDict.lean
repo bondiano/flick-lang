@@ -18,14 +18,12 @@ variable {P : Prog} {S : Sig} {N : Names}
 theorem lams_typ {Ψ Θ} {q : Ty} {T : TTy} {b' : Flick.Tm} (hns : ∀ s, ¬ b'.Has s) :
     ∀ (qs : List Cn) (Γc : List Flick.Scheme), qs ≠ [] →
     Typ S Ψ Θ (dctx N qs ++ Γc) b' (.ex (trTT N T) .pure) →
-    (∀ i s a, b'.Free (i + qs.length) → Γc[i]? = some s → s.reach a →
-      (trT N q).reach a ∨ (trTT N T).reach a) →
     ∀ φ, Typ S Ψ Θ Γc (lamsC qs.length b') (.ex (trTT N (dicts q qs T)) φ) := by
   intro qs
   induction qs with
   | nil => intro _ h; exact absurd rfl h
   | cons c qs ih =>
-    intro Γc _ hb hh φ
+    intro Γc _ hb φ
     have hb' : Typ S Ψ Θ (dctx N qs ++ (Flick.Scheme.mono (trD N c) :: Γc)) b'
         (.ex (trTT N T) .pure) := by
       simpa [dctx, List.append_assoc] using hb
@@ -33,28 +31,10 @@ theorem lams_typ {Ψ Θ} {q : Ty} {T : TTy} {b' : Flick.Tm} (hns : ∀ s, ¬ b'.
         (.ex (trTT N (dicts q qs T)) .pure) := by
       cases qs with
       | nil => exact hb'
-      | cons c' qs' =>
-        refine ih _ (List.cons_ne_nil _ _) hb' ?_ .pure
-        intro i s a hi hs hr
-        cases i with
-        | zero =>
-          simp only [List.getElem?_cons_zero, Option.some.injEq] at hs; subst hs
-          exact absurd ((Flick.Scheme.reach_mono _ _).1 hr) (trD_reach N c a)
-        | succ i =>
-          refine hh i s a ?_ hs hr
-          simp only [List.length_cons] at hi ⊢; rwa [Nat.add_right_comm] at hi
-    refine .lam inner (fun h => hns _ (lamsC_has.1 h)) ?_ .refl
-    rintro a (⟨i, s, hi, hs, hr⟩ | ⟨⟨p, hp, -⟩ | ⟨l, u, hl, -⟩⟩)
-    · have hi' : b'.Free (i + (c :: qs).length) := by
-        have := lamsC_free.1 hi; simp only [List.length_cons]; rwa [Nat.add_right_comm] at this
-      rcases hh i s a hi' hs hr with h | h
-      · exact .inr (.inr h)
-      · exact .inr (.inl (trTT_reach_dicts N h))
-    · exact absurd (lamsC_has.1 hp) (hns _)
-    · exact absurd (lamsC_has.1 hl) (hns _)
+      | cons c' qs' => exact ih _ (List.cons_ne_nil _ _) hb' .pure
+    exact .lam inner (fun h => hns _ (lamsC_has.1 h)) .refl
 
-theorem has_lamD {Γ Δ qs e t q φ} (he : Has S N Γ (qs ++ Δ) e t φ) (hφ : qs ≠ [] → φ = .P)
-    (hh : qs ≠ [] → ∀ n, heldT Γ e n → t.reach n ∨ q.reach n) :
+theorem has_lamD {Γ Δ qs e t q φ} (he : Has S N Γ (qs ++ Δ) e t φ) (hφ : qs ≠ [] → φ = .P) :
     Has S N Γ Δ (.lamD qs.length e) (dicts q qs t) φ := by
   intro Ψ Θ Γc γ δ hc
   obtain ⟨b', hb', tb⟩ := he Ψ Θ _ _ _ (hc.lamD N qs)
@@ -62,21 +42,7 @@ theorem has_lamD {Γ Δ qs e t q φ} (he : Has S N Γ (qs ++ Δ) e t φ) (hφ : 
   by_cases hq : qs = []
   · subst hq; exact tb
   · have := hφ hq; subst this
-    refine lams_typ (hb'.has N) qs Γc hq tb ?_ _
-    have fin : ∀ {a n}, a = Atom.v n → heldT Γ e n → (trT N q).reach a ∨ (trTT N t).reach a := by
-      rintro a n rfl hn
-      rcases hh hq n hn with h | h
-      · exact .inr ((trTT_reach N t _).2 ⟨n, rfl, h⟩)
-      · exact .inl (trT_reach_v N h)
-    intro i s a hi hs hr
-    rcases hb'.free N hi with ⟨x, hx, hγ⟩ | ⟨k, hk⟩
-    · obtain ⟨n, hn, hn'⟩ := corr_held N hc (.inl ⟨x, hx, by omega⟩) hs hr
-      exact fin hn hn'
-    · unfold dext at hk
-      split at hk
-      · omega
-      · obtain ⟨n, hn, hn'⟩ := corr_held N hc (e := e) (.inr ⟨k - qs.length, by omega⟩) hs hr
-        exact fin hn hn'
+    exact lams_typ (hb'.has N) qs Γc hq tb _
 
 /-- The field of a method at the instance `θ` of its class parameters and own variables. -/
 theorem rot_inst (T : Flick.Ty) {p kk : Nat} (θ : Nat → Ty) :
@@ -106,10 +72,20 @@ theorem rot_inst (T : Flick.Ty) {p kk : Nat} (θ : Nat → Ty) :
           dif_neg (by omega : ¬ j - kk - p + kk < kk), trσ, if_neg h2, trT]
         congr 1; omega
 
+/-- `rot_inst` at one atom. -/
+theorem rot_inst_atom (a : Atom) {p kk : Nat} (θ : Nat → Ty) :
+    ((rot p kk a).substT (liftT kk (instT (((vars p).map (·.subst θ)).map (trT N))))).substT
+        (instT ((List.range kk).map fun j => trT N (θ (j + p)))) =
+      trσ N (fun j => if j < p + kk then θ j else .var (j - (p + kk))) a := by
+  cases a with
+  | v n => exact rot_inst (.tvar n) θ
+  | r q => exact rot_inst (.rg q) θ
+
 theorem has_meth (hR : Real P S N) {Γ Δ e m C s c₀ rest θ φ} (hm : P.methods m = some (C, s))
-    (hc₀ : s.ctx = c₀ :: rest) (he : Has S N Γ Δ e (.dict (c₀.subst θ)) φ) :
+    (hc₀ : s.ctx = c₀ :: rest) (hb : Bounds.Hold (s.bd.map (Bound.subst θ)))
+    (he : Has S N Γ Δ e (.dict (c₀.subst θ)) φ) :
     Has S N Γ Δ (.meth e m) (dicts .cnil (rest.map (·.subst θ)) (.mono (s.ty.subst θ))) φ := by
-  obtain ⟨p, rest', hctx, hp, hcl, hfs⟩ := hR.meth hm
+  obtain ⟨p, rest', hctx, hp, hcl, hbd, hfs⟩ := hR.meth hm
   rw [hctx] at hc₀; cases hc₀
   intro Ψ Θ Γc γ δ hc
   obtain ⟨e', he', te⟩ := he Ψ Θ Γc γ δ hc
@@ -118,8 +94,19 @@ theorem has_meth (hR : Real P S N) {Γ Δ e m C s c₀ rest θ φ} (hm : P.metho
   have te' : Typ S Ψ Θ Γc e'
       (.ex (.dict (N.cls C p) (Flick.Ty.spine (((vars p).map (·.subst θ)).map (trT N)))) (trStage N φ)) := by
     have := te; simp only [trTT, trD, Cn.subst, hlen] at this; exact this
+  -- the value bounds of the field hold at the instance: it is `θ` on the scheme's variables
+  have hθ : ∀ j, j < s.k → (if j < p + (s.k - p) then θ j else .var (j - (p + (s.k - p)))) = θ j :=
+    fun j hj => by rw [if_pos (by omega)]
+  have holds : (Flick.Scheme.substT (instT (((vars p).map (·.subst θ)).map (trT N)))
+      ⟨s.k - p, (trBd N s.bd).substT (rot p (s.k - p)),
+        (trTT N (methTy rest s.ty)).substT (rot p (s.k - p))⟩).Holds Θ
+      ((List.range (s.k - p)).map fun j => trT N (θ (j + p))) := by
+    rintro C r ⟨C₁, r₁, ⟨C₀, r₀, h₀, rfl, rfl⟩, rfl, rfl⟩
+    simp only [Caps.substT_comp, Flick.Ty.substT_comp]
+    refine trBd_holds N (fun a => ?_) (by rw [hbd _ θ hθ]; exact hb) Θ C₀ r₀ h₀
+    rw [← Flick.Ty.substT_comp]; exact rot_inst_atom a θ
   refine ⟨_, .meth he', .dproj te' hd (by simp [vars]) (hfs fs hd)
-    (ts := (List.range (s.k - p)).map fun j => trT N (θ (j + p))) (by simp) holds_none ?_⟩
+    (ts := (List.range (s.k - p)).map fun j => trT N (θ (j + p))) (by simp) holds ?_⟩
   simp only [Flick.Scheme.inst, Flick.Scheme.substT]
   rw [rot_inst, ← trTT_subst, Nat.add_sub_cancel' hp,
     hcl _ θ fun j hj => by simp [hj]]

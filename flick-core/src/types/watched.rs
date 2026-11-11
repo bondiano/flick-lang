@@ -10,16 +10,23 @@ pub struct Watched {
     names: Vec<(String, String)>,
 }
 
+/// The module of a watched tag: `@tag` is held as `(TAG, tag)`, which is no
+/// name of a module.
+const TAG: &str = "@";
+
 /// Nothing watched, as a module checked on its own has it.
 static NONE: Watched = Watched { names: Vec::new() };
 
 impl Watched {
     /// The names `entries` declares, each `Module.name`, `Module.Sub.name`
-    /// or `*.name`; anything else is left out, the manifest having refused
-    /// it already.
+    /// or `*.name`, and the tags, each `@tag`; anything else is left out,
+    /// the manifest having refused it already.
     pub fn new<'e>(entries: impl IntoIterator<Item = &'e str>) -> Watched {
         let names = (entries.into_iter())
             .filter_map(|entry| {
+                if let Some(tag) = entry.strip_prefix('@') {
+                    return Some((TAG.to_owned(), tag.to_owned()));
+                }
                 let (module, name) = entry.rsplit_once('.')?;
                 let module = if module == "*" { "" } else { module };
                 Some((module.to_owned(), name.to_owned()))
@@ -31,6 +38,11 @@ impl Watched {
     /// Nothing watched.
     pub fn none() -> &'static Watched {
         &NONE
+    }
+
+    /// Whether a plugin watches the values `tag` marks.
+    pub fn tag(&self, tag: &str) -> bool {
+        self.names.iter().any(|(m, n)| m == TAG && n == tag)
     }
 
     pub fn is_empty(&self) -> bool {

@@ -1,4 +1,4 @@
-// Failures of Effect's `Stream`, what runs around a stream, and its services.
+// Failures of `Stream`, what runs around a stream, and its services.
 module App.Main exposing (main)
 
 type error Boom = Boom Float
@@ -27,7 +27,7 @@ let is_boom failure = Option.is_some (Failure.primary failure)
 record : Ref (List String) -> String ->{} Unit
 let record log entry = Ref.set log (Ref.get log ++ [entry])
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Async; AppError} Unit
 let main () =
   line (
     "catch",

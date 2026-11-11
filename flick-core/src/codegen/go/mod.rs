@@ -23,7 +23,6 @@ mod loops;
 mod main_file;
 mod names;
 mod pattern;
-mod reach;
 mod runtime;
 
 pub use runtime::{GO_MOD, GO_SUM, PACKAGES, Package, RUNTIME};
@@ -34,7 +33,7 @@ use std::{mem, slice};
 use flick_pretty::{Document, DocumentArena, Documentable, docvec};
 
 use crate::diagnostics::{Diagnostic, Severity, codes};
-use crate::ir::{ExprKind, ItemKind, Module, Stage};
+use crate::ir::{ExprKind, ItemKind, Module, Stage, reach};
 use crate::source::Span;
 use layout::{Code, block, call, directive, list, statement};
 use reach::Key;
@@ -245,6 +244,7 @@ fn compile<'a>(
             shapes.insert((modules[m].name.clone(), name), shape(&item.kind));
         }
     }
+    let item_initializers = modules.iter().any(|m| !m.initialization.is_empty());
     let mut files = Vec::new();
     let mut sources = BTreeMap::new();
     // the modules each module's initialization reads
@@ -259,6 +259,7 @@ fn compile<'a>(
         }
         let arena = DocumentArena::new();
         let mut g = Gen::new(&module.name, &shapes, program.package, &arena);
+        g.item_initializers = item_initializers;
         if (program.own)(&module.name) {
             g.location = Some(program.location);
             g.foreign_file = Some(program.foreign_file);
@@ -276,16 +277,25 @@ fn compile<'a>(
         sources.extend(g.sources);
         files.push((names::file(&module.name), code));
     }
-    let mut order = Vec::new();
-    let mut visited = HashSet::new();
-    for root in roots {
-        init_order(root, &deps, &mut visited, &mut order);
-    }
-    let inits = order
-        .iter()
-        .filter(|m| deps.contains_key(*m))
-        .map(|m| statement(a, docvec![a, names::init(m), "()"]));
-    let run = block(a, inits.chain([statement(a, start)]));
+    let inits: Vec<_> = if item_initializers {
+        initialization_order(modules, index, &reached)
+            .into_iter()
+            .filter(|&(m, i)| has_initializer(&modules[m].items[i].kind))
+            .map(|(m, i)| statement(a, docvec![a, names::item_init(&modules[m].name, i), "()"]))
+            .collect()
+    } else {
+        let mut order = Vec::new();
+        let mut visited = HashSet::new();
+        for root in roots {
+            init_order(root, &deps, &mut visited, &mut order);
+        }
+        order
+            .iter()
+            .filter(|m| deps.contains_key(*m))
+            .map(|m| statement(a, docvec![a, names::init(m), "()"]))
+            .collect()
+    };
+    let run = block(a, inits.into_iter().chain([statement(a, start)]));
     let run = call(
         a,
         "flickrt.Main",
@@ -304,6 +314,54 @@ fn compile<'a>(
         diagnostics,
         packages,
     }
+}
+
+fn has_initializer(item: &ItemKind) -> bool {
+    match item {
+        ItemKind::Value { .. } => matches!(shape(item), Shape::Var),
+        ItemKind::Instance { info, .. } => info.context.is_empty(),
+        ItemKind::Destructure { .. } | ItemKind::Refined { .. } => true,
+        ItemKind::Foreign(_) | ItemKind::Constructor(_) | ItemKind::Service { .. } => false,
+    }
+}
+
+/// Lexical module references may form a module-level cycle while their
+/// value-initialization graph is acyclic. Schedule that graph directly.
+fn initialization_order(
+    modules: &[&Module],
+    index: &HashMap<Key, (usize, usize)>,
+    reached: &HashSet<(usize, usize)>,
+) -> Vec<(usize, usize)> {
+    fn visit(
+        at: (usize, usize),
+        modules: &[&Module],
+        index: &HashMap<Key, (usize, usize)>,
+        reached: &HashSet<(usize, usize)>,
+        seen: &mut HashSet<(usize, usize)>,
+        out: &mut Vec<(usize, usize)>,
+    ) {
+        if !seen.insert(at) {
+            return;
+        }
+        let mut used = Vec::new();
+        reach::uses(&modules[at.0].items[at.1], &mut used);
+        for key in used {
+            if let Some(&next) = index.get(&key)
+                && reached.contains(&next)
+            {
+                visit(next, modules, index, reached, seen, out);
+            }
+        }
+        out.push(at);
+    }
+    let mut items: Vec<_> = reached.iter().copied().collect();
+    items.sort_unstable();
+    let mut seen = HashSet::new();
+    let mut out = Vec::new();
+    for at in items {
+        visit(at, modules, index, reached, &mut seen, &mut out);
+    }
+    out
 }
 
 /// The modules in an order where each one's initialization runs after
@@ -370,6 +428,7 @@ fn dedup(diagnostics: &mut Vec<Diagnostic>) {
 struct Gen<'a> {
     a: &'a DocumentArena<'a>,
     module: &'a str,
+    item_initializers: bool,
     shapes: &'a HashMap<Key, Shape>,
     package: &'a dyn Fn(&str) -> Option<String>,
     /// Statements of the block being emitted, each with its newline.
@@ -418,6 +477,7 @@ impl<'a> Gen<'a> {
         Gen {
             a,
             module,
+            item_initializers: false,
             shapes,
             package,
             buf: Vec::new(),

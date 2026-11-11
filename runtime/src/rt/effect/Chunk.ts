@@ -1,4 +1,4 @@
-// Effect Chunk's pure collection surface over Flick's persistent array chunks.
+// The pure collection operations of `Chunk` over Flick's persistent array chunks.
 import { equals, LT, GT, none, some as optionSome, type Option, type Result, type Ordering } from "../../core/data.ts";
 import { item } from "../../internal.ts";
 type Chunk<A> = ReadonlyArray<A>;

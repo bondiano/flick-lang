@@ -174,7 +174,7 @@ a `let` or a signature of the user's. A whole number is
 an integer literal, of any numeric type its use asks for; a declaration
 block whose group is empty declares nothing. A function in a
 plugin's code needs no signature: its type is inferred. The arena version is the version of the interface,
-`0.1.0`. Until Flick 0.2 the interface changes without a new version: build
+`0.2.0`. Build
 a component with the `flick-plugin` of the compiler it runs in. A component
 built for another version does not load: the import that exposes its heads
 is `FLICK-P035`, naming the version it was built for and the one the
@@ -214,13 +214,45 @@ watch = ["Ui.Event.queue", "*.parse"]
 
 `check-calls` then gets every place of a checked module that applies one of
 them, with what the checker found there: the module and name applied, the
-span of the application, and for each argument where it is written, its
-type as `check` sees it and the constant it folds to, if any. A call of the
+span of the application, whether it stands in code a plugin wrote, and for
+each argument where it is written, its type as `check` sees it, the constant
+it folds to, if any, and whether it is written as a `fun`. A call of the
 `parse` of a refined type also carries how its check reads that constant:
-the literals of an enum, a check the compiler knows by name, or the
-compiler's verdict on the module's own predicate. Every span is of the
+the literals of an enum, or the syntax and resolved references of the
+module's own predicate. The plugin interprets those facts. Every span is of the
 module's own file, inside a block as well as outside one, so a diagnostic
 comes back at the code the user wrote.
+
+A serializable atom reference also carries read-only `binding` facts: its
+module and top-level name, the binding span, whether its scheme takes a
+dictionary, whether the reference is inside a function, and its applied
+argument count. This includes partial references. The UI plugin uses these
+facts for `FLICK-U003`; it does not change type inference.
+
+A watched service that the signature of a top-level function names is a place
+too: at the function's name, with no arguments and with `binding` saying
+which function it is and, in `gives`, the type it gives when all its arrows
+are applied. The UI plugin warns (`FLICK-U007`) where a function reads atoms
+to give a `Ui`.
+
+A handler made of a `fun` inside the render of a `Ui.view` is found the same
+way: the calls of `Ui.view` and of the constructors of `Ui.Event` are watched,
+and the plugin warns (`FLICK-U002`) where a constructor given a `fun` stands
+inside the first argument of a view the module itself writes.
+
+A plugin may also watch a tag, the attribute that marks values of a kind, as
+`@maker` marks what makes an atom, an action or a view. Each place inside a
+function that names a value the tag reaches, itself or through the functions
+it calls, is then a place with `tagged`: the tag, the name as written, the
+marked value it ends at, and in `inside` the functions around the place from
+the nearest outwards, each with the services of its arrow and whether its
+row is open. The task of a handler runs later, so the functions around a
+`task` are not around what is inside it. The UI plugin refuses
+(`FLICK-U006`) a maker named in a render, a function whose services are
+`Atom.Read` alone.
+
+The `watch` of a manifest names values. Services and tags are watched by the
+plugins the compiler ships.
 
 ```rust
 fn check_calls(&self, calls: &[CallSite], state: &[u8]) -> Vec<Diagnostic> {
@@ -519,3 +551,9 @@ built-in module the file hides by an alias, as `import Other as List`, is
 hidden from generated code too. `collect` sees the modules the run loads, so `flick check one.fl` gives it
 fewer blocks than a whole build. A package whose modules have plugin blocks
 is checked again in each build.
+
+### Source checks and refined predicates
+
+`check-structure` receives the structure of a block's original expression and declaration holes, together with the project's lint thresholds. It can report warnings without type wildcards. Generated wrappers do not contribute to these facts. The UI plugin uses it for T036–T038 on `component`.
+
+A refined call carries enum literals or an expression arena with resolved references. The refined plugin recognizes `Checks.*` and evaluates supported local predicates; an unknown result remains a runtime check. The host supplies no predicate verdict. Protocol 0.2.0 changes the WIT interface and invalidates expansion caches; rebuild external plugins with the matching SDK.

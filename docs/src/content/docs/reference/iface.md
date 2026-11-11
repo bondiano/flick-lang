@@ -3,18 +3,23 @@ title: "`.iface` — native module interface"
 ---
 
 An `.iface` file describes what one module exposes, in the form the checker
-needs, so an importer never re-reads, re-parses or re-checks the module's
-source (see [Compiler architecture](../../contributing/implementation-decisions/#compiler-architecture)). It is versioned JSON. `.d.ts` is only a projection for
-TypeScript; `.iface` is the source of truth for Flick importers.
+needs. Ordinary imports use those checked types directly. Static parameterized modules also
+carry a checked template that is instantiated for its module arguments. A saved
+native package can instantiate it without the original checkout (see
+[Compiler architecture](../../contributing/implementation-decisions/#compiler-architecture)).
+It is versioned JSON. `.d.ts` is only a projection for TypeScript; `.iface` is the source of truth for Flick importers.
 
-The current schema is `iface-version` 8. Every change of the schema bumps it,
-and a compiler rejects any version but its own with `FLICK-P010`.
+The current schema is `iface-version` 16. It includes module visibility,
+`type module` contracts, nested static modules, higher-order signatures, the
+`exists` type form and implicit conversion instances. Every schema change
+bumps the version; a compiler rejects any other version with `FLICK-P010`. The simplified example below shows the envelope;
+use the current compiler to write an interface for a new package.
 
-## Version 3
+## Example
 
 ```json
 {
-  "iface-version": 8,
+  "iface-version": 16,
   "compiler": "0.1.0",
   "module": "App.Shapes",
   "exports": [
@@ -31,13 +36,23 @@ and a compiler rejects any version but its own with `FLICK-P010`.
 ```
 
 Rebuild dependencies written with an older schema; changing the version
-number by hand cannot recover missing capture information.
+number by hand cannot recover missing capture information. A template's
+`capture.scopes` records each defining module and source-prefix boundary,
+with the counts of bindings and inherited imports in scope there. Offline
+instantiation checks the saved prefix and keeps its original entity owners;
+later arguments do not enter that lexical environment.
 
 | Field | Meaning |
 | - | - |
 | `iface-version` | schema version; must equal the compiler's |
 | `compiler` | version of the compiler that wrote the file; must equal the reader's |
 | `module` | full name of the described module |
+| `modules` | exported static module members, each with its own interface; omitted when empty |
+| `parameterized` | checked higher-order signature of a static parameterized module; arrows retain scoped binder identities, parameter signatures, result signatures and atomic group sizes; omitted for structures |
+| `signature_explicit` | `true` when the parameterized module result comes from an explicit declaration or ascription; public aliases cannot inherit a private inferred result |
+| `member_of` | owner namespace and member name for a generated static member; external access uses the checked parent view |
+| `template` | checked static body (`source`) and its lexical `capture`: module bindings, signature origins, partial arguments with the caller's namespace access, lexical namespaces, inherited-import count and definition package; omitted for ordinary structures |
+| `private` | `true` for a module importable only within its package; omitted otherwise |
 | `exports` | the module's interface, in the order of its `exposing` list |
 | `hidden` | constructors of exported types that are not exported, so an import of one gets a precise `FLICK-R005`; omitted when empty |
 | `docs` | the `///` comment of each export the module declares, by name, which its `.d.ts` carries as JSDoc; omitted when empty |
@@ -46,6 +61,25 @@ number by hand cannot recover missing capture information.
 | `dependencies` | the fingerprint of each imported module's interface the module was built against; omitted when empty |
 | `source` | the module's source, relative to the root of its package, so editors find declarations in a published package; written by `flick build` |
 | `targets` | the targets `flick build` compiled the module for, `["js"]` today; a project with `emit = "go"` that imports a module without `"go"` gets `FLICK-P030`; omitted when no build wrote the file |
+
+A native saved package keeps both these templates and the portable IR of their
+ordinary dependencies. It can instantiate a factory for a new argument and build
+JS or Go with `--offline` after the original `.fl` files have been removed. The
+package manifest, lock and saved artifacts must still be available. Path
+packages remain keyed by their current source files; an immutable fetched
+package is keyed by its locked checksum. A changed original file is reported
+as `FLICK-P034` during a build instead of mixing it with saved code.
+
+Compiler-only builds without `native-project` or `build-artifacts` omit persistent
+templates from serialization. They still elaborate static module expressions
+from available source; disk package caches and published template metadata belong
+to those capabilities.
+
+Captures retain access to the definition package's private implementation
+modules. That access belongs to the stored body; importing its public factory
+does not grant clients access to those private paths. A template body change
+invalidates its fingerprint, while API comparison uses the public signature and
+nested members rather than the implementation body.
 
 Each export names an **entity** by `module`, `namespace` and `name`. `module`
 is where the entity is *defined*: a re-export keeps the defining module, which
@@ -205,5 +239,6 @@ records the fingerprint of every imported module's interface at build time.
 ## Location in a package
 
 `flick build` writes `A/B.iface` next to `A/B.js` in the output directory.
-Dependents never read another package's interfaces: they compile a Flick
-library from its sources (see [project.md](../project/#flick-dependencies)).
+Dependents compile a Flick library from its sources or restore its saved
+checked package, including static templates (see
+[project.md](../project/#flick-dependencies)).

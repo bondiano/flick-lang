@@ -1,4 +1,4 @@
-// The bindings of `Schedule` on the kernel, as Go's `flickrt` has Effect 4's:
+// The bindings of `Schedule` on the kernel, as Go's `flickrt` has them:
 // each run of a schedule starts a step function, which from the time and an
 // input decides the step's output and the delay before the next one, or ends
 // the run with a last output. A step runs the schedule's callbacks, so it is a
@@ -37,7 +37,7 @@ export class Schedule {
 
 const NO_DELAY = /*#__PURE__*/ new Duration(0);
 
-/** What a step of a run is told of itself: Effect's `Metadata`, a Flick record. */
+/** What a step of a run is told of itself, a Flick record. */
 export interface Metadata {
   readonly input: unknown;
   readonly output: unknown;
@@ -49,7 +49,7 @@ export interface Metadata {
   readonly elapsedSincePrevious: number;
 }
 
-/** Effect's `metadataFn`: the attempts and times of a run's steps. */
+/** The attempts and times of a run's steps. */
 export const counter = (): ((now: number, input: unknown) => Metadata) => {
   let n = 0;
   let start = 0;
@@ -68,7 +68,7 @@ function* decided(out: Out): Run {
   return out;
 }
 
-/** Effect's `fromStepWithMetadata`: steps decided by `f` from their metadata. */
+/** A schedule whose steps `f` decides from their metadata. */
 const withMeta = (start: () => (m: Metadata) => Out): Schedule =>
   new Schedule(() => {
     const f = start();
@@ -106,7 +106,7 @@ export const exponential = (base: Duration, factor: number): Schedule =>
     return [d, d, false];
   });
 
-/** As Effect 4.1: the first delay is `one`, then 1, 2, 3, 5 times it. */
+/** The first delay is `one`, then 1, 2, 3, 5 times it. */
 export const fibonacci = (one: Duration): Schedule =>
   new Schedule(() => {
     let a = 0;
@@ -148,7 +148,7 @@ export const windowed = (interval: Duration): Schedule => {
   });
 };
 
-/** Effect's `map`: `f` maps the last output too. */
+/** Maps each output by `f`, the last output too. */
 const mapOutput = (self: Schedule, f: (m: Metadata) => unknown): Schedule =>
   around(self, function* (step, meta, now, input): Run {
     const [output, delay, done] = outOf(yield step(now, input));
@@ -156,7 +156,7 @@ const mapOutput = (self: Schedule, f: (m: Metadata) => unknown): Schedule =>
     return [yield f(m), delay, done];
   });
 
-/** Effect's `while`. */
+/** Recurs while `f` holds of a step's metadata. */
 const whileMeta = (self: Schedule, f: (m: Metadata) => unknown): Schedule =>
   around(self, function* (step, meta, now, input): Run {
     const [output, delay, done] = outOf(yield step(now, input));
@@ -189,7 +189,7 @@ export const tap =
       return out;
     });
 
-/** Effect's `modifyDelay`: `f` replaces each delay. */
+/** `f` replaces each delay. */
 const modified = (self: Schedule, f: (m: Metadata) => unknown): Schedule =>
   around(self, function* (step, meta, now, input): Run {
     const out = outOf(yield step(now, input));
@@ -253,7 +253,7 @@ export const concat =
   (self: Schedule): Schedule =>
     mapOutput(concatResult(other)(self), (m) => either(m.output));
 
-/** Effect's `max` and `min`: each step runs every schedule's, and `pick` chooses among the delays, `undefined` where one ended. */
+/** Each step runs every schedule's, and `pick` chooses among the delays, `undefined` where one ended. */
 const combined = (schedules: ReadonlyArray<Schedule>, pick: (ds: ReadonlyArray<Duration | undefined>) => Duration | undefined): Schedule =>
   new Schedule(() => {
     const steps = schedules.map((s) => s.start());
@@ -305,5 +305,5 @@ export const DEFAULT_METADATA: Metadata = /*#__PURE__*/ Object.freeze({
 
 export const flickCurrentMetadata = (): unknown => lookup(METADATA) ?? DEFAULT_METADATA;
 
-// shortcut: a `Cron.Cron` is made by `Cron`, which is on Effect: port Go's `cron_step.go` when `Cron` comes to the kernel
+// Cron remains on the optional adapter; the compiler routes this placeholder there.
 export const cron: (c: unknown) => Schedule = /*#__PURE__*/ absent("Schedule", "cron");

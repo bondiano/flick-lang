@@ -32,7 +32,7 @@ func TestParseURL(t *testing.T) {
 	}
 }
 
-// The expected trees are what Effect's makeTreeRecord builds.
+// The expected trees are what makeTreeRecord of the Effect library builds.
 func TestTreeRecord(t *testing.T) {
 	pairs := []Value{
 		[]Value{"user[name]", "a"}, []Value{"tags[]", "x"}, []Value{"tags[]", "y"},

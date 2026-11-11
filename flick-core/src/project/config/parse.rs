@@ -6,12 +6,11 @@ use std::{mem, ops};
 use serde::Deserialize;
 use toml::{Spanned, de};
 
-use super::deps::{
-    RawDependency, RawGrants, RawJs, RawPackage, dependencies, grants, js_dependencies, package,
-};
+use super::deps::{RawDependency, RawGrants, RawPackage, dependencies, grants, package};
 use super::workspace::RawWorkspace;
 use super::{Build, Config, Entry, Kind, MAIN_ENTRY, Manifest, Script};
 use crate::diagnostics::{Code, Diagnostic, Severity, codes};
+use crate::manifest::{RawJs, js_dependencies};
 use crate::source::{FileId, Span};
 use crate::types::Thresholds;
 

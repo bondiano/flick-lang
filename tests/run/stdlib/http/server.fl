@@ -1,4 +1,4 @@
-// Effect's HTTP server on Node.js at an ephemeral port of 127.0.0.1: a
+// The HTTP server on Node.js at an ephemeral port of 127.0.0.1: a
 // router of handlers, request bodies, cookies whose values never reach the
 // log, static files and forms; closing the server's scope waits for the
 // running request and its finalizer, and then the port refuses connections.
@@ -35,7 +35,7 @@ let stdout_log =
     write = fun level message -> Platform.stdout_line ("log " ++ level ++ ": " ++ message);
   }
 
-/// Effect's log of the address, without the port the system picked.
+/// The server's log of the address, without the port the system picked.
 listening : Logger.Logger String
 let listening =
   Logger.make (fun o ->
@@ -52,7 +52,7 @@ let hello request =
   Http.ServerResponse.text ("hello " ++ name ++ " " ++ show (Http.Router.params ())) ok
 
 create :
-  ServerRequest ->{Log; Http.ServerError.HttpServerError, SchemaError, Http.Body.HttpBodyError, Http.Cookies.CookiesError}
+  ServerRequest ->{Async, Log; Http.ServerError.HttpServerError, SchemaError, Http.Body.HttpBodyError, Http.Cookies.CookiesError}
   ServerResponse
 let create request =
   let created = Http.ServerRequest.schema_body_json item request
@@ -108,14 +108,14 @@ let parse request =
   let _ = Http.ServerRequest.json request
   Http.ServerResponse.text "parsed" ok
 
-upload : ServerRequest ->{; Http.Multipart.MultipartError} ServerResponse
+upload : ServerRequest ->{Async; Http.Multipart.MultipartError} ServerResponse
 let upload request = scope {
   let form = Http.Multipart.persisted request
   Http.ServerResponse.text (show (Http.Multipart.fields form)) ok
 }
 
 /// `upload` of at most one part: a larger form is answered with 413.
-upload_one : ServerRequest ->{; Http.Multipart.MultipartError} ServerResponse
+upload_one : ServerRequest ->{Async; Http.Multipart.MultipartError} ServerResponse
 let upload_one request =
   Http.Multipart.with_limits
     { Http.Multipart.limits with maxParts = Some 1 }

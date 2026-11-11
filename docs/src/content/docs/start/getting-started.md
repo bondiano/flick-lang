@@ -110,12 +110,18 @@ JavaScript to `dist/`, `flick test` runs the tests of the test root and
 `flick dev` rebuilds and restarts on every change. The [CLI reference](../../reference/cli/)
 has every command.
 
+Next, [design a program with effects](../../handbook/designing-with-effects/):
+separate user lookup logic from external calls and provide different services
+in the application and its tests.
+
 ## In a web page
 
 Astro and Vite import Flick modules directly with `@flick-lang/astro`: the
 plugin builds each imported `.fl` with `flick build`. The package is published
 on npm, versioned with the compiler, and its sources are in the Flick
 repository ([source](https://github.com/bondiano/flick-lang/tree/main/tools/astro-flick)).
+Place the `.fl` file inside a Flick project; the new project's default RT
+configuration matches the runtime import below.
 
 ```js
 // astro.config.mjs
@@ -127,7 +133,7 @@ export default defineConfig({ integrations: [flick()] });
 ```astro
 <div id="app"></div>
 <script>
-  import { runMain } from "@flick-lang/effect-ts";
+  import { runMain } from "@flick-lang/runtime/rt";
   import { main } from "../app/Main.fl";
 
   runMain(main);

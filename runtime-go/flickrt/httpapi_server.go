@@ -13,12 +13,12 @@ type apiServer struct{ port float64 }
 
 func HttpApiPort(server Value) Value { return server.(*apiServer).port }
 
-// apiRouterConfig is the router's defaults, as Effect's HttpRouter.make has them.
+// apiRouterConfig is the router's defaults.
 var apiRouterConfig = Rec("ignoreTrailingSlash", None, "ignoreDuplicateSlashes", None,
 	"caseSensitive", None, "maxParamLength", None)
 
 // typedFailure is the error a cause fails with when it has no defect: what
-// Effect's `catch` and `match` see.
+// a recovery from typed errors sees.
 func typedFailure(c *Cause) (Value, bool) {
 	if c.has(causeDie) {
 		return nil, false
@@ -385,7 +385,7 @@ func apiRoutes(fb *Fiber, a *apiDefinition, handlers Value) []Value {
 	return routes
 }
 
-// routePath is a route's path, which starts with `/` as Effect's router needs.
+// routePath is a route's path, which starts with `/` as the router needs.
 func routePath(path string) string {
 	if !strings.HasPrefix(path, "/") {
 		panic(Defect{`TypeError: an HTTP path starts with "/": ` + path})
@@ -456,7 +456,7 @@ func HttpApiRoute(fb *Fiber, path, api, handlers Value) Value {
 
 // The documentation pages load Swagger UI and Scalar from a CDN.
 //
-// shortcut: the JS runtime inlines the bundles its Effect ships, which the go target has no copy of; embed them if pages must work offline
+// shortcut: the JS runtime inlines bundles shipped with its dependencies, which the go target has no copy of; embed them if pages must work offline
 func escapeJSON(text string) string { return strings.ReplaceAll(text, "<", "\\u003c") }
 
 func swaggerPage(title, spec string) string {

@@ -1,5 +1,5 @@
 // Randomness and digests through the `Crypto.Crypto` service, provided by
-// Effect's `Crypto` over Web Crypto. Random values are checked by shape only.
+// `Crypto.system` over Web Crypto. Random values are checked by shape only.
 module App.Main exposing (main)
 
 line : String -> String -> Unit ->{} Unit

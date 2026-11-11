@@ -1,5 +1,5 @@
-/// Effect's `TxRef`: a cell whose reads and writes take part in the
-/// enclosing `Tx.atomically` transaction.
+/// A cell whose reads and writes take part in the enclosing `Tx.atomically`
+/// transaction.
 module TxRef exposing (..)
 
 import Tx
@@ -9,30 +9,30 @@ type TxRef a
 
 /// A new cell holding `initial`.
 make : a ->{} TxRef a
-foreign effect make from "@flick-lang/effect-ts/effect/TxRef" "make"
+foreign effect make from "flick:TxRef" "make"
   reviewed "effect@4.1.2 sha256:b759a9ff75590599"
 
 /// The value the transaction sees.
 get : TxRef a ->{Tx.Transaction} a
-foreign effect get from "@flick-lang/effect-ts/effect/TxRef" "get"
+foreign effect get from "flick:TxRef" "get"
   reviewed "effect@4.1.2 sha256:c7903e0d0c832052"
 
 /// Replaces the value.
 set : a -> TxRef a ->{Tx.Transaction} Unit
-foreign effect set from "@flick-lang/effect-ts/effect/TxRef" "set"
+foreign effect set from "flick:TxRef" "set"
   arity 1
   reviewed "effect@4.1.2 sha256:cc7dc9d082f8540d"
 
 /// Replaces the value with `f` of it.
 update : (a -> a)^c -> TxRef a ->{Tx.Transaction} Unit
-foreign effect update from "@flick-lang/effect-ts/effect/TxRef" "update"
+foreign effect update from "flick:TxRef" "update"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:65fa1fa830be5d12"
 
 /// Replaces the value with the second of `f` of it; returns the first.
 modify : (a -> (b, a))^c -> TxRef a ->{Tx.Transaction} b
-foreign effect modify from "@flick-lang/effect-ts/effect/TxRef" "modify"
+foreign effect modify from "flick:TxRef" "modify"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:526c2831c92131de"

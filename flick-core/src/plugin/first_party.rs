@@ -14,47 +14,35 @@ use flick_plugin_ui::{calls, component};
 
 use super::{Expander, Native};
 
-/// The heads of the plugins linked into the compiler and the module that
-/// exposes each. Every module has them without an import: `cli "x" { … }`
-/// is a block of std's plugin, and no other plugin may give the head.
-pub const HEADS: [(&str, &str); 5] = [
-    ("cli", "Cli"),
-    ("server", "Server"),
-    ("codec", "Codec"),
-    ("sql", "Sql"),
-    ("component", "Ui"),
-];
-
-/// The heads whose blocks need no body even where no import exposes them,
-/// as the compiler read them before: `server fn f x = …` and `server f`.
-pub const BARE: [&str; 1] = ["server"];
-
-/// The declarations of the compiler's own plugins even where no import
-/// exposes their heads, by the head and the word after it: `server fn f x
-/// = …`, `sql table Users "users" { … }`, `sql migration 1 "m" { … }`.
-pub const DECLARATIONS: [(&str, &str); 3] =
-    [("server", "fn"), ("sql", "table"), ("sql", "migration")];
-
-/// The heads that declare a name right after them, whatever word it is:
-/// `component counter (start : Float) = …`.
-pub const NAMED: [&str; 1] = ["component"];
+pub use crate::syntax::heads::{BARE, DECLARATIONS, HEADS, NAMED};
 
 /// The names whose places of call the plugin of std checks, as the `watch`
 /// of a package declares them. Every module is watched for them without a
 /// manifest, as every module has std's heads.
-pub const WATCH: [&str; 5] = [
+pub const WATCH: [&str; 14] = [
+    "@maker",
+    "Atom.Read",
+    "Ui.view",
+    "Ui.Event.exhaust",
+    "Ui.Event.latest",
     "Ui.Event.queue",
     "Ui.Event.concurrent",
     "Action.queue",
     "Action.concurrent",
     "*.parse",
+    "Atom.serializable",
+    "Atom.serializable_family",
+    "Atom.serializable_task",
+    "Atom.serializable_result",
 ];
 
 /// The codes std's plugin gives that are the compiler's own, not shown
 /// under its package: the checks that moved into it keep the code, the
 /// reference page and the `flick explain` text they had. Its other codes,
 /// such as `Q010`, stay `std/Q010`.
-pub const OWN_CODES: [&str; 2] = ["U001", "D006"];
+pub const OWN_CODES: [&str; 9] = [
+    "U001", "U002", "U003", "U006", "U007", "D006", "T036", "T037", "T038",
+];
 
 /// The package whose plugin is linked into the compiler. An implicit package
 /// without a plugin of its own needs no entry here.
@@ -111,6 +99,14 @@ impl Plugin for Std {
             "codec" => codec::check(block, facts),
             "sql" => Sql.check(block, state, facts),
             _ => Vec::new(),
+        }
+    }
+
+    fn check_structure(&self, block: &Block, facts: &flick_plugin::Structure) -> Vec<Diagnostic> {
+        if block.head == "component" {
+            component::check(block, facts)
+        } else {
+            Vec::new()
         }
     }
 

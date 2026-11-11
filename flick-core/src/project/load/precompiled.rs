@@ -9,17 +9,21 @@ use std::collections::HashMap;
 #[cfg(feature = "native-project")]
 use std::hash::{DefaultHasher, Hash, Hasher};
 #[cfg(feature = "native-project")]
+use std::io::ErrorKind;
+#[cfg(feature = "native-project")]
 use std::mem;
 use std::path::{Path, PathBuf};
+#[cfg(feature = "native-project")]
+use std::str;
 use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 
-use super::{Compiled, Loader, Mode, module_path};
+use super::{Compiled, Loader, Mode};
+#[cfg(feature = "native-project")]
+use super::{Loaded, Root, Virtual, module_path};
 #[cfg(feature = "native-project")]
 use crate::diagnostics::{Diagnostic, Severity, codes};
-#[cfg(feature = "native-project")]
 use crate::ir;
 #[cfg(feature = "native-project")]
 use crate::project::Project;
@@ -29,7 +33,11 @@ use crate::project::cache::Key;
 use crate::project::packages::{Library, Packages};
 use crate::resolve::Interface;
 #[cfg(feature = "native-project")]
+use crate::source::Span;
+#[cfg(feature = "native-project")]
 use crate::source::{FileId, SourceMap};
+#[cfg(feature = "native-project")]
+use crate::{resolve, syntax};
 
 /// A module of a source package as a run checked and lowered it.
 #[derive(Clone, Serialize, Deserialize)]
@@ -42,9 +50,13 @@ pub struct CachedModule {
     /// Every top-level entity with its type, for the reference model.
     declarations: Arc<Interface>,
     /// The IR with its spans in file 0; a run moves them to the module's file.
-    ir: Value,
+    ir: ir::Module,
     /// A hash of the text it was checked from, which its spans point into.
     source: u64,
+    /// Checked source for portable template instantiation and source-map
+    /// locations when the immutable package's original files are unavailable.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    source_text: Option<String>,
 }
 
 /// What a host keeps of source packages between runs.
@@ -70,17 +82,20 @@ pub struct Fresh {
 #[derive(Default)]
 pub(super) struct Precompiled {
     /// The key and source directory of each package that has one.
+    #[cfg(feature = "native-project")]
     packages: BTreeMap<String, (String, PathBuf)>,
     /// The saved modules by name, with their package.
     saved: BTreeMap<String, (String, CachedModule)>,
     /// The saved modules the run used, in the order it took them.
+    #[cfg(feature = "native-project")]
     used: Vec<String>,
 }
 
 impl Precompiled {
     /// The libraries of `packages` with their keys and saved modules. A
-    /// library's key covers the compiler, the configuration of the project,
-    /// its sources and the keys of the libraries it depends on. A `--rt` build
+    /// library's key covers the compiler, what checking reads of the
+    /// configuration of the project, its sources and the keys of the
+    /// libraries it depends on. A `--rt` build
     /// keeps the configuration of the project, so the mode counts on its own.
     #[cfg(feature = "native-project")]
     pub(super) fn new(
@@ -93,7 +108,7 @@ impl Precompiled {
             .libraries()
             .map(|(name, dir, library)| (name, (dir, library)))
             .collect();
-        let config = format!("{:?} {stages_by_class}", project.config);
+        let config = format!("{:?} {stages_by_class}", project.config.checked());
         let mut keys: HashMap<String, Option<String>> = HashMap::new();
         let mut out = Precompiled::default();
         for &name in libraries.keys() {
@@ -117,6 +132,7 @@ impl Precompiled {
     }
 
     /// Whether the saved module `name` belongs to the package in `dir`.
+    #[cfg(feature = "native-project")]
     fn covers(&self, dir: &Path, name: &str) -> bool {
         self.saved.get(name).is_some_and(|(package, _)| {
             self.packages
@@ -136,8 +152,9 @@ impl Precompiled {
     ) -> Vec<Fresh> {
         let mut by_package: BTreeMap<&str, BTreeMap<String, CachedModule>> = BTreeMap::new();
         for c in compiled {
-            // shortcut: a package with plugin blocks is checked each time; its
-            // key would also need its plugin, not only its sources
+            // shortcut: a package with a written plugin block, or a derive of
+            // a plugin outside the compiler, is checked each time; its key
+            // would also need that plugin and what it read
             let Some(package) = c.package.as_deref().filter(|p| !expanded.contains(p)) else {
                 continue;
             };
@@ -207,10 +224,13 @@ fn key_of(
 /// `compiled`, checked from `text`, to save, unless its IR has spans in
 /// another file.
 fn cached(compiled: &Compiled, dir: &Path, text: &str) -> Option<CachedModule> {
-    let mut ir = serde_json::to_value(&compiled.ir).ok()?;
-    let own = serde_json::to_value(compiled.file).ok()?;
-    let zero = serde_json::to_value(FileId::default()).ok()?;
-    if !move_spans(&mut ir, Some(&own), &zero) {
+    let mut ir = compiled.ir.clone();
+    let mut own = true;
+    ir.each_span_mut(&mut |span| {
+        own &= span.file == compiled.file;
+        span.file = FileId::default();
+    });
+    if !own {
         return None;
     }
     Some(CachedModule {
@@ -221,6 +241,11 @@ fn cached(compiled: &Compiled, dir: &Path, text: &str) -> Option<CachedModule> {
         declarations: compiled.declarations.clone(),
         ir,
         source: hash(text),
+        source_text: compiled
+            .interface
+            .template
+            .is_none()
+            .then(|| text.to_owned()),
     })
 }
 
@@ -233,41 +258,18 @@ fn hash(text: &str) -> u64 {
     hasher.finish()
 }
 
-#[cfg(feature = "native-project")]
-/// Sets the file of every span in `value` to `to`; false when one is not in
-/// `from`.
-fn move_spans(value: &mut Value, from: Option<&Value>, to: &Value) -> bool {
-    match value {
-        Value::Object(fields) if is_span(fields) => {
-            let file = fields.get_mut("file").expect("a span has a file");
-            if from.is_some_and(|from| file != from) {
-                return false;
-            }
-            *file = to.clone();
-            true
-        }
-        Value::Object(fields) => fields.values_mut().all(|v| move_spans(v, from, to)),
-        Value::Array(items) => items.iter_mut().all(|v| move_spans(v, from, to)),
-        _ => true,
-    }
-}
-
-#[cfg(feature = "native-project")]
-fn is_span(fields: &serde_json::Map<String, Value>) -> bool {
-    fields.len() == 3
-        && ["file", "start", "end"]
-            .iter()
-            .all(|k| fields.contains_key(*k))
-}
-
 impl Loader<'_> {
     /// Uses the saved module `name` of the package in `dir`, and what it
     /// imports, instead of loading their sources; false when none is saved.
+    #[cfg(feature = "native-project")]
     pub(super) fn use_saved(&mut self, dir: &Path, name: &str) -> bool {
         if !self.precompiled.covers(dir, name) {
             return false;
         }
-        if self.from_packages.contains_key(name) {
+        if self.from_packages.contains_key(name) || self.by_name.contains_key(name) {
+            return true;
+        }
+        if self.restore_template(name) {
             return true;
         }
         let (_, module) = &self.precompiled.saved[name];
@@ -283,6 +285,7 @@ impl Loader<'_> {
 
     /// Finds `name`, imported by a saved module, as a module of a source
     /// package or a built-in one.
+    #[cfg(feature = "native-project")]
     fn find_in_packages(&mut self, name: &str) {
         if self.by_name.contains_key(name) || self.from_packages.contains_key(name) {
             return;
@@ -319,7 +322,7 @@ impl Loader<'_> {
         {
             let fresh = if save {
                 let expanded: Vec<&str> = (self.modules.iter())
-                    .filter(|m| m.expansion.is_some())
+                    .filter(|m| !m.derives_alone())
                     .filter_map(|m| match &m.root {
                         super::Root::Package(name) => Some(name.as_str()),
                         _ => None,
@@ -349,6 +352,14 @@ impl Loader<'_> {
             let path = dir.join(&module.path);
             let bytes = match self.host.read(&path) {
                 Ok(bytes) => bytes,
+                Err(err) if err.kind() == ErrorKind::NotFound && module.source_text.is_some() => {
+                    module
+                        .source_text
+                        .as_ref()
+                        .expect("saved source")
+                        .as_bytes()
+                        .to_vec()
+                }
                 Err(err) => {
                     let message = format!("cannot read `{}`: {err}", self.host.display(&path));
                     self.diagnostics
@@ -368,17 +379,7 @@ impl Loader<'_> {
                 continue;
             }
             let mut ir = module.ir.clone();
-            let to = serde_json::to_value(file).expect("a file id serializes");
-            move_spans(&mut ir, None, &to);
-            let ir = match serde_json::from_value::<ir::Module>(ir) {
-                Ok(ir) => ir,
-                Err(err) => {
-                    let message = format!("the saved IR of `{name}` does not load: {err}");
-                    self.diagnostics
-                        .push(Diagnostic::new(codes::P001, Severity::Error, message));
-                    continue;
-                }
-            };
+            ir.each_span_mut(&mut |span| span.file = file);
             out.push(Compiled {
                 name: module.name.clone(),
                 path,
@@ -395,3 +396,6 @@ impl Loader<'_> {
         out
     }
 }
+
+#[cfg(feature = "native-project")]
+include!("precompiled_templates.rs");

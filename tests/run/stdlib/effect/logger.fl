@@ -1,4 +1,4 @@
-// Effect's `Logger`: the `Log` service through Effect's loggers, custom and
+// `Logger`: the `Log` service through its loggers, custom and
 // built-in formats, batches and a log file. Loggers whose lines carry the
 // time write to a console on stderr.
 module App.Main exposing (main)
@@ -13,7 +13,7 @@ replace : Logger.LayerOptions
 let replace = { mergeWithExisting = false }
 
 /// Logs through `Log` with the loggers of `loggers`.
-logged : Layer none none none -> (Unit ->{Log.Log} Unit) ->{} Unit
+logged : Layer none none none -> (Unit ->{Log.Log} Unit) ->{Async} Unit
 let logged loggers body = provide (Layer.merge loggers Logger.effect_log) { body () }
 
 contains : String -> String -> Bool

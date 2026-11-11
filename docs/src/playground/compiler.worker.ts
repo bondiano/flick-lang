@@ -53,6 +53,8 @@ export interface Completion {
 interface Emitted {
   readonly js: string | null;
   readonly dts: string | null;
+  readonly declarations?: Record<string, string>;
+  readonly declaration_entry?: string;
   readonly files: Record<string, string> | null;
   readonly entry: string | null;
   readonly diagnostics: Array<Event>;
@@ -62,6 +64,8 @@ interface Emitted {
 export interface Generated {
   readonly code: string;
   readonly dts: string;
+  readonly declarations?: Readonly<Record<string, string>>;
+  readonly declarationEntry?: string;
   readonly diagnostics: Array<Diagnostic>;
 }
 
@@ -74,7 +78,7 @@ export interface Built {
 export type Operation =
   | { readonly action: "load" }
   | { readonly action: "check"; readonly source: string }
-  | { readonly action: "compile"; readonly source: string; readonly profile: string }
+  | { readonly action: "compile"; readonly source: string; readonly profile: string; readonly declarations?: boolean }
   | { readonly action: "build"; readonly source: string; readonly profile: string }
   | { readonly action: "hover"; readonly source: string; readonly at: number }
   | { readonly action: "complete"; readonly source: string; readonly at: number; readonly dotted: boolean }
@@ -110,14 +114,15 @@ const diagnostics = (events: ReadonlyArray<Event>): Array<Diagnostic> => events.
     })),
 }));
 
-const emitted = (source: string, profile: string): Emitted => {
+const emitted = (source: string, profile: string, declarations = false): Emitted => {
   analysed(source);
-  return JSON.parse((session as Session).emit(profile)) as Emitted;
+  const current = session as Session;
+  return JSON.parse(declarations ? current.emit_declarations(profile) : current.emit(profile)) as Emitted;
 };
 
-const generated = (source: string, profile: string): Generated => {
-  const result = emitted(source, profile);
-  return { code: result.js ?? "", dts: result.dts ?? "", diagnostics: diagnostics(result.diagnostics) };
+const generated = (source: string, profile: string, declarations = false): Generated => {
+  const result = emitted(source, profile, declarations);
+  return { code: result.js ?? "", dts: result.dts ?? "", declarations: result.declarations, declarationEntry: result.declaration_entry, diagnostics: diagnostics(result.diagnostics) };
 };
 
 onmessage = async (event: MessageEvent<Request>) => {
@@ -133,7 +138,7 @@ onmessage = async (event: MessageEvent<Request>) => {
         result = diagnostics(analysed(request.source));
         break;
       case "compile":
-        result = generated(request.source, request.profile);
+        result = generated(request.source, request.profile, request.declarations);
         break;
       case "build": {
         const built = emitted(request.source, request.profile);

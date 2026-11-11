@@ -7,6 +7,7 @@ use std::collections::HashMap;
 
 use crate::types::Checker;
 use crate::types::kinds::Kind;
+use crate::types::regions::{AliasKey, Unfold, leave_alias};
 use crate::types::ty::{Effects, Type};
 
 /// The outcome of matching a constructor against a value's type.
@@ -101,8 +102,19 @@ impl Refiner<'_, '_> {
 
     /// `t` with everything solved substituted.
     fn full(&self, t: &Type) -> Type {
-        let t = self.walk(t);
-        t.map_children(&mut |c| self.full(c))
+        self.full_in(t, &mut Vec::new())
+    }
+
+    /// `path` holds the aliases it is unfolding: one met again inside its
+    /// own unfolding stays as written, its arguments substituted.
+    fn full_in(&self, t: &Type, path: &mut Vec<AliasKey>) -> Type {
+        let unfold = self.checker.enter_alias(t, path);
+        let full = match unfold {
+            Unfold::Again => t.map_children(&mut |c| self.full_in(c, path)),
+            _ => self.walk(t).map_children(&mut |c| self.full_in(c, path)),
+        };
+        leave_alias(path, unfold);
+        full
     }
 
     fn occurs(&self, t: &Type, x: &Type) -> bool {
@@ -111,6 +123,7 @@ impl Refiner<'_, '_> {
 
     fn rigid_kind(&self, s: u32) -> Option<&Kind> {
         self.checker
+            .cx
             .regions
             .rigid_kinds
             .iter()
@@ -200,8 +213,8 @@ impl Refiner<'_, '_> {
                     Err(Stop::Unsupported(Unsupported::Row))
                 }
             }
-            (Type::Record(_) | Type::Row(_) | Type::Union(..), _)
-            | (_, Type::Record(_) | Type::Row(_) | Type::Union(..)) => {
+            (Type::Record(_) | Type::Row(_) | Type::Union(..) | Type::Without { .. }, _)
+            | (_, Type::Record(_) | Type::Row(_) | Type::Union(..) | Type::Without { .. }) => {
                 if self.full(&a) == self.full(&b) {
                     Ok(())
                 } else {

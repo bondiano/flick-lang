@@ -1,13 +1,13 @@
 package flickrt
 
-// Pull is Effect's: each call is the next element of what is pulled, or
-// its end, a failure whose cause is a fail of a *done (Effect's
-// `Cause.Done`) carrying the done value, or another failure. The end being
-// a failure, combined causes, exits and finalizers see it as Effect's do.
-// One fiber pulls a pull at a time; [serial] shares one.
+// Pull is, at each call, the next element of what is pulled, or its end, a
+// failure whose cause is a fail of a *done carrying the done value, or
+// another failure. The end being a failure, combined causes, exits and
+// finalizers see it as one. One fiber pulls a pull at a time; [serial]
+// shares one.
 type Pull func(fb *Fiber) Value
 
-// done is Effect's `Cause.Done`; Flick never sees one.
+// done is the end of a pull; Flick never sees one.
 type done struct{ value Value }
 
 func doneCause(v Value) *Cause { return &Cause{kind: causeFail, err: &done{v}} }
@@ -35,9 +35,8 @@ func isDoneCause(c *Cause) bool {
 	return false
 }
 
-// filterDone is Effect's `Pull.filterDone`: the done value of a cause that
-// ended a pull; when something besides interruptions failed too, the cause
-// without its ends.
+// filterDone is the done value of a cause that ended a pull; when
+// something besides interruptions failed too, the cause without its ends.
 func filterDone(c *Cause) (Value, *Cause, bool) {
 	var d *done
 	failed := false
@@ -95,9 +94,8 @@ func doneExit(c *Cause) *Exit {
 	return &Exit{cause: rest}
 }
 
-// closeScope closes an owner [forkScope] made, as Effect's `Scope.close`,
-// with the exit of what ran in it (nil: a success), failing as its
-// finalizers do.
+// closeScope closes an owner [forkScope] made, with the exit of what ran
+// in it (nil: a success), failing as its finalizers do.
 //
 // shortcut: an owner closed early stays among its parent's finalizers until the parent closes; remove it then if a long-lived channel forks scopes without end
 func closeScope(fb *Fiber, o *Owner, exit *Cause) {
@@ -106,17 +104,15 @@ func closeScope(fb *Fiber, o *Owner, exit *Cause) {
 	}
 }
 
-// empty is whether the owner holds nothing to release, as an Effect scope
-// whose state is "Empty".
+// empty is whether the owner holds nothing to release.
 func (o *Owner) empty() bool {
 	o.mu.Lock()
 	defer o.mu.Unlock()
 	return len(o.finalizers) == 0 && len(o.children) == 0
 }
 
-// forkIn is `Effect.forkIn`: `task` in a fiber of its own, with the
-// services and owner of `fb`, that the closing of `scope` interrupts and
-// awaits.
+// forkIn runs `task` in a fiber of its own, with the services and owner of
+// `fb`, that the closing of `scope` interrupts and awaits.
 func forkIn(fb *Fiber, scope *Owner, task func(fb *Fiber) Value) *child {
 	c := fork(fb, fb.owner, Eff(task), nil)
 	scope.add(fb, func(fb *Fiber, _ *Cause) Value {

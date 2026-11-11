@@ -1,9 +1,11 @@
 //! Whole-value bounds on generic data and constructor fields.
 
 use super::{Hold, Visible};
+use super::{Unfold, leave_alias};
 use crate::iface::{Entity, Namespace};
 use crate::source::Span;
 use crate::types::Checker;
+use crate::types::Elem;
 use crate::types::env::Form;
 use crate::types::gadt::refine::Refined;
 use crate::types::gadt::scheme::{built, is_hidden_captures, is_indexed};
@@ -86,9 +88,23 @@ impl Checker<'_> {
         t
     }
 
+    /// `seen` holds the data types it has looked into and the aliases it is
+    /// unfolding: one met again inside its own unfolding hides what its
+    /// arguments hide.
     fn hidden_fields(&self, t: &Type, seen: &mut Vec<(String, String)>) -> bool {
-        let t = self.qualified_head(t);
-        match &t {
+        let unfold = self.enter_alias(t, seen);
+        if matches!(unfold, Unfold::Again) {
+            let (_, args) = self.store.head(t).spine();
+            return args.iter().any(|a| self.hidden_fields(a, seen));
+        }
+        let hidden = self.hidden_unfolded(t, seen);
+        leave_alias(seen, unfold);
+        hidden
+    }
+
+    fn hidden_unfolded(&self, t: &Type, seen: &mut Vec<(String, String)>) -> bool {
+        let t = self.borrowed_head(t);
+        match &*t {
             Type::Captured { ty, .. } | Type::Bounded { ty, .. } => self.hidden_fields(ty, seen),
             Type::Fun { .. } => true,
             Type::Tuple(items) => items.iter().any(|t| self.hidden_fields(t, seen)),
@@ -176,7 +192,7 @@ impl Checker<'_> {
         }
     }
 
-    fn refinable_result(&self, result: &Type) -> bool {
+    pub(super) fn refinable_result(&self, result: &Type) -> bool {
         let (bare, captures) = self.whnf_captured(result);
         if let Some(captures) = captures {
             return self
@@ -185,7 +201,7 @@ impl Checker<'_> {
                 .entries
                 .iter()
                 .any(|(label, ty)| {
-                    label.starts_with('^')
+                    matches!(label, Elem::Capture(_))
                         && !matches!(
                             self.atom_kind(ty, &[]),
                             Some(Kind::Region | Kind::CaptureRow)
@@ -235,7 +251,7 @@ impl Checker<'_> {
     /// A bound refines a complete generic type; unlike a nominal qualifier,
     /// it cannot replace that type's own hidden captures on instantiation.
     pub fn subsume_bound(&mut self, actual: &Type, expected: &Type, span: Span) -> Option<Unified> {
-        let mark = self.regions.holds.len();
+        let mark = self.cx.regions.holds.len();
         let fits = self.subsume_bound_at(actual, expected, span)?;
         Some(self.held_fits(fits, mark, actual, expected, span))
     }
@@ -248,9 +264,11 @@ impl Checker<'_> {
             let mut allowed = Norm::default();
             while let Type::Bounded { ty, captures } = base {
                 self.capture_row(&captures, &mut allowed);
+                // what the bounded type shows, as `a` of `List a`, is no hold:
+                // a type argument carries its own qualifier
                 self.hold(Hold {
                     held: vec![(None, actual.clone())],
-                    visible: Visible::Now(Vec::new()),
+                    visible: Visible::Late((*ty).clone()),
                     bound: *captures.clone(),
                     expected: Some(expected.clone()),
                     written: !matches!(self.store.resolve(&captures), Type::Meta(_)),
@@ -322,7 +340,13 @@ impl Checker<'_> {
             && !matches!(e, Type::Captured { .. })
         {
             let identity = self.capture_identity(ty);
-            if self.hidden_fields(expected, &mut Vec::new()) {
+            // what a function or a task hides it may hold: its use is in its
+            // row (`compare.rs`, `subsume_captured`)
+            let callable = matches!(self.whnf(expected), Type::Fun { .. })
+                || self.eff_parts(expected).is_some();
+            if self.hidden_fields(expected, &mut Vec::new())
+                && (!callable || self.holds_reader(&[(None, actual.clone())]))
+            {
                 self.hold(Hold {
                     held: vec![(None, actual.clone())],
                     visible: Visible::Refined(expected.clone()),
@@ -346,7 +370,10 @@ impl Checker<'_> {
         if self.scalar(t) {
             return true;
         }
-        if matches!(self.whnf(t), Type::Var(_) | Type::Meta(_) | Type::Skolem(_)) {
+        if matches!(
+            *self.borrowed_whnf(t),
+            Type::Var(_) | Type::Meta(_) | Type::Skolem(_)
+        ) {
             return false;
         }
         let captures = self.captures_of(t);
@@ -373,36 +400,6 @@ impl Checker<'_> {
         norm.entries
             .iter()
             .any(|(_, atom)| matches!(self.atom_kind(atom, &[]), Some(Kind::Region)))
-    }
-
-    /// Pure parametric code can return only captures from its function and
-    /// argument. Refine abstract results, not independent concrete scalars.
-    pub fn application_result(&self, result: Type, function: &Type, argument: &Type) -> Type {
-        let result = self.value_bound(result);
-        if !self.refinable_result(&result)
-            || matches!(
-                self.whnf(function),
-                Type::Fun {
-                    effects: Some(_),
-                    ..
-                }
-            )
-        {
-            return result;
-        }
-        let mut captures = self.captures_of(function);
-        let arg = self.captures_of(argument);
-        captures.entries.extend(arg.entries);
-        captures.tails.extend(arg.tails);
-        // A reader region is the lending function's own, not data a result
-        // stores; its holds report every escape.
-        captures
-            .entries
-            .retain(|(_, atom)| !matches!(atom, Type::Skolem(s) if self.regions.lent.contains(s)));
-        Type::Bounded {
-            ty: Box::new(result),
-            captures: Box::new(captures.into_type()),
-        }
     }
 
     /// A projection refines an existing field; it never creates a new
@@ -483,8 +480,8 @@ impl Checker<'_> {
     /// Whether `t` is a primitive value, which holds no captures; an integer
     /// literal's type is one before it is settled.
     pub(in crate::types) fn scalar(&self, t: &Type) -> bool {
-        match self.whnf(t) {
-            Type::Meta(m) => self.store.is_numeric(m),
+        match &*self.borrowed_whnf(t) {
+            Type::Meta(m) => self.store.is_numeric(*m),
             t => SCALARS.into_iter().any(|item| t.is_lang(item)),
         }
     }

@@ -14,7 +14,6 @@ use flick_plugin::{Hole, Place};
 
 use crate::diagnostics::{Diagnostic, Related, Severity, codes};
 use crate::iface::{Interface, Namespace};
-use crate::ir;
 use crate::resolve;
 use crate::source::{FileId, Span};
 use crate::syntax::cst::{Element, Node};
@@ -39,6 +38,7 @@ pub struct Expanded {
     pub whole: (u32, u32),
 }
 
+#[derive(Clone)]
 pub struct Expansion {
     pub text: String,
     /// The length of the module's own text: offsets past it are generated.
@@ -54,6 +54,7 @@ pub struct Expansion {
     blocks: Vec<Block>,
 }
 
+#[derive(Clone)]
 struct Block {
     range: (u32, u32),
     code: (u32, u32),
@@ -249,6 +250,11 @@ impl Expansion {
             .collect()
     }
 
+    /// Whether every block of the module is a block of `plugin`.
+    pub fn only_of(&self, plugin: &str) -> bool {
+        self.blocks.iter().all(|b| b.plugin == plugin)
+    }
+
     /// The plugin whose code declares what stands at `span` of the module,
     /// which a block of it declares.
     pub fn plugin_at(&self, span: Span) -> Option<&str> {
@@ -320,7 +326,7 @@ impl Expansion {
     /// Diagnostics and IR of the expanded module at the places of the module
     /// they stand for. Warnings about generated code and fixes that edit it
     /// are dropped: they are about the plugin's code, not the user's.
-    pub fn restore(&self, diagnostics: &mut Vec<Diagnostic>, ir: Option<&mut ir::Module>) {
+    pub fn restore(&self, diagnostics: &mut Vec<Diagnostic>, ir: Option<&mut flick_ir::Module>) {
         diagnostics.retain_mut(|d| {
             let Some(span) = d.span.filter(|s| s.file == self.file) else {
                 return true;
@@ -336,7 +342,6 @@ impl Expansion {
             for related in &mut d.related {
                 related.span = self.place(related.span);
             }
-            #[cfg(feature = "diagnostic-fixes")]
             d.fixes.retain(|fix| {
                 fix.edits
                     .iter()

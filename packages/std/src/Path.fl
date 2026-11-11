@@ -1,6 +1,6 @@
-/// Effect's `Path`: file paths as a service, so a program states that it
-/// works with the paths of a platform. `layer` gives Effect's POSIX paths,
-/// `node` those of Node.js (`node:path`).
+/// File paths as a service, so a program states that it works with the
+/// paths of a platform. `layer` gives POSIX paths, `node` those of Node.js
+/// (`node:path`).
 module Path exposing (..)
 
 import PlatformError
@@ -8,7 +8,7 @@ import PlatformError
 /// A path taken apart: `format` puts it back together.
 type alias Parsed = { root : String; dir : String; base : String; ext : String; name : String }
 
-/// The operations of Effect's `Path`; the functions below call them.
+/// The operations of `Path`; the functions below call them.
 service Path =
   sep : Unit ->{} String
   basename : String ->{} String
@@ -94,14 +94,14 @@ to_namespaced_path : String ->{Path} String
 let to_namespaced_path path = Path.to_namespaced_path path
 
 layer_of : ServiceTag {Path} -> Layer none none {Path}
-foreign pure layer_of from "@flick-lang/effect-ts/effect/Path" "flickLayer"
+foreign pure layer_of from "flick:Path" "flickLayer"
   reviewed "effect@4.1.2 sha256:b30d228cd978968d"
 
 node_of : ServiceTag {Path} -> Layer none none {Path}
-foreign pure node_of from "@flick-lang/effect-ts/effect/Path" "flickNode"
+foreign pure node_of from "flick:Path" "flickNode"
   reviewed "effect@4.1.2 sha256:4c4fc166a1beee53"
 
-/// Effect's own POSIX paths, the same on every platform.
+/// POSIX paths, the same on every platform.
 layer : Layer none none {Path}
 let layer = layer_of Path
 

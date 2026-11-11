@@ -5,9 +5,9 @@ import (
 	"time"
 )
 
-// Layers, as Effect's: a layer is a value with an identity that builds
-// services into a scope, and a memo map builds each layer it is asked for
-// once, sharing its services while any scope that asked still holds them.
+// Layers: a layer is a value with an identity that builds services into a
+// scope, and a memo map builds each layer it is asked for once, sharing
+// its services while any scope that asked still holds them.
 // `provide layer { body }` builds the layer into the owner of the body.
 
 // Services is a `Context`: built services by key. It is never mutated.
@@ -325,8 +325,7 @@ func LayerUnwrap(task Value) Value {
 
 // LayerMergeAll builds the layers concurrently, the services of later ones
 // replacing earlier ones'; the first failure interrupts the others' builds.
-// Their scopes release in parallel when the merged layer's does, as
-// Effect's do.
+// Their scopes release in parallel when the merged layer's does.
 func LayerMergeAll(first, rest Value) Value {
 	layers := append([]Value{first}, List(rest)...)
 	return fromBuild(func(fb *Fiber, memo *MemoMap, scope *Owner) Services {

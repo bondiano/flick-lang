@@ -5,11 +5,12 @@ import (
 	"slices"
 )
 
-// TxPubSub and TxSubscriptionRef as Effect 4's: a TxRef of the subscribers'
-// queues, each a TxQueue of the hub's strategy, and a TxRef of whether the
-// hub is shut down; a TxSubscriptionRef publishes each value it is set to.
+// TxPubSub and TxSubscriptionRef: a TxRef of the subscribers' queues, each
+// a TxQueue of the hub's strategy, and a TxRef of whether the hub is shut
+// down; a TxSubscriptionRef publishes each value it is set to.
 
-// TxPubSub is Effect's TxPubSub.
+// TxPubSub is a transactional hub: its subscribers' queues, whether it is
+// shut down, and its strategy and capacity.
 type TxPubSub struct {
 	subscribers *TxRef // a []*TxQueue, never mutated
 	shutdown    *TxRef // a bool
@@ -133,8 +134,8 @@ func (p *TxPubSub) releaseSubscriber(fb *Fiber, t *tx, q *TxQueue) {
 	q.shutdownIn(fb, t)
 }
 
-// subscribed is Effect's acquireRelease of a subscriber made by `acquire`
-// in a transaction, released as the scope closes.
+// subscribed is a subscriber made by `acquire` in a transaction, released
+// as the scope closes.
 func (p *TxPubSub) subscribed(fb *Fiber, acquire func(*Fiber, *tx) *TxQueue) Value {
 	q := masked(fb, fb.state.mask+1, func() Value {
 		return txDo(fb, func(fb *Fiber, t *tx) Value { return acquire(fb, t) })
@@ -178,7 +179,7 @@ func TxPubSubAwaitShutdown(fb *Fiber, p Value) Value {
 	})
 }
 
-// TxSubscriptionRef is Effect's TxSubscriptionRef.
+// TxSubscriptionRef is a TxRef and the hub its values are published to.
 type TxSubscriptionRef struct {
 	ref    *TxRef
 	pubsub *TxPubSub

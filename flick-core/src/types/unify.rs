@@ -7,9 +7,12 @@
 //! its scope.
 
 use crate::numeric::NumLang;
+use std::borrow::Cow;
 use std::collections::HashSet;
+use std::ptr;
 
 use super::Checker;
+use super::elem::Elem;
 use super::env::Form;
 use super::kinds::Kind;
 use super::ty::{Norm, Row, Type};
@@ -67,7 +70,7 @@ pub enum Mismatch {
     /// A record or row lacks a label the other one has; `left` is the side
     /// that has it.
     Label {
-        label: String,
+        label: Elem,
         left: bool,
     },
     /// Binding the variable would make the type infinite.
@@ -278,6 +281,11 @@ impl Store {
             Type::Union(a, b) => self
                 .normalize(&Type::Union(Box::new(self.zonk(a)), Box::new(self.zonk(b))))
                 .into_type(),
+            Type::Without { row, gone } => {
+                let row = Box::new(self.zonk(row));
+                let gone = gone.clone();
+                self.normalize(&Type::Without { row, gone }).into_type()
+            }
             Type::Record(row) | Type::Row(row) => {
                 let row = self.zonk_row(row);
                 if matches!(t, Type::Record(_)) {
@@ -303,7 +311,7 @@ impl Store {
 
     /// A row with nested row tails merged into one entry list.
     pub fn zonk_row(&self, row: &Row) -> Row {
-        let mut entries: Vec<(String, Type)> = row
+        let mut entries: Vec<(Elem, Type)> = row
             .entries
             .iter()
             .map(|(l, t)| {
@@ -351,6 +359,20 @@ impl Store {
             Type::Union(a, b) => {
                 self.collect_row(&a, out);
                 self.collect_row(&b, out);
+            }
+            // a known row loses the elements; what is still a variable keeps
+            // the names to lose
+            Type::Without { row, gone } => {
+                let mut inner = Norm::default();
+                self.collect_row(&row, &mut inner);
+                let kept = (inner.entries.into_iter()).filter(|(label, _)| !gone.contains(label));
+                out.entries.extend(kept);
+                for tail in inner.tails {
+                    let tail = super::ty::without(tail, &gone);
+                    if !out.tails.contains(&tail) {
+                        out.tails.push(tail);
+                    }
+                }
             }
             other => {
                 if !out.tails.contains(&other) {
@@ -414,15 +436,14 @@ impl Store {
 
 /// The current label of a row entry: a capture row entry, and a type
 /// variable of an error row, follow their element.
-fn relabel(label: &str, t: &Type) -> String {
-    let current = if label.starts_with('^') {
-        super::ty::capture_label(t)
-    } else if label.starts_with('~') {
-        super::ty::error_label(t)
-    } else {
-        None
+fn relabel(label: &Elem, t: &Type) -> Elem {
+    let current = match label {
+        Elem::Capture(_) => super::ty::capture_label(t),
+        Elem::Error(_) => super::ty::error_label(t),
+        Elem::Service(_) => super::ty::service_label(t),
+        Elem::Named(_) | Elem::Live | Elem::Provided(_) => None,
     };
-    current.unwrap_or_else(|| label.to_owned())
+    current.unwrap_or_else(|| label.clone())
 }
 
 impl Checker<'_> {
@@ -438,6 +459,23 @@ impl Checker<'_> {
     /// without its capture qualifier.
     pub fn whnf(&self, t: &Type) -> Type {
         self.whnf_captured(t).0
+    }
+
+    /// [`Self::whnf`] without the copy of a type that does not reduce.
+    pub fn borrowed_whnf<'a>(&'a self, t: &'a Type) -> Cow<'a, Type> {
+        let mut t = self.borrowed_head(t);
+        for _ in 0..64 {
+            t = match t {
+                Cow::Borrowed(Type::Captured { ty, .. } | Type::Bounded { ty, .. }) => {
+                    self.borrowed_head(ty)
+                }
+                Cow::Owned(Type::Captured { ty, .. } | Type::Bounded { ty, .. }) => {
+                    Cow::Owned(self.qualified_head(&ty))
+                }
+                other => return other,
+            };
+        }
+        t
     }
 
     /// [`Self::whnf`], and the capture row of the qualifiers taken off.
@@ -465,16 +503,26 @@ impl Checker<'_> {
     /// Head reduction without erasing the distinction between hidden
     /// captures and a refinement of a complete generic type.
     pub fn qualified_head(&self, t: &Type) -> Type {
-        let mut t = self.store.resolve(t);
+        self.borrowed_head(t).into_owned()
+    }
+
+    /// [`Self::qualified_head`] without the copy of a type that does not
+    /// reduce, which is most of what the capture summaries ask about.
+    pub fn borrowed_head<'a>(&'a self, t: &'a Type) -> Cow<'a, Type> {
+        let mut t = Cow::Borrowed(self.store.head(t));
         for _ in 0..64 {
-            if let Some(reduced) = self.project(&t) {
-                t = self.store.resolve(&reduced);
-                continue;
+            // only an application or a constructor has a head to reduce
+            if !matches!(*t, Type::App { .. } | Type::Con { .. }) {
+                break;
             }
             let (head, args) = t.spine();
-            let resolved = self.store.resolve(head);
-            if resolved != *head {
-                t = Type::apps(resolved, args.into_iter().cloned());
+            if let Some(reduced) = self.project(head, &args) {
+                t = Cow::Owned(self.store.resolve(&reduced));
+                continue;
+            }
+            let resolved = self.store.head(head);
+            if !ptr::eq(resolved, head) && resolved != head {
+                t = Cow::Owned(Type::apps(resolved.clone(), args.into_iter().cloned()));
                 continue;
             }
             let Type::Con { module, name } = head else {
@@ -493,10 +541,10 @@ impl Checker<'_> {
                 .cloned()
                 .zip(args.iter().map(|a| (*a).clone()))
                 .collect();
-            t = self.store.resolve(&Type::apps(
+            t = Cow::Owned(self.store.resolve(&Type::apps(
                 body.substitute(&subst),
                 args[params.len()..].iter().map(|a| (*a).clone()),
-            ));
+            )));
         }
         t
     }
@@ -504,13 +552,15 @@ impl Checker<'_> {
     /// The fixed projections of a row into a type, once the row is known
     /// well enough: `Errors none` is `Never`, `Errors {E}` is `E`, and
     /// `ServiceImpl {S}` is `S.Impl`; `Record.Field "x" T` is `{ x : T }`.
-    fn project(&self, t: &Type) -> Option<Type> {
-        let (head, args) = t.spine();
-        if let ([label, field], Type::Con { module, name }) = (&args[..], head)
+    fn project(&self, head: &Type, args: &[&Type]) -> Option<Type> {
+        if let ([label, field], Type::Con { module, name }) = (args, head)
             && lang::is(Lang::Field, module, name)
             && let Type::Symbol(label) = self.store.resolve(label)
         {
-            return Some(Type::Record(Row::closed(vec![(label, (*field).clone())])));
+            return Some(Type::Record(Row::closed(vec![(
+                Elem::Named(label),
+                (*field).clone(),
+            )])));
         }
         let [row] = args[..] else { return None };
         if !head.is_lang(Lang::Errors) && !head.is_lang(Lang::ServiceImpl) {
@@ -561,8 +611,12 @@ impl Checker<'_> {
         })
     }
 
-    #[allow(clippy::too_many_lines)]
     pub fn unify(&mut self, a: &Type, b: &Type) -> Unified {
+        self.compare_unfolding(a, b, |c| c.unify_unfolded(a, b))
+    }
+
+    #[allow(clippy::too_many_lines)]
+    fn unify_unfolded(&mut self, a: &Type, b: &Type) -> Unified {
         let (mut left, mut right) = (self.bound_head(a), self.bound_head(b));
         if matches!(&left, Type::Captured { value: true, .. })
             || matches!(&right, Type::Captured { value: true, .. })
@@ -626,12 +680,6 @@ impl Checker<'_> {
         if ca.is_some() || cb.is_some() {
             return self.unify_captured((a, ca), (b, cb));
         }
-        if matches!((&a, &b), (Type::Fun { .. }, Type::Fun { .. })) {
-            let (left, right) = (self.implicit_captures(&a), self.implicit_captures(&b));
-            if left != a || right != b {
-                return self.unify(&left, &right);
-            }
-        }
         if let Some(result) = self
             .unify_errors(&a, &b)
             .or_else(|| self.unify_errors(&b, &a))
@@ -654,6 +702,9 @@ impl Checker<'_> {
                     {
                         Mismatch::Types(x, y)
                     }
+                    // a region leaves its `scope` in the `Live` of a row,
+                    // which no type shows
+                    Mismatch::Escape(s) => Mismatch::Escape(s),
                     _ => Mismatch::Types(a.clone(), b.clone()),
                 })?;
                 self.unify(a1, a2)
@@ -685,7 +736,34 @@ impl Checker<'_> {
                 x.iter().zip(y).try_for_each(|(x, y)| self.unify(x, y))
             }
             (Type::Record(r1), Type::Record(r2)) => self.unify_rows(r1, r2),
-            (Type::Row(_) | Type::Union(..), _) | (_, Type::Row(_) | Type::Union(..)) => {
+            (
+                Type::Exists {
+                    binder: x,
+                    contract: c1,
+                    body: b1,
+                },
+                Type::Exists {
+                    binder: y,
+                    contract: c2,
+                    body: b2,
+                },
+            ) => {
+                fn alpha(ty: &Type, binder: &str) -> Type {
+                    if let Type::Con { module, name } = ty
+                        && module == &format!("$exists:{binder}")
+                    {
+                        return Type::con("$exists:#", name);
+                    }
+                    if matches!(ty, Type::Exists { binder: inner, .. } if inner == binder) {
+                        return ty.clone();
+                    }
+                    ty.map_children(&mut |child| alpha(child, binder))
+                }
+                self.unify(c1, c2)?;
+                self.unify(&alpha(b1, x), &alpha(b2, y))
+            }
+            (Type::Row(_) | Type::Union(..) | Type::Without { .. }, _)
+            | (_, Type::Row(_) | Type::Union(..) | Type::Without { .. }) => {
                 self.unify_row_types(&a, &b)
             }
             (
@@ -763,11 +841,11 @@ impl Checker<'_> {
                 let elements = row
                     .entries
                     .iter()
-                    .filter(|(label, _)| label.starts_with('~'));
+                    .filter(|(label, _)| matches!(label, Elem::Error(_)));
                 found.extend(elements.map(|(_, element)| (element.clone(), span)));
             }
         });
-        self.regions.error_elements.extend(found);
+        self.cx.regions.error_elements.extend(found);
     }
 
     pub fn instantiate(&mut self, t: &Type, span: Span) -> Type {
@@ -848,7 +926,7 @@ impl Checker<'_> {
                     .map(|v| {
                         let ty = self.store.skolem(&self.unshadowed(&v.name, &constraints));
                         if let Type::Skolem(s) = &ty {
-                            self.regions.rigid_kinds.push((*s, v.kind.clone()));
+                            self.cx.regions.rigid_kinds.push((*s, v.kind.clone()));
                         }
                         (v.name.clone(), ty)
                     })

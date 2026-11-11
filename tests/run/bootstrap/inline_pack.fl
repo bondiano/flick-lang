@@ -1,0 +1,16 @@
+module App.Main exposing (main)
+
+type module AnswerSig =
+  answer : Int
+
+module Child exposing (answer) =
+  let answer = 42
+
+packed : Module AnswerSig
+let packed = pack Child as AnswerSig
+
+main : Unit ->{} Unit
+let main () =
+  let answer =
+    unpack packed as K in K.answer
+  Platform.stdout_line (show answer)

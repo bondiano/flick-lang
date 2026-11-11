@@ -1,5 +1,6 @@
 //! `flick new` and `flick init`: the files of a project pinning the
-//! compiler, the runtime, Effect adapter and pnpm. `init` never overwrites: every
+//! compiler, the runtime and pnpm. Templates that still need the Effect adapter
+//! pin it explicitly. `init` never overwrites: every
 //! file that exists is reported before anything is written. Neither
 //! installs anything; that is `flick install`.
 
@@ -12,7 +13,7 @@ use flick_core::source::SourceMap;
 use super::build::write;
 use crate::args::Template;
 use crate::command::{Command, Outcome};
-use crate::toolchain::{COMPILER, EFFECT_TS, PNPM, REACT, RUNTIME, VITE};
+use crate::toolchain::{COMPILER, PNPM, REACT, RUNTIME, VITE, adapter_version};
 
 /// The entries of the `fullstack` template: a server, and a page that Vite
 /// serves in development.
@@ -87,18 +88,25 @@ fn files(name: &str, template: Template) -> Vec<(&'static str, String)> {
     } else {
         String::new()
     };
-    let config = format!(
+    let mut config = format!(
         "schema-version = 1\n\n{package}[project]\n{project}source-dir = \"src\"\ntest-dir = \"test\"\n\n[build]\nout-dir = \"dist\"\nprofile = \"debug\"\nemit = \"js\"\n"
     );
+    let needs_effect = matches!(template, Template::Cli | Template::Fullstack);
+    if needs_effect {
+        config.push_str("effect = \"effect\"\n");
+    }
     let mut package = serde_json::json!({
         "name": name,
         "version": "0.1.0",
         "private": app,
         "type": "module",
         "packageManager": format!("pnpm@{PNPM}"),
-        "dependencies": { "@flick-lang/runtime": RUNTIME, "@flick-lang/effect-ts": EFFECT_TS },
+        "dependencies": { "@flick-lang/runtime": RUNTIME },
         "flick": { "compiler": COMPILER },
     });
+    if needs_effect {
+        package["dependencies"]["@flick-lang/effect-ts"] = adapter_version().into();
+    }
     if template == Template::Fullstack {
         let dependencies = &mut package["dependencies"];
         dependencies["react"] = REACT.into();
@@ -155,10 +163,13 @@ const MAIN: &str = "module App.Main exposing (main)
 
 import App.Greeting exposing (greet)
 
+run : Unit ->{Host.Arguments, Host.Console} Unit
+let run () =
+  let name = Host.Arguments.args () |> List.head |> Option.with_default \"world\"
+  Host.Console.stdout_line (greet name)
+
 main : Unit ->{; AppError} Unit
-let main () =
-  let name = Platform.args () |> List.head |> Option.with_default \"world\"
-  Platform.stdout_line (greet name)
+let main () = provide (Layer.merge Host.arguments Host.console) { run () }
 ";
 
 const CLI_MAIN: &str = "module App.Main exposing (main)
@@ -177,7 +188,7 @@ let command = cli \"NAME\" {
     Platform.stdout_line (if loud then String.to_upper text else text)
 }
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Async; AppError} Unit
 let main () =
   try Cli.run_version \"0.1.0\" command (Platform.args ()) with
   | Cli.CliError message -> App.fail message

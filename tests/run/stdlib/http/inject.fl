@@ -25,7 +25,7 @@ type alias Notes = {
   post : Post "/notes" { payload : Note } (Created Note) {};
 } deriving HttpApi
 
-type alias Handler = ServerRequest ->{; Http.ServerError.HttpServerError} ServerResponse
+type alias Handler = ServerRequest ->{Async; Http.ServerError.HttpServerError} ServerResponse
 
 post_note : HttpApi.Request Unit Unit Unit Note ->{} Note
 let post_note request = { text = "posted " ++ request.payload.text }
@@ -46,20 +46,20 @@ let app () =
   }
   Http.Router.router Http.Router.config [HttpApi.route "/api/*" api handlers]
 
-profile : Handler -> String ->{} String
+profile : Handler -> String ->{Async} String
 let profile server name =
   let request = { path = { name = name }; query = (); headers = (); payload = () }
   try (HttpApi.Inject.call server "/api" Notes.endpoints.profile request).name with
   | NotFound who -> "404 " ++ who
   | HttpApi.ClientError e -> "client error " ++ show e.status
 
-post : Handler -> String -> String ->{} String
+post : Handler -> String -> String ->{Async} String
 let post server base text =
   let request = { path = (); query = (); headers = (); payload = { text = text } }
   try (HttpApi.Inject.call server base Notes.endpoints.post request).text with
   | HttpApi.ClientError e -> "client error " ++ show e.status
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Async; AppError} Unit
 let main () =
   server : Handler
   let server = app ()

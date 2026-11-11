@@ -2,11 +2,11 @@ package flickrt
 
 import "strconv"
 
-// The backing hubs of Effect's PubSub (PubSub.ts): bounded ones on a ring
-// (one slot apart), an unbounded one on a linked list, and the replay
-// buffer a new subscriber reads first. The hub's lock guards them all.
+// The backing hubs of PubSub: bounded ones on a ring (one slot apart), an
+// unbounded one on a linked list, and the replay buffer a new subscriber
+// reads first. The hub's lock guards them all.
 
-// hubAtomic is Effect's `PubSub.Atomic`.
+// hubAtomic is the backing hub of a PubSub.
 type hubAtomic interface {
 	capacity() int
 	isEmpty() bool
@@ -19,7 +19,7 @@ type hubAtomic interface {
 	replay() *replayBuffer
 }
 
-// hubBacking is Effect's `PubSub.BackingSubscription`.
+// hubBacking is the backing subscription of a hub.
 type hubBacking interface {
 	isEmpty() bool
 	size() int
@@ -31,11 +31,11 @@ type hubBacking interface {
 // hubAbsent marks an emptied slot.
 var hubAbsent Value = &struct{ absent bool }{true}
 
-// unboundedHubCapacity is Effect's `Number.MAX_SAFE_INTEGER`.
+// unboundedHubCapacity is JS's `Number.MAX_SAFE_INTEGER`.
 const unboundedHubCapacity = 1<<53 - 1
 
-// makeAtomicBounded is Effect's: capacity 1 has a hub of its own, the
-// others a ring (Effect's power-of-two ring behaves as the general one).
+// makeAtomicBounded is a bounded hub: capacity 1 has a hub of its own, the
+// others a ring, whatever their capacity.
 func makeAtomicBounded(capacity int, replay int) hubAtomic {
 	if capacity <= 0 {
 		panic(Defect{"Error: Cannot construct PubSub with capacity of " + strconv.Itoa(capacity)})
@@ -60,7 +60,7 @@ func newReplayBuffer(replay int) *replayBuffer {
 	return &replayBuffer{capacity: replay, head: head, tail: head, slides: make([]replayEntry, replay)}
 }
 
-// hubRing is Effect's `BoundedPubSubArb`.
+// hubRing is a bounded hub on a ring.
 type hubRing struct {
 	array            []Value
 	replayIndex      []int
@@ -203,7 +203,7 @@ func (s *hubRingSub) unsubscribe() {
 	}
 }
 
-// hubSingle is Effect's `BoundedPubSubSingle`.
+// hubSingle is a bounded hub of capacity 1.
 type hubSingle struct {
 	publisherIndex  int
 	subscriberCount int
@@ -337,7 +337,7 @@ type hubNode struct {
 	next        *hubNode
 }
 
-// hubList is Effect's `UnboundedPubSub`.
+// hubList is an unbounded hub on a linked list.
 type hubList struct {
 	head, tail       *hubNode
 	publisherIndex   int
@@ -481,8 +481,8 @@ func (s *hubListSub) unsubscribe() {
 	}
 }
 
-// replayBuffer is Effect's `ReplayBuffer`: the last `capacity` messages,
-// and those slid out of a full hub, which a window catches up with.
+// replayBuffer is the last `capacity` messages, and those slid out of a
+// full hub, which a window catches up with.
 type replayBuffer struct {
 	capacity       int
 	head, tail     *replayNode
@@ -528,8 +528,8 @@ func (b *replayBuffer) offerAll(xs []Value) {
 	}
 }
 
-// replayWindow is Effect's `ReplayWindowImpl`, a subscriber's view of the
-// buffer when it subscribed; nil is the empty window.
+// replayWindow is a subscriber's view of the buffer when it subscribed;
+// nil is the empty window.
 type replayWindow struct {
 	buffer      *replayBuffer
 	values      []Value
@@ -601,8 +601,7 @@ func (w *replayWindow) takeN(n int) []Value {
 
 func (w *replayWindow) takeAll() []Value { return w.takeN(w.remaining) }
 
-// hubReplay is the replay of a hub's options: `None` or a count, rounded
-// up as Effect's `Math.ceil`.
+// hubReplay is the replay of a hub's options: a count, 0 for `None`.
 func hubReplay(replay Value) int {
 	if r, ok := some(replay); ok {
 		return int(r.(int32))

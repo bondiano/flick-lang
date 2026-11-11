@@ -4,14 +4,6 @@ title: "FLICK-T059"
 
 A signature writes something the compiler gives it anyway.
 
-A later stage of a function holds what its earlier parameters hold, so a
-qualifier that says just that can go:
-
-```flick ignore
-map : (a -> b)^c -> (List a -> List b)^c  // warns
-map : (a -> b)^c -> List a -> List b      // the same type
-```
-
 A foreign function with `retention owner` and one region in its signature gets
 `Fiber.Outlives`, `Fiber.Provided` and `Detached`, so it need not write them:
 
@@ -31,8 +23,5 @@ instance Functor Box =
   map : (forall v. a^v -> b)^c -> (Box a)^d -> (Box b)^(c + d)  // warns
   let map f (Box x) = Box (f x)
 ```
-
-A qualifier that says less than the stage holds stays: `f : a -> (b -> b)^{}`
-says that the function it returns holds nothing of `a`.
 
 The fix is safe: `flick check --fix --only T059`.

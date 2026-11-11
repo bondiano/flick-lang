@@ -91,7 +91,12 @@ impl Ide<'_> {
             .map(|p| p.text(text).split_whitespace().collect())
             .collect();
         let local: HashSet<&str> = in_scope.iter().map(|c| c.label.as_str()).collect();
-        let project = self.analysis.modules.iter().map(|x| (x.name.clone(), true));
+        let project = self
+            .analysis
+            .modules
+            .iter()
+            .filter(|x| !x.inline)
+            .map(|x| (x.name.clone(), true));
         // shortcut: built-in modules split into parts (`List.Core`) re-export through the whole
         let builtin = builtins()
             .iter()
@@ -108,7 +113,15 @@ impl Ide<'_> {
             let Some(interface) = self.interface(&module) else {
                 continue;
             };
-            let items = exports(&interface);
+            if interface.private
+                && self
+                    .analysis
+                    .module(&module)
+                    .is_none_or(|owner| owner.package != m.package)
+            {
+                continue;
+            }
+            let items = exports(interface);
             for e in &interface.exports {
                 let name = &e.entity.name;
                 if !name.starts_with(word)

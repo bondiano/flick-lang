@@ -6,11 +6,11 @@ import (
 	"time"
 )
 
-// Http.Cookies as Effect's: cookies by name in the order JS keeps an
-// object's keys, each with its value as given and as it goes on the wire.
-// A cookie is a Go value of comparable fields and the jar a record of
-// them, so `==` compares them as Effect's structural equality does: that
-// tells an option given as undefined from one left out.
+// Http.Cookies: cookies by name in the order JS keeps an object's keys,
+// each with its value as given and as it goes on the wire. A cookie is a
+// Go value of comparable fields and the jar a record of them, so `==`
+// compares them structurally: that tells an option given as undefined from
+// one left out.
 
 type Cookie struct {
 	name, value, encoded string
@@ -24,8 +24,8 @@ const (
 	optionsSet
 )
 
-// The options of Effect's cookie object, as bits of `keys` (which keys it
-// has) and `set` (which have a value).
+// The options of a cookie, as bits of `keys` (which keys it has) and `set`
+// (which have a value).
 const (
 	optDomain = 1 << iota
 	optExpires
@@ -91,7 +91,7 @@ func cookieNameRune(r rune) bool {
 
 func validName(s string) bool { return s != "" && every(s, cookieNameRune) }
 
-// validate is Effect's check of a cookie: the reason it is refused, if.
+// validate is the check of a cookie: the reason it is refused, if.
 func validate(name, encoded string, o *cookieOptions) string {
 	if !validName(name) {
 		return "InvalidCookieName"
@@ -115,8 +115,8 @@ func validate(name, encoded string, o *cookieOptions) string {
 	return ""
 }
 
-// optionsOf is Effect's options of the Flick attributes: an object with
-// every key, those not given undefined.
+// optionsOf is the options of the Flick attributes: an object with every
+// key, those not given undefined.
 func optionsOf(attributes Value) cookieOptions {
 	a := record(attributes)
 	o := cookieOptions{keys: optAll}
@@ -154,8 +154,7 @@ func optionsOf(attributes Value) cookieOptions {
 	return o
 }
 
-// makeCookie is Effect's `makeCookie`: the cookie, or the reason it is
-// refused.
+// makeCookie is the cookie, or the reason it is refused.
 func makeCookie(name, val string, o *cookieOptions) (Cookie, string) {
 	encoded, ok := encodeURIComponent(val)
 	if !ok {

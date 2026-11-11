@@ -1,0 +1,24 @@
+// The mapping of `catch` is declared after the foreign function that names
+// it and after a value that stands for that function: it is read when a
+// call throws, not when the module starts.
+module App.Main exposing (main)
+
+type error Broken = Broken String
+
+fail : String ->{; Broken} Unit
+foreign fail from "./bindings.mjs" "fail"
+  catch to_broken
+
+early : String ->{; Broken} Unit
+let early = fail
+
+to_broken : JsValue -> Broken
+let to_broken _ = Broken "mapped"
+
+main : Unit ->{; AppError} Unit
+let main () =
+  try
+    early "boom"
+    Platform.stdout_line "no error"
+  with
+  | Broken why -> Platform.stdout_line why

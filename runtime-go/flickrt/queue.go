@@ -5,12 +5,11 @@ import (
 	"sync"
 )
 
-// Queue is Effect 4's (Queue.ts), a `Queue<A, E | Done>`: messages up to a
-// capacity, a strategy for a full queue, and an end. Failing or ending it
-// lets takers drain what is left, then fail as it was failed; a take is a
-// Pull, which a `Done` ends.
+// Queue is messages up to a capacity, a strategy for a full queue, and an
+// end. Failing or ending it lets takers drain what is left, then fail as
+// it was failed; a take is a Pull, which a `Done` ends.
 //
-// shortcut: takers are woken at once, where Effect schedules their release on the dispatcher, so the chunks a taker gets while a producer is offering may differ from JS's; batch the release if a program depends on them
+// shortcut: takers are woken at once, where the JS runtime schedules their release on its dispatcher, so the chunks a taker gets while a producer is offering may differ from JS's; batch the release if a program depends on them
 type Queue struct {
 	mu       sync.Mutex
 	capacity int
@@ -66,8 +65,8 @@ func newQueue(capacity int, strategy queueStrategy) *Queue {
 
 func queueOf(v Value) *Queue { return v.(*Queue) }
 
-// offerLocked is Effect's offerUnsafe; the caller holds the lock, as for
-// every method ending in Locked and those it calls.
+// offerLocked offers a message; the caller holds the lock, as for every
+// method ending in Locked and those it calls.
 func (q *Queue) offerLocked(x Value) bool {
 	if q.state != queueOpen {
 		return false
@@ -355,8 +354,8 @@ func (q *Queue) finalize(exit *Cause) {
 	close(q.ended)
 }
 
-// takeLocked is Effect's takeUnsafe: a message, the cause of a done queue,
-// or false when a take must wait.
+// takeLocked is a message, the cause of a done queue, or false when a take
+// must wait.
 func (q *Queue) takeLocked() (Value, *Cause, bool) {
 	if q.state == queueDone {
 		return nil, q.exit, true

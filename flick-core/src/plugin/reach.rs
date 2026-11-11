@@ -13,7 +13,7 @@ use flick_plugin::{ReachError, Request, Response};
 use serde::{Deserialize, Serialize};
 
 use crate::diagnostics::{Code, codes};
-use crate::project::config::Grants;
+use crate::source::Span;
 
 #[cfg(feature = "native-project")]
 mod granted;
@@ -181,6 +181,25 @@ pub fn inside(path: &str) -> bool {
         && Path::new(path)
             .components()
             .all(|c| matches!(c, Component::Normal(_)))
+}
+
+/// What `[plugins.<package>]` lets the plugin of a package reach while it
+/// expands the project's blocks; nothing without it.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Grants {
+    /// Paths from the project's root: a file, or a directory and what it
+    /// holds.
+    pub fs_read: Vec<String>,
+    /// Hosts it fetches from over HTTP: `db.example.com` at any port, or
+    /// `localhost:8080` at that one.
+    pub net: Vec<String>,
+    /// Variables of the environment it reads.
+    pub env: Vec<String>,
+    /// The heads of blocks and the classes, as `Cli.Value`, the project does
+    /// not let the plugin handle.
+    pub disable: Vec<String>,
+    /// Where `[plugins.<package>]` is.
+    pub span: Option<Span>,
 }
 
 #[cfg(test)]

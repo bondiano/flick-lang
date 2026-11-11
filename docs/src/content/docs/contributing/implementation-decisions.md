@@ -26,16 +26,18 @@ diagnostics; TypeScript never decides a Flick type.
 | Typed IR | `flick-core/src/ir` | the checked module with application stages, dictionaries, lifts and source ranges made explicit; `ir/lower` elaborates `do`, comprehensions and `sql` |
 | Constant evaluation | `flick-core/src/consteval` | expressions of literals folded with JS semantics bit for bit |
 | Optimizer | `flick-core/src/opt` | release passes over the typed IR (specialization, inlining, fusion, scalar replacement, folding) that keep every observable contract of the debug lowering; both backends run them (see [Release profile](../../reference/codegen/#release-profile)) |
-| JS backend | `flick-core/src/codegen/js`, `runtime/`, `packages/effect-ts/` | ESM with source maps. With `effect = "rt"` or `--rt`, runtime stages use Flick's own runtime without Effect; the default backend runs them through `@flick-lang/effect-ts` |
+| JS backend | `flick-core/src/codegen/js`, `runtime/`, `packages/effect-ts/` | ESM with source maps. By default, runtime stages use Flick's own RT without Effect; `effect = "effect"` selects `@flick-lang/effect-ts`, and `--rt` overrides that choice for one command |
 | Go backend | `flick-core/src/codegen/go`, `flick-core/src/build/go.rs`, `runtime-go/flickrt` | `[build] emit = "go"`: a Go module per entry over the runtime package `flickrt`, compiled by `go build` (see [Go target](../../reference/codegen/#go-target)) |
 | TypeScript emitter | `flick-core/src/codegen/ts` | the types of `--emit ts`, the `.d.ts` of `--emit-dts` and the Promise façades of `--promise-facade`; a type without a TypeScript form is refused, never written as `any` |
 | Interfaces | `flick-core/src/iface.rs`, `flick-core/src/build` | the versioned JSON `.iface` of each module, with the data and dictionary ABI and fingerprints from a build (see [Interfaces](../../reference/iface/)) |
 | FFI importer | `flick-core/src/ffi`, `tools/dts-importer` | `flick ffi import` and `ffi check` over the surface the Node helper reads from `.d.ts` with TypeScript |
 | Editor | `flick-core/src/ide`, `flick-core/src/projection.rs`, `flick/src/lsp`, `flick/src/mapper.rs` | hover, definition, references, completion, rename and code actions over one analysis; `flick lsp --stdio` serves them and `flick content-mapper` the TypeScript projection with its span maps (see [Editors](../../reference/editor/)) |
 
-The JS backend targets exactly Effect 4.1.2, which `flick/src/toolchain.rs`
-pins with the runtime, pnpm and Node versions; an installed `effect` or
-`@flick-lang/effect-ts` of another version stops a build (`FLICK-P015`).
+The Effect adapter owns its version and exact dependency pins in
+`packages/effect-ts/package.json`. The CLI checks an installed adapter against
+its own requirements (`FLICK-P015`), resolving dependencies from its real
+directory, including pnpm links. `flick/src/toolchain.rs` retains the runtime
+ABI, pnpm and Node versions. RT-only builds do not inspect the adapter.
 `flick-wasm` runs the same core for the in-browser demo, and `flick-model` is
 the reference model of the formal core (`docs/formal/`).
 
@@ -52,17 +54,17 @@ the reference model of the formal core (`docs/formal/`).
 | pnpm | A pinned version through `packageManager` in the project template (`pnpm@12.16.1`); `flick doctor` compares the installed pnpm with it. Dependency commands disable manager bootstrapping and automatic pinning before checking or running pnpm, so a refused frozen install does not rewrite the lockfile's manager metadata |
 | Effect | Exactly 4.1.2, commit `506eef143bcc1750ce58920aac1e45da7265d103` (see [A complex Cause](../../spec/05-errors-and-concurrency/#a-complex-cause-what-the-error-row-promises), [Compiler architecture](#compiler-architecture) and [Effect release](../../reference/runtime/#effect-release)) |
 | Effect API coverage | Every export of `effect`, `effect/cli`, `effect/http` and `effect/http-api` is classified in a manifest; a linter in `cargo test` fails on an unclassified, stale or changed-signature export (see [Effect coverage](../../reference/effect-surface/)) |
-| Backends | Flick's execution rules are the contract: the JS target has an Effect adapter and Flick's own `rt` runtime, while `runtime-go` implements the Go target. `[build] emit = "go"` selects Go output; `[build] effect = "rt"` or `--rt` selects the own JS runtime. The typed IR keeps numeric literals as values, and `foreign` bindings retain the JS calling convention |
+| Backends | Flick's execution rules are the contract: the JS target defaults to Flick's own `rt` runtime and has an optional Effect adapter; `runtime-go` implements the Go target. `[build] emit = "go"` selects Go output; `[build] effect = "effect"` selects the JS adapter. The typed IR keeps numeric literals as values, and `foreign` bindings retain the JS calling convention |
 | Effect Node platform | The HTTP server and `Terminal`/`FileSystem`/`Path` for the CLI come from `@effect/platform-node`, pinned to 4.1.2 alongside Effect as a dependency of `@flick-lang/effect-ts` |
 | PostgreSQL driver | `pg` (node-postgres), an optional peer dependency of `@flick-lang/effect-ts`, bound through `foreign` in the standard library module `Database` (`Database.pg`) |
 | React | React 19 and `react-dom/client` are optional peers of both packages: the shared UI nodes and DOM bridge live in `@flick-lang/runtime`, while the Effect adapter provides its own mounting policy |
 | UI state | The Effect adapter uses `effect/reactivity` atoms and their registry; `packages/effect-ts/src/atoms.ts` and `packages/effect-ts/src/effect/reactivity/` own those imports. Flick's own runtime has its own atom registry in `runtime/src/rt/atoms/`. A root or server request provides a registry, keeping hydration and per-request state independent (see [User interfaces](../../reference/ui/)) |
 | UI handlers | A handler's task has the row `{Atom.Write}` and no errors, so `Ui`, `Action` and `View` carry no service or error rows: a task provides any other service itself and handles its own errors, and a root's supervisor gets `Failure none`, its defects. With the rows, every view, slot and prop type repeated `r e` though handlers became top-level actions; an action that needs a service or fails names that in its own task, where it is handled |
-| UI tracing | Every run of an action is a span named by its label, and every `Atom.Write` write is logged at the debug level with its cause and its `Module:line`, which the compiler passes to `Atom.set`/`update`/`modify`. Both are always in the runtime rather than behind an opt-in layer: they cost about 4.4 KB gzip (spans 2.3 KB, Effect's logger 1.7 KB), which the UI bundle budgets carry (counter 118 KB, atoms 117 KB, playground 126 KB) |
+| UI tracing | Every run of an action is a span named by its label, and every `Atom.Write` write is logged at the debug level with its cause and its `Module:line`, which the compiler passes to `Atom.set`/`update`/`modify`. Both are always in the runtime rather than behind an opt-in layer: they cost about 4.4 KB gzip (spans 2.3 KB, the logger 1.7 KB), which the UI bundle budgets carry (counter 118 KB, atoms 117 KB, playground 126 KB) |
 | Entry points | An app names its programs in `entries`, each built into a runner `flick-<name>.js` beside modules written once; `entry` is the entry `main`, whose runner keeps the name `flick-main.js`. A module that only re-exports `main` is an entry too: a re-export is the same entity, so the runner imports `main` from the module that defines it, as every importer does, since a module's JavaScript has only its own definitions. A re-exported `tests` is not a test module, which would run another module's tests twice. Web pages are not entries: a bundler takes JavaScript modules importing `.fl` |
 | Development of pages | `flick dev` restarts the server entries on a change, as it does any app, and runs Vite for the client entries. A page's entry script accepts its own replacement: `hotDispose` of `Runner.Browser` reads the values of the labelled states (each top-level `let` of an atom, and a form draft's texts, `Type.field`) of the mounted roots, then interrupts the running program, whose finalizers unmount its roots, so no watcher or subscription is left twice; `hotCarry` makes the next program's first root start from those values. An atom found by its label in the new module takes the old value; a renamed or removed one starts afresh. Task atoms run again |
-| Libraries without Effect | A library built on Effect also writes `_core/`, the modules that need no Effect built against `@flick-lang/runtime/core`; one build cannot serve both backends. `core` `Option`/`Result` are plain objects that Effect's `Equal.equals` and `Hash.hash` do not equate with its own, and the Effect build of a module imports Effect, which an app with `effect = "none"` must not load. Measured: `_core/` of `@flick-lang/dts-importer` is 13% of its modules |
-| Documentation bundles | ESM execution workers and size-split vendor chunks preserve Effect's module execution order. A standalone Starlight 404 page provides English and Russian recovery links without becoming a documentation or search entry |
+| Libraries without Effect | A library built on Effect also writes `_core/`, the modules that need no Effect built against `@flick-lang/runtime/core`; one build cannot serve both backends. `core` `Option`/`Result` are plain objects that `Equal.equals` and `Hash.hash` of the Effect library do not equate with its own, and the Effect build of a module imports Effect, which an app with `effect = "none"` must not load. Measured: `_core/` of `@flick-lang/dts-importer` is 13% of its modules |
+| Documentation bundles | ESM execution workers and size-split vendor chunks preserve the execution order of the Effect modules. A standalone Starlight 404 page provides English and Russian recovery links without becoming a documentation or search entry |
 | Run generation locks | Atomically reserved `<pid>-<n>` directories protect construction before the child lock exists. Unix checks owner/child liveness without sending a signal; malformed locks, permission errors and unknown states are kept. Non-Unix hosts remain conservative |
 | `.d.ts` resolution | The npm package `typescript` in the Node helper `@flick-lang/dts-importer`; a JSON request on stdin, the surface as JSON on stdout (see [Importing a package's `.d.ts`](../../reference/ffi/#importing-a-packages-dts)) |
 | npm package scope | `@flick-lang/runtime` (no Effect dependency), `@flick-lang/effect-ts` (Effect adapter) and `@flick-lang/dts-importer`; the standard library ships inside the compiler |
@@ -105,18 +107,21 @@ and [ExceptT](https://github.com/bondiano/flick-lang/blob/main/examples/mtl/src/
 They use ordinary constructors, pattern matching and `do`; no transformer
 primitive or foreign implementation is needed.
 
-Three capture rules make these instances expressible:
+Under typing by use, three rules make these instances expressible:
 
 - A generic bound `a^c` bounds the complete value, including its existing
   qualifications; it does not add `c` to an otherwise unknown capture set.
   A function or nominal wrapper may still need a hidden-capture qualifier.
-- Curried stages retain generic values as well as named regions.
-  Constructors retain their fields' captures, and patterns project the
-  enclosing bound back to fields, including delayed computations.
+- A later stage holds nothing implicitly: it needs live what its earlier
+  parameters reach, which elision reads into the signature. Constructors
+  retain their fields' captures, and patterns project the enclosing bound
+  back to fields, including delayed computations. A pure callback may hold
+  a region it never uses.
 - Prelude callbacks are capture-polymorphic per invocation: for example,
   `flat_map` takes `(forall v. a^v -> (m b)^(c + v))^c`.
   `v` is independent of the computation's bound `d`: a `StateT` state or
-  `ReaderT` environment can arrive only when the computation is run.
+  `ReaderT` environment can arrive only when the computation is run, and
+  what the callback returns holds nothing of its input.
 
 These are bounds, not erasure: concrete scoped regions and explicit stored
 qualifications survive substitution, and mutable storage stays invariant.

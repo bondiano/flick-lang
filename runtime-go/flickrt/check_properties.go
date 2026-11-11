@@ -2,8 +2,8 @@ package flickrt
 
 import "strconv"
 
-// Effect's property checks, on the object of a `Codec.entries` codec as
-// the JS adapter puts them: before it becomes the list of its entries.
+// The property checks, on the object of a `Codec.entries` codec as the JS
+// adapter puts them: before it becomes the list of its entries.
 
 // checkedEntries is an entries codec with checks of its object.
 type checkedEntries struct {
@@ -40,8 +40,8 @@ func (e *checkedEntries) decode(fb *Fiber, in Value) (Value, []issue) {
 	return v, e.run(fb, in)
 }
 
-// encode checks the object of the entries before encoding its values, as
-// Effect checks the decoded side first.
+// encode checks the object of the entries before encoding its values: the
+// decoded side is checked first.
 func (e *checkedEntries) encode(fb *Fiber, v Value) (Value, []issue) {
 	obj := newRecord(Len(v))
 	for _, entry := range List(v) {
@@ -105,12 +105,12 @@ func CheckPropertiesBetween(minimum, maximum, codec Value) Value {
 		expected, "minProperties", float64(low), "maxProperties", float64(high)), codec)
 }
 
-// CheckPropertyNames is Effect's `isPropertyNames`: every key decodes with
-// `key`. The JS exporter writes its `propertyNames` without the key's
-// schema, which JSON drops, so it states nothing.
+// CheckPropertyNames is the check that every key decodes with `key`. The
+// JS exporter writes its `propertyNames` without the key's schema, which
+// JSON drops, so it states nothing.
 //
-// shortcut: a key runs through the whole codec, where Effect checks it
-// against the codec's encoded side only; the same for codecs without a
+// shortcut: a key runs through the whole codec, where the JS target checks
+// it against the codec's encoded side only; the same for codecs without a
 // transformation; check the encoded side if a program names keys by one
 func CheckPropertyNames(key, codec Value) Value {
 	k := codecOf(key)

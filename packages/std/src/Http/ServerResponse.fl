@@ -1,7 +1,7 @@
-/// Effect's `HttpServerResponse`: what a handler answers, an immutable
-/// value of status, headers, cookies and body. Cookie values are secrets;
-/// `show` masks them and secret headers. A streamed body holds no services
-/// or region; files are sent by `Http.Platform.file`.
+/// What a handler answers, an immutable value of status, headers, cookies
+/// and body. Cookie values are secrets; `show` masks them and secret
+/// headers. A streamed body holds no services or region; files are sent by
+/// `Http.Platform.file`.
 module Http.ServerResponse exposing (..)
 
 import Exit
@@ -38,125 +38,136 @@ let defaults = {
 
 /// A response without a body, status 204 unless the options set one.
 empty : Options -> ServerResponse
-foreign pure empty from "@flick-lang/effect-ts/effect/http/HttpServerResponse" "flickEmpty"
+foreign pure empty from "flick:http/HttpServerResponse" "flickEmpty"
   reviewed "effect@4.1.2 sha256:119fa26f8bf28422"
 
 /// A redirect to the location, status 302 unless the options set one.
 redirect : String -> Options -> ServerResponse
-foreign pure redirect from "@flick-lang/effect-ts/effect/http/HttpServerResponse" "flickRedirect"
+foreign pure redirect from "flick:http/HttpServerResponse" "flickRedirect"
   arity 2
   reviewed "effect@4.1.2 sha256:d94c578f44354790"
 
 /// A body of the bytes.
 uint8_array : List Int -> Options -> ServerResponse
-foreign pure uint8_array from "@flick-lang/effect-ts/effect/http/HttpServerResponse" "flickUint8Array"
+foreign pure uint8_array from "flick:http/HttpServerResponse" "flickUint8Array"
   arity 2
   reviewed "effect@4.1.2 sha256:c3153f9d552b4137"
 
 /// A body of the text, `text/plain` unless the options set a content type.
 text : String -> Options -> ServerResponse
-foreign pure text from "@flick-lang/effect-ts/effect/http/HttpServerResponse" "flickText"
+foreign pure text from "flick:http/HttpServerResponse" "flickText"
   arity 2
   reviewed "effect@4.1.2 sha256:8f7360a508f1bd5f"
 
 /// A body of the stream's chunks of bytes, sent as they come;
 /// `application/octet-stream` unless the options set a content type.
 stream : Stream none e (List Int) -> Options -> ServerResponse
-foreign pure stream from "@flick-lang/effect-ts/effect/http/HttpServerResponse" "flickStream"
+foreign pure stream from "flick:http/HttpServerResponse" "flickStream"
   arity 2
   reviewed "effect@4.1.2 sha256:261a610a1e39cd04"
 
-/// A body of the stream's chunks of text in UTF-8, sent as they come, as
-/// `Ui.Server.stream` makes them; `text/plain` unless the options set a
-/// content type.
+/// A body of the stream's chunks of text in UTF-8, sent as they come;
+/// `text/plain` unless the options set a content type.
 stream_text : Stream none e String -> Options -> ServerResponse
-foreign pure stream_text from "@flick-lang/effect-ts/effect/http/HttpServerResponse" "flickStreamText"
+foreign pure stream_text from "flick:http/HttpServerResponse" "flickStreamText"
+  arity 2
+  reviewed "effect@4.1.2 sha256:261a610a1e39cd04"
+
+/// A byte stream that may suspend but holds no service dependency or region.
+stream_async : Stream {Async} e (List Int) -> Options -> ServerResponse
+foreign pure stream_async from "flick:http/HttpServerResponse" "flickStream"
+  arity 2
+  reviewed "effect@4.1.2 sha256:261a610a1e39cd04"
+
+/// A text stream that may suspend, as `Ui.Server.stream` does.
+stream_text_async : Stream {Async} e String -> Options -> ServerResponse
+foreign pure stream_text_async from "flick:http/HttpServerResponse" "flickStreamText"
   arity 2
   reviewed "effect@4.1.2 sha256:261a610a1e39cd04"
 
 /// A `text/html` body of the markup.
 html : String -> ServerResponse
-foreign pure html from "@flick-lang/effect-ts/effect/http/HttpServerResponse" "html"
+foreign pure html from "flick:http/HttpServerResponse" "html"
   arity 1
   reviewed "effect@4.1.2 sha256:773d0f458374a95e"
 
 /// A JSON body of the value.
 json : Json -> Options ->{; Http.Body.HttpBodyError} ServerResponse
-foreign effect json from "@flick-lang/effect-ts/effect/http/HttpServerResponse" "flickJson"
+foreign effect json from "flick:http/HttpServerResponse" "flickJson"
   arity 2
   reviewed "effect@4.1.2 sha256:0676d738c1cf0f81"
 
 /// A JSON body of the value as the codec encodes it.
 schema_json :
   Codec rd re Json a -> a -> Options ->{re; SchemaError, Http.Body.HttpBodyError} ServerResponse
-foreign effect schema_json from "@flick-lang/effect-ts/effect/http/HttpServerResponse" "flickSchemaJson"
+foreign effect schema_json from "flick:http/HttpServerResponse" "flickSchemaJson"
   arity 3
   reviewed "effect@4.1.2 sha256:fe70d386ac654f2e"
 
 /// A form body of the parameters.
 url_params : Http.UrlParams.UrlParams -> Options -> ServerResponse
-foreign pure url_params from "@flick-lang/effect-ts/effect/http/HttpServerResponse" "flickUrlParams"
+foreign pure url_params from "flick:http/HttpServerResponse" "flickUrlParams"
   arity 2
   reviewed "effect@4.1.2 sha256:987fcbd97fa0f366"
 
 /// A `multipart/form-data` body of the fields.
 form_data : Http.Body.FormDataInput -> Options -> ServerResponse
-foreign pure form_data from "@flick-lang/effect-ts/effect/http/HttpServerResponse" "flickFormData"
+foreign pure form_data from "flick:http/HttpServerResponse" "flickFormData"
   arity 2
   reviewed "effect@4.1.2 sha256:000e4376e0cacf03"
 
 /// The status code.
 status : ServerResponse -> Int
-foreign pure status from "@flick-lang/effect-ts/effect/http/HttpServerResponse" "flickStatus"
+foreign pure status from "flick:http/HttpServerResponse" "flickStatus"
   reviewed "effect@4.1.2 sha256:21b98bd151affbd4"
 
 /// The status text, if one was set.
 status_text : ServerResponse -> Option String
-foreign pure status_text from "@flick-lang/effect-ts/effect/http/HttpServerResponse" "flickStatusText"
+foreign pure status_text from "flick:http/HttpServerResponse" "flickStatusText"
   reviewed "effect@4.1.2 sha256:21b98bd151affbd4"
 
 /// The headers.
 headers : ServerResponse -> Http.Headers.Headers
-foreign pure headers from "@flick-lang/effect-ts/effect/http/HttpServerResponse" "flickHeaders"
+foreign pure headers from "flick:http/HttpServerResponse" "flickHeaders"
   reviewed "effect@4.1.2 sha256:21b98bd151affbd4"
 
 /// The cookies it sets.
 cookies : ServerResponse -> Http.Cookies.Cookies
-foreign pure cookies from "@flick-lang/effect-ts/effect/http/HttpServerResponse" "flickCookies"
+foreign pure cookies from "flick:http/HttpServerResponse" "flickCookies"
   reviewed "effect@4.1.2 sha256:21b98bd151affbd4"
 
 /// The body.
 body : ServerResponse -> Http.Body.Body
-foreign pure body from "@flick-lang/effect-ts/effect/http/HttpServerResponse" "flickBody"
+foreign pure body from "flick:http/HttpServerResponse" "flickBody"
   reviewed "effect@4.1.2 sha256:21b98bd151affbd4"
 
 /// Sets a header: `set_header name value response`.
 set_header : String -> String -> ServerResponse -> ServerResponse
-foreign pure set_header from "@flick-lang/effect-ts/effect/http/HttpServerResponse" "setHeader"
+foreign pure set_header from "flick:http/HttpServerResponse" "setHeader"
   arity 2
   reviewed "effect@4.1.2 sha256:72c076c80ebf641f"
 
 /// Removes a header.
 remove_header : String -> ServerResponse -> ServerResponse
-foreign pure remove_header from "@flick-lang/effect-ts/effect/http/HttpServerResponse" "removeHeader"
+foreign pure remove_header from "flick:http/HttpServerResponse" "removeHeader"
   arity 1
   reviewed "effect@4.1.2 sha256:453a0fdd9022d2fd"
 
 /// Sets each of the headers.
 set_headers : Http.Headers.Input -> ServerResponse -> ServerResponse
-foreign pure set_headers from "@flick-lang/effect-ts/effect/http/HttpServerResponse" "setHeaders"
+foreign pure set_headers from "flick:http/HttpServerResponse" "setHeaders"
   arity 1
   reviewed "effect@4.1.2 sha256:e7d86ae76b30fa68"
 
 /// No longer sets the cookie of the name.
 remove_cookie : String -> ServerResponse -> ServerResponse
-foreign pure remove_cookie from "@flick-lang/effect-ts/effect/http/HttpServerResponse" "removeCookie"
+foreign pure remove_cookie from "flick:http/HttpServerResponse" "removeCookie"
   arity 1
   reviewed "effect@4.1.2 sha256:6dc22762e00c8524"
 
 /// Sets exactly the cookies.
 replace_cookies : Http.Cookies.Cookies -> ServerResponse -> ServerResponse
-foreign pure replace_cookies from "@flick-lang/effect-ts/effect/http/HttpServerResponse" "replaceCookies"
+foreign pure replace_cookies from "flick:http/HttpServerResponse" "replaceCookies"
   arity 1
   reviewed "effect@4.1.2 sha256:a1a74a0a778e65a1"
 
@@ -167,26 +178,26 @@ set_cookie :
   Http.Cookies.Attributes ->
   ServerResponse ->{; Http.Cookies.CookiesError}
   ServerResponse
-foreign effect set_cookie from "@flick-lang/effect-ts/effect/http/HttpServerResponse" "flickSetCookie"
+foreign effect set_cookie from "flick:http/HttpServerResponse" "flickSetCookie"
   arity 4
   reviewed "effect@4.1.2 sha256:c3dc909357c4cefd"
 
 /// Sets an expired empty cookie of the name, so that the browser drops it.
 expire_cookie :
   String -> Http.Cookies.Attributes -> ServerResponse ->{; Http.Cookies.CookiesError} ServerResponse
-foreign effect expire_cookie from "@flick-lang/effect-ts/effect/http/HttpServerResponse" "flickExpireCookie"
+foreign effect expire_cookie from "flick:http/HttpServerResponse" "flickExpireCookie"
   arity 3
   reviewed "effect@4.1.2 sha256:8597b123cf37478c"
 
 /// The cookies, changed by `f`.
 update_cookies : (Http.Cookies.Cookies -> Http.Cookies.Cookies) -> ServerResponse -> ServerResponse
-foreign pure update_cookies from "@flick-lang/effect-ts/effect/http/HttpServerResponse" "updateCookies"
+foreign pure update_cookies from "flick:http/HttpServerResponse" "updateCookies"
   arity 1
   reviewed "effect@4.1.2 sha256:134de5d5be1a5778"
 
 /// Adds the cookies, replacing those of their names.
 merge_cookies : Http.Cookies.Cookies -> ServerResponse -> ServerResponse
-foreign pure merge_cookies from "@flick-lang/effect-ts/effect/http/HttpServerResponse" "mergeCookies"
+foreign pure merge_cookies from "flick:http/HttpServerResponse" "mergeCookies"
   arity 1
   reviewed "effect@4.1.2 sha256:fecd12308d403efe"
 
@@ -195,19 +206,19 @@ set_cookies :
   List (String, Redacted String, Http.Cookies.Attributes) ->
   ServerResponse ->{; Http.Cookies.CookiesError}
   ServerResponse
-foreign effect set_cookies from "@flick-lang/effect-ts/effect/http/HttpServerResponse" "flickSetCookies"
+foreign effect set_cookies from "flick:http/HttpServerResponse" "flickSetCookies"
   arity 2
   reviewed "effect@4.1.2 sha256:b33857d0d0581c83"
 
 /// The body.
 set_body : Http.Body.Body -> ServerResponse -> ServerResponse
-foreign pure set_body from "@flick-lang/effect-ts/effect/http/HttpServerResponse" "setBody"
+foreign pure set_body from "flick:http/HttpServerResponse" "setBody"
   arity 1
   reviewed "effect@4.1.2 sha256:b64802a31c2ba0d8"
 
 /// The status, and the status text if given.
 set_status : Int -> Option String -> ServerResponse -> ServerResponse
-foreign pure set_status from "@flick-lang/effect-ts/effect/http/HttpServerResponse" "setStatus"
+foreign pure set_status from "flick:http/HttpServerResponse" "setStatus"
   arity 2
   optional 1
   reviewed "effect@4.1.2 sha256:5c2196d52716a656"
@@ -215,7 +226,7 @@ foreign pure set_status from "@flick-lang/effect-ts/effect/http/HttpServerRespon
 /// Whether the response is sent without its body: a status that has none
 /// (1xx, 204, 304), or `true` for a `HEAD` request.
 omits_body : Bool -> ServerResponse -> Bool
-foreign pure omits_body from "@flick-lang/effect-ts/effect/http/HttpServerResponse" "flickOmitsBody"
+foreign pure omits_body from "flick:http/HttpServerResponse" "flickOmitsBody"
   arity 2
   reviewed "effect@4.1.2 sha256:61469ec5709857f4"
 
@@ -223,20 +234,20 @@ foreign pure omits_body from "@flick-lang/effect-ts/effect/http/HttpServerRespon
 /// double's answer.
 to_client_response :
   Http.ClientRequest.ClientRequest -> ServerResponse -> Http.ClientResponse.ClientResponse
-foreign pure to_client_response from "@flick-lang/effect-ts/effect/http/HttpServerResponse" "flickToClientResponse"
+foreign pure to_client_response from "flick:http/HttpServerResponse" "flickToClientResponse"
   arity 2
   reviewed "effect@4.1.2 sha256:c74fb88476778652"
 
 /// The response a server would send for the client response: a proxy's.
 from_client_response : Http.ClientResponse.ClientResponse -> ServerResponse
-foreign pure from_client_response from "@flick-lang/effect-ts/effect/http/HttpServerResponse" "fromClientResponse"
+foreign pure from_client_response from "flick:http/HttpServerResponse" "fromClientResponse"
   arity 1
   reviewed "effect@4.1.2 sha256:4cd8b34d255267ce"
 
 /// The response a server answers a failure with: the status of a
 /// `HttpServerError`, 499 for an interruption by the client, 500 otherwise.
 cause_response : Failure e ->{} ServerResponse
-foreign effect cause_response from "@flick-lang/effect-ts/effect/http/HttpServerResponse" "flickCauseResponse"
+foreign effect cause_response from "flick:http/HttpServerResponse" "flickCauseResponse"
   reviewed "effect@4.1.2 sha256:c6f53ffbaa896ea2"
 
 /// The response of a handler's exit: its value, or `cause_response`.

@@ -1,8 +1,8 @@
 /// The types of `Graph`: the graph, its indices, edges, snapshots, the
-/// options of its algorithms and their results. Records keep Effect's field
-/// names; string literal unions of Effect are unboxed strings with a value
-/// per literal.
-module Graph.Types exposing (..)
+/// options of its algorithms and their results. Records keep the field
+/// names of the runtime's JS objects; a string literal union there is an
+/// unboxed string here, with a value per literal.
+private module Graph.Types exposing (..)
 
 /// An immutable graph with node data `n`, edge data `e`, and kind `k`:
 /// `Directed` or `Undirected`.
@@ -46,8 +46,8 @@ type alias IndexedNode n = { index : NodeIndex; data : n }
 /// An edge of a snapshot: its index, endpoints and data.
 type alias IndexedEdge e = { index : EdgeIndex; source : NodeIndex; target : NodeIndex; data : e }
 
-/// Every node and edge with its index, and the kind: Effect's `type` field
-/// is `graph_type`.
+/// Every node and edge with its index, and the kind: the JS object's `type`
+/// field is `graph_type`.
 type alias Snapshot n e k = {
   graph_type : Kind k;
   nodes : List (IndexedNode n);

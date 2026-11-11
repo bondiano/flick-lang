@@ -14,9 +14,9 @@ import (
 	"time"
 )
 
-// FileSystem.node as Effect's NodeFileSystem: each operation of the Flick
-// service `FileSystem.FileSystem`, failing with the Flick PlatformError of
-// a system error, tagged by the errno Node reports.
+// FileSystem.node: each operation of the Flick service
+// `FileSystem.FileSystem`, failing with the Flick PlatformError of a system
+// error, tagged by the errno Node reports.
 
 var (
 	platformErrorTag = Tag("PlatformError.PlatformError.PlatformError")
@@ -32,7 +32,7 @@ var (
 	}
 )
 
-// systemTagOf is Effect's tag of the errno of a failed call.
+// systemTagOf is the tag of the errno of a failed call.
 func systemTagOf(err error) string {
 	if errors.Is(err, syscall.ELOOP) {
 		return "BadResource"
@@ -292,7 +292,7 @@ func makeTempFile(options Value, method string) string {
 }
 
 // removeWhenClosed removes the path and what is below it when the owner
-// of the call closes; a failure to is a defect, as Effect's `orDie`.
+// of the call closes; a failure to is a defect.
 func removeWhenClosed(fb *Fiber, path string) {
 	fb.owner.add(fb, func(*Fiber, *Cause) Value {
 		if err := os.RemoveAll(path); err != nil {

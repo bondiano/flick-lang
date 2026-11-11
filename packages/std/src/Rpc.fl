@@ -1,10 +1,9 @@
-/// Typed remote procedure calls over Effect's RPC, served over HTTP with
-/// NDJSON. A procedure is described with codecs, procedures form a group,
-/// and the type of the group is the record of handlers it needs, so
-/// `listen` takes exactly one handler per procedure and a missing or extra
-/// one is a type error naming the procedure. `call` and `call_stream` call
-/// a procedure from the same value. The module is unstable, as Effect marks
-/// `effect/rpc`.
+/// Typed remote procedure calls, served over HTTP with NDJSON. A procedure
+/// is described with codecs, procedures form a group, and the type of the
+/// group is the record of handlers it needs, so `listen` takes exactly one
+/// handler per procedure and a missing or extra one is a type error naming
+/// the procedure. `call` and `call_stream` call a procedure from the same
+/// value. The module is experimental.
 module Rpc exposing (..)
 
 import Fiber
@@ -37,29 +36,30 @@ type Serialization
 /// JSON, one message a line: a stream's elements come as they are sent.
 /// The default.
 ndjson : Serialization
-foreign pure ndjson from "@flick-lang/effect-ts/effect/rpc/Rpc" "rpcNdjson"
+foreign pure ndjson from "flick:rpc/Rpc" "rpcNdjson"
   reviewed "effect@4.1.2 sha256:c72ee8574fb6c140"
 
 /// One JSON document: over HTTP the messages of a call come together, so a
 /// stream's elements come once it ends.
 json : Serialization
-foreign pure json from "@flick-lang/effect-ts/effect/rpc/Rpc" "rpcJson"
+foreign pure json from "flick:rpc/Rpc" "rpcJson"
   reviewed "effect@4.1.2 sha256:868b3e8b899a14b1"
 
 /// JSON-RPC 2.0 documents, for clients that speak it.
 json_rpc : Serialization
-foreign pure json_rpc from "@flick-lang/effect-ts/effect/rpc/Rpc" "rpcJsonRpc"
+foreign pure json_rpc from "flick:rpc/Rpc" "rpcJsonRpc"
   reviewed "effect@4.1.2 sha256:8442484c92ce8133"
 
 /// JSON-RPC 2.0, one message a line.
 ndjson_rpc : Serialization
-foreign pure ndjson_rpc from "@flick-lang/effect-ts/effect/rpc/Rpc" "rpcNdjsonRpc"
+foreign pure ndjson_rpc from "flick:rpc/Rpc" "rpcNdjsonRpc"
   reviewed "effect@4.1.2 sha256:8e90c634696879c6"
 
-/// Effect's binary frames, laid out by the codecs: smaller than JSON, but
-/// both ends must be Effect's, and it adds to a bundle.
+/// Binary frames, laid out by the codecs: smaller than JSON, but the other
+/// end must be this module or a peer built with the Effect library, and it
+/// adds to a bundle.
 binary : Serialization
-foreign pure binary from "@flick-lang/effect-ts/effect/rpc/Rpc" "rpcBinary"
+foreign pure binary from "flick:rpc/Rpc" "rpcBinary"
   reviewed "effect@4.1.2 sha256:5d78f3975991bfc4"
 
 /// Where the server listens, the path of its procedures and how it writes
@@ -80,19 +80,19 @@ type Transport
 
 /// A POST per call over fetch: a server of `listen`.
 http : Transport
-foreign pure http from "@flick-lang/effect-ts/effect/rpc/Rpc" "rpcHttp"
+foreign pure http from "flick:rpc/Rpc" "rpcHttp"
   reviewed "effect@4.1.2 sha256:227f4e7f4b1f1c65"
 
 /// The messages of calls over the global WebSocket: a server of
 /// `listen_websocket`. Only a program that names it bundles it.
 websocket : Transport
-foreign pure websocket from "@flick-lang/effect-ts/effect/rpc/Rpc" "rpcWebsocket"
+foreign pure websocket from "flick:rpc/Rpc" "rpcWebsocket"
   reviewed "effect@4.1.2 sha256:c3de3399064bf5e6"
 
 /// The messages of calls over a TCP connection to `tcp://host:port`, opened
 /// on the first call: a server of `listen_tcp`. Node only.
 tcp : Transport
-foreign pure tcp from "@flick-lang/effect-ts/effect/rpc/RpcNode" "rpcTcp"
+foreign pure tcp from "flick:rpc/RpcNode" "rpcTcp"
   reviewed "effect@4.1.2 sha256:c3de3399064bf5e6"
 
 /// How a client writes its messages, as its server does, and how it
@@ -114,42 +114,42 @@ type error ClientError = ClientError String
 /// A procedure named `l` with no parts yet: its handler takes `Unit` and
 /// answers `Unit`.
 make : Record.Label l -> Rpc l (Unit ->{r; none} Unit)
-foreign pure make from "@flick-lang/effect-ts/effect/rpc/Rpc" "rpcMake"
+foreign pure make from "flick:rpc/Rpc" "rpcMake"
   reviewed "effect@4.1.2 sha256:04f66df479054dbe"
 
 /// The payload, coded as JSON.
 with_payload : PureCodec Json p2 -> Rpc l (p ->{r; e} s) -> Rpc l (p2 ->{r; e} s)
-foreign pure with_payload from "@flick-lang/effect-ts/effect/rpc/Rpc" "rpcWithPayload"
+foreign pure with_payload from "flick:rpc/Rpc" "rpcWithPayload"
   arity 2
   reviewed "effect@4.1.2 sha256:04f66df479054dbe"
 
 /// The success, coded as JSON.
 with_success : PureCodec Json s2 -> Rpc l (p ->{r; e} s) -> Rpc l (p ->{r; e} s2)
-foreign pure with_success from "@flick-lang/effect-ts/effect/rpc/Rpc" "rpcWithSuccess"
+foreign pure with_success from "flick:rpc/Rpc" "rpcWithSuccess"
   arity 2
   reviewed "effect@4.1.2 sha256:04f66df479054dbe"
 
 /// The success as a stream of elements, each coded as JSON and sent as it
 /// comes; a failure of the handler fails the stream.
 with_stream : PureCodec Json a -> Rpc l (p ->{r; e} s) -> Rpc l (p ->{r; e} Stream none none a)
-foreign pure with_stream from "@flick-lang/effect-ts/effect/rpc/Rpc" "rpcWithStream"
+foreign pure with_stream from "flick:rpc/Rpc" "rpcWithStream"
   arity 2
   reviewed "effect@4.1.2 sha256:60a7d20a9e48db21"
 
 /// No typed error.
 errors : ErrorCases none
-foreign pure errors from "@flick-lang/effect-ts/effect/rpc/Rpc" "rpcErrors"
+foreign pure errors from "flick:rpc/Rpc" "rpcErrors"
 
 /// The cases and the error `t`, coded with this codec.
 error_case : PureCodec Json t -> ErrorCases e -> ErrorCases {t | e}
-foreign pure error_case from "@flick-lang/effect-ts/effect/rpc/Rpc" "rpcErrorCase"
+foreign pure error_case from "flick:rpc/Rpc" "rpcErrorCase"
   arity 2
   reviewed "effect@4.1.2 sha256:04f66df479054dbe"
 
 /// More typed errors of the handler, each coded as its case says: a
 /// handler failing with an error no case has is a type error, not a defect.
 with_errors : ErrorCases e2 -> Rpc l (p ->{r; e} s) -> Rpc l (p ->{r; e + e2} s)
-foreign pure with_errors from "@flick-lang/effect-ts/effect/rpc/Rpc" "rpcWithErrors"
+foreign pure with_errors from "flick:rpc/Rpc" "rpcWithErrors"
   arity 2
   reviewed "effect@4.1.2 sha256:04f66df479054dbe"
 
@@ -163,7 +163,7 @@ type alias Call p = { payload : p; headers : Http.Headers.Headers }
 /// is answered as one of the handler would be, so it is one of the
 /// procedure's errors.
 with_middleware : (Call p ->{r; e} Unit) -> Rpc l (p ->{r; e} s) -> Rpc l (p ->{r; e} s)
-foreign pure with_middleware from "@flick-lang/effect-ts/effect/rpc/Rpc" "rpcWithMiddleware"
+foreign pure with_middleware from "flick:rpc/Rpc" "rpcWithMiddleware"
   arity 2
   reviewed "effect@4.1.2 sha256:93976e18ef904486"
 
@@ -179,32 +179,32 @@ with_auth :
   (Call p ->{r; e} ServiceImpl a) ->
   Rpc l (p ->{a + r; e} s) ->
   Rpc l (p ->{a + r; e} s)
-foreign pure with_auth from "@flick-lang/effect-ts/effect/rpc/Rpc" "rpcWithAuth"
+foreign pure with_auth from "flick:rpc/Rpc" "rpcWithAuth"
   arity 3
 
 /// The server runs the handler to its end even when the client goes away
 /// or interrupts the call: for a write that must not stop halfway.
 uninterruptible : Rpc l f -> Rpc l f
-foreign pure uninterruptible from "@flick-lang/effect-ts/effect/rpc/Rpc" "rpcUninterruptible"
+foreign pure uninterruptible from "flick:rpc/Rpc" "rpcUninterruptible"
   reviewed "effect@4.1.2 sha256:1a4870136a854e0f"
 
 /// A group with no procedures yet.
 group : Group r {}
-foreign pure group from "@flick-lang/effect-ts/effect/rpc/Rpc" "rpcGroup"
+foreign pure group from "flick:rpc/Rpc" "rpcGroup"
   reviewed "effect@4.1.2 sha256:2778a7f9eb6fd7f5"
 
 /// The group, served without the service `tag`: each of its procedures
 /// makes it per call with `with_auth`. A procedure without one is a defect
 /// when the group is made.
 authenticated : ServiceTag a -> Group (a + r) hs -> Group r hs
-foreign pure authenticated from "@flick-lang/effect-ts/effect/rpc/Rpc" "rpcAuthenticated"
+foreign pure authenticated from "flick:rpc/Rpc" "rpcAuthenticated"
   arity 2
 
 /// The group with the procedure: its handler becomes a field of the group.
 add :
   (Record.Lacks l hs, Record.UnionDisjoint hs (Record.Field l (p ->{r; e} s)) out) =>
   Rpc l (p ->{r; e} s) -> Group r hs -> Group r out
-foreign pure add from "@flick-lang/effect-ts/effect/rpc/Rpc" "rpcAdd"
+foreign pure add from "flick:rpc/Rpc" "rpcAdd"
   arity 2
   reviewed "effect@4.1.2 sha256:2778a7f9eb6fd7f5"
 
@@ -215,7 +215,7 @@ foreign pure add from "@flick-lang/effect-ts/effect/rpc/Rpc" "rpcAdd"
 listen :
   Fiber.Provided r s =>
   ServeOptions -> Group r hs -> (hs^c ->{Async, Scope s | r; ServeError} Server s)^c
-foreign effect listen from "@flick-lang/effect-ts/effect/rpc/RpcNode" "rpcListen"
+foreign effect listen from "flick:rpc/RpcNode" "rpcListen"
   arity 3
   retention owner
   reviewed "effect@4.1.2 sha256:96a035f63aca976f"
@@ -225,7 +225,7 @@ foreign effect listen from "@flick-lang/effect-ts/effect/rpc/RpcNode" "rpcListen
 listen_websocket :
   Fiber.Provided r s =>
   ServeOptions -> Group r hs -> (hs^c ->{Async, Scope s | r; ServeError} Server s)^c
-foreign effect listen_websocket from "@flick-lang/effect-ts/effect/rpc/RpcNode" "rpcListenWebsocket"
+foreign effect listen_websocket from "flick:rpc/RpcNode" "rpcListenWebsocket"
   arity 3
   retention owner
   reviewed "effect@4.1.2 sha256:95596588ccbf7076"
@@ -237,7 +237,7 @@ foreign effect listen_websocket from "@flick-lang/effect-ts/effect/rpc/RpcNode" 
 listen_tcp :
   Fiber.Provided r s =>
   ServeOptions -> Group r hs -> (hs^c ->{Async, Scope s | r; ServeError} Server s)^c
-foreign effect listen_tcp from "@flick-lang/effect-ts/effect/rpc/RpcNode" "rpcListenTcp"
+foreign effect listen_tcp from "flick:rpc/RpcNode" "rpcListenTcp"
   arity 3
   retention owner
   reviewed "effect@4.1.2 sha256:32acbc4cf74e10ac"
@@ -245,7 +245,7 @@ foreign effect listen_tcp from "@flick-lang/effect-ts/effect/rpc/RpcNode" "rpcLi
 /// The port the server listens on: the one asked for, or the one the system
 /// chose for port 0.
 port : Server s -> Float
-foreign pure port from "@flick-lang/effect-ts/effect/rpc/RpcNode" "rpcPort"
+foreign pure port from "flick:rpc/RpcNode" "rpcPort"
   retention call
   reviewed "effect@4.1.2 sha256:96a035f63aca976f"
 
@@ -258,7 +258,7 @@ handler :
   Serialization ->
   Group r hs ->
   (hs^c ->{Scope s | r} (ServerRequest ->{Async} ServerResponse)^{s})^c
-foreign effect handler from "@flick-lang/effect-ts/effect/rpc/RpcNode" "rpcHandler"
+foreign effect handler from "flick:rpc/RpcNode" "rpcHandler"
   arity 3
   retention owner
   reviewed "effect@4.1.2 sha256:96a035f63aca976f"
@@ -270,7 +270,7 @@ handler_websocket :
   Serialization ->
   Group r hs ->
   (hs^c ->{Scope s | r} (ServerRequest ->{Async} ServerResponse)^{s})^c
-foreign effect handler_websocket from "@flick-lang/effect-ts/effect/rpc/RpcNode" "rpcHandlerWebsocket"
+foreign effect handler_websocket from "flick:rpc/RpcNode" "rpcHandlerWebsocket"
   arity 3
   retention owner
   reviewed "effect@4.1.2 sha256:95596588ccbf7076"
@@ -279,13 +279,13 @@ foreign effect handler_websocket from "@flick-lang/effect-ts/effect/rpc/RpcNode"
 /// `ws://…` over `websocket`) as `options` says: the success, a declared
 /// error as the typed failure, or `ClientError`.
 call_with : CallOptions -> String -> Rpc l (p ->{r; e} s) -> p ->{Async; ClientError | e} s
-foreign effect call_with from "@flick-lang/effect-ts/effect/rpc/Rpc" "rpcCall"
+foreign effect call_with from "flick:rpc/Rpc" "rpcCall"
   arity 4
   reviewed "effect@4.1.2 sha256:9e1b2aef57533a72"
 
 /// `call_with call_defaults`.
 call : String -> Rpc l (p ->{r; e} s) -> p ->{Async; ClientError | e} s
-foreign effect call from "@flick-lang/effect-ts/effect/rpc/Rpc" "rpcCallNdjson"
+foreign effect call from "flick:rpc/Rpc" "rpcCallNdjson"
   arity 3
   reviewed "effect@4.1.2 sha256:9e1b2aef57533a72"
 
@@ -298,14 +298,14 @@ call_stream_with :
   Rpc l (p ->{r; e} Stream none none a) ->
   p ->
   Stream none {ClientError | e} a
-foreign pure call_stream_with from "@flick-lang/effect-ts/effect/rpc/Rpc" "rpcCallStream"
+foreign pure call_stream_with from "flick:rpc/Rpc" "rpcCallStream"
   arity 4
   reviewed "effect@4.1.2 sha256:9e1b2aef57533a72"
 
 /// `call_stream_with call_defaults`.
 call_stream :
   String -> Rpc l (p ->{r; e} Stream none none a) -> p -> Stream none {ClientError | e} a
-foreign pure call_stream from "@flick-lang/effect-ts/effect/rpc/Rpc" "rpcCallStreamNdjson"
+foreign pure call_stream from "flick:rpc/Rpc" "rpcCallStreamNdjson"
   arity 3
   reviewed "effect@4.1.2 sha256:9e1b2aef57533a72"
 
@@ -317,13 +317,13 @@ type Client (s : Region)
 /// for one call: a WebSocket stays open, and HTTP keeps its connections
 /// alive.
 connect : CallOptions -> String ->{Async, Scope s; ClientError} Client s
-foreign effect connect from "@flick-lang/effect-ts/effect/rpc/Rpc" "rpcConnect"
+foreign effect connect from "flick:rpc/Rpc" "rpcConnect"
   arity 2
   reviewed "effect@4.1.2 sha256:c3de3399064bf5e6"
 
 /// Calls the procedure over the connection.
 call_on : Client s -> Rpc l (p ->{r; e} x) -> p ->{Async; ClientError | e} x
-foreign effect call_on from "@flick-lang/effect-ts/effect/rpc/Rpc" "rpcCallOn"
+foreign effect call_on from "flick:rpc/Rpc" "rpcCallOn"
   arity 3
   retention call
   reviewed "effect@4.1.2 sha256:9e1b2aef57533a72"
@@ -331,7 +331,7 @@ foreign effect call_on from "@flick-lang/effect-ts/effect/rpc/Rpc" "rpcCallOn"
 /// Calls the stream procedure over the connection.
 call_stream_on :
   Client s -> Rpc l (p ->{r; e} Stream none none a) -> p -> (Stream none {ClientError | e} a)^{s}
-foreign pure call_stream_on from "@flick-lang/effect-ts/effect/rpc/Rpc" "rpcCallStreamOn"
+foreign pure call_stream_on from "flick:rpc/Rpc" "rpcCallStreamOn"
   arity 3
   retention owner
   reviewed "effect@4.1.2 sha256:9e1b2aef57533a72"
@@ -340,7 +340,7 @@ foreign pure call_stream_on from "@flick-lang/effect-ts/effect/rpc/Rpc" "rpcCall
 /// a program another starts with `spawn`, as editors start language
 /// servers. Nothing else may write to stdout meanwhile. Node only.
 serve_stdio : Serialization -> Group r hs -> (hs^c ->{Async, Stdio.Stdio | r; none} Unit)^c
-foreign effect serve_stdio from "@flick-lang/effect-ts/effect/rpc/RpcNode" "rpcServeStdio"
+foreign effect serve_stdio from "flick:rpc/RpcNode" "rpcServeStdio"
   arity 3
   retention call
   reviewed "effect@4.1.2 sha256:8aea91f3d781cae8"
@@ -349,7 +349,7 @@ foreign effect serve_stdio from "@flick-lang/effect-ts/effect/rpc/RpcNode" "rpcS
 /// stdout, which its `serve_stdio` answers; its stderr is the program's.
 /// The end of the scope stops it. Node only.
 spawn : Serialization -> String -> List String ->{Scope s; ClientError} Client s
-foreign effect spawn from "@flick-lang/effect-ts/effect/rpc/RpcNode" "rpcSpawn"
+foreign effect spawn from "flick:rpc/RpcNode" "rpcSpawn"
   arity 3
   reviewed "effect@4.1.2 sha256:c3de3399064bf5e6"
 
@@ -357,7 +357,7 @@ foreign effect spawn from "@flick-lang/effect-ts/effect/rpc/RpcNode" "rpcSpawn"
 /// closes the worker: the program of the module `worker` starts. Messages
 /// travel by structured clone, so it takes no serialization.
 serve_worker : Group r hs -> (hs^c ->{Async | r; none} Unit)^c
-foreign effect serve_worker from "@flick-lang/effect-ts/effect/rpc/Rpc" "rpcServeWorker"
+foreign effect serve_worker from "flick:rpc/Rpc" "rpcServeWorker"
   arity 2
   retention call
   reviewed "effect@4.1.2 sha256:a3c91b37d4a12a3f"
@@ -365,14 +365,14 @@ foreign effect serve_worker from "@flick-lang/effect-ts/effect/rpc/Rpc" "rpcServ
 /// Starts a module Web Worker from `url` and connects to it; its
 /// `serve_worker` answers. The end of the scope closes it. Browsers only.
 worker : String ->{Scope s; ClientError} Client s
-foreign effect worker from "@flick-lang/effect-ts/effect/rpc/Rpc" "rpcWorker"
+foreign effect worker from "flick:rpc/Rpc" "rpcWorker"
   arity 1
   reviewed "effect@4.1.2 sha256:5a2bb17815a939f5"
 
 /// Answers the calls of the thread that started this worker thread until it
 /// closes it, as `serve_worker` in a browser. Node only.
 serve_node_worker : Group r hs -> (hs^c ->{Async | r; none} Unit)^c
-foreign effect serve_node_worker from "@flick-lang/effect-ts/effect/rpc/RpcNode" "rpcServeNodeWorker"
+foreign effect serve_node_worker from "flick:rpc/RpcNode" "rpcServeNodeWorker"
   arity 2
   retention call
   reviewed "effect@4.1.2 sha256:a3c91b37d4a12a3f"
@@ -381,14 +381,14 @@ foreign effect serve_node_worker from "@flick-lang/effect-ts/effect/rpc/RpcNode"
 /// connects to it; its `serve_node_worker` answers. The end of the scope
 /// closes it. Node only.
 node_worker : String -> List String ->{Scope s; ClientError} Client s
-foreign effect node_worker from "@flick-lang/effect-ts/effect/rpc/RpcNode" "rpcNodeWorker"
+foreign effect node_worker from "flick:rpc/RpcNode" "rpcNodeWorker"
   arity 2
   reviewed "effect@4.1.2 sha256:5a2bb17815a939f5"
 
 /// Runs `task` with its calls carrying the headers too, which the hooks of
 /// `with_middleware` read: `authorization`, say.
 with_headers : Http.Headers.Input -> (Eff r e a)^c ->{r; e} a
-foreign effect with_headers from "@flick-lang/effect-ts/effect/rpc/Rpc" "rpcWithHeaders"
+foreign effect with_headers from "flick:rpc/Rpc" "rpcWithHeaders"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:dcacf8ec37486efd"
@@ -398,7 +398,7 @@ foreign effect with_headers from "@flick-lang/effect-ts/effect/rpc/Rpc" "rpcWith
 /// so this does not test them; the hooks of `with_middleware` see no
 /// headers.
 call_local : Group r hs -> hs^c -> Rpc l (p ->{r; e} s) -> p ->{r; e} s
-foreign effect call_local from "@flick-lang/effect-ts/effect/rpc/Rpc" "rpcCallLocal"
+foreign effect call_local from "flick:rpc/Rpc" "rpcCallLocal"
   arity 4
   retention call
   reviewed "effect@4.1.2 sha256:e7f8fc6a44cc917c"
@@ -406,7 +406,7 @@ foreign effect call_local from "@flick-lang/effect-ts/effect/rpc/Rpc" "rpcCallLo
 /// Calls the stream procedure of the group in memory, as `call_local`.
 call_stream_local :
   Group r hs -> hs^c -> Rpc l (p ->{r; e} Stream none none a) -> p -> (Stream r e a)^c
-foreign pure call_stream_local from "@flick-lang/effect-ts/effect/rpc/Rpc" "rpcCallStreamLocal"
+foreign pure call_stream_local from "flick:rpc/Rpc" "rpcCallStreamLocal"
   arity 4
   retention owner
   reviewed "effect@4.1.2 sha256:e7f8fc6a44cc917c"

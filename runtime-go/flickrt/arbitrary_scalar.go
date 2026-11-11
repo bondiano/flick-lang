@@ -5,9 +5,8 @@ import (
 	"math/big"
 )
 
-// Numbers and strings of Effect's Arbitrary (internal/arbitrary/schema.ts):
-// within the bounds their checks state, edge cases first, shrinking toward
-// zero or the empty string.
+// Numbers and strings of Arbitrary: within the bounds their checks state,
+// edge cases first, shrinking toward zero or the empty string.
 
 // numShrink is a candidate and the closest value known to pass.
 type numShrink struct {
@@ -246,7 +245,7 @@ func numberNode(c *arbConstraint) *arbGen {
 	})
 }
 
-// stringEdgeCases are Effect's, in UTF-16 code units.
+// stringEdgeCases are the edge cases of strings, in UTF-16 code units.
 var stringEdgeCases = func() [][]uint16 {
 	out := [][]uint16{}
 	for _, s := range []string{"", " ", "\t", "\n", "\x00", "0", "-1", "4294967295", "__proto__", "constructor", "prototype", "toString"} {

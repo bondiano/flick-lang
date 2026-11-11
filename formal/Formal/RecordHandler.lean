@@ -140,7 +140,7 @@ theorem recArms_typ {E : Name} {w : Tm} {Ψ Θ Γ t s} {r ε : Row}
     exact .app (C := Caps.none) (ψ := .rt Row.none Row.none)
       (.proj (hw x) (S.op_field _ _ _ _ hop hne) .refl)
       (.var (ts := []) rfl rfl (fun _ _ h => h.elim) (by rw [Scheme.inst_mono]; exact .refl))
-      ⟨fun _ h => h.elim, fun _ h => h.elim⟩ .refl
+      (by rw [Stage.use_none]; exact ⟨fun _ h => h.elim, fun _ h => h.elim⟩) .refl
 
 theorem recArms_noIns {w : Tm} (hw : w.NoIns) : ∀ {os : List Name}, (recArms w os).NoIns
   | [] => fun h => h
@@ -153,12 +153,8 @@ theorem recArms_noIns {w : Tm} (hw : w.NoIns) : ∀ {os : List Name}, (recArms w
 
 /-- The function `λx. x` of a handler that gives the value of its body back. -/
 theorem id_typ {Ψ Θ Γ t φ} : Typ S Ψ Θ Γ (.lam (.var 0)) (.ex (.arrow t .pure t (t.reach)) φ) := by
-  refine .lam (.var (ts := []) rfl rfl (fun _ _ h => h.elim) (by rw [Scheme.inst_mono]; exact .refl))
-    (fun h => by simp [Tm.Has] at h) ?_ .refl
-  rintro a (⟨i, s, hi, _⟩ | ⟨p, hp, _⟩ | ⟨l, _, hl, _⟩)
-  · simp [Tm.Free] at hi
-  · simp [Tm.Has] at hp
-  · simp [Tm.Has] at hl
+  exact .lam (.var (ts := []) rfl rfl (fun _ _ h => h.elim) (by rw [Scheme.inst_mono]; exact .refl))
+    (fun h => by simp [Tm.Has] at h) .refl
 
 /-- A layer of known bindings is (Provide): its outputs leave the row of the body, unless an
 obligation is about them. -/
@@ -185,20 +181,20 @@ theorem layer_typ {Ψ Θ Γ t} {r ε : Row} : ∀ (bs : List Binding) {e : Tm} {
           refine ⟨fun x hx => ?_, hle.2⟩
           by_cases hx' : x = .nm b.1
           · exact .inl hx'
-          · exact .inr ⟨hx, hx'⟩
-      · refine ⟨fun N a h => ⟨fun v h' => (by cases h'), fun h' => (hO.1 N a h).2 (.inl h')⟩,
-          fun v a h => ⟨fun w h' => (by cases h'), fun N h' => (hO.2 v a h).2 N (.inl h')⟩⟩
+          · exact .inr (Row.le_back _ _ _ ⟨hx, hx'⟩)
+      · refine ⟨fun N a h => ⟨fun v _ h' => (by cases h'), fun h' => (hO.1 N a h).2 (.inl h')⟩,
+          fun v G a h => ⟨fun w _ h' => (by cases h'), fun N h' => (hO.2 v G a h).2 N (.inl h')⟩⟩
       · rw [recArms_armOf (hb.ops o c x y hop)]; rfl
     refine layer_typ bs (fun b' h => hall b' (List.mem_cons_of_mem _ h)) hh ⟨fun x hx => ?_, fun _ h => h⟩ ?_
     · rcases Stage.le_svc hle x hx.1 with (h | h) | h
       · exact (hx.2 h).elim
       · exact .inl h
       · exact .inr h
-    · refine ⟨fun N a h => ?_, fun v a h => ?_⟩
+    · refine ⟨fun N a h => ?_, fun v G a h => ?_⟩
       · obtain ⟨h₁, h₂⟩ := hO.1 N a h.1
-        exact ⟨fun v h' => h₁ v (.inr h'), fun h' => h₂ (.inr h')⟩
-      · obtain ⟨h₁, h₂⟩ := hO.2 v a h.1
-        exact ⟨fun v h' => h₁ v (.inr h'), fun N h' => h₂ N (.inr h')⟩
+        exact ⟨fun v K h' => h₁ v K (.inr h'), fun h' => h₂ (.inr h')⟩
+      · obtain ⟨h₁, h₂⟩ := hO.2 v G a h.1
+        exact ⟨fun v K h' => h₁ v K (.inr h'), fun N h' => h₂ N (.inr h')⟩
 
 /-- The record that answers an operation: the first binding of its effect with it. -/
 def answer : List Binding → Name → Name → Option Tm

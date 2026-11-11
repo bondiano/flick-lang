@@ -1,6 +1,5 @@
-/// Effect's `ConfigProvider`: where a `Config` reads its values, by path —
-/// the environment by default. `layer` makes a provider the one of the body
-/// of a `provide`.
+/// Where a `Config` reads its values, by path — the environment by default.
+/// `layer` makes a provider the one of the body of a `provide`.
 module ConfigProvider exposing (..)
 
 import FileSystem
@@ -49,52 +48,52 @@ let make_array length value = ArrayNode length value
 /// A provider that asks `load` for the node at each path; `None` when the
 /// path has nothing.
 make : (Path ->{; SourceError} Option Node) -> ConfigProvider
-foreign pure make from "@flick-lang/effect-ts/effect/ConfigProvider" "flickMake"
+foreign pure make from "flick:ConfigProvider" "flickMake"
   reviewed "effect@4.1.2 sha256:e9b7766d049ef1b6"
 
 /// `provider |> or_else fallback`: `fallback` where `provider` has nothing.
 or_else : ConfigProvider -> ConfigProvider -> ConfigProvider
-foreign pure or_else from "@flick-lang/effect-ts/effect/ConfigProvider" "orElse"
+foreign pure or_else from "flick:ConfigProvider" "orElse"
   arity 1
   reviewed "effect@4.1.2 sha256:d5aba5e4aebd72d7"
 
 /// Each path mapped by `f` before the provider reads it.
 map_input : (Path -> Path) -> ConfigProvider -> ConfigProvider
-foreign pure map_input from "@flick-lang/effect-ts/effect/ConfigProvider" "mapInput"
+foreign pure map_input from "flick:ConfigProvider" "mapInput"
   arity 1
   reviewed "effect@4.1.2 sha256:6425f1edb0a645ae"
 
 /// Keys read in `CONSTANT_CASE`: `apiKey` as `API_KEY`.
 constant_case : ConfigProvider -> ConfigProvider
-foreign pure constant_case from "@flick-lang/effect-ts/effect/ConfigProvider" "constantCase"
+foreign pure constant_case from "flick:ConfigProvider" "constantCase"
   reviewed "effect@4.1.2 sha256:2f46091dcd4ea1e1"
 
 /// Every path read under the prefix.
 nested : String -> ConfigProvider -> ConfigProvider
-foreign pure nested from "@flick-lang/effect-ts/effect/ConfigProvider" "nested"
+foreign pure nested from "flick:ConfigProvider" "nested"
   arity 1
   reviewed "effect@4.1.2 sha256:1056ffd9131572e0"
 
 /// Values from a JSON-like value: records, arrays and scalars.
 from_unknown : Options -> Unknown -> ConfigProvider
-foreign pure from_unknown from "@flick-lang/effect-ts/effect/ConfigProvider" "flickFromUnknown"
+foreign pure from_unknown from "flick:ConfigProvider" "flickFromUnknown"
   arity 2
   reviewed "effect@4.1.2 sha256:dcfa01ea8839fb66"
 
 /// Values from environment variables given as pairs; `A_B` is the path `A`, `B`.
 from_env_record : Options -> List (String, String) -> ConfigProvider
-foreign pure from_env_record from "@flick-lang/effect-ts/effect/ConfigProvider" "flickFromEnvRecord"
+foreign pure from_env_record from "flick:ConfigProvider" "flickFromEnvRecord"
   arity 2
   reviewed "effect@4.1.2 sha256:f12a72b2b741c5e7"
 
 /// The environment variables of the process.
 from_env : Options ->{} ConfigProvider
-foreign from_env from "@flick-lang/effect-ts/effect/ConfigProvider" "fromEnv"
+foreign from_env from "flick:ConfigProvider" "fromEnv"
   reviewed "effect@4.1.2 sha256:069a8cae256d0b24"
 
 /// Values from the text of a `.env` file.
 from_dot_env_contents : DotEnvOptions -> String -> ConfigProvider
-foreign pure from_dot_env_contents from "@flick-lang/effect-ts/effect/ConfigProvider" "flickFromDotEnvContents"
+foreign pure from_dot_env_contents from "flick:ConfigProvider" "flickFromDotEnvContents"
   arity 2
   reviewed "effect@4.1.2 sha256:d273b5253ceaeb98"
 
@@ -120,17 +119,17 @@ let from_dot_env options =
 from_dir :
   { rootPath : Option String; preserveEmptyStrings : Bool } ->{Async, FileSystem.FileSystem}
   ConfigProvider
-foreign effect from_dir from "@flick-lang/effect-ts/effect/ConfigProvider" "flickFromDir"
+foreign effect from_dir from "flick:ConfigProvider" "flickFromDir"
   reviewed "effect@4.1.2 sha256:2df6220667d4e4fc"
 
 /// Makes the provider the one of the body of a `provide`.
 layer : ConfigProvider -> Layer none none none
-foreign pure layer from "@flick-lang/effect-ts/effect/ConfigProvider" "layer"
+foreign pure layer from "flick:ConfigProvider" "layer"
   reviewed "effect@4.1.2 sha256:a5ab9efbc17a9258"
 
 /// Adds the provider to the current one: as a fallback, or as the primary
 /// source when `asPrimary` holds.
 layer_add : { asPrimary : Bool } -> ConfigProvider -> Layer none none none
-foreign pure layer_add from "@flick-lang/effect-ts/effect/ConfigProvider" "flickLayerAdd"
+foreign pure layer_add from "flick:ConfigProvider" "flickLayerAdd"
   arity 2
   reviewed "effect@4.1.2 sha256:460e0b3f7d4ce362"

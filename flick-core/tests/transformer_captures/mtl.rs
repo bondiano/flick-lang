@@ -144,7 +144,7 @@ let inside () =
 }
 
 #[test]
-fn writer_output_and_returned_writer_actions_cannot_escape() {
+fn writer_output_of_pure_callbacks_may_leave() {
     for (result, projection) in [
         ("WriterT Log Identity Unit", "action"),
         (
@@ -152,9 +152,8 @@ fn writer_output_and_returned_writer_actions_cannot_escape() {
             "let (_, output) = Identity.run (WriterT.run action)\n    output",
         ),
     ] {
-        rejects(
-            &format!(
-                r"leak : Unit ->{{Files; OpenError}} {result}
+        accepts(&format!(
+            r"leak : Unit ->{{Files; OpenError}} {result}
 let leak () =
   scope {{
     let handle = Files.open_scoped ()
@@ -163,14 +162,12 @@ let leak () =
     {projection}
   }}
 "
-            ),
-            &[codes::G001, codes::G002],
-        );
+        ));
     }
 }
 
 #[test]
-fn except_error_data_and_returned_except_actions_cannot_escape() {
+fn except_errors_of_pure_callbacks_may_leave() {
     for (result, projection) in [
         ("ExceptT (Unit -> Float) Identity Unit", "action"),
         (
@@ -178,9 +175,8 @@ fn except_error_data_and_returned_except_actions_cannot_escape() {
             "Identity.run (ExceptT.run action)",
         ),
     ] {
-        rejects(
-            &format!(
-                r"leak : Unit ->{{Files; OpenError}} {result}
+        accepts(&format!(
+            r"leak : Unit ->{{Files; OpenError}} {result}
 let leak () =
   scope {{
     let handle = Files.open_scoped ()
@@ -189,14 +185,12 @@ let leak () =
     {projection}
   }}
 "
-            ),
-            &[codes::G001, codes::G002],
-        );
+        ));
     }
 }
 
 #[test]
-fn other_actual_transformers_preserve_captures_in_returned_computations() {
+fn returned_computations_may_hold_pure_callbacks() {
     for (result, action) in [
         (
             "MaybeT Identity (Unit -> Float)",
@@ -211,23 +205,20 @@ fn other_actual_transformers_preserve_captures_in_returned_computations() {
             "reader (fun environment -> environment + touch handle)",
         ),
     ] {
-        rejects(
-            &format!(
-                r"leak : Unit ->{{Files; OpenError}} {result}
+        accepts(&format!(
+            r"leak : Unit ->{{Files; OpenError}} {result}
 let leak () =
   scope {{
     let handle = Files.open_scoped ()
     {action}
   }}
 "
-            ),
-            &[codes::G001, codes::G002],
-        );
+        ));
     }
 }
 
 #[test]
-fn actual_transformer_run_projections_preserve_captures() {
+fn run_projections_may_hold_pure_callbacks() {
     for (action_type, projection) in [
         (
             "MaybeT Identity (Unit -> Float)",
@@ -242,9 +233,8 @@ fn actual_transformer_run_projections_preserve_captures() {
             "Identity.run (ReaderT.run action ())",
         ),
     ] {
-        rejects(
-            &format!(
-                r"leak : Unit ->{{Files; OpenError}} Unit -> Float
+        accepts(&format!(
+            r"leak : Unit ->{{Files; OpenError}} Unit -> Float
 let leak () =
   scope {{
     let handle = Files.open_scoped ()
@@ -253,15 +243,13 @@ let leak () =
     {projection}
   }}
 "
-            ),
-            &[codes::G001, codes::G002],
-        );
+        ));
     }
 }
 
 #[test]
-fn native_and_inherited_listen_projections_cannot_erase_log_captures() {
-    rejects(
+fn listen_projections_may_hold_pure_callbacks() {
+    accepts(
         r"leak : Unit ->{Files; OpenError} Log
 let leak () =
   scope {
@@ -272,9 +260,8 @@ let leak () =
     heard
   }
 ",
-        &[codes::G001, codes::G002],
     );
-    rejects(
+    accepts(
         r"leak : Unit ->{Files; OpenError} Log
 let leak () =
   scope {
@@ -287,12 +274,11 @@ let leak () =
     | Some (_, heard) -> heard
   }
 ",
-        &[codes::G001, codes::G002],
     );
 }
 
 #[test]
-fn native_and_inherited_catch_projections_cannot_erase_error_captures() {
+fn catch_projections_may_hold_pure_callbacks() {
     for (action_type, projection) in [
         (
             "ExceptT (Unit -> Float) Identity (Unit -> Float)",
@@ -303,9 +289,8 @@ fn native_and_inherited_catch_projections_cannot_erase_error_captures() {
             "Identity.run (ExceptT.run (ReaderT.run recovered ()))",
         ),
     ] {
-        rejects(
-            &format!(
-                r"leak : Unit ->{{Files; OpenError}} Unit -> Float
+        accepts(&format!(
+            r"leak : Unit ->{{Files; OpenError}} Unit -> Float
 let leak () =
   scope {{
     let handle = Files.open_scoped ()
@@ -317,14 +302,12 @@ let leak () =
     | Ok read -> read
   }}
 "
-            ),
-            &[codes::G001, codes::G002],
-        );
+        ));
     }
 }
 
 #[test]
-fn partially_applied_operations_retain_scoped_callbacks() {
+fn partially_applied_operations_may_hold_pure_callbacks() {
     for (result, operation) in [
         (
             "(ReaderT (Unit -> Float) Identity Float -> ReaderT (Unit -> Float) Identity Float)",
@@ -339,62 +322,44 @@ fn partially_applied_operations_retain_scoped_callbacks() {
             "ReaderT.run (ReaderT (fun () -> Identity (touch handle)))",
         ),
     ] {
-        rejects(
-            &format!(
-                r"leak : Unit ->{{Files; OpenError}} {result}
+        accepts(&format!(
+            r"leak : Unit ->{{Files; OpenError}} {result}
 let leak () =
   scope {{
     let handle = Files.open_scoped ()
     {operation}
   }}
 "
-            ),
-            &[codes::G001, codes::G002],
-        );
+        ));
     }
 }
 
 #[test]
-fn native_pass_preserves_captures_of_a_stored_modifier() {
-    for (result, observation, escapes) in [
-        ("Float", "consume_log output", false),
-        ("Log", "output", true),
-    ] {
-        let source = format!(
+fn native_pass_keeps_a_stored_modifier() {
+    // the log holds pure callbacks over the handle, which use nothing of it
+    for (result, observation) in [("Float", "consume_log output"), ("Log", "output")] {
+        accepts(&format!(
             r"observe : Unit ->{{Files; OpenError}} {result}
 let observe () =
   scope resource {{
     let handle = Files.open_scoped ()
-    modify : (HeldLog {{resource}} -> HeldLog {{resource}})^{{resource}}
+    modify : Log -> Log
     let modify output = [fun () -> touch handle] ++ output
-    action : WriterT (HeldLog {{resource}}) Identity (Unit, (HeldLog {{resource}} -> HeldLog {{resource}})^{{resource}})
+    action : WriterT Log Identity (Unit, Log -> Log)
     let action = writer (((), modify), [])
     let (_, output) = Identity.run (WriterT.run (pass action))
     {observation}
   }}
 "
-        );
-        if escapes {
-            let diagnostics = rejects(&source, &[codes::G001, codes::G002, codes::T003]);
-            assert!(
-                diagnostics
-                    .iter()
-                    .any(|d| [codes::G001, codes::G002].contains(&d.code)),
-                "{source}\n{diagnostics:?}"
-            );
-        } else {
-            accepts(&source);
-        }
+        ));
     }
 }
 
 #[test]
-fn lifted_pass_tracks_a_modifier_supplied_by_a_later_reader_environment() {
-    for (result, observation, escapes) in [
-        ("Float", "consume_log output", false),
-        ("Log", "output", true),
-    ] {
-        let source = format!(
+fn lifted_pass_takes_a_modifier_supplied_by_a_later_reader_environment() {
+    // the log holds pure callbacks over the handle, which use nothing of it
+    for (result, observation) in [("Float", "consume_log output"), ("Log", "output")] {
+        accepts(&format!(
             r"from_environment :
   forall c d. ReaderT ((HeldLog c -> HeldLog c)^d) (WriterT (HeldLog c) Identity)
     (Unit, (HeldLog c -> HeldLog c)^d)
@@ -402,30 +367,15 @@ let from_environment = do {{ modify <- ask; pure ((), modify) }}
 observe : Unit ->{{Files; OpenError}} {result}
 let observe () =
   scope resource {{
-    action :
-      ReaderT ((HeldLog {{resource}} -> HeldLog {{resource}})^{{resource}})
-        (WriterT (HeldLog {{resource}}) Identity)
-        (Unit, (HeldLog {{resource}} -> HeldLog {{resource}})^{{resource}})
     let action = from_environment
     let handle = Files.open_scoped ()
-    modify : (HeldLog {{resource}} -> HeldLog {{resource}})^{{resource}}
+    modify : Log -> Log
     let modify output = [fun () -> touch handle] ++ output
     let (_, output) = Identity.run (WriterT.run (ReaderT.run (pass action) modify))
     {observation}
   }}
 "
-        );
-        if escapes {
-            let diagnostics = rejects(&source, &[codes::G001, codes::G002, codes::T003]);
-            assert!(
-                diagnostics
-                    .iter()
-                    .any(|d| [codes::G001, codes::G002].contains(&d.code)),
-                "{source}\n{diagnostics:?}"
-            );
-        } else {
-            accepts(&source);
-        }
+        ));
     }
 }
 
@@ -471,8 +421,8 @@ let observe () =
 }
 
 #[test]
-fn outer_refs_cannot_store_scoped_actions_or_projected_logs() {
-    rejects(
+fn outer_refs_may_store_pure_scoped_actions() {
+    accepts(
         r"store : Unit ->{Files; OpenError} Unit
 let store () =
   empty_action : WriterT Log Identity Unit
@@ -483,9 +433,8 @@ let store () =
     Ref.set cell (tell [fun () -> touch handle])
   }
 ",
-        &[codes::G001, codes::G002],
     );
-    rejects(
+    accepts(
         r"store : Unit ->{Files; OpenError} Unit
 let store () =
   let cell = Ref.make []
@@ -497,7 +446,6 @@ let store () =
     Ref.set cell output
   }
 ",
-        &[codes::G001, codes::G002],
     );
 }
 
@@ -519,7 +467,7 @@ let narrow cell = cell
 }
 
 #[test]
-fn transformed_actions_require_a_child_owner_that_outlives_their_captures() {
+fn pure_transformed_actions_need_nothing_of_a_child_owner() {
     for owner in ["outer", "inner"] {
         let source = format!(
             r"report : Failure none ->{{}} Unit
@@ -539,16 +487,13 @@ let children () =
   }}
 "
         );
-        if owner == "outer" {
-            rejects(&source, &[codes::G003]);
-        } else {
-            accepts(&source);
-        }
+        // the child's pure log uses nothing of either owner's region
+        accepts(&source);
     }
 }
 
 #[test]
-fn every_generic_lift_preserves_the_base_actions_captures() {
+fn every_generic_lift_may_hold_pure_callbacks() {
     for (transformed, qualified, observation) in [
         (
             "MaybeT Identity (Unit -> Float)",
@@ -579,7 +524,9 @@ fn every_generic_lift_preserves_the_base_actions_captures() {
         for escapes in [false, true] {
             let result = if escapes { transformed } else { "Float" };
             let projection = if escapes { "action" } else { observation };
-            let action_type = if escapes { transformed } else { qualified };
+            // a pure callback says nothing of the handle it holds
+            let action_type = transformed;
+            let _ = qualified;
             let source = format!(
                 r"observe : Unit ->{{Files; OpenError}} {result}
 let observe () =
@@ -591,11 +538,62 @@ let observe () =
   }}
 "
             );
-            if escapes {
-                rejects(&source, &[codes::G001, codes::G002]);
-            } else {
-                accepts(&source);
-            }
+            accepts(&source);
         }
+    }
+}
+
+/// A callback that uses the handle, not only holds it, keeps the handle's
+/// region in its type through every transformer: used inside the `scope`
+/// it is accepted, and leaving the scope it is rejected.
+#[test]
+fn effectful_callbacks_keep_their_region_through_transformers() {
+    let read = "read_handle : forall s. Handle s ->{} Float\n\
+                foreign effect read_handle from \"./x.js\" \"read\"\n  retention call\n";
+    // the callback written first: the operations take its type
+    let log = "read_fn : (Unit ->{} Float)^{resource}\n    \
+               let read_fn = fun () -> read_handle handle\n    ";
+    for (held, bare, made) in [
+        (
+            "WriterT (List ((Unit ->{} Float)^{resource})) Identity Unit",
+            "WriterT (List (Unit ->{} Float)) Identity Unit",
+            "tell [read_fn]",
+        ),
+        (
+            "ExceptT ((Unit ->{} Float)^{resource}) Identity Float",
+            "ExceptT (Unit ->{} Float) Identity Float",
+            "throw_error read_fn",
+        ),
+        (
+            "StateT Float Identity ((Unit ->{} Float)^{resource})",
+            "StateT Float Identity (Unit ->{} Float)",
+            "state (fun old -> (read_fn, old))",
+        ),
+        (
+            "ReaderT Float Identity ((Unit ->{} Float)^{resource})",
+            "ReaderT Float Identity (Unit ->{} Float)",
+            "reader (fun _ -> read_fn)",
+        ),
+        (
+            "MaybeT Identity ((Unit ->{} Float)^{resource})",
+            "MaybeT Identity (Unit ->{} Float)",
+            "pure read_fn",
+        ),
+    ] {
+        accepts(&format!(
+            "{read}inside : Unit ->{{Files; OpenError}} Float\n\
+             let inside () =\n  scope resource {{\n    let handle = Files.open_scoped ()\n    \
+             {log}action : {held}\n    let action = {made}\n    ignore action\n    0\n  }}\n"
+        ));
+        // the bare type keeps nothing live: a mismatch (T003) or a use
+        // outside the region (G001, G002)
+        rejects(
+            &format!(
+                "{read}leak : Unit ->{{Files; OpenError}} {bare}\n\
+                 let leak () =\n  scope resource {{\n    let handle = Files.open_scoped ()\n    \
+                 {log}action : {held}\n    let action = {made}\n    action\n  }}\n"
+            ),
+            &[codes::G001, codes::G002, codes::T003],
+        );
     }
 }

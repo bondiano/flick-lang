@@ -21,7 +21,7 @@ use super::Loader;
 use crate::diagnostics::{Diagnostic, codes};
 use crate::plugin::expansion::Expansion;
 use crate::plugin::render::render;
-use crate::plugin::{Expander, Failure, first_party, placed};
+use crate::plugin::{Expander, Failure, placed};
 use crate::project::module_name;
 use crate::resolve::{Header, Item, ItemKind, ModuleSyntax};
 use crate::source::{FileId, Span};
@@ -123,13 +123,21 @@ impl Loader<'_> {
             span: at,
         };
         let header = Header {
+            result: None,
+            body: None,
+            materialized_body: None,
+            parameter_groups: Vec::new(),
             name: name.to_owned(),
+            private: false,
             span: at,
             exposing: Some(vec![all]),
+            parameters: Vec::new(),
         };
         let syntax = ModuleSyntax {
             header: Some(header),
             imports: Vec::new(),
+            inline_imports: Vec::new(),
+            applications: Vec::new(),
             bodiless: Vec::new(),
         };
         (Arc::new(syntax::parse("", file)), Arc::new(syntax))
@@ -149,15 +157,8 @@ impl Loader<'_> {
             let len = u32::try_from(text.len()).expect("source fits in u32");
             let whole = Span::new(m.file, 0, len);
             let path = self.host.display(&m.path);
-            let plugin =
-                plugins.entry(package.clone()).or_insert_with(|| {
-                    match first_party::plugin(&package) {
-                        Some(plugin) => Ok(plugin),
-                        None => self.host.plugin(&package, self.component(&package)),
-                    }
-                });
-            let plugin = match plugin {
-                Ok(plugin) => Arc::clone(plugin),
+            let plugin = match self.load_plugin(plugins, &package) {
+                Ok(plugin) => plugin,
                 Err(why) => {
                     let message =
                         format!("the plugin of package `{package}` cannot be loaded: {why}");

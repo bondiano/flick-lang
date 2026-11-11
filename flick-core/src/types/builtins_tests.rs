@@ -7,7 +7,6 @@ fn built_in_signatures_write_nothing_they_get_anyway() {
     super::check_allowing(super::builtin_sources(), &[], false, |_, _| {});
 }
 
-#[cfg(feature = "diagnostic-fixes")]
 mod fixes {
     use std::cmp::Reverse;
     use std::fs;
@@ -130,4 +129,84 @@ fn builtins_check_cleanly() {
     assert_eq!(names, sources);
     assert_eq!(names.iter().collect::<BTreeSet<_>>().len(), names.len());
     assert_eq!(names[..2], ["Prelude", "Instances"]);
+}
+
+/// `Live` in a row runs nothing: `Atom.value`, whose arrow needs the atom's
+/// qualifier live once elision reads it, is still read at once (Sync), and a
+/// row of `Live` alone is no Sync stage, as the empty row is not.
+#[test]
+fn live_in_a_row_keeps_a_read_sync() {
+    use crate::types::Elem;
+    use crate::types::lang::{self, Lang};
+    use crate::types::ty::{Row, Type, sync_rows};
+    let read = Elem::named(&lang::item(Lang::AtomRead).label);
+    let live = (Elem::Live, Type::Var("d".into()));
+    let row = |entries| Type::Row(Row::closed(entries));
+    let none = Type::empty_row();
+    assert!(sync_rows(&row(vec![(read.clone(), none.clone())]), &none));
+    assert!(sync_rows(
+        &row(vec![live.clone(), (read, none.clone())]),
+        &none
+    ));
+    assert!(!sync_rows(&row(vec![live]), &none));
+}
+
+/// A built-in module sees only the ones before it: an import of a later
+/// one is unknown there, and lowering would find none of its names.
+#[test]
+fn a_built_in_module_imports_only_the_ones_before_it() {
+    use crate::diagnostics::codes;
+    let early = "module Early exposing (..)\n\nimport List.Core\n\n\
+                 count : List Int -> Int\nlet count xs = List.Core.length xs\n";
+    let mut modules: Vec<(&str, &str)> = super::CORE.to_vec();
+    let at = (modules.iter().position(|(n, _)| *n == "List.Core")).expect("a core module");
+    modules.insert(at, ("Early", early));
+    let mut said = Vec::new();
+    let report = |name: &str, diagnostics: Vec<_>| {
+        if name == "Early" {
+            said = diagnostics;
+        }
+    };
+    super::check_reporting(&modules, report, false, |_, _| {});
+    let found: Vec<_> = (said.iter())
+        .map(|d| (d.code, &early[d.span.expect("a span").range()]))
+        .collect();
+    assert_eq!(found, [(codes::R003, "List.Core")], "{said:?}");
+}
+
+/// A built-in module that names a later one without importing it hears
+/// that the order of the built-in modules is why the name is unknown.
+#[test]
+fn a_built_in_module_names_only_the_ones_before_it() {
+    use crate::diagnostics::codes;
+    let early = "module Early exposing (..)\n\n\
+                 known : Option Int -> Bool\nlet known value = Option.is_some value\n";
+    let mut modules: Vec<(&str, &str)> = super::CORE.to_vec();
+    let at = (modules.iter().position(|(n, _)| *n == "Option")).expect("a core module");
+    modules.insert(at, ("Early", early));
+    let mut said = Vec::new();
+    let report = |name: &str, diagnostics: Vec<_>| {
+        if name == "Early" {
+            said = diagnostics;
+        }
+    };
+    super::check_reporting(&modules, report, false, |_, _| {});
+    let found: Vec<_> = (said.iter())
+        .map(|d| {
+            (
+                d.code,
+                &early[d.span.expect("a span").range()],
+                d.message.as_str(),
+            )
+        })
+        .collect();
+    assert_eq!(
+        found,
+        [(
+            codes::T001,
+            "Option.is_some",
+            "module `Option` comes after this one among the built-in modules: a built-in module names only the ones before it"
+        )],
+        "{said:?}"
+    );
 }

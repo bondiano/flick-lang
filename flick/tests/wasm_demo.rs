@@ -150,6 +150,31 @@ fn hover_and_completion_answer_at_utf16_offsets() {
 }
 
 #[test]
+fn attribute_hover_updates_at_utf16_offsets() {
+    let source = "module Main exposing (..)\nlet text = \"ёж 🦔\"\n@lang action_concurrent\nlet concurrent = ()\n";
+    let mut session = session(source);
+    for (text, word, expected) in [
+        (source.to_owned(), "action_concurrent", "Action.concurrent"),
+        (
+            source.replace("@lang action_concurrent", "@maker"),
+            "@maker",
+            "atom, action or view",
+        ),
+    ] {
+        session.update(&text);
+        let start = text.find(word).expect("attribute");
+        let at = u32::try_from(text[..start].encode_utf16().count()).expect("small");
+        let hover = json(&session.hover(at));
+        assert!(
+            hover["text"].as_str().is_some_and(|s| s.contains(expected)),
+            "{hover}"
+        );
+        assert_eq!(hover["from"], at);
+        assert_eq!(hover["to"], at + u32::try_from(word.len()).expect("small"));
+    }
+}
+
+#[test]
 fn format_and_explain_need_no_session() {
     let formatted = json(&flick_wasm::format(
         "module Main exposing (x)\nx : Int\nlet x =   1\n",
@@ -178,5 +203,31 @@ fn what_the_dts_leaves_out_is_kept_apart() {
     assert_eq!(
         emitted["dts_diagnostics"][0]["code"], "FLICK-F004",
         "{emitted}"
+    );
+}
+
+#[test]
+fn reexport_declarations_are_available_on_demand() {
+    let session = session(
+        "module Main exposing (main, length)\nimport String exposing (length)\nmain : Unit ->{} Unit\nlet main () = Platform.stdout_line (show (length \"Flick\"))\n",
+    );
+    let emitted = json(&session.emit_declarations("debug"));
+    assert_eq!(emitted["declaration_entry"], "Main.d.ts");
+    assert!(emitted["declarations"].get("Main.d.ts").is_none());
+    assert!(
+        emitted["dts"]
+            .as_str()
+            .expect("entry declarations")
+            .contains("export { length }")
+    );
+    assert!(
+        emitted["declarations"]["_flick/String.d.ts"]
+            .as_str()
+            .expect("String declarations")
+            .contains("export declare const length: (arg: string) => number;")
+    );
+    assert!(
+        json(&session.emit("debug"))["declarations"].is_null(),
+        "normal editor emits keep their existing payload"
     );
 }

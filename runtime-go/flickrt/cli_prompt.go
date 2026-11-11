@@ -119,7 +119,7 @@ func PromptNode(key Value) Value {
 }
 
 // promptProcessService is the `Tty` of the process terminal; Ctrl+C and
-// Ctrl+D quit, as Effect's NodeTerminal has it.
+// Ctrl+D quit.
 func promptProcessService(tty *promptProcessTty) *Record {
 	return Rec(
 		"read_key", Fn(func(_ *Fiber, _ Value) Value {

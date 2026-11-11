@@ -1,23 +1,6 @@
 ---
 title: "FLICK-T061"
-source_hash: "58e246a0b91ec465"
+source_hash: "7cfc4679e76e90c1"
 ---
 
-В теле `try … with` и в цикле (`for … do` или в предложениях и элементе `[for …]`) переменной `let mut`, объявленной снаружи, пока нельзя присваивать: что она содержала бы после перехваченной ошибки или после цикла, ещё не определено. Присвойте значение всего `try` или присваивайте в одной из его ветвей; переменной, объявленной внутри тела, присваивать там можно.
-
-```flick
-module App.Parse exposing (Missing, port_of)
-
-type error Missing = Missing String
-
-lookup : String ->{; Missing} Int
-let lookup key = from_result (Err (Missing key))
-
-port_of : String ->{} Int
-let port_of key =
-  let mut port = 80
-  port =
-    try lookup key with
-    | Missing _ -> port + 8000
-  port
-```
+Модуль экспортирует нужное имя, но род члена, его тип, явное равенство типов или форма класса/сервиса не соответствуют контракту `type module`. Сверьте объявление и публичную сигнатуру. Абстрактный тип сам по себе не доказывает равенство вида `type Key = String`.

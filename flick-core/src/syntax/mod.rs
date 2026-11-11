@@ -3,10 +3,16 @@
 
 pub mod ast;
 pub mod cst;
+pub(crate) mod heads;
 pub mod kind;
+#[cfg(test)]
+mod kind_tests;
+pub(crate) mod lang;
 pub mod lexer;
 pub mod literal;
 mod parser;
+pub mod patterns;
+pub(crate) mod structure;
 mod validate;
 
 pub use parser::{

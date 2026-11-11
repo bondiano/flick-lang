@@ -57,7 +57,7 @@ cron = "cron expressions need a parser of their own"
 
 ## Linter
 
-`flick-core/tests/effect_surface.rs` fails, naming `Module.name` and why, on:
+`packages/effect-ts/tools/surface/tests/coverage.rs` fails, naming `Module.name` and why, on:
 
 - an export or entrypoint without a decision, or a decision for one that
   does not exist;
@@ -77,8 +77,7 @@ to the run's summary.
 `just effect-bump <version>` downloads the release, writes its snapshot,
 prints what was added, removed and changed and what the runtime's
 capability matrix lacks, and moves the pins (`packages/effect-ts/package.json`,
-`packages/effect-ts/src/capabilities.ts`, the runtime's version test,
-`flick/src/toolchain.rs`). The linter stays red until the manifest and the
+`packages/effect-ts/src/capabilities.ts`, the runtime's version test). The linter stays red until the manifest and the
 reviewed bindings agree with the new snapshot.
 
 ## Unstable modules
@@ -129,10 +128,11 @@ handshake, on Node.
 
 ## Bindings
 
-A wrapper binds the export through the runtime, which re-exports each
-wrapped module of Effect as `@flick-lang/effect-ts/effect/<Module>`
-(`packages/effect-ts/src/effect/<Module>.ts`), so compiled code still imports only
-the runtime package. An adapter for what a Flick value cannot pass as is
+A wrapper binds the export by the key of its module, `flick:<Module>`, which
+names no package of a target. On Effect the key stands for
+`@flick-lang/effect-ts/effect/<Module>`
+(`packages/effect-ts/src/effect/<Module>.ts`), which re-exports the wrapped
+module of Effect, so compiled code still imports only the runtime package. An adapter for what a Flick value cannot pass as is
 (an options record with `Option` fields, an Effect error that becomes a
 Flick `type error`) sits in the same file, named `flick<Name>`.
 
@@ -141,13 +141,13 @@ Flick `type error`) sits in the same file, named `flick<Name>`.
 #
 /// Recurs forever, each step the duration after the previous one ended.
 spaced : Duration.Duration -> Schedule none none i Float
-foreign pure spaced from "@flick-lang/effect-ts/effect/Schedule" "spaced"
+foreign pure spaced from "flick:Schedule" "spaced"
   reviewed "effect@4.1.2 sha256:498f22b480d2397e"
 
 retry :
   forall c r e a r2 e2 o.
   Schedule.Schedule r2 e2 (Errors e) o -> (Eff r e a)^c ->{Async | r + r2; e + e2} a
-foreign effect retry from "@flick-lang/effect-ts/effect/Effect" "retry"
+foreign effect retry from "flick:Effect" "retry"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:508d9e1864f6c9d3"

@@ -1,8 +1,8 @@
 package flickrt
 
-// Effect's `ConfigProvider`: where a Config reads its values. A provider
-// gives the node at a path: a value, a record with its keys or an array
-// with its length, where a record or an array may have a value too.
+// `ConfigProvider`: where a Config reads its values. A provider gives the
+// node at a path: a value, a record with its keys or an array with its
+// length, where a record or an array may have a value too.
 
 import (
 	"os"
@@ -186,7 +186,8 @@ func segmentText(seg Value) string {
 	return strconv.Itoa(int(seg.(int32)))
 }
 
-// fromEnvMap is Effect's fromEnvRecord: `A_B` is the path `A`, `B`.
+// fromEnvMap is a provider over environment variables: `A_B` is the path
+// `A`, `B`.
 func fromEnvMap(names []string, env map[string]string, preserve bool) provider {
 	root := &envTrie{}
 	for _, name := range names {

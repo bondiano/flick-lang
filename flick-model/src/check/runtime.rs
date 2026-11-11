@@ -10,7 +10,7 @@ use std::mem;
 use std::rc::Rc;
 
 use super::expr::mono;
-use super::regions::owner;
+use super::regions::{arg_caps, live_arg, live_service, owner};
 use super::{Check, Checker, Inst, error, substitute};
 use crate::decls::Decls;
 use crate::eval::Lambda;
@@ -59,8 +59,20 @@ pub fn check_config(
     })
 }
 
+/// The least solution of what is still unknown: a row or a capture
+/// variable never solved stands for nothing, also in `Live`.
 fn least(mut r: Row) -> Row {
     r.vars.retain(|v| !matches!(v, Var::Meta(_)));
+    if let Some(args) = r.elems.get(&live_service()) {
+        let mut c = arg_caps(&args[0]);
+        c.atoms.retain(|v| !matches!(v, Var::Meta(_)));
+        c.vars.retain(|v| !matches!(v, Var::Meta(_)));
+        if c.is_empty() {
+            r.elems.remove(&live_service());
+        } else {
+            r.elems.insert(live_service(), Rc::from([live_arg(c)]));
+        }
+    }
     r
 }
 
@@ -73,10 +85,7 @@ impl Checker<'_> {
                 Some(t) => Ok(Type::Ref(Rc::new(t.clone()))),
                 None => error("Loc", format!("no cell ℓ{l} in μ")),
             },
-            // (Fix): `fix f. λx. e` is `let rec f : σ = λx. e in f`
-            Term::Fix(f, sig, lam) => {
-                self.let_rec(f, sig.as_deref(), lam, &Term::Var(f.clone()), expected)
-            }
+            Term::Fix(f, sig, lam) => self.fix(f, sig.as_deref(), lam, expected),
             Term::Env(theta) => self.env(theta),
             // (Bind)
             Term::Bind(s, e) => {
@@ -144,8 +153,8 @@ impl Checker<'_> {
         }
     }
 
-    /// `⊢ Λ`: the children and finalizers of each live region are typed,
-    /// and reach only regions that outlive it (§2.4, T4).
+    /// `⊢ Λ`: the children and finalizers of each live region are typed as
+    /// what runs in it, and reach only regions that outlive it (§2.4, T4).
     fn lambda(&mut self, lambda: &Lambda, mem: &[Term]) -> Check<()> {
         for (pi, r) in lambda.regions.iter().enumerate().filter(|(_, r)| r.live) {
             let fins = r.finalizers.iter().filter_map(|f| match f {
@@ -154,9 +163,11 @@ impl Checker<'_> {
             });
             let kids = r.children.iter().flat_map(|(f, t, _)| [f, t]);
             let outer = lambda.outlived_by(pi);
+            // made one in another, so in the order they were made
+            let enclosing: Vec<_> = outer.iter().map(|p| region_name(*p)).collect();
             for t in fins.chain(kids) {
                 let stage = mem::replace(&mut self.stage, Stage::Pure);
-                self.infer(t)?;
+                self.nested_in(enclosing.clone(), |c| c.infer(t))?;
                 self.stage = stage;
                 if let Some(q) = reach(t, mem).difference(&outer).next() {
                     return error(

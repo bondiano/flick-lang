@@ -1,6 +1,6 @@
-// A `let mut` from outside a `scope` cannot take what the scope owns: its
-// type is fixed where it is declared, so an assignment inside the scope can
-// neither give it the region nor make a closure it holds capture more.
+// A mutable variable retains its monotype. Nominal region escape is rejected;
+// a closure that merely inspects held data without using the region is allowed
+// by the current typing-by-use contract.
 module App.LetMutRegions exposing (..)
 
 type File (s : Region) = File String
@@ -40,5 +40,3 @@ let written_callback path =
   reader ()
 
 //~ FLICK-G002 @20:12-20:21
-//~ FLICK-G001 @28:14-28:36
-//~ FLICK-G001 @38:14-38:36

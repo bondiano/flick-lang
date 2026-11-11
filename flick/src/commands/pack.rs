@@ -88,6 +88,7 @@ pub fn pack(options: &OutDirArguments, global: &GlobalArguments) -> Outcome {
         entry: None,
         generation: false,
         built: RefCell::default(),
+        modules: None,
     };
     let runners = build.entries(&project);
     let outcome = build.run();
@@ -405,7 +406,7 @@ mod tests {
         let _ = fs::remove_dir_all(&root);
         write(
             &root.join("flick.toml"),
-            "schema-version = 1\n[project]\nkind = \"lib\"\n",
+            "schema-version = 1\n[project]\nkind = \"lib\"\n[build]\neffect = \"effect\"\n",
         )
         .expect("config");
         write(

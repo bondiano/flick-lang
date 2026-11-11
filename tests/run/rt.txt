@@ -1,8 +1,8 @@
 # Cases on Flick's own runtime (`flick build --rt`): `just conformance-rt` runs
 # them in both profiles, checks each trace with the monitor, and compares the
-# projection of a case of tests/run/runtime with Go's. A case joins as soon as it
-# passes. The paths are under tests/run; `../rt/` holds cases only this runtime
-# runs, as the corpus runs every case on Effect too.
+# projection of a case of tests/run/runtime with Go's. The paths are under
+# tests/run; `../rt/` holds cases only this runtime runs, as the main corpus
+# runs every case on Effect too.
 
 ../rt/control_handlers
 ../rt/deep_async
@@ -13,6 +13,12 @@
 bootstrap/app_fail
 bootstrap/debug
 bootstrap/hello
+bootstrap/inline_declarations
+bootstrap/inline_module
+bootstrap/inline_nested
+bootstrap/inline_pack
+bootstrap/inline_pack_nominals
+bootstrap/packed_module
 bootstrap/stderr
 codegen/abi
 codegen/applicative_do
@@ -26,6 +32,7 @@ codegen/defaults
 codegen/defect
 codegen/derive_default
 codegen/do_notation
+codegen/effect_abi
 codegen/effect_sets
 codegen/enums
 codegen/errors
@@ -44,12 +51,13 @@ codegen/given_shadow
 codegen/handler_arms
 codegen/handlers
 codegen/higher_rank
-codegen/instance_names
 codegen/implicit
+codegen/instance_names
 codegen/interpolation
 codegen/ints
 codegen/let_assert
 codegen/let_mut
+codegen/loops
 codegen/lift
 codegen/literals
 codegen/local_functions
@@ -70,11 +78,15 @@ codegen/stage_order
 codegen/strings_utf16
 codegen/tags
 codegen/task_twice
+ffi/catch_order
 ffi/copy
 ffi/defect
+ffi/events
+ffi/foreign
 ffi/snapshot
 runtime/abort_closes_scopes
 runtime/abort_stops_children
+runtime/cause_laws
 runtime/cause_lists
 runtime/close_phases
 runtime/closed_owner
@@ -90,6 +102,8 @@ runtime/handoff
 runtime/hung_io
 runtime/interrupt_after_close
 runtime/interrupt_in_finalizer
+runtime/interrupt_skips
+runtime/leases
 runtime/owners
 runtime/parallel
 runtime/paths
@@ -113,46 +127,163 @@ schema/policies
 schema/route
 schema/route_nested
 sql/queries
+stdlib/cli/cli
+stdlib/cli/cli_exit
+stdlib/cli/file_parse
+stdlib/cli/prompt
+stdlib/cli/surface
+stdlib/cli/trace
 stdlib/cli/value
 stdlib/collections
+stdlib/core_more
 stdlib/decimals
+stdlib/devtools/devtools
+stdlib/devtools/headers
+stdlib/effect/arbitrary
 stdlib/effect/array
 stdlib/effect/bytesize
+stdlib/effect/bytesize_text
+stdlib/effect/cache
+stdlib/effect/channel
+stdlib/effect/channel_control
+stdlib/effect/channel_core
+stdlib/effect/channel_schema
+stdlib/effect/channel_transform
+stdlib/effect/channel_web
+stdlib/effect/check
 stdlib/effect/chunk
 stdlib/effect/clock
 stdlib/effect/clock_random
+stdlib/effect/codec
 stdlib/effect/combine
+stdlib/effect/config
+stdlib/effect/console
+stdlib/effect/cron
+stdlib/effect/cron_more
 stdlib/effect/crypto
+stdlib/effect/datetime
+stdlib/effect/datetime_more
+stdlib/effect/deferred
 stdlib/effect/duration
+stdlib/effect/effect_core
+stdlib/effect/effect_errors
+stdlib/effect/effect_errors_more
 stdlib/effect/exit_cause
+stdlib/effect/fibers
+stdlib/effect/filesystem
+stdlib/effect/filesystem_node
 stdlib/effect/function
+stdlib/effect/graph
+stdlib/effect/graph_algorithms
 stdlib/effect/hash_map
 stdlib/effect/hash_ring
+stdlib/effect/hash_ring_places
 stdlib/effect/hash_set
 stdlib/effect/hmac
 stdlib/effect/json_schema
+stdlib/effect/jwt
+stdlib/effect/layer
+stdlib/effect/layer_map
+stdlib/effect/logger
+stdlib/effect/metric
 stdlib/effect/mutable_ref
 stdlib/effect/number
+stdlib/effect/observe
+stdlib/effect/optic_parts
 stdlib/effect/option
+stdlib/effect/option_pairs
 stdlib/effect/order
 stdlib/effect/password
+stdlib/effect/platform
+stdlib/effect/pubsub
 stdlib/effect/queue
 stdlib/effect/record
+stdlib/effect/ref
+stdlib/effect/request
 stdlib/effect/schedule
+stdlib/effect/schema
+stdlib/effect/schema_http
+stdlib/effect/schema_types
 stdlib/effect/shared_layer_merged
+stdlib/effect/sink
+stdlib/effect/sink_more
+stdlib/effect/stream
+stdlib/effect/stream_combine
+stdlib/effect/stream_core
+stdlib/effect/stream_errors
+stdlib/effect/stream_platform
+stdlib/effect/stream_sink
+stdlib/effect/stream_transform
+stdlib/effect/stream_web
 stdlib/effect/string
 stdlib/effect/string_locale
 stdlib/effect/tracer
 stdlib/effect/trie
+stdlib/effect/trie_keys
+stdlib/effect/txchunk
+stdlib/effect/txdeferred
+stdlib/effect/txhashmap
+stdlib/effect/txhashset
+stdlib/effect/txlock
+stdlib/effect/txpubsub
+stdlib/effect/txqueue
+stdlib/effect/txref
 stdlib/effect/values
 stdlib/effect/void
 stdlib/file
 stdlib/hash_order
+stdlib/http/api
+stdlib/http/api_bodies
+stdlib/http/auth
+stdlib/http/client
+stdlib/http/derive
+stdlib/http/error_cases
+stdlib/http/error_cases_opaque
+stdlib/http/forms
+stdlib/http/handlers
+stdlib/http/headers
+stdlib/http/inject
+stdlib/http/lifecycle
+stdlib/http/redaction_context
+stdlib/http/router_patterns
+stdlib/http/serve
+stdlib/http/server
+stdlib/http/shutdown_masked
+stdlib/http/shutdown_stream
+stdlib/http/shutdown_timeout
+stdlib/http/spa
+stdlib/http/spans
+stdlib/http/streams
+stdlib/http/types
+stdlib/http/values
 stdlib/lists
 stdlib/markdown
 stdlib/monoids
+stdlib/observability/config
+stdlib/observability/otlp
+stdlib/observability/prometheus
+stdlib/observability/settings
+stdlib/observability/tracer
+stdlib/process/child_process
 stdlib/reactivity/atom
+stdlib/rpc/auth
+stdlib/rpc/local
+stdlib/rpc/middleware
+stdlib/rpc/router
+stdlib/rpc/rpc
+stdlib/rpc/serializations
+stdlib/rpc/stdio
+stdlib/rpc/tcp
+stdlib/rpc/websocket
+stdlib/rpc/worker
+stdlib/seq
 stdlib/seqs
+stdlib/server/auth
+stdlib/server/node
+stdlib/server/origin
+stdlib/server/server_fn
+stdlib/server/streamed
+stdlib/server/trace
 ui/async
 ui/atoms
 ui/awaiting
@@ -162,26 +293,29 @@ ui/directory
 ui/element
 ui/email
 ui/family
+ui/form
 ui/host_field
+ui/hydrate
+ui/navigate
 ui/parity
+ui/query
 ui/registry
+ui/route
+ui/serializable
 ui/server
+ui/stream
 ui/sync
 ui/sync_data
 ui/sync_for
 ui/wake_chain
 
-# Not yet, and why:
-# codegen/effect_abi     its foreign fixture runs an Effect
-# codegen/release        `spin` loops for ever in a `->{}` stage, which runs at once and cannot be interrupted: docs/formal/runtime.md#the-runtime-of-effect--rt
-# runtime/cause_laws     its properties need `Arbitrary`, on Effect; `cause_lists`, `closing_causes` and the kernel's unit tests cover the algebra
-# runtime/interrupt_skips its `Stream` probe, on Effect; the other probes pass
-# runtime/leases         `ScopedRef`, `Resource`, `ScopedCache`, on Effect
-# ui/form                its validation parses with `Schema`, on Effect
-# ui/hydrate             `Codec.json` of its serializable atoms is a `Schema`, on Effect
-# ui/navigate            the codec of its route is a `Schema`, on Effect
-# ui/query               `Atom.query_stream` reads a `Stream`, on Effect
-# ui/route               the codec of its route is a `Schema`, on Effect, and `Ui.Server.stream` a `Stream`
-# ui/serializable        `Codec.json` of its serializable atoms is a `Schema`, on Effect
-# ui/stream              `Codec.json` is a `Schema` and `Ui.Server.stream` a `Stream`, both on Effect
-# the rest of tests/run  what they reach is on Effect yet: a binding of a module this runtime does not have fails when it is called
+codegen/release
+../rt/interrupt_closed
+
+effect/host_services
+codegen/loops_state
+codegen/loops_for_source
+codegen/loops_guards
+codegen/loops_owners
+
+effect/row_without

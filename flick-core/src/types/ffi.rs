@@ -12,6 +12,8 @@
 //! | `variadic` | the last argument is a `List a` spread into the call |
 //! | `retention call` / `retention owner` | what a parameter that may hold a scope's capabilities is kept for |
 
+#[cfg(not(target_arch = "wasm32"))]
+mod bridge_shape;
 mod retention;
 pub use retention::keeps_for_owner;
 
@@ -23,11 +25,11 @@ use super::kinds::Kind;
 use super::ty::{Stage, Type};
 use super::typing::{ForeignInfo, range};
 use crate::diagnostics::codes;
-use crate::ir::{Copies, ForeignMode};
 use crate::source::Span;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
 use crate::types::lang::{self, Lang};
+use flick_ir::{Copies, ForeignMode};
 
 /// What a foreign function keeps of its arguments.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -92,6 +94,16 @@ impl Checker<'_> {
             })
             .collect();
         info.adapter.copies = self.copies(&params, &body, arity, &info.adapter.callbacks);
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            info.adapter.shapes = self.param_shapes(&params, arity);
+            info.adapter.result_shape = self
+                .call_result(&body, arity)
+                .or_else(|| {
+                    (arity == 0 && mode == ForeignMode::Pure).then(|| self.whnf_captured(&body).0)
+                })
+                .map_or(flick_ir::Shape::Data, |r| self.shape(&r, 0));
+        }
         let scoped: Vec<String> = binders
             .iter()
             .filter(|b| matches!(b.kind, Kind::Region | Kind::CaptureRow))
@@ -392,6 +404,7 @@ fn mentions(t: &Type, names: &[String]) -> bool {
                 || row.tail.as_ref().is_some_and(|t| mentions(t, names))
         }
         Type::Union(a, b) => mentions(a, names) || mentions(b, names),
+        Type::Without { row, .. } => mentions(row, names),
         Type::Captured { ty, captures, .. } | Type::Bounded { ty, captures } => {
             mentions(ty, names) || mentions(captures, names)
         }

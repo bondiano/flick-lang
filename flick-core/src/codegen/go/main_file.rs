@@ -3,6 +3,7 @@
 
 use std::collections::HashSet;
 
+use crate::effects::bindings;
 use flick_pretty::{Document, DocumentArena, docvec};
 
 use super::RUNTIME_PACKAGE;
@@ -13,30 +14,7 @@ use crate::ir::{ItemKind, Module};
 /// need one: a program that reaches a binding imports the package, which
 /// registers itself with the runtime, and its Go module requires the
 /// modules of the package.
-pub const OPTIONAL: &[(&str, &str, &[&str])] = &[
-    // the PostgreSQL driver, on pgx
-    ("flickpg", "@flick-lang/effect-ts/sql", &["pgLayer"]),
-    // brotli and zstd of the compression middleware; the web one has neither
-    (
-        "flickcompress",
-        "@flick-lang/effect-ts/effect/http/HttpMiddleware",
-        &["flickCompression"],
-    ),
-];
-
-/// The bindings that look a named time zone up: a program that reaches one
-/// embeds Go's zone database and V8's names of zones; others carry neither.
-const ZONE_MODULE: &str = "@flick-lang/effect-ts/effect/DateTime";
-const ZONE_EXPORTS: &[&str] = &[
-    "flickZoneMakeNamed",
-    "flickZoneFromString",
-    "flickSetZoneNamed",
-    "flickMakeZonedFromString",
-    "zoneMakeLocal",
-    "flickJsonZoned",
-    "flickJsonZone",
-    "flickJsonZoneNamed",
-];
+pub const OPTIONAL: &[(&str, &str, &[&str])] = bindings::GO_OPTIONAL;
 
 /// The optional packages `reached` reaches.
 pub fn packages(modules: &[&Module], reached: &HashSet<(usize, usize)>) -> Vec<&'static str> {
@@ -49,7 +27,12 @@ pub fn packages(modules: &[&Module], reached: &HashSet<(usize, usize)>) -> Vec<&
 
 /// Whether `reached` looks a named time zone up.
 pub fn zones(modules: &[&Module], reached: &HashSet<(usize, usize)>) -> bool {
-    reaches(modules, reached, ZONE_MODULE, ZONE_EXPORTS)
+    reaches(
+        modules,
+        reached,
+        bindings::ZONE_MODULE,
+        bindings::ZONE_EXPORTS,
+    )
 }
 
 /// `main.go`: imports the runtime, the optional `packages` and with `zones`

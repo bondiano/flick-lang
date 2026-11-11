@@ -1,7 +1,6 @@
-/// Effect's `RcRef`: a resource shared by reference count. It is acquired
-/// on the first `get`, kept while some `scope` holds it, and released when
-/// the last one closes (after an idle time) or when the `scope` owning the
-/// reference does.
+/// A resource shared by reference count. It is acquired on the first `get`,
+/// kept while some `scope` holds it, and released when the last one closes
+/// (after an idle time) or when the `scope` owning the reference does.
 module RcRef exposing (..)
 
 import Duration
@@ -14,19 +13,19 @@ type RcRef (s : Region) (e : ErrorRow) a
 /// for `idleTimeToLive` after its last holder (`None`: no time).
 make :
   { acquire : Eff r e a; idleTimeToLive : Option Duration.Duration } ->{Scope s | r} RcRef s e a
-foreign effect make from "@flick-lang/effect-ts/effect/RcRef" "flickMake"
+foreign effect make from "flick:RcRef" "flickMake"
   reviewed "effect@4.1.2 sha256:e19931a575c79b4b"
 
 /// The resource, acquiring it if no one holds it; the innermost `scope`
 /// (or the one of region `t`) holds it until it closes.
 get : RcRef s e a ->{Scope t; e} a^{t}
-foreign effect get from "@flick-lang/effect-ts/effect/RcRef" "get"
+foreign effect get from "flick:RcRef" "get"
   retention call
   reviewed "effect@4.1.2 sha256:bd017d10758c36d1"
 
 /// Releases the resource once its holders are done; the next `get`
 /// acquires it again.
 invalidate : RcRef s e a ->{Async} Unit
-foreign effect invalidate from "@flick-lang/effect-ts/effect/RcRef" "invalidate"
+foreign effect invalidate from "flick:RcRef" "invalidate"
   retention call
   reviewed "effect@4.1.2 sha256:1c1dccd0aab9e2c0"

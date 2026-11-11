@@ -226,6 +226,9 @@ let server = HttpApi.listen options api { users = { get_user = find_user } }
 
 `listen` needs `Scope s` and serves until that scope closes: then it stops
 accepting, lets the requests in flight finish and runs their finalizers.
+After the default 20-second grace period it interrupts remaining requests
+and waits for their cleanup before releasing the server owner's resources.
+Cleanup can outlast that period, including when a handler is uninterruptible.
 A missing or extra handler is a type error naming the endpoint and its
 group (`field \`ping\` is missing from \`users\``). A request whose parts do
 not decode is answered 400 with `{ error, issues }` — the path and message of
@@ -250,7 +253,7 @@ for a dev server on another origin.
 #
 # let example = task {
 let files = Http.StaticServer.route { Http.StaticServer.static_options "dist" with spa = true } ""
-# app : Http.Middleware.Handler none {Http.ServerError.HttpServerError}
+# app : Http.Middleware.Handler {Async} {Http.ServerError.HttpServerError}
 let app =
   Http.Middleware.cors
     { Http.Middleware.cors_options with allowedOrigins = ["http://localhost:5173"] }

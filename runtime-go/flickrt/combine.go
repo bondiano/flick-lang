@@ -5,8 +5,8 @@ import (
 	"math/big"
 )
 
-// Combiner is Effect's `Combiner`, and with an initial value its
-// `Reducer`, which is a Combiner too.
+// Combiner is a way to combine two values, and with an initial value a
+// reducer, which is a Combiner too.
 type Combiner struct {
 	combine func(fb *Fiber, a, b Value) Value
 	initial Value
@@ -174,7 +174,7 @@ var (
 	BooleanOr        Value = reducer(func(_ *Fiber, a, b Value) Value { return a.(bool) || b.(bool) }, false)
 )
 
-// The multiplying reducers stop at a zero, as Effect's do.
+// The multiplying reducers stop at a zero.
 var (
 	NumberReducerMultiply Value = func() Value {
 		r := reducer(func(_ *Fiber, a, b Value) Value { return a.(float64) * b.(float64) }, 1.0)
@@ -280,6 +280,6 @@ func RecordReducerIntersection(c Value) Value {
 	}, &Record{})
 }
 
-// HashCombine is Effect's `Hash.combine`, data-last.
+// HashCombine combines two hashes, data-last.
 func HashCombine(b, self Value) Value { return effectCombine(self.(int32), b.(int32)) }
 func HashOptimize(n Value) Value      { return optimize(n.(int32)) }

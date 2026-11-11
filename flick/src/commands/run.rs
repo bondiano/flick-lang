@@ -10,13 +10,14 @@ use std::fs::OpenOptions;
 use std::io::{ErrorKind, Write as _};
 use std::path::{Path, PathBuf};
 use std::process::{Command as Process, ExitCode};
+use std::rc::Rc;
 use std::sync::atomic::AtomicUsize;
 use std::{fs, io, process};
 
 use flick_core::build::{go, runner_file};
 use flick_core::diagnostics::{Diagnostic, Severity, codes};
 use flick_core::project::config::{Backend, Emit, MAIN_ENTRY};
-use flick_core::project::{self, Project, cache};
+use flick_core::project::{self, ModuleCache, Project, cache};
 use flick_core::source::SourceMap;
 #[cfg(unix)]
 use rustix::io::Errno;
@@ -40,6 +41,8 @@ pub struct Generation {
     path: PathBuf,
     /// Built for Flick's own runtime, which has no `DevTools`.
     rt: bool,
+    /// Built for go: each entry is an executable, not a module for node.
+    go: bool,
 }
 
 impl Generation {
@@ -51,7 +54,13 @@ impl Generation {
             // The owner is in the name, so clean cannot race lock-file creation.
             let path = dir.join(format!("{owner}-{number}"));
             match fs::create_dir(&path) {
-                Ok(()) => return Ok(Self { path, rt: false }),
+                Ok(()) => {
+                    return Ok(Self {
+                        path,
+                        rt: false,
+                        go: false,
+                    });
+                }
                 Err(err) if err.kind() == ErrorKind::AlreadyExists => {}
                 Err(err) => return Err(err),
             }
@@ -190,7 +199,7 @@ pub fn build_generation(
             return Err(2);
         }
     };
-    build_into_generation(project, options, global).map(|generation| (generation, name))
+    build_into_generation(project, options, global, None).map(|generation| (generation, name))
 }
 
 /// Builds the app into a new generation; `Err` once diagnostics are shown.
@@ -198,6 +207,7 @@ pub fn build_into_generation(
     project: &Project,
     options: &RunArguments,
     global: &GlobalArguments,
+    modules: Option<Rc<RefCell<ModuleCache>>>,
 ) -> Result<Generation, u8> {
     let mut generation = match Generation::reserve(&project.root) {
         Ok(generation) => generation,
@@ -235,8 +245,11 @@ pub fn build_into_generation(
         entry: options.entry.clone(),
         generation: true,
         built: RefCell::default(),
+        modules,
     };
-    generation.rt = options.rt || project.config.build.effect == Backend::Rt;
+    generation.go = project.config.build.emit == Emit::Go;
+    generation.rt = options.rt
+        || (project.config.build.emit != Emit::Go && project.config.build.effect == Backend::Rt);
     let outcome = build.run();
     report::render(global, &outcome.sources, &outcome.diagnostics);
     let code = report::code(&outcome.diagnostics);
@@ -256,7 +269,7 @@ pub fn launch(
 ) -> Option<Running> {
     // a generation built for go holds the entry's executable
     let executable = generation.path().join(go::executable(name));
-    let go = executable.is_file();
+    let go = generation.go;
     let mut command = if go {
         Process::new(&executable)
     } else {

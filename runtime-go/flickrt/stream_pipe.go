@@ -5,9 +5,9 @@ import (
 	"sync"
 )
 
-// Streams through sinks and channels, as Effect's (Stream.ts): sinks run
-// again and again over a stream, beside it or once at its head, and
-// execution plans, and their bindings.
+// Streams through sinks and channels: sinks run again and again over a
+// stream, beside it or once at its head, and execution plans, and their
+// bindings.
 
 // StreamTransduce runs the sink again and again over the stream, each
 // time from the last one's leftovers, emitting each value; a failure of
@@ -298,8 +298,8 @@ func StreamPipeThroughChannelOrFail(c, s Value) Value {
 	return &Stream{channelPipeToOrFail(streamOf(s).ch, channelOf(c))}
 }
 
-// streamRetryWithoutReset is Effect's: the stream again after each typed
-// error while the schedule, never restarted, goes on.
+// streamRetryWithoutReset is the stream again after each typed error while
+// the schedule, never restarted, goes on.
 func streamRetryWithoutReset(self *Stream, schedule *Schedule) *Stream {
 	return &Stream{channelUnwrap(func(fb *Fiber) *Channel {
 		step, meta := schedule.stepper(fb), defaultMetadata

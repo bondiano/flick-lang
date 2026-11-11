@@ -15,11 +15,11 @@ let escaped hub =
   //~ FLICK-G002 @14:25-14:73 region `s` ends with its `scope`
   ()
 
-/// A callback kept in a channel may not hold a scoped resource.
+/// A callback kept in a channel may hold a scoped resource it uses there.
 captured : Path ->{Files} Unit
 let captured path = scope {
   let file = Files.open path
   let lines = Channel.map_effect (fun n -> Files.read file) (Channel.from_list [1])
-  //~ FLICK-G001 @22:35-22:59 holds region `s`
+  // the channel is not run, so nothing uses `file` after the scope
   ()
 }

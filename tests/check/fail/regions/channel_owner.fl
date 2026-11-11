@@ -1,0 +1,29 @@
+// The callback of a channel shows in the row of the channel (`map_effect`),
+// so a runner that keeps the channel running until its owner closes
+// (`retention owner`, as `Channel.to_queue`) asks that what the callback
+// uses outlive the owner: here an outer owner keeps reading a file of an
+// inner `scope`.
+module App.ChannelOwner exposing (..)
+
+type File (s : Region)
+
+service Files =
+  open_scoped : forall s. String ->{Scope s} File s
+  read : forall s. File s ->{} String
+
+queued :
+  Fiber.Outlives c s =>
+  Fiber.Provided r s =>
+  Detached r =>
+  Fiber.Owner s -> (Channel.Channel r e i o d none Unit)^c ->{Scope s | r} Queue.Queue e o
+let queued _ channel = Channel.to_queue { capacity = None; strategy = None } channel
+
+pumped : String ->{Files} Unit
+let pumped path = scope outer {
+  scope inner {
+    let file = Files.open_scoped path
+    let lines = Channel.map_effect (fun _ -> Files.read file) (Channel.from_list [1])
+    ignore (queued outer lines)
+  }
+}
+//~ FLICK-G003 @26:13-26:19 the child holds region `inner`, which may end before its owner region `outer`

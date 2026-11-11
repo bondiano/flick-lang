@@ -1,4 +1,4 @@
-// RegExp operations of Effect String, beside the plain string helpers.
+// RegExp operations of `String`, beside the plain string helpers.
 import { none, some, type Option } from "../../core/data.ts";
 
 export * from "../../core/String.ts";

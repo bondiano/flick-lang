@@ -10,6 +10,8 @@ use flick_plugin::{Block, DeriveTarget, Place};
 use super::super::{Loaded, Loader, Root};
 use super::{Found, Plugins, Results, failure, refusal};
 use crate::diagnostics::{Diagnostic, codes};
+#[cfg(feature = "native-project")]
+use crate::plugin::blocks_under;
 use crate::plugin::derive::{Derived, Named, builtin_derived, derived_classes, named, target};
 use crate::plugin::reach::Reach;
 use crate::plugin::render::{Rendered, render};
@@ -20,6 +22,21 @@ use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
 use crate::syntax::parse;
 use crate::types::{self, is_type};
+
+impl Loaded {
+    /// Whether the code of the module is its own text and, at most, what
+    /// the compiler's own plugin derives from its declarations: a function
+    /// of the sources and the compiler, which the key of a package holds.
+    #[cfg(feature = "native-project")]
+    pub(in crate::project::load) fn derives_alone(&self) -> bool {
+        let Some(expansion) = &self.expansion else {
+            return true;
+        };
+        let mut written = Vec::new();
+        blocks_under(&self.parse.tree, &mut written);
+        written.is_empty() && self.loader.is_none() && expansion.only_of(first_party::PACKAGE)
+    }
+}
 
 impl Loader<'_> {
     /// The derive blocks of every loaded module, with the code their plugins
@@ -141,7 +158,7 @@ impl Loader<'_> {
     }
 
     /// The plugin of `package`, loaded once.
-    pub(super) fn load_plugin(
+    pub(in crate::project::load) fn load_plugin(
         &self,
         plugins: &mut Plugins,
         package: &str,

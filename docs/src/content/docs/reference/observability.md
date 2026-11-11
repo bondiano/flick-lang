@@ -5,14 +5,14 @@ title: "Observability"
 A trace answers “where did this request spend its time?”; a log records
 what happened; a metric answers “how often, and how much?”. Flick exposes
 all three through ordinary runtime functions, with separate destinations:
-`Tracer` creates spans, Effect's loggers consume log records, and `Metric`
+`Tracer` creates spans, loggers consume log records, and `Metric`
 stores numeric series in a metric registry. Logs and spans are not kept in
 that registry.
 
 Provide an OTLP or DevTools layer around the work you want to observe.
 Prometheus uses a different model: mount a route that reads the metric
 registry when a scraper requests it. Without an exporter, telemetry is not
-sent to an OTLP collector; Effect's default logger still writes to the
+sent to an OTLP collector; the default logger still writes to the
 console.
 
 ## Spans
@@ -112,7 +112,7 @@ let observe_checkout () =
 ```
 
 `Otlp.settings url service_name` starts with JSON, no gzip, no extra
-headers or resource attributes, and Effect's batching defaults. Pass a
+headers or resource attributes, and the default batching. Pass a
 record update to `layer_with`, `traces_with`, `logs_with` or
 `metrics_with` to set the service version, resource attributes, request
 headers, serialization, export interval or shutdown timeout. `max_batch_size`
@@ -180,7 +180,18 @@ values on each scrape; it does not push to a Prometheus server.
 
 ## UI actions and atom writes
 
-Each task an action or an event handler of a mounted root runs is a span,
+Action spans on the Effect adapter are disabled by default. Wrap the task that
+mounts a root in `Ui.Tracing.with_action_spans true`; the root captures the
+setting when mounted. `false` opts a root out inside an enabled parent.
+`flick run --devtools` enables them explicitly. The tracing implementation lives
+in a separate module, so an application that never enables it can drop that code.
+
+```flick
+observe_actions : (Eff r e a)^c ->{r; e} a
+let observe_actions mount = Ui.Tracing.with_action_spans true mount
+```
+
+When enabled, each task an action or event handler of a mounted root runs is a span,
 named by the action's label (`App.Counter.increment`; `Ui.event` for a
 handler with none). Its attributes are `flick.action.policy`,
 `flick.action.capacity` or `flick.action.limit` where the policy has one,
@@ -201,7 +212,7 @@ place, `Module:line`. The names are labels, which release builds keep with
 
 ## Server renders and server functions
 
-A request's trace goes on in what serves it. Effect's HTTP server opens a
+A request's trace goes on in what serves it. The HTTP server opens a
 span per request, a child of the `traceparent` the request carries;
 `Ui.Server.render` and `Ui.Server.stream` run as a `flick.render` span
 under it. A [server function](../server-fn/) call carries the caller's
@@ -212,7 +223,7 @@ its handler calls are one trace with the browser's request.
 ## DevTools
 
 `DevTools.layer url` sends a program's spans, as they start and end, over
-a WebSocket to the Effect DevTools listening at `url` (Effect's default
+a WebSocket to the Effect DevTools listening at `url` (its default
 is `ws://localhost:34437`), which must already listen.
 `DevTools.layer_with { url; headers }` adds headers to the WebSocket's
 handshake — a token a proxy in front of the DevTools checks, say; only

@@ -1,6 +1,6 @@
 ---
 title: "Errors, services, resources and concurrency"
-source_hash: 42fc822e9d961d9b
+source_hash: e6e808936974060b
 ---
 
 ## Expected errors
@@ -152,7 +152,7 @@ Retry, schedules, streams, queues, cache, tracing and HTTP are a typed standard 
 
 `deriving Schema` and codecs for external formats are part of the language. Generics, recursion, refinements, field policies and effectful transformations are covered in [Schema and standard data types](../07-schema/).
 
-The handlers of a program's effects are one-shot: a continuation resumes at most once, never several times. Services and `provide layer` still rely on Effect's mechanisms, and on the Go target on the same mechanisms of `runtime-go/flickrt`; `control` arms compile for Go, and for JavaScript once it has a runtime of its own.
+The handlers of a program's effects are one-shot: a continuation resumes at most once, never several times. Services and `provide layer` still rely on the mechanisms of Effect, and on the Go target on the same mechanisms of `runtime-go/flickrt`; `control` arms compile for Go, and for JavaScript once it has a runtime of its own.
 
 ## Execution and static lifetime contracts
 
@@ -275,7 +275,7 @@ For safe scoped APIs the checker verifies direct and indirect escape: the result
 
 Every `scope s { ... }` creates a fresh region `s` and a runtime owner. In `scope { ... }` the name is inferred and stays hidden. A scoped handle has a type such as `File s`. The owner is passed by the compiler lexically; it is not implemented by a single ordinary Context lookup, which in a nested region could pick a different scope.
 
-```flick fail E002 G001
+```flick fail E002 G002
 # import File exposing (File, Path, FileSystem, OpenError, ReadError)
 #
 bad_deferred :
@@ -287,7 +287,7 @@ let bad_deferred path =
   }
 ```
 
-This is an error (`FLICK-G001`): the task captures `file`, yet it is being returned after the region has closed. The ordinary type `Eff {FileSystem} {ReadError} String` does not show this dependency, so a check of `s` in the result type alone is not enough.
+This is an error (`FLICK-G002`): the task reads `file`, so running it needs `s` live, yet it is returned after the region has closed. The type `Eff {FileSystem} {ReadError} String` does not keep `s` live, so a check of `s` in the result type alone is not enough: the checker asks it of the row where the task uses the file.
 
 The correct fix is to move the acquisition inside the deferred execution:
 
@@ -309,7 +309,7 @@ Now every `await` gets its own region and resource. The returned string may outl
 
 The same check applies to an ordinary callback:
 
-```flick fail E002 G001
+```flick fail E002 G002
 # import File exposing (File, Path, FileSystem, OpenError, ReadError)
 #
 bad_callback :
@@ -391,7 +391,7 @@ The operation does not close an external `Scope`: resources registered in it liv
 
 `parallel_results` converts the selected expected failures into `Result` and lets the other branches finish. Defects and external interruption remain control events. `parallel_exits` returns opaque full outcomes of the completed branches; external cancellation of the group still propagates. The safe API does not promise to collect all potential errors of a fail-fast operation.
 
-Binding to a scope sets the lifetime; `join` is the wait for a specific result. Structured combinators run their branches in a separate child group with cancellation and join of all active branches, since Effect's `joinAll` stops waiting on an error without interrupting the other fibers.
+Binding to a scope sets the lifetime; `join` is the wait for a specific result. Structured combinators run their branches in a separate child group with cancellation and join of all active branches, since `joinAll` of the Effect library stops waiting on an error without interrupting the other fibers.
 
 ### Supervised children
 

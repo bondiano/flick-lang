@@ -3,6 +3,7 @@
 //! unknown at the end is the empty row, the least solution. Then every
 //! constraint either holds or names what its bound lacks.
 
+use crate::types::Elem;
 use std::mem;
 
 use super::Site;
@@ -38,10 +39,13 @@ struct Excess {
     services: Vec<String>,
     errors: Vec<String>,
     /// The row labels of what is lacking, for the fixes that name a service.
-    labels: Vec<String>,
+    labels: Vec<Elem>,
     /// Where the bound's row is written, once rows are solved: a variable
     /// may stand for a row written elsewhere.
     bound: Written,
+    /// A name the bound takes out of its row variable is lacking: writing
+    /// it into the row is no fix.
+    taken: bool,
 }
 
 impl Checker<'_> {
@@ -49,7 +53,8 @@ impl Checker<'_> {
     pub fn grow(&mut self) {
         loop {
             // `|`, not `||`: every row grows in each round
-            let rows = (0..self.subrows.len()).fold(false, |changed, i| changed | self.grow_one(i));
+            let rows =
+                (0..self.cx.subrows.len()).fold(false, |changed, i| changed | self.grow_one(i));
             if !(self.grow_holds() || rows) {
                 break;
             }
@@ -58,10 +63,11 @@ impl Checker<'_> {
 
     /// The actual row of constraint `i` without what its scope provides.
     fn actual(&mut self, i: usize) -> Norm {
-        let mut actual = self.store.normalize(&self.subrows[i].actual);
-        let Some(region) = self.subrows[i].provides.clone() else {
+        let mut actual = self.store.normalize(&self.cx.subrows[i].actual);
+        let Some(region) = self.cx.subrows[i].provides.clone() else {
             return actual;
         };
+        self.discharge_live(&mut actual, &region);
         let Some(scope) = actual.get(regions::scope()).cloned() else {
             return actual;
         };
@@ -82,27 +88,35 @@ impl Checker<'_> {
     /// Adds to the declared row of constraint `i` one label or row variable
     /// it lacks, if that row is open; `true` when it did.
     fn grow_one(&mut self, i: usize) -> bool {
-        let givens = mem::take(&mut self.subrows[i].givens);
+        let givens = mem::take(&mut self.cx.subrows[i].givens);
         let grown = self.under(&givens, |this| this.grow_row(i));
-        self.subrows[i].givens = givens;
+        self.cx.subrows[i].givens = givens;
         grown
     }
 
     fn grow_row(&mut self, i: usize) -> bool {
         let actual = self.actual(i);
-        let declared = self.store.normalize(&self.subrows[i].declared);
-        let open = declared.tails.iter().find_map(|t| match t {
-            Type::Meta(m) => Some(*m),
-            _ => None,
-        });
-        for (label, ty) in &actual.entries {
+        let declared = self.store.normalize(&self.cx.subrows[i].declared);
+        // a row still unknown, maybe less some names: it grows by what the
+        // actual row holds, but never by a name it is taken without
+        let unknown_tail = declared.tails.iter().find(|t| unknown(t).is_some());
+        let open = unknown_tail.and_then(unknown);
+        let never: Vec<Elem> = unknown_tail.map_or_else(Vec::new, |t| less(t).1.to_vec());
+        if self.grow_live(&actual, &declared, open) {
+            return true;
+        }
+        for (label, ty) in actual
+            .entries
+            .iter()
+            .filter(|(l, _)| !matches!(l, Elem::Live))
+        {
             match declared.get(label) {
                 Some(bound) => {
                     let bound = bound.clone();
                     let _ = self.unify(ty, &bound);
                 }
                 None => {
-                    if let Some(m) = open {
+                    if let Some(m) = open.filter(|_| !never.contains(label)) {
                         let rest = self.store.fresh_beside(m);
                         let row = Type::Row(Row {
                             entries: vec![(label.clone(), ty.clone())],
@@ -115,7 +129,7 @@ impl Checker<'_> {
             }
         }
         for tail in &actual.tails {
-            if matches!(tail, Type::Meta(_) | Type::Error) || declared.tails.contains(tail) {
+            if matches!(tail, Type::Error) || unknown(tail).is_some() || allows(&declared, tail) {
                 continue;
             }
             if let Some(m) = open {
@@ -134,9 +148,9 @@ impl Checker<'_> {
         self.grow();
         let level = self.store.level;
         let mut close = Vec::new();
-        for c in &self.subrows {
+        for c in &self.cx.subrows {
             for t in self.store.normalize(&c.actual).tails {
-                if let Type::Meta(m) = t
+                if let Some(m) = unknown(&t)
                     && self.store.meta_level(m).is_some_and(|l| l > level)
                 {
                     close.push(m);
@@ -170,12 +184,10 @@ impl Checker<'_> {
     pub fn close_rows_above(&mut self, level: Option<u32>) {
         self.grow();
         let mut open = Vec::new();
-        for c in &self.subrows {
+        for c in &self.cx.subrows {
             for side in [&c.actual, &c.declared] {
                 for t in self.store.normalize(side).tails {
-                    if let Type::Meta(m) = t {
-                        open.push(m);
-                    }
+                    open.extend(unknown(&t));
                 }
             }
         }
@@ -193,9 +205,9 @@ impl Checker<'_> {
 
     fn report_rows(&mut self) {
         let mut excess: Vec<Excess> = Vec::new();
-        for i in 0..self.subrows.len() {
+        for i in 0..self.cx.subrows.len() {
             let actual = self.actual(i);
-            let c = self.subrows[i].clone();
+            let c = self.cx.subrows[i].clone();
             let declared = self.store.normalize(&c.declared);
             // a declared element that is no error is reported as such, once
             if c.errors && declared.entries.iter().any(|(_, t)| !self.may_be_error(t)) {
@@ -203,7 +215,12 @@ impl Checker<'_> {
             }
             let mut lacking = Vec::new();
             let mut labels = Vec::new();
-            for (label, ty) in &actual.entries {
+            self.report_live(&actual, &declared, c.site, c.span);
+            for (label, ty) in actual
+                .entries
+                .iter()
+                .filter(|(l, _)| !matches!(l, Elem::Live))
+            {
                 match declared.get(label) {
                     Some(bound) => {
                         if let Err(m) = self.unify(ty, bound) {
@@ -211,7 +228,7 @@ impl Checker<'_> {
                         }
                     }
                     None if label == regions::scope() => self.no_owner(ty, &c),
-                    None if label.starts_with(regions::PROVIDED) => {
+                    None if matches!(label, Elem::Provided(_)) => {
                         if let [service, owner] = ty.spine().1[..] {
                             let service = self.show(service);
                             let owner = self.show(owner);
@@ -224,9 +241,16 @@ impl Checker<'_> {
                     }
                 }
             }
-            for tail in &actual.tails {
-                if !matches!(tail, Type::Error) && !declared.tails.contains(tail) {
-                    lacking.push(self.show(tail));
+            let mut taken = false;
+            for tail in (actual.tails.iter()).filter(|t| !matches!(t, Type::Error)) {
+                match owed(&declared, tail) {
+                    // the variable is allowed, less names nothing gives back
+                    Some(names) => {
+                        taken |= !names.is_empty();
+                        lacking.extend(names.iter().map(Elem::short));
+                        labels.extend(names);
+                    }
+                    None => lacking.push(self.show(tail)),
                 }
             }
             if declared.tails.contains(&Type::Error) || lacking.is_empty() {
@@ -240,12 +264,14 @@ impl Checker<'_> {
                     errors: Vec::new(),
                     labels: Vec::new(),
                     bound: Written::default(),
+                    taken: false,
                 });
             }
             let i = excess
                 .iter()
                 .position(|e| e.site == c.site)
                 .expect("just added");
+            excess[i].taken |= taken;
             let list = if c.errors {
                 &mut excess[i].errors
             } else {
@@ -265,7 +291,7 @@ impl Checker<'_> {
                 excess[i].bound = self.local_place(&c.declared);
             }
         }
-        self.subrows.clear();
+        self.cx.subrows.clear();
         for e in excess {
             self.report_excess(&e);
         }
@@ -377,7 +403,7 @@ impl Checker<'_> {
         } else {
             written
         };
-        if let Some(written) = written {
+        if let Some(written) = written.filter(|_| !e.taken) {
             // the services go after the `{`; the errors, after the `;`, are left to the user
             let edits: Vec<Edit> = (e.errors.is_empty())
                 .then(|| written.adding(&e.services.join(", ")))
@@ -390,7 +416,7 @@ impl Checker<'_> {
                 && !edits.is_empty()
                 // a row variable it lacks has no label
                 && e.labels.len() == e.services.len()
-                && (e.labels.iter()).all(|l| lang::label(Lang::Async) == Some(l.as_str()));
+                && (e.labels.iter()).all(|l| lang::label(Lang::Async) == l.name());
             let fix = || (format!("add {list} to {bound}"), edits);
             diagnostic = if only_async {
                 diagnostic.with_safe_fix(fix)
@@ -411,7 +437,7 @@ impl Checker<'_> {
                 ),
                 e.span,
             ).with_fix(|| {
-        let is = |l: Lang| e.labels.iter().any(|s| lang::label(l) == Some(s.as_str()));
+        let is = |l: Lang| e.labels.iter().any(|s| lang::label(l) == s.name());
         let writes = is(Lang::AtomWrite) || is(Lang::AtomRegistry);
         let (setup, document) = (is(Lang::Setup), is(Lang::UiDocument));
         let fixes = [
@@ -429,4 +455,41 @@ impl Checker<'_> {
             }),
         );
     }
+}
+
+/// A row variable and the names it is taken without, if any.
+fn less(tail: &Type) -> (&Type, &[Elem]) {
+    match tail {
+        Type::Without { row, gone } => (row, gone),
+        other => (other, &[]),
+    }
+}
+
+/// The variable of a tail still to be inferred, maybe less some names.
+fn unknown(tail: &Type) -> Option<u32> {
+    match less(tail).0 {
+        Type::Meta(m) => Some(*m),
+        _ => None,
+    }
+}
+
+/// The names `declared` takes out of the variable of `tail` that neither
+/// the tail is less too nor `declared` names itself, or `None` when it does
+/// not hold the variable: `s` is within `{L | s - L}`, whatever `s` is.
+fn owed(declared: &Norm, tail: &Type) -> Option<Vec<Elem>> {
+    let (variable, gone) = less(tail);
+    (declared.tails.iter().map(less))
+        .filter(|(held, _)| *held == variable)
+        .map(|(_, taken)| {
+            (taken.iter())
+                .filter(|l| !gone.contains(l) && declared.get(*l).is_none())
+                .cloned()
+                .collect::<Vec<_>>()
+        })
+        .min_by_key(Vec::len)
+}
+
+/// Whether `declared` allows all a `tail` stands for.
+fn allows(declared: &Norm, tail: &Type) -> bool {
+    owed(declared, tail).is_some_and(|names| names.is_empty())
 }

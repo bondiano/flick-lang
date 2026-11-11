@@ -4,6 +4,7 @@
 //! higher-kinded variable, a region, an open record) is refused with the
 //! reason, never written as `any`.
 
+use crate::effects::bindings;
 use std::cell::{Cell, RefCell};
 use std::collections::{BTreeSet, HashMap};
 use std::fmt::Write;
@@ -11,13 +12,15 @@ use std::fmt::Write;
 use super::names;
 use crate::iface::{Interface, Namespace};
 use crate::types::lang::{self, Lang};
-use crate::types::{Form, Kind, Type, TypeDef, passes_dictionary};
+use crate::types::{Elem, Form, Kind, ModuleRequirement, Type, TypeDef, passes_dictionary};
 
 /// The runtime package generated code imports.
-const RUNTIME: &str = "@flick-lang/effect-ts";
+const EFFECT_RUNTIME: &str = bindings::ADAPTER_PREFIX;
+const FLICK_RUNTIME: &str = "@flick-lang/runtime/rt/types";
 
 /// The runtime module whose `Ui` a Flick `Ui` value is.
-const RUNTIME_UI: &str = "@flick-lang/effect-ts/ui/react";
+const EFFECT_RUNTIME_UI: &str = bindings::ADAPTER_UI;
+const FLICK_RUNTIME_UI: &str = "@flick-lang/runtime/rt/types";
 
 /// Built-in types TypeScript has natively.
 const PRIMITIVES: &[(Lang, &str)] = &[
@@ -33,7 +36,7 @@ const PRIMITIVES: &[(Lang, &str)] = &[
 ];
 
 /// Built-in types projected to native Effect or TypeScript types, or not at
-/// all; `Stream` is Effect's `Stream`.
+/// all; `Stream` is projected to the `Stream` of the Effect library.
 const NATIVE: &[Lang] = &[
     Lang::List,
     Lang::Option,
@@ -69,6 +72,8 @@ pub struct Projection<'a> {
     pub used: RefCell<BTreeSet<String>>,
     /// Whether the runtime `Ui` is referenced.
     ui: Cell<bool>,
+    /// The projection of values compiled for Flick's own runtime.
+    rt: bool,
 }
 
 /// Type parameters in scope: Flick name to TypeScript name; regions have
@@ -81,12 +86,22 @@ impl Projection<'_> {
         lookup: &'a dyn Fn(&str) -> Option<Interface>,
         package: &'a dyn Fn(&str) -> Option<String>,
     ) -> Projection<'a> {
+        Self::for_runtime(module, lookup, package, false)
+    }
+
+    pub fn for_runtime<'a>(
+        module: &'a str,
+        lookup: &'a dyn Fn(&str) -> Option<Interface>,
+        package: &'a dyn Fn(&str) -> Option<String>,
+        rt: bool,
+    ) -> Projection<'a> {
         Projection {
             module,
             lookup,
             package,
             used: RefCell::new(BTreeSet::new()),
             ui: Cell::new(false),
+            rt,
         }
     }
 
@@ -192,7 +207,7 @@ impl Projection<'_> {
                         let a = self.ty(result, vars)?;
                         let e_row = self.row(&e.errors, vars)?;
                         let r_row = self.row(&e.services, vars)?;
-                        effect(&a, &e_row, &r_row)
+                        effect(&a, &e_row, &r_row, self.rt)
                     }
                 };
                 Ok(format!("(arg: {param}) => {result}"))
@@ -210,7 +225,11 @@ impl Projection<'_> {
                     .entries
                     .iter()
                     .map(|(label, ty)| {
-                        Ok(format!("readonly {}: {}", key(label), self.ty(ty, vars)?))
+                        Ok(format!(
+                            "readonly {}: {}",
+                            key(&label.to_string()),
+                            self.ty(ty, vars)?
+                        ))
                     })
                     .collect();
                 let fields = fields?;
@@ -225,7 +244,11 @@ impl Projection<'_> {
                 let inner = self.value_in(t, vars)?;
                 Ok(format!("({inner})"))
             }
-            Type::Row(_) | Type::Union(..) => self.row(t, vars),
+            // TypeScript has no existential opener that preserves a fresh
+            // abstract module identity. `unknown` keeps the exported value
+            // present without claiming that its witness may be inspected.
+            Type::Exists { .. } => Ok("unknown".to_owned()),
+            Type::Row(_) | Type::Union(..) | Type::Without { .. } => self.row(t, vars),
             Type::Symbol(s) => Ok(names::string(s)),
             Type::Meta(_) | Type::Skolem(_) | Type::Error => {
                 Err("the type is not fully known".to_owned())
@@ -248,8 +271,9 @@ impl Projection<'_> {
         match t {
             Type::Row(row) => {
                 // TypeScript has no `Async`: a function that may suspend is async anyway
-                let not_async =
-                    |(l, _): &&(String, Type)| lang::label(Lang::Async) != Some(l.as_str());
+                let not_async = |(l, _): &&(Elem, Type)| {
+                    lang::label(Lang::Async) != l.name() && !matches!(l, Elem::Live)
+                };
                 for (_, entry) in row.entries.iter().filter(not_async) {
                     out.push(self.ty(entry, vars)?);
                 }
@@ -262,6 +286,8 @@ impl Projection<'_> {
                 self.row_parts(a, vars, out)?;
                 self.row_parts(b, vars, out)
             }
+            // what a caller no longer owes is no part of what the value is
+            Type::Without { row, .. } => self.row_parts(row, vars, out),
             other => {
                 out.push(self.ty(other, vars)?);
                 Ok(())
@@ -281,58 +307,14 @@ impl Projection<'_> {
                 "`{shown}` is applied to a type: a higher-kinded type has no TypeScript form; export a concrete façade"
             ));
         };
-        let arg = |i: usize| self.ty(args[i], vars);
+        if let Some(shown) = self.module_or_dictionary(module, name, &args, vars)? {
+            return Ok(shown);
+        }
         let seq = lang::is(Lang::Seq, module, name).then_some(Lang::Seq);
-        if let Some(item) = native(module, name).or(seq) {
-            if let Some((_, ts)) = PRIMITIVES.iter().find(|&&(p, _)| p == item) {
-                return Ok((*ts).to_owned());
-            }
-            match (item, args.len()) {
-                (Lang::Stream, 3) => {
-                    let r = self.row(args[0], vars)?;
-                    let e = self.row(args[1], vars)?;
-                    return Ok(format!("$Stream.Stream<{}, {e}, {r}>", arg(2)?));
-                }
-                (Lang::List, 1) => return Ok(format!("ReadonlyArray<{}>", arg(0)?)),
-                (Lang::Ui, 0) => {
-                    self.ui.set(true);
-                    return Ok("$Ui".to_owned());
-                }
-                (Lang::Seq, 1) => return Ok(format!("Iterable<{}>", arg(0)?)),
-                (Lang::Option, 1) => return Ok(format!("$Option.Option<{}>", arg(0)?)),
-                (Lang::Result, 2) => {
-                    return Ok(format!("$Result.Result<{}, {}>", arg(1)?, arg(0)?));
-                }
-                (Lang::Eff, 3) => {
-                    let r = self.row(args[0], vars)?;
-                    let e = self.row(args[1], vars)?;
-                    return Ok(effect(&arg(2)?, &e, &r));
-                }
-                (Lang::Layer, 3) => {
-                    let ri = self.row(args[0], vars)?;
-                    let e = self.row(args[1], vars)?;
-                    let ro = self.row(args[2], vars)?;
-                    return Ok(format!("$Layer.Layer<{ro}, {e}, {ri}>"));
-                }
-                (Lang::Errors, 1) => return self.row(args[0], vars),
-                (Lang::Schema, 1) => return Ok(format!("$Schema.Codec<{0}, {0}>", arg(0)?)),
-                (Lang::PureCodec, 2) => {
-                    return Ok(format!("$Schema.Codec<{}, {}>", arg(1)?, arg(0)?));
-                }
-                (Lang::Codec, 4) => {
-                    let rd = self.row(args[0], vars)?;
-                    let re = self.row(args[1], vars)?;
-                    return Ok(format!(
-                        "$Schema.Codec<{}, {}, {rd}, {re}>",
-                        arg(3)?,
-                        arg(2)?
-                    ));
-                }
-                (Lang::ServiceTag | Lang::ServiceImpl | Lang::Scope, _) => {
-                    return Err(format!("`{name}` has no TypeScript form"));
-                }
-                _ => {}
-            }
+        if let Some(item) = native(module, name).or(seq)
+            && let Some(projected) = self.native_applied(item, &args, vars, name)?
+        {
+            return Ok(projected);
         }
         let def = self.definition(module, name)?;
         let params = params(&def.kind);
@@ -371,6 +353,96 @@ impl Projection<'_> {
         ))
     }
 
+    fn module_or_dictionary(
+        &self,
+        module: &str,
+        name: &str,
+        args: &[&Type],
+        vars: &Vars,
+    ) -> Result<Option<String>, String> {
+        if module == "Prelude" && name == "Module" {
+            return match args {
+                [signature] => self.module_value(signature).map(Some),
+                _ => Err("`Module` needs one module contract".to_owned()),
+            };
+        }
+        if let Some(class) = name.strip_suffix("$Dict") {
+            let def = self.definition(module, class)?;
+            if matches!(def.form, Form::Class { .. }) {
+                let shown: Result<Vec<_>, _> = args.iter().map(|arg| self.ty(arg, vars)).collect();
+                return Ok(Some(format!(
+                    "{}{}",
+                    self.qualified(module, class),
+                    type_args(&shown?)
+                )));
+            }
+        }
+        Ok(None)
+    }
+
+    fn module_value(&self, signature: &Type) -> Result<String, String> {
+        let Type::Con { module, name } = signature else {
+            return Err("a module contract alias has no TypeScript projection".to_owned());
+        };
+        let def = self.definition(module, name)?;
+        let Form::ModuleContract { requirements } = def.form else {
+            return Err("`Module` argument is not a module contract".to_owned());
+        };
+        let mut subst = Vec::new();
+        for requirement in &requirements {
+            match requirement {
+                ModuleRequirement::Type {
+                    name,
+                    manifest: Some(ty),
+                    ..
+                } => {
+                    subst.push((name.clone(), ty.substitute(&subst)));
+                }
+                ModuleRequirement::Type {
+                    name,
+                    manifest: None,
+                    ..
+                } => {
+                    return Err(format!(
+                        "abstract type `{name}` in a module value has no faithful TypeScript projection"
+                    ));
+                }
+                ModuleRequirement::Nominal {
+                    name,
+                    identity: Some(identity),
+                    ..
+                } => {
+                    subst.push((name.clone(), Type::con(&identity.module, &identity.name)));
+                }
+                ModuleRequirement::Nominal {
+                    name,
+                    identity: None,
+                    ..
+                } => {
+                    return Err(format!(
+                        "abstract class or service `{name}` has no TypeScript projection"
+                    ));
+                }
+                _ => {}
+            }
+        }
+        let mut fields = Vec::new();
+        for requirement in &requirements {
+            if let ModuleRequirement::Value { name, ty } = requirement {
+                fields.push(format!(
+                    "readonly {}: {}",
+                    key(name),
+                    self.value(&ty.substitute(&subst))?
+                ));
+            }
+        }
+        Ok(if fields.is_empty() {
+            "{}".to_owned()
+        } else {
+            format!("{{ {} }}", fields.join("; "))
+        })
+    }
+
     /// `T` of this module, `$t_A$B.T` of another.
     fn qualified(&self, module: &str, name: &str) -> String {
         if module == self.module {
@@ -393,11 +465,27 @@ impl Projection<'_> {
     /// `import type` lines for what the projection referenced, with
     /// `path(module)` the import specifier of a module.
     pub fn imports(&self, path: &dyn Fn(&str) -> String) -> String {
-        let mut out = format!(
-            "import type {{ Effect as $Effect, Option as $Option, Result as $Result, Layer as $Layer, Schema as $Schema, Stream as $Stream, Context as $Context }} from \"{RUNTIME}\";\n"
-        );
+        let runtime = if self.rt {
+            FLICK_RUNTIME
+        } else {
+            EFFECT_RUNTIME
+        };
+        let runtime_ui = if self.rt {
+            FLICK_RUNTIME_UI
+        } else {
+            EFFECT_RUNTIME_UI
+        };
+        let mut out = if self.rt {
+            format!(
+                "import type {{ EffectValue as $Effect, OptionValue as $Option, ResultValue as $Result, LayerValue as $Layer, SchemaValue as $Schema, StreamValue as $Stream, ServiceValue as $Service }} from \"{runtime}\";\n"
+            )
+        } else {
+            format!(
+                "import type {{ Effect as $Effect, Option as $Option, Result as $Result, Layer as $Layer, Schema as $Schema, Stream as $Stream, Context as $Context }} from \"{runtime}\";\n"
+            )
+        };
         if self.ui.get() {
-            let _ = writeln!(out, "import type {{ Ui as $Ui }} from \"{RUNTIME_UI}\";");
+            let _ = writeln!(out, "import type {{ Ui as $Ui }} from \"{runtime_ui}\";");
         }
         for module in self.used.borrow().iter() {
             let _ = writeln!(
@@ -411,77 +499,7 @@ impl Projection<'_> {
     }
 }
 
-fn uncaptured<'a>(mut t: &'a Type, vars: &Vars) -> Result<&'a Type, String> {
-    while let Type::Captured { ty, captures, .. } | Type::Bounded { ty, captures } = t {
-        if !empty_captures(captures, vars) {
-            return Err(
-                "a value holding a scope's capabilities has no bare TypeScript export".to_owned(),
-            );
-        }
-        t = ty;
-    }
-    Ok(t)
-}
-
-fn empty_captures(t: &Type, vars: &Vars) -> bool {
-    match t {
-        Type::Row(row) => {
-            row.entries.iter().all(|(_, t)| empty_captures(t, vars))
-                && row.tail.as_deref().is_none_or(|t| empty_captures(t, vars))
-        }
-        Type::Union(a, b) => empty_captures(a, vars) && empty_captures(b, vars),
-        // TypeScript type parameters contain only scope-free data.
-        Type::Var(name) => matches!(vars.get(name), Some(Some(_))),
-        _ => false,
-    }
-}
-
-/// The kinds of the parameters of a type constructor of kind `k`.
-fn params(k: &Kind) -> Vec<Kind> {
-    let mut out = Vec::new();
-    let mut k = k;
-    while let Kind::Arrow(p, r) = k {
-        out.push((**p).clone());
-        k = r;
-    }
-    out
-}
-
-/// The TypeScript name of a type variable: `a` is `A`, `elem` is `Elem`.
-fn generic(name: &str) -> String {
-    let mut chars = name.chars();
-    let first = chars.next().map_or('T', |c| c.to_ascii_uppercase());
-    let rest: String = chars
-        .filter(|c| c.is_ascii_alphanumeric() || *c == '_')
-        .collect();
-    format!("{first}{rest}")
-}
-
-fn type_args(args: &[String]) -> String {
-    if args.is_empty() {
-        String::new()
-    } else {
-        format!("<{}>", args.join(", "))
-    }
-}
-
-/// `Effect<A, E, R>` with `never` for an empty row.
-fn effect(a: &str, e: &str, r: &str) -> String {
-    format!("$Effect.Effect<{a}, {e}, {r}>")
-}
-
-fn key(label: &str) -> String {
-    if names::is_property(label) {
-        label.to_owned()
-    } else {
-        names::string(label)
-    }
-}
-
-mod declare;
-mod dts;
-pub mod stages;
-
-pub use dts::{Facade, declaration_file, facade_files, jsdoc};
+include!("ts/helpers.rs");
+mod native;
 #[cfg(test)]
 mod tests;

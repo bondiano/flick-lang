@@ -1,33 +1,18 @@
 //! T036–T039: a function too long, nested too deep, with too many branches
-//! or parameters, past the `[lint]` thresholds. U007: a function that reads
-//! atoms to build a `Ui`, which a `component` does with its own re-render.
+//! or parameters, past the `[lint]` thresholds; and the functions whose
+//! signatures name a service a plugin watches, which that plugin is told of.
 
 use super::super::Checker;
 use super::super::let_parts;
 use super::super::ty::Type;
 use crate::diagnostics::{Diagnostic, Severity, codes};
 use crate::source::Span;
-use crate::syntax::cst::Node;
-use crate::syntax::kind::SyntaxKind as K;
-use crate::types::lang::{self, Lang};
-
-/// The expressions each of which nests what is inside it one level deeper.
-const NESTS: [K; 7] = [
-    K::IfExpr,
-    K::MatchExpr,
-    K::FunExpr,
-    K::DoExpr,
-    K::TaskExpr,
-    K::ForExpr,
-    K::TryExpr,
-];
+use crate::syntax::{cst::Node, structure};
+use flick_plugin::{Binding, CallSite};
 
 impl Checker<'_> {
     /// The lints of a function `decl`, a `let` with parameters; other
     /// declarations have none.
-    // shortcut: a component is the code of std's plugin, whose ranges mix the
-    // user's code and the generated, so it has no T036–T038; lint it in the
-    // plugin once a plugin's `check` sees the module (PX5)
     pub(super) fn structure(&mut self, decl: &Node) {
         let parts = let_parts(decl, self.text);
         let body = (!parts.params.is_empty()).then_some(parts.body).flatten();
@@ -40,10 +25,9 @@ impl Checker<'_> {
         let warn =
             |code, message: String| Diagnostic::new(code, Severity::Warning, message).with_span(at);
 
-        let lines = self.text[body.range().0 as usize..body.range().1 as usize]
-            .lines()
-            .count();
-        if lines > limits.function_lines as usize {
+        let structure = structure::measure(body, self.text, limits);
+        let lines = structure.lines;
+        if lines > limits.function_lines {
             self.diagnostics.push(
                 warn(
                     codes::T036,
@@ -55,7 +39,7 @@ impl Checker<'_> {
                 .with_fix(|| ("split it into smaller functions", Vec::new())),
             );
         }
-        let complexity = 1 + branches(body);
+        let complexity = structure.complexity;
         if complexity > limits.complexity {
             self.diagnostics.push(
                 warn(
@@ -86,50 +70,37 @@ impl Checker<'_> {
                 .with_fix(|| ("take a record of them", Vec::new())),
             );
         }
-        self.too_deep(body, 0, limits.nesting);
-        self.reads_atoms(&name, at);
-    }
-
-    /// T037 at each expression `depth` levels deep past `limit`, and not
-    /// within one already reported.
-    fn too_deep(&mut self, node: &Node, depth: u32, limit: u32) {
-        for child in node.nodes() {
-            if is_function(child) {
-                continue;
-            }
-            // `else if` continues its `if`
-            let else_if = node.kind == K::IfExpr && child.kind == K::IfExpr;
-            let depth = depth + u32::from(NESTS.contains(&child.kind) && !else_if);
-            if depth > limit {
-                let at = child
-                    .child_tokens()
-                    .next()
-                    .map_or_else(|| self.span(child), |t| self.token_span(t));
-                self.diagnostics.push(
-                    Diagnostic::new(
-                        codes::T037,
-                        Severity::Warning,
-                        format!("nested {depth} levels deep, more than {limit}"),
-                    )
-                    .with_span(at)
-                    .with_fix(|| ("move the inner part into a function of its own", Vec::new())),
-                );
-                continue;
-            }
-            self.too_deep(child, depth, limit);
+        for nesting in structure.nesting {
+            self.diagnostics.push(
+                Diagnostic::new(
+                    codes::T037,
+                    Severity::Warning,
+                    format!(
+                        "nested {} levels deep, more than {}",
+                        nesting.depth, limits.nesting
+                    ),
+                )
+                .with_span(Span::new(self.file, nesting.span.start, nesting.span.end))
+                .with_fix(|| ("move the inner part into a function of its own", Vec::new())),
+            );
         }
+        self.named_in_signature(&name, at, decl);
     }
 
-    /// U007: a top-level function whose result is a `Ui` it builds from
-    /// atoms it reads.
-    fn reads_atoms(&mut self, name: &str, at: Span) {
-        let Some(mut ty) = self.signed_type(name) else {
+    /// The services a plugin watches that the signature of the top-level
+    /// function `name` names: each is a place its plugin is told of, at the
+    /// function's name, with what the function gives at last.
+    fn named_in_signature(&mut self, name: &str, at: Span, decl: &Node) {
+        let Some(signed) = self.signed_type(name) else {
             return;
         };
-        if let Type::Forall { body, .. } = ty {
-            ty = *body;
-        }
-        let mut reads = false;
+        let (mut ty, constrained) = match &signed {
+            Type::Forall {
+                body, constraints, ..
+            } => (&**body, !constraints.is_empty()),
+            other => (other, false),
+        };
+        let mut found: Vec<(&str, &str)> = Vec::new();
         while let Type::Fun {
             effects, result, ..
         } = ty
@@ -137,46 +108,39 @@ impl Checker<'_> {
             if let Some(effects) = effects
                 && let Type::Row(row) = &effects.services
             {
-                reads |= (row.entries.iter())
-                    .any(|(l, _)| Some(l.as_str()) == lang::label(Lang::AtomRead));
+                let named = row.entries.iter().filter_map(|(l, _)| l.name());
+                for service in named.filter_map(|n| n.rsplit_once('.')) {
+                    if self.options.watched.holds(service.0, service.1) && !found.contains(&service)
+                    {
+                        found.push(service);
+                    }
+                }
             }
-            ty = *result;
+            ty = result;
         }
         if let Type::Captured { ty: inner, .. } = ty {
-            ty = *inner;
+            ty = inner;
         }
-        if reads && ty.is_lang(Lang::Ui) {
-            self.diagnostics.push(
-                Diagnostic::new(
-                    codes::U007,
-                    Severity::Warning,
-                    format!("`{name}` reads atoms to build a `Ui`: whatever calls it renders again when they change"),
-                )
-                .with_span(at).with_fix(|| ("make it a `component`: it renders again on its own, not with its parent", Vec::new())),
-            );
+        let span = |(start, end)| flick_plugin::Span { start, end };
+        for (module, service) in found {
+            self.typing.call_sites.push(CallSite {
+                module: module.to_owned(),
+                name: service.to_owned(),
+                span: span((at.start, at.end)),
+                arguments: Vec::new(),
+                refinement: None,
+                generated: at.start >= self.generated,
+                tagged: None,
+                binding: Some(Binding {
+                    module: self.env.module.clone(),
+                    name: Some(name.to_owned()),
+                    span: span(decl.range()),
+                    constrained,
+                    in_function: false,
+                    applied: 0,
+                    gives: Some(self.fact_type(ty)),
+                }),
+            });
         }
     }
-}
-
-/// A local function, linted as a function of its own.
-fn is_function(node: &Node) -> bool {
-    node.kind == K::LetDecl && node.nodes().any(|n| n.kind == K::Params)
-}
-
-/// The branches of `node` apart from local functions: each `if`, each arm
-/// after the first, each guard, each `&&` and `||`.
-fn branches(node: &Node) -> u32 {
-    node.nodes()
-        .filter(|c| !is_function(c))
-        .map(|c| {
-            let own = match c.kind {
-                K::IfExpr | K::Guard | K::GuardStmt => 1,
-                K::MatchExpr => u32::try_from(c.nodes().filter(|a| a.kind == K::MatchArm).count())
-                    .map_or(0, |n| n.saturating_sub(1)),
-                K::BinExpr if c.has_token(K::AndAnd) || c.has_token(K::OrOr) => 1,
-                _ => 0,
-            };
-            own + branches(c)
-        })
-        .sum()
 }

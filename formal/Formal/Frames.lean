@@ -34,22 +34,46 @@ def Frame.dom (F : Frame) : Row
   | .nm N => F.installs N
   | .atm a => ∃ p, F = .inside p ∧ a = .r p
   | .ob N a => F.installs N ∨ ∃ p, F = .inside p ∧ a = .r p
-  | .obv _ a => ∃ p, F = .inside p ∧ a = .r p
-  | .rv _ => False
+  | .obv _ _ a => ∃ p, F = .inside p ∧ a = .r p
+  | .rv _ _ => False
 
+/-- The region of a runtime form of a handler. Such a frame is created inside the
+`inside` form of its region (`Step.resume`, `PHead.hresVal`), so in the live
+discipline its hole may need that region live. -/
+def Frame.rgn : Frame → Option Nat
+  | .hctlA p _ _ _ _ _ _ _ => some p
+  | .hdone p => some p
+  | .hresB p _ _ => some p
+  | _ => none
+
+/-- What a frame provides its hole: `Frame.dom`, and a runtime form of a handler stands for
+its own region, which the `inside` form around it keeps live. -/
+def Frame.provides (F : Frame) : Row := fun n => F.dom n ∨ ∃ p, F.rgn = some p ∧ n = .atm (.r p)
+
+theorem Frame.provides_of {F : Frame} {n : Elem} (h : F.dom n) : F.provides n := .inl h
+
+/-- At a name, a frame provides what `Frame.dom` does: the rest are region atoms. -/
+theorem Frame.provides_nm {F : Frame} {N : Name} (h : F.provides (.nm N)) : F.dom (.nm N) := by
+  rcases h with h | ⟨p, -, h'⟩
+  · exact h
+  · cases h'
 /-- What the frames of `E` provide. -/
 def domE : List Frame → Row
   | [] => Row.none
-  | F :: E => Row.union F.dom (domE E)
+  | F :: E => Row.union F.provides (domE E)
 
 theorem domE_cons (F : Frame) (E : List Frame) (n : Elem) :
-    domE (F :: E) n ↔ F.dom n ∨ domE E n := Iff.rfl
+    domE (F :: E) n ↔ F.provides n ∨ domE E n := Iff.rfl
 
-theorem domE_nm (E : List Frame) (N : Name) : domE E (.nm N) ↔ ∃ F ∈ E, F.installs N := by
-  induction E with
-  | nil => simp [domE, Row.none]
-  | cons F E ih => simp only [domE, Row.union, Frame.dom, ih, List.mem_cons]; grind
+/-- No frame provides a row variable. -/
+theorem Frame.provides_rv {F : Frame} {a : Atom} {G : Name → Prop} : ¬ F.provides (.rv a G) := by
+  rintro (h | ⟨_, _, h⟩)
+  · exact h
+  · cases h
 
+theorem domE_rv : ∀ {E : List Frame} {a : Atom} {G : Name → Prop}, ¬ domE E (.rv a G)
+  | [], _, _, h => h
+  | _ :: _, _, _, h => h.elim Frame.provides_rv domE_rv
 theorem not_value_plug {r : Tm} (hr : ¬ Value r) (F : Frame) : ¬ Value (F.plug r) := by
   intro hv
   cases F <;> simp only [Frame.plug] at hv

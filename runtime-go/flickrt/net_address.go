@@ -7,10 +7,10 @@ import (
 	"strings"
 )
 
-// Effect's network addresses (effect/net NetAddress, IpInterface,
-// IpNetwork): parsed from text with Effect's rules and messages, and
-// written back in Effect's canonical form. An IP address is a netip.Addr
-// (an IPv6 one never unmapped), a MAC address a macAddress.
+// Network addresses (NetAddress, IpInterface, IpNetwork): parsed from text
+// with the rules and messages of the JS target, and written back in
+// canonical form. An IP address is a netip.Addr (an IPv6 one never
+// unmapped), a MAC address a macAddress.
 
 type macAddress [6]byte
 
@@ -30,7 +30,7 @@ var (
 	digitsOnly = regexp.MustCompile(`^\d+$`)
 )
 
-// An address parser: the value, or the message of Effect's NetAddressError.
+// An address parser: the value, or the message of a NetAddressError.
 type netParse func(string) (Value, string)
 
 func ipv4FromString(s string) (netip.Addr, string) {
@@ -157,8 +157,9 @@ func formatMac(m macAddress) string {
 	return strings.Join(parts, ":")
 }
 
-// formatIp is Effect's: an IPv4-mapped address in dotted form, otherwise
-// the longest run of two or more zero segments compressed.
+// formatIp is the canonical text of an address: an IPv4-mapped address in
+// dotted form, otherwise the longest run of two or more zero segments
+// compressed.
 func formatIp(a netip.Addr) string {
 	if a.Is4() {
 		return a.String()
@@ -197,7 +198,7 @@ func formatIp(a netip.Addr) string {
 	return hex(seg[:bestStart]) + "::" + hex(seg[bestStart+bestLength:])
 }
 
-// Effect's predicates of addresses.
+// The predicates of addresses.
 func ipv4Value(a netip.Addr) uint32 {
 	b := a.As4()
 	return uint32(b[0])<<24 | uint32(b[1])<<16 | uint32(b[2])<<8 | uint32(b[3])
@@ -231,8 +232,8 @@ func isPrivate(a netip.Addr) bool {
 }
 func isUniqueLocal(a netip.Addr) bool { return a.As16()[0]&0xfe == 0xfc }
 
-// parseWithPrefix is Effect's `address/prefix`; without a slash the
-// prefix is the address's width unless it is required.
+// parseWithPrefix reads `address/prefix`; without a slash the prefix is
+// the address's width unless it is required.
 func parseWithPrefix(s string, required bool, parse func(string) (netip.Addr, string)) (*ipInterface, string) {
 	slash := strings.Index(s, "/")
 	text, prefix := s, -1

@@ -6,16 +6,16 @@ import (
 	"sync"
 )
 
-// Request is Effect's: a request is made of its payload, so equal payloads
-// make equal requests, and a resolver answers the requests made at the
-// same time in one batch.
+// Request: a request is made of its payload, so equal payloads make equal
+// requests, and a resolver answers the requests made at the same time in
+// one batch.
 //
-// Effect runs fibers one at a time in the order they were scheduled, so
-// the requests of fibers forked together reach their resolver in that
-// order, and a batch's fiber runs after them. Here they arrive at once, in
-// any order: a resolver keeps them in a window, which a fiber taking its
-// turn (startup.go) after them sorts into batches as Effect's `addEntry`
-// would have, in the order the requesting fibers were forked.
+// The JS runtime runs fibers one at a time in the order they were
+// scheduled, so the requests of fibers forked together reach their
+// resolver in that order, and a batch's fiber runs after them. Here they
+// arrive at once, in any order: a resolver keeps them in a window, which a
+// fiber taking its turn (startup.go) after them sorts into batches, in the
+// order the requesting fibers were forked.
 
 var requestTag = Tag("Request.Request.Request")
 
@@ -89,8 +89,8 @@ func (b *batch) dropPending(e *requestEntry) bool {
 	return i >= 0
 }
 
-// A resolver is Effect's RequestResolver; `window` is the requests not
-// yet sorted into its batches, `pending` its batches still collecting.
+// A resolver answers requests in batches; `window` is the requests not yet
+// sorted into its batches, `pending` its batches still collecting.
 type resolver struct {
 	delay        func(fb *Fiber)
 	batchKey     func(fb *Fiber, e *requestEntry) Value
@@ -155,8 +155,8 @@ func (r *resolver) sort(fb *Fiber) {
 	}
 }
 
-// addEntry is Effect's: it adds an entry to its batch, forking the batch's
-// fiber for a new one, or running the batch at once when it takes no more.
+// addEntry adds an entry to its batch, forking the batch's fiber for a new
+// one, or running the batch at once when it takes no more.
 func (r *resolver) addEntry(fb *Fiber, e *requestEntry) {
 	if r.preCheck != nil && !r.preCheck(fb, e) {
 		return
@@ -176,7 +176,7 @@ func (r *resolver) addEntry(fb *Fiber, e *requestEntry) {
 		requests.Unlock()
 		return
 	}
-	// Effect runs the batch at once, before another entry comes
+	// the batch runs at once, before another entry comes
 	r.drop(b)
 	previous := b.fiber
 	b.fork(fb, func(*Fiber) {})
@@ -287,7 +287,7 @@ func RequestComplete(_ *Fiber, exit, entry Value) Value {
 }
 
 // RequestCompleteEffect completes `entry` as `task` ends; a defect or an
-// interruption fails the call instead, as Effect's `matchEffect` lets them.
+// interruption fails the call instead.
 func RequestCompleteEffect(fb *Fiber, task, entry Value) Value {
 	exit := exitOf(fb, task)
 	if exit.cause.has(causeDie) || exit.cause.has(causeInterrupt) {

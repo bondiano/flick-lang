@@ -2,7 +2,10 @@
 // adapters where a Flick value differs from what Effect takes.
 import { type Duration, Effect, FileSystem, type Layer, Logger, type LogLevel, Option } from "effect";
 
-import { RawCause } from "../cause.ts";
+import { RawCause as HostRawCause } from "../cause.ts";
+import { RawCause as NativeRawCause } from "@flick-lang/runtime/rt/outcome";
+import { inNativeFiber } from "@flick-lang/runtime/rt/fiber";
+import { causeFromEffect } from "../bridge.ts";
 import type { Data } from "../data.ts";
 import { inspect } from "../host.ts";
 import { tag } from "@flick-lang/runtime/tags";
@@ -24,13 +27,17 @@ export const flickMake = <O>(
   f: (options: {
     readonly message: ReadonlyArray<string>;
     readonly logLevel: LogLevel.LogLevel;
-    readonly cause: RawCause;
+    readonly cause: HostRawCause | NativeRawCause;
     readonly date: number;
   }) => O,
-): AnyLogger<O> =>
-  Logger.make((o) =>
-    f({ message: parts(o.message), logLevel: o.logLevel, cause: new RawCause(o.cause), date: o.date.getTime() }),
+): AnyLogger<O> => {
+  const native = inNativeFiber();
+  return Logger.make((o) =>
+    f({ message: parts(o.message), logLevel: o.logLevel,
+      cause: native ? new NativeRawCause(causeFromEffect(o.cause)) : new HostRawCause(o.cause),
+      date: o.date.getTime() }),
   );
+};
 
 /** `Logger.format_structured`: `Logger.Structured`. */
 export const flickFormatStructured = /*#__PURE__*/ Logger.map(Logger.formatStructured, (s) => ({

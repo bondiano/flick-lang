@@ -1,0 +1,36 @@
+// Generic code checks as under the default discipline: what a value of a
+// type variable holds is no use of a region, and an instance method may
+// write the signature its class gives it.
+module App.Generic exposing (..)
+
+type WriterT w (m : Type -> Type) a = WriterT (m (a, w))
+
+run : (WriterT w m a)^c -> (m (a, w))^c
+let run (WriterT action) = action
+
+instance Functor m => Functor (WriterT w m) =
+  let map f (WriterT action) = WriterT (map (fun (value, output) -> (f value, output)) action)
+
+instance (Monoid w, Applicative m) => Applicative (WriterT w m) =
+  let pure value = WriterT (pure (value, empty))
+  let map2 f (WriterT left) (WriterT right) =
+    WriterT (map2 (fun (a, prefix) (b, suffix) -> (f a b, combine prefix suffix)) left right)
+
+instance (Monoid w, Monad m) => Monad (WriterT w m) =
+  let flat_map f (WriterT action) =
+    WriterT
+      (do {
+        (value, prefix) <- action
+        (next, suffix) <- run (f value)
+        pure (next, combine prefix suffix)
+      })
+
+class Mapper (f : Type -> Type) =
+  over : (forall v. a^v -> b)^c -> (f a)^d -> (f b)^(c + d)
+
+instance Mapper (Eff r e) =
+  over : (forall v. a^v -> b)^c -> (Eff r e a)^d -> (Eff r e b)^(c + d)
+  let over f eff = task {
+    let _ : Option b = None
+    f (await eff)
+  }

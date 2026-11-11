@@ -132,11 +132,16 @@ impl<'a> Printer<'a> {
         !line.contains('\n') && self.column + line.chars().count() <= WIDTH
     }
 
-    /// `class`, `instance` and `service`: the head, then the members one per
-    /// line, one level in.
+    /// Declarations with members, including anonymous static parameterized modules: the
+    /// head, then the members one per line, one level in.
     pub fn class(&mut self, n: &'a Node) -> Doc<'a> {
         let a = self.a;
-        let (Some(eq), Some(members)) = (position(n, K::Eq), n.nodes().last()) else {
+        let separator = if n.kind == K::ModuleParamExpr {
+            K::Arrow
+        } else {
+            K::Eq
+        };
+        let (Some(eq), Some(members)) = (position(n, separator), n.nodes().last()) else {
             return self.generic(n);
         };
         if members.kind != K::Members {

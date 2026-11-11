@@ -8,6 +8,7 @@ use super::{Checker, Ref, block_statements, unparen, words};
 use crate::diagnostics::{Diagnostic, Severity, codes};
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
+use crate::syntax::patterns;
 use crate::types::lang::{self, Lang};
 
 /// `var <- source`: one step of a chain.
@@ -29,6 +30,12 @@ impl Checker<'_> {
             body = rest;
         }
         if steps.len() < 2
+            || self.contains_mutable(body)
+            || lexical_exit(body)
+            || steps
+                .iter()
+                .skip(1)
+                .any(|s| self.contains_mutable(s.source) || lexical_exit(s.source))
             || steps
                 .iter()
                 .any(|step| self.source_of(unparen(step.source)).trim().contains('\n'))
@@ -137,9 +144,6 @@ impl Checker<'_> {
     /// with `let` unless it is a whole statement. Not offered when the call
     /// uses a variable the block binds.
     pub(super) fn bind_before(&mut self, node: &Node) {
-        if !cfg!(feature = "diagnostic-fixes") {
-            return;
-        }
         let (start, end) = node.range();
         let line = self.text[..start as usize].rfind('\n').map_or(0, |i| i + 1);
         let indent = self.text[line..start as usize].to_owned();
@@ -202,9 +206,7 @@ impl Checker<'_> {
 /// The variables the statements of the `do` block `node` bind.
 fn binders(node: &Node, text: &str) -> Vec<String> {
     fn vars(node: &Node, text: &str, out: &mut Vec<String>) {
-        if node.kind == K::VarPat {
-            out.push(node.text(text).trim().to_owned());
-        }
+        out.extend(patterns::binder(node).map(|name| name.text(text).to_owned()));
         node.nodes().for_each(|n| vars(n, text, out));
     }
     let mut out = Vec::new();
@@ -266,3 +268,17 @@ fn single(node: &Node) -> &Node {
 #[cfg(test)]
 #[path = "chains_tests.rs"]
 mod tests;
+
+/// An existing nested function or loop keeps its own exits when moved.
+fn lexical_exit(node: &Node) -> bool {
+    if matches!(node.kind, K::BreakExpr | K::ContinueExpr) {
+        return true;
+    }
+    if matches!(
+        node.kind,
+        K::FunExpr | K::TaskExpr | K::LoopExpr | K::WhileExpr | K::ForExpr
+    ) {
+        return false;
+    }
+    node.nodes().any(lexical_exit)
+}

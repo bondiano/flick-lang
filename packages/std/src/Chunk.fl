@@ -1,4 +1,4 @@
-/// Effect's immutable `Chunk`, for repeated concatenation.
+/// An immutable sequence for repeated concatenation.
 module Chunk exposing (
   Chunk,
   NonEmptyChunk,
@@ -81,5 +81,5 @@ import Chunk.Ops exposing (..)
 
 /// A chunk as a JSON array of its items.
 json : PureCodec Json a -> PureCodec Json (Chunk a)
-foreign pure json from "@flick-lang/effect-ts/effect/Schema" "flickChunkJson"
+foreign pure json from "flick:Schema" "flickChunkJson"
   reviewed "effect@4.1.2 sha256:2826521488c26924"

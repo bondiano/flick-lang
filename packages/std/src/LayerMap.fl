@@ -1,6 +1,5 @@
-/// Effect's `LayerMap`: layers looked up by key, each built on first use,
-/// shared while in use and released when idle or when the owner of region
-/// `s` closes.
+/// Layers looked up by key, each built on first use, shared while in use
+/// and released when idle or when the owner of region `s` closes.
 module LayerMap exposing (..)
 
 import Duration
@@ -19,24 +18,24 @@ type alias RecordOptions = { idleTimeToLive : Option Duration.Duration; preload 
 
 /// A map building the layer `lookup key` for each key it is asked for.
 make : (k -> Layer ri e ro) -> Options k ->{Scope s | ri; e} LayerMap s k e ro
-foreign effect make from "@flick-lang/effect-ts/effect/LayerMap" "flickMake"
+foreign effect make from "flick:LayerMap" "flickMake"
   reviewed "effect@4.1.2 sha256:b3f9d448a158acb0"
 
 /// A map of the layers of `layers`, by name.
 from_record :
   List (String, Layer ri e ro) -> RecordOptions ->{Scope s | ri; e} LayerMap s String e ro
-foreign effect from_record from "@flick-lang/effect-ts/effect/LayerMap" "flickFromRecord"
+foreign effect from_record from "flick:LayerMap" "flickFromRecord"
   reviewed "effect@4.1.2 sha256:9ffecdbbd834efcf"
 
 /// The services of `key` as a layer: a `provide` of it builds them or
 /// shares those already built.
 get : k -> LayerMap s k e ro -> (Layer none e ro)^{s}
-foreign pure get from "@flick-lang/effect-ts/effect/LayerMap" "flickGet"
+foreign pure get from "flick:LayerMap" "flickGet"
   arity 1
   retention owner
 
 /// Drops the services of `key`: the next use builds them anew.
 invalidate : k -> LayerMap s k e ro ->{Async} Unit
-foreign effect invalidate from "@flick-lang/effect-ts/effect/LayerMap" "flickInvalidate"
+foreign effect invalidate from "flick:LayerMap" "flickInvalidate"
   arity 1
   retention call

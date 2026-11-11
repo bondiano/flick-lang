@@ -6,7 +6,7 @@ import (
 	"strconv"
 )
 
-// Effect's Graph flows, cuts, spanning forests and transitive reduction.
+// Graph flows, cuts, spanning forests and transitive reduction.
 
 type flowSolution struct {
 	value      float64
@@ -14,8 +14,8 @@ type flowSolution struct {
 	sourceSide []bool
 }
 
-// solveFlow is Effect's `solveMaximumFlow`: Edmonds-Karp over residual
-// arcs, a self-loop carrying none.
+// solveFlow is a maximum flow: Edmonds-Karp over residual arcs, a
+// self-loop carrying none.
 func (g *Graph) solveFlow(fb *Fiber, config Value) flowSolution {
 	if g.kind == "undirected" {
 		graphFail("Cannot compute flow of undirected graph")
@@ -132,8 +132,8 @@ func GraphMinimumCut(fb *Fiber, config, v Value) Value {
 	})
 }
 
-// GraphMinimumSpanningForest is Effect's Kruskal: edges by weight, ties in
-// edge order, an infinite weight never taken.
+// GraphMinimumSpanningForest is Kruskal: edges by weight, ties in edge
+// order, an infinite weight never taken.
 func GraphMinimumSpanningForest(fb *Fiber, cost, v Value) Value {
 	return graphAttempt(func() Value {
 		g := graphOf(v)
@@ -189,8 +189,7 @@ func GraphMinimumSpanningForest(fb *Fiber, cost, v Value) Value {
 	})
 }
 
-// keepEdges is the graph of all the nodes and the selected edges, as
-// Effect's `fromSnapshot` of them.
+// keepEdges is the graph of all the nodes and the selected edges.
 func (g *Graph) keepEdges(selected []bool) *Graph {
 	out := newGraph(g.kind)
 	out.nodes = append([]graphNode{}, g.nodes...)
@@ -203,7 +202,7 @@ func (g *Graph) keepEdges(selected []bool) *Graph {
 }
 
 // GraphTransitiveReduction keeps the first edge from each node to each
-// other that no longer path joins, as Effect's `transitiveReduction`.
+// other that no longer path joins.
 func GraphTransitiveReduction(v Value) Value {
 	return graphAttempt(func() Value {
 		g := graphOf(v)

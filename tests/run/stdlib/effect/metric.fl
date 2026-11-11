@@ -1,4 +1,4 @@
-// Effect's `Metric`: each kind of metric updated and read back, through
+// `Metric`: each kind of metric updated and read back, through
 // `value` and `snapshot`, and the metrics of the fiber runtime.
 module App.Main exposing (main)
 
@@ -39,7 +39,7 @@ let started () =
       (Metric.snapshot ())
   List.sum counts
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Async; AppError} Unit
 let main () =
   requests |> Metric.update 1
   requests |> Metric.update 2

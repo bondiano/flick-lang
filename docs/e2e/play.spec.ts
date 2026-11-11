@@ -1,35 +1,52 @@
 // The playground in a browser, with the real WebAssembly compiler.
-import { expect, type Page, test } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 
-/** The compiler has loaded and checked the first example, and the editor has opened. */
-const ready = async (page: Page): Promise<void> => {
-  await expect(page.locator(".fp-status")).toContainText("0.1.0", { timeout: 60_000 });
-  await expect(page.locator(".fp-cm .cm-content")).toBeVisible();
-};
-
-/** Moves the pointer onto the first `word` in the editor's line that holds `line`. */
-const hoverWord = async (page: Page, line: string, word: string): Promise<void> => {
-  const box = await page.locator(".cm-line", { hasText: line }).first().evaluate((element, word) => {
-    const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
-    for (let node = walker.nextNode(); node !== null; node = walker.nextNode()) {
-      const at = node.textContent?.indexOf(word) ?? -1;
-      if (at < 0) continue;
-      const range = document.createRange();
-      range.setStart(node, at);
-      range.setEnd(node, at + word.length);
-      const { x, y, width, height } = range.getBoundingClientRect();
-      return { x: x + width / 2, y: y + height / 2 };
-    }
-    throw new Error(`no ${word} in the line`);
-  }, word);
-  await page.mouse.move(box.x, box.y);
-};
+import { hoverWord, ready, replaceSource } from "./helpers.ts";
 
 test("Run prints what the program writes", async ({ page }) => {
   await page.goto("/flick-lang/play/");
   await ready(page);
   await page.getByRole("button", { name: "Run", exact: true }).click();
   await expect(page.locator(".fp-output")).toContainText("Hello from Flick", { timeout: 60_000 });
+});
+
+test("an inline module compiles and runs in the browser", async ({ page }) => {
+  await page.goto("/flick-lang/play/");
+  await ready(page);
+  await page.locator(".cm-content").click();
+  await page.keyboard.press("ControlOrMeta+A");
+  await page.keyboard.insertText("module Main exposing (main)\n\nmodule Child exposing (answer) =\n  let answer = 42\n\nmain : Unit ->{} Unit\nlet main () = Platform.stdout_line (show Child.answer)\n");
+  await expect(page.locator(".fp-status")).toContainText("Type-checked", { timeout: 30_000 });
+  await page.getByRole("button", { name: "Run", exact: true }).click();
+  await expect(page.locator(".fp-output")).toContainText("42", { timeout: 60_000 });
+});
+
+test("higher-order signatures retain dependent type names in browser hover", async ({ page }) => {
+  await page.goto("/flick-lang/play/");
+  await ready(page);
+  await page.locator(".cm-content").click();
+  await page.keyboard.press("ControlOrMeta+A");
+  await page.keyboard.insertText("module Main exposing (main, Factory)\n\ntype module Input =\n  type Key\n\ntype module Output =\n  type Value\n\ntype module Factory = (K : Input) -> Output with type Value = K.Key\n\nmain : Unit ->{} Unit\nlet main () = Platform.stdout_line \"42\"\n");
+  await expect(page.locator(".fp-status")).toContainText("Type-checked", { timeout: 30_000 });
+  await hoverWord(page, "type module Factory", "Factory");
+  await expect(page.locator(".cm-tooltip-hover")).toContainText("K.Key");
+  await page.mouse.move(0, 0);
+  await page.getByRole("button", { name: "Run", exact: true }).click();
+  await expect(page.locator(".fp-output")).toContainText("42", { timeout: 60_000 });
+});
+
+test("a higher-order module captures one prefix and updates after an edit", async ({ page }) => {
+  await page.goto("/flick-lang/play/");
+  await ready(page);
+  const source = "module Main exposing (main)\n\ntype module Input =\n  identity : forall a. a -> a\n\ntype module Output =\n  answer : Int\n\noffset : Int\nlet offset = 1\n\nmodule Make(K : Input) : Output =\n  answer : Int\n  let answer = K.identity (41 + offset)\n\nmodule Chosen = Make(Prelude)\n\nmain : Unit ->{} Unit\nlet main () = Platform.stdout_line (show Chosen.answer)\n";
+  for (const [text, expected] of [[source, "42"], [source.replace("offset = 1", "offset = 2"), "43"]] as const) {
+    await page.locator(".cm-content").click();
+    await page.keyboard.press("ControlOrMeta+A");
+    await page.keyboard.insertText(text);
+    await expect(page.locator(".fp-status")).toContainText("Type-checked", { timeout: 30_000 });
+    await page.getByRole("button", { name: "Run", exact: true }).click();
+    await expect(page.locator(".fp-output")).toContainText(expected, { timeout: 60_000 });
+  }
 });
 
 test("a shared program opens without running and a draft survives reload", async ({ page, context }) => {
@@ -84,7 +101,7 @@ test("a signature lesson checks a correction and remembers completion", async ({
   await expect(page.locator(".fp-lesson")).toContainText("String.length returns Int");
   await page.getByRole("button", { name: "Show solution" }).click();
   await page.getByRole("button", { name: "Check answer" }).click();
-  await expect(page.locator(".fp-lesson")).toContainText("Correct. The signature says String -> Int", { timeout: 30_000 });
+  await expect(page.locator(".fp-lesson")).toContainText("Correct. The signature and output match", { timeout: 30_000 });
   await page.reload();
   await expect(page.locator(".fp-cm .cm-content")).toBeVisible({ timeout: 60_000 });
   await expect(page.locator(".fp-lesson")).toContainText("Lesson completed");
@@ -214,3 +231,96 @@ test("a quick fix adds the forgotten case", async ({ page }) => {
   await expect(page.locator(".cm-content")).toContainText("| Paused ->");
   await expect(page.locator(".fp-status")).toContainText("Type-checked", { timeout: 30_000 });
 });
+
+for (const locale of ["en", "ru"]) {
+  test(`second signature lesson isolates progress and rejects a wrong answer (${locale})`, async ({ page }) => {
+    const ru = locale === "ru";
+    await page.goto(`/flick-lang/${ru ? "ru/" : ""}tour/arguments/`);
+    await expect(page.locator(".fp-cm .cm-content")).toBeVisible({ timeout: 60_000 });
+    const lesson = page.locator(".fp-lesson");
+    const check = page.getByRole("button", { name: ru ? "Проверить" : "Check answer", exact: true });
+    await check.click();
+    await expect(lesson).toContainText(ru ? "Сначала исправьте ошибки" : "Fix the compiler errors");
+    await page.getByRole("button", { name: ru ? "Показать решение" : "Show solution" }).click();
+    await expect(lesson).not.toContainText(ru ? "Урок пройден" : "Lesson completed");
+    await replaceSource(page, 'module Main exposing (main, size_of)\n\nsize_of : String -> Int\nlet size_of text = String.length text\n\nmain : Unit ->{} Unit\nlet main () = Platform.stdout_line "5"\n');
+    await check.click();
+    await expect(lesson).toContainText(ru ? "Вывод не совпадает" : "The output does not match");
+    await page.getByRole("button", { name: ru ? "Показать решение" : "Show solution" }).click();
+    await check.click();
+    await expect(lesson).toContainText(ru ? "Верно." : "Correct.");
+    expect(await page.evaluate(() => localStorage.getItem("flick.lesson.signatures.02.done"))).toBe("1");
+    expect(await page.evaluate(() => localStorage.getItem("flick.lesson.signatures.01.done"))).toBeNull();
+    await page.reload();
+    await expect(lesson).toContainText(ru ? "Урок пройден" : "Lesson completed");
+    await page.getByRole("button", { name: ru ? "Сбросить" : "Reset", exact: true }).click();
+    await expect(page.locator(".cm-content")).toContainText("size_of : Int -> Int");
+  });
+}
+
+test("exercise checks resolve a re-export through the worker declaration graph", async ({ page }) => {
+  await page.goto("/flick-lang/tour/signatures/");
+  await expect(page.locator(".fp-cm .cm-content")).toBeVisible({ timeout: 60_000 });
+  await page.evaluate(() => {
+    const element = document.getElementById("flick-lesson");
+    if (!element) throw new Error("missing exercise contract");
+    const exercise = JSON.parse(element.textContent ?? "{}");
+    exercise.check.export = "length";
+    element.textContent = JSON.stringify(exercise);
+  });
+  await replaceSource(page, 'module Main exposing (main, length)\nimport String exposing (length)\nmain : Unit ->{} Unit\nlet main () = Platform.stdout_line (show (length "Flick"))\n');
+  await page.getByRole("button", { name: "Check answer" }).click();
+  await expect(page.locator(".fp-lesson")).toContainText("Correct. The signature and output match.");
+});
+
+test("local mutation, loops and typed errors run in the browser", async ({ page }) => {
+  await page.goto("/flick-lang/play/");
+  await ready(page);
+  await replaceSource(page, `module Main exposing (main)
+
+type error Missing = Missing
+
+main : Unit ->{} Unit
+let main () =
+  let mut i = 0
+  while i < 3 do i = i + 1
+  let answer = loop {
+    if i == 3 then break 7
+    break 0
+  }
+  let mut visited = 0
+  for {
+    x <- [1, 2]
+    y <- (if x == 1 then continue else [x])
+  } do visited = visited + y
+  let after =
+    try
+      i = i + 1
+      i = from_result (Err Missing)
+      i
+    with
+    | Missing -> i
+  Platform.stdout_line (show (answer, after, visited))
+`);
+  await expect(page.locator(".fp-status")).toContainText("Type-checked", { timeout: 30_000 });
+  await page.getByRole("button", { name: "Run", exact: true }).click();
+  await expect(page.locator(".fp-output")).toContainText("(7, 4, 2)", { timeout: 60_000 });
+});
+
+for (const lang of ["en", "ru"]) {
+  test(`loop challenges run from the gallery (${lang})`, async ({ page }) => {
+    await page.goto(lang === "ru" ? "/flick-lang/ru/play/" : "/flick-lang/play/");
+    await ready(page);
+    const examples = [
+      { name: lang === "ru" ? "Бинарный поиск" : "Binary search", output: "Some 4\nNone\nNone" },
+      { name: lang === "ru" ? "Лучшая сделка с акцией" : "Best stock trade", output: "5\n0\n0" },
+      { name: lang === "ru" ? "Число-палиндром" : "Palindrome number", output: "true\ntrue\nfalse\nfalse\ntrue" },
+    ];
+    for (const example of examples) {
+      await page.locator(".fp-gallery-button").click();
+      await page.locator(".fp-gallery").getByRole("button", { name: example.name, exact: true }).click();
+      await page.getByRole("button", { name: lang === "ru" ? "Запустить" : "Run", exact: true }).click();
+      await expect(page.locator(".fp-output")).toContainText(example.output, { timeout: 60_000 });
+    }
+  });
+}

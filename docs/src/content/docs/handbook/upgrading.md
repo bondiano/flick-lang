@@ -45,9 +45,9 @@ change needs.
 | [`LogLevel` is an enum](#loglevel-is-an-enum) | no | `FLICK-T001` |
 | [Plugins follow the compiler's interface](#plugins-follow-the-compilers-interface) | no | — |
 | [`CallSite` replaces the `_at` writes](#callsite-replaces-the-_at-writes) | no | `FLICK-T001` |
-| [A closure over an error value says so](#a-closure-over-an-error-value-says-so) | no | `FLICK-G001` |
+| [Regions are checked by use](#regions-are-checked-by-use) | no | `FLICK-G002`, `FLICK-G003` |
 | [Rust 1.95 builds the compiler](#rust-195-builds-the-compiler) | no | — |
-| [`mut` is a keyword](#mut-is-a-keyword) | no | `FLICK-S007` |
+| [`mut` is a keyword](#mut-is-a-keyword) | no | `FLICK-S007`, `FLICK-S016` |
 
 `flick check --fix page.md` rewrites the `flick` code blocks of a Markdown
 page, each checked on its own.
@@ -305,11 +305,13 @@ passes on a row variable names `Detached r` in its signature, and `flick check
 
 ## The IR has no `Try`, `Provide`, `Scope` or `Operation`
 
-A reader of `flick build --emit-ir` meets a new version, `0.5.0`. A `try` with
+A reader of `flick build --emit-ir` meets a new version, `0.7.0`. A `try` with
 arms only for errors is a `Handle`, `provide layer { body }` is a call of
 `Layer.run`, `scope s { body }` is a call of `Scope.run`, and an operation is
 `Perform { effect, op }`. A `let mut` variable is a `Stmt::Var`, its assignment
-a `Stmt::Assign` and a read of it an `ExprKind::Var`. Source code does not change.
+a `Stmt::Assign` and a read of it an `ExprKind::Var`. Sequential loops use
+`ControlLoop`; `LoopExit` records the target and the optional break value.
+Source code does not change.
 
 ## `mut` is a keyword
 
@@ -318,6 +320,10 @@ assigns (see [Variables](../../reference/types/#variables)). The word `mut`
 is a keyword now: a parameter, a value or a record field named `mut` is
 `FLICK-S007`, or `FLICK-S016` for `let mut = …`; rename it. After a dot,
 `r.mut` is still a name.
+
+`break` and `continue` are also reserved for local loop control; rename bare
+bindings with these names. `loop` and `while` are contextual words, so existing
+names such as `Loop.loop` and `Schedule.while` keep working.
 
 ## Instances belong to one package
 
@@ -372,7 +378,7 @@ constructors declared from least to most severe:
 | 0.1.0 | 0.2 |
 | - | - |
 | `LogLevel.all`, `trace`, `debug`, `info`, `warn`, `error`, `fatal` | `LogLevel.All`, `Trace`, `Debug`, `Info`, `Warn`, `Error`, `Fatal` |
-| `LogLevel.none_` | `LogLevel.Off`, whose literal is Effect's `"None"` |
+| `LogLevel.none_` | `LogLevel.Off`, whose literal is `"None"` |
 | `LogLevel.values` | `LogLevel.all`, in order of severity |
 | `LogLevel.name level` | `LogLevel.value level` |
 | `LogLevel.get_ordinal a < LogLevel.get_ordinal b` | `compare a b`, the derived `Ord` |
@@ -397,35 +403,27 @@ are gone (`FLICK-T001`): call `Atom.set atom value`, or give your own
 function `CallSite =>` to report its caller's place. A serializable atom's
 key is still `Module.name`, now its `CallSite.definition`.
 
-## A closure over an error value says so
+## Regions are checked by use
 
-A value of `Errors e`, `Exit e a` or `Failure e` holds what the errors of
-`e` hold, and an error-row variable `e` is held as a type variable is. In
-0.1.0 such a value held nothing, so a closure over a caught error could
-hide a region its payload has. A curried stage keeps the variable, so
-`keep : forall e. Errors e -> (Unit -> Unit)` still checks and reads as
-holding `e`. A bare type that is no stage, such as a field, now rejects the
-closure:
+The checker asks where a value **uses** a region, not what it **holds** (see
+[Regions and captures](../../reference/regions/)). A closure, a task or a
+constructor may now keep a handle past the end of its `scope` while nothing it
+runs uses the handle there, so programs that were `FLICK-G001` for that alone
+are accepted. A closure that reads a handle after its scope is `FLICK-G002`,
+where it was `FLICK-G001`. A later stage of a curried function holds nothing
+of its earlier parameters; it needs live what they reach, which the checker
+reads into the signature.
 
-```flick fail G001
-keep_field : forall e. Errors e -> { run : Unit -> Unit }
-let keep_field x = { run = fun () -> ignore x }
-```
-
-```text
-error[FLICK-G001]: this function uses `x`, which holds `e`, but the expected type `Unit -> Unit` holds no captures
-```
-
-Name what it holds with a capture row, as for a type variable (see
-[Captures](../../reference/regions/#captures)):
-
-```flick
-keep_field : forall c e. (Errors e)^c -> { run : (Unit -> Unit)^c }
-let keep_field x = { run = fun () -> ignore x }
-```
-
-`flick check --fix` does not rewrite it: the capture row goes into the
-`forall`, the parameter and the field at once.
+- **`.iface` files** of the earlier discipline are rejected: their version is
+  now 12. Rebuild the libraries.
+- **A component** may use its instance's region in its setup again: `Setup s`
+  keeps `s` live. Work that `Ui.on_mount` and `Ui.watch` start must use only
+  what outlives the instance (`FLICK-G003`); `Lifecycle` now names the
+  instance's region, `Lifecycle s`.
+- **A handler a program installs** for a service a region indexes needs the
+  region live where it is installed (`FLICK-G002`).
+- **`Option.map`** returns `(Option b)^c`: what the callback returns holds
+  nothing of its input.
 
 ## Rust 1.95 builds the compiler
 

@@ -4,8 +4,8 @@
 
 mod common;
 
-use std::io::{BufRead, BufReader, Write};
-use std::net::TcpListener;
+use std::io::{self, BufRead, BufReader, Write};
+use std::net::{TcpListener, TcpStream};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 use std::{fs, thread};
@@ -226,25 +226,47 @@ fn install_locked_refuses_a_dependency_the_lock_lacks() {
     assert!(!app.join("flick.lock").exists());
 }
 
-/// Serves `body` once at `http://127.0.0.1:<port>/geo.tgz`; the URL.
+/// Serves `body` at `http://127.0.0.1:<port>/geo.tgz` until it is asked for
+/// once; the URL. Any other request, such as the probe of a forwarder of
+/// local ports, gets the body too and does not count.
 fn serve_once(body: Vec<u8>) -> String {
     let listener = TcpListener::bind("127.0.0.1:0").expect("a port");
     let port = listener.local_addr().expect("address").port();
     thread::spawn(move || {
-        let (mut stream, _) = listener.accept().expect("a request");
-        let mut reader = BufReader::new(stream.try_clone().expect("clone"));
-        let mut line = String::new();
-        while reader.read_line(&mut line).is_ok_and(|n| n > 2) {
-            line.clear();
+        for mut stream in listener.incoming().map_while(Result::ok) {
+            let mut reader = BufReader::new(stream.try_clone().expect("clone"));
+            let mut request = String::new();
+            let _ = reader.read_line(&mut request);
+            let mut line = String::new();
+            while reader.read_line(&mut line).is_ok_and(|n| n > 2) {
+                line.clear();
+            }
+            let head = format!(
+                "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                body.len()
+            );
+            let _ = stream.write_all(head.as_bytes());
+            let _ = stream.write_all(&body);
+            if request.starts_with("GET /geo.tgz ") {
+                break;
+            }
         }
-        let head = format!(
-            "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
-            body.len()
-        );
-        let _ = stream.write_all(head.as_bytes());
-        let _ = stream.write_all(&body);
     });
     format!("http://127.0.0.1:{port}/geo.tgz")
+}
+
+/// Asks the server of `url` for `/`, as a forwarder of local ports (WSL, an
+/// editor) does when a port starts listening.
+fn probe(url: &str) {
+    let address = url["http://".len()..]
+        .split('/')
+        .next()
+        .expect("an address");
+    let mut stream = TcpStream::connect(address).expect("the server");
+    stream
+        .write_all(b"GET / HTTP/1.1\r\nHost: probe\r\n\r\n")
+        .expect("a request");
+    let _ = io::copy(&mut stream, &mut io::sink());
 }
 
 #[test]
@@ -269,6 +291,7 @@ fn install_fetches_a_tarball_of_the_named_hash() {
         .expect("sha256sum runs");
     let sha = String::from_utf8_lossy(&sum.stdout)[..64].to_owned();
     let url = serve_once(bytes);
+    probe(&url);
     let manifest = APP.replace(
         "{ git = \"https://example.com/geo\", tag = \"v1.0.0\", subdir = \"lib\" }",
         &format!("{{ url = \"{url}\", sha256 = \"{sha}\" }}"),
@@ -370,7 +393,7 @@ const GREET_MAIN: &str = "module App.Main exposing (main)
 import Lib.Greet
 
 main : Unit ->{} Unit
-let main () = Console.log (Lib.Greet.hi \"there\")
+let main () = Platform.stdout_line (Lib.Greet.hi \"there\")
 ";
 
 /// The library `lib` of a foreign module on both targets, and an app of it

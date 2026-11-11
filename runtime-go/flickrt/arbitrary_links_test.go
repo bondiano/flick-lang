@@ -2,9 +2,9 @@ package flickrt
 
 import "testing"
 
-// The declarations Effect generates through a link, or cannot generate:
-// testdata/arbitrary_links.txt is Effect's output on Node for the same
-// schemas, seeds and properties (tools/go-arbitrary/gen.mjs).
+// The declarations generated through a link, or not generated at all:
+// testdata/arbitrary_links.txt is the output of the Effect library on Node
+// for the same schemas, seeds and properties (tools/go-arbitrary/gen.mjs).
 
 func arbLinkCases() []arbCase {
 	UseZones()

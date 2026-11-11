@@ -6,8 +6,13 @@ import { Arbitrary, Effect, Option } from "effect";
 import type { Schema } from "effect";
 
 import { tag } from "@flick-lang/runtime/tags";
+import { nativeArbitraryValue } from "../bridge.ts";
 
 export * from "effect/Arbitrary";
+
+/** Values of a native schema keep Flick's plain data ABI through generation and shrinking. */
+export const schema = <A>(value: Schema.Codec<A, unknown, unknown, unknown>): Arbitrary.Arbitrary<A> =>
+  Arbitrary.map(Arbitrary.schema(value), (item) => nativeArbitraryValue(value, item));
 
 const SAMPLE_ERROR = /*#__PURE__*/ tag("Arbitrary.SampleError.SampleError");
 const RETURNED_FALSE = /*#__PURE__*/ tag("Arbitrary.PropertyFailure.ReturnedFalse");
@@ -55,8 +60,11 @@ interface SchemaOptions<A> {
   readonly shrink: Option.Option<(value: A) => ReadonlyArray<A>>;
 }
 
-export const flickSchema = <A>(options: SchemaOptions<A>, schema: Schema.Codec<A, unknown, unknown, unknown>): Arbitrary.Arbitrary<A> =>
-  Arbitrary.schema(schema, { shrink: Option.getOrUndefined(options.shrink) });
+export const flickSchema = <A>(options: SchemaOptions<A>, codec: Schema.Codec<A, unknown, unknown, unknown>): Arbitrary.Arbitrary<A> =>
+  Arbitrary.map(
+    Arbitrary.schema(codec, { shrink: Option.getOrUndefined(options.shrink) }),
+    (item) => nativeArbitraryValue(codec, item),
+  );
 
 /** `Arbitrary.SampleOptions`. */
 interface SampleOptions {

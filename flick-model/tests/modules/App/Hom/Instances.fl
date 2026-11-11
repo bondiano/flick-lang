@@ -1,0 +1,6 @@
+module App.Hom.Instances exposing (Chosen, Anonymous, Alias)
+
+module Half = App.Hom.Return(App.Hom.Nest.Make)
+module Chosen = Half(App.Hom.Never)
+module Anonymous = (module (K : App.Hom.Contracts.Input) -> App.Hom.Make(K)) (App.Hom.Never)
+module Alias = Chosen

@@ -1,6 +1,6 @@
-/// Effect's `TxHashMap`: a hash map in a transactional cell, read and
-/// changed inside `Tx.atomically` transactions. Like `HashMap`, each map
-/// keeps the witness of its keys.
+/// A hash map in a transactional cell, read and changed inside
+/// `Tx.atomically` transactions. Like `HashMap`, each map keeps the witness
+/// of its keys.
 module TxHashMap exposing (..)
 
 import EqHash
@@ -12,148 +12,148 @@ type TxHashMap w k v
 
 /// A new empty map under the witness.
 empty : EqHash.EqHash w k ->{} TxHashMap w k v
-foreign effect empty from "@flick-lang/effect-ts/effect/TxHashMap" "flickEmpty"
+foreign effect empty from "flick:TxHashMap" "flickEmpty"
   reviewed "effect@4.1.2 sha256:53b731b352b246c1"
 
 /// A new map of the entries under the witness; a later entry wins.
 make : EqHash.EqHash w k -> List (k, v) ->{} TxHashMap w k v
-foreign effect make from "@flick-lang/effect-ts/effect/TxHashMap" "flickMake"
+foreign effect make from "flick:TxHashMap" "flickMake"
   reviewed "effect@4.1.2 sha256:037aefb04d62b017"
 
 /// A new map of the entries under the witness, as `make`.
 from_iterable : EqHash.EqHash w k -> List (k, v) ->{} TxHashMap w k v
-foreign effect from_iterable from "@flick-lang/effect-ts/effect/TxHashMap" "flickFromIterable"
+foreign effect from_iterable from "flick:TxHashMap" "flickFromIterable"
   reviewed "effect@4.1.2 sha256:d7d4ea783a68e734"
 
 /// The value of the key, if any.
 get : k -> TxHashMap w k v ->{Tx.Transaction} Option v
-foreign effect get from "@flick-lang/effect-ts/effect/TxHashMap" "flickGet"
+foreign effect get from "flick:TxHashMap" "flickGet"
   reviewed "effect@4.1.2 sha256:eb0c924c72728810"
 
 /// Sets the value of the key.
 set : k -> v -> TxHashMap w k v ->{Tx.Transaction} Unit
-foreign effect set from "@flick-lang/effect-ts/effect/TxHashMap" "flickSet"
+foreign effect set from "flick:TxHashMap" "flickSet"
   reviewed "effect@4.1.2 sha256:4eb264ca51c347a5"
 
 /// Whether the key has a value.
 has : k -> TxHashMap w k v ->{Tx.Transaction} Bool
-foreign effect has from "@flick-lang/effect-ts/effect/TxHashMap" "flickHas"
+foreign effect has from "flick:TxHashMap" "flickHas"
   reviewed "effect@4.1.2 sha256:917f3d20e24bee5d"
 
 /// Removes the key; whether it had a value.
 remove : k -> TxHashMap w k v ->{Tx.Transaction} Bool
-foreign effect remove from "@flick-lang/effect-ts/effect/TxHashMap" "flickRemove"
+foreign effect remove from "flick:TxHashMap" "flickRemove"
   reviewed "effect@4.1.2 sha256:5eed0b53204b2dbc"
 
 /// Removes every entry.
 clear : TxHashMap w k v ->{Tx.Transaction} Unit
-foreign effect clear from "@flick-lang/effect-ts/effect/TxHashMap" "flickClear"
+foreign effect clear from "flick:TxHashMap" "flickClear"
   reviewed "effect@4.1.2 sha256:4ba6b0ec9b7a0b72"
 
 /// The number of entries.
 size : TxHashMap w k v ->{Tx.Transaction} Int
-foreign effect size from "@flick-lang/effect-ts/effect/TxHashMap" "flickSize"
+foreign effect size from "flick:TxHashMap" "flickSize"
   reviewed "effect@4.1.2 sha256:ec154c2738f70495"
 
 /// Whether it has no entries.
 is_empty : TxHashMap w k v ->{Tx.Transaction} Bool
-foreign effect is_empty from "@flick-lang/effect-ts/effect/TxHashMap" "flickIsEmpty"
+foreign effect is_empty from "flick:TxHashMap" "flickIsEmpty"
   reviewed "effect@4.1.2 sha256:e6751a60fbc116f9"
 
 /// Whether it has an entry.
 is_non_empty : TxHashMap w k v ->{Tx.Transaction} Bool
-foreign effect is_non_empty from "@flick-lang/effect-ts/effect/TxHashMap" "flickIsNonEmpty"
+foreign effect is_non_empty from "flick:TxHashMap" "flickIsNonEmpty"
   reviewed "effect@4.1.2 sha256:98bd88f910b5fcd5"
 
 /// Replaces the value of the key, if it has one, with `f` of it; the old
 /// value.
 modify : k -> (v -> v)^c -> (TxHashMap w k v ->{Tx.Transaction} Option v)^c
-foreign effect modify from "@flick-lang/effect-ts/effect/TxHashMap" "flickModify"
+foreign effect modify from "flick:TxHashMap" "flickModify"
   retention call
   reviewed "effect@4.1.2 sha256:56732f6408593818"
 
 /// Sets or removes the key by `f` of its value.
 modify_at : k -> (Option v -> Option v)^c -> (TxHashMap w k v ->{Tx.Transaction} Unit)^c
-foreign effect modify_at from "@flick-lang/effect-ts/effect/TxHashMap" "flickModifyAt"
+foreign effect modify_at from "flick:TxHashMap" "flickModifyAt"
   retention call
   reviewed "effect@4.1.2 sha256:705c17efddeaf801"
 
 /// The keys, in no particular order.
 keys : TxHashMap w k v ->{Tx.Transaction} List k
-foreign effect keys from "@flick-lang/effect-ts/effect/TxHashMap" "flickKeys"
+foreign effect keys from "flick:TxHashMap" "flickKeys"
   reviewed "effect@4.1.2 sha256:777af1e47db5786f"
 
 /// The values, in no particular order.
 values : TxHashMap w k v ->{Tx.Transaction} List v
-foreign effect values from "@flick-lang/effect-ts/effect/TxHashMap" "flickValues"
+foreign effect values from "flick:TxHashMap" "flickValues"
   reviewed "effect@4.1.2 sha256:7b483d53accccb90"
 
 /// The entries, in no particular order.
 entries : TxHashMap w k v ->{Tx.Transaction} List (k, v)
-foreign effect entries from "@flick-lang/effect-ts/effect/TxHashMap" "flickEntries"
+foreign effect entries from "flick:TxHashMap" "flickEntries"
   reviewed "effect@4.1.2 sha256:15a2bba90aa16de5"
 
 /// The entries, as `entries`.
 to_entries : TxHashMap w k v ->{Tx.Transaction} List (k, v)
-foreign effect to_entries from "@flick-lang/effect-ts/effect/TxHashMap" "flickToEntries"
+foreign effect to_entries from "flick:TxHashMap" "flickToEntries"
   reviewed "effect@4.1.2 sha256:ef0c7fc27c9de462"
 
 /// The values, as `values`.
 to_values : TxHashMap w k v ->{Tx.Transaction} List v
-foreign effect to_values from "@flick-lang/effect-ts/effect/TxHashMap" "flickToValues"
+foreign effect to_values from "flick:TxHashMap" "flickToValues"
   reviewed "effect@4.1.2 sha256:80db30932f946361"
 
 /// The immutable map the transaction sees.
 snapshot : TxHashMap w k v ->{Tx.Transaction} HashMap.HashMap w k v
-foreign effect snapshot from "@flick-lang/effect-ts/effect/TxHashMap" "flickSnapshot"
+foreign effect snapshot from "flick:TxHashMap" "flickSnapshot"
   reviewed "effect@4.1.2 sha256:7ddf31d84c172557"
 
 /// Sets the entries of the immutable map.
 union : HashMap.HashMap w k v -> TxHashMap w k v ->{Tx.Transaction} Unit
-foreign effect union from "@flick-lang/effect-ts/effect/TxHashMap" "flickUnion"
+foreign effect union from "flick:TxHashMap" "flickUnion"
   reviewed "effect@4.1.2 sha256:7c36f7469be80486"
 
 /// Removes the keys.
 remove_many : List k -> TxHashMap w k v ->{Tx.Transaction} Unit
-foreign effect remove_many from "@flick-lang/effect-ts/effect/TxHashMap" "flickRemoveMany"
+foreign effect remove_many from "flick:TxHashMap" "flickRemoveMany"
   reviewed "effect@4.1.2 sha256:9a3acb3e98105d51"
 
 /// Sets the entries.
 set_many : List (k, v) -> TxHashMap w k v ->{Tx.Transaction} Unit
-foreign effect set_many from "@flick-lang/effect-ts/effect/TxHashMap" "flickSetMany"
+foreign effect set_many from "flick:TxHashMap" "flickSetMany"
   reviewed "effect@4.1.2 sha256:f331295e244ffdff"
 
 /// `get` with the key's hash, which must be the witness's hash of it.
 get_hash : k -> Int -> TxHashMap w k v ->{Tx.Transaction} Option v
-foreign effect get_hash from "@flick-lang/effect-ts/effect/TxHashMap" "flickGetHash"
+foreign effect get_hash from "flick:TxHashMap" "flickGetHash"
   reviewed "effect@4.1.2 sha256:2c9f09e061f628d3"
 
 /// `has` with the key's hash, which must be the witness's hash of it.
 has_hash : k -> Int -> TxHashMap w k v ->{Tx.Transaction} Bool
-foreign effect has_hash from "@flick-lang/effect-ts/effect/TxHashMap" "flickHasHash"
+foreign effect has_hash from "flick:TxHashMap" "flickHasHash"
   reviewed "effect@4.1.2 sha256:8c5c148986f01cae"
 
 /// A new map of `f value key` for each entry.
 map : (v -> k -> b)^c -> TxHashMap w k v ->{Tx.Transaction} TxHashMap w k b
-foreign effect map from "@flick-lang/effect-ts/effect/TxHashMap" "flickMap"
+foreign effect map from "flick:TxHashMap" "flickMap"
   retention call
   reviewed "effect@4.1.2 sha256:4b2559c8279dc48c"
 
 /// A new map of the entries the predicate accepts.
 filter : (v -> k -> Bool)^c -> TxHashMap w k v ->{Tx.Transaction} TxHashMap w k v
-foreign effect filter from "@flick-lang/effect-ts/effect/TxHashMap" "flickFilter"
+foreign effect filter from "flick:TxHashMap" "flickFilter"
   retention call
   reviewed "effect@4.1.2 sha256:366c0b297ddce515"
 
 /// A new map of the `Ok` values of `f value key`.
 filter_map : (v -> k -> Result x b)^c -> TxHashMap w k v ->{Tx.Transaction} TxHashMap w k b
-foreign effect filter_map from "@flick-lang/effect-ts/effect/TxHashMap" "flickFilterMap"
+foreign effect filter_map from "flick:TxHashMap" "flickFilterMap"
   retention call
   reviewed "effect@4.1.2 sha256:1347f1c7adc3b7f1"
 
 /// A new map of the `Some` values.
 compact : TxHashMap w k (Option a) ->{Tx.Transaction} TxHashMap w k a
-foreign effect compact from "@flick-lang/effect-ts/effect/TxHashMap" "flickCompact"
+foreign effect compact from "flick:TxHashMap" "flickCompact"
   reviewed "effect@4.1.2 sha256:03a1b73a2b794da9"
 
 /// A new map of the entries of the maps `f value key` makes.
@@ -161,42 +161,42 @@ flat_map :
   (v -> k ->{Tx.Transaction} TxHashMap w k b)^c ->
   TxHashMap w k v ->{Tx.Transaction}
   TxHashMap w k b
-foreign effect flat_map from "@flick-lang/effect-ts/effect/TxHashMap" "flickFlatMap"
+foreign effect flat_map from "flick:TxHashMap" "flickFlatMap"
   retention call
   reviewed "effect@4.1.2 sha256:47018e4a5b37b24d"
 
 /// Folds the entries, in no particular order, from `zero`.
 reduce : a -> (a -> v -> k -> a)^c -> (TxHashMap w k v ->{Tx.Transaction} a)^c
-foreign effect reduce from "@flick-lang/effect-ts/effect/TxHashMap" "flickReduce"
+foreign effect reduce from "flick:TxHashMap" "flickReduce"
   retention call
   reviewed "effect@4.1.2 sha256:717f3dea2004f2e5"
 
 /// Whether the predicate accepts an entry.
 has_by : (v -> k -> Bool)^c -> TxHashMap w k v ->{Tx.Transaction} Bool
-foreign effect has_by from "@flick-lang/effect-ts/effect/TxHashMap" "flickHasBy"
+foreign effect has_by from "flick:TxHashMap" "flickHasBy"
   retention call
   reviewed "effect@4.1.2 sha256:b0a6982a29a3e53f"
 
 /// Whether the predicate accepts an entry, as `has_by`.
 some : (v -> k -> Bool)^c -> TxHashMap w k v ->{Tx.Transaction} Bool
-foreign effect some from "@flick-lang/effect-ts/effect/TxHashMap" "flickSome"
+foreign effect some from "flick:TxHashMap" "flickSome"
   retention call
   reviewed "effect@4.1.2 sha256:9096620e98bc2c47"
 
 /// Whether the predicate accepts every entry.
 every : (v -> k -> Bool)^c -> TxHashMap w k v ->{Tx.Transaction} Bool
-foreign effect every from "@flick-lang/effect-ts/effect/TxHashMap" "flickEvery"
+foreign effect every from "flick:TxHashMap" "flickEvery"
   retention call
   reviewed "effect@4.1.2 sha256:4a0f88e8415cee3c"
 
 /// An entry the predicate accepts, if any.
 find_first : (v -> k -> Bool)^c -> TxHashMap w k v ->{Tx.Transaction} Option (k, v)
-foreign effect find_first from "@flick-lang/effect-ts/effect/TxHashMap" "flickFindFirst"
+foreign effect find_first from "flick:TxHashMap" "flickFindFirst"
   retention call
   reviewed "effect@4.1.2 sha256:e05c71daca04194e"
 
 /// Runs `f value key` for each entry, in no particular order.
 for_each : (v -> k ->{r; e} Unit)^c -> TxHashMap w k v ->{Tx.Transaction | r; e} Unit
-foreign effect for_each from "@flick-lang/effect-ts/effect/TxHashMap" "flickForEach"
+foreign effect for_each from "flick:TxHashMap" "flickForEach"
   retention call
   reviewed "effect@4.1.2 sha256:286e8a090d429313"

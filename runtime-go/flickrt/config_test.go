@@ -42,7 +42,7 @@ func TestConfigStringMissingEmptyAndDefault(t *testing.T) {
 	if got := ConfigGet(rootFiber(), ConfigWithDefault("outer", withDefault)); got != "fallback" {
 		t.Fatalf("an outer default replaced a successful inner default: %v", got)
 	}
-	// as Effect's fromEnv, an empty value is missing
+	// an empty value is missing
 	t.Setenv(name, "")
 	if _, cause := catch(func() Value { return ConfigGet(rootFiber(), config) }); cause == nil {
 		t.Fatalf("an empty environment value was read")

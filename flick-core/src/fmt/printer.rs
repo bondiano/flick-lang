@@ -127,10 +127,14 @@ impl<'a> Printer<'a> {
             K::BindStmt => self.bind(n),
             K::BindGroup => self.bind_group(n),
             K::Block => self.block(n),
-            K::TaskExpr | K::UiExpr | K::ScopeExpr | K::ProvideExpr | K::DoExpr | K::RecGroup => {
-                self.braced(n, &[])
-            }
-            K::ForExpr => self.for_(n),
+            K::LoopExpr
+            | K::TaskExpr
+            | K::UiExpr
+            | K::ScopeExpr
+            | K::ProvideExpr
+            | K::DoExpr
+            | K::RecGroup => self.braced(n, &[]),
+            K::ForExpr | K::WhileExpr => self.for_(n),
             K::ListExpr | K::TupleExpr | K::ListPat | K::TuplePat | K::TupleType | K::Exposing => {
                 self.bracket(n, &[])
             }
@@ -138,8 +142,13 @@ impl<'a> Printer<'a> {
             K::RecordField => self.field(n),
             K::ArrowType => self.arrow(n),
             K::Signature => self.signature(n),
-            K::TypeDecl | K::KindDecl | K::ErrorDecl => self.type_decl(n),
-            K::ClassDecl | K::InstanceDecl | K::ServiceDecl => self.class(n),
+            K::TypeDecl | K::ModuleTypeMember | K::KindDecl | K::ErrorDecl => self.type_decl(n),
+            K::ModuleTypeDecl
+            | K::ModuleParamExpr
+            | K::ClassDecl
+            | K::InstanceDecl
+            | K::ServiceDecl
+            | K::InlineModuleDecl => self.class(n),
             K::ForeignDecl => self.foreign(n),
             // the arguments of a derive are its plugin's words
             K::DerivingArgs => self.as_written(n),
@@ -304,14 +313,22 @@ fn space((a, a_parent): (K, K), (b, b_parent): (K, K)) -> bool {
             | K::Question,
         )
         | (K::LBrace, K::RBrace) => false,
-        (K::Dot, _) => a_parent == K::ForallType,
+        (K::Dot, _) => matches!(a_parent, K::ForallType | K::ExistsType),
         (K::DotDot | K::DotDotLt, _) if a_parent == K::RangeExpr => false,
         (_, K::DotDot | K::DotDotLt) if b_parent == K::RangeExpr => false,
         (K::Arrow, K::LBrace) if b_parent == K::EffectAnnot => false,
         (K::LBrace, _) => !tight_braces(a_parent),
         (_, K::RBrace) => !tight_braces(b_parent),
         (K::Minus, _) => !matches!(a_parent, K::PrefixExpr | K::LitPat | K::RowOmit),
-        (K::Con, K::LParen) => b_parent != K::ExposeItem,
+        (K::Con, K::LParen) => !matches!(
+            b_parent,
+            K::ExposeItem
+                | K::ModuleHeader
+                | K::ModuleApplyDecl
+                | K::InlineModuleDecl
+                | K::ModuleParamGroup
+                | K::ModuleApplyExpr
+        ),
         _ => true,
     }
 }

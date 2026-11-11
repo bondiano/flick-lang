@@ -10,6 +10,7 @@ use super::hover::companions::companion_note;
 use super::{Ide, locals, tree};
 use crate::diagnostics::Edit;
 use crate::iface::{Export, Interface, Namespace};
+use crate::project::Analyzed;
 use crate::resolve::declarations;
 use crate::source::FileId;
 use crate::syntax::cst::Node;
@@ -68,6 +69,19 @@ const IMPORTED: u8 = 2;
 const PRELUDE_NAMES: u8 = 3;
 
 impl Ide<'_> {
+    fn completion_interface(&self, module: &str, from: &Analyzed) -> Option<&Interface> {
+        let interface = self.interface(module)?;
+        if interface.private
+            && self
+                .analysis
+                .module(module)
+                .is_none_or(|owner| owner.package != from.package)
+        {
+            return None;
+        }
+        Some(interface)
+    }
+
     /// Completions at `offset` of `file`. With `dotted`, `offset` is the end
     /// of what comes before a `.`.
     pub fn complete(&self, file: FileId, offset: u32, dotted: bool) -> Vec<Completion> {
@@ -126,19 +140,19 @@ impl Ide<'_> {
                 continue;
             };
             let module: String = path.text(text).split_whitespace().collect();
+            let Some(interface) = self.completion_interface(&module, m) else {
+                continue;
+            };
             // `import Conduit.Server.Session as Auth` is `Auth` here
             let name = tree::name_of(import, K::Con, text)
                 .unwrap_or_else(|| module.rsplit('.').next().unwrap_or(&module));
             add(IMPORTED, item(name, CompletionKind::Module, None));
-            let Some(interface) = self.interface(&module) else {
-                continue;
-            };
-            for e in exposed(import, &interface, text) {
+            for e in exposed(import, interface, text) {
                 add(IMPORTED, completion(e));
             }
         }
         if let Some(prelude) = self.interface(lang::prelude()) {
-            for c in exports(&prelude) {
+            for c in exports(prelude) {
                 add(PRELUDE_NAMES, c);
             }
         }
@@ -160,17 +174,20 @@ impl Ide<'_> {
             .rev()
             .collect();
         if qualifier.starts_with(|c: char| c.is_ascii_uppercase()) {
-            if let Some(interface) = self.interface(&self.unalias(m, qualifier.clone())) {
-                return exports(&interface);
+            if let Some(interface) =
+                self.completion_interface(&self.unalias(m, qualifier.clone()), m)
+            {
+                return exports(interface);
             }
             // `Api.Public.` or `Public.`: the companions of a type
             let (owner, interface) = match qualifier.rsplit_once('.') {
-                Some((module, owner)) => {
-                    (owner, self.interface(&self.unalias(m, module.to_owned())))
-                }
-                None => (qualifier.as_str(), Some(m.interface.clone())),
+                Some((module, owner)) => (
+                    owner,
+                    self.completion_interface(&self.unalias(m, module.to_owned()), m),
+                ),
+                None => (qualifier.as_str(), Some(&m.interface)),
             };
-            let companions = interface.map(|i| companions(&i, owner)).unwrap_or_default();
+            let companions = interface.map(|i| companions(i, owner)).unwrap_or_default();
             if !companions.is_empty() {
                 return companions;
             }
@@ -178,7 +195,14 @@ impl Ide<'_> {
                 return ops;
             }
             let service = iter::once(&m.interface)
-                .chain(self.analysis.modules.iter().map(|x| &x.interface))
+                .chain(
+                    self.analysis
+                        .modules
+                        .iter()
+                        .filter(|x| !x.inline || x.file == m.file)
+                        .filter(|x| !x.interface.private || x.package == m.package)
+                        .map(|x| &x.interface),
+                )
                 .find_map(|i| i.find(Namespace::Type, &qualifier)?.definition.clone());
             if let Some(def) = service
                 && let Form::Service { operations, .. } = def.form
@@ -219,7 +243,9 @@ impl Ide<'_> {
             ty = inner;
         }
         match ty {
-            Type::Record(row) => out.extend(row.entries.iter().cloned()),
+            Type::Record(row) => {
+                out.extend(row.entries.iter().map(|(l, t)| (l.to_string(), t.clone())));
+            }
             Type::App { .. } | Type::Con { .. } if depth < 8 => {
                 let (head, args) = ty.spine();
                 let Type::Con { module, name } = head else {

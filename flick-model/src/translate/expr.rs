@@ -2,11 +2,14 @@
 //! `docs/formal/core.md` §1.4: blocks are nested `let`s, `if` is a
 //! `match` on `Bool`, operators are constants, a lift is the identity.
 
+use std::mem;
 use std::rc::Rc;
 
 use flick_core::ir::{self, BinOp, ExprKind, Stmt};
 use flick_core::types::Constructor;
+use flick_core::types::lang::{self, Lang};
 
+pub(super) use super::callbacks::layer_run;
 use super::{Tr, dict, given, lams};
 use crate::handler::{Handled, Handler, Op};
 use crate::syntax::{Arm, Con, Const, Lit, Name, Pat, Path, Prim, Term};
@@ -40,6 +43,84 @@ pub fn cond(c: Term, then: Term, otherwise: Term) -> Term {
 }
 
 impl Tr {
+    fn try_value(&mut self, body: &ir::Expr, arms: &[ir::Arm]) -> Term {
+        let rc = |t| Rc::new(t);
+        if super::mutation::modified(body).is_empty() {
+            Term::Try(rc(self.expr(body)), self.arms(arms))
+        } else {
+            let joined = self.try_state(body, arms, &[]);
+            let value = self.fresh("value");
+            Term::Match(
+                rc(joined),
+                Rc::from([Arm {
+                    pat: Pat::Tuple(Rc::from([Pat::Var(value.clone())])),
+                    guard: None,
+                    body: Term::Var(value),
+                }]),
+            )
+        }
+    }
+
+    fn delayed_expr(&mut self, body: &ir::Expr) -> Term {
+        let versions = mem::take(&mut self.versions);
+        let cells = mem::take(&mut self.cells);
+        let resumptions = mem::take(&mut self.resumptions);
+        let control = self.control.take();
+        let error_action = self.error_action.take();
+        let body = self.expr(body);
+        self.versions = versions;
+        self.cells = cells;
+        self.resumptions = resumptions;
+        self.control = control;
+        self.error_action = error_action;
+        body
+    }
+
+    fn lambda_expr(&mut self, params: &[ir::Param], body: &ir::Expr) -> Term {
+        let mut body = self.delayed_expr(body);
+        for p in params.iter().rev() {
+            body = self.param(&p.pat, body);
+        }
+        body
+    }
+
+    fn control_expr(&mut self, e: &ir::Expr) -> Term {
+        let rc = |t| Rc::new(t);
+        match &e.kind {
+            ExprKind::ControlLoop {
+                id,
+                condition,
+                body,
+                iterable: false,
+            } => {
+                let joined = self.source_loop(id, condition.as_deref(), body, &[]);
+                let value = self.fresh("loopvalue");
+                Term::Match(
+                    rc(joined),
+                    Rc::from([Arm {
+                        pat: Pat::Tuple(Rc::from([Pat::Var(value.clone())])),
+                        guard: None,
+                        body: Term::Var(value),
+                    }]),
+                )
+            }
+            ExprKind::ControlLoop {
+                id,
+                body,
+                iterable: true,
+                ..
+            } => {
+                let joined = self.source_for(id, body, &[]);
+                Term::Let("_".into(), None, rc(joined), rc(Term::unit()))
+            }
+            ExprKind::LoopExit { .. } => stuck("an iterable control loop outside its translation"),
+            ExprKind::Loop { condition, body } => {
+                let looped = self.loop_term(condition, body, &[]);
+                Term::Let("_".into(), None, rc(looped), rc(Term::unit()))
+            }
+            _ => unreachable!("loop"),
+        }
+    }
     pub(super) fn expr(&mut self, e: &ir::Expr) -> Term {
         let rc = |t: Term| Rc::new(t);
         match &e.kind {
@@ -71,8 +152,8 @@ impl Tr {
                 lams(names.iter().map(|n| given(n)), self.expr(body))
             }
             ExprKind::App { func, arg, .. } if layer_run(func).is_some() => self.provide(func, arg),
-            ExprKind::App { func, arg, .. } if is_global(func, "Scope", "run") => self.scope(arg),
-            ExprKind::App { func, .. } if is_global(func, "Scope", "current") => Term::unit(),
+            ExprKind::App { func, arg, .. } if is_lang(func, Lang::ScopeRun) => self.scope(arg),
+            ExprKind::App { func, .. } if is_lang(func, Lang::ScopeCurrent) => Term::unit(),
             ExprKind::App {
                 func,
                 arg,
@@ -87,23 +168,18 @@ impl Tr {
                     Term::app(f, a)
                 }
             }
-            ExprKind::Lambda { params, body } => {
-                let mut body = self.expr(body);
-                for p in params.iter().rev() {
-                    body = self.param(&p.pat, body);
-                }
-                body
+            ExprKind::Lambda { params, body } => self.lambda_expr(params, body),
+            ExprKind::ControlLoop { .. } | ExprKind::LoopExit { .. } | ExprKind::Loop { .. } => {
+                self.control_expr(e)
             }
             ExprKind::Block(stmts, tail) => self.block(stmts, tail, None),
             ExprKind::If(c, a, b) => cond(self.expr(c), self.expr(a), self.expr(b)),
             ExprKind::Match(e, arms) => Term::Match(rc(self.expr(e)), self.arms(arms)),
-            ExprKind::Handle(h) if h.is_try() => {
-                Term::Try(rc(self.expr(&h.body)), self.arms(&h.errors))
-            }
+            ExprKind::Handle(h) if h.is_try() => self.try_value(&h.body, &h.errors),
             ExprKind::Tuple(xs) if xs.is_empty() => Term::unit(),
             ExprKind::Tuple(xs) => Term::Tuple(xs.iter().map(|x| self.expr(x)).collect()),
             ExprKind::List(xs) => Term::List(xs.iter().map(|x| self.expr(x)).collect()),
-            ExprKind::Record(fs) => Term::Record(
+            ExprKind::Record(fs) | ExprKind::Dictionary(fs) => Term::Record(
                 fs.iter()
                     .map(|(l, x)| (Name::from(l.as_str()), self.expr(x)))
                     .collect(),
@@ -124,7 +200,10 @@ impl Tr {
             ExprKind::Neg(num, x) => Term::app(Term::prim(Prim::Neg(*num)), self.expr(x)),
             ExprKind::Ignore(x) => Term::Let("_".into(), None, rc(self.expr(x)), rc(Term::unit())),
             ExprKind::Await(x) => Term::Await(rc(self.expr(x))),
-            ExprKind::Task(x) => Term::Task(rc(self.expr(x))),
+            ExprKind::Task(x) => Term::Task(rc(self.delayed_expr(x))),
+            ExprKind::Generate {
+                body, strict: true, ..
+            } => self.strict_collection(body),
             ExprKind::Handle(h) => Term::Handler(Rc::new(self.handler(h))),
             // a lift does nothing in the model (§3.4); its correctness is G2
             ExprKind::Lift(x, _) => self.expr(x),
@@ -161,7 +240,7 @@ impl Tr {
     }
 
     /// `λp. body`, with a pattern that is not a variable matched inside.
-    fn param(&mut self, p: &ir::Pat, body: Term) -> Term {
+    pub(super) fn param(&mut self, p: &ir::Pat, body: Term) -> Term {
         if let ir::Pat::Bind(x) = p {
             return Term::lam(x, body);
         }
@@ -225,9 +304,17 @@ impl Tr {
     }
 
     /// A handler of effects: the function of each operation as it is.
-    fn handler(&mut self, h: &ir::Handler) -> Handler {
-        let effects = h
-            .effects
+    pub(super) fn handler(&mut self, h: &ir::Handler) -> Handler {
+        let effects = self.handled_effects(h);
+        Handler {
+            effects,
+            body: self.expr(&h.body),
+            ret: h.ret.as_ref().map(|r| self.handler_return(r)),
+            errors: self.arms(&h.errors),
+        }
+    }
+    pub(super) fn handled_effects(&mut self, h: &ir::Handler) -> Vec<Handled> {
+        h.effects
             .iter()
             .map(|e| Handled {
                 effect: Path::parse(&e.effect),
@@ -244,13 +331,7 @@ impl Tr {
                     })
                     .collect(),
             })
-            .collect();
-        Handler {
-            effects,
-            body: self.expr(&h.body),
-            ret: h.ret.as_ref().map(|r| self.expr(r)),
-            errors: self.arms(&h.errors),
-        }
+            .collect()
     }
 }
 
@@ -312,77 +393,6 @@ fn binary(op: BinOp, a: Term, b: Term) -> Term {
     Term::apps(Term::prim(prim), [a, b])
 }
 
-impl Tr {
-    /// `Scope.run arg`, which is `scope s { body }`: the core's form of it.
-    fn scope(&mut self, arg: &ir::Expr) -> Term {
-        self.scope_with(arg, &|tr, body| tr.expr(body))
-    }
-
-    /// [`Self::scope`] with the body as `body` translates it.
-    pub(super) fn scope_with(&mut self, arg: &ir::Expr, body: Body) -> Term {
-        let translate = body;
-        if let ExprKind::Lambda { params, body } = &arg.kind
-            && let [ir::Param { pat, .. }] = &params[..]
-        {
-            match pat {
-                ir::Pat::Bind(s) => {
-                    return Term::Scope(Name::from(s.as_str()), Rc::new(translate(self, body)));
-                }
-                ir::Pat::Wild => {
-                    let s = self.fresh("s");
-                    return Term::Scope(s, Rc::new(translate(self, body)));
-                }
-                _ => {}
-            }
-        }
-        let s = self.fresh("s");
-        let body = Term::app(self.expr(arg), Term::Var(s.clone()));
-        Term::Scope(s, Rc::new(body))
-    }
-
-    /// `Layer.run layer arg`, which is `provide layer { body }`: the core's
-    /// form of it.
-    fn provide(&mut self, func: &ir::Expr, arg: &ir::Expr) -> Term {
-        self.provide_with(func, arg, &|tr, body| tr.expr(body))
-    }
-
-    /// [`Self::provide`] with the body as `body` translates it.
-    pub(super) fn provide_with(&mut self, func: &ir::Expr, arg: &ir::Expr, body: Body) -> Term {
-        let translate = body;
-        let layer = self.expr(layer_run(func).expect("a call of `Layer.run`"));
-        let body = match &arg.kind {
-            // what `provide` lowers to, which binds nothing
-            ExprKind::Lambda { params, body }
-                if matches!(
-                    params[..],
-                    [ir::Param {
-                        pat: ir::Pat::Wild,
-                        ..
-                    }]
-                ) =>
-            {
-                translate(self, body)
-            }
-            _ => Term::app(self.expr(arg), Term::unit()),
-        };
-        Term::Provide(Rc::new(layer), Rc::new(body))
-    }
-}
-
-/// How the body of a `scope` or a `provide` is translated.
-pub(super) type Body<'b> = &'b dyn Fn(&mut Tr, &ir::Expr) -> Term;
-
-pub(super) fn is_global(func: &ir::Expr, m: &str, n: &str) -> bool {
-    matches!(&func.kind, ExprKind::Global { module, name } if module == m && name == n)
-}
-
-/// The layer of `Layer.run layer`.
-pub(super) fn layer_run(func: &ir::Expr) -> Option<&ir::Expr> {
-    let ExprKind::App { func, arg, .. } = &func.kind else {
-        return None;
-    };
-    match &func.kind {
-        ExprKind::Global { module, name } if module == "Layer" && name == "run" => Some(arg),
-        _ => None,
-    }
+pub(super) fn is_lang(func: &ir::Expr, item: Lang) -> bool {
+    matches!(&func.kind, ExprKind::Global { module, name } if lang::is(item, module, name))
 }

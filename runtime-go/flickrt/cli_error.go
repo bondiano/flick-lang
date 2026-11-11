@@ -5,8 +5,8 @@ import (
 	"strings"
 )
 
-// cliError is Effect's CliError: tag is its `_tag`, the fields those of
-// that error, and message() its text.
+// cliError is an error of the command line: tag is its `_tag`, the fields
+// those of that error, and message() its text.
 type cliError struct {
 	tag         string
 	option      string   // UnrecognizedOption, MissingOption, InvalidValue
@@ -93,7 +93,7 @@ func (e *cliError) message() string {
 	return "Help requested"
 }
 
-// cliLevenshtein counts in UTF-16 code units, as auto-suggest.ts does.
+// cliLevenshtein counts in UTF-16 code units.
 func cliLevenshtein(a, b string) int {
 	x, y := utf16Units(a), utf16Units(b)
 	prev := make([]int, len(y)+1)
@@ -115,8 +115,7 @@ func cliLevenshtein(a, b string) int {
 	return prev[len(y)]
 }
 
-// cliSuggest is auto-suggest.ts's `suggest`: the candidates nearest to the
-// input, within two edits.
+// cliSuggest is the candidates nearest to the input, within two edits.
 func cliSuggest(input string, candidates []string) []string {
 	best, out := 3, []string{}
 	for _, c := range candidates {

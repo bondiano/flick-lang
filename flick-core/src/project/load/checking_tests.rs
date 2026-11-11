@@ -9,9 +9,13 @@ use std::sync::Arc;
 
 use super::checking::levels;
 #[cfg(feature = "ide")]
-use super::{ModuleCache, analyze, analyze_with};
+use super::{Mode, ModuleCache, analyze, analyze_with, run};
+#[cfg(feature = "ide")]
+use crate::iface::{Interface, Namespace};
 #[cfg(feature = "ide")]
 use crate::project::config::{Build, Config, Kind};
+#[cfg(feature = "ide")]
+use crate::project::config::{Dependency, Source};
 #[cfg(feature = "ide")]
 use crate::project::{Host, Project};
 #[cfg(feature = "ide")]
@@ -20,6 +24,8 @@ use crate::source::SourceMap;
 use crate::types::Thresholds;
 #[cfg(feature = "ide")]
 use crate::types::Typing;
+#[cfg(feature = "ide")]
+use crate::{ir, types};
 
 #[cfg(feature = "ide")]
 struct Memory(BTreeMap<PathBuf, String>);
@@ -43,11 +49,62 @@ const USE: &str =
     "module A.Use exposing (y)\nimport A.Base exposing (x)\ny : Float\nlet y = x + 1\n";
 
 #[cfg(feature = "ide")]
-fn host(base: &str) -> Memory {
-    Memory(BTreeMap::from([
-        (PathBuf::from("/p/src/A/Base.fl"), base.to_owned()),
-        (PathBuf::from("/p/src/A/Use.fl"), USE.to_owned()),
-    ]))
+include!("checking_tests_replay.rs");
+#[cfg(feature = "ide")]
+include!("checking_tests_visibility.rs");
+include!("checking_tests_relocate.rs");
+#[cfg(feature = "ide")]
+include!("checking_tests_broken.rs");
+include!("checking_tests_contracts.rs");
+#[cfg(all(feature = "ide", feature = "native-project"))]
+include!("checking_tests_packages.rs");
+#[cfg(feature = "ide")]
+#[test]
+fn private_builtin_cannot_be_imported_or_named_without_an_import() {
+    use crate::diagnostics::codes;
+
+    for (use_text, expected) in [
+        (
+            "module A.Use exposing (x)\nimport List.Core\nx : Int\nlet x = 1\n",
+            codes::R017,
+        ),
+        (
+            "module A.Use exposing (x)\nx : List Int\nlet x = List.Core.sort_by compare [1, 2]\n",
+            codes::R017,
+        ),
+    ] {
+        let host = Memory(BTreeMap::from([(
+            PathBuf::from("/p/src/A/Use.fl"),
+            use_text.into(),
+        )]));
+        let mut sources = SourceMap::default();
+        let project = library(&mut sources);
+        let analysis = analyze(
+            &host,
+            &mut sources,
+            Some(&project),
+            &[PathBuf::from("/p/src/A/Use.fl")],
+        );
+        assert!(
+            analysis.diagnostics.iter().any(|d| d.code == expected),
+            "{use_text}: {:?}",
+            analysis.diagnostics
+        );
+    }
+}
+
+#[test]
+fn standalone_check_rejects_a_private_builtin_import() {
+    use crate::diagnostics::codes;
+    use crate::source::SourceMap;
+
+    let mut sources = SourceMap::default();
+    let file = sources.add("Probe.fl", "module Probe\nimport List.Core\n");
+    let diagnostics = crate::check(&sources, file);
+    assert!(
+        diagnostics.iter().any(|d| d.code == codes::R017),
+        "{diagnostics:?}"
+    );
 }
 
 #[cfg(feature = "ide")]
@@ -185,3 +242,29 @@ fn changing_programmatic_config_invalidates_cached_checking() {
         &changed.modules[0].typing
     ));
 }
+
+#[test]
+fn standalone_check_of_inline_modules_rejects_a_private_builtin_import() {
+    use crate::diagnostics::codes;
+    use crate::source::SourceMap;
+
+    let mut sources = SourceMap::default();
+    let text = "module Probe exposing (page)\nimport List.Core\n\
+                module Inner exposing (one) =\n  one : Int\n  let one = 1\n\
+                page : Int\nlet page = Inner.one\n";
+    let file = sources.add("Probe.fl", text);
+    let diagnostics = crate::check(&sources, file);
+    assert!(
+        diagnostics.iter().any(|d| d.code == codes::R017),
+        "{diagnostics:?}"
+    );
+}
+
+include!("checking_tests_review.rs");
+include!("checking_tests_review_boundaries.rs");
+
+include!("checking_tests_ported_review.rs");
+include!("checking_tests_ported_followup.rs");
+include!("checking_tests_final_contracts.rs");
+#[cfg(all(feature = "ide", feature = "native-project"))]
+include!("checking_tests_ported_package.rs");

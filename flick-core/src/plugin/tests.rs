@@ -393,6 +393,9 @@ fn a_plugin_sees_the_calls_of_the_names_it_watches_and_no_others() {
         span: span(10, 15),
         arguments: Vec::new(),
         refinement: None,
+        binding: None,
+        generated: false,
+        tagged: None,
     };
     let plugin = Native::new("panicking", Panicking);
     let file = FileId::default();
@@ -530,5 +533,27 @@ fn a_built_in_module_expands_a_head_of_std_without_an_import_and_says_what_it_ca
     assert_eq!(
         expand(&nested(super::ROUNDS + 1)),
         (true, vec!["FLICK-P036".to_owned()])
+    );
+}
+
+#[test]
+fn standalone_component_checks_report_source_complexity() {
+    use crate::diagnostics::codes;
+    use crate::source::SourceMap;
+    let source = format!(
+        "module App exposing (..)\ncomponent badge (p : Bool) = {}Ui.text \"нет\"\n",
+        "if p then Ui.text \"да\" else ".repeat(11)
+    );
+    let mut sources = SourceMap::default();
+    let file = sources.add("App.fl", source.clone());
+    let diagnostics = crate::check(&sources, file);
+    let warnings: Vec<_> = diagnostics
+        .iter()
+        .filter(|d| d.code == codes::T038)
+        .collect();
+    assert_eq!(warnings.len(), 1, "{diagnostics:?}");
+    assert_eq!(
+        &source[warnings[0].span.expect("name span").range()],
+        "badge"
     );
 }

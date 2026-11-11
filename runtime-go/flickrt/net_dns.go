@@ -7,18 +7,18 @@ import (
 	"strings"
 )
 
-// Effect's DNS records (effect/net Dns) and their JSON codecs: a record is
-// its JSON object, `_tag` first, decoded by the record type's fields.
+// DNS records and their JSON codecs: a record is its JSON object, `_tag`
+// first, decoded by the record type's fields.
 //
-// shortcut: SOA timers stay whole seconds, where Effect holds Durations; nothing reads them but format_record and the codec, which write seconds alike
+// shortcut: SOA timers stay whole seconds, where the JS target holds Durations; nothing reads them but format_record and the codec, which write seconds alike
 type dnsRecord struct{ fields *Record }
 
 func (r *dnsRecord) tag() string { return r.fields.Get("_tag").(string) }
 
 var dnsRecordTypes = []string{"A", "AAAA", "CAA", "CNAME", "MX", "NAPTR", "NS", "PTR", "SOA", "SRV", "TLSA", "TXT"}
 
-// dnsAddress is Effect's canonical address of a record: text that parses
-// and is already in canonical form.
+// dnsAddress is the canonical address of a record: text that parses and is
+// already in canonical form.
 func dnsAddress(parse func(string) (netip.Addr, string), is func(Value) bool) codec {
 	return netCodec("IpAddress", func(s string) (Value, string) {
 		a, msg := parse(s)
@@ -55,7 +55,7 @@ var (
 	}
 	stringCodec = CodecString.(codec)
 
-	// the fields of each record type, after its `_tag`, as Effect's schemas
+	// the fields of each record type, after its `_tag`
 	dnsFields = map[string][]any{
 		"A":     {"address", dnsAddress(ipv4FromString, isIpv4)},
 		"AAAA":  {"address", dnsAddress(ipv6FromString, isIpv6)},
@@ -82,8 +82,8 @@ var (
 	}()
 )
 
-// dnsRecordCodec is Effect's JSON codec of the records of type `t`: its
-// TaggedStruct, then Effect's `makeRecord`.
+// dnsRecordCodec is the JSON codec of the records of type `t`: the block
+// of its `_tag` and fields, then the record made of them.
 func dnsRecordCodec(t string) codec {
 	entries := []Value{"_tag", DslField("_tag", CodecLiteral(t))}
 	fields := dnsFields[t]
@@ -105,9 +105,9 @@ func dnsRecordCodec(t string) codec {
 	}
 }
 
-// dnsUnion is Effect's union of the record types: the member of the
-// input's `_tag`, or of the record's type. Input of no known `_tag` is the
-// union's issue, as Effect has no candidate for it.
+// dnsUnion is the union of the record types: the member of the input's
+// `_tag`, or of the record's type. Input of no known `_tag` is the union's
+// issue, as no member is a candidate for it.
 type dnsUnion struct{}
 
 func (dnsUnion) accepts(in Value) bool { _, ok := in.(*Record); return ok }
@@ -201,7 +201,7 @@ func formatDnsName(s string) string {
 	return b.String()
 }
 
-// NetFormatRecord is Effect's `Dns.formatRecord`: one line of zone file.
+// NetFormatRecord is a record as one line of zone file.
 func NetFormatRecord(v Value) Value {
 	r := v.(*dnsRecord)
 	get := func(k string) Value { return r.fields.Get(k) }

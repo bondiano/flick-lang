@@ -33,6 +33,11 @@ just bundle-size  # browser bundles against their gzip budgets
 just ratchet  # budgets only go down against origin/main; a looser one needs a `reason`
 ```
 
+Use the Node version pinned in [`.tool-versions`](.tool-versions) for golden
+e2e checks. CI reads the same file. The Go Intl tables and localized DateTime fixtures
+were generated with that version's ICU; another ICU can spell valid locale
+errors and time-zone names differently.
+
 ## Crates
 
 | Crate | Purpose |
@@ -51,20 +56,15 @@ capabilities with `--no-default-features --features <names>`.
 
 | Cargo feature | Capability |
 | - | - |
-| `ide` | Editor queries, projections and retained editor metadata; enables `typescript` and `diagnostic-fixes`. |
-| `build-artifacts` | Published `.iface`, `package.json` and publication fingerprints. |
-| `source-maps` | Source markers, mapping data, `.map` files and `sourceMappingURL`. |
-| `typescript` | TypeScript output, `.d.ts` and Promise façades; JavaScript exports and Sync wrappers remain available without it. |
-| `diagnostic-fixes` | Lazy construction and JSON serialization of fixes/edits; primary diagnostics and validation remain available without it. |
-| `native-project` | Project discovery, TOML/FFI-policy parsing, installed packages, disk-cache contracts and pnpm adapters; activates `toml`. |
-| `terminal-diagnostics` | Human-readable diagnostic rendering; activates `annotate-snippets`. |
-| `builtin-docs` | Documentation comments in embedded builtin sources. Without it, build-time lexing removes those comments, not user-program documentation or string contents. |
+| `ide` | Editor queries, projections and retained editor metadata. |
+| `native-project` | Project discovery, TOML/FFI-policy parsing, installed packages, disk-cache contracts and pnpm adapters; published `.iface`, `package.json` and publication fingerprints; source maps; documentation comments in the built-in sources. Activates `toml`, `semver` and `sha2`. |
+| `embedded-std` | `std` inside the binary, for a host without packages. |
 
 Shared in-memory project/configuration types, `Host`-backed source loading,
-type checking, JSON primary diagnostics and both debug/release profiles remain
-available without defaults. Unsupported TypeScript output requests report an
-error instead of silently producing JavaScript. Without `diagnostic-fixes`,
-JSON diagnostic events omit `fixes`.
+type checking, diagnostics with their fixes in both renderings, TypeScript
+output and both debug/release profiles are available without defaults.
+Without `native-project`, build-time lexing removes documentation comments
+from the built-in sources, not user-program documentation or string contents.
 
 `flick-wasm` disables the core's default features.
 Use `just wasm` or `just docs-wasm` for this smaller browser compiler.
@@ -118,7 +118,13 @@ The main entry points are Start, Handbook and Reference. `/play/` runs a
 single Flick module in an isolated browser worker and shows its real debug or
 release JavaScript and `.d.ts`, with the WebAssembly build of the compiler
 core. Its examples are files in `docs/src/playground/examples/`, run by
-`docs/test/examples.test.ts`.
+`docs/test/examples.test.ts`. The tour's order is `docs/tour/index.json`: a
+lesson shows its own `docs/tour/<chapter>/<page>.fl` (with a `.stdout` when it
+runs), an example of the gallery, or an exercise of `docs/exercises/`, beside
+the text of `tour/<page>.mdx`. `docs/test/tour.test.ts` checks the index
+against the files and pages and runs each program; `docs/e2e/tour.spec.ts`
+walks the tour in a browser. A lesson's program runs by itself once typing
+pauses, except code that came from a link.
 
 Interactive widgets are Flick programs: `docs/src/widgets/` owns search,
 theme controls, the live homepage example and code copying;

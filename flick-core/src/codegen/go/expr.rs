@@ -3,6 +3,8 @@
 
 use std::mem;
 
+use crate::codegen::loops;
+
 use flick_pretty::{Document, docvec};
 
 use super::arith::Native;
@@ -117,9 +119,45 @@ impl<'a> Gen<'a> {
         self.emit(docvec![self.a, "_ = ", l]);
     }
 
+    fn loop_expr(&mut self, e: &Expr) -> Code<'a> {
+        let a = self.a;
+        match &e.kind {
+            ExprKind::ControlLoop {
+                id,
+                condition,
+                body,
+                iterable,
+            } => {
+                let lowered = loops::lower(id, condition.as_deref(), body, *iterable, e.span);
+                self.expr(&lowered)
+            }
+            ExprKind::LoopExit { .. } => unreachable!("loop exits are lowered with their loop"),
+            ExprKind::Loop { condition, body } => {
+                let (stmts, ()) = self.block(|g| {
+                    let c = g.expr(condition);
+                    let c = g.unboxed(condition, c, Native::Bool).doc;
+                    g.emit(docvec![
+                        a,
+                        "if !",
+                        c,
+                        " ",
+                        super::layout::single(a, "break")
+                    ]);
+                    g.discard(body);
+                });
+                self.emit(docvec![a, "for ", super::layout::block(a, stmts)]);
+                self.unit()
+            }
+            _ => unreachable!("loop expression"),
+        }
+    }
+
     pub(super) fn expr(&mut self, e: &Expr) -> Code<'a> {
         let a = self.a;
         match &e.kind {
+            ExprKind::ControlLoop { .. } | ExprKind::LoopExit { .. } | ExprKind::Loop { .. } => {
+                self.loop_expr(e)
+            }
             ExprKind::Lit(lit) => self.code(&literal(lit)),
             ExprKind::Local(name) => self.code(&names::local(name)),
             // not atomic: an operand after it that assigns it is ordered after the read
@@ -159,6 +197,11 @@ impl<'a> Gen<'a> {
                 list(a, "[]flickrt.Value{", items, "}").into()
             }
             ExprKind::Record(fields) => self.record(None, fields),
+            ExprKind::Dictionary(fields) => {
+                let all: Vec<&Expr> = fields.iter().map(|(_, value)| value).collect();
+                let values = self.ordered(&all);
+                call(self.a, "flickrt.DictOf", self.entries(fields, values)).into()
+            }
             ExprKind::Update(base, fields) => self.record(Some(base), fields),
             ExprKind::Field(record, label) => {
                 let r = self.expr(record);
@@ -304,10 +347,25 @@ impl<'a> Gen<'a> {
             }
             Stmt::Var(name, value) => {
                 let v = self.expr(value);
-                self.bind(name, v);
+                // a variable has one type, so a scalar one is unboxed where it is
+                // declared and where it is assigned, not boxed on every assignment
+                match self
+                    .native(value)
+                    .or_else(|| Native::of(value.ty.as_deref()))
+                {
+                    Some(n) => {
+                        let v = self.unboxed(value, v, n);
+                        self.bind_native(name, v, n);
+                    }
+                    None => self.bind(name, v),
+                }
             }
             Stmt::Assign(name, value) => {
                 let v = self.expr(value);
+                let v = match self.natives.get(name).copied() {
+                    Some(n) => self.unboxed(value, v, n),
+                    None => v,
+                };
                 let l = a.alloc_str(&names::local(name));
                 self.emit(docvec![a, l, " = ", v]);
             }

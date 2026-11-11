@@ -61,17 +61,17 @@ impl Checker<'_> {
             };
             self.record_givens(self.span(node), &givens);
             self.classes.givens.extend(givens);
-            let saved = mem::take(&mut self.runtime);
-            let (holds, held) = (self.regions.holds.len(), self.regions.held.len());
+            let saved = mem::take(&mut self.cx.runtime);
+            let (holds, held) = (self.cx.regions.holds.len(), self.cx.regions.held.len());
             self.check(node, &body);
             if self.names_top_level(node) {
                 // a top-level value has no environment: the regions its
                 // instantiated type names under the `forall` it does not hold
-                self.regions.holds.truncate(holds);
-                self.regions.held.truncate(held);
+                self.cx.regions.holds.truncate(holds);
+                self.cx.regions.held.truncate(held);
             }
-            let runtime = mem::replace(&mut self.runtime, saved);
-            self.runtime |= runtime;
+            let runtime = mem::replace(&mut self.cx.runtime, saved);
+            self.cx.runtime |= runtime;
             self.classes.givens.truncate(mark);
             self.store.level -= 1;
             let span = self.span(node);
@@ -90,6 +90,9 @@ impl Checker<'_> {
             }
             (K::FunExpr, _) => {
                 self.lambda(node, Some(expected));
+            }
+            (K::LoopExpr | K::WhileExpr, _) => {
+                self.control_loop(node, Some(expected));
             }
             (K::IfExpr, _) => self.if_expr(node, expected),
             (K::MatchExpr, _) => {
@@ -165,8 +168,8 @@ impl Checker<'_> {
             }
             (K::RecordExpr, Type::Record(row)) => {
                 let row = self.store.zonk_row(row);
-                let row = if let Some(captures) = self.whnf_captured(expected).1 {
-                    super::ty::Row {
+                if let Some(captures) = self.whnf_captured(expected).1 {
+                    let row = super::ty::Row {
                         entries: row
                             .entries
                             .into_iter()
@@ -174,12 +177,16 @@ impl Checker<'_> {
                             .collect(),
                         tail: row.tail,
                         ..super::ty::Row::default()
-                    }
+                    };
+                    // each field holds within the bound where it is checked; the
+                    // literal is compared with those fields, as the value's own
+                    // record shows its fields bare
+                    let actual = self.record(node, Some(&row));
+                    self.expect(&actual, &Type::Record(row), self.span(node));
                 } else {
-                    row
-                };
-                let actual = self.record(node, Some(&row));
-                self.expect(&actual, expected, self.span(node));
+                    let actual = self.record(node, Some(&row));
+                    self.expect(&actual, expected, self.span(node));
+                }
             }
             (K::DoExpr, _) => {
                 self.do_expr(node, Some(expected));
@@ -220,7 +227,11 @@ impl Checker<'_> {
             },
             K::NameExpr => self.name(node),
             K::AssignStmt => self.assign(node),
+            K::LoopExpr | K::WhileExpr => self.control_loop(node, None),
+            K::BreakExpr | K::ContinueExpr => self.loop_exit(node),
             K::InterpExpr => self.interpolation(node),
+            K::PackExpr => self.pack_module(node),
+            K::UnpackExpr => self.unpack_module(node),
             K::ParenExpr => self.infer(children[0]),
             K::UnitExpr => Type::lang(Lang::Unit),
             K::TupleExpr => {
@@ -336,12 +347,12 @@ impl Checker<'_> {
             let since = self.diagnostics.len();
             // one mismatch: of the whole `if` when its place wants a value
             let fits = self.expect(&unit, expected, span);
-            self.explain_since(since, expected, keyword, why);
+            self.explain_since(since, expected, keyword, &why);
             if let Some(then) = children.get(1) {
                 if fits {
                     let since = self.diagnostics.len();
                     self.check(then, &unit);
-                    self.explain_since(since, &unit, keyword, why);
+                    self.explain_since(since, &unit, keyword, &why);
                 } else {
                     self.infer(then);
                 }
@@ -359,7 +370,7 @@ impl Checker<'_> {
             self.check(branch, expected);
             if open {
                 let then = self.span(children[1]);
-                self.explain_since(since, expected, then, |t| {
+                self.explain_since(since, expected, then, &|t| {
                     format!("the `then` branch has type `{t}`")
                 });
             }
@@ -409,8 +420,8 @@ impl Checker<'_> {
         expected: Option<&Type>,
         node: &Node,
     ) -> Type {
-        let saved = mem::take(&mut self.runtime);
-        let mark = self.locals.len();
+        let saved = mem::take(&mut self.cx.runtime);
+        let mark = self.cx.locals.len();
         let givens = self.classes.givens.len();
         let uses = self.uses_mark();
         self.enter_apart(super::mutation::Apart::Function);
@@ -430,7 +441,7 @@ impl Checker<'_> {
             let known = rest.clone().filter(|t| {
                 !matches!(target, Some(Type::Meta(_))) || self.whnf_captured(t).1.is_some()
             });
-            closures.push((self.locals.len(), known));
+            closures.push((self.cx.locals.len(), known));
             let target = match target {
                 Some(t @ Type::Forall { .. }) => {
                     self.store.level += 1;
@@ -478,13 +489,14 @@ impl Checker<'_> {
             Some(effects) => self.body_stage(effects.as_deref(), node, expected),
             None => self.open_stage(),
         };
+        self.live_bound(&mut stage, closures.last().and_then(|c| c.1.as_ref()));
         // `o?` in the body returns from this function, so it fixes the result type
         let inferred_result = rest.is_none();
         let returns = rest.clone().unwrap_or_else(|| self.fresh());
         stage.returns = Some(returns.clone());
-        let outer = mem::replace(&mut self.stage, stage);
+        let outer = mem::replace(&mut self.cx.stage, stage);
         let result = body(self, rest);
-        let inner = mem::replace(&mut self.stage, outer);
+        let inner = mem::replace(&mut self.cx.stage, outer);
         if inferred_result && self.unify(&returns, &result).is_err() {
             let (returns, result) = (self.show(&returns), self.show(&result));
             self.error(
@@ -503,9 +515,9 @@ impl Checker<'_> {
             .into_iter()
             .map(|(locals, expected)| (self.held_since(uses, locals), expected))
             .collect();
-        self.locals.truncate(mark);
+        self.cx.locals.truncate(mark);
         self.classes.givens.truncate(givens);
-        self.runtime = saved;
+        self.cx.runtime = saved;
         let span = self.span(node);
         self.end_reader(&result, span);
         let result = self.curry(stages, closures, unknown.as_ref(), result, span);
@@ -577,7 +589,7 @@ impl Checker<'_> {
                 .find(|n| n.kind == K::Block)
                 .map(|b| self.span(b));
             match first {
-                Some(first) if open => self.explain_since(since, &result, first, |t| {
+                Some(first) if open => self.explain_since(since, &result, first, &|t| {
                     format!("the first arm has type `{t}`")
                 }),
                 Some(_) => {}
@@ -602,7 +614,7 @@ impl Checker<'_> {
         scrutinee: &Type,
         result: &Type,
     ) -> (super::patterns::Pat, bool, source::Span) {
-        let mark = self.locals.len();
+        let mark = self.cx.locals.len();
         let mut pat = super::patterns::Pat::Wild;
         let mut guarded = false;
         let mut span = self.span(arm);
@@ -633,7 +645,7 @@ impl Checker<'_> {
                 .dead_arms
                 .insert(super::typing::range(self.span(arm)));
         }
-        self.locals.truncate(mark);
+        self.cx.locals.truncate(mark);
         (pat, guarded, span)
     }
 }

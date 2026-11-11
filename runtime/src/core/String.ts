@@ -1,10 +1,9 @@
-// The `String` bindings of the standard library without Effect: the
-// semantics of `effect/String` (4.1.2) on plain data, curried as the
-// bindings call them.
+// The `String` bindings of the standard library without Effect: string
+// operations on plain data, curried as the bindings call them.
 import { constructorName } from "../tags.ts";
 import { EQ, GT, LT, fromNullable, none, type Option, type Ordering, some } from "./data.ts";
 
-/** Effect's `Count.normalize`: a whole count, 0 for a negative one or NaN. */
+/** A whole count, 0 for a negative one or NaN. */
 const count = (n: number): number => (n > 0 ? Math.floor(n) : 0);
 
 export const trim = (self: string): string => self.trim();
@@ -13,7 +12,7 @@ export const trimEnd = (self: string): string => self.trimEnd();
 export const length = (self: string): number => self.length;
 export const isNonEmpty = (self: string): boolean => self.length > 0;
 
-/** `"".split("")` is `[]`; Effect gives `[self]` then. */
+/** `"".split("")` is `[]`; the result is `[self]` then. */
 export const split =
   (separator: string) =>
   (self: string): Array<string> => {
@@ -34,7 +33,7 @@ export const toLowerCase = (self: string): string => self.toLowerCase();
 export const toLocaleUpperCase = (locale: string) => (self: string) => self.toLocaleUpperCase(locale);
 export const toLocaleLowerCase = (locale: string) => (self: string) => self.toLocaleLowerCase(locale);
 
-/** The first code unit, not code point, as Effect does. */
+/** The first code unit, not code point. */
 export const capitalize = (self: string): string => (self.length === 0 ? self : self.charAt(0).toUpperCase() + self.slice(1));
 export const uncapitalize = (self: string): string =>
   self.length === 0 ? self : self.charAt(0).toLowerCase() + self.slice(1);
@@ -133,7 +132,7 @@ const SPLIT = [/([a-z0-9])([A-Z])/g, /([A-Z])([A-Z][a-z])/g, /([A-Z])([0-9])/gi,
 const CONFIG_SPLIT = [/([a-z0-9])([A-Z])/g, /([A-Z])([A-Z][a-z])/g];
 const STRIP = /[^A-Z0-9]+/gi;
 
-/** Effect's `normalizeCase`: the words, split and stripped, each transformed, joined by `delimiter`. */
+/** The words, split and stripped, each transformed, joined by `delimiter`. */
 const normalizeCase =
   (splitters: ReadonlyArray<RegExp>, delimiter: string, transform: (word: string, i: number) => string) =>
   (input: string): string => {

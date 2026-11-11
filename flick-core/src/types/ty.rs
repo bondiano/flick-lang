@@ -5,6 +5,7 @@ use std::hash::{Hash, Hasher};
 
 use serde::{Deserialize, Serialize};
 
+use super::elem::{Atom, Elem, Label};
 use super::kinds::Kind;
 use super::lang::{self, Lang};
 use crate::source::Span;
@@ -40,6 +41,13 @@ pub enum Type {
     Row(Row),
     /// `r1 + r2`.
     Union(Box<Type>, Box<Type>),
+    /// What `row` stands for without the elements named `gone`: the tail of
+    /// `{-S | r}`. A row that is known is that row without them, so only a
+    /// row variable keeps this form.
+    Without {
+        row: Box<Type>,
+        gone: Vec<Elem>,
+    },
     /// `T^c`: a qualifier on a value's captures or a stored type qualification.
     /// A bare type permits only captures exposed by its complete type.
     Captured {
@@ -60,6 +68,13 @@ pub enum Type {
         /// Class constraints, kept for class resolution.
         #[serde(default, skip_serializing_if = "Vec::is_empty")]
         constraints: Vec<Type>,
+        body: Box<Type>,
+    },
+    /// `exists K : Sig. T`: a value and a hidden module witness packaged
+    /// together. Abstract `K.Member` references in `body` use `$exists:K`.
+    Exists {
+        binder: String,
+        contract: Box<Type>,
         body: Box<Type>,
     },
     /// A unification variable.
@@ -89,11 +104,10 @@ pub struct Effects {
     /// `Atom.Read` keeps the runtime stage its function was compiled with.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub sync: bool,
-    /// Whether the arrow is written, under `Options::stages_by_class`, with a
-    /// closed row without `Async` or an effect with a `control` operation: a
-    /// plain function on Flick's own runtime, where nothing else suspends. No
-    /// part of the type: `sync` still says what unifies, and the runtime adapts
-    /// a call of either stage to a function of the other.
+    /// Calling-convention metadata for intrinsically synchronous rows on the
+    /// native runtime. Ordinary closed rows remain preemptible; absence of an
+    /// `Async` operation does not promise termination. No part of the type:
+    /// `sync` still says what unifies, and runtime calls adapt either stage.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub direct: bool,
     /// Where the row is written, for a fix that adds to it.
@@ -199,23 +213,27 @@ pub fn stage_of(effects: Option<&Effects>) -> Stage {
 }
 
 /// The labels of a row without a variable or a meta in it.
-fn closed_labels(row: &Type) -> Option<Vec<&str>> {
+fn closed_labels(row: &Type) -> Option<Vec<&Elem>> {
     let Type::Row(r) = row else { return None };
-    let mut labels: Vec<&str> = r.entries.iter().map(|(l, _)| l.as_str()).collect();
+    let mut labels: Vec<&Elem> = r.entries.iter().map(|(l, _)| l).collect();
     if let Some(tail) = &r.tail {
         labels.extend(closed_labels(tail)?);
     }
     Some(labels)
 }
 
-/// Whether `services` and `errors` make a Sync stage.
+/// Whether `services` and `errors` make a Sync stage. `Live` is no service:
+/// what a stage needs live runs nothing.
 pub fn sync_rows(services: &Type, errors: &Type) -> bool {
-    closed_labels(services).is_some_and(|l| {
+    closed_labels(services).is_some_and(|mut l| {
+        l.retain(|l| **l != Elem::Live);
         !l.is_empty()
             && l.iter().all(|l| {
-                SYNC_SERVICES
-                    .iter()
-                    .any(|&s| lang::table().find(s).is_some_and(|i| i.label == *l))
+                SYNC_SERVICES.iter().any(|&s| {
+                    lang::table()
+                        .find(s)
+                        .is_some_and(|i| l.name() == Some(&i.label))
+                })
             })
     }) && closed_labels(errors).is_some_and(|l| l.is_empty())
 }
@@ -224,7 +242,7 @@ pub fn sync_rows(services: &Type, errors: &Type) -> bool {
 /// field names; a service or error row with the element's qualified name.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct Row {
-    pub entries: Vec<(String, Type)>,
+    pub entries: Vec<(Elem, Type)>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tail: Option<Box<Type>>,
     /// Where the row is written as a type, `none` or `{…}`, for a fix that
@@ -234,7 +252,7 @@ pub struct Row {
 }
 
 impl Row {
-    pub fn closed(mut entries: Vec<(String, Type)>) -> Row {
+    pub fn closed(mut entries: Vec<(Elem, Type)>) -> Row {
         entries.sort_by(|a, b| a.0.cmp(&b.0));
         Row {
             entries,
@@ -243,9 +261,9 @@ impl Row {
         }
     }
 
-    pub fn get(&self, label: &str) -> Option<&Type> {
+    pub fn get(&self, label: &(impl Label + ?Sized)) -> Option<&Type> {
         self.entries
-            .binary_search_by(|(l, _)| l.as_str().cmp(label))
+            .binary_search_by(|(l, _)| label.against(l))
             .ok()
             .map(|i| &self.entries[i].1)
     }
@@ -255,15 +273,15 @@ impl Row {
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Norm {
     /// Sorted by label, each label once.
-    pub entries: Vec<(String, Type)>,
+    pub entries: Vec<(Elem, Type)>,
     /// Row variables, unknown rows and error markers the row extends.
     pub tails: Vec<Type>,
 }
 
 impl Norm {
-    pub fn get(&self, label: &str) -> Option<&Type> {
+    pub fn get(&self, label: &(impl Label + ?Sized)) -> Option<&Type> {
         self.entries
-            .binary_search_by(|(l, _)| l.as_str().cmp(label))
+            .binary_search_by(|(l, _)| label.against(l))
             .ok()
             .map(|i| &self.entries[i].1)
     }
@@ -285,28 +303,43 @@ impl Norm {
     }
 }
 
+/// `tail` of a row without the elements named `gone`: a tail already less
+/// some names is less these too.
+pub fn without(tail: Type, gone: &[Elem]) -> Type {
+    let (row, mut all) = match tail {
+        Type::Error => return Type::Error,
+        Type::Without { row, gone } => (row, gone),
+        other => (Box::new(other), Vec::new()),
+    };
+    all.extend(gone.iter().cloned());
+    all.sort();
+    all.dedup();
+    Type::Without { row, gone: all }
+}
+
 /// The label of a region, or of a type variable whose captures are meant, in
 /// a capture row. It follows the element, which unification may still
 /// change, so rows relabel such entries whenever they are taken apart.
-pub fn capture_label(t: &Type) -> Option<String> {
-    match t {
-        Type::Var(name) => Some(format!("^{name}")),
-        Type::Skolem(s) => Some(format!("^'{s}")),
-        Type::Meta(m) => Some(format!("^?{m}")),
-        _ => None,
-    }
+pub fn capture_label(t: &Type) -> Option<Elem> {
+    Atom::of(t).map(Elem::Capture)
 }
 
 /// The label of a type variable as an element of an error row, `{t | e}`.
 /// It follows the element until the variable stands for an error type,
 /// which is then labelled by its name like any other.
-pub fn error_label(t: &Type) -> Option<String> {
+pub fn error_label(t: &Type) -> Option<Elem> {
     match t.spine().0 {
-        Type::Con { module, name } => Some(format!("{module}.{name}")),
-        Type::Var(name) => Some(format!("~{name}")),
-        Type::Skolem(s) => Some(format!("~'{s}")),
-        Type::Meta(m) => Some(format!("~?{m}")),
-        _ => None,
+        Type::Con { module, name } => Some(Elem::Named(format!("{module}.{name}"))),
+        head => Atom::of(head).map(Elem::Error),
+    }
+}
+
+/// A service atom supplied by a static module may still be a bound variable.
+/// Its row key must follow that variable when the witness is instantiated.
+pub fn service_label(t: &Type) -> Option<Elem> {
+    match t.spine().0 {
+        Type::Con { module, name } => Some(Elem::Named(format!("{module}.{name}"))),
+        head => Atom::of(head).map(Elem::Service),
     }
 }
 
@@ -374,7 +407,7 @@ impl Type {
 
     /// Applies `f` to every direct child type.
     #[must_use]
-    pub fn map_children(&self, f: &mut impl FnMut(&Type) -> Type) -> Type {
+    pub fn map_children(&self, f: &mut dyn FnMut(&Type) -> Type) -> Type {
         let row = |row: &Row, f: &mut dyn FnMut(&Type) -> Type| Row {
             entries: row.entries.iter().map(|(l, t)| (l.clone(), f(t))).collect(),
             tail: row.tail.as_ref().map(|t| Box::new(f(t))),
@@ -403,6 +436,10 @@ impl Type {
             Type::Record(r) => Type::Record(row(r, f)),
             Type::Row(r) => Type::Row(row(r, f)),
             Type::Union(a, b) => Type::Union(Box::new(f(a)), Box::new(f(b))),
+            Type::Without { row, gone } => Type::Without {
+                row: Box::new(f(row)),
+                gone: gone.clone(),
+            },
             Type::Captured {
                 ty,
                 captures,
@@ -425,6 +462,15 @@ impl Type {
                 constraints: constraints.iter().map(&mut *f).collect(),
                 body: Box::new(f(body)),
             },
+            Type::Exists {
+                binder,
+                contract,
+                body,
+            } => Type::Exists {
+                binder: binder.clone(),
+                contract: Box::new(f(contract)),
+                body: Box::new(f(body)),
+            },
             Type::Con { .. }
             | Type::Var(_)
             | Type::Symbol(_)
@@ -435,7 +481,7 @@ impl Type {
     }
 
     /// Calls `f` on every direct child type.
-    pub fn for_each_child(&self, f: &mut impl FnMut(&Type)) {
+    pub fn for_each_child(&self, f: &mut dyn FnMut(&Type)) {
         let row = |row: &Row, f: &mut dyn FnMut(&Type)| {
             row.entries.iter().for_each(|(_, t)| f(t));
             row.tail.iter().for_each(|t| f(t));
@@ -459,6 +505,7 @@ impl Type {
             }
             Type::Tuple(items) => items.iter().for_each(f),
             Type::Record(r) | Type::Row(r) => row(r, f),
+            Type::Without { row, .. } => f(row),
             Type::Union(a, b)
             | Type::Captured {
                 ty: a, captures: b, ..
@@ -473,6 +520,10 @@ impl Type {
                 constraints.iter().for_each(&mut *f);
                 f(body);
             }
+            Type::Exists { contract, body, .. } => {
+                f(contract);
+                f(body);
+            }
             Type::Con { .. }
             | Type::Var(_)
             | Type::Symbol(_)
@@ -483,7 +534,7 @@ impl Type {
     }
 
     /// Calls `f` on every type inside, this one first.
-    pub fn visit(&self, f: &mut impl FnMut(&Type)) {
+    pub fn visit(&self, f: &mut dyn FnMut(&Type)) {
         f(self);
         self.for_each_child(&mut |t| t.visit(f));
     }
@@ -496,10 +547,21 @@ impl Type {
             return self.clone();
         }
         match self {
-            Type::Var(name) => subst
-                .iter()
-                .find(|(n, _)| n == name)
-                .map_or_else(|| self.clone(), |(_, t)| t.clone()),
+            Type::Var(name) => {
+                if let Some((_, ty)) = subst.iter().find(|(n, _)| n == name) {
+                    return ty.clone();
+                }
+                if let Some(class) = name.strip_suffix("$Dict")
+                    && let Some((_, identity)) = subst.iter().find(|(n, _)| n == class)
+                {
+                    return match identity {
+                        Type::Con { module, name } => Type::con(module, &format!("{name}$Dict")),
+                        Type::Var(name) => Type::Var(format!("{name}$Dict")),
+                        _ => self.clone(),
+                    };
+                }
+                self.clone()
+            }
             Type::Forall {
                 vars,
                 constraints,
@@ -520,7 +582,7 @@ impl Type {
         }
     }
 
-    pub fn contains(&self, pred: &mut impl FnMut(&Type) -> bool) -> bool {
+    pub fn contains(&self, pred: &mut dyn FnMut(&Type) -> bool) -> bool {
         let mut found = false;
         self.visit(&mut |t| found |= pred(t));
         found
@@ -528,55 +590,4 @@ impl Type {
 }
 
 #[cfg(test)]
-mod tests {
-    use std::hash::{DefaultHasher, Hash, Hasher};
-
-    use super::{Effects, Lang, Stage, Type};
-
-    #[test]
-    fn direct_changes_the_stage_and_not_the_type() {
-        let plain = Effects::new(Type::empty_row(), Type::empty_row());
-        let direct = Effects {
-            direct: true,
-            ..plain.clone()
-        };
-        let hash = |e: &Effects| {
-            let mut hasher = DefaultHasher::new();
-            e.hash(&mut hasher);
-            hasher.finish()
-        };
-        assert_eq!(plain, direct);
-        assert_eq!(hash(&plain), hash(&direct));
-        assert_eq!(plain.stage(), Stage::Runtime);
-        assert_eq!(direct.stage(), Stage::Sync);
-        // an interface of the default mode does not change
-        let json = |e: &Effects| serde_json::to_string(e).expect("serializes");
-        assert!(!json(&plain).contains("direct"));
-        assert!(json(&direct).contains("\"direct\":true"));
-        let read: Effects = serde_json::from_str(&json(&direct)).expect("reads");
-        assert!(read.direct);
-    }
-
-    #[test]
-    fn substitution_preserves_capture_qualification_kind() {
-        for value in [false, true] {
-            let ty = Type::Captured {
-                ty: Box::new(Type::Var("a".into())),
-                captures: Box::new(Type::Var("c".into())),
-                value,
-            };
-            let substituted = ty.substitute(&[
-                ("a".into(), Type::lang(Lang::Float)),
-                ("c".into(), Type::empty_row()),
-            ]);
-            assert_eq!(
-                substituted,
-                Type::Captured {
-                    ty: Box::new(Type::lang(Lang::Float)),
-                    captures: Box::new(Type::empty_row()),
-                    value,
-                }
-            );
-        }
-    }
-}
+mod tests;

@@ -2,13 +2,13 @@ package flickrt
 
 import "math"
 
-// Effect's `Array` functions the standard library binds, in the order Flick
+// The `Array` functions the standard library binds, in the order Flick
 // passes the arguments: data-last, the list at the end. Each copies what it
-// returns; edge cases (counts, bounds, empty lists) are Effect's.
+// returns; edge cases (counts, bounds, empty lists) are the JS target's.
 
 func pred(fb *Fiber, f, a Value) bool { return Bool(Apply(fb, f, a)) }
 
-// countOf is Effect's `Count.normalize`: a positive count, else 0.
+// countOf is a normalized count: a positive count, else 0.
 func countOf(n Value) int { return max(0, int(n.(int32))) }
 
 func ArrayFindLast(fb *Fiber, f, xs Value) Value {
@@ -85,7 +85,7 @@ func ArrayDedupeAdjacentWith(fb *Fiber, eq, xs Value) Value {
 	return out
 }
 
-// ArrayDifferenceWith is the elements of `self` not in `that`, as Effect's
+// ArrayDifferenceWith is the elements of `self` not in `that`: the
 // data-last curried form reads `difference_with eq that self`.
 func ArrayDifferenceWith(fb *Fiber, eq, that, self Value) Value {
 	return ArrayFilter(fb, Fn(func(fb *Fiber, a Value) Value { return !ArrayContainsWith(fb, eq, a, that).(bool) }), self)
@@ -98,7 +98,7 @@ func ArrayIntersectionWith(fb *Fiber, eq, that, self Value) Value {
 func ArrayFilter(fb *Fiber, f, xs Value) Value { return ListFilter(fb, f, xs) }
 
 // ArrayUnionWith is self, then the elements of that no element of self
-// equals (as Effect 4.1 has it: neither side is deduplicated).
+// equals (neither side is deduplicated).
 func ArrayUnionWith(fb *Fiber, that, eq, self Value) Value {
 	a, b := List(self), List(that)
 	switch {

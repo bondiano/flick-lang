@@ -2,11 +2,13 @@ use std::io;
 use std::path::{Path, PathBuf};
 
 use flick_core::build::{self, Artifact, Extras, Settings};
+use flick_core::codegen::EffectBridge;
 use flick_core::diagnostics::{Diagnostic, Severity, codes};
 use flick_core::iface;
 use flick_core::project::config::Backend;
 use flick_core::project::{self, Compilation, Host};
 use flick_core::source::{FileId, SourceMap};
+use flick_core::types::{Kind, Type};
 
 struct Module<'a>(&'a str);
 
@@ -59,6 +61,7 @@ fn settings(release: bool) -> Settings<'static> {
         out_dir: Path::new("/dist"),
         root: None,
         backend: Backend::Effect,
+        effect_bridge: EffectBridge::Absent,
         ui: None,
         runners: &[],
         core_modules: &[],
@@ -86,13 +89,16 @@ fn optional_outputs_have_real_artifacts_only_when_enabled() {
         assert!(file("Main.js").is_some());
         assert_eq!(
             file("package.json").is_some(),
-            cfg!(feature = "build-artifacts")
+            cfg!(feature = "native-project")
         );
         assert_eq!(
             file("Main.iface").is_some(),
-            cfg!(feature = "build-artifacts")
+            cfg!(feature = "native-project")
         );
-        assert_eq!(file("Main.js.map").is_some(), cfg!(feature = "source-maps"));
+        assert_eq!(
+            file("Main.js.map").is_some(),
+            cfg!(feature = "native-project")
+        );
         if let Some(artifact) = file("Main.iface") {
             let interface =
                 iface::read(artifact.contents.as_bytes(), "Main").expect("published interface");
@@ -112,24 +118,6 @@ fn optional_outputs_have_real_artifacts_only_when_enabled() {
             assert_eq!(map["version"], 3);
             assert_eq!(map["sources"], serde_json::json!(["file:///Main.fl"]));
         }
-    }
-}
-
-#[cfg(not(feature = "typescript"))]
-#[test]
-fn unavailable_typed_outputs_report_errors_instead_of_returning_javascript() {
-    for selection in [0, 1, 2] {
-        let mut settings = settings(false);
-        match selection {
-            0 => settings.typescript = true,
-            1 => settings.extras.dts = true,
-            _ => settings.extras.promise_facade = true,
-        }
-        let (artifacts, diagnostics) = emit(MAIN, &settings);
-        assert!(artifacts.is_empty());
-        assert_eq!(diagnostics.len(), 1);
-        assert_eq!(diagnostics[0].code, codes::F004);
-        assert_eq!(diagnostics[0].severity, Severity::Error);
     }
 }
 
@@ -182,7 +170,6 @@ fn server_fns_and_cli_blocks_are_plugins_of_std_in_every_build() {
     assert!(!missing, "{diagnostics:?}");
 }
 
-#[cfg(feature = "typescript")]
 #[test]
 fn typed_declarations_and_facades_do_not_require_native_artifact_publication() {
     let source = "module Main exposing (answer)\nanswer : Unit ->{} Int\nlet answer () = 42\n";
@@ -198,6 +185,37 @@ fn typed_declarations_and_facades_do_not_require_native_artifact_publication() {
         assert!(contains("Main.d.ts"));
         assert!(contains("Main.promise.js"));
         assert!(contains("Main.promise.d.ts"));
-        assert_eq!(contains("Main.iface"), cfg!(feature = "build-artifacts"));
+        assert_eq!(contains("Main.iface"), cfg!(feature = "native-project"));
     }
+}
+
+#[test]
+fn an_inferred_row_argument_takes_the_kind_of_its_parameter() {
+    let source = "module Main exposing (functions)\n\nimport Server\n\n\
+                  greet : String ->{Server.Server} String\n\
+                  server fn greet name = \"Hello, \" ++ name\n\n\
+                  let functions = [server greet]\n";
+    let (diagnostics, _, compilation) = compile(source);
+    let errors: Vec<_> = diagnostics
+        .iter()
+        .filter(|d| d.severity == Severity::Error)
+        .collect();
+    assert!(errors.is_empty(), "{errors:?}");
+    let main = compilation
+        .modules
+        .iter()
+        .find(|m| m.name == "Main")
+        .expect("Main compiles");
+    let functions = main
+        .interface
+        .exports
+        .iter()
+        .find(|e| e.entity.name == "functions")
+        .and_then(|e| e.scheme.clone());
+    // `Server.Function (r : ServiceRow)`: the open tail of `{Server.Server | a}`
+    let Some(Type::Forall { vars, .. }) = functions else {
+        panic!("`functions` is polymorphic: {functions:?}");
+    };
+    let kinds: Vec<Kind> = vars.into_iter().map(|b| b.kind).collect();
+    assert_eq!(kinds, [Kind::ServiceRow]);
 }

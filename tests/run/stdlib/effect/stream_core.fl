@@ -1,4 +1,4 @@
-// Effect's `Stream` and `Sink` core, on both targets: a stream is a channel
+// The core of `Stream` and `Sink`, on both targets: a stream is a channel
 // of chunks, whose boundaries show, run with a sink or folded; a sink is a
 // channel that ends with a value and its leftovers.
 module App.Main exposing (main)
@@ -32,7 +32,7 @@ let ended sink stream =
     Stream.to_channel stream |> Channel.pipe_to (Sink.to_channel sink) |> Channel.run_drain
   (value, Option.map NonEmpty.to_list leftover)
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Async; AppError} Unit
 let main () =
   let five = Stream.from_list [1, 2, 3, 4, 5]
   say ("from_list chunks: " ++ show (chunked five))

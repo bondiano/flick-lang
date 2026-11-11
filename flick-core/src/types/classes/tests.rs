@@ -96,6 +96,36 @@ fn implicit_instances_survive_interfaces() {
 }
 
 #[test]
+fn explicit_class_dictionary_has_the_class_method_shape() {
+    let src = "module App.Dict exposing (equality)\n\
+               equality : Eq.Dict String\n\
+               let equality = Eq.dictionary { eq = fun a b -> a == b }\n";
+    let (diagnostics, _) = check_all(&[("App.Dict", src)]);
+    assert!(diagnostics.is_empty(), "{diagnostics:?}");
+}
+
+#[test]
+fn explicit_superclass_dictionary_has_a_named_slot() {
+    let src = "module App.Dict exposing (hashing)\n\
+               hashing : Hash.Dict String\n\
+               let hashing = Hash.dictionary { Eq = Eq.dictionary { eq = fun _ _ -> false }; hash = fun _ -> 0 }\n";
+    let (diagnostics, _) = check_all(&[("App.Dict", src)]);
+    assert!(diagnostics.is_empty(), "{diagnostics:?}");
+}
+
+#[test]
+fn explicit_superclass_dictionary_requires_its_superclass_slot() {
+    let src = "module App.Dict exposing (hashing)\n\
+               hashing : Hash.Dict String\n\
+               let hashing = Hash.dictionary { hash = fun _ -> 0 }\n";
+    let (diagnostics, _) = check_all(&[("App.Dict", src)]);
+    assert!(
+        diagnostics.iter().any(|d| d.message.contains("Eq")),
+        "{diagnostics:?}"
+    );
+}
+
+#[test]
 fn instances_do_not_depend_on_the_order_or_form_of_imports() {
     let mains = [
         "module App.Main exposing (texts)\n\

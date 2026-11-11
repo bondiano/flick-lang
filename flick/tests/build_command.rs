@@ -1,8 +1,12 @@
 #[path = "build_command/cache.rs"]
 mod cache;
+#[path = "build_command/capabilities.rs"]
+mod capabilities;
 mod common;
 #[path = "build_command/ir.rs"]
 mod ir;
+#[path = "build_command/modules.rs"]
+mod modules;
 
 use std::fs;
 use std::path::Path;
@@ -91,17 +95,17 @@ fn build_progress_preserves_stream_contracts() {
     );
     for expected in [
         &[
-            "Preparing compiler",
             "Resolving project",
             "Checking build cache",
+            "Preparing compiler",
             "Compiling Flick modules",
             "Emitting JavaScript",
             "Writing artifacts",
             "Recording build outputs",
             "Saving build cache",
         ][..],
+        // a hit restores what it built and never reads the built-in modules
         &[
-            "Preparing compiler",
             "Resolving project",
             "Checking build cache",
             "Restoring cached artifacts",

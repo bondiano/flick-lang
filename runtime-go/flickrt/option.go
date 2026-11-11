@@ -1,134 +1,13 @@
 package flickrt
 
-// Effect's `Option` and `Result` functions the standard library binds, in
-// the order Flick passes the arguments: data-last, `self` at the end.
+// The `Option` and `Result` functions the standard library binds, in the
+// order Flick passes the arguments: data-last, `self` at the end.
 
 func opt(v Value) *Data { return v.(*Data) }
 
 func isSome(v Value) bool { return opt(v).Tag == "Some" }
 func isOk(v Value) bool   { return opt(v).Tag == "Success" }
 func value(v Value) Value { return opt(v).Fields[0] }
-
-func OptionAll(xs Value) Value {
-	out := []Value{}
-	for _, o := range List(xs) {
-		if !isSome(o) {
-			return None
-		}
-		out = append(out, value(o))
-	}
-	return Some(out)
-}
-
-func OptionAs(b, o Value) Value {
-	if isSome(o) {
-		return Some(b)
-	}
-	return None
-}
-
-func OptionAsVoid(o Value) Value { return OptionAs(Unit, o) }
-
-var OptionVoid Value = Some(Unit)
-
-// OptionComposeK is `a` through `g`, then `f`.
-func OptionComposeK(fb *Fiber, f, g, a Value) Value {
-	if b := Apply(fb, g, a); isSome(b) {
-		return Apply(fb, f, value(b))
-	}
-	return None
-}
-
-func OptionContainsWith(fb *Fiber, eq, a, o Value) Value {
-	return isSome(o) && Bool(apply2(fb, eq, value(o), a))
-}
-func OptionExists(fb *Fiber, p, o Value) Value { return isSome(o) && Bool(Apply(fb, p, value(o))) }
-
-func OptionFilter(fb *Fiber, p, o Value) Value {
-	if OptionExists(fb, p, o).(bool) {
-		return o
-	}
-	return None
-}
-
-func OptionFilterMap(fb *Fiber, f, o Value) Value {
-	if !isSome(o) {
-		return None
-	}
-	if r := Apply(fb, f, value(o)); isOk(r) {
-		return Some(value(r))
-	}
-	return None
-}
-
-func OptionFirstSomeOf(xs Value) Value {
-	for _, o := range List(xs) {
-		if isSome(o) {
-			return o
-		}
-	}
-	return None
-}
-
-func OptionFlatten(o Value) Value {
-	if isSome(o) {
-		return value(o)
-	}
-	return None
-}
-
-// OptionLift2 is `f` of the values of `oa`, then `ob`.
-func OptionLift2(fb *Fiber, f, ob, oa Value) Value { return OptionZipWith(fb, ob, f, oa) }
-
-func OptionLiftPredicate(fb *Fiber, p, b Value) Value {
-	if Bool(Apply(fb, p, b)) {
-		return Some(b)
-	}
-	return None
-}
-
-func OptionMatch(fb *Fiber, options, o Value) Value {
-	r := record(options)
-	if isSome(o) {
-		return Apply(fb, r.Get("onSome"), value(o))
-	}
-	return Apply(fb, r.Get("onNone"), Unit)
-}
-
-func OptionOrElseResult(fb *Fiber, that, o Value) Value {
-	if isSome(o) {
-		return Some(Err(value(o)))
-	}
-	if b := Apply(fb, that, Unit); isSome(b) {
-		return Some(Ok(value(b)))
-	}
-	return None
-}
-
-func OptionOrElseSome(fb *Fiber, onNone, o Value) Value {
-	if isSome(o) {
-		return o
-	}
-	return Some(Apply(fb, onNone, Unit))
-}
-
-func OptionPartitionMap(fb *Fiber, f, o Value) Value {
-	if !isSome(o) {
-		return []Value{None, None}
-	}
-	if r := Apply(fb, f, value(o)); !isOk(r) {
-		return []Value{None, Some(value(r))}
-	} else {
-		return []Value{Some(value(r)), None}
-	}
-}
-
-func OptionProduct(that, self Value) Value {
-	if isSome(self) && isSome(that) {
-		return Some([]Value{value(self), value(that)})
-	}
-	return None
-}
 
 func OptionProductMany(xs, self Value) Value {
 	if !isSome(self) {
@@ -142,44 +21,6 @@ func OptionProductMany(xs, self Value) Value {
 		out = append(out, value(o))
 	}
 	return Some(out)
-}
-
-func OptionReduceCompact(fb *Fiber, b, f, xs Value) Value {
-	out := b
-	for _, o := range List(xs) {
-		if isSome(o) {
-			out = apply2(fb, f, out, value(o))
-		}
-	}
-	return out
-}
-
-func OptionTap(fb *Fiber, f, o Value) Value {
-	if isSome(o) && isSome(Apply(fb, f, value(o))) {
-		return o
-	}
-	return None
-}
-
-func OptionZipLeft(that, self Value) Value {
-	if isSome(self) && isSome(that) {
-		return self
-	}
-	return None
-}
-
-func OptionZipRight(that, self Value) Value {
-	if isSome(self) {
-		return that
-	}
-	return None
-}
-
-func OptionZipWith(fb *Fiber, that, f, self Value) Value {
-	if isSome(self) && isSome(that) {
-		return Some(apply2(fb, f, value(self), value(that)))
-	}
-	return None
 }
 
 func ResultAll(xs Value) Value {

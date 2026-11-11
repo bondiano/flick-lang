@@ -7,7 +7,17 @@ pub(super) fn type_(p: &mut Parser) -> Option<Done> {
     if !p.enter() {
         return None;
     }
-    let done = if p.at(K::ForallKw) {
+    let done = if p.at_word("exists") && p.nth(1) == K::Con && p.nth(2) == K::Colon {
+        let m = p.start();
+        p.bump();
+        if p.expect(K::Con) && p.expect(K::Colon) {
+            type_(p);
+            if p.expect(K::Dot) {
+                type_(p);
+            }
+        }
+        Some(p.complete(m, K::ExistsType))
+    } else if p.at(K::ForallKw) {
         let m = p.start();
         p.bump();
         if !p.at(K::Ident) {
@@ -141,7 +151,9 @@ pub(super) fn at_atom_start(p: &Parser) -> bool {
 fn app(p: &mut Parser) -> Option<Done> {
     let head = capture(p)?;
     // `List _`: a hole is an argument too, though not a constructor field
-    let at_arg = |p: &Parser| at_atom_start(p) || p.at(K::Underscore);
+    let at_arg = |p: &Parser| {
+        (at_atom_start(p) || p.at(K::Underscore)) && !(p.at_word("and") && p.nth(1) == K::TypeKw)
+    };
     if !at_arg(p) {
         return Some(head);
     }

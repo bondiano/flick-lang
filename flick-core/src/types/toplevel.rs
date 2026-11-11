@@ -42,6 +42,11 @@ struct Item<'a> {
 }
 
 impl TopLevel<'_> {
+    pub(super) fn has_signature(&self, name: &str) -> bool {
+        self.by_name
+            .get(name)
+            .is_some_and(|&index| self.items[index].sig.is_some())
+    }
     /// The name of the top-level definition whose declaration holds `offset`:
     /// the user's code of a block is in the declaration the block gave, which
     /// stands after the module's own text, from `generated` on.
@@ -119,14 +124,14 @@ impl<'a> Checker<'a> {
             }
             self.settle_operators();
         }
-        self.atom_keys(&decls);
+        self.record_atom_bindings(&decls);
         self.class_defaults(&decls);
         self.solve_classes(true);
         self.check_instances(&declared);
         self.solve_rows();
         self.makers(&decls);
         self.servers(&decls);
-        self.made_in_render(&decls);
+        self.tagged_references(&decls);
         self.labelled(&decls);
         self.recursion();
         self.unknown_types();
@@ -313,19 +318,16 @@ impl<'a> Checker<'a> {
                 .collect(),
             None => vec![i],
         };
+        // what the branches of a `match` around the name that asked for the
+        // item learned is nothing of the item's either
+        let outer = mem::take(&mut self.cx);
         let saved = (
-            mem::take(&mut self.locals),
-            mem::take(&mut self.tyvars),
-            mem::take(&mut self.runtime),
-            mem::take(&mut self.stage),
-            mem::take(&mut self.subrows),
-            mem::take(&mut self.operators),
             mem::replace(&mut self.store.level, 0),
+            mem::take(&mut self.store.equalities),
             self.top.current,
             mem::take(&mut self.classes.wanted),
             mem::take(&mut self.classes.givens),
             mem::take(&mut self.classes.steps),
-            mem::take(&mut self.regions),
         );
         for &j in &members {
             self.top.items[j].state = State::Checking;
@@ -350,19 +352,14 @@ impl<'a> Checker<'a> {
         for &j in &members {
             self.top.items[j].state = State::Done;
         }
+        self.cx = outer;
         (
-            self.locals,
-            self.tyvars,
-            self.runtime,
-            self.stage,
-            self.subrows,
-            self.operators,
             self.store.level,
+            self.store.equalities,
             self.top.current,
             self.classes.wanted,
             self.classes.givens,
             self.classes.steps,
-            self.regions,
         ) = saved;
     }
 
@@ -374,9 +371,9 @@ impl<'a> Checker<'a> {
         }
         let parts = let_parts(decl, self.text);
         let Some(name) = parts.name.clone() else {
-            let mark = self.locals.len();
+            let mark = self.cx.locals.len();
             self.pattern_let(decl, &parts, None);
-            let bound: Vec<_> = self.locals.drain(mark..).collect();
+            let bound: Vec<_> = self.cx.locals.drain(mark..).collect();
             for local in bound {
                 let entity = self.env.entity(Namespace::Value, &local.name);
                 let ty = self.zonk(&local.ty);
@@ -401,7 +398,6 @@ impl<'a> Checker<'a> {
     }
 
     /// Where the top-level declaration being checked ends.
-    #[cfg(feature = "diagnostic-fixes")]
     pub fn current_end(&self) -> Option<u32> {
         self.top.current.map(|i| self.top.items[i].decl.range().1)
     }
@@ -434,7 +430,9 @@ impl<'a> Checker<'a> {
         let entity = self.env.entity(Namespace::Value, name);
         let Some(&i) = self.top.by_name.get(name) else {
             let scheme = self.env.value(&entity).cloned();
-            return scheme.map_or(Type::Error, |s| self.instantiate(&s, span));
+            return scheme.map_or(Type::Error, |s| {
+                self.instantiate(&self.live_scheme(&s), span)
+            });
         };
         if let Some(current) = self.top.current {
             self.top.edges.push((current, i, span));

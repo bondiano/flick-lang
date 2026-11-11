@@ -1,144 +1,285 @@
-/// Effect's immutable `Trie`: a map from string keys, kept in key order,
-/// with queries by key prefix.
-module Trie exposing (..)
+/// An immutable map from string keys, kept in key order, with queries by key
+/// prefix.
+module Trie exposing (
+  Trie,
+  empty,
+  from_list,
+  insert,
+  insert_many,
+  remove,
+  remove_many,
+  get,
+  has,
+  size,
+  is_empty,
+  keys,
+  values,
+  entries,
+  keys_with_prefix,
+  values_with_prefix,
+  entries_with_prefix,
+  longest_prefix_of,
+  modify,
+  reduce,
+  map,
+  filter,
+  filter_map,
+  compact,
+  for_each,
+)
+
+/// A ternary search tree over the UTF-16 code units of the keys: `left` and
+/// `right` hold the keys whose unit here is less or greater, `mid` those that
+/// go on after it. An entry is at the node its last unit leads to.
+type Node v =
+  | Tip
+  | Node { code : Int; entry : Option (String, v); left : Node v; mid : Node v; right : Node v }
 
 /// A trie with values `v`.
-type Trie v
+opaque type Trie v = Trie { blank : Option v; root : Node v; count : Int }
+
+/// The code unit of `key` at `at`.
+code_at : String -> Int -> Int
+let code_at key at = Option.with_default 0 (String.char_code_at at key)
+
+/// The tree with `entry` where the units of `key` from `at` lead.
+put : String -> Int -> (String, v) -> Node v -> Node v
+let rec put key at entry node =
+  let code = code_at key at
+  let last = at + 1 == String.length key
+  match node with
+  | Tip ->
+    if last then
+      Node { code = code; entry = Some entry; left = Tip; mid = Tip; right = Tip }
+    else
+      Node { code = code; entry = None; left = Tip; mid = put key (at + 1) entry Tip; right = Tip }
+  | Node n ->
+    if code < n.code then
+      Node { n with left = put key at entry n.left }
+    else if code > n.code then
+      Node { n with right = put key at entry n.right }
+    else if last then
+      Node { n with entry = Some entry }
+    else
+      Node { n with mid = put key (at + 1) entry n.mid }
+
+/// The entry where the units of `key` from `at` lead.
+find : String -> Int -> Node v -> Option (String, v)
+let rec find key at node =
+  match node with
+  | Tip -> None
+  | Node n ->
+    let code = code_at key at
+    if code < n.code then
+      find key at n.left
+    else if code > n.code then
+      find key at n.right
+    else if at + 1 == String.length key then
+      n.entry
+    else
+      find key (at + 1) n.mid
+
+/// A node, or no node when it holds nothing.
+pruned : Node v -> Node v
+let pruned node =
+  match node with
+  | Node { entry = None; left = Tip; mid = Tip; right = Tip } -> Tip
+  | _ -> node
+
+/// The tree without the entry where the units of `key` from `at` lead.
+drop : String -> Int -> Node v -> Node v
+let rec drop key at node =
+  match node with
+  | Tip -> Tip
+  | Node n ->
+    let code = code_at key at
+    if code < n.code then
+      pruned (Node { n with left = drop key at n.left })
+    else if code > n.code then
+      pruned (Node { n with right = drop key at n.right })
+    else if at + 1 == String.length key then
+      pruned (Node { n with entry = None })
+    else
+      pruned (Node { n with mid = drop key (at + 1) n.mid })
+
+/// The entry of a node, as a list.
+own : Option (String, v) -> List (String, v)
+let own entry =
+  match entry with
+  | Some pair -> [pair]
+  | None -> []
+
+/// The entries of a tree in key order.
+listed : Node v -> List (String, v)
+let rec listed node =
+  match node with
+  | Tip -> []
+  | Node n -> List.concat [listed n.left, own n.entry, listed n.mid, listed n.right]
+
+/// The entries whose keys start with `prefix`, whose units from `at` lead on.
+under : String -> Int -> Node v -> List (String, v)
+let rec under prefix at node =
+  match node with
+  | Tip -> []
+  | Node n ->
+    let code = code_at prefix at
+    if code < n.code then
+      under prefix at n.left
+    else if code > n.code then
+      under prefix at n.right
+    else if at + 1 == String.length prefix then
+      List.concat [own n.entry, listed n.mid]
+    else
+      under prefix (at + 1) n.mid
+
+/// The last entry on the way of the units of `key` from `at`, `best` if none.
+longest : String -> Int -> Node v -> Option (String, v) -> Option (String, v)
+let rec longest key at node best =
+  match node with
+  | Tip -> best
+  | Node n ->
+    if at == String.length key then
+      best
+    else
+      let code = code_at key at
+      if code < n.code then
+        longest key at n.left best
+      else if code > n.code then
+        longest key at n.right best
+      else
+        longest key (at + 1) n.mid (Option.or_else best n.entry)
 
 /// The trie without entries.
 empty : Trie v
-foreign pure empty from "@flick-lang/effect-ts/effect/Trie" "flickEmpty"
-  reviewed "effect@4.1.2 sha256:e39035fbcb30cf32"
+let empty = Trie { blank = None; root = Tip; count = 0 }
 
 /// A trie of the entries; a later entry for a key replaces an earlier one.
 from_list : List (String, v) -> Trie v
-foreign pure from_list from "@flick-lang/effect-ts/effect/Trie" "fromIterable"
-  reviewed "effect@4.1.2 sha256:910987f277269bb9"
+let from_list pairs = insert_many pairs empty
 
 /// The trie with `key` bound to `value`.
 insert : String -> v -> Trie v -> Trie v
-foreign pure insert from "@flick-lang/effect-ts/effect/Trie" "insert"
-  arity 2
-  reviewed "effect@4.1.2 sha256:e614b9079bab336f"
+let insert key value (Trie trie) =
+  let count = if has key (Trie trie) then trie.count else trie.count + 1
+  if key == "" then
+    Trie { trie with blank = Some value; count = count }
+  else
+    Trie { trie with root = put key 0 (key, value) trie.root; count = count }
 
 /// The trie with each entry inserted in order.
 insert_many : List (String, v) -> Trie v -> Trie v
-foreign pure insert_many from "@flick-lang/effect-ts/effect/Trie" "insertMany"
-  arity 1
-  reviewed "effect@4.1.2 sha256:4465a09ef58ced93"
+let insert_many pairs trie =
+  List.fold_left (fun acc (key, value) -> insert key value acc) trie pairs
 
 /// The trie without `key`.
 remove : String -> Trie v -> Trie v
-foreign pure remove from "@flick-lang/effect-ts/effect/Trie" "remove"
-  arity 1
-  reviewed "effect@4.1.2 sha256:d442b29bfed2f75c"
+let remove key (Trie trie) =
+  if not (has key (Trie trie)) then
+    Trie trie
+  else if key == "" then
+    Trie { trie with blank = None; count = trie.count - 1 }
+  else
+    Trie { trie with root = drop key 0 trie.root; count = trie.count - 1 }
 
 /// The trie without any of the keys.
 remove_many : List String -> Trie v -> Trie v
-foreign pure remove_many from "@flick-lang/effect-ts/effect/Trie" "removeMany"
-  arity 1
-  reviewed "effect@4.1.2 sha256:836902c2a987afda"
+let remove_many gone trie = List.fold_left (fun acc key -> remove key acc) trie gone
 
 /// The value of `key`, if the trie has it.
 get : String -> Trie v -> Option v
-foreign pure get from "@flick-lang/effect-ts/effect/Trie" "get"
-  arity 1
-  reviewed "effect@4.1.2 sha256:dbda6cc6eaada79b"
+let get key (Trie trie) =
+  if key == "" then trie.blank else Option.map (fun (_, value) -> value) (find key 0 trie.root)
 
 /// Whether the trie has `key`.
 has : String -> Trie v -> Bool
-foreign pure has from "@flick-lang/effect-ts/effect/Trie" "has"
-  arity 1
-  reviewed "effect@4.1.2 sha256:f32218615f90e46d"
+let has key trie = Option.is_some (get key trie)
 
 /// The number of entries.
 size : Trie v -> Int
-foreign pure size from "@flick-lang/effect-ts/effect/Trie" "size"
-  reviewed "effect@4.1.2 sha256:5ab09b0aa12d105d"
+let size (Trie trie) = trie.count
 
 /// Whether the trie has no entries.
 is_empty : Trie v -> Bool
-foreign pure is_empty from "@flick-lang/effect-ts/effect/Trie" "isEmpty"
-  reviewed "effect@4.1.2 sha256:4415176de8e37e1f"
+let is_empty (Trie trie) = trie.count == 0
 
 /// The keys in order.
 keys : Trie v -> List String
-foreign pure keys from "@flick-lang/effect-ts/effect/Trie" "flickKeys"
-  reviewed "effect@4.1.2 sha256:702c25147e99d486"
+let keys trie = List.map (fun (key, _) -> key) (entries trie)
 
 /// The values in the order of their keys.
 values : Trie v -> List v
-foreign pure values from "@flick-lang/effect-ts/effect/Trie" "flickValues"
-  reviewed "effect@4.1.2 sha256:bf3596cdb2a8c04f"
+let values trie = List.map (fun (_, value) -> value) (entries trie)
 
 /// The entries in key order.
 entries : Trie v -> List (String, v)
-foreign pure entries from "@flick-lang/effect-ts/effect/Trie" "toEntries"
-  reviewed "effect@4.1.2 sha256:72ecd97fb8a1e688"
+let entries (Trie trie) =
+  match trie.blank with
+  | Some value -> List.concat [[("", value)], listed trie.root]
+  | None -> listed trie.root
 
 /// The keys that start with `prefix`, in order.
 keys_with_prefix : String -> Trie v -> List String
-foreign pure keys_with_prefix from "@flick-lang/effect-ts/effect/Trie" "flickKeysWithPrefix"
-  arity 1
-  reviewed "effect@4.1.2 sha256:07e47487c4af8824"
+let keys_with_prefix prefix trie = List.map (fun (key, _) -> key) (entries_with_prefix prefix trie)
 
 /// The values whose keys start with `prefix`, in key order.
 values_with_prefix : String -> Trie v -> List v
-foreign pure values_with_prefix from "@flick-lang/effect-ts/effect/Trie" "flickValuesWithPrefix"
-  arity 1
-  reviewed "effect@4.1.2 sha256:11cda72c0e578a9e"
+let values_with_prefix prefix trie =
+  List.map (fun (_, value) -> value) (entries_with_prefix prefix trie)
 
 /// The entries whose keys start with `prefix`, in key order.
 entries_with_prefix : String -> Trie v -> List (String, v)
-foreign pure entries_with_prefix from "@flick-lang/effect-ts/effect/Trie" "toEntriesWithPrefix"
-  arity 1
-  reviewed "effect@4.1.2 sha256:697a0cec28ad358f"
+let entries_with_prefix prefix (Trie trie) =
+  if prefix == "" then entries (Trie trie) else under prefix 0 trie.root
 
 /// The entry with the longest key that is a prefix of `key`.
 longest_prefix_of : String -> Trie v -> Option (String, v)
-foreign pure longest_prefix_of from "@flick-lang/effect-ts/effect/Trie" "longestPrefixOf"
-  arity 1
-  reviewed "effect@4.1.2 sha256:fc45c3158c2361e5"
+let longest_prefix_of key (Trie trie) =
+  longest key 0 trie.root (Option.map (fun value -> ("", value)) trie.blank)
 
 /// The trie with the value of `key` replaced by `f value`, if it has the key.
 modify : String -> (v -> v)^c -> Trie v -> Trie v
-foreign pure modify from "@flick-lang/effect-ts/effect/Trie" "modify"
-  arity 2
-  retention call
-  reviewed "effect@4.1.2 sha256:78662eed9ba277ca"
+let modify key f trie =
+  match get key trie with
+  | Some value -> insert key (f value) trie
+  | None -> trie
 
 /// Folds the entries in key order: `f acc value key`.
 reduce : z -> (z -> v -> String -> z)^c -> (Trie v -> z)^c
-foreign pure reduce from "@flick-lang/effect-ts/effect/Trie" "reduce"
-  arity 2
-  retention call
-  reviewed "effect@4.1.2 sha256:7ae1c8eb56558fb8"
+let reduce initial f trie =
+  List.fold_left (fun acc (key, value) -> f acc value key) initial (entries trie)
 
 /// Each value mapped by `f value key`.
 map : (v -> String -> b)^c -> Trie v -> Trie b
-foreign pure map from "@flick-lang/effect-ts/effect/Trie" "map"
-  arity 1
-  retention call
-  reviewed "effect@4.1.2 sha256:9e54d3639492a8d3"
+let map f trie = from_list (List.map (fun (key, value) -> (key, f value key)) (entries trie))
 
 /// The entries for which `f value key` holds.
 filter : (v -> String -> Bool)^c -> Trie v -> Trie v
-foreign pure filter from "@flick-lang/effect-ts/effect/Trie" "filter"
-  arity 1
-  retention call
-  reviewed "effect@4.1.2 sha256:6448cac4164e2537"
+let filter f trie =
+  reduce empty (fun kept value key -> if f value key then insert key value kept else kept) trie
 
 /// The entries `f value key` keeps with `Ok`, mapped to its value.
 filter_map : (v -> String -> Result x b)^c -> Trie v -> Trie b
-foreign pure filter_map from "@flick-lang/effect-ts/effect/Trie" "filterMap"
-  arity 1
-  retention call
-  reviewed "effect@4.1.2 sha256:446b83fff322dae5"
+let filter_map f trie =
+  reduce
+    empty
+    (fun kept value key ->
+      match f value key with
+      | Ok made -> insert key made kept
+      | Err _ -> kept
+    )
+    trie
 
 /// The entries whose value is `Some`, unwrapped.
 compact : Trie (Option v) -> Trie v
-foreign pure compact from "@flick-lang/effect-ts/effect/Trie" "compact"
-  reviewed "effect@4.1.2 sha256:e9226ab10cebd82a"
+let compact trie =
+  reduce
+    empty
+    (fun kept value key ->
+      match value with
+      | Some present -> insert key present kept
+      | None -> kept
+    )
+    trie
 
 /// Runs `f value key` on each entry in key order.
 for_each : (v -> String ->{r; e} Unit)^c -> Trie v ->{r; e} Unit

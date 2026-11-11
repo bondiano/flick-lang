@@ -1,8 +1,23 @@
 // The sections of the documentation; the sidebar draws each one as a line of its pages.
+import { readFileSync } from "node:fs";
+
 const reference = (name) => ({ slug: `reference/${name}` });
+// The tour's order is its index's; Back and Next follow the sidebar.
+const tour = JSON.parse(readFileSync(new URL("./tour/index.json", import.meta.url), "utf8"));
 
 export const sidebar = [
-  { label: "Tour", translations: { ru: "Тур" }, items: [{ slug: "tour/signatures" }] },
+  {
+    label: "Tour",
+    translations: { ru: "Тур" },
+    items: [
+      { slug: "tour" },
+      ...tour.chapters.map((chapter) => ({
+        label: chapter.en,
+        translations: { ru: chapter.ru },
+        items: chapter.lessons.map((lesson) => ({ slug: `tour/${lesson.id}` })),
+      })),
+    ],
+  },
   {
     label: "Get started",
     translations: { ru: "Начало работы" },
@@ -10,12 +25,13 @@ export const sidebar = [
       { slug: "start" },
       { slug: "start/getting-started" },
       { slug: "start/why" },
+      { slug: "principles" },
     ],
   },
   {
     label: "Handbook",
     translations: { ru: "Руководство" },
-    items: [{ slug: "handbook/upgrading" }],
+    items: [{ slug: "handbook/designing-with-effects" }, { slug: "handbook/upgrading" }],
   },
   {
     label: "Reference",

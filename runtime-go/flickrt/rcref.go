@@ -2,9 +2,9 @@ package flickrt
 
 import "sync"
 
-// RcRef is Effect's: a resource acquired in a fiber of its own on the first
-// `get`, kept while some scope holds it, and released when the last one
-// closes (after the idle time) or when the owner of the reference does.
+// RcRef is a resource acquired in a fiber of its own on the first `get`,
+// kept while some scope holds it, and released when the last one closes
+// (after the idle time) or when the owner of the reference does.
 type rcRef struct {
 	mu        sync.Mutex
 	closed    bool

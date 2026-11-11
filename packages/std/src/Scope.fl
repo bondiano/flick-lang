@@ -1,6 +1,6 @@
-/// Effect's `Scope` as Flick's lexical `scope`: the owner of a region
-/// releases what was acquired into it when the block ends. These add work
-/// of its own to that release.
+/// The lexical `scope` as functions: the owner of a region releases what
+/// was acquired into it when the block ends. These add work of its own to
+/// that release.
 module Scope exposing (run, add_finalizer, add_finalizer_exit)
 
 import Fiber
@@ -9,7 +9,7 @@ import Fiber
 /// Runs `body` with the owner of a new region `s`, and closes it after: what
 /// `scope s { … }` stands for.
 run : (forall s. Fiber.Owner s ->{Scope s | r; e} a) ->{r; e} a
-foreign effect run from "@flick-lang/effect-ts" "scopeRun"
+foreign effect run from "flick:rt" "scopeRun"
 
 @lang scope_current
 // Not exposed: its `s` is any region, so a program could keep work under an
@@ -17,18 +17,18 @@ foreign effect run from "@flick-lang/effect-ts" "scopeRun"
 /// The owner of the region this runs in, or none outside of any: what the
 /// compiler reads for the outer owner of a `scope`.
 current : Unit ->{} Fiber.Owner s
-foreign effect current from "@flick-lang/effect-ts" "scopeCurrent"
+foreign effect current from "flick:rt" "scopeCurrent"
 
 /// Runs `finalizer` when the owner of region `s` closes, after the
 /// resources acquired later are released.
 add_finalizer : (Eff r none Unit)^c ->{Scope s | r} Unit
-foreign effect add_finalizer from "@flick-lang/effect-ts/effect/Scope" "flickAddFinalizer"
+foreign effect add_finalizer from "flick:Scope" "flickAddFinalizer"
   retention owner
   reviewed "effect@4.1.2 sha256:53499de357d8640a"
 
 /// `add_finalizer`, the finalizer seeing how the scope ended: `None` when
 /// its body succeeded, the cause otherwise.
 add_finalizer_exit : (Option RawCause ->{r} Unit)^c ->{Scope s | r} Unit
-foreign effect add_finalizer_exit from "@flick-lang/effect-ts/effect/Scope" "flickAddFinalizerExit"
+foreign effect add_finalizer_exit from "flick:Scope" "flickAddFinalizerExit"
   retention owner
   reviewed "effect@4.1.2 sha256:219836b437064bd1"

@@ -41,7 +41,7 @@ const imported = (code) => import(pathToFileURL(targetOf(code)));
 const observed = async (code) => {
   const { stdout } = await run(process.execPath, ["--input-type=module", "--eval", `
     const built = await import(${JSON.stringify(pathToFileURL(targetOf(code)).href)});
-    console.log(JSON.stringify({ answer: built.answer, label: built.state.label?.[0] ?? null }));
+    console.log(JSON.stringify({ answer: built.answer, label: built.state.label ?? null }));
   `]);
   return JSON.parse(stdout);
 };
@@ -163,7 +163,7 @@ test("host build and dev profiles override project settings and respect an expli
     const plugin = flickVite({ binary, profile });
     plugin.configResolved({ command, cacheDir: path.join(root, "cache") });
     const built = await imported((await load(plugin, file)).code);
-    labels.push(built.state.label?.[0] ?? null);
+    labels.push(built.state.label ?? null);
   }
   assert.deepEqual(labels, [null, "Profile.state", "Profile.state"]);
 });
@@ -176,7 +176,7 @@ test("a running Astro host reloads external dependencies, configuration, deletio
   mkdirSync(path.join(site, "src/pages"), { recursive: true });
   writeFileSync(path.join(site, "src/pages/index.astro"), `---
 import { answer, state } from ${JSON.stringify(file)};
-const label = state.label?.[0] ?? "none";
+const label = state.label ?? "none";
 ---
 <output id="answer">{answer}</output><output id="label">{label}</output>
 `);

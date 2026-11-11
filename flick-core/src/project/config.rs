@@ -6,6 +6,8 @@ use std::collections::BTreeMap;
 
 use crate::codegen::Labels;
 use crate::diagnostics::Code;
+pub use crate::manifest::JsDependency;
+pub use crate::plugin::reach::Grants;
 use crate::source::Span;
 use crate::types::{self, Thresholds};
 
@@ -71,16 +73,6 @@ impl Dependency {
     }
 }
 
-/// An npm package a manifest needs at run time on the js target, under
-/// `[js.dependencies]`.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct JsDependency {
-    pub name: String,
-    /// A version or range of the registry.
-    pub version: String,
-    pub span: Span,
-}
-
 /// Where the sources of a dependency come from.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Source {
@@ -143,25 +135,6 @@ pub struct Package {
     /// of any module.
     pub watch: Vec<String>,
     pub span: Span,
-}
-
-/// What `[plugins.<package>]` lets the plugin of a package reach while it
-/// expands the project's blocks; nothing without it.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct Grants {
-    /// Paths from the project's root: a file, or a directory and what it
-    /// holds.
-    pub fs_read: Vec<String>,
-    /// Hosts it fetches from over HTTP: `db.example.com` at any port, or
-    /// `localhost:8080` at that one.
-    pub net: Vec<String>,
-    /// Variables of the environment it reads.
-    pub env: Vec<String>,
-    /// The heads of blocks and the classes, as `Cli.Value`, the project does
-    /// not let the plugin handle.
-    pub disable: Vec<String>,
-    /// Where `[plugins.<package>]` is.
-    pub span: Option<Span>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -230,9 +203,7 @@ pub struct Build {
     pub out_dir: String,
     pub profile: Profile,
     pub emit: Emit,
-    #[cfg(feature = "typescript")]
     pub emit_dts: bool,
-    #[cfg(feature = "typescript")]
     /// Write Promise façades of runtime functions beside the modules.
     pub promise_facade: bool,
     pub schema_aot: bool,
@@ -247,21 +218,57 @@ pub struct Build {
     pub ui: Option<String>,
 }
 
+/// What checking a module reads of a project's configuration: the key of
+/// modules kept between runs holds this of it and nothing else, so no other
+/// setting, and no place of one in `flick.toml`, checks them again.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Checked {
+    pub limits: types::Limits,
+    pub no_let_assert: bool,
+    pub thresholds: types::Thresholds,
+    /// Whether effects are checked: not in a build without a runtime.
+    pub effects: bool,
+}
+
+impl Default for Checked {
+    /// What a file outside every project is checked with.
+    fn default() -> Self {
+        Checked {
+            limits: types::Limits::default(),
+            no_let_assert: false,
+            thresholds: types::Thresholds::default(),
+            effects: true,
+        }
+    }
+}
+
+impl Config {
+    pub fn checked(&self) -> Checked {
+        Checked {
+            limits: types::Limits {
+                steps: self.build.solver_steps,
+                depth: self.build.solver_depth,
+            },
+            no_let_assert: self.no_let_assert,
+            thresholds: self.thresholds,
+            effects: self.build.effect != Backend::None,
+        }
+    }
+}
+
 impl Default for Build {
     fn default() -> Self {
         Build {
             out_dir: "dist".into(),
             profile: Profile::Debug,
             emit: Emit::Js,
-            #[cfg(feature = "typescript")]
             emit_dts: false,
-            #[cfg(feature = "typescript")]
             promise_facade: false,
             schema_aot: false,
             solver_steps: types::Limits::default().steps,
             solver_depth: types::Limits::default().depth,
             labels: Labels::default(),
-            effect: Backend::Effect,
+            effect: Backend::Rt,
             ui: None,
         }
     }
@@ -292,7 +299,6 @@ pub enum Backend {
 #[cfg_attr(feature = "native-project", serde(rename_all = "lowercase"))]
 pub enum Emit {
     Js,
-    #[cfg(feature = "typescript")]
     Ts,
     /// A Go module per entry, built into an executable.
     Go,

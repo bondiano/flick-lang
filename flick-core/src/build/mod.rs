@@ -2,28 +2,35 @@
 //! with source maps and `.iface` files, the built-in modules they use, and
 //! for an app the runner that starts `main`.
 
-#[cfg(any(feature = "build-artifacts", feature = "typescript"))]
 mod abi;
-pub mod effects;
-#[cfg(feature = "build-artifacts")]
+#[cfg(not(target_arch = "wasm32"))]
+mod bridge_select;
+#[cfg(not(target_arch = "wasm32"))]
+mod capabilities;
+#[cfg(all(test, not(target_arch = "wasm32")))]
+mod capability_tests;
+#[cfg(feature = "native-project")]
 pub mod go;
 
-#[cfg(any(feature = "build-artifacts", feature = "typescript"))]
+pub use crate::effects;
+pub(crate) use crate::effects::bindings;
 pub use abi::interface;
 
-#[cfg(any(feature = "build-artifacts", feature = "typescript"))]
 use std::collections::BTreeMap;
 use std::collections::{HashMap, HashSet};
 use std::path::{Component, Path, PathBuf};
 use std::sync::{Arc, OnceLock};
 
-#[cfg(feature = "source-maps")]
+use tracing::debug;
+
+use crate::clock::{micros, timed};
+
+#[cfg(feature = "native-project")]
 use crate::codegen::sourcemap;
-#[cfg(feature = "typescript")]
 use crate::codegen::ts::{Facade, Projection, declaration_file, facade_files};
-use crate::codegen::{self, Labels, Options};
+use crate::codegen::{self, EffectBridge, Labels, Options};
 use crate::diagnostics::{Diagnostic, Severity, codes};
-#[cfg(feature = "build-artifacts")]
+#[cfg(feature = "native-project")]
 use crate::iface;
 use crate::iface::{Interface, Namespace};
 use crate::project::config::{Backend, MAIN_ENTRY};
@@ -59,14 +66,6 @@ pub fn schema_aot_file(name: &str) -> String {
     }
 }
 
-/// The runtime modules `[build] ui` replaces.
-const UI_RENDERER: &[&str] = &[
-    "@flick-lang/effect-ts/ui",
-    "@flick-lang/effect-ts/ui/react",
-    "@flick-lang/runtime/ui",
-    "@flick-lang/runtime/ui/react",
-];
-
 /// A file of the output, by its path relative to the output directory.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Artifact {
@@ -98,6 +97,8 @@ pub struct Settings<'a> {
     /// What runs effects: without Effect, compiled code imports the
     /// runtime's `core`.
     pub backend: Backend,
+    /// Whether the project has the optional Effect adapter for RT fallbacks.
+    pub effect_bridge: EffectBridge,
     /// The module that renders and mounts views in place of React's; a
     /// relative one is relative to the project's root.
     pub ui: Option<&'a str>,
@@ -110,20 +111,6 @@ pub struct Settings<'a> {
     /// Build, without Effect, only the modules that need no Effect, and no
     /// interfaces: the part of a library under [`effects::CORE_DIR`].
     pub core_only: bool,
-}
-
-impl Settings<'_> {
-    fn unsupported_output(&self) -> Option<Diagnostic> {
-        (!cfg!(feature = "typescript")
-            && (self.typescript || self.extras.dts || self.extras.promise_facade))
-            .then(|| {
-                Diagnostic::new(
-                    codes::F004,
-                    Severity::Error,
-                    "TypeScript output requires the `typescript` Cargo feature",
-                )
-            })
-    }
 }
 
 /// The opt-in outputs of a build.
@@ -152,12 +139,16 @@ pub fn emit(
     sources: &SourceMap,
     settings: &Settings,
 ) -> (Vec<Artifact>, Vec<Diagnostic>) {
-    if let Some(diagnostic) = settings.unsupported_output() {
-        return (Vec::new(), vec![diagnostic]);
-    }
-    #[cfg(not(feature = "source-maps"))]
+    #[cfg(not(feature = "native-project"))]
     let _ = sources;
     let mut diagnostics = Vec::new();
+    #[cfg(not(target_arch = "wasm32"))]
+    if settings.backend == Backend::Rt && !settings.effect_bridge.available() {
+        capabilities::check(compilation, settings, sources, &mut diagnostics);
+        if !diagnostics.is_empty() {
+            return (Vec::new(), diagnostics);
+        }
+    }
     let modules = &compilation.modules;
     let ext = if settings.typescript { "ts" } else { "js" };
     let is_builtin = |m: &str| types::builtin_sources().iter().any(|(n, _)| *n == m);
@@ -170,18 +161,8 @@ pub fn emit(
         }
     };
     let package = |m: &str| own_package(modules, settings, m);
-    #[cfg(any(feature = "build-artifacts", feature = "typescript"))]
     let published_interfaces = published_interfaces(compilation, settings);
-    let interface_of = |m: &str| {
-        #[cfg(any(feature = "build-artifacts", feature = "typescript"))]
-        let own = published_interfaces.get(m).cloned();
-        #[cfg(not(any(feature = "build-artifacts", feature = "typescript")))]
-        let own = modules
-            .iter()
-            .find(|module| module.name == m)
-            .map(|module| module.interface.clone());
-        own
-    };
+    let interface_of = |m: &str| published_interfaces.get(m).cloned();
     let foreign = |module: &str, spec: &str| {
         // a library's own file ships beside its module, so its spelling holds
         if compilation.shipped_foreign(module, spec).is_some() {
@@ -215,24 +196,27 @@ pub fn emit(
         direct: &direct,
         labels: settings.extras.labels,
         rt: settings.backend == Backend::Rt,
+        #[cfg(not(target_arch = "wasm32"))]
+        effect_bridge: bridge_select::select(compilation, settings.effect_bridge),
+        #[cfg(target_arch = "wasm32")]
+        effect_bridge: settings.effect_bridge,
     };
     let mut out = Vec::new();
-    #[cfg(feature = "build-artifacts")]
+    #[cfg(feature = "native-project")]
     if !settings.core_only {
         out.push(package_json(settings));
     }
+    let layout = codegen::RuntimeLayout::new(compilation.modules.iter().map(|m| &m.ir));
     let ctx = Context {
+        layout: &layout,
         modules: &compilation.modules,
         settings,
-        #[cfg(feature = "source-maps")]
+        #[cfg(feature = "native-project")]
         sources,
         options: &options,
         path: &path,
-        #[cfg(feature = "typescript")]
         package: &package,
-        #[cfg(any(feature = "build-artifacts", feature = "typescript"))]
         published_interfaces: &published_interfaces,
-        #[cfg(feature = "typescript")]
         any_interface: &any_interface,
     };
     // a built-in runner is written like any module the program imports
@@ -261,7 +245,9 @@ fn foreign_specifier(
 ) -> String {
     // `[build] ui` stands for the renderer and the mount of `Ui` and `Action`.
     let (spec, dir) = match settings.ui {
-        Some(ui) if UI_RENDERER.contains(&spec) => (ui, settings.root.map(Path::to_path_buf)),
+        Some(ui) if bindings::UI_RENDERER.contains(&spec) => {
+            (ui, settings.root.map(Path::to_path_buf))
+        }
         _ => (spec, (settings.source_dir)(module)),
     };
     let relative = spec.starts_with("./") || spec.starts_with("../");
@@ -273,10 +259,11 @@ fn foreign_specifier(
         .filter(|rt| dir.as_ref().is_some_and(|d| d.join(rt).is_file()));
     let spec = beside.as_deref().unwrap_or(spec);
     if settings.backend == Backend::None && !relative {
-        return effects::specifier(spec).unwrap_or_else(|| spec.to_owned());
+        return effects::specifier(spec).unwrap_or_else(|| effects::effect_specifier(spec));
     }
     if settings.backend == Backend::Rt && !relative {
-        return effects::rt_specifier(spec).unwrap_or_else(|| spec.to_owned());
+        // a module neither target has is the adapter's
+        return effects::rt_specifier(spec).unwrap_or_else(|| effects::effect_specifier(spec));
     }
     if settings.backend == Backend::Effect && !relative {
         return effects::effect_specifier(spec);
@@ -291,7 +278,6 @@ fn foreign_specifier(
     }
 }
 
-#[cfg(any(feature = "build-artifacts", feature = "typescript"))]
 fn published_interfaces<'a>(
     compilation: &'a Compilation,
     settings: &Settings,
@@ -330,9 +316,9 @@ fn published_interfaces<'a>(
             (module.name.as_str(), published)
         })
         .collect();
-    #[cfg(feature = "build-artifacts")]
+    #[cfg(feature = "native-project")]
     let mut published_interfaces = published_interfaces;
-    #[cfg(feature = "build-artifacts")]
+    #[cfg(feature = "native-project")]
     {
         // Hash only finalized ABI, including backend availability, exactly as published.
         let fingerprints: BTreeMap<&str, String> = published_interfaces
@@ -444,10 +430,11 @@ fn core_modules(ctx: &Context, compilation: &Compilation, out: &mut Vec<Artifact
             .filter(|(name, _, imports, _)| {
                 core.contains(name)
                     && !imports.iter().all(|i| {
-                        if compilation.modules.iter().any(|m| &m.name == i) {
-                            core.contains(i.as_str())
+                        let owner = ctx.layout.owner(i);
+                        if compilation.modules.iter().any(|m| m.name == owner) {
+                            core.contains(owner)
                         } else {
-                            effects::in_core(i)
+                            effects::in_core(owner)
                         }
                     })
             })
@@ -488,7 +475,7 @@ pub fn core_built(
         .collect()
 }
 
-#[cfg(feature = "build-artifacts")]
+#[cfg(feature = "native-project")]
 /// `package.json` of the output. Top-level initialization is pure
 /// (spec 11): only the runner of an app runs anything when loaded.
 fn package_json(settings: &Settings) -> Artifact {
@@ -559,11 +546,9 @@ fn builtins(
     out: &mut Vec<Artifact>,
     diagnostics: &mut Vec<Diagnostic>,
 ) {
-    #[cfg(feature = "typescript")]
     let dts = ctx.settings.extras.dts;
     let mut pending = imports;
     let lowered = builtin_modules_of(ctx.settings.backend == Backend::Rt);
-    #[cfg(feature = "typescript")]
     if dts {
         pending = lowered.iter().map(|module| module.name.clone()).collect();
     }
@@ -584,10 +569,14 @@ fn builtins(
             path: (ctx.path)(&module.name),
             contents: output.code,
         });
-        #[cfg(feature = "typescript")]
         if dts
-            && let Some((text, _)) =
-                declarations(&module.name, ctx.any_interface, ctx.package, ctx.path)
+            && let Some((text, _)) = declarations(
+                &module.name,
+                ctx.any_interface,
+                ctx.package,
+                ctx.path,
+                ctx.settings.backend == Backend::Rt,
+            )
         {
             out.push(Artifact {
                 path: dts_path(&(ctx.path)(&module.name)),
@@ -619,17 +608,15 @@ fn generic_of(
 
 /// What the compilation of every module shares.
 struct Context<'a> {
+    layout: &'a codegen::RuntimeLayout,
     modules: &'a [Compiled],
     settings: &'a Settings<'a>,
-    #[cfg(feature = "source-maps")]
+    #[cfg(feature = "native-project")]
     sources: &'a SourceMap,
     options: &'a Options<'a>,
     path: &'a dyn Fn(&str) -> String,
-    #[cfg(feature = "typescript")]
     package: &'a dyn Fn(&str) -> Option<String>,
-    #[cfg(any(feature = "build-artifacts", feature = "typescript"))]
     published_interfaces: &'a BTreeMap<&'a str, Interface>,
-    #[cfg(feature = "typescript")]
     any_interface: &'a dyn Fn(&str) -> Option<Interface>,
 }
 
@@ -655,55 +642,30 @@ fn compiled_module(
     if ctx.settings.backend != Backend::Rt {
         effects::control_on_js(&module.ir, diagnostics);
     }
-    let output = codegen::js(optimized.as_ref().unwrap_or(&module.ir), ctx.options);
+    let mut imports = Vec::new();
+    for (physical, output) in codegen::js_parts(
+        optimized.as_ref().unwrap_or(&module.ir),
+        ctx.options,
+        ctx.layout,
+    ) {
+        imports.extend(write_js_output(ctx, &(ctx.path)(&physical), output, out));
+    }
     let file = (ctx.path)(&module.name);
-    #[cfg(feature = "source-maps")]
-    {
-        let base = file.rsplit('/').next().unwrap_or(&file);
-        // an absolute source becomes relative to the map, so no build path ships
-        let map_dir = normalize(&ctx.settings.out_dir.join(&file));
-        let map_dir = map_dir.parent().unwrap_or(ctx.settings.out_dir);
-        let source_path = |file: FileId| {
-            let source = (ctx.settings.source_path)(file);
-            if Path::new(&source).is_absolute() {
-                specifier(map_dir, &normalize(Path::new(&source)))
-            } else {
-                source
-            }
-        };
-        let map = sourcemap::source_map(base, &output, ctx.sources, &source_path);
-        out.push(Artifact {
-            path: file.clone(),
-            contents: format!("{}//# sourceMappingURL={base}.map\n", output.code),
-        });
-        out.push(Artifact {
-            path: format!("{file}.map"),
-            contents: map,
-        });
-    }
-    #[cfg(not(feature = "source-maps"))]
-    {
-        #[cfg(feature = "typescript")]
-        let path = file.clone();
-        #[cfg(not(feature = "typescript"))]
-        let path = file;
-        out.push(Artifact {
-            path,
-            contents: output.code,
-        });
-    }
     if ctx.settings.core_only {
-        return output.imports;
+        return imports;
     }
-    #[cfg(any(feature = "build-artifacts", feature = "typescript"))]
     let built = ctx
         .published_interfaces
         .get(module.name.as_str())
         .expect("every compiled module has a published interface");
-    #[cfg(feature = "typescript")]
     if ctx.settings.extras.dts
-        && let Some((text, refused)) =
-            declarations(&module.name, ctx.any_interface, ctx.package, ctx.path)
+        && let Some((text, refused)) = declarations(
+            &module.name,
+            ctx.any_interface,
+            ctx.package,
+            ctx.path,
+            ctx.settings.backend == Backend::Rt,
+        )
     {
         out.push(Artifact {
             path: dts_path(&file),
@@ -717,7 +679,6 @@ fn compiled_module(
             ));
         }
     }
-    #[cfg(feature = "typescript")]
     if ctx.settings.extras.promise_facade {
         out.extend(facade(
             module,
@@ -727,11 +688,54 @@ fn compiled_module(
             ctx.path,
         ));
     }
-    #[cfg(feature = "build-artifacts")]
+    #[cfg(feature = "native-project")]
     out.push(Artifact {
         path: format!("{}.iface", module.name.replace('.', "/")),
         contents: iface::write(built),
     });
+    imports
+}
+
+fn write_js_output(
+    ctx: &Context,
+    file: &str,
+    output: codegen::Output,
+    out: &mut Vec<Artifact>,
+) -> Vec<String> {
+    #[cfg(not(feature = "native-project"))]
+    let _ = ctx;
+    #[cfg(feature = "native-project")]
+    {
+        let base = file.rsplit('/').next().unwrap_or(file);
+        // an absolute source becomes relative to the map, so no build path ships
+        let map_dir = normalize(&ctx.settings.out_dir.join(file));
+        let map_dir = map_dir.parent().unwrap_or(ctx.settings.out_dir);
+        let source_path = |file: FileId| {
+            let source = (ctx.settings.source_path)(file);
+            if Path::new(&source).is_absolute() {
+                specifier(map_dir, &normalize(Path::new(&source)))
+            } else {
+                source
+            }
+        };
+        let map = sourcemap::source_map(base, &output, ctx.sources, &source_path);
+        out.push(Artifact {
+            path: file.to_owned(),
+            contents: format!("{}//# sourceMappingURL={base}.map\n", output.code),
+        });
+        out.push(Artifact {
+            path: format!("{file}.map"),
+            contents: map,
+        });
+    }
+    #[cfg(not(feature = "native-project"))]
+    {
+        let path = file.to_owned();
+        out.push(Artifact {
+            path,
+            contents: output.code,
+        });
+    }
     output.imports
 }
 
@@ -744,11 +748,11 @@ fn runner(file: &str, entry: &str, start: &Start, schema_aot: Option<&str>) -> A
     let (import, run) = match start {
         Start::Call => (None, "main(undefined);"),
         Start::RunMain => (
-            Some(("runMain", "@flick-lang/effect-ts")),
+            Some(("runMain", bindings::ADAPTER_PREFIX)),
             "await runMain(main);",
         ),
         Start::RunMainRt => (
-            Some(("runMain", "@flick-lang/runtime/rt")),
+            Some(("runMain", bindings::NATIVE_ENTRY)),
             "await runMain(main);",
         ),
         // what `run` returns is what the host takes from the module, such as Cloudflare's `fetch`
@@ -759,7 +763,8 @@ fn runner(file: &str, entry: &str, start: &Start, schema_aot: Option<&str>) -> A
     });
     let contents = if let Some(aot) = schema_aot {
         format!(
-            "import {{ enableSchemaAot, installSchemaAot }} from \"@flick-lang/effect-ts\";\n{import}\nenableSchemaAot();\nconst {{ main }} = await import(\"{entry}\");\ninstallSchemaAot(await import(\"./{aot}\"));\n{run}\n"
+            "import {{ enableSchemaAot, installSchemaAot }} from \"{}\";\n{import}\nenableSchemaAot();\nconst {{ main }} = await import(\"{entry}\");\ninstallSchemaAot(await import(\"./{aot}\"));\n{run}\n",
+            bindings::ADAPTER_PREFIX
         )
     } else {
         format!("{import}import {{ main }} from \"{entry}\";\n\n{run}\n")
@@ -786,29 +791,27 @@ enum Start {
 /// The module of compiled decoders an app's runner installs.
 pub const SCHEMA_AOT: &str = "schemas.aot.js";
 
-#[cfg(feature = "typescript")]
 /// The `.d.ts` of module `name`, and the exports it refused with why.
 fn declarations(
     name: &str,
     interfaces: &dyn Fn(&str) -> Option<Interface>,
     package: &dyn Fn(&str) -> Option<String>,
     path: &dyn Fn(&str) -> String,
+    rt: bool,
 ) -> Option<(String, Vec<(String, String)>)> {
-    let projection = Projection::new(name, interfaces, package);
+    let projection = Projection::for_runtime(name, interfaces, package, rt);
     let interface = interfaces(name)?;
     let here = path(name);
     let import = |m: &str| codegen::relative(&here, &path(m));
     Some(declaration_file(&projection, &interface, &import))
 }
 
-#[cfg(feature = "typescript")]
 /// `A/B.d.ts` beside `A/B.js` (or `A/B.ts`).
 fn dts_path(file: &str) -> String {
     let stem = file.rsplit_once('.').map_or(file, |(s, _)| s);
     format!("{stem}.d.ts")
 }
 
-#[cfg(feature = "typescript")]
 /// The Promise façade of `module`: each exported runtime function that
 /// needs no service and whose earlier stages only make closures.
 fn facade(
@@ -891,7 +894,15 @@ fn specifier(from: &Path, target: &Path) -> String {
 /// it, for every target alike; `by_class` is the mode the build is checked in.
 pub fn optimized(modules: &[Compiled], module: &Compiled, by_class: bool) -> ir::Module {
     let mut ir = module.ir.clone();
-    let exported = |name: &str| module.interface.exports_value(name);
+    let exported = |name: &str| {
+        module.interface.exports_value(name)
+            || module
+                .ir
+                .initialization
+                .prefixes
+                .iter()
+                .any(|p| p.bindings.iter().any(|n| n == name))
+    };
     let generics = |m: &str, name: &str| generic_of(modules, m, name, by_class);
     opt::optimize(&mut ir, &exported, &generics);
     ir
@@ -902,24 +913,62 @@ pub fn builtin_modules() -> &'static [ir::Module] {
     builtin_modules_of(false)
 }
 
-/// The built-in modules, lowered from a check with `stages_by_class`.
+/// The built-in modules, lowered from a check with `stages_by_class`: read
+/// from the host's store, or checked and lowered once and given to it.
 pub fn builtin_modules_of(stages_by_class: bool) -> &'static [ir::Module] {
-    &lowered_builtins(stages_by_class).0
+    static MODULES: [OnceLock<Vec<ir::Module>>; 2] = [OnceLock::new(), OnceLock::new()];
+    MODULES[usize::from(stages_by_class)].get_or_init(|| {
+        let store = BUILTIN_STORE.get();
+        if let Some(kept) = store.and_then(|store| (store.load)(stages_by_class)) {
+            return kept;
+        }
+        let (modules, declarations) = lower_builtins(stages_by_class);
+        if !stages_by_class {
+            // the same pass serves the reference model
+            let _ = DECLARATIONS.set(declarations);
+        }
+        if let Some(store) = store {
+            (store.save)(stages_by_class, &modules);
+        }
+        modules
+    })
 }
+
+/// Where a host keeps the lowered built-in modules between its processes:
+/// lowering them takes longer than building a small project. What `load`
+/// gives must be what `save` got from this compiler for the same sources of
+/// the built-in modules and the same mode of `stages_by_class`. Asked for
+/// when a build first reads a mode, which only the emitters decide: a host
+/// that installed them up front would read both modes for every build.
+pub struct BuiltinStore {
+    pub load: fn(bool) -> Option<Vec<ir::Module>>,
+    pub save: fn(bool, &[ir::Module]),
+}
+
+static BUILTIN_STORE: OnceLock<BuiltinStore> = OnceLock::new();
+
+/// Keeps the lowered built-in modules in `store` from now on; false when a
+/// store is set already.
+pub fn keep_builtin_modules(store: BuiltinStore) -> bool {
+    BUILTIN_STORE.set(store).is_ok()
+}
+
+static DECLARATIONS: OnceLock<Vec<Arc<Interface>>> = OnceLock::new();
 
 /// What the reference model reads of each built-in module, in the order of
 /// [`builtin_modules`].
 pub fn builtin_declarations() -> &'static [Arc<Interface>] {
-    &lowered_builtins(false).1
+    // lowering the modules fills this too, unless a store had them
+    builtin_modules_of(false);
+    DECLARATIONS.get_or_init(|| lower_builtins(false).1)
 }
 
 /// The built-in modules lowered, with what the reference model reads of each.
 type Lowered = (Vec<ir::Module>, Vec<Arc<Interface>>);
 
-fn lowered_builtins(stages_by_class: bool) -> &'static Lowered {
-    static BUILTINS: [OnceLock<Lowered>; 2] = [OnceLock::new(), OnceLock::new()];
-    BUILTINS[usize::from(stages_by_class)].get_or_init(|| {
-        let (mut lowered, mut declarations) = (Vec::new(), Vec::new());
+fn lower_builtins(stages_by_class: bool) -> Lowered {
+    let (mut lowered, mut declarations) = (Vec::new(), Vec::new());
+    let ((), elapsed) = timed(|| {
         types::check_each(
             types::builtin_sources(),
             stages_by_class,
@@ -928,11 +977,17 @@ fn lowered_builtins(stages_by_class: bool) -> &'static Lowered {
                 declarations.push(typing.declarations.clone());
             },
         );
-        (lowered, declarations)
-    })
+    });
+    debug!(
+        modules = lowered.len(),
+        ?elapsed,
+        micros = micros(elapsed),
+        "built-in modules lowered"
+    );
+    (lowered, declarations)
 }
 
-#[cfg(all(test, any(feature = "build-artifacts", feature = "typescript")))]
+#[cfg(test)]
 mod tests {
     use crate::iface::{self, Interface};
     use crate::ir::tests::check_text;

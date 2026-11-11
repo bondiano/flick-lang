@@ -5,7 +5,8 @@ import { Effect, type Fiber, Option, type Scope } from "effect";
 
 import { CurrentOwner, FlickFiber, type Owner, within } from "../owner.ts";
 
-const owners = /*#__PURE__*/ new WeakMap<object, Owner>();
+interface GroupOwner { readonly owner: Owner; open: boolean }
+const owners = /*#__PURE__*/ new WeakMap<object, GroupOwner>();
 
 /**
  * Makes the collection and remembers the owner the call acquires into. The
@@ -21,8 +22,12 @@ export const owned = <T extends object>(
   Effect.flatMap(Effect.service(CurrentOwner), (owner) =>
     Effect.map(make, (value) => {
       if (owner !== undefined) {
-        owners.set(value, owner);
-        owner.closing.add(() => clear(value));
+        const group = { owner, open: true };
+        owners.set(value, group);
+        owner.closing.add(() => Effect.suspend(() => {
+          group.open = false;
+          return clear(value);
+        }));
       }
       return value;
     }),
@@ -30,12 +35,13 @@ export const owned = <T extends object>(
 
 /** `task` acquiring into the owner of `collection`. */
 export const inOwner = <A, E, R>(collection: object, task: Effect.Effect<A, E, R>): Effect.Effect<A, E, Exclude<R, Scope.Scope>> => {
-  const owner = owners.get(collection);
+  const group = owners.get(collection);
   // without an owner (made outside every scope) the task keeps the scope of its fiber
   // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the compiler provides `Scope` lexically
-  if (owner === undefined) return task as Effect.Effect<A, E, Exclude<R, Scope.Scope>>;
-  // a closing owner admits no new child
-  return Effect.suspend(() => (owner.open ? within(owner, task) : Effect.interrupt));
+  if (group === undefined) return task as Effect.Effect<A, E, Exclude<R, Scope.Scope>>;
+  // The group closes at its own C1 hook. A group made during the owner's
+  // closing is still open until that hook runs, before resource finalizers.
+  return Effect.suspend(() => (group.open ? within(group.owner, task) : Effect.interrupt));
 };
 
 /** A native child as a Flick `Fiber`. */

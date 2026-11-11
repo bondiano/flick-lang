@@ -22,6 +22,7 @@ pub fn validate(
         module: "",
         scope: Vec::new(),
         vars: Vec::new(),
+        loops: Vec::new(),
         problems: Vec::new(),
     };
     let mut seen = BTreeSet::new();
@@ -65,6 +66,7 @@ struct Validator<'p> {
     /// The names `Var` binds, of every block entered; a name is a variable
     /// where its innermost binder in `scope` is one.
     vars: Vec<String>,
+    loops: Vec<String>,
     problems: Vec<String>,
 }
 
@@ -108,10 +110,42 @@ impl Validator<'_> {
         }
     }
 
+    fn loop_exit(&mut self, id: &str, value: Option<&Expr>) {
+        if self.loops.last().map(String::as_str) != Some(id) {
+            let problem = if self.loops.iter().any(|loop_id| loop_id == id) {
+                format!("exit does not target the nearest loop: `{id}`")
+            } else {
+                format!("exit targets no loop: `{id}`")
+            };
+            self.problems.push(problem);
+        }
+        if let Some(value) = value {
+            self.expr(value);
+        }
+    }
+
+    fn control_loop(&mut self, id: &str, condition: Option<&Expr>, body: &Expr) {
+        self.loops.push(id.to_owned());
+        if let Some(condition) = condition {
+            self.expr(condition);
+        }
+        self.expr(body);
+        self.loops.pop();
+    }
+
     fn expr(&mut self, e: &Expr) {
         self.span(e.span);
         let (mark, vars) = (self.scope.len(), self.vars.len());
         match &e.kind {
+            ExprKind::ControlLoop {
+                id,
+                condition,
+                body,
+                ..
+            } => {
+                self.control_loop(id, condition.as_deref(), body);
+            }
+            ExprKind::LoopExit { id, value } => self.loop_exit(id, value.as_deref()),
             ExprKind::Local(name) => self.used(name),
             ExprKind::Var(name) => self.variable(name, "reads"),
             ExprKind::Global { module, .. } => {
@@ -132,7 +166,15 @@ impl Validator<'_> {
                 }
                 self.expr(body);
             }
-            ExprKind::Each { pat, source, body } => {
+            ExprKind::Each {
+                pat,
+                source,
+                body,
+                stop,
+            } => {
+                if let Some(stop) = stop {
+                    self.expr(stop);
+                }
                 self.expr(source);
                 bind(pat, &mut self.scope);
                 self.expr(body);
@@ -279,6 +321,7 @@ mod tests {
                 name: "App.Main".into(),
                 items: vec![item],
                 labels: BTreeMap::default(),
+                initialization: crate::Initialization::default(),
             }],
         }
     }
@@ -374,6 +417,37 @@ mod tests {
         assert_eq!(
             validate(&program(body), &|_| false, &files),
             ["`App.Main` uses the local `x`, which nothing binds there"]
+        );
+    }
+    #[test]
+    fn exits_target_the_nearest_loop() {
+        let files = BTreeSet::from([FileId::new(0)]);
+        let exit = || {
+            at(ExprKind::LoopExit {
+                id: "outer".into(),
+                value: None,
+            })
+        };
+        let looping = |id: &str, body| {
+            at(ExprKind::ControlLoop {
+                id: id.into(),
+                condition: None,
+                body: Box::new(body),
+                iterable: false,
+            })
+        };
+        assert_eq!(
+            validate(&program(looping("outer", exit())), &|_| false, &files),
+            Vec::<String>::new()
+        );
+        assert_eq!(
+            validate(&program(exit()), &|_| false, &files),
+            ["exit targets no loop: `outer`"]
+        );
+        let nested = looping("outer", looping("inner", exit()));
+        assert_eq!(
+            validate(&program(nested), &|_| false, &files),
+            ["exit does not target the nearest loop: `outer`"]
         );
     }
 }

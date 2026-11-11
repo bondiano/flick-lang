@@ -11,10 +11,10 @@ import (
 	"sync"
 )
 
-// Http.ServerRequest as Effect's HttpServerRequest: a request a server got
-// or one made of a client request, as a handler sees it. A middleware or a
-// router gives a handler a changed copy (another URL, other headers); the
-// copies share their source, whose body is read once.
+// Http.ServerRequest: a request a server got or one made of a client
+// request, as a handler sees it. A middleware or a router gives a handler
+// a changed copy (another URL, other headers); the copies share their
+// source, whose body is read once.
 
 type ServerRequest struct {
 	src         *requestSource
@@ -101,7 +101,7 @@ func (q *ServerRequest) header(name string) (string, bool) {
 
 // read is the body's bytes, read once: up to the largest size
 // `with_max_body_size` gives when it is first read, a served request's and
-// (as since Effect 4.1) one made of a client request's.
+// one made of a client request's.
 func (s *requestSource) read(fb *Fiber) ([]byte, error) {
 	s.once.Do(func() {
 		limit := int64(-1)
@@ -129,7 +129,7 @@ type errString string
 
 func (e errString) Error() string { return string(e) }
 
-// bytes is the body, failing as Effect does with a RequestParseError.
+// bytes is the body, failing with a RequestParseError.
 func (q *ServerRequest) bytes(fb *Fiber) []byte {
 	var body []byte
 	var err error
@@ -234,7 +234,7 @@ func (q *ServerRequest) toURL() Value {
 			protocol = "https"
 		}
 	}
-	// a path stays on the host, as Effect resolves `.` ++ path: `//x` names no other host
+	// a path stays on the host: `//x` names no other host
 	if strings.HasPrefix(q.url, "/") {
 		if u, ok := parseURL(protocol + "://" + host + q.url); ok {
 			return Some(*u)
@@ -333,7 +333,7 @@ func RequestFromClientRequest(c Value) Value {
 	}
 }
 
-// removeHost is the path of a URL, as Effect takes it from a full one.
+// removeHost is the path of a URL, taken from a full one.
 func removeHost(url string) string {
 	if strings.HasPrefix(url, "/") {
 		return url

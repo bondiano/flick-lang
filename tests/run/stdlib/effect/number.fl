@@ -1,4 +1,4 @@
-// Numbers, BigInts and decimals from Effect's `Float`, `BigInt` and
+// Numbers, BigInts and decimals from `Float`, `BigInt` and
 // `BigDecimal`, and redacted values from `Redacted`.
 module App.Main exposing (main)
 

@@ -8,8 +8,8 @@ import (
 	"unicode/utf8"
 )
 
-// The scalars, indicators and flow collections of Effect's encoding/Yaml
-// (based on `yaml` 2.9.0); its block structure is in encoding_yaml.go.
+// The scalars, indicators and flow collections of YAML (based on `yaml`
+// 2.9.0); its block structure is in encoding_yaml.go.
 
 func isSpaceAt(s string, i int) bool {
 	if i >= len(s) {
@@ -273,8 +273,8 @@ func parseYamlKey(input string) string {
 	return stringOfJSON(v)
 }
 
-// yamlMapping is Effect's MappingBuilder: explicit keys take precedence
-// over merged keys, and earlier merge sources over later ones.
+// yamlMapping builds a mapping: explicit keys take precedence over merged
+// keys, and earlier merge sources over later ones.
 type yamlMapping struct {
 	out *Record
 	// keys added by the merge key, which an explicit key may still
@@ -317,8 +317,8 @@ func (m *yamlMapping) merge(value Value, fail func(string)) {
 	}
 }
 
-// yamlFlow is Effect's FlowParser of a `[…]` or `{…}`: while a collection
-// is open, the end of the line goes on with `nextLine`.
+// yamlFlow is the parser of a `[…]` or `{…}`: while a collection is open,
+// the end of the line goes on with `nextLine`.
 type yamlFlow struct {
 	in       string
 	i        int

@@ -18,11 +18,12 @@ use crate::diagnostics::codes;
 use crate::source::Span;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
+use crate::types::Elem;
 
 /// An effect a handler has arms for.
 pub struct Handled {
     /// `M.E`, its label in a row.
-    pub label: String,
+    pub label: Elem,
     /// `E ā`, its entry in a row, the parameters as the arms see them.
     pub entry: Type,
     /// The number of parameters of the effect.
@@ -162,7 +163,7 @@ impl Checker<'_> {
             let args: Vec<Type> = (0..params.len()).map(|_| self.fresh()).collect();
             handled.push(Handled {
                 entry: Type::apps(Type::con(&entity.module, &entity.name), args),
-                label,
+                label: Elem::Named(label),
                 params: params.len(),
                 operations,
                 covered: Vec::new(),
@@ -183,7 +184,7 @@ impl Checker<'_> {
         result: &Type,
         region: Option<&Type>,
     ) -> bool {
-        let mark = self.locals.len();
+        let mark = self.cx.locals.len();
         let frame = self.enter_arm();
         let (vars, constraints, body) = match &op.ty {
             Type::Forall {
@@ -273,7 +274,7 @@ impl Checker<'_> {
             }
         }
         self.leave_arm(frame);
-        self.locals.truncate(mark);
+        self.cx.locals.truncate(mark);
         // it covers the operation when it takes every value of its arguments
         let covers = !guarded
             && pats.len() == params.len()
@@ -288,10 +289,15 @@ impl Checker<'_> {
     /// The body of a `tail` arm of an operation that declares the rows `own`;
     /// inside another `tail` arm, that arm's limit holds too.
     fn tail_arm_body(&mut self, body: &Node, value: &Type, own: &[Type]) {
-        let allowed = self.stage.tail_arm.clone().unwrap_or_else(|| own.to_vec());
-        let outer = self.stage.tail_arm.replace(allowed);
+        let allowed = self
+            .cx
+            .stage
+            .tail_arm
+            .clone()
+            .unwrap_or_else(|| own.to_vec());
+        let outer = self.cx.stage.tail_arm.replace(allowed);
         self.check(body, value);
-        self.stage.tail_arm = outer;
+        self.cx.stage.tail_arm = outer;
     }
 
     /// A call in a `tail` arm needs `needs`: the arm runs on the stack of a
@@ -341,8 +347,8 @@ impl Checker<'_> {
         let resume = Type::Fun {
             param: Box::new(value.clone()),
             effects: Some(Box::new(Effects {
-                direct: self.direct_row(&self.stage.services),
-                ..Effects::new(self.stage.services.clone(), self.stage.errors.clone())
+                direct: self.direct_row(&self.cx.stage.services, &self.cx.stage.errors),
+                ..Effects::new(self.cx.stage.services.clone(), self.cx.stage.errors.clone())
             })),
             result: Box::new(result.clone()),
         };
@@ -366,7 +372,7 @@ impl Checker<'_> {
     /// An arm for an operation not found, after its diagnostic: what it
     /// binds is unknown.
     pub fn unknown_operation_arm(&mut self, arm: &Node, result: &Type) {
-        let mark = self.locals.len();
+        let mark = self.cx.locals.len();
         if let Some(pattern) = arm_pattern(arm) {
             for arg in pattern.nodes().filter(|n| is_pattern(n.kind)) {
                 self.bind_pattern(arg, &Type::Error);
@@ -383,7 +389,7 @@ impl Checker<'_> {
                 _ => {}
             }
         }
-        self.locals.truncate(mark);
+        self.cx.locals.truncate(mark);
     }
 
     /// The region of `resume` in the `control` arms of the handler `node`,
@@ -407,23 +413,24 @@ impl Checker<'_> {
         let Type::Skolem(id) = region else {
             unreachable!("a skolem")
         };
-        self.regions.scopes.push(Scope {
+        self.cx.regions.scopes.push(Scope {
             region: id,
             span,
             node: node.range(),
-            outer: self.stage.services.clone(),
-            parent: self.regions.nest.last().copied(),
+            outer: self.cx.stage.services.clone(),
+            parent: self.cx.regions.nest.last().copied(),
             handler: true,
         });
-        self.regions.nest.push(self.regions.scopes.len() - 1);
+        self.cx.regions.nest.push(self.cx.regions.scopes.len() - 1);
         Some(region)
     }
 
     /// After the arms: `resume` stays in them, so nothing of its region
     /// is in the value of the handler (G002).
     pub fn leave_resume(&mut self, ty: &Type, node: &Node) {
-        self.regions.nest.pop();
+        self.cx.regions.nest.pop();
         self.store.level -= 1;
+        self.grow();
         if let Err(skolem) = self.store.leave(ty) {
             let shown = self.show(ty);
             let head = format!("the value of this handler has type `{shown}`");

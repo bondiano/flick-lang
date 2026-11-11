@@ -37,6 +37,15 @@ export class Owner {
     this.defects = defects;
   }
 
+  /** Stops an external source of children before resource finalizers run. */
+  onClose(hook: () => Effect.Effect<unknown, unknown>): Effect.Effect<void, unknown> {
+    return Effect.suspend(() => {
+      if (this.finalizing) return Effect.asVoid(hook());
+      this.closing.add(hook);
+      return Effect.void;
+    });
+  }
+
   track(promise: Promise<unknown>): void {
     this.pending.add(promise);
     const traced = tracing && this.trace !== 0 ? { o: this.trace, t: traceId() } : undefined;
@@ -66,12 +75,12 @@ const settle = async (owner: Owner): Promise<void> => {
   }
 };
 
-/** The two-phase close of `owner` after its body ended with `exit`. */
-export const close = <A, E>(owner: Owner, exit: Exit.Exit<A, E>): Effect.Effect<Exit.Exit<A, unknown>> =>
+/** Cleanup after `exit`, apart from the body's outcome, for an external scope. */
+export const closeOwn = <A, E>(owner: Owner, exit: Exit.Exit<A, E>): Effect.Effect<Exit.Exit<void, unknown>> =>
   Effect.gen(function* () {
     owner.open = false;
     owner.phase("C0");
-    let cause: Cause.Cause<unknown> = Exit.isFailure(exit) ? exit.cause : Cause.empty;
+    let cause: Cause.Cause<unknown> = Cause.empty;
     const ran = new Set<() => Effect.Effect<unknown, unknown>>();
     const hooks = Effect.gen(function* () {
       for (const hook of owner.closing) {
@@ -100,7 +109,7 @@ export const close = <A, E>(owner: Owner, exit: Exit.Exit<A, E>): Effect.Effect<
     yield* hooks;
     // a settling foreign call may add a hook, and a hook may start one: repeat until neither (`docs/formal/runtime.md#a-hook-added-during-c4-does-not-run`)
     for (;;) {
-      yield* Effect.promise(() => settle(owner));
+      if (owner.pending.size > 0) yield* Effect.promise(() => settle(owner));
       if ([...owner.closing].every((hook) => ran.has(hook))) break;
       yield* hooks;
     }
@@ -110,7 +119,14 @@ export const close = <A, E>(owner: Owner, exit: Exit.Exit<A, E>): Effect.Effect<
     const closed = yield* Effect.exit(Scope.close(owner.resources, exit));
     owner.phase("C6");
     if (Exit.isFailure(closed)) cause = Cause.combine(cause, closed.cause);
-    return cause.reasons.length === 0 ? exit : Exit.failCause(cause);
+    return cause.reasons.length === 0 ? Exit.void : Exit.failCause(cause);
+  });
+
+/** The two-phase close of `owner`, joining its body and cleanup outcomes. */
+export const close = <A, E>(owner: Owner, exit: Exit.Exit<A, E>): Effect.Effect<Exit.Exit<A, unknown>> =>
+  Effect.map(closeOwn(owner, exit), (cleanup) => {
+    if (Exit.isSuccess(cleanup)) return exit;
+    return Exit.failCause(Exit.isFailure(exit) ? Cause.combine(exit.cause, cleanup.cause) : cleanup.cause);
   });
 
 const first = <A>(set: ReadonlySet<A>): A | undefined => set.values().next().value;

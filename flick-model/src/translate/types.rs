@@ -8,6 +8,7 @@
 use std::collections::BTreeMap;
 use std::rc::Rc;
 
+use flick_core::types::lang::Lang;
 use flick_core::types::{self as fc, Binder};
 
 use crate::syntax::Path;
@@ -15,7 +16,7 @@ use crate::types::{Caps, Fields, Kind, Row, Scheme, Stage, Type, Var};
 
 const PRELUDE: &str = "Prelude";
 
-fn kind(k: &fc::Kind) -> Option<Kind> {
+pub(crate) fn kind(k: &fc::Kind) -> Option<Kind> {
     Some(match k {
         fc::Kind::ServiceRow => Kind::Services,
         fc::Kind::ErrorRow => Kind::Errors,
@@ -46,9 +47,9 @@ pub fn scheme(t: &fc::Type) -> Scheme {
                 out = Type::fun(constraint(c), Stage::Pure, out);
             }
             for c in constraints.iter().filter(|c| !passes(c)) {
-                if let (fc::Type::Con { name, .. }, args) = c.spine()
+                if let (head, args) = c.spine()
                     && let [r, s] = &args[..]
-                    && name == "Provided"
+                    && head.is_lang(Lang::Provided)
                 {
                     out = out.with_provided(&row(r), &ty(s));
                 }
@@ -57,7 +58,7 @@ pub fn scheme(t: &fc::Type) -> Scheme {
                 .iter()
                 .filter(|c| !passes(c))
                 .filter_map(|c| match c.spine() {
-                    (fc::Type::Con { name, .. }, args) if name == "Outlives" => match &args[..] {
+                    (head, args) if head.is_lang(Lang::Outlives) => match &args[..] {
                         [c, s] => Some((caps(c), ty(s))),
                         _ => None,
                     },
@@ -97,10 +98,15 @@ pub fn constraint(c: &fc::Type) -> Type {
 
 pub fn ty(t: &fc::Type) -> Type {
     match t {
-        fc::Type::Con { module, name } => match name.strip_suffix(".Impl") {
-            Some(service) => Type::Impl(Row::one(Path::new(module, service))),
-            None => Type::con(module, name),
-        },
+        fc::Type::Con { module, name } => {
+            if let Some(class) = name.strip_suffix("$Dict") {
+                Type::Dict(Path::new(module, class), Rc::from([]))
+            } else if let Some(service) = name.strip_suffix(".Impl") {
+                Type::Impl(Row::one(Path::new(module, service)))
+            } else {
+                Type::con(module, name)
+            }
+        }
         fc::Type::Var(v) => Type::Var(Var::Named(v.as_str().into())),
         fc::Type::App { .. } => app(t),
         fc::Type::Fun {
@@ -127,6 +133,9 @@ pub fn ty(t: &fc::Type) -> Type {
             captures,
         } => Type::Bounded(Rc::new(ty(inner)), caps(captures)),
         fc::Type::Forall { .. } => Type::Forall(Rc::new(scheme(t))),
+        // a row written as the argument of a type: `Atom.Async a none`, as
+        // instantiating a row variable there gives it (`generalize::substitute`)
+        fc::Type::Row(_) | fc::Type::Union(..) | fc::Type::Without { .. } => Type::Errors(row(t)),
         other => Type::Con(Path::new("?", &format!("{other:?}"))),
     }
 }
@@ -134,18 +143,22 @@ pub fn ty(t: &fc::Type) -> Type {
 fn app(t: &fc::Type) -> Type {
     let (head, args) = t.spine();
     if let fc::Type::Con { module, name } = head
-        && module == PRELUDE
+        && let Some(class) = name.strip_suffix("$Dict")
     {
-        match (name.as_str(), &args[..]) {
-            ("Eff", [r, e, a]) => return Type::Eff(row(r), row(e), Rc::new(ty(a))),
-            ("Eff", [r, e]) => return Type::EffOf(row(r), row(e)),
-            ("Layer", [i, e, o]) => return Type::Layer(row(i), row(e), row(o)),
-            ("Errors", [r]) => return Type::Errors(row(r)),
-            ("Ref", [a]) => return Type::Ref(Rc::new(ty(a))),
-            ("ServiceImpl", [r]) => return Type::Impl(row(r)),
-            ("ServiceTag", [r]) => return Type::Tag(row(r)),
-            _ => {}
-        }
+        return Type::Dict(Path::new(module, class), args.into_iter().map(ty).collect());
+    }
+    // the forms of the core, by the lang item of their constructor: the
+    // library may move or rename what it declares
+    let form = |item| head.is_lang(item);
+    match &args[..] {
+        [r, e, a] if form(Lang::Eff) => return Type::Eff(row(r), row(e), Rc::new(ty(a))),
+        [r, e] if form(Lang::Eff) => return Type::EffOf(row(r), row(e)),
+        [i, e, o] if form(Lang::Layer) => return Type::Layer(row(i), row(e), row(o)),
+        [r] if form(Lang::Errors) => return Type::Errors(row(r)),
+        [a] if form(Lang::Ref) => return Type::Ref(Rc::new(ty(a))),
+        [r] if form(Lang::ServiceImpl) => return Type::Impl(row(r)),
+        [r] if form(Lang::ServiceTag) => return Type::Tag(row(r)),
+        _ => {}
     }
     args.into_iter().fold(ty(head), |h, a| Type::app(h, ty(a)))
 }
@@ -163,7 +176,7 @@ fn add(t: &fc::Type, out: &mut Row) {
             for (label, element) in &r.entries {
                 let (_, args) = element.spine();
                 let args: Rc<[Type]> = args.into_iter().map(ty).collect();
-                out.elems.insert(Path::parse(label), args);
+                out.elems.insert(Path::parse(&label.to_string()), args);
             }
             if let Some(tail) = &r.tail {
                 add(tail, out);
@@ -175,6 +188,10 @@ fn add(t: &fc::Type, out: &mut Row) {
         }
         fc::Type::Var(v) => {
             out.vars.insert(Var::Named(v.as_str().into()));
+        }
+        fc::Type::Without { row: inner, gone } => {
+            let gone = gone.iter().map(|l| Path::parse(&l.to_string())).collect();
+            out.add_less(&row(inner), &gone);
         }
         fc::Type::Captured { ty: inner, .. } | fc::Type::Bounded { ty: inner, .. } => {
             add(inner, out);
@@ -221,7 +238,7 @@ fn fields(r: &fc::Row) -> Fields {
     let fields: BTreeMap<Rc<str>, Type> = r
         .entries
         .iter()
-        .map(|(l, t)| (Rc::from(l.as_str()), ty(t)))
+        .map(|(l, t)| (Rc::from(l.to_string()), ty(t)))
         .collect();
     let tail = match r.tail.as_deref() {
         Some(fc::Type::Var(v)) => Some(Var::Named(v.as_str().into())),

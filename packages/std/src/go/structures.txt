@@ -1,15 +1,6 @@
-# Data structures: Chunk, Trie, HashRing, ByteSize, Crypto, checks.
+# Data structures: Chunk, Trie, ByteSize, Crypto, checks.
 
-[@flick-lang/effect-ts/effect/HashRing]
-flickMake HashRingMake
-flickAdd *HashRingAdd
-flickAddMany *HashRingAddMany
-flickRemove *HashRingRemove
-flickHas *HashRingHas
-flickGet HashRingGet
-flickGetShards HashRingGetShards
-
-[@flick-lang/effect-ts/effect/Crypto]
+[flick:Crypto]
 flickRandomBytes CryptoRandomBytes
 flickDigest CryptoDigest
 flickPbkdf2 CryptoPbkdf2
@@ -27,34 +18,9 @@ flickUtf8Decode CryptoUtf8Decode
 flickBase64UrlEncode CryptoBase64UrlEncode
 flickBase64UrlDecode CryptoBase64UrlDecode
 
-[@flick-lang/effect-ts/effect/Trie]
-flickEmpty TrieEmpty
-fromIterable TrieFromList
-insert TrieInsert
-insertMany TrieInsertMany
-remove TrieRemove
-removeMany TrieRemoveMany
-get TrieGet
-has TrieHas
-size TrieSize
-isEmpty TrieIsEmpty
-flickKeys TrieKeys
-flickValues TrieValues
-toEntries TrieEntries
-flickKeysWithPrefix TrieKeysWithPrefix
-flickValuesWithPrefix TrieValuesWithPrefix
-toEntriesWithPrefix TrieEntriesWithPrefix
-longestPrefixOf TrieLongestPrefixOf
-modify *TrieModify
-reduce *TrieReduce
-map *TrieMap
-filter *TrieFilter
-filterMap *TrieFilterMap
-compact TrieCompact
-
 # the rest of ByteSize; `zero`, `flickBytes`, `flickFormat` and the codecs
 # are in effect.txt
-[@flick-lang/effect-ts/effect/ByteSize]
+[flick:ByteSize]
 flickKilobytes ByteSizeKilobytes
 flickMegabytes ByteSizeMegabytes
 flickGigabytes ByteSizeGigabytes
@@ -95,13 +61,13 @@ ReducerSum BigIntReducerSum
 CombinerMax BigIntCombinerMax
 CombinerMin BigIntCombinerMin
 
-[@flick-lang/effect-ts]
+[flick:rt]
 chunkAppend ChunkAppend
 chunkConcat ChunkConcat
 chunkGet ChunkGet
 chunkMap *ChunkMap
 
-[@flick-lang/effect-ts/effect/Chunk]
+[flick:Chunk]
 flickNonEmpty ChunkNonEmpty
 isEmpty ChunkIsEmpty
 of ChunkOf
@@ -162,7 +128,7 @@ zipWith *ChunkZipWith
 
 # the checks of `Check`; apply, int, finite, between, min/max length and
 # pattern are in schema.txt
-[@flick-lang/effect-ts/effect/Schema]
+[flick:Schema]
 makeFilterGroup CheckAll
 flickMakeFilter CheckPredicate
 isBetweenLength CheckLengthBetween

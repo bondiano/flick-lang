@@ -1,7 +1,7 @@
 package flickrt
 
-// Running streams, as Effect's (Stream.ts): folds, heads and lasts, loops
-// over the elements, and running into queues and hubs, and their bindings.
+// Running streams: folds, heads and lasts, loops over the elements, and
+// running into queues and hubs, and their bindings.
 
 func StreamRunSum(fb *Fiber, s Value) Value {
 	return runFold(fb, streamOf(s).ch, 0.0, func(_ *Fiber, acc, chunk Value) Value {

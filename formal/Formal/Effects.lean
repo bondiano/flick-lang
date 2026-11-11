@@ -63,7 +63,7 @@ theorem T2a {root Ψ Λ μ e t Λ' μ' e'} (hroot : RootTy S root) (hμ : StoreT
   | step h₁ _ _ ih =>
     obtain ⟨hl, rfl, rfl⟩ := step_pure h h₁
     obtain ⟨X, hμ', h', hX⟩ := preservation hroot h hμ hb.main hb.mem hΨ h₁
-    obtain ⟨hb', _⟩ := h₁.below hroot hb
+    obtain ⟨hb', _⟩ := h₁.below hroot.below hb
     obtain ⟨hs', rfl, rfl, hr⟩ := ih hμ' hb' (fun u hu => by
       rcases List.mem_append.mp hu with hu | hu
       · exact hΨ u hu
@@ -81,20 +81,21 @@ theorem step_root {root Ψ Θ Λ μ e t r ε N o} (h : Typ S Ψ Θ [] e (.ex t (
 theorem Row.kill_sub (ε : Row) (n : Nat) : Row.Sub (ε.substT (kill n)) ε := by
   intro x hx
   cases x with
-  | nm => rcases hx with hx | ⟨b, _, hb⟩
+  | nm => rcases hx with hx | ⟨b, _, _, _, hb⟩
           · exact hx
           · cases kill_asRow hb
   | atm a =>
-    rcases hx with ⟨b, hb, h⟩ | ⟨b, _, hb⟩
+    rcases hx with ⟨b, hb, h⟩ | ⟨b, _, _, hb⟩
     · obtain ⟨rfl, _⟩ := kill_reach h; exact hb
     · cases kill_asRow hb
   | ob _ a =>
-    rcases hx with ⟨b, hb, h⟩ | ⟨_, _, _, hv, _⟩
+    rcases hx with ⟨b, hb, h⟩ | ⟨_, _, _, _, _, hv, _⟩
     · obtain ⟨rfl, _⟩ := kill_reach h; exact hb
     · cases kill_asRow hv
-  | rv a => obtain ⟨b, hb, h⟩ := hx; cases kill_asRow h; exact hb
-  | obv w a =>
-    obtain ⟨v, b, hb, hv, h⟩ := hx; cases kill_asRow hv; obtain ⟨rfl, _⟩ := kill_reach h; exact hb
+  | rv a H => obtain ⟨b, G, hb, H', h, rfl⟩ := hx; cases kill_asRow h; simpa using hb
+  | obv w H a =>
+    obtain ⟨v, G, b, hb, ⟨H', hv, rfl⟩, h⟩ := hx
+    cases kill_asRow hv; obtain ⟨rfl, _⟩ := kill_reach h; simpa using hb
 
 theorem Steps.mono {root : Roots} {Q Q' : Lbl → Prop} {Λ μ e Λ' μ' e'}
     (h : Steps root Q Λ μ e Λ' μ' e') (hQ : ∀ l, Q l → Q' l) : Steps root Q' Λ μ e Λ' μ' e' := by
@@ -114,7 +115,7 @@ theorem T2b {root Ψ Λ μ e t r ε Λ' μ' e'} (hroot : RootTy S root) (hμ : S
   | refl => exact ⟨.refl, fun v he hv => ⟨Ψ, by subst he; exact raise_errors hv h⟩⟩
   | step h₁ _ _ ih =>
     obtain ⟨X, hμ', h', hX⟩ := preservation hroot h hμ hb.main hb.mem hΨ h₁
-    obtain ⟨hb', hl⟩ := h₁.below hroot hb
+    obtain ⟨hb', hl⟩ := h₁.below hroot.below hb
     obtain ⟨hs', hr⟩ := ih hμ' hb' (fun u hu => by
       rcases List.mem_append.mp hu with hu | hu
       · exact (hΨ u hu).mono hl
@@ -125,13 +126,22 @@ theorem T2b {root Ψ Λ μ e t r ε Λ' μ' e'} (hroot : RootTy S root) (hμ : S
     obtain ⟨_, _, _, _, U, _, _, _, hU, ht, hsub⟩ := canonical_errors hv hv'
     exact ⟨Ψ', .errVal hv ht hU (hsub.trans (Row.kill_sub _ _))⟩
 
-/-- T2(b) for `await v` with `v : Eff r ε τ`. -/
+/-- T2(b) for `await v` with `v : Eff r ε τ`: awaiting runs at the stage that uses the
+task's qualifier `C`, whose effects are still those of `r` (`Stage.use_svc_nm`). -/
 theorem T2b_await {root Ψ Λ μ v r ε t C Λ' μ' e'} (hroot : RootTy S root) (hμ : StoreTy S Ψ μ)
     (hb : CfgBelow Λ μ (.await v)) (hΨ : ∀ u ∈ Ψ, u.YF Λ.length)
     (h : Typ S Ψ Facts.age [] v (.ex (.eff r ε t C) .pure))
     (hs : Steps root (fun _ => True) Λ μ (.await v) Λ' μ' e') :
     Steps root (fun l => ∀ N, l = .root N → r (.nm N)) Λ μ (.await v) Λ' μ' e' ∧
-      ∀ w, e' = .raise w → Value w → ∃ Ψ', Typ S Ψ' Facts.age [] w (.ex (.errors ε) .pure) :=
-  T2b hroot hμ hb hΨ (.await (h.sub ⟨.refl, Stage.pure_le _⟩) (Stage.le_refl _) .refl) hs
+      ∀ w, e' = .raise w → Value w → ∃ Ψ', Typ S Ψ' Facts.age [] w (.ex (.errors ε) .pure) := by
+  obtain ⟨r', ε', hu⟩ := Stage.use_rt r ε C
+  have hε : ε' = ε := by simpa [hu, Stage.err] using Stage.use_err (.rt r ε) C
+  rw [hε] at hu
+  have ha : Typ S Ψ Facts.age [] (.await v) (.ex t (.rt r' ε)) :=
+    .await (h.sub ⟨.refl, Stage.pure_le _⟩) (hu ▸ Stage.le_refl _) .refl
+  obtain ⟨hs', hr⟩ := T2b hroot hμ hb hΨ ha hs
+  refine ⟨hs'.mono fun _ hq N hl => ?_, hr⟩
+  have := hq N hl
+  exact Stage.use_svc_nm (φ := .rt r ε) (C := C) (by rw [hu]; exact this)
 
 end Flick

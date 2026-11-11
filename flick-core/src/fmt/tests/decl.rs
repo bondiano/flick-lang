@@ -5,6 +5,71 @@ use crate::diagnostics::Severity;
 use crate::source::SourceMap;
 
 #[test]
+fn preserves_a_private_module_header() {
+    let src = "private module App.Hidden exposing (answer)\nanswer : Int\nlet answer = 42\n";
+    let out = fmt(src);
+    assert!(
+        out.starts_with("private module App.Hidden exposing (answer)"),
+        "{out}"
+    );
+}
+
+#[test]
+fn formats_module_contract_without_changing_manifest_equality() {
+    let src = "type module HashKey =\n  type Key\n  equality:Eq.Dict Key\n  instance Eq Key from equality\n  type Value=String\n";
+    assert_eq!(
+        fmt(src),
+        "type module HashKey =\n  type Key\n  equality : Eq.Dict Key\n  instance Eq Key from equality\n  type Value = String\n"
+    );
+}
+
+#[test]
+fn formats_parameterized_module_headers_and_named_applications() {
+    let src = "module HashSet.Make(K:HashKey) exposing (Set,empty)\nmodule Names=HashSet.Make(CaseInsensitive)\n";
+    assert_eq!(
+        fmt(src),
+        "module HashSet.Make(K : HashKey) exposing (Set, empty)\nmodule Names = HashSet.Make(CaseInsensitive)\n"
+    );
+}
+
+#[test]
+fn formats_anonymous_parameterized_declarations_and_preserves_comments() {
+    let src = "module App.Return(F:Factory):Factory=module (K:Input) ->\n  // Keep the application inside the closure.\n  module Built=F(K)\n\n  answer:Int\n  let answer=Built.answer\n";
+    assert_eq!(
+        fmt(src),
+        "module App.Return(F : Factory) : Factory = module (K : Input) ->\n  // Keep the application inside the closure.\n  module Built = F(K)\n\n  answer : Int\n  let answer = Built.answer\n"
+    );
+}
+
+#[test]
+fn formats_inline_module_members_and_keeps_their_scope() {
+    let src = "module App.Main exposing (answer)\nlet seed=41\nmodule Child exposing (value)=\n  type Key=Key Int\n  value:Key\n  let value=Key(seed+1)\nlet answer=Child.value\n";
+    let out = fmt(src);
+    assert!(out.contains("module Child exposing (value) =\n  type Key = Key Int\n  value : Key\n  let value = Key (seed + 1)\n"), "{out}");
+    assert!(out.ends_with("let answer = Child.value\n"), "{out}");
+}
+
+#[test]
+fn formats_nominal_requirements_and_existential_module_values() {
+    let src = "type module Runtime =\n  type Key\n  class Eq=Core.Eq\n  service Clock=Time.Clock\n\nresult:exists K:Runtime. K.Key\nlet result=unpack packed as K in K.value\nlet packed=pack Concrete as Runtime\n";
+    let out = fmt(src);
+    assert!(out.contains("class Eq = Core.Eq\n"), "{out}");
+    assert!(out.contains("service Clock = Time.Clock\n"), "{out}");
+    assert!(
+        out.contains("result : exists K : Runtime. K.Key\n"),
+        "{out}"
+    );
+    assert!(
+        out.contains("let result =\n  unpack packed as K in K.value\n"),
+        "{out}"
+    );
+    assert!(
+        out.contains("let packed = pack Concrete as Runtime\n"),
+        "{out}"
+    );
+}
+
+#[test]
 fn omits_redundant_outer_forall_on_nonrecursive_functions() {
     let src = "module App.Main exposing (eval)\n\ntype Expr a = IntLit Int : Expr Int | BoolLit Bool : Expr Bool\n\neval : forall a. Expr a -> a\nlet eval e =\n  match e with\n  | IntLit n -> n\n  | BoolLit b -> b\n";
     let out = fmt(src);

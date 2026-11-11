@@ -1,6 +1,6 @@
-/// Lists cut, padded and edited by position: the part of `List` over
-/// Effect's `Array` that keeps the elements as they are.
-module List.Slice exposing (..)
+/// Lists cut, padded and edited by position: the part of `List` that keeps
+/// the elements as they are.
+private module List.Slice exposing (..)
 
 /// The empty list.
 empty : List a
@@ -8,145 +8,145 @@ let empty = []
 
 /// The last `n` elements.
 take_right : Int -> List a -> List a
-foreign pure take_right from "@flick-lang/effect-ts/effect/Array" "takeRight"
+foreign pure take_right from "flick:Array" "takeRight"
   arity 1
   reviewed "effect@4.1.2 sha256:c25bc1b508b9bf53"
 
 /// Every element but the last `n`.
 drop_right : Int -> List a -> List a
-foreign pure drop_right from "@flick-lang/effect-ts/effect/Array" "dropRight"
+foreign pure drop_right from "flick:Array" "dropRight"
   arity 1
   reviewed "effect@4.1.2 sha256:3525d3278c5bf7d4"
 
 /// The longest prefix whose elements satisfy `p`.
 take_while : (a -> Bool)^c -> List a -> List a
-foreign pure take_while from "@flick-lang/effect-ts/effect/Array" "takeWhile"
+foreign pure take_while from "flick:Array" "takeWhile"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:6c3edb21850229b8"
 
 /// The list without its longest prefix whose elements satisfy `p`.
 drop_while : (a -> Bool)^c -> List a -> List a
-foreign pure drop_while from "@flick-lang/effect-ts/effect/Array" "dropWhile"
+foreign pure drop_while from "flick:Array" "dropWhile"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:b1c0ff068967514d"
 
 /// The `Ok` values of `f` over the elements, up to the first `Err`.
 take_while_filter : (a -> Result e b)^c -> List a -> List b
-foreign pure take_while_filter from "@flick-lang/effect-ts/effect/Array" "takeWhileFilter"
+foreign pure take_while_filter from "flick:Array" "takeWhileFilter"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:80554d0e0ee091c8"
 
 /// The list from the first element for which `f` gives an `Err`.
 drop_while_filter : (a -> Result e b)^c -> List a -> List a
-foreign pure drop_while_filter from "@flick-lang/effect-ts/effect/Array" "dropWhileFilter"
+foreign pure drop_while_filter from "flick:Array" "dropWhileFilter"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:9721247b81d1b0b2"
 
 /// The longest prefix whose elements satisfy `p`, and the rest.
 span : (a -> Bool)^c -> List a -> (List a, List a)
-foreign pure span from "@flick-lang/effect-ts/effect/Array" "span"
+foreign pure span from "flick:Array" "span"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:910a7ac3581648c7"
 
 /// The first `n` elements, and the rest.
 split_at : Int -> List a -> (List a, List a)
-foreign pure split_at from "@flick-lang/effect-ts/effect/Array" "splitAt"
+foreign pure split_at from "flick:Array" "splitAt"
   arity 1
   reviewed "effect@4.1.2 sha256:5bbca1602761700f"
 
 /// The list cut into `n` runs of about the same length.
 split : Int -> List a -> List (List a)
-foreign pure split from "@flick-lang/effect-ts/effect/Array" "split"
+foreign pure split from "flick:Array" "split"
   arity 1
   reviewed "effect@4.1.2 sha256:d21b35fff72d4eb3"
 
 /// The elements before the first one that satisfies `p`, and the rest.
 split_where : (a -> Bool)^c -> List a -> (List a, List a)
-foreign pure split_where from "@flick-lang/effect-ts/effect/Array" "splitWhere"
+foreign pure split_where from "flick:Array" "splitWhere"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:b4481f43666cc199"
 
 /// Runs of `n` elements; the last one may be shorter.
 chunks_of : Int -> List a -> List (NonEmpty.NonEmpty a)
-foreign pure chunks_of from "@flick-lang/effect-ts/effect/Array" "chunksOf"
+foreign pure chunks_of from "flick:Array" "chunksOf"
   arity 1
   reviewed "effect@4.1.2 sha256:26d2603afaabc94b"
 
 /// Every run of `n` adjacent elements, in order: a sliding window.
 window : Int -> List a -> List (List a)
-foreign pure window from "@flick-lang/effect-ts/effect/Array" "window"
+foreign pure window from "flick:Array" "window"
   arity 1
   reviewed "effect@4.1.2 sha256:ca2e713ca8eb60f1"
 
 /// Repeatedly takes a value and the rest from what is left, until nothing is.
 chop : (NonEmpty.NonEmpty a -> (b, List a))^c -> List a -> List b
-foreign pure chop from "@flick-lang/effect-ts/effect/Array" "chop"
+foreign pure chop from "flick:Array" "chop"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:e6ca6993245b8f39"
 
 /// Every element after the first; `None` for the empty list.
 tail : List a -> Option (List a)
-foreign pure tail from "@flick-lang/effect-ts/effect/Array" "tail"
+foreign pure tail from "flick:Array" "tail"
   reviewed "effect@4.1.2 sha256:7060a34a06a33318"
 
 /// Every element before the last; `None` for the empty list.
 init : List a -> Option (List a)
-foreign pure init from "@flick-lang/effect-ts/effect/Array" "init"
+foreign pure init from "flick:Array" "init"
   reviewed "effect@4.1.2 sha256:28d55ffcf8bc4273"
 
 /// Exactly `n` elements: cut, or filled up with `fill`.
 pad : Int -> a -> List a -> List a
-foreign pure pad from "@flick-lang/effect-ts/effect/Array" "pad"
+foreign pure pad from "flick:Array" "pad"
   arity 2
   reviewed "effect@4.1.2 sha256:7a9ba2418a57ebf7"
 
 /// The elements rotated `n` places to the right; a negative `n` rotates left.
 rotate : Int -> List a -> List a
-foreign pure rotate from "@flick-lang/effect-ts/effect/Array" "rotate"
+foreign pure rotate from "flick:Array" "rotate"
   arity 1
   reviewed "effect@4.1.2 sha256:f8d1a713edcba5f0"
 
 /// `x` inserted before the element at index `i` (`i` may be the length);
 /// `None` out of range.
 insert_at : Int -> a -> List a -> Option (NonEmpty.NonEmpty a)
-foreign pure insert_at from "@flick-lang/effect-ts/effect/Array" "insertAt"
+foreign pure insert_at from "flick:Array" "insertAt"
   arity 2
   reviewed "effect@4.1.2 sha256:ef2f0c1ac48c59e3"
 
 /// The list without the element at index `i`; out of range, unchanged.
 remove : Int -> List a -> List a
-foreign pure remove from "@flick-lang/effect-ts/effect/Array" "remove"
+foreign pure remove from "flick:Array" "remove"
   arity 1
   reviewed "effect@4.1.2 sha256:deb0b958f3b561d5"
 
 /// The element at index `i` replaced by `f` of it; `None` out of range.
 modify : Int -> (a -> a)^c -> List a -> Option (List a)
-foreign pure modify from "@flick-lang/effect-ts/effect/Array" "modify"
+foreign pure modify from "flick:Array" "modify"
   arity 2
   retention call
   reviewed "effect@4.1.2 sha256:6014816038e27854"
 
 /// The element at index `i` replaced by `x`; `None` out of range.
 replace : Int -> a -> List a -> Option (List a)
-foreign pure replace from "@flick-lang/effect-ts/effect/Array" "replace"
+foreign pure replace from "flick:Array" "replace"
   arity 2
   reviewed "effect@4.1.2 sha256:ea61f4223b1eb575"
 
 /// `middle` between each two adjacent elements.
 intersperse : a -> List a -> List a
-foreign pure intersperse from "@flick-lang/effect-ts/effect/Array" "intersperse"
+foreign pure intersperse from "flick:Array" "intersperse"
   arity 1
   reviewed "effect@4.1.2 sha256:371bfb09942f512b"
 
 /// `xs |> append_all ys` is `xs ++ ys`.
 append_all : List a -> List a -> List a
-foreign pure append_all from "@flick-lang/effect-ts/effect/Array" "appendAll"
+foreign pure append_all from "flick:Array" "appendAll"
   arity 1
   reviewed "effect@4.1.2 sha256:51b5a3cb6ba3a631"

@@ -14,7 +14,7 @@ type QueuePolicy
 /// A bounded FIFO of `capacity` events; an event that finds it full is
 /// rejected and reported to the supervisor.
 queue : Int -> QueuePolicy
-foreign pure queue from "@flick-lang/effect-ts" "eventsQueue"
+foreign pure queue from "flick:rt" "eventsQueue"
 
 /// A supervisor that logs how a handler failed.
 log_failures : Failure e ->{Log.Log; none} Unit
@@ -35,12 +35,12 @@ listen :
   (Failure e ->{Scope s | r} Unit)^c ->
   (a -> Eff {Scope s | r} e Unit)^c ->{r}
   Listener s a
-foreign effect listen from "@flick-lang/effect-ts" "eventsListen"
+foreign effect listen from "flick:rt" "eventsListen"
   retention owner
 
 /// Registers `listener` with `add`. When the owner of `s` begins to close,
 /// later events are ignored at once and `remove` gets the very function
 /// `add` got; then the handler's tasks end and resources are released.
 attach : Listener s a -> (Listener s a ->{} Unit) -> (Listener s a ->{} Unit) ->{Scope s} Unit
-foreign effect attach from "@flick-lang/effect-ts" "eventsAttach"
+foreign effect attach from "flick:rt" "eventsAttach"
   retention owner

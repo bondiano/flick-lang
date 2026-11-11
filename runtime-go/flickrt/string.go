@@ -101,13 +101,33 @@ func CompareStrings(a, b string) int {
 	for i > 0 && a[i]&0xC0 == 0x80 {
 		i--
 	}
-	x, y := utf16Units(a[i:]), utf16Units(b[i:])
-	for k := 0; k < len(x) && k < len(y); k++ {
-		if x[k] != y[k] {
-			return int(x[k]) - int(y[k])
+	// the code points that differ decide: by their first UTF-16 unit, which
+	// for one past the BMP is a high surrogate, below U+E000
+	x, n := decode(a[i:])
+	y, m := decode(b[i:])
+	unit := func(r rune) int {
+		if r >= 0x10000 {
+			return int(0xD800 + ((r - 0x10000) >> 10))
 		}
+		return int(r)
 	}
-	return len(x) - len(y)
+	if unit(x) != unit(y) {
+		return unit(x) - unit(y)
+	}
+	// one high surrogate, alone in one string and of a pair in the other:
+	// the unit after it decides, the low surrogate of the pair against
+	// what follows the lone one, and the end of a string is the least
+	second := func(rest string, r rune) int {
+		if r >= 0x10000 {
+			return int(0xDC00 + (r-0x10000)&0x3FF)
+		}
+		if rest == "" {
+			return -1
+		}
+		next, _ := decode(rest)
+		return unit(next)
+	}
+	return second(a[i+n:], x) - second(b[i+m:], y)
 }
 
 // QuoteJSON is JS `JSON.stringify` of a string; a lone surrogate is
@@ -185,6 +205,17 @@ func wellFormed(s string) string {
 
 // position is `i` clamped into `0..n`, negative counting from the end when
 // `fromEnd`, as JS `slice` takes it.
+// ascii is whether each UTF-16 unit of `s` is its byte, so that a place in
+// units is a place in bytes and no copy in UTF-16 is needed.
+func ascii(s string) bool {
+	for i := 0; i < len(s); i++ {
+		if s[i] >= 0x80 {
+			return false
+		}
+	}
+	return true
+}
+
 func position(i int32, n int, fromEnd bool) int {
 	k := int(i)
 	if k < 0 && fromEnd {
@@ -195,6 +226,14 @@ func position(i int32, n int, fromEnd bool) int {
 
 // Slice is JS `s.slice(start, end)`.
 func Slice(start, end, v Value) Value {
+	if s := v.(string); ascii(s) {
+		from := position(start.(int32), len(s), true)
+		to := position(end.(int32), len(s), true)
+		if from >= to {
+			return ""
+		}
+		return s[from:to]
+	}
 	units := utf16Units(v.(string))
 	from := position(start.(int32), len(units), true)
 	to := position(end.(int32), len(units), true)
@@ -207,6 +246,14 @@ func Slice(start, end, v Value) Value {
 // Substring is JS `s.substring(start, end)`: negative is 0, and the bounds
 // are swapped when out of order.
 func Substring(start, end, v Value) Value {
+	if s := v.(string); ascii(s) {
+		from := position(start.(int32), len(s), false)
+		to := position(end.(int32), len(s), false)
+		if from > to {
+			from, to = to, from
+		}
+		return s[from:to]
+	}
 	units := utf16Units(v.(string))
 	from := position(start.(int32), len(units), false)
 	to := position(end.(int32), len(units), false)
@@ -218,16 +265,49 @@ func Substring(start, end, v Value) Value {
 
 // CharCodeAt is the code unit at `i`, if any.
 func CharCodeAt(i, v Value) Value {
-	units := utf16Units(v.(string))
+	s := v.(string)
 	k := int(i.(int32))
-	if k < 0 || k >= len(units) {
+	if k < 0 {
 		return None
 	}
-	return Some(int32(units[k]))
+	// walks to the unit without a copy of the string in UTF-16
+	for n := 0; len(s) > 0; {
+		if s[0] < 0x80 {
+			if n == k {
+				return Some(int32(s[0]))
+			}
+			n, s = n+1, s[1:]
+			continue
+		}
+		r, size := decode(s)
+		s = s[size:]
+		if r < 0x10000 {
+			if n == k {
+				return Some(int32(r))
+			}
+			n++
+			continue
+		}
+		r -= 0x10000
+		if n == k {
+			return Some(int32(0xD800 + (r >> 10)))
+		}
+		if n+1 == k {
+			return Some(int32(0xDC00 + r&0x3FF))
+		}
+		n += 2
+	}
+	return None
 }
 
 // CharAt is the one-unit string at `i`, if any.
 func CharAt(i, v Value) Value {
+	if s := v.(string); ascii(s) {
+		if k := int(i.(int32)); k >= 0 && k < len(s) {
+			return Some(s[k : k+1])
+		}
+		return None
+	}
 	units := utf16Units(v.(string))
 	k := int(i.(int32))
 	if k < 0 || k >= len(units) {
@@ -238,6 +318,16 @@ func CharAt(i, v Value) Value {
 
 // StringAt is the one-unit string at `i`, negative counting from the end.
 func StringAt(i, v Value) Value {
+	if s := v.(string); ascii(s) {
+		k := int(i.(int32))
+		if k < 0 {
+			k += len(s)
+		}
+		if k < 0 || k >= len(s) {
+			return None
+		}
+		return Some(s[k : k+1])
+	}
 	units := utf16Units(v.(string))
 	k := int(i.(int32))
 	if k < 0 {
@@ -251,6 +341,12 @@ func StringAt(i, v Value) Value {
 
 // CodePointAt is the code point starting at unit `i`, if any.
 func CodePointAt(i, v Value) Value {
+	if s := v.(string); ascii(s) {
+		if k := int(i.(int32)); k >= 0 && k < len(s) {
+			return Some(int32(s[k]))
+		}
+		return None
+	}
 	units := utf16Units(v.(string))
 	k := int(i.(int32))
 	if k < 0 || k >= len(units) {
@@ -287,10 +383,30 @@ func LastIndexOf(part, v Value) Value {
 }
 
 // Chars is the code points of a string, each a string.
+// asciiChars is each ASCII character as a string value, made once: a
+// string as a value is an allocation otherwise.
+var asciiChars = func() (chars [128]Value) {
+	for i := range chars {
+		chars[i] = string(rune(i))
+	}
+	return chars
+}()
+
 func Chars(v Value) Value {
 	s := v.(string)
-	out := []Value{}
+	count := 0
+	for i := 0; i < len(s); i++ {
+		if s[i]&0xC0 != 0x80 {
+			count++
+		}
+	}
+	out := make([]Value, 0, count)
 	for len(s) > 0 {
+		if s[0] < 0x80 {
+			out = append(out, asciiChars[s[0]])
+			s = s[1:]
+			continue
+		}
 		_, n := decode(s)
 		out = append(out, s[:n])
 		s = s[n:]

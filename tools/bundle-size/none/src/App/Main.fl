@@ -1,6 +1,6 @@
-// The program of `pure.fl` built with `effect = "none"`: plain JavaScript
-// on `@flick-lang/runtime/core`, with no Effect in the bundle.
-module App.Main exposing (main)
+// A pure arithmetic library with no host dependencies. This is not
+// an I/O-equivalent comparison with `pure.fl`; `pure-rt` provides that comparison.
+module App.Main exposing (Shape(..), area, result)
 
 type Shape = Circle Float | Rect Float Float
 
@@ -13,11 +13,8 @@ let area s =
 add : Float -> Float -> Float
 let add a b = a + b
 
-log : String -> Unit
-foreign pure log from global "console.log"
-
-main : Unit -> Unit
-let main () =
+result : Float
+let result =
   let a = area (Circle 2)
   let b = area (Rect 3 4)
-  log (show (add a b))
+  add a b

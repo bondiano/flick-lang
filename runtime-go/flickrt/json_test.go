@@ -39,7 +39,7 @@ func TestJsonRoundTrips(t *testing.T) {
 	}
 }
 
-// `Json.json` is Effect's `Schema.Json`: a tree with a non-finite number
+// `Json.json` is a JSON value as itself: a tree with a non-finite number
 // anywhere is no JSON value, and the whole input is what it names.
 func TestJsonCodecRefusesNonFiniteNumbers(t *testing.T) {
 	codec := codecOf(JsonCodec)

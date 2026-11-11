@@ -2,22 +2,26 @@
 //! runs in a fresh instance with a budget of fuel and memory: calls stay
 //! pure, so their results can be cached, and a plugin can neither hang the
 //! compiler nor take its memory. Imports other than the compiler's trap.
-//! A component is compiled once per process, on its first call: a build
-//! whose blocks all come from the cache never compiles it.
+//! A component is compiled on its first call: a build whose blocks all come
+//! from the cache never compiles it. A process keeps the plugins it loaded
+//! last, by the bytes of their components, so a language server compiles
+//! one once and not for every analysis; and wasmtime keeps the compiled
+//! code in the user's cache directory, so the next process reads it.
 
 use std::fs;
 use std::io;
 use std::mem;
 use std::path::Path;
 use std::str;
-use std::sync::{Arc, OnceLock};
+use std::sync::{Arc, Mutex, OnceLock, PoisonError};
 
 use flick_core::plugin::source::BlockSource;
 use flick_core::plugin::{Expander, Failure};
+use flick_core::project::store;
 use flick_plugin::Compiler;
 use sha2::{Digest, Sha256};
 use wasmtime::component::{Component, HasSelf, Linker};
-use wasmtime::{Config, Engine, Store, StoreLimits, StoreLimitsBuilder, Trap};
+use wasmtime::{Cache, CacheConfig, Config, Engine, Store, StoreLimits, StoreLimitsBuilder, Trap};
 
 use crate::fetch;
 
@@ -33,8 +37,29 @@ flick_plugin::reach_conversions!(flick::plugin::types);
 const FUEL: u64 = 1_000_000_000;
 const MEMORY: usize = 64 << 20;
 
-/// The plugin of `package` in the component at `path`.
+/// How many plugins a process keeps with what they compiled: the ones of
+/// the projects open in a language server, not every one it ever loaded.
+const KEPT: usize = 8;
+
+/// The plugin of `package` in the component at `path`: the one loaded
+/// before, with what it compiled, when the bytes of the file are the same.
+/// The file is read and hashed each time, as a rebuilt component may keep
+/// its size and its time; compiling it is what a load costs.
 pub fn load(package: &str, path: &Path) -> Result<Arc<dyn Expander>, String> {
+    // the latest first
+    static LOADED: Mutex<Vec<Arc<Wasm>>> = Mutex::new(Vec::new());
+    let read = read(package, path)?;
+    let mut loaded = LOADED.lock().unwrap_or_else(PoisonError::into_inner);
+    let plugin = match loaded.iter().position(|kept| kept.id == read.id) {
+        Some(at) => loaded.remove(at),
+        None => Arc::new(read),
+    };
+    loaded.insert(0, plugin.clone());
+    loaded.truncate(KEPT);
+    Ok(plugin)
+}
+
+fn read(package: &str, path: &Path) -> Result<Wasm, String> {
     let bytes = fs::read(path).map_err(|e| {
         let hint = match e.kind() {
             io::ErrorKind::NotFound => "; build it, as `flick run plugin` in its package does",
@@ -60,11 +85,11 @@ pub fn load(package: &str, path: &Path) -> Result<Arc<dyn Expander>, String> {
         }
     }
     let id = format!("{package} {}", fetch::hex(&Sha256::digest(&bytes)));
-    Ok(Arc::new(Wasm {
+    Ok(Wasm {
         id,
         bytes,
         compiled: OnceLock::new(),
-    }))
+    })
 }
 
 /// The version of `flick:plugin` a component imports the compiler of, as
@@ -190,6 +215,14 @@ impl flick::plugin::compiler::Host for State {
     }
 }
 
+/// Where wasmtime keeps compiled components, by their bytes, its own
+/// version and the settings of the engine.
+fn compiled_cache() -> Option<Cache> {
+    let mut config = CacheConfig::new();
+    config.with_directory(store::cache_dir()?.join("wasmtime"));
+    Cache::new(config).ok()
+}
+
 fn engine() -> Result<&'static Engine, String> {
     static ENGINE: OnceLock<Result<Engine, String>> = OnceLock::new();
     ENGINE
@@ -198,6 +231,8 @@ fn engine() -> Result<&'static Engine, String> {
             config.consume_fuel(true);
             // the same results on every machine, which caches rely on
             config.cranelift_nan_canonicalization(true);
+            // without a cache directory a component is only compiled anew
+            config.cache(compiled_cache());
             Engine::new(&config).map_err(|e| e.to_string())
         })
         .as_ref()
@@ -465,6 +500,19 @@ impl Expander for Wasm {
         Ok(result?.into_iter().map(convert::from_diagnostic).collect())
     }
 
+    fn check_structure(
+        &self,
+        block: &flick_plugin::Block,
+        facts: &flick_plugin::Structure,
+    ) -> Result<Vec<flick_plugin::Diagnostic>, String> {
+        let block = convert::to_block(block);
+        let facts = convert::to_structure(facts);
+        let (result, _) = self.run(BlockSource::default(), |plugin, store| {
+            plugin.call_check_structure(store, &block, &facts)
+        });
+        Ok(result?.into_iter().map(convert::from_diagnostic).collect())
+    }
+
     fn check_calls(
         &self,
         calls: &[flick_plugin::CallSite],
@@ -477,3 +525,6 @@ impl Expander for Wasm {
         Ok(result?.into_iter().map(convert::from_diagnostic).collect())
     }
 }
+
+#[cfg(test)]
+mod tests;

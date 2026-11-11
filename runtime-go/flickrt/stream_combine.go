@@ -5,9 +5,9 @@ import (
 	"sync"
 )
 
-// Streams combined, as Effect's (Stream.ts): one after another, nested,
-// repeated, merged, raced and interleaved, and their bindings. What runs
-// concurrently runs in fibers of the stream's scope.
+// Streams combined: one after another, nested, repeated, merged, raced and
+// interleaved, and their bindings. What runs concurrently runs in fibers
+// of the stream's scope.
 
 func StreamConcat(that, s Value) Value { return streamConcat(streamOf(s), streamOf(that)) }
 
@@ -19,8 +19,8 @@ func StreamFlatMap(f, s Value) Value {
 	return streamFlatMap(streamOf(s), func(fb *Fiber, a Value) *Stream { return streamOf(Apply(fb, f, a)) })
 }
 
-// streamFlatMapPar is Effect's `flatMap` with options: in turn when at
-// most one runs at once, merged otherwise.
+// streamFlatMapPar is `flatMap` with options: in turn when at most one
+// runs at once, merged otherwise.
 func streamFlatMapPar(self *Stream, f func(fb *Fiber, a Value) *Stream, options Value) *Stream {
 	o := record(options)
 	n := concurrencyOf(o.Get("concurrency"))
@@ -56,8 +56,8 @@ func StreamFlattenIterable(s Value) Value {
 
 func StreamDrain(s Value) Value { return onChannel(s, channelDrain) }
 
-// streamMergeEffect is Effect's `mergeEffect`: `task` runs beside the
-// stream, whose end ends the merge.
+// streamMergeEffect runs `task` beside the stream, whose end ends the
+// merge.
 func streamMergeEffect(self *Stream, task func(fb *Fiber)) *Stream {
 	drained := channelFromPullOf(func(fb *Fiber) Value {
 		task(fb)
@@ -138,7 +138,7 @@ func StreamMergeResult(that, s Value) Value {
 	return StreamMerge(right, left)
 }
 
-// StreamMergeAll is Effect's `flatten(fromIterable(streams), options)`.
+// StreamMergeAll flattens the stream of the streams given, by the options.
 func StreamMergeAll(options, streams Value) Value {
 	return streamFlatMapPar(chunkStream(List(streams)), func(_ *Fiber, inner Value) *Stream { return streamOf(inner) }, options)
 }
@@ -156,9 +156,8 @@ func StreamCrossWith(right, f, s Value) Value {
 	})
 }
 
-// streamRaceAll is Effect's `raceAll`: each stream pulled in a scope of
-// its own; the first to emit wins, the others are interrupted and their
-// scopes closed.
+// streamRaceAll pulls each stream in a scope of its own; the first to emit
+// wins, the others are interrupted and their scopes closed.
 func streamRaceAll(streams []Value) *Stream {
 	return &Stream{fromTransform(func(_ *Fiber, _ Pull, scope *Owner) Pull {
 		var mu sync.Mutex
@@ -211,7 +210,7 @@ func StreamRaceAll(streams Value) Value { return streamRaceAll(List(streams)) }
 
 func StreamRace(that, s Value) Value { return streamRaceAll([]Value{s, that}) }
 
-// alternating is Effect's `fromIterable(Iterable.forever([true, false]))`.
+// alternating is the stream of true, false, true and so on without end.
 var alternating = &Stream{fromPull(func(*Fiber) Pull {
 	return func(*Fiber) Value {
 		chunk := make([]Value, streamChunkSize)
@@ -272,8 +271,7 @@ func StreamHaltWhen(task, s Value) Value {
 	return onChannel(s, func(c *Channel) *Channel { return channelOf(ChannelHaltWhen(task, c)) })
 }
 
-// timeoutMarker is the defect a timed-out stream dies with, as Effect's
-// `timeoutSymbol`.
+// timeoutMarker is the defect a timed-out stream dies with.
 type timeoutMarker struct{ _ byte }
 
 var timedOut = &timeoutMarker{}

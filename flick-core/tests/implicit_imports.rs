@@ -3,12 +3,11 @@
 //! with an `import`, so a package's dependencies can be read from its sources.
 //! Which names a module qualifies is checked beside the built-in modules.
 
-#![cfg(feature = "typescript")]
-
 use std::io;
 use std::path::{Path, PathBuf};
 
 use flick_core::build::{self, BUILTIN_DIR, Extras, Settings};
+use flick_core::codegen::EffectBridge;
 use flick_core::project::config::Backend;
 use flick_core::project::{self, Host, normalize};
 use flick_core::source::{FileId, SourceMap};
@@ -96,6 +95,7 @@ fn the_javascript_of_an_implicit_package_imports_what_its_source_imports() {
         out_dir: Path::new("/dist"),
         root: None,
         backend: Backend::Effect,
+        effect_bridge: EffectBridge::Absent,
         ui: None,
         runners: &[],
         core_modules: &[],

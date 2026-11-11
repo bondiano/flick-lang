@@ -1,0 +1,27 @@
+module Main exposing (main)
+
+run : Bool ->{} Unit
+let run stop = scope outer {
+  acquire : String ->{Scope outer} String
+  let acquire name =
+    Resource.acquire_release
+      (task {
+        Platform.stdout_line ("open " ++ name)
+        name
+      })
+      (fun value -> Platform.stdout_line ("release " ++ value))
+  scope inner {
+    loop {
+      ignore (acquire (if stop then break else "kept"))
+      break
+    }
+    ignore inner
+    Platform.stdout_line "inner done"
+  }
+  Platform.stdout_line "outer done"
+}
+
+main : Unit ->{} Unit
+let main () =
+  run false
+  run true

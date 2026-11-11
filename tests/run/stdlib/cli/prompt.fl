@@ -1,4 +1,4 @@
-// Prompts of Effect's CLI on a scripted `Cli.Prompt.Tty`: each prompt reads
+// Prompts of `Cli.Prompt` on a scripted `Cli.Prompt.Tty`: each prompt reads
 // only the key presses it needs, so the next one finds the rest.
 module App.Main exposing (main)
 
@@ -125,7 +125,7 @@ let date_options start = {
   locales = None;
 }
 
-/// Effect's theme with another prefix and no colors.
+/// The default theme with another prefix and no colors.
 plain_theme : Unit ->{} Cli.Prompt.Theme
 let plain_theme () = { (Cli.Prompt.default_theme ()) with prefix = ">>"; colors = false }
 

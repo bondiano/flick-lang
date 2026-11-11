@@ -12,29 +12,18 @@ publish.workspace = true
 workspace = true
 
 [features]
-default = [
-    "ide",
-    "build-artifacts",
-    "source-maps",
-    "typescript",
-    "diagnostic-fixes",
-    "native-project",
-    "terminal-diagnostics",
-    "builtin-docs",
-]
-ide = ["typescript", "diagnostic-fixes"]
-build-artifacts = []
-source-maps = []
-typescript = []
-diagnostic-fixes = []
+default = ["ide", "native-project"]
+# editor queries, projections and the metadata they keep
+ide = []
+# projects on disk: manifests, installed packages, published artifacts,
+# source maps and the docs of the built-in sources
 native-project = ["dep:toml", "dep:semver", "dep:sha2"]
-terminal-diagnostics = ["dep:annotate-snippets"]
-builtin-docs = []
 # std in the binary, for a host with no packages: the playground
 embedded-std = []
 
 # the build script compiles src/source.rs, whose spans the IR serializes
 [build-dependencies]
+serde_json = { workspace = true }
 flick-ir = { path = "../flick-ir" }
 serde = { version = "1.0.229", features = ["derive"] }
 
@@ -44,8 +33,11 @@ flick-test-pairs = { path = "../tests/plugins/pairs" }
 insta = "1.49.0"
 toml = "1.1.8"
 
+[target.'cfg(unix)'.dev-dependencies]
+rustix = { version = "1.1.6", features = ["time"] }
+
 [dependencies]
-annotate-snippets = { version = "0.12.17", optional = true }
+annotate-snippets = "0.12.17"
 flick-ir = { path = "../flick-ir" }
 flick-plugin = { path = "../flick-plugin" }
 flick-plugin-cli = { path = "../plugins/cli" }
@@ -56,7 +48,7 @@ flick-plugin-ui = { path = "../plugins/ui" }
 flick-pretty = { path = "../flick-pretty" }
 semver = { version = "1.0.26", optional = true }
 serde = { version = "1.0.229", features = ["derive", "rc"] }
-serde_json = "1.0.154"
+serde_json = { workspace = true }
 sha2 = { version = "0.10.9", optional = true }
 strsim = "0.11.1"
 toml = { version = "1.1.8", optional = true }

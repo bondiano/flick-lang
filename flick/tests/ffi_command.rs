@@ -87,7 +87,7 @@ fn project() -> PathBuf {
     .expect("write");
     fs::write(
         dir.join("package.json"),
-        "{ \"name\": \"app\", \"type\": \"module\" }\n",
+        "{ \"name\": \"app\", \"type\": \"module\", \"dependencies\": { \"@flick-lang/effect-ts\": \"*\" } }\n",
     )
     .expect("write");
     fs::write(dir.join("src/Ffi/LookupLib/policy.toml"), POLICY).expect("write");

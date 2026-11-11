@@ -3,6 +3,7 @@
 use std::fmt::Debug;
 use std::rc::Rc;
 
+use super::trace::key;
 use super::{Checker, TypeError};
 use crate::decls::Decls;
 use crate::syntax::{Arm, Con, Const, Lit, Pat, Path, Prim, Term};
@@ -242,6 +243,40 @@ fn let_sig_rule() {
     );
 }
 
+/// An opaque alias that names itself, `opaque type alias Stream = Option
+/// (Float, Stream)`, inside its module: two of it are equal by their
+/// arguments, and zonking a type does not unfold it (`tests/opaque.rs`
+/// checks its source).
+#[test]
+fn a_recursive_opaque_alias_is_checked() {
+    let mut d = decls();
+    let stream = Type::con(T, "Stream");
+    let tuple = Type::Tuple(Rc::from([ty("Float"), stream.clone()]));
+    d.opaque.insert(
+        Path::new(T, "Stream"),
+        (Vec::new(), Type::app(ty("Option"), tuple)),
+    );
+    let mut c = Checker::new(&d);
+    c.module = T.into();
+    let id = mono(Type::fun(stream.clone(), Stage::Pure, stream));
+    let checked = c.check_top(&Term::lam("s", var("s")), &id);
+    assert!(checked.is_ok(), "{checked:?}");
+}
+
+/// A field of a constructor applied by (App) is typed where it stands: the
+/// trace a certificate reads has its node.
+#[test]
+fn the_fields_of_a_constructor_are_traced() {
+    let e = b_err();
+    let Term::App(_, field) = &e else {
+        unreachable!("a call")
+    };
+    let trace = Checker::new(&decls())
+        .check_top_traced(&e, &mono(Type::con(T, "B")))
+        .expect("`B \"x\"` is a `B`");
+    assert!(trace.contains_key(&key(field)), "the field has no node");
+}
+
 #[test]
 fn rec_and_field() {
     let r = record(&[("a", int(1))]);
@@ -316,8 +351,9 @@ fn task_and_await() {
     rejected_by(infer(&task(await_(int(1)))), "≡");
 }
 
-/// (Task) with a generic value (`regions.md` §2.1, `docs/formal/regions.md#a-bounded-variable-reaches-what-the-variable-reaches`): `a^{≤c}` is
-/// within `c`, a bare `a` is a capture the bare `Eff` does not allow.
+/// (Task) with a generic value (`regions.md` §2.1, `docs/formal/regions.md#a-bounded-variable-reaches-what-the-variable-reaches`): a task
+/// that only holds a value uses nothing of it, so both `a^{≤c}` and a bare
+/// `a` may go into a bare `Eff`.
 #[test]
 fn task_holds_a_type_variable() {
     let c = Var::Named("c".into());
@@ -334,10 +370,7 @@ fn task_holds_a_type_variable() {
         outlives: Vec::new(),
     };
     assert!(check(&lam, &bounded).is_ok());
-    rejected_by(
-        check(&lam, &poly(Type::fun(a(), Stage::Pure, eff(ty("Unit"))))),
-        "Task",
-    );
+    assert!(check(&lam, &poly(Type::fun(a(), Stage::Pure, eff(ty("Unit"))))).is_ok());
 }
 
 /// `∀e. Errors e → (Unit → Unit)^{e}`: a qualifier takes what the row
@@ -522,5 +555,21 @@ fn comparisons_order_numbers_and_strings_only() {
             Term::Lit(Lit::String("b".into()))
         ))
         .is_ok()
+    );
+}
+
+#[test]
+fn never_has_no_pattern_cases_but_inhabited_types_do() {
+    let absurd = Term::lam("x", match_(var("x"), Vec::new()));
+    assert!(
+        check(
+            &absurd,
+            &mono(Type::fun(ty("Never"), Stage::Pure, ty("Int")))
+        )
+        .is_ok()
+    );
+    rejected_by(
+        check(&absurd, &mono(Type::fun(ty("Int"), Stage::Pure, ty("Int")))),
+        "Match",
     );
 }

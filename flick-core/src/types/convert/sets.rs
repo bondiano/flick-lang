@@ -12,6 +12,7 @@ use crate::source::Span;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
 use crate::types::Checker;
+use crate::types::Elem;
 use crate::types::env::Form;
 use crate::types::kinds::Kind;
 use crate::types::lang::{self, Lang};
@@ -24,7 +25,7 @@ pub(super) struct Slot<'n> {
     fails: Vec<Type>,
     omitted: Vec<&'n Node>,
     /// The labels of the elements this side names itself.
-    named: Vec<String>,
+    named: Vec<Elem>,
 }
 
 impl Slot<'_> {
@@ -41,7 +42,7 @@ impl Slot<'_> {
 /// What a set holds.
 #[derive(Default)]
 pub(super) struct Set {
-    pub(super) services: Vec<(String, Type)>,
+    pub(super) services: Vec<(Elem, Type)>,
     pub(super) fails: Vec<Type>,
 }
 
@@ -69,7 +70,7 @@ impl Checker<'_> {
         if norm.entries.is_empty() && norm.tails.is_empty() {
             return services;
         }
-        let label = lang::label(Lang::Fail).unwrap_or("Fail").to_owned();
+        let label = Elem::named(lang::label(Lang::Fail).unwrap_or("Fail"));
         let fail = (label, Type::app(Type::lang(Lang::Fail), errors));
         match services {
             Type::Row(mut row) => {
@@ -129,7 +130,7 @@ impl Checker<'_> {
             Kind::CaptureRow => Kind::Region,
             _ => Kind::Type,
         };
-        let mut entries: Vec<(String, Type)> = Vec::new();
+        let mut entries: Vec<(Elem, Type)> = Vec::new();
         let mut named = Vec::new();
         // with a set the row needs no `;`: the first fix that adds `...` takes it away
         let mut needless_semi = self.needless_semi(node);
@@ -218,13 +219,7 @@ impl Checker<'_> {
     }
 
     /// Adds an element of a row, which tells its elements apart by name, not by arguments.
-    fn add_entry(
-        &mut self,
-        entries: &mut Vec<(String, Type)>,
-        label: String,
-        ty: Type,
-        node: &Node,
-    ) {
+    fn add_entry(&mut self, entries: &mut Vec<(Elem, Type)>, label: Elem, ty: Type, node: &Node) {
         match entries.iter().find(|(l, _)| *l == label) {
             Some((_, held)) if *held != ty => {
                 let (held, ty) = (self.show(held), self.show(&ty));
@@ -345,7 +340,7 @@ impl Checker<'_> {
     }
 }
 
-pub(super) fn rebuilt(entries: Vec<(String, Type)>, tails: Vec<Type>) -> Type {
+pub(super) fn rebuilt(entries: Vec<(Elem, Type)>, tails: Vec<Type>) -> Type {
     let tail = tails
         .into_iter()
         .reduce(|a, b| Type::Union(Box::new(a), Box::new(b)));

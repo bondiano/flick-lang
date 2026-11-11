@@ -7,14 +7,13 @@ import (
 )
 
 // The schemas and JSON codecs of the standard library's types: durations,
-// decimals, chunks, hash sets and hash maps, as the JS runtime builds them
-// over Effect Schema.
+// decimals, chunks, hash sets and hash maps, as the JS runtime builds them.
 
 // CodecBigint is `BigInt.json`: a string of digits.
 var CodecBigint Value = sch(SchemaBigint).jsonOf()
 
-// isPattern is Effect's `isPattern` of a regular expression without flags,
-// which its JSON Schema states only approximately.
+// isPattern is the check of a regular expression without flags, which its
+// JSON Schema states only approximately.
 func isPattern(source string) *check {
 	re := regexp.MustCompile(source)
 	return &check{
@@ -29,7 +28,7 @@ var nonNegativeDuration = &check{
 	expected: "a non-negative duration",
 }
 
-// toMillis is Effect's `Duration.toMillis`: an infinity as itself.
+// toMillis is the milliseconds of a duration: an infinity as itself.
 func toMillis(d Value) Value {
 	switch x := dur(d); x.tag {
 	case durationInfinite:
@@ -40,7 +39,7 @@ func toMillis(d Value) Value {
 	return value(DurationToMillis(d))
 }
 
-// String is Effect's text of a duration, as `String(duration)` writes it.
+// String is the text of a duration, as JS `String(duration)` writes it.
 func (d *Duration) String() string {
 	switch d.tag {
 	case durationInfinite:
@@ -75,7 +74,8 @@ var (
 		},
 	}
 
-	// CodecDurationString is `Duration.json_string`: Effect's text form.
+	// CodecDurationString is `Duration.json_string`: the text form of a
+	// duration.
 	CodecDurationString Value = &fallible{withChecks(&stage{
 		&stringAs{"a string that will be decoded as a Duration"},
 		func(_ *Fiber, v Value) (Value, []issue) {
@@ -114,7 +114,7 @@ var (
 	}))
 )
 
-// Chunk is Effect's immutable Chunk: its elements, never changed.
+// Chunk is an immutable chunk: its elements, never changed.
 type Chunk struct{ items []Value }
 
 var ChunkEmpty Value = &Chunk{}

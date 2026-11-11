@@ -9,20 +9,23 @@
 //! client's, and Vite for its pages: the bundler builds the client's
 //! modules itself and replaces them in the page as they change.
 
+use std::cell::RefCell;
 use std::process::ExitCode;
+use std::rc::Rc;
 use std::sync::atomic::Ordering;
 use std::thread;
 use std::time::Duration;
 
 use flick_core::diagnostics::{Diagnostic, Severity, codes};
+use flick_core::project::ModuleCache;
 use flick_core::source::SourceMap;
 use signal_hook::consts::SIGTERM;
 
 use super::run::{Generation, build_into_generation, dev_entries, find_project, launch, vite};
-use super::test::{watch_snapshot, watched_roots};
+use super::test::{settled_snapshot, watch_snapshot, watched_roots};
 use crate::args::{GlobalArguments, RunArguments};
 use crate::child::{self, Running};
-use crate::report;
+use crate::{report, timings};
 
 /// A running generation: a process per entry it started.
 struct Live {
@@ -84,11 +87,20 @@ pub fn dev(options: &RunArguments, global: &GlobalArguments) -> ExitCode {
     let paths = watched_roots(&project);
     let mut live: Option<Live> = None;
     let mut seen = None;
+    // what the builds of this session compiled: a change compiles what it reaches
+    let modules: Rc<RefCell<ModuleCache>> = Rc::default();
     loop {
-        let now = watch_snapshot(&paths);
-        if seen.as_ref() != Some(&now) {
+        if seen.as_ref() != Some(&watch_snapshot(&paths)) {
+            let now = settled_snapshot(&paths);
+            // the version running until now is no phase of the next build
+            if seen.is_some() {
+                timings::discard();
+            }
             seen = Some(now);
-            if let Ok(generation) = build_into_generation(&project, options, global) {
+            let built = build_into_generation(&project, options, global, Some(modules.clone()));
+            // each build reports itself, before the version it built starts
+            timings::report(global);
+            if let Ok(generation) = built {
                 if let Some(old) = live.take() {
                     report::log(global, "dev: stopping the running version");
                     let code = old.stop(SIGTERM as usize);

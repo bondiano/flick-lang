@@ -2,35 +2,124 @@
 //! of one level of the import graph in parallel, reusing what a
 //! [`ModuleCache`] kept of earlier runs.
 
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::{Path, PathBuf};
+use std::slice;
 use std::sync::Arc;
 
 use tracing::debug;
 
 #[cfg(feature = "ide")]
 use super::Analyzed;
+use super::plugins::Watching;
 use super::precompiled::Precompiled;
-use super::{Loaded, Loader, Root};
-use crate::clock::timed;
-use crate::diagnostics::{Diagnostic, Severity};
+use super::{
+    BindingOrigin, CalleeOrigin, Loaded, Loader, Root, StaticArgument, StaticCapture, Virtual,
+};
+use crate::clock::{micros, timed};
+use crate::diagnostics::{Diagnostic, Severity, codes};
+#[cfg(feature = "native-project")]
+use crate::iface::ModuleTemplate;
+use crate::iface::{Decl, Namespace};
 use crate::ir;
 use crate::plugin::calls as plugin_calls;
-#[cfg(feature = "ide")]
 use crate::plugin::expansion::Expansion;
+use crate::plugin::first_party;
 use crate::project::Project;
-use crate::project::config::{Backend, Config};
+use crate::project::config::{Checked, Config};
 use crate::resolve::{self, Interface, ModuleSyntax};
-#[cfg(feature = "ide")]
+use crate::resolve::{Header, Import, Item, ItemKind};
 use crate::source::Span;
 use crate::source::{FileId, SourceMap};
-use crate::syntax::Parse;
+use crate::syntax::cst::{Element, Node};
+use crate::syntax::{Parse, kind::SyntaxKind as K};
 use crate::types;
+
+/// A file checked on its own takes the path of a module of a project run,
+/// while resolving only built-in imports.
+pub(crate) fn check_file(
+    sources: &SourceMap,
+    file: FileId,
+    parse: Parse,
+    syntax: ModuleSyntax,
+    expansion: Option<Expansion>,
+    mut derived: Vec<Diagnostic>,
+) -> Vec<Diagnostic> {
+    let name = syntax
+        .header
+        .as_ref()
+        .map_or(String::new(), |h| h.name.clone());
+    let loaded = Loaded {
+        path: PathBuf::from(&sources.get(file).path),
+        file,
+        root: Root::Other(None),
+        parse: Arc::new(parse),
+        syntax: Arc::new(syntax),
+        name: name.clone(),
+        expansion: expansion.map(Arc::new),
+        editing: Vec::new(),
+        loader: None,
+        virtual_of: None,
+        member_of: None,
+        scope_of: None,
+    };
+    let modules = [loaded];
+    let mut by_name = BTreeMap::new();
+    by_name.insert(name, 0);
+    let from_packages = BTreeMap::new();
+    let precompiled = Precompiled::default();
+    let watched = types::Watched::new(first_party::WATCH);
+    let watching = first_party::plugin(first_party::PACKAGE).map(|plugin| Watching {
+        package: first_party::PACKAGE.to_owned(),
+        plugin,
+        watched: types::Watched::new(first_party::WATCH),
+    });
+    let watching: Vec<_> = watching.into_iter().collect();
+    let checking = Checking {
+        modules: &modules,
+        sources,
+        by_name: &by_name,
+        from_packages: &from_packages,
+        project: None,
+        stages_by_class: false,
+        lower: false,
+        cached_ir: CachedIr::Dropped,
+        lower_packages_only: false,
+        precompiled: &precompiled,
+        cache: None,
+        watching: &watching,
+        watched: &watched,
+    };
+    let builtin = |name: &str| {
+        types::builtins()
+            .iter()
+            .find(|i| i.module == name && !i.private)
+            .cloned()
+    };
+    let mut diagnostics = checking.check(&modules[0], &builtin, &builtin).diagnostics;
+    diagnostics.append(&mut derived);
+    // a lone file has no package, so no private module of one is its own
+    for import in &modules[0].syntax.imports {
+        let private = |i: &Interface| i.module == import.module && i.private;
+        if types::builtins().iter().any(private) {
+            diagnostics.push(Diagnostic::error(
+                codes::R017,
+                format!(
+                    "module `{}` is private to its package; import its public facade instead",
+                    import.module
+                ),
+                import.span,
+            ));
+        }
+    }
+    diagnostics.sort_by_key(|d| d.span.map(|s| (s.start, s.end)));
+    diagnostics
+}
 
 mod graph;
 
 pub(super) use graph::levels;
-use graph::{package_of, parallel};
+use graph::parallel;
 
 /// The output of checking each module in earlier runs, reused while the
 /// module's text, the interfaces of its imports and the configuration stay
@@ -45,6 +134,11 @@ pub struct ModuleCache {
 }
 
 type Parsed = (Arc<Parse>, Arc<ModuleSyntax>);
+type ContractView = (
+    BTreeMap<String, Interface>,
+    Vec<(types::Type, types::Dict)>,
+    Vec<Diagnostic>,
+);
 
 impl ModuleCache {
     /// Drops the modules a run no longer loaded.
@@ -76,10 +170,14 @@ struct Key {
     /// The effective configuration, including programmatically supplied values.
     config: Option<Config>,
     lower: bool,
+    /// An editor's entry, without the IR, is none a build reads.
+    cached_ir: CachedIr,
     /// Each import's interface, without where its names are declared and
     /// their docs, which checking does not read, and whether it is a module
     /// of the project.
     imports: Vec<(Option<Arc<Interface>>, bool)>,
+    virtual_contracts: Vec<Option<Arc<Interface>>>,
+    virtual_capture: Option<StaticCapture>,
     /// What tells the watching plugins apart: a module without blocks is
     /// checked again when one of them changes.
     watching: Vec<String>,
@@ -150,6 +248,15 @@ impl Loader<'_> {
                     .diagnostics
                     .iter()
                     .any(|d| d.severity == Severity::Error),
+            // an editor's run reads no IR; a check and a build do
+            #[cfg(feature = "ide")]
+            cached_ir: if self.ide.is_some() {
+                CachedIr::Dropped
+            } else {
+                CachedIr::Kept
+            },
+            #[cfg(not(feature = "ide"))]
+            cached_ir: CachedIr::Kept,
             lower_packages_only: self.lower_packages_only,
             precompiled: &self.precompiled,
             cache: self.cache.as_deref(),
@@ -168,15 +275,27 @@ impl Loader<'_> {
             lowered[i] = Some((ir, output.declarations));
         }
         #[cfg(feature = "ide")]
-        if let Some(ide) = &mut self.ide {
+        if let Some(ide) = &mut self.ide
+            && self.modules[i].scope_of.is_none()
+        {
             ide.push(Analyzed::new(
                 &self.modules[i],
                 output.typing,
                 output.interface,
             ));
+            ide.extend(output.inline_ide);
         }
         known.interfaces[i] = Some(output.exported);
     }
+}
+
+/// What a cached output does with a module's IR: an editor reads its
+/// diagnostics only, and keeping the IR would copy all of it on every
+/// keystroke; a check or a build that runs again reads it.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum CachedIr {
+    Kept,
+    Dropped,
 }
 
 /// What the modules checked so far show their importers.
@@ -196,6 +315,7 @@ struct Checking<'a> {
     project: Option<&'a Project>,
     stages_by_class: bool,
     lower: bool,
+    cached_ir: CachedIr,
     lower_packages_only: bool,
     precompiled: &'a Precompiled,
     cache: Option<&'a ModuleCache>,
@@ -205,181 +325,13 @@ struct Checking<'a> {
     watched: &'a types::Watched,
 }
 
-impl Checking<'_> {
-    /// Resolves, checks and, when asked and clean, lowers module `i` against
-    /// the interfaces known so far, or reuses the cached output; with a
-    /// cache, also the key to cache it by.
-    fn module(
-        &self,
-        i: usize,
-        interfaces: &[Option<Interface>],
-        comparable: &[Option<Arc<Interface>>],
-    ) -> (Output, Option<Key>) {
-        let loaded = &self.modules[i];
-        let known = |name: &str| match self.by_name.get(name) {
-            Some(&j) => interfaces[j].as_ref(),
-            None => self.from_packages.get(name),
-        };
-        let lookup = |name: &str| known(name).cloned();
-        let Some(cache) = self.cache else {
-            return (self.timed(loaded, &lookup), None);
-        };
-        let key = Key {
-            file: loaded.file,
-            // the code of its blocks too, which other modules' blocks change
-            text: self.text_of(loaded).to_owned(),
-            config: self.project.map(|p| p.config.clone()),
-            lower: self.lower,
-            imports: loaded
-                .syntax
-                .imports
-                .iter()
-                .map(|i| {
-                    let interface = match self.by_name.get(&i.module) {
-                        Some(&j) => comparable[j].clone(),
-                        None => self.from_packages.get(&i.module).map(comparable_copy),
-                    };
-                    (interface, self.by_name.contains_key(&i.module))
-                })
-                .collect(),
-            watching: (self.watching.iter())
-                .map(|w| w.plugin.id().to_owned())
-                .collect(),
-        };
-        match cache.entries.get(&loaded.path) {
-            Some((cached, output)) if *cached == key => {
-                let mut output = output.clone();
-                // re-exported names are declared where their module now says
-                for import in &loaded.syntax.imports {
-                    if let Some(interface) = known(&import.module) {
-                        redeclare(&mut output.interface, interface);
-                        redeclare(&mut output.exported, interface);
-                    }
-                }
-                debug!(module = %loaded.name, "module reused");
-                (output, Some(key))
-            }
-            _ => (self.timed(loaded, &lookup), Some(key)),
-        }
-    }
+include!("checking_core.rs");
+include!("checking_contracts.rs");
+include!("checking_lexical.rs");
 
-    /// [`Checking::check`], logging how long it took.
-    fn timed(&self, loaded: &Loaded, lookup: &dyn Fn(&str) -> Option<Interface>) -> Output {
-        let (output, elapsed) = timed(|| self.check(loaded, lookup));
-        debug!(module = %loaded.name, ?elapsed, "module checked");
-        output
-    }
-
-    /// The text checking reads: the module's own, followed by the code of
-    /// its plugin blocks.
-    fn text_of<'l>(&'l self, loaded: &'l Loaded) -> &'l str {
-        loaded
-            .expansion
-            .as_ref()
-            .map_or(&self.sources.get(loaded.file).text, |e| &e.text)
-    }
-
-    fn check(&self, loaded: &Loaded, lookup: &dyn Fn(&str) -> Option<Interface>) -> Output {
-        let tree = loaded
-            .expansion
-            .as_ref()
-            .map_or(&loaded.parse.tree, |e| &e.tree);
-        let module = resolve::Module {
-            name: &loaded.name,
-            file: loaded.file,
-            text: self.text_of(loaded),
-            tree,
-            syntax: &loaded.syntax,
-            generated: loaded
-                .expansion
-                .as_ref()
-                .map_or(resolve::NO_GENERATED, |e| e.len),
-        };
-        let (mut interface, resolved) = resolve::resolve(&module, lookup);
-        // a library's modules are another package's: they own their own instances
-        let local = |name: &str| match self.by_name.get(name) {
-            Some(&i) => package_of(&self.modules[i].root) == package_of(&loaded.root),
-            // a saved module of the same package is as local as its source
-            None => self
-                .precompiled
-                .package_of(name)
-                .is_some_and(|p| package_of(&loaded.root) == Some(p)),
-        };
-        let build = self.project.map(|p| &p.config.build);
-        let options = types::Options {
-            local: &local,
-            limits: build.map_or_else(types::Limits::default, |b| types::Limits {
-                steps: b.solver_steps,
-                depth: b.solver_depth,
-            }),
-            no_let_assert: self.project.is_some_and(|p| p.config.no_let_assert),
-            thresholds: self
-                .project
-                .map_or_else(Default::default, |p| p.config.thresholds),
-            watched: self.watched,
-            effects: build.is_none_or(|b| b.effect != Backend::None),
-            stages_by_class: self.stages_by_class,
-        };
-        let mut diagnostics = loaded.parse.diagnostics.clone();
-        let resolved_cleanly = !resolved.iter().any(|d| d.severity == Severity::Error);
-        diagnostics.extend(resolved);
-        // Keep the resolved exports before checking: a failed module may leave
-        // store-local type variables in its inferred schemes. Importers must
-        // not read those variables with their own unification store.
-        let broken = !loaded.parse.diagnostics.is_empty();
-        let mut untyped = interface.clone();
-        let (mut checked, typing) = types::check_typed(
-            &module,
-            lookup,
-            types::builtins_of(self.stages_by_class),
-            options,
-            &mut interface,
-        );
-        // what the plugins find from the types of their code stops lowering too
-        if let Some(expansion) = &loaded.expansion {
-            checked.extend(expansion.check_blocks(&loaded.editing, &typing.wildcards));
-        }
-        checked.extend(self.watched_calls(loaded, &typing));
-        let checked = types::beside_syntax_errors(tree, checked);
-        let clean =
-            !broken && resolved_cleanly && !checked.iter().any(|d| d.severity == Severity::Error);
-        diagnostics.extend(checked);
-        let declarations = typing.declarations.clone();
-        let mut ir = None;
-        let lowers = !self.lower_packages_only || matches!(loaded.root, Root::Package(_));
-        if clean && self.lower && lowers {
-            match ir::lower(&module, &typing) {
-                Ok(lowered) => ir = Some(lowered),
-                Err(d) => diagnostics.extend(d),
-            }
-        }
-        if let Some(expansion) = &loaded.expansion {
-            expansion.restore(&mut diagnostics, ir.as_mut());
-            expansion.place_interface(&mut interface);
-            expansion.place_interface(&mut untyped);
-        }
-        #[cfg(feature = "ide")]
-        let typing = match &loaded.expansion {
-            Some(expansion) => {
-                let own = &self.sources.get(loaded.file).text;
-                editor_names(typing, expansion, loaded.file, own)
-            }
-            None => typing,
-        };
-        Output {
-            diagnostics,
-            #[cfg(feature = "ide")]
-            typing: Arc::new(typing),
-            exported: if clean { interface.clone() } else { untyped },
-            interface,
-            // editors, the runs with a cache, read its diagnostics only, and
-            // keeping the IR would copy all of it on every keystroke
-            ir: ir.filter(|_| self.cache.is_none()),
-            declarations,
-        }
-    }
-}
-
+include!("checking_inline.rs");
+include!("checking_relocate.rs");
+include!("checking_relocate_decls.rs");
 impl Checking<'_> {
     /// What the watching plugins find wrong with the places of `loaded` that
     /// call the names each watches, at spans of the module's own text; a
@@ -417,6 +369,8 @@ struct Output {
     diagnostics: Vec<Diagnostic>,
     #[cfg(feature = "ide")]
     typing: Arc<types::Typing>,
+    #[cfg(feature = "ide")]
+    inline_ide: Vec<Analyzed>,
     /// The checked interface, which editors see.
     interface: Interface,
     /// What importers see: without types when the module has errors.
@@ -424,6 +378,29 @@ struct Output {
     ir: Option<ir::Module>,
     /// Every top-level entity with its type, for the reference model.
     declarations: Arc<Interface>,
+}
+
+/// What importers see of a module: all of a clean one; of one with errors,
+/// the exports and instances checking finished, typed, and the others by
+/// name alone. One error then costs its importers what it broke, not every
+/// type of the module.
+fn exported(interface: &Interface, clean: bool) -> Interface {
+    // a type left open holds variables of the module's own store, which no
+    // interface writes and no importer may read with its own
+    fn written(part: &impl serde::Serialize) -> bool {
+        serde_json::to_value(part).is_ok()
+    }
+    let mut out = interface.clone();
+    if clean {
+        return out;
+    }
+    for export in &mut out.exports {
+        if !written(export) {
+            (export.scheme, export.definition) = (None, None);
+        }
+    }
+    out.instances.retain(written);
+    out
 }
 
 /// `interface` as a cache key compares it: without where its names are

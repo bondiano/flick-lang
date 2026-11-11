@@ -2,11 +2,11 @@
 //! bound locally by a parameter, pattern, `let` or `scope`; and the local
 //! names nothing refers to.
 
-use super::defs::{binders, is_pattern};
 use super::{Module, Namespace};
 use crate::source::{FileId, Span};
 use crate::syntax::cst::{Node, Token};
 use crate::syntax::kind::SyntaxKind as K;
+use crate::syntax::patterns::{binders, is_part, is_pattern};
 
 #[derive(Debug)]
 pub(super) struct Reference {
@@ -29,6 +29,8 @@ pub(super) struct Unused {
     /// For a `let mut` never assigned, the `mut ` to remove; `span` is its
     /// keyword.
     pub needless_mut: Option<Span>,
+    pub mut_fix: bool,
+    pub written: bool,
 }
 
 pub(super) fn references(module: &Module) -> (Vec<Reference>, Vec<Unused>) {
@@ -37,6 +39,7 @@ pub(super) fn references(module: &Module) -> (Vec<Reference>, Vec<Unused>) {
         file: module.file,
         generated: module.generated,
         locals: Vec::new(),
+        module_locals: Vec::new(),
         out: Vec::new(),
         unused: Vec::new(),
         used: Vec::new(),
@@ -72,6 +75,7 @@ struct Local<'a> {
     used: bool,
     /// The `mut` of a `let mut`, and whether a statement assigns it.
     mutable: Option<(Token, bool)>,
+    mut_fix: bool,
 }
 
 struct Walker<'a> {
@@ -79,6 +83,7 @@ struct Walker<'a> {
     file: FileId,
     generated: u32,
     locals: Vec<Local<'a>>,
+    module_locals: Vec<&'a str>,
     out: Vec<Reference>,
     unused: Vec<Unused>,
     /// Where each binder that was used is written.
@@ -87,10 +92,56 @@ struct Walker<'a> {
 }
 
 impl Walker<'_> {
+    fn unpack(&mut self, node: &Node) {
+        let mark = self.locals.len();
+        let mut children = node.nodes();
+        if let Some(source) = children.next() {
+            self.walk(source);
+        }
+        let mut tokens = node.child_tokens();
+        let payload = tokens
+            .find(|t| t.kind == K::Comma)
+            .and_then(|_| tokens.find(|t| t.kind == K::Ident));
+        if let Some(payload) = payload {
+            self.locals.push(Local {
+                name: payload.text(self.text),
+                generated: payload.start >= self.generated,
+                binder: Some((payload, false)),
+                mutable: None,
+                mut_fix: false,
+                used: false,
+            });
+        }
+        for child in children {
+            self.walk(child);
+        }
+        self.release(mark);
+    }
+
     fn walk(&mut self, node: &Node) {
         let mark = self.locals.len();
         match node.kind {
-            K::ModuleHeader | K::ImportDecl => return,
+            K::ModuleSignatureArrow => {
+                self.module_signature(node);
+                return;
+            }
+            K::ModuleParamExpr | K::InlineModuleDecl
+                if node.kind == K::ModuleParamExpr
+                    || node.nodes().any(|n| n.kind == K::ModuleParamGroup) =>
+            {
+                self.module_parameterized(node);
+                return;
+            }
+            K::ImportDecl => return,
+            K::ModuleHeader => {
+                for child in node
+                    .nodes()
+                    .filter(|n| matches!(n.kind, K::ModuleParamGroup | K::ModuleResult))
+                {
+                    self.walk(child);
+                }
+                return;
+            }
             K::NameExpr | K::ConPat => self.reference(node, Namespace::Constructor),
             K::NameType => self.reference(node, Namespace::Type),
             K::DerivingClause => {
@@ -106,6 +157,10 @@ impl Walker<'_> {
             K::Block => {
                 self.statements(node);
                 self.release(mark);
+                return;
+            }
+            K::UnpackExpr => {
+                self.unpack(node);
                 return;
             }
             K::ForExpr => {
@@ -148,8 +203,9 @@ impl Walker<'_> {
                     name: t.text(self.text),
                     generated: t.start >= self.generated,
                     binder: None,
-                    used: false,
                     mutable: None,
+                    mut_fix: false,
+                    used: false,
                 }));
             }
             _ => {}
@@ -158,6 +214,105 @@ impl Walker<'_> {
             self.walk(child);
         }
         self.release(mark);
+    }
+
+    fn module_parameterized(&mut self, node: &Node) {
+        let mark = self.locals.len();
+        let modules = self.module_locals.len();
+        for parameter in node
+            .nodes()
+            .filter(|n| n.kind == K::ModuleParamGroup)
+            .flat_map(Node::nodes)
+        {
+            for signature in parameter.nodes() {
+                self.walk(signature);
+            }
+            if let Some(name) = parameter.child_tokens().find(|t| t.kind == K::Con) {
+                self.module_locals.push(name.text(self.text));
+            }
+        }
+        for result in node.nodes().filter(|n| n.kind == K::ModuleResult) {
+            self.walk(result);
+        }
+        if let Some(body) = node.nodes().find(|n| {
+            matches!(
+                n.kind,
+                K::Members
+                    | K::ModuleApplyExpr
+                    | K::ModuleParamExpr
+                    | K::ModuleParenExpr
+                    | K::ModuleAnnotExpr
+            ) || (node.kind == K::ModuleParamExpr && n.kind == K::ModulePath)
+        }) {
+            for declaration in body.nodes().filter(|_| body.kind == K::Members) {
+                if declaration.kind == K::ImportDecl {
+                    let qualifier = declaration
+                        .child_tokens()
+                        .find(|t| t.kind == K::Con)
+                        .or_else(|| {
+                            declaration
+                                .nodes()
+                                .find(|n| n.kind == K::ModulePath)
+                                .and_then(|p| p.child_tokens().find(|t| t.kind == K::Con))
+                        });
+                    if let Some(qualifier) = qualifier {
+                        self.module_locals.push(qualifier.text(self.text));
+                    }
+                    continue;
+                }
+                let names = declaration
+                    .child_tokens()
+                    .filter(|t| matches!(t.kind, K::Ident | K::Con));
+                self.locals.extend(names.map(|t| Local {
+                    name: t.text(self.text),
+                    generated: t.start >= self.generated,
+                    binder: None,
+                    mutable: None,
+                    mut_fix: false,
+                    used: false,
+                }));
+                if let Some(pattern) = declaration.nodes().find(|n| is_pattern(n.kind)) {
+                    let mut names = Vec::new();
+                    binders(pattern, &mut names);
+                    self.locals.extend(names.into_iter().map(|t| Local {
+                        name: t.text(self.text),
+                        generated: t.start >= self.generated,
+                        binder: None,
+                        mutable: None,
+                        mut_fix: false,
+                        used: false,
+                    }));
+                }
+            }
+            self.walk(body);
+        }
+        self.module_locals.truncate(modules);
+        self.locals.truncate(mark);
+    }
+
+    fn module_signature(&mut self, node: &Node) {
+        let mark = self.module_locals.len();
+        let mut parts = node.nodes();
+        if let Some(input) = parts.next() {
+            if input.kind == K::ModuleSignatureParen
+                && input.nodes().all(|n| n.kind == K::ModuleSignatureBinder)
+            {
+                for binder in input.nodes() {
+                    for signature in binder.nodes() {
+                        self.walk(signature);
+                    }
+                    if let Some(name) = binder.child_tokens().find(|t| t.kind == K::Con) {
+                        self.module_locals.push(name.text(self.text));
+                    }
+                }
+            } else {
+                self.walk(input);
+            }
+        }
+        for result in parts {
+            self.walk(result);
+        }
+        self.module_locals.truncate(mark);
     }
 
     /// The statements of a block: a `let` scopes over those after it.
@@ -200,6 +355,8 @@ impl Walker<'_> {
                     span: Span::new(self.file, token.start, token.end),
                     punned,
                     needless_mut: None,
+                    mut_fix: false,
+                    written: local.mutable.is_some_and(|(_, assigned)| assigned),
                 });
             }
             if let Some((kw, false)) = local.mutable {
@@ -211,6 +368,8 @@ impl Walker<'_> {
                     span: Span::new(self.file, kw.start, kw.end),
                     punned: false,
                     needless_mut: Some(Span::new(self.file, kw.start, end)),
+                    mut_fix: local.mut_fix,
+                    written: false,
                 });
             }
         }
@@ -242,6 +401,7 @@ impl Walker<'_> {
             binder: Some((t, puns.contains(&t.start))),
             used: false,
             mutable: None,
+            mut_fix: false,
         }));
     }
 
@@ -261,6 +421,7 @@ impl Walker<'_> {
                 binder: None,
                 used: false,
                 mutable: None,
+                mut_fix: false,
             }));
         }
         for params in node.nodes().filter(|n| n.kind == K::Params) {
@@ -276,6 +437,7 @@ impl Walker<'_> {
             let mutable = node.child_tokens().find(|t| t.kind == K::MutKw);
             if let (Some(kw), [local]) = (mutable, &mut self.locals[mark..]) {
                 local.mutable = Some((kw, false));
+                local.mut_fix = !node.has_token(K::Colon);
             }
         }
     }
@@ -325,6 +487,12 @@ impl Walker<'_> {
         let Some((&name, qualifier)) = parts.split_last() else {
             return;
         };
+        if qualifier
+            .first()
+            .is_some_and(|name| self.module_locals.contains(name))
+        {
+            return;
+        }
         // a companion `T$schema` of generated code is a value, its token one
         let namespace = if last.kind == K::Con {
             con_namespace
@@ -367,7 +535,7 @@ fn punned(pattern: &Node, out: &mut Vec<u32>) {
                 .map(|t| t.start),
         );
     }
-    for child in pattern.nodes().filter(|n| is_pattern(n.kind)) {
+    for child in pattern.nodes().filter(|n| is_part(n.kind)) {
         punned(child, out);
     }
 }

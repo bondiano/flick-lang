@@ -1,5 +1,6 @@
 //! `scope` expressions and the calls that acquire into their owners.
 
+use crate::types::Elem;
 use std::mem;
 
 use super::{Need, Scope, scope};
@@ -32,21 +33,21 @@ impl Checker<'_> {
         let Type::Skolem(id) = region else {
             unreachable!("a skolem")
         };
-        self.regions.scopes.push(Scope {
+        self.cx.regions.scopes.push(Scope {
             region: id,
             span,
             node: node.range(),
-            outer: self.stage.services.clone(),
-            parent: self.regions.nest.last().copied(),
+            outer: self.cx.stage.services.clone(),
+            parent: self.cx.regions.nest.last().copied(),
             handler: false,
         });
-        let index = self.regions.scopes.len() - 1;
-        self.regions.open.push(index);
-        self.regions.nest.push(index);
-        let (locals, tyvars) = (self.locals.len(), self.tyvars.len());
+        let index = self.cx.regions.scopes.len() - 1;
+        self.cx.regions.open.push(index);
+        self.cx.regions.nest.push(index);
+        let (locals, tyvars) = (self.cx.locals.len(), self.cx.tyvars.len());
         if let Some(token) = name {
             let name = token.text(self.text);
-            self.tyvars.push(TyVar {
+            self.cx.tyvars.push(TyVar {
                 name: name.to_owned(),
                 ty: region.clone(),
                 kind: Kind::Region,
@@ -55,10 +56,10 @@ impl Checker<'_> {
             self.push_local(name, token.start, owner);
         }
         let needed = self.fresh();
-        let mut stage = self.stage.clone();
+        let mut stage = self.cx.stage.clone();
         stage.services = needed.clone();
         stage.returns = None;
-        let outer = mem::replace(&mut self.stage, stage);
+        let outer = mem::replace(&mut self.cx.stage, stage);
         let body = node.nodes().next();
         let ty = match (body, expected) {
             (Some(body), Some(expected)) => {
@@ -68,18 +69,20 @@ impl Checker<'_> {
             (Some(body), None) => self.infer(body),
             (None, _) => Type::Error,
         };
-        let inner = mem::replace(&mut self.stage, outer);
-        self.stage.calls = inner.calls;
-        if self.stage.pure.is_none() {
-            let outer = self.stage.services.clone();
+        let inner = mem::replace(&mut self.cx.stage, outer);
+        self.cx.stage.calls = inner.calls;
+        if self.cx.stage.pure.is_none() {
+            let outer = self.cx.stage.services.clone();
             self.scope_row(&needed, &outer, &region, span);
         }
         self.settle_needs(index);
-        self.locals.truncate(locals);
-        self.tyvars.truncate(tyvars);
-        self.regions.open.pop();
-        self.regions.nest.pop();
+        self.cx.locals.truncate(locals);
+        self.cx.tyvars.truncate(tyvars);
+        self.cx.regions.open.pop();
+        self.cx.regions.nest.pop();
         self.store.level -= 1;
+        // what the value needs live is in rows still growing (`live.rs`)
+        self.grow();
         if let Err(skolem) = self.store.leave(&ty) {
             let shown = self.show_exact(&ty);
             let span = body.map_or(span, |b| self.span(b));
@@ -94,27 +97,28 @@ impl Checker<'_> {
     /// result: without `Scope` when a scope of the stage provides it, since
     /// each scope provides `Scope` of its own region only.
     pub fn lexical_owner(&mut self, services: &Type, span: Span) -> Type {
-        let Some(&inner) = self.regions.open.last() else {
+        let Some(&inner) = self.cx.regions.open.last() else {
             return services.clone();
         };
         let mut norm = self.store.normalize(services);
         let Some(needed) = norm.get(scope()).cloned() else {
             return services.clone();
         };
-        let own = self.regions.open[self.stage.scopes.min(self.regions.open.len())..].to_vec();
+        let own =
+            self.cx.regions.open[self.cx.stage.scopes.min(self.cx.regions.open.len())..].to_vec();
         if own.is_empty() {
             // no scope of this stage provides it: the stage passes `Scope` on to
             // what runs it, which provides the region its row names
             if let [region] = needed.spine().1[..]
                 && let Type::Meta(_) = self.store.resolve(region)
             {
-                match (self.declared_scope(), &mut self.regions.defaults) {
+                match (self.declared_scope(), &mut self.cx.regions.defaults) {
                     (Some(owner), _) => {
                         let _ = self.unify(region, &owner);
                     }
                     (None, Some(defaults)) => defaults.push((region.clone(), inner)),
                     (None, None) => {
-                        let owner = Type::Skolem(self.regions.scopes[inner].region);
+                        let owner = Type::Skolem(self.cx.regions.scopes[inner].region);
                         let _ = self.unify(region, &owner);
                     }
                 }
@@ -122,10 +126,16 @@ impl Checker<'_> {
             return services.clone();
         }
         let open = self
+            .cx
             .regions
             .open
             .iter()
-            .map(|&i| (self.regions.scopes[i].region, self.regions.scopes[i].node))
+            .map(|&i| {
+                (
+                    self.cx.regions.scopes[i].region,
+                    self.cx.regions.scopes[i].node,
+                )
+            })
             .collect();
         self.typing
             .pending_owners
@@ -134,15 +144,15 @@ impl Checker<'_> {
             return services.clone();
         };
         if let Type::Meta(_) = self.store.resolve(region) {
-            let owner = Type::Skolem(self.regions.scopes[inner].region);
+            let owner = Type::Skolem(self.cx.regions.scopes[inner].region);
             let _ = self.unify(region, &owner);
         }
-        self.regions.needs.push(Need {
+        self.cx.regions.needs.push(Need {
             region: region.clone(),
             inner,
             own,
             span,
-            site: self.stage.site,
+            site: self.cx.stage.site,
         });
         norm.entries.retain(|(label, _)| label != scope());
         norm.into_type()
@@ -153,7 +163,7 @@ impl Checker<'_> {
     pub fn settle_defaults(&mut self, defaults: Vec<(Type, usize)>) {
         for (region, inner) in defaults {
             if let Type::Meta(_) = self.store.resolve(&region) {
-                let owner = Type::Skolem(self.regions.scopes[inner].region);
+                let owner = Type::Skolem(self.cx.regions.scopes[inner].region);
                 let _ = self.unify(&region, &owner);
             }
         }
@@ -162,7 +172,7 @@ impl Checker<'_> {
     /// The region of the `Scope` the current stage's row names, once known:
     /// a task checked against `Eff {Scope s | r} e a` acquires into `s`.
     fn declared_scope(&self) -> Option<Type> {
-        let declared = self.store.normalize(&self.stage.services);
+        let declared = self.store.normalize(&self.cx.stage.services);
         let scope = declared.get(scope())?;
         let [region] = scope.spine().1[..] else {
             return None;
@@ -176,6 +186,7 @@ impl Checker<'_> {
     /// those scopes.
     fn settle_needs(&mut self, index: usize) {
         let needs: Vec<Need> = self
+            .cx
             .regions
             .needs
             .extract_if(.., |n| n.inner == index)
@@ -185,18 +196,18 @@ impl Checker<'_> {
                 continue;
             };
             let provided = need.own.iter().any(|&i| {
-                self.store.resolve(&need.region) == Type::Skolem(self.regions.scopes[i].region)
+                self.store.resolve(&need.region) == Type::Skolem(self.cx.regions.scopes[i].region)
             });
             if !provided {
                 let row = Type::Row(Row {
                     entries: vec![(
-                        scope().to_owned(),
+                        Elem::named(scope()),
                         Type::app(Type::lang(Lang::Scope), need.region.clone()),
                     )],
                     tail: None,
                     ..Row::default()
                 });
-                let outer = self.regions.scopes[first].outer.clone();
+                let outer = self.cx.regions.scopes[first].outer.clone();
                 self.sub_row(&row, &outer, need.site, need.span, false);
             }
         }

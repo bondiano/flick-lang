@@ -2,7 +2,7 @@ package flickrt
 
 import "strconv"
 
-// Effect's `JsonSchema` writers of a draft 2020-12 document as draft-07 and
+// The `JsonSchema` writers of a draft 2020-12 document as draft-07 and
 // draft-04.
 
 func JsonSchemaToDraft07(d Value) Value {

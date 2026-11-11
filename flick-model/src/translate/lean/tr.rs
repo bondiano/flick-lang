@@ -1,10 +1,11 @@
 //! Rules 1–4 of the translation of Prelude schemes
-//! (`docs/formal/elaboration.md#value-qualifiers-in-prelude-schemes`) on one checker type: `Tr::ty`, then `Tr::resolve`.
+//! (`docs/formal/elaboration.md#value-qualifiers-in-prelude-schemes`) on one checker type: `Tr::ty`, then `Tr::resolve`,
+//! with the elision of rule 6 on the way.
 
 use std::collections::{BTreeMap, BTreeSet};
-use std::iter;
+use std::{iter, mem};
 
-use flick_core::types::{self as fc, show_type};
+use flick_core::types::{self as fc, Kind, show_type};
 
 use super::Skip;
 
@@ -66,6 +67,20 @@ pub(super) struct Tr {
     pub fresh: Vec<String>,
     /// the type constructors, in the order they appear
     pub cons: Vec<String>,
+    /// the variables of kind `CaptureRow` or `Region`: what elision keeps live
+    pub live_kinds: BTreeSet<String>,
+    /// what the parameters of the stages before reach, for the next runtime arrow (rule 6)
+    held: Vec<String>,
+    /// rule 6 as the checker's `for_loop` reads `for … do`: only the first
+    /// parameter, the body, is kept live, nothing of the source
+    pub callback_only: bool,
+    /// the arrows on the way to the result so far
+    stages: usize,
+    /// the value bounds `a^c` on variables of the scheme, rule 1: `(a, c)`,
+    /// a fact of the scheme
+    pub bounds: Vec<(Ty, Ty)>,
+    /// the binders of the `∀` of parameters open here
+    inner: Vec<String>,
 }
 
 /// What a qualified argument reaches besides its qualifier.
@@ -90,6 +105,8 @@ impl Tr {
     }
 
     pub fn ty(&mut self, t: &fc::Type, neg: bool) -> Result<Ty, Skip> {
+        // only the result of a stage, a qualified type and a `∀` pass on what is held
+        let held = mem::take(&mut self.held);
         Ok(match t {
             fc::Type::Var(a) => Ty::Var(a.clone()),
             fc::Type::Con { name, .. } => self.con(name.to_lowercase()),
@@ -98,7 +115,7 @@ impl Tr {
                 param,
                 effects,
                 result,
-            } => self.arrow(param, effects.as_deref(), result, None, neg)?,
+            } => self.arrow(param, effects.as_deref(), result, None, neg, held)?,
             // `(a, b, c)` is `tup (tup a b) c`, as `nest` of `Sugar`
             fc::Type::Tuple(ts) if ts.len() > 1 => {
                 let tup = self.con("tup".into());
@@ -116,7 +133,7 @@ impl Tr {
                 tail: None,
                 ..
             }) => {
-                let labels: Vec<&str> = entries.iter().map(|(l, _)| l.as_str()).collect();
+                let labels: Vec<String> = entries.iter().map(|(l, _)| l.to_string()).collect();
                 let h = self.con(format!("rec_{}", labels.join("_")));
                 let fields = entries
                     .iter()
@@ -125,24 +142,40 @@ impl Tr {
                 app(h, fields)
             }
             fc::Type::Row(_) | fc::Type::Union(..) => self.row(t)?,
-            fc::Type::Captured { ty, captures, .. } | fc::Type::Bounded { ty, captures } => {
+            fc::Type::Bounded { ty, captures } => {
+                let fc::Type::Var(a) = &**ty else {
+                    return Err(Skip::Other(
+                        "a value bound on a type that is not a variable".into(),
+                    ));
+                };
+                self.bound(a, captures)?
+            }
+            fc::Type::Captured { ty, captures, .. } => {
                 let (names, inner) = self.open(ty)?;
                 let t = match inner {
                     fc::Type::Fun {
                         param,
                         effects,
                         result,
-                    } => self.arrow(param, effects.as_deref(), result, Some(captures), neg)?,
+                    } => {
+                        self.arrow(param, effects.as_deref(), result, Some(captures), neg, held)?
+                    }
                     fc::Type::App { .. } => self.data(inner, Some(captures), neg)?,
-                    // a type variable: its bound is not modelled; other data
-                    // has no storage
-                    _ => self.ty(inner, neg)?,
+                    // a hidden qualifier on a type variable adds nothing
+                    _ => {
+                        self.held = held;
+                        self.ty(inner, neg)?
+                    }
                 };
+                self.close(&names);
                 all(names, t)
             }
             fc::Type::Forall { .. } => {
                 let (names, body) = self.open(t)?;
-                all(names, self.ty(body, neg)?)
+                self.held = held;
+                let t = self.ty(body, neg)?;
+                self.close(&names);
+                all(names, t)
             }
             other => return Err(Skip::Other(format!("no type {}", show_type(other)))),
         })
@@ -164,6 +197,9 @@ impl Tr {
         }
         let mut names = Vec::new();
         for v in vars {
+            if matches!(v.kind, Kind::CaptureRow | Kind::Region) {
+                self.live_kinds.insert(v.name.clone());
+            }
             match bound(body, &v.name) {
                 Some(a) => {
                     self.inst.insert(v.name.clone(), a);
@@ -171,9 +207,37 @@ impl Tr {
                 None => names.push(v.name.clone()),
             }
         }
+        self.inner.extend(names.iter().cloned());
         Ok((names, body))
     }
 
+    /// The binders `names` of a `∀` of a parameter are out of scope again.
+    fn close(&mut self, names: &[String]) {
+        self.inner.truncate(self.inner.len() - names.len());
+    }
+
+    /// `a^c` on a type variable: `∀v. a^v` of rule 2 is `a`, and a bound on
+    /// a variable of the scheme is `a` with the fact `(a, c)` (rule 1).
+    fn bound(&mut self, a: &String, captures: &fc::Type) -> Result<Ty, Skip> {
+        if matches!(captures, fc::Type::Var(v) if self.inst.get(v) == Some(a)) {
+            return Ok(Ty::Var(a.clone()));
+        }
+        let mut atoms = Vec::new();
+        self.atoms(captures, &mut atoms)?;
+        if iter::once(a).chain(&atoms).any(|v| self.inner.contains(v)) {
+            return Err(Skip::Other(
+                "a value bound over a variable of a `∀` of a parameter".into(),
+            ));
+        }
+        let c = cun(atoms.into_iter().map(Ty::Var).collect());
+        self.bounds.push((Ty::Var(a.clone()), c));
+        Ok(Ty::Var(a.clone()))
+    }
+
+    /// An arrow, its row with `Live` of what `held` and its parameter reach
+    /// (rule 6, the checker's `elide`): `Live C` is the capture row `C` in
+    /// the row, ending in `.cnil` so that one variable is not read as a row
+    /// variable (`Ty.Keeps` of `Elab/Source.lean`).
     fn arrow(
         &mut self,
         param: &fc::Type,
@@ -181,23 +245,73 @@ impl Tr {
         result: &fc::Type,
         q: Option<&fc::Type>,
         neg: bool,
+        mut held: Vec<String>,
     ) -> Result<Ty, Skip> {
         let rows = effects
-            .map(|e| {
-                Ok((
-                    Box::new(self.row(&e.services)?),
-                    Box::new(self.row(&e.errors)?),
-                ))
-            })
+            .map(|e| Ok((self.row(&e.services)?, Box::new(self.row(&e.errors)?))))
             .transpose()?;
         let start = self.fresh.len();
         let a = self.ty(param, !neg)?;
+        let mut reached = Vec::new();
+        if !neg {
+            self.stages += 1;
+        }
+        if !(self.callback_only && !neg && self.stages > 1) {
+            self.reached(&a, &[], &mut reached);
+        }
+        for v in reached {
+            if !held.contains(&v) {
+                held.push(v);
+            }
+        }
+        let rows = rows.map(|(r, e)| {
+            let live = (!held.is_empty()).then(|| {
+                let c = cun(held.iter().cloned().map(Ty::Var).collect());
+                Ty::Un(Box::new(c), Box::new(Ty::Nil))
+            });
+            let r = match live {
+                Some(live) => Ty::RUn(Box::new(live), Box::new(r)),
+                None => r,
+            };
+            (Box::new(r), e)
+        });
+        self.held = held;
         let b = self.ty(result, neg)?;
         let q = match q {
             Some(q) => self.qual(q, neg, Site::Fun(start))?,
             None => Ty::Nil,
         };
         Ok(Ty::Arr(rows, Box::new(a), Box::new(b), Box::new(q)))
+    }
+
+    /// The variables of kind `CaptureRow` or `Region` a value of `t` reaches,
+    /// but those `bound` binds: `Ty.Shown`, without the rows of arrows.
+    fn reached(&self, t: &Ty, bound: &[String], out: &mut Vec<String>) {
+        let push = |v: &String, out: &mut Vec<String>| {
+            let live = self.live_kinds.contains(v) || self.fresh.contains(v);
+            if live && !bound.contains(v) && !out.contains(v) {
+                out.push(v.clone());
+            }
+        };
+        match t {
+            Ty::Var(v) => push(v, out),
+            Ty::Pos(vs) => vs.iter().for_each(|v| push(v, out)),
+            Ty::App(a, b) | Ty::Un(a, b) | Ty::RUn(a, b) => {
+                self.reached(a, bound, out);
+                self.reached(b, bound, out);
+            }
+            Ty::Arr(_, a, b, q) => {
+                self.reached(a, bound, out);
+                self.reached(b, bound, out);
+                self.reached(q, bound, out);
+            }
+            Ty::Nm(_, t) => self.reached(t, bound, out),
+            Ty::All(names, t) => {
+                let inner: Vec<String> = bound.iter().chain(names).cloned().collect();
+                self.reached(t, &inner, out);
+            }
+            Ty::Con(_) | Ty::Nil => {}
+        }
     }
 
     /// `T ā` with the qualifier `q` of its value.
@@ -235,8 +349,16 @@ impl Tr {
             _ => self.new_var(),
         };
         if let [v] = &atoms[..] {
-            let rest = match site {
-                Site::Data(args) => args,
+            let rest: Vec<Ty> = match site {
+                // what the arguments reach, as rule 6 and the checker's
+                // `live_atoms` count it: no type variable
+                Site::Data(args) => {
+                    let mut reached = Vec::new();
+                    for a in &args {
+                        self.reached(a, &[], &mut reached);
+                    }
+                    reached.into_iter().map(Ty::Var).collect()
+                }
                 Site::Fun(start) => self.fresh[start..]
                     .iter()
                     .filter(|w| !matches!(&var, Ty::Var(v) if v == *w))

@@ -100,7 +100,7 @@ impl Lower<'_> {
     pub(super) fn prelude_method(&mut self, key: Range, method: Lang) -> Expr {
         let name = lang::item(method).name.as_str();
         let span = Span::new(self.file, key.0, key.1);
-        let mut dicts = self.typing.dicts.get(&key).cloned().unwrap_or_default();
+        let mut dicts = self.dictionaries(key);
         assert!(
             !dicts.is_empty(),
             "the checker resolved the `{name}` of a `do` block"

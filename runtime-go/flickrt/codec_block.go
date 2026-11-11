@@ -1,9 +1,8 @@
 package flickrt
 
-// The codecs of `codec` blocks: a record of labelled fields, each under
-// its wire name, as Effect's Struct with renamed keys reads and writes it.
-// An object with a key no field names is refused unless the block ignores
-// extra fields.
+// The codecs of `codec` blocks: a record of labelled fields, each read and
+// written under its wire name. An object with a key no field names is
+// refused unless the block ignores extra fields.
 
 // A fieldSpec is `field wire codec` before the block labels it.
 type fieldSpec struct {

@@ -11,9 +11,9 @@ import (
 
 func SchemaJsonCodec(s Value) Value { return sch(s).jsonOf() }
 
-// JsonCodec is `Json.json`, Effect's `Schema.Json`: a JSON value as
-// itself. A tree that holds anything else, such as an infinity a parse
-// gave for `1e400`, fails as a whole, both ways.
+// JsonCodec is `Json.json`: a JSON value as itself. A tree that holds
+// anything else, such as an infinity a parse gave for `1e400`, fails as a
+// whole, both ways.
 var JsonCodec Value = jsonValue{}
 
 type jsonValue struct{}

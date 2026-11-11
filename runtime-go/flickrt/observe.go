@@ -66,8 +66,8 @@ func EffectAnnotateCurrentSpan(fb *Fiber, key, value Value) Value {
 	return Unit
 }
 
-// noSuchElement fails with Effect's NoSuchElementError, whose message JS
-// leaves undefined.
+// noSuchElement fails with a NoSuchElementError, whose message JS leaves
+// undefined.
 func noSuchElement() Value { return Fail(NewData(noSuchElementTag, "")) }
 
 func EffectCurrentSpan(fb *Fiber) Value {

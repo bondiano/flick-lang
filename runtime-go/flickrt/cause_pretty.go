@@ -6,12 +6,12 @@ import (
 	"strings"
 )
 
-// Effect's `Cause.pretty` and `Cause.prettyErrors` (internal/effect.ts):
-// each failure and defect as an Error, and an interruption alone as an
-// `InterruptError` caused by the interrupting fibers.
+// The pretty form of a cause and its pretty errors: each failure and
+// defect as an Error, and an interruption alone as an `InterruptError`
+// caused by the interrupting fibers.
 
-// prettyError is the Error Effect's `causePrettyError` makes of a reason:
-// its name, message and stack, and the error it was caused by.
+// prettyError is the Error made of a reason: its name, message and stack,
+// and the error it was caused by.
 type prettyError struct {
 	name, message, stack string
 	cause                *prettyError
@@ -108,8 +108,8 @@ func causePretty(c *Cause) string {
 	return strings.Join(out, "\n")
 }
 
-// rendered is Effect's renderPrettyError: the stack, its cause's nested,
-// the stack of `includeCauseInStack`.
+// rendered is the stack, with the stack of its cause nested under
+// `[cause]`.
 func (e *prettyError) rendered() string {
 	if e.cause == nil {
 		return e.stack
@@ -118,8 +118,8 @@ func (e *prettyError) rendered() string {
 	return e.stack + " {\n  [cause]: " + strings.Join(lines, "\n  ") + "\n}"
 }
 
-// formatJSON is Effect's `formatJson` of a Flick value: its JSON, with an
-// Option or a Result as their `toJSON` gives them.
+// formatJSON is the JSON of a Flick value, with an Option or a Result as
+// their `toJSON` gives them.
 func formatJSON(v Value) string {
 	switch x := v.(type) {
 	case []Value:

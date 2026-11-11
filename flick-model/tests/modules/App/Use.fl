@@ -1,0 +1,6 @@
+module App.Use exposing (answer)
+
+import App.Packed exposing (result)
+
+answer : Int
+let answer = unpack result as K, item in (fun _ -> 42) item

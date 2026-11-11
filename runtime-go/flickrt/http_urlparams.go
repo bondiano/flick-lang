@@ -5,10 +5,9 @@ import (
 	"strings"
 )
 
-// Http.UrlParams as Effect's: pairs of key and value in order, a key
-// possibly given more than once. Flick only ever puts strings in them, so
-// they are the list of pairs itself, which `==` compares as Effect's
-// equivalence does.
+// Http.UrlParams: pairs of key and value in order, a key possibly given
+// more than once. Flick only ever puts strings in them, so they are the
+// list of pairs itself, and `==` is their equivalence.
 
 var (
 	UrlParamsEmpty         Value = []Value{}
@@ -16,7 +15,7 @@ var (
 	defaultUrlRedactedName       = []string{"AWSAccessKeyId", "Signature", "sig", "X-Goog-Signature"}
 )
 
-// UrlParamsDefaultRedactedNames is the names Effect masks by default.
+// UrlParamsDefaultRedactedNames is the names masked by default.
 var UrlParamsDefaultRedactedNames Value = []Value{"AWSAccessKeyId", "Signature", "sig", "X-Goog-Signature"}
 
 func paramsOf(v Value) []Value { return v.([]Value) }
@@ -125,8 +124,8 @@ func UrlParamsToRecord(p Value) Value {
 	return out
 }
 
-// paramsRecord is Effect's `toRecord`: an object of a string per key, or
-// an array of strings for a key given more than once.
+// paramsRecord is an object of a string per key, or an array of strings
+// for a key given more than once.
 func paramsRecord(p []Value) *Record {
 	out := newRecord(len(p))
 	for _, kv := range UrlParamsToRecord(p).([]Value) {
@@ -210,8 +209,8 @@ func UrlParamsShow(p Value) Value {
 
 func UrlParamsRedactUrl(names, url Value) Value { return redactURL(url.(string), stringsOf(names)) }
 
-// Effect's `redactUrl`: it works on the text, so a URL no parser accepts
-// is still masked.
+// Masking a URL works on the text, so a URL no parser accepts is still
+// masked.
 var (
 	authorityStart      = regexp.MustCompile(`(?i)^(?:(https?|ftp|wss?):[/\\]*|[a-z][a-z\d+.-]*://|[/\\]{2,})`)
 	specialAuthorityEnd = regexp.MustCompile(`[/\\?#]`)

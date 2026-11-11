@@ -1,4 +1,4 @@
-// Effect's `Channel` and `Sink` over JS streams: web streams and async
+// `Channel` and `Sink` over JS streams: web streams and async
 // iterables, which only the JS target has.
 module App.Main exposing (main)
 
@@ -36,10 +36,10 @@ let boom value = Boom "js"
 say : String ->{} Unit
 let say line = Platform.stdout_line line
 
-lists : Channel.Channel none e i (NonEmpty.NonEmpty a) d none Unit ->{; e} List (List a)
+lists : Channel.Channel {Async} e i (NonEmpty.NonEmpty a) d none Unit ->{Async; e} List (List a)
 let lists channel = Channel.run_collect (Channel.map NonEmpty.to_list channel)
 
-sources : Unit ->{; Boom} Unit
+sources : Unit ->{Async; Boom} Unit
 let sources () =
   let stream = readable ["x", "y"]
   let web =
@@ -69,7 +69,7 @@ let sources () =
       })
   say ("from_transform_stream: " ++ show (lists shouted))
 
-sinks : Unit ->{; Boom} Unit
+sinks : Unit ->{Async; Boom} Unit
 let sinks () =
   let stream = writable ()
   let into =
@@ -95,7 +95,7 @@ let sinks () =
             })))
   say ("Sink.from_writable_stream: " ++ show (written_numbers ()))
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Async; AppError} Unit
 let main () =
   try
     sources ()

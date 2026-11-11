@@ -11,6 +11,7 @@ use std::io;
 use std::path::{Path, PathBuf};
 
 use flick_core::build::{self, Extras, Settings};
+use flick_core::codegen::EffectBridge;
 use flick_core::diagnostics::render::json_events;
 use flick_core::diagnostics::{Diagnostic, Severity, codes};
 use flick_core::fmt;
@@ -76,22 +77,12 @@ impl Session {
     /// is apart: it says nothing about the program. A profile other than
     /// `"release"` is `"debug"`.
     pub fn emit(&self, profile: &str) -> String {
-        let mut diagnostics = self.analysis.diagnostics.clone();
-        let mut declarations = Vec::new();
-        let mut out = json!({ "js": null, "dts": null, "files": null, "entry": null });
-        if !has_errors(&diagnostics) {
-            let (artifacts, problems) = self.artifacts(profile);
-            let (left_out, problems): (Vec<_>, Vec<_>) =
-                problems.into_iter().partition(|d| d.code == codes::F004);
-            declarations = left_out;
-            diagnostics.extend(problems);
-            if !has_errors(&diagnostics) {
-                out = self.output(artifacts);
-            }
-        }
-        out["diagnostics"] = self.diagnostics(&diagnostics);
-        out["dts_diagnostics"] = self.diagnostics(&declarations);
-        out.to_string()
+        self.emit_output(profile, false)
+    }
+
+    /// The normal emit plus declaration files for resolving re-exported signatures.
+    pub fn emit_declarations(&self, profile: &str) -> String {
+        self.emit_output(profile, true)
     }
 
     /// `{ "text", "from", "to" }`: what hovering at the UTF-16 offset `at`
@@ -135,6 +126,25 @@ impl Session {
 }
 
 impl Session {
+    fn emit_output(&self, profile: &str, include_declarations: bool) -> String {
+        let mut diagnostics = self.analysis.diagnostics.clone();
+        let mut declarations = Vec::new();
+        let mut out = json!({ "js": null, "dts": null, "files": null, "entry": null });
+        if !has_errors(&diagnostics) {
+            let (artifacts, problems) = self.artifacts(profile);
+            let (left_out, problems): (Vec<_>, Vec<_>) =
+                problems.into_iter().partition(|d| d.code == codes::F004);
+            declarations = left_out;
+            diagnostics.extend(problems);
+            if !has_errors(&diagnostics) {
+                out = self.output(artifacts, include_declarations);
+            }
+        }
+        out["diagnostics"] = self.diagnostics(&diagnostics);
+        out["dts_diagnostics"] = self.diagnostics(&declarations);
+        out.to_string()
+    }
+
     fn file(&self) -> Option<FileId> {
         self.analysis
             .modules
@@ -168,6 +178,7 @@ impl Session {
             out_dir: Path::new("/dist"),
             root: None,
             backend: Backend::Effect,
+            effect_bridge: EffectBridge::Absent,
             ui: None,
             runners: &[],
             core_modules: &[],
@@ -176,10 +187,27 @@ impl Session {
         build::emit(compilation, &self.sources, &settings)
     }
 
-    fn output(&self, artifacts: Vec<build::Artifact>) -> Value {
+    fn output(&self, artifacts: Vec<build::Artifact>, include_declarations: bool) -> Value {
         let stem = (self.analysis.compilation.modules.iter())
             .find(|m| m.path == path())
             .map(|m| m.name.replace('.', "/"));
+        let declaration_entry = if include_declarations {
+            stem.as_ref().map(|stem| format!("{stem}.d.ts"))
+        } else {
+            None
+        };
+        let declarations: serde_json::Map<String, Value> = if include_declarations {
+            artifacts
+                .iter()
+                .filter(|a| {
+                    a.path.ends_with(".d.ts")
+                        && Some(a.path.as_str()) != declaration_entry.as_deref()
+                })
+                .map(|a| (a.path.clone(), Value::String(a.contents.clone())))
+                .collect()
+        } else {
+            serde_json::Map::default()
+        };
         let contents = |path: &str| {
             (artifacts.iter())
                 .find(|a| a.path == path)
@@ -200,12 +228,17 @@ impl Session {
             .filter(|a| Path::new(&a.path).extension().is_some_and(|e| e == "js"))
             .map(|a| (a.path, Value::String(a.contents)))
             .collect();
-        json!({
+        let mut output = json!({
             "js": js,
             "dts": dts,
             "files": files,
             "entry": entry.unwrap_or(Value::Null),
-        })
+        });
+        if include_declarations {
+            output["declarations"] = Value::Object(declarations);
+            output["declaration_entry"] = declaration_entry.map_or(Value::Null, Value::String);
+        }
+        output
     }
 
     fn diagnostics(&self, diagnostics: &[Diagnostic]) -> Value {
@@ -362,5 +395,34 @@ impl Host for Demo<'_> {
 
     fn display(&self, path: &Path) -> String {
         path.strip_prefix("/").unwrap_or(path).display().to_string()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Session;
+    use serde_json::Value;
+
+    #[test]
+    fn playground_compiles_and_queries_an_inline_module() {
+        let source = "module Main exposing (main)\nmodule Child exposing (answer) =\n  let answer = 42\nmain : Unit ->{} Unit\nlet main () = Platform.stdout_line (show Child.answer)\n";
+        let mut session = Session::new();
+        let diagnostics: Value = serde_json::from_str(&session.update(source)).expect("JSON");
+        assert_eq!(diagnostics, serde_json::json!([]));
+        let built: Value = serde_json::from_str(&session.emit("debug")).expect("JSON");
+        assert!(
+            built["js"]
+                .as_str()
+                .is_some_and(|js| js.contains("Child$answer")),
+            "{built}"
+        );
+        let at = u32::try_from(source.find("Child.answer").expect("use") + 6).expect("offset");
+        let hover: Value = serde_json::from_str(&session.hover(at)).expect("JSON");
+        assert!(
+            hover["text"]
+                .as_str()
+                .is_some_and(|text| text.contains("Int")),
+            "{hover}"
+        );
     }
 }

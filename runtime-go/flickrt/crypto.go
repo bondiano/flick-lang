@@ -11,8 +11,8 @@ import (
 	"math"
 )
 
-// Effect's `Crypto` made over the platform's randomness and digests, as the
-// JS adapter's over Web Crypto; a `PlatformError` becomes a `CryptoError`.
+// `Crypto` made over the platform's randomness and digests, as the JS
+// adapter's over Web Crypto; a `PlatformError` becomes a `CryptoError`.
 
 var cryptoErrorTag = Tag("Crypto.CryptoError.CryptoError")
 
@@ -82,7 +82,7 @@ func CryptoPbkdf2(algorithm, iterations, length, salt, password Value) Value {
 	return byteList(out[:size])
 }
 
-// cryptoDouble is Effect's `nextDoubleUnsafe`: 53 random bits over 2^53.
+// cryptoDouble is 53 random bits over 2^53.
 func cryptoDouble() float64 {
 	b := cryptoBytes(7)
 	n := uint64(b[0]&0x1f)<<48 | uint64(b[1])<<40 | uint64(b[2])<<32 |

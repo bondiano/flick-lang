@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 
 use super::{CompletionKind, Ide, Symbol, Target};
 use crate::diagnostics::Diagnostic;
-use crate::project::config::{Build, Config, Kind};
+use crate::project::config::{Build, Config, Dependency, Kind};
 use crate::project::{self, Analysis, Host, analysis_fingerprint};
 use crate::projection;
 use crate::source::{FileId, SourceMap};
@@ -143,6 +143,13 @@ fn fixture() -> Fixture {
 
 /// A library project of `files` (paths under `src/`), analysed from its last file.
 pub(super) fn fixture_of(files: &[(&str, &str)]) -> Fixture {
+    fixture_with_dependencies(files, Vec::new())
+}
+
+pub(super) fn fixture_with_dependencies(
+    files: &[(&str, &str)],
+    dependencies: Vec<Dependency>,
+) -> Fixture {
     let host = Memory(
         files
             .iter()
@@ -159,7 +166,7 @@ pub(super) fn fixture_of(files: &[(&str, &str)]) -> Fixture {
             source_dir: "src".into(),
             test_dir: "test".into(),
             entries: Vec::new(),
-            dependencies: Vec::new(),
+            dependencies,
             js_dependencies: Vec::new(),
             package: None,
             build: Build::default(),
@@ -469,7 +476,7 @@ fn the_projection_maps_names_exactly_and_comes_from_the_analysis() {
     let module = f.analysis.module("App.Main").expect("module");
     let text = &f.sources.get(module.file).text;
     let fingerprint = analysis_fingerprint(&f.analysis.compilation);
-    let lookup = |m: &str| ide.interface(m);
+    let lookup = |m: &str| ide.interface(m).cloned();
     let projected = projection::project(module, text, &fingerprint, &lookup, &|_| None, &|m| {
         projection::relative(&module.name, m)
     });
@@ -503,7 +510,7 @@ fn a_documented_declaration_keeps_its_exact_mappings() {
     let ide = f.ide();
     let module = f.analysis.module("App.Docs").expect("module");
     let text = &f.sources.get(module.file).text;
-    let lookup = |m: &str| ide.interface(m);
+    let lookup = |m: &str| ide.interface(m).cloned();
     let projected = projection::project(module, text, "", &lookup, &|_| None, &|m| {
         projection::relative(&module.name, m)
     });

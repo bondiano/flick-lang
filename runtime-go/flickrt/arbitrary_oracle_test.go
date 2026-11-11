@@ -10,9 +10,9 @@ import (
 	"testing"
 )
 
-// The port draws, shrinks and replays what Effect does: testdata/
-// arbitrary.txt is the output of the same cases run by Effect 4.0.5's
-// Arbitrary on Node, over the schemas the JS runtime builds.
+// The engine draws, shrinks and replays what the Effect library does:
+// testdata/arbitrary.txt is the output of the same cases run by the
+// Arbitrary of Effect 4.0.5 on Node, over the schemas the JS runtime builds.
 
 func showArb(v Value) string {
 	switch x := v.(type) {
@@ -258,7 +258,8 @@ func arbOracleLines(fb *Fiber, cases []arbCase) []string {
 
 func TestArbitraryAsEffect(t *testing.T) { compareArbOracle(t, "testdata/arbitrary.txt", arbCases()) }
 
-// compareArbOracle compares the lines of `cases` with Effect's in `file`.
+// compareArbOracle compares the lines of `cases` with those the Effect
+// library gives, in `file`.
 func compareArbOracle(t *testing.T, file string, cases []arbCase) {
 	want, err := os.ReadFile(file)
 	if err != nil {

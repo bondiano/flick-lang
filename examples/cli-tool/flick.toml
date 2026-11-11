@@ -9,3 +9,4 @@ test-dir = "test"
 [build]
 out-dir = "dist"
 emit = "js"
+effect = "effect"

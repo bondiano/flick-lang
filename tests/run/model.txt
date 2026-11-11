@@ -3,6 +3,9 @@
 # and compares what it prints with the `.stdout` the JS and Go builds print.
 # Every case here is in portable.txt too.
 bootstrap/hello
+bootstrap/inline_declarations
+bootstrap/inline_module
+bootstrap/inline_nested
 codegen/enums
 codegen/call_site
 codegen/eval_order
@@ -36,3 +39,15 @@ codegen/classes
 codegen/let_mut
 runtime/abort_closes_scopes
 runtime/discontinued_body
+codegen/loops_state
+codegen/loops
+codegen/loops_for_source
+codegen/loops_guards
+codegen/category_classes
+codegen/effect_sets
+codegen/given_shadow
+codegen/implicit
+codegen/instance_names
+effect/row_without
+stdlib/effect/mutable_ref
+stdlib/effect/optic_parts

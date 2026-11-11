@@ -1,5 +1,5 @@
-/// Effect's `Etag`: entity tags of files, made by a `Generator` service;
-/// `layer` makes strong tags, `layer_weak` weak ones.
+/// Entity tags of files, made by a `Generator` service; `layer` makes
+/// strong tags, `layer_weak` weak ones.
 module Http.Etag exposing (..)
 
 import FileSystem
@@ -24,11 +24,11 @@ from_file_info : FileSystem.Info ->{Generator} Etag
 let from_file_info info = Generator.from_file_info info
 
 layer_of : ServiceTag {Generator} -> Layer none none {Generator}
-foreign pure layer_of from "@flick-lang/effect-ts/effect/http/Etag" "flickLayer"
+foreign pure layer_of from "flick:http/Etag" "flickLayer"
   reviewed "effect@4.1.2 sha256:616074a7cc92d3ab"
 
 weak_of : ServiceTag {Generator} -> Layer none none {Generator}
-foreign pure weak_of from "@flick-lang/effect-ts/effect/http/Etag" "flickLayerWeak"
+foreign pure weak_of from "flick:http/Etag" "flickLayerWeak"
   reviewed "effect@4.1.2 sha256:db322aab894772b2"
 
 /// Strong tags.

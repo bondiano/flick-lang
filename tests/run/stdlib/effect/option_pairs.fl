@@ -1,0 +1,91 @@
+// Every combinator of `Option` on each absent and present value, and on each
+// pair of them: the Effect library gives the same under the same names.
+module App.Main exposing (main)
+
+line : String -> String ->{} Unit
+let line label text = Platform.stdout_line (label ++ ": " ++ text)
+
+half : Float -> Result String Float
+let half n = if n - 2 * Float.floor (n / 2) == 0 then Ok (n / 2) else Err ("odd " ++ show n)
+
+positive : Float -> Option Float
+let positive n = if n > 0 then Some (n + 1) else None
+
+values : List (Option Float)
+let values = [None, Some 0, Some 1, Some (-2)]
+
+/// `f` of each value.
+each : Show b => (Option Float -> b) -> String
+let each f = show (List.map f values)
+
+/// `f that self` of each pair of values, `self` the slower to change.
+pairs : Show b => (Option Float -> Option Float -> b) -> String
+let pairs f = show (List.flat_map (fun self -> List.map (fun that -> f that self) values) values)
+
+described : Option Float -> String
+let described = Option.match_ { onNone = fun () -> "none"; onSome = fun n -> "some " ++ show n }
+
+singles : Unit ->{} Unit
+let singles () =
+  line "as" (each (Option.as_ "b"))
+  line "as_void" (each Option.as_void)
+  line "exists" (each (Option.exists (fun n -> n > 0)))
+  line "filter" (each (Option.filter (fun n -> n > 0)))
+  line "filter_map" (each (Option.filter_map half))
+  line "tap" (each (Option.tap positive))
+  line "or_else_some" (each (Option.or_else_some (fun () -> 9)))
+  line "or_else_result none" (each (Option.or_else_result (fun () -> (None : Option String))))
+  line "or_else_result some" (each (Option.or_else_result (fun () -> Some "b")))
+  line "partition_map" (each (Option.partition_map half))
+  line "match" (each described)
+  line "contains" (each (Option.contains 1))
+  line "contains_with" (each (Option.contains_with (fun value x -> value > x) 0))
+  line "flatten" (each (fun value -> Option.flatten (Some value)))
+  line "flatten none" (show (Option.flatten (None : Option (Option Float))))
+  line "lift_predicate" (show (List.map (Option.lift_predicate (fun n -> n > 0)) [-1, 0, 2]))
+  line "compose_k" (show (List.map (Option.compose_k positive positive) [1, 0, -1]))
+
+doubles : Unit ->{} Unit
+let doubles () =
+  line "product" (pairs Option.product)
+  line "zip_left" (pairs Option.zip_left)
+  line "zip_right" (pairs Option.zip_right)
+  line "zip_with" (pairs (fun that self -> Option.zip_with that (fun a b -> a - b) self))
+  line "lift2" (pairs (Option.lift2 (fun a b -> a - b)))
+  line "or_else" (pairs Option.or_else)
+
+lists : Unit ->{} Unit
+let lists () =
+  let empty : List (Option Float) = []
+  line
+    "all"
+    (show (
+      Option.all empty,
+      Option.all values,
+      Option.all [Some 1, Some 0],
+      Option.all [None, Some 1],
+    ))
+  line
+    "first_some_of"
+    (show (
+      Option.first_some_of empty,
+      Option.first_some_of ([None, None] : List (Option Float)),
+      Option.first_some_of values,
+    ))
+  line
+    "reduce_compact"
+    (show (
+      Option.reduce_compact 10 (fun acc n -> acc - n) empty,
+      Option.reduce_compact 10 (fun acc n -> acc - n) values,
+      Option.reduce_compact 10 (fun acc n -> acc - n) [None, None],
+    ))
+  line "product_many" (each (Option.product_many [Some 2, Some 3]))
+  line
+    "product_many of none"
+    (each (Option.product_many empty) ++ " " ++ each (Option.product_many [Some 2, None]))
+
+main : Unit ->{; AppError} Unit
+let main () =
+  singles ()
+  doubles ()
+  lists ()

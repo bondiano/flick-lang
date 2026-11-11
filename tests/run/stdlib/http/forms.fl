@@ -16,7 +16,7 @@ let json_of c = Codec.general (ignore_extra_fields c)
 point : Codec none none Json Point
 let point = Codec.general (Codec.json Point.schema)
 
-forms : Unit ->{; Http.Multipart.MultipartError, SchemaError} Unit
+forms : Unit ->{Async; Http.Multipart.MultipartError, SchemaError} Unit
 let forms () =
   let post =
     Http.ClientRequest.body_form_data
@@ -100,7 +100,7 @@ let traces () =
               ("x-b3-sampled", "1"),
             ])))))
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Async; AppError} Unit
 let main () =
   try forms () with
   | Http.Multipart.MultipartError reason ->

@@ -43,7 +43,7 @@ Database.Migrate
 Test
 Runner.Node
 Runner.Browser
-# Effect: values and classes
+# values and classes
 RegExp
 Combiner
 Reducer
@@ -60,14 +60,14 @@ Version
 ByteSize
 Bytes
 Crypto
-# end of Effect: values and classes
-# Effect: lists and records
+# end of values and classes
+# lists and records
 Bool
 Predicate
 Filter
 Function
-# end of Effect: lists and records
-# Effect: collections
+# end of lists and records
+# collections
 Trie
 HashRing
 Graph.Types
@@ -76,15 +76,16 @@ Graph.Query
 Graph.Algorithms
 Graph.Walk
 Graph
-# end of Effect: collections
-# Effect: time
+# end of collections
+# time
 DateTime
 Cron
 Clock
 Jwt
 Random
-# end of Effect: time
-# Effect: concurrency
+Host
+# end of time
+# concurrency
 SynchronizedRef
 SubscriptionRef
 Deferred
@@ -99,8 +100,8 @@ ScopedRef
 RcRef
 RcMap
 Pool
-# end of Effect: concurrency
-# Effect: transactions
+# end of concurrency
+# transactions
 Tx
 TxRef
 TxChunk
@@ -113,15 +114,15 @@ TxPubSub
 TxReentrantLock
 TxSemaphore
 TxSubscriptionRef
-# end of Effect: transactions
-# Effect: schema
+# end of transactions
+# schema
 Check
 Arbitrary
 JsonSchema
 Differ
 Net
-# end of Effect: schema
-# Effect: platform and observability
+# end of schema
+# platform and observability
 PlatformError
 Path
 LogLevel
@@ -133,8 +134,8 @@ Logger
 ConfigProvider
 Metric
 Tracer
-# end of Effect: platform and observability
-# Effect: context, layers and requests
+# end of platform and observability
+# context, layers and requests
 Context
 Scope
 Layer.Trace
@@ -143,8 +144,8 @@ LayerRef
 ErrorReporter
 Request
 RequestResolver
-# end of Effect: context, layers and requests
-# Effect: effects, schedules and fibers
+# end of context, layers and requests
+# effects, schedules and fibers
 Schedule
 Cause
 Scheduler
@@ -159,16 +160,16 @@ Effect
 FiberHandle
 FiberMap
 FiberSet
-# end of Effect: effects, schedules and fibers
-# Effect: streams, sinks and channels
+# end of effects, schedules and fibers
+# streams, sinks and channels
 Channel.Core
 Channel.Transform
 Channel.Control
 Channel.Run
 Channel
 ChannelSchema
-# end of Effect: streams, sinks and channels
-# Effect: streams, Stream
+# end of streams, sinks and channels
+# streams, Stream
 Stream.Core
 Sink
 Stream.Transform
@@ -178,22 +179,23 @@ Stream.Run
 Stream.Pipe
 Stream.Platform
 Stream
-# end of Effect: streams, Stream
-# Effect: child processes
+# end of streams, Stream
+# child processes
 ChildProcess
-# Effect: reactivity (unstable in Effect 4.1.2)
+# reactivity (experimental)
 Reactivity.AsyncResult
 Reactivity.Atom
 # UI on atoms: `Atom` over the reactivity modules, then `Ui`
 Atom
 Ui.Safe
 Ui
+Ui.Tracing
 Ui.Event
 Ui.Dom
 Ui.Server
 Form
 Action
-# Effect: HTTP
+# HTTP
 Http.Method
 Http.Status
 Http.Headers
@@ -220,28 +222,28 @@ Http.Server
 Http.StaticServer
 Http.TraceContext
 Runner.Cloudflare
-# end of Effect: HTTP
-# Effect: HttpApi
+# end of HTTP
+# HttpApi
 HttpApi
 HttpApi.Derive
 HttpApi.Mount
 HttpApi.Inject
-# end of Effect: HttpApi
-# Effect: RPC (unstable in Effect 4.1.2)
+# end of HttpApi
+# RPC (experimental)
 Rpc
 Server
 Server.Derive
 # after `Server`: a secret is read only on a server
 Config
-# end of Effect: RPC
-# Effect: observability (unstable in Effect 4.1.2)
+# end of RPC
+# observability (experimental)
 Otlp
 Prometheus
-# end of Effect: observability
-# Effect: devtools (unstable in Effect 4.1.2)
+# end of observability
+# devtools (experimental)
 DevTools
-# end of Effect: devtools
-# Effect: CLI
+# end of devtools
+# CLI
 Cli.Prompt
 Cli
-# end of Effect: CLI
+# end of CLI

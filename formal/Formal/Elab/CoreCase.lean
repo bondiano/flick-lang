@@ -30,12 +30,8 @@ theorem SubOk.of_get {Ψ Θ Γ₁ Γ₂} {τ : Nat → Flick.Tm}
   intro i s hi
   rcases h i s hi with ⟨j, hj, hs⟩ | ⟨hf, hn, ht, hd⟩
   · rw [hj]
-    refine ⟨Typ.var_self hs, fun h => False.elim h, ?_, .inr (.inl ⟨_, rfl, hs⟩)⟩
-    rintro a (⟨j', s', hj', hs', ha⟩ | ⟨p, hp, _⟩ | ⟨l, _, hl, _⟩)
-    · cases hj'; rw [hs] at hs'; cases hs'; exact ha
-    · cases hp
-    · cases hl
-  · exact ⟨ht, hn .ins, fun a ha => (held_none hf hn a ha).elim, .inr (.inr (.inr hd))⟩
+    exact ⟨Typ.var_self hs, fun h => False.elim h, .inr (.inl ⟨_, rfl, hs⟩)⟩
+  · exact ⟨ht, hn .ins, .inr (.inr (.inr hd))⟩
 
 /-- The core context of `Γ` and `Δ`, the premises first. -/
 def canonC (Γ : List TSch) (Δ : List Cn) : List Flick.Scheme :=

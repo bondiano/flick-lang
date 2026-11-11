@@ -1,5 +1,6 @@
 //! Capture-qualified type equality and value subsumption.
 
+use crate::types::{Atom, Elem};
 use std::mem;
 
 use super::{Hold, Visible, capture_mismatch};
@@ -47,8 +48,8 @@ impl Checker<'_> {
         let (left, right) = (self.expanded(left), self.expanded(right));
         match self.unify(&left, &right) {
             Err(mismatch) if self.unknown_captures(&mismatch) => {
-                let span = self.regions.deferring.expect("checked");
-                self.regions.deferred.push((left, right, span));
+                let span = self.cx.regions.deferring.expect("checked");
+                self.cx.regions.deferred.push((left, right, span));
                 Ok(())
             }
             other => other,
@@ -61,12 +62,15 @@ impl Checker<'_> {
         let Mismatch::Label { label, .. } = mismatch else {
             return false;
         };
-        self.regions.deferring.is_some() && self.uninferred(label)
+        self.cx.regions.deferring.is_some() && self.uninferred(label)
     }
 
     /// Whether `label` is the captures `^?m` of a type not inferred yet.
-    fn uninferred(&self, label: &str) -> bool {
-        let meta = label.strip_prefix("^?").and_then(|m| m.parse().ok());
+    fn uninferred(&self, label: &Elem) -> bool {
+        let meta = match label {
+            Elem::Capture(Atom::Meta(m)) => Some(*m),
+            _ => None,
+        };
         meta.is_some_and(|m| {
             !self.store.is_capture_row(m)
                 && matches!(self.store.resolve(&Type::Meta(m)), Type::Meta(_))
@@ -81,19 +85,19 @@ impl Checker<'_> {
         if norm
             .entries
             .iter()
-            .all(|(label, t)| !label.starts_with('^') || atom(t))
+            .all(|(label, t)| !matches!(label, Elem::Capture(_)) || atom(t))
         {
             return row.clone();
         }
         let mut out = Norm::default();
         for (label, t) in norm.entries {
-            if !label.starts_with('^') || atom(&t) {
+            if !matches!(label, Elem::Capture(_)) || atom(&t) {
                 out.entries.push((label, t));
                 continue;
             }
             match self.store.resolve(&t) {
                 row @ (Type::Row(_) | Type::Union(..)) => {
-                    self.capture_row_filtered(&row, &mut out, false);
+                    self.capture_row_filtered(&row, &mut out, false, &mut Vec::new());
                 }
                 other => self.collect_captures(&other, &mut out),
             }
@@ -124,7 +128,7 @@ impl Checker<'_> {
     /// Compares the qualifiers deferred until their types were inferred, and
     /// reports the captures no hold named.
     pub fn compare_deferred(&mut self) {
-        for (left, right, span) in mem::take(&mut self.regions.deferred) {
+        for (left, right, span) in mem::take(&mut self.cx.regions.deferred) {
             let (left, right) = (self.inferred(&left), self.inferred(&right));
             if let Err(mismatch) = self.unify(&left, &right)
                 && !self.hold_reported(span)
@@ -132,7 +136,7 @@ impl Checker<'_> {
                 self.mismatch(&mismatch, &left, &right, span);
             }
         }
-        for (mismatch, actual, expected, span) in mem::take(&mut self.regions.held) {
+        for (mismatch, actual, expected, span) in mem::take(&mut self.cx.regions.held) {
             if !self.hold_reported(span) {
                 self.mismatch(&mismatch, &actual, &expected, span);
             }
@@ -154,14 +158,31 @@ impl Checker<'_> {
             (Type::Meta(_), _) if ca.is_none() => return self.unify(actual, expected),
             _ => {}
         }
-        let visible = if ce.is_some() {
+        let (a, e) = self.live_sides((a, ca.as_ref()), (e, ce.as_ref()));
+        let callable = matches!(self.whnf(&a), Type::Fun { .. }) || self.eff_parts(&a).is_some();
+        // what the type of a function or a task position shows is no more
+        // than its reach, as the core compares arrows (`LeLive.arrow`): a
+        // callback over `forall v. a^v` holds `v` where its type shows it
+        let visible = if ce.is_some() && !callable {
             Visible::Now(Vec::new())
         } else {
             Visible::Late(e.clone())
         };
         let bound = ce.unwrap_or_else(Type::empty_row);
         let written = !matches!(self.store.resolve(&bound), Type::Meta(_));
-        let mark = self.regions.holds.len();
+        // against a written qualifier, a function or a task holds what it
+        // likes: the qualifier is the `Live` its use needs, which its row
+        // has now (`live_sides`), and the core bounds no value it holds
+        // (`TypingMode.held`). One still inferred grows from it below, which
+        // what an owner keeps needs; the reader of a lazy `for` is held too.
+        if written && callable && !self.holds_reader(&[(None, actual.clone())]) {
+            let a = match ca {
+                Some(_) => self.bounded_callable(a, &self.captures_of(actual).into_type()),
+                None => a,
+            };
+            return self.subsume(&a, &e, span);
+        }
+        let mark = self.cx.regions.holds.len();
         self.hold(Hold {
             held: vec![(None, actual.clone())],
             visible,
@@ -192,12 +213,12 @@ impl Checker<'_> {
             // what a value holds beyond its position is the hold's to name
             Err(mismatch) if capture_mismatch(&mismatch) => {
                 let held = (mismatch, actual.clone(), expected.clone(), span);
-                self.regions.held.push(held);
+                self.cx.regions.held.push(held);
                 Ok(())
             }
             // a value whose type does not fit is reported once, by the type
             Err(mismatch) => {
-                self.regions.holds.truncate(mark);
+                self.cx.regions.holds.truncate(mark);
                 Err(mismatch)
             }
             Ok(()) => Ok(()),

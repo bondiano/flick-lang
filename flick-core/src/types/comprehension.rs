@@ -5,12 +5,13 @@
 //! the services of the stage that built it; a lazy `Seq` holds what it
 //! uses, a strict `[for …]` is a `List` built at once.
 
+use crate::types::Elem;
 use std::mem;
 
 use super::Checker;
 use super::do_notation::bind_key;
 use super::effects::{Site, Stage};
-use super::mutation::{Apart, Settled};
+use super::mutation::Apart;
 use super::ty::{Row, Type};
 use crate::diagnostics::codes;
 use crate::source::Span;
@@ -25,7 +26,7 @@ fn reader() -> Type {
         return Type::empty_row();
     };
     Type::Row(Row {
-        entries: vec![(label.to_owned(), Type::lang(Lang::AtomRead))],
+        entries: vec![(Elem::named(label), Type::lang(Lang::AtomRead))],
         tail: None,
         ..Row::default()
     })
@@ -57,9 +58,9 @@ impl Checker<'_> {
         if is_loop(node) {
             return self.for_loop(node, expected);
         }
-        let mark = self.locals.len();
+        let mark = self.cx.locals.len();
         let uses = self.uses_mark();
-        let saved = mem::take(&mut self.runtime);
+        let saved = mem::take(&mut self.cx.runtime);
         let (reason, sync_reason) = if strict {
             (
                 "a `[for …]` list is built from pure clauses: bind the result of a runtime call with `let` before it",
@@ -72,17 +73,17 @@ impl Checker<'_> {
             )
         };
         // a stage that may read atoms lends its reader to the clauses
-        let stage = if self.stage.pure.is_none() {
+        let stage = if self.cx.stage.pure.is_none() {
             let mut stage = self.bounded_stage(reader(), Type::empty_row(), Site::Inferred);
             stage.only_sync = Some(sync_reason);
             stage
         } else {
             Stage::pure(reason)
         };
-        let outer = mem::replace(&mut self.stage, stage);
+        let outer = mem::replace(&mut self.cx.stage, stage);
         // a lazy sequence runs its body when iterated; `[for …]` runs it now
         if strict {
-            self.enter_settled(Settled::Loop);
+            self.enter_settled();
         } else {
             self.enter_apart(Apart::Sequence);
         }
@@ -110,8 +111,8 @@ impl Checker<'_> {
         } else {
             self.leave_apart();
         }
-        let inner = mem::replace(&mut self.stage, outer);
-        self.runtime = saved;
+        let inner = mem::replace(&mut self.cx.stage, outer);
+        self.cx.runtime = saved;
         let mut held = self.held_since(uses, mark);
         let mut region = None;
         if inner.only_sync.is_some() && inner.calls > 0 {
@@ -124,7 +125,7 @@ impl Checker<'_> {
                 region = Some(reader);
             }
         }
-        self.locals.truncate(mark);
+        self.cx.locals.truncate(mark);
         if strict {
             return Type::app(Type::lang(Lang::List), item);
         }
@@ -139,8 +140,8 @@ impl Checker<'_> {
     /// `for { clauses } do body`: the body runs for each element, here and
     /// now, so the clauses and the body may make runtime calls.
     fn for_loop(&mut self, node: &Node, expected: Option<&Type>) -> Type {
-        let mark = self.locals.len();
-        self.enter_settled(Settled::Loop);
+        let mark = self.cx.locals.len();
+        self.enter_loop(Type::lang(Lang::Unit), false);
         let (clauses, body) = for_parts(node);
         for clause in clauses {
             self.for_clause(clause);
@@ -149,8 +150,8 @@ impl Checker<'_> {
         if let Some(body) = body {
             self.check(body, &unit);
         }
-        self.leave_settled();
-        self.locals.truncate(mark);
+        self.leave_loop();
+        self.cx.locals.truncate(mark);
         if let Some(expected) = expected {
             self.expect(&unit, expected, self.span(node));
         }
@@ -183,7 +184,7 @@ impl Checker<'_> {
                     self.check(condition, &Type::lang(Lang::Bool));
                 }
             }
-            K::LetDecl => self.local_let(clause, None, &[]),
+            K::LetDecl => self.restricted_let(clause, None, &[], "`for` clauses"),
             _ => self.error(
                 codes::T019,
                 self.span(clause),

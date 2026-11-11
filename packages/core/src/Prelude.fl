@@ -56,6 +56,10 @@ type Codec (rd : ServiceRow) (re : ServiceRow) i a
 @lang errors
 type Errors (e : ErrorRow)
 
+/// A packed module satisfying the structural contract `sig`.
+/// `pack` and `unpack` are the only ways to construct and open one.
+type Module (sig : Module)
+
 @lang ui
 /// A user interface: see the module `Ui`.
 type Ui
@@ -67,8 +71,8 @@ type ServiceTag (r : ServiceRow)
 @lang async
 /// Suspension: waiting for time, input or output, or another fiber. The
 /// runtime's scheduler handles it at the root. A function whose row has it
-/// may suspend; one whose closed row has only effects of `tail` and `abort`
-/// operations runs at once.
+/// may wait for external work. Ordinary runtime calls and recursive loops
+/// remain interruptible even without it; only intrinsic Sync stages are atomic.
 effect Async
 
 @lang fail
@@ -83,9 +87,10 @@ effect Fail (e : ErrorRow)
 /// provides. It has no operations of its own.
 service Scope (s : Region)
 
-/// Work of a component instance that runs while it is mounted, which
-/// `Ui.on_mount` and `Ui.watch` describe.
-type Lifecycle
+/// Work of a component instance of region `s` that runs while it is
+/// mounted, which `Ui.on_mount` and `Ui.watch` describe: what it uses
+/// outlives `s`, as `Ui.mounted` and `Ui.watched` ask (`Fiber.Outlives`).
+type Lifecycle (s : Region)
 
 @lang setup
 /// The setup of a component instance, region `s`: it runs once when the
@@ -95,7 +100,7 @@ service Setup (s : Region) =
   /// region `s`, so it cannot leave the instance.
   own : forall a. a ->{} a^{s}
   /// Runs `work` from the instance's mount to its unmount.
-  start : forall c. Lifecycle^c ->{} Unit
+  start : forall c. (Lifecycle s)^c ->{} Unit
 
 @lang service_impl
 /// The implementation record of the one service of `r`:
@@ -236,7 +241,7 @@ let identity value = value
 /// Fails with the error of an `Err`: `Result NotFound a` has the error row
 /// `{NotFound}`.
 from_result : Result (Errors e) a ->{; e} a
-foreign effect from_result from "@flick-lang/effect-ts" "fromResult"
+foreign effect from_result from "flick:rt" "fromResult"
   reviewed "effect@4.1.2 sha256:5776a5b0ab051f96"
 
 @lang detached
@@ -250,47 +255,47 @@ class Detached (r : ServiceRow)
 /// Runs both, as children: on a failure the other one is interrupted and
 /// awaited. The results keep the order of the arguments.
 parallel : Detached r => (Eff r e a)^c -> (Eff r e b)^c ->{r; e} (a, b)
-foreign effect parallel from "@flick-lang/effect-ts" "parallel"
+foreign effect parallel from "flick:rt" "parallel"
   retention call
 
 /// Runs every task, at most `limit` at a time; `limit` must be a positive
 /// finite integer. The results keep the order of the input.
 parallel_all : Detached r => Int -> List ((Eff r e a)^c) ->{r; e} List a
-foreign effect parallel_all from "@flick-lang/effect-ts" "parallelAll"
+foreign effect parallel_all from "flick:rt" "parallelAll"
   retention call
 
 /// Each task's typed failure as an `Err`; a defect or an interruption still
 /// stops the group.
 parallel_results : Detached r => List ((Eff r e a)^c) ->{r; none} List (Result (Errors e) a)
-foreign effect parallel_results from "@flick-lang/effect-ts" "parallelResults"
+foreign effect parallel_results from "flick:rt" "parallelResults"
   retention call
 
 /// The opaque exit of every task.
 parallel_exits : Detached r => List ((Eff r e a)^c) ->{r; none} List (Exit e a)
-foreign effect parallel_exits from "@flick-lang/effect-ts" "parallelExits"
+foreign effect parallel_exits from "flick:rt" "parallelExits"
   retention call
 
 /// The first task to succeed; the loser is interrupted and awaited.
 race_success : Detached r => (Eff r e a)^c -> (Eff r e a)^c ->{r; e} a
-foreign effect race_success from "@flick-lang/effect-ts" "raceSuccess"
+foreign effect race_success from "flick:rt" "raceSuccess"
   retention call
   reviewed "effect@4.1.2 sha256:ac5b5886f22dc7c6"
 
 /// The first task to end, however it ends.
 race_first : Detached r => (Eff r e a)^c -> (Eff r e a)^c ->{r; e} a
-foreign effect race_first from "@flick-lang/effect-ts" "raceFirst"
+foreign effect race_first from "flick:rt" "raceFirst"
   retention call
   reviewed "effect@4.1.2 sha256:5247faa250c6adc7"
 
 /// Fails with `TimeoutError` when `millis` pass before the task ends.
 timeout : Detached r => Float -> (Eff r e a)^c ->{r; TimeoutError | e} a
-foreign effect timeout from "@flick-lang/effect-ts" "timeout"
+foreign effect timeout from "flick:rt" "timeout"
   retention call
   reviewed "effect@4.1.2 sha256:297e05405fa2e747"
 
 /// `None` when `millis` pass before the task ends; other failures stay.
 timeout_option : Detached r => Float -> (Eff r e a)^c ->{r; e} Option a
-foreign effect timeout_option from "@flick-lang/effect-ts" "timeoutOption"
+foreign effect timeout_option from "flick:rt" "timeoutOption"
   retention call
   reviewed "effect@4.1.2 sha256:35e1a71b230ac8e2"
 
@@ -300,45 +305,45 @@ let bind ma f = flat_map f ma
 
 /// A task followed by `f` of its value; the rows of both join.
 bind_eff : (Eff r1 e1 a)^c -> (a -> (Eff r2 e2 b)^d)^d -> (Eff (r1 + r2) (e1 + e2) b)^(c + d)
-foreign pure bind_eff from "@flick-lang/effect-ts" "bindEff"
+foreign pure bind_eff from "flick:rt" "bindEff"
   arity 2
   retention call
 
 /// A field under the wire name `wire`: the key must be present.
 field : String -> PureCodec Json a -> FieldCodec none a
-foreign pure field from "@flick-lang/effect-ts" "dslField"
+foreign pure field from "flick:rt" "dslField"
   reviewed "effect@4.1.2 sha256:e623c16c7b6244f7"
 
 /// A field that may be missing: missing is `None`, `None` is not written.
 optional_field : String -> PureCodec Json a -> FieldCodec none (Option a)
-foreign pure optional_field from "@flick-lang/effect-ts" "dslOptionalField"
+foreign pure optional_field from "flick:rt" "dslOptionalField"
   reviewed "effect@4.1.2 sha256:6f386babb608471d"
 
 /// A field whose codec may need services to decode.
 field_effect : String -> Codec rd none Json a -> FieldCodec rd a
-foreign pure field_effect from "@flick-lang/effect-ts" "dslFieldEffect"
+foreign pure field_effect from "flick:rt" "dslFieldEffect"
 
 /// `null` is `None`; a missing key is an error.
 option_as_null : PureCodec Json a -> PureCodec Json (Option a)
-foreign pure option_as_null from "@flick-lang/effect-ts" "codecOptionNull"
+foreign pure option_as_null from "flick:rt" "codecOptionNull"
   reviewed "effect@4.1.2 sha256:833c83dfb847977e"
 
 /// `null` and a missing key are `None`; `None` is written as `null`.
 option_as_nullish : PureCodec Json a -> PureCodec Json (Option a)
-foreign pure option_as_nullish from "@flick-lang/effect-ts" "codecOptionNullish"
+foreign pure option_as_nullish from "flick:rt" "codecOptionNullish"
   reviewed "effect@4.1.2 sha256:038a29f7741a127f"
 
 /// A missing key decodes to `default ()`, called once per decode; `null` or
 /// a wrong value is still an error.
 on_missing : (Unit -> a)^c -> FieldCodec rd a -> FieldCodec rd a
-foreign pure on_missing from "@flick-lang/effect-ts" "dslOnMissing"
+foreign pure on_missing from "flick:rt" "dslOnMissing"
   arity 2
   retention call
   reviewed "effect@4.1.2 sha256:f0155391ca2658bc"
 
 /// `on_missing` with a runtime default, whose services decoding then needs.
 on_missing_effect : (Unit ->{r; SchemaError} a)^c -> FieldCodec rd a -> FieldCodec (rd + r) a
-foreign pure on_missing_effect from "@flick-lang/effect-ts" "dslOnMissingEffect"
+foreign pure on_missing_effect from "flick:rt" "dslOnMissingEffect"
   arity 2
   retention call
   reviewed "effect@4.1.2 sha256:f0155391ca2658bc"
@@ -346,4 +351,4 @@ foreign pure on_missing_effect from "@flick-lang/effect-ts" "dslOnMissingEffect"
 /// The codec of a `codec` block, dropping keys it does not name instead of
 /// refusing them.
 ignore_extra_fields : PureCodec Json a -> PureCodec Json a
-foreign pure ignore_extra_fields from "@flick-lang/effect-ts" "codecIgnoreExtra"
+foreign pure ignore_extra_fields from "flick:rt" "codecIgnoreExtra"

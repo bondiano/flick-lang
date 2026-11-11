@@ -9,7 +9,7 @@ use std::rc::Rc;
 
 use super::{Control, Frame, Machine, Outcome, Step, stuck};
 use crate::handler::Handler;
-use crate::subst::{any, subst};
+use crate::subst::{any, subst_in_region};
 use crate::syntax::{Const, Env, Name, Path, RegionOp, Term};
 
 /// What `Λ` keeps of a region `π`.
@@ -114,7 +114,7 @@ pub fn reach(e: &Term, mem: &[Term]) -> BTreeSet<usize> {
 pub type Ended = Result<Term, Term>;
 
 impl Machine<'_> {
-    /// `scope s { e } → inside π e[s := own π]`, `π` fresh and live.
+    /// `scope s { e } → inside π e[s := π][s := own π]`, `π` fresh and live.
     pub(super) fn open_scope(&mut self, s: Name, body: &Term) -> Control {
         let pi = self.lambda.regions.len();
         self.lambda.regions.push(Region {
@@ -123,7 +123,7 @@ impl Machine<'_> {
             finalizers: Vec::new(),
             children: Vec::new(),
         });
-        let body = subst(body, &[(s.clone(), Term::Own(pi))]);
+        let body = subst_in_region(body, &[(s.clone(), Term::Own(pi))], &s, &region_name(pi));
         self.push(Frame::Inside(pi, s));
         Control::Eval(body)
     }

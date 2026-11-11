@@ -7,7 +7,9 @@ use std::process::{Command, Output, Stdio};
 use std::time::{Duration, Instant};
 use std::{env, thread};
 
-use super::{assert_go, jobs, listed_cases, parallel, portable, run_case, run_case_with, trace};
+use super::{
+    assert_go, jobs, listed_cases, parallel, portable, run_case, run_case_with, shard, trace,
+};
 
 /// How long a case not in `rt.txt` may run: some never end on this runtime.
 const UNLISTED_LIMIT: Duration = Duration::from_secs(30);
@@ -72,21 +74,28 @@ pub fn output_within(command: &mut Command, limit: Option<Duration>) -> Output {
 /// each trace checked by the monitor, and every other case of tests/run in
 /// debug, which must fail: one that passes is reported, so it joins the list,
 /// as `known_gaps.txt` reports a gap that passes. Its own test: no other run
-/// builds for it.
+/// builds for it. `FLICK_E2E_SHARD` splits the listed cases and the others,
+/// each on its own.
 #[test]
 #[ignore = "needs Node and `pnpm install`; run `just conformance-rt`"]
 fn rt_cases() {
     let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
     let root = repo.join("tests/run");
     let only = env::var("FLICK_E2E_ONLY").ok();
-    let cases: Vec<PathBuf> = listed_cases(&root, "rt.txt")
+    // by the path, as `run_cases` and the unlisted cases below are selected:
+    // a part the list does not spell, `tests/run/`, selects the same cases
+    let listed: Vec<PathBuf> = listed_cases(&root, "rt.txt")
         .into_iter()
+        .map(|c| root.join(format!("{c}.fl")))
         .filter(|c| {
             only.as_ref()
-                .is_none_or(|o| o.split(',').any(|p| c.contains(p)))
+                .is_none_or(|o| o.split(',').any(|p| c.to_string_lossy().contains(p)))
         })
-        .map(|c| root.join(format!("{c}.fl")))
         .collect();
+    // a shard runs its part of the list, and what the list lacks is told
+    // from all of it: a case of another shard is not an unlisted one
+    let mut cases = listed.clone();
+    shard(&mut cases);
     let out_root = Path::new(env!("CARGO_TARGET_TMPDIR")).join("e2e-rt");
     let mut report = Vec::new();
     // what the debug run of each case projects its trace to
@@ -161,7 +170,7 @@ fn rt_cases() {
         on_go.len(),
         own.len()
     );
-    report.extend(unlisted_passing(&root, &cases, only.as_deref(), &out_root));
+    report.extend(unlisted_passing(&root, &listed, only.as_deref(), &out_root));
     assert!(report.is_empty(), "e2e mismatches:\n{}", report.join("\n"));
 }
 
@@ -177,11 +186,12 @@ fn unlisted_passing(
     let mut all = Vec::new();
     super::cases(root, &mut all);
     all.sort();
-    let unlisted: Vec<PathBuf> = all
+    let mut unlisted: Vec<PathBuf> = all
         .into_iter()
         .filter(|c| !listed.contains(c))
         .filter(|c| only.is_none_or(|o| o.split(',').any(|p| c.to_string_lossy().contains(p))))
         .collect();
+    shard(&mut unlisted);
     let passing = parallel(&unlisted, jobs(), |case| {
         let rel = case.strip_prefix(root).expect("case under root");
         let out_dir = out_root.join("unlisted").join(rel.with_extension(""));

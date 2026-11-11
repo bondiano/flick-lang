@@ -1,7 +1,7 @@
-/// Effect's `ExecutionPlan`: steps that each provide the services `p` of a
-/// task, tried in order until one succeeds (`Effect.with_execution_plan`).
-/// A step builds its layer, which needs `r` and may fail with `e`, and may
-/// be tried several times; the task's error, of type `i`, decides retries.
+/// An execution plan: steps that each provide the services `p` of a task,
+/// tried in order until one succeeds (`Effect.with_execution_plan`). A step
+/// builds its layer, which needs `r` and may fail with `e`, and may be
+/// tried several times; the task's error, of type `i`, decides retries.
 module ExecutionPlan exposing (..)
 
 import Duration
@@ -31,35 +31,35 @@ type Event (e : ErrorRow) =
 
 /// A step providing the services the layer builds, tried once.
 step : Layer r e p -> Step p r e i
-foreign pure step from "@flick-lang/effect-ts/effect/ExecutionPlan" "flickStep"
+foreign pure step from "flick:ExecutionPlan" "flickStep"
 
 /// The step tried up to `n` times.
 with_attempts : Int -> Step p r e i -> Step p r e i
-foreign pure with_attempts from "@flick-lang/effect-ts/effect/ExecutionPlan" "flickWithAttempts"
+foreign pure with_attempts from "flick:ExecutionPlan" "flickWithAttempts"
   arity 1
 
 /// The step tried again by the schedule, which gets the task's error.
 with_schedule : Schedule.Schedule r e i o -> Step p r e i -> Step p r e i
-foreign pure with_schedule from "@flick-lang/effect-ts/effect/ExecutionPlan" "flickWithSchedule"
+foreign pure with_schedule from "flick:ExecutionPlan" "flickWithSchedule"
   arity 1
 
 /// The step tried again only while `f` of the task's error holds.
 with_while : (i ->{r; e} Bool) -> Step p r e i -> Step p r e i
-foreign pure with_while from "@flick-lang/effect-ts/effect/ExecutionPlan" "flickWithWhile"
+foreign pure with_while from "flick:ExecutionPlan" "flickWithWhile"
   arity 1
 
 /// The plan of these steps, tried in order.
 make : NonEmpty.NonEmpty (Step p r e i) -> ExecutionPlan p r e i
-foreign pure make from "@flick-lang/effect-ts/effect/ExecutionPlan" "flickMake"
+foreign pure make from "flick:ExecutionPlan" "flickMake"
   reviewed "effect@4.1.2 sha256:558d7d1b14e5c534"
 
 /// The steps of the plans, one plan after another.
 merge : NonEmpty.NonEmpty (ExecutionPlan p r e i) -> ExecutionPlan p r e i
-foreign pure merge from "@flick-lang/effect-ts/effect/ExecutionPlan" "flickMerge"
+foreign pure merge from "flick:ExecutionPlan" "flickMerge"
   reviewed "effect@4.1.2 sha256:3b9926fe30ac6c1e"
 
 /// The attempt the current task runs as, inside a plan.
 current_metadata : Unit ->{} Metadata
-foreign effect current_metadata from "@flick-lang/effect-ts/effect/ExecutionPlan" "flickCurrentMetadata"
+foreign effect current_metadata from "flick:ExecutionPlan" "flickCurrentMetadata"
   arity 0
   reviewed "effect@4.1.2 sha256:331a4ec44cf66af8"

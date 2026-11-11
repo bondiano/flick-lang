@@ -1,4 +1,4 @@
-package flick:plugin@0.1.0;
+package flick:plugin@0.2.0;
 
 /// What a plugin and the compiler exchange.
 interface types {
@@ -188,6 +188,9 @@ interface types {
   /// `literal-of` is the exact base type of an enum, `String` or `Int`.
   record fact-type { shown: string, exact: option<string>, literal-of: option<string> }
   record fact-field { label: string, ty: fact-type }
+  /// Original source structure, with the first nodes beyond the nesting limit.
+  record nesting { span: span, depth: u32 }
+  record structure { lines: u32, complexity: u32, nesting: list<nesting>, max-lines: u32, max-complexity: u32, max-nesting: u32 }
   /// The type of a `_` of a block's code, at the span its code gave it, and
   /// its fields when it is a closed record.
   record fact { span: span, ty: fact-type, fields: option<list<fact-field>> }
@@ -204,12 +207,45 @@ interface types {
     ty: fact-type,
     fields: option<list<fact-field>>,
     constant: option<constant>,
+    /// Written as a `fun`, maybe in parentheses.
+    lambda: bool,
   }
 
-  /// How a refined type checks a value at `T$parse`: the literals of an
-  /// enum, the name of a check the compiler knows (`email`, `non-empty`,
-  /// `positive`), or the host's verdict on the module's own predicate.
-  variant refinement { literals(list<constant>), known(string), holds(bool) }
+  record reference-fact { module: string, name: string }
+  record unary-fact { op: string, value: u32 }
+  record binary-fact { op: string, left: u32, right: u32 }
+  record if-fact { condition: u32, then: u32, otherwise: u32 }
+  record lambda-fact { parameter: string, body: u32 }
+  variant expression-kind {
+    constant(constant), big-int(string), reference(reference-fact), variable(string),
+    unary(unary-fact), binary(binary-fact), %if(if-fact), lambda(lambda-fact), unknown,
+  }
+  record expression-fact { nodes: list<expression-kind>, root: u32 }
+  /// Read-only syntax; the plugin owns interpretation.
+  variant refinement { literals(list<constant>), predicate(expression-fact) }
+
+  /// Read-only facts about the top-level binding enclosing a reference.
+  record binding {
+    module: string,
+    name: option<string>,
+    span: span,
+    constrained: bool,
+    in-function: bool,
+    applied: u32,
+    /// What the binding's function gives at last, where its signature names
+    /// the watched name.
+    gives: option<fact-type>,
+  }
+
+  /// A function around a place: the services its arrow names, and whether
+  /// its row is open to more.
+  record enclosing { services: list<string>, open: bool }
+
+  /// A value a tag marks, where a module names it inside a function: the
+  /// tag, the value as the module writes it, the value of the library it
+  /// is or reaches, and the functions around the place, innermost first,
+  /// up to the nearest `task`.
+  record tagged { tag: string, named: string, reaches: string, inside: list<enclosing> }
 
   /// A place that calls a name the plugin's package watches: the module and
   /// the name as the compiler knows them, where the call is written, its
@@ -222,6 +258,11 @@ interface types {
     span: span,
     arguments: list<argument>,
     refinement: option<refinement>,
+    binding: option<binding>,
+    /// The call is in code a plugin wrote, not in the module's own text.
+    generated: bool,
+    /// What marks the value named here, for a tag the package watches.
+    tagged: option<tagged>,
   }
 
   enum highlight-kind { keyword, parameter }
@@ -321,7 +362,7 @@ interface compiler {
 
 world plugin {
   import compiler;
-  use types.{block, arena, diagnostic, completion, hover, highlight, piece, derive-target, fact, call-site, published, artifact};
+  use types.{block, arena, diagnostic, completion, hover, highlight, piece, derive-target, fact, call-site, published, artifact, structure};
 
   /// What the plugin learns from all its blocks of a group, before any expands.
   export collect: func(blocks: list<block>) -> list<u8>;
@@ -371,6 +412,8 @@ world plugin {
   /// What is wrong with `block` that only the types of its code show, from
   /// the types of the `_` of its code; it only adds diagnostics.
   export check: func(block: block, state: list<u8>, facts: list<fact>) -> list<diagnostic>;
+  /// Source structure without generated wrappers, including project thresholds.
+  export check-structure: func(block: block, facts: structure) -> list<diagnostic>;
   /// What is wrong with the places of one module that call the names the
   /// plugin's package declares in `watch`, given the types the checker
   /// found there; `state` is what `collect` learned from that module's

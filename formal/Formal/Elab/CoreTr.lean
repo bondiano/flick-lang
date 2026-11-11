@@ -12,8 +12,7 @@ only in the globals of structural and primitive dictionaries (`docs/formal/elabo
 
 `Corr Γc Γ Δ γ δ`: the context of the core gives `⟦Γ[x]⟧` at `γ x` and `D_{Δ[k]}` at `δ k`,
 and nothing where `Γ` and `Δ` give nothing. A translation has no run-time sites
-(`Tr.has`), and its free variables are those of `e` through `γ`, or premises (`Tr.free`);
-so what it holds in the core is what `e` holds in `Γ` (`corr_held`).
+(`Tr.has`), and its free variables are those of `e` through `γ`, or premises (`Tr.free`).
 -/
 
 namespace Flick.Elab
@@ -249,25 +248,5 @@ theorem Corr.lamD {Γc Γ Δ γ δ} (h : Corr N Γc Γ Δ γ δ) (qs : List Cn) 
     · rename_i hk
       rw [List.getElem?_append_right (by simp [dctx]), List.getElem?_append_right (by omega)]
       simp [dctx, h.dict]
-
-/-- What the core context holds through a variable of `Γ` free in `e` is what `e` holds in
-`Γ`; a premise holds nothing. -/
-theorem corr_held {Γc Γ Δ γ δ} (h : Corr N Γc Γ Δ γ δ) {e : Tm} {i : Nat}
-    (hi : (∃ x, e.Free x ∧ γ x = i) ∨ ∃ k, δ k = i) {s : Flick.Scheme} (hs : Γc[i]? = some s)
-    {a : Atom} (ha : s.reach a) : ∃ n, a = .v n ∧ heldT Γ e n := by
-  rcases hi with ⟨x, hx, rfl⟩ | ⟨k, rfl⟩
-  · rw [h.var] at hs
-    cases hx' : Γ[x]? with
-    | none => rw [hx'] at hs; cases hs
-    | some s₀ =>
-      rw [hx'] at hs; cases hs
-      obtain ⟨n, rfl, hn⟩ := (trS_reach N s₀ a).1 ha
-      exact ⟨n, rfl, x, s₀, hx, hx', hn⟩
-  · rw [h.dict] at hs
-    cases hk : Δ[k]? with
-    | none => rw [hk] at hs; cases hs
-    | some q =>
-      rw [hk] at hs; cases hs
-      exact absurd ((Flick.Scheme.reach_mono _ _).1 ha) (trD_reach N q a)
 
 end Flick.Elab

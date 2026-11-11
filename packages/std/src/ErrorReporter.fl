@@ -1,6 +1,6 @@
-/// Effect's `ErrorReporter`: where unhandled failures are reported. A
-/// reporter hands each report to an `Events.Listener`, whose handler runs
-/// as a child of its scope; `layer` installs reporters for a body.
+/// Where unhandled failures are reported. A reporter hands each report to
+/// an `Events.Listener`, whose handler runs as a child of its scope;
+/// `layer` installs reporters for a body.
 module ErrorReporter exposing (..)
 
 import Events
@@ -25,17 +25,17 @@ type alias LayerOptions = { mergeWithExisting : Bool }
 /// A reporter sending each report to `listener`; an interruption is not
 /// reported, and a cause is reported once.
 make : Events.Listener s Report -> ErrorReporter s
-foreign pure make from "@flick-lang/effect-ts/effect/ErrorReporter" "flickMake"
+foreign pure make from "flick:ErrorReporter" "flickMake"
   retention owner
   reviewed "effect@4.1.2 sha256:9f9f7bbdfa054642"
 
 /// Installs `reporters` for the body of a `provide`.
 layer : List (ErrorReporter s) -> LayerOptions -> Layer none none none
-foreign pure layer from "@flick-lang/effect-ts/effect/ErrorReporter" "flickLayer"
+foreign pure layer from "flick:ErrorReporter" "flickLayer"
   retention owner
   reviewed "effect@4.1.2 sha256:a4bfb912e10f9fd1"
 
 /// Reports `failure` to the reporters installed.
 report : Failure e ->{} Unit
-foreign effect report from "@flick-lang/effect-ts/effect/ErrorReporter" "flickReport"
+foreign effect report from "flick:ErrorReporter" "flickReport"
   reviewed "effect@4.1.2 sha256:0410343a98c91ca0"

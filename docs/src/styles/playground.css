@@ -1,6 +1,7 @@
 /* The playground fills the screen under the header. Its page's title is for
-   screen readers, and the notes of the page follow below it. */
-main:has(#flick-playground) h1#_top {
+   screen readers, and the notes of the page follow below it. A page of the
+   tour keeps its title and puts its text beside the editor. */
+main:has(#flick-playground):not(:has(.tour-lesson)) h1#_top {
   position: absolute;
   width: 1px;
   height: 1px;
@@ -8,8 +9,8 @@ main:has(#flick-playground) h1#_top {
   clip-path: inset(50%);
   white-space: nowrap;
 }
-main:has(#flick-playground) .content-panel { padding: 0; }
-main:has(#flick-playground) .sl-container { max-width: none; }
+main:has(#flick-playground):not(:has(.tour-lesson)) .content-panel { padding: 0; }
+main:has(#flick-playground):not(:has(.tour-lesson)) .sl-container { max-width: none; }
 .sl-markdown-content:has(.flick-playground-shell) > p { margin-inline: var(--flick-gutter); }
 .sl-markdown-content:has(.flick-playground-shell) > p:last-child { margin-bottom: 2.5rem; }
 
@@ -430,9 +431,30 @@ main:has(#flick-playground) .sl-container { max-width: none; }
 .fp-execution > .fp-failure-detail { margin: 0; padding: 1rem; }
 .fp-boot { min-height: 12rem; padding: 1.5rem; border: 1px solid var(--sl-color-gray-5); color: var(--sl-color-gray-3); }
 
+/* A lesson of the tour: its text, then the editor over the output. From a
+   laptop up the editor stays beside the text as it scrolls. */
+.tour-lesson { display: grid; gap: 1.5rem; }
+.tour-lesson > .tour-prose > :first-child { margin-top: 0; }
+.tour-contents-link { font-size: 0.875rem; }
+.tour-lesson > .tour-editor { margin-top: 0; }
+.tour-editor .flick-playground-shell { margin: 0; }
+.tour-editor .fp-workspace { height: min(44rem, calc(100dvh - var(--sl-nav-height) - 2rem)); border: 1px solid var(--fp-rule); }
+/* An exercise adds its task and buttons above the editor, which keeps its own height. */
+.tour-editor .fp-workspace:has(.fp-lesson) { height: auto; }
+.tour-editor .fp-workspace:has(.fp-lesson) .fp-panes { grid-template-rows: minmax(14rem, auto) minmax(8rem, auto); }
+.tour-editor .fp-panes { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 3fr) minmax(0, 2fr); }
+.tour-editor .fp-split { display: none; }
+.tour-editor .fp-result { border-top: 1px solid var(--fp-rule); }
+@media (min-width: 64rem) {
+  .tour-lesson { grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); align-items: start; }
+  .tour-editor { position: sticky; top: calc(var(--sl-nav-height) + 1rem); }
+}
+
 /* A phone or a narrow window stacks the panels and lets the page scroll. */
 @media (max-width: 56rem) {
-  .fp-workspace { height: auto; }
+  .fp-workspace, .tour-editor .fp-workspace { height: auto; }
+  .tour-editor .fp-panes,
+  .tour-editor .fp-workspace:has(.fp-lesson) .fp-panes { grid-template-rows: none; }
   .fp-panes { grid-template-columns: minmax(0, 1fr); }
   .fp-split { display: none; }
   .fp-result { border-top: 1px solid var(--fp-rule); }

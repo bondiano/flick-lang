@@ -11,6 +11,37 @@ use common::{flick_in, project};
 
 const LIB: &str = "schema-version = 1\n\n[project]\nkind = \"lib\"\n";
 
+const RT_WIRE: &str = "module Lib.Wire exposing (Item, item_json)\n\n\
+type alias Item = { id : String }\n  deriving Schema\n\n\
+item_json : PureCodec Json Item\nlet item_json = Codec.json Item.schema\n";
+
+#[test]
+#[ignore = "needs Node and pnpm install"]
+fn rt_schema_export_uses_the_native_codec() {
+    let dir = project(
+        "schema_export_rt",
+        &[("flick.toml", LIB), ("src/Lib/Wire.fl", RT_WIRE)],
+    );
+    let out = flick_in(
+        &dir,
+        &[
+            "schema",
+            "export",
+            "Lib.Wire.item_json",
+            "--target",
+            "json-schema-2020-12",
+            "--out",
+            "item.json",
+        ],
+    );
+    assert_eq!(out.status.code(), Some(0), "{out:?}");
+    let item = fs::read_to_string(dir.join("item.json")).expect("schema");
+    assert!(
+        item.contains("\"id\"") && item.contains("2020-12"),
+        "{item}"
+    );
+}
+
 const WIRE: &str = r#"module Lib.Wire exposing (..)
 
 type alias Upload = { name : String; data : Unknown }
@@ -40,7 +71,13 @@ let api = HttpApi.api "Files" |> HttpApi.add_group (HttpApi.group (Record.label 
 fn strict_export_refuses_what_it_cannot_state() {
     let dir = project(
         "schema_export_strict",
-        &[("flick.toml", LIB), ("src/Lib/Wire.fl", WIRE)],
+        &[
+            (
+                "flick.toml",
+                &format!("{LIB}\n[build]\neffect = \"effect\"\n"),
+            ),
+            ("src/Lib/Wire.fl", WIRE),
+        ],
     );
     let export = |codec: &str, target: &str, out: &str| {
         flick_in(

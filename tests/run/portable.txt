@@ -6,6 +6,12 @@
 bootstrap/app_fail
 bootstrap/debug
 bootstrap/hello
+bootstrap/inline_declarations
+bootstrap/inline_module
+bootstrap/inline_nested
+bootstrap/inline_pack
+bootstrap/inline_pack_nominals
+bootstrap/packed_module
 bootstrap/stderr
 codegen/applicative_do
 codegen/category_classes
@@ -40,6 +46,7 @@ codegen/implicit
 codegen/ints
 codegen/let_assert
 codegen/let_mut
+codegen/loops
 codegen/lift
 codegen/literals
 codegen/local_functions
@@ -71,7 +78,9 @@ stdlib/effect/hash_map
 stdlib/effect/hash_set
 stdlib/effect/json_schema
 stdlib/effect/number
+stdlib/effect/optic_parts
 stdlib/effect/option
+stdlib/effect/option_pairs
 stdlib/effect/order
 stdlib/effect/record
 stdlib/effect/string
@@ -134,6 +143,9 @@ stdlib/http/types
 stdlib/http/server
 stdlib/http/streams
 stdlib/http/lifecycle
+stdlib/http/shutdown_masked
+stdlib/http/shutdown_stream
+stdlib/http/shutdown_timeout
 stdlib/http/api
 stdlib/http/api_bodies
 stdlib/http/auth
@@ -160,12 +172,15 @@ stdlib/effect/mutable_ref
 stdlib/effect/clock
 stdlib/effect/schedule
 stdlib/effect/hash_ring
+stdlib/effect/hash_ring_places
 stdlib/effect/crypto
 stdlib/effect/hmac
 stdlib/effect/password
 stdlib/effect/jwt
 stdlib/effect/trie
+stdlib/effect/trie_keys
 stdlib/effect/bytesize
+stdlib/effect/bytesize_text
 stdlib/effect/chunk
 stdlib/effect/check
 stdlib/effect/graph
@@ -227,3 +242,10 @@ runtime/abort_closes_scopes
 runtime/abort_stops_children
 runtime/discontinued_body
 runtime/discontinued_fiber
+
+effect/host_services
+codegen/loops_state
+codegen/loops_for_source
+codegen/loops_guards
+codegen/loops_owners
+effect/row_without

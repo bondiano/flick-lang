@@ -2,15 +2,7 @@
 title: "FLICK-R017"
 ---
 
-A `let mut` variable that no statement assigns never changes, so it needs
-no `mut`: a reader of the code would look for the assignment. The fix
-removes `mut`.
-
-```flick
-module App.Area exposing (area)
-
-area : Float -> Float -> Float
-let area width height =
-  let size = width * height
-  size
-```
+A private module can be imported only by source and test files of its own package.
+The module still belongs to its package when a dependency is compiled from source
+or restored from the package cache. Import a public facade that re-exports the
+needed names, or ask the package author to make the module public.

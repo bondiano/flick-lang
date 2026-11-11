@@ -3,7 +3,8 @@ import type { Tagged } from "../core/data.ts";
 import { tag } from "../tags.ts";
 
 const CONTINUE = /*#__PURE__*/ tag("Loop.Step.Continue");
-type Step<S, A> = (Tagged<string, S> & { readonly continue?: true }) | (Tagged<string, A> & { readonly continue?: false });
+/** `Loop.Step s a`: the tags alone tell `Continue` from `Done`. */
+export type Step<S, A> = (Tagged<string, S> & { readonly continue?: true }) | (Tagged<string, A> & { readonly continue?: false });
 const isContinue = <S, A>(step: Step<S, A>): step is Tagged<string, S> & { readonly continue?: true } =>
   step._tag === CONTINUE;
 

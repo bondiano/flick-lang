@@ -6,6 +6,7 @@ packages:
   - tools/astro-flick
   - tools/bundle-size
   - tools/load
+  - tools/load/ssr
   - tools/tokens
   - docs
   - editors/vscode

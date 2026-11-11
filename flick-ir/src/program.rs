@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 use crate::{FileId, Module};
 
 /// The version of the IR this crate reads and writes.
-pub const VERSION: &str = "0.5.0";
+pub const VERSION: &str = "0.7.0";
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Program {
@@ -152,6 +152,7 @@ mod tests {
             name: "App".to_owned(),
             items: vec![item],
             labels: BTreeMap::default(),
+            initialization: crate::Initialization::default(),
         };
         Program::new("flick test", vec![module], &|f| {
             format!("file{}.fl", f.index())
@@ -185,6 +186,7 @@ mod tests {
     #[test]
     fn a_reader_takes_only_its_own_minor_version_before_1_0() {
         assert!(compatible(VERSION));
+        assert!(!compatible("0.5.0"));
         assert!(!compatible("0.3.0"));
         assert!(!compatible("1.0.0"));
         assert!(!compatible("0.1"));
@@ -195,5 +197,19 @@ mod tests {
             Program::from_json(&p.to_json()),
             Err(Error::Version { found })
         );
+    }
+
+    #[test]
+    fn lexical_initialization_survives_both_forms() {
+        let mut p = program(1.0);
+        p.modules[0].initialization = crate::Initialization {
+            prefixes: vec![crate::Prefix {
+                before: 100,
+                bindings: vec!["x".into()],
+            }],
+        };
+        assert_eq!(Program::from_json(&p.to_json()), Ok(p.clone()));
+        #[cfg(feature = "cbor")]
+        assert_eq!(Program::from_cbor(&p.to_cbor()), Ok(p));
     }
 }

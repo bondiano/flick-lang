@@ -7,9 +7,9 @@ import (
 	"strconv"
 )
 
-// Http.Body as Effect's HttpBody: nothing, bytes (a text body keeps the
-// text it was made of), the fields of a form, or bytes read when the body
-// is sent. A content type and length go with the bytes.
+// Http.Body: nothing, bytes (a text body keeps the text it was made of),
+// the fields of a form, or bytes read when the body is sent. A content
+// type and length go with the bytes.
 
 const (
 	bodyEmpty = iota
@@ -171,7 +171,7 @@ func (b *Body) reader(fb *Fiber) (io.ReadCloser, string, error) {
 	return io.NopCloser(bytes.NewReader(data)), contentType, err
 }
 
-// parseContentLength is Effect's length of a `Content-Length` header: its
+// parseContentLength is the length of a `Content-Length` header: its
 // digits as a safe integer, or -1.
 func parseContentLength(h Value) int64 {
 	s, ok := h.(string)
@@ -190,8 +190,8 @@ func parseContentLength(h Value) int64 {
 	return n
 }
 
-// withBodyHeaders is Effect's headers of a request given the body: its
-// content type and length, or neither for an empty or a form body.
+// withBodyHeaders is the headers of a request given the body: its content
+// type and length, or neither for an empty or a form body.
 func withBodyHeaders(h *Record, b *Body) *Record {
 	if b.kind == bodyEmpty || b.kind == bodyForm {
 		return h.without("content-type").without("content-length")

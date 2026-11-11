@@ -12,12 +12,12 @@ import (
 	"sync/atomic"
 )
 
-// Http.FetchClient as Effect's FetchHttpClient, on net/http: the request's
-// headers but `Content-Length`, which the transport sets from the body;
-// redirects followed up to 20 times as fetch follows them; the response's
-// headers by lower-case name in order, their values joined, and its
-// cookies of every `Set-Cookie`. An interruption of the fiber cancels the
-// request, or the read of its body, which is read when it is asked for.
+// Http.FetchClient, on net/http: the request's headers but
+// `Content-Length`, which the transport sets from the body; redirects
+// followed up to 20 times as fetch follows them; the response's headers by
+// lower-case name in order, their values joined, and its cookies of every
+// `Set-Cookie`. An interruption of the fiber cancels the request, or the
+// read of its body, which is read when it is asked for.
 //
 // shortcut: a stream body is read whole before the request is sent; pipe it to the connection when programs upload large streams
 

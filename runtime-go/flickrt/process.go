@@ -1,8 +1,8 @@
 package flickrt
 
-// `ChildProcess`: commands as Effect describes them, run on `os/exec`. A
-// command is immutable; each setter gives a new one, and a pipeline
-// applies a setting to each of its commands as Effect's does.
+// `ChildProcess`: commands as descriptions, run on `os/exec`. A command is
+// immutable; each setter gives a new one, and a pipeline applies a setting
+// to each of its commands.
 
 import (
 	"strings"
@@ -57,7 +57,7 @@ func (c *procCommand) commands() []*procCommand {
 	return []*procCommand{c}
 }
 
-// text is the command line, as Effect names a command in its errors.
+// text is the command line, which names a command in its errors.
 func (c *procCommand) text() string {
 	parts := make([]string, 0, 2)
 	for _, cmd := range c.commands() {

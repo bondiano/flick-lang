@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-// Effect's PrometheusMetrics: the registry in Prometheus's text format.
+// PrometheusMetrics: the registry in Prometheus's text format.
 
 var (
 	metricNameUnsafe = regexp.MustCompile(`[^a-zA-Z0-9_:]`)
@@ -103,8 +103,8 @@ func prometheusData(name string, s metricSnapshot) []string {
 	return append(lines, name+"_sum"+base+" "+prometheusValue(n("sum")), name+"_count"+base+" "+jsString(n("count")))
 }
 
-// prometheusFormat is Effect's formatUnsafe: a family per name, its HELP
-// and TYPE from its first series.
+// prometheusFormat is the text of the registry: a family per name, its
+// HELP and TYPE from its first series.
 func prometheusFormat(fb *Fiber, prefix string, rename func(string) string) string {
 	if prefix != "" {
 		prefix = sanitizeMetricName(prefix) + "_"

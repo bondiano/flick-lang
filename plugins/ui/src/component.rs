@@ -211,3 +211,62 @@ pub fn hover(block: &Block, offset: u32) -> Option<Hover> {
         span: block.whole(),
     })
 }
+
+/// Structural warnings on the original setup and render, before expansion.
+pub fn check(block: &Block, s: &flick_plugin::Structure) -> Vec<Diagnostic> {
+    let Some(name) = block.tokens.first() else {
+        return Vec::new();
+    };
+    let name_text = block.text_of(name.span);
+    let mut out = Vec::new();
+    {
+        if s.lines > s.max_lines {
+            out.push(
+                Diagnostic::warning(
+                    format!(
+                        "`{name_text}` is {} lines long, more than {}",
+                        s.lines, s.max_lines
+                    ),
+                    name.span,
+                )
+                .with_code("T036")
+                .with_fix("split it into smaller functions", Vec::new(), false),
+            );
+        }
+        if s.complexity > s.max_complexity {
+            out.push(
+                Diagnostic::warning(
+                    format!(
+                        "`{name_text}` has a complexity of {}, more than {}",
+                        s.complexity, s.max_complexity
+                    ),
+                    name.span,
+                )
+                .with_code("T038")
+                .with_fix(
+                    "move some of its branches into functions of their own",
+                    Vec::new(),
+                    false,
+                ),
+            );
+        }
+        for n in &s.nesting {
+            out.push(
+                Diagnostic::warning(
+                    format!(
+                        "nested {} levels deep, more than {}",
+                        n.depth, s.max_nesting
+                    ),
+                    n.span,
+                )
+                .with_code("T037")
+                .with_fix(
+                    "move the inner part into a function of its own",
+                    Vec::new(),
+                    false,
+                ),
+            );
+        }
+    }
+    out
+}

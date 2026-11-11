@@ -81,7 +81,7 @@ pub(super) fn task(body: Term) -> Term {
     Term::Task(Rc::new(body))
 }
 
-fn open() -> Term {
+pub(super) fn open() -> Term {
     Term::app(global(MODULE, "open_scoped"), Term::string("x"))
 }
 

@@ -5,10 +5,9 @@ import (
 	"sync/atomic"
 )
 
-// Transactions as Effect 4's (Effect.ts `tx`, `txRetry`; TxRef.ts): an
-// attempt reads and writes TxRefs through a journal of `{version, value,
-// written}` and commits it at once, or runs again after `retry` or a
-// conflict.
+// Transactions: an attempt reads and writes TxRefs through a journal of
+// `{version, value, written}` and commits it at once, or runs again after
+// `retry` or a conflict.
 //
 // JS interleaves fibers, where Go runs them in parallel, so commits are
 // TL2's: a commit publishes each value it writes with a new stamp of
@@ -25,7 +24,8 @@ type txCell struct {
 	value   Value
 }
 
-// TxRef is Effect's TxRef.
+// TxRef is a transactional reference: its committed cell, and the attempts
+// waiting for it to change.
 type TxRef struct {
 	cell    atomic.Pointer[txCell]
 	waiters map[*txWaiter]struct{} // attempts waiting after `retry` for a change; under txMu
@@ -64,9 +64,9 @@ type txEntry struct {
 	written bool
 }
 
-// tx is Effect's TransactionMetaInner: the journal of the current attempt
-// and its metadata. A body may fork fibers that share it, so `mu` guards
-// it; take `mu` before `txMu`, never after.
+// tx is the journal of the current attempt and its metadata. A body may
+// fork fibers that share it, so `mu` guards it; take `mu` before `txMu`,
+// never after.
 type tx struct {
 	mu        sync.Mutex
 	journal   map[*TxRef]*txEntry
@@ -98,8 +98,8 @@ func txOf(fb *Fiber) *tx {
 	return nil
 }
 
-// TxAtomically is Effect's `tx`: the task runs as one transaction, or as
-// part of the fiber's.
+// TxAtomically runs the task as one transaction, or as part of the
+// fiber's.
 func TxAtomically(fb *Fiber, task Value) Value {
 	if txOf(fb) != nil {
 		return Run(fb, task)
@@ -107,8 +107,8 @@ func TxAtomically(fb *Fiber, task Value) Value {
 	return atomically(fb, func(fb *Fiber) Value { return Run(fb, task) })
 }
 
-// txDo runs `f` in the fiber's transaction, or in one of its own, as each
-// of Effect's operations on transactional values is wrapped in `tx`.
+// txDo runs `f` in the fiber's transaction, or in one of its own: each
+// operation on a transactional value is a transaction.
 func txDo(fb *Fiber, f func(*Fiber, *tx) Value) Value {
 	if t := txOf(fb); t != nil {
 		return f(fb, t)
@@ -165,8 +165,8 @@ func interruptsOnly(c *Cause) bool {
 	return c.has(causeInterrupt) && !c.has(causeFail) && !c.has(causeDie)
 }
 
-// begin starts an attempt: Effect stamps the times of every attempt but
-// the first.
+// begin starts an attempt: every attempt but the first has its times
+// stamped.
 func (t *tx) begin(clock Clock) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
@@ -210,7 +210,7 @@ func (t *tx) get(fb *Fiber, r *TxRef) Value {
 	return t.entry(fb, r).value
 }
 
-// set writes `v` to `r` in the journal; as Effect's, it reads `r` first.
+// set writes `v` to `r` in the journal; it reads `r` first.
 func (t *tx) set(fb *Fiber, r *TxRef, v Value) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
@@ -218,8 +218,7 @@ func (t *tx) set(fb *Fiber, r *TxRef, v Value) {
 	e.value, e.written = v, true
 }
 
-// retryNow is Effect's `txRetry`: the attempt ends, to run again once a
-// ref it read changes.
+// retryNow ends the attempt, to run again once a ref it read changes.
 func (t *tx) retryNow(fb *Fiber) Value {
 	t.mu.Lock()
 	t.retry = true
@@ -278,8 +277,8 @@ func (t *tx) commit() bool {
 	return true
 }
 
-// await is Effect's awaitPendingTransaction: it waits, interruptibly,
-// until a commit writes a ref the attempt read, unless one already has.
+// await waits, interruptibly, until a commit writes a ref the attempt
+// read, unless one already has.
 func (t *tx) await(fb *Fiber) {
 	w := &txWaiter{ch: make(chan struct{})}
 	t.mu.Lock()

@@ -32,7 +32,7 @@ func raceAll(fb *Fiber, tasks []Value, first bool) Value {
 		}
 		failed = concat(failed, c.cause)
 	}
-	panic(&Failure{failed.electDefects()}) // as Effect's raceAll
+	panic(&Failure{failed.electDefects()}) // every racer failed
 }
 
 func RaceAll(fb *Fiber, tasks Value) Value      { return raceAll(fb, List(tasks), false) }
@@ -188,9 +188,8 @@ var (
 	scheduleOnce   = ScheduleRecurs(int32(1)).(*Schedule)
 )
 
-// retries is Effect's `scheduleFromStep`: the schedule that retries the
-// step, nil for none. A step after the first replays the previous step's
-// error to it first.
+// retries is the schedule that retries the step, nil for none. A step
+// after the first replays the previous step's error to it first.
 func (s *planStep) retries(first bool) *Schedule {
 	var while func(*Fiber, Value) bool
 	if s.while != nil {
@@ -223,7 +222,7 @@ func WithExecutionPlan(fb *Fiber, plan, onEvent, task Value) Value {
 	steps := plan.([]*planStep)
 	attempt, lastStepIndex, stepAttempt := int32(0), int32(-1), int32(0)
 	emit := func(fb *Fiber, event Value) { catch(func() Value { return Run(fb, Apply(fb, onEvent, event)) }) }
-	// an attempt with its metadata and events, as Effect's `provideMeta` and `instrument`
+	// an attempt with its metadata and events
 	attemptAt := func(index int32, step *planStep) Value {
 		return Eff(func(fb *Fiber) Value {
 			attempt++

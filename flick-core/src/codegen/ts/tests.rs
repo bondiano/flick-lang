@@ -67,6 +67,44 @@ fn exports_have_typescript_types_without_any() {
     assert!(typed.iter().all(|l| !l.contains("any")), "{out}");
 }
 
+#[test]
+fn first_class_module_projects_its_public_values_to_typescript() {
+    let out = project(
+        "module App.Shapes exposing (S, packed)\n\
+         type module S =\n  identity : a -> a\n\
+         packed : Module S\nlet packed = pack Prelude as S\n",
+    );
+    assert!(
+        out.contains("packed: { readonly identity: <A>(arg: A) => A }"),
+        "{out}"
+    );
+    assert!(!out.contains("interface S"), "{out}");
+}
+
+#[test]
+fn abstract_module_witness_is_not_projected_as_any() {
+    let out = project(
+        "module App.Shapes exposing (S, packed)\n\
+         type module S =\n  type Key\n  value : Key\n\
+         packed : Module S\nforeign pure packed from \"fixture\" \"packed\"\n",
+    );
+    assert!(out.contains("packed: !"), "{out}");
+    assert!(out.contains("abstract type"), "{out}");
+}
+
+#[test]
+fn existential_module_value_is_exported_as_unknown() {
+    let lookup = |m: &str| types::builtins().iter().find(|i| i.module == m).cloned();
+    let package = |_: &str| None;
+    let projection = Projection::new("App.Shapes", &lookup, &package);
+    let ty = types::Type::Exists {
+        binder: "K".to_owned(),
+        contract: Box::new(types::Type::con("App.Shapes", "Box")),
+        body: Box::new(types::Type::con("$exists:K", "Key")),
+    };
+    assert_eq!(projection.value(&ty), Ok("unknown".to_owned()));
+}
+
 /// A case per constructor, over the type's parameters; a hidden type is
 /// `unknown`, and a held dictionary is no field.
 #[test]
@@ -259,4 +297,19 @@ fn a_set_of_services_and_errors_has_no_declaration() {
         assert!(!dts.contains(&format!("export type {name}")), "{dts}");
         assert!(!dts.contains(&format!("export interface {name}")), "{dts}");
     }
+}
+
+#[test]
+fn rt_service_keys_use_the_native_service_type() {
+    let (interface, lookup) = checked(
+        "module App.Shapes exposing (Greeter)\nservice Greeter =\n  hello : String ->{} String\n",
+    );
+    let package = |_: &str| None;
+    let projection = Projection::for_runtime("App.Shapes", &lookup, &package, true);
+    let (dts, refused) = declaration_file(&projection, &interface, &|m| m.to_owned());
+    assert!(refused.is_empty(), "{refused:?}");
+    assert!(dts.contains("$s_Greeter: $Service<Greeter,"), "{dts}");
+    assert!(dts.contains("ServiceValue as $Service"), "{dts}");
+    assert!(!dts.contains("$Context"), "{dts}");
+    assert!(!dts.contains("@flick-lang/effect-ts"), "{dts}");
 }

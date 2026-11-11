@@ -15,6 +15,10 @@ use common::{APP, project};
 
 const FOREVER: &str = "import { Effect } from \"@flick-lang/effect-ts\";\nexport const forever = () => Effect.never;\n";
 
+fn effect_app() -> String {
+    format!("{APP}\n[build]\neffect = \"effect\"\n")
+}
+
 /// An app that prints `started <v>`, waits for a signal and prints
 /// `cleanup <v>` when its scope closes, failing there when `broken`.
 fn waiting(version: &str, broken: bool) -> String {
@@ -128,7 +132,7 @@ fn exit_codes_follow_the_outcome_and_cleanup() {
         let dir = project(
             name,
             &[
-                ("flick.toml", APP),
+                ("flick.toml", &effect_app()),
                 ("src/App/Main.fl", &source),
                 ("src/App/forever.mjs", FOREVER),
             ],
@@ -191,7 +195,7 @@ fn simultaneous_runs_keep_the_survivors_files() {
     let dir = project(
         "run_generations",
         &[
-            ("flick.toml", APP),
+            ("flick.toml", &effect_app()),
             ("src/App/Main.fl", &waiting("v1", false)),
             ("src/App/forever.mjs", FOREVER),
         ],
@@ -250,13 +254,13 @@ fn dev_replaces_the_app_only_after_its_shutdown() {
     let dir = project(
         "dev_cycle",
         &[
-            ("flick.toml", APP),
+            ("flick.toml", &effect_app()),
             ("src/App/Main.fl", &waiting("v1", false)),
             ("src/App/forever.mjs", FOREVER),
         ],
     );
     let main = dir.join("src/App/Main.fl");
-    let mut dev = flick(&dir, &["--quiet", "dev"])
+    let mut dev = flick(&dir, &["--quiet", "--timings", "dev"])
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
@@ -297,6 +301,10 @@ fn dev_replaces_the_app_only_after_its_shutdown() {
         err.contains("FLICK-P021") && err.contains("exit code 1)"),
         "{err}"
     );
+    // each of the four builds reported itself, and none the version that
+    // ran and waited before it
+    assert_eq!(err.matches("Timings\n").count(), 4, "{err}");
+    assert!(!err.contains("Running a child process"), "{err}");
 }
 
 /// Logs `aborted` when interrupted but settles only after its own delay.
@@ -329,6 +337,10 @@ fn dev_starts_the_next_version_after_foreign_work_settles() {
         "dev_quiescence",
         &[
             ("flick.toml", APP),
+            (
+                "package.json",
+                "{\"type\":\"module\",\"dependencies\":{\"@flick-lang/effect-ts\":\"*\"}}",
+            ),
             ("src/App/Main.fl", LINGERING),
             ("src/App/linger.mjs", LINGER),
             ("src/App/forever.mjs", FOREVER),
@@ -455,6 +467,17 @@ fn the_spec_examples_and_the_ci_set_pass() {
         Some(0)
     );
     let app = root.join("my-app");
+    let config = fs::read_to_string(app.join("flick.toml")).expect("config");
+    fs::write(
+        app.join("flick.toml"),
+        format!("{config}effect = \"effect\"\n"),
+    )
+    .expect("Effect configuration");
+    let package_path = app.join("package.json");
+    let mut package: serde_json::Value =
+        serde_json::from_slice(&fs::read(&package_path).expect("package")).expect("JSON");
+    package["dependencies"]["@flick-lang/effect-ts"] = "workspace:*".into();
+    fs::write(&package_path, format!("{package:#}\n")).expect("Effect dependency");
     let domain = "module App.Domain exposing (User, user_json, api)\n\ntype alias User = { name : String; age : Float }\n  deriving Schema\n\nuser_json : PureCodec Json User\nlet user_json = Codec.json User.schema\n\nme : HttpApi.Endpoint \"me\" (HttpApi.Request Unit Unit Unit Unit ->{r} User)\nlet me =\n  HttpApi.endpoint HttpApi.Get \"/me\" (Record.label : Record.Label \"me\")\n  |> HttpApi.with_success 200 user_json\n\napi : HttpApi.Api r { users : { me : HttpApi.Request Unit Unit Unit Unit ->{r} User } }\nlet api =\n  HttpApi.api \"Users\"\n  |> HttpApi.add_group (HttpApi.group (Record.label : Record.Label \"users\") |> HttpApi.add me)\n";
     fs::write(app.join("src/App/Domain.fl"), domain).expect("write");
     let sessions: [&[&str]; 12] = [

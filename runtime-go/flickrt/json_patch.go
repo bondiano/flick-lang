@@ -5,8 +5,8 @@ import (
 	"strings"
 )
 
-// Effect's `JsonPointer` (RFC 6901) and `JsonPatch` (RFC 6902's add, remove
-// and replace) over JSON values, and the `Differ` of a codec's JSON form.
+// `JsonPointer` (RFC 6901) and `JsonPatch` (RFC 6902's add, remove and
+// replace) over JSON values, and the `Differ` of a codec's JSON form.
 
 func EscapeToken(token Value) Value   { return escapeToken(token.(string)) }
 func UnescapeToken(token Value) Value { return unescapeToken(token.(string)) }
@@ -344,7 +344,7 @@ func JsonPatchApply(patch, doc Value) Value {
 	return Ok(out)
 }
 
-// differ is an Effect `Differ`: patches `p` of values `a`.
+// differ is a `Differ`: patches `p` of values `a`.
 type differ struct {
 	empty   Value
 	diff    func(fb *Fiber, old, new Value) Value
@@ -358,8 +358,7 @@ func DifferCombine(first, second, d Value) Value       { return d.(*differ).comb
 func DifferPatch(fb *Fiber, old, patch, d Value) Value { return d.(*differ).patch(fb, old, patch) }
 
 // DifferJsonPatch is `Schema.toDifferJsonPatch`: JSON Patches of the
-// codec's JSON form; a value the codec refuses is a defect, as Effect's
-// `encodeSync`/`decodeSync` throw.
+// codec's JSON form; a value the codec refuses is a defect.
 func DifferJsonPatch(c Value) Value {
 	cd := codecOf(c)
 	encode := func(fb *Fiber, v Value) Value {

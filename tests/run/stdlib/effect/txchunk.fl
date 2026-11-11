@@ -1,4 +1,4 @@
-// Transactional chunks from Effect's `TxChunk`.
+// Transactional chunks from `TxChunk`.
 module App.Main exposing (main)
 
 type error Stop = Stop

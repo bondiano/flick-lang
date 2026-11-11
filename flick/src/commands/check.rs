@@ -1,27 +1,35 @@
+use std::cell::RefCell;
 use std::cmp::Reverse;
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
 use flick_core::diagnostics::{Diagnostic, Edit, Severity, codes};
-use flick_core::project::{self, Project};
+use flick_core::project::{self, ModuleCache, Project};
 use flick_core::source::{FileId, SourceMap};
 
 use crate::args::CheckArguments;
 use crate::command::{Command, Outcome};
-use crate::package_cache;
 use crate::sources::{self, FsHost};
+use crate::{builtins, package_cache, timings};
 
 mod pages;
 
 pub struct CheckCommand {
     options: CheckArguments,
     project: Option<String>,
+    /// What the checks before this one checked, for a command that checks
+    /// again: the passes of `--fix` and the runs of `--watch`.
+    modules: RefCell<ModuleCache>,
 }
 
 impl CheckCommand {
     pub fn new(options: CheckArguments, project: Option<String>) -> Self {
-        Self { options, project }
+        Self {
+            options,
+            project,
+            modules: RefCell::default(),
+        }
     }
 }
 
@@ -35,6 +43,12 @@ impl Command for CheckCommand {
         } else {
             self.check_files(&paths)
         };
+        if !pages.is_empty()
+            && let Err(diagnostic) = builtins::prepare()
+        {
+            outcome.diagnostics.push(diagnostic);
+            return outcome;
+        }
         for page in &pages {
             let fix = self.options.fix.then_some(self.options.only.as_slice());
             let diagnostics = pages::check(&mut outcome.sources, page, fix);
@@ -72,6 +86,7 @@ impl CheckCommand {
     /// The diagnostics of the files selected by `paths`, and those files.
     fn check(&self, host: &FsHost, paths: &[String]) -> (Outcome, Vec<PathBuf>) {
         let mut sources = SourceMap::default();
+        timings::stage("Resolving project");
         let (project, roots) = match select(host, &mut sources, self.project.as_deref(), paths) {
             Ok(selected) => selected,
             Err(diagnostic) => {
@@ -85,8 +100,26 @@ impl CheckCommand {
                 );
             }
         };
+        // Projects select class-derived stages on RT. Persist that set of
+        // builtin interfaces, rather than checking std anew in every process.
+        let rt = project::stages_by_class(project.as_ref(), false);
+        timings::stage("Preparing compiler");
+        if let Err(diagnostic) = builtins::prepare_in(rt) {
+            return (
+                Outcome {
+                    sources,
+                    diagnostics: vec![diagnostic],
+                },
+                roots,
+            );
+        }
+        timings::stage("Checking Flick modules");
+        // one check keeps nothing: what it would keep is copied for no reader
+        let again = self.options.watch || self.options.fix;
+        let mut modules = self.modules.borrow_mut();
+        let kept = again.then_some(&mut *modules);
         let diagnostics = package_cache::with_saved(|saved| {
-            project::check_with(host, &mut sources, project.as_ref(), &roots, saved)
+            project::check_with(host, &mut sources, project.as_ref(), &roots, saved, kept)
         });
         (
             Outcome {

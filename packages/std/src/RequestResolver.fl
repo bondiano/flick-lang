@@ -1,6 +1,6 @@
-/// Effect's `RequestResolver`: answers `Request`s in batches. Its
-/// callbacks get the entries of a batch and complete each one with
-/// `Request.succeed`, `Request.fail` or `Request.complete`.
+/// A resolver answers `Request`s in batches. Its callbacks get the entries
+/// of a batch and complete each one with `Request.succeed`, `Request.fail`
+/// or `Request.complete`.
 module RequestResolver exposing (..)
 
 import Cache
@@ -54,49 +54,49 @@ type alias AsCacheOptions p (e : ErrorRow) a = {
 /// A resolver running `run_all` on each batch; a failure of it fails every
 /// entry the batch left incomplete.
 make : (NonEmpty.NonEmpty (Entry p e a) ->{; e} Unit) -> RequestResolver p e a
-foreign pure make from "@flick-lang/effect-ts/effect/RequestResolver" "flickMake"
+foreign pure make from "flick:RequestResolver" "flickMake"
   reviewed "effect@4.1.2 sha256:8be7e3d338c7b70f"
 
 /// A resolver batching as `options` say.
 make_with : MakeOptions p e a k -> RequestResolver p e a
-foreign pure make_with from "@flick-lang/effect-ts/effect/RequestResolver" "flickMakeWith"
+foreign pure make_with from "flick:RequestResolver" "flickMakeWith"
   reviewed "effect@4.1.2 sha256:7dcf8a2b5093b31f"
 
 /// A resolver splitting each batch by `key`, resolving each group apart.
 make_grouped : GroupedOptions p e a k -> RequestResolver p e a
-foreign pure make_grouped from "@flick-lang/effect-ts/effect/RequestResolver" "flickMakeGrouped"
+foreign pure make_grouped from "flick:RequestResolver" "flickMakeGrouped"
   reviewed "effect@4.1.2 sha256:823559a5e765d0e1"
 
 /// Answers each request with `f` of its entry.
 from_function : (Entry p e a -> a) -> RequestResolver p e a
-foreign pure from_function from "@flick-lang/effect-ts/effect/RequestResolver" "fromFunction"
+foreign pure from_function from "flick:RequestResolver" "fromFunction"
   reviewed "effect@4.1.2 sha256:e85962fb31771c92"
 
 /// Answers a batch with `f`, the answers in the order of the entries.
 from_function_batched : (NonEmpty.NonEmpty (Entry p e a) -> List a) -> RequestResolver p e a
-foreign pure from_function_batched from "@flick-lang/effect-ts/effect/RequestResolver" "fromFunctionBatched"
+foreign pure from_function_batched from "flick:RequestResolver" "fromFunctionBatched"
   reviewed "effect@4.1.2 sha256:166c17dc50686483"
 
 /// Answers each request with what `f` of its entry computes.
 from_effect : (Entry p e a ->{; e} a) -> RequestResolver p e a
-foreign pure from_effect from "@flick-lang/effect-ts/effect/RequestResolver" "fromEffect"
+foreign pure from_effect from "flick:RequestResolver" "fromEffect"
   reviewed "effect@4.1.2 sha256:960a9c0639ba8a97"
 
 /// A resolver that never completes its requests.
 never : RequestResolver p e a
-foreign pure never from "@flick-lang/effect-ts/effect/RequestResolver" "never"
+foreign pure never from "flick:RequestResolver" "never"
   reviewed "effect@4.1.2 sha256:d27d748f8d3e9bf6"
 
 /// `resolver`, running `delay` before it takes a batch; the batch takes
 /// the requests made until then.
 set_delay_effect : Eff none none Unit -> RequestResolver p e a -> RequestResolver p e a
-foreign pure set_delay_effect from "@flick-lang/effect-ts/effect/RequestResolver" "flickSetDelayEffect"
+foreign pure set_delay_effect from "flick:RequestResolver" "flickSetDelayEffect"
   arity 1
   reviewed "effect@4.1.2 sha256:6c1100a6701ba6e1"
 
 /// `resolver`, waiting `duration` before it takes a batch.
 set_delay : Duration.Duration -> RequestResolver p e a -> RequestResolver p e a
-foreign pure set_delay from "@flick-lang/effect-ts/effect/RequestResolver" "setDelay"
+foreign pure set_delay from "flick:RequestResolver" "setDelay"
   arity 1
   reviewed "effect@4.1.2 sha256:3eb4df251630feb8"
 
@@ -107,43 +107,43 @@ around :
   (NonEmpty.NonEmpty (Entry p e a) -> b ->{; e} x) ->
   RequestResolver p e a ->
   RequestResolver p e a
-foreign pure around from "@flick-lang/effect-ts/effect/RequestResolver" "around"
+foreign pure around from "flick:RequestResolver" "around"
   arity 2
   reviewed "effect@4.1.2 sha256:3690926b82cc0631"
 
 /// `resolver`, taking at most `n` entries per batch.
 batch_n : Int -> RequestResolver p e a -> RequestResolver p e a
-foreign pure batch_n from "@flick-lang/effect-ts/effect/RequestResolver" "batchN"
+foreign pure batch_n from "flick:RequestResolver" "batchN"
   arity 1
   reviewed "effect@4.1.2 sha256:67fe3934c2dd14ce"
 
 /// `resolver`, batching apart the entries of a different `key`.
 grouped : (Entry p e a -> k) -> RequestResolver p e a -> RequestResolver p e a
-foreign pure grouped from "@flick-lang/effect-ts/effect/RequestResolver" "grouped"
+foreign pure grouped from "flick:RequestResolver" "grouped"
   arity 1
   reviewed "effect@4.1.2 sha256:521254476cb4191e"
 
 /// Both resolvers on each batch; the first to complete an entry wins.
 race : RequestResolver p e a -> RequestResolver p e a -> RequestResolver p e a
-foreign pure race from "@flick-lang/effect-ts/effect/RequestResolver" "race"
+foreign pure race from "flick:RequestResolver" "race"
   arity 1
   reviewed "effect@4.1.2 sha256:120a8182420ce1c4"
 
 /// `resolver`, each batch in a span of the name.
 with_span : String -> Tracer.SpanOptions -> RequestResolver p e a -> RequestResolver p e a
-foreign pure with_span from "@flick-lang/effect-ts/effect/RequestResolver" "flickWithSpan"
+foreign pure with_span from "flick:RequestResolver" "flickWithSpan"
   arity 2
   reviewed "effect@4.1.2 sha256:4c17810d32197f83"
 
 /// `resolver`, answering a request equal to a cached one from the cache.
 with_cache : CacheOptions -> RequestResolver p e a ->{} RequestResolver p e a
-foreign effect with_cache from "@flick-lang/effect-ts/effect/RequestResolver" "flickWithCache"
+foreign effect with_cache from "flick:RequestResolver" "flickWithCache"
   arity 1
   reviewed "effect@4.1.2 sha256:14012ddb32f4d7a9"
 
 /// A `Cache` whose lookup of a request runs it through `resolver`.
 as_cache :
   AsCacheOptions p e a -> RequestResolver p e a ->{} Cache.Cache (Request.Request p e a) e a
-foreign effect as_cache from "@flick-lang/effect-ts/effect/RequestResolver" "flickAsCache"
+foreign effect as_cache from "flick:RequestResolver" "flickAsCache"
   arity 1
   reviewed "effect@4.1.2 sha256:78dc436fe8ad9afb"

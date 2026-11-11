@@ -7,7 +7,7 @@ import {
   Cause,
   type Duration,
   Effect,
-  type Exit,
+  Exit,
   FileSystem,
   Option,
   PlatformError,
@@ -26,9 +26,15 @@ import { constructorName, tag } from "@flick-lang/runtime/tags";
 import { effectFileSystem, info, nativeFileSystem } from "./FileSystem.ts";
 import { toFlick } from "./PlatformError.ts";
 import { nativeStdio } from "./Stdio.ts";
+import { callEffect, causeFromEffect, inNativeRuntime } from "../bridge.ts";
+import { fromQueue } from "./StreamQueue.ts";
+import { Queue as NativeQueue, end as nativeEnd } from "@flick-lang/runtime/rt/effect/Queue";
 
 export * from "effect/Stream";
 export { flickStreamWithExecutionPlan } from "./ExecutionPlan.ts";
+
+export { flickToQueue, fromQueue, partitionQueue, runIntoQueue } from "./StreamQueue.ts";
+
 
 type Strategy = "suspend" | "dropping" | "sliding";
 
@@ -89,9 +95,27 @@ export const flickUnwrap = <A, E, R, E2, R2>(
   effect: Effect.Effect<Stream.Stream<A, E2, R2>, E, R>,
 ): Stream.Stream<A, E | E2, R | R2> => Stream.flatten(Stream.fromEffect(effect));
 
+/** Elements of a Flick stream may be kernel tasks; run those on the kernel. */
+export const flattenEffect = (self: Stream.Stream<Effect.Effect<unknown, unknown, unknown> | (() => unknown)>): Stream.Stream<unknown, unknown, unknown> =>
+  Stream.mapEffect(self, (task) => typeof task === "function"
+    ? callEffect(() => task())
+    : task);
+
 export const flickCallback = <A, E, R>(
   producer: (queue: Queue.Queue<A, E | Cause.Done>) => Effect.Effect<unknown, E, R>,
-): Stream.Stream<A, E, R> => inOuterScope((outer) => Stream.callback<A, E, R>((queue) => outer(producer(queue))));
+): Stream.Stream<A, E, R> => inOuterScope((outer) => Stream.unwrap(Effect.flatMap(inNativeRuntime, (native) => native
+  ? Effect.map(Effect.gen(function* () {
+      const queue = new NativeQueue(Infinity, "suspend");
+      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the callback comes from generated Flick code in this branch
+      const nativeProducer = producer as unknown as (queue: NativeQueue) => Effect.Effect<unknown, E, R>;
+      yield* Effect.forkScoped(Effect.flatMap(Effect.exit(outer(nativeProducer(queue))), (exit) => Effect.sync(() => {
+        if (Exit.isSuccess(exit)) nativeEnd(queue);
+        else queue.failCause(causeFromEffect(exit.cause));
+      })));
+      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the native queue carries A and E from the callback
+      return fromQueue(queue) as Stream.Stream<A, E, R>;
+    }), (stream): Stream.Stream<A, E, R> => stream)
+  : Effect.succeed(Stream.callback<A, E, R>((queue) => outer(producer(queue)))))));
 
 export const flickFailCause = <E>(failure: Failure): Stream.Stream<never, E> => Stream.failCause(failureCause<E>(failure));
 
@@ -330,11 +354,6 @@ export const flickToPubSub =
   (options: SplitOptions) =>
   <A, E, R>(self: Stream.Stream<A, E, R>) =>
     Stream.toPubSub(self, splitOf(options));
-
-export const flickToQueue =
-  (options: BufferOptions) =>
-  <A, E, R>(self: Stream.Stream<A, E, R>) =>
-    Stream.toQueue(self, bufferOf(options));
 
 export const flickDecodeText = <E, R>(self: Stream.Stream<ReadonlyArray<number>, E, R>): Stream.Stream<string, E, R> =>
   Stream.decodeText(toBytes(self));

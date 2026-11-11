@@ -1,5 +1,5 @@
-/// Effect's `Differ`: the difference of two values as a patch `p`, and the
-/// patch applied to a value. `json_patch` makes one from a codec.
+/// A differ gives the difference of two values as a patch `p`, and applies
+/// a patch to a value. `json_patch` makes one from a codec.
 module Differ exposing (..)
 
 /// Computes, combines and applies patches `p` of values `a`.
@@ -7,25 +7,25 @@ type Differ a p
 
 /// The patches of the values' JSON form, as an RFC 6902 JSON Patch.
 json_patch : PureCodec Json a -> Differ a Json
-foreign pure json_patch from "@flick-lang/effect-ts/effect/Schema" "toDifferJsonPatch"
+foreign pure json_patch from "flick:Schema" "toDifferJsonPatch"
   reviewed "effect@4.1.2 sha256:6ee0092548812edc"
 
 /// The patch that changes nothing.
 empty : Differ a p -> p
-foreign pure empty from "@flick-lang/effect-ts/effect/Differ" "flickEmpty"
+foreign pure empty from "flick:Differ" "flickEmpty"
   reviewed "effect@4.1.2 sha256:af39eb13bd979141"
 
 /// The patch from `old` to `new`.
 diff : a -> a -> Differ a p -> p
-foreign pure diff from "@flick-lang/effect-ts/effect/Differ" "flickDiff"
+foreign pure diff from "flick:Differ" "flickDiff"
   reviewed "effect@4.1.2 sha256:af39eb13bd979141"
 
 /// The first patch, then the second.
 combine : p -> p -> Differ a p -> p
-foreign pure combine from "@flick-lang/effect-ts/effect/Differ" "flickCombine"
+foreign pure combine from "flick:Differ" "flickCombine"
   reviewed "effect@4.1.2 sha256:af39eb13bd979141"
 
 /// The value with the patch applied; a patch that does not fit is a defect.
 patch : a -> p -> Differ a p -> a
-foreign pure patch from "@flick-lang/effect-ts/effect/Differ" "flickPatch"
+foreign pure patch from "flick:Differ" "flickPatch"
   reviewed "effect@4.1.2 sha256:af39eb13bd979141"

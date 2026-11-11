@@ -1,5 +1,5 @@
 //! The rules of `docs/formal/core.md` §2.3 that are not handlers: (Var),
-//! (Lam), (App), the `let`s, records and fields, with (Sub) where an
+//! (Lam), (App), records and fields (the `let`s are `bindings.rs`), with (Sub) where an
 //! expression meets the type it is checked against. Γ₀ (§1.5) is
 //! `constant`.
 
@@ -7,6 +7,8 @@ use std::collections::BTreeMap;
 use std::mem;
 use std::rc::Rc;
 
+use super::dicts::at_args;
+use super::regions::live_stage;
 use super::{Check, Checker, error};
 use crate::syntax::{Head, Lit, Name, Path, Term};
 use crate::types::{Caps, Fields, Kind, Row, Scheme, Stage, Type, Var};
@@ -41,6 +43,22 @@ pub(super) fn runtime(r: Row, e: Row) -> Stage {
 impl Checker<'_> {
     /// `Γ ⊢ e : τ ! φ`, `φ` joined into `self.stage`.
     pub(super) fn infer(&mut self, e: &Term) -> Check<Type> {
+        let t = self.infer_node(e)?;
+        if self.trace.is_some() {
+            let instance = self
+                .instanced
+                .take()
+                .filter(|_| matches!(e, Term::Var(_) | Term::Global(_)));
+            let inferred = t.clone();
+            self.note(e, |n| {
+                n.inferred = Some(inferred);
+                n.instance = n.instance.take().or(instance);
+            });
+        }
+        Ok(t)
+    }
+
+    fn infer_node(&mut self, e: &Term) -> Check<Type> {
         match e {
             Term::Var(x) => self.var(x),
             Term::Global(p) => self.global(p),
@@ -76,16 +94,22 @@ impl Checker<'_> {
             Term::Try(body, arms) => self.try_(body, arms, None),
             Term::Provide(l, body) => self.provide(l, body, None),
             Term::Handler(h) => self.handler(h, None),
-            Term::Apply(Head::Con(c), args) if args.len() == c.arity => self.construct(c, args),
+            Term::Apply(Head::Con(c), args) if args.len() == c.arity => {
+                self.construct(c, args.iter(), e)
+            }
             Term::Apply(head, args) => {
                 let t = match head {
                     Head::Con(c) => self.constructor(&c.ty.module, &c.name)?,
                     Head::Const(c) => self.constant(c)?,
                 };
-                args.iter().try_fold(t, |t, a| self.apply(&t, a))
+                self.note_instance(e);
+                self.call(|c| args.iter().try_fold(t, |t, a| c.apply(&t, a)))
             }
             Term::Scope(s, body) => self.scope(s, body, None),
-            Term::Tag(s) => Ok(Type::Tag(Row::one(s.clone()))),
+            Term::Tag(s) => {
+                let (vars, row) = self.service_row(s);
+                Ok(self.instantiate(&Scheme::new(vars, Type::Tag(row))))
+            }
             Term::Structural(class, fields) => {
                 let t = self.fresh();
                 let d = Type::Dict(Path::new("Prelude", class), Rc::from([t]));
@@ -102,6 +126,10 @@ impl Checker<'_> {
     /// `Γ ⊢ e : τ'` with `τ ≤ τ'` (Sub): the expected type is pushed into
     /// λs, `let` bodies and arms, where it fixes stages and parameters.
     pub(super) fn check(&mut self, e: &Term, expected: &Type) -> Check<()> {
+        if self.trace.is_some() {
+            let expected = expected.clone();
+            self.note(e, |n| n.expected = Some(expected));
+        }
         let full = self.follow(expected);
         let expected = self.resolve(&full);
         match (e, &expected) {
@@ -113,18 +141,23 @@ impl Checker<'_> {
             (Term::Lam(x, body), Type::Fun(p, s, r)) => {
                 let outer = mem::replace(&mut self.stage, Stage::Pure);
                 self.locals.push((x.clone(), mono((**p).clone())));
-                let checked = self.check(body, r);
+                let checked = self.declaring(Some(s), |c| c.check(body, r));
                 self.locals.pop();
                 let inner = mem::replace(&mut self.stage, outer);
                 checked?;
-                self.stage_within(&inner, s)?;
-                let qualifier = self.qualifier(&full);
-                self.close_over(e, expected.clone(), Some(qualifier));
-                Ok(())
+                self.close_within(&expected, &inner, s, Some(&full))
+                    .map(drop)
             }
             (Term::Scope(s, body), _) => self.scope(s, body, Some(&full)).map(drop),
+            // (List) against a bare `List τ`: each element against `τ`, so
+            // (Sub) may widen it, as `[text "x"] : List (Ui^c)`
+            (Term::List(xs), Type::App(h, t))
+                if matches!(full, Type::App(..)) && **h == prelude("List") =>
+            {
+                xs.iter().try_for_each(|x| self.check(x, t))
+            }
             (Term::Apply(Head::Con(c), args), _) if args.len() == c.arity => {
-                let t = self.construct(c, args)?;
+                let t = self.construct(c, args.iter(), e)?;
                 self.subsume(&t, &full)
             }
             (Term::Let(x, sig, e1, e2), _) => {
@@ -179,9 +212,15 @@ impl Checker<'_> {
     }
 
     /// (Let-Sig) against `(∀ᾱ. τ)^C`: the value has `τ^C`.
-    fn check_qualified_forall(&mut self, e: &Term, s: &Scheme, qualifier: Caps) -> Check<()> {
+    pub(super) fn check_qualified_forall(
+        &mut self,
+        e: &Term,
+        s: &Scheme,
+        qualifier: Caps,
+    ) -> Check<()> {
         let (facts, givens) = (self.regions.facts.len(), self.givens());
-        let mut body = self.skolemize(s);
+        let (mut body, rigid) = self.skolemize(s);
+        self.note(e, |n| n.rigid = Some(rigid));
         if !qualifier.is_empty() {
             body = Type::Captured(Rc::new(body), qualifier);
         }
@@ -208,7 +247,7 @@ impl Checker<'_> {
         match self.locals.iter().rev().find(|(n, _)| &**n == x) {
             Some((_, s)) => {
                 let s = s.clone();
-                Ok(self.instantiate(&s))
+                Ok(self.instance_of(s))
             }
             None => error("Var", format!("`{x}` is not bound")),
         }
@@ -223,18 +262,34 @@ impl Checker<'_> {
             .or_else(|| self.decls.instances.get(p));
         match s {
             Some(s) => {
-                let s = s.clone();
-                Ok(self.instantiate(&s))
+                let s = self.live_scheme(s);
+                Ok(self.instance_of(s))
             }
             None => error("Var", format!("no type for `{p}`")),
         }
+    }
+
+    /// The instance just taken, on the node of `e`.
+    pub(super) fn note_instance(&mut self, e: &Term) {
+        if let Some(i) = self.instanced.take() {
+            self.note(e, |n| n.instance = Some(i));
+        }
+    }
+
+    /// An instance of `s`, which the trace keeps with the scheme.
+    pub(super) fn instance_of(&mut self, s: Scheme) -> Type {
+        let (t, insts) = self.instantiate_with(&s);
+        if self.trace.is_some() {
+            self.instanced = Some((s, insts));
+        }
+        t
     }
 
     pub(super) fn constructor(&mut self, module: &str, name: &str) -> Check<Type> {
         match self.decls.constructors.get(&Path::new(module, name)) {
             Some(s) => {
                 let s = s.clone();
-                Ok(self.instantiate(&s))
+                Ok(self.instance_of(s))
             }
             None => error("Var", format!("no constructor `{module}.{name}`")),
         }
@@ -246,11 +301,10 @@ impl Checker<'_> {
         let p = self.fresh();
         let outer = mem::replace(&mut self.stage, Stage::Pure);
         self.locals.push((x.clone(), mono(p.clone())));
-        let r = self.infer(body);
+        let r = self.declaring(None, |c| c.infer(body));
         self.locals.pop();
         let inner = mem::replace(&mut self.stage, outer);
-        let lam = Term::Lam(x.clone(), Rc::new(body.clone()));
-        Ok(self.close_over(&lam, Type::fun(p, inner, r?), None))
+        Ok(Type::fun(p, inner, r?))
     }
 
     /// (App): `φ₁ ⊔ φ₂ ⊔ φ`. A callee of unknown type is a pure arrow (`docs/formal/core.md#a-callee-of-unknown-type-is-a-pure-arrow`).
@@ -259,27 +313,38 @@ impl Checker<'_> {
         if let (true, Term::Lam(x, body)) = (self.config, f) {
             return self.redex(x, body, a, None);
         }
-        let mut args = vec![a.clone()];
+        let mut args = vec![a];
         let mut head = f;
         while let Term::App(g, b) = head {
-            args.push((**b).clone());
+            args.push(b);
             head = g;
         }
+        args.reverse();
         if let Term::Apply(Head::Con(c), given) = head
             && given.len() + args.len() == c.arity
         {
-            args.reverse();
-            let all: Vec<Term> = given.iter().cloned().chain(args).collect();
-            return self.construct(c, &all);
+            // the fields themselves, not copies: the trace is by address
+            return self.construct(c, given.iter().chain(args), head);
         }
-        let t = self.infer(f)?;
-        self.apply(&t, a)
+        // the spine is one call
+        self.call(|c| {
+            let (t, rest) = match head {
+                Term::Lam(x, body) if c.config => (c.redex(x, body, args[0], None)?, &args[1..]),
+                _ => (c.infer(head)?, &args[..]),
+            };
+            rest.iter().try_fold(t, |t, a| c.apply(&t, a))
+        })
     }
 
     pub(super) fn apply(&mut self, f: &Type, a: &Term) -> Check<Type> {
         match self.resolve(f) {
             Type::Fun(p, s, r) => {
-                self.check(a, &p)?;
+                if matches!(self.resolve(&p), Type::Eff(..)) {
+                    self.task_argument(|c| c.check(a, &p))?;
+                } else {
+                    self.check(a, &p)?;
+                }
+                let s = live_stage(&s, &self.qualifier(f));
                 self.perform(&s)?;
                 Ok((*r).clone())
             }
@@ -301,102 +366,6 @@ impl Checker<'_> {
                 ),
             ),
         }
-    }
-
-    /// (Let-Gen), (Let-Mono) and (Let-Sig).
-    fn let_(
-        &mut self,
-        x: &Name,
-        sig: Option<&Scheme>,
-        e1: &Term,
-        e2: &Term,
-        expected: Option<&Type>,
-    ) -> Check<Type> {
-        let s = if let Some(s) = sig {
-            let s = self.local_signature(s);
-            let (bare, qualifier) = match &s.body {
-                Type::Captured(t, c) => ((**t).clone(), c.clone()),
-                t => (t.clone(), Caps::default()),
-            };
-            let bare = Scheme {
-                body: bare,
-                ..s.clone()
-            };
-            self.check_qualified_forall(e1, &bare, qualifier)?;
-            s
-        } else {
-            self.level += 1;
-            let outer = mem::replace(&mut self.stage, Stage::Pure);
-            let t1 = self.infer(e1);
-            let inner = mem::replace(&mut self.stage, outer);
-            self.level -= 1;
-            let t1 = t1?;
-            if inner == Stage::Pure {
-                self.generalize(&t1)
-            } else {
-                // the result of a runtime step is not generalized, by a
-                // later `let` either
-                self.perform(&inner)?;
-                self.lower(&t1, self.level);
-                mono(t1)
-            }
-        };
-        self.body(x, s, e2, expected)
-    }
-
-    fn body(&mut self, x: &Name, s: Scheme, e2: &Term, expected: Option<&Type>) -> Check<Type> {
-        self.locals.push((x.clone(), s));
-        let t = match expected {
-            Some(t) => self.check(e2, t).map(|()| t.clone()),
-            None => self.infer(e2),
-        };
-        self.locals.pop();
-        t
-    }
-
-    /// A local signature of a function: its own qualifier is inferred, a
-    /// fresh capture row, unless written (`regions.md` §2.6, `docs/formal/regions.md#local-signatures-infer-only-the-outer-qualifier`).
-    fn local_signature(&mut self, s: &Scheme) -> Scheme {
-        let s = &self.in_scopes(s);
-        match &s.body {
-            Type::Fun(..) => {
-                let q = self.fresh_caps();
-                Scheme {
-                    body: Type::Captured(Rc::new(s.body.clone()), q),
-                    ..s.clone()
-                }
-            }
-            _ => s.clone(),
-        }
-    }
-
-    /// (Let-Rec): without a signature the recursive calls are monomorphic.
-    pub(super) fn let_rec(
-        &mut self,
-        f: &Name,
-        sig: Option<&Scheme>,
-        lam: &Term,
-        e2: &Term,
-        expected: Option<&Type>,
-    ) -> Check<Type> {
-        let s = if let Some(s) = sig {
-            let s = &self.in_scopes(s);
-            self.locals.push((f.clone(), s.clone()));
-            let checked = self.check_forall(lam, s);
-            self.locals.pop();
-            checked?;
-            s.clone()
-        } else {
-            self.level += 1;
-            let t = self.fresh();
-            self.locals.push((f.clone(), mono(t.clone())));
-            let inferred = self.infer(lam);
-            self.locals.pop();
-            self.level -= 1;
-            self.unify(&t, &inferred?)?;
-            self.generalize(&t)
-        };
-        self.body(f, s, e2, expected)
     }
 
     /// (Rec): distinct labels, an exact record.
@@ -446,7 +415,8 @@ impl Checker<'_> {
             }
             Type::Impl(r) => {
                 let s = self.service(&r)?;
-                let op = self.decls.operation(&s, l).cloned();
+                let args = self.zonk_row(&r).elems[&s].clone();
+                let op = self.decls.operation(&s, l).map(|op| at_args(op, &args));
                 match op {
                     Some(op) => Ok(self.instantiate(&op)),
                     None => error("Field", format!("`{}` has no operation `{l}`", s.name)),

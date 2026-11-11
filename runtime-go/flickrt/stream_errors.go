@@ -1,11 +1,11 @@
 package flickrt
 
-// How a stream fails and what runs around it, as Effect's (Stream.ts):
-// recovery, taps, finalizers, retries, services and spans, and their
-// bindings. A cause reaches Flick as a `Failure`, a defect as a `Failure`
-// of the defect alone, as the JS adapter gives them.
+// How a stream fails and what runs around it: recovery, taps, finalizers,
+// retries, services and spans, and their bindings. A cause reaches Flick
+// as a `Failure`, a defect as a `Failure` of the defect alone, as the JS
+// adapter gives them.
 
-// findDefect is Effect's `Cause.findDefect`: the first defect of a cause.
+// findDefect is the first defect of a cause.
 func findDefect(c *Cause) *Cause {
 	for _, r := range c.reasons() {
 		if r.kind == causeDie {
@@ -103,8 +103,7 @@ func StreamOrElseSucceed(f, s Value) Value {
 	})
 }
 
-// StreamOrDie is Effect's `catch(self, die)`: the first typed error a
-// defect.
+// StreamOrDie makes the first typed error a defect.
 func StreamOrDie(s Value) Value {
 	return streamCatchError(streamOf(s), func(_ *Fiber, err Value) *Stream {
 		return streamFailCause(dieOf(err))
@@ -157,7 +156,7 @@ func StreamUpdateService(key, f, s Value) Value {
 	return onChannel(s, func(c *Channel) *Channel { return channelOf(ChannelUpdateService(key, f, c)) })
 }
 
-// StreamWithSpan opens the span with the options Effect defaults to.
+// StreamWithSpan opens the span with the default options.
 func StreamWithSpan(name, s Value) Value {
 	return onChannel(s, func(c *Channel) *Channel {
 		return channelWithSpan(c, name, Rec("parent", None, "root", false))

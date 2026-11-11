@@ -9,6 +9,7 @@ use crate::source::{FileId, Span};
 use crate::syntax::cst::{Node, Token, foreign_words};
 use crate::syntax::kind::SyntaxKind as K;
 use crate::syntax::literal::string_value;
+use crate::syntax::patterns::binders;
 
 #[derive(Debug, Clone)]
 pub(super) struct Def {
@@ -71,7 +72,12 @@ fn declaration(decl: &Node, text: &str, file: FileId, defs: &mut Vec<Def>) {
                 }
             }
         }
-        K::TypeDecl | K::KindDecl | K::ErrorDecl | K::ServiceDecl | K::ClassDecl => {
+        K::TypeDecl
+        | K::ModuleTypeDecl
+        | K::KindDecl
+        | K::ErrorDecl
+        | K::ServiceDecl
+        | K::ClassDecl => {
             let Some(name) = first(K::Con) else { return };
             let parent = name.text(text);
             let variants: Vec<Token> = decl
@@ -85,6 +91,7 @@ fn declaration(decl: &Node, text: &str, file: FileId, defs: &mut Vec<Def>) {
                 K::TypeDecl if !variants.is_empty() => Decl::Adt,
                 K::TypeDecl if decl.has_token(K::Eq) => Decl::Alias,
                 K::TypeDecl => Decl::Abstract,
+                K::ModuleTypeDecl => Decl::ModuleType,
                 K::KindDecl => Decl::Kind,
                 K::ErrorDecl => Decl::Error,
                 K::ServiceDecl => Decl::Service,
@@ -151,26 +158,6 @@ fn foreign(
         ),
         ..def
     })
-}
-
-/// Names a pattern binds, in source order.
-pub(super) fn binders(pattern: &Node, out: &mut Vec<Token>) {
-    match pattern.kind {
-        K::VarPat => out.extend(pattern.child_tokens().find(|t| t.kind == K::Ident)),
-        K::RecordPatField if !pattern.has_token(K::Eq) => {
-            out.extend(pattern.child_tokens().find(|t| t.kind == K::Ident));
-        }
-        // a type annotation inside a pattern binds nothing
-        _ => {
-            for child in pattern.nodes().filter(|n| is_pattern(n.kind)) {
-                binders(child, out);
-            }
-        }
-    }
-}
-
-pub(super) fn is_pattern(kind: K) -> bool {
-    (K::WildcardPat..=K::OrPat).contains(&kind) || kind == K::RecordPatField
 }
 
 /// A second definition of a name in the same namespace.
@@ -341,3 +328,5 @@ pub(crate) fn shortest_cycle(start: usize, edges: &[Vec<usize>]) -> Option<Vec<u
     }
     None
 }
+
+include!("module_cycles.rs");

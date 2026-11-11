@@ -6,9 +6,9 @@ import (
 )
 
 // Schema.arbitrary: values of a schema for property tests, drawn by its
-// structure as the JS runtime's generator walks the Effect AST of the
-// schema, one draw of a size at each node above depth 4. A refinement, or
-// a type without a structure, needs an explicit generator.
+// structure as the JS runtime's generator walks the AST of the schema, one
+// draw of a size at each node above depth 4. A refinement, or a type
+// without a structure, needs an explicit generator.
 
 func needsGenerator(what string) {
 	panic(Defect{"RangeError: Schema.arbitrary: " + what + " needs an explicit generator (Schema.with_generator)"})
@@ -40,7 +40,7 @@ func drawSchema(fb *Fiber, r rng, s *Schema, depth int) Value {
 	case kindInt:
 		needsGenerator("a check")
 	case kindRefined:
-		// Effect's checks of nested refinements run from the innermost one
+		// the checks of nested refinements run from the innermost one
 		inner := s
 		for inner.item.kind == kindRefined {
 			inner = inner.item
@@ -50,7 +50,7 @@ func drawSchema(fb *Fiber, r rng, s *Schema, depth int) Value {
 		if e, ok := s.jsonOf().(*enumCodec); ok {
 			return drawEnum(r, e, depth)
 		}
-		// shortcut: a codec's decoded side says it needs a generator, as Effect's declarations do, though JS generates the decoded side of some codecs (strings); walk the codec's type when a program draws from one
+		// shortcut: a codec's decoded side says it needs a generator, as a declaration does, though JS generates the decoded side of some codecs (strings); walk the codec's type when a program draws from one
 		if s.needs == "" {
 			needsGenerator("a declared type")
 		}
@@ -89,7 +89,7 @@ func drawSchema(fb *Fiber, r rng, s *Schema, depth int) Value {
 		}
 		return out
 	case kindRecord:
-		// drawn in key order, as Effect lists the properties of a struct
+		// drawn in key order, the order of the properties of a struct
 		label := make([]int, len(s.items))
 		for i := range label {
 			label[i] = i
@@ -129,8 +129,8 @@ func drawSchema(fb *Fiber, r rng, s *Schema, depth int) Value {
 	return nil
 }
 
-// drawVariant is a value of a variant type: Effect's union of structs of a
-// `_tag` and the fields, a variant without fields past depth 3.
+// drawVariant is a value of a variant type: a union of structs of a `_tag`
+// and the fields, a variant without fields past depth 3.
 func drawVariant(fb *Fiber, r rng, s *Schema, depth int) Value {
 	choices := s.variants
 	if depth > 3 {

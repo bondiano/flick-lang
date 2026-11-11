@@ -3,7 +3,7 @@ package flickrt
 import "testing"
 
 // TestIsaacMatchesEffect checks draws 0, 1, 255 and 299 of seeded
-// generators against Effect's `Random.withSeed` on Node.
+// generators against `Random.withSeed` of the Effect library on Node.
 func TestIsaacMatchesEffect(t *testing.T) {
 	cases := []struct {
 		name string

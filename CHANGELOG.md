@@ -6,19 +6,46 @@ break programs.
 
 ## Unreleased
 
-- **Local variables:** `let mut name = value` declares a variable of a function
-  and `name = value` assigns it; a pure function may assign its variables.
-  A variable has one type, fixed where it is declared, which a `scope` cannot
-  give its region (`FLICK-G002`/`G001`). A function, `task`, lazy `for`, `do`
-  block or arm of a handler of operations inside the function cannot use one
-  (`FLICK-G005`), the body of `try … with` and loops do not assign one from
-  outside yet (`FLICK-T061`), an assignment to another name is `FLICK-T060`,
-  `mut` elsewhere `FLICK-S016`, and a `mut` never assigned the warning
-  `FLICK-R017`. `mut` is a keyword now: a program that names something `mut`
-  renames it. The IR is 0.5.0: `Stmt::Var`, `Stmt::Assign` and `ExprKind::Var`;
-  a plugin's pass over the IR reads and writes them. JavaScript and Go assign
-  in place, and the model and the new Lean theorem T7 read a variable by
-  passing its values along.
+- **Serializable atoms on Flick's runtime:** `Atom.serializable`,
+  `serializable_family`, `serializable_task` and `serializable_result` run on
+  the default runtime. `Ui.Server.state` hands their values to the client, and
+  `Ui.Dom.mount` starts from them, without running a hydrated task again. A
+  program that uses them no longer needs `@flick-lang/effect-ts`, and its UI
+  stays on the runtime unless it streams server markup.
+- **Local mutation and loops:** `let mut name = value` declares a local
+  monomorphic variable and `name = value` assigns it. Pure functions may
+  change their variables; nested functions, tasks and lazy sequences cannot
+  capture them (`FLICK-G005`). `loop { … }` returns its `break value`;
+  `while condition do body` and `for … do` return `Unit`. `continue` starts
+  the next iteration. Exits target the nearest loop and close scopes normally.
+  Completed assignments survive an error in `try`; an error in the right-hand
+  side leaves its target unchanged. Assigning an immutable name is
+  `FLICK-T069`, mutation in a strict comprehension is `FLICK-T070`, invalid
+  loop control is `FLICK-T071`, and unused `mut` is `FLICK-R020`.
+  `loop` and `while` are contextual words, preserving `Loop.loop` and
+  `Schedule.while`. IR 0.7.0 adds variables and explicit sequential loops.
+
+- **Watching:** `flick dev`, `flick test --watch` and `--watch` start a run
+  once the watched files settle, so a save that truncates a file and then
+  writes it is built once and `dev` restarts the app once for it.
+
+- **HTTP request ownership:** each request owns its resources through response
+  streaming. Closing a server stops admission before outer resources are
+  released, interrupts requests left after the grace period and waits for
+  their finalizers on native JS, Effect and Go. Cleanup and uninterruptible
+  work may outlast that period. Go now applies the documented 20-second
+  default and distinguishes an immediate timeout from an infinite one.
+
+- **Regions by use:** the checker asks where a value uses a region, not what
+  it holds, everywhere: a value may keep a handle past its `scope` while
+  nothing uses it there, and a use there is `FLICK-G002`. The `captures`
+  discipline, the `[build] regions` key and the `flick live` code-block tag
+  are gone; `.iface` version 12. `Setup s` keeps an instance's region live,
+  a handler of a region-indexed service needs its region live where it is
+  installed, and lifecycle work outlives its instance (`Lifecycle s`). The
+  reference model and the Lean development have one typing judgment, by use,
+  with T4′ as their region safety theorem.
+
 - **Opt-in implicit conversions:** `@implicit` marks a ground, context-free
   instance of a class with one pure `a -> b` method. A unique visible
   conversion is inserted at a ground nominal type mismatch, without chains

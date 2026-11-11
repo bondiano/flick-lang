@@ -7,7 +7,7 @@ import (
 	"strings"
 )
 
-// Effect's integer and number prompts: the typed text is kept as JS's
+// The integer and number prompts: the typed text is kept as JS's
 // `parseInt` and `parseFloat` read it.
 
 type promptNumberState struct {

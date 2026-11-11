@@ -257,8 +257,15 @@ macro_rules! wit_conversions {
                 }
             }
 
+            pub fn to_structure(s: &$crate::Structure) -> w::Structure {
+                w::Structure { lines: s.lines, complexity: s.complexity, nesting: s.nesting.iter().map(|n| w::Nesting { span: to_span(n.span), depth: n.depth }).collect(), max_lines: s.max_lines, max_complexity: s.max_complexity, max_nesting: s.max_nesting }
+            }
+            pub fn from_structure(s: w::Structure) -> $crate::Structure {
+                $crate::Structure { lines: s.lines, complexity: s.complexity, nesting: s.nesting.into_iter().map(|n| $crate::Nesting { span: from_span(n.span), depth: n.depth }).collect(), max_lines: s.max_lines, max_complexity: s.max_complexity, max_nesting: s.max_nesting }
+            }
+
             pub fn to_fact(f: &$crate::Fact) -> w::Fact {
-                let ty = |t: &$crate::FactType| w::FactType { shown: t.shown.clone(), exact: t.exact.clone(), literal_of: t.literal_of.clone() };
+                let ty = to_type;
                 w::Fact {
                     span: to_span(f.span),
                     ty: ty(&f.ty),
@@ -267,7 +274,7 @@ macro_rules! wit_conversions {
             }
 
             pub fn from_fact(f: w::Fact) -> $crate::Fact {
-                let ty = |t: w::FactType| $crate::FactType { shown: t.shown, exact: t.exact, literal_of: t.literal_of };
+                let ty = from_type;
                 $crate::Fact {
                     span: from_span(f.span),
                     ty: ty(f.ty),
@@ -275,77 +282,8 @@ macro_rules! wit_conversions {
                 }
             }
 
-            pub fn to_call_site(c: &$crate::CallSite) -> w::CallSite {
-                w::CallSite {
-                    module: c.module.clone(),
-                    name: c.name.clone(),
-                    span: to_span(c.span),
-                    arguments: c.arguments.iter().map(to_argument).collect(),
-                    refinement: c.refinement.as_ref().map(to_refinement),
-                }
-            }
+            $crate::wit_call_conversions!();
 
-            pub fn from_call_site(c: w::CallSite) -> $crate::CallSite {
-                $crate::CallSite {
-                    module: c.module,
-                    name: c.name,
-                    span: from_span(c.span),
-                    arguments: c.arguments.into_iter().map(from_argument).collect(),
-                    refinement: c.refinement.map(from_refinement),
-                }
-            }
-
-            fn to_argument(a: &$crate::Argument) -> w::Argument {
-                let ty = |t: &$crate::FactType| w::FactType { shown: t.shown.clone(), exact: t.exact.clone(), literal_of: t.literal_of.clone() };
-                w::Argument {
-                    span: to_span(a.span),
-                    ty: ty(&a.ty),
-                    fields: a.fields.as_ref().map(|fs| fs.iter().map(|x| w::FactField { label: x.label.clone(), ty: ty(&x.ty) }).collect()),
-                    constant: a.constant.as_ref().map(to_constant),
-                }
-            }
-
-            fn from_argument(a: w::Argument) -> $crate::Argument {
-                let ty = |t: w::FactType| $crate::FactType { shown: t.shown, exact: t.exact, literal_of: t.literal_of };
-                $crate::Argument {
-                    span: from_span(a.span),
-                    ty: ty(a.ty),
-                    fields: a.fields.map(|fs| fs.into_iter().map(|x| $crate::FactField { label: x.label, ty: ty(x.ty) }).collect()),
-                    constant: a.constant.map(from_constant),
-                }
-            }
-
-            fn to_constant(c: &$crate::Constant) -> w::Constant {
-                match c {
-                    $crate::Constant::Number(n) => w::Constant::Number(*n),
-                    $crate::Constant::Text(t) => w::Constant::Text(t.clone()),
-                    $crate::Constant::Boolean(b) => w::Constant::Boolean(*b),
-                }
-            }
-
-            fn from_constant(c: w::Constant) -> $crate::Constant {
-                match c {
-                    w::Constant::Number(n) => $crate::Constant::Number(n),
-                    w::Constant::Text(t) => $crate::Constant::Text(t),
-                    w::Constant::Boolean(b) => $crate::Constant::Boolean(b),
-                }
-            }
-
-            fn to_refinement(r: &$crate::Refinement) -> w::Refinement {
-                match r {
-                    $crate::Refinement::Literals(ls) => w::Refinement::Literals(ls.iter().map(to_constant).collect()),
-                    $crate::Refinement::Known(name) => w::Refinement::Known(name.clone()),
-                    $crate::Refinement::Holds(b) => w::Refinement::Holds(*b),
-                }
-            }
-
-            fn from_refinement(r: w::Refinement) -> $crate::Refinement {
-                match r {
-                    w::Refinement::Literals(ls) => $crate::Refinement::Literals(ls.into_iter().map(from_constant).collect()),
-                    w::Refinement::Known(name) => $crate::Refinement::Known(name),
-                    w::Refinement::Holds(b) => $crate::Refinement::Holds(b),
-                }
-            }
             pub fn to_hover(h: $crate::Hover) -> w::Hover {
                 w::Hover { markdown: h.markdown, span: to_span(h.span) }
             }

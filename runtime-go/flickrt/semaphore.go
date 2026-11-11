@@ -2,8 +2,8 @@ package flickrt
 
 import "sync"
 
-// Semaphore is Effect's: `permits` in all, `taken` of them held; a release
-// wakes the fibers waiting for permits, each checking again.
+// Semaphore is `permits` in all, `taken` of them held; a release wakes the
+// fibers waiting for permits, each checking again.
 type Semaphore struct {
 	mu      sync.Mutex
 	permits int
@@ -113,7 +113,7 @@ func SemaphoreWithPermitsIfAvailable(fb *Fiber, s, n, task Value) Value {
 	return None
 }
 
-// Partitioned is Effect's PartitionedSemaphore: waiters queue by key, and
+// Partitioned is a semaphore partitioned by key: waiters queue by key, and
 // released permits go to the keys in turn, one permit at a time.
 type Partitioned struct {
 	mu      sync.Mutex

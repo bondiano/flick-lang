@@ -1,4 +1,4 @@
-// Effect's `DateTime`: parsing that fails with a typed error, time zones,
+// `DateTime`: parsing that fails with a typed error, time zones,
 // parts, calendar arithmetic, comparisons and formatting.
 module App.Main exposing (main)
 

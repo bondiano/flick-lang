@@ -1,0 +1,26 @@
+module App.Make(Database : App.Contracts.Database) : App.Contracts.Repository exposing (
+  Repo,
+  get,
+  layer,
+)
+
+import App.Driver as Driver
+import App.Domain exposing (Repo)
+
+get : String ->{Repo} String
+let get key = Repo.get key
+
+// This is deferred build code. Applying Make does not acquire a connection.
+layer : Layer {Database.Db} {Driver.Boot} {Repo}
+let layer =
+  Layer.from_build (fun _ ->
+    let connection =
+      Effect.uninterruptible
+        (task {
+          let connection = Database.acquire ()
+          Scope.add_finalizer (task { Database.release connection })
+          connection
+        })
+    Database.initialize connection
+    Context.make Repo { get = fun key -> Database.fetch connection key }
+  )

@@ -1,4 +1,4 @@
-// Effect's `FileSystem` on Node.js, in a temporary directory that the scope
+// `FileSystem` on Node.js, in a temporary directory that the scope
 // removes, and `PlatformError` for what fails.
 module App.Main exposing (main)
 

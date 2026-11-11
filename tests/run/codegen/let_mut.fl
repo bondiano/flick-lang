@@ -102,7 +102,7 @@ let ordered () =
     x,
   )
 
-/// An arm of `try` may assign; only its body may not.
+/// An arm of `try` may assign a variable declared before it.
 recovered : String ->{} String
 let recovered key =
   let mut status = "found"

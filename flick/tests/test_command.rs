@@ -4,12 +4,15 @@
 
 mod common;
 
-use std::io::Read;
+#[path = "test_command/adapter_contract.rs"]
+mod adapter_contract;
+#[path = "test_command/watch.rs"]
+mod watch;
+
+use std::fs;
 use std::path::{Path, PathBuf};
-use std::process::{Child, Command, Output, Stdio};
-use std::sync::{Arc, Mutex};
+use std::process::Output;
 use std::time::{Duration, Instant};
-use std::{fs, thread};
 
 use common::flick_in;
 use serde_json::Value;
@@ -289,94 +292,6 @@ fn test_preparation_reports_phases_without_changing_json() {
     }
 }
 
-const SLOW: &str = r#"module Test.Slow exposing (tests)
-
-sleep : Float ->{Async;} Unit
-foreign sleep from "./sleep.mjs" "sleep"
-
-tests : List Test.Test
-let tests =
-  [
-    Test.effect_test
-      "holds a resource"
-      (task {
-        let r =
-          Resource.acquire_release
-            (task { Platform.stdout_line "acquired" })
-            (fun _ -> Platform.stdout_line "released")
-        sleep 3000
-      })
-  ]
-"#;
-
-/// Collects the child's stdout as it comes.
-fn collect(child: &mut Child) -> Arc<Mutex<String>> {
-    let out = Arc::new(Mutex::new(String::new()));
-    let mut stdout = child.stdout.take().expect("piped");
-    let sink = out.clone();
-    thread::spawn(move || {
-        let mut buf = [0u8; 256];
-        while let Ok(n) = stdout.read(&mut buf) {
-            if n == 0 {
-                break;
-            }
-            sink.lock()
-                .expect("lock")
-                .push_str(&String::from_utf8_lossy(&buf[..n]));
-        }
-    });
-    out
-}
-
-/// Waits up to a minute: each run of `flick test` compiles the project
-/// first, which takes over 10 s in a debug build.
-fn wait_for(out: &Mutex<String>, text: &str, count: usize) -> String {
-    for _ in 0..1200 {
-        let now = out.lock().expect("lock").clone();
-        if now.matches(text).count() >= count {
-            return now;
-        }
-        thread::sleep(Duration::from_millis(50));
-    }
-    panic!("no {count}× {text:?} in {:?}", out.lock().expect("lock"));
-}
-
-#[test]
-#[ignore = "needs Node and pnpm install"]
-fn watch_runs_again_after_the_previous_run_cleaned_up() {
-    let dir = project("watch");
-    fs::remove_file(dir.join("test/Test/Sample.fl")).expect("remove");
-    fs::write(dir.join("test/Test/Slow.fl"), SLOW).expect("write");
-    fs::write(
-        dir.join("test/Test/sleep.mjs"),
-        "export const sleep = (ms) => new Promise((r) => setTimeout(r, ms));\n",
-    )
-    .expect("write");
-    let mut child = Command::new(env!("CARGO_BIN_EXE_flick"))
-        .args(["test", "--watch"])
-        .current_dir(&dir)
-        .stdout(Stdio::piped())
-        .spawn()
-        .expect("flick runs");
-    let out = collect(&mut child);
-    wait_for(&out, "acquired", 1);
-    thread::sleep(Duration::from_millis(300));
-    fs::write(
-        dir.join("src/App/Lib.fl"),
-        "module App.Lib exposing (one)\n\none : Float\nlet one = 2\n",
-    )
-    .expect("write");
-    let text = wait_for(&out, "acquired", 2);
-    // the runner of the second run stops by itself: its stdin closes with the watcher
-    let _ = child.kill();
-    let released = text
-        .find("released")
-        .expect("the first run released its resource");
-    let changed = text.find("a file changed").expect("the change was noticed");
-    let second = text.rfind("acquired").expect("second run");
-    assert!(released < changed && changed < second, "{text}");
-}
-
 const CLOCKS: &str = r#"module Test.Clocks exposing (tests)
 
 type error Again = Again
@@ -544,6 +459,12 @@ let tests =
 fn schema_arbitrary_draws_alike_on_go() {
     let report = |name: &str, args: &[&str]| {
         let dir = project(name);
+        let config = fs::read_to_string(dir.join("flick.toml")).expect("config");
+        fs::write(
+            dir.join("flick.toml"),
+            format!("{config}\n[build]\neffect = \"effect\"\n"),
+        )
+        .expect("Effect configuration");
         fs::write(dir.join("test/Test/Sample.fl"), DRAWS).expect("write");
         let out = flick_in(
             &dir,

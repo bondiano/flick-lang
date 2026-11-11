@@ -1,7 +1,7 @@
 package flickrt
 
-// The functions of `Record`: Flick's row primitives and Effect's Record
-// functions, in the order Flick passes the arguments (data-last, the
+// The functions of `Record`: Flick's row primitives and the functions on
+// dictionaries, in the order Flick passes the arguments (data-last, the
 // record at the end). Callbacks get the value, then the key, except
 // `collect` and `map_keys`.
 

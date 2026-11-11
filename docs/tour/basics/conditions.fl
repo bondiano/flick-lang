@@ -1,0 +1,13 @@
+module Main exposing (main)
+
+sign : Int -> String
+let sign n = if n < 0 then "negative" else if n == 0 then "zero" else "positive"
+
+factorial : Int -> Int
+let rec factorial n = if n <= 1 then 1 else n * factorial (n - 1)
+
+main : Unit ->{} Unit
+let main () =
+  Platform.stdout_line (sign (-3))
+  Platform.stdout_line (sign 0)
+  Platform.stdout_line (show (factorial 5))

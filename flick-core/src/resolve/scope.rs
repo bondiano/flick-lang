@@ -196,7 +196,7 @@ impl<'a> Scope<'a> {
         let mut open = self.open(namespace, name);
         match (open.next(), open.next()) {
             (Some((export, interface)), None) => Found::Imported(export, Some(interface)),
-            (None, None) if self.has_unloaded_open_import() => Found::Unknown,
+            (None, None) if self.has_unknown_open_import() => Found::Unknown,
             (None, None) => Found::Missing,
             // ambiguous: reported where it is used
             _ => Found::Unknown,
@@ -225,9 +225,12 @@ impl<'a> Scope<'a> {
             .filter(move |(export, _)| seen.insert(export.entity.clone()))
     }
 
-    fn has_unloaded_open_import(&self) -> bool {
+    /// Some `exposing (..)` import names a module that could not be loaded
+    /// or did not parse in full, so a name found nowhere may be one of its.
+    fn has_unknown_open_import(&self) -> bool {
         self.imports.iter().any(|(import, interface)| {
-            interface.is_none() && import.exposing.iter().any(|i| i.kind == ItemKind::All)
+            interface.as_ref().is_none_or(|i| i.incomplete)
+                && import.exposing.iter().any(|i| i.kind == ItemKind::All)
         })
     }
 
@@ -363,6 +366,13 @@ impl<'a> Scope<'a> {
                 }
             }
             Found::Unknown => {}
+            Found::Missing
+                if self
+                    .module
+                    .syntax
+                    .applications
+                    .iter()
+                    .any(|application| application.name == item.name) => {}
             Found::Missing => diagnostics.push(error(format!(
                 "cannot export `{}`: it is neither defined in this module nor imported",
                 item.name
@@ -401,6 +411,7 @@ impl<'a> Scope<'a> {
             if let Some(interface) = interface
                 && interface.find(*namespace, name).is_none()
                 && !typed
+                && !interface.incomplete
             {
                 diagnostics.push(not_exported(interface, name, *span));
             }
@@ -511,7 +522,7 @@ fn expose(
                     .members(&item.name)
                     .map(|e| (e.entity.namespace, Some(e.clone())))
                     .collect();
-                if members.is_empty() {
+                if members.is_empty() && !interface.incomplete {
                     diagnostics.push(no_members(import, interface, item));
                 }
                 out.push(binding);
@@ -520,6 +531,9 @@ fn expose(
         }
     }
     if out.is_empty() && item.kind != ItemKind::All {
+        if interface.incomplete {
+            return expose(import, None, item, diagnostics);
+        }
         diagnostics.push(not_exported(interface, &item.name, item.span));
     }
     out

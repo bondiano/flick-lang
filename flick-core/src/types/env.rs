@@ -54,6 +54,13 @@ pub enum Form {
         #[serde(default, skip_serializing_if = "std::ops::Not::not")]
         opaque: bool,
     },
+    /// A structural contract on a module's public members.
+    ModuleContract {
+        requirements: Vec<ModuleRequirement>,
+    },
+    ModuleSignature {
+        signature: Box<ModuleSignature>,
+    },
     Service {
         params: Vec<String>,
         operations: Vec<Operation>,
@@ -83,6 +90,74 @@ pub enum Form {
     Kind,
     /// A member of a `kind` declaration.
     KindMember,
+}
+
+/// A member required by `type module`; the contract's type members bind
+/// names in the types of later requirements.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "member", rename_all = "kebab-case")]
+pub enum ModuleRequirement {
+    /// A finite kind or a member retained by an inferred module signature.
+    Kind {
+        name: String,
+        identity: Option<Entity>,
+        definition: Box<TypeDef>,
+    },
+    Module {
+        name: String,
+        /// Lexical identity of this member in dependent sibling requirements.
+        #[serde(default, skip_serializing_if = "String::is_empty")]
+        binder: String,
+        signature: Box<ModuleSignature>,
+    },
+    Type {
+        name: String,
+        params: Vec<Binder>,
+        manifest: Option<Type>,
+    },
+    Value {
+        name: String,
+        ty: Type,
+    },
+    Nominal {
+        name: String,
+        category: ModuleNominalKind,
+        /// A class or service whose identity the contract fixes.
+        identity: Option<Entity>,
+        /// The shape of an abstract class or service requirement.
+        definition: Option<Box<TypeDef>>,
+        /// Method schemes of an abstract class; a service's operations are in its definition.
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        methods: Vec<(String, Type)>,
+    },
+    Dictionary {
+        head: Type,
+        from: String,
+    },
+}
+
+/// A checked static module signature. Module arrows are distinct from value
+/// arrows: their binders name static identities, not runtime arguments.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "signature", rename_all = "kebab-case")]
+pub enum ModuleSignature {
+    Structure {
+        requirements: Vec<ModuleRequirement>,
+    },
+    Parameterized {
+        /// Number of arguments still required in this atomic parameter group.
+        group_size: usize,
+        binder: String,
+        parameter: Box<ModuleSignature>,
+        result: Box<ModuleSignature>,
+    },
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ModuleNominalKind {
+    Class,
+    Service,
 }
 
 /// The JS representation of a variant type's values.
@@ -156,13 +231,46 @@ pub enum Found {
     Missing,
 }
 
+/// The definitions of types by module, then by name: a lookup borrows both,
+/// and the checker asks for one at every head of a type it reduces.
+#[derive(Debug, Default)]
+pub(super) struct TypeDefs(HashMap<String, HashMap<String, TypeDef>>);
+
+impl TypeDefs {
+    fn get(&self, module: &str, name: &str) -> Option<&TypeDef> {
+        self.0.get(module)?.get(name)
+    }
+
+    fn remove(&mut self, module: &str, name: &str) {
+        if let Some(types) = self.0.get_mut(module) {
+            types.remove(name);
+        }
+    }
+
+    fn define(&mut self, module: &str, name: String, def: TypeDef) {
+        match self.0.get_mut(module) {
+            Some(types) => types.insert(name, def),
+            None => self
+                .0
+                .entry(module.to_owned())
+                .or_default()
+                .insert(name, def),
+        };
+    }
+
+    /// The types `module` defines, in no order.
+    fn of(&self, module: &str) -> impl Iterator<Item = (&String, &TypeDef)> {
+        self.0.get(module).into_iter().flatten()
+    }
+}
+
 /// A module's environment: its own and imported knowledge over the shared
 /// [`Builtins`], which every lookup falls back to.
 #[derive(Debug)]
 pub struct Env<'b> {
     pub module: String,
     builtins: &'b Builtins,
-    types: HashMap<(String, String), TypeDef>,
+    types: TypeDefs,
     values: HashMap<Entity, Type>,
     /// Type of a constructor's parent, by constructor entity.
     parents: HashMap<Entity, String>,
@@ -183,329 +291,20 @@ pub struct Env<'b> {
     interfaces: HashMap<String, Option<Interface>>,
     /// Some open import could not be loaded, so a missing name may exist.
     open_unknown: bool,
+    /// Some open import did not parse in full, so a name found nowhere,
+    /// not even in the prelude, may be one its module lost.
+    lost_unknown: bool,
     /// The instances this module sees beyond the built-in ones: of the
     /// modules it depends on, however they are imported, and its own.
     instances: Vec<Instance>,
 }
 
-impl<'b> Env<'b> {
-    /// The environment of `module` before its own declarations are added.
-    pub fn new(
-        module: &str,
-        syntax: &ModuleSyntax,
-        imported: &dyn Fn(&str) -> Option<Interface>,
-        builtins: &'b Builtins,
-    ) -> Env<'b> {
-        let mut env = Env {
-            module: module.to_owned(),
-            builtins,
-            types: HashMap::new(),
-            values: HashMap::new(),
-            parents: HashMap::new(),
-            scope: HashMap::new(),
-            open: HashMap::new(),
-            prelude: module != lang::prelude(),
-            ambiguous: HashSet::new(),
-            qualifiers: HashMap::new(),
-            imported: HashSet::new(),
-            interfaces: HashMap::new(),
-            open_unknown: false,
-            instances: Vec::new(),
-        };
-        for import in &syntax.imports {
-            let interface = imported(&import.module);
-            env.qualifiers
-                .insert(import.qualifier().to_owned(), import.module.clone());
-            env.imported.insert(import.qualifier().to_owned());
-            if let Some(i) = &interface {
-                env.learn(i);
-            }
-            env.interfaces.insert(import.module.clone(), interface);
-        }
-        for import in &syntax.imports {
-            let interface = env.interfaces[&import.module].clone();
-            let open = import.exposing.iter().any(|i| i.kind == ItemKind::All);
-            match interface {
-                None => {
-                    // names from a module that could not be loaded are taken on trust
-                    env.open_unknown |=
-                        open || import.exposing.iter().any(|i| i.kind == ItemKind::ConAll);
-                    for item in &import.exposing {
-                        for namespace in [Namespace::Value, Namespace::Type, Namespace::Constructor]
-                        {
-                            env.ambiguous.insert((namespace, item.name.clone()));
-                        }
-                    }
-                }
-                Some(i) if open => {
-                    for export in &i.exports {
-                        bring(&mut env.open, &mut env.ambiguous, export);
-                    }
-                }
-                Some(_) => {}
-            }
-        }
-        let mut ambiguous = HashSet::new();
-        for import in &syntax.imports {
-            let Some(interface) = env.interfaces[&import.module].clone() else {
-                continue;
-            };
-            for item in &import.exposing {
-                let named = interface
-                    .exports
-                    .iter()
-                    .filter(|e| e.entity.name == item.name);
-                let members = interface
-                    .members(&item.name)
-                    .filter(|_| item.kind == ItemKind::ConAll);
-                for export in named.chain(members).collect::<Vec<_>>() {
-                    bring(&mut env.scope, &mut ambiguous, export);
-                }
-            }
-        }
-        // a name imported by name hides the same name from `exposing (..)`
-        env.ambiguous.retain(|key| !env.scope.contains_key(key));
-        env.ambiguous.extend(ambiguous);
-        env
-    }
-
-    /// Records the types and instances an interface carries.
-    fn learn(&mut self, interface: &Interface) {
-        for instance in &interface.instances {
-            let known = |i: &Instance| i.module == instance.module && i.name == instance.name;
-            if !self
-                .builtins
-                .seen
-                .contains(&(instance.module.clone(), instance.name.clone()))
-                && !self.instances.iter().any(known)
-            {
-                self.instances.push(instance.clone());
-            }
-        }
-        learn_exports(
-            &mut self.types,
-            &mut self.values,
-            &mut self.parents,
-            interface,
-        );
-    }
-
-    /// Every instance this module sees: the built-in ones, then those of the
-    /// modules it depends on, however they are imported, and its own.
-    pub fn instances(&self) -> impl Iterator<Item = &Instance> {
-        self.builtins.instances.iter().chain(&self.instances)
-    }
-
-    /// The values and constructors the module declares, with their types.
-    pub fn own_values(&self) -> impl Iterator<Item = (&Entity, &Type)> {
-        self.values.iter().filter(|(e, _)| e.module == self.module)
-    }
-
-    /// The types, services and classes the module declares.
-    pub fn own_types(&self) -> impl Iterator<Item = (&str, &TypeDef)> {
-        self.types
-            .iter()
-            .filter(|((m, _), _)| *m == self.module)
-            .map(|((_, n), d)| (n.as_str(), d))
-    }
-
-    /// The instances beyond the built-in ones, which an interface carries.
-    pub fn own_instances(&self) -> impl Iterator<Item = &Instance> {
-        self.instances
-            .iter()
-            .filter(|i| !self.builtins.contains(&i.module))
-    }
-
-    pub fn add_instance(&mut self, instance: Instance) {
-        self.instances.push(instance);
-    }
-
-    pub fn entity(&self, namespace: Namespace, name: &str) -> Entity {
-        Entity {
-            module: self.module.clone(),
-            namespace,
-            name: name.to_owned(),
-        }
-    }
-
-    pub fn type_def(&self, module: &str, name: &str) -> Option<&TypeDef> {
-        let key = (module.to_owned(), name.to_owned());
-        self.types
-            .get(&key)
-            .or_else(|| self.builtins.types.get(&key))
-    }
-
-    pub fn define_type(&mut self, name: &str, def: TypeDef) {
-        self.types
-            .insert((self.module.clone(), name.to_owned()), def);
-    }
-
-    #[cfg(feature = "ide")]
-    /// The transparent type aliases the module declares, exported or not.
-    pub fn local_aliases(&self) -> impl Iterator<Item = (&str, &[String], &Type)> {
-        self.types
-            .iter()
-            .filter_map(|((module, name), def)| match &def.form {
-                Form::Alias {
-                    params,
-                    body,
-                    opaque: false,
-                } if *module == self.module => Some((name.as_str(), params.as_slice(), body)),
-                _ => None,
-            })
-    }
-
-    pub fn type_def_mut(&mut self, name: &str) -> Option<&mut TypeDef> {
-        self.types.get_mut(&(self.module.clone(), name.to_owned()))
-    }
-
-    /// Makes a local definition visible by its plain name.
-    pub fn declare(&mut self, namespace: Namespace, name: &str) {
-        let entity = self.entity(namespace, name);
-        let key = (namespace, name.to_owned());
-        self.ambiguous.remove(&key);
-        self.scope.insert(key, entity);
-    }
-
-    pub fn set_value(&mut self, entity: Entity, scheme: Type) {
-        self.values.insert(entity, scheme);
-    }
-
-    pub fn set_parent(&mut self, entity: Entity, parent: &str) {
-        self.parents.insert(entity, parent.to_owned());
-    }
-
-    pub fn value(&self, entity: &Entity) -> Option<&Type> {
-        self.values
-            .get(entity)
-            .or_else(|| self.builtins.values.get(entity))
-    }
-
-    /// The type a constructor builds, by its entity.
-    pub fn parent(&self, entity: &Entity) -> Option<(String, String)> {
-        let parent = self
-            .parents
-            .get(entity)
-            .or_else(|| self.builtins.parents.get(entity))?;
-        Some((entity.module.clone(), parent.clone()))
-    }
-
-    pub fn find(&self, namespace: Namespace, name: &str) -> Found {
-        let key = (namespace, name.to_owned());
-        if self.ambiguous.contains(&key) {
-            return Found::Unknown;
-        }
-        match self.scope.get(&key).or_else(|| self.open.get(&key)) {
-            Some(entity) => Found::Entity(entity.clone()),
-            None if self.open_unknown => Found::Unknown,
-            None => match self.prelude_names().get(&key) {
-                Some(entity) => Found::Entity(entity.clone()),
-                None => Found::Missing,
-            },
-        }
-    }
-
-    /// The type `path` names: an unqualified one in scope, or `M.T`, `T` as
-    /// the module of the import `M` exports it, re-exported or its own.
-    pub fn find_type(&self, path: &str) -> Found {
-        let Some((qualifier, name)) = path.rsplit_once('.') else {
-            return self.find(Namespace::Type, path);
-        };
-        match self.qualified_module(qualifier) {
-            Some((_, Some(interface))) => interface
-                .find(Namespace::Type, name)
-                .map_or(Found::Missing, |e| Found::Entity(e.entity.clone())),
-            Some((_, None)) => Found::Unknown,
-            None => Found::Missing,
-        }
-    }
-
-    /// Every unqualified name in `namespace`: candidates for a misspelt one.
-    pub fn names(&self, namespace: Namespace) -> impl Iterator<Item = &str> {
-        self.scope
-            .keys()
-            .chain(self.open.keys())
-            .chain(self.prelude_names().keys())
-            .filter(move |(n, _)| *n == namespace)
-            .map(|(_, name)| name.as_str())
-    }
-
-    /// Every import qualifier and built-in module name.
-    pub fn qualifier_names(&self) -> impl Iterator<Item = &str> {
-        self.qualifiers
-            .keys()
-            .chain(self.builtins.interfaces.keys())
-            .map(String::as_str)
-    }
-
-    fn prelude_names(&self) -> &HashMap<(Namespace, String), Entity> {
-        static NONE: LazyLock<HashMap<(Namespace, String), Entity>> = LazyLock::new(HashMap::new);
-        if self.prelude {
-            &self.builtins.prelude
-        } else {
-            &NONE
-        }
-    }
-
-    /// The module a qualifier names, and its interface if it was loaded.
-    /// Whether `qualifier` names an import, whose missing names name
-    /// resolution reports, rather than a built-in module used without one.
-    pub fn is_import(&self, qualifier: &str) -> bool {
-        self.imported.contains(qualifier)
-    }
-
-    /// The representation of constructor `name` of type `ty` of `module`.
-    pub fn constructor_rep(&self, module: &str, ty: &str, name: &str) -> Rep {
-        match self.type_def(module, ty).map(|d| &d.form) {
-            Some(Form::Adt { constructors, abi }) => constructors
-                .iter()
-                .position(|c| c == name)
-                .map_or(Rep::Tagged, |i| abi.rep(i)),
-            _ => Rep::Tagged,
-        }
-    }
-
-    /// The shortest qualifier that names `module`.
-    pub fn qualifier_of(&self, module: &str) -> Option<&str> {
-        let builtin = self
-            .builtins
-            .interfaces
-            .get_key_value(module)
-            .filter(|(q, _)| !self.qualifiers.contains_key(*q))
-            .map(|(q, _)| q.as_str());
-        self.qualifiers
-            .iter()
-            .filter(|(_, m)| *m == module)
-            .map(|(q, _)| q.as_str())
-            .chain(builtin)
-            .min_by_key(|q| (q.len(), *q))
-    }
-
-    /// The interface of an imported or built-in module.
-    pub fn interface(&self, module: &str) -> Option<&Interface> {
-        match self.interfaces.get(module) {
-            Some(interface) => interface.as_ref(),
-            None => self.builtins.interfaces.get(module),
-        }
-    }
-
-    pub fn qualified_module(&self, qualifier: &str) -> Option<(&str, Option<&Interface>)> {
-        let module = match self.qualifiers.get(qualifier) {
-            Some(module) => module.as_str(),
-            None => self
-                .builtins
-                .interfaces
-                .get_key_value(qualifier)?
-                .0
-                .as_str(),
-        };
-        let interface = match self.interfaces.get(module) {
-            Some(interface) => interface.as_ref(),
-            None => self.builtins.interfaces.get(module),
-        };
-        Some((module, interface))
-    }
+pub(super) struct StaticLexical {
+    names: Vec<((Namespace, String), Option<Entity>, bool)>,
+    instances: usize,
 }
+
+include!("env_impl.rs");
 
 fn bring(
     scope: &mut HashMap<(Namespace, String), Entity>,

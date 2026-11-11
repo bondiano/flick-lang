@@ -1,6 +1,6 @@
 package flickrt
 
-// Channel's transformations, as Effect's (Channel.ts), and their bindings.
+// Channel's transformations and their bindings.
 
 func channelMap(self *Channel, f func(fb *Fiber, o Value) Value) *Channel {
 	return transformPull(self, func(_ *Fiber, pull Pull, _ *Owner) Pull {
@@ -124,7 +124,7 @@ func channelPipeTo(self, that *Channel) *Channel {
 }
 
 // piped is the failure of the channel piped to another one, which crosses
-// it as a defect, as Effect's `Cause.Done` of a cause.
+// it as a defect.
 type piped struct{ cause *Cause }
 
 // channelPipeToOrFail is channelPipeTo where `that` does not see the
@@ -206,8 +206,8 @@ func channelCatchCause(self *Channel, f func(fb *Fiber, c *Cause) *Channel) *Cha
 	})
 }
 
-// The bindings: Flick callbacks are curried, and a task is run where
-// Effect would yield it.
+// The bindings: Flick callbacks are curried, and a task a callback returns
+// is run in place.
 
 func ChannelMap(f, self Value) Value {
 	return channelMap(channelOf(self), func(fb *Fiber, o Value) Value { return Apply(fb, f, o) })

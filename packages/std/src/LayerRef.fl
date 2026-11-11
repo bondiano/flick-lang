@@ -1,5 +1,5 @@
-/// Effect's `LayerRef`: one layer's services, built on first use, shared
-/// while in use and built anew on `refresh` or after `invalidate`.
+/// One layer's services, built on first use, shared while in use and built
+/// anew on `refresh` or after `invalidate`.
 module LayerRef exposing (..)
 
 import Duration
@@ -14,20 +14,20 @@ type alias Options = { idleTimeToLive : Option Duration.Duration; preload : Bool
 
 /// A ref of the services `layer` builds.
 make : Layer ri e ro -> Options ->{Scope s | ri; e} LayerRef s e ro
-foreign effect make from "@flick-lang/effect-ts/effect/LayerRef" "flickMake"
+foreign effect make from "flick:LayerRef" "flickMake"
   reviewed "effect@4.1.2 sha256:920ebbf52b1b72f1"
 
 /// The services as a layer: a `provide` of it shares those already built.
 get : LayerRef s e ro -> Layer none e ro
-foreign pure get from "@flick-lang/effect-ts/effect/LayerRef" "flickGet"
+foreign pure get from "flick:LayerRef" "flickGet"
   retention owner
 
 /// Drops the services: the next use builds them anew.
 invalidate : LayerRef s e ro ->{Async} Unit
-foreign effect invalidate from "@flick-lang/effect-ts/effect/LayerRef" "flickInvalidate"
+foreign effect invalidate from "flick:LayerRef" "flickInvalidate"
   retention call
 
 /// Builds the services anew now, replacing those built before.
 refresh : LayerRef s e ro ->{Async; e} Unit
-foreign effect refresh from "@flick-lang/effect-ts/effect/LayerRef" "flickRefresh"
+foreign effect refresh from "flick:LayerRef" "flickRefresh"
   retention call

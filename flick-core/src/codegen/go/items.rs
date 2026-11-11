@@ -39,7 +39,22 @@ impl<'a> Gen<'a> {
             }
         }
         for &i in order {
-            self.item(&module.items[i], &mut decls, &mut init);
+            if self.item_initializers {
+                let mut statements = Vec::new();
+                self.item(&module.items[i], &mut decls, &mut statements);
+                if !statements.is_empty() {
+                    let initializer = docvec![
+                        a,
+                        "func ",
+                        names::item_init(self.module, i),
+                        "() ",
+                        block(a, statements)
+                    ];
+                    decls.push((initializer, false));
+                }
+            } else {
+                self.item(&module.items[i], &mut decls, &mut init);
+            }
         }
         let decls = decls.into_iter().map(|(decl, located)| {
             // the lines after a `//line` count from it: name the Go file again
@@ -50,7 +65,11 @@ impl<'a> Gen<'a> {
             };
             docvec![a, decl, again, a.lines(2)]
         });
-        let init = docvec![a, "func ", names::init(self.module), "() ", block(a, init)];
+        let init = if self.item_initializers {
+            a.empty()
+        } else {
+            docvec![a, "func ", names::init(self.module), "() ", block(a, init)]
+        };
         print(docvec![
             a,
             "package main",
@@ -370,6 +389,16 @@ impl<'a> Gen<'a> {
                     .map_or_else(|| panic!("dictionary `{shown}` is in scope"), |&(_, p)| p);
                 self.code(given)
             }
+            Dict::Value { module, name } => {
+                self.reads(module);
+                self.global_value(module, name, Vec::new())
+            }
+            Dict::Opened { binder, field } => call(
+                a,
+                "flickrt.Field",
+                [self.code(&names::local(binder)).doc, self.string(field)],
+            )
+            .into(),
             // bound by the pattern of the constructor whose value holds it
             Dict::Field(local) => self.code(&names::local(local)),
             Dict::Super { dict, class } => {

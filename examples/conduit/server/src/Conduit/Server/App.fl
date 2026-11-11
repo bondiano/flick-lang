@@ -12,7 +12,8 @@ import Conduit.Server.Session exposing (Keys, Signing)
 
 /// A request answered with the services the server runs with.
 type alias Handler =
-  ServerRequest ->{Database, Keys, Crypto.Crypto; Http.ServerError.HttpServerError} ServerResponse
+  ServerRequest ->{Async, Database, Keys, Crypto.Crypto; Http.ServerError.HttpServerError}
+    ServerResponse
 
 /// The router of the API and, given a directory, of the client's files.
 router : Option String ->{...Signing; PlatformError.PlatformError} Handler

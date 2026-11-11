@@ -5,22 +5,22 @@ module Js.Array exposing (Array, make, from_list, to_list, push, get, set, lengt
 type Array a
 
 make : Unit ->{} Array a
-foreign make from "@flick-lang/effect-ts" "jsArrayMake"
+foreign make from "flick:rt" "jsArrayMake"
 
 from_list : List a ->{} Array a
-foreign from_list from "@flick-lang/effect-ts" "jsArrayFromList"
+foreign from_list from "flick:rt" "jsArrayFromList"
 
 to_list : Array a ->{} List a
-foreign to_list from "@flick-lang/effect-ts" "jsArrayFromList"
+foreign to_list from "flick:rt" "jsArrayFromList"
 
 push : Array a -> a ->{} Unit
-foreign push from "@flick-lang/effect-ts" "jsArrayPush"
+foreign push from "flick:rt" "jsArrayPush"
 
 get : Int -> Array a ->{} Option a
-foreign get from "@flick-lang/effect-ts" "listGet"
+foreign get from "flick:rt" "listGet"
 
 set : Int -> a -> Array a ->{} Unit
-foreign set from "@flick-lang/effect-ts" "jsArraySet"
+foreign set from "flick:rt" "jsArraySet"
 
 length : Array a ->{} Int
-foreign length from "@flick-lang/effect-ts" "listLength"
+foreign length from "flick:rt" "listLength"

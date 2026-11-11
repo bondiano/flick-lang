@@ -43,7 +43,10 @@ let main () = Tracer.with_span \"App.save\" options Effect.void
     let dir = project(
         "run_devtools",
         &[
-            ("flick.toml", APP),
+            (
+                "flick.toml",
+                &format!("{APP}\n[build]\neffect = \"effect\"\n"),
+            ),
             ("src/App/Main.fl", main),
             ("devtools.mjs", DEVTOOLS),
         ],

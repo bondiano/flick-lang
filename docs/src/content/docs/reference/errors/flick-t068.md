@@ -1,0 +1,14 @@
+---
+title: "FLICK-T068"
+---
+
+# Static parameterized module or nested module cannot be packed
+
+`Module Sig`, `pack` and `unpack` carry runtime structures. A parameterized module is a
+static module constructor, including when it is nested in a structure.
+Apply it statically first, then pack a structure with a runtime contract.
+
+Runtime module records currently carry a flat set of values and type witnesses.
+A signature containing `module Child : Inner` cannot be packed either: its
+nested namespace is not represented by that record. Flatten the runtime contract
+and explicitly expose the values and witnesses that must travel together.

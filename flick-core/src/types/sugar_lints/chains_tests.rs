@@ -1,5 +1,4 @@
 use crate::diagnostics::codes;
-#[cfg(feature = "diagnostic-fixes")]
 use crate::types::lint_tests::fixed;
 use crate::types::lint_tests::{HEAD, assert_fix, check};
 
@@ -59,7 +58,6 @@ fn a_chain_in_an_argument_keeps_its_parentheses() {
 fn one_step_is_left_alone() {
     let text = format!("{HEAD}{SIG}let f a b = Option.bind (fun x -> Some (x + 1)) a\n");
     assert!(!check(&text).iter().any(|d| d.code == codes::T035));
-    #[cfg(feature = "diagnostic-fixes")]
     assert_eq!(fixed(&text, "FLICK-T035"), None);
 }
 
@@ -94,6 +92,21 @@ fn a_call_on_a_bound_variable_stays() {
         "{HEAD}{LOOK}h : Float ->{{}} Option Float\nlet h n =\n  do {{\n    x <- Some n\n    y <- look x\n    pure (x + y)\n  }}\n"
     );
     assert!(check(&text).iter().any(|d| d.code == codes::E001));
-    #[cfg(feature = "diagnostic-fixes")]
     assert_eq!(fixed(&text, "FLICK-E001"), None);
+}
+
+#[test]
+fn a_bind_chain_does_not_introduce_mutable_captures() {
+    let text = format!(
+        "{HEAD}f : Option Int -> Option Int -> Option Int\nlet f a b =\n  let mut total = 0\n  match a with | Some x -> (match b with | Some y -> Some (x + y + total) | None -> None) | None -> None\n"
+    );
+    assert_eq!(fixed(&text, "FLICK-T035"), None);
+}
+
+#[test]
+fn a_bind_chain_does_not_move_lexical_exits_into_continuations() {
+    let text = format!(
+        "{HEAD}f : Option Int -> Option Int -> Int\nlet f a b = loop {{ ignore (match a with | Some x -> (match b with | Some y -> Some (if x > y then break 7 else y) | None -> None) | None -> None); break 0 }}\n"
+    );
+    assert_eq!(fixed(&text, "FLICK-T035"), None);
 }

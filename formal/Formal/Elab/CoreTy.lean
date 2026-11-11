@@ -7,16 +7,17 @@ import Formal.Elab.Sugar
 
 The types of `Elab` in the core of `Formal/` with regions and dictionary records:
 `var ↦ tvar`, `app ↦ tapp`, `con c ↦ adt`, `Bool ↦ base bool`, `Int ↦ base int`,
-`arr φ a b q ↦ ⟦a⟧ →⟦φ⟧^(⌈⟦q⟧⌉ ∪ vars φ) ⟦b⟧`,
+`arr φ a b q ↦ ⟦a⟧ →⟦φ⟧^⌈⟦q⟧⌉ ⟦b⟧`,
 `cnil ↦ caps ∅`, `cun ↦ caps (∪)`, `rnm c t ↦ row ({c} ∪ ⌈⟦t⟧⌉)` (`Row.err`),
 `run r r' ↦ row (⟦r⟧ ∪ ⟦r'⟧)` with each side what it stands for as a row,
 `D_{C τ̄} ↦ dict (cls C |τ̄|) τ̄`. A stage `R r e` is
 `rt ⟦r⟧ (⟦e⟧ ∪ ⌈⟦e⟧⌉ ∪ ε)`, a row `⟦r⟧` what the type `⟦r⟧` stands for as a row (`Ty.asRow`: a
 variable is a row variable), `⌈⟦e⟧⌉` what its errors reach (`errRow`), `ε` every name
 (`allNames`, `docs/formal/elaboration.md#from_result-could-not-raise-in-the-core`). The qualifier of a translated
-arrow also counts the variables of its rows, as `⌈·⌉` of the source does.
-The translation commutes with substitution (`trT_subst`, `trTT_subst`, `trS_subst`) and with
-`⌈·⌉` (`trT_reach`): a capture variable is an ordinary variable on both sides.
+arrow is what a call of it needs live, so it does not count the variables of its rows.
+The translation commutes with substitution (`trT_subst`, `trTT_subst`, `trS_subst`), and
+`⌈⟦t⟧⌉` is what `t` shows (`trT_reach`, `Ty.Shown`): a capture variable is an ordinary
+variable on both sides.
 
 `Names` chooses the names of the core that realise the program. The class name carries
 the number of parameters, so that projecting a superclass slot of `D_{C τ̄}` is typed for any
@@ -65,15 +66,6 @@ theorem errRow_substT (t : Flick.Ty) (σ : Atom → Flick.Ty) :
     (errRow t).substT σ = errRow (t.substT σ) := by
   simp [errRow, Ty.asRow_substT, Row.ofCaps_substT, Ty.reach_caps]
 
-/-- The variables of the rows of a stage, as atoms. -/
-def Stage.atoms (φ : Stage) : Caps := fun a => ∃ n, a = .v n ∧ φ.Occurs n
-
-/-- The qualifier of a translated arrow: its own, and at `R r e` the variables of the rows. -/
-def Stage.qual (φ : Stage) (C : Caps) : Caps :=
-  match φ with
-  | .P => C
-  | .R .. => fun x => C x ∨ φ.atoms x
-
 /-- `⟦τ⟧`. -/
 def trT : Ty → Flick.Ty
   | .var n => .tvar n
@@ -81,7 +73,7 @@ def trT : Ty → Flick.Ty
   | .app t u => .tapp (trT t) (trT u)
   | .arr .P a b q => .arrow (trT a) .pure (trT b) (trT q).reach
   | .arr (.R r e) a b q => .arrow (trT a) (.rt (trT r).asRow (Row.union (errRow (trT e)) allNames))
-      (trT b) fun x => (trT q).reach x ∨ (Stage.R r e).atoms x
+      (trT b) (trT q).reach
   | .cnil => .caps Caps.none
   | .cun q q' => .caps fun a => (trT q).reach a ∨ (trT q').reach a
   | .rnm c t => .row (Row.err (N.con c) (trT t))
@@ -94,11 +86,8 @@ def trStage : Stage → Flick.Stage
   | .R r e => .rt (trT N r).asRow (Row.union (errRow (trT N e)) allNames)
 
 theorem trT_arr (φ : Stage) (a b q : Ty) :
-    trT N (.arr φ a b q) = .arrow (trT N a) (trStage N φ) (trT N b) (φ.qual (trT N q).reach) := by
+    trT N (.arr φ a b q) = .arrow (trT N a) (trStage N φ) (trT N b) (trT N q).reach := by
   cases φ <;> rfl
-
-theorem Stage.qual_reach (φ : Stage) (C : Caps) (x : Atom) : φ.qual C x ↔ C x ∨ φ.atoms x := by
-  cases φ <;> simp [Stage.qual, Stage.atoms, Stage.Occurs]
 
 /-- `⟦D_Q⟧`. -/
 def trD (q : Cn) : Flick.Ty := .dict (N.cls q.cls q.args.length) (Flick.Ty.spine (q.args.map (trT N)))
@@ -106,17 +95,28 @@ def trD (q : Cn) : Flick.Ty := .dict (N.cls q.cls q.args.length) (Flick.Ty.spine
 /-- `⟦t⟧` of a type of an elaborated term. -/
 def trTT : TTy → Flick.Ty
   | .mono t => trT N t
-  | .arr .P a b q => .arrow (trTT a) .pure (trTT b) (trT N q).reach
-  | .arr (.R r e) a b q => .arrow (trTT a) (trStage N (.R r e)) (trTT b)
-      fun x => (trT N q).reach x ∨ (Stage.R r e).atoms x
+  | .arr φ a b q => .arrow (trTT a) (trStage N φ) (trTT b) (trT N q).reach
   | .dict q => trD N q
 
 theorem trTT_arr (φ : Stage) (a b : TTy) (q : Ty) :
-    trTT N (.arr φ a b q) = .arrow (trTT N a) (trStage N φ) (trTT N b) (φ.qual (trT N q).reach) := by
-  cases φ <;> rfl
+    trTT N (.arr φ a b q) = .arrow (trTT N a) (trStage N φ) (trTT N b) (trT N q).reach := rfl
 
-/-- `⟦∀ᾱ. t⟧`, without facts. -/
-def trS (s : TSch) : Flick.Scheme := ⟨s.k, Facts.none, trTT N s.ty⟩
+/-- A value bound `(t, D)` as a fact of the core: `Outlives ⌈⟦t⟧⌉ ⌈⟦D⟧⌉`, so `⌈⟦t⟧⌉ ⊆ ⌈⟦D⟧⌉`;
+for `t = var i` it is `Facts.bnd i ⌈⟦D⟧⌉` (`trB_var`). -/
+def trB (b : Ty × Ty) : Facts := fun C r => C = (trT N b.1).reach ∧ r = .caps (trT N b.2).reach
+
+/-- The value bounds of a scheme as its facts. -/
+def trBd : List (Ty × Ty) → Facts
+  | [] => Facts.none
+  | b :: bd => Facts.union (trB N b) (trBd bd)
+
+/-- The facts of the value bounds of a scheme with `k` variables. A scheme without variables
+has no instance to check them at: the source checks them at each use (`Elab.var`), and the
+core binds it by (Let-Mono), without facts. -/
+def trFacts (k : Nat) (bd : List (Ty × Ty)) : Facts := if k = 0 then Facts.none else trBd N bd
+
+/-- `⟦∀ᾱ. t⟧`, with its value bounds as facts. -/
+def trS (s : TSch) : Flick.Scheme := ⟨s.k, trFacts N s.k s.bd, trTT N s.ty⟩
 
 /-- `⟦σ⟧` of a substitution; regions stay. -/
 def trσ (σ : Nat → Ty) : Atom → Flick.Ty
@@ -146,31 +146,54 @@ theorem ex_or {P Q : Nat → Prop} {a : Atom} :
     · exact .inl ⟨n, rfl, h⟩
     · exact .inr ⟨n, rfl, h⟩
 
-/-- `⌈⟦τ⟧⌉ = ⌈τ⌉`: only variables. -/
-theorem trT_reach (t : Ty) (a : Atom) : (trT N t).reach a ↔ ∃ n, a = .v n ∧ t.Occurs n := by
+/-- `⌈⟦τ⟧⌉` is what `τ` shows: only variables. -/
+theorem trT_reach (t : Ty) (a : Atom) : (trT N t).reach a ↔ ∃ n, a = .v n ∧ t.Shown n := by
   induction t using Ty.ind generalizing a with
-  | var m => simp [trT, Ty.Occurs]
+  | var m => simp [trT, Ty.Shown]
   | con c =>
-    simp only [trT, Ty.Occurs, and_false, exists_false, iff_false]
+    simp only [trT, Ty.Shown, and_false, exists_false, iff_false]
     split <;> (try split) <;> simp [Flick.Ty.reach, Caps.none]
-  | app t u iht ihu => simp only [trT, Flick.Ty.reach, iht, ihu, Ty.Occurs, ex_or]
+  | app t u iht ihu => simp only [trT, Flick.Ty.reach, iht, ihu, Ty.Shown, ex_or]
   | arr φ a b q iha ihb ihq _ =>
-    simp only [trT_arr, Flick.Ty.reach, Stage.qual_reach, iha, ihb, ihq, Ty.Occurs, Stage.atoms,
-      ex_or]
-  | cnil => simp [trT, Flick.Ty.reach, Caps.none, Ty.Occurs]
-  | cun q q' ihq ihq' => simp only [trT, Flick.Ty.reach, ihq, ihq', Ty.Occurs, ex_or]
-  | rnm c t iht => simp [trT, Flick.Ty.reach, Row.err, Row.union, Row.single, Row.ofCaps, iht, Ty.Occurs]
+    simp only [trT_arr, Flick.Ty.reach, iha, ihb, ihq, Ty.Shown, ex_or]
+  | cnil => simp [trT, Flick.Ty.reach, Caps.none, Ty.Shown]
+  | cun q q' ihq ihq' => simp only [trT, Flick.Ty.reach, ihq, ihq', Ty.Shown, ex_or]
+  | rnm c t iht => simp [trT, Flick.Ty.reach, Row.err, Row.union, Row.single, Row.ofCaps, iht, Ty.Shown]
   | all k t iht =>
-    simp only [trT, Flick.Ty.reach, iht, Ty.Occurs]
+    simp only [trT, Flick.Ty.reach, iht, Ty.Shown]
     cases a <;> simp [Atom.up]
   | run r r' ihr ihr' =>
-    simp only [Ty.Occurs, ← ex_or, ← ihr, ← ihr']
+    simp only [Ty.Shown, ← ex_or, ← ihr, ← ihr']
     rw [Ty.reach_asRow (trT N r), Ty.reach_asRow (trT N r')]
     simp only [trT, Flick.Ty.reach, Row.union]
     grind
 
-theorem trT_reach_v {t : Ty} {n : Nat} (h : t.Occurs n) : (trT N t).reach (.v n) :=
+theorem trT_reach_v {t : Ty} {n : Nat} (h : t.Shown n) : (trT N t).reach (.v n) :=
   (trT_reach N t _).2 ⟨n, rfl, h⟩
+
+/-- What `⟦t⟧` reaches are variables of `t`. -/
+theorem trT_reach_sub {t : Ty} {a : Atom} (h : (trT N t).reach a) : ∃ n, a = .v n ∧ t.Occurs n :=
+  let ⟨n, e, hn⟩ := (trT_reach N t a).1 h; ⟨n, e, hn.occurs⟩
+
+/-- A row that keeps `n` live has its atom: `Scope s`, or a capture row written in it. -/
+theorem trT_keeps {r : Ty} {n : Nat} (h : r.Keeps n) : (trT N r).asRow (.atm (.v n)) := by
+  induction r using Ty.ind with
+  | var m => exact h.elim
+  | rnm c t _ => exact .inr (trT_reach_v N h)
+  | run r r' ihr ihr' =>
+    rcases h with h | h
+    · exact .inl (ihr h)
+    · exact .inr (ihr' h)
+  | con c =>
+    simp only [Ty.Keeps, Ty.Shown] at h
+  | app t u _ _ => exact trT_reach_v N h
+  | arr φ a b q _ _ _ _ =>
+    have := trT_reach_v N h
+    rw [trT_arr] at this ⊢
+    exact this
+  | cnil => exact h.elim
+  | cun q q' _ _ => exact trT_reach_v N h
+  | all k t _ => exact trT_reach_v N h
 
 theorem trD_reach (q : Cn) (a : Atom) : ¬ (trD N q).reach a := by
   simp [trD, Flick.Ty.reach, Caps.none]
@@ -179,26 +202,8 @@ theorem trTT_reach (t : TTy) (a : Atom) : (trTT N t).reach a ↔ ∃ n, a = .v n
   induction t generalizing a with
   | mono t => exact trT_reach N t a
   | arr φ a b q iha ihb =>
-    simp only [trTT_arr, Flick.Ty.reach, Stage.qual_reach, iha, ihb, trT_reach, TTy.reach,
-      Stage.atoms, ex_or]
+    simp only [trTT_arr, Flick.Ty.reach, iha, ihb, trT_reach, TTy.reach, ex_or]
   | dict q => simp [trTT, trD_reach, TTy.reach]
-
-theorem trTT_reach_dicts {q : Ty} {qs : List Cn} {t : TTy} {a : Atom} (h : (trTT N t).reach a) :
-    (trTT N (dicts q qs t)).reach a := by
-  induction qs with
-  | nil => exact h
-  | cons c qs ih => exact .inr (.inl ih)
-
-theorem trS_reach (s : TSch) (a : Atom) : (trS N s).reach a ↔ ∃ n, a = .v n ∧ s.reach n := by
-  simp only [Flick.Scheme.reach, trS, trTT_reach, TSch.reach]
-  constructor
-  · rintro ⟨b, ⟨n, rfl, h⟩, hd⟩
-    simp only [Atom.down] at hd
-    split at hd
-    · cases hd
-    · cases hd; exact ⟨n - s.k, rfl, by rwa [Nat.sub_add_cancel (by omega)]⟩
-  · rintro ⟨n, rfl, h⟩
-    exact ⟨.v (n + s.k), ⟨_, rfl, h⟩, by simp [Atom.down]⟩
 
 theorem Caps.substT_or (C C' : Caps) (σ : Atom → Flick.Ty) :
     Caps.substT σ (fun a => C a ∨ C' a) = fun a => C.substT σ a ∨ C'.substT σ a := by
@@ -210,22 +215,6 @@ theorem Caps.substT_or (C C' : Caps) (σ : Atom → Flick.Ty) :
   · rintro (⟨b, h, hb⟩ | ⟨b, h, hb⟩)
     · exact ⟨b, .inl h, hb⟩
     · exact ⟨b, .inr h, hb⟩
-
-theorem Stage.atoms_subst (φ : Stage) (σ : Nat → Ty) :
-    (φ.subst σ).atoms = φ.atoms.substT (trσ N σ) := by
-  funext x; apply propext
-  simp only [Stage.atoms, Caps.substT]
-  cases φ with
-  | P => simp [Stage.subst, Stage.Occurs]
-  | R r e =>
-    simp only [Stage.subst, Stage.Occurs, Ty.occurs_subst_iff]
-    constructor
-    · rintro ⟨n, rfl, ⟨m, hm, hn⟩ | ⟨m, hm, hn⟩⟩
-      · exact ⟨.v m, ⟨m, rfl, .inl hm⟩, trT_reach_v N hn⟩
-      · exact ⟨.v m, ⟨m, rfl, .inr hm⟩, trT_reach_v N hn⟩
-    · rintro ⟨b, ⟨m, rfl, hm⟩, hx⟩
-      obtain ⟨n, rfl, hn⟩ := (trT_reach N _ x).1 hx
-      exact ⟨n, rfl, hm.imp (fun h => ⟨m, h, hn⟩) fun h => ⟨m, h, hn⟩⟩
 
 /-- The translation commutes with a substitution whose types shift as they should. -/
 theorem trT_subst_of (t : Ty) (σ : Nat → Ty)
@@ -262,14 +251,8 @@ theorem trT_subst_of (t : Ty) (σ : Nat → Ty)
       | P => rfl
       | R r e =>
         simp [Stage.subst, trStage, Flick.Stage.substT, ihφ.1 σ hσ, ihφ.2 σ hσ, Ty.asRow_substT, errRow_substT]
-    have hq : (φ.subst σ).qual (trT N (q.subst σ)).reach =
-        Caps.substT (trσ N σ) (φ.qual (trT N q).reach) := by
+    have hq : (trT N (q.subst σ)).reach = Caps.substT (trσ N σ) (trT N q).reach := by
       rw [ihq σ hσ, ← Ty.reach_caps]
-      cases φ with
-      | P => rfl
-      | R r e =>
-        show (fun x => _ ∨ _) = Caps.substT _ (fun x => _ ∨ _)
-        rw [Caps.substT_or, ← Stage.atoms_subst N (.R r e) σ]
     simp only [Ty.subst, trT_arr, Flick.Ty.substT, iha σ hσ, ihb σ hσ, hφ, hq]
   | cnil => simp [Ty.subst, trT, Flick.Ty.substT]
   | cun q q' ihq ihq' =>
@@ -305,14 +288,8 @@ theorem trTT_subst (t : TTy) (σ : Nat → Ty) :
   induction t with
   | mono t => exact trT_subst N t σ
   | arr φ a b q iha ihb =>
-    have hq : (φ.subst σ).qual (trT N (q.subst σ)).reach =
-        Caps.substT (trσ N σ) (φ.qual (trT N q).reach) := by
+    have hq : (trT N (q.subst σ)).reach = Caps.substT (trσ N σ) (trT N q).reach := by
       rw [trT_subst, ← Ty.reach_caps]
-      cases φ with
-      | P => rfl
-      | R r e =>
-        show (fun x => _ ∨ _) = Caps.substT _ (fun x => _ ∨ _)
-        rw [Caps.substT_or, ← Stage.atoms_subst N (.R r e) σ]
     simp only [TTy.subst, trTT_arr, Flick.Ty.substT, iha, ihb, trStage_subst, hq]
   | dict q => exact trD_subst N q σ
 
@@ -333,9 +310,59 @@ theorem trσ_inst (ts : List Ty) (a : Atom) : trσ N (inst ts) a = instT (ts.map
   | v n => simp only [trσ, inst, instT, List.length_map]; split <;> simp [trT]
   | r p => rfl
 
+theorem trB_var (i : Nat) (D : Ty) : trB N (.var i, D) = Facts.bnd i (trT N D).reach := rfl
+
+/-- A value bound as a fact under any substitution of the core. -/
+theorem trB_substT_any (b : Ty × Ty) (ρ : Atom → Flick.Ty) :
+    (trB N b).substT ρ =
+      fun C r => C = ((trT N b.1).substT ρ).reach ∧ r = .caps ((trT N b.2).substT ρ).reach := by
+  funext C r; apply propext
+  simp only [trB, Facts.substT, ← Ty.reach_caps]
+  constructor
+  · rintro ⟨_, _, ⟨rfl, rfl⟩, rfl, rfl⟩; exact ⟨rfl, rfl⟩
+  · rintro ⟨rfl, rfl⟩; exact ⟨_, _, ⟨rfl, rfl⟩, rfl, rfl⟩
+
+theorem trB_substT (b : Ty × Ty) (σ : Nat → Ty) :
+    (trB N b).substT (trσ N σ) = trB N (Bound.subst σ b) := by
+  rw [trB_substT_any]; unfold trB; simp only [Bound.subst, trT_subst]
+
+theorem trBd_substT (bd : List (Ty × Ty)) (σ : Nat → Ty) :
+    (trBd N bd).substT (trσ N σ) = trBd N (bd.map (Bound.subst σ)) := by
+  induction bd with
+  | nil => exact Facts.none_substT _
+  | cons b bd ih => simp only [trBd, List.map_cons, Facts.union_substT, trB_substT, ih]
+
+/-- The facts of value bounds hold under the translation of a substitution that makes the
+bounds hold: `⌈⟦t⟧⌉ ⊆ ⌈⟦D⟧⌉` is what `t` shows within what `D` shows (`trT_reach`). -/
+theorem trBd_holds {bd : List (Ty × Ty)} {σ : Nat → Ty} {ρ : Atom → Flick.Ty}
+    (hρ : ∀ a, ρ a = trσ N σ a) (h : Bounds.Hold (bd.map (Bound.subst σ))) (Θ : Facts) :
+    ∀ C r, trBd N bd C r → Outl Θ (C.substT ρ) (r.substT ρ) := by
+  rw [funext hρ]
+  induction bd with
+  | nil => intro _ _ h; exact h.elim
+  | cons b bd ih =>
+    rintro C r (⟨rfl, rfl⟩ | hr)
+    · refine Outl.caps_of_sub fun a ha => ?_
+      rw [Ty.reach_caps, ← trT_subst] at ha ⊢
+      obtain ⟨n, rfl, hn⟩ := (trT_reach N _ a).1 ha
+      exact trT_reach_v N (h _ (.head _) n hn)
+    · exact ih (fun b hb => h b (.tail _ hb)) C r hr
+
+theorem trFacts_holds {k : Nat} {bd : List (Ty × Ty)} {σ : Nat → Ty} {ρ : Atom → Flick.Ty}
+    (hρ : ∀ a, ρ a = trσ N σ a) (h : Bounds.Hold (bd.map (Bound.subst σ))) (Θ : Facts) :
+    ∀ C r, trFacts N k bd C r → Outl Θ (C.substT ρ) (r.substT ρ) := by
+  unfold trFacts; split
+  · intro _ _ h; exact h.elim
+  · exact trBd_holds N hρ h Θ
+
 theorem trS_subst (s : TSch) (σ : Nat → Ty) : trS N (s.subst σ) = (trS N s).substT (trσ N σ) := by
-  simp only [trS, TSch.subst, Flick.Scheme.substT, Facts.none_substT, trTT_subst]
+  simp only [trS, TSch.subst, Flick.Scheme.substT, trTT_subst, Flick.Scheme.mk.injEq, true_and]
   rw [funext (trσ_lift N s.k σ)]
+  refine ⟨?_, rfl⟩
+  rw [← funext (trσ_lift N s.k σ)]
+  unfold trFacts; split
+  · exact (Facts.none_substT _).symm
+  · exact (trBd_substT N _ _).symm
 
 theorem trS_up (s : TSch) (k : Nat) : trS N (s.subst (up k)) = (trS N s).up k := by
   rw [trS_subst, Flick.Scheme.up, funext (trσ_up N k)]

@@ -94,6 +94,9 @@ pub fn describe(
             break;
         }
     }
+    if let Some(project) = project {
+        files.extend(toolchain::contract_inputs(&project.root));
+    }
     files.sort();
     files.dedup();
     let mut key = Key::default();

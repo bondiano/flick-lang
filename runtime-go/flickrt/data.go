@@ -57,7 +57,7 @@ func Equals(a, b Value) bool {
 		y, ok := b.(*Duration)
 		return ok && durationOrder(x, y) == 0
 	case *Chunk:
-		// Effect's Chunk is `Equal`: the same elements, by `Equal.equals`
+		// a Chunk equals one with the same elements, by structural equality
 		y, ok := b.(*Chunk)
 		return ok && Equals(x.items, y.items)
 	case *Dict:
@@ -155,8 +155,8 @@ func ordered(a, b Value) bool {
 // combine folds a hash into another, as Flick's list and derived hashes do.
 func combine(h, x int32) int32 { return h*31 + x }
 
-// Hash is `hash` of a primitive, as Effect's `Hash.hash` computes it on the
-// JS target, which hash collections order their elements by.
+// Hash is `hash` of a primitive, computed as on the JS target, which hash
+// collections order their elements by.
 func Hash(a Value) Value { return hash(a) }
 
 func optimize(n int32) int32 { return n&-0x40000001 | int32(uint32(n)>>1)&0x40000000 }
@@ -174,10 +174,16 @@ func effectCombine(a, b int32) int32 {
 	return mix(int32(uint32(a)*0x9e3779b1 + uint32(b)*0x85ebca6b))
 }
 
-// hashString is Effect's djb2 over the UTF-16 code units, from the last.
+// hashString is djb2 over the UTF-16 code units, from the last.
 func hashString(s string) int32 {
-	units := utf16Units(s)
 	h := int32(5381)
+	if ascii(s) {
+		for i := len(s) - 1; i >= 0; i-- {
+			h = h*33 ^ int32(s[i])
+		}
+		return optimize(h)
+	}
+	units := utf16Units(s)
 	for i := len(units) - 1; i >= 0; i-- {
 		h = h*33 ^ int32(units[i])
 	}
@@ -196,6 +202,15 @@ func hashNumber(x float64) int32 {
 	return optimize(effectCombine(int32(bits>>32), int32(bits)))
 }
 
+// The hashes of the strings every hash of a Bool, a Unit or a variant
+// takes, made once.
+var (
+	hashTrue  = optimize(mix(hashString("true")))
+	hashFalse = optimize(mix(hashString("false")))
+	hashUnit  = optimize(mix(hashString("undefined")))
+	hashOfTag = hashString("_tag")
+)
+
 func hash(a Value) int32 {
 	switch x := a.(type) {
 	case int32:
@@ -207,9 +222,12 @@ func hash(a Value) int32 {
 	case *big.Int:
 		return hashString(x.String())
 	case bool:
-		return optimize(mix(hashString(strconv.FormatBool(x))))
+		if x {
+			return hashTrue
+		}
+		return hashFalse
 	case UnitType:
-		return optimize(mix(hashString("undefined")))
+		return hashUnit
 	case []Value:
 		h := int32(6151)
 		for _, v := range x {
@@ -218,7 +236,7 @@ func hash(a Value) int32 {
 		return optimize(h)
 	case *Data:
 		// the object `{ _tag, _0, … }`: its keys in any order
-		h := int32(12289) ^ effectCombine(hashString("_tag"), hashString(x.Tag))
+		h := int32(12289) ^ effectCombine(hashOfTag, hashString(x.Tag))
 		for i, v := range x.Fields {
 			h ^= effectCombine(hashString(nativeField(x.Tag, i)), hash(v))
 		}

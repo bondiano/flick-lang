@@ -1,9 +1,12 @@
-/// Effect's `HttpServer` on Node.js: `serve` starts a server of a handler
+/// An HTTP server on Node.js: `serve` starts a server of a handler
 /// that belongs to the scope of region `s`. Each request runs in a fiber of
 /// the server; when the scope closes, the server stops accepting
 /// connections, waits for the requests that are running and their
 /// finalizers, at most `gracefulShutdownTimeout` (20 seconds by default),
-/// and then interrupts what is left. A `HttpServerError` or
+/// and then interrupts what is left and waits for its cleanup. The timeout
+/// bounds ordinary work, not finalizers or uninterruptible foreign work.
+/// Requests stop before the server owner's resource finalizers run.
+/// A `HttpServerError` or
 /// `Http.Multipart.MultipartError` a handler lets through is answered with
 /// its status, any other failure with 500.
 module Http.Server exposing (..)
@@ -39,14 +42,14 @@ serve :
   ServeOptions ->
   (ServerRequest ->{r; e} ServerResponse)^c ->{Async, Scope s | r; ServeError}
   Server s
-foreign effect serve from "@flick-lang/effect-ts/effect/http/HttpServer" "flickServe"
+foreign effect serve from "flick:http/HttpServer" "flickServe"
   arity 2
   retention owner
   reviewed "effect@4.1.2 sha256:2830adcb190e6acd"
 
 /// Where the server listens.
 address : Server s -> Address
-foreign pure address from "@flick-lang/effect-ts/effect/http/HttpServer" "flickAddress"
+foreign pure address from "flick:http/HttpServer" "flickAddress"
   retention call
   reviewed "effect@4.1.2 sha256:2ee695843d7fe6dc"
 
@@ -63,9 +66,10 @@ let format_address a =
 address_formatted_with : (String ->{r; e} a) -> Server s ->{r; e} a
 let address_formatted_with f server = f (format_address (address server))
 
-/// Logs `Listening on <url>` at the info level of Effect's logger.
+/// Logs `Listening on <url>` at the info level, through the current
+/// loggers.
 log_address : Server s ->{} Unit
-foreign effect log_address from "@flick-lang/effect-ts/effect/http/HttpServer" "flickLogAddress"
+foreign effect log_address from "flick:http/HttpServer" "flickLogAddress"
   retention call
   reviewed "effect@4.1.2 sha256:13cc22882eaf503e"
 

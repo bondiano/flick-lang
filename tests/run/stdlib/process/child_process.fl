@@ -1,4 +1,4 @@
-// Effect's child processes: commands run to their end, a pipeline, input,
+// Child processes: commands run to their end, a pipeline, input,
 // environment and directory, a spawned process read as streams and
 // stopped, and a program that does not exist. Commands go through `sh` on
 // POSIX and `cmd` on Windows, and are compared line by line.
@@ -26,7 +26,7 @@ let reason failure =
 
 /// Text of a byte stream, as lines.
 text_lines :
-  (Stream none {PlatformError.PlatformError} (List Int))^c ->{; PlatformError.PlatformError}
+  (Stream {Async} {PlatformError.PlatformError} (List Int))^c ->{Async; PlatformError.PlatformError}
   List String
 let text_lines bytes = Stream.run_collect (Stream.split_lines (Stream.decode_text bytes))
 

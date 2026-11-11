@@ -56,7 +56,7 @@ impl Gen<'_> {
             }
             (self.collector, self.sync, self.limit) = saved;
             self.generator = generator;
-            let function = format!("function* () {{\n{}}}", indent(&stmts));
+            let function = self.generator_function("", &stmts);
             if !sync {
                 format!("{}({function})", self.rt("seq"))
             } else if self.generator && !self.kernel {
@@ -74,8 +74,14 @@ impl Gen<'_> {
     /// Emits `e` for what it does: the loops, guards and yields of a `for`.
     pub(super) fn discard(&mut self, e: &Expr) {
         match &e.kind {
-            ExprKind::Each { pat, source, body } => {
+            ExprKind::Each {
+                pat,
+                source,
+                body,
+                stop,
+            } => {
                 let s = self.expr(source);
+                let s = if stop.is_some() { self.spill(s) } else { s };
                 let (var, test) = match pat {
                     Pat::Bind(name) => (names::ident(name), false),
                     _ => (self.temp(), true),
@@ -86,9 +92,19 @@ impl Gen<'_> {
                     } else {
                         g.discard(body);
                     }
+                    if let Some(stop) = stop {
+                        let stop = g.expr(stop);
+                        g.buf.push(format!("if ({stop}) break;"));
+                    }
                 });
-                self.buf
-                    .push(format!("for (const {var} of {s}) {{\n{}}}", indent(&inner)));
+                let loop_ = format!("for (const {var} of {s}) {{\n{}}}", indent(&inner));
+                let loop_ = if let Some(stop) = stop {
+                    let stop = self.expr(stop);
+                    format!("if (!({stop})) {{\n{}}}", indent(&[loop_]))
+                } else {
+                    loop_
+                };
+                self.buf.push(loop_);
             }
             ExprKind::Yield(value) => {
                 let v = self.expr(value);

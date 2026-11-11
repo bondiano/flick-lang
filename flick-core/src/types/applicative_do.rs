@@ -12,6 +12,7 @@ use crate::iface::Namespace;
 use crate::source::Span;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
+use crate::syntax::patterns;
 use crate::types::env::Found;
 use crate::types::lang::{self, Lang};
 
@@ -117,11 +118,11 @@ impl Checker<'_> {
         let patterns: Vec<Option<&Node>> = parts.iter().map(|(p, _)| *p).collect();
         if let (Some(value), Some((x, fx, captures))) = (applicative, result) {
             self.typing.applicative.insert(group.range());
-            let function = self.implicit_captures(&Type::Captured {
+            let function = Type::Captured {
                 ty: Box::new(curried(&items, x)),
                 captures: Box::new(captures),
                 value: false,
-            });
+            };
             let body = |c: &mut Self, result: Option<Type>| match result {
                 Some(result) => {
                     c.check(value, &result);
@@ -175,9 +176,8 @@ impl Checker<'_> {
             self.expect(&ty, expected, self.span(group));
         }
         let continuation = self.group_continuation(&continuation, items);
-        let function = self.implicit_captures(&continuation);
         let body = |c: &mut Self, result: Option<Type>| c.do_rest(node, rest, result.as_ref());
-        self.function_with(patterns, body, Some(&function), group);
+        self.function_with(patterns, body, Some(&continuation), group);
         ty
     }
 
@@ -293,7 +293,7 @@ impl Checker<'_> {
             None => {
                 name == "pure"
                     && !bound.iter().any(|b| b == "pure")
-                    && !self.locals.iter().any(|l| l.name == "pure")
+                    && !self.cx.locals.iter().any(|l| l.name == "pure")
                     && matches!(self.env.find(Namespace::Value, "pure"),
                         Found::Entity(e) if lang::is(Lang::Pure, &e.module, &e.name))
             }
@@ -332,11 +332,7 @@ fn curried(items: &[Type], result: Type) -> Type {
 
 /// The names `pattern` binds.
 fn binders(pattern: &Node, text: &str, out: &mut Vec<String>) {
-    if pattern.kind == K::VarPat {
-        let (start, end) = pattern.range();
-        out.push(text[start as usize..end as usize].trim().to_owned());
-    }
-    for child in pattern.nodes() {
-        binders(child, text, out);
-    }
+    let mut names = Vec::new();
+    patterns::binders(pattern, &mut names);
+    out.extend(names.iter().map(|name| name.text(text).to_owned()));
 }

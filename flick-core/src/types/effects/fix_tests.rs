@@ -330,7 +330,7 @@ fn the_fix_of_g001_adds_the_region_to_a_written_qualifier() {
             "module Probe exposing (..)\n\
              type Handle (s : Region) = Handle\n\
              {signature}\n\
-             let f h = fun () -> ignore h\n"
+             let f _ x = x\n"
         )
     };
     let fixed = |signature: &str| {
@@ -353,8 +353,11 @@ fn the_fix_of_g001_adds_the_region_to_a_written_qualifier() {
             .expect("the signature")
             .to_owned()
     };
+    // what using a stream needs may not be narrowed away
     assert_eq!(
-        fixed("f : Handle s -> (Unit ->{} Unit)^{}"),
-        "f : Handle s -> (Unit ->{} Unit)^{s}"
+        fixed(
+            "f : Handle s -> (Stream.Stream none none Int)^{s} -> (Stream.Stream none none Int)^{}"
+        ),
+        "f : Handle s -> (Stream.Stream none none Int)^{s} -> (Stream.Stream none none Int)^{s}"
     );
 }

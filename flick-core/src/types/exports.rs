@@ -1,10 +1,13 @@
 //! The types and kinds of a module's exports, as `.iface` stores them.
 
+use std::collections::HashMap;
+
 use super::Checker;
 use super::env::{Abi, Form, TypeDef};
+use super::regions;
 use super::services::Operation;
 use super::ty::Type;
-use crate::iface::{Decl, Entity, Export, Interface, Namespace};
+use crate::iface::{self, Decl, Entity, Export, Interface, Namespace};
 
 impl Checker<'_> {
     /// Stores the types and kinds of this module's exports.
@@ -20,8 +23,13 @@ impl Checker<'_> {
             })
             .map(|e| e.entity.name.as_str())
             .collect();
-        interface.makers = super::makers::exported_makers(&self.typing.makers, &exported);
-        interface.servers = super::server::exported_servers(&self.typing.servers, &exported);
+        let makers = tagged(&self.typing.makers, &exported, |_| Vec::new());
+        let servers = tagged(&self.typing.servers, &exported, Vec::clone);
+        let tags = [(iface::MAKER, makers), (iface::SERVER, servers)];
+        interface.tags = (tags.into_iter())
+            .filter(|(_, marked)| !marked.is_empty())
+            .map(|(tag, marked)| (tag.to_owned(), marked))
+            .collect();
         for export in &mut interface.exports {
             let entity = &export.entity;
             if entity.module != self.env.module {
@@ -108,6 +116,7 @@ impl Checker<'_> {
                 Form::Adt { .. } => Decl::Adt,
                 Form::Error => Decl::Error,
                 Form::Alias { .. } => Decl::Alias,
+                Form::ModuleContract { .. } | Form::ModuleSignature { .. } => Decl::ModuleType,
                 Form::Service { .. } => Decl::Service,
                 Form::Class { .. } => Decl::Class,
                 Form::Kind => Decl::Kind,
@@ -193,6 +202,12 @@ impl Checker<'_> {
     /// need no alias of a module they do not import.
     fn exported(&self, t: &Type) -> Type {
         let t = self.zonk(t);
+        // a use elides `Live` again from the signature (`regions/live.rs`)
+        let t = if regions::has_live(&t) {
+            regions::strip_live(&t)
+        } else {
+            t
+        };
         let (head, args) = t.spine();
         if let Type::Con { module, name } = head
             && let Some(Form::Alias {
@@ -212,4 +227,19 @@ impl Checker<'_> {
         }
         t.map_children(&mut |c| self.exported(c))
     }
+}
+
+/// The values among the exported ones that `marked` holds, each with the
+/// path `path` gives it, for the tags of the interface.
+fn tagged<P>(
+    marked: &HashMap<String, P>,
+    exported: &[&str],
+    path: impl Fn(&P) -> Vec<String>,
+) -> Vec<(String, Vec<String>)> {
+    let mut found: Vec<(String, Vec<String>)> = exported
+        .iter()
+        .filter_map(|n| Some(((*n).to_owned(), path(marked.get(*n)?))))
+        .collect();
+    found.sort();
+    found
 }

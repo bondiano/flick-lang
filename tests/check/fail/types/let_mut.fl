@@ -1,6 +1,6 @@
 // Assignments the checker rejects: to a name that is not `let mut`, of
-// another type, to or from a `let mut` of an enclosing function, and inside
-// the body of `try … with` or a loop.
+// another type, to or from a `let mut` of an enclosing function, and
+// inside a strict comprehension.
 module App.LetMutFail exposing (..)
 
 type error Missing = Missing String
@@ -12,13 +12,13 @@ not_mut : Int -> Int
 let not_mut n =
   let x = n
   x = x + 1
-//^ FLICK-T060 `x` is not `let mut`
+//^ FLICK-T069 `x` is not `let mut`
   x
 
 parameter : Int -> Int
 let parameter n =
   n = 2
-//^ FLICK-T060 `n` is not `let mut`
+//^ FLICK-T069 `n` is not `let mut`
   n
 
 global : Int
@@ -27,13 +27,13 @@ let global = 1
 to_global : Unit -> Int
 let to_global () =
   global = 2
-//^^^^^^ FLICK-T060 only a `let mut` variable
+//^^^^^^ FLICK-T069 only a `let mut` variable
   global
 
 undeclared : Unit -> Int
 let undeclared () =
   fresh = 2
-//^^^^^ FLICK-T060 cannot find `fresh`
+//^^^^^ FLICK-T069 cannot find `fresh`
   0
 
 other_type : Int -> Int
@@ -92,20 +92,22 @@ let in_handler_arm () =
   | Ask.ask () -> answer
 //                ^^^^^^ FLICK-G005 `answer`
 
-in_try_body : String ->{} Int
-let in_try_body key =
-  let mut status = 0
-  try
-    status = 1
-//  ^^^^^^ FLICK-T061 the body of `try … with`
-    from_result (Err (Missing key))
-  with
-  | Missing _ -> status
+polymorphic_cell : Unit -> Int
+let polymorphic_cell () =
+  value : a
+  let mut value = 1
+  value = 2
+  value
 
-in_loop : List Int ->{} Int
-let in_loop xs =
+strict_outer : List Int -> List Int
+let strict_outer xs =
   let mut total = 0
-  for x <- xs do
+  total = 1
+  [for x <- xs yield (if x > 0 then
     total = total + x
-//  ^^^^^ FLICK-T061 a loop
-  total
+    total
+  else total)]
+
+//~ FLICK-T013 @97:11-97:12
+
+//~ FLICK-T070 @107:5-107:10

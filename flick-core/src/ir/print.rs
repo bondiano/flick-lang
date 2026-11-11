@@ -83,6 +83,8 @@ pub fn dict(d: &Dict) -> String {
             format!("<{name}>({})", args.join(", "))
         }
         Dict::Given(g) => format!("?{g}"),
+        Dict::Value { module, name } => format!("@{module}.{name}"),
+        Dict::Opened { binder, field } => format!("@{binder}.{field}"),
         Dict::Field(local) => format!("@{local}"),
         Dict::Super { dict: d, class } => format!("{}.{class}", dict(d)),
         Dict::Structural { class, fields } => {
@@ -177,6 +179,7 @@ pub fn expr(e: &Expr) -> String {
         ExprKind::Tuple(items) => format!("({})", exprs(items)),
         ExprKind::List(items) => format!("[{}]", exprs(items)),
         ExprKind::Record(f) => format!("{{{}}}", fields(f)),
+        ExprKind::Dictionary(f) => format!("dictionary {{{}}}", fields(f)),
         ExprKind::Update(r, f) => format!("{{{} with {}}}", expr(r), fields(f)),
         ExprKind::Field(r, l) => format!("{}.{l}", expr(r)),
         ExprKind::Binary(op, l, r) => format!("({} {} {})", expr(l), op.symbol(), expr(r)),
@@ -206,8 +209,13 @@ pub fn expr(e: &Expr) -> String {
             pat: p,
             source,
             body,
+            stop,
         } => {
+            let _ = stop;
             format!("(each {} <- {} {})", pat(p), expr(source), expr(body))
+        }
+        ExprKind::ControlLoop { .. } | ExprKind::LoopExit { .. } | ExprKind::Loop { .. } => {
+            loop_expr(e)
         }
         ExprKind::Yield(e) => format!("(yield {})", expr(e)),
         ExprKind::Within(owner, e) => format!("(within {owner} {})", expr(e)),
@@ -317,4 +325,25 @@ fn handler(h: &Handler) -> String {
         expr(&h.body),
         arms(&h.errors)
     )
+}
+
+fn loop_expr(e: &Expr) -> String {
+    match &e.kind {
+        ExprKind::ControlLoop {
+            id,
+            condition,
+            body,
+            iterable,
+        } => format!(
+            "(control-loop {id} {iterable} {} {})",
+            condition.as_deref().map_or("true".into(), expr),
+            expr(body)
+        ),
+        ExprKind::LoopExit { id, value } => format!(
+            "(exit {id} {})",
+            value.as_deref().map_or("continue".into(), expr)
+        ),
+        ExprKind::Loop { condition, body } => format!("(loop {} {})", expr(condition), expr(body)),
+        _ => unreachable!("loop"),
+    }
 }

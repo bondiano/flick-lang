@@ -37,11 +37,12 @@ Qualified names are written without spaces around `.`: `Users.get`,
 module exposing import as let mut rec fun match with try if then else task await
 scope provide ignore todo echo type opaque refined where kind error service class
 instance deriving foreign from forall not none true false
-ui in when for yield do
+ui in when for yield do break continue
 ```
 
 Contextual words are ordinary names everywhere except in one position:
 
+- `loop` before `{` and `while` before a condition followed by `do`;
 - `unboxed` and `untagged` right before `type` (see `codegen.md`);
 - foreign modes `pure`, `effect`, `blocked` and the source
   `global`;
@@ -239,7 +240,7 @@ let between x =
 ## Declarations
 
 ```text
-file        = [module_header] { import } { decl }
+file        = [module_header] { import } { decl | module_application }
 module_header = "module" ModulePath ["exposing" exposing]
 import      = "import" ModulePath ["as" Con] ["exposing" exposing]
 exposing    = "(" item { "," item } [","] ")"
@@ -247,8 +248,11 @@ item        = name | Con | Con "(..)" | ".." | "plugin" name   // see plugins.md
 ModulePath  = Con { "." Con }
 
 decl        = signature | let | rec_group | type_decl | kind_decl | error_decl
-            | service | class | instance | foreign
+            | service | class | instance | foreign | module_contract | inline_module
             | head { head_arg } ("{" { token } "}" | { token })   // a plugin's, to the next decl
+inline_module = "module" Con ["exposing" exposing] "=" indented { import | decl }
+module_contract = "type" "module" Con "=" indented { module_member }
+module_application = "module" Con "=" ModulePath "(" ModulePath { "," ModulePath } ")"
 signature   = name ":" type
 let         = "let" ["rec"] (name { atom_pattern } | pattern) [":" type] "=" block
             | "let" "assert" pattern [":" type] "=" block ["as" String]
@@ -278,6 +282,9 @@ foreign     = "foreign" [mode] name "from" ("global" String | String String) [me
 mode        = "pure" | "effect"
 metadata    = indented lines: meta_name { atom }
 ```
+
+`module_application` is a file-level declaration. Writing it inside an
+`inline_module` reports `FLICK-R019`; a `module_contract` is allowed there.
 
 The right-hand side of `type` is always a list of variants, so
 `type Wrapper = Wrap Float` is an ADT with one constructor; a transparent
@@ -415,6 +422,9 @@ save_with :
 block       = statement { line break statement }
 statement   = "let" … | signature | name "=" block | expr
 expr        = "fun" atom_pattern { atom_pattern } "->" block
+            | "loop" "{" block "}"
+            | "while" expr "do" block
+            | "break" [expr] | "continue"
             | "match" expr "with" arm { arm }
             | "try" block "with" handler_arm { handler_arm }
             | "if" expr "then" block [ "else" (if_expr | block) ]

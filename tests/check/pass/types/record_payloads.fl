@@ -1,0 +1,16 @@
+// A constructor whose payload is a record: a function field and a field of
+// the same type variable share the capture bound of the constructed value.
+module App.RecordPayloads exposing (..)
+
+type Step a b = Step { run : a -> b; seed : a }
+
+make : (a -> b) -> a -> Step a b
+let make run seed = Step { run = run; seed = seed }
+
+twice : Step a a -> Step a a
+let twice (Step { run; seed }) = Step { run = fun x -> run (run x); seed = seed }
+
+type Counter a = Counter { bump : Int -> Int; items : List a }
+
+counter : List a -> Counter a
+let counter items = Counter { items = items; bump = fun n -> n + 1 }

@@ -16,7 +16,7 @@ impl Checker<'_> {
         since: usize,
         ty: &Type,
         origin: Span,
-        note: impl Fn(&str) -> String,
+        note: &dyn Fn(&str) -> String,
     ) {
         if self.diagnostics.len() == since {
             return;
@@ -52,14 +52,14 @@ impl Checker<'_> {
             _ => None,
         };
         match (named, signature) {
-            (Some(name), Some(sig)) => self.explain_since(since, param, sig, |t| {
+            (Some(name), Some(sig)) => self.explain_since(since, param, sig, &|t| {
                 format!("the {nth} argument of `{name}` is declared as `{t}` here")
             }),
             (Some(name), None) => {
-                let unsigned = (self.locals.iter().rev())
+                let unsigned = (self.cx.locals.iter().rev())
                     .find(|l| l.name == name)
                     .is_some_and(|l| l.unsigned);
-                self.explain_since(since, param, span, |t| {
+                self.explain_since(since, param, span, &|t| {
                     let takes = format!("`{name}` takes `{t}` as its {nth} argument");
                     if unsigned {
                         format!("{takes}: without a signature a local function has one type")
@@ -68,7 +68,7 @@ impl Checker<'_> {
                     }
                 });
             }
-            (None, _) => self.explain_since(since, param, span, |t| {
+            (None, _) => self.explain_since(since, param, span, &|t| {
                 format!("this function takes `{t}` as its {nth} argument")
             }),
         }

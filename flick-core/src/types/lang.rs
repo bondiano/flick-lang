@@ -11,203 +11,7 @@ use crate::iface::{Entity, Namespace};
 use crate::source::SourceMap;
 use crate::syntax::{self, cst::Node, kind::SyntaxKind as K};
 
-macro_rules! lang_items {
-    ($($item:ident = $name:literal,)*) => {
-        /// A lang item, spelled in snake case after `@lang`.
-        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-        pub enum Lang {
-            $($item,)*
-        }
-
-        impl Lang {
-            pub const ALL: &[Lang] = &[$(Lang::$item,)*];
-
-            pub fn name(self) -> &'static str {
-                match self {
-                    $(Lang::$item => $name,)*
-                }
-            }
-
-            pub fn from_name(name: &str) -> Option<Lang> {
-                match name {
-                    $($name => Some(Lang::$item),)*
-                    _ => None,
-                }
-            }
-        }
-    };
-}
-
-lang_items! {
-    // the module whose names every module sees unqualified
-    Prelude = "prelude",
-    // types
-    Unit = "unit",
-    Never = "never",
-    Bool = "bool",
-    Int = "int",
-    Float = "float",
-    BigInt = "bigint",
-    String = "string",
-    Unknown = "unknown",
-    JsValue = "js_value",
-    List = "list",
-    Seq = "seq",
-    Ref = "ref",
-    Redacted = "redacted",
-    Schema = "schema",
-    Url = "url",
-    Form = "form",
-    PureCodec = "pure_codec",
-    Eff = "eff",
-    Layer = "layer",
-    Codec = "codec",
-    Errors = "errors",
-    Ui = "ui",
-    ServiceTag = "service_tag",
-    Scope = "scope",
-    // what may suspend, which the runtime's scheduler handles at the root
-    Async = "async",
-    Setup = "setup",
-    AtomRead = "atom_read",
-    // what `ui` and atoms are made of, which their checks name
-    Atom = "atom",
-    AtomWritable = "atom_writable",
-    AtomBrowser = "atom_browser",
-    AtomFamily = "atom_family",
-    ReactivityAtom = "reactivity_atom",
-    ReactivityWritable = "reactivity_writable",
-    AtomWrite = "atom_write",
-    AtomRegistry = "atom_registry",
-    UiView = "ui_view",
-    UiHandler = "ui_handler",
-    UiComponent = "ui_component",
-    Action = "action",
-    View = "view",
-    EventExhaust = "event_exhaust",
-    EventLatest = "event_latest",
-    EventQueue = "event_queue",
-    EventConcurrent = "event_concurrent",
-    ActionQueue = "action_queue",
-    ActionConcurrent = "action_concurrent",
-    Serializable = "serializable",
-    SerializableFamily = "serializable_family",
-    SerializableTask = "serializable_task",
-    SerializableResult = "serializable_result",
-    ServiceImpl = "service_impl",
-    Option = "option",
-    Result = "result",
-    Exit = "exit",
-    Failure = "failure",
-    Json = "json",
-    SchemaError = "schema_error",
-    AppError = "app_error",
-    // constructors
-    None = "none",
-    Some = "some",
-    Err = "err",
-    Ok = "ok",
-    // classes
-    Eq = "eq",
-    Ord = "ord",
-    Hash = "hash",
-    Show = "show",
-    Iterable = "iterable",
-    Stream = "stream",
-    Numeric = "numeric",
-    Integer = "integer",
-    Floating = "floating",
-    // the classes the compiler solves for records, and their types
-    Label = "label",
-    Field = "field",
-    HasField = "has_field",
-    Lacks = "lacks",
-    Remove = "remove",
-    Project = "project",
-    UnionDisjoint = "union_disjoint",
-    MapFields = "map_fields",
-    Labels = "labels",
-    PathParams = "path_params",
-    // what scopes and fibers own
-    Owner = "owner",
-    Outlives = "outlives",
-    Provided = "provided",
-    Detached = "detached",
-    // the module of the built-in instances
-    Instances = "instances",
-    // class methods that syntax stands for
-    Map2 = "map2",
-    FlatMap = "flat_map",
-    Nothing = "nothing",
-    Iter = "iter",
-    ShowMethod = "show_method",
-    DisplayMethod = "display_method",
-    Add = "add",
-    Sub = "sub",
-    Mul = "mul",
-    Div = "div",
-    Rem = "rem",
-    Pow = "pow",
-    Negate = "negate",
-    FromInt = "from_int",
-    FromFloat = "from_float",
-    Lt = "lt",
-    Le = "le",
-    Gt = "gt",
-    Ge = "ge",
-    // functions that syntax stands for or the optimizer knows
-    FromResult = "from_result",
-    Fail = "fail",
-    LayerRun = "layer_run",
-    ScopeRun = "scope_run",
-    ScopeCurrent = "scope_current",
-    Pure = "pure",
-    OptionBind = "option_bind",
-    ResultBind = "result_bind",
-    OrdLt = "ord_lt",
-    OrdLe = "ord_le",
-    OrdGt = "ord_gt",
-    OrdGe = "ord_ge",
-    SeqFrom = "seq_from",
-    SeqRange = "seq_range",
-    SeqRangeTo = "seq_range_to",
-    SeqMap = "seq_map",
-    SeqFilter = "seq_filter",
-    SeqFlatMap = "seq_flat_map",
-    SeqTake = "seq_take",
-    SeqToList = "seq_to_list",
-    ListMap = "list_map",
-    ListFilter = "list_filter",
-    RecordLabel = "record_label",
-    WireCodec = "wire_codec",
-    CodecJson = "codec_json",
-    // what a server fn needs and serves as, which E009 and E011 name
-    Server = "server",
-    ServerFunction = "server_function",
-    ServerGuarded = "server_guarded",
-    // the live page, which a view's render does not reach
-    UiDocument = "ui_document",
-    // the checks of refined types the compiler applies to a constant
-    CheckEmail = "check_email",
-    CheckNonEmpty = "check_non_empty",
-    CheckPositive = "check_positive",
-    FloatInfinity = "float_infinity",
-    FloatNan = "float_nan",
-    LayerMerge = "layer_merge",
-    // the class the compiler gives every enum an instance of
-    Enum = "enum",
-    // the evidence of two types being one, which a GADT branch assumes
-    TypeEq = "type_eq",
-    CallSite = "call_site",
-    // the class `deriving Generic` gives an instance of, and its representation
-    Generic = "generic",
-    GenericSum = "generic_sum",
-    GenericCon = "generic_con",
-    GenericField = "generic_field",
-    TodoAt = "todo_at",
-    EchoAt = "echo_at",
-    AssertAt = "assert_at",
-}
+pub use crate::syntax::lang::Lang;
 
 /// Where a lang item is declared.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -247,6 +51,10 @@ impl Table {
             items: vec![None; Lang::ALL.len()],
         };
         for &(module, text) in sources {
+            // most modules declare none: only one that may is parsed
+            if !may_declare(text) {
+                continue;
+            }
             let mut map = SourceMap::default();
             let file = map.add(format!("<builtin>/{module}.fl"), text);
             let parse = syntax::parse(text, file);
@@ -279,6 +87,18 @@ impl Table {
         self.find(lang)
             .unwrap_or_else(|| panic!("no built-in module declares `@lang {}`", lang.name()))
     }
+}
+
+/// Whether `text` may hold a `@lang` attribute: an `@` whose next word is
+/// `lang`, however they are spaced, or one that no word follows, which only
+/// parsing tells apart.
+fn may_declare(text: &str) -> bool {
+    text.match_indices('@').any(|(at, _)| {
+        let rest = text[at + 1..].trim_start();
+        let end = rest.find(|c: char| !(c.is_alphanumeric() || c == '_'));
+        let word = end.map_or(rest, |end| &rest[..end]);
+        word.is_empty() || word == "lang"
+    })
 }
 
 /// The lang items of the built-in modules.
@@ -421,7 +241,25 @@ pub fn lang_of(attribute: &Node, text: &str) -> Option<Lang> {
 
 #[cfg(test)]
 mod tests {
-    use super::{Lang, table};
+    use super::{Lang, Table, may_declare, table};
+
+    /// A module is parsed for its lang items however the parser may read
+    /// the attribute, and not for an `@` of something else.
+    #[test]
+    fn a_lang_attribute_is_found_however_it_is_spaced() {
+        for spelling in ["@lang owner", "@ lang owner", "@\tlang owner"] {
+            let text =
+                format!("module Fiber exposing (Owner)\n\n{spelling}\ntype Owner (s : Region)\n");
+            let table = Table::of(&[("Fiber", &text)]);
+            let found = table.find(Lang::Owner).map(|item| item.name.as_str());
+            assert_eq!(found, Some("Owner"), "{spelling}");
+        }
+        assert!(may_declare("@"));
+        assert!(!may_declare(
+            "foreign f from \"@flick-lang/effect-ts\" \"f\""
+        ));
+        assert!(!may_declare("@language of the page"));
+    }
 
     /// Each lang item names one declaration of the built-in modules.
     #[test]

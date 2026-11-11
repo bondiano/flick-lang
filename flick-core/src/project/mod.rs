@@ -25,13 +25,14 @@ use std::path::{Component, Path, PathBuf};
 use std::sync::Arc;
 
 pub use config::Config;
-#[cfg(all(test, feature = "build-artifacts"))]
+pub(crate) use load::check_file;
+#[cfg(all(test, feature = "native-project"))]
 pub(crate) use load::js_only;
 #[cfg(feature = "ide")]
 pub use load::{Analysis, Analyzed, analysis_fingerprint, analyze, analyze_with};
 pub use load::{
     CachedModule, Compilation, Compiled, FormatPlugins, Fresh, MainKind, ModuleCache, PackageCache,
-    check, check_with, compile, compile_with, main_kind,
+    check, check_with, compile, compile_with, main_kind, stages_by_class,
 };
 #[cfg(feature = "native-project")]
 pub use packages::project_name;
@@ -62,7 +63,7 @@ use crate::source::FileId;
 use crate::source::SourceMap;
 
 #[cfg(feature = "native-project")]
-pub const CONFIG_FILE: &str = "flick.toml";
+pub use crate::manifest::CONFIG_FILE;
 
 /// File access for the project model; paths are absolute.
 pub trait Host {

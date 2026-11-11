@@ -1,0 +1,17 @@
+module App.Hom.Contracts exposing (Input, Output, Factory)
+
+type module Input =
+  type Item = String
+  class Eq = Prelude.Eq
+  seed : Int
+  sample : Item
+  equality : Eq.Dict Item
+  instance Eq Item from equality
+
+type module Output =
+  type Value
+  value : Value
+  answer : Int
+  same : Value -> Value -> Bool
+
+type module Factory = (K : Input) -> Output with type Value = K.Item

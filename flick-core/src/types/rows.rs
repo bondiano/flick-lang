@@ -7,6 +7,7 @@
 use std::cmp::Ordering;
 
 use super::Checker;
+use super::elem::Elem;
 use super::ty::{Norm, Row, Type, Written};
 use super::unify::{Mismatch, Unified};
 
@@ -30,7 +31,7 @@ impl Checker<'_> {
             .entries
             .iter()
             .chain(&right_norm.entries)
-            .any(|(label, _)| label.starts_with('^'))
+            .any(|(label, _)| matches!(label, Elem::Capture(_)))
         {
             left_norm = Norm::default();
             right_norm = Norm::default();
@@ -39,6 +40,7 @@ impl Checker<'_> {
         }
         self.merge_same_names(&mut left_norm)?;
         self.merge_same_names(&mut right_norm)?;
+        self.unify_live(&mut left_norm, &mut right_norm);
         let (left, right) = (left_norm, right_norm);
         let (mut only_left, mut only_right) = (Vec::new(), Vec::new());
         let (mut i, mut j) = (0, 0);
@@ -80,7 +82,7 @@ impl Checker<'_> {
             return Ok(());
         }
         self.pair_variable(&mut only_left, &mut only_right, &tails_left, &tails_right)?;
-        let missing = |only: &[(String, Type)], left| {
+        let missing = |only: &[(Elem, Type)], left| {
             only.first().map_or(Ok(()), |(label, _)| {
                 Err(Mismatch::Label {
                     label: label.clone(),
@@ -114,6 +116,22 @@ impl Checker<'_> {
                 missing(&only_right, false)?;
                 self.bind(*m, &written(extended(only_left, tails_left), left_written))
             }
+            // `?m` less some names against a row: the least `?m` is that row,
+            // which then holds none of the names
+            ([Type::Without { row, gone }], _) if matches!(**row, Type::Meta(_)) => {
+                missing(&only_left, true)?;
+                let Type::Meta(m) = **row else {
+                    unreachable!("matched above")
+                };
+                self.bind(m, &left_out(only_right, tails_right, gone, false)?)
+            }
+            (_, [Type::Without { row, gone }]) if matches!(**row, Type::Meta(_)) => {
+                missing(&only_right, false)?;
+                let Type::Meta(m) = **row else {
+                    unreachable!("matched above")
+                };
+                self.bind(m, &left_out(only_left, tails_left, gone, true)?)
+            }
             // `r1 + r2` against what is left empty: each variable is empty
             (metas, []) | ([], metas)
                 if only_left.is_empty()
@@ -144,13 +162,12 @@ impl Checker<'_> {
     /// against `{NotFound}`: the variable is that element.
     fn pair_variable(
         &mut self,
-        only_left: &mut Vec<(String, Type)>,
-        only_right: &mut Vec<(String, Type)>,
+        only_left: &mut Vec<(Elem, Type)>,
+        only_right: &mut Vec<(Elem, Type)>,
         tails_left: &[Type],
         tails_right: &[Type],
     ) -> Unified {
-        let variable =
-            |only: &[(String, Type)]| matches!(only, [(label, _)] if label.starts_with('~'));
+        let variable = |only: &[(Elem, Type)]| matches!(only, [(Elem::Error(_), _)]);
         let pair = match (&only_left[..], &only_right[..]) {
             ([(_, l)], [(_, r)])
                 if variable(only_left) && tails_left.is_empty()
@@ -175,6 +192,11 @@ impl Checker<'_> {
         while i < norm.entries.len() {
             if norm.entries[i].0 == norm.entries[i - 1].0 {
                 let (kept, same) = (norm.entries[i - 1].1.clone(), norm.entries.remove(i).1);
+                // what each `Live` needs alive, `regions/live.rs`, is needed together
+                if norm.entries[i - 1].0 == Elem::Live {
+                    norm.entries[i - 1].1 = Type::Union(Box::new(kept), Box::new(same));
+                    continue;
+                }
                 self.unify(&kept, &same)?;
             } else {
                 i += 1;
@@ -184,7 +206,24 @@ impl Checker<'_> {
     }
 }
 
-fn extended(entries: Vec<(String, Type)>, tails: Vec<Type>) -> Type {
+/// The row a variable less the names `gone` equals: it may hold none of them,
+/// or no row less them is this one. `left` says which side holds the entries.
+fn left_out(
+    entries: Vec<(Elem, Type)>,
+    tails: Vec<Type>,
+    gone: &[Elem],
+    left: bool,
+) -> Result<Type, Mismatch> {
+    match entries.iter().find(|(label, _)| gone.contains(label)) {
+        Some((label, _)) => Err(Mismatch::Label {
+            label: label.clone(),
+            left,
+        }),
+        None => Ok(extended(entries, tails)),
+    }
+}
+
+fn extended(entries: Vec<(Elem, Type)>, tails: Vec<Type>) -> Type {
     Norm { entries, tails }.into_type()
 }
 

@@ -1,0 +1,13 @@
+module App.Main exposing (main)
+
+type module IdentityModule =
+  identity : a -> a
+
+packed : Module IdentityModule
+let packed = pack Prelude as IdentityModule
+
+main : Unit ->{} Unit
+let main () =
+  let answer =
+    unpack packed as I in I.identity 42
+  Platform.stdout_line (show answer)

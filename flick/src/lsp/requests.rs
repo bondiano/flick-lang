@@ -88,15 +88,15 @@ impl Server {
 
     pub(super) fn snapshot_for(&mut self, path: &Path) -> &Snapshot {
         let context = Context::of(&self.docs, path);
-        let fresh = self
-            .snapshot
-            .as_ref()
-            .is_some_and(|s| s.context == context && s.file(path).is_some());
+        let kept = self.snapshots.get(&context);
+        let fresh = kept.is_some_and(|s| s.file(path).is_some());
         tracing::debug!(cached = fresh, "selecting analysis snapshot");
         if !fresh {
-            self.snapshot = Some(analyze(&self.docs, path, &mut self.caches));
+            let snapshot = analyze(&self.docs, path, &mut self.caches);
+            self.snapshots.insert(context.clone(), snapshot);
         }
-        self.snapshot.as_ref().expect("analyzed")
+        self.latest = Some(context.clone());
+        &self.snapshots[&context]
     }
 
     fn at_position(&mut self, method: &str, params: &Value) -> Reply {
@@ -133,10 +133,10 @@ impl Server {
                         })
                     }))
             }
-            "textDocument/documentSymbol" => Ok(features::document_symbols(&ide, &text, file)),
-            "textDocument/semanticTokens/full" => Ok(features::semantic_tokens(&ide, &text, file)),
-            "textDocument/foldingRange" => Ok(features::folding_ranges(&ide, &text, file)),
-            "textDocument/inlayHint" => Ok(features::inlay_hints(&ide, &text, file)),
+            "textDocument/documentSymbol" => Ok(features::document_symbols(&ide, file)),
+            "textDocument/semanticTokens/full" => Ok(features::semantic_tokens(&ide, file)),
+            "textDocument/foldingRange" => Ok(features::folding_ranges(&ide, file)),
+            "textDocument/inlayHint" => Ok(features::inlay_hints(&ide, file)),
             "textDocument/signatureHelp" => Ok(features::signature_help(&ide, file, offset)),
             "textDocument/typeDefinition" => ide
                 .type_definition(file, offset)
@@ -214,20 +214,26 @@ impl Server {
             .last()
             .map_or(cursor, |(i, _)| i);
         let dotted = text[..word].ends_with('.');
+        let cut;
         let (snapshot, offset) = if dotted {
             let dot = word - 1;
             let mut docs = self.docs.clone();
             docs.insert(path.clone(), format!("{}{}", &text[..dot], &text[cursor..]));
-            (analyze(&docs, &path, &mut self.caches), dot)
+            cut = analyze(&docs, &path, &mut self.caches);
+            (&cut, dot)
+        } else if self.docs.contains_key(&path) {
+            // the text of an open document is what its last change analyzed
+            (self.snapshot_for(&path), word)
         } else {
             let mut docs = self.docs.clone();
             docs.insert(path.clone(), text.clone());
-            (analyze(&docs, &path, &mut self.caches), word)
+            cut = analyze(&docs, &path, &mut self.caches);
+            (&cut, word)
         };
         let Some(file) = snapshot.file(&path) else {
             return Ok(json!([]));
         };
-        let items: Vec<Value> = ide(&snapshot)
+        let items: Vec<Value> = ide(snapshot)
             .complete(file, u32::try_from(offset).unwrap_or(0), dotted)
             .into_iter()
             .map(|c| {

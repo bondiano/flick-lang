@@ -6,14 +6,14 @@ import (
 	"time"
 )
 
-// The operations of Effect's Stream (Stream.ts) the others are built of:
-// streams of channels, sequential and concurrent maps, threaded states,
-// recovery and the latches their fibers meet at.
+// The operations of Stream the others are built of: streams of channels,
+// sequential and concurrent maps, threaded states, recovery and the
+// latches their fibers meet at.
 
 func onChannel(s Value, f func(self *Channel) *Channel) Value { return &Stream{f(streamOf(s).ch)} }
 
-// streamFlatMap is Effect's sequential `flatMap`: the stream of each
-// element, one after the other.
+// streamFlatMap is the sequential `flatMap`: the stream of each element,
+// one after the other.
 func streamFlatMap(self *Stream, f func(fb *Fiber, a Value) *Stream) *Stream {
 	return &Stream{channelFlatMap(channelFlattenArray(self.ch), func(fb *Fiber, a Value) *Channel { return f(fb, a).ch })}
 }
@@ -27,7 +27,7 @@ func streamFailCause(c *Cause) *Stream { return &Stream{channelFailCause(c)} }
 
 func streamFail(err Value) *Stream { return streamFailCause(&Cause{kind: causeFail, err: err}) }
 
-// streamFromPull is Effect's `fromPull(Effect.succeed(pull))`.
+// streamFromPullOf is the stream whose pull is `p`.
 func streamFromPullOf(p Pull) *Stream { return &Stream{channelFromPullOf(p)} }
 
 // streamConcat is `self` and then `that`, each in a scope of its own.
@@ -44,8 +44,8 @@ func streamCatchError(self *Stream, f func(fb *Fiber, err Value) *Stream) *Strea
 	return &Stream{channelCatchError(self.ch, func(fb *Fiber, err Value) *Channel { return f(fb, err).ch })}
 }
 
-// streamMapEffect is Effect's `mapEffect`: each element's result a chunk
-// of its own, `n` (at most; 1 or less: in turn) at once.
+// streamMapEffect is `mapEffect`: each element's result a chunk of its
+// own, `n` (at most; 1 or less: in turn) at once.
 func streamMapEffect(self *Stream, f func(fb *Fiber, a Value) Value, n int, unordered bool) *Stream {
 	elements := channelFlattenArray(self.ch)
 	var mapped *Channel
@@ -65,9 +65,9 @@ func concurrencyOf(o Value) int {
 	return math.MaxInt
 }
 
-// fiberSet is Effect's `Fiber.runIn(scope)` for fibers forked one by one:
-// those still running when the scope closes are interrupted and awaited,
-// and one that ended is forgotten.
+// fiberSet is fibers forked one by one into a scope: those still running
+// when the scope closes are interrupted and awaited, and one that ended is
+// forgotten.
 type fiberSet struct {
 	mu      sync.Mutex
 	running map[*child]struct{}
@@ -110,9 +110,9 @@ func (s *fiberSet) fork(fb *Fiber, task func(fb *Fiber) Value) *child {
 	return c
 }
 
-// channelMapEffectPar is Effect's `mapEffectConcurrent`: `f` of each
-// element in a fiber of its own, `n` at once, the results in their order
-// unless `unordered`.
+// channelMapEffectPar is the concurrent `mapEffect`: `f` of each element
+// in a fiber of its own, `n` at once, the results in their order unless
+// `unordered`.
 func channelMapEffectPar(self *Channel, f func(fb *Fiber, o Value) Value, n int, unordered bool) *Channel {
 	return fromTransformBracket(func(fb *Fiber, upstream Pull, scope, forked *Owner) Pull {
 		pull := self.transform(fb, upstream, scope)
@@ -193,9 +193,8 @@ func channelMapEffectPar(self *Channel, f func(fb *Fiber, o Value) Value, n int,
 	})
 }
 
-// channelMapAccumHalt is Effect's `Channel.mapAccum` with `onHalt`: once
-// the channel ends or fails, what `onHalt` gives of the last state goes
-// out first.
+// channelMapAccumHalt is `mapAccum` with `onHalt`: once the channel ends
+// or fails, what `onHalt` gives of the last state goes out first.
 func channelMapAccumHalt(self *Channel, initial func(fb *Fiber) Value, f func(fb *Fiber, s, o Value) (Value, []Value), onHalt func(fb *Fiber, s Value) []Value) *Channel {
 	return transformPull(self, func(fb *Fiber, pull Pull, _ *Owner) Pull {
 		state := initial(fb)
@@ -234,8 +233,8 @@ func nonEmptyChunk(values []Value) []Value {
 	return []Value{values}
 }
 
-// streamMapAccumArray is Effect's `mapAccumArray`: `f` of the state and
-// each chunk gives the next state and the elements to emit as a chunk.
+// streamMapAccumArray is `mapAccum` over chunks: `f` of the state and each
+// chunk gives the next state and the elements to emit as a chunk.
 func streamMapAccumArray(self *Stream, initial func(fb *Fiber) Value, f func(fb *Fiber, s Value, chunk []Value) (Value, []Value), onHalt func(fb *Fiber, s Value) []Value) *Stream {
 	var last func(fb *Fiber, s Value) []Value
 	if onHalt != nil {
@@ -255,7 +254,7 @@ func statePair(v Value) (Value, []Value) {
 
 func newLatch() *Latch { return &Latch{wake: make(chan struct{})} }
 
-// sleepOrOpen is `Effect.raceFirst(Effect.sleep(ms), latch.await)`.
+// sleepOrOpen sleeps `ms` milliseconds, or until the latch opens.
 func sleepOrOpen(fb *Fiber, ms float64, l *Latch) {
 	l.mu.Lock()
 	if l.open {

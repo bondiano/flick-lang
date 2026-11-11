@@ -1,8 +1,7 @@
 package flickrt
 
-// Sink is Effect's (Sink.ts:69): given the pull of chunks of its input and
-// the scope it runs in, the value it ends with and its leftovers (nil:
-// none).
+// Sink is, given the pull of chunks of its input and the scope it runs in,
+// the value it ends with and its leftovers (nil: none).
 type Sink struct {
 	transform func(fb *Fiber, upstream Pull, scope *Owner) (Value, []Value)
 }
@@ -13,7 +12,7 @@ func sinkFromTransform(transform func(fb *Fiber, upstream Pull, scope *Owner) (V
 	return &Sink{transform: transform}
 }
 
-// sinkEnd is Effect's `Sink.End`, the done value of a sink's channel.
+// sinkEnd is the done value of a sink's channel.
 type sinkEnd struct {
 	value    Value
 	leftover []Value

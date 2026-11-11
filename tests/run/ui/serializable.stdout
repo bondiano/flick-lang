@@ -1,3 +1,1 @@
-App.Main.count = 3
-App.Main.draft/intro = "hello"
-App.Main.draft/outro = "bye"
+<script type="application/json" id="flick-state-app">[{"key":"App.Main.count","value":3},{"key":"App.Main.draft/intro","value":"hello"},{"key":"App.Main.draft/outro","value":"bye"}]</script>

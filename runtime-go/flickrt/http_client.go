@@ -2,11 +2,10 @@ package flickrt
 
 import "strconv"
 
-// Http.Client as Effect's HttpClient: a client is the preparation of each
-// request and the sending of the prepared one, both tasks, so that a
-// combinator retrying the sending prepares the request again as Effect's
-// does. Its failures are Flick values already: a transport makes the Flick
-// HttpClientError itself.
+// Http.Client: a client is the preparation of each request and the
+// sending of the prepared one, both tasks, so that a combinator retrying
+// the sending prepares the request again. Its failures are Flick values
+// already: a transport makes the Flick HttpClientError itself.
 
 type Client struct {
 	pre  func(fb *Fiber, request Value) Value  // a task of the prepared request
@@ -17,7 +16,7 @@ func httpClientOf(v Value) *Client { return v.(*Client) }
 
 func (c *Client) execute(fb *Fiber, request Value) Value { return c.post(fb, c.pre(fb, request)) }
 
-// The fiber-local settings of the client's spans, as Effect's references.
+// The fiber-local settings of the client's spans.
 const (
 	clientTracerDisabledKey = "effect/http/HttpClient/TracerDisabledWhen"
 	clientHeaderFilterKey   = "effect/http/HttpClient/TracerHeaderFilter"
@@ -40,19 +39,19 @@ func HttpClientMake(f Value) Value {
 	})
 }
 
-// clientOfTransport is Effect's `make`: the URL of the request with its
-// parameters and hash, an InvalidUrlError without one; the request sent in
-// a client span whose trace context goes with it as headers, unless the
-// fiber's settings say otherwise. The span records the request and the
-// response, and fails with a StatusCodeError on a 4xx or 5xx one, which
-// the call still answers.
+// clientOfTransport is the client of a transport: the URL of the request
+// with its parameters and hash, an InvalidUrlError without one; the
+// request sent in a client span whose trace context goes with it as
+// headers, unless the fiber's settings say otherwise. The span records the
+// request and the response, and fails with a StatusCodeError on a 4xx or
+// 5xx one, which the call still answers.
 func clientOfTransport(send transport) *Client {
 	return &Client{pre: func(_ *Fiber, request Value) Value { return Succeed(request) }, post: func(fb *Fiber, prepared Value) Value {
 		return Eff(func(fb *Fiber) Value {
 			request := clientOf(Run(fb, prepared))
 			url := UrlMake(request.url, request.params, request.hash)
 			if !isOk(url) {
-				// Effect's UrlError has no message of its own
+				// an invalid URL has no message of its own
 				return Fail(requestFailure(fb, invalidUrlTag, request, Some("")))
 			}
 			if envOr(fb, disablePropagationKey, false).(bool) {

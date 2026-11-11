@@ -3,7 +3,6 @@
 use strsim::osa_distance;
 
 use super::Diagnostic;
-#[cfg(feature = "diagnostic-fixes")]
 use super::Edit;
 use crate::source::Span;
 
@@ -11,9 +10,15 @@ use crate::source::Span;
 /// swap of neighbours is one edit), the closest first and ties in name order,
 /// so the answer does not depend on hash map order.
 pub fn closest<'a>(name: &str, candidates: impl IntoIterator<Item = &'a str>) -> Option<&'a str> {
+    closest_in(name, &mut candidates.into_iter())
+}
+
+// Candidate sources have different iterator types. Share the distance search
+// rather than specialize its loop for every environment and namespace.
+#[inline(never)]
+fn closest_in<'a>(name: &str, candidates: &mut dyn Iterator<Item = &'a str>) -> Option<&'a str> {
     let limit = (name.chars().count() / 3).max(1);
     candidates
-        .into_iter()
         .filter(|c| *c != name)
         .map(|c| (osa_distance(name, c), c))
         .filter(|(d, _)| *d <= limit)
@@ -25,25 +30,22 @@ impl Diagnostic {
     /// Offer `replacement` for `span` as a "did you mean" fix.
     #[must_use]
     pub fn did_you_mean(self, span: Span, replacement: impl FnOnce() -> Option<String>) -> Self {
-        #[cfg(feature = "diagnostic-fixes")]
-        {
-            match replacement() {
-                Some(r) => self.with_fix(|| {
-                    (
-                        format!("did you mean `{r}`?"),
-                        vec![Edit {
-                            span,
-                            replacement: r,
-                        }],
-                    )
-                }),
-                None => self,
-            }
-        }
-        #[cfg(not(feature = "diagnostic-fixes"))]
-        {
-            let _ = (span, replacement);
-            self
+        self.with_replacement(span, replacement())
+    }
+
+    #[inline(never)]
+    fn with_replacement(self, span: Span, replacement: Option<String>) -> Self {
+        match replacement {
+            Some(r) => self.with_fix(|| {
+                (
+                    format!("did you mean `{r}`?"),
+                    vec![Edit {
+                        span,
+                        replacement: r,
+                    }],
+                )
+            }),
+            None => self,
         }
     }
 }
@@ -94,14 +96,12 @@ mod tests {
                 called.set(true);
                 Some("total".to_owned())
             });
-        assert_eq!(called.get(), cfg!(feature = "diagnostic-fixes"));
+        assert!(called.get());
         assert_eq!(diagnostic.message, "cannot find value `totl`");
         assert_eq!(diagnostic.span, Some(span));
-        #[cfg(feature = "diagnostic-fixes")]
         assert_eq!(diagnostic.fixes[0].edits[0].replacement, "total");
     }
 
-    #[cfg(feature = "diagnostic-fixes")]
     /// The replacement each "did you mean" fix of checking `body` offers.
     fn guesses(body: &str) -> Vec<String> {
         let text = format!(
@@ -120,7 +120,6 @@ mod tests {
             .collect()
     }
 
-    #[cfg(feature = "diagnostic-fixes")]
     #[test]
     fn misspelt_names_get_a_replacement() {
         let cases = [
@@ -137,7 +136,6 @@ mod tests {
         }
     }
 
-    #[cfg(feature = "diagnostic-fixes")]
     #[test]
     fn unexported_import_items_get_a_replacement() {
         let text = "module Probe exposing (..)\nimport Int exposing (to_strng)\n";

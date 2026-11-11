@@ -144,7 +144,7 @@ impl Gen<'_> {
         }
         let params = format!("$f, {}", vars.join(", "));
         let value = if generator {
-            format!("function* ({params}) {{\n{}}}", indent(&body))
+            self.generator_function(&params, &body)
         } else {
             format!("{} {{\n{}}}", self.arrow(&params), indent(&body))
         };

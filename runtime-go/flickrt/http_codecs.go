@@ -5,10 +5,10 @@ import (
 	"strings"
 )
 
-// Http.Codecs: the JSON codecs Effect Schema gives HTTP values, and those
-// that read parameters, cookies, query strings and forms into a record or
-// tree for a codec of the program. Their decoding may refuse a wire value
-// of the right JSON type, so they are fallible.
+// Http.Codecs: the JSON codecs of HTTP values, and those that read
+// parameters, cookies, query strings and forms into a record or tree for a
+// codec of the program. Their decoding may refuse a wire value of the
+// right JSON type, so they are fallible.
 
 // fallible marks a codec whose decoding may refuse a value of the right
 // JSON type: it has no exact JSON Schema.
@@ -44,7 +44,7 @@ func httpCodec(wire codec, to, back func(*Fiber, Value) (Value, []issue)) Value 
 	return &fallible{&stage{wire, to, back}}
 }
 
-// stringAs is a JSON string that Effect names `expected` when it is not one.
+// stringAs is a JSON string that an issue names `expected` when it is not one.
 type stringAs struct{ expected string }
 
 func (s *stringAs) accepts(in Value) bool                     { _, ok := in.(string); return ok }
@@ -219,8 +219,8 @@ func CodecFromFormData(inner Value) Value {
 	})
 }
 
-// paramsOfInput is Effect's `fromInput` of a record: an array gives a
-// pair per item, a nested object a pair per leaf under `key[a][b]`.
+// paramsOfInput is the parameters of a record: an array gives a pair per
+// item, a nested object a pair per leaf under `key[a][b]`.
 func paramsOfInput(w Value) []Value {
 	out := []Value{}
 	var walk func(path string, v Value)

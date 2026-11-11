@@ -3,7 +3,7 @@
 //! mapping, name collisions and import cycles, then resolves each module
 //! against the interfaces of its imports.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::io;
 use std::mem;
 use std::path::{Path, PathBuf};
@@ -13,11 +13,13 @@ mod checking;
 #[cfg(test)]
 mod checking_tests;
 mod entry;
+mod expressions;
 mod files;
 mod format_plugins;
 #[cfg(feature = "ide")]
 mod ide;
 mod imports;
+mod lexical;
 mod loader;
 mod plugins;
 // the plugin of a module is its package's, which needs packages
@@ -29,12 +31,13 @@ mod target;
 mod unknown;
 
 pub use checking::ModuleCache;
+pub(crate) use checking::check_file;
 pub use entry::{MainKind, main_kind};
 pub use format_plugins::FormatPlugins;
 #[cfg(feature = "ide")]
 pub use ide::{Analysis, Analyzed, analysis_fingerprint, analyze, analyze_with};
 pub use precompiled::{CachedModule, Fresh, PackageCache};
-#[cfg(all(test, feature = "build-artifacts"))]
+#[cfg(all(test, feature = "native-project"))]
 pub(crate) use target::js_only;
 
 use super::config::Backend;
@@ -42,6 +45,10 @@ use super::config::Backend;
 use super::packages::Packages;
 use super::{Host, Project, module_path, normalize};
 use crate::diagnostics::{Diagnostic, Edit, Severity, codes};
+use crate::iface::{
+    BindingOrigin, CalleeOrigin, ExpansionFrame, LexicalScope, StaticArgument, StaticBinding,
+    StaticCapture, StaticMember,
+};
 use crate::ir;
 use crate::plugin::EditorBlock;
 use crate::plugin::expansion::Expansion;
@@ -63,6 +70,17 @@ enum Root {
     Other(Option<PathBuf>),
 }
 
+impl Root {
+    fn same_package(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::Source | Self::Test, Self::Source | Self::Test) => true,
+            (Self::Package(a), Self::Package(b)) => a == b,
+            (Self::Other(a), Self::Other(b)) => a == b,
+            _ => false,
+        }
+    }
+}
+
 struct Loaded {
     path: PathBuf,
     file: FileId,
@@ -77,6 +95,18 @@ struct Loaded {
     editing: Vec<EditorBlock>,
     /// The package whose plugin gives its code, for a file of another language.
     loader: Option<String>,
+    /// A named application compiled as a separate generated module.
+    virtual_of: Option<Virtual>,
+    member_of: Option<StaticMember>,
+    scope_of: Option<LexicalScope>,
+}
+
+include!("loaded.rs");
+
+#[derive(Clone)]
+struct Virtual {
+    at: Span,
+    capture: StaticCapture,
 }
 
 /// How far a run goes past checking.
@@ -100,6 +130,8 @@ struct Output {
 }
 
 struct Loader<'a> {
+    expression_serial: usize,
+    expressions_active: BTreeSet<String>,
     host: &'a dyn Host,
     sources: &'a mut SourceMap,
     project: Option<&'a Project>,
@@ -142,7 +174,19 @@ fn compiled(m: &Loaded, (ir, declarations): Lowered, interface: Interface) -> Co
             Root::Package(name) => Some(name.clone()),
             _ => None,
         },
-        imports: m.syntax.imports.iter().map(|i| i.module.clone()).collect(),
+        imports: m
+            .syntax
+            .imports
+            .iter()
+            .chain(&m.syntax.inline_imports)
+            .filter(|i| !i.module.starts_with("$scope:"))
+            .map(|i| i.module.clone())
+            .chain(
+                m.virtual_of
+                    .iter()
+                    .flat_map(|v| v.capture.scopes.iter().map(|s| s.module.clone())),
+            )
+            .collect(),
         ir,
         declarations,
         interface,
@@ -221,15 +265,17 @@ pub fn check(
 }
 
 /// [`check`], taking the modules of source packages `packages` saved and
-/// giving those to save.
+/// giving those to save; a command that checks again and again keeps what
+/// it checked in `cache`.
 pub fn check_with(
     host: &dyn Host,
     sources: &mut SourceMap,
     project: Option<&Project>,
     roots: &[PathBuf],
     packages: Option<&PackageCache>,
+    cache: Option<&mut ModuleCache>,
 ) -> (Vec<Diagnostic>, Vec<Fresh>) {
-    let output = run(host, sources, project, roots, Mode::Check, None, packages);
+    let output = run(host, sources, project, roots, Mode::Check, cache, packages);
     (output.diagnostics, output.fresh)
 }
 
@@ -250,7 +296,8 @@ pub fn compile(
 
 /// [`compile`], taking the modules of source packages `packages` saved and
 /// giving those to save; `rt` builds for Flick's own runtime whatever the
-/// project says.
+/// project says; a command that builds again and again keeps what it
+/// compiled in `cache`.
 pub fn compile_with(
     host: &dyn Host,
     sources: &mut SourceMap,
@@ -258,9 +305,10 @@ pub fn compile_with(
     roots: &[PathBuf],
     packages: Option<&PackageCache>,
     rt: bool,
+    cache: Option<&mut ModuleCache>,
 ) -> (Vec<Diagnostic>, Compilation, Vec<Fresh>) {
     let mode = Mode::Compile;
-    let output = run_in(host, sources, project, roots, mode, None, packages, rt);
+    let output = run_in(host, sources, project, roots, mode, cache, packages, rt);
     (output.diagnostics, output.compilation, output.fresh)
 }
 
@@ -276,6 +324,14 @@ fn run(
     run_in(host, sources, project, roots, mode, cache, saved, false)
 }
 
+/// Whether a run over `project` checks with the stages of a class derived
+/// from it, as Flick's own runtime has them: asked for with `rt`, or the
+/// project's runtime, whatever the target of the build. A host prepares the
+/// built-in modules checked this way before it runs.
+pub fn stages_by_class(project: Option<&Project>, rt: bool) -> bool {
+    rt || project.is_some_and(|p| p.config.build.effect == Backend::Rt)
+}
+
 #[allow(clippy::too_many_arguments, clippy::too_many_lines)]
 fn run_in(
     host: &dyn Host,
@@ -287,7 +343,7 @@ fn run_in(
     saved: Option<&PackageCache>,
     rt: bool,
 ) -> Output {
-    let stages_by_class = rt || project.is_some_and(|p| p.config.build.effect == Backend::Rt);
+    let stages_by_class = stages_by_class(project, rt);
     #[cfg(feature = "native-project")]
     let mut diagnostics = Vec::new();
     #[cfg(feature = "native-project")]
@@ -313,6 +369,8 @@ fn run_in(
     // a check lowers the modules of source packages only to save them
     let lower_packages_only = mode == Mode::Check && saved.is_some();
     let mut loader = Loader {
+        expression_serial: 0,
+        expressions_active: BTreeSet::new(),
         host,
         sources,
         project,
@@ -366,7 +424,25 @@ fn run_in(
             .into_iter()
             .zip(interfaces)
             .zip(&loader.modules)
-            .filter_map(|((lowered, interface), m)| Some(compiled(m, lowered?, interface?)))
+            .filter_map(|((lowered, interface), m)| {
+                if m.scope_of.is_some() {
+                    return None;
+                }
+                let interface = interface?;
+                let lowered = lowered.or_else(|| {
+                    interface.parameterized.as_ref()?;
+                    Some((
+                        ir::Module {
+                            name: m.name.clone(),
+                            items: Vec::new(),
+                            labels: BTreeMap::new(),
+                            initialization: flick_ir::Initialization::default(),
+                        },
+                        Arc::new(interface.clone()),
+                    ))
+                })?;
+                Some(compiled(m, lowered, interface))
+            })
             .collect(),
         _ => Vec::new(),
     };
@@ -452,7 +528,7 @@ impl Loader<'_> {
         if let Some(found) = self.cache.as_ref().and_then(|c| c.parsed(path, file, text)) {
             return found;
         }
-        let parse = Arc::new(syntax::parse(text, file));
+        let parse = Arc::new(syntax::parse(text, file).into_module());
         let module = Arc::new(resolve::module_syntax(&parse.tree, text, file));
         if let Some(cache) = &mut self.cache {
             let parsed = (parse.clone(), module.clone());

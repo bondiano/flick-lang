@@ -5,5 +5,13 @@ tests/run/portable.txt merge=union
 # corpora tools/go-unicode/graphemes.mjs and tools/go-collate/gen.mjs write from Node
 runtime-go/flickrt/testdata/graphemes.txt linguist-generated=true
 runtime-go/flickrt/testdata/collation.txt linguist-generated=true
-# just formal-schemes writes the Prelude schemes from the checker
+# just formal-schemes writes the Prelude schemes and their elision from the checker
 formal/Formal/Elab/PreludeSchemes.lean linguist-generated=true
+formal/Formal/Live/ElideSchemes.lean linguist-generated=true
+# just formal-certs writes the signature and the golden and kept certificates from the model
+formal/FormalCert/GenSig.lean linguist-generated=true
+formal/FormalCert/Gen/Golden.lean linguist-generated=true
+formal/FormalCert/Gen/Kept.lean linguist-generated=true
+# tools/rt-exports.mjs generates the native export manifest
+runtime/rt_exports.txt linguist-generated=true
+editors/tree-sitter-flick/src/grammar.json linguist-generated=true

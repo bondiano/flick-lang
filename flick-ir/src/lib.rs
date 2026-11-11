@@ -15,14 +15,15 @@ mod program;
 mod span;
 mod stage;
 mod validate;
+mod visit;
 
 pub use data::{Constructor, EnumLit, JsClass, Rep, TypeName};
 pub use dict::Dict;
 pub use expr::{
-    Arm, BinOp, Expr, ExprKind, Item, ItemKind, Label, Lit, Module, Param, Pat, Stmt,
-    operation_arity,
+    Arm, BinOp, Expr, ExprKind, Initialization, Item, ItemKind, Label, Lit, Module, Param, Pat,
+    Prefix, Stmt, operation_arity,
 };
-pub use foreign::{Adapter, Binding, Copies, Foreign, ForeignMode, ResultAdapter};
+pub use foreign::{Adapter, Binding, Copies, Foreign, ForeignMode, ResultAdapter, Shape};
 pub use handler::{Handled, Handler, OpArm};
 pub use instance::{GenericInfo, InstanceInfo};
 pub use num::{Arith, Num, NumKind};

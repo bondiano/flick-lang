@@ -1,6 +1,5 @@
-/// Effect's `HttpClientRequest`: a request for `Http.Client`, an immutable
-/// value built by a constructor and the `set_*` functions; `show` masks
-/// secret headers.
+/// A request for `Http.Client`, an immutable value built by a constructor
+/// and the `set_*` functions; `show` masks secret headers.
 module Http.ClientRequest exposing (..)
 
 import FileSystem
@@ -43,7 +42,7 @@ let defaults = {
 
 /// A `GET` of no URL.
 empty : ClientRequest
-foreign pure empty from "@flick-lang/effect-ts/effect/http/HttpClientRequest" "empty"
+foreign pure empty from "flick:http/HttpClientRequest" "empty"
   reviewed "effect@4.1.2 sha256:42e2caf762119d9f"
 
 /// A request of every part: method, URL, parameters, hash, headers, body.
@@ -55,219 +54,219 @@ make_with :
   Http.Headers.Headers ->
   Http.Body.Body ->
   ClientRequest
-foreign pure make_with from "@flick-lang/effect-ts/effect/http/HttpClientRequest" "flickMakeWith"
+foreign pure make_with from "flick:http/HttpClientRequest" "flickMakeWith"
   arity 6
   reviewed "effect@4.1.2 sha256:4b1dbac614de85a9"
 
 /// A request of the method to the URL, with the options.
 make : Http.Method.Method -> String -> Options -> ClientRequest
-foreign pure make from "@flick-lang/effect-ts/effect/http/HttpClientRequest" "flickMake"
+foreign pure make from "flick:http/HttpClientRequest" "flickMake"
   arity 3
   reviewed "effect@4.1.2 sha256:3a4f687360f7a6e2"
 
 /// A `GET` of the URL.
 get : String -> ClientRequest
-foreign pure get from "@flick-lang/effect-ts/effect/http/HttpClientRequest" "get"
+foreign pure get from "flick:http/HttpClientRequest" "get"
   arity 1
   reviewed "effect@4.1.2 sha256:7bf57df95d99686d"
 
 /// A `QUERY` of the URL.
 query : String -> ClientRequest
-foreign pure query from "@flick-lang/effect-ts/effect/http/HttpClientRequest" "query"
+foreign pure query from "flick:http/HttpClientRequest" "query"
   arity 1
   reviewed "effect@4.1.2 sha256:d3922f7ef1be933a"
 
 /// A `POST` to the URL.
 post : String -> ClientRequest
-foreign pure post from "@flick-lang/effect-ts/effect/http/HttpClientRequest" "post"
+foreign pure post from "flick:http/HttpClientRequest" "post"
   arity 1
   reviewed "effect@4.1.2 sha256:536345c3b8cd9686"
 
 /// A `PATCH` of the URL.
 patch : String -> ClientRequest
-foreign pure patch from "@flick-lang/effect-ts/effect/http/HttpClientRequest" "patch"
+foreign pure patch from "flick:http/HttpClientRequest" "patch"
   arity 1
   reviewed "effect@4.1.2 sha256:8b3edc10283361f6"
 
 /// A `PUT` to the URL.
 put : String -> ClientRequest
-foreign pure put from "@flick-lang/effect-ts/effect/http/HttpClientRequest" "put"
+foreign pure put from "flick:http/HttpClientRequest" "put"
   arity 1
   reviewed "effect@4.1.2 sha256:659722f666fe793d"
 
 /// A `DELETE` of the URL.
 delete : String -> ClientRequest
-foreign pure delete from "@flick-lang/effect-ts/effect/http/HttpClientRequest" "delete"
+foreign pure delete from "flick:http/HttpClientRequest" "delete"
   arity 1
   reviewed "effect@4.1.2 sha256:0a51e1fbedaf28ba"
 
 /// A `HEAD` of the URL.
 head : String -> ClientRequest
-foreign pure head from "@flick-lang/effect-ts/effect/http/HttpClientRequest" "head"
+foreign pure head from "flick:http/HttpClientRequest" "head"
   arity 1
   reviewed "effect@4.1.2 sha256:d35c29363094585b"
 
 /// An `OPTIONS` of the URL.
 options : String -> ClientRequest
-foreign pure options from "@flick-lang/effect-ts/effect/http/HttpClientRequest" "options"
+foreign pure options from "flick:http/HttpClientRequest" "options"
   arity 1
   reviewed "effect@4.1.2 sha256:240dae5290aa9b77"
 
 /// A `TRACE` of the URL.
 trace : String -> ClientRequest
-foreign pure trace from "@flick-lang/effect-ts/effect/http/HttpClientRequest" "trace"
+foreign pure trace from "flick:http/HttpClientRequest" "trace"
   arity 1
   reviewed "effect@4.1.2 sha256:8c825395b13cb783"
 
 /// The request with what the options set.
 modify : Options -> ClientRequest -> ClientRequest
-foreign pure modify from "@flick-lang/effect-ts/effect/http/HttpClientRequest" "flickModify"
+foreign pure modify from "flick:http/HttpClientRequest" "flickModify"
   arity 2
   reviewed "effect@4.1.2 sha256:36c866de23397bc6"
 
 /// The method.
 set_method : Http.Method.Method -> ClientRequest -> ClientRequest
-foreign pure set_method from "@flick-lang/effect-ts/effect/http/HttpClientRequest" "flickSetMethod"
+foreign pure set_method from "flick:http/HttpClientRequest" "flickSetMethod"
   arity 2
   reviewed "effect@4.1.2 sha256:0d89a61bd4c677a6"
 
 /// Sets a header: `set_header name value request`.
 set_header : String -> String -> ClientRequest -> ClientRequest
-foreign pure set_header from "@flick-lang/effect-ts/effect/http/HttpClientRequest" "setHeader"
+foreign pure set_header from "flick:http/HttpClientRequest" "setHeader"
   arity 2
   reviewed "effect@4.1.2 sha256:3c3cde5fd9eacb29"
 
 /// Sets each of the headers.
 set_headers : Http.Headers.Input -> ClientRequest -> ClientRequest
-foreign pure set_headers from "@flick-lang/effect-ts/effect/http/HttpClientRequest" "setHeaders"
+foreign pure set_headers from "flick:http/HttpClientRequest" "setHeaders"
   arity 1
   reviewed "effect@4.1.2 sha256:6b4f69d7cbdd83b8"
 
 /// The headers, changed by `f`.
 update_headers : (Http.Headers.Headers -> Http.Headers.Headers) -> ClientRequest -> ClientRequest
-foreign pure update_headers from "@flick-lang/effect-ts/effect/http/HttpClientRequest" "updateHeaders"
+foreign pure update_headers from "flick:http/HttpClientRequest" "updateHeaders"
   arity 1
   reviewed "effect@4.1.2 sha256:82be5433e1d1e0ac"
 
 /// Removes a header.
 remove_header : String -> ClientRequest -> ClientRequest
-foreign pure remove_header from "@flick-lang/effect-ts/effect/http/HttpClientRequest" "removeHeader"
+foreign pure remove_header from "flick:http/HttpClientRequest" "removeHeader"
   arity 1
   reviewed "effect@4.1.2 sha256:daf102021a6eb1c7"
 
 /// `Authorization: Basic …` of the user name and the password.
 basic_auth : String -> Redacted String -> ClientRequest -> ClientRequest
-foreign pure basic_auth from "@flick-lang/effect-ts/effect/http/HttpClientRequest" "basicAuth"
+foreign pure basic_auth from "flick:http/HttpClientRequest" "basicAuth"
   arity 2
   reviewed "effect@4.1.2 sha256:2235676af1b600f9"
 
 /// `Authorization: Bearer …` of the token.
 bearer_token : Redacted String -> ClientRequest -> ClientRequest
-foreign pure bearer_token from "@flick-lang/effect-ts/effect/http/HttpClientRequest" "bearerToken"
+foreign pure bearer_token from "flick:http/HttpClientRequest" "bearerToken"
   arity 1
   reviewed "effect@4.1.2 sha256:30d9dd20a99b005d"
 
 /// The `Accept` header.
 accept : String -> ClientRequest -> ClientRequest
-foreign pure accept from "@flick-lang/effect-ts/effect/http/HttpClientRequest" "accept"
+foreign pure accept from "flick:http/HttpClientRequest" "accept"
   arity 1
   reviewed "effect@4.1.2 sha256:3d909c91c01f432c"
 
 /// `Accept: application/json`.
 accept_json : ClientRequest -> ClientRequest
-foreign pure accept_json from "@flick-lang/effect-ts/effect/http/HttpClientRequest" "acceptJson"
+foreign pure accept_json from "flick:http/HttpClientRequest" "acceptJson"
   arity 1
   reviewed "effect@4.1.2 sha256:cec2a81f0ca361e8"
 
 /// The URL; its query becomes the parameters.
 set_url : String -> ClientRequest -> ClientRequest
-foreign pure set_url from "@flick-lang/effect-ts/effect/http/HttpClientRequest" "setUrl"
+foreign pure set_url from "flick:http/HttpClientRequest" "setUrl"
   arity 1
   reviewed "effect@4.1.2 sha256:d59763feacbd38f5"
 
 /// Puts the text before the URL, with one `/` between them.
 prepend_url : String -> ClientRequest -> ClientRequest
-foreign pure prepend_url from "@flick-lang/effect-ts/effect/http/HttpClientRequest" "prependUrl"
+foreign pure prepend_url from "flick:http/HttpClientRequest" "prependUrl"
   arity 1
   reviewed "effect@4.1.2 sha256:8a80375bd0df5b71"
 
 /// Puts the path after the URL, with one `/` between them.
 append_url : String -> ClientRequest -> ClientRequest
-foreign pure append_url from "@flick-lang/effect-ts/effect/http/HttpClientRequest" "appendUrl"
+foreign pure append_url from "flick:http/HttpClientRequest" "appendUrl"
   arity 1
   reviewed "effect@4.1.2 sha256:d7a15cdc00011624"
 
 /// The URL, changed by `f`.
 update_url : (String -> String) -> ClientRequest -> ClientRequest
-foreign pure update_url from "@flick-lang/effect-ts/effect/http/HttpClientRequest" "updateUrl"
+foreign pure update_url from "flick:http/HttpClientRequest" "updateUrl"
   arity 1
   reviewed "effect@4.1.2 sha256:257a8e468dadd3a5"
 
 /// Replaces the values of a query parameter by the one.
 set_url_param : String -> String -> ClientRequest -> ClientRequest
-foreign pure set_url_param from "@flick-lang/effect-ts/effect/http/HttpClientRequest" "setUrlParam"
+foreign pure set_url_param from "flick:http/HttpClientRequest" "setUrlParam"
   arity 2
   reviewed "effect@4.1.2 sha256:94c8dafd8b073148"
 
 /// `set_url_param` of each pair.
 set_url_params : Http.UrlParams.Input -> ClientRequest -> ClientRequest
-foreign pure set_url_params from "@flick-lang/effect-ts/effect/http/HttpClientRequest" "setUrlParams"
+foreign pure set_url_params from "flick:http/HttpClientRequest" "setUrlParams"
   arity 1
   reviewed "effect@4.1.2 sha256:22757d4d47f5cc39"
 
 /// Adds a value of a query parameter.
 append_url_param : String -> String -> ClientRequest -> ClientRequest
-foreign pure append_url_param from "@flick-lang/effect-ts/effect/http/HttpClientRequest" "appendUrlParam"
+foreign pure append_url_param from "flick:http/HttpClientRequest" "appendUrlParam"
   arity 2
   reviewed "effect@4.1.2 sha256:7c1ca7ff9bda8bd2"
 
 /// `append_url_param` of each pair.
 append_url_params : Http.UrlParams.Input -> ClientRequest -> ClientRequest
-foreign pure append_url_params from "@flick-lang/effect-ts/effect/http/HttpClientRequest" "appendUrlParams"
+foreign pure append_url_params from "flick:http/HttpClientRequest" "appendUrlParams"
   arity 1
   reviewed "effect@4.1.2 sha256:8d851e639aa54ea1"
 
 /// The fragment of the URL.
 set_hash : String -> ClientRequest -> ClientRequest
-foreign pure set_hash from "@flick-lang/effect-ts/effect/http/HttpClientRequest" "setHash"
+foreign pure set_hash from "flick:http/HttpClientRequest" "setHash"
   arity 1
   reviewed "effect@4.1.2 sha256:88188350c2d88e88"
 
 /// No fragment.
 remove_hash : ClientRequest -> ClientRequest
-foreign pure remove_hash from "@flick-lang/effect-ts/effect/http/HttpClientRequest" "removeHash"
+foreign pure remove_hash from "flick:http/HttpClientRequest" "removeHash"
   arity 1
   reviewed "effect@4.1.2 sha256:f25ab12d7dca9fa8"
 
 /// The body.
 set_body : Http.Body.Body -> ClientRequest -> ClientRequest
-foreign pure set_body from "@flick-lang/effect-ts/effect/http/HttpClientRequest" "setBody"
+foreign pure set_body from "flick:http/HttpClientRequest" "setBody"
   arity 1
   reviewed "effect@4.1.2 sha256:94098279a0ef1cf9"
 
 /// Compresses the body with the algorithm if it has at least `minSize`
 /// bytes (by default any), setting `Content-Encoding`.
 compress_body : CompressionAlgorithm -> Option Float -> ClientRequest ->{Async} ClientRequest
-foreign effect compress_body from "@flick-lang/effect-ts/effect/http/HttpClientRequest" "flickCompressBody"
+foreign effect compress_body from "flick:http/HttpClientRequest" "flickCompressBody"
   arity 3
   reviewed "effect@4.1.2 sha256:51099300fc21d90a"
 
 /// A body of the bytes, of the content type or `application/octet-stream`.
 body_uint8_array : List Int -> Option String -> ClientRequest -> ClientRequest
-foreign pure body_uint8_array from "@flick-lang/effect-ts/effect/http/HttpClientRequest" "flickBodyUint8Array"
+foreign pure body_uint8_array from "flick:http/HttpClientRequest" "flickBodyUint8Array"
   arity 3
   reviewed "effect@4.1.2 sha256:eeea73133d9982da"
 
 /// A body of the text, of the content type or `text/plain`.
 body_text : String -> Option String -> ClientRequest -> ClientRequest
-foreign pure body_text from "@flick-lang/effect-ts/effect/http/HttpClientRequest" "bodyText"
+foreign pure body_text from "flick:http/HttpClientRequest" "bodyText"
   arity 2
   optional 1
   reviewed "effect@4.1.2 sha256:8e2b9450d17f39b4"
 
 /// A JSON body of the value.
 body_json : Json -> ClientRequest ->{; Http.Body.HttpBodyError} ClientRequest
-foreign effect body_json from "@flick-lang/effect-ts/effect/http/HttpClientRequest" "flickBodyJson"
+foreign effect body_json from "flick:http/HttpClientRequest" "flickBodyJson"
   arity 2
   reviewed "effect@4.1.2 sha256:2a91b7e0b4184134"
 
@@ -277,19 +276,19 @@ schema_body_json :
   a ->
   ClientRequest ->{re; SchemaError, Http.Body.HttpBodyError}
   ClientRequest
-foreign effect schema_body_json from "@flick-lang/effect-ts/effect/http/HttpClientRequest" "flickSchemaBodyJson"
+foreign effect schema_body_json from "flick:http/HttpClientRequest" "flickSchemaBodyJson"
   arity 3
   reviewed "effect@4.1.2 sha256:548734a6e79844b8"
 
 /// A form body of the parameters.
 body_url_params : Http.UrlParams.Input -> ClientRequest -> ClientRequest
-foreign pure body_url_params from "@flick-lang/effect-ts/effect/http/HttpClientRequest" "bodyUrlParams"
+foreign pure body_url_params from "flick:http/HttpClientRequest" "bodyUrlParams"
   arity 1
   reviewed "effect@4.1.2 sha256:4ac230753db172ac"
 
 /// A `multipart/form-data` body of the fields.
 body_form_data : Http.Body.FormDataInput -> ClientRequest -> ClientRequest
-foreign pure body_form_data from "@flick-lang/effect-ts/effect/http/HttpClientRequest" "flickBodyFormData"
+foreign pure body_form_data from "flick:http/HttpClientRequest" "flickBodyFormData"
   arity 2
   reviewed "effect@4.1.2 sha256:880e6823b420b68c"
 
@@ -297,7 +296,7 @@ foreign pure body_form_data from "@flick-lang/effect-ts/effect/http/HttpClientRe
 /// `application/octet-stream`, and of the length if it is known.
 body_stream :
   Stream none e (List Int) -> Option String -> Option Float -> ClientRequest -> ClientRequest
-foreign pure body_stream from "@flick-lang/effect-ts/effect/http/HttpClientRequest" "flickBodyStream"
+foreign pure body_stream from "flick:http/HttpClientRequest" "flickBodyStream"
   arity 4
   reviewed "effect@4.1.2 sha256:0298a2fda8a6af0a"
 
@@ -311,38 +310,38 @@ let body_file options path request = set_body (Http.Body.file options path) requ
 
 /// The URL with its parameters and hash, if it is a valid URL.
 to_url : ClientRequest -> Option Http.Url.Url
-foreign pure to_url from "@flick-lang/effect-ts/effect/http/HttpClientRequest" "toUrl"
+foreign pure to_url from "flick:http/HttpClientRequest" "toUrl"
   arity 1
   reviewed "effect@4.1.2 sha256:00e9cf4f0b576fa5"
 
 /// The method.
 method : ClientRequest -> Http.Method.Method
-foreign pure method from "@flick-lang/effect-ts/effect/http/HttpClientRequest" "flickMethod"
+foreign pure method from "flick:http/HttpClientRequest" "flickMethod"
   reviewed "effect@4.1.2 sha256:afa4b1c1920c9f89"
 
 /// The URL without its parameters.
 url : ClientRequest -> String
-foreign pure url from "@flick-lang/effect-ts/effect/http/HttpClientRequest" "flickUrl"
+foreign pure url from "flick:http/HttpClientRequest" "flickUrl"
   reviewed "effect@4.1.2 sha256:afa4b1c1920c9f89"
 
 /// The query parameters.
 url_params : ClientRequest -> Http.UrlParams.UrlParams
-foreign pure url_params from "@flick-lang/effect-ts/effect/http/HttpClientRequest" "flickUrlParams"
+foreign pure url_params from "flick:http/HttpClientRequest" "flickUrlParams"
   reviewed "effect@4.1.2 sha256:afa4b1c1920c9f89"
 
 /// The fragment.
 hash : ClientRequest -> Option String
-foreign pure hash from "@flick-lang/effect-ts/effect/http/HttpClientRequest" "flickHash"
+foreign pure hash from "flick:http/HttpClientRequest" "flickHash"
   reviewed "effect@4.1.2 sha256:afa4b1c1920c9f89"
 
 /// The headers.
 headers : ClientRequest -> Http.Headers.Headers
-foreign pure headers from "@flick-lang/effect-ts/effect/http/HttpClientRequest" "flickHeaders"
+foreign pure headers from "flick:http/HttpClientRequest" "flickHeaders"
   reviewed "effect@4.1.2 sha256:afa4b1c1920c9f89"
 
 /// The body.
 body : ClientRequest -> Http.Body.Body
-foreign pure body from "@flick-lang/effect-ts/effect/http/HttpClientRequest" "flickBody"
+foreign pure body from "flick:http/HttpClientRequest" "flickBody"
   reviewed "effect@4.1.2 sha256:afa4b1c1920c9f89"
 
 instance Show ClientRequest =

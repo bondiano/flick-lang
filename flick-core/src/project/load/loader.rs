@@ -101,6 +101,9 @@ impl Loader<'_> {
             expansion: None,
             editing: Vec::new(),
             loader,
+            virtual_of: None,
+            member_of: None,
+            scope_of: None,
         });
         Ok(Some(index))
     }

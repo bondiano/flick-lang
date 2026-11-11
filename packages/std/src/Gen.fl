@@ -5,41 +5,41 @@ module Gen exposing (..)
 type Gen a
 
 constant : a -> Gen a
-foreign pure constant from "@flick-lang/effect-ts" "genConstant"
+foreign pure constant from "flick:rt" "genConstant"
 
 /// A number in `[low, high)`.
 number : Float -> Float -> Gen Float
-foreign pure number from "@flick-lang/effect-ts" "genNumber"
+foreign pure number from "flick:rt" "genNumber"
 
 /// An integer in `[low, high]`.
 int : Int -> Int -> Gen Int
-foreign pure int from "@flick-lang/effect-ts" "genInt"
+foreign pure int from "flick:rt" "genInt"
 
 bool : Gen Bool
-foreign pure bool from "@flick-lang/effect-ts" "genBool"
+foreign pure bool from "flick:rt" "genBool"
 
 /// A string of printable ASCII, at most `max` long.
 string : Int -> Gen String
-foreign pure string from "@flick-lang/effect-ts" "genString"
+foreign pure string from "flick:rt" "genString"
 
 /// A list at most `max` long.
 list : Int -> Gen a -> Gen (List a)
-foreign pure list from "@flick-lang/effect-ts" "genList"
+foreign pure list from "flick:rt" "genList"
 
 /// One of the values; the list must not be empty.
 one_of : List a -> Gen a
-foreign pure one_of from "@flick-lang/effect-ts" "genOneOf"
+foreign pure one_of from "flick:rt" "genOneOf"
 
 pair : Gen a -> Gen b -> Gen (a, b)
-foreign pure pair from "@flick-lang/effect-ts" "genPair"
+foreign pure pair from "flick:rt" "genPair"
 
 /// A pure function whose result for each argument is drawn from `result`,
 /// the same on every call: what a law over functions takes.
 function : Hash a => Gen b -> Gen (a -> b)
-foreign pure function from "@flick-lang/effect-ts" "genFunction"
+foreign pure function from "flick:rt" "genFunction"
   arity 1
 
 map : (a -> b)^c -> Gen a -> Gen b
-foreign pure map from "@flick-lang/effect-ts" "genMap"
+foreign pure map from "flick:rt" "genMap"
   arity 2
   retention call

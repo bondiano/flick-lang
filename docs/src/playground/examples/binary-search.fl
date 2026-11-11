@@ -1,0 +1,23 @@
+// Find a target in a sorted list. The search interval is [low, high).
+// Each iteration halves the interval; break returns the answer from loop.
+module Main exposing (main)
+
+binary_search : Int -> List Int -> Option Int
+let binary_search target values =
+  let mut low = 0
+  let mut high = List.length values
+  loop {
+    if low >= high then break None
+    let middle = low + (high - low) / 2
+    match List.get middle values with
+    | None -> break None
+    | Some value ->
+      if value == target then break (Some middle)
+      if value < target then low = middle + 1 else high = middle
+  }
+
+main : Unit ->{} Unit
+let main () =
+  Platform.stdout_line (show (binary_search 9 [-1, 0, 3, 5, 9, 12]))
+  Platform.stdout_line (show (binary_search 2 [-1, 0, 3, 5, 9, 12]))
+  Platform.stdout_line (show (binary_search 1 []))

@@ -77,21 +77,47 @@ impl<'a> Gen<'a> {
     pub(super) fn discard(&mut self, e: &Expr) {
         let a = self.a;
         match &e.kind {
-            ExprKind::Each { pat, source, body } => {
+            ExprKind::Each {
+                pat,
+                source,
+                body,
+                stop,
+            } => {
                 let s = self.expr(source);
+                let s = if stop.is_some() { self.spill(s) } else { s };
                 let var = self.temp();
-                let (inner, ()) = self.block(|g| match pat {
-                    Pat::Bind(name) => {
-                        g.bind(name, g.code(var));
-                        g.discard(body);
+                let (inner, ()) = self.block(|g| {
+                    match pat {
+                        Pat::Bind(name) => {
+                            g.bind(name, g.code(var));
+                            g.discard(body);
+                        }
+                        _ => g.arm(a.text(var), pat, None, body, Self::discard),
                     }
-                    _ => g.arm(a.text(var), pat, None, body, Self::discard),
+                    if let Some(stop) = stop {
+                        let stop = g.expr(stop);
+                        let stop = call(a, "flickrt.Bool", [stop.doc]);
+                        g.emit(docvec![a, "if ", stop, " ", single(a, "break")]);
+                    }
                 });
                 // a pattern that ignores the element leaves the variable unused
                 let used = statement(a, docvec![a, "_ = ", var]);
                 let body = block(a, iter::once(used).chain(inner));
                 let range = call(a, "flickrt.Iter", [self.context(), s.doc]);
-                self.emit(docvec![a, "for ", var, " := range ", range, " ", body]);
+                let loop_ = docvec![a, "for ", var, " := range ", range, " ", body];
+                if let Some(stop) = stop {
+                    let stop = self.expr(stop);
+                    let stop = call(a, "flickrt.Bool", [stop.doc]);
+                    self.emit(docvec![
+                        a,
+                        "if !",
+                        stop,
+                        " ",
+                        block(a, [statement(a, loop_)])
+                    ]);
+                } else {
+                    self.emit(loop_);
+                }
             }
             ExprKind::Yield(value) => {
                 let v = self.expr(value);

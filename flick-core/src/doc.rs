@@ -8,9 +8,13 @@ use std::fmt::Write;
 use std::ptr;
 
 use crate::iface::{Decl, Export, Interface, Namespace};
+use crate::source::FileId;
+use crate::syntax;
 use crate::syntax::cst::{Element, Node};
 use crate::syntax::kind::SyntaxKind as K;
-use crate::types::{Form, show_signature, show_type};
+use crate::types::{
+    Form, ModuleNominalKind, ModuleRequirement, ModuleSignature, show_signature, show_type,
+};
 
 /// The `///` comment right above each top-level declaration, and above
 /// each constructor on a line of its own (`| Circle Float`), by name. A
@@ -109,6 +113,11 @@ fn declared(line: &str) -> Option<String> {
         return None;
     }
     let words: Vec<&str> = line.split_whitespace().collect();
+    if words.starts_with(&["type", "module"]) {
+        return words
+            .get(2)
+            .map(|name| name.trim_end_matches('=').to_owned());
+    }
     let skip = [
         "type", "alias", "error", "opaque", "refined", "unboxed", "untagged", "service", "class",
         "kind", "sql", "table",
@@ -129,6 +138,7 @@ fn declared(line: &str) -> Option<String> {
 /// The page of `interface`, its comments from `text`.
 pub fn page(interface: &Interface, text: &str) -> String {
     let docs = comments(text);
+    let contracts = source_module_declarations(text, &interface.module);
     let mut out = format!("# {}\n", interface.module);
     let doc = |name: &str, out: &mut String| {
         if let Some(d) = docs.get(name) {
@@ -149,7 +159,29 @@ pub fn page(interface: &Interface, text: &str) -> String {
         doc(name, &mut out);
         if let Some(def) = &e.definition {
             let _ = writeln!(out, "\nKind: `{}`", def.kind);
-            definition(interface, e, &def.form, &mut out);
+            if matches!(
+                def.form,
+                Form::ModuleContract { .. } | Form::ModuleSignature { .. }
+            ) && e.entity.module == interface.module
+                && let Some(declaration) = contracts.get(name.as_str())
+            {
+                let _ = writeln!(out, "\n```flick\n{declaration}\n```");
+                match &def.form {
+                    Form::ModuleSignature { signature } => {
+                        expanded_signature(name, signature, &mut out);
+                    }
+                    Form::ModuleContract { requirements } => expanded_signature(
+                        name,
+                        &ModuleSignature::Structure {
+                            requirements: requirements.clone(),
+                        },
+                        &mut out,
+                    ),
+                    _ => unreachable!("module contract declaration"),
+                }
+            } else {
+                definition(interface, e, &def.form, &mut out);
+            }
         }
     }
     let values: Vec<&Export> = interface
@@ -191,9 +223,120 @@ pub fn page(interface: &Interface, text: &str) -> String {
     out
 }
 
+fn expanded_signature(name: &str, signature: &ModuleSignature, out: &mut String) {
+    let _ = writeln!(
+        out,
+        "\nExpanded module signature:\n\n```text\n{name} : {}\n```",
+        signature.display()
+    );
+}
+
+fn module_contract(name: &str, requirements: &[ModuleRequirement], out: &mut String) {
+    if requirements.iter().any(|r| {
+        matches!(
+            r,
+            ModuleRequirement::Module { .. } | ModuleRequirement::Kind { .. }
+        )
+    }) {
+        let signature = ModuleSignature::Structure {
+            requirements: requirements.to_vec(),
+        };
+        expanded_signature(name, &signature, out);
+        return;
+    }
+    let mut lines = Vec::new();
+    for requirement in requirements {
+        lines.push(match requirement {
+            ModuleRequirement::Kind { .. } | ModuleRequirement::Module { .. } => {
+                unreachable!("structured signature descriptions are rendered above")
+            }
+            ModuleRequirement::Type {
+                name,
+                params,
+                manifest,
+            } => {
+                let params = params
+                    .iter()
+                    .map(|p| p.name.as_str())
+                    .collect::<Vec<_>>()
+                    .join(" ");
+                let head = if params.is_empty() {
+                    name.clone()
+                } else {
+                    format!("{name} {params}")
+                };
+                manifest.as_ref().map_or_else(
+                    || format!("  type {head}"),
+                    |ty| format!("  type {head} = {}", show_type(ty)),
+                )
+            }
+            ModuleRequirement::Value { name, ty } => {
+                format!("  {name} : {}", show_signature(ty))
+            }
+            ModuleRequirement::Nominal {
+                name,
+                category,
+                identity,
+                definition,
+                methods,
+            } => {
+                let keyword = match category {
+                    ModuleNominalKind::Class => "class",
+                    ModuleNominalKind::Service => "service",
+                };
+                if let Some(e) = identity {
+                    format!("  {keyword} {name} = {}.{}", e.module, e.name)
+                } else if let Some(def) = definition {
+                    let (params, members) = match &def.form {
+                        Form::Class { params, .. } => (
+                            params.as_slice(),
+                            methods
+                                .iter()
+                                .map(|(n, ty)| format!("    {n} : {}", show_signature(ty)))
+                                .collect::<Vec<_>>(),
+                        ),
+                        Form::Service {
+                            params, operations, ..
+                        } => (
+                            params.as_slice(),
+                            operations
+                                .iter()
+                                .map(|op| format!("    {} : {}", op.name, show_signature(&op.ty)))
+                                .collect::<Vec<_>>(),
+                        ),
+                        _ => (&[][..], Vec::new()),
+                    };
+                    let suffix = if params.is_empty() {
+                        String::new()
+                    } else {
+                        format!(" {}", params.join(" "))
+                    };
+                    if members.is_empty() {
+                        format!("  {keyword} {name}{suffix}")
+                    } else {
+                        format!("  {keyword} {name}{suffix} =\n{}", members.join("\n"))
+                    }
+                } else {
+                    format!("  {keyword} {name}")
+                }
+            }
+            ModuleRequirement::Dictionary { head, from } => {
+                format!("  instance {} from {from}", show_type(head))
+            }
+        });
+    }
+    let _ = writeln!(
+        out,
+        "\n```flick\ntype module {name} =\n{}\n```",
+        lines.join("\n")
+    );
+}
+
 fn definition(interface: &Interface, e: &Export, form: &Form, out: &mut String) {
     let name = &e.entity.name;
     match form {
+        Form::ModuleContract { requirements } => module_contract(name, requirements, out),
+        Form::ModuleSignature { signature } => expanded_signature(name, signature, out),
         Form::Alias { params, body, .. } => {
             let params: String = params.iter().fold(String::new(), |mut acc, p| {
                 let _ = write!(acc, " {p}");
@@ -291,5 +434,50 @@ mod tests {
         assert!(!docs.contains_key("x"));
         let docs = comments("/// Made.\nlet rec made = 1\n");
         assert_eq!(docs.get("made").map(String::as_str), Some("Made."));
+        let docs = comments("/// Contract.\ntype module HashKey =\n  type Key\n");
+        assert_eq!(docs.get("HashKey").map(String::as_str), Some("Contract."));
     }
 }
+
+#[cfg(test)]
+mod module_signature_tests {
+    use crate::ir::tests::check_text;
+    use crate::source::FileId;
+    use crate::syntax;
+
+    #[test]
+    fn exported_contract_aliases_document_members_of_private_source_signatures() {
+        let source = "module Contracts exposing (Public)\ntype module Hidden =\n  seed : Int\ntype module Public = Hidden\n";
+        let (_, interface) = check_text("Contracts", source).expect("checks");
+        let page = super::page(&interface, source);
+        assert!(page.contains("type module Public = Hidden"), "{page}");
+        assert!(page.contains("seed : Int"), "{page}");
+    }
+    #[test]
+    fn module_signature_documentation_preserves_valid_source_declarations() {
+        let source = "module App.Contracts exposing (..)\ntype module Input =\n  seed : Int\ntype module Output =\n  answer : Int\ntype module Factory = (K : Input) -> Output\ntype module Namespace =\n  module Make : Factory\n";
+        let (_, interface) = check_text("App.Contracts", source).expect("checks");
+        let page = super::page(&interface, source);
+        assert!(
+            page.contains("type module Factory = (K : Input) -> Output"),
+            "{page}"
+        );
+        for block in page.split("```flick\n").skip(1) {
+            let code = block.split("```").next().expect("code fence");
+            let parsed = syntax::parse(code, FileId::new(0));
+            assert!(
+                parsed.diagnostics.is_empty(),
+                "{code}: {:?}",
+                parsed.diagnostics
+            );
+        }
+        let without_source = super::page(&interface, "");
+        assert!(
+            without_source.contains("Expanded module signature"),
+            "{without_source}"
+        );
+        assert!(without_source.contains("```text\n"), "{without_source}");
+    }
+}
+
+include!("doc/module_source.rs");

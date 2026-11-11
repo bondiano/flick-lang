@@ -1,7 +1,7 @@
-# The schemas, codecs and checks over Effect Schema beyond the core ones of
-# runtime.txt: Effect's combinators and the standard library's types.
+# The schemas, codecs and checks beyond the core ones of runtime.txt: the
+# combinators and the standard library's types.
 
-[@flick-lang/effect-ts]
+[flick:rt]
 schemaValidate *SchemaValidate
 codecTransformEffect CodecTransformEffect
 codecBigint CodecBigint
@@ -33,7 +33,7 @@ routeNestedOf RouteNestedOf
 routeQuery RouteQuery
 routeCodec RouteCodecOf
 
-[@flick-lang/effect-ts/effect/Schema]
+[flick:Schema]
 Literal CodecLiteral
 Literals CodecLiterals
 flickEntries CodecEntries
@@ -90,7 +90,7 @@ isMinLength CheckMinLength
 isMaxLength CheckMaxLength
 flickIsPattern CheckPattern
 
-[@flick-lang/effect-ts/effect/Arbitrary]
+[flick:Arbitrary]
 schema ArbitrarySchema
 flickSchema ArbitrarySchemaWith
 Constant ArbitraryConstant
@@ -107,7 +107,7 @@ flickSampleEffect *ArbitrarySample
 flickCheckEffect *ArbitraryCheck
 flickFormatCheckFailure ArbitraryFormatCheckFailure
 
-[@flick-lang/effect-ts/effect/JsonSchema]
+[flick:JsonSchema]
 META_SCHEMA_URI_DRAFT_04 MetaSchemaUriDraft04
 META_SCHEMA_URI_DRAFT_07 MetaSchemaUriDraft07
 META_SCHEMA_URI_DRAFT_2020_12 MetaSchemaUriDraft202012
@@ -119,20 +119,20 @@ flickToDocumentDraft07 JsonSchemaToDraft07
 flickToDocumentDraft04 JsonSchemaToDraft04
 toMultiDocumentOpenApi3_1 JsonSchemaToOpenApi31
 
-[@flick-lang/effect-ts/effect/JsonPointer]
+[flick:JsonPointer]
 escapeToken EscapeToken
 unescapeToken UnescapeToken
 parseUriFragment ParseUriFragment
 formatUriFragment FormatUriFragment
 
-[@flick-lang/effect-ts/effect/JsonPatch]
+[flick:JsonPatch]
 flickGet JsonPatchGet
 flickApply JsonPatchApply
 
-[@flick-lang/effect-ts/effect/Schema]
+[flick:Schema]
 toDifferJsonPatch DifferJsonPatch
 
-[@flick-lang/effect-ts/effect/Differ]
+[flick:Differ]
 flickEmpty DifferEmpty
 flickDiff *DifferDiff
 flickCombine DifferCombine

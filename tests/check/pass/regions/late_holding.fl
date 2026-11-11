@@ -1,0 +1,25 @@
+// A closure compared late may hold a scoped file that nothing it runs
+// uses: a position without captures takes it inside the `scope`.
+module App.LateHolding exposing (..)
+
+type alias Path = String
+
+type File (s : Region)
+
+type error OpenError = OpenError Path
+
+service FileSystem =
+  open_scoped : forall s. Path ->{Scope s; OpenError} File s
+
+type alias Batch o = { flush : List o ->{} Unit }
+
+take : Batch String -> Unit
+let take _ = ()
+
+held : Path ->{FileSystem; OpenError} Unit
+let held path = scope {
+  let file = FileSystem.open_scoped path
+  let seen = Ref.make []
+  let collect = { flush = fun outputs -> ignore (file, Ref.set seen (Ref.get seen ++ outputs)) }
+  take collect
+}

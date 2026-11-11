@@ -5,9 +5,13 @@
 //! is the least row, `none`: the least solution of §2.1.
 
 use std::mem;
+use std::rc::Rc;
+use std::slice;
 
-use super::{Check, Checker, error};
-use crate::types::{Caps, Row, Stage, Type, Var};
+use super::regions::{add_live, arg_caps, live_arg, live_stage};
+use super::{Check, Checker, error, live_service};
+use crate::syntax::Path;
+use crate::types::{Caps, PROVIDED, Row, Stage, Type, Var};
 
 impl Checker<'_> {
     /// `ρ ⊆ ρ'`. An element or a rigid variable `ρ'` lacks goes into its
@@ -15,8 +19,23 @@ impl Checker<'_> {
     pub(super) fn within(&mut self, a: &Row, b: &Row) -> Check<()> {
         let (a, b) = (self.zonk_row(a), self.zonk_row(b));
         let mut extra = Row::none();
+        let scoped = self.scope_live(&b);
         for (name, args) in &a.elems {
             match b.elems.get(name) {
+                // `{Live C} ⊆ {Live C'}` is `C ⊆ C'`, which may grow `C'`;
+                // `Scope ϱ` of `ρ'` keeps `ϱ` live too
+                Some(theirs) if *name == live_service() => {
+                    let allowed = arg_caps(&theirs[0]).union(&scoped);
+                    self.hold(slice::from_ref(&args[0]), &[], &allowed, "Live");
+                }
+                // against a closed row, `Live C` needs `C` to hold no region
+                // or variable but those its `Scope` keeps live, once known:
+                // what is unknown now may be none
+                None if *name == live_service()
+                    && !b.vars.iter().any(|v| matches!(v, Var::Meta(_))) =>
+                {
+                    self.hold(slice::from_ref(&args[0]), &[], &scoped, "Live");
+                }
                 Some(theirs) if theirs.len() == args.len() => {
                     for (x, y) in args.iter().zip(theirs.iter()) {
                         self.unify(x, y)?;
@@ -29,14 +48,17 @@ impl Checker<'_> {
             }
         }
         for v in &a.vars {
-            if b.vars.contains(v) {
-                continue;
-            }
+            let held = b.vars.contains(v);
             match v {
-                Var::Named(_) => {
-                    extra.vars.insert(v.clone());
+                // what `ρ'` takes out of `ρ` it has to name itself
+                Var::Named(_) if held => {
+                    for n in a.owed(v, &b) {
+                        extra.elems.insert(n.clone(), Rc::from([]));
+                    }
                 }
-                Var::Meta(_) => self.pending.push((Row::var(v.clone()), b.clone())),
+                Var::Named(_) => extra.add_var(v, &a.less_of(v).cloned().collect()),
+                Var::Meta(_) if held && a.owed(v, &b).next().is_none() => {}
+                Var::Meta(_) => self.pending.push((a.only(v), b.clone())),
             }
         }
         if extra.is_none() {
@@ -46,7 +68,16 @@ impl Checker<'_> {
             Var::Meta(m) => Some(*m),
             Var::Named(_) => None,
         });
-        match tail {
+        // a row taken without `S` does not grow by `S`, nor by a variable
+        // that may hold it
+        let closed = |m: u32| {
+            let m = Var::Meta(m);
+            b.less_of(&m).any(|n| {
+                extra.elems.contains_key(n)
+                    || (extra.vars.iter()).any(|v| !extra.less.contains(&(v.clone(), n.clone())))
+            })
+        };
+        match tail.filter(|m| !closed(*m)) {
             Some(m) => {
                 let mut grown = extra;
                 grown.vars.insert(Var::Meta(self.meta()));
@@ -96,6 +127,14 @@ impl Checker<'_> {
         let mut out = a.clone();
         for (name, args) in &b.elems {
             match a.elems.get(name) {
+                Some(mine) if *name == live_service() => {
+                    let both = arg_caps(&mine[0]).union(&arg_caps(&args[0]));
+                    out.elems.insert(name.clone(), Rc::from([live_arg(both)]));
+                }
+                Some(mine) if &*name.module == PROVIDED => {
+                    let owner = self.both_owners(&mine[0], &args[0])?;
+                    out.elems.insert(name.clone(), Rc::from([owner]));
+                }
                 Some(mine) if mine.len() == args.len() => {
                     for (x, y) in mine.iter().zip(args.iter()) {
                         self.unify(x, y)?;
@@ -107,7 +146,9 @@ impl Checker<'_> {
                 }
             }
         }
-        out.vars.extend(b.vars.iter().cloned());
+        for v in &b.vars {
+            out.add_var(v, &b.less_of(v).cloned().collect());
+        }
         Ok(out)
     }
 
@@ -152,24 +193,60 @@ impl Checker<'_> {
     /// `τ ≤ τ'`: ≤-Fun and ≤-Eff, else ≤-Refl; with (≤-Cap) of
     /// `regions.md` §2.2 on the whole value, qualified or bare.
     pub(super) fn subsume(&mut self, actual: &Type, expected: &Type) -> Check<()> {
+        // an opaque alias on both sides met again inside its own unfolding
+        // is equal by its arguments, as `unify` reads it: unfolding one that
+        // names itself would not end
+        let (x, y) = (self.heads(actual), self.heads(expected));
+        let alias = match (self.alias(&x), self.alias(&y)) {
+            (Some((p, _)), Some((q, _))) if p == q => Some(p.clone()),
+            _ => None,
+        };
+        let Some(p) = alias else {
+            return self.subsume_unfolded(actual, expected);
+        };
+        if self.unfolding.contains(&p) {
+            return self.unify(&x, &y);
+        }
+        self.unfolding.push(p);
+        let checked = self.subsume_unfolded(actual, expected);
+        self.unfolding.pop();
+        checked
+    }
+
+    fn subsume_unfolded(&mut self, actual: &Type, expected: &Type) -> Check<()> {
         let (a, b) = (self.follow(actual), self.follow(expected));
         if matches!(b, Type::Var(Var::Meta(_))) {
             return self.unify(&a, &b);
         }
         self.subsume_bare(actual, expected)?;
-        self.hold(&[a], &[b], &Caps::default(), "≤-Cap");
+        for b in self.layers(&b) {
+            self.hold(slice::from_ref(&a), &[b], &Caps::default(), "≤-Cap");
+        }
         Ok(())
     }
 
     fn subsume_bare(&mut self, actual: &Type, expected: &Type) -> Check<()> {
+        // under `regions/live.rs` a qualifier on a function or a task is
+        // the `Live` its use needs
+        // each qualifier of the expected type bounds the `Live` of its use
+        let (qa, mut qes) = (self.qualifier(actual), self.qualifiers(expected));
+        if qes.is_empty() {
+            qes.push(Caps::default());
+        }
         match (self.resolve(actual), self.resolve(expected)) {
             (Type::Fun(p, s, r), Type::Fun(p2, s2, r2)) => {
                 self.subsume(&p2, &p)?;
-                self.stage_within(&s, &s2)?;
+                let s = live_stage(&s, &qa);
+                for qe in &qes {
+                    self.stage_within(&s, &live_stage(&s2, qe))?;
+                }
                 self.subsume(&r, &r2)
             }
             (Type::Eff(r, e, t), Type::Eff(r2, e2, t2)) => {
-                self.within(&r, &r2)?;
+                let r = add_live(&r, &qa);
+                for qe in &qes {
+                    self.within(&r, &add_live(&r2, qe))?;
+                }
                 self.within(&e, &e2)?;
                 self.subsume(&t, &t2)
             }
@@ -182,7 +259,8 @@ impl Checker<'_> {
     }
 
     /// `ρ` without what `of` has: the services `provide` leaves its
-    /// surroundings to give.
+    /// surroundings to give. A variable of `ρ` is left without the names of
+    /// `of`, which it may hold.
     pub(super) fn minus(&mut self, r: &Row, of: &Row) -> Check<Row> {
         let (r, of) = (self.zonk_row(r), self.zonk_row(of));
         let mut out = Row::none();
@@ -198,7 +276,14 @@ impl Checker<'_> {
                 }
             }
         }
-        out.vars = r.vars.difference(&of.vars).cloned().collect();
+        let named = (of.elems.iter()).filter(|(_, args)| args.is_empty());
+        let gone: Vec<&Path> = named.map(|(n, _)| n).collect();
+        for v in r.vars.difference(&of.vars) {
+            out.add_var(
+                v,
+                &r.less_of(v).chain(gone.iter().copied()).cloned().collect(),
+            );
+        }
         Ok(out)
     }
 }

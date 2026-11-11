@@ -14,19 +14,19 @@ type Concurrency = Sequential | Bounded Int | Unbounded
 /// A reusable cold task that succeeds with `()`, requires no services and
 /// has no expected errors. Use it instead of an empty `task` body.
 void : Eff none none Unit
-foreign pure void from "@flick-lang/effect-ts/effect/Effect" "void"
+foreign pure void from "flick:Effect" "void"
   reviewed "effect@4.1.2 sha256:f4001e59cfd15a7d"
 
 /// Suspends the fiber for the duration.
 sleep : Duration.Duration ->{Async} Unit
-foreign effect sleep from "@flick-lang/effect-ts/effect/Effect" "sleep"
+foreign effect sleep from "flick:Effect" "sleep"
   reviewed "effect@4.1.2 sha256:2900e4923ff8d2f8"
 
 /// Runs `task` again after each typed failure, as long as the schedule,
 /// which gets the error, recurs; then fails with the last error. A defect
 /// or an interruption is never retried.
 retry : Schedule.Schedule r2 e2 (Errors e) o -> (Eff r e a)^c ->{Async | r + r2; e + e2} a
-foreign effect retry from "@flick-lang/effect-ts/effect/Effect" "retry"
+foreign effect retry from "flick:Effect" "retry"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:508d9e1864f6c9d3"
@@ -38,7 +38,7 @@ retry_or_else :
   (Errors e -> o ->{r3; e3} a) ->
   (Eff r e a)^c ->{Async | r + r2 + r3; e2 + e3}
   a
-foreign effect retry_or_else from "@flick-lang/effect-ts/effect/Effect" "retryOrElse"
+foreign effect retry_or_else from "flick:Effect" "retryOrElse"
   arity 2
   retention call
   reviewed "effect@4.1.2 sha256:5fe0f949f1b659e3"
@@ -47,7 +47,7 @@ foreign effect retry_or_else from "@flick-lang/effect-ts/effect/Effect" "retryOr
 /// result, recurs; the schedule's last output. The first typed failure
 /// stops it.
 repeat : Schedule.Schedule r2 e2 a o -> (Eff r e a)^c ->{Async | r + r2; e + e2} o
-foreign effect repeat from "@flick-lang/effect-ts/effect/Effect" "repeat"
+foreign effect repeat from "flick:Effect" "repeat"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:ee9b528bc8acab06"
@@ -59,7 +59,7 @@ repeat_or_else :
   (Errors (e + e2) -> Option (Schedule.Metadata o a) ->{r3; e3} o) ->
   (Eff r e a)^c ->{Async | r + r2 + r3; e3}
   o
-foreign effect repeat_or_else from "@flick-lang/effect-ts/effect/Effect" "repeatOrElse"
+foreign effect repeat_or_else from "flick:Effect" "repeatOrElse"
   arity 2
   retention call
   reviewed "effect@4.1.2 sha256:d4f448e3bb9bbbc8"
@@ -67,14 +67,14 @@ foreign effect repeat_or_else from "@flick-lang/effect-ts/effect/Effect" "repeat
 /// Runs `task` by the schedule, which gets no input, delaying before each
 /// run after the first; the schedule's last output.
 schedule : Schedule.Schedule r2 e2 i o -> (Eff r e a)^c ->{Async | r + r2; e + e2} o
-foreign effect schedule from "@flick-lang/effect-ts/effect/Effect" "schedule"
+foreign effect schedule from "flick:Effect" "schedule"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:2f8fe183096c3d87"
 
 /// `repeat` with `initial` as the schedule's first input.
 schedule_from : a -> Schedule.Schedule r2 e2 a o -> (Eff r e a)^c ->{Async | r + r2; e + e2} o
-foreign effect schedule_from from "@flick-lang/effect-ts/effect/Effect" "scheduleFrom"
+foreign effect schedule_from from "flick:Effect" "scheduleFrom"
   arity 2
   retention call
   reviewed "effect@4.1.2 sha256:ea9fbaee9728bd5e"
@@ -82,116 +82,116 @@ foreign effect schedule_from from "@flick-lang/effect-ts/effect/Effect" "schedul
 /// Dies with a defect carrying the message: not a typed error, so no
 /// `try … with` handles it.
 die : String ->{} a
-foreign effect die from "@flick-lang/effect-ts/effect/Effect" "die"
+foreign effect die from "flick:Effect" "die"
   reviewed "effect@4.1.2 sha256:cf34f67c8ed6636c"
 
 /// Fails with the whole cause of the failure `f ()` gives.
 fail_cause_sync : (Unit -> Failure e)^c ->{; e} a
-foreign effect fail_cause_sync from "@flick-lang/effect-ts/effect/Effect" "flickFailCauseSync"
+foreign effect fail_cause_sync from "flick:Effect" "flickFailCauseSync"
   retention call
   reviewed "effect@4.1.2 sha256:aab9e6230fa8e4ed"
 
 /// Never ends; only an interruption stops it.
 never : Unit ->{Async} a
-foreign effect never from "@flick-lang/effect-ts/effect/Effect" "flickNever"
+foreign effect never from "flick:Effect" "flickNever"
   arity 0
   reviewed "effect@4.1.2 sha256:8db8203fce2282c5"
 
 /// Lets the other fibers run before this one goes on.
 yield_now : Unit ->{Async} Unit
-foreign effect yield_now from "@flick-lang/effect-ts/effect/Effect" "flickYieldNow"
+foreign effect yield_now from "flick:Effect" "flickYieldNow"
   arity 0
   reviewed "effect@4.1.2 sha256:c167d26106a1fa95"
 
 /// `yield_now` with the priority of the scheduler's task, a Float as the
 /// scheduler takes it.
 yield_now_with : Float ->{Async} Unit
-foreign effect yield_now_with from "@flick-lang/effect-ts/effect/Effect" "yieldNowWith"
+foreign effect yield_now_with from "flick:Effect" "yieldNowWith"
   reviewed "effect@4.1.2 sha256:7e82b2a2a9eb9a63"
 
 /// How `task` ends, its typed failure, defect or interruption included;
 /// never fails itself.
 exit : (Eff r e a)^c ->{r} Exit e a
-foreign effect exit from "@flick-lang/effect-ts/effect/Effect" "flickExit"
+foreign effect exit from "flick:Effect" "flickExit"
   retention call
   reviewed "effect@4.1.2 sha256:f4b245f186c9f3a9"
 
 /// Runs `task`, then `other`: both results. `parallel` runs them at once.
 zip : (Eff r2 e2 b)^c -> (Eff r e a)^c ->{r + r2; e + e2} (a, b)
-foreign effect zip from "@flick-lang/effect-ts/effect/Effect" "zip"
+foreign effect zip from "flick:Effect" "zip"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:827d4c0d73b7f936"
 
 /// Runs `task`, then `other`, and combines their results with `f`.
 zip_with : (Eff r2 e2 b)^c -> (a -> b -> d)^c -> (Eff r e a)^c ->{r + r2; e + e2} d
-foreign effect zip_with from "@flick-lang/effect-ts/effect/Effect" "zipWith"
+foreign effect zip_with from "flick:Effect" "zipWith"
   arity 2
   retention call
   reviewed "effect@4.1.2 sha256:5915af61e36fd58f"
 
 /// Runs `task` after the duration.
 delay : Duration.Duration -> (Eff r e a)^c ->{r; e} a
-foreign effect delay from "@flick-lang/effect-ts/effect/Effect" "delay"
+foreign effect delay from "flick:Effect" "delay"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:1c71f203aeea12d2"
 
 /// The result of `task` with how long it ran.
 timed : (Eff r e a)^c ->{r; e} (Duration.Duration, a)
-foreign effect timed from "@flick-lang/effect-ts/effect/Effect" "timed"
+foreign effect timed from "flick:Effect" "timed"
   retention call
   reviewed "effect@4.1.2 sha256:b7b453eb3154ac8d"
 
 /// Runs `fallback` instead when `task` does not end within the duration;
 /// `task` is interrupted.
 timeout_or_else : Duration.Duration -> (Eff r2 e2 a)^c -> (Eff r e a)^c ->{r + r2; e + e2} a
-foreign effect timeout_or_else from "@flick-lang/effect-ts/effect/Effect" "flickTimeoutOrElse"
+foreign effect timeout_or_else from "flick:Effect" "flickTimeoutOrElse"
   arity 2
   retention call
   reviewed "effect@4.1.2 sha256:3de84923ba3336b1"
 
 /// Runs `task` again and again until it fails.
 forever : (Eff r e a)^c ->{r; e} b
-foreign effect forever from "@flick-lang/effect-ts/effect/Effect" "forever"
+foreign effect forever from "flick:Effect" "forever"
   retention call
   reviewed "effect@4.1.2 sha256:fe36215c57cef002"
 
 /// Runs `task` again after each typed failure until it succeeds.
 eventually : (Eff r e a)^c ->{r} a
-foreign effect eventually from "@flick-lang/effect-ts/effect/Effect" "eventually"
+foreign effect eventually from "flick:Effect" "eventually"
   retention call
   reviewed "effect@4.1.2 sha256:0a54a91084aa5c5e"
 
 /// `n` copies of `task`, none of them run yet.
 replicate : Int -> Eff r e a -> List (Eff r e a)
-foreign pure replicate from "@flick-lang/effect-ts/effect/Effect" "replicate"
+foreign pure replicate from "flick:Effect" "replicate"
   arity 1
   reviewed "effect@4.1.2 sha256:5ed109e83142a878"
 
 /// Runs `task` `n` times, as many at once as `concurrency` lets; the
 /// results in order.
 replicate_effect : Detached r => Concurrency -> Int -> (Eff r e a)^c ->{r; e} List a
-foreign effect replicate_effect from "@flick-lang/effect-ts/effect/Effect" "flickReplicateEffect"
+foreign effect replicate_effect from "flick:Effect" "flickReplicateEffect"
   arity 2
   retention call
   reviewed "effect@4.1.2 sha256:0747f16ecf18fcaa"
 
 /// Runs `task` only if `condition` gives `true`: its result, or `None`.
 when_ : (Eff r2 e2 Bool)^c -> (Eff r e a)^c ->{r + r2; e + e2} Option a
-foreign effect when_ from "@flick-lang/effect-ts/effect/Effect" "when"
+foreign effect when_ from "flick:Effect" "when"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:ad1ba2755fec89b6"
 
-/// The value `task` gives the resource Effect's `Resource.auto` makes: it
-/// is acquired now and again by the schedule, and released when the
-/// innermost `scope` (or the one of region `s`) closes.
+/// A resource of the value `task` gives, refreshed automatically: it is
+/// acquired now and again by the schedule, and released when the innermost
+/// `scope` (or the one of region `s`) closes.
 resource_auto :
   Fiber.Provided r2 s =>
   Schedule.Schedule r2 e2 i o ->
   (forall t. Eff {Scope t | r} e a^{t})^c ->{Scope s | r + r2}
   Resource.Resource s e a
-foreign effect resource_auto from "@flick-lang/effect-ts/effect/Effect" "flickResourceAuto"
+foreign effect resource_auto from "flick:Effect" "flickResourceAuto"
   arity 1
   retention owner

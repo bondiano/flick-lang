@@ -9,6 +9,7 @@ use super::{Interface, Module};
 use crate::diagnostics::{Code, Diagnostic, Edit, Severity, codes};
 use crate::plugin::first_party;
 use crate::source::Span;
+use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
 use crate::types::implicit_package_of;
 
@@ -17,7 +18,11 @@ pub(super) fn unused_locals(unused: Vec<Unused>) -> impl Iterator<Item = Diagnos
     unused.into_iter().map(|u| {
         if let Some(removal) = u.needless_mut {
             let message = format!("`{}` is never assigned, so it needs no `mut`", u.name);
-            return warning(codes::R017, message, u.span).with_safe_fix(|| {
+            let diagnostic = warning(codes::R020, message, u.span);
+            if !u.mut_fix {
+                return diagnostic;
+            }
+            return diagnostic.with_safe_fix(|| {
                 let edit = Edit {
                     span: removal,
                     replacement: String::new(),
@@ -25,7 +30,11 @@ pub(super) fn unused_locals(unused: Vec<Unused>) -> impl Iterator<Item = Diagnos
                 ("remove `mut`", vec![edit])
             });
         }
-        warning(codes::R013, format!("`{}` is never used", u.name), u.span).with_fix(|| {
+        let diagnostic = warning(codes::R013, format!("`{}` is never used", u.name), u.span);
+        if u.written {
+            return diagnostic;
+        }
+        diagnostic.with_fix(|| {
             let start = Span::new(u.span.file, u.span.start, u.span.start);
             let (message, edit) = if u.punned {
                 (
@@ -49,6 +58,26 @@ pub(super) fn unused_locals(unused: Vec<Unused>) -> impl Iterator<Item = Diagnos
     })
 }
 
+fn packed_paths(node: &Node, text: &str, out: &mut Vec<String>) {
+    if matches!(node.kind, K::PackExpr | K::ModuleNominalMember)
+        && let Some(path) = node.nodes().find(|n| n.kind == K::ModulePath)
+    {
+        out.push(path.text(text).split_whitespace().collect());
+    }
+    for child in node.nodes() {
+        packed_paths(child, text, out);
+    }
+}
+
+fn module_expression_paths(node: &Node, text: &str, out: &mut Vec<String>) {
+    if node.kind == K::ModulePath {
+        out.push(node.text(text).split_whitespace().collect());
+    }
+    for child in node.nodes() {
+        module_expression_paths(child, text, out);
+    }
+}
+
 impl Scope<'_> {
     /// Warnings for imports, and names they expose, that no reference and no
     /// export of the module uses.
@@ -69,14 +98,50 @@ impl Scope<'_> {
                 .map(|i| i.name.as_str()),
         );
         // `M.S.op` uses the import `M` too: count each prefix of a qualifier
+        let mut packed = Vec::new();
+        packed_paths(module.tree, module.text, &mut packed);
+        if let Some(header) = &module.syntax.header {
+            if let Some(body) = &header.body {
+                module_expression_paths(body, module.text, &mut packed);
+            }
+            if let Some(target) = &header.materialized_body {
+                packed.push(target.clone());
+            }
+        }
+        for application in &module.syntax.applications {
+            module_expression_paths(&application.expression, module.text, &mut packed);
+            packed.push(application.template.clone());
+            packed.extend(application.arguments.iter().cloned());
+            if names.contains(application.name.as_str()) {
+                packed.push(application.name.clone());
+            }
+        }
         let qualifiers: BTreeSet<&str> = references
             .iter()
             .filter_map(|r| r.qualifier.as_deref())
             .flat_map(|q| q.match_indices('.').map(|(i, _)| &q[..i]).chain([q]))
+            .chain(packed.iter().flat_map(|q| {
+                q.match_indices('.')
+                    .map(|(i, _)| &q[..i])
+                    .chain([q.as_str()])
+            }))
             .collect();
         // `T.member`, a companion, uses the type `T`
         names.extend(qualifiers.iter().filter(|q| !q.contains('.')));
         for (import, interface) in self.imports() {
+            if import.module.starts_with("$scope:") || import.module.starts_with("$lexical:") {
+                continue;
+            }
+            // A module expression's synthetic binding import has no source
+            // import to remove; its public view may come from a result signature.
+            if module
+                .syntax
+                .applications
+                .iter()
+                .any(|application| import.module == format!("{}.{}", module.name, application.name))
+            {
+                continue;
+            }
             let Some(interface) = interface else {
                 continue;
             };
@@ -95,7 +160,10 @@ impl Scope<'_> {
             // blocks of the plugins it exposes use it
             let whole =
                 unused.len() == import.exposing.len() && needless.len() == import.plugins.len();
-            if !qualifiers.contains(import.qualifier()) && whole {
+            if !qualifiers.contains(import.qualifier())
+                && !qualifiers.contains(import.module.as_str())
+                && whole
+            {
                 // importing a module brings its instances, which may be the point
                 if interface
                     .instances
@@ -112,6 +180,11 @@ impl Scope<'_> {
                 continue;
             }
             for item in unused {
+                // Synthesized imports have no separate source `exposing`
+                // clause, so they have no user-editable item to diagnose.
+                if item.span == import.span {
+                    continue;
+                }
                 diagnostics.push(unused_item(module.text, import, item));
             }
             for item in needless {
@@ -147,30 +220,26 @@ fn unused_import(module: &Module, import: &Import) -> Diagnostic {
         format!("`{}` is imported but never used", import.module),
         import.span,
     );
-    if cfg!(feature = "diagnostic-fixes") {
-        let decl = module.tree.nodes().find(|n| {
-            n.kind == K::ImportDecl
-                && n.range().0 <= import.span.start
-                && import.span.end <= n.range().1
-        });
-        match decl {
-            Some(decl) => {
-                let (start, end) = decl.range();
-                let end = end + u32::from(module.text[end as usize..].starts_with('\n'));
-                d.with_fix(|| {
-                    (
-                        "remove the import",
-                        vec![Edit {
-                            span: Span::new(import.span.file, start, end),
-                            replacement: String::new(),
-                        }],
-                    )
-                })
-            }
-            None => d,
+    let decl = module.tree.nodes().find(|n| {
+        n.kind == K::ImportDecl
+            && n.range().0 <= import.span.start
+            && import.span.end <= n.range().1
+    });
+    match decl {
+        Some(decl) => {
+            let (start, end) = decl.range();
+            let end = end + u32::from(module.text[end as usize..].starts_with('\n'));
+            d.with_fix(|| {
+                (
+                    "remove the import",
+                    vec![Edit {
+                        span: Span::new(import.span.file, start, end),
+                        replacement: String::new(),
+                    }],
+                )
+            })
         }
-    } else {
-        d
+        None => d,
     }
 }
 

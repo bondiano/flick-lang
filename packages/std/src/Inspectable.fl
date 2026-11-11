@@ -1,14 +1,14 @@
-/// Effect's `Inspectable`: the debugging text and JSON form Effect gives a
-/// value. Over inert data (`Unknown`), so no getter or method runs.
+/// The debugging text and JSON form of a value. Over inert data
+/// (`Unknown`), so no getter or method runs.
 module Inspectable exposing (..)
 
-/// The data as Effect prints it for debugging, indented by `indent` spaces
-/// (0 for one line).
+/// The data as debugging text, indented by `indent` spaces (0 for one
+/// line).
 to_string_unknown : Int -> Unknown -> String
-foreign pure to_string_unknown from "@flick-lang/effect-ts/effect/Inspectable" "flickToStringUnknown"
+foreign pure to_string_unknown from "flick:Inspectable" "flickToStringUnknown"
   reviewed "effect@4.1.2 sha256:ea5d81bca700957a"
 
-/// The data in the JSON form Effect logs it in.
+/// The data in the JSON form it is logged in.
 to_json : Unknown -> Unknown
-foreign pure to_json from "@flick-lang/effect-ts/effect/Inspectable" "toJson"
+foreign pure to_json from "flick:Inspectable" "toJson"
   reviewed "effect@4.1.2 sha256:ce435a1e920b496d"

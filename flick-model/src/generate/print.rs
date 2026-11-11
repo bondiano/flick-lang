@@ -8,7 +8,8 @@
 
 use std::fmt::Write as _;
 
-use super::{PRELUDE, Program};
+use super::classes::is_dict;
+use super::{MODULE, PRELUDE, Program};
 use crate::syntax::{Arm, Const, Head, Lit, Pat, Prim, Term};
 use crate::types::{Caps, Row, Scheme, Stage, Type, Var, provided};
 
@@ -75,8 +76,10 @@ fn binding(x: &str, sig: Option<&Scheme>, rhs: &Term, col: usize, rec: &str) -> 
             while let Term::Lam(p, b) = body
                 && !params.split(' ').any(|q| q == &**p)
             {
-                params.push(' ');
-                params.push_str(p);
+                if !p.starts_with('?') {
+                    params.push(' ');
+                    params.push_str(p);
+                }
                 body = b;
             }
             format!(
@@ -117,11 +120,13 @@ fn expr(e: &Term, col: usize) -> String {
             format!("{{ ({}) with{sep}{l} = {v} }}", expr(r, col))
         }
         Term::List(xs) => format!("[{}]", list(xs.iter().map(|x| expr(x, col)), ", ")),
-        Term::Global(p) if &*p.module == "Gen" => p.name.to_string(),
+        Term::Global(p) if &*p.module == MODULE => p.name.to_string(),
         // by the module that exposes it: `List.get` of `List.Core`
         Term::Global(p) => format!("{}.{}", p.module.split('.').next().unwrap_or(""), p.name),
         Term::Scope(s, body) => format!("(scope {s} {{\n{} }})", block(body, inner)),
         Term::Lit(l) => lit(l),
+        // the λ of a dictionary is the constraint of a signature
+        Term::Lam(x, body) if x.starts_with('?') => expr(body, col),
         Term::Lam(x, body) => format!("(fun {x} ->\n{})", block(body, inner)),
         Term::Tuple(xs) => format!("({})", list(xs.iter().map(|x| expr(x, col)), ", ")),
         Term::Record(fs) => {
@@ -136,6 +141,8 @@ fn expr(e: &Term, col: usize) -> String {
                 format!("{{ {} }}", fields.join("; "))
             }
         }
+        // a method: flick-core resolves its dictionary
+        Term::Field(r, l) if is_dict(r) => l.to_string(),
         Term::Field(r, l) if matches!(**r, Term::Var(_)) => format!("{}.{l}", expr(r, col)),
         // `0.a` would read as a number
         Term::Field(r, l) => format!("({}).{l}", expr(r, col)),
@@ -186,7 +193,9 @@ fn app(e: &Term, col: usize) -> String {
     let mut args = Vec::new();
     let mut head = e;
     while let Term::App(f, a) = head {
-        args.push(expr(a, col));
+        if !is_dict(a) {
+            args.push(expr(a, col));
+        }
         head = f;
     }
     args.reverse();
@@ -294,12 +303,23 @@ fn scheme(s: &Scheme) -> String {
         .map(|(c, r)| format!("Fiber.Outlives {} {}", caps(c), ty_atom(r)))
         .collect();
     given(&s.body, &mut facts);
+    let mut body = &s.body;
+    while let Type::Fun(p, Stage::Pure, r) = body
+        && let Type::Dict(c, args) = &**p
+    {
+        facts.push(format!(
+            "{} {}",
+            c.name,
+            list(args.iter().map(ty_atom), " ")
+        ));
+        body = r;
+    }
     let facts = match &facts[..] {
         [] => String::new(),
         [one] => format!("{one} => "),
         _ => format!("({}) => ", facts.join(", ")),
     };
-    format!("forall {vars}. {facts}{}", ty(&s.body))
+    format!("forall {vars}. {facts}{}", ty(body))
 }
 
 /// The `Fiber.Provided R s` a signature writes as a constraint, which the
@@ -345,7 +365,7 @@ fn ty(t: &Type) -> String {
 fn ty_atom(t: &Type) -> String {
     match t {
         Type::Var(v) => v.to_string(),
-        Type::Con(p) if ["Gen", "Prelude"].contains(&&*p.module) => p.name.to_string(),
+        Type::Con(p) if [MODULE, "Prelude"].contains(&&*p.module) => p.name.to_string(),
         Type::Con(p) => p.to_string(),
         Type::Tuple(ts) => format!("({})", list(ts.iter().map(ty), ", ")),
         Type::Record(f) => format!(

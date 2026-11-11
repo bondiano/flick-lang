@@ -14,6 +14,7 @@
 //! which the translation never makes, are typed in `runtime.rs`, so that
 //! Preservation can be checked on the states of the machine (the model properties, `just model`).
 
+mod bindings;
 mod constants;
 mod dicts;
 mod expr;
@@ -24,7 +25,9 @@ mod pattern;
 mod regions;
 mod rows;
 mod runtime;
+pub mod trace;
 mod unify;
+mod zonk;
 
 #[cfg(test)]
 mod tests;
@@ -40,8 +43,9 @@ use crate::eval::Program;
 use crate::syntax::{Name, Path, Term};
 use crate::types::{Caps, Fields, Row, Scheme, Stage, Type};
 
-pub(crate) use generalize::{Inst, substitute};
-pub(crate) use regions::scope_service;
+pub(crate) use constants::prim_scheme;
+pub(crate) use generalize::{Inst, in_regions, substitute};
+pub(crate) use regions::{live_service, scope_service};
 pub use runtime::check_config;
 
 /// A rule whose premise fails, and why.
@@ -113,6 +117,23 @@ pub struct Checker<'d> {
     /// Whether `≡` may equate a rigid variable: the result of a constructor
     /// of a GADT against the type of the matched value.
     refining: bool,
+    /// The module of the definition being checked: its opaque aliases
+    /// are their representations.
+    module: Name,
+    /// What each subterm was typed at, when a certificate is wanted.
+    trace: Option<trace::Trace>,
+    /// The scheme and instance of the variable or global just typed.
+    instanced: Option<(Scheme, Vec<Inst>)>,
+    /// The opaque aliases subsumption is unfolding on both sides: one met
+    /// again inside its own unfolding is equal by its arguments.
+    unfolding: Vec<Path>,
+}
+
+/// `σ` as the model reads a signature: with the `Live` elision adds
+/// (`regions/live.rs`), which `formal/Formal/Live/ElideSchemes.lean` proves
+/// to be `Ty.elide` of the core for the Prelude.
+pub fn elided(decls: &Decls, s: &Scheme) -> Scheme {
+    Checker::new(decls).live_scheme(s)
 }
 
 impl<'d> Checker<'d> {
@@ -132,6 +153,10 @@ impl<'d> Checker<'d> {
             regions: regions::Regions::default(),
             equalities: Vec::new(),
             refining: false,
+            module: Name::from(""),
+            trace: None,
+            instanced: None,
+            unfolding: Vec::new(),
         }
     }
 
@@ -139,7 +164,7 @@ impl<'d> Checker<'d> {
     /// as (Let-Sig) checks the right side of a `let` with a signature.
     pub fn check_top(&mut self, e: &Term, scheme: &Scheme) -> Check<()> {
         self.stage = Stage::Pure;
-        let expected = self.skolemize(scheme);
+        let (expected, _) = self.skolemize(scheme);
         self.check(e, &expected)?;
         self.finish()?;
         if self.stage != Stage::Pure {
@@ -149,6 +174,14 @@ impl<'d> Checker<'d> {
             );
         }
         Ok(())
+    }
+
+    /// [`Self::check_top`], and what it typed each subterm at.
+    pub fn check_top_traced(&mut self, e: &Term, scheme: &Scheme) -> Check<trace::Trace> {
+        self.trace = Some(trace::Trace::default());
+        self.check_top(e, scheme)?;
+        let trace = self.trace.take().unwrap_or_default();
+        Ok(self.zonk_trace(&trace))
     }
 
     /// `· ⊢ e : τ ! φ`, with the rows of `τ` and `φ` settled.
@@ -191,6 +224,7 @@ pub fn check_program<S: BuildHasher>(
     for (path, term) in globals {
         let scheme = decls.values.get(path).or_else(|| decls.instances.get(path));
         let mut checker = Checker::new(decls);
+        checker.module = path.module.clone();
         let result = match scheme {
             Some(s) => checker.check_top(term, s),
             None => checker.infer_top(term).map(|_| ()),

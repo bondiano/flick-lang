@@ -39,22 +39,36 @@ impl Key {
         self.parts.push((label.into(), bytes.into()));
     }
 
-    /// 128 bits of two FNV-1a hashes over the sorted, length-prefixed parts.
-    pub fn finish(mut self) -> String {
-        self.parts.sort();
-        let mut a = Fnv(0xcbf2_9ce4_8422_2325);
-        let mut b = Fnv(0x6c62_272e_07bb_0142);
-        for (label, bytes) in &self.parts {
-            for chunk in [label.as_bytes(), bytes.as_slice()] {
-                let len = (chunk.len() as u64).to_le_bytes();
-                for h in [&mut a, &mut b] {
-                    h.write(&len);
-                    h.write(chunk);
-                }
-            }
-        }
-        format!("{:016x}{:016x}", a.0, b.0)
+    /// The key: a digest over the sorted parts, each a label and the digest
+    /// of its bytes.
+    pub fn finish(self) -> String {
+        self.signed().0
     }
+
+    /// [`Key::finish`], with the digest of each part by its label: what
+    /// tells which input differs between two keys.
+    pub fn signed(mut self) -> (String, Vec<(String, String)>) {
+        self.parts.sort();
+        let parts: Vec<(String, String)> = (self.parts.into_iter())
+            .map(|(label, bytes)| (label, digest([bytes.as_slice()])))
+            .collect();
+        let chunks = (parts.iter()).flat_map(|(label, part)| [label.as_bytes(), part.as_bytes()]);
+        (digest(chunks), parts)
+    }
+}
+
+/// 128 bits of two FNV-1a hashes over the length-prefixed `chunks`.
+fn digest<'a>(chunks: impl IntoIterator<Item = &'a [u8]>) -> String {
+    let mut a = Fnv(0xcbf2_9ce4_8422_2325);
+    let mut b = Fnv(0x6c62_272e_07bb_0142);
+    for chunk in chunks {
+        let len = (chunk.len() as u64).to_le_bytes();
+        for h in [&mut a, &mut b] {
+            h.write(&len);
+            h.write(chunk);
+        }
+    }
+    format!("{:016x}{:016x}", a.0, b.0)
 }
 
 struct Fnv(u64);

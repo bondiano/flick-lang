@@ -1,0 +1,9 @@
+{
+  "name": "@flick-lang/load-ssr",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@flick-lang/runtime": "workspace:*",
+    "@flick-lang/effect-ts": "workspace:*"
+  }
+}

@@ -6,7 +6,7 @@ import (
 	"strconv"
 )
 
-// The Effect Schema AST a schema of the program has on the JS target, as
+// The AST of a schema of the program, the one it has on the JS target, as
 // far as Arbitrary reads it: what the generators of arbitrary_schema.go
 // compile. Each node makes the go target's values of its type.
 
@@ -57,7 +57,7 @@ type arbFilter struct {
 	test       func(fb *Fiber, v Value) bool
 }
 
-// arbConstraint is Effect's FilterConstraint, of the keys a check of the
+// arbConstraint is the constraint of a filter, of the keys a check of the
 // program can state.
 type arbConstraint struct {
 	order                              string // "number", "bigint" or "" for none
@@ -110,7 +110,7 @@ func mergeLimit(self, that *float64, f func(float64, float64) float64) *float64 
 	return &v
 }
 
-// mergeConstraint is Effect's `mergeConstraint`: the tighter of each.
+// mergeConstraint merges two constraints: the tighter of each.
 func mergeConstraint(self, that *arbConstraint) *arbConstraint {
 	if self == nil {
 		self = &arbConstraint{}
@@ -170,8 +170,8 @@ var (
 	}}
 )
 
-// withChecks is the node with more checks: a new node, as Effect's
-// `check` makes a new AST.
+// withChecks is the node with more checks: a new node, the receiver
+// unchanged.
 func (a *arbAST) withChecks(checks ...arbFilter) *arbAST {
 	c := *a
 	c.checks = append(append([]arbFilter(nil), a.checks...), checks...)
@@ -182,7 +182,7 @@ func (a *arbAST) withChecks(checks ...arbFilter) *arbAST {
 // recursive type's suspension finds the node it started from.
 type arbASTs struct {
 	nodes map[astKey]*arbAST
-	json  *arbAST // Effect's Json declaration, once per compilation
+	json  *arbAST // the Json declaration, once per compilation
 }
 
 type astKey struct {
@@ -217,7 +217,7 @@ func (b *arbASTs) of(s *Schema, wire bool) *arbAST {
 }
 
 // A HashSet, a HashMap or a Result of a JSON codec is a declaration
-// without a link, which Effect cannot generate either.
+// without a link, which has no generator.
 func (b *arbASTs) build(s *Schema, wire bool) *arbAST {
 	switch s.kind {
 	case kindNumber:
@@ -282,7 +282,7 @@ func (b *arbASTs) build(s *Schema, wire bool) *arbAST {
 		if !wire {
 			return &arbAST{tag: astRedacted, members: []*arbAST{b.of(s.item, wire)}}
 		}
-		// its JSON codec refuses every value: Effect generates JSON values
+		// its JSON codec refuses every value: the generator gives JSON values
 		return b.jsonNode()
 	case kindLazy:
 		return &arbAST{tag: astSuspend, thunk: func() *arbAST { return b.of(s.resolved(), wire) }}

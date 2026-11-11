@@ -5,11 +5,13 @@
 //! Operations are not class methods: no instance is looked up for them.
 //! Services and errors are identified by module and name.
 
+use crate::types::Elem;
 use serde::{Deserialize, Serialize};
 
 use super::Checker;
 use super::env::{Form, TypeDef};
 use super::kinds::Kind;
+use super::regions::{Unfold, leave_alias};
 use super::ty::{Binder, Row, Type};
 use crate::diagnostics::codes;
 use crate::iface::{Entity, Namespace};
@@ -39,7 +41,7 @@ pub fn impl_def(def: &TypeDef) -> Option<TypeDef> {
     };
     let fields = operations
         .iter()
-        .map(|op| (op.name.clone(), own_type(&op.ty, params.len())))
+        .map(|op| (Elem::named(&op.name), own_type(&op.ty, params.len())))
         .collect();
     Some(TypeDef {
         kind: with_result(&def.kind, Kind::Type),
@@ -157,12 +159,12 @@ fn require(ty: Type, label: &str, service: &Type, never_suspends: bool) -> Type 
             param,
             effects: effects.map(|mut e| {
                 e.services = Type::Row(Row {
-                    entries: vec![(label.to_owned(), service.clone())],
+                    entries: vec![(Elem::named(label), service.clone())],
                     tail: Some(Box::new(e.services)),
                     ..Row::default()
                 });
                 e.sync = super::ty::sync_rows(&e.services, &e.errors);
-                e.direct = e.direct && never_suspends;
+                e.direct = e.direct && e.sync && never_suspends;
                 e
             }),
             result: Box::new(require(*result, label, service, never_suspends)),
@@ -222,7 +224,7 @@ impl Checker<'_> {
         let args: Vec<Type> = params.iter().map(|_| self.fresh()).collect();
         let service = Type::apps(Type::con(&entity.module, name), args);
         let row = Type::Row(Row::closed(vec![(
-            format!("{}.{name}", entity.module),
+            Elem::Named(format!("{}.{name}", entity.module)),
             service,
         )]));
         Some(Type::app(Type::lang(Lang::ServiceTag), row))
@@ -289,7 +291,21 @@ impl Checker<'_> {
         }
     }
 
+    /// `seen` holds the types it has looked into and the aliases it is
+    /// unfolding: one met again inside its own unfolding holds what its
+    /// arguments hold.
     fn live_part(&self, ty: &Type, seen: &mut Vec<(String, String)>) -> Option<Type> {
+        let unfold = self.enter_alias(ty, seen);
+        if matches!(unfold, Unfold::Again) {
+            let (_, args) = self.store.head(ty).spine();
+            return args.iter().find_map(|a| self.live_part(a, seen));
+        }
+        let live = self.live_unfolded(ty, seen);
+        leave_alias(seen, unfold);
+        live
+    }
+
+    fn live_unfolded(&self, ty: &Type, seen: &mut Vec<(String, String)>) -> Option<Type> {
         let normalized = self.bound_head(ty);
         let ty = &normalized;
         match ty {

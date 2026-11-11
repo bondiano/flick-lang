@@ -209,9 +209,9 @@ const builtin = (file: string): URL => {
   return existsSync(core) ? core : new URL(`../../../packages/std/src/${file}`, import.meta.url);
 };
 
-/** The JS names the `.fl` files bind from `@flick-lang/effect-ts/effect/<module>`. */
+/** The JS names the `.fl` files bind from `flick:<module>`. */
 const bound = (files: ReadonlyArray<string>, module: string): Array<string> => {
-  const re = new RegExp(`foreign \\w+ \\w+ from "@flick-lang/effect-ts/effect/${module}" "(\\w+)"`, "g");
+  const re = new RegExp(`foreign \\w+ \\w+ from "flick:${module}" "(\\w+)"`, "g");
   const names = files.flatMap((f) => [...readFileSync(builtin(f), "utf8").matchAll(re)].map((m) => m[1] ?? ""));
   return [...new Set(names)].toSorted();
 };

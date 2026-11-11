@@ -1,8 +1,7 @@
 schema-version = 1
 
 [project]
-kind = "app"
-entry = "App.Main"
+kind = "lib"
 
 [build]
 effect = "none"

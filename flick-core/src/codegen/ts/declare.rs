@@ -35,8 +35,8 @@ impl Projection<'_> {
             && matches!(self.declaration(interface, export), Ok(Some(_)))
     }
 
-    /// A Prelude type TypeScript or Effect has, never declared; Effect's
-    /// `Stream` too.
+    /// A Prelude type TypeScript or Effect has, never declared; the Effect
+    /// library's `Stream` too.
     fn native(&self, name: &str) -> bool {
         native(self.module, name).is_some()
     }
@@ -50,6 +50,13 @@ impl Projection<'_> {
         let Some(def) = &export.definition else {
             return Ok(None);
         };
+        if matches!(
+            def.form,
+            Form::ModuleContract { .. } | Form::ModuleSignature { .. }
+        ) || self.module == "Prelude" && name == "Module"
+        {
+            return Ok(None);
+        }
         // a set of services and errors is expanded in every signature that names it
         if matches!(def.form, Form::Alias { .. }) && alias_of_row(&def.kind) {
             return Ok(None);

@@ -250,13 +250,7 @@ impl Loader<'_> {
                 // the module is reported as unknown
                 (None, None) => continue,
             };
-            let plugin =
-                plugins.entry(package.clone()).or_insert_with(|| {
-                    match first_party::plugin(&package) {
-                        Some(plugin) => Ok(plugin),
-                        None => self.host.plugin(&package, self.component(&package)),
-                    }
-                });
+            let plugin = self.load_plugin(plugins, &package);
             // its blocks still find it, to say they have no code, unless an
             // import of a plugin that loads gives the head
             let loaded = plugin.is_ok();

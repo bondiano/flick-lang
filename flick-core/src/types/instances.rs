@@ -35,14 +35,14 @@ impl Checker<'_> {
         let Some(info) = self.class_info(&cm, &cn) else {
             return Vec::new();
         };
-        let mark = self.tyvars.len();
+        let mark = self.cx.tyvars.len();
         let skolems: Vec<(String, Type)> = instance
             .vars
             .iter()
             .map(|v| (v.name.clone(), self.store.skolem(&v.name)))
             .collect();
         for (v, (name, ty)) in instance.vars.iter().zip(&skolems) {
-            self.tyvars.push(TyVar {
+            self.cx.tyvars.push(TyVar {
                 name: name.clone(),
                 ty: ty.clone(),
                 kind: v.kind.clone(),
@@ -64,11 +64,13 @@ impl Checker<'_> {
                     let parts = let_parts(member, self.text);
                     let name = parts.name.clone().unwrap_or_default();
                     if !info.methods.contains(&name) {
-                        self.error(
-                            codes::C011,
-                            self.span(member),
-                            format!("`{name}` is not a method of class `{cn}`"),
-                        );
+                        if !self.env.incomplete(&cm) {
+                            self.error(
+                                codes::C011,
+                                self.span(member),
+                                format!("`{name}` is not a method of class `{cn}`"),
+                            );
+                        }
                         continue;
                     }
                     defined.push(name.clone());
@@ -87,7 +89,11 @@ impl Checker<'_> {
                     }
                     match (sig, expected) {
                         (Some(sig), expected) => {
-                            let (scheme, _) = self.signature(sig);
+                            let (mut scheme, _) = self.signature(sig);
+                            // the class signature is what callers see, without `Live`
+                            if expected.is_some() {
+                                scheme = super::regions::strip_live(&scheme);
+                            }
                             if let Some(expected) = expected {
                                 self.compare_method(&name, &scheme, &expected, self.span(sig));
                                 if let Some(signature) = signature {
@@ -101,7 +107,9 @@ impl Checker<'_> {
                         }
                         // The class signature already fixes the method's type.
                         (None, Some(expected)) => {
-                            self.check_signed(member, &parts, &expected, None, None);
+                            let body = (self.method_body_type(&cm, &name, &info.params, &args))
+                                .unwrap_or(expected);
+                            self.check_signed(member, &parts, &body, None, None);
                         }
                         (None, None) => {
                             self.unsigned(member, &parts, &name);
@@ -153,7 +161,7 @@ impl Checker<'_> {
         }
         self.solve_classes(true);
         self.classes.givens.truncate(assumed);
-        self.tyvars.truncate(mark);
+        self.cx.tyvars.truncate(mark);
         defaulted
     }
 
@@ -298,27 +306,27 @@ impl Checker<'_> {
             namespace: Namespace::Value,
             name: method.to_owned(),
         };
-        let Type::Forall {
-            vars,
-            constraints,
-            body,
-        } = self.env.value(&entity)?
-        else {
-            return None;
+        instance_method(self.env.value(&entity)?, params, args)
+    }
+
+    /// [`Self::method_type`] as the body of a method without its own
+    /// signature reads it: the class signature elided before the instance's
+    /// arguments replace its parameters, so its `Live` is what the class
+    /// shows (`traverse`'s callback), not what an argument makes of a
+    /// parameter (`f String` as an `Eff`, `fail/instance.fl`).
+    fn method_body_type(
+        &self,
+        class_module: &str,
+        method: &str,
+        params: &[String],
+        args: &[Type],
+    ) -> Option<Type> {
+        let entity = Entity {
+            module: class_module.to_owned(),
+            namespace: Namespace::Value,
+            name: method.to_owned(),
         };
-        let subst: Vec<(String, Type)> = params.iter().cloned().zip(args.iter().cloned()).collect();
-        let own = vars.get(params.len()..).unwrap_or_default().to_vec();
-        let constraints = constraints.get(1..).unwrap_or_default().to_vec();
-        let ty = if own.is_empty() && constraints.is_empty() {
-            (**body).clone()
-        } else {
-            Type::Forall {
-                vars: own,
-                constraints,
-                body: body.clone(),
-            }
-        };
-        Some(ty.substitute(&subst))
+        instance_method(&self.live_scheme(self.env.value(&entity)?), params, args)
     }
 
     /// The signature of an instance method must be the class signature: as
@@ -364,4 +372,31 @@ impl Checker<'_> {
             }
         }
     }
+}
+
+/// The class method `value` at an instance whose arguments `args` replace
+/// the class's parameters `params`: its own variables and constraints but
+/// the class's.
+fn instance_method(value: &Type, params: &[String], args: &[Type]) -> Option<Type> {
+    let Type::Forall {
+        vars,
+        constraints,
+        body,
+    } = value
+    else {
+        return None;
+    };
+    let subst: Vec<(String, Type)> = params.iter().cloned().zip(args.iter().cloned()).collect();
+    let own = vars.get(params.len()..).unwrap_or_default().to_vec();
+    let constraints = constraints.get(1..).unwrap_or_default().to_vec();
+    let ty = if own.is_empty() && constraints.is_empty() {
+        (**body).clone()
+    } else {
+        Type::Forall {
+            vars: own,
+            constraints,
+            body: body.clone(),
+        }
+    };
+    Some(ty.substitute(&subst))
 }

@@ -10,9 +10,10 @@ variable {S : Sig}
 
 /-- How the stage of the hole relates to the stage of `E[e]`: services may
 grow by the effects of handlers, errors only under a `try` frame, and a pure
-context has a pure hole. -/
+context has a pure hole. In the live discipline a runtime form of a handler also
+provides its own region (`Frame.provides`). -/
 structure ERel (E : List Frame) (φ' φ : Stage) : Prop where
-  svc : Row.Sub φ'.svc (Row.union φ.svc (domE E))
+  svc : Row.Sub φ'.svc (Row.union φ.svc.modNames (domE E))
   err : (∀ F ∈ E, ¬ F.isTry) → Row.Sub φ'.err φ.err
   pure : φ = .pure → φ' = .pure
 
@@ -41,7 +42,7 @@ theorem ctx_typing {Ψ Θ} :
       ∃ K Θ' t' φ', Typ S (Ψ.map (Ty.up K)) Θ' [] r (.ex t' φ') ∧ ERel E φ' φ ∧
         (φ' = .pure ∨ K = 0 ∧ Ext Θ Θ') ∧ Refill S Ψ Θ K Θ' t' φ' (plug E) t φ r
   | [], _, _, _, _, _, h =>
-    ⟨0, Θ, _, _, by simpa using h, ⟨fun n hn => .inl hn, fun _ _ h => h, fun h => h⟩,
+    ⟨0, Θ, _, _, by simpa using h, ⟨fun n hn => .inl (Row.le_modNames hn), fun _ _ h => h, fun h => h⟩,
       .inr ⟨rfl, Ext.refl _⟩,
       fun _ _ _ _ h' => by rw [List.map_up_zero, liftT_zero] at h'; exact h'⟩
   | F :: E, r, _, _, hE, hr, h => by
@@ -52,9 +53,12 @@ theorem ctx_typing {Ψ Θ} :
     refine ⟨K₁ + k, Θ', t', φ', h', ⟨fun n hn => ?_, fun hT => ?_, fun hp => rel.pure (rel₁.pure hp)⟩,
       ?_, fun σ hσ X r' hr' => back₁ σ hσ X (F.plug r') ?_⟩
     · rcases rel.svc n hn with h | h
-      · rcases rel₁.svc n h with h | h
-        · exact .inl h
-        · exact .inr ((domE_cons F E n).mpr (.inr h))
+      · rcases Row.modNames_union (Row.modNames_mono rel₁.svc n h) with h | h
+        · exact .inl (Row.modNames_idem h)
+        · refine .inr ((domE_cons F E n).mpr (.inr ?_))
+          cases n with
+          | rv a G => obtain ⟨_, h⟩ := h; exact (domE_rv h).elim
+          | _ => exact h
       · exact .inr ((domE_cons F E n).mpr (.inl h))
     · exact (rel.err (hT F (by simp))).trans (rel₁.err fun G hG => hT G (by simp [hG]))
     · rcases p with hp | ⟨hk, hΘ, -⟩

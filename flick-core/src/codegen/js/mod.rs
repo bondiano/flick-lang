@@ -3,13 +3,14 @@
 //! current statement list, earlier operands spilled into constants first so
 //! that evaluation stays left to right.
 
+use crate::effects::bindings;
 macro_rules! mark {
     ($gen:expr, $span:expr) => {{
-        #[cfg(feature = "source-maps")]
+        #[cfg(feature = "native-project")]
         {
             ($gen).mark($span)
         }
-        #[cfg(not(feature = "source-maps"))]
+        #[cfg(not(feature = "native-project"))]
         {
             let _ = &$span;
             String::new()
@@ -18,6 +19,12 @@ macro_rules! mark {
 }
 
 mod binary;
+#[cfg(not(target_arch = "wasm32"))]
+mod bridge;
+#[cfg(target_arch = "wasm32")]
+#[path = "bridge_stub.rs"]
+mod bridge;
+mod control;
 mod exports;
 mod expr;
 mod foreign;
@@ -31,7 +38,9 @@ mod kernel;
 mod labels;
 mod lift;
 mod literal;
+mod paths;
 mod pattern;
+pub use paths::relative;
 mod release;
 mod schema;
 mod services;
@@ -40,38 +49,42 @@ mod view;
 
 pub use release::{direct_methods, exported_worker};
 
-#[cfg(feature = "typescript")]
 use std::cell::RefCell;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::mem;
 
 use super::exports::reexports;
 use super::tail::{Callee, Target};
-#[cfg(feature = "typescript")]
 use super::ts::Projection;
 use super::{Options, Output, names};
-use crate::ir::{ItemKind, Label, Module};
-#[cfg(feature = "source-maps")]
+use crate::iface::Namespace;
+use crate::ir::{Item, ItemKind, Label, Module};
+#[cfg(feature = "native-project")]
 use crate::source::Span;
 use crate::types::Dict;
-#[cfg(feature = "typescript")]
 use exports::annotations;
 use exports::sync_exports;
 
-const RUNTIME: &str = "@flick-lang/effect-ts";
+const RUNTIME: &str = bindings::ADAPTER_PREFIX;
 const MARK_START: char = '\u{E000}';
 const MARK_END: char = '\u{E001}';
 
 /// Compiles `module` to ESM (or TypeScript, see [`Options::typescript`]).
 pub fn js(module: &Module, options: &Options) -> Output {
-    assert!(
-        cfg!(feature = "typescript") || !options.typescript,
-        "TypeScript output requires the `typescript` Cargo feature"
-    );
+    js_at(module, options, &module.name, &|_, _| None)
+}
+
+pub(crate) fn js_at(
+    module: &Module,
+    options: &Options,
+    physical: &str,
+    location: &dyn Fn(&str, &str) -> Option<String>,
+) -> Output {
     let mut g = Gen::new(module, options);
-    #[cfg(feature = "typescript")]
-    let projection = Projection::new(&module.name, options.interface, options.package);
-    #[cfg(feature = "typescript")]
+    g.physical = physical;
+    g.location = location;
+    let projection =
+        Projection::for_runtime(physical, options.interface, options.package, options.rt);
     let mut declarations = Vec::new();
     let interface = (options.interface)(&module.name);
     if let Some(interface) = interface.as_ref().filter(|_| !options.rt) {
@@ -79,32 +92,37 @@ pub fn js(module: &Module, options: &Options) -> Output {
         // the wrapper of a Sync export is the runtime's
         g.runtime |= !g.sync_exports.is_empty();
     }
-    #[cfg(feature = "typescript")]
     if options.typescript
         && let Some(interface) = &interface
     {
-        declarations = projection.declarations(interface).0;
-        g.annotations = annotations(&projection, interface);
+        let mut interface = interface.clone();
+        if physical != module.name {
+            for export in &mut interface.exports {
+                if export.entity.module == module.name && export.entity.namespace != Namespace::Type
+                {
+                    export.entity.module = physical.into();
+                }
+            }
+        }
+        declarations = projection.declarations(&interface).0;
+        g.annotations = annotations(&projection, &interface);
     }
     let body = g.items(&module.items);
     let mut code = String::new();
-    #[cfg(feature = "typescript")]
     let typed = RefCell::new(Vec::new());
-    #[cfg(feature = "typescript")]
     if options.typescript {
-        let here = (options.path)(&module.name);
+        let here = (options.path)(physical);
         let path = |m: &str| {
             typed.borrow_mut().push(m.to_owned());
             relative(&here, &(options.path)(m))
         };
         code.push_str(&projection.imports(&path));
     }
-    let here = (options.path)(&module.name);
+    let here = (options.path)(physical);
     g.write_imports(&mut code, &here);
     if !code.is_empty() {
         code.push('\n');
     }
-    #[cfg(feature = "typescript")]
     for d in &declarations {
         code.push_str(d);
         code.push_str("\n\n");
@@ -112,7 +130,9 @@ pub fn js(module: &Module, options: &Options) -> Output {
     code.push_str(&body);
     // a module exposing what it imports: JS consumers find it here too
     let mut barrel = Vec::new();
-    if let Some(interface) = (options.interface)(&module.name) {
+    if let Some(interface) = (options.interface)(&module.name)
+        && physical == module.name
+    {
         let path = |m: &str| relative(&here, &(options.path)(m));
         let (lines, modules) = reexports(&module.name, &interface, &path, &|_| true, &|_| {
             options.typescript()
@@ -125,43 +145,19 @@ pub fn js(module: &Module, options: &Options) -> Output {
         code = tidy::layout(&code);
     }
     let mut output = finish(
-        #[cfg(feature = "source-maps")]
+        #[cfg(feature = "native-project")]
         &code,
-        #[cfg(not(feature = "source-maps"))]
+        #[cfg(not(feature = "native-project"))]
         code,
-        #[cfg(feature = "source-maps")]
+        #[cfg(feature = "native-project")]
         &g.spans,
-        #[cfg(feature = "source-maps")]
+        #[cfg(feature = "native-project")]
         &g.names,
     );
     let imports = g.imports.into_iter();
-    #[cfg(feature = "typescript")]
     let imports = imports.chain(typed.into_inner());
     output.imports = imports.chain(barrel).collect();
     output
-}
-
-/// The import specifier of `to` from `from`, both relative to the output
-/// root; `npm:` marks a module of a package.
-pub fn relative(from: &str, to: &str) -> String {
-    if let Some(bare) = to.strip_prefix("npm:") {
-        return bare.to_owned();
-    }
-    let from_dir: Vec<&str> = from.split('/').collect();
-    let from_dir = &from_dir[..from_dir.len() - 1];
-    let to_parts: Vec<&str> = to.split('/').collect();
-    let common = from_dir
-        .iter()
-        .zip(&to_parts)
-        .take_while(|(a, b)| a == b)
-        .count();
-    let up = from_dir.len() - common;
-    let rest = to_parts[common..].join("/");
-    if up == 0 {
-        format!("./{rest}")
-    } else {
-        format!("{}{rest}", "../".repeat(up))
-    }
 }
 
 /// Removes the markers from `code`, recording where each one was.
@@ -172,9 +168,11 @@ impl<'a> Gen<'a> {
         let grouped = group::grouped(&module.name, &module.items, &groups, calls);
         Gen {
             module: &module.name,
+            physical: &module.name,
+            location: &|_, _| None,
             options,
             labels: &module.labels,
-            #[cfg(feature = "source-maps")]
+            #[cfg(feature = "native-project")]
             names: HashMap::new(),
             imports: BTreeSet::new(),
             foreign: Vec::new(),
@@ -183,7 +181,7 @@ impl<'a> Gen<'a> {
             kernel: options.rt,
             temps: 0,
             givens: Vec::new(),
-            #[cfg(feature = "source-maps")]
+            #[cfg(feature = "native-project")]
             spans: Vec::new(),
             buf: Vec::new(),
             generator: false,
@@ -197,13 +195,18 @@ impl<'a> Gen<'a> {
             views: HashMap::new(),
             vars: HashSet::new(),
             rests: HashMap::new(),
-            #[cfg(feature = "typescript")]
             annotations: HashMap::new(),
             sync_exports: HashMap::new(),
             workers: if options.release {
                 let interface = (options.interface)(&module.name);
-                let exported =
-                    |name: &str| interface.as_ref().is_none_or(|i| i.exports_value(name));
+                let exported = |name: &str| {
+                    interface.as_ref().is_none_or(|i| i.exports_value(name))
+                        || module
+                            .initialization
+                            .prefixes
+                            .iter()
+                            .any(|p| p.bindings.iter().any(|n| n == name))
+                };
                 let exported_arity = |name: &str| (options.workers)(&module.name, name);
                 release::workers(&module.name, &module.items, &exported, &exported_arity)
             } else {
@@ -219,7 +222,7 @@ impl<'a> Gen<'a> {
                 })
                 .collect(),
             direct_foreigns: if options.release && !options.typescript() {
-                foreign::plain_foreigns(&module.items)
+                foreign::plain_foreigns(&module.items, &module.name, options)
             } else {
                 HashMap::new()
             },
@@ -232,49 +235,7 @@ impl<'a> Gen<'a> {
     }
 }
 
-fn finish(
-    #[cfg(feature = "source-maps")] code: &str,
-    #[cfg(not(feature = "source-maps"))] code: String,
-    #[cfg(feature = "source-maps")] spans: &[Span],
-    #[cfg(feature = "source-maps")] names: &HashMap<usize, String>,
-) -> Output {
-    #[cfg(feature = "source-maps")]
-    {
-        let mut out = String::with_capacity(code.len());
-        let mut mappings = Vec::new();
-        let (mut line, mut col) = (0u32, 0u32);
-        let mut chars = code.chars();
-        while let Some(c) = chars.next() {
-            match c {
-                MARK_START => {
-                    let id: String = chars.by_ref().take_while(|&c| c != MARK_END).collect();
-                    if let Ok(id) = id.parse::<usize>() {
-                        mappings.push((line, col, spans[id], names.get(&id).cloned()));
-                    }
-                }
-                '\n' => {
-                    out.push(c);
-                    line += 1;
-                    col = 0;
-                }
-                c => {
-                    out.push(c);
-                    col += u32::try_from(c.len_utf16()).unwrap_or(1);
-                }
-            }
-        }
-        Output {
-            code: out,
-            mappings,
-            imports: Vec::new(),
-        }
-    }
-    #[cfg(not(feature = "source-maps"))]
-    Output {
-        code,
-        imports: Vec::new(),
-    }
-}
+include!("finish.rs");
 
 /// Where a tail call jumps: the function, or the members of its group (see
 /// [`group`]), with their arity; the loop variables; the local each
@@ -298,10 +259,12 @@ struct Tail {
 )]
 struct Gen<'a> {
     module: &'a str,
+    physical: &'a str,
+    location: &'a dyn Fn(&str, &str) -> Option<String>,
     options: &'a Options<'a>,
     /// The module's labelled top-level values (see [`Gen::labelled`]).
     labels: &'a BTreeMap<String, Label>,
-    #[cfg(feature = "source-maps")]
+    #[cfg(feature = "native-project")]
     /// The Flick name at a marker, by its index in `spans`.
     names: HashMap<usize, String>,
     /// Modules whose exports are used.
@@ -316,7 +279,7 @@ struct Gen<'a> {
     temps: u32,
     /// Dictionaries in scope: as `Dict::Given` names them, and the parameter.
     givens: Vec<(String, String)>,
-    #[cfg(feature = "source-maps")]
+    #[cfg(feature = "native-project")]
     spans: Vec<Span>,
     /// Statements of the block being emitted.
     buf: Vec<String>,
@@ -359,7 +322,6 @@ struct Gen<'a> {
     aliases: HashMap<String, String>,
     /// The constructors of the module, which a module alias must not shadow.
     constructors: Vec<String>,
-    #[cfg(feature = "typescript")]
     /// TypeScript types of the exported values, by their JS name.
     annotations: HashMap<String, String>,
     /// Exported functions whose last stage is Sync, by their JS name, with
@@ -384,6 +346,25 @@ impl Gen<'_> {
             .map(|p| format!("{p}: any"))
             .collect();
         format!("({}): any =>", typed.join(", "))
+    }
+
+    /// Native generators have the same internal `any` convention as arrows.
+    /// Their public contracts are projected independently from checked Flick types.
+    fn generator_function(&self, params: &str, stmts: &[String]) -> String {
+        let (params, returns) = if self.options.typescript() {
+            (
+                params
+                    .split(", ")
+                    .filter(|p| !p.is_empty())
+                    .map(|p| format!("{p}: any"))
+                    .collect::<Vec<_>>()
+                    .join(", "),
+                ": globalThis.Generator<any, any, any>",
+            )
+        } else {
+            (params.to_owned(), "")
+        };
+        format!("function* ({params}){returns} {{\n{}}}", indent(stmts))
     }
 
     /// `const name = value;`, `any` in TypeScript.
@@ -418,7 +399,6 @@ impl Gen<'_> {
             None => value,
         };
         let value = pure(value);
-        #[cfg(feature = "typescript")]
         if let Some(ty) = self.annotations.get(name) {
             return format!("export const {name}: {ty} = {value};");
         }
@@ -445,7 +425,7 @@ impl Gen<'_> {
         format!("Effect.{name}")
     }
 
-    #[cfg(feature = "source-maps")]
+    #[cfg(feature = "native-project")]
     /// A marker that maps the generated position to `span`.
     fn mark(&mut self, span: Span) -> String {
         self.spans.push(span);
@@ -454,11 +434,13 @@ impl Gen<'_> {
 
     /// A top-level value of `module` by its JS name.
     fn global(&mut self, module: &str, name: &str) -> String {
-        if module == self.module {
+        let relocated = (self.location)(module, name);
+        let target = relocated.as_deref().unwrap_or(module);
+        if target == self.physical {
             name.to_owned()
         } else {
-            self.imports.insert(module.to_owned());
-            format!("{}.{name}", self.alias(module))
+            self.imports.insert(target.to_owned());
+            format!("{}.{name}", self.alias(target))
         }
     }
 
@@ -503,6 +485,10 @@ impl Gen<'_> {
                     || panic!("dictionary `{shown}` is in scope"),
                     |(_, p)| p.clone(),
                 ),
+            Dict::Value { module, name } => self.global(module, &names::ident(name)),
+            Dict::Opened { binder, field } => {
+                format!("{}.{field}", names::ident(binder))
+            }
             // bound by the pattern of the constructor whose value holds it
             Dict::Field(local) => names::ident(local),
             Dict::Super { dict, class } => format!("{}.${class}", self.dict(dict)),
@@ -549,31 +535,17 @@ impl Gen<'_> {
     }
 }
 
-/// Statements as the lines of a block, indented one level.
-fn indent(stmts: &[String]) -> String {
-    let mut out = String::new();
-    for stmt in stmts {
-        for line in stmt.lines() {
-            out.push_str("  ");
-            out.push_str(line);
-            out.push('\n');
-        }
+/// Includes optional release workers and direct instance methods, whose
+/// physical owner is the same as the binding that defines them.
+pub(crate) fn runtime_exports(item: &Item) -> Vec<String> {
+    let mut names = items::defined(item);
+    if let Some((name, arity)) = release::exported_worker(item) {
+        names.push(format!("{}${arity}", self::names::ident(name)));
     }
-    out
-}
-
-/// A top-level `value` that is a call or an immediately run arrow, marked
-/// `/*#__PURE__*/`: top-level initialization is pure (spec 11), so a bundler
-/// may drop it when nothing uses it.
-fn pure(value: &str) -> String {
-    // a call starts with the marker of its span
-    let code = expr::unmarked(value);
-    let rest =
-        code.trim_start_matches(|c: char| c.is_alphanumeric() || c == '_' || c == '$' || c == '.');
-    let call = rest.len() < code.len() && rest.starts_with('(');
-    if call || code.starts_with("((") {
-        format!("/*#__PURE__*/ {value}")
-    } else {
-        value.to_owned()
-    }
+    names.extend(
+        release::direct_methods(item)
+            .into_iter()
+            .map(|(instance, method)| format!("{}${method}", self::names::instance(instance))),
+    );
+    names
 }

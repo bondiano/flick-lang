@@ -12,65 +12,54 @@ use crate::types::{Constructor, Dict};
 /// How often `e` reads the local `name`.
 pub fn uses(e: &Expr, name: &str) -> usize {
     let mut n = 0;
-    count(e, name, &mut n);
+    each_use(e, &mut |l| n += usize::from(l == name));
     n
 }
 
-fn count(e: &Expr, name: &str, n: &mut usize) {
-    match &e.kind {
-        ExprKind::Local(l) | ExprKind::Within(l, _) if l == name => *n += 1,
-        _ => {}
+/// Each read of a local in `e`, by its name.
+pub fn each_use<'e>(e: &'e Expr, read: &mut dyn FnMut(&'e str)) {
+    if let ExprKind::Local(l) | ExprKind::Within(l, _) = &e.kind {
+        read(l);
     }
-    e.each_child(&mut |c| count(c, name, n));
+    e.each_child(&mut |c| each_use(c, read));
 }
 
-/// How often `e` reads `name` where it is evaluated exactly once whenever
-/// `e` is: not inside a function, task, branch, arm or handler.
-pub fn strict_uses(e: &Expr, name: &str) -> usize {
+/// Each read of a local in `e` that is evaluated exactly once whenever `e`
+/// is, by its name: not inside a function, task, branch, arm or handler.
+pub fn each_strict_use<'e>(e: &'e Expr, read: &mut dyn FnMut(&'e str)) {
     match &e.kind {
-        ExprKind::Local(l) => usize::from(l == name),
+        ExprKind::Local(l) => read(l),
         // only catching errors, it runs its body at once
-        ExprKind::Handle(h) if h.is_try() => strict_uses(&h.body, name),
+        ExprKind::Handle(h) if h.is_try() => each_strict_use(&h.body, read),
         ExprKind::Lambda { .. }
         | ExprKind::Task(_)
         | ExprKind::Within(..)
         | ExprKind::Handle(_)
         | ExprKind::Lift(..)
         | ExprKind::Abstract(..)
-        | ExprKind::Generate { strict: false, .. } => 0,
+        | ExprKind::Generate { strict: false, .. }
+        | ExprKind::ControlLoop { .. }
+        | ExprKind::LoopExit { .. }
+        | ExprKind::Loop { .. } => {}
         // the body runs once per element, maybe never
-        ExprKind::Each { source, .. } => strict_uses(source, name),
-        ExprKind::If(c, _, _) => strict_uses(c, name),
-        ExprKind::Match(s, _) => strict_uses(s, name),
+        ExprKind::Each { source, .. } => each_strict_use(source, read),
+        ExprKind::If(c, _, _) => each_strict_use(c, read),
+        ExprKind::Match(s, _) => each_strict_use(s, read),
         // `&&` and `||` may skip their right operand
-        ExprKind::Binary(BinOp::And | BinOp::Or, l, _) => strict_uses(l, name),
+        ExprKind::Binary(BinOp::And | BinOp::Or, l, _) => each_strict_use(l, read),
         ExprKind::Block(stmts, result) => {
-            let in_stmts: usize = stmts
-                .iter()
-                .map(|s| match s {
+            for s in stmts {
+                match s {
                     Stmt::Let(_, v) | Stmt::Var(_, v) | Stmt::Assign(_, v) | Stmt::Expr(v) => {
-                        strict_uses(v, name)
+                        each_strict_use(v, read);
                     }
-                    Stmt::Fun { .. } => 0,
-                })
-                .sum();
-            in_stmts + strict_uses(result, name)
+                    Stmt::Fun { .. } => {}
+                }
+            }
+            each_strict_use(result, read);
         }
-        _ => {
-            let mut n = 0;
-            e.each_child(&mut |c| n += strict_uses(c, name));
-            n
-        }
+        _ => e.each_child(&mut |c| each_strict_use(c, read)),
     }
-}
-
-/// Replaces each read of the local `name` in `e` with `value`.
-pub fn substitute(e: &mut Expr, name: &str, value: &Expr) {
-    if matches!(&e.kind, ExprKind::Local(l) if l == name) {
-        *e = value.clone();
-        return;
-    }
-    e.each_child_mut(&mut |c| substitute(c, name, value));
 }
 
 /// `e` at `span`, every part of it: code copied from another module, whose
@@ -203,6 +192,7 @@ fn pat_binders(p: &Pat, names: &mut HashMap<String, String>, suffix: &str) {
 
 fn binders(e: &Expr, names: &mut HashMap<String, String>, suffix: &str) {
     match &e.kind {
+        ExprKind::ControlLoop { id, .. } => fresh(names, id, suffix),
         ExprKind::Lambda { params, .. } => {
             for p in params {
                 pat_binders(&p.pat, names, suffix);
@@ -240,6 +230,7 @@ fn apply(e: &mut Expr, names: &HashMap<String, String>) {
         }
     };
     match &mut e.kind {
+        ExprKind::ControlLoop { id, .. } | ExprKind::LoopExit { id, .. } => new(id),
         ExprKind::Local(n) | ExprKind::Var(n) | ExprKind::Within(n, _) => new(n),
         // a dictionary a matched value holds is a local of the pattern too
         ExprKind::Dicts(_, dicts) => {
@@ -293,7 +284,12 @@ fn rename_dict(d: &mut Dict, names: &HashMap<String, String>) {
             }
         }
         Dict::Super { dict, .. } => rename_dict(dict, names),
-        Dict::Given(_) | Dict::Primitive { .. } | Dict::Site { .. } | Dict::Error => {}
+        Dict::Given(_)
+        | Dict::Value { .. }
+        | Dict::Opened { .. }
+        | Dict::Primitive { .. }
+        | Dict::Site { .. }
+        | Dict::Error => {}
     }
 }
 

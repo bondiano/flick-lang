@@ -1,0 +1,30 @@
+---
+// The tour's contents: its chapters and their lessons, in the order of `tour/index.json`.
+import { getCollection } from "astro:content";
+import CodeText from "./CodeText.astro";
+import { lessons } from "../../tour/load.ts";
+
+interface Props { locale: "en" | "ru" }
+const ru = Astro.props.locale === "ru";
+const titles = new Map((await getCollection("docs")).map((entry) => [entry.id, entry.data.title]));
+const all = lessons();
+const chapters = [...new Map(all.map((entry) => [entry.chapter.id, entry.chapter])).values()];
+const title = (id: string): string => {
+  const found = titles.get(`${ru ? "ru/" : ""}tour/${id}`);
+  if (found === undefined) throw new Error(`The tour lesson ${id} has no page`);
+  return found;
+};
+---
+
+<ol class="tour-chapters">
+  {chapters.map((chapter) => (
+    <li>
+      <h2 id={chapter.id}>{ru ? chapter.ru : chapter.en}</h2>
+      <ol>
+        {all.filter((entry) => entry.chapter.id === chapter.id).map((entry) => (
+          <li><a href={`./${entry.id}/`}><CodeText text={title(entry.id)} /></a></li>
+        ))}
+      </ol>
+    </li>
+  ))}
+</ol>

@@ -64,7 +64,7 @@ def ctorF : Name → Option (Nat × List Flick.Ty × Name)
 
 /-- The field of the method with scheme `s` in the record of its class. -/
 def mfield (s : Scheme) : Flick.Scheme :=
-  ⟨s.k - 1, Facts.none, (trTT N (methTy [] s.ty)).substT (rot 1 (s.k - 1))⟩
+  ⟨s.k - 1, (trBd N s.bd).substT (rot 1 (s.k - 1)), (trTT N (methTy [] s.ty)).substT (rot 1 (s.k - 1))⟩
 
 def methsOf : Nat → List Nat
   | 0 => [0] | 1 => [1, 2] | 2 => [3] | 3 => [4] | 4 => [5] | _ => []
@@ -80,7 +80,7 @@ def dfields (C n : Nat) : List (Label × Flick.Scheme) :=
 def globF (g : Nat) : Option Flick.Scheme :=
   if g % 4 = 0 then (insts (g / 4)).map fun ins => ⟨0, Facts.none, trTT N (instTy ins)⟩
   else if g % 4 = 1 then
-    (constSch (g / 4)).map fun s => ⟨s.k, Facts.none, trTT N (dicts .cnil s.ctx (.mono s.ty))⟩
+    (constSch (g / 4)).map fun s => ⟨s.k, trBd N s.bd, trTT N (dicts .cnil s.ctx (.mono s.ty))⟩
   else if g = 2 then some ⟨0, Facts.none, trTT N (strctTy cEq tyRec [tyInt])⟩
   else none
 
@@ -137,7 +137,9 @@ theorem dict_closed : ∀ c k fs, some (c / 8, dfields (c % 8) (c / 8)) = some (
           unfold methSch at e; split at e <;> cases e <;> decide
         show Flick.Scheme.Closed (p.2.k - 1 + 1) _
         rw [Nat.add_comm]
-        exact mfield_closed N fun n hn => by have := methSch_lt e n hn; omega
+        refine mfield_closed N (fun n hn => by have := methSch_lt e n hn; omega) ?_
+        unfold methSch at e
+        split at e <;> cases e <;> simp [Ty.Occurs] <;> omega
     · simp at hs
 
 theorem vars_occ {n m : Nat} {t : Ty} (ht : t ∈ vars n) (h : t.Occurs m) : m < n := by
@@ -206,7 +208,7 @@ theorem constSch_ok {c s} (h : constSch c = some s) : s.ctx = [] ∧ ∀ n, s.ty
     | (cases h
        refine ⟨rfl, ?_⟩
        intro n hn
-       simp [Ty.Occurs, Stage.Occurs, bindTy, appQ, arrP, optTy] at hn ⊢
+       simp [Ty.Occurs, Stage.Occurs, bindTy, appQ, arrP, optTy, PreludeSchemes.Seq.each_loop] at hn ⊢
        try omega)
 
 theorem glob_closed : ∀ g s, globF g = some s → s.Closed s.k := by
@@ -225,7 +227,7 @@ theorem glob_closed : ∀ g s, globF g = some s → s.Closed s.k := by
       | some s' =>
         simp [e] at h; subst h
         obtain ⟨hc, hl⟩ := constSch_ok e
-        simp only [hc]
+        simp only [hc, constSch_bd e]
         exact trT_closed N hl
     · split at h
       · cases h

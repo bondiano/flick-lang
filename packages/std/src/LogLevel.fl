@@ -1,11 +1,11 @@
-/// Effect's `LogLevel`: the levels of log messages, an enum of Effect's
-/// own names (`"Info"`, …) ordered by severity.
+/// The levels of log messages, an enum of their names (`"Info"`, …) ordered
+/// by severity.
 module LogLevel exposing (..)
 
 import Enum
 
-/// Effect's levels, declared from least to most severe, so `Ord` is
-/// severity; each is Effect's own name of it, `Off` is `"None"`.
+/// The levels, declared from least to most severe, so `Ord` is severity;
+/// each is its own name, `Off` is `"None"`.
 untagged type LogLevel =
   | All = "All"
   | Trace = "Trace"
@@ -24,36 +24,36 @@ type alias Severity = LogLevel
 all : List LogLevel
 let all = Enum.all
 
-/// Effect's name of the level, `"None"` for `Off`.
+/// The name of the level, `"None"` for `Off`.
 value : LogLevel -> String
 let value level = Enum.value level
 
 /// `level |> is_greater_than that`: `level` is more severe than `that`.
 is_greater_than : LogLevel -> LogLevel -> Bool
-foreign pure is_greater_than from "@flick-lang/effect-ts/effect/LogLevel" "isGreaterThan"
+foreign pure is_greater_than from "flick:LogLevel" "isGreaterThan"
   arity 1
   reviewed "effect@4.1.2 sha256:6d01956b9822116b"
 
 /// `level |> is_greater_than_or_equal_to that`.
 is_greater_than_or_equal_to : LogLevel -> LogLevel -> Bool
-foreign pure is_greater_than_or_equal_to from "@flick-lang/effect-ts/effect/LogLevel" "isGreaterThanOrEqualTo"
+foreign pure is_greater_than_or_equal_to from "flick:LogLevel" "isGreaterThanOrEqualTo"
   arity 1
   reviewed "effect@4.1.2 sha256:1f3b565858715fd8"
 
 /// `level |> is_less_than that`: `level` is less severe than `that`.
 is_less_than : LogLevel -> LogLevel -> Bool
-foreign pure is_less_than from "@flick-lang/effect-ts/effect/LogLevel" "isLessThan"
+foreign pure is_less_than from "flick:LogLevel" "isLessThan"
   arity 1
   reviewed "effect@4.1.2 sha256:543dbb98246cdb23"
 
 /// `level |> is_less_than_or_equal_to that`.
 is_less_than_or_equal_to : LogLevel -> LogLevel -> Bool
-foreign pure is_less_than_or_equal_to from "@flick-lang/effect-ts/effect/LogLevel" "isLessThanOrEqualTo"
+foreign pure is_less_than_or_equal_to from "flick:LogLevel" "isLessThanOrEqualTo"
   arity 1
   reviewed "effect@4.1.2 sha256:371988eb8e39fd3e"
 
 /// Whether a message at the level would be logged: the level is at least
 /// the current minimum level of the fiber.
 is_enabled : LogLevel ->{} Bool
-foreign effect is_enabled from "@flick-lang/effect-ts/effect/LogLevel" "isEnabled"
+foreign effect is_enabled from "flick:LogLevel" "isEnabled"
   reviewed "effect@4.1.2 sha256:c68766ed87e3755d"

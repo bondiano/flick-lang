@@ -18,6 +18,12 @@ fn success(dir: &Path, args: &[&str]) {
     assert!(out.status.success(), "{args:?} failed: {out:?}");
 }
 
+#[test]
+fn the_ssr_load_server_checks() {
+    let out = common::flick(&["--project", "tools/load/ssr", "check"]);
+    assert!(out.status.success(), "{out:?}");
+}
+
 /// Starts the collector, runs `flick run` in the project with
 /// `OTEL_EXPORTER_OTLP_ENDPOINT` on it, and prints the run's stdout and
 /// then everything the collector got.

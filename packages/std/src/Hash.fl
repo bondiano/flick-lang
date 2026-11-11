@@ -1,14 +1,14 @@
-/// Effect's `Hash` beyond the class `Hash`: mixing hashes, for writing
-/// `hash` of an instance from the hashes of its parts.
+/// Hashing beyond the class `Hash`: mixing hashes, for writing `hash` of an
+/// instance from the hashes of its parts.
 module Hash exposing (..)
 
 /// Mixes the hash `b` into `self`: `hash x |> Hash.combine (hash y)`.
 combine : Int -> Int -> Int
-foreign pure combine from "@flick-lang/effect-ts/effect/Hash" "combine"
+foreign pure combine from "flick:Hash" "combine"
   arity 1
   reviewed "effect@4.1.2 sha256:cf78c54becf09bc0"
 
 /// Spreads the bits of a hash into a 32-bit integer.
 optimize : Int -> Int
-foreign pure optimize from "@flick-lang/effect-ts/effect/Hash" "optimize"
+foreign pure optimize from "flick:Hash" "optimize"
   reviewed "effect@4.1.2 sha256:469fa27ccc5de639"

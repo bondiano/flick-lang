@@ -89,7 +89,7 @@ impl Lower<'_> {
     /// The function of `Flick.Debug` the lang item `function` names, given
     /// the `CallSite` the checker found at `keyword`.
     fn debug(&self, function: Lang, keyword: Range, span: Span) -> Expr {
-        let dicts = self.typing.dicts.get(&keyword).cloned().unwrap_or_default();
+        let dicts = self.dictionaries(keyword);
         with_dicts(Expr::new(ExprKind::lang(function), span), dicts)
     }
 }

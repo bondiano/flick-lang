@@ -52,44 +52,44 @@ impl Checker<'_> {
                     Type::fun(Type::Errors(e.clone()), runtime(none(), e), a()),
                 )
             }
-            Const::Ask(s) => Scheme {
-                vars: Vec::new(),
-                body: Type::fun(
-                    prelude("Unit"),
-                    runtime(Row::one(s.clone()), none()),
-                    Type::Impl(Row::one(s.clone())),
-                ),
-                outlives: Vec::new(),
-            },
-            Const::LayerSucceed(s) => Scheme {
-                vars: Vec::new(),
-                body: Type::fun(
-                    Type::Impl(Row::one(s.clone())),
-                    Stage::Pure,
-                    Type::Layer(none(), none(), Row::one(s.clone())),
-                ),
-                outlives: Vec::new(),
-            },
-            Const::LayerEffect(s) => {
-                let (r, e) = (
-                    Row::var(Var::Named("r".into())),
-                    Row::var(Var::Named("e".into())),
-                );
-                scheme(
-                    &[("r", Kind::Services), ("e", Kind::Errors)],
+            // `∀p̄. Unit →R⟨S p̄⟩ S.Impl p̄`, and so the layers of `S`
+            Const::Ask(s) => {
+                let (vars, sp) = self.service_row(s);
+                Scheme::new(
+                    vars,
+                    Type::fun(prelude("Unit"), runtime(sp.clone(), none()), Type::Impl(sp)),
+                )
+            }
+            Const::LayerSucceed(s) => {
+                let (vars, sp) = self.service_row(s);
+                Scheme::new(
+                    vars,
                     Type::fun(
-                        Type::Eff(
-                            r.clone(),
-                            e.clone(),
-                            Rc::new(Type::Impl(Row::one(s.clone()))),
-                        ),
+                        Type::Impl(sp.clone()),
                         Stage::Pure,
-                        Type::Layer(r, e, Row::one(s.clone())),
+                        Type::Layer(none(), none(), sp),
+                    ),
+                )
+            }
+            Const::LayerEffect(s) => {
+                // named apart from the service's parameters
+                let (mut vars, sp) = self.service_row(s);
+                let (r, e) = (
+                    Row::var(Var::Named("%r".into())),
+                    Row::var(Var::Named("%e".into())),
+                );
+                vars.extend([("%r".into(), Kind::Services), ("%e".into(), Kind::Errors)]);
+                Scheme::new(
+                    vars,
+                    Type::fun(
+                        Type::Eff(r.clone(), e.clone(), Rc::new(Type::Impl(sp.clone()))),
+                        Stage::Pure,
+                        Type::Layer(r, e, sp),
                     ),
                 )
             }
             Const::Prim(p @ (Prim::Lt | Prim::Le | Prim::Gt | Prim::Ge)) => {
-                let t = self.instantiate(&prim(*p));
+                let t = self.instance_of(prim(*p));
                 if let Type::Fun(operand, ..) = &t {
                     self.ordered.push((**operand).clone());
                 }
@@ -105,8 +105,14 @@ impl Checker<'_> {
                 );
             }
         };
-        Ok(self.instantiate(&s))
+        let s = self.live_scheme(&s);
+        Ok(self.instance_of(s))
     }
+}
+
+/// The scheme of an operator, a global of a certificate (`crate::cert`).
+pub(crate) fn prim_scheme(p: Prim) -> Scheme {
+    prim(p)
 }
 
 /// `τ^c`, `c` the capacity of a cell.

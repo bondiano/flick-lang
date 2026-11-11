@@ -5,7 +5,7 @@ use std::path::Path;
 use super::{Loader, Root, target};
 use crate::diagnostics::Diagnostic;
 use crate::diagnostics::codes;
-use crate::iface::Namespace;
+use crate::iface::{self, Namespace};
 use crate::project::config::{self, Backend, Emit, Kind};
 use crate::project::{Project, is_module_name, module_path};
 use crate::resolve::Interface;
@@ -56,7 +56,7 @@ pub fn main_kind(t: &Type) -> Result<MainKind, String> {
         Type::Var(_) => {}
         // the scheduler of every runner handles `Async`
         Type::Row(row)
-            if (row.entries.iter()).all(|(l, _)| lang::label(Lang::Async) == Some(l.as_str())) => {}
+            if (row.entries.iter()).all(|(l, _)| lang::label(Lang::Async) == l.name()) => {}
         _ => {
             return Err(format!(
                 "entry `main` needs `{}`, which no runner provides; provide it inside `main`",
@@ -200,9 +200,7 @@ impl Loader<'_> {
         let (mut module, mut name) = (module.to_owned(), "main".to_owned());
         let mut path = vec![format!("{module}.{name}")];
         // a value whose own type needs `Server` lists no path: it ends there
-        while let Some((_, hops)) =
-            interface_of(&module).and_then(|i| i.servers.iter().find(|(n, _)| *n == name))
-        {
+        while let Some(hops) = interface_of(&module).and_then(|i| i.tagged(iface::SERVER, &name)) {
             for hop in hops {
                 match hop.rsplit_once('.') {
                     Some((m, n)) => (module, name) = (m.to_owned(), n.to_owned()),

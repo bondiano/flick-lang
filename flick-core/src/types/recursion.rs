@@ -4,6 +4,7 @@
 use std::mem;
 
 use super::ty::Type;
+use super::{Atom, Elem};
 use super::{Checker, Rec};
 use crate::diagnostics::{Diagnostic, codes};
 
@@ -80,7 +81,7 @@ impl Checker<'_> {
         for ((name, var), (own_name, own)) in vars.iter().zip(&rec.skolems) {
             let Type::Skolem(own) = own else { continue };
             debug_assert_eq!(name, own_name, "open and skolemize agree");
-            match self.store.resolve(var) {
+            match self.lone_skolem(var) {
                 Type::Skolem(s) => {
                     if !identify(classes, owners, *own, s) {
                         return false;
@@ -94,6 +95,22 @@ impl Checker<'_> {
             }
         }
         true
+    }
+
+    /// What `var` stands for; a capture row of its own skolem alone is that
+    /// skolem, as the use of a callable `^c` holds it in an entry.
+    fn lone_skolem(&self, var: &Type) -> Type {
+        let resolved = self.store.resolve(var);
+        if !matches!(resolved, Type::Row(_)) {
+            return resolved;
+        }
+        let norm = self.store.normalize(&resolved);
+        match (&norm.entries[..], &norm.tails[..]) {
+            ([(Elem::Capture(Atom::Skolem(label)), Type::Skolem(s))], []) if label == s => {
+                Type::Skolem(*s)
+            }
+            _ => resolved,
+        }
     }
 
     /// `t` with fresh variables for its quantified ones, as

@@ -1,10 +1,11 @@
 //! Runtime, foreign and Flick imports for one generated module.
 
+use crate::effects::bindings;
 use std::fmt::Write;
 
 use super::{Gen, RUNTIME, names, relative};
 
-const KERNEL_RUNTIME: &str = "@flick-lang/runtime";
+const KERNEL_RUNTIME: &str = bindings::OWNED_PREFIX;
 
 impl Gen<'_> {
     pub(super) fn write_imports(&self, code: &mut String, here: &str) {
@@ -29,20 +30,8 @@ impl Gen<'_> {
             let _ = writeln!(code, "import * as {} from \"{runtime}\";", bound("$rt"));
             untyped(code, "$rt");
         }
-        // on the kernel, a binding of the runtime it has no export for fails when
-        // it is called, not when the module loads: a module binds more than a program uses
         let mut namespaces: Vec<&str> = Vec::new();
         for (source, export, alias) in &self.foreign {
-            // a module the kernel does not have is no import at all
-            if self.kernel && source.starts_with(&format!("{RUNTIME}/effect/")) {
-                let _ = writeln!(
-                    code,
-                    "const {alias} = $rt.absent({}, {});",
-                    names::string(source),
-                    names::string(export)
-                );
-                continue;
-            }
             if self.kernel && source.starts_with(KERNEL_RUNTIME) {
                 let at = namespaces
                     .iter()
@@ -62,7 +51,7 @@ impl Gen<'_> {
                 } else {
                     format!("[{}]", names::string(export))
                 };
-                let _ = writeln!(code, "const {alias} = $n{at}{member};");
+                let _ = writeln!(code, "{}", self.constant(alias, &format!("$n{at}{member}")));
                 continue;
             }
             let export = if names::is_property(export) {

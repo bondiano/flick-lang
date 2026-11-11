@@ -2,12 +2,12 @@ package flickrt
 
 import "strings"
 
-// The rest of Effect's `Cause` over Flick's opaque `Failure e`: its
-// reasons, what a filter finds in it, and the stack frames annotated on it.
+// The rest of `Cause` over Flick's opaque `Failure e`: its reasons, what a
+// filter finds in it, and the stack frames annotated on it.
 
 func reasonOf(r Value) *Cause { return r.(*Cause) }
 
-// CauseFromReasons is Effect's `Cause.fromReasons`: repeats are kept.
+// CauseFromReasons is the failure of the reasons given: repeats are kept.
 func CauseFromReasons(reasons Value) Value {
 	var c *Cause
 	for _, r := range List(reasons) {
@@ -25,8 +25,8 @@ func CauseIsFailReason(r Value) Value         { return reasonOf(r).kind == cause
 func CauseIsDieReason(r Value) Value          { return reasonOf(r).kind == causeDie }
 func CauseIsInterruptReason(r Value) Value    { return reasonOf(r).kind == causeInterrupt }
 
-// findReason is Effect's filter of the first reason of `kind`: `Ok` of
-// what `found` makes of it, else `Err` of the failure as it is.
+// findReason is the filter of the first reason of `kind`: `Ok` of what
+// `found` makes of it, else `Err` of the failure as it is.
 func findReason(f Value, kind causeKind, found func(*Cause) Value) Value {
 	if r := causeOfFailure(f).firstOf(kind); r != nil {
 		return Ok(found(r))
@@ -57,7 +57,7 @@ func CauseFilterInterruptors(f Value) Value {
 
 func CausePretty(f Value) Value { return causePretty(causeOfFailure(f)) }
 
-// CausePrettyErrors is `name: message` of each of Effect's pretty errors.
+// CausePrettyErrors is `name: message` of each of the pretty errors.
 func CausePrettyErrors(f Value) Value {
 	errs := prettyErrors(causeOfFailure(f))
 	out := make([]Value, len(errs))
@@ -67,8 +67,8 @@ func CausePrettyErrors(f Value) Value {
 	return out
 }
 
-// annotated is Effect's `Cause.annotate` of a stack trace: each reason
-// with `frame`, unless it has one and `overwrite` is false.
+// annotated is the cause annotated with a stack trace: each reason with
+// `frame`, unless it has one and `overwrite` is false.
 func (c *Cause) annotated(frame *stackFrame, overwrite bool) *Cause {
 	var out *Cause
 	changed := false
@@ -94,8 +94,8 @@ func frameOption(frame *stackFrame) Value {
 	return Some(frame)
 }
 
-// CauseStackTrace is the stack frame of the failure: Effect merges the
-// annotations of its reasons, the last one winning.
+// CauseStackTrace is the stack frame of the failure: the annotations of
+// its reasons merged, the last one winning.
 func CauseStackTrace(f Value) Value {
 	var frame *stackFrame
 	for _, r := range causeOfFailure(f).reasons() {

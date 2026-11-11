@@ -220,8 +220,17 @@ theorem RHead.below {Λ μ e Λ' μ' e'} (hh : RHead Λ μ e Λ' μ' e') (h : Cf
     exact ⟨h.set hg hk (fun f hf' => by simp at hf') (sub fun _ h => .inr (.inr (.inr h))),
       by simp [setRgn]⟩
 
-theorem root_below {root : Roots} (hroot : RootTy S root) {N v} (h : root.svc N = some v)
-    (n : Nat) : v.Below n := fun p hp => (root_no_rgn hroot h p hp).elim
+/-- The roots name no run-time region. -/
+structure RootBelow (root : Roots) : Prop where
+  svc : ∀ N v, root.svc N = some v → ∀ p, ¬ v.Has (.rgn p)
+  glob : ∀ g v, root.glob g = some v → ∀ x, ¬ v.Has x
+
+theorem RootTy.below {root : Roots} (hroot : RootTy S root) :
+    RootBelow root :=
+  ⟨hroot.svcBelow, fun g v h => (hroot.glob g v h).1⟩
+
+theorem root_below {root : Roots} (hroot : RootBelow root) {N v} (h : root.svc N = some v)
+    (n : Nat) : v.Below n := fun p hp => (hroot.svc _ _ h p hp).elim
 
 theorem plug_below {E : List Frame} {r r' : Tm} {n : Nat} (h : (plug E r).Below n) (h' : r'.Below n) :
     (plug E r').Below n := fun p hp =>
@@ -262,7 +271,7 @@ theorem withs_below {E : List Frame} {r x : Tm} {p n : Nat} (h : (plug E r).Belo
   (withs_has E hq).elim (fun h₁ => h q h₁) (fun h₁ => hx q h₁)
 
 /-- A step writes only regions that exist after it. -/
-theorem Step.below {root l Λ μ e Λ' μ' e'} (hroot : RootTy S root)
+theorem Step.below {root l Λ μ e Λ' μ' e'} (hroot : RootBelow root)
     (hs : Step root l Λ μ e (.cfg Λ' μ' e')) (h : CfgBelow Λ μ e) :
     CfgBelow Λ' μ' e' ∧ Λ.length ≤ Λ'.length := by
   cases hs with
@@ -273,7 +282,7 @@ theorem Step.below {root l Λ μ e Λ' μ' e'} (hroot : RootTy S root)
     obtain ⟨h', hl⟩ := hh.below ⟨h.main.sub fun _ hp => plug_has _ hp, h.mem, h.rgs⟩
     exact ⟨⟨plug_below (h.main.mono hl) h'.main, h'.mem, h'.rgs⟩, hl⟩
   | glob hE hg =>
-    exact ⟨⟨plug_below h.main fun _ hp => ((hroot.glob _ _ hg).1 _ hp).elim, h.mem, h.rgs⟩, Nat.le_refl _⟩
+    exact ⟨⟨plug_below h.main fun _ hp => (hroot.glob _ _ hg _ hp).elim, h.mem, h.rgs⟩, Nat.le_refl _⟩
   | performRoot hE _ hr hf _ =>
     refine ⟨⟨plug_below h.main fun p hp => ?_, h.mem, h.rgs⟩, Nat.le_refl _⟩
     rcases hp with hp | hp

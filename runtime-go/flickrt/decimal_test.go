@@ -17,7 +17,8 @@ func optionText(o Value, f func(Value) Value) string {
 	return "none"
 }
 
-// The corpus is what Effect's BigDecimal and Number compute in Node.
+// The corpus is what the BigDecimal and Number of the Effect library
+// compute in Node.
 func TestDecimalsAreEffects(t *testing.T) {
 	f, err := os.Open("testdata/decimals.txt")
 	if err != nil {

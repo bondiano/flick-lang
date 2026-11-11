@@ -6,16 +6,24 @@
 //! A node without a λFlick form becomes `Term::Stuck` naming it, so a
 //! program that never reaches it still runs.
 
+mod applications;
+mod callbacks;
+mod collection;
+mod control_handlers;
 mod derive;
 mod expr;
 pub mod lean;
+mod loops;
 mod mutation;
+mod mutation_errors;
+mod mutation_handlers;
+mod resumptions;
 pub mod types;
 
-use std::rc::Rc;
+use std::{collections::HashMap, rc::Rc};
 
 use flick_core::ir::{self, ItemKind};
-use flick_core::types::{Dict, InstanceInfo, default_method};
+use flick_core::types::{Dict, InstanceInfo, OpClass, default_method};
 
 use self::expr::pat;
 use crate::eval::Program;
@@ -23,11 +31,52 @@ use crate::native;
 use crate::subst::binders;
 use crate::syntax::{Arm, Const, Lit, Name, Path, RegionOp, Term};
 
+fn control(e: &ir::Expr) -> bool {
+    if let ir::ExprKind::Handle(h) = &e.kind
+        && h.effects
+            .iter()
+            .flat_map(|e| &e.operations)
+            .any(|o| o.class == OpClass::Control)
+    {
+        return true;
+    }
+    let mut found = false;
+    e.each_child(&mut |c| found |= control(c));
+    found
+}
+
 /// The program of `modules`: those of a build and the built-in ones.
 pub fn program<'a>(modules: impl IntoIterator<Item = &'a ir::Module>) -> Program {
+    let modules: Vec<_> = modules.into_iter().collect();
+    let needs_functions = modules.iter().any(|m| {
+        m.items
+            .iter()
+            .any(|i| matches!(&i.kind, ItemKind::Value { body, .. } if control(body)))
+    });
+    let functions = if needs_functions {
+        Rc::new(
+            modules
+                .iter()
+                .flat_map(|m| {
+                    m.items.iter().filter_map(|i| {
+                        if let ItemKind::Value { name, dicts, body } = &i.kind
+                            && dicts.is_empty()
+                        {
+                            Some((Path::new(&m.name, name), body.clone()))
+                        } else {
+                            None
+                        }
+                    })
+                })
+                .collect(),
+        )
+    } else {
+        Rc::default()
+    };
     let mut program = Program::default();
     for module in modules {
         let mut tr = Tr::new(&module.name);
+        tr.functions = Rc::clone(&functions);
         for item in &module.items {
             tr.item(&item.kind, &mut program);
         }
@@ -60,6 +109,11 @@ struct Tr {
     /// Each `let mut` variable in scope and the name of its current value,
     /// innermost last.
     versions: Vec<(String, Name)>,
+    cells: Vec<(String, Name)>,
+    resumptions: Vec<(String, String)>,
+    functions: Rc<HashMap<Path, ir::Expr>>,
+    control: Option<String>,
+    error_action: Option<Name>,
 }
 
 impl Tr {
@@ -68,6 +122,11 @@ impl Tr {
             module: module.to_owned(),
             fresh: 0,
             versions: Vec::new(),
+            cells: Vec::new(),
+            resumptions: Vec::new(),
+            functions: Rc::default(),
+            control: None,
+            error_action: None,
         }
     }
 
@@ -167,6 +226,11 @@ fn dict(d: &Dict) -> Term {
             Term::apps(Term::Global(instance(module, name)), args)
         }
         Dict::Given(name) => Term::Var(given(name)),
+        Dict::Value { module, name } => Term::Global(Path::new(module, name)),
+        Dict::Opened { binder, field } => Term::Field(
+            Rc::new(Term::Var(binder.as_str().into())),
+            field.as_str().into(),
+        ),
         // the pattern of the constructor whose value holds it binds it
         Dict::Field(local) => Term::Var(local.as_str().into()),
         Dict::Super { dict: inner, class } => {
@@ -198,9 +262,9 @@ fn foreign(path: Path, f: &ir::Foreign) -> Term {
     let arity = f.dicts + f.stages.len();
     let module = f.binding.from.as_deref().unwrap_or("global");
     let core = match (module, f.binding.name.as_str()) {
-        ("@flick-lang/effect-ts", "refMake") => Some(Const::RefMake),
-        ("@flick-lang/effect-ts", "refGet") => Some(Const::RefGet),
-        ("@flick-lang/effect-ts", "refSet") => Some(Const::RefSet),
+        ("flick:rt", "refMake") => Some(Const::RefMake),
+        ("flick:rt", "refGet") => Some(Const::RefGet),
+        ("flick:rt", "refSet") => Some(Const::RefSet),
         (m, e) => region_op(m, e).map(|op| Const::Region(path, op)),
     };
     match core {
@@ -230,9 +294,9 @@ fn region_op(module: &str, export: &str) -> Option<RegionOp> {
         ("./res.mjs", "use") => RegionOp::Use,
         ("./res.mjs", "raw") => RegionOp::Make,
         ("./res.mjs", "close") => RegionOp::Release,
-        ("@flick-lang/effect-ts", "fiberSpawn") => RegionOp::Spawn,
-        ("@flick-lang/effect-ts", "acquireRelease") => RegionOp::AcquireRelease,
-        ("@flick-lang/effect-ts/effect/Scope", "flickAddFinalizer") => RegionOp::AddFinalizer,
+        ("flick:rt", "fiberSpawn") => RegionOp::Spawn,
+        ("flick:rt", "acquireRelease") => RegionOp::AcquireRelease,
+        ("flick:Scope", "flickAddFinalizer") => RegionOp::AddFinalizer,
         _ => return None,
     })
 }

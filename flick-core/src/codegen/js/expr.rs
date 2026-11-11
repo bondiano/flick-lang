@@ -4,7 +4,7 @@
 use std::mem;
 
 use super::{Callee, Gen, Target, indent, literal, names, tidy};
-use crate::ir::{Arm, Expr, ExprKind, Pat, Stage, Stmt};
+use crate::ir::{Expr, ExprKind, Pat, Stage, Stmt};
 use crate::numeric::Num;
 use crate::types::{Constructor, Dict, Rep};
 
@@ -24,6 +24,9 @@ pub fn atomic(js: &str) -> bool {
 }
 
 impl Gen<'_> {
+    fn stable(&self, js: &str) -> bool {
+        atomic(js) && !self.vars.contains(js.split('.').next().unwrap_or(js))
+    }
     /// Compiles expressions that are evaluated in order: an operand whose
     /// code needs statements makes the operands before it constants first.
     pub(super) fn ordered(&mut self, exprs: &[&Expr]) -> Vec<String> {
@@ -34,7 +37,7 @@ impl Gen<'_> {
             if self.buf.len() > mark {
                 let mut spills = Vec::new();
                 for prev in &mut out {
-                    if !atomic(prev) || self.vars.contains(prev.as_str()) {
+                    if !self.stable(prev) {
                         let t = self.temp();
                         spills.push(self.constant(&t, prev));
                         *prev = t;
@@ -49,7 +52,7 @@ impl Gen<'_> {
 
     /// `js` as a constant unless it is atomic.
     pub(super) fn spill(&mut self, js: String) -> String {
-        if atomic(&js) && !self.vars.contains(&js) {
+        if self.stable(&js) {
             return js;
         }
         let t = self.temp();
@@ -71,6 +74,9 @@ impl Gen<'_> {
 
     pub(super) fn expr(&mut self, e: &Expr) -> String {
         match &e.kind {
+            ExprKind::ControlLoop { .. } | ExprKind::LoopExit { .. } | ExprKind::Loop { .. } => {
+                self.loop_expr(e)
+            }
             ExprKind::Lit(lit) => literal::literal(lit),
             ExprKind::Local(name) | ExprKind::Var(name) => names::ident(name),
             ExprKind::Global { module, name } => self.global(module, &names::ident(name)),
@@ -116,20 +122,13 @@ impl Gen<'_> {
                 self.expr(result)
             }
             ExprKind::If(c, t, f) => self.if_expr(c, t, f),
-            ExprKind::Match(scrutinee, arms) => {
-                let s = self.expr(scrutinee);
-                let s = self.spill(s);
-                let r = self.temp();
-                self.buf.push(self.declare(&r));
-                self.arms(&s, arms, Some(&r));
-                r
-            }
+            ExprKind::Match(scrutinee, arms) => self.matched(scrutinee, arms),
             ExprKind::Handle(h) if h.is_try() => self.try_expr(&h.body, &h.errors),
             ExprKind::Tuple(items) | ExprKind::List(items) => {
                 let items: Vec<&Expr> = items.iter().collect();
                 format!("[{}]", self.ordered(&items).join(", "))
             }
-            ExprKind::Record(fields) => self.record(None, fields),
+            ExprKind::Record(fields) | ExprKind::Dictionary(fields) => self.record(None, fields),
             ExprKind::Update(record, fields) => self.record(Some(record), fields),
             ExprKind::Field(record, label) => {
                 let r = self.expr(record);
@@ -324,11 +323,15 @@ impl Gen<'_> {
             .enumerate()
             .map(|(i, v)| format!("_{i}: {v}"))
             .collect();
-        Some(format!(
-            "{}{{ _tag: {tag}, {} }}",
-            mark!(self, e.span),
-            fields.join(", ")
-        ))
+        let object = format!("{{ _tag: {tag}, {} }}", fields.join(", "));
+        // as what the constructor returns in debug: the type of an opaque type
+        // in TypeScript shows no fields, and the object would not fit it
+        let object = if self.options.typescript() {
+            format!("({object} as any)")
+        } else {
+            object
+        };
+        Some(format!("{}{object}", mark!(self, e.span)))
     }
 
     /// `yield*` of the effect `js`, in `owner` when a `Within` gave one.
@@ -364,51 +367,6 @@ impl Gen<'_> {
         format!("{} {}", self.arrow(&params), arrow_body(&stmts, &value))
     }
 
-    fn if_expr(&mut self, c: &Expr, t: &Expr, f: &Expr) -> String {
-        let c = self.expr(c);
-        let (ts, tv) = self.block(|g| g.expr(t));
-        let (fs, fv) = self.block(|g| g.expr(f));
-        if ts.is_empty() && fs.is_empty() {
-            return format!("({c} ? {tv} : {fv})");
-        }
-        let r = self.temp();
-        let declare = self.declare(&r);
-        self.buf.push(format!(
-            "{declare}\nif ({c}) {{\n{}  {r} = {tv};\n}} else {{\n{}  {r} = {fv};\n}}",
-            indent(&ts),
-            indent(&fs)
-        ));
-        r
-    }
-
-    fn try_expr(&mut self, body: &Expr, arms: &[Arm]) -> String {
-        if !self.generator && !self.sync {
-            return self.expr(body);
-        }
-        if self.kernel && !self.generator {
-            return self.try_at_once(body, arms);
-        }
-        let body = self.gen_block(body);
-        let error = self.temp();
-        let (stmts, ()) = self.block(|g| g.handlers(&error, arms));
-        let try_with = self.rt("tryWith");
-        let tried = format!(
-            "{try_with}({body}, {} {{\n{}}})",
-            self.arrow(&error),
-            indent(&stmts)
-        );
-        self.run(None, &tried)
-    }
-
-    /// `o?`: the value of the `Some`, after returning a `None` at once.
-    fn unwrap(&mut self, option: &Expr) -> String {
-        let v = self.expr(option);
-        let v = self.spill(v);
-        self.buf
-            .push(format!("if ({v}._tag === \"None\") return {v};"));
-        format!("{v}.value")
-    }
-
     /// A record literal, or `{ base with … }`.
     fn record(&mut self, base: Option<&Expr>, fields: &[(String, Expr)]) -> String {
         let mut all: Vec<&Expr> = base.into_iter().collect();
@@ -426,7 +384,7 @@ impl Gen<'_> {
     }
 
     pub(super) fn stmt(&mut self, stmt: &Stmt) {
-        #[cfg(feature = "source-maps")]
+        #[cfg(feature = "native-project")]
         let span = match stmt {
             Stmt::Let(_, e)
             | Stmt::Var(_, e)
@@ -434,10 +392,10 @@ impl Gen<'_> {
             | Stmt::Expr(e)
             | Stmt::Fun { value: e, .. } => e.span,
         };
-        #[cfg(feature = "source-maps")]
+        #[cfg(feature = "native-project")]
         let first = self.buf.len();
         self.stmt_kind(stmt);
-        #[cfg(feature = "source-maps")]
+        #[cfg(feature = "native-project")]
         if first < self.buf.len() {
             let mark = self.mark(span);
             self.buf[first].insert_str(0, &mark);

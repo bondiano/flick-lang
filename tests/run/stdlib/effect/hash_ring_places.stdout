@@ -1,0 +1,16 @@
+empty: -------------------------------------------- -
+three: bbcbcbcbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+one: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+shards: ["", "b", "ab", "abc", "bbcbba", "bbaccabbbbabbabb", "bbaaaabbbbabbabaababbbbababbbbbacbcbbcbcbbbaccabbbbaabcbbcbacbab"]
+no shards: ("", "")
+without b: acccccccccccccccccccccccccccccccccccccccaaaa acaaaaca
+b gone twice: acccccccccccccccccccccccccccccccccccccccaaaa
+c heavier: bbcbcbcbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb cbcccabb
+has: [true, true, true, false]
+seven: bbcbcbcbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb fbffgcegbbaeeagddbdbb
+one key twice: (Some 2, [0, 2, 3, 0, 2], "hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh")
+three is as it was: bbcbcbcbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb bbcbba
+more shards than shares: ["cbab", "cbabb", "cbcabab", "cbcababb", "cbccaabbbba", "cbcccaabbbabba", "cbcccaacbbabbacaabbb"]
+shards once every node is full: ["aazaaaaaaaaaaaaaaazaaaaaaaaaaaaza", "aazaaaaaaaaaaaaazazaaaaaaaaaaaazaaaaaaaaaaaazaaaaaaaaaaaaaaazaaaaa"]
+base weights: ["babababaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaabbbb", "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "babababaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaabbbb", "babababaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaabbbb"]
+least weights: ["bbabbb", "bbabbb", "bbabbb", "bbabbb", "bbabbb", "baaaba"]

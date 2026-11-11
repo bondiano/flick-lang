@@ -1,4 +1,4 @@
-module App.Shapes exposing (Shape, Id, Kind(..), circle, Alias)
+module App.Shapes exposing (Shape, Id, Kind(..), circle, Alias, none)
 
 type Shape = Circle Float | Square Float
 
@@ -13,3 +13,7 @@ let circle r = Circle r
 
 hidden : Float
 let hidden = 1
+
+// a definition may spell a keyword, and the export list names it
+none : Unit -> Float
+let none () = 0

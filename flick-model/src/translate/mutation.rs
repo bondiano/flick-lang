@@ -5,22 +5,65 @@
 //! what those variables hold after it, which the rest of the block takes
 //! apart: the arms of an `if`, a `match` or a `try`, and the body of a
 //! `scope` or a `provide`, give their tuples where they end. The checker
-//! keeps assignments out of what may run later or again, and out of the
-//! bodies of `try` and loops, where this reading and that of the compiled
-//! code, which assigns in place, would differ.
+//! keeps assignments out of what may run later or again. Runtime handlers
+//! that can abandon or resume their body use private model cells instead.
 
+use flick_core::types::lang::Lang;
 use std::iter;
 use std::rc::Rc;
 
 use flick_core::ir::{self, BinOp, ExprKind, Stmt};
 
 use super::Tr;
-use super::expr::{cond, is_global, layer_run, pat, stuck};
+use super::expr::{cond, is_lang, layer_run, pat, stuck};
 use crate::syntax::{Arm, Name, Pat, Term};
 
 impl Tr {
+    /// A loop carries the current values as the argument of a recursive
+    /// function. Normal completion returns the same state tuple as a branch.
+    pub(super) fn loop_term(
+        &mut self,
+        condition: &ir::Expr,
+        body: &ir::Expr,
+        xs: &[String],
+    ) -> Term {
+        let name = self.fresh("loop");
+        let state = self.fresh("state");
+        let initial = self.pack(Term::unit(), xs);
+        let names: Vec<Name> = xs.iter().map(|x| self.fresh(x)).collect();
+        let mark = self.versions.len();
+        self.versions
+            .extend(xs.iter().cloned().zip(names.iter().cloned()));
+        let step = self.with_value(condition, |tr, c| {
+            let done = tr.pack(Term::unit(), xs);
+            let next = tr.with_value(body, |tr, _| {
+                Term::app(Term::Var(name.clone()), tr.pack(Term::unit(), xs))
+            });
+            cond(c, next, done)
+        });
+        self.versions.truncate(mark);
+        let arm = Arm {
+            pat: Pat::Tuple(
+                iter::once(Pat::Wild)
+                    .chain(names.into_iter().map(Pat::Var))
+                    .collect(),
+            ),
+            guard: None,
+            body: step,
+        };
+        let function = Term::lam(
+            &state,
+            Term::Match(Rc::new(Term::Var(state.clone())), Rc::from([arm])),
+        );
+        let call = Term::app(Term::Var(name.clone()), initial);
+        Term::LetRec(name, None, Rc::new(function), Rc::new(call))
+    }
+
     /// The name the variable `x` holds its value under here.
     pub(super) fn version(&self, x: &str) -> Term {
+        if let Some(cell) = self.cell(x) {
+            return Self::read_cell(cell);
+        }
         (self.versions.iter().rev())
             .find(|(v, _)| v == x)
             .map_or_else(
@@ -45,6 +88,10 @@ impl Tr {
             });
         };
         match first {
+            Stmt::Assign(x, e) if self.cell(x).is_some() => self.with_value(e, |tr, v| {
+                let rest = tr.block(rest, tail, pack);
+                tr.write_cell(x, v, rest)
+            }),
             Stmt::Var(x, e) | Stmt::Assign(x, e) => self.with_value(e, |tr, v| {
                 let name = tr.fresh(x);
                 tr.versions.push((x.clone(), name.clone()));
@@ -79,7 +126,11 @@ impl Tr {
     /// `k` of the value of `e`. When `e` assigns variables from outside it,
     /// its tuple is taken apart first and the variables hold their new names
     /// in `k`.
-    fn with_value(&mut self, e: &ir::Expr, k: impl FnOnce(&mut Self, Term) -> Term) -> Term {
+    pub(super) fn with_value(
+        &mut self,
+        e: &ir::Expr,
+        k: impl FnOnce(&mut Self, Term) -> Term,
+    ) -> Term {
         let xs = modified(e);
         if xs.is_empty() {
             let v = self.expr(e);
@@ -103,16 +154,28 @@ impl Tr {
     }
 
     /// `(v, x₁, …, xₙ)`: `v` and what the variables `xs` hold here.
-    fn pack(&self, v: Term, xs: &[String]) -> Term {
+    pub(super) fn pack(&self, v: Term, xs: &[String]) -> Term {
         let held = xs.iter().map(|x| self.version(x));
         Term::Tuple(iter::once(v).chain(held).collect())
     }
 
     /// `e` as the tuple of its value and of what the variables `xs` hold
     /// after it.
-    fn joined(&mut self, e: &ir::Expr, xs: &[String]) -> Term {
-        let rc = |t: Term| Rc::new(t);
+    pub(super) fn joined(&mut self, e: &ir::Expr, xs: &[String]) -> Term {
         match &e.kind {
+            ExprKind::ControlLoop {
+                id,
+                body,
+                iterable: true,
+                ..
+            } => self.source_for(id, body, xs),
+            ExprKind::ControlLoop {
+                id,
+                condition,
+                body,
+                iterable: false,
+            } => self.source_loop(id, condition.as_deref(), body, xs),
+            ExprKind::Loop { condition, body } => self.loop_term(condition, body, xs),
             ExprKind::Block(stmts, tail) => self.block(stmts, tail, Some(xs)),
             ExprKind::If(c, a, b) => self.with_value(c, |tr, c| {
                 let (a, b) = (tr.joined(a, xs), tr.joined(b, xs));
@@ -126,46 +189,22 @@ impl Tr {
                 let (yes, b) = (tr.pack(Term::bool(true), xs), tr.joined(b, xs));
                 cond(a, yes, b)
             }),
-            ExprKind::Match(s, arms) => self.with_value(s, |tr, s| {
-                let arms = arms
-                    .iter()
-                    .map(|a| Arm {
-                        pat: pat(&a.pat),
-                        guard: a.guard.as_ref().map(|g| tr.expr(g)),
-                        body: tr.joined(&a.body, xs),
-                    })
-                    .collect();
-                Term::Match(rc(s), arms)
+            ExprKind::Match(s, arms) => self.with_value(s, |tr, value| {
+                let name = tr.fresh("scrutinee");
+                let body = tr.match_state(Term::Var(name.clone()), arms, xs);
+                Term::Let(name, None, Rc::new(value), Rc::new(body))
             }),
-            // the body assigns no variable from outside: an arm sees them as before it
-            ExprKind::Handle(h) if h.is_try() => {
-                let value = self.fresh("v");
-                let body = Term::Let(
-                    value.clone(),
-                    None,
-                    rc(self.expr(&h.body)),
-                    rc(self.pack(Term::Var(value), xs)),
-                );
-                let arms = h
-                    .errors
-                    .iter()
-                    .map(|a| Arm {
-                        pat: pat(&a.pat),
-                        guard: a.guard.as_ref().map(|g| self.expr(g)),
-                        body: self.joined(&a.body, xs),
-                    })
-                    .collect();
-                Term::Try(rc(body), arms)
-            }
-            ExprKind::App { func, arg, .. } if layer_run(func).is_some() => {
-                self.provide_with(func, arg, &|tr, body| tr.joined(body, xs))
-            }
-            ExprKind::App { func, arg, .. } if is_global(func, "Scope", "run") => {
+            ExprKind::Handle(h) if h.is_try() => self.try_state(&h.body, &h.errors, xs),
+            ExprKind::Handle(h) => self.joined_handler(h, xs),
+            ExprKind::App { func, arg, .. } if layer_run(func).is_some() => self
+                .with_value(layer_run(func).expect("layer"), |tr, layer| {
+                    tr.provide_value(layer, arg, &|tr, body| tr.joined(body, xs))
+                }),
+            ExprKind::App { func, arg, .. } if is_lang(func, Lang::ScopeRun) => {
                 self.scope_with(arg, &|tr, body| tr.joined(body, xs))
             }
             ExprKind::Within(_, inner) | ExprKind::Lift(inner, _) => self.joined(inner, xs),
-            ExprKind::Handle(_)
-            | ExprKind::Lambda { .. }
+            ExprKind::Lambda { .. }
             | ExprKind::Task(_)
             | ExprKind::Abstract(..)
             | ExprKind::Generate { .. }
@@ -226,4 +265,41 @@ pub fn modified(e: &ir::Expr) -> Vec<String> {
     assigned.sort();
     assigned.dedup();
     assigned
+}
+
+impl Tr {
+    fn match_state(&mut self, value: Term, arms: &[ir::Arm], out: &[String]) -> Term {
+        let Some((arm, rest)) = arms.split_first() else {
+            return Term::Die("unmatched source match".into());
+        };
+        let tracked = self.active_variables();
+        let (next, fallback) =
+            self.state_thunk(&tracked, |tr| tr.match_state(value.clone(), rest, out));
+        let call_next =
+            |tr: &Self| Term::app(Term::Var(next.clone()), tr.pack(Term::unit(), &tracked));
+        let branch = if let Some(g) = &arm.guard {
+            self.with_value(g, |tr, c| {
+                let yes = tr.joined(&arm.body, out);
+                cond(c, yes, call_next(tr))
+            })
+        } else {
+            self.joined(&arm.body, out)
+        };
+        let matched = Term::Match(
+            Rc::new(value),
+            Rc::from([
+                Arm {
+                    pat: pat(&arm.pat),
+                    guard: None,
+                    body: branch,
+                },
+                Arm {
+                    pat: Pat::Wild,
+                    guard: None,
+                    body: call_next(self),
+                },
+            ]),
+        );
+        Term::Let(next, None, Rc::new(fallback), Rc::new(matched))
+    }
 }

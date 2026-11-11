@@ -27,6 +27,7 @@ mod inline;
 mod specialize;
 mod sroa;
 mod walk;
+pub use walk::rename;
 
 #[cfg(test)]
 mod gadt_tests;
@@ -35,14 +36,14 @@ mod inline_tests;
 #[cfg(test)]
 mod tests;
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashMap, HashSet};
 use std::mem;
 
 use crate::ir::{Expr, ExprKind, Item, ItemKind, Lit, Module, Pat, Stmt};
 pub use fold::{js_number, json_string};
 pub use specialize::names_only;
 pub(crate) use walk::uses;
-use walk::{droppable, strict_uses, substitute};
+use walk::{droppable, each_strict_use, each_use};
 
 /// Rounds of inlining: a body inlined in the first may inline again.
 const ROUNDS: usize = 2;
@@ -116,7 +117,7 @@ fn pass(e: &mut Expr) -> bool {
 /// Hoists the statements of blocks a `let` binds or the block ends with:
 /// locals are unique in a definition, so nothing is captured differently.
 fn flatten(stmts: &mut Vec<Stmt>, result: &mut Box<Expr>) -> bool {
-    let nested = |s: &Stmt| matches!(s, Stmt::Let(_, v) | Stmt::Expr(v) if matches!(v.kind, ExprKind::Block(..)));
+    let nested = |s: &Stmt| matches!(s, Stmt::Let(_, v) | Stmt::Var(_, v) | Stmt::Assign(_, v) | Stmt::Expr(v) if matches!(v.kind, ExprKind::Block(..)));
     if !stmts.iter().any(nested) && !matches!(result.kind, ExprKind::Block(..)) {
         return false;
     }
@@ -165,82 +166,129 @@ fn atom(e: &Expr) -> bool {
     }
 }
 
-/// How often the statements after `i` and `result` read `name`; and how
-/// often they surely evaluate the read once.
-fn later_uses(stmts: &[Stmt], i: usize, result: &Expr, name: &str) -> (usize, usize) {
-    let mut all = uses(result, name);
-    let mut strict = strict_uses(result, name);
-    for s in &stmts[i + 1..] {
-        match s {
+/// For each statement that binds one local with `let`: how often the
+/// statements after it and `result` read the local, and how often they
+/// surely evaluate that read once. One walk of the block from its end.
+fn later_uses(stmts: &[Stmt], result: &Expr) -> Vec<Option<(usize, usize)>> {
+    let mut all: HashMap<&str, usize> = HashMap::new();
+    let mut strict: HashMap<&str, usize> = HashMap::new();
+    each_use(result, &mut |l| *all.entry(l).or_default() += 1);
+    each_strict_use(result, &mut |l| *strict.entry(l).or_default() += 1);
+    let mut later = vec![None; stmts.len()];
+    for (i, stmt) in stmts.iter().enumerate().rev() {
+        if let Stmt::Let(Pat::Bind(name), _) = stmt {
+            let of = |counts: &HashMap<&str, usize>| counts.get(name.as_str()).copied();
+            later[i] = Some((of(&all).unwrap_or(0), of(&strict).unwrap_or(0)));
+        }
+        match stmt {
             Stmt::Let(_, v) | Stmt::Var(_, v) | Stmt::Assign(_, v) | Stmt::Expr(v) => {
-                all += uses(v, name);
-                strict += strict_uses(v, name);
+                each_use(v, &mut |l| *all.entry(l).or_default() += 1);
+                each_strict_use(v, &mut |l| *strict.entry(l).or_default() += 1);
             }
-            Stmt::Fun { value, .. } => all += uses(value, name),
+            Stmt::Fun { value, .. } => each_use(value, &mut |l| *all.entry(l).or_default() += 1),
         }
     }
-    (all, strict)
+    later
 }
 
 /// Replaces a local bound to an atom with the atom, and a local read once
-/// by its pure value when that read surely happens.
+/// by its pure value when that read surely happens. One walk of the block:
+/// a value on its way to its reads waits in `moving`, and each statement
+/// takes what it reads when the walk comes to it. A value reads no local
+/// bound after it, so the counts taken before the walk still hold then.
 fn propagate(stmts: &mut Vec<Stmt>, result: &mut Expr) -> bool {
-    let mut changed = false;
-    let mut i = 0;
-    while i < stmts.len() {
-        let Stmt::Let(Pat::Bind(name), value) = &stmts[i] else {
-            i += 1;
-            continue;
-        };
-        let (all, strict) = later_uses(stmts, i, result, name);
-        let movable = atom(value) || (droppable(value) && all == 1 && strict == 1);
-        if !movable || all == 0 {
-            i += 1;
-            continue;
+    let later = later_uses(stmts, result);
+    let before = stmts.len();
+    let mut moving: HashMap<String, Expr> = HashMap::new();
+    let mut kept = Vec::with_capacity(before);
+    for (mut stmt, uses) in mem::take(stmts).into_iter().zip(later) {
+        // what moves in may be dropped, so a value that may be dropped
+        // before it still may after: asking first keeps the answer from
+        // walking the values that moved into this one
+        let once = matches!(uses, Some((1, 1)));
+        let pure = once && matches!(&stmt, Stmt::Let(_, v) if droppable(v));
+        match &mut stmt {
+            Stmt::Let(_, v)
+            | Stmt::Var(_, v)
+            | Stmt::Assign(_, v)
+            | Stmt::Expr(v)
+            | Stmt::Fun { value: v, .. } => place(v, &mut moving),
         }
-        let Stmt::Let(Pat::Bind(name), value) = stmts.remove(i) else {
-            unreachable!("matched above")
+        match (stmt, uses) {
+            (Stmt::Let(Pat::Bind(name), value), Some((all, _)))
+                if all != 0 && (atom(&value) || pure || (once && droppable(&value))) =>
+            {
+                moving.insert(name, value);
+            }
+            (stmt, _) => kept.push(stmt),
+        }
+    }
+    place(result, &mut moving);
+    *stmts = kept;
+    stmts.len() != before
+}
+
+/// Puts the values of `moving` where `e` reads their locals: an atom is
+/// copied to each read; any other value has one read, and moves there.
+fn place(e: &mut Expr, moving: &mut HashMap<String, Expr>) {
+    if moving.is_empty() {
+        return;
+    }
+    if let ExprKind::Local(l) = &e.kind
+        && let Some(value) = moving.get(l)
+    {
+        *e = if atom(value) {
+            value.clone()
+        } else {
+            moving.remove(l).expect("found above")
         };
-        for s in &mut stmts[i..] {
-            match s {
+        return;
+    }
+    e.each_child_mut(&mut |c| place(c, moving));
+}
+
+/// Drops statements whose value is unused and whose evaluation shows
+/// nothing; a runtime call always stays. One walk of the block from its
+/// end, with the locals the statements kept so far and `result` read.
+fn dead(stmts: &mut Vec<Stmt>, result: &Expr) -> bool {
+    let keep: Vec<bool> = {
+        let mut read: HashSet<&str> = HashSet::new();
+        each_use(result, &mut |l| {
+            read.insert(l);
+        });
+        let mut keep = vec![true; stmts.len()];
+        for (i, stmt) in stmts.iter().enumerate().rev() {
+            let drop = match stmt {
+                Stmt::Expr(v) => droppable(v),
+                Stmt::Let(p, v) => {
+                    let mut bound = Vec::new();
+                    p.binders(&mut bound);
+                    p.irrefutable() && bound.iter().all(|n| !read.contains(n)) && droppable(v)
+                }
+                Stmt::Fun { name, .. } => !read.contains(name.as_str()),
+                Stmt::Var(..) | Stmt::Assign(..) => false,
+            };
+            if drop {
+                keep[i] = false;
+                continue;
+            }
+            match stmt {
                 Stmt::Let(_, v)
                 | Stmt::Var(_, v)
                 | Stmt::Assign(_, v)
                 | Stmt::Expr(v)
                 | Stmt::Fun { value: v, .. } => {
-                    substitute(v, &name, &value);
+                    each_use(v, &mut |l| {
+                        read.insert(l);
+                    });
                 }
             }
         }
-        substitute(result, &name, &value);
-        changed = true;
-    }
-    changed
-}
-
-/// Drops statements whose value is unused and whose evaluation shows
-/// nothing; a runtime call always stays.
-fn dead(stmts: &mut Vec<Stmt>, result: &Expr) -> bool {
+        keep
+    };
     let before = stmts.len();
-    let mut i = stmts.len();
-    while i > 0 {
-        i -= 1;
-        let unused = |names: &[&str]| names.iter().all(|n| later_uses(stmts, i, result, n).0 == 0);
-        let drop = match &stmts[i] {
-            Stmt::Expr(v) => droppable(v),
-            Stmt::Let(p, v) => {
-                let mut bound = Vec::new();
-                p.binders(&mut bound);
-                p.irrefutable() && unused(&bound) && droppable(v)
-            }
-            Stmt::Fun { name, .. } => unused(&[name.as_str()]),
-            // a variable's reads are not counted as uses of a local
-            Stmt::Var(..) | Stmt::Assign(..) => false,
-        };
-        if drop {
-            stmts.remove(i);
-        }
-    }
+    let mut keep = keep.into_iter();
+    stmts.retain(|_| keep.next().expect("one for each statement"));
     stmts.len() != before
 }
 
@@ -286,7 +334,7 @@ fn unused_items(module: &mut Module, exported: &dyn Fn(&str) -> bool) {
     loop {
         let mut used = BTreeSet::new();
         for item in &module.items {
-            item_globals(item, &module.name, &mut used);
+            item.each_body(&mut |e| globals(e, &module.name, &mut used));
         }
         let before = module.items.len();
         module.items.retain(|item| match &item.kind {
@@ -301,21 +349,6 @@ fn unused_items(module: &mut Module, exported: &dyn Fn(&str) -> bool) {
         if module.items.len() == before {
             return;
         }
-    }
-}
-
-fn item_globals(item: &Item, module: &str, out: &mut BTreeSet<String>) {
-    let mut walk = |e: &Expr| globals(e, module, out);
-    match &item.kind {
-        ItemKind::Value { body, .. } | ItemKind::Destructure { body, .. } => walk(body),
-        ItemKind::Refined { check, .. } => walk(check),
-        ItemKind::Instance { methods, .. } => methods.iter().for_each(|(_, m)| walk(m)),
-        ItemKind::Foreign(f) => {
-            if let Some(c) = &f.catch {
-                walk(c);
-            }
-        }
-        ItemKind::Constructor(_) | ItemKind::Service { .. } => {}
     }
 }
 

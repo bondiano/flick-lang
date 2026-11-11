@@ -6,9 +6,9 @@ import (
 	"strings"
 )
 
-// Cause is why a computation failed, as Effect's: typed failures, defects
-// and interruptions, sequential or parallel. A failing computation panics
-// with a *Failure carrying its cause.
+// Cause is why a computation failed: typed failures, defects and
+// interruptions, sequential or parallel. A failing computation panics with
+// a *Failure carrying its cause.
 type Cause struct {
 	kind   causeKind
 	err    Value       // a typed failure's error
@@ -38,14 +38,14 @@ func (f *Failure) Error() string { return pretty(f.Cause) }
 // Fail fails with a typed error.
 func Fail(err Value) Value { panic(&Failure{&Cause{kind: causeFail, err: err}}) }
 
-// Sequential and Parallel combine two causes as Effect's `Cause.combine`
-// does: the reasons of both, each once, so the kind of the node is never
-// observed (docs/formal/runtime.md §2.1).
+// Sequential and Parallel combine two causes: the reasons of both, each
+// once, so the kind of the node is never observed
+// (docs/formal/runtime.md).
 func Sequential(a, b *Cause) *Cause { return combineReasons(causeSequential, a, b) }
 func Parallel(a, b *Cause) *Cause   { return combineReasons(causeParallel, a, b) }
 
-// concat is the reasons of both causes, repeats kept, as Effect's
-// `Cause.fromReasons` over both lists: races and a scope's finalizers.
+// concat is the reasons of both causes, repeats kept: races and a scope's
+// finalizers.
 func concat(a, b *Cause) *Cause { return combine2(causeSequential, a, b) }
 
 // emptyCause is the failure without reasons: nil is no failure at all.
@@ -71,9 +71,9 @@ func combineReasons(kind causeKind, a, b *Cause) *Cause {
 	return out
 }
 
-// sameReason is Effect's `Equal.equals` of reasons: a typed error and a
-// defect's message or value by value, a thrown error by identity, an
-// interruption by its fiber.
+// sameReason is the equality of reasons: a typed error and a defect's
+// message or value by value, a thrown error by identity, an interruption
+// by its fiber.
 func sameReason(a, b *Cause) bool {
 	if a.kind != b.kind {
 		return false
@@ -129,8 +129,8 @@ func (c *Cause) failsToDies() *Cause {
 	return out
 }
 
-// electDefects is Effect's `causeElectDefects`: in a cause with a defect,
-// each typed failure but a pull's end is a defect too, its trace kept.
+// electDefects elects defects: in a cause with a defect, each typed
+// failure but a pull's end is a defect too, its trace kept.
 func (c *Cause) electDefects() *Cause {
 	if !c.has(causeDie) || !c.has(causeFail) {
 		return c
@@ -147,9 +147,9 @@ func (c *Cause) electDefects() *Cause {
 	return out
 }
 
-// finalized is Effect's `combineFinalizerCause`: what ended with `cause`
-// (nil: a success) and then a finalizer that failed with `fin`, the failure
-// of both with its defects elected.
+// finalized is what ended with `cause` (nil: a success) and then a
+// finalizer that failed with `fin`: the failure of both with its defects
+// elected.
 func finalized(cause, fin *Cause) *Cause {
 	if cause == nil || fin == nil {
 		return Sequential(cause, fin)
@@ -209,11 +209,12 @@ func causeOf(r any) *Cause {
 	return &Cause{kind: causeDie, defect: fmt.Sprint(r) + "\n" + flickFrames(), thrown: true}
 }
 
-// skipHandler is Effect's failure in a fiber asked to stop while it is
+// skipHandler is the failure in a fiber asked to stop while it is
 // interruptible: it skips the handler, its typed failures dropped and the
-// interruption added (FX/internal/core.ts:611-622, `docs/formal/runtime.md#an-interruption-that-skips-a-handler-erases-fail-effect`). Each recovery
-// handler calls it; a boundary that must run (`on_exit`, a release, a
-// metric) does not, as Effect's mask stops the skipping there.
+// interruption added
+// (`docs/formal/runtime.md#an-interruption-that-skips-a-handler-erases-fail-effect`).
+// Each recovery handler calls it; a boundary that must run (`on_exit`, a
+// release, a metric) does not, as a mask stops the skipping there.
 func skipHandler(fb *Fiber, c *Cause) {
 	s := fb.state
 	if !s.requested.Load() || s.mask != 0 {

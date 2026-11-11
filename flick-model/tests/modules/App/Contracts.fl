@@ -1,0 +1,11 @@
+module App.Contracts exposing (Policy, Box)
+
+type module Policy =
+  type Key = String
+  class Eq = Prelude.Eq
+  equality : Eq.Dict Key
+  instance Eq Key from equality
+
+type module Box =
+  type Key
+  value : Key

@@ -89,6 +89,32 @@ impl Checker<'_> {
         Ok(())
     }
 
+    /// Grows the capture rows the obligations so far need, closing none.
+    pub(in crate::check) fn grow_holds(&mut self) -> Check<()> {
+        loop {
+            let mut grown = false;
+            for i in 0..self.regions.holds.len() {
+                let h = self.regions.holds[i].clone();
+                let (missing, room) = self.excess(&h);
+                if missing.is_empty() {
+                    continue;
+                }
+                if let Some(m) = room {
+                    let level = self.slots[m as usize].level;
+                    let tail = self.meta();
+                    self.slots[tail as usize].level = level;
+                    let mut grow = missing;
+                    grow.vars.insert(Var::Meta(tail));
+                    self.bind_caps(m, grow)?;
+                    grown = true;
+                }
+            }
+            if !grown {
+                return Ok(());
+            }
+        }
+    }
+
     /// What `h` holds beyond what it allows, and the capture row that may
     /// grow to allow it. A type never inferred holds nothing (`docs/formal/regions.md#bounded-qualifiers-are-compared-after-the-type-is-inferred`).
     fn excess(&self, h: &Hold) -> (Caps, Option<u32>) {
@@ -110,6 +136,12 @@ impl Checker<'_> {
             if !allowed.atoms.contains(&a) {
                 held = held.union(&self.zonk_caps(&c));
             }
+        }
+        // Live is a use obligation, not a storage bound. An opaque type
+        // atom cannot be inspected. Filter after zonking, since a capture
+        // meta may have learned either such an atom or an actual region.
+        if h.rule == "Live" {
+            held.atoms.retain(|v| self.is_region(v));
         }
         // an atom is a region or a type variable; a meta of a type never
         // inferred holds nothing (`docs/formal/regions.md#bounded-qualifiers-are-compared-after-the-type-is-inferred`). A capture variable of a signature

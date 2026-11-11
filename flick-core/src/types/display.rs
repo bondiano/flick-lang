@@ -1,12 +1,14 @@
 //! Types as diagnostics show them, in source syntax.
 
 use crate::numeric::NumLang;
+use crate::types::Elem;
 use std::fmt::Write;
 
 use super::Checker;
 use super::lang::Lang;
+use super::regions::{has_live, strip_live};
 use super::shown::short_form;
-use super::ty::{Binder, Row, Type};
+use super::ty::{Binder, Effects, Row, Type};
 use super::unify::Store;
 use crate::numeric::default_num;
 
@@ -20,9 +22,15 @@ impl Checker<'_> {
             qualified: false,
             zero: true,
         };
-        let held = self.held_now(&self.zonk(t));
+        let held = self.held_now(&self.unlive(t));
         printer.print(&short_form(&held, &self.store), Prec::Top, &mut out);
         out
+    }
+
+    /// `t` zonked, without the `Live` of `regions/live.rs`: no row writes it.
+    fn unlive(&self, t: &Type) -> Type {
+        let t = self.zonk(t);
+        if has_live(&t) { strip_live(&t) } else { t }
     }
 
     /// `t` with its `forall` and its qualifiers, for a message about them and
@@ -34,7 +42,7 @@ impl Checker<'_> {
             qualified: false,
             zero: false,
         };
-        printer.print(&self.held_now(&self.zonk(t)), Prec::Top, &mut out);
+        printer.print(&self.held_now(&self.unlive(t)), Prec::Top, &mut out);
         out
     }
 
@@ -47,7 +55,7 @@ impl Checker<'_> {
             qualified: true,
             zero: false,
         };
-        printer.print(&self.zonk(t), Prec::Top, &mut out);
+        printer.print(&self.unlive(t), Prec::Top, &mut out);
         out
     }
 
@@ -74,6 +82,13 @@ impl Checker<'_> {
 
 /// A closed type, as an interface stores it, in source syntax.
 pub fn show_type(t: &Type) -> String {
+    let stripped;
+    let t = if has_live(t) {
+        stripped = strip_live(t);
+        &stripped
+    } else {
+        t
+    };
     let store = Store::default();
     let mut out = String::new();
     Printer {
@@ -89,6 +104,13 @@ pub fn show_type(t: &Type) -> String {
 /// written that way gets back (`shown`). A parameter or a field on its own
 /// keeps its `forall`: use [`show_type`] for those.
 pub fn show_signature(t: &Type) -> String {
+    let stripped;
+    let t = if has_live(t) {
+        stripped = strip_live(t);
+        &stripped
+    } else {
+        t
+    };
     let store = Store::default();
     let mut out = String::new();
     Printer {
@@ -134,9 +156,16 @@ impl Printer<'_> {
             }
         };
         match t {
+            Type::Con { module, name } if let Some(binder) = module.strip_prefix("$exists:") => {
+                let _ = write!(out, "{binder}.{name}");
+            }
+            Type::Con { module, name } if name.ends_with("$Dict") => {
+                self.print_dictionary_name(module, name, out);
+            }
             Type::Con { module, name } if self.qualified && !module.is_empty() => {
                 let _ = write!(out, "{module}.{name}");
             }
+            Type::Var(name) if name.ends_with("$Dict") => self.print_dictionary_name("", name, out),
             Type::Con { name, .. } | Type::Var(name) => out.push_str(name),
             Type::Symbol(label) => {
                 let _ = write!(out, "{label:?}");
@@ -149,37 +178,12 @@ impl Printer<'_> {
             }
             Type::Meta(_) => out.push('_'),
             Type::Error => out.push('?'),
-            Type::App { .. } => {
-                let (head, args) = t.spine();
-                parens(prec >= Prec::Arg, out, &mut |out| {
-                    self.print(head, Prec::App, out);
-                    for arg in &args {
-                        out.push(' ');
-                        self.print(arg, Prec::Arg, out);
-                    }
-                });
-            }
+            Type::App { .. } => self.print_app(t, prec, out),
             Type::Fun {
                 param,
                 effects,
                 result,
-            } => parens(prec >= Prec::App, out, &mut |out| {
-                self.print(param, Prec::App, out);
-                match effects {
-                    None => out.push_str(" -> "),
-                    Some(e) if is_empty(&e.services) && is_empty(&e.errors) => {
-                        out.push_str(" ->{} ");
-                    }
-                    Some(e) => {
-                        out.push_str(" ->{");
-                        self.print_row_items(&e.services, out);
-                        out.push_str("; ");
-                        self.print_row_items(&e.errors, out);
-                        out.push_str("} ");
-                    }
-                }
-                self.print_result(result, out);
-            }),
+            } => self.print_fun(param, effects.as_deref(), result, prec, out),
             Type::Tuple(items) => {
                 out.push('(');
                 for (i, item) in items.iter().enumerate() {
@@ -191,10 +195,10 @@ impl Printer<'_> {
                 out.push(')');
             }
             Type::Row(row)
-                if row
-                    .entries
-                    .iter()
-                    .all(|(l, _)| l.contains('.') || l.starts_with(['^', '~'])) =>
+                if row.entries.iter().all(|(l, _)| {
+                    l.name().is_none_or(|name| name.contains('.'))
+                        && !matches!(l, Elem::Service(_) | Elem::Live | Elem::Provided(_))
+                }) =>
             {
                 if row.entries.is_empty() && row.tail.is_none() {
                     out.push_str("none");
@@ -210,6 +214,11 @@ impl Printer<'_> {
                 out.push_str(" + ");
                 self.print(b, Prec::App, out);
             }),
+            Type::Without { .. } => {
+                out.push('{');
+                self.print_row_items(t, out);
+                out.push('}');
+            }
             Type::Captured { ty, captures, .. } | Type::Bounded { ty, captures } => {
                 self.print_captured(ty, captures, prec, out);
             }
@@ -220,6 +229,71 @@ impl Printer<'_> {
             } => parens(prec > Prec::Top, out, &mut |out| {
                 self.print_forall(vars, constraints, body, out);
             }),
+            Type::Exists {
+                binder,
+                contract,
+                body,
+            } => parens(prec > Prec::Top, out, &mut |out| {
+                let _ = write!(out, "exists {binder} : ");
+                self.print(contract, Prec::Top, out);
+                out.push_str(". ");
+                self.print(body, Prec::Top, out);
+            }),
+        }
+    }
+
+    fn print_fun(
+        &self,
+        param: &Type,
+        effects: Option<&Effects>,
+        result: &Type,
+        prec: Prec,
+        out: &mut String,
+    ) {
+        let needs_parens = prec >= Prec::App;
+        if needs_parens {
+            out.push('(');
+        }
+        self.print(param, Prec::App, out);
+        match effects {
+            None => out.push_str(" -> "),
+            Some(e) if is_empty(&e.services) && is_empty(&e.errors) => out.push_str(" ->{} "),
+            Some(e) => {
+                out.push_str(" ->{");
+                self.print_row_items(&e.services, out);
+                out.push_str("; ");
+                self.print_row_items(&e.errors, out);
+                out.push_str("} ");
+            }
+        }
+        self.print_result(result, out);
+        if needs_parens {
+            out.push(')');
+        }
+    }
+
+    fn print_app(&self, t: &Type, prec: Prec, out: &mut String) {
+        let (head, args) = t.spine();
+        let needs_parens = prec >= Prec::Arg;
+        if needs_parens {
+            out.push('(');
+        }
+        self.print(head, Prec::App, out);
+        for arg in &args {
+            out.push(' ');
+            self.print(arg, Prec::Arg, out);
+        }
+        if needs_parens {
+            out.push(')');
+        }
+    }
+
+    fn print_dictionary_name(&self, module: &str, name: &str, out: &mut String) {
+        if self.qualified && !module.is_empty() {
+            let _ = write!(out, "{module}.");
+        }
+        if let Some(class) = name.strip_suffix("$Dict") {
+            let _ = write!(out, "{class}.Dict");
         }
     }
 
@@ -289,9 +363,19 @@ impl Printer<'_> {
 
     /// The items of a service or error row without braces: `Users, Log | r`.
     fn print_row_items(&self, t: &Type, out: &mut String) {
-        let Type::Row(row) = t else {
-            self.print(t, Prec::App, out);
-            return;
+        let row = match t {
+            Type::Row(row) => row,
+            // `-S` before the `|`, as it is written
+            Type::Without { row, gone } => {
+                print_gone(gone, true, out);
+                out.push_str(" | ");
+                self.print(row, Prec::App, out);
+                return;
+            }
+            _ => {
+                self.print(t, Prec::App, out);
+                return;
+            }
         };
         if row.entries.is_empty() && row.tail.is_none() {
             out.push_str("none");
@@ -307,8 +391,19 @@ impl Printer<'_> {
             self.print(item, Prec::App, out);
         }
         let services = items.clone().any(|item| !is_fail(item));
-        if let Some(tail) = &row.tail {
-            out.push_str(if services { " | " } else { "" });
+        let tail = match row.tail.as_deref() {
+            Some(Type::Without { row, gone }) => {
+                print_gone(gone, !services, out);
+                out.push_str(" | ");
+                Some(&**row)
+            }
+            Some(tail) => {
+                out.push_str(if services { " | " } else { "" });
+                Some(tail)
+            }
+            None => None,
+        };
+        if let Some(tail) = tail {
             self.print(tail, Prec::App, out);
         }
         for item in items.filter(|item| is_fail(item)) {
@@ -351,6 +446,15 @@ enum Prec {
     App,
     /// Argument of an application.
     Arg,
+}
+
+/// `-A, -B`: the names a row variable is taken without, after the items
+/// before them unless they are the `first`.
+fn print_gone(gone: &[Elem], first: bool, out: &mut String) {
+    for (i, label) in gone.iter().enumerate() {
+        out.push_str(if i == 0 && first { "-" } else { ", -" });
+        out.push_str(&label.short());
+    }
 }
 
 #[cfg(test)]

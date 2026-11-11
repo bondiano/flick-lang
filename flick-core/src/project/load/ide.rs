@@ -19,11 +19,16 @@ use crate::syntax::cst::Node;
 use crate::types::Typing;
 
 /// A module as editors see it.
+#[derive(Clone)]
 pub struct Analyzed {
     pub name: String,
+    /// A lexical namespace in another module's source file; never an import target.
+    pub inline: bool,
     pub path: PathBuf,
     pub file: FileId,
     pub test: bool,
+    /// None for the project's source and test modules; otherwise the source package.
+    pub package: Option<String>,
     pub tree: Node,
     pub typing: Arc<Typing>,
     pub interface: Interface,
@@ -37,9 +42,14 @@ impl Analyzed {
     pub(super) fn new(loaded: &Loaded, typing: Arc<Typing>, interface: Interface) -> Self {
         Analyzed {
             name: loaded.name.clone(),
+            inline: false,
             path: loaded.path.clone(),
             file: loaded.file,
             test: loaded.root == Root::Test,
+            package: match &loaded.root {
+                Root::Package(name) => Some(name.clone()),
+                _ => None,
+            },
             // the user's code inside plugin blocks parsed in place
             tree: loaded
                 .expansion

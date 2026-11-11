@@ -13,11 +13,14 @@
     reason = "the code names what it handles as the rules of docs/formal/core.md do: e, x, t for τ, s for φ"
 )]
 
+pub mod cert;
 pub mod check;
 pub mod decls;
 pub mod eval;
 pub mod generate;
 pub mod handler;
+#[cfg(test)]
+mod modules;
 pub mod native;
 pub mod rt;
 pub mod run;

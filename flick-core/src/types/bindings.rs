@@ -12,9 +12,11 @@ use crate::diagnostics::{Diagnostic, Edit, codes};
 use crate::source::Span;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
+use crate::syntax::patterns;
 use crate::types::lang::Lang;
 
 mod header;
+mod unsigned;
 
 /// The parts of a `let`.
 pub struct LetParts<'n> {
@@ -90,7 +92,7 @@ impl Checker<'_> {
         expected: Option<&Type>,
         mut tail: Option<Tail<'_, Self>>,
     ) -> Type {
-        let mark = self.locals.len();
+        let mark = self.cx.locals.len();
         let statements: Vec<&Node> = node.nodes().collect();
         let mut result = None;
         let mut i = 0;
@@ -129,7 +131,7 @@ impl Checker<'_> {
             }
             i += 1;
         }
-        self.locals.truncate(mark);
+        self.cx.locals.truncate(mark);
         result.unwrap_or_else(|| {
             let end = node.range().1;
             self.error(
@@ -183,7 +185,7 @@ impl Checker<'_> {
         // `validate` reports the other places of `mut`, which bind as plain `let`
         if decl.has_token(K::MutKw) && parts.params.is_empty() && !parts.rec {
             self.local_mut(decl, sig, &parts, &name, at);
-            if let (Some(binder), Some(local)) = (binder, self.locals.last()) {
+            if let (Some(binder), Some(local)) = (binder, self.cx.locals.last()) {
                 let ty = local.ty.clone();
                 self.note_type(self.span(binder), &ty);
             }
@@ -195,7 +197,7 @@ impl Checker<'_> {
         if let Some((scheme, explicit)) = signature {
             let rec = parts.rec.then(|| {
                 let rec = (!explicit).then(|| self.new_rec(&name));
-                self.locals.push(Local {
+                self.cx.locals.push(Local {
                     name: name.clone(),
                     at: Some(at),
                     generated: at >= self.generated,
@@ -206,18 +208,18 @@ impl Checker<'_> {
                 });
                 rec
             });
-            let mark = self.locals.len();
+            let mark = self.cx.locals.len();
             // what a local holds is inferred: its signature need not name the regions
             let captures = self.fresh();
             let runtime = self.check_signed(decl, &parts, &scheme, rec.flatten(), Some(&captures));
-            self.locals.truncate(mark - usize::from(rec.is_some()));
+            self.cx.locals.truncate(mark - usize::from(rec.is_some()));
             if let Some(Some(rec)) = rec {
                 self.finish_recs(&[rec]);
             }
             self.polymorphic_signature(&name, &scheme, runtime, decl, &parts);
             let ty = self.inferred_captures(scheme, captures, self.span(decl));
             self.push_local(&name, at, ty);
-            if let Some(local) = self.locals.last_mut()
+            if let Some(local) = self.cx.locals.last_mut()
                 && !parts.is_function()
                 && !parts.rec
             {
@@ -230,17 +232,17 @@ impl Checker<'_> {
             }
             let ty = self.unsigned(decl, &parts, &name);
             if parts.rec {
-                self.locals.pop();
+                self.cx.locals.pop();
             }
             self.push_local(&name, at, ty);
-            if let Some(local) = self.locals.last_mut() {
+            if let Some(local) = self.cx.locals.last_mut() {
                 local.unsigned = parts.is_function();
                 if !parts.is_function() && !parts.rec {
                     local.binding = super::mutation::Binding::Let;
                 }
             }
         }
-        if let (Some(binder), Some(local)) = (binder, self.locals.last()) {
+        if let (Some(binder), Some(local)) = (binder, self.cx.locals.last()) {
             let ty = local.ty.clone();
             self.note_type(self.span(binder), &ty);
         }
@@ -288,13 +290,13 @@ impl Checker<'_> {
         };
         let assumed = self.classes.givens.len();
         self.classes.givens.extend(givens);
-        let mark = self.tyvars.len();
+        let mark = self.cx.tyvars.len();
         for (name, ty) in skolems.iter().cloned() {
             let kind = kinds
                 .iter()
                 .find(|b| b.name == name)
                 .map_or(super::kinds::Kind::Type, |b| b.kind.clone());
-            self.tyvars.push(TyVar { name, ty, kind });
+            self.cx.tyvars.push(TyVar { name, ty, kind });
         }
         if let Some(rec) = rec {
             let rec = &mut self.recs[rec];
@@ -302,7 +304,7 @@ impl Checker<'_> {
             rec.target = Some(body.clone());
             rec.skolems.clone_from(&skolems);
         }
-        let saved = mem::take(&mut self.runtime);
+        let saved = mem::take(&mut self.cx.runtime);
         let complete = !scheme.contains(&mut |t| matches!(t, Type::Meta(_)));
         let signed = mem::replace(&mut self.gadt.signed, complete);
         if parts.params.is_empty() {
@@ -313,9 +315,9 @@ impl Checker<'_> {
             self.function(&parts.params, parts.body, Some(&body), decl);
         }
         self.gadt.signed = signed;
-        let runtime = mem::replace(&mut self.runtime, saved);
+        let runtime = mem::replace(&mut self.cx.runtime, saved);
         self.classes.givens.truncate(assumed);
-        self.tyvars.truncate(mark);
+        self.cx.tyvars.truncate(mark);
         self.store.level -= 1;
         runtime
     }
@@ -332,113 +334,36 @@ impl Checker<'_> {
             span,
         )
         .with_incomplete(incomplete);
-        if cfg!(feature = "diagnostic-fixes") {
-            let suggestion = self.signature_of(ty);
-            let shown = self.show(&suggestion);
-            // the edit is offered only for a type inferred without errors
-            let line = self.text[..span.start as usize]
-                .rfind('\n')
-                .map_or(0, |i| i + 1);
-            let indent = &self.text[line..span.start as usize];
-            let inferred = errors == self.diagnostics.len()
-                && self.operators_fit()
-                && !suggestion.contains(&mut |t| matches!(t, Type::Error | Type::Meta(_)));
-            let at = (inferred && indent.chars().all(|c| c == ' ' || c == '\t')).then(|| {
-                (
-                    u32::try_from(line).expect("offsets fit in u32"),
-                    indent.to_owned(),
-                )
+        let suggestion = self.signature_of(ty);
+        let shown = self.show(&suggestion);
+        // the edit is offered only for a type inferred without errors
+        let line = self.text[..span.start as usize]
+            .rfind('\n')
+            .map_or(0, |i| i + 1);
+        let indent = &self.text[line..span.start as usize];
+        let inferred = errors == self.diagnostics.len()
+            && self.operators_fit()
+            && !suggestion.contains(&mut |t| matches!(t, Type::Error | Type::Meta(_)));
+        let at = (inferred && indent.chars().all(|c| c == ' ' || c == '\t')).then(|| {
+            (
+                u32::try_from(line).expect("offsets fit in u32"),
+                indent.to_owned(),
+            )
+        });
+        // a number literal's type is known once the declaration settles
+        if self.has_open_number(ty) {
+            self.signatures.push(PendingSignature {
+                index: self.diagnostics.len(),
+                name: name.to_owned(),
+                ty: ty.clone(),
+                span,
+                at,
             });
-            // a number literal's type is known once the declaration settles
-            if self.has_open_number(ty) {
-                self.signatures.push(PendingSignature {
-                    index: self.diagnostics.len(),
-                    name: name.to_owned(),
-                    ty: ty.clone(),
-                    span,
-                    at,
-                });
-                self.diagnostics
-                    .push(signature_diagnostic(diagnostic, name, &shown, span, None));
-            } else {
-                self.diagnostics
-                    .push(signature_diagnostic(diagnostic, name, &shown, span, at));
-            }
+            self.diagnostics
+                .push(signature_diagnostic(diagnostic, name, &shown, span, None));
         } else {
-            self.diagnostics.push(diagnostic);
-        }
-    }
-
-    pub fn unsigned(&mut self, decl: &Node, parts: &LetParts, name: &str) -> Type {
-        let function = parts.is_function();
-        let header = self.header_types(decl, parts, false);
-        if parts.rec && !parts.is_function() {
-            self.error(
-                codes::T012,
-                self.span(decl),
-                format!(
-                    "`{name}` would be evaluated while it is being defined; only functions can be recursive"
-                ),
-            );
-        }
-        self.store.level += 1;
-        let saved = mem::take(&mut self.runtime);
-        let signed = mem::take(&mut self.gadt.signed);
-        let errors = self.diagnostics.len();
-        let mut redundant = None;
-        let ty = match (parts.params.is_empty(), parts.header) {
-            (false, _) => self.function(&parts.params, parts.body, None, decl),
-            (true, Some(header)) => {
-                let ty = self.annotation(header);
-                if let Some(b) = parts.body
-                    && self.check_exact(b, &ty)
-                {
-                    redundant = Some(header);
-                }
-                ty
-            }
-            (true, None) => parts.body.map_or(Type::Error, |b| self.infer(b)),
-        };
-        let runtime = mem::replace(&mut self.runtime, saved);
-        self.gadt.signed = signed;
-        self.store.level -= 1;
-        let is_fun = matches!(self.whnf(&ty), Type::Fun { .. });
-        // a plugin's code needs no signature: no one reads it. Nor does a local
-        // function: nothing outside its body sees it, and it stays of one type
-        let local = self.store.level > 0 && !parts.rec;
-        let signed = header || local || self.span(decl).start >= self.generated;
-        if let (true, Some(written), true) = (is_fun, parts.header, parts.params.is_empty()) {
-            let written = self.text_of(written);
-            self.error(
-                codes::T005,
-                self.span(decl),
-                format!(
-                    "write the type of function `{name}` as a signature above the `let`: `{name} : {written}`"
-                ),
-            );
-        } else if (function || is_fun) && !signed {
-            // the suggestion shows the rows the body needs, not their unknowns;
-            // only this binding's own: an enclosing row still gathers its calls
-            self.close_rows_above(Some(self.store.level));
-            self.missing_signature(name, &ty, self.span(decl), errors);
-        } else if let Some(header) = redundant {
-            self.redundant_annotation(decl, parts, header);
-        }
-        // a type in a GADT branch may hold by its equalities only
-        if runtime || function || !self.store.equalities.is_empty() {
-            self.store.lower(&ty);
-            ty
-        } else {
-            // a local atom's uses, all in sight, decide its one type
-            if self.store.level > 0 {
-                self.lower_atoms(&ty);
-            }
-            let ty = self.generalize(&ty);
-            // an annotation was checked as the value's type already
-            if let (None, Some(body)) = (parts.header, parts.body) {
-                self.polymorphic_atom(Some(name), &ty, self.span(body));
-            }
-            ty
+            self.diagnostics
+                .push(signature_diagnostic(diagnostic, name, &shown, span, at));
         }
     }
 
@@ -478,25 +403,9 @@ fn binders(scheme: &Type) -> Vec<super::ty::Binder> {
 
 /// The names a top-level pattern binds, a field pun among them.
 pub(super) fn pattern_names(pattern: &Node, text: &str, out: &mut Vec<String>) {
-    match pattern.kind {
-        K::VarPat => out.extend(
-            pattern
-                .child_tokens()
-                .find(|t| t.kind == K::Ident)
-                .map(|t| t.text(text).to_owned()),
-        ),
-        K::RecordPatField if !pattern.has_token(K::Eq) => out.extend(
-            pattern
-                .child_tokens()
-                .find(|t| t.kind == K::Ident)
-                .map(|t| t.text(text).to_owned()),
-        ),
-        _ => {
-            for child in pattern.nodes() {
-                pattern_names(child, text, out);
-            }
-        }
-    }
+    let mut names = Vec::new();
+    patterns::binders(pattern, &mut names);
+    out.extend(names.iter().map(|name| name.text(text).to_owned()));
 }
 
 /// A signature suggested for a function, to write later: the literals of

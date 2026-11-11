@@ -196,6 +196,7 @@ fn combinator(e: &mut Expr, fresh: &mut usize) -> bool {
                 let v = fresh_name(fresh);
                 Expr::new(
                     ExprKind::Each {
+                        stop: None,
                         pat: Pat::Bind(v.clone()),
                         source: Box::new(function.apply(value)),
                         body: Box::new(yield_of(Expr::new(ExprKind::Local(v), at))),
@@ -217,7 +218,10 @@ fn combinator(e: &mut Expr, fresh: &mut usize) -> bool {
 /// `for { x <- (for { … } yield e); … }`: the clauses of the inner `for`
 /// around the rest, `x` bound to `e`.
 fn nested(e: &mut Expr) -> bool {
-    let ExprKind::Each { pat, source, body } = &mut e.kind else {
+    let ExprKind::Each {
+        pat, source, body, ..
+    } = &mut e.kind
+    else {
         return false;
     };
     // a strict inner list is built before the outer clauses run

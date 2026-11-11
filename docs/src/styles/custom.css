@@ -223,6 +223,7 @@ code, pre, kbd { font-variant-ligatures: none; }
 .doc-section + h1#_top { margin-top: 0.5rem; }
 
 /* Reading comes first: quiet type, one measure, no decoration between the reader and the text. */
+[data-has-sidebar] .main-pane { --sl-content-margin-inline: 0; }
 .content-panel { padding-block: 1.5rem; }
 .content-panel + .content-panel { border-top: 0; padding-top: 0; }
 [data-has-sidebar] .content-panel:first-of-type { padding-top: 2.5rem; }

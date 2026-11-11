@@ -8,8 +8,10 @@ Source types are the `Ty` of constraints, with the arrow `a →φ^q b` (`docs/fo
 `con 2`, `Int` is `con 4` and `Option a` is `app (con 3) a`. Schemes bind `var 0 … var (k-1)`, capture
 variables among them; under a binder of `k` variables the context is shifted by `k`, as
 `Typ.letGen` does in the core. Terms are Curry-style with de Bruijn variables; a premise `δ`
-is an index into `Δ`. (Lam) and (Let-Sig-Dict) show what a closure holds, as (Lam) of
-`regions.md` (`docs/formal/elaboration.md#t6a-without-captures-does-not-carry-over-to-the-core-with-regions`); qualifiers match exactly, there is no (≤-Cap).
+is an index into `Δ`. Typing is by use, as in the core: the qualifier `q` of an arrow is what
+a call needs live, so (App) of a runtime arrow asks its stage to keep `q` live (`Stage.Keeps`),
+and (Lam) and (Let-Sig-Dict) ask nothing of what a closure holds. Qualifiers match exactly,
+there is no (≤-Cap).
 -/
 
 namespace Flick.Elab
@@ -34,12 +36,83 @@ theorem liftTy_eq (k : Nat) (σ : Nat → Ty) : liftTy k σ = lift k σ := by
 def inst (ts : List Ty) : Nat → Ty :=
   fun n => if h : n < ts.length then ts[n] else .var (n - ts.length)
 
-def Scheme.subst (σ : Nat → Ty) (s : Scheme) : Scheme :=
-  ⟨s.k, s.ctx.map (·.subst (lift s.k σ)), s.ty.subst (lift s.k σ), s.q.subst (lift s.k σ)⟩
+/-- A value bound `(t, D)` under a substitution. -/
+def Bound.subst (σ : Nat → Ty) (b : Ty × Ty) : Ty × Ty := (b.1.subst σ, b.2.subst σ)
 
-/-- `⌈s⌉` below its binders: the reach of `⟦s⟧ = ∀ᾱ. D_Q̄ →P^q τ`, as `⌈D_Q⌉ = ∅`. -/
-def Scheme.reach (s : Scheme) (n : Nat) : Prop :=
-  s.ty.reach (n + s.k) ∨ (s.ctx ≠ [] ∧ s.q.reach (n + s.k))
+def Scheme.subst (σ : Nat → Ty) (s : Scheme) : Scheme :=
+  ⟨s.k, s.ctx.map (·.subst (lift s.k σ)), s.ty.subst (lift s.k σ), s.q.subst (lift s.k σ),
+    s.bd.map (Bound.subst (lift s.k σ))⟩
+
+/-- The variables of `t` that a translated value reaches: those of `t` but the rows of the
+stages of its arrows, which the qualifier of an arrow does not count. -/
+def Ty.Shown : Ty → Nat → Prop
+  | .var m, n => m = n
+  | .con _, _ => False
+  | .app t u, n => t.Shown n ∨ u.Shown n
+  | .arr _ a b q, n => a.Shown n ∨ b.Shown n ∨ q.Shown n
+  | .cnil, _ => False
+  | .cun q q', n => q.Shown n ∨ q'.Shown n
+  | .rnm _ t, n => t.Shown n
+  | .run r r', n => r.Shown n ∨ r'.Shown n
+  | .all k t, n => t.Shown (n + k)
+
+/-- The value bounds hold: what each `t` shows is within what its `D` shows, (Inst) of
+regions.md §2.3 at the instance the bounds are substituted with. -/
+def Bounds.Hold (bd : List (Ty × Ty)) : Prop := ∀ b ∈ bd, ∀ n, b.1.Shown n → b.2.Shown n
+
+theorem Bounds.hold_nil : Bounds.Hold [] := fun _ h => nomatch h
+
+theorem Bounds.hold_one {t D : Ty} (h : ∀ n, t.Shown n → D.Shown n) : Bounds.Hold [(t, D)] := by
+  intro b hb; rw [List.mem_singleton] at hb; subst hb; exact h
+
+theorem Ty.Shown.occurs {t : Ty} {n : Nat} (h : t.Shown n) : t.Occurs n := by
+  induction t using Ty.ind generalizing n with
+  | var m => exact h
+  | con c => exact h.elim
+  | app t u iht ihu => exact Or.imp iht ihu h
+  | arr φ a b q iha ihb ihq _ =>
+    rcases h with h | h | h
+    · exact .inl (iha h)
+    · exact .inr (.inl (ihb h))
+    · exact .inr (.inr (.inl (ihq h)))
+  | cnil => exact h.elim
+  | cun q q' ihq ihq' => exact Or.imp ihq ihq' h
+  | rnm c t iht => exact iht h
+  | run r r' ihr ihr' => exact Or.imp ihr ihr' h
+  | all k t iht => exact iht h
+
+/-- The row `r` keeps `n` live: a variable of the index of a named element, as `Scope s`
+keeps `s`, or of a type written in the row, as `Live q` is the capture row `q` there. A row
+variable keeps nothing. -/
+def Ty.Keeps : Ty → Nat → Prop
+  | .var _, _ => False
+  | .rnm _ t, n => t.Shown n
+  | .run r r', n => r.Keeps n ∨ r'.Keeps n
+  | t, n => t.Shown n
+
+/-- The stage `φ` keeps the qualifier `q` live: its row of services keeps each variable `q`
+shows. -/
+def Stage.Keeps : Stage → Ty → Prop
+  | .P, _ => False
+  | .R r _, q => ∀ n, q.Shown n → r.Keeps n
+
+/-- (App) of an arrow at the stage `ψ` where the stage is `φ`: a pure arrow anywhere; a
+runtime one where `φ` keeps its qualifier `q` live, at `φ` itself or at `φ` with `Live C` in
+its row, `R⟨Live C + r; e⟩` as elision writes a later stage, when `φ` keeps `C` live too: the
+checker's (App) asks the same of such a row (`regions/live.rs`). -/
+abbrev Stage.Applies (ψ φ : Stage) (q : Ty) : Prop :=
+  ψ = .P ∨ φ.Keeps q ∧ (ψ = φ ∨ ∃ C r e, φ = .R r e ∧ ψ = .R (.run (.cun C .cnil) r) e ∧ φ.Keeps C)
+
+/-- An arrow with the empty qualifier applies at its own stage: it needs nothing live. -/
+theorem Stage.keeps_cnil (φ : Stage) : φ.Applies φ .cnil := by
+  cases φ with
+  | P => exact .inl rfl
+  | R r e => exact .inr ⟨fun _ h => h.elim, .inl rfl⟩
+
+/-- `R⟨Live ∅ + r; e⟩` with the empty qualifier applies at `R⟨r; e⟩`: it keeps nothing more. -/
+theorem Stage.applies_live_cnil (r e : Ty) :
+    (Stage.R (.run (.cun .cnil .cnil) r) e).Applies (.R r e) .cnil :=
+  .inr ⟨fun _ h => h.elim, .inr ⟨.cnil, r, e, rfl, rfl, fun _ h => h.elim⟩⟩
 
 /-- Source terms; `letSig σ e b` is `let x : σ = e in b`. -/
 inductive Exp where
@@ -109,10 +182,6 @@ def Tm.Free : Tm → Nat → Prop
   | .caseOpt e n s, x => e.Free x ∨ n.Free x ∨ s.Free (x + 1)
   | .con _, _ => False
   | .caseK e _ n _ b r, x => e.Free x ∨ b.Free (x + n) ∨ r.Free x
-
-/-- What `e` holds in `Γ`: the reach of its free variables. `Δ` adds nothing: `⌈D_Q⌉ = ∅`. -/
-def heldS (Γ : List Scheme) (e : Exp) (n : Nat) : Prop :=
-  ∃ x s, e.Free x ∧ Γ[x]? = some s ∧ s.reach n
 
 /-- `e d₁ … dₗ`. -/
 def Tm.dapps (f : Tm) (ds : List Dict) : Tm := ds.foldl (fun f d => .app f (.dict d)) f
@@ -245,7 +314,7 @@ def Ctor.eqs (c : Ctor) (us : List Ty) : Eqs := c.res.zip (us.map (·.subst (up 
 
 /-- The context of an arm on `c` under `θ`: its fields, then `Γ` past the variables of `c`. -/
 def armS (c : Ctor) (θ : Nat → Ty) (Γ : List Scheme) : List Scheme :=
-  c.fields.map (fun t => (⟨0, [], t.subst θ, .cnil⟩ : Scheme)) ++ (Γ.map (·.subst (up c.k))).map (·.subst θ)
+  c.fields.map (fun t => (⟨0, [], t.subst θ, .cnil, []⟩ : Scheme)) ++ (Γ.map (·.subst (up c.k))).map (·.subst θ)
 
 /-- The premises of an arm on `c` under `θ`: the dictionaries of the value, then `Δ`. -/
 def armΔ (c : Ctor) (θ : Nat → Ty) (Δ : List Cn) : List Cn :=
@@ -258,51 +327,51 @@ variable (P : Prog)
 
 /-- `Γ; Δ ⊢ e : τ ! φ ⇝ e'` of §2.4. Values take any stage, and an application, a `let` or a
 `match` runs at one stage `φ`: the arrow applied and the right side of a `let` run at
-`ψ ⊑ φ` (the stage part of (Sub), `docs/formal/elaboration.md#let-sig-dict-lost-the-effect-of-the-right-hand-side`). A closure shows what it holds in its arrow, a
-function of dictionaries in the qualifier of its scheme (`docs/formal/elaboration.md#the-dictionary-function-of-let-sig-dict-holds-what-the-right-hand-side-holds`). -/
+`ψ ⊑ φ` (the stage part of (Sub), `docs/formal/elaboration.md#let-sig-dict-lost-the-effect-of-the-right-hand-side`). A runtime arrow is applied where its
+stage keeps its qualifier live; a closure may hold what its arrow does not show. -/
 inductive Elab : List Scheme → List Cn → Exp → Ty → Stage → Tm → Prop
-  /-- (Var-Dict) -/
+  /-- (Var-Dict), with (Inst) of the value bounds of the scheme -/
   | var {Γ Δ x σ ts ds φ} : Γ[x]? = some σ → ts.length = σ.k →
+      Bounds.Hold (σ.bd.map (Bound.subst (inst ts))) →
       Ent P Δ (σ.ctx.map (·.subst (inst ts))) ds →
       Elab Γ Δ (.var x) (σ.ty.subst (inst ts)) φ ((Tm.var x).dapps ds)
   /-- (Method) -/
   | meth {Γ Δ m C σ c₀ rest ts d₀ ds φ} : P.methods m = some (C, σ) → σ.ctx = c₀ :: rest →
-      c₀.cls = C → ts.length = σ.k → Ent P Δ [c₀.subst (inst ts)] [d₀] →
-      Ent P Δ (rest.map (·.subst (inst ts))) ds →
+      c₀.cls = C → ts.length = σ.k → Bounds.Hold (σ.bd.map (Bound.subst (inst ts))) →
+      Ent P Δ [c₀.subst (inst ts)] [d₀] → Ent P Δ (rest.map (·.subst (inst ts))) ds →
       Elab Γ Δ (.meth m) (σ.ty.subst (inst ts)) φ ((Tm.meth (.dict d₀) m).dapps ds)
   /-- (Const): a constant of Γ₀, with the dictionaries of its scheme, as (Var-Dict) -/
   | const {Γ Δ c σ ts ds φ} : P.consts c = some σ → ts.length = σ.k →
+      Bounds.Hold (σ.bd.map (Bound.subst (inst ts))) →
       Ent P Δ (σ.ctx.map (·.subst (inst ts))) ds →
       Elab Γ Δ (.const c) (σ.ty.subst (inst ts)) φ ((Tm.const c).dapps ds)
   /-- (∀I) of `core.md` at a lambda: its variables are fresh, at `P`, as in (Let-Sig-Dict) -/
   | allLam {Γ Δ k b t ψ b'} :
       Elab (Γ.map (·.subst (up k))) (Δ.map (·.subst (up k))) (.lam b) t .P (.lam b') →
       Elab Γ Δ (.lam b) (.all k t) ψ (.lam b')
-  /-- (∀I-Var): a variable of a scheme with no dictionaries -/
-  | allVar {Γ Δ x σ ψ} : Γ[x]? = some σ → σ.ctx = [] → 0 < σ.k →
+  /-- (∀I-Var): a variable of a scheme with no dictionaries and no value bounds -/
+  | allVar {Γ Δ x σ ψ} : Γ[x]? = some σ → σ.ctx = [] → σ.bd = [] → 0 < σ.k →
       Elab Γ Δ (.var x) (.all σ.k σ.ty) ψ (.var x)
   /-- (Var) at an instance of a binder -/
-  | varAll {Γ Δ x σ ts k t us φ} : Γ[x]? = some σ → σ.ctx = [] → ts.length = σ.k →
+  | varAll {Γ Δ x σ ts k t us φ} : Γ[x]? = some σ → σ.ctx = [] → σ.bd = [] → ts.length = σ.k →
       σ.ty.subst (inst ts) = .all k t → us.length = k →
       Elab Γ Δ (.var x) (t.subst (inst us)) φ (.var x)
   | app {Γ Δ f x a b q ψ φ f' x'} : Elab Γ Δ f (.arr ψ a b q) φ f' → Elab Γ Δ x a φ x' →
-      (ψ = .P ∨ ψ = φ) → Elab Γ Δ (.app f x) b φ (.app f' x')
-  | lam {Γ Δ b a t q φ ψ b'} : Elab (⟨0, [], a, .cnil⟩ :: Γ) Δ b t φ b' →
-      (∀ n, heldS Γ (.lam b) n → (Ty.arr φ a t q).reach n) →
+      ψ.Applies φ q → Elab Γ Δ (.app f x) b φ (.app f' x')
+  | lam {Γ Δ b a t q φ ψ b'} : Elab (⟨0, [], a, .cnil, []⟩ :: Γ) Δ b t φ b' →
       Elab Γ Δ (.lam b) (.arr φ a t q) ψ (.lam b')
-  | let_ {Γ Δ e b a t φ e' b'} : Elab Γ Δ e a φ e' → Elab (⟨0, [], a, .cnil⟩ :: Γ) Δ b t φ b' →
+  | let_ {Γ Δ e b a t φ e' b'} : Elab Γ Δ e a φ e' → Elab (⟨0, [], a, .cnil, []⟩ :: Γ) Δ b t φ b' →
       Elab Γ Δ (.let_ e b) t φ (.let_ e' b')
   /-- (Let-Sig-Dict), with the premise that the right-hand side is pure -/
   | letSig {Γ Δ σ e b t φ₁ φ e' b'} :
       Elab (Γ.map (·.subst (up σ.k))) (σ.ctx ++ Δ.map (·.subst (up σ.k))) e σ.ty φ₁ e' →
       (σ.ctx ≠ [] ∨ σ.k ≠ 0 → φ₁ = .P) → (φ₁ = .P ∨ φ₁ = φ) →
-      (σ.ctx ≠ [] → ∀ n, heldS (Γ.map (·.subst (up σ.k))) e n → σ.ty.reach n ∨ σ.q.reach n) →
       Elab (σ :: Γ) Δ b t φ b' →
       Elab Γ Δ (.letSig σ e b) t φ (.let_ (.lamD σ.ctx.length e') b')
   | ite {Γ Δ c a b t φ c' a' b'} : Elab Γ Δ c boolTy φ c' → Elab Γ Δ a t φ a' →
       Elab Γ Δ b t φ b' → Elab Γ Δ (.ite c a b) t φ (.ite c' a' b')
   | caseOpt {Γ Δ e n s a t φ e' n' s'} : Elab Γ Δ e (optTy a) φ e' → Elab Γ Δ n t φ n' →
-      Elab (⟨0, [], a, .cnil⟩ :: Γ) Δ s t φ s' → Elab Γ Δ (.caseOpt e n s) t φ (.caseOpt e' n' s')
+      Elab (⟨0, [], a, .cnil, []⟩ :: Γ) Δ s t φ s' → Elab Γ Δ (.caseOpt e n s) t φ (.caseOpt e' n' s')
   /-- (Con): a constructor with the dictionaries of its constraints, as (Const) -/
   | con {Γ Δ K c ts ds φ} : P.ctors K = some c → ts.length = c.k →
       Ent P Δ (c.ctx.map (·.subst (inst ts))) ds →

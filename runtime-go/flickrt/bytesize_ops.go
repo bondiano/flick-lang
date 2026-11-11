@@ -3,10 +3,12 @@ package flickrt
 import (
 	"math"
 	"math/big"
+	"strconv"
+	"strings"
 )
 
-// Effect's `ByteSize` constructors, conversions, comparisons and arithmetic.
-// A constructor gives `None` where Effect's throws, as the JS adapter's.
+// The `ByteSize` constructors, conversions, comparisons and arithmetic. A
+// constructor gives `None` for a size it refuses, as the JS adapter's.
 
 // unitOf is the unit of a `ByteSize.ByteUnit`: its constructor name, `KB`
 // as `kB`.
@@ -23,16 +25,43 @@ func unitOf(u Value) byteUnit {
 	return decimalUnits[0]
 }
 
-// byteSizeIn is Effect's constructor of a unit: `None` unless the bytes
-// are a whole, non-negative, safe number.
+// byteSizeIn is the constructor of a unit: `None` unless the bytes are a
+// whole, non-negative, safe number.
 func byteSizeIn(units []byteUnit, symbol string) func(Value) Value {
 	for _, u := range units {
 		if u.symbol == symbol {
-			factor := bigToFloat(u.factor)
-			return func(q Value) Value { return ByteSizeBytes(q.(float64) * factor) }
+			factor := u.factor
+			return func(q Value) Value { return scaledBytes(q.(float64), factor) }
 		}
 	}
 	panic("no byte unit " + symbol)
+}
+
+// scaledBytes is `x` units of `factor` bytes: the shortest decimal digits
+// that read back as `x`, scaled as integers, so a product a float64 cannot
+// hold exactly (1e-21 of 1e30) still counts when it is whole bytes.
+func scaledBytes(x float64, factor *big.Int) Value {
+	if math.IsNaN(x) || math.IsInf(x, 0) || x < 0 {
+		return None
+	}
+	mantissa, exponent, _ := strings.Cut(strconv.FormatFloat(x, 'e', -1, 64), "e")
+	power, _ := strconv.Atoi(exponent)
+	digits := strings.Replace(mantissa, ".", "", 1)
+	n, _ := new(big.Int).SetString(digits, 10)
+	n.Mul(n, factor)
+	if shift := power - (len(digits) - 1); shift >= 0 {
+		n.Mul(n, pow10(int64(shift)))
+	} else {
+		rest := new(big.Int)
+		n.QuoRem(n, pow10(int64(-shift)), rest)
+		if rest.Sign() != 0 {
+			return None
+		}
+	}
+	if !n.IsInt64() || n.Int64() > 1<<53-1 {
+		return None
+	}
+	return Some(n)
 }
 
 var (
@@ -121,7 +150,7 @@ func ByteSizeSubtract(that, self Value) Value {
 	return Some(new(big.Int).Sub(bsize(self), bsize(that)))
 }
 
-// byteScalar is Effect's `scalar`: a safe integer of at least `least`.
+// byteScalar is a scalar: a safe integer of at least `least`.
 func byteScalar(x float64, least float64) (*big.Int, bool) {
 	if x != math.Trunc(x) || math.Abs(x) > 1<<53-1 || x < least {
 		return nil, false

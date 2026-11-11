@@ -27,6 +27,12 @@ import {
 import { pretty } from "../entry.ts";
 import { Failure } from "../outcome.ts";
 
+/** Optional Effect formatting for the shared Cause surface. */
+export const causeHooks: {
+  pretty?: (failure: Failure) => string;
+  prettyErrors?: (failure: Failure) => Array<string>;
+} = {};
+
 const optional = <A>(option: Option<A>): A | undefined => (option._tag === "Some" ? option.value : undefined);
 
 export const flickEmpty: Failure = /*#__PURE__*/ new Failure(empty);
@@ -117,9 +123,9 @@ export const flickInterruptors = (failure: Failure): Array<number> => interrupto
 export const flickFilterInterruptors = (failure: Failure): Result<Array<number>, Failure> =>
   hasInterrupts(failure.cause) ? ok(interruptors(failure.cause)) : err(failure);
 
-export const flickPretty = (failure: Failure): string => pretty(failure.cause);
+export const flickPretty = (failure: Failure): string => causeHooks.pretty?.(failure) ?? pretty(failure.cause);
 export const flickPrettyErrors = (failure: Failure): Array<string> =>
-  failure.cause.reasons.flatMap((r) => (isFail(r) ? [String(r.error)] : isDie(r) ? [describeDefect(r.defect)] : []));
+  causeHooks.prettyErrors?.(failure) ?? failure.cause.reasons.flatMap((r) => (isFail(r) ? [String(r.error)] : isDie(r) ? [describeDefect(r.defect)] : []));
 
 /** A frame of a span, which a reason may carry: nothing on this runtime makes one, but `annotate` keeps one given. */
 interface StackFrame {

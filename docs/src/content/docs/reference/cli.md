@@ -6,6 +6,7 @@ title: "Command line"
 global options `--project <path>`, `--package <name>` (`-p`, a member of the
 [workspace](../project/#workspaces)), `--diagnostics human|json`,
 `--warnings-as-errors`, `--color auto|always|never`, `--quiet` (alias `--silent`)/`--verbose`,
+`--timings` ([what took the time](#timings)),
 `--offline` (no network: [plugins](../plugins/#reaching-outside) answer
 from the project's snapshots, which `CI` set means too, and `install`
 installs from the store) and `--help`; `flick help <command>` prints a command's help and
@@ -52,6 +53,9 @@ nothing, run no `main` and load no foreign module. An installed
 `@flick-lang/runtime`, `@flick-lang/effect-ts` or `effect` of another version than the compiler
 pins stops them with `FLICK-P015` (exit code 2). `schema export` loads the
 module that makes the codec, whose top level is pure, and nothing else.
+JSON Schema export uses the project's selected runtime. OpenAPI export uses the
+Effect adapter; set `effect = "effect"` and install `@flick-lang/effect-ts` for
+an `HttpApi.Api` export.
 
 `test` streams human results after each test's cleanup, with success/failure markers, completion counts and timings, then prints a summary. Node and Go share the format and honor `--color`; auto color checks stdout, `NO_COLOR` and `TERM=dumb`. `--reporter json` writes one final object in declaration order, without color or timings.
 
@@ -138,6 +142,19 @@ In human mode the app's stderr passes through as it is.
 It suppresses service output, not warnings or errors, and leaves useful stdout
 (such as `build --inputs` JSON or the app's output) intact. It conflicts with
 `--verbose`; `--warnings-as-errors` still promotes warnings and changes the exit code.
+
+### Timings
+
+`--timings` reports on stderr, after the diagnostics, how long the command's
+phases took, the work measured inside them (such as checking the built-in
+modules), the ten modules that took longest to check and, when the build
+cache missed, the inputs that differ from the build cached last. What a
+command spends in a process it starts, the app or the tests, is the phase
+`Running a child process`. A watching command reports each run: `check` and
+`build` after it, `test --watch` and `dev` after its build. With `--diagnostics json` the report is one event of type
+`timings` with `stages` and `phases` (each a `label` and `micros`), `modules`
+(each a `module` and `micros`, the slowest first) and `cache-misses`. The
+measurements are no input of the build cache.
 
 Explicit `build` and `build --watch` show one updating line with the current
 phase and elapsed time when stderr is a TTY, `TERM` is not `dumb`, and `CI` is

@@ -6,8 +6,8 @@ import Formal.Elab.Basic
 
 Closing the premises of an elaboration by types `θ` moves `θ` under binders: a scheme
 substitutes `lift k θ`, an instantiation commutes with it (`lift_inst`), a shift `up k` of
-`letSig` commutes with it (`up_lift`). What a substituted term holds comes from what it held
-(`heldS_subst`). A ground premise stays fixed by every substitution (`Cn.Ground`), and the
+`letSig` commutes with it (`up_lift`). A ground premise stays fixed by every substitution
+(`Cn.Ground`), and the
 constants of `Γ₀` have closed schemes (`Prog.ConstsClosed`).
 -/
 
@@ -47,7 +47,7 @@ theorem Ty.lift_up_lift (j k : Nat) (θ : Nat → Ty) (t : Ty) :
 
 theorem Scheme.up_lift (k : Nat) (θ : Nat → Ty) (s : Scheme) :
     (s.subst (up k)).subst (lift k θ) = (s.subst θ).subst (up k) := by
-  simp only [Scheme.subst, List.map_map, Function.comp_def, Ty.lift_up_lift]
+  simp only [Scheme.subst, List.map_map, Function.comp_def, Ty.lift_up_lift, Bound.subst]
   congr 1
   refine List.map_congr_left fun q _ => ?_
   simp only [Cn.subst, List.map_map, Function.comp_def, Ty.lift_up_lift]
@@ -91,25 +91,6 @@ theorem Ty.occurs_lift {σ : Nat → Ty} {k n : Nat} {t : Ty} (h : (t.subst (lif
     · rwa [Nat.sub_add_cancel (by omega)]
     · rwa [show n = j by omega]
 
-theorem Scheme.reach_subst {σ : Nat → Ty} {s : Scheme} {n : Nat} (h : (s.subst σ).reach n) :
-    ∃ m, s.reach m ∧ (σ m).Occurs n := by
-  rcases h with h | ⟨hc, h⟩
-  · obtain ⟨m, hm, h⟩ := Ty.occurs_lift h; exact ⟨m, .inl hm, h⟩
-  · obtain ⟨m, hm, h⟩ := Ty.occurs_lift h
-    exact ⟨m, .inr ⟨fun e => hc (by simp [Scheme.subst, e]), hm⟩, h⟩
-
-/-- What a term holds in a substituted context. -/
-theorem heldS_subst {σ : Nat → Ty} {Γ : List Scheme} {e : Exp} {n : Nat}
-    (h : heldS (Γ.map (·.subst σ)) e n) : ∃ m, heldS Γ e m ∧ (σ m).Occurs n := by
-  obtain ⟨x, s, hx, hs, hr⟩ := h
-  rw [List.getElem?_map] at hs
-  cases hΓ : Γ[x]? with
-  | none => rw [hΓ] at hs; cases hs
-  | some s₀ =>
-    rw [hΓ] at hs; cases hs
-    obtain ⟨m, hm, h⟩ := Scheme.reach_subst hr
-    exact ⟨m, ⟨x, s₀, hx, hΓ, hm⟩, h⟩
-
 theorem Ty.subst_ground {t : Ty} (h : t.Ground) (σ : Nat → Ty) : t.subst σ = t := by
   rw [Ty.subst_agree (σ' := .var) fun n hn => (h n hn).elim, Ty.subst_id]
 
@@ -120,10 +101,12 @@ theorem Cn.subst_ground {q : Cn} (h : q.Ground) (σ : Nat → Ty) : q.subst σ =
     conv => rhs; rw [← List.map_id args]
     exact List.map_congr_left fun t ht => Ty.subst_ground (h t ht) σ
 
-/-- The constants of `Γ₀` have closed schemes: their types mention only their binders. -/
+/-- The constants of `Γ₀` have closed schemes: their types and value bounds mention only
+their binders. -/
 def Prog.ConstsClosed (P : Prog) : Prop :=
   ∀ c s, P.consts c = some s → ∀ σ σ' : Nat → Ty, (∀ j, j < s.k → σ j = σ' j) →
-    (dicts .cnil s.ctx (.mono s.ty)).subst σ = (dicts .cnil s.ctx (.mono s.ty)).subst σ'
+    (dicts .cnil s.ctx (.mono s.ty)).subst σ = (dicts .cnil s.ctx (.mono s.ty)).subst σ' ∧
+      s.bd.map (Bound.subst σ) = s.bd.map (Bound.subst σ')
 
 /-- An instantiation of a closed scheme, substituted, is an instantiation. -/
 theorem const_inst {P : Prog} (hP : P.ConstsClosed) {c : Nat} {s : Scheme} (hc : P.consts c = some s)
@@ -131,11 +114,20 @@ theorem const_inst {P : Prog} (hP : P.ConstsClosed) {c : Nat} {s : Scheme} (hc :
     (dicts .cnil s.ctx (.mono s.ty)).subst (inst (ts.map (·.subst θ))) =
       dicts .cnil ((s.ctx.map (·.subst (inst ts))).map (·.subst θ))
         (.mono ((s.ty.subst (inst ts)).subst θ)) := by
-  rw [hP c s hc _ (fun n => (inst ts n).subst θ) fun j hj => by
-    simp [inst, hk, hj]]
+  rw [(hP c s hc _ (fun n => (inst ts n).subst θ) fun j hj => by
+    simp [inst, hk, hj]).1]
   simp only [TTy.subst_dicts, TTy.subst, List.map_map, Function.comp_def, Cn.subst_comp,
     Ty.subst_comp]
   rfl
+
+/-- The value bounds at an instantiation of a closed scheme, substituted. -/
+theorem const_bd_inst {P : Prog} (hP : P.ConstsClosed) {c : Nat} {s : Scheme}
+    (hc : P.consts c = some s) {ts : List Ty} (hk : ts.length = s.k) (θ : Nat → Ty) :
+    s.bd.map (Bound.subst (inst (ts.map (·.subst θ)))) =
+      (s.bd.map (Bound.subst (inst ts))).map (Bound.subst θ) := by
+  rw [(hP c s hc _ (fun n => (inst ts n).subst θ) fun j hj => by
+    simp [inst, hk, hj]).2]
+  simp [Bound.subst, Ty.subst_comp]
 
 /-- The constructors have closed types: they mention only their variables. -/
 def Prog.CtorsClosed (P : Prog) : Prop :=

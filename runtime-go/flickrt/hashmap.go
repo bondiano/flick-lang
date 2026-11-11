@@ -1,8 +1,7 @@
 package flickrt
 
-// The functions of `HashMap`, as Effect's HashMap defines them: `set` and
-// `union` take the new key and value, and callbacks get the value first,
-// then the key.
+// The functions of `HashMap`: `set` and `union` take the new key and
+// value, and callbacks get the value first, then the key.
 
 func HashMapWith(w Value) Value             { return mapOf(empty(w)) }
 func HashMapEmpty(fb *Fiber, d Value) Value { return HashMapWith(EqHashCanonical(fb, d)) }

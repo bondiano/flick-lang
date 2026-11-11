@@ -48,7 +48,7 @@ func RegExpMake(pattern, flags Value) Value {
 
 var escaped = regexp.MustCompile(`[/\\^$*+?.()|[\]{}]`)
 
-// RegExpEscape escapes what JS reads as syntax in a pattern, as Effect's.
+// RegExpEscape escapes what JS reads as syntax in a pattern.
 func RegExpEscape(s Value) Value { return escaped.ReplaceAllString(s.(string), `\$0`) }
 
 func match(s string, loc []int) Value {

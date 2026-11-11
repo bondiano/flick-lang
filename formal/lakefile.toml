@@ -1,5 +1,5 @@
 name = "formal"
-defaultTargets = ["Formal"]
+defaultTargets = ["Formal", "FormalCert"]
 
 [leanOptions]
 autoImplicit = true
@@ -7,3 +7,6 @@ relaxedAutoImplicit = false
 
 [[lean_lib]]
 name = "Formal"
+
+[[lean_lib]]
+name = "FormalCert"

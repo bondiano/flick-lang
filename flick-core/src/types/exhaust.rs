@@ -75,9 +75,6 @@ impl Checker<'_> {
                 return (missing, false);
             }
             missing.push(self.show_pat(&witness[0], false));
-            if !cfg!(feature = "diagnostic-fixes") {
-                return (missing, false);
-            }
             rows.push(witness);
         }
         (missing, true)

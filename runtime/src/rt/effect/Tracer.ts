@@ -35,7 +35,22 @@ interface Span {
   ended: bigint | undefined;
 }
 
+interface Frame {
+  readonly name: string;
+  readonly stack: () => string | undefined;
+  readonly parent: Frame | undefined;
+}
+
+const asFrame = (value: unknown): Frame | undefined =>
+  typeof value === "object" && value !== null && typeof Reflect.get(value, "name") === "string" &&
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- checked frame fields at the runtime boundary
+    typeof Reflect.get(value, "stack") === "function" ? value as Frame : undefined;
+
+const appendParent = (inner: Frame | undefined, parent: Frame): Frame =>
+  inner === undefined ? parent : { ...inner, parent: appendParent(inner.parent, parent) };
+
 const CURRENT: object = /*#__PURE__*/ Object.freeze({ key: "rt/tracer/current" });
+export const tracerHooks: { parent?: () => unknown } = {};
 const PROPAGATING: object = /*#__PURE__*/ Object.freeze({ key: "rt/tracer/propagating" });
 const MINIMUM: object = /*#__PURE__*/ Object.freeze({ key: "rt/tracer/minimum" });
 const LEVEL: object = /*#__PURE__*/ Object.freeze({ key: "rt/tracer/level" });
@@ -87,7 +102,7 @@ export const flickWithSpan =
         started: BigInt(Date.now()), ended: undefined,
       };
       const capturedStack = options.captureStackTrace ? new Error().stack : undefined;
-      const frame = {
+      const frame: Frame = {
         name, parent: undefined,
         stack: () => capturedStack,
       };
@@ -101,11 +116,14 @@ export const flickWithSpan =
       }
       if (exit.cause === undefined) return exit.value;
       const reasons: Array<Reason> = [];
-      for (const reason of exit.cause.reasons) reasons.push(Object.assign({}, reason, { trace: frame }));
+      for (const reason of exit.cause.reasons) reasons.push(Object.assign({}, reason, {
+        trace: appendParent(asFrame(Reflect.get(reason, "trace")), frame),
+      }));
       return raise(fromReasons(reasons));
     })();
 
-export const flickParentSpan = (): Option<Span> => option(asSpan(lookup(CURRENT)));
+export const flickParentSpan = (): Option<Span> => option(asSpan(tracerHooks.parent?.() ?? lookup(CURRENT)));
+export const nativeParentSpan = (): Span | undefined => asSpan(lookup(PROPAGATING));
 export const flickSpanId = (span: Span): string => span.spanId;
 export const flickTraceId = (span: Span): string => span.traceId;
 export const flickSampled = (span: Span): boolean => span.sampled;

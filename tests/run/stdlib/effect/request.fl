@@ -1,4 +1,4 @@
-// Effect's `Request` and `RequestResolver`: requests made at the same time
+// `Request` and `RequestResolver`: requests made at the same time
 // are batched into one call of the resolver, which completes each entry.
 module App.Main exposing (main)
 

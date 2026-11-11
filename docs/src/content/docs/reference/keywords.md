@@ -12,6 +12,7 @@ foreign modes, the SQL and CLI clause words) are listed in [grammar.md](../gramm
 | Keyword | Meaning | Example |
 | - | - | - |
 | `module` | names the module of the file | `module App.Main exposing (run)` |
+| `private` | limits a file module to its own package when placed before `module`; a name elsewhere | `private module App.Internal exposing (helper)` |
 | `exposing` | the names a module exports, or an import brings in unqualified | `import App.Domain exposing (User, greet)` |
 | `import` | uses another module | `import Effect.Log as Log` |
 | `as` | a local name for an imported module; the Flick type of a `sql table` column | `import Effect.Log as Log` |
@@ -24,6 +25,10 @@ See [modules.md](../modules/).
 | - | - | - |
 | `let` | binds a value or a function, at the top level or in a block | `let total = a + b` |
 | `mut` | `let mut` declares a variable of a function, which `name = value` assigns | `let mut total = 0` |
+| `loop` | contextual: repeats a block until `break value` returns its result | `loop { break 42 }` |
+| `while` | contextual: repeats a `Unit` body while its condition is true | `while i < n do i = i + 1` |
+| `break` | exits the nearest loop; only `loop` accepts a value | `break 42` |
+| `continue` | skips the rest of the current iteration | `continue` |
 | `rec` | `let rec` lets a function call itself; `rec { … }` groups mutually recursive functions | `let rec go n = …` |
 | `assert` | `let assert` binds a pattern that may not match, and fails when it does not | `let assert [x, ..._] = xs as "no items"` |
 | `type` | declares an ADT, `type alias` a transparent alias | `type Shape = Circle Float \| Empty` |

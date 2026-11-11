@@ -1,4 +1,4 @@
-// Streams of Effect's `Stream` changed element by element.
+// `Stream`: streams changed element by element.
 module App.Main exposing (main)
 
 type error Boom = Boom Float
@@ -35,7 +35,7 @@ let grow chunk = NonEmpty.map (fun n -> n * 10) chunk
 collect : Stream.Stream none none (NonEmpty.NonEmpty Float) ->{} List (List Float)
 let collect s = List.map NonEmpty.to_list (Stream.run_collect s)
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Async; AppError} Unit
 let main () =
   line ("map", (Stream.run_collect (Stream.map (fun n -> n * n) nums)))
   line ("as_", (Stream.run_collect (Stream.as_ 0 (Stream.take 2 nums))))

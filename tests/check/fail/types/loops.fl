@@ -1,0 +1,33 @@
+module App.BadLoops exposing (..)
+
+outside : Unit -> Unit
+let outside () = break
+//               ^^^^^ FLICK-T071
+
+wrong_value : Unit -> Unit
+let wrong_value () = while true do break 1
+//                                 ^^^^^^^ FLICK-T071
+//                                       ^ FLICK-T003
+
+wrong_condition : Unit -> Unit
+let wrong_condition () = while 1 do ()
+//                             ^ FLICK-T003
+
+in_function : Unit -> Unit
+let in_function () = loop {
+  let f = fun () -> break
+//                  ^^^^^ FLICK-T071
+  f ()
+  break
+}
+
+wrong_result : Unit -> Int
+let wrong_result () = loop { break "hello" }
+//                                 ^^^^^^^ FLICK-T003
+
+in_comprehension : Unit -> Unit
+let in_comprehension () = loop {
+  ignore [for _ <- [1] yield break]
+//                           ^^^^^ FLICK-T071
+  break
+}

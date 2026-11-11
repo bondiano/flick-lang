@@ -7,6 +7,7 @@ use crate::diagnostics::suggest::closest;
 use crate::diagnostics::{Diagnostic, codes};
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
+use crate::types::Elem;
 
 impl Checker<'_> {
     /// The type of a field of a record whose fields are already known,
@@ -47,7 +48,7 @@ impl Checker<'_> {
         let mut labels = Vec::new();
         let mut ty = self.whnf(record);
         while let Type::Record(row) = ty {
-            labels.extend(row.entries.into_iter().map(|(l, _)| l));
+            labels.extend(row.entries.into_iter().map(|(l, _)| l.to_string()));
             match row.tail {
                 Some(tail) => ty = self.whnf(&tail),
                 None => break,
@@ -73,7 +74,7 @@ impl Checker<'_> {
         let field = self.fresh();
         let rest = self.fresh();
         let shape = Type::Record(Row {
-            entries: vec![(label.clone(), field.clone())],
+            entries: vec![(Elem::named(&label), field.clone())],
             tail: Some(Box::new(rest)),
             ..Row::default()
         });
@@ -97,11 +98,14 @@ impl Checker<'_> {
 
     /// A record literal; `expected` gives the types of fields it mentions.
     pub(super) fn record(&mut self, node: &Node, expected: Option<&Row>) -> Type {
-        let mut entries: Vec<(String, Type)> = Vec::new();
+        let mut entries: Vec<(Elem, Type)> = Vec::new();
         #[cfg(feature = "ide")]
         let mut labels = Vec::new();
         for field in node.nodes().filter(|n| n.kind == K::RecordField) {
-            let Some(label) = field.child_tokens().find(|t| t.kind == K::Ident) else {
+            let Some(label) = field
+                .child_tokens()
+                .find(|t| matches!(t.kind, K::Ident | K::Con))
+            else {
                 continue;
             };
             #[cfg(feature = "ide")]
@@ -123,7 +127,7 @@ impl Checker<'_> {
             if entries.iter().any(|(l, _)| *l == name) {
                 self.duplicate_label(&name, self.token_span(label));
             } else {
-                entries.push((name, ty));
+                entries.push((Elem::Named(name), ty));
             }
         }
         let record = Type::Record(Row::closed(entries));
@@ -148,7 +152,10 @@ impl Checker<'_> {
         let record = self.infer(children[0]);
         let mut seen: Vec<String> = Vec::new();
         for field in node.nodes().filter(|n| n.kind == K::RecordField) {
-            let Some(label) = field.child_tokens().find(|t| t.kind == K::Ident) else {
+            let Some(label) = field
+                .child_tokens()
+                .find(|t| matches!(t.kind, K::Ident | K::Con))
+            else {
                 continue;
             };
             let name = label.text(self.text).to_owned();
@@ -161,7 +168,7 @@ impl Checker<'_> {
             let ty = self.fresh();
             let rest = self.fresh();
             let shape = Type::Record(Row {
-                entries: vec![(name.clone(), ty.clone())],
+                entries: vec![(Elem::named(&name), ty.clone())],
                 tail: Some(Box::new(rest)),
                 ..Row::default()
             });

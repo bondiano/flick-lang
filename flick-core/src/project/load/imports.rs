@@ -2,11 +2,16 @@
 //! project's roots and its source packages, and the cycles among them.
 
 use std::path::PathBuf;
+use std::sync::Arc;
 
-use super::{Loader, Root, module_path};
+use super::{
+    BindingOrigin, CalleeOrigin, ExpansionFrame, Loaded, Loader, Root, StaticArgument,
+    StaticBinding, StaticCapture, StaticMember, Virtual, module_path,
+};
 use crate::diagnostics::{Diagnostic, codes};
-use crate::resolve;
+use crate::resolve::{self, ItemKind, ModuleApplication};
 use crate::source::Span;
+use crate::syntax::{self, kind::SyntaxKind as K};
 
 impl Loader<'_> {
     /// Loads imported modules until the set is closed; returns the local
@@ -15,10 +20,67 @@ impl Loader<'_> {
         let mut edges = Vec::new();
         let mut i = 0;
         while i < self.modules.len() {
+            self.materialize_expression_body(i);
+            self.scope_imports(i);
             let mut targets = Vec::new();
-            for import in self.modules[i].syntax.imports.clone() {
+            for import in self.modules[i]
+                .syntax
+                .imports
+                .iter()
+                .chain(&self.modules[i].syntax.inline_imports)
+                .cloned()
+                .collect::<Vec<_>>()
+            {
+                if import.module.starts_with("$module:") {
+                    continue;
+                }
+                if self.modules[i].syntax.header.as_ref().is_some_and(|h| {
+                    !h.parameters.is_empty()
+                        && self.modules[i].syntax.applications.iter().any(|a| {
+                            a.expression.kind != K::ModuleParamExpr
+                                && import.module == format!("{}.{}", h.name, a.name)
+                        })
+                }) {
+                    continue;
+                }
                 if let Some(target) = self.find_module(i, &import.module, import.span) {
                     targets.push(target);
+                }
+            }
+            if let Some(virtual_of) = self.modules[i].virtual_of.clone() {
+                let mut dependencies: Vec<_> = virtual_of
+                    .capture
+                    .bindings
+                    .iter()
+                    .map(|b| b.origin.module.clone())
+                    .collect();
+                dependencies.extend(
+                    virtual_of
+                        .capture
+                        .bindings
+                        .iter()
+                        .map(|b| b.argument.module.clone()),
+                );
+                if let Some(callee) = &virtual_of.capture.callee {
+                    dependencies.push(callee.signature_owner().to_owned());
+                    dependencies.extend(callee.contract_arguments().map(|a| a.module.clone()));
+                }
+                for dependency in dependencies {
+                    if let Some(target) = self.find_module(i, &dependency, virtual_of.at) {
+                        targets.push(target);
+                    }
+                }
+            }
+            if self.modules[i].scope_of.is_none() {
+                for application in self.modules[i].syntax.applications.clone() {
+                    let symbolic = self.modules[i]
+                        .syntax
+                        .header
+                        .as_ref()
+                        .is_some_and(|h| !h.parameters.is_empty());
+                    if !symbolic || application.expression.kind == K::ModuleParamExpr {
+                        self.instantiate(i, &application);
+                    }
                 }
             }
             targets.sort_by(|a, b| self.modules[*a].name.cmp(&self.modules[*b].name));
@@ -26,10 +88,86 @@ impl Loader<'_> {
             edges.push(targets);
             i += 1;
         }
+        self.namespace_edges(&mut edges);
         edges
     }
 
-    fn find_module(&mut self, importer: usize, name: &str, span: Span) -> Option<usize> {
+    fn namespace_edges(&self, edges: &mut [Vec<usize>]) {
+        for (i, targets) in edges.iter_mut().enumerate() {
+            let loaded = &self.modules[i];
+            for import in loaded
+                .syntax
+                .imports
+                .iter()
+                .chain(&loaded.syntax.inline_imports)
+            {
+                let view = loaded.virtual_of.as_ref().and_then(|v| {
+                    v.capture.bindings.iter().rev().find(|binding| {
+                        binding.alias == import.qualifier()
+                            && binding.argument.module == import.module
+                    })
+                });
+                self.namespace_parents(
+                    i,
+                    &import.module,
+                    view.map(|b| b.argument.access_modules.as_slice()),
+                    targets,
+                );
+            }
+            if let Some(context) = &loaded.virtual_of {
+                for binding in &context.capture.bindings {
+                    self.namespace_parents(
+                        i,
+                        &binding.argument.module,
+                        Some(&binding.argument.access_modules),
+                        targets,
+                    );
+                }
+                if let Some(callee) = &context.capture.callee {
+                    for view in callee.contract_arguments() {
+                        self.namespace_parents(
+                            i,
+                            &view.module,
+                            Some(&view.access_modules),
+                            targets,
+                        );
+                    }
+                }
+            }
+            targets.sort_unstable();
+            targets.dedup();
+        }
+    }
+
+    fn namespace_parents(
+        &self,
+        importer: usize,
+        name: &str,
+        access: Option<&[String]>,
+        targets: &mut Vec<usize>,
+    ) {
+        let mut next = self.by_name.get(name).copied();
+        while let Some(index) = next {
+            let Some(member) = &self.modules[index].member_of else {
+                break;
+            };
+            let allowed = access.map_or_else(
+                || self.modules[importer].can_access_member(member),
+                |access| access.contains(&member.parent),
+            );
+            if allowed {
+                break;
+            }
+            let Some(&parent) = self.by_name.get(&member.parent) else {
+                break;
+            };
+            targets.push(parent);
+            next = Some(parent);
+        }
+    }
+
+    #[allow(clippy::too_many_lines)]
+    pub(super) fn find_module(&mut self, importer: usize, name: &str, span: Span) -> Option<usize> {
         let packages = self.package_sources().into_iter().map(|(_, dir)| dir);
         // the project's own modules come before those of source packages
         let dirs: Vec<PathBuf> = match (&self.modules[importer].root, self.project) {
@@ -43,15 +181,47 @@ impl Loader<'_> {
             _ => Vec::new(),
         };
         if !self.by_name.contains_key(name) {
-            for dir in dirs {
-                if self.use_saved(&dir, name) {
+            for dir in &dirs {
+                #[cfg(feature = "native-project")]
+                if self.use_saved(dir, name) {
                     continue;
                 }
                 // absent files are simply not candidates
                 let _ = self.load(&dir.join(module_path(name)));
-                for path in self.loaded_paths(&dir, name) {
+                for path in self.loaded_paths(dir, name) {
                     let _ = self.load(&path);
                 }
+            }
+        }
+        if !self.by_name.contains_key(name)
+            && let Some((parent_name, _)) = name.rsplit_once('.')
+        {
+            let mut prefix = parent_name;
+            while !self.by_name.contains_key(prefix) {
+                for dir in &dirs {
+                    let _ = self.load(&dir.join(module_path(prefix)));
+                }
+                if self.by_name.contains_key(prefix) {
+                    break;
+                }
+                let Some((parent, _)) = prefix.rsplit_once('.') else {
+                    break;
+                };
+                prefix = parent;
+            }
+            let active = format!("member:{name}");
+            if !self.expressions_active.insert(active.clone()) {
+                self.diagnostics.push(Diagnostic::error(
+                    codes::R006,
+                    format!("cyclic module member resolution for `{name}`"),
+                    span,
+                ));
+                return None;
+            }
+            self.materialize_members(name);
+            self.expressions_active.remove(&active);
+            if !self.by_name.contains_key(name) && self.report_inline_import(&dirs, name, span) {
+                return None;
             }
         }
         let local = self.by_name.get(name).copied();
@@ -63,7 +233,163 @@ impl Loader<'_> {
                 None => self.diagnostics.push(self.unknown_module(name, span)),
             }
         }
+        let private = local
+            .and_then(|j| self.modules[j].syntax.header.as_ref().map(|h| h.private))
+            .or_else(|| self.from_packages.get(name).map(|i| i.private))
+            .unwrap_or(false);
+        let owner = local.map(|j| self.modules[j].root.clone()).or_else(|| {
+            self.precompiled
+                .package_of(name)
+                .map(|p| Root::Package(p.to_owned()))
+        });
+        let same_package = owner
+            .as_ref()
+            .is_some_and(|r| self.modules[importer].can_access(r, name));
+        let member = local
+            .and_then(|j| self.modules[j].member_of.clone())
+            .or_else(|| {
+                self.from_packages
+                    .get(name)
+                    .and_then(|i| i.member_of.clone())
+            });
+        let through_parent = member
+            .as_ref()
+            .is_some_and(|m| !self.modules[importer].can_access_member(m));
+        if let Some(member) = member.filter(|_| through_parent) {
+            self.find_module(importer, &member.parent, span);
+        }
+        if private && !same_package && !through_parent {
+            self.diagnostics.push(Diagnostic::error(
+                codes::R017,
+                format!(
+                    "module `{name}` is private to its package; import its public facade instead"
+                ),
+                span,
+            ));
+            return None;
+        }
         local
+    }
+
+    /// Resolve static members from the closest loaded ancestor outward. An
+    /// importer can request `Result.Make` before `Result` itself was visited.
+    fn materialize_members(&mut self, name: &str) {
+        let mut pending = Vec::new();
+        let mut prefix = name;
+        while !self.by_name.contains_key(prefix) {
+            pending.push(prefix);
+            let Some((parent, _)) = prefix.rsplit_once('.') else {
+                return;
+            };
+            prefix = parent;
+        }
+        for name in pending.into_iter().rev() {
+            let (parent, child) = name.rsplit_once('.').expect("member path");
+            let Some(&parent) = self.by_name.get(parent) else {
+                return;
+            };
+            if let Some(application) = self.modules[parent]
+                .syntax
+                .applications
+                .iter()
+                .find(|app| app.name == child)
+                .cloned()
+            {
+                // Availability is checked through the parent's advertised view.
+                self.instantiate(parent, &application);
+                continue;
+            }
+            self.materialize_expression_body(parent);
+            let Some(body) = self.modules[parent]
+                .syntax
+                .header
+                .as_ref()
+                .and_then(|h| h.materialized_body.clone())
+                .filter(|body| body != &self.modules[parent].name)
+            else {
+                return;
+            };
+            let at = self.modules[parent]
+                .syntax
+                .header
+                .as_ref()
+                .expect("alias header")
+                .span;
+            let target = format!("{body}.{child}");
+            self.find_module(parent, &target, at);
+            if self.by_name.contains_key(&target) || self.from_packages.contains_key(&target) {
+                self.alias_expression(parent, Some(child), &target, None, at, None);
+            }
+        }
+    }
+
+    fn imported_module(&self, importer: usize, name: &str) -> Option<String> {
+        let (head, tail) = name.split_once('.').unwrap_or((name, ""));
+        let import = self.modules[importer]
+            .syntax
+            .imports
+            .iter()
+            .find(|i| i.alias.as_deref() == Some(head) && i.module != head)?;
+        Some(if tail.is_empty() {
+            import.module.clone()
+        } else {
+            format!("{}.{tail}", import.module)
+        })
+    }
+
+    /// A module value may be a source node or a checked external structure.
+    /// External/built-in arguments retain their canonical identity without a
+    /// synthetic source module or a duplicate runtime definition.
+    pub(super) fn module_reference(
+        &mut self,
+        importer: usize,
+        name: &str,
+        span: Span,
+    ) -> Option<String> {
+        let expanded = self.imported_module(importer, name);
+        let name = expanded.as_deref().unwrap_or(name);
+        self.find_module(importer, name, span)
+            .map(|index| self.modules[index].name.clone())
+            .or_else(|| self.from_packages.get(name).map(|i| i.module.clone()))
+    }
+
+    /// An import may descend through several inline namespaces, but the first
+    /// one already makes the whole path private to its source file.
+    fn report_inline_import(&mut self, dirs: &[PathBuf], name: &str, span: Span) -> bool {
+        let mut candidate = name;
+        while let Some((file_module, suffix)) = candidate.rsplit_once('.') {
+            for dir in dirs {
+                let _ = self.load(&dir.join(module_path(file_module)));
+            }
+            if let Some(&parent) = self.by_name.get(file_module) {
+                let child = suffix.split('.').next().unwrap_or(suffix);
+                let source = self.sources.get(self.modules[parent].file);
+                if let Some(decl) = self.modules[parent]
+                    .parse
+                    .tree
+                    .nodes()
+                    .filter(|n| n.kind == K::InlineModuleDecl)
+                    .filter_map(|n| n.nodes().find(|n| n.kind == K::ModulePath))
+                    .find(|path| {
+                        path.text(&source.text)
+                            .split_whitespace()
+                            .collect::<String>()
+                            == child
+                    })
+                {
+                    let (start, end) = decl.range();
+                    self.diagnostics.push(Diagnostic::error(
+                        codes::R018,
+                        format!("inline module `{name}` is private to its source file; use its members inside `{file_module}`, or move it to a separate module file"),
+                        span,
+                    ).with_related(Span::new(self.modules[parent].file, start, end), "inline module declared here"));
+                    return true;
+                }
+                break;
+            }
+            candidate = file_module;
+        }
+        false
     }
 
     pub(super) fn import_cycles(&mut self, edges: &[Vec<usize>]) {
@@ -91,13 +417,21 @@ impl Loader<'_> {
                 .syntax
                 .imports
                 .iter()
-                .find(|i| i.module == self.modules[next].name)
-                .map(|i| i.span);
+                .find(|i| {
+                    i.module == self.modules[next].name
+                        || i.module
+                            .strip_prefix(&self.modules[next].name)
+                            .is_some_and(|suffix| suffix.starts_with('.'))
+                })
+                .map(|i| i.span)
+                .or_else(|| module.virtual_of.as_ref().map(|v| v.at))
+                .or_else(|| module.syntax.header.as_ref().map(|h| h.span))
+                .unwrap_or_else(|| Span::new(module.file, 0, 0));
             self.diagnostics.push(
                 Diagnostic::error(
                     codes::R006,
                     format!("import cycle: {}", chain.join(" -> ")),
-                    span.expect("edge has an import"),
+                    span,
                 )
                 .with_fix(|| {
                     (
@@ -109,3 +443,5 @@ impl Loader<'_> {
         }
     }
 }
+
+include!("imports_application.rs");

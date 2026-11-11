@@ -23,6 +23,12 @@ import {
   skipHandler,
 } from "./fiber.ts";
 
+/** Filled by the optional Effect adapter when generated code crosses into it. */
+export const bridgeHooks: {
+  operation: ((tag: object) => unknown) | undefined;
+  ran: (value: unknown) => unknown;
+} = { operation: undefined, ran: (value) => value };
+
 /** An operation of a handler: its name, arm, class, and how many dictionaries and arguments it takes. */
 export type OpInstall = readonly [
   name: string,
@@ -38,9 +44,9 @@ export type Install = readonly [tag: object, operations: ReadonlyArray<OpInstall
 const tags = /*#__PURE__*/ new Map<string, Readonly<{ key: string }>>();
 
 /**
- * A service's tag, compared by identity: one per key, `Module.Service`, as
- * Effect's keys compare by name, so the runtime reaches the services of
- * `Atom` and `Ui` that a program declares.
+ * A service's tag, compared by identity: one per key, `Module.Service`, so
+ * every lookup of a key gives the same tag and the runtime reaches the
+ * services of `Atom` and `Ui` that a program declares.
  */
 export const service = (key: string): Readonly<{ key: string }> => {
   let tag = tags.get(key);
@@ -83,6 +89,11 @@ export const operation = (tag: object, name: string, arity: number, dicts: Reado
   const call = (args: ReadonlyArray<unknown>): unknown => {
     const impl = lookup(tag);
     if (impl === undefined) {
+      const fromHost = bridgeHooks.operation?.(tag);
+      if (fromHost !== undefined) {
+        const value = applyAll(dictsApplied(Reflect.get(Object(fromHost), name), dicts), args);
+        return bridgeHooks.ran(value);
+      }
       throw new Error(`no handler of \`${String(Reflect.get(tag, "key"))}\` is in effect`);
     }
     if (impl instanceof Served) return impl.call(name, dicts, args);

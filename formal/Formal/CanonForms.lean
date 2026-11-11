@@ -30,9 +30,9 @@ theorem Typ.vkind {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) : Value e → ∀ {T �
     ¬ T.isAll → VKind e T.kind := by
   induction h with
   | allI => intro _ _ _ hJ h; cases hJ; exact (h trivial).elim
-  | lam _ _ _ hT => intro _ _ _ hJ _; cases hJ; simp only [VKind, Tm.head]; rw [← hT.kind]; rfl
-  | fix _ _ _ hT => intro _ _ _ hJ _; cases hJ; simp only [VKind, Tm.head]; rw [← hT.kind]; rfl
-  | task _ _ _ _ hT => intro _ _ _ hJ _; cases hJ; simp only [VKind, Tm.head]; rw [← hT.kind]; rfl
+  | lam _ _ hT => intro _ _ _ hJ _; cases hJ; simp only [VKind, Tm.head]; rw [← hT.kind]; rfl
+  | fix _ _ hT => intro _ _ _ hJ _; cases hJ; simp only [VKind, Tm.head]; rw [← hT.kind]; rfl
+  | task _ _ _ hT => intro _ _ _ hJ _; cases hJ; simp only [VKind, Tm.head]; rw [← hT.kind]; rfl
   | cap => intro _ _ _ hJ _; cases hJ; rfl
   | own => intro _ _ _ hJ _; cases hJ; rfl
   | lit => intro _ _ _ hJ _; cases hJ; rfl
@@ -42,7 +42,7 @@ theorem Typ.vkind {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) : Value e → ∀ {T �
   | drec => intro _ _ _ hJ _; cases hJ; rfl
   | const _ hT =>
     intro _ _ _ hJ _; cases hJ
-    simp only [VKind, Tm.head]; rw [← hT.kind, Const.ty_kind]
+    simp only [VKind, Tm.head]; rw [← hT.kind, Const.ty_kind _ _]
   | perform _ hT =>
     intro _ _ _ hJ _; cases hJ
     simp only [VKind, Tm.head]; rw [← hT.kind]; rfl
@@ -109,15 +109,15 @@ theorem canonical_ref {Ψ Θ Γ v t φ} (hv : Value v) (h : Typ S Ψ Θ Γ v (.e
 /-- L1 for computations. -/
 theorem canonical_eff {Ψ Θ Γ v r ε t C φ} (hv : Value v)
     (h : Typ S Ψ Θ Γ v (.ex (.eff r ε t C) φ)) :
-    ∃ e t₀ ψ, v = .task e ∧ Typ S Ψ Θ Γ e (.ex t₀ ψ) ∧ ψ.le (.rt r ε) ∧ Le t₀ t := by
+    ∃ e t₀ ψ, v = .task e ∧ Typ S Ψ Θ Γ e (.ex t₀ ψ) ∧ ψ.le (Stage.use (.rt r ε) C) ∧ LeLive t₀ t := by
   have hk := h.vkind hv rfl (by simp [Ty.isAll])
   cases hv with
   | task =>
     cases h with
-    | task he hψ _ _ hT =>
-      obtain ⟨_, _, _, _, h, hr, he', ht, -⟩ := hT.eff_left
+    | task he hψ _ hT =>
+      obtain ⟨_, _, _, _, h, huse, ht, -⟩ := hT.eff_left
       cases h
-      exact ⟨_, _, _, rfl, he, Stage.le_trans hψ ⟨hr, he'⟩, ht⟩
+      exact ⟨_, _, _, rfl, he, Stage.le_trans hψ huse, ht⟩
   | ctorApp _ hf _ => simp [VKind, Tm.head, hf, Ty.kind] at hk
   | constApp =>
     simp [VKind, Tm.head, Ty.kind] at hk

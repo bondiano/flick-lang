@@ -9,6 +9,5 @@ pub use codes::Code;
 
 mod model;
 
-#[cfg(feature = "diagnostic-fixes")]
 pub use model::Fix;
 pub use model::{Diagnostic, Edit, Related, Severity};

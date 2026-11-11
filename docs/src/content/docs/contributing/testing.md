@@ -166,6 +166,28 @@ Checks a record of 200 fields read field by field and a function of 2000
 lines, each also at a quarter of the size: the full size must stay within a
 time budget, and the ratio between the sizes must stay linear.
 
+## Performance and runtime cost
+
+`just perf` checks compiler and LSP latency, server throughput, executable size,
+RSS and cold start against `tools/perf/budgets.json`. Cold start is the median
+of five fresh server processes, from spawn to the first successful HTTP response,
+with 10 ms readiness polling and no warm-up. Throughput uses separate warmed
+processes. A missing measurement fails the run, even when a later stage fails.
+
+Linux reads RSS from `/proc`; macOS uses `ps`. The LSP uses Linux's lifetime
+high-water mark or samples every 250 ms on macOS. Server RSS is sampled during
+the soak. `target/perf-environment.json` records the platform, CPU, Node version
+and methods beside the measurements. Compare runs on the same host and toolchain;
+these budgets do not promise equal latency on different hardware.
+
+`just bundle-size` compares the same arithmetic-and-output source on Effect
+(`pure`) and the native runtime (`pure-rt`), and checks a separate pure library
+(`none`) with no host I/O or foreign declarations. It also reports minified source
+bytes attributed to the runtime, adapter, Effect and UI/React. Those categories
+describe retained code; gzip sizes cannot be added per category. Action spans
+are opt-in through `Ui.Tracing`; a bundle regression checks that unused span
+construction is removed. `just ratchet` prevents silently loosening budgets.
+
 ## What the test suites cover
 
 Where to look for the tests of a behavior, and where a new one goes:

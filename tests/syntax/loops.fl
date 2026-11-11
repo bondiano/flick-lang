@@ -1,0 +1,26 @@
+module App.Loops exposing (..)
+
+count : Int -> Int
+let count n =
+  let mut i = 0
+  while i < n do i = i + 1
+  i
+
+find : Int -> Int
+let find n =
+  let mut i = 0
+  loop {
+    i = i + 1
+    if i < n then continue
+    break i
+  }
+
+sum : List Int -> Int
+let sum xs =
+  let mut total = 0
+  for x <- xs do {
+    if x < 0 then continue
+    if x > 10 then break
+    total = total + x
+  }
+  total

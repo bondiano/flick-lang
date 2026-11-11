@@ -19,7 +19,6 @@ pub struct Diagnostic {
     pub related: Vec<Related>,
     /// The checker relied on an error type while forming this diagnostic.
     pub(crate) incomplete: bool,
-    #[cfg(feature = "diagnostic-fixes")]
     pub fixes: Vec<Fix>,
 }
 
@@ -29,7 +28,6 @@ pub struct Related {
     pub message: String,
 }
 
-#[cfg(feature = "diagnostic-fixes")]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Fix {
     pub message: String,
@@ -45,6 +43,7 @@ pub struct Edit {
 }
 
 impl Diagnostic {
+    #[inline(never)]
     pub fn new(code: Code, severity: Severity, message: impl Into<String>) -> Self {
         Diagnostic {
             code,
@@ -53,11 +52,11 @@ impl Diagnostic {
             span: None,
             related: Vec::new(),
             incomplete: false,
-            #[cfg(feature = "diagnostic-fixes")]
             fixes: Vec::new(),
         }
     }
 
+    #[inline(never)]
     pub fn error(code: Code, message: impl Into<String>, span: Span) -> Self {
         Diagnostic::new(code, Severity::Error, message).with_span(span)
     }
@@ -69,13 +68,14 @@ impl Diagnostic {
             codes::R012,
             codes::R013,
             codes::R014,
-            codes::R017,
+            codes::R020,
             codes::T059,
         ]
         .contains(&self.code)
     }
 
     #[must_use]
+    #[cfg_attr(target_arch = "wasm32", inline(never))]
     pub fn with_span(self, span: Span) -> Self {
         Diagnostic {
             span: Some(span),
@@ -84,6 +84,7 @@ impl Diagnostic {
     }
 
     #[must_use]
+    #[inline(never)]
     pub fn with_related(mut self, span: Span, message: impl Into<String>) -> Self {
         self.related.push(Related {
             span,
@@ -117,22 +118,20 @@ impl Diagnostic {
     }
 
     fn attach_fix<M: Into<String>>(self, safe: bool, fix: impl FnOnce() -> (M, Vec<Edit>)) -> Self {
-        #[cfg(feature = "diagnostic-fixes")]
-        {
-            let mut diagnostic = self;
-            let (message, edits) = fix();
-            diagnostic.fixes.push(Fix {
-                message: message.into(),
-                edits,
-                safe,
-            });
-            diagnostic
-        }
-        #[cfg(not(feature = "diagnostic-fixes"))]
-        {
-            let _ = (safe, fix);
-            self
-        }
+        let (message, edits) = fix();
+        self.push_fix(safe, message.into(), edits)
+    }
+
+    // Fix factories have distinct closure types at each diagnostic site.
+    // Share attachment after the lazy factory has produced its payload.
+    #[inline(never)]
+    fn push_fix(mut self, safe: bool, message: String, edits: Vec<Edit>) -> Self {
+        self.fixes.push(Fix {
+            message,
+            edits,
+            safe,
+        });
+        self
     }
 }
 
@@ -179,15 +178,10 @@ mod tests {
                 message: "used here".into()
             }]
         );
-        #[cfg(feature = "diagnostic-fixes")]
-        {
-            assert_eq!(called.get(), 2);
-            assert_eq!(diagnostic.fixes[0].edits[0].replacement, "total");
-            assert!(!diagnostic.fixes[0].safe);
-            assert_eq!(diagnostic.fixes[1].edits[0].replacement, "");
-            assert!(diagnostic.fixes[1].safe);
-        }
-        #[cfg(not(feature = "diagnostic-fixes"))]
-        assert_eq!(called.get(), 0);
+        assert_eq!(called.get(), 2);
+        assert_eq!(diagnostic.fixes[0].edits[0].replacement, "total");
+        assert!(!diagnostic.fixes[0].safe);
+        assert_eq!(diagnostic.fixes[1].edits[0].replacement, "");
+        assert!(diagnostic.fixes[1].safe);
     }
 }

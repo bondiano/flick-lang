@@ -1,6 +1,6 @@
 ---
 title: "Грамматика Flick"
-source_hash: 3327c24de959b385
+source_hash: 3cd5856d7900590d
 ---
 
 Здесь описан синтаксис исходного кода, который принимают `flick check`
@@ -41,11 +41,12 @@ source_hash: 3327c24de959b385
 module exposing import as let mut rec fun match with try if then else task await
 scope provide ignore todo echo type opaque refined where kind error service class
 instance deriving foreign from forall not none true false
-ui in when for yield do
+ui in when for yield do break continue
 ```
 
 Контекстные слова считаются обычными именами, кроме следующих позиций:
 
+- `loop` перед `{` и `while` перед условием, за которым идёт `do`;
 - `unboxed` и `untagged` непосредственно перед `type` (см. `codegen.md`);
 - режимы внешних функций `pure`, `effect`, `blocked` и источник
   `global`;
@@ -260,7 +261,7 @@ let between x =
 ## Объявления
 
 ```text
-file        = [module_header] { import } { decl }
+file        = [module_header] { import } { decl | module_application }
 module_header = "module" ModulePath ["exposing" exposing]
 import      = "import" ModulePath ["as" Con] ["exposing" exposing]
 exposing    = "(" item { "," item } [","] ")"
@@ -268,8 +269,11 @@ item        = name | Con | Con "(..)" | ".." | "plugin" name   // см. plugins.
 ModulePath  = Con { "." Con }
 
 decl        = signature | let | rec_group | type_decl | kind_decl | error_decl
-            | service | class | instance | foreign
+            | service | class | instance | foreign | module_contract | inline_module
             | head { head_arg } ("{" { token } "}" | { token })   // плагина, до следующего decl
+inline_module = "module" Con ["exposing" exposing] "=" indented { import | decl }
+module_contract = "type" "module" Con "=" indented { module_member }
+module_application = "module" Con "=" ModulePath "(" ModulePath { "," ModulePath } ")"
 signature   = name ":" type
 let         = "let" ["rec"] (name { atom_pattern } | pattern) [":" type] "=" block
             | "let" "assert" pattern [":" type] "=" block ["as" String]
@@ -299,6 +303,9 @@ foreign     = "foreign" [mode] name "from" ("global" String | String String) [me
 mode        = "pure" | "effect"
 metadata    = indented lines: meta_name { atom }
 ```
+
+`module_application` объявляется только на уровне файла. Внутри
+`inline_module` он вызывает `FLICK-R019`; `module_contract` там разрешён.
 
 Правая часть `type` — всегда список вариантов.
 Например, `type Wrapper = Wrap Float` — ADT с одним конструктором.
@@ -441,6 +448,9 @@ save_with :
 block       = statement { line break statement }
 statement   = "let" … | signature | name "=" block | expr
 expr        = "fun" atom_pattern { atom_pattern } "->" block
+            | "loop" "{" block "}"
+            | "while" expr "do" block
+            | "break" [expr] | "continue"
             | "match" expr "with" arm { arm }
             | "try" block "with" handler_arm { handler_arm }
             | "if" expr "then" block [ "else" (if_expr | block) ]

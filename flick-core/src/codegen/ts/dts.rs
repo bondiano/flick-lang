@@ -65,11 +65,14 @@ pub fn declaration_file(
             })
             .collect();
         match ops {
-            Ok(ops) => values.push(format!(
-                "export declare const {}: $Context.Service<{name}, {{ {} }}>;",
-                names::service(name),
-                ops.join("; ")
-            )),
+            Ok(ops) => {
+                let service = if projection.rt { "$Service" } else { "$Context.Service" };
+                values.push(format!(
+                    "export declare const {}: {service}<{name}, {{ {} }}>;",
+                    names::service(name),
+                    ops.join("; ")
+                ));
+            }
             Err(reason) => refused.push((names::service(name), reason)),
         }
     }
@@ -87,15 +90,25 @@ pub fn declaration_file(
     let value = |export: &Export| {
         let scheme = export.scheme.as_ref();
         scheme.is_some_and(|scheme| {
-            Projection::new(&export.entity.module, projection.lookup, projection.package)
-                .value(scheme)
-                .is_ok()
+            Projection::for_runtime(
+                &export.entity.module,
+                projection.lookup,
+                projection.package,
+                projection.rt,
+            )
+            .value(scheme)
+            .is_ok()
         })
     };
     let ty = |export: &Export| {
         (projection.lookup)(&export.entity.module).is_some_and(|interface| {
-            Projection::new(&export.entity.module, projection.lookup, projection.package)
-                .declares(&interface, export)
+            Projection::for_runtime(
+                &export.entity.module,
+                projection.lookup,
+                projection.package,
+                projection.rt,
+            )
+            .declares(&interface, export)
         })
     };
     let (barrel, _) = reexports(projection.module, interface, path, &value, &ty);
@@ -215,7 +228,8 @@ pub fn facade_files(
     path: &dyn Fn(&str) -> String,
 ) -> (String, String) {
     let mut js = format!(
-        "import {{ promiseFacade }} from \"@flick-lang/effect-ts\";\nimport * as $m from {};\n\n",
+        "import {{ promiseFacade }} from \"{}\";\nimport * as $m from {};\n\n",
+        super::EFFECT_RUNTIME,
         names::string(module_js)
     );
     let mut dts = projection.imports(path);

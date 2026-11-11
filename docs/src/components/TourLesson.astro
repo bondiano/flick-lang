@@ -1,0 +1,28 @@
+---
+// A page of the tour: what it says, beside the program it is about.
+import { readFileSync } from "node:fs";
+import Playground from "./Playground.astro";
+import { lesson } from "../../tour/load.ts";
+
+interface Props {
+  locale: "en" | "ru";
+  /** The page's slug under `tour/`, as `tour/index.json` lists it. */
+  id: string;
+}
+
+const { locale, id } = Astro.props;
+const { file, exercise } = lesson(id);
+const ru = locale === "ru";
+---
+
+<div class="tour-lesson">
+  <div class="tour-prose">
+    <slot />
+    <p class="tour-contents-link"><a href="../">{ru ? "Содержание тура" : "Tour contents"}</a></p>
+  </div>
+  <div class="tour-editor">
+    {exercise === undefined
+      ? <Playground locale={locale} source={readFileSync(file ?? "", "utf8")} id={`tour/${id}`} />
+      : <Playground locale={locale} lesson={exercise} />}
+  </div>
+</div>

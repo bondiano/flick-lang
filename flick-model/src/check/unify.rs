@@ -4,14 +4,14 @@
 //! types are and they reach the same captures (`regions.md` §2.2); a meta
 //! never takes a region of a `scope` deeper than itself (§2.3 (Scope)).
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeSet;
 use std::rc::Rc;
 use std::slice;
 
 use super::generalize::{Inst, rigid_inst, substitute_all};
 use super::{Check, Checker, Slot, Solved, error};
-use crate::syntax::{Name, Path};
-use crate::types::{Caps, Fields, Row, Scheme, Stage, Type, Var};
+use crate::syntax::Path;
+use crate::types::{Caps, Fields, Row, Stage, Type, Var};
 
 impl Checker<'_> {
     pub(super) fn meta(&mut self) -> u32 {
@@ -28,151 +28,6 @@ impl Checker<'_> {
 
     pub(super) fn fresh_row(&mut self) -> Row {
         Row::var(Var::Meta(self.meta()))
-    }
-
-    fn solution(&self, v: &Var) -> Option<&Solved> {
-        match v {
-            Var::Meta(m) => self.slots[*m as usize].solved.as_ref(),
-            Var::Named(n) => self
-                .equalities
-                .iter()
-                .rev()
-                .find(|(x, _)| x == n)
-                .map(|(_, s)| s),
-        }
-    }
-
-    /// `t` with the metas at its head followed, and `EffOf ρ ρ' τ` as
-    /// `Eff ρ ρ' τ`; a qualifier is kept.
-    pub(super) fn follow(&self, t: &Type) -> Type {
-        let mut t = t.clone();
-        while let Type::Var(v) = &t
-            && let Some(Solved::Type(next)) = self.solution(v)
-        {
-            t = next.clone();
-        }
-        if let Type::App(h, a) = &t
-            && let Type::EffOf(r, e) = self.resolve(h)
-        {
-            return Type::Eff(r, e, a.clone());
-        }
-        t
-    }
-
-    /// `t` followed, under its qualifiers: what a rule that takes the
-    /// value apart sees.
-    pub(super) fn resolve(&self, t: &Type) -> Type {
-        let mut t = self.follow(t);
-        while let Type::Captured(inner, _) | Type::Bounded(inner, _) = &t {
-            t = self.follow(inner);
-        }
-        t
-    }
-
-    /// `C` with every solved meta replaced: a type meta in an atom by
-    /// what its type reaches (`regions.md` §2.1, the reach bound).
-    pub(super) fn zonk_caps(&self, c: &Caps) -> Caps {
-        let mut out = Caps::default();
-        for a in &c.atoms {
-            match self.solution(a) {
-                Some(Solved::Type(t)) => out = out.union(&self.reach(t)),
-                Some(Solved::Row(r)) => out = out.union(&self.reach(&Type::Errors(r.clone()))),
-                _ => {
-                    out.atoms.insert(a.clone());
-                }
-            }
-        }
-        for v in &c.vars {
-            match self.solution(v) {
-                Some(Solved::Caps(more)) => out = out.union(&self.zonk_caps(more)),
-                Some(Solved::Type(t)) => out = out.union(&self.reach(t)),
-                _ => {
-                    out.vars.insert(v.clone());
-                }
-            }
-        }
-        out
-    }
-
-    /// `t` with every solved meta replaced.
-    pub(super) fn zonk(&self, t: &Type) -> Type {
-        let z = |t: &Rc<Type>| Rc::new(self.zonk(t));
-        match self.follow(t) {
-            Type::Captured(t, c) => Type::Captured(z(&t), self.zonk_caps(&c)),
-            Type::Bounded(t, c) => Type::Bounded(z(&t), self.zonk_caps(&c)),
-            t @ (Type::Var(_) | Type::Con(_)) => t,
-            Type::App(h, a) => Type::App(z(&h), z(&a)),
-            Type::Fun(p, s, r) => Type::Fun(z(&p), self.zonk_stage(&s), z(&r)),
-            Type::Eff(r, e, t) => Type::Eff(self.zonk_row(&r), self.zonk_row(&e), z(&t)),
-            Type::EffOf(r, e) => Type::EffOf(self.zonk_row(&r), self.zonk_row(&e)),
-            Type::Ref(t) => Type::Ref(z(&t)),
-            Type::Layer(i, e, o) => {
-                Type::Layer(self.zonk_row(&i), self.zonk_row(&e), self.zonk_row(&o))
-            }
-            Type::Record(f) => Type::Record(self.zonk_fields(&f)),
-            Type::Tuple(ts) => Type::Tuple(ts.iter().map(|t| self.zonk(t)).collect()),
-            Type::Errors(r) => Type::Errors(self.zonk_row(&r)),
-            Type::Impl(r) => Type::Impl(self.zonk_row(&r)),
-            Type::Tag(r) => Type::Tag(self.zonk_row(&r)),
-            Type::Dict(c, ts) => Type::Dict(c, ts.iter().map(|t| self.zonk(t)).collect()),
-            Type::Env(r) => Type::Env(self.zonk_row(&r)),
-            Type::Forall(s) => Type::Forall(Rc::new(Scheme {
-                vars: s.vars.clone(),
-                body: self.zonk(&s.body),
-                outlives: s.outlives.clone(),
-            })),
-        }
-    }
-
-    pub(super) fn zonk_stage(&self, s: &Stage) -> Stage {
-        match s {
-            Stage::Pure => Stage::Pure,
-            Stage::Runtime(r, e) => Stage::Runtime(self.zonk_row(r), self.zonk_row(e)),
-        }
-    }
-
-    pub(super) fn zonk_row(&self, r: &Row) -> Row {
-        let mut out = Row {
-            elems: r
-                .elems
-                .iter()
-                .map(|(n, args)| (n.clone(), args.iter().map(|a| self.zonk(a)).collect()))
-                .collect(),
-            vars: BTreeSet::new(),
-        };
-        for v in &r.vars {
-            match self.solution(v) {
-                Some(Solved::Row(inner)) => {
-                    let inner = self.zonk_row(inner);
-                    for (n, args) in inner.elems {
-                        out.elems.entry(n).or_insert(args);
-                    }
-                    out.vars.extend(inner.vars);
-                }
-                _ => {
-                    out.vars.insert(v.clone());
-                }
-            }
-        }
-        out
-    }
-
-    pub(super) fn zonk_fields(&self, f: &Fields) -> Fields {
-        let mut fields: BTreeMap<Name, Type> = f
-            .fields
-            .iter()
-            .map(|(l, t)| (l.clone(), self.zonk(t)))
-            .collect();
-        let mut tail = f.tail.clone();
-        while let Some(v) = &tail
-            && let Some(Solved::Fields(more)) = self.solution(v)
-        {
-            for (l, t) in &more.fields {
-                fields.insert(l.clone(), self.zonk(t));
-            }
-            tail = more.tail.clone();
-        }
-        Fields { fields, tail }
     }
 
     /// The metas of `t`, with the level each is at.
@@ -281,6 +136,14 @@ impl Checker<'_> {
 
     /// `τ ≡ τ'`.
     pub(super) fn unify(&mut self, a: &Type, b: &Type) -> Check<()> {
+        // one opaque alias on both sides is equal by its arguments, as it is
+        // outside its module: unfolding one that names itself would not end
+        let (x, y) = (self.heads(a), self.heads(b));
+        if let (Some((p, xs)), Some((q, ys))) = (self.alias(&x), self.alias(&y))
+            && p == q
+        {
+            return xs.iter().zip(&ys).try_for_each(|(x, y)| self.unify(x, y));
+        }
         let (a, b) = (self.follow(a), self.follow(b));
         match (&a, &b) {
             (Type::Var(Var::Meta(m)), Type::Var(Var::Meta(n))) if m == n => Ok(()),
@@ -397,6 +260,7 @@ impl Checker<'_> {
         }
         for (x, y) in [(&a, &b), (&b, &a)] {
             if x.elems.is_empty()
+                && x.less.is_empty()
                 && let [Var::Meta(m)] = x.vars.iter().collect::<Vec<_>>()[..]
             {
                 return self.bind_row(*m, y.clone());

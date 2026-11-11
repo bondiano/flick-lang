@@ -82,7 +82,7 @@ pub struct Ide<'a> {
     pub sources: &'a SourceMap,
 }
 
-impl Ide<'_> {
+impl<'a> Ide<'a> {
     fn module(&self, file: FileId) -> Option<&Analyzed> {
         self.analysis.by_file(file)
     }
@@ -92,14 +92,11 @@ impl Ide<'_> {
     }
 
     /// The interface of any module the analysis knows.
-    pub fn interface(&self, module: &str) -> Option<Interface> {
+    pub fn interface(&self, module: &str) -> Option<&'a Interface> {
         if let Some(m) = self.analysis.module(module) {
-            return Some(m.interface.clone());
+            return Some(&m.interface);
         }
-        types::builtins()
-            .iter()
-            .find(|i| i.module == module)
-            .cloned()
+        types::builtins().iter().find(|i| i.module == module)
     }
 
     /// The symbol at `offset` of `file`, with the range of the name there.
@@ -128,6 +125,7 @@ impl Ide<'_> {
                     };
                     Symbol::Local { file, binder, name }
                 }
+                Ref::PackedField { .. } => return None,
                 Ref::Value { module, name } => match name.split_once('$') {
                     Some((ty, _)) => entity(module, Namespace::Type, ty),
                     None => entity(module, Namespace::Value, name),
@@ -448,6 +446,8 @@ mod kind_hover_tests;
 mod migration_tests;
 #[cfg(test)]
 mod pattern_tests;
+#[cfg(test)]
+mod privacy_tests;
 #[cfg(test)]
 mod set_tests;
 #[cfg(test)]

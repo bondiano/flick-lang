@@ -1,0 +1,152 @@
+// A trie against a sorted list of its entries through 400 inserts and
+// removals, every earlier version kept; then the keys a trie orders by UTF-16
+// code units, the empty key, and prefixes that are keys, parts of keys or
+// neither.
+module App.Main exposing (main)
+
+line : String -> String ->{} Unit
+let line label text = Platform.stdout_line (label ++ ": " ++ text)
+
+alphabet : List String
+let alphabet = ["a", "b", "c", "é", "😀"]
+
+/// The next number of a linear congruential sequence, in 0 .. 1000002; the
+/// multiplication wraps in 32 bits.
+next : Int -> Int
+let next seed =
+  let n = (seed * 1103515245 + 12345) % 1000003
+  if n < 0 then 0 - n else n
+
+letter : Int -> String
+let letter seed = Option.with_default "a" (List.get (seed % 5) alphabet)
+
+/// `left` more letters after `text`, and the seed after them.
+letters : Int -> Int -> String -> (String, Int)
+let rec letters left seed text =
+  if left == 0 then (text, seed) else letters (left - 1) (next seed) (text ++ letter seed)
+
+/// A word of one to four letters, and the seed after it.
+word : Int -> (String, Int)
+let word seed = letters (seed / 5 % 4 + 1) (next seed) ""
+
+/// The entries of a version, as an association list kept sorted by key.
+type alias Model = List (String, Int)
+
+without : String -> Model -> Model
+let without key model = List.filter (fun (k, _) -> k != key) model
+
+with_entry : String -> Int -> Model -> Model
+let with_entry key value model =
+  List.sort_by (fun (a, _) (b, _) -> compare a b) (without key model ++ [(key, value)])
+
+/// Whether a trie has exactly the entries of the model, in its order.
+agrees : Trie.Trie Int -> Model -> Bool
+let agrees trie model =
+  Trie.entries trie == model
+    && Trie.size trie == List.length model
+    && Trie.keys trie == List.map (fun (k, _) -> k) model
+    && List.all (fun (k, v) -> Trie.get k trie == Some v && Trie.has k trie) model
+
+/// The versions of a trie from `step` to `steps` inserts and removals, each
+/// with its model, after those of `acc`.
+grow :
+  Int ->
+  Int ->
+  Int ->
+  Trie.Trie Int ->
+  Model ->
+  List (Trie.Trie Int, Model) ->
+  List (Trie.Trie Int, Model)
+let rec grow steps step seed trie model acc =
+  if step == steps then
+    acc
+  else
+    let (key, after) = word seed
+    let removing = after % 3 == 0
+    let trie2 = if removing then Trie.remove key trie else Trie.insert key step trie
+    let model2 = if removing then without key model else with_entry key step model
+    grow steps (step + 1) (next after) trie2 model2 (acc ++ [(trie2, model2)])
+
+versions : Int -> List (Trie.Trie Int, Model)
+let versions steps = grow steps 0 7 Trie.empty [] []
+
+history : Unit ->{} Unit
+let history () =
+  let all = versions 400
+  line "versions" (show (List.length all))
+  line "every version agrees" (show (List.all (fun (trie, model) -> agrees trie model) all))
+  match List.last all with
+  | Some (trie, _) -> line "last" (show (Trie.entries trie))
+  | None -> line "last" "none"
+
+order : Unit ->{} Unit
+let order () =
+  let trie = Trie.from_list [("ｚ", 1), ("😀", 2), ("é", 3), ("z", 4), ("", 5), ("zz", 6), ("Z", 7)]
+  line "units" (show (Trie.keys trie))
+  line "size" (show (Trie.size trie))
+  line "empty key" (show (Trie.get "" trie, Trie.has "" trie, Trie.size (Trie.remove "" trie)))
+  line "empty key alone" (show (Trie.entries (Trie.insert "" 1 Trie.empty)))
+  line "pair" (show (Trie.keys_with_prefix "😀" (Trie.insert "😀!" 8 trie)))
+  line
+    "empty key as a prefix"
+    (show (
+      Trie.longest_prefix_of "zzz" trie,
+      Trie.longest_prefix_of "q" trie,
+      Trie.longest_prefix_of "" trie,
+      Trie.keys_with_prefix "" trie,
+      Trie.keys_with_prefix "z" trie,
+    ))
+  line
+    "empty key changed"
+    (show (
+      Trie.get "" (Trie.modify "" (fun n -> n * 2) trie),
+      Trie.get "" (Trie.insert "" 9 trie),
+      Trie.size (Trie.insert "" 9 trie),
+      Trie.keys (Trie.filter (fun n _ -> n > 4) trie),
+    ))
+
+prefixes : Unit ->{} Unit
+let prefixes () =
+  let trie = Trie.from_list [("she", 1), ("shells", 2), ("sea", 3), ("sells", 4), ("s", 5)]
+  line "all" (show (Trie.entries_with_prefix "" trie))
+  line "a key" (show (Trie.entries_with_prefix "she" trie))
+  line "a part" (show (Trie.keys_with_prefix "shel" trie, Trie.values_with_prefix "se" trie))
+  line "neither" (show (Trie.keys_with_prefix "x" trie, Trie.keys_with_prefix "shellss" trie))
+  line
+    "longest"
+    (show (
+      Trie.longest_prefix_of "shells" trie,
+      Trie.longest_prefix_of "shelter" trie,
+      Trie.longest_prefix_of "sx" trie,
+      Trie.longest_prefix_of "x" trie,
+      Trie.longest_prefix_of "" trie,
+    ))
+
+changes : Unit ->{} Unit
+let changes () =
+  let trie = Trie.from_list [("b", 2), ("a", 1), ("b", 20), ("ab", 3)]
+  line "replaced" (show (Trie.entries trie, Trie.size trie))
+  line
+    "missing"
+    (show (
+      Trie.entries (Trie.remove "c" trie),
+      Trie.entries (Trie.modify "c" (fun n -> n + 1) trie),
+      Trie.size (Trie.remove "a" (Trie.remove "a" trie)),
+    ))
+  line
+    "removed part"
+    (show (Trie.entries (Trie.remove "a" trie), Trie.get "ab" (Trie.remove "a" trie)))
+  line "reduce" (Trie.reduce "" (fun acc n key -> acc ++ key ++ show n) trie)
+  line "map" (show (Trie.entries (Trie.map (fun n key -> key ++ show n) trie)))
+  line "filter" (show (Trie.entries (Trie.filter (fun n key -> n > 1 && key != "ab") trie)))
+  line
+    "filter_map"
+    (show (Trie.size (Trie.filter_map (fun n _ -> if n > 100 then Ok n else Err ()) trie)))
+  line "emptied" (show (Trie.is_empty (Trie.remove_many ["a", "b", "ab"] trie)))
+
+main : Unit ->{; AppError} Unit
+let main () =
+  history ()
+  order ()
+  prefixes ()
+  changes ()

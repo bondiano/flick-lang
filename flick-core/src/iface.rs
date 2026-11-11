@@ -8,10 +8,16 @@ use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 
-use crate::types::{EnumLit, Instance, Type, TypeDef};
+use crate::types::{EnumLit, Instance, ModuleSignature, Type, TypeDef};
+
+mod template;
+pub use template::{
+    BindingOrigin, CalleeOrigin, ExpansionFrame, LexicalScope, ModuleTemplate, StaticArgument,
+    StaticBinding, StaticCapture, StaticMember,
+};
 
 /// Bumped on every change of the schema.
-pub const IFACE_VERSION: u32 = 8;
+pub const IFACE_VERSION: u32 = 16;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -49,6 +55,8 @@ pub enum Decl {
     Refined,
     /// `type T` without a definition
     Abstract,
+    /// `type module Sig = ...`; its body is a structural module contract.
+    ModuleType,
     Error,
     Kind,
     /// `A` of `kind K = A | B`
@@ -102,6 +110,26 @@ pub struct Hidden {
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Interface {
     pub module: String,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub modules: BTreeMap<String, Interface>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub parameterized: Option<ModuleSignature>,
+    /// The parameterized's result was advertised by a declaration or ascription,
+    /// rather than inferred from a private implementation body.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub signature_explicit: bool,
+    /// A static namespace member is imported through its parent's public view.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub member_of: Option<StaticMember>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(not(feature = "native-project"), serde(skip))]
+    pub template: Option<ModuleTemplate>,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub private: bool,
+    /// The module's source did not parse in full, so a declaration may have
+    /// lost names: importers take on trust what they do not find here.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub incomplete: bool,
     pub exports: Vec<Export>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub hidden: Vec<Hidden>,
@@ -123,18 +151,23 @@ pub struct Interface {
     /// a build, so editors find a declaration in a published package.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub source: Option<String>,
-    /// The exported functions that make an atom, an action or a view, which
-    /// a render must not call.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub makers: Vec<String>,
-    /// The exported values that reach `Server`, each with its path to it:
-    /// names of this module, then an imported one whose interface goes on.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub servers: Vec<(String, Vec<String>)>,
+    /// The exported values a tag marks, by tag, each with its path to what
+    /// the tag is of: names of this module, then an imported one whose
+    /// interface goes on. [`MAKER`] marks the functions that make an atom,
+    /// an action or a view, which a render must not call; [`SERVER`], the
+    /// values that reach `Server`.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub tags: BTreeMap<String, Vec<(String, Vec<String>)>>,
     /// The targets a build compiled the module for; empty in an interface
     /// no build wrote.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub targets: Vec<Target>,
+}
+
+// serde's predicate receives a reference to the serialized field.
+#[allow(clippy::trivially_copy_pass_by_ref)]
+fn is_false(value: &bool) -> bool {
+    !*value
 }
 
 /// A target compiled code of a module exists for.
@@ -236,7 +269,19 @@ pub fn fingerprint(interface: &Interface) -> String {
     format!("{hash:016x}")
 }
 
+/// The tag of the makers of an interface.
+pub const MAKER: &str = "maker";
+/// The tag of what reaches `Server`.
+pub const SERVER: &str = "server";
+
 impl Interface {
+    /// The path of the exported value `name` to what `tag` is of, if the
+    /// tag marks it.
+    pub fn tagged(&self, tag: &str, name: &str) -> Option<&[String]> {
+        let marked = self.tags.get(tag)?;
+        (marked.iter().find(|(n, _)| n == name)).map(|(_, path)| &path[..])
+    }
+
     pub fn find(&self, namespace: Namespace, name: &str) -> Option<&Export> {
         self.exports
             .iter()
@@ -316,6 +361,29 @@ mod tests {
     use crate::source::SourceMap;
     use crate::{syntax, types};
 
+    #[test]
+    fn persistent_templates_follow_the_artifact_capability() {
+        let interface = Interface {
+            module: "App.Factory".into(),
+            template: Some(ModuleTemplate {
+                source: "module App.Factory(K : App.Contracts.Empty) : App.Contracts.Empty\n"
+                    .into(),
+                capture: None,
+                materialized_body: None,
+            }),
+            ..Interface::default()
+        };
+        let serialized = serde_json::to_value(&interface).expect("interface serializes");
+        let persistent = cfg!(feature = "native-project");
+        assert_eq!(serialized.get("template").is_some(), persistent);
+        let restored: Interface = serde_json::from_value(serialized).expect("interface reads");
+        if persistent {
+            assert_eq!(restored.template, interface.template);
+        } else {
+            assert!(restored.template.is_none());
+        }
+    }
+
     fn interface_of(text: &str) -> Interface {
         let mut sources = SourceMap::default();
         let file = sources.add("t.fl", text);
@@ -350,6 +418,17 @@ mod tests {
         diagnostics.retain(|d| !d.unnecessary());
         assert!(diagnostics.is_empty(), "{diagnostics:?}");
         interface
+    }
+
+    #[test]
+    fn private_visibility_round_trips_and_changes_fingerprint() {
+        let public = interface_of("module App.Shapes exposing (answer)\nlet answer = 42\n");
+        let private =
+            interface_of("private module App.Shapes exposing (answer)\nlet answer = 42\n");
+        assert!(!public.private);
+        assert!(private.private);
+        assert_ne!(fingerprint(&public), fingerprint(&private));
+        assert_eq!(read(write(&private).as_bytes(), "App.Shapes"), Ok(private));
     }
 
     #[test]

@@ -4,8 +4,10 @@
 //! (`docs/formal/elaboration.md`):
 //!
 //! 1. `(T ā)^q` is `T q ā` (`appQ`) for a type with hidden storage and for
-//!    a variable over containers; data without storage and a type variable
-//!    drop `q`; `(A → B)^q` is `.arr φ A B q`, without `q` `.cnil`; an arrow
+//!    a variable over containers; data without storage drops `q`; a value
+//!    bound `a^q` on a variable of the scheme is `a` with the bound
+//!    `(a, q)` of the scheme (`Scheme.bd`), and a hidden qualifier on a type
+//!    variable is dropped; `(A → B)^q` is `.arr φ A B q`, without `q` `.cnil`; an arrow
 //!    with rows `{r; e}` is at the stage `R r e`; a row is a variable,
 //!    `.cnil`, a named element `.rnm c t` or a union `.run`, also as an
 //!    argument of a type.
@@ -15,14 +17,22 @@
 //!    of the checker stays itself at its first such position, the rest are
 //!    new; a missing qualifier of a stored type is new.
 //! 4. In a positive position a variable that qualified negative positions
-//!    is what those arguments reach, left to right through `cun`: `q ∪ ā` of
-//!    data, `q` and the new variables inside of a function.
+//!    is what those arguments reach, left to right through `cun`: `q` and
+//!    the variables of kind `CaptureRow` and `Region` its arguments reach of
+//!    data, as rule 6 counts them; `q` and the new variables inside of a
+//!    function.
 //! 5. Binders: the class parameter, the checker's `∀` that remain in their
 //!    order, then the new variables in the order they appear.
+//! 6. Elision, as the checker reads a signature (`regions/live.rs` `elide`
+//!    of flick-core): the row of each runtime arrow gets `Live` of what its
+//!    parameter and those of the stages before it reach, the variables of
+//!    kind `CaptureRow` and `Region` only; `Live C` is the capture row
+//!    `.cun C .cnil` in the row. `Eff` drops its rows (rule 1), so its `Live`.
 //!
 //! A scheme the model cannot write is a line of the skipped list, with its
 //! reason (`docs/formal/elaboration.md#the-scheme-generator-translated-only-the-sugar-names`).
 
+pub(crate) mod elide;
 mod tr;
 
 use std::fmt::{self, Write};
@@ -30,10 +40,14 @@ use std::fmt::{self, Write};
 use flick_core::iface::{Decl, Export};
 use flick_core::types::{self as fc, Kind, show_type};
 
+pub use self::elide::elide_schemes;
 use self::tr::{Tr, Ty, occurs};
 
 /// The modules whose exports the model takes, in this order.
 const MODULES: [&str; 5] = ["Prelude", "Seq", "Option", "Result", "List"];
+
+/// The scheme of the loop of `for … do`, `Seq.each_effect` read by `for_loop`.
+const LOOP: &str = "each_loop";
 
 /// Identifiers of the checker that are Lean keywords.
 const KEYWORDS: [&str; 4] = ["show", "from", "at", "fun"];
@@ -135,10 +149,53 @@ fn lean(t: &Ty, vars: &[String], out: &mut String) {
     }
 }
 
+/// The value bounds of a scheme, `Scheme.bd`: `[(a, c), …]`.
+fn bounds(bounds: &[(Ty, Ty)], vars: &[String], out: &mut String) {
+    out.push('[');
+    for (i, (a, c)) in bounds.iter().enumerate() {
+        if i > 0 {
+            out.push_str(", ");
+        }
+        out.push('(');
+        lean(a, vars, out);
+        out.push_str(", ");
+        lean(c, vars, out);
+        out.push(')');
+    }
+    out.push(']');
+}
+
+/// The doc comment of a `def`, and its name.
+fn header<'a>(
+    module: &str,
+    name: &'a str,
+    scheme: &fc::Type,
+    callback_only: bool,
+) -> (String, &'a str) {
+    if callback_only {
+        let doc = format!(
+            "/-- `{module}.{name}` as the checker's `for_loop` reads `for … do`: only the body, its\n\
+             first parameter, is kept live, nothing of the source (`types/comprehension.rs`) -/\n"
+        );
+        (doc, LOOP)
+    } else {
+        (
+            format!("/-- `{module}.{name} : {}` -/\n", show_type(scheme)),
+            name,
+        )
+    }
+}
+
 /// The `def` of one scheme: its parameters are the classes of its context,
 /// the class of a method first, then the type constructors in the order
 /// they appear.
-fn def(module: &str, name: &str, scheme: &fc::Type, class: Option<&str>) -> Result<String, Skip> {
+fn def(
+    module: &str,
+    name: &str,
+    scheme: &fc::Type,
+    class: Option<&str>,
+    callback_only: bool,
+) -> Result<String, Skip> {
     let (vars, constraints, body) = match scheme {
         fc::Type::Forall {
             vars,
@@ -148,9 +205,13 @@ fn def(module: &str, name: &str, scheme: &fc::Type, class: Option<&str>) -> Resu
         t => (&[][..], &[][..], t),
     };
     let mut tr = Tr::default();
+    tr.callback_only = callback_only;
     for b in vars {
         match &b.kind {
-            Kind::Type | Kind::CaptureRow | Kind::ServiceRow | Kind::ErrorRow => {}
+            Kind::CaptureRow => {
+                tr.live_kinds.insert(b.name.clone());
+            }
+            Kind::Type | Kind::ServiceRow | Kind::ErrorRow => {}
             Kind::Arrow(..) => {
                 tr.containers.insert(b.name.clone());
             }
@@ -192,7 +253,11 @@ fn def(module: &str, name: &str, scheme: &fc::Type, class: Option<&str>) -> Resu
                 .map(|b| &b.name)
                 .filter(|v| first.as_ref() != Some(*v)),
         )
-        .filter(|v| occurs(&t, v) || ctx.iter().flat_map(|c| &c.1).any(|a| occurs(a, v)))
+        .filter(|v| {
+            occurs(&t, v)
+                || ctx.iter().flat_map(|c| &c.1).any(|a| occurs(a, v))
+                || tr.bounds.iter().any(|(a, c)| occurs(a, v) || occurs(c, v))
+        })
         .chain(&tr.fresh)
         .cloned()
         .collect();
@@ -202,7 +267,7 @@ fn def(module: &str, name: &str, scheme: &fc::Type, class: Option<&str>) -> Resu
             params.push(p.clone());
         }
     }
-    let mut out = format!("/-- `{module}.{name} : {}` -/\n", show_type(scheme));
+    let (mut out, name) = header(module, name, scheme, callback_only);
     let _ = write!(out, "def {}", lean_name(module, name));
     if !params.is_empty() {
         let params: Vec<String> = params.iter().map(|p| ident(p)).collect();
@@ -224,7 +289,9 @@ fn def(module: &str, name: &str, scheme: &fc::Type, class: Option<&str>) -> Resu
     }
     out.push_str("],\n    ");
     lean(&t, &binders, &mut out);
-    out.push_str(", .cnil⟩\n");
+    out.push_str(", .cnil, ");
+    bounds(&tr.bounds, &binders, &mut out);
+    out.push_str("⟩\n");
     Ok(out)
 }
 
@@ -263,10 +330,17 @@ pub fn prelude_schemes() -> String {
             .parent
             .as_deref()
             .filter(|_| export.decl == Decl::Method);
-        match def(module, name, scheme, class) {
+        let looped = (module, name.as_str()) == ("Seq", "each_effect");
+        match def(module, name, scheme, class, false) {
             Ok(d) => {
                 out.push('\n');
                 out.push_str(&d);
+                if looped {
+                    out.push('\n');
+                    out.push_str(
+                        &def(module, name, scheme, class, true).expect("as `each_effect`"),
+                    );
+                }
             }
             Err(why) => {
                 let _ = writeln!(
@@ -326,9 +400,9 @@ mod tests {
     fn a_parameter_of_rank_two_is_a_binder() {
         let param = forall(&[("a", Kind::Type)], arrow(var("a"), None, var("a")));
         let scheme = arrow(param, None, fc::Type::con("Prelude", "Int"));
-        let text = super::def("M", "apply_twice", &scheme, None).expect("translated");
+        let text = super::def("M", "apply_twice", &scheme, None, false).expect("translated");
         assert!(
-            text.contains("⟨0, [],\n    .arr .P (.all 1 (.arr .P (.var 0) (.var 0) .cnil)) (.con int) .cnil, .cnil⟩"),
+            text.contains("⟨0, [],\n    .arr .P (.all 1 (.arr .P (.var 0) (.var 0) .cnil)) (.con int) .cnil, .cnil, []⟩"),
             "{text}"
         );
     }
@@ -356,11 +430,39 @@ mod tests {
             ],
             arrow(param, Some((var("r"), var("e"))), var("a")),
         );
-        let text = super::def("Scope", "run", &scheme, None).expect("translated");
+        let text = super::def("Scope", "run", &scheme, None, false).expect("translated");
         assert!(
-            text.contains(".all 1 (.arr (.R (.run (.rnm scope"),
+            text.contains(".all 1 (.arr (.R (.run (.cun (.var 0) .cnil) (.run (.rnm scope"),
             "{text}"
         );
+    }
+
+    /// Rule 1: a bound on a variable of the scheme is a bound of the
+    /// scheme; one over a variable of a `∀` of a parameter is skipped.
+    #[test]
+    fn a_value_bound_is_a_bound_of_the_scheme() {
+        let bounded = |a: &str, c: &str| fc::Type::Bounded {
+            ty: Box::new(var(a)),
+            captures: Box::new(var(c)),
+        };
+        let vars = [("a", Kind::Type), ("c", Kind::CaptureRow)];
+        let scheme = forall(&vars, arrow(bounded("a", "c"), None, var("a")));
+        let text = super::def("M", "keep", &scheme, None, false).expect("translated");
+        assert!(
+            text.contains(
+                "⟨2, [],\n    .arr .P (.var 0) (.var 0) .cnil, .cnil, [(.var 0, .var 1)]⟩"
+            ),
+            "{text}"
+        );
+        let param = forall(
+            &[("u", Kind::Type)],
+            arrow(bounded("u", "c"), None, var("u")),
+        );
+        let scheme = forall(&vars, arrow(param, None, var("a")));
+        assert!(matches!(
+            super::def("M", "inner", &scheme, None, false),
+            Err(super::Skip::Other(why)) if why.contains("`∀` of a parameter")
+        ));
     }
 
     #[test]
@@ -377,7 +479,7 @@ mod tests {
         };
         let scheme = arrow(param, None, fc::Type::con("Prelude", "String"));
         assert!(matches!(
-            super::def("M", "f", &scheme, None),
+            super::def("M", "f", &scheme, None, false),
             Err(super::Skip::Rank)
         ));
     }

@@ -3,6 +3,7 @@
 //! renamed apart within each top-level definition, so a name never needs
 //! shadowing in the generated code.
 
+mod abstraction;
 mod applicative_do;
 mod comprehension;
 mod debug;
@@ -14,6 +15,7 @@ mod handle;
 mod interpolation;
 mod lambda;
 mod literals;
+mod loops;
 mod numeric;
 mod pattern;
 mod question;
@@ -28,14 +30,15 @@ use super::{
     Binding, Expr, ExprKind, Foreign, Item, ItemKind, Lit, Module, Param, Stage, TypeName,
 };
 use crate::diagnostics::{Diagnostic, codes};
+use crate::effects::key;
 use crate::resolve;
 use crate::source::{FileId, Span};
 use crate::syntax::cst::{Node, foreign_words};
 use crate::syntax::kind::SyntaxKind as K;
 use crate::syntax::literal;
 use crate::types::{
-    Abi, Constructor, Range, Rep, Type, Typing, class_defaults, default_method, is_type, let_parts,
-    written_dicts,
+    Abi, Constructor, Dict, Range, Rep, Type, Typing, class_defaults, default_method, is_type,
+    let_parts, written_dicts,
 };
 
 /// Lowers `module`, which checked without errors, with what its check recorded.
@@ -49,6 +52,7 @@ pub fn lower(module: &resolve::Module, typing: &Typing) -> Result<Module, Vec<Di
         scope: Vec::new(),
         used: HashMap::new(),
         vars: HashSet::new(),
+        loops: Vec::new(),
         consumed: HashSet::new(),
         reuse: None,
         owners: HashMap::new(),
@@ -84,6 +88,7 @@ pub fn lower(module: &resolve::Module, typing: &Typing) -> Result<Module, Vec<Di
             name: module.name.to_owned(),
             items,
             labels: typing.labelled.clone(),
+            initialization: flick_ir::Initialization::default(),
         })
     } else {
         Err(lower.diagnostics)
@@ -119,6 +124,7 @@ struct Lower<'a> {
     /// The unique names of the `let mut` variables of the current
     /// definition: a read of one is `ExprKind::Var`.
     vars: HashSet<String>,
+    loops: Vec<String>,
     /// Ranges whose lift or dictionaries are applied already: a block and
     /// its only expression share one.
     consumed: HashSet<(Range, bool)>,
@@ -172,6 +178,36 @@ impl Lower<'_> {
         (self.scope.iter().rev())
             .find(|(n, g, _)| n == name && *g == generated)
             .map(|(_, _, u)| u.as_str())
+    }
+
+    fn dictionaries(&self, key: Range) -> Vec<Dict> {
+        fn bind(lower: &Lower<'_>, key: Range, dict: &mut Dict) {
+            match dict {
+                Dict::Opened { binder, .. } => {
+                    let unique = lower
+                        .local(binder, key.0)
+                        .unwrap_or_else(|| panic!("`{binder}` is an opened module in scope"));
+                    *binder = unique.to_owned();
+                }
+                Dict::Instance { args, .. } => {
+                    for arg in args {
+                        bind(lower, key, arg);
+                    }
+                }
+                Dict::Super { dict, .. } => bind(lower, key, dict),
+                Dict::Structural { fields, .. } => {
+                    for field in fields {
+                        bind(lower, key, field);
+                    }
+                }
+                _ => {}
+            }
+        }
+        let mut dictionaries = self.typing.dicts.get(&key).cloned().unwrap_or_default();
+        for dictionary in &mut dictionaries {
+            bind(self, key, dictionary);
+        }
+        dictionaries
     }
 
     fn givens(&self, node: &Node) -> Vec<String> {
@@ -386,8 +422,7 @@ impl Lower<'_> {
                 let value = if dicts.is_empty() {
                     value
                 } else {
-                    let span = value.span;
-                    Expr::new(ExprKind::Abstract(dicts, Box::new(value)), span)
+                    abstraction::abstract_value(dicts, value)
                 };
                 Some((name, value))
             })
@@ -426,7 +461,8 @@ impl Lower<'_> {
             name,
             mode: info.mode,
             binding: Binding {
-                from: module,
+                // the built-in packages are bound by key, however a source spells it
+                from: module.map(|spec| key(&spec).into_owned()),
                 name: export,
             },
             stages: info.stages.clone(),

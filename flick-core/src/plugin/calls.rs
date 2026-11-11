@@ -30,6 +30,9 @@ pub fn placed_sites(
     };
     for site in &mut sites {
         site.span = place(site.span);
+        if let Some(binding) = &mut site.binding {
+            binding.span = place(binding.span);
+        }
         for argument in &mut site.arguments {
             argument.span = place(argument.span);
         }
@@ -49,7 +52,10 @@ pub fn check_calls(
     file: FileId,
 ) -> Vec<Diagnostic> {
     let mine: Vec<CallSite> = (sites.iter())
-        .filter(|c| watched.holds(&c.module, &c.name))
+        .filter(|c| match &c.tagged {
+            Some(tagged) => watched.tag(&tagged.tag),
+            None => watched.holds(&c.module, &c.name),
+        })
         .cloned()
         .collect();
     let Some(first) = mine.first() else {

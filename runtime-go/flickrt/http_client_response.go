@@ -9,11 +9,11 @@ import (
 	"sync"
 )
 
-// Http.ClientResponse as Effect's HttpClientResponse: the status, headers
-// and cookies of a response and its body, read when it is asked for. Read
-// whole, it is kept, so reading it again gives the same bytes, as Effect's
-// web responses cache theirs; streamed, it is read as it comes. A response
-// comes from the network or from a handler's response, for a test double.
+// Http.ClientResponse: the status, headers and cookies of a response and
+// its body, read when it is asked for. Read whole, it is kept, so reading
+// it again gives the same bytes; streamed, it is read as it comes. A
+// response comes from the network or from a handler's response, for a test
+// double.
 
 type ClientResponse struct {
 	request *ClientRequest

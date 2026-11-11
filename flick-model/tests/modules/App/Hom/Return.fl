@@ -1,0 +1,13 @@
+module App.Hom.Return(F : App.Hom.Contracts.Factory) : App.Hom.Contracts.Factory = module (K : App.Hom.Contracts.Input) ->
+  module Built = F(K)
+
+  type alias Value = K.Item
+
+  value : Value
+  let value = Built.value
+
+  answer : Int
+  let answer = Built.answer
+
+  same : Value -> Value -> Bool
+  let same a b = Built.same a b

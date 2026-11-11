@@ -1,4 +1,4 @@
-// Effect's `Effect` beyond the language: one task timed, repeated, raced
+// `Effect` beyond the language: one task timed, repeated, raced
 // and checked, and tasks run per element of a list.
 module App.Main exposing (main)
 

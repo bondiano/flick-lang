@@ -1,7 +1,6 @@
-/// Operations on strings, over Effect's `String`. Lengths and indices count
-/// UTF-16 code units, as in JS; the subject comes last, so
-/// `s |> String.take_left 3` reads in order. Regular expressions are in
-/// `RegExp`.
+/// Operations on strings. Lengths and indices count UTF-16 code units, as
+/// in JS; the subject comes last, so `s |> String.take_left 3` reads in
+/// order. Regular expressions are in `RegExp`.
 module String exposing (..)
 
 /// A Unicode normalization form, as `String.normalize` takes it.
@@ -9,287 +8,287 @@ type NormalForm = NFC | NFD | NFKC | NFKD
 
 /// Without the whitespace at both ends.
 trim : String -> String
-foreign pure trim from "@flick-lang/effect-ts/effect/String" "trim"
+foreign pure trim from "flick:String" "trim"
   reviewed "effect@4.1.2 sha256:58288b115448c78c"
 
 /// Without the whitespace at the start.
 trim_start : String -> String
-foreign pure trim_start from "@flick-lang/effect-ts/effect/String" "trimStart"
+foreign pure trim_start from "flick:String" "trimStart"
   reviewed "effect@4.1.2 sha256:e75d0d4ecb2ec109"
 
 /// Without the whitespace at the end.
 trim_end : String -> String
-foreign pure trim_end from "@flick-lang/effect-ts/effect/String" "trimEnd"
+foreign pure trim_end from "flick:String" "trimEnd"
   reviewed "effect@4.1.2 sha256:ef16ec68a58eebfe"
 
 /// The number of UTF-16 code units, as JS `length`.
 length : String -> Int
-foreign pure length from "@flick-lang/effect-ts/effect/String" "length"
+foreign pure length from "flick:String" "length"
   reviewed "effect@4.1.2 sha256:d05e61e9b6fba063"
 
 /// Whether the string is `""`.
 is_empty : String -> Bool
-let is_empty s = length s == 0
+let is_empty s = s == ""
 
 /// Whether the string has a code unit.
 is_non_empty : String -> Bool
-foreign pure is_non_empty from "@flick-lang/effect-ts/effect/String" "isNonEmpty"
+foreign pure is_non_empty from "flick:String" "isNonEmpty"
   reviewed "effect@4.1.2 sha256:2a464a561e6655bd"
 
 /// The parts between the separators: `"a,b" |> String.split ","`.
 split : String -> String -> List String
-foreign pure split from "@flick-lang/effect-ts/effect/String" "split"
+foreign pure split from "flick:String" "split"
   arity 1
   reviewed "effect@4.1.2 sha256:8ccb239906ac2865"
 
 /// The parts with the separator between them.
 join : String -> List String -> String
-foreign pure join from "@flick-lang/effect-ts" "stringJoin"
+foreign pure join from "flick:rt" "stringJoin"
 
 /// Whether `part` occurs in the string.
 contains : String -> String -> Bool
-foreign pure contains from "@flick-lang/effect-ts/effect/String" "includes"
+foreign pure contains from "flick:String" "includes"
   arity 1
   reviewed "effect@4.1.2 sha256:0a37ad9d2b74aca8"
 
 /// Whether the string starts with `prefix`.
 starts_with : String -> String -> Bool
-foreign pure starts_with from "@flick-lang/effect-ts/effect/String" "startsWith"
+foreign pure starts_with from "flick:String" "startsWith"
   arity 1
   reviewed "effect@4.1.2 sha256:9c52d4d8c75f6cfd"
 
 /// Whether the string ends with `suffix`.
 ends_with : String -> String -> Bool
-foreign pure ends_with from "@flick-lang/effect-ts/effect/String" "endsWith"
+foreign pure ends_with from "flick:String" "endsWith"
   arity 1
   reviewed "effect@4.1.2 sha256:936a9f770078d3a9"
 
 /// The position of the first occurrence of `part`.
 index_of : String -> String -> Option Int
-foreign pure index_of from "@flick-lang/effect-ts/effect/String" "indexOf"
+foreign pure index_of from "flick:String" "indexOf"
   arity 1
   reviewed "effect@4.1.2 sha256:18b4858888e9b6c8"
 
 /// The position of the last occurrence of `part`.
 last_index_of : String -> String -> Option Int
-foreign pure last_index_of from "@flick-lang/effect-ts/effect/String" "lastIndexOf"
+foreign pure last_index_of from "flick:String" "lastIndexOf"
   arity 1
   reviewed "effect@4.1.2 sha256:b0a4f2b8af72794a"
 
 /// Upper case, by the default Unicode rules.
 to_upper : String -> String
-foreign pure to_upper from "@flick-lang/effect-ts/effect/String" "toUpperCase"
+foreign pure to_upper from "flick:String" "toUpperCase"
   reviewed "effect@4.1.2 sha256:147116a43b5dc642"
 
 /// Lower case, by the default Unicode rules.
 to_lower : String -> String
-foreign pure to_lower from "@flick-lang/effect-ts/effect/String" "toLowerCase"
+foreign pure to_lower from "flick:String" "toLowerCase"
   reviewed "effect@4.1.2 sha256:71ce05bee2fdcef6"
 
 /// Upper case by the rules of the locale `locale` (a BCP 47 tag; an invalid
 /// one is a defect).
 to_locale_upper : String -> String -> String
-foreign pure to_locale_upper from "@flick-lang/effect-ts/effect/String" "toLocaleUpperCase"
+foreign pure to_locale_upper from "flick:String" "toLocaleUpperCase"
   arity 1
   reviewed "effect@4.1.2 sha256:2d56e60d763181a2"
 
 /// Lower case by the rules of the locale `locale`.
 to_locale_lower : String -> String -> String
-foreign pure to_locale_lower from "@flick-lang/effect-ts/effect/String" "toLocaleLowerCase"
+foreign pure to_locale_lower from "flick:String" "toLocaleLowerCase"
   arity 1
   reviewed "effect@4.1.2 sha256:f1f5c278d6d31f87"
 
 /// The first character in upper case.
 capitalize : String -> String
-foreign pure capitalize from "@flick-lang/effect-ts/effect/String" "capitalize"
+foreign pure capitalize from "flick:String" "capitalize"
   reviewed "effect@4.1.2 sha256:97c6d18a22a181ca"
 
 /// The first character in lower case.
 uncapitalize : String -> String
-foreign pure uncapitalize from "@flick-lang/effect-ts/effect/String" "uncapitalize"
+foreign pure uncapitalize from "flick:String" "uncapitalize"
   reviewed "effect@4.1.2 sha256:916f16049a228141"
 
 /// The code units from `start` up to `end`, as JS `slice`: negative
 /// positions count from the end.
 slice : Int -> Int -> String -> String
-foreign pure slice from "@flick-lang/effect-ts/effect/String" "slice"
+foreign pure slice from "flick:String" "slice"
   arity 2
   reviewed "effect@4.1.2 sha256:2afeb2b09199b119"
 
 /// The code units between `start` and `end`, as JS `substring`: negative
 /// positions are 0, and the two may come in either order.
 substring : Int -> Int -> String -> String
-foreign pure substring from "@flick-lang/effect-ts/effect/String" "substring"
+foreign pure substring from "flick:String" "substring"
   arity 2
   reviewed "effect@4.1.2 sha256:f0c7d2f6278e477f"
 
 /// The first `n` code units.
 take_left : Int -> String -> String
-foreign pure take_left from "@flick-lang/effect-ts/effect/String" "takeLeft"
+foreign pure take_left from "flick:String" "takeLeft"
   arity 1
   reviewed "effect@4.1.2 sha256:5ffe31526eda0022"
 
 /// The last `n` code units.
 take_right : Int -> String -> String
-foreign pure take_right from "@flick-lang/effect-ts/effect/String" "takeRight"
+foreign pure take_right from "flick:String" "takeRight"
   arity 1
   reviewed "effect@4.1.2 sha256:8d0623f636ca14de"
 
 /// The code unit at `index`; a negative one counts from the end.
 at : Int -> String -> Option String
-foreign pure at from "@flick-lang/effect-ts/effect/String" "at"
+foreign pure at from "flick:String" "at"
   arity 1
   reviewed "effect@4.1.2 sha256:b3182b49326861cf"
 
 /// The code unit at `index`, which must be in range.
 char_at : Int -> String -> Option String
-foreign pure char_at from "@flick-lang/effect-ts/effect/String" "charAt"
+foreign pure char_at from "flick:String" "charAt"
   arity 1
   reviewed "effect@4.1.2 sha256:6e382d7bbf76817d"
 
 /// The UTF-16 code unit at `index`, as a number.
 char_code_at : Int -> String -> Option Int
-foreign pure char_code_at from "@flick-lang/effect-ts/effect/String" "charCodeAt"
+foreign pure char_code_at from "flick:String" "charCodeAt"
   arity 1
   reviewed "effect@4.1.2 sha256:d2d0b683e654ff12"
 
 /// The code point starting at `index`.
 code_point_at : Int -> String -> Option Int
-foreign pure code_point_at from "@flick-lang/effect-ts/effect/String" "codePointAt"
+foreign pure code_point_at from "flick:String" "codePointAt"
   arity 1
   reviewed "effect@4.1.2 sha256:90d15a40a2969fcd"
 
 /// Compares by the collation of the locale `locale`: `self |>
 /// String.locale_compare "de" that`.
 locale_compare : String -> String -> String -> Ordering
-foreign pure locale_compare from "@flick-lang/effect-ts/effect/String" "flickLocaleCompare"
+foreign pure locale_compare from "flick:String" "flickLocaleCompare"
   reviewed "effect@4.1.2 sha256:07afbb35384ec88e"
 
 /// The string in the Unicode normalization form.
 normalize : NormalForm -> String -> String
-foreign pure normalize from "@flick-lang/effect-ts/effect/String" "flickNormalize"
+foreign pure normalize from "flick:String" "flickNormalize"
   reviewed "effect@4.1.2 sha256:ab5c139c9fcc7593"
 
 /// Padded at the start with `fill`, repeated and cut, up to `length`.
 pad_start : Int -> String -> String -> String
-foreign pure pad_start from "@flick-lang/effect-ts/effect/String" "padStart"
+foreign pure pad_start from "flick:String" "padStart"
   arity 2
   reviewed "effect@4.1.2 sha256:71969f32fb003e59"
 
 /// Padded at the end with `fill`, repeated and cut, up to `length`.
 pad_end : Int -> String -> String -> String
-foreign pure pad_end from "@flick-lang/effect-ts/effect/String" "padEnd"
+foreign pure pad_end from "flick:String" "padEnd"
   arity 2
   reviewed "effect@4.1.2 sha256:d19b7af946daf38f"
 
 /// The string `n` times; a negative `n` counts as 0, a fraction is cut.
 repeat : Int -> String -> String
-foreign pure repeat from "@flick-lang/effect-ts/effect/String" "repeat"
+foreign pure repeat from "flick:String" "repeat"
   arity 1
   reviewed "effect@4.1.2 sha256:b43e515bdbfde4c6"
 
 /// Every occurrence of `pattern` replaced by `replacement`, taken as it is.
 replace_all : String -> String -> String -> String
-foreign pure replace_all from "@flick-lang/effect-ts" "stringReplaceAll"
+foreign pure replace_all from "flick:rt" "stringReplaceAll"
 
 /// The lines, without their line breaks (`\n` or `\r\n`).
 lines : String -> List String
-foreign pure lines from "@flick-lang/effect-ts/effect/String" "flickLines"
+foreign pure lines from "flick:String" "flickLines"
   reviewed "effect@4.1.2 sha256:40885e6af03b7629"
 
 /// The lines, each with its line break.
 lines_with_separators : String -> List String
-foreign pure lines_with_separators from "@flick-lang/effect-ts/effect/String" "flickLinesWithSeparators"
+foreign pure lines_with_separators from "flick:String" "flickLinesWithSeparators"
   reviewed "effect@4.1.2 sha256:8b9bd97dda1861cc"
 
 /// Each line without its leading blanks and the `|` after them.
 strip_margin : String -> String
-foreign pure strip_margin from "@flick-lang/effect-ts/effect/String" "stripMargin"
+foreign pure strip_margin from "flick:String" "stripMargin"
   reviewed "effect@4.1.2 sha256:8da64e852a9e220b"
 
 /// Each line without its leading blanks and the margin character after them.
 strip_margin_with : String -> String -> String
-foreign pure strip_margin_with from "@flick-lang/effect-ts/effect/String" "stripMarginWith"
+foreign pure strip_margin_with from "flick:String" "stripMarginWith"
   arity 1
   reviewed "effect@4.1.2 sha256:cb14394498bfec4b"
 
 /// `snake_case` to `camelCase`.
 snake_to_camel : String -> String
-foreign pure snake_to_camel from "@flick-lang/effect-ts/effect/String" "snakeToCamel"
+foreign pure snake_to_camel from "flick:String" "snakeToCamel"
   reviewed "effect@4.1.2 sha256:e6f4fe7e5db9f7f8"
 
 /// `snake_case` to `PascalCase`.
 snake_to_pascal : String -> String
-foreign pure snake_to_pascal from "@flick-lang/effect-ts/effect/String" "snakeToPascal"
+foreign pure snake_to_pascal from "flick:String" "snakeToPascal"
   reviewed "effect@4.1.2 sha256:cf935137feb5371a"
 
 /// `snake_case` to `kebab-case`.
 snake_to_kebab : String -> String
-foreign pure snake_to_kebab from "@flick-lang/effect-ts/effect/String" "snakeToKebab"
+foreign pure snake_to_kebab from "flick:String" "snakeToKebab"
   reviewed "effect@4.1.2 sha256:baececf36928821f"
 
 /// `camelCase` to `snake_case`.
 camel_to_snake : String -> String
-foreign pure camel_to_snake from "@flick-lang/effect-ts/effect/String" "camelToSnake"
+foreign pure camel_to_snake from "flick:String" "camelToSnake"
   reviewed "effect@4.1.2 sha256:361d3aed15db766c"
 
 /// `PascalCase` to `snake_case`.
 pascal_to_snake : String -> String
-foreign pure pascal_to_snake from "@flick-lang/effect-ts/effect/String" "pascalToSnake"
+foreign pure pascal_to_snake from "flick:String" "pascalToSnake"
   reviewed "effect@4.1.2 sha256:e495e4aba2c5853e"
 
 /// `kebab-case` to `snake_case`.
 kebab_to_snake : String -> String
-foreign pure kebab_to_snake from "@flick-lang/effect-ts/effect/String" "kebabToSnake"
+foreign pure kebab_to_snake from "flick:String" "kebabToSnake"
   reviewed "effect@4.1.2 sha256:9017f43844d4efca"
 
 /// The words in lower case, separated by spaces: `"fooBar"` is `"foo bar"`.
 no_case : String -> String
-foreign pure no_case from "@flick-lang/effect-ts/effect/String" "noCase"
+foreign pure no_case from "flick:String" "noCase"
   reviewed "effect@4.1.2 sha256:b0953b5c24decb0d"
 
 /// The words as `PascalCase`.
 pascal_case : String -> String
-foreign pure pascal_case from "@flick-lang/effect-ts/effect/String" "pascalCase"
+foreign pure pascal_case from "flick:String" "pascalCase"
   reviewed "effect@4.1.2 sha256:0e43498c12baff94"
 
 /// The words as `camelCase`.
 camel_case : String -> String
-foreign pure camel_case from "@flick-lang/effect-ts/effect/String" "camelCase"
+foreign pure camel_case from "flick:String" "camelCase"
   reviewed "effect@4.1.2 sha256:417505d013cbd4fb"
 
 /// The words as `CONSTANT_CASE`.
 constant_case : String -> String
-foreign pure constant_case from "@flick-lang/effect-ts/effect/String" "constantCase"
+foreign pure constant_case from "flick:String" "constantCase"
   reviewed "effect@4.1.2 sha256:3a3d8181eb18128f"
 
 /// The words as a configuration key, `CONFIG_CASE`, keeping digits apart.
 config_case : String -> String
-foreign pure config_case from "@flick-lang/effect-ts/effect/String" "configCase"
+foreign pure config_case from "flick:String" "configCase"
   reviewed "effect@4.1.2 sha256:c31a723ddb9784e8"
 
 /// The words as `kebab-case`.
 kebab_case : String -> String
-foreign pure kebab_case from "@flick-lang/effect-ts/effect/String" "kebabCase"
+foreign pure kebab_case from "flick:String" "kebabCase"
   reviewed "effect@4.1.2 sha256:b08413acba8c802f"
 
 /// The words as `snake_case`.
 snake_case : String -> String
-foreign pure snake_case from "@flick-lang/effect-ts/effect/String" "snakeCase"
+foreign pure snake_case from "flick:String" "snakeCase"
   reviewed "effect@4.1.2 sha256:b51c8e0a076bb258"
 
 /// The code points, each as a string.
 chars : String -> List String
-foreign pure chars from "@flick-lang/effect-ts" "stringChars"
+foreign pure chars from "flick:rt" "stringChars"
 
 /// The number in JS syntax; `-0` is `"-0"`.
 from_number : Float -> String
-foreign pure from_number from "@flick-lang/effect-ts" "stringFromNumber"
+foreign pure from_number from "flick:rt" "stringFromNumber"
 
 /// The number a whole string spells in JS syntax, if any.
 to_number : String -> Option Float
-foreign pure to_number from "@flick-lang/effect-ts" "stringToNumber"
+foreign pure to_number from "flick:rt" "stringToNumber"
 
 /// A JSON string.
 json : PureCodec Json String
-foreign pure json from "@flick-lang/effect-ts" "codecString"
+foreign pure json from "flick:rt" "codecString"

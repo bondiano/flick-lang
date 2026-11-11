@@ -108,6 +108,9 @@ impl Checker<'_> {
         outlived: &[String],
         body: &Type,
     ) -> Vec<&'b Binder> {
+        // a later stage holds what the result shows, though a signature
+        // leaves it out
+        let body = &self.held_stages(body);
         (vars.iter())
             .filter(|v| {
                 let name = slice::from_ref(&v.name);

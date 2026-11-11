@@ -96,12 +96,12 @@ theorem Typ.cut {Ψ Θ₁ Γ e J} (h : Typ S Ψ Θ₁ Γ e J) : ∀ {Θ₂}, Ent
   | var hi hts hH hT => intro _ hΘ; exact .var hi hts (hH.mono hΘ) hT
   | allVar hi hk hc => intro _ _; exact .allVar hi hk hc
   | allI hv _ ih => intro _ hΘ; exact .allI hv (ih (hΘ.substT _))
-  | lam _ hn hc hT ih => intro _ hΘ; exact .lam (ih hΘ) hn hc hT
+  | lam _ hn hT ih => intro _ hΘ; exact .lam (ih hΘ) hn hT
   | app _ _ hψ hT ih₁ ih₂ => intro _ hΘ; exact .app (ih₁ hΘ) (ih₂ hΘ) hψ hT
   | let_ _ _ ih₁ ih₂ => intro _ hΘ; exact .let_ (ih₁ hΘ) (ih₂ hΘ)
   | letGen _ _ ih₁ ih₂ => intro _ hΘ; exact .letGen (ih₁ (hΘ.lift _ _)) (ih₂ hΘ)
-  | letrec _ hn hc _ ih₁ ih₂ => intro _ hΘ; exact .letrec (ih₁ hΘ) hn hc (ih₂ hΘ)
-  | fix _ hn hc hT ih => intro _ hΘ; exact .fix (ih hΘ) hn hc hT
+  | letrec _ hn _ ih₁ ih₂ => intro _ hΘ; exact .letrec (ih₁ hΘ) hn (ih₂ hΘ)
+  | fix _ hn hT ih => intro _ hΘ; exact .fix (ih hΘ) hn hT
   | lit => intro _ _; exact .lit
   | loc hl => intro _ _; exact .loc hl
   | const hc hT => intro _ hΘ; exact .const (Const.ok_mono hc hΘ) hT
@@ -118,7 +118,7 @@ theorem Typ.cut {Ψ Θ₁ Γ e J} (h : Typ S Ψ Θ₁ Γ e J) : ∀ {Θ₂}, Ent
     intro _ hΘ
     exact .aref hK hU hn hfr hlc hpA (fun θ hθ hu => ihA θ hθ hu ((hΘ.substT _).substT θ)) (ihr hΘ)
   | todo => intro _ _; exact .todo
-  | task _ hψ hn hc hT ih => intro _ hΘ; exact .task (ih hΘ) hψ hn hc hT
+  | task _ hψ hn hT ih => intro _ hΘ; exact .task (ih hΘ) hψ hn hT
   | await _ hφ hT ih => intro _ hΘ; exact .await (ih hΘ) hφ hT
   | raise _ hφ ih => intro _ hΘ; exact .raise (ih hΘ) hφ
   | raiseAdt _ hU hφ ih => intro _ hΘ; exact .raiseAdt (ih hΘ) hU hφ
@@ -134,7 +134,7 @@ theorem Typ.cut {Ψ Θ₁ Γ e J} (h : Typ S Ψ Θ₁ Γ e J) : ∀ {Θ₂}, Ent
     intro _ hΘ; exact .inside hF (ih (hΘ.union _)) hφ' ht hε hφ hT
   | cap => intro _ _; exact .cap
   | own => intro _ _; exact .own
-  | drec hc hk _ hn hh ih => intro _ hΘ; exact .drec hc hk (ih hΘ) hn hh
+  | drec hc hk _ hn ih => intro _ hΘ; exact .drec hc hk (ih hΘ) hn
   | dnil => intro _ _; exact .dnil
   | dcons _ _ ih₁ ih₂ => intro _ hΘ; exact .dcons (ih₁ (hΘ.lift _ _)) (ih₂ hΘ)
   | dproj _ hc hk hl hts hH hT ih => intro _ hΘ; exact .dproj (ih hΘ) hc hk hl hts (hH.mono hΘ) hT
@@ -146,15 +146,15 @@ theorem Typ.cut {Ψ Θ₁ Γ e J} (h : Typ S Ψ Θ₁ Γ e J) : ∀ {Θ₂}, Ent
   | hactl hop _ _ ih₁ ih₂ => intro _ hΘ; exact .hactl hop (ih₁ hΘ) (ih₂ hΘ)
   | hdl _ hn _ hψ _ hφ₀ hOb hc hφ hT ih₁ ih₂ ih₃ =>
     intro _ hΘ; exact .hdl (ih₁ (hΘ.substT _)) hn (ih₂ hΘ) hψ (ih₃ hΘ) hφ₀ hOb hc hφ hT
-  | hwith hℓ _ _ hψ _ hφ₀ hc hφ hT ih₁ ih₂ ih₃ =>
-    intro _ hΘ; exact .hwith hℓ (ih₁ hΘ) (ih₂ hΘ) hψ (ih₃ hΘ) (Stage.le_rt_sub hφ₀ (Row.hP_mono hΘ)) hc hφ hT
-  | hctl hℓ _ _ hψ hop hc htl hE hk _ hφ₀ _ hl hcm hφ hT ih₁ ih₂ ih₃ ih₄ =>
-    intro _ hΘ; exact .hctl hℓ (ih₁ hΘ) (ih₂ hΘ) hψ hop hc htl hE hk (ih₃ hΘ) (Stage.le_rt_sub hφ₀ (Row.hP_mono hΘ)) (ih₄ hΘ) hl hcm hφ hT
+  | hwith hℓ _ _ hψ _ hφ₀ hc hφ hT ha ih₁ ih₂ ih₃ =>
+    intro _ hΘ; exact .hwith hℓ (ih₁ hΘ) (ih₂ hΘ) hψ (ih₃ hΘ) (Stage.le_rt_sub hφ₀ (Row.hP_mono hΘ)) hc hφ hT ha
+  | hctl hℓ _ _ hψ hop hc htl hE hk _ hφ₀ _ hl hcm hφ hT ha ih₁ ih₂ ih₃ ih₄ =>
+    intro _ hΘ; exact .hctl hℓ (ih₁ hΘ) (ih₂ hΘ) hψ hop hc htl hE hk (ih₃ hΘ) (Stage.le_rt_sub hφ₀ (Row.hP_mono hΘ)) (ih₄ hΘ) hl hcm hφ hT ha
   | hkeep hℓ _ _ hφ₀ hc hnt hle hφ hT ih₁ ih₂ =>
     intro _ hΘ; exact .hkeep hℓ (ih₁ hΘ) (ih₂ hΘ) (Stage.le_rt_sub hφ₀ (Row.hP_mono hΘ)) hc hnt hle hφ hT
   | hkarm hℓ _ hop hE hk _ hφ₀ hc hnt _ hle hφ hT ih₁ ih₂ ih₃ =>
     intro _ hΘ; exact .hkarm hℓ (ih₁ hΘ) hop hE hk (ih₂ hΘ) (Stage.le_rt_sub hφ₀ (Row.hP_mono hΘ)) hc hnt (ih₃ hΘ) hle hφ hT
-  | hres hℓ _ hA ha _ hl hφ hT ih₁ ih₂ => intro _ hΘ; exact .hres hℓ (ih₁ hΘ) hA ha (ih₂ hΘ) hl hφ hT
+  | hres hℓ _ hA ha _ hl hcp hφ hT ih₁ ih₂ => intro _ hΘ; exact .hres hℓ (ih₁ hΘ) hA ha (ih₂ hΘ) hl hcp hφ hT
   | hdone _ ih => intro _ hΘ; exact .hdone (ih hΘ)
   | unw hℓ _ hφ ih => intro _ hΘ; exact .unw hℓ (ih hΘ) hφ
   | kont hl hC hT => intro _ _; exact .kont hl hC hT

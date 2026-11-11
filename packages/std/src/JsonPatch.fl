@@ -1,6 +1,6 @@
-/// Effect's `JsonPatch`: the differences between two JSON values as a list
-/// of operations (RFC 6902's `add`, `remove` and `replace`), and applying
-/// them. Paths are JSON Pointers, see `JsonPointer`.
+/// The differences between two JSON values as a list of operations (RFC
+/// 6902's `add`, `remove` and `replace`), and applying them. Paths are JSON
+/// Pointers, see `JsonPointer`.
 module JsonPatch exposing (..)
 
 /// One change at a path: add a value, remove one, or replace one.
@@ -15,10 +15,10 @@ type error PatchError = PatchError String
 
 /// The operations that turn `old` into `new`: `JsonPatch.get old new`.
 get : Json -> Json -> JsonPatch
-foreign pure get from "@flick-lang/effect-ts/effect/JsonPatch" "flickGet"
+foreign pure get from "flick:JsonPatch" "flickGet"
   reviewed "effect@4.1.2 sha256:ddd08e9b587c85f7"
 
 /// The value after the operations: `old |> JsonPatch.apply patch`.
 apply : JsonPatch -> Json -> Result PatchError Json
-foreign pure apply from "@flick-lang/effect-ts/effect/JsonPatch" "flickApply"
+foreign pure apply from "flick:JsonPatch" "flickApply"
   reviewed "effect@4.1.2 sha256:7f3d050630dffd85"

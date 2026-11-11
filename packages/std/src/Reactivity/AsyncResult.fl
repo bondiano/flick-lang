@@ -1,6 +1,6 @@
-/// Effect's `AsyncResult` (unstable in Effect 4.1.2): the value of an atom
-/// an effect computes. It is not there yet, it succeeded, or it failed, and
-/// each case may be waiting for a run that has started again.
+/// The value of an atom an effect computes. It is not there yet, it
+/// succeeded, or it failed, and each case may be waiting for a run that has
+/// started again. The module is experimental.
 module Reactivity.AsyncResult exposing (..)
 
 /// The state of an effect's result: initial, a success of `a` or a failure
@@ -10,15 +10,15 @@ type AsyncResult a (e : ErrorRow)
 /// `initial` when nothing has finished, else `success` of the value or
 /// `failure` of what went wrong.
 fold : b -> (a -> b) -> (Failure e -> b) -> AsyncResult a e -> b
-foreign pure fold from "@flick-lang/effect-ts/effect/reactivity/AsyncResult" "flickFold"
+foreign pure fold from "flick:reactivity/AsyncResult" "flickFold"
   reviewed "effect@4.1.2 sha256:bb0f230e80dc1cfc"
 
 /// The value of a success, the last one kept by a failure, else `None`.
 value : AsyncResult a e -> Option a
-foreign pure value from "@flick-lang/effect-ts/effect/reactivity/AsyncResult" "value"
+foreign pure value from "flick:reactivity/AsyncResult" "value"
   reviewed "effect@4.1.2 sha256:d43f686611659163"
 
 /// Whether a run is under way.
 is_waiting : AsyncResult a e -> Bool
-foreign pure is_waiting from "@flick-lang/effect-ts/effect/reactivity/AsyncResult" "isWaiting"
+foreign pure is_waiting from "flick:reactivity/AsyncResult" "isWaiting"
   reviewed "effect@4.1.2 sha256:aa0af91299b3a059"

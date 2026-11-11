@@ -10,6 +10,7 @@
 
 mod lower;
 mod print;
+pub(crate) mod reach;
 
 pub use flick_ir::{
     Adapter, Arm, BinOp, Binding, Copies, Expr, ExprKind, Foreign, ForeignMode, Handled, Handler,

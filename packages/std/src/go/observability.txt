@@ -1,6 +1,6 @@
 # Logger, Metric, Tracer and References.
 
-[@flick-lang/effect-ts/effect/Logger]
+[flick:Logger]
 map LoggerMap
 withConsoleError LoggerWithConsoleError
 withLeveledConsole LoggerWithLeveledConsole
@@ -21,7 +21,7 @@ flickToFile LoggerToFile
 flickWithLogToStderr *LoggerWithLogToStderr
 flickLogWrite *LoggerLogWrite
 
-[@flick-lang/effect-ts/effect/Metric]
+[flick:Metric]
 flickCounter MetricCounter
 flickGauge MetricGauge
 flickFrequency MetricFrequency
@@ -46,7 +46,7 @@ disableRuntimeMetrics *MetricDisableRuntimeMetrics
 enableRuntimeMetricsLayer MetricEnableRuntimeMetricsLayer
 disableRuntimeMetricsLayer MetricDisableRuntimeMetricsLayer
 
-[@flick-lang/effect-ts/effect/Tracer]
+[flick:Tracer]
 flickSpanKind TracerSpanKind
 flickLinks TracerLinks
 flickStatus TracerStatus
@@ -56,7 +56,7 @@ flickWithTracer *TracerWithTracer
 flickWithTraceLevel *TracerWithTraceLevel
 flickWithMinimumTraceLevel *TracerWithMinimumTraceLevel
 
-[@flick-lang/effect-ts/effect/References]
+[flick:References]
 flickCurrentLogLevel *ReferencesCurrentLogLevel
 flickWithCurrentLogLevel *ReferencesWithCurrentLogLevel
 flickWithUnhandledLogLevel *ReferencesWithUnhandledLogLevel
@@ -68,12 +68,12 @@ flickWithTracerEnabled *ReferencesWithTracerEnabled
 flickWithTracerTimingEnabled *ReferencesWithTracerTimingEnabled
 flickTracerSpanAnnotations *ReferencesTracerSpanAnnotations
 
-[@flick-lang/effect-ts/effect/observability/PrometheusMetrics]
+[flick:observability/PrometheusMetrics]
 prometheusFormat *PrometheusFormat
 prometheusFormatWith *PrometheusFormatWith
 
 # Effect.Observe
-[@flick-lang/effect-ts/effect/Effect]
+[flick:Effect]
 flickLogWithLevel *EffectLogWithLevel
 withLogger *EffectWithLogger
 annotateLogs *EffectAnnotateLogs

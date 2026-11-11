@@ -1,0 +1,125 @@
+// Optics that miss their part, composed and converted: what a miss says and
+// where, and that a structure without the part comes back unchanged.
+module App.Main exposing (main)
+
+type alias Point = { x : Float; y : Float }
+
+type alias Shape = { name : String; corner : Option Point }
+
+line : String -> String ->{} Unit
+let line label text = Platform.stdout_line (label ++ ": " ++ text)
+
+corner : Optic.Optional Shape Point
+let corner =
+  Optic.make_optional
+    (fun s ->
+      match s.corner with
+      | Some p -> Ok p
+      | None -> Err "no corner"
+    )
+    (fun p s -> if p.x < 0 then Err "left of the origin" else Ok { name = s.name; corner = Some p })
+
+x_of : Optic.Lens Point Float
+let x_of = Optic.make_lens (fun p -> p.x) (fun x p -> { x = x; y = p.y })
+
+positive : Optic.Prism Float Float
+let positive = Optic.make_prism (fun n -> if n > 0 then Ok n else Err "not positive") (fun n -> n)
+
+halves : Optic.Prism Float Float
+let halves =
+  Optic.make_prism (fun n -> if n % 2 == 0 then Ok (n / 2) else Err "odd") (fun n -> n * 2)
+
+corner_x : Optic.Optional Shape Float
+let corner_x = corner |> Optic.compose (Optic.lens_optional x_of)
+
+positive_x : Optic.Optional Shape Float
+let positive_x = corner_x |> Optic.compose (Optic.prism_optional positive)
+
+box : Shape
+let box = { name = "box"; corner = Some { x = 2; y = 5 } }
+
+dot : Shape
+let dot = { name = "dot"; corner = None }
+
+behind : Shape
+let behind = { name = "behind"; corner = Some { x = -3; y = 1 } }
+
+shapes : List Shape
+let shapes = [box, dot, behind]
+
+/// `f` of each shape.
+each : Show b => (Shape -> b) -> String
+let each f = show (List.map f shapes)
+
+reads : Unit ->{} Unit
+let reads () =
+  line "get_result" (each (Optic.get_result corner))
+  line "composed" (each (Optic.get_result corner_x))
+  line "composed twice" (each (Optic.get_result positive_x))
+  line "prism" (show (List.map (Optic.get_result (Optic.prism_optional positive)) [3, 0, -1]))
+  let half_of_positive = positive |> Optic.compose_prism halves
+  line
+    "compose_prism"
+    (show (List.map (Optic.get_result (Optic.prism_optional half_of_positive)) [8, 3, -4]))
+  line "compose_prism set" (show (Optic.set half_of_positive 5))
+  line
+    "check"
+    (show
+      (Optic.get_result (Optic.prism_optional (Optic.from_check (fun n -> n < 10) "too big")) 30))
+
+writes : Unit ->{} Unit
+let writes () =
+  line "replace" (each (Optic.replace corner_x 7))
+  line "replace refused" (each (Optic.replace corner_x (-7)))
+  line "replace_result" (each (Optic.replace_result corner_x 7))
+  line "replace_result refused" (each (Optic.replace_result corner_x (-7)))
+  line "replace through a prism" (each (Optic.replace positive_x 9))
+  line "modify" (each (Optic.modify corner_x (fun x -> x * 10)))
+  line "modify through a prism" (each (Optic.modify positive_x (fun x -> x + 1)))
+  line "modify refused" (each (Optic.modify corner_x (fun x -> 0 - x - 10)))
+
+parts : Optic.Traversal Shape Float
+let parts =
+  Optic.traversal
+    (Optic.make_optional
+      (fun s ->
+        match s.corner with
+        | Some p -> Ok [p.x, p.y]
+        | None -> Err "no corner"
+      )
+      (fun xs s ->
+        match xs with
+        | [x, y] -> Ok { name = s.name; corner = Some { x = x; y = y } }
+        | _ -> Err "not two parts"
+      ))
+
+lists : Unit ->{} Unit
+let lists () =
+  line "get_all" (each (Optic.get_all parts))
+  line "modify_all" (each (Optic.modify_all parts (fun n -> n + 1)))
+  let doubled = Optic.make_iso (fun n -> n * 2) (fun n -> n / 2)
+  line
+    "iso"
+    (show (
+      Optic.get (Optic.iso_lens doubled) 3,
+      Optic.set (Optic.iso_prism doubled) 8,
+      Optic.get_result (Optic.prism_optional (Optic.iso_prism doubled)) 3,
+      Optic.replace (Optic.lens_optional (Optic.iso_lens doubled)) 8 3,
+      Optic.replace (Optic.prism_optional (Optic.iso_prism doubled)) 8 3,
+    ))
+  let none_prism : Optic.Prism (Option Float) Unit = Optic.none ()
+  let err_prism : Optic.Prism (Result String Float) String = Optic.failure ()
+  line
+    "misses"
+    (show (
+      Optic.get_result (Optic.prism_optional (Optic.some ())) (None : Option Float),
+      Optic.get_result (Optic.prism_optional none_prism) (Some 1),
+      Optic.get_result (Optic.prism_optional (Optic.success ())) (Err "e" : Result String Float),
+      Optic.get_result (Optic.prism_optional err_prism) (Ok 1),
+    ))
+
+main : Unit ->{; AppError} Unit
+let main () =
+  reads ()
+  writes ()
+  lists ()

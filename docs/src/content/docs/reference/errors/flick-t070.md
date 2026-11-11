@@ -1,0 +1,9 @@
+---
+title: "FLICK-T070"
+---
+
+# Mutation in a strict comprehension
+
+A strict `[for … yield …]` comprehension cannot assign a mutable variable
+from outside it. Use `for … do` to update local state, or a fold to build a
+value. Lazy sequences cannot capture mutable variables at all (`FLICK-G005`).

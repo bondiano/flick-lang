@@ -1,4 +1,4 @@
-// Effect's `Sink`, run on chunks of two through its channel: the value it
+// `Sink`, run on chunks of two through its channel: the value it
 // gives and the elements it leaves over.
 module App.Main exposing (main)
 
@@ -36,7 +36,7 @@ let small = Filter.make (fun n -> if n < 3 then Ok (n * 10) else Err n)
 small_effect : Filter.FilterEffect none none Float Float Float
 let small_effect = Filter.make_effect (fun n -> if n < 3 then Ok (n * 10) else Err n)
 
-folds : Unit ->{; Boom} Unit
+folds : Unit ->{Async; Boom} Unit
 let folds () =
   say (ended "collect" (run (Sink.collect ())))
   say (ended "count" (run Sink.count))
@@ -116,7 +116,7 @@ let folds () =
       "never, interrupted"
       (Channel.run_drain (Channel.interrupt_when (task { stopped }) forever)))
 
-shapes : Unit ->{; Boom} Unit
+shapes : Unit ->{Async; Boom} Unit
 let shapes () =
   say (ended "succeed" (run (Sink.succeed "x")))
   say (ended "sync" (run (Sink.sync (fun () -> "lazy"))))

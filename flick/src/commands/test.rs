@@ -16,8 +16,9 @@ use std::{env, fs, io, thread};
 use flick_core::build::{Artifact, go};
 use flick_core::diagnostics::{Diagnostic, Severity, codes};
 use flick_core::project::config::{Backend, Emit};
-use flick_core::project::{self, Project};
+use flick_core::project::{self, ModuleCache, Project};
 use flick_core::source::SourceMap;
+use tracing::debug;
 
 use super::build::{BuildPlan, Emission, artifacts, release, write, write_artifacts};
 use super::check::select;
@@ -25,7 +26,7 @@ use crate::args::{Color, GlobalArguments, Reporter, TestArguments, TestEmitArgum
 use crate::package_cache;
 use crate::progress::{Mode, Progress};
 use crate::sources::FsHost;
-use crate::{builtins, cache, child, report, toolchain};
+use crate::{builtins, cache, child, report, timings, toolchain};
 use flick_core::build::Extras;
 
 /// Where the test build goes, inside the project.
@@ -35,7 +36,7 @@ pub fn test(options: &TestArguments, global: &GlobalArguments) -> ExitCode {
     if options.watch {
         return watch(options, global);
     }
-    let Ok(runner) = prepare(options, global) else {
+    let Ok(runner) = prepare(options, global, None) else {
         return ExitCode::from(1);
     };
     let signals = child::signals();
@@ -51,7 +52,11 @@ pub fn test(options: &TestArguments, global: &GlobalArguments) -> ExitCode {
 
 /// Builds the test run and writes its runner.
 #[allow(clippy::too_many_lines)]
-fn prepare(options: &TestArguments, global: &GlobalArguments) -> Result<PathBuf, ()> {
+fn prepare(
+    options: &TestArguments,
+    global: &GlobalArguments,
+    modules: Option<&mut ModuleCache>,
+) -> Result<PathBuf, ()> {
     let progress = Progress::new(if matches!(options.reporter, Reporter::Json) {
         Mode::Hidden
     } else {
@@ -82,7 +87,11 @@ fn prepare(options: &TestArguments, global: &GlobalArguments) -> Result<PathBuf,
     let mut selected = wanted.clone();
     selected.sort();
     selected.dedup();
-    let rt = options.rt || project.config.build.effect == Backend::Rt;
+    let go_requested = match options.emit {
+        Some(target) => target == TestEmitArgument::Go,
+        None => project.config.build.emit == Emit::Go,
+    };
+    let rt = options.rt || (!go_requested && project.config.build.effect == Backend::Rt);
     let settings = format!(
         "test {:?} {:?} {:?} {rt}",
         selected,
@@ -93,23 +102,20 @@ fn prepare(options: &TestArguments, global: &GlobalArguments) -> Result<PathBuf,
         },
         release(options.profile, Some(&project.config.build)),
     );
-    let key = cache::key(&project, &roots, &settings);
+    let key = cache::key(&project, &roots, &settings, !go_requested && !rt);
     let out = project.root.join(OUT_DIR);
     progress.stage("Checking test cache");
     if let Some(runner) = cached_prepare(&project, &key, &out, &progress) {
         return Ok(runner);
     }
     progress.stage("Preparing compiler");
-    if let Err(diagnostic) = builtins::prepare_in(rt) {
+    if let Err(diagnostic) = builtins::prepare_in(project::stages_by_class(Some(&project), rt)) {
         drop(progress);
         return fail(&sources, vec![diagnostic]);
     }
     progress.stage("Compiling Flick modules");
-    let (mut diagnostics, mut compilation) = package_cache::with_saved(|saved| {
-        let (diagnostics, compilation, fresh) =
-            project::compile_with(&host, &mut sources, Some(&project), &roots, saved, rt);
-        ((diagnostics, compilation), fresh)
-    });
+    let (mut diagnostics, mut compilation) =
+        package_cache::compile(&host, &mut sources, Some(&project), &roots, rt, modules);
     super::build::hooks::ir(Some(&project), &mut compilation, &mut diagnostics);
     let errors = diagnostics.iter().any(|d| d.severity == Severity::Error);
     let progress = if diagnostics.is_empty() {
@@ -134,11 +140,7 @@ fn prepare(options: &TestArguments, global: &GlobalArguments) -> Result<PathBuf,
         .filter(|m| wanted.is_empty() || wanted.contains(&m.path))
         .map(|m| (m.name.clone(), format!("./{}.js", m.name.replace('.', "/"))))
         .collect();
-    let go = match options.emit {
-        Some(target) => target == TestEmitArgument::Go,
-        None => project.config.build.emit == Emit::Go,
-    };
-    if go && rt {
+    if go_requested && rt {
         drop(progress);
         let message = "Flick's own runtime has only JavaScript output yet";
         return fail(
@@ -147,7 +149,7 @@ fn prepare(options: &TestArguments, global: &GlobalArguments) -> Result<PathBuf,
         );
     }
     // with no suite, the go target has no program: the node runner reports the empty run
-    let go = go && !suites.is_empty();
+    let go = go_requested && !suites.is_empty();
     if !go && let Some(problem) = toolchain::check_runtime(&project.root, rt) {
         drop(progress);
         return fail(&sources, vec![problem]);
@@ -179,12 +181,13 @@ fn prepare(options: &TestArguments, global: &GlobalArguments) -> Result<PathBuf,
         drop(progress);
         return fail(&sources, emitted.diagnostics);
     }
+    let read = (&roots[..], &*host.cwd, &sources);
+    let store = |artifacts: &[Artifact]| {
+        let now = cache::key(&project, &roots, &settings, !go_requested && !rt);
+        diagnostics.is_empty() && cache::store_built(&project, read, &key, &now, artifacts)
+    };
     if go {
-        if diagnostics.is_empty()
-            && cache::key(&project, &roots, &settings) == key
-            && cache::read_unchanged(&project, &roots, &host.cwd, &sources)
-        {
-            cache::store(&project.root, &key, &emitted.artifacts);
+        if store(&emitted.artifacts) {
             cache::mark_go(&project.root, &key, &out, &go::executable(go::TEST));
         }
         drop(progress);
@@ -197,27 +200,25 @@ fn prepare(options: &TestArguments, global: &GlobalArguments) -> Result<PathBuf,
         eprintln!("error: cannot write `{}`: {err}", runner.display());
         return Err(());
     }
-    if diagnostics.is_empty()
-        && cache::key(&project, &roots, &settings) == key
-        && cache::read_unchanged(&project, &roots, &host.cwd, &sources)
-    {
-        emitted.artifacts.push(Artifact {
-            path: "test.js".to_owned(),
-            contents: runner_source(&suites, rt),
-        });
-        cache::store(&project.root, &key, &emitted.artifacts);
-    }
+    emitted.artifacts.push(Artifact {
+        path: "test.js".to_owned(),
+        contents: runner_source(&suites, rt),
+    });
+    store(&emitted.artifacts);
     drop(progress);
     Ok(runner)
 }
 
 fn cached_prepare(
     project: &Project,
-    key: &str,
+    key: &cache::Signed,
     out: &Path,
     progress: &Progress,
 ) -> Option<PathBuf> {
-    let artifacts = cache::load(&project.root, key)?;
+    let Some(artifacts) = cache::load(&project.root, key) else {
+        debug!(miss = %cache::missed(&project.root, key));
+        return None;
+    };
     let go = artifacts.iter().any(|a| a.path == "go/test/go.mod");
     let runner = out.join(if go {
         go::executable(go::TEST)
@@ -407,6 +408,27 @@ pub fn watch_snapshot(paths: &[PathBuf]) -> WatchSnapshot {
     WatchSnapshot(out)
 }
 
+/// The snapshot once two in a row agree: a save that truncates a file and
+/// then writes it is one change, not a build of each state. A file that
+/// keeps changing (a log in a watched directory) ends the wait after about
+/// a second, with the latest snapshot.
+pub fn settled_snapshot(paths: &[PathBuf]) -> WatchSnapshot {
+    settle(paths, || thread::sleep(Duration::from_millis(50)))
+}
+
+fn settle(paths: &[PathBuf], mut pause: impl FnMut()) -> WatchSnapshot {
+    let mut last = watch_snapshot(paths);
+    for _ in 0..20 {
+        pause();
+        let now = watch_snapshot(paths);
+        if now == last {
+            break;
+        }
+        last = now;
+    }
+    last
+}
+
 /// Stops a run: closing its stdin lets every running test close its scope,
 /// and the wait returns only once the runner has exited.
 fn stop(child: &mut Child) {
@@ -416,9 +438,14 @@ fn stop(child: &mut Child) {
 
 fn watch(options: &TestArguments, global: &GlobalArguments) -> ExitCode {
     let paths = watched(global);
+    // what the runs of this session compiled: a change compiles what it reaches
+    let mut modules = ModuleCache::default();
     loop {
-        let before = watch_snapshot(&paths);
-        let mut child = prepare(options, global)
+        let before = settled_snapshot(&paths);
+        let prepared = prepare(options, global, Some(&mut modules));
+        // each run reports its build, before its tests start
+        timings::report(global);
+        let mut child = prepared
             .ok()
             .and_then(|runner| start(&runner, options, global, true).ok());
         while watch_snapshot(&paths) == before {
@@ -427,6 +454,7 @@ fn watch(options: &TestArguments, global: &GlobalArguments) -> ExitCode {
         if let Some(child) = &mut child {
             stop(child);
         }
+        timings::discard();
         println!("\n— a file changed: running the tests again —\n");
     }
 }
@@ -477,5 +505,35 @@ mod tests {
         );
         fs::remove_dir_all(&root).expect("delete root");
         assert_eq!(watch_snapshot(&paths), WatchSnapshot(Vec::new()));
+    }
+
+    #[test]
+    fn a_save_settles_on_the_saved_file_and_a_busy_file_ends_the_wait() {
+        let root = env::temp_dir().join(format!("flick-watch-settle-{}", process::id()));
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(&root).expect("fixture");
+        let main = root.join("Main.fl");
+        fs::write(&main, "old").expect("old");
+        let paths = [root.clone()];
+        // a save has truncated the file and writes it during the first pause
+        File::create(&main).expect("truncate");
+        let mut saved = false;
+        let mut save = || {
+            if !saved {
+                fs::write(&main, "saved").expect("write");
+                saved = true;
+            }
+        };
+        let settled = settle(&paths, &mut save);
+        save();
+        assert_eq!(settled, watch_snapshot(&paths), "the saved file");
+        let mut writes = 0;
+        let busy = settle(&paths, || {
+            writes += 1;
+            fs::write(&main, "x".repeat(writes)).expect("write");
+        });
+        assert_eq!(writes, 20, "the wait is bounded");
+        assert_eq!(busy, watch_snapshot(&paths), "the latest state");
+        fs::remove_dir_all(&root).expect("delete root");
     }
 }

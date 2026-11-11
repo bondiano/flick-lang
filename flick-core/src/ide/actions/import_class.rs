@@ -42,7 +42,12 @@ impl Ide<'_> {
         }
         let name = token.text(text);
         let syntax = module_syntax(&m.tree, text, file);
-        let project = self.analysis.modules.iter().map(|m| m.name.clone());
+        let project = self
+            .analysis
+            .modules
+            .iter()
+            .filter(|m| !m.inline)
+            .map(|m| m.name.clone());
         let builtin = builtins()
             .iter()
             .filter(|i| {
@@ -55,14 +60,7 @@ impl Ide<'_> {
             if !seen.insert(module.clone()) || module == m.name {
                 continue;
             }
-            let Some(interface) = self.interface(&module) else {
-                continue;
-            };
-            if !interface.exports.iter().any(|e| {
-                e.decl == Decl::Class
-                    && e.entity.namespace == Namespace::Type
-                    && e.entity.name == name
-            }) {
+            if !self.can_import_class(&module, name, m.package.as_ref()) {
                 continue;
             }
             let change = if let Some(import) = syntax.imports.iter().find(|i| i.module == module) {
@@ -105,5 +103,22 @@ impl Ide<'_> {
             });
         }
         actions
+    }
+
+    fn can_import_class(&self, module: &str, name: &str, package: Option<&String>) -> bool {
+        let Some(interface) = self.interface(module) else {
+            return false;
+        };
+        if interface.private
+            && self
+                .analysis
+                .module(module)
+                .is_none_or(|owner| owner.package.as_ref() != package)
+        {
+            return false;
+        }
+        interface.exports.iter().any(|e| {
+            e.decl == Decl::Class && e.entity.namespace == Namespace::Type && e.entity.name == name
+        })
     }
 }

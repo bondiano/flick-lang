@@ -1,6 +1,6 @@
-/// Cryptographic randomness and digests as a service, over Effect's
-/// `Crypto`; `Crypto.system` provides it from the platform's Web Crypto.
-/// Bytes are lists of numbers from 0 to 255.
+/// Cryptographic randomness and digests as a service; `Crypto.system`
+/// provides it from the platform's Web Crypto. Bytes are lists of numbers
+/// from 0 to 255.
 module Crypto exposing (
   CryptoError(..),
   DigestAlgorithm(..),
@@ -72,7 +72,7 @@ let hmac algorithm key message =
 /// the salt and the password in `iterations` rounds. Both counts must be
 /// positive.
 pbkdf2 : DigestAlgorithm -> Int -> Int -> List Int -> List Int ->{Async; CryptoError} List Int
-foreign effect pbkdf2 from "@flick-lang/effect-ts/effect/Crypto" "flickPbkdf2"
+foreign effect pbkdf2 from "flick:Crypto" "flickPbkdf2"
 
 /// A hash of the password to store: PBKDF2-HMAC-SHA256 with 600000 rounds
 /// and a random 16-byte salt, written
@@ -156,45 +156,46 @@ random_ulid : Unit ->{Crypto; CryptoError} String
 let random_ulid () = Crypto.random_ulid ()
 
 system_random_bytes : Int ->{; CryptoError} List Int
-foreign effect system_random_bytes from "@flick-lang/effect-ts/effect/Crypto" "flickRandomBytes"
+foreign effect system_random_bytes from "flick:Crypto" "flickRandomBytes"
 
 system_digest : DigestAlgorithm -> List Int ->{Async; CryptoError} List Int
-foreign effect system_digest from "@flick-lang/effect-ts/effect/Crypto" "flickDigest"
+foreign effect system_digest from "flick:Crypto" "flickDigest"
 
 system_random : Unit ->{} Float
-foreign effect system_random from "@flick-lang/effect-ts/effect/Crypto" "flickRandom"
+foreign effect system_random from "flick:Crypto" "flickRandom"
   arity 0
 
 system_random_boolean : Unit ->{} Bool
-foreign effect system_random_boolean from "@flick-lang/effect-ts/effect/Crypto" "flickRandomBoolean"
+foreign effect system_random_boolean from "flick:Crypto" "flickRandomBoolean"
   arity 0
 
 system_random_int : Unit ->{} Int
-foreign effect system_random_int from "@flick-lang/effect-ts/effect/Crypto" "flickRandomInt"
+foreign effect system_random_int from "flick:Crypto" "flickRandomInt"
   arity 0
 
 system_random_between : Float -> Float ->{} Float
-foreign effect system_random_between from "@flick-lang/effect-ts/effect/Crypto" "flickRandomBetween"
+foreign effect system_random_between from "flick:Crypto" "flickRandomBetween"
 
 system_random_int_between : Int -> Int ->{} Int
-foreign effect system_random_int_between from "@flick-lang/effect-ts/effect/Crypto" "flickRandomIntBetween"
+foreign effect system_random_int_between from "flick:Crypto" "flickRandomIntBetween"
 
 system_random_shuffle : List a ->{} List a
-foreign effect system_random_shuffle from "@flick-lang/effect-ts/effect/Crypto" "flickRandomShuffle"
+foreign effect system_random_shuffle from "flick:Crypto" "flickRandomShuffle"
 
 system_random_uuid_v4 : Unit ->{; CryptoError} String
-foreign effect system_random_uuid_v4 from "@flick-lang/effect-ts/effect/Crypto" "flickRandomUuidV4"
+foreign effect system_random_uuid_v4 from "flick:Crypto" "flickRandomUuidV4"
   arity 0
 
 system_random_uuid_v7 : Unit ->{; CryptoError} String
-foreign effect system_random_uuid_v7 from "@flick-lang/effect-ts/effect/Crypto" "flickRandomUuidV7"
+foreign effect system_random_uuid_v7 from "flick:Crypto" "flickRandomUuidV7"
   arity 0
 
 system_random_ulid : Unit ->{; CryptoError} String
-foreign effect system_random_ulid from "@flick-lang/effect-ts/effect/Crypto" "flickRandomUlid"
+foreign effect system_random_ulid from "flick:Crypto" "flickRandomUlid"
   arity 0
 
-/// Effect's `Crypto` over the platform's Web Crypto (`globalThis.crypto`).
+/// The `Crypto` service over the platform's Web Crypto
+/// (`globalThis.crypto`).
 system : Layer none none {Crypto}
 let system =
   Layer.succeed Crypto {

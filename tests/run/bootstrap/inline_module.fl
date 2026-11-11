@@ -1,0 +1,13 @@
+module App.Main exposing (main)
+
+type Key = Key Int
+let base = 41
+
+module Child exposing (answer) =
+  answer : Key
+  let answer = Key (base + 1)
+
+main : Unit ->{} Unit
+let main () =
+  match Child.answer with
+  | Key n -> Platform.stdout_line (show n)

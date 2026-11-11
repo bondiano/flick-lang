@@ -8,7 +8,7 @@ use flick_plugin::{Block, Diagnostic, Span};
 
 use crate::read::{Clause, Command, Multi, Param};
 
-/// Long and short names Effect's CLI reserves.
+/// Long and short names the CLI reserves for itself.
 const RESERVED: [&str; 4] = ["help", "h", "version", "completions"];
 
 pub fn check(block: &Block, command: &Command) -> Vec<Diagnostic> {

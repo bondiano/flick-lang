@@ -1,0 +1,26 @@
+module App.Main exposing (main)
+
+module Child exposing (Tag(..), describe, Greeter, speak) =
+  type Tag = Tag Int
+
+  class Describe a =
+    describe : a -> String
+    decorated : a -> String
+    let decorated value = "[" ++ describe value ++ "]"
+
+  instance Describe Tag =
+    let describe value =
+      match value with
+      | Tag n -> show n
+
+  service Greeter =
+    greet : String ->{} String
+
+  speak : String ->{Greeter; none} String
+  let speak name = Greeter.greet name ++ " " ++ decorated (Tag 42)
+
+main : Unit ->{; AppError} Unit
+let main () =
+  let greeter : Child.Greeter.Impl = { greet = fun name -> "hello " ++ name }
+  let message = provide Child.Greeter greeter { Child.speak "Ada" }
+  Platform.stdout_line message

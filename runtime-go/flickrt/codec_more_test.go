@@ -16,7 +16,7 @@ func roundTrip(t *testing.T, c Value, in Value) Value {
 	return v
 }
 
-// Effect's key-value splitting drops pairs without a key or a value.
+// Key-value splitting drops pairs without a key or a value.
 func TestSplitKeyValue(t *testing.T) {
 	v, _ := codecOf(CodecSplitKeyValue("&", "=")).decode(rootFiber(), "a=1&=2&b=&c=3=4&a=5")
 	if got := JsonStringify(v); got != `[["a","5"],["c","3=4"]]` {
@@ -45,7 +45,7 @@ func TestListEnsure(t *testing.T) {
 	}
 }
 
-// encode_xml writes Effect's pretty XML: keys sorted, unsafe names renamed.
+// encode_xml writes pretty XML: keys sorted, unsafe names renamed.
 func TestEncodeXml(t *testing.T) {
 	got := CodecEncodeXml(rootFiber(), JsonCodec, Rec("b", []Value{1.0, true}, "a b", JsonNull, "c", "<&>"))
 	want := "<root>\n  <a_b data-name=\"a b\"/>\n  <b>\n    <item>1</item>\n    <item>true</item>\n  </b>\n  <c>&lt;&amp;&gt;</c>\n</root>"

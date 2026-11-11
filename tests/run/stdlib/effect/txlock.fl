@@ -1,4 +1,4 @@
-// Locks from Effect's `TxReentrantLock` and permits from `TxSemaphore`:
+// Locks from `TxReentrantLock` and permits from `TxSemaphore`:
 // counted inside transactions, held around a task or until a `scope`
 // closes.
 module App.Main exposing (main)

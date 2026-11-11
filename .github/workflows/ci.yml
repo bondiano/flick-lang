@@ -23,7 +23,7 @@ jobs:
           BASE: ${{ github.base_ref }}
         run: |
           git fetch --depth=1 origin "$BASE"
-          node --test tools/perf/ratchet.test.mjs
+          node --test tools/perf/*.test.mjs tools/load/*.test.mjs
           node tools/perf/ratchet.mjs FETCH_HEAD
       # installs the toolchain, components and targets from rust-toolchain.toml
       - run: rustup show active-toolchain || rustup toolchain install
@@ -47,7 +47,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
         with:
-          node-version: 24.18.0
+          node-version-file: .tool-versions
       - run: node --test .github/actions/setup-flick/install.test.mjs
 
   test:
@@ -68,7 +68,7 @@ jobs:
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v7
         with:
-          node-version: 24.18.0
+          node-version-file: .tool-versions
       - run: just unit
       - run: just effect-coverage >> "$GITHUB_STEP_SUMMARY"
 
@@ -107,7 +107,7 @@ jobs:
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v7
         with:
-          node-version: 24.18.0
+          node-version-file: .tool-versions
           cache: pnpm
       # the wasm-bindgen CLI `just docs-wasm` installs
       - uses: actions/cache@v6
@@ -121,6 +121,14 @@ jobs:
           key: playwright-${{ runner.os }}-1.64.1
       - run: pnpm install --frozen-lockfile && pnpm -C docs exec playwright install chromium
       - run: just e2e-js
+      # the site the Docs workflow deploys once this run passes
+      - if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/upload-artifact@v7
+        with:
+          name: site
+          path: docs/dist
+          retention-days: 1
+          if-no-files-found: error
       - run: just go-test
       - run: just language
       - run: just bundle-size >> "$GITHUB_STEP_SUMMARY"
@@ -147,7 +155,7 @@ jobs:
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v7
         with:
-          node-version: 24.18.0
+          node-version-file: .tool-versions
           cache: pnpm
       - run: just e2e-tests
       - uses: actions/upload-artifact@v7
@@ -183,8 +191,15 @@ jobs:
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v7
         with:
-          node-version: 24.18.0
+          node-version-file: .tool-versions
           cache: pnpm
+      # what the TypeScript output catches beyond the JS one is `tsc`, which
+      # typechecks the TypeScript passes either way: a pull request and a push
+      # to main build them without running them, and the nightly run and a
+      # release, which call this workflow with another event or ref, run them
+      - name: Only build the TypeScript passes for a pull request or a push to main
+        if: ${{ github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref == 'refs/heads/main') }}
+        run: echo 'FLICK_E2E_TS_BUILD_ONLY=1' >> "$GITHUB_ENV"
       - run: just e2e-cases ${{ matrix.shard }}/3
       - uses: actions/upload-artifact@v7
         if: ${{ !cancelled() }}
@@ -199,7 +214,10 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - run: rustup show active-toolchain || rustup toolchain install
+      # the plugin tests build the compiler in the `e2e` profile, as the e2e jobs do
       - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: e2e
       - uses: taiki-e/install-action@v2
         with:
           tool: just@1.59.0
@@ -226,7 +244,7 @@ jobs:
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v7
         with:
-          node-version: 24.18.0
+          node-version-file: .tool-versions
           cache: pnpm
       - run: just e2e-postgres
 
@@ -238,21 +256,43 @@ jobs:
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v7
+      # The source of the derivation is the whole checkout, so no cache of it
+      # can hit and every run builds the compiler anew. A pull request does
+      # that only when it changes the flake, what the flake pins or this
+      # workflow, whose steps it would otherwise never run; a push to
+      # main, the nightly run and a release always do. A comparison that
+      # fails counts as a change
+      - name: Whether the flake's inputs changed
+        id: flake
+        env:
+          BASE: ${{ github.event_name == 'pull_request' && github.base_ref || '' }}
+        run: |
+          changed=true
+          if [ -n "$BASE" ] && git fetch --depth=1 origin "$BASE" &&
+            git diff --quiet FETCH_HEAD HEAD -- flake.nix flake.lock nix Cargo.lock rust-toolchain.toml .github/workflows/ci.yml; then
+            changed=false
+          fi
+          echo "changed=$changed" >> "$GITHUB_OUTPUT"
       - uses: cachix/install-nix-action@v31
+        if: steps.flake.outputs.changed == 'true'
         with:
           extra_nix_config: |
             experimental-features = nix-command flakes
       - name: Evaluate every supported platform
+        if: steps.flake.outputs.changed == 'true'
         run: nix flake check --all-systems --no-build
       - name: Build the package and its tests
+        if: steps.flake.outputs.changed == 'true'
         run: nix build .#flick --no-link
       # the std of this checkout, as a released compiler would fetch it by tag
       - name: Smoke-test the binary
+        if: steps.flake.outputs.changed == 'true'
         run: |
           out=$(nix build .#flick --no-link --print-out-paths)
           "$out/bin/flick" --version
           FLICK_STD_PATH="$PWD/packages/std" "$out/bin/flick" --project examples/first-slice check
       - name: Dev shell versions
+        if: steps.flake.outputs.changed == 'true'
         run: |
           nix develop --command bash -euo pipefail -c '
             want_rust=$(sed -n "s/^channel = \"\(.*\)\"/\1/p" rust-toolchain.toml)
@@ -266,7 +306,8 @@ jobs:
           '
 
   # the reference model of λFlick (flick-model) against tests/run/model.txt,
-  # and the model properties on generated programs; it needs neither Node nor Go
+  # every pass fixture and docs example, and the model properties on
+  # generated programs; it needs neither Node nor Go
   model:
     runs-on: ubuntu-26.04
     timeout-minutes: 60
@@ -317,15 +358,22 @@ jobs:
         with:
           go-version-file: runtime-go/go.mod
           cache-dependency-path: runtime-go/go.sum
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: just@1.59.0
       - name: Go runtime
-        working-directory: runtime-go
-        run: go vet ./... && go test ./...
-      - name: Portable cases, the go executable and a non-ASCII project path
-        env:
-          FLICK_E2E_GO_ONLY: "1"
-        run: cargo test --profile e2e -p flick --test e2e --test go_main --test unicode_path -- --ignored run_cases exit_codes_follow_the_outcome_and_signals run_and_test_use_the_go_executable a_project_builds_runs_and_tests_under_a_non_ascii_path
-      # the node half and the comparison of both reports run in `just e2e`
-      - name: Language tests on the go target
+        run: just go-test
+      # Windows is the slowest of the three: a push to main holds it to the
+      # cases of tests/run/runtime, and the nightly run and a release, which
+      # call this workflow with another event or ref, run every portable case
+      # there. `FLICK_E2E_ONLY` is a part of the native path of a case
+      - name: Only the runtime cases on Windows for a push to main
+        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && runner.os == 'Windows' }}
         shell: bash
-        working-directory: tests/language
-        run: cargo run -q --profile e2e -p flick -- test --emit go --seed 42
+        run: echo 'FLICK_E2E_ONLY=runtime\' >> "$GITHUB_ENV"
+      - name: Portable cases, the go executable and a non-ASCII project path
+        run: just e2e-go
+      # the node half and the comparison of both reports run in `just e2e`;
+      # the compiler is the one the step above built for its tests
+      - name: Language tests on the go target
+        run: just language-go

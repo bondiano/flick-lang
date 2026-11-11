@@ -1,5 +1,5 @@
-/// Effect's `Order`: a total order as a Flick function, `compare` for the
-/// types with an `Ord` instance. The combinators build orders from others.
+/// A total order as a Flick function, `compare` for the types with an `Ord`
+/// instance. The combinators build orders from others.
 module Order exposing (..)
 
 import Reducer

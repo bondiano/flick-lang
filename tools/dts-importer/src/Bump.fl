@@ -13,7 +13,6 @@ let pins = [
   ("packages/effect-ts/package.json", "(\"effect\": \")[^\"]+(\")"),
   ("packages/effect-ts/src/capabilities.ts", "(EFFECT_VERSION = \")[^\"]+(\")"),
   ("packages/effect-ts/test/effect-version.test.ts", "(PINNED_EFFECT = \")[^\"]+(\")"),
-  ("flick/src/toolchain.rs", "(pub const EFFECT: &str = \")[^\"]+(\")"),
 ]
 
 /// The capture groups of every match of `source`, a valid pattern.
@@ -163,4 +162,4 @@ let run version package_dir root =
     )
     pins
   Platform.stdout_write
-    "\nwrote the snapshot and the pins; next: `pnpm install`, review stdlib/Effect/surface/ until `cargo test -p flick-core --test effect_surface` passes\n"
+    "\nwrote the snapshot and the pins; next: `pnpm install`, review stdlib/Effect/surface/ until `cargo test -p flick-effect-surface --test coverage` passes\n"

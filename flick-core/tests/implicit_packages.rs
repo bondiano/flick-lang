@@ -10,6 +10,7 @@ use std::path::{Path, PathBuf};
 use std::{env, fs, process};
 
 use flick_core::build::{self, Extras, Settings};
+use flick_core::codegen::EffectBridge;
 use flick_core::diagnostics::Severity;
 use flick_core::project::config::Backend;
 use flick_core::project::{self, Host};
@@ -132,6 +133,7 @@ fn a_second_implicit_package_is_one_more_entry_and_directory() {
         out_dir: Path::new("/dist"),
         root: None,
         backend: Backend::Effect,
+        effect_bridge: EffectBridge::Absent,
         ui: None,
         runners: &[],
         core_modules: &[],

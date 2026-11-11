@@ -1,5 +1,5 @@
-// `Cli.file_parse` by extension: INI, TOML and YAML files read as Effect's
-// encoding parsers read them, and the error of a malformed one.
+// `Cli.file_parse` by extension: what INI, TOML and YAML files read
+// as, and the error of a malformed one.
 module App.Main exposing (main)
 
 type alias DataOptions = {
@@ -16,7 +16,7 @@ let data =
     (Cli.required |> Cli.file_parse None)
   |> Cli.handle (fun (o : DataOptions) -> Platform.stdout_line o.data)
 
-attempt_in : String -> List String ->{} Unit
+attempt_in : String -> List String ->{Async} Unit
 let attempt_in dir args =
   Platform.stdout_line ("$ " ++ String.replace_all dir "$TMP" (String.join " " args))
   try Cli.run data args with

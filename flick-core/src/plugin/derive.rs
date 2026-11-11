@@ -12,14 +12,14 @@ use flick_plugin::Place;
 use super::expansion::{Expanded, Expansion};
 use super::render::render;
 use super::source::BlockSource;
-use super::{Expander, Failure, ROUNDS, blocks_under, first_party, placed};
+use super::{EditorBlock, Expander, Failure, ROUNDS, blocks_under, first_party, placed};
 use crate::diagnostics::{Diagnostic, codes};
 use crate::resolve::ModuleSyntax;
 use crate::source::{FileId, Span};
 use crate::syntax::cst::{Element, Node, Token};
 use crate::syntax::kind::SyntaxKind as K;
 use crate::syntax::parse;
-use crate::types::{builtin_sources, implicit_package_of, is_type};
+use crate::types::{Thresholds, builtin_sources, implicit_package_of, is_type};
 
 /// A class a module declares with `@derive`, or a type such as `Schema`
 /// whose companions a plugin derives, and the package its attribute names,
@@ -283,9 +283,34 @@ pub fn builtin_expansion(
         return (None, diagnostics);
     }
     blocks.sort_by_key(|b| b.node.range());
+    checked_expansion(text, file, tree, blocks, diagnostics)
+}
+
+fn checked_expansion(
+    text: &str,
+    file: FileId,
+    tree: &Node,
+    blocks: Vec<Expanded>,
+    mut diagnostics: Vec<Diagnostic>,
+) -> (Option<Expansion>, Vec<Diagnostic>) {
+    let editing = source_checks(&blocks);
     let (expansion, failed) = Expansion::build(text, file, tree, blocks);
     diagnostics.extend(failed);
+    if let Some(expansion) = &expansion {
+        diagnostics.extend(expansion.check_blocks(&editing, &[], Thresholds::default()));
+    }
     (expansion, diagnostics)
+}
+
+/// Standalone checks also run source hooks, which need no solved wildcards.
+fn source_checks(blocks: &[Expanded]) -> Vec<EditorBlock> {
+    blocks
+        .iter()
+        .filter_map(|b| {
+            let plugin = first_party::plugin(&b.plugin)?;
+            Some(EditorBlock::new(&b.source, &[], &plugin))
+        })
+        .collect()
 }
 
 /// The code of each block of std's plugin in `tree`, as the loader expands

@@ -10,6 +10,7 @@
 //! lossless tree, attaching trivia between nodes.
 
 mod build;
+mod control;
 mod decl;
 mod expr;
 mod fragment;
@@ -606,6 +607,8 @@ impl<'t> Parser<'t> {
     }
 }
 
+#[cfg(test)]
+mod exposing_tests;
 #[cfg(test)]
 mod plugin_tests;
 #[cfg(test)]

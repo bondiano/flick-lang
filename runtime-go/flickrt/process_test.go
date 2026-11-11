@@ -62,8 +62,7 @@ func TestChildProcessKillAndScope(t *testing.T) {
 }
 
 // Kill waits for the process, not for a member of its group that ignores
-// the signal and still holds its stdout: that one gets a second, as with
-// Effect's spawner.
+// the signal and still holds its stdout: that one gets a second.
 func TestChildProcessKillAwaitsTheLeaderNotItsPipes(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("no signals to ignore")

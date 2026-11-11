@@ -184,7 +184,7 @@ let seconds n =
   | Ok d -> d
   | Err _ -> Duration.zero
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Async; AppError} Unit
 let main () =
   params ()
   urls ()

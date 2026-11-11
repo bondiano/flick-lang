@@ -1,0 +1,19 @@
+[package]
+name = "flick-effect-surface"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
+
+[features]
+default = ["ide"]
+ide = ["flick-core/ide"]
+
+[dev-dependencies]
+flick-core = { path = "../../../../flick-core" }
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = { workspace = true }
+toml = "1.1.8"

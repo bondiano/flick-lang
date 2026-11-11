@@ -1,5 +1,6 @@
 //! Expressions and block statements.
 
+use super::control::{control_expr, while_ahead};
 use super::{Done, K, Parser, decl, pattern, plugin, types};
 use crate::diagnostics::codes;
 
@@ -29,21 +30,6 @@ fn assign_stmt(p: &mut Parser) {
 
 pub(super) fn expr(p: &mut Parser) -> Option<Done> {
     expr_bp(p, 0)
-}
-
-/// Binding powers of the fixed operator table, weakest first (grammar.md).
-fn infix(kind: K) -> Option<(u8, u8)> {
-    Some(match kind {
-        K::PipeGt => (2, 3),
-        K::OrOr => (4, 4),
-        K::AndAnd => (6, 6),
-        K::EqEq | K::NotEq | K::Lt | K::Le | K::Gt | K::Ge => (8, 9),
-        K::PlusPlus => (10, 10),
-        K::Plus | K::Minus => (12, 13),
-        K::Star | K::Slash | K::Percent => (14, 15),
-        K::StarStar => (18, 18),
-        _ => return None,
-    })
 }
 
 /// Operand of a prefix operator: binds tighter than `*`, looser than `**`.
@@ -98,7 +84,7 @@ fn expr_bp(p: &mut Parser, min_bp: u8) -> Option<Done> {
             }
             continue;
         }
-        let Some((left, right)) = infix(op) else {
+        let Some((left, right)) = op.binding_power() else {
             break;
         };
         if left < min_bp {
@@ -136,6 +122,11 @@ fn prefix(p: &mut Parser) -> Option<Done> {
         return Some(p.complete(m, K::PrefixExpr));
     }
     match p.current() {
+        K::Ident if p.at_word("pack") && keyword_ahead(p, K::AsKw) => Some(pack_expr(p)),
+        K::Ident if p.at_word("unpack") && keyword_ahead(p, K::AsKw) => Some(unpack_expr(p)),
+        K::Ident if p.at_word("loop") && p.nth(1) == K::LBrace => Some(control_expr(p)),
+        K::Ident if p.at_word("while") && while_ahead(p) => Some(control_expr(p)),
+        K::BreakKw | K::ContinueKw => Some(control_expr(p)),
         K::FunKw => Some(fun_expr(p)),
         K::MatchKw => Some(match_expr(p)),
         K::TryKw => Some(try_expr(p)),
@@ -148,8 +139,45 @@ fn prefix(p: &mut Parser) -> Option<Done> {
     }
 }
 
+fn keyword_ahead(p: &Parser, kind: K) -> bool {
+    for i in p.pos + 1..p.toks.len() {
+        if p.sep_at(i).is_some() {
+            return false;
+        }
+        if p.toks[i].kind == kind {
+            return true;
+        }
+    }
+    false
+}
+
+fn pack_expr(p: &mut Parser) -> Done {
+    let m = p.start();
+    p.bump();
+    decl::module_path(p);
+    if p.expect(K::AsKw) {
+        types::type_(p);
+    }
+    p.complete(m, K::PackExpr)
+}
+
+fn unpack_expr(p: &mut Parser) -> Done {
+    let m = p.start();
+    p.bump();
+    expr(p);
+    if p.expect(K::AsKw) && p.expect(K::Con) {
+        if p.eat(K::Comma) {
+            p.expect(K::Ident);
+        }
+        if p.expect(K::InKw) {
+            p.body(K::Block, stmt);
+        }
+    }
+    p.complete(m, K::UnpackExpr)
+}
+
 /// Whether the next token can start the operand of a prefix operator.
-fn at_operand_start(p: &Parser) -> bool {
+pub(super) fn at_operand_start(p: &Parser) -> bool {
     at_arg_start(p)
         || matches!(
             p.current(),
@@ -392,7 +420,7 @@ fn interpolation(p: &mut Parser) -> K {
     K::InterpExpr
 }
 
-fn head_without_braces(p: &mut Parser, head: fn(&mut Parser)) {
+pub(super) fn head_without_braces(p: &mut Parser, head: fn(&mut Parser)) {
     let saved = p.no_brace;
     p.no_brace = true;
     head(p);
@@ -434,7 +462,7 @@ fn record(p: &mut Parser) -> K {
         return K::RecordExpr;
     }
     p.push_aligned_here();
-    let kind = if p.at(K::Ident) && p.nth(1) == K::Eq {
+    let kind = if matches!(p.current(), K::Ident | K::Con) && p.nth(1) == K::Eq {
         p.items(record_field, true, |_| false);
         K::RecordExpr
     } else {
@@ -453,7 +481,12 @@ fn record(p: &mut Parser) -> K {
 
 fn record_field(p: &mut Parser) {
     let m = p.start();
-    if p.expect(K::Ident) && p.expect(K::Eq) {
+    if matches!(p.current(), K::Ident | K::Con) {
+        p.bump();
+    } else {
+        p.error_expected("a record field name");
+    }
+    if p.expect(K::Eq) {
         p.body(K::Block, stmt);
     }
     p.complete(m, K::RecordField);

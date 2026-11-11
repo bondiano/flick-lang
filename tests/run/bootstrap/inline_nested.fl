@@ -1,0 +1,12 @@
+module App.Main exposing (main)
+
+module Outer exposing (answer) =
+  let seed = 41
+
+  module Inner exposing (value) =
+    let value = seed + 1
+
+  let answer = Inner.value
+
+main : Unit ->{} Unit
+let main () = Platform.stdout_line (show Outer.answer)

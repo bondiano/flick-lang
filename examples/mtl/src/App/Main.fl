@@ -63,7 +63,7 @@ let command = cli "mtl" {
   subcommand catalog_command
 }
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Async; AppError} Unit
 let main () =
   try Cli.run command (Platform.args ()) with
   | Cli.CliError message -> App.fail message

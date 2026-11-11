@@ -1,16 +1,18 @@
 use std::cell::RefCell;
 use std::path::{Path, PathBuf};
+use std::rc::Rc;
 use std::time::Duration;
-use std::{fs, io, process};
+use std::{fs, io};
 
 use flick_core::build::{self, Artifact, Extras, Settings};
 use flick_core::codegen::Labels;
 use flick_core::diagnostics::{Diagnostic, Severity, codes};
 use flick_core::project::config::{Backend, Build, Emit, Kind, MAIN_ENTRY, Profile};
-use flick_core::project::{self, Compilation, Compiled, Project, js};
+use flick_core::project::{self, Compilation, Compiled, ModuleCache, Project, js};
 use flick_core::source::{FileId, SourceMap};
 
 use self::js_artifacts::js_artifacts;
+use self::schemas::compile_schemas;
 use super::check::select;
 use super::emit_ir;
 use super::out_dir::overlap;
@@ -22,11 +24,14 @@ use crate::progress::{Mode, Progress};
 use crate::sources::FsHost;
 use crate::{builtins, cache, toolchain};
 
+mod backend;
 mod cached;
 pub(super) mod hooks;
 mod js_artifacts;
 mod progress;
+mod schemas;
 mod shipped;
+mod unwritten;
 
 pub struct BuildCommand {
     pub options: BuildArguments,
@@ -40,11 +45,15 @@ pub struct BuildCommand {
     pub generation: bool,
     /// What the last run wrote, for its summary.
     pub built: RefCell<Option<Built>>,
+    /// What the builds before this one compiled, for a command that builds
+    /// again and again: `--watch` and `dev`. One build keeps nothing.
+    pub modules: Option<Rc<RefCell<ModuleCache>>>,
 }
 
 impl BuildCommand {
     pub fn new(options: BuildArguments, project: Option<String>, display: Option<Mode>) -> Self {
         Self {
+            modules: options.watch.then(Rc::default),
             options,
             project,
             display,
@@ -86,9 +95,6 @@ impl Command for BuildCommand {
     #[allow(clippy::too_many_lines)]
     fn run(&self) -> Outcome {
         let progress = self.progress();
-        if let Err(outcome) = self.prepare(&progress) {
-            return outcome;
-        }
         let mut sources = SourceMap::default();
         let host = FsHost::new();
         progress.stage("Resolving project");
@@ -112,20 +118,12 @@ impl Command for BuildCommand {
         }
         let plan = self.plan(&host, project.as_ref(), Vec::new());
         let go = plan.go;
-        if plan.extras.rt {
-            if plan.typescript || go || plan.extras.dts || plan.extras.promise_facade {
-                let message = "Flick's own runtime has only JavaScript output yet";
-                return Outcome {
-                    sources,
-                    diagnostics: vec![Diagnostic::new(codes::F004, Severity::Error, message)],
-                };
-            }
-            if let Err(diagnostic) = builtins::prepare_in(true) {
-                return Outcome {
-                    sources,
-                    diagnostics: vec![diagnostic],
-                };
-            }
+        if plan.extras.rt && (go || plan.extras.promise_facade) {
+            let message = "Flick's own runtime does not support Go output or Promise façades";
+            return Outcome {
+                sources,
+                diagnostics: vec![Diagnostic::new(codes::F004, Severity::Error, message)],
+            };
         }
         if let Some(problem) = project
             .as_ref()
@@ -162,18 +160,29 @@ impl Command for BuildCommand {
                 diagnostics,
             };
         }
+        // only a build that compiles reads the built-in modules: a cache hit
+        // restored its artifacts above
+        if let Err(outcome) = self.prepare(&progress) {
+            return outcome;
+        }
+        if project::stages_by_class(project.as_ref(), plan.extras.rt)
+            && let Err(diagnostic) = builtins::prepare_in(true)
+        {
+            return Outcome {
+                sources,
+                diagnostics: vec![diagnostic],
+            };
+        }
         progress.stage("Compiling Flick modules");
-        let (mut diagnostics, mut compilation) = package_cache::with_saved(|saved| {
-            let (diagnostics, compilation, fresh) = project::compile_with(
-                &host,
-                &mut sources,
-                project.as_ref(),
-                &roots,
-                saved,
-                plan.extras.rt,
-            );
-            ((diagnostics, compilation), fresh)
-        });
+        let mut kept = self.modules.as_ref().map(|modules| modules.borrow_mut());
+        let (mut diagnostics, mut compilation) = package_cache::compile(
+            &host,
+            &mut sources,
+            project.as_ref(),
+            &roots,
+            plan.extras.rt,
+            kept.as_deref_mut(),
+        );
         if diagnostics.iter().any(|d| d.severity == Severity::Error) {
             return Outcome {
                 sources,
@@ -220,19 +229,13 @@ impl Command for BuildCommand {
         {
             progress.stage("Saving build cache");
             let key = self.key(p, &roots, &output);
-            if initial_key.as_ref() == Some(&key)
-                && cache::read_unchanged(p, &roots, &host.cwd, &sources)
-            {
-                cache::store(&p.root, &key, &emitted.artifacts);
-                if output.go {
-                    for (name, _) in &output.entries {
-                        cache::mark_go(
-                            &p.root,
-                            &key,
-                            &output.out_dir,
-                            &build::go::executable(name),
-                        );
-                    }
+            let read = (&roots[..], &*host.cwd, &sources);
+            let stored = initial_key.as_ref().is_some_and(|before| {
+                cache::store_built(p, read, before, &key, &emitted.artifacts)
+            });
+            if stored && output.go {
+                for (name, _) in &output.entries {
+                    cache::mark_go(&p.root, &key, &output.out_dir, &build::go::executable(name));
                 }
             }
         }
@@ -299,7 +302,8 @@ impl BuildCommand {
                 dts: self.options.emit_dts || config.is_some_and(|b| b.emit_dts),
                 promise_facade: self.options.promise_facade
                     || config.is_some_and(|b| b.promise_facade),
-                rt: self.options.rt || config.is_some_and(|b| b.effect == Backend::Rt),
+                rt: self.options.rt
+                    || (emit != Emit::Go && config.is_some_and(|b| b.effect == Backend::Rt)),
                 schema_aot: self.options.schema_aot || config.is_some_and(|b| b.schema_aot),
                 labels: match self.options.labels {
                     Some(LabelsArgument::All) => Labels::All,
@@ -312,7 +316,7 @@ impl BuildCommand {
         }
     }
 
-    fn key(&self, project: &Project, roots: &[PathBuf], output: &BuildPlan) -> String {
+    fn key(&self, project: &Project, roots: &[PathBuf], output: &BuildPlan) -> cache::Signed {
         // generations sit at one depth, so their artifacts are the same
         let out_dir = if self.generation {
             project.root.join(".flick/run/*")
@@ -329,7 +333,7 @@ impl BuildCommand {
             output.extras,
             output.release
         );
-        cache::key(project, roots, &settings)
+        cache::key(project, roots, &settings, !output.go && !output.extras.rt)
     }
 }
 
@@ -386,6 +390,11 @@ pub(super) fn write_artifacts(output: &BuildPlan, emitted: &mut Emission, progre
     }
     let out_dir = output.out_dir.as_path();
     progress.stage("Writing artifacts");
+    if let Err(err) = unwritten::remove(out_dir, &emitted.artifacts) {
+        let message = format!("cannot remove an earlier build's files: {err}");
+        (emitted.diagnostics).push(Diagnostic::new(codes::P013, Severity::Error, message));
+        return;
+    }
     for artifact in &emitted.artifacts {
         let path = out_dir.join(&artifact.path);
         if let Err(err) = write_if_changed(&path, &artifact.contents) {
@@ -430,24 +439,6 @@ pub(super) fn write_artifacts(output: &BuildPlan, emitted: &mut Emission, progre
             ));
             break;
         }
-    }
-}
-
-/// Loads the app's modules on Node and writes the compiled decoders of the
-/// codecs they make, which the runner installs.
-fn compile_schemas(out_dir: &Path, module: &Path, file: &str) -> Result<(), String> {
-    let script = "import { writeSchemaAot } from \"@flick-lang/effect-ts\";\nawait writeSchemaAot(process.argv[1], process.argv[2]);\n";
-    let output = process::Command::new("node")
-        .args(["--input-type=module", "-e", script])
-        .arg(module)
-        .arg(out_dir.join(file))
-        .current_dir(out_dir)
-        .output()
-        .map_err(|err| format!("cannot run node: {err}"))?;
-    if output.status.success() {
-        Ok(())
-    } else {
-        Err(String::from_utf8_lossy(&output.stderr).trim().to_owned())
     }
 }
 
@@ -507,6 +498,7 @@ pub fn artifacts(
     } else {
         project.map_or(Backend::Effect, |p| p.config.build.effect)
     };
+
     let settings = Settings {
         source_dir: &source_dir,
         out_dir,
@@ -518,6 +510,7 @@ pub fn artifacts(
         release: output.release,
         root: project.map(|p| p.root.as_path()),
         backend,
+        effect_bridge: backend::effect_bridge(host, project, compilation),
         ui: project.and_then(|p| p.config.build.ui.as_deref()),
         runners: &runners,
         core_modules: &[],

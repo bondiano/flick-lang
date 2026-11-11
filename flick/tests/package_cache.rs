@@ -10,6 +10,11 @@ use std::process::Command;
 use std::time::Duration;
 
 use common::project;
+use flick_core::build::go::executable;
+use flick_core::build::runner_path;
+use flick_core::iface::IFACE_VERSION;
+use flick_core::project::config::MAIN_ENTRY;
+use serde_json::{Value, json};
 
 const APP: &str = "schema-version = 1
 
@@ -140,9 +145,156 @@ fn a_saved_library_is_not_checked_again() {
     );
 }
 
+/// `Geo` with a schema its plugin derives, and `tail` after it.
+fn derived(tail: &str) -> String {
+    let alias = "type alias Point = { x : Float; y : Float }";
+    let head = GEO.replace(alias, &format!("{alias}\n  deriving Schema"));
+    assert_ne!(head, GEO);
+    format!("{head}{tail}")
+}
+
+#[test]
+fn a_library_that_derives_is_saved_and_one_with_a_written_block_is_not() {
+    // what the compiler's own plugin derives is a function of the sources
+    let (root, geo) = fetched("package-cache-derived");
+    fs::write(&geo, derived("")).expect("write");
+    let (status, stderr) = flick_output(&root, "cache", &["check"]);
+    assert_eq!(status, Some(0), "{stderr}");
+    fs::write(&geo, BROKEN).expect("write");
+    assert_eq!(flick(&root, "cache", &["check"]), Some(0));
+
+    // a block written out may read what no key of the package holds
+    let (root, geo) = fetched("package-cache-block");
+    let block = "\npoints : PureCodec Json Point\nlet points = codec Point.schema {\n  x = field \"x\" Float.json;\n  y = field \"y\" Float.json;\n}\n";
+    let import = "import Geo.Shift exposing (by)";
+    let written = derived(block).replace(import, &format!("{import}\nimport Codec"));
+    fs::write(&geo, written).expect("write");
+    let (status, stderr) = flick_output(&root, "cache", &["check"]);
+    assert_eq!(status, Some(0), "{stderr}");
+    fs::write(&geo, BROKEN).expect("write");
+    assert_eq!(flick(&root, "cache", &["check"]), Some(1));
+}
+
+#[test]
+fn cached_private_module_stays_private_to_a_dependent() {
+    let (root, _) = fetched("package-cache-private");
+    let shift = root.join(format!("store/{HASH}/lib/src/Geo/Shift.fl"));
+    fs::write(
+        &shift,
+        SHIFT.replacen("module Geo.Shift", "private module Geo.Shift", 1),
+    )
+    .expect("private dependency module");
+    assert_eq!(flick(&root, "cache", &["check"]), Some(0));
+
+    let main = root.join("app/src/App/Main.fl");
+    fs::write(
+        &main,
+        MAIN.replace(
+            "import Geo exposing (origin, shifted)",
+            "import Geo exposing (origin, shifted)\nimport Geo.Shift exposing (by)",
+        ),
+    )
+    .expect("import private dependency module");
+    for cache in ["cache", "fresh"] {
+        let (status, stderr) = flick_output(&root, cache, &["check", "--diagnostics", "json"]);
+        assert_eq!(status, Some(1), "{stderr}");
+        let diagnostics: Vec<Value> = stderr
+            .lines()
+            .map(|line| serde_json::from_str(line).expect("JSON diagnostic"))
+            .filter(|event: &Value| event["severity"] == "error")
+            .collect();
+        assert_eq!(diagnostics.len(), 1, "{stderr}");
+        assert_eq!(diagnostics[0]["code"], "FLICK-R017");
+        assert!(
+            Path::new(diagnostics[0]["path"].as_str().expect("source path"))
+                .ends_with(Path::new("src").join("App").join("Main.fl")),
+            "{stderr}"
+        );
+        // R017 points at the forbidden module path, not the import keyword
+        // or its exposing list.
+        let start = MAIN.find("\n\nstart").expect("end of imports") + 1 + "import ".len();
+        assert_eq!(
+            diagnostics[0]["range"],
+            json!({ "start": start, "end": start + "Geo.Shift".len() })
+        );
+    }
+}
+
+#[test]
+#[ignore = "needs Node and Go; run `just e2e-tests`"]
+fn installed_private_module_public_facade_runs_on_js_and_go() {
+    for emit in ["js", "go"] {
+        for profile in ["debug", "release"] {
+            let (root, geo) = fetched(&format!("package-private-facade-{emit}-{profile}"));
+            fs::write(
+                root.join(format!("store/{HASH}/lib/src/Geo/Shift.fl")),
+                SHIFT.replacen("module Geo.Shift", "private module Geo.Shift", 1),
+            )
+            .expect("private implementation");
+            // Re-export the private implementation, rather than wrapping it.
+            fs::write(
+                geo,
+                "module Geo exposing (by)\nimport Geo.Shift exposing (by)\n",
+            )
+            .expect("public facade");
+            let main = "module App.Main exposing (main)\nimport Geo exposing (by)\n\
+                        main : Unit ->{; AppError} Unit\n\
+                        let main () = Platform.stdout_line (show (by 41.0))\n";
+            let main_path = root.join("app/src/App/Main.fl");
+            for (cache, out) in [("cache", "cold"), ("cache", "saved"), ("fresh", "fresh")] {
+                // Force a build-artifact miss: the saved run must lower the
+                // package interface, not just copy the first executable.
+                fs::write(&main_path, format!("{main}\n// {out}\n")).expect("app source");
+                let (status, stderr) = flick_output(
+                    &root,
+                    cache,
+                    &[
+                        "build",
+                        "--emit",
+                        emit,
+                        "--profile",
+                        profile,
+                        "--out-dir",
+                        out,
+                    ],
+                );
+                assert_eq!(status, Some(0), "{emit}/{profile}/{out}: {stderr}");
+                let dist = root.join("app").join(out);
+                let output = if emit == "js" {
+                    Command::new("node")
+                        .arg(dist.join(runner_path(false)))
+                        .output()
+                } else {
+                    Command::new(dist.join(executable(MAIN_ENTRY))).output()
+                }
+                .expect("program runs");
+                assert!(
+                    output.status.success(),
+                    "{emit}/{profile}/{out}: {output:?}"
+                );
+                assert_eq!(output.stdout, b"42\n", "{emit}/{profile}/{out}");
+                assert!(output.stderr.is_empty(), "{output:?}");
+            }
+        }
+    }
+}
+
+include!("package_cache/modules.rs");
+
 #[test]
 fn a_build_from_saved_modules_is_the_build_from_sources() {
-    let (root, _) = fetched("package-cache-same");
+    for (name, geo_text) in [
+        ("package-cache-same", GEO.to_owned()),
+        // with the code a plugin derived, which a saved module carries too
+        ("package-cache-same-derived", derived("")),
+    ] {
+        same_build(name, &geo_text);
+    }
+}
+
+fn same_build(name: &str, geo_text: &str) {
+    let (root, geo) = fetched(name);
+    fs::write(&geo, geo_text).expect("write");
     let main = root.join("app/src/App/Main.fl");
     assert_eq!(
         flick(&root, "cache", &["build", "--out-dir", "first"]),
@@ -172,8 +324,21 @@ fn a_changed_library_project_or_compiler_checks_again() {
     let (root, geo) = fetched("package-cache-miss");
     assert_eq!(flick(&root, "cache", &["check"]), Some(0));
     fs::write(&geo, BROKEN).expect("write");
-    // another binary of the compiler
+    // another binary of the compiler, copied by a process of its own: a
+    // child that another test forks while this process writes the copy would
+    // hold it open for writing until its `exec`, and running the copy then
+    // fails with "Text file busy"
     let copy = root.join("flick-copy");
+    #[cfg(unix)]
+    assert!(
+        Command::new("cp")
+            .arg(env!("CARGO_BIN_EXE_flick"))
+            .arg(&copy)
+            .status()
+            .expect("cp runs")
+            .success()
+    );
+    #[cfg(not(unix))]
     fs::copy(env!("CARGO_BIN_EXE_flick"), &copy).expect("copy");
     // APFS can preserve the source timestamp when copying, while the cache
     // fingerprint distinguishes binaries by size and modification time.
@@ -189,12 +354,14 @@ fn a_changed_library_project_or_compiler_checks_again() {
         .set_times(fs::FileTimes::new().set_modified(earlier))
         .expect("change copied binary timestamp");
     assert_eq!(flick_with(&copy, &root, "cache", &["check"]), Some(1));
-    // the project's configuration
+    // a setting of the project that checking does not read keeps the library
     let config = root.join("app/flick.toml");
-    let changed = APP
-        .replace("DEPENDENCY", FETCHED)
-        .replace("kind = \"app\"", "kind = \"app\"\ntest-dir = \"spec\"");
-    fs::write(&config, changed).expect("write");
+    let app = APP.replace("DEPENDENCY", FETCHED);
+    let moved = app.replace("kind = \"app\"", "kind = \"app\"\ntest-dir = \"spec\"");
+    fs::write(&config, moved).expect("write");
+    assert_eq!(flick(&root, "cache", &["check"]), Some(0));
+    // one that it reads does not
+    fs::write(&config, format!("{app}\n[lint]\nno-let-assert = true\n")).expect("write");
     assert_eq!(flick(&root, "cache", &["check"]), Some(1));
 
     // the sources of a path library

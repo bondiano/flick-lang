@@ -7,7 +7,7 @@ import (
 	"strings"
 )
 
-// Effect's file prompt: a path chosen by walking the file system, with the
+// The file prompt: a path chosen by walking the file system, with the
 // entries filtered by what the user types.
 
 const promptConfirmTraverse = "The selected directory contains files. Would you like to traverse the selected directory?"

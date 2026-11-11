@@ -1,5 +1,5 @@
-// `hash` of the built-in instances as Effect's `Hash.hash` computes it, as Go's
-// `flickrt` does too: a seed draws the same `Gen.function` on every runtime.
+// `hash` of the built-in instances, computed as Go's `flickrt` computes it: a
+// seed draws the same `Gen.function` on every runtime.
 const optimize = (n: number): number => (n & 0xbfffffff) | ((n >>> 1) & 0x40000000);
 
 /** The 32-bit MurmurHash3 finalizer. */

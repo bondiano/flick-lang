@@ -3,6 +3,7 @@
 //! cover completely, and `provide` removes the services a layer builds while
 //! adding what building it needs.
 
+use crate::types::Elem;
 use std::mem;
 
 use super::Checker;
@@ -33,10 +34,10 @@ impl Checker<'_> {
             let message = format!("`task` makes an effect, but {NO_EFFECTS}");
             self.error(codes::E008, span, message);
         }
-        let saved = mem::take(&mut self.runtime);
-        let (uses, locals) = (self.uses_mark(), self.locals.len());
+        let saved = mem::take(&mut self.cx.runtime);
+        let (uses, locals) = (self.uses_mark(), self.cx.locals.len());
         let parts = expected.and_then(|t| Some((t.clone(), self.eff_parts(t)?)));
-        let (stage, result) = match parts {
+        let (mut stage, result) = match parts {
             Some((expected, (services, errors, result))) => {
                 // the services of an `Eff` written as a type: a fix adds to them there
                 let written = self.store.resolve(&services).written();
@@ -45,7 +46,8 @@ impl Checker<'_> {
             }
             None => (self.open_stage(), None),
         };
-        let outer = mem::replace(&mut self.stage, stage);
+        self.live_bound(&mut stage, expected);
+        let outer = mem::replace(&mut self.cx.stage, stage);
         self.enter_apart(super::mutation::Apart::Task);
         let result = match result {
             Some(result) => {
@@ -55,8 +57,8 @@ impl Checker<'_> {
             None => self.infer(body),
         };
         self.leave_apart();
-        let inner = mem::replace(&mut self.stage, outer);
-        self.runtime = saved;
+        let inner = mem::replace(&mut self.cx.stage, outer);
+        self.cx.runtime = saved;
         let held = self.held_since(uses, locals);
         let ty = eff(inner.services, inner.errors, result);
         let span = self.span(node);
@@ -98,7 +100,7 @@ impl Checker<'_> {
         };
         let raised = self.store.fresh_error_row();
         let needed = effects.then(|| self.fresh());
-        let mut stage = self.stage.clone();
+        let mut stage = self.cx.stage.clone();
         stage.errors = raised.clone();
         stage.returns = None;
         if let Some(needed) = &needed {
@@ -108,25 +110,23 @@ impl Checker<'_> {
         if let Some(allowed) = &mut stage.tail_arm {
             allowed.extend(handled.iter().map(Handled::row));
         }
-        let outer = mem::replace(&mut self.stage, stage);
+        let outer = mem::replace(&mut self.cx.stage, stage);
         if effects {
             let labels = handled.iter().map(|h: &Handled| h.label.clone()).collect();
             self.enter_provide(node, span, labels, false);
         }
         if let Some(body) = node.nodes().next() {
-            self.enter_settled(super::mutation::Settled::TryBody);
             self.check(body, &value);
-            self.leave_settled();
         }
         if effects {
             self.leave_provide();
         }
-        let inner = mem::replace(&mut self.stage, outer);
-        self.stage.runtime |= inner.runtime;
-        self.stage.calls = inner.calls;
+        let inner = mem::replace(&mut self.cx.stage, outer);
+        self.cx.stage.runtime |= inner.runtime;
+        self.cx.stage.calls = inner.calls;
         let mut errors = Caught::default();
         // the handlers run in a JS function of their own
-        let returns = self.stage.returns.take();
+        let returns = self.cx.stage.returns.take();
         let region = self.enter_resume(node, span, &operations);
         let mut returned = false;
         for (arm, operation) in arms.iter().zip(&operations) {
@@ -156,21 +156,22 @@ impl Checker<'_> {
         if region.is_some() {
             self.leave_resume(&ty, node);
         }
-        self.stage.returns = returns;
-        if !errors.all && self.stage.pure.is_none() {
+        self.cx.stage.returns = returns;
+        if !errors.all && self.cx.stage.pure.is_none() {
             let mut handled = errors.handled;
             handled.sort_by(|a, b| a.0.cmp(&b.0));
             let rest = Type::Row(Row {
                 entries: handled,
-                tail: Some(Box::new(self.stage.errors.clone())),
+                tail: Some(Box::new(self.cx.stage.errors.clone())),
                 ..Row::default()
             });
-            let site = self.stage.site;
+            let site = self.cx.stage.site;
             self.sub_row(&raised, &rest, site, span, true);
         }
         if let Some(needed) = needed
-            && self.stage.pure.is_none()
+            && self.cx.stage.pure.is_none()
         {
+            self.live_install(handled.iter().map(|h| &h.entry), span);
             self.handled_row(&needed, &handled, span);
         }
         ty
@@ -180,12 +181,12 @@ impl Checker<'_> {
     /// it covers, besides the enclosing stage's; an effect it does not
     /// cover is also the enclosing stage's, for the operations without arms.
     fn handled_row(&mut self, needed: &Type, handled: &[Handled], span: Span) {
-        let mut entries: Vec<(String, Type)> = handled
+        let mut entries: Vec<(Elem, Type)> = handled
             .iter()
             .map(|h| (h.label.clone(), h.entry.clone()))
             .collect();
         entries.sort_by(|a, b| a.0.cmp(&b.0));
-        let partial: Vec<(String, Type)> = handled
+        let partial: Vec<(Elem, Type)> = handled
             .iter()
             .filter(|h| !h.complete())
             .map(|h| (h.label.clone(), h.entry.clone()))
@@ -196,10 +197,10 @@ impl Checker<'_> {
         }
         let rest = Type::Row(Row {
             entries,
-            tail: Some(Box::new(self.stage.services.clone())),
+            tail: Some(Box::new(self.cx.stage.services.clone())),
             ..Row::default()
         });
-        let site = self.stage.site;
+        let site = self.cx.stage.site;
         self.sub_row(needed, &rest, site, span, false);
     }
 
@@ -211,7 +212,7 @@ impl Checker<'_> {
             let every = self.store.fresh_error_row();
             let errors = Type::app(Type::lang(Lang::Errors), every.clone());
             let (_, guarded, span) = self.arm(arm, &errors, ty);
-            if self.stage.pure.is_none() {
+            if self.cx.stage.pure.is_none() {
                 self.sites.push(Site::Expected(errors, Written::default()));
                 self.sub_row(raised, &every, self.sites.len() - 1, span, true);
             }
@@ -289,10 +290,10 @@ impl Checker<'_> {
             .filter(|t| matches!(t, Type::Skolem(_) | Type::Var(_)))
             .collect();
         let needed = self.fresh();
-        let mut stage = self.stage.clone();
+        let mut stage = self.cx.stage.clone();
         stage.services = needed.clone();
         stage.returns = None;
-        let outer = mem::replace(&mut self.stage, stage);
+        let outer = mem::replace(&mut self.cx.stage, stage);
         self.enter_provide(node, span, labels, unknown);
         let ty = match (children.get(1), expected) {
             (Some(body), Some(expected)) => {
@@ -303,12 +304,13 @@ impl Checker<'_> {
             (None, _) => Type::Error,
         };
         self.leave_provide();
-        let inner = mem::replace(&mut self.stage, outer);
-        self.stage.calls = inner.calls;
-        if self.stage.pure.is_none() {
+        let inner = mem::replace(&mut self.cx.stage, outer);
+        self.cx.stage.calls = inner.calls;
+        if self.cx.stage.pure.is_none() {
+            self.live_install(provided.iter().map(|(_, t)| t), span);
             let tail = open
                 .into_iter()
-                .fold(self.stage.services.clone(), |rest, t| {
+                .fold(self.cx.stage.services.clone(), |rest, t| {
                     Type::Union(Box::new(t), Box::new(rest))
                 });
             let rest = Type::Row(Row {
@@ -316,7 +318,7 @@ impl Checker<'_> {
                 tail: Some(Box::new(tail)),
                 ..Row::default()
             });
-            let site = self.stage.site;
+            let site = self.cx.stage.site;
             self.sub_row(&needed, &rest, site, span, false);
         }
         ty
@@ -381,10 +383,11 @@ impl Checker<'_> {
             self.check(record, &implementation);
         }
         let needed = self.fresh();
-        let mut stage = self.stage.clone();
+        let mut stage = self.cx.stage.clone();
         stage.services = needed.clone();
         stage.returns = None;
-        let outer = mem::replace(&mut self.stage, stage);
+        let outer = mem::replace(&mut self.cx.stage, stage);
+        let label = Elem::Named(label);
         self.enter_provide(node, span, vec![label.clone()], false);
         let ty = match (body, expected) {
             (Some(body), Some(expected)) => {
@@ -395,15 +398,16 @@ impl Checker<'_> {
             (None, _) => Type::Error,
         };
         self.leave_provide();
-        let inner = mem::replace(&mut self.stage, outer);
-        self.stage.calls = inner.calls;
-        if self.stage.pure.is_none() {
+        let inner = mem::replace(&mut self.cx.stage, outer);
+        self.cx.stage.calls = inner.calls;
+        if self.cx.stage.pure.is_none() {
+            self.live_install([&entry], span);
             let rest = Type::Row(Row {
                 entries: vec![(label, entry)],
-                tail: Some(Box::new(self.stage.services.clone())),
+                tail: Some(Box::new(self.cx.stage.services.clone())),
                 ..Row::default()
             });
-            let site = self.stage.site;
+            let site = self.cx.stage.site;
             self.sub_row(&needed, &rest, site, span, false);
         }
         ty
@@ -435,7 +439,7 @@ impl Checker<'_> {
     }
 
     /// The row label of a type declared with `type error`.
-    pub fn error_label(&self, ty: &Type) -> Option<String> {
+    pub fn error_label(&self, ty: &Type) -> Option<Elem> {
         match ty.spine().0 {
             Type::Con { module, name }
                 if matches!(
@@ -443,7 +447,7 @@ impl Checker<'_> {
                     Some(Form::Error)
                 ) =>
             {
-                Some(format!("{module}.{name}"))
+                Some(Elem::Named(format!("{module}.{name}")))
             }
             _ => None,
         }
@@ -459,7 +463,7 @@ impl Checker<'_> {
 /// The errors the arms of a `try` catch: by label, or all of them.
 #[derive(Default)]
 struct Caught {
-    handled: Vec<(String, Type)>,
+    handled: Vec<(Elem, Type)>,
     all: bool,
 }
 

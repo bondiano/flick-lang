@@ -1,5 +1,5 @@
 // The laws of causes (docs/formal/runtime.md §2.2–2.3) as properties over
-// causes Effect's `Arbitrary` draws by seed, the same on every target: a
+// causes `Arbitrary` draws by seed, the same on every target: a
 // cause is a list of atoms, a typed failure, a defect or an interruption,
 // few enough to repeat. `⊕` is `Cause.combine`, `⧺` is `Cause.from_reasons`
 // over both lists; a cause is seen as its list of reasons. (Seq=Par) has

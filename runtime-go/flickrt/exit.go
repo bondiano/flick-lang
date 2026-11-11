@@ -24,8 +24,8 @@ func exitOf(fb *Fiber, task Value) *Exit {
 func ex(v Value) *Exit { return v.(*Exit) }
 
 // failureOf is the `Failure` of a cause; one without reasons is the empty
-// cause, which still fails, as Effect's `Cause.empty`. A cause that unwinds
-// to a handler of effects is no failure the code sees: it goes on unwinding.
+// cause, which still fails. A cause that unwinds to a handler of effects
+// is no failure the code sees: it goes on unwinding.
 func failureOf(c *Cause) Value {
 	if c == nil {
 		c = emptyCause
@@ -83,7 +83,7 @@ func ExitHasInterrupts(e Value) Value { return ex(e).cause.has(causeInterrupt) }
 
 var ExitVoid Value = &Exit{value: Unit}
 
-// pass is Effect's filter result: `Ok` what passes, `Err` the rest.
+// pass is a filter's result: `Ok` what passes, `Err` the rest.
 func pass(ok bool, yes, no Value) Value {
 	if ok {
 		return Ok(yes)
@@ -342,7 +342,7 @@ func handledExit(fb *Fiber, task Value) *Exit {
 }
 
 // withExit runs `task`, then `after` of its exit uninterruptibly; a
-// failure of `after` joins the task's, as Effect's `onExit` joins them.
+// failure of `after` joins the task's.
 func withExit(fb *Fiber, task Value, after func(*Exit) Value) Value {
 	e := exitOf(fb, task)
 	if task := after(e); task != nil {

@@ -6,12 +6,13 @@
 use std::collections::{BTreeSet, HashMap};
 use std::rc::Rc;
 
+use super::regions::regions_of;
 use super::{Checker, Solved};
 use crate::syntax::Name;
 use crate::types::{Caps, Fields, Kind, Row, Scheme, Stage, Type, Var};
 
 /// What a variable of a scheme becomes.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub(crate) enum Inst {
     Type(Type),
     Row(Row),
@@ -62,9 +63,10 @@ impl Checker<'_> {
     }
 
     /// The body of `s` with its variables rigid and the stages of its
-    /// signature holding their parameters: what (Let-Sig) checks. Its
-    /// facts `Θ` are given from here on.
-    pub(super) fn skolemize(&mut self, s: &Scheme) -> Type {
+    /// signature holding their parameters: what (Let-Sig) checks, with the
+    /// names of the rigid variables. Its facts `Θ` are given from here on.
+    pub(super) fn skolemize(&mut self, s: &Scheme) -> (Type, Vec<Name>) {
+        let mut rigid = Vec::new();
         let insts: Vec<Inst> = s
             .vars
             .iter()
@@ -74,6 +76,7 @@ impl Checker<'_> {
                 if *k == Kind::Region {
                     self.regions.kinds.insert(Var::Named(name.as_str().into()));
                 }
+                rigid.push(Name::from(name.as_str()));
                 rigid_inst(&name, k)
             })
             .collect();
@@ -82,9 +85,14 @@ impl Checker<'_> {
             let fact = (substitute_caps(c, &map), substitute(r, &map));
             self.regions.facts.push(fact);
         }
-        let body = substitute(&self.implicit(&s.body, &Caps::default()), &map);
+        let body = self.elide(
+            &s.body,
+            &Caps::default(),
+            &regions_of(&s.vars, &BTreeSet::new()),
+        );
+        let body = substitute(&body, &map);
         self.give_provided(&body);
-        body
+        (body, rigid)
     }
 
     /// `Gen(Γ, τ)`: the type metas of `t` deeper than the current level.
@@ -92,14 +100,23 @@ impl Checker<'_> {
     pub(super) fn generalize(&mut self, t: &Type) -> Scheme {
         let mut ms = BTreeSet::new();
         self.metas(t, &mut ms);
+        let zonked = self.zonk(t);
         let mut vars = Vec::new();
         for m in ms {
             let slot = &self.slots[m as usize];
-            if slot.level > self.level && slot.solved.is_none() && self.is_type_meta(m, t) {
-                let name: Name = format!("g{m}").into();
-                self.slots[m as usize].solved =
-                    Some(Solved::Type(Type::Var(Var::Named(name.clone()))));
+            if slot.level <= self.level || slot.solved.is_some() {
+                continue;
+            }
+            let name: Name = format!("g{m}").into();
+            let named = Var::Named(name.clone());
+            if self.is_type_meta(m, t) {
+                self.slots[m as usize].solved = Some(Solved::Type(Type::Var(named)));
                 vars.push((name, Kind::Type));
+            } else if in_errors(&Var::Meta(m), &zonked) {
+                // a row a type takes, as `Errors e`; a row only of a stage
+                // is closed instead (`core.md` §2.5, item 5)
+                self.slots[m as usize].solved = Some(Solved::Row(Row::var(named)));
+                vars.push((name, Kind::Errors));
             }
         }
         Scheme {
@@ -128,6 +145,22 @@ impl Checker<'_> {
             Type::Forall(s) => self.mentions(v, &s.body),
             _ => false,
         }
+    }
+}
+
+/// Whether the row variable `v` is in a row a type of `t` takes, `Errors ρ`.
+fn in_errors(v: &Var, t: &Type) -> bool {
+    let any = |ts: &[Type]| ts.iter().any(|t| in_errors(v, t));
+    match t {
+        Type::Errors(r) => r.vars.contains(v) || r.elems.values().any(|a| any(a)),
+        Type::App(h, a) | Type::Fun(h, _, a) => in_errors(v, h) || in_errors(v, a),
+        Type::Eff(_, _, t) | Type::Ref(t) | Type::Captured(t, _) | Type::Bounded(t, _) => {
+            in_errors(v, t)
+        }
+        Type::Record(f) => f.fields.values().any(|t| in_errors(v, t)),
+        Type::Tuple(ts) | Type::Dict(_, ts) => any(ts),
+        Type::Forall(s) => in_errors(v, &s.body),
+        _ => false,
     }
 }
 
@@ -196,6 +229,26 @@ fn row_atoms(r: &Row, out: &mut Caps) {
         args.iter().for_each(|t| free_atoms(t, out));
     }
     out.atoms.extend(r.vars.iter().cloned());
+}
+
+/// `σ[s̄ := ϱ̄]`: `s` with each region of `renamed` in place of its name, but
+/// for a name the signature binds itself.
+pub(crate) fn in_regions(s: &Scheme, renamed: &[(Name, Name)]) -> Scheme {
+    let map: HashMap<Name, Inst> = renamed
+        .iter()
+        .filter(|(n, r)| n != r && !s.vars.iter().any(|(v, _)| v == n))
+        .map(|(n, r)| (n.clone(), Inst::Type(Type::Var(Var::Named(r.clone())))))
+        .collect();
+    if map.is_empty() {
+        return s.clone();
+    }
+    Scheme {
+        vars: s.vars.clone(),
+        body: substitute(&s.body, &map),
+        outlives: (s.outlives.iter())
+            .map(|(c, r)| (substitute_caps(c, &map), substitute(r, &map)))
+            .collect(),
+    }
 }
 
 /// `τ[ᾱ := τ̄]`.
@@ -277,24 +330,16 @@ pub(super) fn substitute_row(r: &Row, map: &HashMap<Name, Inst>) -> Row {
             .iter()
             .map(|(n, args)| (n.clone(), args.iter().map(|a| substitute(a, map)).collect()))
             .collect(),
-        vars: BTreeSet::new(),
+        ..Row::default()
     };
     for v in &r.vars {
+        let gone = r.less_of(v).cloned().collect();
         match v {
             Var::Named(n) => match map.get(n) {
-                Some(Inst::Row(inner)) => {
-                    for (k, args) in &inner.elems {
-                        out.elems.entry(k.clone()).or_insert_with(|| args.clone());
-                    }
-                    out.vars.extend(inner.vars.iter().cloned());
-                }
-                _ => {
-                    out.vars.insert(v.clone());
-                }
+                Some(Inst::Row(inner)) => out.add_less(inner, &gone),
+                _ => out.add_var(v, &gone),
             },
-            Var::Meta(_) => {
-                out.vars.insert(v.clone());
-            }
+            Var::Meta(_) => out.add_var(v, &gone),
         }
     }
     out

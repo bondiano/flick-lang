@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["flick-core", "flick-ir", "flick", "flick-pretty", "flick-wasm", "flick-model", "flick-plugin", "flick-plugin/macros", "plugins/cli", "plugins/derive", "plugins/refined", "plugins/sql", "plugins/ui", "tests/plugins/pairs"]
+members = ["flick-core", "flick-ir", "flick", "flick-pretty", "flick-wasm", "flick-model", "flick-plugin", "flick-plugin/macros", "plugins/cli", "plugins/derive", "plugins/refined", "plugins/sql", "plugins/ui", "tests/plugins/pairs", "packages/effect-ts/tools/surface"]
 
 [workspace.package]
 edition = "2024"
@@ -23,6 +23,13 @@ missing_errors_doc = "allow"
 missing_panics_doc = "allow"
 must_use_candidate = "allow"
 module_name_repetitions = "allow"
+
+[workspace.dependencies]
+serde_json = "1.0.154"
+
+# Backtraces keep file and line; full variable info only bloats target/.
+[profile.dev]
+debug = "line-tables-only"
 
 [profile.release]
 lto = "thin"

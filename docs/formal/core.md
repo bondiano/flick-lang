@@ -20,10 +20,11 @@ The source of an expected error is `raise`; the source of a defect is `todo`.
 
 | Not included | Where | How the core accounts for it |
 | - | - | - |
-| Regions, captures `T^c`, `scope`, `NoCapture` | `regions.md` | Core types are checker types with the `Captured`/`Bounded` qualifiers erased. `close_over`, `value_bound` and `hold` take no part in the rules |
+| Regions, qualifiers `T^c` typed by use, `scope`, `Live` | `regions.md` | Core types are checker types with the `Captured`/`Bounded` qualifiers and the `Live` row elements erased. The region rules (`regions/live.rs`, `live_rows.rs`) take no part in the rules. Lean's core (`formal/`) has them, a value bound as a fact of its scheme ([value bounds in the core](regions.md#value-bounds-in-the-core)) |
 | Classes, dictionaries, `do`, `for`, `?` | `elaboration.md` | The core receives a program with dictionaries already inserted; schemes carry no constraints |
+| `type module`, parameterized modules, `Module Sig`, `exists K : Sig. T` | source checker and lowering | Static applications become named modules; packed modules and existential witnesses become records. The core does not prove the source rules for generativity, nominal identity, or existential opening |
 | Fibers, `parallel`, `race`, `spawn`, Cause, interruption, layer memoization | `runtime.md` (λRT) | The core has one thread of execution; the "interrupted" outcome appears only in λRT |
-| The Sync stage | — | For typing this is the runtime arrow `R⟨ρ; ε⟩` with `ρ` a closed row of effects of `tail` and `abort` operations. Sync is a way of compiling such an arrow, not a separate kind of stage; what may suspend has the effect `Async` in `ρ` |
+| The Sync stage | — | For typing this is the runtime arrow `R⟨ρ; ε⟩`. Intrinsic UI Sync rows may use a synchronous calling convention; ordinary runtime arrows retain λRT interruption points even without `Async`. Asynchronous waiting requires `Async` in `ρ`; scheduler preemption does not. Sync is implementation metadata, not a separate core stage |
 | `foreign` | hypothesis G1 (§4) | Bindings enter Γ₀ with their declared types |
 
 ## 1. Syntax
@@ -55,7 +56,7 @@ Checker: `kinds.rs`, `convert/kinds.rs`, `convert/rows.rs` `Checker::row`, `row_
 φ ::= P                           pure stage:      a -> b
     | R⟨ρ; ρ⟩                     runtime stage:   a ->{r; e} b
 
-ρ ::= α | none | {a₁, …, aₙ} | {a₁, …, aₙ | ρ} | ρ + ρ
+ρ ::= α | α − N̄ | none | {a₁, …, aₙ} | {a₁, …, aₙ | ρ} | ρ + ρ
 
 a ::= S τ̄                         SRow element: a service
     | E τ̄                         ERow element: a type declared with `type error`
@@ -72,21 +73,35 @@ How this is written in the language:
 
 The kind of a row in `φ` and `Eff` is fixed by its position. `none` is the empty row of any kind.
 
+The checker also takes a type variable as an element of an error row: in `{t | e}` the variable `t` stands for one error, as `Rpc.error_case : … -> ErrorCases e -> ErrorCases {t | e}` uses it. The core has no such element, and the model rejects what needs it (`flick-model/tests/known_gaps.txt`).
+
 **Row equality ≡** (SRow, ERow):
 
 - `+` is associative and commutative, with unit `none`;
 - `{ā | ρ} ≡ {ā} + ρ` and `ρ + ρ ≡ ρ`;
 - an element is identified by its name `Module.Name`, and a row has at most one element with a given name. `{N τ̄} + {N τ̄'}` is well-formed only when `τ̄ = τ̄'`, and then equals `{N τ̄}`.
 
-The normal form of a row is a pair: a set of elements keyed by name and a set of variables.
+**A variable without names** (SRow, ERow). `α − N̄` is the row `α` stands for less the elements named `N̄`; the language writes it `{-N | α}`. Only a name whose element takes no arguments is taken out of a variable: the variable may hold the element at other arguments, and then nothing says which one is meant (`FLICK-T002`).
 
-**Inclusion:** `ρ ⊆ ρ'` ⇔ `ρ' ≡ ρ + ρ''` for some `ρ''`. On normal forms this is inclusion of both sets.
+- a substitution takes the names out of what it puts there: `(α − N̄)[α := ρ]` is `ρ` without its elements named in `N̄`, and with each of its variables `β − M̄` as `β − (N̄ ∪ M̄)`;
+- `(α − N̄) + (α − M̄) ≡ α − (N̄ ∩ M̄)`, so `α + (α − N̄) ≡ α`;
+- `{N} + (α − N) ≡ {N} + α`: beside `N` the variable has it back.
+
+The normal form of a row is a pair: a set of elements keyed by name and a set of variables, each with the set of names it stands without, none of which the row names itself.
+
+**Inclusion:** `ρ ⊆ ρ'` ⇔ `ρ' ≡ ρ + ρ''` for some `ρ''`. On normal forms the elements of `ρ` are elements of `ρ'`, and a variable `α − N̄` of `ρ` is a variable `α − M̄` of `ρ'` with `M̄ ⊆ N̄`. So `α − N ⊆ α` and `α ⊆ {N | α − N}`, while `α ⊄ α − N`: the variable may hold `N`.
+
+With `ε_b = α` and `H = {E}`, the least remainder `ε'` of (Try) is `α − E`, and so is the row a handler of `E` leaves its surroundings in (Handle-E) when its body needs `α`: `provide` gives a service to a body it knows only by a row variable.
 
 A field row works differently. Labels are unique, order does not matter, and a repeated label is an error (`FLICK-T014`), not a merge. There is no inclusion, only equality: there is no width subtyping.
 
 Checker:
 
-- `unify.rs` `Store::normalize`: the normal form;
+- `unify.rs` `Store::normalize`: the normal form; `Type::Without` is a variable without names;
+- `effects/solve.rs` `owed`: what a variable may hold that a row takes out of it and does not name;
+
+Model: `Row.less` (`flick-model/src/types.rs`), with `Row::within` and `Row::add_less` for inclusion and substitution. Lean: a row variable is `Elem.rv a G`, the variable `a` without the names `G`; `Row.less` and `Row.substT` are the substitution, and `Row.back` is the third equality, read by the pointwise `Row.Sub` in the premises of `Typ.tryR` and `Typ.hdl`. A frame of a context keeps a row variable of its hole up to the names it stands without (`Row.modNames` in `FRel`, and in `Typ.handle`), since an element with a name is found by the name. `formal/Formal/Examples.lean` has the three facts above about `α` and `α − N`.
+
 - `rows.rs` `Checker::unify_row_types`, `merge_same_names`: one element per name;
 - `convert/rows.rs` `element_label`.
 
@@ -238,7 +253,7 @@ Checker:
  τ ≤ τ                 τ₁ →φ τ₂  ≤  τ₁' →φ' τ₂'                   Eff r e τ  ≤  Eff r' e' τ'
 ```
 
-There are no other rules. `Ref`, `List`, records and ADTs are invariant; inside them types are compared by `≡` (see [only arrows and `Eff` have subtyping](#only-arrows-and-eff-have-subtyping)).
+There are no other rules. `Ref`, `List`, records and ADTs are invariant; inside them types are compared by `≡` (see [only arrows and `Eff` have subtyping](#only-arrows-and-eff-have-subtyping)). The checker also subsumes a `Layer` by its rows, which the core does not (see [a layer that needs less fits where more is allowed](#a-layer-that-needs-less-fits-where-more-is-allowed)).
 
 `≤-Fun` with `φ = P` and `φ' = R⟨…⟩` is the lift of a pure function into a runtime position. There is no converse, because `R⟨…⟩ ⋢ P`. At run time (§3) the lift does nothing in the model. In the IR it is the `Lift` node, and its correctness is hypothesis G2.
 
@@ -452,7 +467,7 @@ The checker generalizes no more than `Gen`. Fewer generalized variables give the
 1. "Not free in Γ" is decided by levels. `Store::level`: a meta deeper than the current level is not in Γ. The result of a runtime binding is lowered to the level of the environment (`Store::lower`).
 2. Variables of numeric literals are not generalized: the literal's type is chosen later.
 3. Variables of unsolved class constraints are not generalized. A scheme without a signature gets no constraints (see [class constraints and generalization](#class-constraints-and-generalization)).
-4. Variables of a value that holds an open capture obligation are not generalized. This belongs to regions.
+4. Variables of a value with an open region obligation are not generalized. This belongs to regions.
 5. Unknown call rows inside a binding are closed with `none` before generalization rather than quantified (`effects/solve.rs` `settle_rows`): the checker picks the least solution (see [unknown call rows](#unknown-call-rows-in-a-generalized-binding-close-to-none)).
 6. `let (a, b) = …` and `let assert` are always monomorphic. A top-level or recursive function without a signature is `FLICK-T004`; another local one is monomorphic.
 
@@ -461,6 +476,8 @@ Checker:
 - The condition `φ₁ ≠ P` is the flag `Checker::runtime`. Only `perform` sets it. `function_with` (λ), `task` and `for` save the flag and restore it after the body.
 - `bindings.rs` `unsigned` → `generalize.rs` `Checker::generalize`; this is the only call of `generalize`.
 - `bindings.rs` `check_signed` and `polymorphic_runtime` (`FLICK-T013`), `pattern_let`.
+- `generalize.rs` `kind_of`: a quantified variable takes the kind of where it occurs, an argument of a type the kind of the type's parameter (`Server.Function (r : ServiceRow)` makes `r` a service row). Before, a row argument of a type other than `Eff` and `Layer` was quantified at kind `Type` (`flick-core/tests/features.rs`).
+- The model (`flick-model/src/check/generalize.rs`) quantifies type metas and the row metas a type takes, as in `Errors e`; a row only of a stage is closed, as in item 5.
 
 `foreign pure` atoms are created as state, so they have two separate rules (see [stateful atoms](#atommake-and-atomfresh-create-state-but-are-foreign-pure)). A local binding without a type does not generalize variables inside an atom type (`ui.rs` `lower_atoms` before `generalize`): its uses fix the type. An atom type with a quantified variable on a value is `FLICK-U005` (`ui.rs` `polymorphic_atom`): at the top level without a signature (`unsigned`), with a signature (`polymorphic_signature`), and when checked against `∀` (`check_value`).
 
@@ -723,7 +740,7 @@ T1 follows from two statements:
   - The case `try (raise v)`: the value `v` came from the body with `v : Errors ε'`, `ε' ⊆ ε_b`, and (Errors-Val) gives `v : Errors ε_b` for (Handle).
   - The false-guard case: the remainder `match v with ā` is typed by (Match-Val).
 
-Progress and Preservation are checked on the reference checker by the property `progress_and_preservation_hold` (`flick-model/tests/props.rs`, part of the model properties, `just model`). Every machine state, read as `⟨μ, E[e]⟩`, is retyped with `φ' ⊑ φ₀`; the run does not get stuck, and a final `raise v` is an error from `ε₀`. Programs with regions run the same way, with state `⟨Λ, μ, E[e]⟩` (`regions.md` §3.3).
+Progress and Preservation are checked on the reference checker by the property `progress_and_preservation_hold` (`flick-model/tests/props.rs`, part of the model properties, `just model`). Every machine state, read as `⟨μ, E[e]⟩`, is retyped with `φ' ⊑ φ₀`; the run does not get stuck, and a final `raise v` is an error from `ε₀`. Programs with regions run the same way, with state `⟨Λ, μ, E[e]⟩` (`regions.md` §3.3). Programs with classes too (§1.6): methods of `Describe` and `Rank` of `flick-model/src/generate/Gen.fl` at the types they have instances at, through the instance of `Option` and the superclass of `Rank`, and local functions with a class constraint, bound with their signature; the source writes no dictionary and annotates the argument of a method, and `checkers_agree` also changes a program into a method without an instance, a signature without its constraint, or an argument without its type, which flick-core may find ambiguous (`FLICK-C002`, `generate::by_design`). The module of `Gen.fl` is `Fixture`, not `Gen`, which would shadow the module of std. That name found a checker bug: a project module named like a module of std exported no instances, since `own_instances` (`env_impl.rs`) left out those of the built-in modules by name, while `learn` already keeps a built-in instance out by its key (`flick-core/src/project/tests.rs` `a_module_named_as_one_of_std_*`).
 
 **T2 (effect rows).**
 
@@ -870,6 +887,12 @@ let poke () =
 - The spec ("A signature gives an upper bound"; `reference/effects.md` "A runtime arrow and an Eff accept a value that needs fewer services and errors") did not say that rows under other constructors must be equal.
 - Resolution (spec): stated in `reference/effects.md`. Covariance of immutable constructors needs variance inference, which spec/03 defers.
 
+### A layer that needs less fits where more is allowed
+
+- Divergence: the checker accepts `Layer none none {Log}` where `Layer {Async} none {Log}` is expected (`effects.rs` `subsume_at`, `layer_parts`): the input and error rows are compared by `⊆`, the output row by `≡`. §2.2 has no such rule; the model follows §2.2 and rejects it (`flick-model/tests/known_gaps.txt`, `tests/check/pass/effects/async.fl` `quiet`).
+- Sound for the reason (≤-Eff) is: a layer is used only through `provide`, which adds its input row to the stage of the user, and a smaller row asks less there.
+- Resolution (recorded): adding (≤-Layer) to §2.2 needs the rule in the model and in the Lean development; until then the checker accepts more than the core.
+
 ### Or-pattern alternatives are compared by subtyping
 
 The alternatives of an or-pattern were compared by subtyping, and the IR did not apply the lift recorded by that comparison.
@@ -982,7 +1005,7 @@ let v1 g x = (g x)
 
 - Divergence: the step of §3.3 gives `(λg. λx. g x) (try … with _ → as4)` with `as4 : Unit →R⟨none;none⟩ (Unit, Int)`. In the program the `try` was checked against `a →R⟨r;e⟩ b` from `σ`, but in the state `λg` has no signature. The reference checker infers the argument without an expected type: `λx2` takes `P` (see [a callee of unknown type](#a-callee-of-unknown-type-is-a-pure-arrow)), and the branch with `as4` fails `(⊑)` at step 32 of `progress_and_preservation_hold`.
 - This is incompleteness of the reference checker, not of the document: under the rules of §2, `λg` is typed with a runtime-arrow parameter, and Preservation holds. The reference checker infers, and `λg. λx. g x` has no principal type.
-- Resolution (model): in the reference checker the step `let x : σ = λy. e₁ in e₂` gives `e₂[x := fix x. λy. e₁]`: `x ∉ fv(λy. e₁)`, the value is the same, and (Fix) of §3.6 checks it against `σ`, like the source program (`flick-model/src/eval/mod.rs`). Test: `a_function_keeps_its_signature` (`flick-model/tests/props.rs`).
+- Resolution (model): in the reference checker the step `let x : σ = λy. e₁ in e₂` gives `e₂[x := fix x. λy. e₁]`: `x ∉ fv(λy. e₁)`, the value is the same, and (Fix) of §3.6 checks it against `σ`, like the source program (`flick-model/src/eval/mod.rs`). Test: `a_function_keeps_its_signature` (`flick-model/tests/props.rs`). With regions, `σ` there is the local signature with its own qualifier inferred ([Fix keeps the qualifier of a local signature](regions.md#fix-keeps-the-qualifier-of-a-local-signature)).
 
 ### A handler that waited for its body to unwind was typable and stuck
 

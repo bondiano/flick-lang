@@ -353,11 +353,33 @@ errors each go on their own side of `;`. `-...Reads` takes a whole set. All of
 these are `FLICK-T002`, so a typo or a rename does not pass silently:
 
 - taking out what the row does not hold;
-- taking out of a row variable, as in `{-Log | r}`: only the names the row lists
-  can go, and `| r` is left as it is;
+- taking an element with arguments out of a row variable, as in
+  `{-Store Int | r}`: the variable may hold `Store` at another type, so write
+  `{Store Int | r}` and leave `r`;
 - writing an element and taking it out in one row, as in `{Log, ...Reads, -Log}`;
 - `...r`, since a row variable goes after `|`; merging an alias with a tail, since
   `| r` belongs where the set is used; `opaque type alias` of a row.
+
+Over a row variable `-` says what a function gives on its own. `{-Log | r}` is
+`r` without `Log`, whether or not `r` holds it, so the caller owes everything of
+its row but `Log`:
+
+```flick
+# service Log =
+#   info : String ->{} Unit
+# service Clock =
+#   now : Unit ->{} Float
+#
+quiet : Layer none none {Log} -> Eff r none a ->{-Log | r} a
+let quiet layer work = provide layer { await work }
+
+timed : Layer none none {Log} -> Eff {Clock, Log} none a ->{Clock} a
+let timed layer work = quiet layer work
+```
+
+Without `provide`, the body of `quiet` would need `Log` whenever `r` holds it,
+which the signature does not allow (`FLICK-E002`). Errors work the same after
+`;`, as in `->{; -NotFound | e}` over a `try` that handles `NotFound`.
 
 A set may take parameters, as in `type alias Db s = {Scope s, Log}`.
 
@@ -446,7 +468,10 @@ let start owner = ignore (Fiber.spawn owner report (task { Greeter.greet "child"
 A function that waits for time, input or output or another fiber says so
 with the effect `Async` in its row: `Effect.sleep : Duration ->{Async} Unit`,
 `Database.query`, `Http.Client.get`, `Fiber.join`, `Queue.take`. A row
-without it runs at once. `Async` has no operations: the scheduler of the
+without it performs no asynchronous wait. Ordinary runtime calls and recursive
+loops still have interruption points, including `->{}`; an empty row does not
+promise termination or atomic execution. Pure calls and intrinsic UI Sync stages
+remain synchronous. `Async` has no operations: the scheduler of the
 runtime handles it at the root, so `main` may have it, and so may the tasks
 of `spawn` and `parallel`; `provide Async` is `FLICK-E016`.
 
@@ -465,6 +490,35 @@ without it, a call that returns at once. A `foreign effect` is as written:
 without `Async` it runs at once, and a suspension is a defect. A call that may suspend in a row without `Async`
 is `FLICK-E002`, whose fix adds `Async` where the row is written: the
 signature, an `Eff`, or the row given to a type such as `Handlers none`.
+
+## Explicit host dependencies
+
+`Host` provides five ordinary services: `Host.Console` (standard streams),
+`Host.Clock` (wall and monotonic time reads), `Host.Random` (a draw in `[0, 1)`),
+`Host.Environment` and `Host.Arguments`. None has an implicit implementation.
+Provide `Host.console`, `Host.clock`, `Host.random`, `Host.environment` or
+`Host.arguments` at the entry boundary; `Host.live` combines all five.
+
+```flick
+mode : Unit ->{Host.Environment} Option String
+let mode () = Host.Environment.env "MODE"
+
+selected : Unit ->{} Option String
+let selected () =
+  let environment = Layer.succeed Host.Environment { env = fun _ -> Some "test" }
+  provide environment { mode () }
+```
+
+Service implementations are records, so tests can capture output, fix time and
+draws, or supply arguments without changing process globals. Tasks read their
+services where they run; an inner provider restores the outer one when it ends.
+The live clock reads the ambient fiber clock; replace scheduling time with
+`Test.clock_test`, rather than expecting a custom `Host.Clock` to drive timers.
+
+The existing `Platform`, `Clock`, `Random`, `Console` and `DateTime.now` APIs
+remain trusted ambient adapters for compatibility. Their empty rows do not
+identify host capabilities. Use `Host` in application contracts that need this
+guarantee; this API is not a sandbox against foreign code.
 
 ## Effects and handlers
 

@@ -1,6 +1,9 @@
 use super::*;
+use crate::diagnostics::codes;
 use crate::source::SourceMap;
 use crate::syntax::cst::Element;
+use crate::types::{Limits, Options, Thresholds, Watched};
+use crate::{doc, iface, ir, resolve, types};
 
 /// Compact shape of the tree: node kinds and token texts, no trivia; nodes
 /// with one child are shown as `Kind:child` to keep expectations short.
@@ -216,6 +219,8 @@ fn type_lists_variants_and_alias_names_a_type() {
     );
 }
 
+include!("tests_modules.rs");
+include!("tests_module_values.rs");
 #[test]
 fn a_gadt_constructor_names_what_it_builds() {
     assert_eq!(
@@ -503,4 +508,18 @@ fn a_handler_has_an_arm_for_the_value_of_its_body() {
         errors("let f x = match x with\n  | return -> 0\n"),
         Vec::<String>::new()
     );
+}
+
+#[test]
+fn a_contextual_while_stops_at_the_current_expression() {
+    for text in [
+        "let f while = (while true, do { pure () })\n",
+        "let f while = (while (do { pure true }), ())\n",
+        "let f while = if while true then do { pure () } else None\n",
+    ] {
+        let tree = sexp(text);
+        assert!(!tree.contains("WhileExpr"), "{tree}");
+    }
+    assert!(sexp("let f () = while (do { pure true }) do ()\n").contains("WhileExpr"));
+    assert!(sexp("let f () = while if true then false else true do ()\n").contains("WhileExpr"));
 }

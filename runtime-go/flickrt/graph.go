@@ -1,9 +1,9 @@
 package flickrt
 
-// Graph is Effect's immutable graph: its kind, its nodes and edges by
-// increasing index (Effect's maps keep insertion order, and indexes only
-// grow), each node's outgoing and incoming edges in Effect's adjacency
-// order, and the next indexes. A change works on a copy, as `Graph.mutate`.
+// Graph is an immutable graph: its kind, its nodes and edges by increasing
+// index (which is insertion order, as indexes only grow), each node's
+// outgoing and incoming edges in adjacency order, and the next indexes. A
+// change works on a copy, as `Graph.mutate`.
 type Graph struct {
 	kind               string
 	nodes              []graphNode
@@ -25,7 +25,7 @@ type graphEdge struct {
 func GraphNodeCount(g Value) Value { return int32(len(g.(*Graph).nodes)) }
 func GraphEdgeCount(g Value) Value { return int32(len(g.(*Graph).edges)) }
 
-// GraphJson is Effect's `Schema.Graph` as JSON: `{ type, nodes, edges }`,
+// GraphJson is the schema of a graph as JSON: `{ type, nodes, edges }`,
 // the indices strictly increasing and each edge's endpoints encoded nodes.
 func GraphJson(kind, node, edge Value) Value {
 	k := kind.(string)

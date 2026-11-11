@@ -1,8 +1,8 @@
 package flickrt
 
-// Effect's `Formatter`, `Inspectable` and `Version` over the JSON-like data
-// Flick hands them (`Json.to_unknown`).
-// shortcut: JSON-like data only, written as JSON.stringify writes it; Effect's own forms of other values (classes, symbols, cycles) when a program formats one
+// `Formatter`, `Inspectable` and `Version` over the JSON-like data Flick
+// hands them (`Json.to_unknown`).
+// shortcut: JSON-like data only, written as JSON.stringify writes it; the JS target's own forms of other values (classes, symbols, cycles) when a program formats one
 
 import (
 	"bytes"
@@ -39,13 +39,14 @@ func InspectableToStringUnknown(indent, data Value) Value {
 
 func InspectableToJson(data Value) Value { return data }
 
-// VersionCurrent is the version of Effect the runtime follows.
+// VersionCurrent is `Version.current`: the version the Effect library
+// reports on the JS target, the same here.
 func VersionCurrent() Value { return "4.1.2" }
 
-// formatSpaced is Effect's `Formatter.format` of a value as the JS target
-// holds it, by `space` spaces: an array or an object of more than one
-// entry over several lines. A variant is its object of `_tag` and fields;
-// an Option, a Result and a Duration write themselves, without spaces.
+// formatSpaced is the text of a value as the JS target holds it, by
+// `space` spaces: an array or an object of more than one entry over
+// several lines. A variant is its object of `_tag` and fields; an Option,
+// a Result and a Duration write themselves, without spaces.
 //
 // shortcut: other values of the runtime (Chunk, BigDecimal, DateTime, …) as Format writes them; port their `toString` when a report shows one
 func formatSpaced(v Value, space int) string {

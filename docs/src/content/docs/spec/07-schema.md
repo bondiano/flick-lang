@@ -1,6 +1,6 @@
 ---
 title: "Schema and standard data types"
-source_hash: 8e2c5d329fe1a552
+source_hash: 8a612413030f5f29
 ---
 
 ## The boundary between the language core and the library
@@ -46,7 +46,7 @@ Codec.decode_result : (PureCodec i a)^c -> Unknown^ci -> Result SchemaError a
 Codec.encode_result : (PureCodec i a)^c -> a -> Result SchemaError i
 ```
 
-The codec's captures are preserved on a partially applied function, as any later stage holds its earlier parameters; the provenance of the returned `a`/`i` is checked separately and is not erased by a generic witness. SchemaError carries a safe diagnostic, not the live source input, which could carry a scoped capability out.
+A partially applied function keeps the codec, and a later runtime stage needs live what its earlier parameters reach; the provenance of the returned `a`/`i` is checked separately and is not erased by a generic witness. SchemaError carries a safe diagnostic, not the live source input, which could carry a scoped capability out.
 
 `PureCodec` is an opaque certificate of pure synchronous execution, not an alias over empty service rows. `Codec none none i a` may perform async/runtime actions. The certificate is created by checked pure combinators, deriving and explicitly trusted FFI. An external Effect Schema without such a contract gets the general Codec. Pure decoding accepts only a source Unknown with an inert structural representation; arbitrary JS first goes through the runtime import `Js.snapshot` ([FFI](../../reference/ffi/#js-values)).
 

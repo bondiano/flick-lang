@@ -1,8 +1,8 @@
 package flickrt
 
-// Brace expansion of Effect's internal/glob.ts: `{a,b}` groups that may
-// nest, skipping bracket classes; a pattern whose expansion is too deep or
-// too large stays literal.
+// Brace expansion of glob patterns: `{a,b}` groups that may nest, skipping
+// bracket classes; a pattern whose expansion is too deep or too large stays
+// literal.
 
 type fsGlobBraceGroup struct {
 	commas []int

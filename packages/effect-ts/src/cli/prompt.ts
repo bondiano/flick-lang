@@ -6,8 +6,8 @@
 
 
 import {
-  type Cause,
-  type Context,
+  Cause,
+  Context,
   DateTime,
   Effect,
   Layer,
@@ -19,22 +19,53 @@ import {
 import { Prompt } from "effect/cli";
 
 import { nodeModule } from "../host.ts";
+import { callEffect } from "../bridge.ts";
 import { constructorName, tag } from "@flick-lang/runtime/tags";
+import { Queue as NativeQueue, flickTake as nativeTake } from "@flick-lang/runtime/rt/effect/Queue";
 
 const QUIT = /*#__PURE__*/ Object.freeze({ _tag: tag("Terminal.QuitError.QuitError") });
 
 /** The operations of `Cli.Prompt.Tty`, as Flick calls them. */
 export interface TtyImpl {
-  readonly read_key: (unit: undefined) => Effect.Effect<Terminal.UserInput, unknown>;
-  readonly display: (text: string) => Effect.Effect<unknown>;
-  readonly columns: (unit: undefined) => Effect.Effect<number>;
-  readonly rows: (unit: undefined) => Effect.Effect<number>;
+  readonly read_key: (unit: undefined) => unknown;
+  readonly display: (text: string) => unknown;
+  readonly columns: (unit: undefined) => unknown;
+  readonly rows: (unit: undefined) => unknown;
 }
 
+interface HostTty {
+  readonly read_key: (unit: undefined) => Effect.Effect<Terminal.UserInput, unknown>;
+  readonly display: (text: string) => Effect.Effect<unknown, unknown>;
+  readonly columns: (unit: undefined) => Effect.Effect<number, unknown>;
+  readonly rows: (unit: undefined) => Effect.Effect<number, unknown>;
+}
+
+/** Flick service tags carry the same key as Effect tags, but are not Effect instructions. */
+const hostKey = <I>(key: Context.Key<I, TtyImpl> | { readonly key: string }): Context.Key<I, TtyImpl> => {
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- both contexts identify a service by its key
+  return Context.Service<TtyImpl>(key.key) as unknown as Context.Key<I, TtyImpl>;
+};
+
+const operation = <A>(value: unknown): Effect.Effect<A, unknown> => {
+  const result = Effect.map(Effect.isEffect(value) ? value : callEffect(() => value), (output) => {
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the service's Flick signature fixes this result type
+    return output as A;
+  });
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- callEffect reads its kernel context internally
+  return result as Effect.Effect<A, unknown>;
+};
+
+const hostTty = (tty: TtyImpl): HostTty => ({
+  read_key: (unit) => Effect.suspend(() => operation<Terminal.UserInput>(tty.read_key(unit))),
+  display: (text) => Effect.suspend(() => operation(tty.display(text))),
+  columns: (unit) => Effect.suspend(() => operation<number>(tty.columns(unit))),
+  rows: (unit) => Effect.suspend(() => operation<number>(tty.rows(unit))),
+});
+
 /** `Cli.Prompt.node`: the terminal of the process; Ctrl+C and Ctrl+D quit. */
-export const promptNode = <I>(key: Context.Key<I, TtyImpl>): Layer.Layer<I> =>
+export const promptNode = <I>(key: Context.Key<I, TtyImpl> | { readonly key: string }): Layer.Layer<I> =>
   Layer.effect(
-    key,
+    hostKey(key),
     Effect.gen(function* () {
       const terminal = yield* nodeModule("@effect/platform-node/NodeTerminal").make();
       const input = yield* terminal.readInput;
@@ -53,8 +84,17 @@ interface Loop {
   readonly render: (state: unknown, action: unknown) => Effect.Effect<string, never, unknown>;
   readonly process: (input: unknown, state: unknown) => Effect.Effect<Action, never, unknown>;
   readonly clear: (state: unknown, action: unknown) => Effect.Effect<string, never, unknown>;
-  readonly events: Queue.Dequeue<unknown, Cause.Done> | undefined;
+  readonly events: Queue.Dequeue<unknown, Cause.Done> | NativeQueue | undefined;
 }
+
+const takeEvent = (events: Queue.Dequeue<unknown, Cause.Done> | NativeQueue): Effect.Effect<unknown, unknown> =>
+  events instanceof NativeQueue
+    ? Effect.flatMap(callEffect(() => nativeTake(events)), (option) => {
+      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the kernel Queue.take result is a native Option
+      const value = option as { readonly _tag: "Some" | "None"; readonly value?: unknown };
+      return value._tag === "Some" ? Effect.succeed(value.value) : Effect.fail(Cause.Done());
+    })
+    : Queue.take(events);
 
 type Action =
   | { readonly _tag: "Beep" }
@@ -69,7 +109,7 @@ type Op =
 const CURSOR_SHOW = "\x1b[?25h";
 
 /** One loop of a prompt, as Effect's runner draws it, reading keys from the service. */
-const runLoop = (loop: Loop, tty: TtyImpl): Effect.Effect<unknown, unknown, unknown> =>
+const runLoop = (loop: Loop, tty: HostTty): Effect.Effect<unknown, unknown, unknown> =>
   Effect.gen(function* () {
     let state = Effect.isEffect(loop.initialState) ? yield* loop.initialState : loop.initialState;
     let action: Action = { _tag: "NextFrame", state };
@@ -84,7 +124,7 @@ const runLoop = (loop: Loop, tty: TtyImpl): Effect.Effect<unknown, unknown, unkn
           ? (yield* tty.read_key(undefined))
           : yield* Effect.raceFirst(
             key,
-            Effect.map(Queue.take(loop.events), (value) => ({ _tag: "Event", value })),
+            Effect.map(takeEvent(loop.events), (value) => ({ _tag: "Event", value })),
           );
       action = yield* loop.process(input, state);
       if (action._tag === "Beep") continue;
@@ -99,7 +139,7 @@ const runLoop = (loop: Loop, tty: TtyImpl): Effect.Effect<unknown, unknown, unkn
     }
   }).pipe(Effect.ensuring(Effect.ignore(tty.display(CURSOR_SHOW))));
 
-const runOp = (op: Op, tty: TtyImpl): Effect.Effect<unknown, unknown, unknown> =>
+const runOp = (op: Op, tty: HostTty): Effect.Effect<unknown, unknown, unknown> =>
   Effect.suspend(() => {
     if (op._tag === "Loop") return runLoop(op, tty);
     if (op._tag === "OnSuccess") return Effect.flatMap(runOp(op.prompt, tty), (a) => runOp(op.onSuccess(a), tty));
@@ -107,37 +147,38 @@ const runOp = (op: Op, tty: TtyImpl): Effect.Effect<unknown, unknown, unknown> =
   });
 
 /** Effect's `Terminal` the prompts' handlers ask for its size. */
-const terminalOf = (tty: TtyImpl): Terminal.Terminal =>
+const terminalOf = (tty: HostTty): Terminal.Terminal =>
   Terminal.make({
-    columns: Effect.suspend(() => tty.columns(undefined)),
-    rows: Effect.suspend(() => tty.rows(undefined)),
+    columns: Effect.orDie(Effect.suspend(() => tty.columns(undefined))),
+    rows: Effect.orDie(Effect.suspend(() => tty.rows(undefined))),
     size: Effect.die("Cli.Prompt asks Tty for its columns and rows"),
     readInput: Effect.die("Cli.Prompt reads keys from Tty.read_key"),
     readLine: Effect.die("Cli.Prompt reads keys from Tty.read_key"),
-    display: (text) => Effect.asVoid(tty.display(text)),
+    display: (text) => Effect.asVoid(Effect.orDie(tty.display(text))),
   });
 
 /** `Cli.Prompt.run`: the File prompt reads the file system of Node.js. */
 export const promptRun = <I>(
-  key: Context.Key<I, TtyImpl>,
+  key: Context.Key<I, TtyImpl> | { readonly key: string },
   prompt: Prompt.Prompt<unknown>,
 ): Effect.Effect<unknown, unknown, unknown> =>
-  Effect.flatMap(Effect.service(key), (tty) =>
+  Effect.flatMap(Effect.service(hostKey(key)), (tty) => {
+    const compatible = hostTty(tty);
     // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- every prompt is Effect's tree of these three nodes
-    runOp(prompt as unknown as Op, tty).pipe(
+    return runOp(prompt as unknown as Op, compatible).pipe(
       Effect.provide(
         Layer.mergeAll(
           nodeModule("@effect/platform-node/NodeFileSystem").layer,
           nodeModule("@effect/platform-node/NodePath").layer,
-          Layer.succeed(Terminal.Terminal, terminalOf(tty)),
+          Layer.succeed(Terminal.Terminal, terminalOf(compatible)),
         ),
       ),
-    ),
-  );
+    );
+  });
 
 /** `Cli.Prompt.run_themed`. */
 export const promptRunThemed = <I>(
-  key: Context.Key<I, TtyImpl>,
+  key: Context.Key<I, TtyImpl> | { readonly key: string },
   theme: Prompt.Theme,
   prompt: Prompt.Prompt<unknown>,
 ): Effect.Effect<unknown, unknown, unknown> => Effect.provideService(promptRun(key, prompt), Prompt.Theme, theme);
@@ -449,10 +490,11 @@ export const promptCustom = (state: unknown, h: FlickHandlers<Terminal.UserInput
 const INPUT = /*#__PURE__*/ tag("Cli.Prompt.ProcessInput.Input");
 const EVENT = /*#__PURE__*/ tag("Cli.Prompt.ProcessInput.Event");
 
-export const promptCustomEvents = (state: unknown, events: Queue.Dequeue<unknown>, h: FlickHandlers<FlickAction>) =>
+export const promptCustomEvents = (state: unknown, events: Queue.Dequeue<unknown> | NativeQueue, h: FlickHandlers<FlickAction>) =>
   Prompt.Custom(
     state,
-    events,
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- runLoop reads native queues through takeEvent
+    events as Queue.Dequeue<unknown>,
     handlers(
       h,
       (i: Prompt.ProcessInput<unknown>): FlickAction =>

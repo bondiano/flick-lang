@@ -6,11 +6,10 @@ import (
 	"sync"
 )
 
-// Pool is Effect's: items acquired ahead and lent to tasks, at most
-// `concurrency` tasks per item, released when the owner of the pool's
-// region closes.
+// Pool is items acquired ahead and lent to tasks, at most `concurrency`
+// tasks per item, released when the owner of the pool's region closes.
 //
-// shortcut: a resize acquires its items one after another and the call that starts it waits for it to end, where Effect acquires them concurrently and returns once its fiber suspends; acquire them in fibers if slow acquisitions need it
+// shortcut: a resize acquires its items one after another and the call that starts it waits for it to end, where the JS target acquires them concurrently and returns once its fiber suspends; acquire them in fibers if slow acquisitions need it
 type pool struct {
 	mu                sync.Mutex
 	acquire           Value
@@ -341,15 +340,14 @@ func PoolUse(fb *Fiber, f, self Value) Value {
 			return masked(fb, outer, func() Value { return Run(fb, Apply(fb, f, item.exit.value)) })
 		})
 		_, released := catch(func() Value { p.release(fb, item); return Unit })
-		if cause = finalized(cause, released); cause != nil { // as Effect's Pool.use
+		if cause = finalized(cause, released); cause != nil { // then the failure of the release
 			panic(&Failure{cause})
 		}
 		return out
 	})
 }
 
-// find is the item whose value is `value`, by identity as Effect's `===`.
-// With the lock.
+// find is the item whose value is `value`, by identity. With the lock.
 func (p *pool) find(value Value) *poolItem {
 	for _, item := range p.items {
 		if item.exit.cause == nil && identical(item.exit.value, value) {

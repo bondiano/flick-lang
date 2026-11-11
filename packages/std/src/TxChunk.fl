@@ -1,5 +1,5 @@
-/// Effect's `TxChunk`: a `Chunk` in a transactional cell; each operation
-/// takes part in the enclosing `Tx.atomically` transaction.
+/// A `Chunk` in a transactional cell; each operation takes part in the
+/// enclosing `Tx.atomically` transaction.
 module TxChunk exposing (..)
 
 import Chunk
@@ -10,118 +10,118 @@ type TxChunk a
 
 /// A new transactional chunk holding `initial`.
 make : Chunk.Chunk a ->{} TxChunk a
-foreign effect make from "@flick-lang/effect-ts/effect/TxChunk" "make"
+foreign effect make from "flick:TxChunk" "make"
   reviewed "effect@4.1.2 sha256:951cdffbe4785f14"
 
 /// A new empty transactional chunk.
 empty : Unit ->{} TxChunk a
-foreign effect empty from "@flick-lang/effect-ts/effect/TxChunk" "empty"
+foreign effect empty from "flick:TxChunk" "empty"
   arity 0
   reviewed "effect@4.1.2 sha256:27084a506c74ec08"
 
 /// A new transactional chunk of the elements of the list.
 from_iterable : List a ->{} TxChunk a
-foreign effect from_iterable from "@flick-lang/effect-ts/effect/TxChunk" "fromIterable"
+foreign effect from_iterable from "flick:TxChunk" "fromIterable"
   reviewed "effect@4.1.2 sha256:407ed538a36509ad"
 
 /// Replaces the chunk with the second of `f` of it; returns the first.
 modify : (Chunk.Chunk a -> (b, Chunk.Chunk a))^c -> TxChunk a ->{Tx.Transaction} b
-foreign effect modify from "@flick-lang/effect-ts/effect/TxChunk" "modify"
+foreign effect modify from "flick:TxChunk" "modify"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:12617ebb5f2607a6"
 
 /// Replaces the chunk with `f` of it.
 update : (Chunk.Chunk a -> Chunk.Chunk a)^c -> TxChunk a ->{Tx.Transaction} Unit
-foreign effect update from "@flick-lang/effect-ts/effect/TxChunk" "update"
+foreign effect update from "flick:TxChunk" "update"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:5367e65de8b6c91f"
 
 /// The chunk the transaction sees.
 get : TxChunk a ->{Tx.Transaction} Chunk.Chunk a
-foreign effect get from "@flick-lang/effect-ts/effect/TxChunk" "get"
+foreign effect get from "flick:TxChunk" "get"
   reviewed "effect@4.1.2 sha256:94f7700157d48480"
 
 /// Replaces the chunk.
 set : Chunk.Chunk a -> TxChunk a ->{Tx.Transaction} Unit
-foreign effect set from "@flick-lang/effect-ts/effect/TxChunk" "set"
+foreign effect set from "flick:TxChunk" "set"
   arity 1
   reviewed "effect@4.1.2 sha256:7941bfca16230329"
 
 /// Adds the element at the end.
 append : a -> TxChunk a ->{Tx.Transaction} Unit
-foreign effect append from "@flick-lang/effect-ts/effect/TxChunk" "append"
+foreign effect append from "flick:TxChunk" "append"
   arity 1
   reviewed "effect@4.1.2 sha256:7f154ee820b65aec"
 
 /// Adds the element at the start.
 prepend : a -> TxChunk a ->{Tx.Transaction} Unit
-foreign effect prepend from "@flick-lang/effect-ts/effect/TxChunk" "prepend"
+foreign effect prepend from "flick:TxChunk" "prepend"
   arity 1
   reviewed "effect@4.1.2 sha256:16ae585b9218b462"
 
 /// The number of elements.
 size : TxChunk a ->{Tx.Transaction} Int
-foreign effect size from "@flick-lang/effect-ts/effect/TxChunk" "size"
+foreign effect size from "flick:TxChunk" "size"
   reviewed "effect@4.1.2 sha256:5b88194fe0b0fb51"
 
 /// Whether it has no elements.
 is_empty : TxChunk a ->{Tx.Transaction} Bool
-foreign effect is_empty from "@flick-lang/effect-ts/effect/TxChunk" "isEmpty"
+foreign effect is_empty from "flick:TxChunk" "isEmpty"
   reviewed "effect@4.1.2 sha256:968d5e5785055738"
 
 /// Whether it has an element.
 is_non_empty : TxChunk a ->{Tx.Transaction} Bool
-foreign effect is_non_empty from "@flick-lang/effect-ts/effect/TxChunk" "isNonEmpty"
+foreign effect is_non_empty from "flick:TxChunk" "isNonEmpty"
   reviewed "effect@4.1.2 sha256:3a7352ba4cf5f63b"
 
 /// Keeps the first `n` elements.
 take : Int -> TxChunk a ->{Tx.Transaction} Unit
-foreign effect take from "@flick-lang/effect-ts/effect/TxChunk" "take"
+foreign effect take from "flick:TxChunk" "take"
   arity 1
   reviewed "effect@4.1.2 sha256:9f2e15960002e560"
 
 /// Removes the first `n` elements.
 drop : Int -> TxChunk a ->{Tx.Transaction} Unit
-foreign effect drop from "@flick-lang/effect-ts/effect/TxChunk" "drop"
+foreign effect drop from "flick:TxChunk" "drop"
   arity 1
   reviewed "effect@4.1.2 sha256:29dd4694ef25991f"
 
 /// Keeps the elements from index `start` up to, not including, `end`.
 slice : Int -> Int -> TxChunk a ->{Tx.Transaction} Unit
-foreign effect slice from "@flick-lang/effect-ts/effect/TxChunk" "slice"
+foreign effect slice from "flick:TxChunk" "slice"
   arity 2
   reviewed "effect@4.1.2 sha256:fc2fd7c096db9ed7"
 
 /// Replaces each element with `f` of it.
 map : (a -> a)^c -> TxChunk a ->{Tx.Transaction} Unit
-foreign effect map from "@flick-lang/effect-ts/effect/TxChunk" "map"
+foreign effect map from "flick:TxChunk" "map"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:7e06d312bae3268e"
 
 /// Keeps the elements the predicate accepts.
 filter : (a -> Bool)^c -> TxChunk a ->{Tx.Transaction} Unit
-foreign effect filter from "@flick-lang/effect-ts/effect/TxChunk" "filter"
+foreign effect filter from "flick:TxChunk" "filter"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:4741585517363688"
 
 /// Adds the elements of the chunk at the end.
 append_all : Chunk.Chunk a -> TxChunk a ->{Tx.Transaction} Unit
-foreign effect append_all from "@flick-lang/effect-ts/effect/TxChunk" "appendAll"
+foreign effect append_all from "flick:TxChunk" "appendAll"
   arity 1
   reviewed "effect@4.1.2 sha256:b23c2869bd7666ce"
 
 /// Adds the elements of the chunk at the start.
 prepend_all : Chunk.Chunk a -> TxChunk a ->{Tx.Transaction} Unit
-foreign effect prepend_all from "@flick-lang/effect-ts/effect/TxChunk" "prependAll"
+foreign effect prepend_all from "flick:TxChunk" "prependAll"
   arity 1
   reviewed "effect@4.1.2 sha256:b4ce2b2701adcd08"
 
 /// Adds the elements `other` holds, in the same transaction, at the end.
 concat : TxChunk a -> TxChunk a ->{Tx.Transaction} Unit
-foreign effect concat from "@flick-lang/effect-ts/effect/TxChunk" "concat"
+foreign effect concat from "flick:TxChunk" "concat"
   arity 1
   reviewed "effect@4.1.2 sha256:e51557d82f4d7acc"

@@ -1,7 +1,7 @@
 ---
 title: Начало работы
 description: Установите инструменты, создайте приложение и запустите его.
-source_hash: c3f53e07fdc6a9a5
+source_hash: 3ac73dfef57b9489
 ---
 
 ## Установка
@@ -117,6 +117,10 @@ let main () =
 после изменений. Все команды описаны в
 [справочнике командной строки](../../reference/cli/).
 
+Следующий шаг — [спроектировать программу с эффектами](../../handbook/designing-with-effects/):
+отделить логику поиска пользователей от внешних вызовов и предоставить
+разные сервисы в приложении и его тестах.
+
 ## На веб-странице
 
 В Astro и Vite модули `.fl` можно импортировать через `@flick-lang/astro`:
@@ -124,6 +128,8 @@ let main () =
 опубликован в npm и версионируется вместе с компилятором, а исходники лежат
 в репозитории Flick
 ([исходники](https://github.com/bondiano/flick-lang/tree/main/tools/astro-flick)).
+Разместите `.fl` внутри проекта Flick: конфигурация нового проекта по
+умолчанию выбирает RT, как и импорт ниже.
 
 ```js
 // astro.config.mjs
@@ -135,7 +141,7 @@ export default defineConfig({ integrations: [flick()] });
 ```astro
 <div id="app"></div>
 <script>
-  import { runMain } from "@flick-lang/effect-ts";
+  import { runMain } from "@flick-lang/runtime/rt";
   import { main } from "../app/Main.fl";
 
   runMain(main);

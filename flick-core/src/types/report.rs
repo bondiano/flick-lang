@@ -3,6 +3,7 @@
 use super::Checker;
 use super::ty::Type;
 use super::unify::Mismatch;
+use crate::types::{Atom, Elem};
 mod async_place;
 mod coercions;
 
@@ -21,7 +22,6 @@ impl Checker<'_> {
         detail: impl FnOnce(&Self) -> String,
     ) {
         let d = Diagnostic::error(code, head, span).with_incomplete(incomplete);
-        #[cfg(feature = "diagnostic-fixes")]
         let d = {
             let detail = detail(self);
             if detail.is_empty() {
@@ -30,16 +30,14 @@ impl Checker<'_> {
                 d.with_fix(|| (detail, Vec::new()))
             }
         };
-        #[cfg(not(feature = "diagnostic-fixes"))]
-        let _ = detail;
-        self.diagnostics.push(d);
+        self.diagnostic(d);
     }
 
     /// Unifies the type an expression has with the one its position expects;
     /// reports a mismatch at `span`. `false` after a diagnostic.
     pub fn expect(&mut self, actual: &Type, expected: &Type, span: Span) -> bool {
         let ground = self.coercion_types(actual, expected);
-        let marks = (self.regions.holds.len(), self.subrows.len());
+        let marks = (self.cx.regions.holds.len(), self.cx.subrows.len());
         match self.subsume(actual, expected, span) {
             Ok(()) => {
                 if let Some(lift) = self.lift(actual, expected) {
@@ -53,8 +51,8 @@ impl Checker<'_> {
                 {
                     // ground nominal types bind no metas; what the failed
                     // comparison queued is about a value no longer placed here
-                    self.regions.holds.truncate(marks.0);
-                    self.subrows.truncate(marks.1);
+                    self.cx.regions.holds.truncate(marks.0);
+                    self.cx.subrows.truncate(marks.1);
                     return true;
                 }
                 self.mismatch(&mismatch, actual, expected, span);
@@ -64,20 +62,22 @@ impl Checker<'_> {
     }
 
     /// Qualifiers that must be equal, as in mutable storage, differ.
-    fn capture_mismatch(&mut self, head: &str, label: &str, left: bool, span: Span) {
-        let meta = label.strip_prefix("^?").and_then(|n| n.parse().ok());
+    fn capture_mismatch(&mut self, head: &str, label: &Elem, left: bool, span: Span) {
+        let meta = match label {
+            Elem::Capture(Atom::Meta(m)) => Some(*m),
+            _ => None,
+        };
         let incomplete = meta.is_some_and(|m| {
             self.zonk(&Type::Meta(m))
                 .contains(&mut |t| matches!(t, Type::Error))
         });
         self.error_help(codes::T003, span, head, incomplete, |this| {
             // a meta label names what the meta has become since
-            let element = match meta {
-                Some(meta) => this.store.resolve(&Type::Meta(meta)),
-                None => match label.strip_prefix("^'").and_then(|n| n.parse().ok()) {
-                    Some(skolem) => Type::Skolem(skolem),
-                    None => Type::Var(label.trim_start_matches('^').to_owned()),
-                },
+            let element = match label {
+                Elem::Capture(Atom::Meta(meta)) => this.store.resolve(&Type::Meta(*meta)),
+                Elem::Capture(Atom::Skolem(skolem)) => Type::Skolem(*skolem),
+                Elem::Capture(Atom::Var(name)) => Type::Var(name.clone()),
+                other => Type::Var(other.to_string()),
             };
             let region = match element {
                 Type::Skolem(skolem) => this.store.skolem_name(skolem).to_owned(),
@@ -100,7 +100,8 @@ impl Checker<'_> {
         actual: &Type,
         expected: &Type,
     ) -> (String, String) {
-        let captures = matches!(mismatch, Mismatch::Label { label, .. } if label.starts_with('^'));
+        let captures =
+            matches!(mismatch, Mismatch::Label { label, .. } if matches!(label, Elem::Capture(_)));
         let plain = |t: &Type| uncaptured(&self.zonk(t));
         let polymorphic = |t: &Type| matches!(plain(t), Type::Forall { .. });
         let short = |t: &Type| self.show(&plain(t));
@@ -117,10 +118,19 @@ impl Checker<'_> {
         }
         let (a, e) = (short(actual), short(expected));
         if a == e {
-            return (
+            let (a, e) = (
                 self.show_exact(&plain(actual)),
                 self.show_exact(&plain(expected)),
             );
+            if a == e {
+                // Distinct nominal types from different modules, including
+                // virtual parameterized module results, can share the same short name.
+                return (
+                    self.show_qualified(&plain(actual)),
+                    self.show_qualified(&plain(expected)),
+                );
+            }
+            return (a, e);
         }
         (a, e)
     }
@@ -146,7 +156,13 @@ impl Checker<'_> {
                     _ => self.show(t),
                 };
                 let (sa, sb) = (show(a), show(b));
-                if sa == actual && sb == expected || sa == expected && sb == actual {
+                if sa == sb && self.show_qualified(a) != self.show_qualified(b) {
+                    format!(
+                        "`{}` and `{}` are distinct nominal types; use one module result or convert the values explicitly",
+                        self.show_qualified(a),
+                        self.show_qualified(b)
+                    )
+                } else if sa == actual && sb == expected || sa == expected && sb == actual {
                     String::new()
                 } else {
                     format!("`{sa}` is not `{sb}`")
@@ -160,7 +176,7 @@ impl Checker<'_> {
         self.report_mismatch(mismatch, actual, expected, span);
         // a type that lacks only `Async` says so where it is written
         let about_async = match mismatch {
-            Mismatch::Label { label, .. } => lang::label(Lang::Async) == Some(label.as_str()),
+            Mismatch::Label { label, .. } => lang::label(Lang::Async) == label.name(),
             Mismatch::Types(..) => true,
             _ => false,
         };
@@ -181,6 +197,7 @@ impl Checker<'_> {
     }
 
     fn report_mismatch(&mut self, mismatch: &Mismatch, actual: &Type, expected: &Type, span: Span) {
+        let through_live = matches!(mismatch, Mismatch::Escape(s) if self.needs_live(actual, *s));
         let (actual, expected) = self.mismatch_types(mismatch, actual, expected);
         let head = format!("expected `{expected}`, found `{actual}`");
         match mismatch {
@@ -208,14 +225,15 @@ impl Checker<'_> {
                     this.mismatch_hint(&a, &b, &actual, &expected)
                 });
             }
-            Mismatch::Label { label, left } if label.starts_with('^') => {
+            Mismatch::Label { label, left } if matches!(label, Elem::Capture(_)) => {
                 self.capture_mismatch(&head, label, *left, span);
             }
             Mismatch::Label { label, left } => {
                 self.error_help(codes::T003, span, &head, false, |this| {
                     // in a nested record literal, the record that lacks or has the field
                     let path = this.field_path.join(".");
-                    match (label.rsplit_once('.'), *left) {
+                    let name = label.name().unwrap_or_default();
+                    match (name.rsplit_once('.'), *left) {
                         (Some((_, name)), true) => format!(
                             "`{name}` is in the row, which the expected type does not allow"
                         ),
@@ -241,21 +259,7 @@ impl Checker<'_> {
                     format!("{head}: the type would contain itself (`{t}`)"),
                 );
             }
-            Mismatch::Escape(skolem) => {
-                if !self.region_escape(*skolem, &head, span) {
-                    let name = self.store.skolem_name(*skolem).to_owned();
-                    let scope = if self.gadt.existentials.contains(skolem) {
-                        "the branch that matched the constructor hiding it"
-                    } else {
-                        "the scope of its `forall`"
-                    };
-                    self.error(
-                        codes::T007,
-                        span,
-                        format!("{head}: the type variable `{name}` would escape {scope}"),
-                    );
-                }
-            }
+            Mismatch::Escape(skolem) => self.report_escape(*skolem, head, through_live, span),
             Mismatch::Untouchable(t) => {
                 let t = self.show(t);
                 self.error(
@@ -281,6 +285,30 @@ impl Checker<'_> {
 }
 
 impl Checker<'_> {
+    /// A rigid variable that would leave its `forall`, or a region its
+    /// `scope`, as one a row needs live (`through_live`).
+    fn report_escape(&mut self, skolem: u32, head: String, through_live: bool, span: Span) {
+        let head = if through_live {
+            let name = self.store.skolem_name(skolem);
+            format!("this value needs region `{name}` live")
+        } else {
+            head
+        };
+        if !self.region_escape(skolem, &head, span) {
+            let name = self.store.skolem_name(skolem).to_owned();
+            let scope = if self.gadt.existentials.contains(&skolem) {
+                "the branch that matched the constructor hiding it"
+            } else {
+                "the scope of its `forall`"
+            };
+            self.error(
+                codes::T007,
+                span,
+                format!("{head}: the type variable `{name}` would escape {scope}"),
+            );
+        }
+    }
+
     /// E011: a `Server.Guarded` where a `Server.Function` goes, or the other
     /// way round; `false` when the mismatch is something else.
     fn served_wrong(&mut self, actual: &Type, expected: &Type, span: Span) -> bool {

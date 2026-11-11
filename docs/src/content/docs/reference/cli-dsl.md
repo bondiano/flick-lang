@@ -5,7 +5,7 @@ title: "Command-line applications"
 A `Cli.Command r e` describes a command line: flags, positional arguments,
 subcommands and a handler that needs services `r` and fails with errors `e`
 (see [CLI eDSL: flags, arguments and subcommands](../../spec/08-type-programming-and-edsl/#cli-edsl-flags-arguments-and-subcommands)). Building one parses and runs nothing; `Cli.run`
-parses the arguments with Effect's CLI and only then runs the handler.
+parses the arguments and only then runs the handler.
 
 The block `cli "name" { … }` is the plugin `cli` of the `std` package (see
 [plugins](../plugins/)), which every module has without an import.
@@ -118,9 +118,9 @@ handler pattern naming a field the command does not have is a type error.
 
 ## Running
 
-`Cli.run command args` parses `args` with Effect's CLI and only then runs
+`Cli.run command args` parses `args` and only then runs
 the handler of the command they name, in the current fiber, with the
-Node.js services Effect's CLI needs. `Cli.run_version version command args`
+Node.js services the CLI needs. `Cli.run_version version command args`
 also gives the text of `--version` (`Cli.run` uses `0.0.0`), and
 `Cli.run_with settings` chooses the built-in flags and a `Cli.Formatter`
 of help and version as well.
@@ -128,7 +128,7 @@ of help and version as well.
 ```flick
 # import App.Greet exposing (greet)
 #
-main : Unit ->{; AppError} Unit
+main : Unit ->{Async; AppError} Unit
 let main () =
   try Cli.run greet (Platform.args ()) with
   | Cli.CliError message -> App.fail message
@@ -144,13 +144,12 @@ logs and metrics over OTLP to `OTEL_EXPORTER_OTLP_ENDPOINT`
 (the command's name by default); without it nothing loads the exporter.
 `Cli.run_with` with `builtIns` leaving out `Cli.TraceFlag` removes it. Invalid input — an unknown flag, a missing argument, a value
 `Cli.Value` refuses — prints the command's help and fails with
-`Cli.CliError` and Effect's text; no handler runs, and `App.fail` turns it
+`Cli.CliError` and its message; no handler runs, and `App.fail` turns it
 into exit code 1. The flags of a command with subcommands come before the
 subcommand's name and are seen only by that command's handler.
 
-A command keeps the captures of its handler: one whose handler holds a
-resource of a `scope` runs inside that scope and cannot leave it
-(`FLICK-G001`).
+A command needs what its handler uses: one whose handler uses a resource
+of a `scope` runs inside that scope and cannot leave it (`FLICK-G001`).
 
 ## Rules
 

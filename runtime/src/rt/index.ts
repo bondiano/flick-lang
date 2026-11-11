@@ -2,6 +2,7 @@
 // `core`, whose throwing stubs these names replace, on the kernel.
 export * from "../core/index.ts";
 export { runMain } from "./entry.ts";
+export { eventsQueue, eventsListen, eventsAttach } from "./events.ts";
 export {
   chunkEmpty, chunkFromList, chunkToList, chunkAppend, chunkConcat, chunkSize, chunkGet, chunkMap,
 } from "./chunk.ts";
@@ -67,6 +68,8 @@ export {
   schemaString, schemaTupleOf, schemaUnboxed, schemaUnit, schemaUnknown, schemaValidate, schemaEnumTags,
   refinedParse,
 } from "./schema.ts";
+export { schemaGenerator, schemaWithGenerator } from "./schema_gen.ts";
+export { schemaArbitrary } from "./effect/Arbitrary.ts";
 export { codecJsonSchema, jsonParse, jsonStringify } from "./schema_export.ts";
 export {
   eqHashCanonical,
@@ -94,10 +97,10 @@ export {
 export { fileOpen, fileReadHandle, fileRead, fileWrite } from "./file.ts";
 export { routeCodec, routeNestedOf, routeParse, routePath, routePrint, routeQuery, routeSegment, routeWordsOf } from "./route.ts";
 export {
-  codecBlock, codecBool, codecField, codecFieldsEmpty, codecIgnoreExtra, codecInt, codecNumberFinite, codecNumberLossless,
+  codecBigint, codecBlock, codecBool, codecCheckWhole, codecDecode, codecEncode, codecField, codecFieldsEmpty, codecIgnoreExtra, codecInt, codecList, codecNumberFinite, codecNumberLossless,
   codecOptionNull, codecOptionNullish, codecRecord, codecStandard, codecStandardAsync, codecString, codecTaggedOption,
-  codecRedactedReveal, codecRedactedMasked,
-  dslField, dslOnMissing, dslOptionalField,
+  codecRedactedReveal, codecRedactedMasked, codecTransformEffect, codecTransformResult,
+  dslField, dslFieldEffect, dslOnMissing, dslOnMissingEffect, dslOptionalField,
 } from "./codec.ts";
 export {
   atomAt,

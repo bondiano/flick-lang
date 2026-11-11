@@ -9,7 +9,7 @@ let count = cli "count" {
   handle fun { times } -> Platform.stdout_line "handler ran"
 }
 
-main : Unit ->{; AppError} Unit
+main : Unit ->{Async; AppError} Unit
 let main () =
   try Cli.run count ["--times", "abc"] with
   | Cli.CliError message -> App.fail message

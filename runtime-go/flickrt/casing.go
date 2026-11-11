@@ -5,8 +5,8 @@ import (
 	"strings"
 )
 
-// Effect's `String` functions on lines, margins and the case of
-// identifiers, on code units as JS runs them.
+// The `String` functions on lines, margins and the case of identifiers, on
+// code units as JS runs them.
 
 // lines splits at CR, LF and CRLF; a break at the end adds no line.
 func lines(s string, keep bool) Value {
@@ -112,8 +112,8 @@ var (
 	stripCase = regexp.MustCompile(`(?i)[^A-Z0-9]+`)
 )
 
-// words is Effect's `normalizeCase`: the words of an identifier, each
-// transformed, joined by `delimiter`.
+// words is the words of an identifier, each transformed, joined by
+// `delimiter`.
 func words(s string, splits []*regexp.Regexp, delimiter string, transform func(w string, i int) string) Value {
 	for _, re := range splits {
 		s = re.ReplaceAllString(s, "${1}\x00${2}")

@@ -6,7 +6,7 @@
 import { type Cause, type Exit, combine, empty, raise } from "./cause.ts";
 import { allOf } from "./concurrency.ts";
 import { mapped } from "./effects.ts";
-import { type Ctx, type Run, Suspend, Under, asExit, currentCtx, exitOf, extend, lookup, raiseOf, uninterruptible } from "./fiber.ts";
+import { type Ctx, type Run, Suspend, Under, asExit, currentCtx, exitOf, extend, hosted, lookup, raiseOf, uninterruptible } from "./fiber.ts";
 import { Owner, addTo, closeOwn, finalize, inside, withOwner } from "./owner.ts";
 import { traceEvent, traceLayer, tracing } from "./trace.ts";
 
@@ -23,7 +23,24 @@ export class Layer {
   }
 }
 
-export const servicesOf = (value: unknown): Services => (Array.isArray(value) ? (value as Services) : []);
+/** An Effect Context carried by a layer that the optional adapter supplied. */
+export const HOST = /*#__PURE__*/ Object.freeze({ key: "flick/bridge/HostContext" });
+export const layerHooks: {
+  adopt: (layer: unknown) => Layer;
+  merge: (a: unknown, b: unknown) => unknown;
+  services: (value: unknown) => Services | undefined;
+  context: (services: Services) => unknown;
+} = {
+  adopt: (layer) => {
+    if (layer instanceof Layer) return layer;
+    throw new TypeError("not a layer of this runtime");
+  },
+  merge: (_, b) => b,
+  services: () => undefined,
+  context: (services) => services,
+};
+
+export const servicesOf = (value: unknown): Services => (Array.isArray(value) ? (value as Services) : layerHooks.services(value) ?? []);
 
 interface Entry {
   observers: number;
@@ -143,12 +160,13 @@ export const scoped = (scope: Owner, task: () => unknown): Under => inside(scope
 /** Builds `layer` into `scope` through `memo`, which the build and what runs with its services read as the current map. */
 export const buildWith = (layer: Layer, memo: MemoMap, scope: Owner): Under =>
   new Under(extend(currentCtx(), MEMO, memo), () =>
-    mapped(layer.build(memo, scope), (services): Services => [...servicesOf(services), [MEMO, memo]]),
+    mapped(layerHooks.adopt(layer).build(memo, scope), (services): Services => [...servicesOf(services), [MEMO, memo]]),
   );
 
 /** Runs `body` with a layer's services as values in the caller's evidence. */
 export const withServices = (services: Services, body: () => unknown): Under =>
-  new Under(services.reduce((c: Ctx, [tag, impl]) => extend(c, tag, impl), currentCtx()), body);
+  new Under(services.reduce((c: Ctx, [tag, impl]) =>
+    tag === HOST ? hosted(c, layerHooks.merge(c.host, impl)) : extend(c, tag, impl), currentCtx()), body);
 
 /** A layer of services built without effects. */
 export const constant = (services: Services): Layer => new Layer(() => services);
@@ -158,7 +176,7 @@ export const layerSucceed = (tag: object, impl: unknown): Layer => constant([[ta
 /** What `allOf` gave, known to be a list. */
 const listOf = (value: unknown): ReadonlyArray<unknown> => (Array.isArray(value) ? value : []);
 
-/** Closes the scopes side by side, the last acquired starting first, as Effect and Go do: they fail as their own finalizers do, joined. */
+/** Closes the scopes side by side, the last acquired starting first, as Go's `flickrt` does: they fail as their own finalizers do, joined. */
 function* closeAll(scopes: ReadonlyArray<Owner>, exit: Exit): Run {
   const causes: Array<Cause> = scopes.map(() => empty);
   yield allOf(
@@ -183,7 +201,7 @@ function* closeAll(scopes: ReadonlyArray<Owner>, exit: Exit): Run {
  */
 export const mergeAll = (layers: ReadonlyArray<Layer>): Layer =>
   fromBuild(function* (memo, into): Run {
-    const parts = layers.map((layer) => [layer, new Owner(into.defects)] as const);
+    const parts = layers.map((layer) => [layerHooks.adopt(layer), new Owner(into.defects)] as const);
     addTo(into, (exit: Exit) => closeAll(parts.map(([, scope]) => scope), exit), true);
     const built = listOf(
       yield allOf(

@@ -1,9 +1,9 @@
-/// Effect's `HttpClient`: a client sends requests and gives responses. The
-/// service `HttpClient` holds the program's client (`Http.FetchClient.layer`
-/// provides one over `fetch`); `get`, `post`, … send through it. A `Client r
-/// e` is a client as a value, needing the services `r` and failing with the
-/// errors `e`: the combinators below change what it does around each
-/// request.
+/// An HTTP client sends requests and gives responses. The service
+/// `HttpClient` holds the program's client (`Http.FetchClient.layer`
+/// provides one over `fetch`); `get`, `post`, … send through it. A
+/// `Client r e` is a client as a value, needing the services `r` and
+/// failing with the errors `e`: the combinators below change what it does
+/// around each request.
 module Http.Client exposing (..)
 
 import Http.ClientError exposing (HttpClientError)
@@ -31,7 +31,7 @@ let current () = HttpClient.client ()
 
 /// Sends the request with the client.
 execute_with : Client r e -> ClientRequest ->{Async | r; e} ClientResponse
-foreign effect execute_with from "@flick-lang/effect-ts/effect/http/HttpClient" "flickExecute"
+foreign effect execute_with from "flick:http/HttpClient" "flickExecute"
   arity 2
   reviewed "effect@4.1.2 sha256:0239bbc65598209d"
 
@@ -76,7 +76,7 @@ let options url = execute (Http.ClientRequest.options url)
 make :
   (ClientRequest -> Http.Url.Url ->{; HttpClientError} ClientResponse) ->
   Client none {HttpClientError}
-foreign pure make from "@flick-lang/effect-ts/effect/http/HttpClient" "make"
+foreign pure make from "flick:http/HttpClient" "make"
   arity 1
   reviewed "effect@4.1.2 sha256:805c9341b50413ee"
 
@@ -86,7 +86,7 @@ make_with :
   (Eff r2 e2 ClientRequest ->{r; e} ClientResponse) ->
   (ClientRequest ->{r2; e2} ClientRequest) ->
   Client r e
-foreign pure make_with from "@flick-lang/effect-ts/effect/http/HttpClient" "makeWith"
+foreign pure make_with from "flick:http/HttpClient" "makeWith"
   arity 2
   reviewed "effect@4.1.2 sha256:70c38be12cf1de41"
 
@@ -94,7 +94,7 @@ foreign pure make_with from "@flick-lang/effect-ts/effect/http/HttpClient" "make
 /// that sends the request and the request.
 transform :
   (Eff r e ClientResponse -> ClientRequest ->{r2; e2} ClientResponse) -> Client r e -> Client r2 e2
-foreign pure transform from "@flick-lang/effect-ts/effect/http/HttpClient" "transform"
+foreign pure transform from "flick:http/HttpClient" "transform"
   arity 1
   reviewed "effect@4.1.2 sha256:048667a8cb1e7860"
 
@@ -102,13 +102,13 @@ foreign pure transform from "@flick-lang/effect-ts/effect/http/HttpClient" "tran
 /// sends the request.
 transform_response :
   (Eff r e ClientResponse ->{r2; e2} ClientResponse) -> Client r e -> Client r2 e2
-foreign pure transform_response from "@flick-lang/effect-ts/effect/http/HttpClient" "transformResponse"
+foreign pure transform_response from "flick:http/HttpClient" "transformResponse"
   arity 1
   reviewed "effect@4.1.2 sha256:fb7f187e4c1d5237"
 
 /// The client with a failure answered by `f`.
 catch : (Errors e ->{r2; e2} ClientResponse) -> Client r e -> Client (r + r2) e2
-foreign pure catch from "@flick-lang/effect-ts/effect/http/HttpClient" "catch"
+foreign pure catch from "flick:http/HttpClient" "catch"
   arity 1
   reviewed "effect@4.1.2 sha256:b0f947a95f98c3e7"
 
@@ -118,59 +118,59 @@ filter_or_else :
   (ClientResponse ->{r2; e2} ClientResponse) ->
   Client r e ->
   Client (r + r2) (e + e2)
-foreign pure filter_or_else from "@flick-lang/effect-ts/effect/http/HttpClient" "filterOrElse"
+foreign pure filter_or_else from "flick:http/HttpClient" "filterOrElse"
   arity 2
   reviewed "effect@4.1.2 sha256:53434cd000725a2d"
 
 /// The client failing with `or_fail` of a response `f` refuses.
 filter_or_fail :
   (ClientResponse -> Bool) -> (ClientResponse -> Errors e2) -> Client r e -> Client r (e + e2)
-foreign pure filter_or_fail from "@flick-lang/effect-ts/effect/http/HttpClient" "filterOrFail"
+foreign pure filter_or_fail from "flick:http/HttpClient" "filterOrFail"
   arity 2
   reviewed "effect@4.1.2 sha256:c16573096365ba37"
 
 /// The client failing with a `StatusCodeError` for a status `f` refuses.
 filter_status : (Int -> Bool) -> Client r e -> Client r (e + {HttpClientError})
-foreign pure filter_status from "@flick-lang/effect-ts/effect/http/HttpClient" "flickFilterStatus"
+foreign pure filter_status from "flick:http/HttpClient" "flickFilterStatus"
   arity 2
   reviewed "effect@4.1.2 sha256:cc30e67e212b858c"
 
 /// The client failing with a `StatusCodeError` for a status other than 2xx.
 filter_status_ok : Client r e -> Client r (e + {HttpClientError})
-foreign pure filter_status_ok from "@flick-lang/effect-ts/effect/http/HttpClient" "flickFilterStatusOk"
+foreign pure filter_status_ok from "flick:http/HttpClient" "flickFilterStatusOk"
   reviewed "effect@4.1.2 sha256:61e9e61b87e8edfe"
 
 /// The client with each request changed by `f` before it is sent.
 map_request : (ClientRequest -> ClientRequest) -> Client r e -> Client r e
-foreign pure map_request from "@flick-lang/effect-ts/effect/http/HttpClient" "mapRequest"
+foreign pure map_request from "flick:http/HttpClient" "mapRequest"
   arity 1
   reviewed "effect@4.1.2 sha256:3e2bd11619a8071a"
 
 /// `map_request` with a runtime `f`.
 map_request_effect :
   (ClientRequest ->{r2; e2} ClientRequest) -> Client r e -> Client (r + r2) (e + e2)
-foreign pure map_request_effect from "@flick-lang/effect-ts/effect/http/HttpClient" "mapRequestEffect"
+foreign pure map_request_effect from "flick:http/HttpClient" "mapRequestEffect"
   arity 1
   reviewed "effect@4.1.2 sha256:586e4d41ce71423d"
 
 /// The client with each request changed by `f` before the client's own
 /// preparation of it.
 map_request_input : (ClientRequest -> ClientRequest) -> Client r e -> Client r e
-foreign pure map_request_input from "@flick-lang/effect-ts/effect/http/HttpClient" "mapRequestInput"
+foreign pure map_request_input from "flick:http/HttpClient" "mapRequestInput"
   arity 1
   reviewed "effect@4.1.2 sha256:d5be0c103cca4049"
 
 /// `map_request_input` with a runtime `f`.
 map_request_input_effect :
   (ClientRequest ->{r2; e2} ClientRequest) -> Client r e -> Client (r + r2) (e + e2)
-foreign pure map_request_input_effect from "@flick-lang/effect-ts/effect/http/HttpClient" "mapRequestInputEffect"
+foreign pure map_request_input_effect from "flick:http/HttpClient" "mapRequestInputEffect"
   arity 1
   reviewed "effect@4.1.2 sha256:608c6bfbf4d77c18"
 
 /// The client sending a request again after a failure, as long as the
 /// schedule, which gets the error, recurs.
 retry : Schedule.Schedule r2 e2 (Errors e) o -> Client r e -> Client (r + r2) (e + e2)
-foreign pure retry from "@flick-lang/effect-ts/effect/http/HttpClient" "retry"
+foreign pure retry from "flick:http/HttpClient" "retry"
   arity 1
   reviewed "effect@4.1.2 sha256:985ca298c5f1fd7a"
 
@@ -178,52 +178,52 @@ foreign pure retry from "@flick-lang/effect-ts/effect/http/HttpClient" "retry"
 /// transport failure or a response of a transient status; a `Retry-After`
 /// header delays the next try.
 retry_transient : RetryOn -> Int -> Client r e -> Client r e
-foreign pure retry_transient from "@flick-lang/effect-ts/effect/http/HttpClient" "flickRetryTransient"
+foreign pure retry_transient from "flick:http/HttpClient" "flickRetryTransient"
   arity 3
   reviewed "effect@4.1.2 sha256:791853420f219777"
 
 /// The client running `f` on each response.
 tap : (ClientResponse ->{r2; e2} x) -> Client r e -> Client (r + r2) (e + e2)
-foreign pure tap from "@flick-lang/effect-ts/effect/http/HttpClient" "tap"
+foreign pure tap from "flick:http/HttpClient" "tap"
   arity 1
   reviewed "effect@4.1.2 sha256:ed4a75467f47f740"
 
 /// The client running `f` on each failure, which it keeps.
 tap_error : (Errors e ->{r2; e2} x) -> Client r e -> Client (r + r2) (e + e2)
-foreign pure tap_error from "@flick-lang/effect-ts/effect/http/HttpClient" "tapError"
+foreign pure tap_error from "flick:http/HttpClient" "tapError"
   arity 1
   reviewed "effect@4.1.2 sha256:284f8c3731ffaa09"
 
 /// The client running `f` on each request before it is sent.
 tap_request : (ClientRequest ->{r2; e2} x) -> Client r e -> Client (r + r2) (e + e2)
-foreign pure tap_request from "@flick-lang/effect-ts/effect/http/HttpClient" "tapRequest"
+foreign pure tap_request from "flick:http/HttpClient" "tapRequest"
   arity 1
   reviewed "effect@4.1.2 sha256:0227e56caf2bacf1"
 
 /// The client sending the cookies of the cell with each request and
 /// keeping those of each response in it.
 with_cookies_ref : Ref Http.Cookies.Cookies -> Client r e -> Client r e
-foreign pure with_cookies_ref from "@flick-lang/effect-ts/effect/http/HttpClient" "flickWithCookiesRef"
+foreign pure with_cookies_ref from "flick:http/HttpClient" "flickWithCookiesRef"
   arity 2
   reviewed "effect@4.1.2 sha256:29915d4c60acd6cc"
 
 /// The client whose responses stay open until the scope of region `s`
 /// closes, instead of until their body is read.
 with_scope : Client r e -> Client {Scope s | r} e
-foreign pure with_scope from "@flick-lang/effect-ts/effect/http/HttpClient" "withScope"
+foreign pure with_scope from "flick:http/HttpClient" "withScope"
   arity 1
   reviewed "effect@4.1.2 sha256:d35002632b8689ef"
 
 /// The client following redirects, at most the number or 10 times.
 follow_redirects : Option Int -> Client r e -> Client r e
-foreign pure follow_redirects from "@flick-lang/effect-ts/effect/http/HttpClient" "followRedirects"
+foreign pure follow_redirects from "flick:http/HttpClient" "followRedirects"
   arity 1
   optional 0
   reviewed "effect@4.1.2 sha256:383ebd85fe4d37a8"
 
 /// Runs `task` with no client span for the requests `f` accepts.
 with_tracer_disabled_when : (ClientRequest -> Bool) -> (Eff r e a)^c ->{r; e} a
-foreign effect with_tracer_disabled_when from "@flick-lang/effect-ts/effect/http/HttpClient" "flickWithTracerDisabledWhen"
+foreign effect with_tracer_disabled_when from "flick:http/HttpClient" "flickWithTracerDisabledWhen"
   arity 2
   retention call
   reviewed "effect@4.1.2 sha256:c43ff2b84024cb7d"
@@ -231,28 +231,28 @@ foreign effect with_tracer_disabled_when from "@flick-lang/effect-ts/effect/http
 /// Runs `task` recording in client spans only the headers `f name phase`
 /// accepts; the phase is `"request"` or `"response"`.
 with_tracer_header_filter : (String -> String -> Bool) -> (Eff r e a)^c ->{r; e} a
-foreign effect with_tracer_header_filter from "@flick-lang/effect-ts/effect/http/HttpClient" "flickWithTracerHeaderFilter"
+foreign effect with_tracer_header_filter from "flick:http/HttpClient" "flickWithTracerHeaderFilter"
   arity 2
   retention call
   reviewed "effect@4.1.2 sha256:80416986cda2fed8"
 
 /// Runs `task` sending trace context headers with requests, or not.
 with_tracer_propagation : Bool -> (Eff r e a)^c ->{r; e} a
-foreign effect with_tracer_propagation from "@flick-lang/effect-ts/effect/http/HttpClient" "flickWithTracerPropagation"
+foreign effect with_tracer_propagation from "flick:http/HttpClient" "flickWithTracerPropagation"
   arity 2
   retention call
   reviewed "effect@4.1.2 sha256:d2af437eaa149cfd"
 
 /// Runs `task` naming the span of a request by `f`.
 with_span_name_generator : (ClientRequest -> String) -> (Eff r e a)^c ->{r; e} a
-foreign effect with_span_name_generator from "@flick-lang/effect-ts/effect/http/HttpClient" "flickWithSpanNameGenerator"
+foreign effect with_span_name_generator from "flick:http/HttpClient" "flickWithSpanNameGenerator"
   arity 2
   retention call
   reviewed "effect@4.1.2 sha256:cb38a74bf2b1e79b"
 
 layer_of :
   ServiceTag {HttpClient} -> Eff r e (Client none {HttpClientError}) -> Layer r e {HttpClient}
-foreign pure layer_of from "@flick-lang/effect-ts/effect/http/HttpClient" "flickLayer"
+foreign pure layer_of from "flick:http/HttpClient" "flickLayer"
   arity 2
   reviewed "effect@4.1.2 sha256:98c81d5e1a5bc411"
 

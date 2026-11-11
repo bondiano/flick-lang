@@ -1,6 +1,7 @@
 //! Patterns: their types, the names they bind, and their shape for the
 //! exhaustiveness check.
 
+use crate::types::Elem;
 use std::{iter, mem};
 
 use super::gadt::scheme::dicts;
@@ -46,9 +47,7 @@ pub enum Ctor {
     Literal(String),
 }
 
-pub fn is_pattern(kind: K) -> bool {
-    (K::WildcardPat..=K::OrPat).contains(&kind)
-}
+pub use crate::syntax::patterns::is_pattern;
 
 impl Checker<'_> {
     /// Checks `node` against `ty` and brings its names into scope. A
@@ -62,7 +61,7 @@ impl Checker<'_> {
             K::VarPat => {
                 if let Some(name) = node.child_tokens().find(|t| t.kind == K::Ident) {
                     self.note_type(span, ty);
-                    self.locals.push(Local {
+                    self.cx.locals.push(Local {
                         name: name.text(self.text).to_owned(),
                         at: Some(name.start),
                         generated: name.start >= self.generated,
@@ -213,10 +212,10 @@ impl Checker<'_> {
     /// Every alternative binds the same names (checked by the parser); their
     /// types must agree too.
     fn or_pattern(&mut self, alternatives: &[&Node], ty: &Type) -> Pat {
-        let mark = self.locals.len();
+        let mark = self.cx.locals.len();
         let mut pats = Vec::new();
         for (i, alternative) in alternatives.iter().enumerate() {
-            let inner = self.locals.len();
+            let inner = self.cx.locals.len();
             // alternatives would learn different things: none refines
             let refining = mem::take(&mut self.gadt.refining);
             pats.push(self.bind_pattern(alternative, ty));
@@ -224,9 +223,9 @@ impl Checker<'_> {
             if i == 0 {
                 continue;
             }
-            let bound: Vec<Local> = self.locals.drain(inner..).collect();
+            let bound: Vec<Local> = self.cx.locals.drain(inner..).collect();
             for local in bound {
-                let first = self.locals[mark..inner]
+                let first = self.cx.locals[mark..inner]
                     .iter()
                     .find(|l| l.name == local.name)
                     .map(|l| l.ty.clone());
@@ -260,9 +259,9 @@ impl Checker<'_> {
         let rest = self.fresh();
         let shape = Type::Record(Row {
             entries: {
-                let mut entries: Vec<(String, Type)> = fields
+                let mut entries: Vec<(Elem, Type)> = fields
                     .iter()
-                    .map(|(l, t, _)| (l.clone(), t.clone()))
+                    .map(|(l, t, _)| (Elem::named(l), t.clone()))
                     .collect();
                 entries.sort_by(|a, b| a.0.cmp(&b.0));
                 entries
@@ -282,7 +281,7 @@ impl Checker<'_> {
                 let pat = if let Some(p) = pattern {
                     self.bind_pattern(p, &field_ty)
                 } else {
-                    self.locals.push(Local {
+                    self.cx.locals.push(Local {
                         name: label.clone(),
                         at: None,
                         generated: node.range().0 >= self.generated,

@@ -1,7 +1,7 @@
 # The platform modules: configuration, paths, the standard streams, the
 # terminal, the console and log levels.
 
-[@flick-lang/effect-ts/effect/Config]
+[flick:Config]
 flickGet *ConfigGet
 flickParse *ConfigParse
 map ConfigMap
@@ -33,7 +33,7 @@ flickArray ConfigArray
 flickRecord ConfigRecord
 nested ConfigNested
 
-[@flick-lang/effect-ts/effect/ConfigProvider]
+[flick:ConfigProvider]
 flickMake ConfigProviderMake
 orElse ConfigProviderOrElse
 mapInput ConfigProviderMapInput
@@ -47,17 +47,17 @@ flickFromDir *ConfigProviderFromDir
 layer ConfigProviderLayer
 flickLayerAdd ConfigProviderLayerAdd
 
-[@flick-lang/effect-ts/effect/Path]
+[flick:Path]
 flickLayer PathLayer
 flickNode PathNode
 
-[@flick-lang/effect-ts/effect/Stdio]
+[flick:Stdio]
 flickNode StdioNode
 
-[@flick-lang/effect-ts/effect/Terminal]
+[flick:Terminal]
 flickNode TerminalNode
 
-[@flick-lang/effect-ts/effect/Console]
+[flick:Console]
 flickCurrent *ConsoleCurrent
 flickWithConsole *ConsoleWithConsole
 flickToStderr ConsoleToStderr
@@ -80,7 +80,7 @@ time *ConsoleTimeScoped
 timeLog *ConsoleTimeLog
 withTime *ConsoleWithTime
 
-[@flick-lang/effect-ts/effect/LogLevel]
+[flick:LogLevel]
 values LogLevelValues
 getOrdinal LogLevelOrdinal
 isGreaterThan LogLevelGreaterThan
@@ -89,10 +89,10 @@ isLessThan LogLevelLessThan
 isLessThanOrEqualTo LogLevelLessThanOrEqual
 isEnabled *LogLevelIsEnabled
 
-[@flick-lang/effect-ts/effect/References]
+[flick:References]
 flickWithMinimumLogLevel *ReferencesWithMinimumLogLevel
 
-[@flick-lang/effect-ts/effect/FileSystem]
+[flick:FileSystem]
 flickFileStat *FileSystemFileStat
 flickSeek *FileSystemSeek
 flickSync *FileSystemSync
@@ -101,7 +101,7 @@ flickFileTruncate *FileSystemFileTruncate
 flickWrite *FileSystemWrite
 flickWriteAll *FileSystemWriteAll
 
-[@flick-lang/effect-ts/effect/ChildProcess]
+[flick:ChildProcess]
 flickMake ChildProcessMake
 setCwd ChildProcessSetCwd
 flickSetEnv ChildProcessSetEnv
@@ -121,7 +121,7 @@ flickString *ChildProcessString
 flickLines *ChildProcessLines
 flickExitCode *ChildProcessExitCode
 
-[@flick-lang/effect-ts/sql]
+[flick:sql]
 sqlCodec SqlCodec
 sqlBind SqlBind
 sqlText SqlText
@@ -138,35 +138,13 @@ sqlTemplate SqlTemplate
 pgTransaction *DatabaseTransaction
 pgLayer DatabasePgLayer
 
-[@flick-lang/effect-ts/effect/Optic]
-makeIso OpticMakeIso
-makeLens OpticMakeLens
-flickMakePrism OpticMakePrism
-flickMakeOptional OpticMakeOptional
-flickFromCheck OpticFromCheck
-id OpticId
-some OpticSome
-none OpticNone
-success OpticSuccess
-failure OpticFailure
-get *OpticGet
-flickGetResult *OpticGetResult
-set *OpticSet
-replace *OpticReplace
-flickReplaceResult *OpticReplaceResult
-modify *OpticModify
-getAll *OpticGetAll
-modifyAll *OpticModifyAll
-flickCompose OpticCompose
-flickAs OpticAs
-
-[@flick-lang/effect-ts/effect/Formatter]
+[flick:Formatter]
 format FormatterFormat
 flickFormatJson FormatterFormatJson
 
-[@flick-lang/effect-ts/effect/Inspectable]
+[flick:Inspectable]
 flickToStringUnknown InspectableToStringUnknown
 toJson InspectableToJson
 
-[@flick-lang/effect-ts/effect/Version]
+[flick:Version]
 getCurrentVersion VersionCurrent

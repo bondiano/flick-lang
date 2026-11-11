@@ -51,7 +51,7 @@ theorem constSch_lt {c : Nat} {s : Scheme} (h : constSch c = some s) :
   any_goals
     cases h
     exact ⟨rfl, fun n hn => by
-      simp [Ty.Occurs, Stage.Occurs, bindTy, appQ, arrP, optTy] at hn ⊢ <;> omega⟩
+      simp [Ty.Occurs, Stage.Occurs, bindTy, appQ, arrP, optTy, PreludeSchemes.Seq.each_loop] at hn ⊢ <;> omega⟩
   · cases h
   · split at h
     · split at h
@@ -80,7 +80,7 @@ theorem constSch_lt {c : Nat} {s : Scheme} (h : constSch c = some s) :
 theorem consts_closed : P.ConstsClosed := by
   intro c s hc σ σ' hσ
   obtain ⟨hctx, hlt⟩ := constSch_lt hc
-  simp only [hctx, dicts, List.foldr_nil, TTy.subst]
+  simp only [hctx, dicts, List.foldr_nil, TTy.subst, constSch_bd hc, List.map_nil, and_true]
   rw [Ty.subst_congr fun n hn => hσ n (hlt n hn)]
 
 end Flick.Elab.Witness

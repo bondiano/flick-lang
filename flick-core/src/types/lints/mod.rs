@@ -45,7 +45,6 @@ impl Checker<'_> {
         fix: impl FnOnce(&Self) -> (M, Vec<Edit>, bool),
     ) {
         let warning = Diagnostic::new(code, Severity::Warning, message).with_span(at);
-        #[cfg(feature = "diagnostic-fixes")]
         let warning = {
             let (help, edits, safe) = fix(self);
             if safe {
@@ -54,9 +53,7 @@ impl Checker<'_> {
                 warning.with_fix(|| (help, edits))
             }
         };
-        #[cfg(not(feature = "diagnostic-fixes"))]
-        let _ = fix;
-        self.diagnostics.push(warning);
+        self.diagnostic(warning);
     }
 
     /// The edit that writes `replacement` over `node`.

@@ -2,13 +2,12 @@ package flickrt
 
 import "math/big"
 
-// Sink's constructors and transformations, as Effect's (Sink.ts): a
-// transform gives the value and the leftovers (nil: none) it ends with.
+// Sink's constructors and transformations: a transform gives the value and
+// the leftovers (nil: none) it ends with.
 
 func endOf(v Value) (Value, []Value) { return v, nil }
 
-// sinkOfEffect is Effect's `fromEffectEnd`: the task's end, consuming
-// nothing.
+// sinkOfEffect is the task's end, consuming nothing.
 func sinkOfEffect(task func(fb *Fiber) (Value, []Value)) *Sink {
 	return sinkFromTransform(func(fb *Fiber, _ Pull, _ *Owner) (Value, []Value) { return task(fb) })
 }
@@ -121,7 +120,7 @@ func sinkOnExit(self *Sink, f func(fb *Fiber, exit *Exit)) *Sink {
 		_, fc := catch(func() Value {
 			return masked(fb, fb.state.mask+1, func() Value { f(fb, &Exit{value: v, cause: c}); return nil })
 		})
-		if c = finalized(c, fc); c != nil { // as Effect's onExit
+		if c = finalized(c, fc); c != nil { // then the failure of `f`
 			panic(&Failure{c})
 		}
 		return v, l
@@ -294,7 +293,7 @@ func SinkMapEffect(f, self Value) Value {
 	})
 }
 
-// SinkMapError maps the first typed error, as Effect's `mapError`.
+// SinkMapError maps the first typed error.
 func SinkMapError(f, self Value) Value {
 	s := sinkOf(self)
 	return sinkFromTransform(func(fb *Fiber, upstream Pull, scope *Owner) (Value, []Value) {

@@ -146,6 +146,11 @@ pub struct GlobalArguments {
     #[arg(long, global = true)]
     pub verbose: bool,
 
+    /// Report on stderr how long each phase and the slowest modules took,
+    /// and which input made the build cache miss.
+    #[arg(long, global = true)]
+    pub timings: bool,
+
     /// Project directory or its `flick.toml`; by default the nearest
     /// `flick.toml` from the working directory upwards.
     #[arg(long, global = true, value_name = "PATH")]

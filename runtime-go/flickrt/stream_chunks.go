@@ -1,7 +1,7 @@
 package flickrt
 
-// Stream's transformations of chunks, as Effect's (Stream.ts): states
-// threaded through the elements, windows and groups, and their bindings.
+// Stream's transformations of chunks: states threaded through the
+// elements, windows and groups, and their bindings.
 
 func StreamMapAccum(initial, f, s Value) Value {
 	return streamMapAccumArray(streamOf(s), func(*Fiber) Value { return initial },

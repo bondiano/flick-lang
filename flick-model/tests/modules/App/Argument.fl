@@ -1,0 +1,11 @@
+module App.Argument exposing (Key, Eq(..), equality, value)
+
+import Prelude exposing (Eq(..))
+
+type alias Key = String
+
+equality : Eq.Dict Key
+let equality = Eq.dictionary { eq = fun _ _ -> false }
+
+value : Key
+let value = "x"
