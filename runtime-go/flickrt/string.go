@@ -103,8 +103,8 @@ func CompareStrings(a, b string) int {
 	}
 	// the code points that differ decide: by their first UTF-16 unit, which
 	// for one past the BMP is a high surrogate, below U+E000
-	x, _ := decode(a[i:])
-	y, _ := decode(b[i:])
+	x, n := decode(a[i:])
+	y, m := decode(b[i:])
 	unit := func(r rune) int {
 		if r >= 0x10000 {
 			return int(0xD800 + ((r - 0x10000) >> 10))
@@ -114,7 +114,20 @@ func CompareStrings(a, b string) int {
 	if unit(x) != unit(y) {
 		return unit(x) - unit(y)
 	}
-	return int(x) - int(y)
+	// one high surrogate, alone in one string and of a pair in the other:
+	// the unit after it decides, the low surrogate of the pair against
+	// what follows the lone one, and the end of a string is the least
+	second := func(rest string, r rune) int {
+		if r >= 0x10000 {
+			return int(0xDC00 + (r-0x10000)&0x3FF)
+		}
+		if rest == "" {
+			return -1
+		}
+		next, _ := decode(rest)
+		return unit(next)
+	}
+	return second(a[i+n:], x) - second(b[i+m:], y)
 }
 
 // QuoteJSON is JS `JSON.stringify` of a string; a lone surrogate is
