@@ -185,6 +185,13 @@ jobs:
         with:
           node-version: 24.18.0
           cache: pnpm
+      # what the TypeScript output catches beyond the JS one is `tsc`, which
+      # typechecks the TypeScript passes either way: a pull request and a push
+      # to main build them without running them, and the nightly run and a
+      # release, which call this workflow with another event or ref, run them
+      - name: Only build the TypeScript passes for a pull request or a push to main
+        if: ${{ github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref == 'refs/heads/main') }}
+        run: echo 'FLICK_E2E_TS_BUILD_ONLY=1' >> "$GITHUB_ENV"
       - run: just e2e-cases ${{ matrix.shard }}/3
       - uses: actions/upload-artifact@v7
         if: ${{ !cancelled() }}
