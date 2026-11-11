@@ -172,18 +172,14 @@ impl Command for BuildCommand {
         }
         progress.stage("Compiling Flick modules");
         let mut kept = self.modules.as_ref().map(|modules| modules.borrow_mut());
-        let (mut diagnostics, mut compilation) = package_cache::with_saved(|saved| {
-            let (diagnostics, compilation, fresh) = project::compile_with(
-                &host,
-                &mut sources,
-                project.as_ref(),
-                &roots,
-                saved,
-                plan.extras.rt,
-                kept.as_deref_mut(),
-            );
-            ((diagnostics, compilation), fresh)
-        });
+        let (mut diagnostics, mut compilation) = package_cache::compile(
+            &host,
+            &mut sources,
+            project.as_ref(),
+            &roots,
+            plan.extras.rt,
+            kept.as_deref_mut(),
+        );
         if diagnostics.iter().any(|d| d.severity == Severity::Error) {
             return Outcome {
                 sources,
@@ -230,19 +226,13 @@ impl Command for BuildCommand {
         {
             progress.stage("Saving build cache");
             let key = self.key(p, &roots, &output);
-            if initial_key.as_ref() == Some(&key)
-                && cache::read_unchanged(p, &roots, &host.cwd, &sources)
-            {
-                cache::store(&p.root, &key, &emitted.artifacts);
-                if output.go {
-                    for (name, _) in &output.entries {
-                        cache::mark_go(
-                            &p.root,
-                            &key,
-                            &output.out_dir,
-                            &build::go::executable(name),
-                        );
-                    }
+            let read = (&roots[..], &*host.cwd, &sources);
+            let stored = initial_key.as_ref().is_some_and(|before| {
+                cache::store_built(p, read, before, &key, &emitted.artifacts)
+            });
+            if stored && output.go {
+                for (name, _) in &output.entries {
+                    cache::mark_go(&p.root, &key, &output.out_dir, &build::go::executable(name));
                 }
             }
         }
