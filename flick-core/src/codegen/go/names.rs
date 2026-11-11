@@ -47,7 +47,7 @@ pub fn instance(module: &str, name: &str) -> String {
 
 /// The package variable of a value a module makes once.
 pub fn once(module: &str, index: usize) -> String {
-    format!("K_{}__{index}", mangle(&module.replace('.', "_")))
+    top("K", module, &index.to_string())
 }
 
 /// The function that initializes the top-level values of a module.
