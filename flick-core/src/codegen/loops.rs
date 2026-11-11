@@ -1,6 +1,7 @@
 //! Backend-only completion flags. The shared IR retains typed lexical exits.
 use crate::ir::{Arm, BinOp, Expr, ExprKind, Handler, Lit, Param, Pat, Stage, Stmt};
 use crate::source::Span;
+use crate::types::lang::{self, Lang};
 use std::mem;
 fn unit(span: Span) -> Expr {
     Expr::new(ExprKind::Lit(Lit::Unit), span)
@@ -236,7 +237,7 @@ impl Control {
                 e
             }
             ExprKind::App { func, arg, .. }
-                if matches!(&func.kind, ExprKind::Global { module, name } if module == "Scope" && name == "run")
+                if matches!(&func.kind, ExprKind::Global { module, name } if lang::is(Lang::ScopeRun, module, name))
                     && matches!(arg.kind, ExprKind::Lambda { .. }) =>
             {
                 **arg = self.guarded_parts((**arg).clone(), flag);

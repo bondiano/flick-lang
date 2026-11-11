@@ -2,7 +2,7 @@ use std::cell::RefCell;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
 use std::time::Duration;
-use std::{fs, io, process};
+use std::{fs, io};
 
 use flick_core::build::{self, Artifact, Extras, Settings};
 use flick_core::codegen::Labels;
@@ -12,6 +12,7 @@ use flick_core::project::{self, Compilation, Compiled, ModuleCache, Project, js}
 use flick_core::source::{FileId, SourceMap};
 
 use self::js_artifacts::js_artifacts;
+use self::schemas::compile_schemas;
 use super::check::select;
 use super::emit_ir;
 use super::out_dir::overlap;
@@ -28,7 +29,9 @@ mod cached;
 pub(super) mod hooks;
 mod js_artifacts;
 mod progress;
+mod schemas;
 mod shipped;
+mod unwritten;
 
 pub struct BuildCommand {
     pub options: BuildArguments,
@@ -387,6 +390,11 @@ pub(super) fn write_artifacts(output: &BuildPlan, emitted: &mut Emission, progre
     }
     let out_dir = output.out_dir.as_path();
     progress.stage("Writing artifacts");
+    if let Err(err) = unwritten::remove(out_dir, &emitted.artifacts) {
+        let message = format!("cannot remove an earlier build's files: {err}");
+        (emitted.diagnostics).push(Diagnostic::new(codes::P013, Severity::Error, message));
+        return;
+    }
     for artifact in &emitted.artifacts {
         let path = out_dir.join(&artifact.path);
         if let Err(err) = write_if_changed(&path, &artifact.contents) {
@@ -431,24 +439,6 @@ pub(super) fn write_artifacts(output: &BuildPlan, emitted: &mut Emission, progre
             ));
             break;
         }
-    }
-}
-
-/// Loads the app's modules on Node and writes the compiled decoders of the
-/// codecs they make, which the runner installs.
-fn compile_schemas(out_dir: &Path, module: &Path, file: &str) -> Result<(), String> {
-    let script = "import { writeSchemaAot } from \"@flick-lang/effect-ts\";\nawait writeSchemaAot(process.argv[1], process.argv[2]);\n";
-    let output = process::Command::new("node")
-        .args(["--input-type=module", "-e", script])
-        .arg(module)
-        .arg(out_dir.join(file))
-        .current_dir(out_dir)
-        .output()
-        .map_err(|err| format!("cannot run node: {err}"))?;
-    if output.status.success() {
-        Ok(())
-    } else {
-        Err(String::from_utf8_lossy(&output.stderr).trim().to_owned())
     }
 }
 

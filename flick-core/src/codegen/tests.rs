@@ -1,5 +1,5 @@
 use super::{EffectBridge, Labels, Options, js};
-use crate::build::effects::effect_specifier;
+use crate::effects::effect_specifier;
 use crate::ir::tests::lower_text;
 use crate::types::{Constructor, Rep};
 

@@ -1,9 +1,11 @@
 //! Compiler-generated scope/provider callbacks preserve operand order and completion.
 use super::Tr;
+use super::expr::is_lang;
 use crate::syntax::{Name, Term};
 use flick_core::{
     ir::{self, ExprKind},
     source::Span,
+    types::lang::{self, Lang},
 };
 use std::rc::Rc;
 
@@ -19,7 +21,7 @@ impl Tr {
         if matches!(arg.kind, ExprKind::LoopExit { .. }) {
             return translate(self, arg);
         }
-        let run = |arg: &ir::Expr| app(global("Scope", arg.span), arg.clone(), arg.span);
+        let run = |arg: &ir::Expr| app(global(Lang::ScopeRun, arg.span), arg.clone(), arg.span);
         let context = match &arg.kind {
             ExprKind::If(c, a, b) => {
                 Some(ExprKind::If(c.clone(), Box::new(run(a)), Box::new(run(b))))
@@ -63,7 +65,7 @@ impl Tr {
             arg.span,
         );
         let callback = lambda(ir::Pat::Bind(s.to_string()), call, arg.span);
-        let run = app(global("Scope", arg.span), callback, arg.span);
+        let run = app(global(Lang::ScopeRun, arg.span), callback, arg.span);
         let block = binding(&name, arg, run);
         translate(self, &block)
     }
@@ -97,7 +99,7 @@ impl Tr {
                 );
                 let callback = lambda(ir::Pat::Wild, call, arg.span);
                 let layer = ir::Expr::new(ExprKind::Local(layer.to_string()), arg.span);
-                let partial = app(global("Layer", arg.span), layer, arg.span);
+                let partial = app(global(Lang::LayerRun, arg.span), layer, arg.span);
                 let run = app(partial, callback, arg.span);
                 let block = binding(&name, arg, run);
                 return translate(self, &block);
@@ -135,11 +137,12 @@ fn lambda(pat: ir::Pat, body: ir::Expr, span: Span) -> ir::Expr {
         span,
     )
 }
-fn global(module: &str, span: Span) -> ir::Expr {
+fn global(item: Lang, span: Span) -> ir::Expr {
+    let item = lang::item(item);
     ir::Expr::new(
         ExprKind::Global {
-            module: module.into(),
-            name: "run".into(),
+            module: item.module.clone(),
+            name: item.name.clone(),
         },
         span,
     )
@@ -161,10 +164,7 @@ pub(super) fn layer_run(func: &ir::Expr) -> Option<&ir::Expr> {
     let ExprKind::App { func, arg, .. } = &func.kind else {
         return None;
     };
-    match &func.kind {
-        ExprKind::Global { module, name } if module == "Layer" && name == "run" => Some(arg),
-        _ => None,
-    }
+    is_lang(func, Lang::LayerRun).then_some(&**arg)
 }
 
 /// An already evaluated callback, called under the state/completion protocol.

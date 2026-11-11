@@ -294,3 +294,36 @@ let tests =
         }
     }
 }
+
+/// A module that drops out of the program leaves no Go file in the directory
+/// an earlier build wrote: `go build` compiles every file of the package, and
+/// that one names what the program no longer has. Files no build wrote stay.
+#[test]
+#[ignore = "needs Go"]
+fn a_module_that_drops_out_leaves_no_go_file_behind() {
+    let with = "module A exposing (main)\nimport B\nmain : Unit ->{; AppError} Unit\nlet main () = Platform.stdout_line (Int.to_string (B.twice 21))\n";
+    let without = "module A exposing (main)\nmain : Unit ->{; AppError} Unit\nlet main () = Platform.stdout_line (Int.to_string 42)\n";
+    let b = "module B exposing (twice)\ntwice : Int -> Int\nlet twice x = Int.max (x * 2) 0\n";
+    let mine = ["out/notes.txt", "out/go/main/notes.txt"];
+    let dir = project(
+        "go_dropped_module",
+        &[
+            ("A.fl", with),
+            ("B.fl", b),
+            (mine[0], "mine"),
+            (mine[1], "mine"),
+        ],
+    );
+    let build = || flick_in(&dir, &["build", "A.fl", "--emit", "go", "--out-dir", "out"]);
+    let first = build();
+    assert!(first.status.success(), "{first:?}");
+    let dropped = dir.join("out/go/main/m_B.go");
+    assert!(dropped.is_file());
+    fs::write(dir.join("A.fl"), without).expect("write");
+    let second = build();
+    assert!(second.status.success(), "{second:?}");
+    assert!(!dropped.exists());
+    for file in mine {
+        assert_eq!(fs::read_to_string(dir.join(file)).expect(file), "mine");
+    }
+}

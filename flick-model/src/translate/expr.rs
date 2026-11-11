@@ -7,6 +7,7 @@ use std::rc::Rc;
 
 use flick_core::ir::{self, BinOp, ExprKind, Stmt};
 use flick_core::types::Constructor;
+use flick_core::types::lang::{self, Lang};
 
 pub(super) use super::callbacks::layer_run;
 use super::{Tr, dict, given, lams};
@@ -151,8 +152,8 @@ impl Tr {
                 lams(names.iter().map(|n| given(n)), self.expr(body))
             }
             ExprKind::App { func, arg, .. } if layer_run(func).is_some() => self.provide(func, arg),
-            ExprKind::App { func, arg, .. } if is_global(func, "Scope", "run") => self.scope(arg),
-            ExprKind::App { func, .. } if is_global(func, "Scope", "current") => Term::unit(),
+            ExprKind::App { func, arg, .. } if is_lang(func, Lang::ScopeRun) => self.scope(arg),
+            ExprKind::App { func, .. } if is_lang(func, Lang::ScopeCurrent) => Term::unit(),
             ExprKind::App {
                 func,
                 arg,
@@ -392,6 +393,6 @@ fn binary(op: BinOp, a: Term, b: Term) -> Term {
     Term::apps(Term::prim(prim), [a, b])
 }
 
-pub(super) fn is_global(func: &ir::Expr, m: &str, n: &str) -> bool {
-    matches!(&func.kind, ExprKind::Global { module, name } if module == m && name == n)
+pub(super) fn is_lang(func: &ir::Expr, item: Lang) -> bool {
+    matches!(&func.kind, ExprKind::Global { module, name } if lang::is(item, module, name))
 }

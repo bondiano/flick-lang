@@ -1,10 +1,11 @@
 //! Keep polymorphic operands in application position while propagating exits.
 use super::{
     Tr,
-    expr::{is_global, layer_run},
+    expr::{is_lang, layer_run},
 };
 use crate::syntax::Term;
 use flick_core::ir::{self, ExprKind};
+use flick_core::types::lang::Lang;
 use std::rc::Rc;
 
 /// Put the call only in normal leaves; an exiting leaf never calls it.
@@ -74,8 +75,8 @@ impl Tr {
         else {
             return None;
         };
-        if is_global(func, "Scope", "run")
-            || is_global(func, "Scope", "current")
+        if is_lang(func, Lang::ScopeRun)
+            || is_lang(func, Lang::ScopeCurrent)
             || layer_run(func).is_some()
         {
             return None;

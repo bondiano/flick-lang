@@ -2,11 +2,12 @@
 //! Exit values cross scope callbacks as ordinary results, so scopes close normally.
 use super::{
     Tr,
-    expr::{cond, is_global, layer_run, pat},
+    expr::{cond, is_lang, layer_run, pat},
     mutation::modified,
 };
 use crate::syntax::{Arm, Con, Name, Pat, Path, Term};
 use flick_core::ir::{self, ExprKind, Stmt};
+use flick_core::types::lang::Lang;
 use std::iter;
 use std::rc::Rc;
 fn con(ty: &str, name: &str, arity: usize) -> Rc<Con> {
@@ -249,7 +250,7 @@ impl Tr {
                 let body = tr.loop_arms(Term::Var(name.clone()), arms, id, xs);
                 Term::Let(name, None, Rc::new(value), Rc::new(body))
             }),
-            ExprKind::App { func, arg, .. } if is_global(func, "Scope", "run") => {
+            ExprKind::App { func, arg, .. } if is_lang(func, Lang::ScopeRun) => {
                 self.scope_with(arg, &|tr, body| tr.loop_value(body, id, xs))
             }
             ExprKind::App { func, arg, .. } if layer_run(func).is_some() => {

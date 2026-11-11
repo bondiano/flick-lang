@@ -3,7 +3,9 @@
 
 pub mod ast;
 pub mod cst;
+pub(crate) mod heads;
 pub mod kind;
+pub(crate) mod lang;
 pub mod lexer;
 pub mod literal;
 mod parser;

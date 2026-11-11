@@ -29,8 +29,8 @@ use std::sync::Arc;
 use super::{
     Binding, Expr, ExprKind, Foreign, Item, ItemKind, Lit, Module, Param, Stage, TypeName,
 };
-use crate::build::effects::key;
 use crate::diagnostics::{Diagnostic, codes};
+use crate::effects::key;
 use crate::resolve;
 use crate::source::{FileId, Span};
 use crate::syntax::cst::{Node, foreign_words};

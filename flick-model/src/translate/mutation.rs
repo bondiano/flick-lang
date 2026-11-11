@@ -8,13 +8,14 @@
 //! keeps assignments out of what may run later or again. Runtime handlers
 //! that can abandon or resume their body use private model cells instead.
 
+use flick_core::types::lang::Lang;
 use std::iter;
 use std::rc::Rc;
 
 use flick_core::ir::{self, BinOp, ExprKind, Stmt};
 
 use super::Tr;
-use super::expr::{cond, is_global, layer_run, pat, stuck};
+use super::expr::{cond, is_lang, layer_run, pat, stuck};
 use crate::syntax::{Arm, Name, Pat, Term};
 
 impl Tr {
@@ -199,7 +200,7 @@ impl Tr {
                 .with_value(layer_run(func).expect("layer"), |tr, layer| {
                     tr.provide_value(layer, arg, &|tr, body| tr.joined(body, xs))
                 }),
-            ExprKind::App { func, arg, .. } if is_global(func, "Scope", "run") => {
+            ExprKind::App { func, arg, .. } if is_lang(func, Lang::ScopeRun) => {
                 self.scope_with(arg, &|tr, body| tr.joined(body, xs))
             }
             ExprKind::Within(_, inner) | ExprKind::Lift(inner, _) => self.joined(inner, xs),

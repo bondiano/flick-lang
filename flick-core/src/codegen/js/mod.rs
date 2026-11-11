@@ -3,7 +3,7 @@
 //! current statement list, earlier operands spilled into constants first so
 //! that evaluation stays left to right.
 
-use crate::build::bindings;
+use crate::effects::bindings;
 macro_rules! mark {
     ($gen:expr, $span:expr) => {{
         #[cfg(feature = "native-project")]

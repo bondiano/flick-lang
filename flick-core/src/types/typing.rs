@@ -17,12 +17,12 @@ use super::gadt::branch::as_field_given;
 use super::services::OpClass;
 use super::ty::{Stage, Type};
 use crate::iface::Interface;
-use crate::ir::{Adapter, ForeignMode, Label};
 use crate::numeric::Num;
 use crate::source::Span;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
 use crate::types::lang::Lang;
+use flick_ir::{Adapter, ForeignMode, Label};
 
 mod stages;
 

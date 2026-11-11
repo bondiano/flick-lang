@@ -5,12 +5,13 @@ mod loops;
 
 use super::{
     Tr,
-    expr::{cond, is_global, layer_run, pat},
+    expr::{cond, is_lang, layer_run, pat},
     loops::{list_step, none, option, result, rpat, some, state_function, state_pattern},
 };
 use crate::syntax::{Arm, Name, Pat, Term};
 use crate::types::{Scheme, Stage as ModelStage, Type};
 use flick_core::ir::{self, ExprKind, Stmt};
+use flick_core::types::lang::Lang;
 use std::iter;
 use std::rc::Rc;
 
@@ -211,7 +212,7 @@ impl Tr {
             }
             ExprKind::Handle(h) if h.is_try() => self.try_state_as(&h.body, &h.errors, xs, true),
             ExprKind::Handle(h) => self.protected_handler(h, xs),
-            ExprKind::App { func, arg, .. } if is_global(func, "Scope", "run") => {
+            ExprKind::App { func, arg, .. } if is_lang(func, Lang::ScopeRun) => {
                 self.scope_with(arg, &|tr, body| tr.protected(body, xs))
             }
             ExprKind::App { func, arg, .. } if layer_run(func).is_some() => {

@@ -63,7 +63,7 @@ use crate::source::FileId;
 use crate::source::SourceMap;
 
 #[cfg(feature = "native-project")]
-pub const CONFIG_FILE: &str = "flick.toml";
+pub use crate::manifest::CONFIG_FILE;
 
 /// File access for the project model; paths are absolute.
 pub trait Host {

@@ -40,7 +40,7 @@ test("family metadata covers every context-bound UI and Atom export", () => {
 });
 
 test("the compiler interprets package metadata without module-specific tables", () => {
-  const source = read("flick-core/src/build/effects.rs").split("#[cfg(test)]")[0] ?? "";
+  const source = read("flick-core/src/effects.rs").split("#[cfg(test)]")[0] ?? "";
   assert.ok(!source.includes('"@flick-lang/'));
   for (const table of ["IN_RT", "IN_CORE", "UI_IN_RT", "RT_EXPORTS"]) {
     assert.ok(!source.includes(`const ${table}`));
