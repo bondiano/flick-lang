@@ -12,6 +12,7 @@
 
 mod arith;
 mod call;
+mod closures;
 mod effects;
 mod expr;
 mod foreign;

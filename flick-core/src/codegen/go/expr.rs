@@ -8,7 +8,7 @@ use crate::codegen::loops;
 use flick_pretty::{Document, docvec};
 
 use super::arith::Native;
-use super::call::poly;
+use super::closures::poly;
 use super::layout::{Code, call, if_else, list, statement};
 use super::{Gen, names};
 use crate::codegen::tail::{Callee, Target};
