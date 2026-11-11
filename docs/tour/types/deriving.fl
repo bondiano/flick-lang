@@ -11,4 +11,4 @@ let main () =
   let hand = [Card Spades 3, Card Hearts 12, Card Hearts 2]
   Platform.stdout_line (show (List.sort hand))
   Platform.stdout_line (show (Card Hearts 2 == Card Hearts 2))
-  Platform.stdout_line (show (compare (Card Hearts 12) (Card Spades 1)))
+  Platform.stdout_line (show (Card Hearts 12 < Card Spades 1))

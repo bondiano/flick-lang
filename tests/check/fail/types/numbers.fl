@@ -10,9 +10,9 @@ bools : Bool -> Bool
 let bools b = b + b
 
 compare : Bool
-let compare = true < false
+let compare = bools < identity
 
 //~ FLICK-T003 @4:13-4:19 expected `Float`, found `BigInt`
 //~ FLICK-T003 @7:21-7:22 expected `String`, found `Int`
 //~ FLICK-T003 @10:15-10:20 `+` works on `Int` or `Float` or `BigInt`, not on `Bool`
-//~ FLICK-T003 @13:15-13:27 `<` works on `Int` or `Float` or `BigInt` or `String`, not on `Bool`
+//~ FLICK-C001 @13:15-13:31 no instance for `Ord (Bool -> Bool)`; instances of `Ord`: `Ord Int`, `Ord Float`, `Ord BigInt`, `Ord String`, `Ord Bool`, and 11 more

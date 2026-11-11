@@ -1,0 +1,24 @@
+// A comparison orders any type with an `Ord`: the built-in numbers and
+// strings directly, every other type by its `compare`.
+module App.Ordered exposing (..)
+
+type Suit = Hearts | Spades
+  deriving Eq, Ord
+
+type Card = Card Suit Int
+  deriving Eq, Ord
+
+lower : Card -> Card -> Bool
+let lower a b = a < b
+
+flags : Bool
+let flags = true > false
+
+lists : List Int -> List Int -> Bool
+let lists xs ys = xs <= ys
+
+records : { rank : Int } -> { rank : Int } -> Bool
+let records a b = a >= b
+
+within : Ord a => a -> a -> a -> Bool
+let within low high x = low <= x && x <= high

@@ -6,6 +6,10 @@ break programs.
 
 ## Unreleased
 
+- **Comparisons by `Ord`:** `< <= > >=` order any type with an `Ord`
+  instance by its `compare`, as they already did a type variable: `Bool`, a
+  derived type, a record, a list. A type without one is `FLICK-C001`, where
+  it was `FLICK-T003`.
 - **`show` of `Option` and `Result`:** an argument with fields is shown in
   parentheses, as a derived `Show` writes one: `Some (Card Spades 3)` and
   `Err (ArithmeticError "division by zero")`, where they were

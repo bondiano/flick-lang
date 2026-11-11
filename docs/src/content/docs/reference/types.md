@@ -277,7 +277,7 @@ matching instance.
 | - | - | - |
 | `+ - * / % **`, prefix `-` | both `Int`, both `Float` or both `BigInt` | the same type |
 | `++` | both `String` or both `List a` | the same type |
-| `< <= > >=` | both `Int`, `Float`, `BigInt` or `String` | `Bool` |
+| `< <= > >=` | both `Int`, `Float`, `BigInt` or `String`, or both of another type with `Ord` | `Bool` |
 | `== !=` | the same type | `Bool` |
 | `&& \|\|`, `not` | `Bool` | `Bool` |
 | `x \|> f` | `f x` | the result of `f` |
@@ -307,7 +307,9 @@ let mean xs = List.sum xs / Numeric.from_int (List.length xs)
 `x + 1` on a type variable is `FLICK-C001`. `< <= > >=` on a type variable
 with a numeric class use its `lt`, `le`, `gt`, `ge`, which mean what the
 operators mean on its type (NaN is unordered); with only `Ord a`, they
-compare by `compare`.
+compare by `compare`. On any other type, such as `Bool`, a derived type, a
+record or a list, they compare by its `Ord` instance's `compare`; a type
+without one is `FLICK-C001`.
 
 Counts, sizes, indices, hashes and calendar parts are `Int` throughout the
 standard library (`List.length`, `HashMap.size`, `Hash.hash`, `Queue.size`,
