@@ -38,6 +38,9 @@ pub struct Sig {
     pub(crate) globs: Vec<(Key, Scheme)>,
 }
 
+/// The globals of other modules the generator calls.
+const EXTRA: [(&str, &str); 1] = [("List.Core", "get")];
+
 /// The operators the generator makes.
 pub(crate) const PRIMS: [Prim; 4] = [
     Prim::Arith(Arith::Add, Num::Int),
@@ -122,6 +125,25 @@ impl Sig {
                 adt: "Tuple".into(),
             },
         );
+        // the core has no list: a literal is the spine of these, which only
+        // the signature has
+        let list = "(.tapp (.adt \"Prelude.List\") (.tvar 0))";
+        ctors.insert(
+            "Prelude.Nil".into(),
+            Ctor {
+                k: 1,
+                fields: Vec::new(),
+                adt: "Prelude.List".into(),
+            },
+        );
+        ctors.insert(
+            "Prelude.Cons".into(),
+            Ctor {
+                k: 1,
+                fields: vec!["(.tvar 0)".into(), list.into()],
+                adt: "Prelude.List".into(),
+            },
+        );
         let mut globs: Vec<(Key, Scheme)> = PRIMS
             .iter()
             .map(|p| (prim_key(*p), prim_scheme(*p)))
@@ -134,6 +156,13 @@ impl Sig {
         values.sort_by(|a, b| a.0.cmp(b.0));
         for (p, s) in values {
             globs.push((Key::Value(p.clone()), elided(decls, s)));
+        }
+        // after the Fixture values, so that their indices stay
+        for (module, name) in EXTRA {
+            let p = Path::new(module, name);
+            if let Some(s) = decls.values.get(&p) {
+                globs.push((Key::Value(p), elided(decls, s)));
+            }
         }
         Sig { ctors, globs }
     }

@@ -12,6 +12,7 @@ use crate::translate::lean::elide::{Env, caps, row, stage, ty};
 use crate::types::{Caps, Fields, Row, Scheme, Stage, Type, Var};
 
 use super::Unsupported;
+use super::list::list_tm;
 use super::pat::{arms_tm, match_tm};
 use super::raise::is_raise;
 use super::sig::{Key, Sig, bare, kept, prim_key};
@@ -64,6 +65,7 @@ pub(super) fn tm(e: &Term, ctx: &[Name], sig: &Sig) -> Result<String, Unsupporte
         Term::Await(x) => format!("(.await {})", tm(x, ctx)?),
         // a record of the core is a spine in the order of its labels, as
         // its type is written
+        Term::List(xs) => list_tm(xs, ctx, sig)?,
         Term::Record(fs) => {
             let mut out = ".rnil".to_owned();
             for (l, x) in sorted(fs).into_iter().rev() {
@@ -284,6 +286,7 @@ impl<'t> Cx<'t> {
                 ))
             }
             Term::Record(fs) => self.record(fs, t, col),
+            Term::List(xs) => self.list(xs, t, col),
             Term::Field(r, l) => {
                 let at = self.inferred(r)?;
                 let ft = field(&at, l)?;

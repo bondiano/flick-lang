@@ -18,6 +18,8 @@ def genCtor : Name → Option (Nat × List Ty × Name)
   | "Fixture.Oops" => some (0, [(.base .int)], "Fixture.Oops")
   | "Fixture.Sealed" => some (0, [(.arrow (.base .unit) (.rt Row.none Row.none) (.base .unit) Caps.none)], "Fixture.Sealed")
   | "Fixture.Wrapper" => some (1, [(.tapp (.adt "Fixture.Handle") (.tvar 0))], "Fixture.Wrapper")
+  | "Prelude.Cons" => some (1, [(.tvar 0), (.tapp (.adt "Prelude.List") (.tvar 0))], "Prelude.List")
+  | "Prelude.Nil" => some (1, [], "Prelude.List")
   | "Prelude.None" => some (1, [], "Prelude.Option")
   | "Prelude.Some" => some (1, [(.tvar 0)], "Prelude.Option")
   | "Tuple" => some (2, [(.tvar 0), (.tvar 1)], "Tuple")
@@ -35,6 +37,7 @@ def genAdtCtors : Name → List (Name × Nat)
   | "Fixture.Oops" => [("Fixture.Oops", 1)]
   | "Fixture.Sealed" => [("Fixture.Sealed", 1)]
   | "Fixture.Wrapper" => [("Fixture.Wrapper", 1)]
+  | "Prelude.List" => [("Prelude.Cons", 2), ("Prelude.Nil", 0)]
   | "Prelude.Option" => [("Prelude.None", 0), ("Prelude.Some", 1)]
   | "Tuple" => [("Tuple", 2)]
   | _ => []
@@ -76,6 +79,8 @@ def genGlob : Nat → Option Scheme
   | 17 => some ⟨1, Facts.none, (.arrow (.tapp (.adt "Fixture.Handle") (.tvar 0)) (.rt (fun x => x = .atm (.v 0)) Row.none) (.base .unit) Caps.none)⟩
   -- Value(Path { module: "Fixture", name: "use_conn" })
   | 18 => some ⟨1, Facts.none, (.arrow (.adt "Fixture.Raw") (.rt (fun x => x = .atm (.v 0)) Row.none) (.base .unit) Caps.none)⟩
+  -- Value(Path { module: "List.Core", name: "get" })
+  | 19 => some ⟨1, Facts.none, (.arrow (.base .int) .pure (.arrow (.tapp (.adt "Prelude.List") (.tvar 0)) .pure (.tapp (.adt "Prelude.Option") (.tvar 0)) Caps.none) Caps.none)⟩
   | _ => none
 
 structure GenSig (S : Sig) : Prop where
