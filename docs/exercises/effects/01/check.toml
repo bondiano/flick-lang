@@ -1,0 +1,11 @@
+export = "describe_total"
+argument_types = ["number"]
+return_type = "string"
+output = "77 years; not a list of ages"
+starter_error = "FLICK-E002"
+title = "Practice: say how it fails"
+title_ru = "Практика: скажите, как она падает"
+task = "parse_age fails with Invalid on a word that is not a number, but its signature does not say so. Make the signature tell the truth, then check your answer."
+task_ru = "parse_age падает с Invalid на слове, которое не число, но её сигнатура об этом молчит. Заставьте сигнатуру сказать правду и проверьте ответ."
+hint = "The errors of a function go after the semicolon in its braces, as in sum_ages."
+hint_ru = "Ошибки функции пишутся после точки с запятой в фигурных скобках, как у sum_ages."

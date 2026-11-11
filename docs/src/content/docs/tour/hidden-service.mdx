@@ -1,0 +1,21 @@
+---
+title: A service the signature hides
+description: Use a service the signature does not name, and read the error.
+tableOfContents: false
+---
+
+import TourLesson from "../../../components/TourLesson.astro";
+
+<TourLesson locale="en" id="hidden-service">
+
+This program does not compile, on purpose. `report` calls `Log.info`, but
+its signature, `->{}`, needs nothing. The compiler reports `FLICK-E002` and
+offers a fix that adds `Log` to the signature.
+
+This is the promise from the start of the tour: a signature says what its
+function needs, so a reader of `report` knows it logs without reading its
+body.
+
+**Try:** apply the fix, and the program runs.
+
+</TourLesson>

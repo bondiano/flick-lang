@@ -1,0 +1,24 @@
+---
+title: Типизированные ошибки
+description: Сбой, который обрабатывает вызывающий, входит в сигнатуру.
+tableOfContents: false
+source_hash: 0aba63b4ab044c40
+---
+
+import TourLesson from "../../../../components/TourLesson.astro";
+
+<TourLesson locale="ru" id="errors">
+
+Сбой, который должен обработать вызывающий, — это типизированная ошибка.
+`type error NotFound = NotFound String` объявляет её, а
+`find : String ->{; NotFound} Float` после `;` говорит, что `find` может с
+ней упасть.
+
+`from_result (Err …)` падает. `try … with` обрабатывает сбой, с веткой для
+каждой ошибки. После обработки ошибка уходит из сигнатуры: у `main` в
+собственной сигнатуре `NotFound` нет.
+
+**Попробуйте:** уберите `; NotFound` из сигнатуры `find`. Компилятор сообщит
+`FLICK-E002`: телу нужна ошибка, которую сигнатура не разрешает.
+
+</TourLesson>

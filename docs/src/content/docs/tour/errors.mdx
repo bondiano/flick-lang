@@ -1,0 +1,23 @@
+---
+title: Typed errors
+description: A failure a caller handles is part of the signature.
+tableOfContents: false
+---
+
+import TourLesson from "../../../components/TourLesson.astro";
+
+<TourLesson locale="en" id="errors">
+
+A failure the caller should handle is a typed error.
+`type error NotFound = NotFound String` declares one, and
+`find : String ->{; NotFound} Float` says, after the `;`, that `find` may fail
+with it.
+
+`from_result (Err …)` fails. `try … with` handles the failure, with an arm for
+each error. Once handled, the error leaves the signature: `main` has no
+`NotFound` in its own.
+
+**Try:** remove `; NotFound` from the signature of `find`. The compiler
+reports `FLICK-E002`: the body needs an error the signature does not allow.
+
+</TourLesson>

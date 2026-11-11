@@ -1,0 +1,25 @@
+---
+title: Сервисы
+description: Что нужно функции и `provide`, который даёт ей одну реализацию.
+tableOfContents: false
+source_hash: e4b9f2b0d93d54a4
+---
+
+import TourLesson from "../../../../components/TourLesson.astro";
+
+<TourLesson locale="ru" id="services">
+
+Сервис — это то, что нужно функции извне: база данных, журнал, способ
+поздороваться. `service Greeter =` перечисляет его операции, а
+`welcome : String ->{Greeter; none} String` говорит, что он нужен
+`welcome`; `none` значит, что она ни с чем не падает.
+
+`Layer.succeed Greeter { … }` строит реализацию из записи с операциями, а
+`provide layer { … }` делает её доступной внутри блока. Одна и та же
+`welcome` здоровается вежливо или запросто, в зависимости от того, что
+даёт вызывающий.
+
+**Попробуйте:** добавьте третий слой, который здоровается на другом языке,
+и передайте его через `provide`.
+
+</TourLesson>

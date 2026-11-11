@@ -45,6 +45,22 @@
         { "id": "gadt", "example": "gadt" },
         { "id": "show-size", "exercise": "types/01" }
       ]
+    },
+    {
+      "id": "effects", "en": "Effects", "ru": "Эффекты",
+      "lessons": [
+        { "id": "arrows", "expect": "run" },
+        { "id": "errors", "example": "typed-errors" },
+        { "id": "question", "expect": "run" },
+        { "id": "services", "example": "services" },
+        { "id": "hidden-service", "example": "missing-service" },
+        { "id": "layers", "expect": "run" },
+        { "id": "handlers", "example": "handlers" },
+        { "id": "tasks", "expect": "run" },
+        { "id": "concurrency", "example": "concurrency" },
+        { "id": "retry", "example": "retry" },
+        { "id": "failures", "exercise": "effects/01" }
+      ]
     }
   ]
 }

@@ -1,0 +1,28 @@
+---
+title: Pure and running functions
+description: A plain arrow computes; braces after it mark a function that runs.
+tableOfContents: false
+---
+
+import TourLesson from "../../../components/TourLesson.astro";
+
+<TourLesson locale="en" id="arrows">
+
+Signatures tell two kinds of functions apart. `double : Int -> Int` has a
+plain arrow: it is pure, it only computes a result from its arguments, and
+the same arguments always give the same result.
+
+`announce : Int ->{} Unit` has braces after the arrow: it runs, and running
+can do things, such as print. The braces list what it needs before a `;` and
+how it may fail after it, as in `->{Users, Log; NotFound}`. Empty braces need
+nothing. A pure function cannot call one that runs.
+
+One limit for now: calls to the host, such as `Platform.stdout_line` or the
+clock, are `->{}` and are not named in the braces.
+[Why Flick](../../start/why/#where-the-promise-stops) says where the promise
+stops.
+
+**Try:** make `double` print a line before it returns. The compiler reports
+`FLICK-E001`: `double` is pure.
+
+</TourLesson>

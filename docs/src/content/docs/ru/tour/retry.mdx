@@ -1,0 +1,22 @@
+---
+title: Повторные попытки
+description: Запустите упавшую задачу снова по расписанию.
+tableOfContents: false
+source_hash: aa7f7480526019f0
+---
+
+import TourLesson from "../../../../components/TourLesson.astro";
+
+<TourLesson locale="ru" id="retry">
+
+Упавшую задачу можно запустить снова. `flaky` падает дважды, а потом
+срабатывает. `Effect.retry (Schedule.recurs 5)` запускает её снова после
+каждого сбоя, до пяти раз, а `try … with` обрабатывает ошибку, если
+упадут все попытки.
+
+`Ref` считает попытки между запусками задачи.
+
+**Попробуйте:** замените `Schedule.recurs 5` на `Schedule.recurs 1`. Вторая
+попытка тоже упадёт, и обработчик сдастся.
+
+</TourLesson>

@@ -1,0 +1,13 @@
+module Main exposing (main)
+
+main : Unit ->{} Unit
+let main () =
+  let runs = Ref.make 0
+  let counted : Eff none none Int = task {
+    Ref.set runs (Ref.get runs + 1)
+    Ref.get runs
+  }
+  Platform.stdout_line "before: \{Ref.get runs}"
+  let first = await counted
+  let second = await counted
+  Platform.stdout_line "first \{first}, second \{second}"
