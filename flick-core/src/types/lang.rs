@@ -261,6 +261,30 @@ mod tests {
         assert!(!may_declare("@language of the page"));
     }
 
+    /// Without the `std` that declares `@lang owner`, as a host that hands
+    /// over no implicit package checks, a named `scope` is a diagnostic, not a
+    /// panic.
+    #[test]
+    fn a_named_scope_without_the_owner_of_std_is_a_diagnostic() {
+        use crate::diagnostics::codes;
+        use crate::source::SourceMap;
+        use crate::types::{builtin_sources, builtins_of};
+        // the built-in modules are checked once, with every lang item
+        let _ = builtins_of(false);
+        let sources: Vec<(&str, String)> = (builtin_sources().iter())
+            .map(|(module, text)| (*module, text.replace("@lang owner", "")))
+            .collect();
+        let sources: Vec<(&str, &str)> = sources.iter().map(|(m, t)| (*m, t.as_str())).collect();
+        let text = "module M exposing (f)\n\nf : Unit ->{} Int\nlet f () = scope s {\n  1\n}\n";
+        let mut map = SourceMap::default();
+        let file = map.add("M.fl".to_owned(), text);
+        let said = super::with_table(Table::of(&sources), || crate::check(&map, file));
+        let found: Vec<_> = (said.iter())
+            .map(|d| (d.code, &text[d.span.expect("a span").range()]))
+            .collect();
+        assert_eq!(found, [(codes::T001, "s")], "{said:?}");
+    }
+
     /// Each lang item names one declaration of the built-in modules.
     #[test]
     fn every_lang_item_is_declared() {

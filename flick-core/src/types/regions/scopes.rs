@@ -4,13 +4,14 @@ use crate::types::Elem;
 use std::mem;
 
 use super::{Need, Scope, scope};
+use crate::diagnostics::codes;
 use crate::source::Span;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
 use crate::types::Checker;
 use crate::types::convert::TyVar;
 use crate::types::kinds::Kind;
-use crate::types::lang::Lang;
+use crate::types::lang::{self, Lang};
 use crate::types::ty::{Row, Type};
 use crate::types::typing::range;
 
@@ -52,7 +53,17 @@ impl Checker<'_> {
                 ty: region.clone(),
                 kind: Kind::Region,
             });
-            let owner = Type::app(Type::lang(Lang::Owner), region.clone());
+            // the owner is a type of `std`, which a host may not hand over
+            let owner = if let Some(item) = lang::table().find(Lang::Owner) {
+                Type::app(Type::con(&item.module, &item.name), region.clone())
+            } else {
+                self.error(
+                    codes::T001,
+                    self.token_span(token),
+                    format!("unknown type of the owner of `{name}`: no built-in module declares `@lang owner`, which `std` does"),
+                );
+                Type::Error
+            };
             self.push_local(name, token.start, owner);
         }
         let needed = self.fresh();
