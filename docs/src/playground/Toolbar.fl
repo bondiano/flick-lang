@@ -109,7 +109,12 @@ let examples_view model m =
 run_button : Atom.Writable Model -> Model -> Ui
 let run_button model m =
   Ui.with_host
-    { Ui.host with class_name = Some (if m.running then "fp-primary fp-stop" else "fp-primary") }
+    {
+      Ui.host with
+      // a lesson's autorun presses it, so that Stop interrupts that run as well
+      id = Some "fp-run";
+      class_name = Some (if m.running then "fp-primary fp-stop" else "fp-primary");
+    }
     (Ui.button
       {
         disabled =
@@ -135,7 +140,8 @@ let format_button model m =
 view : Atom.Writable Model -> Model -> Ui
 let view model m = ui {
   div { class_name = "fp-toolbar" } [
-    examples_view model m,
+    // a lesson has one program and nothing to choose
+    if List.length m.examples > 1 then examples_view model m else empty,
     run_button model m,
     format_button model m,
     Ui.button { disabled = false; on_click = Ui.Event.exhaust (fun _ -> task { share model }) } [

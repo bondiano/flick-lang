@@ -1,0 +1,12 @@
+module Main exposing (main)
+
+add : Int -> Int -> Int
+let add a b = a + b
+
+main : Unit ->{} Unit
+let main () =
+  Platform.stdout_line (show (7 / 2))
+  Platform.stdout_line (show (7 % 2))
+  Platform.stdout_line (show (7.0 / 2.0))
+  Platform.stdout_line (show (Int.to_float 7 / 2.0))
+  Platform.stdout_line (show (add 2147483647 1))

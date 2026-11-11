@@ -118,7 +118,13 @@ The main entry points are Start, Handbook and Reference. `/play/` runs a
 single Flick module in an isolated browser worker and shows its real debug or
 release JavaScript and `.d.ts`, with the WebAssembly build of the compiler
 core. Its examples are files in `docs/src/playground/examples/`, run by
-`docs/test/examples.test.ts`.
+`docs/test/examples.test.ts`. The tour's order is `docs/tour/index.json`: a
+lesson shows its own `docs/tour/<chapter>/<page>.fl` (with a `.stdout` when it
+runs), an example of the gallery, or an exercise of `docs/exercises/`, beside
+the text of `tour/<page>.mdx`. `docs/test/tour.test.ts` checks the index
+against the files and pages and runs each program; `docs/e2e/tour.spec.ts`
+walks the tour in a browser. A lesson's program runs by itself once typing
+pauses, except code that came from a link.
 
 Interactive widgets are Flick programs: `docs/src/widgets/` owns search,
 theme controls, the live homepage example and code copying;

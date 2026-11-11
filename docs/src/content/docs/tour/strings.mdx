@@ -1,0 +1,21 @@
+---
+title: Strings
+description: Join strings, put values in them, and print the form code uses.
+tableOfContents: false
+---
+
+import TourLesson from "../../../components/TourLesson.astro";
+
+<TourLesson locale="en" id="strings">
+
+`++` joins two strings. Inside a string, `\{…}` puts the text of a value:
+an `Int`, a `Float` or a `Bool` appears as people read it.
+
+`show` gives the form a value has in code instead. For a string that means
+quotes around it and a backslash before each quote inside. The `String` module
+holds the rest: `String.length`, `String.split`, `String.join`, and more.
+
+**Try:** write `"Hello, " ++ 1`. `++` takes two strings, so the compiler
+reports `FLICK-T003`. Write `"Hello, \{1}"` instead.
+
+</TourLesson>

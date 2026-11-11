@@ -1,0 +1,21 @@
+{
+  "chapters": [
+    {
+      "id": "basics", "en": "Basics", "ru": "Основы",
+      "lessons": [
+        { "id": "program", "expect": "run" },
+        { "id": "hello", "example": "hello" },
+        { "id": "numbers", "expect": "run" },
+        { "id": "strings", "expect": "run" },
+        { "id": "blocks", "expect": "run" },
+        { "id": "functions", "expect": "run" },
+        { "id": "signatures", "exercise": "signatures/01" },
+        { "id": "arguments", "exercise": "signatures/02" },
+        { "id": "pipes", "expect": "run" },
+        { "id": "conditions", "expect": "run" },
+        { "id": "loops", "expect": "run" },
+        { "id": "fizzbuzz", "exercise": "basics/01" }
+      ]
+    }
+  ]
+}

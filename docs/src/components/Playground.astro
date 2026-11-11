@@ -10,16 +10,22 @@ import { examples } from "./gallery.ts";
 
 interface Props {
   locale: "en" | "ru";
+  /** An exercise, by its directory under `exercises/`. */
   lesson?: string;
+  /** One program to show and run, under `id`, which keys its draft apart from the gallery's. */
+  source?: string;
+  id?: string;
 }
 
-const { locale, lesson = "" } = Astro.props;
+const { locale, lesson = "", source, id = "" } = Astro.props;
 const exercise = lesson ? loadExercise(lesson) : undefined;
 const { starter, ...lessonData } = exercise ?? { starter: "" };
 const solution = exercise?.solution ?? "";
-const gallery = lesson ? [{ id: "lesson", group: "Lesson", group_ru: "Урок", name: "Starter", name_ru: "Начало", source: starter }] : examples();
+const only = (text: string) => [{ id: "lesson", group: "Lesson", group_ru: "Урок", name: "Starter", name_ru: "Начало", source: text }];
+const gallery = lesson ? only(starter) : source !== undefined ? only(source) : examples();
+const autorun = !lesson && source !== undefined;
 const configuration = {
-  locale, examples: gallery, lesson: Boolean(exercise), solution, done: false,
+  locale, examples: gallery, lesson: Boolean(exercise), solution, done: false, autorun,
   ...lessonConfiguration(exercise),
 };
 const markup = renderToString(uiRenderStatic(await Effect.runPromise(initial_view(configuration))));
@@ -27,7 +33,7 @@ const markup = renderToString(uiRenderStatic(await Effect.runPromise(initial_vie
 const embedded = JSON.stringify(gallery).replaceAll("<", "\\u003c");
 ---
 
-<div id="flick-playground" class="not-content flick-playground-shell" data-locale={locale} data-lesson={lesson} data-flick-ssr data-pagefind-ignore set:html={markup}></div>
+<div id="flick-playground" class="not-content flick-playground-shell" data-locale={locale} data-lesson={lesson || id} data-autorun={String(autorun)} data-flick-ssr data-pagefind-ignore set:html={markup}></div>
 <script is:inline type="application/json" id="flick-playground-examples" set:html={embedded}></script>
 {exercise && <script is:inline type="application/json" id="flick-lesson" set:html={JSON.stringify(lessonData).replaceAll("<", "\\u003c")}></script>}
 <noscript>

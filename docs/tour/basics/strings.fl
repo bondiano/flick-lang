@@ -1,0 +1,9 @@
+module Main exposing (main)
+
+main : Unit ->{} Unit
+let main () =
+  let name = "Flick"
+  Platform.stdout_line ("Hello, " ++ name ++ "!")
+  Platform.stdout_line "\{name} has \{String.length name} letters"
+  Platform.stdout_line "short: \{String.length name < 6}, half: \{0.5}"
+  Platform.stdout_line (show "a \"quoted\" word")

@@ -1,0 +1,21 @@
+---
+title: Variables and loops
+description: "`let mut` makes a variable, and `while` repeats while a condition holds."
+tableOfContents: false
+---
+
+import TourLesson from "../../../components/TourLesson.astro";
+
+<TourLesson locale="en" id="loops">
+
+Sometimes a loop says it best. `let mut` makes a variable, `name = value`
+changes it, and `while condition do …` repeats while the condition holds.
+Several lines after `do` go in braces.
+
+The variables belong to the function that makes them. The signature of
+`digits` is still `Int -> Int`: no one outside can see them change.
+
+**Try:** remove `mut` from `count`. The compiler reports `FLICK-T069`: a plain
+`let` cannot be assigned.
+
+</TourLesson>

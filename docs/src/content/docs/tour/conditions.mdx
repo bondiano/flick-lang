@@ -1,0 +1,22 @@
+---
+title: Conditions and recursion
+description: "`if` gives a value, and a function that calls itself says `rec`."
+tableOfContents: false
+---
+
+import TourLesson from "../../../components/TourLesson.astro";
+
+<TourLesson locale="en" id="conditions">
+
+`if … then … else …` is an expression: it gives a value, so both branches
+give the same type. `else if` adds another case.
+
+A negative number passed as an argument goes in parentheses: `sign (-3)`.
+
+A function that calls itself is declared with `let rec`. `factorial` stops
+at 1 and otherwise multiplies `n` by the factorial of `n - 1`.
+
+**Try:** remove `rec`. The compiler reports `FLICK-T017` and names the
+function that uses itself.
+
+</TourLesson>
