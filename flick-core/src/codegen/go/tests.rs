@@ -57,6 +57,46 @@ fn a_while_nothing_leaves_is_a_plain_loop_over_variables_of_their_go_type() {
     );
 }
 
+const ONCE: &str = "module App exposing (main)\n\n\
+type Mark = Low | High Int\n\n\
+scale : BigInt -> BigInt\nlet scale n =\n  match n with\n  | 0n -> 10n\n  | _ -> n * 10n\n\n\
+pick : Bool -> Mark\nlet pick high = if high then High 1 else Low\n\n\
+label : Mark -> String\nlet label mark =\n  match mark with\n  | Low -> \"low\"\n  | High _ -> \"high\"\n\n\
+main : Unit ->{; AppError} Unit\n\
+let main () = Platform.stdout_line (label (pick false) ++ BigInt.to_string (scale 2n))\n";
+
+#[test]
+fn a_bigint_literal_and_a_constructor_without_fields_are_made_once() {
+    let go = app(ONCE);
+    // `10n` twice is one variable, and with `0n` in the pattern and `2n` three
+    assert_eq!(go.matches("flickrt.BigLit(\"10\")").count(), 1, "{go}");
+    assert_eq!(go.matches("flickrt.BigLit(").count(), 3, "{go}");
+    assert_eq!(go.matches("flickrt.Nullary(").count(), 1, "{go}");
+    // each is made by a package variable, not where the code runs
+    let made = |line: &&str| line.contains("flickrt.BigLit(") || line.contains("flickrt.Nullary(");
+    for line in go.lines().filter(made) {
+        assert!(line.starts_with("var K_App__"), "{line}");
+    }
+}
+
+#[test]
+fn the_labels_of_a_record_literal_are_placed_once() {
+    let go = app("module App exposing (main)\n\n\
+         type alias Point = { x : Int; y : Int }\n\n\
+         point : Int -> Point\nlet point n = { y = n; x = n + 1 }\n\n\
+         moved : Point -> Point\nlet moved p = { y = p.x; x = p.y }\n\n\
+         main : Unit ->{; AppError} Unit\n\
+         let main () = Platform.stdout_line (show (moved (point 1)).x)\n");
+    // two literals of the same labels in the same order: one shape, no label where a record is made
+    assert_eq!(
+        go.matches("flickrt.ShapeOf(\"y\", \"x\")").count(),
+        1,
+        "{go}"
+    );
+    assert_eq!(go.matches("flickrt.Shaped(K_App__").count(), 2, "{go}");
+    assert!(!go.contains("flickrt.Rec("), "{go}");
+}
+
 #[test]
 fn a_loop_with_an_exit_keeps_the_flags_of_its_exits() {
     let go = app(&SUM.replace(

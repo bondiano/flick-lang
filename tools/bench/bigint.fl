@@ -1,0 +1,12 @@
+// BigInt arithmetic with literals in its loop: 400 000 steps of a linear
+// congruential sequence of 64 bits, and the sum of what each leaves of 1000.
+module App.Main exposing (main)
+
+step : BigInt -> BigInt
+let step x = (x * 6364136223846793005n + 1442695040888963407n) % 18446744073709551616n
+
+run : Int -> BigInt -> BigInt -> BigInt
+let rec run left x sum = if left == 0 then sum else run (left - 1) (step x) (sum + x % 1000n)
+
+main : Unit ->{; AppError} Unit
+let main () = Platform.stdout_line (BigInt.to_string (run 400000 1n 0n))

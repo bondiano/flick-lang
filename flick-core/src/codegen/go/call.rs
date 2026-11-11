@@ -116,7 +116,8 @@ impl<'a> Gen<'a> {
                 Box::new(move |_, _: &[Code<'a>]| a.text(lit).into())
             }
             Rep::Tagged if c.arity == 0 && held.is_empty() => {
-                Box::new(move |_, _: &[Code<'a>]| call(a, "flickrt.Nullary", [a.text(tag)]).into())
+                let value = self.once(&format!("flickrt.Nullary({tag})"));
+                Box::new(move |_, _: &[Code<'a>]| a.text(value).into())
             }
             Rep::Tagged => Box::new(move |_, args: &[Code<'a>]| {
                 let args = args.iter().map(|arg| arg.doc).chain(held.iter().copied());

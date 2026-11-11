@@ -45,6 +45,11 @@ pub fn instance(module: &str, name: &str) -> String {
     top("I", module, name)
 }
 
+/// The package variable of a value a module makes once.
+pub fn once(module: &str, index: usize) -> String {
+    top("K", module, &index.to_string())
+}
+
 /// The function that initializes the top-level values of a module.
 pub fn init(module: &str) -> String {
     format!("init_{}", mangle(&module.replace('.', "_")))

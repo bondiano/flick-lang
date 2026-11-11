@@ -220,3 +220,59 @@ func RecordFromEntries(entries Value) Value {
 	}
 	return r
 }
+
+// Shape is the labels of a record literal in the order a record keeps
+// them, found once for every record the literal makes.
+type Shape struct {
+	keys []string
+	pos  []int
+}
+
+// ShapeOf is the shape of the records of `labels`, as a literal writes
+// them. Its labels are shared by those records, so they have no room where
+// a record that grows could write.
+func ShapeOf(labels ...string) *Shape {
+	keys, pos := shapeOf(labels)
+	return &Shape{slices.Clip(keys), pos}
+}
+
+// Shaped is the record of a shape from the values of its labels, in the
+// order of the literal: the values alone are made, in one allocation for
+// up to eight.
+func Shaped(s *Shape, vals ...Value) Value {
+	n := len(vals)
+	var out *Record
+	switch {
+	case n <= 2:
+		b := &struct {
+			r Record
+			v [2]Value
+		}{}
+		b.r = Record{s.keys, b.v[:n]}
+		out = &b.r
+	case n <= 4:
+		b := &struct {
+			r Record
+			v [4]Value
+		}{}
+		b.r = Record{s.keys, b.v[:n]}
+		out = &b.r
+	case n <= 8:
+		b := &struct {
+			r Record
+			v [8]Value
+		}{}
+		b.r = Record{s.keys, b.v[:n]}
+		out = &b.r
+	default:
+		out = &Record{s.keys, make([]Value, n)}
+	}
+	if s.pos == nil {
+		copy(out.vals, vals)
+		return out
+	}
+	for i, v := range vals {
+		out.vals[s.pos[i]] = v
+	}
+	return out
+}
