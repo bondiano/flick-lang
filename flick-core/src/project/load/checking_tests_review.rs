@@ -101,10 +101,6 @@ fn static_arguments_resolve_aliases_once_before_using_canonical_module_identitie
                 "module App.Contracts exposing (Input, Output)\ntype module Input =\n  identity : a -> a\ntype module Output =\n  answer : Int\n",
             ),
             (
-                "Argument",
-                "module App.Argument exposing (seed)\nidentity : a -> a\nlet seed = 41\n",
-            ),
-            (
                 "Other",
                 "module App.Other exposing (unrelated)\nunrelated : String\nlet unrelated = \"other\"\n",
             ),

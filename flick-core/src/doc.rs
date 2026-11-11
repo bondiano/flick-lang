@@ -455,5 +455,11 @@ mod module_signature_tests {
                 parsed.diagnostics
             );
         }
+        let without_source = super::page(&interface, "");
+        assert!(
+            without_source.contains("Expanded module signature"),
+            "{without_source}"
+        );
+        assert!(without_source.contains("```text\n"), "{without_source}");
     }
 }

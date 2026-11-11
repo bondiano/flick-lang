@@ -1,15 +1,7 @@
 impl ModuleSignature {
     pub fn project(&self, actual: &Interface) -> Interface {
         match self {
-            Self::Structure { requirements } => super::module_contract::project(
-                &TypeDef {
-                    kind: Kind::Module,
-                    form: Form::ModuleContract {
-                        requirements: requirements.clone(),
-                    },
-                },
-                actual,
-            ),
+            Self::Structure { .. } => super::module_contract::project(&self.definition(), actual),
             Self::Functor { .. } => Interface {
                 module: actual.module.clone(),
                 functor: Some(self.clone()),
@@ -79,18 +71,9 @@ impl ModuleSignature {
 
     pub fn accepts(&self, actual: &Interface) -> bool {
         match self {
-            Self::Structure { requirements } => {
+            Self::Structure { .. } => {
                 actual.functor.is_none()
-                    && super::module_contract::check(
-                        &TypeDef {
-                            kind: Kind::Module,
-                            form: Form::ModuleContract {
-                                requirements: requirements.clone(),
-                            },
-                        },
-                        actual,
-                    )
-                    .is_empty()
+                    && super::module_contract::check(&self.definition(), actual).is_empty()
             }
             Self::Functor { .. } => actual
                 .functor
