@@ -43,6 +43,9 @@ struct Excess {
     /// Where the bound's row is written, once rows are solved: a variable
     /// may stand for a row written elsewhere.
     bound: Written,
+    /// A name the bound takes out of its row variable is lacking: writing
+    /// it into the row is no fix.
+    taken: bool,
 }
 
 impl Checker<'_> {
@@ -94,10 +97,11 @@ impl Checker<'_> {
     fn grow_row(&mut self, i: usize) -> bool {
         let actual = self.actual(i);
         let declared = self.store.normalize(&self.cx.subrows[i].declared);
-        let open = declared.tails.iter().find_map(|t| match t {
-            Type::Meta(m) => Some(*m),
-            _ => None,
-        });
+        // a row still unknown, maybe less some names: it grows by what the
+        // actual row holds, but never by a name it is taken without
+        let unknown_tail = declared.tails.iter().find(|t| unknown(t).is_some());
+        let open = unknown_tail.and_then(unknown);
+        let never: Vec<Elem> = unknown_tail.map_or_else(Vec::new, |t| less(t).1.to_vec());
         if self.grow_live(&actual, &declared, open) {
             return true;
         }
@@ -112,7 +116,7 @@ impl Checker<'_> {
                     let _ = self.unify(ty, &bound);
                 }
                 None => {
-                    if let Some(m) = open {
+                    if let Some(m) = open.filter(|_| !never.contains(label)) {
                         let rest = self.store.fresh_beside(m);
                         let row = Type::Row(Row {
                             entries: vec![(label.clone(), ty.clone())],
@@ -125,7 +129,7 @@ impl Checker<'_> {
             }
         }
         for tail in &actual.tails {
-            if matches!(tail, Type::Meta(_) | Type::Error) || declared.tails.contains(tail) {
+            if matches!(tail, Type::Error) || unknown(tail).is_some() || allows(&declared, tail) {
                 continue;
             }
             if let Some(m) = open {
@@ -146,7 +150,7 @@ impl Checker<'_> {
         let mut close = Vec::new();
         for c in &self.cx.subrows {
             for t in self.store.normalize(&c.actual).tails {
-                if let Type::Meta(m) = t
+                if let Some(m) = unknown(&t)
                     && self.store.meta_level(m).is_some_and(|l| l > level)
                 {
                     close.push(m);
@@ -183,9 +187,7 @@ impl Checker<'_> {
         for c in &self.cx.subrows {
             for side in [&c.actual, &c.declared] {
                 for t in self.store.normalize(side).tails {
-                    if let Type::Meta(m) = t {
-                        open.push(m);
-                    }
+                    open.extend(unknown(&t));
                 }
             }
         }
@@ -239,9 +241,16 @@ impl Checker<'_> {
                     }
                 }
             }
-            for tail in &actual.tails {
-                if !matches!(tail, Type::Error) && !declared.tails.contains(tail) {
-                    lacking.push(self.show(tail));
+            let mut taken = false;
+            for tail in (actual.tails.iter()).filter(|t| !matches!(t, Type::Error)) {
+                match owed(&declared, tail) {
+                    // the variable is allowed, less names nothing gives back
+                    Some(names) => {
+                        taken |= !names.is_empty();
+                        lacking.extend(names.iter().map(Elem::short));
+                        labels.extend(names);
+                    }
+                    None => lacking.push(self.show(tail)),
                 }
             }
             if declared.tails.contains(&Type::Error) || lacking.is_empty() {
@@ -255,12 +264,14 @@ impl Checker<'_> {
                     errors: Vec::new(),
                     labels: Vec::new(),
                     bound: Written::default(),
+                    taken: false,
                 });
             }
             let i = excess
                 .iter()
                 .position(|e| e.site == c.site)
                 .expect("just added");
+            excess[i].taken |= taken;
             let list = if c.errors {
                 &mut excess[i].errors
             } else {
@@ -392,7 +403,7 @@ impl Checker<'_> {
         } else {
             written
         };
-        if let Some(written) = written {
+        if let Some(written) = written.filter(|_| !e.taken) {
             // the services go after the `{`; the errors, after the `;`, are left to the user
             let edits: Vec<Edit> = (e.errors.is_empty())
                 .then(|| written.adding(&e.services.join(", ")))
@@ -444,4 +455,41 @@ impl Checker<'_> {
             }),
         );
     }
+}
+
+/// A row variable and the names it is taken without, if any.
+fn less(tail: &Type) -> (&Type, &[Elem]) {
+    match tail {
+        Type::Without { row, gone } => (row, gone),
+        other => (other, &[]),
+    }
+}
+
+/// The variable of a tail still to be inferred, maybe less some names.
+fn unknown(tail: &Type) -> Option<u32> {
+    match less(tail).0 {
+        Type::Meta(m) => Some(*m),
+        _ => None,
+    }
+}
+
+/// The names `declared` takes out of the variable of `tail` that neither
+/// the tail is less too nor `declared` names itself, or `None` when it does
+/// not hold the variable: `s` is within `{L | s - L}`, whatever `s` is.
+fn owed(declared: &Norm, tail: &Type) -> Option<Vec<Elem>> {
+    let (variable, gone) = less(tail);
+    (declared.tails.iter().map(less))
+        .filter(|(held, _)| *held == variable)
+        .map(|(_, taken)| {
+            (taken.iter())
+                .filter(|l| !gone.contains(l) && declared.get(*l).is_none())
+                .cloned()
+                .collect::<Vec<_>>()
+        })
+        .min_by_key(Vec::len)
+}
+
+/// Whether `declared` allows all a `tail` stands for.
+fn allows(declared: &Norm, tail: &Type) -> bool {
+    owed(declared, tail).is_some_and(|names| names.is_empty())
 }

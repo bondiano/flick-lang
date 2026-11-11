@@ -51,9 +51,6 @@ let omit_absent () = ()
 omit_absent_of_set : Unit ->{...Env, -...Mixed} Unit
 let omit_absent_of_set () = ()
 
-omit_from_variable : Unit ->{-Log | r} Unit
-let omit_from_variable () = ()
-
 omit_error_before_semi : Unit ->{...Mixed, -Boom} Unit
 let omit_error_before_semi () = ()
 
@@ -110,18 +107,17 @@ type alias Loop = {...Loop}
 //~ FLICK-T002 @45:27-45:33 `Open r` is an open row, so it has no elements to merge: give the set no tail, and write `| r` where it is used
 //~ FLICK-T002 @48:31-48:37 this row holds no `Async`, so `-` has nothing to take
 //~ FLICK-T002 @51:38-51:47 this row holds no `Boom`, so `-` has nothing to take
-//~ FLICK-T002 @54:30-54:34 `-` takes `Log` out of what the row names, and a row variable names nothing: list what it holds instead
-//~ FLICK-T002 @57:44-57:49 `Boom` is an error, which is taken out after `;`: `{…; -Boom}`
-//~ FLICK-T002 @60:44-60:50 `Users` is both written and taken out of this row
-//~ FLICK-T002 @63:36-63:39 `Env` holds services, which go before `;`
-//~ FLICK-T002 @66:21-66:50 `Layer {...Mixed} none {Users}` gets a row with errors, and only an arrow or `Eff` has a place for them: name the services in an alias of their own
-//~ FLICK-T002 @69:24-69:30 `{s; t}`: `...`, `-` and `;` are for rows of services and errors
-//~ FLICK-T002 @72:26-72:32 `{...s}`: `...`, `-` and `;` are for rows of services and errors
-//~ FLICK-T002 @75:35-75:46 `{Log; Boom}` holds services, but a row of errors is expected here
-//~ FLICK-T002 @78:1-78:33 `Hidden` cannot be opaque: a set is its row, which a signature that names it must show
-//~ FLICK-E002 @82:18-82:40 the signature of `outside` does not allow error `Oops`, which its body needs
-//~ FLICK-E002 @85:26-85:39 the signature of `missing_service` does not allow service `Users`, which its body needs
-//~ FLICK-E002 @88:20-88:32 the signature of `taken_out` does not allow service `Log`, which its body needs
-//~ FLICK-T003 @93:36-93:47 the row already holds `Scope s`, so it cannot hold `Scope t` too: a row has one element of each name
-//~ FLICK-T003 @98:25-98:30 expected `List (Eff {Log, Users} {Boom} Unit)`, found `List (Eff {Log} {Boom} Unit)`
-//~ FLICK-R007 @101:12-101:16 type alias `Loop` is cyclic: Loop -> Loop
+//~ FLICK-T002 @54:44-54:49 `Boom` is an error, which is taken out after `;`: `{…; -Boom}`
+//~ FLICK-T002 @57:44-57:50 `Users` is both written and taken out of this row
+//~ FLICK-T002 @60:36-60:39 `Env` holds services, which go before `;`
+//~ FLICK-T002 @63:21-63:50 `Layer {...Mixed} none {Users}` gets a row with errors, and only an arrow or `Eff` has a place for them: name the services in an alias of their own
+//~ FLICK-T002 @66:24-66:30 `{s; t}`: `...`, `-` and `;` are for rows of services and errors
+//~ FLICK-T002 @69:26-69:32 `{...s}`: `...`, `-` and `;` are for rows of services and errors
+//~ FLICK-T002 @72:35-72:46 `{Log; Boom}` holds services, but a row of errors is expected here
+//~ FLICK-T002 @75:1-75:33 `Hidden` cannot be opaque: a set is its row, which a signature that names it must show
+//~ FLICK-E002 @79:18-79:40 the signature of `outside` does not allow error `Oops`, which its body needs
+//~ FLICK-E002 @82:26-82:39 the signature of `missing_service` does not allow service `Users`, which its body needs
+//~ FLICK-E002 @85:20-85:32 the signature of `taken_out` does not allow service `Log`, which its body needs
+//~ FLICK-T003 @90:36-90:47 the row already holds `Scope s`, so it cannot hold `Scope t` too: a row has one element of each name
+//~ FLICK-T003 @95:25-95:30 expected `List (Eff {Log, Users} {Boom} Unit)`, found `List (Eff {Log} {Boom} Unit)`
+//~ FLICK-R007 @98:12-98:16 type alias `Loop` is cyclic: Loop -> Loop

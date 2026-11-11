@@ -2,7 +2,7 @@
 //! fields of `S.Impl` and `C.Dict τ̄` that (Field-Impl) instantiates, and
 //! records checked as either.
 
-use std::collections::{BTreeSet, HashMap};
+use std::collections::HashMap;
 use std::rc::Rc;
 
 use super::expr::mono;
@@ -62,7 +62,7 @@ impl Checker<'_> {
             .collect();
         let row = Row {
             elems: [(s.clone(), args)].into(),
-            vars: BTreeSet::new(),
+            ..Row::default()
         };
         (vars, row)
     }

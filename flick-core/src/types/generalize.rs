@@ -320,6 +320,7 @@ fn kind_of(ty: &Type, m: u32, params: &dyn Fn(&Type) -> Vec<Kind>) -> Kind {
             Type::Meta(x) => *x == m,
             Type::Row(row) => row.tail.as_deref().is_some_and(|t| is(t, m)),
             Type::Union(a, b) => is(a, m) || is(b, m),
+            Type::Without { row, .. } => is(row, m),
             _ => false,
         }
     }

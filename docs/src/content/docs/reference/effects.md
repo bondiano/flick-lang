@@ -353,11 +353,33 @@ errors each go on their own side of `;`. `-...Reads` takes a whole set. All of
 these are `FLICK-T002`, so a typo or a rename does not pass silently:
 
 - taking out what the row does not hold;
-- taking out of a row variable, as in `{-Log | r}`: only the names the row lists
-  can go, and `| r` is left as it is;
+- taking an element with arguments out of a row variable, as in
+  `{-Store Int | r}`: the variable may hold `Store` at another type, so write
+  `{Store Int | r}` and leave `r`;
 - writing an element and taking it out in one row, as in `{Log, ...Reads, -Log}`;
 - `...r`, since a row variable goes after `|`; merging an alias with a tail, since
   `| r` belongs where the set is used; `opaque type alias` of a row.
+
+Over a row variable `-` says what a function gives on its own. `{-Log | r}` is
+`r` without `Log`, whether or not `r` holds it, so the caller owes everything of
+its row but `Log`:
+
+```flick
+# service Log =
+#   info : String ->{} Unit
+# service Clock =
+#   now : Unit ->{} Float
+#
+quiet : Layer none none {Log} -> Eff r none a ->{-Log | r} a
+let quiet layer work = provide layer { await work }
+
+timed : Layer none none {Log} -> Eff {Clock, Log} none a ->{Clock} a
+let timed layer work = quiet layer work
+```
+
+Without `provide`, the body of `quiet` would need `Log` whenever `r` holds it,
+which the signature does not allow (`FLICK-E002`). Errors work the same after
+`;`, as in `->{; -NotFound | e}` over a `try` that handles `NotFound`.
 
 A set may take parameters, as in `type alias Db s = {Scope s, Log}`.
 

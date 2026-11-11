@@ -169,7 +169,7 @@ theorem rt_preservation {Ψ Θ Λ μ e t φ Λ' μ' e'} (h : Typ S Ψ Θ [] e (.
       refine same (.handle hv (.errVal hv ht hU (hsub.trans hε.2)) hA
         (fun K' k' ts' T' hK' hS' => ?_) (fun x hx => ?_) ⟨fun _ h => h.elim, hε'⟩)
       · rw [hK] at hK'; cases hK'; rw [hS] at hS'; cases hS'; exact hs _ (hε.2 _ hT)
-      · exact .inr (hs _ hx)
+      · exact .inr ((hs _ hx).imp_right Row.back_modNames)
     | tryP hb =>
       obtain ⟨_, _, hε⟩ := raise_inv hv hb; exact hε.elim
     | errVal hv'' | allI hv'' => exact (nv hv'').elim

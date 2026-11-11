@@ -140,8 +140,14 @@ pub(crate) fn row(r: &Row, env: &Env) -> Result<String, String> {
             return Err(format!("the element `{name}` with arguments"));
         }
     }
+    if let Some((v, n)) = r.less.first() {
+        return Err(format!("the row variable `{v}` without `{}`", n.name));
+    }
     for v in env.kept(r.vars.iter()) {
-        parts.push(format!("x = .rv (.v {})", env.index_of(v)?));
+        parts.push(format!(
+            "x = .rv (.v {}) (fun _ => False)",
+            env.index_of(v)?
+        ));
     }
     Ok(disjunction(&parts, "Row.none"))
 }

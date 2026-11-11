@@ -284,6 +284,7 @@ fn argument(arg: &Type, kinds: &[(String, Kind)], bounded: bool) -> Atoms {
             }
         }
         Type::Union(a, b) => union(&argument(a, kinds, bounded), &argument(b, kinds, bounded)),
+        Type::Without { row, .. } => argument(row, kinds, bounded),
         Type::Row(_) => None,
         other => reach(other, kinds, bounded),
     }

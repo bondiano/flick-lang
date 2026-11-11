@@ -70,10 +70,10 @@ macro "caps_set" : tactic => `(tactic| first
 /-- `r = r'` or `r ⊆ r'` of finite rows. -/
 macro "row_set" : tactic => `(tactic| first
   | (funext x
-     rcases x with _ | a | ⟨_, a⟩ | a | ⟨v, a⟩ <;> (try cases a) <;> (try cases v) <;> cert_simp)
+     rcases x with _ | a | ⟨_, a⟩ | ⟨a, _⟩ | ⟨v, _, a⟩ <;> (try cases a) <;> (try cases v) <;> cert_simp)
   | (simp only [Row.Sub]
      intro x hx
-     rcases x with _ | a | ⟨_, a⟩ | a | ⟨v, a⟩ <;> (try cases a) <;> (try cases v) <;> split_mem hx <;>
+     rcases x with _ | a | ⟨_, a⟩ | ⟨a, _⟩ | ⟨v, _, a⟩ <;> (try cases a) <;> (try cases v) <;> split_mem hx <;>
        cert_simp))
 
 /-- `φ ≤ φ'` of concrete stages, `Stage.use` unfolded. -/

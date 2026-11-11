@@ -1,0 +1,77 @@
+// A function gives a service to work it knows by a row variable, or handles an
+// error of it, and says so in its signature: `{-Log | r}` is what the caller
+// still owes of `r`, whether or not `r` holds `Log`.
+module App.Main exposing (main)
+
+type error Missing = Missing String
+
+type error Late = Late
+
+service Log =
+  line : String ->{} Unit
+
+service Clock =
+  now : Unit ->{} Int
+
+/// Gives `Log`; the rest of `r` is the caller's.
+quiet : Eff r e a ->{-Log | r; e} a
+let quiet work = provide (Layer.succeed Log {
+  line = fun text -> Platform.stdout_line ("log: " ++ text);
+}) { await work }
+
+/// Handles `Missing`; the other errors of `e` pass.
+found : Eff r e Int ->{r; -Missing | e} Int
+let found work =
+  try await work with
+  | Missing _ -> 0
+
+stamp : Unit -> Eff {Clock, Log} {Missing, Late} Int
+let stamp () = task {
+  Log.line "reading the clock"
+  let at = Clock.now ()
+  if at > 2 then
+    from_result (Err Late)
+  else if at > 1 then
+    from_result (Err (Missing "gone"))
+  else
+    at
+}
+
+/// `Clock` and `Late` are what is left of the rows of `stamp`.
+read : Unit ->{Clock; Late} Int
+let read () = found (task { quiet (stamp ()) })
+
+/// A row without `Log` loses nothing.
+plain : Unit ->{Clock} Int
+let plain () = quiet (task { Clock.now () })
+
+at : Int -> Layer none none {Clock}
+let at time = Layer.succeed Clock { now = fun () -> time }
+
+main : Unit ->{} Unit
+let main () =
+  provide (at 1) {
+    Platform.stdout_line
+      (show
+        (
+          try read () with
+          | Late -> -1
+        ))
+  }
+  provide (at 2) {
+    Platform.stdout_line
+      (show
+        (
+          try read () with
+          | Late -> -1
+        ))
+  }
+  provide (at 3) {
+    Platform.stdout_line
+      (show
+        (
+          try read () with
+          | Late -> -1
+        ))
+  }
+  provide (at 4) { Platform.stdout_line (show (plain ())) }

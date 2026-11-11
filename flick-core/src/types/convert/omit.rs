@@ -9,7 +9,7 @@ use crate::syntax::kind::SyntaxKind as K;
 use crate::types::Checker;
 use crate::types::Elem;
 use crate::types::kinds::Kind;
-use crate::types::ty::{Norm, Type};
+use crate::types::ty::{self, Norm, Type};
 
 /// An element `-` takes out.
 pub(super) struct Gone {
@@ -95,12 +95,14 @@ impl Checker<'_> {
         (services, errors)
     }
 
-    /// `row` without what is `gone`, which it must hold; its tail stays as it is.
+    /// `row` without what is `gone`: what it names must hold each, and what a
+    /// row variable of it stands for is taken without the others, by name.
     pub(super) fn without(&mut self, row: Type, gone: Vec<Gone>, named: &[Elem]) -> Type {
         if gone.is_empty() {
             return row;
         }
         let Norm { mut entries, tails } = self.store.normalize(&row);
+        let mut later = Vec::new();
         for Gone { label, ty, span } in gone {
             let shown = self.show(&ty);
             if named.contains(&label) {
@@ -111,13 +113,21 @@ impl Checker<'_> {
             } else if tails.is_empty() {
                 let message = format!("this row holds no `{shown}`, so `-` has nothing to take");
                 self.error(codes::T002, span, message);
+            } else if ty.spine().1.is_empty() {
+                later.push(label);
             } else {
+                // the variable may hold the element with other arguments,
+                // which nothing here would relate to these
                 let message = format!(
-                    "`-` takes `{shown}` out of what the row names, and a row variable names nothing: list what it holds instead"
+                    "`-` takes an element out of a row variable by its name, and `{shown}` has arguments: write the row as `{{{shown} | r}}` and leave `r`"
                 );
                 self.error(codes::T002, span, message);
             }
         }
-        rebuilt(entries, tails)
+        if later.is_empty() {
+            return rebuilt(entries, tails);
+        }
+        let tails = tails.into_iter().map(|tail| ty::without(tail, &later));
+        rebuilt(entries, tails.collect())
     }
 }

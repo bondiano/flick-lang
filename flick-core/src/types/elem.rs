@@ -54,6 +54,12 @@ impl Elem {
         Elem::Named(name.into())
     }
 
+    /// The element as a signature names it: without the module of its name.
+    pub fn short(&self) -> String {
+        let name = self.to_string();
+        name.rsplit('.').next().unwrap_or(&name).to_owned()
+    }
+
     /// The name of a field, a service or an error.
     pub fn name(&self) -> Option<&str> {
         match self {

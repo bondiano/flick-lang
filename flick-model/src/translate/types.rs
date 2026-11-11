@@ -134,7 +134,7 @@ pub fn ty(t: &fc::Type) -> Type {
         fc::Type::Forall { .. } => Type::Forall(Rc::new(scheme(t))),
         // a row written as the argument of a type: `Atom.Async a none`, as
         // instantiating a row variable there gives it (`generalize::substitute`)
-        fc::Type::Row(_) | fc::Type::Union(..) => Type::Errors(row(t)),
+        fc::Type::Row(_) | fc::Type::Union(..) | fc::Type::Without { .. } => Type::Errors(row(t)),
         other => Type::Con(Path::new("?", &format!("{other:?}"))),
     }
 }
@@ -188,6 +188,10 @@ fn add(t: &fc::Type, out: &mut Row) {
         }
         fc::Type::Var(v) => {
             out.vars.insert(Var::Named(v.as_str().into()));
+        }
+        fc::Type::Without { row: inner, gone } => {
+            let gone = gone.iter().map(|l| Path::parse(&l.to_string())).collect();
+            out.add_less(&row(inner), &gone);
         }
         fc::Type::Captured { ty: inner, .. } | fc::Type::Bounded { ty: inner, .. } => {
             add(inner, out);

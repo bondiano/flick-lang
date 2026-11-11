@@ -14,7 +14,7 @@ impl Row {
     pub fn one(s: Path) -> Row {
         Row {
             elems: BTreeMap::from([(s, Rc::from([]))]),
-            vars: BTreeSet::new(),
+            ..Row::default()
         }
     }
 }
@@ -90,6 +90,9 @@ pub struct Row {
     /// Each element by its name `Module.Name`, with its arguments.
     pub elems: BTreeMap<Path, Rc<[Type]>>,
     pub vars: BTreeSet<Var>,
+    /// `(ρ, S)`: the variable `ρ` stands here without `S`, as `{-S | ρ}`
+    /// writes it. Only a name without arguments is taken out of a variable.
+    pub less: BTreeSet<(Var, Path)>,
 }
 
 /// The fields of a record and the variable of its tail, if open.
@@ -162,8 +165,49 @@ impl Row {
 
     pub fn var(v: Var) -> Row {
         Row {
-            elems: BTreeMap::new(),
             vars: BTreeSet::from([v]),
+            ..Row::default()
+        }
+    }
+
+    /// The names the variable `v` is taken without.
+    pub fn less_of<'a>(&'a self, v: &'a Var) -> impl Iterator<Item = &'a Path> {
+        (self.less.iter()).filter_map(move |(w, n)| (w == v).then_some(n))
+    }
+
+    /// The variable `v` of this row alone, without what it is taken without.
+    #[must_use]
+    pub fn only(&self, v: &Var) -> Row {
+        Row {
+            elems: BTreeMap::new(),
+            vars: BTreeSet::from([v.clone()]),
+            less: self.less.iter().filter(|(w, _)| w == v).cloned().collect(),
+        }
+    }
+
+    /// `self + (ρ − gone)`: a row with `ρ` twice holds what either gives,
+    /// so `ρ` is without the names both are without.
+    pub fn add_var(&mut self, v: &Var, gone: &BTreeSet<Path>) {
+        if self.vars.insert(v.clone()) {
+            self.less
+                .extend(gone.iter().map(|n| (v.clone(), n.clone())));
+        } else {
+            self.less.retain(|(w, n)| w != v || gone.contains(n));
+        }
+    }
+
+    /// `self + (inner − gone)`: what a variable taken without `gone` gives
+    /// once it stands for `inner`. An element this row has keeps its
+    /// arguments.
+    pub fn add_less(&mut self, inner: &Row, gone: &BTreeSet<Path>) {
+        for (n, args) in &inner.elems {
+            if !gone.contains(n) {
+                self.elems.entry(n.clone()).or_insert_with(|| args.clone());
+            }
+        }
+        for v in &inner.vars {
+            let gone = inner.less_of(v).chain(gone).cloned().collect();
+            self.add_var(v, &gone);
         }
     }
 
@@ -182,8 +226,19 @@ impl Row {
                 }
             }
         }
-        out.vars.extend(other.vars.iter().cloned());
+        for v in &other.vars {
+            out.add_var(v, &other.less_of(v).cloned().collect());
+        }
         Some(out)
+    }
+
+    /// The names `other` takes out of `v` that this row keeps in it and
+    /// `other` does not name itself: what `v` may hold that `other` lacks.
+    /// `ρ ⊆ {S | ρ − S}`, whatever `ρ` is.
+    pub fn owed<'a>(&'a self, v: &'a Var, other: &'a Row) -> impl Iterator<Item = &'a Path> {
+        (other.less_of(v)).filter(move |n| {
+            !self.less.contains(&(v.clone(), (*n).clone())) && !other.elems.contains_key(*n)
+        })
     }
 
     /// `ρ ⊆ ρ'` on normal forms.
@@ -191,7 +246,8 @@ impl Row {
         self.elems
             .iter()
             .all(|(n, a)| other.elems.get(n) == Some(a))
-            && self.vars.is_subset(&other.vars)
+            && (self.vars.iter())
+                .all(|v| other.vars.contains(v) && self.owed(v, other).next().is_none())
     }
 }
 
@@ -286,7 +342,13 @@ impl fmt::Display for Row {
                 s
             })
             .collect();
-        parts.extend(self.vars.iter().map(ToString::to_string));
+        parts.extend(self.vars.iter().map(|v| {
+            let mut s = v.to_string();
+            for n in self.less_of(v) {
+                let _ = write!(s, " - {}", n.name);
+            }
+            s
+        }));
         if parts.is_empty() {
             write!(f, "none")
         } else {
@@ -383,5 +445,61 @@ impl fmt::Display for Type {
             Type::Captured(t, c) => write!(f, "{}^{c}", Atom(t)),
             Type::Bounded(t, c) => write!(f, "{}^<={c}", Atom(t)),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn name(n: &str) -> Path {
+        Path::new("M", n)
+    }
+
+    /// `{-names | s}`.
+    fn less(names: &[&str]) -> Row {
+        let mut row = Row::none();
+        row.add_var(
+            &Var::Named("s".into()),
+            &names.iter().map(|n| name(n)).collect(),
+        );
+        row
+    }
+
+    #[test]
+    fn a_variable_is_within_what_names_all_it_is_taken_without() {
+        let (s, log) = (less(&[]), Row::one(name("Log")));
+        assert!(less(&["Log"]).within(&s));
+        assert!(!s.within(&less(&["Log"])));
+        assert!(s.within(&log.sum(&less(&["Log"])).expect("no name twice")));
+        assert!(!s.within(&log.sum(&less(&["Clock", "Log"])).expect("no name twice")));
+        assert!(
+            less(&["Clock"]).within(&log.sum(&less(&["Clock", "Log"])).expect("no name twice"))
+        );
+    }
+
+    #[test]
+    fn a_variable_twice_is_without_what_both_are_without() {
+        assert_eq!(
+            less(&["Log"]).sum(&less(&[])).expect("no name twice"),
+            less(&[])
+        );
+        let both = less(&["Clock", "Log"])
+            .sum(&less(&["Log"]))
+            .expect("no name twice");
+        assert_eq!(both, less(&["Log"]));
+    }
+
+    #[test]
+    fn what_stands_for_a_variable_loses_the_names_taken_out() {
+        let mut inner = Row::one(name("Log"))
+            .sum(&Row::one(name("Clock")))
+            .expect("no name twice");
+        inner.add_var(&Var::Named("r".into()), &BTreeSet::new());
+        let mut out = Row::none();
+        out.add_less(&inner, &BTreeSet::from([name("Log")]));
+        let mut want = Row::one(name("Clock"));
+        want.add_var(&Var::Named("r".into()), &BTreeSet::from([name("Log")]));
+        assert_eq!(out, want);
     }
 }

@@ -109,35 +109,35 @@ theorem Catches.substT {ε₀ : Row} {p : Pat} {θ : Ty} {H H' : Row} (σ : Atom
   intro n hn
   cases n with
   | nm N =>
-    rcases hn with hn | ⟨b, hb, h'⟩
+    rcases hn with hn | ⟨b, G, hb, hG, h'⟩
     · rcases h _ hn with (⟨rfl, h'⟩ | ⟨rfl, h'⟩) | h'
       · exact .inl (.inl ⟨rfl, .inl h'⟩)
       · exact .inl (.inr ⟨rfl, h'⟩)
       · exact .inr (.inl h')
     · rcases h _ hb with h | h
-      · obtain ⟨rfl, hc⟩ := h; exact .inl (.inl ⟨rfl, .inr ⟨b, hc, h'⟩⟩)
-      · exact .inr (.inr ⟨b, h, h'⟩)
+      · obtain ⟨rfl, hc⟩ := h; exact .inl (.inl ⟨rfl, .inr ⟨b, G, hc, hG, h'⟩⟩)
+      · exact .inr (.inr ⟨b, G, h, hG, h'⟩)
   | atm a =>
-    rcases hn with ⟨b, hb, h'⟩ | ⟨b, hb, h'⟩ <;> rcases h _ hb with h | h
+    rcases hn with ⟨b, hb, h'⟩ | ⟨b, G, hb, h'⟩ <;> rcases h _ hb with h | h
     · obtain ⟨rfl, hc⟩ := h; exact .inl ⟨rfl, .inl ⟨b, hc, h'⟩⟩
     · exact .inr (.inl ⟨b, h, h'⟩)
-    · obtain ⟨rfl, hc⟩ := h; exact .inl ⟨rfl, .inr ⟨b, hc, h'⟩⟩
-    · exact .inr (.inr ⟨b, h, h'⟩)
+    · obtain ⟨rfl, hc⟩ := h; exact .inl ⟨rfl, .inr ⟨b, G, hc, h'⟩⟩
+    · exact .inr (.inr ⟨b, G, h, h'⟩)
   | ob N a =>
-    rcases hn with ⟨b, hb, h'⟩ | ⟨v, b, hb, hv, h'⟩ <;> rcases h _ hb with h | h
+    rcases hn with ⟨b, hb, h'⟩ | ⟨v, G, b, hb, hG, hv, h'⟩ <;> rcases h _ hb with h | h
     · obtain ⟨rfl, hc⟩ := h; exact .inl ⟨rfl, .inl ⟨b, hc, h'⟩⟩
     · exact .inr (.inl ⟨b, h, h'⟩)
-    · obtain ⟨rfl, hc⟩ := h; exact .inl ⟨rfl, .inr ⟨v, b, hc, hv, h'⟩⟩
-    · exact .inr (.inr ⟨v, b, h, hv, h'⟩)
-  | obv w a =>
-    obtain ⟨v, b, hb, hv, h'⟩ := hn
+    · obtain ⟨rfl, hc⟩ := h; exact .inl ⟨rfl, .inr ⟨v, G, b, hc, hG, hv, h'⟩⟩
+    · exact .inr (.inr ⟨v, G, b, h, hG, hv, h'⟩)
+  | obv w H a =>
+    obtain ⟨v, G, b, hb, hv, h'⟩ := hn
     rcases h _ hb with h | h
-    · obtain ⟨rfl, hc⟩ := h; exact .inl ⟨rfl, ⟨v, b, hc, hv, h'⟩⟩
-    · exact .inr ⟨v, b, h, hv, h'⟩
-  | rv a =>
-    obtain ⟨b, hb, h'⟩ := hn
+    · obtain ⟨rfl, hc⟩ := h; exact .inl ⟨rfl, ⟨v, G, b, hc, hv, h'⟩⟩
+    · exact .inr ⟨v, G, b, h, hv, h'⟩
+  | rv a H =>
+    obtain ⟨b, G, hb, h'⟩ := hn
     rcases h _ hb with h | h
-    · obtain ⟨rfl, hc⟩ := h; exact .inl ⟨rfl, ⟨b, hc, h'⟩⟩
-    · exact .inr ⟨b, h, h'⟩
+    · obtain ⟨rfl, hc⟩ := h; exact .inl ⟨rfl, ⟨b, G, hc, h'⟩⟩
+    · exact .inr ⟨b, G, h, h'⟩
 
 end Flick

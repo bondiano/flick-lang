@@ -108,14 +108,37 @@ example {S : Sig} {root : Roots} {c : Cfg} (hroot : RootTy S root)
     (by simp [Stage.substT]) hs).1
 
 /-- The row variable `ρ`, the variable `0` of a scheme. -/
-def rowVar : Row := fun x => x = .rv (.v 0)
+def rowVar : Row := fun x => x = .rv (.v 0) fun _ => False
+
+/-- `ρ − L`, the tail of `{-L | ρ}`: the row variable without the name `L`. -/
+def rowLess (L : Name) : Row := fun x => x = .rv (.v 0) (· = L)
+
+/-- `ρ ⊆ {L | ρ − L}`: beside `L` the row gives it back to its variable. -/
+example (L : Name) :
+    Row.Sub rowVar (Row.union (Row.single L) ((rowLess L).back (Row.single L))) := by
+  rintro x rfl
+  exact .inr ⟨_, rfl, fun _ h => h.elim, fun n h => .inr (by cases h; rfl)⟩
+
+/-- `ρ ⊄ ρ − L`: the variable may hold `L`. -/
+example (L : Name) : ¬ Row.Sub rowVar (rowLess L) := by
+  intro h
+  have h := congrFun (Elem.rv.inj (h _ rfl)).2 L
+  simp at h
+
+/-- `(ρ − L)[ρ := {L, C}]` holds `C` and not `L`. -/
+example (L C : Name) (hC : C ≠ L) :
+    let r := (rowLess L).substT (instT [.row (Row.union (Row.single L) (Row.single C))])
+    r (.nm C) ∧ ¬ r (.nm L) := by
+  refine ⟨.inr ⟨.v 0, _, rfl, hC, .inr rfl⟩, ?_⟩
+  rintro (h | ⟨_, _, h, hL, -⟩)
+  · cases h
+  · cases h; exact hL rfl
 
 /-- `Unit →R⟨ρ;∅⟩ Unit`. -/
 def thunkTy (r : Row) : Ty := .arrow (.base .unit) (.rt r Row.none) (.base .unit) Caps.none
 
-theorem rowVar_inst (r : Row) : rowVar.substT (instT [.row r]) = r.plain := by
-  funext x; apply propext
-  cases x <;> simp [rowVar, Row.substT, instT, Ty.asRow_row, Row.plain]
+theorem rowVar_inst (r : Row) : rowVar.substT (instT [.row r]) = r.plain :=
+  Row.var_substT (instT [.row r]) (.v 0)
 
 /-- `app : ∀ρ. (Unit →R⟨ρ;∅⟩ Unit) →R⟨ρ;∅⟩ Unit`, used at `ρ := {S}`, a service. -/
 example (S : Sig) (hop : S.op "S" "op" = some (.tail, .base .unit, .base .unit)) :

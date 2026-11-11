@@ -116,6 +116,22 @@ impl Checker<'_> {
                 missing(&only_right, false)?;
                 self.bind(*m, &written(extended(only_left, tails_left), left_written))
             }
+            // `?m` less some names against a row: the least `?m` is that row,
+            // which then holds none of the names
+            ([Type::Without { row, gone }], _) if matches!(**row, Type::Meta(_)) => {
+                missing(&only_left, true)?;
+                let Type::Meta(m) = **row else {
+                    unreachable!("matched above")
+                };
+                self.bind(m, &left_out(only_right, tails_right, gone, false)?)
+            }
+            (_, [Type::Without { row, gone }]) if matches!(**row, Type::Meta(_)) => {
+                missing(&only_right, false)?;
+                let Type::Meta(m) = **row else {
+                    unreachable!("matched above")
+                };
+                self.bind(m, &left_out(only_left, tails_left, gone, true)?)
+            }
             // `r1 + r2` against what is left empty: each variable is empty
             (metas, []) | ([], metas)
                 if only_left.is_empty()
@@ -187,6 +203,23 @@ impl Checker<'_> {
             }
         }
         Ok(())
+    }
+}
+
+/// The row a variable less the names `gone` equals: it may hold none of them,
+/// or no row less them is this one. `left` says which side holds the entries.
+fn left_out(
+    entries: Vec<(Elem, Type)>,
+    tails: Vec<Type>,
+    gone: &[Elem],
+    left: bool,
+) -> Result<Type, Mismatch> {
+    match entries.iter().find(|(label, _)| gone.contains(label)) {
+        Some((label, _)) => Err(Mismatch::Label {
+            label: label.clone(),
+            left,
+        }),
+        None => Ok(extended(entries, tails)),
     }
 }
 
