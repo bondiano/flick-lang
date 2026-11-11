@@ -104,6 +104,7 @@ impl<'b> Env<'b> {
             imported: HashSet::new(),
             interfaces: HashMap::new(),
             open_unknown: false,
+            lost_unknown: false,
             instances: Vec::new(),
         };
         for import in &syntax.imports {
@@ -145,28 +146,7 @@ impl<'b> Env<'b> {
                 env.interfaces.insert(contract_module, Some(interface));
             }
         }
-        for import in &syntax.imports {
-            let open = import.exposing.iter().any(|i| i.kind == ItemKind::All);
-            match &env.interfaces[&import.module] {
-                None => {
-                    // names from a module that could not be loaded are taken on trust
-                    env.open_unknown |=
-                        open || import.exposing.iter().any(|i| i.kind == ItemKind::ConAll);
-                    for item in &import.exposing {
-                        for namespace in [Namespace::Value, Namespace::Type, Namespace::Constructor]
-                        {
-                            env.ambiguous.insert((namespace, item.name.clone()));
-                        }
-                    }
-                }
-                Some(i) if open => {
-                    for export in &i.exports {
-                        bring(&mut env.open, &mut env.ambiguous, export);
-                    }
-                }
-                Some(_) => {}
-            }
-        }
+        env.open_imports(syntax);
         let mut ambiguous = HashSet::new();
         for import in &syntax.imports {
             let Some(interface) = &env.interfaces[&import.module] else {
@@ -189,6 +169,40 @@ impl<'b> Env<'b> {
         env.ambiguous.retain(|key| !env.scope.contains_key(key));
         env.ambiguous.extend(ambiguous);
         env
+    }
+
+    /// What the imports bring unqualified beyond their names: all of an
+    /// `exposing (..)`, and on trust what a module could not tell.
+    fn open_imports(&mut self, syntax: &ModuleSyntax) {
+        for import in &syntax.imports {
+            let open = import.exposing.iter().any(|i| i.kind == ItemKind::All);
+            let interface = self.interfaces[&import.module].as_ref();
+            // names from a module that could not be loaded, or that a module
+            // which did not parse in full may have lost, are taken on trust
+            if interface.is_none_or(|i| i.incomplete) {
+                let members = open || import.exposing.iter().any(|i| i.kind == ItemKind::ConAll);
+                if interface.is_none() {
+                    self.open_unknown |= members;
+                } else {
+                    self.lost_unknown |= members;
+                }
+                let lost = |name: &String| {
+                    interface.is_none_or(|i| i.exports.iter().all(|e| &e.entity.name != name))
+                };
+                for item in import.exposing.iter().filter(|item| lost(&item.name)) {
+                    for namespace in [Namespace::Value, Namespace::Type, Namespace::Constructor] {
+                        self.ambiguous.insert((namespace, item.name.clone()));
+                    }
+                }
+            }
+            if let Some(i) = interface
+                && open
+            {
+                for export in &i.exports {
+                    bring(&mut self.open, &mut self.ambiguous, export);
+                }
+            }
+        }
     }
 
     /// Records the types and instances an interface carries.
@@ -320,6 +334,7 @@ impl<'b> Env<'b> {
             None if self.open_unknown => Found::Unknown,
             None => match self.prelude_names().get(&key) {
                 Some(entity) => Found::Entity(entity.clone()),
+                None if self.lost_unknown => Found::Unknown,
                 None => Found::Missing,
             },
         }
@@ -332,9 +347,14 @@ impl<'b> Env<'b> {
             return self.find(Namespace::Type, path);
         };
         match self.qualified_module(qualifier) {
-            Some((_, Some(interface))) => interface
-                .find(Namespace::Type, name)
-                .map_or(Found::Missing, |e| Found::Entity(e.entity.clone())),
+            Some((_, Some(interface))) => interface.find(Namespace::Type, name).map_or(
+                if interface.incomplete {
+                    Found::Unknown
+                } else {
+                    Found::Missing
+                },
+                |e| Found::Entity(e.entity.clone()),
+            ),
             Some((_, None)) => Found::Unknown,
             None => Found::Missing,
         }
@@ -434,6 +454,13 @@ impl<'b> Env<'b> {
             None => self.builtins.interfaces.get(module),
         };
         Some((interface.map_or(module, |i| i.module.as_str()), interface))
+    }
+
+    /// `module` did not parse in full: what it seems to lack may be lost.
+    pub fn incomplete(&self, module: &str) -> bool {
+        self.interfaces
+            .get(module)
+            .is_some_and(|i| i.as_ref().is_some_and(|i| i.incomplete))
     }
 
     pub fn private_builtin(&self, qualifier: &str) -> bool {

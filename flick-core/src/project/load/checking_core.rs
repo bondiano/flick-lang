@@ -381,7 +381,10 @@ impl Checking<'_> {
             typing: Arc::new(typing),
             #[cfg(feature = "ide")]
             inline_ide: Vec::new(),
-            exported: exported(&interface, clean),
+            exported: Interface {
+                incomplete: broken,
+                ..exported(&interface, clean)
+            },
             interface,
             ir: ir.filter(|_| self.cache.is_none() || self.cached_ir == CachedIr::Kept),
             declarations,
