@@ -244,9 +244,9 @@ let scaled quantity by =
   | (Some power, Some number) when digits whole && (not pointed || digits fraction) ->
     let shift = power - String.length fraction
     if shift >= 0 then
-      Some (number * by * ten_to shift)
-    else if number * by % ten_to (0 - shift) == 0n then
-      Some (number * by / ten_to (0 - shift))
+      Some (ten_to shift * number * by)
+    else if 1n * number * by % ten_to (0 - shift) == 0n then
+      Some (1n * number * by / ten_to (0 - shift))
     else
       None
   | _ -> None
@@ -267,7 +267,7 @@ let counted unit n =
 
 /// `value` in units of `by` bytes times `scale`, rounded half up.
 rounded : BigInt -> BigInt -> BigInt -> BigInt
-let rounded value by scale = (value * scale * 2n + by) / (by * 2n)
+let rounded value by scale = (2n * value * scale + by) / (2n * by)
 
 /// `text` without the zeros it ends with.
 unpadded : String -> String

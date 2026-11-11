@@ -27,7 +27,6 @@ flickUtf8Decode CryptoUtf8Decode
 flickBase64UrlEncode CryptoBase64UrlEncode
 flickBase64UrlDecode CryptoBase64UrlDecode
 
-
 [flick:rt]
 chunkAppend ChunkAppend
 chunkConcat ChunkConcat
