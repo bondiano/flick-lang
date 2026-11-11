@@ -59,17 +59,17 @@ let tests = [
   Test.group "checked" [
     Test.test "add overflows" (fun () ->
       Test.equal
-        "Err ArithmeticError \"Int.checked_add: 2147483648 does not fit in Int\""
+        "Err (ArithmeticError \"Int.checked_add: 2147483648 does not fit in Int\")"
         (show (Int.checked_add 2147483647 (add 0 1)))
     ),
     Test.test "mul overflows" (fun () ->
       Test.equal
-        "Err ArithmeticError \"Int.checked_mul: 4294967296 does not fit in Int\""
+        "Err (ArithmeticError \"Int.checked_mul: 4294967296 does not fit in Int\")"
         (show (Int.checked_mul 65536 (add 65535 1)))
     ),
     Test.test "div by zero" (fun () ->
       Test.equal
-        "Err ArithmeticError \"Int.checked_div: division by zero\""
+        "Err (ArithmeticError \"Int.checked_div: division by zero\")"
         (show (Int.checked_div 1 (add 0 0)))
     ),
     Test.test "div fits" (fun () -> Test.equal "Ok -3" (show (Int.checked_div (-7) (add 2 0)))),

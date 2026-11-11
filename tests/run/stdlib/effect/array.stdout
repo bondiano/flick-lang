@@ -5,7 +5,7 @@ chunks: ([NonEmpty [3, 1, 4], NonEmpty [1, 5, 9], NonEmpty [2, 6]], [[1, 2, 3], 
 chop: [10, 20, 30]
 ends: (Some [1, 4, 1, 5, 9, 2, 6], Some [1, 2], None, None)
 edit: ([1, 2, 0, 0], [1], [3, 1, 2], [2, 3])
-insert: (Some NonEmpty [1, 7, 2], None)
+insert: (Some (NonEmpty [1, 7, 2]), None)
 modify: (Some [1, 200, 3], None, [1, 0, 2, 0, 3])
 append: ([1, 2, 3, 4], [1, 2, 3, 4], true, 8)
 find: (Some 4, Some 2, Some 6, Some 7, Some (4, 2))
@@ -39,5 +39,5 @@ ne ends: (5, 1, [3, 8, 1], [5, 3, 8], NonEmpty [0])
 ne edit: (NonEmpty [10, 3, 8, 1], NonEmpty [0, 3, 8, 1], NonEmpty [5, 3, 8, 2], NonEmpty [5, 3, 8, 0])
 ne split: ((NonEmpty [5, 3], [8, 1]), (NonEmpty [5], [3, 8, 1]), ([5, 3, 8], 1), (5, [3, 8, 1]))
 ne group: (NonEmpty [NonEmpty [1, 1], NonEmpty [2]], NonEmpty [NonEmpty [1, 3], NonEmpty [2]])
-ne order: (8, 1, None, Some NonEmpty [1])
+ne order: (8, 1, None, Some (NonEmpty [1]))
 types: ["a"]

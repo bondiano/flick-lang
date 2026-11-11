@@ -6,7 +6,7 @@ bounds: true 5 2 3
 sign: LT EQ GT
 misc: 32 3.14 1000 -
 bigint arith: 12n 7n 30n 2n 0n
-bigint div: Ok 3n Err ArithmeticError "division by zero" 4n
+bigint div: Ok 3n Err (ArithmeticError "division by zero") 4n
 bigint gcd: 6n 12n 4n -
 bigint all: 3n 6n 1n 2n
 bigint compare: true true false true

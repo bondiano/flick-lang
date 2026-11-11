@@ -106,7 +106,7 @@ let tests = [
     ),
     Test.test "Json.json has no JSON Schema" (fun () ->
       Test.equal
-        "Err ExportError \"Doc -> JSON Schema: JSON value has no JSON form\""
+        "Err (ExportError \"Doc -> JSON Schema: JSON value has no JSON form\")"
         (show (Codec.json_schema "Doc" Json.json))
     ),
     Test.test "escapes" (fun () ->

@@ -1,14 +1,14 @@
-get_result: [Ok { x = 2, y = 5 }, Err SchemaError [{ message = "no corner", path = "(root)" }], Ok { x = -3, y = 1 }]
-composed: [Ok 2, Err SchemaError [{ message = "no corner", path = "(root)" }], Ok -3]
-composed twice: [Ok 2, Err SchemaError [{ message = "no corner", path = "(root)" }], Err SchemaError [{ message = "not positive", path = "(root)" }]]
-prism: [Ok 3, Err SchemaError [{ message = "not positive", path = "(root)" }], Err SchemaError [{ message = "not positive", path = "(root)" }]]
-compose_prism: [Ok 4, Err SchemaError [{ message = "odd", path = "(root)" }], Err SchemaError [{ message = "not positive", path = "(root)" }]]
+get_result: [Ok { x = 2, y = 5 }, Err (SchemaError [{ message = "no corner", path = "(root)" }]), Ok { x = -3, y = 1 }]
+composed: [Ok 2, Err (SchemaError [{ message = "no corner", path = "(root)" }]), Ok -3]
+composed twice: [Ok 2, Err (SchemaError [{ message = "no corner", path = "(root)" }]), Err (SchemaError [{ message = "not positive", path = "(root)" }])]
+prism: [Ok 3, Err (SchemaError [{ message = "not positive", path = "(root)" }]), Err (SchemaError [{ message = "not positive", path = "(root)" }])]
+compose_prism: [Ok 4, Err (SchemaError [{ message = "odd", path = "(root)" }]), Err (SchemaError [{ message = "not positive", path = "(root)" }])]
 compose_prism set: 10
-check: Err SchemaError [{ message = "too big", path = "(root)" }]
+check: Err (SchemaError [{ message = "too big", path = "(root)" }])
 replace: [{ corner = Some { x = 7, y = 5 }, name = "box" }, { corner = None, name = "dot" }, { corner = Some { x = 7, y = 1 }, name = "behind" }]
 replace refused: [{ corner = Some { x = 2, y = 5 }, name = "box" }, { corner = None, name = "dot" }, { corner = Some { x = -3, y = 1 }, name = "behind" }]
-replace_result: [Ok { corner = Some { x = 7, y = 5 }, name = "box" }, Err SchemaError [{ message = "no corner", path = "(root)" }], Ok { corner = Some { x = 7, y = 1 }, name = "behind" }]
-replace_result refused: [Err SchemaError [{ message = "left of the origin", path = "(root)" }], Err SchemaError [{ message = "no corner", path = "(root)" }], Err SchemaError [{ message = "left of the origin", path = "(root)" }]]
+replace_result: [Ok { corner = Some { x = 7, y = 5 }, name = "box" }, Err (SchemaError [{ message = "no corner", path = "(root)" }]), Ok { corner = Some { x = 7, y = 1 }, name = "behind" }]
+replace_result refused: [Err (SchemaError [{ message = "left of the origin", path = "(root)" }]), Err (SchemaError [{ message = "no corner", path = "(root)" }]), Err (SchemaError [{ message = "left of the origin", path = "(root)" }])]
 replace through a prism: [{ corner = Some { x = 9, y = 5 }, name = "box" }, { corner = None, name = "dot" }, { corner = Some { x = -3, y = 1 }, name = "behind" }]
 modify: [{ corner = Some { x = 20, y = 5 }, name = "box" }, { corner = None, name = "dot" }, { corner = Some { x = -3, y = 1 }, name = "behind" }]
 modify through a prism: [{ corner = Some { x = 3, y = 5 }, name = "box" }, { corner = None, name = "dot" }, { corner = Some { x = -3, y = 1 }, name = "behind" }]
@@ -16,4 +16,4 @@ modify refused: [{ corner = Some { x = 2, y = 5 }, name = "box" }, { corner = No
 get_all: [[2, 5], [], [-3, 1]]
 modify_all: [{ corner = Some { x = 3, y = 6 }, name = "box" }, { corner = None, name = "dot" }, { corner = Some { x = -2, y = 2 }, name = "behind" }]
 iso: (6, 4, Ok 6, 4, 4)
-misses: (Err SchemaError [{ message = "expected a Some value", path = "(root)" }], Err SchemaError [{ message = "expected a None value", path = "(root)" }], Err SchemaError [{ message = "expected a Result.Success value", path = "(root)" }], Err SchemaError [{ message = "expected a Result.Failure value", path = "(root)" }])
+misses: (Err (SchemaError [{ message = "expected a Some value", path = "(root)" }]), Err (SchemaError [{ message = "expected a None value", path = "(root)" }]), Err (SchemaError [{ message = "expected a Result.Success value", path = "(root)" }]), Err (SchemaError [{ message = "expected a Result.Failure value", path = "(root)" }]))

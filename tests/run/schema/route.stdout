@@ -5,10 +5,10 @@
 /search?exact=false&page=2&q=
 /settings
 / -> Some Home
-/user/42 -> Some User 42
+/user/42 -> Some (User 42)
 /user/x -> None
 /user-post/7/ -> None
-/search?q=atoms&exact=false -> Some Search { exact = false, page = None, q = "atoms" }
+/search?q=atoms&exact=false -> Some (Search { exact = false, page = None, q = "atoms" })
 /search?exact=true -> None
 https://example.com/settings#top -> Some Settings
 /nope -> None
@@ -19,11 +19,11 @@ round trip: passed
 /profile/ada
 /profile/ada/favorites
 /feed/followed-by/3
-/?page=2 -> Some Index { page = Some 2 }
-/editor -> Some Editor None
+/?page=2 -> Some (Index { page = Some 2 })
+/editor -> Some (Editor None)
 /editor/ -> None
-/profile/ada/favorites -> Some Profile "ada" (Some Favorites)
+/profile/ada/favorites -> Some (Profile "ada" (Some Favorites))
 /profile/ada/other -> None
-/feed/followed-by/3 -> Some Feed FollowedBy 3
+/feed/followed-by/3 -> Some (Feed FollowedBy 3)
 /feed/favorites -> None
 site round trip: passed
