@@ -54,7 +54,6 @@ pub struct StaticBinding {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct BindingOrigin {
     pub module: String,
-    pub parameter: usize,
     pub group: usize,
     pub prefix: Vec<String>,
 }

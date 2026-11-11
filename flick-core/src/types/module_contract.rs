@@ -23,9 +23,9 @@ type OpenedRequirements = (
 
 fn open_existential_type(ty: &Type, binder: &str, witness: &str) -> Type {
     if let Type::Con { module, name } = ty
-        && module == &format!("$exists:{binder}")
+        && let Some(suffix) = within_witness(module, &format!("$exists:{binder}"))
     {
-        return Type::con(witness, name);
+        return Type::con(&format!("{witness}{suffix}"), name);
     }
     if matches!(ty, Type::Exists { binder: inner, .. } if inner == binder) {
         return ty.clone();
@@ -35,14 +35,15 @@ fn open_existential_type(ty: &Type, binder: &str, witness: &str) -> Type {
 
 fn close_existential_type(ty: &Type, witness: &str, binder: &str) -> Type {
     if let Type::Con { module, name } = ty
-        && module == witness
+        && let Some(suffix) = within_witness(module, witness)
     {
-        return Type::con(&format!("$exists:{binder}"), name);
+        return Type::con(&format!("$exists:{binder}{suffix}"), name);
     }
     ty.map_children(&mut |child| close_existential_type(child, witness, binder))
 }
 
 include!("module_contract/checker.rs");
+include!("module_contract/runtime.rs");
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum Mismatch {
@@ -54,10 +55,13 @@ pub(crate) enum Mismatch {
     Shape(String),
 }
 
+include!("module_contract/kinds.rs");
+
 fn contract_subst(
     requirements: &[ModuleRequirement],
     actual: &Interface,
     errors: &mut Vec<Mismatch>,
+    kinds: &[(super::Kind, super::Kind)],
 ) -> Vec<(String, Type)> {
     let mut subst = Vec::new();
     for requirement in requirements {
@@ -73,7 +77,7 @@ fn contract_subst(
                 };
                 let expected =
                     super::Kind::arrows(params.iter().map(|p| p.kind.clone()), super::Kind::Type);
-                if def.kind != expected {
+                if def.kind != substitute_kind(&expected, kinds) {
                     errors.push(Mismatch::Kind(name.clone()));
                 }
                 let representation = match &def.form {
@@ -82,7 +86,7 @@ fn contract_subst(
                 };
                 subst.push((name.clone(), representation));
             }
-            ModuleRequirement::Nominal { name, .. } => {
+            ModuleRequirement::Kind { name, .. } | ModuleRequirement::Nominal { name, .. } => {
                 if let Some(export) = actual.find(Namespace::Type, name) {
                     subst.push((
                         name.clone(),
@@ -113,11 +117,12 @@ pub(crate) fn check(contract: &TypeDef, actual: &Interface) -> Vec<Mismatch> {
     };
     let mut errors = Vec::new();
     let requirements = super::ModuleSignature::instantiate_members(requirements, actual);
-    let subst = contract_subst(&requirements, actual, &mut errors);
+    let kinds = kind_witnesses(&requirements, actual, &mut errors);
+    let subst = contract_subst(&requirements, actual, &mut errors, &kinds);
     let normalizer = super::Store::default();
     let same = |expected: &Type, found: &Type| {
         api_diff::canonical_type(&normalizer.zonk(&expand_actual(
-            &expected.substitute(&subst),
+            &substitute_type_kinds(&expected.substitute(&subst), &kinds),
             actual,
             32,
         ))) == api_diff::canonical_type(&normalizer.zonk(&expand_actual(found, actual, 32)))
@@ -176,7 +181,7 @@ pub(crate) fn check(contract: &TypeDef, actual: &Interface) -> Vec<Mismatch> {
                         errors.push(Mismatch::NominalIdentity(name.clone()));
                     }
                 } else if let (Some(expected), Some(found)) = (definition, &export.definition) {
-                    if expected.kind != found.kind
+                    if substitute_kind(&expected.kind, &kinds) != found.kind
                         || !shape_matches(expected, found, methods, actual, name, &same)
                     {
                         errors.push(Mismatch::Shape(name.clone()));
@@ -190,7 +195,7 @@ pub(crate) fn check(contract: &TypeDef, actual: &Interface) -> Vec<Mismatch> {
                     errors.push(Mismatch::Missing(from.clone()));
                 }
             }
-            ModuleRequirement::Type { manifest: None, .. } => {}
+            ModuleRequirement::Kind { .. } | ModuleRequirement::Type { manifest: None, .. } => {}
         }
     }
     errors
@@ -306,6 +311,7 @@ pub(crate) fn project(contract: &TypeDef, actual: &Interface) -> Interface {
         return Interface::default();
     };
     let requirements = super::ModuleSignature::instantiate_members(requirements, actual);
+    let kinds = kind_witnesses(&requirements, actual, &mut Vec::new());
     let mut projected = Interface {
         module: actual.module.clone(),
         private: actual.private,
@@ -314,7 +320,9 @@ pub(crate) fn project(contract: &TypeDef, actual: &Interface) -> Interface {
     let subst: Vec<(String, Type)> = requirements
         .iter()
         .filter_map(|requirement| match requirement {
-            ModuleRequirement::Type { name, .. } | ModuleRequirement::Nominal { name, .. } => {
+            ModuleRequirement::Type { name, .. }
+            | ModuleRequirement::Kind { name, .. }
+            | ModuleRequirement::Nominal { name, .. } => {
                 let export = actual.find(Namespace::Type, name)?;
                 Some((
                     name.clone(),
@@ -347,7 +355,7 @@ pub(crate) fn project(contract: &TypeDef, actual: &Interface) -> Interface {
                     if let Some(def) = &mut export.definition {
                         def.form = manifest.as_ref().map_or(Form::NOMINAL, |ty| Form::Alias {
                             params: params.iter().map(|p| p.name.clone()).collect(),
-                            body: ty.substitute(&subst),
+                            body: substitute_type_kinds(&ty.substitute(&subst), &kinds),
                             opaque: false,
                         });
                     }
@@ -357,11 +365,11 @@ pub(crate) fn project(contract: &TypeDef, actual: &Interface) -> Interface {
             ModuleRequirement::Value { name, ty } => {
                 if let Some(export) = actual.find(Namespace::Value, name) {
                     let mut export = export.clone();
-                    export.scheme = Some(ty.substitute(&subst));
+                    export.scheme = Some(substitute_type_kinds(&ty.substitute(&subst), &kinds));
                     projected.exports.push(export);
                 }
             }
-            ModuleRequirement::Nominal { name, .. } => {
+            ModuleRequirement::Kind { name, .. } | ModuleRequirement::Nominal { name, .. } => {
                 if let Some(export) = actual.find(Namespace::Type, name) {
                     projected.exports.push(export.clone());
                     projected.exports.extend(

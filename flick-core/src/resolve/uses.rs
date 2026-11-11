@@ -94,6 +94,28 @@ impl Walker<'_> {
                 self.module_parameterized(node);
                 return;
             }
+            K::ModuleSignatureArrow => {
+                let modules = self.module_locals.len();
+                let mut children = node.nodes();
+                if let Some(parameters) = children.next() {
+                    for parameter in parameters.nodes() {
+                        for signature in parameter.nodes() {
+                            self.walk(signature);
+                        }
+                        if let Some(name) = parameter.child_tokens().find(|t| t.kind == K::Con) {
+                            self.module_locals.push(name.text(self.text));
+                        }
+                    }
+                    if parameters.kind != K::ModuleSignatureParen {
+                        self.walk(parameters);
+                    }
+                }
+                for result in children {
+                    self.walk(result);
+                }
+                self.module_locals.truncate(modules);
+                return;
+            }
             K::ImportDecl => return,
             K::ModuleHeader => {
                 for child in node

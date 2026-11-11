@@ -59,6 +59,15 @@ pub(crate) fn phases(module: &Module) -> Vec<Option<u32>> {
 }
 
 impl RuntimeLayout {
+    pub(crate) fn owner(&self, physical: &str) -> Option<&str> {
+        self.symbols.iter().find_map(|(owner, symbols)| {
+            symbols
+                .iter()
+                .any(|(_, location)| location == physical)
+                .then_some(owner.as_str())
+        })
+    }
+
     pub(crate) fn new<'a>(modules: impl Iterator<Item = &'a Module>) -> Self {
         let mut layout = Self::default();
         for module in modules {

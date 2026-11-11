@@ -151,7 +151,9 @@ fn unused_members_of_a_mixed_builtin_do_not_import_the_adapter() {
     let source = r"module App.Main exposing (main)
 
 main : Unit ->{} Unit
-let main () = ignore (DateTime.now ())
+let main () =
+  ignore (DateTime.now ())
+  ignore (Duration.to_millis Duration.zero)
 ";
     let app = project(
         "capabilities/mixed_builtin",
@@ -254,7 +256,7 @@ fn supported_native_members_emit_typechecking_typescript() {
             ("package.json", "{\"type\":\"module\"}"),
             (
                 "src/App/Main.fl",
-                "module App.Main exposing (main, Generator)\nservice Generator =\n  value : Unit ->{} Unit\nmain : Unit ->{} Unit\nlet main () = ignore (DateTime.now ())\n",
+                "module App.Main exposing (main, Generator)\nservice Generator =\n  value : Unit ->{} Unit\nmain : Unit ->{} Unit\nlet main () =\n  ignore (DateTime.now ())\n  ignore (Duration.to_millis Duration.zero)\n",
             ),
         ],
     );

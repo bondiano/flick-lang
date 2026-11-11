@@ -123,6 +123,7 @@ fn inline_units(
     let mut prefix_syntax = (*loaded.syntax).clone();
     if let Some(header) = &mut prefix_syntax.header {
         header.exposing = Some(vec![all.clone()]);
+        header.result = None;
     }
     let prefix = inline_unit(
         loaded,

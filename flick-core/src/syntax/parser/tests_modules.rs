@@ -329,7 +329,7 @@ fn higher_order_module_expressions_and_result_annotations() {
 }
 
 #[test]
-fn module_contract_can_require_nested_modules_and_parameterizeds() {
+fn module_contract_can_require_nested_modules_and_parameterized_modules() {
     let source = "type module Library =\n  module Make : Factory\n  module Keys : KeyPolicy\n";
     assert!(errors(source).is_empty(), "{:?}", errors(source));
 }

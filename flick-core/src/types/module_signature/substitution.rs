@@ -1,8 +1,27 @@
+fn map_kind_types(kind: &Kind, f: &mut dyn FnMut(&Type) -> Type) -> Kind {
+    match kind {
+        Kind::Named { module, name } => match f(&Type::con(module, name)) {
+            Type::Con { module, name } => Kind::Named { module, name },
+            _ => kind.clone(),
+        },
+        Kind::Row(inner) => Kind::Row(Box::new(map_kind_types(inner, f))),
+        Kind::Arrow(input, output) => {
+            Kind::arrow(map_kind_types(input, f), map_kind_types(output, f))
+        }
+        _ => kind.clone(),
+    }
+}
+
 /// Module substitution changes service/error identities and their derived
 /// set keys together. Record field labels are source names and stay fixed.
 #[inline(never)]
 fn map_module_children(ty: &Type, f: &mut dyn FnMut(&Type) -> Type) -> Type {
     let mut mapped = ty.map_children(f);
+    if let Type::Forall { vars, .. } = &mut mapped {
+        for var in vars {
+            var.kind = map_kind_types(&var.kind, f);
+        }
+    }
     if let (Type::Row(before), Type::Row(after)) = (ty, &mut mapped) {
         for ((old_key, old), (key, new)) in before.entries.iter().zip(&mut after.entries) {
             if let (
@@ -23,6 +42,7 @@ fn map_module_children(ty: &Type, f: &mut dyn FnMut(&Type) -> Type) -> Type {
 }
 
 fn map_definition_types(definition: &mut TypeDef, f: &mut dyn FnMut(&Type) -> Type) {
+    definition.kind = map_kind_types(&definition.kind, f);
     match &mut definition.form {
         Form::Alias { body, .. } => *body = f(body),
         Form::Class {
@@ -80,9 +100,29 @@ fn map_interface_types(interface: &mut Interface, f: &mut dyn FnMut(&Type) -> Ty
 fn map_requirement_types(requirement: &mut R, f: &mut dyn FnMut(&Type) -> Type) {
     match requirement {
         R::Type {
-            manifest: Some(ty), ..
+            params, manifest, ..
+        } => {
+            for param in params {
+                param.kind = map_kind_types(&param.kind, f);
+            }
+            if let Some(ty) = manifest {
+                *ty = f(ty);
+            }
         }
-        | R::Value { ty, .. } => *ty = f(ty),
+        R::Value { ty, .. } => *ty = f(ty),
+        R::Kind {
+            identity,
+            definition,
+            ..
+        } => {
+            if let Some(entity) = identity
+                && let Type::Con { module, name } = f(&Type::con(&entity.module, &entity.name))
+            {
+                entity.module = module;
+                entity.name = name;
+            }
+            map_definition_types(definition, f);
+        }
         R::Dictionary { head, .. } => *head = f(head),
         R::Module { signature, .. } => signature.map_types(f),
         R::Nominal {
@@ -104,7 +144,6 @@ fn map_requirement_types(requirement: &mut R, f: &mut dyn FnMut(&Type) -> Type) 
                 map_definition_types(definition, f);
             }
         }
-        R::Type { manifest: None, .. } => {}
     }
 }
 
@@ -292,8 +331,52 @@ impl ModuleSignature {
             }
             Self::Structure { requirements } => {
                 for requirement in requirements {
-                    if let R::Module { signature, .. } = requirement {
-                        signature.canonicalize(next);
+                    match requirement {
+                        R::Module { signature, .. } => signature.canonicalize(next),
+                        R::Type {
+                            params, manifest, ..
+                        } => {
+                            let subst: Vec<_> = params
+                                .iter_mut()
+                                .map(|parameter| {
+                                    let old = parameter.name.clone();
+                                    parameter.name = format!("'{}", *next);
+                                    *next += 1;
+                                    (old, Type::Var(parameter.name.clone()))
+                                })
+                                .collect();
+                            if let Some(ty) = manifest {
+                                *ty = ty.substitute(&subst);
+                            }
+                        }
+                        R::Nominal {
+                            definition: Some(definition),
+                            methods,
+                            ..
+                        } => {
+                            let params = match &mut definition.form {
+                                Form::Class { params, .. } | Form::Service { params, .. } => {
+                                    Some(params)
+                                }
+                                _ => None,
+                            };
+                            if let Some(params) = params {
+                                let subst: Vec<_> = params
+                                    .iter_mut()
+                                    .map(|parameter| {
+                                        let old = parameter.clone();
+                                        *parameter = format!("'{}", *next);
+                                        *next += 1;
+                                        (old, Type::Var(parameter.clone()))
+                                    })
+                                    .collect();
+                                map_definition_types(definition, &mut |ty| ty.substitute(&subst));
+                                for (_, ty) in methods {
+                                    *ty = ty.substitute(&subst);
+                                }
+                            }
+                        }
+                        _ => {}
                     }
                 }
             }

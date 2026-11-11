@@ -726,9 +726,10 @@ impl Checker<'_> {
             ) => {
                 fn alpha(ty: &Type, binder: &str) -> Type {
                     if let Type::Con { module, name } = ty
-                        && module == &format!("$exists:{binder}")
+                        && let Some(suffix) = module.strip_prefix(&format!("$exists:{binder}"))
+                        && (suffix.is_empty() || suffix.starts_with('.'))
                     {
-                        return Type::con("$exists:#", name);
+                        return Type::con(&format!("$exists:#{suffix}"), name);
                     }
                     if matches!(ty, Type::Exists { binder: inner, .. } if inner == binder) {
                         return ty.clone();

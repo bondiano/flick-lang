@@ -1,4 +1,54 @@
 impl Checker<'_> {
+    fn refresh_nominal_requirements(&self, signature: &mut super::ModuleSignature) {
+        match signature {
+            super::ModuleSignature::Parameterized {
+                parameter, result, ..
+            } => {
+                self.refresh_nominal_requirements(parameter);
+                self.refresh_nominal_requirements(result);
+            }
+            super::ModuleSignature::Structure { requirements } => {
+                for requirement in requirements {
+                    match requirement {
+                        ModuleRequirement::Module { signature, .. } => {
+                            self.refresh_nominal_requirements(signature)
+                        }
+                        ModuleRequirement::Nominal {
+                            identity: Some(identity),
+                            definition,
+                            methods,
+                            ..
+                        } => {
+                            if let Some(completed) =
+                                self.env.type_def(&identity.module, &identity.name)
+                            {
+                                *methods = if let Form::Class { methods, .. } = &completed.form {
+                                    methods
+                                        .iter()
+                                        .filter_map(|name| {
+                                            let entity = Entity {
+                                                module: identity.module.clone(),
+                                                namespace: Namespace::Value,
+                                                name: name.clone(),
+                                            };
+                                            self.env
+                                                .value(&entity)
+                                                .map(|ty| (name.clone(), ty.clone()))
+                                        })
+                                        .collect()
+                                } else {
+                                    Vec::new()
+                                };
+                                *definition = Some(Box::new(completed.clone()));
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+            }
+        }
+    }
+
     fn class_contract_requirement(
         &mut self,
         member: &Node,
@@ -119,6 +169,9 @@ impl Checker<'_> {
     fn default_contract_requirements(&mut self, requirements: &mut [ModuleRequirement]) {
         for requirement in requirements {
             match requirement {
+                ModuleRequirement::Kind { definition, .. } => {
+                    definition.kind = self.kinds.zonk(&definition.kind, true);
+                }
                 ModuleRequirement::Module { signature, .. } => {
                     signature.map_types(&mut |ty| self.default_kinds(ty));
                 }

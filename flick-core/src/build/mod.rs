@@ -431,10 +431,11 @@ fn core_modules(ctx: &Context, compilation: &Compilation, out: &mut Vec<Artifact
             .filter(|(name, _, imports, _)| {
                 core.contains(name)
                     && !imports.iter().all(|i| {
-                        if compilation.modules.iter().any(|m| &m.name == i) {
-                            core.contains(i.as_str())
+                        let owner = ctx.layout.owner(i).unwrap_or(i);
+                        if compilation.modules.iter().any(|m| m.name == owner) {
+                            core.contains(owner)
                         } else {
-                            effects::in_core(i)
+                            effects::in_core(owner)
                         }
                     })
             })

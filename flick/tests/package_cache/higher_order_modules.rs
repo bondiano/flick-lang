@@ -113,7 +113,7 @@ fn assert_hom_template_interfaces(root: &Path, dist: &Path, emit: &str) {
                 .expect("saved template")["interface"]
                 .clone()
         };
-        assert!(interface["parameterized module"].is_object());
+        assert!(interface["parameterized"].is_object());
         assert!(interface["template"]["source"].is_string());
         if module.ends_with("Selected") {
             assert!(

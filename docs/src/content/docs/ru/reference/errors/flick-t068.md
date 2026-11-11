@@ -1,6 +1,6 @@
 ---
 title: "FLICK-T068"
-source_hash: 8ec5291d94dd6c3f
+source_hash: "8ec5291d94dd6c3f"
 ---
 
 # Статический параметрический модуль нельзя упаковать в runtime-модуль

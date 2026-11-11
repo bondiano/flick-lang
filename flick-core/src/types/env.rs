@@ -97,6 +97,12 @@ pub enum Form {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "member", rename_all = "kebab-case")]
 pub enum ModuleRequirement {
+    /// A finite kind or a member retained by an inferred module signature.
+    Kind {
+        name: String,
+        identity: Option<Entity>,
+        definition: Box<TypeDef>,
+    },
     Module {
         name: String,
         /// Lexical identity of this member in dependent sibling requirements.

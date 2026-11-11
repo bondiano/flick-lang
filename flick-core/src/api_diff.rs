@@ -266,6 +266,19 @@ fn canonical(e: &Export) -> Export {
         let mut types = |t: &mut Type| *t = rename(t, &names, next);
         match &mut form {
             Form::ModuleSignature { signature } => signature.canonicalize(next),
+            Form::ModuleContract { requirements } => {
+                let mut signature = ModuleSignature::Structure {
+                    requirements: std::mem::take(requirements),
+                };
+                signature.canonicalize(next);
+                let ModuleSignature::Structure {
+                    requirements: canonical,
+                } = signature
+                else {
+                    unreachable!()
+                };
+                *requirements = canonical;
+            }
             Form::Alias { body, .. } => types(body),
             Form::Service { operations, .. } => {
                 for o in operations {
@@ -321,12 +334,21 @@ pub(crate) fn canonical_type(ty: &Type) -> Type {
 fn rename(ty: &Type, names: &[(String, String)], next: &mut usize) -> Type {
     match ty {
         Type::Con { module, name } if let Some(binder) = module.strip_prefix("$exists:") => {
-            let binder = names
+            let (root, suffix) = binder
+                .split_once('.')
+                .map_or((binder, ""), |(root, rest)| (root, rest));
+            let fresh = names
                 .iter()
-                .find(|(old, _)| old == binder)
-                .map_or(binder, |(_, fresh)| fresh);
-            Type::con(&format!("$exists:{binder}"), name)
+                .find(|(old, _)| old == root)
+                .map_or(root, |(_, fresh)| fresh);
+            let path = if suffix.is_empty() {
+                fresh.to_owned()
+            } else {
+                format!("{fresh}.{suffix}")
+            };
+            Type::con(&format!("$exists:{path}"), name)
         }
+
         Type::Var(name) => (names.iter().find(|(n, _)| n == name))
             .map_or_else(|| ty.clone(), |(_, fresh)| Type::Var(fresh.clone())),
         Type::Forall {

@@ -176,7 +176,7 @@ fn hom_parameterized_manifest_members_compare_bodies_under_their_binders() {
 
 #[cfg(feature = "ide")]
 #[test]
-fn hom_nested_parameterizeds_capture_earlier_local_signatures_types_and_values() {
+fn hom_nested_parameterized_modules_capture_earlier_local_signatures_types_and_values() {
     use crate::diagnostics::codes;
     for late in [false, true] {
         let offset = "offset : Int\nlet offset = 1\n";
@@ -216,7 +216,7 @@ fn hom_nested_parameterizeds_capture_earlier_local_signatures_types_and_values()
 
 #[cfg(feature = "ide")]
 #[test]
-fn hom_nested_parameterizeds_capture_values_of_an_enclosing_generic_parameterized() {
+fn hom_nested_parameterized_modules_capture_values_of_an_enclosing_generic_parameterized() {
     let (_, analysis) = hom_boundary_analysis(
         &[
             (

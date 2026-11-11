@@ -257,3 +257,40 @@ fn a_renamed_type_variable_is_no_change() {
         }]
     );
 }
+
+#[test]
+fn review_structure_signature_offsets_do_not_change_the_public_api() {
+    let source = "module Lib exposing (Outer)\ntype module Input =\n  type Key\ntype module Outer =\n  module Child : Input\n  value : Child.Key\n";
+    let old = interface(source);
+    let new = interface(&source.replace("  module Child", "\n  module Child"));
+    assert!(diff(&[old], &[new]).is_empty());
+}
+
+#[test]
+fn review_signature_type_parameter_names_do_not_change_the_public_api() {
+    use crate::types::{Kind, ModuleRequirement as R, ModuleSignature as S};
+    let signature = |name: &str| {
+        S::Parameterized {
+            group_size: 1,
+            binder: "K".into(),
+            parameter: Box::new(S::Structure {
+                requirements: vec![R::Type {
+                    name: "Items".into(),
+                    params: vec![Binder {
+                        name: name.into(),
+                        kind: Kind::Type,
+                    }],
+                    manifest: Some(Type::app(
+                        Type::con("Prelude", "List"),
+                        Type::Var(name.into()),
+                    )),
+                }],
+            }),
+            result: Box::new(S::Structure {
+                requirements: vec![],
+            }),
+        }
+        .interface("Lib")
+    };
+    assert!(diff(&[signature("a")], &[signature("item")]).is_empty());
+}

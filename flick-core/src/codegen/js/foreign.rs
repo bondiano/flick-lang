@@ -79,7 +79,13 @@ impl Gen<'_> {
                     bindings::ADAPTER_PREFIX
                 ))
                 .expect("a diagnostic string serializes");
-                return (format!("(() => {{ throw new Error({message}); }})"), false);
+                let missing = format!("(() => {{ throw new Error({message}); }})");
+                let missing = if self.options.typescript() {
+                    format!("({missing} as any)")
+                } else {
+                    missing
+                };
+                return (missing, false);
             }
             if self.kernel
                 && !selected_on_kernel(&spec, &f.binding.name, self.options.effect_bridge)

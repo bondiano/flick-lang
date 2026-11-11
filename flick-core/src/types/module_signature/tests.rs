@@ -521,3 +521,28 @@ fn higher_order_signatures_survive_interface_serialization() {
     let read = read(written.as_bytes(), "App.Factory").expect("interface");
     assert_eq!(read.parameterized, Some(signature));
 }
+
+#[test]
+fn review_dependent_variance_uses_expected_parameter_equalities() {
+    let input = |manifest| ModuleSignature::Structure {
+        requirements: vec![R::Type {
+            name: "Key".into(),
+            params: vec![],
+            manifest,
+        }],
+    };
+    let output = |ty| ModuleSignature::Structure {
+        requirements: vec![R::Type {
+            name: "Value".into(),
+            params: vec![],
+            manifest: Some(ty),
+        }],
+    };
+    let provided = factory(input(None), output(Type::con("$module:K", "Key")));
+    let expected = factory(
+        input(Some(Type::con("Prelude", "String"))),
+        output(Type::con("Prelude", "String")),
+    );
+    assert!(provided.is_subtype_of(&expected));
+    assert!(!expected.is_subtype_of(&provided));
+}

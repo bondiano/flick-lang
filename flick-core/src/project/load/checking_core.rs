@@ -146,6 +146,21 @@ impl Checking<'_> {
                         }
                         None => {}
                     }
+                    let caller = loaded
+                        .member_of
+                        .as_ref()
+                        .and_then(|member| self.by_name.get(&member.parent))
+                        .map_or(loaded, |&index| &self.modules[index]);
+                    let mut index = 0;
+                    while index < names.len() {
+                        if let Some(member) = contracts(&names[index]).and_then(|i| i.member_of)
+                            && !caller.can_access_member(&member)
+                            && !names.contains(&member.parent)
+                        {
+                            names.push(member.parent);
+                        }
+                        index += 1;
+                    }
                     names
                 })
                 .map(|module| match self.by_name.get(&module) {
@@ -239,7 +254,7 @@ impl Checking<'_> {
             return self.check_inline(loaded, tree, index, inline, lookup, contracts);
         }
         let (mut projections, mut local_dictionaries, contract_errors) =
-            Self::virtual_contracts(loaded, lookup, contracts);
+            self.virtual_contracts(loaded, lookup, contracts);
         let mut projected_syntax = (*loaded.syntax).clone();
         let (lexical, mut lexical_dictionaries) =
             self.lexical_environment(loaded, lookup, &mut projected_syntax);
@@ -247,7 +262,7 @@ impl Checking<'_> {
         lexical_dictionaries.append(&mut local_dictionaries);
         let local_dictionaries = lexical_dictionaries;
         let projected_lookup = |name: &str| projections.get(name).cloned().or_else(|| lookup(name));
-        let result_signature = Self::virtual_result_signature(loaded, lookup, contracts);
+        let result_signature = self.virtual_result_signature(loaded, lookup, contracts);
         for import in &mut projected_syntax.imports {
             let key = Self::binding_view_name(loaded, import.qualifier());
             if projections.contains_key(&key) {
@@ -345,7 +360,7 @@ impl Checking<'_> {
                     &mut checked,
                 );
             }
-            let explicit = Self::callee_has_explicit_result(loaded, contracts);
+            let explicit = self.callee_has_explicit_result(loaded, contracts);
             // An inferred private factory exports its ordinary checked declarations,
             // including ADT constructors. Only an advertised signature seals them.
             if explicit {

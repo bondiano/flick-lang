@@ -134,6 +134,7 @@ fn declared(line: &str) -> Option<String> {
 /// The page of `interface`, its comments from `text`.
 pub fn page(interface: &Interface, text: &str) -> String {
     let docs = comments(text);
+    let module_declarations = source_module_declarations(text);
     let mut out = format!("# {}\n", interface.module);
     let doc = |name: &str, out: &mut String| {
         if let Some(d) = docs.get(name) {
@@ -154,7 +155,16 @@ pub fn page(interface: &Interface, text: &str) -> String {
         doc(name, &mut out);
         if let Some(def) = &e.definition {
             let _ = writeln!(out, "\nKind: `{}`", def.kind);
-            definition(interface, e, &def.form, &mut out);
+            if matches!(
+                def.form,
+                Form::ModuleContract { .. } | Form::ModuleSignature { .. }
+            ) && e.entity.module == interface.module
+                && let Some(declaration) = module_declarations.get(name)
+            {
+                let _ = writeln!(out, "\n```flick\n{declaration}\n```");
+            } else {
+                definition(interface, e, &def.form, &mut out);
+            }
         }
     }
     let values: Vec<&Export> = interface
@@ -196,10 +206,34 @@ pub fn page(interface: &Interface, text: &str) -> String {
     out
 }
 
+// Keep named references from checked declarations. A structural signature's
+// display is useful for hover, but is not source syntax for an anonymous contract.
+fn source_module_declarations(text: &str) -> HashMap<String, String> {
+    let parsed = crate::syntax::parse(text, crate::source::FileId::default());
+    fn collect(node: &Node, text: &str, out: &mut HashMap<String, String>) {
+        if node.kind == K::ModuleTypeDecl
+            && let Some(name) = node.child_tokens().find(|token| token.kind == K::Con)
+        {
+            let (start, end) = node.range();
+            out.insert(
+                name.text(text).to_owned(),
+                text[start as usize..end as usize].to_owned(),
+            );
+        }
+        for child in node.nodes() {
+            collect(child, text, out);
+        }
+    }
+    let mut declarations = HashMap::new();
+    collect(&parsed.tree, text, &mut declarations);
+    declarations
+}
+
 fn module_contract(name: &str, requirements: &[ModuleRequirement], out: &mut String) {
     let mut lines = Vec::new();
     for requirement in requirements {
         lines.push(match requirement {
+            ModuleRequirement::Kind { name, .. } => format!("  kind {name}"),
             ModuleRequirement::Module {
                 name, signature, ..
             } => {
@@ -290,11 +324,28 @@ fn module_contract(name: &str, requirements: &[ModuleRequirement], out: &mut Str
 fn definition(interface: &Interface, e: &Export, form: &Form, out: &mut String) {
     let name = &e.entity.name;
     match form {
+        Form::ModuleContract { requirements }
+            if requirements.iter().any(|r| {
+                matches!(
+                    r,
+                    ModuleRequirement::Module { .. } | ModuleRequirement::Kind { .. }
+                )
+            }) =>
+        {
+            let signature = crate::types::ModuleSignature::Structure {
+                requirements: requirements.clone(),
+            };
+            let _ = writeln!(
+                out,
+                "\nSignature shape:\n\n```text\n{}\n```",
+                signature.display()
+            );
+        }
         Form::ModuleContract { requirements } => module_contract(name, requirements, out),
         Form::ModuleSignature { signature } => {
             let _ = writeln!(
                 out,
-                "\n```flick\ntype module {name} = {}\n```",
+                "\nSignature shape:\n\n```text\n{}\n```",
                 signature.display()
             );
         }
@@ -397,5 +448,24 @@ mod tests {
         assert_eq!(docs.get("made").map(String::as_str), Some("Made."));
         let docs = comments("/// Contract.\ntype module HashKey =\n  type Key\n");
         assert_eq!(docs.get("HashKey").map(String::as_str), Some("Contract."));
+    }
+}
+
+#[cfg(test)]
+mod module_signature_tests {
+    #[test]
+    fn review_generated_module_signatures_are_valid_flick_declarations() {
+        let source = "module Api exposing (Factory, Namespace)\ntype module Input =\n  type Key\ntype module Output =\n  type Value\ntype module Factory = (K : Input) -> Output with type Value = K.Key\ntype module Namespace =\n  module Make : Factory\n";
+        let (_, interface) = crate::ir::tests::check_text("Api", source).expect("source checks");
+        let page = super::page(&interface, source);
+        for fence in page.split("```flick\n").skip(1) {
+            let text = fence.split("```").next().expect("closed fence");
+            let parsed = crate::syntax::parse(text, crate::source::FileId::default());
+            assert!(
+                parsed.diagnostics.is_empty(),
+                "{text}: {:?}",
+                parsed.diagnostics
+            );
+        }
     }
 }

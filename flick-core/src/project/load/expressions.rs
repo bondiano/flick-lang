@@ -107,6 +107,10 @@ impl Loader<'_> {
             ));
             return;
         }
+        self.select_expression_body(module, target, header.span);
+    }
+
+    fn select_expression_body(&mut self, module: usize, target: String, at: Span) {
         let syntax = Arc::make_mut(&mut self.modules[module].syntax);
         syntax.header.as_mut().expect("header").materialized_body = Some(target.clone());
         syntax.imports.push(Import {
@@ -115,10 +119,10 @@ impl Loader<'_> {
             exposing: vec![Item {
                 kind: ItemKind::All,
                 name: String::new(),
-                span: header.span,
+                span: at,
             }],
             plugins: Vec::new(),
-            span: header.span,
+            span: at,
         });
     }
 
@@ -321,7 +325,7 @@ impl Loader<'_> {
         Some(full)
     }
 
-    fn alias_expression(
+    pub(super) fn alias_expression(
         &mut self,
         parent: usize,
         desired: Option<&str>,
@@ -350,7 +354,9 @@ impl Loader<'_> {
         let generated =
             format!("{visibility}module {full}{annotation}{exposing} = {target}\n{imports}");
         self.register_expression(parent, &local, generated, inherited_imports, lexical_at);
-        if let Some(context) = self.modules[*self.by_name.get(&full)?].virtual_of.as_mut() {
+        let index = *self.by_name.get(&full)?;
+        self.select_expression_body(index, target.to_owned(), at);
+        if let Some(context) = self.modules[index].virtual_of.as_mut() {
             context.capture.callee = origin;
         }
         Some(full)

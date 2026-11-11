@@ -310,10 +310,10 @@ pub fn module_syntax(tree: &Node, text: &str, file: FileId) -> ModuleSyntax {
                     .collect();
                 if parts.len() > 1 {
                     let module = parts[..parts.len() - 1].join(".");
-                    if !imports
-                        .iter()
-                        .any(|i| i.module == module || i.qualifier() == module)
-                    {
+                    if !imports.iter().any(|i| {
+                        i.module == module
+                            || i.qualifier() == module.split('.').next().unwrap_or(&module)
+                    }) {
                         imports.push(Import {
                             module,
                             alias: None,

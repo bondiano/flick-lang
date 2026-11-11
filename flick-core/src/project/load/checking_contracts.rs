@@ -1,11 +1,21 @@
 impl Checking<'_> {
     fn public_contract_interface(
+        &self,
+        loaded: &Loaded,
         name: &str,
         contracts: &dyn Fn(&str) -> Option<Interface>,
     ) -> Option<Interface> {
         let actual = contracts(name)?;
-        if let Some(member) = &actual.member_of {
-            return Self::public_contract_interface(&member.parent, contracts)?
+        let caller = loaded
+            .member_of
+            .as_ref()
+            .and_then(|member| self.by_name.get(&member.parent))
+            .map_or(loaded, |&index| &self.modules[index]);
+        if let Some(member) = &actual.member_of
+            && !caller.can_access_member(member)
+        {
+            return self
+                .public_contract_interface(loaded, &member.parent, contracts)?
                 .modules
                 .remove(&member.name);
         }
@@ -38,10 +48,12 @@ impl Checking<'_> {
     }
 
     fn callee_signature(
-        context: &Virtual,
+        &self,
+        loaded: &Loaded,
         lookup: &dyn Fn(&str) -> Option<Interface>,
         contracts: &dyn Fn(&str) -> Option<Interface>,
     ) -> Option<types::ModuleSignature> {
+        let context = loaded.virtual_of.as_ref()?;
         match context.capture.callee.as_ref()? {
             CalleeOrigin::Module(name) => {
                 let actual = contracts(name)?;
@@ -53,7 +65,8 @@ impl Checking<'_> {
                 )
             }
             CalleeOrigin::Member(member) => {
-                let actual = Self::public_contract_interface(&member.parent, contracts)?
+                let actual = self
+                    .public_contract_interface(loaded, &member.parent, contracts)?
                     .modules
                     .get(&member.name)?
                     .clone();
@@ -87,6 +100,7 @@ impl Checking<'_> {
     }
 
     fn callee_has_explicit_result(
+        &self,
         loaded: &Loaded,
         contracts: &dyn Fn(&str) -> Option<Interface>,
     ) -> bool {
@@ -97,23 +111,23 @@ impl Checking<'_> {
                 Some(CalleeOrigin::Module(name)) => {
                     contracts(name).is_some_and(|i| i.signature_explicit)
                 }
-                Some(CalleeOrigin::Member(member)) => {
-                    Self::public_contract_interface(&member.parent, contracts)
-                        .and_then(|i| i.modules.get(&member.name).map(|m| m.signature_explicit))
-                        .unwrap_or(false)
-                }
+                Some(CalleeOrigin::Member(member)) => self
+                    .public_contract_interface(loaded, &member.parent, contracts)
+                    .and_then(|i| i.modules.get(&member.name).map(|m| m.signature_explicit))
+                    .unwrap_or(false),
                 Some(CalleeOrigin::Parameter { .. }) => true,
                 None => false,
             })
     }
 
     fn virtual_result_signature(
+        &self,
         loaded: &Loaded,
         lookup: &dyn Fn(&str) -> Option<Interface>,
         contracts: &dyn Fn(&str) -> Option<Interface>,
     ) -> Option<types::ModuleSignature> {
         let context = loaded.virtual_of.as_ref()?;
-        let mut signature = Self::callee_signature(context, lookup, contracts)?;
+        let mut signature = self.callee_signature(loaded, lookup, contracts)?;
         for argument in &context.capture.arguments {
             let types::ModuleSignature::Parameterized {
                 binder, mut result, ..
@@ -180,6 +194,7 @@ impl Checking<'_> {
     }
 
     fn virtual_contracts(
+        &self,
         loaded: &Loaded,
         lookup: &dyn Fn(&str) -> Option<Interface>,
         contracts: &dyn Fn(&str) -> Option<Interface>,
@@ -222,7 +237,7 @@ impl Checking<'_> {
                 );
             }
         }
-        if let Some(mut signature) = Self::callee_signature(context, lookup, contracts) {
+        if let Some(mut signature) = self.callee_signature(loaded, lookup, contracts) {
             for argument in &context.capture.arguments {
                 let types::ModuleSignature::Parameterized {
                     binder,

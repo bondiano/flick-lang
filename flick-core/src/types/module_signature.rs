@@ -158,15 +158,30 @@ impl ModuleSignature {
                                 });
                             }
                             Form::ModuleContract { .. } | Form::ModuleSignature { .. } => {}
-                            form => requirements.push(R::Type {
+                            Form::Kind | Form::KindMember => requirements.push(R::Kind {
                                 name: export.entity.name.clone(),
-                                params: inferred_type_parameters(definition),
-                                manifest: if let Form::Alias { body, .. } = form {
+                                identity: (export.entity.module != interface.module)
+                                    .then(|| export.entity.clone()),
+                                definition: Box::new(definition.clone()),
+                            }),
+                            form => {
+                                let params = inferred_type_parameters(definition);
+                                let manifest = if let Form::Alias { body, .. } = form {
                                     Some(body.clone())
+                                } else if export.entity.module != interface.module {
+                                    Some(Type::apps(
+                                        Type::con(&export.entity.module, &export.entity.name),
+                                        params.iter().map(|p| Type::Var(p.name.clone())),
+                                    ))
                                 } else {
                                     None
-                                },
-                            }),
+                                };
+                                requirements.push(R::Type {
+                                    name: export.entity.name.clone(),
+                                    params,
+                                    manifest,
+                                });
+                            }
                         }
                     }
                 }
@@ -188,7 +203,12 @@ impl ModuleSignature {
         let names: Vec<_> = requirements
             .iter()
             .filter_map(|r| match r {
-                R::Type { name, .. } => Some((name.clone(), false)),
+                R::Type { name, .. }
+                | R::Kind {
+                    name,
+                    identity: None,
+                    ..
+                } => Some((name.clone(), false)),
                 R::Nominal {
                     name,
                     identity: None,

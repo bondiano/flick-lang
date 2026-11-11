@@ -73,7 +73,7 @@ fn higher_order_factory_with_partial_application_runs_on_js_and_go() {
 
 #[test]
 #[ignore = "needs Node and Go; run `just e2e-tests`"]
-fn anonymous_nested_and_returned_parameterizeds_execute_on_js_and_go() {
+fn anonymous_nested_and_returned_parameterized_modules_execute_on_js_and_go() {
     for &(case, factory, instances) in hom_expression_cases() {
         let dir = Path::new(env!("CARGO_TARGET_TMPDIR")).join(format!("hom_expression_{case}"));
         let source = dir.join("App");
@@ -287,3 +287,32 @@ fn assert_hom_execution(source: &Path, dir: &Path, case: &str, expected: &[u8]) 
 }
 
 include!("module_runtime_contracts.rs");
+
+#[test]
+#[ignore = "needs Node and Go; run `just e2e-tests`"]
+fn nested_runtime_module_structures_execute_on_js_ts_and_go() {
+    let dir = Path::new(env!("CARGO_TARGET_TMPDIR")).join("nested_runtime_module");
+    let source = dir.join("App");
+    fs::create_dir_all(&source).expect("source directory");
+    for (name, text) in [
+        (
+            "Contracts.fl",
+            "module App.Contracts exposing (Cell, Namespace)\ntype module Cell =\n  type Item\n  value : Item\n  read : Item -> Int\ntype module Namespace =\n  module Child : Cell\n",
+        ),
+        (
+            "Child.fl",
+            "module App.Child exposing (Item, value, read)\ntype Item = Item Int\nvalue : Item\nlet value = Item 42\nread : Item -> Int\nlet read (Item value) = value\n",
+        ),
+        (
+            "Namespace.fl",
+            "module App.Namespace exposing (Child)\nmodule Child = App.Child\n",
+        ),
+        (
+            "Main.fl",
+            "module App.Main exposing (main)\nimport App.Contracts as C\nimport App.Namespace\npacked : Module C.Namespace\nlet packed = pack App.Namespace as C.Namespace\nescaped : exists K : C.Namespace. K.Child.Item\nlet escaped = unpack packed as K in K.Child.value\nmain : Unit ->{} Unit\nlet main () =\n  let direct = unpack packed as K in K.Child.read K.Child.value\n  let reopened = unpack escaped as N, item in N.Child.read item\n  Platform.stdout_line (show direct ++ \" \" ++ show reopened)\n",
+        ),
+    ] {
+        fs::write(source.join(name), text).expect("source");
+    }
+    assert_hom_execution(&source, &dir, "nested-runtime-structures", b"42 42\n");
+}

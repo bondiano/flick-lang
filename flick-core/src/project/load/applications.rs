@@ -154,8 +154,15 @@ impl Loader<'_> {
         let syntax = Arc::new(resolve::module_syntax(&parse.tree, generated, file));
         let index = self.modules.len();
         self.by_name.insert(name.clone(), index);
-        let context =
-            self.application_context(parameterized, &header, application, callee, template, trace);
+        let context = self.application_context(
+            parent,
+            parameterized,
+            &header,
+            application,
+            callee,
+            template,
+            trace,
+        );
         self.modules.push(Loaded {
             path,
             file,
@@ -177,6 +184,7 @@ impl Loader<'_> {
 
     fn application_context(
         &self,
+        parent: usize,
         parameterized: usize,
         header: &resolve::Header,
         application: &ModuleApplication,
@@ -186,6 +194,22 @@ impl Loader<'_> {
     ) -> Virtual {
         let inherited = self.modules[parameterized].virtual_of.as_ref();
         let mut capture = inherited.map_or_else(StaticCapture::default, |v| v.capture.clone());
+        if let CalleeOrigin::Parameter { binding, .. } = &callee
+            && let Some(caller) = self.modules[parent]
+                .virtual_of
+                .as_ref()
+                .and_then(|context| {
+                    context
+                        .capture
+                        .bindings
+                        .iter()
+                        .find(|b| &b.origin == binding)
+                })
+            && !capture.bindings.iter().any(|b| b.origin == caller.origin)
+        {
+            capture.bindings.push(caller.clone());
+        }
+
         if !capture
             .access_modules
             .contains(&self.modules[parameterized].name)
@@ -205,7 +229,6 @@ impl Loader<'_> {
                 argument: argument.clone(),
                 origin: BindingOrigin {
                     module: self.modules[parameterized].name.clone(),
-                    parameter: index,
                     group: header
                         .parameter_groups
                         .iter()

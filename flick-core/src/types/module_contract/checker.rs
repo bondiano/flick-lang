@@ -46,7 +46,14 @@ impl super::Checker<'_> {
             return Type::Error;
         };
         let requirements = requirements.clone();
-        let (subst, types, values) = self.opened_requirements(&requirements, &witness);
+        let interface = super::ModuleSignature::Structure {
+            requirements: requirements.clone(),
+        }
+        .interface(&witness);
+        let requirements = super::ModuleSignature::instantiate_members(&requirements, &interface);
+        let (subst, _, _) = self.opened_requirements(&requirements, &witness);
+        let opened_mark = self.opened_modules.len();
+        self.open_structure(&requirements, &witness, &alias);
         let local_mark = self.classes.local.len();
         for requirement in &requirements {
             if let ModuleRequirement::Dictionary { head, from } = requirement {
@@ -59,20 +66,15 @@ impl super::Checker<'_> {
                 ));
             }
         }
-        self.opened_modules.push(Opened {
-            alias: alias.clone(),
-            types,
-            values,
-        });
         let value_mark = self.locals.len();
         if let (Some(payload), Some(value)) = (payload, opened_value) {
             self.push_local(payload.text(self.text), payload.start, value);
         }
         let result = self.block(body, None);
         self.locals.truncate(value_mark);
-        self.opened_modules.pop();
+        self.opened_modules.truncate(opened_mark);
         self.classes.local.truncate(local_mark);
-        if result.contains(&mut |ty| matches!(ty, Type::Con { module, .. } if module == &witness)) {
+        if result.contains(&mut |ty| matches!(ty, Type::Con { module, .. } if within_witness(module, &witness).is_some())) {
             self.typing.existential_unpacks.insert(node.range());
             Type::Exists {
                 binder: alias.clone(),
@@ -142,6 +144,41 @@ impl super::Checker<'_> {
             ((*signature).clone(), None)
         };
         Some((signature, opened_value))
+    }
+
+    pub(super) fn open_structure(
+        &mut self,
+        requirements: &[ModuleRequirement],
+        witness: &str,
+        alias: &str,
+    ) {
+        let interface = super::ModuleSignature::Structure {
+            requirements: requirements.to_vec(),
+        }
+        .interface(witness);
+        let requirements = super::ModuleSignature::instantiate_members(requirements, &interface);
+        let (subst, types, values) = self.opened_requirements(&requirements, witness);
+        self.opened_modules.push(Opened {
+            alias: alias.to_owned(),
+            types,
+            values,
+        });
+        for requirement in &requirements {
+            if let ModuleRequirement::Module {
+                name, signature, ..
+            } = requirement
+            {
+                let mut signature = (**signature).clone();
+                signature.substitute_outer_types(&subst);
+                if let super::ModuleSignature::Structure { requirements } = signature {
+                    self.open_structure(
+                        &requirements,
+                        &format!("{witness}.{name}"),
+                        &format!("{alias}.{name}"),
+                    );
+                }
+            }
+        }
     }
 
     fn opened_requirements(
@@ -244,20 +281,13 @@ impl super::Checker<'_> {
         };
         let actual = actual.clone();
         let mut failed = false;
-        for requirement in requirements {
-            if let ModuleRequirement::Nominal {
-                name,
-                identity: None,
-                ..
-            } = requirement
-            {
-                self.error(
-                    codes::T063,
-                    self.span(contract_node),
-                    format!("`Module {}` cannot carry abstract class or service `{name}`; fix its identity with `class {name} = Path.{name}` or `service {name} = Path.{name}`", self.text_of(contract_node)),
-                );
-                failed = true;
-            }
+        for name in abstract_nominals(requirements) {
+            self.error(
+                codes::T063,
+                self.span(contract_node),
+                format!("`Module {}` cannot carry abstract class or service `{name}`; fix its nominal identity in the contract", self.text_of(contract_node)),
+            );
+            failed = true;
         }
         for mismatch in check(&contract, &actual) {
             let (code, message) = match mismatch {
@@ -292,20 +322,8 @@ impl super::Checker<'_> {
         if failed {
             Type::Error
         } else {
-            let fields = requirements
-                .iter()
-                .filter_map(|requirement| match requirement {
-                    ModuleRequirement::Value { name, .. } => {
-                        let export = actual.find(Namespace::Value, name)?;
-                        Some((
-                            name.clone(),
-                            export.entity.module.clone(),
-                            export.entity.name.clone(),
-                        ))
-                    }
-                    _ => None,
-                })
-                .collect();
+            let mut fields = Vec::new();
+            packed_fields(requirements, &actual, "", &mut fields);
             self.typing.packs.insert(node.range(), fields);
             Type::app(Type::con("Prelude", "Module"), signature)
         }

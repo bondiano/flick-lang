@@ -232,6 +232,26 @@ impl Loader<'_> {
                 .find(|app| app.name == child)
                 .cloned()
             else {
+                self.materialize_expression_body(parent);
+                let target = self.modules[parent]
+                    .syntax
+                    .header
+                    .as_ref()
+                    .and_then(|header| header.materialized_body.clone());
+                if let Some(target) = target.filter(|target| target != &self.modules[parent].name) {
+                    let at = self.modules[parent]
+                        .syntax
+                        .header
+                        .as_ref()
+                        .expect("header")
+                        .span;
+                    let member = format!("{target}.{child}");
+                    if let Some(target) = self.find_module(parent, &member, at) {
+                        let target = self.modules[target].name.clone();
+                        self.alias_expression(parent, Some(child), &target, None, at, None);
+                        continue;
+                    }
+                }
                 return;
             };
             // Availability is checked through the parent's advertised view.
