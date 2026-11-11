@@ -154,8 +154,9 @@ impl Precompiled {
     ) -> Vec<Fresh> {
         let mut by_package: BTreeMap<&str, BTreeMap<String, CachedModule>> = BTreeMap::new();
         for c in compiled {
-            // shortcut: a package with plugin blocks is checked each time; its
-            // key would also need its plugin, not only its sources
+            // shortcut: a package with a written plugin block, or a derive of
+            // a plugin outside the compiler, is checked each time; its key
+            // would also need that plugin and what it read
             let Some(package) = c.package.as_deref().filter(|p| !expanded.contains(p)) else {
                 continue;
             };
@@ -432,7 +433,7 @@ impl Loader<'_> {
         {
             let fresh = if save {
                 let expanded: Vec<&str> = (self.modules.iter())
-                    .filter(|m| m.expansion.is_some())
+                    .filter(|m| !m.derives_alone())
                     .filter_map(|m| match &m.root {
                         super::Root::Package(name) => Some(name.as_str()),
                         _ => None,
