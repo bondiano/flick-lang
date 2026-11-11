@@ -3,7 +3,10 @@
 /// the server; when the scope closes, the server stops accepting
 /// connections, waits for the requests that are running and their
 /// finalizers, at most `gracefulShutdownTimeout` (20 seconds by default),
-/// and then interrupts what is left. A `HttpServerError` or
+/// and then interrupts what is left and waits for its cleanup. The timeout
+/// bounds ordinary work, not finalizers or uninterruptible foreign work.
+/// Requests stop before the server owner's resource finalizers run.
+/// A `HttpServerError` or
 /// `Http.Multipart.MultipartError` a handler lets through is answered with
 /// its status, any other failure with 500.
 module Http.Server exposing (..)

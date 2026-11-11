@@ -9,6 +9,6 @@ export const get = async (url) => {
 };
 export const text = async (url) => (await fetch(url)).text();
 /** Starts a request without waiting for it; `wait` gives its outcome. */
-export const start = (url) => fetch(url).then(async (r) => `${r.status} ${await r.text()}`, (e) => `failed: ${e.message}`);
+export const start = (url) => fetch(url).then(async (r) => `${r.status} ${await r.text()}`).catch((e) => `failed: ${e.message}`);
 export const wait = (pending) => pending;
 export const head = async (url) => String((await fetch(url, { method: "HEAD" })).status);
