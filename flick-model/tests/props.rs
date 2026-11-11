@@ -213,6 +213,31 @@ fn a_change_leaves_dictionaries_alone() {
     );
 }
 
+/// The argument of a method chooses its dictionary in the source: a change
+/// of `describe x` under `Describe a` into `describe 0` would be the
+/// instance of `Int` to flick-core and the given dictionary to the model.
+/// A case `checkers_agree` found.
+#[test]
+#[allow(
+    clippy::unreadable_literal,
+    reason = "the choices as proptest printed them"
+)]
+fn a_change_leaves_the_argument_of_a_method_alone() {
+    let c = [
+        3816966318, 289569670, 0, 118480388, 2936692731, 0, 103205097, 1635211862, 0, 0, 592720980,
+        2935318876, 1087149310, 3463225929, 2186994493, 4146360, 1762250172, 642133, 1739070660,
+        2377399617, 0, 0,
+    ];
+    let p = generate::mutate(&generate::program(&c), &[3749175508, 624562279]);
+    let source = generate::source(&p);
+    let core = core(&source);
+    assert_eq!(
+        model(&p).is_ok(),
+        core.is_empty() || generate::by_design(&core),
+        "{core:?}\n{source}"
+    );
+}
+
 /// A function with a class constraint is called at a type the generator
 /// builds a value of: one at `Oops` took `()`. A case
 /// `generated_programs_are_well_typed` found.

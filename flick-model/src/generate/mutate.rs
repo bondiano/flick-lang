@@ -303,6 +303,9 @@ fn rewrite(e: &Term, at: &mut usize, block: bool, g: &mut Gen, change: &mut Chan
                         rest.clone(),
                     ))
                 }
+                // written alone, its type is what chooses the dictionary in
+                // the source: changed, the source would name another one
+                _ if method(f) => a.clone(),
                 _ => go(a, false),
             };
             Term::App(f2, a)
