@@ -3,12 +3,12 @@
 //! `Async`.
 
 use crate::diagnostics::{Diagnostic, Edit, codes};
-use crate::ir::ForeignMode;
 use crate::source::Span;
 use crate::syntax::cst::{Node, foreign_words};
 use crate::types::Checker;
 use crate::types::lang::{self, Lang};
 use crate::types::ty::{Effects, Type};
+use flick_ir::ForeignMode;
 
 impl Checker<'_> {
     pub(super) fn foreign_mode(&mut self, decl: &Node, body: &Type) -> ForeignMode {

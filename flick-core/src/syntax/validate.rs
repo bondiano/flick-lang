@@ -7,7 +7,7 @@ use super::cst::{Node, Token};
 use super::kind::SyntaxKind as K;
 use crate::diagnostics::{Diagnostic, codes};
 use crate::source::{FileId, Span};
-use crate::types::lang::Lang;
+use crate::syntax::lang::Lang;
 
 pub fn check(
     tree: &Node,

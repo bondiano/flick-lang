@@ -86,6 +86,7 @@ mod watched;
 pub mod wire;
 
 use crate::numeric::NumLang;
+pub use crate::syntax::structure::Thresholds;
 pub use applicative_do::{and_keys, group_key, pure_argument};
 pub use bindings::{LetParts, let_parts, signature_name};
 use builtins::builtin_env;
@@ -158,26 +159,6 @@ impl Default for Limits {
         Limits {
             steps: 100_000,
             depth: 256,
-        }
-    }
-}
-
-/// `[lint]` thresholds: a function past one gets a warning.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Thresholds {
-    pub function_lines: u32,
-    pub nesting: u32,
-    pub complexity: u32,
-    pub params: u32,
-}
-
-impl Default for Thresholds {
-    fn default() -> Self {
-        Thresholds {
-            function_lines: 60,
-            nesting: 4,
-            complexity: 10,
-            params: 5,
         }
     }
 }

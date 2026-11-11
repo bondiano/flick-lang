@@ -8,12 +8,12 @@ use flick_ir::Shape;
 
 use super::bridge::Toward;
 use super::{Gen, names};
-use crate::build::effects::owned;
-#[cfg(not(target_arch = "wasm32"))]
-use crate::build::effects::{effect_specifier, requires_adapter, selected_on_kernel};
-#[cfg(not(target_arch = "wasm32"))]
-use crate::build::{bindings, effects::belongs_to};
 use crate::codegen::Options;
+use crate::effects::owned;
+#[cfg(not(target_arch = "wasm32"))]
+use crate::effects::{belongs_to, bindings};
+#[cfg(not(target_arch = "wasm32"))]
+use crate::effects::{effect_specifier, requires_adapter, selected_on_kernel};
 use crate::ir::Copies;
 use crate::ir::{Foreign, ForeignMode, Item, ItemKind};
 

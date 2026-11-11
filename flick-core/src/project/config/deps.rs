@@ -7,7 +7,7 @@ use std::ops;
 use serde::Deserialize;
 use toml::Spanned;
 
-use super::{Dependency, Grants, JsDependency, Package, Source};
+use super::{Dependency, Grants, Package, Source};
 use crate::diagnostics::{Diagnostic, codes};
 use crate::plugin::reach::inside;
 use crate::source::Span;
@@ -37,65 +37,6 @@ pub(super) struct RawPackage {
     hooks: Vec<String>,
     #[serde(default)]
     watch: Vec<String>,
-}
-
-/// `[js]` as written: its only table is `dependencies`.
-#[derive(Deserialize)]
-#[serde(deny_unknown_fields)]
-pub(super) struct RawJs {
-    #[serde(default)]
-    dependencies: BTreeMap<String, Spanned<String>>,
-}
-
-/// The npm packages of `[js.dependencies]`. What a fetched library writes
-/// here reaches the project's `package.json`, so an entry names a package of
-/// the registry: no path, no URL, no `workspace:` or `file:` protocol.
-pub(super) fn js_dependencies(
-    raw: Option<RawJs>,
-    span: &dyn Fn(ops::Range<usize>) -> Span,
-) -> Result<Vec<JsDependency>, Diagnostic> {
-    (raw.into_iter().flat_map(|js| js.dependencies))
-        .map(|(name, version)| {
-            let at = span(version.span());
-            let version = version.into_inner();
-            let error = |what: String| {
-                Diagnostic::error(codes::P032, format!("`[js.dependencies]`: {what}"), at)
-            };
-            if !is_npm_name(&name) {
-                return Err(error(format!("`{name}` is not the name of an npm package")));
-            }
-            if !is_registry_version(&version) {
-                return Err(error(format!(
-                    "`{name} = \"{version}\"` is not a version or range of the registry"
-                )));
-            }
-            Ok(JsDependency {
-                name,
-                version,
-                span: at,
-            })
-        })
-        .collect()
-}
-
-/// `name` or `@scope/name`, which cannot leave `node_modules`.
-fn is_npm_name(name: &str) -> bool {
-    let part = |p: &str| {
-        !p.is_empty()
-            && !p.starts_with('.')
-            && p.bytes()
-                .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'-' | b'_' | b'.' | b'~'))
-    };
-    match name.strip_prefix('@') {
-        Some(scoped) => scoped
-            .split_once('/')
-            .is_some_and(|(scope, name)| part(scope) && part(name)),
-        None => part(name),
-    }
-}
-
-fn is_registry_version(version: &str) -> bool {
-    !version.trim().is_empty() && !version.contains([':', '/', '\\'])
 }
 
 /// The dependencies of `[dependencies]`, each with one source.
@@ -331,27 +272,11 @@ pub(super) fn grants(
 
 #[cfg(test)]
 mod tests {
-    use super::{RawDependency, is_npm_name, is_registry_version, source};
+    use super::{RawDependency, source};
     use crate::project::config::Source;
 
     fn raw(text: &str) -> Result<Source, String> {
         source(toml::from_str::<RawDependency>(text).expect("valid toml"))
-    }
-
-    #[test]
-    fn a_js_dependency_names_a_package_of_the_registry() {
-        for name in ["left-pad", "@acme/left.pad", "lodash_es"] {
-            assert!(is_npm_name(name), "{name}");
-        }
-        for name in ["", "../up", "@acme", "@acme/", "a/b", ".hidden", "@a/../b"] {
-            assert!(!is_npm_name(name), "{name}");
-        }
-        for version in ["1.3.0", "^1.3.0", ">=1 <3", "1.x || 2.x", "latest"] {
-            assert!(is_registry_version(version), "{version}");
-        }
-        for version in ["", " ", "file:../x", "workspace:*", "git+ssh://x/y", "../x"] {
-            assert!(!is_registry_version(version), "{version}");
-        }
     }
 
     #[test]

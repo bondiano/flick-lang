@@ -10,7 +10,7 @@
 //! elsewhere.
 
 use super::{K, Parser, SyntaxKind};
-use crate::plugin::first_party::{BARE, DECLARATIONS, HEADS, NAMED};
+use crate::syntax::heads::{BARE, DECLARATIONS, HEADS, NAMED};
 
 /// Whether an exposed item `plugin head` starts here.
 pub(super) fn at_head(p: &Parser) -> bool {

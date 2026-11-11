@@ -1,6 +1,6 @@
 //! Runtime, foreign and Flick imports for one generated module.
 
-use crate::build::bindings;
+use crate::effects::bindings;
 use std::fmt::Write;
 
 use super::{Gen, RUNTIME, names, relative};

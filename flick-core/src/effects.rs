@@ -9,11 +9,14 @@ use crate::diagnostics::{Diagnostic, Severity, codes};
 use crate::ir::{self, ItemKind};
 use crate::types::{NO_EFFECTS, OpClass};
 
+/// The tables of the built-in modules' bindings, which the build script writes.
+pub(crate) mod bindings {
+    include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
+}
+
 /// Where a library on Effect writes its build without Effect, beside its
 /// interfaces: the modules that need no Effect, and the built-in ones they use.
 pub const CORE_DIR: &str = "_core/";
-
-use super::bindings;
 
 /// The key of a module the built-in packages bind, `flick:Trie`, which names
 /// no package of a target. `spec` may spell it as a module of the adapter's
@@ -113,7 +116,7 @@ pub fn selected_on_kernel(spec: &str, export: &str, bridge: EffectBridge) -> boo
 /// A native export that is a placeholder, rather than an implementation.
 /// Bridge policy also names working native exports, so it cannot answer this.
 #[cfg(not(target_arch = "wasm32"))]
-pub(super) fn unavailable_on_kernel(spec: &str, export: &str) -> bool {
+pub(crate) fn unavailable_on_kernel(spec: &str, export: &str) -> bool {
     (spec == bindings::NATIVE_ENTRY && bindings::STUBS.lines().any(|name| name == export))
         || bindings::UNAVAILABLE
             .lines()

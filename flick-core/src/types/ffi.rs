@@ -25,11 +25,11 @@ use super::kinds::Kind;
 use super::ty::{Stage, Type};
 use super::typing::{ForeignInfo, range};
 use crate::diagnostics::codes;
-use crate::ir::{Copies, ForeignMode};
 use crate::source::Span;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
 use crate::types::lang::{self, Lang};
+use flick_ir::{Copies, ForeignMode};
 
 /// What a foreign function keeps of its arguments.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

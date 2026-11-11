@@ -3,7 +3,7 @@
 
 use std::collections::HashSet;
 
-use crate::build::bindings;
+use crate::effects::bindings;
 use flick_pretty::{Document, DocumentArena, docvec};
 
 use super::RUNTIME_PACKAGE;

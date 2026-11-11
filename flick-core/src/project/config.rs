@@ -6,6 +6,8 @@ use std::collections::BTreeMap;
 
 use crate::codegen::Labels;
 use crate::diagnostics::Code;
+pub use crate::manifest::JsDependency;
+pub use crate::plugin::reach::Grants;
 use crate::source::Span;
 use crate::types::{self, Thresholds};
 
@@ -71,16 +73,6 @@ impl Dependency {
     }
 }
 
-/// An npm package a manifest needs at run time on the js target, under
-/// `[js.dependencies]`.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct JsDependency {
-    pub name: String,
-    /// A version or range of the registry.
-    pub version: String,
-    pub span: Span,
-}
-
 /// Where the sources of a dependency come from.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Source {
@@ -143,25 +135,6 @@ pub struct Package {
     /// of any module.
     pub watch: Vec<String>,
     pub span: Span,
-}
-
-/// What `[plugins.<package>]` lets the plugin of a package reach while it
-/// expands the project's blocks; nothing without it.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct Grants {
-    /// Paths from the project's root: a file, or a directory and what it
-    /// holds.
-    pub fs_read: Vec<String>,
-    /// Hosts it fetches from over HTTP: `db.example.com` at any port, or
-    /// `localhost:8080` at that one.
-    pub net: Vec<String>,
-    /// Variables of the environment it reads.
-    pub env: Vec<String>,
-    /// The heads of blocks and the classes, as `Cli.Value`, the project does
-    /// not let the plugin handle.
-    pub disable: Vec<String>,
-    /// Where `[plugins.<package>]` is.
-    pub span: Option<Span>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
