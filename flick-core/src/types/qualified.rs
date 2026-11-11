@@ -9,6 +9,7 @@ use crate::diagnostics::codes;
 use crate::diagnostics::suggest::closest;
 use crate::iface::{Entity, Namespace};
 use crate::source::Span;
+use crate::types::Elem;
 use crate::types::lang::{self, Lang};
 
 impl Checker<'_> {
@@ -214,7 +215,7 @@ impl Checker<'_> {
             let slot = super::classes::super_slot(&supers, index);
             let head = superclass.substitute(&subst);
             fields.push((
-                slot.clone(),
+                Elem::named(&slot),
                 super::module_contract::dictionary_type(&head)?,
             ));
             runtime_slots.push((slot.clone(), format!("${slot}")));
@@ -249,7 +250,7 @@ impl Checker<'_> {
                 }
                 ty => ty,
             };
-            fields.push((method, method_type.substitute(&subst)));
+            fields.push((Elem::Named(method), method_type.substitute(&subst)));
         }
         self.typing
             .dictionary_constructors

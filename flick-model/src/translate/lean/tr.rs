@@ -128,7 +128,7 @@ impl Tr {
                 tail: None,
                 ..
             }) => {
-                let labels: Vec<&str> = entries.iter().map(|(l, _)| l.as_str()).collect();
+                let labels: Vec<String> = entries.iter().map(|(l, _)| l.to_string()).collect();
                 let h = self.con(format!("rec_{}", labels.join("_")));
                 let fields = entries
                     .iter()

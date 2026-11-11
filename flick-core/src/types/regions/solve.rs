@@ -4,6 +4,7 @@
 //! the region's scope ends before the qualified value does, reports what it
 //! lacks.
 
+use crate::types::Elem;
 use std::{collections::HashSet, mem};
 
 use super::{Hold, Visible};
@@ -274,7 +275,7 @@ impl Checker<'_> {
     /// An inferred qualifier lacks only what its value takes out of a scope;
     /// a written one lacks what it does not allow.
     fn report_hold(&mut self, hold: &Hold, atom: &Type, bound: &Norm) {
-        let label = ty::capture_label(atom).unwrap_or_default();
+        let label = ty::capture_label(atom).unwrap_or_else(|| Elem::named(""));
         let holder = hold
             .held
             .iter()
@@ -461,13 +462,13 @@ impl Checker<'_> {
 /// What a hold shows, may hold and holds beyond what it shows.
 #[derive(Debug, PartialEq)]
 struct Summary {
-    visible: Vec<String>,
+    visible: Vec<Elem>,
     bound: Norm,
     hidden: Norm,
 }
 
 /// Upper bounds decide which side of an inferred union may retain an atom.
-fn blocked_capture_rows(summaries: &[Summary], label: &str) -> HashSet<u32> {
+fn blocked_capture_rows(summaries: &[Summary], label: &Elem) -> HashSet<u32> {
     let mut blocked = HashSet::new();
     loop {
         let mut changed = false;

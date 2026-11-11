@@ -176,7 +176,7 @@ fn add(t: &fc::Type, out: &mut Row) {
             for (label, element) in &r.entries {
                 let (_, args) = element.spine();
                 let args: Rc<[Type]> = args.into_iter().map(ty).collect();
-                out.elems.insert(Path::parse(label), args);
+                out.elems.insert(Path::parse(&label.to_string()), args);
             }
             if let Some(tail) = &r.tail {
                 add(tail, out);
@@ -234,7 +234,7 @@ fn fields(r: &fc::Row) -> Fields {
     let fields: BTreeMap<Rc<str>, Type> = r
         .entries
         .iter()
-        .map(|(l, t)| (Rc::from(l.as_str()), ty(t)))
+        .map(|(l, t)| (Rc::from(l.to_string()), ty(t)))
         .collect();
     let tail = match r.tail.as_deref() {
         Some(fc::Type::Var(v)) => Some(Var::Named(v.as_str().into())),

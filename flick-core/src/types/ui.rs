@@ -218,7 +218,7 @@ impl Checker<'_> {
             && services
                 .entries
                 .iter()
-                .map(|(l, _)| l.as_str())
+                .filter_map(|(l, _)| l.name())
                 .eq(lang::label(Lang::AtomRead))
     }
 
@@ -237,7 +237,7 @@ impl Checker<'_> {
             && services
                 .entries
                 .iter()
-                .map(|(l, _)| l.as_str())
+                .filter_map(|(l, _)| l.name())
                 .eq(["Prelude.Setup"])
     }
 

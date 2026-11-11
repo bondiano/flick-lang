@@ -3,6 +3,7 @@
 use super::Checker;
 use super::ty::Type;
 use super::unify::Mismatch;
+use crate::types::{Atom, Elem};
 mod async_place;
 mod coercions;
 
@@ -61,20 +62,22 @@ impl Checker<'_> {
     }
 
     /// Qualifiers that must be equal, as in mutable storage, differ.
-    fn capture_mismatch(&mut self, head: &str, label: &str, left: bool, span: Span) {
-        let meta = label.strip_prefix("^?").and_then(|n| n.parse().ok());
+    fn capture_mismatch(&mut self, head: &str, label: &Elem, left: bool, span: Span) {
+        let meta = match label {
+            Elem::Capture(Atom::Meta(m)) => Some(*m),
+            _ => None,
+        };
         let incomplete = meta.is_some_and(|m| {
             self.zonk(&Type::Meta(m))
                 .contains(&mut |t| matches!(t, Type::Error))
         });
         self.error_help(codes::T003, span, head, incomplete, |this| {
             // a meta label names what the meta has become since
-            let element = match meta {
-                Some(meta) => this.store.resolve(&Type::Meta(meta)),
-                None => match label.strip_prefix("^'").and_then(|n| n.parse().ok()) {
-                    Some(skolem) => Type::Skolem(skolem),
-                    None => Type::Var(label.trim_start_matches('^').to_owned()),
-                },
+            let element = match label {
+                Elem::Capture(Atom::Meta(meta)) => this.store.resolve(&Type::Meta(*meta)),
+                Elem::Capture(Atom::Skolem(skolem)) => Type::Skolem(*skolem),
+                Elem::Capture(Atom::Var(name)) => Type::Var(name.clone()),
+                other => Type::Var(other.to_string()),
             };
             let region = match element {
                 Type::Skolem(skolem) => this.store.skolem_name(skolem).to_owned(),
@@ -97,7 +100,8 @@ impl Checker<'_> {
         actual: &Type,
         expected: &Type,
     ) -> (String, String) {
-        let captures = matches!(mismatch, Mismatch::Label { label, .. } if label.starts_with('^'));
+        let captures =
+            matches!(mismatch, Mismatch::Label { label, .. } if matches!(label, Elem::Capture(_)));
         let plain = |t: &Type| uncaptured(&self.zonk(t));
         let polymorphic = |t: &Type| matches!(plain(t), Type::Forall { .. });
         let short = |t: &Type| self.show(&plain(t));
@@ -172,7 +176,7 @@ impl Checker<'_> {
         self.report_mismatch(mismatch, actual, expected, span);
         // a type that lacks only `Async` says so where it is written
         let about_async = match mismatch {
-            Mismatch::Label { label, .. } => lang::label(Lang::Async) == Some(label.as_str()),
+            Mismatch::Label { label, .. } => lang::label(Lang::Async) == label.name(),
             Mismatch::Types(..) => true,
             _ => false,
         };
@@ -221,14 +225,15 @@ impl Checker<'_> {
                     this.mismatch_hint(&a, &b, &actual, &expected)
                 });
             }
-            Mismatch::Label { label, left } if label.starts_with('^') => {
+            Mismatch::Label { label, left } if matches!(label, Elem::Capture(_)) => {
                 self.capture_mismatch(&head, label, *left, span);
             }
             Mismatch::Label { label, left } => {
                 self.error_help(codes::T003, span, &head, false, |this| {
                     // in a nested record literal, the record that lacks or has the field
                     let path = this.field_path.join(".");
-                    match (label.rsplit_once('.'), *left) {
+                    let name = label.name().unwrap_or_default();
+                    match (name.rsplit_once('.'), *left) {
                         (Some((_, name)), true) => format!(
                             "`{name}` is in the row, which the expected type does not allow"
                         ),

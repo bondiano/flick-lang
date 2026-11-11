@@ -4,6 +4,7 @@ use crate::iface::Interface;
 use crate::source::SourceMap;
 use crate::types::display::show_type_qualified;
 use crate::types::{self, Watched, show_signature, show_type};
+use crate::types::{Atom, Elem};
 use crate::{resolve, syntax};
 
 use super::{row_atoms, short_form};
@@ -165,7 +166,7 @@ fn normal_row(row: &Type) -> Type {
             Type::Row(Row {
                 entries: atoms
                     .into_iter()
-                    .map(|a| (format!("^{a}"), Type::Var(a)))
+                    .map(|a| (Elem::Capture(Atom::Var(a.clone())), Type::Var(a)))
                     .collect(),
                 ..Row::default()
             })

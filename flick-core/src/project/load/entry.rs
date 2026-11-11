@@ -56,7 +56,7 @@ pub fn main_kind(t: &Type) -> Result<MainKind, String> {
         Type::Var(_) => {}
         // the scheduler of every runner handles `Async`
         Type::Row(row)
-            if (row.entries.iter()).all(|(l, _)| lang::label(Lang::Async) == Some(l.as_str())) => {}
+            if (row.entries.iter()).all(|(l, _)| lang::label(Lang::Async) == l.name()) => {}
         _ => {
             return Err(format!(
                 "entry `main` needs `{}`, which no runner provides; provide it inside `main`",

@@ -6,6 +6,7 @@ use crate::diagnostics::codes;
 use crate::source::{FileId, Span};
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
+use crate::types::Elem;
 use crate::types::env::Form;
 use crate::types::kinds::Kind;
 use crate::types::lang::{self, Lang};
@@ -164,7 +165,7 @@ impl Checker<'_> {
         kind
     }
 
-    pub(super) fn element_label(&mut self, ty: &Type, kind: &Kind, node: &Node) -> Option<String> {
+    pub(super) fn element_label(&mut self, ty: &Type, kind: &Kind, node: &Node) -> Option<Elem> {
         let (head, _) = ty.spine();
         match head {
             Type::Con { module, name } => {
@@ -183,13 +184,13 @@ impl Checker<'_> {
                     );
                     return None;
                 }
-                Some(format!("{module}.{name}"))
+                Some(Elem::Named(format!("{module}.{name}")))
             }
             _ if *kind == Kind::CaptureRow => ty::capture_label(ty),
             _ if *kind == Kind::ErrorRow => ty::error_label(ty),
             _ if *kind == Kind::ServiceRow => ty::service_label(ty),
-            Type::Var(name) => Some(name.clone()),
-            Type::Skolem(s) => Some(self.store.skolem_name(*s).to_owned()),
+            Type::Var(name) => Some(Elem::named(name)),
+            Type::Skolem(s) => Some(Elem::named(self.store.skolem_name(*s))),
             _ => None,
         }
     }
@@ -207,7 +208,7 @@ impl Checker<'_> {
     }
 
     pub(super) fn record_type(&mut self, node: &Node, free: Free) -> Row {
-        let mut entries: Vec<(String, Type)> = Vec::new();
+        let mut entries: Vec<(Elem, Type)> = Vec::new();
         let mut tail = None;
         for child in node.nodes() {
             match child.kind {
@@ -223,7 +224,7 @@ impl Checker<'_> {
                     if entries.iter().any(|(l, _)| *l == label_text) {
                         self.duplicate_label(&label_text, self.token_span(label));
                     } else {
-                        entries.push((label_text, ty));
+                        entries.push((Elem::Named(label_text), ty));
                     }
                 }
                 K::RowTail => {

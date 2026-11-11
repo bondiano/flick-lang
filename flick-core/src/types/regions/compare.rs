@@ -1,5 +1,6 @@
 //! Capture-qualified type equality and value subsumption.
 
+use crate::types::{Atom, Elem};
 use std::mem;
 
 use super::{Hold, Visible, capture_mismatch};
@@ -65,8 +66,11 @@ impl Checker<'_> {
     }
 
     /// Whether `label` is the captures `^?m` of a type not inferred yet.
-    fn uninferred(&self, label: &str) -> bool {
-        let meta = label.strip_prefix("^?").and_then(|m| m.parse().ok());
+    fn uninferred(&self, label: &Elem) -> bool {
+        let meta = match label {
+            Elem::Capture(Atom::Meta(m)) => Some(*m),
+            _ => None,
+        };
         meta.is_some_and(|m| {
             !self.store.is_capture_row(m)
                 && matches!(self.store.resolve(&Type::Meta(m)), Type::Meta(_))
@@ -81,13 +85,13 @@ impl Checker<'_> {
         if norm
             .entries
             .iter()
-            .all(|(label, t)| !label.starts_with('^') || atom(t))
+            .all(|(label, t)| !matches!(label, Elem::Capture(_)) || atom(t))
         {
             return row.clone();
         }
         let mut out = Norm::default();
         for (label, t) in norm.entries {
-            if !label.starts_with('^') || atom(&t) {
+            if !matches!(label, Elem::Capture(_)) || atom(&t) {
                 out.entries.push((label, t));
                 continue;
             }

@@ -1,6 +1,7 @@
 //! Patterns: their types, the names they bind, and their shape for the
 //! exhaustiveness check.
 
+use crate::types::Elem;
 use std::{iter, mem};
 
 use super::gadt::scheme::dicts;
@@ -259,9 +260,9 @@ impl Checker<'_> {
         let rest = self.fresh();
         let shape = Type::Record(Row {
             entries: {
-                let mut entries: Vec<(String, Type)> = fields
+                let mut entries: Vec<(Elem, Type)> = fields
                     .iter()
-                    .map(|(l, t, _)| (l.clone(), t.clone()))
+                    .map(|(l, t, _)| (Elem::named(l), t.clone()))
                     .collect();
                 entries.sort_by(|a, b| a.0.cmp(&b.0));
                 entries

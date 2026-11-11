@@ -7,12 +7,13 @@ use crate::source::Span;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
 use crate::types::Checker;
+use crate::types::Elem;
 use crate::types::kinds::Kind;
 use crate::types::ty::{Norm, Type};
 
 /// An element `-` takes out.
 pub(super) struct Gone {
-    label: String,
+    label: Elem,
     ty: Type,
     span: Span,
 }
@@ -95,7 +96,7 @@ impl Checker<'_> {
     }
 
     /// `row` without what is `gone`, which it must hold; its tail stays as it is.
-    pub(super) fn without(&mut self, row: Type, gone: Vec<Gone>, named: &[String]) -> Type {
+    pub(super) fn without(&mut self, row: Type, gone: Vec<Gone>, named: &[Elem]) -> Type {
         if gone.is_empty() {
             return row;
         }

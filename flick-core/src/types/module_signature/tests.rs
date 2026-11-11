@@ -1,5 +1,6 @@
 use super::*;
 use crate::iface::{read, write};
+use crate::types::{Atom, Elem};
 
 #[test]
 fn symbolic_interfaces_keep_manifest_aliases_as_bounded_witness_references() {
@@ -148,14 +149,20 @@ fn inferred_rows_distinguish_local_errors_services_and_reexported_identities() {
         };
         assert_eq!(
             errors.entries,
-            vec![("~Failure".into(), Type::Var("Failure".into()))]
+            vec![(
+                Elem::Error(Atom::Var("Failure".into())),
+                Type::Var("Failure".into())
+            )]
         );
         assert_eq!(
             services.entries,
             if imported {
                 vec![("External.Clock".into(), Type::con("External", "Clock"))]
             } else {
-                vec![("@Clock".into(), Type::Var("Clock".into()))]
+                vec![(
+                    Elem::Service(Atom::Var("Clock".into())),
+                    Type::Var("Clock".into()),
+                )]
             }
         );
     }
@@ -209,7 +216,7 @@ fn nominal_row_source(owner: &str) -> Interface {
             param: Box::new(Type::con("Prelude", "Unit")),
             effects: Some(Box::new(Effects::new(
                 Type::Row(Row::closed(vec![(
-                    format!("{owner}.Clock"),
+                    Elem::Named(format!("{owner}.Clock")),
                     Type::con(owner, "Clock"),
                 )])),
                 Type::Row(Row::closed(vec![(

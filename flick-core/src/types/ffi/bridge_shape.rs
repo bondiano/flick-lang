@@ -72,7 +72,7 @@ impl Checker<'_> {
                 let fields: Vec<(String, Shape)> = row
                     .entries
                     .iter()
-                    .map(|(name, field)| (name.clone(), self.shape(field, depth + 1)))
+                    .map(|(name, field)| (name.to_string(), self.shape(field, depth + 1)))
                     .collect();
                 if fields.iter().all(|(_, field)| field.is_data()) {
                     Shape::Data

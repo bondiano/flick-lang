@@ -1,5 +1,6 @@
 use super::*;
 use crate::source::SourceMap;
+use crate::types::{Atom, Elem};
 use std::slice;
 
 use crate::{resolve, syntax, types};
@@ -144,7 +145,7 @@ fn canonical_service_atoms_follow_alpha_renaming() {
             Type::con("Prelude", "Eff"),
             [
                 Type::Row(Row::closed(vec![(
-                    format!("@{name}"),
+                    Elem::Service(Atom::Var(name.into())),
                     Type::Var(name.into()),
                 )])),
                 Type::empty_row(),

@@ -18,11 +18,12 @@ use crate::diagnostics::codes;
 use crate::source::Span;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
+use crate::types::Elem;
 
 /// An effect a handler has arms for.
 pub struct Handled {
     /// `M.E`, its label in a row.
-    pub label: String,
+    pub label: Elem,
     /// `E ā`, its entry in a row, the parameters as the arms see them.
     pub entry: Type,
     /// The number of parameters of the effect.
@@ -162,7 +163,7 @@ impl Checker<'_> {
             let args: Vec<Type> = (0..params.len()).map(|_| self.fresh()).collect();
             handled.push(Handled {
                 entry: Type::apps(Type::con(&entity.module, &entity.name), args),
-                label,
+                label: Elem::Named(label),
                 params: params.len(),
                 operations,
                 covered: Vec::new(),

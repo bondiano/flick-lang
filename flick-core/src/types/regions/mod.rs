@@ -21,8 +21,8 @@ mod scopes;
 mod solve;
 mod unfold;
 
-pub use live::{LIVE, has_live, strip_live};
-pub use provided::{PROVIDED, Provide};
+pub use live::{has_live, strip_live};
+pub use provided::Provide;
 pub use solve::Outlives;
 pub(in crate::types) use unfold::{AliasKey, Unfold, leave_alias};
 
@@ -34,6 +34,7 @@ use super::unify::Mismatch;
 use crate::diagnostics;
 use crate::diagnostics::codes;
 use crate::source::Span;
+use crate::types::Elem;
 use crate::types::lang::{self, Lang};
 
 /// The service a `scope` provides to the operations that acquire resources.
@@ -59,7 +60,7 @@ pub struct State {
     pub provided_late: Vec<provided::Want>,
     /// A `provide` compared with an owner not known yet: its scope, the
     /// owner, the service and where.
-    pub late_owners: Vec<(usize, Type, String, Span)>,
+    pub late_owners: Vec<(usize, Type, Elem, Span)>,
     /// The locals used so far, by index into `Checker::locals`.
     pub uses: Vec<usize>,
     pub outlives: Vec<solve::Outlives>,
@@ -140,7 +141,7 @@ pub enum Visible {
     Refined(Type),
     /// Those of an expected type as written, before the value's type is
     /// unified into it: `a^c` shows nothing of what `a` stands for.
-    Now(Vec<String>),
+    Now(Vec<Elem>),
 }
 
 /// What a value holds must fit the qualifier `bound`.
@@ -348,7 +349,7 @@ impl Checker<'_> {
     ) {
         let norm = self.store.normalize(row);
         for (label, t) in &norm.entries {
-            if label.starts_with('^') {
+            if matches!(label, Elem::Capture(_)) {
                 match self.store.resolve(t) {
                     // an error-row variable or unknown, held as an atom, may
                     // have become a row of errors
@@ -520,7 +521,9 @@ impl Checker<'_> {
     /// error, as a capture row labels each of its entries `^…`, or a row
     /// variable of it stands for errors, as in a row with no error yet.
     fn of_errors(&self, row: &Norm) -> bool {
-        row.entries.iter().any(|(label, _)| !label.starts_with('^'))
+        row.entries
+            .iter()
+            .any(|(label, _)| !matches!(label, Elem::Capture(_)))
             || row
                 .tails
                 .iter()
@@ -555,7 +558,7 @@ impl Checker<'_> {
 
     /// What a type shows its values may hold: exactly what they may reach, so
     /// a region a type mentions where no value keeps it hides no capture.
-    pub fn shown_by(&self, t: &Type) -> Vec<String> {
+    pub fn shown_by(&self, t: &Type) -> Vec<Elem> {
         self.captures_of(t)
             .entries
             .into_iter()
@@ -838,7 +841,7 @@ fn qualify(t: Type, held: Type) -> Type {
 /// Whether types differ only in what they capture: the hold, not the type,
 /// says what escapes.
 fn capture_mismatch(mismatch: &Mismatch) -> bool {
-    matches!(mismatch, Mismatch::Label { label, .. } if label.starts_with('^'))
+    matches!(mismatch, Mismatch::Label { label, .. } if matches!(label, Elem::Capture(_)))
 }
 
 fn push_atom(out: &mut Norm, t: &Type) {
