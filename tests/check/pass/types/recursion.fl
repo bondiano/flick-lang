@@ -1,5 +1,14 @@
 // Recursion is explicit; polymorphic recursion needs a full `forall`.
-module App.Recursion exposing (depth, countdown, is_even, sum, even_len, first_even, nested_depth)
+module App.Recursion exposing (
+  depth,
+  countdown,
+  is_even,
+  sum,
+  even_len,
+  first_even,
+  nested_depth,
+  applied,
+)
 
 type Nested a = Flat a | Nest (Nested (List a))
 
@@ -70,3 +79,7 @@ let nested_depth value =
     | Flat _ -> acc
     | Nest inner -> go inner (acc + 1)
   go value 0
+
+// a callback that keeps its captures `^c` is passed on at its own type
+applied : (Float -> Float)^c -> Float -> Float
+let rec applied f n = if n <= 0 then 0 else f n + applied f (n - 1)
