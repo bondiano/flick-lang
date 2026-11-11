@@ -2,7 +2,6 @@
 //! across modules. Backends and build validation share this graph, so a
 //! built-in module may hold bindings a program never uses.
 
-#[cfg(any(not(target_arch = "wasm32"), feature = "native-project"))]
 use std::collections::HashMap;
 #[cfg(feature = "native-project")]
 use std::collections::HashSet;
@@ -36,60 +35,25 @@ pub fn defined(item: &Item) -> Vec<String> {
 
 /// The top-level names `item` refers to.
 pub fn uses(item: &Item, out: &mut Vec<Key>) {
-    match &item.kind {
-        ItemKind::Value { body, .. } | ItemKind::Destructure { body, .. } => expr_uses(body, out),
-        ItemKind::Instance { info, methods } => {
-            for (_, d) in &info.supers {
-                dict_uses(d, out);
-            }
-            if let Some((fields, _)) = &info.derived {
-                for d in fields {
-                    dict_uses(d, out);
-                }
-            }
-            for (_, m) in methods {
-                expr_uses(m, out);
-            }
-            let (module, class) = &info.class;
-            for (name, _, extra) in &info.defaults {
-                out.push((module.clone(), default_method(class, name)));
-                for d in extra {
-                    dict_uses(d, out);
-                }
-            }
+    item.each_body(&mut |e| expr_uses(e, out));
+    if let ItemKind::Instance { info, .. } = &item.kind {
+        let derived = info.derived.iter().flat_map(|(fields, _)| fields);
+        let extra = info.defaults.iter().flat_map(|(_, _, extra)| extra);
+        for d in (info.supers.iter().map(|(_, d)| d))
+            .chain(derived)
+            .chain(extra)
+        {
+            dict_uses(d, out);
         }
-        ItemKind::Foreign(f) => {
-            if let Some(c) = &f.catch {
-                expr_uses(c, out);
-            }
+        let (module, class) = &info.class;
+        for (name, _, _) in &info.defaults {
+            out.push((module.clone(), default_method(class, name)));
         }
-        ItemKind::Refined { check, .. } => expr_uses(check, out),
-        ItemKind::Constructor(_) | ItemKind::Service { .. } => {}
     }
 }
 
 pub fn dict_uses(d: &Dict, out: &mut Vec<Key>) {
-    match d {
-        Dict::Instance { module, name, args } => {
-            out.push((module.clone(), name.clone()));
-            for a in args {
-                dict_uses(a, out);
-            }
-        }
-        Dict::Value { module, name } => out.push((module.clone(), name.clone())),
-        Dict::Super { dict, .. } => dict_uses(dict, out),
-        Dict::Structural { fields, .. } => {
-            for f in fields {
-                dict_uses(f, out);
-            }
-        }
-        Dict::Opened { .. }
-        | Dict::Given(_)
-        | Dict::Field(_)
-        | Dict::Primitive { .. }
-        | Dict::Site { .. }
-        | Dict::Error => {}
-    }
+    d.each_global(&mut |_, module, name| out.push((module.to_owned(), name.to_owned())));
 }
 
 fn expr_uses(e: &Expr, out: &mut Vec<Key>) {

@@ -343,6 +343,8 @@ and require the last file to fail with `FLICK-T003`.
 
 ## Higher-order module signatures
 
+Static expansion compares the active template and its module arguments, so a finite higher-order callback may revisit a template with different arguments. Repeating the same active application reports `FLICK-R006`. Expansion also stops at 64 active applications with `FLICK-R006`, including recursive definitions that keep producing fresh arguments. This is a compiler resource bound, not a termination proof.
+
 Public functors declare their result signature (`FLICK-T067`). Private and local
 functors may infer it. A public alias may inherit an explicitly advertised
 signature or add an ascription. An optional `exposing` list must agree with

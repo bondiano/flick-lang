@@ -41,3 +41,32 @@ fn finish(
         imports: Vec::new(),
     }
 }
+
+/// Statements as the lines of a block, indented one level.
+fn indent(stmts: &[String]) -> String {
+    let mut out = String::new();
+    for stmt in stmts {
+        for line in stmt.lines() {
+            out.push_str("  ");
+            out.push_str(line);
+            out.push('\n');
+        }
+    }
+    out
+}
+
+/// A top-level `value` that is a call or an immediately run arrow, marked
+/// `/*#__PURE__*/`: top-level initialization is pure (spec 11), so a bundler
+/// may drop it when nothing uses it.
+fn pure(value: &str) -> String {
+    // a call starts with the marker of its span
+    let code = expr::unmarked(value);
+    let rest =
+        code.trim_start_matches(|c: char| c.is_alphanumeric() || c == '_' || c == '$' || c == '.');
+    let call = rest.len() < code.len() && rest.starts_with('(');
+    if call || code.starts_with("((") {
+        format!("/*#__PURE__*/ {value}")
+    } else {
+        value.to_owned()
+    }
+}

@@ -3,6 +3,7 @@
 use std::fmt::Debug;
 use std::rc::Rc;
 
+use super::trace::key;
 use super::{Checker, TypeError};
 use crate::decls::Decls;
 use crate::syntax::{Arm, Con, Const, Lit, Pat, Path, Prim, Term};
@@ -240,6 +241,40 @@ fn let_sig_rule() {
         ))),
         "Let-Sig",
     );
+}
+
+/// An opaque alias that names itself, `opaque type alias Stream = Option
+/// (Float, Stream)`, inside its module: two of it are equal by their
+/// arguments, and zonking a type does not unfold it. Its source makes
+/// flick-core overflow its stack as well, so the case is the model's alone.
+#[test]
+fn a_recursive_opaque_alias_is_checked() {
+    let mut d = decls();
+    let stream = Type::con(T, "Stream");
+    let tuple = Type::Tuple(Rc::from([ty("Float"), stream.clone()]));
+    d.opaque.insert(
+        Path::new(T, "Stream"),
+        (Vec::new(), Type::app(ty("Option"), tuple)),
+    );
+    let mut c = Checker::new(&d);
+    c.module = T.into();
+    let id = mono(Type::fun(stream.clone(), Stage::Pure, stream));
+    let checked = c.check_top(&Term::lam("s", var("s")), &id);
+    assert!(checked.is_ok(), "{checked:?}");
+}
+
+/// A field of a constructor applied by (App) is typed where it stands: the
+/// trace a certificate reads has its node.
+#[test]
+fn the_fields_of_a_constructor_are_traced() {
+    let e = b_err();
+    let Term::App(_, field) = &e else {
+        unreachable!("a call")
+    };
+    let trace = Checker::new(&decls())
+        .check_top_traced(&e, &mono(Type::con(T, "B")))
+        .expect("`B \"x\"` is a `B`");
+    assert!(trace.contains_key(&key(field)), "the field has no node");
 }
 
 #[test]

@@ -67,4 +67,4 @@ let main () =
   Platform.stdout_line (show (args == Platform.args ()))
   let draw = fun () -> Random.with_seed 7 (task { provide Host.random { Host.Random.next () } })
   Platform.stdout_line (show (draw () == draw ()))
-  provide Host.console { Host.Console.stdout_line "live output" }
+  provide Host.live { Host.Console.stdout_line "live output" }

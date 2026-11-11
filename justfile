@@ -41,9 +41,18 @@ unit:
 model:
     cargo test -p flick-model -- --include-ignored
 
-# Regenerate formal/Formal/Elab/PreludeSchemes.lean from the checker's Prelude
+# Regenerate formal/Formal/Elab/PreludeSchemes.lean and formal/Formal/Live/ElideSchemes.lean from the checker's Prelude
 formal-schemes:
     FLICK_FORMAL_SCHEMES=1 cargo test -p flick-model --lib translate::lean
+
+# Regenerate formal/FormalCert/GenSig.lean and the golden certificates from the model
+formal-certs:
+    FLICK_FORMAL_CERTS=1 cargo test -p flick-model --test certs the_certificates_are_fresh
+
+# Certify a run of generated programs and check the certificates with Lean
+model-certs:
+    cargo test -p flick-model --test certs -- --ignored
+    cd formal && lake build --wfail && lake env lean ../target/certs/Batch.lean
 
 # Check each capability independently, without workspace feature unification
 feature-check:

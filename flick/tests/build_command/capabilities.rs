@@ -12,6 +12,25 @@ let main () =
 "#;
 
 #[test]
+fn rt_checks_initializers_captured_by_a_static_module_closure() {
+    let source = "module App.Main exposing (main)\n\nzone : DateTime.TimeZone\nlet zone = DateTime.zone_make_offset 0\n\nprivate module Make(K : Input) =\n  value : DateTime.TimeZone\n  let value = zone\n\ntype module Input =\n  identity : a -> a\n\nmodule Chosen = Make(Prelude)\n\nmain : Unit -> Unit\nlet main () = ignore Chosen.value\n";
+    let app = project(
+        "capabilities/lexical_initializer",
+        &[("flick.toml", APP), ("src/App/Main.fl", source)],
+    );
+    for profile in ["debug", "release"] {
+        let out = flick_in(&app, &["build", "--offline", "--profile", profile]);
+        assert_eq!(out.status.code(), Some(1), "{profile}: {out:?}");
+        let stderr = String::from_utf8(out.stderr).expect("UTF-8 diagnostics");
+        assert!(
+            stderr.contains("FLICK-P012") && stderr.contains("DateTime.zone_make_offset"),
+            "{stderr}"
+        );
+        assert!(!app.join("dist/flick-main.js").exists());
+    }
+}
+
+#[test]
 fn rt_checks_the_selected_custom_runner() {
     let config = APP.replace(
         "entry = \"App.Main\"",
@@ -212,4 +231,94 @@ fn changing_the_adapter_dependency_invalidates_the_cached_build() {
     fs::write(app.join("package.json"), with_adapter).expect("restore adapter dependency");
     let restored = flick_in(&app, &["build", "--offline"]);
     assert_eq!(restored.status.code(), Some(0), "{restored:?}");
+}
+
+#[test]
+fn reexported_modules_contribute_their_eager_initializers() {
+    let app = project(
+        "capabilities/eager_reexport",
+        &[
+            ("flick.toml", APP),
+            (
+                "src/App/Main.fl",
+                "module App.Main exposing (main, value)\nimport App.Other exposing (value)\nmain : Unit ->{} Unit\nlet main () = ()\n",
+            ),
+            (
+                "src/App/Other.fl",
+                "module App.Other exposing (value)\nlet zone = DateTime.zone_make_offset 0\nvalue : Int\nlet value = 1\n",
+            ),
+        ],
+    );
+    for profile in ["debug", "release"] {
+        let out = flick_in(&app, &["build", "--offline", "--profile", profile]);
+        assert_eq!(out.status.code(), Some(1), "{out:?}");
+        let stderr = String::from_utf8_lossy(&out.stderr);
+        assert!(
+            stderr.contains("FLICK-P012") && stderr.contains("DateTime.zone_make_offset"),
+            "{stderr}"
+        );
+        assert!(!app.join("dist/flick-main.js").exists());
+    }
+}
+
+#[test]
+#[ignore = "needs Node and pnpm install"]
+fn supported_native_members_emit_typechecking_typescript() {
+    use std::path::Path;
+    use std::process::Command;
+    let app = project(
+        "capabilities/mixed_typescript",
+        &[
+            ("flick.toml", APP),
+            ("package.json", "{\"type\":\"module\"}"),
+            (
+                "src/App/Main.fl",
+                "module App.Main exposing (main, Generator)\nservice Generator =\n  value : Unit ->{} Unit\nmain : Unit ->{} Unit\nlet main () = ignore (DateTime.now ())\n",
+            ),
+        ],
+    );
+    for profile in ["debug", "release"] {
+        let out = flick_in(
+            &app,
+            &["build", "--offline", "--emit", "ts", "--profile", profile],
+        );
+        assert!(out.status.success(), "{out:?}");
+        let checked =
+            Command::new(Path::new(env!("CARGO_MANIFEST_DIR")).join("../node_modules/.bin/tsc"))
+                .args([
+                    "--noEmit",
+                    "--allowImportingTsExtensions",
+                    "--skipLibCheck",
+                    "--target",
+                    "ES2024",
+                    "--module",
+                    "nodenext",
+                ])
+                .arg(app.join("dist/flick-main.ts"))
+                .output()
+                .expect("tsc runs");
+        assert!(checked.status.success(), "{profile}: {checked:?}");
+    }
+}
+
+#[test]
+fn a_reexported_main_still_initializes_its_declaring_entry_module() {
+    let app = project(
+        "capabilities/entry_eager_reexport",
+        &[
+            ("flick.toml", APP),
+            (
+                "src/App/Main.fl",
+                "module App.Main exposing (main)\nimport App.Program exposing (main)\nlet _ = DateTime.zone_make_offset 0\n",
+            ),
+            (
+                "src/App/Program.fl",
+                "module App.Program exposing (main)\nmain : Unit ->{} Unit\nlet main () = ()\n",
+            ),
+        ],
+    );
+    let out = flick_in(&app, &["build", "--offline"]);
+    assert_eq!(out.status.code(), Some(1), "{out:?}");
+    assert!(String::from_utf8_lossy(&out.stderr).contains("FLICK-P012"));
+    assert!(!app.join("dist/flick-main.js").exists());
 }

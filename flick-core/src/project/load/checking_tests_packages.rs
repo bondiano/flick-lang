@@ -34,6 +34,7 @@ fn hom_package_templates_survive_serialization_and_missing_sources() {
         &roots,
         Some(&empty),
         false,
+        None,
     );
     assert!(diagnostics.is_empty(), "{diagnostics:?}");
     let saved: BTreeMap<_, Vec<CachedModule>> = fresh
@@ -65,6 +66,7 @@ fn hom_package_templates_survive_serialization_and_missing_sources() {
         &roots,
         Some(&cache),
         false,
+        None,
     );
     assert!(diagnostics.is_empty(), "{diagnostics:?}");
     let chosen = compilation
@@ -117,6 +119,7 @@ fn hom_save_package(
         &[PathBuf::from("/p/src/App/Root.fl")],
         Some(&empty),
         false,
+        None,
     );
     assert!(diagnostics.is_empty(), "{diagnostics:?}");
     fresh
@@ -163,6 +166,7 @@ fn hom_package_private_implementation_access_stays_lexical() {
         slice::from_ref(&root),
         Some(&cache),
         false,
+        None,
     );
     assert!(diagnostics.is_empty(), "{diagnostics:?}");
     host.0.insert(
@@ -176,6 +180,7 @@ fn hom_package_private_implementation_access_stays_lexical() {
         &[root],
         Some(&cache),
         false,
+        None,
     );
     assert!(
         diagnostics.iter().any(|d| d.code == codes::R017),
@@ -207,6 +212,7 @@ fn hom_package_templates_detect_modified_immutable_sources() {
         &[PathBuf::from("/p/src/App/Root.fl")],
         Some(&cache),
         false,
+        None,
     );
     assert!(
         diagnostics.iter().any(|d| d.code == codes::P034),

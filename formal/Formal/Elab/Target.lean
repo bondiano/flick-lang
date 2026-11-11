@@ -99,7 +99,7 @@ structure Target (P : Prog) where
     Has Γ Δ (.var x) (.mono (t.subst (inst us))) φ
   /-- (App); a pure arrow applies at any stage, a runtime one where its qualifier is live -/
   app : ∀ {Γ Δ f x a b q ψ φ}, Has Γ Δ f (.mono (.arr ψ a b q)) φ → Has Γ Δ x (.mono a) φ →
-    (ψ = .P ∨ ψ = φ ∧ φ.Keeps q) → Has Γ Δ (.app f x) (.mono b) φ
+    ψ.Applies φ q → Has Γ Δ (.app f x) (.mono b) φ
   ite : ∀ {Γ Δ c a b t φ}, Has Γ Δ c (.mono boolTy) φ → Has Γ Δ a (.mono t) φ →
     Has Γ Δ b (.mono t) φ → Has Γ Δ (.ite c a b) (.mono t) φ
   caseOpt : ∀ {Γ Δ e n s a t φ}, Has Γ Δ e (.mono (optTy a)) φ → Has Γ Δ n (.mono t) φ →

@@ -29,8 +29,6 @@ impl Checker<'_> {
                 d.with_fix(|| (detail, Vec::new()))
             }
         };
-        #[cfg(not(feature = "diagnostic-fixes"))]
-        let _ = detail;
         self.diagnostic(d);
     }
 

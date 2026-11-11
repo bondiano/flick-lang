@@ -8,6 +8,8 @@ use std::fmt::Write;
 use std::ptr;
 
 use crate::iface::{Decl, Export, Interface, Namespace};
+use crate::source::FileId;
+use crate::syntax;
 use crate::syntax::cst::{Element, Node};
 use crate::syntax::kind::SyntaxKind as K;
 use crate::types::{Form, ModuleNominalKind, ModuleRequirement, show_signature, show_type};
@@ -134,6 +136,16 @@ fn declared(line: &str) -> Option<String> {
 /// The page of `interface`, its comments from `text`.
 pub fn page(interface: &Interface, text: &str) -> String {
     let docs = comments(text);
+    let parsed = syntax::parse(text, FileId::new(0));
+    let contracts: HashMap<_, _> = parsed
+        .tree
+        .nodes()
+        .filter(|node| node.kind == K::ModuleTypeDecl)
+        .filter_map(|node| {
+            let name = node.child_tokens().find(|token| token.kind == K::Con)?;
+            Some((name.text(text), node.text(text)))
+        })
+        .collect();
     let mut out = format!("# {}\n", interface.module);
     let doc = |name: &str, out: &mut String| {
         if let Some(d) = docs.get(name) {
@@ -154,7 +166,16 @@ pub fn page(interface: &Interface, text: &str) -> String {
         doc(name, &mut out);
         if let Some(def) = &e.definition {
             let _ = writeln!(out, "\nKind: `{}`", def.kind);
-            definition(interface, e, &def.form, &mut out);
+            if matches!(
+                def.form,
+                Form::ModuleContract { .. } | Form::ModuleSignature { .. }
+            ) && e.entity.module == interface.module
+                && let Some(declaration) = contracts.get(name.as_str())
+            {
+                let _ = writeln!(out, "\n```flick\n{declaration}\n```");
+            } else {
+                definition(interface, e, &def.form, &mut out);
+            }
         }
     }
     let values: Vec<&Export> = interface
@@ -197,6 +218,20 @@ pub fn page(interface: &Interface, text: &str) -> String {
 }
 
 fn module_contract(name: &str, requirements: &[ModuleRequirement], out: &mut String) {
+    if requirements
+        .iter()
+        .any(|r| matches!(r, ModuleRequirement::Module { .. }))
+    {
+        let signature = crate::types::ModuleSignature::Structure {
+            requirements: requirements.to_vec(),
+        };
+        let _ = writeln!(
+            out,
+            "\nExpanded module contract:\n\n```text\n{name} : {}\n```",
+            signature.display()
+        );
+        return;
+    }
     let mut lines = Vec::new();
     for requirement in requirements {
         lines.push(match requirement {
@@ -294,7 +329,7 @@ fn definition(interface: &Interface, e: &Export, form: &Form, out: &mut String) 
         Form::ModuleSignature { signature } => {
             let _ = writeln!(
                 out,
-                "\n```flick\ntype module {name} = {}\n```",
+                "\nExpanded module signature:\n\n```text\n{name} : {}\n```",
                 signature.display()
             );
         }
@@ -397,5 +432,28 @@ mod tests {
         assert_eq!(docs.get("made").map(String::as_str), Some("Made."));
         let docs = comments("/// Contract.\ntype module HashKey =\n  type Key\n");
         assert_eq!(docs.get("HashKey").map(String::as_str), Some("Contract."));
+    }
+}
+
+#[cfg(test)]
+mod module_signature_tests {
+    #[test]
+    fn module_signature_documentation_preserves_valid_source_declarations() {
+        let source = "module App.Contracts exposing (..)\ntype module Input =\n  seed : Int\ntype module Output =\n  answer : Int\ntype module Factory = (K : Input) -> Output\ntype module Namespace =\n  module Make : Factory\n";
+        let (_, interface) = crate::ir::tests::check_text("App.Contracts", source).expect("checks");
+        let page = super::page(&interface, source);
+        assert!(
+            page.contains("type module Factory = (K : Input) -> Output"),
+            "{page}"
+        );
+        for block in page.split("```flick\n").skip(1) {
+            let code = block.split("```").next().expect("code fence");
+            let parsed = crate::syntax::parse(code, crate::source::FileId::new(0));
+            assert!(
+                parsed.diagnostics.is_empty(),
+                "{code}: {:?}",
+                parsed.diagnostics
+            );
+        }
     }
 }

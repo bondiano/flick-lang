@@ -343,6 +343,25 @@ impl Gen<'_> {
         format!("({}): any =>", typed.join(", "))
     }
 
+    /// Native generators have the same internal `any` convention as arrows.
+    /// Their public contracts are projected independently from checked Flick types.
+    fn generator_function(&self, params: &str, stmts: &[String]) -> String {
+        let (params, returns) = if self.options.typescript() {
+            (
+                params
+                    .split(", ")
+                    .filter(|p| !p.is_empty())
+                    .map(|p| format!("{p}: any"))
+                    .collect::<Vec<_>>()
+                    .join(", "),
+                ": globalThis.Generator<any, any, any>",
+            )
+        } else {
+            (params.to_owned(), "")
+        };
+        format!("function* ({params}){returns} {{\n{}}}", indent(stmts))
+    }
+
     /// `const name = value;`, `any` in TypeScript.
     fn constant(&self, name: &str, value: &str) -> String {
         let ty = if self.options.typescript() {
@@ -498,35 +517,6 @@ impl Gen<'_> {
         let saved = mem::take(&mut self.buf);
         let result = f(self);
         (mem::replace(&mut self.buf, saved), result)
-    }
-}
-
-/// Statements as the lines of a block, indented one level.
-fn indent(stmts: &[String]) -> String {
-    let mut out = String::new();
-    for stmt in stmts {
-        for line in stmt.lines() {
-            out.push_str("  ");
-            out.push_str(line);
-            out.push('\n');
-        }
-    }
-    out
-}
-
-/// A top-level `value` that is a call or an immediately run arrow, marked
-/// `/*#__PURE__*/`: top-level initialization is pure (spec 11), so a bundler
-/// may drop it when nothing uses it.
-fn pure(value: &str) -> String {
-    // a call starts with the marker of its span
-    let code = expr::unmarked(value);
-    let rest =
-        code.trim_start_matches(|c: char| c.is_alphanumeric() || c == '_' || c == '$' || c == '.');
-    let call = rest.len() < code.len() && rest.starts_with('(');
-    if call || code.starts_with("((") {
-        format!("/*#__PURE__*/ {value}")
-    } else {
-        value.to_owned()
     }
 }
 

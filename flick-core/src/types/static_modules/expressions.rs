@@ -105,9 +105,8 @@ impl Checker<'_> {
                 .filter_map(|p| {
                     let name = p.child_tokens().find(|t| t.kind == K::Con)?;
                     let signature = p.nodes().next()?;
-                    Some(FunctorParam {
+                    Some(ModuleParam {
                         name: name.text(self.text).to_owned(),
-                        contract: signature.text(self.text).split_whitespace().collect(),
                         span: Span::new(self.file, name.start, name.end),
                         signature: signature.clone(),
                     })

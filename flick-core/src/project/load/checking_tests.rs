@@ -256,3 +256,5 @@ fn standalone_check_of_inline_modules_rejects_a_private_builtin_import() {
         "{diagnostics:?}"
     );
 }
+
+include!("checking_tests_review.rs");

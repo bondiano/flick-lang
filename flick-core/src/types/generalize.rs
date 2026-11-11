@@ -98,7 +98,7 @@ impl Checker<'_> {
             let name = names.next().expect("names are endless");
             vars.push(Binder {
                 name: name.clone(),
-                kind: kind_of(&ty, m),
+                kind: kind_of(&ty, m, &|h| param_kinds(self, h)),
             });
             self.store.set(m, Type::Var(name));
         }
@@ -149,7 +149,7 @@ impl Checker<'_> {
         // implies its projections through the stages' parameters
         let types: Vec<String> = subst
             .iter()
-            .filter(|(m, _)| matches!(kind_of(&ty, *m), Kind::Type))
+            .filter(|(m, _)| matches!(kind_of(&ty, *m, &|h| param_kinds(self, h)), Kind::Type))
             .filter_map(|(_, v)| match v {
                 Type::Var(name) => Some(name.clone()),
                 _ => None,
@@ -296,9 +296,24 @@ pub(super) fn replace_metas(t: &Type, subst: &[(u32, Type)]) -> Type {
     }
 }
 
+/// The kinds of the parameters of a type constructor, by its definition.
+fn param_kinds(checker: &Checker<'_>, head: &Type) -> Vec<Kind> {
+    let Type::Con { module, name } = head else {
+        return Vec::new();
+    };
+    let mut kinds = Vec::new();
+    let mut kind = checker.env.type_def(module, name).map(|d| &d.kind);
+    while let Some(Kind::Arrow(param, result)) = kind {
+        kinds.push((**param).clone());
+        kind = Some(result);
+    }
+    kinds
+}
+
 /// The kind of a variable by where it occurs: a record tail is a field row,
-/// the rows of a runtime arrow are service and error rows.
-fn kind_of(ty: &Type, m: u32) -> Kind {
+/// the rows of a runtime arrow are service and error rows, an argument of a
+/// type has the kind of its parameter (`params` gives them).
+fn kind_of(ty: &Type, m: u32, params: &dyn Fn(&Type) -> Vec<Kind>) -> Kind {
     fn is(t: &Type, m: u32) -> bool {
         match t {
             Type::Meta(x) => *x == m,
@@ -327,16 +342,16 @@ fn kind_of(ty: &Type, m: u32) -> Kind {
         }
         Type::App { .. } => {
             let (head, args) = t.spine();
-            let rows: &[Kind] = if head.is_lang(Lang::Eff) {
-                &[Kind::ServiceRow, Kind::ErrorRow]
+            let rows: Vec<Kind> = if head.is_lang(Lang::Eff) {
+                vec![Kind::ServiceRow, Kind::ErrorRow]
             } else if head.is_lang(Lang::Layer) {
-                &[Kind::ServiceRow, Kind::ErrorRow, Kind::ServiceRow]
+                vec![Kind::ServiceRow, Kind::ErrorRow, Kind::ServiceRow]
             } else {
-                &[]
+                params(head)
             };
             for (arg, row) in args.iter().zip(rows) {
-                if is(arg) {
-                    kind = row.clone();
+                if is(arg) && !matches!(row, Kind::Meta(_)) {
+                    kind = row;
                 }
             }
         }

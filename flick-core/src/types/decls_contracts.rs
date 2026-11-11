@@ -10,6 +10,7 @@ impl Checker<'_> {
         let module_mark = self.opened_modules.len();
         let bound = self.bind_contract_members(&members);
         let mut requirements = self.contract_requirements(&members, &bound);
+        self.reject_contract_cycles(&members, &mut requirements);
         self.validate_contract_dictionaries(&members, &requirements);
         self.default_contract_requirements(&mut requirements);
         self.contract_types.truncate(mark);
@@ -445,3 +446,5 @@ impl Checker<'_> {
             .map(|t| t.text(self.text).to_owned())
     }
 }
+
+include!("decls_cycles.rs");

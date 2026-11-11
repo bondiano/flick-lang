@@ -26,18 +26,7 @@ impl ModuleSignature {
         let mut subst: Vec<_> = requirements
             .iter()
             .filter_map(|r| match r {
-                R::Type {
-                    name,
-                    params,
-                    manifest,
-                } => Some((
-                    name.clone(),
-                    if params.is_empty() {
-                        manifest.clone().unwrap_or_else(|| Type::con(path, name))
-                    } else {
-                        Type::con(path, name)
-                    },
-                )),
+                R::Type { name, .. } => Some((name.clone(), Type::con(path, name))),
                 R::Nominal { name, identity, .. } => Some((
                     name.clone(),
                     identity
@@ -63,16 +52,6 @@ impl ModuleSignature {
                     Type::con(module, &format!("{actual_name}$Dict")),
                 ));
             }
-        }
-        for _ in 0..subst.len() {
-            let next: Vec<_> = subst
-                .iter()
-                .map(|(name, ty)| (name.clone(), ty.substitute(&subst)))
-                .collect();
-            if next == subst {
-                break;
-            }
-            subst = next;
         }
         for requirement in &requirements {
             let (name, namespace, decl, definition, scheme) = match requirement {

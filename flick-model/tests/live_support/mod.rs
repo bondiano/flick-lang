@@ -56,7 +56,7 @@ pub fn run(p: &Program) -> Outcome {
 }
 
 pub fn g(name: &str) -> Term {
-    Term::Global(Global::new("Gen", name))
+    Term::Global(Global::new("Fixture", name))
 }
 
 pub fn v(x: &str) -> Term {

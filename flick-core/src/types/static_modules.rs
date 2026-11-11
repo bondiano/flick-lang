@@ -4,7 +4,7 @@ use std::collections::HashMap;
 
 use crate::diagnostics::codes;
 use crate::iface::Interface;
-use crate::resolve::{self, FunctorParam, Header, Import, Item};
+use crate::resolve::{self, Header, Import, Item, ModuleParam};
 use crate::resolve::{ItemKind, Module};
 use crate::source::Span;
 use crate::syntax::cst::Element;

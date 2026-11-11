@@ -26,7 +26,7 @@ fn handled_touch() -> Term {
     };
     Term::Handler(Rc::new(Handler {
         effects: vec![Handled {
-            effect: Path::new("Gen", "Within"),
+            effect: Path::new("Fixture", "Within"),
             ops: vec![get],
         }],
         body: Term::app(g("touch"), Term::unit()),

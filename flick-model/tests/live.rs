@@ -263,22 +263,9 @@ fn live_on_std() {
 /// The values of std and core the model cannot type (`live_on_std`).
 const UNTYPED: &[&str] = &[
     "Atom.local",
-    "Atom.serializable_result",
-    "Http.Client.current",
-    "Http.Client.execute",
-    "Http.Client.layer",
-    "Http.Server.layer_test_client",
-    "Http.Server.test_client",
-    "Http.StaticServer.route",
-    "HttpApi.Derive.problem_case",
     "HttpApi.http_error",
-    "Jwt.expiry_json",
-    "Jwt.header_json",
-    "Jwt.sign",
     "Record.instance Show (ReadonlyRecord a)",
     "Resource.acquire_release",
     "Scope.add_finalizer",
     "Ui.element",
-    "Ui.on_mount",
-    "Ui.watch",
 ];

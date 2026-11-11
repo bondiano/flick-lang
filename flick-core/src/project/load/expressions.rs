@@ -11,27 +11,6 @@ use crate::source::Span;
 use crate::syntax::{self, cst::Node, kind::SyntaxKind as K};
 
 impl Loader<'_> {
-    /// Resolve source aliases only at module-expression use sites. Import
-    /// declarations already name canonical modules and must not be captured.
-    fn expression_module(&mut self, importer: usize, name: &str, span: Span) -> Option<usize> {
-        let (head, tail) = name.split_once('.').unwrap_or((name, ""));
-        if let Some(import) = self.modules[importer]
-            .syntax
-            .imports
-            .iter()
-            .find(|i| i.alias.as_deref() == Some(head) && i.module != head)
-            .cloned()
-        {
-            let expanded = if tail.is_empty() {
-                import.module
-            } else {
-                format!("{}.{tail}", import.module)
-            };
-            return self.find_module(importer, &expanded, span);
-        }
-        self.find_module(importer, name, span)
-    }
-
     fn expression_name(&mut self, parent: usize, desired: Option<&str>) -> String {
         if let Some(desired) = desired {
             return desired.to_owned();

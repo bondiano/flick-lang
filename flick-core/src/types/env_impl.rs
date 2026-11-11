@@ -40,9 +40,9 @@ impl<'b> Env<'b> {
         for export in &interface.exports {
             let entity = &export.entity;
             self.types
-                .remove(&(entity.module.clone(), entity.name.clone()));
+                .remove(&entity.module, &entity.name);
             self.types
-                .remove(&(entity.module.clone(), format!("{}.Impl", entity.name)));
+                .remove(&entity.module, &format!("{}.Impl", entity.name));
             self.values.remove(entity);
             self.parents.remove(entity);
         }
@@ -146,9 +146,8 @@ impl<'b> Env<'b> {
             }
         }
         for import in &syntax.imports {
-            let interface = env.interfaces[&import.module].clone();
             let open = import.exposing.iter().any(|i| i.kind == ItemKind::All);
-            match interface {
+            match &env.interfaces[&import.module] {
                 None => {
                     // names from a module that could not be loaded are taken on trust
                     env.open_unknown |=
@@ -170,7 +169,7 @@ impl<'b> Env<'b> {
         }
         let mut ambiguous = HashSet::new();
         for import in &syntax.imports {
-            let Some(interface) = env.interfaces[&import.module].clone() else {
+            let Some(interface) = &env.interfaces[&import.module] else {
                 continue;
             };
             for item in &import.exposing {
@@ -232,11 +231,11 @@ impl<'b> Env<'b> {
         self.types.of(&self.module).map(|(n, d)| (n.as_str(), d))
     }
 
-    /// The instances beyond the built-in ones, which an interface carries.
+    /// The instances beyond the built-in ones, which an interface carries:
+    /// `learn` keeps a built-in one out by its key, so a module of the
+    /// project named as one of std (`Gen`) keeps its own.
     pub fn own_instances(&self) -> impl Iterator<Item = &Instance> {
-        self.instances
-            .iter()
-            .filter(|i| !self.builtins.contains(&i.module))
+        self.instances.iter()
     }
 
     pub fn add_instance(&mut self, instance: Instance) {

@@ -43,7 +43,6 @@ pub struct Header {
 #[derive(Debug, Clone)]
 pub struct ModuleParam {
     pub name: String,
-    pub contract: String,
     pub span: Span,
     pub signature: Node,
 }
@@ -272,7 +271,6 @@ pub fn module_syntax(tree: &Node, text: &str, file: FileId) -> ModuleSyntax {
                             let contract = param.nodes().next()?;
                             Some(ModuleParam {
                                 name: name.text(text).to_owned(),
-                                contract: contract.text(text).split_whitespace().collect(),
                                 span: Span::new(file, name.start, name.end),
                                 signature: contract.clone(),
                             })

@@ -55,7 +55,7 @@ impl Loader<'_> {
         }
         let suffix = &source[header_node.range().1 as usize..];
         if header_node.has_token(K::Eq) && header.body.is_none() {
-            let indent = self.modules[functor]
+            let indent = self.modules[template]
                 .parse
                 .tree
                 .nodes()
@@ -131,22 +131,12 @@ impl Loader<'_> {
             ));
             return;
         }
-        let Some((template, trace)) = self.expansion_trace(parent, functor, application.span)
-        else {
+        // Module-expression evaluation has already resolved every argument.
+        // Canonical identities must not pass through the caller's aliases again.
+        let Some((origin, trace)) = self.expansion_trace(parent, template, application) else {
             return;
         };
-        let mut normalized = application.clone();
-        for (argument, span) in normalized
-            .arguments
-            .iter_mut()
-            .zip(&application.argument_spans)
-        {
-            let Some(name) = self.module_reference(parent, argument, *span) else {
-                return;
-            };
-            *argument = name;
-        }
-        let application = &normalized;
+
         let Some(generated) = self.virtual_source(parent, template, &name, &header, application)
         else {
             return;
@@ -160,7 +150,7 @@ impl Loader<'_> {
         let index = self.modules.len();
         self.by_name.insert(name.clone(), index);
         let context =
-            self.application_context(functor, &header, application, callee, template, trace);
+            self.application_context(template, &header, application, callee, origin, trace);
         self.modules.push(Loaded {
             path,
             file,
@@ -187,7 +177,7 @@ impl Loader<'_> {
         application: &ModuleApplication,
         callee: CalleeOrigin,
         template: String,
-        trace: Vec<String>,
+        trace: Vec<ExpansionFrame>,
     ) -> Virtual {
         let inherited = self.modules[functor].virtual_of.as_ref();
         let mut capture = inherited.map_or_else(StaticCapture::default, |v| v.capture.clone());
@@ -207,7 +197,6 @@ impl Loader<'_> {
                 argument: argument.clone(),
                 origin: BindingOrigin {
                     module: self.modules[functor].name.clone(),
-                    parameter: index,
                     group: header
                         .parameter_groups
                         .iter()
@@ -244,8 +233,11 @@ impl Loader<'_> {
         &mut self,
         parent: usize,
         functor: usize,
-        at: Span,
-    ) -> Option<(String, Vec<String>)> {
+        application: &ModuleApplication,
+    ) -> Option<(String, Vec<ExpansionFrame>)> {
+        // An argument-changing recursive definition has no repeated key. Bound
+        // active expansion depth as well as detecting exact recursive calls.
+        const MAX_DEPTH: usize = 64;
         let context = self.modules[functor].virtual_of.as_ref();
         let template = context
             .and_then(|v| v.capture.template.clone())
@@ -254,25 +246,50 @@ impl Loader<'_> {
             .virtual_of
             .as_ref()
             .map_or_else(Vec::new, |v| v.capture.trace.clone());
+        let mut arguments = Vec::new();
         if let Some(context) = context {
             let mut captured = context.capture.trace.as_slice();
-            // A partial application resumes its own last expansion. Earlier
-            // captured expansions remain active in its lexical environment.
-            if context.capture.template.is_some() && captured.last() == Some(&template) {
+            if context.capture.template.is_some()
+                && captured
+                    .last()
+                    .is_some_and(|frame| frame.template == template)
+            {
+                arguments.clone_from(&captured.last().expect("partial application").arguments);
                 captured = &captured[..captured.len() - 1];
             }
-            trace.extend_from_slice(captured);
+            let shared = trace
+                .iter()
+                .zip(captured)
+                .take_while(|(a, b)| a == b)
+                .count();
+            trace.extend_from_slice(&captured[shared..]);
         }
-        if trace.contains(&template) {
-            trace.push(template);
+        arguments.extend(application.arguments.iter().cloned());
+        let frame = ExpansionFrame {
+            template: template.clone(),
+            arguments,
+        };
+        let repeated = trace.contains(&frame);
+        if repeated || trace.len() >= MAX_DEPTH {
+            trace.push(frame);
+            let chain = trace
+                .iter()
+                .map(|f| format!("{}({})", f.template, f.arguments.join(", ")))
+                .collect::<Vec<_>>()
+                .join(" -> ");
+            let reason = if repeated {
+                "recursive static module expansion".to_owned()
+            } else {
+                format!("static module expansion exceeds {MAX_DEPTH} active applications")
+            };
             self.diagnostics.push(Diagnostic::error(
                 codes::R006,
-                format!("recursive static module expansion: {}", trace.join(" -> ")),
-                at,
+                format!("{reason}: {chain}"),
+                application.span,
             ));
             return None;
         }
-        trace.push(template.clone());
+        trace.push(frame);
         Some((template, trace))
     }
 }

@@ -52,6 +52,7 @@ enum Form {
     Predicate,
     Member,
     FunctionCell,
+    Method,
 }
 
 impl Gen<'_> {
@@ -227,6 +228,7 @@ impl Gen<'_> {
             Form::Predicate => self.predicate(cx, budget, s),
             Form::Member => self.member(cx, budget, s),
             Form::FunctionCell => self.function_cell(cx, t, budget, s),
+            Form::Method => self.method(cx, t, budget, s),
             Form::Field => {
                 let other = self.data(0);
                 let fields =
@@ -492,6 +494,9 @@ fn forms(cx: &Cx, t: &Type, budget: &Stage, block: bool) -> Vec<Form> {
     }
     if [int(), boolean(), string()].contains(t) {
         forms.push(Form::Prim);
+    }
+    if [int(), string()].contains(t) {
+        forms.push(Form::Method);
     }
     forms
 }

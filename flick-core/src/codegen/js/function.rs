@@ -321,9 +321,9 @@ impl Gen<'_> {
             return format!("{}(() => {effect})", self.effect("suspend"));
         }
         format!(
-            "{}(function* () {{\n{}}})",
+            "{}({})",
             self.effect("gen"),
-            indent(stmts)
+            self.generator_function("", stmts)
         )
     }
 }
@@ -374,6 +374,9 @@ pub(super) fn balanced_without_yield(js: &str) -> bool {
 /// Whether `js` ends with the head of a generator, `function* (…)`.
 fn after_generator_head(js: &str) -> bool {
     let head = js.trim_end();
+    let head = head
+        .strip_suffix(": globalThis.Generator<any, any, any>")
+        .unwrap_or(head);
     head.rfind("function* (")
         .is_some_and(|at| head[at..].find(')') == Some(head.len() - at - 1))
 }
@@ -401,4 +404,17 @@ pub(super) fn binds(params: &[Param]) -> Vec<Option<String>> {
 /// Whether a tail position of `body` jumps to a member of `tail`.
 fn has_tail_call(body: &Expr, tail: &Tail, calls: Calls) -> bool {
     !tail_callees(body, &tail.members, calls).is_empty()
+}
+
+#[cfg(test)]
+mod generator_header_tests {
+    #[test]
+    fn typed_nested_generators_keep_their_yields_local() {
+        assert!(super::balanced_without_yield(
+            "(function* (x: any): globalThis.Generator<any, any, any> { yield x; })"
+        ));
+        assert!(!super::balanced_without_yield(
+            "(function* (x: any): globalThis.Generator<any, any, any> { yield x; }); yield 2;"
+        ));
+    }
 }

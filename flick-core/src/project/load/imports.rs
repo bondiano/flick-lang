@@ -5,8 +5,8 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use super::{
-    BindingOrigin, CalleeOrigin, Loaded, Loader, Root, StaticBinding, StaticCapture, StaticMember,
-    Virtual, module_path,
+    BindingOrigin, CalleeOrigin, ExpansionFrame, Loaded, Loader, Root, StaticBinding,
+    StaticCapture, StaticMember, Virtual, module_path,
 };
 use crate::diagnostics::{Diagnostic, codes};
 use crate::resolve::{self, ItemKind, ModuleApplication};
@@ -115,9 +115,6 @@ impl Loader<'_> {
 
     #[allow(clippy::too_many_lines)]
     pub(super) fn find_module(&mut self, importer: usize, name: &str, span: Span) -> Option<usize> {
-        if let Some(expanded) = self.imported_module(importer, name) {
-            return self.find_module(importer, &expanded, span);
-        }
         let packages = self.package_sources().into_iter().map(|(_, dir)| dir);
         // the project's own modules come before those of source packages
         let dirs: Vec<PathBuf> = match (&self.modules[importer].root, self.project) {
@@ -265,9 +262,8 @@ impl Loader<'_> {
         name: &str,
         span: Span,
     ) -> Option<String> {
-        if let Some(expanded) = self.imported_module(importer, name) {
-            return self.module_reference(importer, &expanded, span);
-        }
+        let expanded = self.imported_module(importer, name);
+        let name = expanded.as_deref().unwrap_or(name);
         self.find_module(importer, name, span)
             .map(|index| self.modules[index].name.clone())
             .or_else(|| self.from_packages.get(name).map(|i| i.module.clone()))

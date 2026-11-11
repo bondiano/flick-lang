@@ -20,8 +20,8 @@ The type constructors are `unit = 1`, `Bool = 2`, `Option = 3`, `Int = 4`, `Eff 
 `OptQ = 6`, `ListQ = 7`, `List = 8`, `Seq = 9`, the pair `Tup = 10`, `Result = 11`,
 `Errors = 12`, `Rec = 13`.
 
-The schemes of `methSch` and `constSch` are written by hand (`bindTy`, `map2Ty`; `eachSch`,
-`pair` and `unc n` have no Prelude name); the fields of `S` equate the first with the ones generated from the checker (`PreludeSchemes`) by
+The schemes of `methSch` and `constSch` are written by hand (`bindTy`, `map2Ty`; `each_P`,
+`pair` and `unc n` have no Prelude name, `each_R` is the generated `Seq.each_loop`); the fields of `S` equate the first with the ones generated from the checker (`PreludeSchemes`) by
 `rfl`, so a hand scheme that drifts from `Prelude.fl` breaks the build.
 -/
 
@@ -49,7 +49,7 @@ def methSch : Nat → Option (Nat × Scheme)
       bindTy (.var 0) (.var 1) (.var 2) (.var 3) (.var 4) (.var 5), .cnil⟩)
   | 4 => some (cAlt, ⟨3, [⟨cAlt, [.var 0]⟩], appQ (.var 0) (.var 2) (.var 1), .cnil⟩)
   | 5 => some (cIter, ⟨3, [⟨cIter, [.var 0]⟩],
-      arrP (appQ (.var 0) (.var 1) (.var 2)) (appQ (.con 9) (.cun (.var 1) (.var 2)) (.var 2)),
+      arrP (appQ (.var 0) (.var 1) (.var 2)) (appQ (.con 9) (.var 1) (.var 2)),
       .cnil⟩)
   | _ => none
 
@@ -64,8 +64,7 @@ def constSch : Nat → Option Scheme
   | 5 => some ⟨2, [], arrP (appQ (.con 9) (.var 1) (.var 0)) (.app (.con 8) (.var 0)), .cnil⟩
   | 6 => some ⟨3, [], arrP (.arr .P (.var 2) (.con 1) (.var 0))
       (.arr .P (appQ (.con 9) (.var 1) (.var 2)) (.con 1) (.var 0)), .cnil⟩
-  | 7 => some ⟨5, [], arrP (.arr (.R (.var 1) (.var 2)) (.var 0) (.con 1) (.var 3))
-      (.arr (.R (.var 1) (.var 2)) (appQ (.con 9) (.var 4) (.var 0)) (.con 1) (.var 3)), .cnil⟩
+  | 7 => some (PreludeSchemes.Seq.each_loop 1 9)
   | 8 => some ⟨0, [], .con 1, .cnil⟩
   | 9 => none
   | n + 10 => if n % 2 = 0 then (if 0 < n / 2 then some (uncSch 10 (n / 2)) else none)

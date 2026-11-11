@@ -9,12 +9,12 @@
 // loosening one takes a `reason` beside it (ratchet.mjs).
 //
 //   node tools/perf/index.mjs <flick binary>
-import { execFileSync, spawn, spawnSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { appendFileSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { availableParallelism, cpus } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { once } from "node:events";
+import { startServer, startupTimes, stopServer } from "../load/server-start.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 
@@ -118,48 +118,18 @@ const soak = (flick) => {
   return Number(/^RSS, MiB: growth ([\d.]+)/m.exec(out)?.[1]);
 };
 
-const answers = async (url) => {
-  for (let i = 0; i < 3000; i++) {
-    try {
-      const response = await fetch(url);
-      await response.text();
-      if (response.status === 200) return;
-    } catch {
-      // not listening yet
-    }
-    await new Promise((resolve) => setTimeout(resolve, 10));
-  }
-  throw new Error(`${url} did not answer in 30 s`);
-};
-
-const stopServer = async (server) => {
-  if (server.exitCode !== null || server.signalCode !== null) return;
-  const ended = once(server, "exit");
-  server.kill();
-  await ended;
-};
-
 /** Spawn to the first successful HTTP response; fresh processes, no warm-up. */
-export const coldStart = async (command, { port, path: route, env = {} }, runs = RUNS) => {
-  const samples = [];
-  for (let i = 0; i < runs; i++) {
-    const started = performance.now();
-    const server = spawn(command[0], command.slice(1), { cwd: root, env: { ...process.env, ...env, PORT: String(port) }, stdio: "ignore" });
-    try {
-      await answers(`http://127.0.0.1:${port}${route.replace("{id}", "cold")}`);
-      samples.push(performance.now() - started);
-    } finally {
-      await stopServer(server);
-    }
-  }
-  return Math.round(median(samples));
-};
+export const coldStart = async (command, { port, path: route, env = {} }, runs = RUNS) =>
+  Math.round(median(await startupTimes(command, {
+    url: `http://127.0.0.1:${port}${route.replace("{id}", "cold")}`, env, cwd: root, pollMs: 10,
+  }, runs)));
 
 /** Requests per second at 16 clients, the median of tools/load's runs, of the server `command` starts. */
 const throughput = async (command, { port, path: route, expect, env = {}, client = "fetch" }) => {
-  const server = spawn(command[0], command.slice(1), { cwd: root, env: { ...process.env, ...env, PORT: String(port) }, stdio: "ignore" });
+  const { child: server } = await startServer(command, {
+    url: `http://127.0.0.1:${port}${route.replace("{id}", "warm")}`, env, cwd: root, pollMs: 10,
+  });
   try {
-    await answers(`http://127.0.0.1:${port}${route.replace("{id}", "warm")}`);
     // Go JSON selects direct GETs because fetch limits its throughput even
     // with workers. SSR keeps its historical client for comparable results.
     const workers = String(Math.max(1, Math.min(8, availableParallelism() >> 1)));

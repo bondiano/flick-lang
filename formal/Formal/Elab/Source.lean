@@ -83,11 +83,23 @@ def Stage.Keeps : Stage → Ty → Prop
   | .P, _ => False
   | .R r _, q => ∀ n, q.Shown n → r.Keeps n
 
+/-- (App) of an arrow at the stage `ψ` where the stage is `φ`: a pure arrow anywhere; a
+runtime one where `φ` keeps its qualifier `q` live, at `φ` itself or at `φ` with `Live C` in
+its row, `R⟨Live C + r; e⟩` as elision writes a later stage, when `φ` keeps `C` live too: the
+checker's (App) asks the same of such a row (`regions/live.rs`). -/
+abbrev Stage.Applies (ψ φ : Stage) (q : Ty) : Prop :=
+  ψ = .P ∨ φ.Keeps q ∧ (ψ = φ ∨ ∃ C r e, φ = .R r e ∧ ψ = .R (.run (.cun C .cnil) r) e ∧ φ.Keeps C)
+
 /-- An arrow with the empty qualifier applies at its own stage: it needs nothing live. -/
-theorem Stage.keeps_cnil (φ : Stage) : φ = .P ∨ φ = φ ∧ φ.Keeps .cnil := by
+theorem Stage.keeps_cnil (φ : Stage) : φ.Applies φ .cnil := by
   cases φ with
   | P => exact .inl rfl
-  | R r e => exact .inr ⟨rfl, fun _ h => h.elim⟩
+  | R r e => exact .inr ⟨fun _ h => h.elim, .inl rfl⟩
+
+/-- `R⟨Live ∅ + r; e⟩` with the empty qualifier applies at `R⟨r; e⟩`: it keeps nothing more. -/
+theorem Stage.applies_live_cnil (r e : Ty) :
+    (Stage.R (.run (.cun .cnil .cnil) r) e).Applies (.R r e) .cnil :=
+  .inr ⟨fun _ h => h.elim, .inr ⟨.cnil, r, e, rfl, rfl, fun _ h => h.elim⟩⟩
 
 /-- Source terms; `letSig σ e b` is `let x : σ = e in b`. -/
 inductive Exp where
@@ -330,7 +342,7 @@ inductive Elab : List Scheme → List Cn → Exp → Ty → Stage → Tm → Pro
       σ.ty.subst (inst ts) = .all k t → us.length = k →
       Elab Γ Δ (.var x) (t.subst (inst us)) φ (.var x)
   | app {Γ Δ f x a b q ψ φ f' x'} : Elab Γ Δ f (.arr ψ a b q) φ f' → Elab Γ Δ x a φ x' →
-      (ψ = .P ∨ ψ = φ ∧ φ.Keeps q) → Elab Γ Δ (.app f x) b φ (.app f' x')
+      ψ.Applies φ q → Elab Γ Δ (.app f x) b φ (.app f' x')
   | lam {Γ Δ b a t q φ ψ b'} : Elab (⟨0, [], a, .cnil⟩ :: Γ) Δ b t φ b' →
       Elab Γ Δ (.lam b) (.arr φ a t q) ψ (.lam b')
   | let_ {Γ Δ e b a t φ e' b'} : Elab Γ Δ e a φ e' → Elab (⟨0, [], a, .cnil⟩ :: Γ) Δ b t φ b' →

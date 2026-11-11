@@ -51,7 +51,7 @@ theorem constSch_lt {c : Nat} {s : Scheme} (h : constSch c = some s) :
   any_goals
     cases h
     exact ⟨rfl, fun n hn => by
-      simp [Ty.Occurs, Stage.Occurs, bindTy, appQ, arrP, optTy] at hn ⊢ <;> omega⟩
+      simp [Ty.Occurs, Stage.Occurs, bindTy, appQ, arrP, optTy, PreludeSchemes.Seq.each_loop] at hn ⊢ <;> omega⟩
   · cases h
   · split at h
     · split at h

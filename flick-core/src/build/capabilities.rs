@@ -119,6 +119,7 @@ fn roots(
         }
     }
     let mut loading: Vec<_> = entries.iter().map(|(module, _)| module.clone()).collect();
+    loading.extend(settings.entries.iter().map(|(_, module)| module.clone()));
     loading.extend(settings.runners.iter().map(|(_, module)| module.clone()));
     if settings.entries.is_empty() {
         loading.extend(
@@ -134,24 +135,12 @@ fn roots(
         loading.extend(reexports.iter().map(|(key, _)| key.0.clone()));
         pending.extend(reexports);
     }
-    let loaded = loaded_modules(modules, loading);
+    let loaded = loaded_modules(compilation, modules, loading);
     for module in &compilation.modules {
         for item in &module.ir.items {
-            let eager = loaded.contains(&module.name)
-                && match &item.kind {
-                    ItemKind::Value { dicts, body, .. } => {
-                        dicts.is_empty()
-                            && !matches!(
-                                body.kind,
-                                ExprKind::Lambda { .. }
-                                    | ExprKind::Task(_)
-                                    | ExprKind::Global { .. }
-                                    | ExprKind::Abstract(..)
-                            )
-                    }
-                    ItemKind::Destructure { .. } => true,
-                    _ => false,
-                };
+            if loaded.contains(&module.name) {
+                initialization_roots(item, &mut pending);
+            }
             for name in reach::defined(item) {
                 let entry = entries.contains(&(module.name.clone(), name.clone()));
                 let public = settings.entries.is_empty()
@@ -159,13 +148,53 @@ fn roots(
                     && !module.interface.private
                     && (module.interface.exports_value(&name)
                         || matches!(item.kind, ItemKind::Instance { .. }));
-                if entry || public || eager {
+                if entry || public {
                     pending.push(((module.name.clone(), name), item.span));
                 }
             }
         }
     }
     pending
+}
+
+fn initialization_roots(item: &Item, pending: &mut Vec<(reach::Key, Span)>) {
+    fn visit(expr: &Expr, pending: &mut Vec<(reach::Key, Span)>) {
+        if matches!(
+            expr.kind,
+            ExprKind::Lambda { .. } | ExprKind::Task(_) | ExprKind::Abstract(..)
+        ) {
+            return;
+        }
+        let mut used = Vec::new();
+        match &expr.kind {
+            ExprKind::Global { module, name } => used.push((module.clone(), name.clone())),
+            ExprKind::Method { dict, .. } => reach::dict_uses(dict, &mut used),
+            ExprKind::Dicts(_, dicts) => {
+                for dict in dicts {
+                    reach::dict_uses(dict, &mut used);
+                }
+            }
+            _ => {}
+        }
+        pending.extend(used.into_iter().map(|key| (key, expr.span)));
+        expr.each_child(&mut |child| visit(child, pending));
+    }
+    match &item.kind {
+        ItemKind::Value { dicts, body, .. }
+            if dicts.is_empty() && !matches!(body.kind, ExprKind::Global { .. }) =>
+        {
+            visit(body, pending);
+        }
+        ItemKind::Destructure { body, .. } => visit(body, pending),
+        ItemKind::Instance { info, methods } if info.context.is_empty() => {
+            for (_, body) in methods {
+                if !matches!(body.kind, ExprKind::Global { .. }) {
+                    visit(body, pending);
+                }
+            }
+        }
+        _ => {}
+    }
 }
 
 fn library_reexports(compilation: &Compilation, sources: &SourceMap) -> Vec<(reach::Key, Span)> {
@@ -210,11 +239,31 @@ fn library_reexports(compilation: &Compilation, sources: &SourceMap) -> Vec<(rea
 }
 
 /// Static imports load a module even when the referencing function is unused.
-fn loaded_modules(modules: &[&Module], mut pending: Vec<String>) -> HashSet<String> {
+fn loaded_modules(
+    compilation: &Compilation,
+    modules: &[&Module],
+    mut pending: Vec<String>,
+) -> HashSet<String> {
     let mut loaded = HashSet::new();
     while let Some(name) = pending.pop() {
         if !loaded.insert(name.clone()) {
             continue;
+        }
+        if let Some(module) = compilation
+            .modules
+            .iter()
+            .find(|module| module.name == name)
+        {
+            pending.extend(
+                module
+                    .interface
+                    .exports
+                    .iter()
+                    .filter(|export| {
+                        export.entity.namespace == Namespace::Value && export.entity.module != name
+                    })
+                    .map(|export| export.entity.module.clone()),
+            );
         }
         if let Some(module) = modules.iter().find(|module| module.name == name) {
             let mut used = Vec::new();
@@ -253,22 +302,6 @@ fn reference_span(item: &Item, key: &reach::Key) -> Option<Span> {
         expr.each_child(&mut |child| find(child, key, found));
     }
     let mut found = None;
-    match &item.kind {
-        ItemKind::Value { body, .. } | ItemKind::Destructure { body, .. } => {
-            find(body, key, &mut found);
-        }
-        ItemKind::Instance { methods, .. } => {
-            for (_, method) in methods {
-                find(method, key, &mut found);
-            }
-        }
-        ItemKind::Refined { check, .. } => find(check, key, &mut found),
-        ItemKind::Foreign(foreign) => {
-            if let Some(catch) = &foreign.catch {
-                find(catch, key, &mut found);
-            }
-        }
-        ItemKind::Constructor(_) | ItemKind::Service { .. } => {}
-    }
+    item.each_body(&mut |body| find(body, key, &mut found));
     found
 }

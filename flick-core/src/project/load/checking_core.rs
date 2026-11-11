@@ -345,7 +345,7 @@ impl Checking<'_> {
         interface.member_of.clone_from(&loaded.member_of);
         untyped.member_of.clone_from(&loaded.member_of);
         untyped.private = interface.private;
-        #[cfg(any(feature = "native-project", feature = "native-project"))]
+        #[cfg(feature = "native-project")]
         if clean && interface.functor.is_some() {
             interface.template = Some(ModuleTemplate {
                 source: self.text_of(loaded).to_owned(),
@@ -434,7 +434,7 @@ impl Checking<'_> {
             && self.lower
             && lowers
             && loaded.scope_of.is_none()
-            && !Self::is_functor_template(loaded)
+            && !Self::is_module_template(loaded)
         {
             match ir::lower(module, typing) {
                 Ok(lowered) => return Some(lowered),

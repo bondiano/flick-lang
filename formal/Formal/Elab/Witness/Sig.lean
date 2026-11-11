@@ -206,7 +206,7 @@ theorem constSch_ok {c s} (h : constSch c = some s) : s.ctx = [] ∧ ∀ n, s.ty
     | (cases h
        refine ⟨rfl, ?_⟩
        intro n hn
-       simp [Ty.Occurs, Stage.Occurs, bindTy, appQ, arrP, optTy] at hn ⊢
+       simp [Ty.Occurs, Stage.Occurs, bindTy, appQ, arrP, optTy, PreludeSchemes.Seq.each_loop] at hn ⊢
        try omega)
 
 theorem glob_closed : ∀ g s, globF g = some s → s.Closed s.k := by

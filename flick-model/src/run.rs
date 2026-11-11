@@ -29,12 +29,41 @@ impl Host for Files {
     }
 }
 
+/// One module in memory, at [`SOURCE`].
+struct Source<'a>(&'a str);
+
+/// Where [`compile_source`] puts its module.
+const SOURCE: &str = "/Main.fl";
+
+impl Host for Source<'_> {
+    fn read(&self, p: &path::Path) -> io::Result<Vec<u8>> {
+        if p == path::Path::new(SOURCE) {
+            Ok(self.0.as_bytes().to_vec())
+        } else {
+            Err(io::ErrorKind::NotFound.into())
+        }
+    }
+
+    fn display(&self, p: &path::Path) -> String {
+        p.display().to_string()
+    }
+}
+
 /// The modules of the program in `file`, or its errors.
 pub fn compile(file: &path::Path) -> Result<Vec<Compiled>, String> {
     let file = fs::canonicalize(file).map_err(|e| format!("{}: {e}", file.display()))?;
+    compile_with(&Files, &project::normalize(&file))
+}
+
+/// The modules of the program of the one module `text`, or its errors.
+pub fn compile_source(text: &str) -> Result<Vec<Compiled>, String> {
+    compile_with(&Source(text), path::Path::new(SOURCE))
+}
+
+fn compile_with(host: &dyn Host, root: &path::Path) -> Result<Vec<Compiled>, String> {
     let mut sources = SourceMap::default();
     let (diagnostics, compilation) =
-        project::compile(&Files, &mut sources, None, &[project::normalize(&file)]);
+        project::compile(host, &mut sources, None, &[root.to_path_buf()]);
     let errors: Vec<String> = diagnostics
         .iter()
         .filter(|d| d.severity == Severity::Error)

@@ -29,7 +29,6 @@ export const sampleRss = (pid) => {
   const timer = setInterval(sample, 250);
   timer.unref();
   return {
-    sample,
     stop: () => {
       clearInterval(timer);
       sample();

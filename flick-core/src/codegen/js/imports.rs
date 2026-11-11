@@ -51,7 +51,7 @@ impl Gen<'_> {
                 } else {
                     format!("[{}]", names::string(export))
                 };
-                let _ = writeln!(code, "const {alias} = $n{at}{member};");
+                let _ = writeln!(code, "{}", self.constant(alias, &format!("$n{at}{member}")));
                 continue;
             }
             let export = if names::is_property(export) {

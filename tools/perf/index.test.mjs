@@ -35,3 +35,14 @@ test("cold start measures fresh HTTP servers and waits for each to exit", async 
   assert.ok(Number.isFinite(ms) && ms > 0);
   await assert.rejects(fetch(`http://127.0.0.1:${port}/after`));
 });
+
+test("cold start rejects an HTTP listener owned by another process", async () => {
+  const server = createServer((_req, res) => res.end("unrelated"));
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  try {
+    const port = server.address().port;
+    await assert.rejects(coldStart([process.execPath, "-e", "process.exit(1)"], { port, path: "/" }, 1), /in use|occupied/);
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+});

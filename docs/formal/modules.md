@@ -45,6 +45,9 @@ serializer, or either backend implements them. In particular, it does not prove
 source-level progress or preservation for arbitrary modules, nor correctness of
 the generated record ABI. The static shape model does not represent source
 type schemes, dependent equality substitution or resource lifecycles; preserving
+opaque code references does not prove termination of source expansion. The compiler
+rejects repeated active applications and limits expansion to 64 active applications;
+the finite evaluator here does not model that resource limit. Preserving
 opaque code references is not a proof of runtime cleanup. The compiler regressions check source typing and
 diagnostic spans; the reference model and JS/Go tests check representative
 lowered executions. The existing Lean core theorems apply after modules have

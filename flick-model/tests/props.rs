@@ -120,7 +120,14 @@ fn progress_and_preservation(decls: &eval::Program, d: &Decls, p: &Program) -> R
                     "step {steps}: `{phi}` is not within `{phi0}`:\n{e:?}"
                 ));
             }
-            Err(err) => failure = Some(format!("step {steps}: {err}\n{e:?}")),
+            Err(err) => {
+                failure = Some(format!(
+                    "step {steps}: {err}
+{e:?}
+Λ: {:?}",
+                    l.regions
+                ));
+            }
         }
     });
     if let Some(f) = failure {
@@ -168,18 +175,14 @@ fn leaks_reach_a_use_after_close() {
 /// A signed `let` keeps its signature when it steps: `(fun g x -> g x) (try … with _ -> as4)`, the λ of `v1` after
 /// its `let` with a signature stepped, whose argument needs the runtime
 /// arrow of the signature. A case the model properties found.
+///
+/// The choices are the picks of the case proptest printed: each below the
+/// number of forms then, so forms added later at the end keep the program.
 #[test]
-#[allow(
-    clippy::unreadable_literal,
-    reason = "the choices as proptest printed them"
-)]
 fn a_function_keeps_its_signature() {
     let c = [
-        53872532, 614429763, 316647345, 3323234475, 11786860, 1371144852, 2703845322, 1737490265,
-        255759160, 2157138854, 3717280138, 1624885393, 2433392247, 2010853328, 2566700010,
-        409181594, 736146643, 0, 17231705, 3249833829, 0, 0, 0, 3387466705, 0, 3191903211, 0, 0,
-        1714366921, 0, 2364491101, 3175111223, 0, 95212, 8248188, 12185093, 0, 0, 0, 0, 2690176445,
-        0, 0, 0, 0, 0, 0, 0, 0,
+        0, 3, 0, 3, 0, 0, 2, 1, 1, 6, 2, 4, 7, 0, 10, 0, 3, 0, 0, 3, 0, 0, 0, 4, 0, 7, 0, 0, 1, 0,
+        1, 11, 0, 4, 0, 5, 0, 0, 0, 0, 5,
     ];
     let p = generate::program(&c);
     assert!(model(&p).is_ok());
@@ -187,24 +190,138 @@ fn a_function_keeps_its_signature() {
     assert!(checked.is_ok(), "{checked:?}\n{}", generate::source(&p));
 }
 
-/// A signature in a child names the region of its `scope`: a task given to
-/// `Fiber.spawn s` holds `v : ((Unit ->{} Unit)^{s}) ->{} Unit`, and once it
-/// is a child of the region it is typed outside the `scope` that bound `s`.
-/// With an argument that holds the region, and with one that holds nothing.
-/// Cases the model properties found.
+/// A change leaves a dictionary alone, which the source does not write: a
+/// cast of `instance Rank Int` printed its name. A case `checkers_agree`
+/// found.
 #[test]
 #[allow(
     clippy::unreadable_literal,
     reason = "the choices as proptest printed them"
 )]
+fn a_change_leaves_dictionaries_alone() {
+    let c = [
+        1060304624, 1385092055, 157142940, 0, 0, 2106292236, 3731932068, 1712555527, 0, 1497749644,
+        179845092, 550714479,
+    ];
+    let p = generate::mutate(&generate::program(&c), &[3364843738, 1681919443]);
+    let source = generate::source(&p);
+    let core = core(&source);
+    assert_eq!(
+        model(&p).is_ok(),
+        core.is_empty() || generate::by_design(&core),
+        "{core:?}\n{source}"
+    );
+}
+
+/// A function with a class constraint is called at a type the generator
+/// builds a value of: one at `Oops` took `()`. A case
+/// `generated_programs_are_well_typed` found.
+#[test]
+#[allow(
+    clippy::unreadable_literal,
+    reason = "the choices as proptest printed them"
+)]
+fn a_constrained_call_has_its_argument() {
+    let c = [
+        698017122, 21051635, 4607202, 146514692, 3913711338, 0, 793500998, 1683621662, 0, 0,
+        251895549, 388005714, 991649132, 1165236, 180835688, 3687733928, 1099618755, 863166628,
+        2307264338, 0, 505020075, 3260581365, 0, 0, 2299046473, 0, 268533177, 2959975492,
+        2121448646, 1497048870, 62919524, 23206904, 418612195, 2862996111, 511838154, 208771041,
+        3968671193, 0, 394628986,
+    ];
+    let p = generate::program(&c);
+    assert!(model(&p).is_ok(), "{}", generate::source(&p));
+}
+
+/// The work a region keeps is typed with the names of its `scope`s: a
+/// task spawned in `scope s1` whose local signature writes `^{s1}` was
+/// typed in `Λ` without `s1`, and its use of the region did not fit. A case
+/// `progress_and_preservation_hold` found.
+#[test]
+#[allow(
+    clippy::unreadable_literal,
+    reason = "the choices as proptest printed them"
+)]
+fn work_of_a_region_names_its_scope() {
+    let c = [
+        353888456, 969789605, 1953347358, 892319260, 59954573, 61239403, 328474308, 3050587714,
+        317413424, 0, 3925569377, 286594538, 331073892, 1239522750, 2644842610, 0, 0, 0, 613638093,
+        2117780986, 0, 103271129, 3875599509, 810550817, 0, 1179730476, 0, 3142153284, 21161750,
+        605014265, 0, 64989447, 0, 0,
+    ];
+    let p = generate::program(&c);
+    assert!(model(&p).is_ok(), "{}", generate::source(&p));
+    let checked = GEN.with(|(d, globals)| progress_and_preservation(globals, d, &p));
+    assert!(checked.is_ok(), "{checked:?}\n{}", generate::source(&p));
+}
+
+/// A change leaves the annotation of a method's argument, which fixes the
+/// dictionary the model's term names and the source does not write: `rank`
+/// of `Bool` got an `Int`, and flick-core took `Rank Int`. A case
+/// `checkers_agree` found.
+#[test]
+#[allow(
+    clippy::unreadable_literal,
+    reason = "the choices as proptest printed them"
+)]
+fn a_change_keeps_a_methods_annotation() {
+    let c = [
+        2177478260, 286759169, 812953880, 3858219642, 839833810, 221447766, 0, 0, 3741861477,
+        3440751098, 0, 0, 1162552687, 196817947, 1879677901, 1709693216,
+    ];
+    let p = generate::mutate(&generate::program(&c), &[181709788, 1865841925]);
+    let source = generate::source(&p);
+    let core = core(&source);
+    assert_eq!(
+        model(&p).is_ok(),
+        core.is_empty() || generate::by_design(&core),
+        "{core:?}\n{source}"
+    );
+}
+
+/// A local function bound with its signature keeps the qualifier inferred
+/// for it once its `let` steps to a `fix` (`core.md` §3.6): `v4 : Unit ->{}
+/// Unit` uses a region, and the `fix` in a child read its signature bare. A
+/// case `progress_and_preservation_hold` found.
+#[test]
+#[allow(
+    clippy::unreadable_literal,
+    reason = "the choices as proptest printed them"
+)]
+fn a_stepped_signature_keeps_its_qualifier() {
+    let c = [
+        1425097824, 506836982, 1915265, 0, 885644193, 1741814068, 577031872, 1905967045, 0,
+        701402791, 3155179838, 3121792442, 3210598022, 0, 3391211448, 0, 687554087, 3160364061, 0,
+        2702157866, 2194849492, 0, 3391091691, 1362750893, 0, 5597883, 0, 0,
+    ];
+    let p = generate::program(&c);
+    assert!(model(&p).is_ok(), "{}", generate::source(&p));
+    let checked = GEN.with(|(d, globals)| progress_and_preservation(globals, d, &p));
+    assert!(checked.is_ok(), "{checked:?}\n{}", generate::source(&p));
+}
+
+/// Every instance a program names is one of `Gen.fl`.
+#[test]
+fn the_instances_of_the_programs_are_declared() {
+    GEN.with(|(d, _)| {
+        for i in generate::instances() {
+            assert!(d.instances.contains_key(&i), "no `{i}` in Gen.fl");
+        }
+    });
+}
+
+/// A signature in a child names the region of its `scope`: a task given to
+/// `Fiber.spawn s` holds `v : ((Unit ->{} Unit)^{s}) ->{} Unit`, and once it
+/// is a child of the region it is typed outside the `scope` that bound `s`.
+/// With an argument that holds the region, and with one that holds nothing.
+/// Cases the model properties found.
+///
+/// The choices are the picks of the case proptest printed, as for
+/// `a_function_keeps_its_signature`.
+#[test]
 fn a_child_keeps_the_region_its_signatures_name() {
-    let held: &[u32] = &[
-        3, 0, 0, 0, 0, 0, 0, 0, 1, 3733153966, 1140624250, 0, 0, 41785623, 1, 0, 265291797,
-    ];
-    let nothing: &[u32] = &[
-        0, 0, 0, 2, 1, 1, 2971067122, 1, 1911584171, 0, 3036185343, 3743594924, 3928023536,
-        2226115803, 0, 0, 1533559200, 1,
-    ];
+    let held: &[u32] = &[3, 0, 0, 0, 0, 0, 0, 0, 1, 9, 10, 0, 0, 12, 1, 0, 15];
+    let nothing: &[u32] = &[0, 0, 0, 2, 1, 1, 10, 1, 11, 0, 9, 12, 8, 12, 0, 0, 12, 1];
     for c in [held, nothing] {
         let p = generate::program(c);
         let source = generate::source(&p);
@@ -219,16 +336,14 @@ fn a_child_keeps_the_region_its_signatures_name() {
 /// for it when its `let` steps: `v : Unit ->{} Unit` uses a handle of the
 /// `scope` around it, and the `fix` its λ became is called in a task. A
 /// case the model properties found.
+///
+/// The choices are the picks of the case proptest printed, as for
+/// `a_function_keeps_its_signature`.
 #[test]
-#[allow(
-    clippy::unreadable_literal,
-    reason = "the choices as proptest printed them"
-)]
 fn a_function_keeps_the_qualifier_of_its_local_signature() {
     let c = [
-        0, 0, 0, 2, 1, 1, 3798531823, 396777437, 2, 0, 0, 0, 1, 2291891977, 0, 1, 2111737910, 0,
-        190755199, 82792337, 0, 0, 0, 0, 2882392651, 0, 0, 0, 0, 1, 0, 0, 0, 1084595813, 2, 0, 3,
-        0, 315595452, 1,
+        0, 0, 0, 2, 1, 1, 13, 14, 2, 0, 0, 0, 1, 4, 0, 1, 9, 0, 8, 8, 0, 0, 0, 0, 19, 0, 0, 0, 0,
+        1, 0, 0, 0, 14, 2, 0, 3, 0, 18, 1,
     ];
     let p = generate::program(&c);
     let source = generate::source(&p);
@@ -245,16 +360,12 @@ fn a_function_keeps_the_qualifier_of_its_local_signature() {
 /// that region, so a child of the inner `scope` may hold the outer one,
 /// `Fiber.spawn s1` in a child of `s4` in a child of `s1`. A case the model
 /// properties found.
+///
+/// The choices are the picks of the case proptest printed, as for
+/// `a_function_keeps_its_signature`.
 #[test]
-#[allow(
-    clippy::unreadable_literal,
-    reason = "the choices as proptest printed them"
-)]
 fn a_scope_in_a_child_is_inside_the_region_of_its_owner() {
-    let c = [
-        0, 0, 0, 0, 0, 1, 2103265675, 3241815428, 0, 0, 1685817865, 0, 2523900354, 3031439068, 0,
-        1, 318732972,
-    ];
+    let c = [0, 0, 0, 0, 0, 1, 11, 12, 0, 0, 4, 0, 8, 12, 0, 1, 12];
     let p = generate::program(&c);
     let source = generate::source(&p);
     assert_eq!(source.matches("Fiber.spawn s1").count(), 2, "{source}");
@@ -300,9 +411,9 @@ proptest! {
         let source = generate::source(&p);
         let model = model(&p);
         let core = core(&source);
-        // a local function needs a signature in flick-core, not in the
-        // rules (`core.md` §2.5, 6): a change can make one of a `let`
-        let by_design = !core.is_empty() && core.iter().all(|e| e.starts_with("FLICK-T004"));
+        // a change can make a local function of a `let` without its
+        // signature, or leave a type of a method open
+        let by_design = generate::by_design(&core);
         prop_assert_eq!(
             model.is_ok(),
             core.is_empty() || by_design,

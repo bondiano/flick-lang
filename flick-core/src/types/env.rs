@@ -246,6 +246,12 @@ impl TypeDefs {
         };
     }
 
+    fn remove(&mut self, module: &str, name: &str) {
+        if let Some(types) = self.0.get_mut(module) {
+            types.remove(name);
+        }
+    }
+
     /// The types `module` defines, in no order.
     fn of(&self, module: &str) -> impl Iterator<Item = (&String, &TypeDef)> {
         self.0.get(module).into_iter().flatten()

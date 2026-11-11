@@ -71,6 +71,11 @@ pub(super) struct Tr {
     pub live_kinds: BTreeSet<String>,
     /// what the parameters of the stages before reach, for the next runtime arrow (rule 6)
     held: Vec<String>,
+    /// rule 6 as the checker's `for_loop` reads `for … do`: only the first
+    /// parameter, the body, is kept live, nothing of the source
+    pub callback_only: bool,
+    /// the arrows on the way to the result so far
+    stages: usize,
 }
 
 /// What a qualified argument reaches besides its qualifier.
@@ -209,7 +214,12 @@ impl Tr {
         let start = self.fresh.len();
         let a = self.ty(param, !neg)?;
         let mut reached = Vec::new();
-        self.reached(&a, &[], &mut reached);
+        if !neg {
+            self.stages += 1;
+        }
+        if !(self.callback_only && !neg && self.stages > 1) {
+            self.reached(&a, &[], &mut reached);
+        }
         for v in reached {
             if !held.contains(&v) {
                 held.push(v);
@@ -300,8 +310,16 @@ impl Tr {
             _ => self.new_var(),
         };
         if let [v] = &atoms[..] {
-            let rest = match site {
-                Site::Data(args) => args,
+            let rest: Vec<Ty> = match site {
+                // what the arguments reach, as rule 6 and the checker's
+                // `live_atoms` count it: no type variable
+                Site::Data(args) => {
+                    let mut reached = Vec::new();
+                    for a in &args {
+                        self.reached(a, &[], &mut reached);
+                    }
+                    reached.into_iter().map(Ty::Var).collect()
+                }
                 Site::Fun(start) => self.fresh[start..]
                     .iter()
                     .filter(|w| !matches!(&var, Ty::Var(v) if v == *w))

@@ -15,7 +15,7 @@ use super::precompiled::Precompiled;
 use super::{BindingOrigin, CalleeOrigin, Loaded, Loader, Root, StaticCapture, Virtual};
 use crate::clock::timed;
 use crate::diagnostics::{Diagnostic, Severity, codes};
-#[cfg(any(feature = "native-project", feature = "native-project"))]
+#[cfg(feature = "native-project")]
 use crate::iface::ModuleTemplate;
 use crate::iface::{Decl, Namespace};
 use crate::ir;

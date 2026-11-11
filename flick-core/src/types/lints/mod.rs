@@ -53,8 +53,6 @@ impl Checker<'_> {
                 warning.with_fix(|| (help, edits))
             }
         };
-        #[cfg(not(feature = "diagnostic-fixes"))]
-        let _ = fix;
         self.diagnostic(warning);
     }
 

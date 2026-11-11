@@ -10,7 +10,7 @@ use std::slice;
 
 use super::regions::{add_live, arg_caps, live_arg, live_stage};
 use super::{Check, Checker, error, live_service};
-use crate::types::{Caps, Row, Stage, Type, Var};
+use crate::types::{Caps, PROVIDED, Row, Stage, Type, Var};
 
 impl Checker<'_> {
     /// `ρ ⊆ ρ'`. An element or a rigid variable `ρ'` lacks goes into its
@@ -117,6 +117,10 @@ impl Checker<'_> {
                 Some(mine) if *name == live_service() => {
                     let both = arg_caps(&mine[0]).union(&arg_caps(&args[0]));
                     out.elems.insert(name.clone(), Rc::from([live_arg(both)]));
+                }
+                Some(mine) if &*name.module == PROVIDED => {
+                    let owner = self.both_owners(&mine[0], &args[0])?;
+                    out.elems.insert(name.clone(), Rc::from([owner]));
                 }
                 Some(mine) if mine.len() == args.len() => {
                     for (x, y) in mine.iter().zip(args.iter()) {

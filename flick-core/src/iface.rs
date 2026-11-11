@@ -12,12 +12,12 @@ use crate::types::{EnumLit, Instance, ModuleSignature, Type, TypeDef};
 
 mod template;
 pub use template::{
-    BindingOrigin, CalleeOrigin, LexicalScope, ModuleTemplate, StaticBinding, StaticCapture,
-    StaticMember,
+    BindingOrigin, CalleeOrigin, ExpansionFrame, LexicalScope, ModuleTemplate, StaticBinding,
+    StaticCapture, StaticMember,
 };
 
 /// Bumped on every change of the schema.
-pub const IFACE_VERSION: u32 = 13;
+pub const IFACE_VERSION: u32 = 14;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -122,10 +122,7 @@ pub struct Interface {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub member_of: Option<StaticMember>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[cfg_attr(
-        not(any(feature = "native-project", feature = "native-project")),
-        serde(skip)
-    )]
+    #[cfg_attr(not(feature = "native-project"), serde(skip))]
     pub template: Option<ModuleTemplate>,
     #[serde(default, skip_serializing_if = "is_false")]
     pub private: bool,
@@ -361,7 +358,7 @@ mod tests {
             ..Interface::default()
         };
         let serialized = serde_json::to_value(&interface).expect("interface serializes");
-        let persistent = cfg!(any(feature = "native-project", feature = "native-project"));
+        let persistent = cfg!(feature = "native-project");
         assert_eq!(serialized.get("template").is_some(), persistent);
         let restored: Interface = serde_json::from_value(serialized).expect("interface reads");
         if persistent {

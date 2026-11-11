@@ -73,6 +73,8 @@ How this is written in the language:
 
 The kind of a row in `φ` and `Eff` is fixed by its position. `none` is the empty row of any kind.
 
+The checker also takes a type variable as an element of an error row: in `{t | e}` the variable `t` stands for one error, as `Rpc.error_case : … -> ErrorCases e -> ErrorCases {t | e}` uses it. The core has no such element, and the model rejects what needs it (`flick-model/tests/known_gaps.txt`).
+
 **Row equality ≡** (SRow, ERow):
 
 - `+` is associative and commutative, with unit `none`;
@@ -239,7 +241,7 @@ Checker:
  τ ≤ τ                 τ₁ →φ τ₂  ≤  τ₁' →φ' τ₂'                   Eff r e τ  ≤  Eff r' e' τ'
 ```
 
-There are no other rules. `Ref`, `List`, records and ADTs are invariant; inside them types are compared by `≡` (see [only arrows and `Eff` have subtyping](#only-arrows-and-eff-have-subtyping)).
+There are no other rules. `Ref`, `List`, records and ADTs are invariant; inside them types are compared by `≡` (see [only arrows and `Eff` have subtyping](#only-arrows-and-eff-have-subtyping)). The checker also subsumes a `Layer` by its rows, which the core does not (see [a layer that needs less fits where more is allowed](#a-layer-that-needs-less-fits-where-more-is-allowed)).
 
 `≤-Fun` with `φ = P` and `φ' = R⟨…⟩` is the lift of a pure function into a runtime position. There is no converse, because `R⟨…⟩ ⋢ P`. At run time (§3) the lift does nothing in the model. In the IR it is the `Lift` node, and its correctness is hypothesis G2.
 
@@ -462,6 +464,8 @@ Checker:
 - The condition `φ₁ ≠ P` is the flag `Checker::runtime`. Only `perform` sets it. `function_with` (λ), `task` and `for` save the flag and restore it after the body.
 - `bindings.rs` `unsigned` → `generalize.rs` `Checker::generalize`; this is the only call of `generalize`.
 - `bindings.rs` `check_signed` and `polymorphic_runtime` (`FLICK-T013`), `pattern_let`.
+- `generalize.rs` `kind_of`: a quantified variable takes the kind of where it occurs, an argument of a type the kind of the type's parameter (`Server.Function (r : ServiceRow)` makes `r` a service row). Before, a row argument of a type other than `Eff` and `Layer` was quantified at kind `Type` (`flick-core/tests/features.rs`).
+- The model (`flick-model/src/check/generalize.rs`) quantifies type metas and the row metas a type takes, as in `Errors e`; a row only of a stage is closed, as in item 5.
 
 `foreign pure` atoms are created as state, so they have two separate rules (see [stateful atoms](#atommake-and-atomfresh-create-state-but-are-foreign-pure)). A local binding without a type does not generalize variables inside an atom type (`ui.rs` `lower_atoms` before `generalize`): its uses fix the type. An atom type with a quantified variable on a value is `FLICK-U005` (`ui.rs` `polymorphic_atom`): at the top level without a signature (`unsigned`), with a signature (`polymorphic_signature`), and when checked against `∀` (`check_value`).
 
@@ -724,7 +728,7 @@ T1 follows from two statements:
   - The case `try (raise v)`: the value `v` came from the body with `v : Errors ε'`, `ε' ⊆ ε_b`, and (Errors-Val) gives `v : Errors ε_b` for (Handle).
   - The false-guard case: the remainder `match v with ā` is typed by (Match-Val).
 
-Progress and Preservation are checked on the reference checker by the property `progress_and_preservation_hold` (`flick-model/tests/props.rs`, part of the model properties, `just model`). Every machine state, read as `⟨μ, E[e]⟩`, is retyped with `φ' ⊑ φ₀`; the run does not get stuck, and a final `raise v` is an error from `ε₀`. Programs with regions run the same way, with state `⟨Λ, μ, E[e]⟩` (`regions.md` §3.3).
+Progress and Preservation are checked on the reference checker by the property `progress_and_preservation_hold` (`flick-model/tests/props.rs`, part of the model properties, `just model`). Every machine state, read as `⟨μ, E[e]⟩`, is retyped with `φ' ⊑ φ₀`; the run does not get stuck, and a final `raise v` is an error from `ε₀`. Programs with regions run the same way, with state `⟨Λ, μ, E[e]⟩` (`regions.md` §3.3). Programs with classes too (§1.6): methods of `Describe` and `Rank` of `flick-model/src/generate/Gen.fl` at the types they have instances at, through the instance of `Option` and the superclass of `Rank`, and local functions with a class constraint, bound with their signature; the source writes no dictionary and annotates the argument of a method, and `checkers_agree` also changes a program into a method without an instance, a signature without its constraint, or an argument without its type, which flick-core may find ambiguous (`FLICK-C002`, `generate::by_design`). The module of `Gen.fl` is `Fixture`, not `Gen`, which would shadow the module of std. That name found a checker bug: a project module named like a module of std exported no instances, since `own_instances` (`env_impl.rs`) left out those of the built-in modules by name, while `learn` already keeps a built-in instance out by its key (`flick-core/src/project/tests.rs` `a_module_named_as_one_of_std_*`).
 
 **T2 (effect rows).**
 
@@ -870,6 +874,12 @@ let poke () =
 - Divergence: `List (Eff {Log} none Unit)` does not pass as `List (Eff {Log, Clock} none Unit)` (`FLICK-T003`). The model (§2.2) specifies the same.
 - The spec ("A signature gives an upper bound"; `reference/effects.md` "A runtime arrow and an Eff accept a value that needs fewer services and errors") did not say that rows under other constructors must be equal.
 - Resolution (spec): stated in `reference/effects.md`. Covariance of immutable constructors needs variance inference, which spec/03 defers.
+
+### A layer that needs less fits where more is allowed
+
+- Divergence: the checker accepts `Layer none none {Log}` where `Layer {Async} none {Log}` is expected (`effects.rs` `subsume_at`, `layer_parts`): the input and error rows are compared by `⊆`, the output row by `≡`. §2.2 has no such rule; the model follows §2.2 and rejects it (`flick-model/tests/known_gaps.txt`, `tests/check/pass/effects/async.fl` `quiet`).
+- Sound for the reason (≤-Eff) is: a layer is used only through `provide`, which adds its input row to the stage of the user, and a smaller row asks less there.
+- Resolution (recorded): adding (≤-Layer) to §2.2 needs the rule in the model and in the Lean development; until then the checker accepts more than the core.
 
 ### Or-pattern alternatives are compared by subtyping
 

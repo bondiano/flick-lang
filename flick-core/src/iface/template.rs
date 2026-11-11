@@ -26,7 +26,7 @@ pub struct StaticCapture {
     /// Original template retained by a partial application.
     pub template: Option<String>,
     /// Lexically active expansions, including captures of anonymous functors.
-    pub trace: Vec<String>,
+    pub trace: Vec<ExpansionFrame>,
     /// Packages whose private implementation names this lexical body may use.
     pub access_packages: Vec<String>,
     /// Lexical namespaces whose implementation members this body may use.
@@ -54,7 +54,6 @@ pub struct StaticBinding {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct BindingOrigin {
     pub module: String,
-    pub parameter: usize,
     pub group: usize,
     pub prefix: Vec<String>,
 }
@@ -84,4 +83,11 @@ impl LexicalScope {
     pub(crate) fn key(&self) -> String {
         format!("$scope:{}:{}", self.module, self.before)
     }
+}
+
+/// An active static application, independent of generated module names.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ExpansionFrame {
+    pub template: String,
+    pub arguments: Vec<String>,
 }

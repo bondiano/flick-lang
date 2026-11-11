@@ -1,6 +1,40 @@
 use super::*;
 use crate::iface::{read, write};
 
+#[test]
+fn symbolic_interfaces_keep_manifest_aliases_as_bounded_witness_references() {
+    let signature = ModuleSignature::Structure {
+        requirements: vec![
+            R::Type {
+                name: "T".into(),
+                params: Vec::new(),
+                manifest: Some(Type::Tuple(vec![
+                    Type::Var("T".into()),
+                    Type::Var("T".into()),
+                ])),
+            },
+            R::Value {
+                name: "value".into(),
+                ty: Type::Var("T".into()),
+            },
+        ],
+    };
+    let interface = signature.interface("Witness");
+    assert_eq!(
+        interface
+            .find(Namespace::Value, "value")
+            .and_then(|e| e.scheme.as_ref()),
+        Some(&Type::con("Witness", "T"))
+    );
+    let alias = interface
+        .find(Namespace::Type, "T")
+        .and_then(|e| e.definition.as_ref())
+        .expect("alias definition");
+    assert!(
+        matches!(&alias.form, Form::Alias { body: Type::Tuple(items), .. } if items == &vec![Type::con("Witness", "T"), Type::con("Witness", "T")])
+    );
+}
+
 fn structure(fields: &[&str]) -> ModuleSignature {
     ModuleSignature::Structure {
         requirements: fields

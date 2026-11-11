@@ -89,9 +89,11 @@ theorem Stage.Keeps.subst {φ : Stage} {q : Ty} (σ : Nat → Ty) (h : φ.Keeps 
     exact (h n hn).subst hm
 
 /-- The premise of (App) at an instance. -/
-theorem Stage.subst_keeps_or {ψ φ : Stage} {q : Ty} (θ : Nat → Ty)
-    (h : ψ = .P ∨ ψ = φ ∧ φ.Keeps q) :
-    ψ.subst θ = .P ∨ ψ.subst θ = φ.subst θ ∧ (φ.subst θ).Keeps (q.subst θ) :=
-  h.imp (fun h => by rw [h]; rfl) fun ⟨h, hk⟩ => ⟨congrArg _ h, hk.subst θ⟩
+theorem Stage.subst_keeps_or {ψ φ : Stage} {q : Ty} (θ : Nat → Ty) (h : ψ.Applies φ q) :
+    (ψ.subst θ).Applies (φ.subst θ) (q.subst θ) := by
+  rcases h with rfl | ⟨hk, rfl | ⟨C, r, e, rfl, rfl, hC⟩⟩
+  · exact .inl rfl
+  · exact .inr ⟨hk.subst θ, .inl rfl⟩
+  · exact .inr ⟨hk.subst θ, .inr ⟨C.subst θ, r.subst θ, e.subst θ, rfl, rfl, hC.subst θ⟩⟩
 
 end Flick.Elab

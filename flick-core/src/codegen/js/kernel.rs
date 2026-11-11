@@ -60,7 +60,7 @@ impl Gen<'_> {
             (&heads[..at], heads[at..].join(", "))
         };
         let mut text = if yields(stmts) {
-            format!("function* ({own}) {{\n{}}}", indent(stmts))
+            self.generator_function(&own, stmts)
         } else {
             let body = match stmts {
                 [only] if only.starts_with("return ") && !only.contains('\n') => {
@@ -148,7 +148,11 @@ impl Gen<'_> {
         let info = &f.adapter;
         if info.result.nullable || info.result.unit || copy {
             let value = self.foreign_result(f, copy, "$v");
-            format!("{}({called}, ($v) => {value})", self.rt("mapped"))
+            format!(
+                "{}({called}, {} {value})",
+                self.rt("mapped"),
+                self.arrow("$v")
+            )
         } else {
             called
         }

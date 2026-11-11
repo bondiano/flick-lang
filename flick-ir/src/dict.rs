@@ -35,3 +35,31 @@ pub enum Dict {
     /// A constraint on a type that already produced a diagnostic.
     Error,
 }
+
+impl Dict {
+    /// Each top-level name the dictionary stands on, as its module and
+    /// name: an instance (`true`) or a named dictionary value.
+    pub fn each_global(&self, f: &mut impl FnMut(bool, &str, &str)) {
+        match self {
+            Dict::Instance { module, name, args } => {
+                f(true, module, name);
+                for a in args {
+                    a.each_global(f);
+                }
+            }
+            Dict::Value { module, name } => f(false, module, name),
+            Dict::Super { dict, .. } => dict.each_global(f),
+            Dict::Structural { fields, .. } => {
+                for d in fields {
+                    d.each_global(f);
+                }
+            }
+            Dict::Opened { .. }
+            | Dict::Given(_)
+            | Dict::Field(_)
+            | Dict::Primitive { .. }
+            | Dict::Site { .. }
+            | Dict::Error => {}
+        }
+    }
+}

@@ -178,3 +178,31 @@ fn a_library_reexport_requires_its_runtime_capability() {
         assert!(diagnostics_for(source, EffectBridge::Available, release, false).is_empty());
     }
 }
+
+#[test]
+fn eager_dictionary_values_and_discarded_initializers_need_their_capabilities() {
+    for declaration in [
+        "class Seed a =\n  seed : a\ninstance Seed DateTime.TimeZone =\n  let seed = DateTime.zone_make_offset 0\n",
+        "let _ = DateTime.zone_make_offset 0\n",
+    ] {
+        let source = format!(
+            "module App.Main exposing (main)\n{declaration}\nmain : Unit ->{{}} Unit\nlet main () = ()\n"
+        );
+        for release in [false, true] {
+            let found = diagnostics(&source, EffectBridge::Absent, release);
+            assert_eq!(found.len(), 1, "{source}: {found:?}");
+            assert_eq!(found[0].code, codes::P012);
+            let span = found[0].span.expect("initializer reference");
+            assert_eq!(
+                &source[span.start as usize..span.end as usize],
+                "DateTime.zone_make_offset"
+            );
+        }
+    }
+}
+
+#[test]
+fn an_unused_dictionary_function_does_not_run_at_initialization() {
+    let source = "module App.Main exposing (main)\nclass Seed a =\n  seed : Unit -> a\ninstance Seed DateTime.TimeZone =\n  let seed () = DateTime.zone_make_offset 0\nmain : Unit ->{} Unit\nlet main () = ()\n";
+    assert!(diagnostics(source, EffectBridge::Absent, false).is_empty());
+}

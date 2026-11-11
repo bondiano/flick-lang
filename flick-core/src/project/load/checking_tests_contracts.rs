@@ -311,8 +311,7 @@ fn two_named_functor_applications_have_distinct_abstract_result_types() {
             && mismatch.message.contains("App.Parent.B.Token"),
         "{mismatch:?}"
     );
-    #[cfg(feature = "diagnostic-fixes")]
-    assert!(
+        assert!(
         mismatch
             .fixes
             .iter()

@@ -46,7 +46,8 @@ use super::packages::Packages;
 use super::{Host, Project, module_path, normalize};
 use crate::diagnostics::{Diagnostic, Edit, Severity, codes};
 use crate::iface::{
-    BindingOrigin, CalleeOrigin, LexicalScope, StaticBinding, StaticCapture, StaticMember,
+    BindingOrigin, CalleeOrigin, ExpansionFrame, LexicalScope, StaticBinding, StaticCapture,
+    StaticMember,
 };
 use crate::ir;
 use crate::plugin::EditorBlock;
