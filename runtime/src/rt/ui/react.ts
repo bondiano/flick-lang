@@ -6,12 +6,13 @@ import { Component, type ReactNode, createElement } from "react";
 
 import { type Option, none, some } from "../../core/data.ts";
 import type { ElementHandle, Ui } from "../../ui/react/nodes.ts";
-import { isSafeUrl } from "../../ui/react/nodes.ts";
+import { isSafeUrl, plainClick, routeLink } from "../../ui/react/nodes.ts";
+import { eventLatest } from "../../ui/react/handlers.ts";
 import type { RenderRoot, Renderer } from "../../ui/react/tree.ts";
 import { toReact } from "../../ui/react/tree.ts";
-import type { Registry } from "../atoms/registry.ts";
-import { registryHere } from "../atoms/services.ts";
-import { absent } from "../builtins.ts";
+import type { Atom, Registry } from "../atoms/registry.ts";
+import { WRITE, registryHere } from "../atoms/services.ts";
+import { type UrlCodec, routePrint } from "../route.ts";
 import { type Cause, Raise, causeOf, fail, raise } from "../cause.ts";
 import { type Run, Suspend, asExit, atMask, awaitFiber, currentCtx, currentFiber, exitOf, extend, raiseOf } from "../fiber.ts";
 import { service } from "../handle.ts";
@@ -40,8 +41,26 @@ export * from "./views.ts";
 /** `Ui.safe_url`: a relative URL, or one with a safe scheme. */
 export const uiSafeUrl = (url: string): Option<string> => (isSafeUrl(url) ? some(url) : none);
 
-// a route link prints its URL with the route's codec, whose `Schema` this runtime does not have yet
-export const uiRouteLink = /*#__PURE__*/ absent("@flick-lang/effect-ts/ui/react", "uiRouteLink");
+interface RouteLinkProps {
+  readonly route: Atom;
+  readonly url: UrlCodec;
+  readonly to: Readonly<Record<string, unknown>>;
+}
+
+/**
+ * A link inside the app: a plain click writes `to` to the route state, which
+ * pushes its URL without a reload; another click, and markup without a
+ * client, follow the real `href`.
+ */
+export const uiRouteLink = (props: RouteLinkProps, children: ReadonlyArray<Ui>): Ui => {
+  // a handler's task runs with the root's `Atom.Write`, as one of Flick's does
+  const navigate = (): undefined => {
+    registryHere(WRITE).set(props.route, props.to);
+    return undefined;
+  };
+  const handler = eventLatest((snapshot) => (plainClick(snapshot) ? navigate : () => undefined));
+  return routeLink(routePrint(props.url, props.to), handler, children);
+};
 
 const DETACHED = /*#__PURE__*/ tag("Ui.Detached.Detached");
 

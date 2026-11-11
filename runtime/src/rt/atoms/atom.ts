@@ -6,6 +6,7 @@ import { absent } from "../builtins.ts";
 import type { Run } from "../fiber.ts";
 import { implementation } from "../handle.ts";
 import type { Codec } from "../schema.ts";
+import { type UrlCodec, routeParse, routePrint } from "../route.ts";
 import { type Atom, type Reading, isAtom, mapped, patched, readable, state } from "./registry.ts";
 import { seededTask, serializableTask, withSeed } from "./serial.ts";
 import { WRITE, reading, registryHere, registryOf } from "./services.ts";
@@ -239,6 +240,48 @@ export const atomSerializableTask = (key: string, codec: Codec, atom: Atom<objec
 export const atomSerializableResult = (key: string, codec: Codec, errors: Codec, atom: Atom<object>): Atom<object> =>
   serializableTask(key, codec, atom, errors);
 
-// a route parses its URL with a `Schema`, and a stream query reads a `Stream`: this runtime has neither yet
-export const atomRoute = /*#__PURE__*/ absent("@flick-lang/runtime", "atomRoute");
+const location = (): string | undefined => (typeof window === "undefined" ? undefined : window.location.href);
+
+/**
+ * `Atom.route codec fallback`: the state of the URL, `fallback` when it does
+ * not parse. A server reads the URL `Atom.serving` set; a browser the page's,
+ * again on back and forward; a write pushes its URL without a reload.
+ */
+export const atomRoute = <A>(codec: UrlCodec, fallback: A): Atom<A> => {
+  // the same URL gives the same value: a server's stream compares what a view read by identity
+  let last: { readonly url: string | undefined; readonly value: A } | undefined;
+  const parse = (url: string | undefined): A => {
+    if (last !== undefined && last.url === url) return last.value;
+    const parsed = url === undefined ? undefined : routeParse(codec, url);
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- `parse` gives a value of the route type
+    const value = parsed === undefined ? fallback : (parsed as A);
+    last = { url, value };
+    return value;
+  };
+  return {
+    ...readable((r) => {
+      const served = r.get(requestUrl);
+      if (served !== undefined || typeof window === "undefined") return parse(served);
+      const update = (): void => r.setSelf(parse(location()));
+      window.addEventListener("popstate", update);
+      r.addFinalizer(() => window.removeEventListener("popstate", update));
+      return parse(location());
+    }),
+    keepAlive: true,
+    write: (value, setSelf) => {
+      if (typeof window !== "undefined") {
+        // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- a value of the route type
+        const url = routePrint(codec, value as Readonly<Record<string, unknown>>);
+        if (url !== window.location.pathname + window.location.search) window.history.pushState(null, "", url);
+      }
+      setSelf(value);
+    },
+    server: (get) => {
+      const served = get(requestUrl);
+      return parse(typeof served === "string" ? served : location());
+    },
+  };
+};
+
+// a stream query reads a `Stream`, which this runtime does not have yet
 export const atomQueryStream = /*#__PURE__*/ absent("@flick-lang/runtime", "atomQueryStream");

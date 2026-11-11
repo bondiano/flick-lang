@@ -20,7 +20,7 @@ in lists, records or variants. Its JSON codec still rejects non-finite numbers.
 Opaque Stream values stay in the adapter. Native atoms, serializable atoms and
 renderers remain on RT, including `Ui.Server.stream`, which renders on RT and
 hands its markup to the adapter's Stream. If a used UI binding needs the
-adapter (such as `Atom.route`, `Atom.query_stream` or explicit action spans),
+adapter (such as `Atom.query_stream` or explicit action spans),
 atoms, forms, routes and renderers use their matching Effect implementations
 together for the build.
 Tracing bindings share Effect implementations with their configured exporters.

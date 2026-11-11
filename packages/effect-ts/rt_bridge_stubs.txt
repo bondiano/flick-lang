@@ -1,5 +1,4 @@
 @flick-lang/runtime/rt atomQueryStream
-@flick-lang/runtime/rt atomRoute
 @flick-lang/runtime/rt durationFormat
 @flick-lang/runtime/rt redactedMake
 @flick-lang/runtime/rt redactedReveal
@@ -29,5 +28,3 @@
 @flick-lang/runtime/rt/effect/Tracer nativeParentSpan
 @flick-lang/runtime/rt/effect/Tracer nativeTracer
 @flick-lang/runtime/rt/effect/Tracer tracerHooks
-@flick-lang/runtime/rt/ui uiRouteLink
-@flick-lang/runtime/rt/ui/react uiRouteLink

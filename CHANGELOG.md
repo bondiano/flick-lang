@@ -6,6 +6,11 @@ break programs.
 
 ## Unreleased
 
+- **Routes on Flick's runtime:** `Atom.route` and `Ui.route_link` run on the
+  default runtime: the route reads the served URL on a server and the page's
+  in a browser, again on back and forward, and a write or a plain click on a
+  link pushes its URL without a reload. A program that uses them keeps its UI
+  on the runtime.
 - **Playground on Flick's own runtime:** the browser compiler checks and builds
   a program as `flick build --rt` does, and the playground runs it on Flick's
   own runtime. Bindings that runtime does not have yet still reach the Effect

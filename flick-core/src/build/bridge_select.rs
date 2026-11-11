@@ -136,6 +136,26 @@ mod tests {
     }
 
     #[test]
+    fn a_route_and_its_links_keep_the_ui_free_of_effect() {
+        let module = lower_text(
+            "App",
+            r"module App exposing (page, to)
+type Page = Home | User Float
+  deriving Eq, Show, Schema, Url
+page : Atom.Writable Page
+let page = Atom.route Page.url Home
+to : Page -> List Ui -> Ui
+let to target children = Ui.route_link { route = page; url = Page.url; to = target } children
+",
+        )
+        .expect("lowers");
+        assert_eq!(
+            select_modules(once(&module), EffectBridge::Available),
+            EffectBridge::Available
+        );
+    }
+
+    #[test]
     fn a_reexported_stream_renderer_keeps_the_ui_free_of_effect() {
         let module = lower_text(
             "App",
