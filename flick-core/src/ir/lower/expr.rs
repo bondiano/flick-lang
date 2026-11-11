@@ -39,7 +39,8 @@ impl Lower<'_> {
             expr = Self::coercion_expr(expr, coercion.dict, coercion.method, span);
         }
         if let Some(dicts) = dicts {
-            expr = Expr::new(ExprKind::Abstract(dicts, Box::new(expr)), span);
+            expr = super::abstraction::abstract_value(dicts, expr);
+            expr.span = span;
         }
         expr
     }

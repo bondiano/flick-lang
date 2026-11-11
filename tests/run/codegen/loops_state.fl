@@ -17,6 +17,13 @@ let render_twice render = (render 1, render true)
 rendered : Unit -> (String, String)
 let rendered () = loop { break (render_twice show) }
 
+polymorphic_exit : Bool -> Int
+let polymorphic_exit stop =
+  loop {
+    ignore (render_twice (if stop then break 7 else show))
+    break 8
+  }
+
 return_pattern : Unit ->{} Int
 let return_pattern () =
   loop {
@@ -73,6 +80,7 @@ let find n =
 
 main : Unit ->{} Unit
 let main () =
+  Platform.stdout_line (show (polymorphic_exit true, polymorphic_exit false))
   Platform.stdout_line (show (return_pattern ()))
   Platform.stdout_line (show (rendered ()))
   let mut record = { value = 1 }

@@ -6,6 +6,7 @@
 //! A node without a λFlick form becomes `Term::Stuck` naming it, so a
 //! program that never reaches it still runs.
 
+mod applications;
 mod callbacks;
 mod collection;
 mod control_handlers;
@@ -16,12 +17,13 @@ mod loops;
 mod mutation;
 mod mutation_errors;
 mod mutation_handlers;
+mod resumptions;
 pub mod types;
 
-use std::rc::Rc;
+use std::{collections::HashMap, rc::Rc};
 
 use flick_core::ir::{self, ItemKind};
-use flick_core::types::{Dict, InstanceInfo, default_method};
+use flick_core::types::{Dict, InstanceInfo, OpClass, default_method};
 
 use self::expr::pat;
 use crate::eval::Program;
@@ -29,11 +31,52 @@ use crate::native;
 use crate::subst::binders;
 use crate::syntax::{Arm, Const, Lit, Name, Path, RegionOp, Term};
 
+fn control(e: &ir::Expr) -> bool {
+    if let ir::ExprKind::Handle(h) = &e.kind
+        && h.effects
+            .iter()
+            .flat_map(|e| &e.operations)
+            .any(|o| o.class == OpClass::Control)
+    {
+        return true;
+    }
+    let mut found = false;
+    e.each_child(&mut |c| found |= control(c));
+    found
+}
+
 /// The program of `modules`: those of a build and the built-in ones.
 pub fn program<'a>(modules: impl IntoIterator<Item = &'a ir::Module>) -> Program {
+    let modules: Vec<_> = modules.into_iter().collect();
+    let needs_functions = modules.iter().any(|m| {
+        m.items
+            .iter()
+            .any(|i| matches!(&i.kind, ItemKind::Value { body, .. } if control(body)))
+    });
+    let functions = if needs_functions {
+        Rc::new(
+            modules
+                .iter()
+                .flat_map(|m| {
+                    m.items.iter().filter_map(|i| {
+                        if let ItemKind::Value { name, dicts, body } = &i.kind
+                            && dicts.is_empty()
+                        {
+                            Some((Path::new(&m.name, name), body.clone()))
+                        } else {
+                            None
+                        }
+                    })
+                })
+                .collect(),
+        )
+    } else {
+        Rc::default()
+    };
     let mut program = Program::default();
     for module in modules {
         let mut tr = Tr::new(&module.name);
+        tr.functions = Rc::clone(&functions);
         for item in &module.items {
             tr.item(&item.kind, &mut program);
         }
@@ -68,6 +111,7 @@ struct Tr {
     versions: Vec<(String, Name)>,
     cells: Vec<(String, Name)>,
     resumptions: Vec<(String, String)>,
+    functions: Rc<HashMap<Path, ir::Expr>>,
     control: Option<String>,
     error_action: Option<Name>,
 }
@@ -80,6 +124,7 @@ impl Tr {
             versions: Vec::new(),
             cells: Vec::new(),
             resumptions: Vec::new(),
+            functions: Rc::default(),
             control: None,
             error_action: None,
         }

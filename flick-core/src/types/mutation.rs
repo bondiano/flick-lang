@@ -28,8 +28,8 @@ pub enum Binding {
     Other,
     /// `let name = value`: `mut` would make it a variable.
     Let,
-    /// A `let` clause of `for`, whose syntax does not allow `mut`.
-    Clause,
+    /// A local `let` in syntax that does not allow `mut`.
+    Restricted(&'static str),
     /// `let mut name = value`.
     Mut,
 }
@@ -301,6 +301,22 @@ impl Checker<'_> {
         );
     }
 
+    pub(super) fn restricted_let(
+        &mut self,
+        node: &Node,
+        written: Option<&Node>,
+        rest: &[&Node],
+        context: &'static str,
+    ) {
+        let mark = self.cx.locals.len();
+        self.local_let(node, written, rest);
+        for local in &mut self.cx.locals[mark..] {
+            if local.binding == Binding::Let {
+                local.binding = Binding::Restricted(context);
+            }
+        }
+    }
+
     /// `FLICK-T069` for `name = …` where `name` is not a `let mut` variable
     /// of this function; the local `found` is the name if it is one.
     fn not_assignable(&mut self, name: &str, span: Span, found: Option<usize>) {
@@ -329,12 +345,12 @@ impl Checker<'_> {
                 })
             }
             Some(Local {
-                binding: Binding::Clause,
+                binding: Binding::Restricted(context),
                 ..
             }) => Diagnostic::error(
                 codes::T069,
                 format!(
-                    "`{name}` is a `for` clause binding and cannot be assigned; move a `let mut` binding into the loop body"
+                    "`{name}` is declared in {context}, where `let mut` is not allowed; bind a variable in an ordinary block"
                 ),
                 span,
             ),

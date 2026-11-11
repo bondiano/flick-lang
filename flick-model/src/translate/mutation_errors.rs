@@ -156,6 +156,11 @@ impl Tr {
         }
     }
     pub(super) fn protected(&mut self, e: &ir::Expr, xs: &[String]) -> Term {
+        if let Some(id) = self.control.clone()
+            && matches!(&e.kind, ExprKind::App { func, .. } if matches!(&func.kind, ExprKind::Local(n) if self.resumptions.iter().any(|(r, target)| r == n && target == &id)))
+        {
+            return self.protected_resumption(e, &id, xs);
+        }
         match &e.kind {
             ExprKind::LoopExit { id, value } if self.control.as_deref() == Some(id.as_str()) => {
                 match value {

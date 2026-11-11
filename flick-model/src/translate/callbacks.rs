@@ -19,7 +19,7 @@ impl Tr {
         if matches!(arg.kind, ExprKind::LoopExit { .. }) {
             return translate(self, arg);
         }
-        let run = |arg: &ir::Expr| app(global("Scope", "run", arg.span), arg.clone(), arg.span);
+        let run = |arg: &ir::Expr| app(global("Scope", arg.span), arg.clone(), arg.span);
         let context = match &arg.kind {
             ExprKind::If(c, a, b) => {
                 Some(ExprKind::If(c.clone(), Box::new(run(a)), Box::new(run(b))))
@@ -63,7 +63,7 @@ impl Tr {
             arg.span,
         );
         let callback = lambda(ir::Pat::Bind(s.to_string()), call, arg.span);
-        let run = app(global("Scope", "run", arg.span), callback, arg.span);
+        let run = app(global("Scope", arg.span), callback, arg.span);
         let block = binding(&name, arg, run);
         translate(self, &block)
     }
@@ -71,13 +71,8 @@ impl Tr {
     /// `Layer.run layer arg`, which is `provide layer { body }`: the core's
     /// form of it.
     pub(super) fn provide(&mut self, func: &ir::Expr, arg: &ir::Expr) -> Term {
-        self.provide_with(func, arg, &|tr, body| tr.expr(body))
-    }
-
-    /// [`Self::provide`] with the body as `body` translates it.
-    pub(super) fn provide_with(&mut self, func: &ir::Expr, arg: &ir::Expr, body: Body) -> Term {
         let layer = self.expr(layer_run(func).expect("a call of `Layer.run`"));
-        self.provide_value(layer, arg, body)
+        self.provide_value(layer, arg, &|tr, body| tr.expr(body))
     }
 
     pub(super) fn provide_value(&mut self, layer: Term, arg: &ir::Expr, body: Body) -> Term {
@@ -102,7 +97,7 @@ impl Tr {
                 );
                 let callback = lambda(ir::Pat::Wild, call, arg.span);
                 let layer = ir::Expr::new(ExprKind::Local(layer.to_string()), arg.span);
-                let partial = app(global("Layer", "run", arg.span), layer, arg.span);
+                let partial = app(global("Layer", arg.span), layer, arg.span);
                 let run = app(partial, callback, arg.span);
                 let block = binding(&name, arg, run);
                 return translate(self, &block);
@@ -140,11 +135,11 @@ fn lambda(pat: ir::Pat, body: ir::Expr, span: Span) -> ir::Expr {
         span,
     )
 }
-fn global(module: &str, name: &str, span: Span) -> ir::Expr {
+fn global(module: &str, span: Span) -> ir::Expr {
     ir::Expr::new(
         ExprKind::Global {
             module: module.into(),
-            name: name.into(),
+            name: "run".into(),
         },
         span,
     )
@@ -174,13 +169,9 @@ pub(super) fn layer_run(func: &ir::Expr) -> Option<&ir::Expr> {
 
 /// An already evaluated callback, called under the state/completion protocol.
 fn runtime_call(name: &Name, arg: ir::Expr, span: Span) -> ir::Expr {
-    ir::Expr::new(
-        ExprKind::App {
-            func: Box::new(ir::Expr::new(ExprKind::Local(name.to_string()), span)),
-            arg: Box::new(arg),
-            stage: ir::Stage::Runtime,
-            arg_first: false,
-        },
+    app(
+        ir::Expr::new(ExprKind::Local(name.to_string()), span),
+        arg,
         span,
     )
 }

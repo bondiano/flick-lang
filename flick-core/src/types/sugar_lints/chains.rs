@@ -30,10 +30,11 @@ impl Checker<'_> {
         }
         if steps.len() < 2
             || self.contains_mutable(body)
+            || lexical_exit(body)
             || steps
                 .iter()
                 .skip(1)
-                .any(|s| self.contains_mutable(s.source))
+                .any(|s| self.contains_mutable(s.source) || lexical_exit(s.source))
             || steps
                 .iter()
                 .any(|step| self.source_of(unparen(step.source)).trim().contains('\n'))
@@ -268,3 +269,17 @@ fn single(node: &Node) -> &Node {
 #[cfg(test)]
 #[path = "chains_tests.rs"]
 mod tests;
+
+/// An existing nested function or loop keeps its own exits when moved.
+fn lexical_exit(node: &Node) -> bool {
+    if matches!(node.kind, K::BreakExpr | K::ContinueExpr) {
+        return true;
+    }
+    if matches!(
+        node.kind,
+        K::FunExpr | K::TaskExpr | K::LoopExpr | K::WhileExpr | K::ForExpr
+    ) {
+        return false;
+    }
+    node.nodes().any(lexical_exit)
+}

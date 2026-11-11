@@ -327,8 +327,17 @@ let make_callback () =
   Platform.stdout_line "callback"
   fun () -> Ask.ask ()
 
+loop_scrutinee_once : Unit ->{} Int
+let loop_scrutinee_once () =
+  loop {
+    match scrutinee () with
+    | 0 -> break 0
+    | _ -> break 1
+  }
+
 main : Unit ->{} Unit
 let main () =
+  Platform.stdout_line (show (loop_scrutinee_once ()))
   Platform.stdout_line (show (scrutinee_once ()))
   Platform.stdout_line (show (callback_exit ()))
   Platform.stdout_line (show (scope_callback_exit ()))

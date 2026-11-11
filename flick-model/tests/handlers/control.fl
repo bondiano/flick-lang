@@ -68,7 +68,10 @@ let control_exit () =
         seen = n
         break n
       with
-      | Select.select () -> resume 7
+      | Select.select () ->
+        let again = resume
+        try again 7 with
+        | Missing -> ()
       | return _ ->
         seen = 99
         ()
@@ -140,6 +143,37 @@ let control_local_loops () =
     | Choose.choose () -> resume true
   (value, result)
 
+keep : a -> a
+let keep value = value
+
+keep_after : a -> b -> c -> b
+let keep_after first continuation last =
+  ignore (first, last)
+  continuation
+
+forwarded_exit : Unit ->{} Int
+let forwarded_exit () =
+  loop {
+    try
+      let n = Select.select ()
+      break n
+    with
+    | Select.select () ->
+      let again = keep resume
+      let traced =
+        (scope {
+          say "last"
+          2
+        })
+        |> keep_after
+          (scope {
+            say "first"
+            1
+          })
+          again
+      traced 19
+  }
+
 main : Unit ->{} Unit
 let main () =
   say (show (collect three))
@@ -161,6 +195,7 @@ let main () =
     )
   say (show chosen)
   say (show (control_exit ()))
+  say (show (forwarded_exit ()))
   say (show (control_normal ()))
   say (show (control_error_exit ()))
   say (show (control_unhandled ()))

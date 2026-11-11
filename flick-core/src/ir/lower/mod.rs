@@ -3,6 +3,7 @@
 //! renamed apart within each top-level definition, so a name never needs
 //! shadowing in the generated code.
 
+mod abstraction;
 mod applicative_do;
 mod comprehension;
 mod debug;
@@ -421,8 +422,7 @@ impl Lower<'_> {
                 let value = if dicts.is_empty() {
                     value
                 } else {
-                    let span = value.span;
-                    Expr::new(ExprKind::Abstract(dicts, Box::new(value)), span)
+                    abstraction::abstract_value(dicts, value)
                 };
                 Some((name, value))
             })

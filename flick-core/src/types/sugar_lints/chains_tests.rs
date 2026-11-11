@@ -102,3 +102,11 @@ fn a_bind_chain_does_not_introduce_mutable_captures() {
     );
     assert_eq!(fixed(&text, "FLICK-T035"), None);
 }
+
+#[test]
+fn a_bind_chain_does_not_move_lexical_exits_into_continuations() {
+    let text = format!(
+        "{HEAD}f : Option Int -> Option Int -> Int\nlet f a b = loop {{ ignore (match a with | Some x -> (match b with | Some y -> Some (if x > y then break 7 else y) | None -> None) | None -> None); break 0 }}\n"
+    );
+    assert_eq!(fixed(&text, "FLICK-T035"), None);
+}

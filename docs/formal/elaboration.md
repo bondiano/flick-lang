@@ -400,6 +400,10 @@ the body use private core `Ref` cells, then return the cells' values with the
 result. This keeps the current state available when a continuation is discarded.
 Control and abort handlers carry lexical completion through the protected body,
 return callback and resumption, so a resumed exit bypasses the remaining body.
+The translation normalizes immutable continuation aliases and known beta
+applications before assigning that protocol. Dictionary-independent construction
+steps and exits remain outside dictionary abstractions; their normal branches
+retain the dictionary binders.
 The source handler already requires a runtime stage; pure blocks keep the SSA
 translation. These are existing typed core operations, with no new typing rules
 or proof axioms.

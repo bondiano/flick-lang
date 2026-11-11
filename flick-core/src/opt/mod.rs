@@ -27,6 +27,7 @@ mod inline;
 mod specialize;
 mod sroa;
 mod walk;
+pub use walk::rename;
 
 #[cfg(test)]
 mod gadt_tests;

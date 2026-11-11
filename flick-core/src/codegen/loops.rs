@@ -228,7 +228,10 @@ impl Control {
                 }
                 self.guarded_block(stmts, tail, flag, span)
             }
-            ExprKind::Within(_, body) | ExprKind::Lambda { body, .. } | ExprKind::Task(body) => {
+            ExprKind::Within(_, body)
+            | ExprKind::Lambda { body, .. }
+            | ExprKind::Abstract(_, body)
+            | ExprKind::Task(body) => {
                 **body = self.guarded_parts((**body).clone(), flag);
                 e
             }

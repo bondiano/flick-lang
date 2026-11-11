@@ -66,7 +66,7 @@ impl Checker<'_> {
                     n.kind == K::LetDecl && let_parts(n, self.text).name.as_deref() == name
                 });
                 if let Some(decl) = decl {
-                    self.local_let(decl, Some(first), &rest[1..]);
+                    self.restricted_let(decl, Some(first), &rest[1..], "a `do` block");
                     self.do_rest(node, &rest[1..], expected)
                 } else {
                     self.lone_signature(first, false);
@@ -74,7 +74,7 @@ impl Checker<'_> {
                 }
             }
             K::LetDecl => {
-                self.local_let(first, None, rest);
+                self.restricted_let(first, None, rest, "a `do` block");
                 self.do_rest(node, rest, expected)
             }
             K::GuardStmt => {

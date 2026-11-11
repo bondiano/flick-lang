@@ -17,6 +17,17 @@ use flick_core::{
 };
 
 impl Tr {
+    pub(super) fn protected_resumption(&mut self, e: &ir::Expr, id: &str, xs: &[String]) -> Term {
+        let completion = self.loop_result(e, id);
+        let name = self.fresh("completion");
+        let body = Term::Let(
+            name.clone(),
+            None,
+            Rc::new(completion),
+            Rc::new(self.pack(result(true, Term::Var(name)), xs)),
+        );
+        self.catch_failure(body, xs, true)
+    }
     pub(super) fn iteration_effectful(&self, e: &ir::Expr) -> bool {
         effectful(e) || (!self.cells.is_empty() && self.cell_step(e))
     }
@@ -138,7 +149,8 @@ impl Tr {
                 {
                     self.resumptions.push((name.clone(), id.into()));
                 }
-                let mut body = self.loop_result(body, id);
+                let normalized = self.normalize_resumptions(body, id);
+                let mut body = self.loop_result(&normalized, id);
                 self.resumptions.truncate(mark);
                 for p in params.iter().rev() {
                     body = self.param(&p.pat, body);

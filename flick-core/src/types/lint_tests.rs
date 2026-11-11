@@ -94,3 +94,19 @@ fn a_for_clause_binding_does_not_get_an_invalid_mut_fix() {
         "let mut is not valid in a for clause"
     );
 }
+
+#[test]
+fn a_do_binding_does_not_get_an_invalid_mut_fix() {
+    let text = format!(
+        "{HEAD}f : Int -> Option Unit\nlet f n = do {{ let x = n; pure (if n > 0 then x = x + 1) }}\n"
+    );
+    let diagnostics = check(&text);
+    let error = diagnostics
+        .iter()
+        .find(|d| d.code.to_string() == "FLICK-T069")
+        .expect("immutable assignment");
+    assert!(
+        error.fixes.is_empty(),
+        "let mut is not valid directly in do"
+    );
+}

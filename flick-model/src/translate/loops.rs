@@ -118,22 +118,6 @@ impl Tr {
         let value = self.loop_value(e, id, &tracked);
         self.unpack_loop(value, &tracked, out, k)
     }
-    fn loop_completion(&self, e: &ir::Expr, id: &str) -> bool {
-        if matches!(&e.kind, ExprKind::LoopExit { id: target, .. } if target == id)
-            || matches!(&e.kind, ExprKind::App { func, .. } if matches!(&func.kind, ExprKind::Local(n) if self.resumptions.iter().any(|(r, target)| r == n && target == id)))
-        {
-            return true;
-        }
-        if matches!(
-            e.kind,
-            ExprKind::ControlLoop { .. } | ExprKind::Generate { .. }
-        ) {
-            return false;
-        }
-        let mut found = false;
-        e.each_child(&mut |c| found |= self.loop_completion(c, id));
-        found
-    }
     pub(super) fn unpack_loop(
         &mut self,
         value: Term,
@@ -205,6 +189,16 @@ impl Tr {
         }
     }
     pub(super) fn loop_value(&mut self, e: &ir::Expr, id: &str, xs: &[String]) -> Term {
+        if !matches!(e.kind, ExprKind::Each { .. } | ExprKind::Yield(_))
+            && modified(e).is_empty()
+            && !self.loop_completion(e, id)
+        {
+            let value = self.expr(e);
+            return self.loop_pack(true, value, xs);
+        }
+        if let Some(value) = self.loop_application(e, id, xs) {
+            return value;
+        }
         match &e.kind {
             ExprKind::App { func, arg, .. } if matches!(&func.kind, ExprKind::Local(n) if self.resumptions.iter().any(|(r, target)| r == n && target == id)) => {
                 self.loop_with(arg, id, xs, &|tr, v| {
@@ -250,9 +244,11 @@ impl Tr {
                     }
                 })
             }
-            ExprKind::Match(s, arms) => {
-                self.loop_with(s, id, xs, &|tr, value| tr.loop_arms(value, arms, id, xs))
-            }
+            ExprKind::Match(s, arms) => self.loop_with(s, id, xs, &|tr, value| {
+                let name = tr.fresh("scrutinee");
+                let body = tr.loop_arms(Term::Var(name.clone()), arms, id, xs);
+                Term::Let(name, None, Rc::new(value), Rc::new(body))
+            }),
             ExprKind::App { func, arg, .. } if is_global(func, "Scope", "run") => {
                 self.scope_with(arg, &|tr, body| tr.loop_value(body, id, xs))
             }
