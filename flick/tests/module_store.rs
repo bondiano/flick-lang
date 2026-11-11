@@ -5,7 +5,7 @@
 mod common;
 
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use common::project;
@@ -51,16 +51,21 @@ fn flick(root: &Path, args: &[&str]) -> (Option<i32>, String, usize) {
     (out.status.code(), format!("{stdout}{stderr}"), checked)
 }
 
-#[test]
-fn a_saved_module_serves_the_next_process_until_what_it_read_changes() {
-    let root = project(
-        "module-store",
+/// A project of two modules in a directory of its own, `name`.
+fn app(name: &str) -> PathBuf {
+    project(
+        name,
         &[
             ("app/flick.toml", APP),
             ("app/src/App/Base.fl", BASE),
             ("app/src/App/Main.fl", MAIN),
         ],
-    );
+    )
+}
+
+#[test]
+fn a_saved_module_serves_the_next_process_until_what_it_read_changes() {
+    let root = app("module-store");
     let base = root.join("app/src/App/Base.fl");
     let check = |what: &str, status: i32, checked: usize| {
         let (code, out, count) = flick(&root, &["check"]);
@@ -78,6 +83,19 @@ fn a_saved_module_serves_the_next_process_until_what_it_read_changes() {
     fs::write(&base, BASE).expect("write");
     check("the text saved before", 0, 0);
 
+    // what cannot be read back is checked again
+    let saved = root.join("cache/flick/modules");
+    for entry in fs::read_dir(&saved).expect("saved modules") {
+        fs::write(entry.expect("an entry").path(), "{").expect("write");
+    }
+    check("every saved module unreadable", 0, 2);
+}
+
+#[test]
+#[ignore = "needs Node and the installed runtime"]
+fn a_build_takes_the_modules_saved_with_their_ir() {
+    let root = app("module-store-run");
+    assert_eq!(flick(&root, &["check"]).2, 2);
     // a check lowers nothing, so a build takes none of its modules; a later
     // build, after an edit, takes the others with their IR
     let (code, out, count) = flick(&root, &["run"]);
@@ -88,11 +106,4 @@ fn a_saved_module_serves_the_next_process_until_what_it_read_changes() {
     let (code, out, count) = flick(&root, &["run"]);
     assert_eq!((code, count), (Some(0), 1), "{out}");
     assert!(out.contains("3\n"), "{out}");
-
-    // what cannot be read back is checked again
-    let saved = root.join("cache/flick/modules");
-    for entry in fs::read_dir(&saved).expect("saved modules") {
-        fs::write(entry.expect("an entry").path(), "{").expect("write");
-    }
-    check("every saved module unreadable", 0, 2);
 }
