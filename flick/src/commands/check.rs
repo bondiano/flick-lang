@@ -5,7 +5,6 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use flick_core::diagnostics::{Diagnostic, Edit, Severity, codes};
-use flick_core::project::config::Backend;
 use flick_core::project::{self, ModuleCache, Project};
 use flick_core::source::{FileId, SourceMap};
 
@@ -103,9 +102,7 @@ impl CheckCommand {
         };
         // Projects select class-derived stages on RT. Persist that set of
         // builtin interfaces, rather than checking std anew in every process.
-        let rt = project
-            .as_ref()
-            .is_some_and(|p| p.config.build.effect == Backend::Rt);
+        let rt = project::stages_by_class(project.as_ref(), false);
         timings::stage("Preparing compiler");
         if let Err(diagnostic) = builtins::prepare_in(rt) {
             return (

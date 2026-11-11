@@ -162,7 +162,7 @@ impl Command for BuildCommand {
         if let Err(outcome) = self.prepare(&progress) {
             return outcome;
         }
-        if plan.extras.rt
+        if project::stages_by_class(project.as_ref(), plan.extras.rt)
             && let Err(diagnostic) = builtins::prepare_in(true)
         {
             return Outcome {
