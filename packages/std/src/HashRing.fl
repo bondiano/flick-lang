@@ -2,8 +2,6 @@
 /// persistent, and identifies a node by the string its key function gives.
 module HashRing exposing (HashRing, make, add, add_many, remove, has, get, get_shards)
 
-import Hash
-
 // Point ordering and shard allocation are derived from effect@4.1.2 HashRing (MIT).
 
 /// A point of a node on the ring: its hash, the node's key, the node and its weight.
@@ -16,7 +14,6 @@ opaque type HashRing a =
     base : Float;
     nodes : List (String, a, Float);
     points : List (Point a);
-    total : Float;
   }
 
 /// The nodes with `node` under `name`, in the place of the node of that name.
@@ -33,28 +30,26 @@ let placed name node weight nodes =
 points_of : Float -> (String, a, Float) -> List (Point a)
 let points_of base (name, node, weight) =
   List.map
-    (fun at -> (Hash.string (name ++ ":" ++ show (at + 1)), name, node, weight))
+    (fun at -> (hash (name ++ ":" ++ show (at + 1)), name, node, weight))
     (List.range 0 (Int.truncate (Float.round (weight * base))))
 
 /// Whether a point is before another: by hash, then by the key of its node.
 before : Point a -> Point a -> Ordering
 let before (h, n, _, _) (g, m, _, _) = if h == g then compare n m else compare h g
 
-/// The ring of the nodes and their points, sorted; the weights are summed
-/// in the order of the keys, for the same rounding on every target.
+/// The weight of all nodes, summed in the order of their keys, for the same
+/// rounding on every target.
+total_of : List (String, a, Float) -> Float
+let total_of nodes =
+  List.fold_left
+    (fun sum (_, _, weight) -> sum + weight)
+    0
+    (List.sort_by (fun (n, _, _) (m, _, _) -> compare n m) nodes)
+
+/// The ring of the nodes and their points, sorted.
 ring : (a -> String) -> Float -> List (String, a, Float) -> List (Point a) -> HashRing a
 let ring key base nodes points =
-  let weights =
-    List.map
-      (fun (_, _, weight) -> weight)
-      (List.sort_by (fun (n, _, _) (m, _, _) -> compare n m) nodes)
-  let made = {
-    key = key;
-    base = base;
-    nodes = nodes;
-    points = points;
-    total = List.fold_left (fun sum weight -> sum + weight) 0 weights;
-  }
+  let made = { key = key; base = base; nodes = nodes; points = points }
   HashRing made
 
 /// The hash of the point at `at`.
@@ -148,18 +143,23 @@ let given plan spread shard at =
   | None -> (spread, (shard, None))
   | Some (_, name, node, weight) ->
     let has = count_of name spread.counts + 1
-    let share = Float.max 1 (Float.floor (Int.to_float plan.count * weight / plan.total))
+    // its part of the weight first, then the shards: the order rounds differently
+    let share = Float.max 1 (Float.floor (Int.to_float plan.count * (weight / plan.total)))
     let counts =
       List.concat [List.filter (fun (other, _) -> other != name) spread.counts, [(name, has)]]
-    let full = if Int.to_float has >= share then List.concat [spread.full, [name]] else spread.full
+    let full =
+      if Int.to_float has >= share && not (List.contains name spread.full) then
+        List.concat [spread.full, [name]]
+      else
+        spread.full
     ({ counts = counts; full = full }, (shard, Some node))
 
 /// A shard with the place of the point nearest to it and how far that is.
 shard_of : List (Point a) -> Int -> (Int, Int, Float)
 let shard_of points shard =
-  let hash = Hash.string ("shard-" ++ show shard)
-  let at = nearest points hash None
-  (shard, at, distance points hash at)
+  let spot = hash ("shard-" ++ show shard)
+  let at = nearest points spot None
+  (shard, at, distance points spot at)
 
 /// Gives a shard to its nearest node, unless that node is full.
 near_pass : Plan a -> Spread -> (Int, Int, Float) -> (Spread, (Int, Option a))
@@ -174,7 +174,7 @@ let near_pass plan spread (shard, at, _) =
 far_pass : Plan a -> Spread -> Int -> (Spread, (Int, Option a))
 let far_pass plan spread shard =
   let excluding = if List.length spread.full == plan.nodes then None else Some spread.full
-  given plan spread shard (nearest plan.points (Hash.string ("shard-" ++ show shard)) excluding)
+  given plan spread shard (nearest plan.points (hash ("shard-" ++ show shard)) excluding)
 
 /// The shards that have a node, each with it.
 with_node : List (Int, Option a) -> List (Int, a)
@@ -198,9 +198,9 @@ let add_many options nodes (HashRing self) =
   // of two nodes with one key the later stays
   let added = List.fold_left (fun all node -> placed (self.key node) node weight all) [] nodes
   let names = List.map (fun (name, _, _) -> name) added
-  // the points of the other nodes stay sorted: only the new ones are sorted into them
+  // the points of the other nodes are not hashed again: the new ones are sorted into them
   let kept = List.filter (fun (_, name, _, _) -> not (List.contains name names)) self.points
-  let fresh = List.sort_by before (List.flat_map (points_of self.base) added)
+  let fresh = List.flat_map (points_of self.base) added
   ring
     self.key
     self.base
@@ -231,7 +231,7 @@ let get input (HashRing self) =
   else
     Option.map
       (fun (_, _, node, _) -> node)
-      (List.get (nearest self.points (Hash.string input) None) self.points)
+      (List.get (nearest self.points (hash input) None) self.points)
 
 /// The node of each of `count` shards, spread by weight; `None` for an
 /// empty ring.
@@ -243,7 +243,7 @@ let get_shards requested (HashRing self) =
     let count = Int.max requested 0
     let plan = {
       points = self.points;
-      total = self.total;
+      total = total_of self.nodes;
       nodes = List.length self.nodes;
       count = count;
     }

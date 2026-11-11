@@ -72,6 +72,12 @@ let main () =
       landing twice,
     ))
   line "three is as it was" (landing three ++ " " ++ shards 6 three)
+  let even = ring_of None [("a", None), ("b", None), ("c", None)]
+  line
+    "more shards than shares"
+    (show (List.map (fun count -> shards count even) [4, 5, 7, 8, 11, 14, 20]))
+  let light = ring_of (Some 16) [("a", None), ("z", Some 0.1)]
+  line "shards once every node is full" (show (List.map (fun count -> shards count light) [33, 66]))
   line
     "base weights"
     (show
