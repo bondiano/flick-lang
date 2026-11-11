@@ -9,6 +9,8 @@ and have the requested export, but produce the wrong output.
 English/Russian `title`, `task`, and `hint` strings (Russian keys end in `_ru`).
 `starter_error` names the one error code the starter reports (`FLICK-T003`
 when absent); CI checks it, while the browser only asks to fix the errors.
+`runs = true` asks for an export that runs (`->{}`): its declared result is
+an Effect of the `return_type` that needs and fails with nothing.
 The current checker supports one or more curried primitive string, number, and boolean arguments,
 and those result types plus void. Add support in the shared checker and loader
 before using more complex signatures.

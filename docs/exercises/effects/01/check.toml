@@ -1,7 +1,8 @@
-export = "describe_total"
-argument_types = ["number"]
-return_type = "string"
-output = "77 years; not a list of ages"
+export = "total_age"
+argument_types = ["string"]
+return_type = "number"
+runs = true
+output = "77 -1"
 starter_error = "FLICK-E002"
 title = "Practice: say how it fails"
 title_ru = "Практика: скажите, как она падает"
