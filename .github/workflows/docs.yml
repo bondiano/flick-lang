@@ -1,16 +1,19 @@
 name: Docs
 
+# CI checks and builds the site on every pull request and push (`just e2e-js`:
+# translations, the site, its links and a browser; `just unit`: the examples).
+# A push to main whose CI passed keeps the site CI built, and this workflow
+# deploys it: nothing is published with a translation behind, a broken
+# example or a dead link, and the site is built once. To redeploy, re-run
+# a run of this workflow
 on:
-  push:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
     branches: [main]
-  pull_request:
-    paths:
-      - docs/**
-      - editors/vscode/syntaxes/**
-      - .github/workflows/docs.yml
-  workflow_dispatch:
 
 permissions:
+  actions: read
   contents: read
   pages: write
   id-token: write
@@ -21,42 +24,22 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  build:
-    runs-on: ubuntu-26.04
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v7
-      # installs the toolchain and the wasm target from rust-toolchain.toml
-      - run: rustup show active-toolchain || rustup toolchain install
-      - uses: Swatinem/rust-cache@v2
-      - uses: taiki-e/install-action@v2
-        with:
-          tool: just@1.59.0
-      - uses: pnpm/action-setup@v6
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 24.18.0
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      # nothing is published with a translation behind, a broken example or a dead link
-      - run: node docs/scripts/parity.mjs
-      - run: cargo test -p flick-core --test corpus docs_examples_check
-      - run: just docs
-      - name: Check every exercise contract and its rejected answers
-        run: pnpm -C docs exec node --test test/exercise-engine.test.ts test/exercise-loader.test.ts test/lesson.test.ts test/lesson-browser.test.ts
-      - run: node docs/scripts/links.mjs
-      - uses: actions/upload-pages-artifact@v5
-        with:
-          path: docs/dist
-
   deploy:
-    if: github.event_name != 'pull_request'
-    needs: build
+    if: github.event.workflow_run.event == 'push' && github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-26.04
     timeout-minutes: 10
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: site
+          path: docs/dist
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ github.token }}
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: docs/dist
       - id: deployment
         uses: actions/deploy-pages@v5
