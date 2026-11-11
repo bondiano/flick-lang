@@ -386,5 +386,11 @@ bridgeKernel.causeToEffect = causeToEffect;
       ),
       "flick.render",
     );
+  // the native `Atom.query_stream` runs the Stream on its registry's fiber; a chunk's last element is the latest, as the adapter's stream atom takes it
+  streamHooks.each = (stream, element) =>
+    fromEffect(
+      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- `Atom.query_stream` takes a Stream
+      Stream.runForEachArray(stream as Stream.Stream<unknown, unknown>, (chunk) => Effect.sync(() => element(chunk[chunk.length - 1]))),
+    );
 };
 initializeBridge();

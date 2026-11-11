@@ -1,2 +1,1 @@
-@flick-lang/runtime/rt atomQueryStream
 @flick-lang/runtime/rt/effect/Schedule cron

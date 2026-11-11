@@ -502,10 +502,10 @@ const isResult = (value: unknown): value is AsyncResult =>
   typeof value === "object" && value !== null && ["Initial", "Success", "Failure"].includes(String(Reflect.get(value, "_tag")));
 
 /** The result of a run that has started again after `previous`. */
-const waitingFrom = (previous: { readonly value: unknown } | undefined): AsyncResult =>
+export const waitingFrom = (previous: { readonly value: unknown } | undefined): AsyncResult =>
   previous !== undefined && isResult(previous.value) ? { ...previous.value, waiting: true } : { _tag: "Initial", waiting: true };
 
-const lastSuccess = (previous: { readonly value: unknown } | undefined): { readonly value: unknown } | undefined => {
+export const lastSuccess = (previous: { readonly value: unknown } | undefined): { readonly value: unknown } | undefined => {
   const result = previous?.value;
   if (!isResult(result) || result._tag === "Initial") return undefined;
   return result._tag === "Success" ? { value: result.value } : result.previous;
@@ -531,3 +531,4 @@ export const taskAtom = (make: (reading: Reading) => () => unknown): Atom<AsyncR
     reading.addFinalizer(() => fiber.interrupt(-1));
     return waitingFrom(previous);
   });
+

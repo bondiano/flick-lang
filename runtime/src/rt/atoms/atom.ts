@@ -2,14 +2,17 @@
 // from `@flick-lang/runtime/rt`.
 import type { HashDict } from "../../core/data.ts";
 import { none, some } from "../../core/data.ts";
-import { absent } from "../builtins.ts";
-import type { Run } from "../fiber.ts";
+import { tag } from "../../tags.ts";
+import { type Cause, type Exit, fail } from "../cause.ts";
+import { type Run, forkNow } from "../fiber.ts";
 import { implementation } from "../handle.ts";
+import { withOwner } from "../owner.ts";
 import type { Codec } from "../schema.ts";
 import { type UrlCodec, routeParse, routePrint } from "../route.ts";
-import { type Atom, type Reading, isAtom, mapped, patched, readable, state } from "./registry.ts";
+import { streamHooks } from "../ui/stream_hook.ts";
+import { type Atom, type AsyncResult, type Reading, isAtom, lastSuccess, mapped, patched, readable, state, waitingFrom } from "./registry.ts";
 import { seededTask, serializableTask, withSeed } from "./serial.ts";
-import { WRITE, reading, registryHere, registryOf } from "./services.ts";
+import { WRITE, reading, registryHere, registryOf, toAsync } from "./services.ts";
 
 export { atomPending } from "./services.ts";
 
@@ -283,5 +286,49 @@ export const atomRoute = <A>(codec: UrlCodec, fallback: A): Atom<A> => {
   };
 };
 
-// a stream query reads a `Stream`, which this runtime does not have yet
-export const atomQueryStream = /*#__PURE__*/ absent("@flick-lang/runtime", "atomQueryStream");
+/**
+ * The atom of the latest element the task `run` hands to its `element`, run
+ * as a task atom's: waiting until the first, then each element, the last
+ * one when the task ends, or the last of an earlier run; `empty` fails it
+ * when there is none. Its failure fails it. As the adapter's atom of a stream.
+ */
+const streamAtom = (run: (element: (value: unknown) => void) => unknown, empty: () => Cause): Atom<AsyncResult> =>
+  readable((r) => {
+    const previous = r.self();
+    let latest: { readonly value: unknown } | undefined;
+    let started = false;
+    const element = (value: unknown): void => {
+      latest = { value };
+      // during the read, the value it returns is the latest; `setSelf` there would replace it
+      if (started) r.setSelf({ _tag: "Success", value, waiting: true });
+    };
+    const ended = (exit: Exit): AsyncResult => {
+      const last = latest ?? lastSuccess(previous);
+      if (exit.cause !== undefined) return { _tag: "Failure", cause: exit.cause, previous: last, waiting: false };
+      return last === undefined ? { _tag: "Failure", cause: empty(), previous: undefined, waiting: false } : { _tag: "Success", value: last.value, waiting: false };
+    };
+    const fiber = forkNow(() => withOwner(() => run(element)), r.registry.ctx);
+    if (fiber.exit !== undefined) return ended(fiber.exit);
+    started = true;
+    fiber.observe((exit) => r.setSelf(ended(exit)));
+    r.addFinalizer(() => fiber.interrupt(-1));
+    return latest === undefined ? waitingFrom(previous) : { _tag: "Success", value: latest.value, waiting: true };
+  });
+
+const NO_SUCH_ELEMENT = /*#__PURE__*/ tag("Cause.NoSuchElementError.NoSuchElementError");
+
+const noElement = (): Cause => fail(Object.freeze({ _tag: NO_SUCH_ELEMENT, _0: "the stream ended with no element" }));
+
+/**
+ * `Atom.query_stream keys stream`: the latest element of `stream`, which a
+ * mutation of one of `keys` starts anew. The stream is the adapter's
+ * `Stream`, which its bridge runs; one that ends with no element fails with
+ * `NoSuchElementError`, as the adapter's atom of a stream does.
+ */
+export const atomQueryStream = (keys: ReadonlyArray<string>, stream: unknown): Atom => {
+  const run = (element: (value: unknown) => void): unknown => {
+    if (streamHooks.each === undefined) throw new Error("`Atom.query_stream` reads a `Stream`, which needs the optional `@flick-lang/effect-ts` adapter");
+    return streamHooks.each(stream, element);
+  };
+  return withReactivity(keys, mapped(streamAtom(run, noElement), toAsync));
+};

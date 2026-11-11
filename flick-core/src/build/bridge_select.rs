@@ -156,6 +156,21 @@ let to target children = Ui.route_link { route = page; url = Page.url; to = targ
     }
 
     #[test]
+    fn a_stream_query_keeps_the_ui_free_of_effect() {
+        let module = lower_text(
+            "App",
+            "module App exposing (latest)\n\
+             latest : Atom.Atom (Atom.Async Float none)\n\
+             let latest = Atom.query_stream [\"stock\"] (Stream.from_list [7, 8])\n",
+        )
+        .expect("lowers");
+        assert_eq!(
+            select_modules(once(&module), EffectBridge::Available),
+            EffectBridge::Available
+        );
+    }
+
+    #[test]
     fn a_reexported_stream_renderer_keeps_the_ui_free_of_effect() {
         let module = lower_text(
             "App",
