@@ -82,11 +82,11 @@ impl Normalize<'_> {
             _ => false,
         }
     }
-    fn alias_tail(&self, e: &ir::Expr) -> bool {
+    fn value_tail(&self, e: &ir::Expr) -> bool {
         if let ExprKind::Block(_, tail) = &e.kind {
-            return self.alias_tail(tail);
+            return self.value_tail(tail);
         }
-        self.value(e) && mentions(e, &self.roots)
+        self.value(e)
     }
     fn expr(&mut self, e: &ir::Expr) -> ir::Expr {
         if let ExprKind::Local(n) = &e.kind
@@ -111,10 +111,23 @@ impl Normalize<'_> {
         let saved = self.aliases.clone();
         let mut out = Vec::new();
         for stmt in stmts {
+            if let Stmt::Fun {
+                name,
+                rec: false,
+                dicts,
+                value,
+            } = stmt
+                && dicts.is_empty()
+                && matches!(value.kind, ExprKind::Lambda { .. })
+            {
+                let value = self.expr(value);
+                self.aliases.insert(name.clone(), value);
+                continue;
+            }
             if let Stmt::Let(p, e) = stmt {
                 let mut e = self.expr(e);
                 if let Pat::Bind(name) = p
-                    && self.alias_tail(&e)
+                    && self.value_tail(&e)
                 {
                     while let ExprKind::Block(stmts, tail) = e.kind {
                         out.extend(stmts);

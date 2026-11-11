@@ -159,6 +159,8 @@ let forwarded_exit () =
       break n
     with
     | Select.select () ->
+      let forward k = k
+      let relay = forward
       let again = keep resume
       let traced =
         (scope {
@@ -171,7 +173,7 @@ let forwarded_exit () =
             1
           })
           again
-      traced 19
+      relay traced 19
   }
 
 main : Unit ->{} Unit
