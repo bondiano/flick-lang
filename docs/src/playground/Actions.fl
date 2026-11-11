@@ -3,6 +3,7 @@ module Actions exposing (
   prepare_highlighting,
   prepare_editor,
   refresh,
+  rerun,
   load_compiler,
   edit,
   edited,
@@ -499,7 +500,9 @@ let run_program model =
       | JsError failure -> { empty_execution with status = "failure"; detail = failure.message }
     update model (fun m -> { m with running = false; execution = execution })
     runtime_messages model
-    rerun model
+    // an edit made while this ran waits for its own pause, through a new check
+    let current = Atom.current model
+    if current.autorun && current.source != m.source then notify "fp-compile"
 
 /// Receives output and failures after a preview has mounted.
 runtime_messages : Atom.Writable Model ->{Atom.Write} Unit

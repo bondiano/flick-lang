@@ -47,6 +47,7 @@ export const lessons = (): ReadonlyArray<Lesson> => {
   return read<Index>(path.join(site, "tour/index.json")).chapters.flatMap(({ lessons: entries, ...chapter }) =>
     entries.map((entry): Lesson => {
       if (entry.exercise !== undefined) return { id: entry.id, chapter, expect: "", exercise: entry.exercise };
+      if (entry.example !== undefined && !examples.has(entry.example)) throw new Error(`tour lesson ${entry.id}: no gallery example ${entry.example}`);
       const [file, expect] = entry.example === undefined
         ? [path.join(site, "tour", chapter.id, `${entry.id}.fl`), entry.expect ?? ""]
         : [path.join(gallery, `${entry.example}.fl`), examples.get(entry.example) ?? ""];
