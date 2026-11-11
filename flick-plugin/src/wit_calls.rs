@@ -41,6 +41,16 @@ macro_rules! wit_call_conversions {
                         })
                         .collect(),
                 }),
+                lacking: c.lacking.as_ref().map(|l| w::Lacking {
+                    allowed: w::Enclosing {
+                        services: l.allowed.services.clone(),
+                        open: l.allowed.open,
+                    },
+                    what: l.what.clone(),
+                    services: l.services.clone(),
+                    labels: l.labels.clone(),
+                    errors: l.errors.clone(),
+                }),
             }
         }
 
@@ -73,6 +83,16 @@ macro_rules! wit_call_conversions {
                             open: f.open,
                         })
                         .collect(),
+                }),
+                lacking: c.lacking.map(|l| $crate::Lacking {
+                    allowed: $crate::Enclosing {
+                        services: l.allowed.services,
+                        open: l.allowed.open,
+                    },
+                    what: l.what,
+                    services: l.services,
+                    labels: l.labels,
+                    errors: l.errors,
                 }),
             }
         }

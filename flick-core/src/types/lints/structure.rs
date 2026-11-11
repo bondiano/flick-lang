@@ -131,6 +131,7 @@ impl Checker<'_> {
                 refinement: None,
                 generated: at.start >= self.generated,
                 tagged: None,
+                lacking: None,
                 binding: Some(Binding {
                     module: self.env.module.clone(),
                     name: Some(name.to_owned()),

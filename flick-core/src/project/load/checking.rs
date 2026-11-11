@@ -333,16 +333,23 @@ include!("checking_inline.rs");
 include!("checking_relocate.rs");
 include!("checking_relocate_decls.rs");
 impl Checking<'_> {
-    /// What the watching plugins find wrong with the places of `loaded` that
-    /// call the names each watches, at spans of the module's own text; a
-    /// plugin gets what it collected from this module's blocks, if any.
-    fn watched_calls(&self, loaded: &Loaded, typing: &types::Typing) -> Vec<Diagnostic> {
+    /// Adds to `checked` what the watching plugins find wrong with the places
+    /// of `loaded` that call the names each watches, at spans of the module's
+    /// own text; a plugin gets what it collected from this module's blocks,
+    /// if any. Its answer about a row that does not allow what is asked
+    /// stands for the compiler's refusal there.
+    fn watched_calls(
+        &self,
+        loaded: &Loaded,
+        typing: &types::Typing,
+        checked: &mut Vec<Diagnostic>,
+    ) {
         if typing.call_sites.is_empty() {
-            return Vec::new();
+            return;
         }
         let expansion = loaded.expansion.as_deref();
         let sites = plugin_calls::placed_sites(&typing.call_sites, expansion, loaded.file);
-        (self.watching.iter())
+        let answers: Vec<Diagnostic> = (self.watching.iter())
             .flat_map(|w| {
                 // Each block of a collected group holds the same state,
                 // already collected from all its blocks, not just this one.
@@ -359,7 +366,9 @@ impl Checking<'_> {
                     loaded.file,
                 )
             })
-            .collect()
+            .collect();
+        plugin_calls::answered(checked, &answers, &typing.call_sites, &sites, loaded.file);
+        checked.extend(answers);
     }
 }
 

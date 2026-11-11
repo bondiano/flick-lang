@@ -7,15 +7,17 @@
 use std::collections::HashMap;
 use std::mem;
 
+use super::Elem;
 use super::ty::{Norm, Type};
 use super::typing::Ref;
 use super::ui::members;
 use super::{Checker, Range, let_parts};
 use crate::iface::{self, Namespace};
+use crate::source::Span;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
 use crate::types::lang::{self, Lang};
-use flick_plugin::{CallSite, Enclosing, Tagged};
+use flick_plugin::{CallSite, Enclosing, Lacking, Tagged};
 
 impl Checker<'_> {
     /// The top-level functions of this module that make an atom, an action
@@ -181,6 +183,7 @@ impl Checker<'_> {
                     reaches,
                     inside: around.iter().rev().cloned().collect(),
                 }),
+                lacking: None,
             });
         }
         for child in node.nodes() {
@@ -189,9 +192,54 @@ impl Checker<'_> {
         around.truncate(depth);
     }
 
+    /// Tells the plugins that watch a service of the row of `bound`, the
+    /// function expected at `span`, what the code there asks for beyond it:
+    /// `what` as the refusal words it, and the services as shown, their
+    /// labels and the errors.
+    pub(crate) fn lacking_under(
+        &mut self,
+        bound: &Type,
+        span: Span,
+        what: &str,
+        (services, labels, errors): (&[String], &[Elem], &[String]),
+    ) {
+        let Some(allowed) = self.enclosing(bound) else {
+            return;
+        };
+        for service in &allowed.services {
+            let watched = (service.rsplit_once('.'))
+                .filter(|(module, name)| self.options.watched.holds(module, name));
+            let Some((module, name)) = watched else {
+                continue;
+            };
+            self.typing.call_sites.push(CallSite {
+                module: module.to_owned(),
+                name: name.to_owned(),
+                span: flick_plugin::Span {
+                    start: span.start,
+                    end: span.end,
+                },
+                arguments: Vec::new(),
+                refinement: None,
+                binding: None,
+                generated: span.start >= self.generated,
+                tagged: None,
+                lacking: Some(Lacking {
+                    allowed: allowed.clone(),
+                    what: what.to_owned(),
+                    services: services.to_vec(),
+                    labels: (labels.iter())
+                        .filter_map(|l| l.name().map(str::to_owned))
+                        .collect(),
+                    errors: errors.to_vec(),
+                }),
+            });
+        }
+    }
+
     /// The function `ty` is, as a place inside it is told of it: the
     /// services of its arrow by name, and whether its row is open.
-    fn enclosing(&self, ty: &Type) -> Option<Enclosing> {
+    pub(super) fn enclosing(&self, ty: &Type) -> Option<Enclosing> {
         let Type::Fun { effects, .. } = self.bare(ty) else {
             return None;
         };

@@ -33,7 +33,7 @@ pub use diagnostic::{Diagnostic, Edit, Fix, Severity};
 pub use exports::Plugin;
 pub use facts::{
     Argument, Binding, CallSite, Constant, Enclosing, ExpressionFact, ExpressionKind, Fact,
-    FactField, FactType, Nesting, Refinement, Structure, Tagged,
+    FactField, FactType, Lacking, Nesting, Refinement, Structure, Tagged,
 };
 pub use flick_plugin_macros::flick;
 pub use literal::{literal_text, string_value};
