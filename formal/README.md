@@ -199,6 +199,7 @@ operation, and `c.at i` ranges over the main thread and the children of live reg
 | `regions.md` §1.2 atoms, capture sets, `τ^C`, `H ϱ`, `Owner ϱ`, `Scope ϱ` | `Atom`, `Caps`, `Elem`; `Ty.arrow`/`Ty.eff` with `C`, `Ty.caps`, `Ty.rg`, `Ty.hnd`, `Ty.owner`; `Row.scope` (`Syntax.lean`) |
 | `regions.md` §2.1 `⌈τ⌉`; its commutation with substitution | `Ty.reach`; `Ty.reach_substT`, `Scheme.reach_substT` (`TyOps.lean`, `Reach.lean`) |
 | `regions.md` §2.4 `Θ ⊢ Outlives C ϱ` | `Facts`, `Outl` (`Syntax.lean`); dropping facts that follow: `Typ.cut` (`Cut.lean`) |
+| `regions.md` §2.1 a value bound `α^{≤C}` on a variable of a scheme, (Inst) `⌈τᵢ⌉ ⊆ C[c̄ := C̄]` | the fact `Facts.bnd`, `Outl.caps_iff`, `Scheme.holds_bnd` (`SchemeOps.lean`); `Scheme.Holds` of `Typ.var`, `Typ.glob`, `Typ.dproj` (`Rules.lean`) |
 | type substitution, `Gen` and instantiation | `Ty.substT`, `Ty.up`, `liftT`, `instT` (`TyOps.lean`); `Scheme.substT`, `Scheme.inst` (`SchemeOps.lean`) |
 | `core.md` §1.3 terms, patterns; §3.1 run-time forms; `regions.md` §1.3, §3.1 | `Tm`, `Pat` (`Syntax.lean`) |
 | what a term holds: free variables, run-time regions, locations (typing by use does not bound it) | `Tm.Free`, `Tm.Has`, `held` (`Reach.lean`) |
@@ -243,7 +244,7 @@ operation, and `c.at i` ranges over the main thread and the children of live reg
 | T1 | `T1` (`Soundness.lean`) |
 | T2(a), T2(b) | `T2a`, `T2b`, `T2b_await` (`Effects.lean`) |
 | lemma 3.1, T3 | `lemma_3_1`, `T3` (`Generalization.lean`) |
-| a polymorphic use; a use of a row-polymorphic function at a row of services; a `_` arm that removes a row variable of errors; a scope that acquires and uses, as checks | `Examples.lean` |
+| a polymorphic use; a use of a row-polymorphic function at a row of services; a `_` arm that removes a row variable of errors; a scope that acquires and uses; a generic `let` under a value bound and an instance beyond it, as checks | `Examples.lean` |
 
 ## Representation
 
@@ -321,12 +322,12 @@ Each item narrows `core.md` or `regions.md` unless it says otherwise.
    any other variable, and (Var) instantiates it by a row (`Ty.row`); constants are typed
    at any rows (`CArg`). Kinds are not checked. A row variable stands for names, atoms and
    variables, never for obligations; the rows that must be named are what a handler gives when
-   its body has obligations (`Row.Named`, item 21). `⌈Errors ε⌉` counts the row
+   its body has obligations (`Row.Named`, item 22). `⌈Errors ε⌉` counts the row
    variables of `ε`, as `regions.md` §2.1 and the checker do (`regions/mod.rs`
    `error_row_captures`): an instance shows what its errors reach, and `⌈·⌉` must commute
    with it, so a closure over an error of an unknown row holds that row. What still keeps a
    region out of an error is (Err-Decl) and (Err-Raise) of `regions.md` §2.5 (`FLICK-E005`),
-   of which the model needs only the second (item 18). Nominal types have parameters
+   of which the model needs only the second (item 19). Nominal types have parameters
    (`Sig.ctor` gives their number); their fields mention only the parameters
    (`Sig.ctor_closed`, `Sig.ctor_reach`); services have no parameters (`Sig.impl_closed`).
    (Let-Sig) is (Let-Gen) or (Let-Mono) with the annotation erased: terms carry no types,
@@ -397,27 +398,27 @@ Each item narrows `core.md` or `regions.md` unless it says otherwise.
     store typing only grows (a cell keeps its allocation type), and a redex under the
     right-hand side of a (Let-Gen) with `ᾱ ≠ ∅` is pure while the cell types it sees
     avoid `ᾱ` (they are shifted past it, `Ty.Avoids`).
-15. **Qualifiers are hidden only.** The value bound `α^{≤C}` and the refinement of
-    (App-Pure) are not modeled: both let the checker accept more programs, and `Ref.*`
-    instantiate the cell type directly, which keeps it invariant. The hidden qualifier of
-    data with hidden storage is a parameter of kind `CRow` of its type, so (Con) and
-    (Proj) are (App) and (Match) at an instance ([Con field premise ignores field qualifier](../docs/formal/regions.md#the-field-premise-of-con-ignores-the-field-qualifier)).
-16. **Capabilities and constants.** `H ϱ̄ τ̄` is one family `hnd ϱ` with one region;
+15. **A value bound on a type that is not a variable is read as `⌈υ⌉ ⊆ C`**, not
+    `C ∪ regions(υ)`.
+16. **Hidden storage is a parameter of kind `CRow`.** The hidden qualifier of data with
+    hidden storage is a parameter of kind `CRow` of its type, so (Con) and (Proj) are (App)
+    and (Match) at an instance ([Con field premise ignores field qualifier](../docs/formal/regions.md#the-field-premise-of-con-ignores-the-field-qualifier)).
+17. **Capabilities and constants.** `H ϱ̄ τ̄` is one family `hnd ϱ` with one region;
     `open_H` takes the owner of its region and nothing else (G6: the region is explicit)
     and registers the use that releases it; `op_H` returns `()`; `cap π` has no index `n`.
     `Fiber.spawn` has no supervisor and returns `()`: there is no `join`. A finalizer runs as a
     child once the body of its region is finished and the earlier children are, the last
     one first; the region closes when none is left. Closing waits for every child.
-17. **Facts are not chained.** `Θ ⊢ k ≥ ϱ` is reflexive or a fact; a scope gives one fact
+18. **Facts are not chained.** `Θ ⊢ k ≥ ϱ` is reflexive or a fact; a scope gives one fact
     for everything outside it, which is what transitivity would derive for a body
     (`regions.md` §2.4, rules 1 and 2). A run-time configuration is typed with the
     facts of the order of creation (`Facts.age`: a region outlives every region created
     after it); (Inside) adds its own facts about `π`, which name only older regions.
-18. **(Err-Raise) is checked where errors leave a scope**: the error row of the body of
+19. **(Err-Raise) is checked where errors leave a scope**: the error row of the body of
     `scope` does not mention its region by construction. The stricter rule of the spec
     (also for errors caught inside) is not needed by the model; (Err-Decl) is not either,
     since a row of errors carries what its errors reach.
-19. **Regions not yet created are renamed away in every step.** A derivation may name
+20. **Regions not yet created are renamed away in every step.** A derivation may name
     a region before it exists (the type of a hole is chosen by it). Each step renames
     the derivation by `kill |Λ|`, which sends regions `≥ |Λ|` to `Unit`; this fits the
     term because a configuration writes only regions that exist (`CfgBelow`). Then a new
@@ -428,14 +429,14 @@ Each item narrows `core.md` or `regions.md` unless it says otherwise.
     (`hb`, `hΨ`). T1 is stated with two blocked outcomes: a finished region body
     waiting for a child (deadlock freedom is λRT's), and a step that needs a region
     that is not live; `T1_regions` drops the second by T4′.
-20. **`⊢ Λ` is an invariant with ghost data.** `LNest` relates a configuration to the
+21. **`⊢ Λ` is an invariant with ghost data.** `LNest` relates a configuration to the
     ancestors `anc π` of each region and the thread `home π` of the `inside π` form; T4′
     needs no other change to the model. `inside` forms stand only where the term
     evaluates, so a step neither copies nor drops one, and only `scope` and closing change
     them. What a thread names is not bounded, as typing by use gives up T4.2; T4.1 and
     T4.3 follow from the stage of the redex instead: every region atom of the stage of a
     hole is the thread's or a frame's, and so live (`hole_atm`, `LNest.atm_live`).
-21. **Obligations of handlers (regions.md §2.7) are row elements.** `Provided {S} ϱ` is
+22. **Obligations of handlers (regions.md §2.7) are row elements.** `Provided {S} ϱ` is
     an element `ob S ϱ` of a row of services, and `Provided r ϱ` over a row variable `r`
     an element `obv r ϱ`, which a substitution turns into the obligations of what `r` stands
     for; `Fiber.spawn` and `Scope.add_finalizer` put one for each service and each row
@@ -448,7 +449,7 @@ Each item narrows `core.md` or `regions.md` unless it says otherwise.
     obligation not discharged stays in the row of the stage and of the arrows that carry it,
     which is the deferred element and the given `Provided` of a signature. At run time a
     handler discharges an obligation about its effect when its region is older (`Row.hP`).
-22. **Two kinds of dead constructor.** (Branch-GADT) is dead when no unifier of what the
+23. **Two kinds of dead constructor.** (Branch-GADT) is dead when no unifier of what the
     constructor builds with the matched type keeps the regions the body writes, so that a
     dead branch stays dead under the substitutions of the regions around it (`kill`, scopes),
     which may move the regions it does not write; its body keeps only its free variables and
@@ -707,7 +708,7 @@ Simplifications:
    written in `Sugar.lean`. `from_result : ∀e a. Result (Errors e) a →R⟨∅; e⟩ a` is the
    generated scheme, and `e?` takes it at the row of errors of `e` (`tryResult_elab`, at the
    stage `R⟨∅; ε⟩`): its `raise` of `Errors e` adds the atom `e` to the row, which the stage
-   gives (simplification 10). Simplification 15 extends to the Prelude ([Prelude schemes translated with CRow qualifiers](../docs/formal/elaboration.md#value-qualifiers-in-prelude-schemes)): a type with
+   gives (simplification 10). Simplification 16 extends to the Prelude ([Prelude schemes translated with CRow qualifiers](../docs/formal/elaboration.md#value-qualifiers-in-prelude-schemes)): a type with
    hidden storage (`Eff`, `Seq`) and the variable of a class over containers take the
    qualifier of the value as a first argument of kind `CRow`, `(T ā)^q ↦ T q ā` (`appQ`), and
    data without storage drops it. That argument is invariant, so a qualifier the caller
@@ -853,7 +854,7 @@ are schemes, and fields need not be values.
 - **Lazy instances.** Fields are typed at their schemes exactly, and a dictionary holds
   nothing, so a lazy instance whose method result holds its continuation (`Monad (Eff r e)`)
   is typed in the core iff its method scheme shows that: the core has (≤-Cap) on arrows and
-  `Eff`, but no `τ^q` on other types. The `CRow` parameter of simplification 15 is how the
+  `Eff`, but no `τ^q` on other types. The `CRow` parameter of simplification 16 is how the
   schemes show it ([Prelude schemes translated with CRow qualifiers](../docs/formal/elaboration.md#value-qualifiers-in-prelude-schemes); see the core instance below).
 - **Higher rank** ([a polymorphic parameter has no constraint in the model](../docs/formal/elaboration.md#a-polymorphic-parameter-has-no-constraint-in-the-model)). `elaboration.md` §0.1 also allows a
   constraint on a `∀` in an arrow parameter; `Ty.all` holds no dictionary, so the model has `∀`
@@ -904,7 +905,7 @@ for the core, as instances of `T6a`, `T6a_do` and `T6a_sugar`.
   in the core: it would be a new type former with its use stage in `LeLive`, and every case
   analysis on `Ty` and `LeLive` would change (substitution, `⌈·⌉`, canonical forms, shapes
   and patterns, preservation and T4′). Instead the hidden qualifier of `Eff` and
-  `Seq` is a parameter of kind `CRow` of the type (simplification 15), the schemes of
+  `Seq` is a parameter of kind `CRow` of the type (simplification 16), the schemes of
   `Sugar` show it (`elaboration.md` gives the translation of the checker's schemes,
   [Prelude schemes translated with CRow qualifiers](../docs/formal/elaboration.md#value-qualifiers-in-prelude-schemes)), and a lazy body is `MkEff (task …)` of the nominal type `Eff q b`
   with the field `eff ∅ ∅ b {q}`: `typ_effPure_tr`, `typ_effMap2_tr` and `typ_effBind_tr`

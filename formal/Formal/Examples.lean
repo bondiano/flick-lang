@@ -15,6 +15,8 @@ services of its argument and uses it at `{S}`.
 `Bool`, and takes a lambda or a generalized variable as the argument.
 `let f = λo. op (open o) in Scope.run f` passes a variable at the rank-2 type of `Scope.run`,
 and T4.1 holds of it.
+`let mk = λx. Ref.make x in mk h` generalizes `mk` under the value bound `α^{≤c}`, a fact its
+body assumes, and an instance whose contents reach more than the capacity is rejected.
 -/
 
 namespace Flick
@@ -170,5 +172,38 @@ example (S : Sig) (h : S.dict 0 = some (1, [("id", idField)])) :
       · simp [idField, Scheme.inst, Ty.substT, liftT]; exact .refl
   · rintro _ _ ⟨_, _, h, _⟩; exact h.elim
   · simp [idField, Scheme.substT, Scheme.inst, Ty.substT, liftT, instT]; exact .refl
+
+/-- `mk : ∀α c. α^{≤c} ⇒ α →R⟨∅;∅⟩ Ref α`: the value bound of `α` is a fact of the scheme. -/
+def mkSch : Scheme :=
+  ⟨2, Facts.bnd 0 (· = .v 1), .arrow (.tvar 0) (.rt Row.none Row.none) (.ref (.tvar 0)) Caps.none⟩
+
+/-- `let mk = λx. Ref.make x in mk h`, with `h` a capability of region 0: `mk` is generic, its
+body makes a cell of capacity `c` under the bound `α^{≤c}`, and the use instantiates the
+capacity with the region. -/
+example (S : Sig) :
+    Typ S [] Facts.none [.mono (.hnd (.rg 0))]
+      (.let_ (.lam (.app (.const .refMake) (.var 0))) (.app (.var 0) (.var 1)))
+      (.ex (.ref (.hnd (.rg 0))) (.rt Row.none Row.none)) := by
+  refine .letGen (k := 2) (Φ := mkSch.cs) (a := mkSch.t) ?_ ?_
+  · refine .lam (a := .tvar 0) (ψ := .rt Row.none Row.none) (C := Caps.none) ?_
+      (fun h => by simp [Tm.Has] at h) .refl
+    refine .app (.const (c := .refMake) (ι := { (default : CArg) with t := .tvar 0, C := (· = .v 1) })
+      ?_ .refl) (.var (ts := []) rfl rfl (fun _ _ h => h.elim) .refl) (Stage.le_refl _) .refl
+    rintro k rfl; exact .inr ⟨_, .inr ⟨rfl, rfl⟩, rfl⟩
+  · refine .app (ψ := .rt Row.none Row.none) (C := Caps.none)
+      (.var (σ := mkSch) (ts := [.hnd (.rg 0), .caps (· = .r 0)]) rfl rfl ?_ ?_)
+      (.var (ts := []) rfl rfl (fun _ _ h => h.elim) .refl)
+      (by simp only [Stage.use_none]; exact Stage.le_refl _) .refl
+    · refine Scheme.holds_bnd.2 (Outl.caps_of_sub fun k hk => ?_)
+      exact ⟨.v 1, rfl, by simpa [instT, Ty.reach] using hk⟩
+    · simp [mkSch, Scheme.inst, Ty.substT, instT, Stage.substT, Row.none_substT]; exact .refl
+
+/-- An instance of `mk` whose contents reach more than its capacity is rejected: (Inst) asks
+`⌈H 0⌉ ⊆ ∅`. -/
+example : ¬ mkSch.Holds Facts.none [.hnd (.rg 0), .caps Caps.none] := by
+  intro h
+  rcases Scheme.holds_bnd.1 h (.r 0) rfl with ⟨_, rfl, h⟩ | ⟨_, h, _⟩
+  · simp [instT, Ty.reach, Caps.none] at h
+  · exact h.elim
 
 end Flick
