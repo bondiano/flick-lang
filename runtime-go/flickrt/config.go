@@ -271,7 +271,7 @@ func decodeDuration(text string) (Value, string) {
 	if r.Tag != "Success" {
 		return nil, "Expected a valid Duration string"
 	}
-	return r.Fields[0], ""
+	return r.Fields()[0], ""
 }
 
 var byteSizeText = regexp.MustCompile(`^\s*(\d+)(?:\.(\d+))?\s*([A-Za-z]+)\s*$`)

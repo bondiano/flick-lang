@@ -28,13 +28,13 @@ func TestStringsCountUTF16CodeUnits(t *testing.T) {
 	if wellFormed(high+"x") != "�x" {
 		t.Error("output replaces a lone surrogate")
 	}
-	if CodePointAt(int32(1), s).(*Data).Fields[0] != int32(0x1F30D) {
+	if CodePointAt(int32(1), s).(*Data).Fields()[0] != int32(0x1F30D) {
 		t.Error("code point at a pair")
 	}
-	if CharCodeAt(int32(2), s).(*Data).Fields[0] != int32(0xDF0D) {
+	if CharCodeAt(int32(2), s).(*Data).Fields()[0] != int32(0xDF0D) {
 		t.Error("code unit inside a pair")
 	}
-	if IndexOf("b", s).(*Data).Fields[0] != int32(3) {
+	if IndexOf("b", s).(*Data).Fields()[0] != int32(3) {
 		t.Error("index counts code units")
 	}
 	if Substring(int32(3), int32(-1), s) != "a\U0001F30D" {

@@ -98,7 +98,7 @@ func TestChildProcessMissingProgramIsNotFound(t *testing.T) {
 	if cause == nil || cause.kind != causeFail {
 		t.Fatalf("no failure: %v", cause)
 	}
-	reason := cause.err.(*Data).Fields[0].(*Data).Fields[0].(*Record)
+	reason := cause.err.(*Data).Fields()[0].(*Data).Fields()[0].(*Record)
 	if tag := reason.Get("tag").(*Data).Tag; tag != Tag("PlatformError.SystemErrorTag.NotFound") {
 		t.Fatalf("tag %s", tag)
 	}

@@ -29,7 +29,7 @@ func plain(v flickrt.Value) flickrt.Value {
 	switch x := v.(type) {
 	case *flickrt.Data:
 		fields := []flickrt.Value{"_tag", x.Tag}
-		for i, f := range x.Fields {
+		for i, f := range x.Fields() {
 			fields = append(fields, "_"+strconv.Itoa(i), plain(f))
 		}
 		return flickrt.Rec(fields...)

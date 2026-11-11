@@ -232,7 +232,7 @@ func CodecTransformPure(decode, encode, from Value) Value {
 // issuesOf is the issue a SchemaError of the program gives as a whole.
 func issuesOf(err Value) []issue {
 	var messages []string
-	for _, i := range List(err.(*Data).Fields[0]) {
+	for _, i := range List(err.(*Data).Fields()[0]) {
 		messages = append(messages, i.(*Record).Get("message").(string))
 	}
 	return fail(strings.Join(messages, "; "))

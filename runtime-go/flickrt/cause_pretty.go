@@ -133,14 +133,14 @@ func formatJSON(v Value) string {
 		case "None":
 			return `{"_id":"Option","_tag":"None"}`
 		case "Some":
-			return `{"_id":"Option","_tag":"Some","value":` + formatJSON(x.Fields[0]) + "}"
+			return `{"_id":"Option","_tag":"Some","value":` + formatJSON(x.Fields()[0]) + "}"
 		case "Success":
-			return `{"_id":"Result","_tag":"Success","value":` + formatJSON(x.Fields[0]) + "}"
+			return `{"_id":"Result","_tag":"Success","value":` + formatJSON(x.Fields()[0]) + "}"
 		case "Failure":
-			return `{"_id":"Result","_tag":"Failure","failure":` + formatJSON(x.Fields[0]) + "}"
+			return `{"_id":"Result","_tag":"Failure","failure":` + formatJSON(x.Fields()[0]) + "}"
 		}
 		out := `{"_tag":` + QuoteJSON(x.Tag)
-		for i, f := range x.Fields {
+		for i, f := range x.Fields() {
 			out += "," + QuoteJSON(nativeField(x.Tag, i)) + ":" + formatJSON(f)
 		}
 		return out + "}"

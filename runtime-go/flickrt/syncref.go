@@ -32,7 +32,7 @@ func update(r Value, f func(Value) (Value, Value, bool)) Value {
 
 func some(o Value) (Value, bool) {
 	if d := o.(*Data); d.Tag == "Some" {
-		return d.Fields[0], true
+		return d.Fields()[0], true
 	}
 	return nil, false
 }

@@ -102,10 +102,10 @@ func formatSpaced(v Value, space int) string {
 			case x.Tag == "None":
 				return "none()"
 			case wrapped[x.Tag] != "":
-				return wrapped[x.Tag] + "(" + formatSpaced(x.Fields[0], 0) + ")"
+				return wrapped[x.Tag] + "(" + formatSpaced(x.Fields()[0], 0) + ")"
 			}
 			keys, vals := []string{"_tag"}, []Value{x.Tag}
-			for i, f := range x.Fields {
+			for i, f := range x.Fields() {
 				keys, vals = append(keys, "_"+strconv.Itoa(i)), append(vals, f)
 			}
 			return entries("{", "}", keys, vals, d)

@@ -35,7 +35,7 @@ func TestRoute(t *testing.T) {
 		}
 	}
 	page := some2(RouteParse(fb, codec, "/search/a%2Fb?q=x&page=z"))
-	if q := record(page.Fields[1]); q.Get("page") != None || q.Get("q") != "x" {
+	if q := record(page.Fields()[1]); q.Get("page") != None || q.Get("q") != "x" {
 		t.Fatalf("an invalid optional parameter gave %v", Format(q))
 	}
 }

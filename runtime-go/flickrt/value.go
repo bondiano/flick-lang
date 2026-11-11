@@ -30,16 +30,30 @@ var Unit Value = UnitType{}
 
 // Data is a value of a variant type: its constructor's tag and fields.
 type Data struct {
-	Tag    string
-	Fields []Value
+	Tag string
+	// Up to two fields are in the value itself, and more are a list of
+	// their own: most values have one or two, and are then one allocation
+	// where kept and none where taken apart at once. The value holds no
+	// pointer to itself, so Go can still see when one does not escape.
+	n    int
+	in   [2]Value
+	more []Value
+}
+
+// Fields is the fields of the value, in the order of its constructor.
+func (d *Data) Fields() []Value {
+	if d.more != nil {
+		return d.more
+	}
+	return d.in[:d.n]
 }
 
 // Option and Result have the tags of the JS runtime's native values.
 var None Value = &Data{Tag: "None"}
 
-func Some(v Value) Value { return &Data{Tag: "Some", Fields: []Value{v}} }
-func Ok(v Value) Value   { return &Data{Tag: "Success", Fields: []Value{v}} }
-func Err(v Value) Value  { return &Data{Tag: "Failure", Fields: []Value{v}} }
+func Some(v Value) Value { return &Data{Tag: "Some", n: 1, in: [2]Value{v}} }
+func Ok(v Value) Value   { return &Data{Tag: "Success", n: 1, in: [2]Value{v}} }
+func Err(v Value) Value  { return &Data{Tag: "Failure", n: 1, in: [2]Value{v}} }
 
 // Ordering values, tagged as the compiler tags Prelude's constructors.
 var (
@@ -83,7 +97,14 @@ var nullaries sync.Map
 
 // NewData builds a value of a constructor with its fields.
 func NewData(tag string, fields ...Value) Value {
-	return &Data{Tag: tag, Fields: fields}
+	switch len(fields) {
+	case 1:
+		return &Data{Tag: tag, n: 1, in: [2]Value{fields[0]}}
+	case 2:
+		return &Data{Tag: tag, n: 2, in: [2]Value{fields[0], fields[1]}}
+	}
+	// a copy: the list a caller gives stays where the caller made it
+	return &Data{Tag: tag, more: append([]Value(nil), fields...)}
 }
 
 // IsTag tells whether `v` is a value of the constructor tagged `tag`.
@@ -93,7 +114,13 @@ func IsTag(v Value, tag string) bool { return v.(*Data).Tag == tag }
 func TagOf(v Value) Value { return v.(*Data).Tag }
 
 // Get is the field `i` of a variant value.
-func Get(v Value, i int) Value { return v.(*Data).Fields[i] }
+func Get(v Value, i int) Value {
+	d := v.(*Data)
+	if d.more != nil {
+		return d.more[i]
+	}
+	return d.in[i]
+}
 
 // Fn2 and Fn3 are functions of two and three arguments whose stages before
 // the last are pure. Given all their arguments they are one call; given the

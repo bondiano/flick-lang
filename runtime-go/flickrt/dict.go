@@ -136,7 +136,7 @@ func Derive(name string, fields func(*Fiber) []Value, constructors []Constructor
 		if constructors[i].Unboxed || constructors[i].Class != "" {
 			return []Value{v}
 		}
-		return v.(*Data).Fields
+		return v.(*Data).Fields()
 	}
 	d := NewDict()
 	for class, f := range supers {

@@ -225,9 +225,9 @@ func Loop(fb *Fiber, step, state Value) Value {
 	for s := state; ; {
 		next := Apply(fb, step, s).(*Data)
 		if next.Tag != continueTag {
-			return next.Fields[0]
+			return next.Fields()[0]
 		}
-		s = next.Fields[0]
+		s = next.Fields()[0]
 	}
 }
 
@@ -255,11 +255,11 @@ func ValidationMap2(fb *Fiber, combine, f, x, y Value) Value {
 	a, b := x.(*Data), y.(*Data)
 	switch {
 	case a.Tag == "Failure" && b.Tag == "Failure":
-		return Err(Apply2(fb, combine, a.Fields[0], b.Fields[0]))
+		return Err(Apply2(fb, combine, a.Fields()[0], b.Fields()[0]))
 	case a.Tag == "Failure":
 		return a
 	case b.Tag == "Failure":
 		return b
 	}
-	return Ok(Apply2(fb, f, a.Fields[0], b.Fields[0]))
+	return Ok(Apply2(fb, f, a.Fields()[0], b.Fields()[0]))
 }

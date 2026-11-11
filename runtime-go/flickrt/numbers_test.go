@@ -12,7 +12,7 @@ func option(v Value) string {
 	if d.Tag == "None" {
 		return "None"
 	}
-	return d.Fields[0].(*big.Int).String()
+	return d.Fields()[0].(*big.Int).String()
 }
 
 // `BigInt.from_number`, `parse`, `to_string` and `to_number` as the JS

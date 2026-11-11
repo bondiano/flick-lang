@@ -89,7 +89,7 @@ func SchemaRefinedOf(name, known, base, parse Value) Value {
 	check := Fn(func(fb *Fiber, v Value) Value { return Apply(fb, parse, v).(*Data).Tag == "Success" })
 	text := ""
 	if k := known.(*Data); k.Tag == "Some" {
-		text = k.Fields[0].(string)
+		text = k.Fields()[0].(string)
 	}
 	return SchemaRefined(name.(string), base, check, text)
 }
@@ -99,7 +99,7 @@ func RoutePath(constructor, path, segments, query, optional Value) Value {
 	route := Route{Tag: tagOf(constructor), Path: path.(string), Segments: List(segments), Optional: optional.(bool)}
 	if q := query.(*Data); q.Tag == "Some" {
 		route.Query = []QueryField{}
-		for _, field := range List(q.Fields[0]) {
+		for _, field := range List(q.Fields()[0]) {
 			route.Query = append(route.Query, field.(QueryField))
 		}
 	}

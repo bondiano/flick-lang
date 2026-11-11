@@ -104,7 +104,7 @@ func failFast(fb *Fiber, f func(*Fiber, Value, Value) Value, a, b Value) Value {
 	if x.Tag == "None" || y.Tag == "None" {
 		return None
 	}
-	return Some(f(fb, x.Fields[0], y.Fields[0]))
+	return Some(f(fb, x.Fields()[0], y.Fields()[0]))
 }
 
 // StructCombiner combines records field by field, as `combiners` lists
@@ -220,7 +220,7 @@ func OptionReducer(c Value) Value {
 		case y.Tag == "None":
 			return a
 		}
-		return Some(f(fb, x.Fields[0], y.Fields[0]))
+		return Some(f(fb, x.Fields()[0], y.Fields()[0]))
 	}, None)
 }
 

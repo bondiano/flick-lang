@@ -73,7 +73,7 @@ func TestPromptKindsAnswers(t *testing.T) {
 }
 
 func TestPromptDateEditsParts(t *testing.T) {
-	start := DateTimeMake("2024-01-31T12:00:00Z").(*Data).Fields[0]
+	start := DateTimeMake("2024-01-31T12:00:00Z").(*Data).Fields()[0]
 	prompt := PromptDate(Rec("message", "When", "initial", Some(start), "dateMask", Some("YYYY-MM-DD"), "validate", None, "locales", None))
 	keys := promptTestKeys(promptTestPress("right"), promptTestPress("up"), promptTestPress("x"), promptTestPress("return"))
 	got := promptTestRun(&promptScript{keys: keys}, prompt).(*DateTime).time().In(time.Local)
@@ -117,7 +117,7 @@ func TestPromptCustomEventsWinOverKeys(t *testing.T) {
 	process := Fn(func(_ *Fiber, input Value) Value {
 		return Fn(func(_ *Fiber, _ Value) Value {
 			if d := input.(*Data); d.Tag == promptEventTag {
-				return NewData(promptSubmitTag, d.Fields[0])
+				return NewData(promptSubmitTag, d.Fields()[0])
 			}
 			return Nullary(promptBeepTag)
 		})

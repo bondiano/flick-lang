@@ -12,7 +12,7 @@ var modeNames = []string{"Ceiling", "Floor", "TowardZero", "AwayFromZero", "Half
 
 func optionText(o Value, f func(Value) Value) string {
 	if d := o.(*Data); d.Tag == "Some" {
-		return f(d.Fields[0]).(string)
+		return f(d.Fields()[0]).(string)
 	}
 	return "none"
 }

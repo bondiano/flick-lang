@@ -22,7 +22,7 @@ func TestJsonParseErrorsReadAsNodes(t *testing.T) {
 		}
 		got := "ok"
 		if r := JsonParse(input); !isOk(r) {
-			got = strings.TrimPrefix(List(value(r).(*Data).Fields[0])[0].(*Record).Get("message").(string), "not JSON: ")
+			got = strings.TrimPrefix(List(value(r).(*Data).Fields()[0])[0].(*Record).Get("message").(string), "not JSON: ")
 		}
 		if got != want {
 			t.Errorf("%s: got %q, want %q", quoted, got, want)

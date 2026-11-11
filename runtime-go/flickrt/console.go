@@ -124,7 +124,7 @@ func ConsoleDirxml(fb *Fiber, v Value) Value {
 
 func (c *console) group(options Value) {
 	if label, ok := record(options).Get("label").(*Data); ok && label.Tag == "Some" {
-		c.log(label.Fields[0].(string))
+		c.log(label.Fields()[0].(string))
 	}
 	c.mu.Lock()
 	c.indent += "  "
@@ -237,7 +237,7 @@ func ConsoleTable(fb *Fiber, properties, rows Value) Value {
 	var columns []string
 	given, hasValues := false, false
 	if p, ok := properties.(*Data); ok && p.Tag == "Some" {
-		columns, given = stringsOf(p.Fields[0]), true
+		columns, given = stringsOf(p.Fields()[0]), true
 	}
 	seen := map[string]bool{}
 	for _, row := range List(rows) {
@@ -339,7 +339,7 @@ func inspect(v Value) string {
 		return "{ " + strings.Join(parts, ", ") + " }"
 	case *Data:
 		parts := []string{"_tag: " + inspect(x.Tag)}
-		for i, f := range x.Fields {
+		for i, f := range x.Fields() {
 			parts = append(parts, nativeField(x.Tag, i)+": "+inspect(f))
 		}
 		return "{ " + strings.Join(parts, ", ") + " }"

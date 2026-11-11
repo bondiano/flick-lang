@@ -7,7 +7,7 @@ func opt(v Value) *Data { return v.(*Data) }
 
 func isSome(v Value) bool { return opt(v).Tag == "Some" }
 func isOk(v Value) bool   { return opt(v).Tag == "Success" }
-func value(v Value) Value { return opt(v).Fields[0] }
+func value(v Value) Value { return opt(v).Fields()[0] }
 
 func OptionProductMany(xs, self Value) Value {
 	if !isSome(self) {

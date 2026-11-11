@@ -11,7 +11,7 @@ func TestSchemaValidate(t *testing.T) {
 		t.Fatalf("a record gave %v", v)
 	}
 	bad := SchemaValidate(fb, rec, Rec("n", 2.0, "s", []Value{1.0}))
-	if isOk(bad) || JsonStringify(List(value(bad).(*Data).Fields[0])[0]) != `{"message":"expected a string, got number","path":"s[0]"}` {
+	if isOk(bad) || JsonStringify(List(value(bad).(*Data).Fields()[0])[0]) != `{"message":"expected a string, got number","path":"s[0]"}` {
 		t.Fatalf("a wrong element gave %v", bad)
 	}
 }

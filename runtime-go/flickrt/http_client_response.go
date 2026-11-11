@@ -284,7 +284,7 @@ func responseFailure(fb *Fiber, reason string, r *ClientResponse, description Va
 // failureReason is the reason of a Flick HttpClientError, if `err` is one.
 func failureReason(err Value) (*Data, bool) {
 	if d, ok := err.(*Data); ok && d.Tag == clientErrorTag {
-		return d.Fields[0].(*Data), true
+		return d.Fields()[0].(*Data), true
 	}
 	return nil, false
 }

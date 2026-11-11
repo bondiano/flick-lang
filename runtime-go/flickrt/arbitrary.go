@@ -148,10 +148,10 @@ func ArbitraryFormatCheckFailure(result Value) Value {
 	d := result.(*Data)
 	switch d.Tag {
 	case falsifiedTag:
-		f := record(d.Fields[0])
+		f := record(d.Fields()[0])
 		failure := "Failure: returned false"
 		if e := f.Get("failure").(*Data); e.Tag == propertyErrorTag {
-			failure = "Failure: " + formatSpaced(e.Fields[0], 2)
+			failure = "Failure: " + formatSpaced(e.Fields()[0], 2)
 		}
 		return Some(strings.Join([]string{
 			"Property falsified after " + jsString(f.Get("runs")) + " run(s) and " + jsString(f.Get("shrinks")) + " shrink(s)",
@@ -160,11 +160,11 @@ func ArbitraryFormatCheckFailure(result Value) Value {
 			"Replay: " + f.Get("replay").(string),
 		}, "\n"))
 	case exhaustedTag:
-		f := record(d.Fields[0])
+		f := record(d.Fields()[0])
 		return Some("Property exhausted after " + jsString(f.Get("runs")) + " run(s) and " +
 			jsString(f.Get("discards")) + " discard(s)\nSeed: " + QuoteJSON(f.Get("seed").(string)))
 	case replayMismatchTag:
-		return Some("Property replay failed: " + d.Fields[0].(string))
+		return Some("Property replay failed: " + d.Fields()[0].(string))
 	}
 	return None
 }

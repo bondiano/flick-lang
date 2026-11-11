@@ -397,7 +397,7 @@ Values have the representation of the JS target, in Go terms:
 | `Bool`, `Unit` | `bool`, `flickrt.Unit` |
 | a tuple, a `List` | `[]flickrt.Value`; `[x, ...rest]` shares the storage of the list |
 | a record | `*flickrt.Record`, its labels in JS key order, copied by `{ r with … }` |
-| a constructor | `*flickrt.Data` with the tag of the JS target and its fields |
+| a constructor | `*flickrt.Data` with the tag of the JS target; `Fields()` is its fields, up to two of them held in the value itself |
 | a function | `func(*flickrt.Fiber, flickrt.Value) flickrt.Value` per stage; one of two or three arguments whose stages before the last are pure is `flickrt.Fn2` or `flickrt.Fn3`, which takes them at once |
 | a dictionary | `*flickrt.Dict`; superclasses and default methods made on first use |
 

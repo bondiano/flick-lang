@@ -298,7 +298,7 @@ func ResponseOmitsBody(withoutBody, r Value) Value {
 func statusOf(c *Cause) int32 {
 	if r := c.firstOf(causeFail); r != nil {
 		if d, ok := r.err.(*Data); ok && d.Tag == serverErrorTag {
-			switch d.Fields[0].(*Data).Tag {
+			switch d.Fields()[0].(*Data).Tag {
 			case parseErrorTag:
 				return 400
 			case routeMissingTag:
@@ -307,7 +307,7 @@ func statusOf(c *Cause) int32 {
 			return 500
 		}
 		if d, ok := r.err.(*Data); ok && d.Tag == multipartErrorTag {
-			return multipartStatus[d.Fields[0].(*Data).Tag]
+			return multipartStatus[d.Fields()[0].(*Data).Tag]
 		}
 	}
 	if !c.has(causeFail) && !c.has(causeDie) && c.has(causeInterrupt) {

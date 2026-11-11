@@ -130,7 +130,7 @@ func RoutePrint(codec, value Value) Value {
 	if route.Query == nil {
 		return b.String()
 	}
-	r := d.Fields[len(route.Segments)].(*Record)
+	r := d.Fields()[len(route.Segments)].(*Record)
 	var pairs []Value
 	for _, q := range route.Query {
 		field := recordField(r, q.Label)
@@ -165,7 +165,7 @@ func routeParts(c *urlCodec, d *Data) ([]string, *Route) {
 		parts = append(parts, route.Path)
 	}
 	for i, s := range route.Segments {
-		field := d.Fields[i]
+		field := d.Fields()[i]
 		if route.Optional && i == len(route.Segments)-1 {
 			v, ok := some(field)
 			if !ok {

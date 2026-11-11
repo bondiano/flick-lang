@@ -108,10 +108,10 @@ func promptValidate(fb *Fiber, validate, value Value) (Value, *string) {
 	}
 	result := Apply(fb, f, value).(*Data)
 	if result.Tag == "Failure" {
-		message := result.Fields[0].(string)
+		message := result.Fields()[0].(string)
 		return nil, &message
 	}
-	return result.Fields[0], nil
+	return result.Fields()[0], nil
 }
 
 func promptOr(option Value, otherwise string) string {

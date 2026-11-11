@@ -109,7 +109,7 @@ func Format(v Value) string {
 		return out + "]"
 	case *Data:
 		out := "{\"_tag\":" + QuoteJSON(x.Tag)
-		for i, f := range x.Fields {
+		for i, f := range x.Fields() {
 			out += fmt.Sprintf(",%q:%s", nativeField(x.Tag, i), Format(f))
 		}
 		return out + "}"
