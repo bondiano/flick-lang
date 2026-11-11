@@ -118,6 +118,24 @@ mod tests {
     }
 
     #[test]
+    fn a_serializable_atom_keeps_the_ui_free_of_effect() {
+        let module = lower_text(
+            "App",
+            "module App exposing (count, draft, item)\n\
+             let count = Atom.serializable (Codec.json Schema.number) (Atom.make 0)\n\
+             draft : String -> Atom.Writable String\n\
+             let draft = Atom.serializable_family (Codec.json Schema.string) (fun _ -> Atom.make \"\")\n\
+             item : Atom.Atom (Atom.Async String none)\n\
+             let item = Atom.serializable_task (Codec.json Schema.string) (Atom.task (task { \"x\" }))\n",
+        )
+        .expect("lowers");
+        assert_eq!(
+            select_modules(once(&module), EffectBridge::Available),
+            EffectBridge::Available
+        );
+    }
+
+    #[test]
     fn a_reexported_stream_renderer_selects_one_adapter_ui_family() {
         let module = lower_text(
             "App",
