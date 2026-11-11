@@ -48,7 +48,7 @@ Read [what is proved and its limits](../../formal/README.md) and the affected
 
 - Update the reference model, translation, examples and Lean statements/proofs
   together with the implementation. Extend tests for the new behavior.
-- Run `just model` and, from `formal/`, `lake build --wfail`.
+- Run `just model` and `just lean` (`lake build --wfail` in `formal/`).
 - If Prelude schemes change, run `just formal-schemes`, review the generated
   diff, then rerun `just model` and the Lean build.
 - Do not introduce `sorry`, extra axioms or narrower theorem premises to

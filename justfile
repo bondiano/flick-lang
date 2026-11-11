@@ -50,9 +50,13 @@ formal-certs:
     FLICK_FORMAL_CERTS=1 cargo test -p flick-model --test certs the_certificates_are_fresh
 
 # Certify a run of generated programs and check the certificates with Lean
-model-certs:
+model-certs: lean
     cargo test -p flick-model --test certs -- --ignored
-    cd formal && lake build --wfail && lake env lean ../target/certs/Batch.lean
+    cd formal && lake env lean ../target/certs/Batch.lean
+
+# Build the Lean 4 mechanization of λFlick in formal/ as CI does; --wfail fails on a `sorry`
+lean:
+    cd formal && lake build --wfail
 
 # Check each capability independently, without workspace feature unification
 feature-check:
@@ -72,6 +76,10 @@ go-test:
 # Go runtime and the language tests; CI runs the parts as jobs side by side
 e2e: e2e-js e2e-tests e2e-cases go-test language
 
+# The go target without Node, as CI's go jobs run it: portable cases, the go executable, a non-ASCII path
+e2e-go:
+    FLICK_E2E_GO_ONLY=1 cargo test --profile e2e -p flick --test e2e --test go_main --test unicode_path -- --ignored run_cases exit_codes_follow_the_outcome_and_signals run_and_test_use_the_go_executable a_project_builds_runs_and_tests_under_a_non_ascii_path
+
 # The compiler in the `e2e` profile, built as a dependency of its own tests:
 # their dev-dependencies turn on features of the compiler's crates, so a plain
 # `cargo build -p flick` is another build, which the suites would then redo
@@ -86,14 +94,16 @@ e2e-prepare: e2e-compiler
     pnpm -C packages/effect-ts build
     FLICK_BIN={{flick}} pnpm -C tools/dts-importer build
 
-# The JS packages, with the playground's compiler: typecheck, lint, tests, and
-# the built site in a browser (`CHROMIUM=$(which chromium)`, or
-# `pnpm -C docs exec playwright install chromium` once)
+# The JS packages, with the playground's compiler: typecheck, lint, tests, the
+# site's translations, and the built site, its links and in a browser
+# (`CHROMIUM=$(which chromium)`, or `pnpm -C docs exec playwright install chromium` once)
 e2e-js: docs-wasm e2e-prepare
+    node docs/scripts/parity.mjs
     FLICK_BIN={{flick}} pnpm -r typecheck
     FLICK_BIN={{flick}} pnpm -r lint
     FLICK_BIN={{flick}} pnpm -r test
     FLICK_BIN={{flick}} pnpm -C docs build
+    node docs/scripts/links.mjs
     node docs/scripts/chunks.mjs
     pnpm -C docs e2e
 
@@ -123,6 +133,11 @@ language seed="42": e2e-compiler
     diff -u target/language-js.txt target/language-go.txt
     cat target/language-go.txt
     node tools/language-rt/index.mjs {{flick}} {{seed}} target/language-js.txt
+
+# A relative path: on Windows the shell would drop the backslashes of {{flick}}.
+# The language tests as a Go executable alone, without Node, after `e2e-go` built the compiler
+language-go seed="42":
+    cd tests/language && ../../target/e2e/flick test --emit go --seed {{seed}}
 
 # Bundle the tracked programs (release) with rolldown and hold them to their gzip budgets
 bundle-size: e2e-compiler
@@ -276,7 +291,7 @@ docs: docs-wasm
     cargo build -p flick
     pnpm -C docs build
 
-# Everything CI runs
+# CI's lint, test and features jobs; the e2e, model and Lean jobs have recipes of their own
 check: lint test
 
 # Check that the Zed extension (and its language server launcher) compiles
