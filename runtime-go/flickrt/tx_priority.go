@@ -2,8 +2,8 @@ package flickrt
 
 import "slices"
 
-// TxPriorityQueue is Effect 4's: a TxRef of a Chunk kept sorted by an
-// order, equal elements in the order they came.
+// TxPriorityQueue is a TxRef of a Chunk kept sorted by an order, equal
+// elements in the order they came.
 type TxPriorityQueue struct {
 	ref   *TxRef
 	order func(*Fiber, Value, Value) int
@@ -34,9 +34,9 @@ func (q *TxPriorityQueue) sorted(fb *Fiber, xs []Value) []Value {
 	return out
 }
 
-// mergeSorted is Effect's: the sorted `values` merged into the sorted
-// `arr`, each after the elements equal to it, by galloping then binary
-// search from where the previous one went.
+// mergeSorted is the sorted `values` merged into the sorted `arr`, each
+// after the elements equal to it, by galloping then binary search from
+// where the previous one went.
 func (q *TxPriorityQueue) mergeSorted(fb *Fiber, arr, values []Value) Value {
 	out := make([]Value, 0, len(arr)+len(values))
 	i := 0

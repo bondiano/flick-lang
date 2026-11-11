@@ -1,4 +1,4 @@
-/// Effect's `Mime`: media types by file extension and back.
+/// Media types by file extension and back.
 module Http.Mime exposing (..)
 
 /// The media type of the path's extension: `Some "text/html"` for `a.html`.

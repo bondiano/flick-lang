@@ -5,9 +5,9 @@ import (
 	"strings"
 )
 
-// Effect's `Arbitrary` for the bindings of the standard library: a port of
-// Effect's engine (arbitrary_*.go), so a seed draws, shrinks and reports
-// what it does on the JS target. An Arbitrary value is a *arbGen.
+// `Arbitrary` for the bindings of the standard library: the engine of
+// arbitrary_*.go, so a seed draws, shrinks and reports what it does on the
+// JS target. An Arbitrary value is a *arbGen.
 
 func arb(v Value) *arbGen { return v.(*arbGen) }
 
@@ -15,7 +15,7 @@ func arb(v Value) *arbGen { return v.(*arbGen) }
 func ArbitrarySchema(schema Value) Value { return compileSchema(sch(schema)) }
 
 // ArbitrarySchemaWith is `Arbitrary.from_schema_with`: a `shrink` of the
-// options replaces Effect's shrinking, its candidates validated.
+// options replaces the default shrinking, its candidates validated.
 func ArbitrarySchemaWith(options, schema Value) Value {
 	compiled := compileSchema(sch(schema))
 	shrink, ok := some(record(options).Get("shrink"))
@@ -104,7 +104,7 @@ func ArbitraryFlatMap(f, self Value) Value {
 // ArbitrarySample is `Arbitrary.sample`.
 func ArbitrarySample(fb *Fiber, options, self Value) Value { return arbSample(fb, arb(self), options) }
 
-// ArbitraryCheck is `Arbitrary.check`, Effect's `checkEffect`.
+// ArbitraryCheck is `Arbitrary.check`: `property` run on values of `self`.
 func ArbitraryCheck(fb *Fiber, options, property, self Value) Value {
 	return arbCheck(fb, arb(self), property, options)
 }
@@ -142,8 +142,8 @@ func evaluate(fb *Fiber, property, v Value) Value {
 }
 
 // ArbitraryFormatCheckFailure is `Arbitrary.format_check_failure`: the
-// report of a failed check, `None` when it passed, its values written by
-// Effect's `Formatter.format` with two spaces.
+// report of a failed check, `None` when it passed, its values formatted
+// with two spaces.
 func ArbitraryFormatCheckFailure(result Value) Value {
 	d := result.(*Data)
 	switch d.Tag {

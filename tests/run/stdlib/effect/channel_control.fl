@@ -1,4 +1,4 @@
-// Effect's `Channel`: failures, finalizers, merging, schedules, services,
+// `Channel`: failures, finalizers, merging, schedules, services,
 // spans, and running a channel into queues and hubs.
 module App.Main exposing (main)
 

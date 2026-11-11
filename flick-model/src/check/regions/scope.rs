@@ -94,6 +94,7 @@ impl Checker<'_> {
         self.level -= 1;
         let s = &s;
         let (t, inner) = checked?;
+        let own = inner.clone();
         self.grow_holds()?;
         let (mut r, e) = match inner {
             Stage::Pure => (Row::none(), Row::none()),
@@ -106,6 +107,10 @@ impl Checker<'_> {
                 self.unify(a, &Type::Var(region.clone()))?;
             }
         }
+        self.note(body, |n| {
+            n.own = Some((own, r.clone()));
+            n.region = Some(s.clone());
+        });
         let left = Type::Tuple(Rc::from([
             t.clone(),
             Type::Errors(self.zonk_row(&r)),

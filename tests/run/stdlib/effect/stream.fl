@@ -1,4 +1,4 @@
-// Sources of Effect's `Stream` and the calls that run them.
+// Sources of `Stream` and the calls that run them.
 module App.Main exposing (main)
 
 type error Boom = Boom Float

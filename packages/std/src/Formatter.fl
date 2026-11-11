@@ -1,9 +1,9 @@
-/// Effect's `Formatter`: text for inert data (`Unknown`), as Effect writes
-/// it in its messages. A formatter of a Flick type is a function `a ->
-/// String`, as `show`.
+/// Text for inert data (`Unknown`), as the runtime writes it in its
+/// messages. A formatter of a Flick type is a function `a -> String`, as
+/// `show`.
 module Formatter exposing (..)
 
-/// The data as Effect shows it: strings quoted, `BigInt`s with `n`.
+/// The data as text: strings quoted, `BigInt`s with `n`.
 format : Unknown -> String
 foreign pure format from "flick:Formatter" "format"
   reviewed "effect@4.1.2 sha256:e11f1775ecc1e146"

@@ -1,4 +1,4 @@
-// Effect's `Logger`: the `Log` service through Effect's loggers, custom and
+// `Logger`: the `Log` service through its loggers, custom and
 // built-in formats, batches and a log file. Loggers whose lines carry the
 // time write to a console on stderr.
 module App.Main exposing (main)

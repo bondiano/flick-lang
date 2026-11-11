@@ -1,5 +1,5 @@
-/// Effect's `Clock`: the fiber's source of time. It is a default service, so
-/// reading it needs no service row; each read is a runtime call.
+/// The fiber's source of time. It is a default service, so reading it needs
+/// no service row; each read is a runtime call.
 module Clock exposing (..)
 
 /// The clock a fiber runs with.

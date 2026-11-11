@@ -1,11 +1,11 @@
-/// Network addresses and DNS records as JSON, from Effect's `Schema`. Each
-/// kind of address is its own type, holding Effect's value: decoding
-/// validates and normalizes the text (`"2001:DB8:0::1"` becomes an address
-/// written `2001:db8::1`), and text of another form is a `SchemaError`. Two
+/// Network addresses and DNS records, with their JSON codecs. Each kind of
+/// address is its own type, holding a parsed value: decoding validates and
+/// normalizes the text (`"2001:DB8:0::1"` becomes an address written
+/// `2001:db8::1`), and text of another form is a `SchemaError`. Two
 /// addresses are equal when their canonical texts are.
 module Net exposing (..)
 
-/// A DNS record of any type, as Effect keeps it; `format_record` writes it.
+/// A DNS record of any type; `format_record` writes it.
 type DnsRecord
 
 /// An IPv4 or IPv6 address: `2001:db8::1`.
@@ -359,7 +359,7 @@ scoped_ipv6_literal : PureCodec Json ScopedIpv6Literal
 foreign pure scoped_ipv6_literal from "flick:Net" "flickScopedIpv6Literal"
   reviewed "effect@4.1.2 sha256:120263e034f9bb0e"
 
-/// A DNS record of any type as Effect's JSON object, tagged by `"_tag"`:
+/// A DNS record of any type as a JSON object, tagged by `"_tag"`:
 /// `{ "_tag": "A", "address": "192.0.2.1" }`.
 dns_record : PureCodec Json DnsRecord
 foreign pure dns_record from "flick:Net" "flickDnsRecord"

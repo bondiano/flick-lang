@@ -7,9 +7,9 @@ import (
 	"sync"
 )
 
-// Effect's Tracer: a span runs around a task under the fiber's span, with
+// The tracer: a span runs around a task under the fiber's span, with
 // attributes, links, events and a status that ends with the task. Every
-// tracer is Effect's native one, which keeps its spans in memory; one that
+// tracer is the native one, which keeps its spans in memory; one that
 // exports (`--trace`) also gets each span as it ends.
 
 // A tracer makes the spans; `ended`, if any, gets each one as it ends.
@@ -110,8 +110,8 @@ func currentSpanLocal(fb *Fiber) *span {
 
 func currentTracer(fb *Fiber) *tracer { return envOr(fb, tracerKey, TracerNative).(*tracer) }
 
-// propagating is Effect's filterDisablePropagation: the span, or the first
-// ancestor whose propagation is not disabled.
+// propagating is the span, or the first ancestor whose propagation is not
+// disabled.
 func propagating(s Value) Value {
 	for {
 		p, ok := some(s)
@@ -129,8 +129,8 @@ func propagating(s Value) Value {
 	}
 }
 
-// openSpan is Effect's makeSpanUnsafe: a span of `name` made as the
-// `Tracer.SpanOptions` say, which may lack fields, under the fiber's span.
+// openSpan is a span of `name` made as the `Tracer.SpanOptions` say, which
+// may lack fields, under the fiber's span.
 func openSpan(fb *Fiber, name, options Value) *span {
 	o := record(options)
 	stack := ""
@@ -167,7 +167,7 @@ func openSpan(fb *Fiber, name, options Value) *span {
 	} else {
 		sampled = logLevelOrdinal(envOr(fb, minimumTraceLevelKey, "All").(string)) <= logLevelOrdinal(level)
 	}
-	// random ids, as Effect's Hex.random
+	// random ids
 	s := &span{name: Some(name), spanId: fmt.Sprintf("%016x", rand.Uint64()),
 		traceId: fmt.Sprintf("%016x%016x", rand.Uint64(), rand.Uint64()),
 		sampled: sampled, parent: parent, kind: optField(o, "kind_", "internal").(string), start: start,
@@ -210,8 +210,8 @@ func (s *span) event(name string, time *big.Int, attrs []spanAttr) {
 	s.mu.Unlock()
 }
 
-// endSpan is Effect's: it ends a running span with the exit, at the
-// clock's time when timing is on.
+// endSpan ends a running span with the exit, at the clock's time when
+// timing is on.
 func endSpan(s *span, exit *Cause, clock Clock, timing bool) {
 	if s.noop || s.external {
 		return
@@ -242,8 +242,7 @@ type stackFrame struct {
 }
 
 // withParentSpan runs `task` with the span as the parent of its spans.
-// A failure that leaves it is annotated with its stack frame, as Effect's
-// fiber annotates a failure with its own.
+// A failure that leaves it is annotated with its stack frame.
 func withParentSpan(fb *Fiber, s *span, task Value) Value {
 	inner := *fb
 	inner.env = inner.env.with(parentSpanKey, s)
@@ -284,7 +283,7 @@ func spanning(fb *Fiber, s *span, body func(*span) Value) Value {
 	return out
 }
 
-// scopedSpan is Effect's makeSpanScoped: a span ended when `scope` closes.
+// scopedSpan is a span ended when `scope` closes.
 func scopedSpan(fb *Fiber, name, options Value, scope *Owner) *span {
 	s := openSpan(fb, name, options)
 	clock, timing := clockOf(fb), envOr(fb, tracerTimingKey, true).(bool)

@@ -105,7 +105,7 @@ fn data(t: &Type) -> Option<(String, Vec<&Type>)> {
         Type::Tuple(ts) => Some(("Tuple".into(), ts.iter().collect())),
         // the core writes the qualifier of no data the signature has
         // (`translate::lean::elide`)
-        Type::Captured(x, _) => data(x),
+        Type::Captured(x, _) | Type::Bounded(x, _) => data(x),
         t => {
             let mut args = Vec::new();
             let mut h = t;

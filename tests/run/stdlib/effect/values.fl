@@ -1,4 +1,4 @@
-// Optics from Effect's `Optic`, JSON patches and pointers from `JsonPatch`
+// Optics from `Optic`, JSON patches and pointers from `JsonPatch`
 // and `JsonPointer`, and `Inspectable`, `Formatter` and `Version`.
 module App.Main exposing (main)
 

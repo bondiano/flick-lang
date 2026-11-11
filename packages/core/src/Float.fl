@@ -51,13 +51,13 @@ foreign pure trunc from global "Math.trunc"
 sqrt : Float -> Float
 foreign pure sqrt from global "Math.sqrt"
 
-/// The lesser of two numbers by Effect's order, where NaN is least.
+/// The lesser of two numbers by the order where NaN is least.
 min : Float -> Float -> Float
 foreign pure min from "flick:Number" "min"
   arity 1
   reviewed "effect@4.1.2 sha256:a308f0d3d25f7462"
 
-/// The greater of two numbers by Effect's order, where NaN is least.
+/// The greater of two numbers by the order where NaN is least.
 max : Float -> Float -> Float
 foreign pure max from "flick:Number" "max"
   arity 1
@@ -123,25 +123,26 @@ multiply_all : List Float -> Float
 foreign pure multiply_all from "flick:Number" "multiplyAll"
   reviewed "effect@4.1.2 sha256:568b0e4eebb80af0"
 
-/// `self < that` by Effect's order: `x |> Float.is_less_than 3`.
+/// `self < that` by the order where NaN is least:
+/// `x |> Float.is_less_than 3`.
 is_less_than : Float -> Float -> Bool
 foreign pure is_less_than from "flick:Number" "isLessThan"
   arity 1
   reviewed "effect@4.1.2 sha256:f93dca59da8efce8"
 
-/// `self <= that` by Effect's order.
+/// `self <= that` by the order where NaN is least.
 is_less_than_or_equal_to : Float -> Float -> Bool
 foreign pure is_less_than_or_equal_to from "flick:Number" "isLessThanOrEqualTo"
   arity 1
   reviewed "effect@4.1.2 sha256:396e72de3afcdd6e"
 
-/// `self > that` by Effect's order.
+/// `self > that` by the order where NaN is least.
 is_greater_than : Float -> Float -> Bool
 foreign pure is_greater_than from "flick:Number" "isGreaterThan"
   arity 1
   reviewed "effect@4.1.2 sha256:4b25fdb77a95059a"
 
-/// `self >= that` by Effect's order.
+/// `self >= that` by the order where NaN is least.
 is_greater_than_or_equal_to : Float -> Float -> Bool
 foreign pure is_greater_than_or_equal_to from "flick:Number" "isGreaterThanOrEqualTo"
   arity 1

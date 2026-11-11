@@ -1,6 +1,5 @@
-/// Effect's `ConfigProvider`: where a `Config` reads its values, by path —
-/// the environment by default. `layer` makes a provider the one of the body
-/// of a `provide`.
+/// Where a `Config` reads its values, by path — the environment by default.
+/// `layer` makes a provider the one of the body of a `provide`.
 module ConfigProvider exposing (..)
 
 import FileSystem

@@ -1,4 +1,4 @@
-// Effect's `Tracer`: tasks in spans of the native tracer, their parents,
+// `Tracer`: tasks in spans of the native tracer, their parents,
 // links, attributes and status, and the references that steer tracing.
 module App.Main exposing (main)
 

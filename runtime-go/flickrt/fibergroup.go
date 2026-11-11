@@ -2,8 +2,8 @@ package flickrt
 
 import "sync"
 
-// fiberGroup is Effect's FiberSet, FiberMap and FiberHandle: children of
-// the owner of its region, by key. A child that ends leaves the group; a
+// fiberGroup is a FiberSet, a FiberMap or a FiberHandle: children of the
+// owner of its region, by key. A child that ends leaves the group; a
 // failure other than an interruption by the group itself fails `join`.
 // The owner of the region interrupts and awaits what is left when it
 // begins to close, before its finalizers: a hook, as in the JS runtime.

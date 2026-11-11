@@ -5,10 +5,10 @@ import (
 	"sync"
 )
 
-// Effect's loggers: a logger turns each message a fiber logs into its
-// output, which the console loggers write. The fiber carries its loggers
-// (Effect's default and tracer loggers unless a layer or `with_loggers`
-// sets others), its log levels, annotations and log spans.
+// Loggers: a logger turns each message a fiber logs into its output, which
+// the console loggers write. The fiber carries its loggers (the default
+// and tracer loggers unless a layer or `with_loggers` sets others), its log
+// levels, annotations and log spans.
 
 const (
 	loggersKey           = "effect/Loggers"
@@ -24,9 +24,9 @@ type logger struct {
 	log func(fb *Fiber, m *logEntry) Value
 }
 
-// logEntry is Effect's `Logger.Options`: the parts of a message, its
-// level, the cause logged with it (nil for none) and its time in
-// milliseconds since the epoch.
+// logEntry is what a logger is given: the parts of a message, its level,
+// the cause logged with it (nil for none) and its time in milliseconds
+// since the epoch.
 type logEntry struct {
 	message []Value
 	level   string
@@ -36,7 +36,7 @@ type logEntry struct {
 
 func loggerOf(v Value) *logger { return v.(*logger) }
 
-// defaultLoggers are Effect's CurrentLoggers by default.
+// defaultLoggers are the loggers of a fiber by default.
 var defaultLoggers = []Value{LoggerDefault, LoggerTracer}
 
 // loggersOf is the fiber's loggers.
@@ -47,8 +47,7 @@ func loggersOf(fb *Fiber) []Value {
 	return defaultLoggers
 }
 
-// loggerSet is Effect's Set of loggers: `existing`, then each of `add`
-// it lacks.
+// loggerSet is a set of loggers: `existing`, then each of `add` it lacks.
 func loggerSet(existing, add []Value) []Value {
 	out := append([]Value{}, existing...)
 	for _, l := range add {
@@ -171,8 +170,8 @@ func EffectLogWithLevel(fb *Fiber, level, message Value) Value {
 
 var logLevels = map[string]string{"debug": "Debug", "info": "Info", "warn": "Warn", "error": "Error"}
 
-// LoggerLogWrite is the `write` of `Logger.effect_log`: the `Log` level
-// of the message as Effect's.
+// LoggerLogWrite is the `write` of `Logger.effect_log`: the message at its
+// `Log` level, `Info` for a level it does not know.
 func LoggerLogWrite(fb *Fiber, level, message Value) Value {
 	l, ok := logLevels[level.(string)]
 	if !ok {
@@ -208,9 +207,9 @@ func LoggerWithLogToStderr(fb *Fiber, toStderr, task Value) Value {
 	return withEnv(fb, logToStderrKey, toStderr, task)
 }
 
-// batched is Effect's `Logger.batched`: the outputs of `inner` gather in
-// a buffer that a detached fiber flushes every window, and that `scope`
-// flushes as it closes, once that fiber is interrupted.
+// batched is a batching logger: the outputs of `inner` gather in a buffer
+// that a detached fiber flushes every window, and that `scope` flushes as
+// it closes, once that fiber is interrupted.
 func batched(fb *Fiber, scope *Owner, inner *logger, window *Duration, flush func(*Fiber, []Value)) Value {
 	var mu sync.Mutex
 	var buffer []Value
@@ -283,7 +282,7 @@ func LoggerToFile(file, options, path, l Value) Value {
 			for i, line := range out {
 				lines[i] = line.(string)
 			}
-			// Effect ignores a failed write
+			// a failed write is ignored
 			catch(func() Value {
 				file := fsFileOf(opened)
 				file.mu.Lock()

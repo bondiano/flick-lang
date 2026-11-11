@@ -1,5 +1,5 @@
-// `Cli.file_parse` by extension: INI, TOML and YAML files read as Effect's
-// encoding parsers read them, and the error of a malformed one.
+// `Cli.file_parse` by extension: what INI, TOML and YAML files read
+// as, and the error of a malformed one.
 module App.Main exposing (main)
 
 type alias DataOptions = {

@@ -1,4 +1,4 @@
-// Transactional sets from Effect's `TxHashSet` and priority queues from
+// Transactional sets from `TxHashSet` and priority queues from
 // `TxPriorityQueue`; sets are printed sorted for stable output.
 module App.Main exposing (main)
 

@@ -1,8 +1,8 @@
 package flickrt
 
-// Stream's transformations of elements, as Effect's (Stream.ts): maps,
-// taps, filters, takes and drops, and their bindings. Flick callbacks are
-// curried, an effectful one gives a task, and a filter gives a `Result`.
+// Stream's transformations of elements: maps, taps, filters, takes and
+// drops, and their bindings. Flick callbacks are curried, an effectful one
+// gives a task, and a filter gives a `Result`.
 
 func StreamAs(b, s Value) Value {
 	return mapChunks(streamOf(s), func(_ *Fiber, chunk []Value) []Value {

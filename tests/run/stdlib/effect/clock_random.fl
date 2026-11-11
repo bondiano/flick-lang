@@ -1,4 +1,4 @@
-// Effect's default `Clock` and `Random`: reads are runtime calls. The
+// The default `Clock` and `Random`: reads are runtime calls. The
 // clock is checked by properties; random draws under `with_seed` repeat.
 module App.Main exposing (main)
 

@@ -6,8 +6,8 @@ import (
 )
 
 // jsDate is a JS `Date`: a time value, epoch milliseconds or NaN, and the
-// UTC getters and setters of ECMAScript that Effect's DateTime and Cron
-// compute through, so that overflowing parts roll over as they do in JS.
+// UTC getters and setters of ECMAScript that DateTime and Cron compute
+// through, so that overflowing parts roll over as they do in JS.
 type jsDate struct{ t float64 }
 
 const (

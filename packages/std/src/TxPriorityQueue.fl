@@ -1,6 +1,6 @@
-/// Effect's `TxPriorityQueue`: a queue that hands out its least element
-/// by `Ord` first, inside `Tx.atomically` transactions; a take from an
-/// empty one retries the transaction until it holds an element.
+/// A queue that hands out its least element by `Ord` first, inside
+/// `Tx.atomically` transactions; a take from an empty one retries the
+/// transaction until it holds an element.
 module TxPriorityQueue exposing (..)
 
 import Tx

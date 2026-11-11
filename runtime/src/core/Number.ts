@@ -1,8 +1,8 @@
-// `Float` of the standard library without Effect: the bindings of Float.fl,
-// with Effect's semantics; a binary function takes `that`, then `self`.
+// `Float` of the standard library without Effect: the bindings of Float.fl; a
+// binary function takes `that`, then `self`.
 import { EQ, GT, LT, none, type Option, type Ordering, some } from "./data.ts";
 
-/** Effect's `Order.Number`: NaN is least and equals NaN; -0 equals 0. */
+/** The order of numbers: NaN is least and equals NaN; -0 equals 0. */
 const order = (self: number, that: number): -1 | 0 | 1 => {
   if (self === that) return 0;
   const selfNaN = Number.isNaN(self);

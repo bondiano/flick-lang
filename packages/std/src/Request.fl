@@ -1,6 +1,6 @@
-/// Effect's `Request`: a request for an `a` that may fail with `e`, made of
-/// a payload `p` and answered by a `RequestResolver`, which batches the
-/// requests made at the same time and completes each one's `Entry`.
+/// A request for an `a` that may fail with `e`, made of a payload `p` and
+/// answered by a `RequestResolver`, which batches the requests made at the
+/// same time and completes each one's `Entry`.
 module Request exposing (..)
 
 /// A request of payload `p` for an `a`, failing with `e`.

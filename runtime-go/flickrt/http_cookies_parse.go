@@ -6,8 +6,7 @@ import (
 	"strings"
 )
 
-// Reading cookies from headers, as Effect's `fromSetCookie` and
-// `parseHeader` do.
+// Reading cookies from headers.
 
 func CookiesFromSetCookie(headers Value) Value {
 	jar := &Record{}
@@ -168,7 +167,7 @@ func CookiesParseHeader(header Value) Value {
 }
 
 // cookieHeaderValue is the value between `start` and `end`: a quoted one
-// loses its first and last UTF-16 unit, as Effect slices it.
+// loses its first and last UTF-16 unit.
 func cookieHeaderValue(h string, start, end int) string {
 	val := h[start:end]
 	if start < len(h) && h[start] == '"' {

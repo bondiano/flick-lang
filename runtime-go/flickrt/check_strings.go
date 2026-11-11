@@ -6,12 +6,11 @@ import (
 	"strings"
 )
 
-// The checks of `Check` on strings, as Effect Schema's filters: the same
-// expected texts, JSON Schema keywords (exact or not) and arbitrary
-// constraints.
+// The checks of `Check` on strings: the same expected texts, JSON Schema
+// keywords (exact or not) and arbitrary constraints as on the JS target.
 
-// checkGroup is Effect's `FilterGroup`: its checks run in order as if
-// applied one by one, and the exporter states each.
+// checkGroup is a group of checks: its checks run in order as if applied
+// one by one, and the exporter states each.
 type checkGroup []*check
 
 // checksOf is the checks a `Check` value applies.
@@ -22,7 +21,7 @@ func checksOf(c Value) []*check {
 	return []*check{c.(*check)}
 }
 
-// CheckAll is `Check.all`, Effect's `makeFilterGroup`.
+// CheckAll is `Check.all`: the group of the checks given.
 func CheckAll(checks Value) Value {
 	out := checkGroup{}
 	for _, c := range List(checks) {
@@ -31,7 +30,7 @@ func CheckAll(checks Value) Value {
 	return out
 }
 
-// CheckPredicate is `Check.predicate`, Effect's `makeFilter` with a message.
+// CheckPredicate is `Check.predicate`: a filter with a message.
 func CheckPredicate(f, message Value) Value {
 	return &check{
 		test:    func(fb *Fiber, v Value) bool { return Bool(Apply(fb, f, v)) },
@@ -48,8 +47,8 @@ func CheckLengthBetween(minimum, maximum Value) Value {
 
 var CheckIsNonEmpty Value = CheckMinLength(int32(1))
 
-// codePointsUpTo is Effect's `countCodePointsUpTo`: the code points of
-// `s`, counting no further than `limit`.
+// codePointsUpTo is the code points of `s`, counting no further than
+// `limit`.
 func codePointsUpTo(s string, limit int) int {
 	count := 0
 	for len(s) > 0 && count < limit {
@@ -105,7 +104,7 @@ func regExpSource(pattern string) string {
 	return strings.NewReplacer("\n", `\n`, "\r", `\r`, " ", ` `, " ", ` `).Replace(pattern)
 }
 
-// regExpEscape is Effect's `RegExp.escape`.
+// regExpEscape escapes the characters of `s` a RegExp reads as syntax.
 func regExpEscape(s string) string {
 	var b strings.Builder
 	for _, r := range s {
@@ -117,13 +116,13 @@ func regExpEscape(s string) string {
 	return b.String()
 }
 
-// literalCheck is Effect's check of a string containing a literal at a
-// place: `anchor` puts the escaped literal in its pattern.
+// literalCheck is the check of a string containing a literal at a place:
+// `anchor` puts the escaped literal in its pattern.
 //
-// shortcut: Effect drops a lone surrogate at the cut end of the literal from
-// the JSON Schema pattern and tests UTF-16 units; here the pattern keeps it
-// and the test is on bytes, the same unless the literal holds a lone
-// surrogate; port the cut if a program checks one
+// shortcut: the JS target drops a lone surrogate at the cut end of the
+// literal from the JSON Schema pattern and tests UTF-16 units; here the
+// pattern keeps it and the test is on bytes, the same unless the literal
+// holds a lone surrogate; port the cut if a program checks one
 func literalCheck(what, literal string, test func(s string) bool, anchor func(string) string) *check {
 	source := regExpSource(anchor(regExpEscape(literal)))
 	return &check{
@@ -193,8 +192,8 @@ var (
 		func(s string) bool { c := firstUnit(s); return ToLowerCase(c) == c })
 )
 
-// patternCheck is Effect's `isPattern` of a JS pattern, run as Go's, with its
-// own expected text (the RegExp's by default) and keywords.
+// patternCheck is the check of a JS pattern, run as Go's, with its own
+// expected text (the RegExp's by default) and keywords.
 func patternCheck(source, expected string, keywords ...Value) *check {
 	re := regexp.MustCompile(goPattern(utf16Units(source)))
 	if expected == "" {
@@ -208,8 +207,8 @@ func patternCheck(source, expected string, keywords ...Value) *check {
 	}
 }
 
-// CheckUUID is `Check.uuid`: of the version given, as Effect's `isUUID`,
-// which reads a version of 0 as none.
+// CheckUUID is `Check.uuid`: of the version given, a version of 0 read as
+// none.
 func CheckUUID(version Value) Value {
 	v := 0
 	if n, ok := some(version); ok {

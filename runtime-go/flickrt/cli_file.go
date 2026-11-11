@@ -6,9 +6,9 @@ import (
 	"strings"
 )
 
-// The primitives of Effect's CLI that read the file system: Path,
-// FileText and FileParse. Paths resolve against the working directory as
-// Node's `path.resolve` of the OS does.
+// The primitives of the CLI that read the file system: Path, FileText and
+// FileParse. Paths resolve against the working directory as Node's
+// `path.resolve` of the OS does.
 
 func cliAbsolute(path string) string {
 	if runtime.GOOS == "windows" {

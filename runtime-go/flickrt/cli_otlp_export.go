@@ -10,11 +10,11 @@ import (
 	"time"
 )
 
-// Effect's OtlpExporter.make, for `--trace`: the items pushed are buffered
-// and posted as one batch every interval, as soon as `maxBatch` are
-// waiting, and once more when the command ends, within the shutdown
-// timeout. A failed post disables the exporter for a minute and drops its
-// buffer; a transient one is retried three times first.
+// The OTLP exporter of `--trace`: the items pushed are buffered and posted
+// as one batch every interval, as soon as `maxBatch` are waiting, and once
+// more when the command ends, within the shutdown timeout. A failed post
+// disables the exporter for a minute and drops its buffer; a transient one
+// is retried three times first.
 type otlpExporter struct {
 	url, label  string
 	maxBatch    int  // 0: no limit

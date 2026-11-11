@@ -465,7 +465,7 @@ fn streams_services_and_sync_exports_cross_into_effect_typescript() {
     .expect("write");
     let build = flick_in(&dir, &["build", "--emit-dts"]);
     assert!(build.status.success(), "{build:?}");
-    // a TypeScript caller uses Effect's own API on Flick's values
+    // a TypeScript caller uses the Effect library's own API on Flick's values
     fs::write(
         dir.join("consumer.ts"),
         "import { Effect } from '@flick-lang/effect-ts';\n\

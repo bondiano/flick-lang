@@ -47,8 +47,8 @@ NOTES_FILE=/tmp/work.txt ./examples/cli-tool/dist/flick-main add review
 Set `emit = "go"` in `flick.toml` to make Go the default for `build`, `run`
 and `test`. The checked-in example keeps JavaScript as its default.
 
-On Go, the CLI is a port of Effect's: commands, prompts, help, version,
-errors and completions for every shell print the same text as on
+On Go, the CLI has its own implementation: commands, prompts, help,
+version, errors and completions for every shell print the same text as on
 JavaScript, `--log-level` sets the handler's minimum log level and
 `--trace` sends the command's span over OTLP, and `--wizard` builds a
 command line interactively.

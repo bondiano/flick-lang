@@ -1,4 +1,4 @@
-// Effect's `Channel`: the sources of a pipeline, from values, effects,
+// `Channel`: the sources of a pipeline, from values, effects,
 // queues, hubs and schedules.
 module App.Main exposing (main)
 

@@ -44,15 +44,19 @@ theorem has_do (X : Target P) {dM dA dA' : Dict} (hM : DTyp P [] dM (.dict effMo
     X.Has [] [] (doSkel.fill [dM, dA, dA']) doTy .P := by
   have hpure : ∀ Γ d, DTyp P [] d (.dict effApp) →
       X.Has Γ [] (.meth (.dict d) 1) (.mono (arrP (.con 1) (appQ (.con 5) .cnil (.con 1)))) .P :=
-    fun Γ d h => X.meth (m := 1) (θ := inst [.con 5, .cnil, .con 1]) rfl rfl (h.target X Γ .P)
+    -- the bound `a^c` of `pure` at `a := Unit`, `c := ∅`: `Unit` shows nothing
+    fun Γ d h => X.meth (m := 1) (θ := inst [.con 5, .cnil, .con 1]) rfl rfl
+      (Bounds.hold_one fun _ h => h) (h.target X Γ .P)
   have hk : X.Has [] [] (.lam (.app (.meth (.dict dA) 1) (.var 0)))
       (.mono (.arr .P (.con 1) (appQ (.con 5) .cnil (.con 1)) .cnil)) .P :=
-    X.lam (X.app (hpure _ _ hA) (X.var (s := ⟨0, .mono (.con 1)⟩) (ts := []) rfl rfl) (.inl rfl))
+    X.lam (X.app (hpure _ _ hA) (X.var (s := ⟨0, .mono (.con 1), []⟩) (ts := []) rfl rfl
+      Bounds.hold_nil) (.inl rfl))
   have hx : X.Has [] [] (.app (.meth (.dict dA') 1) (.const 8))
       (.mono (appQ (.con 5) .cnil (.con 1))) .P :=
-    X.app (hpure _ _ hA') (X.const (s := ⟨0, [], .con 1, .cnil⟩) (ts := []) rfl rfl) (.inl rfl)
+    X.app (hpure _ _ hA') (X.const (s := ⟨0, [], .con 1, .cnil, []⟩) (ts := []) rfl rfl
+      Bounds.hold_nil) (.inl rfl)
   exact X.app (X.app (X.meth (m := 3) (θ := inst [.con 5, .cnil, .cnil, .con 1, .con 1, .cnil])
-    rfl rfl (hM.target X [] .P)) hk (.inl rfl)) hx (.inl rfl)
+    rfl rfl Bounds.hold_nil (hM.target X [] .P)) hk (.inl rfl)) hx (.inl rfl)
 
 /-- The premise `Monad Eff`, closed by the instance `I2`. -/
 def ρEff : Nat → Dict := fun _ => .inst 2

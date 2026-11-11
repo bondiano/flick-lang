@@ -72,10 +72,20 @@ theorem rot_inst (T : Flick.Ty) {p kk : Nat} (θ : Nat → Ty) :
           dif_neg (by omega : ¬ j - kk - p + kk < kk), trσ, if_neg h2, trT]
         congr 1; omega
 
+/-- `rot_inst` at one atom. -/
+theorem rot_inst_atom (a : Atom) {p kk : Nat} (θ : Nat → Ty) :
+    ((rot p kk a).substT (liftT kk (instT (((vars p).map (·.subst θ)).map (trT N))))).substT
+        (instT ((List.range kk).map fun j => trT N (θ (j + p)))) =
+      trσ N (fun j => if j < p + kk then θ j else .var (j - (p + kk))) a := by
+  cases a with
+  | v n => exact rot_inst (.tvar n) θ
+  | r q => exact rot_inst (.rg q) θ
+
 theorem has_meth (hR : Real P S N) {Γ Δ e m C s c₀ rest θ φ} (hm : P.methods m = some (C, s))
-    (hc₀ : s.ctx = c₀ :: rest) (he : Has S N Γ Δ e (.dict (c₀.subst θ)) φ) :
+    (hc₀ : s.ctx = c₀ :: rest) (hb : Bounds.Hold (s.bd.map (Bound.subst θ)))
+    (he : Has S N Γ Δ e (.dict (c₀.subst θ)) φ) :
     Has S N Γ Δ (.meth e m) (dicts .cnil (rest.map (·.subst θ)) (.mono (s.ty.subst θ))) φ := by
-  obtain ⟨p, rest', hctx, hp, hcl, hfs⟩ := hR.meth hm
+  obtain ⟨p, rest', hctx, hp, hcl, hbd, hfs⟩ := hR.meth hm
   rw [hctx] at hc₀; cases hc₀
   intro Ψ Θ Γc γ δ hc
   obtain ⟨e', he', te⟩ := he Ψ Θ Γc γ δ hc
@@ -84,8 +94,19 @@ theorem has_meth (hR : Real P S N) {Γ Δ e m C s c₀ rest θ φ} (hm : P.metho
   have te' : Typ S Ψ Θ Γc e'
       (.ex (.dict (N.cls C p) (Flick.Ty.spine (((vars p).map (·.subst θ)).map (trT N)))) (trStage N φ)) := by
     have := te; simp only [trTT, trD, Cn.subst, hlen] at this; exact this
+  -- the value bounds of the field hold at the instance: it is `θ` on the scheme's variables
+  have hθ : ∀ j, j < s.k → (if j < p + (s.k - p) then θ j else .var (j - (p + (s.k - p)))) = θ j :=
+    fun j hj => by rw [if_pos (by omega)]
+  have holds : (Flick.Scheme.substT (instT (((vars p).map (·.subst θ)).map (trT N)))
+      ⟨s.k - p, (trBd N s.bd).substT (rot p (s.k - p)),
+        (trTT N (methTy rest s.ty)).substT (rot p (s.k - p))⟩).Holds Θ
+      ((List.range (s.k - p)).map fun j => trT N (θ (j + p))) := by
+    rintro C r ⟨C₁, r₁, ⟨C₀, r₀, h₀, rfl, rfl⟩, rfl, rfl⟩
+    simp only [Caps.substT_comp, Flick.Ty.substT_comp]
+    refine trBd_holds N (fun a => ?_) (by rw [hbd _ θ hθ]; exact hb) Θ C₀ r₀ h₀
+    rw [← Flick.Ty.substT_comp]; exact rot_inst_atom a θ
   refine ⟨_, .meth he', .dproj te' hd (by simp [vars]) (hfs fs hd)
-    (ts := (List.range (s.k - p)).map fun j => trT N (θ (j + p))) (by simp) holds_none ?_⟩
+    (ts := (List.range (s.k - p)).map fun j => trT N (θ (j + p))) (by simp) holds ?_⟩
   simp only [Flick.Scheme.inst, Flick.Scheme.substT]
   rw [rot_inst, ← trTT_subst, Nat.add_sub_cancel' hp,
     hcl _ θ fun j hj => by simp [hj]]

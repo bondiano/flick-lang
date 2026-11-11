@@ -1,4 +1,4 @@
-// Effect's default `Clock`: reads are runtime calls, through the clock or
+// The default `Clock`: reads are runtime calls, through the clock or
 // through the service, and sleeps and `DateTime.now` follow it.
 module App.Main exposing (main)
 

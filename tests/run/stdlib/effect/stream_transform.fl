@@ -1,4 +1,4 @@
-// Streams of Effect's `Stream` changed element by element.
+// `Stream`: streams changed element by element.
 module App.Main exposing (main)
 
 type error Boom = Boom Float

@@ -2,10 +2,9 @@ package flickrt
 
 import "math"
 
-// Checks: Effect Schema's filters as values. A check tests a decoded value,
-// says what an issue reports when it fails, and carries the JSON Schema
-// keywords that state it, as Effect's `toJsonSchema` annotation does, so the
-// strict exporter writes it exactly or refuses it.
+// Checks: a schema's filters as values. A check tests a decoded value, says
+// what an issue reports when it fails, and carries the JSON Schema keywords
+// that state it, so the strict exporter writes it exactly or refuses it.
 type check struct {
 	test func(fb *Fiber, v Value) bool
 	// expected names what passes: "expected <expected>, got …"
@@ -49,12 +48,12 @@ func exactly(kw ...Value) func(string) (*Record, bool) {
 	return func(string) (*Record, bool) { return record(Rec(kw...)), true }
 }
 
-// formatNumber is Effect's `format` of a number in an issue.
+// formatNumber is the text of a number in an issue.
 func formatNumber(n float64) string { return jsString(n) }
 
 func numberOf(v Value) float64 { x, _ := number(v); return x }
 
-// isInt is Effect's `isInt`: a safe integer.
+// isInt is the check of a safe integer.
 func isInt() *check {
 	return &check{
 		test: func(_ *Fiber, v Value) bool {
@@ -66,7 +65,7 @@ func isInt() *check {
 	}
 }
 
-// isFinite is Effect's `isFinite`.
+// isFinite is the check of a finite number.
 func isFinite() *check {
 	return &check{
 		test:     func(_ *Fiber, v Value) bool { x := numberOf(v); return !math.IsNaN(x) && !math.IsInf(x, 0) },
@@ -83,8 +82,8 @@ func isGreaterThanOrEqualTo(minimum float64) *check {
 	}
 }
 
-// isBetween is Effect's `isBetween` of numbers, inclusive; `expected`
-// overrides its text when set.
+// isBetween is the check of a number between two bounds, inclusive;
+// `expected` overrides its text when set.
 func isBetween(minimum, maximum float64, expected string) *check {
 	if expected == "" {
 		expected = "a value between " + formatNumber(minimum) + " and " + formatNumber(maximum)
@@ -96,8 +95,8 @@ func isBetween(minimum, maximum float64, expected string) *check {
 	}
 }
 
-// isBetweenLength is Effect's `isBetweenLength` of a string, in UTF-16
-// units, or of a list.
+// isBetweenLength is the check of a length between two bounds: of a
+// string, in UTF-16 units, or of a list.
 func isBetweenLength(minimum, maximum int) *check {
 	expected := "a value with a length between " + jsString(float64(minimum)) + " and " + jsString(float64(maximum))
 	if minimum == maximum {
@@ -124,7 +123,7 @@ func isBetweenLength(minimum, maximum int) *check {
 	}
 }
 
-// lengthOf is the length Effect's length checks test: a string's in UTF-16
+// lengthOf is the length the length checks test: a string's in UTF-16
 // units, or a list's.
 func lengthOf(v Value) int {
 	if s, ok := v.(string); ok {
@@ -133,7 +132,7 @@ func lengthOf(v Value) int {
 	return len(List(v))
 }
 
-// isMinLength is Effect's `isMinLength` (`isNonEmpty` is of 1).
+// isMinLength is the check of a least length (a non-empty value has 1).
 func isMinLength(minimum int) *check {
 	return &check{
 		test:     func(_ *Fiber, v Value) bool { return lengthOf(v) >= minimum },
@@ -151,7 +150,7 @@ func isMinLength(minimum int) *check {
 	}
 }
 
-// isTrimmed is Effect's `isTrimmed`.
+// isTrimmed is the check of a string with no leading or trailing whitespace.
 func isTrimmed() *check {
 	return &check{
 		test:     func(_ *Fiber, v Value) bool { return Trim(v) == v },
@@ -204,8 +203,8 @@ type checkedCodec struct {
 	description Value
 }
 
-// withChecks is the codec with more checks; as Effect puts annotations on
-// the last check, a new check has none.
+// withChecks is the codec with more checks; annotations belong to the last
+// check, so a new check has none.
 func withChecks(c codec, checks ...*check) *checkedCodec {
 	if k, ok := c.(*checkedCodec); ok {
 		return &checkedCodec{k.from, append(append([]*check{}, k.checks...), checks...), None, None}
@@ -230,7 +229,7 @@ func (c *checkedCodec) encode(fb *Fiber, v Value) (Value, []issue) {
 	return c.from.encode(fb, v)
 }
 
-// run stops at the first check that fails, as Effect's default does.
+// run stops at the first check that fails.
 func (c *checkedCodec) run(fb *Fiber, v Value) []issue {
 	for _, k := range c.checks {
 		if issues := k.issues(fb, v); issues != nil {

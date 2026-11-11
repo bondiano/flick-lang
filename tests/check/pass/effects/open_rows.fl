@@ -1,0 +1,52 @@
+// What an open row lets a signature say without a rule for taking a service
+// or an error out of a row: a layer or a handler names what it settles
+// beside a variable for the rest, and the rest is what the result needs.
+module App.OpenRows exposing (..)
+
+service Log =
+  line : String ->{} Unit
+
+service Primary =
+  query : String ->{} Float
+
+service Replica =
+  query : String ->{} Float
+
+type error Missing = Missing String
+
+/// A layer whose outputs are a variable provides them out of a larger row.
+with_layer : Layer none none o -> Eff (o + r) none Float ->{r} Float
+let with_layer layer t = provide layer { await t }
+
+/// A known service is taken out of an open row and the rest passed on,
+quiet : Layer none none {Log} -> Eff {Log | r} none a ->{r} a
+let quiet layer t = provide layer { await t }
+
+/// by a caller that writes the same row of its own,
+through : Layer none none {Log} -> Eff {Log | s} none a ->{s} a
+let through layer t = quiet layer t
+
+/// and by one that knows nothing of its row.
+any_row : Layer none none {Log} -> Eff s none a ->{s} a
+let any_row layer t = quiet layer t
+
+/// A known error is handled out of an open row of errors,
+recover : Eff r {Missing | e} Float ->{r; e} Float
+let recover t =
+  try await t with
+  | Missing _ -> 0.0
+
+/// of a computation that cannot raise it too,
+safe : Eff none none Float ->{} Float
+let safe t = recover t
+
+/// and out of a row nothing is known of.
+or_zero : (Unit ->{r; e} Float) ->{r; e} Float
+let or_zero run =
+  try run () with
+  | Missing _ -> 0.0
+
+/// Two roles of one shape are two services: a row has one element of each
+/// name, and each name has its own provider.
+both : Unit ->{Primary, Replica} Float
+let both () = Primary.query "a" + Replica.query "b"

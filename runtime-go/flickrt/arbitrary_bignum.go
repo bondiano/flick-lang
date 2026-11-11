@@ -6,9 +6,8 @@ import (
 	"sort"
 )
 
-// BigInts and BigDecimals of Effect's Arbitrary (internal/arbitrary/
-// bigInt.ts and bigDecimal.ts): magnitudes by families of bit lengths,
-// shrinking by bisection toward the closest passing value.
+// BigInts and BigDecimals of Arbitrary: magnitudes by families of bit
+// lengths, shrinking by bisection toward the closest passing value.
 
 var semanticMagnitudes = func() []*big.Int {
 	maxValue, _ := new(big.Float).SetFloat64(math.MaxFloat64).Int(nil)

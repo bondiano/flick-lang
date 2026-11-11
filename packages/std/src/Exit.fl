@@ -1,6 +1,6 @@
 /// How a computation ended, as `parallel_exits` and `Effect.exit` give it:
-/// Effect's `Exit`, its value or a `Failure`. A typed failure, a defect and
-/// an interruption stay apart; a defect is read only as inert text.
+/// its value or a `Failure`. A typed failure, a defect and an interruption
+/// stay apart; a defect is read only as inert text.
 module Exit exposing (..)
 
 /// The value of a success.

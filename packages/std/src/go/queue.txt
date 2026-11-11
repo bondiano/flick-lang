@@ -1,4 +1,4 @@
-# Queues, ended by Done, as Effect 4's.
+# Queues, ended by Done.
 
 [flick:Queue]
 flickMake QueueMake

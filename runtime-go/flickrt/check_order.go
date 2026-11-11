@@ -6,11 +6,11 @@ import (
 	"strconv"
 )
 
-// The checks of `Check` on ordered values and collections, as Effect
-// Schema's `makeIs*` filters and its size, uniqueness and property checks.
+// The checks of `Check` on ordered values and collections: the bounds of
+// an order, and the size, uniqueness and property checks.
 
-// orderChecks are the bound checks of an order: Effect's `makeIsGreaterThan`
-// and its kin, formatting a bound with `format`.
+// orderChecks are the bound checks of an order: greater than, less than
+// and their kin, formatting a bound with `format`.
 type orderChecks struct {
 	compare  func(fb *Fiber, a, b Value) int
 	format   func(Value) string
@@ -54,8 +54,8 @@ func (o orderChecks) lessThanOrEqualTo(b Value) Value {
 		&arbConstraint{maximum: b}, "maximum", b)
 }
 
-// between is Effect's `makeIsBetween` of `{ minimum, maximum,
-// exclusiveMinimum, exclusiveMaximum }`.
+// between is the check of a value between the bounds of `{ minimum,
+// maximum, exclusiveMinimum, exclusiveMaximum }`.
 func (o orderChecks) between(options Value) Value {
 	r := record(options)
 	low, high := r.Get("minimum"), r.Get("maximum")
@@ -82,8 +82,7 @@ func (o orderChecks) between(options Value) Value {
 	return c
 }
 
-// finiteBound is Effect's `encodeNumberPayload`: a bound of a number check
-// must be finite.
+// finiteBound is a bound of a number check, which must be finite.
 func finiteBound(b Value) Value {
 	if x := b.(float64); math.IsNaN(x) || math.IsInf(x, 0) {
 		panic(Defect{"RangeError: Expected a finite number, got " + formatNumber(x)})
@@ -91,12 +90,12 @@ func finiteBound(b Value) Value {
 	return b
 }
 
-// approximately is keywords Effect gives as `[{}, true]`: none exact.
+// approximately is keywords that state a check only in part: none exact.
 func approximately(...Value) func(string) (*Record, bool) {
 	return func(string) (*Record, bool) { return newRecord(0), false }
 }
 
-// numberCompare is Effect's `Order.Number`: NaN below every number.
+// numberCompare is the order of numbers: NaN below every number.
 func numberCompare(a, b float64) int {
 	switch {
 	case a == b || a != a && b != b:
@@ -133,7 +132,7 @@ func CheckGreaterThanOrEqualTo(b Value) Value {
 func CheckLessThan(b Value) Value          { return numberChecks.lessThan(finiteBound(b)) }
 func CheckLessThanOrEqualTo(b Value) Value { return numberChecks.lessThanOrEqualTo(finiteBound(b)) }
 
-// CheckMultipleOf is Effect's `isMultipleOf`: of the divisor's magnitude,
+// CheckMultipleOf is the check of a multiple of the divisor's magnitude,
 // by `Number.remainder`.
 func CheckMultipleOf(divisor Value) Value {
 	d := divisor.(float64)
@@ -148,7 +147,7 @@ func CheckMultipleOf(divisor Value) Value {
 	}
 }
 
-// checkIntBetween is Effect's group of `isInt` and `isBetween`.
+// checkIntBetween is the group of `isInt` and `isBetween`.
 func checkIntBetween(minimum, maximum float64) Value {
 	return checkGroup{CheckInt.(*check), CheckBetween(Rec("minimum", minimum, "maximum", maximum,
 		"exclusiveMinimum", false, "exclusiveMaximum", false)).(*check)}
@@ -171,7 +170,7 @@ func CheckLessThanDecimal(b Value) Value             { return decimalChecks.less
 func CheckLessThanOrEqualToDecimal(b Value) Value    { return decimalChecks.lessThanOrEqualTo(b) }
 func CheckBetweenDecimal(options Value) Value        { return decimalChecks.between(options) }
 
-// effectFormat is Effect's `format` of a bound in an expected text.
+// effectFormat is the text of a bound in an expected text.
 func effectFormat(v Value) string { return formatSpaced(v, 0) }
 
 // byOrd is the order of a Flick `Ord` dictionary.
@@ -200,8 +199,8 @@ func CheckBetweenBy(d, minimum, maximum Value) Value {
 		"exclusiveMinimum", false, "exclusiveMaximum", false))
 }
 
-// CheckMultipleOfBy is Effect's `makeIsMultipleOf`: the remainder is
-// `zero` by JS `===`.
+// CheckMultipleOfBy is the check of a multiple by a `remainder` of the
+// program: the remainder is `zero` by JS `===`.
 func CheckMultipleOfBy(remainder, zero, divisor Value) Value {
 	return &check{
 		test:     func(fb *Fiber, v Value) bool { return Same(apply2(fb, remainder, v, divisor), zero) },
@@ -209,15 +208,15 @@ func CheckMultipleOfBy(remainder, zero, divisor Value) Value {
 	}
 }
 
-// unique is whether no two of `xs` are equal by Effect's `Equal`.
+// unique is whether no two of `xs` are equal by the structural `==`.
 func unique(xs []Value) bool {
 	return len(List(ArrayDedupeWith(nil, equalsFn, xs))) == len(xs)
 }
 
-// shortcut: Effect's arbitrary constraints of uniqueness, sizes and
-// properties are not read on the go target, which filters generated values
-// by the check instead; carry them in arbConstraint if a program generates
-// such values
+// shortcut: the arbitrary constraints of uniqueness, sizes and properties
+// are not read on the go target, which filters generated values by the
+// check instead; carry them in arbConstraint if a program generates such
+// values
 
 var (
 	CheckUnique Value = &check{

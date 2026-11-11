@@ -1,6 +1,6 @@
-/// Effect's `TxHashSet`: a hash set in a transactional cell, read and
-/// changed inside `Tx.atomically` transactions. Like `HashSet`, each set
-/// keeps its witness.
+/// A hash set in a transactional cell, read and changed inside
+/// `Tx.atomically` transactions. Like `HashSet`, each set keeps its
+/// witness.
 module TxHashSet exposing (..)
 
 import EqHash

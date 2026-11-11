@@ -1,6 +1,6 @@
-/// Effect's `RequestResolver`: answers `Request`s in batches. Its
-/// callbacks get the entries of a batch and complete each one with
-/// `Request.succeed`, `Request.fail` or `Request.complete`.
+/// A resolver answers `Request`s in batches. Its callbacks get the entries
+/// of a batch and complete each one with `Request.succeed`, `Request.fail`
+/// or `Request.complete`.
 module RequestResolver exposing (..)
 
 import Cache

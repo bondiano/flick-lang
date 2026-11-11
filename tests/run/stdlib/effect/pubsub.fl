@@ -1,4 +1,4 @@
-// Effect's `PubSub`: hubs of each strategy, replay and ending, and
+// `PubSub`: hubs of each strategy, replay and ending, and
 // subscriptions that belong to a `scope`.
 module App.Main exposing (main)
 

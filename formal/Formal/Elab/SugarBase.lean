@@ -11,18 +11,25 @@ live where it is called.
 namespace Flick.Elab
 
 /-- A monomorphic binder `x : a`. -/
-abbrev Scheme.mono (a : Ty) : Scheme := ⟨0, [], a, .cnil⟩
+abbrev Scheme.mono (a : Ty) : Scheme := ⟨0, [], a, .cnil, []⟩
 
 variable {P : Prog} (S : Sugar P)
 
-theorem elab_const {Γ Δ c k ty q ts τ φ} (hc : P.consts c = some ⟨k, [], ty, q⟩)
-    (hk : ts.length = k) (hτ : ty.subst (inst ts) = τ) : Elab P Γ Δ (.const c) τ φ (.const c) := by
-  subst hτ; exact .const (σ := ⟨k, [], ty, q⟩) hc hk .nil
+/-- A constant at an instance where its value bounds hold; a scheme without them needs nothing. -/
+theorem elab_const {Γ Δ c k ty q bd ts τ φ} (hc : P.consts c = some ⟨k, [], ty, q, bd⟩)
+    (hk : ts.length = k) (hτ : ty.subst (inst ts) = τ)
+    (hb : Bounds.Hold (bd.map (Bound.subst (inst ts))) := by exact Bounds.hold_nil) :
+    Elab P Γ Δ (.const c) τ φ (.const c) := by
+  subst hτ; exact .const (σ := ⟨k, [], ty, q, bd⟩) hc hk hb .nil
 
-theorem elab_meth {Γ Δ m C k c₀ ty q ts d τ φ} (hm : P.methods m = some (C, ⟨k, [c₀], ty, q⟩))
+/-- A method at an instance where its value bounds hold. -/
+theorem elab_meth {Γ Δ m C k c₀ ty q bd ts d τ φ}
+    (hm : P.methods m = some (C, ⟨k, [c₀], ty, q, bd⟩))
     (hC : c₀.cls = C) (hk : ts.length = k) (hd : Ent P Δ [c₀.subst (inst ts)] [d])
-    (hτ : ty.subst (inst ts) = τ) : Elab P Γ Δ (.meth m) τ φ (.meth (.dict d) m) := by
-  subst hτ; exact .meth (σ := ⟨k, [c₀], ty, q⟩) (rest := []) hm rfl hC hk hd .nil
+    (hτ : ty.subst (inst ts) = τ)
+    (hb : Bounds.Hold (bd.map (Bound.subst (inst ts))) := by exact Bounds.hold_nil) :
+    Elab P Γ Δ (.meth m) τ φ (.meth (.dict d) m) := by
+  subst hτ; exact .meth (σ := ⟨k, [c₀], ty, q, bd⟩) (rest := []) hm rfl hC hk hb hd .nil
 
 theorem Ty.subst_curry (σ : Nat → Ty) (q : Ty) (as : List Ty) (r : Ty) :
     (curry q as r).subst σ = curry (q.subst σ) (as.map (·.subst σ)) (r.subst σ) := by

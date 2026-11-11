@@ -1,10 +1,9 @@
-/// Typed remote procedure calls over Effect's RPC, served over HTTP with
-/// NDJSON. A procedure is described with codecs, procedures form a group,
-/// and the type of the group is the record of handlers it needs, so
-/// `listen` takes exactly one handler per procedure and a missing or extra
-/// one is a type error naming the procedure. `call` and `call_stream` call
-/// a procedure from the same value. The module is unstable, as Effect marks
-/// `effect/rpc`.
+/// Typed remote procedure calls, served over HTTP with NDJSON. A procedure
+/// is described with codecs, procedures form a group, and the type of the
+/// group is the record of handlers it needs, so `listen` takes exactly one
+/// handler per procedure and a missing or extra one is a type error naming
+/// the procedure. `call` and `call_stream` call a procedure from the same
+/// value. The module is experimental.
 module Rpc exposing (..)
 
 import Fiber
@@ -56,8 +55,9 @@ ndjson_rpc : Serialization
 foreign pure ndjson_rpc from "flick:rpc/Rpc" "rpcNdjsonRpc"
   reviewed "effect@4.1.2 sha256:8e90c634696879c6"
 
-/// Effect's binary frames, laid out by the codecs: smaller than JSON, but
-/// both ends must be Effect's, and it adds to a bundle.
+/// Binary frames, laid out by the codecs: smaller than JSON, but the other
+/// end must be this module or a peer built with the Effect library, and it
+/// adds to a bundle.
 binary : Serialization
 foreign pure binary from "flick:rpc/Rpc" "rpcBinary"
   reviewed "effect@4.1.2 sha256:5d78f3975991bfc4"

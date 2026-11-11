@@ -1,4 +1,4 @@
-// Effect's `Channel` and `Sink` over JS streams: web streams and async
+// `Channel` and `Sink` over JS streams: web streams and async
 // iterables, which only the JS target has.
 module App.Main exposing (main)
 

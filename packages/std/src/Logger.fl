@@ -1,7 +1,6 @@
-/// Effect's `Logger`: what happens to each log message. A `Logger o` turns
-/// a message into an `o`; the console loggers write it. `layer` installs
-/// loggers for the body of a `provide`, and `effect_log` sends the `Log`
-/// service to them.
+/// What happens to each log message. A `Logger o` turns a message into an
+/// `o`; the console loggers write it. `layer` installs loggers for the body
+/// of a `provide`, and `effect_log` sends the `Log` service to them.
 module Logger exposing (..)
 
 import Duration
@@ -88,7 +87,7 @@ with_leveled_console : Logger o -> Logger Unit
 foreign pure with_leveled_console from "flick:Logger" "withLeveledConsole"
   reviewed "effect@4.1.2 sha256:5ffd4c966037647a"
 
-/// Effect's default: `[time] LEVEL (#fiber): message` on the console.
+/// The default logger: `[time] LEVEL (#fiber): message` on the console.
 default_logger : Logger Unit
 foreign pure default_logger from "flick:Logger" "defaultLogger"
   reviewed "effect@4.1.2 sha256:8328337a393ac745"
@@ -193,7 +192,7 @@ write_effect : String -> String ->{} Unit
 foreign effect write_effect from "flick:Logger" "flickLogWrite"
   arity 2
 
-/// The `Log` service through Effect's loggers: `Log.info` logs at `info`,
-/// and so on.
+/// The `Log` service through the installed loggers: `Log.info` logs at
+/// `info`, and so on.
 effect_log : Layer none none {Log}
 let effect_log = Layer.succeed Log { write = write_effect }

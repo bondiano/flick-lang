@@ -1,6 +1,6 @@
 package flickrt
 
-// Effect's `Config`: a description of configuration read from the current
+// `Config`: a description of configuration read from the current
 // ConfigProvider (the environment by default) when it runs. Reading gives
 // a value, or a recoverable failure where the provider has nothing (which
 // `with_default` and `or_else` take); a value that does not parse and a
@@ -151,7 +151,7 @@ func load(fb *Fiber, p provider, path []Value) *cfgNode {
 	return node
 }
 
-// schemaError is Effect's ConfigError of a SchemaError at the path.
+// schemaError is the ConfigError of a SchemaError at the path.
 func schemaError(path []Value, message string) Value {
 	if len(path) > 0 {
 		var at strings.Builder
@@ -167,7 +167,7 @@ func schemaError(path []Value, message string) Value {
 	return configError("SchemaError(" + message + ")")
 }
 
-// A decoder reads the text of a value, or gives Effect's issue.
+// A decoder reads the text of a value, or gives the message of an issue.
 type decoder func(text string) (Value, string)
 
 // scalar reads the value at the path, missing where the provider has none.
@@ -350,7 +350,7 @@ func ConfigRedacted(_ *Fiber, name Value) Value {
 }
 
 // schemaDecoder reads the text of a value of a scalar schema, as its
-// string tree form in Effect does.
+// string tree form does.
 func schemaDecoder(s *Schema) decoder {
 	switch s.resolved().kind {
 	case kindNumber:
@@ -378,7 +378,7 @@ func schemaDecoder(s *Schema) decoder {
 
 // ConfigSchema is the value at the path decoded by the schema: a record
 // schema reads a record of the provider, a list one an array.
-// shortcut: scalar, record and list schemas; Effect's other string tree forms when a program reads one
+// shortcut: scalar, record and list schemas; the other string tree forms when a program reads one
 func ConfigSchema(schema, name Value) Value {
 	return &config{func(fb *Fiber, p provider, prefix []Value) (Value, Value) {
 		path := append(append([]Value{}, prefix...), name)

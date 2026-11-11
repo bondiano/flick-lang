@@ -1,5 +1,5 @@
 //! the bridge to Effect in compiled code. A foreign binding the kernel
-//! has no export for is Effect's, and what crosses it is converted by its
+//! has no export for is one of Effect, and what crosses it is converted by its
 //! shape, from the signature. Emitted only for Flick's own runtime.
 
 use crate::build::bindings;
@@ -11,9 +11,9 @@ use crate::ir::{Foreign, ForeignMode};
 /// which way a value crosses the bridge to Effect.
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub(super) enum Toward {
-    /// From Flick to Effect's side.
+    /// From Flick to the Effect side.
     Host,
-    /// From Effect's side to Flick.
+    /// From the Effect side to Flick.
     Flick,
 }
 
@@ -194,7 +194,7 @@ impl Gen<'_> {
             (Toward::Flick, Shape::Chunk) => self.bridge("chunkFromEffect"),
             (Toward::Flick, Shape::HashMap) => self.bridge("hashMapFromEffect"),
             (Toward::Flick, Shape::HashSet) => self.bridge("hashSetFromEffect"),
-            // a record of handlers is Effect's as it is
+            // a record of handlers crosses unchanged
             (Toward::Flick, _) => return value,
         };
         format!("{convert}({value})")
@@ -258,7 +258,7 @@ impl Gen<'_> {
             .fold(body, |body, param| format!("({param}) => {body}"))
     }
 
-    /// an `Eff`, a thunk on the kernel and an Effect on Effect's side.
+    /// an `Eff`, a thunk on the kernel and an Effect on the Effect side.
     fn crossed_eff(&mut self, toward: Toward, inner: &Shape, eff: &str) -> String {
         let depth = self.bridge_depth();
         let at = format!("$r{depth}");

@@ -6,7 +6,7 @@ import (
 )
 
 // The histogram counts a value equal to a boundary in that boundary's
-// bucket and one past the last in none of them, as Effect's does.
+// bucket and one past the last in none of them.
 func TestHistogramBuckets(t *testing.T) {
 	c := metricContext{rootFiber(), noAttributes}
 	h := newHistogram("test_histogram_buckets", None, nil, []Value{10.0, 1.0, 5.0})
@@ -23,8 +23,8 @@ func TestHistogramBuckets(t *testing.T) {
 	}
 }
 
-// A summary keeps its last `maxSize` values and reads its quantiles as
-// Effect's does: the value at ceil(q * n) - 1 of the sorted samples.
+// A summary keeps its last `maxSize` values and reads a quantile as the
+// value at ceil(q * n) - 1 of the sorted samples.
 func TestSummaryQuantiles(t *testing.T) {
 	c := metricContext{rootFiber(), noAttributes}
 	now := clockOf(c.fb).millis()

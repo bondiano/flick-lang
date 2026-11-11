@@ -6,14 +6,14 @@ import (
 	"sync"
 )
 
-// PubSub is Effect 4's (PubSub.ts): a backing hub, the subscriptions
-// with takers waiting, a strategy for a full hub (back pressure, dropping
-// or sliding) and an end. One lock guards the hub, its subscriptions and
-// its strategy, as JS runs each of their operations at once.
+// PubSub is a backing hub, the subscriptions with takers waiting, a
+// strategy for a full hub (back pressure, dropping or sliding) and an end.
+// One lock guards the hub, its subscriptions and its strategy, as JS runs
+// each of their operations at once.
 type PubSub struct {
 	mu           sync.Mutex
 	atomic       hubAtomic
-	subscribers  []*Subscription // with takers waiting, as Effect's Map orders them
+	subscribers  []*Subscription // with takers waiting, in insertion order
 	live         []*Subscription // the hub's scope: what shutting it down unsubscribes
 	isShutdown   bool
 	shutdownHook chan struct{} // closed once shut down
@@ -31,8 +31,8 @@ const (
 	hubSliding
 )
 
-// Subscription is Effect's: a backing subscription, its takers, and the
-// replay window it reads first.
+// Subscription is a backing subscription, its takers, and the replay
+// window it reads first.
 type Subscription struct {
 	hub        *PubSub
 	backing    hubBacking
@@ -91,8 +91,8 @@ func newPubSub(atomic hubAtomic, strategy hubStrategy) *PubSub {
 
 func pubSubOf(v Value) *PubSub { return v.(*PubSub) }
 
-// interruptSelf is Effect's `Effect.interrupt`, a failure with the
-// fiber's own interruption, after unlocking the hub.
+// interruptSelf is a failure with the fiber's own interruption, after
+// unlocking the hub.
 func (h *PubSub) interruptSelf(fb *Fiber) Value {
 	h.mu.Unlock()
 	panic(&Failure{&Cause{kind: causeInterrupt, fiber: fb.state.id}})
@@ -107,8 +107,9 @@ func (h *PubSub) size() int {
 	return h.atomic.size()
 }
 
-// shutdown is Effect's: the first call unsubscribes every subscriber, as
-// closing the hub's scope does, and interrupts the waiting publishers.
+// shutdown shuts the hub down: the first call unsubscribes every
+// subscriber, as closing the hub's scope does, and interrupts the waiting
+// publishers.
 func (h *PubSub) shutdown(fb *Fiber) {
 	masked(fb, fb.state.mask+1, func() Value {
 		h.mu.Lock()
@@ -137,7 +138,7 @@ func (h *PubSub) shutdown(fb *Fiber) {
 	})
 }
 
-// end is Effect's `endUnsafe`.
+// end ends the hub with `v`, false when it is shut down or already ended.
 func (h *PubSub) end(v Value) bool {
 	h.mu.Lock()
 	defer h.mu.Unlock()
@@ -260,7 +261,7 @@ func (h *PubSub) onEmptySpace() {
 	}
 }
 
-// completePollers is Effect's `strategyCompletePollersUnsafe`.
+// completePollers gives the waiting takers of `s` its buffered messages.
 func (h *PubSub) completePollers(s *Subscription) {
 	for !s.backing.isEmpty() {
 		if len(s.pollers) == 0 {
@@ -298,8 +299,8 @@ func (h *PubSub) removeSubscriber(s *Subscription) {
 	}
 }
 
-// subscribe is Effect's: the subscription ends when the owner closes, or
-// when the hub shuts down; at once on a hub already shut down.
+// subscribe is a new subscription: it ends when the owner closes, or when
+// the hub shuts down; at once on a hub already shut down.
 func (h *PubSub) subscribe(fb *Fiber) *Subscription {
 	h.mu.Lock()
 	s := &Subscription{hub: h, backing: h.atomic.subscribe(), replay: newReplayWindow(h.atomic.replay())}
@@ -319,8 +320,8 @@ func (h *PubSub) subscribe(fb *Fiber) *Subscription {
 	return s
 }
 
-// unsubscribe is Effect's: the first call interrupts the takers and gives
-// the subscription's messages up.
+// unsubscribe ends the subscription: the first call interrupts the takers
+// and gives the subscription's messages up.
 func (s *Subscription) unsubscribe(fb *Fiber) {
 	h := s.hub
 	h.mu.Lock()
@@ -354,7 +355,7 @@ func (s *Subscription) pollNow() (Value, bool) {
 	return v, ok
 }
 
-// take is Effect's, with the hub locked, which it releases.
+// take is the next message, with the hub locked, which it releases.
 func (s *Subscription) take(fb *Fiber) Value {
 	if s.shutdown {
 		return s.hub.interruptSelf(fb)
@@ -449,7 +450,7 @@ func (s *Subscription) takeUpTo(fb *Fiber, n int) []Value {
 	return append(replay, as...)
 }
 
-// takeBetween is Effect's `takeRemainderLoop`.
+// takeBetween takes at least `lo` messages, waiting for them, and at most `hi`.
 func (s *Subscription) takeBetween(fb *Fiber, lo, hi int) []Value {
 	lo, hi = max(lo, 0), max(hi, 0)
 	acc := []Value{}
@@ -499,7 +500,7 @@ func PubSubUnbounded(options Value) Value {
 // PubSubCapacity is the hub's capacity; an unbounded one's is the largest
 // Int.
 //
-// shortcut: Effect's unbounded capacity is 2^53-1, beyond Int on Go; make Int wider if a program reads it
+// shortcut: the unbounded capacity is 2^53-1 on the JS target, beyond Int on Go; make Int wider if a program reads it
 func PubSubCapacity(hub Value) Value {
 	return int32(min(pubSubOf(hub).atomic.capacity(), math.MaxInt32))
 }
@@ -558,8 +559,8 @@ func PubSubTakeBetween(fb *Fiber, lo, hi, sub Value) Value {
 
 func PubSubRemaining(fb *Fiber, sub Value) Value { return int32(subscriptionOf(sub).remaining(fb)) }
 
-// StreamFromSubscription is Effect's: the chunks of messages there are, as
-// they come.
+// StreamFromSubscription is the chunks of messages there are, as they
+// come.
 func StreamFromSubscription(sub Value) Value {
 	return &Stream{channelFromSubscriptionArray(subscriptionOf(sub))}
 }

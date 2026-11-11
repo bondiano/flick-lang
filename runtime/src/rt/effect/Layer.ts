@@ -1,4 +1,4 @@
-// The bindings of `Layer` on the kernel, as Go's `flickrt` has Effect's.
+// The bindings of `Layer` on the kernel, as Go's `flickrt` has them.
 import { type Cause, die, dies, isFail, raise } from "../cause.ts";
 import { type Run, Suspend, asExit, currentOwner, exitOf } from "../fiber.ts";
 import {

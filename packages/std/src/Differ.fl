@@ -1,5 +1,5 @@
-/// Effect's `Differ`: the difference of two values as a patch `p`, and the
-/// patch applied to a value. `json_patch` makes one from a codec.
+/// A differ gives the difference of two values as a patch `p`, and applies
+/// a patch to a value. `json_patch` makes one from a codec.
 module Differ exposing (..)
 
 /// Computes, combines and applies patches `p` of values `a`.

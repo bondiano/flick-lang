@@ -1,9 +1,9 @@
 package flickrt
 
-// TxChunk and TxDeferred as Effect 4's: a TxRef of a Chunk, and a TxRef of
-// an `Option (Result e a)`.
+// TxChunk and TxDeferred: a TxRef of a Chunk, and a TxRef of an
+// `Option (Result e a)`.
 
-// TxChunk is Effect's TxChunk.
+// TxChunk is a TxRef of a Chunk.
 type TxChunk struct{ ref *TxRef }
 
 func txChunkOf(v Value) *TxRef { return v.(*TxChunk).ref }
@@ -32,8 +32,7 @@ func TxChunkPrepend(fb *Fiber, x, c Value) Value {
 	return txUpdate(fb, txChunkOf(c), func(v Value) Value { return ChunkPrepend(x, v) })
 }
 
-// Effect reads the size by `modify`, which writes the chunk back; a read
-// is the same here but for not making a new version.
+// The size is a read: it makes no new version of the chunk.
 
 func TxChunkSize(fb *Fiber, c Value) Value {
 	return txRead(fb, txChunkOf(c), func(v Value) Value { return int32(len(items(v))) })
@@ -86,7 +85,7 @@ func TxChunkConcat(fb *Fiber, other, c Value) Value {
 	})
 }
 
-// TxDeferred is Effect's TxDeferred.
+// TxDeferred is a TxRef of an `Option (Result e a)`.
 type TxDeferred struct{ ref *TxRef }
 
 func txDeferredOf(v Value) *TxRef { return v.(*TxDeferred).ref }

@@ -1,6 +1,5 @@
-/// Lists searched, compared as sets and grouped: the part of `List` over
-/// Effect's `Array` that relates elements to each other. The variants
-/// without `_with` use `Eq`.
+/// Lists searched, compared as sets and grouped: the part of `List` that
+/// relates elements to each other. The variants without `_with` use `Eq`.
 private module List.Search exposing (..)
 
 /// The last element that satisfies `p`.

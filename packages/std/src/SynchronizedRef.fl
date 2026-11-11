@@ -1,6 +1,6 @@
-/// Effect's `SynchronizedRef`: a reference whose updates may run tasks.
-/// An update holds the reference until its task ends, so updates never
-/// interleave; a plain read does not wait.
+/// A reference whose updates may run tasks. An update holds the reference
+/// until its task ends, so updates never interleave; a plain read does not
+/// wait.
 module SynchronizedRef exposing (..)
 
 /// A reference to a value of `a` with serialized updates.

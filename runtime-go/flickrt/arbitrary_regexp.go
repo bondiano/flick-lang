@@ -7,7 +7,7 @@ import (
 	"strconv"
 )
 
-// Strings that match a pattern (internal/arbitrary/regexp.ts): the
+// Strings that match a pattern: the
 // pattern parsed into literals, character classes, sequences, choices and
 // repetitions, each generated at an exact length in UTF-16 code units.
 
@@ -274,8 +274,8 @@ func isHexUnit(u int) bool {
 	return isDigitUnit(u) || u >= 'a' && u <= 'f' || u >= 'A' && u <= 'F'
 }
 
-// reParser is Effect's parser of the supported subset; anything else
-// makes the pattern unsupported, and the string generator ignores it.
+// reParser is the parser of the supported subset; anything else makes the
+// pattern unsupported, and the string generator ignores it.
 type reParser struct {
 	src       []uint16
 	i         int
@@ -631,7 +631,7 @@ func hasTrailingAnchor(src []uint16) bool {
 	return backslashes%2 == 0
 }
 
-// regexpGen is a compiled pattern: Effect's `Regexp.Compiled`.
+// regexpGen is a compiled pattern.
 type regexpGen struct {
 	node          *reNode
 	minimumLength float64
@@ -640,7 +640,7 @@ type regexpGen struct {
 }
 
 // compilePattern compiles a pattern without flags, as a check of the
-// program states one; nil when Effect does not support it.
+// program states one; nil when the pattern is not supported.
 func compilePattern(source string) *regexpGen {
 	src := utf16Units(source)
 	parsed := (&reParser{src: src, supported: true}).parse()

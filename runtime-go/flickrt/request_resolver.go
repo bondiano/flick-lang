@@ -1,7 +1,7 @@
 package flickrt
 
-// RequestResolver is Effect's: the batching of a resolver, and its
-// combinators, which make a resolver of the same batching otherwise.
+// RequestResolver: the batching of a resolver, and its combinators, which
+// make a resolver of the same batching otherwise.
 
 import "slices"
 
@@ -11,8 +11,7 @@ var defaultBatchKey = new(byte)
 
 func collectAll(*Fiber, []*requestEntry) bool { return true }
 
-// newResolver batches every entry together, after a yield, as Effect's
-// `make` does.
+// newResolver batches every entry together, after a yield.
 func newResolver(runAll func(fb *Fiber, entries []Value, key Value)) *resolver {
 	return &resolver{
 		delay:        yieldTurn,
@@ -130,7 +129,7 @@ func RequestResolverAround(before, after, self Value) Value {
 			_, released := catch(func() Value {
 				return masked(fb, outer+1, func() Value { return Run(fb, Apply(fb, Apply(fb, after, entries), a)) })
 			})
-			if cause = finalized(cause, released); cause != nil { // as Effect's acquireUseRelease
+			if cause = finalized(cause, released); cause != nil { // then the failure of `after`
 				panic(&Failure{cause})
 			}
 		}

@@ -227,12 +227,14 @@ impl Checker<'_> {
         let checked = self.own_stage(body, expected);
         self.leave_provide();
         let (t, inner) = checked?;
+        let own = inner.clone();
         let (mut needed, raised) = match inner {
             Stage::Pure => (Row::none(), Row::none()),
             Stage::Runtime(r, e) => (self.zonk_row(&r), e),
         };
         self.settle_provide(&mut needed, &self.zonk_row(&outputs), Some(&p))?;
         let rest = self.minus(&needed, &outputs)?;
+        self.note(body, |n| n.own = Some((own, rest.clone())));
         // a layer of a service a region indexes is provided where it is live
         let live = (self.zonk_row(&outputs).elems.values()).fold(Caps::default(), |out, args| {
             out.union(&self.indexed_live(args))

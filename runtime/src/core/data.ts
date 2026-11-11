@@ -1,8 +1,9 @@
 // The data ABI of compiled Flick code without Effect: an ADT value is
 // `{ _tag, _0, _1, … }` with a qualified tag, a record is a plain object, a
 // tuple or a list a dense array, Unit `undefined`. Option and Result have
-// the fields of Effect's (`{ _tag: "Some", value }`, `{ _tag: "Success",
-// success }`, …) as plain objects, so compiled matches read either.
+// the same fields as those of the Effect library (`{ _tag: "Some", value }`,
+// `{ _tag: "Success", success }`, …) as plain objects, so compiled matches
+// read either.
 // Equality is canonical: structural, SameValueZero on numbers.
 import { item } from "../internal.ts";
 import { constructorName, tag } from "../tags.ts";
@@ -59,7 +60,7 @@ export const runtimeHash = Symbol.for("@flick-lang/runtime/hash");
 /** A key `$0`, `$1` …: a dictionary a value of a GADT holds, which `==` and `hash` leave out. */
 const held = (k: string): boolean => k.charCodeAt(0) === 36;
 
-/** Effect's Option has its tag on the prototype; Flick's has it on the value. */
+/** An Option of the Effect library has its tag on the prototype; Flick's has it on the value. */
 const optionTag = (value: Readonly<Record<string, unknown>>): "None" | "Some" | undefined => {
   const variant: unknown = Reflect.get(value, "_tag");
   const keys = Object.keys(value);

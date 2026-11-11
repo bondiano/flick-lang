@@ -8,8 +8,7 @@ import (
 )
 
 // On Windows a process starts in a group of its own, and stopping it ends
-// its tree with `taskkill`, as Effect's spawner does; what outlived the
-// leader is left running.
+// its tree with `taskkill`; what outlived the leader is left running.
 const processGroupsLinger = false
 
 func processGroup(cmd *exec.Cmd) {

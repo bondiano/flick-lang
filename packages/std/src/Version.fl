@@ -1,8 +1,8 @@
-/// Effect's `Version`: the release of Effect the program runs on.
+/// The release of the Effect library the program runs on.
 module Version exposing (..)
 
-/// The version Effect reports, as `"4.1.2"`; JS code may change it, so
-/// reading it is runtime.
+/// The version the Effect library reports, as `"4.1.2"`; JS code may change
+/// it, so reading it is runtime.
 current : Unit ->{} String
 foreign current from "flick:Version" "getCurrentVersion"
   arity 0

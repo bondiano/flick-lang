@@ -1,4 +1,4 @@
-// Effect's `ChannelSchema`: channels that encode and decode each chunk with
+// `ChannelSchema`: channels that encode and decode each chunk with
 // a codec, failing with the program's `SchemaError`.
 module App.Main exposing (main)
 

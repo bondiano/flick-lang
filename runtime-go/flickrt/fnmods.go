@@ -1,7 +1,7 @@
 package flickrt
 
-// Effect's `Boolean`, `Predicate`, `Filter` and `Function` functions, in
-// the order Flick passes the arguments: data-last, so `and that self` is
+// The `Boolean`, `Predicate`, `Filter` and `Function` functions, in the
+// order Flick passes the arguments: data-last, so `and that self` is
 // `self && that`. A predicate, a filter and a lazy argument are type
 // aliases of functions, so a function returning one takes its argument
 // last: `Predicate.and that self a`.

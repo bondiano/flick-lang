@@ -1,4 +1,4 @@
-// Effect's `Stream` with sinks, channels and an execution plan.
+// `Stream` with sinks, channels and an execution plan.
 module App.Main exposing (main)
 
 type error Boom = Boom Float

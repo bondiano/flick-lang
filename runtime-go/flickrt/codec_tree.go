@@ -9,16 +9,15 @@ import (
 )
 
 // String trees: values whose every leaf is a string, as query strings and
-// forms carry them. `Codec.string_tree` reads a schema's values from one
-// as Effect Schema's `toCodecStringTree` does, and bracket paths
-// (`a[b][0]`) build one as Effect's `makeTreeRecord` does.
+// forms carry them. `Codec.string_tree` reads a schema's values from one,
+// and bracket paths (`a[b][0]`) build one.
 
 type stringTree struct{ s *Schema }
 
 // CodecStringTree is the string-tree codec of a schema of numbers, strings,
 // booleans, BigInts, lists, tuples and records.
 //
-// shortcut: Unit, Option, Result, Redacted and variant types are refused; Effect's forms of them are not ones a query string can carry, port them if a program needs one
+// shortcut: Unit, Option, Result, Redacted and variant types are refused; their forms are not ones a query string can carry, port them if a program needs one
 func CodecStringTree(s Value) Value {
 	checkTree(sch(s), map[*Schema]bool{})
 	return &fallible{&stringTree{sch(s)}}
@@ -47,7 +46,7 @@ func (t *stringTree) accepts(Value) bool { return true }
 
 var finiteText = regexp.MustCompile(`^[+-]?[0-9]*\.?[0-9]+(?:[Ee][+-]?[0-9]+)?$`)
 
-// numberOfText is Effect's number of a string: a finite number's text, or
+// numberOfText is the number of a string: a finite number's text, or
 // `NaN`, `Infinity` or `-Infinity`.
 func numberOfText(in Value) (float64, []issue) {
 	s, ok := in.(string)

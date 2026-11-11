@@ -1,6 +1,6 @@
-/// Effect's `Console`: the JS console of the current fiber, which a program
-/// may replace for a task with `with_console`. It needs no service row: the
-/// global console is the default.
+/// The JS console of the current fiber, which a program may replace for a
+/// task with `with_console`. It needs no service row: the global console is
+/// the default.
 module Console exposing (..)
 
 /// A JS console.

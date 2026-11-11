@@ -128,7 +128,7 @@ from the atoms it reads, and `Atom.set`/`Atom.update` write a state
 through the service `Atom.Write`, which the task of an action has and a
 render does not. `Atom.layer` provides one registry as both
 `Atom.Registry`, which roots and server markup read, and `Atom.Write`;
-`Atom.Registry` is Effect's `Reactivity.Atom.Registry`, which `Atom`
+`Atom.Registry` is `Reactivity.Atom.Registry`, which `Atom`
 re-exports.
 
 A view is a component whose render reads atoms through the service
@@ -151,8 +151,8 @@ component counter_view () = ui {
 ```
 
 `Ui.render view props` places a view in a `Ui`. The compiler names each
-top-level view, action and atom `Module.name`, as React's developer tools
-and Effect's show it (`App.Counter.counter_view`); a release build keeps
+top-level view, action and atom `Module.name`, as the developer tools
+of React and of Effect show it (`App.Counter.counter_view`); a release build keeps
 them all, or only those of views and actions with `[build] labels = "components"`.
 `Ui.named` gives a view another name. A view subscribes to what it read after React
 commits, and a write between its render and its subscription renders it
@@ -701,7 +701,7 @@ typed primitives and event snapshots, or foreign React components through
 The state of a Flick UI is in atoms: a view renders from the atoms it reads,
 and a handler is a supervised task that writes them. There is no
 `Msg → update` loop, and none is planned: what Elm puts in commands is a
-task of an action, run by the Effect fibers, scopes and event policies that
+task of an action, run by the fibers, scopes and event policies that
 already exist. Sources that write atoms on their own, Elm's subscriptions,
 are among the [limitations](#limitations) below.
 

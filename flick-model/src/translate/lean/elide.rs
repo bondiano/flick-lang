@@ -4,11 +4,15 @@
 //! `K` the binders of kind `Region` and `CaptureRow`, which the model's
 //! `shown` counts. A capture row is a set of atoms, a row a set of elements,
 //! both as predicates; `Live C` in a row is the atoms of `C`, `Scope ϱ` the
-//! atom `ϱ`. `∀v. a^v → …` of a parameter is `v := a`, as rule 2 of the
-//! scheme translation reads it. What the core has no form for is skipped,
-//! with its reason.
+//! atom `ϱ`. A value bound `a^c` on a variable of the scheme is the fact
+//! `Facts.bnd a ⟦c⟧` of the scheme and `a` in its type, as rule 1 of the
+//! scheme translation reads it; `∀v. a^v → …` of a parameter is `v := a`,
+//! as rule 2 reads it. What the core has no form for is skipped, with its
+//! reason.
 
+use std::cell::RefCell;
 use std::fmt::Write;
+use std::rc::Rc;
 
 use flick_core::types::{builtins, show_type};
 
@@ -16,11 +20,14 @@ use crate::check::{elided, live_service, scope_service};
 use crate::decls::Decls;
 use crate::syntax::Path;
 use crate::translate::types::scheme;
-use crate::types::{Caps, Kind, Row, Scheme, Stage, Type, Var};
+use crate::types::{Caps, Kind, PROVIDED, Row, Scheme, Stage, Type, Var, provided};
 
 /// Types with hidden storage: the qualifier of a value is their first
 /// argument, as `appQ` of the scheme translation.
 const STORED: [&str; 1] = ["Seq"];
+
+/// The value bounds a translation meets, by their variable.
+type Bounds = Rc<RefCell<Vec<(String, Caps)>>>;
 
 /// The binders in scope, innermost first, with the capture rows rule 2 has
 /// instantiated: `v ↦ a`.
@@ -32,6 +39,16 @@ pub(crate) struct Env {
     /// `Unit`, a row, capture row or record's rest empty. A certificate's typing holds at
     /// any instance of them, and Lean checks it at this one.
     pub(crate) ground: bool,
+    /// The classes by the index the core gives their dictionaries; with
+    /// none, every dictionary is of class 0.
+    pub(crate) classes: Vec<String>,
+    /// The value bounds on variables of the scheme met so far, rule 1: each
+    /// is a fact of the scheme. Without it a bound is not read, as a
+    /// certificate's type has no facts.
+    pub(crate) bounds: Option<Bounds>,
+    /// The binders of the `∀` of parameters around: the variables of the
+    /// scheme come after them in `vars`.
+    pub(crate) inner: usize,
 }
 
 impl Env {
@@ -95,6 +112,28 @@ pub(crate) fn row(r: &Row, env: &Env) -> Result<String, String> {
             for a in c.atoms.iter().chain(&c.vars) {
                 parts.push(format!("x = .atm (.v {})", env.index_of(a)?));
             }
+        } else if *name == provided() {
+            // `Provided {r} ϱ` of a scheme: an obligation for each service of `r`
+            let [Type::Tag(r), s] = &args[..] else {
+                return Err(format!("`{name}` with arguments the core does not write"));
+            };
+            let a = region(s, env)?;
+            for n in r.elems.keys() {
+                parts.push(format!("x = .ob \"{n}\" (.v {a})"));
+            }
+            for v in env.kept(r.vars.iter()) {
+                parts.push(format!("x = .obv (.v {}) (.v {a})", env.index_of(v)?));
+            }
+        } else if &*name.module == PROVIDED {
+            // `{Provided {S} ϱ}`, split by service
+            let [s] = &args[..] else {
+                return Err(format!("`{name}` with arguments the core does not write"));
+            };
+            parts.push(format!(
+                "x = .ob \"{}\" (.v {})",
+                name.name,
+                region(s, env)?
+            ));
         } else if args.is_empty() {
             parts.push(format!("x = .nm \"{name}\""));
         } else {
@@ -105,6 +144,34 @@ pub(crate) fn row(r: &Row, env: &Env) -> Result<String, String> {
         parts.push(format!("x = .rv (.v {})", env.index_of(v)?));
     }
     Ok(disjunction(&parts, "Row.none"))
+}
+
+/// The type of a scheme and its facts in the core, in `env`, whose variables
+/// start with the scheme's: each `Outlives C s` as `Facts.single`, and each
+/// value bound `a^c` on a variable as `Facts.bnd`, rule 1.
+pub(crate) fn scheme_facts(s: &Scheme, env: &Env) -> Result<(String, String), String> {
+    let bounds = Rc::new(RefCell::new(Vec::new()));
+    let env = Env {
+        bounds: Some(bounds.clone()),
+        ..env.clone()
+    };
+    let t = ty(&s.body, &env)?;
+    let mut parts: Vec<String> = (s.outlives.iter())
+        .map(|(c, r)| Ok(format!("Facts.single {} {}", caps(c, &env)?, ty(r, &env)?)))
+        .collect::<Result<_, String>>()?;
+    parts.extend(facts(&bounds.borrow(), &env)?);
+    let cs = (parts.into_iter())
+        .reduce(|a, b| format!("Facts.union ({a}) ({b})"))
+        .unwrap_or_else(|| "Facts.none".into());
+    Ok((cs, t))
+}
+
+/// The atom of the region an obligation is about.
+fn region(s: &Type, env: &Env) -> Result<usize, String> {
+    match s {
+        Type::Var(v) => env.index_of(v),
+        other => Err(format!("an obligation about `{other}`, no region")),
+    }
 }
 
 pub(crate) fn stage(s: &Stage, env: &Env) -> Result<String, String> {
@@ -134,6 +201,12 @@ fn data(t: &Type, c: Option<&Caps>, env: &Env) -> Result<String, String> {
         head = h;
     }
     args.reverse();
+    // the owner of a region is the core's own type
+    if let (Type::Con(p), [s]) = (head, &args[..])
+        && p.to_string() == "Fiber.Owner"
+    {
+        return Ok(format!("(.owner {})", ty(s, env)?));
+    }
     let mut out = ty(head, env)?;
     if let (Type::Con(p), Some(c)) = (head, c)
         && STORED.contains(&&*p.name)
@@ -175,7 +248,35 @@ fn qualified(t: &Type, q: Option<&Caps>, env: &Env) -> Result<String, String> {
                 {
                     ty(x, env)?
                 }
-                _ => return Err("a value bound, which the core does not have".into()),
+                // a certificate reads a bound as the core does: on data the
+                // data, `⌈τ⌉ ⊆ C` checked where a cell takes it (`Const.ok`);
+                // on a function or a computation the qualifier of its use
+                _ if env.ground
+                    && (env.bounds.is_none() || !matches!(&**x, Type::Var(Var::Named(_)))) =>
+                {
+                    let mut inner = &**x;
+                    while let Type::Captured(y, _) | Type::Bounded(y, _) = inner {
+                        inner = y;
+                    }
+                    match inner {
+                        Type::Fun(..) | Type::Eff(..) => qualified(inner, Some(b), env)?,
+                        _ => ty(x, env)?,
+                    }
+                }
+                _ => {
+                    let Some(bounds) = &env.bounds else {
+                        return Err("a value bound, which the core does not have".into());
+                    };
+                    let Type::Var(Var::Named(a)) = &**x else {
+                        return Err("a value bound on a type that is not a variable".into());
+                    };
+                    let outer = |v: &Var| env.index_of(v).is_ok_and(|i| i >= env.inner);
+                    if !outer(&Var::Named(a.clone())) || !bound.iter().all(|v| outer(v)) {
+                        return Err("a value bound over a variable of a `∀` of a parameter".into());
+                    }
+                    bounds.borrow_mut().push((a.to_string(), b.clone()));
+                    ty(x, env)?
+                }
             }
         }
         Type::Ref(x) => format!("(.ref {})", ty(x, env)?),
@@ -198,12 +299,18 @@ fn qualified(t: &Type, q: Option<&Caps>, env: &Env) -> Result<String, String> {
                 .unwrap_or_else(|| "(.base .unit)".into())
         }
         Type::Errors(r) => format!("(.errors {})", row(r, env)?),
-        Type::Dict(_, args) => {
+        Type::Dict(c, args) => {
             let args = args
                 .iter()
                 .map(|a| ty(a, env))
                 .collect::<Result<Vec<_>, _>>()?;
-            format!("(.dict 0 (Ty.spine [{}]))", args.join(", "))
+            let class = if env.classes.is_empty() {
+                0
+            } else {
+                (env.classes.iter().position(|k| *k == c.to_string()))
+                    .ok_or_else(|| format!("the class `{c}`, not in the signature"))?
+            };
+            format!("(.dict {class} (Ty.spine [{}]))", args.join(", "))
         }
         Type::Forall(s) => forall(s, env)?,
         other => return Err(format!("no core form for `{other}`")),
@@ -225,6 +332,7 @@ fn forall(s: &Scheme, env: &Env) -> Result<String, String> {
             _ => kept.push(v.to_string()),
         }
     }
+    inner.inner = env.inner + kept.len();
     inner.vars = kept
         .iter()
         .cloned()
@@ -277,10 +385,28 @@ fn visit(t: &Type, f: &mut dyn FnMut(&Type) -> bool) -> bool {
     }
 }
 
-/// The theorem of one scheme: `Ty.elide K ⟦σ⟧ Caps.none = ⟦elided σ⟧`.
+/// The facts of the value bounds of a scheme, rule 1: `Facts.bnd a ⟦c⟧`
+/// for each, joined by `Facts.union`.
+pub(crate) fn facts(bounds: &[(String, Caps)], env: &Env) -> Result<Option<String>, String> {
+    let mut parts: Vec<String> = Vec::new();
+    for (a, c) in bounds {
+        let fact = format!("Facts.bnd {} {}", env.index(a)?, caps(c, env)?);
+        if !parts.contains(&fact) {
+            parts.push(fact);
+        }
+    }
+    Ok(parts
+        .into_iter()
+        .reduce(|a, b| format!("Facts.union ({a}) ({b})")))
+}
+
+/// The theorem of one scheme: `Ty.elide K ⟦σ⟧ Caps.none = ⟦elided σ⟧`, or
+/// of a scheme with value bounds `Scheme.elide K ⟨k, Θ, ⟦σ⟧⟩ = ⟨k, Θ, ⟦elided σ⟧⟩`.
 pub(super) fn theorem(name: &str, doc: &str, s: &Scheme, live: &Scheme) -> Result<String, String> {
+    let bounds = Rc::new(RefCell::new(Vec::new()));
     let env = Env {
         vars: s.vars.iter().map(|(v, _)| v.to_string()).collect(),
+        bounds: Some(bounds.clone()),
         ..Env::default()
     };
     let k: Vec<String> = s
@@ -290,12 +416,31 @@ pub(super) fn theorem(name: &str, doc: &str, s: &Scheme, live: &Scheme) -> Resul
         .filter(|(_, (_, k))| matches!(k, Kind::Region | Kind::Captures))
         .map(|(i, _)| format!("x = .v {i}"))
         .collect();
-    let (src, out) = (ty(&s.body, &env)?, ty(&live.body, &env)?);
-    let mut text = format!(
-        "/-- `{doc}` -/\ntheorem {name} :\n    Ty.elide {} ",
-        disjunction(&k, "Caps.none")
-    );
-    let _ = write!(text, "{src} Caps.none =\n      {out} := by\n  elide_eq\n");
+    let k = disjunction(&k, "Caps.none");
+    let src = ty(&s.body, &env)?;
+    let facts = facts(&bounds.take(), &env)?;
+    let out = ty(&live.body, &env)?;
+    let mut text = format!("/-- `{doc}` -/\ntheorem {name} :\n");
+    let runtime = !visit(&s.body, &mut |t| {
+        !matches!(t, Type::Fun(_, Stage::Runtime(..), _) | Type::Eff(..))
+    });
+    match facts {
+        None => {
+            let _ = write!(text, "    Ty.elide {k} {src} Caps.none =\n      {out}");
+        }
+        // the model's elision keeps the bound live after its parameter, `Ty.elide` the variable
+        Some(_) if runtime => {
+            return Err("a value bound in a scheme with a runtime stage".into());
+        }
+        Some(facts) => {
+            let n = s.vars.len();
+            let _ = write!(
+                text,
+                "    Scheme.elide {k} ⟨{n}, {facts},\n      {src}⟩ =\n      ⟨{n}, {facts},\n      {out}⟩"
+            );
+        }
+    }
+    text.push_str(" := by\n  elide_eq\n");
     Ok(text)
 }
 
@@ -313,7 +458,9 @@ pub fn elide_schemes() -> String {
          Each export of `Prelude`, `Seq`, `Option`, `Result` and `List` the core can write, as the model\n\
          takes it (`flick-model/src/translate/types.rs`) and as the model reads it (`check::elided`):\n\
          `Ty.elide K` of the first is the second, `K` the binders of kind `Region` and `CaptureRow`\n\
-         (`flick-model/src/translate/lean/elide.rs`). The exports the core cannot write close the file.\n\
+         (`flick-model/src/translate/lean/elide.rs`). A value bound `a^c` on a variable of the scheme\n\
+         is the fact `Facts.bnd a c`, which `Scheme.elide` keeps. The exports the core cannot write\n\
+         close the file.\n\
          -/\n\n\
          namespace Flick.ElideSchemes\n",
     );
@@ -343,25 +490,4 @@ pub fn elide_schemes() -> String {
 }
 
 #[cfg(test)]
-mod tests {
-    use std::{env, fs};
-
-    /// `ElideSchemes.lean` is what the model generates; with
-    /// `FLICK_FORMAL_SCHEMES` set the test writes it.
-    #[test]
-    fn elide_schemes_are_generated() {
-        let path = concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/../formal/Formal/Live/ElideSchemes.lean"
-        );
-        let text = super::elide_schemes();
-        if env::var_os("FLICK_FORMAL_SCHEMES").is_some() {
-            fs::write(path, &text).expect("write ElideSchemes.lean");
-        }
-        let committed = fs::read_to_string(path).unwrap_or_default();
-        assert!(
-            committed == text,
-            "ElideSchemes.lean is stale: run `just formal-schemes`"
-        );
-    }
-}
+mod tests;

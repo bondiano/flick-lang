@@ -5,13 +5,13 @@ import (
 	"strconv"
 )
 
-// Effect's Graph: building and changing graphs. Each change copies the
-// graph and runs Effect's mutation on the copy, as the JS adapter's
-// `Graph.mutate`; a `GraphError` Effect throws is the `Err` of a result.
+// Graph: building and changing graphs. Each change copies the graph and
+// runs the mutation on the copy, as the JS adapter's `Graph.mutate`; a
+// `GraphError` thrown is the `Err` of a result.
 
 var graphErrorTag = Tag("Graph.Types.GraphError.GraphError")
 
-// graphError is a `GraphError` thrown by Effect's code, caught by attempt.
+// graphError is a `GraphError` thrown by the graph code, caught by attempt.
 type graphError string
 
 func graphFail(message string) { panic(graphError(message)) }
@@ -49,7 +49,7 @@ func newGraph(kind string) *Graph {
 	return &Graph{kind: kind, adj: map[int][]int{}, radj: map[int][]int{}}
 }
 
-// hydrate is Effect's `hydrate`: the adjacency of the nodes and edges.
+// hydrate fills the adjacency of the nodes and edges.
 func (g *Graph) hydrate() *Graph {
 	g.adj, g.radj = map[int][]int{}, map[int][]int{}
 	for _, n := range g.nodes {
@@ -81,7 +81,7 @@ func cloneAdjacency(m map[int][]int) map[int][]int {
 	return out
 }
 
-// clone is Effect's `beginMutation`: a copy to change.
+// clone is a copy to change.
 func (g *Graph) clone() *Graph {
 	out := *g
 	out.nodes = append([]graphNode{}, g.nodes...)
@@ -164,7 +164,7 @@ func (g *Graph) removeEdge(i int) bool {
 	return true
 }
 
-// removeNode is Effect's `removeNodeInternal`: the node and its edges.
+// removeNode removes the node and its edges.
 func (g *Graph) removeNode(i int) bool {
 	p := g.nodeAt(i)
 	if p < 0 {
@@ -212,7 +212,7 @@ func GraphMake(kind Value) Value { return newGraph(kind.(string)) }
 func GraphDirected() Value       { return newGraph("directed") }
 func GraphUndirected() Value     { return newGraph("undirected") }
 
-// GraphFromSnapshot is Effect's `fromSnapshot`, its checks in order.
+// GraphFromSnapshot is the graph of a snapshot, its checks in order.
 func GraphFromSnapshot(s Value) Value {
 	return graphAttempt(func() Value {
 		r := record(s)
@@ -353,7 +353,7 @@ func GraphMapEdges(fb *Fiber, f, v Value) Value {
 }
 
 // filterNodes keeps the nodes `keep` gives new data, then removes the
-// others, as Effect's `filterMapNodes`.
+// others.
 func filterNodes(v Value, keep func(Value) (Value, bool)) Value {
 	return edit(v, func(m *Graph) {
 		remove := []int{}

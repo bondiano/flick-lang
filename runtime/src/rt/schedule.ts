@@ -1,4 +1,4 @@
-// Running tasks by a schedule: Effect's repeat, retry and scheduleFrom, as Go's
+// Running tasks by a schedule: repeat, retry and scheduleFrom, as Go's
 // `flickrt` has them. Each step of the schedule reads the clock, and the delay
 // it chooses is a wait.
 import { type Option, none, some } from "../core/data.ts";
@@ -23,7 +23,7 @@ const steppedOf = (value: unknown): Stepped => {
   throw new TypeError("not a step of a schedule");
 };
 
-/** Effect's `toStepWithMetadata`: a run that reads the clock for each input and waits the step's delay. */
+/** A run that reads the clock for each input and waits the step's delay. */
 const stepper = (s: Schedule): ((input: unknown) => Run) => {
   const step = s.start();
   const count = counter();
@@ -40,7 +40,7 @@ const stepper = (s: Schedule): ((input: unknown) => Run) => {
 /** `task` with `m` as the metadata `Schedule.current_metadata` reads. */
 const withMetadata = (m: Metadata, task: () => unknown): Under => new Under(extend(currentCtx(), METADATA, m), task);
 
-/** The first error of a cause that holds only typed errors (Effect's `findErrorOnly`). */
+/** The first error of a cause that holds only typed errors. */
 const errorOnly = (cause: Cause): Fail | undefined => {
   if (cause.reasons.length === 0 || unwinds(cause) || !cause.reasons.every(isFail)) return undefined;
   return cause.reasons.find(isFail);

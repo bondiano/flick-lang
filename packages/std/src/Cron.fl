@@ -1,4 +1,4 @@
-/// Effect's `Cron`: sets of seconds, minutes, hours, days, months and
+/// Cron expressions: sets of seconds, minutes, hours, days, months and
 /// weekdays, optionally in a time zone; `Schedule.cron` runs by one.
 module Cron exposing (..)
 

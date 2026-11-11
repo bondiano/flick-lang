@@ -1,6 +1,6 @@
-/// Effect's `FiberHandle`: at most one child at a time, owned by a `scope`
-/// and interrupted when it closes; running another interrupts the last.
-/// `join` waits for its failure, so the handle supervises its child.
+/// A handle of at most one child at a time, owned by a `scope` and
+/// interrupted when it closes; running another interrupts the last. `join`
+/// waits for its failure, so the handle supervises its child.
 module FiberHandle exposing (..)
 
 import Fiber

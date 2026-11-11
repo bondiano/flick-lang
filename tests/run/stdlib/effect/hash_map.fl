@@ -1,4 +1,4 @@
-// Effect's `HashMap` through Flick's maps, which keep the witness of their keys.
+// `HashMap`: maps that keep the witness of their keys.
 module App.Main exposing (main)
 
 sorted : HashMap.HashMap w String Float -> List (String, Float)

@@ -5,8 +5,8 @@ import (
 	"strings"
 )
 
-// The completion descriptor of a command (internal/completions/
-// descriptor.ts), Fish's script (fish.ts) and Completions.generate.
+// The completion descriptor of a command, Fish's script and
+// Completions.generate.
 
 func cliCompleteType(p *cliPrim, flag bool) completeType {
 	switch p.tag {
@@ -24,7 +24,7 @@ func cliCompleteType(p *cliPrim, flag bool) completeType {
 	return completeType{tag: "String"}
 }
 
-// cliDescriptor is descriptor.ts's fromCommand.
+// cliDescriptor is the completion descriptor of a command.
 func cliDescriptor(c *cliCommand, inherited []*cliParam) completeCommand {
 	out := completeCommand{name: c.name, description: c.shortDescription}
 	if out.description == "" {
@@ -244,7 +244,7 @@ func fishCommand(executable string, d completeCommand, parent []string, lines []
 	return lines
 }
 
-// completeFish is fish.ts's generate.
+// completeFish is the Fish script.
 func completeFish(executable string, d completeCommand) string {
 	lines := []string{
 		"###-begin-" + executable + "-completions-###", "#", "# Static completion script for Fish", "#",

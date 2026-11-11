@@ -1,6 +1,5 @@
-/// Effect's `LayerMap`: layers looked up by key, each built on first use,
-/// shared while in use and released when idle or when the owner of region
-/// `s` closes.
+/// Layers looked up by key, each built on first use, shared while in use
+/// and released when idle or when the owner of region `s` closes.
 module LayerMap exposing (..)
 
 import Duration

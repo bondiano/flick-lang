@@ -7,10 +7,10 @@ import (
 	"strings"
 )
 
-// Http.Middleware as Effect's HttpMiddleware and HttpEffect: each binding
-// takes the handler and the request at once and answers it. What Effect
-// keeps by a request's source (the logger turned off, the handlers to run
-// on the response before it is sent) lives in the marks of its source.
+// Http.Middleware: each binding takes the handler and the request at once
+// and answers it. What is kept by a request's source (the logger turned
+// off, the handlers to run on the response before it is sent) lives in the
+// marks of its source.
 
 const (
 	tracerDisabledKey = "effect/http/HttpMiddleware/TracerDisabledWhen"
@@ -34,8 +34,8 @@ func requestState(fb *Fiber) *requestMarks {
 	return nil
 }
 
-// withRequestState is the fiber with a fresh request state, as Effect's
-// `toHandled` gives the request it handles.
+// withRequestState is the fiber with a fresh request state, which a
+// handled request has.
 func withRequestState(fb *Fiber) (*Fiber, *requestMarks) {
 	m := &requestMarks{}
 	inner := *fb
@@ -131,12 +131,11 @@ func MiddlewareWithLoggerDisabled(fb *Fiber, handler, request Value) Value {
 	return handle(fb, handler, request)
 }
 
-// MiddlewareTracer is Effect's `tracer`: the request runs in a server span
-// named by the span name generator, the request's method by default,
-// continuing the trace of the request's headers. The span ends with the
-// response, failed for a 5xx one. An exporting tracer gets the request's
-// and the response's attributes; the native one only those of a request
-// that failed.
+// MiddlewareTracer runs the request in a server span named by the span
+// name generator, the request's method by default, continuing the trace of
+// the request's headers. The span ends with the response, failed for a 5xx
+// one. An exporting tracer gets the request's and the response's
+// attributes; the native one only those of a request that failed.
 func MiddlewareTracer(fb *Fiber, handler, request Value) Value {
 	if !envOr(fb, tracerEnabledKey, true).(bool) {
 		return handle(fb, handler, request)
@@ -159,7 +158,7 @@ func MiddlewareTracer(fb *Fiber, handler, request Value) Value {
 	}
 	response, spanExit := (*ServerResponse)(nil), cause
 	if cause != nil {
-		// Effect's causeResponseStripped: a Flick defect is never a response
+		// a Flick defect is never a response
 		response = newResponse(500, "", false, nil, nil, nil, false)
 	} else {
 		response = responseOf(out)
@@ -224,9 +223,9 @@ func MiddlewareWithTracerHeaderFilter(fb *Fiber, f, task Value) Value {
 
 // MiddlewareXForwardedHeaders takes the client's address, the host and the
 // protocol from the `X-Forwarded-*` headers when the peer is one of the
-// proxies (CIDRs), as Effect's `xForwardedHeaders` does: from the last
-// `X-Forwarded-For` entry back, the first that is not a proxy is the client,
-// and the host and protocol lists count only with one value an entry.
+// proxies (CIDRs): from the last `X-Forwarded-For` entry back, the first
+// that is not a proxy is the client, and the host and protocol lists count
+// only with one value an entry.
 func MiddlewareXForwardedHeaders(fb *Fiber, proxies, handler, request Value) Value {
 	var networks []netip.Prefix
 	for _, cidr := range stringsOf(proxies) {
@@ -352,7 +351,7 @@ func validForwardedHost(host string) bool {
 }
 
 // MiddlewareSearchParamsParser parses the query of the original URL, which
-// only a full URL has, as Effect does; no Flick decoder reads the parse.
+// only a full URL has; no Flick decoder reads the parse.
 func MiddlewareSearchParamsParser(fb *Fiber, handler, request Value) Value {
 	if _, ok := parseURL(requestOf(request).originalURL); !ok {
 		panic(Defect{"TypeError: Invalid URL"})
@@ -361,7 +360,7 @@ func MiddlewareSearchParamsParser(fb *Fiber, handler, request Value) Value {
 }
 
 // MiddlewareCors answers preflight requests and adds the CORS headers to
-// the responses of the others, as Effect's `cors` does.
+// the responses of the others.
 func MiddlewareCors(fb *Fiber, options, handler, request Value) Value {
 	o := record(options)
 	origins := stringsOf(o.Get("allowedOrigins"))

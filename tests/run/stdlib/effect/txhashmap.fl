@@ -1,4 +1,4 @@
-// Transactional maps from Effect's `TxHashMap`: keys compared by the
+// Transactional maps from `TxHashMap`: keys compared by the
 // map's witness, entries read in a sorted order for stable output.
 module App.Main exposing (main)
 

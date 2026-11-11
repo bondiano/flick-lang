@@ -41,34 +41,41 @@ def tyRec : Ty := .con 13
 
 /-- The schemes of the methods: `eq`, `pure`, `map2`, `flat_map`, `nothing`, `iter`. -/
 def methSch : Nat → Option (Nat × Scheme)
-  | 0 => some (cEq, ⟨1, [⟨cEq, [.var 0]⟩], arrP (.var 0) (arrP (.var 0) boolTy), .cnil⟩)
-  | 1 => some (cApp, ⟨3, [⟨cApp, [.var 0]⟩], arrP (.var 2) (appQ (.var 0) (.var 1) (.var 2)), .cnil⟩)
+  | 0 => some (cEq, ⟨1, [⟨cEq, [.var 0]⟩], arrP (.var 0) (arrP (.var 0) boolTy), .cnil, []⟩)
+  | 1 => some (cApp, ⟨3, [⟨cApp, [.var 0]⟩], arrP (.var 2) (appQ (.var 0) (.var 1) (.var 2)), .cnil,
+      [(.var 2, .var 1)]⟩)
   | 2 => some (cApp, ⟨7, [⟨cApp, [.var 0]⟩],
-      map2Ty (.var 0) (.var 1) (.var 2) (.var 3) (.var 4) (.var 5) (.var 6), .cnil⟩)
+      map2Ty (.var 0) (.var 1) (.var 2) (.var 3) (.var 4) (.var 5) (.var 6), .cnil, []⟩)
   | 3 => some (cMonad, ⟨6, [⟨cMonad, [.var 0]⟩],
-      bindTy (.var 0) (.var 1) (.var 2) (.var 3) (.var 4) (.var 5), .cnil⟩)
-  | 4 => some (cAlt, ⟨3, [⟨cAlt, [.var 0]⟩], appQ (.var 0) (.var 2) (.var 1), .cnil⟩)
+      bindTy (.var 0) (.var 1) (.var 2) (.var 3) (.var 4) (.var 5), .cnil, []⟩)
+  | 4 => some (cAlt, ⟨3, [⟨cAlt, [.var 0]⟩], appQ (.var 0) (.var 2) (.var 1), .cnil, []⟩)
   | 5 => some (cIter, ⟨3, [⟨cIter, [.var 0]⟩],
       arrP (appQ (.var 0) (.var 1) (.var 2)) (appQ (.con 9) (.var 1) (.var 2)),
-      .cnil⟩)
+      .cnil, []⟩)
   | _ => none
 
 /-- The constants of Γ₀: `pair`, `None`, `Seq.flat_map`, `singleton`, `empty`, `to_list`,
 `each_P`, `each_R`, `()`, then `unc n` at `2n + 10` and `from_result` at `11`. -/
 def constSch : Nat → Option Scheme
-  | 0 => some ⟨2, [], arrP (.var 0) (arrP (.var 1) (.app (.app (.con 10) (.var 0)) (.var 1))), .cnil⟩
-  | 1 => some ⟨1, [], optTy (.var 0), .cnil⟩
-  | 2 => some ⟨5, [], bindTy (.con 9) (.var 2) (.var 3) (.var 0) (.var 1) (.var 4), .cnil⟩
-  | 3 => some ⟨2, [], arrP (.var 0) (appQ (.con 9) (.var 1) (.var 0)), .cnil⟩
-  | 4 => some ⟨2, [], appQ (.con 9) (.var 1) (.var 0), .cnil⟩
-  | 5 => some ⟨2, [], arrP (appQ (.con 9) (.var 1) (.var 0)) (.app (.con 8) (.var 0)), .cnil⟩
+  | 0 => some ⟨2, [], arrP (.var 0) (arrP (.var 1) (.app (.app (.con 10) (.var 0)) (.var 1))), .cnil, []⟩
+  | 1 => some ⟨1, [], optTy (.var 0), .cnil, []⟩
+  | 2 => some ⟨5, [], bindTy (.con 9) (.var 2) (.var 3) (.var 0) (.var 1) (.var 4), .cnil, []⟩
+  | 3 => some ⟨2, [], arrP (.var 0) (appQ (.con 9) (.var 1) (.var 0)), .cnil, []⟩
+  | 4 => some ⟨2, [], appQ (.con 9) (.var 1) (.var 0), .cnil, []⟩
+  | 5 => some ⟨2, [], arrP (appQ (.con 9) (.var 1) (.var 0)) (.app (.con 8) (.var 0)), .cnil, []⟩
   | 6 => some ⟨3, [], arrP (.arr .P (.var 2) (.con 1) (.var 0))
-      (.arr .P (appQ (.con 9) (.var 1) (.var 2)) (.con 1) (.var 0)), .cnil⟩
+      (.arr .P (appQ (.con 9) (.var 1) (.var 2)) (.con 1) (.var 0)), .cnil, []⟩
   | 7 => some (PreludeSchemes.Seq.each_loop 1 9)
-  | 8 => some ⟨0, [], .con 1, .cnil⟩
+  | 8 => some ⟨0, [], .con 1, .cnil, []⟩
   | 9 => none
   | n + 10 => if n % 2 = 0 then (if 0 < n / 2 then some (uncSch 10 (n / 2)) else none)
       else if n = 1 then some (PreludeSchemes.from_result 11 12) else none
+
+/-- The constants of the witness have no value bounds. -/
+theorem constSch_bd {c : Nat} {s : Scheme} (h : constSch c = some s) : s.bd = [] := by
+  unfold constSch at h
+  repeat' split at h
+  all_goals first | (cases h; rfl) | cases h
 
 /-- The instances `I0 … I6`. -/
 def insts : Nat → Option Inst

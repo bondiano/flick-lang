@@ -1,6 +1,6 @@
-/// Effect's `Headers`: HTTP headers with lower-case names. `show` masks the
-/// values of secret headers (`authorization`, `cookie`, `set-cookie`,
-/// `x-api-key`, or the names `with_redacted_names` sets).
+/// HTTP headers with lower-case names. `show` masks the values of secret
+/// headers (`authorization`, `cookie`, `set-cookie`, `x-api-key`, or the
+/// names `with_redacted_names` sets).
 module Http.Headers exposing (..)
 
 import Redacted

@@ -44,9 +44,9 @@ export type Install = readonly [tag: object, operations: ReadonlyArray<OpInstall
 const tags = /*#__PURE__*/ new Map<string, Readonly<{ key: string }>>();
 
 /**
- * A service's tag, compared by identity: one per key, `Module.Service`, as
- * Effect's keys compare by name, so the runtime reaches the services of
- * `Atom` and `Ui` that a program declares.
+ * A service's tag, compared by identity: one per key, `Module.Service`, so
+ * every lookup of a key gives the same tag and the runtime reaches the
+ * services of `Atom` and `Ui` that a program declares.
  */
 export const service = (key: string): Readonly<{ key: string }> => {
   let tag = tags.get(key);

@@ -1,4 +1,4 @@
-/// Interactive prompts of Effect's CLI: a `Prompt a` describes questions
+/// Interactive prompts on the terminal: a `Prompt a` describes questions
 /// that end in an `a`, and `run` asks them on the service `Tty`, one key
 /// press at a time. Prompts are ordinary runtime calls inside a handler.
 module Cli.Prompt exposing (..)
@@ -56,7 +56,7 @@ type alias Theme = {
   colors : Bool;
 }
 
-/// Effect's theme, with colors when the output supports them.
+/// The default theme, with colors when the output supports them.
 default_theme : Unit ->{} Theme
 foreign default_theme from "flick:cli" "promptDefaultTheme"
   arity 0

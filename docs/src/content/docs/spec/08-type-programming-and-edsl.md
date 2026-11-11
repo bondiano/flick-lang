@@ -1,6 +1,6 @@
 ---
 title: "Type-level programming and eDSLs"
-source_hash: b286bedd7df24636
+source_hash: 0fa82cfc007e7393
 ---
 
 Flick's SQL, UI and CLI DSLs — `sql params { … }`, `ui { … }` with `component` declarations, and `cli "name" { … }` — are libraries over one type core: rows, labels, finite kinds, HKT and multiparameter classes with functional dependencies. Their backends are PostgreSQL, React (in the browser and on the server) and Effect CLI.
@@ -178,7 +178,7 @@ let greet = cli "greet" {
 
 A `///` comment right above a `flag`, `arg` or `subcommand` is its help text. The handler gets an exact record with a field per `flag` and `arg`, so a typo in its pattern is an ordinary type error. The type decides parsing and multiplicity: `Bool` is a switch, `T` is required unless it has a default, `Option T` is optional and takes no default, `List T` and `NonEmpty T` repeat (for an `arg`, only the last). A value is parsed by the class `Cli.Value T`. The services and errors of a command are the union of the rows of its handler and subcommands; a command needs what its handler uses (`FLICK-G001`).
 
-`Cli.run command args` parses the arguments with Effect's CLI and only then runs the handler in the current fiber. `--help`, `--version` and `--completions` run no handler; invalid input fails with `Cli.CliError` and runs no handler. Duplicate names, a default on `Option`, a many-valued `arg` before the last, a repeated `description` or `handle`, a command with neither a handler nor subcommands, and an `arg` beside subcommands are compile errors of the plugin (`std/L001`–`std/L007`). See [Command-line applications](../../reference/cli-dsl/).
+`Cli.run command args` parses the arguments and only then runs the handler in the current fiber. `--help`, `--version` and `--completions` run no handler; invalid input fails with `Cli.CliError` and runs no handler. Duplicate names, a default on `Option`, a many-valued `arg` before the last, a repeated `description` or `handle`, a command with neither a handler nor subcommands, and an `arg` beside subcommands are compile errors of the plugin (`std/L001`–`std/L007`). See [Command-line applications](../../reference/cli-dsl/).
 
 ## `do` and library combinators
 

@@ -1,14 +1,13 @@
-// The `Array` bindings of `List` without Effect: the semantics of
-// `effect/Array` (4.1.2) on plain data, curried as the bindings call them.
-// A callback of the program takes one argument, or two uncurried; the index
-// Effect passes besides is never read by it, so it is not passed.
+// The `Array` bindings of `List` without Effect: list operations on plain
+// data, curried as the bindings call them. A callback of the program takes
+// one argument, or two uncurried; it never reads an index, so none is passed.
 import { item } from "../internal.ts";
 import { none, type Option, type Result, some } from "./data.ts";
 
 type List<A> = ReadonlyArray<A>;
 type Eqv<A> = (a: A, b: A) => boolean;
 
-/** Effect's `Count.normalize`: a whole count, 0 for a negative one or NaN. */
+/** A whole count, 0 for a negative one or NaN. */
 const count = (n: number): number => (n > 0 ? Math.floor(n) : 0);
 
 const isOutOfBounds = (i: number, xs: List<unknown>): boolean => !Number.isFinite(i) || i < 0 || i >= xs.length;
@@ -82,7 +81,7 @@ export const intersectionWith =
   (self: List<A>): Array<A> =>
     self.filter((a) => that.some((b) => eq(a, b)));
 
-/** Returns `self` or `that` itself when the other is empty, as Effect does. */
+/** Returns `self` or `that` itself when the other is empty. */
 export const unionWith =
   <A>(that: List<A>, eq: Eqv<A>) =>
   (self: List<A>): List<A> =>
@@ -152,7 +151,7 @@ export const dropWhileFilter =
   (self: List<A>): Array<A> =>
     self.slice(spanIndex(self, (a) => f(a)._tag === "Success"));
 
-/** Effect's `splitAt` on a count already normalized. */
+/** The first `n` elements and the rest, for a count already normalized. */
 const cut = <A>(self: List<A>, n: number): [Array<A>, Array<A>] => [self.slice(0, n), self.slice(n)];
 
 export const span =

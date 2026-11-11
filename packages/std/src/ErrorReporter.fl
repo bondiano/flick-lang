@@ -1,6 +1,6 @@
-/// Effect's `ErrorReporter`: where unhandled failures are reported. A
-/// reporter hands each report to an `Events.Listener`, whose handler runs
-/// as a child of its scope; `layer` installs reporters for a body.
+/// Where unhandled failures are reported. A reporter hands each report to
+/// an `Events.Listener`, whose handler runs as a child of its scope;
+/// `layer` installs reporters for a body.
 module ErrorReporter exposing (..)
 
 import Events

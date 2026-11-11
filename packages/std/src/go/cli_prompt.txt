@@ -1,4 +1,4 @@
-# Effect's CLI prompts, run on the service `Cli.Prompt.Tty`.
+# CLI prompts, run on the service `Cli.Prompt.Tty`.
 [flick:cli]
 promptNode PromptNode
 promptRun *PromptRun

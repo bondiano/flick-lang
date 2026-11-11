@@ -1,4 +1,4 @@
-# The rest of Effect's `Effect` and `Cause`, and the failures of the core.
+# The rest of `Effect` and `Cause`, and the failures of the core.
 
 [flick:Effect]
 # Effect.Core

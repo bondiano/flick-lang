@@ -1,6 +1,6 @@
-/// Effect's `HttpBody`: the body of a request or a response, with its
-/// content type. Bytes are lists of numbers from 0 to 255. A streamed body
-/// holds no services or region; its stream's failure ends the body.
+/// The body of a request or a response, with its content type. Bytes are
+/// lists of numbers from 0 to 255. A streamed body holds no services or
+/// region; its stream's failure ends the body.
 module Http.Body exposing (..)
 
 import ByteSize

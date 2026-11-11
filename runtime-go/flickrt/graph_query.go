@@ -1,6 +1,6 @@
 package flickrt
 
-// Effect's Graph queries: nodes, edges, degrees and neighbors.
+// Graph queries: nodes, edges, degrees and neighbors.
 
 func GraphGetNode(i, v Value) Value {
 	g := graphOf(v)
@@ -62,8 +62,7 @@ func GraphGetEdge(i, v Value) Value {
 	return None
 }
 
-// neighbor is the node across `e` from `node`, as Effect's
-// `getTraversableNeighbor`.
+// neighbor is the node across `e` from `node`.
 func (g *Graph) neighbor(node int, e graphEdge) int {
 	if g.kind == "undirected" && e.target == node {
 		return e.source
@@ -89,8 +88,7 @@ func (g *Graph) existing(i Value) int {
 	return index(i)
 }
 
-// GraphIncidentEdges merges the outgoing and incoming edges by index, as
-// Effect's `incidentEdges`.
+// GraphIncidentEdges merges the outgoing and incoming edges by index.
 func GraphIncidentEdges(i, v Value) Value {
 	return graphAttempt(func() Value {
 		g := graphOf(v)

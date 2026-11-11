@@ -5,10 +5,10 @@ import (
 	"strings"
 )
 
-// Command.runWith and run.ts: the built-in global flags, the run of a
-// command line, and `Cli.run_with`. Invalid input becomes the Flick error
-// `Cli.CliError` with Effect's text; the handler runs only after the whole
-// command line parsed.
+// The built-in global flags, the run of a command line, and
+// `Cli.run_with`. Invalid input becomes the Flick error `Cli.CliError` with
+// the text of the error; the handler runs only after the whole command line
+// parsed.
 
 func cliBoolFlag(name, alias, description string) *cliParam {
 	s := &cliSingle{kind: "flag", name: name, prim: cliBoolean, description: &description}
@@ -68,7 +68,7 @@ var (
 		param: cliChoiceFlag("log-level", []string{"all", "trace", "debug", "info", "warn", "warning", "error", "fatal", "none"},
 			[]string{"All", "Trace", "Debug", "Info", "Warn", "Warn", "Error", "Fatal", "None"},
 			"<all|trace|debug|info|warn|warning|error|fatal|none>", "Sets the minimum log level")}
-	// cliTraceGlobal is `--trace`, a flag of Flick's rather than Effect's.
+	// cliTraceGlobal is `--trace`, a flag Flick adds to the built-in ones.
 	cliTraceGlobal = &cliGlobal{id: "trace", param: cliBoolFlag("trace", "", "Send spans, logs and metrics to OTEL_EXPORTER_OTLP_ENDPOINT")}
 )
 
@@ -273,7 +273,7 @@ func CliRunWith(fb *Fiber, settings, spec, args Value) Value {
 	return Unit
 }
 
-// cliCapabilities is Effect's `TerminalCapabilities` of the process.
+// cliCapabilities is the terminal capabilities of the process.
 type cliCapabilities struct{ canColor, canPrompt bool }
 
 // cliTerminal is TerminalCapabilities' `fromProcess`: TERM=dumb can do
@@ -326,7 +326,7 @@ func CliHelpDoc(fb *Fiber, path, spec Value) Value {
 	capture := cliFormatter{func(_ *Fiber, doc *cliHelpDoc) string { captured = doc; return "" }, plain.version}
 	cliPrinted(fb, spec.(*cliSpec), append(cliStrings(path), "--help"), capture)
 	if captured == nil {
-		return Die("Effect's CLI printed no help")
+		return Die("the CLI printed no help")
 	}
 	return cliDocRecord(captured)
 }

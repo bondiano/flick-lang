@@ -32,11 +32,12 @@ theorem real : Real P Sg N where
     refine ⟨1, [], ?_⟩
     simp only [P] at h
     unfold methSch at h
-    split at h <;> cases h <;> refine ⟨rfl, by decide, ?_, ?_⟩ <;>
+    split at h <;> cases h <;> refine ⟨rfl, by decide, ?_, ?_, ?_⟩ <;>
       first
       | (intro fs hf; rw [dict_cls hf]; rfl)
       | exact TTy.closed_of fun n hn => by
           simp [Ty.Occurs, bindTy, map2Ty, appQ, arrP, boolTy] at hn ⊢; omega
+      | (intro σ σ' hσ; simp [Bound.subst, Ty.subst, hσ]; done)
   inst {I ins} h := by
     refine ⟨0, ?_, ?_⟩
     · simp only [Sg, globF, P, N] at h ⊢

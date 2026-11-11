@@ -1,6 +1,6 @@
-/// Effect's `Pool`: items acquired ahead and lent to tasks, at most
-/// `concurrency` tasks per item. Items are released when the `scope`
-/// owning the pool's region closes.
+/// A pool of items acquired ahead and lent to tasks, at most `concurrency`
+/// tasks per item. Items are released when the `scope` owning the pool's
+/// region closes.
 module Pool exposing (..)
 
 import Duration

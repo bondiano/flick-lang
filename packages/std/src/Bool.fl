@@ -1,5 +1,5 @@
-/// Booleans: Effect's `Boolean` connectives as functions, for pipelines and
-/// for passing where `&&` and `||` cannot go.
+/// Booleans: the connectives as functions, for pipelines and for passing
+/// where `&&` and `||` cannot go.
 module Bool exposing (..)
 
 /// `not`, as a function.

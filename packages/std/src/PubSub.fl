@@ -1,5 +1,5 @@
-/// Effect's `PubSub`: messages published to every subscriber. A
-/// subscription belongs to a `scope` and ends when that scope closes.
+/// Messages published to every subscriber. A subscription belongs to a
+/// `scope` and ends when that scope closes.
 module PubSub exposing (..)
 
 /// A hub that hands each message of `a` to all its subscribers.

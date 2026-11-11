@@ -1,6 +1,6 @@
-/// Effect's `Cache`: values looked up by key on demand, at most once at a
-/// time per key, kept up to a capacity and for a time to live. Keys are
-/// compared by `==`.
+/// A cache of values looked up by key on demand, at most once at a time per
+/// key, kept up to a capacity and for a time to live. Keys are compared by
+/// `==`.
 module Cache exposing (..)
 
 import Duration

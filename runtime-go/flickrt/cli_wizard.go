@@ -5,10 +5,9 @@ import (
 	"strings"
 )
 
-// `--wizard`: Effect's internal/wizard.ts and the wizard branch of
-// Command.runWith. It asks for each flag and argument of the command, and
-// for a subcommand, on the terminal of the process (Effect's Terminal, not
-// `Cli.Prompt.Tty`), then offers to run the command line it built.
+// `--wizard`: it asks for each flag and argument of the command, and for a
+// subcommand, on the terminal of the process (not `Cli.Prompt.Tty`), then
+// offers to run the command line it built.
 
 const ansiMagenta = "\x1b[35m"
 
@@ -83,7 +82,7 @@ func cliWizard(fb *Fiber, root *cliCommand, args []string, ctx *cliContext) *cli
 	return err
 }
 
-// run is wizard.ts's `run`: the command line, and how it is shown.
+// run is the command line, and how it is shown.
 func (w *cliWizardRun) run(root *cliCommand, path, prefix []string) ([]string, []string, *cliError) {
 	selected := root
 	for _, name := range path[min(1, len(path)):] {
@@ -132,7 +131,7 @@ func (w *cliWizardRun) section(name, section string) {
 		cliAnnotate(w.colors, "·", ansiBlackBright) + " " + cliAnnotate(w.colors, section, ansiBold, ansiWhite))
 }
 
-// command is wizard.ts's `promptCommand`.
+// command prompts for a command.
 func (w *cliWizardRun) command(c *cliCommand, line []cliWizardArg, section string) ([]cliWizardArg, *cliError) {
 	visible := cliVisible(c)
 	config := &c.config
@@ -197,7 +196,7 @@ func cliVisible(c *cliCommand) []*cliCommand {
 	return out
 }
 
-// param is wizard.ts's `promptParam`.
+// param prompts for a parameter.
 func (w *cliWizardRun) param(p *cliParam) ([]cliWizardArg, *cliError) {
 	s := p.single
 	if p.optional {
@@ -247,8 +246,8 @@ func (w *cliWizardRun) param(p *cliParam) ([]cliWizardArg, *cliError) {
 	return out, nil
 }
 
-// single is wizard.ts's `promptSingle` for the primitives a Flick command
-// has: a switch, a choice, and text for the others.
+// single prompts for a single flag or argument, of the primitives a Flick
+// command has: a switch, a choice, and text for the others.
 func (w *cliWizardRun) single(s *cliSingle) cliWizardArg {
 	message := cliWizardLabel(s)
 	switch s.prim.tag {

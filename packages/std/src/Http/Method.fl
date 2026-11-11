@@ -1,4 +1,4 @@
-/// HTTP request methods, as Effect's `HttpMethod` names them.
+/// HTTP request methods.
 module Http.Method exposing (..)
 
 /// A request method.
@@ -9,8 +9,8 @@ type Method = GET | POST | PUT | DELETE | PATCH | HEAD | OPTIONS | TRACE | QUERY
 all : List Method
 let all = [GET, POST, PUT, DELETE, PATCH, HEAD, OPTIONS, TRACE, QUERY]
 
-/// Each method with the lower-case short name Effect's routers use (`del`
-/// for `DELETE`).
+/// Each method with the lower-case short name routers use (`del` for
+/// `DELETE`).
 all_short : List (Method, String)
 let all_short = [
   (GET, "get"),

@@ -1,4 +1,4 @@
-// Effect's atoms through `Reactivity.Atom`: a state, derived atoms that
+// The atoms of `Reactivity.Atom`: a state, derived atoms that
 // compute again after a write, a family, labels, idle time, and a task's
 // result as an `AsyncResult`.
 module App.Main exposing (main)

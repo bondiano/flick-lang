@@ -1,5 +1,5 @@
-/// Operations on `Ordering`, the result of `compare`: Effect's `Ordering`,
-/// whose -1, 0 and 1 are `LT`, `EQ` and `GT`.
+/// Operations on `Ordering`, the result of `compare`: `LT`, `EQ` and `GT`
+/// stand for -1, 0 and 1.
 module Ordering exposing (..)
 
 import Reducer

@@ -1,4 +1,4 @@
-// Effect's `Graph`: building persistent graphs, querying, changing,
+// `Graph`: building persistent graphs, querying, changing,
 // combining, walking and rendering them; invalid input is a `GraphError`.
 module App.Main exposing (main)
 

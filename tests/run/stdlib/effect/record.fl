@@ -1,4 +1,4 @@
-// Dictionaries over Effect's `Record`, and records over its `Struct`.
+// `Record`: dictionaries and records.
 module App.Main exposing (main)
 
 line : String -> String ->{} Unit

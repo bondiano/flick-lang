@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-// Effect's `JsonSchema` readers of other dialects into draft 2020-12, its
+// The `JsonSchema` readers of other dialects into draft 2020-12, the
 // writer for OpenAPI 3.1 components, and the Flick `JsonSchema.Document`
 // (whose schema is `root`, a keyword in Flick).
 

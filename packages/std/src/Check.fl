@@ -1,7 +1,7 @@
-/// Checks of decoded values: Effect Schema's filters as values, applied to
-/// a codec by `apply`: `String.json |> Check.apply (Check.min_length 3)`.
-/// The strict JSON Schema exporter states a check only when its keywords
-/// are exact, and refuses it otherwise.
+/// Checks of decoded values: filters as values, applied to a codec by
+/// `apply`: `String.json |> Check.apply (Check.min_length 3)`. The strict
+/// JSON Schema exporter states a check only when its keywords are exact,
+/// and refuses it otherwise.
 module Check exposing (..)
 
 import BigDecimal
@@ -317,7 +317,7 @@ max_items : Int -> Check (List a)
 foreign pure max_items from "flick:Schema" "isMaxLength"
   reviewed "effect@4.1.2 sha256:24a60bba09eeaf98"
 
-/// No two elements equal by Effect's structural `Equal`.
+/// No two elements equal by structural equality.
 unique : Check (List a)
 foreign pure unique from "flick:Schema" "flickIsUnique"
   reviewed "effect@4.1.2 sha256:af0e9e28be5f89ec"

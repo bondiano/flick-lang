@@ -1,7 +1,7 @@
 package flickrt
 
-// Effect's `Option` and `Result` functions the standard library binds, in
-// the order Flick passes the arguments: data-last, `self` at the end.
+// The `Option` and `Result` functions the standard library binds, in the
+// order Flick passes the arguments: data-last, `self` at the end.
 
 func opt(v Value) *Data { return v.(*Data) }
 

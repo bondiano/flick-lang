@@ -81,9 +81,8 @@ foreign pure flatten_array from "flick:Channel" "flattenArray"
   reviewed "effect@4.1.2 sha256:0c3700bf6c7dd4cb"
 
 /// How `merge_all` runs the inner channels: at most `concurrency` at once
-/// (`None`: all), buffering `bufferSize` elements (`None`: Effect's
-/// default); with `switch`, a new channel beyond the limit interrupts the
-/// oldest.
+/// (`None`: all), buffering `bufferSize` elements (`None`: the default);
+/// with `switch`, a new channel beyond the limit interrupts the oldest.
 type alias MergeOptions = { concurrency : Option Int; bufferSize : Option Int; switch : Bool }
 
 /// The elements of the channels the channel emits, run concurrently.

@@ -1,13 +1,12 @@
 package flickrt
 
-// `Stream.watch`: the changes under a path, as Effect's watch on Node
-// reports them (NodeFileSystem.ts watchNode): the path of what changed,
-// relative to the watched directory, or the name of a watched file. The
-// system tells that a path was renamed or changed: a rename is a Create
-// when the path exists afterwards and a Remove when it does not, a change
-// an Update. Each system's notifications are in a stream_watch_<os>.go;
-// without them, or out of watches or descriptors, the path is polled,
-// where Node would fail.
+// `Stream.watch`: the changes under a path, as a watch on Node reports
+// them: the path of what changed, relative to the watched directory, or
+// the name of a watched file. The system tells that a path was renamed or
+// changed: a rename is a Create when the path exists afterwards and a
+// Remove when it does not, a change an Update. Each system's notifications
+// are in a stream_watch_<os>.go; without them, or out of watches or
+// descriptors, the path is polled, where Node would fail.
 
 import (
 	"errors"

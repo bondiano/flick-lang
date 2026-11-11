@@ -20,7 +20,7 @@ The source of an expected error is `raise`; the source of a defect is `todo`.
 
 | Not included | Where | How the core accounts for it |
 | - | - | - |
-| Regions, qualifiers `T^c` typed by use, `scope`, `Live` | `regions.md` | Core types are checker types with the `Captured`/`Bounded` qualifiers and the `Live` row elements erased. The region rules (`regions/live.rs`, `live_rows.rs`) take no part in the rules |
+| Regions, qualifiers `T^c` typed by use, `scope`, `Live` | `regions.md` | Core types are checker types with the `Captured`/`Bounded` qualifiers and the `Live` row elements erased. The region rules (`regions/live.rs`, `live_rows.rs`) take no part in the rules. Lean's core (`formal/`) has them, a value bound as a fact of its scheme ([value bounds in the core](regions.md#value-bounds-in-the-core)) |
 | Classes, dictionaries, `do`, `for`, `?` | `elaboration.md` | The core receives a program with dictionaries already inserted; schemes carry no constraints |
 | `type module`, parameterized modules, `Module Sig`, `exists K : Sig. T` | source checker and lowering | Static applications become named modules; packed modules and existential witnesses become records. The core does not prove the source rules for generativity, nominal identity, or existential opening |
 | Fibers, `parallel`, `race`, `spawn`, Cause, interruption, layer memoization | `runtime.md` (λRT) | The core has one thread of execution; the "interrupted" outcome appears only in λRT |

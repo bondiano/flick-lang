@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-// The hashes Effect's `Hash.hash` gives these values on the JS target.
+// The hashes the Effect library gives these values on the JS target.
 func TestHashIsEffects(t *testing.T) {
 	cases := []struct {
 		value Value
@@ -54,8 +54,8 @@ func stringWitness() *Witness {
 	}
 }
 
-// Inserts, replacements and removals keep the walk order of Effect's HAMT:
-// by hash five bits at a time from the lowest, then by insertion.
+// Inserts, replacements and removals keep the walk order of the HAMT: by
+// hash five bits at a time from the lowest, then by insertion.
 func TestHashMapKeepsWalkOrderThroughChanges(t *testing.T) {
 	w := stringWitness()
 	// few distinct hashes, so many collide

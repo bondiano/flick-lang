@@ -2,8 +2,8 @@ package flickrt
 
 import "strings"
 
-// Http.TraceContext as Effect's HttpTraceContext: the B3 and W3C headers
-// of a span, and the external span of a request's headers.
+// Http.TraceContext: the B3 and W3C headers of a span, and the external
+// span of a request's headers.
 
 func TraceContextToHeaders(s Value) Value {
 	sp := spanOf(s)

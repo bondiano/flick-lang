@@ -1,7 +1,6 @@
-/// Effect's `RcRef`: a resource shared by reference count. It is acquired
-/// on the first `get`, kept while some `scope` holds it, and released when
-/// the last one closes (after an idle time) or when the `scope` owning the
-/// reference does.
+/// A resource shared by reference count. It is acquired on the first `get`,
+/// kept while some `scope` holds it, and released when the last one closes
+/// (after an idle time) or when the `scope` owning the reference does.
 module RcRef exposing (..)
 
 import Duration

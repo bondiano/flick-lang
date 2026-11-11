@@ -7,12 +7,11 @@ import (
 	"strings"
 )
 
-// Effect's `Number`, `BigInt` and `BigDecimal` functions the standard
-// library binds. A function Effect takes data-last, `f(a)(self)`, takes
-// `a`, then `self`.
+// The `Number`, `BigInt` and `BigDecimal` functions the standard library
+// binds. A data-last function, `f(a)(self)`, takes `a`, then `self`.
 
-// numberOrder is Effect's `Order.Number`: NaN is less than every other
-// number and equal to itself, and -0 equals 0.
+// numberOrder is the order of numbers: NaN is less than every other number
+// and equal to itself, and -0 equals 0.
 func numberOrder(a, b Value) int {
 	x, y := a.(float64), b.(float64)
 	switch {
@@ -26,7 +25,7 @@ func numberOrder(a, b Value) int {
 
 func bigOrder(a, b Value) int { return a.(*big.Int).Cmp(b.(*big.Int)) }
 
-// The comparisons of an Effect `Order`.
+// The comparisons of an order.
 func less(o func(a, b Value) int, a, self Value) Value      { return o(self, a) == -1 }
 func lessEq(o func(a, b Value) int, a, self Value) Value    { return o(self, a) != 1 }
 func greater(o func(a, b Value) int, a, self Value) Value   { return o(self, a) == 1 }
@@ -121,8 +120,8 @@ func NumberNextPow2(n Value) Value {
 	return math.Max(math.Pow(2, math.Ceil(math.Log(n.(float64))/math.Log(2))), 2)
 }
 
-// NumberParse is Effect's `Number.parse`: JS `Number(s)` but blank is
-// nothing, and the names of the non-finite numbers are read.
+// NumberParse is JS `Number(s)` but blank is nothing, and the names of the
+// non-finite numbers are read.
 func NumberParse(s Value) Value {
 	switch text := s.(string); text {
 	case "NaN":
@@ -148,8 +147,8 @@ func shortest(x float64) (*big.Int, int) {
 	return coefficient, e - (len(digits) - 1)
 }
 
-// NumberRemainder is Effect's `Number.remainder`: exact on the decimal
-// spellings of both, with the sign of `self`.
+// NumberRemainder is the remainder, exact on the decimal spellings of
+// both, with the sign of `self`.
 func NumberRemainder(divisor, self Value) Value {
 	x, y := self.(float64), divisor.(float64)
 	if math.IsNaN(x) || math.IsInf(x, 0) || math.IsNaN(y) || math.IsInf(y, 0) || y == 0 {

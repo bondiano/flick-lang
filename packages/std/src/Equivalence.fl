@@ -1,6 +1,5 @@
-/// Effect's `Equivalence`: an equivalence relation as a Flick function,
-/// `eq` (`==`) for the types with an `Eq` instance. The combinators build
-/// equivalences from others.
+/// An equivalence relation as a Flick function, `eq` (`==`) for the types
+/// with an `Eq` instance. The combinators build equivalences from others.
 module Equivalence exposing (..)
 
 import Reducer

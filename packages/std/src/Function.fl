@@ -1,5 +1,5 @@
-/// Functions as values: Effect's `Function` helpers that Flick does not
-/// write with `|>`, `fun` or a tuple pattern.
+/// Functions as values: the helpers that Flick does not write with `|>`,
+/// `fun` or a tuple pattern.
 module Function exposing (..)
 
 /// A value computed when asked for.

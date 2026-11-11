@@ -1,6 +1,6 @@
-/// Effect's `TxSemaphore`: a count of permits taken and given back inside
-/// `Tx.atomically` transactions; taking more than are available retries
-/// the transaction until they are.
+/// A count of permits taken and given back inside `Tx.atomically`
+/// transactions; taking more than are available retries the transaction
+/// until they are.
 module TxSemaphore exposing (..)
 
 import Tx

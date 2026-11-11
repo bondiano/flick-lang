@@ -1,8 +1,8 @@
-/// Effect's reactive atoms (`effect/reactivity`, unstable in Effect 4.1.2).
-/// An atom only describes a value: a `Registry` holds the values of the
-/// atoms read through it, computes a derived atom again when an atom it
-/// read changes, and drops a value nobody reads, after its idle time. The
-/// same atom read through two registries has two values.
+/// Reactive atoms; the module is experimental. An atom only describes a
+/// value: a `Registry` holds the values of the atoms read through it,
+/// computes a derived atom again when an atom it read changes, and drops a
+/// value nobody reads, after its idle time. The same atom read through two
+/// registries has two values.
 module Reactivity.Atom exposing (..)
 
 import Duration
@@ -54,7 +54,7 @@ foreign pure map from "flick:reactivity/Atom" "flickMap"
   reviewed "effect@4.1.2 sha256:66489a3049c532a3"
 
 /// One atom per key, made by `f` the first time and the same after: keys
-/// compare as Effect's `Equal` does, strings and numbers by value.
+/// that are strings or numbers compare by value.
 family : (k -> Atom a) -> k -> Atom a
 foreign pure family from "flick:reactivity/Atom" "family"
   arity 1
@@ -93,7 +93,7 @@ foreign pure idle_ttl from "flick:reactivity/Atom" "flickIdleTtl"
   reviewed "effect@4.1.2 sha256:ff359ba0593bfaa2"
 
 @lang atom_registry
-/// The values of atoms, held by Effect's `AtomRegistry`.
+/// The registry that holds the values of atoms.
 service Registry =
   get : forall a. Atom a ->{} a
   set : forall a. Writable a -> a ->{} Unit

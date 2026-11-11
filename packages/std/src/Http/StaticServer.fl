@@ -1,6 +1,6 @@
-/// Effect's `HttpStaticServer`: a handler of the files below a directory on
-/// Node's file system, answering `GET` and `HEAD` with each file, its media
-/// type, `ETag` and ranges; a path outside the directory is not found.
+/// A handler of the files below a directory on Node's file system,
+/// answering `GET` and `HEAD` with each file, its media type, `ETag` and
+/// ranges; a path outside the directory is not found.
 module Http.StaticServer exposing (..)
 
 import Http.Method
@@ -13,7 +13,7 @@ import PlatformError
 /// The directory, the file a directory's path answers with (`index.html`
 /// unless given), whether a path of no file answers with that index (a
 /// single-page app), the `Cache-Control` header, and media types by
-/// extension besides Effect's.
+/// extension besides the built-in ones.
 type alias StaticOptions = {
   root : String;
   index : Option String;
@@ -22,7 +22,7 @@ type alias StaticOptions = {
   mimeTypes : List (String, String);
 }
 
-/// The files below the directory, with Effect's defaults.
+/// The files below the directory, with the defaults.
 static_options : String -> StaticOptions
 let static_options root = {
   root = root;

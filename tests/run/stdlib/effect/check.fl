@@ -1,4 +1,4 @@
-// Effect Schema's checks on codecs: what each accepts and rejects, and the
+// Checks on codecs: what each accepts and rejects, and the
 // JSON Schema keywords the strict exporter writes for them, or why it
 // refuses one.
 module App.Main exposing (main)

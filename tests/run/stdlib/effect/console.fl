@@ -1,4 +1,4 @@
-// Effect's `Console` and `LogLevel`: what the console writes, in order, and
+// `Console` and `LogLevel`: what the console writes, in order, and
 // how levels compare.
 module App.Main exposing (main)
 

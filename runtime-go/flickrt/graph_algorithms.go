@@ -2,8 +2,8 @@ package flickrt
 
 import "sort"
 
-// Effect's Graph algorithms on cycles, bipartiteness, reachability and
-// connectivity, over its compact view.
+// Graph algorithms on cycles, bipartiteness, reachability and
+// connectivity, over the compact view.
 
 func GraphFindCycle(v Value) Value {
 	g := graphOf(v)
@@ -116,8 +116,8 @@ func (g *Graph) isAcyclic() bool {
 	return true
 }
 
-// twoColors is Effect's breadth-first two-coloring, nil when an edge joins
-// two nodes of a color.
+// twoColors is a breadth-first two-coloring, nil when an edge joins two
+// nodes of a color.
 func (g *Graph) twoColors() []int {
 	outgoing := g.outgoing()
 	colors := make([]int, len(g.nodes))
@@ -152,8 +152,8 @@ func GraphIsBipartite(v Value) Value {
 	return g.twoColors() != nil
 }
 
-// GraphMaximumBipartiteMatching is Effect's Hopcroft-Karp matching, the
-// left side the nodes of the first color.
+// GraphMaximumBipartiteMatching is a Hopcroft-Karp matching, the left side
+// the nodes of the first color.
 func GraphMaximumBipartiteMatching(v Value) Value {
 	return graphAttempt(func() Value {
 		g := graphOf(v)
@@ -326,7 +326,7 @@ func (g *Graph) undirectedOrDefect(message string) {
 	}
 }
 
-// components is Effect's depth-first components over the rows.
+// components is the depth-first components over the rows.
 func (g *Graph) components(primary, secondary [][]int) Value {
 	visited := make([]bool, len(g.nodes))
 	out := []Value{}
@@ -359,8 +359,7 @@ func (g *Graph) components(primary, secondary [][]int) Value {
 	return out
 }
 
-// GraphConnectedComponents pushes each neighbor of a visit once, as
-// Effect's generation marks do.
+// GraphConnectedComponents pushes each neighbor of a visit once.
 func GraphConnectedComponents(v Value) Value {
 	g := graphOf(v)
 	g.undirectedOrDefect("Cannot find connected components of directed graph")
@@ -438,7 +437,7 @@ func GraphStronglyConnectedComponents(v Value) Value {
 	return out
 }
 
-// reachesAll is Effect's `csrReachesAll` from the first node.
+// reachesAll is whether a walk from the first node reaches every node.
 func reachesAll(n int, primary, secondary [][]int) bool {
 	if n == 0 {
 		return true
@@ -488,8 +487,8 @@ func GraphIsTree(v Value) Value {
 	return len(g.nodes) > 0 && len(g.edges) == len(g.nodes)-1 && reachesAll(len(g.nodes), g.outgoing(), nil)
 }
 
-// lowLinks is Effect's `analyzeLowLinks`: bridges, articulation points
-// and biconnected components of an undirected graph.
+// lowLinks is the bridges, articulation points and biconnected components
+// of an undirected graph, by low links.
 func (g *Graph) lowLinks() (bridges, points []int, components [][]int) {
 	g.undirectedOrDefect("Cannot analyze undirected connectivity of directed graph")
 	n := len(g.nodes)

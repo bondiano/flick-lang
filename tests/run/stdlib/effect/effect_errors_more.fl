@@ -1,4 +1,4 @@
-// Effect's `Cause.pretty` text, inert reports of failures, the cause a
+// The text of `Cause.pretty`, inert reports of failures, the cause a
 // logger gets, and `Effect`'s handlers and collections in their other forms.
 module App.Main exposing (main)
 
@@ -33,7 +33,7 @@ let say s = Platform.stdout_line s
 failure_of : Exit {Boom} a -> Failure {Boom}
 let failure_of x = Option.with_default Cause.empty (Exit.failure x)
 
-/// `Cause.pretty` and `Cause.pretty_errors` as Effect writes them.
+/// The text of `Cause.pretty` and `Cause.pretty_errors`.
 pretty : Unit ->{} Unit
 let pretty () =
   let failed : Failure {Boom} = Cause.fail (Boom 1)

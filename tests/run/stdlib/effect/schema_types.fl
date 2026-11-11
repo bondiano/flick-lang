@@ -1,5 +1,5 @@
 // JSON codecs of sizes, date-times and zones, bytes, graphs, network
-// addresses and DNS records, from Effect's `Schema`: each case decodes JSON
+// addresses and DNS records: each case decodes JSON
 // text and encodes the value back, or shows the `SchemaError`.
 module App.Main exposing (main)
 

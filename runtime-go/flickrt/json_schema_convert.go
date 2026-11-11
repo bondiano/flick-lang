@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-// The kernel of Effect's `JsonSchema` dialect conversions: a walk over the
+// The kernel of the `JsonSchema` dialect conversions: a walk over the
 // schemas an adapter names, which records where each source schema lands
 // in the target so a `$ref` is relocated once the walk is done. Schemas
 // are JSON values; an object being built is a *Record mutated in place
@@ -44,8 +44,8 @@ func (r *Record) remove(k string) {
 	}
 }
 
-// unsupportedKeyword is Effect's error of a keyword the target cannot hold;
-// it is a defect, as the conversions throw.
+// unsupportedKeyword is the error of a keyword the target cannot hold; it
+// is a defect.
 func unsupportedKeyword(keyword, dialect, details string) {
 	Die("Error: Cannot convert JSON Schema keyword \"" + keyword + "\" to " + dialect + ": " + details)
 }
@@ -103,7 +103,7 @@ func extend(p []string, tokens ...string) []string {
 
 // resolveReference is `new URL(ref, base)`, false where JS's `URL.canParse` is.
 //
-// shortcut: a relative reference against a base without an authority (an opaque or host-less one) does not resolve; Effect's bases are http(s) URLs, so handle those if a schema's $id needs them
+// shortcut: a relative reference against a base without an authority (an opaque or host-less one) does not resolve; the bases in use are http(s) URLs, so handle those if a schema's $id needs them
 func resolveReference(ref, base string) (*webURL, bool) {
 	if u, ok := parseURL(ref); ok {
 		return u, true
@@ -175,7 +175,7 @@ type pendingRef struct {
 	value, source string
 }
 
-// converter is a run of Effect's `runConverter` with its adapter.
+// converter is a run of a conversion with its adapter.
 type converter struct {
 	adapter           func(source *Record, cx *convContext) *Record
 	booleanAdapter    func(bool) Value

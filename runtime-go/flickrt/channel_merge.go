@@ -6,10 +6,9 @@ import (
 	"sync"
 )
 
-// Merging channels, as Effect's `mergeAll` and `merge` (Channel.ts:8353,
-// 8701): each channel runs in a fiber of its own and offers what it emits
-// to a queue the merged pull takes from; they share the upstream one pull
-// at a time.
+// Merging channels: each channel runs in a fiber of its own and offers
+// what it emits to a queue the merged pull takes from; they share the
+// upstream one pull at a time.
 
 // channelMergeAll runs the channels the channel emits, `concurrency` at
 // once; with `switching`, a new one interrupts the oldest instead of
@@ -185,7 +184,7 @@ func channelMerge(left, right *Channel, strategy string) *Channel {
 					_, closed := catch(func() Value { closeScope(fb, scope, exit.cause); return nil })
 					switch {
 					case exit.cause != nil:
-						onExit(side, finalized(exit.cause, closed)) // as Effect's onExitPrimitive
+						onExit(side, finalized(exit.cause, closed)) // then the failure of closing
 					case closed != nil:
 						onExit(side, closed)
 					default:

@@ -1,6 +1,5 @@
-/// Effect's `HttpClientRequest`: a request for `Http.Client`, an immutable
-/// value built by a constructor and the `set_*` functions; `show` masks
-/// secret headers.
+/// A request for `Http.Client`, an immutable value built by a constructor
+/// and the `set_*` functions; `show` masks secret headers.
 module Http.ClientRequest exposing (..)
 
 import FileSystem

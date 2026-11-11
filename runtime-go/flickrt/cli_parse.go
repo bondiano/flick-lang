@@ -2,9 +2,9 @@ package flickrt
 
 import "regexp"
 
-// The command line as Effect's CLI reads it: internal/lexer.ts and
-// internal/parser.ts. Tokens are routed to the commands they name and to
-// their flags; values are parsed later, by the parameters.
+// The command line as the CLI reads it: a lexer and a parser. Tokens are
+// routed to the commands they name and to their flags; values are parsed
+// later, by the parameters.
 
 type cliToken struct {
 	kind  string // "long", "short" or "value"
@@ -17,7 +17,7 @@ func (t cliToken) flag() bool { return t.kind != "value" }
 
 var cliNegativeNumber = regexp.MustCompile(`^-(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?$`)
 
-// cliLex is lexer.ts's `lex`: the tokens before `--`, and what follows it.
+// cliLex is the tokens before `--`, and what follows it.
 func cliLex(argv []string) ([]cliToken, []string) {
 	var trailing []string
 	for i, a := range argv {
@@ -284,8 +284,8 @@ func cliLocalPrecedesSubcommand(t cliToken, rest []cliToken, found *cliResolved,
 	return false
 }
 
-// cliConsumeGlobals is parser.ts's consumeGlobalFlags: the values of the
-// global flags, wherever they are, and the tokens left for the commands.
+// cliConsumeGlobals is the values of the global flags, wherever they are,
+// and the tokens left for the commands.
 func cliConsumeGlobals(tokens []cliToken, root *cliCommand, global *cliRegistry) (cliFlagMap, []cliToken, []*cliError) {
 	flags, errors := cliEmptyFlags(global.params), []*cliError{}
 	var level func(tokens []cliToken, cmd *cliCommand, ignored []*cliRegistry) []cliToken
@@ -337,7 +337,7 @@ func cliConsumeGlobals(tokens []cliToken, root *cliCommand, global *cliRegistry)
 	return flags, level(tokens, root, nil), errors
 }
 
-// cliParsed is Effect's ParsedTokens.
+// cliParsed is what the tokens of a command line parse to.
 type cliParsed struct {
 	flags     cliFlagMap
 	arguments []string
@@ -383,7 +383,7 @@ func cliAliasForm(n string) string {
 	return "--" + n
 }
 
-// cliParseArgs is parser.ts's parseArgs.
+// cliParseArgs parses the tokens of `cmd`, a subcommand of `parent`.
 func cliParseArgs(tokens []cliToken, trailing []string, cmd *cliCommand, parent []string) *cliParsed {
 	path := append(parent[:len(parent):len(parent)], cmd.name)
 	singles := cmd.config.flagSingles()

@@ -15,11 +15,11 @@ import (
 // flushes stdout.
 var testClocks atomic.Int64
 
-// A testClock is Effect's TestClock: virtual time from 0 that moves only by
-// `adjust` and `setTime`, which wake the sleepers due on the way in order.
-// Where Effect tracks the tasks a wake schedules, this counts the fibers
-// under the clock that are not parked: a wake is over once every one but
-// the caller is parked on something that has not come.
+// A testClock is virtual time from 0 that moves only by `adjust` and
+// `setTime`, which wake the sleepers due on the way in order. Where the JS
+// runtime tracks the tasks a wake schedules, this counts the fibers under
+// the clock that are not parked: a wake is over once every one but the
+// caller is parked on something that has not come.
 type testClock struct {
 	mu      sync.Mutex
 	now     float64  // milliseconds
@@ -70,7 +70,7 @@ func (c *testClock) monotonic() *big.Int {
 
 // timer registers a sleeper; one due now or before wakes at once.
 //
-// shortcut: no warning is logged when a test sleeps without moving the clock, as Effect's warningStart does; log it from the sleeping fiber if a test needs it
+// shortcut: no warning is logged when a test sleeps without moving the clock, where the JS target logs one; log it from the sleeping fiber if a test needs it
 func (c *testClock) timer(d time.Duration) (<-chan struct{}, func()) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -145,7 +145,7 @@ func (c *testClock) settle(fb *Fiber, woken bool) {
 		quiet = 0
 		if time.Now().After(deadline) {
 			if woken {
-				// logged on the live clock, as Effect's `withLive` does
+				// logged on the live clock
 				real := *fb
 				real.env = fb.env.with(clockKey, systemClock)
 				EffectLogWarning(&real, busyWarning)

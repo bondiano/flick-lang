@@ -1,7 +1,6 @@
-/// Operations on strings, over Effect's `String`. Lengths and indices count
-/// UTF-16 code units, as in JS; the subject comes last, so
-/// `s |> String.take_left 3` reads in order. Regular expressions are in
-/// `RegExp`.
+/// Operations on strings. Lengths and indices count UTF-16 code units, as
+/// in JS; the subject comes last, so `s |> String.take_left 3` reads in
+/// order. Regular expressions are in `RegExp`.
 module String exposing (..)
 
 /// A Unicode normalization form, as `String.normalize` takes it.

@@ -1,10 +1,10 @@
 package flickrt
 
-// Channel is Effect's (Channel.ts): given the pull of its upstream and the
-// scope it runs in, the pull of what it emits. Building the pull runs in
-// the fiber that runs the channel, whose owner stays the lexical one, as a
-// Flick acquisition belongs to the scope its region names; a failure while
-// building is a pull that fails.
+// Channel is, given the pull of its upstream and the scope it runs in, the
+// pull of what it emits. Building the pull runs in the fiber that runs the
+// channel, whose owner stays the lexical one, as a Flick acquisition
+// belongs to the scope its region names; a failure while building is a
+// pull that fails.
 type Channel struct {
 	transform func(fb *Fiber, upstream Pull, scope *Owner) Pull
 }
@@ -39,7 +39,7 @@ func fromTransformBracket(f func(fb *Fiber, upstream Pull, scope, forked *Owner)
 		forked := forkScope(fb, scope)
 		onError := func(fb *Fiber, c *Cause) *Failure {
 			_, closed := catch(func() Value { closeScope(fb, forked, doneExit(c).cause); return nil })
-			return &Failure{finalized(c, closed)} // as Effect's onError
+			return &Failure{finalized(c, closed)} // then the failure of closing the scope
 		}
 		var p Pull
 		if _, c := catch(func() Value { p = f(fb, upstream, scope, forked); return nil }); c != nil {
@@ -61,7 +61,7 @@ func toPullScoped(fb *Fiber, self *Channel, scope *Owner) Pull {
 }
 
 // toPull is the channel's pull in the owner of `fb`, with its services,
-// shared by fibers one at a time (Channel.ts:11886).
+// shared by fibers one at a time.
 func toPull(fb *Fiber, self *Channel) Pull {
 	env, owner := fb.env, fb.owner
 	p := serial(toPullScoped(fb, self, owner))

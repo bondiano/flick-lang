@@ -1,4 +1,4 @@
-// Effect's `Stream` and `Sink` core, on both targets: a stream is a channel
+// The core of `Stream` and `Sink`, on both targets: a stream is a channel
 // of chunks, whose boundaries show, run with a sink or folded; a sink is a
 // channel that ends with a value and its leftovers.
 module App.Main exposing (main)

@@ -1,5 +1,5 @@
 // `Option` of the standard library without Effect: the one binding Option.fl
-// keeps, with Effect's semantics; the rest of the module is written in Flick.
+// keeps; the rest of the module is written in Flick.
 import { none, type Option, some } from "./data.ts";
 
 export const productMany =

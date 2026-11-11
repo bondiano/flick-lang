@@ -57,7 +57,7 @@ func Equals(a, b Value) bool {
 		y, ok := b.(*Duration)
 		return ok && durationOrder(x, y) == 0
 	case *Chunk:
-		// Effect's Chunk is `Equal`: the same elements, by `Equal.equals`
+		// a Chunk equals one with the same elements, by structural equality
 		y, ok := b.(*Chunk)
 		return ok && Equals(x.items, y.items)
 	case *Dict:
@@ -155,8 +155,8 @@ func ordered(a, b Value) bool {
 // combine folds a hash into another, as Flick's list and derived hashes do.
 func combine(h, x int32) int32 { return h*31 + x }
 
-// Hash is `hash` of a primitive, as Effect's `Hash.hash` computes it on the
-// JS target, which hash collections order their elements by.
+// Hash is `hash` of a primitive, computed as on the JS target, which hash
+// collections order their elements by.
 func Hash(a Value) Value { return hash(a) }
 
 func optimize(n int32) int32 { return n&-0x40000001 | int32(uint32(n)>>1)&0x40000000 }
@@ -174,7 +174,7 @@ func effectCombine(a, b int32) int32 {
 	return mix(int32(uint32(a)*0x9e3779b1 + uint32(b)*0x85ebca6b))
 }
 
-// hashString is Effect's djb2 over the UTF-16 code units, from the last.
+// hashString is djb2 over the UTF-16 code units, from the last.
 func hashString(s string) int32 {
 	units := utf16Units(s)
 	h := int32(5381)

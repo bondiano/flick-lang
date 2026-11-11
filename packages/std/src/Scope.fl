@@ -1,6 +1,6 @@
-/// Effect's `Scope` as Flick's lexical `scope`: the owner of a region
-/// releases what was acquired into it when the block ends. These add work
-/// of its own to that release.
+/// The lexical `scope` as functions: the owner of a region releases what
+/// was acquired into it when the block ends. These add work of its own to
+/// that release.
 module Scope exposing (run, add_finalizer, add_finalizer_exit)
 
 import Fiber

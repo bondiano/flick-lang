@@ -15,7 +15,7 @@ export const flickFilterMapWhile =
     return out;
   };
 
-/** `List.repeat_all`: the list repeated `n` times, at least once as Effect's `repeat` does. */
+/** `List.repeat_all`: the list repeated `n` times, and at least once. */
 export const flickRepeat =
   (n: number) =>
   <A>(self: ReadonlyArray<A>): Array<A> => {

@@ -1,4 +1,4 @@
-// Sizes in bytes from Effect's `ByteSize`.
+// `ByteSize`: sizes in bytes.
 module App.Main exposing (main)
 
 line : String -> String -> Unit ->{} Unit

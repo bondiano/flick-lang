@@ -1,10 +1,10 @@
-/// Effect's `Reducer`: a combiner with a start value, which folds a whole
-/// list: `Reducer.combine_all Reducer.number_sum [1, 2, 3]` is 6.
+/// A combiner with a start value, which folds a whole list:
+/// `Reducer.combine_all Reducer.number_sum [1, 2, 3]` is 6.
 module Reducer exposing (..)
 
 import Combiner
 
-/// Effect's reducer of values of `a`.
+/// A reducer of values of `a`.
 type Reducer a
 
 /// The reducer of `combine` starting from `initial`.

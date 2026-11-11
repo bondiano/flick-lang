@@ -1,4 +1,4 @@
-// Strings from Effect's `String`, and regular expressions from `RegExp`;
+// Strings from `String`, and regular expressions from `RegExp`;
 // `locale_compare`, which needs Intl's collation, is in `string_locale`.
 module App.Main exposing (main)
 

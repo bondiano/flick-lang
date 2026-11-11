@@ -36,7 +36,7 @@ const PRIMITIVES: &[(Lang, &str)] = &[
 ];
 
 /// Built-in types projected to native Effect or TypeScript types, or not at
-/// all; `Stream` is Effect's `Stream`.
+/// all; `Stream` is projected to the `Stream` of the Effect library.
 const NATIVE: &[Lang] = &[
     Lang::List,
     Lang::Option,

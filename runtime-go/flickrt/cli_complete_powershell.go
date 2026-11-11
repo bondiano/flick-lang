@@ -7,9 +7,9 @@ import (
 	"unicode/utf16"
 )
 
-// Ported line for line from Effect 4's cli/internal/completions/powershell.ts
-// so `--completions powershell` prints the same static script as the
+// `--completions powershell` prints the same static script as the
 // TypeScript CLI. The script sticks to Windows PowerShell 5.1.
+// Derived from Effect 4 cli/internal/completions/powershell.ts.
 
 // completeQuotePs is quotePs: non-ASCII and control characters become
 // `[char]` UTF-16 code units, since Windows PowerShell 5.1 can misread
@@ -130,7 +130,7 @@ func completePsContexts(data string, d completeCommand, path []string, lines []s
 	return lines
 }
 
-// completePowerShell is powershell.ts's generate: a self-contained script
+// completePowerShell is the PowerShell script: a self-contained script
 // that never re-invokes the CLI.
 func completePowerShell(executable string, d completeCommand) string {
 	data := "$global:_" + completeSanitize(executable) + "_Completions"

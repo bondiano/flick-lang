@@ -8,8 +8,8 @@ import (
 )
 
 // TestGraphemesAndWidthsAsNode checks graphemes and cliDisplayWidth
-// against Intl.Segmenter and Effect's displayWidth on the corpus that
-// tools/go-unicode/graphemes.mjs writes.
+// against Intl.Segmenter and the displayWidth of the Effect library on the
+// corpus that tools/go-unicode/graphemes.mjs writes.
 func TestGraphemesAndWidthsAsNode(t *testing.T) {
 	data, err := os.ReadFile("testdata/graphemes.txt")
 	if err != nil {

@@ -152,7 +152,7 @@ Retry, schedules, streams, queues, cache, tracing and HTTP are a typed standard 
 
 `deriving Schema` and codecs for external formats are part of the language. Generics, recursion, refinements, field policies and effectful transformations are covered in [Schema and standard data types](../07-schema/).
 
-The handlers of a program's effects are one-shot: a continuation resumes at most once, never several times. Services and `provide layer` still rely on Effect's mechanisms, and on the Go target on the same mechanisms of `runtime-go/flickrt`; `control` arms compile for Go, and for JavaScript once it has a runtime of its own.
+The handlers of a program's effects are one-shot: a continuation resumes at most once, never several times. Services and `provide layer` still rely on the mechanisms of Effect, and on the Go target on the same mechanisms of `runtime-go/flickrt`; `control` arms compile for Go, and for JavaScript once it has a runtime of its own.
 
 ## Execution and static lifetime contracts
 
@@ -391,7 +391,7 @@ The operation does not close an external `Scope`: resources registered in it liv
 
 `parallel_results` converts the selected expected failures into `Result` and lets the other branches finish. Defects and external interruption remain control events. `parallel_exits` returns opaque full outcomes of the completed branches; external cancellation of the group still propagates. The safe API does not promise to collect all potential errors of a fail-fast operation.
 
-Binding to a scope sets the lifetime; `join` is the wait for a specific result. Structured combinators run their branches in a separate child group with cancellation and join of all active branches, since Effect's `joinAll` stops waiting on an error without interrupting the other fibers.
+Binding to a scope sets the lifetime; `join` is the wait for a specific result. Structured combinators run their branches in a separate child group with cancellation and join of all active branches, since `joinAll` of the Effect library stops waiting on an error without interrupting the other fibers.
 
 ### Supervised children
 
