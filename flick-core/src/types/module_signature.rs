@@ -6,7 +6,7 @@ use super::{
     Form, Kind, ModuleNominalKind, ModuleRequirement as R, ModuleSignature, Type, TypeDef,
     show_type,
 };
-use crate::api_diff::canonical_type;
+use crate::api_diff::{canonical_type, canonical_type_in};
 use crate::iface::{Decl, Entity, Export, Interface, Namespace};
 
 fn replace_types(ty: &Type, replacements: &[(Type, Type)]) -> Type {

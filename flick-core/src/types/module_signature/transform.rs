@@ -165,7 +165,7 @@ impl ModuleSignature {
                 }
             }
         }
-        self.map_types(&mut |ty| crate::api_diff::canonical_type_in(ty, next));
+        self.map_types(&mut |ty| canonical_type_in(ty, next));
     }
 
     pub fn refine(&mut self, path: &[String], ty: Type) -> Result<(), String> {
