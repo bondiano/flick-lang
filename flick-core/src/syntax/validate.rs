@@ -5,6 +5,7 @@
 
 use super::cst::{Node, Token};
 use super::kind::SyntaxKind as K;
+use super::patterns::{is_part, is_pattern};
 use crate::diagnostics::{Diagnostic, codes};
 use crate::source::{FileId, Span};
 use crate::syntax::lang::Lang;
@@ -40,10 +41,6 @@ enum Place {
     Do,
     /// The clauses of a `for`.
     For,
-}
-
-fn is_pattern(kind: K) -> bool {
-    (K::WildcardPat..=K::OrPat).contains(&kind)
 }
 
 impl Validator<'_> {
@@ -185,7 +182,7 @@ impl Validator<'_> {
             K::OrPat => self.alternatives(node),
             _ => node
                 .nodes()
-                .filter(|n| is_pattern(n.kind) || n.kind == K::RecordPatField)
+                .filter(|n| is_part(n.kind))
                 .flat_map(|n| self.bindings(n))
                 .collect(),
         }

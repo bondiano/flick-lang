@@ -9,6 +9,7 @@ pub(crate) mod lang;
 pub mod lexer;
 pub mod literal;
 mod parser;
+pub mod patterns;
 pub(crate) mod structure;
 mod validate;
 

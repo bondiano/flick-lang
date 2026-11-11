@@ -9,6 +9,7 @@ use crate::source::{FileId, Span};
 use crate::syntax::cst::{Node, Token, foreign_words};
 use crate::syntax::kind::SyntaxKind as K;
 use crate::syntax::literal::string_value;
+use crate::syntax::patterns::binders;
 
 #[derive(Debug, Clone)]
 pub(super) struct Def {
@@ -157,26 +158,6 @@ fn foreign(
         ),
         ..def
     })
-}
-
-/// Names a pattern binds, in source order.
-pub(super) fn binders(pattern: &Node, out: &mut Vec<Token>) {
-    match pattern.kind {
-        K::VarPat => out.extend(pattern.child_tokens().find(|t| t.kind == K::Ident)),
-        K::RecordPatField if !pattern.has_token(K::Eq) => {
-            out.extend(pattern.child_tokens().find(|t| t.kind == K::Ident));
-        }
-        // a type annotation inside a pattern binds nothing
-        _ => {
-            for child in pattern.nodes().filter(|n| is_pattern(n.kind)) {
-                binders(child, out);
-            }
-        }
-    }
-}
-
-pub(super) fn is_pattern(kind: K) -> bool {
-    (K::WildcardPat..=K::OrPat).contains(&kind) || kind == K::RecordPatField
 }
 
 /// A second definition of a name in the same namespace.
