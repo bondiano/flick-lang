@@ -109,7 +109,7 @@ fn prepare(
         return Ok(runner);
     }
     progress.stage("Preparing compiler");
-    if let Err(diagnostic) = builtins::prepare_in(rt) {
+    if let Err(diagnostic) = builtins::prepare_in(project::stages_by_class(Some(&project), rt)) {
         drop(progress);
         return fail(&sources, vec![diagnostic]);
     }

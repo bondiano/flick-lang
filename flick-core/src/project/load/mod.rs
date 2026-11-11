@@ -324,6 +324,14 @@ fn run(
     run_in(host, sources, project, roots, mode, cache, saved, false)
 }
 
+/// Whether a run over `project` checks with the stages of a class derived
+/// from it, as Flick's own runtime has them: asked for with `rt`, or the
+/// project's runtime, whatever the target of the build. A host prepares the
+/// built-in modules checked this way before it runs.
+pub fn stages_by_class(project: Option<&Project>, rt: bool) -> bool {
+    rt || project.is_some_and(|p| p.config.build.effect == Backend::Rt)
+}
+
 #[allow(clippy::too_many_arguments, clippy::too_many_lines)]
 fn run_in(
     host: &dyn Host,
@@ -335,7 +343,7 @@ fn run_in(
     saved: Option<&PackageCache>,
     rt: bool,
 ) -> Output {
-    let stages_by_class = rt || project.is_some_and(|p| p.config.build.effect == Backend::Rt);
+    let stages_by_class = stages_by_class(project, rt);
     #[cfg(feature = "native-project")]
     let mut diagnostics = Vec::new();
     #[cfg(feature = "native-project")]
