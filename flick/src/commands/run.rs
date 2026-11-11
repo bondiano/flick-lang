@@ -41,6 +41,8 @@ pub struct Generation {
     path: PathBuf,
     /// Built for Flick's own runtime, which has no `DevTools`.
     rt: bool,
+    /// Built for go: each entry is an executable, not a module for node.
+    go: bool,
 }
 
 impl Generation {
@@ -52,7 +54,13 @@ impl Generation {
             // The owner is in the name, so clean cannot race lock-file creation.
             let path = dir.join(format!("{owner}-{number}"));
             match fs::create_dir(&path) {
-                Ok(()) => return Ok(Self { path, rt: false }),
+                Ok(()) => {
+                    return Ok(Self {
+                        path,
+                        rt: false,
+                        go: false,
+                    });
+                }
                 Err(err) if err.kind() == ErrorKind::AlreadyExists => {}
                 Err(err) => return Err(err),
             }
@@ -239,6 +247,7 @@ pub fn build_into_generation(
         built: RefCell::default(),
         modules,
     };
+    generation.go = project.config.build.emit == Emit::Go;
     generation.rt = options.rt
         || (project.config.build.emit != Emit::Go && project.config.build.effect == Backend::Rt);
     let outcome = build.run();
@@ -260,7 +269,7 @@ pub fn launch(
 ) -> Option<Running> {
     // a generation built for go holds the entry's executable
     let executable = generation.path().join(go::executable(name));
-    let go = executable.is_file();
+    let go = generation.go;
     let mut command = if go {
         Process::new(&executable)
     } else {

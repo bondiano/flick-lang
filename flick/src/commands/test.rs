@@ -114,18 +114,8 @@ fn prepare(
         return fail(&sources, vec![diagnostic]);
     }
     progress.stage("Compiling Flick modules");
-    let (mut diagnostics, mut compilation) = package_cache::with_saved(|saved| {
-        let (diagnostics, compilation, fresh) = project::compile_with(
-            &host,
-            &mut sources,
-            Some(&project),
-            &roots,
-            saved,
-            rt,
-            modules,
-        );
-        ((diagnostics, compilation), fresh)
-    });
+    let (mut diagnostics, mut compilation) =
+        package_cache::compile(&host, &mut sources, Some(&project), &roots, rt, modules);
     super::build::hooks::ir(Some(&project), &mut compilation, &mut diagnostics);
     let errors = diagnostics.iter().any(|d| d.severity == Severity::Error);
     let progress = if diagnostics.is_empty() {
@@ -191,12 +181,13 @@ fn prepare(
         drop(progress);
         return fail(&sources, emitted.diagnostics);
     }
+    let read = (&roots[..], &*host.cwd, &sources);
+    let store = |artifacts: &[Artifact]| {
+        let now = cache::key(&project, &roots, &settings, !go_requested && !rt);
+        diagnostics.is_empty() && cache::store_built(&project, read, &key, &now, artifacts)
+    };
     if go {
-        if diagnostics.is_empty()
-            && cache::key(&project, &roots, &settings, !go_requested && !rt) == key
-            && cache::read_unchanged(&project, &roots, &host.cwd, &sources)
-        {
-            cache::store(&project.root, &key, &emitted.artifacts);
+        if store(&emitted.artifacts) {
             cache::mark_go(&project.root, &key, &out, &go::executable(go::TEST));
         }
         drop(progress);
@@ -209,16 +200,11 @@ fn prepare(
         eprintln!("error: cannot write `{}`: {err}", runner.display());
         return Err(());
     }
-    if diagnostics.is_empty()
-        && cache::key(&project, &roots, &settings, !go_requested && !rt) == key
-        && cache::read_unchanged(&project, &roots, &host.cwd, &sources)
-    {
-        emitted.artifacts.push(Artifact {
-            path: "test.js".to_owned(),
-            contents: runner_source(&suites, rt),
-        });
-        cache::store(&project.root, &key, &emitted.artifacts);
-    }
+    emitted.artifacts.push(Artifact {
+        path: "test.js".to_owned(),
+        contents: runner_source(&suites, rt),
+    });
+    store(&emitted.artifacts);
     drop(progress);
     Ok(runner)
 }
