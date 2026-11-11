@@ -198,8 +198,10 @@ fn constraint_on_aliases_nested_in_their_arguments_meets_its_budget_in_time() {
         assert_eq!(codes, ["FLICK-C009"]);
         elapsed
     }]);
+    // a debug build takes 1.4–2.4 s of CPU, and about 29 s with the aliases
+    // left folded: 8 s lies between with room on both sides
     assert!(
-        full < Duration::from_secs(2),
+        full < Duration::from_secs(8),
         "nested aliases take {full:?}"
     );
 }
