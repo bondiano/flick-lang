@@ -1,5 +1,6 @@
 /// Module substitution changes service/error identities and their derived
 /// set keys together. Record field labels are source names and stay fixed.
+#[inline(never)]
 fn map_module_children(ty: &Type, f: &mut dyn FnMut(&Type) -> Type) -> Type {
     let mut mapped = ty.map_children(f);
     if let (Type::Row(before), Type::Row(after)) = (ty, &mut mapped) {
@@ -339,6 +340,7 @@ impl ModuleSignature {
     }
 
     /// Visits all types, including types inside nested nominal requirements.
+    #[inline(never)]
     pub fn map_types(&mut self, f: &mut dyn FnMut(&Type) -> Type) {
         match self {
             Self::Functor {

@@ -23,7 +23,7 @@ use crate::plugin::calls as plugin_calls;
 use crate::plugin::expansion::Expansion;
 use crate::plugin::first_party;
 use crate::project::Project;
-use crate::project::config::{Backend, Config};
+use crate::project::config::{Checked, Config};
 use crate::resolve::{self, Interface, ModuleSyntax};
 use crate::resolve::{Header, Import, Item, ItemKind};
 use crate::source::Span;
@@ -374,6 +374,42 @@ struct Output {
     ir: Option<ir::Module>,
     /// Every top-level entity with its type, for the reference model.
     declarations: Arc<Interface>,
+}
+
+/// What importers see of a module: all of a clean one; of one with errors,
+/// the exports and instances checking finished, typed, and the others by
+/// name alone. One error then costs its importers what it broke, not every
+/// type of the module.
+fn exported(interface: &Interface, clean: bool) -> Interface {
+    // a type left open holds variables of the module's own store, which no
+    // interface writes and no importer may read with its own
+    fn written(part: &impl serde::Serialize) -> bool {
+        serde_json::to_value(part).is_ok()
+    }
+    let mut out = interface.clone();
+    if clean {
+        return out;
+    }
+    for export in &mut out.exports {
+        if !written(export) {
+            (export.scheme, export.definition) = (None, None);
+        }
+    }
+    for child in out.modules.values_mut() {
+        *child = exported(child, false);
+    }
+    out.functor = out
+        .functor
+        .map(|signature| {
+            if written(&signature) {
+                signature
+            } else {
+                signature.inputs_only()
+            }
+        })
+        .filter(written);
+    out.instances.retain(written);
+    out
 }
 
 /// `interface` as a cache key compares it: without where its names are

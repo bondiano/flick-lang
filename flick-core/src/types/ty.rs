@@ -527,6 +527,7 @@ impl Type {
     /// Replaces the free variables named in `subst`; stops at a `forall`
     /// that rebinds a name.
     #[must_use]
+    #[inline(never)]
     pub fn substitute(&self, subst: &[(String, Type)]) -> Type {
         if subst.is_empty() {
             return self.clone();

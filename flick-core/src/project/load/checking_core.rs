@@ -301,30 +301,21 @@ impl Checking<'_> {
                 .package_of(name)
                 .is_some_and(|p| loaded.definition_package() == Some(p)),
         };
-        let build = self.project.map(|p| &p.config.build);
+        let read = (self.project).map_or_else(Checked::default, |p| p.config.checked());
         let options = types::Options {
             local: &local,
-            limits: build.map_or_else(types::Limits::default, |b| types::Limits {
-                steps: b.solver_steps,
-                depth: b.solver_depth,
-            }),
-            no_let_assert: self.project.is_some_and(|p| p.config.no_let_assert),
-            thresholds: self
-                .project
-                .map_or_else(Default::default, |p| p.config.thresholds),
+            limits: read.limits,
+            no_let_assert: read.no_let_assert,
+            thresholds: read.thresholds,
             watched: self.watched,
-            effects: build.is_none_or(|b| b.effect != Backend::None),
+            effects: read.effects,
             stages_by_class: self.stages_by_class,
         };
         let mut diagnostics = loaded.parse.diagnostics.clone();
         let resolved_cleanly = !resolved.iter().any(|d| d.severity == Severity::Error);
         diagnostics.extend(resolved);
         diagnostics.extend(contract_errors);
-        // Keep the resolved exports before checking: a failed module may leave
-        // store-local type variables in its inferred schemes. Importers must
-        // not read those variables with their own unification store.
         let broken = !loaded.parse.diagnostics.is_empty();
-        let mut untyped = interface.clone();
         let witnesses: Vec<_> = loaded
             .virtual_of
             .iter()
@@ -386,16 +377,8 @@ impl Checking<'_> {
             && resolved_cleanly
             && !checked.iter().any(|d| d.severity == Severity::Error)
             && !diagnostics.iter().any(|d| d.severity == Severity::Error);
-        if !clean {
-            untyped.functor = interface
-                .functor
-                .as_ref()
-                .map(types::ModuleSignature::inputs_only);
-        }
         interface.private = loaded.syntax.header.as_ref().is_some_and(|h| h.private);
         interface.member_of.clone_from(&loaded.member_of);
-        untyped.member_of.clone_from(&loaded.member_of);
-        untyped.private = interface.private;
         #[cfg(feature = "native-project")]
         if clean && interface.functor.is_some() {
             interface.template = Some(ModuleTemplate {
@@ -449,7 +432,6 @@ impl Checking<'_> {
         if let Some(expansion) = &loaded.expansion {
             expansion.restore(&mut diagnostics, ir.as_mut());
             expansion.place_interface(&mut interface);
-            expansion.place_interface(&mut untyped);
         }
         #[cfg(feature = "ide")]
         let typing = match &loaded.expansion {
@@ -465,7 +447,7 @@ impl Checking<'_> {
             typing: Arc::new(typing),
             #[cfg(feature = "ide")]
             inline_ide: Vec::new(),
-            exported: if clean { interface.clone() } else { untyped },
+            exported: exported(&interface, clean),
             interface,
             ir: ir.filter(|_| self.cache.is_none() || self.cached_ir == CachedIr::Kept),
             declarations,
