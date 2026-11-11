@@ -331,6 +331,7 @@ include!("checking_lexical.rs");
 
 include!("checking_inline.rs");
 include!("checking_relocate.rs");
+include!("checking_relocate_decls.rs");
 impl Checking<'_> {
     /// What the watching plugins find wrong with the places of `loaded` that
     /// call the names each watches, at spans of the module's own text; a
