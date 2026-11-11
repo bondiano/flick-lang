@@ -11,8 +11,8 @@ type Canonical
 /// Calls `body` with a witness of a fresh identity made of `eq` and `hash`,
 /// which must agree: equal values have equal hashes.
 with : (a -> a -> Bool) -> (a -> Int) -> (forall w. EqHash w a -> b)^c -> b
-foreign pure with from "@flick-lang/effect-ts" "eqHashWith"
+foreign pure with from "flick:rt" "eqHashWith"
   retention call
 
 canonical : Hash a => EqHash Canonical a
-foreign pure canonical from "@flick-lang/effect-ts" "eqHashCanonical"
+foreign pure canonical from "flick:rt" "eqHashCanonical"

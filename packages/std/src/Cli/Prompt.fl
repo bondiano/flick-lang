@@ -19,14 +19,14 @@ service Tty =
   rows : Unit ->{} Int
 
 node_of : ServiceTag {Tty} -> Layer none none {Tty}
-foreign pure node_of from "@flick-lang/effect-ts/cli" "promptNode"
+foreign pure node_of from "flick:cli" "promptNode"
 
 /// The terminal of the process; Ctrl+C and Ctrl+D quit with `QuitError`.
 node : Layer none none {Tty}
 let node = node_of Tty
 
 run_of : ServiceTag {Tty} -> Prompt a ->{Async, Tty; Terminal.QuitError} a
-foreign effect run_of from "@flick-lang/effect-ts/cli" "promptRun"
+foreign effect run_of from "flick:cli" "promptRun"
   arity 2
   reviewed "effect@4.1.2 sha256:18008f9b6d24eb7b"
 
@@ -58,12 +58,12 @@ type alias Theme = {
 
 /// Effect's theme, with colors when the output supports them.
 default_theme : Unit ->{} Theme
-foreign default_theme from "@flick-lang/effect-ts/cli" "promptDefaultTheme"
+foreign default_theme from "flick:cli" "promptDefaultTheme"
   arity 0
   reviewed "effect@4.1.2 sha256:47c0b93e9a1682bd"
 
 run_themed_of : ServiceTag {Tty} -> Theme -> Prompt a ->{Async, Tty; Terminal.QuitError} a
-foreign effect run_themed_of from "@flick-lang/effect-ts/cli" "promptRunThemed"
+foreign effect run_themed_of from "flick:cli" "promptRunThemed"
   arity 3
   reviewed "effect@4.1.2 sha256:f397581b74a20b3b"
 
@@ -80,17 +80,17 @@ type alias TextOptions = {
 
 /// A line of text.
 text : TextOptions -> Prompt String
-foreign pure text from "@flick-lang/effect-ts/cli" "promptText"
+foreign pure text from "flick:cli" "promptText"
   reviewed "effect@4.1.2 sha256:faa9b5f8f9dbaeb9"
 
 /// A secret typed behind the theme's mask.
 password : TextOptions -> Prompt (Redacted String)
-foreign pure password from "@flick-lang/effect-ts/cli" "promptPassword"
+foreign pure password from "flick:cli" "promptPassword"
   reviewed "effect@4.1.2 sha256:34d1d247c5a52093"
 
 /// A secret typed without echo.
 hidden : TextOptions -> Prompt (Redacted String)
-foreign pure hidden from "@flick-lang/effect-ts/cli" "promptHidden"
+foreign pure hidden from "flick:cli" "promptHidden"
   reviewed "effect@4.1.2 sha256:e1ad30ce884a96fd"
 
 /// `TextOptions` with the `delimiter` between items (`,` when `None`).
@@ -103,7 +103,7 @@ type alias ListOptions = {
 
 /// Items typed on one line.
 list : ListOptions -> Prompt (List String)
-foreign pure list from "@flick-lang/effect-ts/cli" "promptList"
+foreign pure list from "flick:cli" "promptList"
   reviewed "effect@4.1.2 sha256:73e85bc939aafc1c"
 
 /// A number question: bounds, the steps of the arrow keys and a check.
@@ -119,7 +119,7 @@ type alias IntOptions = {
 
 /// An integer.
 int : IntOptions -> Prompt Int
-foreign pure int from "@flick-lang/effect-ts/cli" "promptInt"
+foreign pure int from "flick:cli" "promptInt"
   reviewed "effect@4.1.2 sha256:85daa1430ff41c31"
 
 /// `IntOptions` with the digits after the point.
@@ -136,7 +136,7 @@ type alias NumberOptions = {
 
 /// A number with a fractional part.
 number : NumberOptions -> Prompt Float
-foreign pure number from "@flick-lang/effect-ts/cli" "promptNumber"
+foreign pure number from "flick:cli" "promptNumber"
   reviewed "effect@4.1.2 sha256:08a8804170ffcc4a"
 
 /// The words of a yes/no question.
@@ -155,7 +155,7 @@ type alias ConfirmOptions = {
 
 /// Yes or no, typed as `y` or `n`.
 confirm : ConfirmOptions -> Prompt Bool
-foreign pure confirm from "@flick-lang/effect-ts/cli" "promptConfirm"
+foreign pure confirm from "flick:cli" "promptConfirm"
   reviewed "effect@4.1.2 sha256:941f4c739c6b6e2c"
 
 /// A switch between two words.
@@ -168,7 +168,7 @@ type alias ToggleOptions = {
 
 /// On or off, moved with the arrow keys.
 toggle : ToggleOptions -> Prompt Bool
-foreign pure toggle from "@flick-lang/effect-ts/cli" "promptToggle"
+foreign pure toggle from "flick:cli" "promptToggle"
   reviewed "effect@4.1.2 sha256:8e2b9474cf4d4fb2"
 
 /// The names of months and weekdays, long and short.
@@ -190,7 +190,7 @@ type alias DateOptions = {
 
 /// A date and time, edited part by part.
 date : DateOptions -> Prompt DateTime.DateTime
-foreign pure date from "@flick-lang/effect-ts/cli" "promptDate"
+foreign pure date from "flick:cli" "promptDate"
   reviewed "effect@4.1.2 sha256:263b01cd88c91dea"
 
 /// What a path names: a file, a directory, or either.
@@ -209,7 +209,7 @@ type alias FileOptions = {
 
 /// A path of the file system of Node.js.
 file : FileOptions -> Prompt String
-foreign pure file from "@flick-lang/effect-ts/cli" "promptFile"
+foreign pure file from "flick:cli" "promptFile"
   reviewed "effect@4.1.2 sha256:09c4f3321d9eec4b"
 
 /// One choice of a selection.
@@ -230,7 +230,7 @@ type alias SelectOptions a = {
 
 /// One of the choices, moved to with the arrow keys.
 select : SelectOptions a -> Prompt a
-foreign pure select from "@flick-lang/effect-ts/cli" "promptSelect"
+foreign pure select from "flick:cli" "promptSelect"
   reviewed "effect@4.1.2 sha256:694d2c3b50601b9f"
 
 /// A selection filtered by what the user types.
@@ -245,7 +245,7 @@ type alias AutoCompleteOptions a = {
 
 /// One of the choices that match the typed filter.
 auto_complete : AutoCompleteOptions a -> Prompt a
-foreign pure auto_complete from "@flick-lang/effect-ts/cli" "promptAutoComplete"
+foreign pure auto_complete from "flick:cli" "promptAutoComplete"
   reviewed "effect@4.1.2 sha256:b33ef84a0308a6bb"
 
 /// The labels of the bulk actions of a multiple selection, and its bounds.
@@ -259,7 +259,7 @@ type alias MultiSelectOptions = {
 
 /// Any of the choices, toggled with space.
 multi_select : SelectOptions a -> MultiSelectOptions -> Prompt (List a)
-foreign pure multi_select from "@flick-lang/effect-ts/cli" "promptMultiSelect"
+foreign pure multi_select from "flick:cli" "promptMultiSelect"
   arity 2
   reviewed "effect@4.1.2 sha256:1bac7838cd4f9fd5"
 
@@ -280,34 +280,34 @@ type alias Handlers s a i = {
 
 /// A prompt of its own, from the first state.
 custom : s -> Handlers s a Terminal.UserInput -> Prompt a
-foreign pure custom from "@flick-lang/effect-ts/cli" "promptCustom"
+foreign pure custom from "flick:cli" "promptCustom"
   arity 2
   reviewed "effect@4.1.2 sha256:924998b86604ca75"
 
 /// `custom` that also steps on the messages of `events`.
 custom_events : s -> Queue.Queue none ev -> Handlers s a (ProcessInput ev) -> Prompt a
-foreign pure custom_events from "@flick-lang/effect-ts/cli" "promptCustomEvents"
+foreign pure custom_events from "flick:cli" "promptCustomEvents"
   arity 3
   reviewed "effect@4.1.2 sha256:924998b86604ca75"
 
 /// The prompts one after another, with their answers in order.
 all : List (Prompt a) -> Prompt (List a)
-foreign pure all from "@flick-lang/effect-ts/cli" "promptAll"
+foreign pure all from "flick:cli" "promptAll"
   reviewed "effect@4.1.2 sha256:b5e5237e5b626c19"
 
 /// The answer passed through `f`.
 map : (a -> b) -> Prompt a -> Prompt b
-foreign pure map from "@flick-lang/effect-ts/cli" "promptMap"
+foreign pure map from "flick:cli" "promptMap"
   arity 1
   reviewed "effect@4.1.2 sha256:ea6b1cb41ed96080"
 
 /// The prompt `f` makes of the answer, asked next.
 flat_map : (a -> Prompt b) -> Prompt a -> Prompt b
-foreign pure flat_map from "@flick-lang/effect-ts/cli" "promptFlatMap"
+foreign pure flat_map from "flick:cli" "promptFlatMap"
   arity 1
   reviewed "effect@4.1.2 sha256:3f76f63447d9c83d"
 
 /// The answer `value`, without asking.
 succeed : a -> Prompt a
-foreign pure succeed from "@flick-lang/effect-ts/cli" "promptSucceed"
+foreign pure succeed from "flick:cli" "promptSucceed"
   reviewed "effect@4.1.2 sha256:1006ececc7946365"

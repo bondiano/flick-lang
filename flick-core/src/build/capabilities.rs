@@ -284,9 +284,9 @@ fn needs_adapter(foreign: &Foreign, settings: &Settings<'_>) -> bool {
         .ui
         .filter(|_| super::bindings::UI_RENDERER.contains(&from))
         .unwrap_or(from);
-    let native = effects::rt_specifier(from);
+    let native = effects::rt_specifier(from).unwrap_or_else(|| effects::effect_specifier(from));
     effects::requires_adapter(
-        native.as_deref().unwrap_or(from),
+        &native,
         &foreign.binding.name,
         foreign.mode == ForeignMode::Effect,
     )

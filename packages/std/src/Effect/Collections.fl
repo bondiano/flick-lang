@@ -11,7 +11,7 @@ type error ValidationError (e : ErrorRow) = ValidationError (NonEmpty.NonEmpty (
 /// Runs `f` on each element, as many at once as `concurrency` lets; the
 /// results in order. The first typed failure stops the others.
 for_each : Concurrency -> (a ->{r; e} b)^c -> List a ->{r; e} List b
-foreign effect for_each from "@flick-lang/effect-ts/effect/Effect" "flickForEach"
+foreign effect for_each from "flick:Effect" "flickForEach"
   arity 2
   retention call
   reviewed "effect@4.1.2 sha256:767c242704681a58"
@@ -19,7 +19,7 @@ foreign effect for_each from "@flick-lang/effect-ts/effect/Effect" "flickForEach
 /// Runs every task, as many at once as `concurrency` lets; the results in
 /// order. The first typed failure stops the others.
 all : Detached r => Concurrency -> List ((Eff r e a)^c) ->{r; e} List a
-foreign effect all from "@flick-lang/effect-ts/effect/Effect" "flickAll"
+foreign effect all from "flick:Effect" "flickAll"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:8a93e1fbc3704f9a"
@@ -27,49 +27,49 @@ foreign effect all from "@flick-lang/effect-ts/effect/Effect" "flickAll"
 /// Runs `f` on every element: the results and the typed errors apart, in
 /// order; it fails only with a defect or an interruption.
 partition : Concurrency -> (a ->{r; e} b)^c -> List a ->{r} (List b, List (Errors e))
-foreign effect partition from "@flick-lang/effect-ts/effect/Effect" "flickPartition"
+foreign effect partition from "flick:Effect" "flickPartition"
   arity 2
   retention call
   reviewed "effect@4.1.2 sha256:ca229ec4881fe89d"
 
 /// Runs `f` on every element: all the results, or every typed error.
 validate : Concurrency -> (a ->{r; e} b)^c -> List a ->{r; ValidationError e} List b
-foreign effect validate from "@flick-lang/effect-ts/effect/Effect" "flickValidate"
+foreign effect validate from "flick:Effect" "flickValidate"
   arity 2
   retention call
   reviewed "effect@4.1.2 sha256:6ff548b347118190"
 
 /// The elements `f` keeps, in order.
 filter : Concurrency -> (a ->{r; e} Bool)^c -> List a ->{r; e} List a
-foreign effect filter from "@flick-lang/effect-ts/effect/Effect" "flickFilter"
+foreign effect filter from "flick:Effect" "flickFilter"
   arity 2
   retention call
   reviewed "effect@4.1.2 sha256:f411310bb6b2f0b4"
 
 /// The values the filter passes, in order.
 filter_map : (a -> Result x b)^c -> List a ->{} List b
-foreign effect filter_map from "@flick-lang/effect-ts/effect/Effect" "filterMap"
+foreign effect filter_map from "flick:Effect" "filterMap"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:a38faebf284d9ef4"
 
 /// The values the runtime filter passes, in order.
 filter_map_effect : Concurrency -> (a ->{r; e} Result x b)^c -> List a ->{r; e} List b
-foreign effect filter_map_effect from "@flick-lang/effect-ts/effect/Effect" "flickFilterMapEffect"
+foreign effect filter_map_effect from "flick:Effect" "flickFilterMapEffect"
   arity 2
   retention call
   reviewed "effect@4.1.2 sha256:3e73a1b9a285bcdf"
 
 /// The first element `f` holds for, trying one after another.
 find_first : (a ->{r; e} Bool)^c -> List a ->{r; e} Option a
-foreign effect find_first from "@flick-lang/effect-ts/effect/Effect" "findFirst"
+foreign effect find_first from "flick:Effect" "findFirst"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:65c599e695c25a55"
 
 /// The first value the runtime filter passes.
 find_first_filter : (a ->{r; e} Result x b)^c -> List a ->{r; e} Option b
-foreign effect find_first_filter from "@flick-lang/effect-ts/effect/Effect" "findFirstFilter"
+foreign effect find_first_filter from "flick:Effect" "findFirstFilter"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:57116fd1cce44d46"
@@ -77,26 +77,26 @@ foreign effect find_first_filter from "@flick-lang/effect-ts/effect/Effect" "fin
 /// The result of the first task to succeed, trying one after another; the
 /// last failure when all fail.
 first_success_of : List ((Eff r e a)^c) ->{r; e} a
-foreign effect first_success_of from "@flick-lang/effect-ts/effect/Effect" "firstSuccessOf"
+foreign effect first_success_of from "flick:Effect" "firstSuccessOf"
   retention call
   reviewed "effect@4.1.2 sha256:e3365a4b89e4ae6d"
 
 /// The first element of the list `task` gives.
 head : (Eff r e (List a))^c ->{r; Cause.NoSuchElementError | e} a
-foreign effect head from "@flick-lang/effect-ts/effect/Effect" "flickHead"
+foreign effect head from "flick:Effect" "flickHead"
   retention call
   reviewed "effect@4.1.2 sha256:50547e546e74840e"
 
 /// Folds the list from `zero` with the runtime `f`, from the first element.
 reduce : b -> (b -> a ->{r; e} b)^c -> List a ->{r; e} b
-foreign effect reduce from "@flick-lang/effect-ts/effect/Effect" "flickReduce"
+foreign effect reduce from "flick:Effect" "flickReduce"
   arity 2
   retention call
   reviewed "effect@4.1.2 sha256:8c26aadefefc5d8b"
 
 /// The result of `task` if `p` holds for it, else `fallback` of it.
 filter_or_else : (a -> Bool)^c -> (a ->{r2; e2} a)^c -> (Eff r e a)^c ->{r + r2; e + e2} a
-foreign effect filter_or_else from "@flick-lang/effect-ts/effect/Effect" "filterOrElse"
+foreign effect filter_or_else from "flick:Effect" "filterOrElse"
   arity 2
   retention call
   reviewed "effect@4.1.2 sha256:b7d9eb3e5d59e17c"
@@ -104,14 +104,14 @@ foreign effect filter_or_else from "@flick-lang/effect-ts/effect/Effect" "filter
 /// The value the filter passes of `task`'s result, else `fallback` of what
 /// it refused.
 filter_map_or_else : (a -> Result x b)^c -> (x ->{r2; e2} b)^c -> (Eff r e a)^c ->{r + r2; e + e2} b
-foreign effect filter_map_or_else from "@flick-lang/effect-ts/effect/Effect" "filterMapOrElse"
+foreign effect filter_map_or_else from "flick:Effect" "filterMapOrElse"
   arity 2
   retention call
   reviewed "effect@4.1.2 sha256:e64aef27a5f9a96c"
 
 /// The result of `task` if `p` holds for it, else fails with `f` of it.
 filter_or_fail : (a -> Bool)^c -> (a -> Errors e2)^c -> (Eff r e a)^c ->{r; e + e2} a
-foreign effect filter_or_fail from "@flick-lang/effect-ts/effect/Effect" "filterOrFail"
+foreign effect filter_or_fail from "flick:Effect" "filterOrFail"
   arity 2
   retention call
   reviewed "effect@4.1.2 sha256:cf882cc11a4c2d4f"
@@ -119,7 +119,7 @@ foreign effect filter_or_fail from "@flick-lang/effect-ts/effect/Effect" "filter
 /// The value the filter passes of `task`'s result, else fails with `f` of
 /// what it refused.
 filter_map_or_fail : (a -> Result x b)^c -> (x -> Errors e2)^c -> (Eff r e a)^c ->{r; e + e2} b
-foreign effect filter_map_or_fail from "@flick-lang/effect-ts/effect/Effect" "filterMapOrFail"
+foreign effect filter_map_or_fail from "flick:Effect" "filterMapOrFail"
   arity 2
   retention call
   reviewed "effect@4.1.2 sha256:a95798c4871ce983"

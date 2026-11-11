@@ -29,30 +29,30 @@ module Ref exposing (
 
 /// A fresh cell holding `value`.
 make : a^c ->{} Ref (a^c)
-foreign make from "@flick-lang/effect-ts" "refMake"
+foreign make from "flick:rt" "refMake"
   retention call
   reviewed "effect@4.1.2 sha256:13ba531db6f50e31"
 
 /// The current contents.
 get : (Ref a)^c ->{} a^c
-foreign get from "@flick-lang/effect-ts" "refGet"
+foreign get from "flick:rt" "refGet"
   retention call
   reviewed "effect@4.1.2 sha256:b4713cd12c52d94d"
 
 /// Whether both are the same cell. Cells have no `Eq` or `Hash`: a write
 /// would change what they compare by.
 same : Ref a -> Ref a -> Bool
-foreign pure same from "@flick-lang/effect-ts" "refSame"
+foreign pure same from "flick:rt" "refSame"
 
 /// Replaces the contents.
 set : (Ref a)^c -> a^c ->{} Unit
-foreign set from "@flick-lang/effect-ts" "refSet"
+foreign set from "flick:rt" "refSet"
   retention call
   reviewed "effect@4.1.2 sha256:7ab1cc29131d058b"
 
 /// `f` gives the result and the new contents, in one step.
 modify : (Ref a)^c -> (a^c -> (b^x, a^c))^d ->{} b^x
-foreign modify from "@flick-lang/effect-ts" "refModify"
+foreign modify from "flick:rt" "refModify"
   retention call
   reviewed "effect@4.1.2 sha256:2931caacecf3556c"
 

@@ -22,10 +22,10 @@ assert_at : CallSite => String -> a -> b
 let assert_at message value = assert_failed (CallSite.place ++ ": " ++ message) value
 
 todo_failed : String -> a
-foreign pure todo_failed from "@flick-lang/effect-ts" "flickTodo"
+foreign pure todo_failed from "flick:rt" "flickTodo"
 
 echoed : String -> a -> a
-foreign pure echoed from "@flick-lang/effect-ts" "flickEcho"
+foreign pure echoed from "flick:rt" "flickEcho"
 
 assert_failed : String -> a -> b
-foreign pure assert_failed from "@flick-lang/effect-ts" "flickAssert"
+foreign pure assert_failed from "flick:rt" "flickAssert"

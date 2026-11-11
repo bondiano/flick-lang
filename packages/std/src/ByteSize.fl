@@ -47,7 +47,7 @@ let default_format = { precision = None; trailingZeros = None; binary = true; un
 
 /// No bytes.
 zero : ByteSize
-foreign pure zero from "@flick-lang/effect-ts/effect/ByteSize" "zero"
+foreign pure zero from "flick:ByteSize" "zero"
   reviewed "effect@4.1.2 sha256:c8f5ad84568cdd21"
 
 instance Eq ByteSize =
@@ -64,235 +64,235 @@ instance Show ByteSize =
 
 /// `n` bytes; `None` unless that is a whole, non-negative, safe number of bytes.
 bytes : Float -> Option ByteSize
-foreign pure bytes from "@flick-lang/effect-ts/effect/ByteSize" "flickBytes"
+foreign pure bytes from "flick:ByteSize" "flickBytes"
   reviewed "effect@4.1.2 sha256:7e6fdea26a33e505"
 
 /// `n` kB (1000 bytes); `None` unless that is a whole, non-negative, safe number of bytes.
 kilobytes : Float -> Option ByteSize
-foreign pure kilobytes from "@flick-lang/effect-ts/effect/ByteSize" "flickKilobytes"
+foreign pure kilobytes from "flick:ByteSize" "flickKilobytes"
   reviewed "effect@4.1.2 sha256:5076fd1cb1d9b494"
 
 /// `n` MB; `None` unless that is a whole, non-negative, safe number of bytes.
 megabytes : Float -> Option ByteSize
-foreign pure megabytes from "@flick-lang/effect-ts/effect/ByteSize" "flickMegabytes"
+foreign pure megabytes from "flick:ByteSize" "flickMegabytes"
   reviewed "effect@4.1.2 sha256:a335e85d0c32c9a0"
 
 /// `n` GB; `None` unless that is a whole, non-negative, safe number of bytes.
 gigabytes : Float -> Option ByteSize
-foreign pure gigabytes from "@flick-lang/effect-ts/effect/ByteSize" "flickGigabytes"
+foreign pure gigabytes from "flick:ByteSize" "flickGigabytes"
   reviewed "effect@4.1.2 sha256:29e3945cc96095c8"
 
 /// `n` TB; `None` unless that is a whole, non-negative, safe number of bytes.
 terabytes : Float -> Option ByteSize
-foreign pure terabytes from "@flick-lang/effect-ts/effect/ByteSize" "flickTerabytes"
+foreign pure terabytes from "flick:ByteSize" "flickTerabytes"
   reviewed "effect@4.1.2 sha256:fdde24c5d238e02e"
 
 /// `n` PB; `None` unless that is a whole, non-negative, safe number of bytes.
 petabytes : Float -> Option ByteSize
-foreign pure petabytes from "@flick-lang/effect-ts/effect/ByteSize" "flickPetabytes"
+foreign pure petabytes from "flick:ByteSize" "flickPetabytes"
   reviewed "effect@4.1.2 sha256:44d54101f043dad7"
 
 /// `n` EB; `None` unless that is a whole, non-negative, safe number of bytes.
 exabytes : Float -> Option ByteSize
-foreign pure exabytes from "@flick-lang/effect-ts/effect/ByteSize" "flickExabytes"
+foreign pure exabytes from "flick:ByteSize" "flickExabytes"
   reviewed "effect@4.1.2 sha256:0dba137317d678fa"
 
 /// `n` ZB; `None` unless that is a whole, non-negative, safe number of bytes.
 zettabytes : Float -> Option ByteSize
-foreign pure zettabytes from "@flick-lang/effect-ts/effect/ByteSize" "flickZettabytes"
+foreign pure zettabytes from "flick:ByteSize" "flickZettabytes"
   reviewed "effect@4.1.2 sha256:d896f8418e968df1"
 
 /// `n` YB; `None` unless that is a whole, non-negative, safe number of bytes.
 yottabytes : Float -> Option ByteSize
-foreign pure yottabytes from "@flick-lang/effect-ts/effect/ByteSize" "flickYottabytes"
+foreign pure yottabytes from "flick:ByteSize" "flickYottabytes"
   reviewed "effect@4.1.2 sha256:c85fd5eaff8208a0"
 
 /// `n` RB; `None` unless that is a whole, non-negative, safe number of bytes.
 ronnabytes : Float -> Option ByteSize
-foreign pure ronnabytes from "@flick-lang/effect-ts/effect/ByteSize" "flickRonnabytes"
+foreign pure ronnabytes from "flick:ByteSize" "flickRonnabytes"
   reviewed "effect@4.1.2 sha256:35d6a048114e3dbd"
 
 /// `n` QB; `None` unless that is a whole, non-negative, safe number of bytes.
 quettabytes : Float -> Option ByteSize
-foreign pure quettabytes from "@flick-lang/effect-ts/effect/ByteSize" "flickQuettabytes"
+foreign pure quettabytes from "flick:ByteSize" "flickQuettabytes"
   reviewed "effect@4.1.2 sha256:d6283c99e8b2c643"
 
 /// `n` KiB (1024 bytes); `None` unless that is a whole, non-negative, safe number of bytes.
 kibibytes : Float -> Option ByteSize
-foreign pure kibibytes from "@flick-lang/effect-ts/effect/ByteSize" "flickKibibytes"
+foreign pure kibibytes from "flick:ByteSize" "flickKibibytes"
   reviewed "effect@4.1.2 sha256:b3cc57ff0a65a742"
 
 /// `n` MiB; `None` unless that is a whole, non-negative, safe number of bytes.
 mebibytes : Float -> Option ByteSize
-foreign pure mebibytes from "@flick-lang/effect-ts/effect/ByteSize" "flickMebibytes"
+foreign pure mebibytes from "flick:ByteSize" "flickMebibytes"
   reviewed "effect@4.1.2 sha256:4e998a15f8102103"
 
 /// `n` GiB; `None` unless that is a whole, non-negative, safe number of bytes.
 gibibytes : Float -> Option ByteSize
-foreign pure gibibytes from "@flick-lang/effect-ts/effect/ByteSize" "flickGibibytes"
+foreign pure gibibytes from "flick:ByteSize" "flickGibibytes"
   reviewed "effect@4.1.2 sha256:3ce5bb1d52d57a8c"
 
 /// `n` TiB; `None` unless that is a whole, non-negative, safe number of bytes.
 tebibytes : Float -> Option ByteSize
-foreign pure tebibytes from "@flick-lang/effect-ts/effect/ByteSize" "flickTebibytes"
+foreign pure tebibytes from "flick:ByteSize" "flickTebibytes"
   reviewed "effect@4.1.2 sha256:dad789457ccca587"
 
 /// `n` PiB; `None` unless that is a whole, non-negative, safe number of bytes.
 pebibytes : Float -> Option ByteSize
-foreign pure pebibytes from "@flick-lang/effect-ts/effect/ByteSize" "flickPebibytes"
+foreign pure pebibytes from "flick:ByteSize" "flickPebibytes"
   reviewed "effect@4.1.2 sha256:351e8f3e4cc3f62d"
 
 /// `n` EiB; `None` unless that is a whole, non-negative, safe number of bytes.
 exbibytes : Float -> Option ByteSize
-foreign pure exbibytes from "@flick-lang/effect-ts/effect/ByteSize" "flickExbibytes"
+foreign pure exbibytes from "flick:ByteSize" "flickExbibytes"
   reviewed "effect@4.1.2 sha256:c8a9c07fdb27579c"
 
 /// `n` ZiB; `None` unless that is a whole, non-negative, safe number of bytes.
 zebibytes : Float -> Option ByteSize
-foreign pure zebibytes from "@flick-lang/effect-ts/effect/ByteSize" "flickZebibytes"
+foreign pure zebibytes from "flick:ByteSize" "flickZebibytes"
   reviewed "effect@4.1.2 sha256:17a9755114d3d8c1"
 
 /// `n` YiB; `None` unless that is a whole, non-negative, safe number of bytes.
 yobibytes : Float -> Option ByteSize
-foreign pure yobibytes from "@flick-lang/effect-ts/effect/ByteSize" "flickYobibytes"
+foreign pure yobibytes from "flick:ByteSize" "flickYobibytes"
   reviewed "effect@4.1.2 sha256:e9a7209cd27d053e"
 
 /// The size a string spells, as `"1.5 kB"` or `"2 mebibytes"`.
 from_string : String -> Option ByteSize
-foreign pure from_string from "@flick-lang/effect-ts/effect/ByteSize" "fromString"
+foreign pure from_string from "flick:ByteSize" "fromString"
   reviewed "effect@4.1.2 sha256:1fbbb9611681f55a"
 
 /// Whether the size is no bytes.
 is_zero : ByteSize -> Bool
-foreign pure is_zero from "@flick-lang/effect-ts/effect/ByteSize" "isZero"
+foreign pure is_zero from "flick:ByteSize" "isZero"
   reviewed "effect@4.1.2 sha256:615311c29fc8ec15"
 
 /// The number of bytes.
 to_bigint : ByteSize -> BigInt
-foreign pure to_bigint from "@flick-lang/effect-ts/effect/ByteSize" "toBigInt"
+foreign pure to_bigint from "flick:ByteSize" "toBigInt"
   reviewed "effect@4.1.2 sha256:fe413cfa29f04444"
 
 /// The number of bytes, when it is a safe integer.
 to_number : ByteSize -> Option Float
-foreign pure to_number from "@flick-lang/effect-ts/effect/ByteSize" "toNumber"
+foreign pure to_number from "flick:ByteSize" "toNumber"
   reviewed "effect@4.1.2 sha256:4d89735b6c92ae19"
 
 /// The size in a unit, as a number that may be fractional.
 to_unit : ByteUnit -> ByteSize -> Float
-foreign pure to_unit from "@flick-lang/effect-ts/effect/ByteSize" "flickToUnit"
+foreign pure to_unit from "flick:ByteSize" "flickToUnit"
   reviewed "effect@4.1.2 sha256:6291ffce829cd84a"
 
 /// Whether both are the same number of bytes.
 equals : ByteSize -> ByteSize -> Bool
-foreign pure equals from "@flick-lang/effect-ts/effect/ByteSize" "equals"
+foreign pure equals from "flick:ByteSize" "equals"
   arity 1
   reviewed "effect@4.1.2 sha256:944aebda0c94ae69"
 
 /// Whether `self` lies within `minimum` and `maximum`, both included.
 between : { minimum : ByteSize; maximum : ByteSize } -> ByteSize -> Bool
-foreign pure between from "@flick-lang/effect-ts/effect/ByteSize" "between"
+foreign pure between from "flick:ByteSize" "between"
   arity 1
   reviewed "effect@4.1.2 sha256:2552698c6e66eaaf"
 
 /// `self` kept within `minimum` and `maximum`.
 clamp : { minimum : ByteSize; maximum : ByteSize } -> ByteSize -> ByteSize
-foreign pure clamp from "@flick-lang/effect-ts/effect/ByteSize" "clamp"
+foreign pure clamp from "flick:ByteSize" "clamp"
   arity 1
   reviewed "effect@4.1.2 sha256:74a54a29530d8c9d"
 
 /// The smaller of the two.
 min : ByteSize -> ByteSize -> ByteSize
-foreign pure min from "@flick-lang/effect-ts/effect/ByteSize" "min"
+foreign pure min from "flick:ByteSize" "min"
   arity 1
   reviewed "effect@4.1.2 sha256:f39c8df67a0155cc"
 
 /// The larger of the two.
 max : ByteSize -> ByteSize -> ByteSize
-foreign pure max from "@flick-lang/effect-ts/effect/ByteSize" "max"
+foreign pure max from "flick:ByteSize" "max"
   arity 1
   reviewed "effect@4.1.2 sha256:a4c97cd51b22802a"
 
 /// `self < that`: `size |> ByteSize.is_less_than limit`.
 is_less_than : ByteSize -> ByteSize -> Bool
-foreign pure is_less_than from "@flick-lang/effect-ts/effect/ByteSize" "isLessThan"
+foreign pure is_less_than from "flick:ByteSize" "isLessThan"
   arity 1
   reviewed "effect@4.1.2 sha256:d7ce136aa69dc4e0"
 
 /// `self <= that`.
 is_less_than_or_equal_to : ByteSize -> ByteSize -> Bool
-foreign pure is_less_than_or_equal_to from "@flick-lang/effect-ts/effect/ByteSize" "isLessThanOrEqualTo"
+foreign pure is_less_than_or_equal_to from "flick:ByteSize" "isLessThanOrEqualTo"
   arity 1
   reviewed "effect@4.1.2 sha256:ed62e69dbaa62f09"
 
 /// `self > that`.
 is_greater_than : ByteSize -> ByteSize -> Bool
-foreign pure is_greater_than from "@flick-lang/effect-ts/effect/ByteSize" "isGreaterThan"
+foreign pure is_greater_than from "flick:ByteSize" "isGreaterThan"
   arity 1
   reviewed "effect@4.1.2 sha256:3b2aff9d7c2ca11a"
 
 /// `self >= that`.
 is_greater_than_or_equal_to : ByteSize -> ByteSize -> Bool
-foreign pure is_greater_than_or_equal_to from "@flick-lang/effect-ts/effect/ByteSize" "isGreaterThanOrEqualTo"
+foreign pure is_greater_than_or_equal_to from "flick:ByteSize" "isGreaterThanOrEqualTo"
   arity 1
   reviewed "effect@4.1.2 sha256:eb8ffc64f191efe4"
 
 /// Both sizes together.
 sum : ByteSize -> ByteSize -> ByteSize
-foreign pure sum from "@flick-lang/effect-ts/effect/ByteSize" "sum"
+foreign pure sum from "flick:ByteSize" "sum"
   arity 1
   reviewed "effect@4.1.2 sha256:6c2589fb48d4b85c"
 
 /// `self - that`; `None` when `that` is larger.
 subtract : ByteSize -> ByteSize -> Option ByteSize
-foreign pure subtract from "@flick-lang/effect-ts/effect/ByteSize" "subtract"
+foreign pure subtract from "flick:ByteSize" "subtract"
   arity 1
   reviewed "effect@4.1.2 sha256:fc6c6b6f312d9235"
 
 /// `self` times a whole, non-negative, safe number; `None` otherwise.
 times : Float -> ByteSize -> Option ByteSize
-foreign pure times from "@flick-lang/effect-ts/effect/ByteSize" "times"
+foreign pure times from "flick:ByteSize" "times"
   arity 1
   reviewed "effect@4.1.2 sha256:99da3dfe95feedb3"
 
 /// `self` divided by a whole, positive, safe number, rounded down; `None`
 /// otherwise.
 divide : Float -> ByteSize -> Option ByteSize
-foreign pure divide from "@flick-lang/effect-ts/effect/ByteSize" "divide"
+foreign pure divide from "flick:ByteSize" "divide"
   arity 1
   reviewed "effect@4.1.2 sha256:00b41bab58ef0a29"
 
 /// The size as text in a unit: `"1.5 KiB"`.
 format : FormatOptions -> ByteSize -> String
-foreign pure format from "@flick-lang/effect-ts/effect/ByteSize" "flickFormat"
+foreign pure format from "flick:ByteSize" "flickFormat"
   reviewed "effect@4.1.2 sha256:ce94ffb1e3723d16"
 
 /// Sums sizes from `zero`.
 reducer_sum : Reducer.Reducer ByteSize
-foreign pure reducer_sum from "@flick-lang/effect-ts/effect/ByteSize" "ReducerSum"
+foreign pure reducer_sum from "flick:ByteSize" "ReducerSum"
   reviewed "effect@4.1.2 sha256:b18343fbdcc9aa03"
 
 /// The larger of two sizes.
 combiner_max : Combiner.Combiner ByteSize
-foreign pure combiner_max from "@flick-lang/effect-ts/effect/ByteSize" "CombinerMax"
+foreign pure combiner_max from "flick:ByteSize" "CombinerMax"
   reviewed "effect@4.1.2 sha256:af30c6a95d8ba20b"
 
 /// The smaller of two sizes.
 combiner_min : Combiner.Combiner ByteSize
-foreign pure combiner_min from "@flick-lang/effect-ts/effect/ByteSize" "CombinerMin"
+foreign pure combiner_min from "flick:ByteSize" "CombinerMin"
   reviewed "effect@4.1.2 sha256:6dcd87653f39fc92"
 
 /// A size as JSON text such as `"1.5 KiB"` or `"10 MB"`; encodes as
 /// `"1536 bytes"`. Other text is a `SchemaError`.
 json : PureCodec Json ByteSize
-foreign pure json from "@flick-lang/effect-ts/effect/ByteSize" "flickJson"
+foreign pure json from "flick:ByteSize" "flickJson"
   reviewed "effect@4.1.2 sha256:1f0a1d398ef2056f"
 
 /// A size as a whole, non-negative JSON number of bytes.
 json_number : PureCodec Json ByteSize
-foreign pure json_number from "@flick-lang/effect-ts/effect/ByteSize" "flickJsonNumber"
+foreign pure json_number from "flick:ByteSize" "flickJsonNumber"
   reviewed "effect@4.1.2 sha256:1e94e27386d2573e"
 
 /// A size as a JSON string of digits, for sizes past the safe numbers.
 json_bigint : PureCodec Json ByteSize
-foreign pure json_bigint from "@flick-lang/effect-ts/effect/ByteSize" "flickJsonBigint"
+foreign pure json_bigint from "flick:ByteSize" "flickJsonBigint"
   reviewed "effect@4.1.2 sha256:863e6b8c413aa5c9"

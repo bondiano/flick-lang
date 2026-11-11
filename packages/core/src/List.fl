@@ -118,7 +118,7 @@ import List.Transform exposing (..)
 @lang list_map
 /// Applies a pure function to each element.
 map : (a -> b)^c -> List a -> List b
-foreign pure map from "@flick-lang/effect-ts" "listMap"
+foreign pure map from "flick:rt" "listMap"
   reviewed "effect@4.1.2 sha256:1f6394368959203b"
   arity 2
   retention call
@@ -126,5 +126,5 @@ foreign pure map from "@flick-lang/effect-ts" "listMap"
 /// Runs a runtime function on each element, one after another from the
 /// first.
 map_effect : (a ->{r; e} b)^c -> List a ->{r; e} List b
-foreign effect map_effect from "@flick-lang/effect-ts" "listMapEffect"
+foreign effect map_effect from "flick:rt" "listMapEffect"
   retention call

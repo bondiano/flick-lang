@@ -36,7 +36,7 @@ let static_options root = {
 make :
   StaticOptions ->{Async; PlatformError.PlatformError}
   (ServerRequest ->{Async; HttpServerError} ServerResponse)
-foreign effect make from "@flick-lang/effect-ts/effect/http/HttpStaticServer" "flickMake"
+foreign effect make from "flick:http/HttpStaticServer" "flickMake"
   reviewed "effect@4.1.2 sha256:e59cebe7d680fe43"
 
 /// A route of `GET` below the prefix to the handler of the files.

@@ -1,7 +1,7 @@
 # The Go functions of the JS exports the go target supports: under each
 # `[module]`, an export and the function of package `flickrt`.
 
-[@flick-lang/effect-ts]
+[flick:rt]
 checkEmail CheckEmail
 checkNonEmpty CheckNonEmpty
 checkPositive CheckPositive
@@ -254,7 +254,7 @@ nonEmptyFromList NonEmptyFromList
 nonEmptyCons NonEmptyCons
 nonEmptyHead NonEmptyHead
 
-[@flick-lang/effect-ts]
+[flick:rt]
 genConstant GenConstant
 genNumber GenNumber
 genInt GenInt

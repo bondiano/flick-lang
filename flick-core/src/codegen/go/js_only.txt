@@ -3,7 +3,7 @@
 # a comment saying why. Modules of `project/load/target.rs::JS_ONLY` are
 # left out whole and need no entry here.
 
-[@flick-lang/effect-ts/effect/Channel]
+[flick:Channel]
 # a web ReadableStream, a JS value Go has no form of
 fromReadableStream
 # a web WritableStream, a JS value Go has no form of
@@ -14,11 +14,11 @@ fromTransformStream
 fromAsyncIterable
 fromAsyncIterableArray
 
-[@flick-lang/effect-ts/effect/Sink]
+[flick:Sink]
 # a web WritableStream, a JS value Go has no form of
 fromWritableStream
 
-[@flick-lang/effect-ts/effect/Stream]
+[flick:Stream]
 # a web ReadableStream, a JS value Go has no form of
 flickFromReadableStream
 # a JS AsyncIterable and its promises, which Go has no form of
@@ -26,11 +26,11 @@ flickFromAsyncIterable
 # a JS event target (`addEventListener`), which Go has no form of
 flickFromEventListener
 
-[@flick-lang/effect-ts]
+[flick:rt]
 # a thrown JS value, which only a foreign `catch` gives and Go has no form of
 jsErrorMessage
 
-[@flick-lang/effect-ts/effect/server/Functions]
+[flick:server/Functions]
 # a `server fn` is called and served over Effect RPC, which is js only (Rpc)
 serverAuthenticated
 serverProcedure
@@ -39,6 +39,6 @@ serverFunction
 serverNoErrors
 serverError
 
-[@flick-lang/effect-ts/effect/server/FunctionsNode]
+[flick:server/FunctionsNode]
 # serves the calls of `server fn` over Effect RPC, which is js only (Rpc)
 serverHandler

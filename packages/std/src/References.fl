@@ -8,20 +8,20 @@ import LogLevel
 
 /// The level `Effect.log` writes at.
 current_log_level : Unit ->{} LogLevel.LogLevel
-foreign effect current_log_level from "@flick-lang/effect-ts/effect/References" "flickCurrentLogLevel"
+foreign effect current_log_level from "flick:References" "flickCurrentLogLevel"
   arity 0
   reviewed "effect@4.1.2 sha256:baa823ff308c24fd"
 
 /// Runs `task` with `Effect.log` writing at the level.
 with_current_log_level : LogLevel.LogLevel -> (Eff r e a)^c ->{r; e} a
-foreign effect with_current_log_level from "@flick-lang/effect-ts/effect/References" "flickWithCurrentLogLevel"
+foreign effect with_current_log_level from "flick:References" "flickWithCurrentLogLevel"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:baa823ff308c24fd"
 
 /// Runs `task` dropping log messages below the level.
 with_minimum_log_level : LogLevel.LogLevel -> (Eff r e a)^c ->{r; e} a
-foreign effect with_minimum_log_level from "@flick-lang/effect-ts/effect/References" "flickWithMinimumLogLevel"
+foreign effect with_minimum_log_level from "flick:References" "flickWithMinimumLogLevel"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:3fce114ceb469342"
@@ -29,53 +29,53 @@ foreign effect with_minimum_log_level from "@flick-lang/effect-ts/effect/Referen
 /// Runs `task` logging a failure no one handled at the level, or not at
 /// all with `None`.
 with_unhandled_log_level : Option LogLevel.LogLevel -> (Eff r e a)^c ->{r; e} a
-foreign effect with_unhandled_log_level from "@flick-lang/effect-ts/effect/References" "flickWithUnhandledLogLevel"
+foreign effect with_unhandled_log_level from "flick:References" "flickWithUnhandledLogLevel"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:6859ae1bc9614df5"
 
 /// The annotations log messages of the current task get, as text.
 current_log_annotations : Unit ->{} List (String, String)
-foreign effect current_log_annotations from "@flick-lang/effect-ts/effect/References" "flickCurrentLogAnnotations"
+foreign effect current_log_annotations from "flick:References" "flickCurrentLogAnnotations"
   arity 0
   reviewed "effect@4.1.2 sha256:7d21075216108a32"
 
 /// The labels of the log spans around the current task, innermost first.
 current_log_spans : Unit ->{} List String
-foreign effect current_log_spans from "@flick-lang/effect-ts/effect/References" "flickCurrentLogSpans"
+foreign effect current_log_spans from "flick:References" "flickCurrentLogSpans"
   arity 0
   reviewed "effect@4.1.2 sha256:bc8f553429a20a29"
 
 /// The stack frame of the traced function the current task runs in.
 current_stack_frame : Unit ->{} Option Cause.StackFrame
-foreign effect current_stack_frame from "@flick-lang/effect-ts/effect/References" "flickCurrentStackFrame"
+foreign effect current_stack_frame from "flick:References" "flickCurrentStackFrame"
   arity 0
   reviewed "effect@4.1.2 sha256:cab67a0de8f50bb6"
 
 /// Runs `task` with spans that, if `disabled`, are not traced and that
 /// the spans inside skip when they look for their parent.
 with_disable_propagation : Bool -> (Eff r e a)^c ->{r; e} a
-foreign effect with_disable_propagation from "@flick-lang/effect-ts/effect/References" "flickWithDisablePropagation"
+foreign effect with_disable_propagation from "flick:References" "flickWithDisablePropagation"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:f9a31da22b2b4f40"
 
 /// Runs `task` with tracing on or off: off, its spans are not traced.
 with_tracer_enabled : Bool -> (Eff r e a)^c ->{r; e} a
-foreign effect with_tracer_enabled from "@flick-lang/effect-ts/effect/References" "flickWithTracerEnabled"
+foreign effect with_tracer_enabled from "flick:References" "flickWithTracerEnabled"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:b9aa00511cf3e2fc"
 
 /// Runs `task` with span timing on or off: off, spans take no clock time.
 with_tracer_timing : Bool -> (Eff r e a)^c ->{r; e} a
-foreign effect with_tracer_timing from "@flick-lang/effect-ts/effect/References" "flickWithTracerTimingEnabled"
+foreign effect with_tracer_timing from "flick:References" "flickWithTracerTimingEnabled"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:4778d1c29866dfc6"
 
 /// The annotations the spans of the current task get, as text.
 span_annotations : Unit ->{} List (String, String)
-foreign effect span_annotations from "@flick-lang/effect-ts/effect/References" "flickTracerSpanAnnotations"
+foreign effect span_annotations from "flick:References" "flickTracerSpanAnnotations"
   arity 0
   reviewed "effect@4.1.2 sha256:22abf218a90734fd"

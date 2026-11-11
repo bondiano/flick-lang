@@ -2,6 +2,8 @@
 //! `@flick-lang/runtime/core`, which has the runtime's data and pure helpers
 //! without Effect. A foreign module with no such version cannot be built.
 
+use std::borrow::Cow;
+
 use crate::codegen::EffectBridge;
 use crate::diagnostics::{Diagnostic, Severity, codes};
 use crate::ir::{self, ItemKind};
@@ -13,7 +15,34 @@ pub const CORE_DIR: &str = "_core/";
 
 use super::bindings;
 
+/// The key of a module the built-in packages bind, `flick:Trie`, which names
+/// no package of a target. `spec` may spell it as a module of the adapter's
+/// package or of the runtime's, as earlier sources do.
+pub fn key(spec: &str) -> Cow<'_, str> {
+    let adapter = bindings::ADAPTER_PREFIX.len();
+    bindings::PACKAGES
+        .iter()
+        .find_map(|package| spec.strip_prefix(package))
+        .and_then(|rest| {
+            bindings::ALIASES.iter().find_map(|(key, module, prefix)| {
+                rest.strip_prefix(&module[adapter..])
+                    .filter(|tail| tail.is_empty() || *prefix)
+                    .map(|tail| format!("{key}{tail}"))
+            })
+        })
+        .map_or(Cow::Borrowed(spec), Cow::Owned)
+}
+
+/// Whether `spec` is a module of the built-in packages' own: a key, or a
+/// module of the runtime's or the adapter's package.
+pub fn owned(spec: &str) -> bool {
+    spec.starts_with(bindings::KEY) || bindings::PACKAGES.iter().any(|p| belongs_to(spec, p))
+}
+
+/// The module of the adapter `spec` stands for; a module of another package
+/// is itself.
 pub fn effect_specifier(spec: &str) -> String {
+    let spec = key(spec);
     bindings::ALIASES
         .iter()
         .find_map(|(from, to, prefix)| {
@@ -21,14 +50,15 @@ pub fn effect_specifier(spec: &str) -> String {
                 .filter(|rest| rest.is_empty() || *prefix)
                 .map(|rest| format!("{to}{rest}"))
         })
-        .unwrap_or_else(|| spec.to_owned())
+        .unwrap_or_else(|| spec.into_owned())
 }
 
 fn route(spec: &str, native: bool) -> Option<String> {
+    let spec = key(spec);
     if let Some((_, core, rt)) = bindings::ROUTES.iter().find(|(from, _, _)| *from == spec) {
         return if native { *rt } else { *core }.map(str::to_owned);
     }
-    (!bindings::PACKAGES.iter().any(|p| belongs_to(spec, p))).then(|| spec.to_owned())
+    (!owned(&spec)).then(|| spec.into_owned())
 }
 
 pub fn belongs_to(spec: &str, package: &str) -> bool {
@@ -174,7 +204,7 @@ pub fn control_on_js(module: &ir::Module, diagnostics: &mut Vec<Diagnostic>) {
 
 #[cfg(test)]
 mod tests {
-    use super::{bindings, effect_specifier, on_kernel, rt_specifier, specifier};
+    use super::{bindings, effect_specifier, key, on_kernel, owned, rt_specifier, specifier};
     use crate::types::builtin_sources;
 
     #[test]
@@ -200,6 +230,76 @@ mod tests {
                     );
                 }
             }
+        }
+    }
+
+    #[test]
+    fn a_key_has_two_earlier_spellings_and_names_the_module_of_each_target() {
+        for (spelled, is) in [
+            ("@flick-lang/effect-ts/effect/Trie", "flick:Trie"),
+            ("@flick-lang/runtime/effect/http/Url", "flick:http/Url"),
+            ("@flick-lang/effect-ts", "flick:rt"),
+            ("@flick-lang/runtime", "flick:rt"),
+            ("@flick-lang/effect-ts/ui", "flick:ui"),
+            ("@flick-lang/runtime/ui/react", "flick:ui/react"),
+            ("@flick-lang/effect-ts/runner/node", "flick:runner/node"),
+            ("@flick-lang/effect-ts/sql", "flick:sql"),
+            ("@flick-lang/effect-ts/cli", "flick:cli"),
+            // the modules of a target are no keys, nor are those of other packages
+            ("@flick-lang/runtime/rt", "@flick-lang/runtime/rt"),
+            (
+                "@flick-lang/runtime/rt/effect/Trie",
+                "@flick-lang/runtime/rt/effect/Trie",
+            ),
+            (
+                "@flick-lang/runtime/core/Option",
+                "@flick-lang/runtime/core/Option",
+            ),
+            (
+                "@flick-lang/effect-ts/bridge",
+                "@flick-lang/effect-ts/bridge",
+            ),
+            ("@flick-lang/effect-ts-extra", "@flick-lang/effect-ts-extra"),
+            ("./clock.mjs", "./clock.mjs"),
+        ] {
+            assert_eq!(key(spelled), is);
+            assert_eq!(key(is), is);
+        }
+        for (key, adapter, core, rt) in [
+            (
+                "flick:Option",
+                "@flick-lang/effect-ts/effect/Option",
+                Some("@flick-lang/runtime/core/Option"),
+                Some("@flick-lang/runtime/rt/effect/Option"),
+            ),
+            (
+                "flick:rt",
+                "@flick-lang/effect-ts",
+                Some("@flick-lang/runtime/core"),
+                Some("@flick-lang/runtime/rt"),
+            ),
+            (
+                "flick:ui/react",
+                "@flick-lang/effect-ts/ui/react",
+                None,
+                Some("@flick-lang/runtime/rt/ui/react"),
+            ),
+            (
+                "flick:Stream",
+                "@flick-lang/effect-ts/effect/Stream",
+                None,
+                None,
+            ),
+            ("flick:cli", "@flick-lang/effect-ts/cli", None, None),
+        ] {
+            assert_eq!(effect_specifier(key), adapter);
+            assert_eq!(specifier(key).as_deref(), core, "{key}");
+            assert_eq!(rt_specifier(key).as_deref(), rt, "{key}");
+            assert!(owned(key));
+        }
+        assert!(!owned("./clock.mjs") && !owned("@flick-lang/runtime-extra"));
+        for (key, _, _) in bindings::ROUTES {
+            assert!(key.starts_with(bindings::KEY), "{key} is routed by its key");
         }
     }
 

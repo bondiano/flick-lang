@@ -32,7 +32,7 @@ impl fmt::Debug for Native {
     }
 }
 
-const RT: &str = "@flick-lang/effect-ts";
+const RT: &str = "flick:rt";
 
 macro_rules! natives {
     ($($module:expr, $export:literal, $arity:literal => $run:expr;)*) => {
@@ -68,7 +68,7 @@ natives! {
     RT, "refModify", 2 => ref_modify;
     RT, "layerSucceed", 2 => layer_succeed;
     RT, "layerMerge", 2 => layer_merge;
-    "@flick-lang/effect-ts/effect/Layer", "effect", 2 => layer_effect;
+    "flick:Layer", "effect", 2 => layer_effect;
     RT, "flickTodo", 1 => todo;
     MODEL, "structShow", 2 => struct_show;
     MODEL, "structEq", 3 => struct_eq;

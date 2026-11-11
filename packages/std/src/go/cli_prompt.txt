@@ -1,5 +1,5 @@
 # Effect's CLI prompts, run on the service `Cli.Prompt.Tty`.
-[@flick-lang/effect-ts/cli]
+[flick:cli]
 promptNode PromptNode
 promptRun *PromptRun
 promptRunThemed *PromptRunThemed

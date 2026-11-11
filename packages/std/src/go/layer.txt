@@ -1,6 +1,6 @@
 # Layers, contexts and spans.
 
-[@flick-lang/effect-ts/effect/Layer]
+[flick:Layer]
 empty LayerEmpty
 succeedContext LayerSucceedContext
 sync LayerSync
@@ -35,7 +35,7 @@ parentSpan LayerParentSpan
 flickWithSpan LayerWithSpan
 withParentSpan LayerWithParentSpan
 
-[@flick-lang/effect-ts/effect/Context]
+[flick:Context]
 empty ContextEmpty
 make ContextMake
 add ContextAdd
@@ -51,7 +51,7 @@ flickReference ContextReference
 flickRead *ContextRead
 flickWithReference *ContextWithReference
 
-[@flick-lang/effect-ts/effect/Tracer]
+[flick:Tracer]
 flickWithSpan *TracerWithSpan
 flickParentSpan *TracerParentSpan
 flickExternalSpan TracerExternalSpan
@@ -61,19 +61,19 @@ flickSampled TracerSampled
 flickSpanName TracerSpanName
 flickParent TracerParent
 
-[@flick-lang/effect-ts/effect/LayerMap]
+[flick:LayerMap]
 flickMake *LayerMapMake
 flickFromRecord *LayerMapFromRecord
 flickGet LayerMapGet
 flickInvalidate *LayerMapInvalidate
 
-[@flick-lang/effect-ts/effect/LayerRef]
+[flick:LayerRef]
 flickMake *LayerRefMake
 flickGet LayerRefGet
 flickInvalidate *LayerRefInvalidate
 flickRefresh *LayerRefRefresh
 
-[@flick-lang/effect-ts/effect/ErrorReporter]
+[flick:ErrorReporter]
 flickMake ErrorReporterMake
 flickLayer ErrorReporterLayer
 flickReport *ErrorReporterReport

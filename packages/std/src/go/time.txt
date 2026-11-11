@@ -1,5 +1,5 @@
 # Random, DateTime and Cron.
-[@flick-lang/effect-ts/effect/Random]
+[flick:Random]
 flickNext *RandomNext
 flickNextBoolean *RandomNextBoolean
 flickNextInt *RandomNextInt
@@ -9,7 +9,7 @@ shuffle *RandomShuffle
 choice *RandomChoice
 withSeed *RandomWithSeed
 
-[@flick-lang/effect-ts/effect/Cron]
+[flick:Cron]
 flickMake CronMake
 flickParse CronParse
 flickFormat CronFormat

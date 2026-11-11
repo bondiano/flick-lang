@@ -6,13 +6,13 @@ import List.Core
 
 /// `xs |> cartesian ys`: every pair of an element of `xs` and one of `ys`.
 cartesian : List b -> List a -> List (a, b)
-foreign pure cartesian from "@flick-lang/effect-ts/effect/Array" "cartesian"
+foreign pure cartesian from "flick:Array" "cartesian"
   arity 1
   reviewed "effect@4.1.2 sha256:27e8b9b64b93c694"
 
 /// `f` of every pair of an element of `xs` and one of `ys`.
 cartesian_with : List b -> (a -> b -> d)^c -> (List a -> List d)^c
-foreign pure cartesian_with from "@flick-lang/effect-ts/effect/Array" "cartesianWith"
+foreign pure cartesian_with from "flick:Array" "cartesianWith"
   arity 2
   retention call
   reviewed "effect@4.1.2 sha256:510ebcd5bae393a1"
@@ -20,7 +20,7 @@ foreign pure cartesian_with from "@flick-lang/effect-ts/effect/Array" "cartesian
 /// `xs |> zip_with ys f`: `f` of the elements at each index of both, as
 /// long as the shorter one.
 zip_with : List b -> (a -> b -> d)^c -> (List a -> List d)^c
-foreign pure zip_with from "@flick-lang/effect-ts/effect/Array" "zipWith"
+foreign pure zip_with from "flick:Array" "zipWith"
   arity 2
   retention call
   reviewed "effect@4.1.2 sha256:6c2154874d632092"
@@ -28,87 +28,87 @@ foreign pure zip_with from "@flick-lang/effect-ts/effect/Array" "zipWith"
 /// Maps each element while threading a state from the first: the final
 /// state and the mapped list.
 map_accum : s -> (s -> a -> (s, b))^c -> (List a -> (s, List b))^c
-foreign pure map_accum from "@flick-lang/effect-ts/effect/Array" "mapAccum"
+foreign pure map_accum from "flick:Array" "mapAccum"
   arity 2
   retention call
   reviewed "effect@4.1.2 sha256:9eae82ec484758de"
 
 /// Every intermediate result of `fold_left`, `init` first.
 scan : b -> (b -> a -> b)^c -> (List a -> NonEmpty.NonEmpty b)^c
-foreign pure scan from "@flick-lang/effect-ts/effect/Array" "scan"
+foreign pure scan from "flick:Array" "scan"
   arity 2
   retention call
   reviewed "effect@4.1.2 sha256:59c151daea4e9ab8"
 
 /// Every intermediate result of a fold from the last element, `init` last.
 scan_right : b -> (b -> a -> b)^c -> (List a -> NonEmpty.NonEmpty b)^c
-foreign pure scan_right from "@flick-lang/effect-ts/effect/Array" "scanRight"
+foreign pure scan_right from "flick:Array" "scanRight"
   arity 2
   retention call
   reviewed "effect@4.1.2 sha256:ca9246706cc0e8d7"
 
 /// `f` of each suffix of the list, longest first.
 extend : (List a -> b)^c -> List a -> List b
-foreign pure extend from "@flick-lang/effect-ts/effect/Array" "extend"
+foreign pure extend from "flick:Array" "extend"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:d8cac66dc625bf46"
 
 /// The `Ok` values of `f` over the elements, up to the first `Err`.
 filter_map_while : (a -> Result e b)^c -> List a -> List b
-foreign pure filter_map_while from "@flick-lang/effect-ts/effect/Iterable" "flickFilterMapWhile"
+foreign pure filter_map_while from "flick:Iterable" "flickFilterMapWhile"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:7c8202cdac71ced9"
 
 /// The values of the `Some` elements.
 get_somes : List (Option a) -> List a
-foreign pure get_somes from "@flick-lang/effect-ts/effect/Array" "getSomes"
+foreign pure get_somes from "flick:Array" "getSomes"
   reviewed "effect@4.1.2 sha256:95d6b893bb2bd19d"
 
 /// The errors of the `Err` elements.
 get_failures : List (Result e a) -> List e
-foreign pure get_failures from "@flick-lang/effect-ts/effect/Array" "getFailures"
+foreign pure get_failures from "flick:Array" "getFailures"
   reviewed "effect@4.1.2 sha256:08ef9c290a6d3033"
 
 /// The values of the `Ok` elements.
 get_successes : List (Result e a) -> List a
-foreign pure get_successes from "@flick-lang/effect-ts/effect/Array" "getSuccesses"
+foreign pure get_successes from "flick:Array" "getSuccesses"
   reviewed "effect@4.1.2 sha256:325bb258ee275ed2"
 
 /// The `Ok` values and the `Err` errors.
 separate : List (Result e a) -> (List a, List e)
-foreign pure separate from "@flick-lang/effect-ts/effect/Array" "separate"
+foreign pure separate from "flick:Array" "separate"
   reviewed "effect@4.1.2 sha256:64996beb2cefeaff"
 
 /// The `Ok` values and the `Err` errors of `f` over the elements.
 partition_map : (a -> Result f p)^c -> List a -> (List p, List f)
-foreign pure partition_map from "@flick-lang/effect-ts/effect/Array" "partition"
+foreign pure partition_map from "flick:Array" "partition"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:2041b78a35e1a52a"
 
 /// The elements `f` produces from `seed`, until it gives `None`.
 unfold : b -> (b -> Option (a, b))^c -> List a
-foreign pure unfold from "@flick-lang/effect-ts/effect/Array" "unfold"
+foreign pure unfold from "flick:Array" "unfold"
   retention call
   reviewed "effect@4.1.2 sha256:e0d90f7405483233"
 
 /// `f`, its `Some` as a one-element list and `None` as the empty one.
 lift_option : (a -> Option b) -> a -> List b
-foreign pure lift_option from "@flick-lang/effect-ts/effect/Array" "liftOption"
+foreign pure lift_option from "flick:Array" "liftOption"
   arity 1
   reviewed "effect@4.1.2 sha256:86c050dd9a97f7f1"
 
 /// `[x]` when `p x` holds, `[]` otherwise.
 lift_predicate : (a -> Bool) -> a -> List a
-foreign pure lift_predicate from "@flick-lang/effect-ts/effect/Array" "liftPredicate"
+foreign pure lift_predicate from "flick:Array" "liftPredicate"
   arity 1
   reviewed "effect@4.1.2 sha256:aebb7a8db587bbb8"
 
 /// `f`, its `Ok` as a one-element list and `Err` as the empty one.
 lift_result : (a -> Result e b) -> a -> List b
-foreign pure lift_result from "@flick-lang/effect-ts/effect/Array" "liftResult"
+foreign pure lift_result from "flick:Array" "liftResult"
   arity 1
   reviewed "effect@4.1.2 sha256:fe629cc51d8ef1d1"
 
@@ -119,24 +119,24 @@ let sort_with f xs = List.Core.sort_by (fun x y -> compare (f x) (f y)) xs
 
 /// The list repeated `n` times.
 repeat_all : Int -> List a -> List a
-foreign pure repeat_all from "@flick-lang/effect-ts/effect/Iterable" "flickRepeat"
+foreign pure repeat_all from "flick:Iterable" "flickRepeat"
   arity 1
   reviewed "effect@4.1.2 sha256:a2eb4643a0757092"
 
 /// `onEmpty ()` for the empty list, `onNonEmpty` of it otherwise.
 match_ : { onEmpty : Unit -> b; onNonEmpty : NonEmpty.NonEmpty a -> b } -> List a -> b
-foreign pure match_ from "@flick-lang/effect-ts/effect/Array" "match"
+foreign pure match_ from "flick:Array" "match"
   arity 1
   reviewed "effect@4.1.2 sha256:7ed362fc2b2fed73"
 
 /// `onEmpty ()` for the empty list, `onNonEmpty` of its head and tail otherwise.
 match_left : { onEmpty : Unit -> b; onNonEmpty : a -> List a -> b } -> List a -> b
-foreign pure match_left from "@flick-lang/effect-ts/effect/Array" "flickMatchLeft"
+foreign pure match_left from "flick:Array" "flickMatchLeft"
   arity 1
   reviewed "effect@4.1.2 sha256:d5567acc2f9dfd5c"
 
 /// `onEmpty ()` for the empty list, `onNonEmpty` of its init and last otherwise.
 match_right : { onEmpty : Unit -> b; onNonEmpty : List a -> a -> b } -> List a -> b
-foreign pure match_right from "@flick-lang/effect-ts/effect/Array" "flickMatchRight"
+foreign pure match_right from "flick:Array" "flickMatchRight"
   arity 1
   reviewed "effect@4.1.2 sha256:b16ef029ac9fd1ba"

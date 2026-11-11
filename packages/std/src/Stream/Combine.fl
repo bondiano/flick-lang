@@ -13,14 +13,14 @@ import Stream.Core exposing (Stream, HaltStrategy)
 
 /// `first` and then `second`: `first |> Stream.concat second`.
 concat : (Stream r2 e2 a)^c -> (Stream r e a)^c -> (Stream (r + r2) (e + e2) a)^c
-foreign pure concat from "@flick-lang/effect-ts/effect/Stream" "concat"
+foreign pure concat from "flick:Stream" "concat"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:a62191d22f3e68a3"
 
 /// The values before the elements of the stream.
 prepend : List a -> (Stream r e a)^c -> (Stream r e a)^c
-foreign pure prepend from "@flick-lang/effect-ts/effect/Stream" "prepend"
+foreign pure prepend from "flick:Stream" "prepend"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:effa63dcf2be81a3"
@@ -28,7 +28,7 @@ foreign pure prepend from "@flick-lang/effect-ts/effect/Stream" "prepend"
 /// The elements of the stream `f` gives for each element, one stream after
 /// the other.
 flat_map : (a -> Stream r2 e2 b)^c -> (Stream r e a)^c -> (Stream (r + r2) (e + e2) b)^c
-foreign pure flat_map from "@flick-lang/effect-ts/effect/Stream" "flatMap"
+foreign pure flat_map from "flick:Stream" "flatMap"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:8d242a075f924d9a"
@@ -43,7 +43,7 @@ flat_map_par :
   (a -> Stream r2 e2 b)^c ->
   (Stream r e a)^c ->
   (Stream {Async | r + r2} (e + e2) b)^c
-foreign pure flat_map_par from "@flick-lang/effect-ts/effect/Stream" "flickFlatMapPar"
+foreign pure flat_map_par from "flick:Stream" "flickFlatMapPar"
   arity 2
   retention call
   reviewed "effect@4.1.2 sha256:8d242a075f924d9a"
@@ -51,74 +51,74 @@ foreign pure flat_map_par from "@flick-lang/effect-ts/effect/Stream" "flickFlatM
 /// `flat_map` where a new element interrupts the inner stream of the
 /// previous one.
 switch_map : (a -> Stream r2 e2 b)^c -> (Stream r e a)^c -> (Stream (r + r2) (e + e2) b)^c
-foreign pure switch_map from "@flick-lang/effect-ts/effect/Stream" "switchMap"
+foreign pure switch_map from "flick:Stream" "switchMap"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:7e3bfbb90fe6b54b"
 
 /// The elements of each inner stream, one after the other.
 flatten : (Stream r e (Stream r2 e2 a))^c -> (Stream (r + r2) (e + e2) a)^c
-foreign pure flatten from "@flick-lang/effect-ts/effect/Stream" "flatten"
+foreign pure flatten from "flick:Stream" "flatten"
   retention call
   reviewed "effect@4.1.2 sha256:675651dfd106f9ba"
 
 /// The elements of each non-empty list.
 flatten_chunks : (Stream r e (NonEmpty.NonEmpty a))^c -> (Stream r e a)^c
-foreign pure flatten_chunks from "@flick-lang/effect-ts/effect/Stream" "flattenArray"
+foreign pure flatten_chunks from "flick:Stream" "flattenArray"
   retention call
   reviewed "effect@4.1.2 sha256:58abf8be044d2a98"
 
 /// The elements of each list.
 flatten_list : (Stream r e (List a))^c -> (Stream r e a)^c
-foreign pure flatten_list from "@flick-lang/effect-ts/effect/Stream" "flattenIterable"
+foreign pure flatten_list from "flick:Stream" "flattenIterable"
   retention call
   reviewed "effect@4.1.2 sha256:9a61c35a4c891bb4"
 
 /// Runs the stream for its effects, emitting nothing.
 drain : (Stream r e a)^c -> (Stream r e b)^c
-foreign pure drain from "@flick-lang/effect-ts/effect/Stream" "drain"
+foreign pure drain from "flick:Stream" "drain"
   retention call
   reviewed "effect@4.1.2 sha256:d7224daac84a543b"
 
 /// The elements of the stream while `other` runs alongside it for its
 /// effects; it is interrupted when the stream ends.
 drain_fork : (Stream r2 e2 x)^c -> (Stream r e a)^c -> (Stream (r + r2) (e + e2) a)^c
-foreign pure drain_fork from "@flick-lang/effect-ts/effect/Stream" "drainFork"
+foreign pure drain_fork from "flick:Stream" "drainFork"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:ecf216ff15a3fe60"
 
 /// The stream again each time the schedule recurs.
 repeat : Schedule.Schedule r2 e2 Unit o -> (Stream r e a)^c -> (Stream (r + r2) (e + e2) a)^c
-foreign pure repeat from "@flick-lang/effect-ts/effect/Stream" "repeat"
+foreign pure repeat from "flick:Stream" "repeat"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:25433e73eebce393"
 
 /// Each element again as long as the schedule recurs.
 repeat_elements : Schedule.Schedule r2 e2 a o -> (Stream r e a)^c -> (Stream (r + r2) (e + e2) a)^c
-foreign pure repeat_elements from "@flick-lang/effect-ts/effect/Stream" "repeatElements"
+foreign pure repeat_elements from "flick:Stream" "repeatElements"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:f3dad084e3cfd50a"
 
 /// The stream again and again, forever.
 forever : (Stream r e a)^c -> (Stream r e a)^c
-foreign pure forever from "@flick-lang/effect-ts/effect/Stream" "forever"
+foreign pure forever from "flick:Stream" "forever"
   retention call
   reviewed "effect@4.1.2 sha256:cbb840f784f5d699"
 
 /// Each element delayed by the schedule, which gets the elements; the
 /// stream ends when it stops.
 schedule : Schedule.Schedule r2 e2 a o -> (Stream r e a)^c -> (Stream (r + r2) (e + e2) a)^c
-foreign pure schedule from "@flick-lang/effect-ts/effect/Stream" "schedule"
+foreign pure schedule from "flick:Stream" "schedule"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:00d7ee7b4903e0a9"
 
 /// Ends the stream when the duration passes without an element.
 timeout : Duration.Duration -> (Stream r e a)^c -> (Stream r e a)^c
-foreign pure timeout from "@flick-lang/effect-ts/effect/Stream" "timeout"
+foreign pure timeout from "flick:Stream" "timeout"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:8260378f834741ad"
@@ -126,14 +126,14 @@ foreign pure timeout from "@flick-lang/effect-ts/effect/Stream" "timeout"
 /// Switches to `fallback` when the duration passes without an element.
 timeout_or_else :
   Duration.Duration -> (Stream r2 e2 a)^c -> (Stream r e a)^c -> (Stream (r + r2) (e + e2) a)^c
-foreign pure timeout_or_else from "@flick-lang/effect-ts/effect/Stream" "flickTimeoutOrElse"
+foreign pure timeout_or_else from "flick:Stream" "flickTimeoutOrElse"
   arity 2
   retention call
   reviewed "effect@4.1.2 sha256:5d94692b2f9e9c3b"
 
 /// The elements of both as they come; the merge ends when both end.
 merge : (Stream r2 e2 a)^c -> (Stream r e a)^c -> (Stream (r + r2) (e + e2) a)^c
-foreign pure merge from "@flick-lang/effect-ts/effect/Stream" "merge"
+foreign pure merge from "flick:Stream" "merge"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:41c2e8e72fa9c35b"
@@ -142,35 +142,35 @@ foreign pure merge from "@flick-lang/effect-ts/effect/Stream" "merge"
 /// right one, both or either end.
 merge_with :
   HaltStrategy -> (Stream r2 e2 a)^c -> (Stream r e a)^c -> (Stream (r + r2) (e + e2) a)^c
-foreign pure merge_with from "@flick-lang/effect-ts/effect/Stream" "flickMergeWith"
+foreign pure merge_with from "flick:Stream" "flickMergeWith"
   arity 2
   retention call
   reviewed "effect@4.1.2 sha256:41c2e8e72fa9c35b"
 
 /// The elements of the stream while `task` runs alongside it.
 merge_effect : Eff r2 e2 x -> (Stream r e a)^c -> (Stream (r + r2) (e + e2) a)^c
-foreign pure merge_effect from "@flick-lang/effect-ts/effect/Stream" "mergeEffect"
+foreign pure merge_effect from "flick:Stream" "mergeEffect"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:ce4e9035f18c3883"
 
 /// `merge` telling the sides apart: `Ok` of this stream, `Err` of `other`.
 merge_result : (Stream r2 e2 b)^c -> (Stream r e a)^c -> (Stream (r + r2) (e + e2) (Result b a))^c
-foreign pure merge_result from "@flick-lang/effect-ts/effect/Stream" "mergeResult"
+foreign pure merge_result from "flick:Stream" "mergeResult"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:947418c66ea438d0"
 
 /// The elements of this stream, merged with `right` run for its effects.
 merge_left : (Stream r2 e2 b)^c -> (Stream r e a)^c -> (Stream (r + r2) (e + e2) a)^c
-foreign pure merge_left from "@flick-lang/effect-ts/effect/Stream" "mergeLeft"
+foreign pure merge_left from "flick:Stream" "mergeLeft"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:c7f0335548cd4ce1"
 
 /// The elements of `right`, merged with this stream run for its effects.
 merge_right : (Stream r2 e2 b)^c -> (Stream r e a)^c -> (Stream (r + r2) (e + e2) b)^c
-foreign pure merge_right from "@flick-lang/effect-ts/effect/Stream" "mergeRight"
+foreign pure merge_right from "flick:Stream" "mergeRight"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:332ac6dc42ff5fc1"
@@ -181,14 +181,14 @@ merge_all :
   { concurrency : Option Int; bufferSize : Option Int } ->
   List ((Stream r e a)^c) ->
   (Stream r e a)^c
-foreign pure merge_all from "@flick-lang/effect-ts/effect/Stream" "flickMergeAll"
+foreign pure merge_all from "flick:Stream" "flickMergeAll"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:e4348b38a0151264"
 
 /// Each element of this stream with each of `right`.
 cross : (Stream r2 e2 b)^c -> (Stream r e a)^c -> (Stream (r + r2) (e + e2) (a, b))^c
-foreign pure cross from "@flick-lang/effect-ts/effect/Stream" "cross"
+foreign pure cross from "flick:Stream" "cross"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:60d51d13cff240d4"
@@ -196,14 +196,14 @@ foreign pure cross from "@flick-lang/effect-ts/effect/Stream" "cross"
 /// `cross` combined by `f`.
 cross_with :
   (Stream r2 e2 b)^c -> (a -> b -> x)^c -> ((Stream r e a)^c -> (Stream (r + r2) (e + e2) x)^c)^c
-foreign pure cross_with from "@flick-lang/effect-ts/effect/Stream" "crossWith"
+foreign pure cross_with from "flick:Stream" "crossWith"
   arity 2
   retention call
   reviewed "effect@4.1.2 sha256:bfc09961b19a6d33"
 
 /// Pairs of the elements of both, until either ends.
 zip : (Stream r2 e2 b)^c -> (Stream r e a)^c -> (Stream (r + r2) (e + e2) (a, b))^c
-foreign pure zip from "@flick-lang/effect-ts/effect/Stream" "zip"
+foreign pure zip from "flick:Stream" "zip"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:09a0eee6f1080467"
@@ -211,7 +211,7 @@ foreign pure zip from "@flick-lang/effect-ts/effect/Stream" "zip"
 /// `zip` combined by `f`.
 zip_with :
   (Stream r2 e2 b)^c -> (a -> b -> x)^c -> ((Stream r e a)^c -> (Stream (r + r2) (e + e2) x)^c)^c
-foreign pure zip_with from "@flick-lang/effect-ts/effect/Stream" "zipWith"
+foreign pure zip_with from "flick:Stream" "zipWith"
   arity 2
   retention call
   reviewed "effect@4.1.2 sha256:2bc5c488c2198b54"
@@ -221,59 +221,59 @@ zip_with_chunks :
   (Stream r2 e2 b)^c ->
   (NonEmpty.NonEmpty a -> NonEmpty.NonEmpty b -> (NonEmpty.NonEmpty x, List a, List b))^c ->
   ((Stream r e a)^c -> (Stream (r + r2) (e + e2) x)^c)^c
-foreign pure zip_with_chunks from "@flick-lang/effect-ts/effect/Stream" "zipWithArray"
+foreign pure zip_with_chunks from "flick:Stream" "zipWithArray"
   arity 2
   retention call
   reviewed "effect@4.1.2 sha256:fcd6236ecf45bee6"
 
 /// The elements of this stream, zipped with `right` but dropping its own.
 zip_left : (Stream r2 e2 b)^c -> (Stream r e a)^c -> (Stream (r + r2) (e + e2) a)^c
-foreign pure zip_left from "@flick-lang/effect-ts/effect/Stream" "zipLeft"
+foreign pure zip_left from "flick:Stream" "zipLeft"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:6b34bfdecb8724d8"
 
 /// The elements of `right`, zipped with this stream but dropping its own.
 zip_right : (Stream r2 e2 b)^c -> (Stream r e a)^c -> (Stream (r + r2) (e + e2) b)^c
-foreign pure zip_right from "@flick-lang/effect-ts/effect/Stream" "zipRight"
+foreign pure zip_right from "flick:Stream" "zipRight"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:c590f375fb8a3d3d"
 
 /// Pairs zipped with a third stream, as triples.
 zip_flatten : (Stream r2 e2 x)^c -> (Stream r e (a, b))^c -> (Stream (r + r2) (e + e2) (a, b, x))^c
-foreign pure zip_flatten from "@flick-lang/effect-ts/effect/Stream" "zipFlatten"
+foreign pure zip_flatten from "flick:Stream" "zipFlatten"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:0b16e685ace04836"
 
 /// Each element with its index from 0.
 zip_with_index : (Stream r e a)^c -> (Stream r e (a, Int))^c
-foreign pure zip_with_index from "@flick-lang/effect-ts/effect/Stream" "zipWithIndex"
+foreign pure zip_with_index from "flick:Stream" "zipWithIndex"
   retention call
   reviewed "effect@4.1.2 sha256:59c03101aa945b3e"
 
 /// Each element with the next one, if any.
 zip_with_next : (Stream r e a)^c -> (Stream r e (a, Option a))^c
-foreign pure zip_with_next from "@flick-lang/effect-ts/effect/Stream" "zipWithNext"
+foreign pure zip_with_next from "flick:Stream" "zipWithNext"
   retention call
   reviewed "effect@4.1.2 sha256:2fb4d54b313da0bb"
 
 /// Each element with the previous one, if any.
 zip_with_previous : (Stream r e a)^c -> (Stream r e (Option a, a))^c
-foreign pure zip_with_previous from "@flick-lang/effect-ts/effect/Stream" "zipWithPrevious"
+foreign pure zip_with_previous from "flick:Stream" "zipWithPrevious"
   retention call
   reviewed "effect@4.1.2 sha256:6ff8175cda1f62bf"
 
 /// Each element with the previous and the next one.
 zip_with_previous_and_next : (Stream r e a)^c -> (Stream r e (Option a, a, Option a))^c
-foreign pure zip_with_previous_and_next from "@flick-lang/effect-ts/effect/Stream" "zipWithPreviousAndNext"
+foreign pure zip_with_previous_and_next from "flick:Stream" "zipWithPreviousAndNext"
   retention call
   reviewed "effect@4.1.2 sha256:9d298764df43c09c"
 
 /// The latest element of each side whenever either emits, once both have.
 zip_latest : (Stream r2 e2 b)^c -> (Stream r e a)^c -> (Stream (r + r2) (e + e2) (a, b))^c
-foreign pure zip_latest from "@flick-lang/effect-ts/effect/Stream" "zipLatest"
+foreign pure zip_latest from "flick:Stream" "zipLatest"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:4d42cedfc0cc67ad"
@@ -281,35 +281,35 @@ foreign pure zip_latest from "@flick-lang/effect-ts/effect/Stream" "zipLatest"
 /// `zip_latest` combined by `f`.
 zip_latest_with :
   (Stream r2 e2 b)^c -> (a -> b -> x)^c -> ((Stream r e a)^c -> (Stream (r + r2) (e + e2) x)^c)^c
-foreign pure zip_latest_with from "@flick-lang/effect-ts/effect/Stream" "zipLatestWith"
+foreign pure zip_latest_with from "flick:Stream" "zipLatestWith"
   arity 2
   retention call
   reviewed "effect@4.1.2 sha256:454b5fa571946964"
 
 /// The latest element of every stream, in their order, whenever one emits.
 zip_latest_all : List ((Stream r e a)^c) -> (Stream r e (List a))^c
-foreign pure zip_latest_all from "@flick-lang/effect-ts/effect/Stream" "zipLatestAll"
+foreign pure zip_latest_all from "flick:Stream" "zipLatestAll"
   variadic
   retention call
   reviewed "effect@4.1.2 sha256:b39a7167dd1640d3"
 
 /// The stream that emits first; the others are interrupted.
 race : (Stream r2 e2 a)^c -> (Stream r e a)^c -> (Stream (r + r2) (e + e2) a)^c
-foreign pure race from "@flick-lang/effect-ts/effect/Stream" "race"
+foreign pure race from "flick:Stream" "race"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:bc4d590b1b27140d"
 
 /// `race` of all the streams.
 race_all : List ((Stream r e a)^c) -> (Stream r e a)^c
-foreign pure race_all from "@flick-lang/effect-ts/effect/Stream" "raceAll"
+foreign pure race_all from "flick:Stream" "raceAll"
   variadic
   retention call
   reviewed "effect@4.1.2 sha256:865ea6f87d8861bb"
 
 /// One element of each in turn; the rest of the longer one at the end.
 interleave : (Stream r2 e2 a)^c -> (Stream r e a)^c -> (Stream (r + r2) (e + e2) a)^c
-foreign pure interleave from "@flick-lang/effect-ts/effect/Stream" "interleave"
+foreign pure interleave from "flick:Stream" "interleave"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:a37ca57cc5151ad3"
@@ -321,21 +321,21 @@ interleave_with :
   (Stream r3 e3 Bool)^c ->
   (Stream r e a)^c ->
   (Stream (r + r2 + r3) (e + e2 + e3) a)^c
-foreign pure interleave_with from "@flick-lang/effect-ts/effect/Stream" "interleaveWith"
+foreign pure interleave_with from "flick:Stream" "interleaveWith"
   arity 2
   retention call
   reviewed "effect@4.1.2 sha256:7ad40557c12af785"
 
 /// Interrupts the stream when `task` ends; its failure fails the stream.
 interrupt_when : Eff r2 e2 x -> (Stream r e a)^c -> (Stream (r + r2) (e + e2) a)^c
-foreign pure interrupt_when from "@flick-lang/effect-ts/effect/Stream" "interruptWhen"
+foreign pure interrupt_when from "flick:Stream" "interruptWhen"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:bffed6bccdb362b8"
 
 /// Ends the stream after the element being pulled when `task` ends.
 halt_when : Eff r2 e2 x -> (Stream r e a)^c -> (Stream (r + r2) (e + e2) a)^c
-foreign pure halt_when from "@flick-lang/effect-ts/effect/Stream" "haltWhen"
+foreign pure halt_when from "flick:Stream" "haltWhen"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:c2407941cf2f5d8d"
@@ -346,14 +346,14 @@ group_by :
   (a ->{r2; e2} (k, v))^c ->
   (Stream r e a)^c ->
   (Stream (r + r2) (e + e2) (k, Stream none none v))^c
-foreign pure group_by from "@flick-lang/effect-ts/effect/Stream" "groupBy"
+foreign pure group_by from "flick:Stream" "groupBy"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:32fe4c313ba6bcdb"
 
 /// Groups by the key `f` gives (compared by `==`).
 group_by_key : (a -> k)^c -> (Stream r e a)^c -> (Stream r e (k, Stream none none a))^c
-foreign pure group_by_key from "@flick-lang/effect-ts/effect/Stream" "groupByKey"
+foreign pure group_by_key from "flick:Stream" "groupByKey"
   arity 1
   retention call
   reviewed "effect@4.1.2 sha256:6c9bad407068e0fe"
@@ -371,7 +371,7 @@ type alias Split = {
 /// source runs once, as a child of that scope, and every consumer sees its
 /// elements.
 broadcast : Split -> (Stream r e a)^c ->{Scope s | r} (Stream none e a)^{s}
-foreign effect broadcast from "@flick-lang/effect-ts/effect/Stream" "flickBroadcast"
+foreign effect broadcast from "flick:Stream" "flickBroadcast"
   arity 1
   retention owner
   reviewed "effect@4.1.2 sha256:45756ec482f4df57"
@@ -379,7 +379,7 @@ foreign effect broadcast from "@flick-lang/effect-ts/effect/Stream" "flickBroadc
 /// `n` streams that each see every element of the source, which runs once
 /// as a child of the scope of region `s`.
 broadcast_n : Int -> Split -> (Stream r e a)^c ->{Scope s | r} List ((Stream none e a)^{s})
-foreign effect broadcast_n from "@flick-lang/effect-ts/effect/Stream" "flickBroadcastN"
+foreign effect broadcast_n from "flick:Stream" "flickBroadcastN"
   arity 2
   retention owner
   reviewed "effect@4.1.2 sha256:f02752854171ddfb"
@@ -387,7 +387,7 @@ foreign effect broadcast_n from "@flick-lang/effect-ts/effect/Stream" "flickBroa
 /// `broadcast` that starts the source with its first consumer and stops it
 /// `idleTimeToLive` (`None`: at once) after its last one ends.
 share : Split -> Option Duration.Duration -> (Stream r e a)^c ->{Scope s | r} (Stream none e a)^{s}
-foreign effect share from "@flick-lang/effect-ts/effect/Stream" "flickShare"
+foreign effect share from "flick:Stream" "flickShare"
   arity 2
   retention owner
   reviewed "effect@4.1.2 sha256:2f0697ec71021660"
@@ -398,7 +398,7 @@ partition :
   Filter.Filter a p f ->
   (Stream r e a)^c ->{Scope s | r}
   ((Stream none e p)^{s}, (Stream none e f)^{s})
-foreign effect partition from "@flick-lang/effect-ts/effect/Stream" "partition"
+foreign effect partition from "flick:Stream" "partition"
   arity 1
   retention owner
   reviewed "effect@4.1.2 sha256:4f65c5bc5b8812e5"
@@ -409,7 +409,7 @@ partition_effect :
   Filter.FilterEffect r2 e2 a p f ->
   (Stream r e a)^c ->{Scope s | r + r2}
   ((Stream none (e + e2) p)^{s}, (Stream none (e + e2) f)^{s})
-foreign effect partition_effect from "@flick-lang/effect-ts/effect/Stream" "partitionEffect"
+foreign effect partition_effect from "flick:Stream" "partitionEffect"
   arity 1
   retention owner
   reviewed "effect@4.1.2 sha256:a144d92820cdfa5f"
@@ -419,7 +419,7 @@ foreign effect partition_effect from "@flick-lang/effect-ts/effect/Stream" "part
 /// it closes.
 partition_queue :
   Filter.Filter a p f -> (Stream r e a)^c ->{Scope s | r} (Queue.Queue e p, Queue.Queue e f)
-foreign effect partition_queue from "@flick-lang/effect-ts/effect/Stream" "partitionQueue"
+foreign effect partition_queue from "flick:Stream" "partitionQueue"
   arity 1
   retention owner
   reviewed "effect@4.1.2 sha256:a3290b3226b51ff2"

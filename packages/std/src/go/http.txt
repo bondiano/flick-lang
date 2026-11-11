@@ -1,12 +1,12 @@
 # The HTTP modules: servers, routes, and the values of requests and
 # responses.
 
-[@flick-lang/effect-ts/effect/http/HttpServer]
+[flick:http/HttpServer]
 flickServe *HttpServe
 flickAddress HttpAddress
 flickLogAddress *HttpServerLogAddress
 
-[@flick-lang/effect-ts/effect/http/HttpRouter]
+[flick:http/HttpRouter]
 flickRoute HttpRoute
 flickRouter *HttpRouter
 prefixPath PrefixPath
@@ -16,7 +16,7 @@ flickSchemaParams *RouterSchemaParams
 flickSchemaNoBody *RouterSchemaNoBody
 flickSchemaJson *RouterSchemaJson
 
-[@flick-lang/effect-ts/effect/http/HttpServerRequest]
+[flick:http/HttpServerRequest]
 flickMethod RequestMethod
 flickUrl RequestUrl
 flickOriginalUrl RequestOriginalUrl
@@ -39,7 +39,7 @@ flickSchemaSearchParams *RequestSchemaSearchParams
 flickSchemaBodyJson *RequestSchemaBodyJson
 flickSchemaBodyUrlParams *RequestSchemaBodyUrlParams
 
-[@flick-lang/effect-ts/effect/http/HttpServerResponse]
+[flick:http/HttpServerResponse]
 flickEmpty ResponseEmpty
 flickRedirect ResponseRedirect
 flickUint8Array ResponseUint8Array
@@ -73,7 +73,7 @@ flickToClientResponse ResponseToClientResponse
 fromClientResponse ResponseFromClientResponse
 flickCauseResponse *ResponseCauseResponse
 
-[@flick-lang/effect-ts/effect/http/HttpMiddleware]
+[flick:http/HttpMiddleware]
 flickLogger *MiddlewareLogger
 flickWithLoggerDisabled *MiddlewareWithLoggerDisabled
 flickTracer *MiddlewareTracer
@@ -91,7 +91,7 @@ flickAppendPreResponseHandler *MiddlewareAppendPreResponseHandler
 flickWithPreResponseHandler *MiddlewareWithPreResponseHandler
 flickToHandled *MiddlewareToHandled
 
-[@flick-lang/effect-ts/effect/http/HttpBody]
+[flick:http/HttpBody]
 empty BodyEmpty
 flickUint8Array BodyUint8Array
 text BodyText
@@ -105,7 +105,7 @@ flickContentType BodyContentType
 flickContentLength BodyContentLength
 flickToText BodyToText
 
-[@flick-lang/effect-ts/effect/http/HttpClientRequest]
+[flick:http/HttpClientRequest]
 empty ClientRequestEmpty
 flickMake ClientRequestMake
 get ClientRequestGet
@@ -155,7 +155,7 @@ removeHash ClientRequestRemoveHash
 flickCompressBody *ClientRequestCompressBody
 flickSchemaBodyJson *ClientRequestSchemaBodyJson
 
-[@flick-lang/effect-ts/effect/http/HttpClientResponse]
+[flick:http/HttpClientResponse]
 flickStatus ClientResponseStatus
 flickHeaders ClientResponseHeaders
 flickCookies ClientResponseCookies
@@ -174,7 +174,7 @@ flickSchemaBodyJson *ClientResponseSchemaBodyJson
 flickSchemaBodyUrlParams *ClientResponseSchemaBodyUrlParams
 flickSchemaHeaders *ClientResponseSchemaHeaders
 
-[@flick-lang/effect-ts/effect/http/HttpClient]
+[flick:http/HttpClient]
 flickExecute *HttpClientExecute
 make HttpClientMake
 makeWith HttpClientMakeWith
@@ -203,27 +203,27 @@ flickWithTracerPropagation *HttpClientWithTracerPropagation
 flickWithSpanNameGenerator *HttpClientWithSpanNameGenerator
 flickLayer HttpClientLayer
 
-[@flick-lang/effect-ts/effect/http/FetchHttpClient]
+[flick:http/FetchHttpClient]
 flickLayer *FetchClientLayer
 
-[@flick-lang/effect-ts/effect/http/Etag]
+[flick:http/Etag]
 flickLayer EtagLayer
 flickLayerWeak EtagLayerWeak
 
-[@flick-lang/effect-ts/effect/http/HttpPlatform]
+[flick:http/HttpPlatform]
 flickNode HttpPlatformNode
 
-[@flick-lang/effect-ts/effect/http/HttpStaticServer]
+[flick:http/HttpStaticServer]
 flickMake *StaticServerMake
 
-[@flick-lang/effect-ts/effect/http/HttpTraceContext]
+[flick:http/HttpTraceContext]
 flickToHeaders TraceContextToHeaders
 fromHeaders TraceContextFromHeaders
 b3 TraceContextB3
 xb3 TraceContextXb3
 w3c TraceContextW3c
 
-[@flick-lang/effect-ts/effect/http/Multipart]
+[flick:http/Multipart]
 flickPersisted *MultipartPersisted
 flickFields MultipartFields
 flickFiles MultipartFiles
@@ -239,10 +239,10 @@ flickWithLimits *MultipartWithLimits
 flickDefaultIsFile MultipartDefaultIsFile
 flickDecodeField MultipartDecodeField
 
-[@flick-lang/effect-ts/effect/FileSystem]
+[flick:FileSystem]
 flickNode FileSystemNode
 
-[@flick-lang/effect-ts/effect/http/Headers]
+[flick:http/Headers]
 empty HeadersEmpty
 fromInput HeadersFromInput
 has HeadersHas
@@ -260,7 +260,7 @@ flickToUnknown HeadersToUnknown
 Equivalence HeadersEquivalence
 flickShow HeadersShow
 
-[@flick-lang/effect-ts/effect/http/UrlParams]
+[flick:http/UrlParams]
 make UrlParamsMake
 fromInput UrlParamsMake
 empty UrlParamsEmpty
@@ -285,7 +285,7 @@ flickToUnknown UrlParamsToUnknown
 Equivalence UrlParamsEquivalence
 flickShow UrlParamsShow
 
-[@flick-lang/effect-ts/effect/http/Url]
+[flick:http/Url]
 flickFromString UrlFromString
 flickMake UrlMake
 flickHref UrlHref
@@ -304,12 +304,12 @@ urlParams UrlUrlParams
 modifyUrlParams *UrlModifyUrlParams
 flickShow *UrlShow
 
-[@flick-lang/effect-ts/effect/http/Mime]
+[flick:http/Mime]
 getType MimeGetType
 getExtension MimeGetExtension
 flickGetAllExtensions MimeGetAllExtensions
 
-[@flick-lang/effect-ts/effect/http/Cookies]
+[flick:http/Cookies]
 empty CookiesEmpty
 isEmpty CookiesIsEmpty
 fromSetCookie CookiesFromSetCookie
@@ -335,7 +335,7 @@ flickValue CookiesValue
 flickShowCookie CookiesShowCookie
 flickShowCookies CookiesShowCookies
 
-[@flick-lang/effect-ts/effect/SchemaHttp]
+[flick:SchemaHttp]
 flickHeaders CodecHeaders
 flickUrlParams CodecUrlParams
 flickCookie CodecCookie
@@ -347,7 +347,7 @@ flickJsonUrlParamsField CodecJsonUrlParamsField
 flickFromUrlSearchParams CodecFromUrlSearchParams
 flickFromFormData CodecFromFormData
 
-[@flick-lang/effect-ts/effect/http-api/HttpApi]
+[flick:http-api/HttpApi]
 httpApiEndpoint HttpApiEndpoint
 httpApiWithPath HttpApiWithPath
 httpApiWithQuery HttpApiWithQuery
