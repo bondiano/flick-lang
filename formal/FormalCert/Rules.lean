@@ -68,4 +68,21 @@ theorem typ_provide {E o : Name} {a b R t T : Ty} {w e : Tm} {r ε : Row} {φ₀
       exact ⟨fun n h => by simp [Row.union, Row.none, Row.ofCaps, Caps.none] at h; cases n <;> simp_all,
         fun _ h => h.elim⟩
   · simp [Tm.NoIns, Tm.Has]
+/-! ## Dictionaries -/
+
+/-- (Dproj) of a method or a superclass of no variables of its own, at the dictionary's
+arguments. -/
+theorem typ_dproj {e : Tm} {c k : Nat} {us : List Ty} {fs : List (Label × Scheme)} {l : Label}
+    {t T' T : Ty} {φ : Stage}
+    (he : Typ S Ψ Θ Γ e (.ex (.dict c (Ty.spine us)) φ)) (hd : S.dict c = some (k, fs))
+    (hk : us.length = k) (hl : fs.lookup l = some ⟨0, Facts.none, t⟩)
+    (hi : t.substT (instT us) = T') (hT : LeLive T' T) :
+    Typ S Ψ Θ Γ (.proj e l) (.ex T φ) := by
+  refine .dproj (ts := []) he hd hk hl rfl ?_ ?_
+  · rintro _ _ ⟨_, _, h, _⟩; exact h.elim
+  · have hid : ∀ t : Ty, t.substT (instT []) = t := fun t => by
+      conv => rhs; rw [← t.substT_ident]
+      exact Ty.substT_congr (fun a => by cases a <;> simp [instT, Ty.ident])
+    simpa [Scheme.substT, Scheme.inst, hid, ← hi] using hT
+
 end Flick.Cert

@@ -49,8 +49,9 @@ macro "stage_le" : tactic => `(tactic| first
 
 /-- `σ.inst ts = T` of a concrete scheme at a concrete instance. -/
 macro "inst_eq" : tactic => `(tactic| (
-  simp only [Scheme.inst, Scheme.mono, Ty.substT, Stage.substT]
-  try simp [instT, Ty.substT, Stage.substT]
+  simp only [Scheme.inst, Scheme.mono, Scheme.up, Scheme.substT, liftT_zero, Ty.up_def, Ty.substT,
+    Stage.substT, Ty.spine, Lit.base]
+  try simp [instT, Ty.substT, Stage.substT, Ty.spine, shiftV, Lit.base]
   all_goals first
     | caps_set
     | row_set
@@ -81,5 +82,12 @@ macro_rules
 macro "ob_out" : tactic => `(tactic| (
   refine ⟨fun N a h => ?_, fun v a h => ?_⟩ <;>
     simp_all [Stage.svc, Row.Named, Row.single, Row.none, Row.union]))
+
+/-- `σ.Holds Θ ts` of a scheme without facts, shifted under binders or not. -/
+macro "holds" : tactic => `(tactic| first
+  | exact Cert.holds_none _
+  | (intro C r h
+     simp only [Scheme.up, Scheme.substT, Scheme.mono, Facts.none_substT] at h
+     exact h.elim))
 
 end Flick.Cert

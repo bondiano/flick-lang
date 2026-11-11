@@ -32,6 +32,9 @@ pub(crate) struct Env {
     /// `Unit`, a row, capture row or record's rest empty. A certificate's typing holds at
     /// any instance of them, and Lean checks it at this one.
     pub(crate) ground: bool,
+    /// The classes by the index the core gives their dictionaries; with
+    /// none, every dictionary is of class 0.
+    pub(crate) classes: Vec<String>,
 }
 
 impl Env {
@@ -198,12 +201,18 @@ fn qualified(t: &Type, q: Option<&Caps>, env: &Env) -> Result<String, String> {
                 .unwrap_or_else(|| "(.base .unit)".into())
         }
         Type::Errors(r) => format!("(.errors {})", row(r, env)?),
-        Type::Dict(_, args) => {
+        Type::Dict(c, args) => {
             let args = args
                 .iter()
                 .map(|a| ty(a, env))
                 .collect::<Result<Vec<_>, _>>()?;
-            format!("(.dict 0 (Ty.spine [{}]))", args.join(", "))
+            let class = if env.classes.is_empty() {
+                0
+            } else {
+                (env.classes.iter().position(|k| *k == c.to_string()))
+                    .ok_or_else(|| format!("the class `{c}`, not in the signature"))?
+            };
+            format!("(.dict {class} (Ty.spine [{}]))", args.join(", "))
         }
         Type::Forall(s) => forall(s, env)?,
         other => return Err(format!("no core form for `{other}`")),

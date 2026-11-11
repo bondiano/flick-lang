@@ -54,7 +54,7 @@ def genGlob : Nat → Option Scheme
   -- Value(Path { module: "Fixture", name: "$default_Describe_describe" })
   | 4 => some ⟨1, Facts.none, (.arrow (.dict 0 (Ty.spine [(.tvar 0)])) .pure (.arrow (.tvar 0) .pure (.base .string) Caps.none) Caps.none)⟩
   -- Value(Path { module: "Fixture", name: "$default_Rank_rank" })
-  | 5 => some ⟨1, Facts.none, (.arrow (.dict 0 (Ty.spine [(.tvar 0)])) .pure (.arrow (.tvar 0) .pure (.base .int) Caps.none) Caps.none)⟩
+  | 5 => some ⟨1, Facts.none, (.arrow (.dict 1 (Ty.spine [(.tvar 0)])) .pure (.arrow (.tvar 0) .pure (.base .int) Caps.none) Caps.none)⟩
   -- Value(Path { module: "Fixture", name: "close_conn" })
   | 6 => some ⟨1, Facts.none, (.arrow (.adt "Fixture.Raw") (.rt (fun x => x = .atm (.v 0)) Row.none) (.base .unit) Caps.none)⟩
   -- Value(Path { module: "Fixture", name: "describe" })
@@ -68,7 +68,7 @@ def genGlob : Nat → Option Scheme
   -- Value(Path { module: "Fixture", name: "open_scoped" })
   | 11 => some ⟨1, Facts.none, (.arrow (.base .string) (.rt (fun x => x = .atm (.v 0)) Row.none) (.tapp (.adt "Fixture.Handle") (.tvar 0)) Caps.none)⟩
   -- Value(Path { module: "Fixture", name: "rank" })
-  | 12 => some ⟨1, Facts.none, (.arrow (.dict 0 (Ty.spine [(.tvar 0)])) .pure (.arrow (.tvar 0) .pure (.base .int) Caps.none) Caps.none)⟩
+  | 12 => some ⟨1, Facts.none, (.arrow (.dict 1 (Ty.spine [(.tvar 0)])) .pure (.arrow (.tvar 0) .pure (.base .int) Caps.none) Caps.none)⟩
   -- Value(Path { module: "Fixture", name: "report" })
   | 13 => some ⟨1, Facts.none, (.arrow (.tapp (.adt "Prelude.Failure") (.tvar 0)) (.rt Row.none Row.none) (.base .unit) Caps.none)⟩
   -- Value(Path { module: "Fixture", name: "shape_name" })
@@ -81,6 +81,18 @@ def genGlob : Nat → Option Scheme
   | 18 => some ⟨1, Facts.none, (.arrow (.adt "Fixture.Raw") (.rt (fun x => x = .atm (.v 0)) Row.none) (.base .unit) Caps.none)⟩
   -- Value(Path { module: "List.Core", name: "get" })
   | 19 => some ⟨1, Facts.none, (.arrow (.base .int) .pure (.arrow (.tapp (.adt "Prelude.List") (.tvar 0)) .pure (.tapp (.adt "Prelude.Option") (.tvar 0)) Caps.none) Caps.none)⟩
+  -- Value(Path { module: "Fixture", name: "instance Describe (Option a)" })
+  | 20 => some ⟨1, Facts.none, (.arrow (.dict 0 (Ty.spine [(.tvar 0)])) .pure (.dict 0 (Ty.spine [(.tapp (.adt "Prelude.Option") (.tvar 0))])) Caps.none)⟩
+  -- Value(Path { module: "Fixture", name: "instance Describe Bool" })
+  | 21 => some ⟨0, Facts.none, (.dict 0 (Ty.spine [(.base .bool)]))⟩
+  -- Value(Path { module: "Fixture", name: "instance Describe Int" })
+  | 22 => some ⟨0, Facts.none, (.dict 0 (Ty.spine [(.base .int)]))⟩
+  -- Value(Path { module: "Fixture", name: "instance Describe Oops" })
+  | 23 => some ⟨0, Facts.none, (.dict 0 (Ty.spine [(.adt "Fixture.Oops")]))⟩
+  -- Value(Path { module: "Fixture", name: "instance Rank Bool" })
+  | 24 => some ⟨0, Facts.none, (.dict 1 (Ty.spine [(.base .bool)]))⟩
+  -- Value(Path { module: "Fixture", name: "instance Rank Int" })
+  | 25 => some ⟨0, Facts.none, (.dict 1 (Ty.spine [(.base .int)]))⟩
   | _ => none
 
 def genOps : Name → List Name
@@ -93,6 +105,19 @@ def genOp : Name → Name → Option (OpClass × Ty × Ty)
   | "Fixture.Log", "log" => some (.tail, (.base .string), (.base .unit))
   | _, _ => none
 
+def genDict : Nat → Option (Nat × List (Label × Scheme))
+  | 0 => some (1, [("describe", ⟨0, Facts.none, (.arrow (.tvar 0) .pure (.base .string) Caps.none)⟩)])
+  | 1 => some (1, [("$Describe", ⟨0, Facts.none, (.dict 0 (Ty.spine [(.tvar 0)]))⟩), ("rank", ⟨0, Facts.none, (.arrow (.tvar 0) .pure (.base .int) Caps.none)⟩)])
+  | _ => none
+
+theorem genDict_closed : ∀ c k fs, genDict c = some (k, fs) → ∀ l s, (l, s) ∈ fs →
+    s.Closed (s.k + k) := by
+  intro c k fs h l s hm
+  unfold genDict at h
+  split at h <;> cases h <;>
+    simp only [List.mem_cons, List.mem_nil_iff, or_false, Prod.mk.injEq] at hm <;>
+    rcases hm with ⟨-, rfl⟩ | ⟨-, rfl⟩ <;> subst_vars <;> closed_tac
+
 structure GenSig (S : Sig) : Prop where
   ctor : ∀ K, (genCtor K).isSome → S.ctor K = genCtor K
   res : ∀ K, (genCtor K).isSome → S.res K = genRes K
@@ -101,6 +126,7 @@ structure GenSig (S : Sig) : Prop where
   closed : ∀ K k ts T, S.ctor K = some (k, ts, T) → genAdtCtors T ≠ [] → genCtor K = some (k, ts, T)
   /-- A service of the generator has its operations and no other. -/
   op : ∀ E o, genOps E ≠ [] → S.op E o = genOp E o
+  dict : ∀ c, (genDict c).isSome → S.dict c = genDict c
 
 theorem genAdtCtors_complete : ∀ K k ts T, genCtor K = some (k, ts, T) →
     (K, ts.length) ∈ genAdtCtors T := by
@@ -166,9 +192,9 @@ def genSig : Sig where
   res := genRes
   res_closed := genRes_closed
   impl_closed _ _ := by simp [Ty.substT, Row.none_substT]
-  dict _ := none
+  dict := genDict
   glob := genGlob
-  dict_closed _ _ _ h := by cases h
+  dict_closed := genDict_closed
   glob_closed := genGlob_closed
   op := genOp
   op_closed := genOp_closed
@@ -177,7 +203,8 @@ def genSig : Sig where
 
 /-- The assumption of a certificate holds of a signature. -/
 theorem GenSig.inhabited : ∃ S, GenSig S :=
-  ⟨genSig, fun _ _ => rfl, fun _ _ => rfl, fun _ _ => rfl, fun _ _ _ _ h _ => h, fun _ _ _ => rfl⟩
+  ⟨genSig, fun _ _ => rfl, fun _ _ => rfl, fun _ _ => rfl, fun _ _ _ _ h _ => h, fun _ _ _ => rfl,
+    fun _ _ => rfl⟩
 
 end Flick.Cert
 

@@ -2,7 +2,7 @@
 //! terms the generator makes, with the types of the trace.
 
 use crate::check::Inst;
-use std::collections::{BTreeMap, HashMap};
+use std::collections::HashMap;
 use std::iter;
 use std::rc::Rc;
 
@@ -87,7 +87,7 @@ pub(super) fn tm(e: &Term, ctx: &[Name], sig: &Sig) -> Result<String, Unsupporte
 }
 
 /// The fields of a record term by label.
-fn sorted(fs: &[(Name, Term)]) -> Vec<(&Name, &Term)> {
+pub(super) fn sorted(fs: &[(Name, Term)]) -> Vec<(&Name, &Term)> {
     let mut fs: Vec<_> = fs.iter().map(|(l, x)| (l, x)).collect();
     fs.sort_by(|a, b| a.0.cmp(b.0));
     fs
@@ -102,7 +102,7 @@ pub(super) fn field<'a>(t: &'a Type, l: &str) -> Result<&'a Type, Unsupported> {
 }
 
 /// The fields of a record type.
-fn fields(t: &Type) -> Option<&Fields> {
+pub(super) fn fields(t: &Type) -> Option<&Fields> {
     match t {
         // a rest the check left open is empty (`Env::ground`)
         Type::Record(f) if matches!(f.tail, None | Some(Var::Meta(_))) => Some(f),
@@ -203,6 +203,7 @@ impl<'t> Cx<'t> {
             terms: Vec::new(),
             env: Env {
                 ground: true,
+                classes: sig.classes.clone(),
                 ..Env::default()
             },
             fixed: Vec::new(),
@@ -291,24 +292,8 @@ impl<'t> Cx<'t> {
             Term::Field(..) if operation(e).is_some() => Err("an operation not called".into()),
             Term::Record(fs) => self.record(fs, t, col),
             Term::List(xs) => self.list(xs, t, col),
-            Term::Field(r, l) => {
-                let at = self.inferred(r)?;
-                let ft = field(&at, l)?;
-                let (rt, ftp) = (self.ty(&at)?, self.ty(ft)?);
-                let pr = self.typing(r, &at, col + 2)?;
-                Ok(format!(
-                    "(.proj (R := {rt}) (t := {ftp}){pad}{pr}{pad}rfl (by le_live))"
-                ))
-            }
-            Term::Update(r, l, v) => {
-                let ft = field(t, l)?;
-                let (rt, ftp) = (self.ty(t)?, self.ty(ft)?);
-                let pr = self.typing(r, t, col + 2)?;
-                let pv = self.typing(v, ft, col + 2)?;
-                Ok(format!(
-                    "(.update (R := {rt}) (t := {ftp}){pad}{pr}{pad}rfl{pad}{pv})"
-                ))
-            }
+            Term::Field(r, l) => self.field(e, r, l, col),
+            Term::Update(r, l, v) => self.update(r, l, v, t, col),
             Term::Let(x, _, e1, e2) => self.let_(x, e1, e2, t, false, col),
             Term::LetRec(f, _, lam, e2) => self.let_(f, lam, e2, t, true, col),
             Term::Match(s, arms) => self.match_(s, arms, t, col),
@@ -374,7 +359,7 @@ impl<'t> Cx<'t> {
         let (_, ts) = self.instance(e)?;
         let instance = self.ty(&self.inferred(e)?)?;
         Ok(format!(
-            "(Cert.typ_glob (ts := [{}]) (T' := {instance}) ((hS.glob {g} rfl).trans rfl) rfl (Cert.holds_none _) (by inst_eq) (by le_live))",
+            "(Cert.typ_glob (ts := [{}]) (T' := {instance}) ((hS.glob {g} rfl).trans rfl) rfl (by holds) (by inst_eq) (by le_live))",
             ts.join(", ")
         ))
     }
@@ -427,6 +412,10 @@ impl<'t> Cx<'t> {
                 Ok((self.ctor(&k, &us)?, at))
             }
             h @ Term::Field(..) if operation(h).is_some() => self.operation(h),
+            Term::Field(d, l) if self.is_dict(d) => {
+                let at = self.inferred(head)?;
+                Ok((self.dproj(head, d, l, col)?, at))
+            }
             Term::Tuple(xs) => {
                 let [x, y] = &xs[..] else {
                     return Err("a tuple of more than two".into());
@@ -447,25 +436,6 @@ impl<'t> Cx<'t> {
             }
             other => Err(format!("a call of {}", form(other))),
         }
-    }
-
-    /// (Rec): the fields by label, each at its type.
-    fn record(&mut self, fs: &[(Name, Term)], t: &Type, col: usize) -> Result<String, Unsupported> {
-        let pad = format!("\n{}", " ".repeat(col + 2));
-        let f = fields(t).ok_or("a record at no record type")?;
-        let mut proof = ".rnil".to_owned();
-        let mut rest = Fields {
-            fields: BTreeMap::new(),
-            tail: None,
-        };
-        for (l, x) in sorted(fs).into_iter().rev() {
-            let ft = f.fields.get(l).ok_or("a field the type does not have")?;
-            let px = self.typing(x, ft, col + 2)?;
-            let r = self.ty(&Type::Record(rest.clone()))?;
-            proof = format!("(.rcons (R := {r}) trivial (by decide){pad}{px}{pad}{proof})");
-            rest.fields.insert(l.clone(), ft.clone());
-        }
-        Ok(proof)
     }
 
     /// `f a₁ … aₙ`: each call at the arrow the instance of `f` gives.

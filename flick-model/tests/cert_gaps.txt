@@ -2,7 +2,6 @@
 # `certificates_of_generated_programs` (`tests/certs.rs`): `<count> <reason>`, a program counted
 # at the first form it stops at. The programs without a certificate may only fall: a new gap fails
 # the test, a closed one is taken off, and a count grows only by programs a closed gap lets on.
-32 a call of the form Field
-46 a call of the constant RefMake
+47 a call of the constant RefMake
 53 a value bound, which the core does not have
-78 the form Scope
+83 the form Scope
