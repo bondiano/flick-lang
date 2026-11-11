@@ -49,6 +49,7 @@ mod lints;
 mod makers;
 mod module_contract;
 mod module_signature;
+pub(crate) use module_signature::normalize_module_interface;
 mod static_modules;
 pub(crate) use module_contract::{
     Mismatch as ModuleMismatch, check as check_module_contract,
@@ -240,18 +241,26 @@ pub fn check_typed(
     (diagnostics, typing)
 }
 
-/// Checks a named functor result with the dictionaries supplied by its
-/// static module arguments in scope for every definition of the result.
-pub(crate) fn check_typed_with_module_dictionaries(
+#[derive(Clone, Copy, Default)]
+pub(crate) struct StaticContext<'a> {
+    pub dictionaries: &'a [(Type, Dict)],
+    /// Transparent definitions available when comparing a concrete result.
+    /// They are not added to the body's abstract parameter environment.
+    pub witnesses: &'a [Interface],
+}
+
+/// Checks a named result with its static arguments' dictionaries and
+/// equality context. Body lookup still uses only the projected interfaces.
+pub(crate) fn check_typed_with_static_context(
     module: &Module,
     imported: &dyn Fn(&str) -> Option<Interface>,
     builtins: &[Interface],
     options: Options,
     interface: &mut Interface,
-    dictionaries: &[(Type, Dict)],
+    context: StaticContext<'_>,
 ) -> (Vec<Diagnostic>, Typing) {
     let (diagnostics, typing, _) =
-        run_with_dictionaries(module, imported, builtins, options, interface, dictionaries);
+        run_with_static_context(module, imported, builtins, options, interface, context);
     (diagnostics, typing)
 }
 
@@ -265,7 +274,14 @@ pub fn check_builtin_typed(
     interface: &mut Interface,
 ) -> (Vec<Diagnostic>, Typing) {
     let known = Builtins::new(dependencies);
-    let (diagnostics, typing, _) = run_in(module, imported, &known, options, interface, &[]);
+    let (diagnostics, typing, _) = run_in(
+        module,
+        imported,
+        &known,
+        options,
+        interface,
+        StaticContext::default(),
+    );
     (diagnostics, typing)
 }
 
@@ -276,16 +292,23 @@ fn run(
     options: Options,
     interface: &mut Interface,
 ) -> (Vec<Diagnostic>, Typing, Vec<(Span, Dict)>) {
-    run_with_dictionaries(module, imported, builtins, options, interface, &[])
+    run_with_static_context(
+        module,
+        imported,
+        builtins,
+        options,
+        interface,
+        StaticContext::default(),
+    )
 }
 
-fn run_with_dictionaries(
+fn run_with_static_context(
     module: &Module,
     imported: &dyn Fn(&str) -> Option<Interface>,
     builtins: &[Interface],
     options: Options,
     interface: &mut Interface,
-    dictionaries: &[(Type, Dict)],
+    context: StaticContext<'_>,
 ) -> (Vec<Diagnostic>, Typing, Vec<(Span, Dict)>) {
     let owned;
     let builtins = if let Some(by_class) = builtins::are_builtins(builtins) {
@@ -295,7 +318,7 @@ fn run_with_dictionaries(
         &owned
     };
     let (mut diagnostics, typing, evidence) =
-        run_in(module, imported, builtins, options, interface, dictionaries);
+        run_in(module, imported, builtins, options, interface, context);
     // only the built-in modules, which `run_in` checks directly, mark lang items
     let marks = lang::attributes(module.tree);
     for attribute in marks
@@ -319,7 +342,7 @@ fn run_in(
     builtins: &Builtins,
     options: Options,
     interface: &mut Interface,
-    dictionaries: &[(Type, Dict)],
+    context: StaticContext<'_>,
 ) -> (Vec<Diagnostic>, Typing, Vec<(Span, Dict)>) {
     let env = Env::new(module.name, module.syntax, imported, builtins);
     let mut checker = Checker {
@@ -328,6 +351,7 @@ fn run_in(
         generated: module.generated,
         derived: derived_classes(module.tree, module.text),
         env,
+        static_witnesses: context.witnesses,
         store: Store::default(),
         kinds: KindStore::default(),
         diagnostics: Vec::new(),
@@ -362,7 +386,10 @@ fn run_in(
         sugar: Vec::new(),
         gadt: gadt::branch::State::default(),
     };
-    checker.classes.local.extend_from_slice(dictionaries);
+    checker
+        .classes
+        .local
+        .extend_from_slice(context.dictionaries);
     let static_parameters = checker.prepare_static_parameters(module);
     let static_results = checker.prepare_static_applications(module);
     checker.module(module.tree);
@@ -393,7 +420,8 @@ fn run_in(
         static_parameters,
         &static_results,
     );
-    checker.typing.declarations = Arc::new(checker.declarations());
+    checker.typing.declarations =
+        Arc::new(checker.static_declarations(module, interface, &static_results));
     checker.sugar_lints(module.tree);
     let typing = checker.finish_typing();
     let mut evidence = checker.classes.evidence;
@@ -516,6 +544,7 @@ struct NumLiteral {
 }
 
 struct Checker<'a> {
+    static_witnesses: &'a [Interface],
     file: FileId,
     text: &'a str,
     /// Where generated code starts in `text`.

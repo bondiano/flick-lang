@@ -337,12 +337,12 @@ impl Checker<'_> {
             let since = self.diagnostics.len();
             // one mismatch: of the whole `if` when its place wants a value
             let fits = self.expect(&unit, expected, span);
-            self.explain_since(since, expected, keyword, why);
+            self.explain_since(since, expected, keyword, &why);
             if let Some(then) = children.get(1) {
                 if fits {
                     let since = self.diagnostics.len();
                     self.check(then, &unit);
-                    self.explain_since(since, &unit, keyword, why);
+                    self.explain_since(since, &unit, keyword, &why);
                 } else {
                     self.infer(then);
                 }
@@ -360,7 +360,7 @@ impl Checker<'_> {
             self.check(branch, expected);
             if open {
                 let then = self.span(children[1]);
-                self.explain_since(since, expected, then, |t| {
+                self.explain_since(since, expected, then, &|t| {
                     format!("the `then` branch has type `{t}`")
                 });
             }
@@ -577,7 +577,7 @@ impl Checker<'_> {
                 .find(|n| n.kind == K::Block)
                 .map(|b| self.span(b));
             match first {
-                Some(first) if open => self.explain_since(since, &result, first, |t| {
+                Some(first) if open => self.explain_since(since, &result, first, &|t| {
                     format!("the first arm has type `{t}`")
                 }),
                 Some(_) => {}

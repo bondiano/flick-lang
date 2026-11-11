@@ -19,6 +19,7 @@ mod format_plugins;
 #[cfg(feature = "ide")]
 mod ide;
 mod imports;
+mod lexical;
 mod loader;
 mod plugins;
 // the plugin of a module is its package's, which needs packages
@@ -44,6 +45,9 @@ use super::config::Backend;
 use super::packages::Packages;
 use super::{Host, Project, module_path, normalize};
 use crate::diagnostics::{Diagnostic, Edit, Severity, codes};
+use crate::iface::{
+    BindingOrigin, CalleeOrigin, LexicalScope, StaticBinding, StaticCapture, StaticMember,
+};
 use crate::ir;
 use crate::plugin::EditorBlock;
 use crate::plugin::expansion::Expansion;
@@ -92,30 +96,49 @@ struct Loaded {
     loader: Option<String>,
     /// A named application compiled as a separate generated module.
     virtual_of: Option<Virtual>,
+    member_of: Option<StaticMember>,
+    scope_of: Option<LexicalScope>,
+}
+
+impl Loaded {
+    fn can_access_member(&self, member: &StaticMember) -> bool {
+        self.name == member.parent
+            || self.virtual_of.as_ref().is_some_and(|context| {
+                context.capture.access_modules.contains(&member.parent)
+                    || context
+                        .capture
+                        .bindings
+                        .iter()
+                        .any(|b| b.argument == format!("{}.{}", member.parent, member.name))
+            })
+    }
+    fn can_access(&self, owner: &Root, name: &str) -> bool {
+        self.root.same_package(owner)
+            || self.virtual_of.as_ref().is_some_and(|context| {
+                let capture = &context.capture;
+                matches!(owner, Root::Package(package) if capture.access_packages.contains(package))
+                    || capture
+                        .bindings
+                        .iter()
+                        .any(|binding| binding.argument == name)
+            })
+    }
+
+    fn definition_package(&self) -> Option<&str> {
+        self.virtual_of
+            .as_ref()
+            .and_then(|v| v.capture.definition_package.as_deref())
+            .or(match &self.root {
+                Root::Package(package) => Some(package.as_str()),
+                _ => None,
+            })
+    }
 }
 
 #[derive(Clone)]
 struct Virtual {
     at: Span,
-    parameters: Vec<(String, String, String)>,
-    bindings: Vec<BindingOrigin>,
-    callee: Option<CalleeOrigin>,
-    arguments: Vec<String>,
-}
-
-/// The checked parameter signature that a static binding was introduced with.
-/// Prefix arguments instantiate dependencies on earlier parameters.
-#[derive(Clone, Debug, PartialEq, Eq)]
-struct BindingOrigin {
-    module: String,
-    parameter: usize,
-    prefix: Vec<String>,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-enum CalleeOrigin {
-    Module(String),
-    Parameter { binding: BindingOrigin, members: Vec<String> },
+    capture: StaticCapture,
 }
 
 /// How far a run goes past checking.
@@ -188,7 +211,13 @@ fn compiled(m: &Loaded, (ir, declarations): Lowered, interface: Interface) -> Co
             .imports
             .iter()
             .chain(&m.syntax.inline_imports)
+            .filter(|i| !i.module.starts_with("$scope:"))
             .map(|i| i.module.clone())
+            .chain(
+                m.virtual_of
+                    .iter()
+                    .flat_map(|v| v.capture.scopes.iter().map(|s| s.module.clone())),
+            )
             .collect(),
         ir,
         declarations,
@@ -415,7 +444,25 @@ fn run_in(
             .into_iter()
             .zip(interfaces)
             .zip(&loader.modules)
-            .filter_map(|((lowered, interface), m)| Some(compiled(m, lowered?, interface?)))
+            .filter_map(|((lowered, interface), m)| {
+                if m.scope_of.is_some() {
+                    return None;
+                }
+                let interface = interface?;
+                let lowered = lowered.or_else(|| {
+                    interface.functor.as_ref()?;
+                    Some((
+                        ir::Module {
+                            name: m.name.clone(),
+                            items: Vec::new(),
+                            labels: BTreeMap::new(),
+                            initialization: flick_ir::Initialization::default(),
+                        },
+                        Arc::new(interface.clone()),
+                    ))
+                })?;
+                Some(compiled(m, lowered, interface))
+            })
             .collect(),
         _ => Vec::new(),
     };
@@ -501,7 +548,7 @@ impl Loader<'_> {
         if let Some(found) = self.cache.as_ref().and_then(|c| c.parsed(path, file, text)) {
             return found;
         }
-        let parse = Arc::new(syntax::parse(text, file));
+        let parse = Arc::new(syntax::parse(text, file).into_module());
         let module = Arc::new(resolve::module_syntax(&parse.tree, text, file));
         if let Some(cache) = &mut self.cache {
             let parsed = (parse.clone(), module.clone());

@@ -283,5 +283,7 @@ fn inline_unit(
         editing: loaded.editing.clone(),
         loader: loaded.loader.clone(),
         virtual_of: loaded.virtual_of.clone(),
+        member_of: loaded.member_of.clone(),
+        scope_of: loaded.scope_of.clone(),
     }
 }

@@ -10,7 +10,7 @@ use std::fmt;
 use std::iter::once;
 
 use crate::iface::{Export, Interface, Namespace};
-use crate::types::{Binder, Form, Instance, Row, Type, TypeDef, show_type};
+use crate::types::{Binder, Form, Instance, ModuleSignature, Row, Type, TypeDef, show_type};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Change {
@@ -50,8 +50,16 @@ impl fmt::Display for Bump {
 
 /// The changes from `old` to `new`, by module name.
 pub fn diff(old: &[Interface], new: &[Interface]) -> Vec<ModuleChanges> {
-    let old: BTreeMap<&str, &Interface> = old.iter().map(|i| (i.module.as_str(), i)).collect();
-    let new: BTreeMap<&str, &Interface> = new.iter().map(|i| (i.module.as_str(), i)).collect();
+    let old: BTreeMap<&str, &Interface> = old
+        .iter()
+        .filter(|i| !i.private && i.member_of.is_none())
+        .map(|i| (i.module.as_str(), i))
+        .collect();
+    let new: BTreeMap<&str, &Interface> = new
+        .iter()
+        .filter(|i| !i.private && i.member_of.is_none())
+        .map(|i| (i.module.as_str(), i))
+        .collect();
     let mut modules: Vec<&str> = old.keys().chain(new.keys()).copied().collect();
     modules.sort_unstable();
     modules.dedup();
@@ -61,7 +69,9 @@ pub fn diff(old: &[Interface], new: &[Interface]) -> Vec<ModuleChanges> {
             let changes = match (old.get(module), new.get(module)) {
                 (Some(_), None) => vec![Change::Removed(format!("module {module}"))],
                 (None, Some(_)) => vec![Change::Added(format!("module {module}"))],
-                (Some(o), Some(n)) => [exports(o, n), instances(o, n)].concat(),
+                (Some(o), Some(n)) => {
+                    [exports(o, n), instances(o, n), static_members(o, n)].concat()
+                }
                 (None, None) => Vec::new(),
             };
             (!changes.is_empty()).then(|| ModuleChanges {
@@ -70,6 +80,60 @@ pub fn diff(old: &[Interface], new: &[Interface]) -> Vec<ModuleChanges> {
             })
         })
         .collect()
+}
+
+fn static_members(old: &Interface, new: &Interface) -> Vec<Change> {
+    let canonical = |signature: &ModuleSignature| {
+        let mut signature = signature.clone();
+        signature.canonicalize(&mut 0);
+        signature
+    };
+    let mut out = Vec::new();
+    if old.functor.as_ref().map(canonical) != new.functor.as_ref().map(canonical) {
+        out.push(Change::Changed {
+            name: format!("module {}", old.module),
+            was: old
+                .functor
+                .as_ref()
+                .map_or_else(|| "structure".into(), ModuleSignature::display),
+            now: new
+                .functor
+                .as_ref()
+                .map_or_else(|| "structure".into(), ModuleSignature::display),
+        });
+    }
+    for (name, child) in &old.modules {
+        match new.modules.get(name) {
+            None => out.push(Change::Removed(format!("module {name}"))),
+            Some(new) => {
+                for change in [
+                    exports(child, new),
+                    instances(child, new),
+                    static_members(child, new),
+                ]
+                .concat()
+                {
+                    let prefix = |label: String| format!("module {name}: {label}");
+                    out.push(match change {
+                        Change::Added(label) => Change::Added(prefix(label)),
+                        Change::Removed(label) => Change::Removed(prefix(label)),
+                        Change::Changed { name, was, now } => Change::Changed {
+                            name: prefix(name),
+                            was,
+                            now,
+                        },
+                    });
+                }
+            }
+        }
+    }
+    out.extend(
+        new.modules
+            .keys()
+            .filter(|name| !old.modules.contains_key(*name))
+            .map(|name| Change::Added(format!("module {name}"))),
+    );
+    out
 }
 
 /// The bump a set of changes calls for.
@@ -302,7 +366,7 @@ fn rename(ty: &Type, names: &[(String, String)], next: &mut usize) -> Type {
                 body: Box::new(rename(body, &inner, next)),
             }
         }
-        // the entry of a variable's captures or errors is labelled by its name
+        // Entries of bound capture, error and service atoms follow their names.
         Type::Row(row) => {
             let mut entries: Vec<(String, Type)> = (row.entries.iter())
                 .map(|(label, t)| (relabel(label, names), rename(t, names, next)))
@@ -318,9 +382,9 @@ fn rename(ty: &Type, names: &[(String, String)], next: &mut usize) -> Type {
     }
 }
 
-/// `label` of a row entry, `^a` or `~a` for a variable `a`, after `names`.
+/// `label` of a bound row atom (`^a`, `~a` or `@a`) after `names`.
 fn relabel(label: &str, names: &[(String, String)]) -> String {
-    let Some((sigil @ ("^" | "~"), name)) = label.split_at_checked(1) else {
+    let Some((sigil @ ("^" | "~" | "@"), name)) = label.split_at_checked(1) else {
         return label.to_owned();
     };
     (names.iter().find(|(n, _)| n == name))
@@ -386,6 +450,124 @@ mod tests {
             &mut interface,
         );
         interface
+    }
+
+    #[test]
+    fn higher_order_signature_changes_are_public_api() {
+        use crate::types::{ModuleRequirement as R, ModuleSignature as S};
+        let signature = |binder: &str, input: &str| S::Functor {
+            group_size: 1,
+            binder: binder.into(),
+            parameter: Box::new(S::Structure {
+                requirements: vec![R::Value {
+                    name: "seed".into(),
+                    ty: Type::con("Prelude", input),
+                }],
+            }),
+            result: Box::new(S::Structure {
+                requirements: vec![R::Value {
+                    name: "answer".into(),
+                    ty: Type::con("Prelude", "Int"),
+                }],
+            }),
+        };
+        let old = Interface {
+            module: "Lib.Make".into(),
+            functor: Some(signature("K", "Int")),
+            ..Interface::default()
+        };
+        let renamed = Interface {
+            functor: Some(signature("Other", "Int")),
+            ..old.clone()
+        };
+        assert!(diff(slice::from_ref(&old), &[renamed]).is_empty());
+        let changed = Interface {
+            functor: Some(signature("K", "String")),
+            ..old.clone()
+        };
+        assert_eq!(bump(&diff(slice::from_ref(&old), &[changed])), Bump::Major);
+    }
+
+    #[test]
+    fn nested_static_members_are_public_api_but_template_bodies_are_not() {
+        use crate::iface::ModuleTemplate;
+        let child = interface("module Lib exposing (answer)\nanswer : Int\nlet answer = 42\n");
+        let mut old = Interface {
+            module: "Api".into(),
+            ..Interface::default()
+        };
+        old.modules.insert("Child".into(), child);
+        let mut changed = old.clone();
+        changed
+            .modules
+            .get_mut("Child")
+            .expect("child")
+            .exports
+            .clear();
+        assert_eq!(bump(&diff(slice::from_ref(&old), &[changed])), Bump::Major);
+        let mut implementation = old.clone();
+        implementation.template = Some(ModuleTemplate {
+            source: "implementation changes".into(),
+            capture: None,
+        });
+        assert!(diff(&[old], &[implementation]).is_empty());
+    }
+
+    #[test]
+    fn private_static_artifacts_do_not_become_public_api() {
+        let old = interface("module Lib exposing (answer)\nanswer : Int\nlet answer = 42\n");
+        let mut private = old.clone();
+        private.private = true;
+        let mut changed = private.clone();
+        changed.exports.clear();
+        assert!(diff(slice::from_ref(&private), &[changed]).is_empty());
+        assert_eq!(
+            bump(&diff(slice::from_ref(&old), slice::from_ref(&private))),
+            Bump::Major
+        );
+        assert_eq!(bump(&diff(&[private], &[old])), Bump::Minor);
+    }
+
+    #[test]
+    fn generated_members_are_compared_through_their_parent_view() {
+        use crate::iface::StaticMember;
+        let mut member = Interface {
+            module: "Api.Hidden".into(),
+            ..Interface::default()
+        };
+        member.member_of = Some(StaticMember {
+            parent: "Api".into(),
+            name: "Hidden".into(),
+        });
+        // A standalone implementation artifact is not another public module.
+        assert!(diff(&[], &[member]).is_empty());
+    }
+
+    #[test]
+    fn canonical_service_atoms_follow_alpha_renaming() {
+        use crate::types::{Binder, Kind};
+        let scheme = |name: &str| Type::Forall {
+            vars: vec![Binder {
+                name: name.into(),
+                kind: Kind::Service,
+            }],
+            constraints: Vec::new(),
+            body: Box::new(Type::apps(
+                Type::con("Prelude", "Eff"),
+                [
+                    Type::Row(Row::closed(vec![(
+                        format!("@{name}"),
+                        Type::Var(name.into()),
+                    )])),
+                    Type::empty_row(),
+                    Type::con("Prelude", "Unit"),
+                ],
+            )),
+        };
+        assert_eq!(
+            canonical_type(&scheme("first")),
+            canonical_type(&scheme("second"))
+        );
     }
 
     #[test]

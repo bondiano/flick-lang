@@ -43,6 +43,34 @@ test("an inline module compiles and runs in the browser", async ({ page }) => {
   await expect(page.locator(".fp-output")).toContainText("42", { timeout: 60_000 });
 });
 
+test("higher-order signatures retain dependent type names in browser hover", async ({ page }) => {
+  await page.goto("/flick-lang/play/");
+  await ready(page);
+  await page.locator(".cm-content").click();
+  await page.keyboard.press("ControlOrMeta+A");
+  await page.keyboard.insertText("module Main exposing (main, Factory)\n\ntype module Input =\n  type Key\n\ntype module Output =\n  type Value\n\ntype module Factory = (K : Input) -> Output with type Value = K.Key\n\nmain : Unit ->{} Unit\nlet main () = Platform.stdout_line \"42\"\n");
+  await expect(page.locator(".fp-status")).toContainText("Type-checked", { timeout: 30_000 });
+  await hoverWord(page, "type module Factory", "Factory");
+  await expect(page.locator(".cm-tooltip-hover")).toContainText("K.Key");
+  await page.mouse.move(0, 0);
+  await page.getByRole("button", { name: "Run", exact: true }).click();
+  await expect(page.locator(".fp-output")).toContainText("42", { timeout: 60_000 });
+});
+
+test("a higher-order module captures one prefix and updates after an edit", async ({ page }) => {
+  await page.goto("/flick-lang/play/");
+  await ready(page);
+  const source = "module Main exposing (main)\n\ntype module Input =\n  identity : forall a. a -> a\n\ntype module Output =\n  answer : Int\n\noffset : Int\nlet offset = 1\n\nmodule Make(K : Input) : Output =\n  answer : Int\n  let answer = K.identity (41 + offset)\n\nmodule Chosen = Make(Prelude)\n\nmain : Unit ->{} Unit\nlet main () = Platform.stdout_line (show Chosen.answer)\n";
+  for (const [text, expected] of [[source, "42"], [source.replace("offset = 1", "offset = 2"), "43"]] as const) {
+    await page.locator(".cm-content").click();
+    await page.keyboard.press("ControlOrMeta+A");
+    await page.keyboard.insertText(text);
+    await expect(page.locator(".fp-status")).toContainText("Type-checked", { timeout: 30_000 });
+    await page.getByRole("button", { name: "Run", exact: true }).click();
+    await expect(page.locator(".fp-output")).toContainText(expected, { timeout: 60_000 });
+  }
+});
+
 test("a shared program opens without running and a draft survives reload", async ({ page, context }) => {
   await page.goto("/flick-lang/play/");
   await ready(page);

@@ -41,7 +41,7 @@ pub(super) fn unused_locals(unused: Vec<Unused>) -> impl Iterator<Item = Diagnos
 }
 
 fn packed_paths(node: &Node, text: &str, out: &mut Vec<String>) {
-    if node.kind == K::PackExpr
+    if matches!(node.kind, K::PackExpr | K::ModuleNominalMember)
         && let Some(path) = node.nodes().find(|n| n.kind == K::ModulePath)
     {
         out.push(path.text(text).split_whitespace().collect());
@@ -102,11 +102,28 @@ impl Scope<'_> {
             .iter()
             .filter_map(|r| r.qualifier.as_deref())
             .flat_map(|q| q.match_indices('.').map(|(i, _)| &q[..i]).chain([q]))
-            .chain(packed.iter().map(String::as_str))
+            .chain(packed.iter().flat_map(|q| {
+                q.match_indices('.')
+                    .map(|(i, _)| &q[..i])
+                    .chain([q.as_str()])
+            }))
             .collect();
         // `T.member`, a companion, uses the type `T`
         names.extend(qualifiers.iter().filter(|q| !q.contains('.')));
         for (import, interface) in self.imports() {
+            if import.module.starts_with("$scope:") || import.module.starts_with("$lexical:") {
+                continue;
+            }
+            // A module expression's synthetic binding import has no source
+            // import to remove; its public view may come from a result signature.
+            if module
+                .syntax
+                .applications
+                .iter()
+                .any(|application| import.module == format!("{}.{}", module.name, application.name))
+            {
+                continue;
+            }
             let Some(interface) = interface else {
                 continue;
             };

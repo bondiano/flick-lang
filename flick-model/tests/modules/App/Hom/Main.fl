@@ -1,0 +1,18 @@
+module App.Hom.Main exposing (main)
+
+import App.Hom.Instances.Chosen as Chosen
+import App.Hom.Instances.Anonymous as Anonymous
+import App.Hom.Instances.Alias as Alias
+
+main : Unit ->{} Unit
+let main () =
+  Platform.stdout_line
+    (show Chosen.answer
+      ++ " "
+      ++ show (Chosen.same Chosen.value Chosen.value)
+      ++ " "
+      ++ show (Anonymous.same Anonymous.value Anonymous.value)
+      ++ " "
+      ++ show (Alias.same Alias.value Alias.value)
+      ++ " "
+      ++ show (eq "x" "x"))

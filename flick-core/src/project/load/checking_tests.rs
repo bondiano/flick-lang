@@ -51,6 +51,8 @@ const USE: &str =
 #[cfg(feature = "ide")]
 include!("checking_tests_visibility.rs");
 include!("checking_tests_contracts.rs");
+#[cfg(all(feature = "ide", feature = "native-project"))]
+include!("checking_tests_packages.rs");
 #[cfg(feature = "ide")]
 #[test]
 fn private_builtin_cannot_be_imported_or_named_without_an_import() {

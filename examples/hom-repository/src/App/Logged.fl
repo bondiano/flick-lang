@@ -1,0 +1,17 @@
+module App.Logged(Base : App.Contracts.Repository) : App.Contracts.LoggedRepository exposing (
+  Repo,
+  get,
+  layer,
+)
+
+import App.Driver as Driver
+import App.Domain exposing (Repo)
+
+// Both contracts explicitly require the same nominal Repo identity.
+get : String ->{Repo, Log.Log} String
+let get key =
+  Log.info ("get " ++ key)
+  Base.get key
+
+layer : Layer {Driver.Db} {Driver.Boot} {Repo}
+let layer = Base.layer

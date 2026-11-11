@@ -56,7 +56,7 @@ impl Checker<'_> {
         };
         #[cfg(not(feature = "diagnostic-fixes"))]
         let _ = fix;
-        self.diagnostics.push(warning);
+        self.diagnostic(warning);
     }
 
     /// The edit that writes `replacement` over `node`.

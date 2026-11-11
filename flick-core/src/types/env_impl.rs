@@ -1,23 +1,87 @@
 impl<'b> Env<'b> {
-    pub(super) fn static_scope(&self) -> HashMap<String, Interface> {
-        self.builtins
-            .interfaces
-            .iter()
-            .map(|(name, interface)| (name.clone(), interface.clone()))
-            .chain(
-                self.interfaces.iter().filter_map(|(name, interface)| {
-                    Some((name.clone(), interface.as_ref()?.clone()))
-                }),
-            )
-            .collect()
+    /// A checked lexical prefix retains its defining entities, including
+    /// private members. Only the temporary static-expression environment
+    /// opens it; the enclosing module is still checked independently.
+    pub(super) fn static_lexical(&mut self, interface: &Interface) -> StaticLexical {
+        let mut saved = StaticLexical {
+            names: Vec::new(),
+            instances: self.instances.len(),
+        };
+        learn_exports(
+            &mut self.types,
+            &mut self.values,
+            &mut self.parents,
+            interface,
+        );
+        for instance in &interface.instances {
+            if !self
+                .builtins
+                .seen
+                .contains(&(instance.module.clone(), instance.name.clone()))
+                && !self
+                    .instances
+                    .iter()
+                    .any(|known| known.module == instance.module && known.name == instance.name)
+            {
+                self.instances.push(instance.clone());
+            }
+        }
+        for export in &interface.exports {
+            debug_assert_eq!(export.entity.module, self.module);
+            let key = (export.entity.namespace, export.entity.name.clone());
+            let ambiguous = self.ambiguous.remove(&key);
+            let previous = self.scope.insert(key.clone(), export.entity.clone());
+            saved.names.push((key, previous, ambiguous));
+        }
+        saved
+    }
+
+    pub(super) fn restore_static_lexical(&mut self, interface: &Interface, saved: StaticLexical) {
+        for export in &interface.exports {
+            let entity = &export.entity;
+            self.types
+                .remove(&(entity.module.clone(), entity.name.clone()));
+            self.types
+                .remove(&(entity.module.clone(), format!("{}.Impl", entity.name)));
+            self.values.remove(entity);
+            self.parents.remove(entity);
+        }
+        self.instances.truncate(saved.instances);
+        for (key, previous, ambiguous) in saved.names {
+            if let Some(previous) = previous {
+                self.scope.insert(key.clone(), previous);
+            } else {
+                self.scope.remove(&key);
+            }
+            if ambiguous {
+                self.ambiguous.insert(key);
+            }
+        }
+    }
+
+    pub(super) fn static_known(&self, name: &str) -> Option<Interface> {
+        self.interfaces
+            .get(name)
+            .and_then(Option::as_ref)
+            .or_else(|| self.builtins.interfaces.get(name))
+            .cloned()
     }
     pub(super) fn static_parameter(&mut self, alias: &str, interface: Interface) {
-        self.qualifiers
-            .insert(alias.to_owned(), interface.module.clone());
-        self.imported.insert(alias.to_owned());
+        // A symbolic result was unresolved during name resolution. Once its
+        // checked view is installed, this checker owns missing-member errors.
+        if self
+            .qualified_module(alias)
+            .is_none_or(|(_, i)| i.is_none())
+            || interface.module.starts_with("$module:")
+        {
+            self.imported.remove(alias);
+        }
+        // Several aliases may expose different signatures of one module.
+        // Keep their namespace views separate from its nominal identity.
+        let view = format!("$static:{}:{alias}", self.module);
+        self.qualifiers.insert(alias.to_owned(), view.clone());
         self.learn(&interface);
-        self.interfaces
-            .insert(interface.module.clone(), Some(interface));
+        self.interfaces.insert(view, Some(interface));
     }
     /// The environment of `module` before its own declarations are added.
     pub fn new(
@@ -375,7 +439,7 @@ impl<'b> Env<'b> {
             Some(interface) => interface.as_ref(),
             None => self.builtins.interfaces.get(module),
         };
-        Some((module, interface))
+        Some((interface.map_or(module, |i| i.module.as_str()), interface))
     }
 
     pub fn private_builtin(&self, qualifier: &str) -> bool {

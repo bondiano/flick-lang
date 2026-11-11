@@ -13,14 +13,22 @@ impl Checker<'_> {
                     && input.nodes().all(|n| n.kind == K::ModuleSignatureBinder)
                 {
                     input.nodes().collect()
-                } else { vec![*input] };
+                } else {
+                    vec![*input]
+                };
                 let mark = self.opened_modules.len();
                 let mut parameters = Vec::new();
                 for input in binders {
                     let (alias, parameter) = if input.kind == K::ModuleSignatureBinder {
-                        (self.con_token(input).unwrap_or_default(),
-                         self.static_module_signature(input.nodes().next().expect("binder signature")))
-                    } else { (String::new(), self.static_module_signature(input)) };
+                        (
+                            self.con_token(input).unwrap_or_default(),
+                            self.static_module_signature(
+                                input.nodes().next().expect("binder signature"),
+                            ),
+                        )
+                    } else {
+                        (String::new(), self.static_module_signature(input))
+                    };
                     let binder = self.static_binder(&alias, input.range().0);
                     self.bind_static_witness(&alias, &format!("$module:{binder}"), &parameter);
                     parameters.push((binder, parameter));
@@ -88,10 +96,6 @@ impl Checker<'_> {
             return String::new();
         }
         format!("{}@{start}#{alias}", self.env.module)
-    }
-
-    fn bind_static_signature(&mut self, alias: &str, signature: &super::ModuleSignature) {
-        self.bind_static_witness(alias, &format!("$module:{alias}"), signature);
     }
 
     fn bind_static_witness(
@@ -228,7 +232,8 @@ impl Checker<'_> {
         for member in members.iter().filter(|m| m.kind == K::ModuleMember) {
             if let (Some(name), Some(node)) = (self.con_token(member), member.nodes().next()) {
                 let signature = self.static_module_signature(node);
-                self.bind_static_signature(&name, &signature);
+                let binder = self.static_binder(&name, member.range().0);
+                self.bind_static_witness(&name, &format!("$module:{binder}"), &signature);
             }
         }
         bound
@@ -248,6 +253,7 @@ impl Checker<'_> {
                     {
                         let signature = self.static_module_signature(node);
                         requirements.push(ModuleRequirement::Module {
+                            binder: self.static_binder(&name, member.range().0),
                             name,
                             signature: Box::new(signature),
                         });
@@ -322,7 +328,7 @@ impl Checker<'_> {
                 } else {
                     ModuleNominalKind::Service
                 };
-                let identity = self.find_type(path, &qualifier, actual).and_then(
+                let resolved = self.find_type(path, &qualifier, actual).and_then(
                                 |(module, def)| {
                                     let matches = matches!(
                                         (category, &def.form),
@@ -344,19 +350,39 @@ impl Checker<'_> {
                                         );
                                         return None;
                                     }
-                                    Some(Entity {
+                                    Some((Entity {
                                         module,
                                         namespace: Namespace::Type,
                                         name: (*actual).to_owned(),
-                                    })
+                                    }, def))
                                 },
                             );
+                let (identity, definition, methods) = match resolved {
+                    Some((identity, definition)) => {
+                        let methods = match &definition.form {
+                            Form::Class { methods, .. } => methods
+                                .iter()
+                                .filter_map(|name| {
+                                    let entity = Entity {
+                                        module: identity.module.clone(),
+                                        namespace: Namespace::Value,
+                                        name: name.clone(),
+                                    };
+                                    self.env.value(&entity).map(|ty| (name.clone(), ty.clone()))
+                                })
+                                .collect(),
+                            _ => Vec::new(),
+                        };
+                        (Some(identity), Some(Box::new(definition)), methods)
+                    }
+                    None => (None, None, Vec::new()),
+                };
                 requirements.push(ModuleRequirement::Nominal {
                     name,
                     category,
                     identity,
-                    definition: None,
-                    methods: Vec::new(),
+                    definition,
+                    methods,
                 });
             }
         }

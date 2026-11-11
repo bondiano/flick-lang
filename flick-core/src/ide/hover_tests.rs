@@ -3,6 +3,31 @@ use super::{Symbol, Target};
 use crate::diagnostics::Diagnostic;
 
 #[test]
+fn higher_order_signature_hover_preserves_source_and_import_ranges() {
+    let source = "module App.Contracts exposing (Factory)\ntype module Input =\n  type Key\ntype module Output =\n  type Value\ntype module Factory = (K : Input) -> Output with type Value = K.Key\n";
+    let imported = "module App.Main exposing (Factory)\nimport App.Contracts exposing (Factory)\n";
+    let fixture = fixture_of(&[
+        ("src/App/Contracts.fl", source),
+        ("src/App/Main.fl", imported),
+    ]);
+    let ide = fixture.ide();
+    assert!(
+        ide.analysis.diagnostics.iter().all(Diagnostic::unnecessary),
+        "{:?}",
+        ide.analysis.diagnostics
+    );
+    for (module, needle) in [("App.Contracts", "Factory ="), ("App.Main", "Factory)")] {
+        let offset = fixture.at(module, needle, 0);
+        let (shown, range) = ide.hover(fixture.file(module), offset + 1).expect("hover");
+        assert!(
+            shown.contains("type module Factory = (K : Input) -> Output with type Value = K.Key"),
+            "{shown}"
+        );
+        assert_eq!(range, (offset, offset + 7));
+    }
+}
+
+#[test]
 fn private_recursive_type_and_constructor_hover_uses_local_declarations() {
     let source = "module App.Main exposing (make, example)
 

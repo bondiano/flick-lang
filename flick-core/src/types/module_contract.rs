@@ -4,7 +4,7 @@ use super::env::{Form, ModuleNominalKind, ModuleRequirement, TypeDef};
 use super::ty::Type;
 use crate::api_diff;
 use crate::diagnostics::codes;
-use crate::iface::{Decl, Interface, Namespace};
+use crate::iface::{Decl, Export, Interface, Namespace};
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
 
@@ -112,18 +112,24 @@ pub(crate) fn check(contract: &TypeDef, actual: &Interface) -> Vec<Mismatch> {
         return vec![Mismatch::Kind("module contract".into())];
     };
     let mut errors = Vec::new();
-    let subst = contract_subst(requirements, actual, &mut errors);
+    let requirements = super::ModuleSignature::instantiate_members(requirements, actual);
+    let subst = contract_subst(&requirements, actual, &mut errors);
     let normalizer = super::Store::default();
     let same = |expected: &Type, found: &Type| {
-        api_diff::canonical_type(&normalizer.zonk(&expected.substitute(&subst)))
-            == api_diff::canonical_type(&normalizer.zonk(&expand_actual(found, actual, 32)))
+        api_diff::canonical_type(&normalizer.zonk(&expand_actual(
+            &expected.substitute(&subst),
+            actual,
+            32,
+        ))) == api_diff::canonical_type(&normalizer.zonk(&expand_actual(found, actual, 32)))
     };
-    for requirement in requirements {
+    for requirement in &requirements {
         match requirement {
-            ModuleRequirement::Module { name, signature } => match actual.modules.get(name) {
+            ModuleRequirement::Module {
+                name, signature, ..
+            } => match actual.modules.get(name) {
                 None => errors.push(Mismatch::Missing(name.clone())),
-                Some(actual) => {
-                    if !signature.accepts(actual) {
+                Some(child) => {
+                    if !matches_child(signature, child, actual, &subst) {
                         errors.push(Mismatch::Shape(name.clone()));
                     }
                 }
@@ -131,20 +137,16 @@ pub(crate) fn check(contract: &TypeDef, actual: &Interface) -> Vec<Mismatch> {
             ModuleRequirement::Type {
                 name,
                 manifest: Some(expected),
-                ..
+                params,
             } => {
                 if let Some(export) = actual.find(Namespace::Type, name)
-                    && let Some(def) = &export.definition
+                    && let Some(found) = manifest_body(export, params)
+                    && !same(expected, &found)
                 {
-                    let found = match &def.form {
-                        Form::Alias { params, body, .. } if params.is_empty() => body.clone(),
-                        _ => Type::con(&export.entity.module, &export.entity.name),
-                    };
-                    if !same(expected, &found) {
-                        errors.push(Mismatch::TypeEquality(name.clone()));
-                    }
+                    errors.push(Mismatch::TypeEquality(name.clone()));
                 }
             }
+
             ModuleRequirement::Value { name, ty } => match actual.find(Namespace::Value, name) {
                 None => errors.push(Mismatch::Missing(name.clone())),
                 Some(export) if !export.scheme.as_ref().is_some_and(|found| same(ty, found)) => {
@@ -194,6 +196,43 @@ pub(crate) fn check(contract: &TypeDef, actual: &Interface) -> Vec<Mismatch> {
     errors
 }
 
+/// Compare a parameterized equality under the contract's type binders,
+/// independently of the implementation's parameter spelling.
+fn manifest_body(export: &Export, params: &[super::ty::Binder]) -> Option<Type> {
+    Some(match &export.definition.as_ref()?.form {
+        Form::Alias {
+            params: found,
+            body,
+            ..
+        } => {
+            let names: Vec<_> = found
+                .iter()
+                .cloned()
+                .zip(params.iter().map(|p| Type::Var(p.name.clone())))
+                .collect();
+            body.substitute(&names)
+        }
+        _ => Type::apps(
+            Type::con(&export.entity.module, &export.entity.name),
+            params.iter().map(|p| Type::Var(p.name.clone())),
+        ),
+    })
+}
+
+fn matches_child(
+    signature: &super::ModuleSignature,
+    child: &Interface,
+    parent: &Interface,
+    subst: &[(String, Type)],
+) -> bool {
+    let mut signature = signature.clone();
+    signature.substitute_outer_types(subst);
+    signature.normalize_in(parent);
+    let mut child = child.clone();
+    super::normalize_module_interface(&mut child, parent);
+    signature.accepts(&child)
+}
+
 /// The value type that can supply a constraint's dictionary.
 pub(super) fn dictionary_type(head: &Type) -> Option<Type> {
     let (class, args) = head.spine();
@@ -217,6 +256,7 @@ pub(crate) fn local_dictionaries(
     let Form::ModuleContract { requirements } = &contract.form else {
         return Vec::new();
     };
+    let requirements = super::ModuleSignature::instantiate_members(requirements, actual);
     let subst: Vec<(String, Type)> = requirements
         .iter()
         .filter_map(|requirement| match requirement {
@@ -265,6 +305,7 @@ pub(crate) fn project(contract: &TypeDef, actual: &Interface) -> Interface {
     let Form::ModuleContract { requirements } = &contract.form else {
         return Interface::default();
     };
+    let requirements = super::ModuleSignature::instantiate_members(requirements, actual);
     let mut projected = Interface {
         module: actual.module.clone(),
         private: actual.private,
@@ -283,22 +324,32 @@ pub(crate) fn project(contract: &TypeDef, actual: &Interface) -> Interface {
             _ => None,
         })
         .collect();
-    for requirement in requirements {
+    for requirement in &requirements {
         match requirement {
-            ModuleRequirement::Module { name, signature } => {
+            ModuleRequirement::Module {
+                name, signature, ..
+            } => {
                 if let Some(actual) = actual.modules.get(name) {
+                    let mut signature = (**signature).clone();
+                    signature.substitute_outer_types(&subst);
                     projected
                         .modules
                         .insert(name.clone(), signature.project(actual));
                 }
             }
-            ModuleRequirement::Type { name, manifest, .. } => {
+            ModuleRequirement::Type {
+                name,
+                manifest,
+                params,
+            } => {
                 if let Some(export) = actual.find(Namespace::Type, name) {
                     let mut export = export.clone();
-                    if manifest.is_none()
-                        && let Some(def) = &mut export.definition
-                    {
-                        def.form = Form::NOMINAL;
+                    if let Some(def) = &mut export.definition {
+                        def.form = manifest.as_ref().map_or(Form::NOMINAL, |ty| Form::Alias {
+                            params: params.iter().map(|p| p.name.clone()).collect(),
+                            body: ty.substitute(&subst),
+                            opaque: false,
+                        });
                     }
                     projected.exports.push(export);
                 }
@@ -377,13 +428,13 @@ fn shape_matches(
     }
 }
 
-fn expand_actual(ty: &Type, actual: &Interface, fuel: usize) -> Type {
+pub(super) fn expand_actual(ty: &Type, actual: &Interface, fuel: usize) -> Type {
     if fuel == 0 {
         return ty.clone();
     }
     let (head, args) = ty.spine();
     if let Type::Con { module, name } = head
-        && let Some(export) = actual.find(Namespace::Type, name)
+        && let Some(export) = find_type(actual, module, name)
         && export.entity.module == *module
         && let Some(TypeDef {
             form: Form::Alias { params, body, .. },
@@ -399,6 +450,18 @@ fn expand_actual(ty: &Type, actual: &Interface, fuel: usize) -> Type {
         return expand_actual(&body.substitute(&replacements), actual, fuel - 1);
     }
     ty.map_children(&mut |child| expand_actual(child, actual, fuel - 1))
+}
+
+fn find_type<'a>(actual: &'a Interface, module: &str, name: &str) -> Option<&'a Export> {
+    actual
+        .find(Namespace::Type, name)
+        .filter(|e| e.entity.module == module)
+        .or_else(|| {
+            actual
+                .modules
+                .values()
+                .find_map(|child| find_type(child, module, name))
+        })
 }
 
 #[cfg(test)]

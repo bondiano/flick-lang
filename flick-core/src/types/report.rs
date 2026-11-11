@@ -32,7 +32,7 @@ impl Checker<'_> {
         };
         #[cfg(not(feature = "diagnostic-fixes"))]
         let _ = detail;
-        self.diagnostics.push(d);
+        self.diagnostic(d);
     }
 
     /// Unifies the type an expression has with the one its position expects;

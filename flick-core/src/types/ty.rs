@@ -318,6 +318,18 @@ pub fn error_label(t: &Type) -> Option<String> {
     }
 }
 
+/// A service atom supplied by a static module may still be a bound variable.
+/// Its row key must follow that variable when the witness is instantiated.
+pub fn service_label(t: &Type) -> Option<String> {
+    match t.spine().0 {
+        Type::Con { module, name } => Some(format!("{module}.{name}")),
+        Type::Var(name) => Some(format!("@{name}")),
+        Type::Skolem(s) => Some(format!("@'{s}")),
+        Type::Meta(m) => Some(format!("@?{m}")),
+        _ => None,
+    }
+}
+
 impl Type {
     pub fn con(module: &str, name: &str) -> Type {
         Type::Con {
@@ -382,7 +394,7 @@ impl Type {
 
     /// Applies `f` to every direct child type.
     #[must_use]
-    pub fn map_children(&self, f: &mut impl FnMut(&Type) -> Type) -> Type {
+    pub fn map_children(&self, f: &mut dyn FnMut(&Type) -> Type) -> Type {
         let row = |row: &Row, f: &mut dyn FnMut(&Type) -> Type| Row {
             entries: row.entries.iter().map(|(l, t)| (l.clone(), f(t))).collect(),
             tail: row.tail.as_ref().map(|t| Box::new(f(t))),
@@ -452,7 +464,7 @@ impl Type {
     }
 
     /// Calls `f` on every direct child type.
-    pub fn for_each_child(&self, f: &mut impl FnMut(&Type)) {
+    pub fn for_each_child(&self, f: &mut dyn FnMut(&Type)) {
         let row = |row: &Row, f: &mut dyn FnMut(&Type)| {
             row.entries.iter().for_each(|(_, t)| f(t));
             row.tail.iter().for_each(|t| f(t));
@@ -504,7 +516,7 @@ impl Type {
     }
 
     /// Calls `f` on every type inside, this one first.
-    pub fn visit(&self, f: &mut impl FnMut(&Type)) {
+    pub fn visit(&self, f: &mut dyn FnMut(&Type)) {
         f(self);
         self.for_each_child(&mut |t| t.visit(f));
     }
@@ -552,7 +564,7 @@ impl Type {
         }
     }
 
-    pub fn contains(&self, pred: &mut impl FnMut(&Type) -> bool) -> bool {
+    pub fn contains(&self, pred: &mut dyn FnMut(&Type) -> bool) -> bool {
         let mut found = false;
         self.visit(&mut |t| found |= pred(t));
         found

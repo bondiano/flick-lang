@@ -2,11 +2,14 @@
 //! across modules. Backends and build validation share this graph, so a
 //! built-in module may hold bindings a program never uses.
 
+#[cfg(any(not(target_arch = "wasm32"), feature = "build-artifacts"))]
 use std::collections::HashMap;
 #[cfg(feature = "build-artifacts")]
 use std::collections::HashSet;
 
-use crate::ir::{Expr, ExprKind, Item, ItemKind, Module};
+#[cfg(any(not(target_arch = "wasm32"), feature = "build-artifacts"))]
+use crate::ir::Module;
+use crate::ir::{Expr, ExprKind, Item, ItemKind};
 use crate::types::{Dict, companion_name, default_method};
 
 /// A top-level name: its module, and the value, foreign or instance name.
@@ -104,6 +107,7 @@ fn expr_uses(e: &Expr, out: &mut Vec<Key>) {
 }
 
 /// Where each top-level name of `modules` is defined: module and item index.
+#[cfg(any(not(target_arch = "wasm32"), feature = "build-artifacts"))]
 pub fn index(modules: &[&Module]) -> HashMap<Key, (usize, usize)> {
     let mut out = HashMap::new();
     for (m, module) in modules.iter().enumerate() {

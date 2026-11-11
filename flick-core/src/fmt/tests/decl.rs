@@ -33,6 +33,15 @@ fn formats_functor_headers_and_named_applications() {
 }
 
 #[test]
+fn formats_anonymous_functor_declarations_and_preserves_comments() {
+    let src = "module App.Return(F:Factory):Factory=functor (K:Input) ->\n  // Keep the application inside the closure.\n  module Built=F(K)\n\n  answer:Int\n  let answer=Built.answer\n";
+    assert_eq!(
+        fmt(src),
+        "module App.Return(F : Factory) : Factory = functor (K : Input) ->\n  // Keep the application inside the closure.\n  module Built = F(K)\n\n  answer : Int\n  let answer = Built.answer\n"
+    );
+}
+
+#[test]
 fn formats_inline_module_members_and_keeps_their_scope() {
     let src = "module App.Main exposing (answer)\nlet seed=41\nmodule Child exposing (value)=\n  type Key=Key Int\n  value:Key\n  let value=Key(seed+1)\nlet answer=Child.value\n";
     let out = fmt(src);

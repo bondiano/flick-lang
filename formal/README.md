@@ -13,7 +13,10 @@ The module layer (`type module`, named functors, `Module Sig`, and existential
 module witnesses) is checked before this core. [`Formal/Modules.lean`](Formal/Modules.lean)
 models named result identities, manifest class/service requirements, and scoped
 existential elimination; its rules and limits are in the [module boundary
-model](../docs/formal/modules.md). The core theorems still do not establish
+model](../docs/formal/modules.md). [`Formal/HigherModules.lean`](Formal/HigherModules.lean)
+adds grouped static application, returned lexical closures, signature shape
+variance and local dictionary precedence; the independent executable counterpart
+is `flick-model/src/modules.rs`. The core theorems still do not establish
 source-level module soundness or correctness of the Rust lowering. The reference
 model checks dictionary records and executes the lowered module examples;
 source typing remains a compiler obligation.
@@ -39,7 +42,10 @@ in the `lean` job (`leanprover/lean-action` with `build-args: --wfail`).
   manifest class/service requirements match exactly, abstract identities cannot
   cross `Module Sig`, and packed witness introduction follows the scoped
   elimination equations. These are model properties, not a compiler soundness
-  theorem; see the [module boundary model](../docs/formal/modules.md).
+  theorem. `Formal/HigherModules.lean` proves reflexive/transitive higher-order
+  shape matching, invariant atomic groups, captured closure evaluation,
+  public-member projection and explicit/local/global dictionary precedence;
+  see the [module boundary model](../docs/formal/modules.md).
 - **The core** (`Formal/`, the top-level modules), with rows of services and errors that
   take variables, generalized and instantiated as variables of the other kinds, and arms on
   the constructors of a GADT typed under every unifier of what the constructor builds with

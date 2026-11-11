@@ -132,8 +132,9 @@ pub fn module_syntax(tree: &Node, text: &str, file: FileId) -> ModuleSyntax {
                 n.kind == K::ModulePath
                     && (n.has_token(K::Dot) || node.nodes().any(|n| n.kind == K::ModuleParamGroup))
             });
-        let nested_functor =
-            node.kind == K::InlineModuleDecl && node.nodes().any(|n| n.kind == K::ModuleParamGroup);
+        let nested_functor = matches!(node.kind, K::InlineModuleDecl | K::ModuleApplyDecl)
+            && !file_expression
+            && node.nodes().any(|n| n.kind == K::ModuleParamGroup);
         if (node.kind == K::ModuleApplyDecl && !file_expression) || nested_functor {
             fn paths<'a>(node: &'a Node, out: &mut Vec<&'a Node>) {
                 if node.kind == K::ModulePath {
@@ -169,7 +170,16 @@ pub fn module_syntax(tree: &Node, text: &str, file: FileId) -> ModuleSyntax {
                 children: node
                     .nodes()
                     .filter(|n| {
-                        matches!(n.kind, K::ModuleParamGroup | K::ModuleResult | K::Members)
+                        matches!(
+                            n.kind,
+                            K::ModuleParamGroup
+                                | K::ModuleResult
+                                | K::Members
+                                | K::ModuleApplyExpr
+                                | K::ModuleFunctorExpr
+                                | K::ModuleParenExpr
+                                | K::ModuleAnnotExpr
+                        )
                     })
                     .cloned()
                     .map(Element::Node)
@@ -203,11 +213,14 @@ pub fn module_syntax(tree: &Node, text: &str, file: FileId) -> ModuleSyntax {
                 }
                 applications.push(ModuleApplication {
                     expression: expression.clone(),
-                    annotation: node
-                        .nodes()
-                        .find(|n| n.kind == K::ModuleResult)
-                        .and_then(|n| n.nodes().next())
-                        .cloned(),
+                    annotation: (!nested_functor)
+                        .then(|| {
+                            node.nodes()
+                                .find(|n| n.kind == K::ModuleResult)
+                                .and_then(|n| n.nodes().next())
+                                .cloned()
+                        })
+                        .flatten(),
                     argument_groups,
                     name: local_name,
                     functor: named
@@ -297,7 +310,10 @@ pub fn module_syntax(tree: &Node, text: &str, file: FileId) -> ModuleSyntax {
                     .collect();
                 if parts.len() > 1 {
                     let module = parts[..parts.len() - 1].join(".");
-                    if !imports.iter().any(|i| i.module == module) {
+                    if !imports
+                        .iter()
+                        .any(|i| i.module == module || i.qualifier() == module)
+                    {
                         imports.push(Import {
                             module,
                             alias: None,
@@ -336,6 +352,11 @@ pub fn module_syntax(tree: &Node, text: &str, file: FileId) -> ModuleSyntax {
                     }
                 }
             }
+            if node.kind == K::ModuleFunctorExpr
+                && let Some(result) = node.nodes().find(|n| n.kind == K::ModuleResult)
+            {
+                signature_imports(result, text, file, imports);
+            }
             if node.kind == K::ModuleAnnotExpr
                 && let Some(signature) = node.nodes().last()
             {
@@ -363,9 +384,17 @@ pub fn module_syntax(tree: &Node, text: &str, file: FileId) -> ModuleSyntax {
                 expression_imports(child, text, file, &bound, imports);
             }
         }
-        let bound: Vec<_> = header.parameters.iter().map(|p| p.name.clone()).collect();
+        let bound: Vec<_> = header
+            .parameters
+            .iter()
+            .map(|p| p.name.clone())
+            .chain(applications.iter().map(|a| a.name.clone()))
+            .collect();
         for application in &applications {
             expression_imports(&application.expression, text, file, &bound, &mut imports);
+            if let Some(annotation) = &application.annotation {
+                signature_imports(annotation, text, file, &mut imports);
+            }
         }
         if let Some(body) = &header.body {
             expression_imports(body, text, file, &bound, &mut imports);

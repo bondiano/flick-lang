@@ -186,7 +186,8 @@ type module Source =
   type Key
   value : Key
 
-module App.Make(S : App.Contracts.Source) exposing (answer)
+module App.Make(S : App.Contracts.Source) : Answer
+// App/Make.fl declares: type module Answer = answer : Int
 // App/Make.fl uses S.Key and S.value
 
 module App.Parent exposing (Chosen)
@@ -231,9 +232,10 @@ let hashing = Hash.dictionary {
 `instance Eq Key from equality` uses that named dictionary within a functor
 body or an `unpack` body. An explicit given dictionary takes precedence;
 otherwise the local dictionary takes precedence over a global instance.
-The requirement does not declare a global instance. If two functor arguments
-provide the same constraint, `FLICK-T066` reports the ambiguity. A
-dictionary for a class with a superclass must include its named superclass
+The requirement does not declare a global instance. If two arguments in one
+parameter group provide the same constraint, `FLICK-T066` reports the ambiguity.
+A later curried group introduces a nested scope: its local dictionary takes
+precedence over a captured dictionary. A dictionary for a class with a superclass must include its named superclass
 field, as `Hash.dictionary` does above.
 
 A static functor can also require a class whose identity is supplied by its
@@ -247,9 +249,12 @@ type module EqualityPolicy =
   equality : Equality.Dict String
   instance Equality String from equality
 
-module App.Make(K : App.Contracts.EqualityPolicy) exposing (answer)
+module App.Make(K : App.Contracts.EqualityPolicy) : Answer
 answer : Bool
 let answer = K.equal "A" "A"
+
+type module Answer =
+  answer : Bool
 ```
 
 ### Generative result types
@@ -274,12 +279,16 @@ let seed = "Ada"
 ```
 
 ```text title="src/App/Make.fl"
-module App.Make(S : App.Contracts.Source) exposing (Token, value)
+module App.Make(S : App.Contracts.Source) : Result
 
 type Token = Token String
 
 value : Token
 let value = Token S.seed
+
+type module Result =
+  type Token
+  value : Token
 ```
 
 ```text title="src/App/Instances.fl"
@@ -332,6 +341,14 @@ and require the last file to fail with `FLICK-T003`.
 
 ## Higher-order module signatures
 
+Public functors declare their result signature (`FLICK-T067`). Private and local
+functors may infer it. A public alias may inherit an explicitly advertised
+signature or add an ascription. An optional `exposing` list must agree with
+the result signature; it cannot request hidden members.
+Inference retains the arity and kinds of type members and their transparent
+equalities. A class or service declared by a factory body belongs to the named
+application; passing or re-exporting an existing declaration keeps its identity.
+
 A module contract may describe a functor. Its named parameter is in scope in
 the result signature. `with type` exposes an equality that clients may rely
 on; it cannot introduce a missing member or contradict an existing equality.
@@ -347,13 +364,91 @@ type module Output =
 
 type module Factory =
   (K : Input) -> Output with type Value = K.Key
+
+type module Grouped =
+  (A : Input, B : Input) -> Output with type Value = A.Key
+
+type module Curried =
+  (A : Input) -> (B : Input) -> Output with type Value = A.Key
+
+type module Namespace =
+  module M : Input
+  value : M.Key
+
+type module NestedFactory =
+  (K : Namespace) -> Output with type Value = K.M.Key
+
+type module WithFactory =
+  type Item
+  module Make : Input -> Output with type Value = Item
+
+type module Lists =
+  type Items a = List a
+  empty : forall a. Items a
 ```
+
+A structure member also binds a module path: `value : M.Key` must use the
+same `Key` exported by `M`. Its implementation cannot supply an unrelated
+type with a matching name. Projection retains the argument's identities;
+sealing a result gives its abstract nested members fresh identities and
+updates dependent types throughout the result.
+
+An outer structure's type members are also in scope inside nested signatures.
+In `WithFactory`, `Make` returns that structure's `Item`. A nested structure's
+own type members shadow outer names. An arrow parameter's members keep their
+module qualifier in its result signature.
+
+A group `(A : Input, B : Input)` takes both arguments in one application.
+Separate groups `(A : Input)(B : Input)` allow partial application and match
+a curried signature. The two forms are distinct contracts. Parameters retain
+their own visible members even when they receive the same module. Aliases
+preserve type identities and the visibility of their source parameter.
+A nested functor inherits the enclosing imports, including their exact
+`exposing` lists and imported instances. Aliases used only in its parameter
+or result signature remain in scope.
+
+It also captures preceding local signatures, types and values. Later local
+declarations are outside that definition's scope. Capturing a value retains
+the original binding: two applications that return an enclosing `Layer`
+share that layer object, including its memoization identity. Values in the
+prefix are initialized before a result that reads them; the factory does not
+copy or reevaluate those definitions with the caller's dictionaries.
+
+An ascription such as `module Narrow : Factory = F` checks the advertised
+view of `F`, then restricts the alias to `Factory`. It cannot recover members
+hidden by the parameter contract, even when the actual argument exports them.
+The original `F` retains its own view. The same rule applies to an annotated
+application, `module Result : Output = Make(Argument)`.
+
+Recursive static module expansion is rejected with `FLICK-R006`. Finite nested
+applications such as `Identity(Identity(Argument))` may reuse the same functor.
 
 An arrow is a static module signature, separate from a value function type.
 An implementation may accept fewer requirements and return more members than
 the signature requires. A result annotation hides members and type equalities
 that the contract does not expose. Runtime `Module Sig` values cannot carry
 functors, including through nested module members (`FLICK-T068`).
+
+### Repository layers and logging
+
+`examples/hom-repository/` contains a complete checked example. `Make(Database)`
+exports operations and a `Layer`; connection acquisition happens inside
+`Layer.from_build` when the layer runs. `WithLogging` accepts this factory and
+returns an anonymous factory:
+
+```text
+module App.WithLogging(Factory : App.Contracts.Factory) : App.Contracts.LoggedFactory =
+  functor (Database : App.Contracts.Database) -> App.Logged(Factory(Database))
+```
+
+The repository and logging contracts explicitly require the same nominal
+`Domain.Repo`. The adapter's `get` operation adds `Log.Log` to its service row;
+forwarding the layer preserves the service identity and its resource owner.
+A caller that provides only the repository layer still needs `Log` and is
+rejected with `FLICK-E002`. The example's integration test checks deferred
+acquisition, success, failed acquisition, failed initialization, body failure,
+interruption and overlapping layer runs, including exactly-once release, on
+JS and Go in both profiles.
 
 ## Packed modules and existential results
 

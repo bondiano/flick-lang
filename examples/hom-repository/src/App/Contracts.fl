@@ -1,0 +1,26 @@
+module App.Contracts exposing (Database, Repository, Factory, LoggedRepository, LoggedFactory)
+
+import App.Driver as Driver
+import App.Domain as Domain
+
+type module Database =
+  type Connection
+  service Db = Driver.Db
+  acquire : Unit ->{Db; Driver.Boot} Connection
+  release : Connection ->{} Unit
+  initialize : Connection ->{; Driver.Boot} Unit
+  fetch : Connection -> String ->{} String
+
+type module Repository =
+  service Repo = Domain.Repo
+  get : String ->{Repo} String
+  layer : Layer {Driver.Db} {Driver.Boot} {Repo}
+
+type module Factory = (Database : Database) -> Repository
+
+type module LoggedRepository =
+  service Repo = Domain.Repo
+  get : String ->{Repo, Log.Log} String
+  layer : Layer {Driver.Db} {Driver.Boot} {Repo}
+
+type module LoggedFactory = (Database : Database) -> LoggedRepository

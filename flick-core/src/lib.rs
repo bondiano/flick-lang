@@ -38,7 +38,7 @@ pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 /// through [`project::check`].
 pub fn check(sources: &source::SourceMap, file: source::FileId) -> Vec<diagnostics::Diagnostic> {
     let text = &sources.get(file).text;
-    let parse = syntax::parse(text, file);
+    let parse = syntax::parse(text, file).into_module();
     let syntax = resolve::module_syntax(&parse.tree, text, file);
     let name = syntax.header.as_ref().map_or("", |h| h.name.as_str());
     // the witnesses its `deriving` names, which std's plugin writes

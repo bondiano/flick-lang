@@ -1,0 +1,14 @@
+construction attempts=0 acquired=0 released=0 active=0 peak=0 unique=true
+value=0:a 0:b
+logs=get a|get b
+success attempts=1 acquired=1 released=1 active=0 peak=1 unique=true
+body failure failed=true
+body failure attempts=1 acquired=1 released=1 active=0 peak=1 unique=true
+acquisition failure failed=true
+acquisition failure attempts=1 acquired=0 released=0 active=0 peak=0 unique=true
+initialization failure failed=true
+initialization failure attempts=1 acquired=1 released=1 active=0 peak=1 unique=true
+interrupted=true
+interruption attempts=1 acquired=1 released=1 active=0 peak=1 unique=true
+overlap success=true
+overlap attempts=2 acquired=2 released=2 active=0 peak=2 unique=true

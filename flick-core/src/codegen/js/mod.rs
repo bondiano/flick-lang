@@ -58,7 +58,9 @@ use super::tail::{Callee, Target};
 #[cfg(feature = "typescript")]
 use super::ts::Projection;
 use super::{Options, Output, names};
-use crate::ir::{ItemKind, Label, Module};
+#[cfg(feature = "typescript")]
+use crate::iface::Namespace;
+use crate::ir::{Item, ItemKind, Label, Module};
 #[cfg(feature = "source-maps")]
 use crate::source::Span;
 use crate::types::Dict;
@@ -72,14 +74,25 @@ const MARK_END: char = '\u{E001}';
 
 /// Compiles `module` to ESM (or TypeScript, see [`Options::typescript`]).
 pub fn js(module: &Module, options: &Options) -> Output {
+    js_at(module, options, &module.name, &|_, _| None)
+}
+
+pub(crate) fn js_at(
+    module: &Module,
+    options: &Options,
+    physical: &str,
+    location: &dyn Fn(&str, &str) -> Option<String>,
+) -> Output {
     assert!(
         cfg!(feature = "typescript") || !options.typescript,
         "TypeScript output requires the `typescript` Cargo feature"
     );
     let mut g = Gen::new(module, options);
+    g.physical = physical;
+    g.location = location;
     #[cfg(feature = "typescript")]
     let projection =
-        Projection::for_runtime(&module.name, options.interface, options.package, options.rt);
+        Projection::for_runtime(physical, options.interface, options.package, options.rt);
     #[cfg(feature = "typescript")]
     let mut declarations = Vec::new();
     let interface = (options.interface)(&module.name);
@@ -92,8 +105,17 @@ pub fn js(module: &Module, options: &Options) -> Output {
     if options.typescript
         && let Some(interface) = &interface
     {
-        declarations = projection.declarations(interface).0;
-        g.annotations = annotations(&projection, interface);
+        let mut interface = interface.clone();
+        if physical != module.name {
+            for export in &mut interface.exports {
+                if export.entity.module == module.name && export.entity.namespace != Namespace::Type
+                {
+                    export.entity.module = physical.into();
+                }
+            }
+        }
+        declarations = projection.declarations(&interface).0;
+        g.annotations = annotations(&projection, &interface);
     }
     let body = g.items(&module.items);
     let mut code = String::new();
@@ -101,14 +123,14 @@ pub fn js(module: &Module, options: &Options) -> Output {
     let typed = RefCell::new(Vec::new());
     #[cfg(feature = "typescript")]
     if options.typescript {
-        let here = (options.path)(&module.name);
+        let here = (options.path)(physical);
         let path = |m: &str| {
             typed.borrow_mut().push(m.to_owned());
             relative(&here, &(options.path)(m))
         };
         code.push_str(&projection.imports(&path));
     }
-    let here = (options.path)(&module.name);
+    let here = (options.path)(physical);
     g.write_imports(&mut code, &here);
     if !code.is_empty() {
         code.push('\n');
@@ -121,7 +143,9 @@ pub fn js(module: &Module, options: &Options) -> Output {
     code.push_str(&body);
     // a module exposing what it imports: JS consumers find it here too
     let mut barrel = Vec::new();
-    if let Some(interface) = (options.interface)(&module.name) {
+    if let Some(interface) = (options.interface)(&module.name)
+        && physical == module.name
+    {
         let path = |m: &str| relative(&here, &(options.path)(m));
         let (lines, modules) = reexports(&module.name, &interface, &path, &|_| true, &|_| {
             options.typescript()
@@ -158,6 +182,8 @@ impl<'a> Gen<'a> {
         let grouped = group::grouped(&module.name, &module.items, &groups, calls);
         Gen {
             module: &module.name,
+            physical: &module.name,
+            location: &|_, _| None,
             options,
             labels: &module.labels,
             #[cfg(feature = "source-maps")]
@@ -187,8 +213,14 @@ impl<'a> Gen<'a> {
             sync_exports: HashMap::new(),
             workers: if options.release {
                 let interface = (options.interface)(&module.name);
-                let exported =
-                    |name: &str| interface.as_ref().is_none_or(|i| i.exports_value(name));
+                let exported = |name: &str| {
+                    interface.as_ref().is_none_or(|i| i.exports_value(name))
+                        || module
+                            .initialization
+                            .prefixes
+                            .iter()
+                            .any(|p| p.bindings.iter().any(|n| n == name))
+                };
                 let exported_arity = |name: &str| (options.workers)(&module.name, name);
                 release::workers(&module.name, &module.items, &exported, &exported_arity)
             } else {
@@ -283,6 +315,8 @@ struct Tail {
 )]
 struct Gen<'a> {
     module: &'a str,
+    physical: &'a str,
+    location: &'a dyn Fn(&str, &str) -> Option<String>,
     options: &'a Options<'a>,
     /// The module's labelled top-level values (see [`Gen::labelled`]).
     labels: &'a BTreeMap<String, Label>,
@@ -426,11 +460,13 @@ impl Gen<'_> {
 
     /// A top-level value of `module` by its JS name.
     fn global(&mut self, module: &str, name: &str) -> String {
-        if module == self.module {
+        let relocated = (self.location)(module, name);
+        let target = relocated.as_deref().unwrap_or(module);
+        if target == self.physical {
             name.to_owned()
         } else {
-            self.imports.insert(module.to_owned());
-            format!("{}.{name}", self.alias(module))
+            self.imports.insert(target.to_owned());
+            format!("{}.{name}", self.alias(target))
         }
     }
 
@@ -552,4 +588,19 @@ fn pure(value: &str) -> String {
     } else {
         value.to_owned()
     }
+}
+
+/// Includes optional release workers and direct instance methods, whose
+/// physical owner is the same as the binding that defines them.
+pub(crate) fn runtime_exports(item: &Item) -> Vec<String> {
+    let mut names = items::defined(item);
+    if let Some((name, arity)) = release::exported_worker(item) {
+        names.push(format!("{}${arity}", self::names::ident(name)));
+    }
+    names.extend(
+        release::direct_methods(item)
+            .into_iter()
+            .map(|(instance, method)| format!("{}${method}", self::names::instance(instance))),
+    );
+    names
 }

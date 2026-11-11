@@ -99,6 +99,9 @@ pub enum Form {
 pub enum ModuleRequirement {
     Module {
         name: String,
+        /// Lexical identity of this member in dependent sibling requirements.
+        #[serde(default, skip_serializing_if = "String::is_empty")]
+        binder: String,
         signature: Box<ModuleSignature>,
     },
     Type {
@@ -252,6 +255,11 @@ pub struct Env<'b> {
     /// The instances this module sees beyond the built-in ones: of the
     /// modules it depends on, however they are imported, and its own.
     instances: Vec<Instance>,
+}
+
+pub(super) struct StaticLexical {
+    names: Vec<((Namespace, String), Option<Entity>, bool)>,
+    instances: usize,
 }
 
 include!("env_impl.rs");

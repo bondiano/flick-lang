@@ -11,9 +11,15 @@ use crate::source::Span;
 /// swap of neighbours is one edit), the closest first and ties in name order,
 /// so the answer does not depend on hash map order.
 pub fn closest<'a>(name: &str, candidates: impl IntoIterator<Item = &'a str>) -> Option<&'a str> {
+    closest_in(name, &mut candidates.into_iter())
+}
+
+// Candidate sources have different iterator types. Share the distance search
+// rather than specialize its loop for every environment and namespace.
+#[inline(never)]
+fn closest_in<'a>(name: &str, candidates: &mut dyn Iterator<Item = &'a str>) -> Option<&'a str> {
     let limit = (name.chars().count() / 3).max(1);
     candidates
-        .into_iter()
         .filter(|c| *c != name)
         .map(|c| (osa_distance(name, c), c))
         .filter(|(d, _)| *d <= limit)
@@ -27,23 +33,29 @@ impl Diagnostic {
     pub fn did_you_mean(self, span: Span, replacement: impl FnOnce() -> Option<String>) -> Self {
         #[cfg(feature = "diagnostic-fixes")]
         {
-            match replacement() {
-                Some(r) => self.with_fix(|| {
-                    (
-                        format!("did you mean `{r}`?"),
-                        vec![Edit {
-                            span,
-                            replacement: r,
-                        }],
-                    )
-                }),
-                None => self,
-            }
+            self.with_replacement(span, replacement())
         }
         #[cfg(not(feature = "diagnostic-fixes"))]
         {
             let _ = (span, replacement);
             self
+        }
+    }
+
+    #[cfg(feature = "diagnostic-fixes")]
+    #[inline(never)]
+    fn with_replacement(self, span: Span, replacement: Option<String>) -> Self {
+        match replacement {
+            Some(r) => self.with_fix(|| {
+                (
+                    format!("did you mean `{r}`?"),
+                    vec![Edit {
+                        span,
+                        replacement: r,
+                    }],
+                )
+            }),
+            None => self,
         }
     }
 }

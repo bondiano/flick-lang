@@ -200,7 +200,9 @@ fn module_contract(name: &str, requirements: &[ModuleRequirement], out: &mut Str
     let mut lines = Vec::new();
     for requirement in requirements {
         lines.push(match requirement {
-            ModuleRequirement::Module { name, signature } => {
+            ModuleRequirement::Module {
+                name, signature, ..
+            } => {
                 format!("  module {name} : {}", signature.display())
             }
             ModuleRequirement::Type {

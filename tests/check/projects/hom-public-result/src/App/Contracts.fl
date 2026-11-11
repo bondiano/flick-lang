@@ -1,0 +1,4 @@
+module App.Contracts exposing (Input)
+
+type module Input =
+  seed : Int
