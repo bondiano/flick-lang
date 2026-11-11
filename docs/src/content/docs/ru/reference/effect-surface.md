@@ -1,6 +1,6 @@
 ---
 title: "Покрытие Effect"
-source_hash: b384b01a3f7824d2
+source_hash: a03d5e8730a8b87e
 ---
 
 Стандартная библиотека оборачивает закреплённую версию Effect
