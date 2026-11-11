@@ -176,8 +176,14 @@ func effectCombine(a, b int32) int32 {
 
 // hashString is djb2 over the UTF-16 code units, from the last.
 func hashString(s string) int32 {
-	units := utf16Units(s)
 	h := int32(5381)
+	if ascii(s) {
+		for i := len(s) - 1; i >= 0; i-- {
+			h = h*33 ^ int32(s[i])
+		}
+		return optimize(h)
+	}
+	units := utf16Units(s)
 	for i := len(units) - 1; i >= 0; i-- {
 		h = h*33 ^ int32(units[i])
 	}

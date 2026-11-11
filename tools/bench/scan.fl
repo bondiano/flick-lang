@@ -1,0 +1,29 @@
+// A million short strings checked for digits twice: by their characters as a
+// list, and by the code unit at each place.
+module App.Main exposing (main)
+
+by_chars : String -> Bool
+let by_chars text =
+  not (String.is_empty text) && List.all (fun c -> c >= "0" && c <= "9") (String.chars text)
+
+by_places : String -> Bool
+let by_places text =
+  let length = String.length text
+  let mut at = 0
+  let mut ok = length > 0
+  while ok && at < length do
+    let code = Option.with_default 0 (String.char_code_at at text)
+    ok = code >= 48 && code <= 57
+    at = at + 1
+  ok
+
+count : Int -> Int -> Int
+let rec count i acc =
+  if i == 0 then
+    acc
+  else
+    let text = "12345678" ++ show i
+    count (i - 1) (acc + (if by_chars text then 1 else 0) + (if by_places text then 1 else 0))
+
+main : Unit ->{; AppError} Unit
+let main () = Platform.stdout_line (show (count 1000000 0))
