@@ -56,11 +56,13 @@ macro "cert_simp" : tactic => `(tactic| (simp_all [Row.union, Row.ofCaps, Row.pl
   Row.none, Row.substT, Caps.substT, Caps.none, Ty.reach, instT, liftT, Ty.up, Ty.ren, Atom.up,
   Atom.ty, Ty.asRow, Row.err, Row.scope, Row.disch, Row.back, shiftV, and_assoc] <;> omega))
 
-/-- `h : x ∈ A` of a finite set `A`, split into one goal for each element `A` names. -/
+/-- `h : x ∈ A` of a finite set `A`, split into one goal for each element `A` names. Only a
+disjunction is split: `rcases` of an `∃` over atoms would split the witness, its `Nat`, and so
+on without end. -/
 macro "split_mem " h:ident : tactic => `(tactic| (
   (try simp only [Row.union, Row.ofCaps, Row.single, Row.none, Caps.none, Ty.reach, Row.scope,
     Row.disch] at $h:ident)
-  repeat' (obtain $h:ident | $h:ident := $h:ident)))
+  repeat' (obtain $h:ident | $h:ident := ($h:ident : _ ∨ _))))
 
 /-- `C = C'` or `C ⊆ C'` of finite sets of atoms. -/
 macro "caps_set" : tactic => `(tactic| first
@@ -115,11 +117,14 @@ macro "closed_tac" : tactic => `(tactic| (
       | simp [Ty.substT, hσ]))
 
 /-- `LeLive t t'` of concrete types: the same type, or an arrow or a computation whose stage
-and reach widen. -/
+and reach widen. A constructor's type `Sig.ctorTy` is written out first. -/
 syntax "le_live" : tactic
 macro_rules
   | `(tactic| le_live) => `(tactic| first
     | exact LeLive.refl
+    | (unfold Sig.ctorTy
+       simp only [Ty.arrows, Ty.tcon, List.map, List.foldl, Ty.substT, Stage.substT]
+       le_live)
     | (refine LeLive.arrow ?_ ?_ ?_ ?_ <;> first | le_live | stage_le | caps_set)
     | (refine LeLive.eff ?_ ?_ ?_ <;> first | le_live | stage_le | caps_set))
 

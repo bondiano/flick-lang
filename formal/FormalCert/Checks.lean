@@ -12,6 +12,14 @@ namespace Flick.Cert.Checks
 
 open Flick Flick.Cert
 
+/-- A constructor's type with a function field, written out (`le_live`); its reach goes
+through `split_mem`, which once split the witness of an `∃` without end. -/
+example : LeLive (Sig.ctorTy [(.arrow (.base .unit) (.rt Row.none Row.none) (.base .unit) Caps.none)]
+      "K" [])
+    (.arrow (.arrow (.base .unit) (.rt Row.none Row.none) (.base .unit) Caps.none) .pure (.adt "K")
+      Caps.none) := by
+  le_live
+
 /-- A fact whose capture row is empty at the instance (`outl` with `Caps.none`). -/
 example : (Scheme.mk 3 (Facts.single (fun x => x = .v 1) (.tvar 2)) (.base .unit)).Holds Facts.none
     [(.row (fun x => x = .nm "L")), (.caps Caps.none), (.tvar 0)] := by

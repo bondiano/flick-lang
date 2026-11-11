@@ -53,7 +53,7 @@ formal-certs:
 # Certify a run of generated programs and check the certificates with Lean
 model-certs: lean
     cargo test -p flick-model --test certs -- --ignored
-    cd formal && lake env lean ../target/certs/Batch.lean
+    cd formal && ls ../target/certs/Batch/*.lean | xargs -n 1 -P 4 lake env lean
 
 # Build the Lean 4 mechanization of λFlick in formal/ as CI does; --wfail fails on a `sorry`
 lean:
