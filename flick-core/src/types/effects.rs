@@ -105,8 +105,8 @@ impl Checker<'_> {
             only_sync: None,
             returns: None,
             calls: 0,
-            scopes: self.regions.open.len(),
-            provides: self.regions.provides.len(),
+            scopes: self.cx.regions.open.len(),
+            provides: self.cx.regions.provides.len(),
             tail_arm: None,
         }
     }
@@ -167,24 +167,24 @@ impl Checker<'_> {
     pub fn perform(&mut self, services: &Type, errors: &Type, span: Span) {
         let services = &self.settle_performed(services, span);
         let services = &self.lexical_owner(services, span);
-        self.regions.raised.push((errors.clone(), span));
-        self.runtime = true;
-        self.stage.runtime = true;
-        self.stage.calls += 1;
-        if let Some(reason) = &self.stage.pure {
+        self.cx.regions.raised.push((errors.clone(), span));
+        self.cx.runtime = true;
+        self.cx.stage.runtime = true;
+        self.cx.stage.calls += 1;
+        if let Some(reason) = &self.cx.stage.pure {
             let message = format!("this is a runtime call, but {reason}");
             if !self.diagnostics.iter().any(|d| d.span == Some(span)) {
                 self.error(codes::E001, span, message);
             }
             return;
         }
-        if let Some(allowed) = &self.stage.tail_arm {
+        if let Some(allowed) = &self.cx.stage.tail_arm {
             let call = (services.clone(), allowed.clone(), span);
-            self.regions.tail_calls.push(call);
+            self.cx.regions.tail_calls.push(call);
         }
         let (bound_services, bound_errors) =
-            (self.stage.services.clone(), self.stage.errors.clone());
-        let site = self.stage.site;
+            (self.cx.stage.services.clone(), self.cx.stage.errors.clone());
+        let site = self.cx.stage.site;
         self.sub_row(services, &bound_services, site, span, false);
         self.sub_row(errors, &bound_errors, site, span, true);
     }
@@ -203,10 +203,10 @@ impl Checker<'_> {
     /// call, `await`, `scope`, `provide`) may run at `span`; reports it
     /// where the stage allows Sync calls alone.
     pub fn runtime_allowed(&mut self, span: Span) -> bool {
-        let Some(reason) = self.stage.only_sync else {
+        let Some(reason) = self.cx.stage.only_sync else {
             return true;
         };
-        self.stage.runtime = true;
+        self.cx.stage.runtime = true;
         if !self.diagnostics.iter().any(|d| d.span == Some(span)) {
             self.error(
                 codes::E001,
@@ -239,7 +239,7 @@ impl Checker<'_> {
         if norm.entries.is_empty() && norm.tails.is_empty() {
             return;
         }
-        self.subrows.push(SubRow {
+        self.cx.subrows.push(SubRow {
             actual: actual.clone(),
             declared: declared.clone(),
             site,
@@ -253,8 +253,8 @@ impl Checker<'_> {
     /// The services `needed` by the body of a `scope` of `region` must be
     /// `outer`, the services around it, besides `Scope region`.
     pub fn scope_row(&mut self, needed: &Type, outer: &Type, region: &Type, span: Span) {
-        let site = self.stage.site;
-        self.subrows.push(SubRow {
+        let site = self.cx.stage.site;
+        self.cx.subrows.push(SubRow {
             actual: needed.clone(),
             declared: outer.clone(),
             site,
@@ -269,9 +269,9 @@ impl Checker<'_> {
     /// its position allows: runtime arrows and `Eff` are covariant in their
     /// rows and results, and a pure function passes for a runtime one.
     pub fn subsume(&mut self, actual: &Type, expected: &Type, span: Span) -> super::unify::Unified {
-        let outer = self.regions.deferring.replace(span);
+        let outer = self.cx.regions.deferring.replace(span);
         let fits = self.subsume_at(actual, expected, span);
-        self.regions.deferring = outer;
+        self.cx.regions.deferring = outer;
         fits
     }
 

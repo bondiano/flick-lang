@@ -108,3 +108,13 @@ let rec eval_two t =
   match t with
   | One n -> n
   | Both l r -> (eval_two l, eval_two r)
+
+/// A value without a signature that a branch names before its declaration
+/// is inferred on its own, not under what the branch learned.
+late : Expr a -> a
+let late e =
+  match e with
+  | IntLit n -> n + pending
+  | other -> eval other
+
+let pending = List.length [1, 2]

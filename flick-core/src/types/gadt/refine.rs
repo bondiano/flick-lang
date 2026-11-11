@@ -111,6 +111,7 @@ impl Refiner<'_, '_> {
 
     fn rigid_kind(&self, s: u32) -> Option<&Kind> {
         self.checker
+            .cx
             .regions
             .rigid_kinds
             .iter()

@@ -115,7 +115,7 @@ impl Checker<'_> {
 
     /// The declared type of the local a name refers to, in a GADT branch.
     pub(in crate::types) fn declared_local(&self, i: usize) -> Option<Type> {
-        (!self.store.equalities.is_empty()).then(|| self.locals[i].ty.clone())
+        (!self.store.equalities.is_empty()).then(|| self.cx.locals[i].ty.clone())
     }
 
     /// The equalities among the assumptions in scope, for a constraint that
@@ -245,7 +245,7 @@ impl Checker<'_> {
             let skolem = self.store.skolem(&v.name);
             if let Type::Skolem(s) = skolem {
                 self.gadt.existentials.push(s);
-                self.regions.rigid_kinds.push((s, v.kind.clone()));
+                self.cx.regions.rigid_kinds.push((s, v.kind.clone()));
             }
             subst.push((v.name.clone(), skolem));
         }

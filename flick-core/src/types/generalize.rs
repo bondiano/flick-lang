@@ -80,7 +80,7 @@ impl Checker<'_> {
         }
         // a value a pending hold still checks stays monomorphic: its unknown
         // rows, once quantified, would count as variables it captures
-        for hold in &self.regions.holds {
+        for hold in &self.cx.regions.holds {
             for (_, held) in &hold.held {
                 self.store.lower(held);
             }
@@ -130,7 +130,7 @@ impl Checker<'_> {
         // an operand of an arithmetic operator nothing determined becomes
         // the operator's first allowed type once the declaration is settled
         // a number literal's type may still be settled otherwise, so it stays open
-        let settled: Vec<(u32, Lang)> = (self.operators.iter())
+        let settled: Vec<(u32, Lang)> = (self.cx.operators.iter())
             .filter_map(|op| match self.zonk(&op.ty) {
                 Type::Meta(m) if !self.store.is_numeric(m) => Some((m, op.domain.names()[0])),
                 _ => None,
@@ -172,7 +172,8 @@ impl Checker<'_> {
 
     /// Whether every pending operator will accept its operands once settled.
     pub fn operators_fit(&self) -> bool {
-        self.operators
+        self.cx
+            .operators
             .iter()
             .all(|op| match self.zonk(&op.ty).spine().0 {
                 Type::Meta(_) | Type::Error => true,
@@ -200,7 +201,7 @@ impl Checker<'_> {
 
     /// Variable names not used in `ty` or by a variable in scope.
     fn free_names(&self, ty: &Type) -> impl Iterator<Item = String> + use<> {
-        let mut taken: Vec<String> = self.tyvars.iter().map(|v| v.name.clone()).collect();
+        let mut taken: Vec<String> = self.cx.tyvars.iter().map(|v| v.name.clone()).collect();
         ty.visit(&mut |t| match t {
             Type::Var(name) => taken.push(name.clone()),
             Type::Skolem(s) => taken.push(self.store.skolem_name(*s).to_owned()),
