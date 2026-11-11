@@ -38,7 +38,7 @@ mod workspace;
 fn watch(command: &impl Command, global: &GlobalArguments) -> ExitCode {
     let paths = commands::watched(global);
     loop {
-        let before = commands::watch_snapshot(&paths);
+        let before = commands::settled_snapshot(&paths);
         run_command(command, global);
         timings::report(global);
         while commands::watch_snapshot(&paths) == before {

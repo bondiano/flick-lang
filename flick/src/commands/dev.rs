@@ -22,7 +22,7 @@ use flick_core::source::SourceMap;
 use signal_hook::consts::SIGTERM;
 
 use super::run::{Generation, build_into_generation, dev_entries, find_project, launch, vite};
-use super::test::{watch_snapshot, watched_roots};
+use super::test::{settled_snapshot, watch_snapshot, watched_roots};
 use crate::args::{GlobalArguments, RunArguments};
 use crate::child::{self, Running};
 use crate::{report, timings};
@@ -90,8 +90,8 @@ pub fn dev(options: &RunArguments, global: &GlobalArguments) -> ExitCode {
     // what the builds of this session compiled: a change compiles what it reaches
     let modules: Rc<RefCell<ModuleCache>> = Rc::default();
     loop {
-        let now = watch_snapshot(&paths);
-        if seen.as_ref() != Some(&now) {
+        if seen.as_ref() != Some(&watch_snapshot(&paths)) {
+            let now = settled_snapshot(&paths);
             // the version running until now is no phase of the next build
             if seen.is_some() {
                 timings::discard();
