@@ -6,149 +6,188 @@
 module Optic exposing (..)
 
 /// Converts `s` to `a` and back without loss.
-type Iso s a
+opaque type Iso s a = Iso { there : s -> a; back : a -> s }
 
 /// The part `a` that every `s` has.
-type Lens s a
+opaque type Lens s a = Lens { read : s -> a; write : a -> s -> s }
 
 /// The part `a` that some `s` are, and from which an `s` is built.
-type Prism s a
+opaque type Prism s a = Prism { find : s -> Result String a; build : a -> s }
 
 /// The part `a` that some `s` have.
-type Optional s a
+opaque type Optional s a =
+  | Optional { find : s -> Result String a; write : a -> s -> Result String s }
 
 /// The parts `a` of an `s`, as a list.
-type Traversal s a
+opaque type Traversal s a = Traversal (Optional s (List a))
 
 /// The iso of `get` and its inverse `set`.
 make_iso : (s -> a) -> (a -> s) -> Iso s a
-foreign pure make_iso from "flick:Optic" "makeIso"
-  reviewed "effect@4.1.2 sha256:2bafcd2558a96cec"
+let make_iso get set = Iso { there = get; back = set }
 
 /// The lens of `get` and `replace part whole`.
 make_lens : (s -> a) -> (a -> s -> s) -> Lens s a
-foreign pure make_lens from "flick:Optic" "makeLens"
-  reviewed "effect@4.1.2 sha256:242bda49f9e37a19"
+let make_lens get replace = Lens { read = get; write = replace }
 
 /// The prism of `get`, which fails with a message, and `set`.
 make_prism : (s -> Result String a) -> (a -> s) -> Prism s a
-foreign pure make_prism from "flick:Optic" "flickMakePrism"
-  reviewed "effect@4.1.2 sha256:5f3e07378a6a4d71"
+let make_prism get set = Prism { find = get; build = set }
 
 /// The optional of `get` and `set part whole`, which fail with a message.
 make_optional : (s -> Result String a) -> (a -> s -> Result String s) -> Optional s a
-foreign pure make_optional from "flick:Optic" "flickMakeOptional"
-  reviewed "effect@4.1.2 sha256:244ebc5a663d0d1a"
+let make_optional get set = Optional { find = get; write = set }
 
 /// The prism of the values `ok` accepts; the others fail with `message`.
 from_check : (a -> Bool) -> String -> Prism a a
-foreign pure from_check from "flick:Optic" "flickFromCheck"
-  reviewed "effect@4.1.2 sha256:afd622217f087a6c"
+let from_check ok message =
+  Prism {
+    find = fun value -> if ok value then Ok value else Err message;
+    build = fun value -> value;
+  }
 
 /// The iso of a value to itself.
 id : Unit -> Iso s s
-foreign pure id from "flick:Optic" "id"
-  arity 0
-  reviewed "effect@4.1.2 sha256:b813497d39f6956c"
+let id () = Iso { there = fun value -> value; back = fun value -> value }
 
 /// The value of a `Some`.
 some : Unit -> Prism (Option a) a
-foreign pure some from "flick:Optic" "some"
-  arity 0
-  reviewed "effect@4.1.2 sha256:c844c631ecde47ea"
+let some () =
+  Prism {
+    find = fun value ->
+      match value with
+      | Some part -> Ok part
+      | None -> Err "expected a Some value";
+    build = fun part -> Some part;
+  }
 
 /// A `None`.
 none : Unit -> Prism (Option a) Unit
-foreign pure none from "flick:Optic" "none"
-  arity 0
-  reviewed "effect@4.1.2 sha256:85d40751f023fd3b"
+let none () =
+  Prism {
+    find = fun value ->
+      match value with
+      | None -> Ok ()
+      | Some _ -> Err "expected a None value";
+    build = fun _ -> None;
+  }
 
 /// The value of an `Ok`.
 success : Unit -> Prism (Result e a) a
-foreign pure success from "flick:Optic" "success"
-  arity 0
-  reviewed "effect@4.1.2 sha256:376090323da30b51"
+let success () =
+  Prism {
+    find = fun value ->
+      match value with
+      | Ok part -> Ok part
+      | Err _ -> Err "expected a Result.Success value";
+    build = fun part -> Ok part;
+  }
 
 /// The error of an `Err`.
 failure : Unit -> Prism (Result e a) e
-foreign pure failure from "flick:Optic" "failure"
-  arity 0
-  reviewed "effect@4.1.2 sha256:a7490db9974f91e9"
+let failure () =
+  Prism {
+    find = fun value ->
+      match value with
+      | Err part -> Ok part
+      | Ok _ -> Err "expected a Result.Failure value";
+    build = fun part -> Err part;
+  }
 
 /// The part a lens focuses on: `whole |> Optic.get lens`.
 get : Lens s a -> s -> a
-foreign pure get from "flick:Optic" "get"
-  arity 1
-  reviewed "effect@4.1.2 sha256:190a1ee1d1545ce4"
+let get (Lens lens) whole = lens.read whole
 
 /// The part, or why the structure does not have it.
 get_result : Optional s a -> s -> Result SchemaError a
-foreign pure get_result from "flick:Optic" "flickGetResult"
-  reviewed "effect@4.1.2 sha256:ad5463d7fc97ec03"
+let get_result (Optional optional) whole =
+  Result.map_err
+    (fun message -> SchemaError [{ message = message; path = "(root)" }])
+    (optional.find whole)
 
 /// The structure a prism builds from a part.
 set : Prism s a -> a -> s
-foreign pure set from "flick:Optic" "set"
-  arity 1
-  reviewed "effect@4.1.2 sha256:908cfedcb25adeb5"
+let set (Prism prism) part = prism.build part
 
 /// The structure with its part replaced; unchanged when it has none.
 replace : Optional s a -> a -> s -> s
-foreign pure replace from "flick:Optic" "replace"
-  arity 2
-  reviewed "effect@4.1.2 sha256:ad8927d0fabfe521"
+let replace optional part whole =
+  match replace_result optional part whole with
+  | Ok replaced -> replaced
+  | Err _ -> whole
 
 /// The structure with its part replaced, or why it has none.
 replace_result : Optional s a -> a -> s -> Result SchemaError s
-foreign pure replace_result from "flick:Optic" "flickReplaceResult"
-  reviewed "effect@4.1.2 sha256:e95b52a64e4bfdfb"
+let replace_result (Optional optional) part whole =
+  optional.find whole
+  |> Result.bind (fun _ -> optional.write part whole)
+  |> Result.map_err (fun message -> SchemaError [{ message = message; path = "(root)" }])
 
 /// The structure with `f` of its part; unchanged when it has none.
 modify : Optional s a -> (a -> a) -> s -> s
-foreign pure modify from "flick:Optic" "modify"
-  arity 2
-  reviewed "effect@4.1.2 sha256:91f26846361cd291"
+let modify (Optional optional) f whole =
+  match optional.find whole with
+  | Ok part -> replace (Optional optional) (f part) whole
+  | Err _ -> whole
 
 /// Every part a traversal focuses on; none when the structure has none.
 get_all : Traversal s a -> s -> List a
-foreign pure get_all from "flick:Optic" "getAll"
-  arity 1
-  reviewed "effect@4.1.2 sha256:4ed3cb327d026a6d"
+let get_all (Traversal (Optional optional)) whole =
+  match optional.find whole with
+  | Ok parts -> parts
+  | Err _ -> []
 
 /// The structure with `f` of every part.
 modify_all : Traversal s a -> (a -> a) -> s -> s
-foreign pure modify_all from "flick:Optic" "modifyAll"
-  arity 2
-  reviewed "effect@4.1.2 sha256:020997e0c225fc2b"
+let modify_all (Traversal optional) f whole = modify optional (List.map f) whole
 
 /// The optic of `self`, then `that`: `outer |> Optic.compose inner`.
 compose : Optional a b -> Optional s a -> Optional s b
-foreign pure compose from "flick:Optic" "flickCompose"
+let compose (Optional inner) (Optional outer) =
+  Optional {
+    find = fun whole -> Result.bind inner.find (outer.find whole);
+    write = fun part whole ->
+      outer.find whole
+      |> Result.bind (inner.write part)
+      |> Result.bind (fun middle -> outer.write middle whole);
+  }
 
 /// `compose` of two lenses, a lens.
 compose_lens : Lens a b -> Lens s a -> Lens s b
-foreign pure compose_lens from "flick:Optic" "flickCompose"
+let compose_lens (Lens inner) (Lens outer) =
+  Lens {
+    read = fun whole -> inner.read (outer.read whole);
+    write = fun part whole -> outer.write (inner.write part (outer.read whole)) whole;
+  }
 
 /// `compose` of two prisms, a prism.
 compose_prism : Prism a b -> Prism s a -> Prism s b
-foreign pure compose_prism from "flick:Optic" "flickCompose"
+let compose_prism (Prism inner) (Prism outer) =
+  Prism {
+    find = fun whole -> Result.bind inner.find (outer.find whole);
+    build = fun part -> outer.build (inner.build part);
+  }
 
 /// An optional of a list of parts, as a traversal of the parts.
 traversal : Optional s (List a) -> Traversal s a
-foreign pure traversal from "flick:Optic" "flickAs"
+let traversal optional = Traversal optional
 
 /// An iso as a lens.
 iso_lens : Iso s a -> Lens s a
-foreign pure iso_lens from "flick:Optic" "flickAs"
+let iso_lens (Iso iso) = Lens { read = iso.there; write = fun part _ -> iso.back part }
 
 /// An iso as a prism.
 iso_prism : Iso s a -> Prism s a
-foreign pure iso_prism from "flick:Optic" "flickAs"
+let iso_prism (Iso iso) = Prism { find = fun whole -> Ok (iso.there whole); build = iso.back }
 
 /// A lens as an optional.
 lens_optional : Lens s a -> Optional s a
-foreign pure lens_optional from "flick:Optic" "flickAs"
+let lens_optional (Lens lens) =
+  Optional {
+    find = fun whole -> Ok (lens.read whole);
+    write = fun part whole -> Ok (lens.write part whole);
+  }
 
 /// A prism as an optional.
 prism_optional : Prism s a -> Optional s a
-foreign pure prism_optional from "flick:Optic" "flickAs"
+let prism_optional (Prism prism) =
+  Optional { find = prism.find; write = fun part _ -> Ok (prism.build part) }

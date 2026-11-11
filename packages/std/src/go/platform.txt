@@ -138,28 +138,6 @@ sqlTemplate SqlTemplate
 pgTransaction *DatabaseTransaction
 pgLayer DatabasePgLayer
 
-[flick:Optic]
-makeIso OpticMakeIso
-makeLens OpticMakeLens
-flickMakePrism OpticMakePrism
-flickMakeOptional OpticMakeOptional
-flickFromCheck OpticFromCheck
-id OpticId
-some OpticSome
-none OpticNone
-success OpticSuccess
-failure OpticFailure
-get *OpticGet
-flickGetResult *OpticGetResult
-set *OpticSet
-replace *OpticReplace
-flickReplaceResult *OpticReplaceResult
-modify *OpticModify
-getAll *OpticGetAll
-modifyAll *OpticModifyAll
-flickCompose OpticCompose
-flickAs OpticAs
-
 [flick:Formatter]
 format FormatterFormat
 flickFormatJson FormatterFormatJson

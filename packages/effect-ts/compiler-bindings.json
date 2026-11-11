@@ -198,11 +198,6 @@
       "@flick-lang/runtime/rt/effect/Number"
     ],
     [
-      "flick:Optic",
-      null,
-      "@flick-lang/runtime/rt/effect/Optic"
-    ],
-    [
       "flick:Option",
       "@flick-lang/runtime/core/Option",
       "@flick-lang/runtime/rt/effect/Option"
