@@ -255,7 +255,6 @@ fn adapter_resolves_dependencies_beside_the_real_pnpm_package() {
 #[cfg(unix)]
 #[test]
 fn locked_offline_install_checks_the_adapter_without_changing_manifests() {
-    use std::os::unix::fs::PermissionsExt;
     use std::process::Command;
     let package = r#"{"name":"locked-adapter","packageManager":"pnpm@12.16.1"}"#;
     let lock = "lockfileVersion: '9.0'\n";
@@ -273,14 +272,13 @@ fn locked_offline_install_checks_the_adapter_without_changing_manifests() {
                 "node_modules/@flick-lang/effect-ts/node_modules/effect/package.json",
                 r#"{"version":"4.2.0"}"#,
             ),
-            (
-                "bin/pnpm",
-                "#!/bin/sh\nif [ \"$1\" = --version ]; then echo 12.16.1; else printf '%s\\n' \"$@\" > pnpm-args; fi\n",
-            ),
         ],
     );
-    fs::set_permissions(dir.join("bin/pnpm"), fs::Permissions::from_mode(0o755))
-        .expect("executable");
+    fs::create_dir_all(dir.join("bin")).expect("dir");
+    common::write_script(
+        &dir.join("bin/pnpm"),
+        "#!/bin/sh\nif [ \"$1\" = --version ]; then echo 12.16.1; else printf '%s\\n' \"$@\" > pnpm-args; fi\n",
+    );
     let mut paths = vec![dir.join("bin")];
     paths.extend(env::split_paths(&env::var_os("PATH").expect("PATH")));
     let run = || {

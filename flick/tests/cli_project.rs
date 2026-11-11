@@ -318,22 +318,17 @@ fn flick_with_path(dir: &Path, path: &str, args: &[&str]) -> Output {
 /// whether the version gate let a command through without a real install.
 #[cfg(unix)]
 fn fake_pnpm(dir: &Path, version: &str) -> (PathBuf, PathBuf) {
-    use std::os::unix::fs::PermissionsExt;
-
     let bin = dir.join("fake-bin");
     fs::create_dir_all(&bin).expect("dir");
     let marker = dir.join("pnpm-calls.txt");
-    let script = bin.join("pnpm");
-    fs::write(
-        &script,
-        format!(
+    common::write_script(
+        &bin.join("pnpm"),
+        &format!(
             "#!/bin/sh\nif [ \"$1\" = \"--version\" ]; then echo \"{version}\"; exit 0; fi\n\
              echo \"$*\" >> \"{}\"\nexit 0\n",
             marker.display()
         ),
-    )
-    .expect("write");
-    fs::set_permissions(&script, fs::Permissions::from_mode(0o755)).expect("executable");
+    );
     (bin, marker)
 }
 
