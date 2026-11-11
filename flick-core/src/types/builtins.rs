@@ -24,12 +24,10 @@ use crate::diagnostics::{Code, Diagnostic, codes};
 use crate::iface::Interface;
 #[cfg(feature = "native-project")]
 use crate::implicit_packages::IMPLICIT_PACKAGES;
+#[cfg(feature = "native-project")]
+use crate::manifest::js_dependencies_in;
 use crate::plugin::derive::builtin_expansion;
-#[cfg(feature = "native-project")]
-use crate::project::{CONFIG_FILE, config};
 use crate::resolve::{self, Module};
-#[cfg(feature = "native-project")]
-use crate::source::FileId;
 use crate::source::SourceMap;
 use crate::syntax;
 
@@ -181,23 +179,8 @@ pub fn read_package(name: &str, dir: &Path) -> io::Result<ImplicitPackage> {
         name: name.to_owned(),
         modules,
         go_bindings,
-        js_dependencies: manifest_js_dependencies(dir),
+        js_dependencies: js_dependencies_in(dir),
     })
-}
-
-/// The `[js.dependencies]` of the manifest in `dir`. A manifest that does not
-/// parse names none: its own build reports it.
-#[cfg(feature = "native-project")]
-fn manifest_js_dependencies(dir: &Path) -> Vec<(String, String)> {
-    let Ok(text) = fs::read_to_string(dir.join(CONFIG_FILE)) else {
-        return Vec::new();
-    };
-    let Ok(config) = config::parse(&text, FileId::default()) else {
-        return Vec::new();
-    };
-    (config.js_dependencies.into_iter())
-        .map(|d| (d.name, d.version))
-        .collect()
 }
 
 /// Names and sources of the built-in modules, in dependency order: the

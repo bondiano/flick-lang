@@ -4,7 +4,7 @@
 //! higher-kinded variable, a region, an open record) is refused with the
 //! reason, never written as `any`.
 
-use crate::build::bindings;
+use crate::effects::bindings;
 use std::cell::{Cell, RefCell};
 use std::collections::{BTreeSet, HashMap};
 use std::fmt::Write;

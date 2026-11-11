@@ -7,11 +7,11 @@ use super::typing::Ref;
 use super::{Checker, Range, let_parts};
 use crate::diagnostics::codes;
 use crate::iface::Namespace;
-use crate::ir::Label;
 use crate::source::Span;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
 use crate::types::lang::{self, Lang};
+use flick_ir::Label;
 
 impl Checker<'_> {
     /// A foreign component takes props only inside `ui`, through `Ui.component`.

@@ -3,7 +3,6 @@ use flick_plugin::{Nesting, Span, Structure};
 
 use super::cst::{Element, Node};
 use super::kind::SyntaxKind as K;
-use crate::types::Thresholds;
 
 impl super::Parse {
     /// A qualified file declaration with `= <members>` has the same static
@@ -110,6 +109,26 @@ fn depths(node: &Node, depth: u32, limit: u32, out: &mut Vec<Nesting>) {
             });
         } else {
             depths(child, depth, limit, out);
+        }
+    }
+}
+
+/// `[lint]` thresholds: a function past one gets a warning.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Thresholds {
+    pub function_lines: u32,
+    pub nesting: u32,
+    pub complexity: u32,
+    pub params: u32,
+}
+
+impl Default for Thresholds {
+    fn default() -> Self {
+        Thresholds {
+            function_lines: 60,
+            nesting: 4,
+            complexity: 10,
+            params: 5,
         }
     }
 }

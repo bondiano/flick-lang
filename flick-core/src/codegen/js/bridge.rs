@@ -2,7 +2,7 @@
 //! has no export for is one of Effect, and what crosses it is converted by its
 //! shape, from the signature. Emitted only for Flick's own runtime.
 
-use crate::build::bindings;
+use crate::effects::bindings;
 use flick_ir::Shape;
 
 use super::{Gen, names};

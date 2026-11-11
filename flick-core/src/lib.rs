@@ -9,6 +9,7 @@ pub mod codegen;
 pub mod consteval;
 pub mod diagnostics;
 pub mod doc;
+pub mod effects;
 pub mod ffi;
 pub mod fmt;
 #[cfg(feature = "ide")]
@@ -16,6 +17,7 @@ pub mod ide;
 pub mod iface;
 pub mod implicit_packages;
 pub mod ir;
+pub mod manifest;
 pub mod markdown;
 pub mod numeric;
 pub mod opt;
@@ -30,6 +32,8 @@ pub mod types;
 
 #[cfg(test)]
 mod builtin_source;
+#[cfg(test)]
+mod layer_tests;
 /// Version of the compiler; `.iface` files record it.
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 

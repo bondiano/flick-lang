@@ -9,13 +9,11 @@ mod bridge_select;
 mod capabilities;
 #[cfg(all(test, not(target_arch = "wasm32")))]
 mod capability_tests;
-pub mod effects;
-pub(crate) mod bindings {
-    include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
-}
 #[cfg(feature = "native-project")]
 pub mod go;
 
+pub use crate::effects;
+pub(crate) use crate::effects::bindings;
 pub use abi::interface;
 
 use std::collections::BTreeMap;

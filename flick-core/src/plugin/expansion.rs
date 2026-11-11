@@ -14,7 +14,6 @@ use flick_plugin::{Hole, Place};
 
 use crate::diagnostics::{Diagnostic, Related, Severity, codes};
 use crate::iface::{Interface, Namespace};
-use crate::ir;
 use crate::resolve;
 use crate::source::{FileId, Span};
 use crate::syntax::cst::{Element, Node};
@@ -327,7 +326,7 @@ impl Expansion {
     /// Diagnostics and IR of the expanded module at the places of the module
     /// they stand for. Warnings about generated code and fixes that edit it
     /// are dropped: they are about the plugin's code, not the user's.
-    pub fn restore(&self, diagnostics: &mut Vec<Diagnostic>, ir: Option<&mut ir::Module>) {
+    pub fn restore(&self, diagnostics: &mut Vec<Diagnostic>, ir: Option<&mut flick_ir::Module>) {
         diagnostics.retain_mut(|d| {
             let Some(span) = d.span.filter(|s| s.file == self.file) else {
                 return true;
