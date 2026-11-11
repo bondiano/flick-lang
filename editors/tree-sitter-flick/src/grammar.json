@@ -43,10 +43,6 @@
         },
         {
           "type": "SYMBOL",
-          "name": "_module_functor"
-        },
-        {
-          "type": "SYMBOL",
           "name": "_type_refinement_and"
         },
         {
@@ -492,28 +488,6 @@
           "value": "keyword"
         }
       ]
-    },
-    "_module_functor": {
-      "type": "PREC",
-      "value": 1,
-      "content": {
-        "type": "SEQ",
-        "members": [
-          {
-            "type": "ALIAS",
-            "content": {
-              "type": "STRING",
-              "value": "functor"
-            },
-            "named": true,
-            "value": "keyword"
-          },
-          {
-            "type": "SYMBOL",
-            "name": "parens"
-          }
-        ]
-      }
     },
     "_type_refinement_and": {
       "type": "SEQ",

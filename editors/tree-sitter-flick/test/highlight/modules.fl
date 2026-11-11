@@ -5,4 +5,4 @@ type module Factory = Input -> Output with type Key = String and type Value = In
 private module Hidden = Prelude
 // <- keyword
 let functor = 1
-//  ^ variable
+//  ^ function
