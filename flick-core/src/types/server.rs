@@ -2,13 +2,11 @@
 //! every one that names such a value, in this module or in one it imports,
 //! whose interface lists it. A client entry must reach none (`FLICK-E009`).
 
-use std::collections::HashMap;
-
 use super::ty::Type;
 use super::typing::Ref;
 use super::ui::members;
 use super::{Checker, let_parts};
-use crate::iface::{Entity, Namespace};
+use crate::iface::{self, Entity, Namespace};
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
 use crate::types::lang::{self, Lang};
@@ -70,7 +68,7 @@ impl Checker<'_> {
         let listed = self
             .env
             .interface(module)
-            .is_some_and(|i| i.servers.iter().any(|(n, _)| n == name));
+            .is_some_and(|i| i.tagged(iface::SERVER, name).is_some());
         let entity = Entity {
             module: module.to_owned(),
             namespace: Namespace::Value,
@@ -78,20 +76,6 @@ impl Checker<'_> {
         };
         listed || self.env.value(&entity).is_some_and(needs_server)
     }
-}
-
-/// The values among the exported ones that reach `Server`, for the
-/// interface, with their paths.
-pub fn exported_servers(
-    servers: &HashMap<String, Vec<String>>,
-    exported: &[&str],
-) -> Vec<(String, Vec<String>)> {
-    let mut found: Vec<(String, Vec<String>)> = exported
-        .iter()
-        .filter_map(|n| Some(((*n).to_owned(), servers.get(*n)?.clone())))
-        .collect();
-    found.sort();
-    found
 }
 
 /// Whether `ty` mentions `Server` in a row: a function or an effect that
