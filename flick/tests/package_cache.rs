@@ -145,6 +145,36 @@ fn a_saved_library_is_not_checked_again() {
     );
 }
 
+/// `Geo` with a schema its plugin derives, and `tail` after it.
+fn derived(tail: &str) -> String {
+    let alias = "type alias Point = { x : Float; y : Float }";
+    let head = GEO.replace(alias, &format!("{alias}\n  deriving Schema"));
+    assert_ne!(head, GEO);
+    format!("{head}{tail}")
+}
+
+#[test]
+fn a_library_that_derives_is_saved_and_one_with_a_written_block_is_not() {
+    // what the compiler's own plugin derives is a function of the sources
+    let (root, geo) = fetched("package-cache-derived");
+    fs::write(&geo, derived("")).expect("write");
+    let (status, stderr) = flick_output(&root, "cache", &["check"]);
+    assert_eq!(status, Some(0), "{stderr}");
+    fs::write(&geo, BROKEN).expect("write");
+    assert_eq!(flick(&root, "cache", &["check"]), Some(0));
+
+    // a block written out may read what no key of the package holds
+    let (root, geo) = fetched("package-cache-block");
+    let block = "\npoints : PureCodec Json Point\nlet points = codec Point.schema {\n  x = field \"x\" Float.json;\n  y = field \"y\" Float.json;\n}\n";
+    let import = "import Geo.Shift exposing (by)";
+    let written = derived(block).replace(import, &format!("{import}\nimport Codec"));
+    fs::write(&geo, written).expect("write");
+    let (status, stderr) = flick_output(&root, "cache", &["check"]);
+    assert_eq!(status, Some(0), "{stderr}");
+    fs::write(&geo, BROKEN).expect("write");
+    assert_eq!(flick(&root, "cache", &["check"]), Some(1));
+}
+
 #[test]
 fn cached_private_module_stays_private_to_a_dependent() {
     let (root, _) = fetched("package-cache-private");
@@ -253,7 +283,18 @@ include!("package_cache/modules.rs");
 
 #[test]
 fn a_build_from_saved_modules_is_the_build_from_sources() {
-    let (root, _) = fetched("package-cache-same");
+    for (name, geo_text) in [
+        ("package-cache-same", GEO.to_owned()),
+        // with the code a plugin derived, which a saved module carries too
+        ("package-cache-same-derived", derived("")),
+    ] {
+        same_build(name, &geo_text);
+    }
+}
+
+fn same_build(name: &str, geo_text: &str) {
+    let (root, geo) = fetched(name);
+    fs::write(&geo, geo_text).expect("write");
     let main = root.join("app/src/App/Main.fl");
     assert_eq!(
         flick(&root, "cache", &["build", "--out-dir", "first"]),
