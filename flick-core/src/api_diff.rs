@@ -5,6 +5,7 @@
 //! an importer sees each one, so removing one, or making its context
 //! stronger, breaks code that used it.
 
+use crate::types::{Atom, Elem};
 use std::collections::BTreeMap;
 use std::fmt;
 use std::iter::once;
@@ -368,7 +369,7 @@ fn rename(ty: &Type, names: &[(String, String)], next: &mut usize) -> Type {
         }
         // Entries of bound capture, error and service atoms follow their names.
         Type::Row(row) => {
-            let mut entries: Vec<(String, Type)> = (row.entries.iter())
+            let mut entries: Vec<(Elem, Type)> = (row.entries.iter())
                 .map(|(label, t)| (relabel(label, names), rename(t, names, next)))
                 .collect();
             entries.sort_by(|a, b| a.0.cmp(&b.0));
@@ -383,12 +384,20 @@ fn rename(ty: &Type, names: &[(String, String)], next: &mut usize) -> Type {
 }
 
 /// `label` of a bound row atom (`^a`, `~a` or `@a`) after `names`.
-fn relabel(label: &str, names: &[(String, String)]) -> String {
-    let Some((sigil @ ("^" | "~" | "@"), name)) = label.split_at_checked(1) else {
-        return label.to_owned();
+fn relabel(label: &Elem, names: &[(String, String)]) -> Elem {
+    let fresh = |atom: &Atom| match atom {
+        Atom::Var(name) => {
+            (names.iter().find(|(n, _)| n == name)).map(|(_, f)| Atom::Var(f.clone()))
+        }
+        Atom::Skolem(_) | Atom::Meta(_) => None,
     };
-    (names.iter().find(|(n, _)| n == name))
-        .map_or_else(|| label.to_owned(), |(_, fresh)| format!("{sigil}{fresh}"))
+    let renamed = match label {
+        Elem::Capture(atom) => fresh(atom).map(Elem::Capture),
+        Elem::Error(atom) => fresh(atom).map(Elem::Error),
+        Elem::Service(atom) => fresh(atom).map(Elem::Service),
+        Elem::Named(_) | Elem::Live | Elem::Provided(_) => None,
+    };
+    renamed.unwrap_or_else(|| label.clone())
 }
 
 fn label(e: &Export) -> String {

@@ -123,7 +123,9 @@ impl<'n> Checker<'_> {
             .collect();
         let (labels, labelled): (Option<Vec<String>>, Vec<(String, Type)>) = match &fields[..] {
             [Type::Record(row)] if row.tail.is_none() => {
-                let mut entries = row.entries.clone();
+                let mut entries: Vec<(String, Type)> = (row.entries.iter())
+                    .map(|(l, t)| (l.to_string(), t.clone()))
+                    .collect();
                 entries.sort_by(|a, b| a.0.cmp(&b.0));
                 (
                     Some(entries.iter().map(|(l, _)| l.clone()).collect()),

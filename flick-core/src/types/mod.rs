@@ -27,6 +27,7 @@ mod decls;
 mod display;
 mod do_notation;
 mod effects;
+mod elem;
 mod enums;
 mod env;
 mod exhaust;
@@ -104,6 +105,7 @@ pub use convert::is_type;
 pub use display::{show_signature, show_type};
 pub use do_notation::{bind_key, guard_key};
 pub use effects::NO_EFFECTS;
+pub use elem::{Atom, Elem};
 pub use env::{
     Abi, EnumLit, Form, Fundep, Instance, JsClass, ModuleNominalKind, ModuleRequirement,
     ModuleSignature, Rep, TypeDef,
@@ -117,7 +119,6 @@ pub use kinds::Kind;
 pub use patterns::is_pattern;
 pub use question::Question;
 pub use ranges::range_list;
-pub use regions::LIVE;
 pub use schemas::companion_name;
 pub use services::{OpClass, Operation};
 pub use ty::{Binder, Effects, Row, SYNC_SERVICES, Stage, Type, stage_of};

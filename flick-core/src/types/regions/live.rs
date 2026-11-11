@@ -15,13 +15,11 @@
 //!   owner, `FLICK-G003` (`live_rows.rs`).
 
 use crate::types::Checker;
+use crate::types::Elem;
 use crate::types::effects::Stage;
 use crate::types::kinds::Kind;
 use crate::types::lang::Lang;
 use crate::types::ty::{Effects, Norm, Row, Type};
-
-/// The label of `Live C` in a service row; no written row has a space in a label.
-pub const LIVE: &str = "Fiber.Live ";
 
 /// `t` without `Live`: as messages, interfaces and the emitted code show it,
 /// since every use of a signature elides it again.
@@ -30,32 +28,34 @@ pub fn strip_live(t: &Type) -> Type {
         // a row of `Live` alone and a tail is the tail, not `{_}`
         Type::Row(row)
             if !row.entries.is_empty()
-                && row.entries.iter().all(|(l, _)| l == LIVE)
+                && row.entries.iter().all(|(l, _)| matches!(l, Elem::Live))
                 && row.tail.is_some() =>
         {
             strip_live(row.tail.as_deref().expect("a tail"))
         }
-        Type::Row(row) if row.entries.iter().any(|(l, _)| l == LIVE) => Type::Row(Row {
-            entries: (row.entries.iter())
-                .filter(|(l, _)| l != LIVE)
-                .map(|(l, t)| (l.clone(), strip_live(t)))
-                .collect(),
-            tail: row.tail.as_ref().map(|t| Box::new(strip_live(t))),
-            written: row.written,
-        }),
+        Type::Row(row) if row.entries.iter().any(|(l, _)| matches!(l, Elem::Live)) => {
+            Type::Row(Row {
+                entries: (row.entries.iter())
+                    .filter(|(l, _)| !matches!(l, Elem::Live))
+                    .map(|(l, t)| (l.clone(), strip_live(t)))
+                    .collect(),
+                tail: row.tail.as_ref().map(|t| Box::new(strip_live(t))),
+                written: row.written,
+            })
+        }
         _ => t.map_children(&mut |c| strip_live(c)),
     }
 }
 
 /// Whether `t` has a `Live`.
 pub fn has_live(t: &Type) -> bool {
-    t.contains(&mut |t| matches!(t, Type::Row(r) if r.entries.iter().any(|(l, _)| l == LIVE)))
+    t.contains(&mut |t| matches!(t, Type::Row(r) if r.entries.iter().any(|(l, _)| matches!(l, Elem::Live))))
 }
 
 /// Whether the row `r` needs the skolem `s` live.
 fn row_needs(r: &Type, s: u32) -> bool {
     matches!(r, Type::Row(r) if (r.entries.iter())
-        .any(|(l, c)| l == LIVE && c.contains(&mut |a| *a == Type::Skolem(s))))
+        .any(|(l, c)| matches!(l, Elem::Live) && c.contains(&mut |a| *a == Type::Skolem(s))))
 }
 
 /// `services` that also need `atoms` live.
@@ -63,11 +63,11 @@ pub(super) fn add_live(services: &Type, atoms: Norm) -> Type {
     if atoms.entries.is_empty() && atoms.tails.is_empty() {
         return services.clone();
     }
-    let live = (LIVE.to_owned(), atoms.into_type());
+    let live = (Elem::Live, atoms.into_type());
     match services {
         Type::Row(row) => {
             let mut row = row.clone();
-            let at = row.entries.partition_point(|(l, _)| l.as_str() < LIVE);
+            let at = row.entries.partition_point(|(l, _)| *l < Elem::Live);
             row.entries.insert(at, live);
             Type::Row(row)
         }
@@ -118,7 +118,7 @@ impl Checker<'_> {
     pub(super) fn live_in(&self, services: &Norm) -> Norm {
         let mut out = Norm::default();
         for (label, ty) in &services.entries {
-            if label == LIVE {
+            if matches!(label, Elem::Live) {
                 merge(&mut out, self.live_atoms(ty, &[]));
             }
         }

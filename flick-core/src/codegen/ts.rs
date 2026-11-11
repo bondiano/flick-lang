@@ -12,7 +12,7 @@ use std::fmt::Write;
 use super::names;
 use crate::iface::{Interface, Namespace};
 use crate::types::lang::{self, Lang};
-use crate::types::{Form, Kind, LIVE, ModuleRequirement, Type, TypeDef, passes_dictionary};
+use crate::types::{Elem, Form, Kind, ModuleRequirement, Type, TypeDef, passes_dictionary};
 
 /// The runtime package generated code imports.
 const EFFECT_RUNTIME: &str = bindings::ADAPTER_PREFIX;
@@ -225,7 +225,11 @@ impl Projection<'_> {
                     .entries
                     .iter()
                     .map(|(label, ty)| {
-                        Ok(format!("readonly {}: {}", key(label), self.ty(ty, vars)?))
+                        Ok(format!(
+                            "readonly {}: {}",
+                            key(&label.to_string()),
+                            self.ty(ty, vars)?
+                        ))
                     })
                     .collect();
                 let fields = fields?;
@@ -267,8 +271,8 @@ impl Projection<'_> {
         match t {
             Type::Row(row) => {
                 // TypeScript has no `Async`: a function that may suspend is async anyway
-                let not_async = |(l, _): &&(String, Type)| {
-                    lang::label(Lang::Async) != Some(l.as_str()) && l != LIVE
+                let not_async = |(l, _): &&(Elem, Type)| {
+                    lang::label(Lang::Async) != l.name() && !matches!(l, Elem::Live)
                 };
                 for (_, entry) in row.entries.iter().filter(not_async) {
                     out.push(self.ty(entry, vars)?);

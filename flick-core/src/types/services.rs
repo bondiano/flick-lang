@@ -5,6 +5,7 @@
 //! Operations are not class methods: no instance is looked up for them.
 //! Services and errors are identified by module and name.
 
+use crate::types::Elem;
 use serde::{Deserialize, Serialize};
 
 use super::Checker;
@@ -39,7 +40,7 @@ pub fn impl_def(def: &TypeDef) -> Option<TypeDef> {
     };
     let fields = operations
         .iter()
-        .map(|op| (op.name.clone(), own_type(&op.ty, params.len())))
+        .map(|op| (Elem::named(&op.name), own_type(&op.ty, params.len())))
         .collect();
     Some(TypeDef {
         kind: with_result(&def.kind, Kind::Type),
@@ -157,7 +158,7 @@ fn require(ty: Type, label: &str, service: &Type, never_suspends: bool) -> Type 
             param,
             effects: effects.map(|mut e| {
                 e.services = Type::Row(Row {
-                    entries: vec![(label.to_owned(), service.clone())],
+                    entries: vec![(Elem::named(label), service.clone())],
                     tail: Some(Box::new(e.services)),
                     ..Row::default()
                 });
@@ -222,7 +223,7 @@ impl Checker<'_> {
         let args: Vec<Type> = params.iter().map(|_| self.fresh()).collect();
         let service = Type::apps(Type::con(&entity.module, name), args);
         let row = Type::Row(Row::closed(vec![(
-            format!("{}.{name}", entity.module),
+            Elem::Named(format!("{}.{name}", entity.module)),
             service,
         )]));
         Some(Type::app(Type::lang(Lang::ServiceTag), row))

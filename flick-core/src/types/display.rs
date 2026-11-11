@@ -1,6 +1,7 @@
 //! Types as diagnostics show them, in source syntax.
 
 use crate::numeric::NumLang;
+use crate::types::Elem;
 use std::fmt::Write;
 
 use super::Checker;
@@ -194,10 +195,10 @@ impl Printer<'_> {
                 out.push(')');
             }
             Type::Row(row)
-                if row
-                    .entries
-                    .iter()
-                    .all(|(l, _)| l.contains('.') || l.starts_with(['^', '~'])) =>
+                if row.entries.iter().all(|(l, _)| {
+                    l.name().is_none_or(|name| name.contains('.'))
+                        && !matches!(l, Elem::Service(_) | Elem::Live | Elem::Provided(_))
+                }) =>
             {
                 if row.entries.is_empty() && row.tail.is_none() {
                     out.push_str("none");

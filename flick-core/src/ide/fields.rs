@@ -98,7 +98,9 @@ impl Ide<'_> {
             ty = inner;
         }
         match ty {
-            Type::Record(row) => out.extend(row.entries.iter().cloned()),
+            Type::Record(row) => {
+                out.extend(row.entries.iter().map(|(l, t)| (l.to_string(), t.clone())));
+            }
             Type::App { .. } | Type::Con { .. } if depth < 8 => {
                 let (Type::Con { module, name }, args) = ty.spine() else {
                     return;

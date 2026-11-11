@@ -7,6 +7,7 @@
 use std::cmp::Ordering;
 
 use super::Checker;
+use super::elem::Elem;
 use super::ty::{Norm, Row, Type, Written};
 use super::unify::{Mismatch, Unified};
 
@@ -30,7 +31,7 @@ impl Checker<'_> {
             .entries
             .iter()
             .chain(&right_norm.entries)
-            .any(|(label, _)| label.starts_with('^'))
+            .any(|(label, _)| matches!(label, Elem::Capture(_)))
         {
             left_norm = Norm::default();
             right_norm = Norm::default();
@@ -81,7 +82,7 @@ impl Checker<'_> {
             return Ok(());
         }
         self.pair_variable(&mut only_left, &mut only_right, &tails_left, &tails_right)?;
-        let missing = |only: &[(String, Type)], left| {
+        let missing = |only: &[(Elem, Type)], left| {
             only.first().map_or(Ok(()), |(label, _)| {
                 Err(Mismatch::Label {
                     label: label.clone(),
@@ -145,13 +146,12 @@ impl Checker<'_> {
     /// against `{NotFound}`: the variable is that element.
     fn pair_variable(
         &mut self,
-        only_left: &mut Vec<(String, Type)>,
-        only_right: &mut Vec<(String, Type)>,
+        only_left: &mut Vec<(Elem, Type)>,
+        only_right: &mut Vec<(Elem, Type)>,
         tails_left: &[Type],
         tails_right: &[Type],
     ) -> Unified {
-        let variable =
-            |only: &[(String, Type)]| matches!(only, [(label, _)] if label.starts_with('~'));
+        let variable = |only: &[(Elem, Type)]| matches!(only, [(Elem::Error(_), _)]);
         let pair = match (&only_left[..], &only_right[..]) {
             ([(_, l)], [(_, r)])
                 if variable(only_left) && tails_left.is_empty()
@@ -177,7 +177,7 @@ impl Checker<'_> {
             if norm.entries[i].0 == norm.entries[i - 1].0 {
                 let (kept, same) = (norm.entries[i - 1].1.clone(), norm.entries.remove(i).1);
                 // what each `Live` needs alive, `regions/live.rs`, is needed together
-                if norm.entries[i - 1].0 == super::regions::LIVE {
+                if norm.entries[i - 1].0 == Elem::Live {
                     norm.entries[i - 1].1 = Type::Union(Box::new(kept), Box::new(same));
                     continue;
                 }
@@ -190,7 +190,7 @@ impl Checker<'_> {
     }
 }
 
-fn extended(entries: Vec<(String, Type)>, tails: Vec<Type>) -> Type {
+fn extended(entries: Vec<(Elem, Type)>, tails: Vec<Type>) -> Type {
     Norm { entries, tails }.into_type()
 }
 

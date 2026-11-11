@@ -1,5 +1,6 @@
 //! Static module signatures and their dependency-preserving operations.
 
+use crate::types::Elem;
 use std::mem;
 
 use super::{
@@ -36,7 +37,7 @@ fn map_module_children(ty: &Type, f: &mut dyn FnMut(&Type) -> Type) -> Type {
             ) = (old.spine().0, new.spine().0)
                 && *old_key == format!("{module}.{name}")
             {
-                *key = format!("{actual}.{member}");
+                *key = Elem::Named(format!("{actual}.{member}"));
             }
         }
         after.entries.sort_by(|a, b| a.0.cmp(&b.0));

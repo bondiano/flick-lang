@@ -4,6 +4,7 @@ use super::{Hold, Visible};
 use crate::iface::{Entity, Namespace};
 use crate::source::Span;
 use crate::types::Checker;
+use crate::types::Elem;
 use crate::types::env::Form;
 use crate::types::gadt::refine::Refined;
 use crate::types::gadt::scheme::{built, is_hidden_captures, is_indexed};
@@ -185,7 +186,7 @@ impl Checker<'_> {
                 .entries
                 .iter()
                 .any(|(label, ty)| {
-                    label.starts_with('^')
+                    matches!(label, Elem::Capture(_))
                         && !matches!(
                             self.atom_kind(ty, &[]),
                             Some(Kind::Region | Kind::CaptureRow)

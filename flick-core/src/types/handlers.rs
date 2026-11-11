@@ -3,6 +3,7 @@
 //! cover completely, and `provide` removes the services a layer builds while
 //! adding what building it needs.
 
+use crate::types::Elem;
 use std::mem;
 
 use super::Checker;
@@ -176,12 +177,12 @@ impl Checker<'_> {
     /// it covers, besides the enclosing stage's; an effect it does not
     /// cover is also the enclosing stage's, for the operations without arms.
     fn handled_row(&mut self, needed: &Type, handled: &[Handled], span: Span) {
-        let mut entries: Vec<(String, Type)> = handled
+        let mut entries: Vec<(Elem, Type)> = handled
             .iter()
             .map(|h| (h.label.clone(), h.entry.clone()))
             .collect();
         entries.sort_by(|a, b| a.0.cmp(&b.0));
-        let partial: Vec<(String, Type)> = handled
+        let partial: Vec<(Elem, Type)> = handled
             .iter()
             .filter(|h| !h.complete())
             .map(|h| (h.label.clone(), h.entry.clone()))
@@ -382,6 +383,7 @@ impl Checker<'_> {
         stage.services = needed.clone();
         stage.returns = None;
         let outer = mem::replace(&mut self.cx.stage, stage);
+        let label = Elem::Named(label);
         self.enter_provide(node, span, vec![label.clone()], false);
         let ty = match (body, expected) {
             (Some(body), Some(expected)) => {
@@ -433,7 +435,7 @@ impl Checker<'_> {
     }
 
     /// The row label of a type declared with `type error`.
-    pub fn error_label(&self, ty: &Type) -> Option<String> {
+    pub fn error_label(&self, ty: &Type) -> Option<Elem> {
         match ty.spine().0 {
             Type::Con { module, name }
                 if matches!(
@@ -441,7 +443,7 @@ impl Checker<'_> {
                     Some(Form::Error)
                 ) =>
             {
-                Some(format!("{module}.{name}"))
+                Some(Elem::Named(format!("{module}.{name}")))
             }
             _ => None,
         }
@@ -457,7 +459,7 @@ impl Checker<'_> {
 /// The errors the arms of a `try` catch: by label, or all of them.
 #[derive(Default)]
 struct Caught {
-    handled: Vec<(String, Type)>,
+    handled: Vec<(Elem, Type)>,
     all: bool,
 }
 

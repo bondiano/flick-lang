@@ -25,7 +25,7 @@ impl Checker<'_> {
             Type::Record(row) if row.tail.is_none() => Some(
                 (row.entries.iter())
                     .map(|(label, ty)| FactField {
-                        label: label.clone(),
+                        label: label.to_string(),
                         ty: self.fact_type(ty),
                     })
                     .collect(),

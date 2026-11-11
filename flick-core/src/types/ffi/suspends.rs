@@ -16,7 +16,7 @@ impl Checker<'_> {
         let effects = runtime_effects(body);
         let has_async = effects.is_some_and(|e| {
             let label = lang::label(Lang::Async);
-            matches!(&e.services, Type::Row(r) if r.entries.iter().any(|(l, _)| Some(l.as_str()) == label))
+            matches!(&e.services, Type::Row(r) if r.entries.iter().any(|(l, _)| l.name() == label))
         });
         match word.map(|w| w.text(self.text)) {
             Some("pure") => return ForeignMode::Pure,

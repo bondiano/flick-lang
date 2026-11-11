@@ -7,11 +7,12 @@
 //! owner keeps is the owner's own, so it adds nothing to what must outlive
 //! the owner (`keep_live`).
 
+use super::Outlives;
 use super::live::{add_live, merge};
-use super::{LIVE, Outlives};
 use crate::diagnostics::{Diagnostic, codes};
 use crate::source::Span;
 use crate::types::Checker;
+use crate::types::Elem;
 use crate::types::effects::Site;
 use crate::types::kinds::Kind;
 use crate::types::ty::{Norm, Row, Type};
@@ -29,7 +30,7 @@ impl Checker<'_> {
                 if let [region] = entry.spine().1[..] {
                     merge(&mut out, self.live_atoms(region, &[]));
                 }
-            } else if label != LIVE {
+            } else if !matches!(label, Elem::Live) {
                 merge(&mut out, self.indexed_live(entry));
             }
         }
@@ -69,42 +70,42 @@ impl Checker<'_> {
     /// a closed row, lacks, is left out while it needs no region known yet,
     /// as of a cell's capacity a generic signature names.
     pub(in crate::types) fn unify_live(&self, left: &mut Norm, right: &mut Norm) {
-        let lacks =
-            |n: &Norm| n.get(LIVE).is_none() && !n.tails.iter().any(|t| matches!(t, Type::Meta(_)));
+        let lacks = |n: &Norm| {
+            n.get(&Elem::Live).is_none() && !n.tails.iter().any(|t| matches!(t, Type::Meta(_)))
+        };
         let unknown = |this: &Self, t: &Type| {
             (this.live_atoms(t, &[]).entries.iter())
                 .all(|(_, a)| matches!(this.store.resolve(a), Type::Meta(_)))
         };
         if lacks(right) {
-            left.entries.retain(|(l, t)| l != LIVE || !unknown(self, t));
+            left.entries
+                .retain(|(l, t)| !matches!(l, Elem::Live) || !unknown(self, t));
         }
         if lacks(left) {
             right
                 .entries
-                .retain(|(l, t)| l != LIVE || !unknown(self, t));
+                .retain(|(l, t)| !matches!(l, Elem::Live) || !unknown(self, t));
         }
     }
 
     /// The end of `scope` of `region`: its region is live no further.
     pub(in crate::types) fn discharge_live(&self, actual: &mut Norm, region: &Type) {
-        if !actual.entries.iter().any(|(l, _)| l == LIVE) {
+        if !actual.entries.iter().any(|(l, _)| matches!(l, Elem::Live)) {
             return;
         }
         let region = self.store.resolve(region);
         let mut live = self.live_in(actual);
-        actual.entries.retain(|(l, _)| l != LIVE);
+        actual.entries.retain(|(l, _)| !matches!(l, Elem::Live));
         live.entries
             .retain(|(_, a)| self.store.resolve(a) != region);
         if !live.entries.is_empty() || !live.tails.is_empty() {
-            let at = actual.entries.partition_point(|(l, _)| l.as_str() < LIVE);
-            actual
-                .entries
-                .insert(at, (LIVE.to_owned(), live.into_type()));
+            let at = actual.entries.partition_point(|(l, _)| *l < Elem::Live);
+            actual.entries.insert(at, (Elem::Live, live.into_type()));
         }
     }
 
     /// The regions `actual` needs live that `declared` does not.
-    fn live_missing(&self, actual: &Norm, declared: &Norm) -> Vec<(String, Type)> {
+    fn live_missing(&self, actual: &Norm, declared: &Norm) -> Vec<(Elem, Type)> {
         let (mine, mut theirs) = (self.live_in(actual), self.live_in(declared));
         merge(&mut theirs, self.scope_live(declared));
         mine.entries
@@ -127,7 +128,7 @@ impl Checker<'_> {
             return false;
         }
         let inner = (declared.entries.iter())
-            .filter(|(l, _)| l == LIVE)
+            .filter(|(l, _)| matches!(l, Elem::Live))
             .find_map(|(_, t)| {
                 self.store
                     .normalize(t)
@@ -152,7 +153,7 @@ impl Checker<'_> {
                 let rest = self.store.fresh_beside(m);
                 let live = Type::Row(Row::closed(missing));
                 let row = Row {
-                    entries: vec![(LIVE.to_owned(), live)],
+                    entries: vec![(Elem::Live, live)],
                     tail: Some(Box::new(rest)),
                     ..Row::default()
                 };
