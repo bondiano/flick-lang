@@ -290,6 +290,7 @@ macro_rules! wit_conversions {
                     arguments: c.arguments.iter().map(to_argument).collect(),
                     refinement: c.refinement.as_ref().map(to_refinement),
                     binding: c.binding.as_ref().map(|b| w::Binding { module: b.module.clone(), name: b.name.clone(), span: to_span(b.span), constrained: b.constrained, in_function: b.in_function, applied: b.applied }),
+                    generated: c.generated,
                 }
             }
 
@@ -301,6 +302,7 @@ macro_rules! wit_conversions {
                     arguments: c.arguments.into_iter().map(from_argument).collect(),
                     refinement: c.refinement.map(from_refinement),
                     binding: c.binding.map(|b| $crate::Binding { module: b.module, name: b.name, span: from_span(b.span), constrained: b.constrained, in_function: b.in_function, applied: b.applied }),
+                    generated: c.generated,
                 }
             }
 
@@ -311,6 +313,7 @@ macro_rules! wit_conversions {
                     ty: ty(&a.ty),
                     fields: a.fields.as_ref().map(|fs| fs.iter().map(|x| w::FactField { label: x.label.clone(), ty: ty(&x.ty) }).collect()),
                     constant: a.constant.as_ref().map(to_constant),
+                    lambda: a.lambda,
                 }
             }
 
@@ -321,6 +324,7 @@ macro_rules! wit_conversions {
                     ty: ty(a.ty),
                     fields: a.fields.map(|fs| fs.into_iter().map(|x| $crate::FactField { label: x.label, ty: ty(x.ty) }).collect()),
                     constant: a.constant.map(from_constant),
+                    lambda: a.lambda,
                 }
             }
 

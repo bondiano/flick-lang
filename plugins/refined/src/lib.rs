@@ -91,9 +91,11 @@ mod tests {
                 },
                 fields: None,
                 constant: Some(constant),
+                lambda: false,
             }],
             refinement,
             binding: None,
+            generated: false,
         }
     }
 

@@ -443,6 +443,9 @@ pub struct Argument {
     pub ty: FactType,
     pub fields: Option<Vec<FactField>>,
     pub constant: Option<Constant>,
+    /// Written as a `fun`, maybe in parentheses: a function made where the
+    /// call is, each time it runs.
+    pub lambda: bool,
 }
 
 /// Read-only expression syntax. Children precede their parent, as in `Arena`.
@@ -516,6 +519,8 @@ pub struct CallSite {
     pub arguments: Vec<Argument>,
     pub refinement: Option<Refinement>,
     pub binding: Option<Binding>,
+    /// The call is in code a plugin wrote, not in the module's own text.
+    pub generated: bool,
 }
 
 /// What an editor shows over a span of a block, as Markdown.
