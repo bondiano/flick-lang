@@ -49,12 +49,11 @@ func scaledBytes(x float64, factor *big.Int) Value {
 	digits := strings.Replace(mantissa, ".", "", 1)
 	n, _ := new(big.Int).SetString(digits, 10)
 	n.Mul(n, factor)
-	ten := func(k int) *big.Int { return new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(k)), nil) }
 	if shift := power - (len(digits) - 1); shift >= 0 {
-		n.Mul(n, ten(shift))
+		n.Mul(n, pow10(int64(shift)))
 	} else {
 		rest := new(big.Int)
-		n.QuoRem(n, ten(-shift), rest)
+		n.QuoRem(n, pow10(int64(-shift)), rest)
 		if rest.Sign() != 0 {
 			return None
 		}
