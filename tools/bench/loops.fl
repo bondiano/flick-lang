@@ -1,0 +1,21 @@
+// A loop of 50 000 000 turns over two variables: what `while` and `let mut`
+// cost on each target beside the same loop written as a tail call.
+module App.Main exposing (main)
+
+turns : Int
+let turns = 50000000
+
+by_loop : Int -> Int
+let by_loop n =
+  let mut acc = 0
+  let mut i = n
+  while i > 0 do
+    acc = acc + i % 7
+    i = i - 1
+  acc
+
+by_call : Int -> Int -> Int
+let rec by_call i acc = if i == 0 then acc else by_call (i - 1) (acc + i % 7)
+
+main : Unit ->{; AppError} Unit
+let main () = Platform.stdout_line (show (by_loop turns + by_call turns 0))

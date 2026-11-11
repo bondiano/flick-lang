@@ -357,6 +357,16 @@ impl Control {
     }
 }
 
+/// Whether `e` has an exit of the loop `id`.
+fn leaves(e: &Expr, id: &str) -> bool {
+    if matches!(&e.kind, ExprKind::LoopExit { id: of, .. } if of == id) {
+        return true;
+    }
+    let mut found = false;
+    e.each_child(&mut |c| found |= leaves(c, id));
+    found
+}
+
 pub(super) fn lower(
     id: &str,
     condition: Option<&Expr>,
@@ -364,6 +374,24 @@ pub(super) fn lower(
     iterable: bool,
     span: Span,
 ) -> Expr {
+    // a `while` nothing leaves early is the loop itself: it has no flags to test
+    if let Some(condition) = condition
+        && !iterable
+        && !leaves(condition, id)
+        && !leaves(body, id)
+    {
+        let repeat = ExprKind::Loop {
+            condition: Box::new(condition.clone()),
+            body: Box::new(body.clone()),
+        };
+        return Expr::new(
+            ExprKind::Block(
+                vec![Stmt::Expr(Expr::new(repeat, span))],
+                Box::new(unit(span)),
+            ),
+            span,
+        );
+    }
     let mut c = Control {
         id: id.into(),
         next: 0,

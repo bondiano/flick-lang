@@ -30,6 +30,43 @@ fn compile(text: &str) -> Vec<Diagnostic> {
     build(text).diagnostics
 }
 
+/// The Go file of the module `App` of `text`.
+fn app(text: &str) -> String {
+    let out = build(text);
+    assert!(out.diagnostics.is_empty(), "{:?}", out.diagnostics);
+    out.files
+        .into_iter()
+        .find_map(|(name, go)| name.ends_with("m_App.go").then_some(go))
+        .expect("the file of App")
+}
+
+const SUM: &str = "module App exposing (main, sum)\n\n\
+sum : Int -> Int\nlet sum n =\n  let mut acc = 0\n  let mut i = n\n  \
+while i > 0 do\n    acc = acc + i\n    i = i - 1\n  acc\n\n\
+main : Unit ->{; AppError} Unit\nlet main () = Platform.stdout_line (show (sum 3))\n";
+
+#[test]
+fn a_while_nothing_leaves_is_a_plain_loop_over_variables_of_their_go_type() {
+    let go = app(SUM);
+    // boxed variables allocate on every assignment, and flags are tested on every turn
+    assert!(go.contains("var l_acc int32 = int32(0)"), "{go}");
+    assert!(go.contains("var l_i int32 = flickrt.AsInt(l_n)"), "{go}");
+    assert!(
+        !go.contains("_x24_loop") && !go.contains("flickrt.Same"),
+        "{go}"
+    );
+}
+
+#[test]
+fn a_loop_with_an_exit_keeps_the_flags_of_its_exits() {
+    let go = app(&SUM.replace(
+        "    i = i - 1\n",
+        "    i = i - 1\n    if acc > 100 then break\n",
+    ));
+    assert!(go.contains("_x24_loop"), "{go}");
+    assert!(go.contains("var l_acc int32 = int32(0)"), "{go}");
+}
+
 #[test]
 fn only_a_program_that_names_zones_embeds_the_zone_database() {
     let main_go = |body: &str| {

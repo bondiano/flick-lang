@@ -53,14 +53,16 @@ namespace Flick.Cert
 
 /-- The simp set of the finite sets of a certificate: elements, atoms, reach, substitution. -/
 macro "cert_simp" : tactic => `(tactic| (simp_all [Row.union, Row.ofCaps, Row.plain, Row.single,
-  Row.none, Row.substT, Caps.substT, Caps.none, Ty.reach, instT, Atom.up, Atom.ty, Ty.asRow,
-  Row.err, Row.scope, Row.disch, Row.back, shiftV, and_assoc] <;> omega))
+  Row.none, Row.substT, Caps.substT, Caps.none, Ty.reach, instT, liftT, Ty.up, Ty.ren, Atom.up,
+  Atom.ty, Ty.asRow, Row.err, Row.scope, Row.disch, Row.back, shiftV, and_assoc] <;> omega))
 
-/-- `h : x ∈ A` of a finite set `A`, split into one goal for each element `A` names. -/
+/-- `h : x ∈ A` of a finite set `A`, split into one goal for each element `A` names. Only a
+disjunction is split: `rcases` of an `∃` over atoms would split the witness, its `Nat`, and so
+on without end. -/
 macro "split_mem " h:ident : tactic => `(tactic| (
   (try simp only [Row.union, Row.ofCaps, Row.single, Row.none, Caps.none, Ty.reach, Row.scope,
     Row.disch] at $h:ident)
-  repeat' (obtain $h:ident | $h:ident := $h:ident)))
+  repeat' (obtain $h:ident | $h:ident := ($h:ident : _ ∨ _))))
 
 /-- `C = C'` or `C ⊆ C'` of finite sets of atoms. -/
 macro "caps_set" : tactic => `(tactic| first
@@ -89,7 +91,7 @@ macro "stage_le" : tactic => `(tactic| first
 macro "inst_eq" : tactic => `(tactic| (
   simp only [Scheme.inst, Scheme.mono, Scheme.up, Scheme.substT, liftT_zero, Ty.up_def, Ty.substT,
     Stage.substT, Ty.spine, Lit.base]
-  try simp [instT, Ty.substT, Stage.substT, Ty.spine, shiftV, Lit.base]
+  try simp [instT, liftT, Ty.up, Ty.ren, Ty.substT, Stage.substT, Ty.spine, shiftV, Lit.base]
   all_goals first
     | caps_set
     | row_set
@@ -115,11 +117,14 @@ macro "closed_tac" : tactic => `(tactic| (
       | simp [Ty.substT, hσ]))
 
 /-- `LeLive t t'` of concrete types: the same type, or an arrow or a computation whose stage
-and reach widen. -/
+and reach widen. A constructor's type `Sig.ctorTy` is written out first. -/
 syntax "le_live" : tactic
 macro_rules
   | `(tactic| le_live) => `(tactic| first
     | exact LeLive.refl
+    | (unfold Sig.ctorTy
+       simp only [Ty.arrows, Ty.tcon, List.map, List.foldl, Ty.substT, Stage.substT]
+       le_live)
     | (refine LeLive.arrow ?_ ?_ ?_ ?_ <;> first | le_live | stage_le | caps_set)
     | (refine LeLive.eff ?_ ?_ ?_ <;> first | le_live | stage_le | caps_set))
 

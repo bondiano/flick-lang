@@ -17,7 +17,7 @@ pub use template::{
 };
 
 /// Bumped on every change of the schema.
-pub const IFACE_VERSION: u32 = 15;
+pub const IFACE_VERSION: u32 = 16;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -151,14 +151,13 @@ pub struct Interface {
     /// a build, so editors find a declaration in a published package.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub source: Option<String>,
-    /// The exported functions that make an atom, an action or a view, which
-    /// a render must not call.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub makers: Vec<String>,
-    /// The exported values that reach `Server`, each with its path to it:
-    /// names of this module, then an imported one whose interface goes on.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub servers: Vec<(String, Vec<String>)>,
+    /// The exported values a tag marks, by tag, each with its path to what
+    /// the tag is of: names of this module, then an imported one whose
+    /// interface goes on. [`MAKER`] marks the functions that make an atom,
+    /// an action or a view, which a render must not call; [`SERVER`], the
+    /// values that reach `Server`.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub tags: BTreeMap<String, Vec<(String, Vec<String>)>>,
     /// The targets a build compiled the module for; empty in an interface
     /// no build wrote.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -270,7 +269,19 @@ pub fn fingerprint(interface: &Interface) -> String {
     format!("{hash:016x}")
 }
 
+/// The tag of the makers of an interface.
+pub const MAKER: &str = "maker";
+/// The tag of what reaches `Server`.
+pub const SERVER: &str = "server";
+
 impl Interface {
+    /// The path of the exported value `name` to what `tag` is of, if the
+    /// tag marks it.
+    pub fn tagged(&self, tag: &str, name: &str) -> Option<&[String]> {
+        let marked = self.tags.get(tag)?;
+        (marked.iter().find(|(n, _)| n == name)).map(|(_, path)| &path[..])
+    }
+
     pub fn find(&self, namespace: Namespace, name: &str) -> Option<&Export> {
         self.exports
             .iter()

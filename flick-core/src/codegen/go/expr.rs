@@ -135,7 +135,7 @@ impl<'a> Gen<'a> {
             ExprKind::Loop { condition, body } => {
                 let (stmts, ()) = self.block(|g| {
                     let c = g.expr(condition);
-                    let c = call(a, "flickrt.Bool", [c.doc]);
+                    let c = g.unboxed(condition, c, Native::Bool).doc;
                     g.emit(docvec![
                         a,
                         "if !",
@@ -347,10 +347,25 @@ impl<'a> Gen<'a> {
             }
             Stmt::Var(name, value) => {
                 let v = self.expr(value);
-                self.bind(name, v);
+                // a variable has one type, so a scalar one is unboxed where it is
+                // declared and where it is assigned, not boxed on every assignment
+                match self
+                    .native(value)
+                    .or_else(|| Native::of(value.ty.as_deref()))
+                {
+                    Some(n) => {
+                        let v = self.unboxed(value, v, n);
+                        self.bind_native(name, v, n);
+                    }
+                    None => self.bind(name, v),
+                }
             }
             Stmt::Assign(name, value) => {
                 let v = self.expr(value);
+                let v = match self.natives.get(name).copied() {
+                    Some(n) => self.unboxed(value, v, n),
+                    None => v,
+                };
                 let l = a.alloc_str(&names::local(name));
                 self.emit(docvec![a, l, " = ", v]);
             }

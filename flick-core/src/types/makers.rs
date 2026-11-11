@@ -3,16 +3,16 @@
 //! outside the task of a handler, in this module or in one it imports,
 //! whose interface lists them. A render must call none (`FLICK-U006`).
 
-use std::collections::HashMap;
 use std::mem;
 
 use super::ty::Type;
 use super::typing::Ref;
 use super::ui::members;
 use super::{Checker, Range, let_parts};
-use crate::iface::Namespace;
+use crate::iface::{self, Namespace};
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
+use crate::types::lang::{self, Lang};
 
 impl Checker<'_> {
     /// The top-level functions of this module that make an atom, an action
@@ -75,10 +75,8 @@ impl Checker<'_> {
         }
         let interface = self.env.interface(module)?;
         interface
-            .makers
-            .iter()
-            .any(|n| n == name)
-            .then(|| format!("{module}.{name}"))
+            .tagged(iface::MAKER, name)
+            .map(|_| format!("{module}.{name}"))
     }
 
     /// The makers named under `node`, outside the tasks of handlers: where,
@@ -115,19 +113,11 @@ fn alias(body: &Node) -> Option<&Node> {
     matches!(node.kind, K::NameExpr | K::Path).then_some(node)
 }
 
-/// The makers among the exported values, for the interface.
-pub fn exported_makers(makers: &HashMap<String, String>, exported: &[&str]) -> Vec<String> {
-    let mut names: Vec<String> = exported
-        .iter()
-        .filter(|n| makers.contains_key(**n))
-        .map(|n| (*n).to_owned())
-        .collect();
-    names.sort();
-    names
-}
-
 /// Whether a stage of `ty` needs the service `Setup` of a component.
 fn needs_setup(ty: &Type) -> bool {
+    let Some(setup) = lang::label(Lang::Setup) else {
+        return false;
+    };
     let mut found = false;
     ty.visit(&mut |t| {
         if let Type::Fun {
@@ -136,7 +126,7 @@ fn needs_setup(ty: &Type) -> bool {
         } = t
         {
             effects.services.visit(&mut |s| {
-                found |= matches!(s, Type::Row(row) if row.entries.iter().any(|(l, _)| l == "Prelude.Setup"));
+                found |= matches!(s, Type::Row(row) if row.entries.iter().any(|(l, _)| l == setup));
             });
         }
     });

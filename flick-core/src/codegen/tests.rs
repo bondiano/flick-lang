@@ -58,6 +58,21 @@ fn a_release_build_in_typescript_types_a_constructed_value_as_its_constructor_do
     assert!(!emit(false).contains("as any"));
 }
 
+#[test]
+fn a_while_nothing_leaves_is_a_plain_loop_in_javascript() {
+    let text = "module App exposing (sum)\n\nsum : Int -> Int\nlet sum n =\n  let mut acc = 0\n  \
+                let mut i = n\n  while i > 0 do\n    acc = acc + i\n    i = i - 1\n  acc\n";
+    let plain = compile(text);
+    assert!(plain.contains("if (!(i > 0)) break;"), "{plain}");
+    assert!(!plain.contains("$loop"), "{plain}");
+    // an exit still needs the flags that carry it out of nested blocks
+    let left = compile(&text.replace(
+        "    i = i - 1\n",
+        "    i = i - 1\n    if acc > 100 then break\n",
+    ));
+    assert!(left.contains("$loop"), "{left}");
+}
+
 /// The code of `text` on Flick's own runtime, in debug.
 fn on_rt(text: &str) -> String {
     on_rt_with_bridge(text, EffectBridge::Absent)

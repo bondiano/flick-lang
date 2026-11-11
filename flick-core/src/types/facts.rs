@@ -76,15 +76,18 @@ impl Checker<'_> {
     }
 }
 
+/// An argument of a watched call, as the walk found it.
+pub(super) type Given = (SourceSpan, Type, Option<Const>, bool);
+
 /// An application of a watched name, as the walk found it: its types are
 /// read once the module is solved.
 pub(super) struct PendingCall {
     module: String,
     name: String,
     span: SourceSpan,
-    /// Each argument: where it is written, its type and the constant it
-    /// folds to.
-    args: Vec<(SourceSpan, Type, Option<Const>)>,
+    /// Each argument: where it is written, its type, the constant it folds
+    /// to, and whether it is written as a `fun`.
+    args: Vec<Given>,
 }
 
 impl Checker<'_> {
@@ -95,7 +98,7 @@ impl Checker<'_> {
         module: &str,
         name: &str,
         span: SourceSpan,
-        args: Vec<(SourceSpan, Type, Option<Const>)>,
+        args: Vec<Given>,
     ) {
         self.calls.push(PendingCall {
             module: module.to_owned(),
@@ -113,13 +116,14 @@ impl Checker<'_> {
         let sites = (calls.iter())
             .map(|call| {
                 let arguments = (call.args.iter())
-                    .map(|(at, ty, constant)| {
+                    .map(|(at, ty, constant, lambda)| {
                         let fact = self.fact(ty);
                         Argument {
                             span: span_of(*at),
                             ty: fact.ty,
                             fields: fact.fields,
                             constant: constant.as_ref().and_then(constant_of),
+                            lambda: *lambda,
                         }
                     })
                     .collect();
@@ -130,6 +134,7 @@ impl Checker<'_> {
                     arguments,
                     refinement: self.refinement(call, &mut predicates),
                     binding: None,
+                    generated: call.span.start >= self.generated,
                 }
             })
             .collect::<Vec<_>>();
@@ -145,7 +150,7 @@ impl Checker<'_> {
         predicates: &mut HashMap<&'n str, ExpressionFact>,
     ) -> Option<Refinement> {
         let ty = call.name.strip_suffix("$parse")?;
-        call.args.first().and_then(|(_, _, c)| c.as_ref())?;
+        call.args.first().and_then(|(_, _, c, _)| c.as_ref())?;
         // an enum's literals travel in its interface, an opaque one's too
         let literals = match self.env.type_def(&call.module, ty).map(|d| &d.form) {
             Some(Form::Adt {

@@ -99,7 +99,7 @@ impl<'a> Gen<'a> {
                 Some(Native::Float)
             }
             ExprKind::Lit(Lit::String(_)) => Some(Native::String),
-            ExprKind::Local(name) => self.natives.get(name).copied(),
+            ExprKind::Local(name) | ExprKind::Var(name) => self.natives.get(name).copied(),
             ExprKind::Neg(num, _) | ExprKind::Binary(BinOp::Arith(_, num), _, _) => {
                 Native::of_num(*num)
             }

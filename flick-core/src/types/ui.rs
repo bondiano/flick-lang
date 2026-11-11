@@ -37,31 +37,6 @@ impl Checker<'_> {
         }
         target
     }
-
-    /// `Ui.view render`: a handler made from a `fun` inside the render is
-    /// a new closure on every render, so it is worth a warning; an action
-    /// declared at the top level, with `Action.with` data, is made once.
-    pub fn ui_render_handlers(&mut self, head: &Node, render: &Node) {
-        let is_view = matches!(
-            self.typing.names.get(&head.range()),
-            Some(Ref::Value { module, name }) if lang::is(Lang::View, module, name)
-        );
-        // a `component` is a `Ui.view` its plugin writes: its handlers stay as
-        // they are, as before the plugin wrote it
-        if !is_view || head.range().0 >= self.generated {
-            return;
-        }
-        let mut found = Vec::new();
-        handlers_of_lambdas(render, &self.typing.names, &mut found);
-        for (span, what) in found {
-            let span = Span::new(self.file, span.0, span.1);
-            self.warning(
-                codes::U002,
-                span,
-                format!("`{what}` of a `fun` makes a handler on every render: declare an `Action` at the top level, or pass data with `Action.with`"),
-            );
-        }
-    }
 }
 
 impl Checker<'_> {
@@ -97,6 +72,7 @@ impl Checker<'_> {
                     },
                     arguments: Vec::new(),
                     refinement: None,
+                    generated: range.0 >= self.generated,
                     binding: Some(flick_plugin::Binding {
                         module: self.env.module.clone(),
                         name: binding.clone(),
@@ -238,7 +214,7 @@ impl Checker<'_> {
                 .entries
                 .iter()
                 .filter_map(|(l, _)| l.name())
-                .eq(["Prelude.Setup"])
+                .eq(lang::label(Lang::Setup))
     }
 
     /// `ty` resolved, without its captures and quantifiers.
@@ -357,14 +333,6 @@ const SERIALIZABLE: [Lang; 4] = [
     Lang::SerializableResult,
 ];
 
-/// The event policies of `Ui.Event`, which make an action.
-const EVENTS: [Lang; 4] = [
-    Lang::EventExhaust,
-    Lang::EventLatest,
-    Lang::EventQueue,
-    Lang::EventConcurrent,
-];
-
 /// The declarations, those of each `rec` group one by one.
 pub(super) fn members<'n>(decls: &[&'n Node]) -> impl Iterator<Item = &'n Node> {
     decls.iter().flat_map(|d| match d.kind {
@@ -417,41 +385,5 @@ impl Keyed {
         for child in parts {
             self.walk(child, inner, names);
         }
-    }
-}
-
-/// The applications of an event policy to a `fun` under `node`: their
-/// spans and the policy's name. An action made there is `FLICK-U006`.
-fn handlers_of_lambdas(node: &Node, names: &HashMap<Range, Ref>, out: &mut Vec<(Range, String)>) {
-    if node.kind == K::AppExpr {
-        let parts: Vec<&Node> = node.nodes().collect();
-        let constructor = parts
-            .first()
-            .and_then(|head| match names.get(&head.range()) {
-                Some(Ref::Value { module, name })
-                    if EVENTS.into_iter().any(|l| lang::is(l, module, name)) =>
-                {
-                    Some(format!("{module}.{name}"))
-                }
-                _ => None,
-            });
-        let unwrap = |mut n: &Node| {
-            while n.kind == K::ParenExpr {
-                match n.nodes().next() {
-                    Some(inner) => n = inner,
-                    None => break,
-                }
-            }
-            n.kind
-        };
-        if let (Some(what), Some(last)) = (constructor, parts.last())
-            && parts.len() > 1
-            && unwrap(last) == K::FunExpr
-        {
-            out.push((node.range(), what));
-        }
-    }
-    for child in node.nodes() {
-        handlers_of_lambdas(child, names, out);
     }
 }

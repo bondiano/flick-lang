@@ -11,6 +11,7 @@
 //! reason.
 
 use std::cell::RefCell;
+use std::collections::HashMap;
 use std::fmt::Write;
 use std::rc::Rc;
 
@@ -49,6 +50,8 @@ pub(crate) struct Env {
     /// The binders of the `∀` of parameters around: the variables of the
     /// scheme come after them in `vars`.
     pub(crate) inner: usize,
+    /// The kinds of the parameters of each type constructor.
+    pub(crate) params: Option<Rc<HashMap<Path, Vec<Kind>>>>,
 }
 
 impl Env {
@@ -222,8 +225,19 @@ fn data(t: &Type, c: Option<&Caps>, env: &Env) -> Result<String, String> {
     {
         out = format!("(.tapp {out} (.caps {}))", caps(c, env)?);
     }
-    for a in args {
-        out = format!("(.tapp {out} {})", ty(a, env)?);
+    let kinds = match head {
+        Type::Con(p) => env.params.as_ref().and_then(|ps| ps.get(p)),
+        _ => None,
+    };
+    for (i, a) in args.into_iter().enumerate() {
+        // a row parameter (`Failure e`) takes a row, as the core instantiates it
+        let a = match (a, kinds.and_then(|k| k.get(i))) {
+            (Type::Errors(r), Some(Kind::Errors | Kind::Services)) => {
+                format!("(.row {})", row(r, env)?)
+            }
+            (a, _) => ty(a, env)?,
+        };
+        out = format!("(.tapp {out} {a})");
     }
     Ok(out)
 }

@@ -23,8 +23,11 @@ pub(in crate::types) enum Unfold {
 }
 
 impl Checker<'_> {
-    /// The alias at the head of `t`, if it unfolds: only a saturated one does
-    /// (`Checker::borrowed_head`).
+    /// The opaque alias at the head of `t`, if it unfolds: only a saturated
+    /// one does (`Checker::borrowed_head`). A transparent alias is never kept:
+    /// transparent aliases are acyclic (`break_alias_cycles`), so unfolding
+    /// one ends, and keeping it would leave `L (L a)` folded and make every
+    /// later walk unfold it again.
     pub(in crate::types) fn alias_key(&self, t: &Type) -> Option<AliasKey> {
         // what unification asks of every pair: no copy of the spine
         let (mut head, mut args) = (self.store.head(t), 0);
@@ -37,7 +40,7 @@ impl Checker<'_> {
         };
         matches!(
             self.env.type_def(module, name).map(|d| &d.form),
-            Some(Form::Alias { params, .. }) if args >= params.len()
+            Some(Form::Alias { params, opaque: true, .. }) if args >= params.len()
         )
         .then(|| (module.clone(), name.clone()))
     }
