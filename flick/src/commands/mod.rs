@@ -39,5 +39,5 @@ pub use plugins::plugins;
 pub use run::run;
 pub use scaffold::ScaffoldCommand;
 pub use script::script;
-pub use test::{test, watch_snapshot, watched};
+pub use test::{settled_snapshot, test, watch_snapshot, watched};
 pub use tools::{doctor, explain};
