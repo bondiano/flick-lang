@@ -35,7 +35,7 @@ It does not prove:
 | - | - | - |
 | The core | `formal/Formal/` | The typing rules the certificates use. |
 | The derived rules | `formal/FormalCert/Rules.lean`, `Match.lean` | Theorems that `lake build --wfail` checks. They add nothing to the trusted base. |
-| The tactics | `formal/FormalCert/Tactics.lean` | Macros over `simp`, `decide` and `omega`. The kernel checks what they produce, so a tactic that fails makes its certificate fail. |
+| The tactics | `formal/FormalCert/Tactics.lean`, `Checks.lean` | Macros over `simp`, `decide` and `omega`. The kernel checks what they produce, so a tactic that fails makes its certificate fail. `Checks.lean` keeps goals they once failed on. |
 | The signature | `formal/FormalCert/GenSig.lean` | Generated. `GenSig S` assumes that `S` has the generator's constructors at their declared types and that those types have no other constructors, the list constructors `Nil`/`Cons` among them. It assumes the globals at their elided schemes (`check::elided`), with their facts: the generator's values, `List.Core.get`, the region globals `open_scoped`, `use`, `Fiber.spawn`, `Resource.acquire_release` and `Scope.add_finalizer`, and the dictionary of each instance. It assumes the operations of each service without parameters, and no others, and the fields of each class's dictionary. `GenSig.inhabited` gives a signature that satisfies all of it, so the assumption is consistent. It says nothing about `Typ`. |
 | The printers | `flick-model/src/cert/`, `flick-model/src/translate/lean/elide.rs` | They write the term, its type and the signature. A wrong printer certifies the wrong statement. |
 
