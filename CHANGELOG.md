@@ -6,6 +6,14 @@ break programs.
 
 ## Unreleased
 
+- **Children in `ui`:** inside `ui { … }` the children of an element stand
+  one by one, each an argument on the line of the call or a line of its own
+  under it, with no list around them; an element with none is written
+  without them, and one argument that is a list is the list of the
+  children. A list literal there is `FLICK-T073`, which
+  `flick check --fix --only T073` rewrites. `Ui.each items node` gives a
+  node for each item. `ui` is a block of the plugin of `std` and no longer
+  a reserved word.
 - **Comparisons by `Ord`:** `< <= > >=` order any type with an `Ord`
   instance by its `compare`, as they already did a type variable: `Bool`, a
   derived type, a record, a list. A type without one is `FLICK-C001`, where

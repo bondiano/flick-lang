@@ -1,6 +1,6 @@
 ---
 title: "Type-level programming and eDSLs"
-source_hash: 0fa82cfc007e7393
+source_hash: 044f3f3c6a6087b8
 ---
 
 Flick's SQL, UI and CLI DSLs — `sql params { … }`, `ui { … }` with `component` declarations, and `cli "name" { … }` — are libraries over one type core: rows, labels, finite kinds, HKT and multiparameter classes with functional dependencies. Their backends are PostgreSQL, React (in the browser and on the server) and Effect CLI.
@@ -104,9 +104,9 @@ let save_button props = ui {
 }
 ```
 
-`ui { … }` is a block in which the names of `Ui` need no `Ui.`: a local binding wins, then a name of `Ui`, then the module's own names. It compiles to the same IR as the calls `Ui.button … [Ui.text …]`, and applying a `Ui.Component p` to props inside it is `Ui.component value props`, including `props |> value`. JSX is not part of the language.
+`ui { … }` is a block in which the names of `Ui` need no `Ui.`: a local binding wins, then a name of `Ui`, then the module's own names. The children of an element stand there one by one, each an argument on the line of the call or a line of its own under it, and a call of a function whose last parameter is `List Ui` gathers them into that list; one argument that is a list is the list itself, and a list literal is `FLICK-T073`. It compiles to the same IR as the calls `Ui.button … [Ui.text …]`, and applying a `Ui.Component p` to props inside it is `Ui.component value props`, including `props |> value`. JSX is not part of the language.
 
-Props are exact records: a missing field, an unknown one or a wrong type is an error. Children are an ordinary argument of the chosen type — `List Ui`, `Ui`, `Option Ui`, named places, `NonEmpty Tab` — and a key is metadata given with `Ui.keyed`, never a prop. Handlers keep what they need: a button whose handler uses a file of a scope cannot leave that scope (`FLICK-G001`). `Ui.text` inserts text through a safe channel; a URL is a `SafeUrl` and raw HTML a `SanitizedHtml`, which a plain `String` never is.
+Props are exact records: a missing field, an unknown one or a wrong type is an error. Outside `ui`, and for every other shape of children, they are an ordinary argument of the chosen type — `List Ui`, `Ui`, `Option Ui`, named places, `NonEmpty Tab` — and a key is metadata given with `Ui.keyed`, never a prop. Handlers keep what they need: a button whose handler uses a file of a scope cannot leave that scope (`FLICK-G001`). `Ui.text` inserts text through a safe channel; a URL is a `SafeUrl` and raw HTML a `SanitizedHtml`, which a plain `String` never is.
 
 ### Atoms, views and components
 

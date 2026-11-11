@@ -60,3 +60,18 @@ fn a_plugin_that_fails_to_lay_out_a_block_leaves_the_file_and_says_so() {
         "broken {   a }"
     );
 }
+
+#[test]
+fn the_children_of_a_ui_element_keep_their_lines_and_their_comments() {
+    let messy = "module App.V exposing (view)\n\nview : Float -> Ui\nlet view n = ui {\n      let shown = show n\n      div   { class_name = \"counter\" }\n          // the title\n          heading   (text \"count \\{shown}\")   // once\n          paragraph\n                text   \"it is \\{shown}\"\n\n                text \"today\"\n          div { class_name = \"spacer\" }\n}\n";
+    let tidy = "module App.V exposing (view)\n\nview : Float -> Ui\nlet view n = ui {\n  let shown = show n\n  div { class_name = \"counter\" }\n    // the title\n    heading (text \"count \\{shown}\") // once\n    paragraph\n      text \"it is \\{shown}\"\n\n      text \"today\"\n    div { class_name = \"spacer\" }\n}\n";
+    assert_eq!(super::fmt(messy), tidy);
+    assert_eq!(super::fmt(tidy), tidy);
+}
+
+#[test]
+fn a_call_in_a_ui_body_keeps_its_arguments_on_its_line() {
+    // broken over lines, its arguments would be its children
+    let long = "module App.V exposing (view)\n\nview : String -> String -> String -> Ui\nlet view first second third = ui {\n  text (String.join \", \" [first, second, third])\n  classed \"a class name that is long enough to pass the width of a line\" (text first) (text second)\n}\n";
+    assert_eq!(super::fmt(long), long);
+}

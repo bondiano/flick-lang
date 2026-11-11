@@ -58,6 +58,7 @@ an error. A key is metadata, given with `Ui.keyed`, never a prop.
 | - | - | - |
 | `text s` | text, through React's text channel: markup stays text | none |
 | `fragment`, `optional`, `empty` | no element | `List`, `Option`, none |
+| `each items node` | no element: `node item` for each of `items` | none |
 | `div`, `span` `{ class_name }` | `div`, `span` | `List Ui` |
 | `paragraph`, `heading`, `list`, `item` | `p`, `h1`, `ul`, `li` | `List Ui` |
 | `heading_at level` | `h1` … `h6` for `H1` … `H6` | `List Ui` |
@@ -78,6 +79,37 @@ an error. A key is metadata, given with `Ui.keyed`, never a prop.
 | `panel { header; body; footer }` | `section` with `header`, `main`, `footer` | named places |
 | `tabs { selected } (NonEmpty Tab)` | a tab list and the selected panel | `Tab`s from `tab label ui` |
 | `c props` where `c : Ui.Component p` | a foreign React component | its props |
+
+Inside `ui { … }` the children of an element stand one by one, without a
+list around them. Each is an argument of the call: on its line, in
+parentheses when it is a call itself, or on a line of its own under the
+call, where it needs none. An element with no children is written without
+them, and one argument that is a list — a value, `List.map row items`,
+`before ++ [last]` — is the list of the children:
+
+```flick
+row : String -> Ui
+let row label = ui { item (text "row \{label}") }
+
+view : Float -> List String -> Ui
+let view n labels = ui {
+  let shown = show n
+  div { class_name = "counter" }
+    heading (text "count \{shown}")
+    paragraph
+      text "it is \{shown}"
+      text "today"
+    list (List.map row labels)
+    div { class_name = "spacer" }
+}
+```
+
+A list literal there is `FLICK-T073`, which `flick check --fix --only T073`
+rewrites; a list among other children is not a `Ui` (`FLICK-T003`). Among
+children written one by one, `each items row` is a node for each item. The
+lines under a call that takes no children are its arguments, each line
+one; outside `ui` the functions take their list as any function does:
+`Ui.div props [a, b]`.
 
 `text` is `String -> Ui`, so it sits among the children of
 any element. `SafeUrl` comes only from `Ui.safe_url`, which accepts relative

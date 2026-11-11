@@ -52,7 +52,7 @@ fn the_render_of_a_component_sees_its_props_and_the_names_of_its_setup() {
 
 #[test]
 fn a_ui_block_is_code_of_the_user_to_an_editor() {
-    let source = "module App.V exposing (view)\n\nview : Ui.View Float\nlet view =\n  Ui.view (fun n -> ui {\n    let shown = show n\n    text shown\n  })\n";
+    let source = "module App.V exposing (view)\n\nview : Ui.View Float\nlet view =\n  Ui.view (fun n -> ui {\n    let shown = show n\n    paragraph\n      text shown\n  })\n";
     let f = fixture_of(&[("src/App/V.fl", source)]);
     let ide = f.ide();
     let file = f.file("App.V");
@@ -64,6 +64,12 @@ fn a_ui_block_is_code_of_the_user_to_an_editor() {
     assert_eq!(range, (at("ui {"), at("ui {") + 2));
     assert!(head.contains("ui : Ui"), "{head}");
     assert!(head.contains("Describes a user interface"), "{head}");
+    // an element whose children are the lines under it
+    let (element, _) = ide.hover(file, at("paragraph") + 1).expect("an element");
+    assert!(
+        element.contains("paragraph : List (Ui^c) -> Ui^c"),
+        "{element}"
+    );
     // a name of the open module, by what it is
     let (text, _) = ide
         .hover(file, at("text shown") + 1)

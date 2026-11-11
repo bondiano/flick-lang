@@ -48,6 +48,7 @@ change needs.
 | [Regions are checked by use](#regions-are-checked-by-use) | no | `FLICK-G002`, `FLICK-G003` |
 | [Rust 1.95 builds the compiler](#rust-195-builds-the-compiler) | no | — |
 | [`mut` is a keyword](#mut-is-a-keyword) | no | `FLICK-S007`, `FLICK-S016` |
+| [Children in `ui` stand one by one](#children-in-ui-stand-one-by-one) | yes: `--only T073` | `FLICK-T073`, `FLICK-T003` |
 
 `flick check --fix page.md` rewrites the `flick` code blocks of a Markdown
 page, each checked on its own.
@@ -324,6 +325,40 @@ is a keyword now: a parameter, a value or a record field named `mut` is
 `break` and `continue` are also reserved for local loop control; rename bare
 bindings with these names. `loop` and `while` are contextual words, so existing
 names such as `Loop.loop` and `Schedule.while` keep working.
+
+## Children in `ui` stand one by one
+
+Inside `ui { … }` the children of an element are no longer a list literal:
+each is an argument of the call, on its line or on a line of its own under
+it (see [Elements](../../reference/ui/)).
+
+```flick
+# view : Float -> Ui
+# let view n = ui {
+#   let shown = show n
+// before: div { class_name = "counter" } [heading [text shown], spacer []]
+  div { class_name = "counter" }
+    heading (text shown)
+    div { class_name = "spacer" }
+# }
+```
+
+`flick check --fix --only T073` rewrites every list literal written the old
+way. What it leaves:
+
+- **A list among other children** (`[header] ++ rows` written as two
+  arguments) is `FLICK-T003`: join the list first, or give a node for each
+  item with `each rows row`.
+- **A call broken over lines** inside `ui` reads each line under it as one
+  argument. `View.classed "name" (text "x")` written on three lines still
+  works; a line holding two arguments, `text "x"` without parentheses, is
+  now one child.
+- **`div props` inside `ui`** is the element with no children, not a
+  function still waiting for them. Take the function outside `ui`, or write
+  `fun children -> div props children`.
+
+`ui` is no longer a reserved word: it starts a block before `{` and is a
+name elsewhere. Outside `ui` nothing changes: `Ui.div props [a, b]`.
 
 ## Instances belong to one package
 
