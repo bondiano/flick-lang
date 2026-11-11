@@ -136,7 +136,7 @@ mod tests {
     }
 
     #[test]
-    fn a_reexported_stream_renderer_selects_one_adapter_ui_family() {
+    fn a_reexported_stream_renderer_keeps_the_ui_free_of_effect() {
         let module = lower_text(
             "App",
             "module App exposing (stream)\nstream : String -> Ui -> Stream.Core.Stream {Async, Reactivity.Atom.Registry} none String\nlet stream = Ui.Server.stream\n",
@@ -144,7 +144,7 @@ mod tests {
         .expect("lowers");
         assert_eq!(
             select_modules(once(&module), EffectBridge::Available),
-            EffectBridge::AvailableWithUi
+            EffectBridge::Available
         );
         assert_eq!(
             select_modules(once(&module), EffectBridge::Absent),

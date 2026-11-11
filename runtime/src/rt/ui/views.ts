@@ -27,7 +27,7 @@ import { causeOf, hasFails } from "../cause.ts";
 import { type Fiber, type Run, awaitFiber, currentCtx, extend, inCtx, runIn } from "../fiber.ts";
 import { service } from "../handle.ts";
 import { Failure } from "../outcome.ts";
-import { BridgeContext, type Events, RegistryContext } from "./render.ts";
+import { BridgeContext, type Events, RegistryContext, StreamContext } from "./render.ts";
 
 /** `View p r e`: a component whose render reads atoms; React renders it again when one it read changes, or its props. */
 export interface View {
@@ -187,6 +187,7 @@ const component = (view: View): FunctionComponent<object> => {
     const bridge = useContext(BridgeContext);
     const [, rerender] = useReducer((n: number) => n + 1, 0);
     const server = serverSide();
+    const streaming = useContext(StreamContext);
     // set up once per instance: StrictMode calls a state's initializer twice, not a ref's
     const ref = useRef<Instance | undefined>(undefined);
     ref.current ??= instanceOf(view, props);
@@ -210,7 +211,12 @@ const component = (view: View): FunctionComponent<object> => {
         read.set(atom, value);
         return value;
       },
-      () => view.fallback ?? uiFragment([]),
+      () => {
+        // a streamed page shows the boundary's fallback and sends this view once a read atom changes
+        // oxlint-disable-next-line typescript/only-throw-error -- React suspends a render that throws a promise
+        if (streaming !== undefined) throw streaming.wait(read);
+        return view.fallback ?? uiFragment([]);
+      },
     );
     // subscribe after the commit; a write since the render renders again
     useLayoutEffect(() => {

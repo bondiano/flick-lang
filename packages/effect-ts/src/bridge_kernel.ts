@@ -14,6 +14,7 @@ import {
   Schedule as ESchedule,
   Scheduler,
   Scope as EScope,
+  Stream,
   Tracer as ETracer,
 } from "effect";
 import type { StackFrame } from "effect/References";
@@ -23,6 +24,7 @@ import { syncContext, syncIn } from "./sync.ts";
 import { type Cause, type Exit, Raise, dieReason, failReason, failed, fromReasons, interruptReason, raise, succeeded } from "@flick-lang/runtime/rt/cause";
 import { type Ctx, type Fiber, type Run, Suspend, awaitFiber, currentCtx, currentFiber, fiberHooks, forkNow, hosted, inCtx, owned, asExit, exitOf, raiseOf, runIn } from "@flick-lang/runtime/rt/fiber";
 import { Duration } from "@flick-lang/runtime/rt/duration";
+import { streamHooks } from "@flick-lang/runtime/rt/ui/stream_hook";
 
 import { FlickFiber as NativeFlickFiber, Owner, close } from "@flick-lang/runtime/rt/owner";
 
@@ -373,5 +375,16 @@ bridgeKernel.causeToEffect = causeToEffect;
   installDataBridge();
   installLayerBridge();
   installSchemaBridge();
+  // the native `Ui.Server.stream` renders a stream of text; it starts when the Stream is run, with that run's evidence
+  streamHooks.text = (start) =>
+    Stream.withSpan(
+      Stream.unwrap(
+        Effect.map(callEffect(start), (markup) =>
+          // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- `start` makes a stream of text
+          Stream.orDie(Stream.fromReadableStream({ evaluate: () => markup as ReadableStream<string>, onError: (cause) => cause })),
+        ),
+      ),
+      "flick.render",
+    );
 };
 initializeBridge();
