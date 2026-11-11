@@ -202,7 +202,9 @@ fn check(&self, block: &Block, _: &[u8], facts: &[Fact]) -> Vec<Diagnostic> {
 
 A package may watch calls of names, not only its own blocks. `watch` of its
 `[package]`, beside `plugin`, names them, each `Module.name`,
-`Module.Sub.name` or `*.name` for the name in any module:
+`Module.Sub.name` or `*.name` for the name in any module. It may also name a
+service, `Module.Service`, and the tag `@maker`; what the plugin is told of
+those is below.
 
 ```toml
 [package]
@@ -250,9 +252,6 @@ row is open. The task of a handler runs later, so the functions around a
 `task` are not around what is inside it. The UI plugin refuses
 (`FLICK-U006`) a maker named in a render, a function whose services are
 `Atom.Read` alone.
-
-The `watch` of a manifest names values. Services and tags are watched by the
-plugins the compiler ships.
 
 ```rust
 fn check_calls(&self, calls: &[CallSite], state: &[u8]) -> Vec<Diagnostic> {

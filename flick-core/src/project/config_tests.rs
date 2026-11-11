@@ -369,10 +369,20 @@ fn a_package_names_the_calls_its_plugin_watches() {
         config.package.map(|p| p.watch),
         Some(vec!["Ui.Event.queue".into(), "*.parse".into()])
     );
+    // a service, by its signatures, and a tag, by the values it reaches
+    let config =
+        package("plugin = \"protos.wasm\"\nwatch = [\"Atom.Read\", \"@maker\"]").expect("valid");
+    assert_eq!(
+        config.package.map(|p| p.watch),
+        Some(vec!["Atom.Read".into(), "@maker".into()])
+    );
     for refused in [
         "watch = [\"Ui.Event.queue\"]",
         "plugin = \"protos.wasm\"\nwatch = [\"queue\"]",
-        "plugin = \"protos.wasm\"\nwatch = [\"Ui.Event.Queue\"]",
+        "plugin = \"protos.wasm\"\nwatch = [\"Queue\"]",
+        "plugin = \"protos.wasm\"\nwatch = [\"@\"]",
+        "plugin = \"protos.wasm\"\nwatch = [\"@unknown\"]",
+        "plugin = \"protos.wasm\"\nwatch = [\"@Ui.maker\"]",
         "plugin = \"protos.wasm\"\nwatch = [\"ui.event.queue\"]",
         "plugin = \"protos.wasm\"\nwatch = [\"*.*\"]",
         "plugin = \"protos.wasm\"\nwatch = [\"\"]",

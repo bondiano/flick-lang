@@ -9,6 +9,7 @@ use toml::Spanned;
 
 use super::{Dependency, Grants, Package, Source};
 use crate::diagnostics::{Diagnostic, codes};
+use crate::iface;
 use crate::plugin::reach::inside;
 use crate::source::Span;
 
@@ -142,7 +143,7 @@ pub(super) fn package(raw: Spanned<RawPackage>, at: Span) -> Result<Package, Dia
     }
     if let Some(bad) = watch.iter().find(|w| !is_watched(w)) {
         return Err(error(format!(
-            "`watch = [\"{bad}\"]`: a watched name is `Module.name`, `Module.Sub.name` or `*.name` for the name of any module"
+            "`watch = [\"{bad}\"]`: a watched name is `Module.name`, `Module.Sub.name` or `*.name` for the name of any module, `Module.Service` for a service, or the tag `@maker`"
         )));
     }
     if let Some(bad) = hooks.iter().find(|h| !matches!(h.as_str(), "emit" | "ir")) {
@@ -174,9 +175,13 @@ pub(super) fn package(raw: Spanned<RawPackage>, at: Span) -> Result<Package, Dia
     })
 }
 
-/// Whether `watched` names a value of a module: `Ui.Event.queue`, or
-/// `*.parse` for the name of any module.
+/// Whether `watched` names what a plugin is told of: a value of a module
+/// (`Ui.Event.queue`, or `*.parse` for the name of any module), a service
+/// (`Atom.Read`), or a tag the compiler follows (`@maker`).
 fn is_watched(watched: &str) -> bool {
+    if let Some(tag) = watched.strip_prefix('@') {
+        return tag == iface::MAKER;
+    }
     let Some((module, name)) = watched.rsplit_once('.') else {
         return false;
     };
@@ -188,7 +193,7 @@ fn is_watched(watched: &str) -> bool {
         p.starts_with(|c: char| c.is_ascii_uppercase())
             && p.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_')
     };
-    value(name) && (module == "*" || module.split('.').all(part))
+    (value(name) || part(name)) && (module == "*" || module.split('.').all(part))
 }
 
 /// What a project grants the plugin of a package, as written.
