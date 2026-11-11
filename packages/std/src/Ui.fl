@@ -129,6 +129,12 @@ fragment : List (Ui^c) -> Ui^c
 foreign pure fragment from "flick:ui/react" "uiFragment"
   retention call
 
+/// A node for each of `items`, in their order: what a computed list of
+/// children is inside `ui { … }`, where the children of an element stand one
+/// by one. Give each node a `keyed` name when the list changes.
+each : List a -> (a -> Ui^c) -> Ui^c
+let each items node = fragment (List.map node items)
+
 /// The node, or nothing.
 optional : Option (Ui^c) -> Ui^c
 foreign pure optional from "flick:ui/react" "uiOptional"

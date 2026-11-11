@@ -1,7 +1,7 @@
 //! Expressions and block statements.
 
 use super::control::{control_expr, while_ahead};
-use super::{Done, K, Parser, decl, pattern, plugin, types};
+use super::{Ctx, Done, K, Parser, decl, pattern, plugin, types};
 use crate::diagnostics::codes;
 use crate::syntax::heads::OPEN;
 
@@ -215,14 +215,44 @@ fn not_in_v1(p: &mut Parser, message: &str) -> Done {
 
 fn app(p: &mut Parser) -> Option<Done> {
     let head = postfix(p)?;
-    if !at_arg_start(p) {
+    if !at_arg_start(p) && !at_children(p) {
         return Some(head);
     }
     let m = p.precede(head);
-    while at_arg_start(p) {
+    while at_arg_start(p) && !at_children(p) {
         argument(p);
     }
+    if at_children(p) {
+        children(p);
+    }
     Some(p.complete(m, K::AppExpr))
+}
+
+/// Whether the lines of a call's children start here: where a block asks for
+/// them, a line that goes on with the call and starts an expression. Inside
+/// brackets a line break means nothing, as everywhere.
+fn at_children(p: &Parser) -> bool {
+    p.line_children
+        && p.raw().line_start
+        && !matches!(p.ctx.last(), Some((Ctx::Bracket, _)))
+        && p.current() != K::Minus
+        && at_operand_start(p)
+}
+
+/// The lines under a call, each an expression of its own: a block at the
+/// column of the first, whose deeper lines are the children of a line.
+fn children(p: &mut Parser) {
+    let m = p.start();
+    p.push_aligned_here();
+    p.items(
+        |p| {
+            expr(p);
+        },
+        false,
+        |_| false,
+    );
+    p.pop();
+    p.complete(m, K::Children);
 }
 
 pub(super) fn at_arg_start(p: &Parser) -> bool {
@@ -334,6 +364,13 @@ fn atom(p: &mut Parser) -> Option<Done> {
         K::Ident if p.at_word(OPEN) => {
             p.bump();
             con_path(p);
+            // the type of a child, when calls of the body give their last
+            // list element by element
+            if p.at(K::Con) {
+                let child = p.start();
+                con_path(p);
+                p.complete(child, K::NameType);
+            }
             atom(p);
             K::OpenExpr
         }

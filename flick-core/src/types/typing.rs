@@ -55,6 +55,10 @@ pub struct Typing {
     pub runtime: HashSet<Range>,
     /// Those whose stage runs a Sync call.
     pub sync: HashSet<Range>,
+    /// The applications whose arguments from this position on are the
+    /// elements of the list their function takes last, by the range of the
+    /// application.
+    pub gathered: HashMap<Range, usize>,
     /// Applications inside `ui` whose function is an opaque `Ui.Component`.
     pub ui_components: HashSet<Range>,
     /// The `and` groups of `do` followed only by `pure e`, whose last

@@ -288,6 +288,7 @@ fn opens(
     let body = b.at(e).expr(Expr::Hole(e));
     Ok(b.at(block.whole()).expr(Expr::Open {
         module: "Pairs".into(),
+        child: None,
         body,
     }))
 }

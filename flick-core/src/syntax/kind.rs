@@ -301,6 +301,9 @@ syntax_kinds! {
         ForExpr,
         ScopeExpr,
         ProvideExpr,
+        /// The lines under a call that are its arguments, one each, where a
+        /// plugin's block asks for them: the children of an element of `ui`.
+        Children,
         /// A body with a module open, which only generated code writes: the
         /// names of the module are in sight in it before the file's own.
         OpenExpr,

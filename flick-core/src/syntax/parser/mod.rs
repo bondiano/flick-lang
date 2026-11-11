@@ -24,8 +24,8 @@ use SyntaxKind as K;
 use build::{Event, build};
 
 pub use fragment::{
-    Fragment, Heads, parse_body_at, parse_decl_at, parse_decls_at, parse_expr_at, parse_pat_at,
-    parse_type_at,
+    Fragment, Heads, parse_body_at, parse_decl_at, parse_decls_at, parse_expr_at, parse_lines_at,
+    parse_pat_at, parse_type_at,
 };
 
 use super::cst::Node;
@@ -126,6 +126,9 @@ pub(crate) struct Parser<'t> {
     no_brace: bool,
     /// The heads of plugin blocks the imports so far exposed.
     plugin_heads: Vec<&'t str>,
+    /// The lines under a call are its arguments, one each: a plugin asked
+    /// for its body to be read so.
+    line_children: bool,
     depth: u32,
 }
 
@@ -193,6 +196,7 @@ impl<'t> Parser<'t> {
             failed: false,
             no_brace: false,
             plugin_heads: Vec::new(),
+            line_children: false,
             depth: 0,
         }
     }

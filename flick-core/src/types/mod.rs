@@ -19,6 +19,7 @@ mod builtin_sources;
 mod builtins;
 mod calls;
 mod cells;
+pub(crate) mod children;
 mod class_members;
 mod classes;
 mod comprehension;
@@ -535,8 +536,9 @@ struct Checker<'a> {
     cx: ItemCx,
     /// The modules the blocks around the expression open, innermost last,
     /// each as the file names it: a name one of them exports is that one,
-    /// before the names of the file. `ui { … }` opens `Ui`.
-    opened: Vec<String>,
+    /// before the names of the file. `ui { … }` opens `Ui`. With each, the
+    /// type of a child, if its block names one.
+    opened: Vec<(String, Option<Type>)>,
     /// Capitalized type members visible only while checking a `type module` body.
     contract_types: Vec<(String, Type, kinds::Kind)>,
     /// Lexically opened `Module Sig` values, innermost first on lookup.

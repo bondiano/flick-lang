@@ -12,8 +12,10 @@ use flick_plugin::{
 use super::Checker;
 use super::env::{Abi, EnumLit, Form};
 use super::ty::Type;
+use super::typing::Ref;
 use crate::consteval::Const;
 use crate::source::Span as SourceSpan;
+use crate::syntax::cst::Node;
 use crate::types::lang::Lang;
 
 impl Checker<'_> {
@@ -91,6 +93,17 @@ pub(super) struct PendingCall {
 }
 
 impl Checker<'_> {
+    /// The value `head` refers to when a plugin of the project watches it.
+    pub(super) fn watched_name(&self, head: &Node) -> Option<(String, String)> {
+        if self.options.watched.is_empty() {
+            return None;
+        }
+        let Some(Ref::Value { module, name }) = self.typing.names.get(&head.range()) else {
+            return None;
+        };
+        (self.options.watched.holds(module, name)).then(|| (module.clone(), name.clone()))
+    }
+
     /// Records the application of `module.name` at `span` to `args`, which a
     /// plugin watches.
     pub(super) fn watched_call(

@@ -18,7 +18,8 @@ use crate::source::FileId;
 use crate::syntax::cst::{Node, Token};
 use crate::syntax::kind::SyntaxKind as K;
 use crate::syntax::{
-    Fragment, parse_body_at, parse_decl_at, parse_expr_at, parse_pat_at, parse_type_at,
+    Fragment, parse_body_at, parse_decl_at, parse_expr_at, parse_lines_at, parse_pat_at,
+    parse_type_at,
 };
 use crate::types::{let_parts, signature_name};
 
@@ -427,7 +428,7 @@ impl BlockSource {
     ) -> Result<Hole, flick_plugin::Diagnostic> {
         let refuse = |message: &str| flick_plugin::Diagnostic::error(message, Span { start, end });
         let what = match kind {
-            HoleKind::Expr => "an expression",
+            HoleKind::Expr | HoleKind::Lines => "an expression",
             HoleKind::Ty => "a type",
             HoleKind::Pat => "a pattern",
             HoleKind::Decl => "a declaration",
@@ -462,6 +463,7 @@ impl BlockSource {
             HoleKind::Ty => parse_type_at,
             HoleKind::Pat => parse_pat_at,
             HoleKind::Decl => parse_decl_at,
+            HoleKind::Lines => parse_lines_at,
         };
         parse(&self.text, self.file, tokens, &heads)
     }
@@ -493,6 +495,10 @@ impl Compiler for BlockSource {
 
     fn parse_body(&mut self, start: u32, end: u32) -> Result<Hole, flick_plugin::Diagnostic> {
         self.parse_as(HoleKind::Expr, true, start, end)
+    }
+
+    fn parse_lines(&mut self, start: u32, end: u32) -> Result<Hole, flick_plugin::Diagnostic> {
+        self.parse(HoleKind::Lines, start, end)
     }
 
     fn read_file(&mut self, path: &str) -> Result<Vec<u8>, ReachError> {

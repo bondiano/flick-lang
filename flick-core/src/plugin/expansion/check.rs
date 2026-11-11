@@ -36,7 +36,7 @@ impl Expansion {
             // Source holes only: patterns and generated wrappers do not count.
             let mut nodes = Vec::new();
             for (_, hole) in &block.holes {
-                if !matches!(hole.kind, HoleKind::Expr | HoleKind::Decl) {
+                if !matches!(hole.kind, HoleKind::Expr | HoleKind::Decl | HoleKind::Lines) {
                     continue;
                 }
                 let range = (start + hole.span.start, start + hole.span.end);

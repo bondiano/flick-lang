@@ -44,6 +44,7 @@ macro_rules! wit_arena_conversions {
                                 w::Expr::Annot(w::Annot { expr, ty })
                             }
                             $crate::Expr::Hole(s) => w::Expr::Hole(to_span(s)),
+                            $crate::Expr::Lines(s) => w::Expr::Lines(to_span(s)),
                             $crate::Expr::Match { scrutinee, arms } => w::Expr::Match(w::MatchOn {
                                 scrutinee,
                                 arms: (arms.into_iter())
@@ -69,9 +70,15 @@ macro_rules! wit_arena_conversions {
                                     result,
                                 })
                             }
-                            $crate::Expr::Open { module, body } => {
-                                w::Expr::Open(w::Opened { module, body })
-                            }
+                            $crate::Expr::Open {
+                                module,
+                                child,
+                                body,
+                            } => w::Expr::Open(w::Opened {
+                                module,
+                                child,
+                                body,
+                            }),
                         }),
                         $crate::Kind::Ty(t) => w::Kind::Ty(match t {
                             $crate::Ty::Name(s) => w::Ty::Name(s),
@@ -200,6 +207,7 @@ macro_rules! wit_arena_conversions {
                                 ty: a.ty,
                             },
                             w::Expr::Hole(s) => $crate::Expr::Hole(from_span(s)),
+                            w::Expr::Lines(s) => $crate::Expr::Lines(from_span(s)),
                             w::Expr::Match(m) => $crate::Expr::Match {
                                 scrutinee: m.scrutinee,
                                 arms: (m.arms.into_iter())
@@ -221,6 +229,7 @@ macro_rules! wit_arena_conversions {
                             },
                             w::Expr::Open(o) => $crate::Expr::Open {
                                 module: o.module,
+                                child: o.child,
                                 body: o.body,
                             },
                         }),

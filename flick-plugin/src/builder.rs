@@ -98,7 +98,8 @@ impl Kind {
                 | Expr::Text(_)
                 | Expr::Boolean(_)
                 | Expr::Unit
-                | Expr::Hole(_) => Vec::new(),
+                | Expr::Hole(_)
+                | Expr::Lines(_) => Vec::new(),
                 Expr::Apply {
                     function,
                     arguments,

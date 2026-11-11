@@ -195,8 +195,13 @@ impl Checker<'_> {
         // application of a name none watches pays only the lookup
         let watched = self.watched_name(head);
         let mut given = Vec::new();
+        let end = args.last().map_or(head.range().1, |last| last.range().1);
         for (i, arg) in args.iter().enumerate() {
             let span = Span::new(self.file, head.range().0, arg.range().1);
+            if let Some(gathered) = self.gather(head, &ty, &args[i..], (i, end)) {
+                ty = gathered;
+                break;
+            }
             match self.ui_callable(&ty, (span.start, span.end), self.span(head)) {
                 Type::Fun {
                     param,
@@ -254,6 +259,12 @@ impl Checker<'_> {
                 other => return self.not_a_function(&other, span, &args[i..]),
             }
         }
+        // a call that gave all but its children has none
+        if !self.typing.gathered.contains_key(&(head.range().0, end))
+            && let Some(gathered) = self.gather(head, &ty, &[], (args.len(), end))
+        {
+            ty = gathered;
+        }
         if unknown.len() == args.len() && head.kind == K::NameExpr {
             self.stub_fix(since, head, args, &unknown);
         }
@@ -294,17 +305,6 @@ impl Checker<'_> {
                 },
             ])),
         );
-    }
-
-    /// The value `head` refers to when a plugin of the project watches it.
-    fn watched_name(&self, head: &Node) -> Option<(String, String)> {
-        if self.options.watched.is_empty() {
-            return None;
-        }
-        let Some(Ref::Value { module, name }) = self.typing.names.get(&head.range()) else {
-            return None;
-        };
-        (self.options.watched.holds(module, name)).then(|| (module.clone(), name.clone()))
     }
 
     /// `head` names the value `name` of the built-in module `module`.

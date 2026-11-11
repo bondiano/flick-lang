@@ -17,13 +17,14 @@ impl Checker<'_> {
     /// `name`, as the file names the module.
     pub(super) fn opened_with(&self, namespace: Namespace, name: &str) -> Option<String> {
         let exports = |module: &&String| matches!(self.env.qualified_module(module), Some((_, Some(i))) if i.find(namespace, name).is_some());
-        self.opened.iter().rev().find(exports).cloned()
+        let modules = self.opened.iter().rev().map(|(module, _)| module);
+        modules.into_iter().find(exports).cloned()
     }
 
     /// A foreign component takes props only inside `ui`, through `Ui.component`.
     pub fn ui_callable(&mut self, ty: &Type, call: Range, span: Span) -> Type {
         let target = self.whnf(ty);
-        if self.opened.iter().any(|module| module == "Ui")
+        if self.opened.iter().any(|(module, _)| module == "Ui")
             && matches!(
                 &target,
                 Type::App { head, .. }

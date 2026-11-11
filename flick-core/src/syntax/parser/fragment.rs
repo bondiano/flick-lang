@@ -31,7 +31,7 @@ pub fn parse_expr_at<'t>(
     tokens: &[Token],
     heads: Heads<'t>,
 ) -> Option<Fragment> {
-    fragment(text, file, tokens, heads, expr::expr)
+    fragment(text, file, tokens, heads, expr::expr, false)
 }
 
 /// [`parse_expr_at`] for a body, as after the `=` of a `let`: one that
@@ -42,7 +42,18 @@ pub fn parse_body_at<'t>(
     tokens: &[Token],
     heads: Heads<'t>,
 ) -> Option<Fragment> {
-    fragment(text, file, tokens, heads, body)
+    fragment(text, file, tokens, heads, body, false)
+}
+
+/// [`parse_body_at`] for a body whose calls take the lines under them as
+/// arguments, one each: `div props`, then a line for each child.
+pub fn parse_lines_at<'t>(
+    text: &'t str,
+    file: FileId,
+    tokens: &[Token],
+    heads: Heads<'t>,
+) -> Option<Fragment> {
+    fragment(text, file, tokens, heads, body, true)
 }
 
 fn body(p: &mut Parser) -> Option<Done> {
@@ -63,7 +74,7 @@ pub fn parse_type_at<'t>(
     tokens: &[Token],
     heads: Heads<'t>,
 ) -> Option<Fragment> {
-    fragment(text, file, tokens, heads, type_)
+    fragment(text, file, tokens, heads, type_, false)
 }
 
 /// [`parse_expr_at`] for a pattern.
@@ -73,7 +84,7 @@ pub fn parse_pat_at<'t>(
     tokens: &[Token],
     heads: Heads<'t>,
 ) -> Option<Fragment> {
-    fragment(text, file, tokens, heads, pattern::pattern)
+    fragment(text, file, tokens, heads, pattern::pattern, false)
 }
 
 /// The declaration `tokens` start with, its tree the declaration itself.
@@ -83,7 +94,14 @@ pub fn parse_decl_at<'t>(
     tokens: &[Token],
     heads: Heads<'t>,
 ) -> Option<Fragment> {
-    let mut found = fragment(text, file, tokens, heads, |p| Some(decl::declaration(p)))?;
+    let mut found = fragment(
+        text,
+        file,
+        tokens,
+        heads,
+        |p| Some(decl::declaration(p)),
+        false,
+    )?;
     let inner = found.tree.nodes().next()?.clone();
     found.tree = inner;
     Some(found)
@@ -96,7 +114,14 @@ pub fn parse_decls_at<'t>(
     tokens: &[Token],
     heads: Heads<'t>,
 ) -> Option<Fragment> {
-    fragment(text, file, tokens, heads, |p| Some(decl::declarations(p)))
+    fragment(
+        text,
+        file,
+        tokens,
+        heads,
+        |p| Some(decl::declarations(p)),
+        false,
+    )
 }
 
 fn fragment<'t>(
@@ -105,6 +130,7 @@ fn fragment<'t>(
     tokens: &[Token],
     heads: Heads<'t>,
     parse: fn(&mut Parser) -> Option<Done>,
+    line_children: bool,
 ) -> Option<Fragment> {
     let raw: Vec<RawToken> = tokens
         .iter()
@@ -118,6 +144,7 @@ fn fragment<'t>(
     let last = raw.last()?.end;
     let mut p = Parser::new(text, file, &raw);
     p.plugin_heads.extend(heads);
+    p.line_children = line_children;
     place(&mut p, text, last);
     // a fragment that starts a line is a block of its own, as a body is
     if p.raw().line_start {

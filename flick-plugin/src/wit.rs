@@ -94,6 +94,7 @@ macro_rules! wit_conversions {
                         $crate::HoleKind::Ty => w::HoleKind::Ty,
                         $crate::HoleKind::Pat => w::HoleKind::Pat,
                         $crate::HoleKind::Decl => w::HoleKind::Decl,
+                        $crate::HoleKind::Lines => w::HoleKind::Lines,
                     },
                     span: to_span(h.span),
                 }
@@ -106,6 +107,7 @@ macro_rules! wit_conversions {
                         w::HoleKind::Ty => $crate::HoleKind::Ty,
                         w::HoleKind::Pat => $crate::HoleKind::Pat,
                         w::HoleKind::Decl => $crate::HoleKind::Decl,
+                        w::HoleKind::Lines => $crate::HoleKind::Lines,
                     },
                     span: from_span(h.span),
                 }
