@@ -22,5 +22,7 @@ let view = ui {
 }
 ```
 
-`flick check --fix --only T073` rewrites each list written the old way. A
-list that is computed is a node of its own: `Ui.each items row`.
+`flick check --fix --only T073` rewrites each list written the old way. One
+argument that is a list already, a value or a call such as
+`List.map row items`, is the list of the children; among children written
+one by one, `Ui.each items row` is a node for each item.
