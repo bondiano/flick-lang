@@ -4,6 +4,8 @@
 # case is run or is written here, and a reason that changes is written again.
 # A form or a native with no translation is named; a rule of the model's own
 # that rejects a program flick-core accepts is a divergence still to be read.
+# loops_owners exercises the existing G6 explicit-owner limit (docs/formal/regions.md
+# section 1.4); its native and rt oracle remains in portable.txt and rt.txt.
 bootstrap/app_fail # no native for `fail` (flick:rt appFail)
 bootstrap/debug # no native for `echoed` (flick:rt flickEcho)
 bootstrap/inline_pack # the model's (Field) rejects `App.Main.main`
@@ -15,17 +17,18 @@ codegen/deep_recursion # runs out of the model's steps
 codegen/defect # no native for `unsafe_div` (flick:rt intUnsafeDiv)
 codegen/derive_default # the model's (App) rejects `App.Main.instance Default (Pair a)`
 codegen/effect_abi # no native for `bits` (./effect_abi.mjs bits)
-codegen/for_comprehension # a `for` or a `Seq` has no λFlick form
-codegen/for_loop # a `for` or a `Seq` has no λFlick form
+codegen/for_comprehension # the model's (≡) rejects `App.Main.main`
+codegen/for_loop # the model's (≡) rejects `App.Main.main`
 codegen/fusion # a `for` or a `Seq` has no λFlick form
 codegen/interpolation # runs in the model; not in portable.txt
 codegen/ints # a `BigInt` literal has no λFlick form
 codegen/let_assert # no native for `get` (flick:rt listGet)
 codegen/literals # a `BigInt` literal has no λFlick form
+codegen/loops_owners # the model's (≡) rejects `Main.run`
 codegen/numeric_classes # a `BigInt` literal has no λFlick form
 codegen/pure_main # no native for `say` (global console.log)
 codegen/question # `?` on an `Option`, a return from the function, has no λFlick form
-codegen/ranges # a `for` or a `Seq` has no λFlick form
+codegen/ranges # the model's (≡) rejects `App.Main.main`
 codegen/recursion # runs out of the model's steps
 codegen/release # no native for `timeout_option` (flick:rt timeoutOption)
 codegen/repeated_superclass # the model's (Field) rejects `App.Main.back`
@@ -69,16 +72,16 @@ runtime/scoped_file # no native for `node_open` (flick:rt fileOpen)
 runtime/scopes # no native for `open_raw` (./resources.mjs open)
 runtime/settling_calls # no native for `settle_later` (./calls.mjs settleLater)
 runtime/shared_layer # the model's (≡) rejects `App.Main.failed_build`
-runtime/slice # a `for` or a `Seq` has no λFlick form
+runtime/slice # no native for `parallel_all` (flick:rt parallelAll)
 runtime/supervisor_defect # no native for `make` (flick:Deferred make)
 schema/combinators # no native for `unsafe_record` (flick:rt schemaRecordOf)
 schema/contracts # no native for `cyclic` (./inputs.mjs cyclic)
 schema/derive # no native for `number` (flick:rt schemaNumber)
-schema/enums # a `for` or a `Seq` has no λFlick form
+schema/enums # no native for `unsafe_record` (flick:rt schemaRecordOf)
 schema/json_wire # a `BigInt` literal has no λFlick form
 schema/policies # no native for `count` (./count.mjs count)
 schema/route # no native for `encodable` (./route.mjs encodable)
-schema/route_nested # a `for` or a `Seq` has no λFlick form
+schema/route_nested # no definition of `App.Main.Slug$parse`
 sql/queries # a `BigInt` literal has no λFlick form
 stdlib/cli/cli # the row primitive `Lacks "name" { color : Option Color; loud : Bool; times : Float }`
 stdlib/cli/cli_exit # the row primitive `Lacks "times" {}`

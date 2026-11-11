@@ -6,6 +6,19 @@ break programs.
 
 ## Unreleased
 
+- **Local mutation and loops:** `let mut name = value` declares a local
+  monomorphic variable and `name = value` assigns it. Pure functions may
+  change their variables; nested functions, tasks and lazy sequences cannot
+  capture them (`FLICK-G005`). `loop { … }` returns its `break value`;
+  `while condition do body` and `for … do` return `Unit`. `continue` starts
+  the next iteration. Exits target the nearest loop and close scopes normally.
+  Completed assignments survive an error in `try`; an error in the right-hand
+  side leaves its target unchanged. Assigning an immutable name is
+  `FLICK-T069`, mutation in a strict comprehension is `FLICK-T070`, invalid
+  loop control is `FLICK-T071`, and unused `mut` is `FLICK-R020`.
+  `loop` and `while` are contextual words, preserving `Loop.loop` and
+  `Schedule.while`. IR 0.7.0 adds variables and explicit sequential loops.
+
 - **Watching:** `flick dev`, `flick test --watch` and `--watch` start a run
   once the watched files settle, so a save that truncates a file and then
   writes it is built once and `dev` restarts the app once for it.

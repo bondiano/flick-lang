@@ -7,8 +7,6 @@ gap docs/src/content/docs/reference/classes.md 2147921845e6081b # the row primit
 gap docs/src/content/docs/reference/cli-dsl.md 18aa7ec2ddf9b126 # the row primitive `Lacks` has no λFlick form
 gap docs/src/content/docs/reference/cli-dsl.md b1a4db864547e950 # the row primitive `Lacks` has no λFlick form
 gap docs/src/content/docs/reference/errors/flick-s006.md 4dae9935de3c6d3e # a `BigInt` literal has no λFlick form
-gap docs/src/content/docs/reference/errors/flick-t032.md 6a647404bba14807 # `for` and `Seq` have no λFlick form; their elaboration is formal/Formal/Elab
-gap docs/src/content/docs/reference/errors/flick-t033.md 5ae5591e39a87113 # `for` and `Seq` have no λFlick form; their elaboration is formal/Formal/Elab
 gap docs/src/content/docs/reference/http-api.md 545aab0d8d467a6e # the row primitive `Lacks` has no λFlick form
 gap docs/src/content/docs/reference/http-api.md b79edc80601e735d # the row primitive `Lacks` has no λFlick form
 gap docs/src/content/docs/reference/rpc.md 5cf9d8a6f620c312 # `Record.label` has no λFlick form
@@ -18,8 +16,6 @@ gap docs/src/content/docs/ru/reference/classes.md 2147921845e6081b # the row pri
 gap docs/src/content/docs/ru/reference/cli-dsl.md 18aa7ec2ddf9b126 # the row primitive `Lacks` has no λFlick form
 gap docs/src/content/docs/ru/reference/cli-dsl.md b1a4db864547e950 # the row primitive `Lacks` has no λFlick form
 gap docs/src/content/docs/ru/reference/errors/flick-s006.md 4dae9935de3c6d3e # a `BigInt` literal has no λFlick form
-gap docs/src/content/docs/ru/reference/errors/flick-t032.md 6a647404bba14807 # `for` and `Seq` have no λFlick form; their elaboration is formal/Formal/Elab
-gap docs/src/content/docs/ru/reference/errors/flick-t033.md 5ae5591e39a87113 # `for` and `Seq` have no λFlick form; their elaboration is formal/Formal/Elab
 gap docs/src/content/docs/ru/reference/http-api.md 545aab0d8d467a6e # the row primitive `Lacks` has no λFlick form
 gap docs/src/content/docs/ru/reference/http-api.md b79edc80601e735d # the row primitive `Lacks` has no λFlick form
 gap docs/src/content/docs/ru/reference/rpc.md 5cf9d8a6f620c312 # `Record.label` has no λFlick form

@@ -21,7 +21,7 @@ pub fn check(
         allow_trailing_attribute,
         errors: Vec::new(),
     };
-    v.walk(tree);
+    v.walk(tree, Place::Plain);
     v.errors
 }
 
@@ -32,12 +32,22 @@ struct Validator<'a> {
     errors: Vec<Diagnostic>,
 }
 
+/// What the statements of a block are.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Place {
+    Plain,
+    /// The statements of `do { … }`.
+    Do,
+    /// The clauses of a `for`.
+    For,
+}
+
 fn is_pattern(kind: K) -> bool {
     (K::WildcardPat..=K::OrPat).contains(&kind)
 }
 
 impl Validator<'_> {
-    fn walk(&mut self, node: &Node) {
+    fn walk(&mut self, node: &Node, place: Place) {
         match node.kind {
             K::MatchArm | K::BindStmt => {
                 if let Some(pattern) = node.nodes().find(|n| is_pattern(n.kind)) {
@@ -65,8 +75,45 @@ impl Validator<'_> {
                     .map(|n| n.kind);
                 self.attribute(child, next);
             }
-            self.walk(child);
+            if child.kind == K::LetDecl {
+                self.mutable(child, node.kind == K::Block, place);
+            }
+            let inner = match (node.kind, child.kind) {
+                (K::DoExpr, K::Block) => Place::Do,
+                (K::ForExpr, K::Block) if index == 0 => Place::For,
+                _ => Place::Plain,
+            };
+            self.walk(child, inner);
         }
+    }
+
+    /// `let mut`: a variable of one name, a statement of an ordinary block.
+    fn mutable(&mut self, decl: &Node, block: bool, place: Place) {
+        let Some(kw) = decl.child_tokens().find(|t| t.kind == K::MutKw) else {
+            return;
+        };
+        let message = if !block {
+            "a definition of the module cannot be `mut`: only a local variable of a function can"
+        } else if place == Place::Do {
+            "a binding of `do` cannot be `mut`: its statements run in the functions `flat_map` takes"
+        } else if place == Place::For {
+            "a binding of `for` cannot be `mut`: bind it in the body"
+        } else if decl.has_token(K::AssertKw) {
+            "`let assert` cannot be `mut`: bind the names it matches, then a `let mut` of one"
+        } else if decl.nodes().any(|n| n.kind == K::Params) {
+            "a function cannot be `mut`: assign a `fun` to a `let mut` variable"
+        } else if decl.has_token(K::RecKw) {
+            "a recursive binding cannot be `mut`"
+        } else if !decl.nodes().any(|n| n.kind == K::VarPat) {
+            "only a name can be `mut`: bind the pattern, then a `let mut` of one name"
+        } else {
+            return;
+        };
+        self.errors.push(Diagnostic::error(
+            codes::S016,
+            message.to_owned(),
+            Span::new(self.file, kw.start, kw.end),
+        ));
     }
 
     /// `@lang item`, with an item the compiler knows, `@derive` before a

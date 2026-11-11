@@ -10,6 +10,14 @@
       ]
     },
     {
+      "id": "loops", "en": "Loop challenges", "ru": "Задачки на циклы",
+      "examples": [
+        { "id": "binary-search", "en": "Binary search", "ru": "Бинарный поиск", "expect": "run" },
+        { "id": "stock-profit", "en": "Best stock trade", "ru": "Лучшая сделка с акцией", "expect": "run" },
+        { "id": "palindrome-number", "en": "Palindrome number", "ru": "Число-палиндром", "expect": "run" }
+      ]
+    },
+    {
       "id": "types", "en": "Types", "ru": "Типы",
       "examples": [
         { "id": "classes", "en": "Classes and instances", "ru": "Классы и экземпляры", "expect": "run" },

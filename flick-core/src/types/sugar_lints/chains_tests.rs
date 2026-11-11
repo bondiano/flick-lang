@@ -94,3 +94,19 @@ fn a_call_on_a_bound_variable_stays() {
     assert!(check(&text).iter().any(|d| d.code == codes::E001));
     assert_eq!(fixed(&text, "FLICK-E001"), None);
 }
+
+#[test]
+fn a_bind_chain_does_not_introduce_mutable_captures() {
+    let text = format!(
+        "{HEAD}f : Option Int -> Option Int -> Option Int\nlet f a b =\n  let mut total = 0\n  match a with | Some x -> (match b with | Some y -> Some (x + y + total) | None -> None) | None -> None\n"
+    );
+    assert_eq!(fixed(&text, "FLICK-T035"), None);
+}
+
+#[test]
+fn a_bind_chain_does_not_move_lexical_exits_into_continuations() {
+    let text = format!(
+        "{HEAD}f : Option Int -> Option Int -> Int\nlet f a b = loop {{ ignore (match a with | Some x -> (match b with | Some y -> Some (if x > y then break 7 else y) | None -> None) | None -> None); break 0 }}\n"
+    );
+    assert_eq!(fixed(&text, "FLICK-T035"), None);
+}

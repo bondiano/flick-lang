@@ -1,0 +1,109 @@
+// `let mut` variables: an assignment changes what later reads see, in a
+// branch, an arm or a `scope`; a value read before it keeps what it read, and
+// the function that assigns stays pure.
+module Language.Mutation exposing (tests)
+
+type error Missing = Missing String
+
+clamp : Int -> Int -> Int -> Int
+let clamp low high n =
+  let mut value = n
+  if value < low then value = low
+  if value > high then value = high
+  value
+
+swapped : (Int, Int) -> (Int, Int)
+let swapped pair =
+  let (a, b) = pair
+  let mut first = a
+  let mut second = b
+  let kept = first
+  first = second
+  second = kept
+  (first, second)
+
+counted : List String -> String
+let counted words =
+  let mut text = "none"
+  match words with
+  | [] -> ()
+  | [one] -> text = "one: \{one}"
+  | _ -> text = "\{List.length words} words"
+  text
+
+read_then_write : Int -> (Int, Int, Int)
+let read_then_write n =
+  let mut x = n
+  let a = x
+  x = x * 3
+  let b = x
+  x = x + 1
+  (a, b, x)
+
+valued_branch : Bool -> (String, Int)
+let valued_branch flag =
+  let mut changes = 0
+  let label =
+    if flag then
+      changes = changes + 1
+      "yes"
+    else
+      "no"
+  (label, changes)
+
+in_scope : Unit ->{} String
+let in_scope () =
+  let mut steps = "a"
+  scope { steps = steps ++ "b" }
+  steps ++ "c"
+
+operands_in_order : Unit ->{} (Int, Int, Int)
+let operands_in_order () =
+  let mut x = 1
+  (
+    x,
+    scope {
+      x = x + 1
+      x * 10
+    },
+    x,
+  )
+
+in_arm : String ->{} String
+let in_arm key =
+  let mut seen = "nothing"
+  let n =
+    try from_result (Err (Missing key)) with
+    | Missing k ->
+      seen = k
+      -1
+  "\{seen} \{n}"
+
+tests : List Test.Test
+let tests = [
+  Test.test "an assignment in a branch" (fun () ->
+    Test.equal [0, 5, 10] [clamp 0 10 (-3), clamp 0 10 5, clamp 0 10 42]
+  ),
+  Test.test "a swap through a third variable" (fun () -> Test.equal (2, 1) (swapped (1, 2))),
+  Test.test "an assignment in a match arm" (fun () ->
+    Test.equal ["none", "one: hi", "3 words"] [counted [], counted ["hi"], counted ["a", "b", "c"]]
+  ),
+  Test.test "a read keeps the value it read" (fun () -> Test.equal (2, 6, 7) (read_then_write 2)),
+  Test.test "an `if` with a value assigns too" (fun () ->
+    Test.equal [("yes", 1), ("no", 0)] [valued_branch true, valued_branch false]
+  ),
+  Test.effect_test
+    "an assignment inside a scope"
+    (task { Test.expect (Test.equal "abc" (in_scope ())) }),
+  Test.effect_test
+    "an assignment in an arm of try"
+    (task { Test.expect (Test.equal "id -1" (in_arm "id")) }),
+  Test.effect_test
+    "operands read and assign left to right"
+    (task { Test.expect (Test.equal (1, 20, 2) (operands_in_order ())) }),
+  Test.test "a local of a test body" (fun () ->
+    let mut total = 1
+    total = total + 41
+    Test.equal 42 total
+  ),
+]

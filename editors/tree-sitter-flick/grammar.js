@@ -2,12 +2,12 @@
 // compiler, so this tree only nests brackets and keeps every token flat.
 
 const KEYWORDS = [
-  'module', 'exposing', 'import', 'as', 'let', 'rec', 'assert', 'fun', 'match', 'with',
+  'module', 'exposing', 'import', 'as', 'let', 'mut', 'rec', 'assert', 'fun', 'match', 'with',
   'try', 'if', 'then', 'else', 'task', 'await', 'scope', 'provide', 'ignore',
   'todo', 'echo',
   'type', 'opaque', 'refined', 'where', 'kind', 'error', 'service', 'class',
   'instance', 'deriving', 'forall', 'not', 'none',
-  'ui', 'in', 'when', 'for', 'yield', 'do',
+  'ui', 'in', 'when', 'for', 'yield', 'do', 'break', 'continue',
 ];
 
 const OPERATORS = [
@@ -20,14 +20,19 @@ module.exports = grammar({
 
   externals: $ => [$.block_comment, $.raw_string, $.multiline_string],
 
-  extras: $ => [/\s/, $.doc_comment, $.line_comment, $.block_comment],
+  extras: $ => [/[ \t\r]/, $.doc_comment, $.line_comment, $.block_comment],
 
-  word: $ => $.identifier,
+  word: $ => $._identifier,
+
+  conflicts: $ => [[$._loop, $.identifier], [$._while, $.identifier]],
 
   rules: {
     source_file: $ => repeat($._token),
 
     _token: $ => choice(
+      $._newline,
+      $._loop,
+      $._while,
       $.attribute,
       $._foreign,
       $._from,
@@ -55,6 +60,16 @@ module.exports = grammar({
     brackets: $ => seq('[', repeat($._token), ']'),
     braces: $ => seq('{', repeat($._token), '}'),
 
+    _newline: _ => '\n',
+    _loop: $ => prec.dynamic(1, seq(alias('loop', $.keyword), $.braces)),
+    _while: $ => prec.dynamic(1, seq(alias('while', $.keyword), repeat1($._condition_token), alias('do', $.keyword))),
+    _condition_token: $ => choice(
+      $.parens, $.brackets, $.braces, $.identifier, $.constructor, $.boolean,
+      $.number, $.string, $.raw_string, $.multiline_string, $.member,
+      alias(choice(...KEYWORDS.filter(k => !['do', 'let', 'module', 'import', 'type', 'service', 'class', 'instance'].includes(k))), $.keyword),
+      alias(choice(...OPERATORS.filter(k => ![',', ';', '='].includes(k))), $.operator),
+    ),
+
     keyword: _ => choice(...KEYWORDS),
 
     // the mode after `foreign` and `global` after `from` are keywords only there
@@ -78,7 +93,8 @@ module.exports = grammar({
     // `.name` is a field or module member even when it spells a keyword
     member: _ => token(seq('.', /[a-z_][A-Za-z0-9_]*/)),
 
-    identifier: _ => /[a-z_][A-Za-z0-9_]*/,
+    _identifier: _ => /[a-z_][A-Za-z0-9_]*/,
+    identifier: $ => choice($._identifier, 'loop', 'while'),
     constructor: _ => /[A-Z][A-Za-z0-9_]*/,
 
     number: _ => token(choice(

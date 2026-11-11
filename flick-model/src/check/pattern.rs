@@ -293,6 +293,8 @@ impl Checker<'_> {
             head = h;
         }
         Ok(Some(match head {
+            // The builtin Never is uninhabited even though its interface is abstract.
+            Type::Con(p) if p == &Path::new("Prelude", "Never") => Vec::new(),
             Type::Con(p) if p == &Path::new("Prelude", "Bool") => {
                 vec![Ctor::Lit(Lit::Bool(true)), Ctor::Lit(Lit::Bool(false))]
             }

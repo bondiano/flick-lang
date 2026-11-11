@@ -3,6 +3,7 @@
 //! renamed apart within each top-level definition, so a name never needs
 //! shadowing in the generated code.
 
+mod abstraction;
 mod applicative_do;
 mod comprehension;
 mod debug;
@@ -14,6 +15,7 @@ mod handle;
 mod interpolation;
 mod lambda;
 mod literals;
+mod loops;
 mod numeric;
 mod pattern;
 mod question;
@@ -49,6 +51,8 @@ pub fn lower(module: &resolve::Module, typing: &Typing) -> Result<Module, Vec<Di
         typing,
         scope: Vec::new(),
         used: HashMap::new(),
+        vars: HashSet::new(),
+        loops: Vec::new(),
         consumed: HashSet::new(),
         reuse: None,
         owners: HashMap::new(),
@@ -117,6 +121,10 @@ struct Lower<'a> {
     scope: Vec<Bound>,
     /// How often each source name was bound in the current definition.
     used: HashMap<String, u32>,
+    /// The unique names of the `let mut` variables of the current
+    /// definition: a read of one is `ExprKind::Var`.
+    vars: HashSet<String>,
+    loops: Vec<String>,
     /// Ranges whose lift or dictionaries are applied already: a block and
     /// its only expression share one.
     consumed: HashSet<(Range, bool)>,
@@ -214,6 +222,7 @@ impl Lower<'_> {
     fn fresh_definition(&mut self) {
         self.scope.clear();
         self.used.clear();
+        self.vars.clear();
     }
 
     fn item(&mut self, decl: &Node, items: &mut Vec<Item>) {
@@ -413,8 +422,7 @@ impl Lower<'_> {
                 let value = if dicts.is_empty() {
                     value
                 } else {
-                    let span = value.span;
-                    Expr::new(ExprKind::Abstract(dicts, Box::new(value)), span)
+                    abstraction::abstract_value(dicts, value)
                 };
                 Some((name, value))
             })

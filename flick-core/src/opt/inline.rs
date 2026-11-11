@@ -150,7 +150,10 @@ pub(super) fn exits(e: &Expr) -> bool {
 fn inlinable(e: &Expr) -> bool {
     let here = !matches!(
         &e.kind,
-        ExprKind::Match(..)
+        ExprKind::ControlLoop { .. }
+            | ExprKind::LoopExit { .. }
+            | ExprKind::Loop { .. }
+            | ExprKind::Match(..)
             | ExprKind::Generate { .. }
             | ExprKind::Each { .. }
             | ExprKind::Yield(_)

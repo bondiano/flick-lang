@@ -16,7 +16,25 @@ use crate::types::implicit_package_of;
 /// Warnings for local names bound and never used.
 pub(super) fn unused_locals(unused: Vec<Unused>) -> impl Iterator<Item = Diagnostic> {
     unused.into_iter().map(|u| {
-        warning(codes::R013, format!("`{}` is never used", u.name), u.span).with_fix(|| {
+        if let Some(removal) = u.needless_mut {
+            let message = format!("`{}` is never assigned, so it needs no `mut`", u.name);
+            let diagnostic = warning(codes::R020, message, u.span);
+            if !u.mut_fix {
+                return diagnostic;
+            }
+            return diagnostic.with_safe_fix(|| {
+                let edit = Edit {
+                    span: removal,
+                    replacement: String::new(),
+                };
+                ("remove `mut`", vec![edit])
+            });
+        }
+        let diagnostic = warning(codes::R013, format!("`{}` is never used", u.name), u.span);
+        if u.written {
+            return diagnostic;
+        }
+        diagnostic.with_fix(|| {
             let start = Span::new(u.span.file, u.span.start, u.span.start);
             let (message, edit) = if u.punned {
                 (

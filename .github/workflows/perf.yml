@@ -15,6 +15,11 @@ jobs:
     runs-on: ubuntu-26.04
     timeout-minutes: 70
     steps:
+      # The measured historical ref may predate the toolchain file.
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.workflow_sha }}
+      - run: cp .tool-versions "$RUNNER_TEMP/.tool-versions"
       - uses: actions/checkout@v7
         with:
           ref: ${{ inputs.ref }}
@@ -31,7 +36,7 @@ jobs:
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v7
         with:
-          node-version: 24.18.0
+          node-version-file: ${{ runner.temp }}/.tool-versions
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       # the log keeps what the run measured and the budget it passed

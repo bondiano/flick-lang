@@ -557,3 +557,19 @@ fn comparisons_order_numbers_and_strings_only() {
         .is_ok()
     );
 }
+
+#[test]
+fn never_has_no_pattern_cases_but_inhabited_types_do() {
+    let absurd = Term::lam("x", match_(var("x"), Vec::new()));
+    assert!(
+        check(
+            &absurd,
+            &mono(Type::fun(ty("Never"), Stage::Pure, ty("Int")))
+        )
+        .is_ok()
+    );
+    rejected_by(
+        check(&absurd, &mono(Type::fun(ty("Int"), Stage::Pure, ty("Int")))),
+        "Match",
+    );
+}

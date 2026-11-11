@@ -233,3 +233,36 @@ foreign pure clock_test from \"runtime\" \"clockTest\"
         assert!(markdown.contains(phrase), "{markdown}");
     }
 }
+
+#[test]
+fn a_let_mut_variable_is_one_symbol_with_its_assignments() {
+    let source = "module App.Vars exposing (counted)
+
+counted : Int -> Int
+let counted n =
+  let mut total = n
+  total = total + 1
+  total
+";
+    let f = fixture_of(&[("src/App/Vars.fl", source)]);
+    let ide = f.ide();
+    assert!(
+        ide.analysis.diagnostics.is_empty(),
+        "{:?}",
+        ide.analysis.diagnostics
+    );
+    let file = f.file("App.Vars");
+    let declared = f.at("App.Vars", "total", 0);
+    let target = f.at("App.Vars", "total", 1);
+    // the declaration, the assignment, the read in its value and the result
+    let edits = ide.rename(file, declared + 1, "sum").expect("a variable");
+    assert_eq!(edits.len(), 4, "{edits:?}");
+    let from_target = ide.rename(file, target + 1, "sum").expect("its assignment");
+    assert_eq!(from_target.len(), 4, "{from_target:?}");
+    let (markdown, range) = ide.hover(file, target).expect("hover of the assigned name");
+    assert_eq!(range, (target, target + 5));
+    assert!(markdown.contains("total : Int"), "{markdown}");
+    let (symbol, _) = ide.symbol_at(file, target).expect("symbol");
+    let definition = ide.definition(&symbol).expect("definition");
+    assert_eq!(definition.start, declared);
+}

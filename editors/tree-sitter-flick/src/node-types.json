@@ -139,6 +139,11 @@
     }
   },
   {
+    "type": "identifier",
+    "named": true,
+    "fields": {}
+  },
+  {
     "type": "interpolation",
     "named": true,
     "fields": {},
@@ -366,6 +371,10 @@
     }
   },
   {
+    "type": "\n",
+    "named": false
+  },
+  {
     "type": "!=",
     "named": false
   },
@@ -519,12 +528,20 @@
     "extra": true
   },
   {
+    "type": "break",
+    "named": false
+  },
+  {
     "type": "class",
     "named": false
   },
   {
     "type": "constructor",
     "named": true
+  },
+  {
+    "type": "continue",
+    "named": false
   },
   {
     "type": "deriving",
@@ -572,10 +589,6 @@
     "named": false
   },
   {
-    "type": "identifier",
-    "named": true
-  },
-  {
     "type": "if",
     "named": false
   },
@@ -609,6 +622,10 @@
     "extra": true
   },
   {
+    "type": "loop",
+    "named": false
+  },
+  {
     "type": "match",
     "named": false
   },
@@ -623,6 +640,10 @@
   {
     "type": "multiline_string",
     "named": true
+  },
+  {
+    "type": "mut",
+    "named": false
   },
   {
     "type": "none",
@@ -698,6 +719,10 @@
   },
   {
     "type": "where",
+    "named": false
+  },
+  {
+    "type": "while",
     "named": false
   },
   {

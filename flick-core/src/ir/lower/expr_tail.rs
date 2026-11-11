@@ -99,6 +99,7 @@ impl Lower<'_> {
                     break;
                 }
                 K::LetDecl => stmts.push(self.local_let(statement)),
+                K::AssignStmt => stmts.push(self.assign(statement)),
                 _ if last => result = Some(self.expr(statement)),
                 _ => stmts.push(Stmt::Expr(self.expr(statement))),
             }
@@ -132,6 +133,10 @@ impl Lower<'_> {
         }
         let value = self.definition(decl);
         let unique = self.bind(&name, at);
+        if decl.has_token(K::MutKw) {
+            self.vars.insert(unique.clone());
+            return Stmt::Var(unique, value);
+        }
         if parts.params.is_empty() && dicts.is_empty() {
             Stmt::Let(Pat::Bind(unique), value)
         } else {
@@ -142,6 +147,24 @@ impl Lower<'_> {
                 value,
             }
         }
+    }
+
+    /// `name = value` of the `let mut` variable `name` in scope.
+    fn assign(&mut self, node: &Node) -> Stmt {
+        let mut children = node.nodes();
+        let target = children.next();
+        let token = target.and_then(|t| t.child_tokens().find(|t| t.kind == K::Ident));
+        let unique = token
+            .and_then(|t| self.local(t.text(self.text), t.start))
+            .map_or_else(
+                || panic!("the checker resolved the target of an assignment"),
+                str::to_owned,
+            );
+        let value = match children.next() {
+            Some(value) => self.expr(value),
+            None => Expr::new(ExprKind::Lit(Lit::Unit), self.span(node)),
+        };
+        Stmt::Assign(unique, value)
     }
 
     /// Whether a `try` has arms for operations or for the value of its

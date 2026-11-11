@@ -3,6 +3,7 @@ import Formal.Elab.T6a
 import Formal.Elab.Coherence
 import Formal.Elab.CoreT6a
 import Formal.Elab.CoreRun
+import Formal.LetMut
 import Formal.Live.T4Live
 import Formal.Live.T1Regions
 import Formal.Live.Install
@@ -68,3 +69,7 @@ prints, and `#guard_msgs` turns the difference into an error.
 /-- info: 'Flick.Elab.T6b_core' depends on axioms: [propext, Classical.choice, Quot.sound] -/
 #guard_msgs in
 #print axioms Flick.Elab.T6b_core
+
+/-- info: 'Flick.T7' depends on axioms: [propext, Classical.choice, Quot.sound] -/
+#guard_msgs in
+#print axioms Flick.T7

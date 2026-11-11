@@ -149,10 +149,12 @@ impl Checker<'_> {
         };
         // `with_default` takes the default as a value, made before the match:
         // a call there could fail or do work the `match` skipped
-        if !matches!(
-            unparen(default).kind,
-            K::Literal | K::NameExpr | K::FieldExpr
-        ) {
+        if self.contains_mutable(default)
+            || !matches!(
+                unparen(default).kind,
+                K::Literal | K::NameExpr | K::FieldExpr
+            )
+        {
             return;
         }
         self.lint(

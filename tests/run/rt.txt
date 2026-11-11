@@ -56,6 +56,8 @@ codegen/instance_names
 codegen/interpolation
 codegen/ints
 codegen/let_assert
+codegen/let_mut
+codegen/loops
 codegen/lift
 codegen/literals
 codegen/local_functions
@@ -311,4 +313,9 @@ codegen/release
 ../rt/interrupt_closed
 
 effect/host_services
+codegen/loops_state
+codegen/loops_for_source
+codegen/loops_guards
+codegen/loops_owners
+
 effect/row_without

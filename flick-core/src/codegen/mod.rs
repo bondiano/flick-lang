@@ -8,6 +8,7 @@ pub(crate) mod exports;
 pub mod go;
 mod js;
 mod lexical;
+mod loops;
 pub(crate) use lexical::{RuntimeLayout, js_parts};
 mod names;
 #[cfg(feature = "native-project")]

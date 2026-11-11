@@ -1,0 +1,7 @@
+let count n =
+  let mut total = n
+//    ^ keyword
+//        ^ variable
+  total = total + 1
+//^ variable
+  total

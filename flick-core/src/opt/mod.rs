@@ -27,6 +27,7 @@ mod inline;
 mod specialize;
 mod sroa;
 mod walk;
+pub use walk::rename;
 
 #[cfg(test)]
 mod gadt_tests;
@@ -116,7 +117,7 @@ fn pass(e: &mut Expr) -> bool {
 /// Hoists the statements of blocks a `let` binds or the block ends with:
 /// locals are unique in a definition, so nothing is captured differently.
 fn flatten(stmts: &mut Vec<Stmt>, result: &mut Box<Expr>) -> bool {
-    let nested = |s: &Stmt| matches!(s, Stmt::Let(_, v) | Stmt::Expr(v) if matches!(v.kind, ExprKind::Block(..)));
+    let nested = |s: &Stmt| matches!(s, Stmt::Let(_, v) | Stmt::Var(_, v) | Stmt::Assign(_, v) | Stmt::Expr(v) if matches!(v.kind, ExprKind::Block(..)));
     if !stmts.iter().any(nested) && !matches!(result.kind, ExprKind::Block(..)) {
         return false;
     }
@@ -180,7 +181,7 @@ fn later_uses(stmts: &[Stmt], result: &Expr) -> Vec<Option<(usize, usize)>> {
             later[i] = Some((of(&all).unwrap_or(0), of(&strict).unwrap_or(0)));
         }
         match stmt {
-            Stmt::Let(_, v) | Stmt::Expr(v) => {
+            Stmt::Let(_, v) | Stmt::Var(_, v) | Stmt::Assign(_, v) | Stmt::Expr(v) => {
                 each_use(v, &mut |l| *all.entry(l).or_default() += 1);
                 each_strict_use(v, &mut |l| *strict.entry(l).or_default() += 1);
             }
@@ -207,7 +208,11 @@ fn propagate(stmts: &mut Vec<Stmt>, result: &mut Expr) -> bool {
         let once = matches!(uses, Some((1, 1)));
         let pure = once && matches!(&stmt, Stmt::Let(_, v) if droppable(v));
         match &mut stmt {
-            Stmt::Let(_, v) | Stmt::Expr(v) | Stmt::Fun { value: v, .. } => place(v, &mut moving),
+            Stmt::Let(_, v)
+            | Stmt::Var(_, v)
+            | Stmt::Assign(_, v)
+            | Stmt::Expr(v)
+            | Stmt::Fun { value: v, .. } => place(v, &mut moving),
         }
         match (stmt, uses) {
             (Stmt::Let(Pat::Bind(name), value), Some((all, _)))
@@ -261,13 +266,18 @@ fn dead(stmts: &mut Vec<Stmt>, result: &Expr) -> bool {
                     p.irrefutable() && bound.iter().all(|n| !read.contains(n)) && droppable(v)
                 }
                 Stmt::Fun { name, .. } => !read.contains(name.as_str()),
+                Stmt::Var(..) | Stmt::Assign(..) => false,
             };
             if drop {
                 keep[i] = false;
                 continue;
             }
             match stmt {
-                Stmt::Let(_, v) | Stmt::Expr(v) | Stmt::Fun { value: v, .. } => {
+                Stmt::Let(_, v)
+                | Stmt::Var(_, v)
+                | Stmt::Assign(_, v)
+                | Stmt::Expr(v)
+                | Stmt::Fun { value: v, .. } => {
                     each_use(v, &mut |l| {
                         read.insert(l);
                     });

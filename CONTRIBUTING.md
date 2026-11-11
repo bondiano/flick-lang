@@ -33,6 +33,11 @@ just bundle-size  # browser bundles against their gzip budgets
 just ratchet  # budgets only go down against origin/main; a looser one needs a `reason`
 ```
 
+Use the Node version pinned in [`.tool-versions`](.tool-versions) for golden
+e2e checks. CI reads the same file. The Go Intl tables and localized DateTime fixtures
+were generated with that version's ICU; another ICU can spell valid locale
+errors and time-zone names differently.
+
 ## Crates
 
 | Crate | Purpose |

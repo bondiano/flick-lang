@@ -14,10 +14,6 @@ marked : Unit ->{} String
 foreign marked from "./marks.mjs" "marked"
   arity 0
 
-sleep : Float ->{Async} Unit
-foreign sleep from "./marks.mjs" "sleep"
-  arity 1
-
 start : String ->{} Unit
 foreign start from "./marks.mjs" "start"
   arity 1
@@ -63,13 +59,21 @@ let handlers = {
   double = fun n -> if n < 0 then from_result (Err (NotFound { id = n })) else n * 2;
   count_to = fun n -> Stream.from_list (List.map Int.to_float (List.range 1 (Int.truncate n + 1)));
   slow = fun () ->
-    start "slow"
-    sleep 100
-    mark "slow";
+    Effect.ensuring
+      (task { start "slow finished" })
+      (task {
+        start "slow"
+        started "release"
+        mark "slow"
+      });
   steady = fun () ->
-    start "steady"
-    sleep 100
-    mark "steady";
+    Effect.ensuring
+      (task { start "steady finished" })
+      (task {
+        start "steady"
+        started "release"
+        mark "steady"
+      });
 }
 
 main : Unit ->{Async; AppError} Unit
@@ -94,12 +98,16 @@ let main () =
         let slow_call = Fiber.spawn s (fun _ -> ()) (task { Rpc.call url slow () })
         started "slow"
         Fiber.interrupt slow_call
+        // The ordinary handler must stop before either handler may finish.
+        // Its server-side finalizer acknowledges cancellation across HTTP.
+        started "slow finished"
         Platform.stdout_line "slow gave up"
         let steady_call = Fiber.spawn s (fun _ -> ()) (task { Rpc.call url steady () })
         started "steady"
         Fiber.interrupt steady_call
         Platform.stdout_line "steady gave up"
-        sleep 300
+        start "release"
+        started "steady finished"
       }
     with
     | Rpc.ServeError message -> Platform.stdout_line ("serve: " ++ message)

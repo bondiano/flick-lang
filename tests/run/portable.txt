@@ -45,6 +45,8 @@ codegen/instance_names
 codegen/implicit
 codegen/ints
 codegen/let_assert
+codegen/let_mut
+codegen/loops
 codegen/lift
 codegen/literals
 codegen/local_functions
@@ -242,4 +244,8 @@ runtime/discontinued_body
 runtime/discontinued_fiber
 
 effect/host_services
+codegen/loops_state
+codegen/loops_for_source
+codegen/loops_guards
+codegen/loops_owners
 effect/row_without

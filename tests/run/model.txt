@@ -36,8 +36,13 @@ codegen/numbers
 codegen/do_notation
 codegen/applicative_do
 codegen/classes
+codegen/let_mut
 runtime/abort_closes_scopes
 runtime/discontinued_body
+codegen/loops_state
+codegen/loops
+codegen/loops_for_source
+codegen/loops_guards
 codegen/category_classes
 codegen/effect_sets
 codegen/given_shadow

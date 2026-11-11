@@ -271,3 +271,54 @@ fn extract_and_inline_round_trip() {
         "module App.Main exposing (total)\n\ntotal : Float -> Float\nlet total n =\n  (n + 1) * (n - 2)\n"
     );
 }
+
+#[test]
+fn a_let_mut_variable_is_neither_extracted_from_nor_inlined() {
+    let src = "module App.Main exposing (count)\n\ncount : Int -> (Int, Int)\nlet count n =\n  let mut x = n\n  let before = x\n  x = x + 1\n  (before, x * 2)\n";
+    let (f, _) = main(src);
+    let at = f.at("App.Main", "x =", 1);
+    assert!(action(&f, at, at, "inline `x`").is_none(), "the variable");
+    let at = f.at("App.Main", "before =", 0);
+    assert!(
+        action(&f, at, at, "inline `before`").is_none(),
+        "a value that reads the variable, used after it changes"
+    );
+    let start = f.at("App.Main", "x * 2", 0);
+    assert!(
+        action(&f, start, start + 5, "extract `value`").is_none(),
+        "a read moved before its statement"
+    );
+}
+
+#[test]
+fn a_while_condition_cannot_be_cached_before_the_loop() {
+    let src = "module App.Main exposing (run)\nrun : Unit ->{} Unit\nlet run () =\n  let running = Ref.make true\n  while Ref.get running do Ref.set running false\n";
+    let (f, _) = main(src);
+    let at = f.at("App.Main", "Ref.get running", 0);
+    assert!(action(&f, at, at + 15, "extract `value`").is_none());
+}
+
+#[test]
+fn inlining_cannot_move_an_exit_to_another_loop() {
+    let src = "module App.Main exposing (run)\nrun : Bool -> Int\nlet run stop = loop {\n  let value = if stop then break 1 else 2\n  ignore (loop { break value })\n  break 3\n}\n";
+    let (f, _) = main(src);
+    let at = f.at("App.Main", "value =", 0);
+    assert!(action(&f, at, at, "inline `value`").is_none());
+}
+
+#[test]
+fn removing_mut_cannot_invalidate_an_inline_function_annotation() {
+    let src = "module App.Main exposing (run)\nrun : Int -> Int\nlet run n =\n  let mut step : Int -> Int = fun x -> x + 1\n  step n\n";
+    let (f, _) = main(src);
+    let ide = f.ide();
+    let warning = ide
+        .analysis
+        .diagnostics
+        .iter()
+        .find(|d| d.code.to_string() == "FLICK-R020")
+        .expect("unused mut warning");
+    assert!(
+        warning.fixes.is_empty(),
+        "an inline annotation can require a preceding signature after removing mut"
+    );
+}

@@ -148,3 +148,43 @@ test("a hole of a string is code, and a brace in it does not close the hole", as
     highlighter.dispose();
   }
 });
+
+test("`let mut` declares a variable, not a function", async () => {
+  const highlighter = await createHighlighterCore({
+    engine: createJavaScriptRegexEngine(),
+    themes: [],
+    langs: [{ ...grammar, name: "flick" }],
+  });
+  try {
+    const language = highlighter.getLanguage("flick");
+    const line = "  let mut total = n";
+    const { tokens } = language.tokenizeLine(line, null);
+    const scopes = (word: string): readonly string[] => {
+      const start = line.indexOf(word);
+      return tokens.find((token) => token.startIndex <= start && start < token.endIndex)?.scopes ?? [];
+    };
+    assert.ok(scopes("mut").includes("keyword.other.flick"));
+    assert.ok(scopes("total").includes("variable.other.flick"));
+    assert.ok(!scopes("total").includes("entity.name.function.flick"));
+  } finally {
+    highlighter.dispose();
+  }
+});
+
+test("loop and while keep ordinary-name highlighting outside loop syntax", async () => {
+  const highlighter = await createHighlighterCore({ engine: createJavaScriptRegexEngine(), themes: [], langs: [{ ...grammar, name: "flick" }] });
+  try {
+    const language = highlighter.getLanguage("flick");
+    for (const [line, word, keyword] of [
+      ["let saved = loop", "loop", false],
+      ["let saved = while", "while", false],
+      ["let f while = (while true, do { pure () })", "while", false],
+      ["loop { break }", "loop", true],
+      ["while ready do { continue }", "while", true],
+    ] as const) {
+      const at = line.lastIndexOf(word);
+      const scopes = language.tokenizeLine(line, null).tokens.find(t => t.startIndex <= at && at < t.endIndex)?.scopes ?? [];
+      assert.equal(scopes.includes("keyword.control.flick"), keyword, line);
+    }
+  } finally { highlighter.dispose(); }
+});

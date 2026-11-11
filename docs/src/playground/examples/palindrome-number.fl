@@ -1,0 +1,25 @@
+// Reverse only the last half of the digits, then compare both halves.
+// A negative number or a nonzero number ending in 0 cannot be a palindrome.
+module Main exposing (main)
+
+is_palindrome : Int -> Bool
+let is_palindrome n =
+  if n < 0 || (n != 0 && n % 10 == 0) then
+    false
+  else
+    let mut remaining = n
+    let mut reversed = 0
+    while remaining > reversed do {
+      reversed = reversed * 10 + remaining % 10
+      remaining = remaining / 10
+    }
+    // For an odd digit count, drop the middle digit from the reversed half.
+    remaining == reversed || remaining == reversed / 10
+
+main : Unit ->{} Unit
+let main () =
+  Platform.stdout_line (show (is_palindrome 121))
+  Platform.stdout_line (show (is_palindrome 1221))
+  Platform.stdout_line (show (is_palindrome (-121)))
+  Platform.stdout_line (show (is_palindrome 10))
+  Platform.stdout_line (show (is_palindrome 0))

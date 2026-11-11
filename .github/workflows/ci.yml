@@ -47,7 +47,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
         with:
-          node-version: 24.18.0
+          node-version-file: .tool-versions
       - run: node --test .github/actions/setup-flick/install.test.mjs
 
   test:
@@ -68,7 +68,7 @@ jobs:
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v7
         with:
-          node-version: 24.18.0
+          node-version-file: .tool-versions
       - run: just unit
       - run: just effect-coverage >> "$GITHUB_STEP_SUMMARY"
 
@@ -107,7 +107,7 @@ jobs:
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v7
         with:
-          node-version: 24.18.0
+          node-version-file: .tool-versions
           cache: pnpm
       # the wasm-bindgen CLI `just docs-wasm` installs
       - uses: actions/cache@v6
@@ -155,7 +155,7 @@ jobs:
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v7
         with:
-          node-version: 24.18.0
+          node-version-file: .tool-versions
           cache: pnpm
       - run: just e2e-tests
       - uses: actions/upload-artifact@v7
@@ -191,7 +191,7 @@ jobs:
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v7
         with:
-          node-version: 24.18.0
+          node-version-file: .tool-versions
           cache: pnpm
       # what the TypeScript output catches beyond the JS one is `tsc`, which
       # typechecks the TypeScript passes either way: a pull request and a push
@@ -244,7 +244,7 @@ jobs:
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v7
         with:
-          node-version: 24.18.0
+          node-version-file: .tool-versions
           cache: pnpm
       - run: just e2e-postgres
 

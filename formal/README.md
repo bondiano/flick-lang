@@ -62,6 +62,15 @@ signature and golden certificates.
   `lemma_6` (the types of old cells), `T4'` (T4′, below) and `T1_regions` (`T1` with
   `op_H`, without the blocked outcome of a step that needs a region that is not live, which
   `T4'` rules out).
+- **T7, local mutation** (`Formal/LetMut.lean`): the straight-line block
+  fragment with assignments, branches and scope translates to a typed core
+  term. `T7_pure` derives purity from T2a; `T7_regions` derives safety by
+  use from T4′. It does not claim the old holding-based region guarantee.
+- **Local control** (`Formal/LocalControl.lean`): completion carries state
+  through normal return, break, continue and typed error. Assignment commits
+  only a successful RHS, handlers see the current store, and finite iteration
+  preserves an invariant preserved by its body (`iterate_preserves`). These
+  are laws of the local control algebra, not compiler/backend equivalence.
 - **Typing by use.** There is one judgment, `Typ` (`Rules.lean`): a region is needed alive
   only where it is used. The qualifier `C` of an arrow or an `Eff` is what a call or an
   await needs live, so the call runs at `Stage.use ψ C` (`Live/Mode.lean`) and a qualified

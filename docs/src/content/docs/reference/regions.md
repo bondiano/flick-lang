@@ -196,6 +196,7 @@ input bound. See the [user-defined transformer instances](../../contributing/imp
 | a closure or `task` returned or stored | no row of it may need the region live (`FLICK-G002`) |
 | a value an acquisition gives | `Resource.acquire_release` gives `a^{s}`, a value of region `s` (`FLICK-G002`); a function it is passed to takes `Conn^c` for some `c` |
 | a cell or binding from outside the scope | its type may not come to mention the region; mutable storage and its qualified element types are invariant (`FLICK-T003`), even when a value bound could otherwise widen |
+| a `let mut` variable from outside the scope | its type is fixed where it is declared; a stored callable retains its use qualifier, so assigning it cannot permit a use after its region ends |
 | an error | its payload holds no region, even when a handler inside the scope catches it (`FLICK-E005`); `type error E (s : Region) = E (File s)` is rejected where it is declared |
 | a foreign function | its signature is its retention contract: what using its result needs is in the result's qualifier; with `retention owner` and one region in the signature, it gets `Fiber.Outlives` for a capture row it keeps and `Fiber.Provided` and `Detached` for the services of kept work; with two regions the signature writes them (`FLICK-F002`) |
 

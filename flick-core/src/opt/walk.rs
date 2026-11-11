@@ -37,7 +37,10 @@ pub fn each_strict_use<'e>(e: &'e Expr, read: &mut dyn FnMut(&'e str)) {
         | ExprKind::Handle(_)
         | ExprKind::Lift(..)
         | ExprKind::Abstract(..)
-        | ExprKind::Generate { strict: false, .. } => {}
+        | ExprKind::Generate { strict: false, .. }
+        | ExprKind::ControlLoop { .. }
+        | ExprKind::LoopExit { .. }
+        | ExprKind::Loop { .. } => {}
         // the body runs once per element, maybe never
         ExprKind::Each { source, .. } => each_strict_use(source, read),
         ExprKind::If(c, _, _) => each_strict_use(c, read),
@@ -47,7 +50,9 @@ pub fn each_strict_use<'e>(e: &'e Expr, read: &mut dyn FnMut(&'e str)) {
         ExprKind::Block(stmts, result) => {
             for s in stmts {
                 match s {
-                    Stmt::Let(_, v) | Stmt::Expr(v) => each_strict_use(v, read),
+                    Stmt::Let(_, v) | Stmt::Var(_, v) | Stmt::Assign(_, v) | Stmt::Expr(v) => {
+                        each_strict_use(v, read);
+                    }
                     Stmt::Fun { .. } => {}
                 }
             }
@@ -187,6 +192,7 @@ fn pat_binders(p: &Pat, names: &mut HashMap<String, String>, suffix: &str) {
 
 fn binders(e: &Expr, names: &mut HashMap<String, String>, suffix: &str) {
     match &e.kind {
+        ExprKind::ControlLoop { id, .. } => fresh(names, id, suffix),
         ExprKind::Lambda { params, .. } => {
             for p in params {
                 pat_binders(&p.pat, names, suffix);
@@ -196,8 +202,8 @@ fn binders(e: &Expr, names: &mut HashMap<String, String>, suffix: &str) {
             for s in stmts {
                 match s {
                     Stmt::Let(p, _) => pat_binders(p, names, suffix),
-                    Stmt::Fun { name, .. } => fresh(names, name, suffix),
-                    Stmt::Expr(_) => {}
+                    Stmt::Var(name, _) | Stmt::Fun { name, .. } => fresh(names, name, suffix),
+                    Stmt::Assign(..) | Stmt::Expr(_) => {}
                 }
             }
         }
@@ -224,7 +230,8 @@ fn apply(e: &mut Expr, names: &HashMap<String, String>) {
         }
     };
     match &mut e.kind {
-        ExprKind::Local(n) | ExprKind::Within(n, _) => new(n),
+        ExprKind::ControlLoop { id, .. } | ExprKind::LoopExit { id, .. } => new(id),
+        ExprKind::Local(n) | ExprKind::Var(n) | ExprKind::Within(n, _) => new(n),
         // a dictionary a matched value holds is a local of the pattern too
         ExprKind::Dicts(_, dicts) => {
             for d in dicts {
@@ -241,7 +248,9 @@ fn apply(e: &mut Expr, names: &HashMap<String, String>) {
             for s in stmts {
                 match s {
                     Stmt::Let(p, _) => apply_pat(p, names),
-                    Stmt::Fun { name, .. } => new(name),
+                    Stmt::Var(name, _) | Stmt::Assign(name, _) | Stmt::Fun { name, .. } => {
+                        new(name);
+                    }
                     Stmt::Expr(_) => {}
                 }
             }

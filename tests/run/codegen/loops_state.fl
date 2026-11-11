@@ -1,0 +1,214 @@
+module Main exposing (main)
+
+type error Missing = Missing
+
+effect Ask =
+  ask : Unit ->{} Int
+
+effect Log =
+  log : forall a. Show a => a ->{} Unit
+
+deferred_log : Unit -> (Int ->{Log; none} Unit)
+let deferred_log () = loop { break Log.log }
+
+render_twice : (forall a. Show a => a -> String) -> (String, String)
+let render_twice render = (render 1, render true)
+
+rendered : Unit -> (String, String)
+let rendered () = loop { break (render_twice show) }
+
+defer_render : (forall a. Show a => a -> String) -> (Unit -> String)
+let defer_render render = fun () -> render true
+
+dictionary_snapshot : Unit -> (String, String)
+let dictionary_snapshot () =
+  let mut flag = true
+  let before = defer_render (if flag then show else fun _ -> "changed")
+  flag = false
+  let after = defer_render (if flag then show else fun _ -> "changed")
+  (before (), after ())
+
+polymorphic_exit : Bool -> Int
+let polymorphic_exit stop =
+  loop {
+    ignore (render_twice (if stop then break 7 else show))
+    break 8
+  }
+
+return_pattern : Unit ->{} Int
+let return_pattern () =
+  loop {
+    try break 13 with
+    | return (a, b) -> ignore (a, b)
+  }
+
+type Box = Box Int
+class Pick a =
+  pick : a -> Int
+instance Pick Box =
+  let pick box =
+    match box with
+    | Box n -> loop { break n }
+
+scoped_callback : (forall s. Fiber.Owner s ->{Scope s; none} String) ->{} String
+let scoped_callback body = loop { break (Scope.run body) }
+
+provided_callback : (Unit ->{Ask; none} Int) ->{} Int
+let provided_callback body =
+  let layer = Layer.succeed Ask { ask = fun () -> 4 }
+  loop { break (Layer.run layer body) }
+
+handler_exits : Unit ->{} (Int, Int, Int)
+let handler_exits () =
+  let mut touched = 0
+  let guarded =
+    loop {
+      try from_result (Err Missing) with
+      | Missing when (if true then break 7 else false) -> ()
+      | Missing -> break 9
+    }
+  let returned =
+    loop {
+      try break 8 with
+      | return _ -> touched = 99
+    }
+  (guarded, returned, touched)
+
+count : Int -> Int
+let count n =
+  let mut i = 0
+  while i < n do i = i + 1
+  i
+
+find : Int -> Int
+let find n =
+  let mut i = 0
+  loop {
+    i = i + 1
+    if i < n then continue
+    break i
+  }
+
+main : Unit ->{} Unit
+let main () =
+  Platform.stdout_line (show (dictionary_snapshot ()))
+  Platform.stdout_line (show (polymorphic_exit true, polymorphic_exit false))
+  Platform.stdout_line (show (return_pattern ()))
+  Platform.stdout_line (show (rendered ()))
+  let mut record = { value = 1 }
+  let snapshot = (
+    record.value,
+    (
+      if true then
+        record = { value = 2 }
+        0
+      else
+        0
+    ),
+  )
+  Platform.stdout_line (show snapshot)
+  record = { value = 1 }
+  let selected =
+    match record.value with
+    | 1 when (
+      if true then
+        record = { value = 2 }
+        false
+      else
+        false
+    ) ->
+      0
+    | 1 -> 1
+    | _ -> 2
+  Platform.stdout_line (show selected)
+  let collected = loop { break [for x <- [1, 2] yield x] }
+  Platform.stdout_line (show collected)
+  Platform.stdout_line (show (count 0, count 4, find 3))
+  let mut outer = 0
+  while outer < 2 do {
+    outer = outer + 1
+    let mut inner = 0
+    loop {
+      inner = inner + 1
+      if inner < 2 then continue
+      break
+    }
+  }
+  Platform.stdout_line (show outer)
+  let result =
+    loop {
+      scope {
+        Platform.stdout_line "scope"
+        break 42
+      }
+      Platform.stdout_line "unreachable"
+    }
+  Platform.stdout_line (show result)
+  let mut status = 0
+  let recovered =
+    try
+      status = 5
+      status = from_result (Err Missing)
+      status
+    with
+    | Missing -> status
+  Platform.stdout_line (show (status, recovered))
+  let mut attempts = 0
+  let combined =
+    loop {
+      attempts = attempts + 1
+      try
+        if attempts < 2 then from_result (Err Missing)
+        break attempts
+      with
+      | Missing -> continue
+    }
+  Platform.stdout_line (show combined)
+  let mut changes = 0
+  let after_error =
+    try
+      while changes < 3 do {
+        changes = changes + 1
+        if changes == 2 then from_result (Err Missing)
+      }
+      changes
+    with
+    | Missing -> changes
+  Platform.stdout_line (show after_error)
+  let in_operand = loop { ignore (1, (if true then break 7 else 0), 2) }
+  Platform.stdout_line (show in_operand)
+  let in_guard =
+    loop {
+      match 1 with
+      | n when (if n == 1 then break 9 else false) -> ()
+      | _ -> Platform.stdout_line "unreachable"
+    }
+  Platform.stdout_line (show in_guard)
+  let nested_exit = loop { break (if true then break 11 else 0) }
+  Platform.stdout_line (show nested_exit)
+  let mut from_for = 0
+  let recovered_for =
+    try
+      for x <- [1, 2, 3] do {
+        from_for = from_for + x
+        if x == 2 then from_result (Err Missing)
+      }
+      from_for
+    with
+    | Missing -> from_for
+  Platform.stdout_line (show recovered_for)
+  Platform.stdout_line (show (pick (Box 1), pick (Box 2)))
+  Platform.stdout_line (show (handler_exits ()))
+  Platform.stdout_line (scoped_callback (fun _ -> "scoped"))
+  Platform.stdout_line (show (provided_callback (fun _unit -> Ask.ask ())))
+  let layer = Layer.succeed Ask { ask = fun () -> 5 }
+  let named_unit = loop { break (Layer.run layer (fun _unit -> Ask.ask ())) }
+  Platform.stdout_line (show named_unit)
+  let handled =
+    loop {
+      let n =
+        try Ask.ask () with
+        | Ask.ask () -> 20
+      break n
+    }
+  Platform.stdout_line (show handled)

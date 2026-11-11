@@ -1,17 +1,31 @@
 //! Expressions and block statements.
 
+use super::control::{control_expr, while_ahead};
 use super::{Done, K, Parser, decl, pattern, plugin, types};
 use crate::diagnostics::codes;
 
-/// A statement of a block: `let`, a local signature or an expression.
+/// A statement of a block: `let`, a local signature, an assignment or an
+/// expression.
 pub(super) fn stmt(p: &mut Parser) {
     match p.current() {
         K::LetKw => decl::let_decl(p),
         K::Ident if p.nth(1) == K::Colon => decl::signature(p),
+        K::Ident if p.nth(1) == K::Eq => assign_stmt(p),
         _ => {
             expr(p);
         }
     }
+}
+
+/// `name = value`: the name is a `NameExpr`, as any use of it.
+fn assign_stmt(p: &mut Parser) {
+    let m = p.start();
+    let name = p.start();
+    p.bump();
+    p.complete(name, K::NameExpr);
+    p.bump();
+    p.body(K::Block, stmt);
+    p.complete(m, K::AssignStmt);
 }
 
 pub(super) fn expr(p: &mut Parser) -> Option<Done> {
@@ -125,6 +139,9 @@ fn prefix(p: &mut Parser) -> Option<Done> {
     match p.current() {
         K::Ident if p.at_word("pack") && keyword_ahead(p, K::AsKw) => Some(pack_expr(p)),
         K::Ident if p.at_word("unpack") && keyword_ahead(p, K::AsKw) => Some(unpack_expr(p)),
+        K::Ident if p.at_word("loop") && p.nth(1) == K::LBrace => Some(control_expr(p)),
+        K::Ident if p.at_word("while") && while_ahead(p) => Some(control_expr(p)),
+        K::BreakKw | K::ContinueKw => Some(control_expr(p)),
         K::FunKw => Some(fun_expr(p)),
         K::MatchKw => Some(match_expr(p)),
         K::TryKw => Some(try_expr(p)),
@@ -175,7 +192,7 @@ fn unpack_expr(p: &mut Parser) -> Done {
 }
 
 /// Whether the next token can start the operand of a prefix operator.
-fn at_operand_start(p: &Parser) -> bool {
+pub(super) fn at_operand_start(p: &Parser) -> bool {
     at_arg_start(p)
         || matches!(
             p.current(),
@@ -418,7 +435,7 @@ fn interpolation(p: &mut Parser) -> K {
     K::InterpExpr
 }
 
-fn head_without_braces(p: &mut Parser, head: fn(&mut Parser)) {
+pub(super) fn head_without_braces(p: &mut Parser, head: fn(&mut Parser)) {
     let saved = p.no_brace;
     p.no_brace = true;
     head(p);

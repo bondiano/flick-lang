@@ -7,8 +7,6 @@ export const mark = (name) => {
 };
 export const marked = () => marks.join(", ");
 
-export const sleep = (millis) => new Promise((resolve) => setTimeout(() => resolve(undefined), millis));
-
 const begun = new Map();
 const signal = (name) => {
   if (!begun.has(name)) begun.set(name, Promise.withResolvers());

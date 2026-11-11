@@ -228,6 +228,7 @@ impl Totality<'_> {
         match &e.kind {
             ExprKind::Lit(_)
             | ExprKind::Local(_)
+            | ExprKind::Var(_)
             | ExprKind::Global { .. }
             | ExprKind::Con(_)
             | ExprKind::Label(_)
@@ -268,7 +269,11 @@ impl Totality<'_> {
             ExprKind::Block(stmts, result) => {
                 partial(result)
                     || stmts.iter().any(|s| match s {
-                        Stmt::Let(_, v) | Stmt::Expr(v) | Stmt::Fun { value: v, .. } => partial(v),
+                        Stmt::Let(_, v)
+                        | Stmt::Var(_, v)
+                        | Stmt::Assign(_, v)
+                        | Stmt::Expr(v)
+                        | Stmt::Fun { value: v, .. } => partial(v),
                     })
             }
             ExprKind::Dicts(..)
@@ -277,6 +282,7 @@ impl Totality<'_> {
             | ExprKind::Handle(_)
             | ExprKind::Generate { .. }
             | ExprKind::Unwrap(_)
+            | ExprKind::ControlLoop { .. } | ExprKind::LoopExit { .. } | ExprKind::Loop { .. }
             | ExprKind::Each { .. }
             | ExprKind::Yield(_) => true,
         }
