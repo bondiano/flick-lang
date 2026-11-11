@@ -11,7 +11,27 @@ pub fn check(calls: &[CallSite]) -> Vec<Diagnostic> {
     let mut found: Vec<_> = calls.iter().filter_map(one).collect();
     found.extend(atom_keys(calls));
     found.extend(handlers_in_render(calls));
+    found.extend(calls.iter().filter_map(reads_atoms_for_a_ui));
     found
+}
+
+/// `U007` on a top-level function whose signature reads atoms and which
+/// gives a `Ui`: whatever calls it renders again with it, where a
+/// `component` would render on its own.
+fn reads_atoms_for_a_ui(call: &CallSite) -> Option<Diagnostic> {
+    let binding = call.binding.as_ref()?;
+    let gives = binding.gives.as_ref()?;
+    let reads = call.module == "Atom" && call.name == "Read";
+    (reads && gives.exact.as_deref() == Some("Prelude.Ui")).then(|| {
+        let name = binding.name.as_deref().unwrap_or_default();
+        let message = format!(
+            "`{name}` reads atoms to build a `Ui`: whatever calls it renders again when they change"
+        );
+        let fix = "make it a `component`: it renders again on its own, not with its parent";
+        Diagnostic::warning(message, call.span)
+            .with_code("U007")
+            .with_fix(fix, Vec::new(), false)
+    })
 }
 
 /// The constructors of `Ui.Event`, which make a handler of a function.
@@ -127,6 +147,35 @@ mod tests {
     }
 
     #[test]
+    fn a_function_that_reads_atoms_for_a_ui_is_told_of_components() {
+        use flick_plugin::Binding;
+        let named = |gives: &str| {
+            let mut site = call("Atom", "Read", None);
+            site.arguments.clear();
+            site.binding = Some(Binding {
+                module: "App".into(),
+                name: Some("row".into()),
+                span: Span { start: 0, end: 30 },
+                constrained: false,
+                in_function: false,
+                applied: 0,
+                gives: Some(FactType {
+                    shown: gives.rsplit('.').next().unwrap_or(gives).to_owned(),
+                    exact: Some(gives.to_owned()),
+                    literal_of: None,
+                }),
+            });
+            site
+        };
+        let found = check(&[named("Prelude.Ui")]);
+        assert_eq!(found.len(), 1);
+        assert_eq!(found[0].code.as_deref(), Some("U007"));
+        assert!(found[0].message.starts_with("`row` reads atoms"));
+        // a derived value is no view
+        assert!(check(&[named("Prelude.Int")]).is_empty());
+    }
+
+    #[test]
     fn a_handler_of_a_fun_in_a_written_render_is_made_on_every_render() {
         let found = check(&view_with_handler(false, true));
         assert_eq!(found.len(), 1);
@@ -151,6 +200,7 @@ mod tests {
             constrained: false,
             in_function: false,
             applied: 2,
+            gives: None,
         });
         assert!(check(&[site.clone()]).is_empty());
         let mut second = site.clone();

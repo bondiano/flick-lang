@@ -265,7 +265,7 @@ macro_rules! wit_conversions {
             }
 
             pub fn to_fact(f: &$crate::Fact) -> w::Fact {
-                let ty = |t: &$crate::FactType| w::FactType { shown: t.shown.clone(), exact: t.exact.clone(), literal_of: t.literal_of.clone() };
+                let ty = to_type;
                 w::Fact {
                     span: to_span(f.span),
                     ty: ty(&f.ty),
@@ -274,7 +274,7 @@ macro_rules! wit_conversions {
             }
 
             pub fn from_fact(f: w::Fact) -> $crate::Fact {
-                let ty = |t: w::FactType| $crate::FactType { shown: t.shown, exact: t.exact, literal_of: t.literal_of };
+                let ty = from_type;
                 $crate::Fact {
                     span: from_span(f.span),
                     ty: ty(f.ty),
@@ -289,7 +289,7 @@ macro_rules! wit_conversions {
                     span: to_span(c.span),
                     arguments: c.arguments.iter().map(to_argument).collect(),
                     refinement: c.refinement.as_ref().map(to_refinement),
-                    binding: c.binding.as_ref().map(|b| w::Binding { module: b.module.clone(), name: b.name.clone(), span: to_span(b.span), constrained: b.constrained, in_function: b.in_function, applied: b.applied }),
+                    binding: c.binding.as_ref().map(|b| w::Binding { module: b.module.clone(), name: b.name.clone(), span: to_span(b.span), constrained: b.constrained, in_function: b.in_function, applied: b.applied, gives: b.gives.as_ref().map(to_type) }),
                     generated: c.generated,
                 }
             }
@@ -301,13 +301,21 @@ macro_rules! wit_conversions {
                     span: from_span(c.span),
                     arguments: c.arguments.into_iter().map(from_argument).collect(),
                     refinement: c.refinement.map(from_refinement),
-                    binding: c.binding.map(|b| $crate::Binding { module: b.module, name: b.name, span: from_span(b.span), constrained: b.constrained, in_function: b.in_function, applied: b.applied }),
+                    binding: c.binding.map(|b| $crate::Binding { module: b.module, name: b.name, span: from_span(b.span), constrained: b.constrained, in_function: b.in_function, applied: b.applied, gives: b.gives.map(from_type) }),
                     generated: c.generated,
                 }
             }
 
+            fn to_type(t: &$crate::FactType) -> w::FactType {
+                w::FactType { shown: t.shown.clone(), exact: t.exact.clone(), literal_of: t.literal_of.clone() }
+            }
+
+            fn from_type(t: w::FactType) -> $crate::FactType {
+                $crate::FactType { shown: t.shown, exact: t.exact, literal_of: t.literal_of }
+            }
+
             fn to_argument(a: &$crate::Argument) -> w::Argument {
-                let ty = |t: &$crate::FactType| w::FactType { shown: t.shown.clone(), exact: t.exact.clone(), literal_of: t.literal_of.clone() };
+                let ty = to_type;
                 w::Argument {
                     span: to_span(a.span),
                     ty: ty(&a.ty),
@@ -318,7 +326,7 @@ macro_rules! wit_conversions {
             }
 
             fn from_argument(a: w::Argument) -> $crate::Argument {
-                let ty = |t: w::FactType| $crate::FactType { shown: t.shown, exact: t.exact, literal_of: t.literal_of };
+                let ty = from_type;
                 $crate::Argument {
                     span: from_span(a.span),
                     ty: ty(a.ty),

@@ -229,6 +229,12 @@ dictionary, whether the reference is inside a function, and its applied
 argument count. This includes partial references. The UI plugin uses these
 facts for `FLICK-U003`; it does not change type inference.
 
+A watched service that the signature of a top-level function names is a place
+too: at the function's name, with no arguments and with `binding` saying
+which function it is and, in `gives`, the type it gives when all its arrows
+are applied. The UI plugin warns (`FLICK-U007`) where a function reads atoms
+to give a `Ui`.
+
 A handler made of a `fun` inside the render of a `Ui.view` is found the same
 way: the calls of `Ui.view` and of the constructors of `Ui.Event` are watched,
 and the plugin warns (`FLICK-U002`) where a constructor given a `fun` stands
