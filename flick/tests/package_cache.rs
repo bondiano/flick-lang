@@ -324,8 +324,21 @@ fn a_changed_library_project_or_compiler_checks_again() {
     let (root, geo) = fetched("package-cache-miss");
     assert_eq!(flick(&root, "cache", &["check"]), Some(0));
     fs::write(&geo, BROKEN).expect("write");
-    // another binary of the compiler
+    // another binary of the compiler, copied by a process of its own: a
+    // child that another test forks while this process writes the copy would
+    // hold it open for writing until its `exec`, and running the copy then
+    // fails with "Text file busy"
     let copy = root.join("flick-copy");
+    #[cfg(unix)]
+    assert!(
+        Command::new("cp")
+            .arg(env!("CARGO_BIN_EXE_flick"))
+            .arg(&copy)
+            .status()
+            .expect("cp runs")
+            .success()
+    );
+    #[cfg(not(unix))]
     fs::copy(env!("CARGO_BIN_EXE_flick"), &copy).expect("copy");
     // APFS can preserve the source timestamp when copying, while the cache
     // fingerprint distinguishes binaries by size and modification time.
