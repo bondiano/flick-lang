@@ -33,6 +33,13 @@ fn a_pure_foreign_over_a_capability_uses_its_region() {
         Stage::Pure,
         file()
     ))));
+    // nor is a result that holds it in its qualifier
+    let held = Type::Captured(Rc::new(ty("Int")), Caps::atom(Var::Named("s".into())));
+    assert!(!pure_over_capability(&region(Type::fun(
+        file(),
+        Stage::Pure,
+        held
+    ))));
     // a capture row of a pure callback uses nothing
     let callback = Type::Captured(
         Rc::new(Type::fun(ty("Int"), Stage::Pure, ty("Int"))),

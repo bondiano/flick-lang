@@ -278,15 +278,15 @@ pub(super) fn pure_over_capability(s: &Scheme) -> bool {
     };
     let (mut params, mut stages, mut t) = (Vec::new(), Vec::new(), &s.body);
     loop {
-        match t {
-            Type::Fun(p, stage, r) => {
-                params.push(names(p));
-                stages.push(stage);
-                t = r;
-            }
-            Type::Captured(x, _) | Type::Bounded(x, _) => t = x,
-            _ => break,
+        // a qualifier hides the next arrow; the final result keeps its own
+        let mut arrow = t;
+        while let Type::Captured(x, _) | Type::Bounded(x, _) = arrow {
+            arrow = x;
         }
+        let Type::Fun(p, stage, r) = arrow else { break };
+        params.push(names(p));
+        stages.push(stage);
+        t = r;
     }
     let result = names(t);
     let used: Vec<&Name> = s
