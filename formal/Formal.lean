@@ -32,6 +32,7 @@ import Formal.SubOk
 import Formal.SubstArm
 import Formal.Substitution
 import Formal.Canonical
+import Formal.Widen
 import Formal.Shapes
 import Formal.CanonForms
 import Formal.DictCanon

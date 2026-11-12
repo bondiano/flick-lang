@@ -14,7 +14,7 @@ open Flick Flick.Cert
 
 /-- A constructor's type with a function field, written out (`le_live`); its reach goes
 through `split_mem`, which once split the witness of an `∃` without end. -/
-example : LeLive (Sig.ctorTy [(.arrow (.base .unit) (.rt Row.none Row.none) (.base .unit) Caps.none)]
+example : LeLive S (Sig.ctorTy [(.arrow (.base .unit) (.rt Row.none Row.none) (.base .unit) Caps.none)]
       "K" [])
     (.arrow (.arrow (.base .unit) (.rt Row.none Row.none) (.base .unit) Caps.none) .pure (.adt "K")
       Caps.none) := by
