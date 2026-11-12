@@ -65,6 +65,9 @@ fn a_while_nothing_leaves_is_a_plain_loop_in_javascript() {
     let plain = compile(text);
     assert!(plain.contains("if (!(i > 0)) break;"), "{plain}");
     assert!(!plain.contains("$loop"), "{plain}");
+    // a local variable and a loop need nothing of the runtime
+    let rt = on_rt(text);
+    assert!(rt.contains("let acc = 0") && !rt.contains("import"), "{rt}");
     // an exit still needs the flags that carry it out of nested blocks
     let left = compile(&text.replace(
         "    i = i - 1\n",

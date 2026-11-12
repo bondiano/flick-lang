@@ -111,3 +111,10 @@ let strict_outer xs =
 //~ FLICK-T013 @97:11-97:12
 
 //~ FLICK-T070 @107:5-107:10
+
+returned_closure : Int -> Unit -> Int
+let returned_closure n =
+  let mut x = n
+  x = x + 1
+  fun () -> x
+//          ^ FLICK-G005 `x`
