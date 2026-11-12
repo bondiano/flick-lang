@@ -1,0 +1,51 @@
+// `<|` applies the function on its left; `>>` and `<<` compose functions. A
+// composition evaluates its operands once, left to right, where it is
+// written, and calls them in order each time it is applied.
+module App.Main exposing (main)
+
+say : String ->{} Unit
+let say line = Platform.stdout_line line
+
+double : Int -> Int
+let double n = n * 2
+
+inc : Int -> Int
+let inc n = n + 1
+
+/// `f`, after saying that it was evaluated.
+named : String -> (Int -> Int) ->{} (Int -> Int)
+let named name f =
+  say ("evaluated " ++ name)
+  f
+
+/// `n`, after saying that it was evaluated.
+value : String -> Int ->{} Int
+let value name n =
+  say ("evaluated " ++ name)
+  n
+
+/// `n`, after saying that it saw it: a function with a runtime call.
+seen : Int ->{} Int
+let seen n =
+  say ("saw " ++ show n)
+  n
+
+main : Unit ->{} Unit
+let main () =
+  say <| show <| (double >> inc) 5
+  say <| show <| (double << inc) 5
+  say <| (double >> inc >> show) 20
+  say <| (show >> (fun s -> s ++ "!")) 12345
+  say <| show <| List.map (inc >> double) [1, 2, 3]
+  forward : Int -> Int
+  let forward = named "f" double >> named "g" inc
+  say "composed"
+  say <| show <| forward 1
+  say <| show <| forward 2
+  backward : Int -> Int
+  let backward = named "f" double << named "g" inc
+  say <| show <| backward 1
+  say <| show <| (seen >> double >> seen) 3
+  say <| show <| (seen << double) 4
+  say <| show <| (named "f" double) <| value "x" 5
+  say <| show <| (value "x" 5 |> named "f" double)

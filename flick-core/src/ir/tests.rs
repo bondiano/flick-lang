@@ -225,3 +225,38 @@ fn ir_carries_the_checker_types() {
         assert!(seen.iter().any(|s| s == want), "no `{want}` in {seen:?}");
     }
 }
+
+#[test]
+fn compositions_lower_to_one_closure_and_left_pipes_to_calls() {
+    let ir = lower_text(
+        "App",
+        "module App exposing (..)\n\
+         say_n : Int ->{} Int\nforeign say_n from \"./io.js\" \"sayN\"\n\
+         inc : Int -> Int\nlet inc n = n + 1\n\
+         left : List Int -> List Int\nlet left xs = List.map inc <| xs\n\
+         atoms : Int -> Int\nlet atoms = inc >> inc\n\
+         backward : Int -> String\nlet backward = show << inc\n\
+         partial : List Int -> List Int\nlet partial = List.map inc >> List.filter (fun n -> n > 2)\n\
+         chain : Int -> String\nlet chain = inc >> (inc >> inc) >> show\n\
+         effects : Int ->{} Int\nlet effects = inc >> say_n\n\
+         later : List Int ->{} Int\nlet later = List.map_effect say_n >> List.length\n",
+    )
+    .expect("lowers");
+    let printed = super::print(&ir);
+    for line in [
+        // `f a <| x` is `f a x`
+        "let left = (fun xs -> ((List.map App.inc) xs))",
+        // names are used in place, other operands evaluated once before,
+        // a method too: its dictionary may be built where it is read
+        "let atoms = (fun $x -> (App.inc (App.inc $x)))",
+        "let backward = { let $f = <Show Int>.show; (fun $x -> ($f (App.inc $x))) }",
+        "let partial = { let $f = (List.map App.inc); let $f$1 = (List.Core.filter (fun n -> (n > 2))); (fun $x -> ($f$1 ($f $x))) }",
+        // a chain is one closure, through parentheses
+        "let chain = { let $f = <Show Int>.show; (fun $x -> ($f (App.inc (App.inc (App.inc $x))))) }",
+        // the closure's stage and its calls' are those the checker gave them
+        "let effects = (fun $x! -> (App.say_n (App.inc $x))!)",
+        "let later = { let $f = (List.map_effect App.say_n); (fun $x! -> (List.Core.length ($f $x)!)) }",
+    ] {
+        assert!(printed.contains(line), "{line}\nnot in\n{printed}");
+    }
+}

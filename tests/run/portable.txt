@@ -18,6 +18,8 @@ codegen/applicative_do
 codegen/category_classes
 codegen/classes
 codegen/closures
+codegen/composition
+codegen/composition_method
 codegen/deep_recursion
 codegen/defaults
 codegen/derive_default

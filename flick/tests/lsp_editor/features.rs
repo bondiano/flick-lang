@@ -99,7 +99,7 @@ let describe t x =
     lsp.close();
 }
 
-const SOURCE: &str = "module App.Geo exposing (Shape(..), area, scaled)
+const SOURCE: &str = "module App.Geo exposing (Shape(..), area, scaled, counted)
 
 type Shape = Circle Float | Square Float
 
@@ -117,6 +117,11 @@ scaled : List Float -> List Float
 let scaled xs =
   xs
     |> List.map (fun x -> x * 2)
+
+counted : List Float -> Int
+let counted xs =
+  List.length
+    <| xs
 ";
 
 #[test]
@@ -154,7 +159,7 @@ fn outline_tokens_folding_hints_and_signature_help() {
         .iter()
         .filter_map(|s| s["name"].as_str())
         .collect();
-    assert_eq!(names, ["Shape", "add3", "area", "scaled"]);
+    assert_eq!(names, ["Shape", "add3", "area", "scaled", "counted"]);
     assert_eq!(symbols["result"][0]["children"][1]["name"], "Square");
 
     let found = lsp.request("workspace/symbol", &json!({ "query": "sqr" }));
@@ -177,14 +182,14 @@ fn outline_tokens_folding_hints_and_signature_help() {
         "{folds}"
     );
 
-    let hints = lsp.request("textDocument/inlayHint", &json!({ "textDocument": doc, "range": { "start": { "line": 0, "character": 0 }, "end": { "line": 20, "character": 0 } } }));
+    let hints = lsp.request("textDocument/inlayHint", &json!({ "textDocument": doc, "range": { "start": { "line": 0, "character": 0 }, "end": { "line": 30, "character": 0 } } }));
     let labels: Vec<&str> = hints["result"]
         .as_array()
         .expect("hints")
         .iter()
         .filter_map(|h| h["label"].as_str())
         .collect();
-    assert_eq!(labels, [": Float", " : List Float"], "{hints}");
+    assert_eq!(labels, [": Float", " : List Float", " : Int"], "{hints}");
 
     let help = lsp.request("textDocument/signatureHelp", &json!({ "textDocument": doc, "position": position(SOURCE, SOURCE.find("2 3").expect("call") + 1) }));
     assert_eq!(help["result"]["activeParameter"], 1, "{help}");

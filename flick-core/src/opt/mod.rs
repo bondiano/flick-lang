@@ -31,8 +31,10 @@ mod known;
 mod specialize;
 mod sroa;
 mod walk;
-pub use walk::rename;
+pub use walk::{Arity, arity, rename};
 
+#[cfg(test)]
+mod compose_tests;
 #[cfg(test)]
 mod gadt_tests;
 #[cfg(test)]
@@ -40,14 +42,15 @@ mod inline_tests;
 #[cfg(test)]
 mod tests;
 
+use std::cell::RefCell;
 use std::collections::{BTreeSet, HashMap, HashSet};
-use std::mem;
+use std::{mem, ptr};
 
 use crate::ir::{Expr, ExprKind, Item, ItemKind, Lit, Module, Pat, Stmt};
 pub use fold::{js_number, json_string};
 pub use specialize::names_only;
 pub(crate) use walk::uses;
-use walk::{droppable, each_strict_use, each_use};
+use walk::{droppable, each_strict_use, each_use, inert, partial};
 
 /// Rounds of inlining: a body inlined in the first may inline again.
 const ROUNDS: usize = 2;
@@ -56,6 +59,9 @@ const ROUNDS: usize = 2;
 /// spares an object, as a chain of combinators is.
 const STEPS: usize = 8;
 
+/// The arity known of a value of another module that is no function.
+const NO_ARITY: usize = usize::MAX;
+
 /// The values of the other modules of the build, by module and name: their
 /// dictionary parameters and body, when the body names only what its
 /// module exports.
@@ -63,22 +69,53 @@ pub type Generics<'a> = &'a dyn Fn(&str, &str) -> Option<(Vec<String>, Expr)>;
 
 /// Optimizes `module` in place; `exported` tells the values importers see,
 /// `generics` what [`specialize`] may copy and [`inline`] may inline from
-/// other modules.
-pub fn optimize(module: &mut Module, exported: &dyn Fn(&str) -> bool, generics: Generics) {
+/// other modules, `arity` how many arguments a function of another module
+/// takes before its body runs.
+pub fn optimize(
+    module: &mut Module,
+    exported: &dyn Fn(&str) -> bool,
+    generics: Generics,
+    arity: Arity,
+) {
     let mut fresh = 0;
     let foreign = inline::Foreign::new(generics);
+    // what other modules' functions take, by `module.name`: one map type
+    // the compiler has already
+    let found: RefCell<HashMap<String, usize>> = RefCell::default();
+    let elsewhere = |m: &str, name: &str| {
+        let key = format!("{m}.{name}");
+        let known = found.borrow().get(&key).copied();
+        let taken = known.unwrap_or_else(|| {
+            let taken = arity(m, name).unwrap_or(NO_ARITY);
+            found.borrow_mut().insert(key, taken);
+            taken
+        });
+        (taken != NO_ARITY).then_some(taken)
+    };
     devirt::defaults(module, &devirt::Lookup::new(module, generics), &mut fresh);
     specialize::specialize(module, generics);
     for _ in 0..ROUNDS {
         constants(module);
         let lookup = devirt::Lookup::new(module, generics);
         let candidates = inline::candidates(&module.name, &module.items, exported);
+        let mut own: HashMap<String, usize> = HashMap::new();
+        for (name, n) in module.items.iter().filter_map(walk::arity) {
+            own.insert(name.to_owned(), n);
+        }
+        let name = module.name.clone();
+        let arities = |m: &str, n: &str| {
+            if m == name {
+                own.get(n).copied()
+            } else {
+                elsewhere(m, n)
+            }
+        };
         for item in &mut module.items {
             for body in bodies(item) {
                 devirt::methods(body, &lookup, &mut fresh, 0);
                 inline::inline(body, &module.name, &candidates, &foreign, &mut fresh);
                 fuse::fuse(body, &mut fresh);
-                simplify(body);
+                simplify_with(body, &arities);
                 // a value built only to be taken apart: each step may
                 // show the next one
                 for _ in 0..STEPS {
@@ -86,7 +123,7 @@ pub fn optimize(module: &mut Module, exported: &dyn Fn(&str) -> bool, generics: 
                     if !(inlined | known::branches(body, &mut fresh)) {
                         break;
                     }
-                    simplify(body);
+                    simplify_with(body, &arities);
                 }
             }
         }
@@ -104,16 +141,29 @@ fn bodies(item: &mut Item) -> Vec<&mut Expr> {
 
 /// Simplifies `e` until nothing changes, a few times at most.
 pub fn simplify(e: &mut Expr) {
+    simplify_with(e, &|_, _| None);
+}
+
+/// [`simplify`], knowing how many arguments the functions `arity` names take.
+fn simplify_with(e: &mut Expr, arity: Arity) {
     for _ in 0..8 {
-        if !pass(e) {
+        if !pass(e, arity) {
             return;
         }
     }
 }
 
-fn pass(e: &mut Expr) -> bool {
+fn pass(e: &mut Expr, arity: Arity) -> bool {
+    // the owner is the call's: in another shape of it, the first call code
+    // generation meets would take it, maybe one inside its argument
+    if let ExprKind::Within(_, call) = &mut e.kind {
+        let mut changed = false;
+        call.each_child_mut(&mut |c| changed |= pass(c, arity));
+        return changed;
+    }
     let mut changed = false;
-    e.each_child_mut(&mut |c| changed |= pass(c));
+    e.each_child_mut(&mut |c| changed |= pass(c, arity));
+    changed |= walk::ordered(e, arity);
     changed |= specialize::operator(e) | fold::fold(e) | inline::beta(e) | devirt::known_match(e);
     changed |= known::named_again(e);
     if let ExprKind::Block(stmts, result) = &mut e.kind {
@@ -121,8 +171,8 @@ fn pass(e: &mut Expr) -> bool {
         changed |= known::scrutinees(stmts, result);
         changed |= flatten(stmts, result);
         changed |= sroa::split(stmts, result);
-        changed |= propagate(stmts, result);
-        changed |= dead(stmts, result);
+        changed |= propagate(stmts, result, arity);
+        changed |= dead(stmts, result, arity);
         if stmts.is_empty() {
             let result = mem::replace(&mut **result, Expr::new(ExprKind::Lit(Lit::Unit), e.span));
             *e = result;
@@ -210,21 +260,36 @@ fn later_uses(stmts: &[Stmt], result: &Expr) -> Vec<Option<(usize, usize)>> {
 }
 
 /// Replaces a local bound to an atom with the atom, and a local read once
-/// by its pure value when that read surely happens. One walk of the block:
-/// a value on its way to its reads waits in `moving`, and each statement
-/// takes what it reads when the walk comes to it. A value reads no local
-/// bound after it, so the counts taken before the walk still hold then.
-fn propagate(stmts: &mut Vec<Stmt>, result: &mut Expr) -> bool {
+/// by its pure value when that read surely happens. A function applied to
+/// names, but not to all its arguments, moves to its one read even inside a
+/// function when the read gives it the rest: `{ let g = f a; fun x -> g x }`
+/// calls `f` with all its arguments at once; so does a method of a
+/// dictionary already built, which costs a read either way. One walk of the block: a value
+/// on its way to its reads waits in `moving`, and each statement takes what
+/// it reads when the walk comes to it. A value reads no local bound after
+/// it, so the counts taken before the walk still hold then.
+fn propagate(stmts: &mut Vec<Stmt>, result: &mut Expr, arity: Arity) -> bool {
     let later = later_uses(stmts, result);
+    let completed: Vec<bool> = (stmts.iter().enumerate())
+        .map(|(i, stmt)| match (stmt, later[i]) {
+            (Stmt::Let(Pat::Bind(_), v), Some((1, _))) if walk::known_method(v) => true,
+            (Stmt::Let(Pat::Bind(name), v), Some((1, _))) if applied_to_atoms(v) => {
+                partial(v, arity).is_some_and(|rest| completes(&stmts[i + 1..], result, name, rest))
+            }
+            _ => false,
+        })
+        .collect();
     let before = stmts.len();
     let mut moving: HashMap<String, Expr> = HashMap::new();
     let mut kept = Vec::with_capacity(before);
+    let mut completed = completed.into_iter();
     for (mut stmt, uses) in mem::take(stmts).into_iter().zip(later) {
+        let completed = completed.next().unwrap_or(false);
         // what moves in may be dropped, so a value that may be dropped
         // before it still may after: asking first keeps the answer from
         // walking the values that moved into this one
         let once = matches!(uses, Some((1, 1)));
-        let pure = once && matches!(&stmt, Stmt::Let(_, v) if droppable(v));
+        let pure = completed || once && matches!(&stmt, Stmt::Let(_, v) if inert(v, arity));
         match &mut stmt {
             Stmt::Let(_, v)
             | Stmt::Var(_, v)
@@ -234,7 +299,7 @@ fn propagate(stmts: &mut Vec<Stmt>, result: &mut Expr) -> bool {
         }
         match (stmt, uses) {
             (Stmt::Let(Pat::Bind(name), value), Some((all, _)))
-                if all != 0 && (atom(&value) || pure || (once && droppable(&value))) =>
+                if all != 0 && (atom(&value) || pure || (once && inert(&value, arity))) =>
             {
                 moving.insert(name, value);
             }
@@ -265,10 +330,47 @@ fn place(e: &mut Expr, moving: &mut HashMap<String, Expr>) {
     e.each_child_mut(&mut |c| place(c, moving));
 }
 
+/// `f a b` applied to atoms only.
+fn applied_to_atoms(e: &Expr) -> bool {
+    let mut head = e;
+    while let ExprKind::App { func, arg, .. } = &head.kind {
+        if !atom(arg) {
+            return false;
+        }
+        head = func;
+    }
+    !ptr::eq(head, e)
+}
+
+/// Whether the statements `stmts` and `result` read `name` as the function
+/// of an application of at least `rest` arguments.
+fn completes(stmts: &[Stmt], result: &Expr, name: &str, rest: usize) -> bool {
+    fn applies(e: &Expr, name: &str, rest: usize) -> bool {
+        let (mut head, mut args) = (e, 0);
+        while let ExprKind::App { func, .. } = &head.kind {
+            (head, args) = (func, args + 1);
+        }
+        if matches!(&head.kind, ExprKind::Local(l) if l == name) {
+            return args >= rest;
+        }
+        let mut found = false;
+        e.each_child(&mut |c| found |= applies(c, name, rest));
+        found
+    }
+    let in_stmt = |s: &Stmt| match s {
+        Stmt::Let(_, v)
+        | Stmt::Var(_, v)
+        | Stmt::Assign(_, v)
+        | Stmt::Expr(v)
+        | Stmt::Fun { value: v, .. } => applies(v, name, rest),
+    };
+    stmts.iter().any(in_stmt) || applies(result, name, rest)
+}
+
 /// Drops statements whose value is unused and whose evaluation shows
 /// nothing; a runtime call always stays. One walk of the block from its
 /// end, with the locals the statements kept so far and `result` read.
-fn dead(stmts: &mut Vec<Stmt>, result: &Expr) -> bool {
+fn dead(stmts: &mut Vec<Stmt>, result: &Expr, arity: Arity) -> bool {
     let keep: Vec<bool> = {
         let mut read: HashSet<&str> = HashSet::new();
         each_use(result, &mut |l| {
@@ -277,11 +379,11 @@ fn dead(stmts: &mut Vec<Stmt>, result: &Expr) -> bool {
         let mut keep = vec![true; stmts.len()];
         for (i, stmt) in stmts.iter().enumerate().rev() {
             let drop = match stmt {
-                Stmt::Expr(v) => droppable(v),
+                Stmt::Expr(v) => inert(v, arity),
                 Stmt::Let(p, v) => {
                     let mut bound = Vec::new();
                     p.binders(&mut bound);
-                    p.irrefutable() && bound.iter().all(|n| !read.contains(n)) && droppable(v)
+                    p.irrefutable() && bound.iter().all(|n| !read.contains(n)) && inert(v, arity)
                 }
                 Stmt::Fun { name, .. } => !read.contains(name.as_str()),
                 Stmt::Var(..) | Stmt::Assign(..) => false,

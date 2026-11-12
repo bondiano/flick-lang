@@ -17,7 +17,11 @@ use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
 use crate::types::lang::Lang;
 
-impl Checker<'_> {
+/// The body of a function the checker types, given the type of its first
+/// parameter and the result its stages leave, if known; called once.
+pub type Body<'b, 'c> = dyn FnMut(&mut Checker<'c>, Option<&Type>, Option<Type>) -> Type + 'b;
+
+impl<'c> Checker<'c> {
     pub fn check(&mut self, node: &Node, expected: &Type) {
         self.check_value(node, expected);
     }
@@ -92,6 +96,9 @@ impl Checker<'_> {
             }
             (K::FunExpr, _) => {
                 self.lambda(node, Some(expected));
+            }
+            (K::BinExpr, _) if super::pipes::composes(node) => {
+                self.compose(node, Some(expected));
             }
             (K::LoopExpr | K::WhileExpr, _) => {
                 self.control_loop(node, Some(expected));
@@ -425,6 +432,23 @@ impl Checker<'_> {
         expected: Option<&Type>,
         node: &Node,
     ) -> Type {
+        let mut body = Some(body);
+        let mut once =
+            |c: &mut Self, _: Option<&Type>, rest| body.take().map_or(Type::Error, |b| b(c, rest));
+        self.function_typed(params, &mut once, expected, node)
+    }
+
+    /// [`Self::function_with`] whose body also gets the type of the first
+    /// parameter, which it may read without binding a name. The body is
+    /// called once; taken as a `dyn`, this is one function for every
+    /// caller, not a copy for each.
+    pub fn function_typed(
+        &mut self,
+        params: &[Option<&Node>],
+        body: &mut Body<'_, 'c>,
+        expected: Option<&Type>,
+        node: &Node,
+    ) -> Type {
         let saved = mem::take(&mut self.cx.runtime);
         let mark = self.cx.locals.len();
         let givens = self.classes.givens.len();
@@ -500,7 +524,7 @@ impl Checker<'_> {
         let returns = rest.clone().unwrap_or_else(|| self.fresh());
         stage.returns = Some(returns.clone());
         let outer = mem::replace(&mut self.cx.stage, stage);
-        let result = body(self, rest);
+        let result = body(self, stages.first().map(|(ty, _)| ty), rest);
         let inner = mem::replace(&mut self.cx.stage, outer);
         if inferred_result && self.unify(&returns, &result).is_err() {
             let (returns, result) = (self.show(&returns), self.show(&result));

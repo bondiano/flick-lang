@@ -1,7 +1,8 @@
 //! Checks on the finished tree that need more than one token of context:
-//! the names a pattern binds, and the words of an attribute. Like Rust, every alternative of an or-pattern
-//! binds the same names, and no name is bound twice by one pattern or by the
-//! parameters of one function.
+//! operators that do not mix, the names a pattern binds, and the words of an
+//! attribute. Like Rust, every alternative of an or-pattern binds the same
+//! names, and no name is bound twice by one pattern or by the parameters of
+//! one function.
 
 use super::cst::{Node, Token};
 use super::heads::CHECKED_BY;
@@ -63,6 +64,7 @@ impl Validator<'_> {
                     self.group(&[pattern]);
                 }
             }
+            K::BinExpr => self.unmixed(node),
             _ => {}
         }
         for (index, child) in node.nodes().enumerate() {
@@ -83,6 +85,34 @@ impl Validator<'_> {
                 _ => Place::Plain,
             };
             self.walk(child, inner);
+        }
+    }
+
+    /// `x |> f <| y` and `f >> g << h`: operators of opposite directions read
+    /// either way, so an operand of one that is the other needs parentheses.
+    fn unmixed(&mut self, node: &Node) {
+        let operator = |n: &Node| n.child_tokens().find(|t| t.kind.is_binary_op());
+        let Some(outer) = operator(node) else {
+            return;
+        };
+        let (opposite, message) = match outer.kind {
+            K::LtPipe => (K::PipeGt, "`<|` and `|>` do not mix: add parentheses"),
+            K::PipeGt => (K::LtPipe, "`<|` and `|>` do not mix: add parentheses"),
+            K::GtGt => (K::LtLt, "`>>` and `<<` do not mix: add parentheses"),
+            K::LtLt => (K::GtGt, "`>>` and `<<` do not mix: add parentheses"),
+            _ => return,
+        };
+        let inner = node
+            .nodes()
+            .filter(|n| n.kind == K::BinExpr)
+            .filter_map(operator)
+            .find(|t| t.kind == opposite);
+        if let Some(inner) = inner {
+            self.errors.push(Diagnostic::error(
+                codes::S007,
+                message.to_owned(),
+                Span::new(self.file, inner.start, inner.end),
+            ));
         }
     }
 

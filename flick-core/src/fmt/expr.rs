@@ -65,6 +65,15 @@ fn starts_line(text: &str, t: Token) -> bool {
         .is_some_and(|l| l.trim().is_empty())
 }
 
+/// Whether the token ends its line.
+fn ends_line(text: &str, t: Token) -> bool {
+    let after = &text[t.end as usize..];
+    after
+        .split('\n')
+        .next()
+        .is_some_and(|l| l.trim().is_empty())
+}
+
 impl<'a> Printer<'a> {
     /// `f a b`: on one line, or the arguments one per line one level in. A
     /// last argument that hugs keeps the call on its line when what comes
@@ -187,8 +196,10 @@ impl<'a> Printer<'a> {
         if operands.len() != operators.len() + 1 {
             return self.generic(n);
         }
-        let pipe = op.kind == K::PipeGt;
-        let broken = pipe && operators.iter().any(|&o| starts_line(self.text, o));
+        let pipe = matches!(op.kind, K::PipeGt | K::LtPipe);
+        // a step on a line of its own, whichever end of a line its operator is on
+        let on_lines = |&o: &Token| starts_line(self.text, o) || ends_line(self.text, o);
+        let broken = pipe && operators.iter().any(on_lines);
         let mut forced = broken;
         let mut first = self.node(operands[0]);
         if let Some(c) = self.comments.trailing(operators[0].start, None) {

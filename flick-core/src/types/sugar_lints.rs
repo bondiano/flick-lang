@@ -54,11 +54,10 @@ impl Checker<'_> {
                 }
             }
             K::MatchExpr => self.rethrowing_match(node),
-            K::BinExpr if node.has_token(K::PipeGt) => {
-                let children: Vec<&Node> = node.nodes().collect();
-                if let [lhs, rhs] = children[..] {
-                    self.forced(node, rhs, lhs);
-                    self.filter_then_map(node, lhs, rhs);
+            K::BinExpr => {
+                if let Some((function, argument)) = piped(node) {
+                    self.forced(node, function, argument);
+                    self.filter_then_map(node, argument, function);
                 }
             }
             _ => {}
@@ -212,14 +211,14 @@ impl Checker<'_> {
                 Some(f) if FOLLOWS.contains(&f.as_str()) => self.infinite(last),
                 _ => false,
             },
-            (K::BinExpr, [lhs, rhs]) if node.has_token(K::PipeGt) => {
-                let head = match rhs.kind {
-                    K::AppExpr => rhs.nodes().next(),
-                    _ => Some(*rhs),
+            (K::BinExpr, _) if let Some((function, argument)) = piped(node) => {
+                let head = match function.kind {
+                    K::AppExpr => function.nodes().next(),
+                    _ => Some(function),
                 };
                 match head.and_then(|h| self.seq_function(h)) {
                     Some(f) if INFINITE.contains(&f.as_str()) => true,
-                    Some(f) if FOLLOWS.contains(&f.as_str()) => self.infinite(lhs),
+                    Some(f) if FOLLOWS.contains(&f.as_str()) => self.infinite(argument),
                     _ => false,
                 }
             }
@@ -227,14 +226,13 @@ impl Checker<'_> {
         }
     }
 
-    /// T033: `xs |> List.filter (fun x -> p) |> List.map (fun x -> e)`.
-    fn filter_then_map(&mut self, node: &Node, lhs: &Node, rhs: &Node) {
-        let Some(map) = self.list_call(rhs, "map") else {
+    /// T033: `xs |> List.filter (fun x -> p) |> List.map (fun x -> e)`, or
+    /// the same with `<|`.
+    fn filter_then_map(&mut self, node: &Node, argument: &Node, function: &Node) {
+        let Some(map) = self.list_call(function, "map") else {
             return;
         };
-        let lhs = unparen(lhs);
-        let parts: Vec<&Node> = lhs.nodes().collect();
-        let ([source, filter], true) = (&parts[..], lhs.has_token(K::PipeGt)) else {
+        let Some((filter, source)) = piped(unparen(argument)) else {
             return;
         };
         let Some(keep) = self.list_call(filter, "filter") else {
@@ -424,5 +422,21 @@ pub(super) fn unparen(node: &Node) -> &Node {
     match node.kind {
         K::ParenExpr => node.nodes().next().map_or(node, unparen),
         _ => node,
+    }
+}
+
+/// The function and the argument of `x |> f` and of `f <| x`: the lints of
+/// a call see either pipe as one.
+pub(super) fn piped(node: &Node) -> Option<(&Node, &Node)> {
+    if node.kind != K::BinExpr {
+        return None;
+    }
+    let op = node.child_tokens().find(|t| t.kind.is_binary_op())?;
+    let mut operands = node.nodes();
+    let (lhs, rhs) = (operands.next()?, operands.next()?);
+    match op.kind {
+        K::PipeGt => Some((rhs, lhs)),
+        K::LtPipe => Some((lhs, rhs)),
+        _ => None,
     }
 }

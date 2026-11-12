@@ -6,10 +6,10 @@ let add a b = a + b
 main : Unit ->{} Unit
 let main () =
   let add_ten = add 10
-  Platform.stdout_line (show (add_ten 5))
+  Platform.stdout_line <| show <| add_ten 5
   let total =
     [1, 2, 3, 4]
     |> List.map (fun n -> n * 3)
     |> List.filter (fun n -> n > 5)
     |> List.sum
-  Platform.stdout_line (show total)
+  Platform.stdout_line <| show total

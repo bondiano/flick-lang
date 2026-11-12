@@ -267,3 +267,23 @@ test("loop and while keep ordinary-name highlighting outside loop syntax", async
     }
   } finally { highlighter.dispose(); }
 });
+
+test("`<|`, `>>` and `<<` are one operator each", async () => {
+  const highlighter = await createHighlighterCore({
+    engine: createJavaScriptRegexEngine(),
+    themes: [],
+    langs: [{ ...grammar, name: "flick" }],
+  });
+  try {
+    const language = highlighter.getLanguage("flick");
+    const line = "let h = f <| g >> k << m |> n";
+    const { tokens } = language.tokenizeLine(line, null);
+    for (const op of ["<|", ">>", "<<", "|>"]) {
+      const at = line.indexOf(op);
+      const token = tokens.find((t) => t.startIndex === at);
+      assert.ok(token, op);
+      assert.equal(token.endIndex, at + 2, op);
+      assert.ok(token.scopes.includes("keyword.operator.flick"), op);
+    }
+  } finally { highlighter.dispose(); }
+});

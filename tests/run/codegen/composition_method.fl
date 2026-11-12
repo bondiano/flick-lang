@@ -1,0 +1,20 @@
+// A composition evaluates its operands where it is written: a method that
+// fails as its dictionary is made fails there, before anything else runs.
+module App.Main exposing (main)
+
+class Named a =
+  named : a -> String
+
+instance Show a => Named (Option a) =
+  let named =
+    let prefix = show (Int.unsafe_div 1 0)
+    fun _ -> prefix
+
+made : Option Int ->{} Int
+let made o =
+  let h = named >> String.length
+  Platform.stdout_line "made"
+  h o
+
+main : Unit ->{; AppError} Unit
+let main () = Platform.stdout_line (show (made None))

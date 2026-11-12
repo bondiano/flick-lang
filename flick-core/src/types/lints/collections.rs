@@ -6,7 +6,7 @@
 //! default (`Option.with_default`).
 
 use super::super::Checker;
-use super::super::sugar_lints::unparen;
+use super::super::sugar_lints::{piped, unparen};
 use super::super::typing::Ref;
 use super::single;
 use crate::diagnostics::codes;
@@ -198,17 +198,17 @@ impl Checker<'_> {
     }
 
     /// The `List` function `node` applies and its arguments, written
-    /// `List.f a b` or `b |> List.f a`.
+    /// `List.f a b`, `b |> List.f a` or `List.f a <| b`.
     fn list_applied<'n>(&self, node: &'n Node) -> Option<(String, Vec<&'n Node>)> {
         let parts: Vec<&Node> = node.nodes().collect();
         match (node.kind, &parts[..]) {
             (K::AppExpr, [head, args @ ..]) => Some((self.list_function(head)?, args.to_vec())),
-            (K::BinExpr, [lhs, rhs]) if node.has_token(K::PipeGt) => {
-                let (name, mut args) = match unparen(rhs).kind {
-                    K::AppExpr => self.list_applied(unparen(rhs))?,
-                    _ => (self.list_function(rhs)?, Vec::new()),
+            (K::BinExpr, _) if let Some((function, argument)) = piped(node) => {
+                let (name, mut args) = match unparen(function).kind {
+                    K::AppExpr => self.list_applied(unparen(function))?,
+                    _ => (self.list_function(function)?, Vec::new()),
                 };
-                args.push(lhs);
+                args.push(argument);
                 Some((name, args))
             }
             _ => None,

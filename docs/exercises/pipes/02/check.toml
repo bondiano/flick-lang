@@ -1,0 +1,10 @@
+export = "word_count"
+argument_types = ["string"]
+return_type = "number"
+output = "3"
+title = "Compose in order"
+title_ru = "Составьте по порядку"
+task = "word_count counts before it splits. Make it split the text into words, then count them."
+task_ru = "word_count считает раньше, чем разбивает. Пусть сначала разобьёт текст на слова, а потом их сосчитает."
+hints = ["f >> g applies f first, then g.", "String.split \" \" >> List.length"]
+hints_ru = ["f >> g сначала применяет f, затем g.", "String.split \" \" >> List.length"]

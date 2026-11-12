@@ -1,0 +1,27 @@
+// A composition that holds a resource is free to live inside its scope.
+module App.Composition exposing (..)
+
+type alias Path = String
+
+type File (s : Region)
+
+type error OpenError = OpenError Path
+
+type error ReadError = ReadError Path
+
+service FileSystem =
+  open_scoped : forall s. Path ->{Scope s; OpenError} File s
+  read_all : forall s. File s ->{; ReadError} String
+
+inside : Path ->{FileSystem; OpenError, ReadError} String
+let inside path = scope {
+  let file = FileSystem.open_scoped path
+  let read = (fun () -> file) >> FileSystem.read_all
+  read ()
+}
+
+applied : Path ->{FileSystem; OpenError, ReadError} Int
+let applied path = scope {
+  let file = FileSystem.open_scoped path
+  (FileSystem.read_all >> String.length) file
+}

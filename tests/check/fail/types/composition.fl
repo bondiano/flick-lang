@@ -1,0 +1,20 @@
+module App.Composition exposing (..)
+
+inc : Int -> Int
+let inc n = n + 1
+
+not_a_function : Int -> Int
+let not_a_function = inc >> "three"
+
+mismatch : Int -> Int
+let mismatch = inc >> String.length
+
+applied_text : Int
+let applied_text = "a" <| 2
+
+wrong_result : Int -> String
+let wrong_result = inc << inc
+//~ FLICK-T003 @7:29-7:36 `>>` composes functions, but this has type `String`
+//~ FLICK-T003 @10:20-10:36 expected `String`, found `Int`
+//~ FLICK-T003 @13:20-13:28 this is not a function
+//~ FLICK-T003 @16:24-16:26 expected `String`, found `Int`
