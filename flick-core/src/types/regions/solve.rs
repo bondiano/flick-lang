@@ -15,15 +15,6 @@ use crate::types::kinds::Kind;
 use crate::types::ty::{Norm, Row, Type};
 use crate::types::{Checker, ty};
 
-/// `Outlives c s`: the captures `c` live at least as long as the region `s`.
-#[derive(Debug, Clone)]
-pub struct Outlives {
-    pub captures: Type,
-    pub owner: Type,
-    pub givens: Vec<Type>,
-    pub span: Span,
-}
-
 impl Checker<'_> {
     /// What `hold` holds beyond what its type shows.
     fn hidden(&self, hold: &Hold) -> Norm {
@@ -106,6 +97,7 @@ impl Checker<'_> {
         let open_bound = |hold: &Hold| {
             let bound = self.bound_of(hold);
             bound.tails.iter().any(|t| matches!(t, Type::Meta(_)))
+                || self.lone_open_region(&bound).is_some()
         };
         if !self.cx.regions.holds.iter().any(open_bound) {
             return false;
@@ -121,13 +113,24 @@ impl Checker<'_> {
             .collect();
         for i in 0..summaries.len() {
             let Summary { bound, hidden, .. } = &summaries[i];
-            if !bound.tails.iter().any(|t| matches!(t, Type::Meta(_))) {
+            let region = self.lone_open_region(bound);
+            if region.is_none() && !bound.tails.iter().any(|t| matches!(t, Type::Meta(_))) {
                 continue;
             }
             let (bound, actual) = (bound.clone(), hidden.entries.clone());
             for (label, atom) in actual {
                 if bound.get(&label).is_some() {
                     continue;
+                }
+                let mut grew = None;
+                // the region a written row leaves open, `{?r}`, is the one its
+                // value holds, as instantiating the signature there would give
+                if let Some(r) = region
+                    && self.atom_kind(&atom, &[]) == Some(Kind::Region)
+                    && self.bind(r, &atom).is_ok()
+                {
+                    changed = true;
+                    grew = Some(r);
                 }
                 let blocked = blocked_capture_rows(&summaries, &label);
                 let metas = bound.tails.iter().filter_map(|t| match t {
@@ -138,8 +141,11 @@ impl Checker<'_> {
                 // blocked, the first still grows, and its bound reports
                 let (unblocked, shut): (Vec<u32>, Vec<u32>) =
                     metas.partition(|m| !blocked.contains(m));
-                let mut grew = None;
-                for m in unblocked.into_iter().chain(shut) {
+                for m in unblocked
+                    .into_iter()
+                    .chain(shut)
+                    .take_while(|_| grew.is_none())
+                {
                     let rest = self.store.fresh_beside(m);
                     let row = Type::Row(Row {
                         entries: vec![(label.clone(), atom.clone())],
@@ -167,6 +173,18 @@ impl Checker<'_> {
             }
         }
         changed
+    }
+
+    /// The one region of a written capture row not known yet, `{?r}`.
+    fn lone_open_region(&self, bound: &Norm) -> Option<u32> {
+        let mut open = (bound.entries.iter()).filter_map(|(label, atom)| {
+            match (label, self.store.resolve(atom)) {
+                (Elem::Capture(_), Type::Meta(m)) => Some(m),
+                _ => None,
+            }
+        });
+        let region = open.next()?;
+        open.next().is_none().then_some(region)
     }
 
     /// Makes the qualifiers left unknown hold nothing; with `level`, only
@@ -371,94 +389,6 @@ impl Checker<'_> {
             None => diagnostic,
         };
         self.diagnostics.push(diagnostic);
-    }
-
-    /// Whether the scope `outer` is `inner` or around it.
-    pub(super) fn encloses(&self, outer: usize, inner: usize) -> bool {
-        let mut at = Some(inner);
-        while let Some(i) = at {
-            if i == outer {
-                return true;
-            }
-            at = self.cx.regions.scopes[i].parent;
-        }
-        false
-    }
-
-    pub(super) fn scope_index(&self, t: &Type) -> Option<usize> {
-        match t {
-            Type::Skolem(s) => self.cx.regions.scopes.iter().position(|x| x.region == *s),
-            _ => None,
-        }
-    }
-
-    /// A child registered with `owner` runs until the owner's scope closes,
-    /// so it may hold only regions that end no earlier.
-    pub(super) fn check_outlives(&mut self, o: &Outlives) {
-        let owner = self.store.resolve(&o.owner);
-        let owner_scope = self.scope_index(&owner);
-        let mut held = Norm::default();
-        self.capture_row(&o.captures, &mut held);
-        for (label, atom) in held.entries {
-            if atom == owner {
-                continue;
-            }
-            let fits = match self.scope_index(&atom) {
-                Some(scope) => owner_scope.is_some_and(|owner| self.encloses(scope, owner)),
-                // what the signature names outlives every scope inside the body
-                None => {
-                    owner_scope.is_some()
-                        || o.givens.iter().any(|g| match g.spine().1[..] {
-                            [c, s] if self.store.resolve(s) == owner => {
-                                let mut allowed = Norm::default();
-                                self.capture_row(c, &mut allowed);
-                                allowed.get(&label).is_some()
-                            }
-                            _ => false,
-                        })
-                }
-            };
-            if !fits {
-                let (region, scope) = self.describe(&atom);
-                let (owner_name, _) = self.describe(&owner);
-                let mut diagnostic = Diagnostic::error(
-                    codes::G003,
-                    format!(
-                        "the child holds {region}, which may end before its owner {owner_name}: a child runs until its owner's scope closes"
-                    ),
-                    o.span,
-                );
-                if let Some(span) = scope {
-                    diagnostic = diagnostic.with_related(span, "the region's scope ends here");
-                }
-                self.diagnostics.push(diagnostic);
-                return;
-            }
-        }
-    }
-
-    /// An error carries data out of every scope, even when a handler inside
-    /// the scope catches it: its payload holds no region.
-    fn check_raised(&mut self, errors: &Type, span: Span) {
-        for (_, error) in self.store.normalize(errors).entries {
-            let regions = self.captures_of(&error);
-            if let Some((_, atom)) = regions
-                .entries
-                .iter()
-                .find(|(_, t)| self.scope_index(t).is_some())
-            {
-                let (region, _) = self.describe(atom);
-                let shown = self.show_exact(&error);
-                self.error(
-                    codes::E005,
-                    span,
-                    format!(
-                        "the error `{shown}` would carry {region}; an error carries data such as a path, an id or a copy"
-                    ),
-                );
-                return;
-            }
-        }
     }
 }
 

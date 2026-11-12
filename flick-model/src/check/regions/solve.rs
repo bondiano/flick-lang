@@ -2,7 +2,9 @@
 //! grow to the least sets their obligations need, then each obligation,
 //! `Outlives` (§2.4) and (Err-Raise) (§2.5) is decided.
 
-use super::super::{Check, Checker, error};
+use std::collections::BTreeSet;
+
+use super::super::{Check, Checker, Solved, error};
 use super::Hold;
 use crate::types::{Caps, Type, Var};
 
@@ -16,6 +18,10 @@ impl Checker<'_> {
                 let h = self.regions.holds[i].clone();
                 let (missing, room) = self.excess(&h);
                 if missing.is_empty() {
+                    continue;
+                }
+                if self.take_open_region(&h, &missing) {
+                    grown = true;
                     continue;
                 }
                 if let Some(m) = room {
@@ -99,6 +105,10 @@ impl Checker<'_> {
                 if missing.is_empty() {
                     continue;
                 }
+                if self.take_open_region(&h, &missing) {
+                    grown = true;
+                    continue;
+                }
                 if let Some(m) = room {
                     let level = self.slots[m as usize].level;
                     let tail = self.meta();
@@ -113,6 +123,30 @@ impl Checker<'_> {
                 return Ok(());
             }
         }
+    }
+
+    /// The one region a written qualifier `h` is within leaves open, `{?r}`,
+    /// becomes a region it lacks, as instantiating the signature there would
+    /// give; `true` when it did.
+    fn take_open_region(&mut self, h: &Hold, missing: &Caps) -> bool {
+        let mut open = BTreeSet::new();
+        for t in &h.within {
+            for v in self.reach(t).atoms {
+                if let Var::Meta(m) = v
+                    && self.slots[m as usize].solved.is_none()
+                {
+                    open.insert(m);
+                }
+            }
+        }
+        let ([r], Some(region)) = (
+            &open.into_iter().collect::<Vec<_>>()[..],
+            missing.atoms.iter().find(|v| self.is_region(v)),
+        ) else {
+            return false;
+        };
+        let region = Type::Var(region.clone());
+        self.bind(*r, Solved::Type(region.clone()), &region).is_ok()
     }
 
     /// What `h` holds beyond what it allows, and the capture row that may

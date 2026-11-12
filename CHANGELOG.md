@@ -100,6 +100,10 @@ break programs.
   nothing. `cf (F f) (F g) = F (fun x -> f (g x))` for
   `type F s a = F (s -> a)` is accepted, where it was `FLICK-G001`.
   Interfaces are of version 21.
+- **What a callback holds:** a function passed where a qualifier is written
+  fits only if the qualifier covers what it holds, pure functions too, as
+  the core compares arrows. A pure `(Float -> Float)^{d}` given for
+  `(Float -> Float)^{c}` is now `FLICK-G001`, where it passed before.
 - **Labels:** `@label kind` before a type declaration gives the top-level
   values of that type their names where the program runs, as the atoms,
   views and actions of the standard library have them; a library marks its

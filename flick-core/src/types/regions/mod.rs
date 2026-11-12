@@ -18,14 +18,15 @@ mod hidden_rows;
 pub use hidden_rows::{is_elided_row, strip_elided};
 mod live;
 mod live_rows;
+mod outlives;
 mod provided;
 mod scopes;
 mod solve;
 mod unfold;
 
 pub use live::{has_live, strip_live};
+pub use outlives::Outlives;
 pub use provided::Provide;
-pub use solve::Outlives;
 pub(in crate::types) use unfold::{AliasKey, Unfold, leave_alias};
 
 use super::Checker;
@@ -66,7 +67,7 @@ pub struct State {
     pub late_owners: Vec<(usize, Type, Elem, Span)>,
     /// The locals used so far, by index into `Checker::locals`.
     pub uses: Vec<usize>,
-    pub outlives: Vec<solve::Outlives>,
+    pub outlives: Vec<outlives::Outlives>,
     /// Error rows raised, whose payloads must hold no region.
     pub raised: Vec<(Type, Span)>,
     /// What each call in a `tail` arm needs, and the rows it may suspend through.
