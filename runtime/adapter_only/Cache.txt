@@ -1,0 +1,15 @@
+Cache.entries
+Cache.get
+Cache.get_option
+Cache.get_success
+Cache.has
+Cache.invalidate
+Cache.invalidate_all
+Cache.invalidate_when
+Cache.keys
+Cache.make
+Cache.make_with
+Cache.refresh
+Cache.set
+Cache.size
+Cache.values

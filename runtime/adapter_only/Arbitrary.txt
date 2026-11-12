@@ -1,0 +1,9 @@
+Arbitrary.all
+Arbitrary.filter_map
+Arbitrary.flat_map
+Arbitrary.list
+Arbitrary.map
+Arbitrary.sample
+Arbitrary.zip2
+Arbitrary.zip3
+Arbitrary.zip4

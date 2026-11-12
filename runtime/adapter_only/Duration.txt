@@ -1,0 +1,2 @@
+Duration.json_nanos
+Duration.json_string

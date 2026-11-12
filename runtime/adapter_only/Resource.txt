@@ -1,0 +1,3 @@
+Resource.manual
+Resource.refresh
+Resource.use

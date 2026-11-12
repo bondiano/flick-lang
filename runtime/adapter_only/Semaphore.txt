@@ -1,0 +1,9 @@
+Semaphore.make
+Semaphore.release
+Semaphore.release_all
+Semaphore.resize
+Semaphore.take
+Semaphore.take_if_available
+Semaphore.with_permit
+Semaphore.with_permits
+Semaphore.with_permits_if_available

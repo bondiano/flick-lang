@@ -1,0 +1,11 @@
+References.current_log_annotations
+References.current_log_level
+References.current_log_spans
+References.current_stack_frame
+References.span_annotations
+References.with_current_log_level
+References.with_disable_propagation
+References.with_minimum_log_level
+References.with_tracer_enabled
+References.with_tracer_timing
+References.with_unhandled_log_level

@@ -1,0 +1,7 @@
+RcMap.get
+RcMap.get_option
+RcMap.has
+RcMap.invalidate
+RcMap.keys
+RcMap.make
+RcMap.touch

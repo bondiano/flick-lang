@@ -1,0 +1,8 @@
+FileSystem.file_stat
+FileSystem.file_truncate
+FileSystem.node_of
+FileSystem.read_alloc
+FileSystem.seek
+FileSystem.sync
+FileSystem.write
+FileSystem.write_all

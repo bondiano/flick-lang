@@ -1,0 +1,6 @@
+TxDeferred.await_
+TxDeferred.done
+TxDeferred.fail
+TxDeferred.make
+TxDeferred.poll
+TxDeferred.succeed

@@ -1,0 +1,13 @@
+ScopedCache.has
+ScopedCache.invalidate
+ScopedCache.invalidate_all
+ScopedCache.invalidate_when
+ScopedCache.keys
+ScopedCache.make
+ScopedCache.make_with
+ScopedCache.refresh
+ScopedCache.set
+ScopedCache.size
+ScopedCache.use
+ScopedCache.use_option
+ScopedCache.use_success
