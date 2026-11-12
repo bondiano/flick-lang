@@ -26,6 +26,17 @@ atoms, forms, routes and renderers use their matching Effect implementations
 together for the build.
 Tracing bindings share Effect implementations with their configured exporters.
 
+`Rpc` procedures and groups, and their unary calls over HTTP (`Rpc.call` and
+`Rpc.call_with` in `Rpc.ndjson` or `Rpc.json`), run on RT and speak the
+protocol of Effect's RPC server: a browser client takes no Effect, and calls
+a server built with the adapter. Serving, stream calls, `Rpc.websocket`,
+`Rpc.tcp`, the `json_rpc`, `ndjson_rpc` and `binary` serializations,
+`Rpc.connect`, `Rpc.with_headers` and in-memory calls stay in the adapter,
+as Http and server functions do for now. Http, RPC and server functions are
+one family: a build that uses a binding of it only the adapter has takes the
+whole family from the adapter, so a request, a response or a procedure
+belongs to one implementation.
+
 Reading request bodies, persisting multipart forms, serving static files and
 consuming a server-rendered stream require `Async` in the caller's effect row.
 For an HTTP body whose stream requires only `Async`, use `Http.Body.stream_async`
