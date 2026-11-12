@@ -101,3 +101,40 @@ func TestARecordWithNewValuesIsOneRecord(t *testing.T) {
 		t.Errorf("%v allocations, want 1", n)
 	}
 }
+
+// The record that lies in a value of a constructor: its header over the
+// values beside it, filled from any record of the same labels.
+func TestARecordOverValuesOfItsOwner(t *testing.T) {
+	shape := ShapeOf("w", "h", "name")
+	owner := struct {
+		rec Record
+		f   [3]Value
+	}{f: [3]Value{int32(1), int32(2), "n"}}
+	owner.rec.Over(shape, owner.f[:])
+	if !reflect.DeepEqual(owner.rec.keys, []string{"w", "h", "name"}) || Field(&owner.rec, "h") != int32(2) {
+		t.Errorf("%v %v", owner.rec.keys, owner.rec.vals)
+	}
+	// its values are the owner's: one set there is the record's
+	owner.f[0] = int32(7)
+	if Field(&owner.rec, "w") != int32(7) {
+		t.Errorf("w is %v, want 7", Field(&owner.rec, "w"))
+	}
+	var into [3]Value
+	shape.Values(Rec("name", "x", "w", int32(5), "h", int32(6)), into[:])
+	if into != [3]Value{int32(5), int32(6), "x"} {
+		t.Errorf("from a record in another order: %v", into)
+	}
+	shape.Values(&owner.rec, into[:])
+	if into != [3]Value{int32(7), int32(2), "n"} {
+		t.Errorf("from a record of the shape: %v", into)
+	}
+	// a constructor applied to nothing, as the runtime applies one to learn its tag
+	var none [3]Value
+	shape.Values(nil, none[:])
+	if none != [3]Value{} {
+		t.Errorf("from no record: %v", none)
+	}
+	if n := testing.AllocsPerRun(100, func() { shape.Values(&owner.rec, into[:]) }); n != 0 {
+		t.Errorf("%v allocations, want 0", n)
+	}
+}

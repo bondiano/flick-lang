@@ -153,6 +153,7 @@ mod tests {
             items: vec![item],
             labels: BTreeMap::default(),
             initialization: crate::Initialization::default(),
+            records: BTreeMap::default(),
         };
         Program::new("flick test", vec![module], &|f| {
             format!("file{}.fl", f.index())

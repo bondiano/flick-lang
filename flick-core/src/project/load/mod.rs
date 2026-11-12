@@ -445,6 +445,7 @@ fn run_in(
                             items: Vec::new(),
                             labels: BTreeMap::new(),
                             initialization: flick_ir::Initialization::default(),
+                            records: BTreeMap::new(),
                         },
                         Arc::new(interface.clone()),
                     ))

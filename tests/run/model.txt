@@ -49,6 +49,7 @@ codegen/effect_sets
 codegen/given_shadow
 codegen/implicit
 codegen/instance_names
+codegen/record_constructor
 effect/row_without
 stdlib/effect/mutable_ref
 stdlib/effect/optic_parts

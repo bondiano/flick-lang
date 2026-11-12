@@ -31,7 +31,10 @@ impl<'a> Gen<'a> {
                 Box::new(move |_, _: &[Code<'a>]| a.text(value).into())
             }
             Rep::Tagged => {
-                let own = self.own_type(c).map(|ty| a.alloc_str(&own::make(&ty)));
+                let own = self.own_type(c).map(|(ty, held)| match held {
+                    own::Held::Fields(_) => a.alloc_str(&own::make(&ty)),
+                    own::Held::Record(_) => a.alloc_str(&own::of(&ty)),
+                });
                 Box::new(move |_, args: &[Code<'a>]| {
                     let args = args.iter().map(|arg| arg.doc).chain(held.iter().copied());
                     match own {
@@ -184,6 +187,9 @@ impl<'a> Gen<'a> {
     /// arguments is called directly; an application of an effectful stage
     /// of any other value runs the task it gives.
     pub(super) fn app(&mut self, e: &Expr) -> Code<'a> {
+        if let Some(made) = self.over_record(e) {
+            return made;
+        }
         let a = self.a;
         let mut head = e;
         let mut first = None;
