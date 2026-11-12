@@ -618,6 +618,7 @@ dependencies = [
  "flick-ir",
  "flick-model",
  "flick-plugin",
+ "flick-test-support",
  "flick-wasm",
  "insta",
  "rustix",
@@ -645,6 +646,7 @@ dependencies = [
  "flick-plugin-ui",
  "flick-pretty",
  "flick-test-pairs",
+ "flick-test-support",
  "insta",
  "rustix",
  "semver",
@@ -680,6 +682,7 @@ name = "flick-model"
 version = "0.1.0"
 dependencies = [
  "flick-core",
+ "flick-test-support",
  "proptest",
  "serde_json",
 ]
@@ -759,6 +762,10 @@ dependencies = [
  "flick-ir",
  "flick-plugin",
 ]
+
+[[package]]
+name = "flick-test-support"
+version = "0.1.0"
 
 [[package]]
 name = "flick-wasm"

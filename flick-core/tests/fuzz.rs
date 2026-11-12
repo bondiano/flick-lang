@@ -4,11 +4,12 @@
 //! format idempotently and type-check without panicking. `FLICK_FUZZ_ITERATIONS` sets the number of mutated
 //! inputs (default 20 000; the nightly CI job runs 1 000 000 in release).
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::{env, fs, panic};
 
 use flick_core::source::SourceMap;
 use flick_core::syntax::parse;
+use flick_test_support::files as fixture_files;
 
 /// Fragments spliced into inputs: tokens and layout that stress recovery.
 const FRAGMENTS: [&str; 43] = [
@@ -73,17 +74,6 @@ impl Rng {
     }
 }
 
-fn corpus(dir: &Path, out: &mut Vec<String>) {
-    for entry in fs::read_dir(dir).expect("readable dir") {
-        let path: PathBuf = entry.expect("entry").path();
-        if path.is_dir() {
-            corpus(&path, out);
-        } else if path.extension().is_some_and(|e| e == "fl") {
-            out.push(fs::read_to_string(&path).expect("UTF-8 fixture"));
-        }
-    }
-}
-
 fn char_boundary(text: &str, mut at: usize) -> usize {
     while !text.is_char_boundary(at) {
         at -= 1;
@@ -123,11 +113,13 @@ fn front_end_survives_mutated_corpus() {
         .ok()
         .and_then(|n| n.parse().ok())
         .unwrap_or(20_000);
-    let mut seeds = Vec::new();
-    corpus(
+    let seeds: Vec<String> = fixture_files(
         &Path::new(env!("CARGO_MANIFEST_DIR")).join("../tests"),
-        &mut seeds,
-    );
+        "fl",
+    )
+    .iter()
+    .map(|path| fs::read_to_string(path).expect("UTF-8 fixture"))
+    .collect();
     assert!(!seeds.is_empty());
     let mut rng = Rng(0x5eed_f11c_0000_0001);
     for i in 0..iterations {

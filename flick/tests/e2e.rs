@@ -45,18 +45,8 @@ use std::{env, fs, thread};
 use flick_core::build::go::executable;
 use flick_core::build::runner_path;
 use flick_core::project::config::MAIN_ENTRY;
+use flick_test_support::{entries, files as fixture_files};
 use times::{Pass, Timing};
-
-fn cases(dir: &Path, out: &mut Vec<PathBuf>) {
-    for entry in fs::read_dir(dir).expect("readable tests/run") {
-        let path = entry.expect("readable entry").path();
-        if path.is_dir() {
-            cases(&path, out);
-        } else if path.extension().is_some_and(|e| e == "fl") {
-            out.push(path);
-        }
-    }
-}
 
 fn expected(case: &Path, ext: &str) -> Option<String> {
     fs::read_to_string(case.with_extension(ext)).ok()
@@ -202,12 +192,7 @@ fn portable(root: &Path) -> Vec<String> {
 fn listed_cases(root: &Path, list: &str) -> Vec<String> {
     let text =
         fs::read_to_string(root.join(list)).unwrap_or_else(|_| panic!("readable tests/run/{list}"));
-    let cases: Vec<String> = text
-        .lines()
-        .map(|l| l.split('#').next().unwrap_or("").trim())
-        .filter(|l| !l.is_empty())
-        .map(str::to_owned)
-        .collect();
+    let cases: Vec<String> = entries(&text).into_iter().map(str::to_owned).collect();
     for case in &cases {
         assert!(
             root.join(format!("{case}.fl")).exists(),
@@ -220,8 +205,7 @@ fn listed_cases(root: &Path, list: &str) -> Vec<String> {
 /// The cases under `root` that `FLICK_E2E_ONLY` and `FLICK_E2E_SHARD`
 /// select, sorted, and whether they are only a part of them.
 fn selected(root: &Path) -> (Vec<PathBuf>, bool) {
-    let mut paths = Vec::new();
-    cases(root, &mut paths);
+    let mut paths = fixture_files(root, "fl");
     if let Ok(only) = env::var("FLICK_E2E_ONLY") {
         paths.retain(|p| only.split(',').any(|o| p.to_string_lossy().contains(o)));
     }

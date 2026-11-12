@@ -1,6 +1,5 @@
 use std::collections::BTreeSet;
 use std::path::Path;
-use std::path::PathBuf;
 use std::{env, fs};
 
 use crate::diagnostics::Diagnostic;
@@ -12,6 +11,7 @@ use crate::resolve::{self, Module};
 use crate::source::SourceMap;
 use crate::types::Watched;
 use crate::{syntax, types};
+use flick_test_support::files as fixture_files;
 
 /// Checks one self-contained module and lowers it.
 pub(crate) fn lower_text(name: &str, text: &str) -> Result<super::Module, Vec<Diagnostic>> {
@@ -69,22 +69,11 @@ pub(crate) fn check_text_with(
     Ok((super::lower(&module, &typing)?, interface))
 }
 
-fn fixtures(dir: &Path, out: &mut Vec<PathBuf>) {
-    for entry in fs::read_dir(dir).expect("readable") {
-        let path = entry.expect("entry").path();
-        if path.is_dir() {
-            fixtures(&path, out);
-        } else if path.extension().is_some_and(|e| e == "fl") {
-            out.push(path);
-        }
-    }
-}
-
 #[test]
 fn every_passing_fixture_lowers() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../tests/check/pass");
     let mut paths = Vec::new();
-    fixtures(&root, &mut paths);
+    paths.extend(fixture_files(&root, "fl"));
     let builtin = |m: &str| types::builtins().iter().any(|b| b.module == m);
     for path in paths {
         let text = fs::read_to_string(&path).expect("utf-8");

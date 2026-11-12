@@ -5,15 +5,15 @@
 use std::fs;
 use std::path::Path;
 
+use flick_test_support::entries;
+
 /// The lines of the list: a target, `js` or `go`, then a case by path
 /// without `.fl`.
 pub fn load(root: &Path) -> Vec<(String, String)> {
     let text =
         fs::read_to_string(root.join("known_gaps.txt")).expect("readable tests/run/known_gaps.txt");
-    let gaps: Vec<(String, String)> = text
-        .lines()
-        .map(|l| l.split('#').next().unwrap_or("").trim())
-        .filter(|l| !l.is_empty())
+    let gaps: Vec<(String, String)> = entries(&text)
+        .into_iter()
         .map(|l| {
             let (target, case) = l.split_once(' ').expect("`<target> <case>`");
             (target.to_owned(), case.trim().to_owned())

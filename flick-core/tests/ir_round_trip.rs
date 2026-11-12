@@ -15,6 +15,7 @@ use flick_core::ir;
 use flick_core::project::{self, Host};
 use flick_core::source::{FileId, SourceMap};
 use flick_ir::Program;
+use flick_test_support::files as fixture_files;
 
 struct Files;
 
@@ -25,17 +26,6 @@ impl Host for Files {
 
     fn display(&self, path: &Path) -> String {
         path.display().to_string()
-    }
-}
-
-fn sources(dir: &Path, out: &mut Vec<PathBuf>) {
-    for entry in fs::read_dir(dir).expect("a directory").flatten() {
-        let path = entry.path();
-        if path.is_dir() {
-            sources(&path, out);
-        } else if path.extension().is_some_and(|e| e == "fl") {
-            out.push(path);
-        }
     }
 }
 
@@ -97,8 +87,8 @@ fn the_built_in_modules_round_trip() {
 #[test]
 fn every_program_and_fixture_round_trips() {
     let mut paths = Vec::new();
-    sources(&repo("tests/run"), &mut paths);
-    sources(&repo("tests/check/pass"), &mut paths);
+    paths.extend(fixture_files(&repo("tests/run"), "fl"));
+    paths.extend(fixture_files(&repo("tests/check/pass"), "fl"));
     assert!(paths.len() > 100);
     let mut modules = 0;
     for path in &paths {
@@ -125,7 +115,7 @@ fn every_example_project_round_trips() {
         let mut roots = Vec::new();
         for root in [project.source_root(), project.test_root()] {
             if root.is_dir() {
-                sources(&root, &mut roots);
+                roots.extend(fixture_files(&root, "fl"));
             }
         }
         assert!(

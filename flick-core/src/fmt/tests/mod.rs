@@ -3,6 +3,7 @@ use std::path::{Path, PathBuf};
 
 use super::*;
 use crate::source::SourceMap;
+use flick_test_support::files as fixture_files;
 
 mod decl;
 mod layout;
@@ -57,24 +58,7 @@ fn formats_an_empty_file_and_a_file_of_comments() {
 
 /// Every `.fl` file of the repository, test fixtures and tools included.
 fn repository_sources() -> Vec<PathBuf> {
-    fn walk(dir: &Path, out: &mut Vec<PathBuf>) {
-        for entry in fs::read_dir(dir).expect("readable dir") {
-            let path = entry.expect("entry").path();
-            let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
-            if name.starts_with('.') || matches!(name, "node_modules" | "target" | "dist") {
-                continue;
-            }
-            if path.is_dir() {
-                walk(&path, out);
-            } else if path.extension().is_some_and(|e| e == "fl") {
-                out.push(path);
-            }
-        }
-    }
-    let mut out = Vec::new();
-    walk(&Path::new(env!("CARGO_MANIFEST_DIR")).join(".."), &mut out);
-    out.sort();
-    out
+    fixture_files(&Path::new(env!("CARGO_MANIFEST_DIR")).join(".."), "fl")
 }
 
 /// The whole corpus formats without leaving a declaration as written, keeps

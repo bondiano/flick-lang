@@ -15,6 +15,7 @@ use flick_core::fmt;
 use flick_core::markdown::{Block, Mode, blocks};
 use flick_core::source::SourceMap;
 use flick_core::syntax::parse;
+use flick_test_support::files as fixture_files;
 
 const SPEC: &str = "docs/src/content/docs/ru/spec";
 
@@ -140,24 +141,6 @@ fn dump() {
     fs::write(env::var("DUMP").expect("DUMP"), out).expect("write");
 }
 
-fn fl_files(dir: &Path, out: &mut Vec<PathBuf>) {
-    for entry in fs::read_dir(dir).expect("readable dir") {
-        let path = entry.expect("entry").path();
-        // installed packages and build output hold no sources of the repository
-        let skipped = path.file_name().is_some_and(|n| {
-            n == "node_modules" || n == "dist" || n.to_string_lossy().starts_with('.')
-        });
-        if skipped {
-            continue;
-        }
-        if path.is_dir() {
-            fl_files(&path, out);
-        } else if path.extension().is_some_and(|e| e == "fl") {
-            out.push(path);
-        }
-    }
-}
-
 fn md_files(dir: &Path, out: &mut Vec<PathBuf>) {
     for entry in fs::read_dir(dir).expect("readable dir") {
         let path = entry.expect("entry").path();
@@ -183,7 +166,7 @@ fn md_files(dir: &Path, out: &mut Vec<PathBuf>) {
 fn corpus() -> Vec<(String, String)> {
     let mut entries = Vec::new();
     let mut files = Vec::new();
-    fl_files(&root().join("tests"), &mut files);
+    files.extend(fixture_files(&root().join("tests"), "fl"));
     files.sort();
     for path in files {
         let text = fs::read_to_string(&path).expect("UTF-8 fixture");
@@ -579,7 +562,7 @@ fn page_code(page: &str) -> Option<String> {
 #[test]
 fn syntax_fixtures_parse() {
     let mut files = Vec::new();
-    fl_files(&root().join("tests/syntax"), &mut files);
+    files.extend(fixture_files(&root().join("tests/syntax"), "fl"));
     assert!(!files.is_empty(), "no syntax fixtures");
     let errors: Vec<String> = files
         .iter()
@@ -662,7 +645,7 @@ fn fl_sources_are_formatted() {
     for dir in dirs {
         let dir = root().join(dir);
         if dir.is_dir() {
-            fl_files(&dir, &mut files);
+            files.extend(fixture_files(&dir, "fl"));
         }
     }
     files.retain(|f| !excluded.iter().any(|d| f.starts_with(d)));
