@@ -21,6 +21,7 @@ mod suspends;
 use super::Checker;
 use super::env::Form;
 use super::kinds::Kind;
+use super::regions::is_elided_row;
 use super::ty::{Stage, Type};
 use super::typing::{ForeignInfo, range};
 use crate::diagnostics::codes;
@@ -102,7 +103,8 @@ impl Checker<'_> {
             .map_or(flick_ir::Shape::Data, |r| self.shape(&r, 0));
         let scoped: Vec<String> = binders
             .iter()
-            .filter(|b| matches!(b.kind, Kind::Region | Kind::CaptureRow))
+            // a hidden row read into the signature is no capability it took
+            .filter(|b| matches!(b.kind, Kind::Region | Kind::CaptureRow) && !is_elided_row(b))
             .map(|b| b.name.clone())
             .collect();
         if retention.is_none()

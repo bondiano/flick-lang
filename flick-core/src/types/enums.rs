@@ -16,6 +16,7 @@ impl Form {
     /// A nominal type of no literals.
     pub const NOMINAL: Form = Form::Nominal {
         literals: Vec::new(),
+        hidden: false,
     };
 }
 

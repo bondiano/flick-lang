@@ -6,7 +6,7 @@ use std::fmt::Write;
 
 use super::Checker;
 use super::lang::Lang;
-use super::regions::{has_live, strip_live};
+use super::regions::{has_live, strip_elided, strip_live};
 use super::shown::short_form;
 use super::ty::{Binder, Effects, Row, Type};
 use super::unify::Store;
@@ -29,7 +29,7 @@ impl Checker<'_> {
 
     /// `t` zonked, without the `Live` of `regions/live.rs`: no row writes it.
     fn unlive(&self, t: &Type) -> Type {
-        let t = self.zonk(t);
+        let t = strip_elided(&self.zonk(t));
         if has_live(&t) { strip_live(&t) } else { t }
     }
 
@@ -66,10 +66,12 @@ impl Checker<'_> {
                 ty,
                 captures,
                 value,
+                elided,
             } => Type::Captured {
                 ty: Box::new(self.held_now(ty)),
                 captures: Box::new(self.expanded(captures)),
                 value: *value,
+                elided: *elided,
             },
             Type::Bounded { ty, captures } => Type::Bounded {
                 ty: Box::new(self.held_now(ty)),
@@ -82,6 +84,7 @@ impl Checker<'_> {
 
 /// A closed type, as an interface stores it, in source syntax.
 pub fn show_type(t: &Type) -> String {
+    let t = &strip_elided(t);
     let stripped;
     let t = if has_live(t) {
         stripped = strip_live(t);
@@ -104,6 +107,7 @@ pub fn show_type(t: &Type) -> String {
 /// written that way gets back (`shown`). A parameter or a field on its own
 /// keeps its `forall`: use [`show_type`] for those.
 pub fn show_signature(t: &Type) -> String {
+    let t = &strip_elided(t);
     let stripped;
     let t = if has_live(t) {
         stripped = strip_live(t);
@@ -125,6 +129,7 @@ pub fn show_signature(t: &Type) -> String {
 /// `t` with each constructor written with its module.
 #[cfg(test)]
 pub(super) fn show_type_qualified(t: &Type) -> String {
+    let t = &strip_elided(t);
     let store = Store::default();
     let mut out = String::new();
     Printer {
@@ -460,6 +465,7 @@ fn print_gone(gone: &[Elem], first: bool, out: &mut String) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::types::Elided;
     use crate::types::lang::Lang;
 
     #[test]
@@ -468,6 +474,7 @@ mod tests {
             ty: Box::new(Type::lang(Lang::Int)),
             captures: Box::new(Type::Meta(207)),
             value: false,
+            elided: Elided::default(),
         };
         assert_eq!(show_type(&t), "Int");
     }

@@ -3,6 +3,7 @@
 //! `: R` builds `R` over variables of its own, and those of its fields that
 //! `R` does not mention are existential.
 
+use crate::types::Elided;
 use std::mem;
 
 use crate::diagnostics::codes;
@@ -332,6 +333,7 @@ impl Checker<'_> {
             ty: Box::new(result),
             captures: Box::new(held.into_type()),
             value: false,
+            elided: Elided::default(),
         };
         let ty = payload
             .into_iter()

@@ -1,0 +1,33 @@
+// The hidden row of data with hidden storage written bare in a signature is
+// read by elision: a parameter's is its own, a result's what the parameters
+// before it reach. A composition generic in the data's arguments is
+// accepted, and a written `^{}` keeps a fresh closure free of a region.
+module App.HiddenRows exposing (..)
+
+import File exposing (File, Path, FileSystem, OpenError)
+
+type F s a = F (s -> a)
+
+cf : F a b -> F s a -> F s b
+let cf inner outer =
+  match (inner, outer) with
+  | (F f, F g) -> F (fun x -> f (g x))
+
+pre : F a b -> (s -> a) -> F s b
+let pre (F f) g = F (fun x -> f (g x))
+
+run : F s a -> s -> a
+let run (F f) x = f x
+
+through_run : F a b -> F s a -> F s b
+let through_run inner outer = F (fun x -> run inner (run outer x))
+
+// a written `^{}`: the result holds nothing of the file
+make : File s -> (F Unit Int)^{}
+let make _ = F (fun _ -> 1)
+
+leaves : Path ->{Async, FileSystem; OpenError} F Unit Int
+let leaves path = scope {
+  let file = File.open_scoped path
+  make file
+}

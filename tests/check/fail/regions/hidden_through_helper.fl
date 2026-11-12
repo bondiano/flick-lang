@@ -1,0 +1,50 @@
+// What data with a function field stores is its own hidden row, not what
+// its type arguments show: passed through code generic in those arguments,
+// a closure over the file of a `scope` must not leave the `scope`.
+module App.HiddenThroughHelper exposing (..)
+
+import File exposing (Path, FileSystem, OpenError, ReadError)
+
+type G s a = G (s ->{Async, FileSystem; ReadError} a)
+
+run : G s a -> s ->{Async, FileSystem; ReadError} a
+let run (G f) x = f x
+
+compose : G a b -> G s a ->{Async, FileSystem; ReadError} G s b
+let compose inner outer = G (fun x -> run inner (run outer x))
+
+// `outer` holds the file; the result `G Unit String` shows no region
+through_run : Path ->{Async, FileSystem; OpenError, ReadError} G Unit String
+let through_run path = scope {
+  let file = File.open_scoped path
+  compose (G (fun f -> File.read_all f)) (G (fun _ -> file))
+}
+
+c2 : (a ->{Async, FileSystem; ReadError} b) -> (s ->{Async, FileSystem; ReadError} a) -> s ->{Async, FileSystem; ReadError} b
+let c2 f g x = f (g x)
+
+// the functions taken out of the data use its hidden rows, which a bare
+// callback of `c2` does not keep live
+compose2 : G a b -> G s a ->{Async, FileSystem; ReadError} G s b
+let compose2 inner outer = match (inner, outer) with
+  | (G f, G g) -> G (c2 f g)
+
+through_c2 : Path ->{Async, FileSystem; OpenError, ReadError} G Unit String
+let through_c2 path = scope {
+  let file = File.open_scoped path
+  compose2 (G (fun f -> File.read_all f)) (G (fun _ -> file))
+}
+
+unwrapped : G a b -> G s a ->{Async, FileSystem; ReadError} (s ->{Async, FileSystem; ReadError} b)
+let unwrapped inner outer = fun x -> run inner (run outer x)
+
+through_function : Path ->{Async, FileSystem; OpenError, ReadError} (Unit ->{Async, FileSystem; ReadError} String)
+let through_function path = scope {
+  let file = File.open_scoped path
+  unwrapped (G (fun f -> File.read_all f)) (G (fun _ -> file))
+}
+//~ FLICK-G001 @20:3-20:61 this value holds region `s`, but the expected type `G Unit String` holds no captures
+//~ FLICK-G002 @30:25-30:26 this uses the hidden row of a parameter's data, which the expected type `a ->{FileSystem, Async; ReadError} b` does not keep live: a function or a task uses a region only while the region is live
+//~ FLICK-G002 @30:27-30:28 this uses the hidden row of a parameter's data, which the expected type `s ->{FileSystem, Async; ReadError} a` does not keep live: a function or a task uses a region only while the region is live
+//~ FLICK-G001 @35:3-35:62 this value holds region `s`, but the expected type `G Unit String` holds no captures
+//~ FLICK-G002 @44:3-44:63 this uses region `s`, which the expected type `Unit ->{FileSystem, Async; ReadError} String` does not keep live: a function or a task uses a region only while the region is live

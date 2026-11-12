@@ -2,6 +2,7 @@
 //! exhaustiveness check.
 
 use crate::types::Elem;
+use crate::types::Elided;
 use std::{iter, mem};
 
 use super::gadt::scheme::dicts;
@@ -185,6 +186,7 @@ impl Checker<'_> {
                             ty: Box::new(annotated),
                             captures: Box::new(captures),
                             value: false,
+                            elided: Elided::default(),
                         };
                         self.bind_pattern(children[0], &held)
                     }

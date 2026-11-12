@@ -227,6 +227,7 @@ pub fn without_value_captures(t: &Type, types: &[&str]) -> Type {
             ty,
             captures,
             value,
+            elided,
         } => {
             let ty = without_value_captures(ty, types);
             let row = without_value_row(captures, types);
@@ -238,6 +239,7 @@ pub fn without_value_captures(t: &Type, types: &[&str]) -> Type {
                 ty: Box::new(ty),
                 captures: Box::new(row),
                 value: *value,
+                elided: *elided,
             }
         }
         Type::Bounded { ty, captures } => Type::Bounded {

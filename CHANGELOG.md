@@ -55,6 +55,20 @@ break programs.
   `none`, but `import M exposing (none)` brings nothing a module can use,
   as the word stays the keyword in an expression. Its `FLICK-R012` now says
   so, and that the module reaches the name as `M.none`.
+- **The hidden row of data in signatures:** data that stores a function or a
+  `task`, written bare in a signature, has its hidden row read as `Live` is:
+  in a parameter any row, in the result what the parameters before it reach,
+  and a written qualifier turns that off. What the data's other arguments
+  show no longer stands in for its row, and a row only widens. A
+  composition through a helper generic in the data's arguments that kept a
+  file of a `scope` past it, accepted before and reading the released file,
+  is now `FLICK-G001` at the `scope`, and a callback taken out of such data
+  that a bare callback parameter does not keep live is `FLICK-G002`.
+  `make : Handle r -> G Unit Int` returning a fresh closure holds `{r}` and
+  cannot leave the `scope` of `r`; write `(G Unit Int)^{}` if it holds
+  nothing. `cf (F f) (F g) = F (fun x -> f (g x))` for
+  `type F s a = F (s -> a)` is accepted, where it was `FLICK-G001`.
+  Interfaces are of version 21.
 - **Labels:** `@label kind` before a type declaration gives the top-level
   values of that type their names where the program runs, as the atoms,
   views and actions of the standard library have them; a library marks its

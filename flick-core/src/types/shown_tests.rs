@@ -1,3 +1,4 @@
+use crate::types::Elided;
 use std::fmt::Write;
 
 use crate::iface::Interface;
@@ -146,10 +147,12 @@ fn normal(t: &Type) -> Type {
             ty,
             captures,
             value,
+            ..
         } => Type::Captured {
             ty: Box::new(normal(ty)),
             captures: Box::new(normal_row(captures)),
             value: *value,
+            elided: Elided::default(),
         },
         // `{x}` and `x` are one row, which a signature writes either way
         Type::Row(row) if row.tail.is_none() && matches!(row.entries[..], [(_, Type::Var(_))]) => {

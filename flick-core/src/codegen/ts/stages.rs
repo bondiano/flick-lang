@@ -83,10 +83,12 @@ pub fn exported(scheme: &Type) -> Type {
             ty,
             captures,
             value,
+            elided,
         } => Type::Captured {
             ty: Box::new(exported(ty)),
             captures: captures.clone(),
             value: *value,
+            elided: *elided,
         },
         Type::Bounded { ty, captures } => Type::Bounded {
             ty: Box::new(exported(ty)),

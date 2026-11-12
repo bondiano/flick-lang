@@ -133,10 +133,12 @@ fn require(ty: Type, label: &str, service: &Type, never_suspends: bool) -> Type 
             ty,
             captures,
             value,
+            elided,
         } => Type::Captured {
             ty: Box::new(require(*ty, label, service, never_suspends)),
             captures,
             value,
+            elided,
         },
         Type::Bounded { ty, captures } => Type::Bounded {
             ty: Box::new(require(*ty, label, service, never_suspends)),

@@ -2,6 +2,7 @@
 //! type into lambdas, branches and literals, so a higher-rank parameter type
 //! from a signature reaches the callback that must satisfy it; [`Checker::infer`] synthesizes a type otherwise.
 
+use crate::types::Elided;
 use std::mem;
 
 use super::Checker;
@@ -56,6 +57,7 @@ impl Checker<'_> {
                     ty: Box::new(body),
                     captures: Box::new(captures),
                     value: false,
+                    elided: Elided::default(),
                 },
                 None => body,
             };

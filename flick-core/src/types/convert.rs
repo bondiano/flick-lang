@@ -2,6 +2,7 @@
 //! kinds on the way: every position decides the kind it expects, and the
 //! kinds of type variables follow from where they are used.
 
+use crate::types::Elided;
 use std::mem;
 
 use super::Checker;
@@ -95,7 +96,7 @@ impl Checker<'_> {
             },
         };
         let ty = self.default_kinds(&ty);
-        let ty = self.live_scheme(&ty);
+        let ty = self.live_scheme(&self.hidden_rows(&ty));
         #[cfg(feature = "ide")]
         self.typing.signature_types.insert(node.range(), ty.clone());
         (ty, explicit)
@@ -226,6 +227,7 @@ impl Checker<'_> {
                         ty: Box::new(base),
                         captures: Box::new(captures),
                         value: false,
+                        elided: Elided::default(),
                     }
                 };
             }

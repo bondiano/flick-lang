@@ -109,10 +109,12 @@ fn stages(t: &Type, kinds: &mut Vec<(String, Kind)>, held: &Atoms) -> Type {
             ty,
             captures,
             value,
+            elided,
         } => Type::Captured {
             ty: Box::new(stages(ty, kinds, &row_atoms(captures))),
             captures: captures.clone(),
             value: *value,
+            elided: *elided,
         },
         Type::Bounded { ty, captures } => Type::Bounded {
             ty: Box::new(stages(ty, kinds, &row_atoms(captures))),
@@ -129,6 +131,7 @@ fn stages(t: &Type, kinds: &mut Vec<(String, Kind)>, held: &Atoms) -> Type {
                     ty,
                     captures,
                     value: false,
+                    ..
                 } if matches!(**ty, Type::Fun { .. }) && row_atoms(captures) == later => {
                     stages(ty, kinds, &later)
                 }

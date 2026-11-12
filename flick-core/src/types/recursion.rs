@@ -122,6 +122,7 @@ impl Checker<'_> {
                 ty,
                 captures,
                 value,
+                elided,
             } => {
                 let (ty, vars) = self.open(&ty);
                 let ty = Box::new(ty);
@@ -130,6 +131,7 @@ impl Checker<'_> {
                         ty,
                         captures,
                         value,
+                        elided,
                     },
                     vars,
                 )

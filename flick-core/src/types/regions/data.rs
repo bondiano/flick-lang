@@ -6,6 +6,7 @@ use crate::iface::{Entity, Namespace};
 use crate::source::Span;
 use crate::types::Checker;
 use crate::types::Elem;
+use crate::types::Elided;
 use crate::types::env::Form;
 use crate::types::gadt::refine::Refined;
 use crate::types::gadt::scheme::{built, is_hidden_captures, is_indexed};
@@ -35,6 +36,7 @@ impl Checker<'_> {
                 ty,
                 captures,
                 value: true,
+                ..
             } => {
                 if self.hidden_fields(&ty, &mut Vec::new()) {
                     let value = matches!(
@@ -45,6 +47,7 @@ impl Checker<'_> {
                         ty,
                         captures,
                         value,
+                        elided: Elided::default(),
                     }
                 } else {
                     *ty
@@ -71,6 +74,7 @@ impl Checker<'_> {
                         ty,
                         captures,
                         value: true,
+                        elided: Elided::default(),
                     }
                 } else {
                     Type::Bounded { ty, captures }
@@ -301,6 +305,7 @@ impl Checker<'_> {
                         ty,
                         captures,
                         value: true,
+                        ..
                     },
                     _,
                 ) if !matches!(self.whnf(&ty), Type::Fun { .. })
@@ -314,6 +319,7 @@ impl Checker<'_> {
                         ty,
                         captures,
                         value: true,
+                        ..
                     },
                 ) if !matches!(self.whnf(&ty), Type::Fun { .. })
                     && matches!(self.qualified_head(actual), Type::Bounded { .. })
@@ -347,9 +353,15 @@ impl Checker<'_> {
             if self.hidden_fields(expected, &mut Vec::new())
                 && (!callable || self.holds_reader(&[(None, actual.clone())]))
             {
+                // the hidden row of data is no region another argument shows
+                let visible = if self.stores_hidden(expected) {
+                    Visible::Now(Vec::new())
+                } else {
+                    Visible::Refined(expected.clone())
+                };
                 self.hold(Hold {
                     held: vec![(None, actual.clone())],
-                    visible: Visible::Refined(expected.clone()),
+                    visible,
                     bound: Type::empty_row(),
                     expected: Some(expected.clone()),
                     written: true,
@@ -421,7 +433,7 @@ impl Checker<'_> {
     }
 
     /// Constructor payloads and the constructed value share a capture
-    /// bound. Delayed data results also retain their supplied environment.
+    /// bound, and so does what a function field returns.
     pub fn constructor_field(&self, ty: &Type, captures: &Type) -> Type {
         if self.scalar(ty) {
             return ty.clone();
@@ -451,8 +463,7 @@ impl Checker<'_> {
                 effects,
                 result,
             } => {
-                let param_captures = self.captures_of(param).into_type();
-                let bound = Type::Union(Box::new(captures.clone()), Box::new(param_captures));
+                let bound = captures.clone();
                 Type::Fun {
                     param: param.clone(),
                     effects: effects.clone(),
@@ -471,6 +482,7 @@ impl Checker<'_> {
                 ty: Box::new(ty),
                 captures: Box::new(captures.clone()),
                 value: false,
+                elided: Elided::default(),
             }
         }
     }
