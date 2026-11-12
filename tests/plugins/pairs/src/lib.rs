@@ -278,9 +278,26 @@ impl Plugin for Pairs {
                 found.push(Diagnostic::error(message, call.span).with_code("X007"));
                 continue;
             }
-            // A bare `tally` is a function value, not a zero-argument call;
-            // the checker records applications only.
-            let Some(argument) = call.arguments.first() else {
+            // where a watched value is named: the declaration around it
+            if call.name == "keyed"
+                && let Some(binding) = &call.binding
+            {
+                let message = format!(
+                    "`keyed` in `{}`, given {}{}",
+                    binding.name.as_deref().unwrap_or("_"),
+                    binding.applied,
+                    if binding.in_function {
+                        ", in a function"
+                    } else {
+                        ""
+                    }
+                );
+                found.push(Diagnostic::error(message, call.span).with_code("X008"));
+                continue;
+            }
+            // A bare `tally` is a function value, not a zero-argument call:
+            // it has no argument to count from.
+            let Some(argument) = call.arguments.first().filter(|_| call.name == "tally") else {
                 continue;
             };
             if !matches!(argument.constant, Some(Constant::Number(n)) if n > 0.0) {

@@ -4,7 +4,7 @@ use std::collections::HashMap;
 
 use super::ty::Type;
 use super::typing::Ref;
-use super::{Checker, Range, let_parts};
+use super::{Checker, Range, Watched, let_parts};
 use crate::iface::Namespace;
 use crate::source::Span;
 use crate::syntax::cst::Node;
@@ -46,12 +46,18 @@ impl Checker<'_> {
 }
 
 impl Checker<'_> {
-    /// Read-only binding and application facts for serializable atom
-    /// references. The watching UI plugin decides whether their keys are safe.
+    /// Where each watched value is named: the declaration it stands in,
+    /// whether inside a function of it, and how many arguments it is given.
+    /// A plugin that watches the name reads them: the UI's decides by them
+    /// whether the key of a serializable atom is safe.
     pub fn record_atom_bindings(&mut self, decls: &[&Node]) {
+        let watched = self.options.watched;
+        if watched.is_empty() {
+            return;
+        }
         for decl in members(decls) {
             let mut keyed = Keyed::default();
-            keyed.walk(decl, false, &self.typing.names);
+            keyed.walk(decl, false, &self.typing.names, watched);
             if keyed.found.is_empty() {
                 continue;
             }
@@ -114,14 +120,6 @@ impl Checker<'_> {
     }
 }
 
-/// The makers of serializable atoms, whose key U003 checks.
-const SERIALIZABLE: [Lang; 4] = [
-    Lang::Serializable,
-    Lang::SerializableFamily,
-    Lang::SerializableTask,
-    Lang::SerializableResult,
-];
-
 /// The declarations, those of each `rec` group one by one.
 pub(super) fn members<'n>(decls: &[&'n Node]) -> impl Iterator<Item = &'n Node> {
     decls.iter().flat_map(|d| match d.kind {
@@ -134,8 +132,8 @@ pub(super) fn members<'n>(decls: &[&'n Node]) -> impl Iterator<Item = &'n Node> 
     })
 }
 
-/// The serializable atoms under a declaration: where each is named, and
-/// which are applied to their codec and state.
+/// The watched values under a declaration: where each is named, and how
+/// many arguments each is applied to.
 #[derive(Default)]
 struct Keyed {
     found: Vec<(Range, String, bool)>,
@@ -144,7 +142,13 @@ struct Keyed {
 }
 
 impl Keyed {
-    fn walk(&mut self, node: &Node, in_function: bool, names: &HashMap<Range, Ref>) {
+    fn walk(
+        &mut self,
+        node: &Node,
+        in_function: bool,
+        names: &HashMap<Range, Ref>,
+        watched: &Watched,
+    ) {
         let parts: Vec<&Node> = node.nodes().collect();
         match node.kind {
             // a piped application already counted its piped argument
@@ -163,7 +167,7 @@ impl Keyed {
             _ => {}
         }
         if let Some(Ref::Value { module, name }) = names.get(&node.range())
-            && SERIALIZABLE.into_iter().any(|l| lang::is(l, module, name))
+            && watched.holds(module, name)
             && self.found.last().is_none_or(|(r, ..)| *r != node.range())
         {
             self.found.push((node.range(), name.clone(), in_function));
@@ -172,7 +176,7 @@ impl Keyed {
             || node.kind == K::FunExpr
             || (node.kind == K::LetDecl && parts.iter().any(|n| n.kind == K::Params));
         for child in parts {
-            self.walk(child, inner, names);
+            self.walk(child, inner, names, watched);
         }
     }
 }

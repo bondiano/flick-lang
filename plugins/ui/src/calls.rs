@@ -170,7 +170,8 @@ fn one(call: &CallSite) -> Option<Diagnostic> {
 fn atom_keys(calls: &[CallSite]) -> Vec<Diagnostic> {
     let mut defined = Vec::new();
     calls.iter().filter_map(|call| {
-        let binding = call.binding.as_ref()?;
+        // every watched name comes with its binding: these are `Atom`'s
+        let binding = call.binding.as_ref().filter(|_| call.module == "Atom")?;
         let arity = match call.name.as_str() {
             "serializable" | "serializable_family" | "serializable_task" => 2,
             "serializable_result" => 3,
