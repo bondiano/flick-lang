@@ -85,6 +85,7 @@ mod signature_lints;
 mod stub;
 mod sugar_lints;
 mod toplevel;
+mod ts_forms;
 mod ty;
 mod typing;
 mod ui;
@@ -154,7 +155,7 @@ use crate::resolve::Module;
 use crate::source::{FileId, Span};
 use crate::syntax::cst::{Node, Token};
 use crate::syntax::kind::SyntaxKind as K;
-use crate::syntax::ts_mark;
+use crate::syntax::ts_mark::{self, Mark, Origin};
 use crate::types::lang::Lang;
 
 /// Type-checks `module` and stores the types of its exports in `interface`.
@@ -274,12 +275,14 @@ fn run_with_static_context(
     let (mut diagnostics, typing, evidence) =
         run_in(module, imported, builtins, options, interface, context);
     // only the built-in modules, which `run_in` checks directly, mark lang
-    // items and give their types a TypeScript form
+    // items and name the runtime by a word
     for attribute in lang::attributes(module.tree) {
         let what = if lang::lang_of(attribute, module.text).is_some() {
             "`@lang` marks what the compiler relies on"
-        } else if matches!(ts_mark::read(attribute, module.text), Some(Ok(_))) {
-            "`@ts` gives a type its TypeScript form"
+        } else if let Some(Ok(Mark::Import(import))) = ts_mark::read(attribute, module.text)
+            && !matches!(import.from, Origin::Module(_))
+        {
+            "`@ts import` names the runtime by a word"
         } else {
             continue;
         };

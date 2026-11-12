@@ -1,6 +1,6 @@
 ---
 title: "TypeScript generation and the FFI boundary"
-source_hash: a6e8c3172426ab32
+source_hash: d9d778f0ec9d9fee
 ---
 
 The examples of generated code below are the output of the debug profile, the reference lowering; [Code generation](../../reference/codegen/) describes it in full.
@@ -336,6 +336,7 @@ Direct FFI and data validation solve different problems. Passing a trusted `HTML
 | Runtime function | A function with an `Effect<A, E, R>` result |
 | Constrained value | Takes the dictionary of each class first, typed as the interface of the dictionary |
 | Opaque or abstract nominal type, service | An interface branded with its qualified name |
+| Type or service with a `@ts` form | Its form, written where the type is declared; the type itself is not declared |
 | Enum | The union of its literals; an opaque one is `string` or `number` branded with its qualified name |
 | Higher-kinded variable, region, open record | No projection: `FLICK-F004` under `--emit-dts` |
 

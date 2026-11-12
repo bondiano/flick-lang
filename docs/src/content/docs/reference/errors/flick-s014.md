@@ -10,8 +10,9 @@ belongs before a type declaration; `@label` names one kind, as `@label atom`,
 and belongs before a type declaration; `@owner` takes no argument and belongs
 before a service declaration; `@sync` takes `reader` or nothing and belongs
 before a service declaration; `@ts` takes the TypeScript form of a type, as
-`@ts "ReadonlyArray<{0}>"`, `none`, or `import` with a module of the runtime
-and an export, and belongs before the declaration of a type or a service;
+`@ts "ReadonlyArray<{0}>"`, `none`, or `import` with a module and an export
+of it, and belongs before the declaration of a type or a service, with one
+form that can be written for the type;
 `@implicit` takes no argument and belongs only
 before an instance declaration.
 

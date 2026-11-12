@@ -1,6 +1,6 @@
 //! TypeScript declarations of the types a module exports.
 
-use super::{Projection, Vars, generic, jsdoc, key, native, params, type_args, uncaptured};
+use super::{Projection, Vars, generic, jsdoc, key, params, type_args, uncaptured};
 use crate::codegen::names;
 use crate::iface::{Decl, Export, Interface, Namespace};
 use crate::types::{Abi, Binder, Constructor, EnumLit, Form, Kind, Rep, Type, built, is_indexed};
@@ -35,10 +35,10 @@ impl Projection<'_> {
             && matches!(self.declaration(interface, export), Ok(Some(_)))
     }
 
-    /// A Prelude type TypeScript or Effect has, never declared; the Effect
-    /// library's `Stream` too.
+    /// A type its module gives a TypeScript form, or says has none: it is
+    /// never declared.
     fn native(&self, name: &str) -> bool {
-        native(self.module, name).is_some()
+        (self.form(self.module, name)).is_ok_and(|form| form.is_some())
     }
 
     fn declaration(

@@ -13,7 +13,7 @@ pub mod literal;
 mod parser;
 pub mod patterns;
 pub(crate) mod structure;
-pub(crate) mod ts_mark;
+pub mod ts_mark;
 mod validate;
 
 pub use parser::{

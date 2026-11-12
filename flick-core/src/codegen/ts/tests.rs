@@ -316,3 +316,67 @@ fn rt_service_keys_use_the_native_service_type() {
     assert!(!dts.contains("$Context"), "{dts}");
     assert!(!dts.contains("@flick-lang/effect-ts"), "{dts}");
 }
+
+/// A package gives a type of its own a form: the type is not declared,
+/// every module naming it writes the form, and an export the form names
+/// is imported from the module the package says, apart from another
+/// module's export of that name.
+#[test]
+fn a_package_gives_its_types_their_forms_and_says_where_their_names_come_from() {
+    let text = "module App.Shapes exposing (Moment, Later, Page, Plain, at)\n\n@ts \"$Dayjs\"\n@ts import \"dayjs\" \"Dayjs\"\ntype Moment\n\n@ts \"Promise<readonly [{0}, $Handle<{1:row}>]>\"\n@ts import \"../io/fs.d.mts\" \"Handle\" rt \"RtHandle\"\ntype Later a (e : ErrorRow)\n\n@ts none\ntype Page\n\ntype Plain = Plain\n\nat : Moment -> Later Float {} -> Plain\nlet at _ _ = Plain\n";
+    let (interface, lookup) = checked(text);
+    let package = |_: &str| None;
+    let own = Projection::new("App.Shapes", &lookup, &package);
+    let (declared, refused) = own.declarations(&interface);
+    assert!(refused.is_empty(), "{refused:?}");
+    let declared = declared.join("\n");
+    assert!(declared.contains("Plain") && !declared.contains("Moment"));
+    assert!(!declared.contains("Later") && !declared.contains("Page"));
+
+    let shipped = |_: &str, spec: &str| spec.replace("../io/", "../shipped/");
+    let user = Projection::new("App.Use", &lookup, &package).shipping(&shipped);
+    let at = interface.find(Namespace::Value, "at").expect("exported");
+    assert_eq!(
+        user.value(at.scheme.as_ref().expect("typed")),
+        Ok("(arg: $Dayjs$t_App$Shapes) => (arg: Promise<readonly [number, $Handle$t_App$Shapes<never>]>) => $t_App$Shapes.Plain".to_owned())
+    );
+    let imports = user.imports(&|m: &str| format!("../lib/{}.js", m.replace('.', "/")));
+    assert!(
+        imports.contains("import type { Dayjs as $Dayjs$t_App$Shapes } from \"dayjs\";"),
+        "{imports}"
+    );
+    // a file is beside the module that names it, where the build ships it
+    assert!(
+        imports.contains(
+            "import type { Handle as $Handle$t_App$Shapes } from \"../lib/shipped/fs.d.mts\";"
+        ),
+        "{imports}"
+    );
+    let page = types::Type::con("App.Shapes", "Page");
+    assert_eq!(
+        user.value(&page),
+        Err("`Page` has no TypeScript form".to_owned())
+    );
+
+    // an interface from elsewhere is read as a stranger's
+    let mut forged = interface.clone();
+    for (_, parts) in forged.tags.get_mut("ts").into_iter().flatten() {
+        if let Some(form) = parts.get_mut(1) {
+            *form = "number; evil()".to_owned();
+        }
+    }
+    let lookup = move |m: &str| (m == "App.Shapes").then(|| forged.clone());
+    let fooled = Projection::new("App.Use", &lookup, &package);
+    let moment = types::Type::con("App.Shapes", "Moment");
+    let why = fooled.value(&moment).expect_err("no form");
+    assert!(why.contains("no TypeScript form that reads"), "{why}");
+}
+
+#[test]
+fn a_file_beside_a_module_is_named_from_the_file_that_imports_the_module() {
+    use super::imports::beside;
+    assert_eq!(beside("./Lib/Fs.js", "./fs.mjs"), "./Lib/fs.mjs");
+    assert_eq!(beside("../Lib/Fs.js", "../io/fs.d.ts"), "../io/fs.d.ts");
+    assert_eq!(beside("./Fs.js", "../fs.d.ts"), "./../fs.d.ts");
+    assert_eq!(beside("pkg/Lib/Fs.js", "./fs.mjs"), "pkg/Lib/fs.mjs");
+}

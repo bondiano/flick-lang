@@ -107,12 +107,15 @@ break programs.
   stage lends to the clauses of a `for`, `@sync reader`. `Setup` and
   `Atom.Read` are marked so; the compiler no longer names them. The marks
   are those of the built-in modules.
-- **TypeScript forms of built-in types:** the form a built-in type has in
-  `.ts` and `.d.ts` is written where the type is declared, as
+- **TypeScript forms of types:** `@ts "form"` before the declaration of a
+  type or a service says what the type is in `.ts` and `.d.ts`, with `{0}`
+  for an argument and `$Export` for a name `@ts import "module" "Export"`
+  brings, from a package or a file beside the module; `@ts none` says the
+  type has none. A package gives its own types their forms, and its `.d.ts`
+  files ship beside its modules. The built-in modules do the same, as
   `@ts "ReadonlyArray<{0}>"` before `type List a`, and the backend names no
   type of a library. A generated module imports from the runtime only the
-  types its declarations name. `@ts` in a module of a program is
-  `FLICK-R016`.
+  types its declarations name. `.iface` is version 22.
 - **Comparisons by `Ord`:** `< <= > >=` order any type with an `Ord`
   instance by its `compare`, as they already did a type variable: `Bool`, a
   derived type, a record, a list. A type without one is `FLICK-C001`, where

@@ -91,6 +91,7 @@ impl<'a> Checker<'a> {
         self.declare_types(&decls);
         self.declare_cells(&decls);
         self.declare_labels(&decls);
+        self.check_ts_forms(&decls);
         self.declare_classes(&decls);
         if let Some(header) = tree.nodes().find(|n| n.kind == K::ModuleHeader) {
             self.imported_conflicts(self.span(header));
