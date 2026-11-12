@@ -1,0 +1,25 @@
+// A function fits a position only where the reach of the position covers
+// what it holds, pure ones too (`LeLive.arrow` keeps `reach`); a function
+// with effects also needs the regions its use needs live.
+module App.CallbackReach exposing (..)
+
+pure_braced : (Float -> Float)^{c} -> (Float -> Float)^{d} -> Float
+let pure_braced f g =
+  h : (Float -> Float)^{c} -> Float
+  let h k = k 1.0
+  h f + h g
+//        ^ FLICK-G001 this value holds `d`, but the expected type `(Float -> Float)^{c}` allows only `c`
+
+pure_bare : (Float -> Float)^c -> (Float -> Float)^d -> Float
+let pure_bare f g =
+  h : (Float -> Float)^c -> Float
+  let h k = k 1.0
+  h f + h g
+//        ^ FLICK-G001 this value holds `d`, but the expected type `(Float -> Float)^c` allows only `c`
+
+effectful : (Float ->{Async} Float)^{c} -> (Float ->{Async} Float)^{d} ->{Async} Float
+let effectful f g =
+  h : (Float ->{Async} Float)^{c} ->{Async} Float
+  let h k = k 1.0
+  h f + h g
+//        ^ FLICK-G002 this uses `d`, which the expected type `Float ->{Async} Float` does not keep live

@@ -186,15 +186,15 @@ Checker:
 A call of `(τ₁ →ψ τ₂)^C` runs at the use stage `use(ψ, C)`: `ψ` with `Live C` added to its row of services when `ψ` is a runtime stage, and `P` when `ψ = P`. Subtyping compares use stages:
 
 ```text
-τ₁' ≤ τ₁    τ₂ ≤ τ₂'    use(ψ, C) ⊑ use(ψ', C')
-──────────────────────────────────────────── (≤-Use)
+τ₁' ≤ τ₁    τ₂ ≤ τ₂'    use(ψ, C) ⊑ use(ψ', C')    ⌈(τ₁ →ψ τ₂)^C⌉ ⊆ ⌈(τ₁' →ψ' τ₂')^C'⌉
+──────────────────────────────────────────────────────────────────────── (≤-Use)
 (τ₁ →ψ τ₂)^C ≤ (τ₁' →ψ' τ₂')^C'
 ```
 
 and likewise for `Eff r ε τ`. A qualifier may move into the runtime row of a supertype, but not disappear: `(Unit →R⟨∅;∅⟩ Unit)^{s}` is not a subtype of `Unit →R⟨∅;∅⟩ Unit`, even if a parameter or the result shows `s`. Lean: `Stage.use`, `LeLive`, `LeLive.arrow_use`, `LeLive.eff_use` (`Live/Mode.lean`), checked in `LiveRules.lean`. Consequences:
 
 - widening a qualifier is allowed, narrowing is `FLICK-G001`;
-- a function or task value is not held against a written qualifier: what it holds is not compared, only what its use needs live;
+- a function or task value, a pure one too, fits only where the reach of the position covers what it holds (the last premise, `Caps.Sub … reach` of `LeLive.arrow`, `Live/Mode.lean`; `Ty.reach` of an arrow includes its qualifier, `TyBase.lean`); for one with effects the use stages are compared besides;
 - what a function position's type shows, and what a value bound's type shows (`a` of `List a`), counts as visible, not held;
 - inside `Ref`, `List`, records and ADTs, types are compared by `≡` together with their qualifiers: "explicit stored qualifications are part of type identity", and mutable storage is invariant (`FLICK-T003`);
 - the hidden row of data with hidden storage is one of its arguments, and subtyping may only widen it: `(T C ā) ≤ (T C' ā)` when `C ⊆ C'`, the other arguments by `≡` (Lean: `LeLive.hide`, its condition `Sig.hidden_ok`; `Formal/Widen.lean`). Data with a smaller row passes where a larger one is expected, never the reverse, as for the qualifier of a function. Only the row the reading of §1.4 adds widens, and only while it is covariant: a well-formed signature has it in the fields only as the qualifier of a stored function or computation, or as the hidden row of stored data, at the top of a field, never under `Ref`, inside an argument of another type, in a contravariant position, or fixed by the result of a GADT constructor. A capture row a declaration names (`type K (c : CaptureRow)`) is invariant ([a capture row a declaration names is invariant](#a-capture-row-a-declaration-names-is-invariant)). Data inside an argument of another type (`List (G s a)`) is compared by `≡` until the variance of data arguments is specified ([§2.2.1](#221-variance-of-data-arguments-pending)); A region another argument shows does not stand in for it: `(G (File s) a)^{s}` is no `G (File s) a`, because code generic in that argument no longer sees the region, and the use the row records would be lost ([the hidden row of data is not what its arguments show](#the-hidden-row-of-data-is-not-what-its-arguments-show));
@@ -1068,7 +1068,7 @@ type K (c : CaptureRow) = K ((Unit ->{} Unit)^c ->{} Unit)
 ### Rules of typing by use found while porting
 
 - An instance method without a signature is checked against the class signature, elided before the instance arguments are substituted (`tests/check/pass/regions/instance_elided.fl`); a signature an instance method writes does not add the `Live` its own arrows would need (`tests/check/fail/regions/instance_signature.fl`).
-- A function or task value is not held against a written qualifier: only what its use needs live is compared, and a qualifier does not hide that need (`tests/check/fail/regions/call_qualifier.fl`).
+- A function or task value is held against a written qualifier like any value, pure ones too: what it holds must be within the reach of the position, as `LeLive.arrow` requires, and a qualifier does not hide what its use needs live either (`tests/check/fail/regions/call_qualifier.fl`, `tests/check/fail/regions/callback_reach.fl`). The checker had compared only the use stage, so a pure `(Float -> Float)^{d}` passed for `(Float -> Float)^{c}`; the model and Lean rejected it.
 - What a function position's type shows, and what a value bound's type shows (`a` of `List a`), counts as visible, not held.
 - Applying a local `f : (∀v. τ^v → σ)^C` with `v ∉ σ` adds nothing of the argument to the result (`regions/applied.rs` `parametric_in_argument`), so `Option.map` returns `(Option b)^c`.
 
