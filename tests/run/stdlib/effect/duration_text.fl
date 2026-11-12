@@ -47,9 +47,26 @@ let rec each xs f =
 
 main : Unit ->{} Unit
 let main () =
-  each ["\"2000000\"", "\"0\"", "\"1500000\"", "\"-5\"", "\"1.5\"", "5", "\"abc\""]
-    (fun s -> line ("nanos " ++ s) (round s Duration.json_nanos))
-  each ["\"2 seconds\"", "\"1.5 seconds\"", "\"1.0000001 millis\"", "\"0 millis\"", "\"0.5 nanos\"", "\"3 micros\"", "\"1 week\"", "\"Infinity\"", "\"-Infinity\"", "\"-1 seconds\"", "\"2  minutes\"", "\"2seconds\"", "\"soon\"", "7"]
+  each ["\"2000000\"", "\"0\"", "\"1500000\"", "\"-5\"", "\"1.5\"", "5", "\"abc\""] (fun s ->
+    line ("nanos " ++ s) (round s Duration.json_nanos)
+  )
+  each
+    [
+      "\"2 seconds\"",
+      "\"1.5 seconds\"",
+      "\"1.0000001 millis\"",
+      "\"0 millis\"",
+      "\"0.5 nanos\"",
+      "\"3 micros\"",
+      "\"1 week\"",
+      "\"Infinity\"",
+      "\"-Infinity\"",
+      "\"-1 seconds\"",
+      "\"2  minutes\"",
+      "\"2seconds\"",
+      "\"soon\"",
+      "7",
+    ]
     (fun s -> line ("string " ++ s) (round s Duration.json_string))
   line "nanos encode infinity" (encode Duration.json_nanos Duration.infinity)
   line "string encode 1.5ms" (encode Duration.json_string (ms 1.5))
