@@ -6,9 +6,7 @@ module Inspectable exposing (..)
 /// line).
 to_string_unknown : Int -> Unknown -> String
 foreign pure to_string_unknown from "flick:Inspectable" "flickToStringUnknown"
-  reviewed "effect@4.1.2 sha256:ea5d81bca700957a"
 
 /// The data in the JSON form it is logged in.
 to_json : Unknown -> Unknown
 foreign pure to_json from "flick:Inspectable" "toJson"
-  reviewed "effect@4.1.2 sha256:ce435a1e920b496d"

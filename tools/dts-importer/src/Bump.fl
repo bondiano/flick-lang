@@ -141,7 +141,7 @@ let run version package_dir root =
   let next = Surface.snapshot dir
   if next.version != version then
     App.fail (dir ++ " holds effect " ++ next.version ++ ", not " ++ version)
-  let file = Path.join [root, "stdlib/Effect/snapshot.json"]
+  let file = Path.join [root, "packages/effect-ts/coverage/snapshot.json"]
   let old =
     match Json.parse (FileSystem.read_file_string file) with
     | Err _ -> App.fail (file ++ " is not JSON")
@@ -162,4 +162,4 @@ let run version package_dir root =
     )
     pins
   Platform.stdout_write
-    "\nwrote the snapshot and the pins; next: `pnpm install`, review stdlib/Effect/surface/ until `cargo test -p flick-effect-surface --test coverage` passes\n"
+    "\nwrote the snapshot and the pins; next: `pnpm install`, review packages/effect-ts/coverage/surface/ until `cargo test -p flick-effect-surface --test coverage` passes\n"

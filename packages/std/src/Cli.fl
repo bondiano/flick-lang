@@ -100,100 +100,82 @@ instance Value (String, String) =
 /// A flag without a value: present is `true`, absent `false`.
 switch : Multi Bool Bool
 foreign pure switch from "flick:cli" "multiSwitch"
-  reviewed "effect@4.1.2 sha256:e1a44b3854025e04"
 
 /// One value, required.
 required : Multi a a
 foreign pure required from "flick:cli" "multiRequired"
-  reviewed "effect@4.1.2 sha256:412b66f29e784f00"
 
 /// One value, `value` when absent.
 default : a -> Multi a a
 foreign pure default from "flick:cli" "multiDefault"
-  reviewed "effect@4.1.2 sha256:caecb2b3eaafc203"
 
 /// One value, or `None`.
 optional : Multi a (Option a)
 foreign pure optional from "flick:cli" "multiOptional"
-  reviewed "effect@4.1.2 sha256:cf0569efe880619b"
 
 /// Any number of values: a repeated flag, or the rest of the arguments.
 many : Multi a (List a)
 foreign pure many from "flick:cli" "multiMany"
-  reviewed "effect@4.1.2 sha256:85fe2ddc827a41b6"
 
 /// At least one value.
 some : Multi a (NonEmpty.NonEmpty a)
 foreign pure some from "flick:cli" "multiSome"
-  reviewed "effect@4.1.2 sha256:5e88f4ac77db4501"
 
 /// At least `min` values.
 at_least : Int -> Multi a (List a)
 foreign pure at_least from "flick:cli" "multiAtLeast"
-  reviewed "effect@4.1.2 sha256:e42e6aa23f7e9d05"
 
 /// At most `max` values.
 at_most : Int -> Multi a (List a)
 foreign pure at_most from "flick:cli" "multiAtMost"
-  reviewed "effect@4.1.2 sha256:b24c3438bc79d4eb"
 
 /// From `min` to `max` values.
 between : Int -> Int -> Multi a (List a)
 foreign pure between from "flick:cli" "multiBetween"
   arity 2
-  reviewed "effect@4.1.2 sha256:a93023741eb028ac"
 
 /// One value, read from `config` when absent; a config that does not read
 /// is `CliError`.
 from_config : Config.Config a -> Multi a a
 foreign pure from_config from "flick:cli" "multiConfig"
-  reviewed "effect@4.1.2 sha256:6dffe04efbd7d8a1"
 
 /// One value, asked with `prompt` on the terminal of the process when
 /// absent; without an answer the value is missing.
 from_prompt : Cli.Prompt.Prompt a -> Multi a a
 foreign pure from_prompt from "flick:cli" "multiPrompt"
-  reviewed "effect@4.1.2 sha256:771652c2d8bad476"
 
 /// The parameter is left out of help and completions.
 hidden : Multi a t -> Multi a t
 foreign pure hidden from "flick:cli" "multiHidden"
-  reviewed "effect@4.1.2 sha256:6991c5a17408c60a"
 
 /// The name help shows for the parameter's value, `<file>` for `string`.
 metavar : String -> Multi a t -> Multi a t
 foreign pure metavar from "flick:cli" "multiMetavar"
   arity 2
-  reviewed "effect@4.1.2 sha256:744d6162898dacda"
 
 /// A flag written without a value takes `text`: `--color` as `--color=auto`.
 optional_value : String -> Multi a t -> Multi a t
 foreign pure optional_value from "flick:cli" "multiOptionalValue"
   arity 2
-  reviewed "effect@4.1.2 sha256:31d4af878d0bbeab"
 
 /// The value names a file, which must exist when `must_exist`.
 file : Bool -> Multi a t -> Multi a t
 foreign pure file from "flick:cli" "multiFile"
   arity 2
-  reviewed "effect@4.1.2 sha256:efa7830339320456"
 
 /// The value names a directory, which must exist when `must_exist`.
 directory : Bool -> Multi a t -> Multi a t
 foreign pure directory from "flick:cli" "multiDirectory"
   arity 2
-  reviewed "effect@4.1.2 sha256:a8970fc7a01e8e08"
 
 /// The value names a file or a directory, which must exist when `must_exist`.
 path : Bool -> Multi a t -> Multi a t
 foreign pure path from "flick:cli" "multiPath"
   arity 2
-  reviewed "effect@4.1.2 sha256:e1356e339182b8cc"
 
 /// `Cli.Value` parses the text of the file the value names.
 file_text : Multi a t -> Multi a t
 foreign pure file_text from "flick:cli" "multiFileText"
-  reviewed "effect@4.1.2 sha256:0d9045ebad6c7654"
 
 /// The formats `file_parse` reads.
 type FileFormat = Ini | Json | Toml | Yaml
@@ -204,12 +186,10 @@ type FileFormat = Ini | Json | Toml | Yaml
 file_parse : Option FileFormat -> Multi a t -> Multi a t
 foreign pure file_parse from "flick:cli" "multiFileParse"
   arity 2
-  reviewed "effect@4.1.2 sha256:56348d624c058c67"
 
 /// A command named `name` with no options yet.
 command : String -> Spec none none {}
 foreign pure command from "flick:cli" "specCommand"
-  reviewed "effect@4.1.2 sha256:2cfaa70f0f57d3d2"
 
 /// The help text of the command. Like every combinator here, it keeps the
 /// captures `c` of what it is given, so a command whose handler holds a
@@ -218,34 +198,29 @@ description : String -> ((Spec r e o)^c -> (Spec r e o)^c)^c
 foreign pure description from "flick:cli" "specDescription"
   arity 2
   retention call
-  reviewed "effect@4.1.2 sha256:886f18ab4b8311a8"
 
 /// The line that lists the command among its parent's subcommands.
 short_description : String -> ((Spec r e o)^c -> (Spec r e o)^c)^c
 foreign pure short_description from "flick:cli" "specShortDescription"
   arity 2
   retention call
-  reviewed "effect@4.1.2 sha256:0275fa273590d7b2"
 
 /// Another name of the command as a subcommand.
 alias : String -> ((Spec r e o)^c -> (Spec r e o)^c)^c
 foreign pure alias from "flick:cli" "specAlias"
   arity 2
   retention call
-  reviewed "effect@4.1.2 sha256:2252299d039557d0"
 
 /// The command is left out of its parent's help; it still runs.
 unlisted : (Spec r e o)^c -> (Spec r e o)^c
 foreign pure unlisted from "flick:cli" "specUnlisted"
   retention call
-  reviewed "effect@4.1.2 sha256:6f69c621e82d6d55"
 
 /// An example command line for help, with what it does (`""`: nothing).
 example : String -> String -> ((Spec r e o)^c -> (Spec r e o)^c)^c
 foreign pure example from "flick:cli" "specExample"
   arity 3
   retention call
-  reviewed "effect@4.1.2 sha256:b03c329ef63fd3bc"
 
 /// What an action sees: the names of the command line's commands and the version.
 type alias ActionContext = { commandPath : List String; version : String }
@@ -256,7 +231,6 @@ action : String -> String -> (ActionContext ->{} Unit)^c -> (Spec r e o)^c -> (S
 foreign pure action from "flick:cli" "specAction"
   arity 4
   retention call
-  reviewed "effect@4.1.2 sha256:485a1c3df2cdedc3"
 
 /// The flag `--<label>` (underscores become dashes), with more names
 /// (`"n"` is `-n`), its help text and how its values make field `l`.
@@ -266,7 +240,6 @@ flag :
 foreign pure flag from "flick:cli" "specFlag"
   arity 5
   retention call
-  reviewed "effect@4.1.2 sha256:e2248cc36d41abe8"
 
 /// The next positional argument, with its help text.
 arg :
@@ -275,21 +248,18 @@ arg :
 foreign pure arg from "flick:cli" "specArg"
   arity 4
   retention call
-  reviewed "effect@4.1.2 sha256:82fa61fff2987aa0"
 
 /// A nested command, with its help text.
 subcommand : (Command r2 e2)^c -> String -> ((Spec r e o)^c -> (Spec (r + r2) (e + e2) o)^c)^c
 foreign pure subcommand from "flick:cli" "specSubcommand"
   arity 3
   retention call
-  reviewed "effect@4.1.2 sha256:ce9428c267177c25"
 
 /// The command, running `handler` with the parsed options.
 handle : (o ->{r2; e2} Unit)^c -> (Spec r e o)^c -> (Command (r + r2) (e + e2))^c
 foreign pure handle from "flick:cli" "specHandle"
   arity 2
   retention call
-  reviewed "effect@4.1.2 sha256:3be9ad830ea5e5f6"
 
 /// [`handle`] with the spec first, so the handler is checked against the
 /// options the spec makes: what the block `cli "name" { … }` stands for.
@@ -301,7 +271,6 @@ let handled spec handler = handle handler spec
 group : (Spec r e o)^c -> (Command r e)^c
 foreign pure group from "flick:cli" "specGroup"
   retention call
-  reviewed "effect@4.1.2 sha256:ccc0103e6db4f51a"
 
 /// A flag in help: `type_` names its value, empty for a switch.
 type alias FlagDoc = {
@@ -359,19 +328,16 @@ type alias Formatter = {
 /// The default formatter, with ANSI colors when `colors`.
 default_formatter : Bool -> Formatter
 foreign pure default_formatter from "flick:cli" "cliDefaultFormatter"
-  reviewed "effect@4.1.2 sha256:414e73326ef266bc"
 
 /// The columns `text` takes in a terminal, without its ANSI escapes.
 display_width : String -> Int
 foreign pure display_width from "flick:cli" "cliDisplayWidth"
-  reviewed "effect@4.1.2 sha256:2a6f63717edc3afe"
 
 /// The help document `--help` gives after the subcommand names `path`.
 help_doc : List String -> (Command r e)^c ->{} HelpDoc
 foreign effect help_doc from "flick:cli" "cliHelpDoc"
   arity 2
   retention call
-  reviewed "effect@4.1.2 sha256:d67efcd7d4d83aff"
 
 /// The text of `help_doc`, without colors.
 help : List String -> (Command r e)^c ->{} String
@@ -386,7 +352,6 @@ completions : Shell -> (Command r e)^c ->{} String
 foreign effect completions from "flick:cli" "cliCompletions"
   arity 2
   retention call
-  reviewed "effect@4.1.2 sha256:a9819eb64f8a0291"
 
 /// The flags every command line has unless `Settings` leave them out:
 /// `--help`, `--version`, `--wizard` (asks for each value on the terminal),
@@ -418,14 +383,12 @@ run_with : Settings -> (Command r e)^c -> List String ->{Async | r; CliError | e
 foreign effect run_with from "flick:cli" "cliRunWith"
   arity 3
   retention call
-  reviewed "effect@4.1.2 sha256:fe039b878ff7b17a"
 
 /// `run_with` the `settings` with `version`.
 run_version : String -> (Command r e)^c -> List String ->{Async | r; CliError | e} Unit
 foreign effect run_version from "flick:cli" "cliRunVersion"
   arity 3
   retention call
-  reviewed "effect@4.1.2 sha256:fe039b878ff7b17a"
 
 /// `run_version "0.0.0"`.
 run : (Command r e)^c -> List String ->{Async | r; CliError | e} Unit

@@ -527,14 +527,11 @@ let combiner_min = Combiner.make (fun a b -> min b a)
 /// `"1536 bytes"`. Other text is a `SchemaError`.
 json : PureCodec Json ByteSize
 foreign pure json from "flick:ByteSize" "flickJson"
-  reviewed "effect@4.1.2 sha256:1f0a1d398ef2056f"
 
 /// A size as a whole, non-negative JSON number of bytes.
 json_number : PureCodec Json ByteSize
 foreign pure json_number from "flick:ByteSize" "flickJsonNumber"
-  reviewed "effect@4.1.2 sha256:1e94e27386d2573e"
 
 /// A size as a JSON string of digits, for sizes past the safe numbers.
 json_bigint : PureCodec Json ByteSize
 foreign pure json_bigint from "flick:ByteSize" "flickJsonBigint"
-  reviewed "effect@4.1.2 sha256:863e6b8c413aa5c9"

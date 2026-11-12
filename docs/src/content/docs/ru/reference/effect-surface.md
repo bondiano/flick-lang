@@ -12,8 +12,8 @@ source_hash: a03d5e8730a8b87e
 
 ## Снимок
 
-`stdlib/Effect/snapshot.json` описывает API установленной версии Effect.
-Снимок записывается командой `node tools/dts-importer/index.mjs surface > stdlib/Effect/snapshot.json`
+`packages/effect-ts/coverage/snapshot.json` описывает API установленной версии Effect.
+Снимок записывается командой `node tools/dts-importer/index.mjs surface > packages/effect-ts/coverage/snapshot.json`
 и содержит все точки входа из её `package.json`. Для девяти оборачиваемых
 точек входа в нём перечислены все экспорты каждого модуля в виде `Module.name`.
 У каждого экспорта указаны категория (`value`, `type` или `value+type`)
@@ -23,7 +23,7 @@ source_hash: a03d5e8730a8b87e
 
 ## Манифест
 
-`stdlib/Effect/surface/entrypoints.toml` определяет, как обрабатывается
+`packages/effect-ts/coverage/surface/entrypoints.toml` определяет, как обрабатывается
 каждая точка входа: либо её модули описываются в указанном каталоге,
 либо она исключается целиком. Для каждой новой точки входа Effect
 тоже нужно выбрать один из этих вариантов.
@@ -33,7 +33,7 @@ source_hash: a03d5e8730a8b87e
 "effect/ai" = { excluded = "AI provider clients are outside the 0.1.0 standard library" }
 ```
 
-Файл `stdlib/Effect/surface/<dir>/<Module>.toml` (или `<Module>.<part>.toml`
+Файл `packages/effect-ts/coverage/surface/<dir>/<Module>.toml` (или `<Module>.<part>.toml`
 для большого модуля) задаёт ровно один статус для каждого экспорта:
 
 ```toml
@@ -69,8 +69,6 @@ cron = "cron expressions need a parser of their own"
 - отпечаток экспорта `wrapped` отличается от проверенного;
 - стандартная библиотека не экспортирует символ `wrapped` или ни один тест
   в `tests/run/stdlib/` на него не ссылается (ссылки разрешает модуль проверки типов);
-- у внешней привязки символа `wrapped` нет отметки `reviewed
-  "effect@<pinned> …"` либо привязка проверена по другой версии;
 - у решения `language`, `excluded` или `pending` не указана причина;
 - версия снимка отличается от закреплённой в `packages/effect-ts/package.json`.
 
@@ -84,8 +82,8 @@ CI добавляет эти данные в сводку запуска.
 которых недостаёт в матрице возможностей среды выполнения. Она также обновляет
 закреплённые версии в `packages/effect-ts/package.json`, `packages/effect-ts/src/capabilities.ts`,
 тесте версии среды выполнения.
-Линтер продолжает завершаться с ошибкой, пока манифест и проверенные привязки
-не будут согласованы с новым снимком.
+Линтер продолжает завершаться с ошибкой, пока манифест не будет согласован
+с новым снимком.
 
 ## Нестабильные модули
 
@@ -153,7 +151,6 @@ span'ы программы по WebSocket в Effect DevTools, которые с�
 /// Recurs forever, each step the duration after the previous one ended.
 spaced : Duration.Duration -> Schedule none none i Float
 foreign pure spaced from "flick:Schedule" "spaced"
-  reviewed "effect@4.1.2 sha256:498f22b480d2397e"
 
 retry :
   forall c r e a r2 e2 o.
@@ -161,7 +158,6 @@ retry :
 foreign effect retry from "flick:Effect" "retry"
   arity 1
   retention call
-  reviewed "effect@4.1.2 sha256:508d9e1864f6c9d3"
 ```
 
 Имена записываются в snake_case, а основной аргумент передаётся последним.

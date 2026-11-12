@@ -23,7 +23,6 @@ make :
   } ->{Scope s | r}
   ScopedCache s k e a
 foreign effect make from "flick:ScopedCache" "flickMake"
-  reviewed "effect@4.1.2 sha256:463f2234265282d1"
 
 /// `make`, the time to live of each entry computed from how its lookup
 /// ended and its key.
@@ -35,7 +34,6 @@ make_with :
   } ->{Scope s | r}
   ScopedCache s k e a
 foreign effect make_with from "flick:ScopedCache" "flickMakeWith"
-  reviewed "effect@4.1.2 sha256:d09a00e4ddb73874"
 
 /// Runs `f` with the value of `key`, looking it up once if it is missing or
 /// expired; a failed lookup is cached too. The value stays acquired until
@@ -61,28 +59,24 @@ set : k -> a -> ScopedCache s k e a ->{} Unit
 foreign effect set from "flick:ScopedCache" "flickSet"
   arity 2
   retention call
-  reviewed "effect@4.1.2 sha256:e53b86618baa477e"
 
 /// Whether `key` is cached.
 has : k -> ScopedCache s k e a ->{} Bool
 foreign effect has from "flick:ScopedCache" "has"
   arity 1
   retention call
-  reviewed "effect@4.1.2 sha256:a78d8aa2a0d7e860"
 
 /// Drops `key`.
 invalidate : k -> ScopedCache s k e a ->{} Unit
 foreign effect invalidate from "flick:ScopedCache" "invalidate"
   arity 1
   retention call
-  reviewed "effect@4.1.2 sha256:c314077e04cc8375"
 
 /// Drops `key` if its value satisfies `f`; whether it did.
 invalidate_when : k -> (a -> Bool)^c -> (ScopedCache s k e a ->{} Bool)^c
 foreign effect invalidate_when from "flick:ScopedCache" "flickInvalidateWhen"
   arity 2
   retention call
-  reviewed "effect@4.1.2 sha256:5f0df96a161630e0"
 
 /// Looks `key` up again, cached or not, starting its time to live anew; the
 /// previous value is released once no `use` holds it.
@@ -90,22 +84,18 @@ refresh : k -> ScopedCache s k e a ->{Async; e} Unit
 foreign effect refresh from "flick:ScopedCache" "flickRefresh"
   arity 1
   retention call
-  reviewed "effect@4.1.2 sha256:ae56c86a6d037203"
 
 /// Drops every key.
 invalidate_all : ScopedCache s k e a ->{} Unit
 foreign effect invalidate_all from "flick:ScopedCache" "invalidateAll"
   retention call
-  reviewed "effect@4.1.2 sha256:5455eb215e13d5aa"
 
 /// The number of cached keys.
 size : ScopedCache s k e a ->{} Int
 foreign effect size from "flick:ScopedCache" "size"
   retention call
-  reviewed "effect@4.1.2 sha256:9ccf109c88ed2682"
 
 /// The cached keys.
 keys : ScopedCache s k e a ->{} List k
 foreign effect keys from "flick:ScopedCache" "keys"
   retention call
-  reviewed "effect@4.1.2 sha256:339c1fe6110bad0b"

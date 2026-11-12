@@ -9,45 +9,38 @@ import Filter
 map : (o -> b) -> Channel r e i o d ie id -> Channel r e i b d ie id
 foreign pure map from "flick:Channel" "map"
   arity 1
-  reviewed "effect@4.1.2 sha256:79302a5daf4d3f36"
 
 /// Each element mapped by the task `f` gives, one at a time.
 map_effect : (o ->{r2; e2} b) -> Channel r e i o d ie id -> Channel (r + r2) (e + e2) i b d ie id
 foreign pure map_effect from "flick:Channel" "mapEffect"
   arity 1
-  reviewed "effect@4.1.2 sha256:c456784740559e72"
 
 /// Runs `f` on each element, emitting the elements unchanged.
 tap : (o ->{r2; e2} x) -> Channel r e i o d ie id -> Channel (r + r2) (e + e2) i o d ie id
 foreign pure tap from "flick:Channel" "tap"
   arity 1
-  reviewed "effect@4.1.2 sha256:8122d3ba0aaba2cd"
 
 /// The done value mapped by `f`.
 map_done : (d -> d2) -> Channel r e i o d ie id -> Channel r e i o d2 ie id
 foreign pure map_done from "flick:Channel" "mapDone"
   arity 1
-  reviewed "effect@4.1.2 sha256:6ed3774ca99f9fb2"
 
 /// The done value mapped by the task `f` gives.
 map_done_effect :
   (d ->{r2; e2} d2) -> Channel r e i o d ie id -> Channel (r + r2) (e + e2) i o d2 ie id
 foreign pure map_done_effect from "flick:Channel" "mapDoneEffect"
   arity 1
-  reviewed "effect@4.1.2 sha256:653c21afa825f0ae"
 
 /// Each upstream element mapped by `f` before the channel reads it.
 map_input : (i2 ->{r2; ie} i) -> Channel r e i o d ie id -> Channel (r + r2) e i2 o d ie id
 foreign pure map_input from "flick:Channel" "mapInput"
   arity 1
-  reviewed "effect@4.1.2 sha256:1250351341d0416b"
 
 /// Each upstream error mapped by `f` before the channel sees it.
 map_input_error :
   (Errors ie2 ->{r2; ie} Errors ie) -> Channel r e i o d ie id -> Channel (r + r2) e i o d ie2 id
 foreign pure map_input_error from "flick:Channel" "mapInputError"
   arity 1
-  reviewed "effect@4.1.2 sha256:631051e7626e0031"
 
 /// The elements of the channel `f` builds of each element, one after the
 /// other.
@@ -57,7 +50,6 @@ flat_map :
   Channel (r + r2) (e + e2) i o2 d ie id
 foreign pure flat_map from "flick:Channel" "flatMap"
   arity 1
-  reviewed "effect@4.1.2 sha256:35e47ca1b0633127"
 
 /// `flat_map`, dropping the channel of an element when the next one comes.
 switch_map :
@@ -66,19 +58,16 @@ switch_map :
   Channel (r + r2) (e + e2) i o2 d ie id
 foreign pure switch_map from "flick:Channel" "switchMap"
   arity 1
-  reviewed "effect@4.1.2 sha256:bd0af6fef9d4f1be"
 
 /// The elements of the channels the channel emits, one channel after the
 /// other.
 flatten :
   Channel r e i (Channel r2 e2 i o d2 ie id) d ie id -> Channel (r + r2) (e + e2) i o d ie id
 foreign pure flatten from "flick:Channel" "flatten"
-  reviewed "effect@4.1.2 sha256:a340ce4e84aad060"
 
 /// The elements of the lists the channel emits.
 flatten_array : Channel r e i (List o) d ie id -> Channel r e i o d ie id
 foreign pure flatten_array from "flick:Channel" "flattenArray"
-  reviewed "effect@4.1.2 sha256:0c3700bf6c7dd4cb"
 
 /// How `merge_all` runs the inner channels: at most `concurrency` at once
 /// (`None`: all), buffering `bufferSize` elements (`None`: the default);
@@ -92,7 +81,6 @@ merge_all :
   Channel {Async | r + r2} (e + e2) i o d ie id
 foreign pure merge_all from "flick:Channel" "flickMergeAll"
   arity 1
-  reviewed "effect@4.1.2 sha256:c7dbb12e3896fc2c"
 
 /// `self |> concat next`: the elements of `self`, then those of `next`,
 /// ending as `next` does.
@@ -100,7 +88,6 @@ concat :
   Channel r2 e2 i o d2 ie id -> Channel r e i o d ie id -> Channel (r + r2) (e + e2) i o d2 ie id
 foreign pure concat from "flick:Channel" "concat"
   arity 1
-  reviewed "effect@4.1.2 sha256:8e100df43d06f5e6"
 
 /// The elements of the channel, then those of the channel `f` builds of
 /// its done value.
@@ -110,7 +97,6 @@ concat_with :
   Channel (r + r2) (e + e2) i o d2 ie id
 foreign pure concat_with from "flick:Channel" "concatWith"
   arity 1
-  reviewed "effect@4.1.2 sha256:12ad548b5f0a298d"
 
 /// The channel, or the one `f` builds of its done value when it emitted
 /// nothing.
@@ -120,36 +106,30 @@ or_else_if_empty :
   Channel (r + r2) (e + e2) i o d ie id
 foreign pure or_else_if_empty from "flick:Channel" "orElseIfEmpty"
   arity 1
-  reviewed "effect@4.1.2 sha256:6f0d5b8cb1516e8c"
 
 /// Runs the channel for its effects, emitting nothing.
 drain : Channel r e i o d ie id -> Channel r e i o2 d ie id
 foreign pure drain from "flick:Channel" "drain"
-  reviewed "effect@4.1.2 sha256:442a37e12c5bb66c"
 
 /// Runs the channel again each time it ends.
 forever : Channel r e i o d ie id -> Channel r e i o d2 ie id
 foreign pure forever from "flick:Channel" "forever"
-  reviewed "effect@4.1.2 sha256:c487b23da00c50e8"
 
 /// The elements for which `f` holds.
 filter : (o -> Bool) -> Channel r e i o d ie id -> Channel r e i o d ie id
 foreign pure filter from "flick:Channel" "filter"
   arity 1
-  reviewed "effect@4.1.2 sha256:340dbdd4b6889354"
 
 /// The elements the filter passes, as it maps them.
 filter_map : Filter.Filter o b x -> Channel r e i o d ie id -> Channel r e i b d ie id
 foreign pure filter_map from "flick:Channel" "filterMap"
   arity 1
-  reviewed "effect@4.1.2 sha256:ce216c677d840832"
 
 /// The elements for which the task `f` gives `True`.
 filter_effect :
   (o ->{r2; e2} Bool) -> Channel r e i o d ie id -> Channel (r + r2) (e + e2) i o d ie id
 foreign pure filter_effect from "flick:Channel" "filterEffect"
   arity 1
-  reviewed "effect@4.1.2 sha256:72594f6e3abd0ed0"
 
 /// The elements the effectful filter passes, as it maps them.
 filter_map_effect :
@@ -158,7 +138,6 @@ filter_map_effect :
   Channel (r + r2) (e + e2) i b d ie id
 foreign pure filter_map_effect from "flick:Channel" "filterMapEffect"
   arity 1
-  reviewed "effect@4.1.2 sha256:a33df49d0dc9e246"
 
 /// In each chunk, the elements for which `f` holds; empty chunks are
 /// dropped.
@@ -168,7 +147,6 @@ filter_array :
   Channel r e i (NonEmpty.NonEmpty o) d ie id
 foreign pure filter_array from "flick:Channel" "filterArray"
   arity 1
-  reviewed "effect@4.1.2 sha256:ccc1159bbefb1da6"
 
 /// In each chunk, the elements the filter passes, as it maps them.
 filter_map_array :
@@ -177,7 +155,6 @@ filter_map_array :
   Channel r e i (NonEmpty.NonEmpty b) d ie id
 foreign pure filter_map_array from "flick:Channel" "filterMapArray"
   arity 1
-  reviewed "effect@4.1.2 sha256:4dae80a22eba6e8e"
 
 /// In each chunk, the elements for which the task `f` gives `True`.
 filter_array_effect :
@@ -186,7 +163,6 @@ filter_array_effect :
   Channel (r + r2) (e + e2) i (NonEmpty.NonEmpty o) d ie id
 foreign pure filter_array_effect from "flick:Channel" "filterArrayEffect"
   arity 1
-  reviewed "effect@4.1.2 sha256:90ff526b326d3899"
 
 /// In each chunk, the elements the effectful filter passes.
 filter_map_array_effect :
@@ -195,7 +171,6 @@ filter_map_array_effect :
   Channel (r + r2) (e + e2) i (NonEmpty.NonEmpty b) d ie id
 foreign pure filter_map_array_effect from "flick:Channel" "filterMapArrayEffect"
   arity 1
-  reviewed "effect@4.1.2 sha256:9c45591eafdbe904"
 
 /// Threads a state from `initial` through the elements; `f` gives the
 /// next state and the elements to emit.
@@ -206,27 +181,23 @@ map_accum :
   Channel (r + r2) (e + e2) i b d ie id
 foreign pure map_accum from "flick:Channel" "mapAccum"
   arity 2
-  reviewed "effect@4.1.2 sha256:b70e1f2fb154df44"
 
 /// Emits `initial` and each state `f` folds from the elements.
 scan : s -> (s -> o -> s) -> Channel r e i o d ie id -> Channel r e i s d ie id
 foreign pure scan from "flick:Channel" "scan"
   arity 2
-  reviewed "effect@4.1.2 sha256:72bbfa306689d9e4"
 
 /// `scan` with a task for each step.
 scan_effect :
   s -> (s -> o ->{r2; e2} s) -> Channel r e i o d ie id -> Channel (r + r2) (e + e2) i s d ie id
 foreign pure scan_effect from "flick:Channel" "scanEffect"
   arity 2
-  reviewed "effect@4.1.2 sha256:2c47b9f365ecd109"
 
 /// Runs the channel ahead of its reader, keeping what it emits in a queue
 /// with the options.
 buffer : Buffer -> Channel r e i o d ie id -> Channel {Async | r} e i o d ie id
 foreign pure buffer from "flick:Channel" "flickBuffer"
   arity 1
-  reviewed "effect@4.1.2 sha256:de2471a25208abf9"
 
 /// `buffer` counting elements of the chunks.
 buffer_array :
@@ -235,33 +206,28 @@ buffer_array :
   Channel {Async | r} e i (NonEmpty.NonEmpty o) d ie id
 foreign pure buffer_array from "flick:Channel" "flickBufferArray"
   arity 1
-  reviewed "effect@4.1.2 sha256:2f1eb69947695fbc"
 
 /// Splits chunks of text into chunks of lines, across chunk borders.
 split_lines : Unit -> Channel none e (NonEmpty.NonEmpty String) (NonEmpty.NonEmpty String) d e d
 foreign pure split_lines from "flick:Channel" "splitLines"
   arity 0
-  reviewed "effect@4.1.2 sha256:d6f2cf784e0b6995"
 
 /// Decodes chunks of bytes (numbers from 0 to 255) as text in the
 /// encoding, such as `"utf-8"`.
 decode_text :
   String -> Channel none e (NonEmpty.NonEmpty (List Int)) (NonEmpty.NonEmpty String) d e d
 foreign pure decode_text from "flick:Channel" "flickDecodeText"
-  reviewed "effect@4.1.2 sha256:cd214c5b67f6a503"
 
 /// Encodes chunks of text as UTF-8 bytes.
 encode_text : Unit -> Channel none e (NonEmpty.NonEmpty String) (NonEmpty.NonEmpty (List Int)) d e d
 foreign pure encode_text from "flick:Channel" "flickEncodeText"
   arity 0
-  reviewed "effect@4.1.2 sha256:5757f49f7bab9a06"
 
 /// `self |> pipe_to next`: `next` reads what `self` emits, its errors and
 /// its done value.
 pipe_to : Channel r2 e2 o o2 d2 e d -> Channel r e i o d ie id -> Channel (r + r2) e2 i o2 d2 ie id
 foreign pure pipe_to from "flick:Channel" "pipeTo"
   arity 1
-  reviewed "effect@4.1.2 sha256:a93c0df68b2a7289"
 
 /// `pipe_to` a channel that expects no upstream errors: an error of `self`
 /// fails the result directly.
@@ -269,4 +235,3 @@ pipe_to_or_fail :
   Channel r2 e2 o o2 d2 none d -> Channel r e i o d ie id -> Channel (r + r2) (e + e2) i o2 d2 ie id
 foreign pure pipe_to_or_fail from "flick:Channel" "pipeToOrFail"
   arity 1
-  reviewed "effect@4.1.2 sha256:55c59a13fef5e67b"

@@ -27,31 +27,26 @@ type alias FormDataInput = List (String, String)
 /// No body.
 empty : Body
 foreign pure empty from "flick:http/HttpBody" "empty"
-  reviewed "effect@4.1.2 sha256:23013c68fed14abf"
 
 /// The bytes, of the content type or `application/octet-stream`.
 uint8_array : List Int -> Option String -> Body
 foreign pure uint8_array from "flick:http/HttpBody" "flickUint8Array"
   arity 2
-  reviewed "effect@4.1.2 sha256:4503999043e25898"
 
 /// The text as UTF-8, of the content type or `text/plain`.
 text : String -> Option String -> Body
 foreign pure text from "flick:http/HttpBody" "text"
   arity 2
   optional 1
-  reviewed "effect@4.1.2 sha256:badc3c0c39c00b74"
 
 /// The JSON text of the value, `application/json`.
 json : Json ->{; HttpBodyError} Body
 foreign effect json from "flick:http/HttpBody" "flickJson"
-  reviewed "effect@4.1.2 sha256:e4655946782d9a7c"
 
 /// The JSON text of the value as the codec encodes it.
 json_schema : Codec rd re Json a -> a ->{re; SchemaError, HttpBodyError} Body
 foreign effect json_schema from "flick:http/HttpBody" "flickJsonSchema"
   arity 2
-  reviewed "effect@4.1.2 sha256:60518ee2ab583bbc"
 
 /// The parameters as `application/x-www-form-urlencoded`, or of the
 /// content type.
@@ -59,40 +54,33 @@ url_params : Http.UrlParams.UrlParams -> Option String -> Body
 foreign pure url_params from "flick:http/HttpBody" "urlParams"
   arity 2
   optional 1
-  reviewed "effect@4.1.2 sha256:dfd18ea3ca9859fc"
 
 /// The fields as `multipart/form-data`.
 form_data : FormDataInput -> Body
 foreign pure form_data from "flick:http/HttpBody" "flickFormData"
-  reviewed "effect@4.1.2 sha256:30baa27febb7f664"
 
 /// The content type of the body, if it has one.
 content_type : Body -> Option String
 foreign pure content_type from "flick:http/HttpBody" "flickContentType"
-  reviewed "effect@4.1.2 sha256:5d0d3365e232f473"
 
 /// The length of the body in bytes, if it is known.
 content_length : Body -> Option Float
 foreign pure content_length from "flick:http/HttpBody" "flickContentLength"
-  reviewed "effect@4.1.2 sha256:5d0d3365e232f473"
 
 /// The text of a text, JSON or URL parameters body.
 to_text : Body -> Option String
 foreign pure to_text from "flick:http/HttpBody" "flickToText"
-  reviewed "effect@4.1.2 sha256:989b9d895700352a"
 
 /// The chunks of bytes of the stream, of the content type or
 /// `application/octet-stream`, and of the length if it is known.
 stream : Stream none e (List Int) -> Option String -> Option Float -> Body
 foreign pure stream from "flick:http/HttpBody" "flickStream"
   arity 3
-  reviewed "effect@4.1.2 sha256:52e3ba8e5568e864"
 
 /// A stream that may suspend but holds no service dependency or region.
 stream_async : Stream {Async} e (List Int) -> Option String -> Option Float -> Body
 foreign pure stream_async from "flick:http/HttpBody" "flickStream"
   arity 3
-  reviewed "effect@4.1.2 sha256:52e3ba8e5568e864"
 
 /// Which part of a file `file` streams: at most `bytesToRead` bytes from
 /// `offset`, in chunks of `chunkSize`; and the content type.
@@ -116,7 +104,6 @@ file_from_info :
   Body
 foreign effect file_from_info from "flick:http/HttpBody" "flickFileFromInfo"
   arity 3
-  reviewed "effect@4.1.2 sha256:9488e0fdf507824a"
 
 /// The file at the path, as `file_from_info` of its `stat`.
 file : FileOptions -> String ->{Async, FileSystem.FileSystem; PlatformError.PlatformError} Body

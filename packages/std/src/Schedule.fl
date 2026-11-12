@@ -35,93 +35,76 @@ type alias Metadata o i = {
 /// Recurs forever, `n` counting the recurrences from 0, without a delay.
 forever : Schedule none none i Int
 foreign pure forever from "flick:Schedule" "forever"
-  reviewed "effect@4.1.2 sha256:c296114690c174ba"
 
 /// Recurs once, without a delay.
 once : Schedule none none i Unit
 foreign pure once from "flick:Schedule" "once"
-  reviewed "effect@4.1.2 sha256:e3f1fcf2a95f6486"
 
 /// Recurs forever, outputting its input.
 identity : Unit -> Schedule none none a a
 foreign pure identity from "flick:Schedule" "identity"
   arity 0
-  reviewed "effect@4.1.2 sha256:4001f6d8df3e47b3"
 
 /// Recurs `times` times, outputting the count.
 recurs : Int -> Schedule none none i Int
 foreign pure recurs from "flick:Schedule" "recurs"
-  reviewed "effect@4.1.2 sha256:fe26cb8d8389966e"
 
 /// Recurs forever, each step the duration after the previous one ended.
 spaced : Duration.Duration -> Schedule none none i Int
 foreign pure spaced from "flick:Schedule" "spaced"
-  reviewed "effect@4.1.2 sha256:498f22b480d2397e"
 
 /// Recurs on a fixed interval from the start, whatever each step took.
 fixed : Duration.Duration -> Schedule none none i Int
 foreign pure fixed from "flick:Schedule" "fixed"
-  reviewed "effect@4.1.2 sha256:3689434f455bd8d0"
 
 /// Recurs at the ends of consecutive windows of the interval.
 windowed : Duration.Duration -> Schedule none none i Int
 foreign pure windowed from "flick:Schedule" "windowed"
-  reviewed "effect@4.1.2 sha256:62d032b6b1c5d5f9"
 
 /// Recurs once after the duration, outputting it.
 duration : Duration.Duration -> Schedule none none i Duration.Duration
 foreign pure duration from "flick:Schedule" "duration"
-  reviewed "effect@4.1.2 sha256:c48c40027bf04459"
 
 /// Recurs without a delay while less than the duration has passed,
 /// outputting the time elapsed.
 during : Duration.Duration -> Schedule none none i Duration.Duration
 foreign pure during from "flick:Schedule" "during"
-  reviewed "effect@4.1.2 sha256:8df55465389b0f1d"
 
 /// Delays `base * factor ^ n`, outputting the delay.
 exponential : Duration.Duration -> Float -> Schedule none none i Duration.Duration
 foreign pure exponential from "flick:Schedule" "exponential"
   arity 2
-  reviewed "effect@4.1.2 sha256:5c031460f8bbc86b"
 
 /// Delays that sum the two before them, starting from `one`.
 fibonacci : Duration.Duration -> Schedule none none i Duration.Duration
 foreign pure fibonacci from "flick:Schedule" "fibonacci"
-  reviewed "effect@4.1.2 sha256:40d30d20c8bfc3dc"
 
 /// Each delay of the schedule scaled by a random factor in [0.8, 1.2].
 jittered : Schedule r e i o -> Schedule r e i o
 foreign pure jittered from "flick:Schedule" "jittered"
-  reviewed "effect@4.1.2 sha256:3b0aa4bfa0053165"
 
 /// The schedule's steps, outputting the inputs.
 passthrough : Schedule r e i o -> Schedule r e i i
 foreign pure passthrough from "flick:Schedule" "passthrough"
-  reviewed "effect@4.1.2 sha256:1063b7b4662b06db"
 
 /// `concat second first` runs `first` to completion, then `second`.
 concat : Schedule r2 e2 i o -> Schedule r1 e1 i o -> Schedule (r1 + r2) (e1 + e2) i o
 foreign pure concat from "flick:Schedule" "concat"
   arity 1
-  reviewed "effect@4.1.2 sha256:31f6250a2eb3d5eb"
 
 /// `concat`, telling the outputs apart: `Err` of the first, `Ok` of the second.
 concat_result :
   Schedule r2 e2 i o2 -> Schedule r1 e1 i o1 -> Schedule (r1 + r2) (e1 + e2) i (Result o1 o2)
 foreign pure concat_result from "flick:Schedule" "concatResult"
   arity 1
-  reviewed "effect@4.1.2 sha256:f8dc4f51bb567be2"
 
 /// Recurs while all of them do, with the longest of their delays.
 max : NonEmpty.NonEmpty (Schedule r e i o) -> Schedule r e i Duration.Duration
 foreign pure max from "flick:Schedule" "max"
-  reviewed "effect@4.1.2 sha256:410e33516b0b2807"
 
 /// Recurs while any of them does, with the shortest of their delays.
 min : NonEmpty.NonEmpty (Schedule r e i o) -> Schedule r e i Duration.Duration
 foreign pure min from "flick:Schedule" "min"
-  reviewed "effect@4.1.2 sha256:30c2005dab8c8c25"
 
 /// Stops after the duration has elapsed or the number of outputs, whichever
 /// comes first; `None` leaves that bound out.
@@ -131,47 +114,39 @@ up_to :
   Schedule r e i o
 foreign pure up_to from "flick:Schedule" "flickUpTo"
   arity 1
-  reviewed "effect@4.1.2 sha256:7e9d567a101486f7"
 
 /// Each output mapped by `f`, which sees the step's metadata.
 map : (Metadata o i ->{r2; e2} o2) -> Schedule r e i o -> Schedule (r + r2) (e + e2) i o2
 foreign pure map from "flick:Schedule" "map"
   arity 1
-  reviewed "effect@4.1.2 sha256:decd95c50ed5493e"
 
 /// Runs `f` on each step, keeping inputs and outputs.
 tap : (Metadata o i ->{r2; e2} x) -> Schedule r e i o -> Schedule (r + r2) (e + e2) i o
 foreign pure tap from "flick:Schedule" "tap"
   arity 1
-  reviewed "effect@4.1.2 sha256:d4cf5c288548120e"
 
 /// Recurs only while `f` holds for the step.
 while : (Metadata o i ->{r2; e2} Bool) -> Schedule r e i o -> Schedule (r + r2) (e + e2) i o
 foreign pure while from "flick:Schedule" "while"
   arity 1
-  reviewed "effect@4.1.2 sha256:14e7a1f6ce7c5420"
 
 /// Adds the duration `f` computes to each delay.
 add_delay :
   (Metadata o i ->{r2; e2} Duration.Duration) -> Schedule r e i o -> Schedule (r + r2) (e + e2) i o
 foreign pure add_delay from "flick:Schedule" "addDelay"
   arity 1
-  reviewed "effect@4.1.2 sha256:8bc2728ac1228e4a"
 
 /// Replaces each delay by the duration `f` computes.
 modify_delay :
   (Metadata o i ->{r2; e2} Duration.Duration) -> Schedule r e i o -> Schedule (r + r2) (e + e2) i o
 foreign pure modify_delay from "flick:Schedule" "modifyDelay"
   arity 1
-  reviewed "effect@4.1.2 sha256:4781c7c4cc6ad37d"
 
 /// Inside an effect a schedule repeats: the metadata of the current step.
 current_metadata : Unit ->{} Metadata JsValue JsValue
 foreign effect current_metadata from "flick:Schedule" "flickCurrentMetadata"
   arity 0
-  reviewed "effect@4.1.2 sha256:e8b706a551dc4e19"
 
 /// Recurs at each date-time the cron matches, outputting the delay until it.
 cron : Cron.Cron -> Schedule none none i Duration.Duration
 foreign pure cron from "flick:Schedule" "cron"
-  reviewed "effect@4.1.2 sha256:23e23c19f8ac0207"

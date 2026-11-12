@@ -28,17 +28,14 @@ type alias Meta = {
 atomically : (Eff {Transaction | r} e a)^c ->{r; e} a
 foreign effect atomically from "flick:Effect" "tx"
   retention call
-  reviewed "effect@4.1.2 sha256:3e9edfbfca5d9263"
 
 /// Abandons this attempt and runs the transaction again once a value it
 /// read changes.
 retry : Unit ->{Async, Transaction} a
 foreign effect retry from "flick:Tx" "flickRetry"
   arity 0
-  reviewed "effect@4.1.2 sha256:24b8d20da1fdf180"
 
 /// The metadata of the current attempt.
 current : Unit ->{Transaction} Meta
 foreign effect current from "flick:Tx" "flickCurrent"
   arity 0
-  reviewed "effect@4.1.2 sha256:59c4f4b0b993945d"

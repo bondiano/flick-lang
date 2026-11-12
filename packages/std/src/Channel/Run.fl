@@ -11,38 +11,32 @@ import Queue
 run_collect : (Channel r e i o d none Unit)^c ->{r; e} List o
 foreign effect run_collect from "flick:Channel" "runCollect"
   retention call
-  reviewed "effect@4.1.2 sha256:a579a781daa25c53"
 
 /// The number of elements.
 run_count : (Channel r e i o d none Unit)^c ->{r; e} Int
 foreign effect run_count from "flick:Channel" "runCount"
   retention call
-  reviewed "effect@4.1.2 sha256:92bd1128b972ff79"
 
 /// Runs the channel for its effects; its done value.
 run_drain : (Channel r e i o d none Unit)^c ->{r; e} d
 foreign effect run_drain from "flick:Channel" "runDrain"
   retention call
-  reviewed "effect@4.1.2 sha256:f87d19b55e46b366"
 
 /// The first element, if any; the rest is not pulled.
 run_head : (Channel r e i o d none Unit)^c ->{r; e} Option o
 foreign effect run_head from "flick:Channel" "runHead"
   retention call
-  reviewed "effect@4.1.2 sha256:c9501f65006cd8ab"
 
 /// The last element, if any.
 run_last : (Channel r e i o d none Unit)^c ->{r; e} Option o
 foreign effect run_last from "flick:Channel" "runLast"
   retention call
-  reviewed "effect@4.1.2 sha256:915b541bcee8f9fb"
 
 /// Folds the elements from `initial` with `f`.
 run_fold : (Unit -> z) -> (z -> o -> z) -> (Channel r e i o d none Unit)^c ->{r; e} z
 foreign effect run_fold from "flick:Channel" "runFold"
   arity 2
   retention call
-  reviewed "effect@4.1.2 sha256:c27cd38796549ab6"
 
 /// `run_fold` with a task for each step.
 run_fold_effect :
@@ -50,27 +44,23 @@ run_fold_effect :
 foreign effect run_fold_effect from "flick:Channel" "runFoldEffect"
   arity 2
   retention call
-  reviewed "effect@4.1.2 sha256:19e47755d3d1221f"
 
 /// Runs `f` on each element; the done value.
 run_for_each : (o ->{r2; e2} Unit) -> (Channel r e i o d none Unit)^c ->{r + r2; e + e2} d
 foreign effect run_for_each from "flick:Channel" "runForEach"
   arity 1
   retention call
-  reviewed "effect@4.1.2 sha256:5b2f4a8deae8de50"
 
 /// Runs `f` on each element while it gives `True`.
 run_for_each_while : (o ->{r2; e2} Bool) -> (Channel r e i o d none Unit)^c ->{r + r2; e + e2} Unit
 foreign effect run_for_each_while from "flick:Channel" "runForEachWhile"
   arity 1
   retention call
-  reviewed "effect@4.1.2 sha256:87dea9b128efdb10"
 
 /// The bytes of all the chunks, concatenated.
 mk_uint8_array : (Channel r e i (NonEmpty.NonEmpty (List Int)) d none Unit)^c ->{r; e} List Int
 foreign effect mk_uint8_array from "flick:Channel" "flickMkUint8Array"
   retention call
-  reviewed "effect@4.1.2 sha256:55b163c5f42bdbee"
 
 /// Offers every element to the queue, then ends it, or fails it with the
 /// channel's failure.
@@ -78,7 +68,6 @@ run_into_queue : Queue.Queue e o -> (Channel r e i o d none Unit)^c ->{r} Unit
 foreign effect run_into_queue from "flick:Channel" "runIntoQueue"
   arity 1
   retention call
-  reviewed "effect@4.1.2 sha256:e6579706bb27eb9c"
 
 /// `run_into_queue` of the elements of each chunk.
 run_into_queue_array :
@@ -86,7 +75,6 @@ run_into_queue_array :
 foreign effect run_into_queue_array from "flick:Channel" "runIntoQueueArray"
   arity 1
   retention call
-  reviewed "effect@4.1.2 sha256:fc83c8c3086c8860"
 
 /// Runs the channel in the background of the innermost `scope` (or the
 /// one of region `s`) into a queue with the options; the queue ends, or
@@ -95,7 +83,6 @@ to_queue : Buffer -> (Channel r e i o d none Unit)^c ->{Scope s | r} Queue.Queue
 foreign effect to_queue from "flick:Channel" "flickToQueue"
   arity 1
   retention owner
-  reviewed "effect@4.1.2 sha256:35bf155638ac3ccd"
 
 /// `to_queue` of the elements of each chunk.
 to_queue_array :
@@ -103,7 +90,6 @@ to_queue_array :
 foreign effect to_queue_array from "flick:Channel" "flickToQueueArray"
   arity 1
   retention owner
-  reviewed "effect@4.1.2 sha256:8d3912690d60c04a"
 
 /// A hub's options for `to_pubsub`: its `capacity` (`None`: unbounded)
 /// and strategy, the last `replay` messages for a new subscriber, and
@@ -121,7 +107,6 @@ to_pubsub : HubOptions -> (Channel r e i o d none Unit)^c ->{Scope s | r} PubSub
 foreign effect to_pubsub from "flick:Channel" "flickToPubSub"
   arity 1
   retention owner
-  reviewed "effect@4.1.2 sha256:f98bc48088216d95"
 
 /// `to_pubsub` of the elements of each chunk.
 to_pubsub_array :
@@ -129,7 +114,6 @@ to_pubsub_array :
 foreign effect to_pubsub_array from "flick:Channel" "flickToPubSubArray"
   arity 1
   retention owner
-  reviewed "effect@4.1.2 sha256:498f7380ef865025"
 
 /// Publishes every element to the hub, shutting it down at the end when
 /// `shutdownOnEnd`.
@@ -138,7 +122,6 @@ run_into_pubsub :
 foreign effect run_into_pubsub from "flick:Channel" "flickRunIntoPubSub"
   arity 2
   retention call
-  reviewed "effect@4.1.2 sha256:1e2c1ae62a1426e7"
 
 /// `run_into_pubsub` of the elements of each chunk; the done value.
 run_into_pubsub_array :
@@ -149,4 +132,3 @@ run_into_pubsub_array :
 foreign effect run_into_pubsub_array from "flick:Channel" "flickRunIntoPubSubArray"
   arity 2
   retention call
-  reviewed "effect@4.1.2 sha256:8adf743b7375ba01"

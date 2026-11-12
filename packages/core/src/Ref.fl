@@ -31,13 +31,11 @@ module Ref exposing (
 make : a^c ->{} Ref (a^c)
 foreign make from "flick:rt" "refMake"
   retention call
-  reviewed "effect@4.1.2 sha256:13ba531db6f50e31"
 
 /// The current contents.
 get : (Ref a)^c ->{} a^c
 foreign get from "flick:rt" "refGet"
   retention call
-  reviewed "effect@4.1.2 sha256:b4713cd12c52d94d"
 
 /// Whether both are the same cell. Cells have no `Eq` or `Hash`: a write
 /// would change what they compare by.
@@ -48,13 +46,11 @@ foreign pure same from "flick:rt" "refSame"
 set : (Ref a)^c -> a^c ->{} Unit
 foreign set from "flick:rt" "refSet"
   retention call
-  reviewed "effect@4.1.2 sha256:7ab1cc29131d058b"
 
 /// `f` gives the result and the new contents, in one step.
 modify : (Ref a)^c -> (a^c -> (b^x, a^c))^d ->{} b^x
 foreign modify from "flick:rt" "refModify"
   retention call
-  reviewed "effect@4.1.2 sha256:2931caacecf3556c"
 
 /// The contents after a partial update: `next`, or `old` with `None`.
 or_old : a^c -> (Option a)^c -> a^c

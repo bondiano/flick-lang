@@ -48,42 +48,34 @@ foreign effect spawn from "flick:rt" "fiberSpawn"
 /// Waits for the child: its result, or its failure with the original cause.
 join : Fiber e a ->{Async; e} a
 foreign effect join from "flick:rt" "fiberJoin"
-  reviewed "effect@4.1.2 sha256:397c57c3ab8ccb72"
 
 /// Waits for the child and gives how it ended, without failing.
 await_ : Fiber e a ->{Async} Exit e a
 foreign effect await_ from "flick:Fiber" "flickAwait"
-  reviewed "effect@4.1.2 sha256:aa39e3b85d3974ab"
 
 /// Waits for every child; how each ended, in order.
 await_all : List (Fiber e a) ->{Async} List (Exit e a)
 foreign effect await_all from "flick:Fiber" "flickAwaitAll"
-  reviewed "effect@4.1.2 sha256:4354c9187b891885"
 
 /// Waits for every child: their results in order, or the first failure.
 join_all : List (Fiber e a) ->{Async; e} List a
 foreign effect join_all from "flick:Fiber" "flickJoinAll"
-  reviewed "effect@4.1.2 sha256:93cd83981814beab"
 
 /// Interrupts the child and waits until it ended; its supervisor sees the
 /// interruption.
 interrupt : Fiber e a ->{Async} Unit
 foreign effect interrupt from "flick:Fiber" "flickInterrupt"
-  reviewed "effect@4.1.2 sha256:b4dea4597062574b"
 
 /// `interrupt`, naming the fiber id of the interruption.
 interrupt_as : Option Float -> Fiber e a ->{Async} Unit
 foreign effect interrupt_as from "flick:Fiber" "flickInterruptAs"
   arity 1
-  reviewed "effect@4.1.2 sha256:463d52162c7cfb42"
 
 /// Interrupts every child and waits until they ended.
 interrupt_all : List (Fiber e a) ->{Async} Unit
 foreign effect interrupt_all from "flick:Fiber" "flickInterruptAll"
-  reviewed "effect@4.1.2 sha256:1dcaa52c1653c261"
 
 /// `interrupt_all`, naming the fiber id of the interruption.
 interrupt_all_as : Float -> List (Fiber e a) ->{Async} Unit
 foreign effect interrupt_all_as from "flick:Fiber" "flickInterruptAllAs"
   arity 1
-  reviewed "effect@4.1.2 sha256:77c88f3e42b05419"

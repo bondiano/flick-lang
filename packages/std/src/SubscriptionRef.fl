@@ -7,25 +7,21 @@ type SubscriptionRef a
 /// A fresh reference holding `value`.
 make : a ->{} SubscriptionRef a
 foreign effect make from "flick:SubscriptionRef" "make"
-  reviewed "effect@4.1.2 sha256:f3f6e5a550530038"
 
 /// The current value.
 get : SubscriptionRef a ->{Async} a
 foreign effect get from "flick:SubscriptionRef" "get"
-  reviewed "effect@4.1.2 sha256:53991aa417733785"
 
 /// Sets the value, giving the previous one.
 get_and_set : a -> SubscriptionRef a ->{Async} a
 foreign effect get_and_set from "flick:SubscriptionRef" "getAndSet"
   arity 1
-  reviewed "effect@4.1.2 sha256:42ce243743e1369c"
 
 /// Applies `f`, giving the previous value.
 get_and_update : (a -> a)^c -> SubscriptionRef a ->{Async} a
 foreign effect get_and_update from "flick:SubscriptionRef" "getAndUpdate"
   arity 1
   retention call
-  reviewed "effect@4.1.2 sha256:7ec665d69abe08d3"
 
 /// Runs `f` on the value and keeps its result, giving the previous value;
 /// other updates wait for it.
@@ -33,28 +29,24 @@ get_and_update_effect : (a ->{r; e} a)^c -> SubscriptionRef a ->{r; e} a
 foreign effect get_and_update_effect from "flick:SubscriptionRef" "getAndUpdateEffect"
   arity 1
   retention call
-  reviewed "effect@4.1.2 sha256:bb18e47f40a343d7"
 
 /// Applies `f` where it gives `Some`, giving the previous value.
 get_and_update_some : (a -> Option a)^c -> SubscriptionRef a ->{Async} a
 foreign effect get_and_update_some from "flick:SubscriptionRef" "getAndUpdateSome"
   arity 1
   retention call
-  reviewed "effect@4.1.2 sha256:d9c8ddf2000fff61"
 
 /// `get_and_update_effect` where `f` may keep the value with `None`.
 get_and_update_some_effect : (a ->{r; e} Option a)^c -> SubscriptionRef a ->{r; e} a
 foreign effect get_and_update_some_effect from "flick:SubscriptionRef" "getAndUpdateSomeEffect"
   arity 1
   retention call
-  reviewed "effect@4.1.2 sha256:96778e681a82e6f9"
 
 /// `f` gives the result and the new value, in one step.
 modify : (a -> (b, a))^c -> SubscriptionRef a ->{Async} b
 foreign effect modify from "flick:SubscriptionRef" "modify"
   arity 1
   retention call
-  reviewed "effect@4.1.2 sha256:0f5ab6b64e5ceb4d"
 
 /// Runs `f`, which gives the result and the new value; other updates wait
 /// for it.
@@ -62,86 +54,73 @@ modify_effect : (a ->{r; e} (b, a))^c -> SubscriptionRef a ->{r; e} b
 foreign effect modify_effect from "flick:SubscriptionRef" "modifyEffect"
   arity 1
   retention call
-  reviewed "effect@4.1.2 sha256:fb7b51e93e085576"
 
 /// `modify` where `f` may keep the value with `None`.
 modify_some : (a -> (b, Option a))^c -> SubscriptionRef a ->{Async} b
 foreign effect modify_some from "flick:SubscriptionRef" "modifySome"
   arity 1
   retention call
-  reviewed "effect@4.1.2 sha256:444fc5c7fa921ebf"
 
 /// `modify_effect` where `f` may keep the value with `None`.
 modify_some_effect : (a ->{r; e} (b, Option a))^c -> SubscriptionRef a ->{r; e} b
 foreign effect modify_some_effect from "flick:SubscriptionRef" "modifySomeEffect"
   arity 1
   retention call
-  reviewed "effect@4.1.2 sha256:583d92929d65447e"
 
 /// Sets the value.
 set : a -> SubscriptionRef a ->{Async} Unit
 foreign effect set from "flick:SubscriptionRef" "set"
   arity 1
-  reviewed "effect@4.1.2 sha256:2ae907aeaf0b15e4"
 
 /// Sets the value, giving it.
 set_and_get : a -> SubscriptionRef a ->{Async} a
 foreign effect set_and_get from "flick:SubscriptionRef" "setAndGet"
   arity 1
-  reviewed "effect@4.1.2 sha256:af164bd8a0226bc7"
 
 /// Applies `f` to the value.
 update : (a -> a)^c -> SubscriptionRef a ->{Async} Unit
 foreign effect update from "flick:SubscriptionRef" "update"
   arity 1
   retention call
-  reviewed "effect@4.1.2 sha256:ff9842543de3d136"
 
 /// Runs `f` on the value and keeps its result; other updates wait for it.
 update_effect : (a ->{r; e} a)^c -> SubscriptionRef a ->{r; e} Unit
 foreign effect update_effect from "flick:SubscriptionRef" "updateEffect"
   arity 1
   retention call
-  reviewed "effect@4.1.2 sha256:e729be2b3b147b76"
 
 /// Applies `f`, giving the new value.
 update_and_get : (a -> a)^c -> SubscriptionRef a ->{Async} a
 foreign effect update_and_get from "flick:SubscriptionRef" "updateAndGet"
   arity 1
   retention call
-  reviewed "effect@4.1.2 sha256:9f66e0b6c047a329"
 
 /// `update_effect`, giving the new value.
 update_and_get_effect : (a ->{r; e} a)^c -> SubscriptionRef a ->{r; e} a
 foreign effect update_and_get_effect from "flick:SubscriptionRef" "updateAndGetEffect"
   arity 1
   retention call
-  reviewed "effect@4.1.2 sha256:a5eb25db8deb5859"
 
 /// Applies `f` where it gives `Some`.
 update_some : (a -> Option a)^c -> SubscriptionRef a ->{Async} Unit
 foreign effect update_some from "flick:SubscriptionRef" "updateSome"
   arity 1
   retention call
-  reviewed "effect@4.1.2 sha256:8c18f64ab95ada1c"
 
 /// `update_effect` where `f` may keep the value with `None`.
 update_some_effect : (a ->{r; e} Option a)^c -> SubscriptionRef a ->{r; e} Unit
 foreign effect update_some_effect from "flick:SubscriptionRef" "updateSomeEffect"
   arity 1
   retention call
-  reviewed "effect@4.1.2 sha256:9c005d3a4c4131f0"
 
 /// Applies `f` where it gives `Some`, giving the value after.
 update_some_and_get : (a -> Option a)^c -> SubscriptionRef a ->{} a
 foreign effect update_some_and_get from "flick:SubscriptionRef" "updateSomeAndGet"
   arity 1
   retention call
-  reviewed "effect@4.1.2 sha256:892c57ae93b6a995"
 
 /// `update_some_effect`, giving the value after.
 update_some_and_get_effect : (a ->{r; e} Option a)^c -> SubscriptionRef a ->{r; e} a
 foreign effect update_some_and_get_effect from "flick:SubscriptionRef" "updateSomeAndGetEffect"
   arity 1
   retention call
-  reviewed "effect@4.1.2 sha256:ace75de00966e704"

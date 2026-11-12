@@ -16,7 +16,7 @@ let import_command = cli "import" {
 surface_command :
   Cli.Command {Async, FileSystem.FileSystem, Path.Path} {AppError, PlatformError.PlatformError}
 let surface_command = cli "surface" {
-  description "Prints the snapshot of an installed Effect's surface, as stdlib/Effect/snapshot.json holds it"
+  description "Prints the snapshot of an installed Effect's surface, as packages/effect-ts/coverage/snapshot.json holds it"
   /// The directory of the effect package
   arg dir : String = "packages/effect-ts/node_modules/effect"
   handle fun { dir } -> Platform.stdout_write (Surface.render (Surface.snapshot dir))

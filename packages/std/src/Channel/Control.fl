@@ -15,7 +15,6 @@ catch :
   Channel (r + r2) e2 i o d ie id
 foreign pure catch from "flick:Channel" "catch"
   arity 1
-  reviewed "effect@4.1.2 sha256:73e4f3439d7f7730"
 
 /// Recovers from any failure with the channel `f` builds of it.
 catch_cause :
@@ -24,93 +23,78 @@ catch_cause :
   Channel (r + r2) e2 i o d ie id
 foreign pure catch_cause from "flick:Channel" "flickCatchCause"
   arity 1
-  reviewed "effect@4.1.2 sha256:147c2af27851edf5"
 
 /// Runs `f` on a typed error, then fails with it.
 tap_error :
   (Errors e ->{r2; e2} x) -> Channel r e i o d ie id -> Channel (r + r2) (e + e2) i o d ie id
 foreign pure tap_error from "flick:Channel" "tapError"
   arity 1
-  reviewed "effect@4.1.2 sha256:755d233ba3282444"
 
 /// Runs `f` on any failure, then fails with it.
 tap_cause :
   (Failure e ->{r2; e2} x) -> Channel r e i o d ie id -> Channel (r + r2) (e + e2) i o d ie id
 foreign pure tap_cause from "flick:Channel" "flickTapCause"
   arity 1
-  reviewed "effect@4.1.2 sha256:1f26049d7be48184"
 
 /// Each typed error mapped by `f`.
 map_error : (Errors e -> Errors e2) -> Channel r e i o d ie id -> Channel r e2 i o d ie id
 foreign pure map_error from "flick:Channel" "mapError"
   arity 1
-  reviewed "effect@4.1.2 sha256:528e2866e0e4ffd3"
 
 /// Ends instead of failing with a typed error.
 ignore_ : Channel r e i o Unit ie id -> Channel r none i o Unit ie id
 foreign pure ignore_ from "flick:Channel" "ignore"
-  reviewed "effect@4.1.2 sha256:329d70e491308684"
 
 /// Ends instead of failing in any way.
 ignore_cause : Channel r e i o Unit ie id -> Channel r none i o Unit ie id
 foreign pure ignore_cause from "flick:Channel" "ignoreCause"
-  reviewed "effect@4.1.2 sha256:75c4986ff731c950"
 
 /// Runs the task when the channel ends, however it ends.
 ensuring : Eff r2 none x -> Channel r e i o d ie id -> Channel (r + r2) e i o d ie id
 foreign pure ensuring from "flick:Channel" "ensuring"
   arity 1
-  reviewed "effect@4.1.2 sha256:392968793dbade6c"
 
 /// Runs `f` with the failure when the channel fails.
 on_error : (Failure e ->{r2} x) -> Channel r e i o d ie id -> Channel (r + r2) e i o d ie id
 foreign pure on_error from "flick:Channel" "flickOnError"
   arity 1
-  reviewed "effect@4.1.2 sha256:9013037f080633da"
 
 /// Runs `f` with how the channel ended.
 on_exit : (Exit e d ->{r2} x) -> Channel r e i o d ie id -> Channel (r + r2) e i o d ie id
 foreign pure on_exit from "flick:Channel" "flickOnExit"
   arity 1
-  reviewed "effect@4.1.2 sha256:c0aefbd18d2a567b"
 
 /// Runs the task before the channel starts.
 on_start : Eff r2 e2 x -> Channel r e i o d ie id -> Channel (r + r2) (e + e2) i o d ie id
 foreign pure on_start from "flick:Channel" "onStart"
   arity 1
-  reviewed "effect@4.1.2 sha256:13e06ad568f591f7"
 
 /// Runs `f` on the first element.
 on_first : (o ->{r2; e2} x) -> Channel r e i o d ie id -> Channel (r + r2) (e + e2) i o d ie id
 foreign pure on_first from "flick:Channel" "onFirst"
   arity 1
-  reviewed "effect@4.1.2 sha256:c12e5cb7fd9f38fa"
 
 /// Runs the task when the channel ends without failing.
 on_end : Eff r2 e2 x -> Channel r e i o d ie id -> Channel {Async | r + r2} (e + e2) i o d ie id
 foreign pure on_end from "flick:Channel" "onEnd"
   arity 1
-  reviewed "effect@4.1.2 sha256:79cf3bb13c330306"
 
 /// Interrupts the channel when the task ends first, ending with its value.
 interrupt_when :
   Eff r2 e2 d -> Channel r e i o d ie id -> Channel {Async | r + r2} (e + e2) i o d ie id
 foreign pure interrupt_when from "flick:Channel" "interruptWhen"
   arity 1
-  reviewed "effect@4.1.2 sha256:c42a49474a524cb5"
 
 /// Stops pulling the channel once the task has ended, after the element
 /// being emitted.
 halt_when : Eff r2 e2 d -> Channel r e i o d ie id -> Channel (r + r2) (e + e2) i o d ie id
 foreign pure halt_when from "flick:Channel" "haltWhen"
   arity 1
-  reviewed "effect@4.1.2 sha256:127f02cb398757d0"
 
 /// Runs the task alongside the channel; its failure fails the channel.
 merge_effect : Eff r2 e2 x -> Channel r e i o d ie id -> Channel (r + r2) (e + e2) i o d ie id
 foreign pure merge_effect from "flick:Channel" "mergeEffect"
   arity 1
-  reviewed "effect@4.1.2 sha256:c659cc9755d0f49f"
 
 /// `left |> merge strategy right`: the elements of both, as they come,
 /// until the side the strategy names ends.
@@ -121,14 +105,12 @@ merge :
   Channel (r + r2) (e + e2) i o d ie id
 foreign pure merge from "flick:Channel" "flickMerge"
   arity 2
-  reviewed "effect@4.1.2 sha256:5a188ccedb346870"
 
 /// Runs the channel again by the schedule, which gets each done value.
 repeat :
   Schedule.Schedule r2 e2 d so -> Channel r e i o d ie id -> Channel (r + r2) (e + e2) i o d ie id
 foreign pure repeat from "flick:Channel" "repeat"
   arity 1
-  reviewed "effect@4.1.2 sha256:9a1909f59655b5ff"
 
 /// Runs the channel again after a typed error, as long as the schedule,
 /// which gets the error, recurs.
@@ -138,7 +120,6 @@ retry :
   Channel (r + r2) (e + e2) i o d ie id
 foreign pure retry from "flick:Channel" "retry"
   arity 1
-  reviewed "effect@4.1.2 sha256:61f20d41ed7c4b00"
 
 /// Emits each element after the schedule's delay; the channel ends with
 /// the schedule's last output when the schedule stops first.
@@ -146,21 +127,18 @@ schedule :
   Schedule.Schedule r2 e2 o d -> Channel r e i o d ie id -> Channel (r + r2) (e + e2) i o d ie id
 foreign pure schedule from "flick:Channel" "schedule"
   arity 1
-  reviewed "effect@4.1.2 sha256:ef01d15ab59ed821"
 
 /// Builds the layer's services for the channel each time it runs.
 provide_ :
   Layer li le lo -> Channel (lo + r) e i o d ie id -> Channel {Async | li + r} (e + le) i o d ie id
 foreign pure provide_ from "flick:Channel" "provide"
   arity 1
-  reviewed "effect@4.1.2 sha256:2375bbe8c2f75863"
 
 /// Provides the service named by the tag with the implementation.
 provide_service :
   ServiceTag s -> ServiceImpl s -> Channel (s + r) e i o d ie id -> Channel r e i o d ie id
 foreign pure provide_service from "flick:Channel" "provideService"
   arity 2
-  reviewed "effect@4.1.2 sha256:5dcdafb03d6818eb"
 
 /// Provides the service with the implementation the task builds.
 provide_service_effect :
@@ -170,7 +148,6 @@ provide_service_effect :
   Channel (r + r2) (e + e2) i o d ie id
 foreign pure provide_service_effect from "flick:Channel" "provideServiceEffect"
   arity 2
-  reviewed "effect@4.1.2 sha256:7b5bccbd5cf1b6f8"
 
 /// Runs the channel with the service's implementation changed by `f`.
 update_service :
@@ -180,10 +157,8 @@ update_service :
   Channel (s + r) e i o d ie id
 foreign pure update_service from "flick:Channel" "updateService"
   arity 2
-  reviewed "effect@4.1.2 sha256:6222f30661c5b8c1"
 
 /// Runs the channel in a new span with the name.
 with_span : String -> Tracer.SpanOptions -> Channel r e i o d ie id -> Channel r e i o d ie id
 foreign pure with_span from "flick:Channel" "flickWithSpan"
   arity 2
-  reviewed "effect@4.1.2 sha256:662859dd9b85a188"

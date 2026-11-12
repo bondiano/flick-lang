@@ -57,20 +57,17 @@ route :
 foreign pure route from "flick:http/HttpRouter" "flickRoute"
   arity 3
   retention call
-  reviewed "effect@4.1.2 sha256:525d5607645939c4"
 
 /// The path below the prefix: `prefix_path "/api" "/users"` is `/api/users`.
 prefix_path : String -> String -> String
 foreign pure prefix_path from "flick:http/HttpRouter" "prefixPath"
   arity 1
-  reviewed "effect@4.1.2 sha256:d18943285f673c79"
 
 /// The route below the prefix.
 prefix_route : String -> (Route r e)^c -> (Route r e)^c
 foreign pure prefix_route from "flick:http/HttpRouter" "prefixRoute"
   arity 1
   retention call
-  reviewed "effect@4.1.2 sha256:e43d9750bb7c2c0e"
 
 /// One handler of the routes: the first route that matches a request
 /// answers it, and a request none matches fails with `RouteNotFound`.
@@ -79,7 +76,6 @@ router :
 foreign effect router from "flick:http/HttpRouter" "flickRouter"
   arity 2
   retention call
-  reviewed "effect@4.1.2 sha256:4631e316834ea1e9"
 
 /// The parameters of the matched path as an object, for a codec.
 params_unknown : List (String, String) -> Unknown
@@ -93,18 +89,15 @@ let schema_path_params coder = Codec.decode coder (params_unknown (params ()))
 schema_params : Codec rd re Json a -> ServerRequest ->{RouteContext | rd; SchemaError} a
 foreign effect schema_params from "flick:http/HttpRouter" "flickSchemaParams"
   arity 2
-  reviewed "effect@4.1.2 sha256:f234a03b74635f46"
 
 /// Decodes `{ method, url, cookies, headers, pathParams, searchParams }`
 /// of the request.
 schema_no_body : Codec rd re Json a -> ServerRequest ->{RouteContext | rd; SchemaError} a
 foreign effect schema_no_body from "flick:http/HttpRouter" "flickSchemaNoBody"
   arity 2
-  reviewed "effect@4.1.2 sha256:a4db36817d7f5101"
 
 /// `schema_no_body` with the JSON body as `body`.
 schema_json :
   Codec rd re Json a -> ServerRequest ->{RouteContext | rd; HttpServerError, SchemaError} a
 foreign effect schema_json from "flick:http/HttpRouter" "flickSchemaJson"
   arity 2
-  reviewed "effect@4.1.2 sha256:57fcc073d84e485e"

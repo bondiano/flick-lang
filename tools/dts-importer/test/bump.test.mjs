@@ -35,7 +35,7 @@ test("effect-bump reports the change, writes the snapshot and moves the pins", (
     ].join("\n"),
   );
   assert.equal(readFileSync(path.join(root, "flick/src/toolchain.rs"), "utf8"), readFileSync(path.join(fixtures, "repo/flick/src/toolchain.rs"), "utf8"), "bumping Effect leaves compiler toolchain versions unchanged");
-  const written = readFileSync(path.join(root, "stdlib/Effect/snapshot.json"), "utf8");
+  const written = readFileSync(path.join(root, "packages/effect-ts/coverage/snapshot.json"), "utf8");
   // the coverage linter's fixture: `packages/effect-ts/tools/surface/tests/coverage.rs` lints it red
   assert.equal(written, readFileSync(path.join(fixtures, "effect-1.1.0.snapshot.json"), "utf8"));
   const pins = {

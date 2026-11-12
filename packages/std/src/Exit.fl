@@ -6,137 +6,111 @@ module Exit exposing (..)
 /// The value of a success.
 value : Exit e a -> Option a
 foreign pure value from "flick:rt" "exitValue"
-  reviewed "effect@4.1.2 sha256:96f997ca980b2f5b"
 
 /// The failure of an exit that did not succeed.
 failure : Exit e a -> Option (Failure e)
 foreign pure failure from "flick:rt" "exitFailure"
-  reviewed "effect@4.1.2 sha256:849da5933d71bc92"
 
 /// A success with the value.
 succeed : a -> Exit e a
 foreign pure succeed from "flick:Exit" "flickSucceed"
-  reviewed "effect@4.1.2 sha256:ac4a7e44b05bcab7"
 
 /// A typed failure with `error`.
 fail : Errors e -> Exit e a
 foreign pure fail from "flick:Exit" "flickFail"
-  reviewed "effect@4.1.2 sha256:6630ce712245917e"
 
 /// A failure with the whole cause of `failure`.
 fail_cause : Failure e -> Exit e a
 foreign pure fail_cause from "flick:Exit" "flickFailCause"
-  reviewed "effect@4.1.2 sha256:577b1b36435685bb"
 
 /// A defect with the message.
 die : String -> Exit e a
 foreign pure die from "flick:Exit" "flickDie"
-  reviewed "effect@4.1.2 sha256:a14827959be45d5c"
 
 /// An interruption, by the fiber of the id if one is given.
 interrupt : Option Float -> Exit e a
 foreign pure interrupt from "flick:Exit" "flickInterrupt"
-  reviewed "effect@4.1.2 sha256:eed2b084a58a13f5"
 
 /// A success with `()`.
 void : Exit e Unit
 foreign pure void from "flick:Exit" "flickVoid"
-  reviewed "effect@4.1.2 sha256:ac23b1912f0413fe"
 
 /// Whether it succeeded.
 is_success : Exit e a -> Bool
 foreign pure is_success from "flick:Exit" "flickIsSuccess"
-  reviewed "effect@4.1.2 sha256:87e0aadc778579c0"
 
 /// Whether it failed, however.
 is_failure : Exit e a -> Bool
 foreign pure is_failure from "flick:Exit" "flickIsFailure"
-  reviewed "effect@4.1.2 sha256:46fe090d634da47e"
 
 /// Whether its failure holds a typed failure.
 has_fails : Exit e a -> Bool
 foreign pure has_fails from "flick:Exit" "flickHasFails"
-  reviewed "effect@4.1.2 sha256:7f56e882f67dcb7b"
 
 /// Whether its failure holds a defect.
 has_dies : Exit e a -> Bool
 foreign pure has_dies from "flick:Exit" "flickHasDies"
-  reviewed "effect@4.1.2 sha256:4b3b7a3e8caaac8c"
 
 /// Whether its failure holds an interruption.
 has_interrupts : Exit e a -> Bool
 foreign pure has_interrupts from "flick:Exit" "flickHasInterrupts"
-  reviewed "effect@4.1.2 sha256:d85fb7455b9a8080"
 
 /// `Ok` of a success, `Err` of a failed exit.
 filter_success : Exit e a -> Result (Exit e a) (Exit e a)
 foreign pure filter_success from "flick:Exit" "flickFilterSuccess"
-  reviewed "effect@4.1.2 sha256:2416acbe53d2b7b7"
 
 /// The value of a success, or the failed exit.
 filter_value : Exit e a -> Result (Exit e a) a
 foreign pure filter_value from "flick:Exit" "flickFilterValue"
-  reviewed "effect@4.1.2 sha256:a82b8a32f52e7d52"
 
 /// `Ok` of a failed exit, `Err` of a success.
 filter_failure : Exit e a -> Result (Exit e a) (Exit e a)
 foreign pure filter_failure from "flick:Exit" "flickFilterFailure"
-  reviewed "effect@4.1.2 sha256:b6b50a5407e00c6e"
 
 /// The failure of a failed exit, or the success.
 filter_cause : Exit e a -> Result (Exit e a) (Failure e)
 foreign pure filter_cause from "flick:Exit" "flickFilterCause"
-  reviewed "effect@4.1.2 sha256:ce9f071da623fa59"
 
 /// The first typed error, or the exit without one.
 find_error : Exit e a -> Result (Exit e a) (Errors e)
 foreign pure find_error from "flick:Exit" "flickFindError"
-  reviewed "effect@4.1.2 sha256:1a9af85df9945a36"
 
 /// The first typed error, if any.
 find_error_option : Exit e a -> Option (Errors e)
 foreign pure find_error_option from "flick:Exit" "flickFindErrorOption"
-  reviewed "effect@4.1.2 sha256:515a7b1755b6981d"
 
 /// The first defect as inert text, or the exit without one.
 find_defect : Exit e a -> Result (Exit e a) String
 foreign pure find_defect from "flick:Exit" "flickFindDefect"
-  reviewed "effect@4.1.2 sha256:e9dba04776a6cfa0"
 
 /// `on_success` of the value or `on_failure` of the failure.
 match_ : (a -> b)^c -> (Failure e -> b)^c -> (Exit e a -> b)^c
 foreign pure match_ from "flick:Exit" "flickMatch"
   arity 2
   retention call
-  reviewed "effect@4.1.2 sha256:b8fd5abf3f9ca77d"
 
 /// The value of a success changed by `f`.
 map : (a -> b)^c -> Exit e a -> Exit e b
 foreign pure map from "flick:Exit" "flickMap"
   arity 1
   retention call
-  reviewed "effect@4.1.2 sha256:ca82cf9d1072f180"
 
 /// The typed errors changed by `f`.
 map_error : (Errors e -> Errors e2)^c -> Exit e a -> Exit e2 a
 foreign pure map_error from "flick:Exit" "flickMapError"
   arity 1
   retention call
-  reviewed "effect@4.1.2 sha256:611c058a82a1a4cf"
 
 /// The typed errors changed by `on_failure`, the value by `on_success`.
 map_both : (Errors e -> Errors e2)^c -> (a -> b)^c -> (Exit e a -> Exit e2 b)^c
 foreign pure map_both from "flick:Exit" "flickMapBoth"
   arity 2
   retention call
-  reviewed "effect@4.1.2 sha256:5769e61d49c7af9f"
 
 /// The exit with `()` for its value.
 as_void : Exit e a -> Exit e Unit
 foreign pure as_void from "flick:Exit" "flickAsVoid"
-  reviewed "effect@4.1.2 sha256:1138d774debea702"
 
 /// A success if every exit succeeded, else the failures of all of them.
 as_void_all : List (Exit e a) -> Exit e Unit
 foreign pure as_void_all from "flick:Exit" "flickAsVoidAll"
-  reviewed "effect@4.1.2 sha256:0b571c6f15c38c02"

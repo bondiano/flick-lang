@@ -8,7 +8,6 @@ type Combiner a
 /// The combiner of `combine`, called as `combine self that`.
 make : (a -> a -> a) -> Combiner a
 foreign pure make from "flick:Combiner" "make"
-  reviewed "effect@4.1.2 sha256:bb10bcbaeb721a04"
 
 /// Combines `self` with `that`.
 combine : Combiner a -> a -> a -> a
@@ -17,68 +16,55 @@ foreign pure combine from "flick:Combiner" "flickCombine"
 /// The combiner with its arguments swapped.
 flip : Combiner a -> Combiner a
 foreign pure flip from "flick:Combiner" "flip"
-  reviewed "effect@4.1.2 sha256:2e5aa6fec2adf90e"
 
 /// The lesser of the two by the order; `self` on a tie.
 min : (a -> a -> Ordering) -> Combiner a
 foreign pure min from "flick:Combiner" "flickMin"
-  reviewed "effect@4.1.2 sha256:1e958dca77a15e1f"
 
 /// The greater of the two by the order; `self` on a tie.
 max : (a -> a -> Ordering) -> Combiner a
 foreign pure max from "flick:Combiner" "flickMax"
-  reviewed "effect@4.1.2 sha256:8eaecad16288f5fe"
 
 /// Keeps the first value.
 first : Unit -> Combiner a
 foreign pure first from "flick:Combiner" "first"
   arity 0
-  reviewed "effect@4.1.2 sha256:3066ad30ac4b1676"
 
 /// Keeps the last value.
 last : Unit -> Combiner a
 foreign pure last from "flick:Combiner" "last"
   arity 0
-  reviewed "effect@4.1.2 sha256:d89a67b23319db5d"
 
 /// Always `a`, whatever it combines.
 constant : a -> Combiner a
 foreign pure constant from "flick:Combiner" "constant"
-  reviewed "effect@4.1.2 sha256:2d911ee3a9491850"
 
 /// Puts `middle` between the two values: `combine (combine self middle) that`.
 intercalate : a -> Combiner a -> Combiner a
 foreign pure intercalate from "flick:Combiner" "intercalate"
   arity 1
-  reviewed "effect@4.1.2 sha256:bd8c80c96aebcfce"
 
 /// The greater of two BigInts.
 bigint_max : Combiner BigInt
 foreign pure bigint_max from "flick:BigInt" "CombinerMax"
-  reviewed "effect@4.1.2 sha256:1caa26b1e5c4abde"
 
 /// The lesser of two BigInts.
 bigint_min : Combiner BigInt
 foreign pure bigint_min from "flick:BigInt" "CombinerMin"
-  reviewed "effect@4.1.2 sha256:2acf6233664fff9d"
 
 /// Combines two `Some`s with the combiner; a `None` on either side wins.
 option_fail_fast : Combiner a -> Combiner (Option a)
 foreign pure option_fail_fast from "flick:Option" "makeCombinerFailFast"
-  reviewed "effect@4.1.2 sha256:8d4d6192c776d9bf"
 
 /// Combines records field by field, each field with its own combiner:
 /// `Combiner.struct { n = Combiner.max compare; s = Combiner.first () }`.
 struct : Record.Map Combiner r cs => cs -> Combiner r
 foreign pure struct from "flick:Struct" "flickMakeCombiner"
-  reviewed "effect@4.1.2 sha256:ed0f562a63bb30bb"
 
 /// Combines pairs element by element.
 tuple2 : (Combiner a, Combiner b) -> Combiner (a, b)
 foreign pure tuple2 from "flick:Tuple" "makeCombiner"
-  reviewed "effect@4.1.2 sha256:f554726d0614da4c"
 
 /// Combines triples element by element.
 tuple3 : (Combiner a, Combiner b, Combiner c) -> Combiner (a, b, c)
 foreign pure tuple3 from "flick:Tuple" "makeCombiner"
-  reviewed "effect@4.1.2 sha256:f554726d0614da4c"

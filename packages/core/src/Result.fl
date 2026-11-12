@@ -82,83 +82,68 @@ let from_option failure value =
 /// `Ok` of the values when every result is `Ok`, the first `Err` otherwise.
 all : List (Result e a) -> Result e (List a)
 foreign pure all from "flick:Result" "all"
-  reviewed "effect@4.1.2 sha256:74617fad43f63bd6"
 
 /// `Err ()`.
 fail_void : Result Unit a
 foreign pure fail_void from "flick:Result" "failVoid"
-  reviewed "effect@4.1.2 sha256:6a6c65272d6b9f79"
 
 /// `Ok ()`.
 void : Result e Unit
 foreign pure void from "flick:Result" "void"
-  reviewed "effect@4.1.2 sha256:0abb2e23f70b5a58"
 
 /// `Ok x` kept when `p x` holds, `Err (or_fail_with x)` otherwise.
 filter_or_fail : (a -> Bool)^c -> (a -> e)^c -> (Result e a -> Result e a)^c
 foreign pure filter_or_fail from "flick:Result" "filterOrFail"
   arity 2
   retention call
-  reviewed "effect@4.1.2 sha256:7532f9be207ff04b"
 
 /// `Ok` and `Err` swapped.
 flip : Result e a -> Result a e
 foreign pure flip from "flick:Result" "flip"
-  reviewed "effect@4.1.2 sha256:3cc79d3cfcb399fb"
 
 /// The error of an `Err`.
 get_failure : Result e a -> Option e
 foreign pure get_failure from "flick:Result" "getFailure"
-  reviewed "effect@4.1.2 sha256:b8f282f1693a330e"
 
 /// `Ok x` when `p x` holds, `Err (or_fail_with x)` otherwise.
 lift_predicate : (a -> Bool) -> (a -> e) -> a -> Result e a
 foreign pure lift_predicate from "flick:Result" "liftPredicate"
   arity 2
-  reviewed "effect@4.1.2 sha256:6c29839ad4272746"
 
 /// The error mapped by `onFailure`, the value by `onSuccess`.
 map_both : { onFailure : e -> e2; onSuccess : a -> a2 } -> Result e a -> Result e2 a2
 foreign pure map_both from "flick:Result" "mapBoth"
   arity 1
-  reviewed "effect@4.1.2 sha256:7ce463070eff45eb"
 
 /// `onFailure e` for `Err e`, `onSuccess x` for `Ok x`.
 match_ : { onFailure : e -> b; onSuccess : a -> b } -> Result e a -> b
 foreign pure match_ from "flick:Result" "match"
   arity 1
-  reviewed "effect@4.1.2 sha256:e307c84ae7966f1a"
 
 /// The value of either side.
 merge : Result a a -> a
 foreign pure merge from "flick:Result" "merge"
-  reviewed "effect@4.1.2 sha256:62b47b3b1ccee695"
 
 /// `Ok x` kept, `Err e` replaced by `that e`.
 or_else : (e -> Result e2 a)^c -> Result e a -> Result e2 a
 foreign pure or_else from "flick:Result" "orElse"
   arity 1
   retention call
-  reviewed "effect@4.1.2 sha256:b630ce6adb97c8ea"
 
 /// `Ok None`.
 succeed_none : Result e (Option a)
 foreign pure succeed_none from "flick:Result" "succeedNone"
-  reviewed "effect@4.1.2 sha256:f5d5c86aa6909b14"
 
 /// `Ok (Some x)`.
 succeed_some : a -> Result e (Option a)
 foreign pure succeed_some from "flick:Result" "succeedSome"
-  reviewed "effect@4.1.2 sha256:988662f941a61ef1"
 
 /// An optional result as a result of an option: `None` is `Ok None`.
 transpose_option : Option (Result e a) -> Result e (Option a)
 foreign pure transpose_option from "flick:Result" "transposeOption"
-  reviewed "effect@4.1.2 sha256:7eb3e223921bc88c"
 
 /// `f` of the value of an option, the result moved out: `None` is `Ok None`.
 transpose_map_option : (a -> Result e b)^c -> Option a -> Result e (Option b)
 foreign pure transpose_map_option from "flick:Result" "transposeMapOption"
   arity 1
   retention call
-  reviewed "effect@4.1.2 sha256:429566c25f494858"
