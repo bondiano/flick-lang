@@ -1,0 +1,25 @@
+// `provide` of a layer of a service with arguments answers every instance of
+// it in its body: a row variable of the body that may hold another instance
+// is E019, and a task that needs another instance is no argument where the
+// service is taken out of the variable.
+module App.ProvideInstances exposing (..)
+
+service Store a =
+  get : Unit ->{} a
+
+ints : Layer none none {Store Int}
+let ints = Layer.succeed Store { get = fun () -> 42 }
+
+answered : Layer none none {Store Int} -> Eff s none a ->{s} a
+let answered layer t = provide layer { await t }
+//                     ^^^^^^^ FLICK-E019 `s` may hold `Store` at other arguments
+
+apart : Layer none none {Store Int} -> Eff {-Store | s} none a ->{s} a
+let apart layer t = provide layer { await t }
+
+needs_text : Eff {Store String} none String
+let needs_text = task { Store.get () }
+
+mismatched : Unit ->{Store String} String
+let mismatched () = apart ints needs_text
+//                             ^^^^^^^^^^ FLICK-E002 does not allow service `Store String`

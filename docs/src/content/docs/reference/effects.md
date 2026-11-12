@@ -354,8 +354,8 @@ these are `FLICK-T002`, so a typo or a rename does not pass silently:
 
 - taking out what the row does not hold;
 - taking an element with arguments out of a row variable, as in
-  `{-Store Int | r}`: the variable may hold `Store` at another type, so write
-  `{Store Int | r}` and leave `r`;
+  `{-Store Int | r}`: the variable may hold `Store` at another type, so take
+  out every instance, `{-Store | r}`, or write `{Store Int | r}` and leave `r`;
 - writing an element and taking it out in one row, as in `{Log, ...Reads, -Log}`;
 - `...r`, since a row variable goes after `|`; merging an alias with a tail, since
   `| r` belongs where the set is used; `opaque type alias` of a row.
@@ -380,6 +380,14 @@ let timed layer work = quiet layer work
 Without `provide`, the body of `quiet` would need `Log` whenever `r` holds it,
 which the signature does not allow (`FLICK-E002`). Errors work the same after
 `;`, as in `->{; -NotFound | e}` over a `try` that handles `NotFound`.
+
+A handler finds a service by its name, not by its arguments. `provide` of a
+layer of `Store Int` answers every `Store` operation in its body, so the body
+may need a row variable only where the variable holds no other instance of
+`Store`: one taken out, `Eff {-Store | r} …`, or one beside the instance it
+names, `Eff {Store Int | r} …`, which holds `Store` only as `Store Int`. A
+variable that may hold `Store String` would get the layer's `Store Int` for it,
+and is `FLICK-E019`.
 
 A set may take parameters, as in `type alias Db s = {Scope s, Log}`.
 

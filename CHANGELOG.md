@@ -22,6 +22,12 @@ break programs.
   nested call, `x |> f` is `f x` when the order cannot be told, and a
   partial application moves to where it completes, so `|>` pipelines now
   get workers and inlining too.
+- **A provided instance leaves the body no other:** `provide` of a layer of a
+  service with arguments, `Store Int`, under which the body needs a row
+  variable that may hold `Store` at other arguments is `FLICK-E019`, which the
+  checker and the model accepted, though the handler answered by name and the
+  program got the wrong type. `{-Store | r}` takes every instance out, and
+  `{Store Int | r}` holds no other.
 - **No build without a runtime:** `[build] effect = "none"` is gone
   (`FLICK-P005` in `flick.toml`); such a program builds on Flick's own
   runtime. A library no longer writes `_core/`, `.iface` loses `abi.core`

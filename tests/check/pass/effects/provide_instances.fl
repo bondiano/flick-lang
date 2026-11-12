@@ -1,0 +1,34 @@
+// A body under `provide` of a layer of a service with arguments may need a
+// row variable when the variable holds no other instance of the service: it
+// is taken out, `{-Store | s}`, or the instance is named, `{Store Int | s}`.
+module App.ProvideInstances exposing (..)
+
+service Store a =
+  get : Unit ->{} a
+
+service Log =
+  line : String ->{} Unit
+
+ints : Layer none none {Store Int}
+let ints = Layer.succeed Store { get = fun () -> 42 }
+
+apart : Layer none none {Store Int} -> Eff {-Store | s} none a ->{s} a
+let apart layer t = provide layer { await t }
+
+named : Layer none none {Store Int} -> Eff {Store Int | s} none a ->{s} a
+let named layer t = provide layer { await t }
+
+needs_log : Eff {Log} none Unit
+let needs_log = task { Log.line "once" }
+
+needs_int : Eff {Store Int, Log} none Int
+let needs_int = task {
+  Log.line "counted"
+  Store.get () + 1
+}
+
+logged : Unit ->{Log} Unit
+let logged () = apart ints needs_log
+
+counted : Unit ->{Log} Int
+let counted () = named ints needs_int

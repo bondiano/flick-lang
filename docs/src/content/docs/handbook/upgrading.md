@@ -52,6 +52,7 @@ change needs.
 | [`refined type` is a declaration of std's plugin](#refined-type-is-a-declaration-of-stds-plugin) | no | `FLICK-P036`, `FLICK-R005` |
 | [Braces after `then` and `else` hold statements](#braces-after-then-and-else-hold-statements) | yes: `--only T074` | `FLICK-T074` |
 | [No build without a runtime](#no-build-without-a-runtime) | no | `FLICK-P005` |
+| [A provided instance leaves the body no other](#a-provided-instance-leaves-the-body-no-other) | no | `FLICK-E019` |
 
 `flick check --fix page.md` rewrites the `flick` code blocks of a Markdown
 page, each checked on its own.
@@ -538,3 +539,12 @@ runtime builds on Flick's own runtime, which bundles only the helpers the
 program calls. A library no longer writes `_core/` beside its modules, and
 its `.iface` files have no `abi.core`; their version is now 22, so rebuild
 the libraries. `FLICK-E008` is no longer reported.
+
+## A provided instance leaves the body no other
+
+A handler finds a service by its name, so `provide` of a layer of `Store Int`
+answered every `Store` in its body, also a `Store String` a caller passed in
+through a row variable: the checker accepted that, and the program got an `Int`
+where it said `String`. Such a body is now `FLICK-E019`. Take the service out of
+the variable, `Eff {-Store | r} …` (`-` now takes a service with arguments out by
+its name), or name the instance the body needs, `Eff {Store Int | r} …`.

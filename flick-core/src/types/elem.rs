@@ -8,6 +8,7 @@ use std::fmt;
 
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
+use super::lang::{self, Lang};
 use super::ty::Type;
 
 /// A variable an element follows until it stands for something named.
@@ -50,6 +51,19 @@ const LIVE: &str = "Fiber.Live ";
 const PROVIDED: &str = "Fiber.Provided ";
 
 impl Elem {
+    /// Whether this element, holding `ty`, is an instance of a service with
+    /// parameters, which a handler finds by its name: `Store Int`, not the
+    /// language's own `Scope s` or `Fail e`.
+    pub fn is_instance(&self, ty: &Type) -> bool {
+        let Elem::Named(name) = self else {
+            return false;
+        };
+        matches!(ty, Type::App { .. })
+            && [Lang::Scope, Lang::Fail]
+                .iter()
+                .all(|l| lang::label(*l) != Some(name.as_str()))
+    }
+
     pub fn named(name: impl Into<String>) -> Elem {
         Elem::Named(name.into())
     }

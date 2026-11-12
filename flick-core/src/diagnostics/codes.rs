@@ -166,6 +166,7 @@ codes! {
     E016 = Effects 16, "`provide` of an effect that is not a service";
     E017 = Effects 17, "task in a fiber of its own needs a `control` effect";
     E018 = Effects 18, "`tail` arm that may suspend";
+    E019 = Effects 19, "row variable that may hold another instance of a provided service";
     C001 = Classes 1, "no instance for a constraint";
     C002 = Classes 2, "ambiguous class constraint";
     C003 = Classes 3, "overlapping instances";

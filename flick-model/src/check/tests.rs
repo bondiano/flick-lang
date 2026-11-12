@@ -2,6 +2,7 @@
 
 use std::fmt::Debug;
 use std::rc::Rc;
+use std::slice;
 
 use super::trace::key;
 use super::{Checker, TypeError};
@@ -616,4 +617,37 @@ fn bare_data_in_a_signature_reads_its_hidden_rows() {
     // a constant and a written qualifier read no row
     let constant = mono(job());
     assert_eq!(Checker::new(&decls()).live_scheme(&constant).body, job());
+}
+
+/// (Provide) of an instance of a service with arguments: a handler finds it
+/// by its name, so the rest of the body may hold no other instance of it. A
+/// variable is taken without the name, or the instance is named beside it;
+/// one taken without the name is not given it back by `Store Int`.
+#[test]
+fn a_provided_instance_leaves_no_variable_another() {
+    let store = Path::parse("App.Store");
+    let instance = |t: &str| {
+        let mut r = Row::none();
+        r.elems.insert(store.clone(), Rc::from([ty(t)]));
+        r
+    };
+    let s = Var::Named("s".into());
+    let open = |less: &[Path]| {
+        let mut r = Row::none();
+        r.add_var(&s, &less.iter().cloned().collect());
+        r
+    };
+    let d = decls();
+    let mut c = Checker::new(&d);
+    rejected_by(c.minus(&open(&[]), &instance("Int")), "provide");
+    let lacking = open(slice::from_ref(&store));
+    assert_eq!(
+        c.minus(&lacking, &instance("Int")).ok(),
+        Some(lacking.clone())
+    );
+    // `{Store Int | s - Store}` holds `s` only where `s` lacks `Store`
+    let mut named = instance("Int");
+    named.add_var(&s, &[store.clone()].into_iter().collect());
+    assert!(!open(&[]).within(&named));
+    assert!(lacking.within(&named));
 }

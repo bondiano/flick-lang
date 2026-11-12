@@ -246,6 +246,13 @@ impl Checker<'_> {
                 match owed(&declared, tail) {
                     // the variable is allowed, less names nothing gives back
                     Some(names) => {
+                        // an instance of a service the row holds itself, which
+                        // would answer one the variable holds at other arguments
+                        let (answered, names): (Vec<Elem>, Vec<Elem>) =
+                            names.into_iter().partition(|l| declared.get(l).is_some());
+                        for l in answered {
+                            self.instance_answered(&l, &declared, tail, c.span);
+                        }
                         taken |= !names.is_empty();
                         lacking.extend(names.iter().map(Elem::short));
                         labels.extend(names);
@@ -295,6 +302,23 @@ impl Checker<'_> {
         for e in excess {
             self.report_excess(&e);
         }
+    }
+
+    /// E019: `tail` may hold `label` at other arguments than the instance of
+    /// it `declared` holds, which would answer for it by its name.
+    fn instance_answered(&mut self, label: &Elem, declared: &Norm, tail: &Type, span: Span) {
+        let held = declared
+            .get(label)
+            .map(|t| self.show(t))
+            .unwrap_or_default();
+        let variable = self.show(less(tail).0);
+        let name = label.short();
+        let message = format!(
+            "`{variable}` may hold `{name}` at other arguments, and `{held}` here would answer for it: \
+             take it out, `{{-{name} | {variable}}}`, or name the instance, `{{{held} | {variable}}}`"
+        );
+        self.diagnostics
+            .push(Diagnostic::error(codes::E019, message, span));
     }
 
     /// A resource acquired where no `scope` owns it. The fix is not safe: the
@@ -433,15 +457,18 @@ fn unknown(tail: &Type) -> Option<u32> {
 }
 
 /// The names `declared` takes out of the variable of `tail` that neither
-/// the tail is less too nor `declared` names itself, or `None` when it does
+/// the tail is less too nor `declared` gives back, or `None` when it does
 /// not hold the variable: `s` is within `{L | s - L}`, whatever `s` is.
+/// Only a name without arguments gives it back: `s` may hold `S b`, which
+/// `{S a | s - S}` does not.
 fn owed(declared: &Norm, tail: &Type) -> Option<Vec<Elem>> {
     let (variable, gone) = less(tail);
+    let gives_back = |l: &Elem| declared.get(l).is_some_and(|t| !l.is_instance(t));
     (declared.tails.iter().map(less))
         .filter(|(held, _)| *held == variable)
         .map(|(_, taken)| {
             (taken.iter())
-                .filter(|l| !gone.contains(l) && declared.get(*l).is_none())
+                .filter(|l| !gone.contains(l) && !gives_back(l))
                 .cloned()
                 .collect::<Vec<_>>()
         })

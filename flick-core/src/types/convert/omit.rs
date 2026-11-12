@@ -74,6 +74,21 @@ impl Checker<'_> {
                 Kind::Type
             };
             let reported = self.diagnostics.len();
+            // a service with parameters is taken out by its name, every
+            // instance of it: `-Store`, not `-Store Int`
+            if *kind == Kind::ServiceRow && item.kind == K::NameType {
+                let children: Vec<&Node> = item.nodes().collect();
+                let (ty, found) = self.applied(item, &children, free);
+                if self.diagnostics.len() > reported {
+                    continue;
+                }
+                if returns_service(&self.kinds.resolve(&found)) {
+                    if let Some(label) = self.element_label(&ty, kind, item) {
+                        services.push(Gone { label, ty, span });
+                    }
+                    continue;
+                }
+            }
             let ty = self.ty(item, &element, free);
             if self.diagnostics.len() > reported {
                 continue;
@@ -118,8 +133,9 @@ impl Checker<'_> {
             } else {
                 // the variable may hold the element with other arguments,
                 // which nothing here would relate to these
+                let name = label.short();
                 let message = format!(
-                    "`-` takes an element out of a row variable by its name, and `{shown}` has arguments: write the row as `{{{shown} | r}}` and leave `r`"
+                    "`-` takes an element out of a row variable by its name, and `{shown}` has arguments: take every instance out, `-{name}`, or write the row as `{{{shown} | r}}` and leave `r`"
                 );
                 self.error(codes::T002, span, message);
             }
@@ -129,5 +145,13 @@ impl Checker<'_> {
         }
         let tails = tails.into_iter().map(|tail| ty::without(tail, &later));
         rebuilt(entries, tails.collect())
+    }
+}
+
+/// Whether `kind` is that of a service with parameters: `Type -> Service`.
+fn returns_service(kind: &Kind) -> bool {
+    match kind {
+        Kind::Arrow(_, result) => matches!(**result, Kind::Service) || returns_service(result),
+        _ => false,
     }
 }

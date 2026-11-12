@@ -16,7 +16,7 @@ use crate::types::Elem;
 use crate::types::env::Form;
 use crate::types::kinds::Kind;
 use crate::types::lang::{self, Lang};
-use crate::types::ty::{Norm, Row, Type, Written};
+use crate::types::ty::{self, Norm, Row, Type, Written};
 
 /// One side of `;`, before anything is taken out of it.
 pub(super) struct Slot<'n> {
@@ -58,7 +58,7 @@ impl Checker<'_> {
         let second = errors.map_or_else(Slot::empty, |n| self.slot(n, &Kind::ErrorRow, free));
         let (gone_services, mut gone_errors) = self.taken(&first.omitted, &Kind::ServiceRow, free);
         gone_errors.extend(self.taken(&second.omitted, &Kind::ErrorRow, free).1);
-        let services = self.without(first.row, gone_services, &first.named);
+        let services = instances_apart(self.without(first.row, gone_services, &first.named));
         let fails = first.fails.into_iter().chain(second.fails);
         let errors = self.joined(second.row, fails);
         (services, self.without(errors, gone_errors, &second.named))
@@ -391,4 +391,22 @@ fn holds_fail(row: &Type) -> bool {
         Type::Union(a, b) => holds_fail(a) || holds_fail(b),
         _ => false,
     }
+}
+
+/// A row that names an instance of a service with parameters, `{S a | r}`,
+/// holds no other instance of it: its variable stands for the rest less `S`.
+fn instances_apart(row: Type) -> Type {
+    let Type::Row(mut row) = row else {
+        return row;
+    };
+    let named: Vec<Elem> = (row.entries.iter())
+        .filter(|(l, t)| l.is_instance(t))
+        .map(|(l, _)| l.clone())
+        .collect();
+    if !named.is_empty()
+        && let Some(tail) = row.tail.take()
+    {
+        row.tail = Some(Box::new(ty::without(*tail, &named)));
+    }
+    Type::Row(row)
 }
