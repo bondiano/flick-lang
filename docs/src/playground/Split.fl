@@ -11,7 +11,8 @@ initial_share : Int
 let initial_share = 55
 
 clamp_share : Int -> Int
-let clamp_share share = if share < minimum then minimum else if share > maximum then maximum else share
+let clamp_share share =
+  if share < minimum then minimum else if share > maximum then maximum else share
 
 /// Horizontal separators move vertically; vertical ones move horizontally.
 key_share : Bool -> String -> Int -> { handled : Bool; share : Int }
@@ -20,9 +21,14 @@ let key_share stacked key current =
   let next = if stacked then "ArrowDown" else "ArrowRight"
   let handled = key == previous || key == next || key == "Home" || key == "End"
   let share =
-    if key == "Home" then minimum
-    else if key == "End" then maximum
-    else if key == previous then current - 5
-    else if key == next then current + 5
-    else current
+    if key == "Home" then
+      minimum
+    else if key == "End" then
+      maximum
+    else if key == previous then
+      current - 5
+    else if key == next then
+      current + 5
+    else
+      current
   { handled = handled; share = clamp_share share }
