@@ -1,6 +1,6 @@
 ---
 title: "Внешние функции"
-source_hash: d93b3c20160d06df
+source_hash: d5d592ef332b8f37
 ---
 
 Объявление `foreign` связывает функцию JS с сигнатурой Flick
