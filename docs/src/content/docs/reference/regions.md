@@ -178,7 +178,9 @@ Data that stores a function, such as `type G s a = G (s -> a)`, keeps what
 its field uses in a hidden capture row, and that row is an argument of the
 type like the others: a region another argument shows does not stand in for
 it. Data with a smaller row may be used where a larger one is expected, never
-the reverse. Written bare in a signature, the row is read by elision, as `Live` is
+the reverse. Only the row the reading adds widens: a capture row a
+declaration names, `type K (c : CaptureRow)`, and data inside an argument of
+another type, `List (G s a)`, compare as written. Written bare in a signature, the row is read by elision, as `Live` is
 (being implemented, see [Not checked yet](#not-checked-yet)):
 
 - in a parameter, any row: the function is generic in it;

@@ -197,7 +197,7 @@ and likewise for `Eff r ε τ`. A qualifier may move into the runtime row of a s
 - a function or task value is not held against a written qualifier: what it holds is not compared, only what its use needs live;
 - what a function position's type shows, and what a value bound's type shows (`a` of `List a`), counts as visible, not held;
 - inside `Ref`, `List`, records and ADTs, types are compared by `≡` together with their qualifiers: "explicit stored qualifications are part of type identity", and mutable storage is invariant (`FLICK-T003`);
-- the hidden row of data with hidden storage is one of its arguments, and subtyping may only widen it: `(T C ā) ≤ (T C' ā)` when `C ⊆ C'`, the other arguments by `≡` (Lean: a rule of `LeLive` for data, pending). Data with a smaller row passes where a larger one is expected, never the reverse, as for the qualifier of a function. A region another argument shows does not stand in for it: `(G (File s) a)^{s}` is no `G (File s) a`, because code generic in that argument no longer sees the region, and the use the row records would be lost ([the hidden row of data is not what its arguments show](#the-hidden-row-of-data-is-not-what-its-arguments-show));
+- the hidden row of data with hidden storage is one of its arguments, and subtyping may only widen it: `(T C ā) ≤ (T C' ā)` when `C ⊆ C'`, the other arguments by `≡` (Lean: a rule of `LeLive` for data, pending). Data with a smaller row passes where a larger one is expected, never the reverse, as for the qualifier of a function. Only the row the reading of §1.4 adds widens, and only while it is covariant: a well-formed signature has it in the fields only as the qualifier of a stored function or computation, or as the hidden row of stored data, at the top of a field, never under `Ref`, inside an argument of another type, in a contravariant position, or fixed by the result of a GADT constructor. A capture row a declaration names (`type K (c : CaptureRow)`) is invariant ([a capture row a declaration names is invariant](#a-capture-row-a-declaration-names-is-invariant)). Data inside an argument of another type (`List (G s a)`) is compared by `≡` until the variance of data arguments is specified ([§2.2.1](#221-variance-of-data-arguments-pending)); A region another argument shows does not stand in for it: `(G (File s) a)^{s}` is no `G (File s) a`, because code generic in that argument no longer sees the region, and the use the row records would be lost ([the hidden row of data is not what its arguments show](#the-hidden-row-of-data-is-not-what-its-arguments-show));
 - `α^{≤C} ≤ α` and `α ≤ α^{≤C}` by §2.1: both reach `⌈υ⌉`. Hence `Option (a^{≤v}, b^{≤w}) ≡ Option (a, b)` ([bounded variable atoms](#a-bounded-variable-reaches-what-the-variable-reaches)).
 
 Checker:
@@ -205,6 +205,10 @@ Checker:
 - `effects.rs` `subsume_at` → `regions/compare.rs` `subsume_captured`, `held_fits`; `regions/data.rs` `subsume_bound`, `bounded_callable`;
 - the ⌈·⌉ check is not done by `subsume` itself but by the `Hold` obligation (`regions/mod.rs` `hold`) with the `visible` part of the expected type: what the type shows is subtracted from what is held (`regions/solve.rs` `hidden`); subtracting it from the hidden row of data is a divergence ([the hidden row of data is not what its arguments show](#the-hidden-row-of-data-is-not-what-its-arguments-show));
 - `regions/compare.rs` `unify_captured`: qualifiers under an invariant constructor are equal.
+
+#### 2.2.1 Variance of data arguments (pending)
+
+Decided: subtyping will be covariant or contravariant in the arguments of data by the variance of each parameter, computed from the fields (arrows, `Ref`, `Eff`, rows, the results of GADT constructors), so that `List (G s a)^{c}` widens like `(G s a)^{c}`. It is specified by a separate change after its design note. Until then data inside an argument of another type compares by `≡`, which rejects more programs and admits no new one.
 
 ### 2.3 Rules
 
@@ -1046,6 +1050,17 @@ let leaked path = scope {
 - A pure foreign function, `peek : File s -> Int`, reads a released file through the same composition built with a pure helper. Typing by use accepts it: a pure stage uses no region (`Stage.use .pure _ = .pure`). What breaks is G4: a pure foreign arrow over a resource claims its call needs nothing live.
 - Resolution, document: §1.4 reads the hidden row of a bare data type in a signature by elision, §2.2 lets subtyping only widen it, and G4 gives a foreign function over a resource a runtime stage. The contract of typing by use (§0, T4′) is unchanged. For programs: the row of a result holds what the earlier parameters reach, so `make : Handle r -> G Unit Int` that returns a fresh closure holds `{r}` and does not leave the `scope` of `r` unless written `(G Unit Int)^{}`; `cf (F f) (F g) = F (fun x -> f (g x))` for `type F s a = F (s -> a)` is accepted, its result row being `{c, d}`.
 - Pending: the checker (the reading of signatures, `regions/solve.rs`, `regions/data.rs`, `regions/applied.rs`; `tests/check/fail/regions/hidden_through_helper.fl`), the model (`check/regions/live.rs` `elide`, `check/regions/mod.rs`), Lean and the certificates. In Lean the reading is formalized in the core, as the elision of `Live` is: a mark for a bare row, distinct from a written `^{}`; `Ty.elide` extended to it; `Ty.reach_elide`, `Ty.Kept.le_elide` and `Const.ty_kept` proved again; the rule of `LeLive` that widens the hidden row of data, with preservation and T1 proved again where they invert `LeLive` at a type application; `Live/ElideSchemes.lean` regenerated. Open: how data with hidden storage substituted for a higher-kinded variable of a class signature (`Functor (StateT s m)`) gets its row; settled with the checker by `tests/check/pass/regions/transformers.fl`.
+
+### A capture row a declaration names is invariant
+
+Divergence: a rule that widens every capture-row argument of data, `(T C ā) ≤ (T C' ā)` for `C ⊆ C'`, breaks T4′.
+
+```flick
+type K (c : CaptureRow) = K ((Unit ->{} Unit)^c ->{} Unit)
+```
+
+- Symptom: a `K` whose field stores its callback in a cell made outside the `scope` is a `K ∅`. Widened to `K {s}` inside `scope s`, its field takes a callback that uses `s`; after the `scope` the callback, read from the cell as `Unit ->{} Unit`, runs and uses the closed region (T4.1). In a proof of preservation the field, matched as `(Unit ->^{s} Unit) ->{} Unit`, has a value typed `(Unit ->^∅ Unit) ->{} Unit`, and getting from one to the other narrows the qualifier of its parameter.
+- Resolution, document: only the hidden row the reading adds (§1.4) widens, under the condition of §2.2 that it is covariant in the fields; a row a declaration names keeps `≡`. Lean: the condition is part of a well-formed `Sig`, and `K` is a regression of `LiveRules.lean` (pending with the rule).
 
 ### Rules of typing by use found while porting
 
