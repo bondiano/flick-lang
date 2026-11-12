@@ -121,7 +121,8 @@ func Get(v Value, i int) Value {
 	if d.more != nil {
 		return d.more[i]
 	}
-	return d.in[i]
+	// of the fields the value has: a place past them fails as it does in a list
+	return d.in[:d.n][i]
 }
 
 // Fn2 and Fn3 are functions of two and three arguments whose stages before

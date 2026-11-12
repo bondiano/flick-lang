@@ -36,6 +36,18 @@ func TestAVariantHasTheFieldsItWasMadeWith(t *testing.T) {
 	if len(one.Fields()) != 1 || Get(one, 0) != "v" || len(grown) != 2 || one.in[1] != nil {
 		t.Errorf("appending to the fields changed the value: %v, %v", one.Fields(), one.in)
 	}
+	// a field a value does not have is no field, however many it has room for
+	for n := 0; n <= 3; n++ {
+		d := NewData("A#0", make([]Value, n)...)
+		func() {
+			defer func() {
+				if recover() == nil {
+					t.Errorf("field %d of a value of %d fields was read", n, n)
+				}
+			}()
+			Get(d, n)
+		}()
+	}
 	if none := None.(*Data); len(none.Fields()) != 0 || len(Nullary("B#1").(*Data).Fields()) != 0 {
 		t.Errorf("a constructor without fields has fields")
 	}
