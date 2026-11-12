@@ -40,6 +40,7 @@ use std::{mem, slice};
 
 use flick_pretty::{Document, DocumentArena, Documentable, docvec};
 
+use super::order::post_order;
 use crate::diagnostics::{Diagnostic, Severity, codes};
 use crate::ir::{ItemKind, Module, reach};
 use crate::source::Span;
@@ -312,34 +313,15 @@ fn item_order(
     items: &[usize],
     index: &HashMap<Key, (usize, usize)>,
 ) -> Vec<usize> {
-    let mut state: HashMap<usize, bool> = HashMap::new();
-    let mut out = Vec::new();
-    for &i in items {
-        visit(module, i, index, &mut state, &mut out);
-    }
-    out
-}
-
-fn visit(
-    module: &Module,
-    i: usize,
-    index: &HashMap<Key, (usize, usize)>,
-    state: &mut HashMap<usize, bool>,
-    out: &mut Vec<usize>,
-) {
-    if state.contains_key(&i) {
-        return;
-    }
-    state.insert(i, false);
-    let mut used = Vec::new();
-    reach::uses(&module.items[i], &mut used);
-    for key in used.iter().filter(|(m, _)| *m == module.name) {
-        if let Some(&(_, j)) = index.get(key) {
-            visit(module, j, index, state, out);
-        }
-    }
-    state.insert(i, true);
-    out.push(i);
+    let mut uses = |i: usize| {
+        let mut used = Vec::new();
+        reach::uses(&module.items[i], &mut used);
+        (used.iter())
+            .filter(|(m, _)| *m == module.name)
+            .filter_map(|key| index.get(key).map(|&(_, j)| j))
+            .collect()
+    };
+    post_order(module.items.len(), items.iter().copied(), &mut uses)
 }
 
 /// The same message at the same place once.

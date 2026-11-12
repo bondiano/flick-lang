@@ -3,8 +3,8 @@
 //! groups of top-level functions that call each other in tail position. A
 //! backend makes them jumps, so recursion through them needs no stack.
 
-use crate::ir::{BinOp, Expr, ExprKind, Item, ItemKind, Param, Stage};
-use crate::types::Dict;
+use crate::ir::{BinOp, Expr, ExprKind, Item, ItemKind, Param, Pat, Stage};
+use flick_ir::Dict;
 
 /// A function a tail call may jump to: its name and the dictionaries of its
 /// constraints, by the names `Dict::Given` gives them, which a call passes
@@ -65,18 +65,55 @@ pub fn jumpable(params: &[Param], calls: Calls) -> bool {
     }
 }
 
+/// A top-level function a tail call may jump to: its name, parameters and
+/// body.
+pub type Function<'i> = (&'i str, &'i [Param], &'i Expr);
+
+/// The functions of the items `group` of `items`, and the target and arity
+/// of each, which a tail call jumps to.
+pub fn members<'i>(
+    module: &str,
+    items: &'i [Item],
+    group: &[usize],
+    calls: Calls,
+) -> (Vec<Function<'i>>, Vec<(Target, usize)>) {
+    let functions: Vec<Function> = (group.iter())
+        .filter_map(|&i| function(&items[i], calls))
+        .collect();
+    let members = (functions.iter())
+        .map(|(name, params, _)| (target(module, name), params.len()))
+        .collect();
+    (functions, members)
+}
+
+/// The local each parameter binds, if it is a name.
+pub fn binds(params: &[Param]) -> Vec<Option<String>> {
+    (params.iter())
+        .map(|p| match &p.pat {
+            Pat::Bind(n) => Some(n.clone()),
+            _ => None,
+        })
+        .collect()
+}
+
+/// Whether the argument `i` of a jump is the local the parameter `i` binds:
+/// passed on unchanged, it keeps its loop variable.
+pub fn passed_on(args: &[&Expr], binds: &[Option<String>], i: usize) -> bool {
+    matches!(&args[i].kind, ExprKind::Local(n) if binds.get(i).is_some_and(|b| b.as_ref() == Some(n)))
+}
+
+/// Whether a tail position of `body` calls one of `members` in full.
+pub fn has_tail_call(body: &Expr, members: &[(Target, usize)], calls: Calls) -> bool {
+    !tail_callees(body, members, calls).is_empty()
+}
+
 /// The cycles of tail calls between the functions of `items`, by item
 /// index in order, found as strongly connected components (Tarjan).
 pub fn cycles(module: &str, items: &[Item], calls: Calls) -> Vec<Vec<usize>> {
-    let functions: Vec<(usize, &str, &[Param], &Expr)> = items
-        .iter()
-        .enumerate()
-        .filter_map(|(i, item)| function(item, calls).map(|(n, p, b)| (i, n, p, b)))
+    let indices: Vec<usize> = (0..items.len())
+        .filter(|&i| function(&items[i], calls).is_some())
         .collect();
-    let members: Vec<(Target, usize)> = functions
-        .iter()
-        .map(|(_, name, params, _)| (target(module, name), params.len()))
-        .collect();
+    let (functions, members) = members(module, items, &indices, calls);
     let edges: Vec<Vec<usize>> = functions
         .iter()
         .map(|(.., body)| tail_callees(body, &members, calls))
@@ -100,7 +137,7 @@ pub fn cycles(module: &str, items: &[Item], calls: Calls) -> Vec<Vec<usize>> {
         .filter(|c| c.len() > 1)
         .map(|mut c| {
             c.sort_unstable();
-            c.iter().map(|&f| functions[f].0).collect()
+            c.iter().map(|&f| indices[f]).collect()
         })
         .collect()
 }
@@ -153,24 +190,16 @@ pub fn self_call<'e>(
     members: &[(Target, usize)],
     calls: Calls,
 ) -> Option<(usize, Vec<&'e Expr>)> {
-    let mut args = Vec::new();
-    let mut head = e;
-    while let ExprKind::App {
-        func,
-        arg,
-        stage,
-        arg_first: false,
-    } = &head.kind
-    {
+    let (mut head, spine) = e.spine();
+    let mut args = Vec::with_capacity(spine.len());
+    for (i, &(arg, stage)) in spine.iter().enumerate() {
         // the type of the callee fixes the stage of a full call's last arrow
-        let last = args.is_empty() && calls == Calls::Direct;
-        if *stage != Stage::Pure && !last {
+        let last = i + 1 == spine.len() && calls == Calls::Direct;
+        if stage != Stage::Pure && !last {
             return None;
         }
-        args.push(&**arg);
-        head = func;
+        args.push(arg);
     }
-    args.reverse();
     let mut dicts = Vec::new();
     if let ExprKind::Dicts(inner, given) = &head.kind {
         for d in given {

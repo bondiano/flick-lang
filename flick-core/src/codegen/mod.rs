@@ -12,6 +12,7 @@ mod lexical;
 mod loops;
 pub(crate) use lexical::{RuntimeLayout, js_parts};
 mod names;
+mod order;
 #[cfg(feature = "native-project")]
 pub mod sourcemap;
 pub mod tail;
