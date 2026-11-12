@@ -1,0 +1,28 @@
+// A codec that keeps a function over the file of a `scope` (`@stores`) is
+// made and used inside that `scope`.
+module App.CodecStores exposing (..)
+
+import File exposing (Path, FileSystem, OpenError, ReadError)
+
+type alias Row = { size : Float }
+  deriving Schema
+
+inside : Path -> Unknown ->{Async, FileSystem; OpenError, SchemaError} Float
+let inside path u = scope {
+  let file = File.open_scoped path
+  let row = codec Row.schema {
+    size = field_effect "size" (Codec.general Float.json_finite)
+      |> on_missing_effect (fun () ->
+        try Int.to_float (String.length (File.read_all file)) with
+        | ReadError _ -> -1
+      );
+  }
+  (Codec.decode row u).size
+}
+
+// a codec that holds nothing leaves the `scope`
+plain : Path ->{Async, FileSystem; OpenError} PureCodec Json Row
+let plain path = scope {
+  let _ = File.open_scoped path
+  codec Row.schema { size = field "size" Float.json_finite |> on_missing (fun () -> 0.0) }
+}

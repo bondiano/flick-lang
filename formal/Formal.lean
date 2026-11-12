@@ -33,6 +33,9 @@ import Formal.SubstArm
 import Formal.Substitution
 import Formal.Canonical
 import Formal.Widen
+import Formal.Vary
+import Formal.VaryArgs
+import Formal.VarySpine
 import Formal.Shapes
 import Formal.CanonForms
 import Formal.DictCanon
@@ -168,6 +171,7 @@ import Formal.Live.T1Regions
 import Formal.Live.Elide
 import Formal.Live.ElideSchemes
 import Formal.Live.Install
+import Formal.LiveVariance
 import Formal.Axioms
 
 import Formal.LocalControl

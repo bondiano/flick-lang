@@ -4,7 +4,7 @@
 //! into a runtime position, and which dictionaries a use of a constrained
 //! value receives.
 
-pub use flick_ir::{Constructor, GenericInfo, InstanceInfo, Lift};
+pub use flick_ir::{Constructor, GenericInfo, InstanceInfo, Lift, default_method};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::mem;
@@ -254,12 +254,6 @@ pub(super) type OpenScopes = Vec<(u32, Range)>;
 pub struct Owner {
     pub scope: Range,
     pub outside: bool,
-}
-
-/// The top-level value a class's default definition of `method` compiles
-/// to, in the class's module; it takes the class's dictionary first.
-pub fn default_method(class: &str, method: &str) -> String {
-    format!("$default_{class}_{method}")
 }
 
 /// Constraints that are solved by the region checker, and the equalities a

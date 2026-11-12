@@ -13,7 +13,7 @@ use super::shape::Types;
 use super::{Gen, Shape, names, own};
 use crate::codegen::tail::Target;
 use crate::ir::{Expr, ExprKind, Lit, Param, Pat, Stage, operation_arity};
-use crate::types::{Constructor, Dict, Rep};
+use flick_ir::{Constructor, Dict, Rep};
 
 impl<'a> Gen<'a> {
     /// Builds a value of the constructor `c` from its fields, holding the

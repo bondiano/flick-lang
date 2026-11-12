@@ -33,6 +33,10 @@ mod zonk;
 mod tests;
 #[cfg(test)]
 mod tests_ffi;
+#[cfg(test)]
+mod tests_forall;
+#[cfg(test)]
+mod tests_stores;
 
 use std::collections::{BTreeSet, HashSet};
 use std::fmt;

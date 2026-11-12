@@ -360,6 +360,7 @@ durationHooks.native = (d) => {
   throw new TypeError("not a duration of this runtime or of Effect");
 };
 dateTimeHooks.makeUtc = (millis) => EDateTime.makeUnsafe(millis);
+dateTimeHooks.toDate = (value) => (EDateTime.isDateTime(value) ? EDateTime.toDate(value) : new Date(value.epochMilliseconds));
 
 
 export { Raise, asExit, exitOf, raiseOf };

@@ -32,6 +32,12 @@ break programs.
   layer provided on RT, such as `Logger.console_logfmt`, writes to that
   console too: it now sees all the evidence below the layer, the runtime's
   clock included, not only the services Effect supplied last.
+- **Http values on Flick's own runtime:** `Http.Headers`, `Http.Cookies`,
+  `Http.Url`, `Http.UrlParams`, `Http.Mime` and `Http.Etag` run on RT, with
+  the encodings, orders, parsers and error messages of Effect's modules,
+  so a program that only uses them, or them with an RPC client, loads no
+  Effect for them. A build that reaches any other Http binding still takes
+  every web binding from the adapter.
 - **`<|`, `>>` and `<<`:** `f <| x` is `f x`, the weakest operator and
   right-associative, so `say <| show <| total xs` needs no parentheses;
   `f a <| x` is the call `f a x`. `f >> g` applies `f`, then `g`, and
@@ -90,6 +96,19 @@ break programs.
 - **Plugins:** a plugin is told where each value it watches is named, with
   the declaration around it (`CallSite.binding`), as it was for the
   serializable atoms alone.
+- **The hidden row of data under a `forall`:** data with hidden storage
+  written bare under a `forall` of a signature is read as the core reads
+  `.all`: a result there holds what the parameters before it reach of the
+  atoms outside the `forall`, never one of its binders. A callback typed
+  `forall a. File s -> a -> G a` may return data over the file of `s`; one
+  typed `forall t. File t -> G String` still may not over its own `t`.
+- **`@stores`:** an attribute before a type without constructors says that
+  the values foreign code makes keep the functions they are given, as data
+  with a function field does: written bare in a signature, its result holds
+  what the parameters before it reach. `PureCodec`, `Codec`, `FieldCodec`
+  and `Codec.Derive.Fields` are marked, so a codec whose field default or
+  decoding reads a file cannot leave the file's `scope` (`FLICK-G001`);
+  before, decoding with it afterwards read the closed file without an error.
 - **Deep nesting:** checking a nested `fun` or a `<|` takes far less of the
   stack, so the deepest code the parser accepts (198 nested functions with
   their signature, or 199 `<|` in a row) checks on a thread's 2 MiB stack,

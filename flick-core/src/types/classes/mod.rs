@@ -43,8 +43,7 @@ pub const RECORD_CLASSES: [Lang; 8] = [
 /// The closed numeric classes, whose module has every instance.
 pub const NUMERIC_CLASSES: [Lang; 3] = [Lang::Numeric, Lang::Integer, Lang::Floating];
 
-/// Classes whose instances for records and tuples the compiler owns.
-pub const STRUCTURAL: [Lang; 4] = [Lang::Eq, Lang::Ord, Lang::Hash, Lang::Show];
+pub use flick_ir::STRUCTURAL;
 
 /// The lang item among `items` that `module.name` is.
 pub fn which(items: &[Lang], module: &str, name: &str) -> Option<Lang> {

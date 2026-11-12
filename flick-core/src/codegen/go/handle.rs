@@ -7,7 +7,7 @@ use flick_pretty::docvec;
 use super::Gen;
 use super::layout::{Code, call, list};
 use crate::ir::Handler;
-use crate::types::OpClass;
+use flick_ir::OpClass;
 
 impl<'a> Gen<'a> {
     pub(super) fn handle(&mut self, h: &Handler) -> Code<'a> {

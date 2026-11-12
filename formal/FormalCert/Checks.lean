@@ -20,6 +20,11 @@ example : LeLive S (Sig.ctorTy [(.arrow (.base .unit) (.rt Row.none Row.none) (.
       Caps.none) := by
   le_live
 
+/-- A record whose field widens its qualifier (`le_live` through `LeLive.rcons'`). -/
+example : LeLive S (.rcons "f" (.arrow (.base .unit) .pure (.base .unit) Caps.none) .rnil)
+    (.rcons "f" (.arrow (.base .unit) .pure (.base .unit) (fun x => x = .r 0)) .rnil) := by
+  le_live
+
 /-- A fact whose capture row is empty at the instance (`outl` with `Caps.none`). -/
 example : (Scheme.mk 3 (Facts.single (fun x => x = .v 1) (.tvar 2)) (.base .unit)).Holds Facts.none
     [(.row (fun x => x = .nm "L")), (.caps Caps.none), (.tvar 0)] := by

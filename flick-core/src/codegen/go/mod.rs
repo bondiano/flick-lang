@@ -18,6 +18,7 @@ mod expr;
 mod foreign;
 mod generate;
 mod handle;
+mod input;
 mod items;
 mod layout;
 mod loops;
@@ -30,6 +31,8 @@ mod runtime;
 mod shape;
 mod typed;
 
+pub use foreign::{Bindings, is_relative};
+pub use input::Input;
 pub use runtime::{GO_MOD, GO_SUM, PACKAGES, Package, RUNTIME};
 
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
@@ -37,7 +40,6 @@ use std::{mem, slice};
 
 use flick_pretty::{Document, DocumentArena, Documentable, docvec};
 
-use super::Known;
 use crate::diagnostics::{Diagnostic, Severity, codes};
 use crate::ir::{ItemKind, Module, reach};
 use crate::source::Span;
@@ -47,36 +49,6 @@ use shape::{Shape, shape};
 
 /// The Go import path of the runtime package.
 pub const RUNTIME_PACKAGE: &str = "flick.app/flickrt";
-
-/// The source path and line of a span of a module.
-pub type Locate<'a> = dyn Fn(&str, Span) -> Option<(String, u32)> + 'a;
-
-/// What a program is made of.
-pub struct Program<'a> {
-    /// Every module the program may use: its own and the built-in ones.
-    pub modules: &'a [&'a Module],
-    /// The module whose `main` the program runs.
-    pub entry: &'a str,
-    /// The test modules whose `tests` the program runs instead, when any.
-    pub suites: &'a [String],
-    /// The package a module belongs to, for its constructor tags.
-    pub package: &'a dyn Fn(&str) -> Option<String>,
-    /// Whether a module is the program's own, whose source the build has;
-    /// a built-in module's spans are in no source of the build.
-    pub own: &'a dyn Fn(&str) -> bool,
-    /// The source path and 1-based line of a span of the program's own
-    /// module, which `//line` directives give Go's stack traces.
-    pub location: &'a Locate<'a>,
-    /// The Go side of a foreign module of a module of the program, by its
-    /// relative specifier: the file's name in the Go module and its text.
-    pub foreign_file: &'a ForeignFile<'a>,
-    /// The program's lang items, the built-in entities the code knows.
-    pub lang: &'a Known<'a>,
-}
-
-/// Finds the Go file beside a foreign JS module: by the Flick module and
-/// the specifier, its name in the Go module and its text.
-pub type ForeignFile<'a> = dyn Fn(&str, &str) -> Option<(String, String)> + 'a;
 
 /// The Go files of a program, by path in its Go module, and what could not
 /// be compiled.
@@ -88,27 +60,23 @@ pub struct Output {
     pub packages: Vec<&'static str>,
 }
 
-/// Compiles the program that runs `main` of `program.entry`, or the tests
-/// of `program.suites`.
-pub fn go(program: &Program) -> Output {
-    let modules = program.modules;
+/// Compiles the program that runs `main` of `input.entry`, or the tests
+/// of `input.suites`.
+pub fn go(input: &Input) -> Output {
+    let modules: Vec<&Module> = input.own.iter().chain(input.builtins).copied().collect();
+    let modules = &modules[..];
     let index = reach::index(modules);
     // main.go's documents
     let a = &DocumentArena::new();
-    if !program.suites.is_empty() {
-        return compile(
-            program,
-            &index,
-            a,
-            tests_start(a, program.suites),
-            program.suites,
-        );
+    if !input.suites.is_empty() {
+        let start = tests_start(a, input.suites);
+        return compile(input, modules, &index, a, start, input.suites);
     }
-    let main: Key = (program.entry.to_owned(), "main".to_owned());
+    let main: Key = (input.entry.to_owned(), "main".to_owned());
     let mut diagnostics = Vec::new();
     let main_shape = index
         .get(&main)
-        .map(|&(m, i)| shape(program.lang, &modules[m].name, &modules[m].items[i].kind));
+        .map(|&(m, i)| shape(input, &modules[m].name, &modules[m].items[i].kind));
     let Some(Shape::Func {
         dicts: 0,
         params: 1,
@@ -120,7 +88,7 @@ pub fn go(program: &Program) -> Output {
             Severity::Error,
             format!(
                 "the go target runs a `main` of one parameter, and `{}` has none",
-                program.entry
+                input.entry
             ),
         ));
         return Output {
@@ -132,13 +100,8 @@ pub fn go(program: &Program) -> Output {
     let fb = a.text("fb");
     let unit = a.text("flickrt.Unit");
     let start = call(a, names::func(&main.0, &main.1), [fb, unit]);
-    compile(
-        program,
-        &index,
-        a,
-        start,
-        slice::from_ref(&program.entry.to_owned()),
-    )
+    let entry = input.entry.to_owned();
+    compile(input, modules, &index, a, start, slice::from_ref(&entry))
 }
 
 /// What a test program runs: `flickrt.RunTests` on the `tests` of each suite.
@@ -154,16 +117,16 @@ fn tests_start<'a>(a: &'a DocumentArena<'a>, suites: &[String]) -> Document<'a> 
 /// The program of the items `roots` reach, whose `main.go`, of documents
 /// of `a`, initializes the modules of `roots` and runs `start`.
 fn compile<'a>(
-    program: &Program,
+    input: &Input,
+    modules: &[&Module],
     index: &HashMap<Key, (usize, usize)>,
     a: &'a DocumentArena<'a>,
     start: Document<'a>,
     roots: &[String],
 ) -> Output {
-    let modules = program.modules;
     let mut diagnostics = Vec::new();
-    let keys: Vec<Key> = if program.suites.is_empty() {
-        vec![(program.entry.to_owned(), "main".to_owned())]
+    let keys: Vec<Key> = if input.suites.is_empty() {
+        vec![(input.entry.to_owned(), "main".to_owned())]
     } else {
         roots
             .iter()
@@ -182,7 +145,7 @@ fn compile<'a>(
     for &(m, i) in &reached {
         let item = &modules[m].items[i];
         for name in reach::defined(item) {
-            let held = shape(program.lang, &modules[m].name, &item.kind);
+            let held = shape(input, &modules[m].name, &item.kind);
             shapes.insert((modules[m].name.clone(), name), held);
         }
     }
@@ -205,20 +168,16 @@ fn compile<'a>(
             continue;
         }
         let arena = DocumentArena::new();
-        let mut g = Gen::new(&module.name, &shapes, program.package, program.lang, &arena);
+        let mut g = Gen::new(&module.name, &shapes, input, &arena);
         g.settled = Some(&settled);
-        g.own = Some(program.own);
         g.records = Some(&records);
         g.item_initializers = item_initializers;
-        if (program.own)(&module.name) {
-            g.location = Some(program.location);
-            g.foreign_file = Some(program.foreign_file);
-        }
         let order = item_order(module, &items, index);
         let code = g.module(module, &order);
         diagnostics.extend(g.errors.into_iter().map(|(message, span)| {
             let d = Diagnostic::new(codes::P012, Severity::Error, message);
-            match span.filter(|_| (program.own)(&module.name)) {
+            // the spans of a built-in module are in no source of the build
+            match span.filter(|_| m < input.own.len()) {
                 Some(span) => d.with_span(span),
                 None => d,
             }
@@ -231,7 +190,7 @@ fn compile<'a>(
     let inits: Vec<_> = if item_initializers {
         initialization_order(modules, index, &reached)
             .into_iter()
-            .filter(|&(m, i)| has_initializer(program.lang, &modules[m].items[i].kind))
+            .filter(|&(m, i)| has_initializer(input, &modules[m].items[i].kind))
             .map(|(m, i)| statement(a, docvec![a, names::item_init(&modules[m].name, i), "()"]))
             .collect()
     } else {
@@ -261,10 +220,10 @@ fn compile<'a>(
     }
 }
 
-fn has_initializer(lang: &Known, item: &ItemKind) -> bool {
+fn has_initializer(input: &Input, item: &ItemKind) -> bool {
     match item {
         // the shape of a value does not depend on its module
-        ItemKind::Value { .. } => matches!(shape(lang, "", item), Shape::Var),
+        ItemKind::Value { .. } => matches!(shape(input, "", item), Shape::Var),
         ItemKind::Instance { info, .. } => info.context.is_empty(),
         ItemKind::Destructure { .. } => true,
         ItemKind::Foreign(_) | ItemKind::Constructor(_) | ItemKind::Service { .. } => false,
@@ -395,9 +354,8 @@ struct Gen<'a> {
     module: &'a str,
     item_initializers: bool,
     shapes: &'a HashMap<Key, Shape>,
-    package: &'a dyn Fn(&str) -> Option<String>,
-    /// The program's lang items.
-    lang: &'a Known<'a>,
+    /// The program: its modules, the data of the build and its lang items.
+    input: &'a Input<'a>,
     /// Statements of the block being emitted, each with its newline.
     buf: Vec<Document<'a>>,
     temps: u32,
@@ -423,10 +381,6 @@ struct Gen<'a> {
     groups: Vec<loops::Group>,
     /// The group and member of each grouped function, by name.
     grouped: HashMap<String, (usize, usize)>,
-    /// Where a span of this module is in its source, for `//line`.
-    location: Option<&'a Locate<'a>>,
-    /// The Go files of foreign modules, for the program's own modules.
-    foreign_file: Option<&'a ForeignFile<'a>>,
     /// The Go files the module's foreign bindings call, by name.
     sources: BTreeMap<String, String>,
     /// The locals of the definition being emitted whose Go type is not
@@ -438,9 +392,6 @@ struct Gen<'a> {
     settled: Option<&'a HashSet<Key>>,
     /// The Go type the function being emitted returns, when not a value.
     returns: Option<arith::Native>,
-    /// Whether a module is the program's own: its constructors with fields
-    /// have Go types of their own (`own.rs`).
-    own: Option<&'a dyn Fn(&str) -> bool>,
     /// The Go types of constructors the module's code names.
     owned: own::Owned,
     /// The constructors of the program declared over a record.
@@ -454,8 +405,7 @@ impl<'a> Gen<'a> {
     fn new(
         module: &'a str,
         shapes: &'a HashMap<Key, Shape>,
-        package: &'a dyn Fn(&str) -> Option<String>,
-        lang: &'a Known<'a>,
+        input: &'a Input<'a>,
         a: &'a DocumentArena<'a>,
     ) -> Self {
         Gen {
@@ -463,8 +413,7 @@ impl<'a> Gen<'a> {
             module,
             item_initializers: false,
             shapes,
-            package,
-            lang,
+            input,
             buf: Vec::new(),
             temps: 0,
             lines: 0,
@@ -478,14 +427,11 @@ impl<'a> Gen<'a> {
             tail: None,
             groups: Vec::new(),
             grouped: HashMap::new(),
-            location: None,
-            foreign_file: None,
             sources: BTreeMap::new(),
             natives: HashMap::new(),
             once: Vec::new(),
             settled: None,
             returns: None,
-            own: None,
             owned: own::Owned::new(),
             records: None,
             held: HashMap::new(),
@@ -542,7 +488,10 @@ impl<'a> Gen<'a> {
     /// A `//line` directive before the next statement, which Go's stack
     /// traces then name by the Flick source of `span`.
     fn line(&mut self, span: Span) {
-        if let Some((path, line)) = self.location.and_then(|at| at(self.module, span)) {
+        if let Some(path) = self.input.paths.get(self.module) {
+            let starts = self.input.lines[span.file.index() as usize];
+            let line = starts.partition_point(|&start| start <= span.start);
+            let line = u32::try_from(line).expect("fewer than 2^32 lines");
             self.buf.push(directive(self.a, path, line));
             self.lines += 1;
         }

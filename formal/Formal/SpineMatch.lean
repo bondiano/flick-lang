@@ -48,8 +48,8 @@ theorem Typ.spine_match {Ψ Θ Γ v J} (h : Typ S Ψ Θ Γ v J) :
     Value v → ∀ {K k ts T X}, v.head = .ctor K → S.ctor K = some (k, ts, T) →
       J = .ex X .pure → X.kind ≠ 7 → ¬ X.isAll →
       ∃ us, us.length = k ∧
-        (∃ ws, X.res = Ty.tcon T ws ∧ S.Widen T ((S.res K).map (Ty.substT (instT us))) ws) ∧
-        ∀ {us' p Z Δ δ}, S.Widen T us us' → SpTy S K us' p Z Δ → matchP p v = some δ →
+        (∃ ws, X.res = Ty.tcon T ws ∧ S.Vary T ((S.res K).map (Ty.substT (instT us))) ws) ∧
+        ∀ {us' p Z Δ δ}, S.Vary T us us' → SpTy S K us' p Z Δ → matchP p v = some δ →
           (∃ Z', LeLive S Z' X ∧ SpW S Z' Z) ∧ Inst S Ψ Θ Γ δ Δ := by
   induction h with
   | ctor hK hk _ hT =>
@@ -119,7 +119,7 @@ theorem aref_match {Ψ Θ v t t' φ K k ts T₀ qs b δ} {Δ : (Atom → Ty) →
     (h₁.valueAny hv .pure).spine_match hv (matchP_spine_head hm) hK rfl hU7 (Ty.not_all_of_hd hU)
   rw [Ty.res_of_hd hU] at hr
   -- the arm's problem is solved at the value's instance with its hidden row widened to `t`
-  obtain ⟨us, hk, hmap, hwu⟩ := Sig.Widen.lift hK hk₀ hw
+  obtain ⟨us, hk, hmap, hwu⟩ := Sig.Vary.lift hK hk₀ hw
   have hF : Fits (instT us) b := ⟨fun _ _ => rfl, fun h => (hn h).elim, fun h => (hn h).elim,
     fun h => (hn h).elim⟩
   have hu : (Ty.tcon T₀ (S.res K)).substT (instT us) = (t.up k).substT (instT us) := by
