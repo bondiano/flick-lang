@@ -28,7 +28,10 @@ break programs.
 - **`Console` on Flick's own runtime:** every `Console` binding runs on RT
   without the Effect adapter, writing to the host's console or to the one
   `Console.with_console` gives a task; a group or a timer ends when its
-  scope closes or its task ends, however it ends.
+  scope closes or its task ends, however it ends. The adapter's code under a
+  layer provided on RT, such as `Logger.console_logfmt`, writes to that
+  console too: it now sees all the evidence below the layer, the runtime's
+  clock included, not only the services Effect supplied last.
 - **`<|`, `>>` and `<<`:** `f <| x` is `f x`, the weakest operator and
   right-associative, so `say <| show <| total xs` needs no parentheses;
   `f a <| x` is the call `f a x`. `f >> g` applies `f`, then `g`, and

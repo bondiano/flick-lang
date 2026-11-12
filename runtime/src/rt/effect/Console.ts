@@ -5,7 +5,9 @@ import type { Option } from "../../core/data.ts";
 import { type Run, Under, currentCtx, extend, lookup } from "../fiber.ts";
 import { acquireRelease, bracket } from "../owner.ts";
 
-const CONSOLE = /*#__PURE__*/ Object.freeze({ kind: "rt/console" });
+// the key of Effect's `Console` service: the adapter's loggers write to the
+// console `with_console` gives a task, as the runtime's clock is Effect's
+const CONSOLE = /*#__PURE__*/ Object.freeze({ key: "effect/Console" });
 
 const isConsole = (value: unknown): value is Console =>
   typeof value === "object" && value !== null && typeof Reflect.get(value, "log") === "function";

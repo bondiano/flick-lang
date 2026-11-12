@@ -27,7 +27,8 @@ export class Layer {
 export const HOST = /*#__PURE__*/ Object.freeze({ key: "flick/bridge/HostContext" });
 export const layerHooks: {
   adopt: (layer: unknown) => Layer;
-  merge: (a: unknown, b: unknown) => unknown;
+  /** The host Context of the evidence `ctx`, with a provided layer's Context `b` over it. */
+  merge: (ctx: Ctx, b: unknown) => unknown;
   services: (value: unknown) => Services | undefined;
   context: (services: Services) => unknown;
 } = {
@@ -166,7 +167,7 @@ export const buildWith = (layer: Layer, memo: MemoMap, scope: Owner): Under =>
 /** Runs `body` with a layer's services as values in the caller's evidence. */
 export const withServices = (services: Services, body: () => unknown): Under =>
   new Under(services.reduce((c: Ctx, [tag, impl]) =>
-    tag === HOST ? hosted(c, layerHooks.merge(c.host, impl)) : extend(c, tag, impl), currentCtx()), body);
+    tag === HOST ? hosted(c, layerHooks.merge(c, impl)) : extend(c, tag, impl), currentCtx()), body);
 
 /** A layer of services built without effects. */
 export const constant = (services: Services): Layer => new Layer(() => services);
