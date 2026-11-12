@@ -64,6 +64,10 @@ break programs.
 - **Plugins:** a plugin is told where each value it watches is named, with
   the declaration around it (`CallSite.binding`), as it was for the
   serializable atoms alone.
+- **The hidden row of data under a `forall`:** a parameter written
+  `forall t. File t -> G String` is read as Lean reads `.all`: its result
+  holds what its own parameters reach, so a callback for any region may
+  return data over the file it is given while the file's `scope` lasts.
 - **Deep nesting:** checking a nested `fun` or a `<|` takes far less of the
   stack, so the deepest code the parser accepts (198 nested functions with
   their signature, or 199 `<|` in a row) checks on a thread's 2 MiB stack,
