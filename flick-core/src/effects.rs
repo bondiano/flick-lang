@@ -91,21 +91,25 @@ pub fn ui_family(spec: &str, export: &str) -> bool {
         .any(|line| line.split_once(' ') == Some((spec, export)))
 }
 
-/// Whether `source` names a module of the RPC family: its procedures, groups
-/// and calls are one side's values, Flick's runtime's or the adapter's.
-pub fn rpc_family(source: &str) -> bool {
+/// Whether `source` names a module of the web family: Http, RPC and server
+/// functions, whose requests, responses, procedures and handlers are one
+/// implementation's values, Flick's runtime's or the adapter's. An entry
+/// ending in `/` names every module under it.
+pub fn web_family(source: &str) -> bool {
     let source = key(source);
-    bindings::RPC_FAMILY.contains(&source.as_ref())
+    bindings::WEB_FAMILY
+        .iter()
+        .any(|family| source == *family || (family.ends_with('/') && source.starts_with(family)))
 }
 
 pub fn selected_on_kernel(spec: &str, export: &str, bridge: EffectBridge) -> bool {
     if bridge.ui() && ui_family(spec, export) {
         return false;
     }
-    if bridge.rpc()
-        && bindings::RPC_FAMILY
+    if bridge.web()
+        && bindings::ROUTES
             .iter()
-            .any(|source| rt_specifier(source).as_deref() == Some(spec))
+            .any(|(from, rt)| *rt == Some(spec) && web_family(from))
     {
         return false;
     }
@@ -365,7 +369,7 @@ mod tests {
     }
 
     #[test]
-    fn an_adapter_owning_rpc_takes_the_native_client_too() {
+    fn an_adapter_owning_the_web_takes_the_native_rpc_client_too() {
         use crate::codegen::EffectBridge;
         let spec = super::rt_specifier("flick:rpc/Rpc").expect("routed to the runtime");
         assert!(super::selected_on_kernel(
@@ -374,12 +378,19 @@ mod tests {
             EffectBridge::AvailableWithUi
         ));
         for bridge in [
-            EffectBridge::AvailableWithRpc,
-            EffectBridge::AvailableWithUiAndRpc,
+            EffectBridge::AvailableWithWeb,
+            EffectBridge::AvailableWithUiAndWeb,
         ] {
             assert!(!super::selected_on_kernel(&spec, "rpcCallNdjson", bridge));
         }
-        assert!(super::rpc_family("flick:rpc/RpcNode"));
-        assert!(!super::rpc_family("flick:ui"));
+        for web in [
+            "flick:rpc/RpcNode",
+            "flick:http/Headers",
+            "flick:server/Functions",
+        ] {
+            assert!(super::web_family(web), "{web}");
+        }
+        assert!(!super::web_family("flick:ui"));
+        assert!(!super::web_family("flick:httpx"));
     }
 }

@@ -101,5 +101,5 @@
     "@flick-lang/runtime/rt/ui/server uiServerState",
     "@flick-lang/runtime/rt/ui/server uiServerStream"
   ],
-  "rpc_family": ["flick:rpc/Rpc", "flick:rpc/RpcNode"]
+  "web_family": ["flick:http/", "flick:http-api/", "flick:rpc/", "flick:server/", "flick:SchemaHttp"]
 }

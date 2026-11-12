@@ -3,7 +3,7 @@
 use std::collections::{HashMap, HashSet};
 
 use super::builtin_modules_of;
-use super::effects::{on_kernel_with_bridge, rpc_family, rt_specifier, ui_family};
+use super::effects::{on_kernel_with_bridge, rt_specifier, ui_family, web_family};
 use crate::codegen::EffectBridge;
 use crate::ir::{Expr, ExprKind, Item, ItemKind, Module};
 use crate::project::Compilation;
@@ -22,11 +22,11 @@ fn select_modules<'a>(
     if available != EffectBridge::Available {
         return available;
     }
-    let (mut ui, mut rpc) = (false, false);
+    let (mut ui, mut web) = (false, false);
     let mut owned = |item: &Item| {
         ui |= needs_host(item);
-        rpc |= needs_rpc_adapter(item);
-        ui && rpc
+        web |= needs_web_adapter(item);
+        ui && web
     };
     let mut pending = Vec::new();
     // Include all exports of source libraries as well as the entry modules:
@@ -64,19 +64,20 @@ fn select_modules<'a>(
         }
         item.each_body(&mut |e| globals(e, &mut pending));
     }
-    EffectBridge::owning(ui, rpc)
+    EffectBridge::owning(ui, web)
 }
 
-/// A reachable RPC binding only the adapter has: a server, a stream or a
-/// transport of its own. Procedures then cross to it as its values.
-fn needs_rpc_adapter(item: &Item) -> bool {
+/// A reachable web binding only the adapter has: an Http one, an RPC server,
+/// a stream or a transport of its own. Requests, responses and procedures
+/// then cross to it as its values.
+fn needs_web_adapter(item: &Item) -> bool {
     let ItemKind::Foreign(foreign) = &item.kind else {
         return false;
     };
     let Some(source) = foreign.binding.from.as_deref() else {
         return false;
     };
-    rpc_family(source)
+    web_family(source)
         && !rt_specifier(source)
             .is_some_and(|spec| on_kernel_with_bridge(&spec, &foreign.binding.name, true))
 }
@@ -206,14 +207,26 @@ let to target children = Ui.route_link { route = page; url = Page.url; to = targ
     }
 
     #[test]
-    fn a_server_takes_every_rpc_binding_from_the_adapter() {
+    fn a_server_takes_every_web_binding_from_the_adapter() {
         let text = format!(
             "module App exposing (port, run)\n{PROCEDURE}run : Unit ->{{Async; Rpc.ClientError}} String\nlet run () = Rpc.call \"/rpc\" greet \"Ada\"\nport : Rpc.Server s -> Float\nlet port = Rpc.port\n"
         );
         let module = lower_text("App", &text).expect("lowers");
         assert_eq!(
             select_modules(once(&module), EffectBridge::Available),
-            EffectBridge::AvailableWithRpc
+            EffectBridge::AvailableWithWeb
+        );
+    }
+
+    #[test]
+    fn an_http_binding_of_the_adapter_takes_the_rpc_client_with_it() {
+        let text = format!(
+            "module App exposing (headers, run)\n{PROCEDURE}run : Unit ->{{Async; Rpc.ClientError}} String\nlet run () = Rpc.call \"/rpc\" greet \"Ada\"\nlet headers = Http.Headers.empty\n"
+        );
+        let module = lower_text("App", &text).expect("lowers");
+        assert_eq!(
+            select_modules(once(&module), EffectBridge::Available),
+            EffectBridge::AvailableWithWeb
         );
     }
 
