@@ -39,7 +39,7 @@ pub(super) fn check(
         }
         let item = &modules[at.0].items[at.1];
         if let ItemKind::Foreign(foreign) = &item.kind
-            && needs_adapter(foreign, settings)
+            && needs_adapter(foreign, settings.ui)
         {
             diagnostics.push(Diagnostic::error(
                 codes::P012,
@@ -276,12 +276,12 @@ fn loaded_modules(
     loaded
 }
 
-fn needs_adapter(foreign: &Foreign, settings: &Settings<'_>) -> bool {
+/// Whether only the adapter implements `foreign`, with the UI renderer `ui`.
+pub(super) fn needs_adapter(foreign: &Foreign, ui: Option<&str>) -> bool {
     let Some(from) = foreign.binding.from.as_deref() else {
         return false;
     };
-    let from = settings
-        .ui
+    let from = ui
         .filter(|_| super::bindings::UI_RENDERER.contains(&from))
         .unwrap_or(from);
     let native = effects::rt_specifier(from).unwrap_or_else(|| effects::effect_specifier(from));

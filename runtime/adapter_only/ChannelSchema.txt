@@ -1,0 +1,6 @@
+ChannelSchema.decode
+ChannelSchema.decode_unknown
+ChannelSchema.duplex
+ChannelSchema.duplex_unknown
+ChannelSchema.encode
+ChannelSchema.encode_unknown

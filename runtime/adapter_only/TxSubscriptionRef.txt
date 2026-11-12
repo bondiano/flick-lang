@@ -1,0 +1,9 @@
+TxSubscriptionRef.changes
+TxSubscriptionRef.get
+TxSubscriptionRef.get_and_set
+TxSubscriptionRef.get_and_update
+TxSubscriptionRef.make
+TxSubscriptionRef.modify
+TxSubscriptionRef.set
+TxSubscriptionRef.update
+TxSubscriptionRef.update_and_get

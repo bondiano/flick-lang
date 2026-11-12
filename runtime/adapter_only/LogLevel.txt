@@ -1,0 +1,5 @@
+LogLevel.is_enabled
+LogLevel.is_greater_than
+LogLevel.is_greater_than_or_equal_to
+LogLevel.is_less_than
+LogLevel.is_less_than_or_equal_to

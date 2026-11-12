@@ -1,0 +1,16 @@
+RequestResolver.around
+RequestResolver.as_cache
+RequestResolver.batch_n
+RequestResolver.from_effect
+RequestResolver.from_function
+RequestResolver.from_function_batched
+RequestResolver.grouped
+RequestResolver.make
+RequestResolver.make_grouped
+RequestResolver.make_with
+RequestResolver.never
+RequestResolver.race
+RequestResolver.set_delay
+RequestResolver.set_delay_effect
+RequestResolver.with_cache
+RequestResolver.with_span

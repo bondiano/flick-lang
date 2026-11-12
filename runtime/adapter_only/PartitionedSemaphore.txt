@@ -1,0 +1,8 @@
+PartitionedSemaphore.available
+PartitionedSemaphore.capacity
+PartitionedSemaphore.make
+PartitionedSemaphore.release
+PartitionedSemaphore.take
+PartitionedSemaphore.with_permit
+PartitionedSemaphore.with_permits
+PartitionedSemaphore.with_permits_if_available

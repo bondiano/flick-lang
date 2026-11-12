@@ -1,0 +1,10 @@
+FiberMap.await_empty
+FiberMap.clear
+FiberMap.get
+FiberMap.has
+FiberMap.join
+FiberMap.make
+FiberMap.remove
+FiberMap.run
+FiberMap.set
+FiberMap.size

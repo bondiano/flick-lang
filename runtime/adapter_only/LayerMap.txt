@@ -1,0 +1,4 @@
+LayerMap.from_record
+LayerMap.get
+LayerMap.invalidate
+LayerMap.make

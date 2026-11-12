@@ -1,0 +1,15 @@
+TxReentrantLock.acquire_read
+TxReentrantLock.acquire_write
+TxReentrantLock.locked
+TxReentrantLock.make
+TxReentrantLock.read_lock
+TxReentrantLock.read_locked
+TxReentrantLock.read_locks
+TxReentrantLock.release_read
+TxReentrantLock.release_write
+TxReentrantLock.with_lock
+TxReentrantLock.with_read_lock
+TxReentrantLock.with_write_lock
+TxReentrantLock.write_lock
+TxReentrantLock.write_locked
+TxReentrantLock.write_locks

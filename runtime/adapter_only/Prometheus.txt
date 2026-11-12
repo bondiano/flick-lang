@@ -1,0 +1,2 @@
+Prometheus.format
+Prometheus.format_with
