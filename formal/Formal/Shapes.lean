@@ -20,7 +20,7 @@ def Ty.kind : Ty → Nat
   | .errors _ => 7
   | .hnd _ => 10
   | .owner _ => 11
-  | .rg _ | .caps _ | .row _ => 12
+  | .rg _ | .caps _ | .row _ | .bare => 12
   | .dict .. => 13
   | .all .. => 14
 

@@ -115,7 +115,7 @@ theorem Ty.reach_ren (ξ : Atom → Atom) (t : Ty) (a : Atom) :
     simp only [Ty.ren, Ty.reach]
     exact Row.substT_reach _ _ a
   | hnd s ih | owner s ih => simp only [Ty.ren, Ty.reach, ih]
-  | base | adt | rnil | dict => simp [Ty.ren, Ty.reach, Caps.none]
+  | base | adt | rnil | bare | dict => simp [Ty.ren, Ty.reach, Caps.none]
   | all k t ih =>
     simp only [Ty.ren, Ty.reach, ih, Atom.ty_reach]
     constructor
@@ -198,7 +198,7 @@ theorem Ty.reach_substT (σ : Atom → Ty) (t : Ty) (a : Atom) :
     simp only [Ty.substT, Ty.reach]
     exact Row.substT_reach σ _ a
   | hnd s ih | owner s ih => simp only [Ty.substT, Ty.reach, ih]
-  | base | adt | rnil | dict => simp [Ty.substT, Ty.reach, Caps.none]
+  | base | adt | rnil | bare | dict => simp [Ty.substT, Ty.reach, Caps.none]
   | all k t ih =>
     simp only [Ty.substT, Ty.reach, ih, liftT_reach]
     constructor
