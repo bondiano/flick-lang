@@ -6,6 +6,10 @@ break programs.
 
 ## Unreleased
 
+- **The language server outlives a defect:** a panic while `flick lsp`
+  handles a message is logged with its backtrace and answered with a
+  JSON-RPC internal error; the server drops its cached analyses and keeps
+  serving, instead of the editor losing it.
 - **`<|`, `>>` and `<<`:** `f <| x` is `f x`, the weakest operator and
   right-associative, so `say <| show <| total xs` needs no parentheses;
   `f a <| x` is the call `f a x`. `f >> g` applies `f`, then `g`, and

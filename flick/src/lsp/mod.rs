@@ -17,6 +17,7 @@ use std::collections::{HashMap, HashSet};
 use std::env;
 use std::ffi::OsStr;
 use std::io::{self, BufReader, Write};
+use std::panic::{self, AssertUnwindSafe};
 use std::path::{Path, PathBuf};
 use std::process::{self, ExitCode};
 use std::time::Instant;
@@ -120,22 +121,45 @@ pub fn serve() -> ExitCode {
             // what the client answers a request of the server's
             ("", Some(_)) => debug!("response received"),
             (_, Some(id)) => {
-                let reply = match server.request(method, params) {
-                    Ok(result) => protocol::response(id, &result),
-                    Err((code, text)) => {
+                let reply = match server.guarded(|s| s.request(method, params)) {
+                    Some(Ok(result)) => protocol::response(id, &result),
+                    Some(Err((code, text))) => {
                         warn!(code, error = %text, "request failed");
                         protocol::error(id, code, &text)
                     }
+                    None => protocol::error(
+                        id,
+                        INTERNAL_ERROR,
+                        "internal error in the language server; its log has the details",
+                    ),
                 };
                 server.send(&reply);
             }
-            (_, None) => server.notify(method, params),
+            (_, None) => {
+                server.guarded(|s| s.notify(method, params));
+            }
         }
         debug!(elapsed = ?started.elapsed(), "message handled");
     }
 }
 
+/// The JSON-RPC code of a request the server failed on itself.
+const INTERNAL_ERROR: i64 = -32603;
+
 impl Server {
+    /// Runs `f`; a panic in it, which the hook has logged, is `None`, and
+    /// the analyses it may have left half-built are dropped, so the next
+    /// message analyzes anew instead of the editor losing the server.
+    fn guarded<T>(&mut self, f: impl FnOnce(&mut Self) -> T) -> Option<T> {
+        let out = panic::catch_unwind(AssertUnwindSafe(|| f(self))).ok();
+        if out.is_none() {
+            self.snapshots.clear();
+            self.latest = None;
+            self.caches.clear();
+        }
+        out
+    }
+
     fn send(&mut self, message: &Value) {
         if let Err(err) = protocol::write(&mut self.out, message) {
             error!(error = %err, "cannot write protocol message");
