@@ -591,6 +591,7 @@
 @flick-lang/runtime/rt Effect
 @flick-lang/runtime/rt GT
 @flick-lang/runtime/rt LT
+@flick-lang/runtime/rt RuntimeFailure
 @flick-lang/runtime/rt absent
 @flick-lang/runtime/rt acquireRelease
 @flick-lang/runtime/rt appFail
@@ -841,6 +842,7 @@
 @flick-lang/runtime/rt platformArgs
 @flick-lang/runtime/rt platformEnv
 @flick-lang/runtime/rt powInt
+@flick-lang/runtime/rt promiseFacade
 @flick-lang/runtime/rt raceFirst
 @flick-lang/runtime/rt raceSuccess
 @flick-lang/runtime/rt rawCauseInspect

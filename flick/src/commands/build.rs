@@ -118,8 +118,8 @@ impl Command for BuildCommand {
         }
         let plan = self.plan(&host, project.as_ref(), Vec::new());
         let go = plan.go;
-        if plan.extras.rt && (go || plan.extras.promise_facade) {
-            let message = "Flick's own runtime does not support Go output or Promise façades";
+        if plan.extras.rt && go {
+            let message = "Flick's own runtime does not support Go output";
             return Outcome {
                 sources,
                 diagnostics: vec![Diagnostic::new(codes::F004, Severity::Error, message)],
