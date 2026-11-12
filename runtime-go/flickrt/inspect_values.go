@@ -81,7 +81,7 @@ func formatSpaced(v Value, space int) string {
 		return b.String() + close
 	}
 	recur = func(v Value, d int) string {
-		switch x := v.(type) {
+		switch x := asData(v).(type) {
 		case string:
 			return QuoteJSON(x)
 		case float64, int32, bool:

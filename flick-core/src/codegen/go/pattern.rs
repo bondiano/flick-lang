@@ -7,9 +7,9 @@ use flick_pretty::{Document, Documentable, docvec};
 use super::arith::Native;
 use super::expr::enum_literal;
 use super::layout::{block, call, conjunction, inline, statement};
-use super::{Gen, names};
+use super::{Gen, names, own};
 use crate::ir::{Arm, Expr, Lit, Pat};
-use crate::types::Rep;
+use crate::types::{Constructor, Rep};
 
 #[derive(Default)]
 struct Test<'a> {
@@ -74,13 +74,7 @@ impl<'a> Gen<'a> {
                     self.test(arg, subject, t);
                 }
             }
-            Pat::Con(c, args) => {
-                let tag = self.string(&self.tag(c));
-                t.conds.push(call(a, "flickrt.IsTag", [subject, tag]));
-                for (i, arg) in args.iter().enumerate() {
-                    self.test(arg, call(a, "flickrt.Get", [subject, i.to_doc(a)]), t);
-                }
-            }
+            Pat::Con(c, args) => self.tagged(c, args, subject, t),
             Pat::Or(alternatives) => {
                 let mut tests = Vec::new();
                 for alt in alternatives {
@@ -111,6 +105,32 @@ impl<'a> Gen<'a> {
                     ")"
                 ]);
             }
+        }
+    }
+
+    /// The test of a tagged constructor and of its fields.
+    fn tagged(&mut self, c: &Constructor, args: &[Pat], subject: Document<'a>, t: &mut Test<'a>) {
+        let a = self.a;
+        if let Some(ty) = self.own_type(c) {
+            // a Go type of its own: Go tells the constructor and has the fields
+            t.conds
+                .push(call(a, a.alloc_str(&own::test(&ty)), [subject]));
+            let ty = a.alloc_str(&ty);
+            for (i, arg) in args.iter().enumerate() {
+                self.test(arg, docvec![a, subject, ".(*", ty, ").f[", i, "]"], t);
+            }
+            return;
+        }
+        let tag = self.string(&self.tag(c));
+        // of a type whose other constructors may have Go types of their own
+        let is = if self.own.is_some_and(|own| own(&c.module)) {
+            "flickrt.IsData"
+        } else {
+            "flickrt.IsTag"
+        };
+        t.conds.push(call(a, is, [subject, tag]));
+        for (i, arg) in args.iter().enumerate() {
+            self.test(arg, call(a, "flickrt.Get", [subject, i.to_doc(a)]), t);
         }
     }
 

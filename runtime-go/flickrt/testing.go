@@ -276,7 +276,7 @@ func preview(v Value) string {
 // previewJSON is the JSON of a value, or false for `undefined`, which an
 // array writes as null and an object leaves out.
 func previewJSON(v Value) (string, bool) {
-	switch x := v.(type) {
+	switch x := asData(v).(type) {
 	case UnitType:
 		return "", false
 	case float64:
@@ -359,8 +359,8 @@ func describeText(v Value) string {
 		return strconv.FormatBool(x)
 	case UnitType:
 		return "undefined"
-	case *Data:
-		return ConstructorName(x.Tag)
+	case Constructed:
+		return ConstructorName(x.TagName())
 	}
 	return "<object>"
 }

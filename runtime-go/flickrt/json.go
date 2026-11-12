@@ -431,7 +431,7 @@ func describeInput(in Value) string {
 		return "bigint"
 	case []Value:
 		return "an array"
-	case *Record, *Data:
+	case *Record, Constructed:
 		return "an object"
 	case Fn, Fn2, Fn3, Poly:
 		return "function"

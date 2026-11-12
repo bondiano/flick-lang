@@ -122,7 +122,7 @@ func Derive(name string, fields func(*Fiber) []Value, constructors []Constructor
 				}
 				continue
 			}
-			if c.Unboxed || c.Class != "" && IsClass(v, c.Class) || c.Class == "" && v.(*Data).Tag == c.Tag {
+			if c.Unboxed || c.Class != "" && IsClass(v, c.Class) || c.Class == "" && tagName(v) == c.Tag {
 				return i, offset
 			}
 			offset += c.Arity
@@ -136,7 +136,7 @@ func Derive(name string, fields func(*Fiber) []Value, constructors []Constructor
 		if constructors[i].Unboxed || constructors[i].Class != "" {
 			return []Value{v}
 		}
-		return v.(*Data).Fields()
+		return fieldsIn(v)
 	}
 	d := NewDict()
 	for class, f := range supers {

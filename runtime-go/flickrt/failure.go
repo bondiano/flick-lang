@@ -30,13 +30,13 @@ func describeCause(c *Cause) string {
 			parts = append(parts, "interrupt")
 		case causeFail:
 			shown := "<object>"
-			if d, ok := r.err.(*Data); ok {
-				shown = ConstructorName(d.Tag)
+			if d, ok := r.err.(Constructed); ok {
+				shown = ConstructorName(d.TagName())
 			}
 			parts = append(parts, "fail "+shown)
 		case causeDie:
-			if d, ok := r.err.(*Data); ok {
-				parts = append(parts, "die "+ConstructorName(d.Tag))
+			if d, ok := r.err.(Constructed); ok {
+				parts = append(parts, "die "+ConstructorName(d.TagName()))
 				continue
 			}
 			text := strings.TrimSuffix(r.defect, "\n")

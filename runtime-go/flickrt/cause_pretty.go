@@ -29,7 +29,7 @@ func prettyErrors(c *Cause) []*prettyError {
 		case causeFail:
 			out = append(out, prettyFailure(r.err, r.trace))
 		case causeDie:
-			if _, ok := r.err.(*Data); ok {
+			if _, ok := r.err.(Constructed); ok {
 				out = append(out, prettyFailure(r.err, r.trace))
 			} else {
 				out = append(out, prettyDefect(r.defect, r.trace))
@@ -121,7 +121,7 @@ func (e *prettyError) rendered() string {
 // formatJSON is the JSON of a Flick value, with an Option or a Result as
 // their `toJSON` gives them.
 func formatJSON(v Value) string {
-	switch x := v.(type) {
+	switch x := asData(v).(type) {
 	case []Value:
 		parts := make([]string, len(x))
 		for i, e := range x {

@@ -158,5 +158,5 @@ func drawVariant(fb *Fiber, r rng, s *Schema, depth int) Value {
 	for i, f := range v.Fields {
 		fields[i] = drawSchema(fb, r, sch(f), depth+2)
 	}
-	return NewData(v.Tag, fields...)
+	return Construct(v.Tag, fields...)
 }

@@ -1,0 +1,44 @@
+// A persistent binary search tree whose nodes are a constructor of four
+// fields: 300 000 inserts of pseudo-random keys, then a lookup of each.
+module App.Main exposing (main)
+
+type Tree = Leaf | Node Tree Int Int Tree
+
+insert : Int -> Int -> Tree -> Tree
+let rec insert key value tree =
+  match tree with
+  | Leaf -> Node Leaf key value Leaf
+  | Node l k v r ->
+    if key < k then
+      Node (insert key value l) k v r
+    else if key > k then
+      Node l k v (insert key value r)
+    else
+      Node l k value r
+
+find : Int -> Tree -> Option Int
+let rec find key tree =
+  match tree with
+  | Leaf -> None
+  | Node l k v r -> if key < k then find key l else if key > k then find key r else Some v
+
+next : Int -> Int
+let next seed =
+  let n = (seed * 1103515245 + 12345) % 1000003
+  if n < 0 then 0 - n else n
+
+build : Int -> Int -> Tree -> Tree
+let rec build left seed tree =
+  if left == 0 then tree else build (left - 1) (next seed) (insert seed left tree)
+
+total : Int -> Int -> Tree -> Int -> Int
+let rec total left seed tree sum =
+  if left == 0 then
+    sum
+  else
+    total (left - 1) (next seed) tree (sum + Option.with_default 0 (find seed tree))
+
+main : Unit ->{; AppError} Unit
+let main () =
+  let tree = build 300000 7 Leaf
+  Platform.stdout_line (show (total 300000 7 tree 0))

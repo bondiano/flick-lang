@@ -29,7 +29,10 @@ func Equals(a, b Value) bool {
 		return true
 	case *Data:
 		y, ok := b.(*Data)
-		if !ok || x.Tag != y.Tag || len(x.Fields()) != len(y.Fields()) {
+		if !ok {
+			return sameConstructed(x, b)
+		}
+		if x.Tag != y.Tag || len(x.Fields()) != len(y.Fields()) {
 			return false
 		}
 		for i := range x.Fields() {
@@ -67,9 +70,35 @@ func Equals(a, b Value) bool {
 	case Fn, Fn2, Fn3, Poly:
 		// functions compare by identity on the JS target; Go cannot compare them
 		return false
+	case int32, string, bool, UnitType:
+		return a == b
 	default:
+		// a constructor value of a Go type of its own, asked last: a number
+		// or a string never gets here
+		if x, ok := a.(Constructed); ok {
+			return sameConstructed(x, b)
+		}
 		return a == b
 	}
+}
+
+// sameConstructed is `Equals` of a constructor value and any value,
+// whatever Go types the two have.
+func sameConstructed(x Constructed, b Value) bool {
+	y, ok := b.(Constructed)
+	if !ok || x.TagName() != y.TagName() {
+		return false
+	}
+	xs, ys := x.Fields(), y.Fields()
+	if len(xs) != len(ys) {
+		return false
+	}
+	for i := range xs {
+		if !Equals(xs[i], ys[i]) {
+			return false
+		}
+	}
+	return true
 }
 
 // Same is `===` on values whose identity is their equality.
@@ -235,20 +264,27 @@ func hash(a Value) int32 {
 		}
 		return optimize(h)
 	case *Data:
-		// the object `{ _tag, _0, … }`: its keys in any order
-		h := int32(12289) ^ effectCombine(hashOfTag, hashString(x.Tag))
-		for i, v := range x.Fields() {
-			h ^= effectCombine(hashString(nativeField(x.Tag, i)), hash(v))
-		}
-		return optimize(h)
+		return hashConstructed(x.Tag, x.Fields())
 	case *Record:
 		h := int32(12289)
 		for i, k := range x.keys {
 			h ^= effectCombine(hashString(k), hash(x.vals[i]))
 		}
 		return optimize(h)
+	case Constructed:
+		return hashConstructed(x.TagName(), x.Fields())
 	}
 	panic(Defect{"hash of a value without a hash"})
+}
+
+// hashConstructed is the hash of the object `{ _tag, _0, … }`: its keys in
+// any order.
+func hashConstructed(tag string, fields []Value) int32 {
+	h := int32(12289) ^ effectCombine(hashOfTag, hashString(tag))
+	for i, v := range fields {
+		h ^= effectCombine(hashString(nativeField(tag, i)), hash(v))
+	}
+	return optimize(h)
 }
 
 // nativeField is the JS property field `i` of a variant value is in.
@@ -285,6 +321,8 @@ func Show(a Value) Value {
 		return "false"
 	case UnitType:
 		return "undefined"
+	case Constructed:
+		return ConstructorName(x.TagName())
 	}
 	return "[object Object]"
 }
