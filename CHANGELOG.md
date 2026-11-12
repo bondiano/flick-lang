@@ -115,7 +115,7 @@ break programs.
   files ship beside its modules. The built-in modules do the same, as
   `@ts "ReadonlyArray<{0}>"` before `type List a`, and the backend names no
   type of a library. A generated module imports from the runtime only the
-  types its declarations name. `.iface` is version 22.
+  types its declarations name. `.iface` is version 23.
 - **Comparisons by `Ord`:** `< <= > >=` order any type with an `Ord`
   instance by its `compare`, as they already did a type variable: `Bool`, a
   derived type, a record, a list. A type without one is `FLICK-C001`, where
