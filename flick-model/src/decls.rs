@@ -12,6 +12,7 @@ use crate::syntax::{Name, Path};
 use crate::translate::instance;
 use crate::translate::types::{binders, constraint, kind, scheme, ty};
 use crate::types::{Kind, Scheme, Stage, Type};
+use crate::variance::{self, Sign};
 
 /// A class: its parameters, superclasses and methods.
 #[derive(Clone, Debug, Default)]
@@ -49,6 +50,9 @@ pub struct Decls {
     /// The types without constructors with hidden storage: an opaque ADT
     /// whose fields hide captures, or a foreign type marked `@stores`.
     pub hidden: HashSet<Path>,
+    /// The sign of each parameter of a declared type, once every module
+    /// is added; a type without one is invariant in each.
+    pub signs: HashMap<Path, Vec<Sign>>,
 }
 
 /// The arity of a constructor's scheme: its arrows.
@@ -185,6 +189,7 @@ impl Decls {
                 }
             }
         }
+        self.signs = variance::signs(self);
     }
 
     /// The scheme of the method `name` of class `class` as a field of

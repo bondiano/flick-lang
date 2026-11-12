@@ -166,7 +166,7 @@ stdlib/effect/shared_layer_merged # no native for `provide_` (flick:Layer provid
 stdlib/effect/sink # no native for `collect` (flick:Sink collect)
 stdlib/effect/sink_more # no native for `make` (flick:Sink flickMake)
 stdlib/effect/stream # no native for `run_collect` (flick:Stream runCollect)
-stdlib/effect/stream_combine # the model's (≡) rejects `App.Main.main`
+stdlib/effect/stream_combine # the model's (≤-Cap) rejects `App.Main.main`
 stdlib/effect/stream_core # no native for `from_list` (flick:Stream fromArray)
 stdlib/effect/stream_errors # no native for `run_collect` (flick:Stream runCollect)
 stdlib/effect/stream_platform # a `BigInt` literal has no λFlick form
