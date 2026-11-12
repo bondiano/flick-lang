@@ -1,0 +1,14 @@
+// A closure that only applies a generic callback holds what the callback
+// holds, so it is a constructor's payload wherever the callback itself is.
+module App.EtaPayload exposing (..)
+
+type Opt a = Som a | Non
+
+after : (Int -> c) -> Opt (Int -> c)
+let after k = Som (fun x -> k (x + 1))
+
+direct : (Int -> c) -> Opt (Int -> c)
+let direct k = Som k
+
+later : (Int -> c) -> Option (Int -> c)
+let later k = Some (fun x -> k (x * 2))

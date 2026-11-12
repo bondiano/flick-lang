@@ -56,6 +56,14 @@ impl Checker<'_> {
                     Some(Kind::Region | Kind::CaptureRow)
                 )
         });
+        // a bound cannot take a type variable's own captures away, so an
+        // empty one over it says nothing and would only differ from it
+        if captures.entries.is_empty()
+            && captures.tails.is_empty()
+            && matches!(self.whnf(&result), Type::Var(_) | Type::Skolem(_))
+        {
+            return result;
+        }
         Type::Bounded {
             ty: Box::new(result),
             captures: Box::new(captures.into_type()),
