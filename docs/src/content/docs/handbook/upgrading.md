@@ -502,6 +502,22 @@ reads into the signature.
 - **`Option.map`** returns `(Option b)^c`: what the callback returns holds
   nothing of its input.
 
+## Data that stores a function holds what its parameters reach
+
+Data that stores a function or a `task`, such as `type G s a = G (s -> a)`,
+written bare in a signature now has its hidden row read as `Live` is: in a
+parameter any row, in the result what the parameters before it reach (see
+[Regions and captures](../../reference/regions/#qualifiers)).
+
+- **A function that returns fresh data** after a parameter that reaches a
+  region holds that region: `make : Handle r -> G Unit Int` cannot leave the
+  `scope` of `r` (`FLICK-G001`). Write `(G Unit Int)^{}` when it holds
+  nothing.
+- **A callback taken out of such data** uses the data's row, so passing it
+  to a callback parameter written bare is `FLICK-G002`: take the data
+  itself, or write the row on the callback parameter.
+- **`.iface` files** of version 20 are rejected: rebuild the libraries.
+
 ## Rust 1.95 builds the compiler
 
 A checkout of `main` builds with Rust 1.95 (0.1.0 took 1.94); its

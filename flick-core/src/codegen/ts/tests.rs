@@ -1,3 +1,4 @@
+use crate::types::Elided;
 use std::fmt::Write;
 
 use super::{Projection, declaration_file};
@@ -162,6 +163,7 @@ fn capture_projection_preserves_outer_data_binders_but_not_stored_regions() {
         ty: Box::new(ty),
         captures: Box::new(captures),
         value: false,
+        elided: Elided::default(),
     };
     let a = Type::Var("a".to_owned());
     let c = Type::Var("c".to_owned());

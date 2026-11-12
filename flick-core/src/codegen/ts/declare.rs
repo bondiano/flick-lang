@@ -122,7 +122,7 @@ impl Projection<'_> {
                 }
                 self.variants(name, &exported, abi.is_tagged()).map(Some)
             }
-            (Form::Nominal { literals }, _) if !literals.is_empty() => {
+            (Form::Nominal { literals, .. }, _) if !literals.is_empty() => {
                 Ok(Some(self.enumeration(name, literals, false)))
             }
             (Form::Error, _) => {

@@ -14,6 +14,8 @@
 mod applied;
 mod compare;
 mod data;
+mod hidden_rows;
+pub use hidden_rows::{is_elided_row, strip_elided};
 mod live;
 mod live_rows;
 mod provided;
@@ -35,6 +37,7 @@ use crate::diagnostics;
 use crate::diagnostics::codes;
 use crate::source::Span;
 use crate::types::Elem;
+use crate::types::Elided;
 use crate::types::lang::{self, Lang};
 
 /// The service a `scope` provides to the operations that acquire resources.
@@ -447,6 +450,7 @@ impl Checker<'_> {
                         ty,
                         captures: captures.clone(),
                         value: matches!(t, Type::Captured { value: true, .. }),
+                        elided: Elided::default(),
                     }
                 }
             }
@@ -637,6 +641,7 @@ impl Checker<'_> {
                     ty: Box::new(ty.clone()),
                     captures: Box::new(captures.clone()),
                     value: false,
+                    elided: Elided::default(),
                 },
                 None => ty.clone(),
             };
@@ -647,6 +652,7 @@ impl Checker<'_> {
                 ty: Box::new(ty.clone()),
                 captures: Box::new(row.clone()),
                 value: false,
+                elided: Elided::default(),
             };
             (row, qualified)
         };
@@ -687,6 +693,7 @@ impl Checker<'_> {
             ty: Box::new(ty),
             captures: Box::new(captures),
             value: false,
+            elided: Elided::default(),
         }
     }
 
@@ -825,15 +832,18 @@ fn qualify(t: Type, held: Type) -> Type {
             ty,
             captures,
             value,
+            elided,
         } => Type::Captured {
             ty,
             captures: Box::new(Type::Union(captures, Box::new(held))),
             value,
+            elided,
         },
         other => Type::Captured {
             ty: Box::new(other),
             captures: Box::new(held),
             value: false,
+            elided: Elided::default(),
         },
     }
 }

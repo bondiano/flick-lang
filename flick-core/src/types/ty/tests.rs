@@ -1,3 +1,4 @@
+use crate::types::Elided;
 use std::hash::{DefaultHasher, Hash, Hasher};
 
 use super::{Effects, Lang, Stage, Type};
@@ -33,6 +34,7 @@ fn substitution_preserves_capture_qualification_kind() {
             ty: Box::new(Type::Var("a".into())),
             captures: Box::new(Type::Var("c".into())),
             value,
+            elided: Elided::default(),
         };
         let substituted = ty.substitute(&[
             ("a".into(), Type::lang(Lang::Float)),
@@ -44,6 +46,7 @@ fn substitution_preserves_capture_qualification_kind() {
                 ty: Box::new(Type::lang(Lang::Float)),
                 captures: Box::new(Type::empty_row()),
                 value,
+                elided: Elided::default(),
             }
         );
     }

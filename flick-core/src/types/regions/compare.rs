@@ -1,5 +1,6 @@
 //! Capture-qualified type equality and value subsumption.
 
+use crate::types::Elided;
 use crate::types::{Atom, Elem};
 use std::mem;
 
@@ -23,6 +24,7 @@ impl Checker<'_> {
                 ty: Box::new(t.clone()),
                 captures: Box::new(c.clone()),
                 value: false,
+                elided: Elided::default(),
             },
             None => t.clone(),
         };

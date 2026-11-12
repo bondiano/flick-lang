@@ -63,7 +63,7 @@ impl Checker<'_> {
                 abi: Abi::Literal(literals),
                 ..
             }
-            | Form::Nominal { literals } => literals.first()?,
+            | Form::Nominal { literals, .. } => literals.first()?,
             _ => return None,
         };
         let base = match first {
@@ -175,7 +175,7 @@ impl Checker<'_> {
                 abi: Abi::Literal(literals),
                 ..
             }) => Some(literals.clone()),
-            Some(Form::Nominal { literals }) if !literals.is_empty() => Some(literals.clone()),
+            Some(Form::Nominal { literals, .. }) if !literals.is_empty() => Some(literals.clone()),
             _ => None,
         };
         if let Some(literals) = literals {

@@ -1,0 +1,25 @@
+// The cost of reading the hidden row of a bare result: it holds what the
+// earlier parameters reach, so a fresh closure returned by `make` does not
+// leave the `scope` of the file unless the signature writes `^{}`. A row a
+// declaration names is invariant: it does not widen as the hidden row does.
+module App.HiddenRowsFail exposing (..)
+
+import File exposing (File, Path, FileSystem, OpenError)
+
+type F s a = F (s -> a)
+
+make : File s -> F Unit Int
+let make _ = F (fun _ -> 1)
+
+leaves : Path ->{Async, FileSystem; OpenError} F Unit Int
+let leaves path = scope {
+  let file = File.open_scoped path
+  make file
+}
+
+type K (c : CaptureRow) = K ((Unit ->{} Unit)^c ->{} Unit)
+
+widen : K {} -> K c
+let widen k = k
+//~ FLICK-G001 @17:3-17:12 this value holds region `s`, but the expected type `F Unit Int` holds no captures
+//~ FLICK-T008 @23:15-23:16 expected `K c`, found `K none`: `c` stands for any type the caller chooses, so it cannot be `none`

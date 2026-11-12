@@ -180,8 +180,7 @@ type like the others: a region another argument shows does not stand in for
 it. Data with a smaller row may be used where a larger one is expected, never
 the reverse. Only the row the reading adds widens: a capture row a
 declaration names, `type K (c : CaptureRow)`, and data inside an argument of
-another type, `List (G s a)`, compare as written. Written bare in a signature, the row is read by elision, as `Live` is
-(being implemented, see [Not checked yet](#not-checked-yet)):
+another type, `List (G s a)`, compare as written. Written bare in a signature, the row is read by elision, as `Live` is:
 
 - in a parameter, any row: the function is generic in it;
 - in a result, what the parameters before it reach;
@@ -192,10 +191,11 @@ the fields of other data and of opaque types of the standard library, at the
 outer level of a parameter or a result. A value without arrows (`x : G s a`)
 and data inside a type argument (`List (G s a)`) hold nothing beyond what
 their type shows. Like `Live`, the row is not shown in messages or on hover;
-the explanation of `FLICK-G002` names it when it is why a value cannot leave
-its `scope`.
+`FLICK-G001` names the region it holds when it is why a value cannot leave
+its `scope`, and a row a parameter's data holds is called the hidden row of
+a parameter's data.
 
-```flick ignore the checker reads the hidden row of data in signatures in a later change
+```flick
 type Handle (r : Region)
 type G s a = G (s -> a)
 
@@ -207,29 +207,35 @@ let make_free _ = G (fun _ -> 1)
 ```
 
 `make h` holds `{r}`, what its parameter reaches, so it cannot leave the
-`scope` of `r` (`FLICK-G002`); `make_free h` holds nothing and can. A
+`scope` of `r` (`FLICK-G001`); `make_free h` holds nothing and can. A
 composition through a helper generic in the data's argument keeps the rows
 of its parts, so a composition that reads a file of a `scope` cannot leave
 it:
 
-```flick ignore the checker reads the hidden row of data in signatures in a later change
-type G s a = G (s ->{FileSystem} a)
+```flick fail G001
+# import File exposing (Path, FileSystem, OpenError, ReadError)
+#
+type G s a = G (s ->{Async, FileSystem; ReadError} a)
 
-run : G s a -> s ->{FileSystem} a
+run : G s a -> s ->{Async, FileSystem; ReadError} a
 let run (G f) x = f x
 
-compose : G a b -> G s a ->{FileSystem} G s b
+compose : G a b -> G s a ->{Async, FileSystem; ReadError} G s b
 let compose inner outer = G (fun x -> run inner (run outer x))
 
-leaked : Path ->{Async, FileSystem; OpenError} G Unit String
+leaked : Path ->{Async, FileSystem; OpenError, ReadError} G Unit String
 let leaked path = scope {
   let file = File.open_scoped path
   compose (G (fun f -> File.read_all f)) (G (fun _ -> file))
 }
 ```
 
-`leaked` is `FLICK-G002` at its `scope`: the result holds the row of
-`G (fun f -> File.read_all f)`, which uses the file.
+```text
+FLICK-G001: this value holds region `s`, but the expected type `G Unit String` holds no captures
+```
+
+The value of the `scope` holds the row of `G (fun f -> File.read_all f)`,
+which uses the file, and the result of `leaked` reads as holding nothing.
 
 A function that takes a callback says what using its result needs, as
 `map_effect` does:
@@ -354,5 +360,4 @@ What it has instead is a region parameter, `forall r. File r -> Unit`.
 | - | - |
 | foreign retention contracts | signatures are written and reviewed by hand; the checker requires `retention`, and derives or requires `Fiber.Outlives` for what `retention owner` keeps, but does not inspect foreign bodies |
 | a region variable unified late with another region in a capture row | the two are kept apart, which may reject a program |
-| the hidden row of data written bare in a signature | read as nothing beyond what the type shows, and a region another argument shows stands in for it, so a helper generic in that argument can hide a use: `leaked` above is accepted and reads a released file. Being changed to the reading above |
 | a pure foreign function over a resource | accepted, and it can read the resource after its `scope`. Being changed: such a binding needs a runtime stage |

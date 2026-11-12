@@ -263,6 +263,9 @@ impl Checker<'_> {
             ),
             Type::Skolem(s) => {
                 let name = self.store.skolem_name(*s);
+                if name.starts_with(super::hidden_rows::FRESH) {
+                    return ("the hidden row of a parameter's data".to_owned(), None);
+                }
                 match self.scope_of(*s) {
                     Some(scope) => (format!("region `{name}`"), Some(scope.span)),
                     None => (format!("`{name}`"), None),

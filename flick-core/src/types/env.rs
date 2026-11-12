@@ -37,6 +37,9 @@ pub enum Form {
     Nominal {
         #[serde(default, skip_serializing_if = "Vec::is_empty")]
         literals: Vec<EnumLit>,
+        /// An opaque Flick type with hidden storage (`stores_hidden`).
+        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+        hidden: bool,
     },
     /// A variant type with every constructor, exported or not, and how its
     /// values are represented in JS.

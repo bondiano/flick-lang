@@ -2,6 +2,7 @@
 //! full signature right above it; a signature is checked, not trusted, and
 //! does not lift the generalization rules.
 
+use crate::types::Elided;
 use std::mem;
 
 use super::convert::{TyVar, is_type};
@@ -285,6 +286,7 @@ impl Checker<'_> {
                 ty: Box::new(body),
                 captures: Box::new(c.clone()),
                 value: false,
+                elided: Elided::default(),
             },
             None => body,
         };

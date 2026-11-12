@@ -40,10 +40,9 @@ impl Checker<'_> {
                     export.scheme = self.env.value(entity).map(|t| self.exported(t));
                 }
                 Namespace::Type => {
-                    export.definition = self
-                        .env
-                        .type_def(&entity.module, &entity.name)
-                        .map(|d| self.exported_def(d, Some(export.decl)));
+                    export.definition = self.env.type_def(&entity.module, &entity.name).map(|d| {
+                        self.exported_def((&entity.module, &entity.name), d, Some(export.decl))
+                    });
                 }
             }
         }
@@ -119,20 +118,35 @@ impl Checker<'_> {
 
     /// A type definition as importers see it: an opaque alias, and an ADT
     /// exported opaque, are nominal. `export: None` is the module's own view.
-    fn exported_def(&self, d: &TypeDef, export: Option<Decl>) -> TypeDef {
+    fn exported_def(
+        &self,
+        (module, name): (&str, &str),
+        d: &TypeDef,
+        export: Option<Decl>,
+    ) -> TypeDef {
         let nominal = match (&d.form, export) {
             (Form::Alias { opaque, .. }, Some(_)) => *opaque,
             (Form::Adt { .. }, Some(decl)) => decl == Decl::Opaque,
             _ => false,
         };
+        // an importer cannot see the fields, so it is told the type hides
+        let hidden = nominal
+            && matches!(d.form, Form::Adt { .. })
+            && self.stores_hidden(&Type::Con {
+                module: module.to_owned(),
+                name: name.to_owned(),
+            });
         let mut d = d.clone();
         d.form = match d.form {
             // an opaque enum keeps what its values are: its literals
             Form::Adt {
                 abi: Abi::Literal(literals),
                 ..
-            } if nominal => Form::Nominal { literals },
-            _ if nominal => Form::NOMINAL,
+            } if nominal => Form::Nominal { literals, hidden },
+            _ if nominal => Form::Nominal {
+                literals: Vec::new(),
+                hidden,
+            },
             Form::Alias { params, body, .. } => Form::Alias {
                 params,
                 body: self.exported(&body),
@@ -192,7 +206,7 @@ impl Checker<'_> {
             },
             parent: None,
             scheme: None,
-            definition: Some(self.exported_def(d, None)),
+            definition: Some(self.exported_def((&self.env.module, name), d, None)),
             blocked: None,
             at: None,
         };

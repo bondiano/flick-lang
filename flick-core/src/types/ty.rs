@@ -56,6 +56,8 @@ pub enum Type {
         /// Interpreted at a value boundary after inference, rather than as
         /// an explicitly declared or stored type qualification.
         value: bool,
+        #[serde(default, skip_serializing_if = "Elided::is_no")]
+        elided: Elided,
     },
     /// A capture bound on a complete generic type, not an extra hidden
     /// qualifier. Substitution must keep the underlying type's qualifiers.
@@ -438,10 +440,12 @@ impl Type {
                 ty,
                 captures,
                 value,
+                elided,
             } => Type::Captured {
                 ty: Box::new(f(ty)),
                 captures: Box::new(f(captures)),
                 value: *value,
+                elided: *elided,
             },
             Type::Bounded { ty, captures } => Type::Bounded {
                 ty: Box::new(f(ty)),
@@ -582,6 +586,9 @@ impl Type {
         found
     }
 }
+
+mod elided;
+pub use elided::Elided;
 
 #[cfg(test)]
 mod tests;

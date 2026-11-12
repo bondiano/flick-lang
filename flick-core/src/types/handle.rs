@@ -19,6 +19,7 @@ use crate::source::Span;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
 use crate::types::Elem;
+use crate::types::Elided;
 
 /// An effect a handler has arms for.
 pub struct Handled {
@@ -364,6 +365,7 @@ impl Checker<'_> {
                     ..Row::default()
                 })),
                 value: false,
+                elided: Elided::default(),
             },
             None => resume,
         }

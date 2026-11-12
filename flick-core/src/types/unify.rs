@@ -300,10 +300,12 @@ impl Store {
                 ty,
                 captures,
                 value,
+                elided,
             } => Type::Captured {
                 ty: Box::new(self.zonk(ty)),
                 captures: Box::new(self.zonk(captures)),
                 value: *value,
+                elided: *elided,
             },
             _ => t.map_children(&mut |c| self.zonk(c)),
         }
@@ -854,10 +856,12 @@ impl Checker<'_> {
                 ty,
                 captures,
                 value,
+                elided,
             } => Type::Captured {
                 ty: Box::new(self.instantiate(&ty, span)),
                 captures,
                 value,
+                elided,
             },
             Type::Bounded { ty, captures } => Type::Bounded {
                 ty: Box::new(self.instantiate(&ty, span)),

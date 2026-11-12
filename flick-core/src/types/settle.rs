@@ -284,7 +284,7 @@ impl Checker<'_> {
         };
         let form = self.env.type_def(module, name).map(|d| &d.form);
         // an enum's values are its literals, an opaque one's too
-        if let Some(Form::Nominal { literals }) = form
+        if let Some(Form::Nominal { literals, .. }) = form
             && !literals.is_empty()
         {
             return Some(Identity::Value);

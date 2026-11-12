@@ -13,6 +13,7 @@ use crate::source::Span;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
 use crate::syntax::patterns;
+use crate::types::Elided;
 use crate::types::env::Found;
 use crate::types::lang::{self, Lang};
 
@@ -122,6 +123,7 @@ impl Checker<'_> {
                 ty: Box::new(curried(&items, x)),
                 captures: Box::new(captures),
                 value: false,
+                elided: Elided::default(),
             };
             let body = |c: &mut Self, result: Option<Type>| match result {
                 Some(result) => {
@@ -197,10 +199,12 @@ impl Checker<'_> {
                 ty,
                 captures,
                 value,
+                elided,
             } => Type::Captured {
                 ty: Box::new(self.group_continuation(&ty, items)),
                 captures,
                 value,
+                elided,
             },
             Type::Bounded { ty, captures } => Type::Bounded {
                 ty: Box::new(self.group_continuation(&ty, items)),

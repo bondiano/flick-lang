@@ -241,10 +241,12 @@ impl Checker<'_> {
                 ty,
                 captures,
                 value,
+                elided,
             } => Type::Captured {
                 ty: Box::new(self.elide(ty, held, kinds, path)),
                 captures: captures.clone(),
                 value: *value,
+                elided: *elided,
             },
             Type::Bounded { ty, captures } => Type::Bounded {
                 ty: Box::new(self.elide(ty, held, kinds, path)),
