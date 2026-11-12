@@ -40,7 +40,6 @@ use std::{mem, slice};
 
 use flick_pretty::{Document, DocumentArena, Documentable, docvec};
 
-use super::Known;
 use crate::diagnostics::{Diagnostic, Severity, codes};
 use crate::ir::{ItemKind, Module, reach};
 use crate::source::Span;
@@ -357,8 +356,6 @@ struct Gen<'a> {
     shapes: &'a HashMap<Key, Shape>,
     /// The program: its modules, the data of the build and its lang items.
     input: &'a Input<'a>,
-    /// The program's lang items.
-    lang: &'a Known<'a>,
     /// Statements of the block being emitted, each with its newline.
     buf: Vec<Document<'a>>,
     temps: u32,
@@ -417,7 +414,6 @@ impl<'a> Gen<'a> {
             item_initializers: false,
             shapes,
             input,
-            lang: input.lang,
             buf: Vec::new(),
             temps: 0,
             lines: 0,

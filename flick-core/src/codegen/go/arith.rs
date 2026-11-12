@@ -190,7 +190,7 @@ impl<'a> Gen<'a> {
     fn compared(&self, lhs: &Expr, rhs: &Expr) -> Option<Native> {
         let known = |e: &Expr| {
             self.native(e)
-                .or_else(|| Native::of(self.lang, e.ty.as_deref()))
+                .or_else(|| Native::of(self.input.lang, e.ty.as_deref()))
         };
         known(lhs).filter(|&n| known(rhs) == Some(n))
     }

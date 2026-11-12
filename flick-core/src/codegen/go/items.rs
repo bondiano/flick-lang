@@ -3,7 +3,7 @@
 
 use std::iter;
 
-use flick_ir::{Constructor, Dict, InstanceInfo, Lang, Rep, default_method};
+use flick_ir::{Constructor, Dict, InstanceInfo, Rep, STRUCTURAL, default_method};
 use flick_pretty::{Document, docvec};
 
 use super::arith::Native;
@@ -16,9 +16,6 @@ use crate::codegen::names as js_names;
 use crate::codegen::tail::{Callee, Target};
 use crate::ir::{Expr, ExprKind, Item, ItemKind, Module};
 use crate::source::Span;
-
-/// The classes whose instances the runtime derives.
-const DERIVED: [Lang; 4] = [Lang::Eq, Lang::Ord, Lang::Hash, Lang::Show];
 
 /// The declarations of a module, each with whether it holds a `//line`
 /// directive; the statements of its init function.
@@ -221,7 +218,10 @@ impl<'a> Gen<'a> {
             .collect();
         if let Some((fields, constructors)) = &info.derived {
             let (module, class) = &info.class;
-            if !DERIVED.iter().any(|&l| self.lang.is(l, module, class)) {
+            if !STRUCTURAL
+                .iter()
+                .any(|&l| self.input.lang.is(l, module, class))
+            {
                 self.unsupported(span, &format!("`deriving {class}`"));
                 self.emit("d := flickrt.NewDict()");
                 return;
@@ -352,7 +352,7 @@ impl<'a> Gen<'a> {
 
     /// The tag of a tagged constructor, as the JS target writes it.
     pub(super) fn tag(&self, c: &Constructor) -> String {
-        match js_names::native(self.lang, c) {
+        match js_names::native(self.input.lang, c) {
             Some(js_names::Native::Some) => "Some".to_owned(),
             Some(js_names::Native::None) => "None".to_owned(),
             Some(js_names::Native::Ok) => "Success".to_owned(),
