@@ -382,11 +382,17 @@ pub(crate) fn facts(bounds: &[(String, Caps)], env: &Env) -> Result<Option<Strin
 
 /// The theorem of one scheme: `Ty.elide K ⟦σ⟧ Caps.none = ⟦elided σ⟧`, or
 /// of a scheme with value bounds `Scheme.elide K ⟨k, Θ, ⟦σ⟧⟩ = ⟨k, Θ, ⟦elided σ⟧⟩`.
-pub(super) fn theorem(name: &str, doc: &str, s: &Scheme, live: &Scheme) -> Result<String, String> {
+pub(super) fn theorem(
+    name: &str,
+    doc: &str,
+    (s, live): (&Scheme, &Scheme),
+    types: Option<Rc<Types>>,
+) -> Result<String, String> {
     let bounds = Rc::new(RefCell::new(Vec::new()));
     let env = Env {
         vars: s.vars.iter().map(|(v, _)| v.to_string()).collect(),
         bounds: Some(bounds.clone()),
+        types,
         ..Env::default()
     };
     let k: Vec<String> = s
@@ -444,6 +450,11 @@ pub fn elide_schemes() -> String {
          -/\n\n\
          namespace Flick.ElideSchemes\n",
     );
+    // a nominal type with hidden storage shows the row it hides, as `Seq`
+    let types = Rc::new(Types {
+        stored: decls.hidden.clone(),
+        ..Types::default()
+    });
     let mut skipped = String::new();
     for (module, export) in super::exports() {
         let t = export.scheme.as_ref().expect("filtered");
@@ -451,7 +462,12 @@ pub fn elide_schemes() -> String {
         let live = elided(&decls, &s);
         let name = &export.entity.name;
         let doc = format!("{module}.{name} : {}", show_type(t));
-        match theorem(&super::lean_name(module, name), &doc, &s, &live) {
+        match theorem(
+            &super::lean_name(module, name),
+            &doc,
+            (&s, &live),
+            Some(types.clone()),
+        ) {
             Ok(text) => {
                 out.push('\n');
                 out.push_str(&text);

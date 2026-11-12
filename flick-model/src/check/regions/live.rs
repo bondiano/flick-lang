@@ -118,10 +118,21 @@ impl Checker<'_> {
     /// capture row, in order, the parameters of a parameter that is a
     /// function included, as the core's `Ty.fresh`.
     fn fresh_rows(&self, t: &Type, vars: &mut Vec<(Name, Kind)>) -> Type {
+        // a written qualifier is a field of the arrow in the core
+        let arrow = |t: &Type| match t {
+            Type::Captured(x, _) | Type::Bounded(x, _) => matches!(**x, Type::Fun(..)),
+            t => matches!(t, Type::Fun(..)),
+        };
         match t {
+            Type::Captured(x, c) if arrow(t) => {
+                Type::Captured(Rc::new(self.fresh_rows(x, vars)), c.clone())
+            }
+            Type::Bounded(x, c) if arrow(t) => {
+                Type::Bounded(Rc::new(self.fresh_rows(x, vars)), c.clone())
+            }
             Type::Fun(p, s, r) => {
                 let p = match &**p {
-                    p @ Type::Fun(..) => self.fresh_rows(p, vars),
+                    p if arrow(p) => self.fresh_rows(p, vars),
                     p if self.bare_hidden(p) => {
                         let name = Name::from(format!("{FRESH}{}", vars.len()));
                         vars.push((name.clone(), Kind::Captures));

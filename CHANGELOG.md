@@ -96,6 +96,13 @@ break programs.
 - **Plugins:** a plugin is told where each value it watches is named, with
   the declaration around it (`CallSite.binding`), as it was for the
   serializable atoms alone.
+- **`@stores`:** an attribute before a type without constructors says that
+  the values foreign code makes keep the functions they are given, as data
+  with a function field does: written bare in a signature, its result holds
+  what the parameters before it reach. `PureCodec`, `Codec`, `FieldCodec`
+  and `Codec.Derive.Fields` are marked, so a codec whose field default or
+  decoding reads a file cannot leave the file's `scope` (`FLICK-G001`);
+  before, decoding with it afterwards read the closed file without an error.
 - **Deep nesting:** checking a nested `fun` or a `<|` takes far less of the
   stack, so the deepest code the parser accepts (198 nested functions with
   their signature, or 199 `<|` in a row) checks on a thread's 2 MiB stack,
