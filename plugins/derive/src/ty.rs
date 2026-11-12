@@ -1,9 +1,9 @@
-//! The types of a declaration, read from its tokens: as much of Flick's
-//! types as a derive needs to tell what a field holds.
+//! The types of a declaration as the compiler parsed them: as much of
+//! Flick's types as a derive needs to tell what a field holds.
 
 use std::fmt::{self, Display, Formatter};
 
-use flick_plugin::{Block, Span, Token, TokenKind};
+use flick_plugin::{Written, WrittenKind};
 
 /// A type as written.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -98,208 +98,41 @@ impl Ty {
     }
 }
 
-/// The type `block` writes at `span`, or why it does not read as one.
-pub fn read(block: &Block, span: Span) -> Result<Ty, String> {
-    let tokens: Vec<Token> = (block.tokens.iter())
-        .filter(|t| span.start <= t.span.start && t.span.end <= span.end)
-        .copied()
-        .collect();
-    let mut p = Reader {
-        block,
-        tokens: &tokens,
-        at: 0,
-    };
-    let ty = p.ty()?;
-    if p.at < tokens.len() {
-        return Err(format!("`{}` is not a type", block.text_of(span)));
-    }
-    Ok(ty)
-}
-
-struct Reader<'b> {
-    block: &'b Block,
-    tokens: &'b [Token],
-    at: usize,
-}
-
-impl Reader<'_> {
-    fn peek(&self) -> Option<&str> {
-        self.tokens.get(self.at).map(|t| self.block.text_of(t.span))
-    }
-
-    fn kind(&self) -> Option<TokenKind> {
-        self.tokens.get(self.at).map(|t| t.kind)
-    }
-
-    fn eat(&mut self, text: &str) -> bool {
-        let at = self.peek() == Some(text);
-        if at {
-            self.at += 1;
-        }
-        at
-    }
-
-    fn next_text(&mut self) -> Option<String> {
-        let text = self.peek()?.to_owned();
-        self.at += 1;
-        Some(text)
-    }
-
-    /// `app -> ty`, or `app`; a qualifier `^…` after an atom marks it.
-    fn ty(&mut self) -> Result<Ty, String> {
-        let start = self.at;
-        if self.peek() == Some("forall") {
-            self.skip();
-            return Ok(Ty::Fun(self.text_from(start)));
-        }
-        let head = self.app()?;
-        if self.peek().is_some_and(|t| t.starts_with("->")) {
-            // the rest of a function type does not matter
-            self.skip();
-            return Ok(Ty::Fun(self.text_from(start)));
-        }
-        Ok(head)
-    }
-
-    /// The text of the tokens from `start` to here, its spaces collapsed.
-    fn text_from(&self, start: usize) -> String {
-        let (Some(first), Some(last)) = (
-            self.tokens.get(start),
-            self.tokens.get(self.at.max(start + 1) - 1),
-        ) else {
-            return String::new();
-        };
-        let span = Span {
-            start: first.span.start,
-            end: last.span.end,
-        };
-        self.block
-            .text_of(span)
+/// The type `written` is, `text` the text its spans count in, or why a
+/// derive does not read it as one.
+pub fn read(text: &str, written: &Written) -> Result<Ty, String> {
+    let as_written = || {
+        text.get(written.span.start as usize..written.span.end as usize)
+            .unwrap_or("")
             .split_whitespace()
             .collect::<Vec<_>>()
             .join(" ")
-    }
-
-    /// Past the rest of this type: to a `,`, `;`, `|` or closing bracket of
-    /// what holds it.
-    fn skip(&mut self) {
-        let mut depth = 0usize;
-        while let Some(t) = self.peek() {
-            match t {
-                "(" | "{" | "[" => depth += 1,
-                ")" | "}" | "]" | "," | ";" | "|" if depth == 0 => return,
-                ")" | "}" | "]" => depth -= 1,
-                _ => {}
-            }
-            self.at += 1;
-        }
-    }
-
-    fn app(&mut self) -> Result<Ty, String> {
-        let head = self.atom()?;
-        let mut args = Vec::new();
-        while self.at_atom() {
-            args.push(self.atom()?);
-        }
-        if args.is_empty() {
-            return Ok(head);
-        }
-        match head {
-            Ty::Con { name, args: none } if none.is_empty() => Ok(Ty::Con { name, args }),
-            Ty::Var { name, args: none } if none.is_empty() => Ok(Ty::Var { name, args }),
-            other => Ok(other),
-        }
-    }
-
-    fn at_atom(&self) -> bool {
-        matches!(self.kind(), Some(TokenKind::Con | TokenKind::Ident))
-            || matches!(self.peek(), Some("(" | "{" | "_"))
-    }
-
-    fn atom(&mut self) -> Result<Ty, String> {
-        let start = self.at;
-        let ty = self.bare()?;
-        if self.eat("^") {
-            // `^c` or `^{s, t}`
-            if self.eat("{") {
-                while self.peek().is_some() && !self.eat("}") {
-                    self.at += 1;
-                }
-            } else {
-                self.at += 1;
-            }
-            return Ok(Ty::Captured(self.text_from(start)));
-        }
-        Ok(ty)
-    }
-
-    fn bare(&mut self) -> Result<Ty, String> {
-        match (self.kind(), self.peek()) {
-            (Some(TokenKind::Con), _) => {
-                let mut name = self.next_text().unwrap_or_default();
-                // `M.N.T`
-                while self.peek() == Some(".")
-                    && self
-                        .tokens
-                        .get(self.at + 1)
-                        .is_some_and(|t| t.kind == TokenKind::Con)
-                {
-                    self.at += 1;
-                    name.push('.');
-                    name.push_str(&self.next_text().unwrap_or_default());
-                }
-                Ok(Ty::Con {
-                    name,
-                    args: Vec::new(),
-                })
-            }
-            (Some(TokenKind::Ident), _) => Ok(Ty::Var {
-                name: self.next_text().unwrap_or_default(),
-                args: Vec::new(),
-            }),
-            (_, Some("(")) => {
-                self.at += 1;
-                if self.eat(")") {
-                    return Ok(Ty::Unit);
-                }
-                let mut items = vec![self.ty()?];
-                while self.eat(",") {
-                    if self.peek() == Some(")") {
-                        break;
-                    }
-                    items.push(self.ty()?);
-                }
-                if !self.eat(")") {
-                    return Err("expected `)`".into());
-                }
-                Ok(if items.len() == 1 {
-                    items.remove(0)
-                } else {
-                    Ty::Tuple(items)
-                })
-            }
-            (_, Some("{")) => {
-                self.at += 1;
-                let mut fields = Vec::new();
-                let mut open = false;
-                while !self.eat("}") {
-                    if self.eat("|") {
-                        open = true;
-                        self.at += 1;
-                        continue;
-                    }
-                    let label = self.next_text().ok_or("expected a field")?;
-                    if !self.eat(":") {
-                        return Err(format!("expected `:` after `{label}`"));
-                    }
-                    let ty = self.ty()?;
-                    fields.push((label, ty));
-                    self.eat(";");
-                }
-                fields.sort_by(|a, b| a.0.cmp(&b.0));
-                Ok(Ty::Record { fields, open })
-            }
-            _ => Err("expected a type".into()),
-        }
-    }
+    };
+    let all = |ts: &[Written]| {
+        ts.iter()
+            .map(|t| read(text, t))
+            .collect::<Result<Vec<_>, _>>()
+    };
+    Ok(match &written.kind {
+        WrittenKind::Con { name, args } => Ty::Con {
+            name: name.clone(),
+            args: all(args)?,
+        },
+        WrittenKind::Var { name, args } => Ty::Var {
+            name: name.clone(),
+            args: all(args)?,
+        },
+        WrittenKind::Record { fields, open } => Ty::Record {
+            fields: (fields.iter())
+                .map(|(label, t)| Ok((label.clone(), read(text, t)?)))
+                .collect::<Result<_, String>>()?,
+            open: *open,
+        },
+        WrittenKind::Tuple(items) => Ty::Tuple(all(items)?),
+        WrittenKind::Unit => Ty::Unit,
+        // the rest of a function type does not matter
+        WrittenKind::Arrow { .. } | WrittenKind::Generic => Ty::Fun(as_written()),
+        WrittenKind::Captured(_) => Ty::Captured(as_written()),
+        WrittenKind::Other => return Err(format!("`{}` is not a type", as_written())),
+    })
 }

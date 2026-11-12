@@ -6,6 +6,16 @@ break programs.
 
 ## Unreleased
 
+- **Plugins get the types a declaration writes:** a derive's
+  `CaseTarget.fields`, `DeriveTarget.alias` and `DeriveTarget.wraps` are now
+  `Written` types, the compiler's own parse at their spans: named types and
+  variables with their arguments, records, tuples, arrows with their effect
+  row, captured types. A target also says the kind each parameter is written
+  with (`kinds`), the words before its name (`modifiers`) and the classes its
+  `deriving` names, and a block's `Signature` carries its type. A plugin no
+  longer parses the tokens of a declaration or a signature to tell what a
+  field holds; std's derives and `server fn` read these. Over the component
+  interface a type crosses as an arena of nodes (`flick-plugin/wit/written.wit`).
 - **A lambda made in a named scope:** a lambda or a composition made in
   `scope outer { … }` and called inside a nested scope acquires into `outer`,
   as its type says. When the call was checked before the lambda's row named

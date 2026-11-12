@@ -1,9 +1,7 @@
 //! The types of a module as a derive reads them: what each declares, its
 //! parameters and the classes it derives.
 
-use std::mem;
-
-use flick_plugin::{DeriveTarget, TokenKind, literal_text};
+use flick_plugin::{DeriveTarget, literal_text};
 
 use crate::ty::{self, Ty};
 
@@ -89,19 +87,15 @@ impl Local {
 /// The type `target` declares, or why it does not read.
 pub fn read(target: &DeriveTarget) -> Result<Local, String> {
     let block = &target.decl;
-    let words: Vec<&str> = (block.tokens.iter())
-        .take_while(|t| t.kind != TokenKind::Con)
-        .map(|t| block.text_of(t.span))
-        .collect();
-    let has = |w: &str| words.contains(&w);
-    let form = if let Some(span) = target.wraps {
+    let has = |w: &str| target.modifiers.iter().any(|m| m == w);
+    let form = if let Some(base) = &target.wraps {
         Form::Refined {
-            base: ty::read(block, span)?,
+            base: ty::read(&block.text, base)?,
             known: known(target),
         }
-    } else if let Some(span) = target.alias {
+    } else if let Some(body) = &target.alias {
         Form::Alias {
-            body: ty::read(block, span)?,
+            body: ty::read(&block.text, body)?,
             opaque: has("opaque"),
         }
     } else if target.cases.is_empty() {
@@ -110,7 +104,7 @@ pub fn read(target: &DeriveTarget) -> Result<Local, String> {
         let cases = (target.cases.iter())
             .map(|c| {
                 let fields = (c.fields.iter())
-                    .map(|&f| ty::read(block, f))
+                    .map(|f| ty::read(&block.text, f))
                     .collect::<Result<Vec<_>, _>>()?;
                 Ok((c.name.clone(), fields))
             })
@@ -137,7 +131,13 @@ pub fn read(target: &DeriveTarget) -> Result<Local, String> {
         }
     };
     let mut params: Vec<(String, Kind)> = (target.params.iter())
-        .map(|p| (p.clone(), annotated(target, p)))
+        .enumerate()
+        .map(|(i, p)| {
+            (
+                p.clone(),
+                kind(target.kinds.get(i).map_or("", String::as_str)),
+            )
+        })
         .collect();
     for (name, kind) in &mut params {
         if *kind == Kind::Type && applied(&form, name) {
@@ -153,29 +153,16 @@ pub fn read(target: &DeriveTarget) -> Result<Local, String> {
             .to_owned(),
         params,
         form,
-        deriving: deriving(target),
+        deriving: target.deriving.clone(),
     })
 }
 
 /// The kind a parameter is written with, `(r : ServiceRow)`; `Type` without.
-fn annotated(target: &DeriveTarget, param: &str) -> Kind {
-    let block = &target.decl;
-    let texts: Vec<&str> = block.tokens.iter().map(|t| block.text_of(t.span)).collect();
-    let at = texts
-        .windows(3)
-        .position(|w| w[0] == "(" && w[1] == param && w[2] == ":");
-    let Some(at) = at else {
-        return Kind::Type;
-    };
-    let kind: Vec<&str> = texts[at + 3..]
-        .iter()
-        .take_while(|t| **t != ")")
-        .copied()
-        .collect();
-    match kind[..] {
-        ["Type"] => Kind::Type,
-        ["Type", "->", "Type"] => Kind::Arrow,
-        ["Region"] => Kind::Region,
+fn kind(written: &str) -> Kind {
+    match written {
+        "" | "Type" => Kind::Type,
+        "Type -> Type" => Kind::Arrow,
+        "Region" => Kind::Region,
         _ => Kind::Other,
     }
 }
@@ -198,35 +185,6 @@ fn applied(form: &Form, name: &str) -> bool {
         Form::Refined { base, .. } => go(base, name),
         Form::Abstract => false,
     }
-}
-
-/// The classes the `deriving` of `target` names, as written.
-fn deriving(target: &DeriveTarget) -> Vec<String> {
-    let block = &target.decl;
-    let texts: Vec<(TokenKind, &str)> = (block.tokens.iter())
-        .map(|t| (t.kind, block.text_of(t.span)))
-        .collect();
-    let Some(at) = texts.iter().position(|(_, t)| *t == "deriving") else {
-        return Vec::new();
-    };
-    let mut out = Vec::new();
-    let mut path = String::new();
-    let mut depth = 0usize;
-    for (kind, text) in &texts[at + 1..] {
-        match *text {
-            "{" => depth += 1,
-            "}" => depth = depth.saturating_sub(1),
-            _ if depth > 0 => {}
-            "," => out.push(mem::take(&mut path)),
-            "." => path.push('.'),
-            _ if *kind == TokenKind::Con => path.push_str(text),
-            _ => {}
-        }
-    }
-    if !path.is_empty() {
-        out.push(path);
-    }
-    out
 }
 
 /// The check an exporter knows of a refined type's predicate.

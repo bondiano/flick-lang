@@ -7,7 +7,7 @@
 
 use flick_plugin::{
     Arena, Block, Builder, Compiler, Decl, Diagnostic, Expr, NodeId, Pat, Place, Signature, Span,
-    Token, TokenKind, Ty as Type,
+    Token, TokenKind, Ty as Type, Written, WrittenKind,
 };
 
 use crate::module::{Form, Local, Module};
@@ -174,122 +174,47 @@ fn text(signature: &Signature, token: Token) -> &str {
 /// The parameters, the errors and the success of a signature
 /// `name : A -> B ->{r; e} S`, or why it is no server fn's.
 fn parts(signature: &Signature) -> Result<Parts, &'static str> {
-    let sig = Block {
-        head: String::new(),
-        text: signature.text.clone(),
-        body: 0,
-        place: Place::Declaration,
-        tokens: signature.tokens.clone(),
-        docs: String::new(),
-        signature: None,
-        module: String::new(),
-    };
-    let tokens = &signature.tokens[2.min(signature.tokens.len())..];
-    let at = |i: usize| tokens.get(i).map_or("", |t| text(signature, *t));
-    if at(0) == "forall" || (0..tokens.len()).any(|i| at(i) == "=>") {
+    const NOT_A_FUNCTION: &str = "a server fn is a function: `P ->{r; e} S`";
+    let whole = signature.ty.as_ref().ok_or(NOT_A_FUNCTION)?;
+    if whole.kind == WrittenKind::Generic {
         return Err("a server fn is not generic: its types cross the network");
     }
-    // the pieces between the arrows outside brackets, and each arrow's row
-    let mut pieces: Vec<(usize, usize)> = Vec::new();
-    let mut rows: Vec<Option<(usize, usize)>> = Vec::new();
-    let (mut depth, mut start, mut i) = (0usize, 0usize, 0usize);
-    while i < tokens.len() {
-        match at(i) {
-            "(" | "{" | "[" => depth += 1,
-            ")" | "}" | "]" => depth = depth.saturating_sub(1),
-            "->" if depth == 0 => {
-                pieces.push((start, i));
-                let row = (at(i + 1) == "{").then(|| closing(tokens, signature, i + 1));
-                rows.push(row.map(|end| (i + 2, end)));
-                i = row.map_or(i + 1, |end| end + 1);
-                start = i;
-                continue;
-            }
-            _ => {}
-        }
-        i += 1;
+    // the parameters, and the row of each arrow
+    let (mut params, mut rows) = (Vec::new(), Vec::new());
+    let mut success = whole;
+    while let WrittenKind::Arrow { from, to, row } = &success.kind {
+        params.push(&**from);
+        rows.push(row.as_ref());
+        success = to;
     }
-    let Some((&last, before)) = rows.split_last() else {
-        return Err("a server fn is a function: `P ->{r; e} S`");
+    let Some((last, before)) = rows.split_last() else {
+        return Err(NOT_A_FUNCTION);
     };
     if before.iter().any(Option::is_some) {
         return Err("only the last arrow of a server fn runs: `A -> B ->{r; e} S`");
     }
-    let Some((row_start, row_end)) = last else {
+    let Some(row) = last else {
         return Err("a server fn runs on the server: its arrow is `->{r; e}`");
     };
-    let span =
-        |(from, to): (usize, usize)| match (tokens.get(from), tokens.get(to.max(from + 1) - 1)) {
-            (Some(first), Some(last)) if from < to => Some(Span {
-                start: first.span.start,
-                end: last.span.end,
-            }),
-            _ => None,
-        };
-    let read = |range: (usize, usize)| -> Result<(Span, Ty), &'static str> {
-        let span = span(range).ok_or("a server fn is a function: `P ->{r; e} S`")?;
-        Ok((
-            span,
-            ty::read(&sig, span).map_err(|_| "its types are not read")?,
-        ))
+    if row.errors_open {
+        return Err("a server fn lists its errors: each crosses the network with its codec");
+    }
+    let read = |t: &Written| -> Result<(Span, Ty), &'static str> {
+        let ty = ty::read(&signature.text, t).map_err(|_| "its types are not read")?;
+        Ok((t.span, ty))
     };
-    let params = pieces.iter().map(|&p| read(p)).collect::<Result<_, _>>()?;
-    let success = read((start, tokens.len()))?;
-    let whole = span((0, tokens.len())).ok_or("a server fn is a function: `P ->{r; e} S`")?;
-    // `{s; e1, e2}`: the services, then the errors
-    let semicolon = (row_start..row_end).find(|&k| at(k) == ";");
-    let mut errors = Vec::new();
-    let mut guarded = false;
-    if let Some(semicolon) = semicolon {
-        let mut from = semicolon + 1;
-        let mut depth = 0usize;
-        for k in semicolon + 1..=row_end {
-            let piece = at(k);
-            match piece {
-                "(" | "{" | "[" => depth += 1,
-                ")" | "}" | "]" if k < row_end => depth = depth.saturating_sub(1),
-                "|" if depth == 0 => {
-                    return Err(
-                        "a server fn lists its errors: each crosses the network with its codec",
-                    );
-                }
-                _ => {}
-            }
-            if (piece == "," && depth == 0) || k == row_end {
-                if from < k {
-                    let error = span((from, k)).map(|s| sig.text_of(s).to_owned());
-                    guarded |= error.as_deref().is_some_and(|e| UNAUTHORIZED.contains(&e));
-                    errors.push(read((from, k))?);
-                }
-                from = k + 1;
-            }
-        }
-    }
+    let text = |t: &Written| {
+        (signature.text)
+            .get(t.span.start as usize..t.span.end as usize)
+            .unwrap_or("")
+    };
     Ok(Parts {
-        whole,
-        params,
-        errors,
-        success,
-        guarded,
+        whole: whole.span,
+        params: params.into_iter().map(read).collect::<Result<_, _>>()?,
+        guarded: row.errors.iter().any(|e| UNAUTHORIZED.contains(&text(e))),
+        errors: row.errors.iter().map(read).collect::<Result<_, _>>()?,
+        success: read(success)?,
     })
-}
-
-/// The index of the bracket that closes the one at `open`.
-fn closing(tokens: &[Token], signature: &Signature, open: usize) -> usize {
-    let mut depth = 0usize;
-    for (i, t) in tokens.iter().enumerate().skip(open) {
-        match text(signature, *t) {
-            "(" | "{" | "[" => depth += 1,
-            ")" | "}" | "]" => {
-                depth -= 1;
-                if depth == 0 {
-                    return i;
-                }
-            }
-            _ => {}
-        }
-    }
-    tokens.len()
 }
 
 /// The witnesses of the payload, the success and the errors, as

@@ -1,0 +1,46 @@
+package flick:plugin@0.2.0;
+
+/// What the compiler offers a plugin while it expands a block.
+interface compiler {
+  use types.{hole, diagnostic, reach-error, request, response, completion, namespace};
+
+  /// The longest expression of the body from `start` on, before `end`.
+  parse-expr: func(start: u32, end: u32) -> result<hole, diagnostic>;
+  /// The longest type of the body from `start` on, before `end`.
+  parse-type: func(start: u32, end: u32) -> result<hole, diagnostic>;
+  /// The longest pattern of the body from `start` on, before `end`.
+  parse-pat: func(start: u32, end: u32) -> result<hole, diagnostic>;
+  /// The declaration of the block from `start` on, before `end`.
+  parse-decl: func(start: u32, end: u32) -> result<hole, diagnostic>;
+  /// The body of the block from `start` on, before `end`, as after the `=`
+  /// of a `let`: an expression, or on a line of its own the lines of a
+  /// block at its column; its hole is an expression's.
+  parse-body: func(start: u32, end: u32) -> result<hole, diagnostic>;
+  /// `parse-body` where the lines under a call are its arguments, one
+  /// expression each; its hole is of kind `lines`.
+  parse-lines: func(start: u32, end: u32) -> result<hole, diagnostic>;
+  /// The file at `path` from the project's root, as `[plugins.<package>]`
+  /// grants it with `fs-read`.
+  read-file: func(path: string) -> result<list<u8>, reach-error>;
+  /// The variable `name` of the environment, as `env` grants it.
+  env: func(name: string) -> result<option<string>, reach-error>;
+  /// The answer of a host `net` grants, from the project's snapshots when
+  /// the run is offline.
+  fetch: func(request: request) -> result<response, reach-error>;
+  /// The base type, `String` or `Int`, of the enum `name` as the block's
+  /// module writes it, `Role` or `Roles.Role`; none for a type that is no
+  /// enum, or one the module does not see.
+  literal-of: func(name: string) -> option<string>;
+  /// What this plugin published of `name` as the block's module writes it,
+  /// `Users` or `Schema.Users`: its own module's, or one it imports, from
+  /// any group; none for a name it does not see or no publication.
+  published: func(name: string) -> option<list<u8>>;
+  /// Every name `published` answers for the block's module, as it writes
+  /// them.
+  published-names: func() -> list<string>;
+  /// The values or types in scope of the block's module, as it writes
+  /// them; with `fits`, the values whose type instantiates to that type,
+  /// written as the module writes it or with names qualified in full. An
+  /// editor answers it; while a block expands, none.
+  in-scope: func(ns: namespace, fits: option<string>) -> list<completion>;
+}
