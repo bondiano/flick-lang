@@ -9,7 +9,7 @@ use std::mem;
 
 use super::Checker;
 use super::sugar_lints::unparen;
-use super::ty::{Effects, Type};
+use super::ty::Type;
 use super::typing::Range;
 use crate::diagnostics::codes;
 use crate::source::Span;
@@ -104,11 +104,13 @@ pub fn applied_order(operators: &[Token]) -> Vec<usize> {
     }
 }
 
-/// One call a composition makes: of the local its operand is bound to.
-struct Call {
-    local: usize,
-    key: Range,
-    operand: Span,
+/// A composition being typed: its operands, bound to the locals from
+/// `mark` on, and its operator as written.
+struct Chain<'a, 'n> {
+    operands: &'a [&'n Node],
+    operators: &'a [Token],
+    mark: usize,
+    op: &'static str,
 }
 
 impl Checker<'_> {
@@ -173,25 +175,25 @@ impl Checker<'_> {
             let name = self.text_of(operand);
             self.push_local(&name, operand.range().0, ty);
         }
-        let calls: Vec<Call> = applied_order(&operators)
-            .into_iter()
-            .map(|i| Call {
-                local: mark + i,
-                key: composed_key(&operands, &operators, i),
-                operand: self.span(operands[i]),
-            })
-            .collect();
+        let order = applied_order(&operators);
         let op = if operators[0].kind == K::GtGt {
             ">>"
         } else {
             "<<"
         };
+        let chain = Chain {
+            operands: &operands,
+            operators: &operators,
+            mark,
+            op,
+        };
         let (start, end) = result_key(&operators);
         let at = Span::new(self.file, start, end);
         let param = param_key(&operators);
-        let body = |c: &mut Self, stages: &[(Type, Option<Box<Effects>>)], rest: Option<Type>| {
-            c.note_value(param, &stages[0].0);
-            let value = c.composed(&calls, stages[0].0.clone(), op);
+        let mut body = |c: &mut Self, x: Option<&Type>, rest: Option<Type>| {
+            let x = x.cloned().unwrap_or(Type::Error);
+            c.note_value(param, &x);
+            let value = c.composed(&chain, &order, x);
             match rest {
                 Some(rest) => {
                     c.expect(&value, &rest, at);
@@ -200,24 +202,26 @@ impl Checker<'_> {
                 None => value,
             }
         };
-        let ty = self.function_typed(&[None], body, expected, node);
+        let ty = self.function_typed(&[None], &mut body, expected, node);
         self.cx.locals.truncate(mark);
         ty
     }
 
-    /// The value of the calls `calls`, the first applied first, given `x`:
-    /// each one typed as the application of its local to the value of the
-    /// calls before it, as `apply` types `g' (f' x)`.
-    fn composed(&mut self, calls: &[Call], x: Type, op: &str) -> Type {
-        let Some((call, inner)) = calls.split_last() else {
+    /// The value of the calls of the operands `order` names, the first
+    /// applied first, given `x`: each one typed as the application of its
+    /// local to the value of the calls before it, as `apply` types `g' (f' x)`.
+    fn composed(&mut self, chain: &Chain, order: &[usize], x: Type) -> Type {
+        let Some((&i, inner)) = order.split_last() else {
             return x;
         };
         let mut defaults = Vec::new();
         let provided = self.cx.regions.provided.len();
-        let span = Span::new(self.file, call.key.0, call.key.1);
-        let function = self.use_local(call.local, span);
+        let key = composed_key(chain.operands, chain.operators, i);
+        let operand = self.span(chain.operands[i]);
+        let span = Span::new(self.file, key.0, key.1);
+        let function = self.use_local(chain.mark + i, span);
         let function = self.value_bound(function);
-        let ty = match self.ui_callable(&function, call.key, call.operand) {
+        let ty = match self.ui_callable(&function, key, operand) {
             Type::Fun {
                 param,
                 effects,
@@ -226,13 +230,13 @@ impl Checker<'_> {
                 let since = self.diagnostics.len();
                 let eff = self.eff_parts(&param).is_some();
                 let outer = eff.then(|| self.cx.regions.defaults.replace(Vec::new()));
-                let argument = self.composed(inner, x, op);
+                let argument = self.composed(chain, inner, x);
                 self.expect(&argument, &param, span);
                 if let Some(outer) = outer {
                     let mine = mem::replace(&mut self.cx.regions.defaults, outer);
                     defaults.extend(mine.unwrap_or_default());
                 }
-                self.explain_since(since, &param, call.operand, &|t| {
+                self.explain_since(since, &param, operand, &|t| {
                     format!("this function takes `{t}`")
                 });
                 if eff {
@@ -245,31 +249,31 @@ impl Checker<'_> {
                 self.application_result(result, &function, &argument, false)
             }
             Type::Error => {
-                self.composed(inner, x, op);
+                self.composed(chain, inner, x);
                 Type::Error
             }
             meta @ Type::Meta(_) => {
                 let (param, result) = (self.fresh(), self.fresh());
                 let function = Type::pure_fun(param.clone(), result.clone());
                 if self.unify(&meta, &function).is_ok() {
-                    let argument = self.composed(inner, x, op);
+                    let argument = self.composed(chain, inner, x);
                     self.expect(&argument, &param, span);
                     result
                 } else {
-                    self.composed(inner, x, op);
-                    self.not_composable(&meta, call.operand, op);
+                    self.composed(chain, inner, x);
+                    self.not_composable(&meta, operand, chain.op);
                     Type::Error
                 }
             }
             other => {
-                self.composed(inner, x, op);
-                self.not_composable(&other, call.operand, op);
+                self.composed(chain, inner, x);
+                self.not_composable(&other, operand, chain.op);
                 Type::Error
             }
         };
         self.settle_defaults(defaults);
         self.settle_provided(provided);
-        self.note_value(call.key, &ty);
+        self.note_value(key, &ty);
         ty
     }
 

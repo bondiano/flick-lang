@@ -59,6 +59,9 @@ const ROUNDS: usize = 2;
 /// spares an object, as a chain of combinators is.
 const STEPS: usize = 8;
 
+/// The arity known of a value of another module that is no function.
+const NO_ARITY: usize = usize::MAX;
+
 /// The values of the other modules of the build, by module and name: their
 /// dictionary parameters and body, when the body names only what its
 /// module exports.
@@ -76,22 +79,18 @@ pub fn optimize(
 ) {
     let mut fresh = 0;
     let foreign = inline::Foreign::new(generics);
-    // by module, then name: a lookup that finds its answer allocates nothing
-    let found: RefCell<HashMap<String, HashMap<String, Option<usize>>>> = RefCell::default();
+    // what other modules' functions take, by `module.name`: one map type
+    // the compiler has already
+    let found: RefCell<HashMap<String, usize>> = RefCell::default();
     let elsewhere = |m: &str, name: &str| {
-        let known = found
-            .borrow()
-            .get(m)
-            .and_then(|names| names.get(name).copied());
-        known.unwrap_or_else(|| {
-            let taken = arity(m, name);
-            let mut found = found.borrow_mut();
-            found
-                .entry(m.to_owned())
-                .or_default()
-                .insert(name.to_owned(), taken);
+        let key = format!("{m}.{name}");
+        let known = found.borrow().get(&key).copied();
+        let taken = known.unwrap_or_else(|| {
+            let taken = arity(m, name).unwrap_or(NO_ARITY);
+            found.borrow_mut().insert(key, taken);
             taken
-        })
+        });
+        (taken != NO_ARITY).then_some(taken)
     };
     devirt::defaults(module, &devirt::Lookup::new(module, generics), &mut fresh);
     specialize::specialize(module, generics);
@@ -99,10 +98,10 @@ pub fn optimize(
         constants(module);
         let lookup = devirt::Lookup::new(module, generics);
         let candidates = inline::candidates(&module.name, &module.items, exported);
-        let own: HashMap<String, usize> = (module.items.iter())
-            .filter_map(walk::arity)
-            .map(|(name, n)| (name.to_owned(), n))
-            .collect();
+        let mut own: HashMap<String, usize> = HashMap::new();
+        for (name, n) in module.items.iter().filter_map(walk::arity) {
+            own.insert(name.to_owned(), n);
+        }
         let name = module.name.clone();
         let arities = |m: &str, n: &str| {
             if m == name {
@@ -283,7 +282,9 @@ fn propagate(stmts: &mut Vec<Stmt>, result: &mut Expr, arity: Arity) -> bool {
     let before = stmts.len();
     let mut moving: HashMap<String, Expr> = HashMap::new();
     let mut kept = Vec::with_capacity(before);
-    for ((mut stmt, uses), completed) in mem::take(stmts).into_iter().zip(later).zip(completed) {
+    let mut completed = completed.into_iter();
+    for (mut stmt, uses) in mem::take(stmts).into_iter().zip(later) {
+        let completed = completed.next().unwrap_or(false);
         // what moves in may be dropped, so a value that may be dropped
         // before it still may after: asking first keeps the answer from
         // walking the values that moved into this one

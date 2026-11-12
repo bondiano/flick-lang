@@ -8,7 +8,7 @@ use std::mem;
 use super::Checker;
 use super::convert::is_type;
 use super::regions::Held;
-use super::ty::{Effects, Type};
+use super::ty::Type;
 use super::typing::Ref;
 use crate::diagnostics::{Severity, codes};
 use crate::numeric;
@@ -17,7 +17,11 @@ use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
 use crate::types::lang::Lang;
 
-impl Checker<'_> {
+/// The body of a function the checker types, given the type of its first
+/// parameter and the result its stages leave, if known; called once.
+pub type Body<'b, 'c> = dyn FnMut(&mut Checker<'c>, Option<&Type>, Option<Type>) -> Type + 'b;
+
+impl<'c> Checker<'c> {
     pub fn check(&mut self, node: &Node, expected: &Type) {
         self.check_value(node, expected);
     }
@@ -428,15 +432,20 @@ impl Checker<'_> {
         expected: Option<&Type>,
         node: &Node,
     ) -> Type {
-        self.function_typed(params, |c, _, rest| body(c, rest), expected, node)
+        let mut body = Some(body);
+        let mut once =
+            |c: &mut Self, _: Option<&Type>, rest| body.take().map_or(Type::Error, |b| b(c, rest));
+        self.function_typed(params, &mut once, expected, node)
     }
 
-    /// [`Self::function_with`] whose body also gets the type and the arrow
-    /// of each stage, for a parameter it reads without binding a name.
+    /// [`Self::function_with`] whose body also gets the type of the first
+    /// parameter, which it may read without binding a name. The body is
+    /// called once; taken as a `dyn`, this is one function for every
+    /// caller, not a copy for each.
     pub fn function_typed(
         &mut self,
         params: &[Option<&Node>],
-        body: impl FnOnce(&mut Self, &[(Type, Option<Box<Effects>>)], Option<Type>) -> Type,
+        body: &mut Body<'_, 'c>,
         expected: Option<&Type>,
         node: &Node,
     ) -> Type {
@@ -515,7 +524,7 @@ impl Checker<'_> {
         let returns = rest.clone().unwrap_or_else(|| self.fresh());
         stage.returns = Some(returns.clone());
         let outer = mem::replace(&mut self.cx.stage, stage);
-        let result = body(self, &stages, rest);
+        let result = body(self, stages.first().map(|(ty, _)| ty), rest);
         let inner = mem::replace(&mut self.cx.stage, outer);
         if inferred_result && self.unify(&returns, &result).is_err() {
             let (returns, result) = (self.show(&returns), self.show(&result));
