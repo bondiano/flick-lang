@@ -445,6 +445,8 @@ mod kind_hover_tests;
 #[cfg(test)]
 mod migration_tests;
 #[cfg(test)]
+mod operator_hover_tests;
+#[cfg(test)]
 mod pattern_tests;
 #[cfg(test)]
 mod privacy_tests;
