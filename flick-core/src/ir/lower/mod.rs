@@ -7,6 +7,7 @@ mod abstraction;
 mod applicative_do;
 mod comprehension;
 mod debug;
+mod derived;
 mod do_notation;
 mod enums;
 mod expr;
@@ -66,7 +67,9 @@ pub fn lower(module: &resolve::Module, typing: &Typing) -> Result<Module, Vec<Di
     for info in &typing.instances {
         let span = Span::new(module.file, info.span.0, info.span.1);
         let methods = match (&info.derived, &info.generic, &info.enumerates) {
-            (Some(_), _, _) => Vec::new(),
+            (Some((dicts, constructors)), _, _) => {
+                derived::methods(&info.class.1, dicts, constructors.as_deref(), span)
+            }
             (None, Some(generic), _) => generic::methods(generic, span),
             (None, None, Some(ty)) => enums::methods(&info.module, ty, span),
             (None, None, None) => module

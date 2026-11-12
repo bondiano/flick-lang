@@ -216,7 +216,10 @@ impl<'a> Gen<'a> {
             .iter()
             .map(|(class, dict)| (class.clone(), self.dict(dict)))
             .collect();
-        if let Some((fields, constructors)) = &info.derived {
+        // a derived instance without methods written out is the runtime's to derive
+        if methods.is_empty()
+            && let Some((fields, constructors)) = &info.derived
+        {
             let (module, class) = &info.class;
             if !STRUCTURAL
                 .iter()

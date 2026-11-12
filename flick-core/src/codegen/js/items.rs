@@ -191,7 +191,10 @@ impl Gen<'_> {
             let d = self.dict(dict);
             entries.push(format!("get ${class}() {{\n  return {d};\n}}"));
         }
-        let body = if let Some((fields, constructors)) = &info.derived {
+        // a derived instance without methods written out is the runtime's to derive
+        let body = if methods.is_empty()
+            && let Some((fields, constructors)) = &info.derived
+        {
             self.derived(info, fields, constructors.as_deref(), &entries)
         } else {
             {
