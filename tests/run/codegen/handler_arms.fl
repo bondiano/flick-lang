@@ -36,7 +36,7 @@ let both body =
   | return v -> v * 2
 
 /// A guarded arm lets the other calls go on to the handler around it.
-evens : Unit ->{Ask; none} Int
+evens : Unit ->{Ask} Int
 let evens () =
   try Ask.ask 2 + Ask.ask 3 with
   | Ask.ask n when n % 2 == 0 -> n * 100

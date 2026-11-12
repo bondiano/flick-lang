@@ -13,6 +13,8 @@ let pair a b = (a, b)
 
 let describe x = show x
 
+let write = Log.write
+
 main : Unit -> Float
 let main () =
   let inc x = x + 1
@@ -98,7 +100,7 @@ fn signature_quick_fix_makes_the_module_check() {
         .into_iter()
         .filter(|d| d["code"] == "FLICK-T004")
         .collect();
-    assert_eq!(missing.len(), 4, "{missing:?}");
+    assert_eq!(missing.len(), 5, "{missing:?}");
     let mut edits = Vec::new();
     for d in &missing {
         let actions = lsp.request(
@@ -121,6 +123,7 @@ fn signature_quick_fix_makes_the_module_check() {
         let at = offset(&fixed, &edit["range"]["start"]);
         fixed.insert_str(at, edit["newText"].as_str().expect("text"));
     }
+    assert!(fixed.contains("write : String ->{Log} Unit\n"), "{fixed}");
     lsp.notify("textDocument/didChange", &json!({ "textDocument": { "uri": uri(&file), "version": 2 }, "contentChanges": [{ "text": fixed }] }));
     assert_eq!(lsp.diagnostics(&uri(&file)), Vec::<Value>::new(), "{fixed}");
     lsp.notify(

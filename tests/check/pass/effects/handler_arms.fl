@@ -35,13 +35,13 @@ let attempt body =
   | Throw.throw message -> Err message
 
 /// An arm for `bump` only: `read` goes on to the enclosing handler.
-doubled : (Unit ->{Counter; none} Int) ->{Counter; none} Int
+doubled : (Unit ->{Counter} Int) ->{Counter} Int
 let doubled body =
   try body () with
   | Counter.bump n -> Counter.bump (n * 2)
 
 /// A guarded arm covers nothing: `ask` may go on.
-fallback : (Unit ->{Ask Int; none} Int) ->{Ask Int; none} Int
+fallback : (Unit ->{Ask Int} Int) ->{Ask Int} Int
 let fallback body =
   try body () with
   | Ask.ask () when false -> 0
@@ -68,7 +68,7 @@ service Greeter =
 service Store a =
   load : Unit ->{} a
 
-welcome : Unit ->{Greeter; none} String
+welcome : Unit ->{Greeter} String
 let welcome () = Greeter.greet "ada"
 
 greeter : Greeter.Impl
@@ -87,7 +87,7 @@ children : Unit ->{} (List Int, List Int)
 let children () =
   parallel (task { collect (fun () -> Emit.emit 1) }) (task { collect (fun () -> Emit.emit 2) })
 
-asked : Unit ->{Ask Int; none} (Int, Int)
+asked : Unit ->{Ask Int} (Int, Int)
 let asked () = parallel (task { Ask.ask () }) (task { Ask.ask () + 1 })
 
 /// A row variable of the signature is `Detached` by its constraint.
@@ -103,14 +103,14 @@ pause : Unit ->{Async} Unit
 foreign pause from "./pause.mjs" "pause"
   arity 0
 
-declared : (Unit ->{Wait, Async; none} Int) ->{Async; none} Int
+declared : (Unit ->{Wait, Async} Int) ->{Async} Int
 let declared body =
   try body () with
   | Wait.wait () ->
     pause ()
     1
 
-inside : (Unit ->{Store Int; none} Int) ->{} Int
+inside : (Unit ->{Store Int} Int) ->{} Int
 let inside body =
   try body () with
   | Store.load () -> List.length (collect (fun () -> Emit.emit 1))

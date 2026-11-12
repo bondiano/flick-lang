@@ -29,7 +29,7 @@ let memory store =
 summary : Int -> String
 let summary pages = if pages == 0 then "all read" else "\{pages} pages to go"
 
-pages_left : Unit ->{Shelf; none} Int
+pages_left : Unit ->{Shelf} Int
 let pages_left () = Books.pages_left (Shelf.books ())
 
 main : Unit ->{} Unit

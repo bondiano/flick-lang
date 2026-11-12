@@ -13,7 +13,7 @@ type error DbUnavailable = DbUnavailable String
 service Users =
   get : UserId ->{; NotFound} User
 
-load_optional : UserId ->{Users; none} Option User
+load_optional : UserId ->{Users} Option User
 let load_optional id =
   try Some (Users.get id) with
   | NotFound _ -> None
@@ -27,7 +27,7 @@ let find_optional id =
   | NotFound _ -> None
 
 // a variable or `_` handles every error, as a value of `Errors e`
-any_error : UserId ->{Users; none} String
+any_error : UserId ->{Users} String
 let any_error id =
   try (find_user id).name with
   | _ -> "unknown"
@@ -90,7 +90,7 @@ let missing_id e =
   match e with
   | NotFound id -> id
 
-lookup_or_missing : UserId ->{Users; none} UserId
+lookup_or_missing : UserId ->{Users} UserId
 let lookup_or_missing id =
   try (Users.get id).id with
   | e -> missing_id e

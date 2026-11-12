@@ -5,10 +5,10 @@ module App.Main exposing (main)
 log : String -> Eff none none Unit
 let log line = task { Platform.stdout_line line }
 
-with_region : (forall s. Fiber.Owner s ->{Scope s; none} String) ->{} String
+with_region : (forall s. Fiber.Owner s ->{Scope s} String) ->{} String
 let with_region body = Scope.run body
 
-closes : Fiber.Owner s ->{Scope s; none} String
+closes : Fiber.Owner s ->{Scope s} String
 let closes owner =
   Scope.add_finalizer (log "closed")
   ignore owner

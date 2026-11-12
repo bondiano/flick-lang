@@ -25,13 +25,13 @@ let reversed body =
     rest ++ [x]
   | return () -> []
 
-first : (Unit ->{Emit Int; none} Unit) ->{} Int
+first : (Unit ->{Emit Int} Unit) ->{} Int
 let first body =
   try body () with
   | Emit.emit x -> x
   | return () -> 0
 
-three : Unit ->{Emit Int; none} Unit
+three : Unit ->{Emit Int} Unit
 let three () =
   Emit.emit 1
   Emit.emit 2

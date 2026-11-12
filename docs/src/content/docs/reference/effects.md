@@ -111,10 +111,10 @@ In an arrow the side before `;` is always the service row and the side after
 it the error row, so `->{; AppError}` and `->{none; AppError}` are one type,
 and without `;` the row is always services: `->{Log}` means `->{Log; none}`.
 To declare errors, keep `;`, as in `->{; AppError}`.
-`flick fmt` drops a trailing `;` before omitted errors and writes an empty service row of an
-arrow as nothing, `->{none; E}` becomes `->{; E}`, and an arrow with both rows
-empty as `->{}`. Elsewhere `none` stays, so `->{Log; none}` and
-`Eff none none a` are left as they are.
+`flick fmt` omits empty rows in arrows: `->{none; E}` becomes `->{; E}`,
+`->{Log; none}` becomes `->{Log}`, and `->{none; none}` becomes `->{}`.
+It also drops a trailing `;` before omitted errors. Generated signatures use
+the same short forms. Elsewhere `none` stays, as in `Eff none none a`.
 
 ```flick
 # service Log =

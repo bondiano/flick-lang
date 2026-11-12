@@ -17,7 +17,7 @@ queue : Int -> QueuePolicy
 foreign pure queue from "flick:rt" "eventsQueue"
 
 /// A supervisor that logs how a handler failed.
-log_failures : Failure e ->{Log.Log; none} Unit
+log_failures : Failure e ->{Log.Log} Unit
 let log_failures failure =
   let report = Failure.inspect failure
   Log.error ("event handler failed: " ++ RawCause.describe report)

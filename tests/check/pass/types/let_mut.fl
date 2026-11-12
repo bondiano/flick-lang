@@ -8,7 +8,7 @@ type File (s : Region)
 type error Missing = Missing String
 
 service Files =
-  open : forall s. String ->{Scope s; none} File s
+  open : forall s. String ->{Scope s} File s
   name : forall s. File s ->{} String
 
 pure_count : Int -> Int

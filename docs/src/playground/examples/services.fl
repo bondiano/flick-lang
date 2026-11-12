@@ -4,7 +4,7 @@ module Main exposing (main)
 service Greeter =
   greet : String ->{} String
 
-welcome : String ->{Greeter; none} String
+welcome : String ->{Greeter} String
 let welcome name = "\{Greeter.greet name}!"
 
 main : Unit ->{} Unit

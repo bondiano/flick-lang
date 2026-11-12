@@ -80,8 +80,7 @@ type error ClientError = ClientError { status : Int; message : String }
 
 /// An endpoint at `path` (`/users/:id`) with no parts yet: its handler takes
 /// a request of `Unit`s and answers 204 without a body.
-endpoint :
-  Method -> String -> Record.Label l -> Endpoint l (Request Unit Unit Unit Unit ->{r; none} Unit)
+endpoint : Method -> String -> Record.Label l -> Endpoint l (Request Unit Unit Unit Unit ->{r} Unit)
 foreign pure endpoint from "flick:http-api/HttpApi" "httpApiEndpoint"
   arity 3
   reviewed "effect@4.1.2 sha256:249f1d9fd9f6022e"

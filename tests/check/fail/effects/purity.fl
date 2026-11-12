@@ -38,7 +38,7 @@ let partial_early = early 1
 //~ FLICK-E001 @7:19-7:31 this is a runtime call, but `pure_get` is pure: its signature has `->`, not `->{
 //~ FLICK-E001 @13:21-13:28 this is a runtime call, but `empty_rows` is pure: its signature has `->`, not `-
 //~ FLICK-E001 @19:43-19:55 this is a runtime call, but this function must be pure: the expected type has `-
-//~ FLICK-T003 @22:27-22:36 expected `Float -> String`, found `Float ->{Users; none} String`: a pure funct
+//~ FLICK-T003 @22:27-22:36 expected `Float -> String`, found `Float ->{Users} String`: a pure function `->` and a runtime function `->{…}` are different types
 //~ FLICK-E001 @24:15-24:22 this is a runtime call, but module initialization is pure: runtime calls start a
-//~ FLICK-T003 @30:13-30:17 expected `Float ->{Users; none} Float -> String`, found `Float -> Float ->{U
+//~ FLICK-T003 @30:13-30:17 expected `Float ->{Users} Float -> String`, found `Float -> Float ->{Users} String`: a pure function `->` and a runtime function `->{…}` are different types
 //~ FLICK-E001 @36:21-36:28 this is a runtime call, but module initialization is pure: runtime calls start a

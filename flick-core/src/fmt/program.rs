@@ -8,10 +8,10 @@ use crate::syntax::kind::SyntaxKind as K;
 
 /// The AST of `node`, with `;` between statements and members dropped (a
 /// line break separates them as well), the `|` before the first variant
-/// dropped (`= | A | B` declares `A | B`), and an empty service row of an
+/// dropped (`= | A | B` declares `A | B`), and an empty row of an
 /// arrow written as nothing: `->{none; E}` is `->{; E}`, `->{none; none}` is
-/// `->{}`, `->{S;}` is `->{S}`. A declaration left as written then still
-/// compares equal to its formatted twin.
+/// `->{}`, `->{S; none}` and `->{S;}` are `->{S}`. A declaration left as
+/// written then still compares equal to its formatted twin.
 pub(super) fn program(node: &Node, text: &str) -> Ast {
     normalize(lower(node, text))
 }
@@ -59,7 +59,7 @@ fn drop_empty_rows(children: &mut Vec<Ast>) {
     if rows.len() == 2 && rows.iter().all(|&i| empty(&children[i])) {
         children.retain(|c| matches!(c, Ast::Token(k, _) if *k != K::Semi));
     } else if let [_, errors] = rows[..]
-        && matches!(&children[errors], Ast::Node(_, items) if items.is_empty())
+        && empty(&children[errors])
     {
         children.remove(errors);
         children.retain(|c| !is_token(c, K::Semi));

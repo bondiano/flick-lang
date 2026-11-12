@@ -10,13 +10,13 @@ effect Throw =
 
 type error Oops = Oops String
 
-asked : Unit ->{Ask; none} Int
+asked : Unit ->{Ask} Int
 let asked () = Ask.ask () + 1
 
-checked : Int ->{Throw; none} Int
+checked : Int ->{Throw} Int
 let checked n = if n < 0 then Throw.throw "negative" else n * 2
 
-attempt : (Unit ->{Throw; none} Int) ->{} String
+attempt : (Unit ->{Throw} Int) ->{} String
 let attempt body =
   try show (body ()) with
   | Throw.throw message -> "thrown: " ++ message

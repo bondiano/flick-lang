@@ -8,7 +8,7 @@ effect Ask =
 effect Log =
   log : forall a. Show a => a ->{} Unit
 
-deferred_log : Unit -> (Int ->{Log; none} Unit)
+deferred_log : Unit -> (Int ->{Log} Unit)
 let deferred_log () = loop { break Log.log }
 
 render_twice : (forall a. Show a => a -> String) -> (String, String)
@@ -50,10 +50,10 @@ instance Pick Box =
     match box with
     | Box n -> loop { break n }
 
-scoped_callback : (forall s. Fiber.Owner s ->{Scope s; none} String) ->{} String
+scoped_callback : (forall s. Fiber.Owner s ->{Scope s} String) ->{} String
 let scoped_callback body = loop { break (Scope.run body) }
 
-provided_callback : (Unit ->{Ask; none} Int) ->{} Int
+provided_callback : (Unit ->{Ask} Int) ->{} Int
 let provided_callback body =
   let layer = Layer.succeed Ask { ask = fun () -> 4 }
   loop { break (Layer.run layer body) }

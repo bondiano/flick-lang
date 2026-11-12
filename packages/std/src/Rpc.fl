@@ -113,7 +113,7 @@ type error ClientError = ClientError String
 
 /// A procedure named `l` with no parts yet: its handler takes `Unit` and
 /// answers `Unit`.
-make : Record.Label l -> Rpc l (Unit ->{r; none} Unit)
+make : Record.Label l -> Rpc l (Unit ->{r} Unit)
 foreign pure make from "flick:rpc/Rpc" "rpcMake"
   reviewed "effect@4.1.2 sha256:04f66df479054dbe"
 
@@ -339,7 +339,7 @@ foreign pure call_stream_on from "flick:rpc/Rpc" "rpcCallStreamOn"
 /// Answers the calls of the messages on stdin on stdout until stdin ends:
 /// a program another starts with `spawn`, as editors start language
 /// servers. Nothing else may write to stdout meanwhile. Node only.
-serve_stdio : Serialization -> Group r hs -> (hs^c ->{Async, Stdio.Stdio | r; none} Unit)^c
+serve_stdio : Serialization -> Group r hs -> (hs^c ->{Async, Stdio.Stdio | r} Unit)^c
 foreign effect serve_stdio from "flick:rpc/RpcNode" "rpcServeStdio"
   arity 3
   retention call
@@ -356,7 +356,7 @@ foreign effect spawn from "flick:rpc/RpcNode" "rpcSpawn"
 /// Answers the calls of the page that started this Web Worker until it
 /// closes the worker: the program of the module `worker` starts. Messages
 /// travel by structured clone, so it takes no serialization.
-serve_worker : Group r hs -> (hs^c ->{Async | r; none} Unit)^c
+serve_worker : Group r hs -> (hs^c ->{Async | r} Unit)^c
 foreign effect serve_worker from "flick:rpc/Rpc" "rpcServeWorker"
   arity 2
   retention call
@@ -371,7 +371,7 @@ foreign effect worker from "flick:rpc/Rpc" "rpcWorker"
 
 /// Answers the calls of the thread that started this worker thread until it
 /// closes it, as `serve_worker` in a browser. Node only.
-serve_node_worker : Group r hs -> (hs^c ->{Async | r; none} Unit)^c
+serve_node_worker : Group r hs -> (hs^c ->{Async | r} Unit)^c
 foreign effect serve_node_worker from "flick:rpc/RpcNode" "rpcServeNodeWorker"
   arity 2
   retention call

@@ -206,14 +206,14 @@ fn breaks_signatures_after_their_colon() {
     "#);
 }
 
-/// Empty service rows of an arrow are dropped; elsewhere `none` stays.
+/// Empty rows of an arrow are dropped; elsewhere `none` stays.
 #[test]
 fn drops_empty_arrow_rows() {
     let src = "f : A ->{none; E} B\ng : A ->{none /* why */; E} B\nh : A ->{Log; none} B\ni : Eff none none A\nj : A ->{none; none} B\nk : A ->{; none} B\n";
     insta::assert_snapshot!(fmt(src), @r#"
     f : A ->{; E} B
     g : A ->{/* why */; E} B
-    h : A ->{Log; none} B
+    h : A ->{Log} B
     i : Eff none none A
     j : A ->{} B
     k : A ->{} B
@@ -229,10 +229,23 @@ fn drops_the_semicolon_a_set_does_not_need() {
     f : A ->{...Env} B
     g : A ->{...Env, -Log} B
     h : A ->{...Env; Boom} B
-    i : A ->{...Env; none} B
+    i : A ->{...Env} B
     j : A ->{...Env /* why */} B
     k : A ->{Log} B
     type alias Errs = {...UserErrors;}
+    "#);
+}
+
+#[test]
+fn drops_empty_error_rows_in_nested_arrows_without_losing_comments() {
+    let src = "main : Unit ->{Async; none} Unit\ncallback : (Unit ->{Async; none} Unit) ->{Log | r; none} Unit\ncommented : Unit ->{Async; none /* cannot fail */} Unit\nleading : Unit ->{Async; /* no errors */ none} Unit\nfallible : Unit ->{Async; Error} Unit\nopen : Unit ->{Async; e} Unit\n";
+    insta::assert_snapshot!(fmt(src), @r#"
+    main : Unit ->{Async} Unit
+    callback : (Unit ->{Async} Unit) ->{Log | r} Unit
+    commented : Unit ->{Async /* cannot fail */} Unit
+    leading : Unit ->{Async /* no errors */} Unit
+    fallible : Unit ->{Async; Error} Unit
+    open : Unit ->{Async; e} Unit
     "#);
 }
 

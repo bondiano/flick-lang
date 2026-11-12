@@ -53,5 +53,5 @@ let shrunk layer logged =
 //~ FLICK-E002 @22:3-22:26 the signature of `loud` does not allow service `Log`, which its body needs
 //~ FLICK-E002 @30:22-30:35 the signature of `unpaid` does not allow service `Clock`, which its body needs
 //~ FLICK-T002 @33:56-33:66 `-` takes an element out of a row variable by its name, and `Store Int` has arguments: write the row as `{Store Int | r}` and leave `r`
-//~ FLICK-T003 @44:76-44:91 expected `Ref (Unit ->{-Log | _; none} Unit)`, found `Ref (Unit ->{Log; none} Unit)`: `Log` is in the row, which the expected type does not allow
-//~ FLICK-T003 @50:16-50:22 expected `Unit ->{-Log | _; none} Unit`, found `Unit ->{Log; none} Unit`: `Log` is in the row, which the expected type does not allow
+//~ FLICK-T003 @44:76-44:91 expected `Ref (Unit ->{-Log | _} Unit)`, found `Ref (Unit ->{Log} Unit)`: `Log` is in the row, which the expected type does not allow
+//~ FLICK-T003 @50:16-50:22 expected `Unit ->{-Log | _} Unit`, found `Unit ->{Log} Unit`: `Log` is in the row, which the expected type does not allow
