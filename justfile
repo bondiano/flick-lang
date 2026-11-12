@@ -73,6 +73,21 @@ feature-test:
 go-test:
     cd runtime-go && go vet ./... && go test ./...
 
+# Regenerate the Go runtime's tables and test data from Node and Effect
+# (tools/go-*); `just go-oracles check` also fails when one differs from git
+go-oracles mode="":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    for s in go-arbitrary/gen go-cli/complete go-cli/parity go-collate/gen go-dates/gen go-encoding/gen \
+        go-glob/gen go-intl/gen go-mime/gen go-path/gen go-unicode/gen go-unicode/graphemes; do
+        node "tools/$s.mjs"
+    done
+    if [ "{{mode}}" = check ] && [ -n "$(git status --porcelain -- runtime-go/flickrt)" ]; then
+        git status --short -- runtime-go/flickrt
+        echo "tools/go-* generate other files than runtime-go/flickrt has: commit what they wrote" >&2
+        exit 1
+    fi
+
 # The e2e set: the JS packages, the e2e suites, the cases of tests/run, the
 # Go runtime and the language tests; CI runs the parts as jobs side by side
 e2e: e2e-js e2e-tests e2e-cases go-test language
