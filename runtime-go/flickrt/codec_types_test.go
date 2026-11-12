@@ -1,7 +1,6 @@
 package flickrt
 
 import (
-	"math/big"
 	"testing"
 )
 
@@ -35,21 +34,6 @@ func TestPair(t *testing.T) {
 	roundTrip(t, p, []Value{"a", 1.0})
 	if _, issues := p.decode(rootFiber(), []Value{"a", 1.0, 2.0}); len(issues) != 1 || issues[0] != (issue{"[2]", "an unknown key"}) {
 		t.Fatalf("three elements gave %v", issues)
-	}
-}
-
-func TestByteSizeFormat(t *testing.T) {
-	opts := func(binary bool) Value {
-		return Rec("precision", None, "trailingZeros", None, "binary", binary, "unit", None)
-	}
-	for _, c := range []struct {
-		n      int64
-		binary bool
-		want   string
-	}{{0, true, "0 B"}, {1536, true, "1.5 KiB"}, {2 << 20, true, "2 MiB"}, {1048575, true, "1 MiB"}, {999999, false, "1 MB"}} {
-		if got := ByteSizeFormat(opts(c.binary), big.NewInt(c.n)); got != c.want {
-			t.Errorf("%d: %v, want %s", c.n, got, c.want)
-		}
 	}
 }
 

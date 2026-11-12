@@ -3,12 +3,10 @@ package flickrt
 import (
 	"math"
 	"math/big"
-	"strings"
 )
 
-// A ByteSize is a non-negative whole number of bytes, a BigInt.
-
-var ByteSizeZero Value = big.NewInt(0)
+// The JSON codecs of `ByteSize`, a non-negative whole number of bytes held as
+// a BigInt; the rest of the module is written in Flick.
 
 // ByteSizeBytes is `n` bytes, when that is a whole, non-negative, safe
 // number.
@@ -20,86 +18,9 @@ func ByteSizeBytes(n Value) Value {
 	return Some(big.NewInt(int64(x)))
 }
 
-type byteUnit struct {
-	symbol string
-	factor *big.Int
-}
-
-// The units, the decimal then the binary ones, each from the byte up.
-var decimalUnits, binaryUnits = func() ([]byteUnit, []byteUnit) {
-	pow := func(base, n int64) *big.Int { return new(big.Int).Exp(big.NewInt(base), big.NewInt(n), nil) }
-	decimal := []byteUnit{{"B", big.NewInt(1)}}
-	for i, s := range []string{"kB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB", "RB", "QB"} {
-		decimal = append(decimal, byteUnit{s, pow(1000, int64(i+1))})
-	}
-	binary := []byteUnit{decimal[0]}
-	for i, s := range []string{"KiB", "MiB", "GiB", "TiB", "PiB", "EiB", "ZiB", "YiB"} {
-		binary = append(binary, byteUnit{s, pow(1024, int64(i+1))})
-	}
-	return decimal, binary
-}()
-
-// roundedIn is `n` in `unit`, scaled by `scale`, rounded half up.
-func roundedIn(n *big.Int, unit byteUnit, scale *big.Int) *big.Int {
-	num := new(big.Int).Mul(n, scale)
-	num.Mul(num, big.NewInt(2)).Add(num, unit.factor)
-	return num.Quo(num, new(big.Int).Mul(unit.factor, big.NewInt(2)))
-}
-
-func formatWithUnit(n *big.Int, unit byteUnit, precision int, trailingZeros bool) string {
-	scale := new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(precision)), nil)
-	whole, rest := new(big.Int).QuoRem(roundedIn(n, unit, scale), scale, new(big.Int))
-	if precision == 0 {
-		return whole.String() + " " + unit.symbol
-	}
-	fraction := strings.Repeat("0", precision-len(rest.String())) + rest.String()
-	if !trailingZeros {
-		fraction = strings.TrimRight(fraction, "0")
-	}
-	if fraction != "" {
-		fraction = "." + fraction
-	}
-	return whole.String() + fraction + " " + unit.symbol
-}
-
-// ByteSizeFormat is `ByteSize.format`, the precision cut to an integer
-// from 0 to 20.
-func ByteSizeFormat(options, self Value) Value {
-	o, n := record(options), self.(*big.Int)
-	precision := 2
-	if p, ok := some(o.Get("precision")); ok {
-		precision = min(20, max(0, int(p.(int32))))
-	}
-	trailingZeros := false
-	if t, ok := some(o.Get("trailingZeros")); ok {
-		trailingZeros = t.(bool)
-	}
-	if u, ok := some(o.Get("unit")); ok {
-		return formatWithUnit(n, unitOf(u), precision, trailingZeros)
-	}
-	units, base := decimalUnits, int64(1000)
-	if o.Get("binary").(bool) {
-		units, base = binaryUnits, 1024
-	}
-	if n.Sign() == 0 {
-		return "0 B"
-	}
-	i := len(units) - 1
-	for i > 0 && n.Cmp(units[i].factor) < 0 {
-		i--
-	}
-	if i < len(units)-1 {
-		scale := new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(precision)), nil)
-		if roundedIn(n, units[i], scale).Cmp(new(big.Int).Mul(big.NewInt(base), scale)) >= 0 {
-			i++
-		}
-	}
-	return formatWithUnit(n, units[i], precision, trailingZeros)
-}
-
 var (
-	// CodecByteSize is `ByteSize.json`: the text of a size, written back as a
-	// count of bytes.
+	// CodecByteSize is `ByteSize.json`: the text of a size, written
+	// back as a count of bytes.
 	CodecByteSize Value = &fallible{&stage{
 		&stringAs{"a string that will be decoded as a ByteSize"},
 		func(_ *Fiber, v Value) (Value, []issue) {

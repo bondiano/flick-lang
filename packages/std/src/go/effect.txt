@@ -683,9 +683,6 @@ Json JsonCodec
 flickStringTree CodecStringTree
 
 [flick:ByteSize]
-zero ByteSizeZero
-flickBytes ByteSizeBytes
-flickFormat ByteSizeFormat
 flickJson CodecByteSize
 flickJsonNumber CodecByteSizeNumber
 flickJsonBigint CodecByteSizeBigint
