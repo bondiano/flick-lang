@@ -31,6 +31,22 @@ pub struct Surface {
     /// declaration: one Flick type would confuse them.
     #[serde(default)]
     pub ambiguous: Vec<String>,
+    /// How TypeScript names the named types the exports mention; a type
+    /// that neither the package exports nor the platform has is not here.
+    #[serde(default)]
+    pub types: Vec<Named>,
+}
+
+/// A type TypeScript can name outside the declarations of the package: by
+/// an export of the package, or by the name the global scope has it by,
+/// `Date` or `Intl.DateTimeFormatOptions`.
+#[derive(Debug, Clone, Deserialize)]
+pub struct Named {
+    pub name: String,
+    #[serde(default)]
+    pub export: Option<String>,
+    #[serde(default)]
+    pub global: Option<String>,
 }
 
 impl Surface {

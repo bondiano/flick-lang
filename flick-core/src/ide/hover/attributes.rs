@@ -13,6 +13,10 @@ const LANG: &str = "Marks a declaration as a lang item: a built-in entity the co
 const MAKER: &str = "Marks a value as a maker of an atom, action or view. The compiler tracks calls to it, including through other functions, to reject creating a new one on every render (`FLICK-U006`). Create it once at the top level or during component setup instead. Takes no argument.";
 const CELL: &str = "Marks a type whose values hold one value each, as a state made by a pure call does. A value of such a type that is no function is not generalized over what the cell holds, and one whose type gives it variables is rejected (`FLICK-T072`). Takes no argument and belongs before a type declaration.";
 const DERIVE: &str = "Marks a class as derivable with `deriving`. The implementation comes from the plugin of the class's package, or from the package named by the attribute, for example `@derive std`. Belongs before a class declaration.";
+const TS: &str = "Says what the type or service declared next is in TypeScript: it is not declared in `.d.ts`, and every module that names it writes this form. In a form `{0}` is the first argument of the type, `{0:row}` that argument as a row, and `$Export` an export that `@ts import \"module\" \"Export\"` brings from a package or from a file beside the module. `rt \"…\"` after a form or an export is the one for Flick's own runtime. `@ts none` says the type has no form. The compiler does not check that a form is true of the values.";
+const LABEL: &str = "Marks a type whose top-level values carry their names where the program runs: a value of the type that is no function is labelled `Module.name`, for the tools that show it. Takes one kind, as `@label atom`; a build keeps the labels of the kinds its `labels` setting names. Belongs before a type declaration.";
+const OWNER: &str = "Marks a service whose handler owns what is made under it: a function that needs the service is no maker to those that name it (`FLICK-U006`). Takes no argument and belongs before a service declaration.";
+const SYNC: &str = "Marks a service whose operations run at once, without a runtime: a stage that needs only such services and has no errors is Sync. `@sync reader` marks one that only reads, which a stage lends to code that runs later, as the clauses of a `for`. Used in built-in modules only; elsewhere the mark has no effect. Belongs before a service declaration.";
 const IMPLICIT: &str = "Opts an instance into automatic conversion between two distinct ground nominal types when the expected type is known. The class must have two parameters and one pure method of type `a -> b`; the instance must have no context or type variables. Exactly one visible instance must match; conversions do not chain. Takes no argument and belongs before an instance declaration.";
 
 impl Ide<'_> {
@@ -43,11 +47,21 @@ impl Ide<'_> {
             "cell" if on_name => CELL,
             "implicit" if on_name => IMPLICIT,
             "derive" => DERIVE,
+            "ts" => TS,
+            "label" => LABEL,
+            "owner" if on_name => OWNER,
+            "sync" => SYNC,
             "lang" if on_name || Lang::from_name(token.text(text)).is_some() => LANG,
             _ => return None,
         };
         let mut code = format!("@{}", name.text(text));
-        if let Some(argument) = argument {
+        if name.text(text) == "ts" {
+            // its arguments are strings too: the attribute as written
+            let (start, end) = attribute.range();
+            text[start as usize..end as usize]
+                .trim()
+                .clone_into(&mut code);
+        } else if let Some(argument) = argument {
             let _ = write!(code, " {}", argument.text(text));
         }
         let mut markdown = format!("```flick\n{code}\n```\n\n{description}");

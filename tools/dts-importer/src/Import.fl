@@ -34,6 +34,30 @@ let ambiguous named =
     (fun n -> List.length (sites_of named n) > 1)
     (List.dedupe (List.map (fun (n, _) -> n) named))
 
+/// The declarations each export of the module stands for, with its name.
+exported_sites : Ts.Checker -> Ts.Symbol -> List (String, String)
+let exported_sites c module_ =
+  List.flat_map
+    (fun exported ->
+      let symbol = if Ts.symbol_has "Alias" exported then Ts.aliased c exported else exported
+      List.map (fun d -> (Ts.declaration_site d, Ts.symbol_name exported)) (Ts.declarations symbol)
+    )
+    (Ts.exports_of c module_)
+
+/// How TypeScript names the type `name` declared at `site` outside these
+/// declarations: by an export of the package, or by the name the global
+/// scope has it by. A type neither names has no entry.
+named_type : List (String, String) -> List (String, String) -> (String, String) -> Option Value
+let named_type exported globals (name, site) =
+  at : List (String, String) -> Option String
+  let at sites = Option.map (fun (_, found) -> found) (List.find (fun (s, _) -> s == site) sites)
+  match at exported with
+  | Some export -> Some (JObject [("name", JString name), ("export", JString export)])
+  | None ->
+    Option.map
+      (fun global -> JObject [("name", JString name), ("global", JString global)])
+      (at globals)
+
 /// The JSON of the package's value exports, from its declarations `file`.
 surface : Request -> Ts.Resolution -> String ->{Path.Path; AppError} String
 let surface request resolved file =
@@ -54,7 +78,12 @@ let surface request resolved file =
             ])
         )
         shapes
-    let clashes = ambiguous (List.flat_map (fun e -> e.named) shapes)
+    let named = List.dedupe (List.flat_map (fun e -> e.named) shapes)
+    let clashes = ambiguous named
+    let types =
+      List.filter_map
+        (named_type (exported_sites checker module_) (List.flat_map (fun e -> e.globals) shapes))
+        (List.filter (fun (n, _) -> not (List.contains n clashes)) named)
     let package_id = Ts.resolved_package resolved
     let declarations =
       match package_id with
@@ -74,6 +103,7 @@ let surface request resolved file =
           ],
           // absent when empty, so the surface of most packages does not change
           if List.is_empty clashes then [] else [("ambiguous", JArray (List.map JString clashes))],
+          if List.is_empty types then [] else [("types", JArray types)],
         ]))
 
 /// Answers the request on stdin.

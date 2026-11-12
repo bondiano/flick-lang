@@ -12,8 +12,9 @@ use std::fmt::Write;
 
 use super::convert::{Blocked, Convert, arrow_operand, mentions, var_name};
 use super::enums::{Enums, Literals};
-use super::{ExportKind, ExportPolicy, ExportShape, Policy, Signature, Surface};
+use super::{ExportKind, ExportPolicy, ExportShape, Named, Policy, Signature, Surface};
 use crate::syntax::kind::keyword;
+use crate::syntax::ts_mark::{is_export, is_specifier};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Status {
@@ -183,7 +184,8 @@ pub fn generate(
     for handle in &handles {
         let _ = write!(
             text,
-            "\n/// A JS `{handle}`, opaque to Flick.\ntype {handle}\n"
+            "\n/// A JS `{handle}`, opaque to Flick.\n{}type {handle}\n",
+            form(surface, handle)
         );
     }
     text.push_str(&enums.text());
@@ -195,6 +197,28 @@ pub fn generate(
         text,
         entries,
         missing,
+    }
+}
+
+/// The `@ts` lines of the opaque type `handle`: what TypeScript knows it
+/// as, when the package exports the type or the global scope has it, by
+/// its own name or through a namespace. A type neither names stays a brand
+/// of its own in generated declarations.
+fn form(surface: &Surface, handle: &str) -> String {
+    match surface.types.iter().find(|t| t.name == handle) {
+        Some(Named {
+            export: Some(export),
+            ..
+        }) if is_export(export) && is_specifier(&surface.package) => format!(
+            "@ts \"${export}\"\n@ts import {} {}\n",
+            quote(&surface.package),
+            quote(export)
+        ),
+        Some(Named {
+            global: Some(global),
+            ..
+        }) if global.split('.').all(is_export) => format!("@ts \"{global}\"\n"),
+        _ => String::new(),
     }
 }
 

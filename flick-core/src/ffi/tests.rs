@@ -361,3 +361,50 @@ fn a_name_of_two_typescript_types_blocks_what_uses_it() {
     assert_eq!(status_of(&generated, "count").0, Status::Supported);
     assert!(!generated.text.contains("type Options"));
 }
+
+/// An opaque type is what TypeScript knows it as when something outside
+/// the declarations can name it: an export of the package, or a global.
+#[test]
+fn an_opaque_type_has_the_form_typescript_names_it_by() {
+    use crate::source::SourceMap;
+    use crate::syntax;
+    let dated = r#", {"name": "today", "local": "today", "kind": "function", "fingerprint": "sha256:d",
+   "signatures": [{"params": [], "this": false, "typeParams": [],
+     "result": {"k": "handle", "name": "Date"}}]},
+  {"name": "inner", "local": "inner", "kind": "function", "fingerprint": "sha256:e",
+   "signatures": [{"params": [], "this": false, "typeParams": [],
+     "result": {"k": "handle", "name": "Hidden"}}]},
+  {"name": "shown", "local": "shown", "kind": "function", "fingerprint": "sha256:f",
+   "signatures": [{"params": [], "this": false, "typeParams": [],
+     "result": {"k": "object", "name": "DateTimeFormatOptions", "text": "Intl.DateTimeFormatOptions"}}]}]"#;
+    let exports = OPTIONS_SURFACE
+        .strip_suffix(']')
+        .expect("the exports end the surface");
+    let types = r#""types": [{"name": "Options", "export": "RetryOptions"}, {"name": "Date", "global": "Date"},
+        {"name": "DateTimeFormatOptions", "global": "Intl.DateTimeFormatOptions"}]"#;
+    let surface = Surface::parse(&format!("{exports}{dated}, {types}}}")).expect("surface parses");
+    let generated = generate(&surface, &Policy::default(), None, "P.Generated");
+    let text = &generated.text;
+    assert!(
+        text.contains("\n@ts \"$RetryOptions\"\n@ts import \"p\" \"RetryOptions\"\ntype Options\n"),
+        "{text}"
+    );
+    assert!(text.contains("\n@ts \"Date\"\ntype Date\n"), "{text}");
+    // a type of a namespace of the platform is named through the namespace
+    assert!(
+        text.contains("\n@ts \"Intl.DateTimeFormatOptions\"\ntype DateTimeFormatOptions\n"),
+        "{text}"
+    );
+    // a type nothing outside can name keeps its brand
+    assert!(text.contains("opaque to Flick.\ntype Hidden\n"), "{text}");
+    let mut sources = SourceMap::default();
+    let file = sources.add("Generated.fl".to_owned(), text);
+    let parsed = syntax::parse(text, file);
+    assert!(parsed.diagnostics.is_empty(), "{:?}", parsed.diagnostics);
+
+    // a name that is more than a name gives no attribute to refuse later
+    let odd = types.replace("RetryOptions", "Retry-Options");
+    let surface = Surface::parse(&format!("{exports}{dated}, {odd}}}")).expect("surface parses");
+    let generated = generate(&surface, &Policy::default(), None, "P.Generated");
+    assert!(generated.text.contains("opaque to Flick.\ntype Options\n"));
+}

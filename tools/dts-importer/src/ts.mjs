@@ -69,6 +69,24 @@ export const declarationIs = (kind, d) => ts[`is${kind}`](d);
 export const declarationHas = (field, d) => d[field] !== undefined;
 export const declarationName = (d) => d.name?.getText();
 export const declarationSite = (d) => `${d.getSourceFile().fileName}:${d.pos}`;
+/**
+ * The name the global scope has the type by, `Date` or
+ * `Intl.DateTimeFormatOptions`: its own, or through the namespaces it is
+ * declared in. A type a module declares has none.
+ */
+export const globalName = (c, t) => {
+  const symbol = t.aliasSymbol ?? t.symbol;
+  if (symbol === undefined) return undefined;
+  const name = c.getFullyQualifiedName(symbol);
+  // a member of a module is named through the module's file, in quotes
+  if (name.startsWith('"')) return undefined;
+  const [root, ...members] = name.split(".");
+  let found = c.resolveName(root, undefined, ts.SymbolFlags.Type | ts.SymbolFlags.Namespace, false);
+  for (const member of members) {
+    found = found && c.getExportsOfModule(found).find((e) => e.name === member);
+  }
+  return found === symbol ? name : undefined;
+};
 export const printed = (d) => printer.printNode(ts.EmitHint.Unspecified, d, d.getSourceFile());
 
 export const sha256 = (text) => createHash("sha256").update(text).digest("hex");

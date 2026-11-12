@@ -51,6 +51,7 @@ export declare const declarationIs: (kind: string, d: ts.Node) => boolean;
 export declare const declarationHas: (field: string, d: ts.Node) => boolean;
 export declare const declarationName: (d: ts.Declaration) => string | undefined;
 export declare const declarationSite: (d: ts.Declaration) => string;
+export declare const globalName: (c: ts.TypeChecker, t: ts.Type) => string | undefined;
 export declare const printed: (d: ts.Node) => string;
 
 export declare const sha256: (text: string) => string;
