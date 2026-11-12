@@ -68,6 +68,7 @@ theorem Ty.Pol.noV {i : Nat} {s : Variance} {q : Bool} {f : Ty}
     · rcases hs with ⟨h1, -⟩ | ⟨rfl, rfl⟩
       · exact absurd hC h1
       · simp [Variance.at] at hC
+  | rcons _ _ iht ihr => exact Ty.NoV.rcons (iht hs) (ihr hs)
   | @data q t T us _ hng _ hin hbi ht ihp ihn =>
     subst ht
     apply Ty.NoV.tcon
@@ -162,6 +163,8 @@ theorem field_vary {i : Nat} {s : Variance} {q : Bool} {f : Ty} (hf : Ty.Pol S.v
       · have hN := (Ty.Pol.eff hr' he hPt hC).noV (Variance.noV_cond hsn)
         have := same hN
         simpa only [Ty.substT, er, ee] using this
+  | rcons _ _ iht ihr =>
+    exact ⟨fun hq => .rcons' (iht.1 hq) (ihr.1 hq), fun hq => .rcons' (iht.2 hq) (ihr.2 hq)⟩
   | @data q t T us hPp hng hPn hin hbi ht ihp ihn =>
     subst ht
     rw [Ty.tcon_substT, Ty.tcon_substT]

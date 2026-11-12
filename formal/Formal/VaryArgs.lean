@@ -122,6 +122,7 @@ theorem Ty.Closed.le_eq {c u : Ty} (h : c.Closed) (hl : LeLive S c u) : u = c :=
   | refl => rfl
   | arrow => exact h.elim
   | eff => exact h.elim
+  | rcons => exact h.elim
   | hide _ hl _ _ ha hb | data hl _ _ _ _ ha hb =>
     subst ha; subst hb
     obtain rfl := h.tcon
@@ -133,6 +134,7 @@ theorem Ty.Closed.ge_eq {c u : Ty} (h : c.Closed) (hl : LeLive S u c) : u = c :=
   | refl => rfl
   | arrow => exact h.elim
   | eff => exact h.elim
+  | rcons => exact h.elim
   | hide _ hl _ _ ha hb | data hl _ _ _ _ ha hb =>
     subst ha; subst hb
     obtain rfl := h.tcon
@@ -143,18 +145,21 @@ subtyping moves neither. -/
 theorem Ty.Closed.inst_eq {c u u' : Ty} {σ : Atom → Ty} (h : c.Closed) (e : u.substT σ = c)
     (hl : LeLive S u u' ∨ LeLive S u' u) : u' = u := by
   have atom : ∀ {x : Ty}, (∀ T us, x ≠ Ty.tcon T us) → (∀ a φ b C, x ≠ .arrow a φ b C) →
-      (∀ r e t C, x ≠ .eff r e t C) → (LeLive S x u' ∨ LeLive S u' x) → u' = x :=
-    fun ht ha he hl => by
+      (∀ r e t C, x ≠ .eff r e t C) → (∀ l t r, x ≠ .rcons l t r) →
+      (LeLive S x u' ∨ LeLive S u' x) → u' = x :=
+    fun ht ha he hr hl => by
       rcases hl with hl | hl
       · cases hl with
         | refl => rfl
         | arrow => exact absurd rfl (ha _ _ _ _)
         | eff => exact absurd rfl (he _ _ _ _)
+        | rcons => exact absurd rfl (hr _ _ _)
         | hide _ _ _ _ hx _ | data _ _ _ _ _ hx _ => exact absurd hx (ht _ _)
       · cases hl with
         | refl => rfl
         | arrow => exact absurd rfl (ha _ _ _ _)
         | eff => exact absurd rfl (he _ _ _ _)
+        | rcons => exact absurd rfl (hr _ _ _)
         | hide _ _ _ _ _ hx | data _ _ _ _ _ _ hx => exact absurd hx (ht _ _)
   have nt : ∀ {x : Ty}, (∀ g b, x ≠ .tapp g b) → (∀ T, x ≠ .adt T) → ∀ T us, x ≠ Ty.tcon T us :=
     fun hg hd T us hx => by
@@ -164,7 +169,7 @@ theorem Ty.Closed.inst_eq {c u u' : Ty} {σ : Atom → Ty} (h : c.Closed) (e : u
   cases u with
   | tvar | rg =>
     exact atom (nt (fun _ _ h => by cases h) (fun _ h => by cases h)) (fun _ _ _ _ h => by cases h)
-      (fun _ _ _ _ h => by cases h) hl
+      (fun _ _ _ _ h => by cases h) (fun _ _ _ h => by cases h) hl
   | base | adt =>
     simp only [Ty.substT] at e; subst e
     rcases hl with hl | hl

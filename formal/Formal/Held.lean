@@ -123,6 +123,7 @@ theorem LeLive.res {a b : Ty} (h : LeLive S a b) : LeLive S a.res b.res := by
   | refl => exact .refl
   | arrow _ _ _ _ _ ih => exact ih
   | eff hφ ht hc => exact .eff hφ ht hc
+  | rcons h₁ h₂ hc => exact .rcons h₁ h₂ hc
   | hide hi hl he hr ha hb =>
     subst ha; subst hb
     rw [Ty.res_tcon_self, Ty.res_tcon_self]
@@ -140,7 +141,7 @@ theorem Ty.tcon_not_isAll (T : Name) (us : List Ty) : ¬ (Ty.tcon T us).isAll :=
 theorem LeLive.not_all {x y : Ty} (h : LeLive S x y) (hx : ¬ x.isAll) : ¬ y.isAll := by
   cases h with
   | refl => exact hx
-  | arrow | eff => simp [Ty.isAll]
+  | arrow | eff | rcons => simp [Ty.isAll]
   | hide _ _ _ _ _ hb => subst hb; exact Ty.tcon_not_isAll _ _
   | data _ _ _ _ _ _ hb => subst hb; exact Ty.tcon_not_isAll _ _
 

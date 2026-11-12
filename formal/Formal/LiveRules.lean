@@ -282,6 +282,7 @@ theorem named_row_invariant {S : Sig} {T : Name} {us : List Ty} {b : Ty}
   | refl => rfl
   | arrow => exact absurd hX.symm Ty.arrow_ne_tcon
   | eff => exact absurd hX.symm Ty.eff_ne_tcon
+  | rcons => exact absurd hX.symm Ty.rcons_ne_tcon
   | hide hi _ _ _ ha _ =>
     obtain ⟨rfl, -⟩ := Ty.tcon_eq (hX.trans ha)
     rw [hT] at hi; cases hi

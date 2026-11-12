@@ -33,15 +33,20 @@ theorem Ty.tcon_kind' (T : Name) (us : List Ty) : (Ty.tcon T us).kind = 3 := by
 
 theorem LeLive.kind {a b : Ty} (h : LeLive S a b) : a.kind = b.kind := by
   cases h with
-  | refl | arrow | eff => rfl
+  | refl | arrow | eff | rcons => rfl
   | hide _ _ _ _ ha hb => subst ha; subst hb; rw [Ty.tcon_kind', Ty.tcon_kind']
   | data _ _ _ _ _ ha hb => subst ha; subst hb; rw [Ty.tcon_kind', Ty.tcon_kind']
 
 theorem Shp.le {a b : Ty} {e : Tm}
     (h : LeLive S a b) (hs : Shp S true a e) : Shp S true b e := by
-  cases h with
+  induction h generalizing e with
   | refl => exact hs
   | arrow | eff => exact .hidden (by simp [Ty.Opaque, Ty.hd])
+  | rcons _ _ _ ih₁ ih₂ =>
+    cases hs with
+    | hidden ho => simp [Ty.Opaque, Ty.hd] at ho
+    | rcons h₁ h₂ => exact .rcons (ih₁ h₁) (ih₂ h₂)
+    | adt _ _ hT => simp [Ty.hd] at hT
   | hide hi hl heq hsub ha hb =>
     cases hs with
     | hidden ho =>
@@ -141,6 +146,7 @@ theorem LeLive.opaque {a b : Ty} (h : LeLive S a b) (ha : a.Opaque) : b.Opaque :
   | refl => exact ha
   | arrow => simp [Ty.Opaque, Ty.hd]
   | eff => simp [Ty.Opaque, Ty.hd]
+  | rcons => simp [Ty.Opaque, Ty.hd] at ha
   | hide _ _ _ _ ha' hb => subst ha'; subst hb; rw [Ty.Opaque, Ty.tcon_hd] at ha ⊢; exact ha
   | data _ _ _ _ _ ha' hb => subst ha'; subst hb; rw [Ty.Opaque, Ty.tcon_hd] at ha ⊢; exact ha
 
@@ -200,6 +206,7 @@ theorem Shp.full_of {U T e} {us : List Ty} (h : Shp S false U e) (hl : LeLive S 
         exact hB
       | arrow => exact absurd hX Ty.arrow_ne_tcon
       | eff => exact absurd hX Ty.eff_ne_tcon
+      | rcons => exact absurd hX Ty.rcons_ne_tcon
       | hide hi hlen heq hsub ha hb =>
         obtain ⟨rfl, rfl⟩ := Ty.tcon_eq (ha.symm.trans hX)
         subst hb

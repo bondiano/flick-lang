@@ -107,6 +107,7 @@ theorem LeLive.res_tcon {a b : Ty} {T : Name} {us : List Ty}
   | refl => exact ⟨us, ha, .refl⟩
   | arrow _ _ _ _ _ ih => exact ih ha
   | eff => exact absurd ha.symm (Ty.tcon_not_eff _ _ _ _ _ _)
+  | rcons => exact absurd ha Ty.rcons_ne_tcon
   | hide hi hl heq hsub ha' hb' =>
     subst ha'; subst hb'
     rw [Ty.tcon_res] at ha ⊢
@@ -125,6 +126,7 @@ theorem LeLive.res_tcon' {a b : Ty} {T : Name} {us : List Ty}
   | refl => exact ⟨us, hb, .refl⟩
   | arrow _ _ _ _ _ ih => exact ih hb
   | eff => exact absurd hb.symm (Ty.tcon_not_eff _ _ _ _ _ _)
+  | rcons => exact absurd hb Ty.rcons_ne_tcon
   | hide hi hl heq hsub ha' hb' =>
     subst ha'; subst hb'
     rw [Ty.tcon_res] at hb ⊢
@@ -166,6 +168,7 @@ theorem LeLive.adt_eq {T : Name} {U : Ty} (h : LeLive S (.adt T) U) : U = .adt T
   | refl => rfl
   | arrow => cases hX
   | eff => cases hX
+  | rcons => cases hX
   | hide _ hl _ _ ha hb =>
     subst hb
     obtain ⟨rfl, rfl⟩ := Ty.tcon_eq_adt (ha.symm.trans hX.symm)

@@ -1,5 +1,4 @@
-import Formal.Rules
-import Formal.Order
+import Formal.Live.UseStage
 
 /-!
 # Structural laws for typing by use
@@ -8,131 +7,6 @@ import Formal.Order
 -/
 
 namespace Flick
-
-@[simp] theorem Stage.use_none (φ : Stage) :
-    Stage.use φ Caps.none = φ := by
-  cases φ with
-  | pure => rfl
-  | rt r ε =>
-    change Stage.rt (Row.union r (Row.ofCaps Caps.none)) ε = Stage.rt r ε
-    congr 1
-    funext x
-    cases x <;> simp [Row.union, Row.ofCaps, Caps.none]
-
-@[simp] theorem Stage.use_pure (C : Caps) :
-    Stage.use .pure C = .pure := by rfl
-
-@[simp] theorem Stage.use_err (φ : Stage) (C : Caps) :
-    (Stage.use φ C).err = φ.err := by cases φ <;> rfl
-
-/-- A use stage adds only the atoms of what it uses, and only in the live discipline. -/
-theorem Stage.use_svc (φ : Stage) (C : Caps) {n : Elem}
-    (h : (Stage.use φ C).svc n) : φ.svc n ∨ ∃ a, C a ∧ n = .atm a := by
-  cases φ with
-  | pure => exact .inl h
-  | rt r ε =>
-    rcases h with h | h
-    · exact .inl h
-    · cases n <;> simp [Row.ofCaps] at h
-      exact .inr ⟨_, h, rfl⟩
-
-theorem Stage.le_use (φ : Stage) (C : Caps) :
-    φ.le (Stage.use φ C) := by
-  cases φ with
-  | pure => trivial
-  | rt _ _ => exact ⟨fun _ h => .inl h, fun _ h => h⟩
-
-theorem Stage.use_mono {φ ψ : Stage} {C D : Caps}
-    (h : φ.le ψ) (hCD : Caps.Sub C D) : (Stage.use φ C).le (Stage.use ψ D) := by
-  cases φ with
-  | pure => trivial
-  | rt r ε =>
-    cases ψ with
-    | pure => exact h.elim
-    | rt r' ε' =>
-      refine ⟨?_, h.2⟩
-      intro x hx
-      rcases hx with hx | hx
-      · exact .inl (h.1 x hx)
-      · exact .inr (by cases x <;> first | exact hCD _ hx | exact hx)
-
-theorem Stage.use_substT (φ : Stage) (C : Caps) (σ : Atom → Ty) :
-    (Stage.use φ C).substT σ = Stage.use (φ.substT σ) (C.substT σ) := by
-  cases φ <;>
-    simp [Stage.use, Stage.substT, Row.union_substT, Row.ofCaps_substT]
-
-theorem Caps.substT_rg {p : Nat} {σ : Atom → Ty} (hp : σ (.r p) = .rg p) :
-    ((Ty.rg p).reach).substT σ = (Ty.rg p).reach := by
-  funext a
-  apply propext
-  constructor
-  · rintro ⟨b, rfl, h⟩; rw [hp] at h; exact h
-  · intro h; exact ⟨.r p, rfl, by rw [hp]; exact h⟩
-
-theorem Caps.substT_if_rg {tl : Bool} {p : Nat} {σ : Atom → Ty} (hp : σ (.r p) = .rg p) :
-    ((if tl = true then Caps.none else (Ty.rg p).reach) : Caps).substT σ
-      = if tl = true then Caps.none else (Ty.rg p).reach := by
-  cases tl <;> simp [Caps.substT_rg hp, Caps.none_substT]
-
-theorem Stage.use_substT_eq (φ : Stage) {C : Caps} {σ : Atom → Ty}
-    (hC : C.substT σ = C) : (Stage.use φ C).substT σ = Stage.use (φ.substT σ) C := by
-  rw [Stage.use_substT, hC]
-theorem Stage.use_substT_rg (φ : Stage) {p : Nat} {σ : Atom → Ty}
-    (hp : σ (.r p) = .rg p) :
-    (Stage.use φ (Ty.rg p).reach).substT σ = Stage.use (φ.substT σ) (Ty.rg p).reach :=
-  Stage.use_substT_eq φ (Caps.substT_rg hp)
-
-/-- A named effect of a use stage is one of the stage used: typing by use adds only
-region atoms to a row. -/
-theorem Stage.use_svc_nm {φ : Stage} {C : Caps} {N : Name}
-    (h : (Stage.use φ C).svc (.nm N)) : φ.svc (.nm N) := by
-  cases φ with
-  | pure => exact h
-  | rt r ε =>
-    rcases h with h | h
-    · exact h
-    · exact h.elim
-
-/-- A stage above a run-time stage that holds the atom of a region is above the use of
-that region: the frame of a handler supplies the atom its own region needs. -/
-theorem Stage.use_rg_le {r ε : Row} {φ : Stage} {p : Nat}
-    (h : (Stage.rt r ε).le φ) (hp : φ.svc (.atm (.r p))) :
-    (Stage.use (.rt r ε) (Ty.rg p).reach).le φ := by
-  obtain ⟨r', ε', rfl, hr, he⟩ := Stage.rt_le h
-  simp only [Stage.use]
-  refine ⟨fun n hn => ?_, he⟩
-  cases n with
-  | nm N =>
-    rcases hn with hn | hn
-    · exact hr _ hn
-    · simp [Row.ofCaps] at hn
-  | atm a =>
-    rcases hn with hn | hn
-    · exact hr _ hn
-    · rw [show a = .r p by simpa [Row.ofCaps, Ty.reach] using hn]; exact hp
-  | ob N a =>
-    rcases hn with hn | hn
-    · exact hr _ hn
-    · simp [Row.ofCaps] at hn
-  | rv a =>
-    rcases hn with hn | hn
-    · exact hr _ hn
-    · simp [Row.ofCaps] at hn
-  | obv v a =>
-    rcases hn with hn | hn
-    · exact hr _ hn
-    · simp [Row.ofCaps] at hn
-
-/-- A control arm may call `resume`, which uses the region of the handler; a `tail` arm
-does not. -/
-theorem Stage.use_ctl_le (tl : Bool) (r ε : Row) (p : Nat) :
-    (Stage.use (.rt r ε) (if tl then Caps.none else (Ty.rg p).reach)).le
-      (Stage.use (.rt r ε) (Ty.rg p).reach) := by
-  cases tl with
-  | true =>
-    simp only [if_true, Stage.use_none]
-    exact Stage.le_use (Stage.rt r ε) (Ty.rg p).reach
-  | false => exact Stage.le_refl _
 
 theorem Ty.reach_foldl_le : ∀ {us us' : List Ty} {f f' : Ty}, us.length = us'.length →
     Caps.Sub f.reach f'.reach →
@@ -164,7 +38,7 @@ theorem LeLive.hide_args {i : Nat} {us us' : List Ty}
 theorem LeLive.reach {a b : Ty} (h : LeLive S a b) : Caps.Sub a.reach b.reach := by
   cases h with
   | refl => exact Caps.Sub.refl _
-  | arrow _ _ _ hc | eff _ _ hc => exact hc
+  | arrow _ _ _ hc | eff _ _ hc | rcons _ _ hc => exact hc
   | hide _ hl he hr ha hb =>
     subst ha; subst hb
     exact Ty.reach_foldl_le hl (Caps.Sub.refl _) (LeLive.hide_args he hr)
@@ -212,12 +86,36 @@ theorem LeLive.eff_right {r ε t C T} (h : LeLive S T (.eff r ε t C)) :
   | hide _ _ _ _ _ hb => exact absurd hb Ty.eff_ne_tcon
   | data _ _ _ _ _ _ hb => exact absurd hb Ty.eff_ne_tcon
 
+theorem LeLive.rcons_left {l t r T} (h : LeLive S (.rcons l t r) T) :
+    ∃ t' r', T = .rcons l t' r' ∧ LeLive S t t' ∧ LeLive S r r' ∧
+      Caps.Sub (Ty.rcons l t r).reach T.reach := by
+  cases h with
+  | refl => exact ⟨_, _, rfl, .refl, .refl, Caps.Sub.refl _⟩
+  | rcons h₁ h₂ h₃ => exact ⟨_, _, rfl, h₁, h₂, h₃⟩
+  | hide _ _ _ _ ha => exact absurd ha Ty.rcons_ne_tcon
+  | data _ _ _ _ _ ha => exact absurd ha Ty.rcons_ne_tcon
+
+theorem LeLive.rcons_right {l t r T} (h : LeLive S T (.rcons l t r)) :
+    ∃ t' r', T = .rcons l t' r' ∧ LeLive S t' t ∧ LeLive S r' r ∧
+      Caps.Sub T.reach (Ty.rcons l t r).reach := by
+  cases h with
+  | refl => exact ⟨_, _, rfl, .refl, .refl, Caps.Sub.refl _⟩
+  | rcons h₁ h₂ h₃ => exact ⟨_, _, rfl, h₁, h₂, h₃⟩
+  | hide _ _ _ _ _ hb => exact absurd hb Ty.rcons_ne_tcon
+  | data _ _ _ _ _ _ hb => exact absurd hb Ty.rcons_ne_tcon
+
+/-- A record compares field by field; what it reaches follows. -/
+theorem LeLive.rcons' {l t t' r r'} (ht : LeLive S t t') (hr : LeLive S r r') :
+    LeLive S (.rcons l t r) (.rcons l t' r') :=
+  .rcons ht hr fun x hx => hx.elim (fun h => .inl (ht.reach x h)) (fun h => .inr (hr.reach x h))
+
 /-- A plain type has no other subtype or supertype. -/
 theorem LeLive.eq_plain {a b : Ty} (h : LeLive S a b) (ha : a.isPlain = true) : b = a := by
   cases h with
   | refl => rfl
   | arrow => simp [Ty.isPlain] at ha
   | eff => simp [Ty.isPlain] at ha
+  | rcons => simp [Ty.isPlain] at ha
   | hide _ _ _ _ ha' => exact absurd ha' (Ty.ne_tcon_of_plain ha)
   | data _ _ _ _ _ ha' => exact absurd ha' (Ty.ne_tcon_of_plain ha)
 
@@ -227,6 +125,7 @@ theorem LeLive.eq_plain_right {a b : Ty} (h : LeLive S a b) (hb : b.isPlain = tr
   | refl => rfl
   | arrow => simp [Ty.isPlain] at hb
   | eff => simp [Ty.isPlain] at hb
+  | rcons => simp [Ty.isPlain] at hb
   | hide _ _ _ _ _ hb' => exact absurd hb' (Ty.ne_tcon_of_plain hb)
   | data _ _ _ _ _ _ hb' => exact absurd hb' (Ty.ne_tcon_of_plain hb)
 
@@ -241,6 +140,7 @@ theorem LeLive.hide_trans {T : Name} {i : Nat} {us us' : List Ty} {c : Ty}
   | refl => subst hx; exact .hide hi hl he hr rfl rfl
   | arrow => exact absurd hx.symm Ty.arrow_ne_tcon
   | eff => exact absurd hx.symm Ty.eff_ne_tcon
+  | rcons => exact absurd hx.symm Ty.rcons_ne_tcon
   | hide hi' hl' he' hr' ha hb =>
     subst hb
     obtain ⟨rfl, rfl⟩ := Ty.tcon_eq (hx.trans ha)
@@ -304,6 +204,7 @@ theorem LeLive.data_trans {T : Name} {us vs : List Ty} {c : Ty}
   | refl => subst hx; exact .data hl hr hp hn hi rfl rfl
   | arrow => exact absurd hx.symm Ty.arrow_ne_tcon
   | eff => exact absurd hx.symm Ty.eff_ne_tcon
+  | rcons => exact absurd hx.symm Ty.rcons_ne_tcon
   | hide hi' hl' he' hr' ha hb =>
     subst hb
     obtain ⟨rfl, rfl⟩ := Ty.tcon_eq (hx.trans ha)
@@ -354,10 +255,16 @@ theorem LeLive.trans_lt (n : Nat) : ∀ {b a c : Ty}, sizeOf b < n → LeLive S 
       obtain ⟨_, _, _, _, rfl, gφ, gt, gc⟩ := h₂.eff_left
       exact .eff (Stage.le_trans hφ gφ) (ih (by first | simp | (simp; omega)) ht gt)
         (hc.trans gc)
+    by_cases hR : ∃ l t r, b = .rcons l t r
+    · obtain ⟨l, t, r, rfl⟩ := hR
+      obtain ⟨_, _, rfl, ht, hr, hc⟩ := h₁.rcons_right
+      obtain ⟨_, _, rfl, gt, gr, gc⟩ := h₂.rcons_left
+      exact .rcons (ih (by simp; omega) ht gt) (ih (by simp; omega) hr gr) (hc.trans gc)
     cases h₁ with
     | refl => exact h₂
     | arrow => exact absurd ⟨_, _, _, _, rfl⟩ hA
     | eff => exact absurd ⟨_, _, _, _, rfl⟩ hE
+    | rcons => exact absurd ⟨_, _, _, rfl⟩ hR
     | hide hi hl he hr ha hb => subst ha; rw [hb] at h₂; exact LeLive.hide_trans hi hl he hr h₂
     | data hl hr hp hneg hinv ha hb =>
       subst ha; subst hb
@@ -380,6 +287,7 @@ theorem LeLive.substT {a b : Ty} (σ : Atom → Ty) (h : LeLive S a b) :
   | eff hφ _ hc ih =>
     refine .eff ?_ ih (sub hc)
     simpa only [Stage.use_substT] using Stage.le_substT σ hφ
+  | rcons _ _ hc ih₁ ih₂ => exact .rcons ih₁ ih₂ (sub hc)
   | hide hi hl he hr ha hb =>
     subst ha; subst hb
     rw [Ty.tcon_substT, Ty.tcon_substT]

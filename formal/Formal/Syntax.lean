@@ -235,8 +235,8 @@ def Variance.at (s : Variance) (q : Bool) : Prop :=
 /-- Where a parameter `v i` of variance `s` may stand in a field, at polarity `q`
 (regions.md §2.2.1): nowhere, as itself where its variance allows, in the parameter
 (flipped) or the result or the qualifier of a stored function, in the result or the
-qualifier of a stored computation, or in an argument of other data by the variance of
-that argument. A record compares by `≡` (`LeLive` has no rule for it). A covariant parameter never stands below a flip:
+qualifier of a stored computation, in a field of a record as in the record itself, or in
+an argument of other data by the variance of that argument. A covariant parameter never stands below a flip:
 there its argument would grow what the field reaches where subtyping asks it to shrink
 (`LeLive.reach`). Anything else (`Ref`, a handle, an owner, a dictionary, a stage) holds it
 only if it does not depend on it. -/
@@ -247,6 +247,7 @@ inductive Ty.Pol (var : Name → Nat → Variance) (i : Nat) (s : Variance) : Bo
       Ty.Pol var i s q b → ((Ty.caps C).NoV i ∨ s.at q) → Ty.Pol var i s q (.arrow a φ b C)
   | eff {q r e t C} : (Ty.row r).NoV i → (Ty.row e).NoV i → Ty.Pol var i s q t →
       ((Ty.caps C).NoV i ∨ s.at q) → Ty.Pol var i s q (.eff r e t C)
+  | rcons {q l t r} : Ty.Pol var i s q t → Ty.Pol var i s q r → Ty.Pol var i s q (.rcons l t r)
   | data {q t T us} :
       (∀ j u, us[j]? = some u → var T j = .pos → Ty.Pol var i s q u) →
       (∀ j u, us[j]? = some u → var T j = .neg → s = .pos → u.NoV i) →
