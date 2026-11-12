@@ -182,11 +182,11 @@ pub fn arity(item: &Item) -> Option<(&str, usize)> {
 }
 
 /// [`droppable`], or a value whose evaluation shows nothing but a closure:
-/// a function applied to fewer arguments than it takes, or a block that
-/// binds such values.
+/// a function applied to fewer arguments than it takes, a method of a
+/// dictionary already built, or a block that binds such values.
 pub fn inert(e: &Expr, arity: Arity) -> bool {
     match &e.kind {
-        _ if droppable(e) => true,
+        _ if droppable(e) || known_method(e) => true,
         ExprKind::App { .. } => partial(e, arity).is_some(),
         ExprKind::Block(stmts, value) => {
             let bound =
@@ -195,6 +195,21 @@ pub fn inert(e: &Expr, arity: Arity) -> bool {
         }
         _ => false,
     }
+}
+
+/// A method of a dictionary already built: of an instance without a
+/// context, or one the code was given. Reading it runs nothing, where an
+/// instance applied to its context runs the instance's code.
+pub fn known_method(e: &Expr) -> bool {
+    fn built(dict: &Dict) -> bool {
+        match dict {
+            Dict::Instance { args, .. } => args.is_empty(),
+            Dict::Given(_) | Dict::Value { .. } | Dict::Field(_) => true,
+            Dict::Super { dict, .. } => built(dict),
+            _ => false,
+        }
+    }
+    matches!(&e.kind, ExprKind::Method { dict, .. } if built(dict))
 }
 
 /// `f a b` as the arguments `f` still takes after them, when `f` is a

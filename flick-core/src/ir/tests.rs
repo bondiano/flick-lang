@@ -246,12 +246,13 @@ fn compositions_lower_to_one_closure_and_left_pipes_to_calls() {
     for line in [
         // `f a <| x` is `f a x`
         "let left = (fun xs -> ((List.map App.inc) xs))",
-        // names are used in place, other operands evaluated once before
+        // names are used in place, other operands evaluated once before,
+        // a method too: its dictionary may be built where it is read
         "let atoms = (fun $x -> (App.inc (App.inc $x)))",
-        "let backward = (fun $x -> (<Show Int>.show (App.inc $x)))",
+        "let backward = { let $f = <Show Int>.show; (fun $x -> ($f (App.inc $x))) }",
         "let partial = { let $f = (List.map App.inc); let $f$1 = (List.Core.filter (fun n -> (n > 2))); (fun $x -> ($f$1 ($f $x))) }",
         // a chain is one closure, through parentheses
-        "let chain = (fun $x -> (<Show Int>.show (App.inc (App.inc (App.inc $x)))))",
+        "let chain = { let $f = <Show Int>.show; (fun $x -> ($f (App.inc (App.inc (App.inc $x))))) }",
         // the closure's stage and its calls' are those the checker gave them
         "let effects = (fun $x! -> (App.say_n (App.inc $x))!)",
         "let later = { let $f = (List.map_effect App.say_n); (fun $x! -> (List.Core.length ($f $x)!)) }",

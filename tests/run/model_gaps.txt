@@ -14,6 +14,7 @@ bootstrap/packed_module # the model's (Field) rejects `App.Main.main`
 bootstrap/stderr # no native for `stderr_line` (flick:rt stderrLine)
 codegen/abi # no native for `js_type` (./abi.mjs kind)
 codegen/apply_order # no native for `unsafe_div` (flick:rt intUnsafeDiv)
+codegen/composition_method # no native for `unsafe_div` (flick:rt intUnsafeDiv)
 codegen/deep_recursion # runs out of the model's steps
 codegen/defect # no native for `unsafe_div` (flick:rt intUnsafeDiv)
 codegen/derive_default # the model's (App) rejects `App.Main.instance Default (Pair a)`

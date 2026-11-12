@@ -159,7 +159,8 @@ The reduction is specified normatively in `elaboration.md`. This table gives the
 | `provide S impl { e }` | a handler of `S` whose arm for each operation `o` is `x → impl.o x` (§3.7, `T6c_tail`) |
 | `provide layer { e }` | the library's `Layer.run layer (fun () -> e)`: a known layer of `succeed` and `merge` means a chain of such handlers (`Layer` in [`runtime.md`](runtime.md)) |
 | `x \|> f`, `f <\| x`, operators | `f x`, constants |
-| `f >> g`, `g << f` | `let f′ = f in let g′ = g in λx. g′ (f′ x)`, with fresh `f′`, `g′` of monomorphic types, as λ binds them; a chain `f >> g >> h` is one `λx. h′ (g′ (f′ x))` |
+| `f >> g` | `let f′ = f in let g′ = g in λx. g′ (f′ x)`, with fresh `f′`, `g′` of monomorphic types, as λ binds them; a chain `f >> g >> h` is one `λx. h′ (g′ (f′ x))` |
+| `g << f` | `let g′ = g in let f′ = f in λx. g′ (f′ x)`: the operands bound left to right, as written |
 
 ### 1.5 Constants Γ₀
 

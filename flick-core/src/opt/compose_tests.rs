@@ -4,6 +4,8 @@
 use super::tests::release_with;
 use crate::build::builtin_modules;
 use crate::codegen::exported_worker;
+use crate::ir::{Expr, ExprKind, Lit, Param, Pat, Stage};
+use crate::source::{FileId, Span};
 
 const PRELUDE: &str = "module App exposing (main)\n\n\
     say : String ->{} Unit\nlet say line = Platform.stdout_line line\n\n\
@@ -53,6 +55,14 @@ fn a_named_composition_is_inlined_as_a_written_function() {
         ("h : Int -> Int\nlet h = fun x -> shrink (step x)\n\n", uses),
     );
     assert!(js("h : Int -> Int\nlet h = step >> shrink\n\n", uses).contains("shrink(step(4))"));
+    // a method of a known instance is read where the composition calls it,
+    // as in the function written out
+    let uses = "  say (back 4)\n  say (back 5)";
+    let back = js("back : Int -> String\nlet back = show << shrink\n\n", uses);
+    assert!(
+        back.contains("export const back = ($x) => $m_Instances.$i_Show_Int.show(shrink($x));"),
+        "{back}"
+    );
 }
 
 #[test]
@@ -100,4 +110,51 @@ fn an_operand_that_runs_code_is_evaluated_once_before() {
 fn a_pipe_into_a_call_is_the_call() {
     let piped = js("", "  say (show ([1, 2, 3] |> List.map step))");
     assert!(piped.contains("$m_List.map$2(step, [1, 2, 3])"), "{piped}");
+}
+
+/// `Within(outer, (fun x -> acquire (acquire x)) "a")`: both calls acquire
+/// into `outer`. Code generation gives the owner to the first call it
+/// meets, so the call keeps its shape; without an owner it is reduced.
+#[test]
+fn a_call_that_acquires_into_an_owner_keeps_its_shape() {
+    let span = Span::new(FileId::default(), 0, 1);
+    let e = |kind| Expr::new(kind, span);
+    let call = |func: Expr, arg: Expr| {
+        e(ExprKind::App {
+            func: Box::new(func),
+            arg: Box::new(arg),
+            stage: Stage::Runtime,
+            arg_first: false,
+        })
+    };
+    let acquire = || {
+        e(ExprKind::Global {
+            module: "App".to_owned(),
+            name: "acquire".to_owned(),
+        })
+    };
+    let x = e(ExprKind::Local("x".to_owned()));
+    let lambda = e(ExprKind::Lambda {
+        params: vec![Param {
+            pat: Pat::Bind("x".to_owned()),
+            stage: Stage::Runtime,
+            ty: None,
+        }],
+        body: Box::new(call(acquire(), call(acquire(), x))),
+    });
+    let applied = call(lambda, e(ExprKind::Lit(Lit::String("a".to_owned()))));
+    let mut owned = e(ExprKind::Within(
+        "outer".to_owned(),
+        Box::new(applied.clone()),
+    ));
+    let before = owned.clone();
+    super::simplify(&mut owned);
+    assert_eq!(owned, before);
+    let mut free = applied;
+    super::simplify(&mut free);
+    let nested = call(
+        acquire(),
+        call(acquire(), e(ExprKind::Lit(Lit::String("a".to_owned())))),
+    );
+    assert_eq!(free, nested);
 }

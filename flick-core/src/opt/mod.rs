@@ -155,6 +155,13 @@ fn simplify_with(e: &mut Expr, arity: Arity) {
 }
 
 fn pass(e: &mut Expr, arity: Arity) -> bool {
+    // the owner is the call's: in another shape of it, the first call code
+    // generation meets would take it, maybe one inside its argument
+    if let ExprKind::Within(_, call) = &mut e.kind {
+        let mut changed = false;
+        call.each_child_mut(&mut |c| changed |= pass(c, arity));
+        return changed;
+    }
     let mut changed = false;
     e.each_child_mut(&mut |c| changed |= pass(c, arity));
     changed |= walk::ordered(e, arity);
@@ -257,7 +264,8 @@ fn later_uses(stmts: &[Stmt], result: &Expr) -> Vec<Option<(usize, usize)>> {
 /// by its pure value when that read surely happens. A function applied to
 /// names, but not to all its arguments, moves to its one read even inside a
 /// function when the read gives it the rest: `{ let g = f a; fun x -> g x }`
-/// calls `f` with all its arguments at once. One walk of the block: a value
+/// calls `f` with all its arguments at once; so does a method of a
+/// dictionary already built, which costs a read either way. One walk of the block: a value
 /// on its way to its reads waits in `moving`, and each statement takes what
 /// it reads when the walk comes to it. A value reads no local bound after
 /// it, so the counts taken before the walk still hold then.
@@ -265,6 +273,7 @@ fn propagate(stmts: &mut Vec<Stmt>, result: &mut Expr, arity: Arity) -> bool {
     let later = later_uses(stmts, result);
     let completed: Vec<bool> = (stmts.iter().enumerate())
         .map(|(i, stmt)| match (stmt, later[i]) {
+            (Stmt::Let(Pat::Bind(_), v), Some((1, _))) if walk::known_method(v) => true,
             (Stmt::Let(Pat::Bind(name), v), Some((1, _))) if applied_to_atoms(v) => {
                 partial(v, arity).is_some_and(|rest| completes(&stmts[i + 1..], result, name, rest))
             }

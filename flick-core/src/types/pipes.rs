@@ -93,12 +93,14 @@ pub fn param_key(operators: &[Token]) -> Range {
 }
 
 /// The indices of a composition's operands from the function it applies
-/// first: `f >> g` applies `f` first, `f << g` applies `g` first.
-pub fn applied_order(operators: &[Token], operands: usize) -> Vec<usize> {
+/// first: `f >> g` applies `f` first, `f << g` applies `g` first. A chain
+/// has one operand more than operators.
+pub fn applied_order(operators: &[Token]) -> Vec<usize> {
+    let operands = 0..=operators.len();
     if operators.first().is_some_and(|o| o.kind == K::LtLt) {
-        (0..operands).rev().collect()
+        operands.rev().collect()
     } else {
-        (0..operands).collect()
+        operands.collect()
     }
 }
 
@@ -171,7 +173,7 @@ impl Checker<'_> {
             let name = self.text_of(operand);
             self.push_local(&name, operand.range().0, ty);
         }
-        let calls: Vec<Call> = applied_order(&operators, operands.len())
+        let calls: Vec<Call> = applied_order(&operators)
             .into_iter()
             .map(|i| Call {
                 local: mark + i,

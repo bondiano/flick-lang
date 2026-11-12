@@ -68,8 +68,9 @@ impl Lower<'_> {
     }
 
     /// `f >> g` as `{ let f' = f; let g' = g; fun x -> g' (f' x) }`, and
-    /// `f << g` as the same closure applying `g'` first. An operand whose
-    /// evaluation shows nothing and reads no variable is used in place.
+    /// `f << g` as the same closure applying `g'` first. A name or a `fun`,
+    /// whose evaluation shows nothing and reads no variable, is used in
+    /// place; a method may build its dictionary, so it is bound too.
     fn composition(&mut self, node: &Node) -> Expr {
         let span = self.span(node);
         let Some((operands, operators)) = composition(node) else {
@@ -84,7 +85,6 @@ impl Lower<'_> {
                 ExprKind::Local(_)
                     | ExprKind::Global { .. }
                     | ExprKind::Con(_)
-                    | ExprKind::Method { .. }
                     | ExprKind::Lambda { .. }
             );
             if in_place {
@@ -98,7 +98,7 @@ impl Lower<'_> {
         }
         let x = self.hidden("$x");
         let mut value = Expr::new(ExprKind::Local(x.clone()), span);
-        for i in applied_order(&operators, operands.len()) {
+        for i in applied_order(&operators) {
             let key = composed_key(&operands, &operators, i);
             let at = Span::new(self.file, key.0, key.1);
             let func = self.ui_callable(functions[i].clone(), key);
