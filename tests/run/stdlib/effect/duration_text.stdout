@@ -1,0 +1,29 @@
+nanos "2000000": 2ms -> "2000000"
+nanos "0": 0 -> "0"
+nanos "1500000": 1ms 500000ns -> "1500000"
+nanos "-5": err (root): expected a string matching the RegExp ^[0-9]+$, got string
+nanos "1.5": err (root): expected a string matching the RegExp ^[0-9]+$, got string
+nanos 5: err (root): expected a string, got number
+nanos "abc": err (root): expected a string matching the RegExp ^[0-9]+$, got string
+string "2 seconds": 2s -> "2000 millis"
+string "1.5 seconds": 1s 500ms -> "1500 millis"
+string "1.0000001 millis": 1ms -> "1000000 nanos"
+string "0 millis": 0 -> "0 millis"
+string "0.5 nanos": 1ns -> "1 nanos"
+string "3 micros": 3000ns -> "3000 nanos"
+string "1 week": 7d -> "604800000 millis"
+string "Infinity": Infinity -> "Infinity"
+string "-Infinity": err (root): expected a non-negative duration, got an object
+string "-1 seconds": err (root): expected a non-negative duration, got an object
+string "2  minutes": 2m -> "120000 millis"
+string "2seconds": err (root): an invalid value
+string "soon": err (root): an invalid value
+string 7: err (root): expected a string that will be decoded as a Duration, got number
+nanos encode infinity: err (root): an invalid value
+string encode 1.5ms: "1500000 nanos"
+string encode 0: "0 millis"
+export nanos: refused: T -> JSON Schema: the check "a string matching the RegExp ^[0-9]+$" has no exact JSON Schema form
+export string: refused: T -> JSON Schema: a fallible transformation has no JSON Schema form
+format zero: 0
+format 1.5ms: 1ms 500000ns
+format a day: 1d 1h 1m 1s 1ms

@@ -166,6 +166,7 @@ stdlib/effect/datetime
 stdlib/effect/datetime_more
 stdlib/effect/deferred
 stdlib/effect/duration
+stdlib/effect/duration_text
 stdlib/effect/effect_core
 stdlib/effect/effect_errors
 stdlib/effect/effect_errors_more
