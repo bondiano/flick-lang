@@ -11,7 +11,7 @@ use crate::ir::{ItemKind, Module};
 use crate::project::js_only;
 
 /// The Go program of `text` with the built-in modules.
-fn build(text: &str) -> Output {
+pub(super) fn build(text: &str) -> Output {
     let ir = lower_text("App", text).expect("lowers");
     let modules: Vec<&Module> = iter::once(&ir).chain(builtin_modules()).collect();
     go(&Program {

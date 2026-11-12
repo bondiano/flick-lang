@@ -360,7 +360,7 @@ func (w *wire) decode(fb *Fiber, in Value) (Value, []issue) {
 			if issues != nil {
 				return nil, issues
 			}
-			return NewData(v.Tag, fields[1:]...), nil
+			return Construct(v.Tag, fields[1:]...), nil
 		}
 		names := ""
 		for i, v := range s.variants {
@@ -484,16 +484,16 @@ func (w *wire) encode(fb *Fiber, v Value) (Value, []issue) {
 		}
 		return shaped(s.keys, s.pos, out), nil
 	case kindAdt:
-		d := v.(*Data)
+		tag, fields := tagName(v), fieldsIn(v)
 		for at, variant := range s.variants {
-			if variant.Tag != d.Tag {
+			if variant.Tag != tag {
 				continue
 			}
 			keys := s.wireKeys[at]
 			out := make([]Value, len(keys))
 			out[0] = variant.Name
 			for i, f := range s.fields[at][1:] {
-				e, issues := f.jsonOf().encode(fb, d.Fields()[i])
+				e, issues := f.jsonOf().encode(fb, fields[i])
 				if issues != nil {
 					return nil, under(keys[i+1], issues)
 				}

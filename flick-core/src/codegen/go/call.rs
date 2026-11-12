@@ -10,7 +10,7 @@ use super::closures::{Call, at_once, callee, curried, poly, quiet, returning};
 use super::expr::enum_literal;
 use super::layout::{Code, block, call, closure, signature, single};
 use super::shape::Types;
-use super::{Gen, Shape, names};
+use super::{Gen, Shape, names, own};
 use crate::codegen::tail::Target;
 use crate::ir::{Expr, ExprKind, Lit, Param, Pat, Stage, operation_arity};
 use crate::types::{Constructor, Dict, Rep};
@@ -30,10 +30,19 @@ impl<'a> Gen<'a> {
                 let value = self.once(&format!("flickrt.Nullary({tag})"));
                 Box::new(move |_, _: &[Code<'a>]| a.text(value).into())
             }
-            Rep::Tagged => Box::new(move |_, args: &[Code<'a>]| {
-                let args = args.iter().map(|arg| arg.doc).chain(held.iter().copied());
-                call(a, "flickrt.NewData", iter::once(a.text(tag)).chain(args)).into()
-            }),
+            Rep::Tagged => {
+                let own = self.own_type(c).map(|ty| a.alloc_str(&own::make(&ty)));
+                Box::new(move |_, args: &[Code<'a>]| {
+                    let args = args.iter().map(|arg| arg.doc).chain(held.iter().copied());
+                    match own {
+                        // a Go type of its own, which is its tag
+                        Some(make) => call(a, make, args).into(),
+                        None => {
+                            call(a, "flickrt.NewData", iter::once(a.text(tag)).chain(args)).into()
+                        }
+                    }
+                })
+            }
             Rep::Unboxed | Rep::Typeof(_) => Box::new(|_, args: &[Code<'a>]| args[0]),
         }
     }

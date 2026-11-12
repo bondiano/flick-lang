@@ -312,7 +312,7 @@ func renderTable(rows [][]string) string {
 // inspect is Node's `util.inspect` of a value, on one line.
 // shortcut: no line breaks past 72 columns and no depth limit, as Node's; port them when a program inspects large values
 func inspect(v Value) string {
-	switch x := v.(type) {
+	switch x := asData(v).(type) {
 	case string:
 		return "'" + strings.ReplaceAll(strings.ReplaceAll(x, "\\", "\\\\"), "'", "\\'") + "'"
 	case int32, float64:

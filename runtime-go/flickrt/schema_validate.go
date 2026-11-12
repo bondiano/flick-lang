@@ -132,10 +132,10 @@ func (s *Schema) validate(fb *Fiber, in Value) (Value, []issue) {
 		}
 		return shaped(s.keys, s.pos, fields), nil
 	case kindAdt:
-		d, ok := in.(*Data)
+		d, ok := in.(Constructed)
 		if ok {
 			for at, variant := range s.variants {
-				if variant.Tag != d.Tag || len(d.Fields()) != len(variant.Fields) {
+				if variant.Tag != d.TagName() || len(d.Fields()) != len(variant.Fields) {
 					continue
 				}
 				fields := make([]Value, len(d.Fields()))
@@ -146,7 +146,7 @@ func (s *Schema) validate(fb *Fiber, in Value) (Value, []issue) {
 					}
 					fields[i] = v
 				}
-				return NewData(d.Tag, fields...), nil
+				return Construct(d.TagName(), fields...), nil
 			}
 		}
 		return nil, expected("a "+s.name, in)

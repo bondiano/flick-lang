@@ -244,13 +244,13 @@ func serveEndpoint(fb *Fiber, e *apiEndpoint, handler Value, services *env, r Va
 // its type, or a value it encodes.
 func codecHas(fb *Fiber, c codec, v Value) (has bool) {
 	if s := codecType(c); s != nil && s.kind == kindAdt {
-		d, ok := v.(*Data)
+		d, ok := v.(Constructed)
 		if !ok {
 			return false
 		}
 		found := false
 		for _, variant := range s.variants {
-			found = found || variant.Tag == d.Tag
+			found = found || variant.Tag == d.TagName()
 		}
 		if !found {
 			return false

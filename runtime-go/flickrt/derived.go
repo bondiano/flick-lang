@@ -19,7 +19,7 @@ func tagOf(constructor Value) string {
 		case Fn3:
 			v = f(nil, nil, nil, nil)
 		default:
-			return v.(*Data).Tag
+			return tagName(v)
 		}
 	}
 }

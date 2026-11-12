@@ -15,7 +15,7 @@ func labelText(v Value) string {
 		return x.String()
 	case UnitType:
 		return "undefined"
-	case *Data, *Record:
+	case Constructed, *Record:
 		return "[object Object]"
 	case []Value:
 		parts := make([]string, len(x))

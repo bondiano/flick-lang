@@ -97,7 +97,7 @@ func Echo(location, value Value) Value {
 
 // Format shows any value for debugging.
 func Format(v Value) string {
-	switch x := v.(type) {
+	switch x := asData(v).(type) {
 	case []Value:
 		out := "["
 		for i, e := range x {

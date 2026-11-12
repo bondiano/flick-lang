@@ -164,8 +164,8 @@ func dieOf(err Value) *Cause { return &Cause{kind: causeDie, defect: describe(er
 // message is a defect as the JS target describes it (`describeDefect`):
 // the constructor of a value, else the message of its text.
 func (c *Cause) message() string {
-	if d, ok := c.err.(*Data); ok {
-		return ConstructorName(d.Tag)
+	if d, ok := c.err.(Constructed); ok {
+		return ConstructorName(d.TagName())
 	}
 	return defectMessage(c.defect)
 }

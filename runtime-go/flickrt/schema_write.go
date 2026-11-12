@@ -77,9 +77,9 @@ func (w *wire) write(fb *Fiber, b *strings.Builder, v Value) []issue {
 		}
 		b.WriteByte('}')
 	case kindAdt:
-		d := v.(*Data)
+		tag, fields := tagName(v), fieldsIn(v)
 		for at, variant := range s.variants {
-			if variant.Tag != d.Tag {
+			if variant.Tag != tag {
 				continue
 			}
 			keys := s.wireKeys[at]
@@ -89,7 +89,7 @@ func (w *wire) write(fb *Fiber, b *strings.Builder, v Value) []issue {
 				b.WriteByte(',')
 				quoteTo(b, keys[i+1])
 				b.WriteByte(':')
-				if issues := f.jsonOf().(*wire).write(fb, b, d.Fields()[i]); issues != nil {
+				if issues := f.jsonOf().(*wire).write(fb, b, fields[i]); issues != nil {
 					return under(keys[i+1], issues)
 				}
 			}
