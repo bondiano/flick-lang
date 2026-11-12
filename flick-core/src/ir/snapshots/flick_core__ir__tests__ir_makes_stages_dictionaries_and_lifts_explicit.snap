@@ -14,3 +14,4 @@ let inc = (fun x -> (x + 1))
 let run = (fun ()! -> ((App.twice (lift(!) App.inc)) 1)!)
 let pick = (fun o -> (match o | (Some (1 | 2)) -> 0 | (Some n) when (n > 3) -> n | _ -> (-1)))
 instance Eq Shape derived [<Eq Float>, <Eq Float>]
+  eq = (fun a b -> (match a | (Circle x0_0) -> (match b | (Circle y0_0) -> ((<Eq Float>.eq x0_0) y0_0) | _ -> false) | (Square x1_0) -> (match b | (Square y1_0) -> ((<Eq Float>.eq x1_0) y1_0) | _ -> false)))
