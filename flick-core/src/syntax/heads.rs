@@ -18,6 +18,10 @@ pub const HEADS: [(&str, &str); 7] = [
 /// Ui (body)`. No source writes a name with `$` in it.
 pub const OPEN: &str = "open$module";
 
+/// The attribute of generated code before a function a constant is given
+/// to, naming the value that reads the constant: `@checked$by Port$check`.
+pub const CHECKED_BY: &str = "@checked$by";
+
 /// The heads whose blocks need no body even where no import exposes them,
 /// as the compiler read them before: `server fn f x = …` and `server f`.
 pub const BARE: [&str; 1] = ["server"];

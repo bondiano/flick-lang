@@ -166,6 +166,9 @@ macro_rules! wit_arena_conversions {
                             $crate::Decl::Group(d) => w::Decl::Group(d),
                             $crate::Decl::Hole(s) => w::Decl::Hole(to_span(s)),
                             $crate::Decl::Doc { text, decl } => w::Decl::Doc(w::Doc { text, decl }),
+                            $crate::Decl::Checked { by, decl } => {
+                                w::Decl::Checked(w::Checked { by, decl })
+                            }
                         }),
                     },
                     origin: to_span(n.origin),
@@ -312,6 +315,10 @@ macro_rules! wit_arena_conversions {
                             w::Decl::Doc(d) => $crate::Decl::Doc {
                                 text: d.text,
                                 decl: d.decl,
+                            },
+                            w::Decl::Checked(c) => $crate::Decl::Checked {
+                                by: c.by,
+                                decl: c.decl,
                             },
                         }),
                     },

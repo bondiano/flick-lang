@@ -7,6 +7,7 @@ use std::mem;
 use flick_plugin::{Case, Decl, Hole, HoleKind, Kind, NodeId, Span};
 
 use super::{Names, Printer, Role};
+use crate::syntax::heads::CHECKED_BY;
 
 impl Printer<'_> {
     pub(super) fn decl(&mut self, decl: &Decl, depth: u32) -> Result<(), String> {
@@ -79,6 +80,14 @@ impl Printer<'_> {
                     self.push(line);
                     self.push("\n");
                 }
+                self.node(*decl, Role::Decl, d)?;
+            }
+            // an attribute only generated code writes, before the function
+            Decl::Checked { by, decl } => {
+                self.push(CHECKED_BY);
+                self.push(" ");
+                self.value(by)?;
+                self.push("\n");
                 self.node(*decl, Role::Decl, d)?;
             }
         }

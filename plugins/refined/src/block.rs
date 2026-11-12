@@ -171,7 +171,12 @@ impl Code<'_> {
         });
         let value = b.pat(Pat::Var("value".into()));
         let about = "Checks a value: the value as one of the type, or why it is none.";
-        self.defined(b, "parse", value, body, about)
+        let parsed = self.defined(b, "parse", value, body, about);
+        // a constant given to `parse` is read by the check
+        b.decl(Decl::Checked {
+            by: self.companion("check"),
+            decl: parsed,
+        })
     }
 
     /// `T.value`: what the constructor holds.

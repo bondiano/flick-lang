@@ -23,7 +23,7 @@ use std::path::Path;
 
 use flick_plugin::{
     Arena, Artifact, Block, Builder, CallSite, Compiler, Constant, DeriveTarget, Diagnostic, Edit,
-    Fact, NodeId, Plugin, Published, Span, Token, TokenKind, flick,
+    Fact, NodeId, Plugin, Published, Refinement, Span, Token, TokenKind, flick,
 };
 
 pub struct Pairs;
@@ -276,6 +276,18 @@ impl Plugin for Pairs {
                     call.module, call.name, gives.shown
                 );
                 found.push(Diagnostic::error(message, call.span).with_code("X007"));
+                continue;
+            }
+            // a constant given to a function another declaration reads
+            if let Some(Refinement::Predicate(expression)) = &call.refinement
+                && call.name.ends_with("$admit")
+            {
+                let message = format!(
+                    "`{}` is read by an expression of {} nodes",
+                    call.name.replace('$', "."),
+                    expression.nodes.len()
+                );
+                found.push(Diagnostic::error(message, call.span).with_code("X009"));
                 continue;
             }
             // where a watched value is named: the declaration around it

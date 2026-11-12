@@ -7,6 +7,8 @@
 //! - `traced let f x = …`: the user's declaration, and `let f_name = "f"`;
 //! - `variants Color { Red; Green }`: `type Color = Red | Green deriving Show`;
 //! - `shows Box`: `instance Show Box = let show _ = "Box"`;
+//! - `gated Even { p }`: `let Even.holds = p` and `let Even.admit value =
+//!   value`, a function whose constant argument `Even.holds` reads;
 //! - `wrapped Meters`: `unboxed type Meters = Meters$Make Float`, a type of
 //!   its own whose values are `Float`s when the program runs, with
 //!   `Meters.make` and `Meters.value`, the only ways in and out;
@@ -48,7 +50,15 @@ pub fn expand(
     );
     let declaration = matches!(
         block.head.as_str(),
-        "define" | "table" | "traced" | "variants" | "shows" | "companion" | "signed" | "wrapped"
+        "define"
+            | "table"
+            | "traced"
+            | "variants"
+            | "shows"
+            | "companion"
+            | "signed"
+            | "wrapped"
+            | "gated"
     );
     if !expression && !declaration {
         return None;
@@ -84,6 +94,7 @@ pub fn expand(
         "signed" => signed(block, compiler, &mut b),
         "variants" => variants(block, &mut b),
         "wrapped" => wrapped(block, compiler, &mut b),
+        "gated" => gated(block, compiler, &mut b),
         _ => Ok(shows(block, &mut b)),
     };
     Some(made.map(|root| b.finish(root)))
@@ -306,6 +317,28 @@ fn wrapped(
         rec: false,
     });
     Ok(b.group(vec![ty, wrap, unwrap]))
+}
+
+/// `gated Even { p }`: `let Even.holds = p` and `let Even.admit value =
+/// value`, whose constant argument `Even.holds` reads.
+fn gated(
+    block: &Block,
+    compiler: &mut dyn Compiler,
+    b: &mut Builder,
+) -> Result<u32, Vec<Diagnostic>> {
+    let owner = (block.cursor().next())
+        .filter(|t| t.kind == TokenKind::Con)
+        .map(|t| block.text_of(t.span).to_owned())
+        .ok_or_else(|| vec![Diagnostic::error("expected a type", block.whole())])?;
+    let predicate = block.body().expr(compiler).map_err(|d| vec![d])?;
+    let holds = format!("{owner}.holds");
+    let held = flick!(b, let #(&holds) = #predicate);
+    let admit = flick!(b, let #(format!("{owner}.admit")) value = value);
+    let checked = b.decl(Decl::Checked {
+        by: holds,
+        decl: admit,
+    });
+    Ok(b.group(vec![held, checked]))
 }
 
 /// `instance Show Box = let show _ = "Box"`.

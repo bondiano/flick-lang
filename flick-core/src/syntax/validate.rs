@@ -4,6 +4,7 @@
 //! parameters of one function.
 
 use super::cst::{Node, Token};
+use super::heads::CHECKED_BY;
 use super::kind::SyntaxKind as K;
 use super::patterns::{is_part, is_pattern};
 use crate::diagnostics::{Diagnostic, codes};
@@ -161,6 +162,16 @@ impl Validator<'_> {
             }
             [name, ..] if name.text(self.src) == "sync" => {
                 "`@sync` takes `reader` or nothing".to_owned()
+            }
+            // generated code alone writes it: a source cannot spell `$`
+            [name, _]
+                if CHECKED_BY.ends_with(name.text(self.src))
+                    && name.text(self.src).contains('$') =>
+            {
+                if matches!(next, Some(K::LetDecl)) {
+                    return;
+                }
+                "a check is named before the function it reads a constant for".to_owned()
             }
             [name] if name.text(self.src) == "owner" => {
                 if matches!(next, Some(K::ServiceDecl | K::Attribute))

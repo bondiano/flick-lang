@@ -319,6 +319,11 @@ pub enum Decl {
     Hole(Span),
     /// A declaration with its documentation, lines joined by `\n`.
     Doc { text: String, decl: NodeId },
+    /// `decl`, a function, with the value of the module that reads a
+    /// constant given to it, as `Port.check` reads the argument of
+    /// `Port.parse`: a plugin that watches the function is told how that
+    /// value is written wherever the function is applied to a constant.
+    Checked { by: String, decl: NodeId },
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

@@ -97,16 +97,7 @@ impl<'a> Checker<'a> {
         }
         let declared = self.declare_instances(&decls);
         self.declare_schemas(&decls);
-        // the check of a type is its companion `T$check`: a constant given
-        // to `T$parse` is read against it
-        for decl in decls.iter().filter(|d| d.kind == K::LetDecl) {
-            let parts = let_parts(decl, self.text);
-            if let (Some(name), Some(body)) = (parts.name, parts.body)
-                && let Some(ty) = name.strip_suffix("$check")
-            {
-                self.predicates.insert(ty.to_owned(), body);
-            }
-        }
+        self.declare_checks(&decls);
         self.collect(&decls);
         for i in 0..self.top.items.len() {
             self.check_item(i);
