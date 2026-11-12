@@ -313,6 +313,18 @@ fn takes_apart(code: &Expr) -> bool {
     matches!((&param.pat, &scrutinee.kind), (Pat::Bind(x), ExprKind::Local(y)) if x == y)
 }
 
+/// Whether `e` is a constructor with its parts, each a name or a literal:
+/// data that costs nothing to write again where it is taken apart.
+pub(super) fn built(e: &Expr) -> bool {
+    let part = |a: &&Expr| {
+        matches!(
+            a.kind,
+            ExprKind::Lit(_) | ExprKind::Local(_) | ExprKind::Con(_)
+        )
+    };
+    applied(e).is_some_and(|(_, args)| args.iter().all(|a| part(a) || built(a)))
+}
+
 /// Whether `e` is a value built of constructors, literals and locals: pure,
 /// and known where it is built.
 fn data(e: &Expr) -> bool {
@@ -383,7 +395,7 @@ pub fn known_lets(stmts: &mut Vec<Stmt>) -> bool {
 
 /// Whether `pat` matches the data `e`, binding its names; `None` when that
 /// is not known here.
-fn matches(pat: &Pat, e: &Expr, binds: &mut Vec<(String, Expr)>) -> Option<bool> {
+pub(super) fn matches(pat: &Pat, e: &Expr, binds: &mut Vec<(String, Expr)>) -> Option<bool> {
     match (pat, &e.kind) {
         (Pat::Wild, _) => Some(true),
         (Pat::Bind(x), _) => {
