@@ -1,0 +1,55 @@
+// The server of `rpc_rt.rs`, built on the Effect adapter: Effect's RPC
+// server, in NDJSON and in JSON, of the procedures `client.fl` calls.
+module App.Main exposing (main)
+
+type alias User = { id : Float; name : String }
+  deriving Schema
+
+type error NotFound = NotFound { id : Float }
+  deriving Schema
+
+get_user : Rpc.Rpc "get_user" (Float ->{r; NotFound} User)
+let get_user =
+  Rpc.make (Record.label : Record.Label "get_user")
+  |> Rpc.with_payload (Codec.json Schema.number)
+  |> Rpc.with_success (Codec.json User.schema)
+  |> Rpc.with_errors (Rpc.errors |> Rpc.error_case (Codec.json NotFound.schema))
+
+ping : Rpc.Rpc "ping" (Unit ->{r} Unit)
+let ping = Rpc.make (Record.label : Record.Label "ping")
+
+boom : Rpc.Rpc "boom" (Float ->{r} Float)
+let boom =
+  Rpc.make (Record.label : Record.Label "boom")
+  |> Rpc.with_payload (Codec.json Schema.number)
+  |> Rpc.with_success (Codec.json Schema.number)
+
+type alias Handlers r = {
+  get_user : Float ->{r; NotFound} User;
+  ping : Unit ->{r} Unit;
+  boom : Float ->{r} Float;
+}
+
+users : Rpc.Group r (Handlers r)
+let users = Rpc.group |> Rpc.add get_user |> Rpc.add ping |> Rpc.add boom
+
+minute : Duration.Duration
+let minute = Result.with_default Duration.zero (Duration.millis 60000)
+
+main : Unit ->{Async; AppError} Unit
+let main () =
+  let handlers : Handlers none = {
+    get_user = fun id ->
+      if id == 1 then ({ id = 1; name = "Ada" }) else from_result (Err (NotFound { id = id }));
+    ping = fun _ -> ();
+    boom = fun _ -> Effect.die "boom";
+  }
+  try
+    scope s {
+      let lines = Rpc.listen Rpc.defaults users handlers
+      let json = Rpc.listen { Rpc.defaults with serialization = Rpc.json } users handlers
+      Platform.stdout_line ("listening " ++ show (Rpc.port lines) ++ " " ++ show (Rpc.port json))
+      Effect.sleep minute
+    }
+  with
+  | Rpc.ServeError message -> Platform.stdout_line ("serve: " ++ message)

@@ -18,6 +18,12 @@ break programs.
 - **`retention owner` without `std`:** checking a foreign declaration with
   `retention owner` in a build of the core modules alone, which has no
   `Fiber.Outlives`, is `FLICK-F010` instead of a crash of the compiler.
+- **RPC clients on Flick's own runtime:** `Rpc` procedures, groups and their
+  unary calls over HTTP in NDJSON or JSON run on RT, in the protocol of
+  Effect's RPC server, so a browser client of a procedure bundles no Effect:
+  6.9 KB gzip instead of 55 KB. A build that serves procedures, calls a
+  stream or uses another transport or serialization takes every `Rpc`
+  binding from the Effect adapter, as before.
 - **`<|`, `>>` and `<<`:** `f <| x` is `f x`, the weakest operator and
   right-associative, so `say <| show <| total xs` needs no parentheses;
   `f a <| x` is the call `f a x`. `f >> g` applies `f`, then `g`, and

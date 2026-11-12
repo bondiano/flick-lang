@@ -1,0 +1,53 @@
+// The client of `rpc_rt.rs`, built for Flick's own runtime: the calls of
+// the procedures `server.fl` serves, at the URLs in `RPC_NDJSON` and
+// `RPC_JSON`.
+module App.Main exposing (main)
+
+type alias User = { id : Float; name : String }
+  deriving Schema
+
+type error NotFound = NotFound { id : Float }
+  deriving Schema
+
+get_user : Rpc.Rpc "get_user" (Float ->{r; NotFound} User)
+let get_user =
+  Rpc.make (Record.label : Record.Label "get_user")
+  |> Rpc.with_payload (Codec.json Schema.number)
+  |> Rpc.with_success (Codec.json User.schema)
+  |> Rpc.with_errors (Rpc.errors |> Rpc.error_case (Codec.json NotFound.schema))
+
+ping : Rpc.Rpc "ping" (Unit ->{r} Unit)
+let ping = Rpc.make (Record.label : Record.Label "ping")
+
+boom : Rpc.Rpc "boom" (Float ->{r} Float)
+let boom =
+  Rpc.make (Record.label : Record.Label "boom")
+  |> Rpc.with_payload (Codec.json Schema.number)
+  |> Rpc.with_success (Codec.json Schema.number)
+
+calls : String -> Rpc.CallOptions ->{Async; Rpc.ClientError, NotFound} Unit
+let calls url options =
+  let ada = Rpc.call_with options url get_user 1
+  Platform.stdout_line ("got " ++ ada.name)
+  let missing =
+    try (Rpc.call_with options url get_user 9).name with
+    | NotFound e -> "not found " ++ show e.id
+  Platform.stdout_line missing
+  Rpc.call_with options url ping ()
+  Platform.stdout_line "ping answered"
+
+main : Unit ->{Async; AppError} Unit
+let main () =
+  let lines = Option.with_default "" (Platform.env "RPC_NDJSON")
+  let json = Option.with_default "" (Platform.env "RPC_JSON")
+  try
+    calls lines Rpc.call_defaults
+    calls json { Rpc.call_defaults with serialization = Rpc.json }
+    let gone =
+      try show (Rpc.call "http://127.0.0.1:9/rpc" boom 1) with
+      | Rpc.ClientError _ -> "no server"
+    Platform.stdout_line gone
+    Platform.stdout_line (show (Rpc.call lines boom 1))
+  with
+  | Rpc.ClientError message -> Platform.stdout_line ("client: " ++ message)
+  | NotFound _ -> Platform.stdout_line "not found"

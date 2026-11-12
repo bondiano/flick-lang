@@ -27,11 +27,33 @@ pub enum EffectBridge {
     Available,
     /// Opaque UI values and registries belong to the Effect adapter.
     AvailableWithUi,
+    /// Procedures, groups and their calls belong to the Effect adapter.
+    AvailableWithRpc,
+    /// Both UI and RPC values belong to the Effect adapter.
+    AvailableWithUiAndRpc,
 }
 
 impl EffectBridge {
     pub const fn available(self) -> bool {
         !matches!(self, Self::Absent)
+    }
+
+    /// The available bridge with the families whose values the adapter owns.
+    pub const fn owning(ui: bool, rpc: bool) -> Self {
+        match (ui, rpc) {
+            (false, false) => Self::Available,
+            (true, false) => Self::AvailableWithUi,
+            (false, true) => Self::AvailableWithRpc,
+            (true, true) => Self::AvailableWithUiAndRpc,
+        }
+    }
+
+    pub const fn ui(self) -> bool {
+        matches!(self, Self::AvailableWithUi | Self::AvailableWithUiAndRpc)
+    }
+
+    pub const fn rpc(self) -> bool {
+        matches!(self, Self::AvailableWithRpc | Self::AvailableWithUiAndRpc)
     }
 }
 

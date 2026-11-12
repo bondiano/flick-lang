@@ -256,6 +256,7 @@ fn binding_policy(output: &Path) -> io::Result<()> {
     for (key, name) in [
         ("packages", "PACKAGES"),
         ("families", "FAMILIES"),
+        ("rpc_family", "RPC_FAMILY"),
         ("ui_renderer", "UI_RENDERER"),
         ("ui_requirements", "UI_REQUIRED"),
         ("zone_exports", "ZONE_EXPORTS"),

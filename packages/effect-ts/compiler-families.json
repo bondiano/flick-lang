@@ -100,5 +100,6 @@
     "@flick-lang/runtime/rt/ui/server uiServerRender",
     "@flick-lang/runtime/rt/ui/server uiServerState",
     "@flick-lang/runtime/rt/ui/server uiServerStream"
-  ]
+  ],
+  "rpc_family": ["flick:rpc/Rpc", "flick:rpc/RpcNode"]
 }

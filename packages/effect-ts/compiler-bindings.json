@@ -213,6 +213,10 @@
       "@flick-lang/runtime/rt/effect/reactivity/Atom"
     ],
     [
+      "flick:rpc/Rpc",
+      "@flick-lang/runtime/rt/effect/rpc/Rpc"
+    ],
+    [
       "flick:ui",
       "@flick-lang/runtime/rt/ui"
     ],

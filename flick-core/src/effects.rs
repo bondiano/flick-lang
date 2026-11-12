@@ -91,8 +91,22 @@ pub fn ui_family(spec: &str, export: &str) -> bool {
         .any(|line| line.split_once(' ') == Some((spec, export)))
 }
 
+/// Whether `source` names a module of the RPC family: its procedures, groups
+/// and calls are one side's values, Flick's runtime's or the adapter's.
+pub fn rpc_family(source: &str) -> bool {
+    let source = key(source);
+    bindings::RPC_FAMILY.contains(&source.as_ref())
+}
+
 pub fn selected_on_kernel(spec: &str, export: &str, bridge: EffectBridge) -> bool {
-    if bridge == EffectBridge::AvailableWithUi && ui_family(spec, export) {
+    if bridge.ui() && ui_family(spec, export) {
+        return false;
+    }
+    if bridge.rpc()
+        && bindings::RPC_FAMILY
+            .iter()
+            .any(|source| rt_specifier(source).as_deref() == Some(spec))
+    {
         return false;
     }
     let root = Some(bindings::NATIVE_ENTRY);
@@ -348,5 +362,24 @@ mod tests {
             "uiView",
             EffectBridge::AvailableWithUi
         ));
+    }
+
+    #[test]
+    fn an_adapter_owning_rpc_takes_the_native_client_too() {
+        use crate::codegen::EffectBridge;
+        let spec = super::rt_specifier("flick:rpc/Rpc").expect("routed to the runtime");
+        assert!(super::selected_on_kernel(
+            &spec,
+            "rpcCallNdjson",
+            EffectBridge::AvailableWithUi
+        ));
+        for bridge in [
+            EffectBridge::AvailableWithRpc,
+            EffectBridge::AvailableWithUiAndRpc,
+        ] {
+            assert!(!super::selected_on_kernel(&spec, "rpcCallNdjson", bridge));
+        }
+        assert!(super::rpc_family("flick:rpc/RpcNode"));
+        assert!(!super::rpc_family("flick:ui"));
     }
 }
