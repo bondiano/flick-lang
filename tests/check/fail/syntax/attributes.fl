@@ -6,7 +6,7 @@ let main () = ()
 
 type Color = @lang crimson Red | Green
 
-//~ FLICK-S014 @3:1-3:8 unknown attribute `@inline`: the attributes are `@lang`, `@derive`, `@maker`, `@cell`, `@label`, `@owner`, `@sync` and `@implicit`
+//~ FLICK-S014 @3:1-3:8 unknown attribute `@inline`: the attributes are `@lang`, `@derive`, `@maker`, `@cell`, `@label`, `@owner`, `@sync`, `@ts` and `@implicit`
 //~ FLICK-S014 @7:14-7:27 unknown lang item `crimson`
 
 @cell
@@ -46,3 +46,19 @@ service Late =
   wait : Unit ->{} Float
 //~ FLICK-S014 @41:1-41:6 `@sync` belongs before a service declaration
 //~ FLICK-S014 @44:1-44:13 `@sync` takes `reader` or nothing
+
+@ts "number"
+let plain = 1
+
+@ts "Array<{a}>"
+type Rows a = Rows (List a)
+
+@ts import react "Node"
+type Node = Node
+
+@ts
+type Bare = Bare
+//~ FLICK-S014 @50:1-50:13 `@ts` belongs before the declaration of a type or a service
+//~ FLICK-S014 @53:1-53:17 `{a}` is no place of an argument: `{0}` or `{0:row}`
+//~ FLICK-S014 @56:1-56:24 `react` is no module of the runtime: `runtime` or `ui`
+//~ FLICK-S014 @59:1-59:4 `@ts` takes a form, `"…"` and maybe `rt "…"`, or `none`, or `import runtime "Export"`

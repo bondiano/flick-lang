@@ -368,8 +368,15 @@ fn attribute(p: &mut Parser) {
     let m = p.start();
     p.bump();
     p.expect(K::Ident);
-    while p.at(K::Ident) || p.current().is_keyword() {
-        p.bump_as(K::Ident);
+    // words, and the strings of a form: `@ts "ReadonlyArray<{0}>"`
+    loop {
+        if p.at(K::String) {
+            p.bump();
+        } else if p.at(K::Ident) || p.current().is_keyword() {
+            p.bump_as(K::Ident);
+        } else {
+            break;
+        }
     }
     p.complete(m, K::Attribute);
 }

@@ -2,7 +2,7 @@
 source: flick-core/src/codegen/ts/tests.rs
 expression: dts
 ---
-import type { Effect as $Effect, Option as $Option, Result as $Result, Layer as $Layer, Schema as $Schema, Stream as $Stream, Context as $Context } from "@flick-lang/effect-ts";
+import type { Effect as $Effect, Result as $Result, Context as $Context } from "@flick-lang/effect-ts";
 
 /** A shape. */
 export type Shape = { readonly _tag: "Circle#7c57f5571734"; readonly _0: number } | { readonly _tag: "Rect#98a20d8a91fb"; readonly _0: number; readonly _1: number };

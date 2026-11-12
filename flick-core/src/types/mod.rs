@@ -151,6 +151,7 @@ use crate::resolve::Module;
 use crate::source::{FileId, Span};
 use crate::syntax::cst::{Node, Token};
 use crate::syntax::kind::SyntaxKind as K;
+use crate::syntax::ts_mark;
 use crate::types::lang::Lang;
 
 /// Type-checks `module` and stores the types of its exports in `interface`.
@@ -269,16 +270,20 @@ fn run_with_static_context(
     };
     let (mut diagnostics, typing, evidence) =
         run_in(module, imported, builtins, options, interface, context);
-    // only the built-in modules, which `run_in` checks directly, mark lang items
-    let marks = lang::attributes(module.tree);
-    for attribute in marks
-        .into_iter()
-        .filter(|a| lang::lang_of(a, module.text).is_some())
-    {
+    // only the built-in modules, which `run_in` checks directly, mark lang
+    // items and give their types a TypeScript form
+    for attribute in lang::attributes(module.tree) {
+        let what = if lang::lang_of(attribute, module.text).is_some() {
+            "`@lang` marks what the compiler relies on"
+        } else if matches!(ts_mark::read(attribute, module.text), Some(Ok(_))) {
+            "`@ts` gives a type its TypeScript form"
+        } else {
+            continue;
+        };
         let (start, end) = attribute.range();
         diagnostics.push(Diagnostic::error(
             codes::R016,
-            "`@lang` marks what the compiler relies on, in the built-in modules only".to_owned(),
+            format!("{what}, in the built-in modules only"),
             Span::new(module.file, start, end),
         ));
     }

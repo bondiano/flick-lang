@@ -8,4 +8,8 @@ let size c =
   match c with
   | Count n -> n
 
+@ts "number"
+type Meters = Meters Float
+
 //~ FLICK-R016 @3:1-3:10 `@lang` marks what the compiler relies on, in the built-in modules only
+//~ FLICK-R016 @11:1-11:13 `@ts` gives a type its TypeScript form, in the built-in modules only
