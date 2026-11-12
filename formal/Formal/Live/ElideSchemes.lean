@@ -199,7 +199,7 @@ theorem identity :
       (.arrow (.tvar 0) .pure (.tvar 0) Caps.none) := by
   elide_eq
 
-/-- `Prelude.from_result : forall e a. Result (Errors e) a ->{none; e} a` -/
+/-- `Prelude.from_result : forall e a. Result (Errors e) a ->{; e} a` -/
 theorem from_result :
     Ty.elide Caps.none (.arrow (.tapp (.tapp (.adt "Prelude.Result") (.errors (fun x => x = .rv (.v 0) (fun _ => False)))) (.tvar 1)) (.rt Row.none (fun x => x = .rv (.v 0) (fun _ => False))) (.tvar 1) Caps.none) Caps.none =
       (.arrow (.tapp (.tapp (.adt "Prelude.Result") (.errors (fun x => x = .rv (.v 0) (fun _ => False)))) (.tvar 1)) (.rt Row.none (fun x => x = .rv (.v 0) (fun _ => False))) (.tvar 1) Caps.none) := by
@@ -217,13 +217,13 @@ theorem parallel_all :
       (.arrow (.base .int) .pure (.arrow (.tapp (.adt "Prelude.List") (.eff (fun x => x = .rv (.v 0) (fun _ => False)) (fun x => x = .rv (.v 1) (fun _ => False)) (.tvar 2) (fun x => x = .v 3))) (.rt (fun x => x = .atm (.v 3) ∨ x = .rv (.v 0) (fun _ => False)) (fun x => x = .rv (.v 1) (fun _ => False))) (.tapp (.adt "Prelude.List") (.tvar 2)) Caps.none) Caps.none) := by
   elide_eq
 
-/-- `Prelude.parallel_results : forall r e a c. Detached r => List (Eff r e a)^c ->{r; none} List (Result (Errors e) a)` -/
+/-- `Prelude.parallel_results : forall r e a c. Detached r => List (Eff r e a)^c ->{r} List (Result (Errors e) a)` -/
 theorem parallel_results :
     Ty.elide (fun x => x = .v 3) (.arrow (.tapp (.adt "Prelude.List") (.eff (fun x => x = .rv (.v 0) (fun _ => False)) (fun x => x = .rv (.v 1) (fun _ => False)) (.tvar 2) (fun x => x = .v 3))) (.rt (fun x => x = .rv (.v 0) (fun _ => False)) Row.none) (.tapp (.adt "Prelude.List") (.tapp (.tapp (.adt "Prelude.Result") (.errors (fun x => x = .rv (.v 1) (fun _ => False)))) (.tvar 2))) Caps.none) Caps.none =
       (.arrow (.tapp (.adt "Prelude.List") (.eff (fun x => x = .rv (.v 0) (fun _ => False)) (fun x => x = .rv (.v 1) (fun _ => False)) (.tvar 2) (fun x => x = .v 3))) (.rt (fun x => x = .atm (.v 3) ∨ x = .rv (.v 0) (fun _ => False)) Row.none) (.tapp (.adt "Prelude.List") (.tapp (.tapp (.adt "Prelude.Result") (.errors (fun x => x = .rv (.v 1) (fun _ => False)))) (.tvar 2))) Caps.none) := by
   elide_eq
 
-/-- `Prelude.parallel_exits : forall r e a c. Detached r => List (Eff r e a)^c ->{r; none} List (Exit e a)` -/
+/-- `Prelude.parallel_exits : forall r e a c. Detached r => List (Eff r e a)^c ->{r} List (Exit e a)` -/
 theorem parallel_exits :
     Ty.elide (fun x => x = .v 3) (.arrow (.tapp (.adt "Prelude.List") (.eff (fun x => x = .rv (.v 0) (fun _ => False)) (fun x => x = .rv (.v 1) (fun _ => False)) (.tvar 2) (fun x => x = .v 3))) (.rt (fun x => x = .rv (.v 0) (fun _ => False)) Row.none) (.tapp (.adt "Prelude.List") (.tapp (.tapp (.adt "Prelude.Exit") (.tvar 1)) (.tvar 2))) Caps.none) Caps.none =
       (.arrow (.tapp (.adt "Prelude.List") (.eff (fun x => x = .rv (.v 0) (fun _ => False)) (fun x => x = .rv (.v 1) (fun _ => False)) (.tvar 2) (fun x => x = .v 3))) (.rt (fun x => x = .atm (.v 3) ∨ x = .rv (.v 0) (fun _ => False)) Row.none) (.tapp (.adt "Prelude.List") (.tapp (.tapp (.adt "Prelude.Exit") (.tvar 1)) (.tvar 2))) Caps.none) := by

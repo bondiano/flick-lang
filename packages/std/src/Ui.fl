@@ -264,10 +264,7 @@ foreign pure component from "flick:ui/react" "uiComponent"
 /// `Ui.Dom.mount` with a renderer factory, called when this call starts,
 /// instead of a DOM container. The elements here are still DOM ones.
 mount_with :
-  Renderer ->
-  (Failure none ->{r; none} Unit)^c ->
-  Ui^c ->{Async, Atom.Registry, Atom.Write | r; none}
-  Never
+  Renderer -> (Failure none ->{r} Unit)^c -> Ui^c ->{Async, Atom.Registry, Atom.Write | r} Never
 foreign effect mount_with from "flick:ui/react" "uiMountWith"
   retention call
 

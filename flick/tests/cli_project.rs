@@ -355,7 +355,7 @@ fn doc_shows_source_types_kinds_constraints_effects_and_captures() {
         "Circle : Float -> Shape",
         "A shape.",
         "service Store =",
-        "put : String ->{none; StoreError} Unit",
+        "put : String ->{; StoreError} Unit",
         "class Named a =",
         "fetch : Named a => List a ->{Store; StoreError} Unit",
         "keep : (Unit -> Float)^c -> Unit -> Float",

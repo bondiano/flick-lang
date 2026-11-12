@@ -113,8 +113,7 @@ at :
   HttpApi.Method ->
   Record.Label path ->
   Record.Label l ->
-  (Endpoint l (Request Unit Unit Unit Unit ->{r; none} Unit) ->
-    Endpoint l (Request p q h b ->{r; e} s)) ->
+  (Endpoint l (Request Unit Unit Unit Unit ->{r} Unit) -> Endpoint l (Request p q h b ->{r; e} s)) ->
   Endpoint l (Request p q h b ->{r; e} s)
 let at method path label parts = parts (HttpApi.endpoint method (path_text path) label)
 

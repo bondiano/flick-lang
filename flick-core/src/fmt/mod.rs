@@ -29,8 +29,8 @@
 //!   line followed by `,`; records (also record types, patterns and updates)
 //!   put one field per line followed by `;`, a row tail `| r` last;
 //! - a function type breaks after each arrow, `->{r; e}` staying whole; an
-//!   empty service row is dropped: `->{none; E}` becomes `->{; E}` and
-//!   `->{none; none}` becomes `->{}`;
+//!   empty row is dropped: `->{none; E}` becomes `->{; E}`,
+//!   `->{S; none}` becomes `->{S}` and `->{none; none}` becomes `->{}`;
 //! - an outer `forall` of a nonrecursive `let` signature is dropped when its
 //!   variables stay implicitly quantified and no comment would be lost;
 //! - variants stay on one line when the declaration fits, else one per line
@@ -229,8 +229,8 @@ fn verbatim(declaration: &Node, text: &str) -> String {
 }
 
 /// Drops empty rows of an arrow: `->{none; E}` becomes `->{; E}`,
-/// `->{none; none}` becomes `->{}`, and `->{S;}` becomes `->{S}`; a row
-/// holding a comment is kept.
+/// `->{none; none}` becomes `->{}`, and `->{S; none}` or `->{S;}` becomes
+/// `->{S}`; a row holding a comment is kept.
 fn drop_empty_rows(node: &mut Node) {
     if node.kind == K::EffectAnnot {
         let blank = |n: &Node| n.children.iter().all(is_whitespace);
@@ -240,7 +240,7 @@ fn drop_empty_rows(node: &mut Node) {
             node.children
                 .retain(|c| matches!(c, Element::Token(t) if t.kind != K::Semi));
         } else if let [_, errors] = rows[..]
-            && blank(errors)
+            && empty(errors)
         {
             let mut rows = 0;
             node.children.retain(|c| match c {

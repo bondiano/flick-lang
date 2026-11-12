@@ -14,7 +14,7 @@ service FileSystem =
   open_scoped : forall s. Path ->{Scope s; OpenError} File s
   read_all : forall s. File s ->{; ReadError} String
 
-report : Failure {ReadError} ->{FileSystem; none} Unit
+report : Failure {ReadError} ->{FileSystem} Unit
 let report _ = ()
 
 children : Path ->{FileSystem; OpenError} Unit

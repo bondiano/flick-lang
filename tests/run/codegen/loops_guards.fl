@@ -322,7 +322,7 @@ let make_layer () =
   Platform.stdout_line "layer"
   Layer.succeed Ask { ask = fun () -> 5 }
 
-make_callback : Unit ->{} (Unit ->{Ask; none} Int)
+make_callback : Unit ->{} (Unit ->{Ask} Int)
 let make_callback () =
   Platform.stdout_line "callback"
   fun () -> Ask.ask ()

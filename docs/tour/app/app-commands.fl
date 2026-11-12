@@ -29,7 +29,7 @@ let memory store =
     books = fun () -> Ref.get store;
   }
 
-report : Unit ->{Shelf; none} Unit
+report : Unit ->{Shelf} Unit
 let report () =
   let books = Shelf.books ()
   List.each_effect (fun book -> Platform.stdout_line (Books.line book)) books

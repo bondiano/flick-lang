@@ -37,5 +37,5 @@ let render value = show value
 service Repo a =
   find : Float ->{} Option a
 
-lookup : Float ->{Repo String; none} Option String
+lookup : Float ->{Repo String} Option String
 let lookup id = Repo.find id

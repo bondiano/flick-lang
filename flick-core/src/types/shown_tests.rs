@@ -74,6 +74,25 @@ fn the_outer_forall_goes_when_nothing_needs_it() {
 }
 
 #[test]
+fn empty_arrow_rows_are_omitted_from_signatures() {
+    for (source, expected) in [
+        ("Unit ->{Async; none} Unit", "Unit ->{Async} Unit"),
+        ("Unit ->{none; none} Unit", "Unit ->{} Unit"),
+        ("Unit ->{none; e} Unit", "Unit ->{; e} Unit"),
+        ("Unit ->{none; AppError} Unit", "Unit ->{; AppError} Unit"),
+        (
+            "Unit ->{Async; AppError} Unit",
+            "Unit ->{Async; AppError} Unit",
+        ),
+        ("Unit ->{r; none} Unit", "Unit ->{r} Unit"),
+        ("Unit ->{Async; e} Unit", "Unit ->{Async; e} Unit"),
+        ("Eff none none Unit", "Eff none none Unit"),
+    ] {
+        assert_eq!(shown(source), expected, "{source}");
+    }
+}
+
+#[test]
 fn a_forall_stays_where_it_says_something() {
     // rank 2
     assert_eq!(

@@ -3,7 +3,7 @@ module Main exposing (main)
 service Clock =
   hour : Unit ->{} Int
 
-greeting : Unit ->{Clock; none} String
+greeting : Unit ->{Clock} String
 let greeting () = if Clock.hour () < 12 then "Good morning" else "Good afternoon"
 
 at : Int -> Layer {} none {Clock}

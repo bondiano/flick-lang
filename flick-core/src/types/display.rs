@@ -262,12 +262,15 @@ impl Printer<'_> {
         self.print(param, Prec::App, out);
         match effects {
             None => out.push_str(" -> "),
-            Some(e) if is_empty(&e.services) && is_empty(&e.errors) => out.push_str(" ->{} "),
             Some(e) => {
                 out.push_str(" ->{");
-                self.print_row_items(&e.services, out);
-                out.push_str("; ");
-                self.print_row_items(&e.errors, out);
+                if !is_empty(&e.services) {
+                    self.print_row_items(&e.services, out);
+                }
+                if !is_empty(&e.errors) {
+                    out.push_str("; ");
+                    self.print_row_items(&e.errors, out);
+                }
                 out.push_str("} ");
             }
         }

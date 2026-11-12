@@ -8,6 +8,16 @@ const MESSY: &str = "let  f x   =\n    x+1\n";
 const TIDY: &str = "let f x = x + 1\n";
 
 #[test]
+fn fmt_stdin_omits_an_empty_error_row() {
+    let out = flick_stdin(&["fmt", "--stdin"], "main : Unit ->{Async; none} Unit\n");
+    assert_eq!(out.status.code(), Some(0));
+    assert_eq!(
+        String::from_utf8_lossy(&out.stdout),
+        "main : Unit ->{Async} Unit\n"
+    );
+}
+
+#[test]
 fn fmt_stdin_for_editors() {
     let out = flick_stdin(&["fmt", "--stdin", "--stdin-filepath", "src/A.fl"], MESSY);
     assert_eq!(out.status.code(), Some(0));

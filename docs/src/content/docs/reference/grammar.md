@@ -616,8 +616,8 @@ needed by recursion, type shadowing or a comment. Other rewrites are separators 
 statements becomes a line break, a broken bracket gets a trailing `,` and a
 broken record a `;` after every field, a broken variant list starts with
 `|`, and empty rows of an arrow are dropped, which are the same type:
-`->{none; E}` becomes `->{; E}` and `->{none; none}` becomes `->{}`, while
-`->{R; none}` and `Eff none none a` stay as written. The formatter re-parses
+`->{none; E}` becomes `->{; E}`, `->{R; none}` becomes `->{R}`, and
+`->{none; none}` becomes `->{}`. `Eff none none a` stays as written. The formatter re-parses
 each declaration and the whole file and refuses with `FLICK-P003` if the AST
 or the comments would change.
 

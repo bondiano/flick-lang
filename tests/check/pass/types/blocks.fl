@@ -8,7 +8,7 @@ service Log =
 service Users =
   get : Float ->{} String
 
-run : Float ->{Users, Log; none} String
+run : Float ->{Users, Log} String
 let run id =
   let name = Users.get id
   Log.info name

@@ -44,6 +44,61 @@ fn add_signature_writes_the_inferred_type_of_a_value() {
 }
 
 #[test]
+fn add_signature_omits_empty_error_rows() {
+    let (f, text) = main(
+        "module App.Main exposing (run)\n\nservice Log =\n  write : String ->{} Unit\n\nlet run = Log.write\n",
+    );
+    let at = f.at("App.Main", "run =", 0);
+    let a = action(&f, at, at, "add the signature").expect("action");
+    let fixed = applied(&text, &a);
+    assert!(fixed.contains("run : String ->{Log} Unit\n"), "{fixed}");
+    let checked = main(&fixed).0;
+    assert!(
+        checked
+            .ide()
+            .analysis
+            .diagnostics
+            .iter()
+            .all(Diagnostic::unnecessary),
+        "{:?}",
+        checked.ide().analysis.diagnostics
+    );
+}
+
+#[test]
+fn missing_signature_quick_fix_omits_empty_error_rows() {
+    let (f, text) = main(
+        "module App.Main exposing (run)\n\nservice Log =\n  write : String ->{} Unit\n\nlet run = Log.write\n",
+    );
+    let diagnostic = f
+        .ide()
+        .analysis
+        .diagnostics
+        .iter()
+        .find(|d| d.code.to_string() == "FLICK-T004")
+        .expect("missing signature");
+    let fix = diagnostic.fixes.first().expect("signature fix");
+    let a = Action {
+        title: fix.message.clone(),
+        kind: "quickfix",
+        edits: fix.edits.clone(),
+    };
+    let fixed = applied(&text, &a);
+    assert!(fixed.contains("run : String ->{Log} Unit\n"), "{fixed}");
+    let checked = main(&fixed).0;
+    assert!(
+        checked
+            .ide()
+            .analysis
+            .diagnostics
+            .iter()
+            .all(Diagnostic::unnecessary),
+        "{:?}",
+        checked.ide().analysis.diagnostics
+    );
+}
+
+#[test]
 fn unresolved_class_can_be_imported() {
     let src =
         "module App.Main exposing (Expr(..))\n\ntype Expr a =\n  | Numeric a => Add a a : Expr a\n";

@@ -37,11 +37,7 @@ class Provided (r : ServiceRow) (s : Region)
 
 /// Starts `task` as a child of `owner`; `supervisor` observes its failure.
 /// Both may hold only what outlives the owner.
-spawn :
-  Owner s ->
-  (Failure e ->{Scope s | r; none} Unit)^c ->
-  (Eff {Scope s | r} e a)^c ->{r; none}
-  Fiber e a
+spawn : Owner s -> (Failure e ->{Scope s | r} Unit)^c -> (Eff {Scope s | r} e a)^c ->{r} Fiber e a
 foreign effect spawn from "flick:rt" "fiberSpawn"
   retention owner
 

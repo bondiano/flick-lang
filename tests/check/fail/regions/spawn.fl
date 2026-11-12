@@ -5,5 +5,5 @@ module App.Spawn exposing (..)
 lost : Unit ->{} Unit
 let lost () = scope owner {
   ignore (Fiber.spawn owner Effect.void)
-  //~ FLICK-T003 @7:29-7:40 expected `Failure _ ->{Scope owner | _; none} Unit`
+  //~ FLICK-T003 @7:29-7:40 expected `Failure _ ->{Scope owner | _} Unit`
 }

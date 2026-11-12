@@ -299,12 +299,12 @@ foreign effect parallel_all from "flick:rt" "parallelAll"
 
 /// Each task's typed failure as an `Err`; a defect or an interruption still
 /// stops the group.
-parallel_results : Detached r => List ((Eff r e a)^c) ->{r; none} List (Result (Errors e) a)
+parallel_results : Detached r => List ((Eff r e a)^c) ->{r} List (Result (Errors e) a)
 foreign effect parallel_results from "flick:rt" "parallelResults"
   retention call
 
 /// The opaque exit of every task.
-parallel_exits : Detached r => List ((Eff r e a)^c) ->{r; none} List (Exit e a)
+parallel_exits : Detached r => List ((Eff r e a)^c) ->{r} List (Exit e a)
 foreign effect parallel_exits from "flick:rt" "parallelExits"
   retention call
 

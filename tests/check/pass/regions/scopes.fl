@@ -56,7 +56,7 @@ let named path = scope outer {
   }
 }
 
-report : Failure {ReadError} ->{FileSystem; none} Unit
+report : Failure {ReadError} ->{FileSystem} Unit
 let report failure = ()
 
 children : Path ->{FileSystem; OpenError} Unit
@@ -72,7 +72,7 @@ let children path = scope outer {
 
 spawn_given :
   (Fiber.Outlives c s, Fiber.Provided {FileSystem} s) =>
-  Fiber.Owner s -> (Eff {FileSystem} {ReadError} String)^c ->{FileSystem; none} Unit
+  Fiber.Owner s -> (Eff {FileSystem} {ReadError} String)^c ->{FileSystem} Unit
 let spawn_given owner work = ignore (Fiber.spawn owner report work)
 
 // a cell made empty takes a resource of its scope later (`docs/formal/regions.md#a-cell-created-empty-accepts-a-resource-of-its-scope`)

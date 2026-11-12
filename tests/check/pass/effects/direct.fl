@@ -59,12 +59,12 @@ let lambdas id =
   direct.name ++ lifted.name ++ awaited.name
 
 // only the second stage runs through the runtime
-greet : String -> String ->{Log; none} String
+greet : String -> String ->{Log} String
 let greet prefix name =
   Log.info name
   prefix ++ name
 
-hello : String ->{Log; none} String
+hello : String ->{Log} String
 let hello = greet "Hello"
 
 // a task is cold; storing or passing it runs nothing
@@ -88,7 +88,7 @@ let rec each f numbers =
   | [n] -> f n
   | _ -> ()
 
-log_all : List Float ->{Log; none} Unit
+log_all : List Float ->{Log} Unit
 let log_all numbers = each (fun n -> Log.info "number") numbers
 
 both : Eff r1 e1 a -> Eff r2 e2 b ->{r1 + r2; e1 + e2} (a, b)

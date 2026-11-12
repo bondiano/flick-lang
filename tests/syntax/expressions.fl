@@ -75,7 +75,7 @@ let load id =
   let total = (point.x + point.y : Float)
   (user, again)
 
-safe : UserId ->{Users; none} Option User
+safe : UserId ->{Users} Option User
 let safe id =
   try Some (Users.get id) with
   | NotFound _ -> None

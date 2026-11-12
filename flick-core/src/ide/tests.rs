@@ -627,7 +627,7 @@ fn hover_on_component_shows_its_instance() {
         .expect("hover component")
         .0;
     assert!(
-        hover.contains("component : Float ->{Setup s; none} (Float ->{Read; none} Ui^{s})^{s}"),
+        hover.contains("component : Float ->{Setup s} (Float ->{Read} Ui^{s})^{s}"),
         "{hover}"
     );
 }
