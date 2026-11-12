@@ -102,7 +102,7 @@ theorem Ty.tcon_not_eff (T : Name) (us : List Ty) : ∀ r e t C, Ty.tcon T us �
 /-- Subtyping keeps the final type of data, up to widening its hidden row. -/
 theorem LeLive.res_tcon {a b : Ty} {T : Name} {us : List Ty}
     (h : LeLive S a b) (ha : a.res = Ty.tcon T us) :
-    ∃ us', b.res = Ty.tcon T us' ∧ S.Widen T us us' := by
+    ∃ us', b.res = Ty.tcon T us' ∧ S.Vary T us us' := by
   induction h with
   | refl => exact ⟨us, ha, .refl⟩
   | arrow _ _ _ _ _ ih => exact ih ha
@@ -111,11 +111,16 @@ theorem LeLive.res_tcon {a b : Ty} {T : Name} {us : List Ty}
     subst ha'; subst hb'
     rw [Ty.tcon_res] at ha ⊢
     obtain ⟨rfl, rfl⟩ := Ty.tcon_eq ha
-    exact ⟨_, rfl, .inr ⟨_, hi, hl, heq, hsub⟩⟩
+    exact ⟨_, rfl, .of_hide hi hl heq hsub⟩
+  | data hl hr hp hn hi ha' hb' =>
+    subst ha'; subst hb'
+    rw [Ty.tcon_res] at ha ⊢
+    obtain ⟨rfl, rfl⟩ := Ty.tcon_eq ha
+    exact ⟨_, rfl, hl, hr, hp, hn, hi⟩
 
 theorem LeLive.res_tcon' {a b : Ty} {T : Name} {us : List Ty}
     (h : LeLive S a b) (hb : b.res = Ty.tcon T us) :
-    ∃ us₀, a.res = Ty.tcon T us₀ ∧ S.Widen T us₀ us := by
+    ∃ us₀, a.res = Ty.tcon T us₀ ∧ S.Vary T us₀ us := by
   induction h with
   | refl => exact ⟨us, hb, .refl⟩
   | arrow _ _ _ _ _ ih => exact ih hb
@@ -124,14 +129,19 @@ theorem LeLive.res_tcon' {a b : Ty} {T : Name} {us : List Ty}
     subst ha'; subst hb'
     rw [Ty.tcon_res] at hb ⊢
     obtain ⟨rfl, rfl⟩ := Ty.tcon_eq hb
-    exact ⟨_, rfl, .inr ⟨_, hi, hl, heq, hsub⟩⟩
+    exact ⟨_, rfl, .of_hide hi hl heq hsub⟩
+  | data hl hr hp hn hi ha' hb' =>
+    subst ha'; subst hb'
+    rw [Ty.tcon_res] at hb ⊢
+    obtain ⟨rfl, rfl⟩ := Ty.tcon_eq hb
+    exact ⟨_, rfl, hl, hr, hp, hn, hi⟩
 
 /-- The final type of a value's spine is the pattern's, or narrower at the hidden row. -/
 def ResBelow (S : Sig) (t' t : Ty) : Prop :=
-  t'.res = t.res ∨ ∃ T ws ws', t.res = Ty.tcon T ws' ∧ t'.res = Ty.tcon T ws ∧ S.Widen T ws ws'
+  t'.res = t.res ∨ ∃ T ws ws', t.res = Ty.tcon T ws' ∧ t'.res = Ty.tcon T ws ∧ S.Vary T ws ws'
 
 theorem ResBelow.tcon {t' t : Ty} {T : Name} {ws' : List Ty} (h : ResBelow S t' t)
-    (ht : t.res = Ty.tcon T ws') : ∃ ws, t'.res = Ty.tcon T ws ∧ S.Widen T ws ws' := by
+    (ht : t.res = Ty.tcon T ws') : ∃ ws, t'.res = Ty.tcon T ws ∧ S.Vary T ws ws' := by
   rcases h with h | ⟨T₁, ws, ws₁, h₁, h₂, hw⟩
   · exact ⟨ws', h.trans ht, .refl⟩
   · obtain ⟨rfl, rfl⟩ := Ty.tcon_eq (h₁.symm.trans ht)
@@ -160,6 +170,10 @@ theorem LeLive.adt_eq {T : Name} {U : Ty} (h : LeLive S (.adt T) U) : U = .adt T
     subst hb
     obtain ⟨rfl, rfl⟩ := Ty.tcon_eq_adt (ha.symm.trans hX.symm)
     rw [List.eq_nil_of_length_eq_zero hl.symm]; exact hX
+  | data hl _ _ _ _ ha hb =>
+    subst hb
+    obtain ⟨rfl, rfl⟩ := Ty.tcon_eq_adt (ha.symm.trans hX.symm)
+    rw [List.eq_nil_of_length_eq_zero hl.symm]; exact hX
 
 /-- A narrower spine at a type without parameters is the type. -/
 theorem SpW.adt {Z : Ty} {T : Name} (h : SpW S Z (.adt T)) : Z = .adt T := by
@@ -176,7 +190,7 @@ theorem Typ.spine_res {Ψ Θ Γ v J} (h : Typ S Ψ Θ Γ v J) :
     Value v → ∀ {K k ts T X φ}, v.head = .ctor K → S.ctor K = some (k, ts, T) →
       J = .ex X φ → X.kind ≠ 7 → ¬ X.isAll →
         ∃ us, us.length = k ∧ ∃ ws, X.res = Ty.tcon T ws ∧
-          S.Widen T ((S.res K).map (Ty.substT (instT us))) ws := by
+          S.Vary T ((S.res K).map (Ty.substT (instT us))) ws := by
   induction h with
   | ctor hK hk _ hT =>
     intro _ _ _ _ _ _ _ hK' hS hJ _ _
@@ -247,7 +261,7 @@ theorem PatTy.typ_match {Ψ Θ Γ fl p t Δ} (hp : PatTy S fl p t Δ) :
       obtain ⟨ws, h₂, hw⟩ := hres.tcon (Sig.ctorTyR_res _ _ _ _)
       obtain rfl := (Ty.tcon_eq (h₁.symm.trans h₂)).2
       -- the instance of what it builds widens to the instance of the pattern
-      exact ⟨⟨_, hT, SpW.ctor hK hk'' (Sig.Widen.of_map hj hK hk'' hk (hw₁.trans hw))⟩, .nil⟩
+      exact ⟨⟨_, hT, SpW.ctor hK hk'' (Sig.Vary.of_map hj hK hk'' hk (hw₁.trans hw))⟩, .nil⟩
     | allI =>
       obtain ⟨_, h₂, -⟩ := hres.tcon (Sig.ctorTyR_res _ _ _ _)
       exact (Ty.res_tcon_not_all h₂).elim
@@ -327,7 +341,7 @@ theorem HPat.inst {Ψ Θ Γ ε₀ p θ Δ v δ} (hp : HPat S ε₀ p θ Δ) (hvv
     obtain ⟨hnil, rfl⟩ := Ty.tcon_eq_adt hr.symm
     have hrs : S.res K = [] := List.map_eq_nil_iff.mp hnil
     rw [hrs] at hw
-    obtain rfl : ws = [] := Sig.Widen.nil hw
+    obtain rfl : ws = [] := Sig.Vary.nil hw
     obtain ⟨⟨Z, hZ, hs⟩, i⟩ := hp.typ_match hvv hv' hm (fun h => by cases h)
       (fun _ => ⟨hU7, .inl (by rw [hr']; rfl)⟩)
     rw [SpW.adt hs] at hZ

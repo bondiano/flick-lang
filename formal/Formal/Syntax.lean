@@ -298,11 +298,11 @@ structure Sig where
   it, and the fields hold it only where its variance allows (`Ty.Pol`); an unused one is in
   no field. -/
   var : Name → Nat → Variance := fun _ _ => .inv
-  var_ok : ∀ T K k ts, ctor K = some (k, ts, T) → ∀ i, i < k → var T i ≠ .inv →
-      (res K)[i]? = some (.tvar i) ∧ (∀ j u, (res K)[j]? = some u → j ≠ i → u.NoV i) ∧
+  var_ok : ∀ T i, var T i ≠ .inv → ∀ K k ts, ctor K = some (k, ts, T) →
+      i < k ∧ (res K)[i]? = some (.tvar i) ∧ (∀ j u, (res K)[j]? = some u → j ≠ i → u.NoV i) ∧
       ∀ f ∈ ts, (var T i = .bi → f.NoV i) ∧
         (var T i = .pos ∨ var T i = .neg → Ty.Pol var i (var T i) true f) := by
-    intro _ _ _ _ _ _ _ h; exact absurd rfl h
+    intro _ _ h; exact absurd rfl h
 
 /-- The instance of a constant's type variables. -/
 structure CArg where

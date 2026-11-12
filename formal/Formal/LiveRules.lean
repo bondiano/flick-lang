@@ -287,21 +287,9 @@ theorem named_row_invariant {S : Sig} {T : Name} {us : List Ty} {b : Ty}
     rw [hT] at hi; cases hi
   | data hl _ _ _ hinv ha hb =>
     obtain ⟨rfl, rfl⟩ := Ty.tcon_eq (hX.trans ha)
-    subst hb
-    congr 1
-    apply List.ext_getElem?
-    intro j
-    cases hu : us[j]? with
-    | none =>
-      cases hu' : ‹List Ty›[j]? with
-      | none => rfl
-      | some u' => have := (List.getElem?_eq_some_iff.mp hu').1; rw [← hl] at this
-                   rw [List.getElem?_eq_none_iff.mpr (by omega)] at hu; cases hu
-    | some u =>
-      obtain ⟨m, hm⟩ : ∃ m, ‹List Ty›[j]? = some m := by
-        have : j < us.length := (List.getElem?_eq_some_iff.mp hu).1
-        exact ⟨_, List.getElem?_eq_getElem (hl ▸ this)⟩
-      rw [hm, hinv j u m hu hm (by rw [hT]; simp) (hv j)]
+    rw [hb, ← hX]
+    exact congrArg (Ty.tcon T) (List.ext_getElem hl fun j h1 h2 => hinv j _ _
+      (List.getElem?_eq_getElem h1) (List.getElem?_eq_getElem h2) (by rw [hT]; simp) (hv j)).symm
 
 /-- The field of `type K (c : CaptureRow) = K ((Unit ->{} Unit)^c ->{} Unit)`: the row
 qualifies a parameter of the field. -/

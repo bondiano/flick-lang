@@ -199,4 +199,195 @@ theorem field_vary {i : Nat} {s : Variance} {q : Bool} {f : Ty} (hf : Ty.Pol S.v
         have := same hN
         simpa only [Ty.tcon_substT] using this
 
+/-- Substitutions that differ only at variables below `n`, each of which `t` does not hold
+where they differ, agree on `t`. -/
+theorem Ty.substT_eq_upto {t : Ty} {σ σ' : Atom → Ty} : ∀ n : Nat,
+    (∀ a, (∀ j, j < n → a ≠ .v j) → σ a = σ' a) →
+    (∀ j, j < n → σ (.v j) ≠ σ' (.v j) → t.NoV j) → t.substT σ = t.substT σ'
+  | 0, hσ, _ => Ty.substT_congr fun a => hσ a fun j hj => absurd hj (Nat.not_lt_zero _)
+  | n + 1, hσ, h => by
+    let μ : Atom → Ty := fun a => if a = .v n then σ' a else σ a
+    have e1 : t.substT σ = t.substT μ := by
+      by_cases hn : σ (.v n) = σ' (.v n)
+      · exact Ty.substT_congr fun a => by
+          by_cases ha : a = .v n
+          · subst ha; simp [μ, hn]
+          · simp [μ, ha]
+      · exact (h n (by omega) hn).substT_eq fun a ha => by simp [μ, ha]
+    rw [e1]
+    refine Ty.substT_eq_upto n (fun a ha => ?_) (fun j hj hne => h j (by omega) ?_)
+    · by_cases han : a = .v n
+      · subst han; simp [μ]
+      · simp only [μ, han, if_false]
+        exact hσ a fun j hj => by
+          by_cases hjn : j = n
+          · subst hjn; exact han
+          · exact ha j (by omega)
+    · have : (Atom.v j) ≠ .v n := fun e => by injection e; omega
+      simpa [μ, this] using hne
+
+/-- `us'` varies `us` as subtyping of data allows (regions.md §2.2.1, `LeLive.data`): each
+argument keeps what it reaches, and one that is not the hidden row moves by the variance of
+its parameter. -/
+def Sig.Vary (S : Sig) (T : Name) (us us' : List Ty) : Prop :=
+  us.length = us'.length ∧
+  (∀ (j : Nat) (u u' : Ty), us[j]? = some u → us'[j]? = some u' → Caps.Sub u.reach u'.reach) ∧
+  (∀ (j : Nat) (u u' : Ty), us[j]? = some u → us'[j]? = some u' → S.hidden T ≠ some j →
+    S.var T j = .pos → LeLive S u u') ∧
+  (∀ (j : Nat) (u u' : Ty), us[j]? = some u → us'[j]? = some u' → S.hidden T ≠ some j →
+    S.var T j = .neg → LeLive S u' u) ∧
+  (∀ (j : Nat) (u u' : Ty), us[j]? = some u → us'[j]? = some u' → S.hidden T ≠ some j →
+    S.var T j = .inv → u = u')
+
+/-- Arguments of the same position. -/
+theorem List.getElem?_pair {us us' : List Ty} {j : Nat} {u : Ty} (hl : us.length = us'.length)
+    (h : us[j]? = some u) : ∃ u', us'[j]? = some u' :=
+  ⟨_, List.getElem?_eq_getElem (hl ▸ (List.getElem?_eq_some_iff.mp h).1)⟩
+
+/-- Equal positions vary as nothing. -/
+theorem Sig.Vary.of_agree {T : Name} {us us' : List Ty} (hl : us.length = us'.length)
+    (P : Nat → Prop) (hP : ∀ j, ¬ P j → us[j]? = us'[j]?)
+    (hr : ∀ j u u', P j → us[j]? = some u → us'[j]? = some u' → Caps.Sub u.reach u'.reach)
+    (hp : ∀ j u u', P j → us[j]? = some u → us'[j]? = some u' → S.hidden T ≠ some j →
+      S.var T j = .pos → LeLive S u u')
+    (hn : ∀ j u u', P j → us[j]? = some u → us'[j]? = some u' → S.hidden T ≠ some j →
+      S.var T j = .neg → LeLive S u' u)
+    (hi : ∀ j u u', P j → us[j]? = some u → us'[j]? = some u' → S.hidden T ≠ some j →
+      S.var T j = .inv → u = u') : S.Vary T us us' := by
+  refine ⟨hl, fun j u u' h h' => ?_, fun j u u' h h' hh hv => ?_, fun j u u' h h' hh hv => ?_,
+    fun j u u' h h' hh hv => ?_⟩
+  all_goals by_cases hj : P j
+  any_goals rw [hP j hj, h'] at h; cases h
+  · exact hr j u u' hj h h'
+  · exact Caps.Sub.refl _
+  · exact hp j u u' hj h h' hh hv
+  · exact .refl
+  · exact hn j u u' hj h h' hh hv
+  · exact .refl
+  · exact hi j u u' hj h h' hh hv
+  · rfl
+
+theorem Sig.Vary.refl {T : Name} {us : List Ty} : S.Vary T us us :=
+  .of_agree rfl (fun _ => False) (fun _ _ => rfl) (fun _ _ _ h => h.elim)
+    (fun _ _ _ h => h.elim) (fun _ _ _ h => h.elim) (fun _ _ _ h => h.elim)
+
+theorem Sig.Vary.length {T : Name} {us us' : List Ty} (h : S.Vary T us us') :
+    us.length = us'.length := h.1
+
+theorem Sig.Vary.nil {T : Name} {ws : List Ty} (h : S.Vary T [] ws) : ws = [] :=
+  List.eq_nil_of_length_eq_zero h.length.symm
+
+theorem Sig.Vary.trans {T : Name} {us vs ws : List Ty} (h₁ : S.Vary T us vs)
+    (h₂ : S.Vary T vs ws) : S.Vary T us ws := by
+  obtain ⟨l₁, r₁, p₁, n₁, i₁⟩ := h₁
+  obtain ⟨l₂, r₂, p₂, n₂, i₂⟩ := h₂
+  refine ⟨l₁.trans l₂, fun j u w h h' => ?_, fun j u w h h' hh hv => ?_,
+    fun j u w h h' hh hv => ?_, fun j u w h h' hh hv => ?_⟩
+  all_goals obtain ⟨v, hv'⟩ := List.getElem?_pair l₁ h
+  · exact (r₁ j u v h hv').trans (r₂ j v w hv' h')
+  · exact (p₁ j u v h hv' hh hv).trans (p₂ j v w hv' h' hh hv)
+  · exact (n₂ j v w hv' h' hh hv).trans (n₁ j u v h hv' hh hv)
+  · exact (i₁ j u v h hv' hh hv).trans (i₂ j v w hv' h' hh hv)
+
+/-- Widening the hidden row is a variation. -/
+theorem Sig.Vary.of_hide {T : Name} {i : Nat} {us us' : List Ty} (hi : S.hidden T = some i)
+    (hl : us.length = us'.length) (heq : ∀ j, j ≠ i → us[j]? = us'[j]?)
+    (hsub : ∀ r r', us[i]? = some r → us'[i]? = some r' → Caps.Sub r.reach r'.reach) :
+    S.Vary T us us' :=
+  .of_agree hl (· = i) heq (fun j u u' hj h h' => by subst hj; exact hsub u u' h h')
+    (fun j _ _ hj _ _ hh => by subst hj; exact absurd hi hh)
+    (fun j _ _ hj _ _ hh => by subst hj; exact absurd hi hh)
+    (fun j _ _ hj _ _ hh => by subst hj; exact absurd hi hh)
+
+/-- A parameter that may change: not invariant, or the hidden row. -/
+def Sig.Varies (S : Sig) (T : Name) (j : Nat) : Prop := S.var T j ≠ .inv ∨ S.hidden T = some j
+
+/-- A parameter that may change is an ordinary variable of every constructor, and nothing
+else a constructor builds depends on it. -/
+theorem Sig.varies_ok {T : Name} {j : Nat} (h : S.Varies T j) {K : Name} {k : Nat}
+    {ts : List Ty} (hK : S.ctor K = some (k, ts, T)) :
+    j < k ∧ (S.res K)[j]? = some (.tvar j) ∧
+      ∀ m u, (S.res K)[m]? = some u → m ≠ j → u.NoV j := by
+  rcases h with h | h
+  · obtain ⟨h1, h2, h3, -⟩ := S.var_ok T j h K k ts hK; exact ⟨h1, h2, h3⟩
+  · obtain ⟨h1, h2, h3, -⟩ := S.hidden_ok T j h K k ts hK; exact ⟨h1, h2, h3⟩
+
+theorem Sig.Vary.eq_of_not_varies {T : Name} {us us' : List Ty} (hw : S.Vary T us us')
+    {j : Nat} (hj : ¬ S.Varies T j) : us[j]? = us'[j]? := by
+  have hinv : S.var T j = .inv := by
+    exact Classical.byContradiction fun h => hj (.inl h)
+  have hh : S.hidden T ≠ some j := fun h => hj (.inr h)
+  cases hu : us[j]? with
+  | none =>
+    cases hu' : us'[j]? with
+    | none => rfl
+    | some u' =>
+      obtain ⟨u, hu₀⟩ := List.getElem?_pair hw.length.symm hu'
+      rw [hu] at hu₀; cases hu₀
+  | some u =>
+    obtain ⟨u', hu'⟩ := List.getElem?_pair hw.length hu
+    rw [hu', hw.2.2.2.2 j u u' hu hu' hh hinv]
+
+theorem Ty.tcon_up_substT (T : Name) (us : List Ty) (k : Nat) (ρ : Atom → Ty) :
+    ((Ty.tcon T us).up k).substT ρ = Ty.tcon T (us.map fun u => (u.up k).substT ρ) := by
+  simp only [Ty.up, Ty.substT_ren, Ty.tcon_substT]
+
+/-- A constructor that builds data builds every variation of it: what may change is a
+variable of what it builds, and nothing else there depends on it. -/
+theorem Sig.builds_vary {K T : Name} {us us' : List Ty} (hw : S.Vary T us us')
+    (h : S.Builds K (Ty.tcon T us)) : S.Builds K (Ty.tcon T us') := by
+  classical
+  intro k ts T₁ us₁ hK ht hlen
+  obtain ⟨rfl, rfl⟩ := Ty.tcon_eq ht
+  obtain ⟨ρ, hρ⟩ := h k ts T us hK rfl (hw.length.trans hlen)
+  let ρ' : Atom → Ty := fun a => match a with
+    | .v j => if hj : S.Varies T j ∧ j < us'.length then ((us'[j]'hj.2).up k).substT ρ
+        else ρ (.v j)
+    | .r p => ρ (.r p)
+  have hhi : ∀ j, k ≤ j → ρ' (.v j) = ρ (.v j) := fun j hj => by
+    simp only [ρ']
+    split
+    · rename_i h; exact absurd (Sig.varies_ok h.1 hK).1 (by omega)
+    · rfl
+  have hup : ∀ u : Ty, (u.up k).substT ρ' = (u.up k).substT ρ := fun u => by
+    simp only [Ty.up, Ty.substT_ren]
+    apply Ty.substT_congr
+    intro a
+    cases ha : a.up k with
+    | v j =>
+      have : k ≤ j := by
+        exact Classical.byContradiction fun hj => Atom.up_ne (a := a) (by omega : j < k) ha
+      exact hhi j this
+    | r p => rfl
+  refine ⟨ρ', ?_⟩
+  rw [Ty.tcon_up_substT] at hρ ⊢
+  rw [Ty.tcon_substT] at hρ ⊢
+  obtain ⟨-, hρl⟩ := Ty.tcon_eq hρ
+  simp only [hup]
+  congr 1
+  apply List.ext_getElem?
+  intro n
+  simp only [List.getElem?_map]
+  by_cases hn : S.Varies T n
+  · obtain ⟨-, hrn, -⟩ := Sig.varies_ok hn hK
+    have hnl : n < us'.length := by rw [hlen]; exact (List.getElem?_eq_some_iff.mp hrn).1
+    rw [hrn, List.getElem?_eq_getElem hnl]
+    simp [Ty.substT, ρ', hn, hnl]
+  · have e := congrArg (·[n]?) hρl
+    simp only [List.getElem?_map] at e
+    rw [← hw.eq_of_not_varies hn]
+    cases hrn : (S.res K)[n]? with
+    | none => rw [hrn] at e; rw [← e]; rfl
+    | some u =>
+      rw [hrn] at e
+      rw [← e]
+      simp only [Option.map_some, Option.some.injEq]
+      symm
+      refine Ty.substT_eq_upto k (fun a ha => ?_) (fun j hj hne => ?_)
+      · cases a with
+        | v j => exact (hhi j (Classical.byContradiction fun h => ha j (by omega) rfl)).symm
+        | r p => rfl
+      · have hvj : S.Varies T j := Classical.byContradiction fun hv => hne (by simp [ρ', hv])
+        exact (Sig.varies_ok hvj hK).2.2 n u hrn fun e => hn (e ▸ hvj)
+
 end Flick

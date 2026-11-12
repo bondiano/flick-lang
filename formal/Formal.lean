@@ -34,6 +34,7 @@ import Formal.Substitution
 import Formal.Canonical
 import Formal.Widen
 import Formal.Vary
+import Formal.VarySpine
 import Formal.Shapes
 import Formal.CanonForms
 import Formal.DictCanon
