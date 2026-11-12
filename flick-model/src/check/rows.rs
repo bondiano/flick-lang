@@ -219,8 +219,21 @@ impl Checker<'_> {
             return self.unify(&a, &b);
         }
         self.subsume_bare(actual, expected)?;
+        // the hidden row of data with hidden storage only widens: a region
+        // its other arguments show does not stand in for it, the variables
+        // they show do (`regions.md` §2.2)
+        let rows = self.bare_hidden(&self.resolve(&a));
+        let row = |c: Vec<Caps>| live_arg(c.iter().fold(Caps::default(), |o, c| o.union(c)));
         for b in self.layers(&b) {
-            self.hold(slice::from_ref(&a), &[b], &Caps::default(), "≤-Cap");
+            if rows {
+                let (held, within) = (row(self.qualifiers(&a)), row(self.qualifiers(&b)));
+                let mut shown = self.reach(&b);
+                shown.atoms.retain(|v| !self.is_region(v));
+                shown.vars.clear();
+                self.hold(&[held], &[within], &shown, "≤-Cap");
+            } else {
+                self.hold(slice::from_ref(&a), &[b], &Caps::default(), "≤-Cap");
+            }
         }
         Ok(())
     }
