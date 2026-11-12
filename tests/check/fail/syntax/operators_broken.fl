@@ -1,0 +1,15 @@
+// An operand missing while it is typed: the parser reports it, and the
+// checker types what is there without making a call of it.
+module App.OperatorsBroken exposing (..)
+
+inc : Int -> Int
+let inc n = n + 1
+
+composed : Int -> Int
+let composed = (inc >> >> inc) << inc
+
+applied : Int
+let applied = inc <| >> inc
+//~ FLICK-S007 @9:24-9:26 expected an expression, found `>>`
+//~ FLICK-S007 @12:22-12:24 expected an expression, found `>>`
+//~ FLICK-T003 @12:15-12:28 expected `Int`, found a function

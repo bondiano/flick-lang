@@ -61,7 +61,12 @@ pub fn composition(node: &Node) -> Option<(Vec<&Node>, Vec<Token>)> {
     let op = composer(node)?;
     let (mut operands, mut operators) = (Vec::new(), Vec::new());
     chain(node, op, &mut operands, &mut operators);
-    (operands.len() == operators.len() + 1).then_some((operands, operators))
+    // a chain with an operand missing is no composition: the parser puts an
+    // empty `Error` node at the file's start in its place
+    let alternate = operands.len() == operators.len() + 1
+        && (operators.iter().enumerate())
+            .all(|(i, o)| operands[i].range().1 <= o.start && o.end <= operands[i + 1].range().0);
+    alternate.then_some((operands, operators))
 }
 
 /// The key of the call of operand `i`: `f >>` for the first, `>> g` for
@@ -154,8 +159,13 @@ impl Checker<'_> {
         }
     }
 
-    /// `f a <| x` is the application `f a x`.
+    /// `f a <| x` is the application `f a x`. Without its `x`, which the
+    /// parser reported, it is its function alone.
     pub(super) fn right_apply(&mut self, lhs: &Node, rhs: &Node) -> Type {
+        if rhs.kind == K::Error {
+            self.infer(lhs);
+            return Type::Error;
+        }
         let parts = right_application(lhs, rhs);
         self.apply(parts[0], &parts[1..])
     }
