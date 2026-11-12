@@ -311,7 +311,10 @@ impl Gen<'_> {
         let ExprKind::Con(c) = &head.kind else {
             return None;
         };
-        if c.rep != Rep::Tagged || names::native(c).is_some() || args.len() != c.arity {
+        if c.rep != Rep::Tagged
+            || names::native(self.options.lang, c).is_some()
+            || args.len() != c.arity
+        {
             return None;
         }
         args.reverse();
@@ -453,7 +456,7 @@ impl Gen<'_> {
         {
             return names::enum_literal(literal);
         }
-        match names::native(c) {
+        match names::native(self.options.lang, c) {
             Some(names::Native::Some) => self.rt("some"),
             Some(names::Native::None) => self.rt("none"),
             Some(names::Native::Ok) => self.rt("ok"),

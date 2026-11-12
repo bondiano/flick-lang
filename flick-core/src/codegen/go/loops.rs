@@ -143,7 +143,7 @@ impl<'a> Gen<'a> {
                     .iter()
                     .map(|p| {
                         matches!(p.pat, Pat::Bind(_))
-                            .then(|| Native::of(p.ty.as_deref()))
+                            .then(|| Native::of(self.lang, p.ty.as_deref()))
                             .flatten()
                     })
                     .collect();

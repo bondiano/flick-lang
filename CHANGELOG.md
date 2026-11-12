@@ -6,6 +6,32 @@ break programs.
 
 ## Unreleased
 
+- **A lambda made in a named scope:** a lambda or a composition made in
+  `scope outer { … }` and called inside a nested scope acquires into `outer`,
+  as its type says. When the call was checked before the lambda's row named
+  the region, it acquired into the nested scope, which released the resource
+  early, on JS, Go and Flick's runtime alike.
+- **The language server outlives a defect:** a panic while `flick lsp`
+  handles a message is logged with its backtrace and answered with a
+  JSON-RPC internal error; the server drops its cached analyses and keeps
+  serving, instead of the editor losing it.
+- **`retention owner` without `std`:** checking a foreign declaration with
+  `retention owner` in a build of the core modules alone, which has no
+  `Fiber.Outlives`, is `FLICK-F010` instead of a crash of the compiler.
+- **RPC clients on Flick's own runtime:** `Rpc` procedures, groups and their
+  unary calls over HTTP in NDJSON or JSON run on RT, in the protocol of
+  Effect's RPC server, so a browser client of a procedure bundles no Effect:
+  6.9 KB gzip instead of 55 KB. Http, RPC and server functions are one
+  family: a build that serves procedures, calls a stream, uses another
+  transport or serialization, or uses Http takes all of them from the
+  Effect adapter, as before.
+- **`Console` on Flick's own runtime:** every `Console` binding runs on RT
+  without the Effect adapter, writing to the host's console or to the one
+  `Console.with_console` gives a task; a group or a timer ends when its
+  scope closes or its task ends, however it ends. The adapter's code under a
+  layer provided on RT, such as `Logger.console_logfmt`, writes to that
+  console too: it now sees all the evidence below the layer, the runtime's
+  clock included, not only the services Effect supplied last.
 - **`<|`, `>>` and `<<`:** `f <| x` is `f x`, the weakest operator and
   right-associative, so `say <| show <| total xs` needs no parentheses;
   `f a <| x` is the call `f a x`. `f >> g` applies `f`, then `g`, and
@@ -78,6 +104,15 @@ break programs.
   Give it a stage (`->{}`, `foreign effect`). `ChildProcess.pid`,
   `HttpApi.port`, `Rpc.port` and `Http.Server.address` stay pure as reviewed
   exemptions: they return what was fixed when the capability was acquired.
+- **Too deep nesting:** past the depth the parser accepts, the rest of the
+  line or brackets is one error after the `FLICK-S007`; a longer `<|` chain
+  no longer wraps each operator around the one before it, which made a tree
+  as deep as the chain and overflowed the checker.
+- **`ErrorReporter.layer` and `LayerRef.get`** return `(Layer …)^{s}`: the
+  layer sends reports to listeners of region `s`, or builds the services the
+  ref of `s` owns, so it cannot leave the `scope` of `s`. A layer returned
+  from that `scope` is `FLICK-G001`; before, its reports went to a closed
+  listener and were lost.
 - **Refined types:** `refined type` is a declaration of the plugin of `std`,
   which writes the type and its `parse`, `value` and check as code of the
   language; `refined` is no reserved word. The check is a companion too,

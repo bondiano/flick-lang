@@ -36,7 +36,7 @@ const implOut = (impl: unknown): unknown =>
   });
 
 /** The Context of the evidence `ctx`: Effect's own, with the kernel's services in, computed once per node. */
-const rawHostOf = (ctx: Ctx | null): Context.Context<never> => {
+export const rawHostOf = (ctx: Ctx | null): Context.Context<never> => {
   if (ctx === null) return EMPTY;
   const cached = contextOf(ctx.bridged);
   if (cached !== undefined) return cached;

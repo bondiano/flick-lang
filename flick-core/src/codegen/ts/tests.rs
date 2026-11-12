@@ -323,7 +323,7 @@ fn rt_service_keys_use_the_native_service_type() {
 /// module's export of that name.
 #[test]
 fn a_package_gives_its_types_their_forms_and_says_where_their_names_come_from() {
-    let text = "module App.Shapes exposing (Moment, Later, Page, Plain, at)\n\n@ts \"$Dayjs\"\n@ts import \"dayjs\" \"Dayjs\"\ntype Moment\n\n@ts \"Promise<readonly [{0}, $Handle<{1:row}>]>\"\n@ts import \"../io/fs.d.mts\" \"Handle\" rt \"RtHandle\"\ntype Later a (e : ErrorRow)\n\n@ts none\ntype Page\n\ntype Plain = Plain\n\nat : Moment -> Later Float {} -> Plain\nlet at _ _ = Plain\n";
+    let text = "module App.Shapes exposing (Moment, Later, Page, Plain, at)\n\n@ts \"$Dayjs\"\n@ts import \"dayjs\" \"Dayjs\"\ntype Moment\n\n@ts \"Promise<readonly [{0}, $Handle<{1:row}>]>\"\n@ts import \"../io/fs.d.mts\" \"Handle\"\ntype Later a (e : ErrorRow)\n\n@ts none\ntype Page\n\ntype Plain = Plain\n\nat : Moment -> Later Float {} -> Plain\nlet at _ _ = Plain\n";
     let (interface, lookup) = checked(text);
     let package = |_: &str| None;
     let own = Projection::new("App.Shapes", &lookup, &package);

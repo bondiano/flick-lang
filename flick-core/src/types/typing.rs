@@ -14,6 +14,7 @@ use super::Checker;
 use super::classes::Dict;
 use super::env::Abi;
 use super::gadt::branch::as_field_given;
+use super::regions::scope;
 use super::services::OpClass;
 use super::ty::{Stage, Type};
 use crate::iface::Interface;
@@ -177,8 +178,9 @@ pub struct Typing {
     pub owners: HashMap<Range, Owner>,
     /// Pending: uses whose types are known once the module is solved.
     pending_labels: Vec<(Range, Type)>,
-    /// A call needing `Scope r`, with the scopes open around it as regions
-    /// and `scope` expressions, innermost last.
+    /// The services of a call that needs, or whose row may still grow to
+    /// need, `Scope r`, with the scopes open around it as regions and
+    /// `scope` expressions, innermost last.
     pub(super) pending_owners: Vec<(Range, Type, OpenScopes)>,
     pending_dicts: Vec<(Range, u32, Dict)>,
 }
@@ -396,9 +398,15 @@ impl Checker<'_> {
                 typing.labels.insert(at, label);
             }
         }
-        for (at, needed, open) in mem::take(&mut typing.pending_owners) {
-            let region = match self.zonk(&needed).spine().1[..] {
+        for (at, services, open) in mem::take(&mut typing.pending_owners) {
+            let row = self.store.normalize(&self.zonk(&services));
+            let Some(needed) = row.get(scope()) else {
+                continue;
+            };
+            let region = match needed.spine().1[..] {
                 [Type::Skolem(id)] => Some(*id),
+                // no region was ever named: the call keeps the innermost owner
+                [Type::Meta(_)] => continue,
                 _ => None,
             };
             let owner = match open.iter().position(|(r, _)| Some(*r) == region) {

@@ -91,8 +91,26 @@ pub fn ui_family(spec: &str, export: &str) -> bool {
         .any(|line| line.split_once(' ') == Some((spec, export)))
 }
 
+/// Whether `source` names a module of the web family: Http, RPC and server
+/// functions, whose requests, responses, procedures and handlers are one
+/// implementation's values, Flick's runtime's or the adapter's. An entry
+/// ending in `/` names every module under it.
+pub fn web_family(source: &str) -> bool {
+    let source = key(source);
+    bindings::WEB_FAMILY
+        .iter()
+        .any(|family| source == *family || (family.ends_with('/') && source.starts_with(family)))
+}
+
 pub fn selected_on_kernel(spec: &str, export: &str, bridge: EffectBridge) -> bool {
-    if bridge == EffectBridge::AvailableWithUi && ui_family(spec, export) {
+    if bridge.ui() && ui_family(spec, export) {
+        return false;
+    }
+    if bridge.web()
+        && bindings::ROUTES
+            .iter()
+            .any(|(from, rt)| *rt == Some(spec) && web_family(from))
+    {
         return false;
     }
     let root = Some(bindings::NATIVE_ENTRY);
@@ -348,5 +366,31 @@ mod tests {
             "uiView",
             EffectBridge::AvailableWithUi
         ));
+    }
+
+    #[test]
+    fn an_adapter_owning_the_web_takes_the_native_rpc_client_too() {
+        use crate::codegen::EffectBridge;
+        let spec = super::rt_specifier("flick:rpc/Rpc").expect("routed to the runtime");
+        assert!(super::selected_on_kernel(
+            &spec,
+            "rpcCallNdjson",
+            EffectBridge::AvailableWithUi
+        ));
+        for bridge in [
+            EffectBridge::AvailableWithWeb,
+            EffectBridge::AvailableWithUiAndWeb,
+        ] {
+            assert!(!super::selected_on_kernel(&spec, "rpcCallNdjson", bridge));
+        }
+        for web in [
+            "flick:rpc/RpcNode",
+            "flick:http/Headers",
+            "flick:server/Functions",
+        ] {
+            assert!(super::web_family(web), "{web}");
+        }
+        assert!(!super::web_family("flick:ui"));
+        assert!(!super::web_family("flick:httpx"));
     }
 }

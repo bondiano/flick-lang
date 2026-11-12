@@ -486,14 +486,31 @@ impl<'t> Parser<'t> {
         if self.depth >= MAX_DEPTH {
             self.error_expected("less deeply nested code");
             if self.raw().kind != K::Eof {
-                let m = self.start();
-                self.bump();
-                self.complete(m, K::Error);
+                self.skip_too_deep();
             }
             return false;
         }
         self.depth += 1;
         true
+    }
+
+    /// The rest of a too deeply nested construct, to the end of its line or
+    /// brackets, as one error: a long `a <| b <| …` nests no deeper.
+    fn skip_too_deep(&mut self) {
+        let (m, mut open) = (self.start(), 0u32);
+        loop {
+            match self.raw().kind {
+                K::LParen | K::LBracket | K::LBrace => open += 1,
+                kind if kind.is_closer() => open = open.saturating_sub(1),
+                _ => {}
+            }
+            self.bump();
+            let next = self.current();
+            if matches!(next, K::Eof | K::LayoutSep) || next.is_closer() && open == 0 {
+                break;
+            }
+        }
+        self.complete(m, K::Error);
     }
 
     fn leave(&mut self) {

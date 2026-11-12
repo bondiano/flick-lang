@@ -44,10 +44,6 @@ pub const PURE_OVER_CAPABILITY: &[(&str, &str)] = &[
     ("Rpc", "port"),
     // the address fixed when the server started listening
     ("Http.Server", "address"),
-    // shortcut: these two keep using the region through the layer they
-    // return; the next change gives their result the region and drops them
-    ("ErrorReporter", "layer"),
-    ("LayerRef", "get"),
 ];
 
 /// What a foreign function keeps of its arguments.

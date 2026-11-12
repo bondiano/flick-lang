@@ -1,4 +1,6 @@
 use super::tests::{errors, sexp};
+use crate::source::SourceMap;
+use crate::syntax::cst::Node;
 
 #[test]
 fn left_pipe_is_weakest_and_right_associative() {
@@ -65,4 +67,19 @@ fn a_line_that_starts_with_a_new_operator_continues() {
             .contains("(BinExpr (NameExpr f) <| (BinExpr (NameExpr g) <| (NameExpr y)))")
     );
     assert!(sexp("let h =\n  f\n  >> g").contains("(BinExpr (NameExpr f) >> (NameExpr g))"));
+}
+
+#[test]
+fn a_right_chain_past_the_depth_limit_nests_no_deeper() {
+    fn depth(node: &Node) -> u32 {
+        1 + node.nodes().map(depth).max().unwrap_or(0)
+    }
+    let src = format!("let x = {}1\nlet y = 2", "f <| ".repeat(1000));
+    let mut map = SourceMap::default();
+    let parsed = super::parse(&src, map.add("t.fl", src.as_str()));
+    assert!(depth(&parsed.tree) <= super::MAX_DEPTH + 8);
+    assert_eq!(parsed.tree.text(&src), src);
+    let found = errors(&src);
+    assert_eq!(found.len(), 1, "{found:?}");
+    assert!(found[0].starts_with("FLICK-S007"), "{found:?}");
 }

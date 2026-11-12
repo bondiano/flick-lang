@@ -1,5 +1,6 @@
-use super::{EffectBridge, Labels, Options, js};
+use super::{EffectBridge, Known, Labels, Options, js};
 use crate::effects::effect_specifier;
+use crate::ir::lang_items;
 use crate::ir::tests::lower_text;
 use crate::types::{Constructor, Rep};
 
@@ -13,6 +14,8 @@ pub(super) fn compile_with(text: &str, release: bool, labels: Labels) -> super::
     let package = |m: &str| (m == "App.Users").then(|| "@acme/users".to_owned());
     // as a build on Effect has it: a key is the module of the adapter
     let foreign = |_: &str, spec: &str| effect_specifier(spec);
+    let lang = lang_items();
+    let known = Known::of(&lang);
     let options = Options {
         path: &path,
         package: &package,
@@ -25,6 +28,7 @@ pub(super) fn compile_with(text: &str, release: bool, labels: Labels) -> super::
         labels,
         rt: false,
         effect_bridge: EffectBridge::Absent,
+        lang: &known,
     };
     js(&ir, &options)
 }
@@ -37,6 +41,8 @@ fn a_release_build_in_typescript_types_a_constructed_value_as_its_constructor_do
     let path = |m: &str| format!("{}.js", m.replace('.', "/"));
     let foreign = |_: &str, spec: &str| effect_specifier(spec);
     let emit = |typescript: bool| {
+        let lang = lang_items();
+        let known = Known::of(&lang);
         let options = Options {
             path: &path,
             package: &|_| None,
@@ -49,6 +55,7 @@ fn a_release_build_in_typescript_types_a_constructed_value_as_its_constructor_do
             labels: Labels::default(),
             rt: false,
             effect_bridge: EffectBridge::Absent,
+            lang: &known,
         };
         js(&ir, &options).code
     };
@@ -87,6 +94,8 @@ fn on_rt_with_bridge(text: &str, effect_bridge: EffectBridge) -> String {
     let package = |_: &str| None;
     // as a build on Effect has it: a key is the module of the adapter
     let foreign = |_: &str, spec: &str| effect_specifier(spec);
+    let lang = lang_items();
+    let known = Known::of(&lang);
     let options = Options {
         path: &path,
         package: &package,
@@ -99,6 +108,7 @@ fn on_rt_with_bridge(text: &str, effect_bridge: EffectBridge) -> String {
         labels: Labels::default(),
         rt: true,
         effect_bridge,
+        lang: &known,
     };
     js(&ir, &options).code
 }

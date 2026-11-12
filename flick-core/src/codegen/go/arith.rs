@@ -7,9 +7,10 @@ use flick_pretty::{Document, DocumentArena, docvec};
 
 use super::Gen;
 use super::layout::{Code, block, call, statement};
+use crate::codegen::Known;
 use crate::ir::{BinOp, Expr, ExprKind, Lit, TypeName};
 use crate::numeric::{Arith, Num};
-use crate::types::lang::{self, Lang};
+use crate::syntax::lang::Lang;
 
 /// A type whose values are Go's own.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -62,7 +63,7 @@ impl Native {
     }
 
     /// The type of values of type `ty`, when it is one of these.
-    pub(super) fn of(ty: Option<&TypeName>) -> Option<Native> {
+    pub(super) fn of(lang: &Known, ty: Option<&TypeName>) -> Option<Native> {
         let ty = ty?;
         [
             (Lang::Int, Native::Int),
@@ -71,7 +72,7 @@ impl Native {
             (Lang::String, Native::String),
         ]
         .into_iter()
-        .find(|&(item, _)| lang::is(item, &ty.module, &ty.name))
+        .find(|&(item, _)| lang.is(item, &ty.module, &ty.name))
         .map(|(_, native)| native)
     }
 }
@@ -187,7 +188,10 @@ impl<'a> Gen<'a> {
     /// The type both operands of a comparison have, when it is one Go
     /// compares as Flick does.
     fn compared(&self, lhs: &Expr, rhs: &Expr) -> Option<Native> {
-        let known = |e: &Expr| self.native(e).or_else(|| Native::of(e.ty.as_deref()));
+        let known = |e: &Expr| {
+            self.native(e)
+                .or_else(|| Native::of(self.lang, e.ty.as_deref()))
+        };
         known(lhs).filter(|&n| known(rhs) == Some(n))
     }
 

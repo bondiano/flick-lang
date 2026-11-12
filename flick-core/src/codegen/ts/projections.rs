@@ -1,10 +1,11 @@
-//! The TypeScript forms modules give their types with `@ts`, read from
-//! their interfaces: the backend names no type of a library.
+//! The TypeScript forms of types: the backend's own of the built-in types,
+//! by lang item, and those modules give their types with `@ts`, read from
+//! their interfaces.
 
 use std::cell::RefCell;
 use std::sync::Arc;
 
-use super::Projection;
+use super::{Projection, lang_forms};
 use crate::iface::Interface;
 use crate::syntax::ts_mark::{self, Form};
 use crate::types;
@@ -42,6 +43,9 @@ impl Projection<'_> {
     /// The form `module` gives its type or service `name`, if it gives one
     /// or says there is none: such a type is never declared.
     pub(super) fn form(&self, module: &str, name: &str) -> Result<Option<Arc<Form>>, String> {
+        if let Some(form) = lang_forms::of(module, name, self.rt) {
+            return Ok(Some(form));
+        }
         let find = |forms: &Forms| match forms {
             Ok(forms) => Ok((forms.iter().find(|(n, _)| n == name)).map(|(_, f)| Arc::clone(f))),
             Err(why) => Err(why.clone()),

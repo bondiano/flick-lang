@@ -7,6 +7,7 @@ pub(crate) mod exports;
 #[cfg(feature = "native-project")]
 pub mod go;
 mod js;
+mod lang;
 mod lexical;
 mod loops;
 pub(crate) use lexical::{RuntimeLayout, js_parts};
@@ -17,6 +18,7 @@ pub mod tail;
 pub mod ts;
 
 pub use js::{direct_methods, exported_worker, js, relative};
+pub use lang::Known;
 pub use names::{ident, instance as instance_export, qualified_id, tag};
 
 /// Whether an RT build may use the separately installed Effect adapter.
@@ -27,11 +29,33 @@ pub enum EffectBridge {
     Available,
     /// Opaque UI values and registries belong to the Effect adapter.
     AvailableWithUi,
+    /// Http, RPC and server-function values belong to the Effect adapter.
+    AvailableWithWeb,
+    /// Both UI and web values belong to the Effect adapter.
+    AvailableWithUiAndWeb,
 }
 
 impl EffectBridge {
     pub const fn available(self) -> bool {
         !matches!(self, Self::Absent)
+    }
+
+    /// The available bridge with the families whose values the adapter owns.
+    pub const fn owning(ui: bool, web: bool) -> Self {
+        match (ui, web) {
+            (false, false) => Self::Available,
+            (true, false) => Self::AvailableWithUi,
+            (false, true) => Self::AvailableWithWeb,
+            (true, true) => Self::AvailableWithUiAndWeb,
+        }
+    }
+
+    pub const fn ui(self) -> bool {
+        matches!(self, Self::AvailableWithUi | Self::AvailableWithUiAndWeb)
+    }
+
+    pub const fn web(self) -> bool {
+        matches!(self, Self::AvailableWithWeb | Self::AvailableWithUiAndWeb)
     }
 }
 
@@ -71,6 +95,8 @@ pub struct Options<'a> {
     pub rt: bool,
     /// Whether RT code may import the optional Effect adapter.
     pub effect_bridge: EffectBridge,
+    /// The program's lang items, the built-in entities the code knows.
+    pub lang: &'a Known<'a>,
 }
 
 impl Options<'_> {

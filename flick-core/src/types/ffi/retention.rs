@@ -12,7 +12,7 @@ use crate::syntax::kind::SyntaxKind as K;
 use crate::types::Checker;
 use crate::types::classes::args_of;
 use crate::types::kinds::Kind;
-use crate::types::lang::Lang;
+use crate::types::lang::{self, Lang};
 use crate::types::ty::{Binder, Type};
 
 impl Checker<'_> {
@@ -20,6 +20,14 @@ impl Checker<'_> {
     /// outlives that owner: a capture row of a parameter that nothing after
     /// its last parameter shows needs `Fiber.Outlives`.
     pub(super) fn owner_retention(&mut self, scheme: &Type, body: &Type, span: Span) {
+        if !owner_classes_loaded() {
+            self.error(
+                codes::F010,
+                span,
+                "`retention owner` needs `Fiber.Outlives` and `Fiber.Provided` of the std package, which this build does not load",
+            );
+            return;
+        }
         let Type::Forall {
             vars, constraints, ..
         } = scheme
@@ -56,6 +64,9 @@ impl Checker<'_> {
     /// kept work uses is provided and detached. With other than one region the
     /// signature has to say which.
     pub(in crate::types) fn with_owner_constraints(&self, decl: &Node, scheme: Type) -> Type {
+        if !owner_classes_loaded() {
+            return scheme;
+        }
         let Type::Forall {
             vars,
             mut constraints,
@@ -151,6 +162,12 @@ impl Checker<'_> {
             })
             .collect()
     }
+}
+
+/// Whether the classes `retention owner` constrains with are loaded: they
+/// are std's, which a build of the core modules alone does not have.
+fn owner_classes_loaded() -> bool {
+    lang::module_of(Lang::Outlives).is_some() && lang::module_of(Lang::Provided).is_some()
 }
 
 /// Whether `decl` is a foreign declaration that says `retention owner`.

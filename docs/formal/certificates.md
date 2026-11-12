@@ -100,7 +100,10 @@ Each certificate depends only on the axioms `propext`, `Classical.choice` and
   `Seq`, `T C ā` in the core: its first argument is the capture row its value
   hides, and a bare `T` hides none. Its constructor takes that row as its
   first variable and qualifies each function field with it, as the model's
-  (Con) checks a field against `τᵢ^q` and gives the value `(T ῡ)^q`.
+  (Con) checks a field against `τᵢ^q` and gives the value `(T ῡ)^q`. A
+  `match` on it takes the row from the matched type, its first argument, so
+  a function field is bound at the row the value hides (`PatTy.head`), and a
+  bare `T` in a local signature reads a fresh row as any signature does.
 
 Records are written in the order of their labels, and string literals are core
 literals of the base type `String` (simplification 3 of

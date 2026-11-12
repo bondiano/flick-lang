@@ -61,6 +61,7 @@ runtime/hung_io # no native for `hang` (./timers.mjs hang)
 runtime/interrupt_after_close # no native for `make` (flick:Deferred make)
 runtime/interrupt_in_finalizer # no native for `make` (flick:Deferred make)
 runtime/interrupt_skips # no native for `make` (flick:Deferred make)
+runtime/lambda_owners # the model's (≡) rejects `App.Main.composed`
 runtime/leases # no native for `from_acquire` (flick:ScopedRef flickFromAcquire)
 runtime/owners # the model's (≡) rejects `App.Main.keep`
 runtime/parallel # the model's (≡) rejects `App.Main.main`

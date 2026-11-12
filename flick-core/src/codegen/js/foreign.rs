@@ -295,7 +295,8 @@ impl Gen<'_> {
 
 /// Whether the JS function itself can stand for `f` in release: a pure
 /// import called with its arguments as they are and returning its result.
-pub(super) fn plain(f: &Foreign, kernel: bool) -> bool {
+/// On Flick's runtime, only data crosses an import the bridge may convert.
+pub(super) fn plain(f: &Foreign) -> bool {
     let info = &f.adapter;
     f.mode == ForeignMode::Pure
         && f.binding.from.is_some()
@@ -308,7 +309,6 @@ pub(super) fn plain(f: &Foreign, kernel: bool) -> bool {
         && !(info.receiver || info.cancel || info.variadic)
         && info.optional.is_empty()
         && info.callbacks.iter().all(|c| matches!(c, None | Some(1)))
-        && (!kernel || (info.shapes.iter().all(Shape::is_data) && info.result_shape.is_data()))
         && !(info.result.nullable || info.result.unit)
         && copies(f).is_none()
 }
@@ -323,11 +323,15 @@ pub(super) fn plain_foreigns(
     items
         .iter()
         .filter_map(|item| match &item.kind {
-            ItemKind::Foreign(f) if plain(f, options.rt) => {
+            ItemKind::Foreign(f) if plain(f) => {
                 if options.rt {
                     let source = f.binding.from.as_deref()?;
                     let spec = (options.foreign)(module, source);
-                    if belongs_to(&spec, bindings::ADAPTER_PREFIX)
+                    let data = f.adapter.shapes.iter().all(Shape::is_data)
+                        && f.adapter.result_shape.is_data();
+                    // the runtime's own exports take every value as it is
+                    if !(data || belongs_to(&spec, bindings::OWNED_PREFIX))
+                        || belongs_to(&spec, bindings::ADAPTER_PREFIX)
                         || (!options.effect_bridge.available()
                             && requires_adapter(&spec, &f.binding.name, false))
                         || !selected_on_kernel(&spec, &f.binding.name, options.effect_bridge)

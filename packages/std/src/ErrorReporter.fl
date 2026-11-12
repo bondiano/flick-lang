@@ -29,7 +29,7 @@ foreign pure make from "flick:ErrorReporter" "flickMake"
   retention owner
 
 /// Installs `reporters` for the body of a `provide`.
-layer : List (ErrorReporter s) -> LayerOptions -> Layer none none none
+layer : List (ErrorReporter s) -> LayerOptions -> (Layer none none none)^{s}
 foreign pure layer from "flick:ErrorReporter" "flickLayer"
   retention owner
 

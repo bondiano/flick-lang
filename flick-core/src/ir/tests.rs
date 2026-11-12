@@ -89,6 +89,7 @@ fn every_passing_fixture_lowers() {
                     compiler: String::new(),
                     files: Vec::new(),
                     modules: vec![module],
+                    lang: super::lang_items(),
                 };
                 let problems = flick_ir::validate(&program, &builtin, &files);
                 assert!(problems.is_empty(), "{}: {problems:?}", path.display());

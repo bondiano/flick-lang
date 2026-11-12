@@ -1,7 +1,8 @@
 //! Backend-only completion flags. The shared IR retains typed lexical exits.
+use super::Known;
 use crate::ir::{Arm, BinOp, Expr, ExprKind, Handler, Lit, Param, Pat, Stage, Stmt};
 use crate::source::Span;
-use crate::types::lang::{self, Lang};
+use crate::syntax::lang::Lang;
 use std::mem;
 fn unit(span: Span) -> Expr {
     Expr::new(ExprKind::Lit(Lit::Unit), span)
@@ -23,11 +24,12 @@ fn test(flag: &str, b: bool, span: Span) -> Expr {
     )
 }
 
-struct Control {
+struct Control<'k> {
     id: String,
     next: usize,
+    lang: &'k Known<'k>,
 }
-impl Control {
+impl Control<'_> {
     fn hidden(&mut self, label: &str) -> String {
         self.next += 1;
         format!("{}${label}${}", self.id, self.next)
@@ -237,7 +239,7 @@ impl Control {
                 e
             }
             ExprKind::App { func, arg, .. }
-                if matches!(&func.kind, ExprKind::Global { module, name } if lang::is(Lang::ScopeRun, module, name))
+                if matches!(&func.kind, ExprKind::Global { module, name } if self.lang.is(Lang::ScopeRun, module, name))
                     && matches!(arg.kind, ExprKind::Lambda { .. }) =>
             {
                 **arg = self.guarded_parts((**arg).clone(), flag);
@@ -368,6 +370,7 @@ fn leaves(e: &Expr, id: &str) -> bool {
 }
 
 pub(super) fn lower(
+    lang: &Known,
     id: &str,
     condition: Option<&Expr>,
     body: &Expr,
@@ -395,6 +398,7 @@ pub(super) fn lower(
     let mut c = Control {
         id: id.into(),
         next: 0,
+        lang,
     };
     let flag = id;
     let result = format!("{id}$result");

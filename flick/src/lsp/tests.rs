@@ -119,3 +119,32 @@ fn the_extensions_of_loaded_files_are_registered_once_where_the_client_lets_it()
         "{out}"
     );
 }
+
+#[test]
+fn a_panic_in_a_message_leaves_the_server_running_with_fresh_caches() {
+    let written = Written::default();
+    let mut server = Server {
+        docs: HashMap::new(),
+        snapshots: HashMap::new(),
+        latest: None,
+        caches: Caches::new(),
+        published: HashMap::new(),
+        out: Box::new(written.clone()),
+        registered: None,
+        requests: 0,
+    };
+    let dir = env::temp_dir().join(format!("flick-lsp-panic-{}", process::id()));
+    let params = document(&dir.join("A.fl"));
+    server.notify("textDocument/didOpen", &params);
+    assert_eq!(server.caches.len(), 1, "analyzed");
+    let caught = server.guarded::<()>(|_| panic!("a defect in the checker"));
+    assert!(caught.is_none(), "the panic is caught");
+    assert!(
+        server.caches.is_empty() && server.snapshots.is_empty(),
+        "a half-built analysis is dropped"
+    );
+    written.0.lock().expect("not poisoned").clear();
+    server.guarded(|s| s.notify("textDocument/didSave", &params));
+    let out = String::from_utf8(written.0.lock().expect("not poisoned").clone()).expect("UTF-8");
+    assert!(out.contains("textDocument/publishDiagnostics"), "{out}");
+}

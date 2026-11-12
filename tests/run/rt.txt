@@ -114,6 +114,7 @@ runtime/ref_linearizable
 runtime/releases
 runtime/scope_close
 runtime/scope_owners
+runtime/lambda_owners
 runtime/scope_releases
 runtime/scoped_file
 runtime/scopes

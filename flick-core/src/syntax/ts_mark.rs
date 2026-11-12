@@ -1,13 +1,12 @@
-//! `@ts`: the TypeScript form of a type, said where the type is declared.
+//! `@ts`: the TypeScript form of a type of a package, said where the type
+//! is declared. The built-in types have theirs from the backend, by lang item.
 //!
 //! ```text
-//! @ts "ReadonlyArray<{0}>"                        the form: `{i}` is the type's i-th argument,
-//!                                                 `{i:row}` that argument as a row
-//! @ts "$Option.Option<{0}>" rt "$Option<{0}>"     and the form on Flick's own runtime
-//! @ts none                                        the type has no form
-//! @ts import "dayjs" "Dayjs"                      the export a `$Dayjs` of the form stands for, from
-//!                                                 a module named as `foreign … from` names one
-//! @ts import runtime "Option" rt "OptionValue"    or from the runtime, in the built-in modules
+//! @ts "Promise<{0}>"            the form: `{i}` is the type's i-th argument,
+//!                               `{i:row}` that argument as a row
+//! @ts none                      the type has no form
+//! @ts import "dayjs" "Dayjs"    the export a `$Dayjs` of the form stands for, from
+//!                               a module named as `foreign … from` names one
 //! ```
 //!
 //! A form is written into generated code as it stands, and one comes from a
@@ -25,26 +24,32 @@ pub const TAG: &str = "ts";
 /// What one `@ts` attribute says.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Mark {
-    /// The form with the Effect adapter, and on Flick's own runtime.
-    Form { effect: String, rt: String },
+    Form(String),
     /// The type has no TypeScript form.
     None,
-    /// An export a form names as `$` and the export's name with the adapter.
-    Import(Import),
+    /// The export a `$` and its name in a form stand for, from the module
+    /// of the specifier `from`.
+    Import {
+        from: String,
+        export: String,
+    },
 }
 
-/// An export a form names: `$` and its name with the adapter.
+/// An export a form names: `$` and its name.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Import {
     pub from: Origin,
-    pub effect: String,
-    pub rt: String,
+    /// What the form calls it, after `$`.
+    pub name: String,
+    /// What its module exports it as.
+    pub export: String,
 }
 
 /// The module an export comes from.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Origin {
-    /// The runtime and its module of the UI; the build knows their paths.
+    /// The runtime and its module of the UI, which only the backend's own
+    /// forms name; the build knows their paths.
     Runtime,
     Ui,
     /// A module by its specifier: a package, or a file beside the module
@@ -61,13 +66,12 @@ pub enum Piece {
     Place { index: usize, row: bool },
 }
 
-/// The form of a type, as its marks give it.
+/// The form of a type.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Form {
     pub arity: usize,
-    /// With the Effect adapter and on Flick's own runtime; `None` for a
-    /// type that has no form.
-    pub form: Option<(Vec<Piece>, Vec<Piece>)>,
+    /// `None` for a type that has no form.
+    pub form: Option<Vec<Piece>>,
     pub imports: Vec<Import>,
 }
 
@@ -84,31 +88,25 @@ pub fn read(node: &Node, text: &str) -> Option<Result<Mark, String>> {
     Some(mark(&rest))
 }
 
-const USAGE: &str = "`@ts` takes a form, `\"…\"` and maybe `rt \"…\"`, or `none`, or `import \"module\" \"Export\"`";
+const USAGE: &str = "`@ts` takes a form, `\"…\"`, or `none`, or `import \"module\" \"Export\"`";
 
 fn mark(words: &[(K, &str)]) -> Result<Mark, String> {
     match words {
         [(K::Ident, "none")] => Ok(Mark::None),
-        [(K::Ident, "import"), (kind, from), rest @ ..] => {
-            let from = match (*kind, *from) {
-                (K::Ident, "runtime") => Origin::Runtime,
-                (K::Ident, "ui") => Origin::Ui,
-                (K::String, spec) => Origin::Module(value(spec).ok_or(USAGE)?),
-                (_, other) => {
-                    return Err(format!(
-                        "`{other}` is no module: `runtime`, `ui` or a specifier, as `\"dayjs\"`"
-                    ));
-                }
-            };
-            let (effect, rt) = pair(rest).ok_or(USAGE)?;
-            import(from, effect, rt).map(Mark::Import)
+        [(K::Ident, "import"), (K::String, from), (K::String, export)] => {
+            let (from, export) = (value(from).ok_or(USAGE)?, value(export).ok_or(USAGE)?);
+            import(from.clone(), export.clone())?;
+            Ok(Mark::Import { from, export })
         }
-        rest => {
-            let (effect, rt) = pair(rest).ok_or(USAGE)?;
-            pieces(&effect)?;
-            pieces(&rt)?;
-            Ok(Mark::Form { effect, rt })
+        [(K::Ident, "import"), (K::Ident, other), ..] => Err(format!(
+            "`{other}` is no module: name one by its specifier, as `\"dayjs\"`"
+        )),
+        [(K::String, form)] => {
+            let form = value(form).ok_or(USAGE)?;
+            pieces(&form)?;
+            Ok(Mark::Form(form))
         }
+        _ => Err(USAGE.into()),
     }
 }
 
@@ -124,31 +122,20 @@ pub fn is_export(export: &str) -> bool {
     !export.is_empty() && export.chars().all(word)
 }
 
-/// An import whose module and exports are names and nothing else.
-fn import(from: Origin, effect: String, rt: String) -> Result<Import, String> {
-    if let Origin::Module(spec) = &from
-        && !is_specifier(spec)
-    {
-        return Err(format!("`{spec}` is no specifier of a module"));
+/// The export `export` of the module of the specifier `from`, both names
+/// and nothing else; a form calls it by its own name.
+fn import(from: String, export: String) -> Result<Import, String> {
+    if !is_specifier(&from) {
+        return Err(format!("`{from}` is no specifier of a module"));
     }
-    if let Some(export) = [&effect, &rt].into_iter().find(|e| !is_export(e)) {
+    if !is_export(&export) {
         return Err(format!("`{export}` is no name of an export"));
     }
-    Ok(Import { from, effect, rt })
-}
-
-/// `"a"` or `"a" rt "b"`: the one for both, or each.
-fn pair(words: &[(K, &str)]) -> Option<(String, String)> {
-    match words {
-        [(K::String, one)] => {
-            let one = value(one)?;
-            Some((one.clone(), one))
-        }
-        [(K::String, effect), (K::Ident, "rt"), (K::String, rt)] => {
-            Some((value(effect)?, value(rt)?))
-        }
-        _ => None,
-    }
+    Ok(Import {
+        from: Origin::Module(from),
+        name: export.clone(),
+        export,
+    })
 }
 
 /// The text of a string literal that has no escape in it.
@@ -252,18 +239,11 @@ pub fn parts(marks: Vec<Mark>, arity: usize) -> Result<Vec<String>, String> {
     for mark in marks {
         match mark {
             Mark::None => none = true,
-            Mark::Form { effect, rt } => {
+            Mark::Form(form) => {
                 forms += 1;
-                out.extend([effect, rt]);
+                out.push(form);
             }
-            Mark::Import(import) => {
-                let from = match import.from {
-                    Origin::Runtime => RUNTIME.to_owned(),
-                    Origin::Ui => UI.to_owned(),
-                    Origin::Module(spec) => spec,
-                };
-                imports.extend([from, import.effect, import.rt]);
-            }
+            Mark::Import { from, export } => imports.extend([from, export]),
         }
     }
     if forms != usize::from(!none) {
@@ -274,45 +254,38 @@ pub fn parts(marks: Vec<Mark>, arity: usize) -> Result<Vec<String>, String> {
     Ok(out)
 }
 
-/// The runtime and its UI among the [`parts`]: no specifier has a `<`.
-const RUNTIME: &str = "<runtime>";
-const UI: &str = "<ui>";
-
 /// The form an interface keeps as `parts`, read as what a stranger wrote.
 pub fn form(parts: &[String]) -> Result<Form, String> {
     let unread = || "the form does not read".to_owned();
     let (arity, rest) = parts.split_first().ok_or_else(unread)?;
     let arity = arity.parse::<usize>().map_err(|_| unread())?;
-    if rest.is_empty() {
+    let Some((form, imported)) = rest.split_first() else {
         return Ok(Form {
             arity,
             form: None,
             imports: Vec::new(),
         });
-    }
-    let [effect, rt, imported @ ..] = rest else {
-        return Err(unread());
     };
-    let (effect, rt) = (pieces(effect)?, pieces(rt)?);
     let mut imports = Vec::new();
-    for parts in imported.chunks(3) {
-        let [from, effect, rt] = parts else {
+    for parts in imported.chunks(2) {
+        let [from, export] = parts else {
             return Err(unread());
         };
-        let from = match from.as_str() {
-            RUNTIME => Origin::Runtime,
-            UI => Origin::Ui,
-            spec => Origin::Module(spec.to_owned()),
-        };
-        imports.push(import(from, effect.clone(), rt.clone())?);
+        imports.push(import(from.clone(), export.clone())?);
     }
-    for piece in effect.iter().chain(&rt) {
+    checked(arity, pieces(form)?, imports)
+}
+
+/// The form `pieces` of a type of `arity` parameters, whose `$` names are
+/// `imports`; why it is not one.
+pub fn checked(arity: usize, pieces: Vec<Piece>, imports: Vec<Import>) -> Result<Form, String> {
+    for piece in &pieces {
         match piece {
             Piece::Place { index, .. } if *index >= arity => {
                 return Err(format!("`{{{index}}}` is past its {arity} parameters"));
             }
             // each `$Name` of a form is an export the type imports
-            Piece::Name(name) if !imports.iter().any(|i| i.effect == *name) => {
+            Piece::Name(name) if !imports.iter().any(|i| i.name == *name) => {
                 return Err(format!(
                     "`${name}` is no export it imports: add `@ts import`"
                 ));
@@ -322,7 +295,7 @@ pub fn form(parts: &[String]) -> Result<Form, String> {
     }
     Ok(Form {
         arity,
-        form: Some((effect, rt)),
+        form: Some(pieces),
         imports,
     })
 }
@@ -386,26 +359,37 @@ mod tests {
         let word = |s: &'static str| (K::Ident, s);
         assert_eq!(mark(&[word("none")]), Ok(Mark::None));
         assert_eq!(
-            mark(&[string("\"A<{0}>\""), word("rt"), string("\"B<{0}>\"")]),
-            Ok(Mark::Form {
-                effect: "A<{0}>".into(),
-                rt: "B<{0}>".into()
-            })
+            mark(&[string("\"A<{0}>\"")]),
+            Ok(Mark::Form("A<{0}>".into()))
         );
-        let ui = Import {
-            from: Origin::Ui,
-            effect: "Ui".into(),
-            rt: "Ui".into(),
+        let words = [word("import"), string("\"./day.d.ts\""), string("\"Day\"")];
+        let day = Mark::Import {
+            from: "./day.d.ts".into(),
+            export: "Day".into(),
         };
+        assert_eq!(mark(&words), Ok(day));
+        assert!(mark(&[word("import"), string("\"a b\""), string("\"Ui\"")]).is_err());
+        assert!(mark(&[word("import"), string("\"\""), string("\"Ui\"")]).is_err());
+        assert!(mark(&[word("import"), string("\"ui\""), string("\"a b\"")]).is_err());
+        assert!(mark(&[]).is_err());
+        assert!(mark(&[string("\"A<{x}>\"")]).is_err());
+    }
+
+    /// The runtime is the backend's to name: a package names a module by its
+    /// specifier and has one form whatever runtime the build is for.
+    #[test]
+    fn a_package_names_no_runtime_and_has_one_form() {
+        let string = |s: &'static str| (K::String, s);
+        let word = |s: &'static str| (K::Ident, s);
         assert_eq!(
-            mark(&[word("import"), word("ui"), string("\"Ui\"")]),
-            Ok(Mark::Import(ui))
+            mark(&[word("import"), word("runtime"), string("\"Option\"")]),
+            Err("`runtime` is no module: name one by its specifier, as `\"dayjs\"`".into())
         );
-        let day = Import {
-            from: Origin::Module("./day.d.ts".into()),
-            effect: "Day".into(),
-            rt: "RtDay".into(),
-        };
+        assert!(mark(&[word("import"), word("ui"), string("\"Ui\"")]).is_err());
+        assert_eq!(
+            mark(&[string("\"A<{0}>\""), word("rt"), string("\"B<{0}>\"")]),
+            Err(USAGE.into())
+        );
         let words = [
             word("import"),
             string("\"./day.d.ts\""),
@@ -413,13 +397,7 @@ mod tests {
             word("rt"),
             string("\"RtDay\""),
         ];
-        assert_eq!(mark(&words), Ok(Mark::Import(day)));
-        assert!(mark(&[word("import"), word("elsewhere"), string("\"Ui\"")]).is_err());
-        assert!(mark(&[word("import"), word("ui"), string("\"a b\"")]).is_err());
-        assert!(mark(&[word("import"), string("\"a b\""), string("\"Ui\"")]).is_err());
-        assert!(mark(&[word("import"), string("\"\""), string("\"Ui\"")]).is_err());
-        assert!(mark(&[]).is_err());
-        assert!(mark(&[string("\"A<{x}>\"")]).is_err());
+        assert_eq!(mark(&words), Err(USAGE.into()));
     }
 
     fn marks(words: &[&[(K, &'static str)]]) -> Vec<Mark> {
@@ -435,17 +413,7 @@ mod tests {
         let boxed = [string("\"$Box<{1}, {0:row}>\"")];
         let from = [word("import"), string("\"boxes\""), string("\"Box\"")];
         let kept = parts(marks(&[&boxed, &from]), 2).expect("a form");
-        assert_eq!(
-            kept,
-            [
-                "2",
-                "$Box<{1}, {0:row}>",
-                "$Box<{1}, {0:row}>",
-                "boxes",
-                "Box",
-                "Box"
-            ]
-        );
+        assert_eq!(kept, ["2", "$Box<{1}, {0:row}>", "boxes", "Box"]);
         let read = form(&kept).expect("the form");
         assert_eq!((read.arity, read.imports.len()), (2, 1));
         assert_eq!(read.imports[0].from, Origin::Module("boxes".into()));
@@ -477,10 +445,12 @@ mod tests {
         let s = |parts: &[&str]| parts.iter().map(|p| (*p).to_owned()).collect::<Vec<_>>();
         assert!(form(&s(&[])).is_err());
         assert!(form(&s(&["one"])).is_err());
-        assert!(form(&s(&["0", "number"])).is_err());
-        assert!(form(&s(&["0", "number; evil()", "number"])).is_err());
-        assert!(form(&s(&["0", "$X", "$X", "a\"; evil(); \"", "X", "X"])).is_err());
-        assert!(form(&s(&["0", "$X", "$X", "mod", "X; evil()", "X"])).is_err());
-        assert!(form(&s(&["0", "$X", "$X", "mod", "X"])).is_err());
+        assert!(form(&s(&["0", "number"])).is_ok());
+        assert!(form(&s(&["0", "number; evil()"])).is_err());
+        assert!(form(&s(&["0", "$X", "a\"; evil(); \"", "X"])).is_err());
+        assert!(form(&s(&["0", "$X", "mod", "X; evil()"])).is_err());
+        assert!(form(&s(&["0", "$X", "mod"])).is_err());
+        // nor does it name the runtime, as an interface of an older version did
+        assert!(form(&s(&["1", "$Option<{0}>", "<runtime>", "Option"])).is_err());
     }
 }

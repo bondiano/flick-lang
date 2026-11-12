@@ -16,6 +16,7 @@ mod mutate;
 mod print;
 mod provides;
 mod regions;
+mod sealed;
 mod term;
 
 use std::rc::Rc;
