@@ -7,6 +7,9 @@
 //!   instances it is called with, whose methods become operators;
 //! - [`inline`]: known full applications of small pure functions of the
 //!   module, and beta reduction;
+//! - [`known`]: a function that chooses what it gives is inlined where that
+//!   spares an object, and a `match` goes to where its data is known, so a
+//!   value built only to be taken apart is not built;
 //! - [`fold`]: literal expressions with exact JS semantics, constant branches;
 //! - alias and constant propagation, and moving a pure value that cannot
 //!   throw to its one use;
