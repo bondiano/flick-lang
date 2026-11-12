@@ -21,6 +21,8 @@ export const PROGRAMS = [
     unused: ["effect/dist/Graph.js"],
   },
   { name: "atoms", source: "tests/run/ui/atoms.fl", budget: 117, unused: ["effect/dist/Graph.js"] },
+  // the same atoms on Flick's own runtime, no Effect at all
+  { name: "atoms-rt", source: "tests/run/ui/atoms.fl", rt: true, budget: 80, effectFree: true },
   // a browser client of a procedure keeps no Node server
   {
     name: "rpc",
@@ -36,6 +38,8 @@ export const PROGRAMS = [
     budget: 48,
     unused: ["effect/dist/Graph.js", "react-dom/cjs/react-dom-server.browser.production.js", "react-dom/cjs/react-dom-server-legacy.browser.production.js"],
   },
+  // the same template on Flick's own runtime: no Effect, and its own atoms
+  { name: "email-rt", source: "tests/run/ui/email.fl", rt: true, budget: 12, effectFree: true },
   // the client entry of a project with a server entry keeps no server module, and of a
   // server function only its call: not its body, what the body uses or the Node server
   {
