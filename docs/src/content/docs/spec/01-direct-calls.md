@@ -1,6 +1,6 @@
 ---
 title: "Direct effectful calls"
-source_hash: 3fd30797ee012d36
+source_hash: 8a3876683611ee27
 ---
 
 An effectful function is called in an ordinary expression, and `let` binds its result. A sequence of operations is written with ordinary expressions and bindings.
@@ -99,7 +99,7 @@ A pure body or callback is allowed in an expected runtime position through a che
 
 A closed row containing only `tail` and `abort` operations performs no asynchronous wait. `Async` marks waiting for time, input or output or another fiber (`Effect.sleep : Duration ->{Async} Unit`); the runtime's scheduler handles it at the root. Scheduler preemption is independent of this row: ordinary runtime calls and recursive loops have interruption points even at `->{}`. An empty row promises neither termination nor atomic execution. Pure calls and synchronous foreign calls run on the host stack and cannot be preempted there.
 
-The JavaScript backends reserve intrinsic *Sync* stages for closed, nonempty rows of `Atom.Read` and `Setup`, without errors. These are plain calls that read the context installed around a render, derived atom or setup. Other runtime stages retain scheduler steps; the native backend can still remove generator frames from a leaf that yields nothing. A row variable solved to `Atom.Read` later, as in `forall r. (a ->{r} b) -> …`, keeps the runtime calling convention selected where its arrow was written.
+The JavaScript backends reserve intrinsic *Sync* stages for closed, nonempty rows of services marked `@sync`, without errors; in the standard library these are `Atom.Read` and `Setup`. A service marked `@sync reader` only reads, and a stage that has it lends it to code that runs later, as the clauses of a `for`: `Atom.Read` is marked so. The marks are read from the built-in modules; a package cannot mark a service of its own. These are plain calls that read the context installed around a render, derived atom or setup. Other runtime stages retain scheduler steps; the native backend can still remove generator frames from a leaf that yields nothing. A row variable solved to `Atom.Read` later, as in `forall r. (a ->{r} b) -> …`, keeps the runtime calling convention selected where its arrow was written.
 
 A `foreign` without a mode word and with `Async` returns a promise; without it the call returns at once. A `foreign effect` follows its declared row: without `Async`, an asynchronous wait is a defect. A foreign declaration is a boundary of trust, not a termination proof.
 

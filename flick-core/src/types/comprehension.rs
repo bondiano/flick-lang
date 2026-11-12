@@ -19,14 +19,14 @@ use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
 use crate::types::lang::{self, Lang};
 
-/// The services of a stage that reads atoms.
+/// The services a stage lends to code that runs later: those marked
+/// `@sync reader`, which only read. None without a module that declares one.
 fn reader() -> Type {
-    // none without the modules of atoms
-    let Some(label) = lang::label(Lang::AtomRead) else {
-        return Type::empty_row();
-    };
+    let readers = lang::table().sync.iter().filter(|s| s.reader);
     Type::Row(Row {
-        entries: vec![(Elem::named(label), Type::lang(Lang::AtomRead))],
+        entries: readers
+            .map(|s| (Elem::named(&s.label), Type::con(&s.module, &s.name)))
+            .collect(),
         tail: None,
         ..Row::default()
     })

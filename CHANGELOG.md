@@ -51,6 +51,11 @@ break programs.
   is made under the service belongs to its handler. A function that needs
   one is no maker to those that name it, as one that needs `Setup` was by a
   rule of the compiler; `Setup` is marked so.
+- **Sync services:** a service whose operations run at once is marked
+  `@sync` in the module that declares it, and one that only reads, which a
+  stage lends to the clauses of a `for`, `@sync reader`. `Setup` and
+  `Atom.Read` are marked so; the compiler no longer names them. The marks
+  are those of the built-in modules.
 - **Comparisons by `Ord`:** `< <= > >=` order any type with an `Ord`
   instance by its `compare`, as they already did a type variable: `Bool`, a
   derived type, a record, a list. A type without one is `FLICK-C001`, where
