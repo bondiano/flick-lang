@@ -116,8 +116,9 @@ macro "closed_tac" : tactic => `(tactic| (
       | (congr 1; apply Caps.substT_congr; intro b hb; subst hb; simp [hσ])
       | simp [Ty.substT, hσ]))
 
-/-- `LeLive t t'` of concrete types: the same type, or an arrow or a computation whose stage
-and reach widen. A constructor's type `Sig.ctorTy` is written out first. -/
+/-- `LeLive t t'` of concrete types: the same type, an arrow or a computation whose stage
+and reach widen, or a record whose fields do. A constructor's type `Sig.ctorTy` is written
+out first. -/
 syntax "le_live" : tactic
 macro_rules
   | `(tactic| le_live) => `(tactic| first
@@ -126,7 +127,8 @@ macro_rules
        simp only [Ty.arrows, Ty.tcon, List.map, List.foldl, Ty.substT, Stage.substT]
        le_live)
     | (refine LeLive.arrow ?_ ?_ ?_ ?_ <;> first | le_live | stage_le | caps_set)
-    | (refine LeLive.eff ?_ ?_ ?_ <;> first | le_live | stage_le | caps_set))
+    | (refine LeLive.eff ?_ ?_ ?_ <;> first | le_live | stage_le | caps_set)
+    | (refine LeLive.rcons' ?_ ?_ <;> le_live))
 
 /-- `φ₀.ObOut o` of a concrete stage with no obligation about `o`. -/
 macro "ob_out" : tactic => `(tactic| (

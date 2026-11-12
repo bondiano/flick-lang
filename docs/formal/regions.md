@@ -196,7 +196,7 @@ and likewise for `Eff r ε τ`. A qualifier may move into the runtime row of a s
 - widening a qualifier is allowed, narrowing is `FLICK-G001`;
 - a function or task value, a pure one too, fits only where the reach of the position covers what it holds (the last premise, `Caps.Sub … reach` of `LeLive.arrow`, `Live/Mode.lean`; `Ty.reach` of an arrow includes its qualifier, `TyBase.lean`); for one with effects the use stages are compared besides;
 - what a function position's type shows, and what a value bound's type shows (`a` of `List a`), counts as visible, not held;
-- inside `Ref` types are compared by `≡` together with their qualifiers, mutable storage is invariant (`FLICK-T003`); inside lists, records and other data they are compared by the variance of each parameter ([§2.2.1](#221-variance-of-data-arguments));
+- inside `Ref` types are compared by `≡` together with their qualifiers, mutable storage is invariant (`FLICK-T003`); inside lists and other data they are compared by the variance of each parameter ([§2.2.1](#221-variance-of-data-arguments)); a record is immutable and compares field by field, covariantly, with the same labels: `{ℓ : τ, … | ρ} ≤ {ℓ : τ', … | ρ'}` when `τ ≤ τ'` for each field and the tails compare likewise, keeping what it reaches (Lean: `LeLive.rcons`, `Live/Mode.lean`);
 - the hidden row of data with hidden storage is one of its arguments, and subtyping may only widen it: `(T C ā) ≤ (T C' ā)` when `C ⊆ C'`, the other arguments by `≡` (Lean: `LeLive.hide`, its condition `Sig.hidden_ok`; `Formal/Widen.lean`). Data with a smaller row passes where a larger one is expected, never the reverse, as for the qualifier of a function. Only the row the reading of §1.4 adds widens, and only while it is covariant: a well-formed signature has it in the fields only as the qualifier of a stored function or computation, or as the hidden row of stored data, at the top of a field, never under `Ref`, inside an argument of another type, in a contravariant position, or fixed by the result of a GADT constructor. A capture row a declaration names (`type K (c : CaptureRow)`) is invariant ([a capture row a declaration names is invariant](#a-capture-row-a-declaration-names-is-invariant)). Data inside an argument of another type (`List (G s a)`) is compared by `≡` until the variance of data arguments lands in the checker ([§2.2.1](#221-variance-of-data-arguments)); A region another argument shows does not stand in for it: `(G (File s) a)^{s}` is no `G (File s) a`, because code generic in that argument no longer sees the region, and the use the row records would be lost ([the hidden row of data is not what its arguments show](#the-hidden-row-of-data-is-not-what-its-arguments-show));
 - `α^{≤C} ≤ α` and `α ≤ α^{≤C}` by §2.1: both reach `⌈υ⌉`. Hence `Option (a^{≤v}, b^{≤w}) ≡ Option (a, b)` ([bounded variable atoms](#a-bounded-variable-reaches-what-the-variable-reaches)).
 
@@ -218,11 +218,13 @@ T ū ≤ T ū'
 
 The last premise is that of (≤-Use), argument by argument: subtyping never hides what a value reaches (`LeLive.reach`, `Live/Order.lean`), and a field built at one argument is read at the other, so each argument keeps what it reaches. A `−` parameter, whose argument narrows, therefore changes only what does not reach a region, for example the stage of an arrow. So `List ((Unit →P Unit)^{s})` passes where `List ((Unit →P Unit)^{s,t})` is expected, and the widening of the hidden row (§2.2) is the case of its `+` parameter. The variance is inferred from the fields, not written: the least fixed point over a group of declarations, starting from `bi`, where a field contributes the polarity of each position a parameter occupies:
 
-- an arrow: its parameter `−`, its result, qualifier and stage row `+`;
-- `Eff r ε τ C`: `r`, `ε`, `τ` and `C` `+`;
+- an arrow: its parameter `−`, its result and qualifier `+`; its stage does not hold the parameter;
+- `Eff r ε τ C`: `τ` and `C` `+`; its rows `r` and `ε` do not hold the parameter;
 - a record: its fields `+`; another data type: the variance of its parameter, composed;
 - `Ref τ`, a handle, an owner and a dictionary: `inv` (mutable or shared storage);
-- `Errors ρ`: `+`.
+- a stage and `Errors ρ`: `inv`.
+
+A `+` parameter stands in no contravariant position, not even under a second flip: there its argument would grow what the field reaches where subtyping asks it to shrink. Lean: `Ty.Pol`, `Sig.var_ok` (`Syntax.lean`).
 
 Indices of GADT constructors. Matching on a constructor refines an argument to equal `res K[j]σ`. Widening that argument would make the branch assume a type the value does not have:
 
@@ -236,13 +238,13 @@ let use t f =
   | Pure -> f
 ```
 
-If `Tag` were covariant in `a`, `Pure : Tag ((Unit -> Unit)^{s})` would reach the branch, which returns `f` as a pure function, and a callback using `s` would leave its `scope`. A parameter `j` that some constructor fixes, with `res K[j]` other than `v j`, gets a sign only when `res K[j]` is closed in that direction (Scherer and Rémy, *GADTs meet subtyping*, ESOP 2013): upward closed for `+`, downward for `−`, checked syntactically. Scalars and nominal types without widening parameters are closed; a tuple, `List a`, an arrow or a qualifier is not. Otherwise the parameter is `inv`, so `Tag` and the `Expr` of `tests/check/pass/types/gadt.fl` are invariant in their index, and `TypeEq a a` too.
+If `Tag` were covariant in `a`, `Pure : Tag ((Unit -> Unit)^{s})` would reach the branch, which returns `f` as a pure function, and a callback using `s` would leave its `scope`. A parameter `j` that some constructor fixes, with `res K[j]` other than `v j`, gets a sign only when `res K[j]` is closed in that direction (Scherer and Rémy, *GADTs meet subtyping*, ESOP 2013): upward closed for `+`, downward for `−`, checked syntactically, and the fields of `K` do not hold `v j`. The check takes types subtyping moves neither way: scalars and nominal types without arguments; a tuple, `List a`, an arrow or a qualifier is not closed (Lean: `Ty.Closed`, `Ty.Closed.le_eq`, `Sig.builds_vary`, `VaryArgs.lean`). Otherwise the parameter is `inv`, so `Tag` and the `Expr` of `tests/check/pass/types/gadt.fl` are invariant in their index, and `TypeEq a a` too.
 
 Classes. A class parameter has a variance from the types of its methods by the same rules. A wanted `C τ` is served by an instance with head `H` when `τ ≤ Hσ` for a `−` parameter (the class only takes it, as `Show` and `Eq`), `Hσ ≤ τ` for `+` (it only produces it, as `Default` and `Decode`), and `τ ≡ Hσ` for `inv`. Coherence (K1′): two heads of a class must not be comparable by `≤` in that direction under any substitution; the check is the existing overlap error (`FLICK-C003`), extended from unification to comparison. Improvement by functional dependencies stays by `≡`: it infers types, it does not choose a dictionary.
 
 Hover and `flick inspect` show the inferred variances of data and class parameters.
 
-Pending: Lean (`Sig.var` with its condition, `LeLive` by variance for `tapp`, the closure lemma of indices, preservation and T1), the model, the checker (until then the checker compares data inside another argument by `≡`, which rejects more programs and admits no new one), and the classes (`Ty.Le` in elaboration, K1′, T6).
+Lean: `Sig.var` with its condition `Sig.var_ok` (`Syntax.lean`), `LeLive.data` (`Live/Mode.lean`), a constructor builds every variation of the data it builds (`Sig.builds_vary`, `VaryArgs.lean`; `SpW.ctor`, `VarySpine.lean`); preservation and T1 hold with them, and `LiveRules.lean` checks the examples of this section. Pending: the model, the checker (until then the checker compares data inside another argument by `≡`, which rejects more programs and admits no new one), and the classes (`Ty.Le` in elaboration, K1′, T6).
 
 ### 2.3 Rules
 
