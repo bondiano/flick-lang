@@ -1,6 +1,6 @@
 ---
 title: Option и Result
-description: "Без `null`: значение, которого может не быть, и шаг, который может не удаться."
+description: "Без `null`: `Option` для значения, которое может отсутствовать, и `Result` для результата или ошибки."
 tableOfContents: false
 source_hash: e77e7597a2277e0c
 ---
@@ -9,17 +9,19 @@ import TourLesson from "../../../../components/TourLesson.astro";
 
 <TourLesson locale="ru" id="options">
 
-Во Flick нет `null`. Значение, которого может не быть, — это `Option`:
-`Some value` или `None`. Шаг, который может не удаться, даёт `Result`:
-`Ok value` или `Err problem`.
+Во Flick нет `null`. Тип `Option` представляет значение, которое может
+отсутствовать: `Some value` или `None`. Тип `Result` представляет успешный
+результат `Ok value` или ошибку `Err problem`.
 
-`Int.parse` возвращает `Option Int`, а `age` превращает его в `Result` с
-сообщением. Её `match` разбирает оба, а `when n >= 0` уточняет ветку.
+`Int.parse` возвращает `Option Int`, а функция `age` преобразует его в
+`Result`: возвращает число или сообщение об ошибке. Выражение `match`
+сопоставляет результат разбора с образцами `Some` и `None`, а условие
+`when n >= 0` ограничивает первую ветку неотрицательными числами.
 
-`List.head` пустого списка — это `None`, а не падение.
+Для пустого списка `List.head` возвращает `None`, а не ошибку выполнения.
 
 **Попробуйте:** напечатайте `Int.parse "36" + 1`. Компилятор сообщит
-`FLICK-T003`: `Option Int` не становится `Int`, пока `match` или
-`Option.with_default` не достанет из него число.
+`FLICK-T003`: сложение требует `Int`, но `Int.parse` возвращает
+`Option Int`. Извлеките число с помощью `match` или `Option.with_default`.
 
 </TourLesson>

@@ -18,7 +18,7 @@
       ]
     },
     {
-      "id": "data", "en": "Data and patterns", "ru": "Данные и образцы",
+      "id": "data", "en": "Data and patterns", "ru": "Данные и сопоставление с образцом",
       "lessons": [
         { "id": "tuples", "expect": "run" },
         { "id": "records", "example": "records" },
@@ -33,7 +33,7 @@
       ]
     },
     {
-      "id": "types", "en": "Types and classes", "ru": "Типы и классы",
+      "id": "types", "en": "Types and classes", "ru": "Типы и классы типов",
       "lessons": [
         { "id": "aliases", "expect": "run" },
         { "id": "generics", "expect": "run" },
@@ -74,7 +74,7 @@
       ]
     },
     {
-      "id": "app", "en": "A whole app", "ru": "Целое приложение",
+      "id": "app", "en": "A whole app", "ru": "Разработка приложения",
       "lessons": [
         { "id": "app-domain", "expect": "run" },
         { "id": "app-store", "expect": "run" },
