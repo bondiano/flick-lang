@@ -57,7 +57,13 @@ impl Printer<'_> {
                 params,
                 cases,
                 deriving,
-            } => self.adt(name, params, cases, deriving, d)?,
+                unboxed,
+            } => {
+                if *unboxed {
+                    self.push("unboxed ");
+                }
+                self.adt(name, params, cases, deriving, d)?;
+            }
             Decl::Instance {
                 context,
                 head,
@@ -79,7 +85,8 @@ impl Printer<'_> {
         Ok(())
     }
 
-    /// `type Name params = A fields | … deriving C, …`.
+    /// `type Name params = A fields | … deriving C, …`; the checker says
+    /// what an `unboxed` one may be.
     fn adt(
         &mut self,
         name: &str,

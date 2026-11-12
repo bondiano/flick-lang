@@ -291,12 +291,16 @@ pub enum Decl {
         params: Vec<String>,
         ty: NodeId,
     },
-    /// `type Name params = A fields | … deriving C, …`.
+    /// `type Name params = A fields | … deriving C, …`. An `unboxed` one has
+    /// one constructor with one field, and a value of it is the field's value
+    /// when the program runs: a type of its own over another, for nothing.
     Adt {
         name: String,
         params: Vec<String>,
         cases: Vec<Case>,
         deriving: Vec<String>,
+        #[serde(default)]
+        unboxed: bool,
     },
     /// `instance context => head = members`, the members `let`s and
     /// signatures.
@@ -367,8 +371,11 @@ pub struct DeriveTarget {
     pub cases: Vec<CaseTarget>,
     /// The type a `type alias` stands for.
     pub alias: Option<Span>,
-    /// The base type of a `refined type`.
-    pub refined: Option<Span>,
+    /// The type its values are made of, for a type over another whose
+    /// constructor is its declaration's alone: a `refined type`, or an
+    /// `unboxed type` of a block with a constructor only generated code can
+    /// name. Its values come from `T.parse` and are read by `T.value`.
+    pub wraps: Option<Span>,
     pub local: bool,
 }
 

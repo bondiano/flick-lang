@@ -2,6 +2,10 @@
 //! for the types that name it in `deriving`, as a block's plugin gives the
 //! block's code.
 
+mod declared;
+
+pub use declared::{Declared, declared};
+
 use flick_plugin::{Block, CaseTarget, DeriveTarget, Span as BlockSpan};
 
 use std::collections::{BTreeMap, HashMap};
@@ -131,7 +135,7 @@ pub fn target(
         params,
         cases,
         alias: body.filter(|_| alias).map(span),
-        refined: body.filter(|_| refined).map(span),
+        wraps: body.filter(|_| refined).map(span),
         local: qualifier.is_none(),
     })
 }

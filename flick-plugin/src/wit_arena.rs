@@ -138,6 +138,7 @@ macro_rules! wit_arena_conversions {
                                 params,
                                 cases,
                                 deriving,
+                                unboxed,
                             } => w::Decl::Adt(w::Adt {
                                 name,
                                 params,
@@ -149,6 +150,7 @@ macro_rules! wit_arena_conversions {
                                     })
                                     .collect(),
                                 deriving,
+                                unboxed,
                             }),
                             $crate::Decl::Instance {
                                 context,
@@ -295,6 +297,7 @@ macro_rules! wit_arena_conversions {
                                     })
                                     .collect(),
                                 deriving: a.deriving,
+                                unboxed: a.unboxed,
                             },
                             w::Decl::Instance(i) => $crate::Decl::Instance {
                                 context: i.context,

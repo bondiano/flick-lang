@@ -28,7 +28,7 @@ pub fn derive(target: &DeriveTarget, class: &str) -> Result<Arena, Vec<Diagnosti
         })
     };
     let own = target.name.rsplit('.').next().unwrap_or(&target.name);
-    let parse = if target.refined.is_some() {
+    let parse = if target.wraps.is_some() {
         let check = format!("{}.parse", target.name);
         flick!(b, Cli.refined #own #(Name(&check)) text)
     } else if !target.cases.is_empty() && target.cases.iter().all(|c| c.fields.is_empty()) {

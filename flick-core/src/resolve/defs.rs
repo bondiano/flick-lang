@@ -85,8 +85,11 @@ fn declaration(decl: &Node, text: &str, file: FileId, defs: &mut Vec<Def>) {
                 .filter(|n| n.kind == K::Variant)
                 .filter_map(|v| v.child_tokens().find(|t| t.kind == K::Con))
                 .collect();
+            // a constructor only generated code can name is the declaring
+            // code's alone: the type leaves the module without it
+            let sealed = variants.iter().any(|v| v.text(text).contains('$'));
             let form = match decl.kind {
-                K::TypeDecl if decl.has_token(K::OpaqueKw) => Decl::Opaque,
+                K::TypeDecl if sealed || decl.has_token(K::OpaqueKw) => Decl::Opaque,
                 K::TypeDecl if decl.has_token(K::RefinedKw) => Decl::Refined,
                 K::TypeDecl if !variants.is_empty() => Decl::Adt,
                 K::TypeDecl if decl.has_token(K::Eq) => Decl::Alias,

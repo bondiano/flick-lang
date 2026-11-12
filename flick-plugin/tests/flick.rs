@@ -166,10 +166,20 @@ fn type_starts_a_type_without_an_equals_and_ty_is_a_name() {
         flick!(b, type { a : Int });
         flick!(b, type Color = Red);
         flick!(b, (x, y,));
+        flick!(b, unboxed);
+        flick!(b, unboxed type Meters = #("Meters$Make") Float);
     });
     assert_eq!(made[0], Kind::Expr(Expr::Name("ty".into())));
     assert!(matches!(made[2], Kind::Ty(Ty::Record(_))), "{made:?}");
-    assert!(matches!(made[3], Kind::Decl(Decl::Adt { .. })), "{made:?}");
+    assert!(
+        matches!(made[3], Kind::Decl(Decl::Adt { unboxed: false, .. })),
+        "{made:?}"
+    );
+    assert!(made.contains(&Kind::Expr(Expr::Name("unboxed".into()))));
+    assert!(
+        matches!(made.last(), Some(Kind::Decl(Decl::Adt { unboxed: true, cases, .. })) if cases[0].name == "Meters$Make"),
+        "{made:?}"
+    );
     assert!(
         matches!(&made[6], Kind::Expr(Expr::Tuple(items)) if items.len() == 2),
         "{made:?}"

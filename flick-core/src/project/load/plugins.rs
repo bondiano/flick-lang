@@ -23,6 +23,7 @@ pub(super) use watching::{Watchers, Watching};
 
 use super::{Loaded, Loader, Root};
 use crate::diagnostics::{Diagnostic, codes};
+use crate::plugin::derive::{Declared, declared};
 use crate::plugin::expansion::{Expanded, Expansion};
 use crate::plugin::reach::{Gate, Reach};
 use crate::plugin::render::{Rendered, render};
@@ -53,6 +54,8 @@ struct Found {
     /// What the whole block stands for in the module: the block, or the
     /// class a `deriving` names.
     whole: Span,
+    /// The types its code declares that name classes to derive.
+    declared: Vec<Declared>,
 }
 
 impl Loader<'_> {
@@ -141,7 +144,8 @@ impl Loader<'_> {
             expanded.extend(mem::take(&mut round).into_iter().zip(rendered));
             round = next;
         }
-        expanded.extend(self.derive_blocks(&mut plugins, &mut results, &mut diagnostics));
+        let derived = self.derive_blocks(&expanded, &mut plugins, &mut results, &mut diagnostics);
+        expanded.extend(derived);
         diagnostics.extend(round.iter().map(|f| {
             failure(
                 f,
@@ -325,6 +329,7 @@ impl Loader<'_> {
                 }
                 match expanded {
                     Ok(arena) => {
+                        f.declared = declared(&arena, block);
                         let len = u32::try_from(block.text.len()).expect("source fits in u32");
                         let aliases = self.modules[f.module].syntax.aliases();
                         match render(&arena, len, block.place, &aliases) {
@@ -421,6 +426,7 @@ impl Sink<'_> {
                 source,
                 package: package.clone(),
                 keep: false,
+                declared: Vec::new(),
             });
         } else if let Some(Ok(plugin)) = self.plugins.get(package) {
             self.editing

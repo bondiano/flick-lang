@@ -163,7 +163,7 @@ and with the span of the block it stands for:
 | expression | name, number, text, boolean, unit, application, lambda, record, field, list, tuple, annotation, hole, concatenation (`a ++ b`), `match` with guards, `if`, a block of statements and its value, a body with a module open |
 | type | name, application, record, function, tuple, type-level text (`"name"`), `_`, `forall`, row, hole, a type of the signature |
 | pattern | variable, wildcard, constructor, record, tuple, hole |
-| declaration | `let`, signature, `type alias`, `type` with constructors and `deriving`, `instance` with members, a group of several or none, documentation of one, hole |
+| declaration | `let`, signature, `type alias`, `type` with constructors and `deriving`, maybe `unboxed`, `instance` with members, a group of several or none, documentation of one, hole |
 
 The compiler checks the arena before it uses it: names must lex as names,
 numbers be finite, holes lie in the body and not overlap, an expression or a
@@ -318,7 +318,11 @@ A type that names such a class in `deriving`, maybe with arguments
   of it: its name, parameters, constructors with the types of their fields
   and, of an enum, their literals, whether a constructor of a GADT names
   the type it builds (`refined`) or holds dictionaries (`constrained`), the
-  type an alias stands for and the base of a refined type;
+  type an alias stands for and, for a type over another whose constructor
+  is its declaration's alone, the type it wraps (`wraps`): the base of a
+  refined type, or the field of an `unboxed type` of a block whose
+  constructor only generated code can name. The values of such a type come
+  from its `T.parse` and are read by its `T.value`;
 - `class` is the class's full name, `Pairs.Arbitrary`;
 - `args` the `{ … }` after the class;
 - `module` every type the module declares.
@@ -328,6 +332,13 @@ follow the type's declaration, or take the place of `deriving instance`.
 Their errors are on the class in `deriving`. A type of another module is
 named qualified, `Shapes.Square`, and its spans are no holes; the instance
 is still the module's, under the rule of orphans (`FLICK-C006`).
+
+A type the code of a block declares names its classes in the `deriving` of
+that declaration, and each class's derive is called for it as for a
+declaration of the module: the block is its `target`, and the fields of the
+type are the types the user wrote in the block. A field the plugin made
+itself has no span to give, and a class a plugin derives is then
+`FLICK-P036`. The derived code goes with the block's own.
 
 ## Writing one in Rust
 
@@ -399,6 +410,12 @@ Code that starts as a declaration builds one, its name written or
 gives several, `b.doc(&block.docs, id)` documents one, `let #("Users.table")`
 declares a companion, and a `Span` in a declaration's place is the user's.
 `flick!(b @ name, let …)` declares it at the user's `name`, where editors go.
+`flick!(b, unboxed type #name = #(make) Float)` declares a type of its own
+whose values are its field's when the program runs. A constructor named
+`Meters$Make` is one only generated code can write, and only the code of
+the plugin that declared it may name it: another plugin's code that does is
+`FLICK-P036`, and the type leaves its module opaque. The block's own
+functions are then the only ways into the type and out of it.
 
 A block is read with a cursor over its tokens, `block.cursor()` from the
 first or `block.body()` from the body: `eat(":")`, `ident()`, `strings()`,

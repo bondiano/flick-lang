@@ -5,6 +5,7 @@
 //! in generated code to the place in the module it stands for.
 
 mod check;
+mod private;
 
 use std::collections::HashSet;
 use std::iter::Peekable;
@@ -189,6 +190,7 @@ impl Expansion {
             blocks: done,
         };
         diagnostics.extend(expansion.stray_companions());
+        diagnostics.extend(expansion.foreign_constructors());
         (Some(expansion), diagnostics)
     }
 

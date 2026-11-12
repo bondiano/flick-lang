@@ -11,6 +11,7 @@ use flick_plugin::{
 };
 use flick_test_pairs::Pairs;
 
+mod block_derive;
 mod calls;
 mod derive;
 mod forms;
@@ -23,6 +24,7 @@ mod reach;
 mod refined;
 mod stored;
 mod structure;
+mod wrapped;
 
 use super::{check, compile};
 use crate::diagnostics::{Diagnostic, Severity};
@@ -144,6 +146,8 @@ impl Host for Memory {
     fn plugin(&self, package: &str, _: Option<&Path>) -> Result<Arc<dyn Expander>, String> {
         match package {
             "pairs" => Ok(self.plugin.clone()),
+            // another package's plugin, with the heads of `pairs`
+            "twin" => Ok(Arc::new(Native::new("twin", Pairs))),
             _ => Err("no such plugin".into()),
         }
     }
