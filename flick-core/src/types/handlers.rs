@@ -159,7 +159,7 @@ impl Checker<'_> {
         self.cx.stage.returns = returns;
         if !errors.all && self.cx.stage.pure.is_none() {
             let mut handled = errors.handled;
-            handled.sort_by(|a, b| a.0.cmp(&b.0));
+            Row::sort_entries(&mut handled);
             let rest = Type::Row(Row {
                 entries: handled,
                 tail: Some(Box::new(self.cx.stage.errors.clone())),
@@ -185,7 +185,7 @@ impl Checker<'_> {
             .iter()
             .map(|h| (h.label.clone(), h.entry.clone()))
             .collect();
-        entries.sort_by(|a, b| a.0.cmp(&b.0));
+        Row::sort_entries(&mut entries);
         let partial: Vec<(Elem, Type)> = handled
             .iter()
             .filter(|h| !h.complete())

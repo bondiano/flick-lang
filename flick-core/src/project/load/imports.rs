@@ -83,13 +83,19 @@ impl Loader<'_> {
                     }
                 }
             }
-            targets.sort_by(|a, b| self.modules[*a].name.cmp(&self.modules[*b].name));
+            self.sort_by_name(&mut targets);
             targets.dedup();
             edges.push(targets);
             i += 1;
         }
         self.namespace_edges(&mut edges);
         edges
+    }
+
+    /// Sorts modules, by their indices, by name.
+    #[inline(never)]
+    fn sort_by_name(&self, modules: &mut [usize]) {
+        modules.sort_by(|a, b| self.modules[*a].name.cmp(&self.modules[*b].name));
     }
 
     fn namespace_edges(&self, edges: &mut [Vec<usize>]) {
@@ -394,7 +400,7 @@ impl Loader<'_> {
 
     pub(super) fn import_cycles(&mut self, edges: &[Vec<usize>]) {
         let mut order: Vec<usize> = (0..self.modules.len()).collect();
-        order.sort_by(|a, b| self.modules[*a].name.cmp(&self.modules[*b].name));
+        self.sort_by_name(&mut order);
         let mut reported = vec![false; self.modules.len()];
         for start in order {
             if reported[start] {

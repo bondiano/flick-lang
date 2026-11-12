@@ -219,7 +219,7 @@ impl Checker<'_> {
                 other => return other,
             }
         }
-        entries.sort_by(|x, y| x.0.cmp(&y.0));
+        Row::sort_entries(&mut entries);
         let union = Type::Record(Row {
             entries,
             tail: open.tail.clone(),

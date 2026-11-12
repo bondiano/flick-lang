@@ -118,7 +118,7 @@ pub(crate) fn check_file(
             ));
         }
     }
-    diagnostics.sort_by_key(|d| d.span.map(|s| (s.start, s.end)));
+    Diagnostic::sort_by_span(&mut diagnostics);
     diagnostics
 }
 

@@ -43,6 +43,13 @@ pub struct Edit {
 }
 
 impl Diagnostic {
+    /// Sorts by where each stands in its file, those of no place first; one
+    /// function, so the sort is compiled once.
+    #[inline(never)]
+    pub fn sort_by_span(diagnostics: &mut [Diagnostic]) {
+        diagnostics.sort_by_key(|d| d.span.map(|s| (s.start, s.end)));
+    }
+
     #[inline(never)]
     pub fn new(code: Code, severity: Severity, message: impl Into<String>) -> Self {
         Diagnostic {

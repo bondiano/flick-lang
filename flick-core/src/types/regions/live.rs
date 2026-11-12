@@ -82,7 +82,7 @@ pub(super) fn add_live(services: &Type, atoms: Norm) -> Type {
 
 pub(super) fn merge(into: &mut Norm, atoms: Norm) {
     into.entries.extend(atoms.entries);
-    into.entries.sort_by(|a, b| a.0.cmp(&b.0));
+    Row::sort_entries(&mut into.entries);
     into.entries.dedup_by(|a, b| a.0 == b.0);
     for t in atoms.tails {
         if !into.tails.contains(&t) {

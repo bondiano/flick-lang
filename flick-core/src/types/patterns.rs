@@ -263,7 +263,7 @@ impl Checker<'_> {
                     .iter()
                     .map(|(l, t, _)| (Elem::named(l), t.clone()))
                     .collect();
-                entries.sort_by(|a, b| a.0.cmp(&b.0));
+                Row::sort_entries(&mut entries);
                 entries
             },
             tail: Some(Box::new(rest)),

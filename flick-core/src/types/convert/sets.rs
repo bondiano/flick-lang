@@ -75,7 +75,7 @@ impl Checker<'_> {
         match services {
             Type::Row(mut row) => {
                 row.entries.push(fail);
-                row.entries.sort_by(|a, b| a.0.cmp(&b.0));
+                Row::sort_entries(&mut row.entries);
                 Type::Row(row)
             }
             other => Type::Row(Row {
@@ -190,7 +190,7 @@ impl Checker<'_> {
             .and_then(|t| t.nodes().next())
             .and_then(|t| self.row_tail(t))
             .map(|t| Box::new(self.ty(t, kind, free)));
-        entries.sort_by(|a, b| a.0.cmp(&b.0));
+        Row::sort_entries(&mut entries);
         let row = Type::Row(Row {
             entries,
             tail,
