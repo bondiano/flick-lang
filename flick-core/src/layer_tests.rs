@@ -135,3 +135,30 @@ fn code_generation_knows_the_lang_items_of_the_program_only() {
         against.join("\n")
     );
 }
+
+/// The Go code generator reads the IR and the data of the build its input
+/// gives, as a backend outside the compiler must: nothing of the checker,
+/// the projects or the build, and no file.
+#[test]
+fn go_code_generation_reads_only_its_input() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/codegen/go");
+    let mut files = Vec::new();
+    sources(&root, &mut files);
+    let mut against = Vec::new();
+    for file in &files {
+        let text = fs::read_to_string(file).expect("a readable source");
+        let code = text.split("\n#[cfg(test)]").next().unwrap_or(&text);
+        let names = named(code).into_iter();
+        let outside = names.filter(|name| ["types", "project", "build", "syntax"].contains(name));
+        against.extend(outside.map(|name| format!("{} names `{name}`", file.display())));
+        if code.contains("std::fs") {
+            against.push(format!("{} reads files", file.display()));
+        }
+    }
+    against.sort();
+    assert!(
+        against.is_empty(),
+        "the go code generator reads more than its input:\n{}",
+        against.join("\n")
+    );
+}

@@ -1,10 +1,9 @@
 use std::collections::{BTreeMap, HashSet};
 use std::fmt::Write as _;
-use std::iter;
 
-use super::foreign::{lookup, targets};
-use super::{Output, Program, RUNTIME, go};
+use super::{Input, Output, RUNTIME, go};
 use crate::build::builtin_modules;
+use crate::build::go::bindings;
 use crate::codegen::Known;
 use crate::diagnostics::{Diagnostic, Severity, codes};
 use crate::ir::tests::lower_text;
@@ -14,15 +13,16 @@ use crate::project::js_only;
 /// The Go program of `text` with the built-in modules.
 pub(super) fn build(text: &str) -> Output {
     let ir = lower_text("App", text).expect("lowers");
-    let modules: Vec<&Module> = iter::once(&ir).chain(builtin_modules()).collect();
-    go(&Program {
-        suites: &[],
-        modules: &modules,
+    let builtins: Vec<&Module> = builtin_modules().iter().collect();
+    go(&Input {
+        own: &[&ir],
+        builtins: &builtins,
         entry: &ir.name,
-        package: &|_| None,
-        own: &|m| m == ir.name,
-        location: &|_, _| None,
-        foreign_file: &|_, _| None,
+        suites: &[],
+        paths: &BTreeMap::new(),
+        lines: &[],
+        foreign: &BTreeMap::new(),
+        bindings: bindings(),
         lang: &Known::of(&lang_items()),
     })
 }
@@ -366,12 +366,12 @@ fn go_bindings_cover_builtins() {
                 Some(from) => (from.clone(), f.binding.name.clone()),
                 None => (format!("global {}", module.name), f.name.clone()),
             };
-            if lookup(
+            if (bindings().lookup(
                 &module.name,
                 &f.name,
                 f.binding.from.as_deref(),
                 &f.binding.name,
-            )
+            ))
             .is_some()
                 || js_only_exports.contains(&(from.clone(), key))
             {
@@ -422,7 +422,10 @@ fn go_bindings_name_runtime_functions() {
         .flat_map(|(_, text)| text.lines())
         .filter_map(declared)
         .collect();
-    let mut unknown: Vec<&str> = targets().filter(|go| !defined.contains(go)).collect();
+    let mut unknown: Vec<&str> = bindings()
+        .targets()
+        .filter(|go| !defined.contains(go))
+        .collect();
     unknown.sort_unstable();
     unknown.dedup();
     assert!(

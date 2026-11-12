@@ -43,21 +43,26 @@ flick_plugin::export!(Pairs);
 
 impl Plugin for Pairs {
     /// The IR with each string `"hello"` as `"HELLO"`; a string `"break the
-    /// IR"` becomes a local nothing binds.
+    /// IR"` becomes a local nothing binds, and a module with a string `"move
+    /// the package"` goes to another package.
     fn transform(&self, program: Vec<u8>) -> Result<Vec<u8>, Vec<Diagnostic>> {
         let mut program = flick_ir::Program::from_cbor(&program)
             .map_err(|e| vec![Diagnostic::error(e.to_string(), Span::default())])?;
         for module in &mut program.modules {
+            let mut moved = false;
             for item in &mut module.items {
                 match &mut item.kind {
-                    flick_ir::ItemKind::Value { body, .. } => shout(body),
+                    flick_ir::ItemKind::Value { body, .. } => shout(body, &mut moved),
                     flick_ir::ItemKind::Instance { methods, .. } => {
                         for (_, body) in methods {
-                            shout(body);
+                            shout(body, &mut moved);
                         }
                     }
                     _ => {}
                 }
+            }
+            if moved {
+                module.package = Some("elsewhere".into());
             }
         }
         Ok(program.to_cbor())
@@ -367,14 +372,15 @@ fn refuse(token: Token, message: &str) -> Diagnostic {
 }
 
 /// `e` with each string `"hello"` in it as `"HELLO"`, and `"break the IR"`
-/// as a local nothing binds.
-fn shout(e: &mut flick_ir::Expr) {
+/// as a local nothing binds; `moved` when a string says `"move the package"`.
+fn shout(e: &mut flick_ir::Expr, moved: &mut bool) {
     if let flick_ir::ExprKind::Lit(flick_ir::Lit::String(s)) = &mut e.kind {
+        *moved |= s == "move the package";
         if s == "hello" {
             *s = "HELLO".into();
         } else if s == "break the IR" {
             e.kind = flick_ir::ExprKind::Local("dangling".into());
         }
     }
-    e.each_child_mut(&mut |child| shout(child));
+    e.each_child_mut(&mut |child| shout(child, moved));
 }

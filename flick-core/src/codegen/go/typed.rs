@@ -69,7 +69,7 @@ impl<'a> Gen<'a> {
         // the Go types of a binding are written in a table: they must be
         // those of the types the checker gave the call
         let differs = |go: Option<Native>, of: &Expr| {
-            go.zip(Native::of(self.lang, of.ty.as_deref()))
+            go.zip(Native::of(self.input.lang, of.ty.as_deref()))
                 .is_some_and(|(go, flick)| go != flick)
         };
         let mut wrong = differs(types.result(), e);

@@ -3,6 +3,7 @@
 //! comparisons and the locals they are bound to; anywhere else they are a
 //! `flickrt.Value`, which Go boxes them into.
 
+use flick_ir::Lang;
 use flick_pretty::{Document, DocumentArena, docvec};
 
 use super::Gen;
@@ -10,7 +11,6 @@ use super::layout::{Code, block, call, statement};
 use crate::codegen::Known;
 use crate::ir::{BinOp, Expr, ExprKind, Lit, TypeName};
 use crate::numeric::{Arith, Num};
-use crate::syntax::lang::Lang;
 
 /// A type whose values are Go's own.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -190,7 +190,7 @@ impl<'a> Gen<'a> {
     fn compared(&self, lhs: &Expr, rhs: &Expr) -> Option<Native> {
         let known = |e: &Expr| {
             self.native(e)
-                .or_else(|| Native::of(self.lang, e.ty.as_deref()))
+                .or_else(|| Native::of(self.input.lang, e.ty.as_deref()))
         };
         known(lhs).filter(|&n| known(rhs) == Some(n))
     }

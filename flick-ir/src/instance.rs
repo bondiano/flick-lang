@@ -45,3 +45,9 @@ pub struct GenericInfo {
     pub con: Constructor,
     pub field: Constructor,
 }
+
+/// The top-level value a class's default definition of `method` compiles
+/// to, in the class's module; it takes the class's dictionary first.
+pub fn default_method(class: &str, method: &str) -> String {
+    format!("$default_{class}_{method}")
+}

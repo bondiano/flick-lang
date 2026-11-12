@@ -12,7 +12,7 @@ use super::layout::{Code, call};
 use super::shape::builds_settled;
 use super::{Gen, names};
 use crate::ir::{Expr, Lit};
-use crate::types::Dict;
+use flick_ir::Dict;
 
 /// How the Go of a value made on first use begins.
 const LAZY: &str = "flickrt.Lazy(";

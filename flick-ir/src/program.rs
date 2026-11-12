@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 use crate::{FileId, LangItem, Module};
 
 /// The version of the IR this crate reads and writes.
-pub const VERSION: &str = "0.9.0";
+pub const VERSION: &str = "0.10.0";
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Program {
@@ -160,6 +160,7 @@ mod tests {
             labels: BTreeMap::default(),
             initialization: crate::Initialization::default(),
             records: BTreeMap::default(),
+            package: None,
         };
         let item = |lang: &str, namespace, name: &str| LangItem {
             lang: lang.to_owned(),
@@ -214,10 +215,10 @@ mod tests {
         assert!(!compatible("0.3.0"));
         assert!(!compatible("1.0.0"));
         assert!(!compatible("0.1"));
-        assert!(!compatible("0.8.0"));
+        assert!(!compatible("0.9.0"));
         let mut p = program(1.0);
-        p.ir_version = "0.10.0".to_owned();
-        let found = "0.10.0".to_owned();
+        p.ir_version = "0.11.0".to_owned();
+        let found = "0.11.0".to_owned();
         assert_eq!(
             Program::from_json(&p.to_json()),
             Err(Error::Version { found })
