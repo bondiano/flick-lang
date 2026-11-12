@@ -93,8 +93,11 @@ func RequestResolverFromEffect(f Value) Value {
 			children[i] = fork(fb, owner, Apply(fb, f, e), func(c *child) { entryOf(e).complete(c.exit()) })
 		}
 		_, cause := catch(func() Value {
-			for _, c := range children {
+			for i, c := range children {
 				wait(fb, c.done)
+				// `done` closes before `ended` runs: complete here so the batch
+				// never sees the entry pending; the later call is a no-op.
+				entryOf(entries[i]).complete(c.exit())
 			}
 			return Unit
 		})

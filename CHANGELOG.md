@@ -43,6 +43,9 @@ break programs.
   are applied through (`Expr::Open.through`): inside `ui` a foreign component
   takes its props through `Ui.component` by this, not by a rule of the
   checker.
+- **`RequestResolver.from_effect` on Go:** a batch completes every entry
+  whose effect ended before the resolver returns, so a request no longer
+  fails now and then with "RequestResolver did not complete request".
 - **Labels:** `@label kind` before a type declaration gives the top-level
   values of that type their names where the program runs, as the atoms,
   views and actions of the standard library have them; a library marks its
