@@ -1,6 +1,6 @@
 ---
 title: "Среда выполнения и адаптер Effect"
-source_hash: 26dc45c400902efe
+source_hash: c38abf4c5a1d98e8
 ---
 
 По умолчанию скомпилированный код импортирует `@flick-lang/runtime/rt` —
@@ -35,7 +35,14 @@ Effect, для неё импортируется `@flick-lang/effect-ts/bridge`.
 `binary`, `Rpc.connect`, `Rpc.with_headers` и вызовы в памяти остаются в
 адаптере, как пока и серверные функции, и остальной Http. `Http.Headers`,
 `Http.Cookies`, `Http.Url`, `Http.UrlParams`, `Http.Mime` и `Http.Etag`
-работают на RT с кодированием, порядком и сообщениями модулей Effect. Http, RPC и серверные
+работают на RT с кодированием, порядком и сообщениями модулей Effect. Там же
+работает HTTP-сервер на Node.js: `Http.Server.serve` и `address`,
+`Http.ServerRequest`, `Http.ServerResponse`, `Http.Body`, `Http.Router` и
+`Http.Platform.node` отвечают так же, как сервер Effect, а закрытие области
+сервера дожидается его запросов в пределах `gracefulShutdownTimeout` по часам
+задачи, прежде чем область освободит что-либо ещё. Потоковые тела, файловые
+тела `Http.Body`, `Http.Server.log_address` и преобразования в запросы и
+ответы клиента и обратно остаются в адаптере. Http, RPC и серверные
 функции — одно семейство: билд, который использует привязку семейства,
 которая есть только в адаптере, берёт из адаптера всё семейство, так что
 запрос, ответ или процедура принадлежат одной реализации.
