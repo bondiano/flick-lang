@@ -29,7 +29,7 @@ test("import mode prints the shapes of date-fns", () => {
   const out = read("date-fns");
   assert.equal(
     createHash("sha256").update(out).digest("hex"),
-    "3624ea93dee4ebe914232b5fdb94ab3169cf212829289c548c2b62108172fde4",
+    "a81a0ba117525e03a637412d8ad270df42c67d431fd577fdd48ba6253e3af8da",
   );
 });
 

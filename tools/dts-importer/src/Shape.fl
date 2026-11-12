@@ -17,13 +17,15 @@ let handles = ["Date", "RegExp", "Error", "AbortSignal", "URL", "Uint8Array", "A
 
 /// An export: its name, the name Flick binds it by, its description
 /// without either and the fingerprint of all but `local`; `named` pairs
-/// each named object type it mentions with where that is declared.
+/// each named object type it mentions with where that is declared, and
+/// `globals` each such declaration the global scope has with its name there.
 type alias Export = {
   name : String;
   local : String;
   body : List (String, Value);
   fingerprint : String;
   named : List (String, String);
+  globals : List (String, String);
 }
 
 tag : String -> Value
@@ -95,6 +97,28 @@ let site t =
   | Some d -> JString (Ts.declaration_site d)
   | None -> JNull
 
+/// The name the global scope has the named type by, when it has it.
+global : Ts.Checker -> Ts.Type -> List (String, Value)
+let global c t =
+  match Ts.global_name c t with
+  | Some name -> [("global", JString name)]
+  | None -> []
+
+/// The declarations the value mentions that the global scope has, each
+/// with its name there.
+globals : Value -> List (String, String)
+let rec globals v =
+  match v with
+  | JArray items -> List.flat_map globals items
+  | JObject fields ->
+    let here =
+      let site = List.find (fun (k, _) -> k == "site") fields
+      match (site, List.find (fun (k, _) -> k == "global") fields) with
+      | (Some (_, JString s), Some (_, JString g)) -> [(s, g)]
+      | _ -> []
+    List.concat [here, List.flat_map (fun (_, x) -> globals x) fields]
+  | _ -> []
+
 /// The named types the value mentions, with where each is declared.
 sites : Value -> List (String, String)
 let rec sites v =
@@ -109,14 +133,17 @@ let rec sites v =
     List.concat [here, List.flat_map (fun (_, x) -> sites x) fields]
   | _ -> []
 
-/// The value without `site`, as the fingerprint and `flick ffi import` see it.
+/// The value without `site` and `global`, as the fingerprint and
+/// `flick ffi import` see it.
 unsited : Value -> Value
 let rec unsited v =
   match v with
   | JArray items -> JArray (List.map unsited items)
   | JObject fields ->
     JObject
-      (List.filter_map (fun (k, x) -> if k == "site" then None else Some (k, unsited x)) fields)
+      (List.filter_map
+        (fun (k, x) -> if k == "site" || k == "global" then None else Some (k, unsited x))
+        fields)
   | other -> other
 
 /// The value without the aliases of unions, as the fingerprint sees it: a
@@ -147,7 +174,7 @@ rec {
         else if Ts.type_has "Union" t then
           let alias =
             match symbol_name (Ts.alias_symbol t) with
-            | Some a -> [("alias", JString a), ("site", site t)]
+            | Some a -> List.concat [[("alias", JString a), ("site", site t)], global c t]
             | None -> []
           JObject
             (List.concat [
@@ -201,18 +228,26 @@ rec {
             if is_class || List.contains n handles then
               // `typeof C` has the symbol of `C` too: only an instance is the handle
               if List.is_empty args && List.is_empty (Ts.construct_signatures t) then
-                JObject [("k", JString "handle"), ("name", JString n), ("site", site t)]
+                JObject
+                  (List.concat [
+                    [("k", JString "handle"), ("name", JString n), ("site", site t)],
+                    global c t,
+                  ])
               else
                 other c t
             else if List.is_empty calls
               && List.is_empty (Ts.construct_signatures t)
               && List.is_empty args then
-              JObject [
-                ("k", JString "object"),
-                ("name", object_name n t),
-                ("text", JString (Ts.text c t)),
-                ("site", site t),
-              ]
+              JObject
+                (List.concat [
+                  [
+                    ("k", JString "object"),
+                    ("name", object_name n t),
+                    ("text", JString (Ts.text c t)),
+                    ("site", site t),
+                  ],
+                  global c t,
+                ])
             else
               other c t
           | None -> other c t
@@ -305,6 +340,7 @@ let export_of c exported =
         body = body;
         fingerprint = "sha256:" ++ Ts.sha256 fingerprinted;
         named = sites (JObject sited);
+        globals = globals (JObject sited);
       }
     )
     (describe c symbol)

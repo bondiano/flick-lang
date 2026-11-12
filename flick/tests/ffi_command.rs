@@ -373,8 +373,16 @@ fn corpus_of_real_packages() {
         "date_fns",
         corpus(
             "date-fns",
-            "isValid,secondsToHours,millisecondsToSeconds,format,addDays,closestIndexTo,intervalToDuration,isLeapYear,setDefaultOptions,getDefaultOptions,daysInWeek"
+            "isValid,secondsToHours,millisecondsToSeconds,format,addDays,closestIndexTo,intervalToDuration,isLeapYear,setDefaultOptions,getDefaultOptions,daysInWeek,formatDuration"
         )
+    );
+    // an opaque type the package exports is that type to TypeScript
+    let generated = root().join("target/tmp/ffi_command/corpus/DateFns/Generated.fl");
+    let generated = fs::read_to_string(generated).expect("the generated module");
+    assert!(
+        generated
+            .contains("@ts \"$Duration\"\n@ts import \"date-fns\" \"Duration\"\ntype Duration\n"),
+        "{generated}"
     );
     insta::assert_snapshot!(
         "delay",

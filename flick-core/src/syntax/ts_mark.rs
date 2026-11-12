@@ -112,19 +112,27 @@ fn mark(words: &[(K, &str)]) -> Result<Mark, String> {
     }
 }
 
+/// Whether `spec` is the specifier of a module and nothing else.
+pub fn is_specifier(spec: &str) -> bool {
+    let plain = |c: char| c.is_ascii_alphanumeric() || "@/._:-".contains(c);
+    !spec.is_empty() && spec.chars().all(plain)
+}
+
+/// Whether `export` is the name of an export and nothing else.
+pub fn is_export(export: &str) -> bool {
+    let word = |c: char| c.is_ascii_alphanumeric() || c == '_';
+    !export.is_empty() && export.chars().all(word)
+}
+
 /// An import whose module and exports are names and nothing else.
 fn import(from: Origin, effect: String, rt: String) -> Result<Import, String> {
-    if let Origin::Module(spec) = &from {
-        let plain = |c: char| c.is_ascii_alphanumeric() || "@/._:-".contains(c);
-        if spec.is_empty() || !spec.chars().all(plain) {
-            return Err(format!("`{spec}` is no specifier of a module"));
-        }
+    if let Origin::Module(spec) = &from
+        && !is_specifier(spec)
+    {
+        return Err(format!("`{spec}` is no specifier of a module"));
     }
-    for export in [&effect, &rt] {
-        let word = |c: char| c.is_ascii_alphanumeric() || c == '_';
-        if export.is_empty() || !export.chars().all(word) {
-            return Err(format!("`{export}` is no name of an export"));
-        }
+    if let Some(export) = [&effect, &rt].into_iter().find(|e| !is_export(e)) {
+        return Err(format!("`{export}` is no name of an export"));
     }
     Ok(Import { from, effect, rt })
 }

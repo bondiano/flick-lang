@@ -125,7 +125,12 @@ break programs.
   files ship beside its modules. The built-in modules do the same, as
   `@ts "ReadonlyArray<{0}>"` before `type List a`, and the backend names no
   type of a library. A generated module imports from the runtime only the
-  types its declarations name. `.iface` is version 23.
+  types its declarations name. `.iface` is version 23. `flick ffi import`
+  writes the form of an opaque type the package exports or the global
+  scope has, also in a namespace (`Intl.DateTimeFormatOptions`), so a
+  `Generated.fl` of before is out of date for `flick ffi check` until
+  imported again; an editor explains `@ts`, `@label`, `@owner` and `@sync`
+  on hover.
 - **Comparisons by `Ord`:** `< <= > >=` order any type with an `Ord`
   instance by its `compare`, as they already did a type variable: `Bool`, a
   derived type, a record, a list. A type without one is `FLICK-C001`, where

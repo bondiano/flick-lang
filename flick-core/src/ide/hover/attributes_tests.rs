@@ -5,7 +5,7 @@ use crate::types::lang::{self, Lang};
 
 #[test]
 fn attribute_hover_explains_all_attributes_and_derive_providers() {
-    let source = "module App.Main exposing (..)\n\n@maker\nlet make = 1\n\n@cell\ntype Slot a\n\n@derive\nclass First a\n\n@derive std\nclass Second a\n\n@implicit\ninstance Into Int Float =\n  let into n = Int.to_float n\n";
+    let source = "module App.Main exposing (..)\n\n@maker\nlet make = 1\n\n@cell\ntype Slot a\n\n@derive\nclass First a\n\n@derive std\nclass Second a\n\n@implicit\ninstance Into Int Float =\n  let into n = Int.to_float n\n\n@label gauge\ntype Gauge = Gauge Float\n\n@owner\nservice Own =\n  tick : Unit ->{} Float\n\n@sync reader\nservice Peek =\n  see : Unit ->{} Float\n";
     let f = fixture_of(&[("src/App/Main.fl", source)]);
     let ide = f.ide();
     let file = f.file("App.Main");
@@ -16,6 +16,11 @@ fn attribute_hover_explains_all_attributes_and_derive_providers() {
         ("@derive std", "@derive", "`std`"),
         ("std\nclass", "std", "deriving"),
         ("@implicit", "@implicit", "automatic conversion"),
+        ("@label", "@label", "carry their names"),
+        ("gauge\n", "gauge", "carry their names"),
+        ("@owner", "@owner", "owns what is made under it"),
+        ("@sync", "@sync", "run at once"),
+        ("reader\n", "reader", "only reads"),
     ] {
         let start = u32::try_from(source.find(needle).expect("attribute")).expect("small");
         for offset in start..start + u32::try_from(word.len()).expect("small") {
@@ -154,4 +159,33 @@ fn attribute_hover_handles_incomplete_attributes_without_matching_plain_text() {
     let (markdown, _) = ide.hover(file, at).expect("ordinary name");
     assert!(markdown.contains("maker : Int"), "{markdown}");
     assert!(!markdown.contains("atom, action or view"), "{markdown}");
+}
+
+#[test]
+fn attribute_hover_explains_the_typescript_form_of_a_type() {
+    let source = "module App.Main exposing (..)\n\n@ts \"$Dayjs\"\n@ts import \"dayjs\" \"Dayjs\"\ntype Moment\n\n@ts none\ntype Cursor\n";
+    let f = fixture_of(&[("src/App/Main.fl", source)]);
+    let ide = f.ide();
+    let file = f.file("App.Main");
+    let at =
+        |needle: &str| u32::try_from(source.find(needle).expect("in the source")).expect("small");
+    for (needle, shown) in [
+        ("@ts \"$Dayjs\"", "@ts \"$Dayjs\""),
+        ("@ts import", "@ts import \"dayjs\" \"Dayjs\""),
+        ("@ts none", "@ts none"),
+    ] {
+        let start = at(needle);
+        let (markdown, range) = ide.hover(file, start + 1).expect(needle);
+        assert!(
+            markdown.contains(&format!("```flick\n{shown}\n```")),
+            "{markdown}"
+        );
+        assert!(markdown.contains("is in TypeScript"), "{markdown}");
+        assert_eq!(range, (start, start + 3));
+    }
+    // an argument is hovered by itself, with the same explanation
+    let module = at("\"dayjs\"");
+    let (markdown, range) = ide.hover(file, module + 2).expect("the module");
+    assert!(markdown.contains("is in TypeScript"), "{markdown}");
+    assert_eq!(range, (module, module + 7));
 }

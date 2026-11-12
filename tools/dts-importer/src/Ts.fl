@@ -178,6 +178,13 @@ foreign pure declaration_name from "./ts.mjs" "declarationName"
 declaration_site : Declaration -> String
 foreign pure declaration_site from "./ts.mjs" "declarationSite"
 
+/// The name the global scope has the type by, `Date` or
+/// `Intl.DateTimeFormatOptions`; a type a module declares has none.
+global_name : Checker -> Type -> Option String
+foreign pure global_name from "./ts.mjs" "globalName"
+  arity 2
+  nullable
+
 /// The declaration printed without comments.
 printed : Declaration -> String
 foreign pure printed from "./ts.mjs" "printed"

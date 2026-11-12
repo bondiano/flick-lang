@@ -164,7 +164,7 @@ error too. Nothing is inferred that a declaration cannot show: a call is
 | `x?: T`, `x: T \| undefined` | `Option T` with `optional i` |
 | `...xs: T[]` | `List T` with `variadic` |
 | unconstrained `<T>` | `forall t.`, if `T` appears in a parameter |
-| a class instance, `Date`, a named object type | an opaque `type` of the generated module |
+| a class instance, `Date`, a named object type | an opaque `type` of the generated module; when the package exports the type or the global scope has it (`Date`, `Intl.DateTimeFormatOptions`), a [`@ts` form](../codegen/#the-form-of-a-type) says so, and generated declarations name that type instead of a brand |
 | `type Method = "GET" \| "POST"` | an enum `untagged type Method` of the generated module |
 | a callback `(a: A) => B` | a pure `(A -> B)`; needs `retention` |
 | `Promise<T>` result | a row with `Async`; needs `catch` |
