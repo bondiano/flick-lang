@@ -1,0 +1,30 @@
+// A foreign function whose parameter reaches a region its result does not
+// carry uses that region when called, so it has to run a stage: a pure one
+// in a closure that only holds the file would read it after its scope.
+module App.PureOverCapability exposing (..)
+
+type File (s : Region)
+
+service FileSystem =
+  open_scoped : forall s. String ->{Scope s} File s
+
+peek : File s -> Int
+foreign pure peek from "./file.js" "peek"
+  retention call
+
+// with a stage, the closure uses the file and cannot leave its scope
+read : File s ->{} Int
+foreign effect read from "./file.js" "peek"
+  retention call
+
+// a result that carries the region is no use of it
+same : File s -> File s
+foreign pure same from "./file.js" "same"
+  retention call
+
+later : String ->{FileSystem} (Unit -> Int)
+let later path = scope {
+  let file = FileSystem.open_scoped path
+  fun _ -> peek file
+}
+//~ FLICK-F009 @12:1-13:17 `File s` reaches the region of a scope, but the foreign function runs no stage, so a call after the scope closed would read what it released: give it a stage, `->{}` and `foreign effect`

@@ -255,7 +255,7 @@ impl Checker<'_> {
     }
 }
 
-fn names_into(t: &Type, out: &mut BTreeSet<Name>) {
+pub(in crate::check) fn names_into(t: &Type, out: &mut BTreeSet<Name>) {
     let row = |r: &Row, out: &mut BTreeSet<Name>| {
         for args in r.elems.values() {
             args.iter().for_each(|a| names_into(a, out));

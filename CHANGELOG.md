@@ -68,6 +68,12 @@ break programs.
   stack, so the deepest code the parser accepts (198 nested functions with
   their signature, or 199 `<|` in a row) checks on a thread's 2 MiB stack,
   where it overflowed.
+- **Regions:** a pure foreign function with a parameter that reaches a
+  region its result does not carry is `FLICK-F009`: a closure that only held
+  the capability could leave its `scope` and call it on a released resource.
+  Give it a stage (`->{}`, `foreign effect`). `ChildProcess.pid`,
+  `HttpApi.port`, `Rpc.port` and `Http.Server.address` stay pure as reviewed
+  exemptions: they return what was fixed when the capability was acquired.
 - **Refined types:** `refined type` is a declaration of the plugin of `std`,
   which writes the type and its `parse`, `value` and check as code of the
   language; `refined` is no reserved word. The check is a companion too,

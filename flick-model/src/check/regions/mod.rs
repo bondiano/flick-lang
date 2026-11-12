@@ -21,6 +21,7 @@ pub(crate) use live::live_service;
 pub(in crate::check) use live::{
     add_live, arg_caps, drop_empty_live, live_arg, live_stage, regions_of,
 };
+pub(in crate::check) use scope::names_into;
 
 /// `⋃ ⌈held⌉ ⊆ ⋃ ⌈within⌉ ∪ allowed`.
 #[derive(Clone, Debug)]

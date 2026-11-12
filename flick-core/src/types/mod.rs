@@ -118,7 +118,7 @@ pub use env::{
     Abi, EnumLit, Form, Fundep, Instance, JsClass, ModuleNominalKind, ModuleRequirement,
     ModuleSignature, Rep, TypeDef,
 };
-pub use ffi::keeps_for_owner;
+pub use ffi::{PURE_OVER_CAPABILITY, keeps_for_owner};
 pub use gadt::branch::dict_local;
 pub use gadt::scheme::{built, is_indexed, written_dicts};
 pub use generalize::without_value_captures;
