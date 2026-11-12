@@ -7,7 +7,7 @@ use crate::{doc, iface, ir, resolve, types};
 
 /// Compact shape of the tree: node kinds and token texts, no trivia; nodes
 /// with one child are shown as `Kind:child` to keep expectations short.
-fn sexp(src: &str) -> String {
+pub(super) fn sexp(src: &str) -> String {
     fn walk(node: &Node, src: &str) -> String {
         let parts: Vec<String> = node
             .children
@@ -41,7 +41,7 @@ fn parse_str(src: &str) -> Parse {
     parse(src, file)
 }
 
-fn errors(src: &str) -> Vec<String> {
+pub(super) fn errors(src: &str) -> Vec<String> {
     parse_str(src)
         .diagnostics
         .iter()

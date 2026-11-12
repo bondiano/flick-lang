@@ -261,3 +261,24 @@ fn moves_a_block_without_a_layout_with_its_head() {
     }
     "#);
 }
+
+/// Braces after `then` and `else` hold statements: a line for each, the
+/// `else` on the line of the closing brace, one statement on one line; a
+/// record there keeps its parentheses.
+#[test]
+fn keeps_the_braces_of_an_if_branch() {
+    let src = "let f n =\n  if n > 0 then {\n        a = 1\n        b = 2\n     }\n  else {   a = 3;  b = 4 }\n  if n > 9 then {  a = a + b } else    {\n      b = a\n  }\n  a\nlet g r = if r.x > 0 then ( { r with x = 0 } ) else r\n";
+    insta::assert_snapshot!(fmt(src), @r#"
+    let f n =
+      if n > 0 then {
+        a = 1
+        b = 2
+      } else {
+        a = 3
+        b = 4
+      }
+      if n > 9 then { a = a + b } else { b = a }
+      a
+    let g r = if r.x > 0 then ({ r with x = 0 }) else r
+    "#);
+}

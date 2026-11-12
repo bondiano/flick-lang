@@ -79,12 +79,41 @@ let in_arm key =
       -1
   "\{seen} \{n}"
 
+ordered : Int -> Int -> (Int, Int)
+let ordered a b =
+  let mut low = a
+  let mut high = b
+  if low > high then {
+    low = b
+    high = a
+  }
+  (low, high)
+
+signed : Int -> (String, Int)
+let signed n =
+  let mut sign = "+"
+  let mut size = n
+  if n < 0 then {
+    sign = "-"
+    size = 0 - n
+  } else {
+    sign = "+"
+    size = n
+  }
+  (sign, size)
+
 tests : List Test.Test
 let tests = [
   Test.test "an assignment in a branch" (fun () ->
     Test.equal [0, 5, 10] [clamp 0 10 (-3), clamp 0 10 5, clamp 0 10 42]
   ),
   Test.test "a swap through a third variable" (fun () -> Test.equal (2, 1) (swapped (1, 2))),
+  Test.test "braces after then hold statements" (fun () ->
+    Test.equal [(1, 2), (1, 2)] [ordered 2 1, ordered 1 2]
+  ),
+  Test.test "braces after else hold statements" (fun () ->
+    Test.equal [("-", 5), ("+", 3)] [signed (-5), signed 3]
+  ),
   Test.test "an assignment in a match arm" (fun () ->
     Test.equal ["none", "one: hi", "3 words"] [counted [], counted ["hi"], counted ["a", "b", "c"]]
   ),

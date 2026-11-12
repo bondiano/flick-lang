@@ -1,6 +1,6 @@
 ---
 title: "Типизированные RPC"
-source_hash: fa67245f6b0aa9cf
+source_hash: 74cced1b9f727509
 ---
 
 Опишите процедуру один раз и используйте это описание по обе стороны
@@ -57,7 +57,7 @@ handlers : Handlers none
 let handlers =
   {
     get_user = fun id ->
-      if id == 1 then { id = 1; name = "Ada" } else from_result (Err (NotFound { id = id }));
+      if id == 1 then ({ id = 1; name = "Ada" }) else from_result (Err (NotFound { id = id }));
     count_to = fun n -> Stream.from_list (List.map Int.to_float (List.range 1 (Int.truncate n + 1)));
   }
 

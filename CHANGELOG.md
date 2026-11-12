@@ -6,6 +6,10 @@ break programs.
 
 ## Unreleased
 
+- **Braces after `then` and `else`:** they hold statements, as after `do` and
+  `loop`, so `if a > b then { low = b; high = a }` assigns both variables. A
+  record right after `then` or `else` goes in parentheses; written the old way
+  it is `FLICK-T074`, which `flick check --fix --only T074` rewrites.
 - **A closure over a generic callback in a payload:** with `k : Int -> c`,
   `Som (fun x -> k (x + 1))` checks against `Opt (Int -> c)` as `Som k`
   does, where it was `FLICK-T003` "region `c` differs". Such a closure that

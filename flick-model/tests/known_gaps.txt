@@ -9,7 +9,7 @@ gap docs/src/content/docs/reference/cli-dsl.md b1a4db864547e950 # the row primit
 gap docs/src/content/docs/reference/errors/flick-s006.md 4dae9935de3c6d3e # a `BigInt` literal has no λFlick form
 gap docs/src/content/docs/reference/http-api.md 545aab0d8d467a6e # the row primitive `Lacks` has no λFlick form
 gap docs/src/content/docs/reference/http-api.md b79edc80601e735d # the row primitive `Lacks` has no λFlick form
-gap docs/src/content/docs/reference/rpc.md 5cf9d8a6f620c312 # `Record.label` has no λFlick form
+gap docs/src/content/docs/reference/rpc.md 244318eba7c647d7 # `Record.label` has no λFlick form
 gap docs/src/content/docs/reference/rpc.md 6fde1e5b035b1fbd # `Record.label` has no λFlick form
 gap docs/src/content/docs/reference/rpc.md caee8694c8ad2cb0 # the row primitive `Lacks` has no λFlick form
 gap docs/src/content/docs/ru/reference/classes.md 2147921845e6081b # the row primitive `UnionDisjoint` has no λFlick form
@@ -18,7 +18,7 @@ gap docs/src/content/docs/ru/reference/cli-dsl.md b1a4db864547e950 # the row pri
 gap docs/src/content/docs/ru/reference/errors/flick-s006.md 4dae9935de3c6d3e # a `BigInt` literal has no λFlick form
 gap docs/src/content/docs/ru/reference/http-api.md 545aab0d8d467a6e # the row primitive `Lacks` has no λFlick form
 gap docs/src/content/docs/ru/reference/http-api.md b79edc80601e735d # the row primitive `Lacks` has no λFlick form
-gap docs/src/content/docs/ru/reference/rpc.md 5cf9d8a6f620c312 # `Record.label` has no λFlick form
+gap docs/src/content/docs/ru/reference/rpc.md 244318eba7c647d7 # `Record.label` has no λFlick form
 gap docs/src/content/docs/ru/reference/rpc.md 6fde1e5b035b1fbd # `Record.label` has no λFlick form
 gap docs/src/content/docs/ru/reference/rpc.md caee8694c8ad2cb0 # the row primitive `Lacks` has no λFlick form
 gap docs/src/content/docs/ru/spec/08-type-programming-and-edsl.md 66cdf326a016e43e # the row primitive `Lacks` has no λFlick form

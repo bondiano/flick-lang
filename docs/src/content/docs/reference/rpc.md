@@ -54,7 +54,7 @@ handlers : Handlers none
 let handlers =
   {
     get_user = fun id ->
-      if id == 1 then { id = 1; name = "Ada" } else from_result (Err (NotFound { id = id }));
+      if id == 1 then ({ id = 1; name = "Ada" }) else from_result (Err (NotFound { id = id }));
     count_to = fun n -> Stream.from_list (List.map Int.to_float (List.range 1 (Int.truncate n + 1)));
   }
 

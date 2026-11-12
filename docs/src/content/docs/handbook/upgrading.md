@@ -50,6 +50,7 @@ change needs.
 | [`mut` is a keyword](#mut-is-a-keyword) | no | `FLICK-S007`, `FLICK-S016` |
 | [Children in `ui` stand one by one](#children-in-ui-stand-one-by-one) | yes: `--only T073` | `FLICK-T073`, `FLICK-T003` |
 | [`refined type` is a declaration of std's plugin](#refined-type-is-a-declaration-of-stds-plugin) | no | `FLICK-P036`, `FLICK-R005` |
+| [Braces after `then` and `else` hold statements](#braces-after-then-and-else-hold-statements) | yes: `--only T074` | `FLICK-T074` |
 
 `flick check --fix page.md` rewrites the `flick` code blocks of a Markdown
 page, each checked on its own.
@@ -379,6 +380,27 @@ program:
 
 Built JavaScript and Go change for these declarations and nothing else;
 `flick expand` shows the code.
+
+## Braces after `then` and `else` hold statements
+
+Braces right after `then` or `else` are a block of statements, as after `do`
+and `loop`, so a branch can assign several variables:
+
+```flick
+# ordered : Int -> Int -> (Int, Int)
+# let ordered a b =
+#   let mut low = a
+#   let mut high = b
+  if low > high then {
+    low = b
+    high = a
+  }
+#   (low, high)
+```
+
+A record right after `then` or `else` now goes in parentheses,
+`then ({ r with done = true })`. Written the old way it is `FLICK-T074`, and
+`flick check --fix --only T074` adds the parentheses.
 
 ## Instances belong to one package
 
