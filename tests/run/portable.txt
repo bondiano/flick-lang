@@ -104,6 +104,7 @@ codegen/release
 runtime/parallel
 runtime/scope_releases
 runtime/scope_owners
+runtime/lambda_owners
 runtime/handoff
 runtime/exits
 stdlib/effect/deferred

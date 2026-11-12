@@ -13,7 +13,7 @@ use crate::types::convert::TyVar;
 use crate::types::kinds::Kind;
 use crate::types::lang::{self, Lang};
 use crate::types::ty::{Row, Type};
-use crate::types::typing::range;
+use crate::types::typing::{OpenScopes, range};
 
 impl Checker<'_> {
     /// `scope [s] { body }`: the body runs with a fresh region as the owner
@@ -112,12 +112,18 @@ impl Checker<'_> {
             return services.clone();
         };
         let mut norm = self.store.normalize(services);
+        let first_own = self.cx.stage.scopes.min(self.cx.regions.open.len());
+        let has_own = first_own < self.cx.regions.open.len();
         let Some(needed) = norm.get(scope()).cloned() else {
+            // a row still growing, such as that of a lambda made in an outer
+            // scope, names its `Scope` only once solved: the owner is read then
+            if has_own && !norm.tails.is_empty() {
+                let open = self.open_scopes();
+                (self.typing.pending_owners).push((range(span), services.clone(), open));
+            }
             return services.clone();
         };
-        let own =
-            self.cx.regions.open[self.cx.stage.scopes.min(self.cx.regions.open.len())..].to_vec();
-        if own.is_empty() {
+        if !has_own {
             // no scope of this stage provides it: the stage passes `Scope` on to
             // what runs it, which provides the region its row names
             if let [region] = needed.spine().1[..]
@@ -136,21 +142,8 @@ impl Checker<'_> {
             }
             return services.clone();
         }
-        let open = self
-            .cx
-            .regions
-            .open
-            .iter()
-            .map(|&i| {
-                (
-                    self.cx.regions.scopes[i].region,
-                    self.cx.regions.scopes[i].node,
-                )
-            })
-            .collect();
-        self.typing
-            .pending_owners
-            .push((range(span), needed.clone(), open));
+        let open = self.open_scopes();
+        (self.typing.pending_owners).push((range(span), services.clone(), open));
         let [region] = needed.spine().1[..] else {
             return services.clone();
         };
@@ -161,12 +154,22 @@ impl Checker<'_> {
         self.cx.regions.needs.push(Need {
             region: region.clone(),
             inner,
-            own,
+            own: self.cx.regions.open[first_own..].to_vec(),
             span,
             site: self.cx.stage.site,
         });
         norm.entries.retain(|(label, _)| label != scope());
         norm.into_type()
+    }
+
+    /// The region and the expression of each open scope, outermost first.
+    fn open_scopes(&self) -> OpenScopes {
+        (self.cx.regions.open.iter())
+            .map(|&i| {
+                let scope = &self.cx.regions.scopes[i];
+                (scope.region, scope.node)
+            })
+            .collect()
     }
 
     /// Gives the tasks an `Eff` argument left without a region the

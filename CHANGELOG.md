@@ -6,6 +6,11 @@ break programs.
 
 ## Unreleased
 
+- **A lambda made in a named scope:** a lambda or a composition made in
+  `scope outer { … }` and called inside a nested scope acquires into `outer`,
+  as its type says. When the call was checked before the lambda's row named
+  the region, it acquired into the nested scope, which released the resource
+  early, on JS, Go and Flick's runtime alike.
 - **The language server outlives a defect:** a panic while `flick lsp`
   handles a message is logged with its backtrace and answered with a
   JSON-RPC internal error; the server drops its cached analyses and keeps

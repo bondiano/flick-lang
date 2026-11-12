@@ -1,0 +1,56 @@
+// A lambda or a composition made in a named scope acquires into that scope's
+// owner wherever it is called. Its call is checked before the lambda's row
+// has grown to name the region, and still gets that owner.
+module App.Main exposing (main)
+
+say : String ->{} Unit
+let say line = Platform.stdout_line line
+
+open_res : String ->{Scope s} String
+let open_res name =
+  Resource.acquire_release
+    (task {
+      say ("open " ++ name)
+      name
+    })
+    (fun n -> say ("release " ++ n))
+
+/// Calls `f`, whatever it acquires into.
+call : (Unit ->{r} String) ->{r} String
+let call f = f ()
+
+plain : Unit ->{} Unit
+let plain () = scope outer {
+  let f = fun () -> open_res "plain"
+  scope {
+    let _ = f ()
+    say "inner done"
+  }
+  say "outer done"
+}
+
+composed : Unit ->{} Unit
+let composed () = scope outer {
+  let f = (fun () -> "composed") >> open_res
+  scope {
+    let _ = f ()
+    say "inner done"
+  }
+  say "outer done"
+}
+
+passed : Unit ->{} Unit
+let passed () = scope outer {
+  let f = fun () -> open_res "passed"
+  scope {
+    let _ = call f
+    say "inner done"
+  }
+  say "outer done"
+}
+
+main : Unit ->{; AppError} Unit
+let main () =
+  plain ()
+  composed ()
+  passed ()
