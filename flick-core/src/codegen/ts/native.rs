@@ -12,7 +12,7 @@ impl Projection<'_> {
         vars: &Vars,
         name: &str,
     ) -> Result<Option<String>, String> {
-        let Some((effect, rt)) = &form.form else {
+        let Some(pieces) = &form.form else {
             return Err(format!("`{name}` has no TypeScript form"));
         };
         if args.len() != form.arity {
@@ -21,10 +21,10 @@ impl Projection<'_> {
         // an export of a module a package names is apart from every other
         // module's of that name; one of the runtime is the same everywhere
         let apart = |export: &str| {
-            (form.imports.iter()).any(|i| i.effect == export && matches!(i.from, Origin::Module(_)))
+            (form.imports.iter()).any(|i| i.name == export && matches!(i.from, Origin::Module(_)))
         };
         let mut out = String::new();
-        for piece in if self.rt { rt } else { effect } {
+        for piece in pieces {
             match piece {
                 Piece::Text(text) => out.push_str(text),
                 Piece::Name(export) => {
@@ -40,7 +40,7 @@ impl Projection<'_> {
         }
         let mut imported = self.imported.borrow_mut();
         for import in &form.imports {
-            let of = if apart(&import.effect) { module } else { "" };
+            let of = if apart(&import.name) { module } else { "" };
             let named = (import.clone(), of.to_owned());
             if let Err(at) = imported.binary_search(&named) {
                 imported.insert(at, named);

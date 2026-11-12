@@ -6,6 +6,7 @@ use std::env;
 use std::path::Path;
 
 use super::{Artifact, Settings, builtin_modules, optimized, specifier};
+use crate::codegen::Known;
 use crate::codegen::go::{self, GO_MOD, GO_SUM, PACKAGES, Package, Program, RUNTIME};
 use crate::diagnostics::{Diagnostic, Severity, codes};
 use crate::ir;
@@ -90,6 +91,8 @@ pub fn emit(
             .collect();
         Some((format!("ffi{name}.go"), text))
     };
+    let lang = ir::lang_items();
+    let known = Known::of(&lang);
     let mut out = Vec::new();
     for (name, entry) in programs {
         let dir = module_dir(name);
@@ -109,6 +112,7 @@ pub fn emit(
             own: &own,
             location: &location,
             foreign_file: &foreign_file,
+            lang: &known,
         });
         diagnostics.extend(output.diagnostics);
         let packages: Vec<&Package> = PACKAGES

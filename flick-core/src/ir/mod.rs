@@ -14,13 +14,37 @@ pub(crate) mod reach;
 
 pub use flick_ir::{
     Adapter, Arm, BinOp, Binding, Copies, Expr, ExprKind, Foreign, ForeignMode, Handled, Handler,
-    Item, ItemKind, Label, Lit, Module, OpArm, Param, Pat, ResultAdapter, Stage, Stmt, TypeName,
-    operation_arity,
+    Item, ItemKind, Label, LangItem, Lit, Module, OpArm, Param, Pat, ResultAdapter, Stage, Stmt,
+    TypeName, operation_arity,
 };
 pub use lower::lower;
 pub use print::print;
 
+use flick_ir::Namespace as IrNamespace;
+
+use crate::iface::Namespace;
 use crate::types::lang::{self, Lang};
+
+/// The lang items of the built-in modules, as a program gives them to its
+/// backend: every item they declare.
+pub fn lang_items() -> Vec<LangItem> {
+    let table = lang::table();
+    (Lang::ALL.iter())
+        .filter_map(|&item| {
+            let found = table.find(item)?;
+            Some(LangItem {
+                lang: item.name().to_owned(),
+                module: found.module.clone(),
+                namespace: match found.namespace {
+                    Namespace::Value => IrNamespace::Value,
+                    Namespace::Type => IrNamespace::Type,
+                    Namespace::Constructor => IrNamespace::Constructor,
+                },
+                name: found.name.clone(),
+            })
+        })
+        .collect()
+}
 
 /// What the compiler names through lang items in the IR.
 pub trait ExprLang {

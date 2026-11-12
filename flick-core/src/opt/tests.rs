@@ -1,8 +1,8 @@
 use crate::build::builtin_modules;
-use crate::codegen::{EffectBridge, Labels, Options, js};
+use crate::codegen::{EffectBridge, Known, Labels, Options, js};
 use crate::effects::rt_specifier;
-use crate::ir::Expr;
 use crate::ir::tests::check_text;
+use crate::ir::{Expr, lang_items};
 use crate::types::builtins;
 
 /// A generic function of a built-in module, as a build offers it.
@@ -34,6 +34,8 @@ pub(super) fn release_with(text: &str, workers: &dyn Fn(&str, &str) -> Option<us
         &builtin_arity,
     );
     let path = |m: &str| format!("{}.js", m.replace('.', "/"));
+    let lang = lang_items();
+    let known = Known::of(&lang);
     let options = Options {
         path: &path,
         package: &|_| None,
@@ -46,6 +48,7 @@ pub(super) fn release_with(text: &str, workers: &dyn Fn(&str, &str) -> Option<us
         labels: Labels::default(),
         rt: false,
         effect_bridge: EffectBridge::Absent,
+        lang: &known,
     };
     js(&ir, &options).code
 }
@@ -251,6 +254,8 @@ fn known_instances_and_plain_foreigns_are_called_directly() {
         &builtin_generic,
         &builtin_arity,
     );
+    let lang = lang_items();
+    let known = Known::of(&lang);
     let options = Options {
         path: &|m| format!("{}.js", m.replace('.', "/")),
         package: &|_| None,
@@ -263,6 +268,7 @@ fn known_instances_and_plain_foreigns_are_called_directly() {
         labels: Labels::default(),
         rt: false,
         effect_bridge: EffectBridge::Absent,
+        lang: &known,
     };
     let js = js(&ir, &options).code;
     assert!(js.contains("$m_Instances.$i_Show_Float$show(n)"), "{js}");
@@ -288,6 +294,8 @@ fn a_native_binding_with_a_schema_is_called_directly_on_flicks_runtime() {
         &builtin_arity,
     );
     let foreign = |_: &str, spec: &str| rt_specifier(spec).expect("a module of the runtime");
+    let lang = lang_items();
+    let known = Known::of(&lang);
     let options = Options {
         path: &|m| format!("{}.js", m.replace('.', "/")),
         package: &|_| None,
@@ -300,6 +308,7 @@ fn a_native_binding_with_a_schema_is_called_directly_on_flicks_runtime() {
         labels: Labels::default(),
         rt: true,
         effect_bridge: EffectBridge::Available,
+        lang: &known,
     };
     // the runtime's own binding takes the schema as it is: no wrapper of its own
     let js = js(&ir, &options).code;

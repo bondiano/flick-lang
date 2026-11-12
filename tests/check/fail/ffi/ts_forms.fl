@@ -1,4 +1,4 @@
-module App.Forms exposing (Rows, Boxed, Both, Lone, Twice)
+module App.Forms exposing (Rows, Boxed, Both, Lone, Twice, Meters, Paired)
 
 @ts "Array<{1}>"
 type Rows a = Rows (List a)
@@ -17,8 +17,18 @@ type Lone = Lone
 @ts "string"
 type Twice = Twice
 
+@ts "$Option.Option<number>"
+@ts import runtime "Option"
+type Meters = Meters Float
+
+@ts "number" rt "bigint"
+type Paired = Paired
+
 //~ FLICK-S014 @3:1-3:17 `{1}` is past its 1 parameters
 //~ FLICK-S014 @6:1-6:16 `$Box` is no export it imports: add `@ts import`
 //~ FLICK-S014 @9:1-9:13 a type has one form, or `@ts none`
 //~ FLICK-S014 @13:1-13:25 a type has one form, or `@ts none`
 //~ FLICK-S014 @16:1-16:13 a type has one form, or `@ts none`
+//~ FLICK-S014 @20:1-20:29 `$Option` is no export it imports: add `@ts import`
+//~ FLICK-S014 @21:1-21:28 `runtime` is no module: name one by its specifier, as `"dayjs"`
+//~ FLICK-S014 @24:1-24:25 `@ts` takes a form, `"…"`, or `none`, or `import "module" "Export"`

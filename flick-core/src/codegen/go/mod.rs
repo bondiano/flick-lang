@@ -37,6 +37,7 @@ use std::{mem, slice};
 
 use flick_pretty::{Document, DocumentArena, Documentable, docvec};
 
+use super::Known;
 use crate::diagnostics::{Diagnostic, Severity, codes};
 use crate::ir::{ItemKind, Module, reach};
 use crate::source::Span;
@@ -69,6 +70,8 @@ pub struct Program<'a> {
     /// The Go side of a foreign module of a module of the program, by its
     /// relative specifier: the file's name in the Go module and its text.
     pub foreign_file: &'a ForeignFile<'a>,
+    /// The program's lang items, the built-in entities the code knows.
+    pub lang: &'a Known<'a>,
 }
 
 /// Finds the Go file beside a foreign JS module: by the Flick module and
@@ -105,7 +108,7 @@ pub fn go(program: &Program) -> Output {
     let mut diagnostics = Vec::new();
     let main_shape = index
         .get(&main)
-        .map(|&(m, i)| shape(&modules[m].name, &modules[m].items[i].kind));
+        .map(|&(m, i)| shape(program.lang, &modules[m].name, &modules[m].items[i].kind));
     let Some(Shape::Func {
         dicts: 0,
         params: 1,
@@ -179,7 +182,7 @@ fn compile<'a>(
     for &(m, i) in &reached {
         let item = &modules[m].items[i];
         for name in reach::defined(item) {
-            let held = shape(&modules[m].name, &item.kind);
+            let held = shape(program.lang, &modules[m].name, &item.kind);
             shapes.insert((modules[m].name.clone(), name), held);
         }
     }
@@ -202,7 +205,7 @@ fn compile<'a>(
             continue;
         }
         let arena = DocumentArena::new();
-        let mut g = Gen::new(&module.name, &shapes, program.package, &arena);
+        let mut g = Gen::new(&module.name, &shapes, program.package, program.lang, &arena);
         g.settled = Some(&settled);
         g.own = Some(program.own);
         g.records = Some(&records);
@@ -228,7 +231,7 @@ fn compile<'a>(
     let inits: Vec<_> = if item_initializers {
         initialization_order(modules, index, &reached)
             .into_iter()
-            .filter(|&(m, i)| has_initializer(&modules[m].items[i].kind))
+            .filter(|&(m, i)| has_initializer(program.lang, &modules[m].items[i].kind))
             .map(|(m, i)| statement(a, docvec![a, names::item_init(&modules[m].name, i), "()"]))
             .collect()
     } else {
@@ -258,10 +261,10 @@ fn compile<'a>(
     }
 }
 
-fn has_initializer(item: &ItemKind) -> bool {
+fn has_initializer(lang: &Known, item: &ItemKind) -> bool {
     match item {
         // the shape of a value does not depend on its module
-        ItemKind::Value { .. } => matches!(shape("", item), Shape::Var),
+        ItemKind::Value { .. } => matches!(shape(lang, "", item), Shape::Var),
         ItemKind::Instance { info, .. } => info.context.is_empty(),
         ItemKind::Destructure { .. } => true,
         ItemKind::Foreign(_) | ItemKind::Constructor(_) | ItemKind::Service { .. } => false,
@@ -393,6 +396,8 @@ struct Gen<'a> {
     item_initializers: bool,
     shapes: &'a HashMap<Key, Shape>,
     package: &'a dyn Fn(&str) -> Option<String>,
+    /// The program's lang items.
+    lang: &'a Known<'a>,
     /// Statements of the block being emitted, each with its newline.
     buf: Vec<Document<'a>>,
     temps: u32,
@@ -450,6 +455,7 @@ impl<'a> Gen<'a> {
         module: &'a str,
         shapes: &'a HashMap<Key, Shape>,
         package: &'a dyn Fn(&str) -> Option<String>,
+        lang: &'a Known<'a>,
         a: &'a DocumentArena<'a>,
     ) -> Self {
         Gen {
@@ -458,6 +464,7 @@ impl<'a> Gen<'a> {
             item_initializers: false,
             shapes,
             package,
+            lang,
             buf: Vec::new(),
             temps: 0,
             lines: 0,

@@ -39,11 +39,8 @@ impl Projection<'_> {
         for (slot, from) in [(Origin::Runtime, runtime), (Origin::Ui, runtime_ui)] {
             let names: Vec<String> = (imported.iter())
                 .map(|(i, _)| i)
-                .filter(|i| i.from == slot && !OWN.contains(&i.effect.as_str()))
-                .map(|i| {
-                    let export = if self.rt { &i.rt } else { &i.effect };
-                    format!("{export} as ${}", i.effect)
-                })
+                .filter(|i| i.from == slot && !OWN.contains(&i.name.as_str()))
+                .map(|i| format!("{} as ${}", i.export, i.name))
                 .collect();
             if !names.is_empty() {
                 let _ = writeln!(
@@ -64,11 +61,11 @@ impl Projection<'_> {
             } else {
                 spec.clone()
             };
-            let export = if self.rt { &import.rt } else { &import.effect };
             let _ = writeln!(
                 out,
-                "import type {{ {export} as ${}{} }} from {};",
-                import.effect,
+                "import type {{ {} as ${}{} }} from {};",
+                import.export,
+                import.name,
                 Self::alias(module),
                 names::string(&from)
             );

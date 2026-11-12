@@ -99,19 +99,21 @@ impl<'a> Gen<'a> {
         // whether the declaration made now holds a `//line` directive
         let lines = self.lines;
         match &item.kind {
-            ItemKind::Value { name, dicts, body } => match super::shape(self.module, &item.kind) {
-                Shape::Var => {
-                    let var = a.alloc_str(&names::var(self.module, name));
-                    decls.push((docvec![a, "var ", var, " flickrt.Value"], false));
-                    let (mut stmts, v) = self.block(|g| g.expr(body));
-                    stmts.push(statement(a, docvec![a, var, " = ", v]));
-                    init.push(statement(a, block(a, stmts)));
+            ItemKind::Value { name, dicts, body } => {
+                match super::shape(self.lang, self.module, &item.kind) {
+                    Shape::Var => {
+                        let var = a.alloc_str(&names::var(self.module, name));
+                        decls.push((docvec![a, "var ", var, " flickrt.Value"], false));
+                        let (mut stmts, v) = self.block(|g| g.expr(body));
+                        stmts.push(statement(a, docvec![a, var, " = ", v]));
+                        init.push(statement(a, block(a, stmts)));
+                    }
+                    Shape::Func { .. } => {
+                        let decl = self.function(name, dicts, body);
+                        decls.push((decl, self.lines > lines));
+                    }
                 }
-                Shape::Func { .. } => {
-                    let decl = self.function(name, dicts, body);
-                    decls.push((decl, self.lines > lines));
-                }
-            },
+            }
             ItemKind::Destructure { pattern, body } => {
                 let mut binders = Vec::new();
                 pattern.binders(&mut binders);
@@ -353,7 +355,7 @@ impl<'a> Gen<'a> {
 
     /// The tag of a tagged constructor, as the JS target writes it.
     pub(super) fn tag(&self, c: &Constructor) -> String {
-        match js_names::native(c) {
+        match js_names::native(self.lang, c) {
             Some(js_names::Native::Some) => "Some".to_owned(),
             Some(js_names::Native::None) => "None".to_owned(),
             Some(js_names::Native::Ok) => "Success".to_owned(),

@@ -144,7 +144,7 @@ impl Gen<'_> {
 
     fn constructor_item(&mut self, c: &Constructor) -> String {
         let name = names::ident(&c.name);
-        if names::native(c).is_some() {
+        if names::native(self.options.lang, c).is_some() {
             let native = self.constructor(c);
             return self.export(&name, &native);
         }

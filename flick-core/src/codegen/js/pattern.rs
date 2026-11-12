@@ -123,7 +123,7 @@ impl Gen<'_> {
 
     /// The `_tag` of a constructor and the fields its arguments are in.
     fn shape(&self, c: &Constructor, arity: usize) -> (String, Vec<String>) {
-        match names::native(c) {
+        match names::native(self.options.lang, c) {
             Some(names::Native::Some) => ("Some".into(), vec!["value".into()]),
             Some(names::Native::None) => ("None".into(), Vec::new()),
             Some(names::Native::Ok) => ("Success".into(), vec!["success".into()]),
