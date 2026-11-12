@@ -53,6 +53,7 @@ change needs.
 | [Braces after `then` and `else` hold statements](#braces-after-then-and-else-hold-statements) | yes: `--only T074` | `FLICK-T074` |
 | [No build without a runtime](#no-build-without-a-runtime) | no | `FLICK-P005` |
 | [A provided instance leaves the body no other](#a-provided-instance-leaves-the-body-no-other) | no | `FLICK-E019` |
+| [Backends find the built-in types by lang item](#backends-find-the-built-in-types-by-lang-item) | no | `FLICK-S014` |
 
 `flick check --fix page.md` rewrites the `flick` code blocks of a Markdown
 page, each checked on its own.
@@ -548,3 +549,18 @@ through a row variable: the checker accepted that, and the program got an `Int`
 where it said `String`. Such a body is now `FLICK-E019`. Take the service out of
 the variable, `Eff {-Store | r} …` (`-` now takes a service with arguments out by
 its name), or name the instance the body needs, `Eff {Store Int | r} …`.
+
+## Backends find the built-in types by lang item
+
+A reader of `flick build --emit-ir` meets a new version, `0.9.0`: the program
+has `lang`, where its modules declare each lang item, as
+`{ "lang": "option", "module": "Prelude", "namespace": "type", "name": "Option" }`.
+A backend finds `Option`, `Some` or `Int` there and not by name, which the
+library may change. A plugin with `hooks = ["ir"]` gives the table back as it
+got it; a changed one is `FLICK-P047`.
+
+The built-in types carry no `@ts`: the JS backend gives them their TypeScript
+forms. A package's `@ts` has one form, the same on every runtime, and imports
+from a module by its specifier: `rt "…"` after a form or an export, and
+`@ts import runtime` or `ui`, are `FLICK-S014`. `.iface` files of version 23
+are rejected: rebuild the libraries.

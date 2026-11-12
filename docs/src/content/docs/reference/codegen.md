@@ -322,8 +322,8 @@ type Cursor
 
 | Mark | Meaning |
 | - | - |
-| `@ts "form"` | the form: `{i}` is the type's argument `i` (from 0), `{i:row}` that argument as a row of services or errors; `rt "form"` after it is the form on Flick's own runtime, when it differs |
-| `@ts import "module" "Export"` | a `$Export` of the form is that export of the module, named as `foreign … from` names one: a package as written, a file by its path from the source of the module that declares the type; `rt "Other"` after it is the export on Flick's own runtime |
+| `@ts "form"` | the form: `{i}` is the type's argument `i` (from 0), `{i:row}` that argument as a row of services or errors |
+| `@ts import "module" "Export"` | a `$Export` of the form is that export of the module, named as `foreign … from` names one: a package as written, a file by its path from the source of the module that declares the type |
 | `@ts none` | the type has no form: an export whose type names it is `FLICK-F004` under `--emit-dts` |
 
 A form is the text of a type and nothing else: names, `.`, `|`, `&`, `?`,
@@ -336,10 +336,10 @@ true of the values: that is the word of the package, as the signature of a
 `foreign` is.
 
 The `.d.ts`, `.d.mts` and `.d.cts` files of a library ship beside its
-modules, as its `.mjs` and `.cjs` do. The built-in modules give their types
-their forms the same way, as `@ts "ReadonlyArray<{0}>"` before `type List a`;
-only they name the runtime by a word, `@ts import runtime "Option"`
-(`FLICK-R016` elsewhere).
+modules, as its `.mjs` and `.cjs` do. A form is the same whichever runtime a
+build is for. The built-in types have no `@ts`: the backend gives each its
+form by lang item, `ReadonlyArray<A>` for `List a` and the runtime's own type
+for `Option a`, as another backend gives them its representation.
 
 `--emit-dts` (or `emit-dts = true`) writes `A/B.d.ts` beside each module: the
 same declarations, `export declare const` for every exported value and

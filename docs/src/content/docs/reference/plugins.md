@@ -477,11 +477,13 @@ UTF-8 text, and a `.fl` file of the same module beside it is `FLICK-R002`.
 
 A plugin whose package says `hooks = ["ir"]` gets the IR of the project's
 modules, a `Program` of the compiler's IR as CBOR without the built-in
-modules, after the checks of effects pass it and before the build optimizes
+modules but with where they declare each lang item, after the checks of
+effects pass it and before the build optimizes
 it, in `flick build`, `run` and `test`, never in `flick check` or the editor.
 Its `transform` gives the program the build compiles instead. The compiler
 checks it for form only: the version of the IR, every module of the build
-and no other, every local bound where it is used, every global of a module
+and no other, the lang items as it got them, every local bound where it is
+used, every global of a module
 there is, every span of a file the build read; anything else is
 `FLICK-P047`, naming the plugin. A build it rewrote says so with the note
 `FLICK-P048`: what the program does is then the plugin's to answer for,

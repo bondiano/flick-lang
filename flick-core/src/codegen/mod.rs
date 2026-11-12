@@ -7,6 +7,7 @@ pub(crate) mod exports;
 #[cfg(feature = "native-project")]
 pub mod go;
 mod js;
+mod lang;
 mod lexical;
 mod loops;
 pub(crate) use lexical::{RuntimeLayout, js_parts};
@@ -17,6 +18,7 @@ pub mod tail;
 pub mod ts;
 
 pub use js::{direct_methods, exported_worker, js, relative};
+pub use lang::Known;
 pub use names::{ident, instance as instance_export, qualified_id, tag};
 
 /// Whether an RT build may use the separately installed Effect adapter.
@@ -71,6 +73,8 @@ pub struct Options<'a> {
     pub rt: bool,
     /// Whether RT code may import the optional Effect adapter.
     pub effect_bridge: EffectBridge,
+    /// The program's lang items, the built-in entities the code knows.
+    pub lang: &'a Known<'a>,
 }
 
 impl Options<'_> {

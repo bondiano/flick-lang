@@ -1,6 +1,7 @@
 //! JS names of what the IR refers to, and constructor ids.
 
-use crate::types::lang::{self, Lang};
+use super::Known;
+use crate::syntax::lang::Lang;
 use crate::types::{Constructor, EnumLit};
 
 /// Words a Flick name may spell that JS reserves, and the names generated
@@ -154,7 +155,7 @@ pub enum Native {
     Err,
 }
 
-pub fn native(c: &Constructor) -> Option<Native> {
+pub fn native(lang: &Known, c: &Constructor) -> Option<Native> {
     [
         (Lang::Some, Native::Some),
         (Lang::None, Native::None),
@@ -162,7 +163,7 @@ pub fn native(c: &Constructor) -> Option<Native> {
         (Lang::Err, Native::Err),
     ]
     .into_iter()
-    .find(|&(item, _)| lang::is(item, &c.module, &c.name))
+    .find(|&(item, _)| lang.is(item, &c.module, &c.name))
     .map(|(_, native)| native)
 }
 

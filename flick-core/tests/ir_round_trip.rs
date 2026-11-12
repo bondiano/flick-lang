@@ -35,7 +35,7 @@ fn repo(path: &str) -> PathBuf {
 
 /// `modules` survive both forms, and each form writes the same again.
 fn round_trips(what: &str, modules: Vec<ir::Module>, path: &dyn Fn(FileId) -> String) {
-    let program = Program::new("flick test", modules, path);
+    let program = Program::new("flick test", modules, ir::lang_items(), path);
     let json = program.to_json();
     let back = Program::from_json(&json).unwrap_or_else(|e| panic!("{what}: {e}"));
     assert!(back == program, "{what}: the JSON form loses something");

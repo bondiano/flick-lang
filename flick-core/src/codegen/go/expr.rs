@@ -128,7 +128,8 @@ impl<'a> Gen<'a> {
                 body,
                 iterable,
             } => {
-                let lowered = loops::lower(id, condition.as_deref(), body, *iterable, e.span);
+                let lowered =
+                    loops::lower(self.lang, id, condition.as_deref(), body, *iterable, e.span);
                 self.expr(&lowered)
             }
             ExprKind::LoopExit { .. } => unreachable!("loop exits are lowered with their loop"),
@@ -356,7 +357,7 @@ impl<'a> Gen<'a> {
                 // declared and where it is assigned, not boxed on every assignment
                 match self
                     .native(value)
-                    .or_else(|| Native::of(value.ty.as_deref()))
+                    .or_else(|| Native::of(self.lang, value.ty.as_deref()))
                 {
                     Some(n) => {
                         let v = self.unboxed(value, v, n);

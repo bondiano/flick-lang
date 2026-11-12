@@ -452,6 +452,7 @@ impl Projection<'_> {
 
 include!("ts/helpers.rs");
 mod imports;
+mod lang_forms;
 mod native;
 mod projections;
 #[cfg(test)]

@@ -111,3 +111,27 @@ fn a_module_names_only_its_layer_and_those_below() {
         against.join("\n")
     );
 }
+
+/// The JS and Go code generators know the lang items from the table a
+/// program gives its backend, as a backend outside the compiler must, and
+/// not from the checker's. The TypeScript projection reads checked types.
+#[test]
+fn code_generation_knows_the_lang_items_of_the_program_only() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/codegen");
+    let mut files = Vec::new();
+    sources(&root, &mut files);
+    let projection = |file: &Path| file == root.join("ts.rs") || file.starts_with(root.join("ts"));
+    let mut against: Vec<String> = (files.iter())
+        .filter(|file| !projection(file))
+        .filter(|file| {
+            (fs::read_to_string(file).expect("a readable source")).contains("types::lang")
+        })
+        .map(|file| file.display().to_string())
+        .collect();
+    against.sort();
+    assert!(
+        against.is_empty(),
+        "code generation reads the checker's lang items:\n{}",
+        against.join("\n")
+    );
+}
