@@ -33,6 +33,7 @@ test("the index and the example files match one to one", () => {
 
 for (const entry of entries) {
   test(`example ${entry.id}: ${entry.expect}`, () => {
-    verifyExample(`docs-examples/${entry.id}`, path.join(examples, `${entry.id}.fl`), entry.expect, path.join(examples, `${entry.id}.stdout`));
+    const fixture = path.join(examples, `${entry.id}.fetch.json`);
+    verifyExample(`docs-examples/${entry.id}`, path.join(examples, `${entry.id}.fl`), entry.expect, path.join(examples, `${entry.id}.stdout`), existsSync(fixture) ? fixture : undefined);
   });
 }

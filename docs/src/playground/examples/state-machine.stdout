@@ -1,0 +1,6 @@
+Ship "FL-42" rejected: payment required
+Pay -> Paid
+Pay rejected: already paid
+Ship "FL-42" -> Shipped "FL-42"
+Cancel rejected: already shipped
+Final: Shipped "FL-42"

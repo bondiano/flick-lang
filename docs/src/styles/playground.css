@@ -80,6 +80,9 @@ main:has(#flick-playground):not(:has(.tour-lesson)) .sl-container { max-width: n
   font-weight: 600;
 }
 .fp-gallery-button svg { flex-shrink: 0; color: var(--sl-color-gray-3); }
+.fp-gallery-button { anchor-name: --fp-gallery; }
+.fp-examples:has(:popover-open) .fp-gallery-button { border-color: var(--sl-color-accent-high); }
+.fp-examples:has(:popover-open) .fp-gallery-button svg { transform: rotate(180deg); }
 
 /* The gallery is a native popover: Escape and a click outside close it. */
 .fp-gallery {
@@ -88,11 +91,23 @@ main:has(#flick-playground):not(:has(.tour-lesson)) .sl-container { max-width: n
   margin: 12vh auto auto;
   padding: 1.25rem 1.5rem;
   overflow: auto;
-  border: 2px solid var(--sl-color-white);
+  border: 1px solid var(--fp-rule);
   background: var(--sl-color-bg);
   color: var(--sl-color-text);
 }
-.fp-gallery::backdrop { background: #0e111640; }
+.fp-gallery::backdrop { background: transparent; }
+@supports (position-area: bottom span-right) {
+  .fp-gallery {
+    position-anchor: --fp-gallery;
+    position-area: bottom span-right;
+    position-try-fallbacks: flip-inline;
+    inset: auto;
+    margin: 0.5rem 0 1rem;
+    max-height: min(40rem, calc(100% - 1.5rem));
+    justify-self: start;
+    align-self: start;
+  }
+}
 .fp-gallery-group + .fp-gallery-group { margin-top: 1rem; }
 .fp-gallery-group p { margin: 0 0 0.5rem; color: var(--sl-color-gray-3); font-size: 0.8125rem; font-weight: 600; }
 
@@ -437,6 +452,8 @@ main:has(#flick-playground):not(:has(.tour-lesson)) .sl-container { max-width: n
 /* A lesson of the tour: its text, then the editor over the output. From a
    laptop up the editor stays beside the text as it scrolls. */
 .tour-lesson { display: grid; gap: 1.5rem; }
+main:has(.tour-lesson) .sl-container { max-width: none; }
+.tour-prose { min-width: 0; max-width: 65ch; }
 .tour-lesson > .tour-prose > :first-child { margin-top: 0; }
 .tour-contents-link { font-size: 0.875rem; }
 .tour-lesson > .tour-editor { margin-top: 0; }
@@ -449,9 +466,18 @@ main:has(#flick-playground):not(:has(.tour-lesson)) .sl-container { max-width: n
 .tour-editor .fp-panes { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 3fr) minmax(0, 2fr); }
 .tour-editor .fp-split { display: none; }
 .tour-editor .fp-result { border-top: 1px solid var(--fp-rule); }
-@media (min-width: 64rem) {
-  .tour-lesson { grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); align-items: start; }
-  .tour-editor { position: sticky; top: calc(var(--sl-nav-height) + 1rem); }
+@media (min-width: 90rem) {
+  .tour-lesson { grid-template-columns: minmax(18rem, 28rem) minmax(0, 1fr); align-items: start; }
+  .tour-editor { position: sticky; top: calc(var(--sl-nav-height) + 1rem); container-type: inline-size; }
+}
+/* A wide editor can show the source and its output together. */
+@container (min-width: 64rem) {
+  .tour-editor .fp-panes,
+  .tour-editor .fp-workspace:has(.fp-lesson) .fp-panes {
+    grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+    grid-template-rows: minmax(0, 1fr);
+  }
+  .tour-editor .fp-result { border-top: 0; border-left: 1px solid var(--fp-rule); }
 }
 
 /* A phone or a narrow window stacks the panels and lets the page scroll. */
@@ -472,7 +498,7 @@ main:has(#flick-playground):not(:has(.tour-lesson)) .sl-container { max-width: n
 
 @media (max-width: 36rem) {
   .fp-example-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .fp-gallery { margin-top: 5vh; padding: 1rem; }
+  .fp-gallery { padding: 1rem; }
   .fp button { min-height: 2.75rem; padding-inline: 0.625rem; }
   .fp-example-options button { height: 100%; overflow-wrap: anywhere; }
   .fp-toolbar { gap: 0.625rem; padding: 0.75rem; }

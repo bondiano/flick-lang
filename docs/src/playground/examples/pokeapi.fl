@@ -1,0 +1,96 @@
+// Live GET requests: https://pokeapi.co/docs/v2/#pokemon
+// Run explicitly to fetch two Pokemon. Change either name to try another.
+// HTTP errors and invalid JSON are handled separately; there is no sample-data fallback.
+module Main exposing (main)
+
+import Http.Client
+import Http.ClientError exposing (HttpClientError(..))
+import Http.ClientResponse
+import Http.FetchClient
+
+type alias Named = { name : String }
+  deriving Schema
+
+named_json : PureCodec Json Named
+let named_json =
+  ignore_extra_fields
+    (codec Named.schema {
+      name = field "name" String.json;
+    })
+
+type alias PokemonType = { slot : Int; info : Named }
+  deriving Schema
+
+// The API calls this field "type"; our record gives it a Flick name.
+pokemon_type_json : PureCodec Json PokemonType
+let pokemon_type_json =
+  ignore_extra_fields
+    (codec PokemonType.schema {
+      slot = field "slot" Int.json;
+      info = field "type" named_json;
+    })
+
+// A schema checks the fields we use; the API's other fields are ignored.
+type alias Pokemon = {
+  id : Int;
+  name : String;
+  height : Int;
+  weight : Int;
+  types : List PokemonType;
+} deriving Schema
+
+pokemon_json : PureCodec Json Pokemon
+let pokemon_json = codec Pokemon.schema {
+  id = field "id" Int.json;
+  name = field "name" String.json;
+  height = field "height" Int.json;
+  weight = field "weight" Int.json;
+  types = field "types" (Codec.list pokemon_type_json);
+}
+
+type alias Summary = { id : Int; name : String; types : List String }
+  deriving Schema
+
+fetch_pokemon : String ->{Async, Http.Client.HttpClient; HttpClientError, SchemaError} Pokemon
+let fetch_pokemon name =
+  Http.Client.get ("https://pokeapi.co/api/v2/pokemon/" ++ name ++ "/")
+  |> Http.ClientResponse.filter_status_ok
+  |> Http.ClientResponse.schema_body_json (Codec.general (ignore_extra_fields pokemon_json))
+
+summarize : Pokemon -> Summary
+let summarize pokemon = {
+  id = pokemon.id;
+  name = pokemon.name;
+  types = List.map (fun item -> item.info.name) pokemon.types;
+}
+
+main : Unit ->{Async} Unit
+let main () =
+  try
+    let (first, second) = provide Http.FetchClient.layer {
+      parallel (task { fetch_pokemon "pikachu" }) (task { fetch_pokemon "bulbasaur" })
+    }
+    for pokemon <- [first, second] do {
+      Platform.stdout_line
+        (pokemon.name
+          ++ " (#"
+          ++ show pokemon.id
+          ++ "): "
+          ++ String.join ", " (summarize pokemon).types
+          ++ "; "
+          ++ show pokemon.height
+          ++ " dm, "
+          ++ show pokemon.weight
+          ++ " hg")
+    }
+    // Encode a smaller record for storage or an outgoing API payload.
+    let saved =
+      Codec.encode
+        (Codec.general (Codec.json (Schema.list Summary.schema)))
+        (List.map summarize [first, second])
+    Platform.stdout_line ("Serialized: " ++ Json.stringify saved)
+  with
+  | HttpClientError _ ->
+    Platform.stdout_line "Request failed. Check the connection and Pokemon names, then Run again."
+  | SchemaError _ ->
+    Platform.stdout_line "Invalid Pokemon data: the response does not match the schema."
