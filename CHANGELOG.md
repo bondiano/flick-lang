@@ -90,10 +90,12 @@ break programs.
 - **Plugins:** a plugin is told where each value it watches is named, with
   the declaration around it (`CallSite.binding`), as it was for the
   serializable atoms alone.
-- **The hidden row of data under a `forall`:** a parameter written
-  `forall t. File t -> G String` is read as Lean reads `.all`: its result
-  holds what its own parameters reach, so a callback for any region may
-  return data over the file it is given while the file's `scope` lasts.
+- **The hidden row of data under a `forall`:** data with hidden storage
+  written bare under a `forall` of a signature is read as the core reads
+  `.all`: a result there holds what the parameters before it reach of the
+  atoms outside the `forall`, never one of its binders. A callback typed
+  `forall a. File s -> a -> G a` may return data over the file of `s`; one
+  typed `forall t. File t -> G String` still may not over its own `t`.
 - **Deep nesting:** checking a nested `fun` or a `<|` takes far less of the
   stack, so the deepest code the parser accepts (198 nested functions with
   their signature, or 199 `<|` in a row) checks on a thread's 2 MiB stack,

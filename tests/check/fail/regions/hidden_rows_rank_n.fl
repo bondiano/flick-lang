@@ -1,18 +1,20 @@
-// What a callback with a `forall` returns holds what its own parameters
-// reach: a closure over the file it builds does not leave the `scope` of the
-// file through the outer result.
+// Under a `forall` a result holds none of its own binders (`Caps.under`): a
+// callback for any region cannot return data over the file it is given.
 module App.HiddenRowsRankNFail exposing (..)
 
 import File exposing (File, Path, FileSystem, OpenError, ReadError)
 
 type G a = G (Unit ->{Async, FileSystem; ReadError} a)
 
-made : (forall t. File t -> G String) -> File s -> G String
-let made make file = make file
+run : G a ->{Async, FileSystem; ReadError} a
+let run (G f) = f ()
 
-leaks : Path ->{Async, FileSystem; OpenError} G String
-let leaks path = scope {
+with_file : (forall t. File t -> G String) -> File s ->{Async, FileSystem; ReadError} String
+let with_file make file = run (make file)
+
+reads : Path ->{Async, FileSystem; OpenError, ReadError} String
+let reads path = scope {
   let file = File.open_scoped path
-  made (fun f -> G (fun _ -> File.read_all f)) file
+  with_file (fun f -> G (fun _ -> File.read_all f)) file
 }
-//~ FLICK-G001 @16:3-16:52 this value holds region `s`, but the expected type `G String` holds no captures
+//~ FLICK-G001 @18:23-18:51 this value holds `t`, but the expected type `G String` holds no captures

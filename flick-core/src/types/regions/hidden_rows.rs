@@ -129,7 +129,8 @@ impl Checker<'_> {
 
     /// `quantify` is off under a `∀` of the signature: `Ty.fresh` does not
     /// enter it, so a parameter there keeps its row empty, while its results
-    /// still hold what the parameters before them reach (`Ty.elide` of `.all`).
+    /// still hold what the parameters before them reach of the atoms outside
+    /// it (`Ty.elide` of `.all`, `Caps.under`).
     fn rows_of_stages(
         &self,
         t: &Type,
@@ -173,13 +174,44 @@ impl Checker<'_> {
                 constraints,
                 body,
             } => {
+                // a binder named as a name the row carries is renamed, so the
+                // row keeps its meaning under it
+                let carried = held.clone().into_type();
+                let renamed: Vec<(String, Type)> = (vars.iter())
+                    .filter(|v| {
+                        carried.contains(&mut |t| matches!(t, Type::Var(n) if *n == v.name))
+                    })
+                    .map(|v| {
+                        (
+                            v.name.clone(),
+                            Type::Var(format!("{}${}", v.name, kinds.len())),
+                        )
+                    })
+                    .collect();
+                let vars: Vec<Binder> = (vars.iter())
+                    .map(|v| match renamed.iter().find(|(n, _)| *n == v.name) {
+                        Some((_, Type::Var(name))) => Binder {
+                            name: name.clone(),
+                            kind: v.kind.clone(),
+                        },
+                        _ => v.clone(),
+                    })
+                    .collect();
+                // its binders count for nothing a row holds (`Caps.under`)
                 let outer = kinds.len();
-                kinds.extend(vars.iter().map(|v| (v.name.clone(), v.kind.clone())));
-                let body = self.rows_of_stages(body, held, kinds, fresh, depth, false);
+                kinds.extend(vars.iter().map(|v| (v.name.clone(), Kind::Type)));
+                let body = self.rows_of_stages(
+                    &body.substitute(&renamed),
+                    held,
+                    kinds,
+                    fresh,
+                    depth,
+                    false,
+                );
                 kinds.truncate(outer);
                 Type::Forall {
-                    vars: vars.clone(),
-                    constraints: constraints.clone(),
+                    vars,
+                    constraints: constraints.iter().map(|c| c.substitute(&renamed)).collect(),
                     body: Box::new(body),
                 }
             }
