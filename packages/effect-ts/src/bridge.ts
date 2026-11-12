@@ -32,4 +32,3 @@ export const hashSetFromEffect = /*#__PURE__*/ bound(adapter3.hashSetFromEffect)
 export const hashSetToEffect = /*#__PURE__*/ bound(adapter3.hashSetToEffect);
 export { Raise, asExit, exitOf, raiseOf } from "./bridge_kernel.ts";
 export { label } from "./atoms.ts";
-export { refinedParse } from "./schema/index.ts";

@@ -75,3 +75,11 @@ fn a_call_in_a_ui_body_keeps_its_arguments_on_its_line() {
     let long = "module App.V exposing (view)\n\nview : String -> String -> String -> Ui\nlet view first second third = ui {\n  text (String.join \", \" [first, second, third])\n  classed \"a class name that is long enough to pass the width of a line\" (text first) (text second)\n}\n";
     assert_eq!(super::fmt(long), long);
 }
+
+#[test]
+fn a_refined_type_is_laid_out_by_its_plugin() {
+    let messy = "module App.Ports exposing (..)\n\n/// A port of TCP.\nrefined   type Port=Float   where fun n->n>0&&n<65536 deriving Eq,Hash\n\nrefined type Tagged a = List a\n  where fun items -> not (List.is_empty items)\n";
+    let tidy = "module App.Ports exposing (..)\n\n/// A port of TCP.\nrefined type Port = Float where fun n -> n > 0 && n < 65536\n  deriving Eq, Hash\n\nrefined type Tagged a = List a where fun items -> not (List.is_empty items)\n";
+    assert_eq!(super::fmt(messy), tidy);
+    assert_eq!(super::fmt(tidy), tidy);
+}

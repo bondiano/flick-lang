@@ -88,11 +88,7 @@ impl<'n> Checker<'_> {
 
     /// Registers the instances of the module in source order: `instance`
     /// declarations and `deriving` clauses.
-    pub fn declare_instances(
-        &mut self,
-        decls: &[&'n Node],
-        refined: &[(&Node, Type)],
-    ) -> Vec<Declared<'n>> {
+    pub fn declare_instances(&mut self, decls: &[&'n Node]) -> Vec<Declared<'n>> {
         let mut out = Vec::new();
         let mut implicit = false;
         for &decl in decls {
@@ -127,7 +123,7 @@ impl<'n> Checker<'_> {
                     }
                 }
                 K::TypeDecl | K::ErrorDecl => {
-                    out.extend(self.derive(decl, refined));
+                    out.extend(self.derive(decl));
                     out.extend(self.enum_instance(decl));
                 }
                 _ => {}

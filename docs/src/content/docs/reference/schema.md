@@ -19,10 +19,15 @@ refined type Email = String where Checks.email
 ```
 
 A refined type is nominal: its values are those of the base type that pass
-the predicate, a pure `Bool` function. It has no constructor; its
-companions are `T.parse : U -> Result SchemaError T` and
-`T.value : T -> U`, and with `deriving Schema` also `T.json`, its JSON
-codec. The value is represented as the base value.
+the predicate, a pure `Bool` function. It has no constructor a program can
+name; its companions are `T.parse : U -> Result SchemaError T`,
+`T.value : T -> U` and the predicate itself, `T.check : U -> Bool`, and with
+`deriving Schema` also `T.json`, its JSON codec. The value is represented as
+the base value, and another module sees the type as an opaque one.
+
+`refined type` is a declaration of the plugin of `std`, which writes the
+type and its companions as code of the language; `flick expand` shows it.
+`refined` is no reserved word.
 
 `T.parse` of a constant is checked when the program compiles if the
 compiler knows the check — a `Checks` function (`Checks.email`,

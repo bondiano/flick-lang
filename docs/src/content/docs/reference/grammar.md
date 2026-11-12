@@ -35,9 +35,9 @@ Qualified names are written without spaces around `.`: `Users.get`,
 
 ```text
 module exposing import as let mut rec fun match with try if then else task await
-scope provide ignore todo echo type opaque refined where kind error service class
+scope provide ignore todo echo type opaque where kind error service class
 instance deriving foreign from forall not none true false
-ui in when for yield do break continue
+in when for yield do break continue
 ```
 
 Contextual words are ordinary names everywhere except in one position:
@@ -266,7 +266,7 @@ let         = "let" ["rec"] (name { atom_pattern } | pattern) [":" type] "=" blo
 rec_group   = "rec" "{" { signature | let } "}"
 type_decl   = ["opaque"] "type" Con { param } ["=" variants] [deriving]
             | ["opaque"] "type" "alias" Con { param } "=" type [deriving]
-            | "refined" "type" Con { param } "=" type "where" expr [deriving]
+            | "refined" "type" Con { param } "=" type "where" expr [deriving]    (a declaration of std's plugin)
             | ["opaque"] ("unboxed" | "untagged") "type" Con { param } "=" variants [deriving]
 variants    = ["|"] variant { "|" variant }
 variant     = Con { capture } ["=" literal] [":" type]

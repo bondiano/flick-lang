@@ -15,7 +15,6 @@ use crate::iface::Namespace;
 use crate::source::Span;
 use crate::syntax::cst::{Node, foreign_words};
 use crate::syntax::kind::SyntaxKind as K;
-use crate::types::lang::Lang;
 
 mod cycles;
 
@@ -89,22 +88,22 @@ impl<'a> Checker<'a> {
             .nodes()
             .filter(|n| !matches!(n.kind, K::ModuleHeader | K::ImportDecl))
             .collect();
-        let refined = self.declare_types(&decls);
+        self.declare_types(&decls);
         self.declare_cells(&decls);
         self.declare_classes(&decls);
         if let Some(header) = tree.nodes().find(|n| n.kind == K::ModuleHeader) {
             self.imported_conflicts(self.span(header));
         }
-        let declared = self.declare_instances(&decls, &refined);
-        self.declare_schemas(&decls, &refined);
-        for decl in &decls {
-            if decl.has_token(K::RefinedKw)
-                && let (Some(name), Some(predicate)) = (
-                    self.con_token(decl),
-                    decl.nodes().find(|n| n.kind == K::Refinement),
-                )
+        let declared = self.declare_instances(&decls);
+        self.declare_schemas(&decls);
+        // the check of a type is its companion `T$check`: a constant given
+        // to `T$parse` is read against it
+        for decl in decls.iter().filter(|d| d.kind == K::LetDecl) {
+            let parts = let_parts(decl, self.text);
+            if let (Some(name), Some(body)) = (parts.name, parts.body)
+                && let Some(ty) = name.strip_suffix("$check")
             {
-                self.predicates.insert(name, predicate);
+                self.predicates.insert(ty.to_owned(), body);
             }
         }
         self.collect(&decls);
@@ -119,12 +118,6 @@ impl<'a> Checker<'a> {
                 self.foreign_info(decl, &scheme);
                 self.settle_operators();
             }
-        }
-        for (predicate, base) in refined {
-            if let Some(expr) = predicate.nodes().next() {
-                self.check(expr, &Type::pure_fun(base, Type::lang(Lang::Bool)));
-            }
-            self.settle_operators();
         }
         self.record_atom_bindings(&decls);
         self.class_defaults(&decls);

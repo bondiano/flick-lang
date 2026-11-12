@@ -137,19 +137,6 @@ func (s *Schema) refine(fb *Fiber, v Value) []issue {
 	return nil
 }
 
-// RefinedParse is a refined type's `parse`: its check as a Result.
-func RefinedParse(name string, check Value) Value {
-	return Fn(func(fb *Fiber, v Value) Value {
-		if !Apply(fb, check, v).(bool) {
-			return Err(schemaErrorOf(fail("not a valid " + name)))
-		}
-		return Ok(v)
-	})
-}
-
-// RefinedValue is a refined type's `value`: the value of its base type.
-var RefinedValue Value = Fn(func(_ *Fiber, v Value) Value { return v })
-
 func SchemaLazy(name string, get func() Value) Value {
 	return &Schema{kind: kindLazy, name: name, get: get}
 }

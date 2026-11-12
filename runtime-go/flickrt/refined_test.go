@@ -17,9 +17,6 @@ func TestRefinedSchemaChecksBothWays(t *testing.T) {
 	if _, issues := json.encode(fb, "nope"); issues == nil {
 		t.Fatal("encode let a bad value through")
 	}
-	if r := Apply(fb, RefinedParse("Email", Fn(func(_ *Fiber, v Value) Value { return CheckEmail(v) })), "x y@b.c").(*Data); r.Tag != "Failure" {
-		t.Fatalf("parse gave %v", r.Tag)
-	}
 	if got := Format((&schemaExport{defs: &Record{}}).schema(sch(email), "")); got != `{"type":"string","format":"email"}` {
 		t.Fatalf("JSON Schema %s", got)
 	}

@@ -7,7 +7,7 @@ fn relocate_ir(module: &mut ir::Module, child: &str, parent: &str, local: &str) 
     let to = Relocation { child, parent, local };
     for item in &mut module.items {
         match &mut item.kind {
-            ir::ItemKind::Value { body, .. } | ir::ItemKind::Refined { check: body, .. } => {
+            ir::ItemKind::Value { body, .. } => {
                 to.expr(body);
             }
             ir::ItemKind::Destructure { pattern, body } => {
@@ -267,7 +267,7 @@ fn relocate_name(
 
 fn rename_item(item: &mut ir::Item, local: &str) {
     match &mut item.kind {
-        ir::ItemKind::Value { name, .. } | ir::ItemKind::Refined { name, .. } => {
+        ir::ItemKind::Value { name, .. } => {
             *name = runtime_name(local, name);
         }
         ir::ItemKind::Foreign(foreign) => {

@@ -30,3 +30,10 @@ type Shape = Dot | Circle Float
 type Drawing = Drawing Shape
   deriving Schema, Url
 //~ std/D009 @31:20-31:23 `Drawing.Drawing[0]`: a segment is a `String`, a `Float`, a `Bool`, a refined type over them, a type whose constructors have no fields or one that derives `Url`; only the last may be an `Option`
+
+refined type Labels = List String where fun labels -> not (List.is_empty labels)
+  deriving Schema
+
+type Labelled = Unlabelled | Labelled Labels
+  deriving Schema, Url
+//~ std/D009 @38:20-38:23 `Labelled.Labelled[0]`: a segment is a `String`, a `Float`, a `Bool`, a refined type over them, a type whose constructors have no fields or one that derives `Url`; only the last may be an `Option`

@@ -3,8 +3,6 @@
 //! std's plugin gives. Companions are values of the type's module, named as
 //! `T.parse`.
 
-use std::ptr;
-
 use super::Checker;
 use super::env::{Abi, EnumLit};
 use super::kinds::Kind;
@@ -19,7 +17,7 @@ impl Checker<'_> {
     /// Defines the companions of the module's refined types, `T$parse` and
     /// `T$value`; the witnesses of `deriving Schema`, `Url` and `Form` are
     /// the code std's plugin gives.
-    pub fn declare_schemas(&mut self, decls: &[&Node], refined: &[(&Node, Type)]) {
+    pub fn declare_schemas(&mut self, decls: &[&Node]) {
         let module = self.env.module.clone();
         for decl in decls
             .iter()
@@ -33,28 +31,6 @@ impl Checker<'_> {
                 Type::con(&module, &name),
                 binders.iter().map(|b| Type::Var(b.name.clone())),
             );
-            if decl.has_token(K::RefinedKw)
-                && let Some((_, base)) = refined
-                    .iter()
-                    .find(|(p, _)| decl.nodes().any(|n| ptr::eq(n, *p)))
-            {
-                let result = Type::apps(
-                    Type::lang(Lang::Result),
-                    [Type::lang(Lang::SchemaError), this.clone()],
-                );
-                self.companion(
-                    &name,
-                    "parse",
-                    &binders,
-                    Type::pure_fun(base.clone(), result),
-                );
-                self.companion(
-                    &name,
-                    "value",
-                    &binders,
-                    Type::pure_fun(this.clone(), base.clone()),
-                );
-            }
             // an enum's are the methods of its instance of `Enum`
             if let Some(Abi::Literal(literals)) = self.typing.abis.get(&name).cloned() {
                 let base = match literals.first() {

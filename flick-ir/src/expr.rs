@@ -56,13 +56,11 @@ pub struct Item {
 }
 
 impl Item {
-    /// Each expression the item holds: a body, the check of a refined type,
-    /// the methods of an instance and the `catch` mapping of a foreign
-    /// function.
+    /// Each expression the item holds: a body, the methods of an instance
+    /// and the `catch` mapping of a foreign function.
     pub fn each_body<'a>(&'a self, f: &mut impl FnMut(&'a Expr)) {
         match &self.kind {
             ItemKind::Value { body, .. } | ItemKind::Destructure { body, .. } => f(body),
-            ItemKind::Refined { check, .. } => f(check),
             ItemKind::Instance { methods, .. } => methods.iter().for_each(|(_, m)| f(m)),
             ItemKind::Foreign(foreign) => foreign.catch.iter().for_each(f),
             ItemKind::Constructor(_) | ItemKind::Service { .. } => {}
@@ -87,8 +85,6 @@ pub enum ItemKind {
     Constructor(Constructor),
     /// `service S`: its key is `Module.S`.
     Service { name: String, key: String },
-    /// A refined type `name`: its check `T$check`, and `T$parse`, `T$value`.
-    Refined { name: String, check: Expr },
     /// An instance with its methods; with a context, a function of the
     /// context's dictionaries.
     Instance {

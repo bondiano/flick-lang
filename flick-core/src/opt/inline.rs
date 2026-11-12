@@ -108,7 +108,6 @@ fn item_refs<'a>(item: &'a Item, module: &str, out: &mut HashMap<&'a str, usize>
         ItemKind::Value { body, .. } | ItemKind::Destructure { body, .. } => {
             refs(body, module, out);
         }
-        ItemKind::Refined { check, .. } => refs(check, module, out),
         ItemKind::Instance { methods, .. } => {
             for (_, m) in methods {
                 refs(m, module, out);

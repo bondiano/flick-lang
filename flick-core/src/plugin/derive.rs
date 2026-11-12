@@ -3,15 +3,15 @@
 //! block's code.
 
 mod declared;
+mod deriving;
 
 pub use declared::{Declared, declared};
+use deriving::Deriving;
 
 use flick_plugin::{Block, CaseTarget, DeriveTarget, Span as BlockSpan};
 
 use std::collections::{BTreeMap, HashMap};
 use std::sync::{Arc, OnceLock};
-
-use flick_plugin::Place;
 
 use super::expansion::{Expanded, Expansion};
 use super::render::render;
@@ -23,7 +23,7 @@ use crate::source::{FileId, Span};
 use crate::syntax::cst::{Element, Node, Token};
 use crate::syntax::kind::SyntaxKind as K;
 use crate::syntax::parse;
-use crate::types::{Thresholds, builtin_sources, implicit_package_of, is_type};
+use crate::types::{Thresholds, builtin_sources, is_type};
 
 /// A class a module declares with `@derive`, or a type such as `Schema`
 /// whose companions a plugin derives, and the package its attribute names,
@@ -128,14 +128,13 @@ pub fn target(
     let alias = decl
         .child_tokens()
         .any(|t| t.kind == K::Ident && t.text(text) == "alias");
-    let refined = decl.has_token(K::RefinedKw);
     Some(DeriveTarget {
         decl: block,
         name: named(name),
         params,
         cases,
         alias: body.filter(|_| alias).map(span),
-        wraps: body.filter(|_| refined).map(span),
+        wraps: None,
         local: qualifier.is_none(),
     })
 }
@@ -201,7 +200,7 @@ pub fn builtin_expansion(
     let declared: Vec<&Node> = (tree.nodes())
         .filter(|n| matches!(n.kind, K::TypeDecl | K::ErrorDecl))
         .collect();
-    let summary: Vec<DeriveTarget> = (declared.iter())
+    let mut summary: Vec<DeriveTarget> = (declared.iter())
         .filter_map(|d| {
             let source =
                 BlockSource::declaration(Arc::clone(&shared), file, d, Arc::clone(&heads), true);
@@ -210,71 +209,8 @@ pub fn builtin_expansion(
         .collect();
     let mut blocks = Vec::new();
     let mut diagnostics = Vec::new();
-    for decl in declared {
-        let Some(clause) = decl.nodes().find(|c| c.kind == K::DerivingClause) else {
-            continue;
-        };
-        for class in named(clause, text) {
-            // `@derive` alone: the plugin of the class's package
-            let marked = |m: &str| {
-                (builtin_derived(m).iter())
-                    .find(|d| d.class == class.name)
-                    .map(|d| {
-                        let own = implicit_package_of(m).map(str::to_owned);
-                        (m.to_owned(), d.package.clone().or(own))
-                    })
-            };
-            // as the loader finds it: the module, an import exposing it, the Prelude
-            let found = if class.qualifier.is_empty() {
-                marked(module)
-                    .or_else(|| {
-                        (syntax.imports.iter())
-                            .filter(|i| {
-                                (i.exposing.iter())
-                                    .any(|e| e.name == class.name || e.name.is_empty())
-                            })
-                            .find_map(|i| marked(&i.module))
-                    })
-                    .or_else(|| marked("Prelude"))
-            } else {
-                let import = syntax
-                    .imports
-                    .iter()
-                    .find(|i| i.qualifier() == class.qualifier);
-                marked(import.map_or(class.qualifier.as_str(), |i| i.module.as_str()))
-            };
-            let Some((owner, Some(package))) = found else {
-                continue;
-            };
-            let Some(plugin) = first_party::plugin(&package) else {
-                continue;
-            };
-            let mut source =
-                BlockSource::declaration(Arc::clone(&shared), file, decl, Arc::clone(&heads), true);
-            let Some(target) = target(decl, text, source.block(), None) else {
-                continue;
-            };
-            let full = format!("{owner}.{}", class.name);
-            let whole = Span::new(file, class.span.0, class.span.1);
-            let made = plugin.derive(&target, &full, None, &summary, &[], &mut source);
-            let Some(arena) = made_or(made, &package, &source, whole, &mut diagnostics) else {
-                continue;
-            };
-            let len = source.end() - source.start();
-            match render(&arena, len, Place::Declaration, &syntax.aliases()) {
-                Ok(rendered) => blocks.push(Expanded {
-                    node: decl.clone(),
-                    rendered,
-                    source,
-                    plugin: package,
-                    keep: true,
-                    whole: class.span,
-                }),
-                Err(why) => diagnostics.push(Diagnostic::error(codes::P036, why, whole)),
-            }
-        }
-    }
-    std_blocks(
+    // the blocks first: the types their code declares are the module's too
+    let typed = std_blocks(
         &shared,
         file,
         tree,
@@ -283,12 +219,64 @@ pub fn builtin_expansion(
         &mut blocks,
         &mut diagnostics,
     );
+    for declared in typed.iter().flat_map(|(_, _, types)| types) {
+        if let Ok(target) = &declared.target {
+            summary.push(target.clone());
+        }
+    }
+    let deriving = Deriving {
+        module,
+        syntax,
+        summary: &summary,
+    };
+    for decl in declared {
+        let Some(clause) = decl.nodes().find(|c| c.kind == K::DerivingClause) else {
+            continue;
+        };
+        for class in named(clause, text) {
+            let source =
+                BlockSource::declaration(Arc::clone(&shared), file, decl, Arc::clone(&heads), true);
+            let Some(target) = target(decl, text, source.block(), None) else {
+                continue;
+            };
+            let of = (class.qualifier.as_str(), class.name.as_str());
+            let made = deriving.run(
+                decl,
+                &target,
+                source,
+                of,
+                class.span,
+                true,
+                &mut diagnostics,
+            );
+            blocks.extend(made);
+        }
+    }
+    // the classes of the types the blocks declared: the block is the
+    // declaration each derive reads
+    for (node, whole, types) in &typed {
+        for (declared, class) in (types.iter()).flat_map(|d| d.classes.iter().map(move |c| (d, c)))
+        {
+            let source = BlockSource::new(Arc::clone(&shared), file, node, Arc::clone(&heads))
+                .map(|s| s.in_module(module, tree));
+            let (Ok(target), Some(source)) = (&declared.target, source) else {
+                continue;
+            };
+            let of = class.rsplit_once('.').unwrap_or(("", class));
+            let made = deriving.run(node, target, source, of, *whole, false, &mut diagnostics);
+            blocks.extend(made);
+        }
+    }
     if blocks.is_empty() {
         return (None, diagnostics);
     }
     blocks.sort_by_key(|b| b.node.range());
     checked_expansion(text, file, tree, blocks, diagnostics)
 }
+
+/// A block, what it stands for in the module, and the types its code
+/// declares.
+type Typed = (Node, (u32, u32), Vec<Declared>);
 
 fn checked_expansion(
     text: &str,
@@ -320,7 +308,8 @@ fn source_checks(blocks: &[Expanded]) -> Vec<EditorBlock> {
 /// The code of each block of std's plugin in `tree`, as the loader expands
 /// it, into `blocks`: the blocks of the module, then those in the user's
 /// code of the ones the round before expanded, at most [`ROUNDS`] deep. One
-/// not closed, or nested deeper, is `P036`.
+/// not closed, or nested deeper, is `P036`. Gives each block whose code
+/// declares types, with those.
 fn std_blocks(
     shared: &Arc<str>,
     file: FileId,
@@ -329,9 +318,10 @@ fn std_blocks(
     syntax: &ModuleSyntax,
     blocks: &mut Vec<Expanded>,
     diagnostics: &mut Vec<Diagnostic>,
-) {
+) -> Vec<Typed> {
+    let mut typed = Vec::new();
     let Some(plugin) = first_party::plugin(first_party::PACKAGE) else {
-        return;
+        return typed;
     };
     let (heads, aliases) = (&syntax.heads(), syntax.aliases());
     let own = |n: &Node| {
@@ -369,11 +359,14 @@ fn std_blocks(
     let mut round = take(nodes, &top, diagnostics);
     for _ in 0..=ROUNDS {
         if round.is_empty() {
-            return;
+            return typed;
         }
         let expanded = std_round(plugin.as_ref(), module, round, &aliases, diagnostics);
         let mut next = Vec::new();
-        for block in expanded {
+        for (block, types) in expanded {
+            if !types.is_empty() {
+                typed.push((block.node.clone(), block.whole, types));
+            }
             let trees: Vec<Node> = (block.rendered.holes.iter())
                 .filter_map(|&(_, hole)| block.source.hole_tree(hole))
                 .collect();
@@ -392,6 +385,7 @@ fn std_blocks(
     }
     let deep = format!("this block is nested in more than {ROUNDS} blocks");
     diagnostics.extend(round.iter().map(|(n, _)| unexpanded(n, &deep)));
+    typed
 }
 
 /// The code std's plugin gives for each block of `round`, collected as one
@@ -402,7 +396,7 @@ fn std_round(
     round: Vec<(Node, BlockSource)>,
     aliases: &[(String, String)],
     diagnostics: &mut Vec<Diagnostic>,
-) -> Vec<Expanded> {
+) -> Vec<(Expanded, Vec<Declared>)> {
     let file = round[0].1.file();
     let failed = |why: String, node: &Node| {
         let (start, end) = node.range();
@@ -440,15 +434,19 @@ fn std_round(
         let Some(arena) = made_or(made, first_party::PACKAGE, &source, whole, diagnostics) else {
             continue;
         };
+        let types = declared(&arena, block);
         match render(&arena, block.whole().end, source.place(), aliases) {
-            Ok(rendered) => out.push(Expanded {
-                node,
-                rendered,
-                source,
-                plugin: first_party::PACKAGE.into(),
-                keep: false,
-                whole: (start, end),
-            }),
+            Ok(rendered) => out.push((
+                Expanded {
+                    node,
+                    rendered,
+                    source,
+                    plugin: first_party::PACKAGE.into(),
+                    keep: false,
+                    whole: (start, end),
+                },
+                types,
+            )),
             Err(why) => diagnostics.push(Diagnostic::error(codes::P036, why, whole)),
         }
     }

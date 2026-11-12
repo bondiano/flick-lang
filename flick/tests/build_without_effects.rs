@@ -113,3 +113,21 @@ fn a_build_without_effects_runs_without_loading_effect() {
     assert_eq!(run.status.code(), Some(0), "{run:?}");
     assert_eq!(String::from_utf8_lossy(&run.stdout), "[3, 6]\ntrue\n0\n");
 }
+
+/// A refined type is code of the language: its `parse` needs no Effect.
+#[test]
+fn a_build_without_effects_takes_a_refined_type() {
+    let dir = project(
+        "build_without_effects_refined",
+        "module App.Main exposing (main, port)\n\nrefined type Port = Float where fun n -> n > 0\n\nport : Result SchemaError Port\nlet port = Port.parse 80\n\nmain : Unit -> Unit\nlet main () = ()\n",
+    );
+    let out = flick_in(&dir, &["build"]);
+    assert!(out.status.success(), "{out:?}");
+    let mut imported = Vec::new();
+    specifiers(&dir.join("dist"), &mut imported);
+    let outside: Vec<&String> = imported
+        .iter()
+        .filter(|s| !s.starts_with('.') && !s.starts_with("@flick-lang/runtime/core"))
+        .collect();
+    assert!(outside.is_empty(), "{outside:?}");
+}

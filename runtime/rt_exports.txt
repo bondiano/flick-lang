@@ -296,7 +296,6 @@
 @flick-lang/runtime/core/index powInt
 @flick-lang/runtime/core/index raceFirst
 @flick-lang/runtime/core/index raceSuccess
-@flick-lang/runtime/core/index refinedParse
 @flick-lang/runtime/core/index remBigInt
 @flick-lang/runtime/core/index remInt
 @flick-lang/runtime/core/index resultMap2
@@ -498,7 +497,6 @@
 @flick-lang/runtime/core/stubs parallelResults
 @flick-lang/runtime/core/stubs raceFirst
 @flick-lang/runtime/core/stubs raceSuccess
-@flick-lang/runtime/core/stubs refinedParse
 @flick-lang/runtime/core/stubs routeCodec
 @flick-lang/runtime/core/stubs routeNested
 @flick-lang/runtime/core/stubs routeWords
@@ -860,7 +858,6 @@
 @flick-lang/runtime/rt refModify
 @flick-lang/runtime/rt refSame
 @flick-lang/runtime/rt refSet
-@flick-lang/runtime/rt refinedParse
 @flick-lang/runtime/rt remBigInt
 @flick-lang/runtime/rt remInt
 @flick-lang/runtime/rt reportedDefects

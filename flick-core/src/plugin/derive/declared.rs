@@ -1,6 +1,6 @@
-//! The types the code of a block declares that name classes in `deriving`:
-//! what the derive of each class is told of one, as of a declaration of the
-//! module. The block is the declaration, and the fields of the type are the
+//! The types the code of a block declares: what the derive of a class is
+//! told of one, its own in `deriving` or a neighbour's, as of a declaration
+//! of the module. The block is the declaration, and the fields of the type are the
 //! types the user wrote in it.
 
 use flick_plugin::{Arena, Block, CaseTarget, Decl, DeriveTarget, Kind, Span, Ty};
@@ -12,7 +12,7 @@ pub struct Declared {
     pub classes: Vec<String>,
 }
 
-/// Each type `arena`, the code of `block`, declares with classes to derive.
+/// Each type `arena`, the code of `block`, declares.
 pub fn declared(arena: &Arena, block: &Block) -> Vec<Declared> {
     let field = |id: u32| match arena.nodes.get(id as usize).map(|n| &n.kind) {
         Some(Kind::Ty(Ty::Hole(span))) => Some(*span),
@@ -26,7 +26,7 @@ pub fn declared(arena: &Arena, block: &Block) -> Vec<Declared> {
                 cases,
                 deriving,
                 unboxed,
-            }) if !deriving.is_empty() => {
+            }) => {
                 let fields: Option<Vec<Vec<Span>>> = (cases.iter())
                     .map(|c| c.fields.iter().map(|&f| field(f)).collect())
                     .collect();

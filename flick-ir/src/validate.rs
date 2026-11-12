@@ -36,9 +36,7 @@ pub fn validate(
             v.span(item.span);
             match &item.kind {
                 ItemKind::Value { dicts, body, .. } => v.within(dicts, body),
-                ItemKind::Destructure { body, .. } | ItemKind::Refined { check: body, .. } => {
-                    v.expr(body);
-                }
+                ItemKind::Destructure { body, .. } => v.expr(body),
                 ItemKind::Instance { info, methods } => {
                     for (_, body) in methods {
                         v.within(&info.context, body);

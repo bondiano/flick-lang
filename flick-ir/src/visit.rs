@@ -112,9 +112,9 @@ impl Module {
         for item in &mut self.items {
             f(&mut item.span);
             match &mut item.kind {
-                ItemKind::Value { body, .. }
-                | ItemKind::Destructure { body, .. }
-                | ItemKind::Refined { check: body, .. } => body.each_span_mut(f),
+                ItemKind::Value { body, .. } | ItemKind::Destructure { body, .. } => {
+                    body.each_span_mut(f);
+                }
                 ItemKind::Instance { methods, .. } => {
                     for (_, body) in methods {
                         body.each_span_mut(f);

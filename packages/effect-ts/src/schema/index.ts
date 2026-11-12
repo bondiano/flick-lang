@@ -221,12 +221,6 @@ export const codecField = (label: string, spec: FieldSpec, rest: BlockFields): B
 export const codecRecord = (name: string, _schema: AnySchema, fields: BlockFields): AnySchema =>
   codecBlock(name, fields);
 
-/** A refined type's `parse`: its check as a `Result`. */
-export const refinedParse =
-  <A>(name: string, check: (value: A) => boolean) =>
-  (value: A): Result.Result<A, SchemaError> =>
-    check(value) ? ok(value) : err(schemaError("", `not a valid ${name}`));
-
 /** A refined type's witness from its base's. */
 export const refinedSchema = schemaRefined;
 

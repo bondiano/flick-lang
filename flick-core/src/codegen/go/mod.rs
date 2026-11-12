@@ -262,7 +262,7 @@ fn has_initializer(item: &ItemKind) -> bool {
     match item {
         ItemKind::Value { .. } => matches!(shape(item), Shape::Var),
         ItemKind::Instance { info, .. } => info.context.is_empty(),
-        ItemKind::Destructure { .. } | ItemKind::Refined { .. } => true,
+        ItemKind::Destructure { .. } => true,
         ItemKind::Foreign(_) | ItemKind::Constructor(_) | ItemKind::Service { .. } => false,
     }
 }

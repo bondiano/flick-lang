@@ -7,7 +7,7 @@ use std::mem;
 use super::expr::arrow_body;
 use super::{Callee, Gen, Target, indent, names};
 use crate::ir::{Expr, ExprKind, Item, ItemKind};
-use crate::types::{Constructor, Dict, InstanceInfo, Rep, companion_name, default_method};
+use crate::types::{Constructor, Dict, InstanceInfo, Rep, default_method};
 
 impl Gen<'_> {
     pub(super) fn items(&mut self, items: &[Item]) -> String {
@@ -107,7 +107,6 @@ impl Gen<'_> {
                 )
             }
             ItemKind::Instance { info, methods } => self.instance(info, methods),
-            ItemKind::Refined { name, check } => self.refined(name, check),
         }
     }
 
@@ -344,10 +343,6 @@ pub(super) fn defined(item: &Item) -> Vec<String> {
         ItemKind::Constructor(c) => vec![names::ident(&c.name)],
         ItemKind::Service { name, .. } => vec![names::service(name)],
         ItemKind::Instance { info, .. } => vec![names::instance(&info.name)],
-        ItemKind::Refined { name, .. } => ["check", "parse", "value"]
-            .iter()
-            .map(|m| companion_name(name, m))
-            .collect(),
     }
 }
 

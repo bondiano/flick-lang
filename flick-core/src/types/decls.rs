@@ -29,7 +29,7 @@ struct Pending<'n> {
 }
 
 impl Checker<'_> {
-    pub fn declare_types<'n>(&mut self, decls: &[&'n Node]) -> Vec<(&'n Node, Type)> {
+    pub fn declare_types(&mut self, decls: &[&Node]) {
         for decl in decls.iter().filter(|d| d.kind == K::KindDecl) {
             self.kind_decl(decl);
         }
@@ -39,11 +39,10 @@ impl Checker<'_> {
                 pending.push(p);
             }
         }
-        let mut refined = Vec::new();
         let mut bodies: Vec<Body> = pending.iter().map(|_| Body::None).collect();
         for i in self.conversion_order(&pending) {
             let p = &pending[i];
-            bodies[i] = self.with_params(&p.params, |this| this.body(p, &mut refined));
+            bodies[i] = self.with_params(&p.params, |this| this.body(p));
             if let Some(def) = self.env.type_def_mut(&p.name) {
                 match &bodies[i] {
                     Body::ModuleContract(requirements) => {
@@ -124,7 +123,6 @@ impl Checker<'_> {
         for p in &pending {
             self.check_abi(p.node, &p.name);
         }
-        refined
     }
 
     /// Registers the name and kind of a declaration before any body is read.
@@ -166,7 +164,6 @@ impl Checker<'_> {
             .collect();
         let has_body = decl.nodes().any(|n| is_type(n.kind));
         let (form, result) = match decl.kind {
-            K::TypeDecl if decl.has_token(K::RefinedKw) => (Form::NOMINAL, result),
             K::TypeDecl if !variants.is_empty() => (
                 Form::Adt {
                     constructors: variants,
@@ -234,7 +231,7 @@ impl Checker<'_> {
     }
 
     /// Converts what a declaration defines with its parameters in scope.
-    fn body<'n>(&mut self, p: &Pending<'n>, refined: &mut Vec<(&'n Node, Type)>) -> Body {
+    fn body(&mut self, p: &Pending) -> Body {
         let decl = p.node;
         match decl.kind {
             K::ModuleTypeDecl => {
@@ -261,13 +258,6 @@ impl Checker<'_> {
                 let Some(body) = decl.nodes().find(|n| is_type(n.kind)) else {
                     return Body::None;
                 };
-                if decl.has_token(K::RefinedKw) {
-                    let base = self.ty(body, &Kind::Type, Free::Reject);
-                    if let Some(predicate) = decl.nodes().find(|n| n.kind == K::Refinement) {
-                        refined.push((predicate, base));
-                    }
-                    return Body::None;
-                }
                 let Some(TypeDef { kind, .. }) = self.env.type_def(&self.env.module, &p.name)
                 else {
                     return Body::None;

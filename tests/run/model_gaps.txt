@@ -82,7 +82,7 @@ schema/enums # no native for `unsafe_record` (flick:rt schemaRecordOf)
 schema/json_wire # a `BigInt` literal has no λFlick form
 schema/policies # no native for `count` (./count.mjs count)
 schema/route # no native for `encodable` (./route.mjs encodable)
-schema/route_nested # no definition of `App.Main.Slug$parse`
+schema/route_nested # no native for `non_empty` (flick:rt checkNonEmpty)
 sql/queries # a `BigInt` literal has no λFlick form
 stdlib/cli/cli # the row primitive `Lacks "name" { color : Option Color; loud : Bool; times : Float }`
 stdlib/cli/cli_exit # the row primitive `Lacks "times" {}`
