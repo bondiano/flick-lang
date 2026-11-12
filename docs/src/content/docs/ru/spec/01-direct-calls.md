@@ -87,7 +87,7 @@ let load_view id =
 ```flick
 greet : String -> String -> String
 let greet prefix name =
-  prefix ++ ", " ++ name
+  "\{prefix}, \{name}"
 
 hello : String -> String
 let hello =

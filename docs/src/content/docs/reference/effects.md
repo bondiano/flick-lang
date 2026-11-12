@@ -20,7 +20,7 @@ calls count against the last arrow of its signature.
 greet : String -> String ->{Log; none} String
 let greet prefix name =
   Log.info name
-  prefix ++ name
+  "\{prefix}\{name}"
 
 hello : String ->{Log; none} String
 let hello =
@@ -606,7 +606,7 @@ An effect is handled by the arms of a `try` (`FLICK-E016`).
 #   greet : String ->{} String
 #
 greeter : Greeter.Impl
-let greeter = { greet = fun name -> "hello, " ++ name }
+let greeter = { greet = fun name -> "hello, \{name}" }
 
 greeted : Unit ->{} String
 let greeted () = provide Greeter greeter { Greeter.greet "ada" }

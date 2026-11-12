@@ -7,8 +7,8 @@ flaky : Ref Float -> Eff none {Flaky} String
 let flaky calls = task {
   let n = Ref.get calls + 1
   Ref.set calls n
-  Platform.stdout_line ("attempt " ++ show n)
-  if n < 3 then from_result (Err (Flaky n)) else "done after " ++ show n
+  Platform.stdout_line "attempt \{n}"
+  if n < 3 then from_result (Err (Flaky n)) else "done after \{n}"
 }
 
 main : Unit ->{Async} Unit
@@ -16,5 +16,5 @@ let main () =
   let calls = Ref.make 0
   let result =
     try Effect.retry (Schedule.recurs 5) (flaky calls) with
-    | Flaky n -> "gave up at " ++ show n
+    | Flaky n -> "gave up at \{n}"
   Platform.stdout_line result

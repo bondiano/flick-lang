@@ -1,6 +1,6 @@
 ---
 title: "Эффекты, ошибки и сервисы"
-source_hash: 37b09e7c6ed457bd
+source_hash: 33a98d24e9669a4c
 ---
 
 Компилятор проверяет, где допустимы эффектные вызовы, какие сервисы им нужны
@@ -25,7 +25,7 @@ source_hash: 37b09e7c6ed457bd
 greet : String -> String ->{Log; none} String
 let greet prefix name =
   Log.info name
-  prefix ++ name
+  "\{prefix}\{name}"
 
 hello : String ->{Log; none} String
 let hello =
@@ -634,7 +634,7 @@ let escaped body =
 #   greet : String ->{} String
 #
 greeter : Greeter.Impl
-let greeter = { greet = fun name -> "hello, " ++ name }
+let greeter = { greet = fun name -> "hello, \{name}" }
 
 greeted : Unit ->{} String
 let greeted () = provide Greeter greeter { Greeter.greet "ada" }

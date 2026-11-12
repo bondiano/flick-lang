@@ -14,7 +14,7 @@ module Books exposing (Book, add, finish, pages_left, line) =
   let pages_left books = List.sum [for book <- books; if not book.read yield book.pages]
 
   line : Book -> String
-  let line book = (if book.read then "[x] " else "[ ] ") ++ book.title
+  let line book = "\{if book.read then "[x] " else "[ ] "}\{book.title}"
 
 main : Unit ->{} Unit
 let main () =

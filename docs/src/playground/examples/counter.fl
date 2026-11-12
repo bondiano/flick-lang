@@ -12,7 +12,7 @@ component counter () = ui {
         on_click = Ui.Event.exhaust (fun _ -> task { Atom.update count (fun n -> n + 1) });
       }
       (text "+1")
-    text (" clicked " ++ show (Atom.value count) ++ " times")
+    text " clicked \{Atom.value count} times"
 }
 
 main : Unit ->{Async; AppError} Unit

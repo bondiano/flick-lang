@@ -3,6 +3,61 @@ import { expect, test } from "@playwright/test";
 
 import { hoverWord, ready, replaceSource } from "./helpers.ts";
 
+test("interpolated strings keep code colours through themes, sizes and edits", async ({ page }) => {
+  await page.goto("/flick-lang/play/");
+  await ready(page);
+  const source = String.raw`module Main exposing (main)
+
+main : Unit ->{} Unit
+let main () =
+  let pokemon = { name = "Pikachu"; id = 25 }
+  Platform.stdout_line "Pokémon \{pokemon.name} (#\{pokemon.id}): \{String.join ", " ["electric"]} done"
+`;
+  await replaceSource(page, source);
+  await expect(page.locator(".fp-status")).toContainText("Type-checked", { timeout: 30_000 });
+  const line = page.locator(".cm-line", { hasText: 'Platform.stdout_line "Pokémon' });
+  await expect(line.locator(".fp-token-string").first()).toBeVisible();
+  for (const width of [390, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+    for (const theme of ["light", "dark"]) {
+      await page.locator("html").evaluate((element, theme) => { element.dataset.theme = theme; }, theme);
+      const colours = await line.evaluate((element) => {
+        const colour = (word: string): string => {
+          const at = element.textContent?.indexOf(word) ?? -1;
+          if (at < 0) throw new Error(`no ${word} in the line`);
+          const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
+          let offset = 0;
+          for (let node = walker.nextNode(); node !== null; node = walker.nextNode()) {
+            offset += node.textContent?.length ?? 0;
+            if (offset > at && node.parentElement !== null) return getComputedStyle(node.parentElement).color;
+          }
+          throw new Error(`no ${word} in the line`);
+        };
+        return {
+          code: getComputedStyle(element).color,
+          variable: colour("pokemon.name"),
+          member: colour("pokemon.id"),
+          string: colour("Pokémon"),
+          nested: colour("electric"),
+          tail: colour("done"),
+          delimiter: colour("\\{"),
+        };
+      });
+      expect(colours.variable).toBe(colours.code);
+      expect(colours.member).toBe(colours.code);
+      expect(colours.string).not.toBe(colours.code);
+      expect(colours.nested).toBe(colours.string);
+      expect(colours.tail).toBe(colours.string);
+      expect(colours.delimiter).not.toBe(colours.string);
+      await page.screenshot({ path: test.info().outputPath(`interpolation-${width}-${theme}.png`), fullPage: true });
+    }
+  }
+  await replaceSource(page, source.replace("pokemon.name", "String.to_upper pokemon.name"));
+  await expect(page.locator(".fp-status")).toContainText("Type-checked", { timeout: 30_000 });
+  await page.getByRole("button", { name: "Run", exact: true }).click();
+  await expect(page.locator(".fp-output")).toContainText("Pokémon PIKACHU (#25): electric done", { timeout: 60_000 });
+});
+
 test("Run prints what the program writes", async ({ page }) => {
   await page.goto("/flick-lang/play/");
   await ready(page);

@@ -14,7 +14,7 @@ let token = Atom.on_server None (Atom.stored "jwtToken")
 
 /// The `Authorization` header of a token.
 credentials : Option String -> Credentials
-let credentials jwt = { authorization = Option.map (fun t -> "Token " ++ t) jwt }
+let credentials jwt = { authorization = Option.map (fun t -> "Token \{t}") jwt }
 
 /// A request with only the headers of `jwt`.
 asking : Option String -> HttpApi.Request Unit Unit Credentials Unit
@@ -57,4 +57,4 @@ let signed_in () =
 unreachable : HttpApi.ClientError -> Problems
 let unreachable failure =
   match failure with
-  | HttpApi.ClientError e -> [("", ["the server answered " ++ show e.status ++ ": " ++ e.message])]
+  | HttpApi.ClientError e -> [("", ["the server answered \{e.status}: \{e.message}"])]

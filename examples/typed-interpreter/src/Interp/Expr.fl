@@ -36,6 +36,6 @@ let rec pretty e =
   | Plus -> "(+)"
   | Less -> "(<)"
   | Not -> "not"
-  | If c t f -> "if " ++ pretty c ++ " then " ++ pretty t ++ " else " ++ pretty f
-  | Apply f x -> "(" ++ pretty f ++ " " ++ pretty x ++ ")"
+  | If c t f -> "if \{pretty c} then \{pretty t} else \{pretty f}"
+  | Apply f x -> "(\{pretty f} \{pretty x})"
   | Named name _ -> name

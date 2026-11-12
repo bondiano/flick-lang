@@ -238,12 +238,12 @@ let laws = [
             }
             f : Float -> Eff none {Offline} Float
             let f x = task {
-              Ref.update trace (fun xs -> xs ++ ["f " ++ show x])
+              Ref.update trace (fun xs -> xs ++ ["f \{show x}"])
               if (x + branch) % 3 == 0 then from_result (Err (Offline x)) else a * x + b
             }
             g : Float -> Eff none {Offline} Float
             let g x = task {
-              Ref.update trace (fun xs -> xs ++ ["g " ++ show x])
+              Ref.update trace (fun xs -> xs ++ ["g \{show x}"])
               if (x - branch) % 4 == 0 then from_result (Err (Offline x)) else b * x - a
             }
             let left_identity = flat_map f (pure n)
@@ -286,7 +286,7 @@ let laws = [
             }
             f : Float -> Eff none {Offline} Float
             let f x = task {
-              Ref.update trace (fun xs -> xs ++ ["f " ++ show x])
+              Ref.update trace (fun xs -> xs ++ ["f \{show x}"])
               if x + branch == 0 then from_result (Err (Offline x)) else a * x + b
             }
             let bound = flat_map f source
@@ -326,9 +326,9 @@ let laws = [
               if branch < 0 then
                 (Err branch, ["source"])
               else if n + branch == 0 then
-                (Err n, ["source", "f " ++ show n])
+                (Err n, ["source", "f \{n}"])
               else
-                (Ok (a * n + b), ["source", "f " ++ show n])
+                (Ok (a * n + b), ["source", "f \{n}"])
             cold
               && (base_result, base_trace) == expected_base
               && maybe_l == maybe_r
@@ -416,7 +416,7 @@ let behavior = [
       let handle problem =
         lift
           (task {
-            Ref.update trace (fun xs -> xs ++ ["handler " ++ problem])
+            Ref.update trace (fun xs -> xs ++ ["handler \{problem}"])
             9
           })
       let caught = catch_error handle failed

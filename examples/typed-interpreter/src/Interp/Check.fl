@@ -47,7 +47,7 @@ rec {
     | Ok (Typed got e) ->
       match Ty.equal got want with
       | Some Refl -> Ok e
-      | None -> Err ("expected " ++ Ty.describe want ++ ", found " ++ Ty.describe got)
+      | None -> Err "expected \{Ty.describe want}, found \{Ty.describe got}"
     | Err why -> Err why
 
   /// The operator `op` applied to two `Int` operands.

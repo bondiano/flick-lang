@@ -6,7 +6,7 @@ let age text =
   match Int.parse text with
   | Some n when n >= 0 -> Ok n
   | Some _ -> Err "an age is not negative"
-  | None -> Err ("not a number: " ++ text)
+  | None -> Err "not a number: \{text}"
 
 main : Unit ->{} Unit
 let main () =

@@ -11,7 +11,7 @@ identity : a -> a
 let identity value = value
 
 greet : String -> String -> String
-let greet prefix name = prefix ++ ", " ++ name
+let greet prefix name = "\{prefix}, \{name}"
 
 hello : String -> String
 let hello = greet "Hello"
@@ -306,10 +306,10 @@ foreign off from "./bindings.mjs" "off"
 
 report : Failure none ->{} Unit
 let report failure =
-  Platform.stdout_line ("supervisor: " ++ RawCause.describe (Failure.inspect failure))
+  Platform.stdout_line "supervisor: \{RawCause.describe (Failure.inspect failure)}"
 
 handle : Float -> Eff none none Unit
-let handle n = task { Platform.stdout_line ("handled " ++ show n) }
+let handle n = task { Platform.stdout_line "handled \{n}" }
 
 listen_while : Emitter -> (Unit ->{} Unit) ->{} Unit
 let listen_while source work = scope s {

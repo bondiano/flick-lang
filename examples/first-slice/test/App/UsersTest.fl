@@ -47,7 +47,7 @@ let tests = [
           }
           view.title
         with
-        | NotFound id -> "missing " ++ show id
+        | NotFound id -> "missing \{show id}"
       Test.expect (Test.equal "missing \"nobody\"" outcome)
       Test.expect (Test.equal [] (Ref.get lines))
     }),

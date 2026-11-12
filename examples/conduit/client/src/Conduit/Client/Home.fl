@@ -82,7 +82,7 @@ let toggle signed listing = ui {
     if signed then [feed_tab (listing == Following) (page_of Following 1) "Your Feed"] else []
   let tagged =
     match listing with
-    | Tagged t -> [feed_tab true (page_of listing 1) ("# " ++ t)]
+    | Tagged t -> [feed_tab true (page_of listing 1) "# \{t}"]
     | Global -> []
     | Following -> []
   div { class_name = "feed-toggle" }

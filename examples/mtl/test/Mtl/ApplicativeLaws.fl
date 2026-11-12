@@ -26,27 +26,25 @@ let list_functions = Gen.list 3 functions
 
 results : Gen.Gen (Result String Float)
 let results =
-  Gen.map (fun (ok, x) -> if ok then Ok x else Err ("value:" ++ show x)) (Gen.pair Gen.bool ints)
+  Gen.map (fun (ok, x) -> if ok then Ok x else Err "value:\{show x}") (Gen.pair Gen.bool ints)
 
 result_functions : Gen.Gen (Result String (Float -> Float))
 let result_functions =
   Gen.map
-    (fun (ok, x, f) -> if ok then Ok f else Err ("function:" ++ show x))
+    (fun (ok, x, f) -> if ok then Ok f else Err "function:\{show x}")
     (triple Gen.bool ints functions)
 
 validations : Gen.Gen (Validation (List String) Float)
 let validations =
   Gen.map
-    (fun (valid, x) ->
-      if valid then Validation.valid x else Validation.invalid ["value:" ++ show x]
-    )
+    (fun (valid, x) -> if valid then Validation.valid x else Validation.invalid ["value:\{show x}"])
     (Gen.pair Gen.bool ints)
 
 validation_functions : Gen.Gen (Validation (List String) (Float -> Float))
 let validation_functions =
   Gen.map
     (fun (valid, x, f) ->
-      if valid then Validation.valid f else Validation.invalid ["function:" ++ show x]
+      if valid then Validation.valid f else Validation.invalid ["function:\{show x}"]
     )
     (triple Gen.bool ints functions)
 

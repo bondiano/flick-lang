@@ -24,7 +24,7 @@ let greet =
     /// Who to greet
     arg name : String
     handle fun { loud; times; name } ->
-      let text = "Hello, " ++ name
+      let text = "Hello, \{name}"
       let line = if loud then String.to_upper text else text
       Platform.stdout_line (String.join "\n" (List.repeat times line))
   }

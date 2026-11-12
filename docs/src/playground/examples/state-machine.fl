@@ -28,14 +28,14 @@ apply : State -> Event ->{} State
 let apply state event =
   match step state event with
   | Ok next ->
-    Platform.stdout_line (show event ++ " -> " ++ show next)
+    Platform.stdout_line "\{show event} -> \{show next}"
     next
   | Err reason ->
-    Platform.stdout_line (show event ++ " rejected: " ++ reason)
+    Platform.stdout_line "\{show event} rejected: \{reason}"
     state
 
 main : Unit ->{} Unit
 let main () =
   let mut state = AwaitingPayment
   for event <- [Ship "FL-42", Pay, Pay, Ship "FL-42", Cancel] do { state = apply state event }
-  Platform.stdout_line ("Final: " ++ show state)
+  Platform.stdout_line "Final: \{show state}"

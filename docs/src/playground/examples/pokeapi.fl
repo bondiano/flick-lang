@@ -53,7 +53,7 @@ type alias Summary = { id : Int; name : String; types : List String }
 
 fetch_pokemon : String ->{Async, Http.Client.HttpClient; HttpClientError, SchemaError} Pokemon
 let fetch_pokemon name =
-  Http.Client.get ("https://pokeapi.co/api/v2/pokemon/" ++ name ++ "/")
+  Http.Client.get "https://pokeapi.co/api/v2/pokemon/\{name}/"
   |> Http.ClientResponse.filter_status_ok
   |> Http.ClientResponse.schema_body_json (Codec.general (ignore_extra_fields pokemon_json))
 
@@ -72,23 +72,14 @@ let main () =
     }
     for pokemon <- [first, second] do {
       Platform.stdout_line
-        (pokemon.name
-          ++ " (#"
-          ++ show pokemon.id
-          ++ "): "
-          ++ String.join ", " (summarize pokemon).types
-          ++ "; "
-          ++ show pokemon.height
-          ++ " dm, "
-          ++ show pokemon.weight
-          ++ " hg")
+        "\{pokemon.name} (#\{pokemon.id}): \{String.join ", " (summarize pokemon).types}; \{pokemon.height} dm, \{pokemon.weight} hg"
     }
     // Encode a smaller record for storage or an outgoing API payload.
     let saved =
       Codec.encode
         (Codec.general (Codec.json (Schema.list Summary.schema)))
         (List.map summarize [first, second])
-    Platform.stdout_line ("Serialized: " ++ Json.stringify saved)
+    Platform.stdout_line "Serialized: \{Json.stringify saved}"
   with
   | HttpClientError _ ->
     Platform.stdout_line "Request failed. Check the connection and Pokemon names, then Run again."

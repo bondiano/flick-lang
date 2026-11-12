@@ -35,7 +35,7 @@ let checkout user =
     "checkout"
     (span "user" user)
     (task {
-      Tracer.with_span "pay" (span "amount" "42") (task { Effect.log ("paid by " ++ user) })
+      Tracer.with_span "pay" (span "amount" "42") (task { Effect.log "paid by \{user}" })
       Metric.update 1 orders
     })
 
@@ -51,7 +51,7 @@ let main () =
   }
   // only the tasks given the audit tracer trace to its service
   scope {
-    let audit = Otlp.tracer { url = url ++ "/v1/traces"; service_name = "flick-audit" }
+    let audit = Otlp.tracer { url = "\{url}/v1/traces"; service_name = "flick-audit" }
     Tracer.with_tracer audit (task { Tracer.with_span "audit" (span "orders" "2") Effect.void })
   }
-  Platform.stdout_line ("sent to " ++ url)
+  Platform.stdout_line "sent to \{url}"

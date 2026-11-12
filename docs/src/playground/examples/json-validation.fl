@@ -23,7 +23,7 @@ let print_result result =
   match result with
   | Ok json -> Platform.stdout_line json
   | Err (SchemaError issues) -> for issue <- issues do {
-    Platform.stdout_line ("Invalid field: " ++ issue.path)
+    Platform.stdout_line "Invalid field: \{issue.path}"
   }
 
 main : Unit ->{} Unit

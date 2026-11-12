@@ -23,7 +23,7 @@ load_view : UserId ->{Users, Log; NotFound} UserView
 let load_view id =
   let user = Users.get id
   let view = to_view user
-  Log.info ("Loaded " ++ view.title)
+  Log.info "Loaded \{view.title}"
   view
 
 live_users : Layer none none {Users}
@@ -45,7 +45,7 @@ let test_log = Layer.succeed Log { info = fun _ -> () }
 main : Unit ->{; AppError} Unit
 let main () = provide Layer.merge live_users live_log {
   try Log.info (load_view first).title with
-  | NotFound id -> Log.info ("no user " ++ show id)
+  | NotFound id -> Log.info "no user \{show id}"
 }
 
 // show

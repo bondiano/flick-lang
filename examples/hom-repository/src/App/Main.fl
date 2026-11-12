@@ -10,20 +10,10 @@ type error BodyError = BodyError
 
 report : String -> Driver.State ->{} Unit
 let report name state =
+  let released = List.length state.closed
+  let unique = List.length (List.dedupe state.closed) == released
   Platform.stdout_line
-    (name
-      ++ " attempts="
-      ++ show state.attempts
-      ++ " acquired="
-      ++ show state.next
-      ++ " released="
-      ++ show (List.length state.closed)
-      ++ " active="
-      ++ show state.active
-      ++ " peak="
-      ++ show state.peak
-      ++ " unique="
-      ++ show (List.length (List.dedupe state.closed) == List.length state.closed))
+    "\{name} attempts=\{state.attempts} acquired=\{state.next} released=\{released} active=\{state.active} peak=\{state.peak} unique=\{unique}"
 
 logging : Ref (List String) -> Layer none none {Log.Log}
 let logging messages =
@@ -39,13 +29,11 @@ let success () =
     Effect.exit
       (task {
         provide live {
-          provide logging messages {
-            provide Logged.layer { Logged.get "a" ++ " " ++ Alias.get "b" }
-          }
+          provide logging messages { provide Logged.layer { "\{Logged.get "a"} \{Alias.get "b"}" } }
         }
       })
-  Platform.stdout_line ("value=" ++ Option.with_default "failed" (Exit.value outcome))
-  Platform.stdout_line ("logs=" ++ String.join "|" (Ref.get messages))
+  Platform.stdout_line "value=\{Option.with_default "failed" (Exit.value outcome)}"
+  Platform.stdout_line "logs=\{String.join "|" (Ref.get messages)}"
   report "success" (Ref.get state)
 
 failure : Int -> String ->{} Unit
@@ -56,7 +44,7 @@ let failure mode name =
       (task {
         provide Driver.live mode state { provide Base.layer { from_result (Err BodyError) } }
       })
-  Platform.stdout_line (name ++ " failed=" ++ show (Exit.is_failure outcome))
+  Platform.stdout_line "\{name} failed=\{Exit.is_failure outcome}"
   report name (Ref.get state)
 
 interruption : Unit ->{} Unit
@@ -72,9 +60,9 @@ let interruption () =
           }
         }
       })
-  Platform.stdout_line
-    ("interrupted="
-      ++ show (Option.with_default false (Option.map Cause.has_interrupts (Exit.failure outcome))))
+  let interrupted =
+    Option.with_default false (Option.map Cause.has_interrupts (Exit.failure outcome))
+  Platform.stdout_line "interrupted=\{interrupted}"
   report "interruption" (Ref.get state)
 
 overlap : Unit ->{Async} Unit
@@ -103,7 +91,7 @@ let overlap () =
             })
         }
       })
-  Platform.stdout_line ("overlap success=" ++ show (Exit.is_success outcome))
+  Platform.stdout_line "overlap success=\{Exit.is_success outcome}"
   report "overlap" (Ref.get state)
 
 main : Unit ->{Async} Unit

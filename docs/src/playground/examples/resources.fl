@@ -3,7 +3,7 @@ module Main exposing (main)
 
 open : String -> Eff none none String
 let open name = task {
-  Platform.stdout_line ("open " ++ name)
+  Platform.stdout_line "open \{name}"
   name
 }
 
@@ -13,6 +13,6 @@ let main () =
     let a = Resource.acquire_release (open "file") (fun _ -> Platform.stdout_line "close file")
     let b = Resource.acquire_release (open "socket") (fun _ -> Platform.stdout_line "close socket")
     ignore s
-    a ++ " and " ++ b
+    "\{a} and \{b}"
   }
-  Platform.stdout_line ("used " ++ result)
+  Platform.stdout_line "used \{result}"

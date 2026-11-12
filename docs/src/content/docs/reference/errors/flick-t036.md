@@ -15,7 +15,7 @@ functions that each do one part, and name each part.
 # total : Order -> String
 # let total _ = ""
 summary : Order -> String
-let summary order = header order ++ "\n" ++ lines order ++ "\n" ++ total order
+let summary order = "\{header order}\n\{lines order}\n\{total order}"
 ```
 
 Raise the limit with `max-function-lines = 100` under `[lint]`, or turn the

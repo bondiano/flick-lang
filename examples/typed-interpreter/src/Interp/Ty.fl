@@ -26,4 +26,4 @@ let rec describe t =
   match t with
   | TInt -> "Int"
   | TBool -> "Bool"
-  | TFun p r -> "(" ++ describe p ++ " -> " ++ describe r ++ ")"
+  | TFun p r -> "(\{describe p} -> \{describe r})"

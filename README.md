@@ -35,7 +35,7 @@ type Greeting = Hello String | Goodbye
 message : Greeting -> String
 let message greeting =
   match greeting with
-  | Hello name -> "Hello, " ++ name ++ "!"
+  | Hello name -> "Hello, \{name}!"
   | Goodbye -> "See you soon!"
 
 main : Unit ->{} Unit

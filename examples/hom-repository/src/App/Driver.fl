@@ -51,7 +51,7 @@ let live mode state =
           release = fun () ->
             Ref.update state (fun s -> { s with active = s.active - 1; closed = s.closed ++ [id] });
           initialize = fun () -> if mode == 2 then from_result (Err (Boot "initialize"));
-          fetch = fun key -> show id ++ ":" ++ key;
+          fetch = fun key -> "\{id}:\{key}";
         };
   }
 

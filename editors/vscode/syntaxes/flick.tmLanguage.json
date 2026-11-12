@@ -53,10 +53,10 @@
     "interpolation": {
       "name": "meta.interpolation.flick",
       "begin": "\\\\\\{",
-      "beginCaptures": { "0": { "name": "punctuation.section.interpolation.begin.flick" } },
+      "beginCaptures": { "0": { "name": "punctuation.section.embedded.begin.flick" } },
       "end": "\\}|$",
-      "endCaptures": { "0": { "name": "punctuation.section.interpolation.end.flick" } },
-      "contentName": "source.flick.embedded",
+      "endCaptures": { "0": { "name": "punctuation.section.embedded.end.flick" } },
+      "contentName": "meta.embedded.line.flick",
       "patterns": [{ "include": "#interpolation-braces" }, { "include": "$self" }]
     },
     "interpolation-braces": {

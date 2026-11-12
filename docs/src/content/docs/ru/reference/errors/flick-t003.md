@@ -1,6 +1,6 @@
 ---
 title: "FLICK-T003"
-source_hash: "ed26e4fcb9ff1509"
+source_hash: "ab66ff2b086bee9c"
 ---
 
 Выражение имеет тип, отличный от требуемого его позицией. В Flick отсутствуют неявные преобразования: `1 + 1n` смешивает `Float` и `BigInt`, `"a" ++ 1` смешивает `String` и `Float`. Записи точны: запись с дополнительными полями не подходит для меньшего закрытого типа записи (нет подтипизации по ширине); примите дополнительные поля с помощью открытой строки `{ name : String | fields }` или отбросьте их.
@@ -13,5 +13,5 @@ source_hash: "ed26e4fcb9ff1509"
 
 ```flick
 label : Float -> String
-let label n = "count: " ++ Float.to_string n
+let label n = "count: \{Float.to_string n}"
 ```

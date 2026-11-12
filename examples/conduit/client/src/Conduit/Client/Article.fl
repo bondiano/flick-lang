@@ -89,7 +89,7 @@ let follow_button author = ui {
     (button
       { disabled = false; on_click = Action.with follow author }
       (icon { class_name = "ion-plus-round" })
-      (text (" " ++ label ++ author.username)))
+      (text " \{label}\{author.username}"))
 }
 
 /// Deletes the reader's article and goes home.

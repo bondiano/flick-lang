@@ -1,6 +1,6 @@
 ---
 title: "Type-level programming and eDSLs"
-source_hash: 044f3f3c6a6087b8
+source_hash: b4abaf8cf10dbf3c
 ---
 
 Flick's SQL, UI and CLI DSLs — `sql params { … }`, `ui { … }` with `component` declarations, and `cli "name" { … }` — are libraries over one type core: rows, labels, finite kinds, HKT and multiparameter classes with functional dependencies. Their backends are PostgreSQL, React (in the browser and on the server) and Effect CLI.
@@ -160,7 +160,7 @@ let greet = cli "greet" {
   /// Who to greet
   arg name : String
   handle fun { loud; times; name } ->
-    let text = "Hello, " ++ name
+    let text = "Hello, \{name}"
     let line = if loud then String.to_upper text else text
     Platform.stdout_line (String.join "\n" (List.repeat times line))
 }

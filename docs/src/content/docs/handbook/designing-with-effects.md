@@ -145,7 +145,7 @@ let load_view_direct id =
     | Some name -> { id = id; name = name }
     | None -> from_result (Err (NotFound id))
   let view = to_view user
-  console_log ("[log] Loaded " ++ view.title)
+  console_log "[log] Loaded \{view.title}"
   view
 ```
 
@@ -246,7 +246,7 @@ let load_view id =
   let user = Users.get id
   let view = to_view user
 
-  Log.info ("Loaded " ++ view.title)
+  Log.info "Loaded \{view.title}"
 
   view
 ```
@@ -294,7 +294,7 @@ A wrapper must account for the operations it uses too. This version omits
 load_name : UserId ->{Async, Users; NotFound} String
 let load_name id =
   let user = Users.get id
-  Log.info ("Loaded " ++ user.name)
+  Log.info "Loaded \{user.name}"
   user.name
 ```
 
@@ -347,7 +347,7 @@ let users_live =
   }
 
 log_live : Layer none none {Log}
-let log_live = Layer.succeed Log { info = fun line -> console_log ("[log] " ++ line) }
+let log_live = Layer.succeed Log { info = fun line -> console_log "[log] \{line}" }
 ```
 
 `Layer.succeed Users` takes a record with the operations of `Users`.
@@ -407,7 +407,7 @@ The example also loads two users in parallel, still inside `App.Users`:
 #   let user = Users.get id
 #   let view = to_view user
 #
-#   Log.info ("Loaded " ++ view.title)
+#   Log.info "Loaded \{view.title}"
 #
 #   view
 #
@@ -476,7 +476,7 @@ user-facing response:
 #   let user = Users.get id
 #   let view = to_view user
 #
-#   Log.info ("Loaded " ++ view.title)
+#   Log.info "Loaded \{view.title}"
 #
 #   view
 #
@@ -504,21 +504,21 @@ user-facing response:
 #   }
 #
 # log_live : Layer none none {Log}
-# let log_live = Layer.succeed Log { info = fun line -> console_log ("[log] " ++ line) }
+# let log_live = Layer.succeed Log { info = fun line -> console_log "[log] \{line}" }
 #
 describe : String ->{Async, Users, Log} String
 let describe raw =
   try (load_view (user_id raw)).title with
-  | NotFound id -> "not found: " ++ show id
+  | NotFound id -> "not found: \{show id}"
 
 program : Unit ->{Async, Users, Log} Unit
 let program () =
   let both =
     try
       let (first, second) = load_two (user_id "u1") (user_id "u2")
-      first.title ++ " and " ++ second.title
+      "\{first.title} and \{second.title}"
     with
-    | NotFound id -> "not found: " ++ show id
+    | NotFound id -> "not found: \{show id}"
   Platform.stdout_line both
   Platform.stdout_line (describe "u3")
 
@@ -644,7 +644,7 @@ The example then exports these three tests:
 #   let user = Users.get id
 #   let view = to_view user
 #
-#   Log.info ("Loaded " ++ view.title)
+#   Log.info "Loaded \{view.title}"
 #
 #   view
 #
@@ -698,7 +698,7 @@ let tests = [
           }
           view.title
         with
-        | NotFound id -> "missing " ++ show id
+        | NotFound id -> "missing \{show id}"
       Test.expect (Test.equal "missing \"nobody\"" outcome)
       Test.expect (Test.equal [] (Ref.get lines))
     }),

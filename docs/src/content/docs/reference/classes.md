@@ -87,7 +87,7 @@ The core's numeric `Into` instances are **not** implicit.
 # let show_items items = String.join ", " (List.map show items)
 #
 instance Show a => Show (List a) =
-  let show items = "[" ++ show_items items ++ "]"
+  let show items = "[\{show_items items}]"
 ```
 
 Each method of the class is defined once with the class signature, the
@@ -108,7 +108,7 @@ default is abstract, and an instance without it is `FLICK-C011`, as is a
 class Pretty a =
   pretty : a -> String
   verbose : a -> String
-  let verbose x = "<" ++ pretty x ++ ">"
+  let verbose x = "<\{pretty x}>"
 
 instance Pretty Float =
   pretty : Float -> String
@@ -130,7 +130,7 @@ default signature without its `let` is `FLICK-C011`.
 class Describe a =
   describe : a -> String
   describe : Show a => a -> String
-  let describe x = "<" ++ show x ++ ">"
+  let describe x = "<\{show x}>"
 
 instance Describe Float   // takes the default: `Show Float` holds
 ```
@@ -266,7 +266,7 @@ assert` name their place this way.
 #
 /// The place of the caller of `traced`.
 traced : CallSite => String -> String
-let traced label = label ++ " at " ++ CallSite.place
+let traced label = "\{label} at \{CallSite.place}"
 ```
 
 A program declares no instance of it (`FLICK-C012`). In the context of an

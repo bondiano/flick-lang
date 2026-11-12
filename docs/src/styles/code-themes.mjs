@@ -22,6 +22,7 @@ const theme = ({ name, type, fg, bg, comment, keyword, string, number, operator,
   bg,
   settings: [
     { settings: { foreground: fg, background: bg } },
+    { scope: "meta.embedded", settings: { foreground: fg } },
     { scope: ["comment", "punctuation.definition.comment"], settings: { foreground: comment } },
     { scope: ["keyword", "storage", "keyword.other", "keyword.control"], settings: { foreground: keyword } },
     { scope: ["string", "constant.character"], settings: { foreground: string } },

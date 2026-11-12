@@ -47,9 +47,9 @@ format : ((Result String Float, List String), Float) -> String
 let format ((result, output), final) =
   let outcome =
     match result with
-    | Ok value -> "ok=" ++ show value
-    | Err problem -> "error=" ++ problem
-  outcome ++ " state=" ++ show final ++ " log=" ++ String.join "," output
+    | Ok value -> "ok=\{show value}"
+    | Err problem -> "error=\{problem}"
+  "\{outcome} state=\{show final} log=\{String.join "," output}"
 
 identity_run : Float -> ((Result String Float, List String), Float)
 let identity_run input =
@@ -80,7 +80,7 @@ let eff_run input =
 
 main : Unit ->{; AppError} Unit
 let main () =
-  Platform.stdout_line ("identity " ++ format (identity_run 2))
-  Platform.stdout_line ("identity " ++ format (identity_run (0 - 1)))
-  Platform.stdout_line ("eff " ++ format (eff_run 2))
-  Platform.stdout_line ("eff " ++ format (eff_run (0 - 1)))
+  Platform.stdout_line "identity \{format (identity_run 2)}"
+  Platform.stdout_line "identity \{format (identity_run (0 - 1))}"
+  Platform.stdout_line "eff \{format (eff_run 2)}"
+  Platform.stdout_line "eff \{format (eff_run (0 - 1))}"

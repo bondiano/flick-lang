@@ -17,7 +17,7 @@ let base title =
 
 /// The slug of `title` with the unique `suffix`.
 slug : String -> String -> String
-let slug title suffix = base title ++ "-" ++ suffix
+let slug title suffix = "\{base title}-\{suffix}"
 
 /// A page of a list: at most 100 items, 20 unless asked, from `offset`.
 page : Option Float -> Option Float -> { limit : Int; offset : Int }

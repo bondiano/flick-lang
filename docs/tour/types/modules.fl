@@ -4,7 +4,7 @@ module Greeting exposing (greet) =
   let mark = "!"
 
   greet : String -> String
-  let greet name = "Hello, " ++ name ++ mark
+  let greet name = "Hello, \{name}\{mark}"
 
 main : Unit ->{} Unit
 let main () = Platform.stdout_line (Greeting.greet "modules")

@@ -1,6 +1,6 @@
 ---
 title: "Классы и экземпляры классов"
-source_hash: e47e5afebee61d02
+source_hash: 3ec4a92a7d6a10f5
 ---
 
 После вывода типов компилятор разрешает ограничения классов: для каждого
@@ -92,7 +92,7 @@ let length = read (Meters 3.0)
 # let show_items items = String.join ", " (List.map show items)
 #
 instance Show a => Show (List a) =
-  let show items = "[" ++ show_items items ++ "]"
+  let show items = "[\{show_items items}]"
 ```
 
 В экземпляре класса каждый метод определяется один раз. Его тип берётся
@@ -117,7 +117,7 @@ instance Show a => Show (List a) =
 class Pretty a =
   pretty : a -> String
   verbose : a -> String
-  let verbose x = "<" ++ pretty x ++ ">"
+  let verbose x = "<\{pretty x}>"
 
 instance Pretty Float =
   pretty : Float -> String
@@ -140,7 +140,7 @@ instance Pretty Float =
 class Describe a =
   describe : a -> String
   describe : Show a => a -> String
-  let describe x = "<" ++ show x ++ ">"
+  let describe x = "<\{show x}>"
 
 instance Describe Float   // берёт реализацию по умолчанию: `Show Float` есть
 ```
@@ -292,7 +292,7 @@ let tag value = Record.extend (Record.label : Record.Label "tag") "t" value
 #
 /// Место того, кто вызвал `traced`.
 traced : CallSite => String -> String
-let traced label = label ++ " at " ++ CallSite.place
+let traced label = "\{label} at \{CallSite.place}"
 ```
 
 Программа не объявляет его экземпляров (`FLICK-C012`). В контексте

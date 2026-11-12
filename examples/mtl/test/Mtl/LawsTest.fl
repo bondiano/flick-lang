@@ -18,13 +18,13 @@ let options = Gen.map (fun (some, x) -> if some then Some x else None) (Gen.pair
 
 results : Gen.Gen (Result String Float)
 let results =
-  Gen.map (fun (ok, x) -> if ok then Ok x else Err ("e" ++ show x)) (Gen.pair Gen.bool ints)
+  Gen.map (fun (ok, x) -> if ok then Ok x else Err "e\{show x}") (Gen.pair Gen.bool ints)
 
 functions : Gen.Gen (Float -> Float)
 let functions = Gen.function ints
 
 strings : Gen.Gen String
-let strings = Gen.map (fun n -> "s" ++ show n ++ ";") ints
+let strings = Gen.map (fun n -> "s\{n};") ints
 
 validations : Gen.Gen (Validation (List String) Float)
 let validations = Gen.map validated ints

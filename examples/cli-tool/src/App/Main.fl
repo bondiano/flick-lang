@@ -47,7 +47,7 @@ let done_command = cli "done" {
     let path = notes_file ()
     match Notes.remove number (load path) with
     | Some notes -> save path notes
-    | None -> App.fail ("there is no note " ++ show number)
+    | None -> App.fail "there is no note \{show number}"
 }
 
 /// The wizard's question: the first note, which must not be empty.

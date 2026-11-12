@@ -20,7 +20,7 @@ let roman n =
   let mut text = ""
   for (value, digits) <- values do {
     while left >= value do {
-      text = text ++ digits
+      text = "\{text}\{digits}"
       left = left - value
     }
   }

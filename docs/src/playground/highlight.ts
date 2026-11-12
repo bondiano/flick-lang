@@ -12,10 +12,12 @@ const theme: ThemeRegistration = {
   fg: "#101016",
   bg: "#fafafc",
   tokenColors: [
+    { scope: "meta.embedded", settings: { foreground: "#101016" } },
     { scope: ["comment", "punctuation.definition.comment"], settings: { foreground: "#686873" } },
     { scope: ["keyword", "storage", "entity.name.type", "support.type", "support.class"], settings: { foreground: "#584dd0" } },
     { scope: ["string", "constant", "support.constant"], settings: { foreground: "#347b57" } },
     { scope: "invalid", settings: { foreground: "#b43b4f" } },
+    { scope: "punctuation.section.embedded", settings: { foreground: "#584dd0" } },
     { scope: "meta.effect-row.needs", settings: { foreground: "#1560d4" } },
     { scope: "meta.effect-row.fails", settings: { foreground: "#c8283f" } },
   ],
@@ -40,7 +42,7 @@ export const loadHighlighting = (): Promise<void> => {
       import("shiki/core"),
       import("shiki/engine/javascript"),
       import("shiki/langs/javascript.mjs"),
-      import("../../../editors/vscode/syntaxes/flick.tmLanguage.json"),
+      import("../../../editors/vscode/syntaxes/flick.tmLanguage.json", { with: { type: "json" } }),
     ]);
     const { promise, resolve } = Promise.withResolvers<void>();
     if (typeof requestIdleCallback === "function") requestIdleCallback(() => resolve(), { timeout: 1000 });
