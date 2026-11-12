@@ -507,8 +507,13 @@ reads into the signature.
 
 Data that stores a function or a `task`, such as `type G s a = G (s -> a)`,
 written bare in a signature now has its hidden row read as `Live` is: in a
-parameter any row, in the result what the parameters before it reach (see
+parameter any row, in the result what the parameters before it reach, and
+so in the stages of a parameter that is a function (see
 [Regions and captures](../../reference/regions/#qualifiers)).
+
+- **A callback that returns such data** holds what its own parameters reach:
+  `(File s -> G String) -> …` lets the callback return a closure over the
+  file, and what the outer function returns then holds the file's region.
 
 - **A function that returns fresh data** after a parameter that reaches a
   region holds that region: `make : Handle r -> G Unit Int` cannot leave the
