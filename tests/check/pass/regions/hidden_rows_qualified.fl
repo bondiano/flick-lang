@@ -1,0 +1,21 @@
+// A result that is a function with a written qualifier is read as the
+// curried form is: its parameter's bare data is any row, and its result holds
+// that row and the qualifier, as the core reads an arrow, whose qualifier is
+// one of its fields.
+module App.HiddenRowsQualified exposing (..)
+
+import File exposing (Path, FileSystem, OpenError, ReadError)
+
+type G a = G (Unit ->{Async, FileSystem; ReadError} a)
+
+run : G a ->{Async, FileSystem; ReadError} a
+let run (G g) = g ()
+
+lift : (a -> b)^c -> (G a -> G b)^c
+let lift f = fun (G g) -> G (fun u -> f (g u))
+
+reads : Path ->{Async, FileSystem; OpenError, ReadError} Int
+let reads path = scope {
+  let file = File.open_scoped path
+  run (lift String.length (G (fun _ -> File.read_all file)))
+}

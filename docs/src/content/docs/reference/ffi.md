@@ -61,6 +61,12 @@ compiler cannot know how long JS keeps it. A bare callback type keeps
 nothing live, so a closure that uses a scoped value is refused where it is
 passed (`FLICK-G002`).
 
+`retention call` promises that JS keeps nothing the result does not show.
+A foreign type whose values keep a callback past the call, as a codec keeps
+the default of a field, shows it with `@stores` before its declaration: it is
+then [data with hidden storage](../regions/), and a result of that type holds
+what the arguments before it reach.
+
 ## Callbacks
 
 A Flick function passed to JS is adapted to the JS arity of its type:

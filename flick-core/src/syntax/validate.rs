@@ -69,12 +69,11 @@ impl Validator<'_> {
         }
         for (index, child) in node.nodes().enumerate() {
             if child.kind == K::Attribute {
-                let next = node
+                let before = node
                     .nodes()
                     .skip(index + 1)
-                    .find(|n| n.kind != K::Attribute)
-                    .map(|n| n.kind);
-                self.attribute(child, next);
+                    .find(|n| n.kind != K::Attribute);
+                self.attribute(child, before);
             }
             if child.kind == K::LetDecl {
                 self.mutable(child, node.kind == K::Block, place);
@@ -152,8 +151,11 @@ impl Validator<'_> {
     /// whose top-level values carry their names where the program runs,
     /// `@owner` a service whose handler owns what is made under it, `@sync`
     /// one whose operations run at once, `@ts` gives a type its TypeScript
-    /// form, and `@implicit` a conversion instance.
-    fn attribute(&mut self, node: &Node, next: Option<K>) {
+    /// form, `@stores` marks a foreign type whose values store functions
+    /// (data with hidden storage), and `@implicit` a conversion instance.
+    #[allow(clippy::too_many_lines)]
+    fn attribute(&mut self, node: &Node, before: Option<&Node>) {
+        let next = before.map(|n| n.kind);
         let words: Vec<Token> = idents(node).collect();
         let message = match &words[..] {
             [name, ..] if name.text(self.src) == "ts" => match ts_mark::read(node, self.src) {
@@ -222,6 +224,21 @@ impl Validator<'_> {
                 "`@owner` belongs before a service declaration".to_owned()
             }
             [name, ..] if name.text(self.src) == "owner" => "`@owner` takes no argument".to_owned(),
+            [name] if name.text(self.src) == "stores" => {
+                // constructors or a body show what a type stores itself
+                if before.is_some_and(|d| d.kind == K::TypeDecl && d.has_token(K::Eq)) {
+                    "`@stores` belongs before a type without constructors or a body".to_owned()
+                } else if matches!(next, Some(K::TypeDecl | K::Attribute))
+                    || (next.is_none() && self.allow_trailing_attribute)
+                {
+                    return;
+                } else {
+                    "`@stores` belongs before a type declaration".to_owned()
+                }
+            }
+            [name, ..] if name.text(self.src) == "stores" => {
+                "`@stores` takes no argument".to_owned()
+            }
             [name] if name.text(self.src) == "implicit" => {
                 // a lone attribute is a fragment the formatter checks on its own
                 if matches!(next, Some(K::InstanceDecl))
@@ -238,7 +255,7 @@ impl Validator<'_> {
                 "`@derive` names at most the package of its plugin: `@derive std`".to_owned()
             }
             [name, ..] if name.text(self.src) != "lang" => format!(
-                "unknown attribute `@{}`: the attributes are `@lang`, `@derive`, `@maker`, `@cell`, `@label`, `@owner`, `@sync`, `@ts` and `@implicit`",
+                "unknown attribute `@{}`: the attributes are `@lang`, `@derive`, `@maker`, `@cell`, `@label`, `@owner`, `@sync`, `@ts`, `@stores` and `@implicit`",
                 name.text(self.src)
             ),
             [_, item] if Lang::from_name(item.text(self.src)).is_some() => return,

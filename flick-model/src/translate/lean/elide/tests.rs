@@ -39,7 +39,7 @@ fn a_value_bound_is_a_fact_of_the_scheme() {
             Type::Fun(param, stage, unit()),
         )
     };
-    let theorem = |s: &Scheme| super::theorem("t", "t", s, s);
+    let theorem = |s: &Scheme| super::theorem("t", "t", (s, s), None);
     let pure = theorem(&scheme(bounded(a.clone()), Stage::Pure)).expect("a fact");
     assert!(pure.contains("Scheme.elide (fun x => x = .v 1) ⟨2, Facts.bnd 0 (fun x => x = .v 1),"));
     let runtime = Stage::Runtime(Row::none(), Row::none());
