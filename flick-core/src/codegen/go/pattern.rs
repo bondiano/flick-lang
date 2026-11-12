@@ -9,7 +9,7 @@ use super::expr::enum_literal;
 use super::layout::{block, call, conjunction, inline, statement};
 use super::{Gen, names, own};
 use crate::ir::{Arm, Expr, Lit, Pat};
-use crate::types::{Constructor, Rep};
+use flick_ir::{Constructor, Rep};
 
 #[derive(Default)]
 struct Test<'a> {
@@ -151,7 +151,7 @@ impl<'a> Gen<'a> {
         }
         let tag = self.string(&self.tag(c));
         // of a type whose other constructors may have Go types of their own
-        let is = if self.own.is_some_and(|own| own(&c.module)) {
+        let is = if self.input.own_module(&c.module).is_some() {
             "flickrt.IsData"
         } else {
             "flickrt.IsTag"

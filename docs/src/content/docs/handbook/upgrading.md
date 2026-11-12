@@ -564,3 +564,12 @@ forms. A package's `@ts` has one form, the same on every runtime, and imports
 from a module by its specifier: `rt "…"` after a form or an export, and
 `@ts import runtime` or `ui`, are `FLICK-S014`. `.iface` files of version 23
 are rejected: rebuild the libraries.
+
+## A module of the IR names its package
+
+A reader of `flick build --emit-ir` meets a new version, `0.10.0`: a module has
+`package`, the package it belongs to (the project's own modules take the name in
+its `package.json`), which the backends write into the tags of its
+constructors. A built-in module and one of a project without a name have none.
+A plugin with `hooks = ["ir"]` gives the packages back as it got them; a changed
+one is `FLICK-P047`.

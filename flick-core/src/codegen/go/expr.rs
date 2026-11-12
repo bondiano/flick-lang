@@ -13,7 +13,7 @@ use super::layout::{Code, call, if_else, list, statement};
 use super::{Gen, names};
 use crate::codegen::tail::{Callee, Target};
 use crate::ir::{BinOp, Expr, ExprKind, Lit, Pat, Stage, Stmt};
-use crate::types::{EnumLit, Lift};
+use flick_ir::{EnumLit, Lift};
 
 /// A literal as Go: numbers typed as the runtime holds them.
 pub(super) fn literal(lit: &Lit) -> String {

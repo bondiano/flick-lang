@@ -76,14 +76,15 @@ pub(crate) fn ir(
         let mut problems = match Program::from_cbor(&written) {
             Ok(program) => {
                 let mut problems = validate(&program, &builtin, &files);
-                let names = |p: &Program| {
-                    p.modules
-                        .iter()
-                        .map(|m| m.name.clone())
+                // the package of a module names the tags of its constructors
+                let modules = |p: &Program| {
+                    (p.modules.iter())
+                        .map(|m| (m.name.clone(), m.package.clone()))
                         .collect::<BTreeSet<_>>()
                 };
-                if names(&program) != names(&given) {
-                    problems.push("the modules are not those of the build".into());
+                if modules(&program) != modules(&given) {
+                    problems
+                        .push("the modules or their packages are not those of the build".into());
                 }
                 if program.lang != given.lang {
                     problems.push("the lang items are not those of the build".into());

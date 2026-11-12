@@ -95,4 +95,13 @@ fn a_wasm_plugin_rewrites_the_ir_a_build_compiles() {
         stderr.contains("FLICK-P047") && stderr.contains("`dangling`"),
         "{stderr}"
     );
+    // the package of a module names the tags of its constructors
+    fs::write(root.join("app/src/App/Main.fl"), main("move the package")).expect("write");
+    let built = flick(&root, &["build"]);
+    let stderr = String::from_utf8_lossy(&built.stderr);
+    assert!(!built.status.success(), "{stderr}");
+    assert!(
+        stderr.contains("FLICK-P047") && stderr.contains("their packages"),
+        "{stderr}"
+    );
 }

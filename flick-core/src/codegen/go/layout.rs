@@ -110,7 +110,7 @@ pub(super) fn statement<'a>(a: &'a DocumentArena<'a>, stmt: impl Documentable<'a
 }
 
 /// A `//line` directive: Go names what follows by `path` and `line`.
-pub(super) fn directive<'a>(a: &'a DocumentArena<'a>, path: String, line: u32) -> Document<'a> {
+pub(super) fn directive<'a>(a: &'a DocumentArena<'a>, path: &'a str, line: u32) -> Document<'a> {
     docvec![a, a.line(), "//line ", path, ":", line].set_nesting(a, 0)
 }
 
