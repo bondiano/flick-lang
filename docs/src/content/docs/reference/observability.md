@@ -251,7 +251,10 @@ provide `DevTools.layer` to the whole of `main`, at
 `ws://localhost:34437` or the URL given (`--devtools=ws://host:port`),
 with the minimum log level at Debug. The DevTools then show the spans of
 actions and, as events of those spans, the log of each atom write. If no
-DevTools listen, the program runs as without the flag.
+DevTools listen, the program runs as without the flag. On Flick's own
+runtime its own client sends the spans `Tracer.with_span` opens, each as it
+starts and ends; the spans of actions and the log of atom writes reach the
+DevTools only through the Effect adapter so far.
 
 `Otlp`, `Prometheus`, `DevTools` and [RPC](../rpc/) wrap Effect modules
 marked unstable; use matching compiler and runtime versions.

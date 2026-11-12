@@ -72,6 +72,9 @@ export const conclude = (exit: Exit, signal: Signal | undefined, defects: Readon
   return 1;
 };
 
+/** What runs after `main` and its cleanup, before the exit code is set: a client of the DevTools sends what is left. */
+export const mainHooks: Array<() => Promise<void>> = [];
+
 /**
  * Runs `main` and sets the exit code: 0 on success, 1 on a typed failure, a
  * defect or a failed cleanup, 130 or 143 when only a signal stopped it and
@@ -98,6 +101,7 @@ export const runMain = async (main: (input: undefined) => unknown): Promise<void
   const exit = await new Promise<Exit>((resolve) => {
     fiber.observe(resolve);
   });
+  await Promise.all(mainHooks.map(async (finish) => finish()));
   clearTimeout(timer);
   clearInterval(keepAlive);
   for (const [name, handler] of handlers) offSignal(name, handler);

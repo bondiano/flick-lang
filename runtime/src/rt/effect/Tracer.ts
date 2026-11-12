@@ -2,7 +2,7 @@
 // suspension and child calls. A failed task keeps its frame on each reason.
 import { none, type Option, some } from "../../core/data.ts";
 import { tag } from "../../tags.ts";
-import { fromReasons, raise, type Reason } from "../cause.ts";
+import { type Exit, fromReasons, raise, type Reason } from "../cause.ts";
 import { asExit, caught, currentCtx, extend, lookup, type Run, Under } from "../fiber.ts";
 
 interface SpanLink {
@@ -22,7 +22,7 @@ interface SpanOptions {
   readonly disablePropagation: boolean;
 }
 
-interface Span {
+export interface Span {
   readonly name: string | undefined;
   readonly spanId: string;
   readonly traceId: string;
@@ -50,7 +50,12 @@ const appendParent = (inner: Frame | undefined, parent: Frame): Frame =>
   inner === undefined ? parent : { ...inner, parent: appendParent(inner.parent, parent) };
 
 const CURRENT: object = /*#__PURE__*/ Object.freeze({ key: "rt/tracer/current" });
-export const tracerHooks: { parent?: () => unknown } = {};
+/** What watches spans: a client of the DevTools sees each start and end. */
+export const tracerHooks: {
+  parent?: () => unknown;
+  started?: (span: Span) => void;
+  ended?: (span: Span, exit: Exit) => void;
+} = {};
 const PROPAGATING: object = /*#__PURE__*/ Object.freeze({ key: "rt/tracer/propagating" });
 const MINIMUM: object = /*#__PURE__*/ Object.freeze({ key: "rt/tracer/minimum" });
 const LEVEL: object = /*#__PURE__*/ Object.freeze({ key: "rt/tracer/level" });
@@ -101,6 +106,7 @@ export const flickWithSpan =
         kind: options.kind_, attributes: options.attributes, links: options.links,
         started: BigInt(Date.now()), ended: undefined,
       };
+      tracerHooks.started?.(span);
       const capturedStack = options.captureStackTrace ? new Error().stack : undefined;
       const frame: Frame = {
         name, parent: undefined,
@@ -114,6 +120,7 @@ export const flickWithSpan =
       } finally {
         span.ended = BigInt(Date.now());
       }
+      tracerHooks.ended?.(span, exit);
       if (exit.cause === undefined) return exit.value;
       const reasons: Array<Reason> = [];
       for (const reason of exit.cause.reasons) reasons.push(Object.assign({}, reason, {
