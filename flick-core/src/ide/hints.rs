@@ -6,7 +6,7 @@ use crate::iface::{Entity, Namespace};
 use crate::source::FileId;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
-use crate::types::{Type, show_signature, show_type};
+use crate::types::{Type, right_application, show_signature, show_type};
 
 /// The signature of the function a call at the cursor applies.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -18,16 +18,26 @@ pub struct Help {
 }
 
 impl Ide<'_> {
-    /// For a cursor among the arguments of a call `f a b`.
+    /// For a cursor among the arguments of a call `f a b`, or `f a <| b`.
     pub fn signature_help(&self, file: FileId, offset: u32) -> Option<Help> {
         let m = self.module(file)?;
         let text = self.text(file);
         let path = tree::path_to(&m.tree, offset);
-        let call = path.iter().rev().find(|n| {
-            n.kind == K::AppExpr && n.nodes().next().is_some_and(|h| h.range().1 < offset)
+        let call = path.iter().rev().find_map(|n| {
+            let parts: Vec<&Node> = match n.kind {
+                K::AppExpr => n.nodes().collect(),
+                K::BinExpr if n.has_token(K::LtPipe) => {
+                    let mut operands = n.nodes();
+                    right_application(operands.next()?, operands.next()?)
+                }
+                _ => return None,
+            };
+            parts
+                .first()
+                .is_some_and(|h| h.range().1 < offset)
+                .then_some(parts)
         })?;
-        let mut nodes = call.nodes();
-        let head = nodes.next()?;
+        let (head, nodes) = call.split_first()?;
         let ty = m.typing.types.get(&head.range())?;
         let mut params = Vec::new();
         let mut stage = strip(ty);
@@ -46,7 +56,7 @@ impl Ide<'_> {
             ranges.push((to_u32(at), to_u32(at + p.len())));
             from = at + p.len();
         }
-        let before = nodes.filter(|a| a.range().1 < offset).count();
+        let before = nodes.iter().filter(|a| a.range().1 < offset).count();
         Some(Help {
             label,
             params: ranges,
