@@ -51,6 +51,10 @@ break programs.
 - **`RequestResolver.from_effect` on Go:** a batch completes every entry
   whose effect ended before the resolver returns, so a request no longer
   fails now and then with "RequestResolver did not complete request".
+- **An import of a name that spells a keyword:** an export list may name
+  `none`, but `import M exposing (none)` brings nothing a module can use,
+  as the word stays the keyword in an expression. Its `FLICK-R012` now says
+  so, and that the module reaches the name as `M.none`.
 - **Labels:** `@label kind` before a type declaration gives the top-level
   values of that type their names where the program runs, as the atoms,
   views and actions of the standard library have them; a library marks its

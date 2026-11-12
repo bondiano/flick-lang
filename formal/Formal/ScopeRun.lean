@@ -22,7 +22,7 @@ theorem scopeRun_body {Ψ Θ f t T φ φ₀} {r ε : Row} {C : Caps} (hv : Value
       (.rt (Row.union (Row.scope (.tvar 0)) (Row.union (r.substT (shiftV 1))
         (Row.obs (r.substT (shiftV 1)) (.tvar 0)))) (ε.substT (shiftV 1)))
       (t.up 1) (C.substT (shiftV 1)))) φ₀))
-    (hφ : (Stage.rt r ε).le φ) (hT : LeLive t T)
+    (hφ : (Stage.rt r ε).le φ) (hT : LeLive S t T)
     (hC : Row.Sub (Row.ofCaps C) r) :
     Typ S Ψ Θ [] (.scope (.app (f.rename (· + 1)) (.var 0))) (.ex T φ) := by
   have hr := (Typ.allInv hv h).rename (Γ' := [.mono (.owner (.tvar 0))]) (ξ := (· + 1))
@@ -69,7 +69,7 @@ theorem Typ.scopeRun_of_scope {Ψ Θ Γ b t T φ φ'} {r ε : Row} (hn : b.NoIns
       (.mono (.owner (.tvar 0)) :: Γ.map (Scheme.up 1)) b (.ex (t.up 1) φ'))
     (hφ' : φ'.le (.rt (Row.union (Row.scope (.tvar 0))
       (Row.union (r.substT (shiftV 1)) (Row.disch (.v 0) (r.substT (shiftV 1))))) (ε.substT (shiftV 1))))
-    (hφ : (Stage.rt r ε).le φ) (hT : LeLive t T) :
+    (hφ : (Stage.rt r ε).le φ) (hT : LeLive S t T) :
     Typ S Ψ Θ Γ (.app (.const .scopeRun) (.lam b)) (.ex T φ) := by
   have hobs := Row.obs_ty (.v 0) (r.substT (shiftV 1))
   simp only [Atom.ty] at hobs
@@ -87,13 +87,13 @@ theorem Typ.scope_of_scopeRun {Ψ Θ Γ b T φ} (h : Typ S Ψ Θ Γ (.app (.cons
     cases hf with
     | const hok hT' =>
       obtain ⟨_, _, _, _, h, la, lψ, lt, -⟩ := hT'.arrow_left
-      cases h; cases la
+      cases h; obtain rfl := la.eq_plain_right rfl
       have hs := hok.substT (shiftV 1)
       rw [Row.ofCaps_substT] at hs
       cases Typ.allInv .lam ha with
       | lam hb hn hL =>
         obtain ⟨_, _, _, _, h, la', lψ', lt', -⟩ := hL.arrow_left
-        cases h; cases la'
+        cases h; obtain rfl := la'.eq_plain rfl
         rw [show ∀ x, Row.obs x (.tvar 0) = Row.disch (.v 0) x from Row.obs_ty (.v 0)] at lψ'
         exact .scope (F := Facts.none) hn (fun _ _ h => h.elim)
           ((hb.sub (J' := .ex _ _) ⟨lt', Stage.le_refl _⟩).cut (Entails.union_left _ _))

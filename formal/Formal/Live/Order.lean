@@ -134,44 +134,116 @@ theorem Stage.use_ctl_le (tl : Bool) (r ε : Row) (p : Nat) :
     exact Stage.le_use (Stage.rt r ε) (Ty.rg p).reach
   | false => exact Stage.le_refl _
 
-theorem LeLive.reach {a b : Ty} (h : LeLive a b) : Caps.Sub a.reach b.reach := by
+theorem Ty.reach_foldl_le : ∀ {us us' : List Ty} {f f' : Ty}, us.length = us'.length →
+    Caps.Sub f.reach f'.reach →
+    (∀ (j : Nat) (u u' : Ty), us[j]? = some u → us'[j]? = some u' → Caps.Sub u.reach u'.reach) →
+    Caps.Sub (us.foldl .tapp f).reach (us'.foldl .tapp f').reach
+  | [], [], _, _, _, hf, _ => hf
+  | x :: xs, y :: ys, f, f', hl, hf, hu => by
+    simp only [List.foldl]
+    refine Ty.reach_foldl_le (by simpa using hl) ?_
+      (fun j u u' h h' => hu (j + 1) u u' (by simpa using h) (by simpa using h'))
+    intro a ha
+    simp only [Ty.reach] at ha ⊢
+    rcases ha with ha | ha
+    · exact .inl (hf a ha)
+    · exact .inr (hu 0 x y rfl rfl a ha)
+  | [], _ :: _, _, _, hl, _, _ => by simp at hl
+  | _ :: _, [], _, _, hl, _, _ => by simp at hl
+
+/-- The arguments of a widened hidden row compare by reach, each of them. -/
+theorem LeLive.hide_args {i : Nat} {us us' : List Ty}
+    (he : ∀ j, j ≠ i → us[j]? = us'[j]?)
+    (hr : ∀ r r', us[i]? = some r → us'[i]? = some r' → Caps.Sub r.reach r'.reach) :
+    ∀ (j : Nat) (u u' : Ty), us[j]? = some u → us'[j]? = some u' → Caps.Sub u.reach u'.reach := by
+  intro j u u' h h'
+  by_cases hj : j = i
+  · subst hj; exact hr u u' h h'
+  · rw [he j hj, h'] at h; cases h; exact Caps.Sub.refl _
+
+theorem LeLive.reach {a b : Ty} (h : LeLive S a b) : Caps.Sub a.reach b.reach := by
   cases h with
   | refl => exact Caps.Sub.refl _
   | arrow _ _ _ hc | eff _ _ hc => exact hc
+  | hide _ hl he hr ha hb =>
+    subst ha; subst hb
+    exact Ty.reach_foldl_le hl (Caps.Sub.refl _) (LeLive.hide_args he hr)
 
-theorem LeLive.arrow_left {a φ t C T} (h : LeLive (.arrow a φ t C) T) :
-    ∃ a' φ' t' C', T = .arrow a' φ' t' C' ∧ LeLive a' a ∧
-      (Stage.use φ C).le (Stage.use φ' C') ∧ LeLive t t' ∧
+theorem LeLive.arrow_left {a φ t C T} (h : LeLive S (.arrow a φ t C) T) :
+    ∃ a' φ' t' C', T = .arrow a' φ' t' C' ∧ LeLive S a' a ∧
+      (Stage.use φ C).le (Stage.use φ' C') ∧ LeLive S t t' ∧
       Caps.Sub (Ty.arrow a φ t C).reach T.reach := by
   cases h with
   | refl => exact ⟨_, _, _, _, rfl, .refl, Stage.le_refl _, .refl, Caps.Sub.refl _⟩
   | arrow h₁ h₂ h₃ h₄ => exact ⟨_, _, _, _, rfl, h₁, h₂, h₃, h₄⟩
+  | hide _ _ _ _ ha => exact absurd ha Ty.arrow_ne_tcon
 
-theorem LeLive.arrow_right {a φ t C T} (h : LeLive T (.arrow a φ t C)) :
-    ∃ a' φ' t' C', T = .arrow a' φ' t' C' ∧ LeLive a a' ∧
-      (Stage.use φ' C').le (Stage.use φ C) ∧ LeLive t' t ∧
+theorem LeLive.arrow_right {a φ t C T} (h : LeLive S T (.arrow a φ t C)) :
+    ∃ a' φ' t' C', T = .arrow a' φ' t' C' ∧ LeLive S a a' ∧
+      (Stage.use φ' C').le (Stage.use φ C) ∧ LeLive S t' t ∧
       Caps.Sub T.reach (Ty.arrow a φ t C).reach := by
   cases h with
   | refl => exact ⟨_, _, _, _, rfl, .refl, Stage.le_refl _, .refl, Caps.Sub.refl _⟩
   | arrow h₁ h₂ h₃ h₄ => exact ⟨_, _, _, _, rfl, h₁, h₂, h₃, h₄⟩
+  | hide _ _ _ _ _ hb => exact absurd hb Ty.arrow_ne_tcon
 
-theorem LeLive.eff_left {r ε t C T} (h : LeLive (.eff r ε t C) T) :
+theorem LeLive.eff_left {r ε t C T} (h : LeLive S (.eff r ε t C) T) :
     ∃ r' ε' t' C', T = .eff r' ε' t' C' ∧
       (Stage.use (.rt r ε) C).le (Stage.use (.rt r' ε') C') ∧
-      LeLive t t' ∧ Caps.Sub (Ty.eff r ε t C).reach T.reach := by
+      LeLive S t t' ∧ Caps.Sub (Ty.eff r ε t C).reach T.reach := by
   cases h with
   | refl => exact ⟨_, _, _, _, rfl, Stage.le_refl _, .refl, Caps.Sub.refl _⟩
   | eff h₁ h₂ h₃ => exact ⟨_, _, _, _, rfl, h₁, h₂, h₃⟩
+  | hide _ _ _ _ ha => exact absurd ha Ty.eff_ne_tcon
 
-theorem LeLive.eff_right {r ε t C T} (h : LeLive T (.eff r ε t C)) :
+theorem LeLive.eff_right {r ε t C T} (h : LeLive S T (.eff r ε t C)) :
     ∃ r' ε' t' C', T = .eff r' ε' t' C' ∧
       (Stage.use (.rt r' ε') C').le (Stage.use (.rt r ε) C) ∧
-      LeLive t' t ∧ Caps.Sub T.reach (Ty.eff r ε t C).reach := by
+      LeLive S t' t ∧ Caps.Sub T.reach (Ty.eff r ε t C).reach := by
   cases h with
   | refl => exact ⟨_, _, _, _, rfl, Stage.le_refl _, .refl, Caps.Sub.refl _⟩
   | eff h₁ h₂ h₃ => exact ⟨_, _, _, _, rfl, h₁, h₂, h₃⟩
+  | hide _ _ _ _ _ hb => exact absurd hb Ty.eff_ne_tcon
 
-theorem LeLive.trans : ∀ {b a c : Ty}, LeLive a b → LeLive b c → LeLive a c
+/-- A plain type has no other subtype or supertype. -/
+theorem LeLive.eq_plain {a b : Ty} (h : LeLive S a b) (ha : a.isPlain = true) : b = a := by
+  cases h with
+  | refl => rfl
+  | arrow => simp [Ty.isPlain] at ha
+  | eff => simp [Ty.isPlain] at ha
+  | hide _ _ _ _ ha' => exact absurd ha' (Ty.ne_tcon_of_plain ha)
+
+/-- A plain type has no other subtype. -/
+theorem LeLive.eq_plain_right {a b : Ty} (h : LeLive S a b) (hb : b.isPlain = true) : a = b := by
+  cases h with
+  | refl => rfl
+  | arrow => simp [Ty.isPlain] at hb
+  | eff => simp [Ty.isPlain] at hb
+  | hide _ _ _ _ _ hb' => exact absurd hb' (Ty.ne_tcon_of_plain hb)
+
+/-- Widening a hidden row, then anything. -/
+theorem LeLive.hide_trans {T : Name} {i : Nat} {us us' : List Ty} {c : Ty}
+    (hi : S.hidden T = some i) (hl : us.length = us'.length)
+    (he : ∀ j, j ≠ i → us[j]? = us'[j]?)
+    (hr : ∀ r r', us[i]? = some r → us'[i]? = some r' → Caps.Sub r.reach r'.reach)
+    (h₂ : LeLive S (Ty.tcon T us') c) : LeLive S (Ty.tcon T us) c := by
+  generalize hx : Ty.tcon T us' = x at h₂
+  cases h₂ with
+  | refl => subst hx; exact .hide hi hl he hr rfl rfl
+  | arrow => exact absurd hx.symm Ty.arrow_ne_tcon
+  | eff => exact absurd hx.symm Ty.eff_ne_tcon
+  | hide hi' hl' he' hr' ha hb =>
+    subst hb
+    obtain ⟨rfl, rfl⟩ := Ty.tcon_eq (hx.trans ha)
+    rw [hi] at hi'; cases hi'
+    refine .hide hi (hl.trans hl') (fun j hj => (he j hj).trans (he' j hj)) ?_ rfl rfl
+    intro r r' h h'
+    obtain ⟨m, hm⟩ : ∃ m, us'[i]? = some m := by
+      have : i < us.length := (List.getElem?_eq_some_iff.mp h).1
+      exact ⟨us'[i]'(hl ▸ this), by simp⟩
+    exact (hr r m h hm).trans (hr' m r' hm h')
+
+theorem LeLive.trans : ∀ {b a c : Ty}, LeLive S a b → LeLive S b c → LeLive S a c
   | .arrow x φ y C, _, _, h₁, h₂ => by
     obtain ⟨_, _, _, _, rfl, ha, hφ, ht, hc⟩ := h₁.arrow_right
     obtain ⟨_, _, _, _, rfl, ga, gφ, gt, gc⟩ := h₂.arrow_left
@@ -185,10 +257,12 @@ theorem LeLive.trans : ∀ {b a c : Ty}, LeLive a b → LeLive b c → LeLive a 
   | .rg _, _, _, h₁, h₂ | .caps _, _, _, h₁, h₂ | .row _, _, _, h₁, h₂
   | .tapp _ _, _, _, h₁, h₂ | .hnd _, _, _, h₁, h₂ | .owner _, _, _, h₁, h₂
   | .errors _, _, _, h₁, h₂ | .dict _ _, _, _, h₁, h₂ | .all _ _, _, _, h₁, h₂ => by
-    cases h₁; exact h₂
+    cases h₁ with
+    | refl => exact h₂
+    | hide hi hl he hr ha hb => subst ha; rw [hb] at h₂; exact LeLive.hide_trans hi hl he hr h₂
 
-theorem LeLive.substT {a b : Ty} (σ : Atom → Ty) (h : LeLive a b) :
-    LeLive (a.substT σ) (b.substT σ) := by
+theorem LeLive.substT {a b : Ty} (σ : Atom → Ty) (h : LeLive S a b) :
+    LeLive S (a.substT σ) (b.substT σ) := by
   have sub : ∀ {x y : Ty}, Caps.Sub x.reach y.reach →
       Caps.Sub (x.substT σ).reach (y.substT σ).reach := fun hc a ha => by
     obtain ⟨b, hb, h'⟩ := (Ty.reach_substT σ _ a).mp ha
@@ -201,15 +275,24 @@ theorem LeLive.substT {a b : Ty} (σ : Atom → Ty) (h : LeLive a b) :
   | eff hφ _ hc ih =>
     refine .eff ?_ ih (sub hc)
     simpa only [Stage.use_substT] using Stage.le_substT σ hφ
+  | hide hi hl he hr ha hb =>
+    subst ha; subst hb
+    rw [Ty.tcon_substT, Ty.tcon_substT]
+    refine .hide hi (by simpa using hl) (fun j hj => by simp [he j hj]) ?_ rfl rfl
+    intro r r' h h'
+    simp only [List.getElem?_map, Option.map_eq_some_iff] at h h'
+    obtain ⟨u, hu, rfl⟩ := h
+    obtain ⟨u', hu', rfl⟩ := h'
+    exact sub (hr u u' hu hu')
 
-theorem LeLiveI.trans {a b c : Ty} (h : LeLiveI a b)
-    (hc : ∀ {x}, LeLive x b → LeLive x c) : LeLiveI a c := by
+theorem LeLiveI.trans {a b c : Ty} (h : LeLiveI S a b)
+    (hc : ∀ {x}, LeLive S x b → LeLive S x c) : LeLiveI S a c := by
   induction h with
   | le h => exact .le (hc h)
   | inst hus _ ih => exact .inst hus (ih hc)
 
-theorem LeLiveI.substT {a b : Ty} (σ : Atom → Ty) (h : LeLiveI a b) :
-    LeLiveI (a.substT σ) (b.substT σ) := by
+theorem LeLiveI.substT {a b : Ty} (σ : Atom → Ty) (h : LeLiveI S a b) :
+    LeLiveI S (a.substT σ) (b.substT σ) := by
   induction h with
   | le h => exact .le (h.substT σ)
   | @inst k t T us hus _ ih =>

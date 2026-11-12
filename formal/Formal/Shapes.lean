@@ -1,4 +1,4 @@
-import Formal.Canonical
+import Formal.Widen
 
 /-!
 # Kinds of types and shapes of values
@@ -24,12 +24,37 @@ def Ty.kind : Ty → Nat
   | .dict .. => 13
   | .all .. => 14
 
-theorem LeLive.kind {a b : Ty} (h : LeLive a b) : a.kind = b.kind := by
-  cases h <;> rfl
+theorem Ty.tcon_kind' (T : Name) (us : List Ty) : (Ty.tcon T us).kind = 3 := by
+  have : ∀ (us : List Ty) (f : Ty), f.kind = 3 → (us.foldl .tapp f).kind = 3 := by
+    intro us; induction us with
+    | nil => intro f h; exact h
+    | cons x xs ih => intro f _; exact ih _ rfl
+  exact this us _ rfl
+
+theorem LeLive.kind {a b : Ty} (h : LeLive S a b) : a.kind = b.kind := by
+  cases h with
+  | refl | arrow | eff => rfl
+  | hide _ _ _ _ ha hb => subst ha; subst hb; rw [Ty.tcon_kind', Ty.tcon_kind']
 
 theorem Shp.le {a b : Ty} {e : Tm}
-    (h : LeLive a b) (hs : Shp S true a e) : Shp S true b e := by
-  cases h <;> first | exact hs | exact .hidden (by simp [Ty.Opaque, Ty.hd])
+    (h : LeLive S a b) (hs : Shp S true a e) : Shp S true b e := by
+  cases h with
+  | refl => exact hs
+  | arrow | eff => exact .hidden (by simp [Ty.Opaque, Ty.hd])
+  | hide hi hl heq hsub ha hb =>
+    cases hs with
+    | hidden ho =>
+      subst ha; subst hb
+      exact .hidden (by rw [Ty.Opaque, Ty.tcon_hd] at ho ⊢; exact ho)
+    | adt hU hUh hTh hB =>
+      subst ha; subst hb
+      exact .adt hU hUh (by rw [Ty.tcon_hd] at hTh ⊢; exact hTh)
+        fun K hK => Sig.builds_widen (.inr ⟨_, hi, hl, heq, hsub⟩) (hB K hK)
+    | lit | rnil | rcons =>
+      have := congrArg Ty.kind ha
+      rw [Ty.tcon_kind'] at this
+      simp [Ty.kind] at this
+
 theorem Ty.opaque_of_kind {t : Ty} (h : t.kind = 1) : t.Opaque := by
   cases t <;> simp [Ty.kind] at h <;> simp [Ty.Opaque, Ty.hd]
 
@@ -71,7 +96,7 @@ theorem Const.ty_res {c : Const} {ι : CArg} (h : c.arity = 2) :
   cases c <;> simp [Const.arity] at h <;> exact ⟨_, _, rfl, rfl⟩
 
 theorem Const.res_kind {c : Const} {ι a ψ t C T'} (hc : c.arity = 2)
-    (h : LeLive (c.ty S ι) (.arrow a ψ t C)) (hT : LeLive t T') : T'.kind = 1 := by
+    (h : LeLive S (c.ty S ι) (.arrow a ψ t C)) (hT : LeLive S t T') : T'.kind = 1 := by
   obtain ⟨x, y, hxy, hk⟩ := Const.ty_res (S := S) (ι := ι) hc
   rw [hxy] at h
   obtain ⟨_, _, _, _, h', _, _, lt, -⟩ := h.arrow_left
@@ -97,11 +122,12 @@ theorem Typ.constApp_kind {Ψ Θ Γ c w T φ} (h : Typ S Ψ Θ Γ (.app (.const 
     | errVal _ _ _ _ => simp [Ty.hd] at hU
     | allI => simp [Ty.hd] at hU
 
-theorem LeLive.opaque {a b : Ty} (h : LeLive a b) (ha : a.Opaque) : b.Opaque := by
+theorem LeLive.opaque {a b : Ty} (h : LeLive S a b) (ha : a.Opaque) : b.Opaque := by
   cases h with
   | refl => exact ha
   | arrow => simp [Ty.Opaque, Ty.hd]
   | eff => simp [Ty.Opaque, Ty.hd]
+  | hide _ _ _ _ ha' hb => subst ha'; subst hb; rw [Ty.Opaque, Ty.tcon_hd] at ha ⊢; exact ha
 
 theorem Shp.false_arrows {U e} (h : Shp S false U e) :
     ∃ K k ts T ts', e.head = .ctor K ∧ S.ctor K = some (k, ts, T) ∧
@@ -141,26 +167,38 @@ theorem Sig.builds_inst {K k ts T} (hK : S.ctor K = some (k, ts, T)) (us : List 
   refine ⟨instT ((List.range k).map fun i => instT us (.v i)), ?_⟩
   rw [Ty.up_substT _ k _ hl, Ty.tcon_substT, hres]
 
-theorem Shp.full_of {U T e} {us : List Ty} (h : Shp S false U e) (hl : LeLive (U.substT (instT us)) T) :
+theorem Shp.full_of {U T e} {us : List Ty} (h : Shp S false U e) (hl : LeLive S (U.substT (instT us)) T) :
     Shp S true T e := by
   obtain ⟨K, _, _, T₀, ts', hh, hK, rfl⟩ := h.false_arrows
   cases ts' with
   | nil =>
     simp only [Ty.arrows, Ty.tcon_substT] at hl
-    have hT : ∀ X, LeLive X T → X.hd = .adt T₀ → T = X := by
+    have hB := Sig.builds_inst hK us
+    have key : ∀ X, LeLive S X T →
+        X = Ty.tcon T₀ ((S.res K).map (Ty.substT (instT us))) → Shp S true T e := by
       intro X hl hX
-      cases hl <;> first | rfl | simp [Ty.hd] at hX
-    obtain rfl := hT _ hl (Ty.tcon_hd _ _)
-    refine .adt h (Ty.tcon_hd _ _) (Ty.tcon_hd _ _) fun K' hh' => ?_
-    rw [hh] at hh'; cases hh'
-    exact Sig.builds_inst hK us
+      cases hl with
+      | refl =>
+        subst hX
+        refine .adt h (Ty.tcon_hd _ _) (Ty.tcon_hd _ _) fun K' hh' => ?_
+        rw [hh] at hh'; cases hh'
+        exact hB
+      | arrow => exact absurd hX Ty.arrow_ne_tcon
+      | eff => exact absurd hX Ty.eff_ne_tcon
+      | hide hi hlen heq hsub ha hb =>
+        obtain ⟨rfl, rfl⟩ := Ty.tcon_eq (ha.symm.trans hX)
+        subst hb
+        refine .adt h (Ty.tcon_hd _ _) (Ty.tcon_hd _ _) fun K' hh' => ?_
+        rw [hh] at hh'; cases hh'
+        exact Sig.builds_widen (.inr ⟨_, hi, hlen, heq, hsub⟩) hB
+    exact key _ hl rfl
   | cons _ _ => exact .hidden (hl.opaque (by simp [Ty.arrows, Ty.substT, Ty.Opaque, Ty.hd]))
 
 /-- The spine clause of `Typ.shape`: a constructor spine has the shape of its
 declaration, at an instance below its type, or is an error at `Errors ε`. -/
 def SpineShp (S : Sig) (Ψ : List Ty) (Θ : Facts) (Γ : List Scheme) (e : Tm) (T : Ty)
     (φ : Stage) : Prop :=
-  (∃ U us, LeLive (U.substT (instT us)) T ∧ Shp S false U e) ∨
+  (∃ U us, LeLive S (U.substT (instT us)) T ∧ Shp S false U e) ∨
     ∃ ε E U, T = .errors ε ∧ ε (.nm E) ∧ U.hd = .adt E ∧ Shp S true U e ∧
       Typ S Ψ Θ Γ e (.ex U φ) ∧ Row.Sub (Row.err E U) ε
 

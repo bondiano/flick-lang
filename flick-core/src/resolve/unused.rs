@@ -10,7 +10,7 @@ use crate::diagnostics::{Code, Diagnostic, Edit, Severity, codes};
 use crate::plugin::first_party;
 use crate::source::Span;
 use crate::syntax::cst::Node;
-use crate::syntax::kind::SyntaxKind as K;
+use crate::syntax::kind::{KEYWORDS, SyntaxKind as K};
 use crate::types::implicit_package_of;
 
 /// Warnings for local names bound and never used.
@@ -264,6 +264,13 @@ fn needless_head(text: &str, import: &Import, item: &Item) -> Diagnostic {
 fn unused_item(text: &str, import: &Import, item: &Item) -> Diagnostic {
     let message = if item.kind == ItemKind::All {
         format!("nothing `(..)` brings from `{}` is used", import.module)
+    } else if KEYWORDS.contains(&item.name.as_str()) {
+        // an export list may name it, but in an expression it stays the keyword
+        let module = import.alias.as_ref().unwrap_or(&import.module);
+        format!(
+            "`{}` spells a keyword, so the module can use it only as `{module}.{}`",
+            item.name, item.name
+        )
     } else {
         format!("`{}` is imported but never used", item.name)
     };

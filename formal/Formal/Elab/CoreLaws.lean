@@ -206,7 +206,7 @@ theorem has_varAll {Γ Δ x k₀ t₀ ts k t us φ} (hx : Γ[x]? = some ⟨k₀,
   rw [key] at hA'
   refine ⟨_, .var, .var (σ := trS N ⟨k₀, .mono t₀, []⟩) (ts := ts.map (trT N)) (by rw [hc.var, hx]; rfl)
     (by simpa [trS] using hts) (fun _ _ h => (trS_nil _ _ _ _ h).elim) ?_⟩
-  show LeLiveI ((trT N t₀).substT (instT (ts.map (trT N)))) (trT N (t.subst (inst us)))
+  show LeLiveI S ((trT N t₀).substT (instT (ts.map (trT N)))) (trT N (t.subst (inst us)))
   rw [hA', key]
   exact .inst (by simpa using hus) .refl
 

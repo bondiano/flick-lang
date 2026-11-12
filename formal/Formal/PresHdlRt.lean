@@ -130,7 +130,7 @@ theorem hdl_install {Ψ Θ E al rf e₀ T φ n t ψ C φ₀} {r ε : Row} {t' : 
     (he : Typ S Ψ Θ [] e₀ (.ex t φ₀))
     (hφ₀ : φ₀.le (.rt (Row.union (Row.single E) (r.back (Row.single E))) ε))
     (hOb : φ₀.ObOut (Row.single E)) (hc : S.Handles E al r) (hφ' : (Stage.rt r ε).le φ)
-    (hT : LeLive t' T)
+    (hT : LeLive S t' T)
     (hbl : (Tm.hdl E al rf e₀).Below n) (hΨ : ∀ u ∈ Ψ, u.YF n) (hidem : Θ.substT (kill n) = Θ)
     (ht : T.YF n) (hφ : φ.substT (kill n) = φ) :
     ∃ c, c.YF n ∧ Typ S Ψ Facts.age [] (.lam .todo) (.ex c .pure) ∧

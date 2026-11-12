@@ -113,31 +113,48 @@ theorem Ty.res_tcon_not_all {k : Nat} {t : Ty} {T : Name} {us : List Ty}
     (h : (Ty.all k t).res = Ty.tcon T us) : False :=
   Ty.not_all_of_hd (Ty.tcon_hd T us) (h ▸ trivial)
 
-theorem LeLive.res {a b : Ty} (h : LeLive a b) : LeLive a.res b.res := by
+theorem Ty.res_tcon_self (T : Name) (us : List Ty) : (Ty.tcon T us).res = Ty.tcon T us := by
+  have := Ty.tcon_isData T us
+  generalize Ty.tcon T us = t at this ⊢
+  cases t <;> simp_all [Ty.isData, Ty.res]
+
+theorem LeLive.res {a b : Ty} (h : LeLive S a b) : LeLive S a.res b.res := by
   induction h with
   | refl => exact .refl
   | arrow _ _ _ _ _ ih => exact ih
   | eff hφ ht hc => exact .eff hφ ht hc
+  | hide hi hl he hr ha hb =>
+    subst ha; subst hb
+    rw [Ty.res_tcon_self, Ty.res_tcon_self]
+    exact .hide hi hl he hr rfl rfl
 
-theorem LeLive.not_all {x y : Ty} (h : LeLive x y) (hx : ¬ x.isAll) : ¬ y.isAll := by
-  cases h <;> first | exact hx | simp [Ty.isAll]
+theorem Ty.tcon_not_isAll (T : Name) (us : List Ty) : ¬ (Ty.tcon T us).isAll := by
+  have := Ty.tcon_isData T us
+  generalize Ty.tcon T us = t at this ⊢
+  cases t <;> simp_all [Ty.isData, Ty.isAll]
 
-theorem LeLiveI.snoc {a k t} {us : List Ty} (h : LeLiveI a (.all k t)) (hus : us.length = k) :
-    LeLiveI a (t.substT (instT us)) := by
+theorem LeLive.not_all {x y : Ty} (h : LeLive S x y) (hx : ¬ x.isAll) : ¬ y.isAll := by
+  cases h with
+  | refl => exact hx
+  | arrow | eff => simp [Ty.isAll]
+  | hide _ _ _ _ _ hb => subst hb; exact Ty.tcon_not_isAll _ _
+
+theorem LeLiveI.snoc {a k t} {us : List Ty} (h : LeLiveI S a (.all k t)) (hus : us.length = k) :
+    LeLiveI S a (t.substT (instT us)) := by
   generalize ht : Ty.all k t = T at h
   induction h with
-  | le h => subst ht; cases h; exact .inst hus .refl
+  | le h => subst ht; obtain rfl := h.eq_plain_right rfl; exact .inst hus .refl
   | inst hus' _ ih => exact .inst hus' (ih ht)
 
 /-- Only a binder is below a binder. -/
 theorem LeLive.eq_all {x : Ty} {k t}
-    (h : LeLive x (.all k t)) : x = .all k t := by
-  cases h <;> rfl
+    (h : LeLive S x (.all k t)) : x = .all k t :=
+  h.eq_plain_right rfl
 
 /-- Subtyping keeps the shape of an arrow and relates its results. -/
 theorem LeLive.arrow_res {a φ t C T : _}
-    (h : LeLive (.arrow a φ t C) T) :
-    ∃ a' φ' t' C', T = .arrow a' φ' t' C' ∧ LeLive t t' := by
+    (h : LeLive S (.arrow a φ t C) T) :
+    ∃ a' φ' t' C', T = .arrow a' φ' t' C' ∧ LeLive S t t' := by
   obtain ⟨_, _, _, _, he, _, _, ht, -⟩ := LeLive.arrow_left h; exact ⟨_, _, _, _, he, ht⟩
 
 theorem Const.ty_isArrow (c : Const) (ι : CArg) (S : Sig) :

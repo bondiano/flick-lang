@@ -50,10 +50,10 @@ theorem Tm.StandsAt.rename {Γ Γ' s} {e : Tm} {ξ : Nat → Nat} (h : e.StandsA
 /-- A value of a binder's type is typed by (∀I): no other rule gives a value that type. -/
 theorem Typ.allInv {Ψ Θ Γ e k t φ} (hv : Value e) (h : Typ S Ψ Θ Γ e (.ex (.all k t) φ)) :
     Typ S (Ψ.map (Ty.up k)) (Θ.substT (shiftV k)) (Γ.map (Scheme.up k)) e (.ex t .pure) := by
-  have noArrow : ∀ {a φ t C T}, LeLive (.arrow a φ t C) T → ¬ T.isAll := fun h' => by
+  have noArrow : ∀ {a φ t C T}, LeLive S (.arrow a φ t C) T → ¬ T.isAll := fun h' => by
     obtain ⟨_, _, _, _, rfl, -⟩ := h'.arrow_res; simp [Ty.isAll]
-  have noEff : ∀ {r ε t C T}, LeLive (.eff r ε t C) T → ¬ T.isAll := fun h' => by
-    cases h' <;> simp [Ty.isAll]
+  have noEff : ∀ {r ε t C T}, LeLive S (.eff r ε t C) T → ¬ T.isAll := fun h' => by
+    obtain ⟨_, _, _, _, rfl, -⟩ := h'.eff_left; simp [Ty.isAll]
   cases h with
   | allI _ h => exact h
   | lam _ _ hT | fix _ _ hT | perform _ hT | kont _ _ hT => exact (noArrow hT trivial).elim
@@ -66,7 +66,7 @@ theorem Typ.allInv {Ψ Θ Γ e k t φ} (hv : Value e) (h : Typ S Ψ Θ Γ e (.ex
     rw [Sig.ctorTyR, Ty.arrows_res _ _ (Ty.tcon_not_arrow _ _)] at this
     exact (this.not_all (Ty.not_all_of_hd (Ty.tcon_hd _ _)) trivial).elim
   | app hf _ _ hT =>
-    have hT0 : LeLive _ _ := hT
+    have hT0 : LeLive S _ _ := hT
     cases hv with
     | ctorApp hvf hK _ =>
       rcases Typ.spine_notAll hf hvf hK rfl with h | h
@@ -114,7 +114,7 @@ theorem Typ.instAll {Ψ Θ Γ e k t φ} {us : List Ty} (hV : e.Stands) (hn : e.N
 
 /-- (Var) at an instance, for the term that stands for the variable. -/
 theorem Typ.elim {Ψ Θ Γ e A T} (hV : e.Stands ∨ ¬ A.isAll) (hn : e.NoIns)
-    (h : Typ S Ψ Θ Γ e (.ex A .pure)) (hT : LeLiveI A T) :
+    (h : Typ S Ψ Θ Γ e (.ex A .pure)) (hT : LeLiveI S A T) :
     Typ S Ψ Θ Γ e (.ex T .pure) := by
   induction hT with
   | le hl => exact h.sub ⟨hl, Stage.le_refl _⟩

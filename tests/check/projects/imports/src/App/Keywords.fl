@@ -1,0 +1,8 @@
+module App.Keywords exposing (twice)
+
+// an export list may name `none`, but here the word stays the keyword
+import App.Shapes as S exposing (none)
+//                               ^^^^ FLICK-R012 `none` spells a keyword, so the module can use it only as `S.none`
+
+twice : Unit -> Float
+let twice () = S.none () + S.none ()

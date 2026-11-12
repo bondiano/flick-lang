@@ -198,6 +198,24 @@ def Scheme.Closed (n : Nat) (s : Scheme) : Prop :=
 /-- `α₀ … αₖ₋₁`. -/
 def idTs (k : Nat) : List Ty := (List.range k).map Ty.tvar
 
+/-- The variable `v i` replaced by `∅`, the other atoms kept. -/
+def dropV (i : Nat) (a : Atom) : Ty := if a = .v i then .caps Caps.none else Ty.ident a
+
+/-- `t` does not depend on the variable `v i`: replacing it by `∅` changes nothing. -/
+def Ty.NoV (i : Nat) (t : Ty) : Prop := t.substT (dropV i) = t
+
+/-- `φ` does not depend on the variable `v i`. -/
+def Stage.NoV (i : Nat) (φ : Stage) : Prop := φ.substT (dropV i) = φ
+
+/-- Where the hidden row `v i` of data with hidden storage may stand in a field
+(regions.md §2.2): nowhere, as the qualifier of a stored function or computation, or as the
+hidden row of stored data, so that widening the row widens the field. -/
+def Ty.CovRow (hid : Name → Option Nat) (i : Nat) (f : Ty) : Prop :=
+  f.NoV i ∨
+  (∃ a φ b C, f = .arrow a φ b C ∧ a.NoV i ∧ φ.NoV i ∧ b.NoV i) ∨
+  (∃ r e t C, f = .eff r e t C ∧ (Ty.row r).NoV i ∧ (Ty.row e).NoV i ∧ t.NoV i) ∨
+  (∃ T us j, f = Ty.tcon T us ∧ hid T = some j ∧ ∀ l u, us[l]? = some u → l ≠ j → u.NoV i)
+
 /-- Declared ADTs and effects. A constructor has the number of parameters of its
 type, its argument types over them and its type name; its fields mention nothing
 but the parameters (`ctor_closed`, `ctor_reach`). The record type `S.Impl` of an
@@ -232,6 +250,16 @@ structure Sig where
     (impl E).field o = some (.arrow a (.rt Row.none Row.none) b Caps.none)
   dict_closed : ∀ c k fs, dict c = some (k, fs) → ∀ l s, (l, s) ∈ fs → s.Closed (s.k + k)
   glob_closed : ∀ g s, glob g = some s → s.Closed s.k
+  /-- The hidden row of data with hidden storage: the parameter the reading of a signature
+  fills (regions.md §1.4). Its constructors are ordinary at it, and it stands in their
+  fields only where widening it widens them (`Ty.CovRow`), so subtyping may widen it; nothing
+  else a constructor builds depends on it, so the constructor still builds the widened type.
+  A row a declaration names is no hidden row. -/
+  hidden : Name → Option Nat := fun _ => none
+  hidden_ok : ∀ T i, hidden T = some i → ∀ K k ts, ctor K = some (k, ts, T) →
+    i < k ∧ (res K)[i]? = some (.tvar i) ∧
+      (∀ j u, (res K)[j]? = some u → j ≠ i → u.NoV i) ∧ ∀ f ∈ ts, f.CovRow hidden i := by
+    intro _ _ h; simp at h
 
 /-- The instance of a constant's type variables. -/
 structure CArg where

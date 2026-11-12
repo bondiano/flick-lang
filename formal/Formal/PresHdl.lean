@@ -50,13 +50,13 @@ argument below `a₀`, and its result `B`, which holds of every type above it. -
 def HoleFn (S : Sig) (Ψ : List Ty) (f : Tm) (a₀ : Ty) (ψ₀ : Stage)
     (B : Ty → Prop) : Prop :=
   ∀ {K Θ' a ψ t C φ'}, Typ S (Ψ.map (Ty.up K)) Θ' [] f (.ex (.arrow a ψ t C) φ') →
-    ψ ≠ .pure ∧ (K = 0 → LeLive a a₀ ∧ ψ₀.le (Stage.use ψ C) ∧ B t)
+    ψ ≠ .pure ∧ (K = 0 → LeLive S a a₀ ∧ ψ₀.le (Stage.use ψ C) ∧ B t)
 
 /-- The hole `f x` of a context: what has every type of `B` at a run-time stage above `ψ₀`
 fills it, given `x` there at `a₀`. -/
 theorem refill_app {Ψ Θ E f x t₀ φ₀ a₀ w ψ₀ B} (hE : OkE E) (hn : ¬ Value (.app f x))
     (h : Typ S Ψ Θ [] (plug E (.app f x)) (.ex t₀ φ₀)) (hf : HoleFn S Ψ f a₀ ψ₀ B)
-    (hB : ∀ t T, B t → LeLive t T → B T)
+    (hB : ∀ t T, B t → LeLive S t T → B T)
     (hw : ∀ {Θ'} T φ', Ext Θ Θ' → ψ₀.le φ' → B T → Typ S Ψ Θ' [] x (.ex a₀ φ') →
       Typ S Ψ Θ' [] w (.ex T φ')) :
     Typ S Ψ Θ [] (plug E w) (.ex t₀ φ₀) := by
@@ -78,7 +78,7 @@ theorem refill_app {Ψ Θ E f x t₀ φ₀ a₀ w ψ₀ B} (hE : OkE E) (hn : ¬
 /-- An operation of a declared effect at the hole. -/
 theorem perform_fn {Ψ E o c a₀ b₀} (hop : S.op E o = some (c, a₀, b₀)) :
     HoleFn S Ψ (.const (.perform E o c)) a₀ (.rt (Row.single E) Row.none)
-      (fun t => c ≠ .abort → LeLive b₀ t) := by
+      (fun t => c ≠ .abort → LeLive S b₀ t) := by
   intro K Θ' a ψ t C φ' h
   cases h with
   | perform hop' hT =>
@@ -90,13 +90,13 @@ theorem perform_fn {Ψ E o c a₀ b₀} (hop : S.op E o = some (c, a₀, b₀)) 
   | const hok _ => exact hok.elim
 
 theorem perform_up {c : OpClass} {b₀ : Ty} :
-    ∀ t T, (c ≠ .abort → LeLive b₀ t) → LeLive t T →
-    c ≠ .abort → LeLive b₀ T := fun _ _ h l hc => (h hc).trans l
+    ∀ t T, (c ≠ .abort → LeLive S b₀ t) → LeLive S t T →
+    c ≠ .abort → LeLive S b₀ T := fun _ _ h l hc => (h hc).trans l
 
 /-- `resume` at the hole: its cell gives its type. -/
 theorem kont_fn {Ψ : List Ty} {p ℓ b₀ r ε t' C'}
     (hl : Ψ[ℓ]? = some (.arrow b₀ (.rt r ε) t' C')) :
-    HoleFn S Ψ (.kont p ℓ) b₀ (.rt r ε) (fun t => LeLive t' t) := by
+    HoleFn S Ψ (.kont p ℓ) b₀ (.rt r ε) (fun t => LeLive S t' t) := by
   intro K Θ' a ψ t C φ' h
   cases h with
   | kont hl' _ hT =>
@@ -116,7 +116,7 @@ theorem kont_fn {Ψ : List Ty} {p ℓ b₀ r ε t' C'}
 theorem kont_fn_rg {Ψ : List Ty} {p ℓ b₀ r ε t' C'}
     (hl : Ψ[ℓ]? = some (.arrow b₀ (.rt r ε) t' C')) (hcp : C' (.r p)) :
     HoleFn S Ψ (.kont p ℓ) b₀ (Stage.use (.rt r ε) (Ty.rg p).reach)
-      (fun t => LeLive t' t) := by
+      (fun t => LeLive S t' t) := by
   intro K Θ' a ψ t C φ' h
   have h₁ := kont_fn (S := S) (p := p) hl h
   refine ⟨h₁.1, fun hK => ?_⟩
