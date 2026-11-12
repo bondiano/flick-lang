@@ -207,7 +207,7 @@ theorem Typ.aref_substT {Ψ : List Ty} {Θ : Facts} {Γ : List Scheme} {K : Name
 
 theorem Typ.var_substT {Ψ : List Ty} {Θ : Facts} {Γ : List Scheme} {i : Nat} {σ' : Scheme}
     {ts : List Ty} {T : Ty} {φ : Stage} (hi : Γ[i]? = some σ') (hts : ts.length = σ'.k)
-    (hH : σ'.Holds Θ ts) (hT : LeLiveI (σ'.inst ts) T) (σ : Atom → Ty) :
+    (hH : σ'.Holds Θ ts) (hT : LeLiveI S (σ'.inst ts) T) (σ : Atom → Ty) :
     Typ S (Ψ.map (Ty.substT σ)) (Θ.substT σ) (Γ.map (Scheme.substT σ)) (.var i)
       (.ex (T.substT σ) (φ.substT σ)) := by
   refine .var (σ := σ'.substT σ) (ts := ts.map (Ty.substT σ)) (by simp [hi])
@@ -229,7 +229,7 @@ theorem Sig.holds_substT (S : Sig) {K k ts T} (hK : S.ctor K = some (k, ts, T)) 
 theorem Typ.ctor_substT {Ψ : List Ty} {Θ : Facts} {Γ : List Scheme} {K : Name} {k : Nat}
     {ts us : List Ty} {T₀ : Name} {T : Ty} {φ : Stage} (hK : S.ctor K = some (k, ts, T₀))
     (hk : us.length = k) (hH : Sig.Holds ts T₀ (S.res K) us)
-    (hT : LeLive (Sig.ctorTyR ts T₀ (S.res K) us) T) (σ : Atom → Ty) :
+    (hT : LeLive S (Sig.ctorTyR ts T₀ (S.res K) us) T) (σ : Atom → Ty) :
     Typ S Ψ Θ Γ (.ctor K) (.ex (T.substT σ) φ) := by
   refine .ctor (us := us.map (Ty.substT σ)) hK (by simpa using hk) (S.holds_substT hK hk hH σ) ?_
   have := hT.substT σ; rwa [S.ctorTyR_substT σ _ hk hK] at this
@@ -282,7 +282,7 @@ theorem Typ.dproj_at {Ψ : List Ty} {Θ : Facts} {Γ : List Scheme} {c k : Nat} 
     {σ : Atom → Ty} (h₁ : Typ S Ψ (Θ.substT σ) Γ e (.ex ((Ty.dict c (Ty.spine us)).substT σ) φ))
     (hc : S.dict c = some (k, fs)) (hk : us.length = k) (hl : fs.lookup l = some s)
     (hts : ts.length = s.k) (hH : (s.substT (instT us)).Holds Θ ts)
-    (hT : LeLive ((s.substT (instT us)).inst ts) T) :
+    (hT : LeLive S ((s.substT (instT us)).inst ts) T) :
     Typ S Ψ (Θ.substT σ) Γ (.proj e l) (.ex (T.substT σ) φ) := by
   simp only [Ty.substT, Ty.spine_substT] at h₁
   have he := S.field_substT hc (List.lookup_mem' hl) hk σ
@@ -299,14 +299,14 @@ theorem Typ.dproj_substT {Ψ : List Ty} {Θ : Facts} {Γ : List Scheme} {c k : N
       (J.substT σ (.ex (.dict c (Ty.spine us)) φ)))
     (hc : S.dict c = some (k, fs)) (hk : us.length = k) (hl : fs.lookup l = some s)
     (hts : ts.length = s.k) (hH : (s.substT (instT us)).Holds Θ ts)
-    (hT : LeLive ((s.substT (instT us)).inst ts) T) (σ : Atom → Ty) (hσ : Fits σ (.proj e l)) :
+    (hT : LeLive S ((s.substT (instT us)).inst ts) T) (σ : Atom → Ty) (hσ : Fits σ (.proj e l)) :
     Typ S (Ψ.map (Ty.substT σ)) (Θ.substT σ) (Γ.map (Scheme.substT σ)) (.proj e l)
       (J.substT σ (.ex T φ)) :=
   Typ.dproj_at (ih σ hσ) hc hk hl hts hH hT
 
 theorem Typ.glob_substT {Ψ : List Ty} {Θ : Facts} {Γ : List Scheme} {g : Nat} {s : Scheme}
     {ts : List Ty} {T : Ty} {φ : Stage} (hg : S.glob g = some s) (hts : ts.length = s.k)
-    (hH : s.Holds Θ ts) (hT : LeLive (s.inst ts) T) (σ : Atom → Ty) :
+    (hH : s.Holds Θ ts) (hT : LeLive S (s.inst ts) T) (σ : Atom → Ty) :
     Typ S (Ψ.map (Ty.substT σ)) (Θ.substT σ) (Γ.map (Scheme.substT σ)) (.glob g)
       (J.substT σ (.ex T φ)) := by
   have hH' := hH.substT σ hts

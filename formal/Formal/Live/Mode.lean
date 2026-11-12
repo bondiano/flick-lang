@@ -17,27 +17,90 @@ def Stage.use : Stage → Caps → Stage
 
 /-- Subtyping compares the stages at which qualified values are used, so it cannot hide a
 qualifier in an argument or a result type. -/
-inductive LeLive : Ty → Ty → Prop
-  | refl : LeLive t t
-  | arrow : LeLive a' a →
-      (Stage.use φ C).le (Stage.use φ' C') → LeLive t t' →
+inductive LeLive (S : Sig) : Ty → Ty → Prop
+  | refl : LeLive S t t
+  | arrow : LeLive S a' a →
+      (Stage.use φ C).le (Stage.use φ' C') → LeLive S t t' →
       Caps.Sub (Ty.arrow a φ t C).reach (Ty.arrow a' φ' t' C').reach →
-      LeLive (.arrow a φ t C) (.arrow a' φ' t' C')
+      LeLive S (.arrow a φ t C) (.arrow a' φ' t' C')
   | eff : (Stage.use (.rt r e) C).le (Stage.use (.rt r' e') C') →
-      LeLive t t' →
+      LeLive S t t' →
       Caps.Sub (Ty.eff r e t C).reach (Ty.eff r' e' t' C').reach →
-      LeLive (.eff r e t C) (.eff r' e' t' C')
+      LeLive S (.eff r e t C) (.eff r' e' t' C')
+  /-- Data with hidden storage may widen its hidden row and nothing else (regions.md §2.2):
+  `Sig.hidden_ok` keeps the row covariant in the fields. -/
+  | hide {T : Name} {i : Nat} {us us' : List Ty} {a b : Ty} : S.hidden T = some i →
+      us.length = us'.length → (∀ j, j ≠ i → us[j]? = us'[j]?) →
+      (∀ r r', us[i]? = some r → us'[i]? = some r' → Caps.Sub r.reach r'.reach) →
+      a = Ty.tcon T us → b = Ty.tcon T us' → LeLive S a b
+
+/-- A type application or a type name. -/
+def Ty.isData : Ty → Bool
+  | .adt _ => true
+  | .tapp _ _ => true
+  | _ => false
+
+theorem Ty.foldl_tapp_isData (us : List Ty) : ∀ acc : Ty, acc.isData = true →
+    (us.foldl .tapp acc).isData = true := by
+  induction us with
+  | nil => intro acc h; exact h
+  | cons u us ih => intro acc _; exact ih _ rfl
+
+theorem Ty.tcon_isData (T : Name) (us : List Ty) : (Ty.tcon T us).isData = true :=
+  Ty.foldl_tapp_isData us _ rfl
+
+/-- A type that subtyping relates only to itself: not an arrow, a computation or data. -/
+def Ty.isPlain : Ty → Bool
+  | .arrow .. | .eff .. | .adt _ | .tapp _ _ => false
+  | _ => true
+
+theorem Ty.ne_tcon_of_plain {t : Ty} (h : t.isPlain = true) {T : Name} {us : List Ty} :
+    t ≠ Ty.tcon T us := by
+  intro e
+  have := Ty.tcon_isData T us
+  rw [← e] at this
+  cases t <;> simp_all [Ty.isPlain, Ty.isData]
+
+theorem Ty.arrow_ne_tcon {a φ b C T us} : Ty.arrow a φ b C ≠ Ty.tcon T us := by
+  intro h; have := Ty.tcon_isData T us; rw [← h] at this; simp [Ty.isData] at this
+
+theorem Ty.eff_ne_tcon {r e t C T us} : Ty.eff r e t C ≠ Ty.tcon T us := by
+  intro h; have := Ty.tcon_isData T us; rw [← h] at this; simp [Ty.isData] at this
+
+/-- The name and the arguments of a spine of type applications. -/
+def Ty.unspine : Ty → Option (Name × List Ty)
+  | .adt T => some (T, [])
+  | .tapp f a => (Ty.unspine f).map fun p => (p.1, p.2 ++ [a])
+  | _ => none
+
+theorem Ty.unspine_foldl (us : List Ty) : ∀ (acc : Ty) (T : Name) (vs : List Ty),
+    acc.unspine = some (T, vs) → (us.foldl .tapp acc).unspine = some (T, vs ++ us) := by
+  induction us with
+  | nil => intro acc T vs h; simpa using h
+  | cons u us ih =>
+    intro acc T vs h
+    have := ih (.tapp acc u) T (vs ++ [u]) (by simp [Ty.unspine, h])
+    simpa using this
+
+theorem Ty.unspine_tcon (T : Name) (us : List Ty) : (Ty.tcon T us).unspine = some (T, us) := by
+  simpa using Ty.unspine_foldl us (.adt T) T [] rfl
+
+theorem Ty.tcon_eq {T T' : Name} {us vs : List Ty} (h : Ty.tcon T us = Ty.tcon T' vs) :
+    T = T' ∧ us = vs := by
+  have := congrArg Ty.unspine h
+  rw [Ty.unspine_tcon, Ty.unspine_tcon] at this
+  simpa using this
 
 /-- Polymorphic instantiation uses live subtyping at its leaves. -/
-inductive LeLiveI : Ty → Ty → Prop
-  | le : LeLive a b → LeLiveI a b
-  | inst {us : List Ty} : us.length = k → LeLiveI (t.substT (instT us)) T → LeLiveI (.all k t) T
+inductive LeLiveI (S : Sig) : Ty → Ty → Prop
+  | le : LeLive S a b → LeLiveI S a b
+  | inst {us : List Ty} : us.length = k → LeLiveI S (t.substT (instT us)) T → LeLiveI S (.all k t) T
 
-theorem LeLiveI.refl : LeLiveI t t := .le .refl
+theorem LeLiveI.refl : LeLiveI S t t := .le .refl
 
 /-- Subtyping cannot erase the stage needed to call a qualified function. -/
 theorem LeLive.arrow_use {a ψ t C a' ψ' t' C'}
-    (h : LeLive (.arrow a ψ t C) (.arrow a' ψ' t' C')) :
+    (h : LeLive S (.arrow a ψ t C) (.arrow a' ψ' t' C')) :
     (Stage.use ψ C).le (Stage.use ψ' C') := by
   cases h with
   | refl =>
@@ -45,13 +108,15 @@ theorem LeLive.arrow_use {a ψ t C a' ψ' t' C'}
     | pure => trivial
     | rt _ _ => exact ⟨fun _ h => h, fun _ h => h⟩
   | arrow _ hψ _ _ => exact hψ
+  | hide _ _ _ _ ha => exact absurd ha Ty.arrow_ne_tcon
 
 /-- The same obligation is kept when a qualified task is widened. -/
 theorem LeLive.eff_use {r ε t C r' ε' t' C'}
-    (h : LeLive (.eff r ε t C) (.eff r' ε' t' C')) :
+    (h : LeLive S (.eff r ε t C) (.eff r' ε' t' C')) :
     (Stage.use (.rt r ε) C).le (Stage.use (.rt r' ε') C') := by
   cases h with
   | refl => exact ⟨fun _ h => h, fun _ h => h⟩
   | eff hψ _ _ => exact hψ
+  | hide _ _ _ _ ha => exact absurd ha Ty.eff_ne_tcon
 
 end Flick

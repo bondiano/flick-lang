@@ -109,7 +109,7 @@ theorem canonical_ref {Ψ Θ Γ v t φ} (hv : Value v) (h : Typ S Ψ Θ Γ v (.e
 /-- L1 for computations. -/
 theorem canonical_eff {Ψ Θ Γ v r ε t C φ} (hv : Value v)
     (h : Typ S Ψ Θ Γ v (.ex (.eff r ε t C) φ)) :
-    ∃ e t₀ ψ, v = .task e ∧ Typ S Ψ Θ Γ e (.ex t₀ ψ) ∧ ψ.le (Stage.use (.rt r ε) C) ∧ LeLive t₀ t := by
+    ∃ e t₀ ψ, v = .task e ∧ Typ S Ψ Θ Γ e (.ex t₀ ψ) ∧ ψ.le (Stage.use (.rt r ε) C) ∧ LeLive S t₀ t := by
   have hk := h.vkind hv rfl (by simp [Ty.isAll])
   cases hv with
   | task =>

@@ -42,23 +42,26 @@ theorem matchP_spine_head {K qs v δ} (hm : matchP (Pat.spine K qs) v = some δ)
     cases v <;> simp [matchP] at h; simp [Tm.head, h.1]) hm
 
 /-- A value built by a constructor `K` at an instance `us` of its variables: the final
-type of the value is `T rs` at `us`, and patterns of the fields at `us` match. -/
+type of the value is `T rs` at `us`, its hidden row perhaps widened, and patterns of the
+fields at `us` or at a widening of it match. -/
 theorem Typ.spine_match {Ψ Θ Γ v J} (h : Typ S Ψ Θ Γ v J) :
     Value v → ∀ {K k ts T X}, v.head = .ctor K → S.ctor K = some (k, ts, T) →
       J = .ex X .pure → X.kind ≠ 7 → ¬ X.isAll →
-      ∃ us, us.length = k ∧ X.res = Ty.tcon T ((S.res K).map (Ty.substT (instT us))) ∧
-        ∀ {p Z Δ δ}, SpTy S K us p Z Δ → matchP p v = some δ → LeLive Z X ∧ Inst S Ψ Θ Γ δ Δ := by
+      ∃ us, us.length = k ∧
+        (∃ ws, X.res = Ty.tcon T ws ∧ S.Widen T ((S.res K).map (Ty.substT (instT us))) ws) ∧
+        ∀ {us' p Z Δ δ}, S.Widen T us us' → SpTy S K us' p Z Δ → matchP p v = some δ →
+          (∃ Z', LeLive S Z' X ∧ SpW S Z' Z) ∧ Inst S Ψ Θ Γ δ Δ := by
   induction h with
   | ctor hK hk _ hT =>
     intro _ _ _ _ _ _ hK' hS hJ _ _
     cases hJ; simp only [Tm.head] at hK'; cases hK'
     rw [hK] at hS; cases hS
-    refine ⟨_, hk, LeLive.res_tcon hT (Sig.ctorTyR_res _ _ _ _), fun hp hm => ?_⟩
+    refine ⟨_, hk, LeLive.res_tcon hT (Sig.ctorTyR_res _ _ _ _), fun hw hp hm => ?_⟩
     cases hp with
     | head hK'' =>
       rw [hK] at hK''; cases hK''
       simp [matchP] at hm; subst hm
-      exact ⟨hT, .nil⟩
+      exact ⟨⟨_, hT, SpW.ctor hK hk hw⟩, .nil⟩
     | app => simp [matchP] at hm
   | app _ he _ hT ih₁ _ =>
     intro hv _ _ _ _ _ hK hS hJ _ _
@@ -66,17 +69,19 @@ theorem Typ.spine_match {Ψ Θ Γ v J} (h : Typ S Ψ Θ Γ v J) :
     cases hv with
     | ctorApp hvf _ hve =>
       simp only [Tm.head] at hK
-      obtain ⟨us, hl, hr, hus⟩ := ih₁ hvf hK hS rfl (by simp [Ty.kind]) (by simp [Ty.isAll])
+      obtain ⟨us, hl, ⟨ws, hr, hw⟩, hus⟩ :=
+        ih₁ hvf hK hS rfl (by simp [Ty.kind]) (by simp [Ty.isAll])
       simp only [Ty.res] at hr
-      refine ⟨us, hl, LeLive.res_tcon hT hr, fun hp hm => ?_⟩
+      obtain ⟨ws', hr', hw'⟩ := hT.res_tcon hr
+      refine ⟨us, hl, ⟨ws', hr', hw.trans hw'⟩, fun hwu hp hm => ?_⟩
       cases hp with
       | head => simp [matchP] at hm
       | app hp' hq =>
         obtain ⟨δ₁, δ₂, h1, h2, rfl⟩ := matchP_app.mp hm
-        obtain ⟨hl', i₁⟩ := hus hp' h1
-        obtain ⟨_, _, _, _, h, la, _, lt, -⟩ := LeLive.arrow_left hl'
+        obtain ⟨⟨Z, hZ, hs⟩, i₁⟩ := hus hwu hp' h1
+        obtain ⟨_, _, _, _, h, la, Z', lt, hs'⟩ := hs.arrow_step hZ
         cases h
-        exact ⟨lt.trans hT, i₁.append (hq.inst hve
+        exact ⟨⟨Z', lt.trans hT, hs'⟩, i₁.append (hq.inst hve
           (he.sub (J' := .ex _ .pure) ⟨la, Stage.le_refl _⟩) h2)⟩
     | constApp => simp [Tm.head] at hK
   | errVal => intro _ _ _ _ _ _ _ _ hJ hk; cases hJ; simp [Ty.kind] at hk
@@ -110,15 +115,17 @@ theorem aref_match {Ψ Θ v t t' φ K k ts T₀ qs b δ} {Δ : (Atom → Ty) →
     (hm : matchP (Pat.spine K qs) v = some δ) :
     Typ S Ψ Θ [] (b.subst (inst δ)) (.ex t' φ) := by
   have hU7 : t.kind ≠ 7 := by rw [Ty.kind_of_hd hU]; decide
-  obtain ⟨us, hk, hr, hus⟩ :=
+  obtain ⟨us₀, hk₀, ⟨ws, hr, hw⟩, hus⟩ :=
     (h₁.valueAny hv .pure).spine_match hv (matchP_spine_head hm) hK rfl hU7 (Ty.not_all_of_hd hU)
   rw [Ty.res_of_hd hU] at hr
+  -- the arm's problem is solved at the value's instance with its hidden row widened to `t`
+  obtain ⟨us, hk, hmap, hwu⟩ := Sig.Widen.lift hK hk₀ hw
   have hF : Fits (instT us) b := ⟨fun _ _ => rfl, fun h => (hn h).elim, fun h => (hn h).elim,
     fun h => (hn h).elim⟩
   have hu : (Ty.tcon T₀ (S.res K)).substT (instT us) = (t.up k).substT (instT us) := by
-    rw [Ty.up_substT t k us hk, Ty.tcon_substT, hr]
+    rw [Ty.up_substT t k us hk, Ty.tcon_substT, hmap, hr]
   have hsp := (hpA _ hF hu).spTy (K := K) (us := us) (.head hK)
-  obtain ⟨-, hδ⟩ := hus hsp hm
+  obtain ⟨-, hδ⟩ := hus hwu hsp hm
   have hb := hbA _ hF hu
   simp only [List.map_nil, List.map_map, Function.comp_def, Ty.up_substT _ _ _ hk, List.map_id',
     Facts.up_substT _ _ _ hk, Stage.up_substT _ _ _ hk] at hb

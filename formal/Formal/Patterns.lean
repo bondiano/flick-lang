@@ -99,19 +99,43 @@ theorem Ty.tcon_not_eff (T : Name) (us : List Ty) : ∀ r e t C, Ty.tcon T us �
   intro r e t C h
   have := Ty.tcon_kind T us; rw [h] at this; cases this
 
+/-- Subtyping keeps the final type of data, up to widening its hidden row. -/
 theorem LeLive.res_tcon {a b : Ty} {T : Name} {us : List Ty}
-    (h : LeLive a b) (ha : a.res = Ty.tcon T us) : b.res = Ty.tcon T us := by
+    (h : LeLive S a b) (ha : a.res = Ty.tcon T us) :
+    ∃ us', b.res = Ty.tcon T us' ∧ S.Widen T us us' := by
   induction h with
-  | refl => exact ha
+  | refl => exact ⟨us, ha, .refl⟩
   | arrow _ _ _ _ _ ih => exact ih ha
   | eff => exact absurd ha.symm (Ty.tcon_not_eff _ _ _ _ _ _)
+  | hide hi hl heq hsub ha' hb' =>
+    subst ha'; subst hb'
+    rw [Ty.tcon_res] at ha ⊢
+    obtain ⟨rfl, rfl⟩ := Ty.tcon_eq ha
+    exact ⟨_, rfl, .inr ⟨_, hi, hl, heq, hsub⟩⟩
 
 theorem LeLive.res_tcon' {a b : Ty} {T : Name} {us : List Ty}
-    (h : LeLive a b) (hb : b.res = Ty.tcon T us) : a.res = Ty.tcon T us := by
+    (h : LeLive S a b) (hb : b.res = Ty.tcon T us) :
+    ∃ us₀, a.res = Ty.tcon T us₀ ∧ S.Widen T us₀ us := by
   induction h with
-  | refl => exact hb
+  | refl => exact ⟨us, hb, .refl⟩
   | arrow _ _ _ _ _ ih => exact ih hb
   | eff => exact absurd hb.symm (Ty.tcon_not_eff _ _ _ _ _ _)
+  | hide hi hl heq hsub ha' hb' =>
+    subst ha'; subst hb'
+    rw [Ty.tcon_res] at hb ⊢
+    obtain ⟨rfl, rfl⟩ := Ty.tcon_eq hb
+    exact ⟨_, rfl, .inr ⟨_, hi, hl, heq, hsub⟩⟩
+
+/-- The final type of a value's spine is the pattern's, or narrower at the hidden row. -/
+def ResBelow (S : Sig) (t' t : Ty) : Prop :=
+  t'.res = t.res ∨ ∃ T ws ws', t.res = Ty.tcon T ws' ∧ t'.res = Ty.tcon T ws ∧ S.Widen T ws ws'
+
+theorem ResBelow.tcon {t' t : Ty} {T : Name} {ws' : List Ty} (h : ResBelow S t' t)
+    (ht : t.res = Ty.tcon T ws') : ∃ ws, t'.res = Ty.tcon T ws ∧ S.Widen T ws ws' := by
+  rcases h with h | ⟨T₁, ws, ws₁, h₁, h₂, hw⟩
+  · exact ⟨ws', h.trans ht, .refl⟩
+  · obtain ⟨rfl, rfl⟩ := Ty.tcon_eq (h₁.symm.trans ht)
+    exact ⟨ws, h₂, hw⟩
 theorem Ty.tcon_eq_adt {T T' : Name} {us : List Ty} (h : Ty.tcon T us = .adt T') :
     us = [] ∧ T = T' := by
   cases us with
@@ -125,11 +149,34 @@ theorem Ty.tcon_eq_adt {T T' : Name} {us : List Ty} (h : Ty.tcon T us = .adt T')
     obtain ⟨g, b, hg⟩ := this xs (.tapp (.adt T) x) ⟨_, _, rfl⟩
     simp only [Ty.tcon, List.foldl] at h; rw [hg] at h; cases h
 
+/-- A type without parameters is below only itself. -/
+theorem LeLive.adt_eq {T : Name} {U : Ty} (h : LeLive S (.adt T) U) : U = .adt T := by
+  generalize hX : Ty.adt T = X at h
+  cases h with
+  | refl => rfl
+  | arrow => cases hX
+  | eff => cases hX
+  | hide _ hl _ _ ha hb =>
+    subst hb
+    obtain ⟨rfl, rfl⟩ := Ty.tcon_eq_adt (ha.symm.trans hX.symm)
+    rw [List.eq_nil_of_length_eq_zero hl.symm]; exact hX
+
+/-- A narrower spine at a type without parameters is the type. -/
+theorem SpW.adt {Z : Ty} {T : Name} (h : SpW S Z (.adt T)) : Z = .adt T := by
+  generalize hY : Ty.adt T = Y at h
+  cases h with
+  | refl => rfl
+  | res hw =>
+    obtain ⟨rfl, rfl⟩ := Ty.tcon_eq_adt hY.symm
+    rw [List.eq_nil_of_length_eq_zero hw.length]
+  | arrow => cases hY
+
 /-- The final type of a typed constructor spine is its type at an instance. -/
 theorem Typ.spine_res {Ψ Θ Γ v J} (h : Typ S Ψ Θ Γ v J) :
     Value v → ∀ {K k ts T X φ}, v.head = .ctor K → S.ctor K = some (k, ts, T) →
       J = .ex X φ → X.kind ≠ 7 → ¬ X.isAll →
-        ∃ us, us.length = k ∧ X.res = Ty.tcon T ((S.res K).map (Ty.substT (instT us))) := by
+        ∃ us, us.length = k ∧ ∃ ws, X.res = Ty.tcon T ws ∧
+          S.Widen T ((S.res K).map (Ty.substT (instT us))) ws := by
   induction h with
   | ctor hK hk _ hT =>
     intro _ _ _ _ _ _ _ hK' hS hJ _ _
@@ -142,9 +189,10 @@ theorem Typ.spine_res {Ψ Θ Γ v J} (h : Typ S Ψ Θ Γ v J) :
     cases hv with
     | ctorApp hvf hK' _ =>
       simp only [Tm.head] at hK
-      obtain ⟨us, hl, hr⟩ := ih₁ hvf hK hS rfl (by simp [Ty.kind]) (by simp [Ty.isAll])
+      obtain ⟨us, hl, ws, hr, hw⟩ := ih₁ hvf hK hS rfl (by simp [Ty.kind]) (by simp [Ty.isAll])
       simp only [Ty.res] at hr
-      exact ⟨us, hl, hT.res_tcon hr⟩
+      obtain ⟨ws', hr', hw'⟩ := hT.res_tcon hr
+      exact ⟨us, hl, ws', hr', hw.trans hw'⟩
     | constApp => simp [Tm.head] at hK
   | errVal => intro _ _ _ _ _ _ _ _ _ hJ hk; cases hJ; simp [Ty.kind] at hk
   | allI => intro _ _ _ _ _ _ _ _ _ hJ _ hA; cases hJ; exact (hA trivial).elim
@@ -173,20 +221,20 @@ theorem PatTy.spine {fl p t Δ} (hp : PatTy S fl p t Δ) (hf : fl = false) :
 the pattern is below the type of the value, at the same instance. -/
 theorem PatTy.typ_match {Ψ Θ Γ fl p t Δ} (hp : PatTy S fl p t Δ) :
     ∀ {v δ t'}, Value v → Typ S Ψ Θ Γ v (.ex t' .pure) → matchP p v = some δ →
-      (fl = true → t' = t) → (fl = false → t'.kind ≠ 7 ∧ t'.res = t.res) →
-      LeLive t t' ∧ Inst S Ψ Θ Γ δ Δ := by
+      (fl = true → t' = t) → (fl = false → t'.kind ≠ 7 ∧ ResBelow S t' t) →
+      (∃ Z, LeLive S Z t' ∧ SpW S Z t) ∧ Inst S Ψ Θ Γ δ Δ := by
   induction hp with
   | wild =>
     intro _ _ _ _ _ hm ht _; simp [matchP] at hm; subst hm; obtain rfl := ht rfl
-    exact ⟨LeLive.refl, .nil⟩
+    exact ⟨⟨_, LeLive.refl, .refl⟩, .nil⟩
   | var =>
     intro _ _ _ hvv hv hm ht _; simp [matchP] at hm; subst hm
-    obtain rfl := ht rfl; exact ⟨LeLive.refl, .cons hvv hv .nil⟩
+    obtain rfl := ht rfl; exact ⟨⟨_, LeLive.refl, .refl⟩, .cons hvv hv .nil⟩
   | lit =>
     intro v _ _ _ _ hm ht _
     obtain rfl := ht rfl
     cases v <;> simp [matchP] at hm
-    exact ⟨LeLive.refl, hm.2 ▸ .nil⟩
+    exact ⟨⟨_, LeLive.refl, .refl⟩, hm.2 ▸ .nil⟩
   | head hK hj hk =>
     intro v _ _ _ hv hm _ hk'
     cases v <;> simp [matchP] at hm
@@ -195,12 +243,14 @@ theorem PatTy.typ_match {Ψ Θ Γ fl p t Δ} (hp : PatTy S fl p t Δ) :
     cases hv with
     | ctor hK' hk'' _ hT =>
       rw [hK] at hK'; cases hK'
-      have := hT.res_tcon (Sig.ctorTyR_res _ _ _ _)
-      rw [hres, Sig.ctorTyR_res] at this
-      -- the instance of what it builds is the instance of the constructor
-      cases Sig.inst_inj hj hk'' hk (Ty.tcon_inj (by simp) this.symm)
-      exact ⟨hT, .nil⟩
-    | allI => exact (Ty.res_tcon_not_all (hres.trans (Sig.ctorTyR_res _ _ _ _))).elim
+      obtain ⟨ws₁, h₁, hw₁⟩ := hT.res_tcon (Sig.ctorTyR_res _ _ _ _)
+      obtain ⟨ws, h₂, hw⟩ := hres.tcon (Sig.ctorTyR_res _ _ _ _)
+      obtain rfl := (Ty.tcon_eq (h₁.symm.trans h₂)).2
+      -- the instance of what it builds widens to the instance of the pattern
+      exact ⟨⟨_, hT, SpW.ctor hK hk'' (Sig.Widen.of_map hj hK hk'' hk (hw₁.trans hw))⟩, .nil⟩
+    | allI =>
+      obtain ⟨_, h₂, -⟩ := hres.tcon (Sig.ctorTyR_res _ _ _ _)
+      exact (Ty.res_tcon_not_all h₂).elim
     | errVal => exact absurd rfl hk7
   | app _ _ ih₁ ih₂ =>
     intro v δ _ hvv hv hm _ hk
@@ -217,35 +267,37 @@ theorem PatTy.typ_match {Ψ Θ Γ fl p t Δ} (hp : PatTy S fl p t Δ) :
           | constApp _ he' => exact ⟨.const, he'⟩
         obtain ⟨_, _, _, _, _, _, _, hr, _⟩ := (‹PatTy S false _ _ _›).spine rfl
         simp only [Ty.res] at hr
-        have hres' := hT.res_tcon' (by rw [hres]; exact hr)
-        obtain ⟨hl, i₁⟩ := ih₁ hvf.1 hf h1 (fun h => by cases h)
-          (fun _ => ⟨by simp [Ty.kind], by simp only [Ty.res]; rw [hres', hr]⟩)
-        obtain ⟨_, _, _, _, h, la, _, lt, -⟩ := hl.arrow_left
+        obtain ⟨ws, hw1, hww⟩ := hres.tcon hr
+        obtain ⟨ws₀, hres', hw0⟩ := hT.res_tcon' hw1
+        obtain ⟨⟨Z, hZ, hs⟩, i₁⟩ := ih₁ hvf.1 hf h1 (fun h => by cases h)
+          (fun _ => ⟨by simp [Ty.kind], .inr ⟨_, _, _, hr, hres', hw0.trans hww⟩⟩)
+        obtain ⟨_, _, _, _, h, la, Z', lt, hs'⟩ := hs.arrow_step hZ
         cases h
         obtain ⟨_, i₂⟩ := ih₂ hvf.2 (he.sub ⟨la, Stage.le_refl _⟩) h2 (fun _ => rfl)
           (fun h => by cases h)
-        exact ⟨lt.trans hT, i₁.append i₂⟩
+        exact ⟨⟨Z', lt.trans hT, hs'⟩, i₁.append i₂⟩
       | allI =>
         obtain ⟨_, _, _, _, _, _, _, hr, _⟩ := (‹PatTy S false _ _ _›).spine rfl
-        exact (Ty.res_tcon_not_all (hres.trans hr)).elim
+        obtain ⟨_, h₂, -⟩ := hres.tcon hr
+        exact (Ty.res_tcon_not_all h₂).elim
       | errVal => exact absurd rfl hk7
     | _ => simp [matchP] at hm
   | adt _ hU ih =>
     intro _ _ _ hvv hv hm ht _
     obtain rfl := ht rfl
     exact ih hvv hv hm (fun h => by cases h)
-      (fun _ => ⟨by rw [Ty.kind_of_hd hU]; decide, rfl⟩)
+      (fun _ => ⟨by rw [Ty.kind_of_hd hU]; decide, .inl rfl⟩)
   | rany =>
     intro v _ _ _ _ hm ht _
     obtain rfl := ht rfl
-    cases v <;> simp [matchP] at hm <;> exact ⟨LeLive.refl, hm ▸ .nil⟩
+    cases v <;> simp [matchP] at hm <;> exact ⟨⟨_, LeLive.refl, .refl⟩, hm ▸ .nil⟩
   | rfield hR _ _ ih₁ ih₂ =>
     intro v δ _ hvv hv hm ht _
     obtain rfl := ht rfl
     obtain ⟨x, δ₁, δ₂, hx, h1, h2, rfl⟩ := matchP_rfield.mp hm
     obtain ⟨_, i₁⟩ := ih₁ (hvv.field hv hx hR) (field_typ hv hx hR) h1 (fun _ => rfl) (fun h => by cases h)
     obtain ⟨_, i₂⟩ := ih₂ hvv hv h2 (fun _ => rfl) (fun h => by cases h)
-    exact ⟨LeLive.refl, i₁.append i₂⟩
+    exact ⟨⟨_, LeLive.refl, .refl⟩, i₁.append i₂⟩
   | or _ _ ih₁ ih₂ =>
     intro v δ _ hvv hv hm ht hk
     rcases matchP_or.mp hm with h | ⟨_, h⟩
@@ -270,12 +322,16 @@ theorem HPat.inst {Ψ Θ Γ ε₀ p θ Δ v δ} (hp : HPat S ε₀ p θ Δ) (hvv
     rw [hm' v δ hm] at hK; cases hK
     rw [hS] at hS'; cases hS'
     have hU7 : U.kind ≠ 7 := by rw [Ty.kind_of_hd hU]; decide
-    obtain ⟨_, _, hr'⟩ := hv'.spine_res hvv (hm' v δ hm) hS rfl hU7 (Ty.not_all_of_hd hU)
+    obtain ⟨_, _, ws, hr', hw⟩ := hv'.spine_res hvv (hm' v δ hm) hS rfl hU7 (Ty.not_all_of_hd hU)
     -- an error's constructor builds the error type itself
     obtain ⟨hnil, rfl⟩ := Ty.tcon_eq_adt hr.symm
     have hrs : S.res K = [] := List.map_eq_nil_iff.mp hnil
-    obtain ⟨hl, i⟩ := hp.typ_match hvv hv' hm (fun h => by cases h)
-      (fun _ => ⟨hU7, by rw [hr', hrs]; rfl⟩)
-    cases hl <;> exact ⟨i, hv'⟩
+    rw [hrs] at hw
+    obtain rfl : ws = [] := Sig.Widen.nil hw
+    obtain ⟨⟨Z, hZ, hs⟩, i⟩ := hp.typ_match hvv hv' hm (fun h => by cases h)
+      (fun _ => ⟨hU7, .inl (by rw [hr']; rfl)⟩)
+    rw [SpW.adt hs] at hZ
+    rw [LeLive.adt_eq hZ] at hv'
+    exact ⟨i, hv'⟩
 
 end Flick

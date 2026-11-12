@@ -73,7 +73,7 @@ theorem Stage.use_live_mono {φ : Stage} {H C : Caps} :
     exact ⟨fun n h => h.elim (fun h => .inl (.inl h)) (fun h => .inr h), fun _ h => h⟩
 
 /-- The elided reading of a kept type is a supertype of it. -/
-theorem Ty.Kept.le_elide {K : Caps} {t : Ty} (h : t.Kept K) : ∀ H, LeLive t (t.elide K H) := by
+theorem Ty.Kept.le_elide {K : Caps} {t : Ty} (h : t.Kept K) : ∀ H, LeLive S t (t.elide K H) := by
   induction h with
   | fix hf => intro H; rw [hf H]; exact .refl
   | arrow ha _ ih =>
@@ -127,13 +127,13 @@ theorem Const.ty_kept {S : Sig} {Θ : Facts} {c : Const} {ι : CArg} {K : Caps}
 /-- The elided reading of a constant is a live supertype of its live type. -/
 theorem Const.ty_le_elide {S : Sig} {Θ : Facts} {c : Const} {ι : CArg} {K : Caps}
     (hc : c.ok Θ ι) (hι : ι.Fixed) (H : Caps) :
-    LeLive (c.ty S ι) ((c.ty S ι).elide K H) :=
+    LeLive S (c.ty S ι) ((c.ty S ι).elide K H) :=
   (Const.ty_kept hc hι).le_elide H
 
 /-- The core types a constant at each supertype of its elided reading. -/
 theorem Typ.const_elided {S : Sig} {Ψ : List Ty} {Θ : Facts} {Γ : List Scheme} {c : Const}
     {ι : CArg} {K : Caps} {T : Ty} {φ : Stage} (hc : c.ok Θ ι) (hι : ι.Fixed) (H : Caps)
-    (hT : LeLive ((c.ty S ι).elide K H) T) : Typ S Ψ Θ Γ (.const c) (.ex T φ) :=
+    (hT : LeLive S ((c.ty S ι).elide K H) T) : Typ S Ψ Θ Γ (.const c) (.ex T φ) :=
   .const hc ((Const.ty_le_elide hc hι H).trans hT)
 
 /-- A scheme read with `Ty.elide`; its facts, the value bounds, stay, as the model's

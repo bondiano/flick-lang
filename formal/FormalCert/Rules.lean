@@ -14,13 +14,13 @@ variable {S : Sig} {Ψ : List Ty} {Θ : Facts} {Γ : List Scheme}
 /-- (Var) at an instance the certificate writes out: `σ.inst ts` is `T'`, a subtype of `T`. -/
 theorem typ_var {i : Nat} {σ : Scheme} {ts : List Ty} {T' T : Ty} {φ : Stage}
     (h : Γ[i]? = some σ) (hk : ts.length = σ.k) (hH : σ.Holds Θ ts)
-    (he : σ.inst ts = T') (hl : LeLive T' T) : Typ S Ψ Θ Γ (.var i) (.ex T φ) :=
+    (he : σ.inst ts = T') (hl : LeLive S T' T) : Typ S Ψ Θ Γ (.var i) (.ex T φ) :=
   .var h hk hH (he ▸ .le hl)
 
 /-- (Glob) at an instance the certificate writes out. -/
 theorem typ_glob {g : Nat} {σ : Scheme} {ts : List Ty} {T' T : Ty} {φ : Stage}
     (h : S.glob g = some σ) (hk : ts.length = σ.k) (hH : σ.Holds Θ ts)
-    (he : σ.inst ts = T') (hl : LeLive T' T) : Typ S Ψ Θ Γ (.glob g) (.ex T φ) :=
+    (he : σ.inst ts = T') (hl : LeLive S T' T) : Typ S Ψ Θ Γ (.glob g) (.ex T φ) :=
   .glob h hk hH (he ▸ hl)
 
 /-- A scheme without facts holds at every instance. -/
@@ -35,7 +35,7 @@ abbrev recArm (o : Name) : Tm := .acons (Pat.spine o [.var]) (.app (.proj (.var 
 
 /-- An operation `o` of `E` called, at its arrow `a →{E} b`. -/
 theorem typ_op {E o : Name} {a b T : Ty} {φ : Stage} (h : S.op E o = some (.tail, a, b))
-    (hT : LeLive (.arrow a (.rt (Row.single E) Row.none) b Caps.none) T) :
+    (hT : LeLive S (.arrow a (.rt (Row.single E) Row.none) b Caps.none) T) :
     Typ S Ψ Θ Γ (.const (.perform E o .tail)) (.ex T φ) :=
   .perform (t := b) h hT
 
@@ -46,7 +46,7 @@ theorem typ_provide {E o : Name} {a b R t T : Ty} {w e : Tm} {r ε : Row} {φ₀
     (hR : R.field o = some (.arrow a (.rt Row.none Row.none) b Caps.none))
     (hw : Typ S Ψ Θ Γ w (.ex R φ))
     (he : Typ S Ψ Θ (.mono R :: Γ) e (.ex t φ₀)) (hle : φ₀.le (.rt (Row.union (Row.single E) r) ε))
-    (hob : φ₀.ObOut (Row.single E)) (hφ : (Stage.rt r ε).le φ) (hT : LeLive t T) :
+    (hob : φ₀.ObOut (Row.single E)) (hφ : (Stage.rt r ε).le φ) (hT : LeLive S t T) :
     Typ S Ψ Θ Γ (.let_ w (.hdl E (recArm o) (.lam (.var 0)) e)) (.ex T φ) := by
   obtain ⟨ha, hb⟩ := S.op_closed E o .tail a b (shiftV 1) hop
   have hf : (R.up 1).field o = some (.arrow a (.rt Row.none Row.none) b Caps.none) := by
@@ -77,7 +77,7 @@ theorem typ_dproj {e : Tm} {c k : Nat} {us : List Ty} {fs : List (Label × Schem
     {t T' T : Ty} {φ : Stage}
     (he : Typ S Ψ Θ Γ e (.ex (.dict c (Ty.spine us)) φ)) (hd : S.dict c = some (k, fs))
     (hk : us.length = k) (hl : fs.lookup l = some ⟨0, Facts.none, t⟩)
-    (hi : t.substT (instT us) = T') (hT : LeLive T' T) :
+    (hi : t.substT (instT us) = T') (hT : LeLive S T' T) :
     Typ S Ψ Θ Γ (.proj e l) (.ex T φ) := by
   refine .dproj (ts := []) he hd hk hl rfl ?_ ?_
   · rintro _ _ ⟨_, _, h, _⟩; exact h.elim
@@ -102,7 +102,7 @@ theorem typ_scope {F : Facts} {φ' : Stage} {r ε : Row} {t t' T : Ty} {e : Tm} 
     (ht : t.up 1 = t')
     (hle : φ'.le (.rt (Row.union (Row.scope (.tvar 0))
       (Row.union (r.substT (shiftV 1)) (Row.disch (.v 0) (r.substT (shiftV 1))))) (ε.substT (shiftV 1))))
-    (hφ : (Stage.rt r ε).le φ) (hT : LeLive t T) : Typ S Ψ Θ Γ (.scope e) (.ex T φ) :=
+    (hφ : (Stage.rt r ε).le φ) (hT : LeLive S t T) : Typ S Ψ Θ Γ (.scope e) (.ex T φ) :=
   .scope hn hF (ht ▸ he) hle hφ hT
 
 end Flick.Cert

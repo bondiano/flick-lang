@@ -47,7 +47,7 @@ theorem Const.ty_arrow (c : Const) (ι : CArg) : ∃ x φ y C, c.ty S ι = .arro
 
 /-- What `Value.pure` gives. -/
 def PureTy (S : Sig) (Ψ : List Ty) (Θ : Facts) (Γ : List Scheme) (e : Tm) (T : Ty) : Prop :=
-  ∃ T₀, LeLive T₀ T ∧ Typ S Ψ Θ Γ e (.ex T₀ .pure) ∧
+  ∃ T₀, LeLive S T₀ T ∧ Typ S Ψ Θ Γ e (.ex T₀ .pure) ∧
     (∀ K, e.head = .ctor K → T₀.PureSpine) ∧
     (∀ c, e = .const c → ¬ T.isAll → ∃ ι, T₀ = c.ty S ι)
 

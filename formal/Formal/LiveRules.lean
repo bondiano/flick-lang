@@ -1,4 +1,5 @@
 import Formal.Held
+import Formal.TySubstBase
 
 /-!
 # Checks of the live typing contract
@@ -22,19 +23,19 @@ theorem use_none_le (r ε : Row) :
   · cases x <;> exact h.elim
 
 /-- Under live, showing the region in a parameter must not erase its use obligation. -/
-theorem live_keeps_use : ¬ LeLive qualified unqualified := by
+theorem live_keeps_use : ¬ LeLive S qualified unqualified := by
   intro h
   have hstage := h.arrow_use
   exact (hstage.1 (.atm (.r 0)) (Or.inr rfl)).elim id id
 
 /-- An effectful task cannot lose its qualifier just because its result shows the region. -/
-example : ¬ LeLive (.eff Row.none Row.none (.hnd (.rg 0)) region)
+example : ¬ LeLive S (.eff Row.none Row.none (.hnd (.rg 0)) region)
     (.eff Row.none Row.none (.hnd (.rg 0)) Caps.none) := by
   intro h
   exact (h.eff_use.1 (.atm (.r 0)) (Or.inr rfl)).elim id id
 
 /-- A qualifier may instead move into the runtime row; this is not a ban on widening. -/
-example : LeLive qualified
+example : LeLive S qualified
     (.arrow (.hnd (.rg 0)) (.rt (Row.ofCaps region) Row.none) (.base .unit) Caps.none) := by
   refine .arrow .refl ⟨?_, fun _ h => h⟩ .refl ?_
   · intro x hx
@@ -137,7 +138,7 @@ example (S : Sig) :
 
 /-- `op` cannot be coerced to a function whose use has an empty row. -/
 example (S : Sig) :
-    ¬ LeLive (Const.op.ty S { (default : CArg) with s := .rg 0 }) unqualified := by
+    ¬ LeLive S (Const.op.ty S { (default : CArg) with s := .rg 0 }) unqualified := by
   intro h
   exact (h.arrow_use.1 (.atm (.r 0)) (Or.inl rfl)).elim id id
 
@@ -237,7 +238,7 @@ example : Const.ok Facts.none .refMake { hndCell with C := region } :=
 region 0 is a call whose stage keeps region 0 live, whatever its row says. -/
 theorem refSet_needs_capacity (S : Sig) (ι : CArg) (hok : Const.ok Facts.none .refSet ι)
     (ht : ι.t = .hnd (.rg 0)) {T : Ty} (hT : Const.ty S .refSet ι = .arrow (.ref ι.t) .pure T Caps.none) :
-    ¬ LeLive T (.arrow ι.t emptyStage (.base .unit) Caps.none) := by
+    ¬ LeLive S T (.arrow ι.t emptyStage (.base .unit) Caps.none) := by
   injection hT with _ _ hT; subst hT
   intro h
   have hC : ι.C (.r 0) := by
@@ -245,5 +246,71 @@ theorem refSet_needs_capacity (S : Sig) (ι : CArg) (hok : Const.ok Facts.none .
     · exact h
     · exact h.elim
   exact (h.arrow_use.1 (.atm (.r 0)) (Or.inr hC)).elim id id
+
+/-! ### The hidden row of data (regions.md §2.2, §6)
+
+Subtyping widens the hidden row of data with hidden storage, and nothing else. -/
+
+/-- `G C u v`, the hidden row first, as #217 spells data with a stored function. -/
+def GT (C : Caps) (u v : Ty) : Ty := Ty.tcon "G" [.caps C, u, v]
+
+/-- `cf` composes data at the rows `{c}` and `{d}` into data at `{c, d}`: the hidden row
+widens. -/
+theorem hidden_row_widens {S : Sig} {C C' : Caps} (hG : S.hidden "G" = some 0)
+    (hCC : Caps.Sub C C') (u v : Ty) : LeLive S (GT C u v) (GT C' u v) := by
+  refine .hide (us := [.caps C, u, v]) (us' := [.caps C', u, v]) hG rfl (fun j hj => ?_)
+    (fun r r' h h' => ?_) rfl rfl
+  · rcases j with _ | _ | _ | j <;> simp_all
+  · simp only [List.getElem?_cons_zero, Option.some.injEq] at h h'
+    subst h; subst h'
+    exact hCC
+
+/-- `leak6` stops at the `scope` that returns the composition (the compiler reports G001
+there): widening never drops the region the row holds, so a value that needs the scope's
+region `v 0` has no type `t.up 1`. -/
+theorem leak6_scope_rejected {S : Sig} {C : Caps} (hC : C (.v 0)) (u v t : Ty) :
+    ¬ LeLive S (GT C u v) (t.up 1) := fun h =>
+  Ty.up_avoid_v0 t (h.reach (.v 0) (by simp [GT, Ty.tcon, Ty.reach, hC]))
+
+/-- A row the declaration names stays put: data without a hidden row are below only
+themselves. -/
+theorem named_row_invariant {S : Sig} {T : Name} {us : List Ty} {b : Ty}
+    (hT : S.hidden T = none) (h : LeLive S (Ty.tcon T us) b) : b = Ty.tcon T us := by
+  generalize hX : Ty.tcon T us = X at h
+  cases h with
+  | refl => rfl
+  | arrow => exact absurd hX.symm Ty.arrow_ne_tcon
+  | eff => exact absurd hX.symm Ty.eff_ne_tcon
+  | hide hi _ _ _ ha _ =>
+    obtain ⟨rfl, -⟩ := Ty.tcon_eq (hX.trans ha)
+    rw [hT] at hi; cases hi
+
+/-- The field of `type K (c : CaptureRow) = K ((Unit ->{} Unit)^c ->{} Unit)`: the row
+qualifies a parameter of the field. -/
+def kRow : Caps := fun a => a = .v 0
+def kCallback : Ty := .arrow (.base .unit) .pure (.base .unit) kRow
+def kField : Ty := .arrow kCallback .pure (.base .unit) Caps.none
+
+theorem kCallback_not_noV : ¬ kCallback.NoV 0 := by
+  intro h
+  simp only [Ty.NoV, kCallback, Ty.substT, Stage.substT, Ty.arrow.injEq, true_and] at h
+  have := congrFun h (.v 0)
+  simp [Caps.substT, kRow, dropV, Ty.reach, Caps.none] at this
+
+/-- No signature makes that row hidden: widening it would let a callback that needs a
+region outlive its `scope` (regions.md §6), and `Sig.hidden_ok` asks the row to stand only
+where widening it widens the field. -/
+theorem contra_row_not_hidden (S : Sig) (hK : S.ctor "K" = some (1, [kField], "K")) :
+    S.hidden "K" ≠ some 0 := by
+  intro h
+  obtain ⟨-, -, -, hc⟩ := S.hidden_ok "K" 0 h "K" 1 [kField] hK
+  rcases hc kField (.head _) with h | ⟨a, φ, b, C, he, ha, -, -⟩ | ⟨r, e, t, C, he, -⟩ |
+      ⟨T, us, j, he, -⟩
+  · have : kCallback.substT (dropV 0) = kCallback := (Ty.arrow.inj h).1
+    exact kCallback_not_noV this
+  · obtain ⟨rfl, -⟩ := Ty.arrow.inj he
+    exact kCallback_not_noV ha
+  · cases he
+  · exact Ty.arrow_ne_tcon he
 
 end Flick.LiveChecks
