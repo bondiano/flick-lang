@@ -126,6 +126,11 @@ out of messages, interfaces and emitted code.
 - **A pure operation uses no region.** A pure stage cannot reach a
   resource, so a lazy `for` sequence over a scoped file may leave its scope;
   the strict `[for …]` builds its list inside.
+- **A foreign function over a resource has a runtime stage.** A pure
+  foreign arrow whose parameter reaches a region, `peek : File s -> Int`,
+  could read the resource after its `scope` with nothing live, so such a
+  binding is written with a runtime arrow, `File s ->{} Int`, and elision
+  makes each call need `s` live (being implemented).
 - **A `scope` is where its region is live.** `Scope s` in a row keeps `s`
   live, and the end of `scope s` discharges `Live s`. A row that uses a
   region and does not keep it live is `FLICK-G002`. `Live s` gives no
@@ -168,6 +173,63 @@ value of `a` apart, and a type argument carries its own qualifier, so
 Ref (a^c)` keeps the capacity of a cell in its invariant payload type:
 widening an alias of the cell cannot let a shorter-lived replacement in.
 The distinction survives [`.iface` schema 2](../iface/#types-and-kinds).
+
+Data that stores a function, such as `type G s a = G (s -> a)`, keeps what
+its field uses in a hidden capture row, and that row is an argument of the
+type like the others: a region another argument shows does not stand in for
+it. Data with a smaller row may be used where a larger one is expected, never
+the reverse. Only the row the reading adds widens: a capture row a
+declaration names, `type K (c : CaptureRow)`, and data inside an argument of
+another type, `List (G s a)`, compare as written. Written bare in a signature, the row is read by elision, as `Live` is
+(being implemented, see [Not checked yet](#not-checked-yet)):
+
+- in a parameter, any row: the function is generic in it;
+- in a result, what the parameters before it reach;
+- a written qualifier says otherwise, and the body is checked against it.
+
+This applies to data that stores a function or a `task`, directly or through
+the fields of other data and of opaque types of the standard library, at the
+outer level of a parameter or a result. A value without arrows (`x : G s a`)
+and data inside a type argument (`List (G s a)`) hold nothing beyond what
+their type shows. Like `Live`, the row is not shown in messages or on hover;
+the explanation of `FLICK-G002` names it when it is why a value cannot leave
+its `scope`.
+
+```flick ignore the checker reads the hidden row of data in signatures in a later change
+type Handle (r : Region)
+type G s a = G (s -> a)
+
+make : Handle r -> G Unit Int
+let make _ = G (fun _ -> 1)
+
+make_free : Handle r -> (G Unit Int)^{}
+let make_free _ = G (fun _ -> 1)
+```
+
+`make h` holds `{r}`, what its parameter reaches, so it cannot leave the
+`scope` of `r` (`FLICK-G002`); `make_free h` holds nothing and can. A
+composition through a helper generic in the data's argument keeps the rows
+of its parts, so a composition that reads a file of a `scope` cannot leave
+it:
+
+```flick ignore the checker reads the hidden row of data in signatures in a later change
+type G s a = G (s ->{FileSystem} a)
+
+run : G s a -> s ->{FileSystem} a
+let run (G f) x = f x
+
+compose : G a b -> G s a ->{FileSystem} G s b
+let compose inner outer = G (fun x -> run inner (run outer x))
+
+leaked : Path ->{Async, FileSystem; OpenError} G Unit String
+let leaked path = scope {
+  let file = File.open_scoped path
+  compose (G (fun f -> File.read_all f)) (G (fun _ -> file))
+}
+```
+
+`leaked` is `FLICK-G002` at its `scope`: the result holds the row of
+`G (fun f -> File.read_all f)`, which uses the file.
 
 A function that takes a callback says what using its result needs, as
 `map_effect` does:
@@ -292,3 +354,5 @@ What it has instead is a region parameter, `forall r. File r -> Unit`.
 | - | - |
 | foreign retention contracts | signatures are written and reviewed by hand; the checker requires `retention`, and derives or requires `Fiber.Outlives` for what `retention owner` keeps, but does not inspect foreign bodies |
 | a region variable unified late with another region in a capture row | the two are kept apart, which may reject a program |
+| the hidden row of data written bare in a signature | read as nothing beyond what the type shows, and a region another argument shows stands in for it, so a helper generic in that argument can hide a use: `leaked` above is accepted and reads a released file. Being changed to the reading above |
+| a pure foreign function over a resource | accepted, and it can read the resource after its `scope`. Being changed: such a binding needs a runtime stage |

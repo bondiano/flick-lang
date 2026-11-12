@@ -58,7 +58,7 @@ SRow element:  … | Scope ϱ
 How this is written in the language:
 
 - `T^{s, t}` is `τ^{s,t}`, `T^c` is `τ^c`, `T^(c + d)` is `τ^(c ∪ d)`;
-- a bare `T` is `τ^∅`: no hidden captures beyond what `T` shows;
+- a bare `T` is `τ^∅`: no hidden captures beyond what `T` shows, except data with hidden storage written bare in a signature, whose hidden row elision reads (§1.4);
 - `Fiber.Outlives c s` is `Outlives c s`.
 
 Equality of capture sets: `∪` is associative, commutative and idempotent, with unit `∅`. The normal form is a set of atoms and a set of variables `c`, as for core rows. The atom `α` is not written in the source language (`FLICK-T002`): it appears when ⌈·⌉ (§2.1) meets a type variable.
@@ -90,9 +90,17 @@ e ::= … | scope s { e }
 | - | - |
 | `scope { e }` | `scope s { e }`, `s` fresh |
 | A curried stage `a -> b -> c` in a signature | elision: each runtime arrow and `Eff` of the signature needs `Live` of what the earlier parameters reach, `a →R⟨r;ε⟩ (b →R⟨Live ⌈a⌉ + r;ε⟩ c)`; a pure stage needs nothing. Interfaces omit `Live`, and every use of the signature elides it again (`regions/live.rs` `elide`, `live_scheme`; Lean `Ty.elide`) |
+| Data with hidden storage written bare in a signature: `G s a` for `type G s a = G (s ->{FileSystem} a)` | elision of its hidden row, by where it is written: in a parameter, a fresh variable of kind `CRow` the scheme quantifies; in a result (after the arrows of the parameters), `⌈·⌉` of the parameters before it, its atoms of kinds `Region` and `CRow`, as for `Live` above. `make : Handle r -> G Unit Int` reads `∀r. Handle r → (G Unit Int)^{r}`, and `compose : G a b -> G s a ->{FileSystem} G s b` reads `∀a b s c d. (G a b)^c → (G s a)^d →R (G s b)^{c, d}`. A written qualifier turns it off: `(G Unit Int)^{}` holds nothing, and the body is checked against it ([the hidden row of data is not what its arguments show](#the-hidden-row-of-data-is-not-what-its-arguments-show)) |
 | `fun`, `task` without an expected type | the qualifier is a fresh variable of kind `CRow`; the solution is the least one (§2.6) |
 | A call with `Scope ϱ` where `ϱ` is not yet known | `ϱ` is the region of the `Scope` named by the stage row (a task against `Eff {Scope t \| r} e a`), otherwise of the nearest `scope` (`regions/scopes.rs` `lexical_owner`, `declared_scope`) |
 | A call with `Scope ϱ` of an outer region inside a nested `scope` | the requirement travels through the nested `scope`s to the one whose region is `ϱ` (`settle_needs`); codegen passes the owner lexically: `$rt.within(owner, …)` |
+
+The hidden rows of data in signatures (the row of data with hidden storage in the table above):
+
+- **Which data.** Data with hidden storage as Lean and the model have it (#217; `regions/mod.rs` `hidden` of the model): an ADT with a field that is a function or a computation, transitively through the fields of the ADTs it holds, opaque Flick types of std included. A nominal foreign type without constructors gets no row: what a foreign binding can hide is the business of G4 (§5.1), not of elision.
+- **Where.** Only at the outer level of a parameter or of a result. A constant without arrows (`x : G s a`) and data inside a type argument (`List (G s a)`, `Option (G s a)`) get the row `∅`, as elision of `Live` restarts inside a type argument.
+- **When.** The checker reads the rows once, when it converts the signature, and keeps the converted scheme; each use instantiates it.
+- **What a user sees.** Like `Live`, a row the checker read is not shown in diagnostics or hover: messages show the signature as written. The explanation of `FLICK-G002` names the row when it is the cause, the region a result holds because an earlier parameter reaches it.
 
 ### 1.5 Constants Γ₀
 
@@ -189,13 +197,18 @@ and likewise for `Eff r ε τ`. A qualifier may move into the runtime row of a s
 - a function or task value is not held against a written qualifier: what it holds is not compared, only what its use needs live;
 - what a function position's type shows, and what a value bound's type shows (`a` of `List a`), counts as visible, not held;
 - inside `Ref`, `List`, records and ADTs, types are compared by `≡` together with their qualifiers: "explicit stored qualifications are part of type identity", and mutable storage is invariant (`FLICK-T003`);
+- the hidden row of data with hidden storage is one of its arguments, and subtyping may only widen it: `(T C ā) ≤ (T C' ā)` when `C ⊆ C'`, the other arguments by `≡` (Lean: a rule of `LeLive` for data, pending). Data with a smaller row passes where a larger one is expected, never the reverse, as for the qualifier of a function. Only the row the reading of §1.4 adds widens, and only while it is covariant: a well-formed signature has it in the fields only as the qualifier of a stored function or computation, or as the hidden row of stored data, at the top of a field, never under `Ref`, inside an argument of another type, in a contravariant position, or fixed by the result of a GADT constructor. A capture row a declaration names (`type K (c : CaptureRow)`) is invariant ([a capture row a declaration names is invariant](#a-capture-row-a-declaration-names-is-invariant)). Data inside an argument of another type (`List (G s a)`) is compared by `≡` until the variance of data arguments is specified ([§2.2.1](#221-variance-of-data-arguments-pending)); A region another argument shows does not stand in for it: `(G (File s) a)^{s}` is no `G (File s) a`, because code generic in that argument no longer sees the region, and the use the row records would be lost ([the hidden row of data is not what its arguments show](#the-hidden-row-of-data-is-not-what-its-arguments-show));
 - `α^{≤C} ≤ α` and `α ≤ α^{≤C}` by §2.1: both reach `⌈υ⌉`. Hence `Option (a^{≤v}, b^{≤w}) ≡ Option (a, b)` ([bounded variable atoms](#a-bounded-variable-reaches-what-the-variable-reaches)).
 
 Checker:
 
 - `effects.rs` `subsume_at` → `regions/compare.rs` `subsume_captured`, `held_fits`; `regions/data.rs` `subsume_bound`, `bounded_callable`;
-- the ⌈·⌉ check is not done by `subsume` itself but by the `Hold` obligation (`regions/mod.rs` `hold`) with the `visible` part of the expected type: what the type shows is subtracted from what is held (`regions/solve.rs` `hidden`);
+- the ⌈·⌉ check is not done by `subsume` itself but by the `Hold` obligation (`regions/mod.rs` `hold`) with the `visible` part of the expected type: what the type shows is subtracted from what is held (`regions/solve.rs` `hidden`); subtracting it from the hidden row of data is a divergence ([the hidden row of data is not what its arguments show](#the-hidden-row-of-data-is-not-what-its-arguments-show));
 - `regions/compare.rs` `unify_captured`: qualifiers under an invariant constructor are equal.
+
+#### 2.2.1 Variance of data arguments (pending)
+
+Decided: subtyping will be covariant or contravariant in the arguments of data by the variance of each parameter, computed from the fields (arrows, `Ref`, `Eff`, rows, the results of GADT constructors), so that `List (G s a)^{c}` widens like `(G s a)^{c}`. It is specified by a separate change after its design note. Until then data inside an argument of another type compares by `≡`, which rejects more programs and admits no new one.
 
 ### 2.3 Rules
 
@@ -468,11 +481,13 @@ The table of spec/05 "Static regions and captures": the model rule, the countere
 | Passing, including through a contravariant parameter | (≤-Cap) on the whole value | a callback with a bare parameter as `((Unit → Unit)^{s} → Unit)`; a closure with `s` in its parameter as a bare parameter | probes (`FLICK-G001`/`G002`) |
 | Module interfaces | a top-level signature is mandatory for functions and is checked as written; `.iface` stores qualifiers | a call of `reader` from another module that escapes the `scope` | `tests/check/projects/regions` (`FLICK-G001`, `FLICK-G002`); outside the Lean model, which has no modules (`core.md` §2.6) |
 | Existential and opaque packaging | (Con), (Proj) | `Sealed (File s)`; `opaque type Sealed = Sealed (Unit ->{} Unit)` around a closure over `h` | `escape.fl` `sealed`; a probe (`FLICK-G002`) |
+| Through a helper generic in an argument of data with hidden storage | §2.2: the hidden row only widens, and what the other arguments show does not stand in for it; §1.4: a bare result row is what the earlier parameters reach | `compose (G (fun f -> File.read_all f)) (G (fun _ -> file))` returned from the `scope` that opened `file` ([the hidden row of data is not what its arguments show](#the-hidden-row-of-data-is-not-what-its-arguments-show)) | `hidden_through_helper.fl` `through_run`, `through_c2`, `through_function` (pending, `FLICK-G002` at the `scope`) |
 | Write to an outer `Ref` or cache | invariance of `Ref (α^c)`; the cell type is closed at allocation | `Ref.set cell (Some file)`; `Ref (Unit ->{} String)` against `Ref ((Unit ->{} String)^{s})`; a top-level atom | `escape.fl` `outer_cell`, `outer_callback`; `qualifiers.fl` `invariant` (`FLICK-T003`); `ref_capacity.fl`; `instance.fl` |
 | Assignment to a `let mut` variable from outside | the variable's type is fixed where it is declared, outside the region (`elaboration.md` §3.5); T7 reads a `scope` that assigns as one whose value holds the variables | `last = Some file`, `reader = fun () -> path_of file` inside `scope` | `let_mut.fl` `outer_file` (`FLICK-G002`), `outer_callback`, `written_callback` (holding without use is allowed); `T7_regions` |
 | Error, `Exit`, diagnostics | (Err-Decl), (Err-Raise); `Failure`, `RawCause` are inert | `Wrapped file` under `try` inside `scope`; `type error Leak (s : Region)`; a generic `boom : ∀a. a →R⟨none;{Wrapped a}⟩ Unit` with a handle | `escape.fl` `raised`; `qualifiers.fl` `Leak` (`FLICK-E005`); a probe |
 | Child and finalizer | (Spawn), §2.4 | a child of an outer owner holds an inner region; a given `c` without `Outlives` | `qualifiers.fl` `spawn_outer`, `spawn_given` (`FLICK-G003`); `retention.fl` ([owner retention](#owner-retention-requires-outlives)); `children.fl` ([children acquire in the region of their owner](#children-acquire-in-the-region-of-their-owner)); a probe |
 | A layer service in a child of an outer owner | (Spawn-Svc), (Provided), §2.7 | `Fiber.spawn outer` or `Scope.add_finalizer` of an outer region from inside a `provide` with a layer service ([provide services must not outlive their layer](runtime.md#a-provide-service-outlives-the-release-of-its-layer)) | `provide_escape.fl` (`FLICK-G003`); path 10 of the model's program generator (`flick-model/src/generate/provides.rs`) |
+| Pure foreign call over a resource | G4: a foreign function whose parameter reaches a region has a runtime stage, so elision needs that region live where it is called | `peek : File s -> Int` composed with a pure helper and called after the `scope` ([the hidden row of data is not what its arguments show](#the-hidden-row-of-data-is-not-what-its-arguments-show)) | pending (a diagnostic of the checker) |
 | Foreign call | G4: the signature is a retention contract; what is retained under `retention owner` requires `Outlives` (`FLICK-F002`) | an acquired value outside its `scope`, including through a generic function; a lease value from `use` | `acquired.fl` ([acquired values](#acquired-values-carry-their-region), [value bounds](#a-value-bound-survives-an-unknown-type-position)), `leases.fl` ([leases](#leases-instead-of-early-close)), `fail/ffi/owner_retention.fl` |
 
 ## 5. Theorem T4′
@@ -486,7 +501,8 @@ G1–G3 of `core.md` hold, and the following are added:
   - `retention owner` with owner `ϱ` (from `Scope ϱ` or `Owner ϱ`): the function holds its arguments until `ϱ` closes, and its scheme requires `Outlives c ϱ` for each capture row `c` of a retained argument that is not shown by what follows it, and `Provided r ϱ` with `Detached r` for the service row `r` of retained work (§2.7), which a signature with one region gets without writing them (`ffi.rs` `with_owner_constraints`, `owner_retention`, `FLICK-F002`). The call site checks `Outlives` for the whole ⌈·⌉ of the retained argument, including what its result shows ([(Spawn) bounds everything the task holds](#spawn-bounds-everything-the-task-holds)).
   - An acquisition `∀s. τ_a →R⟨{Scope s} + r; ε⟩ τ` returns capabilities of region `s`, and `s ∈ ⌈τ⌉` unless `τ` is a scalar. Only closing `s` releases them.
   - A function without `retention` counts as `call`. `FLICK-F002` requires the annotation only on parameters with variables of kinds `Region` and `CRow` (`ffi.rs` `foreign_info`). A parameter that is a variable of kind `Type` (`∀a. a →R Unit`) needs no annotation even though it can receive a capability: such a binding is covered only by this hypothesis.
-  - Pure operations on a capability (`Rpc.port`, `Http.Server.address`) do not depend on whether the region is live.
+  - A foreign function one of whose parameters reaches an atom of kind `Region` or `CRow` has a runtime stage, so elision needs that atom live where it is called (§1.4). A pure foreign arrow there would let a closed resource be read with nothing live ([the hidden row of data is not what its arguments show](#the-hidden-row-of-data-is-not-what-its-arguments-show)) and is rejected (pending in the checker).
+  - Pure operations on a capability (`Rpc.port`, `Http.Server.address`) do not depend on whether the region is live; they keep a pure stage only as reviewed exemptions of the item above, listed when the checker enforces it.
 - **G5 (leases).** `ScopedRef`, `Resource`, `ScopedCache` hand out their value only in `use`, with lease region `t`, and release the previous value when no lease holds it (`packages/effect-ts/src/effect/lease.ts`); acquisition goes into a region of its own, of higher rank. `RcRef`, `RcMap`, `Pool` lend the value to the calling scope (`a^{t}`) and do not revoke it before that scope closes (Effect 4.1.2).
 - **G6 (lexical owner).** A step that needs `Scope ϱ` receives the owner of region `ϱ`, not the nearest `scope` at run time (`$rt.within`). A constant does not run its `Eff` argument under an owner other than the one named in that argument's row: an argument that a combinator runs names the combinator's region, of higher rank for sub-owners ([leases](#leases-instead-of-early-close)) and the owner's `Scope s` for children ([children acquire in the region of their owner](#children-acquire-in-the-region-of-their-owner)).
 
@@ -1008,6 +1024,43 @@ scope s1 {
 - Symptom: `FLICK-G003` "`π0` may end before region `s4`" in `progress_and_preservation_hold`, at the step that makes the outer task a child of `π0`: the child of `s4` holds the owner of `s1`, which needs `s1 ≥ s4`. The program has it by the first rule of §2.4, `s4` being written inside `scope s1`; in `K(π0)` the task stands apart from that `scope`.
 - Incompleteness of the reference checker: a child runs in the region of its owner ([children acquire in the region of their owner](#children-acquire-in-the-region-of-their-owner)), so a `scope` it opens is inside `π0` and the regions `π0` was made in, as the machine runs it.
 - Resolution, model: `⊢ Λ` types the work of `π` as nested in `π` and in every region `π` was made in (`flick-model/src/check/runtime.rs` `lambda`, `check/regions/scope.rs` `nested_in`). Test: `a_scope_in_a_child_is_inside_the_region_of_its_owner` (`flick-model/tests/props.rs`).
+
+### The hidden row of data is not what its arguments show
+
+Divergence: the checker and the model counted the hidden row of data with hidden storage as covered by what the other arguments of its type show, and read such a type written bare in a signature as `^∅`.
+
+```flick
+type G s a = G (s ->{FileSystem} a)
+
+run : G s a -> s ->{FileSystem} a
+let run (G f) x = f x
+
+compose : G a b -> G s a ->{FileSystem} G s b
+let compose inner outer = G (fun x -> run inner (run outer x))
+
+leaked : Path ->{Async, FileSystem; OpenError} G Unit String
+let leaked path = scope {
+  let file = File.open_scoped path
+  compose (G (fun f -> File.read_all f)) (G (fun _ -> file))
+}
+```
+
+- Symptom: `G (fun f -> File.read_all f)` is `(G (File s) String)^{s}`: its field uses `s`. Passed as a bare `G a b`, it lost the row because `File s` shows `s` (`regions/solve.rs` `hidden`, `regions/data.rs` `subsume_bound_at`); inside `compose`, generic in `a`, nothing shows `s` any more, and the composition leaves the `scope`. Run on js and Go, it reads the released resource after the `scope` ends, without an error. The model accepted it too. The direct form, `G (fun _ -> File.read_all file)` out of the `scope`, is `FLICK-G002`.
+- Lean rejects it, because `LeLive` does not narrow the row. With the bare row read as `∅`, at the `app` of `compose`: the field of the argument needs `s` in its stage and its declared row does not name it, so the argument is `G {s} …` (`LeLive.arrow_use`), and `¬ LeLive (G {s} u v) (G ∅ u v)`. With the row read by elision (§1.4), at the `scope`: the result `(G Unit String)^{s}` reaches `s`, and the body of a `scope` has a type `t.up 1`, which does not (`Ty.up_avoid_v0`). Checked by lemmas in a scratch file outside the library (2026-11-12), against `LeLive` without the rule for data; with the rule, which only widens, both rejections are checked again as regression lemmas of `LiveRules.lean`.
+- A pure foreign function, `peek : File s -> Int`, reads a released file through the same composition built with a pure helper. Typing by use accepts it: a pure stage uses no region (`Stage.use .pure _ = .pure`). What breaks is G4: a pure foreign arrow over a resource claims its call needs nothing live.
+- Resolution, document: §1.4 reads the hidden row of a bare data type in a signature by elision, §2.2 lets subtyping only widen it, and G4 gives a foreign function over a resource a runtime stage. The contract of typing by use (§0, T4′) is unchanged. For programs: the row of a result holds what the earlier parameters reach, so `make : Handle r -> G Unit Int` that returns a fresh closure holds `{r}` and does not leave the `scope` of `r` unless written `(G Unit Int)^{}`; `cf (F f) (F g) = F (fun x -> f (g x))` for `type F s a = F (s -> a)` is accepted, its result row being `{c, d}`.
+- Pending: the checker (the reading of signatures, `regions/solve.rs`, `regions/data.rs`, `regions/applied.rs`; `tests/check/fail/regions/hidden_through_helper.fl`), the model (`check/regions/live.rs` `elide`, `check/regions/mod.rs`), Lean and the certificates. In Lean the reading is formalized in the core, as the elision of `Live` is: a mark for a bare row, distinct from a written `^{}`; `Ty.elide` extended to it; `Ty.reach_elide`, `Ty.Kept.le_elide` and `Const.ty_kept` proved again; the rule of `LeLive` that widens the hidden row of data, with preservation and T1 proved again where they invert `LeLive` at a type application; `Live/ElideSchemes.lean` regenerated. Open: how data with hidden storage substituted for a higher-kinded variable of a class signature (`Functor (StateT s m)`) gets its row; settled with the checker by `tests/check/pass/regions/transformers.fl`.
+
+### A capture row a declaration names is invariant
+
+Divergence: a rule that widens every capture-row argument of data, `(T C ā) ≤ (T C' ā)` for `C ⊆ C'`, breaks T4′.
+
+```flick
+type K (c : CaptureRow) = K ((Unit ->{} Unit)^c ->{} Unit)
+```
+
+- Symptom: a `K` whose field stores its callback in a cell made outside the `scope` is a `K ∅`. Widened to `K {s}` inside `scope s`, its field takes a callback that uses `s`; after the `scope` the callback, read from the cell as `Unit ->{} Unit`, runs and uses the closed region (T4.1). In a proof of preservation the field, matched as `(Unit ->^{s} Unit) ->{} Unit`, has a value typed `(Unit ->^∅ Unit) ->{} Unit`, and getting from one to the other narrows the qualifier of its parameter.
+- Resolution, document: only the hidden row the reading adds (§1.4) widens, under the condition of §2.2 that it is covariant in the fields; a row a declaration names keeps `≡`. Lean: the condition is part of a well-formed `Sig`, and `K` is a regression of `LiveRules.lean` (pending with the rule).
 
 ### Rules of typing by use found while porting
 
