@@ -7,6 +7,7 @@ mod ffi;
 mod foreign;
 mod manifests;
 mod mutable;
+mod operators;
 mod privacy;
 mod quick_fix;
 mod sql_table;
