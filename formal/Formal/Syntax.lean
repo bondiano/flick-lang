@@ -216,6 +216,36 @@ def Ty.CovRow (hid : Name → Option Nat) (i : Nat) (f : Ty) : Prop :=
   (∃ r e t C, f = .eff r e t C ∧ (Ty.row r).NoV i ∧ (Ty.row e).NoV i ∧ t.NoV i) ∨
   (∃ T us j, f = Ty.tcon T us ∧ hid T = some j ∧ ∀ l u, us[l]? = some u → l ≠ j → u.NoV i)
 
+/-- The variance of a parameter of data (regions.md §2.2.1): covariant, contravariant,
+invariant, or unused. -/
+inductive Variance
+  | pos | neg | inv | bi
+  deriving DecidableEq
+
+/-- A parameter of variance `s` may stand at polarity `q` (`true`: covariant). -/
+def Variance.at (s : Variance) (q : Bool) : Prop :=
+  (q = true ∧ s = .pos) ∨ (q = false ∧ s = .neg)
+
+/-- Where a parameter `v i` of variance `s` may stand in a field, at polarity `q`
+(regions.md §2.2.1): nowhere, as itself where its variance allows, in the parameter
+(flipped) or the result of a stored function, in the fields of a record, or in an argument
+of other data by the variance of that argument. Anything else (`Ref`, a handle, an owner, a
+dictionary) holds it only if it does not depend on it. -/
+inductive Ty.Pol (var : Name → Nat → Variance) (i : Nat) (s : Variance) : Bool → Ty → Prop
+  | none {q t} : t.NoV i → Ty.Pol var i s q t
+  | var {q} : s.at q → Ty.Pol var i s q (.tvar i)
+  | arrow {q a φ b C} : Ty.Pol var i s (!q) a → Ty.Pol var i s q b →
+      (φ.NoV i ∨ s.at q) → ((Ty.caps C).NoV i ∨ s.at q) →
+      Ty.Pol var i s q (.arrow a φ b C)
+  | eff {q r e t C} : ((Ty.row r).NoV i ∨ s.at q) → ((Ty.row e).NoV i ∨ s.at q) →
+      Ty.Pol var i s q t → ((Ty.caps C).NoV i ∨ s.at q) → Ty.Pol var i s q (.eff r e t C)
+  | rcons {q l t r} : Ty.Pol var i s q t → Ty.Pol var i s q r → Ty.Pol var i s q (.rcons l t r)
+  | data {q t T us} :
+      (∀ j u, us[j]? = some u → var T j = .pos → Ty.Pol var i s q u) →
+      (∀ j u, us[j]? = some u → var T j = .neg → Ty.Pol var i s (!q) u) →
+      (∀ j u, us[j]? = some u → var T j = .inv → u.NoV i) →
+      t = Ty.tcon T us → Ty.Pol var i s q t
+
 /-- Declared ADTs and effects. A constructor has the number of parameters of its
 type, its argument types over them and its type name; its fields mention nothing
 but the parameters (`ctor_closed`, `ctor_reach`). The record type `S.Impl` of an
@@ -260,6 +290,16 @@ structure Sig where
     i < k ∧ (res K)[i]? = some (.tvar i) ∧
       (∀ j u, (res K)[j]? = some u → j ≠ i → u.NoV i) ∧ ∀ f ∈ ts, f.CovRow hidden i := by
     intro _ _ h; simp at h
+  /-- The variance of each parameter of data (regions.md §2.2.1). A parameter that is not
+  invariant is ordinary in every constructor, nothing else a constructor builds depends on
+  it, and the fields hold it only where its variance allows (`Ty.Pol`); an unused one is in
+  no field. -/
+  var : Name → Nat → Variance := fun _ _ => .inv
+  var_ok : ∀ T K k ts, ctor K = some (k, ts, T) → ∀ i, i < k → var T i ≠ .inv →
+      (res K)[i]? = some (.tvar i) ∧ (∀ j u, (res K)[j]? = some u → j ≠ i → u.NoV i) ∧
+      ∀ f ∈ ts, (var T i = .bi → f.NoV i) ∧
+        (var T i = .pos ∨ var T i = .neg → Ty.Pol var i (var T i) true f) := by
+    intro _ _ _ _ _ _ _ h; exact absurd rfl h
 
 /-- The instance of a constant's type variables. -/
 structure CArg where
