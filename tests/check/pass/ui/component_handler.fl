@@ -11,5 +11,5 @@ component counter () = ui {
       disabled = false;
       on_click = Ui.Event.exhaust (fun _ -> task { Atom.update count (fun n -> n + 1) });
     }
-    [text (show (Atom.value count))]
+    (text (show (Atom.value count)))
 }

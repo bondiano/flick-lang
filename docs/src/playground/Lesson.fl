@@ -5,49 +5,48 @@ import State exposing (Model, tr)
 
 view : Atom.Writable Model -> Model -> Ui
 let view model m = ui {
-  div { class_name = "fp-lesson" } [
-    heading_at H2 [text (tr m.locale m.lesson_title m.lesson_title_ru)],
-    paragraph [text (tr m.locale m.lesson_task m.lesson_task_ru)],
-    div { class_name = "fp-lesson-actions" } [
-      button
+  div { class_name = "fp-lesson" }
+    heading_at H2 (text (tr m.locale m.lesson_title m.lesson_title_ru))
+    paragraph (text (tr m.locale m.lesson_task m.lesson_task_ru))
+    div { class_name = "fp-lesson-actions" }
+      (button
         {
           disabled = m.lesson_checking || m.loading;
           on_click = Ui.Event.exhaust (fun _ -> task { check_lesson model });
         }
-        [
-          text
-            (
-              if m.lesson_checking then
-                tr m.locale "Checking…" "Проверка…"
-              else
-                tr m.locale "Check answer" "Проверить"
-            ),
-        ],
-      button
+        (text
+          (
+            if m.lesson_checking then
+              tr m.locale "Checking…" "Проверка…"
+            else
+              tr m.locale "Check answer" "Проверить"
+          )))
+      (button
         {
           disabled = false;
           on_click = Ui.Event.exhaust (fun _ -> task { reveal_lesson_hint model });
         }
-        [text (tr m.locale "Hint" "Подсказка")],
-      button
+        (text (tr m.locale "Hint" "Подсказка")))
+      (button
         {
           disabled = false;
           on_click = Ui.Event.exhaust (fun _ -> task { show_lesson_solution model });
         }
-        [text (tr m.locale "Show solution" "Показать решение")],
-      button
+        (text (tr m.locale "Show solution" "Показать решение")))
+      (button
         { disabled = false; on_click = Ui.Event.exhaust (fun _ -> task { reset_lesson model }) }
-        [text (tr m.locale "Reset" "Сбросить")],
-    ],
+        (text (tr m.locale "Reset" "Сбросить")))
+
     if m.lesson_hint then
-      paragraph [text (tr m.locale m.lesson_hint_text m.lesson_hint_text_ru)]
-    else empty,
+      paragraph (text (tr m.locale m.lesson_hint_text m.lesson_hint_text_ru))
+    else
+      empty
     if m.lesson_result != "" then
       Ui.with_host
         { Ui.host with role = Some "status"; aria_live = Some Ui.Polite }
-        (paragraph [text m.lesson_result])
+        (paragraph (text m.lesson_result))
     else if m.lesson_done then
-      paragraph [text (tr m.locale "Lesson completed." "Урок пройден.")]
-    else empty,
-  ]
+      paragraph (text (tr m.locale "Lesson completed." "Урок пройден."))
+    else
+      empty
 }

@@ -33,11 +33,10 @@ let page =
       | None -> "server"
       | Some q -> "client " ++ q
     ui {
-      div { class_name = "page" } [
-        paragraph [text ("query " ++ Atom.value query)],
-        paragraph [text client],
-        Ui.field { bind = query; placeholder = "Query"; on_input = None },
-      ]
+      div { class_name = "page" }
+        paragraph (text ("query " ++ Atom.value query))
+        paragraph (text client)
+        Ui.field { bind = query; placeholder = "Query"; on_input = None }
     }
   )
 

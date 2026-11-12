@@ -29,18 +29,16 @@ let form_input name input placeholder bind = ui {
     input_type = Some input;
     class_name = Some "form-control form-control-lg";
   }
-  fieldset { class_name = "form-group" } [
-    with_host attributes (field { bind = bind; placeholder = placeholder; on_input = None }),
-  ]
+  fieldset { class_name = "form-group" }
+    with_host attributes (field { bind = bind; placeholder = placeholder; on_input = None })
 }
 
 /// A text area of a form, named `name`.
 form_area : String -> String -> Atom.Writable String -> Ui
 let form_area name placeholder bind = ui {
   let attributes = { host with name = Some name; class_name = Some "form-control form-control-lg" }
-  fieldset { class_name = "form-group" } [
-    with_host attributes (field_area { bind = bind; placeholder = placeholder; on_input = None }),
-  ]
+  fieldset { class_name = "form-group" }
+    with_host attributes (field_area { bind = bind; placeholder = placeholder; on_input = None })
 }
 
 /// Keeps the token of `user`, clears the form and goes home.
@@ -100,19 +98,17 @@ component form_page (props : { layout : Layout; fields : List Ui }) = ui {
   let send =
     View.classed
       "btn btn-lg btn-primary pull-xs-right"
-      (submit { disabled = false } [text page.label])
-  div { class_name = "auth-page" } [
-    div { class_name = "container page" } [
-      div { class_name = "row" } [
-        div { class_name = "col-md-6 offset-md-3 col-xs-12" } [
-          View.classed "text-xs-center" (heading_at H1 [text page.heading]),
-          View.classed "text-xs-center" (paragraph [page.other]),
-          render View.errors (),
-          form { on_submit = page.submit } (props.fields ++ [send]),
-        ],
-      ],
-    ],
-  ]
+      (submit { disabled = false } (text page.label))
+  div { class_name = "auth-page" }
+    div { class_name = "container page" }
+      (div
+        { class_name = "row" }
+        (div
+          { class_name = "col-md-6 offset-md-3 col-xs-12" }
+          (View.classed "text-xs-center" (heading_at H1 (text page.heading)))
+          (View.classed "text-xs-center" (paragraph (page.other)))
+          (render View.errors ())
+          (form { on_submit = page.submit } (props.fields ++ [send]))))
 }
 
 /// The page of `/login`.
@@ -121,7 +117,7 @@ let sign_in_page = ui {
   render form_page {
     layout = {
       heading = "Sign in";
-      other = Route.to Register [text "Need an account?"];
+      other = Route.to Register (text "Need an account?");
       submit = sign_in;
       label = "Sign in";
     };
@@ -138,7 +134,7 @@ let sign_up_page = ui {
   render form_page {
     layout = {
       heading = "Sign up";
-      other = Route.to Login [text "Have an account?"];
+      other = Route.to Login (text "Have an account?");
       submit = sign_up;
       label = "Sign up";
     };

@@ -171,6 +171,16 @@ impl flick::plugin::compiler::Host for State {
             .map_err(convert::to_diagnostic)
     }
 
+    fn parse_lines(
+        &mut self,
+        start: u32,
+        end: u32,
+    ) -> Result<flick::plugin::types::Hole, flick::plugin::types::Diagnostic> {
+        (self.source.parse_lines(start, end))
+            .map(convert::to_hole)
+            .map_err(convert::to_diagnostic)
+    }
+
     fn read_file(&mut self, path: String) -> Result<Vec<u8>, flick::plugin::types::ReachError> {
         (self.source.read_file(&path)).map_err(reach_convert::to_error)
     }

@@ -10,7 +10,7 @@ use flick_plugin::{
 use flick_plugin_cli::Cli;
 use flick_plugin_derive::{codec, server_fn};
 use flick_plugin_sql::Sql;
-use flick_plugin_ui::{calls, component};
+use flick_plugin_ui::{block as ui_block, calls, component};
 
 use super::{Expander, Native};
 
@@ -63,7 +63,7 @@ struct Std;
 fn cli(block: &Block) -> bool {
     !matches!(
         block.head.as_str(),
-        "server" | "codec" | "sql" | "component"
+        "server" | "codec" | "sql" | "component" | "ui"
     )
 }
 
@@ -92,6 +92,7 @@ impl Plugin for Std {
             "codec" => codec::expand(block, compiler),
             "sql" => Sql.expand(block, state, compiler),
             "component" => component::expand(block, compiler),
+            "ui" => ui_block::expand(block, compiler),
             _ => Cli.expand(block, state, compiler),
         }
     }
@@ -140,6 +141,7 @@ impl Plugin for Std {
             "codec" => codec::hover(block, offset, facts),
             "sql" => Sql.hover(block, state, offset, facts),
             "component" => component::hover(block, offset),
+            "ui" => ui_block::hover(block, offset),
             "server" => None,
             _ => Cli.hover(block, state, offset, facts),
         }
@@ -163,6 +165,7 @@ impl Plugin for Std {
             "codec" => codec::format(block, compiler),
             "sql" => Sql.format(block, state, compiler),
             "component" => component::format(block, compiler),
+            "ui" => ui_block::format(block, compiler),
             "server" => None,
             _ => Cli.format(block, state, compiler),
         }

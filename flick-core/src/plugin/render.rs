@@ -180,6 +180,7 @@ impl Printer<'_> {
                 self.push(")");
             }
             Expr::Hole(span) => self.hole(HoleKind::Expr, *span, "hole")?,
+            Expr::Lines(span) => self.hole(HoleKind::Lines, *span, "hole")?,
             Expr::Concat(items) => {
                 if items.len() < 2 {
                     return Err("a concatenation of fewer than two items".into());
@@ -203,13 +204,21 @@ impl Printer<'_> {
                 return Err("a block is only the body of a `fun` or a `let`".into());
             }
             Expr::Block { statements, result } => self.block(statements, *result, d)?,
-            Expr::Open { module, body } => {
+            Expr::Open {
+                module,
+                child,
+                body,
+            } => {
                 // the node ends with its own `)`, so that a span of it is the
                 // block's and not the body's
                 self.push(OPEN);
                 self.push(" ");
                 // by the name the file imports it under, as a name of it
                 self.name(module, Names::Module)?;
+                if let Some(child) = child {
+                    self.push(" ");
+                    self.name(child, Names::Type)?;
+                }
                 self.push(" (");
                 self.node(*body, Role::Expr, d)?;
                 self.push(")");

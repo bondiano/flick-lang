@@ -70,29 +70,28 @@ let avatar =
 view : Ui.View Unit
 let view =
   Ui.view (fun () -> ui {
-    fragment [
-      nav { class_name = "navbar" } [
-        classed "nav-link" (to Home [text "Home"]),
-        classed "nav-link" (to (Profile "ada" (Some Favorites)) [avatar, text "Favorited"]),
-      ],
-      text (show (Atom.value page) ++ ", submits " ++ show (Atom.value submits)),
-      form { on_submit = saved } [
-        fieldset { class_name = "form-group" } [
-          Ui.with_host
+    fragment
+      nav { class_name = "navbar" }
+        (classed "nav-link" (to Home (text "Home")))
+        (classed "nav-link" (to (Profile "ada" (Some Favorites)) avatar (text "Favorited")))
+
+      text (show (Atom.value page) ++ ", submits " ++ show (Atom.value submits))
+      form { on_submit = saved }
+        (fieldset
+          { class_name = "form-group" }
+          (Ui.with_host
             { Ui.host with name = Some "password"; input_type = Some Ui.PasswordInput }
             (input {
               value = "";
               placeholder = "Password";
               on_input = typed;
-            }),
-        ],
-        classed
+            })))
+        (classed
           "btn btn-primary"
-          (submit { disabled = false } [icon { class_name = "ion-heart" }, text "Sign in"]),
-      ],
-      hr,
-      footer { class_name = "footer" } [classed "error-messages" (list [item [text "ok"]])],
-    ]
+          (submit { disabled = false } (icon { class_name = "ion-heart" }) (text "Sign in")))
+
+      hr
+      footer { class_name = "footer" } (classed "error-messages" (list (item (text "ok"))))
   })
 
 report : Failure e ->{} Unit

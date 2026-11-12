@@ -94,14 +94,15 @@ as record labels: `{ echo = … }`.
 
 ## Embedded languages
 
-| Keyword | Meaning | Example |
+| Block | Meaning | Example |
 | - | - | - |
-| `ui` | a UI block | `ui { … }` |
+| `ui` | a UI block: its code with the names of `Ui` in sight | `ui { … }` |
 
-See [schema.md](../schema/) and [ui.md](../ui/). A component, `component
-counter () = …`, a command-line interface, `cli "deploy" { … }`, and a typed
-SQL query, `sql { from u in Users; select u }`, are blocks of the plugin of
-`std`, not keywords: see
+See [schema.md](../schema/) and [ui.md](../ui/). A UI block, a component,
+`component counter () = …`, a command-line interface, `cli "deploy" { … }`,
+and a typed SQL query, `sql { from u in Users; select u }`, are blocks of
+the plugin of `std`, not keywords: each word starts a block where a block
+may start, and is a name elsewhere. See
 [cli-dsl.md](../cli-dsl/) and [sql.md](../sql/).
 
 ## In the editor

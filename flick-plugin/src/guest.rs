@@ -62,6 +62,12 @@ impl Compiler for Imports {
             .map_err(convert::from_diagnostic)
     }
 
+    fn parse_lines(&mut self, start: u32, end: u32) -> Result<Hole, Diagnostic> {
+        compiler::parse_lines(start, end)
+            .map(convert::from_hole)
+            .map_err(convert::from_diagnostic)
+    }
+
     fn read_file(&mut self, path: &str) -> Result<Vec<u8>, ReachError> {
         compiler::read_file(path).map_err(reach_convert::from_error)
     }

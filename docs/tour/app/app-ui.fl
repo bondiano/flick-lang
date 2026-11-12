@@ -26,19 +26,18 @@ let finish_button title = ui {
       disabled = false;
       on_click = Ui.Event.exhaust (fun _ -> task { Atom.update shelf (Books.finish title) });
     }
-    [text "finish"]
+    (text "finish")
 }
 
 component book_row (book : Books.Book) = ui {
-  item [text (Books.line book ++ " "), if book.read then empty else finish_button book.title]
+  item (text "\{Books.line book} ") (if book.read then empty else finish_button book.title)
 }
 
 component reading_list () = ui {
   let books = Atom.value shelf
-  div { class_name = "books" } [
-    list [for book <- books yield Ui.keyed book.title (Ui.render book_row book)],
-    paragraph [text "pages left: \{Books.pages_left books}"],
-  ]
+  div { class_name = "books" }
+    list [for book <- books yield Ui.keyed book.title (Ui.render book_row book)]
+    paragraph (text "pages left: \{Books.pages_left books}")
 }
 
 main : Unit ->{Async; AppError} Unit

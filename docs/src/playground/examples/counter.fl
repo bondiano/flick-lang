@@ -5,15 +5,14 @@ count : Atom.Writable Int
 let count = Atom.make 0
 
 component counter () = ui {
-  div { class_name = "counter" } [
+  div { class_name = "counter" }
     button
       {
         disabled = false;
         on_click = Ui.Event.exhaust (fun _ -> task { Atom.update count (fun n -> n + 1) });
       }
-      [text "+1"],
-    text (" clicked " ++ show (Atom.value count) ++ " times"),
-  ]
+      (text "+1")
+    text (" clicked " ++ show (Atom.value count) ++ " times")
 }
 
 main : Unit ->{Async; AppError} Unit

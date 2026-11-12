@@ -29,6 +29,22 @@ pub(super) struct Printer<'a> {
     pub tail_inline: bool,
     /// The next [`body`](Printer::body) stays on the line of its `->`.
     pub inline_body: bool,
+    /// How a call is laid out where the code being laid out stands.
+    pub calls: Calls,
+}
+
+/// How a call that does not fit its line is laid out.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum Calls {
+    /// An argument a line.
+    Free,
+    /// On its line still: the code reads the lines under a call as its
+    /// arguments, one each, as the body of a `ui` block does, so an
+    /// argument a line would be the call's children.
+    Lines,
+    /// An argument a line again: inside `( … )` or `[ … ]` of such code,
+    /// where a line break means nothing.
+    Bracketed,
 }
 
 /// An item of a block, a list or a record, with the comments around it.
@@ -62,6 +78,7 @@ impl<'a> Printer<'a> {
             column: 0,
             tail_inline: false,
             inline_body: false,
+            calls: Calls::Free,
         }
     }
 
@@ -127,13 +144,9 @@ impl<'a> Printer<'a> {
             K::BindStmt => self.bind(n),
             K::BindGroup => self.bind_group(n),
             K::Block => self.block(n),
-            K::LoopExpr
-            | K::TaskExpr
-            | K::UiExpr
-            | K::ScopeExpr
-            | K::ProvideExpr
-            | K::DoExpr
-            | K::RecGroup => self.braced(n, &[]),
+            K::LoopExpr | K::TaskExpr | K::ScopeExpr | K::ProvideExpr | K::DoExpr | K::RecGroup => {
+                self.braced(n, &[])
+            }
             K::ForExpr | K::WhileExpr => self.for_(n),
             K::ListExpr | K::TupleExpr | K::ListPat | K::TuplePat | K::TupleType | K::Exposing => {
                 self.bracket(n, &[])

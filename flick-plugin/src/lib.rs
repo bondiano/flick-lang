@@ -121,6 +121,9 @@ pub enum HoleKind {
     Ty,
     Pat,
     Decl,
+    /// A body whose calls take the lines under them as arguments, one
+    /// each: an expression's hole otherwise.
+    Lines,
 }
 
 /// User code in the body that the compiler parsed: an expression or a type.
@@ -167,6 +170,9 @@ pub enum Expr {
     },
     /// The user's expression at this span of the body.
     Hole(Span),
+    /// The user's body at this span, read with the lines under a call as
+    /// its arguments, one each: what [`Compiler::parse_lines`] gave.
+    Lines(Span),
     /// `(a ++ b ++ …)`: texts or lists joined, at least two.
     Concat(Vec<NodeId>),
     // shortcut: `flick!` writes no `match`, `if` or block, which `Builder` builds;
@@ -192,9 +198,13 @@ pub enum Expr {
     /// `body` with the module `module` open: a name the module exports is
     /// that one there, before the names of the file, unless a local of the
     /// body hides it. No source writes this; a block that brings the names
-    /// of its library into sight stands for it.
+    /// of its library into sight stands for it. With `child`, a type, a
+    /// call there of a function whose last parameter is a list of it gives
+    /// that list element by element: each argument from that parameter on
+    /// is one, and none is the empty list.
     Open {
         module: String,
+        child: Option<String>,
         body: NodeId,
     },
 }
@@ -446,6 +456,13 @@ pub trait Compiler {
     /// a block at its column; its hole is an expression's.
     fn parse_body(&mut self, start: u32, end: u32) -> Result<Hole, Diagnostic> {
         self.parse_expr(start, end)
+    }
+    /// [`Compiler::parse_body`] where the lines under a call are its
+    /// arguments, one expression each, and the lines under one of those its
+    /// own: `div props`, then a line for each child. Its hole is of
+    /// [`HoleKind::Lines`], which [`Expr::Lines`] stands for.
+    fn parse_lines(&mut self, start: u32, end: u32) -> Result<Hole, Diagnostic> {
+        self.parse_body(start, end)
     }
     /// The file at `path` from the project's root, as `[plugins.<package>]`
     /// grants it with `fs-read`.

@@ -9,20 +9,19 @@ let greeting = Atom.make "Hello"
 type alias Person = { name : String; tags : List String }
 
 component salutation (name : String) = ui {
-  paragraph [text (Atom.value greeting ++ ", " ++ name ++ "!")]
+  paragraph (text (Atom.value greeting ++ ", " ++ name ++ "!"))
 }
 
 component card (person : Person) = ui {
-  div { class_name = "card" } [
-    Ui.render salutation person.name,
-    list (List.map (fun t -> ui { item [text t] }) person.tags),
-  ]
+  div { class_name = "card" }
+    Ui.render salutation person.name
+    list (List.map (fun t -> ui { item (text t) }) person.tags)
 }
 
 component counter (start : Float) =
   let count = Atom.local (start + 1)
   let bump = Action.exhaust (fun _ -> task { Atom.update count (fun n -> n + 1) })
-  ui { button { on_click = bump; disabled = false } [text (show (Atom.value count))] }
+  ui { button { on_click = bump; disabled = false } (text (show (Atom.value count))) }
 
 // a server renders without mounting: its work never starts there
 component mounted () =

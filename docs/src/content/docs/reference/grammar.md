@@ -190,6 +190,12 @@ blocks of `task`, `scope`, `provide`, `sql`, `ui`, `rec` and plugins.
    missing `)` does not swallow later declarations).
 6. A closing delimiter may be dedented below the block it closes.
 7. `else if` on one line continues the chain without opening a block.
+8. In the body of a block that asks for it, as `ui { … }` does, the lines
+   that continue a call are its arguments, one whole expression each, and
+   the deeper lines under one of those are that line's own: `div props`,
+   then a line for each child. A line that rule 3 or 5 makes a continuation
+   stays one. Elsewhere such lines are the arguments token by token, as
+   rule 2 has them.
 
 ```flick
 # type UserId = UserId String

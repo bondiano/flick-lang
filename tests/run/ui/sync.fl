@@ -40,12 +40,11 @@ let total = Atom.derived (fun () -> Atom.get next + doubled ())
 page : Ui.View Unit
 let page =
   Ui.view (fun () -> ui {
-    paragraph [
-      text (show (twice doubled ())),
-      text (labelled 1),
-      text (show (Atom.get total)),
-      text (show (Atom.get later)),
-    ]
+    paragraph
+      text (show (twice doubled ()))
+      text (labelled 1)
+      text (show (Atom.get total))
+      text (show (Atom.get later))
   })
 
 failing : Ui.View Unit

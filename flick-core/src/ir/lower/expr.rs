@@ -9,7 +9,7 @@ use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
 use crate::types::handle::{arm_pattern, failed_pattern, operation_path};
 use crate::types::lang::{self, Lang};
-use crate::types::{Dict, Identity, Range, Ref, is_pattern, let_parts};
+use crate::types::{Dict, Identity, Range, Ref, children, is_pattern, let_parts};
 
 impl Lower<'_> {
     /// An expression with the lift and the dictionaries its position gives it.
@@ -259,17 +259,12 @@ impl Lower<'_> {
             }
             K::FunExpr => return self.lambda(node, &children),
             K::Block => return self.block(node),
-            // the names of the open module were resolved by the checker
+            // the names of the open module, and inside `Ui` the implicit component
+            // applications, were resolved by the checker
             K::OpenExpr => {
-                return match children.first() {
+                // the body is last, after the type of a child when one is named
+                return match children.last() {
                     Some(body) => self.expr(body),
-                    None => Expr::new(ExprKind::Lit(Lit::Unit), span),
-                };
-            }
-            // `Ui` names and implicit component applications were resolved by the checker.
-            K::UiExpr => {
-                return match children.iter().find(|n| n.kind == K::Block) {
-                    Some(body) => self.block(body),
                     None => Expr::new(ExprKind::Lit(Lit::Unit), span),
                 };
             }
@@ -383,10 +378,16 @@ impl Lower<'_> {
     }
 
     /// `f a b` as `(f a) b`, each stage with its mode and dictionaries.
-    fn apply(&mut self, head: &Node, args: &[&Node]) -> Expr {
+    fn apply(&mut self, head: &Node, written: &[&Node]) -> Expr {
         let start = head.range().0;
         let mut func = self.expr(head);
-        for arg in args {
+        // each line under the call is an argument too
+        let args = children::arguments(written);
+        let end = args.last().map_or(head.range().1, |last| last.range().1);
+        // the arguments that are the elements of the list the function takes last
+        let gathered = self.typing.gathered.get(&(start, end)).copied();
+        let alone = gathered.map_or(args.len(), |at| at.min(args.len()));
+        for arg in &args[..alone] {
             let key = (start, arg.range().1);
             let span = Span::new(self.file, key.0, key.1);
             func = self.ui_callable(func, key);
@@ -394,6 +395,25 @@ impl Lower<'_> {
             let app = ExprKind::App {
                 func: Box::new(func),
                 arg: Box::new(arg),
+                stage: self.call_stage(key),
+                arg_first: false,
+            };
+            let dicts = self.dictionaries(key);
+            func = with_dicts(self.within(key, Expr::new(app, span)), dicts);
+        }
+        if gathered.is_some() {
+            // as the checker placed it: at the call up to its last child, or
+            // at its end when it has none
+            let key = if alone < args.len() {
+                (start, end)
+            } else {
+                (end, end)
+            };
+            let span = Span::new(self.file, key.0, key.1);
+            let items = args[alone..].iter().map(|child| self.expr(child)).collect();
+            let app = ExprKind::App {
+                func: Box::new(func),
+                arg: Box::new(Expr::new(ExprKind::List(items), span)),
                 stage: self.call_stage(key),
                 arg_first: false,
             };

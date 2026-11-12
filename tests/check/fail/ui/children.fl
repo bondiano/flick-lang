@@ -37,7 +37,7 @@ let footer_bare = Ui.panel { header = Ui.text "h"; body = Ui.text "b"; footer = 
 
 // a view is a pure function of the model
 view_reads : Ref Float -> Float -> Ui
-let view_reads model n = ui { paragraph [text (show (Ref.get model))] }
+let view_reads model n = ui { paragraph (text (show (Ref.get model))) }
 //                                                   ^^^^^^^^^^^^^ FLICK-E001 this is a runtime call, but `view_reads` is
 
 // a handler's task handles its own errors
@@ -52,7 +52,6 @@ let refusing n = ui {
       on_click = Ui.Event.exhaust (fun _ -> task { from_result (Err (Refused "no")) });
       //~ FLICK-E002 @52:52-52:84 does not allow error `Refused`
     }
-    []
 }
 
 // handlers write atoms, so a root needs `Atom.Write`
@@ -76,9 +75,8 @@ let escaping path = scope {
             }
           });
       }
-      []
   }
-  //~ FLICK-G001 @67:3-80:4 this value holds region `s`, but the expected
+  //~ FLICK-G001 @66:3-78:4 this value holds region `s`, but the expected
 }
 
 // bound to a local first, it still cannot leave
@@ -97,8 +95,7 @@ let escaping_bound path = scope {
             }
           });
       }
-      []
   }
   view
-  //~ FLICK-G001 @102:3-102:7 this value holds region `s`
+  //~ FLICK-G001 @99:3-99:7 this value holds region `s`
 }

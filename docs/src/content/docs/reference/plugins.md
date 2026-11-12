@@ -126,7 +126,9 @@ it, the holes, is parsed by the compiler: `parse-expr(start, end)`,
 `parse-type`, `parse-pat` and `parse-decl` give the longest expression, type
 or pattern from `start` on, or the declaration there, with the layout of
 where it stands in the file; `parse-body` gives a body as after the `=` of a
-`let`, the lines of a block when it starts a line of its own. A block also
+`let`, the lines of a block when it starts a line of its own; `parse-lines`
+gives the same body with the lines under a call as its arguments, one
+whole expression each, and the arena stands for its hole with `lines`. A block also
 shows `module`, the module it is in, and for a declaration right below a
 signature, `signature`: its text and tokens, spans counting from its start.
 Code with a type of the signature, `signed(span)`, takes it from the module;
@@ -174,7 +176,10 @@ a `let` or a signature of the user's. A body with a module open names the
 module by its path: in the body, a name the module exports is that one,
 before the names of the file, unless a local hides it; no source writes
 this form, which is how a block brings the names of its library into
-sight. A whole number is
+sight. With the type of a child, a call in that body gives a last parameter
+that is a list of the type element by element: each argument from that
+parameter on is one, none is the empty list, one argument that is a list is
+the list itself, and a list literal is refused (`FLICK-T073`). A whole number is
 an integer literal, of any numeric type its use asks for; a declaration
 block whose group is empty declares nothing. A function in a
 plugin's code needs no signature: its type is inferred. The arena version is the version of the interface,

@@ -1,0 +1,269 @@
+//! The children of a call: in a block that opens a module and names the type
+//! of a child, a function whose last parameter is a list of that type takes
+//! the list element by element. Each argument from that parameter on is an
+//! element, on the line of the call or on a line of its own under it, and
+//! none is the empty list. The call then stands for the function applied to
+//! the list of them, which is what lowering writes.
+
+use std::ptr;
+
+use super::Checker;
+use super::comprehension::comprehension;
+use super::lang::Lang;
+use super::ranges::range_list;
+use super::sugar_lints::unparen;
+use super::ty::{Norm, Type};
+use crate::diagnostics::{Diagnostic, Edit, codes};
+use crate::source::Span;
+use crate::syntax::cst::Node;
+use crate::syntax::kind::SyntaxKind as K;
+
+/// Whether `target`, somewhere under `node`, stands inside `( … )`, `[ … ]`,
+/// a record or the hole of a string with no block of lines in between:
+/// there a line break means nothing. `None` when it is not under `node`.
+fn bracketed(node: &Node, target: &Node, inside: bool) -> Option<bool> {
+    if ptr::eq(node, target) {
+        return Some(inside);
+    }
+    let inside = match node.kind {
+        K::ParenExpr
+        | K::ListExpr
+        | K::TupleExpr
+        | K::RecordExpr
+        | K::RecordUpdate
+        | K::InterpExpr => true,
+        K::Block | K::Children => false,
+        _ => inside,
+    };
+    node.nodes()
+        .find_map(|child| bracketed(child, target, inside))
+}
+
+/// Whether `node` needs no parentheses to be an argument on a line.
+fn atomic(node: &Node) -> bool {
+    matches!(
+        node.kind,
+        K::NameExpr | K::Literal | K::ParenExpr | K::UnitExpr | K::RecordExpr | K::ListExpr
+    )
+}
+
+/// The arguments of a call as written: those on its line, then each line
+/// under it.
+pub fn arguments<'n>(written: &[&'n Node]) -> Vec<&'n Node> {
+    let line = |n: &&'n Node| {
+        if n.kind == K::Children {
+            n.nodes().collect()
+        } else {
+            vec![*n]
+        }
+    };
+    written.iter().flat_map(line).collect()
+}
+
+impl Checker<'_> {
+    /// `body` with a module open, and maybe the type of a child.
+    pub(super) fn open_module(&mut self, node: &Node) -> Type {
+        let path = node.child_tokens().filter(|t| t.kind == K::Con);
+        let module: Vec<&str> = path.map(|t| t.text(self.text)).collect();
+        let child = node.nodes().find(|n| n.kind == K::NameType);
+        let child = child.map(|written| self.annotation(written));
+        let body = node.nodes().find(|n| n.kind != K::NameType);
+        self.opened.push((module.join("."), child));
+        let ty = body.map_or(Type::Error, |body| self.infer(body));
+        self.opened.pop();
+        ty
+    }
+
+    /// The elements of `written`, a list literal where the children of
+    /// `head` go one by one, refused with the fix that writes them so: the
+    /// brackets and commas go, and an element that is no line of its own
+    /// under a call starting its line gets parentheses.
+    fn listed<'n>(&mut self, head: &Node, written: &'n Node) -> Option<Vec<&'n Node>> {
+        let list = unparen(written);
+        if list.kind != K::ListExpr
+            || !ptr::eq(list, written)
+            || range_list(list).is_some()
+            || comprehension(list).is_some()
+        {
+            return None;
+        }
+        let elements: Vec<&Node> = list.nodes().collect();
+        let starts_line = |at: u32| {
+            let before = &self.text[..at as usize];
+            before[before.rfind('\n').map_or(0, |i| i + 1)..]
+                .trim()
+                .is_empty()
+        };
+        // lines under the call are its children only outside brackets
+        let lines = starts_line(head.range().0)
+            && self
+                .root
+                .is_some_and(|root| bracketed(root, list, false) == Some(false));
+        let at = |start: u32, end: u32| Span::new(self.file, start, end);
+        let mut edits: Vec<Edit> = (list.child_tokens())
+            .filter(|t| matches!(t.kind, K::LBracket | K::Comma | K::RBracket))
+            .map(|t| Edit {
+                span: at(t.start, t.end),
+                replacement: String::new(),
+            })
+            .collect();
+        // a list that opens on a line of its own, under the arguments before
+        // it, has its elements one level further in: as lines under the call
+        // they stand where the `[` stood
+        let open = list.child_tokens().find(|t| t.kind == K::LBracket);
+        let column = |at: u32| {
+            let before = &self.text[..at as usize];
+            before.len() - before.rfind('\n').map_or(0, |i| i + 1)
+        };
+        if let (true, Some(open), Some(first)) = (lines, open, elements.first())
+            && starts_line(open.start)
+            && starts_line(first.range().0)
+            && column(first.range().0) > column(open.start)
+        {
+            let shift = column(first.range().0) - column(open.start);
+            let (from, to) = (open.end as usize, list.range().1 as usize);
+            let mut line = from + self.text[from..to].find('\n').map_or(to - from, |i| i + 1);
+            while line < to {
+                let rest = &self.text[line..to];
+                let indent = rest.len() - rest.trim_start_matches(' ').len();
+                if indent >= shift {
+                    let start = u32::try_from(line).expect("source fits in u32");
+                    let end = u32::try_from(line + shift).expect("source fits in u32");
+                    edits.push(Edit {
+                        span: at(start, end),
+                        replacement: String::new(),
+                    });
+                }
+                line += rest.find('\n').map_or(rest.len(), |i| i + 1);
+            }
+        }
+        for element in &elements {
+            let (start, end) = element.range();
+            if atomic(element) || lines && starts_line(start) {
+                continue;
+            }
+            edits.extend([(start, "("), (end, ")")].map(|(place, paren)| Edit {
+                span: at(place, place),
+                replacement: paren.to_owned(),
+            }));
+        }
+        let name = self.text_of(head);
+        let diagnostic = Diagnostic::error(
+            codes::T073,
+            format!(
+                "the children of `{name}` stand one by one here, each an argument or a line of its own under the call, not in a list"
+            ),
+            self.span(list),
+        );
+        (self.diagnostics)
+            .push(diagnostic.with_safe_fix(|| ("write the children one by one", edits)));
+        Some(elements)
+    }
+
+    /// The type of `written`, the one argument where children go, and
+    /// whether it is the list of them (`list`) rather than a child (`item`);
+    /// `None` for an expression that is read by the type expected of it,
+    /// which is a child.
+    fn child_or_list(&mut self, written: &Node, list: &Type, item: &Type) -> Option<(Type, bool)> {
+        let inner = unparen(written);
+        if inner.kind == K::ListExpr {
+            // a range or a comprehension: `listed` took the literal
+            return Some((self.check_value(written, list), true));
+        }
+        // a function or a record is read by the type expected of it, and is
+        // no list: a child, which the caller checks
+        let by_expected = matches!(
+            inner.kind,
+            K::FunExpr | K::LoopExpr | K::WhileExpr | K::RecordExpr | K::DoExpr | K::TaskExpr
+        );
+        if by_expected {
+            return None;
+        }
+        let actual = self.infer(inner);
+        let listed = self.list_item(&actual).is_some();
+        let expected = if listed { list } else { item };
+        self.expect(&actual, expected, self.span(inner));
+        self.note_head(inner, expected);
+        Some((actual, listed))
+    }
+
+    /// What `function`, a function of the list of its children alone, gives
+    /// for `children`, the arguments `head` has left from the `at`-th on; or
+    /// `None` where no block around names the type of a child, or the
+    /// function takes no list of it last. `end` is where the call ends.
+    pub(super) fn gather(
+        &mut self,
+        head: &Node,
+        function: &Type,
+        children: &[&Node],
+        (at, end): (usize, u32),
+    ) -> Option<Type> {
+        let child = (self.opened.iter().rev()).find_map(|(_, child)| child.clone())?;
+        let Type::Fun {
+            param,
+            effects,
+            result,
+        } = self.whnf(function)
+        else {
+            return None;
+        };
+        let item = self.list_item(&param)?;
+        let named = |t: &Type| match t.spine().0 {
+            Type::Con { module, name } => Some((module.clone(), name.clone())),
+            _ => None,
+        };
+        let of_child = named(&self.bare(&item)).is_some_and(|n| Some(n) == named(&child));
+        if !of_child || matches!(self.whnf(&result), Type::Fun { .. }) {
+            return None;
+        }
+        // the list of them as it was written before: its elements are the
+        // children, which the fix writes one by one
+        if let [one] = children
+            && let Some(elements) = self.listed(head, one)
+        {
+            for element in &elements {
+                self.check_value(element, &item);
+            }
+            return Some(*result);
+        }
+        // one argument that is a list is the list of them: a value, a call
+        // or a comprehension, as `List.map row items`
+        let alone = match children {
+            [one] => self.child_or_list(one, &param, &item),
+            _ => None,
+        };
+        if let Some((argument, true)) = &alone {
+            let span = Span::new(self.file, head.range().0, children[0].range().1);
+            if let Some(effects) = effects {
+                self.call_effects(&self.live_call(function, &effects), span);
+            }
+            let result = self.instantiate(&result, span);
+            return Some(self.application_result(result, function, argument, false));
+        }
+        let mut captures = Norm::default();
+        for (i, written) in children.iter().enumerate() {
+            let actual = match &alone {
+                Some((actual, _)) if i == 0 => actual.clone(),
+                _ => self.check_value(written, &item),
+            };
+            let kept = self.captures_of(&actual);
+            captures.entries.extend(kept.entries);
+            captures.tails.extend(kept.tails);
+        }
+        let start = head.range().0;
+        // no child leaves the call no text of its own: its place is its end
+        let span = match children.last() {
+            Some(last) => Span::new(self.file, start, last.range().1),
+            None => Span::new(self.file, end, end),
+        };
+        let list = Type::app(Type::lang(Lang::List), item);
+        let argument = self.data_value(&list, captures);
+        self.expect(&argument, &param, span);
+        if let Some(effects) = effects {
+            self.call_effects(&self.live_call(function, &effects), span);
+        }
+        self.typing.gathered.insert((start, end), at);
+        let result = self.instantiate(&result, span);
+        Some(self.application_result(result, function, &argument, false))
+    }
+}

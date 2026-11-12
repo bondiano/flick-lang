@@ -51,10 +51,9 @@ let group_view model m examples =
     Ui.keyed
       first.group
       (ui {
-        div { class_name = "fp-gallery-group" } [
-          paragraph [text (tr m.locale first.group first.group_ru)],
-          div { class_name = "fp-example-options" } (List.map (pick model m) examples),
-        ]
+        div { class_name = "fp-gallery-group" }
+          paragraph (text (tr m.locale first.group first.group_ru))
+          div { class_name = "fp-example-options" } (List.map (pick model m) examples)
       })
 
 set_profile : Atom.Writable Model -> Model -> Profile -> Ui
@@ -85,7 +84,7 @@ let examples_view model m =
     | None -> tr m.locale "Your code" "Ваш код"
   let examples = tr m.locale "Examples" "Примеры"
   ui {
-    div { class_name = "fp-examples" } [
+    div { class_name = "fp-examples" }
       attributes
         [("popoverTarget", gallery)]
         (Ui.with_host
@@ -94,16 +93,15 @@ let examples_view model m =
             class_name = Some "fp-gallery-button";
             aria_label = Some (examples ++ ": " ++ current);
           }
-          (button { disabled = false; on_click = Ui.Event.latest (fun _ -> task { () }) } [
-            text current,
-            chevron,
-          ])),
+          (button
+            { disabled = false; on_click = Ui.Event.latest (fun _ -> task { () }) }
+            (text current)
+            chevron))
       attributes
         [("popover", "auto")]
         (Ui.with_host
           { Ui.host with id = Some gallery; aria_label = Some examples }
-          (div { class_name = "fp-gallery" } (List.map (group_view model m) (groups m.examples)))),
-    ]
+          (div { class_name = "fp-gallery" } (List.map (group_view model m) (groups m.examples))))
   }
 
 run_button : Atom.Writable Model -> Model -> Ui
@@ -139,25 +137,24 @@ let format_button model m =
 /// The toolbar: what to edit and run first, then the state, then the build profile.
 view : Atom.Writable Model -> Model -> Ui
 let view model m = ui {
-  div { class_name = "fp-toolbar" } [
+  div { class_name = "fp-toolbar" }
     // a lesson has one program and nothing to choose
-    if List.length m.examples > 1 then examples_view model m else empty,
-    run_button model m,
-    format_button model m,
-    Ui.button { disabled = false; on_click = Ui.Event.exhaust (fun _ -> task { share model }) } [
-      Ui.text (tr m.locale "Share" "Поделиться"),
-    ],
-    Ui.button { disabled = false; on_click = Ui.Event.exhaust (fun _ -> task { download model }) } [
-      Ui.text (tr m.locale "Download .fl" "Скачать .fl"),
-    ],
+    if List.length m.examples > 1 then examples_view model m else empty
+    run_button model m
+    format_button model m
+    Ui.button { disabled = false; on_click = Ui.Event.exhaust (fun _ -> task { share model }) }
+      Ui.text (tr m.locale "Share" "Поделиться")
+    Ui.button { disabled = false; on_click = Ui.Event.exhaust (fun _ -> task { download model }) }
+      Ui.text (tr m.locale "Download .fl" "Скачать .fl")
     Ui.button
       { disabled = false; on_click = Ui.Event.exhaust (fun _ -> task { discard_draft model }) }
-      [Ui.text (tr m.locale "Clear draft" "Удалить черновик")],
+      (Ui.text (tr m.locale "Clear draft" "Удалить черновик"))
     if m.storage_notice != "" then
       Ui.with_host
         { Ui.host with role = Some "status"; aria_live = Some Ui.Polite }
-        (span { class_name = "fp-storage-notice" } [text m.storage_notice])
-    else empty,
+        (span { class_name = "fp-storage-notice" } (text m.storage_notice))
+    else
+      empty
     Ui.with_host
       { Ui.host with role = Some "status"; aria_live = Some Ui.Polite }
       (span
@@ -170,13 +167,12 @@ let view model m = ui {
             else
               "fp-status fp-status-ready";
         }
-        [text (status m)]),
+        (text (status m)))
     Ui.with_host
       {
         Ui.host with
         role = Some "group";
         aria_label = Some (tr m.locale "Build profile" "Профиль сборки");
       }
-      (div { class_name = "fp-profiles" } [set_profile model m Debug, set_profile model m Release]),
-  ]
+      (div { class_name = "fp-profiles" } (set_profile model m Debug) (set_profile model m Release))
 }

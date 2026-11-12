@@ -51,6 +51,46 @@ fn the_render_of_a_component_sees_its_props_and_the_names_of_its_setup() {
 }
 
 #[test]
+fn a_ui_block_is_code_of_the_user_to_an_editor() {
+    let source = "module App.V exposing (view)\n\nview : Ui.View Float\nlet view =\n  Ui.view (fun n -> ui {\n    let shown = show n\n    paragraph\n      text shown\n  })\n";
+    let f = fixture_of(&[("src/App/V.fl", source)]);
+    let ide = f.ide();
+    let file = f.file("App.V");
+    let found = &ide.analysis.diagnostics;
+    assert!(found.is_empty(), "{found:?}");
+    let at = |needle: &str| u32::try_from(source.find(needle).expect("occurs")).expect("small");
+    // the head: the type of the block, and what its plugin says of it
+    let (head, range) = ide.hover(file, at("ui {") + 1).expect("the head");
+    assert_eq!(range, (at("ui {"), at("ui {") + 2));
+    assert!(head.contains("ui : Ui"), "{head}");
+    assert!(head.contains("Describes a user interface"), "{head}");
+    // an element whose children are the lines under it
+    let (element, _) = ide.hover(file, at("paragraph") + 1).expect("an element");
+    assert!(
+        element.contains("paragraph : List (Ui^c) -> Ui^c"),
+        "{element}"
+    );
+    // a name of the open module, by what it is
+    let (text, _) = ide
+        .hover(file, at("text shown") + 1)
+        .expect("a name of `Ui`");
+    assert!(text.contains("text : String -> Ui"), "{text}");
+    // a local of the block
+    let (binder, used) = (at("shown ="), at("shown\n"));
+    let (symbol, _) = ide.symbol_at(file, used + 1).expect("a local");
+    assert!(
+        matches!(&symbol, Symbol::Local { binder: b, .. } if *b == (binder, binder + 5)),
+        "{symbol:?}"
+    );
+    let m = ide.analysis.by_file(file).expect("the module");
+    let names: Vec<String> = super::locals::in_scope(&m.tree, used, source)
+        .into_iter()
+        .map(|(name, _)| name)
+        .collect();
+    assert_eq!(names, ["n", "shown"]);
+}
+
+#[test]
 fn a_field_a_record_pattern_puns_is_a_name_in_scope() {
     let source = "module App.P exposing (f)\n\nf : { x : Int, y : Int } -> Int\nlet f r =\n  let { x; y = other } = r\n  x + other\n";
     let f = fixture_of(&[("src/App/P.fl", source)]);

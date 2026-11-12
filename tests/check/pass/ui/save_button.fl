@@ -24,7 +24,7 @@ let save_button props = ui {
       disabled = props.disabled;
       on_click = Ui.Event.exhaust (fun _ -> task { props.on_save () });
     }
-    [text props.label]
+    (text props.label)
 }
 
 save_button_calls : SaveButtonProps c -> Ui^c
@@ -63,7 +63,7 @@ let reader path = ui {
           }
         });
     }
-    [text "read"]
+    (text "read")
 }
 
 held_in_scope : File.Path ->{Async, File.FileSystem; File.OpenError} Int
@@ -81,7 +81,7 @@ let held_in_scope path = scope {
             }
           });
       }
-      [text "read"]
+      (text "read")
   }
   List.length [view, view]
 }

@@ -3,12 +3,13 @@
 //! another stays as written, the lines after its first moving with its head.
 
 use std::collections::HashMap;
-use std::slice;
 use std::sync::Arc;
+use std::{mem, slice};
 
-use flick_plugin::Piece;
+use flick_plugin::{HoleKind, Piece};
+use flick_pretty::docvec;
 
-use super::printer::{Doc, INDENT, Printer};
+use super::printer::{Calls, Doc, INDENT, Printer, nodes};
 use crate::diagnostics::{Diagnostic, codes};
 use crate::plugin::source::BlockSource;
 use crate::plugin::{Expander, blocks_under, first_party, head_token};
@@ -31,6 +32,10 @@ pub(super) struct Layout {
     opens: bool,
     /// The block ends with a `}` the compiler writes.
     closes: bool,
+    /// The layout is the user's body alone between the braces, a hole of
+    /// this kind: the compiler lays it out as a block of its own, comments
+    /// and all.
+    braced: Option<HoleKind>,
 }
 
 /// The layout of each block of a file, by its range.
@@ -119,7 +124,7 @@ fn layout(
     node: &Node,
 ) -> Result<Option<Layout>, String> {
     let commented = (node.tokens().iter()).any(|t| t.kind.is_comment() && t.kind != K::DocComment);
-    if !source.closed() || commented {
+    if !source.closed() {
         return Ok(None);
     }
     let block = source.block();
@@ -137,11 +142,22 @@ fn layout(
         return Ok(None);
     };
     let open = node.child_tokens().find(|t| t.kind == K::LBrace);
+    let opens = open.is_some_and(|o| o.end == source.start());
+    let closes = node.has_token(K::RBrace);
+    let braced = match pieces[..] {
+        [Piece::Hole(body)] if opens && closes => Some(body.kind),
+        _ => None,
+    };
+    // a comment outside the user's code would be the plugin's to place
+    if commented && braced.is_none() {
+        return Ok(None);
+    }
     Ok(Some(Layout {
         pieces,
         holes,
-        opens: open.is_some_and(|o| o.end == source.start()),
-        closes: node.has_token(K::RBrace),
+        opens,
+        closes,
+        braced,
     }))
 }
 
@@ -157,6 +173,27 @@ impl<'a> Printer<'a> {
     /// `head`, then the pieces of `layout`, its holes laid out here.
     fn laid_out(&mut self, n: &'a Node, layout: &'a Layout) -> Doc<'a> {
         let a = self.a;
+        let braces = (
+            n.child_tokens().find(|t| t.kind == K::LBrace),
+            n.child_tokens().filter(|t| t.kind == K::RBrace).last(),
+        );
+        if let (true, [body], (Some(open), Some(close))) =
+            (layout.braced.is_some(), &layout.holes[..], braces)
+        {
+            let head = head_token(n).map_or("", |t| t.text(self.text));
+            let statements = if body.kind == K::Block {
+                nodes(body)
+            } else {
+                vec![body]
+            };
+            // the lines under a call of such a body are its children
+            let lines = layout.braced == Some(HoleKind::Lines);
+            let calls = if lines { Calls::Lines } else { self.calls };
+            let outer = mem::replace(&mut self.calls, calls);
+            let block = self.braces_of((open, close), &statements, (false, false), &[]);
+            self.calls = outer;
+            return docvec![a, self.str(head), " ", block];
+        }
         // what comments the block has are the plugin's words or are dropped,
         // which the check of the declaration then refuses
         self.comments.skip(n.range().1);

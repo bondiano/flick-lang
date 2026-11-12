@@ -19,6 +19,7 @@ mod builtin_sources;
 mod builtins;
 mod calls;
 mod cells;
+pub(crate) mod children;
 mod class_members;
 mod classes;
 mod comprehension;
@@ -353,6 +354,7 @@ fn run_in(
         typing: Typing::default(),
         predicates: HashMap::new(),
         cells: HashMap::new(),
+        root: None,
         calls: Vec::new(),
         field_path: Vec::new(),
         holes: Vec::new(),
@@ -535,8 +537,9 @@ struct Checker<'a> {
     cx: ItemCx,
     /// The modules the blocks around the expression open, innermost last,
     /// each as the file names it: a name one of them exports is that one,
-    /// before the names of the file. `ui { … }` opens `Ui`.
-    opened: Vec<String>,
+    /// before the names of the file. `ui { … }` opens `Ui`. With each, the
+    /// type of a child, if its block names one.
+    opened: Vec<(String, Option<Type>)>,
     /// Capitalized type members visible only while checking a `type module` body.
     contract_types: Vec<(String, Type, kinds::Kind)>,
     /// Lexically opened `Module Sig` values, innermost first on lookup.
@@ -561,6 +564,9 @@ struct Checker<'a> {
     typing: Typing,
     /// The predicate of each refined type of the module, by type name.
     predicates: HashMap<String, &'a Node>,
+    /// The tree of the module being checked: a fix that depends on what is
+    /// around a node finds the node from here.
+    root: Option<&'a Node>,
     /// The types marked `@cell`, by module: this module's own, and those the
     /// interfaces it knows declare or pass on.
     cells: HashMap<String, Vec<String>>,

@@ -270,7 +270,10 @@ impl Checker<'_> {
             }
             K::FieldExpr => self.field(node, children[0]),
             K::QuestionExpr => self.question(node, children[0]),
-            K::AppExpr => self.apply(children[0], &children[1..]),
+            K::AppExpr => {
+                let arguments = super::children::arguments(&children[1..]);
+                self.apply(children[0], &arguments)
+            }
             K::BinExpr => self.binary(node, &children),
             K::PrefixExpr => self.prefix(node, &children),
             K::TodoExpr => self.todo(node),
@@ -289,23 +292,7 @@ impl Checker<'_> {
             K::DoExpr => self.do_expr(node, None),
             K::ScopeExpr => self.scope_expr(node, None),
             K::ProvideExpr => self.provide(node, None),
-            K::UiExpr => {
-                self.opened.push("Ui".to_owned());
-                let ty = node
-                    .nodes()
-                    .find(|n| n.kind == K::Block)
-                    .map_or(Type::Error, |b| self.block(b, None));
-                self.opened.pop();
-                ty
-            }
-            K::OpenExpr => {
-                let path = node.child_tokens().filter(|t| t.kind == K::Con);
-                let module: Vec<&str> = path.map(|t| t.text(self.text)).collect();
-                self.opened.push(module.join("."));
-                let ty = (node.nodes().next()).map_or(Type::Error, |body| self.infer(body));
-                self.opened.pop();
-                ty
-            }
+            K::OpenExpr => self.open_module(node),
             _ => Type::Error,
         }
     }

@@ -151,10 +151,6 @@ impl Ide<'_> {
             K::MatchKw => ("match … with", "The value of the arm that matches."),
             K::IfKw => ("if … then … else …", "The value of the branch taken."),
             K::FunKw => ("fun … -> …", "An anonymous function."),
-            K::UiKw => (
-                "ui { … }",
-                "Describes a user interface; building it runs no handler.",
-            ),
             K::AwaitKw => {
                 let ran = match ty.spine() {
                     (h, args) if h.is_lang(Lang::Eff) && args.len() == 3 => show_type(args[2]),

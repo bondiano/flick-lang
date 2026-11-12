@@ -1,6 +1,6 @@
 ---
 title: "Пользовательские интерфейсы"
-source_hash: 5ab8e83d7f3f667f
+source_hash: a84bf3344b726920
 ---
 
 `Ui` описывает пользовательский интерфейс и обработчики его событий
@@ -27,7 +27,7 @@ let save_button props = ui {
       disabled = props.disabled;
       on_click = Ui.Event.exhaust (fun _ -> task { props.on_save () });
     }
-    [text props.label]
+    (text props.label)
 }
 ```
 
@@ -69,6 +69,7 @@ let save_button props = ui {
 | Функция | Элемент | Дочерние элементы |
 | - | - | - |
 | `text s` | текстовый узел React; разметка не интерпретируется | нет |
+| `each items node` | без элемента: `node item` для каждого из `items` | нет |
 | `fragment`, `optional`, `empty` | без элемента | `List`, `Option`, нет |
 | `div`, `span` `{ class_name }` | `div`, `span` | `List Ui` |
 | `paragraph`, `heading`, `list`, `item` | `p`, `h1`, `ul`, `li` | `List Ui` |
@@ -91,8 +92,38 @@ let save_button props = ui {
 | `tabs { selected } (NonEmpty Tab)` | список вкладок и выбранная панель | значения `Tab` из `tab label ui` |
 | `c props`, где `c : Ui.Component p` | внешний компонент React | его свойства |
 
+Внутри `ui { … }` дети элемента идут по одному, без списка вокруг. Каждый —
+аргумент вызова: на его строке, в скобках, если это сам вызов, или на
+отдельной строке под вызовом, где скобки не нужны. Элемент без детей пишется
+без них, а один аргумент-список — значение, `List.map row items`,
+`before ++ [last]` — и есть список детей:
+
+```flick
+row : String -> Ui
+let row label = ui { item (text "row \{label}") }
+
+view : Float -> List String -> Ui
+let view n labels = ui {
+  let shown = show n
+  div { class_name = "counter" }
+    heading (text "count \{shown}")
+    paragraph
+      text "it is \{shown}"
+      text "today"
+    list (List.map row labels)
+    div { class_name = "spacer" }
+}
+```
+
+Литерал списка на этом месте — `FLICK-T073`, его переписывает
+`flick check --fix --only T073`; список среди других детей — не `Ui`
+(`FLICK-T003`). Среди детей, записанных по одному, `each items row` даёт узел
+для каждого элемента. Строки под вызовом, который не принимает детей, — его
+аргументы, по одному на строку; вне `ui` функции принимают список, как любая
+функция: `Ui.div props [a, b]`.
+
 `text` имеет тип `String -> Ui`, поэтому его можно
-включить в список дочерних элементов любого элемента.
+включить в число детей любого элемента.
 `SafeUrl` можно получить только через `Ui.safe_url`: функция принимает
 относительные URL и схемы `http`, `https`, `mailto`, но отклоняет
 управляющие символы. `SanitizedHtml` создаётся только через `Ui.trusted_html`;
@@ -109,7 +140,7 @@ badge : Ui.Component { label : String }
 foreign pure badge from "./badge.mjs" "Badge"
 
 example : Ui
-let example = ui { div { class_name = "badges" } [badge { label = "new" }] }
+let example = ui { div { class_name = "badges" } (badge { label = "new" }) }
 ```
 
 Это работает и для локальных привязок, полей записей, значений,
@@ -164,7 +195,7 @@ component counter_view () = ui {
       disabled = false;
       on_click = Ui.Event.exhaust (fun _ -> task { Atom.update count (fun n -> n + 1) });
     }
-    [text (Atom.value count |> show)]
+    (text (Atom.value count |> show))
 }
 ```
 
@@ -241,7 +272,7 @@ React и состояние политики событий этого ключ�
 component badge (props : { label : String }) = ui { text props.label }
 
 component card (person : { name : String; label : String }) =
-  ui { div { class_name = "card" } [text person.name, Ui.render badge { label = person.label }] }
+  ui { div { class_name = "card" } (text person.name) (Ui.render badge { label = person.label }) }
 ```
 
 Операторы перед последним выражением — setup каждого экземпляра. Он
@@ -262,7 +293,7 @@ component counter (start : Float) =
   let bump = Action.exhaust (fun _ -> task { Atom.update count (fun n -> n + 1) })
   ui {
     let n = Atom.value count
-    button { on_click = bump; disabled = false } [text (show n)]
+    button { on_click = bump; disabled = false } (text (show n))
   }
 ```
 
@@ -321,10 +352,8 @@ component search () =
   ui {
     div
       { class_name = "search" }
-      [
-        input_at field { value = ""; placeholder = "find"; on_input = Ui.Event.latest (fun _ -> task { () }) },
-        button { disabled = false; on_click = focus } [text "focus"],
-      ]
+      input_at field { value = ""; placeholder = "find"; on_input = Ui.Event.latest (fun _ -> task { () }) }
+      button { disabled = false; on_click = focus } (text "focus")
   }
 ```
 
@@ -697,7 +726,7 @@ HTML. Внешний компонент, который умеет отобра�
 #
 receipt : Order -> String
 let receipt order =
-  Ui.Server.to_html (ui { div { class_name = "mail" } [paragraph [text ("Спасибо, " ++ order.customer)]] })
+  Ui.Server.to_html (ui { div { class_name = "mail" } (paragraph (text ("Спасибо, " ++ order.customer))) })
 ```
 
 ## Другие рендереры React

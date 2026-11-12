@@ -72,7 +72,7 @@ feed_tab : Bool -> Page -> String -> Ui
 let feed_tab active target label = ui {
   View.classed
     "nav-item"
-    (item [View.anchor (if active then "nav-link active" else "nav-link") target [text label]])
+    (item (View.anchor (if active then "nav-link active" else "nav-link") target (text label)))
 }
 
 /// The feed toggle: the reader's feed, the global one and the tag shown.
@@ -85,11 +85,10 @@ let toggle signed listing = ui {
     | Tagged t -> [feed_tab true (page_of listing 1) ("# " ++ t)]
     | Global -> []
     | Following -> []
-  div { class_name = "feed-toggle" } [
+  div { class_name = "feed-toggle" }
     View.classed
       "nav nav-pills outline-active"
-      (list (mine ++ [feed_tab (listing == Global) Route.home "Global Feed"] ++ tagged)),
-  ]
+      (list (mine ++ [feed_tab (listing == Global) Route.home "Global Feed"] ++ tagged))
 }
 
 /// The popular tags, each a link to its articles.
@@ -97,19 +96,16 @@ component sidebar () = ui {
   let links =
     match Atom.get tags with
     | Atom.Loaded found ->
-      List.map (fun t -> View.anchor "tag-pill tag-default" (Tag t { page = None }) [text t]) found
+      List.map (fun t -> View.anchor "tag-pill tag-default" (Tag t { page = None }) (text t)) found
     | Atom.Loading -> [text "Loading tags..."]
     | Atom.Failed _ -> [text "The tags cannot be loaded."]
-  div { class_name = "sidebar" } [
-    paragraph [text "Popular Tags"],
-    div { class_name = "tag-list" } links,
-    div { class_name = "sidebar-note" } [
-      paragraph [
-        text "conduit is RealWorld's Conduit, written end to end in Flick: ",
-        text "one typed contract, two targets, no glue.",
-      ],
-    ],
-  ]
+  div { class_name = "sidebar" }
+    paragraph (text "Popular Tags")
+    div { class_name = "tag-list" } links
+    div { class_name = "sidebar-note" }
+      (paragraph
+        (text "conduit is RealWorld's Conduit, written end to end in Flick: ")
+        (text "one typed contract, two targets, no glue."))
 }
 
 /// The articles of the feed shown, and its pages.
@@ -122,32 +118,28 @@ component listed (props : { listing : Listing; number : Int }) = ui {
         View.followed body.articles
       else
         View.articles body.articles
-    fragment [shown, View.pagination body.articlesCount props.number (page_of props.listing)]
-  | Atom.Loading -> div { class_name = "article-preview" } [text "Loading articles..."]
-  | Atom.Failed _ -> div { class_name = "article-preview" } [text "The articles cannot be loaded."]
+    fragment shown (View.pagination body.articlesCount props.number (page_of props.listing))
+  | Atom.Loading -> div { class_name = "article-preview" } (text "Loading articles...")
+  | Atom.Failed _ -> div { class_name = "article-preview" } (text "The articles cannot be loaded.")
 }
 
 /// The banner a visitor sees.
 banner : Ui
 let banner = ui {
-  div { class_name = "banner" } [
-    div { class_name = "container" } [
-      View.classed "logo-font" (heading_at H1 [text "conduit"]),
-      paragraph [text "A place to share your knowledge."],
-    ],
-  ]
+  div { class_name = "banner" }
+    div { class_name = "container" }
+      (View.classed "logo-font" (heading_at H1 (text "conduit")))
+      (paragraph (text "A place to share your knowledge."))
 }
 
 /// The home page of a listing at a page.
 component page (props : { listing : Listing; number : Int }) = ui {
   let signed = Option.is_some (Session.signed_in ())
-  div { class_name = "home-page" } [
-    if signed then empty else banner,
-    div { class_name = "container page" } [
-      div { class_name = "row" } [
-        div { class_name = "col-md-9" } [toggle signed props.listing, render listed props],
-        div { class_name = "col-md-3" } [render sidebar ()],
-      ],
-    ],
-  ]
+  div { class_name = "home-page" }
+    if signed then empty else banner
+    div { class_name = "container page" }
+      (div
+        { class_name = "row" }
+        (div { class_name = "col-md-9" } (toggle signed props.listing) (render listed props))
+        (div { class_name = "col-md-3" } (render sidebar ())))
 }

@@ -1,0 +1,44 @@
+// What the children of an element are not.
+module App.ChildrenLinesFail exposing (..)
+
+row : String -> Ui
+let row label = ui { item (text label) }
+
+// a list written where the children go one by one
+listed : Ui
+let listed = ui { heading [text "one"] }
+
+// a list among the children
+among : List String -> Ui
+let among labels = ui {
+  list
+    item (text "first")
+    List.map row labels
+}
+
+// a child that is no `Ui`
+number : Ui
+let number = ui {
+  paragraph
+    text "one"
+    2
+}
+
+// a line under a function that takes no children is one more argument
+extra : Ui
+let extra = ui {
+  text "one"
+    text "two"
+}
+
+// outside `ui` the lines under a call are its arguments, as everywhere
+outside : Ui
+let outside =
+  Ui.paragraph
+    Ui.text "one"
+//~ FLICK-T073 @9:27-9:39 the children of `heading` stand one by one here, each an argument or a line of its own under the call, not in a list
+//~ FLICK-T003 @16:5-16:24 expected `Ui`, found `List Ui`
+//~ FLICK-T003 @24:5-24:6 expected `Ui`, found `Int`
+//~ FLICK-T003 @30:3-31:15 this is not a function: it has type `Ui`, so it cannot take another argument
+//~ FLICK-T003 @37:3-38:18 this is not a function: it has type `Ui`, so it cannot take another argument
+//~ FLICK-T003 @38:5-38:12 expected `List Ui`, found `String -> Ui`

@@ -5,7 +5,7 @@ use std::{mem, ptr};
 use flick_pretty::{NextBreakFitsMode, docvec};
 
 use super::block::Value;
-use super::printer::{Doc, INDENT, Printer, nodes, position, token};
+use super::printer::{Calls, Doc, INDENT, Printer, nodes, position, token};
 use crate::syntax::cst::{Element, Node, Token};
 use crate::syntax::kind::SyntaxKind as K;
 
@@ -50,7 +50,7 @@ fn hugs(n: &Node) -> bool {
     match n.kind {
         K::ParenExpr => n.nodes().next().is_some_and(|c| c.kind == K::FunExpr),
         K::ListExpr | K::RecordExpr | K::RecordUpdate | K::TupleExpr => n.nodes().next().is_some(),
-        K::TaskExpr | K::UiExpr | K::ScopeExpr | K::ProvideExpr | K::DoExpr => true,
+        K::TaskExpr | K::ScopeExpr | K::ProvideExpr | K::DoExpr => true,
         K::PluginExpr => n.has_token(K::LBrace),
         _ => false,
     }
@@ -72,6 +72,36 @@ impl<'a> Printer<'a> {
     pub fn app(&mut self, n: &'a Node, suffix: &[Part]) -> Doc<'a> {
         let a = self.a;
         let parts = nodes(n);
+        // the lines under a call, each a child: the call on its line, then
+        // a line for each, one level in
+        if let Some((lines, call)) = parts
+            .split_last()
+            .filter(|(last, _)| last.kind == K::Children)
+        {
+            let call = match call {
+                [head] => self.node(head),
+                _ => self.call(n, call, &[]),
+            };
+            let children = nodes(lines);
+            let count = children.len();
+            let mut at = 0;
+            let items = self.items(&children, n.range().1, None, &mut |p, child| {
+                at += 1;
+                if at == count {
+                    p.with_suffix(child, suffix)
+                } else {
+                    p.node(child)
+                }
+            });
+            let under = docvec![a, a.line(), self.join_lines(&items)].nest(a, INDENT);
+            return docvec![a, call, under].force_break(a);
+        }
+        self.call(n, &parts, suffix)
+    }
+
+    /// A function and its arguments: on one line, or an argument a line.
+    fn call(&mut self, n: &'a Node, parts: &[&'a Node], suffix: &[Part]) -> Doc<'a> {
+        let a = self.a;
         let Some((head, args)) = parts.split_first() else {
             return self.generic(n);
         };
@@ -111,13 +141,21 @@ impl<'a> Printer<'a> {
         }
         let hug = !commented && args.last().is_some_and(|l| hugs(l));
         let count = docs.len();
+        // where a line under a call is a child of it, its arguments stay on
+        // its line
+        let fixed = self.calls == Calls::Lines;
         let args = a.concat(docs.into_iter().enumerate().map(|(i, (comments, doc))| {
             let doc = if hug && i + 1 == count {
                 doc.group(a).next_break_fits(a, NextBreakFitsMode::Enabled)
             } else {
                 doc
             };
-            docvec![a, a.break_("", " "), comments, doc]
+            let between = if fixed {
+                a.text(" ")
+            } else {
+                a.break_("", " ")
+            };
+            docvec![a, between, comments, doc]
         }));
         let suffix = if inside {
             a.empty()
@@ -200,6 +238,16 @@ impl<'a> Printer<'a> {
     /// on its own line when its body breaks; a `match`, `try` or broken `if`
     /// goes on lines of its own between them.
     pub fn paren(&mut self, n: &'a Node, suffix: &[Part]) -> Doc<'a> {
+        let outer = self.calls;
+        if outer == Calls::Lines {
+            self.calls = Calls::Bracketed;
+        }
+        let doc = self.parenthesized(n, suffix);
+        self.calls = outer;
+        doc
+    }
+
+    fn parenthesized(&mut self, n: &'a Node, suffix: &[Part]) -> Doc<'a> {
         let a = self.a;
         let inner = nodes(n);
         let (Some(open), Some(close), [inner]) =
@@ -248,9 +296,7 @@ impl<'a> Printer<'a> {
             K::RecordExpr | K::RecordUpdate | K::RecordType | K::RecordPat => {
                 self.record(n, suffix)
             }
-            K::TaskExpr | K::UiExpr | K::ScopeExpr | K::ProvideExpr | K::DoExpr => {
-                self.braced(n, suffix)
-            }
+            K::TaskExpr | K::ScopeExpr | K::ProvideExpr | K::DoExpr => self.braced(n, suffix),
             _ => {
                 let doc = self.node(n);
                 let suffix = self.suffix(suffix);

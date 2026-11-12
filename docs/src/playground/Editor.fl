@@ -68,17 +68,17 @@ component source_pane (props : Source) =
     })
   ui {
     let m = props.m
-    div { class_name = "fp-source" } [
-      div { class_name = "fp-pane-header" } [
-        Ui.with_host
+    div { class_name = "fp-source" }
+      div { class_name = "fp-pane-header" }
+        (Ui.with_host
           { Ui.host with class_name = Some "fp-file" }
-          (button { disabled = false; on_click = edit_here } [text "Main.fl"]),
-        span { class_name = "fp-pane-note" } [text (tr m.locale "Flick source" "Код на Flick")],
-      ],
+          (button { disabled = false; on_click = edit_here } (text "Main.fl")))
+        (span { class_name = "fp-pane-note" } (text (tr m.locale "Flick source" "Код на Flick")))
+
       // CodeMirror opens in `#fp-cm` after the page; the native field serves until then
-      div { class_name = if m.editor_open then "fp-editor fp-editor-open" else "fp-editor" } [
-        Ui.with_host { Ui.host with id = Some "fp-cm" } (div { class_name = "fp-cm" } []),
-        keyed
+      div { class_name = if m.editor_open then "fp-editor fp-editor-open" else "fp-editor" }
+        (Ui.with_host { Ui.host with id = Some "fp-cm" } (div { class_name = "fp-cm" } ))
+        (keyed
           (show m.revision)
           (Ui.with_host
             {
@@ -93,16 +93,16 @@ component source_pane (props : Source) =
               value = m.source;
               placeholder = "module Main exposing (main)";
               on_input = Ui.Event.latest (fun snapshot -> task { edit props.model snapshot.value });
-            })),
-      ],
+            })))
+
       Ui.with_host
         { Ui.host with id = Some "fp-source-hint" }
-        (div { class_name = "fp-pane-footer" } [
-          text
+        (div { class_name = "fp-pane-footer" }
+          (text
             (tr
               m.locale
               "Checked on every edit · compiled locally · Esc, then Tab, leaves the editor"
-              "Проверка после каждого изменения · компиляция в браузере · Esc, затем Tab — выйти из редактора"),
-        ]),
-    ]
+              "Проверка после каждого изменения · компиляция в браузере · Esc, затем Tab — выйти из редактора"))
+        )
+
   }

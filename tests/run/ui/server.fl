@@ -15,10 +15,9 @@ let name = Atom.make ""
 page : Ui.View Unit
 let page =
   Ui.view (fun () -> ui {
-    div { class_name = "page" } [
-      paragraph [text ("count " ++ show (Atom.value count))],
-      Ui.field { bind = name; placeholder = "Name"; on_input = None },
-    ]
+    div { class_name = "page" }
+      paragraph (text ("count " ++ show (Atom.value count)))
+      Ui.field { bind = name; placeholder = "Name"; on_input = None }
   })
 
 request : Float ->{Async} String

@@ -39,10 +39,9 @@ let increment = Action.exhaust (fun _ -> task { Atom.update count (fun n -> n + 
 page : Ui.View Unit
 let page =
   Ui.view (fun () -> ui {
-    div { class_name = "page" } [
-      paragraph [text (Atom.value greeting ++ " " ++ show (Atom.value count))],
-      button { disabled = false; on_click = increment } [text "+1"],
-    ]
+    div { class_name = "page" }
+      paragraph (text (Atom.value greeting ++ " " ++ show (Atom.value count)))
+      button { disabled = false; on_click = increment } (text "+1")
   })
 
 report : Failure e ->{} Unit

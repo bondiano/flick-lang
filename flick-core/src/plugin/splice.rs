@@ -126,7 +126,7 @@ fn generated(
             .hole_tree(hole)
             .ok_or("a hole is no longer the code it was")?;
         let (kind, width) = match hole.kind {
-            HoleKind::Expr => (K::NameExpr, 4),
+            HoleKind::Expr | HoleKind::Lines => (K::NameExpr, 4),
             HoleKind::Ty => (K::NameType, 4),
             HoleKind::Pat => (K::VarPat, 4),
             HoleKind::Decl => (K::LetDecl, DECL_PLACEHOLDER.len()),

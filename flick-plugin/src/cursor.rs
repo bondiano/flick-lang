@@ -126,6 +126,14 @@ impl<'b> Cursor<'b> {
         Ok(hole.span)
     }
 
+    /// The user's body from the next token on, past it, as [`Cursor::block`]
+    /// reads it but with the lines under a call as its arguments, one each.
+    pub fn lines(&mut self, compiler: &mut dyn Compiler) -> Result<Span, Diagnostic> {
+        let hole = compiler.parse_lines(self.start(), self.block.whole().end)?;
+        self.skip_to(hole.span.end);
+        Ok(hole.span)
+    }
+
     /// The user's type from the next token on, the longest one, past it.
     pub fn ty(&mut self, compiler: &mut dyn Compiler) -> Result<Span, Diagnostic> {
         let hole = compiler.parse_type(self.start(), self.block.whole().end)?;

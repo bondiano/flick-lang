@@ -55,6 +55,10 @@ pub struct Typing {
     pub runtime: HashSet<Range>,
     /// Those whose stage runs a Sync call.
     pub sync: HashSet<Range>,
+    /// The applications whose arguments from this position on are the
+    /// elements of the list their function takes last, by the range of the
+    /// application.
+    pub gathered: HashMap<Range, usize>,
     /// Applications inside `ui` whose function is an opaque `Ui.Component`.
     pub ui_components: HashSet<Range>,
     /// The `and` groups of `do` followed only by `pure e`, whose last
@@ -305,6 +309,11 @@ impl Checker<'_> {
         if let t @ (Type::Con { .. } | Type::Meta(_)) = self.store.head(ty) {
             self.typing.pending_values.push((node.range(), t.clone()));
         }
+        // a body with a module open has no keyword of the user's: its type is
+        // at the whole of it, where the head of its block finds it
+        if node.kind == K::OpenExpr {
+            return self.note_type(self.span(node), ty);
+        }
         let head = match node.kind {
             K::TaskExpr => K::TaskKw,
             K::DoExpr => K::DoKw,
@@ -315,7 +324,6 @@ impl Checker<'_> {
             K::MatchExpr => K::MatchKw,
             K::IfExpr => K::IfKw,
             K::FunExpr => K::FunKw,
-            K::UiExpr => K::UiKw,
             _ => return,
         };
         if let Some(kw) = node.child_tokens().find(|t| t.kind == head) {

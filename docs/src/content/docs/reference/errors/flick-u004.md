@@ -21,5 +21,5 @@ let increment = Action.exhaust (fun _ -> task { Atom.update count (fun n -> n + 
 
 counter : Ui.View Unit
 let counter =
-  Ui.view (fun () -> ui { button { disabled = false; on_click = increment } [text (show (Atom.value count))] })
+  Ui.view (fun () -> ui { button { disabled = false; on_click = increment } (text (show (Atom.value count))) })
 ```

@@ -5,8 +5,8 @@ use std::mem;
 use flick_pretty::{NextBreakFitsMode, docvec};
 
 use super::expr::Part;
-use super::printer::{Doc, INDENT, Printer, node_position, nodes, position, token};
-use crate::syntax::cst::{Element, Node};
+use super::printer::{Calls, Doc, INDENT, Printer, node_position, nodes, position, token};
+use crate::syntax::cst::{Element, Node, Token};
 use crate::syntax::kind::SyntaxKind as K;
 
 /// What follows `=`, `->` or `<-`: the block of a body, or one expression.
@@ -27,7 +27,6 @@ pub(super) fn hugs(n: &Node) -> bool {
             | K::ListExpr
             | K::TupleExpr
             | K::TaskExpr
-            | K::UiExpr
             | K::ScopeExpr
             | K::ProvideExpr
             | K::DoExpr
@@ -40,6 +39,16 @@ fn is_expression(n: &Node) -> bool {
 }
 
 impl<'a> Printer<'a> {
+    /// Leaves the brackets around for a block of lines, where a line under
+    /// a call is its child again; what [`Printer::calls`] was, to put back.
+    fn lines_again(&mut self) -> Calls {
+        let outer = self.calls;
+        if outer == Calls::Bracketed {
+            self.calls = Calls::Lines;
+        }
+        outer
+    }
+
     /// `head`, which ends in `=`, `->` or `<-`, and its value: on the same
     /// line when it fits, else on the next lines one level in. A hugging
     /// value stays on the line and breaks inside; several statements always
@@ -47,6 +56,14 @@ impl<'a> Printer<'a> {
     /// value's last line; `closing` starts with the `)` around a function,
     /// which takes its own line when the body breaks.
     pub fn body(&mut self, head: Doc<'a>, value: Value<'a>, end: u32, closing: &[Part]) -> Doc<'a> {
+        // a body is laid out by its lines again, whatever is around it
+        let outer = self.lines_again();
+        let doc = self.body_of(head, value, end, closing);
+        self.calls = outer;
+        doc
+    }
+
+    fn body_of(&mut self, head: Doc<'a>, value: Value<'a>, end: u32, closing: &[Part]) -> Doc<'a> {
         let a = self.a;
         let inline = mem::take(&mut self.inline_body);
         let statements = match value {
@@ -122,7 +139,9 @@ impl<'a> Printer<'a> {
     /// The statements of a block, one per line.
     pub fn block(&mut self, n: &'a Node) -> Doc<'a> {
         let end = n.range().1;
+        let outer = self.lines_again();
         let items = self.items(&nodes(n), end, Some(';'), &mut |p, n| p.statement(n));
+        self.calls = outer;
         self.join_lines(&items)
     }
 
@@ -194,7 +213,6 @@ impl<'a> Printer<'a> {
 
     /// The block in braces starting at the child `open` of `n`.
     pub fn braces(&mut self, n: &'a Node, open: usize, suffix: &[Part]) -> Doc<'a> {
-        let a = self.a;
         let Element::Token(lbrace) = n.children[open] else {
             unreachable!("a token position")
         };
@@ -209,21 +227,37 @@ impl<'a> Printer<'a> {
         let Some(rbrace) = rbrace else {
             return self.generic(n);
         };
-        let lbrace = self.tok(lbrace);
         let statements = inner.map(nodes).unwrap_or_default();
+        let members = inner.is_some_and(|i| i.kind == K::Members);
+        let always = n.kind == K::RecGroup;
+        self.braces_of((lbrace, rbrace), &statements, (members, always), suffix)
+    }
+
+    /// `{ statements }` between the braces `around`: on one line when it is
+    /// one expression that fits, else a line for each. `members` are one
+    /// level further in, and `always` breaks whatever fits.
+    pub fn braces_of(
+        &mut self,
+        (lbrace, rbrace): (Token, Token),
+        statements: &[&'a Node],
+        (members, always): (bool, bool),
+        suffix: &[Part],
+    ) -> Doc<'a> {
+        let a = self.a;
+        let lbrace = self.tok(lbrace);
         let first = statements.first().map_or(rbrace.start, |s| s.range().0);
         let after = self.comments.trailing(first, None);
-        let members = inner.is_some_and(|i| i.kind == K::Members);
         self.column += if members { INDENT } else { 0 };
-        let items = self.items(&statements, rbrace.start, Some(';'), &mut |p, s| {
+        let outer = self.lines_again();
+        let items = self.items(statements, rbrace.start, Some(';'), &mut |p, s| {
             p.statement(s)
         });
+        self.calls = outer;
         self.column -= if members { INDENT } else { 0 };
         let dangling = self.comments.leading(rbrace.start);
         let close = self.tok(rbrace);
         let suffix = self.suffix(suffix);
         let close = docvec![a, close, suffix];
-        let always = n.kind == K::RecGroup;
         let plain = after.is_none()
             && dangling.is_empty()
             && items

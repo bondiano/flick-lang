@@ -38,7 +38,7 @@ interface types {
   /// takes it from the module; without that it stays where it is.
   record signature-above { text: string, tokens: list<token> }
 
-  enum hole-kind { expr, ty, pat, decl }
+  enum hole-kind { expr, ty, pat, decl, lines }
 
   /// User code in the body that the compiler parsed: an expression or a type.
   record hole { kind: hole-kind, span: span }
@@ -59,7 +59,7 @@ interface types {
   record branches { condition: node-id, then: node-id, otherwise: node-id }
   record statements { items: list<node-id>, %result: node-id }
 
-  record opened { module: string, body: node-id }
+  record opened { module: string, child: option<string>, body: node-id }
 
   variant expr {
     name(string),
@@ -75,6 +75,8 @@ interface types {
     %tuple(list<node-id>),
     annot(annot),
     hole(span),
+    /// The user's body, the lines under a call its arguments, one each.
+    lines(span),
     /// `(a ++ b ++ …)`: texts or lists joined, at least two.
     concat(list<node-id>),
     /// `match scrutinee with | p when g -> e …`, at least one arm.
@@ -86,7 +88,8 @@ interface types {
     /// expression.
     block(statements),
     /// The body with a module open: its names are in sight there before
-    /// the file's own. No source writes it.
+    /// the file's own. With `child`, a type, a call there gives a last
+    /// parameter that is a list of it element by element. No source writes it.
     open(opened),
   }
 
@@ -355,6 +358,9 @@ interface compiler {
   /// of a `let`: an expression, or on a line of its own the lines of a
   /// block at its column; its hole is an expression's.
   parse-body: func(start: u32, end: u32) -> result<hole, diagnostic>;
+  /// `parse-body` where the lines under a call are its arguments, one
+  /// expression each; its hole is of kind `lines`.
+  parse-lines: func(start: u32, end: u32) -> result<hole, diagnostic>;
   /// The file at `path` from the project's root, as `[plugins.<package>]`
   /// grants it with `fs-read`.
   read-file: func(path: string) -> result<list<u8>, reach-error>;

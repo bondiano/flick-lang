@@ -37,7 +37,7 @@ let area s =
   | Square a -> a
 
 page : Ui.View Unit
-let page = Ui.view (fun () -> ui { div { class_name = \"page\" } [] })
+let page = Ui.view (fun () -> ui { div { class_name = \"page\" } })
 
 small : Check Float
 let small =

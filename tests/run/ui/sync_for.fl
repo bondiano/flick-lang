@@ -13,11 +13,10 @@ let page =
   Ui.view (fun () ->
     let values = for { atom <- [first, second] } yield Atom.value atom * 10
     ui {
-      fragment [
-        text (show (Seq.to_list values)),
-        text (show (Seq.to_list values)),
-        fragment [for atom <- [first, second] yield text (show (Atom.value atom))],
-      ]
+      fragment
+        text (show (Seq.to_list values))
+        text (show (Seq.to_list values))
+        fragment [for atom <- [first, second] yield text (show (Atom.value atom))]
     }
   )
 

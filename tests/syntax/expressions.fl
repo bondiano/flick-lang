@@ -107,7 +107,7 @@ view : Props -> Ui
 let view props = ui {
   button
     { disabled = props.disabled; on_click = Ui.Event.exhaust (fun _ -> task { props.save () }) }
-    [text props.label]
+    (text props.label)
 }
 
 json : PureCodec Json Profile

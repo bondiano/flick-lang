@@ -67,12 +67,11 @@ let html _ =
   Http.ServerResponse.html
     (Ui.Server.to_html
       (ui {
-        div { class_name = "page" } [
-          heading [text ("request " ++ n)],
+        div { class_name = "page" }
+          heading (text ("request " ++ n))
           div
             { class_name = "rows" }
-            (List.map (fun r -> paragraph [text ("row " ++ show r)]) (List.range 1 51)),
-        ]
+            (List.map (fun r -> paragraph (text ("row " ++ show r))) (List.range 1 51))
       }))
 
 client :

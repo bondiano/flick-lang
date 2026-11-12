@@ -8,7 +8,7 @@ use flick_pretty::docvec;
 use super::block::Value;
 use super::comments::Comment;
 use super::expr::Part;
-use super::printer::{Doc, INDENT, Item, Printer, nodes, position};
+use super::printer::{Calls, Doc, INDENT, Item, Printer, nodes, position};
 use crate::syntax::cst::{Element, Node, Token};
 use crate::syntax::kind::SyntaxKind as K;
 
@@ -57,6 +57,16 @@ fn last_two(n: &Node) -> (Option<Token>, Option<Token>) {
 impl<'a> Printer<'a> {
     /// `[a, b]`, `(a, b)`, `exposing (a, b)` and their patterns and types.
     pub fn bracket(&mut self, n: &'a Node, suffix: &[Part]) -> Doc<'a> {
+        let outer = self.calls;
+        if outer == Calls::Lines {
+            self.calls = Calls::Bracketed;
+        }
+        let doc = self.bracketed(n, suffix);
+        self.calls = outer;
+        doc
+    }
+
+    fn bracketed(&mut self, n: &'a Node, suffix: &[Part]) -> Doc<'a> {
         let a = self.a;
         let Some(open) = n.children.iter().position(
             |c| matches!(c, Element::Token(t) if matches!(t.kind, K::LParen | K::LBracket)),

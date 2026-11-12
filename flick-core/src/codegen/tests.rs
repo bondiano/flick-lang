@@ -161,7 +161,7 @@ fn top_level_atoms_views_and_actions_are_labelled_by_their_names() {
          reset : Action.Action Ui.ClickSnapshot\n\
          let reset = Action.exhaust (fun _ -> task { Atom.set count 0 })\n\
          counter : Ui.View Unit\n\
-         let counter = Ui.view (fun () -> ui { button { disabled = false; on_click = reset } [text (show (Atom.value count))] })\n\
+         let counter = Ui.view (fun () -> ui { button { disabled = false; on_click = reset } (text (show (Atom.value count))) })\n\
          start : Float\nlet start = 0\n";
     let labels = |release, labels| {
         let code = compile_with(text, release, labels).code;
