@@ -202,11 +202,24 @@ impl Server {
         if self.latest.as_ref() == Some(context) {
             self.latest = None;
         }
-        // a project keeps its cache for the next document opened in it; a
-        // standalone file's goes with its last document, or every file ever
-        // opened would stay in memory
-        if let Context::Standalone(_) = context {
-            self.caches.remove(context);
+        // a project keeps its cache for the next document opened in it, but
+        // only the project closed last does: each closed one holds tens of
+        // MiB; a standalone file's goes with its last document, or every
+        // file ever opened would stay in memory
+        match context {
+            Context::Standalone(_) => {
+                self.caches.remove(context);
+            }
+            Context::Project(_) => {
+                let open: HashSet<Context> = self
+                    .docs
+                    .keys()
+                    .map(|p| Context::of(&self.docs, p))
+                    .collect();
+                self.caches
+                    .retain(|kept, _| kept == context || open.contains(kept));
+            }
+            Context::Builtin(_) => {}
         }
         if let Some(files) = self.published.remove(context) {
             let others = self.release(files);

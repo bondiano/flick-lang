@@ -1,3 +1,4 @@
+use std::fs;
 use std::sync::{Arc, Mutex};
 
 use super::*;
@@ -28,6 +29,43 @@ fn a_closed_standalone_file_leaves_no_cache_behind() {
         server.notify("textDocument/didClose", &params);
         assert!(server.caches.is_empty(), "{name} closed");
     }
+}
+
+#[test]
+fn only_the_project_closed_last_keeps_its_cache() {
+    let mut server = Server {
+        docs: HashMap::new(),
+        snapshots: HashMap::new(),
+        latest: None,
+        caches: Caches::new(),
+        published: HashMap::new(),
+        out: Box::new(io::sink()),
+        registered: None,
+        requests: 0,
+    };
+    let dir = env::temp_dir().join(format!("flick-lsp-projects-{}", process::id()));
+    let project = |name: &str| {
+        let root = dir.join(name);
+        fs::create_dir_all(&root).expect("created");
+        fs::write(
+            root.join(project::CONFIG_FILE),
+            "schema-version = 1\n\n[project]\nkind = \"lib\"\nsource-dir = \".\"\n",
+        )
+        .expect("written");
+        document(&root.join("A.fl"))
+    };
+    let (kept, first, second) = (project("kept"), project("first"), project("second"));
+    server.notify("textDocument/didOpen", &kept);
+    for params in [&first, &second] {
+        server.notify("textDocument/didOpen", params);
+        server.notify("textDocument/didClose", params);
+        // the open project and the one closed now: the next document opened
+        // in it finds its modules
+        assert_eq!(server.caches.len(), 2, "closed");
+    }
+    server.notify("textDocument/didClose", &kept);
+    assert_eq!(server.caches.len(), 1, "every project closed");
+    fs::remove_dir_all(&dir).expect("removed");
 }
 
 /// What a server writes, kept for the test to read.
