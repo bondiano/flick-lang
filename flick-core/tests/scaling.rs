@@ -445,15 +445,10 @@ fn the_deepest_nesting_the_parser_accepts_checks_on_a_test_stack() {
     let f = "f : Int -> Int\nlet f a = a\n";
     let applied = format!("{f}x : Int\nlet x = {}1", "f <| ".repeat(199));
     assert_eq!(checked_on_a_test_stack(applied), none);
-    // `<|` nests to the right, so a longer chain is too deep to parse
+    // `<|` nests to the right, so a longer chain is too deep to parse, and
+    // what follows the limit is one error, not a node per operator
     let deeper = format!("{f}x : Int\nlet x = {}1", "f <| ".repeat(1000));
-    let mut sources = SourceMap::default();
-    let parsed = syntax::parse(&deeper, sources.add("nested.fl", deeper.as_str()));
-    let codes: Vec<String> = parsed
-        .diagnostics
-        .iter()
-        .map(|d| d.code.to_string())
-        .collect();
+    let codes = checked_on_a_test_stack(deeper);
     assert!(codes.contains(&"FLICK-S007".to_owned()), "{codes:?}");
     let composed = format!("{f}h : Int -> Int\nlet h = f{}", " >> f".repeat(500));
     assert_eq!(checked_on_a_test_stack(composed), none);

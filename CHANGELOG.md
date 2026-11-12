@@ -86,6 +86,10 @@ break programs.
   Give it a stage (`->{}`, `foreign effect`). `ChildProcess.pid`,
   `HttpApi.port`, `Rpc.port` and `Http.Server.address` stay pure as reviewed
   exemptions: they return what was fixed when the capability was acquired.
+- **Too deep nesting:** past the depth the parser accepts, the rest of the
+  line or brackets is one error after the `FLICK-S007`; a longer `<|` chain
+  no longer wraps each operator around the one before it, which made a tree
+  as deep as the chain and overflowed the checker.
 - **Refined types:** `refined type` is a declaration of the plugin of `std`,
   which writes the type and its `parse`, `value` and check as code of the
   language; `refined` is no reserved word. The check is a companion too,
