@@ -1,0 +1,28 @@
+/// Panel sizing policy, shared by the playground and lesson editors.
+module Split exposing (minimum, maximum, initial_share, clamp_share, key_share)
+
+minimum : Int
+let minimum = 20
+
+maximum : Int
+let maximum = 80
+
+initial_share : Int
+let initial_share = 55
+
+clamp_share : Int -> Int
+let clamp_share share = if share < minimum then minimum else if share > maximum then maximum else share
+
+/// Horizontal separators move vertically; vertical ones move horizontally.
+key_share : Bool -> String -> Int -> { handled : Bool; share : Int }
+let key_share stacked key current =
+  let previous = if stacked then "ArrowUp" else "ArrowLeft"
+  let next = if stacked then "ArrowDown" else "ArrowRight"
+  let handled = key == previous || key == next || key == "Home" || key == "End"
+  let share =
+    if key == "Home" then minimum
+    else if key == "End" then maximum
+    else if key == previous then current - 5
+    else if key == next then current + 5
+    else current
+  { handled = handled; share = clamp_share share }

@@ -176,7 +176,7 @@ let view model m = ui {
             Ui.host with
             role = Some "separator";
             tab_index = Some 0;
-            aria_label = Some (tr m.locale "Resize the panels" "Изменить ширину панелей");
+            aria_label = Some (tr m.locale "Resize the panels" "Изменить размер панелей");
           }
           (div { class_name = "fp-split" }))
         (result_pane model m))

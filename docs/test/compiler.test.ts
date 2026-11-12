@@ -5,6 +5,23 @@ import { WorkerHarness } from "./helpers/compiler-worker.ts";
 
 const checked: Array<never> = [];
 
+test("hover keeps compiler Markdown intact for every tooltip", async () => {
+  const original = globalThis.Worker;
+  globalThis.Worker = WorkerHarness as unknown as typeof Worker;
+  WorkerHarness.instances = [];
+  try {
+    const bridge = await import(new URL("../src/playground/compiler.ts?hover-markdown", import.meta.url).href);
+    const shown = { from: 4, to: 8, text: "```flick\nmain : Unit ->{} Unit\n```\n\nfrom `Main`\n\n**Documentation**" };
+    const pending = bridge.hover("let main = 1", 5);
+    const worker = WorkerHarness.instances[0];
+    assert.ok(worker);
+    worker.reply(worker.messages[0]!.id, shown);
+    assert.deepEqual(await pending, shown);
+  } finally {
+    globalThis.Worker = original;
+  }
+});
+
 test("canceled work waiting behind a busy compiler is never executed", { timeout: 1000 }, async () => {
   const original = globalThis.Worker;
   globalThis.Worker = WorkerHarness as unknown as typeof Worker;
