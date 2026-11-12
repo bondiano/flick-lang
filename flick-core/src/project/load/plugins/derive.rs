@@ -1,7 +1,8 @@
 //! The code classes marked `@derive` give the types that name them: each
 //! type declaration naming such a class in `deriving` is a block of the
 //! class's plugin, its code going after the declaration, and so is each
-//! `deriving instance`, its code in its place.
+//! `deriving instance`, its code in its place. A type the code of a block
+//! declares names its classes there, and the block is its declaration.
 
 use std::sync::Arc;
 
@@ -12,7 +13,9 @@ use super::{Found, Plugins, Results, failure, refusal};
 use crate::diagnostics::{Diagnostic, codes};
 #[cfg(feature = "native-project")]
 use crate::plugin::blocks_under;
-use crate::plugin::derive::{Derived, Named, builtin_derived, derived_classes, named, target};
+use crate::plugin::derive::{
+    Declared, Derived, Named, builtin_derived, derived_classes, named, target,
+};
 use crate::plugin::reach::Reach;
 use crate::plugin::render::{Rendered, render};
 use crate::plugin::source::{BlockSource, token_kind};
@@ -43,6 +46,7 @@ impl Loader<'_> {
     /// gave.
     pub(super) fn derive_blocks(
         &self,
+        expanded: &[(Found, Option<Rendered>)],
         plugins: &mut Plugins,
         results: &mut Results,
         diagnostics: &mut Vec<Diagnostic>,
@@ -50,12 +54,17 @@ impl Loader<'_> {
         let mut out = Vec::new();
         for (i, m) in self.modules.iter().enumerate() {
             let tree = &m.parse.tree;
+            // the blocks whose code declares types with classes of their own
+            let blocks: Vec<&Found> = (expanded.iter())
+                .filter(|(f, code)| f.module == i && code.is_some() && !f.declared.is_empty())
+                .map(|(f, _)| f)
+                .collect();
             let wanted = tree.nodes().any(|n| {
                 n.kind == K::DerivingDecl
                     || matches!(n.kind, K::TypeDecl | K::ErrorDecl)
                         && n.nodes().any(|c| c.kind == K::DerivingClause)
             });
-            if !wanted {
+            if !wanted && blocks.is_empty() {
                 continue;
             }
             let text = &self.sources.get(m.file).text;
@@ -97,6 +106,13 @@ impl Loader<'_> {
                 for class in classes {
                     let made = call.class(decl, &class, keep, plugins, results, diagnostics);
                     out.extend(made);
+                }
+            }
+            for f in blocks {
+                for (d, class) in
+                    (f.declared.iter()).flat_map(|d| d.classes.iter().map(move |c| (d, c)))
+                {
+                    out.extend(call.declared(f, d, class, plugins, results, diagnostics));
                 }
             }
         }
@@ -266,28 +282,7 @@ impl Call<'_, '_> {
         let m = &loader.modules[self.module];
         let text = &loader.sources.get(m.file).text;
         let at = Span::new(m.file, class.span.0, class.span.1);
-        let Some((package, qualified)) = loader.derive_of(m, &class.qualifier, &class.name) else {
-            if !keep {
-                let message = format!(
-                    "the class `{}` has no derive: `deriving instance` names a class marked `@derive`",
-                    class.name
-                );
-                diagnostics.push(Diagnostic::error(codes::C013, message, at));
-            }
-            return None;
-        };
-        if let Some(off) = loader.disabled(&package, &qualified, at) {
-            diagnostics.push(off);
-            return None;
-        }
-        let plugin = match loader.load_plugin(plugins, &package) {
-            Ok(plugin) => plugin,
-            Err(why) => {
-                let message = format!("the plugin of package `{package}` cannot be loaded: {why}");
-                diagnostics.push(Diagnostic::error(codes::P035, message, at));
-                return None;
-            }
-        };
+        let (package, qualified, plugin) = self.deriver(class, keep, plugins, diagnostics)?;
         let (target, source) = if keep {
             let source = BlockSource::declaration(
                 Arc::clone(self.shared),
@@ -319,12 +314,97 @@ impl Call<'_, '_> {
             package,
             keep,
             whole: at,
+            declared: Vec::new(),
         };
         let job = Job {
             plugin: plugin.as_ref(),
             target: &target,
             class: &qualified,
             args: args.as_ref(),
+        };
+        Some(self.run(found, &job, results, diagnostics))
+    }
+
+    /// The package whose plugin derives `class`, the class's full name and
+    /// the plugin; `None` for a class no plugin derives, which only a
+    /// `deriving instance` (not `keep`) reports.
+    fn deriver(
+        &self,
+        class: &Named,
+        keep: bool,
+        plugins: &mut Plugins,
+        diagnostics: &mut Vec<Diagnostic>,
+    ) -> Option<(String, String, Arc<dyn Expander>)> {
+        let loader = self.loader;
+        let m = &loader.modules[self.module];
+        let at = Span::new(m.file, class.span.0, class.span.1);
+        let Some((package, qualified)) = loader.derive_of(m, &class.qualifier, &class.name) else {
+            if !keep {
+                let message = format!(
+                    "the class `{}` has no derive: `deriving instance` names a class marked `@derive`",
+                    class.name
+                );
+                diagnostics.push(Diagnostic::error(codes::C013, message, at));
+            }
+            return None;
+        };
+        if let Some(off) = loader.disabled(&package, &qualified, at) {
+            diagnostics.push(off);
+            return None;
+        }
+        match loader.load_plugin(plugins, &package) {
+            Ok(plugin) => Some((package, qualified, plugin)),
+            Err(why) => {
+                let message = format!("the plugin of package `{package}` cannot be loaded: {why}");
+                diagnostics.push(Diagnostic::error(codes::P035, message, at));
+                None
+            }
+        }
+    }
+
+    /// The code the plugin of `class` gives for `declared`, a type the code
+    /// of the block `block` declares: the block is its declaration, and the
+    /// code goes with the block's own.
+    fn declared(
+        &self,
+        block: &Found,
+        declared: &Declared,
+        class: &str,
+        plugins: &mut Plugins,
+        results: &mut Results,
+        diagnostics: &mut Vec<Diagnostic>,
+    ) -> Option<(Found, Option<Rendered>)> {
+        let (module, name) = class.rsplit_once('.').unwrap_or(("", class));
+        let written = Named {
+            qualifier: module.to_owned(),
+            name: name.to_owned(),
+            args: None,
+            span: (block.whole.start, block.whole.end),
+        };
+        let (package, qualified, plugin) = self.deriver(&written, true, plugins, diagnostics)?;
+        let target = match &declared.target {
+            Ok(target) => target,
+            Err(why) => {
+                diagnostics.push(failure(block, &package, why));
+                return None;
+            }
+        };
+        let m = &self.loader.modules[self.module];
+        let source = self.loader.block_sources(m)(&block.node)?;
+        let found = Found {
+            module: self.module,
+            node: block.node.clone(),
+            source,
+            package,
+            keep: false,
+            whole: block.whole,
+            declared: Vec::new(),
+        };
+        let job = Job {
+            plugin: plugin.as_ref(),
+            target,
+            class: &qualified,
+            args: None,
         };
         Some(self.run(found, &job, results, diagnostics))
     }

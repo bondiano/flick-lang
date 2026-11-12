@@ -15,6 +15,7 @@ impl Parser {
     pub fn at_decl(&self) -> bool {
         self.at_word("let")
             || self.at_word("type") && !self.at_type()
+            || self.at_unboxed()
             || self.at_word("instance")
             || self.at_signature()
     }
@@ -26,6 +27,11 @@ impl Parser {
         let equals = (self.tokens[self.pos..].iter())
             .any(|t| matches!(t, TokenTree::Punct(p) if p.as_char() == '=' && p.spacing() == Spacing::Alone));
         self.at_word("type") && !alias && !equals
+    }
+
+    /// `unboxed type N = …`; `unboxed` alone is a name.
+    fn at_unboxed(&self) -> bool {
+        self.at_word("unboxed") && matches!(self.nth(1), Some(TokenTree::Ident(i)) if i == "type")
     }
 
     /// `name :` or `#(name) :`.
@@ -44,7 +50,7 @@ impl Parser {
     pub fn decl(&mut self) -> Result<Tokens, Error> {
         if self.at_word("let") {
             self.let_decl()
-        } else if self.at_word("type") {
+        } else if self.at_word("type") || self.at_unboxed() {
             self.type_decl()
         } else if self.at_word("instance") {
             self.instance()
@@ -117,6 +123,10 @@ impl Parser {
     }
 
     fn type_decl(&mut self) -> Result<Tokens, Error> {
+        let unboxed = self.at_word("unboxed");
+        if unboxed {
+            self.bump();
+        }
         self.bump();
         let alias = self.at_word("alias");
         if alias {
@@ -182,6 +192,7 @@ impl Parser {
                 params: #params,
                 cases: __c,
                 deriving: ::std::vec![#(#deriving),*],
+                unboxed: #unboxed,
             })
         }))
     }

@@ -95,10 +95,12 @@ mod wasm {
     use super::common::project;
     use super::{APP, LIB, MAIN, PAIRS};
 
+    mod block_derive;
     mod compiled;
     mod opened;
     mod stages;
     mod watched;
+    mod wrapped;
 
     /// The test plugin as a component, which `just wasm-plugins` builds.
     fn component() -> PathBuf {

@@ -94,7 +94,7 @@ pub fn read(target: &DeriveTarget) -> Result<Local, String> {
         .map(|t| block.text_of(t.span))
         .collect();
     let has = |w: &str| words.contains(&w);
-    let form = if let Some(span) = target.refined {
+    let form = if let Some(span) = target.wraps {
         Form::Refined {
             base: ty::read(block, span)?,
             known: known(target),

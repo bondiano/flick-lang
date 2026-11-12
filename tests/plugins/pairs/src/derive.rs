@@ -1,7 +1,8 @@
 //! `deriving Pairs.Arbitrary`: `instance Pairs.Arbitrary T`, whose
-//! `arbitrary` is the first constructor of `T`, each field `Pairs.arbitrary`.
+//! `arbitrary` is the first constructor of `T`, each field `Pairs.arbitrary`;
+//! of a type over another, what its `make` gives of `Pairs.arbitrary`.
 
-use flick_plugin::{Arena, Builder, DeriveTarget, Diagnostic, Expr, NodeId, Ty, flick};
+use flick_plugin::{Arena, Builder, DeriveTarget, Diagnostic, Expr, Name, NodeId, Ty, flick};
 
 pub fn derive(target: &DeriveTarget, class: &str) -> Result<Arena, Vec<Diagnostic>> {
     let whole = target.decl.whole();
@@ -12,6 +13,14 @@ pub fn derive(target: &DeriveTarget, class: &str) -> Result<Arena, Vec<Diagnosti
     let case = (target.cases.first())
         .ok_or_else(|| refuse(format!("`{}` has no constructor", target.name)))?;
     let mut b = Builder::new(whole);
+    if target.wraps.is_some() {
+        let head = b.ty(Ty::Name(target.name.clone()));
+        let make = format!("{}.make", target.name);
+        let instance = flick!(b, instance Pairs.Arbitrary #head {
+            let arbitrary = #(Name(&make)) Pairs.arbitrary
+        });
+        return Ok(b.finish(instance));
+    }
     let fields: Vec<NodeId> = (case.fields.iter())
         .map(|_| b.expr(Expr::Name("Pairs.arbitrary".into())))
         .collect();

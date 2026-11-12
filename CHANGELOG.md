@@ -18,6 +18,14 @@ break programs.
   `flick check --fix --only T073` rewrites. `Ui.each items node` gives a
   node for each item. `ui` is a block of the plugin of `std` and no longer
   a reserved word.
+- **Plugins:** a declaration a plugin gives may be an `unboxed type`, and
+  `flick!` reads one. With a constructor only generated code can name, a
+  plugin declares a type of its own over another at no cost when the program
+  runs. Such a constructor is named by the code of the declaring plugin
+  alone (`FLICK-P036` otherwise), and its type leaves the module opaque.
+  A type the code of a block declares names classes in `deriving` as a
+  declaration of the module does, and a derive is told what such a type
+  wraps (`DeriveTarget.wraps`, which was `refined`).
 - **Comparisons by `Ord`:** `< <= > >=` order any type with an `Ord`
   instance by its `compare`, as they already did a type variable: `Bool`, a
   derived type, a record, a list. A type without one is `FLICK-C001`, where

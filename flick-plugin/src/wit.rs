@@ -196,7 +196,7 @@ macro_rules! wit_conversions {
                         constrained: c.constrained,
                     }).collect(),
                     alias: t.alias.map(to_span),
-                    refined: t.refined.map(to_span),
+                    wraps: t.wraps.map(to_span),
                     local: t.local,
                 }
             }
@@ -214,7 +214,7 @@ macro_rules! wit_conversions {
                         constrained: c.constrained,
                     }).collect(),
                     alias: t.alias.map(from_span),
-                    refined: t.refined.map(from_span),
+                    wraps: t.wraps.map(from_span),
                     local: t.local,
                 }
             }

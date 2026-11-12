@@ -130,7 +130,7 @@ interface types {
   record alias { name: string, params: list<string>, ty: node-id }
   /// A constructor of a type and the types of its fields.
   record %case { name: string, fields: list<node-id> }
-  record adt { name: string, params: list<string>, cases: list<%case>, deriving: list<string> }
+  record adt { name: string, params: list<string>, cases: list<%case>, deriving: list<string>, unboxed: bool }
   record instance { context: list<node-id>, head: node-id, members: list<node-id> }
   /// A declaration and its documentation, lines joined by newlines.
   record doc { text: string, decl: node-id }
@@ -337,7 +337,7 @@ interface types {
     params: list<string>,
     cases: list<case-target>,
     alias: option<span>,
-    refined: option<span>,
+    wraps: option<span>,
     local: bool,
   }
 }
