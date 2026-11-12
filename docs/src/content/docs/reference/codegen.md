@@ -403,7 +403,7 @@ Values have the representation of the JS target, in Go terms:
 | a tuple, a `List` | `[]flickrt.Value`; `[x, ...rest]` shares the storage of the list |
 | a record | `*flickrt.Record`, its labels in JS key order, copied by `{ r with … }` |
 | a constructor | `*flickrt.Data` with the tag of the JS target; `Fields()` is its fields, up to two of them held in the value itself |
-| a constructor with fields of the program's own type | a Go type of its own, `*T_Module__Name`, holding the fields: a `match` asks Go for the type and compares no tag. The runtime reads any constructor value as `flickrt.Constructed` (`TagName()`, `Fields()`) and builds one with `flickrt.Construct(tag, fields...)`; a constructor without fields, one of a built-in module and one holding a dictionary stay `*flickrt.Data` |
+| a constructor that has fields, of a type the program declares | a Go type of its own, `*T_Module__Name`, holding the fields: a `match` asks Go for the type and compares no tag. The runtime reads any constructor value as `flickrt.Constructed` (`TagName()`, `Fields()`) and builds one with `flickrt.Construct(tag, fields...)`; a constructor without fields, one of a built-in module and one holding a dictionary stay `*flickrt.Data` |
 | a function | `func(*flickrt.Fiber, flickrt.Value) flickrt.Value` per stage; one of two or three arguments whose stages before the last are pure is `flickrt.Fn2` or `flickrt.Fn3`, which takes them at once |
 | a dictionary | `*flickrt.Dict`; superclasses and default methods made on first use |
 
