@@ -56,7 +56,7 @@ export {
   recordLabel, recordGet, recordExtend, recordRemove, recordProject, recordMergeDisjoint, recordLabels,
 } from "./builtins.ts";
 export { exitFailure, exitValue, failureInspect, failurePrimary, failureRawCause, failureRethrow, rawCauseInspect } from "./outcome.ts";
-export { describeReport } from "./describe.ts";
+export { describeReport, jsErrorMessage } from "./describe.ts";
 export { redactedMake, redactedReveal } from "./redacted.ts";
 export { loop, trampolineDone, trampolineRun, trampolineSuspend } from "./loop.ts";
 export { snapshot, snapshotDefault } from "./snapshot.ts";

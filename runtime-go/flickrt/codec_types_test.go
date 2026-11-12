@@ -11,6 +11,11 @@ func TestDurationCodecs(t *testing.T) {
 		issues[0].message != "expected a non-negative duration, got an object" {
 		t.Fatalf("a negative duration gave %v", issues)
 	}
+	// Effect reads "-Infinity" as a duration, which is negative
+	if _, issues := codecOf(CodecDurationString).decode(rootFiber(), "-Infinity"); len(issues) != 1 ||
+		issues[0].message != "expected a non-negative duration, got an object" {
+		t.Fatalf("-Infinity gave %v", issues)
+	}
 	if _, issues := codecOf(CodecDurationNanos).encode(rootFiber(), DurationInfinity); issues == nil {
 		t.Fatal("an infinite duration had nanoseconds")
 	}

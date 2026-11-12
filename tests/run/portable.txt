@@ -74,6 +74,7 @@ stdlib/decimals
 stdlib/effect/array
 stdlib/effect/combine
 stdlib/effect/duration
+stdlib/effect/duration_text
 stdlib/effect/function
 stdlib/effect/hash_map
 stdlib/effect/hash_set

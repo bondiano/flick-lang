@@ -778,6 +778,7 @@
 @flick-lang/runtime/rt jsArrayMake
 @flick-lang/runtime/rt jsArrayPush
 @flick-lang/runtime/rt jsArraySet
+@flick-lang/runtime/rt jsErrorMessage
 @flick-lang/runtime/rt jsonParse
 @flick-lang/runtime/rt jsonStringify
 @flick-lang/runtime/rt label
@@ -1315,6 +1316,7 @@
 @flick-lang/runtime/rt/effect/Effect flickAddFinalizer
 @flick-lang/runtime/rt/effect/Effect flickAll
 @flick-lang/runtime/rt/effect/Effect flickExit
+@flick-lang/runtime/rt/effect/Effect flickFailCauseSync
 @flick-lang/runtime/rt/effect/Effect flickFiberId
 @flick-lang/runtime/rt/effect/Effect flickInterrupt
 @flick-lang/runtime/rt/effect/Effect flickMatchCause
@@ -1657,6 +1659,8 @@
 @flick-lang/runtime/rt/effect/Schema flickChunkJson
 @flick-lang/runtime/rt/effect/Schema flickDuration
 @flick-lang/runtime/rt/effect/Schema flickDurationFromMillis
+@flick-lang/runtime/rt/effect/Schema flickDurationFromNanos
+@flick-lang/runtime/rt/effect/Schema flickDurationFromString
 @flick-lang/runtime/rt/effect/Schema flickEntries
 @flick-lang/runtime/rt/effect/Schema flickHashMapJson
 @flick-lang/runtime/rt/effect/Schema flickHashSetJson

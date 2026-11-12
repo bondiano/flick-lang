@@ -1,0 +1,78 @@
+// The text forms of a duration: `Duration.json_nanos` and `Duration.json_string`
+// decode and encode as Effect's `Duration.fromInput` and `toString` do, and
+// `Duration.format` writes zero, a fraction of a millisecond and a day.
+module App.Main exposing (main)
+
+issues : SchemaError -> String
+let issues (SchemaError found) =
+  "err " ++ String.join "; " (List.map (fun i -> i.path ++ ": " ++ i.message) found)
+
+round : String -> PureCodec Json Duration.Duration -> String
+let round text c =
+  match Json.parse text with
+  | Err _ -> "not JSON"
+  | Ok input ->
+    match Codec.decode_result c input with
+    | Err e -> issues e
+    | Ok value ->
+      match Codec.encode_result c value with
+      | Ok wire -> show value ++ " -> " ++ Json.stringify wire
+      | Err e -> show value ++ " -> " ++ issues e
+
+exported : PureCodec Json a -> String
+let exported c =
+  match Codec.json_schema "T" c with
+  | Err (Codec.ExportError reason) -> "refused: " ++ reason
+  | Ok text -> text
+
+encode : PureCodec Json Duration.Duration -> Duration.Duration -> String
+let encode c d =
+  match Codec.encode_result c d with
+  | Ok wire -> Json.stringify wire
+  | Err e -> issues e
+
+line : String -> String ->{} Unit
+let line name text = Platform.stdout_line (name ++ ": " ++ text)
+
+ms : Float -> Duration.Duration
+let ms n = Result.with_default Duration.zero (Duration.millis n)
+
+each : List String -> (String ->{} Unit) ->{} Unit
+let rec each xs f =
+  match xs with
+  | [] -> ()
+  | [x, ...rest] ->
+    f x
+    each rest f
+
+main : Unit ->{} Unit
+let main () =
+  each ["\"2000000\"", "\"0\"", "\"1500000\"", "\"-5\"", "\"1.5\"", "5", "\"abc\""] (fun s ->
+    line ("nanos " ++ s) (round s Duration.json_nanos)
+  )
+  each
+    [
+      "\"2 seconds\"",
+      "\"1.5 seconds\"",
+      "\"1.0000001 millis\"",
+      "\"0 millis\"",
+      "\"0.5 nanos\"",
+      "\"3 micros\"",
+      "\"1 week\"",
+      "\"Infinity\"",
+      "\"-Infinity\"",
+      "\"-1 seconds\"",
+      "\"2  minutes\"",
+      "\"2seconds\"",
+      "\"soon\"",
+      "7",
+    ]
+    (fun s -> line ("string " ++ s) (round s Duration.json_string))
+  line "nanos encode infinity" (encode Duration.json_nanos Duration.infinity)
+  line "string encode 1.5ms" (encode Duration.json_string (ms 1.5))
+  line "string encode 0" (encode Duration.json_string Duration.zero)
+  line "export nanos" (exported Duration.json_nanos)
+  line "export string" (exported Duration.json_string)
+  line "format zero" (Duration.format Duration.zero)
+  line "format 1.5ms" (Duration.format (ms 1.5))
+  line "format a day" (Duration.format (ms 90061001))

@@ -79,6 +79,10 @@ var (
 	CodecDurationString Value = &fallible{withChecks(&stage{
 		&stringAs{"a string that will be decoded as a Duration"},
 		func(_ *Fiber, v Value) (Value, []issue) {
+			// Effect's `Duration.fromInput` also reads "-Infinity", which the check refuses
+			if v.(string) == "-Infinity" {
+				return &Duration{tag: durationNegativeInfinite}, nil
+			}
 			if d, ok := parseDuration(v.(string)); ok {
 				return d, nil
 			}

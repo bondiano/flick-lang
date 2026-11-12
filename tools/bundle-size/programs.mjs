@@ -19,6 +19,8 @@ export const PROGRAMS = [
     reason: "The sandboxed preview, saved drafts and shared links, and the first lesson add browser interactions to the playground.",
     unused: ["effect/dist/Graph.js"],
   },
+  // the same playground on Flick's own runtime: React and the kernel, no Effect at all
+  { name: "playground-rt", source: "docs/src/playground/Playground.fl", rt: true, budget: 92, effectFree: true },
   { name: "atoms", source: "tests/run/ui/atoms.fl", budget: 117, unused: ["effect/dist/Graph.js"] },
   // the same atoms on Flick's own runtime, no Effect at all
   { name: "atoms-rt", source: "tests/run/ui/atoms.fl", rt: true, budget: 80, effectFree: true },

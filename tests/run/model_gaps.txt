@@ -122,6 +122,7 @@ stdlib/effect/datetime # no native for `make` (flick:DateTime flickMake)
 stdlib/effect/datetime_more # no native for `make` (flick:DateTime flickMake)
 stdlib/effect/deferred # no native for `succeed` (flick:Deferred succeed)
 stdlib/effect/duration # a `BigInt` literal has no λFlick form
+stdlib/effect/duration_text # no native for `json_nanos` (flick:Schema flickDurationFromNanos)
 stdlib/effect/effect_core # the model's (≡) rejects `App.Main.collections`
 stdlib/effect/effect_errors # no native for `map_effect` (flick:rt listMapEffect)
 stdlib/effect/effect_errors_more # the model's (≡) rejects `App.Main.collections`

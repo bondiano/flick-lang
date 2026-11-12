@@ -83,3 +83,26 @@ export const describeReport = (r: CauseReport): string =>
       return `${reason.kind} ${what}`;
     })
     .join("; ");
+
+const dataProperty = (value: object, key: string): unknown => {
+  const descriptor = Object.getOwnPropertyDescriptor(value, key);
+  if (descriptor !== undefined) return "value" in descriptor ? descriptor.value : undefined;
+  const inherited: unknown = Object.getPrototypeOf(value);
+  return typeof inherited === "object" && inherited !== null ? dataProperty(inherited, key) : undefined;
+};
+
+/** `JsError.from_js`: what a thrown value says, without running its getters. */
+export const jsErrorMessage = (value: unknown): string => {
+  if (typeof value === "string") return value;
+  try {
+    if (value instanceof Error) {
+      const name = dataProperty(value, "name");
+      const message = dataProperty(value, "message");
+      return `${typeof name === "string" ? name : "Error"}: ${typeof message === "string" ? message : ""}`;
+    }
+    return Object.prototype.toString.call(value);
+  } catch {
+    // a revoked or throwing proxy
+    return "[object Unknown]";
+  }
+};

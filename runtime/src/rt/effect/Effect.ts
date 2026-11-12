@@ -53,6 +53,8 @@ export function* timed(task: () => unknown): Run {
 }
 
 export const die = (message: string): never => raise(dieCause(message));
+/** `Effect.fail_cause_sync`: fails with the whole cause of the failure `f ()` gives. */
+export const flickFailCauseSync = (f: (unit: undefined) => Failure): never => raise(f(undefined).cause);
 export const flickNever = (): Suspend => new Suspend(() => undefined);
 export const flickYieldNow = (): unknown => yieldNow();
 export const flickFiberId = (): number => currentFiber().id;

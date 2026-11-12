@@ -18,25 +18,4 @@ export const eventsQueue = (capacity: number): QueuePolicy => {
   return Object.freeze({ capacity });
 };
 
-const dataProperty = (value: object, key: string): unknown => {
-  const own = Object.getOwnPropertyDescriptor(value, key);
-  if (own !== undefined) return "value" in own ? own.value : undefined;
-  const inherited: unknown = Object.getPrototypeOf(value);
-  return typeof inherited === "object" && inherited !== null ? dataProperty(inherited, key) : undefined;
-};
-
-/** `JsError.from_js`: what a thrown value says, without running its getters. */
-export const jsErrorMessage = (value: unknown): string => {
-  if (typeof value === "string") return value;
-  try {
-    if (value instanceof Error) {
-      const name = dataProperty(value, "name");
-      const message = dataProperty(value, "message");
-      return `${typeof name === "string" ? name : "Error"}: ${typeof message === "string" ? message : ""}`;
-    }
-    return Object.prototype.toString.call(value);
-  } catch {
-    // a revoked or throwing proxy
-    return "[object Unknown]";
-  }
-};
+export { jsErrorMessage } from "@flick-lang/runtime/rt/describe";

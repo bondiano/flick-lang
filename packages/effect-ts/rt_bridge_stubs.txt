@@ -1,4 +1,3 @@
-@flick-lang/runtime/rt durationFormat
 @flick-lang/runtime/rt redactedMake
 @flick-lang/runtime/rt redactedReveal
 @flick-lang/runtime/rt/effect/Arbitrary Constant
