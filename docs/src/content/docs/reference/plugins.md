@@ -234,11 +234,14 @@ check of the module's own type, its companion `T.check`. The plugin interprets t
 module's own file, inside a block as well as outside one, so a diagnostic
 comes back at the code the user wrote.
 
-A serializable atom reference also carries read-only `binding` facts: its
-module and top-level name, the binding span, whether its scheme takes a
-dictionary, whether the reference is inside a function, and its applied
-argument count. This includes partial references. The UI plugin uses these
-facts for `FLICK-U003`; it does not change type inference.
+Each place that names a watched value, applied or not, is a place too, with
+read-only `binding` facts and no arguments: the module and the name of the
+top-level value it stands in (none for a function), the span of that
+declaration, whether its scheme takes a dictionary, whether the reference is
+inside a function, and the count of arguments it is applied to. An applied
+name is so two places: the application, with its arguments, and the name,
+with its `binding`. The UI plugin reads these facts of the serializable
+atoms for `FLICK-U003`; they do not change type inference.
 
 A watched service that the signature of a top-level function names is a place
 too: at the function's name, with no arguments and with `binding` saying

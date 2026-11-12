@@ -26,6 +26,9 @@ break programs.
   A type the code of a block declares names classes in `deriving` as a
   declaration of the module does, and a derive is told what such a type
   wraps (`DeriveTarget.wraps`, which was `refined`).
+- **Plugins:** a plugin is told where each value it watches is named, with
+  the declaration around it (`CallSite.binding`), as it was for the
+  serializable atoms alone.
 - **Refined types:** `refined type` is a declaration of the plugin of `std`,
   which writes the type and its `parse`, `value` and check as code of the
   language; `refined` is no reserved word. The check is a companion too,

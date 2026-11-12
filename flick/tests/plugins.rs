@@ -208,10 +208,10 @@ mod wasm {
         assert!(!checked.status.success(), "{stderr}");
         assert!(stderr.contains("pairs/X005"), "{stderr}");
         assert!(stderr.contains("`tally` counts from one"), "{stderr}");
-        // the two calls of `tally` go in one call of the plugin; `version`
-        // is no watched name
+        // the two calls of `tally` and the two places that name it go in
+        // one call of the plugin; `version` is no watched name
         assert!(
-            trace(&root).iter().any(|l| l == "check-calls pairs 2"),
+            trace(&root).iter().any(|l| l == "check-calls pairs 4"),
             "{:?}",
             trace(&root)
         );
@@ -236,13 +236,14 @@ mod wasm {
     }
 
     #[test]
-    fn a_reference_to_a_watched_function_is_no_call() {
+    fn a_reference_to_a_watched_function_is_a_place_but_no_call() {
         let main = "module App.Main exposing (main, counter)\n\nimport Pairs exposing (tally)\n\ncounter : Float -> Float\nlet counter = tally\n\nmain : Unit ->{; AppError} Unit\nlet main () = ()\n";
         let root = app("plugins-calls-reference", main);
         let checked = flick(&root, &["check"]);
+        // the plugin is told where the name stands, and has no call to check
         assert!(checked.status.success(), "{checked:?}");
         assert!(
-            !trace(&root).iter().any(|l| l.starts_with("check-calls")),
+            trace(&root).iter().any(|l| l == "check-calls pairs 1"),
             "{:?}",
             trace(&root)
         );
