@@ -25,6 +25,10 @@ break programs.
   family: a build that serves procedures, calls a stream, uses another
   transport or serialization, or uses Http takes all of them from the
   Effect adapter, as before.
+- **`Console` on Flick's own runtime:** every `Console` binding runs on RT
+  without the Effect adapter, writing to the host's console or to the one
+  `Console.with_console` gives a task; a group or a timer ends when its
+  scope closes or its task ends, however it ends.
 - **`<|`, `>>` and `<<`:** `f <| x` is `f x`, the weakest operator and
   right-associative, so `say <| show <| total xs` needs no parentheses;
   `f a <| x` is the call `f a x`. `f >> g` applies `f`, then `g`, and
