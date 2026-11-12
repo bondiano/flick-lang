@@ -78,18 +78,21 @@ impl<'a> Gen<'a> {
         let mut labels: Vec<&str> = fields.iter().map(|(label, _)| label.as_str()).collect();
         labels.sort_unstable();
         labels.dedup();
-        let record = if fields.is_empty() || labels.len() < fields.len() {
+        if fields.is_empty() || labels.len() < fields.len() {
             // a label written twice is its last value: the runtime sorts that out
-            call(a, "flickrt.Rec", self.entries(fields, go))
-        } else {
-            let written: Vec<String> = fields.iter().map(|(l, _)| names::string(l)).collect();
-            let shape = self.once(&format!("flickrt.ShapeOf({})", written.join(", ")));
-            let values = go.iter().map(|v| v.doc);
-            call(a, "flickrt.Shaped", iter::once(a.text(shape)).chain(values))
-        };
+            let record = call(a, "flickrt.Rec", self.entries(fields, go));
+            return match base {
+                Some(b) => call(a, "flickrt.Update", [b.doc, record]).into(),
+                None => record.into(),
+            };
+        }
+        let written: Vec<String> = fields.iter().map(|(l, _)| names::string(l)).collect();
+        let shape = self.once(&format!("flickrt.ShapeOf({})", written.join(", ")));
+        let values = iter::once(a.text(shape)).chain(go.iter().map(|v| v.doc));
         match base {
-            Some(b) => call(a, "flickrt.Update", [b.doc, record]).into(),
-            None => record.into(),
+            // the values go into the copy of the record: no record of them is made
+            Some(b) => call(a, "flickrt.With", iter::once(b.doc).chain(values)).into(),
+            None => call(a, "flickrt.Shaped", values).into(),
         }
     }
 

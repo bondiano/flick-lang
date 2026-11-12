@@ -125,8 +125,9 @@ fn the_labels_of_a_record_literal_are_placed_once() {
          type alias Point = { x : Int; y : Int }\n\n\
          point : Int -> Point\nlet point n = { y = n; x = n + 1 }\n\n\
          moved : Point -> Point\nlet moved p = { y = p.x; x = p.y }\n\n\
+         raised : Point -> Point\nlet raised p = { p with y = p.y + 1 }\n\n\
          main : Unit ->{; AppError} Unit\n\
-         let main () = Platform.stdout_line (show (moved (point 1)).x)\n");
+         let main () = Platform.stdout_line (show (raised (moved (point 1))).x)\n");
     // two literals of the same labels in the same order: one shape, no label where a record is made
     assert_eq!(
         go.matches("flickrt.ShapeOf(\"y\", \"x\")").count(),
@@ -135,6 +136,9 @@ fn the_labels_of_a_record_literal_are_placed_once() {
     );
     assert_eq!(go.matches("flickrt.Shaped(K_App__").count(), 2, "{go}");
     assert!(!go.contains("flickrt.Rec("), "{go}");
+    // the new values of a record go into its copy: no record of them is made
+    assert!(go.contains("flickrt.With(\n\t\tl_p,\n\t\tK_App__"), "{go}");
+    assert!(!go.contains("flickrt.Update("), "{go}");
 }
 
 #[test]

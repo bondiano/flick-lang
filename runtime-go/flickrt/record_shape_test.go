@@ -70,3 +70,34 @@ func TestARecordOfAShapeIsTheRecordOfItsLabelsAndValues(t *testing.T) {
 		same("after other records grew from it")
 	}
 }
+
+// `{ r with … }` gives the record an update by a record gives, and makes
+// nothing but that record.
+func TestARecordWithNewValuesIsOneRecord(t *testing.T) {
+	base := Rec("b", "B", "10", "ten", "a", "A", "2", "two")
+	cases := []struct {
+		labels []string
+		vals   []Value
+		keys   []string
+		want   []Value
+	}{
+		{[]string{"a"}, []Value{"x"}, []string{"2", "10", "b", "a"}, []Value{"two", "ten", "B", "x"}},
+		// the labels of the update in another order than the record keeps them
+		{[]string{"a", "2", "b"}, []Value{"x", "y", "z"}, []string{"2", "10", "b", "a"}, []Value{"y", "ten", "z", "x"}},
+		// labels the record has not: added as an object of JavaScript adds keys
+		{[]string{"zz", "a", "1"}, []Value{"x", "y", "z"}, []string{"1", "2", "10", "b", "a", "zz"}, []Value{"z", "two", "ten", "B", "y", "x"}},
+	}
+	for _, c := range cases {
+		got := record(With(base, ShapeOf(c.labels...), c.vals...))
+		if !reflect.DeepEqual(got.keys, c.keys) || !reflect.DeepEqual(got.vals, c.want) {
+			t.Errorf("with %v: %v %v, want %v %v", c.labels, got.keys, got.vals, c.keys, c.want)
+		}
+	}
+	if got := record(base); !reflect.DeepEqual(got.vals, []Value{"two", "ten", "B", "A"}) {
+		t.Errorf("the record itself changed: %v", got.vals)
+	}
+	shape, x, y := ShapeOf("a", "2"), Value("x"), Value("y")
+	if n := testing.AllocsPerRun(100, func() { With(base, shape, x, y) }); n != 1 {
+		t.Errorf("%v allocations, want 1", n)
+	}
+}

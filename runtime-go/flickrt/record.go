@@ -193,6 +193,27 @@ func Update(base Value, fields Value) Value {
 	return out
 }
 
+// With is `Update` of a record by the record of a shape, with that record
+// never made: `vals` are the values of the shape's labels as `Shaped` takes
+// them.
+func With(base Value, s *Shape, vals ...Value) Value {
+	b := record(base)
+	out := b.copied()
+	for i, v := range vals {
+		k := i
+		if s.pos != nil {
+			k = s.pos[i]
+		}
+		at := b.index(s.keys[k])
+		if at < 0 {
+			// a label the record has not: where it goes is the update's to find
+			return Update(base, Shaped(s, vals...))
+		}
+		out.vals[at] = v
+	}
+	return out
+}
+
 // sortedKeys is the labels of a record in UTF-16 order.
 func sortedKeys(r *Record) []string {
 	keys := append([]string{}, r.keys...)
