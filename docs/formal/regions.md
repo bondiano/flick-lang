@@ -211,12 +211,12 @@ Checker:
 Each parameter of a data type has a variance, `+`, `−`, `inv` or `bi` (unused), and subtyping compares the arguments of data by it:
 
 ```text
-for each i:  +: uᵢ ≤ uᵢ'    −: uᵢ' ≤ uᵢ    inv: uᵢ ≡ uᵢ'    bi: any
-──────────────────────────────────────────────────────────── (≤-Data)
+for each i:  +: uᵢ ≤ uᵢ'    −: uᵢ' ≤ uᵢ    inv: uᵢ ≡ uᵢ'    bi: any        ⌈T ū⌉ ⊆ ⌈T ū'⌉
+──────────────────────────────────────────────────────────────────────────── (≤-Data)
 T ū ≤ T ū'
 ```
 
-so `List ((Unit →P Unit)^{s})` passes where `List ((Unit →P Unit)^{s,t})` is expected, and the widening of the hidden row (§2.2) is the case of its `+` parameter. The variance is inferred from the fields, not written: the least fixed point over a group of declarations, starting from `bi`, where a field contributes the polarity of each position a parameter occupies:
+The last premise is that of (≤-Use): subtyping never hides what a value reaches (`LeLive.reach`, `Live/Order.lean`). The reach of data is that of its arguments, so a `−` parameter, whose argument narrows, changes only what does not reach a region, for example the stage of an arrow. So `List ((Unit →P Unit)^{s})` passes where `List ((Unit →P Unit)^{s,t})` is expected, and the widening of the hidden row (§2.2) is the case of its `+` parameter. The variance is inferred from the fields, not written: the least fixed point over a group of declarations, starting from `bi`, where a field contributes the polarity of each position a parameter occupies:
 
 - an arrow: its parameter `−`, its result, qualifier and stage row `+`;
 - `Eff r ε τ C`: `r`, `ε`, `τ` and `C` `+`;
