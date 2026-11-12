@@ -74,6 +74,11 @@ break programs.
   Give it a stage (`->{}`, `foreign effect`). `ChildProcess.pid`,
   `HttpApi.port`, `Rpc.port` and `Http.Server.address` stay pure as reviewed
   exemptions: they return what was fixed when the capability was acquired.
+- **`ErrorReporter.layer` and `LayerRef.get`** return `(Layer …)^{s}`: the
+  layer sends reports to listeners of region `s`, or builds the services the
+  ref of `s` owns, so it cannot leave the `scope` of `s`. A layer returned
+  from that `scope` is `FLICK-G001`; before, its reports went to a closed
+  listener and were lost.
 - **Refined types:** `refined type` is a declaration of the plugin of `std`,
   which writes the type and its `parse`, `value` and check as code of the
   language; `refined` is no reserved word. The check is a companion too,
