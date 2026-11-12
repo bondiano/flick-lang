@@ -177,7 +177,8 @@ The distinction survives [`.iface` schema 2](../iface/#types-and-kinds).
 Data that stores a function, such as `type G s a = G (s -> a)`, keeps what
 its field uses in a hidden capture row, and that row is an argument of the
 type like the others: a region another argument shows does not stand in for
-it. Written bare in a signature, the row is read by elision, as `Live` is
+it. Data with a smaller row may be used where a larger one is expected, never
+the reverse. Written bare in a signature, the row is read by elision, as `Live` is
 (being implemented, see [Not checked yet](#not-checked-yet)):
 
 - in a parameter, any row: the function is generic in it;
