@@ -1,19 +1,25 @@
 //! What plugins gave, kept for the calls of a run and the runs after it:
-//! in memory between the runs of an editor session, and by the host.
+//! in memory between the runs of an editor session, and by the host. A
+//! compiler without projects on disk, the browser's, has neither: it asks
+//! its plugins again and links no code that writes an answer or reads one.
 
 use std::collections::HashMap;
 
 use flick_plugin::{Arena, Block, DeriveTarget, Place, Published, VERSION};
 
+#[cfg(feature = "native-project")]
 use serde::de::DeserializeOwned;
+#[cfg(feature = "native-project")]
 use serde::{Deserialize, Serialize};
 
+#[cfg(feature = "native-project")]
 use crate::plugin::reach::Used;
 use crate::plugin::source::BlockSource;
 use crate::plugin::{Expander, Failure};
 use crate::project::Host;
 
 /// What a call gave, and what its plugin reached outside to give it.
+#[cfg(feature = "native-project")]
 #[derive(Serialize, Deserialize)]
 struct Kept<T> {
     used: Vec<Used>,
@@ -23,12 +29,15 @@ struct Kept<T> {
 /// What plugins gave for the calls of a run: those the last run kept in
 /// memory first, then those the host saved, and the ones this run made.
 pub(super) struct Results<'h> {
+    #[cfg_attr(not(feature = "native-project"), allow(dead_code))]
     pub(super) host: &'h dyn Host,
+    #[cfg_attr(not(feature = "native-project"), allow(dead_code))]
     pub(super) previous: HashMap<Vec<u8>, Vec<u8>>,
     /// What this run used, for the next.
     pub(super) kept: HashMap<Vec<u8>, Vec<u8>>,
 }
 
+#[cfg(feature = "native-project")]
 impl Results<'_> {
     fn get(&mut self, key: &[u8]) -> Option<Vec<u8>> {
         let value = (self.previous.remove(key))
@@ -42,10 +51,13 @@ impl Results<'_> {
         self.host.save(&key, &value);
         self.kept.insert(key, value);
     }
+}
 
+impl Results<'_> {
     /// What `make` gives, or what the call `key` gave earlier while each
     /// answer its plugin reached is still the same. A call that reported
     /// anything is not kept: a kept one would not report it again.
+    #[cfg(feature = "native-project")]
     fn reached<T: Serialize + DeserializeOwned, E>(
         &mut self,
         key: Vec<u8>,
@@ -72,6 +84,18 @@ impl Results<'_> {
             self.put(key, bytes);
         }
         Ok(kept.value)
+    }
+
+    /// What `make` gives: nothing is kept.
+    #[cfg(not(feature = "native-project"))]
+    #[allow(clippy::unused_self)]
+    fn reached<T, E>(
+        &mut self,
+        _key: Vec<u8>,
+        source: &mut BlockSource,
+        make: impl FnOnce(&mut BlockSource) -> Result<T, E>,
+    ) -> Result<T, E> {
+        make(source)
     }
 
     /// What `plugin` collects from `blocks`, their heads and texts in order.
@@ -153,7 +177,11 @@ impl Results<'_> {
         state: &[u8],
         source: &mut BlockSource,
     ) -> Result<Arena, Failure> {
+        // the key of a kept answer: nothing is kept without projects on disk
+        #[cfg(feature = "native-project")]
         let summary = serde_json::to_vec(&(target, args, module)).unwrap_or_default();
+        #[cfg(not(feature = "native-project"))]
+        let summary = Vec::new();
         let key = key([
             b"derive".as_slice(),
             VERSION.as_bytes(),
