@@ -25,9 +25,16 @@ impl<'a> Gen<'a> {
             mem::replace(&mut self.generator, false),
             self.fiber.replace("fb"),
             self.context.replace("fb"),
+            self.returns.take(),
         );
         let (stmts, ()) = self.block(|g| g.tail_expr(body));
-        (self.tail, self.generator, self.fiber, self.context) = saved;
+        (
+            self.tail,
+            self.generator,
+            self.fiber,
+            self.context,
+            self.returns,
+        ) = saved;
         stmts
     }
 

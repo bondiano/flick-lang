@@ -170,7 +170,11 @@ impl<'a> Gen<'a> {
             self.emit(docvec![a, "for ", block(a, out)]);
         } else {
             self.buf.extend(out);
-            self.emit("return flickrt.NoMatch()");
+            // it never returns; a function of a Go type has no value to return of it
+            self.emit(match self.returns {
+                Some(_) => "panic(flickrt.NoMatch())",
+                None => "return flickrt.NoMatch()",
+            });
         }
     }
 

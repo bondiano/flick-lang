@@ -1,0 +1,16 @@
+// Numbers through calls that are not tail calls: a recursion over Int, and
+// a sum over Float of what a function of two numbers gives.
+module App.Main exposing (main)
+
+fib : Int -> Int
+let rec fib n = if n < 2 then n else fib (n - 1) + fib (n - 2)
+
+mix : Float -> Float -> Float
+let mix x y = (x * x + y) / (x + 1.0)
+
+sum : Int -> Float -> Float
+let rec sum left acc =
+  if left == 0 then acc else sum (left - 1) (mix (Int.to_float (left % 100)) acc % 1000.0)
+
+main : Unit ->{; AppError} Unit
+let main () = Platform.stdout_line (show (fib 32, Float.floor (sum 3000000 0.0)))

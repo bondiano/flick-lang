@@ -12,6 +12,7 @@ use flick_pretty::{Document, DocumentArena, Documentable, docvec};
 
 use super::arith::Native;
 use super::layout::{Code, INDENT, block, call, param_list, single, statement};
+use super::shape::Types;
 use super::{Gen, names};
 use crate::codegen::tail::{
     Calls, Target, cycles, function, jumpable, self_call, tail_callees, target,
@@ -105,9 +106,16 @@ impl<'a> Gen<'a> {
         params: &[Param],
         body: &Expr,
         target: Option<Target>,
+        types: Types,
     ) -> (Vec<&'a str>, Vec<Document<'a>>) {
         let a = self.a;
-        let saved = (self.tail.take(), mem::replace(&mut self.generator, false));
+        // what the body returns is of the function's Go type, and nothing
+        // of a function around this one is: a function inside starts anew
+        let saved = (
+            self.tail.take(),
+            mem::replace(&mut self.generator, false),
+            mem::replace(&mut self.returns, types.result()),
+        );
         let looping = target.filter(|t| {
             jumpable(params, Calls::Direct)
                 && !tail_callees(body, &[(t.clone(), params.len())], Calls::Direct).is_empty()
@@ -116,6 +124,12 @@ impl<'a> Gen<'a> {
             None => {
                 let (stmts, heads) = self.block(|g| {
                     let heads = g.bind_params(params);
+                    for (i, p) in params.iter().enumerate() {
+                        // a parameter of a Go type is that type from the start
+                        if let (Pat::Bind(name), Some(native)) = (&p.pat, types.param(i)) {
+                            g.natives.insert(name.clone(), native);
+                        }
+                    }
                     g.tail_expr(body);
                     heads
                 });
@@ -146,9 +160,14 @@ impl<'a> Gen<'a> {
                     .iter()
                     .zip(&heads)
                     .zip(&natives)
-                    .map(|((&var, &head), native)| match native {
+                    .enumerate()
+                    .map(|(i, ((&var, &head), native))| match native {
                         Some(n) => {
-                            let value = n.unbox(a, a.text(head));
+                            // a parameter of the function's own Go type needs no unboxing
+                            let value = match types.param(i) {
+                                Some(_) => a.text(head),
+                                None => n.unbox(a, a.text(head)),
+                            };
                             statement(a, docvec![a, "var ", var, " ", n.go(), " = ", value])
                         }
                         None => statement(a, docvec![a, "var ", var, " flickrt.Value = ", head]),
@@ -159,7 +178,7 @@ impl<'a> Gen<'a> {
                 (heads, stmts)
             }
         };
-        (self.tail, self.generator) = saved;
+        (self.tail, self.generator, self.returns) = saved;
         result
     }
 
@@ -180,7 +199,12 @@ impl<'a> Gen<'a> {
     }
 
     /// The body of a grouped top-level function: a call of its group.
-    pub(super) fn group_call(&self, name: &str, heads: &[&'a str]) -> Option<Document<'a>> {
+    pub(super) fn group_call(
+        &self,
+        name: &str,
+        heads: &[&'a str],
+        result: Option<Native>,
+    ) -> Option<Document<'a>> {
         let a = self.a;
         let &(g, k) = self.grouped.get(name)?;
         let group = &self.groups[g];
@@ -188,7 +212,9 @@ impl<'a> Gen<'a> {
         args.extend(heads.iter().map(|h| a.text(h)));
         args.resize(group.arity + 1, a.text("nil"));
         args.insert(0, self.context());
+        // the group runs on values: its result is made the function's type
         let go = call(a, a.alloc_str(&group.name), args);
+        let go = result.map_or(go, |native| native.unbox(a, go));
         Some(statement(a, docvec![a, "return ", go]))
     }
 

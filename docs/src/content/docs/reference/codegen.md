@@ -398,7 +398,7 @@ Values have the representation of the JS target, in Go terms:
 | a tuple, a `List` | `[]flickrt.Value`; `[x, ...rest]` shares the storage of the list |
 | a record | `*flickrt.Record`, its labels in JS key order, copied by `{ r with … }` |
 | a constructor | `*flickrt.Data` with the tag of the JS target and its fields |
-| a function | `func(*flickrt.Fiber, flickrt.Value) flickrt.Value` per stage |
+| a function | `func(*flickrt.Fiber, flickrt.Value) flickrt.Value` per stage; one of two or three arguments whose stages before the last are pure is `flickrt.Fn2` or `flickrt.Fn3`, which takes them at once |
 | a dictionary | `*flickrt.Dict`; superclasses and default methods made on first use |
 
 Numbers and strings keep the semantics of the JS target: `Int` wraps
@@ -457,7 +457,11 @@ so an unsorted `to_list` prints the same on both targets.
 
 A top-level function is a Go function of its execution fiber, dictionaries
 and all its parameters; a full application calls it, and a partial one or a
-use as a value makes the curried function. The tail calls that are loops on the JS
+use as a value makes a function of values around it. A parameter that is an
+`Int`, a `Float`, a `Bool` or a `String`, and a result that is one, has its
+Go type there (`func F(fb *flickrt.Fiber, n int32) int32`), so a number
+passed to a known function or returned by it is no `flickrt.Value` made for
+the call. The tail calls that are loops on the JS
 target (see [Recursion](#recursion-stack-safety-is-not-the-whole-cost))
 are loops in Go too: a self call is a `for` that assigns the next arguments
 and continues, and a group of functions calling each other is one Go

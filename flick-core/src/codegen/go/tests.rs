@@ -90,7 +90,7 @@ fn a_while_nothing_leaves_is_a_plain_loop_over_variables_of_their_go_type() {
     let go = app(SUM);
     // boxed variables allocate on every assignment, and flags are tested on every turn
     assert!(go.contains("var l_acc int32 = int32(0)"), "{go}");
-    assert!(go.contains("var l_i int32 = flickrt.AsInt(l_n)"), "{go}");
+    assert!(go.contains("var l_i int32 = l_n"), "{go}");
     assert!(
         !go.contains("_x24_loop") && !go.contains("flickrt.Same"),
         "{go}"
@@ -144,9 +144,13 @@ fn a_function_of_two_arguments_is_given_both_at_once() {
          twice : (Int -> Int -> Int) -> Int -> Int\nlet twice f x = f x x\n\n\
          main : Unit ->{; AppError} Unit\n\
          let main () = Platform.stdout_line (show (twice add 1 + twice (fun a b -> a * b) 2))\n");
-    // the Go function is the value, a lambda is one Go function, and a call
-    // through a value gives both arguments: no function is made per argument
-    assert!(go.contains("flickrt.Fn2(F_App__add)"), "{go}");
+    // a function of numbers given as a value is one Go function that takes
+    // both values, a lambda is one too, and a call through a value gives
+    // both arguments: no function is made per argument
+    assert!(
+        go.contains("return F_App__add(fb, flickrt.AsInt(t2), flickrt.AsInt(t3))"),
+        "{go}"
+    );
     assert!(
         go.contains("flickrt.Fn2(func(fb *flickrt.Fiber, l_a, l_b flickrt.Value) flickrt.Value"),
         "{go}"
@@ -444,7 +448,7 @@ fn a_scalar_stays_in_its_go_type_through_a_choice_and_a_test() {
     // ordered by the runtime with no value made of them, and a literal in a
     // pattern is compared as Go compares
     assert!(
-        go.contains("if ((flickrt.AsInt(l_a) > flickrt.AsInt(l_b)) && !(flickrt.CompareStrings("),
+        go.contains("if ((l_a > l_b) && !(flickrt.CompareStrings(l_word, \"m\") < 0)) {"),
         "{go}"
     );
     assert!(go.contains("if (l_word == \"none\") {"), "{go}");
@@ -456,4 +460,51 @@ fn a_scalar_stays_in_its_go_type_through_a_choice_and_a_test() {
     ] {
         assert!(!go.contains(call), "{call} in {go}");
     }
+}
+
+const TYPED: &str = "module App exposing (main)\n\n\
+fib : Int -> Int\nlet rec fib n = if n < 2 then n else fib (n - 1) + fib (n - 2)\n\n\
+first : a -> b -> a\nlet first x _ = x\n\n\
+shout : Int -> List String -> Int\n\
+let shout n words = n + List.length (List.map (fun word -> word ++ \"!\") words)\n\n\
+tick : Int ->{} Int\nlet tick n =\n  Platform.stdout_line \"tick\"\n  n + 1\n\n\
+main : Unit ->{; AppError} Unit\n\
+let main () =\n  \
+let folded = List.fold_left first 0 [fib 5, shout 1 [\"a\"]]\n  \
+Platform.stdout_line (show (tick folded))\n";
+
+#[test]
+fn a_function_takes_and_returns_numbers_in_their_go_type() {
+    let go = app(TYPED);
+    // a number is passed and returned as it is: no value is made for a call
+    assert!(
+        go.contains("func F_App__fib(fb *flickrt.Fiber, l_n int32) int32 {"),
+        "{go}"
+    );
+    assert!(
+        go.contains("F_App__fib(fb, flickrt.SubInt(l_n, int32(1))),"),
+        "{go}"
+    );
+    assert!(!go.contains("flickrt.AsInt(F_App__fib("), "{go}");
+    // so is one of a function that runs effects
+    assert!(
+        go.contains("func F_App__tick(fb *flickrt.Fiber, l_n int32) int32 {"),
+        "{go}"
+    );
+    // a function of values is still a value as it is
+    assert!(go.contains("flickrt.Fn2(F_App__first)"), "{go}");
+}
+
+#[test]
+fn a_function_inside_a_function_of_a_go_type_returns_its_own_values() {
+    let go = app(TYPED);
+    // `shout` returns an `int32`; the function it passes on returns a text,
+    // as a value, and is not made to return a number
+    assert!(
+        go.contains(
+            "func F_App__shout(fb *flickrt.Fiber, l_n int32, l_words flickrt.Value) int32 {"
+        ),
+        "{go}"
+    );
+    assert!(go.contains("return flickrt.Concat(l_word, \"!\")"), "{go}");
 }

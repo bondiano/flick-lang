@@ -12,6 +12,7 @@
 
 mod arith;
 mod call;
+mod closures;
 mod effects;
 mod expr;
 mod foreign;
@@ -26,6 +27,7 @@ mod once;
 mod pattern;
 mod runtime;
 mod shape;
+mod typed;
 
 pub use runtime::{GO_MOD, GO_SUM, PACKAGES, Package, RUNTIME};
 
@@ -409,6 +411,8 @@ struct Gen<'a> {
     once: Vec<String>,
     /// The instances whose dictionary is the same whoever builds it.
     settled: Option<&'a HashSet<Key>>,
+    /// The Go type the function being emitted returns, when not a value.
+    returns: Option<arith::Native>,
 }
 
 impl<'a> Gen<'a> {
@@ -443,6 +447,7 @@ impl<'a> Gen<'a> {
             natives: HashMap::new(),
             once: Vec::new(),
             settled: None,
+            returns: None,
         }
     }
 
