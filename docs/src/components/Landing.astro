@@ -9,8 +9,9 @@ import HeroMap from "./HeroMap.astro";
 import ServedMap from "./ServedMap.astro";
 import RouteBend from "./RouteBend.astro";
 import { highlight, shown } from "./highlight.ts";
-import { Effect } from "@flick-lang/effect-ts";
-import { uiRenderStatic } from "@flick-lang/effect-ts/ui/react";
+import { runPromise } from "@flick-lang/runtime/rt";
+import { uiRenderStatic } from "@flick-lang/runtime/rt/ui/react";
+import type { Ui } from "@flick-lang/runtime/ui/react/nodes";
 import { renderToString } from "react-dom/server";
 import { initial_view } from "../widgets/Hero.fl";
 
@@ -22,7 +23,7 @@ const prefix = `${base}${ru ? "/ru" : ""}`;
 const text = (en: string, russian: string) => ru ? russian : en;
 const title = text("Flick — Functions that do what they say", "Flick — функции делают то, что говорят");
 const description = text("Flick is a language for whole apps, where every function does what it says. It compiles to JavaScript and Go. Try it in your browser.", "Flick — один язык для всего приложения. Компилятор проверяет соответствие функций их сигнатурам. Компилируется в JavaScript и Go. Попробуйте прямо в браузере.");
-const heroHtml = renderToString(uiRenderStatic(await Effect.runPromise(initial_view(ru))));
+const heroHtml = renderToString(uiRenderStatic(await runPromise<Ui>(() => initial_view(ru))));
 
 const repository = "https://github.com/bondiano/flick-lang";
 const [loadView] = shown("load_view");
@@ -260,7 +261,7 @@ const place = (stop: Stop) => `--shift: ${columns[stop]}; --bend: ${bendHeight(s
       <a href={repository}><Icon name="github" /> GitHub</a>
     </footer>
     <script>
-      import { run } from "@flick-lang/effect-ts/runner/browser";
+      import { run } from "@flick-lang/runtime/rt/runner/browser";
       import { main } from "../widgets/Hero.fl";
       void run(main);
     </script>

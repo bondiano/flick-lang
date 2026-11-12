@@ -2,8 +2,9 @@
 import { lessonConfiguration } from "../playground/lesson-config.ts";
 import "../styles/playground.css";
 import { loadExercise } from "../../exercises/load.ts";
-import { Effect } from "@flick-lang/effect-ts";
-import { uiRenderStatic } from "@flick-lang/effect-ts/ui/react";
+import { runPromise } from "@flick-lang/runtime/rt";
+import { uiRenderStatic } from "@flick-lang/runtime/rt/ui/react";
+import type { Ui } from "@flick-lang/runtime/ui/react/nodes";
 import { renderToString } from "react-dom/server";
 import { initial_view } from "../playground/Playground.fl";
 import { examples } from "./gallery.ts";
@@ -28,7 +29,7 @@ const configuration = {
   locale, examples: gallery, lesson: Boolean(exercise), solution, done: false, autorun,
   ...lessonConfiguration(exercise),
 };
-const markup = renderToString(uiRenderStatic(await Effect.runPromise(initial_view(configuration))));
+const markup = renderToString(uiRenderStatic(await runPromise<Ui>(() => initial_view(configuration))));
 // the browser reads the same examples back; `<` cannot end the script early
 const embedded = JSON.stringify(gallery).replaceAll("<", "\\u003c");
 ---
@@ -41,7 +42,7 @@ const embedded = JSON.stringify(gallery).replaceAll("<", "\\u003c");
 </noscript>
 
 <script>
-  import { run } from "@flick-lang/effect-ts/runner/browser";
+  import { run } from "@flick-lang/runtime/rt/runner/browser";
   import { main } from "../playground/Playground.fl";
   import { bindSplit } from "../playground/split.ts";
 

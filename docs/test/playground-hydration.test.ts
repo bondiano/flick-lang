@@ -5,9 +5,10 @@ import path from "node:path";
 import { test } from "node:test";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
-import * as Effect from "@flick-lang/effect-ts/effect/Effect";
-import * as Fiber from "@flick-lang/effect-ts/effect/Fiber";
-import { type Ui, uiRenderStatic } from "@flick-lang/effect-ts/ui/react";
+import { runPromise } from "@flick-lang/runtime/rt";
+import { hotDispose, run } from "@flick-lang/runtime/rt/runner/browser";
+import { uiRenderStatic } from "@flick-lang/runtime/rt/ui/react";
+import type { Ui } from "@flick-lang/runtime/ui/react/nodes";
 import { JSDOM } from "jsdom";
 import { renderToString } from "react-dom/server";
 
@@ -18,11 +19,11 @@ const flick = process.env.FLICK_BIN ?? path.join(process.env.CARGO_TARGET_DIR ??
 test("the playground hydrates the markup its page renders on the server", async () => {
   const out = path.join(repo, "target/tmp/playground-hydration");
   rmSync(out, { recursive: true, force: true });
-  execFileSync(flick, ["build", path.join(here, "../src/playground/Playground.fl"), "--project", path.join(here, "../src/playground"), "--out-dir", out, "--color", "never"]);
+  execFileSync(flick, ["build", path.join(here, "../src/playground/Playground.fl"), "--project", path.join(here, "../src/playground"), "--out-dir", out, "--rt", "--color", "never"]);
   // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the compiled module exports what `Playground.fl` exposes
   const playground = (await import(pathToFileURL(path.join(out, "Playground.js")).href)) as {
-    initial_view: (config: { locale: string; examples: typeof examples }) => Effect.Effect<Ui>;
-    main: (unit: undefined) => Effect.Effect<void, unknown>;
+    initial_view: (config: { locale: string; examples: typeof examples }) => Ui;
+    main: (unit: undefined) => unknown;
   };
   const examples = [
     { id: "hello", group: "Basics", group_ru: "Основы", name: "Hello", name_ru: "Привет", source: "module Main exposing (main)\n" },
@@ -30,7 +31,7 @@ test("the playground hydrates the markup its page renders on the server", async 
   ];
   // as `Playground.astro` renders it
   const markup = renderToString(
-    uiRenderStatic(await Effect.runPromise(playground.initial_view({ locale: "en", examples }))),
+    uiRenderStatic(await runPromise<Ui>(() => playground.initial_view({ locale: "en", examples }))),
   );
   const dom = new JSDOM(
     `<!doctype html><html><body><div id="flick-playground" data-locale="en" data-flick-ssr>${markup}</div>` +
@@ -40,7 +41,7 @@ test("the playground hydrates the markup its page renders on the server", async 
   const complaints: Array<string> = [];
   const error = console.error;
   console.error = (...args: Array<unknown>) => complaints.push(args.map(String).join(" "));
-  const fiber = Effect.runFork(playground.main(undefined));
+  const running = run(playground.main);
   try {
     await new Promise((resolve) => setTimeout(resolve, 100));
     assert.deepEqual(
@@ -49,7 +50,9 @@ test("the playground hydrates the markup its page renders on the server", async 
     );
     assert.ok(dom.window.document.querySelector("#flick-playground textarea"), "the editor is still rendered");
   } finally {
-    await Effect.runPromise(Fiber.interrupt(fiber));
+    // stops the program, which unmounts its roots
+    hotDispose();
+    await running;
     console.error = error;
   }
 });
