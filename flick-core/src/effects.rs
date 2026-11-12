@@ -1,22 +1,17 @@
-//! A build without effects, `[build] effect = "none"`: compiled code imports
-//! `@flick-lang/runtime/core`, which has the runtime's data and pure helpers
-//! without Effect. A foreign module with no such version cannot be built.
+//! Where a foreign module of the built-in packages runs: Flick's own runtime
+//! or the Effect adapter, by the key that names it.
 
 use std::borrow::Cow;
 
 use crate::codegen::EffectBridge;
-use crate::diagnostics::{Diagnostic, Severity, codes};
+use crate::diagnostics::{Diagnostic, codes};
 use crate::ir::{self, ItemKind};
-use crate::types::{NO_EFFECTS, OpClass};
+use crate::types::OpClass;
 
 /// The tables of the built-in modules' bindings, which the build script writes.
 pub(crate) mod bindings {
     include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 }
-
-/// Where a library on Effect writes its build without Effect, beside its
-/// interfaces: the modules that need no Effect, and the built-in ones they use.
-pub const CORE_DIR: &str = "_core/";
 
 /// The key of a module the built-in packages bind, `flick:Trie`, which names
 /// no package of a target. `spec` may spell it as a module of the adapter's
@@ -56,24 +51,19 @@ pub fn effect_specifier(spec: &str) -> String {
         .unwrap_or_else(|| spec.into_owned())
 }
 
-fn route(spec: &str, native: bool) -> Option<String> {
-    let spec = key(spec);
-    if let Some((_, core, rt)) = bindings::ROUTES.iter().find(|(from, _, _)| *from == spec) {
-        return if native { *rt } else { *core }.map(str::to_owned);
-    }
-    (!owned(&spec)).then(|| spec.into_owned())
-}
-
 pub fn belongs_to(spec: &str, package: &str) -> bool {
     spec.strip_prefix(package)
         .is_some_and(|rest| rest.is_empty() || rest.starts_with('/'))
 }
 
-pub fn specifier(spec: &str) -> Option<String> {
-    route(spec, false)
-}
+/// The module of Flick's runtime `spec` stands for, a module of another
+/// package itself, or none when only the adapter has it.
 pub fn rt_specifier(spec: &str) -> Option<String> {
-    route(spec, true)
+    let spec = key(spec);
+    if let Some((_, rt)) = bindings::ROUTES.iter().find(|(from, _)| *from == spec) {
+        return rt.map(str::to_owned);
+    }
+    (!owned(&spec)).then(|| spec.into_owned())
 }
 
 pub fn on_kernel(spec: &str, export: &str) -> bool {
@@ -131,38 +121,6 @@ pub(crate) fn requires_adapter(spec: &str, export: &str, effect: bool) -> bool {
     }
 }
 
-/// E008 when the program's `module` binds a foreign module that needs
-/// Effect, or makes a schema, which `core` has no codecs for.
-pub fn check(module: &ir::Module, diagnostics: &mut Vec<Diagnostic>) {
-    let needed = module.items.iter().find_map(|item| match &item.kind {
-        // shortcut: checks the module, not the export; one `core` lacks fails when the program loads
-        ItemKind::Foreign(f) => f
-            .binding
-            .from
-            .as_deref()
-            .filter(|spec| specifier(spec).is_none())
-            .map(|spec| (item.span, format!("`{spec}` runs on Effect"))),
-        _ => None,
-    });
-    if let Some((span, what)) = needed {
-        let message = format!("{what}, but {NO_EFFECTS}");
-        diagnostics.push(Diagnostic::error(codes::E008, message, span));
-    }
-}
-
-/// Whether the built-in module `name` has a build without Effect.
-pub fn in_core(name: &str) -> bool {
-    bindings::CORE_BUILTINS.contains(&name)
-}
-
-/// E008 when the program uses the built-in module `name`, which needs Effect.
-pub fn check_builtin(name: &str, diagnostics: &mut Vec<Diagnostic>) {
-    if !in_core(name) {
-        let message = format!("the built-in module `{name}` runs on Effect, but {NO_EFFECTS}");
-        diagnostics.push(Diagnostic::new(codes::E008, Severity::Error, message));
-    }
-}
-
 /// P012 at each handler of a `control` operation: on JavaScript it needs a
 /// runtime of its own, which Go has already.
 pub fn control_on_js(module: &ir::Module, diagnostics: &mut Vec<Diagnostic>) {
@@ -200,34 +158,7 @@ pub fn control_on_js(module: &ir::Module, diagnostics: &mut Vec<Diagnostic>) {
 
 #[cfg(test)]
 mod tests {
-    use super::{bindings, effect_specifier, key, on_kernel, owned, rt_specifier, specifier};
-    use crate::types::builtin_sources;
-
-    #[test]
-    fn builtins_without_effects_bind_only_core_and_import_each_other() {
-        for (name, source) in builtin_sources()
-            .iter()
-            .filter(|(n, _)| bindings::CORE_BUILTINS.contains(n))
-        {
-            for line in source.lines() {
-                if let Some(spec) = line
-                    .strip_prefix("foreign ")
-                    .and_then(|l| l.split_once(" from \""))
-                    .and_then(|(_, rest)| rest.split_once('"'))
-                    .map(|(spec, _)| spec)
-                {
-                    assert!(specifier(spec).is_some(), "{name} binds `{spec}`");
-                }
-                if let Some(import) = line.strip_prefix("import ") {
-                    let module = import.split_whitespace().next().unwrap_or_default();
-                    assert!(
-                        bindings::CORE_BUILTINS.contains(&module),
-                        "{name} imports `{module}`"
-                    );
-                }
-            }
-        }
-    }
+    use super::{bindings, effect_specifier, key, on_kernel, owned, rt_specifier};
 
     #[test]
     fn a_key_has_two_earlier_spellings_and_names_the_module_of_each_target() {
@@ -261,40 +192,31 @@ mod tests {
             assert_eq!(key(spelled), is);
             assert_eq!(key(is), is);
         }
-        for (key, adapter, core, rt) in [
+        for (key, adapter, rt) in [
             (
                 "flick:Option",
                 "@flick-lang/effect-ts/effect/Option",
-                Some("@flick-lang/runtime/core/Option"),
                 Some("@flick-lang/runtime/rt/effect/Option"),
             ),
             (
                 "flick:rt",
                 "@flick-lang/effect-ts",
-                Some("@flick-lang/runtime/core"),
                 Some("@flick-lang/runtime/rt"),
             ),
             (
                 "flick:ui/react",
                 "@flick-lang/effect-ts/ui/react",
-                None,
                 Some("@flick-lang/runtime/rt/ui/react"),
             ),
-            (
-                "flick:Stream",
-                "@flick-lang/effect-ts/effect/Stream",
-                None,
-                None,
-            ),
-            ("flick:cli", "@flick-lang/effect-ts/cli", None, None),
+            ("flick:Stream", "@flick-lang/effect-ts/effect/Stream", None),
+            ("flick:cli", "@flick-lang/effect-ts/cli", None),
         ] {
             assert_eq!(effect_specifier(key), adapter);
-            assert_eq!(specifier(key).as_deref(), core, "{key}");
             assert_eq!(rt_specifier(key).as_deref(), rt, "{key}");
             assert!(owned(key));
         }
         assert!(!owned("./clock.mjs") && !owned("@flick-lang/runtime-extra"));
-        for (key, _, _) in bindings::ROUTES {
+        for (key, _) in bindings::ROUTES {
             assert!(key.starts_with(bindings::KEY), "{key} is routed by its key");
         }
     }
@@ -426,20 +348,5 @@ mod tests {
             "uiView",
             EffectBridge::AvailableWithUi
         ));
-    }
-
-    #[test]
-    fn runtime_modules_map_to_core_or_need_effect() {
-        assert_eq!(
-            specifier("@flick-lang/runtime").as_deref(),
-            Some("@flick-lang/runtime/core")
-        );
-        assert_eq!(
-            specifier("@flick-lang/runtime/effect/Option").as_deref(),
-            Some("@flick-lang/runtime/core/Option")
-        );
-        assert_eq!(specifier("@flick-lang/runtime/effect/HashMap"), None);
-        assert_eq!(specifier("@flick-lang/runtime/ui/react"), None);
-        assert_eq!(specifier("./clock.mjs").as_deref(), Some("./clock.mjs"));
     }
 }

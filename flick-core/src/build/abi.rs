@@ -26,7 +26,6 @@ pub fn interface(
         data: data(module, package),
         dictionaries: dictionaries(module),
         values: summaries(module, interface, interface_of),
-        core: None,
     });
     // only the js target compiles a library's modules
     out.targets = vec![Target::Js];

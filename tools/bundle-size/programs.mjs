@@ -7,7 +7,6 @@ export const PROGRAMS = [
   // Identical source, effects and observable output on the native runtime.
   { name: "pure-rt", source: "tools/bundle-size/pure.fl", rt: true, budget: 5, effectFree: true },
   // Pure arithmetic library, with no host I/O or trusted pure foreigns.
-  { name: "none", source: "tools/bundle-size/none", module: "App/Main.js", budget: 0.5, effectFree: true },
   // UI programs render views on atoms: at most 81 KB and 18 KB for effect/reactivity,
   // and 5 KB for the spans of actions and the debug log of writes;
   // the registry keeps `Stream`, which `effect/reactivity` imports for stream atoms,

@@ -513,8 +513,6 @@ pub fn artifacts(
         effect_bridge: backend::effect_bridge(host, project, compilation),
         ui: project.and_then(|p| p.config.build.ui.as_deref()),
         runners: &runners,
-        core_modules: &[],
-        core_only: false,
     };
     if output.go {
         let (artifacts, diagnostics) =
@@ -526,12 +524,7 @@ pub fn artifacts(
             diagnostics,
         };
     }
-    let mut emission = js_artifacts(
-        sources,
-        project.is_some_and(|p| p.config.kind == Kind::Lib) && backend == Backend::Effect,
-        compilation,
-        &settings,
-    );
+    let mut emission = js_artifacts(sources, compilation, &settings);
     if let Some(project) = project {
         let wanted = &compilation.js_dependencies;
         let needs = &mut emission.diagnostics;

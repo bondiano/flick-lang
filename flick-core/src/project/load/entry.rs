@@ -6,12 +6,12 @@ use super::{Loader, Root, target};
 use crate::diagnostics::Diagnostic;
 use crate::diagnostics::codes;
 use crate::iface::{self, Namespace};
-use crate::project::config::{self, Backend, Emit, Kind};
+use crate::project::config::{self, Emit, Kind};
 use crate::project::{Project, is_module_name, module_path};
 use crate::resolve::Interface;
 use crate::source::Span;
 use crate::types::lang::{self, Lang};
-use crate::types::{Effects, NO_EFFECTS, Type, show_type};
+use crate::types::{Effects, Type, show_type};
 
 /// How the runner starts `main`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -162,15 +162,7 @@ impl Loader<'_> {
                     self.check_runner(&module, at, (runner, *runner_at), interfaces);
                     return;
                 }
-                let pure = project.config.build.effect == Backend::None;
-                let problem = main.scheme.as_ref().and_then(|t| match main_kind(t) {
-                    Err(message) => Some(message),
-                    Ok(MainKind::Effect) if pure => Some(format!(
-                        "entry `main` has type `{}`, but {NO_EFFECTS}: a runner calls `Unit -> Unit`",
-                        show_type(t)
-                    )),
-                    Ok(_) => None,
-                });
+                let problem = main.scheme.as_ref().and_then(|t| main_kind(t).err());
                 if let Some(message) = problem {
                     self.diagnostics
                         .push(Diagnostic::error(codes::P026, message, at));

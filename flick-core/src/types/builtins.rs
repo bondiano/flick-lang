@@ -337,7 +337,6 @@ fn check_reporting(
             limits: super::Limits::default(),
             no_let_assert: false,
             thresholds: super::Thresholds::default(),
-            effects: true,
             watched: Watched::none(),
             stages_by_class,
         };

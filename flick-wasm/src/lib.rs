@@ -182,8 +182,6 @@ impl Session {
             effect_bridge: EffectBridge::Available,
             ui: None,
             runners: &[],
-            core_modules: &[],
-            core_only: false,
         };
         build::emit(compilation, &self.sources, &settings)
     }

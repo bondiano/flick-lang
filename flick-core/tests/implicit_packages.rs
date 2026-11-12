@@ -136,8 +136,6 @@ fn a_second_implicit_package_is_one_more_entry_and_directory() {
         effect_bridge: EffectBridge::Absent,
         ui: None,
         runners: &[],
-        core_modules: &[],
-        core_only: false,
     };
     let (artifacts, diagnostics) = build::emit(&compilation, &sources, &settings);
     assert!(diagnostics.is_empty(), "{diagnostics:?}");

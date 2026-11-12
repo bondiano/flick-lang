@@ -300,8 +300,6 @@ fn settings(entries: &[(String, String)]) -> Settings<'_> {
         effect_bridge: EffectBridge::Absent,
         ui: None,
         runners: &[],
-        core_modules: &[],
-        core_only: false,
     }
 }
 

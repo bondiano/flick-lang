@@ -255,7 +255,6 @@ fn binding_policy(output: &Path) -> io::Result<()> {
     let mut out = String::new();
     for (key, name) in [
         ("packages", "PACKAGES"),
-        ("core_builtins", "CORE_BUILTINS"),
         ("families", "FAMILIES"),
         ("ui_renderer", "UI_RENDERER"),
         ("ui_requirements", "UI_REQUIRED"),
@@ -312,11 +311,11 @@ fn binding_policy(output: &Path) -> io::Result<()> {
         .as_array()
         .expect("routes")
         .iter()
-        .map(|r| (r[0].as_str().expect("from"), r[1].as_str(), r[2].as_str()))
+        .map(|r| (r[0].as_str().expect("from"), r[1].as_str()))
         .collect();
     writeln!(
         out,
-        "pub const ROUTES: &[(&str, Option<&str>, Option<&str>)] = &{routes:?};"
+        "pub const ROUTES: &[(&str, Option<&str>)] = &{routes:?};"
     )
     .expect("write string");
     for (path, name) in [

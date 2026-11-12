@@ -51,6 +51,7 @@ change needs.
 | [Children in `ui` stand one by one](#children-in-ui-stand-one-by-one) | yes: `--only T073` | `FLICK-T073`, `FLICK-T003` |
 | [`refined type` is a declaration of std's plugin](#refined-type-is-a-declaration-of-stds-plugin) | no | `FLICK-P036`, `FLICK-R005` |
 | [Braces after `then` and `else` hold statements](#braces-after-then-and-else-hold-statements) | yes: `--only T074` | `FLICK-T074` |
+| [No build without a runtime](#no-build-without-a-runtime) | no | `FLICK-P005` |
 
 `flick check --fix page.md` rewrites the `flick` code blocks of a Markdown
 page, each checked on its own.
@@ -523,3 +524,12 @@ parameter any row, in the result what the parameters before it reach (see
 A checkout of `main` builds with Rust 1.95 (0.1.0 took 1.94); its
 `rust-toolchain.toml` names the version for rustup. The `server-stdlib`
 Cargo feature is gone: every build has the plugin of `std`.
+
+## No build without a runtime
+
+`[build] effect = "none"` is gone: `flick.toml` with it is `FLICK-P005`.
+Remove the key, or write `effect = "rt"`: a program that runs nothing at
+runtime builds on Flick's own runtime, which bundles only the helpers the
+program calls. A library no longer writes `_core/` beside its modules, and
+its `.iface` files have no `abi.core`; their version is now 22, so rebuild
+the libraries. `FLICK-E008` is no longer reported.

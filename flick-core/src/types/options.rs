@@ -31,8 +31,6 @@ pub struct Options<'a> {
     /// `[lint] no-let-assert`: every `let assert` is an error.
     pub no_let_assert: bool,
     pub thresholds: Thresholds,
-    /// Whether runtime code may run: `false` under `effect = "none"`.
-    pub effects: bool,
     /// The names whose places of call the plugins of the project watch:
     /// each one checked gives a [`super::Typing::call_sites`].
     pub watched: &'a Watched,

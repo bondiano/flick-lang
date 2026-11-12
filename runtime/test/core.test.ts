@@ -3,7 +3,7 @@
 // code calls, and none of its modules imports Effect.
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 import { bigintDivide, bigintRemainder } from "../src/core/text.ts";
@@ -65,50 +65,14 @@ test("checked BigInt division keeps a zero divisor as an arithmetic error", () =
   if (result._tag === "Failure") assert.equal(result.failure._0, "division by zero");
 });
 
-import policy from "../../packages/effect-ts/compiler-bindings.json" with { type: "json" };
 
 const repo = new URL("../../", import.meta.url);
 const read = (path: string): string => readFileSync(new URL(path, repo), "utf8");
-
-/** Package-owned declarations used by a build without effects. */
-const builtins = (): Array<string> => {
-  return policy.core_builtins;
-};
-
-/** The source of a built-in module: of the core package, else of std. */
-const source = (module: string): string => {
-  const file = `${module.replaceAll(".", "/")}.fl`;
-  const core = new URL(`packages/core/src/${file}`, repo);
-  return existsSync(core) ? readFileSync(core, "utf8") : read(`packages/std/src/${file}`);
-};
 
 const exportsOf = async (path: string): Promise<Set<string>> => {
   const module: unknown = await import(path);
   return new Set(typeof module === "object" && module !== null ? Object.keys(module) : []);
 };
-
-/** The `core` module of a key a built-in binds. */
-const corePath = (spec: string): string => {
-  const core = policy.routes.find(([from]) => from === spec)?.[1];
-  assert.ok(core, `${spec} has no module of core`);
-  return `${core.replace("@flick-lang/runtime/", "../src/").replace(/core$/, "core/index")}.ts`;
-};
-
-test("core has every binding of the built-in modules without effects", async () => {
-  const modules = builtins();
-  assert.ok(modules.includes("Prelude") && modules.includes("List"), modules.join(", "));
-  const bindings = modules.flatMap((module) =>
-    [...source(module).matchAll(/^foreign (?:\w+ )?\w+ from "(flick:[^"]*)" "(\w+)"/gm)].map(
-      ([, spec = "", name = ""]) => ({ module, spec, name }),
-    ),
-  );
-  assert.ok(bindings.length > 100, `${bindings.length} bindings`);
-  const paths = [...new Set(bindings.map((b) => corePath(b.spec)))];
-  const exported = new Map(await Promise.all(paths.map(async (p) => [p, await exportsOf(p)] as const)));
-  for (const { module, spec, name } of bindings) {
-    assert.ok(exported.get(corePath(spec))?.has(name), `${module} binds \`${name}\` of ${spec}`);
-  }
-});
 
 test("core has every runtime helper compiled code calls", async () => {
   const core = await exportsOf("../src/core/index.ts");

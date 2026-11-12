@@ -317,8 +317,8 @@ fn standalone_compilation_checks_the_real_import_graph() {
 }
 
 #[test]
-fn programmatic_projects_keep_entry_path_runner_and_backend_checks() {
-    use super::config::{Backend, Entry};
+fn programmatic_projects_keep_entry_path_and_runner_checks() {
+    use super::config::Entry;
     use crate::source::Span;
 
     let mut host = memory(&[(
@@ -356,18 +356,6 @@ fn programmatic_projects_keep_entry_path_runner_and_backend_checks() {
             "{diagnostics:?}"
         );
     }
-    project.config.entries[0].runner = None;
-    project.config.build.effect = Backend::None;
-    host.0.insert(
-        PathBuf::from("/p/src/App/Main.fl"),
-        "module App.Main exposing (main)\nmain : Unit ->{; AppError} Unit\nlet main () = ()\n"
-            .into(),
-    );
-    let diagnostics = report(&host, &mut sources, Some(&project), &roots);
-    assert!(
-        diagnostics.iter().any(|d| d.starts_with("FLICK-P026")),
-        "{diagnostics:?}"
-    );
 }
 
 #[test]
@@ -418,42 +406,6 @@ fn entry_main_is_pure_or_an_effect_a_runner_can_start() {
         assert!(
             matches!(&diagnostics[..], [d] if d.starts_with("FLICK-P026 src/App/Main.fl `main`") && d.contains(message)),
             "{main}: {diagnostics:?}"
-        );
-    }
-}
-
-#[cfg(feature = "native-project")]
-#[test]
-fn without_effects_nothing_runs_at_runtime() {
-    const APP: &str = "schema-version = 1\n[project]\nkind = \"app\"\nentry = \"App.Main\"\n[build]\neffect = \"none\"\n";
-    let check = |body: &str| {
-        let source = format!("module App.Main exposing (main)\n\n{body}");
-        let host = memory(&[("flick.toml", APP), ("src/App/Main.fl", &source)]);
-        run(&host, &["src/App/Main.fl"])
-    };
-    assert_eq!(
-        check("main : Unit -> Unit\nlet main () = ()\n"),
-        Vec::<String>::new()
-    );
-    let wrong = [
-        (
-            "main : Unit ->{; AppError} Unit\nlet main () = Platform.stdout_line \"x\"\n",
-            "FLICK-E001 src/App/Main.fl `Platform.stdout_line",
-        ),
-        (
-            "main : Unit -> Unit\nlet main () =\n  let _ = task { 1 }\n  ()\n",
-            "FLICK-E008 src/App/Main.fl `task`",
-        ),
-        (
-            "main : Unit ->{; AppError} Unit\nlet main () = ()\n",
-            "FLICK-P026 src/App/Main.fl `main`",
-        ),
-    ];
-    for (body, expected) in wrong {
-        let diagnostics = check(body);
-        assert!(
-            diagnostics.iter().any(|d| d.starts_with(expected)),
-            "{body}: {diagnostics:?}"
         );
     }
 }

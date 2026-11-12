@@ -12,7 +12,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command as Process;
 use std::{env, fs};
 
-use flick_core::build::{BUILTIN_DIR, effects::CORE_DIR, runner_file};
+use flick_core::build::{BUILTIN_DIR, runner_file};
 use flick_core::diagnostics::{Code, Diagnostic, Severity, codes};
 use flick_core::iface;
 use flick_core::implicit_packages::is_implicit_package;
@@ -232,8 +232,7 @@ fn incomplete(dist: &Path, dts: bool) -> Vec<Diagnostic> {
     files_under(dist, &mut files);
     let mut out = Vec::new();
     let builtins = dist.join(BUILTIN_DIR);
-    let core = dist.join(CORE_DIR);
-    let own = |p: &Path| !p.starts_with(&builtins) && !p.starts_with(&core);
+    let own = |p: &Path| !p.starts_with(&builtins);
     for js in files
         .iter()
         .filter(|f| own(f) && f.extension().is_some_and(|e| e == "js"))
@@ -278,26 +277,6 @@ fn incomplete(dist: &Path, dts: bool) -> Vec<Diagnostic> {
             ));
             continue;
         };
-        if let Some(core) = interface
-            .abi
-            .as_ref()
-            .and_then(|abi| abi.core.as_deref())
-            .filter(|core| !core.is_empty())
-        {
-            let implementation = dist
-                .join(core)
-                .join(format!("{}.js", module.replace('.', "/")));
-            if !implementation.is_file() {
-                out.push(Diagnostic::new(
-                    codes::P020,
-                    Severity::Error,
-                    format!(
-                        "`{module}` declares a build without Effect at `{}`, which the package does not have",
-                        relative(&implementation, dist)
-                    ),
-                ));
-            }
-        }
         for (dependency, fingerprint) in &interface.dependencies {
             let dep_path = dist.join(format!("{}.iface", dependency.replace('.', "/")));
             let Some(dep) = fs::read(&dep_path)
@@ -435,26 +414,14 @@ mod tests {
         .run();
         assert!(built.diagnostics.is_empty(), "{:?}", built.diagnostics);
         let dist = root.join("dist");
-        let core = dist.join(CORE_DIR).join("Lib/Greeting.js");
-        assert!(core.is_file());
-        assert!(!core.with_extension("iface").exists());
-        assert!(!core.with_extension("d.ts").exists());
+        assert!(!dist.join("_core").exists());
         assert!(incomplete(&dist, true).is_empty());
-        let implementation = fs::read(&core).expect("alternate implementation");
-        fs::remove_file(&core).expect("remove alternate");
-        assert!(
-            incomplete(&dist, true)
-                .iter()
-                .any(|d| d.code == codes::P020 && d.message.contains("_core/Lib/Greeting.js")),
-            "the authoritative interface must not advertise a missing implementation"
-        );
-        fs::write(&core, implementation).expect("restore alternate");
         fs::remove_file(dist.join("Lib/Greeting.iface")).expect("remove interface");
         assert!(
             incomplete(&dist, true)
                 .iter()
                 .any(|d| d.code == codes::P020 && d.message.contains("Lib/Greeting.iface")),
-            "a backend alternative does not waive the primary interface"
+            "a module needs its interface"
         );
         fs::remove_dir_all(root).expect("fixture cleanup");
     }

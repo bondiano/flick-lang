@@ -227,8 +227,6 @@ pub struct Checked {
     pub limits: types::Limits,
     pub no_let_assert: bool,
     pub thresholds: types::Thresholds,
-    /// Whether effects are checked: not in a build without a runtime.
-    pub effects: bool,
 }
 
 impl Default for Checked {
@@ -238,7 +236,6 @@ impl Default for Checked {
             limits: types::Limits::default(),
             no_let_assert: false,
             thresholds: types::Thresholds::default(),
-            effects: true,
         }
     }
 }
@@ -252,7 +249,6 @@ impl Config {
             },
             no_let_assert: self.no_let_assert,
             thresholds: self.thresholds,
-            effects: self.build.effect != Backend::None,
         }
     }
 }
@@ -289,8 +285,6 @@ pub enum Profile {
 #[cfg_attr(feature = "native-project", serde(rename_all = "lowercase"))]
 pub enum Backend {
     Effect,
-    /// No runtime calls; the output imports no Effect.
-    None,
     /// Flick's own runtime, without Effect.
     Rt,
 }

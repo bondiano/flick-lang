@@ -39,7 +39,7 @@ const source = (module: string): string => {
 
 /** The native implementation declared by the packages. */
 const kernelPath = (spec: string): string | undefined => {
-  const target = policy.routes.find(([from]) => from === spec)?.[2];
+  const target = policy.routes.find(([from]) => from === spec)?.[1];
   if (!target) return undefined;
   const path = target.replace("@flick-lang/runtime/", "../src/");
   return `${path === "../src/rt" ? `${path}/index` : path}.ts`;

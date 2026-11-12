@@ -240,7 +240,6 @@ impl Checking<'_> {
             no_let_assert: read.no_let_assert,
             thresholds: read.thresholds,
             watched: self.watched,
-            effects: read.effects,
             stages_by_class: self.stages_by_class,
         };
         let mut diagnostics = loaded.parse.diagnostics.clone();

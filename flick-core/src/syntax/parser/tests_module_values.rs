@@ -68,7 +68,6 @@ fn pack_lowers_to_a_record_of_public_values() {
         limits: types::Limits::default(),
         no_let_assert: false,
         thresholds: types::Thresholds::default(),
-        effects: true,
         watched,
         stages_by_class: false,
     };
@@ -199,7 +198,6 @@ fn static_module_contract_preserves_abstract_class_and_service_shapes() {
         limits: Limits::default(),
         no_let_assert: false,
         thresholds: Thresholds::default(),
-        effects: true,
         watched,
         stages_by_class: false,
     };

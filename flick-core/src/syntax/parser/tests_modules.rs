@@ -173,7 +173,6 @@ fn checked_module_contract_is_preserved_in_its_interface() {
         limits: Limits::default(),
         no_let_assert: false,
         thresholds: Thresholds::default(),
-        effects: true,
         watched,
         stages_by_class: false,
     };
@@ -281,7 +280,6 @@ fn manifest_class_name_can_be_used_by_later_dictionary_requirement() {
         limits: types::Limits::default(),
         no_let_assert: false,
         thresholds: types::Thresholds::default(),
-        effects: true,
         watched,
         stages_by_class: false,
     };
