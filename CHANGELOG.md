@@ -100,6 +100,12 @@ break programs.
   nothing. `cf (F f) (F g) = F (fun x -> f (g x))` for
   `type F s a = F (s -> a)` is accepted, where it was `FLICK-G001`.
   Interfaces are of version 21.
+- **Recursion through the regions of its signature:** a recursive use of a
+  signed function in its own body takes the regions and capture rows of its
+  signature, as the core types `letrec` at its own arrow. A callback
+  qualified `^{c}` passed on as it came no longer makes `FLICK-T015`;
+  callbacks passed on in another order are `FLICK-G001` (pure) or
+  `FLICK-G002` (with effects) instead of `FLICK-T015`.
 - **What a callback holds:** a function passed where a qualifier is written
   fits only if the qualifier covers what it holds, pure functions too, as
   the core compares arrows. A pure `(Float -> Float)^{d}` given for

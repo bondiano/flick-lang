@@ -1,0 +1,27 @@
+// A recursive use takes the regions of the signature, so callbacks passed
+// on in the other order hold what the other position does not allow.
+module App.RecursionRegionsSwapped exposing (..)
+
+braced : (Float -> Float)^{c} -> (Float -> Float)^{d} -> Float -> Float
+let rec braced f g n = if n <= 0 then 0 else f n + braced g f (n - 1)
+
+bare : (Float -> Float)^c -> (Float -> Float)^d -> Float -> Float
+let rec bare f g n = if n <= 0 then 0 else f n + bare g f (n - 1)
+
+effects : (Float ->{Async} Float)^{c} -> (Float ->{Async} Float)^{d} -> Float ->{Async} Float
+let rec effects f g n = if n <= 0 then 0 else f n + effects g f (n - 1)
+
+// a local `let rec` too
+local : (Float -> Float)^{c} -> (Float -> Float)^{d} -> Float
+let local f g =
+  go : (Float -> Float)^{e} -> (Float -> Float)^{h} -> Float -> Float
+  let rec go a b n = if n <= 0 then 0 else a n + go b a (n - 1)
+  go f g 3
+//~ FLICK-G001 @6:59-6:60 this value holds `d`, but the expected type `(Float -> Float)^{c}` allows only `c`
+//~ FLICK-G001 @6:61-6:62 this value holds `c`, but the expected type `(Float -> Float)^{d}` allows only `d`
+//~ FLICK-G001 @9:55-9:56 this value holds `d`, but the expected type `(Float -> Float)^c` allows only `c`
+//~ FLICK-G001 @9:57-9:58 this value holds `c`, but the expected type `(Float -> Float)^d` allows only `d`
+//~ FLICK-G002 @12:61-12:62 this uses `d`, which the expected type `Float ->{Async} Float` does not keep live
+//~ FLICK-G002 @12:63-12:64 this uses `c`, which the expected type `Float ->{Async} Float` does not keep live
+//~ FLICK-G001 @18:53-18:54 this value holds `h`, but the expected type `(Float -> Float)^{e}` allows only `e`
+//~ FLICK-G001 @18:55-18:56 this value holds `e`, but the expected type `(Float -> Float)^{h}` allows only `h`

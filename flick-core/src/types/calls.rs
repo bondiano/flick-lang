@@ -144,9 +144,14 @@ impl Checker<'_> {
         self.cx.regions.uses.push(index);
         self.mutable_use(index, span);
         let Local { ty, rec, .. } = self.cx.locals[index].clone();
+        // a local `let rec` is in scope only in its own body
+        let ty = match rec {
+            Some(rec) => self.own_regions(&ty, &self.recs[rec].skolems),
+            None => ty,
+        };
         let ty = self.instantiate(&ty, span);
         if let Some(rec) = rec {
-            self.recs[rec].uses.push((ty.clone(), span));
+            self.recs[rec].uses.push((ty.clone(), span, true));
         }
         ty
     }

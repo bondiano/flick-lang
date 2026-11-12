@@ -3,7 +3,8 @@
 
 use std::mem;
 
-use super::ty::Type;
+use super::kinds::Kind;
+use super::ty::{Binder, Type};
 use super::{Atom, Elem};
 use super::{Checker, Rec};
 use crate::diagnostics::{Diagnostic, codes};
@@ -40,8 +41,8 @@ impl Checker<'_> {
             let (Some(scheme), Some(target)) = (&rec.scheme, &rec.target) else {
                 continue;
             };
-            for (ty, span) in &rec.uses {
-                if self.monomorphic_use(rec, scheme, ty, &owners, &mut classes) {
+            for (ty, span, own) in &rec.uses {
+                if self.monomorphic_use(rec, scheme, ty, *own, &owners, &mut classes) {
                     continue;
                 }
                 let (name, span) = (&rec.name, *span);
@@ -61,26 +62,34 @@ impl Checker<'_> {
 
     /// Whether the use of `rec` at `ty` is monomorphic, recording in
     /// `classes` the skolems it makes one variable; `owners` tells the
-    /// member each skolem of the group is a variable of.
+    /// member each skolem of the group is a variable of. A use in its own
+    /// body (`own`) already has the regions of the signature.
     fn monomorphic_use(
         &mut self,
         rec: &Rec,
         scheme: &Type,
         ty: &Type,
+        own: bool,
         owners: &[(u32, usize)],
         classes: &mut Vec<Vec<u32>>,
     ) -> bool {
+        let scheme = if own {
+            self.own_regions(scheme, &rec.skolems)
+        } else {
+            scheme.clone()
+        };
         // at the level the body was checked at, where its skolems live
         self.store.level += 1;
-        let (opened, vars) = self.open(scheme);
+        let (opened, vars) = self.open(&scheme);
         let unified = self.unify(ty, &opened).is_ok();
         self.store.level -= 1;
         if !unified {
             return false;
         }
-        for ((name, var), (own_name, own)) in vars.iter().zip(&rec.skolems) {
-            let Type::Skolem(own) = own else { continue };
-            debug_assert_eq!(name, own_name, "open and skolemize agree");
+        for (name, var) in &vars {
+            let Some((_, Type::Skolem(own))) = rec.skolems.iter().find(|(n, _)| n == name) else {
+                continue;
+            };
             match self.lone_skolem(var) {
                 Type::Skolem(s) => {
                     if !identify(classes, owners, *own, s) {
@@ -95,6 +104,48 @@ impl Checker<'_> {
             }
         }
         true
+    }
+
+    /// `scheme` with its region and capture-row variables the skolems its
+    /// body is checked against: a recursive use in that body goes through
+    /// the regions of the signature, not fresh ones.
+    pub(super) fn own_regions(&self, scheme: &Type, skolems: &[(String, Type)]) -> Type {
+        match self.store.resolve(scheme) {
+            Type::Captured {
+                ty,
+                captures,
+                value,
+                elided,
+            } => Type::Captured {
+                ty: Box::new(self.own_regions(&ty, skolems)),
+                captures,
+                value,
+                elided,
+            },
+            Type::Bounded { ty, captures } => Type::Bounded {
+                ty: Box::new(self.own_regions(&ty, skolems)),
+                captures,
+            },
+            Type::Forall {
+                vars,
+                constraints,
+                body,
+            } => {
+                let region = |b: &Binder| matches!(b.kind, Kind::Region | Kind::CaptureRow);
+                let subst: Vec<(String, Type)> = (vars.iter().filter(|b| region(b)))
+                    .filter_map(|b| skolems.iter().find(|(n, _)| *n == b.name).cloned())
+                    .collect();
+                let kept = vars
+                    .into_iter()
+                    .filter(|b| !subst.iter().any(|(n, _)| *n == b.name));
+                Type::Forall {
+                    vars: kept.collect(),
+                    constraints: constraints.iter().map(|c| c.substitute(&subst)).collect(),
+                    body: Box::new(body.substitute(&subst)),
+                }
+            }
+            other => other,
+        }
     }
 
     /// What `var` stands for; a capture row of its own skolem alone is that

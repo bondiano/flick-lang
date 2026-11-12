@@ -8,6 +8,7 @@ use std::mem;
 use std::rc::Rc;
 
 use super::dicts::at_args;
+use super::generalize::own_regions;
 use super::regions::live_stage;
 use super::{Check, Checker, error};
 use crate::syntax::{Head, Lit, Name, Path, Term};
@@ -135,7 +136,7 @@ impl Checker<'_> {
         match (e, &expected) {
             (_, Type::Forall(s)) => {
                 let qualifier = self.qualifier(&full);
-                self.check_qualified_forall(e, s, qualifier)
+                self.check_qualified_forall(e, s, qualifier, None)
             }
             // (Lam) against `(τ₁ →φ τ₂)^C` takes `C`, against a bare arrow `∅`
             (Term::Lam(x, body), Type::Fun(p, s, r)) => {
@@ -208,24 +209,33 @@ impl Checker<'_> {
     /// (Let-Sig) with `σ` a `∀`: the value is checked with rigid variables,
     /// and a runtime step while it is built is `FLICK-T013` (`docs/formal/core.md#an-annotation-with-forall-bypasses-let-sig`).
     pub(super) fn check_forall(&mut self, e: &Term, s: &Scheme) -> Check<()> {
-        self.check_qualified_forall(e, s, Caps::default())
+        self.check_qualified_forall(e, s, Caps::default(), None)
     }
 
-    /// (Let-Sig) against `(∀ᾱ. τ)^C`: the value has `τ^C`.
+    /// (Let-Sig) against `(∀ᾱ. τ)^C`: the value has `τ^C`. A signed `let
+    /// rec` binds `f` in `e` at `own`, its regions those `e` is checked at.
     pub(super) fn check_qualified_forall(
         &mut self,
         e: &Term,
         s: &Scheme,
         qualifier: Caps,
+        rec: Option<(&Name, &Scheme)>,
     ) -> Check<()> {
         let (facts, givens) = (self.regions.facts.len(), self.givens());
         let (mut body, rigid) = self.skolemize(s);
+        if let Some((f, own)) = rec {
+            let own = own_regions(own, &s.vars, &rigid);
+            self.locals.push((f.clone(), own));
+        }
         self.note(e, |n| n.rigid = Some(rigid));
         if !qualifier.is_empty() {
             body = Type::Captured(Rc::new(body), qualifier);
         }
         let outer = mem::replace(&mut self.stage, Stage::Pure);
         let checked = self.check(e, &body);
+        if rec.is_some() {
+            self.locals.pop();
+        }
         let inner = mem::replace(&mut self.stage, outer);
         self.regions.facts.truncate(facts);
         self.forget_givens(givens);
@@ -255,6 +265,12 @@ impl Checker<'_> {
 
     /// (Var) on the top-level values of §2.6 and Γ₀.
     pub(super) fn global(&mut self, p: &Path) -> Check<Type> {
+        if let Some((own, s)) = &self.own
+            && own == p
+        {
+            let s = s.clone();
+            return Ok(self.instance_of(s));
+        }
         let s = self
             .decls
             .values

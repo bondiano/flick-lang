@@ -421,7 +421,8 @@ struct Rec {
     scheme: Option<Type>,
     target: Option<Type>,
     skolems: Vec<(String, Type)>,
-    uses: Vec<(Type, Span)>,
+    /// Each use with whether it is in the member's own body.
+    uses: Vec<(Type, Span, bool)>,
 }
 
 /// An operator whose operand type is checked once inference settles it.

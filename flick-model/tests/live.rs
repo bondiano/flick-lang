@@ -266,6 +266,5 @@ const UNTYPED: &[&str] = &[
     "HttpApi.http_error",
     "Record.instance Show (ReadonlyRecord a)",
     "Resource.acquire_release",
-    "Scope.add_finalizer",
     "Ui.element",
 ];
