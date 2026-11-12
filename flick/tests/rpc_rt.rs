@@ -30,7 +30,10 @@ fn a_client_on_flicks_runtime_calls_an_effect_server() {
     build("server.fl", &server, false);
     build("client.fl", &client, true);
     let rpc = fs::read_to_string(client.join("_flick/Rpc.js")).expect("client");
-    assert!(rpc.contains("@flick-lang/runtime/rt/effect/rpc/Rpc"), "{rpc}");
+    assert!(
+        rpc.contains("@flick-lang/runtime/rt/effect/rpc/Rpc"),
+        "{rpc}"
+    );
 
     let mut running = Command::new("node")
         .arg(server.join("flick-main.js"))
