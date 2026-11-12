@@ -31,3 +31,11 @@ let in_comprehension () = loop {
 //                           ^^^^^ FLICK-T071
   break
 }
+
+in_sequence : Unit -> Unit
+let in_sequence () = loop {
+  let items = for _ <- [1] yield break
+//                               ^^^^^ FLICK-T071
+  ignore items
+  break
+}
