@@ -70,7 +70,7 @@ runtime/scope_close # no native for `add_finalizer_exit` (flick:Scope flickAddFi
 runtime/scope_owners # the model's (≡) rejects `App.Main.main`
 runtime/scope_releases # no native for `timeout` (flick:rt timeout)
 runtime/scoped_file # no native for `node_open` (flick:rt fileOpen)
-runtime/scopes # no native for `open_raw` (./resources.mjs open)
+runtime/scopes # no native for `held_write` (./calls.mjs heldWrite)
 runtime/settling_calls # no native for `settle_later` (./calls.mjs settleLater)
 runtime/shared_layer # the model's (≡) rejects `App.Main.failed_build`
 runtime/slice # no native for `parallel_all` (flick:rt parallelAll)
