@@ -25,7 +25,6 @@ make :
   } ->{Scope s | r}
   Pool s e a
 foreign effect make from "flick:Pool" "flickMake"
-  reviewed "effect@4.1.2 sha256:875466331abc2dab"
 
 /// `make` with `min` to `max` items, where an item beyond `min` is released
 /// after `timeToLive` (by `timeToLiveStrategy`; `None`: `Usage`).
@@ -41,21 +40,18 @@ make_with_ttl :
   } ->{Scope s | r}
   Pool s e a
 foreign effect make_with_ttl from "flick:Pool" "flickMakeWithTtl"
-  reviewed "effect@4.1.2 sha256:02cbce8f61aa83d9"
 
 /// An item, waiting for one to be free; the innermost `scope` (or the one
 /// of region `t`) holds it until it closes.
 get : Pool s e a ->{Scope t; e} a^{t}
 foreign effect get from "flick:Pool" "get"
   retention call
-  reviewed "effect@4.1.2 sha256:8a6e6eaddc6c9d40"
 
 /// Runs `f` with an item, given back when `f` ends.
 use : (a ->{r; e2} b)^c -> Pool s e a ->{r; e + e2} b
 foreign effect use from "flick:Pool" "use"
   arity 1
   retention call
-  reviewed "effect@4.1.2 sha256:ccf766ed3107bea9"
 
 /// Releases `item`, the very value `get` gave, once its tasks are done;
 /// the pool acquires another when it needs one.
@@ -63,7 +59,6 @@ invalidate : a -> Pool s e a ->{Async} Unit
 foreign effect invalidate from "flick:Pool" "invalidate"
   arity 1
   retention call
-  reviewed "effect@4.1.2 sha256:aaab56e8f35086ca"
 
 /// Keeps the borrowed `item` for this task alone until the innermost
 /// `scope` (or the one of region `t`) closes; with a `concurrency` of one
@@ -72,4 +67,3 @@ reserve : a -> Pool s e a ->{Scope t} Unit
 foreign effect reserve from "flick:Pool" "reserve"
   arity 1
   retention call
-  reviewed "effect@4.1.2 sha256:a2deed232381ff9a"

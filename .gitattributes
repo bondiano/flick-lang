@@ -1,4 +1,4 @@
-stdlib/Effect/snapshot.json linguist-generated=true
+packages/effect-ts/coverage/snapshot.json linguist-generated=true
 tools/dts-importer/test/fixtures/*.snapshot.json linguist-generated=true
 packages/effect-ts/test/fixtures/openapi-3.1.schema.json linguist-vendored=true
 tests/run/portable.txt merge=union

@@ -14,14 +14,12 @@ type error UrlError = UrlError String
 /// The URL of the text.
 from_string : String -> Result UrlError Url
 foreign pure from_string from "flick:http/Url" "flickFromString"
-  reviewed "effect@4.1.2 sha256:b3101ee6ec2772ea"
 
 /// The URL of the text, its query replaced by the parameters and its
 /// fragment by the hash, if given.
 make : String -> Http.UrlParams.UrlParams -> Option String -> Result UrlError Url
 foreign pure make from "flick:http/Url" "flickMake"
   arity 3
-  reviewed "effect@4.1.2 sha256:df19a7ffe667813a"
 
 /// The whole URL as text.
 href : Url -> String
@@ -31,79 +29,66 @@ foreign pure href from "flick:http/Url" "flickHref"
 set_hash : String -> Url -> Url
 foreign pure set_hash from "flick:http/Url" "setHash"
   arity 1
-  reviewed "effect@4.1.2 sha256:5ae6411733f65f9f"
 
 /// The host with its port, `example.com:8080`.
 set_host : String -> Url -> Url
 foreign pure set_host from "flick:http/Url" "setHost"
   arity 1
-  reviewed "effect@4.1.2 sha256:99e423daeceaa470"
 
 /// The host name, without the port.
 set_hostname : String -> Url -> Url
 foreign pure set_hostname from "flick:http/Url" "setHostname"
   arity 1
-  reviewed "effect@4.1.2 sha256:f039fa882b3cdc47"
 
 /// The whole URL; a text that is no URL leaves it as it was.
 set_href : String -> Url -> Url
 foreign pure set_href from "flick:http/Url" "flickSetHref"
   arity 2
-  reviewed "effect@4.1.2 sha256:d8e53a09b78efee1"
 
 /// The password, a secret kept out of `show`.
 set_password : Redacted String -> Url -> Url
 foreign pure set_password from "flick:http/Url" "setPassword"
   arity 1
-  reviewed "effect@4.1.2 sha256:9e773c9422607475"
 
 /// The path, `/a/b`.
 set_pathname : String -> Url -> Url
 foreign pure set_pathname from "flick:http/Url" "setPathname"
   arity 1
-  reviewed "effect@4.1.2 sha256:d0099c1d17096db8"
 
 /// The port.
 set_port : Float -> Url -> Url
 foreign pure set_port from "flick:http/Url" "setPort"
   arity 1
-  reviewed "effect@4.1.2 sha256:71b8430383ed12a8"
 
 /// The scheme, `https:`.
 set_protocol : String -> Url -> Url
 foreign pure set_protocol from "flick:http/Url" "setProtocol"
   arity 1
-  reviewed "effect@4.1.2 sha256:0710b61223326fa2"
 
 /// The query string, `?a=1`.
 set_search : String -> Url -> Url
 foreign pure set_search from "flick:http/Url" "setSearch"
   arity 1
-  reviewed "effect@4.1.2 sha256:0d76693f1224d1d7"
 
 /// The user name.
 set_username : String -> Url -> Url
 foreign pure set_username from "flick:http/Url" "setUsername"
   arity 1
-  reviewed "effect@4.1.2 sha256:9668f9d251b156e4"
 
 /// The query, from the parameters.
 set_url_params : Http.UrlParams.UrlParams -> Url -> Url
 foreign pure set_url_params from "flick:http/Url" "setUrlParams"
   arity 1
-  reviewed "effect@4.1.2 sha256:4ebb21192b53207a"
 
 /// The parameters of the query.
 url_params : Url -> Http.UrlParams.UrlParams
 foreign pure url_params from "flick:http/Url" "urlParams"
   arity 1
-  reviewed "effect@4.1.2 sha256:fc6d26595ce0e72c"
 
 /// The query, changed by `f`.
 modify_url_params : (Http.UrlParams.UrlParams -> Http.UrlParams.UrlParams) -> Url -> Url
 foreign pure modify_url_params from "flick:http/Url" "modifyUrlParams"
   arity 1
-  reviewed "effect@4.1.2 sha256:89ad3ec2a04aac9f"
 
 instance Eq Url =
   let eq x y = href x == href y

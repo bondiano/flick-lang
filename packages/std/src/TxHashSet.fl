@@ -13,111 +13,90 @@ type TxHashSet w a
 /// A new empty set under the witness.
 empty : EqHash.EqHash w a ->{} TxHashSet w a
 foreign effect empty from "flick:TxHashSet" "flickEmpty"
-  reviewed "effect@4.1.2 sha256:c0a49a958387b8f0"
 
 /// A new set of the elements under the witness.
 make : EqHash.EqHash w a -> List a ->{} TxHashSet w a
 foreign effect make from "flick:TxHashSet" "flickMake"
-  reviewed "effect@4.1.2 sha256:662401eb42f90841"
 
 /// A new set of the elements under the witness, as `make`.
 from_iterable : EqHash.EqHash w a -> List a ->{} TxHashSet w a
 foreign effect from_iterable from "flick:TxHashSet" "flickFromIterable"
-  reviewed "effect@4.1.2 sha256:169989adb5a18e89"
 
 /// A new set of the elements of the immutable set, under its witness.
 from_hash_set : HashSet.HashSet w a ->{} TxHashSet w a
 foreign effect from_hash_set from "flick:TxHashSet" "flickFromHashSet"
-  reviewed "effect@4.1.2 sha256:2a053f4f66b00828"
 
 /// Adds the element.
 add : a -> TxHashSet w a ->{Tx.Transaction} Unit
 foreign effect add from "flick:TxHashSet" "flickAdd"
-  reviewed "effect@4.1.2 sha256:17de322321a21a26"
 
 /// Removes the element; whether it was there.
 remove : a -> TxHashSet w a ->{Tx.Transaction} Bool
 foreign effect remove from "flick:TxHashSet" "flickRemove"
-  reviewed "effect@4.1.2 sha256:52f6570e7bcb8ee6"
 
 /// Whether the element is there.
 has : a -> TxHashSet w a ->{Tx.Transaction} Bool
 foreign effect has from "flick:TxHashSet" "flickHas"
-  reviewed "effect@4.1.2 sha256:5738fa8bdfd16a60"
 
 /// The number of elements.
 size : TxHashSet w a ->{Tx.Transaction} Int
 foreign effect size from "flick:TxHashSet" "flickSize"
-  reviewed "effect@4.1.2 sha256:5e8b3c8d93666d26"
 
 /// Whether it has no elements.
 is_empty : TxHashSet w a ->{Tx.Transaction} Bool
 foreign effect is_empty from "flick:TxHashSet" "flickIsEmpty"
-  reviewed "effect@4.1.2 sha256:0ce6188d164b9a7b"
 
 /// Whether it has an element.
 is_non_empty : TxHashSet w a ->{Tx.Transaction} Bool
 foreign effect is_non_empty from "flick:TxHashSet" "flickIsNonEmpty"
-  reviewed "effect@4.1.2 sha256:87a282eb93c2cae3"
 
 /// Removes every element.
 clear : TxHashSet w a ->{Tx.Transaction} Unit
 foreign effect clear from "flick:TxHashSet" "flickClear"
-  reviewed "effect@4.1.2 sha256:6064ad25ff8a1f2d"
 
 /// A new set of the elements of both.
 union : TxHashSet w a -> TxHashSet w a ->{Tx.Transaction} TxHashSet w a
 foreign effect union from "flick:TxHashSet" "flickUnion"
-  reviewed "effect@4.1.2 sha256:9b0650adc6282862"
 
 /// A new set of the elements in both.
 intersection : TxHashSet w a -> TxHashSet w a ->{Tx.Transaction} TxHashSet w a
 foreign effect intersection from "flick:TxHashSet" "flickIntersection"
-  reviewed "effect@4.1.2 sha256:b1d0d500a21bd72a"
 
 /// A new set of the elements of the second that are not in the first:
 /// `TxHashSet.difference other set`.
 difference : TxHashSet w a -> TxHashSet w a ->{Tx.Transaction} TxHashSet w a
 foreign effect difference from "flick:TxHashSet" "flickDifference"
-  reviewed "effect@4.1.2 sha256:d46b9652a1440675"
 
 /// Whether every element of the second is in the first:
 /// `TxHashSet.is_subset other set`.
 is_subset : TxHashSet w a -> TxHashSet w a ->{Tx.Transaction} Bool
 foreign effect is_subset from "flick:TxHashSet" "flickIsSubset"
-  reviewed "effect@4.1.2 sha256:0713e855a175b048"
 
 /// Whether the predicate accepts an element.
 some : (a -> Bool)^c -> TxHashSet w a ->{Tx.Transaction} Bool
 foreign effect some from "flick:TxHashSet" "flickSome"
   retention call
-  reviewed "effect@4.1.2 sha256:24dbf9cbd167f5f7"
 
 /// Whether the predicate accepts every element.
 every : (a -> Bool)^c -> TxHashSet w a ->{Tx.Transaction} Bool
 foreign effect every from "flick:TxHashSet" "flickEvery"
   retention call
-  reviewed "effect@4.1.2 sha256:2b7dc8fe2bf663f3"
 
 /// A new set of `f` of each element, under the witness given.
 map : EqHash.EqHash x b -> (a -> b)^c -> (TxHashSet w a ->{Tx.Transaction} TxHashSet x b)^c
 foreign effect map from "flick:TxHashSet" "flickMap"
   retention call
-  reviewed "effect@4.1.2 sha256:71aaf1f462aafbf6"
 
 /// A new set of the elements the predicate accepts.
 filter : (a -> Bool)^c -> TxHashSet w a ->{Tx.Transaction} TxHashSet w a
 foreign effect filter from "flick:TxHashSet" "flickFilter"
   retention call
-  reviewed "effect@4.1.2 sha256:f7f0674a2944ebb0"
 
 /// Folds the elements, in no particular order, from `zero`.
 reduce : b -> (b -> a -> b)^c -> (TxHashSet w a ->{Tx.Transaction} b)^c
 foreign effect reduce from "flick:TxHashSet" "flickReduce"
   retention call
-  reviewed "effect@4.1.2 sha256:170aa5a37da9aa7f"
 
 /// The immutable set the transaction sees.
 to_hash_set : TxHashSet w a ->{Tx.Transaction} HashSet.HashSet w a
 foreign effect to_hash_set from "flick:TxHashSet" "flickToHashSet"
-  reviewed "effect@4.1.2 sha256:4f114738268f46de"

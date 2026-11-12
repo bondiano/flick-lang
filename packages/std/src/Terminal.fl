@@ -41,7 +41,6 @@ let display text = Terminal.display text
 node_of : ServiceTag {Terminal} -> Option (UserInput -> Bool) -> Layer none none {Terminal}
 foreign pure node_of from "flick:Terminal" "flickNode"
   arity 2
-  reviewed "effect@4.1.2 sha256:3cb7418d241dbb23"
 
 /// The terminal of the process; Ctrl+C and Ctrl+D quit.
 node : Layer none none {Terminal}

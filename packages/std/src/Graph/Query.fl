@@ -8,130 +8,107 @@ import Graph.Types exposing (..)
 get_node : NodeIndex -> Graph n e k -> Option n
 foreign pure get_node from "flick:Graph" "getNode"
   arity 1
-  reviewed "effect@4.1.2 sha256:ce5e93301f1bd34b"
 
 /// Whether the graph has the node.
 has_node : NodeIndex -> Graph n e k -> Bool
 foreign pure has_node from "flick:Graph" "hasNode"
   arity 1
-  reviewed "effect@4.1.2 sha256:f06dabfb0a39f395"
 
 /// The number of nodes.
 node_count : Graph n e k -> Int
 foreign pure node_count from "flick:Graph" "nodeCount"
-  reviewed "effect@4.1.2 sha256:db159f63f3808ccb"
 
 /// The first node, in index order, whose data satisfies `f`.
 find_node : (n -> Bool)^c -> Graph n e k -> Option NodeIndex
 foreign pure find_node from "flick:Graph" "findNode"
   arity 1
   retention call
-  reviewed "effect@4.1.2 sha256:7ceab3984c35a614"
 
 /// The nodes whose data satisfies `f`, in index order.
 find_nodes : (n -> Bool)^c -> Graph n e k -> List NodeIndex
 foreign pure find_nodes from "flick:Graph" "findNodes"
   arity 1
   retention call
-  reviewed "effect@4.1.2 sha256:9d288f982405f616"
 
 /// The first edge for which `f data source target` holds.
 find_edge : (e -> NodeIndex -> NodeIndex -> Bool)^c -> Graph n e k -> Option EdgeIndex
 foreign pure find_edge from "flick:Graph" "findEdge"
   arity 1
   retention call
-  reviewed "effect@4.1.2 sha256:142479014e32fd77"
 
 /// The edges for which `f data source target` holds, in index order.
 find_edges : (e -> NodeIndex -> NodeIndex -> Bool)^c -> Graph n e k -> List EdgeIndex
 foreign pure find_edges from "flick:Graph" "findEdges"
   arity 1
   retention call
-  reviewed "effect@4.1.2 sha256:c8625fa327ce949d"
 
 /// The edge, if the graph has it.
 get_edge : EdgeIndex -> Graph n e k -> Option (Edge e)
 foreign pure get_edge from "flick:Graph" "getEdge"
   arity 1
-  reviewed "effect@4.1.2 sha256:d07687bfb5ba8f4d"
 
 /// Whether an edge joins `source` to `target` (either way when undirected).
 has_edge : NodeIndex -> NodeIndex -> Graph n e k -> Bool
 foreign pure has_edge from "flick:Graph" "hasEdge"
   arity 2
-  reviewed "effect@4.1.2 sha256:795a5d4ecc3f80d2"
 
 /// The number of edges.
 edge_count : Graph n e k -> Int
 foreign pure edge_count from "flick:Graph" "edgeCount"
-  reviewed "effect@4.1.2 sha256:b792039601c3db95"
 
 /// The edges that touch the node; a missing node is an error.
 incident_edges : NodeIndex -> Graph n e k -> Result GraphError (List EdgeIndex)
 foreign pure incident_edges from "flick:Graph" "flickIncidentEdges"
-  reviewed "effect@4.1.2 sha256:34dadeabfc72cc4d"
 
 /// The edges from the node; a missing node is an error.
 outgoing_edges : NodeIndex -> Graph n e Directed -> Result GraphError (List EdgeIndex)
 foreign pure outgoing_edges from "flick:Graph" "flickOutgoingEdges"
-  reviewed "effect@4.1.2 sha256:fb5a3132d4abdafa"
 
 /// The edges into the node; a missing node is an error.
 incoming_edges : NodeIndex -> Graph n e Directed -> Result GraphError (List EdgeIndex)
 foreign pure incoming_edges from "flick:Graph" "flickIncomingEdges"
-  reviewed "effect@4.1.2 sha256:4f5832f240ba6a29"
 
 /// The edges joining `source` to `target`; a missing node is an error.
 edges_between : NodeIndex -> NodeIndex -> Graph n e k -> Result GraphError (List EdgeIndex)
 foreign pure edges_between from "flick:Graph" "flickEdgesBetween"
-  reviewed "effect@4.1.2 sha256:629d7d0e24ae67c7"
 
 /// The number of edges at the node, a self-loop twice; a missing node is an
 /// error.
 degree : NodeIndex -> Graph n e Undirected -> Result GraphError Int
 foreign pure degree from "flick:Graph" "flickDegree"
-  reviewed "effect@4.1.2 sha256:26d48f52ff1ed8d3"
 
 /// The number of edges from the node; a missing node is an error.
 out_degree : NodeIndex -> Graph n e Directed -> Result GraphError Int
 foreign pure out_degree from "flick:Graph" "flickOutDegree"
-  reviewed "effect@4.1.2 sha256:891562248db71b21"
 
 /// The number of edges into the node; a missing node is an error.
 in_degree : NodeIndex -> Graph n e Directed -> Result GraphError Int
 foreign pure in_degree from "flick:Graph" "flickInDegree"
-  reviewed "effect@4.1.2 sha256:89dffef468c49f5e"
 
 /// The nodes an edge leads to from the node (either way when undirected).
 neighbors : NodeIndex -> Graph n e k -> List NodeIndex
 foreign pure neighbors from "flick:Graph" "neighbors"
   arity 1
-  reviewed "effect@4.1.2 sha256:99760cfb1a59209b"
 
 /// The nodes the node's outgoing edges lead to.
 successors : NodeIndex -> Graph n e Directed -> List NodeIndex
 foreign pure successors from "flick:Graph" "successors"
   arity 1
-  reviewed "effect@4.1.2 sha256:8660ccae5304edf5"
 
 /// The nodes whose edges lead into the node.
 predecessors : NodeIndex -> Graph n e Directed -> List NodeIndex
 foreign pure predecessors from "flick:Graph" "predecessors"
   arity 1
-  reviewed "effect@4.1.2 sha256:659155b230135f0c"
 
 /// `successors` or `predecessors`, by the direction.
 neighbors_directed : NodeIndex -> Direction -> Graph n e Directed -> List NodeIndex
 foreign pure neighbors_directed from "flick:Graph" "neighborsDirected"
   arity 2
-  reviewed "effect@4.1.2 sha256:0e7251b2f35f00f1"
 
 /// The graph in GraphViz DOT; `None` options use indices as labels.
 to_graph_viz : GraphVizOptions n e -> Graph n e k -> String
 foreign pure to_graph_viz from "flick:Graph" "flickToGraphViz"
-  reviewed "effect@4.1.2 sha256:232f599ffdb8cbf0"
 
 /// The graph as a Mermaid diagram.
 to_mermaid : MermaidOptions n e -> Graph n e k -> String
 foreign pure to_mermaid from "flick:Graph" "flickToMermaid"
-  reviewed "effect@4.1.2 sha256:703123032a9bdaf4"

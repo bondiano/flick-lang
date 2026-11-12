@@ -9,53 +9,43 @@ type alias LazyArg a = Unit -> a
 constant : a -> LazyArg a
 foreign pure constant from "flick:Function" "constant"
   arity 1
-  reviewed "effect@4.1.2 sha256:db16ad302034c0a3"
 
 /// Always `true`.
 const_true : LazyArg Bool
 foreign pure const_true from "flick:Function" "constTrue"
-  reviewed "effect@4.1.2 sha256:a1c6d39383c37c88"
 
 /// Always `false`.
 const_false : LazyArg Bool
 foreign pure const_false from "flick:Function" "constFalse"
-  reviewed "effect@4.1.2 sha256:4316281cdd80145d"
 
 /// Always `()`.
 const_void : LazyArg Unit
 foreign pure const_void from "flick:Function" "constVoid"
-  reviewed "effect@4.1.2 sha256:fb5beb6156ec75ce"
 
 /// `f` with its two arguments swapped.
 flip : (a -> b -> c) -> b -> a -> c
 foreign pure flip from "flick:Function" "flickFlip"
   arity 1
-  reviewed "effect@4.1.2 sha256:e6622af2d46ee25e"
 
 /// `compose g f` applies `f`, then `g`.
 compose : (b -> c) -> (a -> b) -> a -> c
 foreign pure compose from "flick:Function" "compose"
   arity 1
-  reviewed "effect@4.1.2 sha256:e1f314c0edfd29db"
 
 /// A value of any type from one that cannot exist.
 absurd : Never -> a
 foreign pure absurd from "flick:Function" "absurd"
-  reviewed "effect@4.1.2 sha256:100c0d7e0aea5d8e"
 
 /// `f` taking its two arguments as a pair.
 tupled : (a -> b -> c) -> (a, b) -> c
 foreign pure tupled from "flick:Function" "tupled"
   arity 1
-  reviewed "effect@4.1.2 sha256:4a41ab9a0d2df54a"
 
 /// `f` of a pair taking the two parts as arguments.
 untupled : ((a, b) -> c) -> a -> b -> c
 foreign pure untupled from "flick:Function" "flickUntupled"
   arity 1
-  reviewed "effect@4.1.2 sha256:efd5718a1a0d828a"
 
 /// Its second argument.
 sk : a -> b -> b
 foreign pure sk from "flick:Function" "SK"
-  reviewed "effect@4.1.2 sha256:75ff7ae554ea2754"

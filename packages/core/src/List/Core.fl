@@ -10,20 +10,17 @@ foreign pure map_indexed from "flick:rt" "listMapIndexed"
 /// Runs a runtime function on each element in order, for what it does.
 each_effect : (a ->{r; e} Unit)^c -> List a ->{r; e} Unit
 foreign effect each_effect from "flick:rt" "listEachEffect"
-  reviewed "effect@4.1.2 sha256:b1c62c32136cf403"
   retention call
 
 /// Folds from the first element: `fold_left f init [a, b]` is `f (f init a) b`.
 fold_left : (b -> a -> b)^c -> b -> (List a -> b)^c
 foreign pure fold_left from "flick:rt" "listFold"
-  reviewed "effect@4.1.2 sha256:f9f3cb8097473b9a"
   arity 3
   retention call
 
 /// Folds from the last element: `fold_right f init [a, b]` is `f a (f b init)`.
 fold_right : (a -> b -> b)^c -> b -> (List a -> b)^c
 foreign pure fold_right from "flick:rt" "listFoldRight"
-  reviewed "effect@4.1.2 sha256:f4b0f812b7a90bf5"
   arity 3
   retention call
 
@@ -36,49 +33,42 @@ foreign effect fold_effect from "flick:rt" "listFoldEffect"
 /// The elements that satisfy `p`, in order.
 filter : (a -> Bool)^c -> List a -> List a
 foreign pure filter from "flick:rt" "listFilter"
-  reviewed "effect@4.1.2 sha256:0d0d5816fea5fabe"
   arity 2
   retention call
 
 /// The values of the `Some` results of `f`, in order.
 filter_map : (a -> Option b)^c -> List a -> List b
 foreign pure filter_map from "flick:rt" "listFilterMap"
-  reviewed "effect@4.1.2 sha256:71ace19b419814b2"
   arity 2
   retention call
 
 /// The lists `f` gives each element, joined.
 flat_map : (a -> List b)^c -> List a -> List b
 foreign pure flat_map from "flick:rt" "listFlatMap"
-  reviewed "effect@4.1.2 sha256:37e174dd96bf5c77"
   arity 2
   retention call
 
 /// The first element that satisfies `p`.
 find : (a -> Bool)^c -> List a -> Option a
 foreign pure find from "flick:rt" "listFind"
-  reviewed "effect@4.1.2 sha256:67b59648cd02439d"
   arity 2
   retention call
 
 /// The index of the first element that satisfies `p`.
 find_index : (a -> Bool)^c -> List a -> Option Int
 foreign pure find_index from "flick:rt" "listFindIndex"
-  reviewed "effect@4.1.2 sha256:74e1ef30d4775390"
   arity 2
   retention call
 
 /// Whether some element satisfies `p`.
 any : (a -> Bool)^c -> List a -> Bool
 foreign pure any from "flick:rt" "listAny"
-  reviewed "effect@4.1.2 sha256:42b6945cc2f397cd"
   arity 2
   retention call
 
 /// Whether every element satisfies `p`.
 all : (a -> Bool)^c -> List a -> Bool
 foreign pure all from "flick:rt" "listAll"
-  reviewed "effect@4.1.2 sha256:8ca3b291bb5f5933"
   arity 2
   retention call
 
@@ -91,7 +81,6 @@ foreign pure partition from "flick:rt" "listPartition"
 /// Sorts by `compare`, keeping equal elements in their order.
 sort_by : (a -> a -> Ordering)^c -> List a -> List a
 foreign pure sort_by from "flick:rt" "listSortBy"
-  reviewed "effect@4.1.2 sha256:26b8439a0f86a059"
   arity 2
   retention call
 
@@ -131,7 +120,6 @@ let minimum xs =
 /// How many elements the list has.
 length : List a -> Int
 foreign pure length from "flick:rt" "listLength"
-  reviewed "effect@4.1.2 sha256:e3bc0aabe62baf6c"
 
 /// Whether the list has no element.
 is_empty : List a -> Bool
@@ -140,7 +128,6 @@ let is_empty xs = length xs == 0
 /// The element at `index`, counting from 0.
 get : Int -> List a -> Option a
 foreign pure get from "flick:rt" "listGet"
-  reviewed "effect@4.1.2 sha256:2c896b5ea54dbe9a"
 
 /// The list with the element at `index` replaced; out of range, unchanged.
 set : Int -> a -> List a -> List a
@@ -161,7 +148,6 @@ let singleton x = [x]
 /// `n` copies of `x`.
 repeat : Int -> a -> List a
 foreign pure repeat from "flick:rt" "listRepeat"
-  reviewed "effect@4.1.2 sha256:163da23fbce2ffe9"
 
 /// `[from, from + 1, …]` below `until`.
 range : Int -> Int -> List Int
@@ -170,13 +156,11 @@ foreign pure range from "flick:rt" "listRange"
 /// The list of `f 0`, …, `f (n - 1)`.
 initialize : Int -> (Int -> a)^c -> List a
 foreign pure initialize from "flick:rt" "listInitialize"
-  reviewed "effect@4.1.2 sha256:e33643fd5390dc62"
   retention call
 
 /// The elements in reverse order.
 reverse : List a -> List a
 foreign pure reverse from "flick:rt" "listReverse"
-  reviewed "effect@4.1.2 sha256:e969bf75834545fd"
 
 /// `append xs ys` is `xs ++ ys`: `ys |> append xs` puts `xs` in front.
 append : List a -> List a -> List a
@@ -185,17 +169,14 @@ let append xs ys = xs ++ ys
 /// The lists joined.
 concat : List (List a) -> List a
 foreign pure concat from "flick:rt" "listConcat"
-  reviewed "effect@4.1.2 sha256:79a7557ec647ea64"
 
 /// The first `n` elements.
 take : Int -> List a -> List a
 foreign pure take from "flick:rt" "listTake"
-  reviewed "effect@4.1.2 sha256:12fb0eb32a21c379"
 
 /// Every element but the first `n`.
 drop : Int -> List a -> List a
 foreign pure drop from "flick:rt" "listDrop"
-  reviewed "effect@4.1.2 sha256:1e7b70fa9118de64"
 
 /// The elements from `start` up to `end`, as JS `slice`: it copies only them.
 slice : Int -> Int -> List a -> List a
@@ -204,12 +185,10 @@ foreign pure slice from "flick:rt" "listSlice"
 /// The pairs of the elements at each index of both, as long as the shorter.
 zip : List a -> List b -> List (a, b)
 foreign pure zip from "flick:rt" "listZip"
-  reviewed "effect@4.1.2 sha256:acfd4eb64d599b89"
 
 /// The firsts and the seconds of the pairs.
 unzip : List (a, b) -> (List a, List b)
 foreign pure unzip from "flick:rt" "listUnzip"
-  reviewed "effect@4.1.2 sha256:fc08e4a943b8119d"
 
 /// The sum of the numbers.
 sum : Numeric.Numeric a => List a -> a

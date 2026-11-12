@@ -10,38 +10,32 @@ filter : (a -> Bool)^c -> Chunk a -> Chunk a
 foreign pure filter from "flick:Chunk" "filter"
   arity 1
   retention call
-  reviewed "effect@4.1.2 sha256:5b6f8b4df57d9246"
 
 /// The `Ok` values of `f` over the elements.
 filter_map : (a -> Result e b)^c -> Chunk a -> Chunk b
 foreign pure filter_map from "flick:Chunk" "filterMap"
   arity 1
   retention call
-  reviewed "effect@4.1.2 sha256:472ff04b8075832b"
 
 /// The `Ok` values of `f` over the elements, up to the first `Err`.
 filter_map_while : (a -> Result e b)^c -> Chunk a -> Chunk b
 foreign pure filter_map_while from "flick:Chunk" "filterMapWhile"
   arity 1
   retention call
-  reviewed "effect@4.1.2 sha256:02462112dd4dab9d"
 
 /// The values of the `Some` elements.
 compact : Chunk (Option a) -> Chunk a
 foreign pure compact from "flick:Chunk" "compact"
-  reviewed "effect@4.1.2 sha256:2254fda6c17b10cc"
 
 /// The chunks `f` gives each element, joined.
 flat_map : (a -> Chunk b)^c -> Chunk a -> Chunk b
 foreign pure flat_map from "flick:Chunk" "flatMap"
   arity 1
   retention call
-  reviewed "effect@4.1.2 sha256:5425515fd7c1fe06"
 
 /// The chunks joined.
 flatten : Chunk (Chunk a) -> Chunk a
 foreign pure flatten from "flick:Chunk" "flatten"
-  reviewed "effect@4.1.2 sha256:d40db7f5af1f97b5"
 
 /// Runs a runtime function on each element in order, for what it does.
 each_effect : (a ->{r; e} Unit)^c -> Chunk a ->{r; e} Unit
@@ -52,7 +46,6 @@ contains_with : (a -> a -> Bool)^c -> a -> Chunk a -> Bool
 foreign pure contains_with from "flick:Chunk" "containsWith"
   arity 1
   retention call
-  reviewed "effect@4.1.2 sha256:ccec8ce893d30b3e"
 
 /// Whether an element equals `x`.
 contains : Eq a => a -> Chunk a -> Bool
@@ -61,19 +54,16 @@ let contains x chunk = contains_with eq x chunk
 /// The first of each set of `==` elements, in order.
 dedupe : Chunk a -> Chunk a
 foreign pure dedupe from "flick:Chunk" "dedupe"
-  reviewed "effect@4.1.2 sha256:e23e0e0455a41988"
 
 /// The chunk without an element `==` to the one before it.
 dedupe_adjacent : Chunk a -> Chunk a
 foreign pure dedupe_adjacent from "flick:Chunk" "dedupeAdjacent"
-  reviewed "effect@4.1.2 sha256:b643d6b5bba0afdc"
 
 /// `c |> difference_with same d`: the elements of `c` with none `same` in `d`.
 difference_with : (a -> a -> Bool)^c -> Chunk a -> Chunk a -> Chunk a
 foreign pure difference_with from "flick:Chunk" "differenceWith"
   arity 1
   retention call
-  reviewed "effect@4.1.2 sha256:960d9c37cfc461dc"
 
 /// `c |> difference d`: the elements of `c` not in `d`, by `Eq`.
 difference : Eq a => Chunk a -> Chunk a -> Chunk a
@@ -83,61 +73,52 @@ let difference that chunk = difference_with eq that chunk
 intersection : Chunk a -> Chunk a -> Chunk a
 foreign pure intersection from "flick:Chunk" "intersection"
   arity 1
-  reviewed "effect@4.1.2 sha256:8c6072cea49f3ba9"
 
 /// `c |> union d`: the elements of both, each once, by `==`.
 union : Chunk a -> Chunk a -> Chunk a
 foreign pure union from "flick:Chunk" "union"
   arity 1
-  reviewed "effect@4.1.2 sha256:4da0b21887053551"
 
 /// Whether every element satisfies `p`.
 every : (a -> Bool)^c -> Chunk a -> Bool
 foreign pure every from "flick:Chunk" "every"
   arity 1
   retention call
-  reviewed "effect@4.1.2 sha256:e830ddc44d126681"
 
 /// Whether some element satisfies `p`.
 some : (a -> Bool)^c -> Chunk a -> Bool
 foreign pure some from "flick:Chunk" "some"
   arity 1
   retention call
-  reviewed "effect@4.1.2 sha256:d15067e9e6730a3e"
 
 /// The first element that satisfies `p`.
 find_first : (a -> Bool)^c -> Chunk a -> Option a
 foreign pure find_first from "flick:Chunk" "findFirst"
   arity 1
   retention call
-  reviewed "effect@4.1.2 sha256:10dae4d47f952371"
 
 /// The index of the first element that satisfies `p`.
 find_first_index : (a -> Bool)^c -> Chunk a -> Option Int
 foreign pure find_first_index from "flick:Chunk" "findFirstIndex"
   arity 1
   retention call
-  reviewed "effect@4.1.2 sha256:aff106aee52f9c1d"
 
 /// The last element that satisfies `p`.
 find_last : (a -> Bool)^c -> Chunk a -> Option a
 foreign pure find_last from "flick:Chunk" "findLast"
   arity 1
   retention call
-  reviewed "effect@4.1.2 sha256:868885f7ed37200d"
 
 /// The index of the last element that satisfies `p`.
 find_last_index : (a -> Bool)^c -> Chunk a -> Option Int
 foreign pure find_last_index from "flick:Chunk" "findLastIndex"
   arity 1
   retention call
-  reviewed "effect@4.1.2 sha256:dfbf39c0c6400a92"
 
 /// The strings joined with `separator` between them.
 join : String -> Chunk String -> String
 foreign pure join from "flick:Chunk" "join"
   arity 1
-  reviewed "effect@4.1.2 sha256:b10068f7a7b4d7c0"
 
 /// Maps each element while threading a state from the first: the final
 /// state and the mapped chunk.
@@ -145,40 +126,34 @@ map_accum : s -> (s -> a -> (s, b))^c -> (Chunk a -> (s, Chunk b))^c
 foreign pure map_accum from "flick:Chunk" "mapAccum"
   arity 2
   retention call
-  reviewed "effect@4.1.2 sha256:8a280bbf63fd6efa"
 
 /// The `Ok` values and the `Err` errors of `f` over the elements.
 partition : (a -> Result f p)^c -> Chunk a -> (Chunk p, Chunk f)
 foreign pure partition from "flick:Chunk" "partition"
   arity 1
   retention call
-  reviewed "effect@4.1.2 sha256:60ee185549645983"
 
 /// The `Ok` values and the `Err` errors.
 separate : Chunk (Result e a) -> (Chunk a, Chunk e)
 foreign pure separate from "flick:Chunk" "separate"
-  reviewed "effect@4.1.2 sha256:a08b4df9c9f1d73e"
 
 /// Folds from the first element.
 reduce : b -> (b -> a -> b)^c -> (Chunk a -> b)^c
 foreign pure reduce from "flick:Chunk" "reduce"
   arity 2
   retention call
-  reviewed "effect@4.1.2 sha256:ac5e1a8d7f7e4f78"
 
 /// Folds from the last element.
 reduce_right : b -> (b -> a -> b)^c -> (Chunk a -> b)^c
 foreign pure reduce_right from "flick:Chunk" "reduceRight"
   arity 2
   retention call
-  reviewed "effect@4.1.2 sha256:54edc840a88d4e23"
 
 /// Sorts by `compare`, keeping equal elements in their order.
 sort_by : (a -> a -> Ordering)^c -> Chunk a -> Chunk a
 foreign pure sort_by from "flick:Chunk" "flickSortBy"
   arity 1
   retention call
-  reviewed "effect@4.1.2 sha256:8ceacf5f0e19c3f0"
 
 /// Sorts by `Ord`, keeping equal elements in their order.
 sort : Ord a => Chunk a -> Chunk a
@@ -191,17 +166,14 @@ let sort_with f chunk = sort_by (fun x y -> compare (f x) (f y)) chunk
 /// The firsts and the seconds of the pairs.
 unzip : Chunk (a, b) -> (Chunk a, Chunk b)
 foreign pure unzip from "flick:Chunk" "unzip"
-  reviewed "effect@4.1.2 sha256:471e171b8c108739"
 
 /// `c |> zip d`: the pairs of the elements at each index of both.
 zip : Chunk b -> Chunk a -> Chunk (a, b)
 foreign pure zip from "flick:Chunk" "zip"
   arity 1
-  reviewed "effect@4.1.2 sha256:42894adfa84ab804"
 
 /// `c |> zip_with d f`: `f` of the elements at each index of both.
 zip_with : Chunk b -> (a -> b -> d)^c -> (Chunk a -> Chunk d)^c
 foreign pure zip_with from "flick:Chunk" "zipWith"
   arity 2
   retention call
-  reviewed "effect@4.1.2 sha256:254ac56a1a06677e"

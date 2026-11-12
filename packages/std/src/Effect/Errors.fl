@@ -11,7 +11,6 @@ catch_cause : (Failure e ->{r2; e2} a)^c -> (Eff r e a)^c ->{r + r2; e2} a
 foreign effect catch_cause from "flick:Effect" "flickCatchCause"
   arity 1
   retention call
-  reviewed "effect@4.1.2 sha256:713f0c9a4b6900ac"
 
 /// `catch_cause` of the failures `p` holds for; the others stay.
 catch_cause_if :
@@ -19,7 +18,6 @@ catch_cause_if :
 foreign effect catch_cause_if from "flick:Effect" "flickCatchCauseIf"
   arity 2
   retention call
-  reviewed "effect@4.1.2 sha256:a3a2498131766f88"
 
 /// `catch_cause` of the failures the filter passes, with what it gave; a
 /// failure it refuses stays as the filter returns it.
@@ -31,7 +29,6 @@ catch_cause_filter :
 foreign effect catch_cause_filter from "flick:Effect" "flickCatchCauseFilter"
   arity 2
   retention call
-  reviewed "effect@4.1.2 sha256:03dbc41c35854cf3"
 
 /// Recovers from a defect of `task` with `f` of its inert text; typed
 /// failures stay.
@@ -39,14 +36,12 @@ catch_defect : (String ->{r2; e2} a)^c -> (Eff r e a)^c ->{r + r2; e + e2} a
 foreign effect catch_defect from "flick:Effect" "flickCatchDefect"
   arity 1
   retention call
-  reviewed "effect@4.1.2 sha256:a7e4cf2e7d1bb677"
 
 /// Runs `f` of the cause when `task` fails, then fails as it did.
 tap_cause : (Failure e ->{r2; e2} b)^c -> (Eff r e a)^c ->{r + r2; e + e2} a
 foreign effect tap_cause from "flick:Effect" "flickTapCause"
   arity 1
   retention call
-  reviewed "effect@4.1.2 sha256:a0548ca982473716"
 
 /// `tap_cause` of the failures `p` holds for.
 tap_cause_if :
@@ -54,7 +49,6 @@ tap_cause_if :
 foreign effect tap_cause_if from "flick:Effect" "flickTapCauseIf"
   arity 2
   retention call
-  reviewed "effect@4.1.2 sha256:2afd8005fba74011"
 
 /// `tap_cause` of the failures the filter passes, with what it gave.
 tap_cause_filter :
@@ -65,28 +59,24 @@ tap_cause_filter :
 foreign effect tap_cause_filter from "flick:Effect" "flickTapCauseFilter"
   arity 2
   retention call
-  reviewed "effect@4.1.2 sha256:134596bc51d72f05"
 
 /// Runs `f` of a defect's inert text when `task` dies, then dies as it did.
 tap_defect : (String ->{r2; e2} b)^c -> (Eff r e a)^c ->{r + r2; e + e2} a
 foreign effect tap_defect from "flick:Effect" "flickTapDefect"
   arity 1
   retention call
-  reviewed "effect@4.1.2 sha256:5ab4371925ca6cd3"
 
 /// `on_failure` of the cause or `on_success` of the value; never fails.
 match_cause : (Failure e -> b)^c -> (a -> b)^c -> (Eff r e a)^c ->{r} b
 foreign effect match_cause from "flick:Effect" "flickMatchCause"
   arity 2
   retention call
-  reviewed "effect@4.1.2 sha256:62bccdc1ab43ca28"
 
 /// `match_cause`, reading an already ended task without a new step.
 match_cause_eager : (Failure e -> b)^c -> (a -> b)^c -> (Eff r e a)^c ->{r} b
 foreign effect match_cause_eager from "flick:Effect" "flickMatchCauseEager"
   arity 2
   retention call
-  reviewed "effect@4.1.2 sha256:6b34fae49f860e94"
 
 /// Runs `on_failure` of the cause or `on_success` of the value.
 match_cause_effect :
@@ -94,7 +84,6 @@ match_cause_effect :
 foreign effect match_cause_effect from "flick:Effect" "flickMatchCauseEffect"
   arity 2
   retention call
-  reviewed "effect@4.1.2 sha256:bcb9d0883a815f91"
 
 /// `match_cause_effect`, reading an already ended task without a new step.
 match_cause_effect_eager :
@@ -102,13 +91,11 @@ match_cause_effect_eager :
 foreign effect match_cause_effect_eager from "flick:Effect" "flickMatchCauseEffectEager"
   arity 2
   retention call
-  reviewed "effect@4.1.2 sha256:e8a1154a0a78c98d"
 
 /// Turns each typed failure of `task` into a defect.
 or_die : (Eff r e a)^c ->{r} a
 foreign effect or_die from "flick:Effect" "orDie"
   retention call
-  reviewed "effect@4.1.2 sha256:02beae1b90df9983"
 
 /// Runs `task` and drops its typed failure, logging it at the level if
 /// one is given.
@@ -116,7 +103,6 @@ ignore_ : Option LogLevel.LogLevel -> (Eff r e a)^c ->{r} Unit
 foreign effect ignore_ from "flick:Effect" "flickIgnore"
   arity 1
   retention call
-  reviewed "effect@4.1.2 sha256:b88bf29312900485"
 
 /// Runs `task` and drops any failure, defects included, logging it at the
 /// level if one is given.
@@ -124,21 +110,18 @@ ignore_cause : Option LogLevel.LogLevel -> (Eff r e a)^c ->{r} Unit
 foreign effect ignore_cause from "flick:Effect" "flickIgnoreCause"
   arity 1
   retention call
-  reviewed "effect@4.1.2 sha256:709c92ad29e593fe"
 
 /// Runs `finalizer` after `task`, however it ends.
 ensuring : (Eff r2 none b)^c -> (Eff r e a)^c ->{r + r2; e} a
 foreign effect ensuring from "flick:Effect" "ensuring"
   arity 1
   retention call
-  reviewed "effect@4.1.2 sha256:e9f9e82c594a5039"
 
 /// Runs `cleanup` of the cause when `task` fails, then fails as it did.
 on_error : (Failure e ->{r2} b)^c -> (Eff r e a)^c ->{r + r2; e} a
 foreign effect on_error from "flick:Effect" "flickOnError"
   arity 1
   retention call
-  reviewed "effect@4.1.2 sha256:f8451c114d1e68b9"
 
 /// `on_error` of the failures `p` holds for.
 on_error_if :
@@ -146,7 +129,6 @@ on_error_if :
 foreign effect on_error_if from "flick:Effect" "flickOnErrorIf"
   arity 2
   retention call
-  reviewed "effect@4.1.2 sha256:297ccf0d03260b31"
 
 /// `on_error` of the failures the filter passes, with what it gave.
 on_error_filter :
@@ -157,14 +139,12 @@ on_error_filter :
 foreign effect on_error_filter from "flick:Effect" "flickOnErrorFilter"
   arity 2
   retention call
-  reviewed "effect@4.1.2 sha256:0e87c8ca876ae26c"
 
 /// Runs `f` of the exit after `task`, however it ends.
 on_exit : (Exit e a ->{r2; e2} Unit)^c -> (Eff r e a)^c ->{r + r2; e + e2} a
 foreign effect on_exit from "flick:Effect" "flickOnExit"
   arity 1
   retention call
-  reviewed "effect@4.1.2 sha256:086e2ee2bcc60ab8"
 
 /// `on_exit` of the exits `p` holds for.
 on_exit_if :
@@ -172,7 +152,6 @@ on_exit_if :
 foreign effect on_exit_if from "flick:Effect" "flickOnExitIf"
   arity 2
   retention call
-  reviewed "effect@4.1.2 sha256:5539021b2c5a6684"
 
 /// `on_exit` of the exits the filter passes, with what it gave.
 on_exit_filter :
@@ -183,7 +162,6 @@ on_exit_filter :
 foreign effect on_exit_filter from "flick:Effect" "flickOnExitFilter"
   arity 2
   retention call
-  reviewed "effect@4.1.2 sha256:20cb873e6ee1b079"
 
 /// `on_exit` with a finalizer `f` may skip by giving `None`; with
 /// `interruptible` the finalizer may be interrupted.
@@ -192,7 +170,6 @@ on_exit_primitive :
 foreign effect on_exit_primitive from "flick:Effect" "flickOnExitPrimitive"
   arity 2
   retention call
-  reviewed "effect@4.1.2 sha256:ab3934e030dc0593"
 
 /// Runs `f` of the ids of the interrupting fibers when `task` is
 /// interrupted.
@@ -200,14 +177,12 @@ on_interrupt : (List Float ->{r2; e2} Unit)^c -> (Eff r e a)^c ->{r + r2; e + e2
 foreign effect on_interrupt from "flick:Effect" "flickOnInterrupt"
   arity 1
   retention call
-  reviewed "effect@4.1.2 sha256:d890af8c78feb1ba"
 
 /// Registers `finalizer` with the owner of region `s`: it runs when that
 /// scope closes, with the cause of its failure if it failed.
 add_finalizer : (Option RawCause ->{r} Unit)^c ->{Scope s | r} Unit
 foreign effect add_finalizer from "flick:Effect" "flickAddFinalizer"
   retention owner
-  reviewed "effect@4.1.2 sha256:de9497fd0e3d4d55"
 
 /// Runs `task`, reporting its failures (only defects with `defects_only`)
 /// to the current error reporters.
@@ -215,4 +190,3 @@ with_error_reporting : Bool -> (Eff r e a)^c ->{r; e} a
 foreign effect with_error_reporting from "flick:Effect" "flickWithErrorReporting"
   arity 1
   retention call
-  reviewed "effect@4.1.2 sha256:2a3264b6b8142c6a"

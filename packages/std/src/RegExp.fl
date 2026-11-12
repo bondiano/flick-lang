@@ -17,37 +17,30 @@ type alias Match = { matched : String; index : Int; captures : List (Option Stri
 /// The regular expression of `pattern` with the flags (`"gi"`, `""`, …).
 make : String -> String -> Result RegExpError RegExp
 foreign pure make from "flick:RegExp" "flickMake"
-  reviewed "effect@4.1.2 sha256:805450df9d9be81c"
 
 /// `text` with every character a pattern treats specially escaped.
 escape : String -> String
 foreign pure escape from "flick:RegExp" "escape"
-  reviewed "effect@4.1.2 sha256:b48e526f3585b949"
 
 /// The first match in the string.
 match_first : RegExp -> String -> Option Match
 foreign pure match_first from "flick:RegExp" "flickMatch"
-  reviewed "effect@4.1.2 sha256:617ae6f97abd7024"
 
 /// Every match in the string, first to last, with or without the flag `g`.
 match_all : RegExp -> String -> List Match
 foreign pure match_all from "flick:RegExp" "flickMatchAll"
-  reviewed "effect@4.1.2 sha256:91b91858ae12e8ee"
 
 /// Where the first match starts.
 search : RegExp -> String -> Option Int
 foreign pure search from "flick:String" "search"
   arity 1
-  reviewed "effect@4.1.2 sha256:451837621e06aa2a"
 
 /// The first match replaced, or every one with the flag `g`; `$1` and `$&`
 /// in `replacement` name the groups and the match, as in JS.
 replace : RegExp -> String -> String -> String
 foreign pure replace from "flick:String" "replace"
   arity 2
-  reviewed "effect@4.1.2 sha256:f751f7d9a3db169a"
 
 /// Every match replaced, with or without the flag `g`.
 replace_all : RegExp -> String -> String -> String
 foreign pure replace_all from "flick:RegExp" "flickReplaceAll"
-  reviewed "effect@4.1.2 sha256:ae63109fc89cbc0d"

@@ -7,7 +7,6 @@ module DevTools exposing (..)
 /// `ws://localhost:34437` by default.
 layer : String -> Layer none none none
 foreign pure layer from "flick:devtools/DevTools" "devToolsLayer"
-  reviewed "effect@4.1.2 sha256:8efdbda563d781dc"
 
 /// Where the DevTools listen, and the headers of the WebSocket's handshake:
 /// a token a proxy in front of them checks, say.
@@ -17,4 +16,3 @@ type alias Options = { url : String; headers : List (String, String) }
 /// Node only.
 layer_with : Options -> Layer none none none
 foreign pure layer_with from "flick:devtools/DevToolsNode" "devToolsLayerWith"
-  reviewed "effect@4.1.2 sha256:4d3f3adcabe3da54"

@@ -16,114 +16,95 @@ type alias Input = List (String, String)
 make : Input -> UrlParams
 foreign pure make from "flick:http/UrlParams" "make"
   arity 1
-  reviewed "effect@4.1.2 sha256:89f59bdb49c50212"
 
 /// The same as `make`: the parameters of the pairs, in order.
 from_input : Input -> UrlParams
 foreign pure from_input from "flick:http/UrlParams" "fromInput"
   arity 1
-  reviewed "effect@4.1.2 sha256:012cd12ce82455eb"
 
 /// No parameters.
 empty : UrlParams
 foreign pure empty from "flick:http/UrlParams" "empty"
-  reviewed "effect@4.1.2 sha256:767df32d480be42b"
 
 /// Every value of the key, in order.
 get_all : String -> UrlParams -> List String
 foreign pure get_all from "flick:http/UrlParams" "getAll"
   arity 1
-  reviewed "effect@4.1.2 sha256:03ab4597392b8a39"
 
 /// The first value of the key.
 get_first : String -> UrlParams -> Option String
 foreign pure get_first from "flick:http/UrlParams" "getFirst"
   arity 1
-  reviewed "effect@4.1.2 sha256:35a5671d85ccd879"
 
 /// The last value of the key.
 get_last : String -> UrlParams -> Option String
 foreign pure get_last from "flick:http/UrlParams" "getLast"
   arity 1
-  reviewed "effect@4.1.2 sha256:9b0be1a031acdabd"
 
 /// Replaces every value of the key by the one: `set key value params`.
 set : String -> String -> UrlParams -> UrlParams
 foreign pure set from "flick:http/UrlParams" "set"
   arity 2
-  reviewed "effect@4.1.2 sha256:e810026311449631"
 
 /// The parameters with their list of pairs changed by `f`.
 transform : (Input -> Input) -> UrlParams -> UrlParams
 foreign pure transform from "flick:http/UrlParams" "transform"
   arity 1
-  reviewed "effect@4.1.2 sha256:4f655923d4026b08"
 
 /// `set` for each key of the pairs.
 set_all : Input -> UrlParams -> UrlParams
 foreign pure set_all from "flick:http/UrlParams" "setAll"
   arity 1
-  reviewed "effect@4.1.2 sha256:df30bb71b92102d0"
 
 /// Adds a value of the key after the others.
 append : String -> String -> UrlParams -> UrlParams
 foreign pure append from "flick:http/UrlParams" "append"
   arity 2
-  reviewed "effect@4.1.2 sha256:86f39b659019c7e8"
 
 /// Adds the pairs after the others.
 append_all : Input -> UrlParams -> UrlParams
 foreign pure append_all from "flick:http/UrlParams" "appendAll"
   arity 1
-  reviewed "effect@4.1.2 sha256:8ee9193358a40ea7"
 
 /// Removes every value of the key.
 remove : String -> UrlParams -> UrlParams
 foreign pure remove from "flick:http/UrlParams" "remove"
   arity 1
-  reviewed "effect@4.1.2 sha256:2d52793caf887ee7"
 
 /// The query string, `a=1&b=x+y`, without `?`.
 to_string : UrlParams -> String
 foreign pure to_string from "flick:http/UrlParams" "toString"
   arity 1
-  reviewed "effect@4.1.2 sha256:7ce2dde888e63199"
 
 /// Each key with all its values, keys in the order of their first value.
 to_record : UrlParams -> List (String, List String)
 foreign pure to_record from "flick:http/UrlParams" "flickToRecord"
-  reviewed "effect@4.1.2 sha256:fd5c8dba631f5db3"
 
 /// The pairs, the values of the named keys turned into secrets.
 redact : List String -> UrlParams -> List (String, Http.Headers.Redaction)
 foreign pure redact from "flick:http/UrlParams" "flickRedact"
   arity 2
-  reviewed "effect@4.1.2 sha256:9d2ddd13dbcef2f5"
 
 /// Whether the key is among the names, ignoring case.
 is_redacted_name : String -> List String -> Bool
 foreign pure is_redacted_name from "flick:http/UrlParams" "isRedactedName"
   arity 2
-  reviewed "effect@4.1.2 sha256:446af9f2160ae36a"
 
 /// The URL with the values of the named query parameters, and a password,
 /// replaced by `<redacted>`: `redact_url names url`.
 redact_url : List String -> String -> String
 foreign pure redact_url from "flick:http/UrlParams" "flickRedactUrl"
   arity 2
-  reviewed "effect@4.1.2 sha256:19d5a6f80ca683fc"
 
 /// The names of the parameters that logs and `show` mask by default.
 default_redacted_names : List String
 foreign pure default_redacted_names from "flick:http/UrlParams" "flickDefaultRedactedNames"
-  reviewed "effect@4.1.2 sha256:c7a7b9cf63e3925a"
 
 /// Runs `task` with the names of the parameters that logs and `show` mask.
 with_redacted_names : List String -> (Eff r e a)^c ->{r; e} a
 foreign effect with_redacted_names from "flick:http/UrlParams" "flickWithRedactedNames"
   arity 2
   retention call
-  reviewed "effect@4.1.2 sha256:c7a7b9cf63e3925a"
 
 /// The pairs of key and value, in order.
 to_list : UrlParams -> Input
@@ -133,16 +114,13 @@ foreign pure to_list from "flick:http/UrlParams" "flickToList"
 /// string, or an array of strings for a key given more than once.
 to_unknown : UrlParams -> Unknown
 foreign pure to_unknown from "flick:http/UrlParams" "flickToUnknown"
-  reviewed "effect@4.1.2 sha256:8f4c3ae49efdad9f"
 
 equivalent : UrlParams -> UrlParams -> Bool
 foreign pure equivalent from "flick:http/UrlParams" "Equivalence"
   arity 2
-  reviewed "effect@4.1.2 sha256:a86b9d2e4bf3cbde"
 
 show_params : UrlParams -> String
 foreign pure show_params from "flick:http/UrlParams" "flickShow"
-  reviewed "effect@4.1.2 sha256:071fcc57ba7aec7c"
 
 instance Eq UrlParams =
   let eq x y = equivalent x y

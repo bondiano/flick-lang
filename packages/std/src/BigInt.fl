@@ -21,143 +21,117 @@ foreign pure parse from "flick:rt" "bigintParse"
 /// The absolute value.
 abs : BigInt -> BigInt
 foreign pure abs from "flick:BigInt" "abs"
-  reviewed "effect@4.1.2 sha256:7ca5a15c381f5718"
 
 /// Division rounding toward zero.
 divide : BigInt -> BigInt -> Result Int.ArithmeticError BigInt
 foreign pure divide from "flick:rt" "bigintDivide"
-  reviewed "effect@4.1.2 sha256:e07728a47fcff98e"
 
 /// The remainder of division rounding toward zero, with the sign of the dividend.
 remainder : BigInt -> BigInt -> Result Int.ArithmeticError BigInt
 foreign pure remainder from "flick:rt" "bigintRemainder"
-  reviewed "effect@4.1.2 sha256:af803eb2f12a3c24"
 
 /// `self + that`: `x |> BigInt.sum 1n`.
 sum : BigInt -> BigInt -> BigInt
 foreign pure sum from "flick:BigInt" "sum"
   arity 1
-  reviewed "effect@4.1.2 sha256:70b05f31568990f4"
 
 /// `self - that`.
 subtract : BigInt -> BigInt -> BigInt
 foreign pure subtract from "flick:BigInt" "subtract"
   arity 1
-  reviewed "effect@4.1.2 sha256:f5c6e397a2686660"
 
 /// `self * that`.
 multiply : BigInt -> BigInt -> BigInt
 foreign pure multiply from "flick:BigInt" "multiply"
   arity 1
-  reviewed "effect@4.1.2 sha256:b7840056acfcb918"
 
 /// `n + 1n`.
 increment : BigInt -> BigInt
 foreign pure increment from "flick:BigInt" "increment"
-  reviewed "effect@4.1.2 sha256:2a57aefe962e04cb"
 
 /// `n - 1n`.
 decrement : BigInt -> BigInt
 foreign pure decrement from "flick:BigInt" "decrement"
-  reviewed "effect@4.1.2 sha256:6ab62e187f3bff72"
 
 /// The greatest common divisor, not negative.
 gcd : BigInt -> BigInt -> BigInt
 foreign pure gcd from "flick:BigInt" "gcd"
   arity 1
-  reviewed "effect@4.1.2 sha256:b4c91c29a5846648"
 
 /// The least common multiple, not negative; 0 when either is 0.
 lcm : BigInt -> BigInt -> BigInt
 foreign pure lcm from "flick:BigInt" "lcm"
   arity 1
-  reviewed "effect@4.1.2 sha256:219f034625963e95"
 
 /// The integer square root; `None` for a negative number.
 sqrt : BigInt -> Option BigInt
 foreign pure sqrt from "flick:BigInt" "sqrt"
-  reviewed "effect@4.1.2 sha256:df0db1e74fe07fa2"
 
 /// The sum of the list, 0 when it is empty.
 sum_all : List BigInt -> BigInt
 foreign pure sum_all from "flick:BigInt" "sumAll"
-  reviewed "effect@4.1.2 sha256:0f2a9b721a5e1ff7"
 
 /// The product of the list, 1 when it is empty.
 multiply_all : List BigInt -> BigInt
 foreign pure multiply_all from "flick:BigInt" "multiplyAll"
-  reviewed "effect@4.1.2 sha256:94405b49db086dc3"
 
 /// The lesser of the two.
 min : BigInt -> BigInt -> BigInt
 foreign pure min from "flick:BigInt" "min"
   arity 1
-  reviewed "effect@4.1.2 sha256:96ef4b435d8928c2"
 
 /// The greater of the two.
 max : BigInt -> BigInt -> BigInt
 foreign pure max from "flick:BigInt" "max"
   arity 1
-  reviewed "effect@4.1.2 sha256:fab9a74b86e3773f"
 
 /// `self < that`: `x |> BigInt.is_less_than 3n`.
 is_less_than : BigInt -> BigInt -> Bool
 foreign pure is_less_than from "flick:BigInt" "isLessThan"
   arity 1
-  reviewed "effect@4.1.2 sha256:daa00103b6ae35d4"
 
 /// `self <= that`.
 is_less_than_or_equal_to : BigInt -> BigInt -> Bool
 foreign pure is_less_than_or_equal_to from "flick:BigInt" "isLessThanOrEqualTo"
   arity 1
-  reviewed "effect@4.1.2 sha256:0925de03aef95576"
 
 /// `self > that`.
 is_greater_than : BigInt -> BigInt -> Bool
 foreign pure is_greater_than from "flick:BigInt" "isGreaterThan"
   arity 1
-  reviewed "effect@4.1.2 sha256:70f7924531a64969"
 
 /// `self >= that`.
 is_greater_than_or_equal_to : BigInt -> BigInt -> Bool
 foreign pure is_greater_than_or_equal_to from "flick:BigInt" "isGreaterThanOrEqualTo"
   arity 1
-  reviewed "effect@4.1.2 sha256:f6199e1fe4770517"
 
 /// Whether `self` lies within `minimum` and `maximum`, both included.
 between : { minimum : BigInt; maximum : BigInt } -> BigInt -> Bool
 foreign pure between from "flick:BigInt" "between"
   arity 1
-  reviewed "effect@4.1.2 sha256:4e9b9d65e1820965"
 
 /// `self` kept within `minimum` and `maximum`.
 clamp : { minimum : BigInt; maximum : BigInt } -> BigInt -> BigInt
 foreign pure clamp from "flick:BigInt" "clamp"
   arity 1
-  reviewed "effect@4.1.2 sha256:3e97fc4b197568de"
 
 /// The number, when the integer is a safe one.
 to_safe_number : BigInt -> Option Float
 foreign pure to_safe_number from "flick:BigInt" "toNumber"
-  reviewed "effect@4.1.2 sha256:bf18c6631a4208c6"
 
 /// The integer of a safe integer number.
 from_safe_number : Float -> Option BigInt
 foreign pure from_safe_number from "flick:BigInt" "fromNumber"
-  reviewed "effect@4.1.2 sha256:ecbb8b6009de18bf"
 
 /// The integer JS `BigInt` reads from the string (`"12"`, `"0x1f"`); blank or
 /// malformed text is `None`.
 from_string : String -> Option BigInt
 foreign pure from_string from "flick:BigInt" "fromString"
-  reviewed "effect@4.1.2 sha256:304301196d3b59ad"
 
 /// How `n` compares with 0.
 sign : BigInt -> Ordering
 foreign pure sign from "flick:BigInt" "flickSign"
-  reviewed "effect@4.1.2 sha256:352fcb74874ed2d4"
 
 /// A BigInt as a JSON string of digits.
 json : PureCodec Json BigInt
 foreign pure json from "flick:rt" "codecBigint"
-  reviewed "effect@4.1.2 sha256:a09d15749ce57a24"

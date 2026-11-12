@@ -10,8 +10,6 @@ use std::io;
 use std::path::{Path, PathBuf};
 
 #[cfg(feature = "ide")]
-use flick_core::ffi::check::reviewed;
-#[cfg(feature = "ide")]
 use flick_core::iface::Decl;
 #[cfg(feature = "ide")]
 use flick_core::ir::{Expr, ExprKind, ItemKind};
@@ -21,7 +19,7 @@ use flick_core::project::{self, Host};
 use flick_core::source::SourceMap;
 #[cfg(feature = "ide")]
 use flick_core::types::{self, Ref, Type};
-use surface::{Binding, Manifest, Snapshot, Stdlib, lint};
+use surface::{Manifest, Snapshot, Stdlib, lint};
 #[cfg(feature = "ide")]
 use surface::{Status, coverage};
 
@@ -145,23 +143,6 @@ fn export(target: &str) -> Option<(String, Decl)> {
 }
 
 #[cfg(feature = "ide")]
-fn binding(target: &str) -> Binding {
-    let Some((defined, Decl::Foreign)) = export(target) else {
-        return Binding::Flick;
-    };
-    let (module, name) = defined.rsplit_once('.').unwrap_or_default();
-    let Some((_, text)) = types::builtin_sources().iter().find(|(m, _)| *m == module) else {
-        return Binding::Flick;
-    };
-    let mut sources = SourceMap::default();
-    let file = sources.add(format!("<builtin>/{module}.fl"), *text);
-    reviewed(text, file)
-        .into_iter()
-        .find(|r| r.name == name)
-        .map_or(Binding::Unreviewed, |r| Binding::Reviewed(r.provenance))
-}
-
-#[cfg(feature = "ide")]
 fn pinned() -> String {
     let text = fs::read_to_string(repo().join("packages/effect-ts/package.json"))
         .expect("packages/effect-ts/package.json");
@@ -175,9 +156,10 @@ fn pinned() -> String {
 #[cfg(feature = "ide")]
 #[test]
 fn the_manifest_classifies_the_pinned_effect() {
-    let dir = repo().join("stdlib/Effect");
+    let dir = repo().join("packages/effect-ts/coverage");
     let snapshot: Snapshot = serde_json::from_str(
-        &fs::read_to_string(dir.join("snapshot.json")).expect("stdlib/Effect/snapshot.json"),
+        &fs::read_to_string(dir.join("snapshot.json"))
+            .expect("packages/effect-ts/coverage/snapshot.json"),
     )
     .expect("a valid snapshot");
     let mut texts = Vec::new();
@@ -189,7 +171,6 @@ fn the_manifest_classifies_the_pinned_effect() {
     let exists = |t: &str| export(t).is_some();
     let stdlib = Stdlib {
         exists: &exists,
-        binding: &binding,
         used: &is_used,
     };
     let report = coverage(&snapshot, &manifest);
@@ -243,16 +224,9 @@ fn fixture(module: &str, snapshot: &str) -> Vec<String> {
         ("core/Sched.toml".to_owned(), module.to_owned()),
     ]);
     let exists = |t: &str| t.starts_with("Sched.") && t != "Sched.gone";
-    let binding = |t: &str| match t {
-        "Sched.spaced" => Binding::Reviewed("effect@9.9.9 sha256:1111111111111111".to_owned()),
-        "Sched.old" => Binding::Reviewed("effect@9.9.8 sha256:1111111111111111".to_owned()),
-        "Sched.bare" => Binding::Unreviewed,
-        _ => Binding::Flick,
-    };
     let used = |t: &str| t != "Sched.unused";
     let stdlib = Stdlib {
         exists: &exists,
-        binding: &binding,
         used: &used,
     };
     lint(&snapshot, &manifest, &stdlib, "9.9.9")
@@ -308,20 +282,6 @@ fn a_wrapper_no_test_uses_fails() {
 }
 
 #[test]
-fn a_binding_reviewed_against_another_release_or_none_fails() {
-    let module = MODULE
-        .replace("\"Sched.forever 2222", "\"Sched.old 2222")
-        .replace("\"Sched.spaced 1111", "\"Sched.bare 1111");
-    assert_eq!(
-        fixture(&module, SNAPSHOT),
-        [
-            "Sched.forever: the binding `Sched.old` was reviewed against `effect@9.9.8 sha256:1111111111111111`, not effect@9.9.9",
-            "Sched.spaced: the binding `Sched.bare` has no `reviewed \"effect@9.9.9 …\"`"
-        ]
-    );
-}
-
-#[test]
 fn pending_needs_a_reason() {
     let module = MODULE
         .replace(
@@ -361,14 +321,13 @@ fn after_effect_bump_the_linter_is_red_until_review() {
         &fs::read_to_string(fixtures.join("effect-1.1.0.snapshot.json")).expect("bumped snapshot"),
     )
     .expect("a valid snapshot");
-    let base = fixtures.join("repo/stdlib/Effect/surface");
+    let base = fixtures.join("repo/packages/effect-ts/coverage/surface");
     let mut texts = Vec::new();
     files(&base, &base, &mut texts);
     let manifest = Manifest::parse(&texts);
     let any = |t: &str| t.starts_with("Sched.");
     let stdlib = Stdlib {
         exists: &any,
-        binding: &|_| Binding::Flick,
         used: &any,
     };
     assert_eq!(

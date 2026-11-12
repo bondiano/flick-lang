@@ -16,99 +16,81 @@ type ClientResponse
 /// The status code.
 status : ClientResponse -> Int
 foreign pure status from "flick:http/HttpClientResponse" "flickStatus"
-  reviewed "effect@4.1.2 sha256:37f765a464b7a0fa"
 
 /// The headers.
 headers : ClientResponse -> Http.Headers.Headers
 foreign pure headers from "flick:http/HttpClientResponse" "flickHeaders"
-  reviewed "effect@4.1.2 sha256:37f765a464b7a0fa"
 
 /// The cookies of its `Set-Cookie` headers.
 cookies : ClientResponse -> Http.Cookies.Cookies
 foreign pure cookies from "flick:http/HttpClientResponse" "flickCookies"
-  reviewed "effect@4.1.2 sha256:37f765a464b7a0fa"
 
 /// The URL the response came from.
 url : ClientResponse -> String
 foreign pure url from "flick:http/HttpClientResponse" "flickUrl"
-  reviewed "effect@4.1.2 sha256:37f765a464b7a0fa"
 
 /// The request it answers.
 request : ClientResponse -> Http.ClientRequest.ClientRequest
 foreign pure request from "flick:http/HttpClientResponse" "flickRequest"
-  reviewed "effect@4.1.2 sha256:37f765a464b7a0fa"
 
 /// The body as text.
 text : ClientResponse ->{Async; HttpClientError} String
 foreign effect text from "flick:http/HttpClientResponse" "flickText"
-  reviewed "effect@4.1.2 sha256:37f765a464b7a0fa"
 
 /// The body as JSON.
 json : ClientResponse ->{Async; HttpClientError} Json
 foreign effect json from "flick:http/HttpClientResponse" "flickJson"
-  reviewed "effect@4.1.2 sha256:37f765a464b7a0fa"
 
 /// The body as URL parameters (`application/x-www-form-urlencoded`).
 url_params_body : ClientResponse ->{Async; HttpClientError} Http.UrlParams.UrlParams
 foreign effect url_params_body from "flick:http/HttpClientResponse" "flickUrlParamsBody"
-  reviewed "effect@4.1.2 sha256:37f765a464b7a0fa"
 
 /// The bytes of the body.
 bytes : ClientResponse ->{Async; HttpClientError} List Int
 foreign effect bytes from "flick:http/HttpClientResponse" "flickBytes"
-  reviewed "effect@4.1.2 sha256:37f765a464b7a0fa"
 
 /// The chunks of bytes of the body, as they arrive.
 stream : ClientResponse -> Stream none {HttpClientError} (List Int)
 foreign pure stream from "flick:http/HttpClientResponse" "flickStream"
-  reviewed "effect@4.1.2 sha256:d1e975aadadf634b"
 
 /// The text fields of a `multipart/form-data` body.
 form_data : ClientResponse ->{Async; HttpClientError} List (String, String)
 foreign effect form_data from "flick:http/HttpClientResponse" "flickFormData"
-  reviewed "effect@4.1.2 sha256:37f765a464b7a0fa"
 
 /// The response, if `f` accepts its status; a `StatusCodeError` otherwise.
 filter_status : (Int -> Bool) -> ClientResponse ->{; HttpClientError} ClientResponse
 foreign effect filter_status from "flick:http/HttpClientResponse" "flickFilterStatus"
   arity 2
-  reviewed "effect@4.1.2 sha256:82ece8d5b24b992d"
 
 /// The response, if its status is 2xx; a `StatusCodeError` otherwise.
 filter_status_ok : ClientResponse ->{; HttpClientError} ClientResponse
 foreign effect filter_status_ok from "flick:http/HttpClientResponse" "flickFilterStatusOk"
-  reviewed "effect@4.1.2 sha256:bd1f82503727157f"
 
 /// Decodes `{ status, headers, body }` of the response, the body read as
 /// JSON.
 schema_json : Codec rd re Json a -> ClientResponse ->{rd; HttpClientError, SchemaError} a
 foreign effect schema_json from "flick:http/HttpClientResponse" "flickSchemaJson"
   arity 2
-  reviewed "effect@4.1.2 sha256:3fc269f3d81aa642"
 
 /// Decodes `{ status, headers }` of the response.
 schema_no_body : Codec rd re Json a -> ClientResponse ->{rd; SchemaError} a
 foreign effect schema_no_body from "flick:http/HttpClientResponse" "flickSchemaNoBody"
   arity 2
-  reviewed "effect@4.1.2 sha256:a0e1567b9179e065"
 
 /// Decodes the JSON body.
 schema_body_json : Codec rd re Json a -> ClientResponse ->{rd; HttpClientError, SchemaError} a
 foreign effect schema_body_json from "flick:http/HttpClientResponse" "flickSchemaBodyJson"
   arity 2
-  reviewed "effect@4.1.2 sha256:a6fc2625f3292603"
 
 /// Decodes the URL parameters of the body.
 schema_body_url_params : Codec rd re Json a -> ClientResponse ->{rd; HttpClientError, SchemaError} a
 foreign effect schema_body_url_params from "flick:http/HttpClientResponse" "flickSchemaBodyUrlParams"
   arity 2
-  reviewed "effect@4.1.2 sha256:fb8aac67bbf0234e"
 
 /// Decodes the headers.
 schema_headers : Codec rd re Json a -> ClientResponse ->{rd; SchemaError} a
 foreign effect schema_headers from "flick:http/HttpClientResponse" "flickSchemaHeaders"
   arity 2
-  reviewed "effect@4.1.2 sha256:c09a4db863a5e1ca"
 
 instance Show ClientResponse =
   let show x = "ClientResponse " ++ show (status x) ++ " " ++ show (headers x)

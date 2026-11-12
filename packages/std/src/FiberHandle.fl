@@ -24,7 +24,6 @@ type alias RunOptions = {
 make : Unit ->{Scope s} FiberHandle s e a
 foreign effect make from "flick:FiberHandle" "flickMake"
   arity 0
-  reviewed "effect@4.1.2 sha256:c6550d9883ffb295"
 
 /// Runs `task` as the child of the handle; it may hold only what outlives
 /// the handle's region.
@@ -34,35 +33,29 @@ run :
 foreign effect run from "flick:FiberHandle" "flickRun"
   arity 1
   retention owner
-  reviewed "effect@4.1.2 sha256:aca7b90ef702a788"
 
 /// Keeps a child spawned elsewhere as the one of the handle.
 set : SetOptions -> Fiber.Fiber e a -> FiberHandle s e a ->{Async} Unit
 foreign effect set from "flick:FiberHandle" "flickSet"
   arity 1
   retention call
-  reviewed "effect@4.1.2 sha256:f4cc4630ffda7eae"
 
 /// The child, if one is running.
 get : FiberHandle s e a ->{} Option (Fiber.Fiber e a)
 foreign effect get from "flick:FiberHandle" "flickGet"
   retention call
-  reviewed "effect@4.1.2 sha256:a7a0c777d9a6de40"
 
 /// Interrupts the child and empties the handle.
 clear : FiberHandle s e a ->{Async} Unit
 foreign effect clear from "flick:FiberHandle" "clear"
   retention call
-  reviewed "effect@4.1.2 sha256:7fe537025eeec2f4"
 
 /// Waits until the scope closes or the child fails, and fails as it did.
 join : FiberHandle s e a ->{Async; e} Unit
 foreign effect join from "flick:FiberHandle" "join"
   retention call
-  reviewed "effect@4.1.2 sha256:caaa432c5d4304c0"
 
 /// Waits until no child is running.
 await_empty : FiberHandle s e a ->{Async} Unit
 foreign effect await_empty from "flick:FiberHandle" "awaitEmpty"
   retention call
-  reviewed "effect@4.1.2 sha256:7328e8a70fedd0b0"

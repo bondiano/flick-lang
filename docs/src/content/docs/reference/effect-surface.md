@@ -9,8 +9,8 @@ Effect moves.
 
 ## Snapshot
 
-`stdlib/Effect/snapshot.json` is the surface of the installed Effect, written
-by `node tools/dts-importer/index.mjs surface > stdlib/Effect/snapshot.json`
+`packages/effect-ts/coverage/snapshot.json` is the surface of the installed Effect, written
+by `node tools/dts-importer/index.mjs surface > packages/effect-ts/coverage/snapshot.json`
 (a Flick program: `pnpm -C tools/dts-importer build` first):
 every entrypoint of its `package.json`, and for the nine wrapped ones each
 export of each module as `Module.name` with its kind (`value`, `type` or
@@ -20,7 +20,7 @@ fingerprint; a changed signature does not.
 
 ## Manifest
 
-`stdlib/Effect/surface/entrypoints.toml` decides each entrypoint: its
+`packages/effect-ts/coverage/surface/entrypoints.toml` decides each entrypoint: its
 modules are classified under a directory, or it is excluded as a whole, so a
 new entrypoint of Effect needs a decision too.
 
@@ -29,7 +29,7 @@ new entrypoint of Effect needs a decision too.
 "effect/ai" = { excluded = "AI provider clients are outside the 0.1.0 standard library" }
 ```
 
-`stdlib/Effect/surface/<dir>/<Module>.toml` (or `<Module>.<part>.toml` for a
+`packages/effect-ts/coverage/surface/<dir>/<Module>.toml` (or `<Module>.<part>.toml` for a
 large module) gives each export of the module exactly one status:
 
 ```toml
@@ -64,8 +64,6 @@ cron = "cron expressions need a parser of their own"
 - a `wrapped` export whose fingerprint differs from the reviewed one;
 - a `wrapped` symbol the standard library does not export, or that no test
   under `tests/run/stdlib/` refers to (resolved by the checker);
-- a foreign binding of a `wrapped` symbol without `reviewed
-  "effect@<pinned> …"`, or reviewed against another release;
 - a `language`, `excluded` or `pending` decision without a reason, a snapshot of another release than
   `packages/effect-ts/package.json` pins.
 
@@ -77,8 +75,7 @@ to the run's summary.
 `just effect-bump <version>` downloads the release, writes its snapshot,
 prints what was added, removed and changed and what the runtime's
 capability matrix lacks, and moves the pins (`packages/effect-ts/package.json`,
-`packages/effect-ts/src/capabilities.ts`, the runtime's version test). The linter stays red until the manifest and the
-reviewed bindings agree with the new snapshot.
+`packages/effect-ts/src/capabilities.ts`, the runtime's version test). The linter stays red until the manifest agrees with the new snapshot.
 
 ## Unstable modules
 
@@ -142,7 +139,6 @@ Flick `type error`) sits in the same file, named `flick<Name>`.
 /// Recurs forever, each step the duration after the previous one ended.
 spaced : Duration.Duration -> Schedule none none i Float
 foreign pure spaced from "flick:Schedule" "spaced"
-  reviewed "effect@4.1.2 sha256:498f22b480d2397e"
 
 retry :
   forall c r e a r2 e2 o.
@@ -150,7 +146,6 @@ retry :
 foreign effect retry from "flick:Effect" "retry"
   arity 1
   retention call
-  reviewed "effect@4.1.2 sha256:508d9e1864f6c9d3"
 ```
 
 Names are snake case; the subject comes last, so `task |> Effect.retry

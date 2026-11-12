@@ -6,9 +6,7 @@ module Formatter exposing (..)
 /// The data as text: strings quoted, `BigInt`s with `n`.
 format : Unknown -> String
 foreign pure format from "flick:Formatter" "format"
-  reviewed "effect@4.1.2 sha256:e11f1775ecc1e146"
 
 /// The data as JSON text, indented by `indent` spaces (0 for one line).
 format_json : Int -> Unknown -> String
 foreign pure format_json from "flick:Formatter" "flickFormatJson"
-  reviewed "effect@4.1.2 sha256:a883240b23b23332"

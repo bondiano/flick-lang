@@ -51,15 +51,12 @@ foreign pure with_while from "flick:ExecutionPlan" "flickWithWhile"
 /// The plan of these steps, tried in order.
 make : NonEmpty.NonEmpty (Step p r e i) -> ExecutionPlan p r e i
 foreign pure make from "flick:ExecutionPlan" "flickMake"
-  reviewed "effect@4.1.2 sha256:558d7d1b14e5c534"
 
 /// The steps of the plans, one plan after another.
 merge : NonEmpty.NonEmpty (ExecutionPlan p r e i) -> ExecutionPlan p r e i
 foreign pure merge from "flick:ExecutionPlan" "flickMerge"
-  reviewed "effect@4.1.2 sha256:3b9926fe30ac6c1e"
 
 /// The attempt the current task runs as, inside a plan.
 current_metadata : Unit ->{} Metadata
 foreign effect current_metadata from "flick:ExecutionPlan" "flickCurrentMetadata"
   arity 0
-  reviewed "effect@4.1.2 sha256:331a4ec44cf66af8"

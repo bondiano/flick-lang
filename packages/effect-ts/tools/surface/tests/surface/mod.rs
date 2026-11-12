@@ -1,7 +1,8 @@
 //! The Effect coverage linter: every export of the pinned Effect's snapshot
-//! has exactly one decision in the manifest `stdlib/Effect/surface/`, and
+//! has exactly one decision in the manifest `packages/effect-ts/coverage/surface/`, and
 //! every `wrapped` decision names a symbol of the standard library that a
-//! stdlib test uses, reviewed against the pinned release.
+//! stdlib test uses, with the fingerprint of the pinned release's export
+//! it was reviewed against.
 
 use std::collections::{BTreeMap, BTreeSet};
 #[cfg(feature = "ide")]
@@ -9,7 +10,7 @@ use std::fmt::Write;
 
 use serde::Deserialize;
 
-/// `stdlib/Effect/snapshot.json`, written by `tools/dts-importer/index.mjs surface`.
+/// `packages/effect-ts/coverage/snapshot.json`, written by `tools/dts-importer/index.mjs surface`.
 #[derive(Debug, Deserialize)]
 pub struct Snapshot {
     pub version: String,
@@ -159,22 +160,10 @@ impl Manifest {
     }
 }
 
-/// A symbol of the standard library as a binding.
-pub enum Binding {
-    /// Defined in Flick, or not a value.
-    Flick,
-    /// A foreign binding without `reviewed`.
-    Unreviewed,
-    /// A foreign binding with the provenance of its `reviewed` line.
-    Reviewed(String),
-}
-
 /// What the linter needs of the standard library.
 pub struct Stdlib<'a> {
     /// Whether `Module.name` is an exported symbol.
     pub exists: &'a dyn Fn(&str) -> bool,
-    /// What kind of binding `Module.name` is.
-    pub binding: &'a dyn Fn(&str) -> Binding,
     /// Whether a stdlib test refers to `Module.name`.
     pub used: &'a dyn Fn(&str) -> bool,
 }
@@ -226,7 +215,7 @@ pub fn lint(
             let status = decisions.and_then(|d| d.get(name).or_else(|| d.get("*")));
             match status {
                 None => out.push(format!("{key}: not classified")),
-                Some(status) => out.extend(check(key, fingerprint, status, stdlib, pinned)),
+                Some(status) => out.extend(check(key, fingerprint, status, stdlib)),
             }
         }
     }
@@ -250,13 +239,7 @@ pub fn lint(
     out
 }
 
-fn check(
-    key: &str,
-    fingerprint: &str,
-    status: &Status,
-    stdlib: &Stdlib,
-    pinned: &str,
-) -> Vec<String> {
+fn check(key: &str, fingerprint: &str, status: &Status, stdlib: &Stdlib) -> Vec<String> {
     let mut out = Vec::new();
     match status {
         Status::Wrapped {
@@ -274,15 +257,6 @@ fn check(
                 ));
             } else if !(stdlib.used)(target) {
                 out.push(format!("{key}: no stdlib test uses `{target}`"));
-            }
-            match (stdlib.binding)(target) {
-                Binding::Unreviewed => out.push(format!(
-                    "{key}: the binding `{target}` has no `reviewed \"effect@{pinned} …\"`"
-                )),
-                Binding::Reviewed(p) if !p.starts_with(&format!("effect@{pinned} ")) => out.push(format!(
-                    "{key}: the binding `{target}` was reviewed against `{p}`, not effect@{pinned}"
-                )),
-                Binding::Reviewed(_) | Binding::Flick => {}
             }
         }
         Status::Language(why) | Status::Excluded(why) | Status::Pending(why)

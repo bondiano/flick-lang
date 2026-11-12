@@ -18,74 +18,62 @@ type Redaction = Plain String | Secret (Redacted String)
 /// No headers.
 empty : Headers
 foreign pure empty from "flick:http/Headers" "empty"
-  reviewed "effect@4.1.2 sha256:82fe6753b2cde128"
 
 /// Headers of the pairs; a later pair of a name replaces an earlier one.
 from_input : Input -> Headers
 foreign pure from_input from "flick:http/Headers" "fromInput"
   arity 1
-  reviewed "effect@4.1.2 sha256:51e9cafba8e55b7b"
 
 /// Whether a header of the name is set.
 has : String -> Headers -> Bool
 foreign pure has from "flick:http/Headers" "has"
   arity 1
-  reviewed "effect@4.1.2 sha256:fa9fa5b01e45548d"
 
 /// The value of the header, if it is set.
 get : String -> Headers -> Option String
 foreign pure get from "flick:http/Headers" "get"
   arity 1
-  reviewed "effect@4.1.2 sha256:f877b8641d547ee6"
 
 /// Sets the header: `set name value headers`.
 set : String -> String -> Headers -> Headers
 foreign pure set from "flick:http/Headers" "set"
   arity 2
-  reviewed "effect@4.1.2 sha256:281fe1d3fa34150d"
 
 /// Sets each of the pairs.
 set_all : Input -> Headers -> Headers
 foreign pure set_all from "flick:http/Headers" "setAll"
   arity 1
-  reviewed "effect@4.1.2 sha256:72daa8fbf61bf93e"
 
 /// The headers with those of the first argument set over them.
 merge : Headers -> Headers -> Headers
 foreign pure merge from "flick:http/Headers" "merge"
   arity 1
-  reviewed "effect@4.1.2 sha256:0e6b0aee07a40030"
 
 /// Removes the header.
 remove : String -> Headers -> Headers
 foreign pure remove from "flick:http/Headers" "remove"
   arity 1
-  reviewed "effect@4.1.2 sha256:23d4476e212e55af"
 
 /// Removes each of the headers.
 remove_many : List String -> Headers -> Headers
 foreign pure remove_many from "flick:http/Headers" "removeMany"
   arity 1
-  reviewed "effect@4.1.2 sha256:6b85e3858d7d9730"
 
 /// The pairs, the values of the named headers turned into secrets.
 redact : List String -> Headers -> List (String, Redaction)
 foreign pure redact from "flick:http/Headers" "flickRedact"
   arity 2
-  reviewed "effect@4.1.2 sha256:badde60aa818e4ae"
 
 /// Whether a header of the name is among the names, ignoring case.
 is_redacted_name : String -> List String -> Bool
 foreign pure is_redacted_name from "flick:http/Headers" "isRedactedName"
   arity 2
-  reviewed "effect@4.1.2 sha256:446af9f2160ae36a"
 
 /// Runs `task` with the names of the headers that logs and `show` mask.
 with_redacted_names : List String -> (Eff r e a)^c ->{r; e} a
 foreign effect with_redacted_names from "flick:http/Headers" "flickWithRedactedNames"
   arity 2
   retention call
-  reviewed "effect@4.1.2 sha256:c7a7b9cf63e3925a"
 
 /// The pairs of name and value, in insertion order.
 to_list : Headers -> Input
@@ -98,11 +86,9 @@ foreign pure to_unknown from "flick:http/Headers" "flickToUnknown"
 equivalent : Headers -> Headers -> Bool
 foreign pure equivalent from "flick:http/Headers" "Equivalence"
   arity 2
-  reviewed "effect@4.1.2 sha256:ce1a003e3bdd15a8"
 
 show_headers : Headers -> String
 foreign pure show_headers from "flick:http/Headers" "flickShow"
-  reviewed "effect@4.1.2 sha256:e90b32f055e0a039"
 
 instance Eq Headers =
   let eq x y = equivalent x y

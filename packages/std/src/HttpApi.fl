@@ -83,7 +83,6 @@ type error ClientError = ClientError { status : Int; message : String }
 endpoint : Method -> String -> Record.Label l -> Endpoint l (Request Unit Unit Unit Unit ->{r} Unit)
 foreign pure endpoint from "flick:http-api/HttpApi" "httpApiEndpoint"
   arity 3
-  reviewed "effect@4.1.2 sha256:249f1d9fd9f6022e"
 
 /// The path parameters, decoded by a record codec from their texts.
 with_path :
@@ -92,7 +91,6 @@ with_path :
   Endpoint l (Request p2 q h b ->{r; e} s)
 foreign pure with_path from "flick:http-api/HttpApi" "httpApiWithPath"
   arity 2
-  reviewed "effect@4.1.2 sha256:722ba5ecbebad307"
 
 /// The query, decoded by a record codec from the texts of its parameters.
 with_query :
@@ -101,7 +99,6 @@ with_query :
   Endpoint l (Request p q2 h b ->{r; e} s)
 foreign pure with_query from "flick:http-api/HttpApi" "httpApiWithQuery"
   arity 2
-  reviewed "effect@4.1.2 sha256:722ba5ecbebad307"
 
 /// The headers, decoded by a record codec (names in lower case).
 with_headers :
@@ -110,7 +107,6 @@ with_headers :
   Endpoint l (Request p q h2 b ->{r; e} s)
 foreign pure with_headers from "flick:http-api/HttpApi" "httpApiWithHeaders"
   arity 2
-  reviewed "effect@4.1.2 sha256:722ba5ecbebad307"
 
 /// The JSON body.
 with_payload :
@@ -119,7 +115,6 @@ with_payload :
   Endpoint l (Request p q h b2 ->{r; e} s)
 foreign pure with_payload from "flick:http-api/HttpApi" "httpApiWithPayload"
   arity 2
-  reviewed "effect@4.1.2 sha256:ea023890e9f4cdfd"
 
 text_payload :
   PureCodec Json String ->
@@ -127,7 +122,6 @@ text_payload :
   Endpoint l (Request p q h String ->{r; e} s)
 foreign pure text_payload from "flick:http-api/HttpApi" "httpApiWithTextPayload"
   arity 2
-  reviewed "effect@4.1.2 sha256:722ba5ecbebad307"
 
 /// The body as plain text.
 with_text_payload :
@@ -142,7 +136,6 @@ with_form_payload :
   Endpoint l (Request p q h b2 ->{r; e} s)
 foreign pure with_form_payload from "flick:http-api/HttpApi" "httpApiWithFormPayload"
   arity 2
-  reviewed "effect@4.1.2 sha256:fae5439e529c17bd"
 
 text_success :
   Int ->
@@ -151,7 +144,6 @@ text_success :
   Endpoint l (Request p q h b ->{r; e} String)
 foreign pure text_success from "flick:http-api/HttpApi" "httpApiWithTextSuccess"
   arity 3
-  reviewed "effect@4.1.2 sha256:722ba5ecbebad307"
 
 /// The success as plain text, with its status.
 with_text_success :
@@ -166,7 +158,6 @@ with_success :
   Endpoint l (Request p q h b ->{r; e} s2)
 foreign pure with_success from "flick:http-api/HttpApi" "httpApiWithSuccess"
   arity 3
-  reviewed "effect@4.1.2 sha256:dcff7c76f16ea23b"
 
 /// No typed error.
 errors : ErrorCases none
@@ -176,7 +167,6 @@ foreign pure errors from "flick:http-api/HttpApi" "httpApiErrors"
 error_case : Int -> PureCodec Json t -> ErrorCases e -> ErrorCases {t | e}
 foreign pure error_case from "flick:http-api/HttpApi" "httpApiErrorCase"
   arity 3
-  reviewed "effect@4.1.2 sha256:722ba5ecbebad307"
 
 /// More typed errors of the handler, each sent as its case says: a handler
 /// failing with an error no case has is a type error, not a 500.
@@ -186,7 +176,6 @@ with_errors :
   Endpoint l (Request p q h b ->{r; e + e2} s)
 foreign pure with_errors from "flick:http-api/HttpApi" "httpApiWithErrors"
   arity 2
-  reviewed "effect@4.1.2 sha256:722ba5ecbebad307"
 
 /// The cases and `HttpError`s of this status, for the document and the client.
 http_error : Int -> ErrorCases e -> ErrorCases {HttpError | e}
@@ -195,25 +184,21 @@ let http_error status cases = error_case status (Codec.json HttpError.schema) ca
 /// A bearer token in `Authorization`, under the scheme name `name`.
 bearer : String -> Security
 foreign pure bearer from "flick:http-api/HttpApi" "httpApiBearer"
-  reviewed "effect@4.1.2 sha256:00de79bf2fbfe284"
 
 /// A user and password in `Authorization`.
 basic : String -> Security
 foreign pure basic from "flick:http-api/HttpApi" "httpApiBasic"
-  reviewed "effect@4.1.2 sha256:884d281acdb5e174"
 
 /// A key named `key` in a header, the query or a cookie.
 api_key : String -> { key : String; location : KeyLocation } -> Security
 foreign pure api_key from "flick:http-api/HttpApi" "httpApiKey"
   arity 2
-  reviewed "effect@4.1.2 sha256:f72f48bfef2f9e66"
 
 /// The endpoint requires one of its security schemes; the handler reads the
 /// credentials from the headers it declares.
 with_security : Security -> Endpoint l f -> Endpoint l f
 foreign pure with_security from "flick:http-api/HttpApi" "httpApiWithSecurity"
   arity 2
-  reviewed "effect@4.1.2 sha256:4254d1f1f0577372"
 
 /// Runs `hook` on the decoded request before the handler, with its services;
 /// a typed failure of the hook is answered as one of the handler would be.
@@ -223,7 +208,6 @@ with_middleware :
   Endpoint l (Request p q h b ->{r; e} s)
 foreign pure with_middleware from "flick:http-api/HttpApi" "httpApiWithMiddleware"
   arity 2
-  reviewed "effect@4.1.2 sha256:468649beea1d8514"
 
 /// The service `a` for the handler, made per request by `check` from the
 /// declared headers; its typed failure is answered as the handler's would
@@ -250,23 +234,19 @@ foreign pure with_optional_auth from "flick:http-api/HttpApi" "httpApiWithOption
 /// The endpoint is marked deprecated in the document.
 deprecate : Endpoint l f -> Endpoint l f
 foreign pure deprecate from "flick:http-api/HttpApi" "httpApiDeprecate"
-  reviewed "effect@4.1.2 sha256:c25f200594f13729"
 
 /// The endpoint is served but left out of the document.
 hide : Endpoint l f -> Endpoint l f
 foreign pure hide from "flick:http-api/HttpApi" "httpApiHide"
-  reviewed "effect@4.1.2 sha256:fcb5f87b0c8dfeb9"
 
 /// The summary in the OpenAPI document.
 describe : String -> Endpoint l f -> Endpoint l f
 foreign pure describe from "flick:http-api/HttpApi" "httpApiDescribe"
   arity 2
-  reviewed "effect@4.1.2 sha256:d6a2b6875e10e51e"
 
 /// A group with no endpoints yet.
 group : Record.Label n -> Group n r {}
 foreign pure group from "flick:http-api/HttpApi" "httpApiGroup"
-  reviewed "effect@4.1.2 sha256:34e655ec9d775e22"
 
 /// The group with the endpoint: its handler becomes a field of the group.
 add :
@@ -277,7 +257,6 @@ add :
   Endpoint l (Request p q h b ->{r; e} s) -> Group n r hs -> Group n r out
 foreign pure add from "flick:http-api/HttpApi" "httpApiAdd"
   arity 2
-  reviewed "effect@4.1.2 sha256:722ba5ecbebad307"
 
 /// The group without the service `a` its endpoints make with `with_auth`
 /// (a defect when one does not).
@@ -288,13 +267,11 @@ foreign pure authenticated from "flick:http-api/HttpApi" "httpApiAuthenticated"
 /// An API with no groups yet; `name` is the title of its document.
 api : String -> Api r {}
 foreign pure api from "flick:http-api/HttpApi" "httpApiMake"
-  reviewed "effect@4.1.2 sha256:722ba5ecbebad307"
 
 /// The document's version, description and servers.
 info : Info -> Api r gs -> Api r gs
 foreign pure info from "flick:http-api/HttpApi" "httpApiInfo"
   arity 2
-  reviewed "effect@4.1.2 sha256:6c74cdf7ba47ec83"
 
 /// The API with the group: its handlers become a field of the API.
 add_group :
@@ -302,7 +279,6 @@ add_group :
   Group n r hs -> Api r gs -> Api r out
 foreign pure add_group from "flick:http-api/HttpApi" "httpApiAddGroup"
   arity 2
-  reviewed "effect@4.1.2 sha256:722ba5ecbebad307"
 
 /// Serves the API with these handlers, one per endpoint, until the scope
 /// owning region `s` closes: then it stops accepting, lets the requests it
@@ -314,7 +290,6 @@ listen :
 foreign effect listen from "flick:http-api/HttpApi" "httpApiListen"
   arity 3
   retention owner
-  reviewed "effect@4.1.2 sha256:39cb432d1b06d567"
 
 /// One route of `Http.Router` at the path pattern (`/api/*`) that serves
 /// the API with these handlers: the API shares a server and an origin with
@@ -331,7 +306,6 @@ foreign effect route from "flick:http-api/HttpApi" "httpApiRoute"
 port : Server s -> Float
 foreign pure port from "flick:http-api/HttpApi" "httpApiPort"
   retention call
-  reviewed "effect@4.1.2 sha256:722ba5ecbebad307"
 
 /// Requests the endpoint of the server at `base` (`http://127.0.0.1:8080`):
 /// the success, a declared error as the typed failure, or `ClientError`.
@@ -339,25 +313,21 @@ call :
   String -> Endpoint l (Request p q h b ->{r; e} s) -> Request p q h b ->{Async; ClientError | e} s
 foreign effect call from "flick:http-api/HttpApi" "httpApiCall"
   arity 3
-  reviewed "effect@4.1.2 sha256:054a5eea6e02f31e"
 
 /// The URL `call` would request with these path parameters and query.
 url : String -> Endpoint l (Request p q h b ->{r; e} s) -> p -> q -> Result ClientError String
 foreign pure url from "flick:http-api/HttpApi" "httpApiUrl"
   arity 4
-  reviewed "effect@4.1.2 sha256:8f2b544a4fb238d8"
 
 /// The API as OpenAPI 3.1 JSON, every schema written by the strict
 /// exporter, or the error naming `group.endpoint.part -> field`.
 openapi : Api r gs -> Result Codec.ExportError String
 foreign pure openapi from "flick:http-api/HttpApi" "httpApiOpenApi"
-  reviewed "effect@4.1.2 sha256:38e741b3195d9f08"
 
 /// The body as bytes, `application/octet-stream`.
 with_bytes_payload :
   Endpoint l (Request p q h b ->{r; e} s) -> Endpoint l (Request p q h (List Int) ->{r; e} s)
 foreign pure with_bytes_payload from "flick:http-api/HttpApi" "httpApiWithBytesPayload"
-  reviewed "effect@4.1.2 sha256:f68406c2b4703e1e"
 
 /// The body as a `multipart/form-data` form, decoded as
 /// `Http.Multipart.schema_persisted` decodes; its files are removed after
@@ -368,7 +338,6 @@ with_multipart_payload :
   Endpoint l (Request p q h b2 ->{r; e} s)
 foreign pure with_multipart_payload from "flick:http-api/HttpApi" "httpApiWithMultipartPayload"
   arity 2
-  reviewed "effect@4.1.2 sha256:f777c853d129da86"
 
 /// The body as the parts of a form, read as the handler streams them; a
 /// client sends the parts of its stream. The handler may fail with the
@@ -380,14 +349,12 @@ with_multipart_stream_payload :
     (Request p q h (Stream {Async} {Http.Multipart.MultipartError} Http.Multipart.Part) ->{Async | r; Http.Multipart.MultipartError | e}
       s)
 foreign pure with_multipart_stream_payload from "flick:http-api/HttpApi" "httpApiWithMultipartStreamPayload"
-  reviewed "effect@4.1.2 sha256:007eacb6e7e077d7"
 
 /// The success as bytes, with its status.
 with_bytes_success :
   Int -> Endpoint l (Request p q h b ->{r; e} s) -> Endpoint l (Request p q h b ->{r; e} List Int)
 foreign pure with_bytes_success from "flick:http-api/HttpApi" "httpApiWithBytesSuccess"
   arity 2
-  reviewed "effect@4.1.2 sha256:f68406c2b4703e1e"
 
 /// The success as a stream of bytes, sent as it comes; a client gets the
 /// whole body as one chunk.
@@ -397,7 +364,6 @@ with_stream_success :
   Endpoint l (Request p q h b ->{r; e} Stream none none (List Int))
 foreign pure with_stream_success from "flick:http-api/HttpApi" "httpApiWithStreamSuccess"
   arity 2
-  reviewed "effect@4.1.2 sha256:aeb72103eb6ce00d"
 
 /// The success as Server-Sent Events, each element the JSON data of one; a
 /// client reads the events of the whole body.
@@ -408,7 +374,6 @@ with_sse_success :
   Endpoint l (Request p q h b ->{r; e} Stream none none a)
 foreign pure with_sse_success from "flick:http-api/HttpApi" "httpApiWithSseSuccess"
   arity 3
-  reviewed "effect@4.1.2 sha256:ea7c04b4cacb81d1"
 
 /// A Server-Sent Event: its id, name and data.
 type alias SseEvent = { id : Option String; event : String; data : String }
@@ -420,7 +385,6 @@ with_sse_events_success :
   Endpoint l (Request p q h b ->{r; e} Stream none none SseEvent)
 foreign pure with_sse_events_success from "flick:http-api/HttpApi" "httpApiWithSseEventsSuccess"
   arity 2
-  reviewed "effect@4.1.2 sha256:ea7c04b4cacb81d1"
 
 /// The success with response headers: the handler answers the value and a
 /// record the codec encodes as headers (names in lower case).
@@ -430,7 +394,6 @@ with_success_headers :
   Endpoint l (Request p q h b ->{r; e} (s, hs))
 foreign pure with_success_headers from "flick:http-api/HttpApi" "httpApiWithSuccessHeaders"
   arity 2
-  reviewed "effect@4.1.2 sha256:478331636310bbe4"
 
 /// The success with the value of the cookie of the security, an `api_key`
 /// `InCookie`, set `Secure` and `HttpOnly` when the handler gives one. A
@@ -443,4 +406,3 @@ security_set_cookie :
   Endpoint l (Request p q h b ->{r; e} (s, Option (Redacted String)))
 foreign pure security_set_cookie from "flick:http-api/HttpApi" "httpApiSecuritySetCookie"
   arity 2
-  reviewed "effect@4.1.2 sha256:f7064c514e82a9c6"

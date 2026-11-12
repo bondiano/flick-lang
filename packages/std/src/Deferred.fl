@@ -10,12 +10,10 @@ type Deferred (e : ErrorRow) a
 make : Unit ->{} Deferred e a
 foreign effect make from "flick:Deferred" "make"
   arity 0
-  reviewed "effect@4.1.2 sha256:1521a0846a3d9965"
 
 /// Waits until the deferred is completed, then succeeds or fails as it did.
 await_ : Deferred e a ->{Async; e} a
 foreign effect await_ from "flick:Deferred" "await"
-  reviewed "effect@4.1.2 sha256:72074c23e1633d27"
 
 /// Runs `task` once and completes the deferred with its outcome; whether
 /// this call completed it.
@@ -23,81 +21,68 @@ complete : (Eff r e a)^c -> Deferred e a ->{r} Bool
 foreign effect complete from "flick:Deferred" "complete"
   arity 1
   retention call
-  reviewed "effect@4.1.2 sha256:da33d3c84e460150"
 
 /// Completes the deferred with `task` itself: each waiting task runs it.
 complete_with : Eff none e a -> Deferred e a ->{} Bool
 foreign effect complete_with from "flick:Deferred" "completeWith"
   arity 1
-  reviewed "effect@4.1.2 sha256:01101c47a8f45be4"
 
 /// Completes the deferred with how a computation ended.
 done : Exit e a -> Deferred e a ->{} Bool
 foreign effect done from "flick:Deferred" "flickDone"
   arity 1
-  reviewed "effect@4.1.2 sha256:99168f500ab46ea6"
 
 /// Fails the deferred with `error`.
 fail : Errors e -> Deferred e a ->{} Bool
 foreign effect fail from "flick:Deferred" "fail"
   arity 1
-  reviewed "effect@4.1.2 sha256:27c39aca7eb7ed57"
 
 /// Fails the deferred with the error `f ()` computes.
 fail_sync : (Unit -> Errors e)^c -> Deferred e a ->{} Bool
 foreign effect fail_sync from "flick:Deferred" "failSync"
   arity 1
   retention call
-  reviewed "effect@4.1.2 sha256:f4ff31e60fd5ce2d"
 
 /// Fails the deferred with the whole cause of `failure`.
 fail_cause : Failure e -> Deferred e a ->{} Bool
 foreign effect fail_cause from "flick:Deferred" "flickFailCause"
   arity 1
-  reviewed "effect@4.1.2 sha256:6d2e3e3fc161ebf2"
 
 /// Fails the deferred with the cause of the failure `f ()` gives.
 fail_cause_sync : (Unit -> Failure e)^c -> Deferred e a ->{} Bool
 foreign effect fail_cause_sync from "flick:Deferred" "flickFailCauseSync"
   arity 1
   retention call
-  reviewed "effect@4.1.2 sha256:291f58c08f01d1f1"
 
 /// Completes the deferred with an interruption: waiting tasks are
 /// interrupted.
 interrupt : Deferred e a ->{} Bool
 foreign effect interrupt from "flick:Deferred" "interrupt"
-  reviewed "effect@4.1.2 sha256:c82d302d4a69af38"
 
 /// `interrupt`, naming the fiber id of the interruption.
 interrupt_with : Float -> Deferred e a ->{} Bool
 foreign effect interrupt_with from "flick:Deferred" "interruptWith"
   arity 1
-  reviewed "effect@4.1.2 sha256:906fb970bd70acbd"
 
 /// Whether the deferred is completed.
 is_done : Deferred e a ->{} Bool
 foreign effect is_done from "flick:Deferred" "isDone"
-  reviewed "effect@4.1.2 sha256:0a3be7431c258f17"
 
 /// The outcome as a task, without waiting: `None` while it is not
 /// completed.
 poll : Deferred e a ->{} Option (Eff none e a)
 foreign effect poll from "flick:Deferred" "poll"
-  reviewed "effect@4.1.2 sha256:b738b8c5dee7684c"
 
 /// Completes the deferred with `value`.
 succeed : a -> Deferred e a ->{} Bool
 foreign effect succeed from "flick:Deferred" "succeed"
   arity 1
-  reviewed "effect@4.1.2 sha256:851dfa260c442d90"
 
 /// Completes the deferred with the value `f ()` computes.
 sync : (Unit -> a)^c -> Deferred e a ->{} Bool
 foreign effect sync from "flick:Deferred" "sync"
   arity 1
   retention call
-  reviewed "effect@4.1.2 sha256:209287da21f9d6d9"
 
 /// Runs `task` and completes `deferred` with its outcome:
 /// `task |> Deferred.into deferred`.
@@ -105,4 +90,3 @@ into : Deferred e a -> (Eff r e a)^c ->{r} Bool
 foreign effect into from "flick:Deferred" "into"
   arity 1
   retention call
-  reviewed "effect@4.1.2 sha256:e9090fed6284fe99"

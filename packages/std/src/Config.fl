@@ -25,104 +25,85 @@ type alias RecordOptions = { separator : Option String; keyValueSeparator : Opti
 /// Reads the configuration from the current provider.
 get : Config a ->{; ConfigError} a
 foreign effect get from "flick:Config" "flickGet"
-  reviewed "effect@4.1.2 sha256:71e6255aa447205a"
 
 /// Reads the configuration from `provider`.
 parse : ConfigProvider.ConfigProvider -> Config a ->{; ConfigError} a
 foreign effect parse from "flick:Config" "flickParse"
   arity 2
-  reviewed "effect@4.1.2 sha256:71e6255aa447205a"
 
 map : (a -> b) -> Config a -> Config b
 foreign pure map from "flick:Config" "map"
   arity 1
-  reviewed "effect@4.1.2 sha256:f29ae8e36cb25d1a"
 
 /// The configuration `f` picks by the value read.
 flat_map : (a -> Config b) -> Config a -> Config b
 foreign pure flat_map from "flick:Config" "flatMap"
   arity 1
-  reviewed "effect@4.1.2 sha256:b2b97f809a299b47"
 
 /// The value checked or converted by `f`, which may fail with a `ConfigError`.
 map_effect : (a ->{; ConfigError} b) -> Config a -> Config b
 foreign pure map_effect from "flick:Config" "mapEffect"
   arity 1
-  reviewed "effect@4.1.2 sha256:cd836bbc021833a5"
 
 /// When reading fails, the configuration `f` picks by the error.
 or_else : (ConfigError -> Config a) -> Config a -> Config a
 foreign pure or_else from "flick:Config" "flickOrElse"
   arity 1
-  reviewed "effect@4.1.2 sha256:2e365717f43bae57"
 
 /// The values of all of them, in order.
 all : List (Config a) -> Config (List a)
 foreign pure all from "flick:Config" "all"
-  reviewed "effect@4.1.2 sha256:7d764e248af5502f"
 
 /// The default when the value is missing; a malformed value still fails.
 with_default : a -> Config a -> Config a
 foreign pure with_default from "flick:Config" "withDefault"
   arity 1
-  reviewed "effect@4.1.2 sha256:0bc5e2f47cf0cbb3"
 
 /// `None` when the value is missing.
 option : Config a -> Config (Option a)
 foreign pure option from "flick:Config" "option"
-  reviewed "effect@4.1.2 sha256:2bbdc1f7d7804fff"
 
 /// The value at the path decoded by the schema; a record schema reads a
 /// record of the provider.
 schema : Schema a -> String -> Config a
 foreign pure schema from "flick:Config" "schema"
   arity 2
-  reviewed "effect@4.1.2 sha256:8db1a196b80a9d6e"
 
 /// Fails with the message.
 fail : String -> Config a
 foreign pure fail from "flick:Config" "flickFail"
-  reviewed "effect@4.1.2 sha256:2d5fc0c39b0ee4b0"
 
 /// Reads to the value, whatever the provider has.
 succeed : a -> Config a
 foreign pure succeed from "flick:Config" "succeed"
-  reviewed "effect@4.1.2 sha256:34218c88b4ed81c4"
 
 /// The value at the name, as text.
 string : String -> Config String
 foreign pure string from "flick:Config" "String"
-  reviewed "effect@4.1.2 sha256:e8b88f90671c1963"
 
 /// `string`, refusing an empty one.
 non_empty_string : String -> Config String
 foreign pure non_empty_string from "flick:Config" "NonEmptyString"
-  reviewed "effect@4.1.2 sha256:f2b55c37d91915c2"
 
 /// A number, `NaN` and the infinities included.
 number : String -> Config Float
 foreign pure number from "flick:Config" "Number"
-  reviewed "effect@4.1.2 sha256:91ad251b68b38893"
 
 /// A finite number.
 finite : String -> Config Float
 foreign pure finite from "flick:Config" "Finite"
-  reviewed "effect@4.1.2 sha256:b62ed692a3a5d63c"
 
 /// An integer.
 int : String -> Config Int
 foreign pure int from "flick:Config" "flickInt"
-  reviewed "effect@4.1.2 sha256:5af3d6e83a058045"
 
 /// `true`, `false`, `yes`, `no`, `on`, `off`, `1` or `0`.
 boolean : String -> Config Bool
 foreign pure boolean from "flick:Config" "Boolean"
-  reviewed "effect@4.1.2 sha256:35edacb881ff2db8"
 
 /// An integer port from 1 to 65535.
 port : String -> Config Float
 foreign pure port from "flick:Config" "Port"
-  reviewed "effect@4.1.2 sha256:6f4a843a0c07b659"
 
 /// A secret: text kept out of logs and output. Only a server reads one, so
 /// it needs `Server.Server`: a client entry that reaches it is
@@ -130,62 +111,51 @@ foreign pure port from "flick:Config" "Port"
 /// browser's bundle.
 redacted : String ->{Server.Server} Config (Redacted String)
 foreign effect redacted from "flick:Config" "flickRedacted"
-  reviewed "effect@4.1.2 sha256:39cdab7425a475a8"
 
 /// A duration written as a number and a unit: `10 seconds`, `5 millis`.
 duration : String -> Config Duration.Duration
 foreign pure duration from "flick:Config" "Duration"
-  reviewed "effect@4.1.2 sha256:748c4be89c7407f3"
 
 /// A size in bytes, as `512` or `10 MiB`.
 byte_size : String -> Config BigInt
 foreign pure byte_size from "flick:Config" "ByteSize"
-  reviewed "effect@4.1.2 sha256:c5d36c61a6f435b3"
 
 /// A log level by its name, as `Info`.
 log_level : String -> Config LogLevel.LogLevel
 foreign pure log_level from "flick:Config" "LogLevel"
-  reviewed "effect@4.1.2 sha256:7ef78dbcbdd27d64"
 
 /// An absolute URL, normalized.
 url : String -> Config String
 foreign pure url from "flick:Config" "flickUrl"
-  reviewed "effect@4.1.2 sha256:858378adaa2a402c"
 
 /// A date, as milliseconds since the epoch.
 date : String -> Config Float
 foreign pure date from "flick:Config" "flickDate"
-  reviewed "effect@4.1.2 sha256:8ad6b40a1a9ddd1d"
 
 /// `literal "prod" "MODE"`: exactly that text.
 literal : String -> String -> Config String
 foreign pure literal from "flick:Config" "Literal"
   arity 2
-  reviewed "effect@4.1.2 sha256:3ff271b8287127fa"
 
 /// One of the texts.
 literals : List String -> String -> Config String
 foreign pure literals from "flick:Config" "Literals"
   arity 2
-  reviewed "effect@4.1.2 sha256:40d42124a2ef815f"
 
 /// An array of the provider, or a single value split by the separator,
 /// each element decoded by the schema.
 array : ArrayOptions -> Schema a -> String -> Config (List a)
 foreign pure array from "flick:Config" "flickArray"
   arity 3
-  reviewed "effect@4.1.2 sha256:89df3be5aaf1e5b2"
 
 /// A record of the provider, or a single value of `key=value` pairs, as
 /// pairs of a key and its value decoded by the schema.
 record : RecordOptions -> Schema v -> String -> Config (List (String, v))
 foreign pure record from "flick:Config" "flickRecord"
   arity 3
-  reviewed "effect@4.1.2 sha256:37c5bece63dd81ce"
 
 /// The configuration read under the name: `nested "DB" (string "HOST")`
 /// reads `DB_HOST` from the environment.
 nested : String -> Config a -> Config a
 foreign pure nested from "flick:Config" "nested"
   arity 1
-  reviewed "effect@4.1.2 sha256:84af3577346fece7"

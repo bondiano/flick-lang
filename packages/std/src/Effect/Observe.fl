@@ -12,130 +12,108 @@ import Tracer
 /// Logs the message at the current log level (`References`).
 log : String ->{} Unit
 foreign effect log from "flick:Effect" "log"
-  reviewed "effect@4.1.2 sha256:15ef8ee1592e26b2"
 
 /// Logs the message at the level `Fatal`.
 log_fatal : String ->{} Unit
 foreign effect log_fatal from "flick:Effect" "logFatal"
-  reviewed "effect@4.1.2 sha256:01b67c00c254bb50"
 
 /// Logs the message at the level `Error`.
 log_error : String ->{} Unit
 foreign effect log_error from "flick:Effect" "logError"
-  reviewed "effect@4.1.2 sha256:f7e709ad617beb40"
 
 /// Logs the message at the level `Warn`.
 log_warning : String ->{} Unit
 foreign effect log_warning from "flick:Effect" "logWarning"
-  reviewed "effect@4.1.2 sha256:087dd1a0f9fe0b96"
 
 /// Logs the message at the level `Info`.
 log_info : String ->{} Unit
 foreign effect log_info from "flick:Effect" "logInfo"
-  reviewed "effect@4.1.2 sha256:15c19a69554dbb06"
 
 /// Logs the message at the level `Debug`.
 log_debug : String ->{} Unit
 foreign effect log_debug from "flick:Effect" "logDebug"
-  reviewed "effect@4.1.2 sha256:0cbd8b1506165ce6"
 
 /// Logs the message at the level `Trace`.
 log_trace : String ->{} Unit
 foreign effect log_trace from "flick:Effect" "logTrace"
-  reviewed "effect@4.1.2 sha256:e081ddba3a7fd517"
 
 /// Logs the message at the level.
 log_with_level : LogLevel.LogLevel -> String ->{} Unit
 foreign effect log_with_level from "flick:Effect" "flickLogWithLevel"
-  reviewed "effect@4.1.2 sha256:e8be8e2dc05a90ca"
 
 /// Runs `task` with the logger added to the current ones.
 with_logger : Logger.Logger o -> (Eff r e a)^c ->{r; e} a
 foreign effect with_logger from "flick:Effect" "withLogger"
   arity 1
   retention call
-  reviewed "effect@4.1.2 sha256:1c2944b650a9248c"
 
 /// Runs `task` with the annotation on its log messages.
 annotate_logs : String -> String -> (Eff r e a)^c ->{r; e} a
 foreign effect annotate_logs from "flick:Effect" "annotateLogs"
   arity 2
   retention call
-  reviewed "effect@4.1.2 sha256:7b2180a0efb60688"
 
 /// Annotates the log messages of the rest of the innermost `scope` (or the
 /// one of region `s`).
 annotate_logs_scoped : String -> String ->{Scope s} Unit
 foreign effect annotate_logs_scoped from "flick:Effect" "annotateLogsScoped"
-  reviewed "effect@4.1.2 sha256:c03fada96be44ec1"
 
 /// Runs `task` inside a log span with the label.
 with_log_span : String -> (Eff r e a)^c ->{r; e} a
 foreign effect with_log_span from "flick:Effect" "withLogSpan"
   arity 1
   retention call
-  reviewed "effect@4.1.2 sha256:7a35af56f150d00a"
 
 /// The current tracer.
 tracer : Unit ->{} Tracer.Tracer
 foreign effect tracer from "flick:Effect" "flickTracer"
   arity 0
-  reviewed "effect@4.1.2 sha256:55b1fe5793345414"
 
 /// Runs `task` with the attribute on every span it makes.
 annotate_spans : String -> String -> (Eff r e a)^c ->{r; e} a
 foreign effect annotate_spans from "flick:Effect" "annotateSpans"
   arity 2
   retention call
-  reviewed "effect@4.1.2 sha256:c30f3fee19705796"
 
 /// Sets the attribute on the current span, if there is one.
 annotate_current_span : String -> String ->{} Unit
 foreign effect annotate_current_span from "flick:Effect" "annotateCurrentSpan"
-  reviewed "effect@4.1.2 sha256:7d50278476b623ad"
 
 /// The span the current task runs in.
 current_span : Unit ->{; Cause.NoSuchElementError} Tracer.Span
 foreign effect current_span from "flick:Effect" "flickCurrentSpan"
   arity 0
-  reviewed "effect@4.1.2 sha256:140aa0cadbcc0501"
 
 /// The parent of the spans the current task makes, an external one too.
 current_parent_span : Unit ->{; Cause.NoSuchElementError} Tracer.Span
 foreign effect current_parent_span from "flick:Effect" "flickCurrentParentSpan"
   arity 0
-  reviewed "effect@4.1.2 sha256:fb3c66650035eac1"
 
 /// The links the spans of the current task get.
 span_links : Unit ->{} List Tracer.SpanLink
 foreign effect span_links from "flick:Effect" "flickSpanLinksNow"
   arity 0
-  reviewed "effect@4.1.2 sha256:63cad6e40b58209e"
 
 /// Runs `task` with its spans linked to these, with the attributes.
 link_spans : List Tracer.Span -> List (String, String) -> (Eff r e a)^c ->{r; e} a
 foreign effect link_spans from "flick:Effect" "flickLinkSpans"
   arity 2
   retention call
-  reviewed "effect@4.1.2 sha256:5cd010e6dfb52a13"
 
 /// A new running span; the caller ends it (`Tracer`).
 make_span : String -> Tracer.SpanOptions ->{} Tracer.Span
 foreign effect make_span from "flick:Effect" "flickMakeSpan"
-  reviewed "effect@4.1.2 sha256:104c1735fecc9b93"
 
 /// A new span that ends when the innermost `scope` (or the one of region
 /// `s`) closes.
 make_span_scoped : String -> Tracer.SpanOptions ->{Scope s} Tracer.Span
 foreign effect make_span_scoped from "flick:Effect" "flickMakeSpanScoped"
-  reviewed "effect@4.1.2 sha256:d80b1cfaabf5956d"
 
 /// Runs `f` of a new span, which ends with it; the spans inside are not
 /// its children unless `f` makes them so.
 use_span : String -> Tracer.SpanOptions -> (Tracer.Span ->{r; e} a)^c ->{r; e} a
 foreign effect use_span from "flick:Effect" "flickUseSpan"
   retention call
-  reviewed "effect@4.1.2 sha256:800a2308ea2a1e63"
 
 /// Runs `task` in a new span that ends when the innermost `scope` (or the
 /// one of region `s`) closes.
@@ -143,46 +121,39 @@ with_span_scoped : String -> Tracer.SpanOptions -> (Eff r e a)^c ->{Scope s | r;
 foreign effect with_span_scoped from "flick:Effect" "flickWithSpanScoped"
   arity 2
   retention call
-  reviewed "effect@4.1.2 sha256:e3f1bafa335eeda7"
 
 /// Runs `task` with its spans children of the span.
 with_parent_span : Tracer.Span -> (Eff r e a)^c ->{r; e} a
 foreign effect with_parent_span from "flick:Effect" "withParentSpan"
   arity 1
   retention call
-  reviewed "effect@4.1.2 sha256:47d7d001ec249b41"
 
 /// Updates the metric with `f` of the exit after `task`.
 track : Metric.Metric i s -> (Exit e a -> i)^c -> (Eff r e a)^c ->{r; e} a
 foreign effect track from "flick:Effect" "flickTrack"
   arity 2
   retention call
-  reviewed "effect@4.1.2 sha256:ed18e3cdfd6afcc8"
 
 /// Updates the metric with `f` of the value when `task` succeeds.
 track_successes : Metric.Metric i s -> (a -> i)^c -> (Eff r e a)^c ->{r; e} a
 foreign effect track_successes from "flick:Effect" "trackSuccesses"
   arity 2
   retention call
-  reviewed "effect@4.1.2 sha256:d2dc71bbe01945bd"
 
 /// Updates the metric with `f` of the typed error when `task` fails with one.
 track_errors : Metric.Metric i s -> (Errors e -> i)^c -> (Eff r e a)^c ->{r; e} a
 foreign effect track_errors from "flick:Effect" "trackErrors"
   arity 2
   retention call
-  reviewed "effect@4.1.2 sha256:ddb9eefc4bd7900c"
 
 /// Updates the metric with `f` of a defect's inert text when `task` dies.
 track_defects : Metric.Metric i s -> (String -> i)^c -> (Eff r e a)^c ->{r; e} a
 foreign effect track_defects from "flick:Effect" "flickTrackDefects"
   arity 2
   retention call
-  reviewed "effect@4.1.2 sha256:db00fc408e3139bb"
 
 /// Updates the metric with `f` of how long `task` ran.
 track_duration : Metric.Metric i s -> (Duration.Duration -> i)^c -> (Eff r e a)^c ->{r; e} a
 foreign effect track_duration from "flick:Effect" "trackDuration"
   arity 2
   retention call
-  reviewed "effect@4.1.2 sha256:b4d0db6b3ecff371"

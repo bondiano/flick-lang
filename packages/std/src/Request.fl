@@ -15,7 +15,6 @@ type RequestResolver p (e : ErrorRow) a
 /// A request of `payload`.
 of : p -> Request p e a
 foreign pure of from "flick:Request" "flickOf"
-  reviewed "effect@4.1.2 sha256:efb5499d17357926"
 
 /// The payload of a request.
 payload : Request p e a -> p
@@ -30,34 +29,28 @@ foreign pure request from "flick:Request" "flickRequest"
 run : RequestResolver p e a -> Request p e a ->{Async; e} a
 foreign effect run from "flick:Request" "flickRun"
   arity 1
-  reviewed "effect@4.1.2 sha256:c9fdf75926dde85d"
 
 /// Completes `entry` as `exit` ended.
 complete : Exit e a -> Entry p e a ->{} Unit
 foreign effect complete from "flick:Request" "flickComplete"
   arity 1
-  reviewed "effect@4.1.2 sha256:7eb5c6503185791c"
 
 /// Completes `entry` with how `task` ends.
 complete_effect : Eff r e a -> Entry p e a ->{r} Unit
 foreign effect complete_effect from "flick:Request" "completeEffect"
   arity 1
-  reviewed "effect@4.1.2 sha256:3676d79652301c9a"
 
 /// Completes `entry` with the value.
 succeed : a -> Entry p e a ->{} Unit
 foreign effect succeed from "flick:Request" "succeed"
   arity 1
-  reviewed "effect@4.1.2 sha256:235e2e7402c951c2"
 
 /// Fails `entry` with the error.
 fail : Errors e -> Entry p e a ->{} Unit
 foreign effect fail from "flick:Request" "fail"
   arity 1
-  reviewed "effect@4.1.2 sha256:45cae51a0eec9af0"
 
 /// Fails `entry` as `failure` failed, defects included.
 fail_cause : Failure e -> Entry p e a ->{} Unit
 foreign effect fail_cause from "flick:Request" "flickFailCause"
   arity 1
-  reviewed "effect@4.1.2 sha256:bc671fd6e88233a3"

@@ -45,13 +45,11 @@ serve :
 foreign effect serve from "flick:http/HttpServer" "flickServe"
   arity 2
   retention owner
-  reviewed "effect@4.1.2 sha256:2830adcb190e6acd"
 
 /// Where the server listens.
 address : Server s -> Address
 foreign pure address from "flick:http/HttpServer" "flickAddress"
   retention call
-  reviewed "effect@4.1.2 sha256:2ee695843d7fe6dc"
 
 /// The URL of an address: `http://127.0.0.1:8080` or `unix://path`.
 format_address : Address -> String
@@ -71,7 +69,6 @@ let address_formatted_with f server = f (format_address (address server))
 log_address : Server s ->{} Unit
 foreign effect log_address from "flick:http/HttpServer" "flickLogAddress"
   retention call
-  reviewed "effect@4.1.2 sha256:13cc22882eaf503e"
 
 /// The client of the service, with each request's URL below the server's.
 test_client :

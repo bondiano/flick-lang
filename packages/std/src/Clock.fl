@@ -9,37 +9,30 @@ type Clock
 clock_with : (Clock ->{r; e} a)^c ->{r; e} a
 foreign effect clock_with from "flick:Clock" "clockWith"
   retention call
-  reviewed "effect@4.1.2 sha256:744511f0e3b70f8b"
 
 /// The clock's milliseconds since 1970-01-01 UTC.
 millis_of : Clock ->{} Float
 foreign effect millis_of from "flick:Clock" "flickMillisOf"
-  reviewed "effect@4.1.2 sha256:ca9480ab0343e961"
 
 /// The clock's nanoseconds since 1970-01-01 UTC.
 nanos_of : Clock ->{} BigInt
 foreign effect nanos_of from "flick:Clock" "flickNanosOf"
-  reviewed "effect@4.1.2 sha256:ca9480ab0343e961"
 
 /// The clock's monotonic nanoseconds, for measuring elapsed time.
 monotonic_nanos_of : Clock ->{} BigInt
 foreign effect monotonic_nanos_of from "flick:Clock" "flickMonotonicNanosOf"
-  reviewed "effect@4.1.2 sha256:ca9480ab0343e961"
 
 /// The milliseconds since 1970-01-01 UTC.
 current_time_millis : Unit ->{} Float
 foreign effect current_time_millis from "flick:Clock" "flickCurrentTimeMillis"
   arity 0
-  reviewed "effect@4.1.2 sha256:fdc70b40c9ebcf9c"
 
 /// The nanoseconds since 1970-01-01 UTC.
 current_time_nanos : Unit ->{} BigInt
 foreign effect current_time_nanos from "flick:Clock" "flickCurrentTimeNanos"
   arity 0
-  reviewed "effect@4.1.2 sha256:3eb5a8a567aaa6fa"
 
 /// Monotonic nanoseconds: never go back, for measuring elapsed time.
 monotonic_time_nanos : Unit ->{} BigInt
 foreign effect monotonic_time_nanos from "flick:Clock" "flickMonotonicTimeNanos"
   arity 0
-  reviewed "effect@4.1.2 sha256:9291436410d9a58b"

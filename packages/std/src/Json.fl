@@ -4,12 +4,10 @@ module Json exposing (parse, stringify, to_unknown, json)
 /// The value of JSON text, or the reason it is not JSON.
 parse : String -> Result SchemaError Unknown
 foreign pure parse from "flick:rt" "jsonParse"
-  reviewed "effect@4.1.2 sha256:d1db3098e80c812f"
 
 /// The JSON text of a value.
 stringify : Json -> String
 foreign pure stringify from "flick:rt" "jsonStringify"
-  reviewed "effect@4.1.2 sha256:21bcb1c5436303ff"
 
 /// A JSON value as input for decoding.
 to_unknown : Json -> Unknown
@@ -18,4 +16,3 @@ foreign pure to_unknown from "flick:rt" "identity"
 /// Any JSON value, kept as it is.
 json : PureCodec Json Json
 foreign pure json from "flick:Schema" "Json"
-  reviewed "effect@4.1.2 sha256:29810266ffcc14b8"

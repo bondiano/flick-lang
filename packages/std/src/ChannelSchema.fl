@@ -9,28 +9,24 @@ decode :
   Codec rd re w a ->
   Channel rd {SchemaError | ie} (NonEmpty.NonEmpty w) (NonEmpty.NonEmpty a) d ie d
 foreign pure decode from "flick:ChannelSchema" "flickDecode"
-  reviewed "effect@4.1.2 sha256:b68dc558b2a1522b"
 
 /// Decodes each chunk of unknown values.
 decode_unknown :
   Codec rd re w a ->
   Channel rd {SchemaError | ie} (NonEmpty.NonEmpty Unknown) (NonEmpty.NonEmpty a) d ie d
 foreign pure decode_unknown from "flick:ChannelSchema" "flickDecode"
-  reviewed "effect@4.1.2 sha256:b8cf3a9ea357e5e4"
 
 /// Encodes each chunk to wire values.
 encode :
   Codec rd re w a ->
   Channel re {SchemaError | ie} (NonEmpty.NonEmpty a) (NonEmpty.NonEmpty w) d ie d
 foreign pure encode from "flick:ChannelSchema" "flickEncode"
-  reviewed "effect@4.1.2 sha256:deab460a9c9e371a"
 
 /// Encodes each chunk, its wire values as unknown values.
 encode_unknown :
   Codec rd re w a ->
   Channel re {SchemaError | ie} (NonEmpty.NonEmpty a) (NonEmpty.NonEmpty Unknown) d ie d
 foreign pure encode_unknown from "flick:ChannelSchema" "flickEncode"
-  reviewed "effect@4.1.2 sha256:db0ae9d339ef3dc5"
 
 /// A channel over wire values as one over decoded ones: its input is
 /// encoded with `inputSchema` and its output decoded with `outputSchema`.
@@ -40,7 +36,6 @@ duplex :
   Channel (r + ire + ord) {SchemaError | e} (NonEmpty.NonEmpty ia) (NonEmpty.NonEmpty oa) d ie id
 foreign pure duplex from "flick:ChannelSchema" "flickDuplex"
   arity 1
-  reviewed "effect@4.1.2 sha256:549ab6426e2eb9ed"
 
 /// `duplex` of a channel whose output is unknown values.
 duplex_unknown :
@@ -49,4 +44,3 @@ duplex_unknown :
   Channel (r + ire + ord) {SchemaError | e} (NonEmpty.NonEmpty ia) (NonEmpty.NonEmpty oa) d ie id
 foreign pure duplex_unknown from "flick:ChannelSchema" "flickDuplex"
   arity 1
-  reviewed "effect@4.1.2 sha256:1cab1c2c63ba1071"

@@ -118,7 +118,6 @@ import List.Transform exposing (..)
 /// Applies a pure function to each element.
 map : (a -> b)^c -> List a -> List b
 foreign pure map from "flick:rt" "listMap"
-  reviewed "effect@4.1.2 sha256:1f6394368959203b"
   arity 2
   retention call
 

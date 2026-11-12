@@ -8,133 +8,107 @@ import Graph.Types exposing (..)
 /// A cycle of the graph, if it has one.
 find_cycle : Graph n e k -> Option CycleResult
 foreign pure find_cycle from "flick:Graph" "findCycle"
-  reviewed "effect@4.1.2 sha256:eb145c66443c1649"
 
 /// Whether the graph has no cycle.
 is_acyclic : Graph n e k -> Bool
 foreign pure is_acyclic from "flick:Graph" "isAcyclic"
-  reviewed "effect@4.1.2 sha256:aab23e46aaa0c8b4"
 
 /// Whether the nodes split in two sets with every edge between them.
 is_bipartite : Graph n e Undirected -> Bool
 foreign pure is_bipartite from "flick:Graph" "isBipartite"
-  reviewed "effect@4.1.2 sha256:cb8a008c6b7530bc"
 
 /// A largest set of edges without a shared node; a graph that is not
 /// bipartite is an error.
 maximum_bipartite_matching : Graph n e Undirected -> Result GraphError (List BipartiteMatch)
 foreign pure maximum_bipartite_matching from "flick:Graph" "flickMaximumBipartiteMatching"
-  reviewed "effect@4.1.2 sha256:47158f1f344b307c"
 
 /// The number of edges from `source` to each node it reaches.
 unweighted_distances :
   NodeIndex -> ReachabilityConfig -> Graph n e k -> Result GraphError (List (NodeIndex, Int))
 foreign pure unweighted_distances from "flick:Graph" "flickUnweightedDistances"
-  reviewed "effect@4.1.2 sha256:ed62d3ebcccaf514"
 
 /// Whether `source` reaches `target`.
 has_path : NodeIndex -> NodeIndex -> ReachabilityConfig -> Graph n e k -> Result GraphError Bool
 foreign pure has_path from "flick:Graph" "flickHasPath"
-  reviewed "effect@4.1.2 sha256:0f051ac217ad6be3"
 
 /// The sets of nodes joined by paths.
 connected_components : Graph n e Undirected -> List (List NodeIndex)
 foreign pure connected_components from "flick:Graph" "connectedComponents"
-  reviewed "effect@4.1.2 sha256:e730ad96b310c398"
 
 /// The edges whose removal disconnects their component.
 bridges : Graph n e Undirected -> List EdgeIndex
 foreign pure bridges from "flick:Graph" "bridges"
-  reviewed "effect@4.1.2 sha256:923b820f07f57115"
 
 /// The nodes whose removal disconnects their component.
 articulation_points : Graph n e Undirected -> List NodeIndex
 foreign pure articulation_points from "flick:Graph" "articulationPoints"
-  reviewed "effect@4.1.2 sha256:d2637d734a82304a"
 
 /// The maximal sets of nodes that no single removed node disconnects.
 biconnected_components : Graph n e Undirected -> List (List NodeIndex)
 foreign pure biconnected_components from "flick:Graph" "biconnectedComponents"
-  reviewed "effect@4.1.2 sha256:97b78dc15450795c"
 
 /// The sets of nodes joined by paths when edge directions are ignored.
 weakly_connected_components : Graph n e Directed -> List (List NodeIndex)
 foreign pure weakly_connected_components from "flick:Graph" "weaklyConnectedComponents"
-  reviewed "effect@4.1.2 sha256:bf75eb82a3386340"
 
 /// The sets of nodes that each reach every other.
 strongly_connected_components : Graph n e Directed -> List (List NodeIndex)
 foreign pure strongly_connected_components from "flick:Graph" "stronglyConnectedComponents"
-  reviewed "effect@4.1.2 sha256:7af6c5153630e9b2"
 
 /// Whether every node reaches every other.
 is_connected : Graph n e Undirected -> Bool
 foreign pure is_connected from "flick:Graph" "isConnected"
-  reviewed "effect@4.1.2 sha256:b46dd0a330ba2e4c"
 
 /// Whether the graph is connected when edge directions are ignored.
 is_weakly_connected : Graph n e Directed -> Bool
 foreign pure is_weakly_connected from "flick:Graph" "isWeaklyConnected"
-  reviewed "effect@4.1.2 sha256:0ba9c25382b391c5"
 
 /// Whether every node reaches every other along the edges.
 is_strongly_connected : Graph n e Directed -> Bool
 foreign pure is_strongly_connected from "flick:Graph" "isStronglyConnected"
-  reviewed "effect@4.1.2 sha256:0ee68fdb9e67c6da"
 
 /// Whether the graph is connected and has no cycle.
 is_tree : Graph n e Undirected -> Bool
 foreign pure is_tree from "flick:Graph" "isTree"
-  reviewed "effect@4.1.2 sha256:702e7808bd93223f"
 
 /// The greatest flow from `source` to `target` within each edge's capacity.
 maximum_flow : MaximumFlowConfig e -> Graph n e Directed -> Result GraphError MaximumFlowResult
 foreign pure maximum_flow from "flick:Graph" "flickMaximumFlow"
-  reviewed "effect@4.1.2 sha256:86774ef934bef05c"
 
 /// The cheapest set of edges whose removal separates `source` from `target`.
 minimum_cut : MaximumFlowConfig e -> Graph n e Directed -> Result GraphError MinimumCutResult
 foreign pure minimum_cut from "flick:Graph" "flickMinimumCut"
-  reviewed "effect@4.1.2 sha256:270f95da961e16fe"
 
 /// A spanning tree of least total cost for each component.
 minimum_spanning_forest :
   (e -> Float) -> Graph n e Undirected -> Result GraphError (Graph n e Undirected)
 foreign pure minimum_spanning_forest from "flick:Graph" "flickMinimumSpanningForest"
-  reviewed "effect@4.1.2 sha256:a4fdd6e9b0d52677"
 
 /// The fewest edges that keep the graph's reachability; a cycle is an error.
 transitive_reduction : Graph n e Directed -> Result GraphError (Graph n e Directed)
 foreign pure transitive_reduction from "flick:Graph" "flickTransitiveReduction"
-  reviewed "effect@4.1.2 sha256:8b36ee45dd476929"
 
 /// The cheapest path, for non-negative costs.
 dijkstra : DijkstraConfig e -> Graph n e k -> Result GraphError (Option (PathResult e))
 foreign pure dijkstra from "flick:Graph" "flickDijkstra"
-  reviewed "effect@4.1.2 sha256:b9ee2d245f293dff"
 
 /// The cheapest path, guided by an estimate of the remaining cost that never
 /// overestimates.
 astar : AstarConfig e n -> Graph n e k -> Result GraphError (Option (PathResult e))
 foreign pure astar from "flick:Graph" "flickAstar"
-  reviewed "effect@4.1.2 sha256:bfcabe852305e983"
 
 /// The cheapest path, for any costs; a reachable negative cycle is an error.
 bellman_ford : BellmanFordConfig e -> Graph n e k -> Result GraphError (Option (PathResult e))
 foreign pure bellman_ford from "flick:Graph" "flickBellmanFord"
-  reviewed "effect@4.1.2 sha256:ec3316cbca43aaa9"
 
 /// The cheapest paths between every pair of nodes.
 floyd_warshall : (e -> Float) -> Graph n e k -> Result GraphError (AllPairsResult e)
 foreign pure floyd_warshall from "flick:Graph" "flickFloydWarshall"
-  reviewed "effect@4.1.2 sha256:bf2121ae1a6a1e80"
 
 /// The paths from `source` to `target` that repeat no node, at most `limit`.
 simple_paths : SimplePathsConfig -> Graph n e k -> Result GraphError (PathWalker e)
 foreign pure simple_paths from "flick:Graph" "flickSimplePaths"
-  reviewed "effect@4.1.2 sha256:f510d180eb8f9abd"
 
 /// Every cheapest path from `source` to `target`, at most `limit`.
 all_shortest_paths : AllShortestPathsConfig e -> Graph n e k -> Result GraphError (PathWalker e)
 foreign pure all_shortest_paths from "flick:Graph" "flickAllShortestPaths"
-  reviewed "effect@4.1.2 sha256:cadfed2ac72b36b6"

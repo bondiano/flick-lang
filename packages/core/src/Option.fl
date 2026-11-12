@@ -206,7 +206,6 @@ let product that self = zip_with that (fun a b -> (a, b)) self
 product_many : List (Option a) -> Option a -> Option (NonEmpty.NonEmpty a)
 foreign pure product_many from "flick:Option" "productMany"
   arity 1
-  reviewed "effect@4.1.2 sha256:ee2b8b144c477b90"
 
 /// Folds the values of the `Some` elements.
 reduce_compact : b -> (b -> a -> b)^c -> (List (Option a) -> b)^c
