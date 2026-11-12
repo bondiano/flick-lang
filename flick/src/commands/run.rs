@@ -39,7 +39,7 @@ pub fn generations(root: &Path) -> PathBuf {
 /// A directory atomically reserved by this CLI until all cleanup ends.
 pub struct Generation {
     path: PathBuf,
-    /// Built for Flick's own runtime, which has no `DevTools`.
+    /// Built for Flick's own runtime, whose `DevTools` client is its own.
     rt: bool,
     /// Built for go: each entry is an executable, not a module for node.
     go: bool,
@@ -275,15 +275,15 @@ pub fn launch(
     } else {
         let mut command = Process::new("node");
         command.arg("--enable-source-maps");
-        if generation.rt && options.devtools.is_some() {
-            report::log(
-                global,
-                "DevTools need Effect: Flick's own runtime runs without them",
-            );
-        } else if let Some(url) = &options.devtools {
-            // the runtime's module that hands `runMain` the DevTools layer
+        if let Some(url) = &options.devtools {
+            // the module that sends the program's spans to the DevTools
+            let client = if generation.rt {
+                "@flick-lang/runtime/rt/runner/devtools"
+            } else {
+                "@flick-lang/effect-ts/runner/devtools"
+            };
             command
-                .args(["--import", "@flick-lang/effect-ts/runner/devtools"])
+                .args(["--import", client])
                 .env("FLICK_DEVTOOLS", url);
         }
         command.arg(generation.path().join(runner_file(name, false)));
