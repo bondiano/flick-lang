@@ -217,6 +217,10 @@
       "@flick-lang/runtime/rt/effect/reactivity/Atom"
     ],
     [
+      "flick:http/Headers",
+      "@flick-lang/runtime/rt/effect/http/Headers"
+    ],
+    [
       "flick:rpc/Rpc",
       "@flick-lang/runtime/rt/effect/rpc/Rpc"
     ],
