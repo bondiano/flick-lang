@@ -8,7 +8,9 @@
 //! A constructor declared over a record, `Node { left : Tree; key : Int }`,
 //! holds that record in its value: the header of a `flickrt.Record` over
 //! the values beside it, so the record a `match` binds is a pointer into
-//! the value and one object is made, not a constructor and a record. Its
+//! the value and one object is made, not a constructor and a record. The
+//! value keeps its list of one field too, for the runtime to read with no
+//! list made at every question. Its
 //! labels are in the order of the declaration, whatever order a literal
 //! writes them in.
 //!
@@ -191,14 +193,14 @@ pub(super) fn file(types: &Owned) -> String {
                 let labels = labels.join(", ");
                 write!(
                     go,
-                    "\ntype {ty} struct {{\n\trec flickrt.Record\n\tf   [{n}]flickrt.Value\n}}\n\n\
+                    "\ntype {ty} struct {{\n\trec  flickrt.Record\n\tf    [{n}]flickrt.Value\n\tself [1]flickrt.Value\n}}\n\n\
                      var S_{ty} = flickrt.ShapeOf({labels})\n\n\
-                     func (p *{ty}) Fields() []flickrt.Value {{ return []flickrt.Value{{&p.rec}} }}\n\n\
+                     func (p *{ty}) Fields() []flickrt.Value {{ return p.self[:] }}\n\n\
                      func {make}({params} flickrt.Value) flickrt.Value {{\n\
                      \tp := &{ty}{{f: [{n}]flickrt.Value{{{params}}}}}\n\
-                     \tp.rec.Over(S_{ty}, p.f[:])\n\treturn p\n}}\n\n\
+                     \tp.rec.Over(S_{ty}, p.f[:])\n\tp.self[0] = &p.rec\n\treturn p\n}}\n\n\
                      func With_{ty}(r flickrt.Value) *{ty} {{\n\tp := &{ty}{{}}\n\
-                     \tS_{ty}.Values(r, p.f[:])\n\tp.rec.Over(S_{ty}, p.f[:])\n\treturn p\n}}\n\n\
+                     \tS_{ty}.Values(r, p.f[:])\n\tp.rec.Over(S_{ty}, p.f[:])\n\tp.self[0] = &p.rec\n\treturn p\n}}\n\n\
                      func (p *{ty}) Set(i int, v flickrt.Value) *{ty} {{\n\tp.f[i] = v\n\treturn p\n}}\n\n\
                      func {of}(r flickrt.Value) flickrt.Value {{ return With_{ty}(r) }}\n\n\
                      var _ = flickrt.Owned({tag}, func(f []flickrt.Value) flickrt.Value {{ return {of}(f[0]) }})\n",

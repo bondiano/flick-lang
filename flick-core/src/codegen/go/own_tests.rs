@@ -67,11 +67,18 @@ fn a_record_under_a_constructor_lies_in_its_value() {
     let (go, types) = (file("m_App.go"), file("own_types.go"));
     // one object: the header of a record over the values, in the order declared
     assert!(
-        types.contains("type T_App__Box struct {\n\trec flickrt.Record\n\tf   [3]flickrt.Value\n}"),
+        types.contains(
+            "type T_App__Box struct {\n\trec  flickrt.Record\n\tf    [3]flickrt.Value\n\tself [1]flickrt.Value\n}"
+        ),
         "{types}"
     );
     assert!(
         types.contains("var S_T_App__Box = flickrt.ShapeOf(\"w\", \"h\", \"name\")"),
+        "{types}"
+    );
+    // the list of its one field is kept in the value: none is made where the runtime asks
+    assert!(
+        types.contains("func (p *T_App__Box) Fields() []flickrt.Value { return p.self[:] }"),
         "{types}"
     );
     // a literal gives its values to their places, whatever order it writes them in
