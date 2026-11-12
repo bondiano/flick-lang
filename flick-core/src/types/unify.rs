@@ -326,7 +326,7 @@ impl Store {
             entries.extend(inner.entries);
             tail = inner.tail.map(|t| *t);
         }
-        entries.sort_by(|a, b| a.0.cmp(&b.0));
+        Row::sort_entries(&mut entries);
         entries.dedup();
         Row {
             entries,
@@ -341,7 +341,7 @@ impl Store {
     pub fn normalize(&self, t: &Type) -> Norm {
         let mut norm = Norm::default();
         self.collect_row(t, &mut norm);
-        norm.entries.sort_by(|a, b| a.0.cmp(&b.0));
+        Row::sort_entries(&mut norm.entries);
         // the same name with other arguments stays, for unification to compare
         norm.entries.dedup();
         norm

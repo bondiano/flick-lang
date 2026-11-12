@@ -182,7 +182,7 @@ impl Checker<'_> {
     pub fn captures_of(&self, t: &Type) -> Norm {
         let mut out = Norm::default();
         self.collect_captures(t, &mut out);
-        out.entries.sort_by(|a, b| a.0.cmp(&b.0));
+        out.sort();
         out.entries.dedup_by(|a, b| a.0 == b.0);
         out
     }
@@ -339,7 +339,7 @@ impl Checker<'_> {
     /// entries, so `{s | c}` and `{s, c}` are the same set.
     pub fn capture_row(&self, row: &Type, out: &mut Norm) {
         self.capture_row_filtered(row, out, false, &mut Vec::new());
-        out.entries.sort_by(|a, b| a.0.cmp(&b.0));
+        out.sort();
         out.entries.dedup_by(|a, b| a.0 == b.0);
     }
 

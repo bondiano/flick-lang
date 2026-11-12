@@ -238,7 +238,7 @@ impl Checker<'_> {
                 _ => {}
             }
         }
-        entries.sort_by(|a, b| a.0.cmp(&b.0));
+        Row::sort_entries(&mut entries);
         Row {
             entries,
             tail,

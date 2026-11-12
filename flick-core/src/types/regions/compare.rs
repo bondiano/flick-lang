@@ -104,7 +104,7 @@ impl Checker<'_> {
                 other => self.collect_captures(&other, &mut out),
             }
         }
-        out.entries.sort_by(|a, b| a.0.cmp(&b.0));
+        out.sort();
         out.entries.dedup_by(|a, b| a.0 == b.0);
         out.tails.extend(norm.tails);
         out.into_type()

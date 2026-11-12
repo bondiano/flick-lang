@@ -33,7 +33,7 @@ impl Checker<'_> {
             out.entries.extend(captures.entries);
             out.tails.extend(captures.tails);
         }
-        out.entries.sort_by(|a, b| a.0.cmp(&b.0));
+        Row::sort_entries(&mut out.entries);
         out.entries.dedup_by(|a, b| a.0 == b.0);
         let late;
         let visible = match &hold.visible {
@@ -55,7 +55,7 @@ impl Checker<'_> {
     fn bound_of(&self, hold: &Hold) -> Norm {
         let mut out = Norm::default();
         self.capture_row(&hold.bound, &mut out);
-        out.entries.sort_by(|a, b| a.0.cmp(&b.0));
+        Row::sort_entries(&mut out.entries);
         out.entries.dedup_by(|a, b| a.0 == b.0);
         out
     }

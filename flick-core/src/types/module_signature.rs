@@ -66,7 +66,7 @@ fn map_module_children(ty: &Type, f: &mut dyn FnMut(&Type) -> Type) -> Type {
                 *key = Elem::Named(format!("{actual}.{member}"));
             }
         }
-        after.entries.sort_by(|a, b| a.0.cmp(&b.0));
+        after.sort();
     }
     mapped
 }
@@ -245,7 +245,7 @@ fn generalize_local_type(ty: &Type, module: &str, names: &[(String, bool)]) -> T
                 .expect("a bound row atom");
             }
         }
-        after.entries.sort_by(|a, b| a.0.cmp(&b.0));
+        after.sort();
     }
     mapped
 }

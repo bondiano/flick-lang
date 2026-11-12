@@ -248,8 +248,21 @@ pub struct Row {
 }
 
 impl Row {
-    pub fn closed(mut entries: Vec<(Elem, Type)>) -> Row {
+    /// Sorts the entries of a row by label. Every row is sorted here: a
+    /// sort is compiled once for each comparison it is given, and one
+    /// written in each place is some kilobytes of the same code each time.
+    #[inline(never)]
+    pub fn sort_entries(entries: &mut [(Elem, Type)]) {
         entries.sort_by(|a, b| a.0.cmp(&b.0));
+    }
+
+    /// Sorts the entries by label.
+    pub fn sort(&mut self) {
+        Row::sort_entries(&mut self.entries);
+    }
+
+    pub fn closed(mut entries: Vec<(Elem, Type)>) -> Row {
+        Row::sort_entries(&mut entries);
         Row {
             entries,
             tail: None,
@@ -275,6 +288,11 @@ pub struct Norm {
 }
 
 impl Norm {
+    /// Sorts the entries by label, as [`Row::sort_entries`] does.
+    pub fn sort(&mut self) {
+        Row::sort_entries(&mut self.entries);
+    }
+
     pub fn get(&self, label: &(impl Label + ?Sized)) -> Option<&Type> {
         self.entries
             .binary_search_by(|(l, _)| label.against(l))

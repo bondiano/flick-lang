@@ -68,7 +68,7 @@ fn parse_with_heads_mode<'t>(
         file,
         allow_trailing_attribute,
     ));
-    diagnostics.sort_by_key(|d| d.span.map(|s| (s.start, s.end)));
+    Diagnostic::sort_by_span(&mut diagnostics);
     Parse { tree, diagnostics }
 }
 
