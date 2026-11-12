@@ -10,6 +10,8 @@ import PubSub
 import Queue
 import Schedule
 
+@ts "$Stream.Stream<{2}, {1:row}, {0:row}>" rt "$Stream<{2}, {1:row}, {0:row}>"
+@ts import runtime "Stream" rt "StreamValue"
 @lang stream
 /// A description of a stream of `a` that needs `r` and fails with `e`.
 type Stream (r : ServiceRow) (e : ErrorRow) a

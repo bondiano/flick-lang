@@ -7,6 +7,7 @@ use super::cst::{Node, Token};
 use super::heads::CHECKED_BY;
 use super::kind::SyntaxKind as K;
 use super::patterns::{is_part, is_pattern};
+use super::ts_mark;
 use crate::diagnostics::{Diagnostic, codes};
 use crate::source::{FileId, Span};
 use crate::syntax::lang::Lang;
@@ -120,11 +121,20 @@ impl Validator<'_> {
     /// marks a type whose values hold one value each, `@label kind` one
     /// whose top-level values carry their names where the program runs,
     /// `@owner` a service whose handler owns what is made under it, `@sync`
-    /// one whose operations run at once, and `@implicit` a conversion
-    /// instance.
+    /// one whose operations run at once, `@ts` gives a type its TypeScript
+    /// form, and `@implicit` a conversion instance.
     fn attribute(&mut self, node: &Node, next: Option<K>) {
         let words: Vec<Token> = idents(node).collect();
         let message = match &words[..] {
+            [name, ..] if name.text(self.src) == "ts" => match ts_mark::read(node, self.src) {
+                Some(Err(why)) => why,
+                _ if matches!(next, Some(K::TypeDecl | K::ServiceDecl | K::Attribute))
+                    || (next.is_none() && self.allow_trailing_attribute) =>
+                {
+                    return;
+                }
+                _ => "`@ts` belongs before the declaration of a type or a service".to_owned(),
+            },
             [name] | [name, _] if name.text(self.src) == "derive" => return,
             [name] if name.text(self.src) == "maker" => return,
             [name, ..] if name.text(self.src) == "maker" => "`@maker` takes no argument".to_owned(),
@@ -198,7 +208,7 @@ impl Validator<'_> {
                 "`@derive` names at most the package of its plugin: `@derive std`".to_owned()
             }
             [name, ..] if name.text(self.src) != "lang" => format!(
-                "unknown attribute `@{}`: the attributes are `@lang`, `@derive`, `@maker`, `@cell`, `@label`, `@owner`, `@sync` and `@implicit`",
+                "unknown attribute `@{}`: the attributes are `@lang`, `@derive`, `@maker`, `@cell`, `@label`, `@owner`, `@sync`, `@ts` and `@implicit`",
                 name.text(self.src)
             ),
             [_, item] if Lang::from_name(item.text(self.src)).is_some() => return,

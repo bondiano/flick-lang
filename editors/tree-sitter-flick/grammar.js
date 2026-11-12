@@ -86,7 +86,7 @@ module.exports = grammar({
     _private_module: $ => seq(alias('private', $.keyword), alias('module', $.keyword)),
     _type_refinement_and: $ => seq(alias('and', $.keyword), alias('type', $.keyword)),
     boolean: _ => choice('true', 'false'),
-    // `@lang int`: the attribute's name; its arguments are plain identifiers
+    // `@lang int`: the attribute's name; its arguments are plain identifiers and strings
     attribute: _ => token(seq('@', /[a-z_][A-Za-z0-9_]*/)),
     operator: _ => choice(...OPERATORS),
 

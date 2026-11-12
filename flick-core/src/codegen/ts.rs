@@ -5,61 +5,33 @@
 //! reason, never written as `any`.
 
 use crate::effects::bindings;
-use std::cell::{Cell, RefCell};
+use std::cell::RefCell;
 use std::collections::{BTreeSet, HashMap};
 use std::fmt::Write;
 
 use super::names;
 use crate::iface::{Interface, Namespace};
+use crate::syntax::ts_mark::{Piece, Slot};
 use crate::types::lang::{self, Lang};
 use crate::types::{Elem, Form, Kind, ModuleRequirement, Type, TypeDef, passes_dictionary};
+use projections::{Import, Projected};
 
 /// The runtime package generated code imports.
 const EFFECT_RUNTIME: &str = bindings::ADAPTER_PREFIX;
 const FLICK_RUNTIME: &str = "@flick-lang/runtime/rt/types";
 
+/// The exports of the runtime the backend imports for what it writes
+/// itself, under `$` and these names.
+const OWN: [&str; 2] = ["Effect", "Result"];
+
 /// The runtime module whose `Ui` a Flick `Ui` value is.
 const EFFECT_RUNTIME_UI: &str = bindings::ADAPTER_UI;
 const FLICK_RUNTIME_UI: &str = "@flick-lang/runtime/rt/types";
 
-/// Built-in types TypeScript has natively.
-const PRIMITIVES: &[(Lang, &str)] = &[
-    (Lang::Int, "number"),
-    (Lang::Float, "number"),
-    (Lang::String, "string"),
-    (Lang::Bool, "boolean"),
-    (Lang::BigInt, "bigint"),
-    (Lang::Unit, "undefined"),
-    (Lang::Never, "never"),
-    (Lang::Unknown, "unknown"),
-    (Lang::Json, "unknown"),
-];
-
-/// Built-in types projected to native Effect or TypeScript types, or not at
-/// all; `Stream` is projected to the `Stream` of the Effect library.
-const NATIVE: &[Lang] = &[
-    Lang::List,
-    Lang::Option,
-    Lang::Result,
-    Lang::Eff,
-    Lang::Layer,
-    Lang::Errors,
-    Lang::ServiceTag,
-    Lang::ServiceImpl,
-    Lang::Scope,
-    Lang::Schema,
-    Lang::PureCodec,
-    Lang::Codec,
-    Lang::Ui,
-    Lang::Stream,
-];
-
-/// The built-in type `module.name` that is never declared, being native
-/// to TypeScript or Effect.
-fn native(module: &str, name: &str) -> Option<Lang> {
-    (PRIMITIVES.iter().map(|&(item, _)| item))
-        .chain(NATIVE.iter().copied())
-        .find(|&item| lang::is(item, module, name))
+/// The type `module.name` when a built-in module gives it a TypeScript form
+/// of its own, or says it has none: such a type is never declared.
+fn native(module: &str, name: &str) -> Option<&'static Projected> {
+    projections::find(module, name)
 }
 
 pub struct Projection<'a> {
@@ -70,8 +42,8 @@ pub struct Projection<'a> {
     pub package: &'a dyn Fn(&str) -> Option<String>,
     /// Other modules whose types are referenced.
     pub used: RefCell<BTreeSet<String>>,
-    /// Whether the runtime `Ui` is referenced.
-    ui: Cell<bool>,
+    /// The exports of the runtime the forms referenced name.
+    imported: RefCell<BTreeSet<Import>>,
     /// The projection of values compiled for Flick's own runtime.
     rt: bool,
 }
@@ -100,7 +72,7 @@ impl Projection<'_> {
             lookup,
             package,
             used: RefCell::new(BTreeSet::new()),
-            ui: Cell::new(false),
+            imported: RefCell::new(BTreeSet::new()),
             rt,
         }
     }
@@ -310,9 +282,8 @@ impl Projection<'_> {
         if let Some(shown) = self.module_or_dictionary(module, name, &args, vars)? {
             return Ok(shown);
         }
-        let seq = lang::is(Lang::Seq, module, name).then_some(Lang::Seq);
-        if let Some(item) = native(module, name).or(seq)
-            && let Some(projected) = self.native_applied(item, &args, vars, name)?
+        if let Some(form) = native(module, name)
+            && let Some(projected) = self.native_applied(form, &args, vars, name)?
         {
             return Ok(projected);
         }
@@ -475,17 +446,34 @@ impl Projection<'_> {
         } else {
             EFFECT_RUNTIME_UI
         };
+        // what the backend writes itself: the stages of functions, the
+        // results of runners and the tags of services
         let mut out = if self.rt {
             format!(
-                "import type {{ EffectValue as $Effect, OptionValue as $Option, ResultValue as $Result, LayerValue as $Layer, SchemaValue as $Schema, StreamValue as $Stream, ServiceValue as $Service }} from \"{runtime}\";\n"
+                "import type {{ EffectValue as $Effect, ResultValue as $Result, ServiceValue as $Service }} from \"{runtime}\";\n"
             )
         } else {
             format!(
-                "import type {{ Effect as $Effect, Option as $Option, Result as $Result, Layer as $Layer, Schema as $Schema, Stream as $Stream, Context as $Context }} from \"{runtime}\";\n"
+                "import type {{ Effect as $Effect, Result as $Result, Context as $Context }} from \"{runtime}\";\n"
             )
         };
-        if self.ui.get() {
-            let _ = writeln!(out, "import type {{ Ui as $Ui }} from \"{runtime_ui}\";");
+        // and what the forms of the types named, each slot on a line
+        let imported = self.imported.borrow();
+        for (slot, from) in [(Slot::Runtime, runtime), (Slot::Ui, runtime_ui)] {
+            let names: Vec<String> = (imported.iter())
+                .filter(|i| i.slot == slot && !OWN.contains(&i.effect.as_str()))
+                .map(|i| {
+                    let export = if self.rt { &i.rt } else { &i.effect };
+                    format!("{export} as ${}", i.effect)
+                })
+                .collect();
+            if !names.is_empty() {
+                let _ = writeln!(
+                    out,
+                    "import type {{ {} }} from \"{from}\";",
+                    names.join(", ")
+                );
+            }
         }
         for module in self.used.borrow().iter() {
             let _ = writeln!(
@@ -501,5 +489,6 @@ impl Projection<'_> {
 
 include!("ts/helpers.rs");
 mod native;
+mod projections;
 #[cfg(test)]
 mod tests;

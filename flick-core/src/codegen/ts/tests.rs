@@ -216,7 +216,8 @@ fn ui_is_the_runtime_ui_imported_only_where_used() {
         projection.value(&types::Type::lang(Lang::Float)),
         Ok("number".to_owned())
     );
-    assert!(!projection.imports(&path).contains("$Ui"));
+    let unused = projection.imports(&path);
+    assert!(!unused.contains("$Ui") && !unused.contains("$Option"));
     let view = types::Type::pure_fun(types::Type::lang(Lang::Bool), types::Type::lang(Lang::Ui));
     assert_eq!(
         projection.value(&view),

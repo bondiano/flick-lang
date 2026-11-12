@@ -301,6 +301,10 @@ exported values with their projected types (see [Public TypeScript interfaces](.
 | `forall a.` | a generic `<A>`; a polymorphic constant uses `never` |
 | `forall a b. a -> b -> …` | each type parameter on the first stage that takes it: `<A>(arg: A) => <B>(arg: B) => …`, so a later argument infers its own |
 
+The form of a built-in type is written where the type is declared, as
+`@ts "ReadonlyArray<{0}>"` before `type List a`; a generated module imports
+from the runtime only the types its declarations name.
+
 `--emit-dts` (or `emit-dts = true`) writes `A/B.d.ts` beside each module: the
 same declarations, `export declare const` for every exported value and
 constructor, and the dictionary of each instance without a context. An export
