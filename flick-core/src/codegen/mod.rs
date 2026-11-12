@@ -107,4 +107,6 @@ pub struct Output {
 }
 
 #[cfg(test)]
+mod pattern_tests;
+#[cfg(test)]
 mod tests;
