@@ -1,0 +1,12 @@
+// A region another argument fixes is no longer open: a callback that holds
+// another region does not fit it.
+module App.OpenRegionPinned exposing (..)
+
+type Tag (s : Region)
+
+pinned : Tag c -> (Float -> Float)^{c} -> Float
+let pinned _ f = f 1.0
+
+wrong : Tag y -> (Float -> Float)^{x} -> Float
+let wrong t g = pinned t g
+//~ FLICK-G001 @11:26-11:27 this value holds `x`, but the expected type `(Float -> Float)^{y}` allows only `y`
