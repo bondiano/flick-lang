@@ -63,58 +63,33 @@ impl<'a> Foreign<'a> {
         }
     }
 
-    /// The parameters and body of `name` of `module` when it is small:
-    /// inlining it makes the module no bigger.
-    fn small(&self, module: &str, name: &str) -> Option<Inlined> {
-        let key = (module.to_owned(), name.to_owned());
-        if let Some(found) = self.found.borrow().get(&key) {
-            return found.clone();
-        }
-        let builtin = builtins().iter().any(|i| i.module == module);
-        let found = builtin.then(|| (self.generics)(module, name)).flatten();
-        let found = found.and_then(|(dicts, body)| {
-            let ExprKind::Lambda { params, body } = body.kind else {
-                return None;
-            };
-            let small = dicts.is_empty()
-                && params
-                    .iter()
-                    .all(|p| p.stage == Stage::Pure && simple(&p.pat))
-                && size(&body) <= SMALL
-                && inlinable(&body)
-                && !calls(&body, module, name);
-            small.then_some((params, *body))
-        });
-        self.found.borrow_mut().insert(key, found.clone());
-        found
-    }
-}
-
-impl Foreign<'_> {
     /// The parameters and body of `name` of a built-in `module` when it is
-    /// plain pure code of a few nodes that may choose with a `match`: bigger
-    /// than its call, so inlined only where an object is spared.
-    fn shaped(&self, module: &str, name: &str) -> Option<Inlined> {
+    /// plain pure code no bigger than `budget`, with a `match` only when
+    /// `choosing`: small, it is inlined at every call, as that makes the
+    /// module no bigger; one that chooses what it gives is bigger than its
+    /// call, and inlined only where that spares an object.
+    fn body(&self, module: &str, name: &str, choosing: bool) -> Option<Inlined> {
+        let cache = if choosing { &self.shaped } else { &self.found };
         let key = (module.to_owned(), name.to_owned());
-        if let Some(found) = self.shaped.borrow().get(&key) {
+        if let Some(found) = cache.borrow().get(&key) {
             return found.clone();
         }
-        let builtin = builtins().iter().any(|i| i.module == module);
-        let found = builtin.then(|| (self.generics)(module, name)).flatten();
-        let found = found.and_then(|(dicts, body)| {
-            let ExprKind::Lambda { params, body } = body.kind else {
-                return None;
-            };
-            let shaped = dicts.is_empty()
-                && params
-                    .iter()
-                    .all(|p| p.stage == Stage::Pure && simple(&p.pat))
-                && size(&body) <= SHAPED
-                && plain(&body, true)
-                && !calls(&body, module, name);
-            shaped.then_some((params, *body))
-        });
-        self.shaped.borrow_mut().insert(key, found.clone());
+        let budget = if choosing { SHAPED } else { SMALL };
+        let mut found = None;
+        if builtins().iter().any(|i| i.module == module)
+            && let Some((dicts, body)) = (self.generics)(module, name)
+            && let ExprKind::Lambda { params, body } = body.kind
+            && dicts.is_empty()
+            && params
+                .iter()
+                .all(|p| p.stage == Stage::Pure && simple(&p.pat))
+            && size(&body) <= budget
+            && plain(&body, choosing)
+            && !calls(&body, module, name)
+        {
+            found = Some((params, *body));
+        }
+        cache.borrow_mut().insert(key, found.clone());
         found
     }
 }
@@ -301,7 +276,7 @@ fn full_application(
     let function = if m == module {
         candidates.get(name).cloned()?
     } else {
-        foreign.small(m, name)?
+        foreign.body(m, name, false)?
     };
     (args.len() == function.0.len()).then(|| Applied {
         function,
@@ -499,7 +474,7 @@ fn shape(
     let Some((module, name, args, piped)) = applied_global(e) else {
         return false;
     };
-    let Some((params, mut body)) = foreign.shaped(module, name) else {
+    let Some((params, mut body)) = foreign.body(module, name, true) else {
         return false;
     };
     if args.len() != params.len() {

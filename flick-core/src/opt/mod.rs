@@ -112,6 +112,7 @@ fn pass(e: &mut Expr) -> bool {
     let mut changed = false;
     e.each_child_mut(&mut |c| changed |= pass(c));
     changed |= specialize::operator(e) | fold::fold(e) | inline::beta(e) | devirt::known_match(e);
+    changed |= known::named_again(e);
     if let ExprKind::Block(stmts, result) = &mut e.kind {
         changed |= devirt::known_lets(stmts);
         changed |= known::scrutinees(stmts, result);

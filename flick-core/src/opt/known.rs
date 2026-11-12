@@ -7,10 +7,12 @@
 //!
 //! [`devirt::known_match`]: super::devirt::known_match
 
+use std::collections::HashMap;
 use std::mem;
 
 use super::devirt::{built, matches};
 use super::walk::{applied, rename, size, uses};
+use super::{atom, place};
 use crate::ir::{Arm, Expr, ExprKind, Lit, Pat, Stage, Stmt};
 use crate::source::Span;
 
@@ -39,6 +41,32 @@ pub fn scrutinees(stmts: &mut [Stmt], result: &mut Expr) -> bool {
             }
         }
         changed |= given(result, &name, &value);
+    }
+    changed
+}
+
+/// `match n with | m when … -> …`: an arm that only names what is taken
+/// apart, itself a name or a literal, reads it as it is written there. No
+/// second name stands for the same value. Whether an arm lost its name.
+pub fn named_again(e: &mut Expr) -> bool {
+    let ExprKind::Match(scrutinee, arms) = &mut e.kind else {
+        return false;
+    };
+    if !atom(scrutinee) {
+        return false;
+    }
+    let mut changed = false;
+    for arm in arms {
+        let Pat::Bind(name) = &arm.pat else {
+            continue;
+        };
+        let mut reads = HashMap::from([(name.clone(), (**scrutinee).clone())]);
+        if let Some(guard) = &mut arm.guard {
+            place(guard, &mut reads);
+        }
+        place(&mut arm.body, &mut reads);
+        arm.pat = Pat::Wild;
+        changed = true;
     }
     changed
 }
@@ -260,16 +288,17 @@ fn described(pat: &Pat, span: Span) -> Option<Expr> {
     match pat {
         Pat::Bind(name) => Some(Expr::new(ExprKind::Local(name.clone()), span)),
         Pat::Con(c, parts) => {
-            let head = Expr::new(ExprKind::Con(c.clone()), span);
-            parts.iter().try_fold(head, |f, part| {
+            let mut data = Expr::new(ExprKind::Con(c.clone()), span);
+            for part in parts {
                 let app = ExprKind::App {
-                    func: Box::new(f),
+                    func: Box::new(data),
                     arg: Box::new(described(part, span)?),
                     stage: Stage::Pure,
                     arg_first: false,
                 };
-                Some(Expr::new(app, span))
-            })
+                data = Expr::new(app, span);
+            }
+            Some(data)
         }
         _ => None,
     }

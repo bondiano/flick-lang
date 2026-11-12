@@ -76,3 +76,16 @@ fn a_combinator_is_inlined_only_where_that_spares_an_object() {
     assert!(!kept.contains("$m_Option.map"), "{js}");
     assert!(passed.contains("$m_Option.map"), "{js}");
 }
+
+/// An arm that names the value taken apart reads it by the name it has.
+#[test]
+fn an_arm_gives_no_second_name_to_what_is_taken_apart() {
+    let js = release(
+        "module App exposing (fizzbuzz)\n\n\
+         fizzbuzz : Int -> String\nlet fizzbuzz n =\n  match n with\n  \
+         | n when n % 15 == 0 -> \"FizzBuzz\"\n  | n when n % 3 == 0 -> \"Fizz\"\n  | n -> show n\n",
+    );
+    assert!(js.contains("if ($rt.remInt(n, 15) === 0) {"), "{js}");
+    assert!(js.contains("if ($rt.remInt(n, 3) === 0) {"), "{js}");
+    assert!(!js.contains("n$") && !js.contains("  const "), "{js}");
+}
